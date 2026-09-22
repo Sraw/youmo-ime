@@ -8,14 +8,13 @@ import android.graphics.Rect
 import android.view.View
 import android.view.ViewGroup
 import android.widget.FrameLayout
-import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.input.broadcast.PunctuationComponent
 import org.fcitx.fcitx5.android.input.dependency.context
-import org.fcitx.fcitx5.android.input.dependency.inputMethodService
+import org.fcitx.fcitx5.android.input.dependency.imeScope
 import org.fcitx.fcitx5.android.input.dependency.theme
 import org.fcitx.fcitx5.android.input.keyboard.KeyAction
 import org.fcitx.fcitx5.android.input.keyboard.KeyDef
@@ -33,7 +32,7 @@ import java.util.LinkedList
 class PopupComponent :
     UniqueComponent<PopupComponent>(), Dependent, ManagedHandler by managedHandler() {
 
-    private val service by manager.inputMethodService()
+    private val imeScope by manager.imeScope()
     private val context by manager.context()
     private val theme by manager.theme()
     private val punctuation: PunctuationComponent by manager.must()
@@ -190,7 +189,7 @@ class PopupComponent :
             if (timeLeft <= 0L) {
                 dismissPopupEntry(viewId, it)
             } else {
-                dismissJobs[viewId] = service.lifecycleScope.launch {
+                dismissJobs[viewId] = imeScope.launch {
                     delay(timeLeft)
                     dismissPopupEntry(viewId, it)
                     dismissJobs.remove(viewId)

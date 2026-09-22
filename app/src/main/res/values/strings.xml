@@ -321,4 +321,24 @@
     <string name="keyboard_height_percent_base">Keyboard height percent base</string>
     <string name="display_metrics">Display metrics (Resources.getDisplayMetrics)</string>
     <string name="real_size">Real size (Display.getRealSize)</string>
+
+    <!-- Accessibility labels for icon-only controls. These are announced by screen readers,
+         and are also what UI automation uses to find a control, so they must stay unique and
+         descriptive. Keys that show text do not need one: their label is already announced. -->
+    <string name="a11y_key_shift">Shift</string>
+    <string name="a11y_key_shift_once">Shift, on for one letter</string>
+    <string name="a11y_key_shift_lock">Caps lock</string>
+    <string name="a11y_key_backspace">Backspace</string>
+    <string name="a11y_key_enter">Enter</string>
+    <string name="a11y_key_space">Space</string>
+    <string name="a11y_key_quick_phrase">Quick phrase</string>
+    <string name="a11y_key_switch_language">Switch language</string>
+    <string name="a11y_key_switch_layout">Switch keyboard layout</string>
+    <string name="a11y_key_switch_picker">Symbols and emoji</string>
+    <string name="a11y_key_number_pad">Number pad</string>
+    <string name="a11y_key_emoji">Emoji</string>
+    <string name="a11y_candidates_prev_page">Previous candidates</string>
+    <string name="a11y_candidates_next_page">More candidates</string>
+    <string name="a11y_add_item">Add</string>
+    <string name="a11y_copy">Copy</string>
 </resources>

@@ -4,15 +4,6 @@
  */
 package org.fcitx.fcitx5.android.core
 
-import android.graphics.Typeface.BOLD
-import android.graphics.Typeface.ITALIC
-import android.text.Spanned.SPAN_INCLUSIVE_EXCLUSIVE
-import android.text.style.BackgroundColorSpan
-import android.text.style.StrikethroughSpan
-import android.text.style.StyleSpan
-import android.text.style.UnderlineSpan
-import androidx.core.text.buildSpannedString
-import splitties.bitflags.hasFlag
 
 /**
  * translated from
@@ -28,7 +19,7 @@ enum class TextFormatFlag(val flag: Int) {
     Italic(1 shl 8)
 }
 
-fun Int.hasFlag(flag: TextFormatFlag) = hasFlag(flag.flag)
+fun Int.hasFlag(flag: TextFormatFlag) = this and flag.flag == flag.flag
 
 data class FormattedText(
     val strings: Array<String>,
@@ -83,32 +74,6 @@ data class FormattedText(
     fun isEmpty() = strings.all { it.isEmpty() }
 
     fun isNotEmpty() = strings.any { it.isNotEmpty() }
-
-    fun toSpannedString(highlightColor: Int) = buildSpannedString {
-        for (i in strings.indices) {
-            val str = strings[i]
-            val fmt = flags[i]
-            val start = length
-            append(str)
-            if (fmt == TextFormatFlag.NoFlag.flag) continue
-            val end = length
-            if (fmt.hasFlag(TextFormatFlag.Underline)) {
-                setSpan(UnderlineSpan(), start, end, SPAN_INCLUSIVE_EXCLUSIVE)
-            }
-            if (fmt.hasFlag(TextFormatFlag.HighLight)) {
-                setSpan(BackgroundColorSpan(highlightColor), start, end, SPAN_INCLUSIVE_EXCLUSIVE)
-            }
-            if (fmt.hasFlag(TextFormatFlag.Bold)) {
-                setSpan(StyleSpan(BOLD), start, end, SPAN_INCLUSIVE_EXCLUSIVE)
-            }
-            if (fmt.hasFlag(TextFormatFlag.Strike)) {
-                setSpan(StrikethroughSpan(), start, end, SPAN_INCLUSIVE_EXCLUSIVE)
-            }
-            if (fmt.hasFlag(TextFormatFlag.Italic)) {
-                setSpan(StyleSpan(ITALIC), start, end, SPAN_INCLUSIVE_EXCLUSIVE)
-            }
-        }
-    }
 
     /**
      * Returns the number of Unicode code points until specified index of this FormattedText.

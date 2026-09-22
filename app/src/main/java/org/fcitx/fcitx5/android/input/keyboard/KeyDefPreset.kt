@@ -6,6 +6,7 @@ package org.fcitx.fcitx5.android.input.keyboard
 
 import android.graphics.Typeface
 import androidx.annotation.DrawableRes
+import androidx.annotation.StringRes
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.core.FcitxKeyMapping
 import org.fcitx.fcitx5.android.core.KeyState
@@ -98,7 +99,9 @@ class CapsKey : KeyDef(
         src = R.drawable.ic_capslock_none,
         viewId = R.id.button_caps,
         percentWidth = 0.15f,
-        variant = Variant.Alternative
+        variant = Variant.Alternative,
+        // updated to the state-specific label by TextKeyboard.updateCapsButtonIcon
+        contentDescription = R.string.a11y_key_shift
     ),
     setOf(
         Behavior.Press(KeyAction.CapsAction(false)),
@@ -134,7 +137,8 @@ class BackspaceKey(
         percentWidth = percentWidth,
         variant = variant,
         viewId = R.id.button_backspace,
-        soundEffect = InputFeedbacks.SoundEffect.Delete
+        soundEffect = InputFeedbacks.SoundEffect.Delete,
+        contentDescription = R.string.a11y_key_backspace
     ),
     setOf(
         Behavior.Press(KeyAction.SymAction(KeySym(FcitxKeyMapping.FcitxKey_BackSpace))),
@@ -146,7 +150,8 @@ class QuickPhraseKey : KeyDef(
     Appearance.Image(
         src = R.drawable.ic_baseline_format_quote_24,
         variant = Variant.Alternative,
-        viewId = R.id.button_quickphrase
+        viewId = R.id.button_quickphrase,
+        contentDescription = R.string.a11y_key_quick_phrase
     ),
     setOf(
         Behavior.Press(KeyAction.QuickPhraseAction),
@@ -196,7 +201,8 @@ class LanguageKey : KeyDef(
     Appearance.Image(
         src = R.drawable.ic_baseline_language_24,
         variant = Variant.AltForeground,
-        viewId = R.id.button_lang
+        viewId = R.id.button_lang,
+        contentDescription = R.string.a11y_key_switch_language
     ),
     setOf(
         Behavior.Press(KeyAction.LangSwitchAction),
@@ -211,7 +217,12 @@ class SpaceKey : KeyDef(
         percentWidth = 0f,
         border = Border.Special,
         viewId = R.id.button_space,
-        soundEffect = InputFeedbacks.SoundEffect.SpaceBar
+        soundEffect = InputFeedbacks.SoundEffect.SpaceBar,
+        // displayText is a single space; without this the key is unlabelled. Note the trade-off:
+        // TalkBack speaks a focusable parent's description instead of its children's text, so
+        // the input method name drawn on the bar is no longer announced. UI automation still
+        // sees it as the inner TextView's node.
+        contentDescription = R.string.a11y_key_space
     ),
     setOf(
         Behavior.Press(KeyAction.SymAction(KeySym(FcitxKeyMapping.FcitxKey_space))),
@@ -226,7 +237,8 @@ class ReturnKey(percentWidth: Float = 0.15f) : KeyDef(
         variant = Variant.Accent,
         border = Border.Special,
         viewId = R.id.button_return,
-        soundEffect = InputFeedbacks.SoundEffect.Return
+        soundEffect = InputFeedbacks.SoundEffect.Return,
+        contentDescription = R.string.a11y_key_enter
     ),
     setOf(
         Behavior.Press(KeyAction.SymAction(KeySym(FcitxKeyMapping.FcitxKey_Return)))
@@ -248,13 +260,15 @@ class ImageLayoutSwitchKey(
     to: String,
     percentWidth: Float = 0.1f,
     variant: Variant = Variant.AltForeground,
-    viewId: Int = -1
+    viewId: Int = -1,
+    @StringRes contentDescription: Int = R.string.a11y_key_switch_layout
 ) : KeyDef(
     Appearance.Image(
         src = icon,
         percentWidth = percentWidth,
         variant = variant,
-        viewId = viewId
+        viewId = viewId,
+        contentDescription = contentDescription
     ),
     setOf(
         Behavior.Press(KeyAction.LayoutSwitchAction(to))
@@ -267,13 +281,15 @@ class ImagePickerSwitchKey(
     to: PickerWindow.Key,
     percentWidth: Float = 0.1f,
     variant: Variant = Variant.AltForeground,
-    viewId: Int = -1
+    viewId: Int = -1,
+    @StringRes contentDescription: Int = R.string.a11y_key_switch_picker
 ) : KeyDef(
     Appearance.Image(
         src = icon,
         percentWidth = percentWidth,
         variant = variant,
-        viewId = viewId
+        viewId = viewId,
+        contentDescription = contentDescription
     ),
     setOf(
         Behavior.Press(KeyAction.PickerSwitchAction(to))
@@ -305,7 +321,8 @@ class MiniSpaceKey : KeyDef(
         src = R.drawable.ic_baseline_space_bar_24,
         percentWidth = 0.15f,
         variant = Variant.Alternative,
-        viewId = R.id.button_mini_space
+        viewId = R.id.button_mini_space,
+        contentDescription = R.string.a11y_key_space
     ),
     setOf(
         Behavior.Press(KeyAction.SymAction(KeySym(FcitxKeyMapping.FcitxKey_space)))

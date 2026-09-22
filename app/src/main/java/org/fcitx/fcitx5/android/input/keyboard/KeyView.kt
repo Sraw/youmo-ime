@@ -117,6 +117,12 @@ abstract class KeyView(ctx: Context, val theme: Theme, val def: KeyDef.Appearanc
         if (def.viewId > 0) {
             id = def.viewId
         }
+        // Set on the touch target, not on the inner ImageView/TextView: those are decoration
+        // with isClickable = false, so a screen reader would announce a label that belongs to
+        // a node the user cannot activate.
+        if (def.contentDescription != 0) {
+            contentDescription = context.getString(def.contentDescription)
+        }
         // key border
         if ((bordered && def.border != Border.Off) || def.border == Border.On) {
             val bkgColor = when (def.variant) {

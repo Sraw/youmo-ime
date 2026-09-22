@@ -55,7 +55,8 @@ class ExpandedCandidateLayout(context: Context, theme: Theme) : ConstraintLayout
                         to = UpBtnLabel,
                         percentWidth = 1f,
                         variant = KeyDef.Appearance.Variant.Alternative,
-                        viewId = UpBtnId
+                        viewId = UpBtnId,
+                        contentDescription = R.string.a11y_candidates_prev_page
                     )
                 ),
                 listOf(
@@ -64,7 +65,8 @@ class ExpandedCandidateLayout(context: Context, theme: Theme) : ConstraintLayout
                         to = DownBtnLabel,
                         percentWidth = 1f,
                         variant = KeyDef.Appearance.Variant.Alternative,
-                        viewId = DownBtnId
+                        viewId = DownBtnId,
+                        contentDescription = R.string.a11y_candidates_next_page
                     )
                 ),
                 listOf(BackspaceKey(percentWidth = 1f, KeyDef.Appearance.Variant.Alternative)),

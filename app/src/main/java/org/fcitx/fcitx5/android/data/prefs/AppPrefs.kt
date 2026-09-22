@@ -440,6 +440,17 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
             sharedPreferences.registerOnSharedPreferenceChangeListener(getInstance().onSharedPreferenceChangeListener)
         }
 
-        fun getInstance() = instance!!
+        /**
+         * Fails with an explanation rather than a bare NPE.
+         *
+         * Many classes read a preference in their initialiser, so a test that touches one of
+         * them transitively blows up here. The message says what to do: `AppPrefs.init()` with
+         * a `SharedPreferences` -- a relaxed mock is enough, nothing reads a real stored value.
+         */
+        fun getInstance(): AppPrefs = instance
+            ?: error(
+                "AppPrefs has not been initialised. FcitxApplication.onCreate does this on " +
+                        "device; a unit test must call AppPrefs.init(sharedPreferences) itself."
+            )
     }
 }

@@ -19,6 +19,7 @@ dependencyResolutionManagement {
 rootProject.name = "fcitx5-android"
 
 include(":lib:common")
+include(":lib:ime-core")
 include(":lib:fcitx5")
 include(":lib:fcitx5-lua")
 include(":lib:libime")

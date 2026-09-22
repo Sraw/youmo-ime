@@ -10,7 +10,6 @@ import android.widget.PopupMenu
 import android.widget.Toast
 import androidx.core.text.buildSpannedString
 import androidx.core.text.color
-import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.launch
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.core.Action
@@ -19,11 +18,10 @@ import org.fcitx.fcitx5.android.daemon.FcitxConnection
 import org.fcitx.fcitx5.android.daemon.launchOnReady
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
-import org.fcitx.fcitx5.android.input.FcitxInputMethodService
 import org.fcitx.fcitx5.android.input.bar.ui.ToolButton
 import org.fcitx.fcitx5.android.input.broadcast.InputBroadcastReceiver
 import org.fcitx.fcitx5.android.input.dependency.fcitx
-import org.fcitx.fcitx5.android.input.dependency.inputMethodService
+import org.fcitx.fcitx5.android.input.dependency.imeScope
 import org.fcitx.fcitx5.android.input.dependency.theme
 import org.fcitx.fcitx5.android.input.editorinfo.EditorInfoWindow
 import org.fcitx.fcitx5.android.input.status.StatusAreaEntry.Android.Type.InputMethod
@@ -48,7 +46,7 @@ import splitties.views.recyclerview.gridLayoutManager
 class StatusAreaWindow : InputWindow.ExtendedInputWindow<StatusAreaWindow>(),
     InputBroadcastReceiver {
 
-    private val service: FcitxInputMethodService by manager.inputMethodService()
+    private val imeScope by manager.imeScope()
     private val fcitx: FcitxConnection by manager.fcitx()
     private val theme by manager.theme()
     private val windowManager: InputWindowManager by manager.must()
@@ -146,8 +144,8 @@ class StatusAreaWindow : InputWindow.ExtendedInputWindow<StatusAreaWindow>(),
                             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
                                 SubtypeManager.syncWith(f.enabledIme())
                             }
-                            service.lifecycleScope.launch {
-                                Toast.makeText(service, R.string.done, Toast.LENGTH_SHORT).show()
+                            imeScope.launch {
+                                Toast.makeText(context, R.string.done, Toast.LENGTH_SHORT).show()
                             }
                         }
                         Keyboard -> AppUtil.launchMainToKeyboard(context)
@@ -209,7 +207,7 @@ class StatusAreaWindow : InputWindow.ExtendedInputWindow<StatusAreaWindow>(),
     override fun onAttached() {
         fcitx.launchOnReady {
             val data = it.statusArea()
-            service.lifecycleScope.launch {
+            imeScope.launch {
                 onStatusAreaUpdate(data)
             }
         }

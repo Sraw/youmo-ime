@@ -45,6 +45,7 @@ class EditorInfoWindow : InputWindow.ExtendedInputWindow<EditorInfoWindow>() {
 
     private val copyButton by lazy {
         ToolButton(context, R.drawable.ic_baseline_content_copy_24, theme).apply {
+            contentDescription = context.getString(R.string.a11y_copy)
             setOnClickListener {
                 val clipData = ClipData.newPlainText("", buildMarkdownString())
                 context.clipboardManager.setPrimaryClip(clipData)

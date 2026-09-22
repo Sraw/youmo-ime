@@ -18,9 +18,6 @@ import org.fcitx.fcitx5.android.input.dependency.fcitx
 import org.fcitx.fcitx5.android.input.dependency.inputMethodService
 import org.fcitx.fcitx5.android.input.dialog.AddMoreInputMethodsPrompt
 import org.fcitx.fcitx5.android.input.dialog.InputMethodPickerDialog
-import org.fcitx.fcitx5.android.input.keyboard.CommonKeyActionListener.BackspaceSwipeState.Reset
-import org.fcitx.fcitx5.android.input.keyboard.CommonKeyActionListener.BackspaceSwipeState.Selection
-import org.fcitx.fcitx5.android.input.keyboard.CommonKeyActionListener.BackspaceSwipeState.Stopped
 import org.fcitx.fcitx5.android.input.keyboard.KeyAction.CommitAction
 import org.fcitx.fcitx5.android.input.keyboard.KeyAction.DeleteSelectionAction
 import org.fcitx.fcitx5.android.input.keyboard.KeyAction.FcitxKeyAction
@@ -44,10 +41,6 @@ import org.mechdancer.dependency.manager.must
 class CommonKeyActionListener :
     UniqueComponent<CommonKeyActionListener>(), Dependent, ManagedHandler by managedHandler() {
 
-    enum class BackspaceSwipeState {
-        Stopped, Selection, Reset
-    }
-
     private val context by manager.context()
     private val fcitx by manager.fcitx()
     private val service by manager.inputMethodService()
@@ -62,7 +55,7 @@ class CommonKeyActionListener :
     private val spaceKeyLongPressBehavior by kbdPrefs.spaceKeyLongPressBehavior
     private val langSwitchKeyBehavior by kbdPrefs.langSwitchKeyBehavior
 
-    private var backspaceSwipeState = Stopped
+    private val backspaceSwipe = BackspaceSwipeBehavior()
 
     // there should be a new fcitx API for this
     private suspend fun FcitxAPI.commitAndReset() {
@@ -133,40 +126,29 @@ class CommonKeyActionListener :
                 }
                 is ShowInputMethodPickerAction -> showInputMethodPicker()
                 is MoveSelectionAction -> {
-                    when (backspaceSwipeState) {
-                        Stopped -> {
-                            backspaceSwipeState = if (
-                                preeditState.isEmpty &&
-                                horizontalCandidate.adapter.total <= 0 // total is -1 on initialization
-                            ) {
-                                service.applySelectionOffset(action.start, action.end)
-                                Selection
-                            } else {
-                                Reset
-                            }
-                        }
-                        Selection -> {
+                    // `total` is -1 until the candidate list has been populated once
+                    val composing = !preeditState.isEmpty || horizontalCandidate.adapter.total > 0
+                    when (backspaceSwipe.onMove(composing)) {
+                        BackspaceSwipeBehavior.MoveEffect.ExtendSelection ->
                             service.applySelectionOffset(action.start, action.end)
-                        }
-                        Reset -> {}
+                        BackspaceSwipeBehavior.MoveEffect.None -> {}
                     }
                 }
                 is DeleteSelectionAction -> {
-                    when (backspaceSwipeState) {
-                        Stopped -> {}
-                        Selection -> service.deleteSelection()
-                        Reset -> if (action.totalCnt < 0) { // swipe left
+                    when (backspaceSwipe.onRelease(action.totalCnt)) {
+                        BackspaceSwipeBehavior.ReleaseEffect.DeleteSelection ->
+                            service.deleteSelection()
+                        BackspaceSwipeBehavior.ReleaseEffect.ResetComposition ->
                             service.postFcitxJob { reset() }
-                        }
+                        BackspaceSwipeBehavior.ReleaseEffect.None -> {}
                     }
-                    backspaceSwipeState = Stopped
                 }
                 is PickerSwitchAction -> {
                     // update lastSymbolType only when specified explicitly
                     val key = action.key?.also { k -> lastPickerType = k.name }
                         ?: runCatching { PickerWindow.Key.valueOf(lastPickerType) }.getOrNull()
                         ?: PickerWindow.Key.Emoji
-                    ContextCompat.getMainExecutor(service).execute {
+                    ContextCompat.getMainExecutor(context).execute {
                         windowManager.attachWindow(key)
                     }
                 }

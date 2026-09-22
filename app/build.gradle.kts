@@ -56,6 +56,23 @@ android {
         @Suppress("UnstableApiUsage")
         generateLocaleConfig = true
     }
+
+    testOptions {
+        unitTests {
+            // don't blow up with `RuntimeException: Stub!` when a test incidentally reaches
+            // an android.jar stub; Robolectric handles the cases that need real behaviour
+            isReturnDefaultValues = true
+            // ...which also means a plain JVM test that touches the framework gets false/0/null
+            // back and can pass for the wrong reason. Logic belongs in :lib:ime-core; anything
+            // that genuinely needs the framework should run under Robolectric.
+            // NOTE: intentionally left off. Turning it on makes :app:test depend on the
+            // merged-assets pipeline, which drags in the fcitx-component CMake install tasks;
+            // those fail outside a native build with "Cannot query ... property 'cxxAbiModel'".
+            // Consequence: Robolectric tests can use the framework but not the app's own
+            // resources (no R.string lookups). See dev/ISSUES.md #4.
+            isIncludeAndroidResources = false
+        }
+    }
 }
 
 fcitxComponent {
@@ -72,11 +89,22 @@ fcitxComponent {
     installPrebuiltAssets = true
 }
 
+androidComponents {
+    onVariants { variant ->
+        // The build type's resValue entries (app_icon, app_name) point at launcher
+        // resources that live in the app's own resource set. AGP copies them into the
+        // androidTest APK too, where those references cannot be resolved and resource
+        // linking fails. The test APK has no launcher, so just drop them there.
+        variant.androidTest?.resValues?.empty()
+    }
+}
+
 ksp {
     arg("room.schemaLocation", "$projectDir/schemas")
 }
 
 dependencies {
+    api(project(":lib:ime-core"))
     ksp(project(":codegen"))
     implementation(project(":lib:fcitx5"))
     implementation(project(":lib:fcitx5-lua"))
@@ -125,10 +153,16 @@ dependencies {
     implementation(libs.splitties.views.recyclerview)
     implementation(libs.aboutlibraries.core)
     testImplementation(libs.junit)
+    testImplementation(libs.kotlinx.coroutines.test)
+    testImplementation(libs.mockk)
+    testImplementation(libs.turbine)
+    testImplementation(libs.robolectric)
     androidTestImplementation(libs.androidx.test.runner)
     androidTestImplementation(libs.androidx.test.rules)
     androidTestImplementation(libs.androidx.lifecycle.testing)
     androidTestImplementation(libs.junit)
+    androidTestImplementation(libs.kotlinx.coroutines.test)
+    androidTestImplementation(libs.mockk.android)
 }
 
 configurations {

@@ -227,6 +227,14 @@ class TextKeyboard(
                 CapsState.Lock -> R.drawable.ic_capslock_lock
             }
         }
+        // the icon carries the state, so the label has to as well
+        caps.contentDescription = context.getString(
+            when (capsState) {
+                CapsState.None -> R.string.a11y_key_shift
+                CapsState.Once -> R.string.a11y_key_shift_once
+                CapsState.Lock -> R.string.a11y_key_shift_lock
+            }
+        )
     }
 
     private fun updateLangSwitchKey(visible: Boolean) {

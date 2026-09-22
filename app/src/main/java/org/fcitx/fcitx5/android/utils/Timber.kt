@@ -7,6 +7,7 @@ package org.fcitx.fcitx5.android.utils
 
 import android.util.Log
 import org.fcitx.fcitx5.android.BuildConfig
+import org.fcitx.fcitx5.android.core.CoreLog
 import timber.log.Timber
 
 class VerboseTree : Timber.DebugTree() {
@@ -27,5 +28,10 @@ fun Timber.Forest.setupForest(verbose: Boolean) {
     if (treeCount > 0) {
         uprootAll()
     }
-    plant(if (BuildConfig.DEBUG || verbose) VerboseTree() else ConciseTree())
+    val debugLogging = BuildConfig.DEBUG || verbose
+    plant(if (debugLogging) VerboseTree() else ConciseTree())
+    // :lib:ime-core is a plain JVM module and cannot depend on Timber. Attaching the sink here
+    // keeps it in step with the tree, and leaving it null when debug logging is off preserves
+    // the old behaviour of not formatting messages that would be dropped anyway.
+    CoreLog.sink = if (debugLogging) ({ Timber.tag("ime-core").d(it) }) else null
 }

@@ -77,6 +77,8 @@ abstract class BaseDynamicListUi<T>(
         imageDrawable = drawable(R.drawable.ic_baseline_plus_24)!!.apply {
             setTint(styledColor(android.R.attr.colorForegroundInverse))
         }
+        // icon-only, so without this it is invisible to screen readers and to UI automation
+        contentDescription = ctx.getString(R.string.a11y_add_item)
     }
 
     sealed class Mode<T> {

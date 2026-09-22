@@ -8,12 +8,6 @@ package org.fcitx.fcitx5.android.utils
 import android.os.Build
 import android.view.inputmethod.InputConnection
 
-fun InputConnection.withBatchEdit(block: InputConnection.() -> Unit) {
-    beginBatchEdit()
-    block.invoke(this)
-    endBatchEdit()
-}
-
 fun InputConnection.monitorCursorAnchor(enable: Boolean = true): Boolean {
     if (!enable) {
         requestCursorUpdates(0)

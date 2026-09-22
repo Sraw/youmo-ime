@@ -4,8 +4,7 @@
  */
 package org.fcitx.fcitx5.android.utils
 
-import org.fcitx.fcitx5.android.data.prefs.AppPrefs
-import timber.log.Timber
+import org.fcitx.fcitx5.android.core.CoreLog
 
 class EventStateMachine<State : Any, Event : EventStateMachine.TransitionEvent<State, B>, B : EventStateMachine.BooleanStateKey>(
     private val initialState: State,
@@ -30,20 +29,16 @@ class EventStateMachine<State : Any, Event : EventStateMachine.TransitionEvent<S
     var currentState = initialState
         private set
 
-    private val enableDebugLog: Boolean by AppPrefs.getInstance().internal.verboseLog
-
     /**
      * Push an event that may trigger a transition of state
      */
     fun push(event: Event) {
         val newState = event.accept(initialState, currentState) { externalBooleanStates[it] }
         if (newState == currentState) {
-            if (enableDebugLog)
-                Timber.d("At $currentState, $event didn't change the state")
+            CoreLog.d { "At $currentState, $event didn't change the state" }
             return
         }
-        if (enableDebugLog)
-            Timber.d("At $currentState transited to $newState by $event")
+        CoreLog.d { "At $currentState transited to $newState by $event" }
         currentState = newState
         onNewStateListener?.invoke(newState)
     }
@@ -73,8 +68,6 @@ class EventStateMachine<State : Any, Event : EventStateMachine.TransitionEvent<S
 
 // DSL
 class TransitionEventBuilder<State : Any, B : EventStateMachine.BooleanStateKey> {
-
-    private val enableDebugLog: Boolean by AppPrefs.getInstance().internal.verboseLog
 
     private var raw: ((State, State, (B) -> Boolean?) -> State)? = null
 
@@ -122,8 +115,9 @@ class TransitionEventBuilder<State : Any, B : EventStateMachine.BooleanStateKey>
                     1 -> filtered[0].target
                     else -> {
                         val first = filtered[0].target
-                        if (enableDebugLog)
-                            Timber.d("More than one target states at $currentState: ${filtered.joinToString()}. Take the first one: $first")
+                        CoreLog.d {
+                            "More than one target states at $currentState: ${filtered.joinToString()}. Take the first one: $first"
+                        }
                         first
                     }
                 }

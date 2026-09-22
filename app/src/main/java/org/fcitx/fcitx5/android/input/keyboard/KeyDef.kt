@@ -6,6 +6,7 @@ package org.fcitx.fcitx5.android.input.keyboard
 
 import android.graphics.Typeface
 import androidx.annotation.DrawableRes
+import androidx.annotation.StringRes
 import org.fcitx.fcitx5.android.data.InputFeedbacks
 
 open class KeyDef(
@@ -19,7 +20,15 @@ open class KeyDef(
         val border: Border,
         val margin: Boolean,
         val viewId: Int,
-        val soundEffect: InputFeedbacks.SoundEffect
+        val soundEffect: InputFeedbacks.SoundEffect,
+        /**
+         * Accessibility label for this key, or `0` for none.
+         *
+         * Keys that show text are already announced by their [Text.displayText]; this is for
+         * icon-only keys, which are otherwise anonymous both to screen readers and to any
+         * tooling that walks the accessibility tree.
+         */
+        @StringRes val contentDescription: Int
     ) {
         enum class Variant {
             Normal, AltForeground, Alternative, Accent
@@ -42,8 +51,11 @@ open class KeyDef(
             border: Border = Border.Default,
             margin: Boolean = true,
             viewId: Int = -1,
-            soundEffect: InputFeedbacks.SoundEffect = InputFeedbacks.SoundEffect.Standard
-        ) : Appearance(percentWidth, variant, border, margin, viewId, soundEffect)
+            soundEffect: InputFeedbacks.SoundEffect = InputFeedbacks.SoundEffect.Standard,
+            @StringRes contentDescription: Int = 0
+        ) : Appearance(
+            percentWidth, variant, border, margin, viewId, soundEffect, contentDescription
+        )
 
         class AltText(
             displayText: String,
@@ -59,7 +71,11 @@ open class KeyDef(
             border: Border = Border.Default,
             margin: Boolean = true,
             viewId: Int = -1,
-        ) : Text(displayText, textSize, textStyle, percentWidth, variant, border, margin, viewId)
+            @StringRes contentDescription: Int = 0
+        ) : Text(
+            displayText, textSize, textStyle, percentWidth, variant, border, margin, viewId,
+            contentDescription = contentDescription
+        )
 
         class Image(
             @DrawableRes
@@ -69,8 +85,11 @@ open class KeyDef(
             border: Border = Border.Default,
             margin: Boolean = true,
             viewId: Int = -1,
-            soundEffect: InputFeedbacks.SoundEffect = InputFeedbacks.SoundEffect.Standard
-        ) : Appearance(percentWidth, variant, border, margin, viewId, soundEffect)
+            soundEffect: InputFeedbacks.SoundEffect = InputFeedbacks.SoundEffect.Standard,
+            @StringRes contentDescription: Int = 0
+        ) : Appearance(
+            percentWidth, variant, border, margin, viewId, soundEffect, contentDescription
+        )
 
         class ImageText(
             displayText: String,
@@ -86,8 +105,12 @@ open class KeyDef(
             variant: Variant = Variant.Normal,
             border: Border = Border.Default,
             margin: Boolean = true,
-            viewId: Int = -1
-        ) : Text(displayText, textSize, textStyle, percentWidth, variant, border, margin, viewId)
+            viewId: Int = -1,
+            @StringRes contentDescription: Int = 0
+        ) : Text(
+            displayText, textSize, textStyle, percentWidth, variant, border, margin, viewId,
+            contentDescription = contentDescription
+        )
     }
 
     sealed class Behavior {

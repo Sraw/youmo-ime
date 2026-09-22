@@ -5,6 +5,7 @@
 package org.fcitx.fcitx5.android.input.dependency
 
 import android.view.ContextThemeWrapper
+import kotlinx.coroutines.CoroutineScope
 import org.fcitx.fcitx5.android.daemon.FcitxConnection
 import org.fcitx.fcitx5.android.daemon.FcitxDaemon
 import org.fcitx.fcitx5.android.data.theme.Theme
@@ -26,6 +27,16 @@ fun DependencyManager.inputView() =
 
 fun DependencyManager.inputMethodService() =
     mustWrapped<UniqueComponentWrapper<FcitxInputMethodService>, FcitxInputMethodService>()
+
+/**
+ * The coroutine scope of the input session.
+ *
+ * Components that only need somewhere to launch session-scoped work should take this rather
+ * than the whole [FcitxInputMethodService]: it is the difference between depending on a
+ * concrete `InputMethodService` and depending on a `CoroutineScope`.
+ */
+fun DependencyManager.imeScope() =
+    mustWrapped<UniqueComponentWrapper<CoroutineScope>, CoroutineScope>()
 
 fun DependencyManager.theme() =
     mustWrapped<UniqueComponentWrapper<Theme>, Theme>()

@@ -4,7 +4,7 @@
  */
 package org.fcitx.fcitx5.android.input.cursor
 
-import timber.log.Timber
+import org.fcitx.fcitx5.android.core.CoreLog
 import java.util.ArrayDeque
 
 class CursorTracker {
@@ -25,7 +25,7 @@ class CursorTracker {
         if (!latest.rangeEquals(new)) {
             predictions.add(new)
         }
-        Timber.d("current: $current; predicted: ${predictions.joinToString()}")
+        CoreLog.d { "current: $current; predicted: ${predictions.joinToString()}" }
     }
 
     fun predict(start: Int, end: Int = start) {
@@ -49,7 +49,7 @@ class CursorTracker {
         }
         current.update(start, end)
         if (!matched) {
-            Timber.d("unable to consume [$start,$end]")
+            CoreLog.d { "unable to consume [$start,$end]" }
         }
         return matched
     }

@@ -1,0 +1,73 @@
+name: Unit Tests
+
+# JVM unit tests only. Deliberately separate from the build workflow:
+#   - no submodules (verified: `:app:test` configures and runs on a submodule-free checkout)
+#   - no NDK, no CMake (the task graph for `:app:test` contains no native tasks)
+#   - single OS
+# so this finishes in well under a minute and can gate every push.
+#
+# Java 21 here, while the build jobs use 17. The unit test job produces no artifacts,
+# and 21 is what this suite is developed and verified against locally. Bytecode target
+# is Java 11 either way (build-logic/convention/src/main/kotlin/Versions.kt).
+
+on:
+  pull_request:
+    types:
+      - opened
+      - reopened
+      - synchronize
+  push:
+    branches:
+      - master
+  workflow_dispatch:
+
+# a newer push to the same branch makes an in-flight run pointless
+concurrency:
+  group: unit-test-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  unit_test:
+    name: JVM unit tests
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Fetch source code
+        uses: actions/checkout@v7
+        with:
+          # full history like pull_request.yml: build-logic runs `git describe` at configuration
+          fetch-depth: 0
+          submodules: false
+
+      - name: Setup Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: "temurin"
+          java-version: "21"
+
+      - name: Setup Android environment
+        uses: android-actions/setup-android@v4
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v6
+
+      # :lib:ime-core is a plain JVM module: no Android SDK, no resource merging, seconds to
+      # run. Kept as a separate step so a failure there is obviously a logic failure rather
+      # than an Android build problem.
+      - name: Run core logic tests
+        run: ./gradlew :lib:ime-core:test
+
+      - name: Run app unit tests
+        run: ./gradlew :app:test
+
+      - name: Upload test report
+        # the report is most useful precisely when the step above failed
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: unit-test-report
+          path: |
+            lib/ime-core/build/reports/tests/
+            lib/ime-core/build/test-results/
+            app/build/reports/tests/
+            app/build/test-results/
+          retention-days: 14

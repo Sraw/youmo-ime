@@ -17,6 +17,8 @@ import android.widget.ImageView
 import androidx.annotation.Keep
 import androidx.annotation.RequiresApi
 import androidx.core.view.updateLayoutParams
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.CoroutineScope
 import org.fcitx.fcitx5.android.core.CapabilityFlags
 import org.fcitx.fcitx5.android.core.FcitxEvent
 import org.fcitx.fcitx5.android.daemon.FcitxConnection
@@ -114,6 +116,9 @@ class InputView(
     private fun setupScope() {
         scope += this@InputView.wrapToUniqueComponent()
         scope += service.wrapToUniqueComponent()
+        // typed as CoroutineScope on purpose: that is what the component is registered as
+        val imeScope: CoroutineScope = service.lifecycleScope
+        scope += imeScope.wrapToUniqueComponent()
         scope += fcitx.wrapToUniqueComponent()
         scope += theme.wrapToUniqueComponent()
         scope += themedContext.wrapToUniqueComponent()

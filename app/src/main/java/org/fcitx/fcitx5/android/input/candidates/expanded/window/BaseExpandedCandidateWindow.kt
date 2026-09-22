@@ -8,7 +8,6 @@ package org.fcitx.fcitx5.android.input.candidates.expanded.window
 import android.graphics.drawable.ShapeDrawable
 import android.graphics.drawable.shapes.RectShape
 import android.view.View
-import androidx.lifecycle.lifecycleScope
 import androidx.paging.Pager
 import androidx.paging.PagingConfig
 import androidx.recyclerview.widget.RecyclerView
@@ -32,7 +31,7 @@ import org.fcitx.fcitx5.android.input.candidates.expanded.ExpandedCandidateLayou
 import org.fcitx.fcitx5.android.input.candidates.expanded.PagingCandidateViewAdapter
 import org.fcitx.fcitx5.android.input.candidates.horizontal.HorizontalCandidateComponent
 import org.fcitx.fcitx5.android.input.dependency.fcitx
-import org.fcitx.fcitx5.android.input.dependency.inputMethodService
+import org.fcitx.fcitx5.android.input.dependency.imeScope
 import org.fcitx.fcitx5.android.input.dependency.inputView
 import org.fcitx.fcitx5.android.input.dependency.theme
 import org.fcitx.fcitx5.android.input.keyboard.CommonKeyActionListener
@@ -49,7 +48,7 @@ import kotlin.math.max
 abstract class BaseExpandedCandidateWindow<T : BaseExpandedCandidateWindow<T>> :
     InputWindow.SimpleInputWindow<T>(), InputBroadcastReceiver {
 
-    protected val service by manager.inputMethodService()
+    protected val imeScope by manager.imeScope()
     protected val theme by manager.theme()
     protected val fcitx by manager.fcitx()
     protected val inputView by manager.inputView()
@@ -160,7 +159,7 @@ abstract class BaseExpandedCandidateWindow<T : BaseExpandedCandidateWindow<T>> :
             it.keyActionListener = keyActionListener
         }
         updateTabs(fcitx.runImmediately { inputPanelCached.tabs })
-        offsetJob = service.lifecycleScope.launch {
+        offsetJob = imeScope.launch {
             horizontalCandidate.expandedCandidateOffset.collect {
                 if (it <= 0) {
                     windowManager.attachWindow(KeyboardWindow)
@@ -170,7 +169,7 @@ abstract class BaseExpandedCandidateWindow<T : BaseExpandedCandidateWindow<T>> :
                 }
             }
         }
-        candidatesSubmitJob = service.lifecycleScope.launch {
+        candidatesSubmitJob = imeScope.launch {
             candidatesPager.flow.collectLatest {
                 adapter.submitData(it)
             }

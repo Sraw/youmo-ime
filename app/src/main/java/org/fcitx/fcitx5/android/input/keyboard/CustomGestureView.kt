@@ -22,8 +22,6 @@ import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 
 open class CustomGestureView(ctx: Context) : FrameLayout(ctx) {
 
-    enum class SwipeAxis { X, Y }
-
     enum class GestureType { Down, Move, Up }
 
     data class Event(
@@ -49,12 +47,20 @@ open class CustomGestureView(ctx: Context) : FrameLayout(ctx) {
         findViewTreeLifecycleOwner()?.lifecycleScope!!
     }
 
-    @Volatile
-    private var touchMovedOutside = false
+    /**
+     * All the coordinate and timing bookkeeping. This view is the adapter: it decodes
+     * [MotionEvent]s, runs the timers as coroutines and performs the Android-side effects,
+     * while every decision about what a gesture *means* comes from here.
+     */
+    private val recognizer = KeyGestureRecognizer()
 
     @Volatile
     private var longPressTriggered = false
-    var longPressEnabled = false
+    var longPressEnabled
+        get() = recognizer.longPressEnabled
+        set(value) {
+            recognizer.longPressEnabled = value
+        }
     private var longPressJob: Job? = null
 
     @Volatile
@@ -62,26 +68,39 @@ open class CustomGestureView(ctx: Context) : FrameLayout(ctx) {
 
     @Volatile
     private var repeatStarted = false
-    var repeatEnabled = false
+    var repeatEnabled
+        get() = recognizer.repeatEnabled
+        set(value) {
+            recognizer.repeatEnabled = value
+        }
     private var repeatJob: Job? = null
 
-    var swipeEnabled = false
-    var swipeRepeatEnabled = false
-    var swipeThresholdX = 24f
-    var swipeThresholdY = 24f
+    var swipeEnabled
+        get() = recognizer.swipeEnabled
+        set(value) {
+            recognizer.swipeEnabled = value
+        }
+    var swipeRepeatEnabled
+        get() = recognizer.swipeRepeatEnabled
+        set(value) {
+            recognizer.swipeRepeatEnabled = value
+        }
+    var swipeThresholdX
+        get() = recognizer.swipeThresholdX
+        set(value) {
+            recognizer.swipeThresholdX = value
+        }
+    var swipeThresholdY
+        get() = recognizer.swipeThresholdY
+        set(value) {
+            recognizer.swipeThresholdY = value
+        }
 
-    private var swipeRepeatTriggered = false
-    private var swipeLastX = -1f
-    private var swipeLastY = -1f
-    private var swipeXUnconsumed = 0f
-    private var swipeYUnconsumed = 0f
-    private var swipeTotalX = 0
-    private var swipeTotalY = 0
-    private var gestureConsumed = false
-
-    var doubleTapEnabled = false
-    private var lastClickTime = 0L
-    private var maybeDoubleTap = false
+    var doubleTapEnabled
+        get() = recognizer.doubleTapEnabled
+        set(value) {
+            recognizer.doubleTapEnabled = value
+        }
 
     var onDoubleTapListener: ((View) -> Unit)? = null
     var onRepeatListener: ((View) -> Unit)? = null
@@ -89,9 +108,8 @@ open class CustomGestureView(ctx: Context) : FrameLayout(ctx) {
 
     var soundEffect: InputFeedbacks.SoundEffect = InputFeedbacks.SoundEffect.Standard
 
-    private val touchSlop: Float = ViewConfiguration.get(ctx).scaledTouchSlop.toFloat()
-
     init {
+        recognizer.touchSlop = ViewConfiguration.get(ctx).scaledTouchSlop.toFloat()
         // disable system sound effect and haptic feedback
         isSoundEffectsEnabled = false
         isHapticFeedbackEnabled = false
@@ -104,15 +122,7 @@ open class CustomGestureView(ctx: Context) : FrameLayout(ctx) {
         }
     }
 
-    private fun pointInView(x: Float, y: Float): Boolean {
-        return -touchSlop <= x &&
-                -touchSlop <= y &&
-                x < (width + touchSlop) &&
-                y < (height + touchSlop)
-    }
-
     private fun resetState() {
-        touchMovedOutside = false
         if (longPressEnabled) {
             longPressTriggered = false
             longPressJob?.cancel()
@@ -123,31 +133,25 @@ open class CustomGestureView(ctx: Context) : FrameLayout(ctx) {
             repeatJob?.cancel()
             repeatJob = null
         }
-        if (swipeEnabled) {
-            if (swipeRepeatEnabled) {
-                swipeRepeatTriggered = false
-            }
-            swipeXUnconsumed = 0f
-            swipeYUnconsumed = 0f
-            swipeTotalX = 0
-            swipeTotalY = 0
-            gestureConsumed = false
-        }
-        // double tap state should be preserved on touch up
+        recognizer.resetForNextTouch()
     }
 
     fun cancelGestures() {
         isPressed = false
         resetState()
-        // reset double tap state on cancel
-        if (doubleTapEnabled) {
-            maybeDoubleTap = false
-            lastClickTime = 0
-        }
+        // unlike a normal lift, a cancel also forgets a pending double tap
+        recognizer.cancel()
     }
 
     @SuppressLint("ClickableViewAccessibility")
     override fun onTouchEvent(event: MotionEvent): Boolean {
+        // Refreshed here rather than in onSizeChanged: KeyView overrides that without calling
+        // super, so a hook there silently never runs and every move looks like it left the key.
+        recognizer.viewWidth = width
+        recognizer.viewHeight = height
+        // longPressDelay is a live preference; the timers below read it per touch, so the
+        // double-tap window must too or the two drift apart after the user changes it
+        recognizer.doubleTapTimeoutMs = longPressDelay.toLong()
         val x = event.x
         val y = event.y
         when (event.actionMasked) {
@@ -182,61 +186,40 @@ open class CustomGestureView(ctx: Context) : FrameLayout(ctx) {
                         }
                     }
                 }
-                if (swipeEnabled) {
-                    swipeLastX = x
-                    swipeLastY = y
-                }
+                recognizer.onDown(x, y)
             }
             MotionEvent.ACTION_UP -> {
                 isPressed = false
                 InputFeedbacks.hapticFeedback(this, longPress = true, keyUp = true)
                 dispatchGestureEvent(GestureType.Up, event.x, event.y)
-                val shouldPerformClick = !(touchMovedOutside ||
-                        longPressTriggered ||
-                        repeatStarted ||
-                        swipeRepeatTriggered ||
-                        gestureConsumed)
+                val outcome = recognizer.onUp(
+                    nowMs = System.currentTimeMillis(),
+                    longPressTriggered = longPressTriggered,
+                    repeatStarted = repeatStarted,
+                )
                 resetState()
-                if (shouldPerformClick) {
-                    if (doubleTapEnabled) {
-                        val now = System.currentTimeMillis()
-                        if (maybeDoubleTap && now - lastClickTime <= longPressDelay) {
-                            maybeDoubleTap = false
-                            onDoubleTapListener?.invoke(this)
-                        } else {
-                            maybeDoubleTap = true
-                            performClick()
-                        }
-                        lastClickTime = now
-                    } else {
-                        performClick()
-                    }
+                if (outcome.performClick) {
+                    if (outcome.isDoubleTap) onDoubleTapListener?.invoke(this) else performClick()
                 }
                 return true
             }
             MotionEvent.ACTION_MOVE -> {
                 if (!isEnabled) return false
                 drawableHotspotChanged(x, y)
-                if (!touchMovedOutside && !pointInView(x, y)) {
-                    touchMovedOutside = true
-                    if (longPressEnabled) {
-                        longPressJob?.cancel()
-                        longPressJob = null
-                    }
-                    if (repeatEnabled) {
-                        repeatJob?.cancel()
-                        repeatJob = null
-                    }
-                    if (repeatStarted || !swipeEnabled) {
-                        isPressed = false
-                    }
+                val outcome = recognizer.onMove(x, y, longPressTriggered, repeatStarted)
+                if (outcome.cancelLongPress) {
+                    longPressJob?.cancel()
+                    longPressJob = null
                 }
-                if (!swipeEnabled || longPressTriggered || repeatStarted) return true
-                val countX = consumeSwipe(x, SwipeAxis.X)
-                val countY = consumeSwipe(y, SwipeAxis.Y)
-                dispatchGestureEvent(GestureType.Move, x, y, countX, countY)
-                swipeLastX = x
-                swipeLastY = y
+                if (outcome.cancelRepeat) {
+                    repeatJob?.cancel()
+                    repeatJob = null
+                }
+                if (outcome.releasePressedState) {
+                    isPressed = false
+                }
+                if (!outcome.dispatchMove) return true
+                dispatchGestureEvent(GestureType.Move, x, y, outcome.countX, outcome.countY)
                 return true
             }
             MotionEvent.ACTION_CANCEL -> {
@@ -255,52 +238,14 @@ open class CustomGestureView(ctx: Context) : FrameLayout(ctx) {
         countX: Int = 0,
         countY: Int = 0
     ) {
-        val event = Event(type, gestureConsumed, x, y, countX, countY, swipeTotalX, swipeTotalY)
+        val event = Event(
+            type, recognizer.gestureConsumed, x, y,
+            countX, countY, recognizer.swipeTotalX, recognizer.swipeTotalY
+        )
         val consumed = onGestureListener?.onGesture(this, event) ?: return
-        if (consumed && !gestureConsumed) {
-            gestureConsumed = true
+        if (consumed) {
+            recognizer.markGestureConsumed()
         }
-    }
-
-    private fun consumeSwipe(current: Float, axis: SwipeAxis): Int {
-        val unconsumed: Float
-        val threshold: Float
-        when (axis) {
-            SwipeAxis.X -> {
-                unconsumed = current - swipeLastX + swipeXUnconsumed
-                threshold = swipeThresholdX
-            }
-            SwipeAxis.Y -> {
-                unconsumed = current - swipeLastY + swipeYUnconsumed
-                threshold = swipeThresholdY
-            }
-        }
-        val remains: Float = unconsumed % threshold
-        val count: Int = (unconsumed / threshold).toInt()
-        if (count != 0) {
-            if (swipeRepeatEnabled && !swipeRepeatTriggered) {
-                swipeRepeatTriggered = true
-            }
-            if (longPressEnabled && !longPressTriggered) {
-                longPressJob?.cancel()
-                longPressJob = null
-            }
-            if (repeatEnabled && !repeatStarted) {
-                repeatJob?.cancel()
-                repeatJob = null
-            }
-        }
-        when (axis) {
-            SwipeAxis.X -> {
-                swipeXUnconsumed = remains
-                swipeTotalX += count
-            }
-            SwipeAxis.Y -> {
-                swipeYUnconsumed = remains
-                swipeTotalY += count
-            }
-        }
-        return count
     }
 
     override fun setOnLongClickListener(l: OnLongClickListener?) {

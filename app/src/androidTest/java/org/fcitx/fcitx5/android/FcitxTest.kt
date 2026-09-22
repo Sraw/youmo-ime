@@ -22,15 +22,29 @@ import org.junit.AfterClass
 import org.junit.Assert
 import org.junit.Before
 import org.junit.BeforeClass
+import org.junit.Rule
 import org.junit.Test
+import org.junit.rules.Timeout
 import timber.log.Timber
 
 class FcitxTest {
 
+    /**
+     * Without this a broken engine interaction hangs the whole run instead of failing it --
+     * which is exactly what happened before `activate`/`focus` were added to [setup].
+     */
+    @get:Rule
+    val timeout: Timeout = Timeout.seconds(30)
+
     private companion object {
 
         lateinit var fcitx: Fcitx
-        val fcitxEventChannel = Channel<FcitxEvent<*>>(capacity = Channel.CONFLATED)
+        /**
+         * Buffered, not CONFLATED. A conflated channel keeps only the newest event, so a
+         * `CommitStringEvent` is overwritten by the `CandidateListEvent` fcitx emits right
+         * after a commit -- the test then waits forever for an event that was dropped.
+         */
+        val fcitxEventChannel = Channel<FcitxEvent<*>>(capacity = Channel.UNLIMITED)
         val scope = MainScope()
 
         @BeforeClass
@@ -48,6 +62,12 @@ class FcitxTest {
             // wait fcitx started
             runBlocking {
                 receiveFirst<FcitxEvent.ReadyEvent>()
+                // Without an input context fcitx has nowhere to route keys: `sendKey` is
+                // accepted but produces no preedit and no candidates, so every test that waits
+                // for an event hangs. FcitxInputMethodService does this from `onBindInput` /
+                // `onStartInputView`; a bare engine has to do it itself.
+                fcitx.activate(TEST_UID, TEST_PKG_NAME)
+                fcitx.focus(true)
                 fcitx.setEnabledIme(arrayOf("pinyin"))
                 fcitx.setGlobalConfig(
                     RawConfig(
@@ -66,8 +86,16 @@ class FcitxTest {
         @AfterClass
         @JvmStatic
         fun cleanup() {
+            runBlocking {
+                fcitx.focus(false)
+                fcitx.deactivate(TEST_UID)
+            }
             fcitx.stop()
         }
+
+        /** Any uid works; fcitx only uses it to key its input context table. */
+        const val TEST_UID = 0
+        const val TEST_PKG_NAME = "org.fcitx.fcitx5.android.test"
 
         private suspend fun sendString(str: String) {
             str.forEach { c ->
@@ -94,8 +122,20 @@ class FcitxTest {
 
     private var enabledIme: List<String> = listOf()
 
+    /**
+     * Each test must start from a clean engine AND a clean event queue.
+     *
+     * The channel is buffered (see [fcitxEventChannel]), so events a previous test did not
+     * consume are still queued, and `receiveFirst*` returns the OLDEST match -- which shows up
+     * as a test asserting on another test's input. Draining here makes the tests independent
+     * of each other and of their declaration order.
+     */
     @Before
-    fun saveEnabledIME() = runBlocking {
+    fun resetEngineAndDrainEvents() = runBlocking {
+        fcitx.reset()
+        @Suppress("ControlFlowWithEmptyBody")
+        while (fcitxEventChannel.tryReceive().isSuccess) {
+        }
         enabledIme = fcitx.enabledIme().map { it.uniqueName }
     }
 
@@ -104,29 +144,166 @@ class FcitxTest {
         fcitx.setEnabledIme(enabledIme.toTypedArray())
     }
 
+    /** A code table is deterministic, so the first candidate can be asserted directly. */
     @Test
     fun testWbx(): Unit = runBlocking {
         fcitx.setEnabledIme(arrayOf("wbx"))
         sendString("wqvb")
-        val expected = "你好"
         fcitx.select(0)
-        val commitString = receiveFirstCommitString()?.data
+        val commitString = receiveFirstCommitString()?.data?.text
+        Timber.i("commitString is $commitString")
+        Assert.assertEquals("你好", commitString)
+        fcitx.reset()
+    }
+
+    /**
+     * Picks the candidate by content rather than by index.
+     *
+     * Asserting `select(0)` would pin the dictionary's ranking: "nihaoshijie" currently offers
+     * 你好时节 ahead of 你好世界, and either is a legitimate reading. What this test is for is
+     * the sendKey -> candidates -> select -> commit path, not libime's scoring.
+     */
+    @Test
+    fun testPinyin(): Unit = runBlocking {
+        fcitx.setEnabledIme(arrayOf("pinyin"))
+        val expected = "你好世界"
+        sendString("nihaoshijie")
+
+        val candidates = fcitx.getCandidates(0, 32).map { it.text }
+        Timber.i("candidates are $candidates")
+        val index = candidates.indexOf(expected)
+        Assert.assertTrue("$expected not among candidates: $candidates", index >= 0)
+
+        fcitx.select(index)
+        val commitString = receiveFirstCommitString()?.data?.text
         Timber.i("commitString is $commitString")
         Assert.assertEquals(expected, commitString)
         fcitx.reset()
     }
 
+    // region input method management
+
     @Test
-    fun testPinyin(): Unit = runBlocking {
+    fun switchingInputMethodChangesTheCurrentOne(): Unit = runBlocking {
+        fcitx.setEnabledIme(arrayOf("pinyin", "wbx"))
+        fcitx.activateIme("pinyin")
+        Assert.assertEquals("pinyin", fcitx.currentIme().uniqueName)
+        fcitx.activateIme("wbx")
+        Assert.assertEquals("wbx", fcitx.currentIme().uniqueName)
+    }
+
+    @Test
+    fun enumerateImeCyclesThroughEnabledOnes(): Unit = runBlocking {
+        fcitx.setEnabledIme(arrayOf("pinyin", "wbx"))
+        fcitx.activateIme("pinyin")
+        fcitx.enumerateIme(forward = true)
+        Assert.assertEquals("wbx", fcitx.currentIme().uniqueName)
+        fcitx.enumerateIme(forward = true)
+        Assert.assertEquals("cycles back round", "pinyin", fcitx.currentIme().uniqueName)
+    }
+
+    @Test
+    fun enabledImeIsWhatWasSet(): Unit = runBlocking {
+        fcitx.setEnabledIme(arrayOf("pinyin", "wbx"))
+        Assert.assertEquals(listOf("pinyin", "wbx"), fcitx.enabledIme().map { it.uniqueName })
+    }
+
+    @Test
+    fun pinyinAndWubiAreBothAvailable(): Unit = runBlocking {
+        val available = fcitx.availableIme().map { it.uniqueName }
+        Assert.assertTrue("pinyin missing from $available", "pinyin" in available)
+        Assert.assertTrue("wbx missing from $available", "wbx" in available)
+    }
+
+    // endregion
+
+    // region pinyin decoding
+
+    /**
+     * Reads cached state instead of waiting on the event stream: `sendString` emits one preedit
+     * event per keystroke, so taking the first would assert on "n" rather than the finished
+     * composition.
+     *
+     * Uses the input panel's preedit, not [FcitxAPI.clientPreeditCached]. This test drives a
+     * bare engine and never calls `setCapFlags`, so fcitx has no reason to believe the client
+     * can render a preedit and keeps it in the input panel. The real service sets the
+     * capability flags in `onStartInput`, which is what moves it client-side.
+     */
+    @Test
+    fun pinyinSegmentsSyllablesInThePreedit(): Unit = runBlocking {
         fcitx.setEnabledIme(arrayOf("pinyin"))
-        sendString("nihaoshijie")
-        val expected = "你好世界"
-        fcitx.select(0)
-        val commitString = receiveFirstCommitString()?.data
-        Timber.i("commitString is $commitString")
-        Assert.assertEquals(expected, commitString)
+        sendString("nihao")
+        val preedit = fcitx.inputPanelCached.preedit.toString()
+        Timber.i("input panel preedit is $preedit")
+        Assert.assertEquals("ni hao", preedit)
         fcitx.reset()
     }
+
+    @Test
+    fun aSingleSyllableOffersItsCommonCharacters(): Unit = runBlocking {
+        fcitx.setEnabledIme(arrayOf("pinyin"))
+        sendString("ni")
+        val candidates = fcitx.getCandidates(0, 16).map { it.text }
+        Timber.i("candidates for 'ni' are $candidates")
+        Assert.assertTrue("你 missing from $candidates", "你" in candidates)
+        fcitx.reset()
+    }
+
+    @Test
+    fun candidatesArePagedByOffsetAndLimit(): Unit = runBlocking {
+        fcitx.setEnabledIme(arrayOf("pinyin"))
+        sendString("ni")
+        val firstFour = fcitx.getCandidates(0, 4).map { it.text }
+        val nextFour = fcitx.getCandidates(4, 4).map { it.text }
+        Assert.assertEquals(4, firstFour.size)
+        Assert.assertEquals(4, nextFour.size)
+        Assert.assertTrue("pages overlap: $firstFour vs $nextFour",
+            firstFour.intersect(nextFour.toSet()).isEmpty())
+        fcitx.reset()
+    }
+
+    @Test
+    fun resetClearsPreeditAndCandidates(): Unit = runBlocking {
+        fcitx.setEnabledIme(arrayOf("pinyin"))
+        sendString("nihao")
+        Assert.assertFalse("engine should hold a composition", fcitx.isEmpty())
+        fcitx.reset()
+        Assert.assertTrue("reset should clear it", fcitx.isEmpty())
+        Assert.assertEquals(0, fcitx.getCandidates(0, 8).size)
+        Assert.assertEquals("", fcitx.inputPanelCached.preedit.toString())
+    }
+
+    /**
+     * Note what is asserted: the *preedit* is cleared, not the whole engine. After a commit
+     * fcitx offers prediction candidates for the word just typed, so `isEmpty()` is still
+     * false -- that is correct behaviour, not leftover state.
+     */
+    @Test
+    fun selectingACandidateCommitsItAndClearsThePreedit(): Unit = runBlocking {
+        fcitx.setEnabledIme(arrayOf("pinyin"))
+        sendString("ni")
+        val first = fcitx.getCandidates(0, 1).first().text
+        fcitx.select(0)
+        Assert.assertEquals(first, receiveFirstCommitString()?.data?.text)
+        Assert.assertEquals("preedit is consumed by the commit", "", fcitx.inputPanelCached.preedit.toString())
+        fcitx.reset()
+    }
+
+    // endregion
+
+    // region code table input
+
+    @Test
+    fun wubiCommitsOnACompleteCode(): Unit = runBlocking {
+        fcitx.setEnabledIme(arrayOf("wbx"))
+        sendString("wq")
+        val candidates = fcitx.getCandidates(0, 16).map { it.text }
+        Timber.i("candidates for wubi 'wq' are $candidates")
+        Assert.assertTrue("expected some candidates for a partial code", candidates.isNotEmpty())
+        fcitx.reset()
+    }
+
+    // endregion
 
     @Test
     fun testInputPanelStatus(): Unit = runBlocking {
