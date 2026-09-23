@@ -554,4 +554,112 @@ class KeyGestureRecognizerTest {
     }
 
     // endregion
+
+    // region settings changing mid-touch
+
+    @Test
+    fun turningSwipeOffMidTouchDoesNotStopTheSwipe() {
+        val r = recognizer(swipe = true)
+        r.onDown(50f, 50f)
+        r.swipeEnabled = false
+        val outcome = r.onMove(50f + 3 * 24f, 50f, longPressTriggered = false, repeatStarted = false)
+        assertEquals("judged by the settings the touch began with", 3, outcome.countX)
+        assertTrue(outcome.dispatchMove)
+    }
+
+    @Test
+    fun aChangedThresholdAppliesFromTheNextTouch() {
+        val r = recognizer(swipe = true)
+        r.onDown(50f, 50f)
+        r.swipeThresholdX = 48f
+        assertEquals(2, r.onMove(50f + 48f, 50f, false, false).countX)
+        r.onUp(0L, longPressTriggered = false, repeatStarted = false)
+        r.resetForNextTouch()
+        r.onDown(50f, 50f)
+        assertEquals(1, r.onMove(50f + 48f, 50f, false, false).countX)
+    }
+
+    @Test
+    fun turningSwipeOnMidTouchWaitsForTheNextTouch() {
+        val r = recognizer(swipe = false)
+        r.onDown(50f, 50f)
+        r.swipeEnabled = true
+        assertFalse(r.onMove(50f + 3 * 24f, 50f, false, false).dispatchMove)
+        r.onUp(0L, false, false)
+        r.resetForNextTouch()
+        r.onDown(50f, 50f)
+        assertEquals(3, r.onMove(50f + 3 * 24f, 50f, false, false).countX)
+    }
+
+    /** The long-press timer was started at DOWN; leaving the key must still cancel it. */
+    @Test
+    fun turningLongPressOffMidTouchStillCancelsItsTimer() {
+        val r = recognizer(swipe = false, longPress = true)
+        r.onDown(50f, 25f)
+        r.longPressEnabled = false
+        assertTrue(r.onMove(500f, 25f, false, false).cancelLongPress)
+    }
+
+    @Test
+    fun turningRepeatOffMidTouchStillCancelsItsTimer() {
+        val r = recognizer(swipe = false, repeat = true)
+        r.onDown(50f, 25f)
+        r.repeatEnabled = false
+        assertTrue(r.onMove(500f, 25f, false, false).cancelRepeat)
+    }
+
+    @Test
+    fun turningSwipeRepeatOffMidTouchStillMarksTheSwipe() {
+        val r = recognizer(swipe = true, swipeRepeat = true)
+        r.onDown(50f, 25f)
+        r.swipeRepeatEnabled = false
+        r.onMove(50f + 24f, 25f, false, false)
+        assertTrue(r.swipeRepeatTriggered)
+        assertFalse("a swipe is not a click", r.onUp(0L, false, false).performClick)
+    }
+
+    @Test
+    fun theDoubleTapWindowIsTheOneTheTouchBeganWith() {
+        val r = recognizer(swipe = false, doubleTap = true).apply { doubleTapTimeoutMs = 300 }
+        r.onDown(50f, 25f); r.onUp(1000L, false, false); r.resetForNextTouch()
+        r.onDown(50f, 25f)
+        r.doubleTapTimeoutMs = 100
+        assertTrue(r.onUp(1250L, false, false).isDoubleTap)
+    }
+
+    @Test
+    fun turningDoubleTapOffMidTouchStillCompletesTheDoubleTap() {
+        val r = recognizer(swipe = false, doubleTap = true).apply { doubleTapTimeoutMs = 300 }
+        r.onDown(50f, 25f); r.onUp(1000L, false, false); r.resetForNextTouch()
+        r.onDown(50f, 25f)
+        r.doubleTapEnabled = false
+        assertTrue(r.onUp(1100L, false, false).isDoubleTap)
+    }
+
+    /** A cancel mid-touch forgets the armed double tap even if double tap was turned off meanwhile. */
+    @Test
+    fun aCancelUsesTheTouchsSettingsToo() {
+        val r = recognizer(swipe = false, doubleTap = true).apply { doubleTapTimeoutMs = 300 }
+        r.onDown(50f, 25f); r.onUp(1000L, false, false); r.resetForNextTouch()
+        r.onDown(50f, 25f)
+        r.doubleTapEnabled = false
+        r.cancel()
+        r.doubleTapEnabled = true
+        r.onDown(50f, 25f)
+        assertFalse(r.onUp(1100L, false, false).isDoubleTap)
+    }
+
+    /** The touch that swiped is cleaned up as a swiping touch, even if swipe is off by then. */
+    @Test
+    fun aSwipeCutShortBySettingsStillLeavesNoTotalsBehind() {
+        val r = recognizer(swipe = true)
+        r.onDown(50f, 50f)
+        r.onMove(50f + 2 * 24f, 50f, false, false)
+        r.swipeEnabled = false
+        r.onUp(0L, false, false)
+        r.resetForNextTouch()
+        assertEquals(0, r.swipeTotalX)
+    }
+
+    // endregion
 }

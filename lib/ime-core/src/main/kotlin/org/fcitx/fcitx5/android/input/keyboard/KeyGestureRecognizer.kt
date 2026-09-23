@@ -65,6 +65,33 @@ class KeyGestureRecognizer {
     /** How close two taps must be to count as a double tap. */
     var doubleTapTimeoutMs: Long = 0L
 
+    /**
+     * The configuration above, as it stood when the touch went down. A setting that changes
+     * mid-touch (a preference flipped while a finger is on the key) takes effect from the next
+     * touch, so one gesture is never judged half by one rule and half by another -- a swipe
+     * cannot stop counting halfway, nor a key's state be left for a reset that no longer runs.
+     */
+    private data class Settings(
+        val longPress: Boolean,
+        val repeat: Boolean,
+        val swipe: Boolean,
+        val swipeRepeat: Boolean,
+        val doubleTap: Boolean,
+        val swipeThresholdX: Float,
+        val swipeThresholdY: Float,
+        val doubleTapTimeoutMs: Long,
+    )
+
+    private fun live() = Settings(
+        longPressEnabled, repeatEnabled, swipeEnabled, swipeRepeatEnabled, doubleTapEnabled,
+        swipeThresholdX, swipeThresholdY, doubleTapTimeoutMs,
+    )
+
+    /** Frozen at [onDown]; between touches the live configuration applies. */
+    private var frozen: Settings? = null
+
+    private val settings: Settings get() = frozen ?: live()
+
     // endregion
 
     // region state
@@ -100,7 +127,8 @@ class KeyGestureRecognizer {
                 x < (viewWidth + touchSlop) && y < (viewHeight + touchSlop)
 
     fun onDown(x: Float, y: Float) {
-        if (swipeEnabled) {
+        frozen = live()
+        if (settings.swipe) {
             swipeLastX = x
             swipeLastY = y
         }
@@ -115,6 +143,7 @@ class KeyGestureRecognizer {
     }
 
     fun onMove(x: Float, y: Float, longPressTriggered: Boolean, repeatStarted: Boolean): MoveOutcome {
+        val settings = settings
         var movedOutsideNow = false
         var cancelLongPress = false
         var cancelRepeat = false
@@ -123,13 +152,13 @@ class KeyGestureRecognizer {
         if (!touchMovedOutside && !pointInView(x, y)) {
             touchMovedOutside = true
             movedOutsideNow = true
-            if (longPressEnabled) cancelLongPress = true
-            if (repeatEnabled) cancelRepeat = true
-            if (repeatStarted || !swipeEnabled) releasePressed = true
+            if (settings.longPress) cancelLongPress = true
+            if (settings.repeat) cancelRepeat = true
+            if (repeatStarted || !settings.swipe) releasePressed = true
         }
 
         // once a long press or repeat has fired, the gesture belongs to them
-        if (!swipeEnabled || longPressTriggered || repeatStarted) {
+        if (!settings.swipe || longPressTriggered || repeatStarted) {
             return MoveOutcome(
                 movedOutsideNow = movedOutsideNow,
                 countX = 0,
@@ -142,12 +171,12 @@ class KeyGestureRecognizer {
         }
 
         // both axes read the *previous* anchor, so consume before moving it
-        val countX = consumeSwipe(x, SwipeAxis.X)
-        val countY = consumeSwipe(y, SwipeAxis.Y)
+        val countX = consumeSwipe(x, SwipeAxis.X, settings)
+        val countY = consumeSwipe(y, SwipeAxis.Y, settings)
         if (countX != 0 || countY != 0) {
-            if (swipeRepeatEnabled) swipeRepeatTriggered = true
-            if (longPressEnabled && !longPressTriggered) cancelLongPress = true
-            if (repeatEnabled && !repeatStarted) cancelRepeat = true
+            if (settings.swipeRepeat) swipeRepeatTriggered = true
+            if (settings.longPress && !longPressTriggered) cancelLongPress = true
+            if (settings.repeat && !repeatStarted) cancelRepeat = true
         }
         swipeLastX = x
         swipeLastY = y
@@ -176,9 +205,9 @@ class KeyGestureRecognizer {
                 swipeRepeatTriggered ||
                 gestureConsumed)
         if (!shouldPerformClick) return UpOutcome(performClick = false, isDoubleTap = false)
-        if (!doubleTapEnabled) return UpOutcome(performClick = true, isDoubleTap = false)
+        if (!settings.doubleTap) return UpOutcome(performClick = true, isDoubleTap = false)
 
-        val isDoubleTap = maybeDoubleTap && nowMs - lastClickTime <= doubleTapTimeoutMs
+        val isDoubleTap = maybeDoubleTap && nowMs - lastClickTime <= settings.doubleTapTimeoutMs
         maybeDoubleTap = !isDoubleTap
         lastClickTime = nowMs
         return UpOutcome(performClick = true, isDoubleTap = isDoubleTap)
@@ -189,9 +218,11 @@ class KeyGestureRecognizer {
      * *next* touch complete a double tap.
      */
     fun resetForNextTouch() {
+        val settings = settings
+        frozen = null
         touchMovedOutside = false
-        if (swipeEnabled) {
-            if (swipeRepeatEnabled) swipeRepeatTriggered = false
+        if (settings.swipe) {
+            if (settings.swipeRepeat) swipeRepeatTriggered = false
             swipeXUnconsumed = 0f
             swipeYUnconsumed = 0f
             swipeTotalX = 0
@@ -202,8 +233,9 @@ class KeyGestureRecognizer {
 
     /** A cancelled gesture also forgets the pending double tap. */
     fun cancel() {
+        val doubleTap = settings.doubleTap
         resetForNextTouch()
-        if (doubleTapEnabled) {
+        if (doubleTap) {
             maybeDoubleTap = false
             lastClickTime = 0
         }
@@ -213,17 +245,17 @@ class KeyGestureRecognizer {
      * How many whole thresholds the finger crossed on [axis] since the last sample, carrying
      * the remainder forward so a slow drag still accumulates.
      */
-    private fun consumeSwipe(current: Float, axis: SwipeAxis): Int {
+    private fun consumeSwipe(current: Float, axis: SwipeAxis, settings: Settings): Int {
         val unconsumed: Float
         val threshold: Float
         when (axis) {
             SwipeAxis.X -> {
                 unconsumed = current - swipeLastX + swipeXUnconsumed
-                threshold = swipeThresholdX
+                threshold = settings.swipeThresholdX
             }
             SwipeAxis.Y -> {
                 unconsumed = current - swipeLastY + swipeYUnconsumed
-                threshold = swipeThresholdY
+                threshold = settings.swipeThresholdY
             }
         }
         val remains = unconsumed % threshold

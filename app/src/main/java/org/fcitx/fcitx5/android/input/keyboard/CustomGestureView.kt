@@ -123,23 +123,27 @@ open class CustomGestureView(ctx: Context) : FrameLayout(ctx) {
     }
 
     private fun resetState() {
-        if (longPressEnabled) {
-            longPressTriggered = false
-            longPressJob?.cancel()
-            longPressJob = null
-        }
-        if (repeatEnabled) {
-            repeatStarted = false
-            repeatJob?.cancel()
-            repeatJob = null
-        }
+        stopTimers()
         recognizer.resetForNextTouch()
+    }
+
+    /**
+     * Unconditionally: had a flag been turned off while the finger was down, a check here would
+     * leave a running repeat job behind for good.
+     */
+    private fun stopTimers() {
+        longPressTriggered = false
+        longPressJob?.cancel()
+        longPressJob = null
+        repeatStarted = false
+        repeatJob?.cancel()
+        repeatJob = null
     }
 
     fun cancelGestures() {
         isPressed = false
-        resetState()
-        // unlike a normal lift, a cancel also forgets a pending double tap
+        stopTimers()
+        // unlike a normal lift, a cancel also forgets a pending double tap (and resets the rest)
         recognizer.cancel()
     }
 
@@ -150,7 +154,8 @@ open class CustomGestureView(ctx: Context) : FrameLayout(ctx) {
         recognizer.viewWidth = width
         recognizer.viewHeight = height
         // longPressDelay is a live preference; the timers below read it per touch, so the
-        // double-tap window must too or the two drift apart after the user changes it
+        // double-tap window must too or the two drift apart after the user changes it (the
+        // recognizer freezes the value written at ACTION_DOWN for the rest of the touch)
         recognizer.doubleTapTimeoutMs = longPressDelay.toLong()
         val x = event.x
         val y = event.y
