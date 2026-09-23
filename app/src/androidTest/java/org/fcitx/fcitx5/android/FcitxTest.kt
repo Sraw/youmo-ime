@@ -6,15 +6,18 @@ package org.fcitx.fcitx5.android
 
 import android.os.SystemClock
 import androidx.test.platform.app.InstrumentationRegistry
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.MainScope
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.firstOrNull
-import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.mapNotNull
-import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.receiveAsFlow
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.withTimeoutOrNull
 import org.fcitx.fcitx5.android.core.Fcitx
 import org.fcitx.fcitx5.android.core.FcitxEvent
 import org.fcitx.fcitx5.android.core.RawConfig
@@ -62,37 +65,44 @@ class FcitxTest {
             val context = InstrumentationRegistry.getInstrumentation().targetContext
             fcitx = Fcitx(context)
 
-            // forward to our channel for point to point consuming
-            fcitx.eventFlow
-                .onEach {
+            // Forward to our channel for point to point consuming. UNDISPATCHED subscribes right
+            // here, before `start()`: eventFlow keeps no replay, so a ReadyEvent emitted before a
+            // dispatched collector got round to subscribing would be lost and setup would hang.
+            scope.launch(start = CoroutineStart.UNDISPATCHED) {
+                fcitx.eventFlow.collect {
                     if (it is FcitxEvent.InputPanelEvent) latestInputPanel = it.data
                     fcitxEventChannel.send(it)
                 }
-                .launchIn(scope)
+            }
             fcitx.start()
 
-            // wait fcitx started
+            // The Timeout rule covers tests, not @BeforeClass; bound this separately so a
+            // broken engine fails the run instead of hanging it.
             runBlocking {
-                receiveFirst<FcitxEvent.ReadyEvent>()
-                // Without an input context fcitx has nowhere to route keys: `sendKey` is
-                // accepted but produces no preedit and no candidates, so every test that waits
-                // for an event hangs. FcitxInputMethodService does this from `onBindInput` /
-                // `onStartInputView`; a bare engine has to do it itself.
-                fcitx.activate(TEST_UID, TEST_PKG_NAME)
-                fcitx.focus(true)
-                fcitx.setEnabledIme(arrayOf("pinyin"))
-                fcitx.setGlobalConfig(
-                    RawConfig(
-                        arrayOf(
-                            RawConfig(
-                                "Behavior", arrayOf(
-                                    RawConfig("ShowInputMethodInformation", false)
-                                )
+                withTimeout(60_000) { setUpEngine() }
+            }
+        }
+
+        private suspend fun setUpEngine() {
+            receiveFirst<FcitxEvent.ReadyEvent>()
+            // Without an input context fcitx has nowhere to route keys: `sendKey` is
+            // accepted but produces no preedit and no candidates, so every test that waits
+            // for an event hangs. FcitxInputMethodService does this from `onBindInput` /
+            // `onStartInputView`; a bare engine has to do it itself.
+            fcitx.activate(TEST_UID, TEST_PKG_NAME)
+            fcitx.focus(true)
+            fcitx.setEnabledIme(arrayOf("pinyin"))
+            fcitx.setGlobalConfig(
+                RawConfig(
+                    arrayOf(
+                        RawConfig(
+                            "Behavior", arrayOf(
+                                RawConfig("ShowInputMethodInformation", false)
                             )
                         )
                     )
                 )
-            }
+            )
         }
 
         @AfterClass
@@ -103,7 +113,15 @@ class FcitxTest {
                 fcitx.deactivate(TEST_UID)
             }
             fcitx.stop()
+            scope.cancel()
         }
+
+        /**
+         * How long the event channel must stay empty to count as drained. The collector runs on
+         * the main thread, which a GC or class loading on a loaded emulator can stall for a few
+         * hundred ms; this leaves headroom over that.
+         */
+        const val QUIET_MS = 500L
 
         /** Any uid works; fcitx only uses it to key its input context table. */
         const val TEST_UID = 0
@@ -118,9 +136,6 @@ class FcitxTest {
 
         private suspend inline fun <reified T : FcitxEvent<*>> receiveFirst(): T? =
             fcitxEventChannel.receiveAsFlow().mapNotNull { it as? T }.firstOrNull()
-
-        private suspend fun receiveFirstCandidateList() =
-            receiveFirst<FcitxEvent.CandidateListEvent>()
 
         private suspend fun receiveFirstCommitString() =
             receiveFirst<FcitxEvent.CommitStringEvent>()
@@ -143,8 +158,6 @@ class FcitxTest {
             }
         }
 
-        private suspend fun receiveFirstInputPanelAux() =
-            receiveFirst<FcitxEvent.InputPanelEvent>()
 
     }
 
@@ -157,13 +170,18 @@ class FcitxTest {
      * consume are still queued, and `receiveFirst*` returns the OLDEST match -- which shows up
      * as a test asserting on another test's input. Draining here makes the tests independent
      * of each other and of their declaration order.
+     *
+     * `reset()` returns before the events it causes have come through the collector, so a
+     * single sweep of the channel can finish before they land. Drain until it has been quiet
+     * for a while instead, then forget the last panel too.
      */
     @Before
     fun resetEngineAndDrainEvents() = runBlocking {
         fcitx.reset()
-        @Suppress("ControlFlowWithEmptyBody")
-        while (fcitxEventChannel.tryReceive().isSuccess) {
+        while (withTimeoutOrNull(QUIET_MS) { fcitxEventChannel.receive() } != null) {
+            // discard
         }
+        latestInputPanel = FcitxEvent.InputPanelEvent.Data()
         enabledIme = fcitx.enabledIme().map { it.uniqueName }
     }
 
@@ -248,9 +266,8 @@ class FcitxTest {
     // region pinyin decoding
 
     /**
-     * Reads cached state instead of waiting on the event stream: `sendString` emits one preedit
-     * event per keystroke, so taking the first would assert on "n" rather than the finished
-     * composition.
+     * Waits for the finished composition rather than taking the first preedit event:
+     * `sendString` produces one per keystroke, so the first would be "n".
      *
      * Uses the input panel's preedit, not [FcitxAPI.clientPreeditCached]. This test drives a
      * bare engine and never calls `setCapFlags`, so fcitx has no reason to believe the client
@@ -325,7 +342,7 @@ class FcitxTest {
     // region code table input
 
     @Test
-    fun wubiCommitsOnACompleteCode(): Unit = runBlocking {
+    fun wubiOffersCandidatesForAPartialCode(): Unit = runBlocking {
         fcitx.setEnabledIme(arrayOf("wbx"))
         sendString("wq")
         val candidates = fcitx.getCandidates(0, 16).map { it.text }
@@ -342,15 +359,10 @@ class FcitxTest {
         Timber.i("after first reset: ${fcitx.isEmpty()}")
         Assert.assertEquals(true, fcitx.isEmpty())
         fcitx.sendKey('a')
-        do {
-            val list = receiveFirstCandidateList()
-        } while (list!!.data.candidates.isNotEmpty())
+        // isEmpty() asks the engine directly, so there is no event to wait for
         Timber.i("after sending 'a': ${fcitx.isEmpty()}")
         Assert.assertEquals(false, fcitx.isEmpty())
         fcitx.reset()
-        do {
-            val list = receiveFirstCandidateList()
-        } while (list!!.data.candidates.isNotEmpty())
         Timber.i("after second reset: ${fcitx.isEmpty()}")
         Assert.assertEquals(true, fcitx.isEmpty())
     }

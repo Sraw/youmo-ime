@@ -19,6 +19,7 @@ import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.currentTime
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert
+import org.junit.Ignore
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -45,7 +46,7 @@ class TestHarnessSmokeTest {
         )
     }
 
-    /** kotlinx-coroutines-test: explicit time control, needed for long-press/repeat logic (P4). */
+    /** kotlinx-coroutines-test: explicit time control, needed for long-press/repeat logic. */
     @Test
     fun coroutinesTestAdvanceTimeByIsExplicit() = runTest {
         var fired = false
@@ -62,7 +63,7 @@ class TestHarnessSmokeTest {
         block()
     }
 
-    /** Turbine: assert on Flow emissions, needed for event-stream tests (P7). */
+    /** Turbine: assert on Flow emissions, needed for event-stream tests. */
     @Test
     fun turbineObservesFlowEmissions() = runTest {
         val flow = MutableSharedFlow<Int>(extraBufferCapacity = 4)
@@ -86,19 +87,27 @@ class TestHarnessSmokeTest {
     /**
      * Robolectric: a real Context and real framework behaviour on the JVM.
      *
-     * Pinned to SDK 35, one below the app's compileSdk. At SDK 36 Robolectric 4.17 dies in
-     * `ApplicationSharedMemory.create` with "Failed to interact with raw FileDescriptor
-     * internals" on JDK 21, and `--add-opens` does not help.
-     * Retry SDK 36 when Robolectric is next upgraded; this test is where you will find out.
+     * The SDK is pinned to 35 for every Robolectric test by `robolectric.properties`; see there
+     * for why.
      */
     @RunWith(RobolectricTestRunner::class)
-    @Config(sdk = [35])
     class RobolectricSmoke {
         @Test
-        fun providesRealContextAtTargetSdk() {
+        fun providesRealContextAtPinnedSdk() {
             val ctx = RuntimeEnvironment.getApplication()
             Assert.assertNotNull("Robolectric supplies an Application context", ctx)
-            Assert.assertEquals("running at the pinned SDK (see KDoc)", 35, Build.VERSION.SDK_INT)
+            Assert.assertEquals("running at the SDK robolectric.properties pins", 35, Build.VERSION.SDK_INT)
+        }
+
+        /**
+         * Canary: remove the @Ignore after upgrading Robolectric. If it passes, raise the pin in
+         * `robolectric.properties` to the app's compileSdk.
+         */
+        @Ignore("Robolectric 4.17 crashes at SDK 36 on JDK 21; retry after upgrading it")
+        @Test
+        @Config(sdk = [36])
+        fun runsAtCompileSdk() {
+            Assert.assertEquals(36, Build.VERSION.SDK_INT)
         }
 
         @Test
