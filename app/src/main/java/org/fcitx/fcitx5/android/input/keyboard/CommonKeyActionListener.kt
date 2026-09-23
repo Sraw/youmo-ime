@@ -61,16 +61,16 @@ class CommonKeyActionListener :
 
     // there should be a new fcitx API for this
     private suspend fun FcitxAPI.commitAndReset() {
-        if (inputMethodEntryCached.languageCode.startsWith("zh")) {
-            // Chinese: select 1st candidate, except prediction candidates
-            if (clientPreeditCached.isNotEmpty() || inputPanelCached.preedit.isNotEmpty()) {
-                // preedit not empty, maybe there are candidates to select ...
-                select(0)
-            }
-        } else {
-            // Other languages: commit preedit as-is. This runs on fcitx's thread pool, and the
-            // composing state belongs to the main thread.
-            withContext(Dispatchers.Main) { service.finishComposing() }
+        val resolution = PendingInputPolicy.resolve(
+            inputMethodEntryCached.languageCode,
+            hasPreedit = clientPreeditCached.isNotEmpty() || inputPanelCached.preedit.isNotEmpty()
+        )
+        when (resolution) {
+            PendingInputPolicy.Resolution.SelectFirstCandidate -> select(0)
+            // This runs on fcitx's thread pool, and the composing state belongs to the main thread.
+            PendingInputPolicy.Resolution.FinishComposing ->
+                withContext(Dispatchers.Main) { service.finishComposing() }
+            PendingInputPolicy.Resolution.None -> {}
         }
         reset()
     }

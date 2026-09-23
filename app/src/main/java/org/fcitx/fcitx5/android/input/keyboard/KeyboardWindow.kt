@@ -115,24 +115,27 @@ class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), Essentia
         }
     }
 
+    private val layoutSwitchPolicy by lazy {
+        LayoutSwitchPolicy(keyboards.keys, TextKeyboard.Name, PickerWindow.Key.Symbol.name)
+    }
+
     fun switchLayout(to: String, remember: Boolean = true) {
-        val target = to.ifEmpty { lastSymbolType }
+        // read now, as before: the memory is what it was when the key was pressed
+        val lastSymbol = lastSymbolType
         ContextCompat.getMainExecutor(context).execute {
-            if (keyboards.containsKey(target)) {
-                if (remember && target != TextKeyboard.Name) {
-                    lastSymbolType = target
+            val outcome = layoutSwitchPolicy.switchTo(to, lastSymbol, currentKeyboardName, remember)
+            outcome.remember?.let { lastSymbolType = it }
+            when (val target = outcome.target) {
+                LayoutSwitchPolicy.Target.Unchanged -> {}
+                is LayoutSwitchPolicy.Target.Keyboard -> {
+                    detachCurrentLayout()
+                    attachLayout(target.name)
+                    if (windowManager.isAttached(this)) {
+                        notifyBarLayoutChanged()
+                    }
                 }
-                if (target == currentKeyboardName) return@execute
-                detachCurrentLayout()
-                attachLayout(target)
-                if (windowManager.isAttached(this)) {
-                    notifyBarLayoutChanged()
-                }
-            } else {
-                if (remember) {
-                    lastSymbolType = PickerWindow.Key.Symbol.name
-                }
-                windowManager.attachWindow(PickerWindow.Key.Symbol)
+                LayoutSwitchPolicy.Target.SymbolPicker ->
+                    windowManager.attachWindow(PickerWindow.Key.Symbol)
             }
         }
     }
