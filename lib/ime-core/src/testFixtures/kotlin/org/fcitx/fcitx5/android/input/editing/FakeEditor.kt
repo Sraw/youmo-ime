@@ -20,14 +20,13 @@ class FakeEditor(
     initial: String = "",
     cursor: Int = initial.length,
     /**
-     * Where `commitText`/`setComposingText` leave the cursor changed across Android versions.
-     * Newer ones (seen at API 35) follow the documented rule, measured on the new text. Older
-     * ones (seen at API 23) place the cursor in the old text and let the edit carry it. The two
-     * differ only for `newCursorPosition == 0` at a collapsed cursor: the older ones leave it
-     * after the new text instead of before it. The exact version of the change was not pinned
-     * down.
+     * `commitText`/`setComposingText` place the cursor in the old text, clamped to it, and let
+     * the edit carry it along (read from AOSP's `replaceTextInternal`). Newer versions (seen at
+     * API 35, not at API 23; the exact version was not pinned down) then put it back for
+     * `newCursorPosition == 0` at a collapsed cursor, so it ends up before the new text rather
+     * than carried after it.
      */
-    private val documentedCursorPlacement: Boolean = true,
+    private val reselectsZeroAfterInsert: Boolean = true,
 ) : InputEditor {
 
     /** Set to false to model the gap between input sessions, when there is no connection. */
@@ -97,16 +96,11 @@ class FakeEditor(
             b = selectionEnd.coerceAtLeast(0)
             if (b < a) a = b.also { b = a }
         }
-        val cursor = if (documentedCursorPlacement) {
-            buffer.replace(a, b, text)
-            val c = if (newCursorPosition > 0) a + text.length + newCursorPosition - 1 else a + newCursorPosition
-            c.coerceIn(0, buffer.length)
-        } else {
-            // placed in the old text, then carried along by the edit
-            val c = (if (newCursorPosition > 0) newCursorPosition + b - 1 else newCursorPosition + a)
-                .coerceIn(0, buffer.length)
-            shift(c, a, b, text.length).also { buffer.replace(a, b, text) }
-        }
+        val c = (if (newCursorPosition > 0) newCursorPosition + b - 1 else newCursorPosition + a)
+            .coerceIn(0, buffer.length)
+        var cursor = shift(c, a, b, text.length)
+        buffer.replace(a, b, text)
+        if (reselectsZeroAfterInsert && newCursorPosition == 0 && a == b) cursor = c
         selectionStart = cursor
         selectionEnd = cursor
         if (composing && text.isNotEmpty()) {
@@ -168,8 +162,7 @@ class FakeEditor(
     /**
      * Deletes around the selection -- widened to take in the composing region, so composing
      * text itself is never deleted -- and never the selection itself.
-     */
-    /**
+     *
      * The composing arguments are what the caller believes; this editor, like a real one,
      * works the widening out from its own composing region instead.
      */

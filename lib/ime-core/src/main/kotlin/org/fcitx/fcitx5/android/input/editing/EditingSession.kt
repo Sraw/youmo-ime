@@ -251,7 +251,18 @@ class EditingSession(
         val lastSelection = selection.latest
         if (lastSelection.isEmpty()) return
         selection.predict(lastSelection.start)
-        editor.commitText("", 1)
+        if (composing.isEmpty()) {
+            editor.commitText("", 1)
+            return
+        }
+        // A commit replaces the composing region, not the selection, so the composition is
+        // finished (kept as typed) first. Only the backspace swipe deletes a selection, and it
+        // does not when anything is composed, so this is defence rather than a path in use.
+        resetComposingState()
+        editor.batchEdit {
+            editor.finishComposingText()
+            editor.commitText("", 1)
+        }
     }
 
     /**
@@ -337,6 +348,10 @@ class EditingSession(
      */
     fun backspace(traits: EditorTraits): Boolean {
         checkThread()
+        // Backspace only gets here when fcitx passed it on, which it does not while it has a
+        // preedit; a composing region left in the editor is stale, so it is finished (kept as
+        // typed) and the deletion works on plain text, predictably.
+        finishComposition()
         val lastSelection = selection.latest
         var direct = editor.isAvailable && traits.acceptsDeleteSurrounding &&
             !traits.isRawKeyInput && (lastSelection.isNotEmpty() || lastSelection.start > 0)
@@ -390,7 +405,10 @@ class EditingSession(
         val wanted = count * 2 + overhang // enough for every code point to be a surrogate pair
         val text = editor.textBeforeCursor(wanted) ?: return count
         // Shorter than the cursor position allows means the editor held text back, not that
-        // the text starts there; counting what came back would under-predict.
+        // the text starts there; counting what came back would under-predict. (Below API 24,
+        // InputConnectionEditor cannot tell the two apart and measures what came back, so for
+        // such an editor the deletion can fall short of this prediction; the next cursor report
+        // then corrects it.)
         if (text.length < minOf(wanted, cursor)) return count
         return CodePoints.lengthOfLast(text.subSequence(0, text.length - overhang), count)
     }

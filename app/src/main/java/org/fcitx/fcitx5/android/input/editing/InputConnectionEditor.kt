@@ -58,11 +58,13 @@ class InputConnectionEditor(private val connection: () -> InputConnection?) : In
             // No code-point variant before API 24: measure the code points and delete that
             // many units, so a surrogate pair is never split. The editor deletes from the edges
             // of the composing region where that sticks out past the selection, so measure from
-            // there. Unmeasurable counts as one unit per code point, which is what the plain
-            // variant would have done anyway; fewer units than asked for cannot hold that many
-            // code points, so a shorter answer means the editor held text back (some return ""
-            // rather than null). Malformed text is refused outright, as the code-point variant
-            // refuses it.
+            // there. Unmeasurable (no text at all) counts as one unit per code point, which is
+            // what the plain variant would have done anyway. A shorter answer than asked for is
+            // taken as the end of the text: the request is a few units, far below any limit an
+            // editor puts on what it reveals. (EditingSession, which knows the cursor, predicts
+            // `count` units for a read that stops short of the text's start; an editor revealing
+            // less than a few units would make the two disagree until the next cursor report.)
+            // Malformed text is refused outright, as the code-point variant refuses it.
             else -> {
                 val unitsBefore = measure(before, composingBefore, fromEnd = true) {
                     ic.getTextBeforeCursor(it, 0)
@@ -87,7 +89,7 @@ class InputConnectionEditor(private val connection: () -> InputConnection?) : In
     ): Int? {
         if (count <= 0) return 0
         val n = count.coerceAtMost(MAX_MEASURED)
-        val text = fetch(n * 2 + skip)?.takeIf { it.length >= n + skip } ?: return count
+        val text = fetch(n * 2 + skip)?.takeIf { it.length > skip } ?: return count
         return if (fromEnd) {
             CodePoints.lengthOfLast(text.subSequence(0, text.length - skip), n)
         } else {

@@ -40,13 +40,17 @@ open class InputEditorContractTest {
 
     private interface Subject {
         val editor: InputEditor
+
+        /** Where a random sequence records what the editor returned along the way. */
+        var returned: MutableList<String>
         fun outcome(returned: List<String>): Outcome
     }
 
     private class Fake(text: String, selStart: Int, selEnd: Int) : Subject {
-        private val fake = FakeEditor(text, selStart, documentedCursorPlacement = Build.VERSION.SDK_INT > 23)
+        private val fake = FakeEditor(text, selStart, reselectsZeroAfterInsert = Build.VERSION.SDK_INT > 23)
             .apply { reportSelection(selStart, selEnd) }
         override val editor: InputEditor = fake
+        override var returned = mutableListOf<String>()
 
         override fun outcome(returned: List<String>) = Outcome(
             fake.text,
@@ -65,6 +69,7 @@ open class InputEditorContractTest {
                 override fun getEditable() = this@Real.editable
             }
         override val editor: InputEditor = InputConnectionEditor { connection }
+        override var returned = mutableListOf<String>()
 
         override fun outcome(returned: List<String>) = Outcome(
             editable.toString(),
@@ -260,6 +265,56 @@ open class InputEditorContractTest {
             },
         )
     )
+
+    /**
+     * Random sequences of every operation, text with surrogate pairs and the odd lone surrogate,
+     * positions in and out of range. Seeded, so a failure names a reproducible sequence.
+     */
+    @Test
+    fun randomSequences() {
+        val random = kotlin.random.Random(20260923)
+        val alphabet = listOf("a", "b", "c", wave, wave, "$high", "$low")
+        fun text(max: Int) = (0 until random.nextInt(max + 1)).joinToString("") { alphabet.random(random) }
+        val scenarios = (0 until 300).map { n ->
+            val initial = text(8)
+            val start = random.nextInt(initial.length + 1)
+            val end = random.nextInt(initial.length + 1)
+            val ops = (0 until random.nextInt(1, 7)).map {
+                val a = random.nextInt(-1, 12)
+                val b = random.nextInt(-1, 12)
+                val t = text(3)
+                val ncp = random.nextInt(-3, 4)
+                when (random.nextInt(8)) {
+                    0 -> "commitText($t, $ncp)" to { e: Subject -> e.editor.commitText(t, ncp) }
+                    1 -> "setComposingText($t, $ncp)" to { e: Subject -> e.editor.setComposingText(t, ncp) }
+                    2 -> "setSelection($a, $b)" to { e: Subject -> e.editor.setSelection(a, b) }
+                    3 -> "setComposingRegion($a, $b)" to { e: Subject -> e.editor.setComposingRegion(a, b) }
+                    4 -> "finishComposingText()" to { e: Subject -> e.editor.finishComposingText() }
+                    5 -> "deleteSurroundingText($a, $b, units)" to { e: Subject ->
+                        e.editor.deleteSurroundingText(a, b, inCodePoints = false)
+                    }
+                    6 -> "deleteSurroundingText($a, $b, code points)" to { e: Subject ->
+                        // the composing overhang, as EditingSession works it out
+                        val o = e.outcome(emptyList())
+                        val (s0, s1) = o.selection.let { minOf(it.first, it.second) to maxOf(it.first, it.second) }
+                        val (c0, c1) = o.composing
+                        val before = if (c0 < 0) 0 else (s0 - c0).coerceAtLeast(0)
+                        val after = if (c0 < 0) 0 else (c1 - s1).coerceAtLeast(0)
+                        e.editor.deleteSurroundingText(a, b, inCodePoints = true, before, after)
+                    }
+                    else -> "textBeforeCursor($a)" to { e: Subject ->
+                        e.returned += "${e.editor.textBeforeCursor(a.coerceAtLeast(0))}"
+                    }
+                }
+            }
+            Scenario("#$n '$initial' [$start,$end]: ${ops.joinToString { it.first }}", initial, start, end) { returned ->
+                this.returned = returned
+                ops.forEach { (_, op) -> op(this) }
+                returned += "${editor.textBeforeCursor(20)}"
+            }
+        }
+        run(scenarios)
+    }
 
     /**
      * The same contract at API 23, the app's minSdk. There is no

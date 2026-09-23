@@ -171,6 +171,79 @@ open class EditingSessionOverRealEditorTest {
         },
     )
 
+    /**
+     * Random sessions: the operations the service drives, plus the user moving the cursor, in
+     * any order over text with surrogate pairs. After each step the prediction must be where the
+     * editor is, and the text must be what a session over [FakeEditor] (held to the platform by
+     * `InputEditorContractTest`) produced -- right cursor, right text. Every step's report is fed
+     * back as the service would. Seeded, so a failure names a reproducible sequence.
+     */
+    @Test
+    fun randomSessions() {
+        val random = kotlin.random.Random(20260923)
+        val alphabet = listOf("a", "b", "c", wave, wave)
+        fun text(max: Int) = (0 until random.nextInt(max + 1)).joinToString("") { alphabet.random(random) }
+        val failures = mutableListOf<String>()
+        repeat(300) { n ->
+            val initial = text(6)
+            val setup = Setup(initial, initial.length)
+            val fake = FakeEditor(initial, initial.length, reselectsZeroAfterInsert = android.os.Build.VERSION.SDK_INT > 23)
+            val twin = EditingSession(fake).apply { selection.resetTo(initial.length) }
+            val log = mutableListOf<String>()
+            for (step in 0 until random.nextInt(1, 10)) {
+                val t = text(3)
+                val k = random.nextInt(0, 4)
+                val at = random.nextInt(0, 12)
+                // the second argument sends the Backspace key event when the session declines
+                val op: Pair<String, EditingSession.(sendKey: () -> Unit) -> Unit> = when (random.nextInt(10)) {
+                    0 -> "commitText($t)" to { commitText(t) }
+                    1 -> "commitText($t, cursor $k)" to { commitText(t, k.coerceAtMost(t.length)) }
+                    2 -> "preedit($t, $k)" to { updateComposingText(preedit(t, k.coerceAtMost(t.length))) }
+                    3 -> "preedit(empty)" to { updateComposingText(FormattedText.Empty) }
+                    4 -> "deleteSurrounding($k, 0)" to { deleteSurrounding(k, 0, inCodePoints = true) }
+                    5 -> "backspace" to { sendKey -> if (!backspace(EditorTraits(acceptsDeleteSurrounding = true))) sendKey() }
+                    6 -> "select back $k" to { applySelectionOffset(-k) }
+                    7 -> "cancelSelection" to { cancelSelection() }
+                    8 -> "user taps at $at" to {} // applied to the editors below
+                    else -> "deleteSelection" to { deleteSelection() }
+                }
+                log += op.first
+                val name = "#$n '$initial': ${log.joinToString()}"
+                // With direct deletion on, the key event only goes at the very start, where it
+                // does nothing, or before an unpaired surrogate, which DEL removes as one unit.
+                setup.session.(op.second) {
+                    val c = Selection.getSelectionStart(setup.editable)
+                    if (c > 0) {
+                        if (!Character.isSurrogate(setup.editable[c - 1])) failures += "$name: key event at $c in '${setup.editable}'"
+                        setup.editable.delete(c - 1, c)
+                    }
+                }
+                twin.(op.second) {
+                    if (fake.selectionStart > 0) fake.deleteSurroundingText(1, 0, inCodePoints = false)
+                }
+                if (op.first.startsWith("user taps")) {
+                    Selection.setSelection(setup.editable, at.coerceAtMost(setup.editable.length))
+                    fake.reportSelection(at.coerceAtMost(fake.text.length), at.coerceAtMost(fake.text.length))
+                } else {
+                    setup.mismatch(name)?.let { failures += it }
+                }
+                if (fake.text != setup.editable.toString()) {
+                    failures += "$name: text '${setup.editable}', expected '${fake.text}'"
+                }
+                // the editor's report for this step, as the service would pass it on
+                setup.session.onCursorUpdate(
+                    Selection.getSelectionStart(setup.editable), Selection.getSelectionEnd(setup.editable),
+                    BaseInputConnection.getComposingSpanStart(setup.editable),
+                    BaseInputConnection.getComposingSpanEnd(setup.editable),
+                    ignoreSystemCursor = false,
+                )
+                twin.onCursorUpdate(fake.selectionStart, fake.selectionEnd, fake.composingStart, fake.composingEnd, ignoreSystemCursor = false)
+                if (failures.isNotEmpty()) break
+            }
+        }
+        assertTrue(failures.take(5).joinToString("\n"), failures.isEmpty())
+    }
+
     /** The same at the app's minSdk, where [InputConnectionEditor] measures code points itself. */
     @Config(sdk = [23])
     class AtMinSdk : EditingSessionOverRealEditorTest()

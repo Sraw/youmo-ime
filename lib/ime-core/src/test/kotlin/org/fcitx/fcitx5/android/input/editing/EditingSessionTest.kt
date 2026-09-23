@@ -205,6 +205,21 @@ class EditingSessionTest {
         assertTrue("the editor was not touched", e.calls.isEmpty())
     }
 
+    /** A commit replaces the composing region, not the selection, so the composition goes first. */
+    @Test
+    fun deletingASelectionWhileComposingDeletesTheSelection() {
+        val (s, e) = session("abcnihao", cursor = 8)
+        e.setComposingRegion(3, 8)
+        s.compose("nihao", start = 3)
+        s.applySelectionOffset(-8, -6) // select "ab"
+        s.deleteSelection()
+        assertEquals("cnihao", e.text)
+        assertTrue(s.composing.isEmpty())
+        assertEquals("the editor's composition is finished too", -1, e.composingStart)
+        assertEquals("in one batch", 1, e.maxBatchDepth)
+        assertTrue(s.selection.latest.rangeEquals(e.selectionStart, e.selectionEnd))
+    }
+
     // endregion
 
     // region applySelectionOffset
@@ -554,6 +569,30 @@ class EditingSessionTest {
         e.isAvailable = false
         assertFalse(s.backspace(optedIn))
         assertTrue(e.calls.isEmpty())
+    }
+
+    /** fcitx only passes Backspace on with no preedit; a composition left over is stale. */
+    @Test
+    fun backspaceFinishesALeftoverCompositionAndDeletesBeforeTheCursor() {
+        val (s, e) = session("abnihao", cursor = 7)
+        e.setComposingRegion(2, 7)
+        s.compose("nihao", start = 2)
+        assertTrue(s.backspace(EditorTraits(acceptsDeleteSurrounding = true)))
+        assertEquals("the character before the cursor, not before the composition", "abniha", e.text)
+        assertTrue(s.composing.isEmpty())
+        assertEquals(-1, e.composingStart)
+        assertTrue(s.selection.latest.rangeEquals(e.selectionStart))
+    }
+
+    @Test
+    fun aKeyEventBackspaceAlsoFinishesALeftoverComposition() {
+        val (s, e) = session("abnihao", cursor = 7)
+        e.setComposingRegion(2, 7)
+        s.compose("nihao", start = 2)
+        e.calls.clear()
+        assertFalse(s.backspace(EditorTraits()))
+        assertEquals(listOf("finishComposingText()"), e.calls)
+        assertTrue(s.composing.isEmpty())
     }
 
     // endregion
