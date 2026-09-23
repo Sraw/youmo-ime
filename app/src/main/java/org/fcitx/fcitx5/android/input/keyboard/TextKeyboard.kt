@@ -8,6 +8,7 @@ import android.annotation.SuppressLint
 import android.content.Context
 import android.view.View
 import androidx.annotation.Keep
+import androidx.core.view.ViewCompat
 import androidx.core.view.allViews
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.core.InputMethodEntry
@@ -170,6 +171,12 @@ class TextKeyboard(
             append(ime.displayName)
             ime.subMode.run { label.ifEmpty { name.ifEmpty { null } } }?.let { append(" ($it)") }
         }
+        // A change of input method (or of its sub-mode, e.g. an ASCII toggle) is otherwise
+        // silent: the name is only on the Space key, which the user is not touching. The first
+        // update is the keyboard appearing, which TalkBack announces itself. A change made while
+        // another layout was showing is announced on returning to this one.
+        if (shownImeName != null && shownImeName != imeName) announce(imeName)
+        shownImeName = imeName
         space.mainText.text = imeName
         // TalkBack reads the key's description instead of the text drawn on it, so the name
         // has to be in the description too
@@ -224,6 +231,20 @@ class TextKeyboard(
         updateAlphabetKeys()
     }
 
+    /** The input method name last shown on the Space key; null until the first update. */
+    private var shownImeName: String? = null
+
+    /**
+     * `announceForAccessibility` is deprecated from API 36 in favour of describing the UI
+     * (state descriptions, live regions). Neither fits the input method name: it is on the
+     * Space key, which the user is not touching, and a live region there would speak every
+     * time the keyboard is rebuilt.
+     */
+    @Suppress("DEPRECATION")
+    private fun announce(text: CharSequence?) {
+        if (!text.isNullOrEmpty()) announceForAccessibility(text)
+    }
+
     private fun updateCapsButtonIcon() {
         caps.img.apply {
             imageResource = when (capsState) {
@@ -232,12 +253,15 @@ class TextKeyboard(
                 CapsState.Lock -> R.drawable.ic_capslock_lock
             }
         }
-        // the icon carries the state, so the label has to as well
-        caps.contentDescription = context.getString(
+        // The icon carries the state, so accessibility has to as well. As a state description
+        // TalkBack speaks it when it changes on the focused key -- the user pressing Shift --
+        // but not when Shift lets go by itself after a letter, when another key has focus.
+        ViewCompat.setStateDescription(
+            caps,
             when (capsState) {
-                CapsState.None -> R.string.a11y_key_shift
-                CapsState.Once -> R.string.a11y_key_shift_once
-                CapsState.Lock -> R.string.a11y_key_shift_lock
+                CapsState.None -> null
+                CapsState.Once -> context.getString(R.string.a11y_state_shift_once)
+                CapsState.Lock -> context.getString(R.string.a11y_state_caps_lock)
             }
         )
     }

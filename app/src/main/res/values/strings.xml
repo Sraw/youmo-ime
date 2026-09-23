@@ -326,8 +326,8 @@
          and are also what UI automation uses to find a control, so they must stay unique and
          descriptive. Keys that show text do not need one: their label is already announced. -->
     <string name="a11y_key_shift">Shift</string>
-    <string name="a11y_key_shift_once">Shift, on for one letter</string>
-    <string name="a11y_key_shift_lock">Caps lock</string>
+    <string name="a11y_state_shift_once">On for one letter</string>
+    <string name="a11y_state_caps_lock">Caps lock</string>
     <string name="a11y_key_backspace">Backspace</string>
     <string name="a11y_key_enter">Enter</string>
     <string name="a11y_key_action_go">Go</string>
