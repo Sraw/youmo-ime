@@ -71,10 +71,12 @@ jobs:
 
       # :lib:ime-core is a plain JVM module: no Android SDK, no resource merging, seconds to
       # run. Kept as a separate step so a failure there is obviously a logic failure rather
-      # than an Android build problem. `check` = tests plus the Android API level guard
-      # (animal-sniffer), which Android lint cannot provide for a JVM module.
-      - name: Run core logic tests and API level check
-        run: ./gradlew :lib:ime-core:check
+      # than an Android build problem. `check` = tests, the Android API level guard
+      # (animal-sniffer, which Android lint cannot provide for a JVM module) and the coverage
+      # floors (Kover).
+      # --continue: the coverage report is wanted most when a check has failed
+      - name: Run core logic tests, API level check and coverage floors
+        run: ./gradlew --continue :lib:ime-core:check :lib:ime-core:koverHtmlReport
 
       # debug variant only: AGP unit-tests just the testBuildType (debug) unless told otherwise
       - name: Run app unit tests
@@ -113,6 +115,7 @@ jobs:
           path: |
             lib/ime-core/build/reports/tests/
             lib/ime-core/build/reports/animalsniffer/
+            lib/ime-core/build/reports/kover/
             lib/ime-core/build/test-results/
             app/build/reports/tests/
             app/build/test-results/

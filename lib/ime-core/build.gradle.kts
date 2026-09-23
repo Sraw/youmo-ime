@@ -13,6 +13,7 @@ plugins {
     `java-test-fixtures`
     alias(libs.plugins.kotlin.jvm)
     alias(libs.plugins.animalsniffer)
+    alias(libs.plugins.kover)
 }
 
 // The bytecode target alone does not stop code from calling APIs newer than Android has: this
@@ -53,5 +54,31 @@ dependencies {
 tasks.withType<Test>().configureEach {
     testLogging {
         events("failed")
+    }
+}
+
+// Coverage floors. This module holds the logic that is hard to get right and easy to break
+// quietly -- cursor prediction, editing, gestures -- and most of it is fully tested; the floors
+// keep it that way. `./gradlew :lib:ime-core:koverLog` prints the current numbers (at the time
+// of writing: 92% of lines overall; input/* 97-100%, core 64%, being mostly key tables --
+// adding untested tables there will need its floor looked at).
+// Part of `check`.
+kover {
+    currentProject {
+        sources {
+            // FakeEditor is test code, whatever source set it lives in
+            excludedSourceSets.add("testFixtures")
+        }
+    }
+    reports {
+        verify {
+            rule("line coverage, whole module") {
+                minBound(90)
+            }
+            rule("line coverage, every package") {
+                groupBy.set(kotlinx.kover.gradle.plugin.dsl.GroupingEntityType.PACKAGE)
+                minBound(60)
+            }
+        }
     }
 }
