@@ -116,6 +116,10 @@ class EditingSession(
     /**
      * Moves each end of the selection by the given offset, clamped at the start of the buffer.
      * An offset that would invert the range is ignored rather than applied backwards.
+     *
+     * The end is not clamped at the end of the text, whose length the session does not know;
+     * an editor ignores a selection past it, leaving the prediction unconfirmed until the next
+     * report. The one caller, the backspace swipe, only ever moves the start.
      */
     fun applySelectionOffset(offsetStart: Int, offsetEnd: Int = 0) {
         checkThread()
@@ -150,10 +154,31 @@ class EditingSession(
     fun deleteSurrounding(before: Int, after: Int, inCodePoints: Boolean) {
         checkThread()
         if (!editor.isAvailable) return
+        val (overhangBefore, overhangAfter) = composingOverhang()
         if (before > 0) {
-            selection.predictOffset(-(if (inCodePoints) unitsBeforeCursor(before) else before))
+            // null: malformed text, which the editor refuses to delete at all
+            val units = if (inCodePoints) {
+                unitsBeforeCursor(before, overhangBefore) ?: 0
+            } else {
+                before.coerceAtMost(selection.latest.start - overhangBefore)
+            }
+            if (units > 0) {
+                selection.predictOffset(-units)
+                // the deletion is before the composition too, so it moves along
+                if (composing.isNotEmpty()) composing.offset(-units)
+            }
         }
-        editor.deleteSurroundingText(before, after, inCodePoints)
+        editor.deleteSurroundingText(before, after, inCodePoints, overhangBefore, overhangAfter)
+    }
+
+    /**
+     * How far the composing region sticks out beyond the selection on each side, in units.
+     * The editor deletes around the union of the two, never the composing text itself.
+     */
+    private fun composingOverhang(): Pair<Int, Int> {
+        if (composing.isEmpty()) return 0 to 0
+        val sel = selection.latest
+        return (sel.start - composing.start).coerceAtLeast(0) to (composing.end - sel.end).coerceAtLeast(0)
     }
 
     /**
@@ -168,8 +193,16 @@ class EditingSession(
     fun backspace(traits: EditorTraits): Boolean {
         checkThread()
         val lastSelection = selection.latest
-        val direct = editor.isAvailable && traits.acceptsDeleteSurrounding &&
+        var direct = editor.isAvailable && traits.acceptsDeleteSurrounding &&
             !traits.isRawKeyInput && (lastSelection.isNotEmpty() || lastSelection.start > 0)
+        // A direct deletion is a known code point, so it is measured -- a round trip per press,
+        // but only for editors that opted in. Malformed text (an unpaired surrogate) would be
+        // refused by a code-point deletion, so that one goes as a key event, which removes it.
+        var directUnits = 1
+        if (direct && lastSelection.isEmpty()) {
+            val measured = unitsBeforeCursor(1, overhang = 0)
+            if (measured == null) direct = false else directUnits = measured
+        }
         // With no editor the key event the caller falls back to goes nowhere either, so there
         // is no move to predict.
         if (editor.isAvailable) {
@@ -177,10 +210,9 @@ class EditingSession(
                 selection.predict(lastSelection.start)
             } else if (lastSelection.start > 0) {
                 // A key event deletes whatever the editor thinks one character is, which can
-                // only be guessed at; asking the editor would add a round trip to every press, so
-                // the guess stays at one unit. A direct deletion is a known code point, so it is
-                // measured -- a round trip per press, but only for editors that opted in.
-                selection.predictOffset(-(if (direct) unitsBeforeCursor(1) else 1))
+                // only be guessed at; asking the editor would add a round trip to every press,
+                // so the guess stays at one unit.
+                selection.predictOffset(-(if (direct) directUnits else 1))
             }
         }
         if (!direct) return false
@@ -193,16 +225,29 @@ class EditingSession(
     }
 
     /**
-     * How many UTF-16 units the last [codePoints] code points before the cursor take up.
-     * Falls back to assuming one unit each when the editor will not show enough text to tell.
+     * How many UTF-16 units deleting [codePoints] code points before the cursor removes -- and
+     * so how far the cursor moves back.
+     *
+     * The editor deletes before the composing region when it starts before the cursor
+     * ([overhang] units of composing text), not before the cursor, so the text is measured from
+     * there. When the editor will not show enough text to tell, one unit per code point is
+     * assumed.
+     *
+     * @return null for malformed text (an unpaired surrogate in the way), which the editor
+     * refuses to delete, so nothing moves
      */
-    private fun unitsBeforeCursor(codePoints: Int): Int {
-        val wanted = codePoints * 2 // enough for any code point to be a surrogate pair
-        val text = editor.textBeforeCursor(wanted) ?: return codePoints
+    private fun unitsBeforeCursor(codePoints: Int, overhang: Int): Int? {
+        val cursor = selection.latest.start
+        val boundary = cursor - overhang
+        if (boundary <= 0) return 0
+        // more code points than there are units cannot exist; also keeps the arithmetic small
+        val count = codePoints.coerceAtMost(boundary)
+        val wanted = count * 2 + overhang // enough for every code point to be a surrogate pair
+        val text = editor.textBeforeCursor(wanted) ?: return count
         // Shorter than the cursor position allows means the editor held text back, not that
         // the text starts there; counting what came back would under-predict.
-        if (text.length < minOf(wanted, selection.latest.start)) return codePoints
-        return CodePoints.lengthOfLast(text, codePoints)
+        if (text.length < minOf(wanted, cursor)) return count
+        return CodePoints.lengthOfLast(text.subSequence(0, text.length - overhang), count)
     }
 
     /**

@@ -8,6 +8,9 @@
 // testable in milliseconds, with no emulator, no Robolectric and no Android SDK.
 plugins {
     `java-library`
+    // FakeEditor lives in testFixtures so :app's contract test can hold it against the real
+    // BaseInputConnection
+    `java-test-fixtures`
     alias(libs.plugins.kotlin.jvm)
     alias(libs.plugins.animalsniffer)
 }

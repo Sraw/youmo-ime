@@ -17,8 +17,8 @@ import org.junit.Test
  * Decoding `EditorInfo`'s bit fields. Each bit is read out of a field that packs several
  * others, so each case sets a neighbour too, to catch a mask that is too wide or too narrow.
  *
- * Plain JUnit, no Robolectric: `EditorInfo` is only a bag of public fields, and its stub
- * constructor is harmless because the build sets `isReturnDefaultValues = true`.
+ * Plain JUnit, no Robolectric: `EditorInfo` is only a bag of public fields, and constructing
+ * one does not reach any stubbed framework method.
  */
 class EditorInfoTraitsTest {
 

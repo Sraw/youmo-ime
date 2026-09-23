@@ -39,26 +39,61 @@ class InputConnectionEditor(private val connection: () -> InputConnection?) : In
     override fun textBeforeCursor(length: Int): CharSequence? =
         connection()?.getTextBeforeCursor(length, 0)
 
-    override fun deleteSurroundingText(before: Int, after: Int, inCodePoints: Boolean) {
+    override fun deleteSurroundingText(
+        before: Int,
+        after: Int,
+        inCodePoints: Boolean,
+        composingBefore: Int,
+        composingAfter: Int,
+    ) {
         val ic = connection() ?: return
         when {
             !inCodePoints -> ic.deleteSurroundingText(before, after)
             Build.VERSION.SDK_INT >= Build.VERSION_CODES.N ->
                 ic.deleteSurroundingTextInCodePoints(before, after)
             // No code-point variant before API 24: measure the code points and delete that
-            // many units, so a surrogate pair is never split. Unmeasurable counts as one unit
-            // per code point, which is what the plain variant would have done anyway. Fewer
-            // than `n` units cannot hold `n` code points, so a shorter answer means the editor
-            // held text back (some return "" rather than null) and is unmeasurable too.
-            else -> ic.deleteSurroundingText(
-                if (before == 0) 0 else ic.getTextBeforeCursor(before * 2, 0)
-                    ?.takeIf { it.length >= before }
-                    ?.let { CodePoints.lengthOfLast(it, before) } ?: before,
-                if (after == 0) 0 else ic.getTextAfterCursor(after * 2, 0)
-                    ?.takeIf { it.length >= after }
-                    ?.let { CodePoints.lengthOfFirst(it, after) } ?: after,
-            )
+            // many units, so a surrogate pair is never split. The editor deletes from the edges
+            // of the composing region where that sticks out past the selection, so measure from
+            // there. Unmeasurable counts as one unit per code point, which is what the plain
+            // variant would have done anyway; fewer units than asked for cannot hold that many
+            // code points, so a shorter answer means the editor held text back (some return ""
+            // rather than null). Malformed text is refused outright, as the code-point variant
+            // refuses it.
+            else -> {
+                val unitsBefore = measure(before, composingBefore, fromEnd = true) {
+                    ic.getTextBeforeCursor(it, 0)
+                } ?: return
+                val unitsAfter = measure(after, composingAfter, fromEnd = false) {
+                    ic.getTextAfterCursor(it, 0)
+                } ?: return
+                ic.deleteSurroundingText(unitsBefore, unitsAfter)
+            }
         }
+    }
+
+    /**
+     * Units taken by [count] code points beyond [skip] units of composing text, reading
+     * outwards from the cursor; null for malformed text.
+     */
+    private inline fun measure(
+        count: Int,
+        skip: Int,
+        fromEnd: Boolean,
+        fetch: (Int) -> CharSequence?,
+    ): Int? {
+        if (count <= 0) return 0
+        val n = count.coerceAtMost(MAX_MEASURED)
+        val text = fetch(n * 2 + skip)?.takeIf { it.length >= n + skip } ?: return count
+        return if (fromEnd) {
+            CodePoints.lengthOfLast(text.subSequence(0, text.length - skip), n)
+        } else {
+            CodePoints.lengthOfFirst(text.subSequence(skip, text.length), n)
+        }
+    }
+
+    private companion object {
+        /** Keeps `2 * count` from overflowing; far more text than any deletion touches. */
+        const val MAX_MEASURED = 1 shl 20
     }
 
     override fun batchEdit(block: () -> Unit) {

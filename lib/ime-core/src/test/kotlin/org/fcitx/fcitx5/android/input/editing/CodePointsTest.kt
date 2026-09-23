@@ -5,6 +5,7 @@
 package org.fcitx.fcitx5.android.input.editing
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Test
 
 class CodePointsTest {
@@ -50,17 +51,25 @@ class CodePointsTest {
     }
 
     /**
-     * A lone surrogate, as left by an editor that already split a pair, counts as a code point
-     * of its own -- and a pair cut in half by the window of text fetched is not glued back.
+     * An unpaired surrogate is malformed text, which the editor refuses to delete by code point,
+     * so there is no length: null. Includes surrogates in the wrong order, and a half pair next
+     * to an ordinary character.
      */
     @Test
-    fun loneSurrogatesAreOneUnitEach() {
-        assertEquals(1, CodePoints.lengthOfLast("a$high", 1))
-        assertEquals(1, CodePoints.lengthOfLast("$low", 1))
-        assertEquals(1, CodePoints.lengthOfFirst("${low}a", 1))
-        assertEquals(1, CodePoints.lengthOfFirst("$high", 1))
-        assertEquals("reversed order is not a pair", 1, CodePoints.lengthOfLast("$low$high", 1))
-        assertEquals("a letter then a low surrogate is not a pair", 1, CodePoints.lengthOfLast("a$low", 1))
-        assertEquals("a high surrogate then a letter is not a pair", 1, CodePoints.lengthOfFirst("${high}a", 1))
+    fun anUnpairedSurrogateHasNoLength() {
+        assertNull(CodePoints.lengthOfLast("a$high", 1))
+        assertNull(CodePoints.lengthOfLast("$low", 1))
+        assertNull(CodePoints.lengthOfFirst("${low}a", 1))
+        assertNull(CodePoints.lengthOfFirst("$high", 1))
+        assertNull("reversed order is not a pair", CodePoints.lengthOfLast("$low$high", 1))
+        assertNull("a letter then a low surrogate is not a pair", CodePoints.lengthOfLast("a$low", 1))
+        assertNull("a high surrogate then a letter is not a pair", CodePoints.lengthOfFirst("${high}a", 1))
+    }
+
+    /** Only the code points counted matter: malformed text further away is never reached. */
+    @Test
+    fun anUnpairedSurrogateBeyondTheCountDoesNotMatter() {
+        assertEquals(1, CodePoints.lengthOfLast("${low}ab", 1))
+        assertEquals(1, CodePoints.lengthOfFirst("ab$high", 1))
     }
 }

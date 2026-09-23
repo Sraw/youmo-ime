@@ -59,13 +59,12 @@ android {
 
     testOptions {
         unitTests {
-            // don't blow up with `RuntimeException: Stub!` when a test incidentally reaches
-            // an android.jar stub; Robolectric handles the cases that need real behaviour
-            isReturnDefaultValues = true
-            // ...which also means a plain JVM test that touches the framework gets false/0/null
-            // back and can pass for the wrong reason. Logic belongs in :lib:ime-core; anything
-            // that genuinely needs the framework should run under Robolectric.
-            // NOTE: intentionally left off. Turning it on makes :app:test depend on the
+            // Off on purpose: a plain JVM test that reaches an android.jar stub fails loudly
+            // instead of getting false/0/null back and passing for the wrong reason (a Rect
+            // whose fields all read 0, say). Logic belongs in :lib:ime-core; anything that
+            // genuinely needs the framework runs under Robolectric.
+            isReturnDefaultValues = false
+            // Also intentionally left off. Turning it on makes :app:test depend on the
             // merged-assets pipeline, which drags in the fcitx-component CMake install tasks;
             // those fail outside a native build with "Cannot query ... property 'cxxAbiModel'".
             // Consequence: Robolectric tests can use the framework but not the app's own
@@ -157,6 +156,7 @@ dependencies {
     testImplementation(libs.mockk)
     testImplementation(libs.turbine)
     testImplementation(libs.robolectric)
+    testImplementation(testFixtures(project(":lib:ime-core")))
     androidTestImplementation(libs.androidx.test.runner)
     androidTestImplementation(libs.androidx.test.rules)
     androidTestImplementation(libs.androidx.lifecycle.testing)

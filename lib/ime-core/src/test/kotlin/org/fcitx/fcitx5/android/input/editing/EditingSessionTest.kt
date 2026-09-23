@@ -104,7 +104,7 @@ class EditingSessionTest {
     fun committingDifferentTextReplacesTheComposingRegion() {
         val (s, e) = session("", cursor = 0)
         s.compose("ni", start = 0)
-        e.showComposingText("ni", start = 0)
+        e.setComposingText("ni")
         s.commitText("你")
         assertEquals("the composing text was replaced, not appended to", "你", e.text)
         assertTrue("composing state is cleared", s.composing.isEmpty())
@@ -142,6 +142,25 @@ class EditingSessionTest {
         assertTrue("caret moved to the end of the composition", s.selection.latest.rangeEquals(2))
         assertTrue(e.calls.contains("setSelection(2, 2)"))
         assertTrue(e.calls.contains("finishComposingText()"))
+    }
+
+    /**
+     * Pins upstream behaviour: this branch compares against the *confirmed* cursor, where every
+     * other path uses the latest prediction. With a move to 0 still unconfirmed and the editor
+     * last seen at 2 (the target), no setSelection is sent -- so if the pending move does land,
+     * the caret ends up at 0 rather than after the composition.
+     */
+    @Test
+    fun finishingAnIdenticalCompositionComparesWithTheConfirmedCursorNotAPendingOne() {
+        val (s, e) = session("你好", cursor = 2)
+        s.compose("你好", start = 0)
+        s.selection.resetTo(2)
+        s.selection.predict(0) // e.g. an arrow key the editor has not acknowledged yet
+
+        s.commitText("你好")
+
+        assertFalse("no move sent, as the confirmed cursor is already there", e.calls.any { it.startsWith("setSelection") })
+        assertTrue("and the pending prediction is left as it was", s.selection.latest.rangeEquals(0))
     }
 
     @Test
@@ -381,6 +400,36 @@ class EditingSessionTest {
         assertFalse(e.calls.any { it.startsWith("textBeforeCursor") })
     }
 
+    /** Malformed text is refused by the editor, so no move is predicted. */
+    @Test
+    fun anUnpairedSurrogateBeforeTheCursorPredictsNoMove() {
+        val low = String(Character.toChars(0x1F44B))[1]
+        val (s, e) = session("a$low", cursor = 2)
+        s.deleteSurrounding(before = 1, after = 0, inCodePoints = true)
+        assertEquals("the editor deleted nothing", "a$low", e.text)
+        assertTrue(s.selection.latest.rangeEquals(2))
+    }
+
+    /**
+     * With a composition, the editor deletes before the composing region -- composing text is
+     * never deleted -- so that is where the code points are measured, not at the cursor.
+     */
+    @Test
+    fun deletingByCodePointsMeasuresFromTheCompositionNotTheCursor() {
+        val wave = String(Character.toChars(0x1F44B))
+        // "a👋" then the composition "bc" with the cursor after it
+        val (s, e) = session("a$wave", cursor = 3)
+        e.setComposingText("bc")
+        s.compose("bc", start = 3)
+        s.selection.resetTo(5)
+
+        s.deleteSurrounding(before = 1, after = 0, inCodePoints = true)
+
+        assertEquals("the emoji went, the composition stayed", "abc", e.text)
+        assertTrue("two units, not the one a 'c' before the cursor would suggest", s.selection.latest.rangeEquals(3))
+        assertTrue(s.selection.consume(e.selectionStart, e.selectionEnd))
+    }
+
     /** Text either side goes; a selection in the middle survives, shifted left. */
     @Test
     fun deletingAroundASelectionShiftsIt() {
@@ -452,6 +501,45 @@ class EditingSessionTest {
         assertTrue(e.calls.isEmpty())
     }
 
+    /** An opted-in editor that hides its text still loses a whole emoji; the guess is one unit. */
+    @Test
+    fun anOptedInEditorHidingItsTextFallsBackToOneUnit() {
+        val wave = String(Character.toChars(0x1F44B))
+        val (s, e) = session("a$wave", cursor = 3)
+        e.revealLimit = null
+        assertTrue(s.backspace(optedIn))
+        assertEquals("a", e.text)
+        assertTrue(s.selection.latest.rangeEquals(2))
+    }
+
+    /**
+     * A code-point deletion would refuse an unpaired surrogate and leave it stuck, so an
+     * opted-in editor gets a key event for it instead, which does remove it.
+     */
+    @Test
+    fun anOptedInBackspaceOnMalformedTextFallsBackToAKeyEvent() {
+        val low = String(Character.toChars(0x1F44B))[1]
+        val (s, e) = session("a$low", cursor = 2)
+        assertFalse(s.backspace(optedIn))
+        assertTrue("predicted like any key event", s.selection.latest.rangeEquals(1))
+        assertFalse(e.calls.any { it.startsWith("delete") })
+    }
+
+    /** A deletion before the composition moves the composition too. */
+    @Test
+    fun deletingBeforeACompositionMovesIt() {
+        val (s, e) = session("abcd", cursor = 4)
+        e.setComposingText("ni")
+        s.compose("ni", start = 4)
+        s.selection.resetTo(6)
+
+        s.deleteSurrounding(before = 2, after = 0, inCodePoints = false)
+
+        assertEquals("abni", e.text)
+        assertTrue(s.composing.rangeEquals(2, 4))
+        assertTrue(s.composing.rangeEquals(e.composingStart, e.composingEnd))
+    }
+
     /** A TYPE_NULL editor takes raw keys only, whatever it asked for. */
     @Test
     fun aRawKeyEditorGetsAKeyEventEvenIfOptedIn() {
@@ -475,8 +563,9 @@ class EditingSessionTest {
     @Test
     fun finishingTheCompositionLeavesTheTextAndForgetsTheRange() {
         val (s, e) = session("", cursor = 0)
-        e.showComposingText("ni", start = 0)
+        e.setComposingText("ni")
         s.compose("ni", start = 0)
+        e.calls.clear()
 
         s.finishComposition()
 
@@ -648,7 +737,7 @@ class EditingSessionTest {
 
         // the service has shown "nihao" as composing text; the editor holds it as a region
         s.compose("nihao", start = 0)
-        e.showComposingText("nihao", start = 0)
+        e.setComposingText("nihao")
         s.selection.consume(5)
 
         s.commitText("你好")
