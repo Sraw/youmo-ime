@@ -1,0 +1,91 @@
+name: Emulator Tests
+
+# Instrumented tests on an emulator: FcitxTest (the engine through JNI) and SoftKeyboardTest
+# (typing on the real keyboard into a real EditText). They need the native build, so they take
+# far longer than the JVM unit tests and do not gate every push: they run weekly, on demand,
+# and on pull requests labelled `emulator`.
+
+on:
+  schedule:
+    - cron: "17 3 * * 1"
+  workflow_dispatch:
+  pull_request:
+    types:
+      - labeled
+      - synchronize
+      - reopened
+
+permissions:
+  contents: read
+
+jobs:
+  emulator_test:
+    name: Instrumented tests (API 35)
+    # on a labelled PR: its pushes, and the `emulator` label itself being added (not other labels)
+    if: >-
+      github.event_name != 'pull_request' ||
+      (contains(github.event.pull_request.labels.*.name, 'emulator') &&
+      (github.event.action != 'labeled' || github.event.label.name == 'emulator'))
+    # on the job, not the workflow: a run for some other label joins no group, so it cannot
+    # cancel one in progress
+    concurrency:
+      group: emulator-test-${{ github.ref }}
+      cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    env:
+      # one ABI, the emulator's, instead of all four
+      BUILD_ABI: x86_64
+    steps:
+      - name: Fetch source code
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          submodules: recursive
+
+      - name: Setup Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: "temurin"
+          java-version: "17"
+
+      - name: Setup Android environment
+        uses: android-actions/setup-android@v4
+
+      - name: Install build dependencies
+        run: |
+          sdkmanager --install "cmake;3.31.6"
+          sudo apt update
+          sudo apt install extra-cmake-modules gettext
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v6
+
+      - name: Build the app and its tests
+        run: ./gradlew :app:assembleDebug :app:assembleDebugAndroidTest
+
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Run instrumented tests
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          arch: x86_64
+          target: google_apis
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
+          script: ./gradlew :app:connectedDebugAndroidTest
+
+      - name: Upload test report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: emulator-test-report
+          path: |
+            app/build/reports/androidTests/
+            app/build/outputs/androidTest-results/
+          retention-days: 14
