@@ -68,7 +68,9 @@ import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.input.cursor.CursorRange
 import org.fcitx.fcitx5.android.input.editing.EditingSession
 import org.fcitx.fcitx5.android.input.editing.EditorKeyPolicy
+import org.fcitx.fcitx5.android.input.editing.ForwardedKeys
 import org.fcitx.fcitx5.android.input.editing.InputConnectionEditor
+import org.fcitx.fcitx5.android.input.editing.StickyMetaState
 import org.fcitx.fcitx5.android.input.editing.toEditorTraits
 import org.fcitx.fcitx5.android.utils.InputMethodUtil
 import org.fcitx.fcitx5.android.utils.alpha
@@ -91,11 +93,8 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     private val cachedKeyEvents = LruCache<Int, KeyEvent>(78)
     private var cachedKeyEventIndex = 0
 
-    /**
-     * Saves MetaState produced by hardware keyboard with "sticky" modifier keys, to clear them in order.
-     * See also [InputConnection#clearMetaKeyStates(int)](https://developer.android.com/reference/android/view/inputmethod/InputConnection#clearMetaKeyStates(int))
-     */
-    private var lastMetaState: Int = 0
+    /** Meta state of a hardware keyboard with sticky modifiers, to clear them in order. */
+    private val stickyMetaState = StickyMetaState()
 
     private lateinit var pkgNameCache: PackageNameCache
 
@@ -261,7 +260,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
                          * intercept the KeyEvent which would cause the default [android.text.method.QwertyKeyListener]
                          * to show a Gingerbread-style CharacterPickerDialog
                          */
-                        if (keyEvent.unicodeChar == KeyCharacterMap.PICKER_DIALOG_INPUT.code) {
+                        if (ForwardedKeys.opensCharacterPicker(keyEvent.unicodeChar)) {
                             currentInputConnection?.sendKeyEvent(
                                 KeyEvent(
                                     keyEvent.downTime, keyEvent.eventTime,
@@ -275,36 +274,28 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
                         currentInputConnection?.sendKeyEvent(keyEvent)
                         if (KeyEvent.isModifierKey(keyEvent.keyCode)) {
                             when (keyEvent.action) {
-                                KeyEvent.ACTION_DOWN -> {
-                                    // save current metaState when modifier key down
-                                    lastMetaState = keyEvent.metaState
-                                }
+                                KeyEvent.ACTION_DOWN -> stickyMetaState.onModifierDown(keyEvent.metaState)
                                 KeyEvent.ACTION_UP -> {
-                                    // only clear metaState that would be missing when this modifier key up
-                                    currentInputConnection?.clearMetaKeyStates(lastMetaState xor keyEvent.metaState)
-                                    lastMetaState = keyEvent.metaState
+                                    // tracked even with no editor to tell
+                                    val released = stickyMetaState.onModifierUp(keyEvent.metaState)
+                                    currentInputConnection?.clearMetaKeyStates(released)
                                 }
                             }
                         }
                         return@event
                     }
-                    // simulate key event
-                    val keyCode = it.sym.keyCode
-                    if (keyCode != KeyEvent.KEYCODE_UNKNOWN) {
-                        // recognized keyCode
-                        val eventTime = SystemClock.uptimeMillis()
-                        if (it.up) {
-                            sendUpKeyEvent(eventTime, keyCode, it.states.metaState)
-                        } else {
-                            sendDownKeyEvent(eventTime, keyCode, it.states.metaState)
+                    // no original event to replay: simulate one
+                    when (val action = ForwardedKeys.decide(it.sym.keyCode, it.up, it.unicode)) {
+                        is ForwardedKeys.Action.SendKey -> {
+                            val eventTime = SystemClock.uptimeMillis()
+                            if (action.up) {
+                                sendUpKeyEvent(eventTime, action.keyCode, it.states.metaState)
+                            } else {
+                                sendDownKeyEvent(eventTime, action.keyCode, it.states.metaState)
+                            }
                         }
-                    } else {
-                        // no matching keyCode, commit character once on key down
-                        if (!it.up && it.unicode > 0) {
-                            commitText(Character.toString(it.unicode))
-                        } else {
-                            Timber.w("Unhandled Fcitx KeyEvent: $it")
-                        }
+                        is ForwardedKeys.Action.CommitChar -> commitText(action.text)
+                        ForwardedKeys.Action.Ignore -> Timber.w("Unhandled Fcitx KeyEvent: $it")
                     }
                 }
             }
