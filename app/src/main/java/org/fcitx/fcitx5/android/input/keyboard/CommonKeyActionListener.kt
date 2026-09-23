@@ -7,7 +7,9 @@ package org.fcitx.fcitx5.android.input.keyboard
 
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.fcitx.fcitx5.android.core.FcitxAPI
 import org.fcitx.fcitx5.android.daemon.launchOnReady
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
@@ -66,8 +68,9 @@ class CommonKeyActionListener :
                 select(0)
             }
         } else {
-            // Other languages: commit preedit as-is
-            service.finishComposing()
+            // Other languages: commit preedit as-is. This runs on fcitx's thread pool, and the
+            // composing state belongs to the main thread.
+            withContext(Dispatchers.Main) { service.finishComposing() }
         }
         reset()
     }

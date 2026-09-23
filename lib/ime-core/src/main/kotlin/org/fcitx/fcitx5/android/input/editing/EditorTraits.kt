@@ -66,8 +66,9 @@ object EditorKeyPolicy {
      * An arrow moves a collapsed cursor by one unit; on a selection it collapses to the side
      * it points at without moving further, as it does in desktop editors.
      *
-     * The target can be -1 at the very start of the text; the editor clamps it, as it always
-     * has here.
+     * The target can be -1 at the very start of the text (or past the end, at the end). The
+     * editor ignores an out-of-range selection, so the key simply does nothing there, as it
+     * always has.
      */
     fun onArrow(traits: EditorTraits, direction: Direction, start: Int, end: Int): ArrowAction {
         if (traits.isRawKeyInput || traits.isUri) return ArrowAction.SendKey

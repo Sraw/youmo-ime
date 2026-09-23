@@ -82,7 +82,7 @@ class EditorKeyPolicyTest {
         assertEquals(ArrowAction.MoveCursor(6), EditorKeyPolicy.onArrow(t, Direction.Right, 2, 6))
     }
 
-    /** At the start the target is -1; the editor clamps it. Pinned so a change is deliberate. */
+    /** At the start the target is -1, which the editor ignores. Pinned so a change is deliberate. */
     @Test
     fun leftAtTheStartTargetsMinusOne() {
         assertEquals(

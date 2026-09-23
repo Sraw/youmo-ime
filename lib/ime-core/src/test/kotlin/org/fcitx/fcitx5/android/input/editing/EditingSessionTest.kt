@@ -473,6 +473,60 @@ class EditingSessionTest {
     // region composing state
 
     @Test
+    fun finishingTheCompositionLeavesTheTextAndForgetsTheRange() {
+        val (s, e) = session("", cursor = 0)
+        e.showComposingText("ni", start = 0)
+        s.compose("ni", start = 0)
+
+        s.finishComposition()
+
+        assertEquals("ni", e.text)
+        assertEquals("the editor's composing region is gone", -1, e.composingStart)
+        assertTrue(s.composing.isEmpty())
+        assertEquals("", s.composingText.toString())
+        assertEquals(listOf("finishComposingText()"), e.calls)
+    }
+
+    @Test
+    fun finishingWithNothingComposedDoesNotTouchTheEditor() {
+        val (s, e) = session("abc", cursor = 3)
+        s.finishComposition()
+        assertTrue(e.calls.isEmpty())
+    }
+
+    /** Every mutating entry point reports in, so a debug build can catch a wrong-thread caller. */
+    @Test
+    fun everyMutatingEntryPointChecksTheThread() {
+        var checks = 0
+        val s = EditingSession(FakeEditor("abcdef", 3)) { checks++ }
+        s.selection.resetTo(3)
+        val calls = listOf<EditingSession.() -> Unit>(
+            { setComposingText(FormattedText.Empty) },
+            { resetComposingState() },
+            { finishComposition() },
+            { commitText("x") },
+            { deleteSelection() },
+            { applySelectionOffset(0) },
+            { cancelSelection() },
+            { deleteSurrounding(1, 0, inCodePoints = false) },
+            { backspace(EditorTraits()) },
+            { restoreComposingRegionIfDropped(-1, -1) },
+            { finishEditorComposing() },
+        )
+        // a new public method must be added above; this catches one that was not
+        val mutators = EditingSession::class.java.declaredMethods.filter {
+            java.lang.reflect.Modifier.isPublic(it.modifiers) && !it.name.startsWith("get") &&
+                !it.isSynthetic && !it.name.contains('$')
+        }
+        assertEquals("public methods: ${mutators.map { it.name }}", calls.size, mutators.size)
+        calls.forEachIndexed { i, call ->
+            val before = checks
+            s.call()
+            assertTrue("call #$i did not check the thread", checks > before)
+        }
+    }
+
+    @Test
     fun resettingClearsBothTheRangeAndTheText() {
         val (s, _) = session("ni", cursor = 2)
         s.compose("ni", start = 0)
@@ -544,14 +598,43 @@ class EditingSessionTest {
         assertTrue(e.calls.isEmpty())
     }
 
-    /** These two were unguarded in the original service and stay that way. */
     @Test
-    fun cancelSelectionIsNotGuardedJustLikeBefore() {
+    fun withNoEditorCancellingASelectionChangesNothing() {
         val (s, e) = session("abcdef", cursor = 0)
         s.selection.resetTo(1, 3)
         e.isAvailable = false
         s.cancelSelection()
-        assertTrue("prediction still made", s.selection.latest.rangeEquals(3))
+        assertTrue(s.selection.latest.rangeEquals(1, 3))
+        assertTrue(e.calls.isEmpty())
+    }
+
+    @Test
+    fun withNoEditorDeletingASelectionChangesNothing() {
+        val (s, e) = session("abcdef", cursor = 0)
+        s.selection.resetTo(1, 3)
+        e.isAvailable = false
+        s.deleteSelection()
+        assertTrue(s.selection.latest.rangeEquals(1, 3))
+        assertTrue(e.calls.isEmpty())
+    }
+
+    /** The key event the caller falls back to is dropped too, so no move may be expected. */
+    @Test
+    fun withNoEditorABackspacePredictsNothing() {
+        val (s, e) = session("abc", cursor = 3)
+        e.isAvailable = false
+        assertFalse(s.backspace(EditorTraits()))
+        assertTrue(s.selection.latest.rangeEquals(3))
+    }
+
+    @Test
+    fun withNoEditorFinishingTheCompositionKeepsIt() {
+        val (s, e) = session("ni", cursor = 2)
+        s.compose("ni", start = 0)
+        e.isAvailable = false
+        s.finishComposition()
+        assertFalse(s.composing.isEmpty())
+        assertTrue(e.calls.isEmpty())
     }
 
     // endregion

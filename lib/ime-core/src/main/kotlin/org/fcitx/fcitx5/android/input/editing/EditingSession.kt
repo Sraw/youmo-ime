@@ -19,8 +19,15 @@ import kotlin.math.max
  * reproduce by hand.
  *
  * Everything here is arithmetic over an [InputEditor], with no Android types involved.
+ *
+ * **Confined to one thread** (the main thread, in the service): the state is plain mutable
+ * fields, and the editor's cursor reports arrive on that thread too. [checkThread] is called on
+ * every mutating entry point so a debug build can flag a caller on the wrong thread.
  */
-class EditingSession(private val editor: InputEditor) {
+class EditingSession(
+    private val editor: InputEditor,
+    private val checkThread: () -> Unit = {},
+) {
 
     /** Where the IME believes the cursor is, reconciled against the editor's reports. */
     val selection = CursorTracker()
@@ -33,12 +40,26 @@ class EditingSession(private val editor: InputEditor) {
         private set
 
     fun setComposingText(text: FormattedText) {
+        checkThread()
         composingText = text
     }
 
     fun resetComposingState() {
+        checkThread()
         composing.clear()
         composingText = FormattedText.Empty
+    }
+
+    /**
+     * Ends the composition, leaving what was composed in the editor as ordinary text, and
+     * forgets it here. Nothing to do when nothing is being composed, or with no editor.
+     */
+    fun finishComposition() {
+        checkThread()
+        if (!editor.isAvailable) return
+        if (composing.isEmpty()) return
+        resetComposingState()
+        editor.finishComposingText()
     }
 
     /**
@@ -49,6 +70,7 @@ class EditingSession(private val editor: InputEditor) {
      * character, which is the common case and lets the editor place the cursor itself.
      */
     fun commitText(text: String, cursor: Int = -1) {
+        checkThread()
         if (!editor.isAvailable) return
         // When the commit is exactly what is already composing, there is nothing to replace:
         // finish the composition as-is and only move the cursor if it is not already there.
@@ -81,13 +103,10 @@ class EditingSession(private val editor: InputEditor) {
         }
     }
 
-    /**
-     * Deletes the current selection, if any. A collapsed cursor is left alone.
-     *
-     * Unlike [commitText] this does not check [InputEditor.isAvailable]: the original service
-     * method did not either, and this refactor keeps behaviour identical.
-     */
+    /** Deletes the current selection, if any. A collapsed cursor is left alone. */
     fun deleteSelection() {
+        checkThread()
+        if (!editor.isAvailable) return
         val lastSelection = selection.latest
         if (lastSelection.isEmpty()) return
         selection.predict(lastSelection.start)
@@ -99,6 +118,7 @@ class EditingSession(private val editor: InputEditor) {
      * An offset that would invert the range is ignored rather than applied backwards.
      */
     fun applySelectionOffset(offsetStart: Int, offsetEnd: Int = 0) {
+        checkThread()
         if (!editor.isAvailable) return
         val lastSelection = selection.latest
         val start = max(lastSelection.start + offsetStart, 0)
@@ -110,6 +130,8 @@ class EditingSession(private val editor: InputEditor) {
 
     /** Collapses a selection to its end, leaving a plain cursor. */
     fun cancelSelection() {
+        checkThread()
+        if (!editor.isAvailable) return
         val lastSelection = selection.latest
         if (lastSelection.isEmpty()) return
         val end = lastSelection.end
@@ -126,6 +148,7 @@ class EditingSession(private val editor: InputEditor) {
      * deletions rarely, so unlike Backspace this path can afford it.
      */
     fun deleteSurrounding(before: Int, after: Int, inCodePoints: Boolean) {
+        checkThread()
         if (!editor.isAvailable) return
         if (before > 0) {
             selection.predictOffset(-(if (inCodePoints) unitsBeforeCursor(before) else before))
@@ -143,16 +166,22 @@ class EditingSession(private val editor: InputEditor) {
      * @return true when handled here; false when the caller must send a Backspace key event
      */
     fun backspace(traits: EditorTraits): Boolean {
+        checkThread()
         val lastSelection = selection.latest
         val direct = editor.isAvailable && traits.acceptsDeleteSurrounding &&
             !traits.isRawKeyInput && (lastSelection.isNotEmpty() || lastSelection.start > 0)
-        if (lastSelection.isNotEmpty()) {
-            selection.predict(lastSelection.start)
-        } else if (lastSelection.start > 0) {
-            // A key event deletes whatever the editor thinks one character is, which can only
-            // be guessed at; asking the editor would add a round trip to every press, so the
-            // guess stays at one unit. A direct deletion is a known code point, so it is exact.
-            selection.predictOffset(-(if (direct) unitsBeforeCursor(1) else 1))
+        // With no editor the key event the caller falls back to goes nowhere either, so there
+        // is no move to predict.
+        if (editor.isAvailable) {
+            if (lastSelection.isNotEmpty()) {
+                selection.predict(lastSelection.start)
+            } else if (lastSelection.start > 0) {
+                // A key event deletes whatever the editor thinks one character is, which can
+                // only be guessed at; asking the editor would add a round trip to every press, so
+                // the guess stays at one unit. A direct deletion is a known code point, so it is
+                // measured -- a round trip per press, but only for editors that opted in.
+                selection.predictOffset(-(if (direct) unitsBeforeCursor(1) else 1))
+            }
         }
         if (!direct) return false
         if (lastSelection.isEmpty()) {
@@ -181,6 +210,7 @@ class EditingSession(private val editor: InputEditor) {
      * this session's composing state -- callers that want that call [resetComposingState].
      */
     fun finishEditorComposing() {
+        checkThread()
         editor.finishComposingText()
     }
 
@@ -191,6 +221,7 @@ class EditingSession(private val editor: InputEditor) {
      * @return whether a restore was issued
      */
     fun restoreComposingRegionIfDropped(reportedStart: Int, reportedEnd: Int): Boolean {
+        checkThread()
         if (reportedStart != -1 || reportedEnd != -1) return false
         if (composing.isEmpty()) return false
         editor.setComposingRegion(composing.start, composing.end)

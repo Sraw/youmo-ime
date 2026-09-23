@@ -14,6 +14,7 @@ import android.graphics.Color
 import android.graphics.drawable.Icon
 import android.os.Build
 import android.os.Bundle
+import android.os.Looper
 import android.os.SystemClock
 import android.util.LruCache
 import android.util.Size
@@ -44,6 +45,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.consumeEach
 import kotlinx.coroutines.launch
+import org.fcitx.fcitx5.android.BuildConfig
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.core.CapabilityFlags
 import org.fcitx.fcitx5.android.core.FcitxAPI
@@ -121,7 +123,13 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     private var capabilityFlags = CapabilityFlags.DefaultFlags
 
     private val editingSession = EditingSession(
-        InputConnectionEditor { currentInputConnection }
+        InputConnectionEditor { currentInputConnection },
+        checkThread = if (BuildConfig.DEBUG) ({
+            if (Looper.myLooper() != Looper.getMainLooper()) {
+                // logged rather than thrown: a debug build is also someone's daily keyboard
+                Timber.e(IllegalStateException("EditingSession used off the main thread"))
+            }
+        }) else ({})
     )
 
     /** The IME's view of the cursor; owned by [editingSession]. */
@@ -244,8 +252,8 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
                     when (it.sym.sym) {
                         FcitxKeyMapping.FcitxKey_BackSpace -> handleBackspaceKey()
                         FcitxKeyMapping.FcitxKey_Return -> handleReturnKey()
-                        FcitxKeyMapping.FcitxKey_Left -> handleArrowKey(KeyEvent.KEYCODE_DPAD_LEFT)
-                        FcitxKeyMapping.FcitxKey_Right -> handleArrowKey(KeyEvent.KEYCODE_DPAD_RIGHT)
+                        FcitxKeyMapping.FcitxKey_Left -> handleArrowKey(EditorKeyPolicy.Direction.Left)
+                        FcitxKeyMapping.FcitxKey_Right -> handleArrowKey(EditorKeyPolicy.Direction.Right)
                         else -> if (it.unicode > 0) {
                             commitText(Character.toString(it.unicode))
                         } else {
@@ -359,12 +367,10 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         }
     }
 
-    private fun handleArrowKey(keyCode: Int) {
-        val direction = when (keyCode) {
-            KeyEvent.KEYCODE_DPAD_LEFT -> EditorKeyPolicy.Direction.Left
-            KeyEvent.KEYCODE_DPAD_RIGHT -> EditorKeyPolicy.Direction.Right
-            // not a horizontal move the policy knows; let the editor have the key
-            else -> return sendDownUpKeyEvents(keyCode)
+    private fun handleArrowKey(direction: EditorKeyPolicy.Direction) {
+        val keyCode = when (direction) {
+            EditorKeyPolicy.Direction.Left -> KeyEvent.KEYCODE_DPAD_LEFT
+            EditorKeyPolicy.Direction.Right -> KeyEvent.KEYCODE_DPAD_RIGHT
         }
         val (start, end) = currentInputSelection
         when (val action = EditorKeyPolicy.onArrow(
@@ -879,13 +885,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
      * Finish composing text and leave cursor position as-is.
      * Also updates internal composing state of [FcitxInputMethodService].
      */
-    fun finishComposing() {
-        val ic = currentInputConnection ?: return
-        if (composing.isEmpty()) return
-        composing.clear()
-        composingText = FormattedText.Empty
-        ic.finishComposingText()
-    }
+    fun finishComposing() = editingSession.finishComposition()
 
     @SuppressLint("RestrictedApi")
     @RequiresApi(Build.VERSION_CODES.R)

@@ -19,6 +19,7 @@ interface InputEditor {
      * Whether there is an editor to talk to right now. `InputMethodService` has no input
      * connection between sessions; operations that would otherwise update the IME's cursor
      * prediction check this first, so a dropped call does not leave a stale prediction behind.
+     * (All of `EditingSession`'s do.)
      */
     val isAvailable: Boolean
 
