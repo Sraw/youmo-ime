@@ -15,7 +15,6 @@ import android.graphics.drawable.Icon
 import android.os.Build
 import android.os.Bundle
 import android.os.SystemClock
-import android.text.InputType
 import android.util.LruCache
 import android.util.Size
 import android.view.KeyCharacterMap
@@ -66,7 +65,9 @@ import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.input.cursor.CursorRange
 import org.fcitx.fcitx5.android.input.editing.EditingSession
+import org.fcitx.fcitx5.android.input.editing.EditorKeyPolicy
 import org.fcitx.fcitx5.android.input.editing.InputConnectionEditor
+import org.fcitx.fcitx5.android.input.editing.toEditorTraits
 import org.fcitx.fcitx5.android.utils.InputMethodUtil
 import org.fcitx.fcitx5.android.utils.alpha
 import org.fcitx.fcitx5.android.utils.forceShowSelf
@@ -75,7 +76,6 @@ import org.fcitx.fcitx5.android.utils.isTypeNull
 import org.fcitx.fcitx5.android.utils.monitorCursorAnchor
 import org.fcitx.fcitx5.android.utils.styledColorOrDefault
 import org.fcitx.fcitx5.android.utils.styledFloat
-import splitties.bitflags.hasFlag
 import splitties.dimensions.dp
 import splitties.resources.styledColor
 import timber.log.Timber
@@ -346,74 +346,34 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     }
 
     private fun handleBackspaceKey() {
-        val lastSelection = selection.latest
-        if (lastSelection.isNotEmpty()) {
-            selection.predict(lastSelection.start)
-        } else if (lastSelection.start > 0) {
-            selection.predictOffset(-1)
-        }
-        // In practice nobody (apart from ourselves) would set `privateImeOptions` to our
-        // `DeleteSurroundingFlag`, leading to a behavior of simulating backspace key pressing
-        // in almost every EditText.
-        if (currentInputEditorInfo.privateImeOptions != DeleteSurroundingFlag ||
-            currentInputEditorInfo.inputType and InputType.TYPE_MASK_CLASS == InputType.TYPE_NULL
-        ) {
+        if (!editingSession.backspace(currentInputEditorInfo.toEditorTraits())) {
             sendDownUpKeyEvents(KeyEvent.KEYCODE_DEL)
-            return
-        }
-        if (lastSelection.isEmpty()) {
-            if (lastSelection.start <= 0) {
-                sendDownUpKeyEvents(KeyEvent.KEYCODE_DEL)
-                return
-            }
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-                currentInputConnection.deleteSurroundingTextInCodePoints(1, 0)
-            } else {
-                currentInputConnection.deleteSurroundingText(1, 0)
-            }
-        } else {
-            currentInputConnection.commitText("", 0)
         }
     }
 
     private fun handleReturnKey() {
-        currentInputEditorInfo.run {
-            if (inputType and InputType.TYPE_MASK_CLASS == InputType.TYPE_NULL ||
-                imeOptions.hasFlag(EditorInfo.IME_FLAG_NO_ENTER_ACTION)
-            ) {
-                sendDownUpKeyEvents(KeyEvent.KEYCODE_ENTER)
-                return
-            }
-            if (actionLabel?.isNotEmpty() == true && actionId != EditorInfo.IME_ACTION_UNSPECIFIED) {
-                currentInputConnection.performEditorAction(actionId)
-                return
-            }
-            when (val action = imeOptions and EditorInfo.IME_MASK_ACTION) {
-                EditorInfo.IME_ACTION_UNSPECIFIED,
-                EditorInfo.IME_ACTION_NONE -> sendDownUpKeyEvents(KeyEvent.KEYCODE_ENTER)
-                else -> currentInputConnection.performEditorAction(action)
-            }
+        when (val action = EditorKeyPolicy.onReturn(currentInputEditorInfo.toEditorTraits())) {
+            EditorKeyPolicy.ReturnAction.SendEnter -> sendDownUpKeyEvents(KeyEvent.KEYCODE_ENTER)
+            is EditorKeyPolicy.ReturnAction.PerformEditorAction ->
+                currentInputConnection.performEditorAction(action.actionId)
         }
     }
 
     private fun handleArrowKey(keyCode: Int) {
-        val type = currentInputEditorInfo.inputType and InputType.TYPE_MASK_CLASS
-        val variation = currentInputEditorInfo.inputType and InputType.TYPE_MASK_VARIATION
-        if (type == InputType.TYPE_NULL ||
-            // confirm URL suggestion in browser location bar, see also https://bugzilla.mozilla.org/show_bug.cgi?id=1999915
-            type == InputType.TYPE_CLASS_TEXT && variation == InputType.TYPE_TEXT_VARIATION_URI
-        ) {
-            sendDownUpKeyEvents(keyCode)
-            return
+        val direction = when (keyCode) {
+            KeyEvent.KEYCODE_DPAD_LEFT -> EditorKeyPolicy.Direction.Left
+            KeyEvent.KEYCODE_DPAD_RIGHT -> EditorKeyPolicy.Direction.Right
+            // not a horizontal move the policy knows; let the editor have the key
+            else -> return sendDownUpKeyEvents(keyCode)
         }
         val (start, end) = currentInputSelection
-        val offset = if (start == end) 1 else 0
-        val target = when (keyCode) {
-            KeyEvent.KEYCODE_DPAD_LEFT -> start - offset
-            KeyEvent.KEYCODE_DPAD_RIGHT -> end + offset
-            else -> return
+        when (val action = EditorKeyPolicy.onArrow(
+            currentInputEditorInfo.toEditorTraits(), direction, start, end
+        )) {
+            EditorKeyPolicy.ArrowAction.SendKey -> sendDownUpKeyEvents(keyCode)
+            is EditorKeyPolicy.ArrowAction.MoveCursor ->
+                currentInputConnection.setSelection(action.position, action.position)
         }
-        currentInputConnection.setSelection(target, target)
     }
 
     fun commitText(text: String, cursor: Int = -1) = editingSession.commitText(text, cursor)

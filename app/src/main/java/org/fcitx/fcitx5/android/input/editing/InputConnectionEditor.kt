@@ -36,12 +36,28 @@ class InputConnectionEditor(private val connection: () -> InputConnection?) : In
         connection()?.setComposingRegion(start, end)
     }
 
+    override fun textBeforeCursor(length: Int): CharSequence? =
+        connection()?.getTextBeforeCursor(length, 0)
+
     override fun deleteSurroundingText(before: Int, after: Int, inCodePoints: Boolean) {
         val ic = connection() ?: return
-        if (inCodePoints && Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-            ic.deleteSurroundingTextInCodePoints(before, after)
-        } else {
-            ic.deleteSurroundingText(before, after)
+        when {
+            !inCodePoints -> ic.deleteSurroundingText(before, after)
+            Build.VERSION.SDK_INT >= Build.VERSION_CODES.N ->
+                ic.deleteSurroundingTextInCodePoints(before, after)
+            // No code-point variant before API 24: measure the code points and delete that
+            // many units, so a surrogate pair is never split. Unmeasurable counts as one unit
+            // per code point, which is what the plain variant would have done anyway. Fewer
+            // than `n` units cannot hold `n` code points, so a shorter answer means the editor
+            // held text back (some return "" rather than null) and is unmeasurable too.
+            else -> ic.deleteSurroundingText(
+                if (before == 0) 0 else ic.getTextBeforeCursor(before * 2, 0)
+                    ?.takeIf { it.length >= before }
+                    ?.let { CodePoints.lengthOfLast(it, before) } ?: before,
+                if (after == 0) 0 else ic.getTextAfterCursor(after * 2, 0)
+                    ?.takeIf { it.length >= after }
+                    ?.let { CodePoints.lengthOfFirst(it, after) } ?: after,
+            )
         }
     }
 

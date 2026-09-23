@@ -306,27 +306,166 @@ class EditingSessionTest {
                 "deleteSurroundingText(1, 0, inCodePoints=true)",
                 "deleteSurroundingText(1, 0, inCodePoints=false)",
             ),
-            e.calls,
+            e.calls.filter { it.startsWith("delete") },
         )
     }
 
     /**
-     * Pins a latent inaccuracy that predates the refactor: the cursor is predicted to move back
-     * by `before` UTF-16 units even when the editor deletes `before` *code points*. Deleting one
-     * emoji therefore predicts a 1-unit move for a 2-unit change, and the editor's report is
-     * later treated as an unpredicted (external) cursor move. See dev/ISSUES.md #6.
+     * The editor reports positions in UTF-16 units, so a deletion counted in code points must
+     * still be predicted in units. Deleting one emoji moves the cursor back two, and predicting
+     * one made the editor's report look like an external cursor move (it used to).
      */
     @Test
-    fun deletingByCodePointsPredictsInUnitsNotCodePoints() {
+    fun deletingByCodePointsPredictsTheUnitsActuallyRemoved() {
         val wave = String(Character.toChars(0x1F44B)) // two UTF-16 units
         val (s, e) = session("a$wave", cursor = 3)
-        s.selection.resetTo(3)
         e.reportSelection(3)
 
         s.deleteSurrounding(before = 1, after = 0, inCodePoints = true)
 
         assertEquals("the editor removed the whole emoji", "a", e.text)
-        assertTrue("but the prediction moved back one unit, to 2 rather than 1", s.selection.latest.rangeEquals(2))
+        assertTrue("the prediction matches where the editor put the cursor", s.selection.latest.rangeEquals(e.selectionStart))
+        assertTrue("and the editor's report is recognised as expected", s.selection.consume(1))
+    }
+
+    @Test
+    fun codePointDeletionsAcrossMixedTextAreMeasuredPerCodePoint() {
+        val wave = String(Character.toChars(0x1F44B))
+        val (s, e) = session("x${wave}b$wave", cursor = 6)
+
+        s.deleteSurrounding(before = 3, after = 0, inCodePoints = true)
+
+        assertEquals("x", e.text)
+        assertTrue("five units for two emoji and a letter", s.selection.latest.rangeEquals(1))
+    }
+
+    /** Asking for more code points than exist deletes to the start, and predicts exactly that. */
+    @Test
+    fun deletingMoreCodePointsThanExistStopsAtTheStart() {
+        val (s, e) = session("ab", cursor = 2)
+        s.deleteSurrounding(before = 5, after = 0, inCodePoints = true)
+        assertEquals("", e.text)
+        assertTrue(s.selection.latest.rangeEquals(0))
+    }
+
+    /**
+     * An editor that will not show its text leaves no way to measure, so the old one-unit-per-
+     * code-point guess stands. Right for everything outside the astral planes.
+     */
+    @Test
+    fun anEditorHidingItsTextFallsBackToOneUnitPerCodePoint() {
+        val wave = String(Character.toChars(0x1F44B))
+        val (s, e) = session("a$wave", cursor = 3)
+        e.revealLimit = null
+        s.deleteSurrounding(before = 1, after = 0, inCodePoints = true)
+        assertEquals("the editor still removed the whole emoji", "a", e.text)
+        assertTrue("but with nothing to measure, one unit was guessed", s.selection.latest.rangeEquals(2))
+    }
+
+    /**
+     * Returning less text than the cursor position allows means the editor held some back,
+     * not that the text starts there. Counting what came back would under-predict.
+     */
+    @Test
+    fun anEditorRevealingTooLittleAlsoFallsBack() {
+        val (s, e) = session("abcdef", cursor = 4)
+        e.revealLimit = 1
+        s.deleteSurrounding(before = 2, after = 0, inCodePoints = true)
+        assertTrue(s.selection.latest.rangeEquals(2))
+    }
+
+    @Test
+    fun deletingByUnitsDoesNotNeedToAskTheEditor() {
+        val (s, e) = session("abcdef", cursor = 4)
+        s.deleteSurrounding(before = 2, after = 0, inCodePoints = false)
+        assertFalse(e.calls.any { it.startsWith("textBeforeCursor") })
+    }
+
+    /** Text either side goes; a selection in the middle survives, shifted left. */
+    @Test
+    fun deletingAroundASelectionShiftsIt() {
+        val (s, e) = session("abcdef", cursor = 0)
+        s.selection.resetTo(2, 4)
+        e.reportSelection(2, 4)
+
+        s.deleteSurrounding(before = 1, after = 1, inCodePoints = false)
+
+        assertEquals("acd" + "f", e.text)
+        assertTrue(s.selection.latest.rangeEquals(1, 3))
+        assertTrue(s.selection.consume(e.selectionStart, e.selectionEnd))
+    }
+
+    // endregion
+
+    // region backspace
+
+    private val optedIn = EditorTraits(acceptsDeleteSurrounding = true)
+
+    /** Almost every editor gets a key event: the only thing all of them understand. */
+    @Test
+    fun anOrdinaryEditorGetsAKeyEvent() {
+        val (s, e) = session("abc", cursor = 3)
+        assertFalse(s.backspace(EditorTraits()))
+        assertTrue("the editor was not edited directly", e.calls.none { it.startsWith("delete") || it.startsWith("commit") })
+        assertTrue("the key event is still predicted to delete one", s.selection.latest.rangeEquals(2))
+    }
+
+    /**
+     * A key event deletes whatever the editor considers one character, which can't be known
+     * without a round trip per press. The prediction stays at one unit, and the editor is not
+     * asked -- Backspace auto-repeats, so that round trip would be paid many times a second.
+     */
+    @Test
+    fun aKeyEventBackspaceDoesNotAskTheEditorForText() {
+        val wave = String(Character.toChars(0x1F44B))
+        val (s, e) = session("a$wave", cursor = 3)
+        assertFalse(s.backspace(EditorTraits()))
+        assertTrue(s.selection.latest.rangeEquals(2))
+        assertTrue(e.calls.isEmpty())
+    }
+
+    @Test
+    fun anOptedInEditorHasOneCodePointDeleted() {
+        val wave = String(Character.toChars(0x1F44B))
+        val (s, e) = session("a$wave", cursor = 3)
+        assertTrue(s.backspace(optedIn))
+        assertEquals("a", e.text)
+        assertTrue("exactly where the editor will report", s.selection.latest.rangeEquals(1))
+    }
+
+    @Test
+    fun anOptedInEditorHasItsSelectionDeleted() {
+        val (s, e) = session("abcdef", cursor = 0)
+        s.selection.resetTo(1, 4)
+        e.reportSelection(1, 4)
+        assertTrue(s.backspace(optedIn))
+        assertEquals("aef", e.text)
+        assertTrue(s.selection.latest.rangeEquals(1))
+    }
+
+    /** At the very start there is nothing to delete; the key event lets the editor decide. */
+    @Test
+    fun atTheStartEvenAnOptedInEditorGetsAKeyEvent() {
+        val (s, e) = session("abc", cursor = 0)
+        assertFalse(s.backspace(optedIn))
+        assertTrue("no move predicted", s.selection.latest.rangeEquals(0))
+        assertTrue(e.calls.isEmpty())
+    }
+
+    /** A TYPE_NULL editor takes raw keys only, whatever it asked for. */
+    @Test
+    fun aRawKeyEditorGetsAKeyEventEvenIfOptedIn() {
+        val (s, _) = session("abc", cursor = 3)
+        assertFalse(s.backspace(optedIn.copy(isRawKeyInput = true)))
+    }
+
+    /** With no connection a direct edit would be dropped; fall back to the key event. */
+    @Test
+    fun withNoEditorAnOptedInBackspaceFallsBackToAKeyEvent() {
+        val (s, e) = session("abc", cursor = 3)
+        e.isAvailable = false
+        assertFalse(s.backspace(optedIn))
+        assertTrue(e.calls.isEmpty())
     }
 
     // endregion

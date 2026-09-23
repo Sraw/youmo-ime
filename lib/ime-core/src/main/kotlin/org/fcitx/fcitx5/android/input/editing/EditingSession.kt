@@ -120,14 +120,60 @@ class EditingSession(private val editor: InputEditor) {
     /**
      * Deletes text around the cursor at fcitx's request.
      *
-     * Only [before] shifts the cursor, so only it is predicted.
+     * Only [before] shifts the cursor, so only it is predicted -- in UTF-16 units, which is
+     * what the editor will report back, even when the deletion itself counts code points.
+     * Measuring that costs one synchronous `getTextBeforeCursor`; fcitx asks for surrounding
+     * deletions rarely, so unlike Backspace this path can afford it.
      */
     fun deleteSurrounding(before: Int, after: Int, inCodePoints: Boolean) {
         if (!editor.isAvailable) return
         if (before > 0) {
-            selection.predictOffset(-before)
+            selection.predictOffset(-(if (inCodePoints) unitsBeforeCursor(before) else before))
         }
         editor.deleteSurroundingText(before, after, inCodePoints)
+    }
+
+    /**
+     * Handles Backspace from the virtual keyboard.
+     *
+     * Most editors get a Backspace key event, because that is the only thing every editor
+     * understands. Editors that opted in ([EditorTraits.acceptsDeleteSurrounding]) are edited
+     * directly instead: the selection is deleted, or else one code point before the cursor.
+     *
+     * @return true when handled here; false when the caller must send a Backspace key event
+     */
+    fun backspace(traits: EditorTraits): Boolean {
+        val lastSelection = selection.latest
+        val direct = editor.isAvailable && traits.acceptsDeleteSurrounding &&
+            !traits.isRawKeyInput && (lastSelection.isNotEmpty() || lastSelection.start > 0)
+        if (lastSelection.isNotEmpty()) {
+            selection.predict(lastSelection.start)
+        } else if (lastSelection.start > 0) {
+            // A key event deletes whatever the editor thinks one character is, which can only
+            // be guessed at; asking the editor would add a round trip to every press, so the
+            // guess stays at one unit. A direct deletion is a known code point, so it is exact.
+            selection.predictOffset(-(if (direct) unitsBeforeCursor(1) else 1))
+        }
+        if (!direct) return false
+        if (lastSelection.isEmpty()) {
+            editor.deleteSurroundingText(1, 0, inCodePoints = true)
+        } else {
+            editor.commitText("", 0)
+        }
+        return true
+    }
+
+    /**
+     * How many UTF-16 units the last [codePoints] code points before the cursor take up.
+     * Falls back to assuming one unit each when the editor will not show enough text to tell.
+     */
+    private fun unitsBeforeCursor(codePoints: Int): Int {
+        val wanted = codePoints * 2 // enough for any code point to be a surrogate pair
+        val text = editor.textBeforeCursor(wanted) ?: return codePoints
+        // Shorter than the cursor position allows means the editor held text back, not that
+        // the text starts there; counting what came back would under-predict.
+        if (text.length < minOf(wanted, selection.latest.start)) return codePoints
+        return CodePoints.lengthOfLast(text, codePoints)
     }
 
     /**

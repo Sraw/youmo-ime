@@ -16,6 +16,12 @@ class FakeEditor(initial: String = "", cursor: Int = initial.length) : InputEdit
     /** Set to false to model the gap between input sessions, when there is no connection. */
     override var isAvailable: Boolean = true
 
+    /**
+     * How much text before the cursor this editor is willing to reveal; null models an editor
+     * that reveals none (`getTextBeforeCursor` returning null). Real editors cap it too.
+     */
+    var revealLimit: Int? = Int.MAX_VALUE
+
     private val buffer = StringBuilder(initial)
 
     var selectionStart = cursor
@@ -76,6 +82,13 @@ class FakeEditor(initial: String = "", cursor: Int = initial.length) : InputEdit
         composingEnd = end
     }
 
+    override fun textBeforeCursor(length: Int): CharSequence? {
+        calls += "textBeforeCursor($length)"
+        val limit = revealLimit ?: return null
+        val n = minOf(length, limit, selectionStart)
+        return buffer.substring(selectionStart - n, selectionStart)
+    }
+
     override fun deleteSurroundingText(before: Int, after: Int, inCodePoints: Boolean) {
         calls += "deleteSurroundingText($before, $after, inCodePoints=$inCodePoints)"
         val start = if (inCodePoints) {
@@ -92,10 +105,12 @@ class FakeEditor(initial: String = "", cursor: Int = initial.length) : InputEdit
         } else {
             (selectionEnd + after).coerceAtMost(buffer.length)
         }
+        // Like InputConnection, text on either side goes and the selection itself stays.
         buffer.delete(selectionEnd, end)
         buffer.delete(start, selectionStart)
-        selectionStart = start
-        selectionEnd = start
+        val removedBefore = selectionStart - start
+        selectionStart -= removedBefore
+        selectionEnd -= removedBefore
     }
 
     override fun batchEdit(block: () -> Unit) {

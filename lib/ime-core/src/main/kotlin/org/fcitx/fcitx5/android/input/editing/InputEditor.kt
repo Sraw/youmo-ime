@@ -31,9 +31,15 @@ interface InputEditor {
     fun setComposingRegion(start: Int, end: Int)
 
     /**
+     * Up to [length] UTF-16 units immediately before the cursor (before the selection start,
+     * when there is a selection), or null when the editor will not say. May be shorter than
+     * asked near the start of the text, or when the editor chooses to reveal less.
+     */
+    fun textBeforeCursor(length: Int): CharSequence?
+
+    /**
      * @param inCodePoints delete whole code points rather than UTF-16 units, so one press
-     * removes a complete emoji instead of half a surrogate pair. The caller decides, because
-     * the code-point variant only exists from API 24.
+     * removes a complete emoji instead of half a surrogate pair.
      */
     fun deleteSurroundingText(before: Int, after: Int, inCodePoints: Boolean)
 
