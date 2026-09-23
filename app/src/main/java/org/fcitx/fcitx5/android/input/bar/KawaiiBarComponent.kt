@@ -19,7 +19,6 @@ import android.widget.ViewAnimator
 import android.widget.inline.InlineContentView
 import androidx.annotation.Keep
 import androidx.annotation.RequiresApi
-import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -56,6 +55,7 @@ import org.fcitx.fcitx5.android.input.candidates.horizontal.HorizontalCandidateC
 import org.fcitx.fcitx5.android.input.clipboard.ClipboardWindow
 import org.fcitx.fcitx5.android.input.dependency.UniqueViewComponent
 import org.fcitx.fcitx5.android.input.dependency.context
+import org.fcitx.fcitx5.android.input.dependency.imeScope
 import org.fcitx.fcitx5.android.input.dependency.inputMethodService
 import org.fcitx.fcitx5.android.input.dependency.theme
 import org.fcitx.fcitx5.android.input.editing.TextEditingWindow
@@ -90,6 +90,7 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
     private val context by manager.context()
     private val theme by manager.theme()
     private val service by manager.inputMethodService()
+    private val imeScope by manager.imeScope()
     private val windowManager: InputWindowManager by manager.must()
     private val horizontalCandidate: HorizontalCandidateComponent by manager.must()
     private val commonKeyActionListener: CommonKeyActionListener by manager.must()
@@ -122,7 +123,7 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
     private val onClipboardUpdateListener =
         ClipboardManager.OnClipboardUpdateListener {
             if (!clipboardSuggestion.getValue()) return@OnClipboardUpdateListener
-            service.lifecycleScope.launch {
+            imeScope.launch {
                 if (it.text.isEmpty()) {
                     isClipboardFresh = false
                 } else {
@@ -166,7 +167,7 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
         val timeout = clipboardItemTimeout.getValue() * 1000L
         // never transition to ClipboardTimedOut state when timeout < 0
         if (timeout < 0L) return
-        clipboardTimeoutJob = service.lifecycleScope.launch {
+        clipboardTimeoutJob = imeScope.launch {
             delay(timeout)
             isClipboardFresh = false
             clipboardTimeoutJob = null
@@ -508,14 +509,14 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
                 scrollable.add(it)
             }
         }
-        service.lifecycleScope.launch {
+        imeScope.launch {
             idleUi.inlineSuggestionsBar.setPinnedView(
                 pinned?.let { inflateInlineContentView(it) }
             )
         }
-        service.lifecycleScope.launch {
+        imeScope.launch {
             val views = scrollable.map { s ->
-                service.lifecycleScope.async {
+                imeScope.async {
                     inflateInlineContentView(s)
                 }
             }.awaitAll()

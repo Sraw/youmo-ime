@@ -19,6 +19,10 @@ import androidx.annotation.RequiresApi
 import androidx.core.view.updateLayoutParams
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.isActive
 import org.fcitx.fcitx5.android.core.CapabilityFlags
 import org.fcitx.fcitx5.android.core.FcitxEvent
 import org.fcitx.fcitx5.android.daemon.FcitxConnection
@@ -113,12 +117,19 @@ class InputView(
     private val emojiPicker = emojiPicker()
     private val emoticonPicker = emoticonPicker()
 
+    /**
+     * Work that belongs to this view: a child of the service's scope, cancelled when this view is
+     * detached -- replaced by a new one after a theme or layout setting change -- rather than
+     * left running, holding on to this view's components, until the service is destroyed.
+     */
+    private val viewScope = CoroutineScope(
+        service.lifecycleScope.coroutineContext.let { it + SupervisorJob(it[Job]) }
+    )
+
     private fun setupScope() {
         scope += this@InputView.wrapToUniqueComponent()
         scope += service.wrapToUniqueComponent()
-        // typed as CoroutineScope on purpose: that is what the component is registered as
-        val imeScope: CoroutineScope = service.lifecycleScope
-        scope += imeScope.wrapToUniqueComponent()
+        scope += viewScope.wrapToUniqueComponent()
         scope += fcitx.wrapToUniqueComponent()
         scope += theme.wrapToUniqueComponent()
         scope += themedContext.wrapToUniqueComponent()
@@ -387,11 +398,18 @@ class InputView(
         return kawaiiBar.handleInlineSuggestions(response)
     }
 
+    override fun onAttachedToWindow() {
+        super.onAttachedToWindow()
+        // the scopes are torn down on detach; a re-attached view would silently do nothing
+        if (!viewScope.isActive) Timber.e(IllegalStateException("InputView re-attached after detach"))
+    }
+
     override fun onDetachedFromWindow() {
         advancedPrefs.unregisterOnChangeListener(onKeyboardSizeChangeListener)
         keyboardPrefs.unregisterOnChangeListener(onKeyboardSizeChangeListener)
         // clear DynamicScope, implies that InputView should not be attached again after detached.
         scope.clear()
+        viewScope.cancel()
         super.onDetachedFromWindow()
     }
 

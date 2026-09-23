@@ -40,6 +40,7 @@ import org.fcitx.fcitx5.android.input.clipboard.ClipboardStateMachine.State.Enab
 import org.fcitx.fcitx5.android.input.clipboard.ClipboardStateMachine.State.Normal
 import org.fcitx.fcitx5.android.input.clipboard.ClipboardStateMachine.TransitionEvent.ClipboardDbUpdated
 import org.fcitx.fcitx5.android.input.clipboard.ClipboardStateMachine.TransitionEvent.ClipboardListeningUpdated
+import org.fcitx.fcitx5.android.input.dependency.imeScope
 import org.fcitx.fcitx5.android.input.dependency.inputMethodService
 import org.fcitx.fcitx5.android.input.dependency.theme
 import org.fcitx.fcitx5.android.input.keyboard.KeyboardWindow
@@ -59,6 +60,7 @@ class ClipboardWindow : InputWindow.ExtendedInputWindow<ClipboardWindow>() {
     private val service: FcitxInputMethodService by manager.inputMethodService()
     private val windowManager: InputWindowManager by manager.must()
     private val theme by manager.theme()
+    private val imeScope by manager.imeScope()
 
     private val snackbarCtx by lazy {
         context.withTheme(R.style.InputViewSnackbarTheme)
@@ -268,7 +270,7 @@ class ClipboardWindow : InputWindow.ExtendedInputWindow<ClipboardWindow>() {
             val empty = it.append.endOfPaginationReached && adapter.itemCount < 1
             stateMachine.push(ClipboardDbUpdated, ClipboardDbEmpty to empty)
         }
-        adapterSubmitJob = service.lifecycleScope.launch {
+        adapterSubmitJob = imeScope.launch {
             clipboardEntriesPager.flow.collect {
                 adapter.submitData(it)
             }

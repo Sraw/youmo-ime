@@ -8,6 +8,7 @@ import android.os.Build
 import android.view.View
 import android.widget.PopupMenu
 import android.widget.Toast
+import androidx.core.content.ContextCompat
 import androidx.core.text.buildSpannedString
 import androidx.core.text.color
 import kotlinx.coroutines.launch
@@ -144,7 +145,8 @@ class StatusAreaWindow : InputWindow.ExtendedInputWindow<StatusAreaWindow>(),
                             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
                                 SubtypeManager.syncWith(f.enabledIme())
                             }
-                            imeScope.launch {
+                            // feedback for work that outlives this view, so not on its scope
+                            ContextCompat.getMainExecutor(context).execute {
                                 Toast.makeText(context, R.string.done, Toast.LENGTH_SHORT).show()
                             }
                         }
