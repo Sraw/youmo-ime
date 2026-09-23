@@ -88,7 +88,7 @@ class TestHarnessSmokeTest {
      *
      * Pinned to SDK 35, one below the app's compileSdk. At SDK 36 Robolectric 4.17 dies in
      * `ApplicationSharedMemory.create` with "Failed to interact with raw FileDescriptor
-     * internals" on JDK 21, and `--add-opens` does not help. See dev/ISSUES.md #4.
+     * internals" on JDK 21, and `--add-opens` does not help.
      * Retry SDK 36 when Robolectric is next upgraded; this test is where you will find out.
      */
     @RunWith(RobolectricTestRunner::class)

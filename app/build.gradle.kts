@@ -69,7 +69,7 @@ android {
             // merged-assets pipeline, which drags in the fcitx-component CMake install tasks;
             // those fail outside a native build with "Cannot query ... property 'cxxAbiModel'".
             // Consequence: Robolectric tests can use the framework but not the app's own
-            // resources (no R.string lookups). See dev/ISSUES.md #4.
+            // resources (no R.string lookups).
             isIncludeAndroidResources = false
         }
     }

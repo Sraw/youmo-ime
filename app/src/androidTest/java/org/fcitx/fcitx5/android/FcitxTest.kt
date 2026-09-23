@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android
 
+import android.os.SystemClock
 import androidx.test.platform.app.InstrumentationRegistry
 import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.channels.Channel
@@ -45,6 +46,14 @@ class FcitxTest {
          * after a commit -- the test then waits forever for an event that was dropped.
          */
         val fcitxEventChannel = Channel<FcitxEvent<*>>(capacity = Channel.UNLIMITED)
+
+        /**
+         * The input panel as of the newest event delivered here. `Fcitx.inputPanelCached` is
+         * written on the fcitx thread without synchronisation, so reading it from the test
+         * thread is a data race; this is written on the collector and read through a volatile.
+         */
+        @Volatile
+        var latestInputPanel = FcitxEvent.InputPanelEvent.Data()
         val scope = MainScope()
 
         @BeforeClass
@@ -55,7 +64,10 @@ class FcitxTest {
 
             // forward to our channel for point to point consuming
             fcitx.eventFlow
-                .onEach { fcitxEventChannel.send(it) }
+                .onEach {
+                    if (it is FcitxEvent.InputPanelEvent) latestInputPanel = it.data
+                    fcitxEventChannel.send(it)
+                }
                 .launchIn(scope)
             fcitx.start()
 
@@ -114,6 +126,22 @@ class FcitxTest {
             receiveFirst<FcitxEvent.CommitStringEvent>()
 
         private suspend fun receiveFirstPreedit() = receiveFirst<FcitxEvent.ClientPreeditEvent>()
+
+        /**
+         * Waits for the input panel to show [expected] as its preedit. The panel is updated
+         * when fcitx flushes its UI, which is not necessarily done by the time `sendKey`
+         * returns, so asserting straight after typing races it.
+         *
+         * @return the preedit last seen: [expected], unless it did not arrive in time
+         */
+        private suspend fun awaitPanelPreedit(expected: String, timeoutMs: Long = 5_000): String {
+            val deadline = SystemClock.uptimeMillis() + timeoutMs
+            while (true) {
+                val preedit = latestInputPanel.preedit.toString()
+                if (preedit == expected || SystemClock.uptimeMillis() >= deadline) return preedit
+                delay(20)
+            }
+        }
 
         private suspend fun receiveFirstInputPanelAux() =
             receiveFirst<FcitxEvent.InputPanelEvent>()
@@ -233,7 +261,7 @@ class FcitxTest {
     fun pinyinSegmentsSyllablesInThePreedit(): Unit = runBlocking {
         fcitx.setEnabledIme(arrayOf("pinyin"))
         sendString("nihao")
-        val preedit = fcitx.inputPanelCached.preedit.toString()
+        val preedit = awaitPanelPreedit("ni hao")
         Timber.i("input panel preedit is $preedit")
         Assert.assertEquals("ni hao", preedit)
         fcitx.reset()
@@ -267,10 +295,12 @@ class FcitxTest {
         fcitx.setEnabledIme(arrayOf("pinyin"))
         sendString("nihao")
         Assert.assertFalse("engine should hold a composition", fcitx.isEmpty())
+        // seen first, so that an empty preedit below is the reset's doing and not a leftover
+        Assert.assertEquals("ni hao", awaitPanelPreedit("ni hao"))
         fcitx.reset()
         Assert.assertTrue("reset should clear it", fcitx.isEmpty())
         Assert.assertEquals(0, fcitx.getCandidates(0, 8).size)
-        Assert.assertEquals("", fcitx.inputPanelCached.preedit.toString())
+        Assert.assertEquals("", awaitPanelPreedit(""))
     }
 
     /**
@@ -282,10 +312,11 @@ class FcitxTest {
     fun selectingACandidateCommitsItAndClearsThePreedit(): Unit = runBlocking {
         fcitx.setEnabledIme(arrayOf("pinyin"))
         sendString("ni")
+        Assert.assertEquals("ni", awaitPanelPreedit("ni"))
         val first = fcitx.getCandidates(0, 1).first().text
         fcitx.select(0)
         Assert.assertEquals(first, receiveFirstCommitString()?.data?.text)
-        Assert.assertEquals("preedit is consumed by the commit", "", fcitx.inputPanelCached.preedit.toString())
+        Assert.assertEquals("preedit is consumed by the commit", "", awaitPanelPreedit(""))
         fcitx.reset()
     }
 
