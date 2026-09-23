@@ -39,6 +39,10 @@ class PinyinDictionaryTypeTest {
         assertNull(Type.fromFileName("words.txt.disable"))
     }
 
+    /**
+     * Pins current behaviour, which looks like a limitation rather than a decision: a
+     * dictionary exported as `WORDS.SCEL` (common on Windows) is not recognised.
+     */
     @Test
     fun matchingIsCaseSensitive() {
         assertNull(Type.fromFileName("words.DICT"))

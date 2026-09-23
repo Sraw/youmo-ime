@@ -4,12 +4,15 @@
  */
 package org.fcitx.fcitx5.android
 
+import android.graphics.Rect
 import kotlinx.serialization.json.Json
 import org.fcitx.fcitx5.android.data.theme.CustomThemeSerializer
 import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.data.theme.ThemePreset
 import org.junit.Assert
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
 
 class ThemeSerializationTest {
 
@@ -235,5 +238,43 @@ class ThemeSerializationTest {
     fun serializingStampsCurrentVersion() {
         val theme = Fixtures.v21.toCustomTheme().first
         Assert.assertTrue("Serialized form carries a version", theme.toJson().contains("\"version\":\"2.1\""))
+    }
+
+    /**
+     * A background image's crop rectangle, which needs a real `android.graphics.Rect`: off
+     * Robolectric, `Rect` is an android.jar stub that cannot even be constructed.
+     */
+    @RunWith(RobolectricTestRunner::class)
+    class WithCropRect {
+
+        private val withCrop = Fixtures.v21.replace(
+            "\"cropRect\": null",
+            "\"cropRect\": {\"bottom\": 400, \"left\": 10, \"right\": 300, \"top\": 20}",
+        )
+
+        private fun String.toCustomTheme() =
+            Json.decodeFromString(CustomThemeSerializer.WithMigrationStatus, this)
+
+        private val Theme.Custom.crop get() = backgroundImage!!.cropRect!!
+
+        @Test
+        fun theCropIsReadFieldByField() {
+            Assert.assertEquals(Rect(10, 20, 300, 400), withCrop.toCustomTheme().first.crop)
+        }
+
+        @Test
+        fun theCropSurvivesARoundTrip() {
+            val theme = withCrop.toCustomTheme().first
+            val again = Json.encodeToString(CustomThemeSerializer, theme).toCustomTheme().first
+            Assert.assertEquals(theme, again)
+            Assert.assertEquals(Rect(10, 20, 300, 400), again.crop)
+        }
+
+        /** Missing edges decode as -1 rather than failing the whole theme. */
+        @Test
+        fun missingEdgesAreMinusOne() {
+            val partial = Fixtures.v21.replace("\"cropRect\": null", "\"cropRect\": {\"left\": 10}")
+            Assert.assertEquals(Rect(10, -1, -1, -1), partial.toCustomTheme().first.crop)
+        }
     }
 }

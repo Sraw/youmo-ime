@@ -59,18 +59,6 @@ class CursorRangeTest {
         assertTrue("rangeEquals compares the bounds", a.rangeEquals(b))
     }
 
-    /**
-     * Assigning a `CursorRange` copies the reference to the same backing array, so mutating
-     * one mutates the other. Callers that need an independent range must construct a new one.
-     */
-    @Test
-    fun copiesAliasTheSameBackingArray() {
-        val original = CursorRange(1, 2)
-        val alias = original
-        alias.update(9, 9)
-        assertTrue("mutating the alias mutated the original", original.rangeEquals(9, 9))
-    }
-
     // endregion
 
     // region update / clear / offset

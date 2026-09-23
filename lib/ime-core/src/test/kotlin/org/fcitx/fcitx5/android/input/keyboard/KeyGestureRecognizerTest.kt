@@ -347,6 +347,33 @@ class KeyGestureRecognizerTest {
         assertFalse(r.onUp(1000L, longPressTriggered = false, repeatStarted = false).performClick)
     }
 
+    /**
+     * Pins an upstream quirk: the consumed flag is only cleared between touches on keys that
+     * swipe, so on any other key a consumed gesture blocks the click on every later tap. The
+     * gesture listeners only consume on swiping keys today, which is why it does not bite.
+     */
+    @Test
+    fun onAKeyThatDoesNotSwipeAConsumedGestureOutlivesTheTouch() {
+        val r = recognizer(swipe = false)
+        r.onDown(50f, 25f)
+        r.markGestureConsumed()
+        r.onUp(1000L, false, false)
+        r.resetForNextTouch()
+        r.onDown(50f, 25f)
+        assertFalse(r.onUp(2000L, false, false).performClick)
+    }
+
+    @Test
+    fun onAKeyThatSwipesTheConsumedFlagIsClearedForTheNextTouch() {
+        val r = recognizer(swipe = true)
+        r.onDown(50f, 25f)
+        r.markGestureConsumed()
+        r.onUp(1000L, false, false)
+        r.resetForNextTouch()
+        r.onDown(50f, 25f)
+        assertTrue(r.onUp(2000L, false, false).performClick)
+    }
+
     /** A swipe the listener ignored still leaves the tap eligible to be a click. */
     @Test
     fun anUnconsumedSwipeStillAllowsTheClick() {
@@ -388,6 +415,22 @@ class KeyGestureRecognizerTest {
         r.onDown(50f, 25f); r.onUp(1000L, false, false); r.resetForNextTouch()
         r.onDown(50f, 25f)
         assertFalse(r.onUp(1301L, false, false).isDoubleTap)
+    }
+
+    /**
+     * Pins an upstream quirk: a touch that is not a click (here one that wandered off the key)
+     * does not disarm a pending double tap, so tap, wander, tap within the window still counts
+     * as a double tap. Change deliberately if this is ever judged wrong.
+     */
+    @Test
+    fun aNonClickBetweenTwoTapsDoesNotDisarmTheDoubleTap() {
+        val r = recognizer(doubleTap = true)
+        r.onDown(50f, 25f); r.onUp(1000L, false, false); r.resetForNextTouch()
+        r.onDown(50f, 25f); r.move(500f, 25f)
+        assertFalse("the wander is no click", r.onUp(1100L, false, false).performClick)
+        r.resetForNextTouch()
+        r.onDown(50f, 25f)
+        assertTrue(r.onUp(1200L, false, false).isDoubleTap)
     }
 
     /** Three quick taps are one double tap then a fresh single, not two overlapping doubles. */
