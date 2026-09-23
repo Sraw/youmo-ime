@@ -90,7 +90,7 @@ fcitxComponent {
 
 androidComponents {
     onVariants { variant ->
-        // The build type's resValue entries (app_icon, app_name) point at launcher
+        // The build type's resValue entries (app_icon, app_icon_round, app_name) point at launcher
         // resources that live in the app's own resource set. AGP copies them into the
         // androidTest APK too, where those references cannot be resolved and resource
         // linking fails. The test APK has no launcher, so just drop them there.
@@ -103,7 +103,7 @@ ksp {
 }
 
 dependencies {
-    api(project(":lib:ime-core"))
+    implementation(project(":lib:ime-core"))
     ksp(project(":codegen"))
     implementation(project(":lib:fcitx5"))
     implementation(project(":lib:fcitx5-lua"))
@@ -161,8 +161,6 @@ dependencies {
     androidTestImplementation(libs.androidx.test.rules)
     androidTestImplementation(libs.androidx.lifecycle.testing)
     androidTestImplementation(libs.junit)
-    androidTestImplementation(libs.kotlinx.coroutines.test)
-    androidTestImplementation(libs.mockk.android)
 }
 
 configurations {

@@ -4,11 +4,11 @@ name: Unit Tests
 #   - no submodules (verified: `:app:test` configures and runs on a submodule-free checkout)
 #   - no NDK, no CMake (the task graph for `:app:test` contains no native tasks)
 #   - single OS
-# so this finishes in well under a minute and can gate every push.
+# so it takes a few minutes rather than the build jobs' half hour, and can gate every push.
 #
-# Java 21 here, while the build jobs use 17. The unit test job produces no artifacts,
-# and 21 is what this suite is developed and verified against locally. Bytecode target
-# is Java 11 either way (build-logic/convention/src/main/kotlin/Versions.kt).
+# Java 17, like the jobs that build APKs here (pull_request, publish) and the nix shell: tests
+# run on the JDK the release is built with. Bytecode target is Java 11 either way
+# (build-logic/convention/src/main/kotlin/Versions.kt).
 
 on:
   pull_request:
@@ -16,20 +16,30 @@ on:
       - opened
       - reopened
       - synchronize
+    paths-ignore:
+      - "**.md"
   push:
     branches:
       - master
+    paths-ignore:
+      - "**.md"
   workflow_dispatch:
 
-# a newer push to the same branch makes an in-flight run pointless
+permissions:
+  contents: read
+
+# a newer push to a pull request makes an in-flight run pointless, so a PR shares one group and
+# cancels. A push to master gets a group of its own (per commit): a shared group would still
+# drop queued runs beyond the first, and with them the results of commits in a burst.
 concurrency:
-  group: unit-test-${{ github.ref }}
+  group: unit-test-${{ github.event_name == 'pull_request' && github.ref || github.sha }}
   cancel-in-progress: true
 
 jobs:
   unit_test:
     name: JVM unit tests
     runs-on: ubuntu-24.04
+    timeout-minutes: 20
     steps:
       - name: Fetch source code
         uses: actions/checkout@v7
@@ -42,13 +52,22 @@ jobs:
         uses: actions/setup-java@v5
         with:
           distribution: "temurin"
-          java-version: "21"
+          java-version: "17"
 
       - name: Setup Android environment
         uses: android-actions/setup-android@v4
 
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v6
+
+      # Robolectric fetches its android-all jars (hundreds of MB, one per SDK the tests run at)
+      # into the Maven local repository, which the Gradle cache does not cover
+      - name: Cache Robolectric runtimes
+        uses: actions/cache@v6
+        with:
+          path: ~/.m2/repository/org/robolectric
+          key: robolectric-${{ hashFiles('gradle/libs.versions.toml', 'app/src/test/resources/robolectric.properties') }}
+          restore-keys: robolectric-
 
       # :lib:ime-core is a plain JVM module: no Android SDK, no resource merging, seconds to
       # run. Kept as a separate step so a failure there is obviously a logic failure rather
@@ -57,11 +76,36 @@ jobs:
       - name: Run core logic tests and API level check
         run: ./gradlew :lib:ime-core:check
 
+      # debug variant only: AGP unit-tests just the testBuildType (debug) unless told otherwise
       - name: Run app unit tests
         run: ./gradlew :app:test
 
+      # a failed test shows up on the run page and the checks tab, not only inside the report
+      # (without a file and line GitHub cannot place it in the diff; it shows the first 10)
+      - name: Annotate test failures
+        if: failure()
+        run: |
+          python3 - <<'PY'
+          import glob, xml.etree.ElementTree as ET
+          def escape(s, prop=False):
+              s = s.replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A")
+              return s.replace(":", "%3A").replace(",", "%2C") if prop else s
+          for path in glob.glob("**/build/test-results/**/TEST-*.xml", recursive=True):
+              try:
+                  root = ET.parse(path).getroot()
+              except ET.ParseError:  # e.g. a test JVM killed mid-write
+                  print(f"::warning title=Unreadable test result::{escape(path)}")
+                  continue
+              for case in root.iter("testcase"):
+                  for bad in list(case.findall("failure")) + list(case.findall("error")):
+                      title = escape(f"{case.get('classname')}.{case.get('name')}", prop=True)
+                      lines = (bad.get("message") or "").splitlines()
+                      text = escape(lines[0] if lines else bad.get("type", "failed"))
+                      print(f"::error title={title}::{text}")
+          PY
+
       - name: Upload test report
-        # the report is most useful precisely when the step above failed
+        # the report is most useful precisely when the tests failed
         if: always()
         uses: actions/upload-artifact@v7
         with:
