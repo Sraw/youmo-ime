@@ -159,6 +159,12 @@ class ThemeSerializationTest {
     fun version1() {
         val (decoded, migrated) = Fixtures.v1.toCustomTheme()
         Assert.assertEquals("Migration should happen", true, migrated)
+        // over a background image, the popup gets the preset matching the theme's darkness
+        Assert.assertEquals(
+            "popupBackgroundColor from preset",
+            ThemePreset.PixelDark.popupBackgroundColor,
+            decoded.popupBackgroundColor
+        )
         Assert.assertEquals("Round trip", decoded, decoded.toJson().toCustomTheme().first)
     }
 
@@ -166,16 +172,10 @@ class ThemeSerializationTest {
     fun version1WithoutBackgroundImage() {
         val (decoded, migrated) = Fixtures.v1NoBackgroundImage.toCustomTheme()
         Assert.assertEquals("Migration should happen", true, migrated)
-        // Pins current behaviour, which is NOT what the 2.0 migration intends -- see dev/ISSUES.md #3.
-        // It branches on `get("backgroundImage") != null`, but a JSON null decodes to JsonNull
-        // rather than a Kotlin null, so the check is always true and a theme with no background
-        // image still takes the "has background image" path. Intended value here is barColor
-        // (1275068416); actual is ThemePreset.PixelDark.popupBackgroundColor.
-        Assert.assertEquals(
-            "popupBackgroundColor (pins the JsonNull bug)",
-            ThemePreset.PixelDark.popupBackgroundColor,
-            decoded.popupBackgroundColor
-        )
+        // With no background image to clash with, the popup takes the theme's own bar color.
+        // A JSON null decodes to JsonNull rather than a Kotlin null, which the migration used
+        // to mistake for "has a background image", handing out a preset color instead.
+        Assert.assertEquals("popupBackgroundColor from barColor", decoded.barColor, decoded.popupBackgroundColor)
         Assert.assertEquals("Round trip", decoded, decoded.toJson().toCustomTheme().first)
     }
 

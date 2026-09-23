@@ -6,6 +6,7 @@ package org.fcitx.fcitx5.android.data.theme
 
 import arrow.core.compose
 import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.JsonTransformingSerializer
@@ -64,7 +65,8 @@ object CustomThemeSerializer : JsonTransformingSerializer<Theme.Custom>(Theme.Cu
             },
             MigrationStrategy("2.0") {
                 JsonObject(it.toMutableMap().apply {
-                    if (get("backgroundImage") != null) {
+                    // `"backgroundImage": null` decodes to JsonNull, not a Kotlin null
+                    if ((get("backgroundImage") ?: JsonNull) !is JsonNull) {
                         val popupBkgColor = if (getValue("isDark").jsonPrimitive.boolean) {
                             ThemePreset.PixelDark.popupBackgroundColor
                         } else {
