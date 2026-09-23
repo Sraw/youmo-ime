@@ -182,6 +182,11 @@ abstract class BaseKeyboard(
                 swipeThresholdY = disabledSwipeThreshold
                 onGestureListener = OnGestureListener { view, event ->
                     when (event.type) {
+                        // must stay reachable: it resets what a cancelled swipe left behind
+                        GestureType.Down -> {
+                            onAction(KeyAction.BeginSelectionSwipeAction)
+                            false
+                        }
                         GestureType.Move -> {
                             val count = event.countX
                             if (count != 0) {

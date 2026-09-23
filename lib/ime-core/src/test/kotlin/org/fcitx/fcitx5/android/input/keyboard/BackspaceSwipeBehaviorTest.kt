@@ -164,5 +164,32 @@ class BackspaceSwipeBehaviorTest {
         assertEquals(ReleaseEffect.None, behavior.onRelease(1))
     }
 
+    /**
+     * Under the vivo keypress workaround a cancelled swipe gets no release. The next touch must
+     * not inherit its reading: a plain tap would otherwise delete a selection, and a new swipe
+     * would skip deciding afresh whether a composition is in progress.
+     */
+    @Test
+    fun aTouchAfterACancelledSelectionSwipeStartsAfresh() {
+        behavior.onMove(composing = false) // cancelled: no onRelease
+        behavior.onTouchDown()
+        assertEquals(State.Stopped, behavior.state)
+        assertEquals(ReleaseEffect.None, behavior.onRelease(0))
+    }
+
+    @Test
+    fun aSwipeAfterACancelledResetSwipeReadsTheCompositionAgain() {
+        behavior.onMove(composing = true) // cancelled: no onRelease
+        behavior.onTouchDown()
+        assertEquals(MoveEffect.ExtendSelection, behavior.onMove(composing = false))
+    }
+
+    @Test
+    fun aNormalSwipeStartingWithTouchDownStillDeletesOnLift() {
+        behavior.onTouchDown()
+        behavior.onMove(composing = false)
+        assertEquals(ReleaseEffect.DeleteSelection, behavior.onRelease(-2))
+    }
+
     // endregion
 }

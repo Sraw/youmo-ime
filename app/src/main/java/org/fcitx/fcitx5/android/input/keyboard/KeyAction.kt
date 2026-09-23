@@ -37,6 +37,9 @@ sealed class KeyAction {
 
     data class DeleteSelectionAction(val totalCnt: Int = 0) : KeyAction()
 
+    /** A touch began on the key that swipes to select; precedes its [MoveSelectionAction]s. */
+    data object BeginSelectionSwipeAction : KeyAction()
+
     data class PickerSwitchAction(val key: PickerWindow.Key? = null) : KeyAction()
 
     data object SpaceLongPressAction : KeyAction()

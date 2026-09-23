@@ -16,10 +16,14 @@ package org.fcitx.fcitx5.android.input.keyboard
  * until the finger lifts -- otherwise a composition ending mid-swipe would switch the meaning
  * of a gesture already in progress.
  *
- * A cancelled touch normally reaches [onRelease] too: CustomGestureView turns ACTION_CANCEL
- * into an Up gesture. Not under the vivo keypress workaround, where BaseKeyboard cancels the
- * key's gestures directly and no Up is dispatched; the state then outlives the touch until
- * the next release, as it did before this class was extracted.
+ * Every touch starts with [onTouchDown]. A cancelled touch usually reaches [onRelease] as well
+ * (CustomGestureView turns ACTION_CANCEL into an Up gesture), but not under the vivo keypress
+ * workaround, where BaseKeyboard cancels the key's gestures directly and no Up is dispatched;
+ * without the reset on the next touch, its reading would carry over to it.
+ *
+ * So a cancel differs between the two: the normal path deletes the selection built so far (the
+ * Up it synthesises is a release), the vivo path leaves it selected in the editor, where the
+ * next Backspace deletes it as any selection.
  */
 class BackspaceSwipeBehavior {
 
@@ -56,6 +60,11 @@ class BackspaceSwipeBehavior {
 
     var state: State = State.Stopped
         private set
+
+    /** A new touch on the key: whatever an earlier, cancelled one left behind no longer applies. */
+    fun onTouchDown() {
+        state = State.Stopped
+    }
 
     /**
      * @param composing whether something is being composed (a preedit, or candidates on offer)

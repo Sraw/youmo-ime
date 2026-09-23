@@ -20,6 +20,7 @@ import org.fcitx.fcitx5.android.input.dependency.fcitx
 import org.fcitx.fcitx5.android.input.dependency.inputMethodService
 import org.fcitx.fcitx5.android.input.dialog.AddMoreInputMethodsPrompt
 import org.fcitx.fcitx5.android.input.dialog.InputMethodPickerDialog
+import org.fcitx.fcitx5.android.input.keyboard.KeyAction.BeginSelectionSwipeAction
 import org.fcitx.fcitx5.android.input.keyboard.KeyAction.CommitAction
 import org.fcitx.fcitx5.android.input.keyboard.KeyAction.DeleteSelectionAction
 import org.fcitx.fcitx5.android.input.keyboard.KeyAction.FcitxKeyAction
@@ -128,6 +129,7 @@ class CommonKeyActionListener :
                     }
                 }
                 is ShowInputMethodPickerAction -> showInputMethodPicker()
+                is BeginSelectionSwipeAction -> backspaceSwipe.onTouchDown()
                 is MoveSelectionAction -> {
                     // `total` is -1 until the candidate list has been populated once
                     val composing = !preeditState.isEmpty || horizontalCandidate.adapter.total > 0
