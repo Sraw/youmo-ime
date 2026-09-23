@@ -24,6 +24,10 @@ class InputConnectionEditor(private val connection: () -> InputConnection?) : In
         connection()?.commitText(text, newCursorPosition)
     }
 
+    override fun setComposingText(text: CharSequence, newCursorPosition: Int) {
+        connection()?.setComposingText(text, newCursorPosition)
+    }
+
     override fun setSelection(start: Int, end: Int) {
         connection()?.setSelection(start, end)
     }

@@ -599,8 +599,8 @@ class EditingSessionTest {
             { cancelSelection() },
             { deleteSurrounding(1, 0, inCodePoints = false) },
             { backspace(EditorTraits()) },
-            { restoreComposingRegionIfDropped(-1, -1) },
-            { finishEditorComposing() },
+            { onCursorUpdate(3, 3, -1, -1, ignoreSystemCursor = false) },
+            { updateComposingText(formatted("ni")) },
         )
         // a new public method must be added above; this catches one that was not
         val mutators = EditingSession::class.java.declaredMethods.filter {
@@ -624,27 +624,280 @@ class EditingSessionTest {
         assertEquals(FormattedText.Empty, s.composingText)
     }
 
+    // endregion
+
+    // region cursor reports (onUpdateSelection)
+
+    private fun EditingSession.report(start: Int, end: Int = start, composing: Pair<Int, Int> = -1 to -1, ignore: Boolean = false) =
+        onCursorUpdate(start, end, composing.first, composing.second, ignoreSystemCursor = ignore)
+
+    private fun preedit(text: String, cursor: Int) = FormattedText(arrayOf(text), intArrayOf(0), cursor)
+
+    @Test
+    fun anExpectedReportChangesNothing() {
+        val (s, e) = session("abc", cursor = 3)
+        s.commitText("d")
+        assertEquals(EditingSession.CursorUpdate.None, s.report(4))
+        assertTrue("confirmed", s.selection.current.rangeEquals(4))
+        assertEquals(listOf("commitText(d, 1)"), e.calls)
+    }
+
     @Test
     fun aDroppedComposingSpanIsRestored() {
         val (s, e) = session("ni", cursor = 2)
         s.compose("ni", start = 0)
-        assertTrue("the editor reported no composing span", s.restoreComposingRegionIfDropped(-1, -1))
-        assertEquals("setComposingRegion(0, 2)", e.calls.last())
+        assertEquals(EditingSession.CursorUpdate.None, s.report(2, composing = -1 to -1))
+        assertEquals(listOf("setComposingRegion(0, 2)"), e.calls)
     }
 
     @Test
     fun aReportedComposingSpanIsLeftAlone() {
         val (s, e) = session("ni", cursor = 2)
         s.compose("ni", start = 0)
-        assertFalse(s.restoreComposingRegionIfDropped(0, 2))
+        assertEquals(EditingSession.CursorUpdate.None, s.report(2, composing = 0 to 2))
         assertTrue(e.calls.isEmpty())
     }
 
     @Test
     fun nothingIsRestoredWhenThereIsNoComposition() {
         val (s, e) = session("ni", cursor = 2)
-        assertFalse(s.restoreComposingRegionIfDropped(-1, -1))
+        s.report(2)
         assertTrue(e.calls.isEmpty())
+    }
+
+    /** An InputFilter may also have changed the text, so the old range means nothing then. */
+    @Test
+    fun anUnexpectedReportDoesNotRestoreTheComposingSpan() {
+        val (s, e) = session("nihao", cursor = 5)
+        s.compose("hao", start = 2)
+        s.report(4, composing = -1 to -1)
+        assertFalse(e.calls.any { it.startsWith("setComposingRegion") })
+    }
+
+    @Test
+    fun theUserMovingTheCursorWithNothingComposedResetsFcitx() {
+        val (s, _) = session("abcdef", cursor = 6)
+        assertEquals(EditingSession.CursorUpdate.ResetIfNotEmpty, s.report(2))
+        assertTrue("the report is the new truth", s.selection.latest.rangeEquals(2))
+    }
+
+    @Test
+    fun anUnexpectedSelectionIsTrackedButLeavesTheCompositionAlone() {
+        val (s, e) = session("abnihao", cursor = 7)
+        s.compose("nihao", start = 2)
+        assertEquals(EditingSession.CursorUpdate.None, s.report(0, 3))
+        assertTrue(s.selection.latest.rangeEquals(0, 3))
+        assertTrue(s.composing.rangeEquals(2, 7))
+        assertTrue(e.calls.isEmpty())
+    }
+
+    @Test
+    fun tappingInsideTheCompositionMovesFcitxsCursorInCodePoints() {
+        val wave = String(Character.toChars(0x1F44B))
+        val text = "${wave}ni"
+        val (s, _) = session("ab$text", cursor = 6)
+        s.setComposingText(preedit(text, cursor = 4))
+        s.composing.update(2, 6)
+        val before = s.cursorUpdateIndex
+        val update = s.report(5) // after the emoji and "n": 3 units, 2 code points
+        assertEquals(EditingSession.CursorUpdate.MovePreeditCursor(2, before + 1), update)
+    }
+
+    @Test
+    fun aTapWhereFcitxsCursorAlreadyIsDoesNothing() {
+        val (s, _) = session("nihao", cursor = 5)
+        s.setComposingText(preedit("nihao", cursor = 2))
+        s.composing.update(0, 5)
+        assertEquals(EditingSession.CursorUpdate.None, s.report(2))
+    }
+
+    @Test
+    fun theIgnoreSystemCursorSettingKeepsFcitxsCursorWhereItIs() {
+        val (s, _) = session("nihao", cursor = 5)
+        s.compose("nihao", start = 0)
+        assertEquals(EditingSession.CursorUpdate.None, s.report(2, ignore = true))
+        assertTrue("the report is still tracked", s.selection.latest.rangeEquals(2))
+    }
+
+    /** The setting only concerns taps inside the preedit; the rest of a report is acted on. */
+    @Test
+    fun theIgnoreSystemCursorSettingStillFinishesACompositionLeftBehind() {
+        val (s, e) = session("abnihao", cursor = 7)
+        s.compose("nihao", start = 2)
+        assertEquals(EditingSession.CursorUpdate.FocusOutIn, s.report(0, ignore = true))
+        assertEquals(listOf("finishComposingText()"), e.calls)
+    }
+
+    @Test
+    fun theIgnoreSystemCursorSettingStillResetsFcitxWithNothingComposed() {
+        val (s, _) = session("abc", cursor = 3)
+        assertEquals(EditingSession.CursorUpdate.ResetIfNotEmpty, s.report(1, ignore = true))
+    }
+
+    @Test
+    fun eitherEdgeOfTheCompositionCountsAsInside() {
+        val (s, _) = session("abnihao", cursor = 4)
+        s.setComposingText(preedit("nihao", cursor = 2))
+        s.composing.update(2, 7)
+        assertEquals(EditingSession.CursorUpdate.MovePreeditCursor(0, s.cursorUpdateIndex + 1), s.report(2))
+        assertEquals(EditingSession.CursorUpdate.MovePreeditCursor(5, s.cursorUpdateIndex + 1), s.report(7))
+    }
+
+    @Test
+    fun leavingTheCompositionFinishesItInPlace() {
+        val (s, e) = session("abnihao", cursor = 7)
+        s.compose("nihao", start = 2)
+        e.setComposingRegion(2, 7)
+        e.calls.clear()
+        assertEquals(EditingSession.CursorUpdate.FocusOutIn, s.report(1))
+        assertTrue(s.composing.isEmpty())
+        assertEquals(FormattedText.Empty, s.composingText)
+        assertEquals(listOf("finishComposingText()"), e.calls)
+        assertEquals("the text stays", "abnihao", e.text)
+    }
+
+    @Test
+    fun onlyTheLatestReportsCursorMoveIsCurrent() {
+        val (s, _) = session("nihao", cursor = 5)
+        s.compose("nihao", start = 0)
+        val first = s.report(1) as EditingSession.CursorUpdate.MovePreeditCursor
+        val second = s.report(3) as EditingSession.CursorUpdate.MovePreeditCursor
+        assertTrue("superseded", first.updateIndex != s.cursorUpdateIndex)
+        assertEquals(s.cursorUpdateIndex, second.updateIndex)
+    }
+
+    @Test
+    fun everyReportCountsEvenAnExpectedOne() {
+        val (s, _) = session("abc", cursor = 3)
+        val before = s.cursorUpdateIndex
+        s.report(3)
+        s.report(1)
+        assertEquals(before + 2, s.cursorUpdateIndex)
+    }
+
+    // endregion
+
+    // region preedit (updateComposingText)
+
+    /** The session's prediction and composing range must be what the editor ended up with. */
+    private fun assertInStep(s: EditingSession, e: FakeEditor) {
+        assertTrue("predicted ${s.selection.latest}, editor at ${e.selectionStart}",
+            s.selection.latest.rangeEquals(e.selectionStart, e.selectionEnd))
+        val tracked = if (s.composing.isEmpty()) -1 to -1 else s.composing.start to s.composing.end
+        assertEquals("composing range", e.composingStart to e.composingEnd, tracked)
+    }
+
+    @Test
+    fun aFirstPreeditIsComposedAtTheCursor() {
+        val (s, e) = session("ab", cursor = 2)
+        s.updateComposingText(preedit("ni", cursor = 2))
+        assertEquals("abni", e.text)
+        assertInStep(s, e)
+        assertEquals("ni", s.composingText.toString())
+    }
+
+    @Test
+    fun aGrowingPreeditReplacesTheComposition() {
+        val (s, e) = session("ab", cursor = 1)
+        s.updateComposingText(preedit("n", cursor = 1))
+        s.updateComposingText(preedit("ni", cursor = 2))
+        s.updateComposingText(preedit("nih", cursor = -1))
+        assertEquals("anihb", e.text)
+        assertInStep(s, e)
+    }
+
+    @Test
+    fun aPreeditCursorInTheMiddleTakesASelectionInTheSameBatch() {
+        val (s, e) = session("", cursor = 0)
+        s.updateComposingText(preedit("nihao", cursor = 2))
+        assertInStep(s, e)
+        assertTrue(s.selection.latest.rangeEquals(2))
+        assertEquals(
+            listOf("beginBatchEdit()", "setComposingText(nihao, 1)", "setSelection(2, 2)", "endBatchEdit()"),
+            e.calls,
+        )
+    }
+
+    @Test
+    fun theSamePreeditWithAMovedCursorOnlyMovesTheCursor() {
+        val (s, e) = session("", cursor = 0)
+        s.updateComposingText(preedit("nihao", cursor = 5))
+        e.calls.clear()
+        s.updateComposingText(preedit("nihao", cursor = 1))
+        assertEquals(listOf("beginBatchEdit()", "setSelection(1, 1)", "endBatchEdit()"), e.calls)
+        assertInStep(s, e)
+    }
+
+    /** fcitx sends -1 when the preedit has no cursor; there is nowhere to move to. */
+    @Test
+    fun theSamePreeditWithNoCursorLeavesTheCursorAlone() {
+        val (s, e) = session("", cursor = 0)
+        s.updateComposingText(preedit("nihao", cursor = 5))
+        e.calls.clear()
+        s.updateComposingText(preedit("nihao", cursor = -1))
+        assertEquals(listOf("beginBatchEdit()", "endBatchEdit()"), e.calls)
+        assertTrue(s.selection.latest.rangeEquals(5))
+    }
+
+    @Test
+    fun theSamePreeditAndCursorTouchesNothing() {
+        val (s, e) = session("", cursor = 0)
+        s.updateComposingText(preedit("nihao", cursor = 5))
+        e.calls.clear()
+        s.updateComposingText(preedit("nihao", cursor = 5))
+        assertEquals(listOf("beginBatchEdit()", "endBatchEdit()"), e.calls)
+    }
+
+    @Test
+    fun anEmptyPreeditRemovesTheCompositionAndPutsTheCursorWhereItStarted() {
+        val (s, e) = session("ab", cursor = 1)
+        s.updateComposingText(preedit("nihao", cursor = 3))
+        s.updateComposingText(FormattedText.Empty)
+        assertEquals("ab", e.text)
+        assertTrue(s.composing.isEmpty())
+        assertInStep(s, e)
+        assertTrue(s.selection.latest.rangeEquals(1))
+    }
+
+    @Test
+    fun anEmptyPreeditWithNothingComposedTouchesNothing() {
+        val (s, e) = session("ab", cursor = 1)
+        s.updateComposingText(FormattedText.Empty)
+        assertEquals(listOf("beginBatchEdit()", "endBatchEdit()"), e.calls)
+        assertTrue(s.selection.latest.rangeEquals(1))
+    }
+
+    @Test
+    fun thePreeditIsShownAsRendered() {
+        val (s, e) = session("", cursor = 0)
+        s.updateComposingText(preedit("ni", cursor = 2)) { it.toString().uppercase() }
+        assertEquals("NI", e.text)
+        assertEquals("the formatted text is what is remembered", "ni", s.composingText.toString())
+    }
+
+    @Test
+    fun withNoEditorAPreeditChangesNothing() {
+        val (s, e) = session("ab", cursor = 2)
+        e.isAvailable = false
+        s.updateComposingText(preedit("ni", cursor = 2))
+        assertTrue(e.calls.isEmpty())
+        assertTrue(s.composing.isEmpty())
+        assertEquals(FormattedText.Empty, s.composingText)
+        assertTrue(s.selection.latest.rangeEquals(2))
+    }
+
+    /** The whole round trip: compose, have the editor report back, commit. */
+    @Test
+    fun typingAWordStaysInStepWithTheEditorsReports() {
+        val (s, e) = session("", cursor = 0)
+        for ((i, p) in listOf("n", "ni", "nih", "niha", "nihao").withIndex()) {
+            s.updateComposingText(preedit(p, cursor = i + 1))
+            assertEquals(EditingSession.CursorUpdate.None, s.report(e.selectionStart, composing = e.composingStart to e.composingEnd))
+        }
+        s.commitText("你好")
+        assertEquals("你好", e.text)
+        assertEquals(EditingSession.CursorUpdate.None, s.report(e.selectionStart))
+        assertInStep(s, e)
     }
 
     // endregion

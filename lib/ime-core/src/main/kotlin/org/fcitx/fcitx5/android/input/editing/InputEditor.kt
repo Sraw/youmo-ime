@@ -19,11 +19,15 @@ interface InputEditor {
      * Whether there is an editor to talk to right now. `InputMethodService` has no input
      * connection between sessions; operations that would otherwise update the IME's cursor
      * prediction check this first, so a dropped call does not leave a stale prediction behind.
-     * (All of `EditingSession`'s do.)
+     * (All of `EditingSession`'s do, except `onCursorUpdate`, which only runs on the editor's own
+     * report.)
      */
     val isAvailable: Boolean
 
     fun commitText(text: String, newCursorPosition: Int)
+
+    /** Replaces the composing region (or else the selection) with [text], which stays composing. */
+    fun setComposingText(text: CharSequence, newCursorPosition: Int)
 
     fun setSelection(start: Int, end: Int)
 

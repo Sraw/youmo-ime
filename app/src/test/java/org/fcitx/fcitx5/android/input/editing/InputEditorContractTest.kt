@@ -40,7 +40,6 @@ open class InputEditorContractTest {
 
     private interface Subject {
         val editor: InputEditor
-        fun setComposingText(text: String, newCursorPosition: Int)
         fun outcome(returned: List<String>): Outcome
     }
 
@@ -48,8 +47,6 @@ open class InputEditorContractTest {
         private val fake = FakeEditor(text, selStart, documentedCursorPlacement = Build.VERSION.SDK_INT > 23)
             .apply { reportSelection(selStart, selEnd) }
         override val editor: InputEditor = fake
-        override fun setComposingText(text: String, newCursorPosition: Int) =
-            fake.setComposingText(text, newCursorPosition)
 
         override fun outcome(returned: List<String>) = Outcome(
             fake.text,
@@ -68,9 +65,6 @@ open class InputEditorContractTest {
                 override fun getEditable() = this@Real.editable
             }
         override val editor: InputEditor = InputConnectionEditor { connection }
-        override fun setComposingText(text: String, newCursorPosition: Int) {
-            connection.setComposingText(text, newCursorPosition)
-        }
 
         override fun outcome(returned: List<String>) = Outcome(
             editable.toString(),
@@ -142,17 +136,17 @@ open class InputEditorContractTest {
     fun composingText() = run(
         listOf(
             Scenario("grows a composition, then commits it", "ab", 1) {
-                setComposingText("n", 1)
-                setComposingText("ni", 1)
+                editor.setComposingText("n", 1)
+                editor.setComposingText("ni", 1)
                 editor.commitText("你", 1)
             },
-            Scenario("composes over a selection", "abcdef", 1, 4) { setComposingText("ni", 1) },
+            Scenario("composes over a selection", "abcdef", 1, 4) { editor.setComposingText("ni", 1) },
             Scenario("empty composing text removes the composition", "ab", 2) {
-                setComposingText("ni", 1)
-                setComposingText("", 1)
+                editor.setComposingText("ni", 1)
+                editor.setComposingText("", 1)
             },
             Scenario("finishing keeps the text", "ab", 2) {
-                setComposingText("ni", 1)
+                editor.setComposingText("ni", 1)
                 editor.finishComposingText()
             },
         )

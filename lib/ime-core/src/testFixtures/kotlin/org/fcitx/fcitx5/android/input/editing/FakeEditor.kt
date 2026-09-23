@@ -120,11 +120,14 @@ class FakeEditor(
         replaceText(text, newCursorPosition, composing = false)
     }
 
-    /** Models `InputConnection.setComposingText`, which the service calls outside the logic under test. */
-    fun setComposingText(text: String, newCursorPosition: Int = 1) {
+    /** Styling spans are not modelled: only the characters of [text] land in the buffer. */
+    override fun setComposingText(text: CharSequence, newCursorPosition: Int) {
         calls += "setComposingText($text, $newCursorPosition)"
-        replaceText(text, newCursorPosition, composing = true)
+        replaceText(text.toString(), newCursorPosition, composing = true)
     }
+
+    /** Test shorthand for the common `newCursorPosition = 1`. */
+    fun setComposingText(text: String) = setComposingText(text, 1)
 
     /** Out-of-range positions are ignored, not clamped, as `BaseInputConnection` does. */
     override fun setSelection(start: Int, end: Int) {

@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.input.editing
 
+import org.fcitx.fcitx5.android.core.CoreLog
 import org.fcitx.fcitx5.android.core.FormattedText
 import org.fcitx.fcitx5.android.input.cursor.CursorRange
 import org.fcitx.fcitx5.android.input.cursor.CursorTracker
@@ -39,9 +40,149 @@ class EditingSession(
     var composingText: FormattedText = FormattedText.Empty
         private set
 
+    /**
+     * Records [text] as the composing text without touching the editor -- for putting a session
+     * into a known state. [updateComposingText] is what shows a new preedit in the editor.
+     */
     fun setComposingText(text: FormattedText) {
         checkThread()
         composingText = text
+    }
+
+    /**
+     * Counts the editor's cursor reports. A fcitx job queued in response to one report checks it
+     * against this before acting, so a burst of reports (a held Backspace, fast typing) only
+     * acts on the last. Read from the fcitx thread, hence volatile. Never reset: a stale job
+     * from before a reset could otherwise match a fresh report's index.
+     */
+    @Volatile
+    var cursorUpdateIndex: Int = 0
+        private set
+
+    /** What the service has to ask fcitx to do after a cursor report; see [onCursorUpdate]. */
+    sealed interface CursorUpdate {
+        /** Nothing: the report was expected, or is a selection the IME does not act on. */
+        data object None : CursorUpdate
+
+        /**
+         * The cursor moved with nothing composed here. If fcitx still has something on its input
+         * panel (candidates, say), it belongs to where the cursor was, so reset it.
+         */
+        data object ResetIfNotEmpty : CursorUpdate
+
+        /**
+         * The cursor moved within the composition; move fcitx's preedit cursor to match.
+         * [codePointPosition] counts code points, as fcitx does. Skip it when [updateIndex] is
+         * no longer [cursorUpdateIndex]: a newer report superseded it.
+         */
+        data class MovePreeditCursor(val codePointPosition: Int, val updateIndex: Int) : CursorUpdate
+
+        /**
+         * The cursor left the composition, which has been finished in place here: the editor
+         * keeps the text. fcitx has to let go of its preedit too; a reset would commit it at the
+         * new cursor position, so the service focuses out and back in instead. With
+         * `ClientUnfocusCommit` set, fcitx drops the preedit on focus out without committing.
+         */
+        data object FocusOutIn : CursorUpdate
+    }
+
+    /**
+     * Reconciles a cursor report from the editor (`onUpdateSelection`) with the prediction.
+     *
+     * A report the prediction expected changes nothing -- except that some editors drop the
+     * composing span through an `InputFilter`, which is restored here. Anything else is the user
+     * moving the cursor, and becomes the new truth; what that means for the composition is
+     * returned for the service to pass on to fcitx.
+     *
+     * @param ignoreSystemCursor the user setting that keeps taps inside the preedit from moving
+     * fcitx's cursor
+     */
+    fun onCursorUpdate(
+        selStart: Int,
+        selEnd: Int,
+        composingStart: Int,
+        composingEnd: Int,
+        ignoreSystemCursor: Boolean,
+    ): CursorUpdate {
+        checkThread()
+        val updateIndex = ++cursorUpdateIndex
+        if (selection.consume(selStart, selEnd)) {
+            // Only when the prediction matched: an InputFilter can also change the text, and
+            // then the old range may no longer be the composition.
+            // https://android.googlesource.com/platform/frameworks/base/+/refs/tags/android-15.0.0_r36/core/java/android/widget/Editor.java#2083
+            // https://android.googlesource.com/platform/frameworks/base/+/refs/tags/android-15.0.0_r36/core/java/android/widget/TextView.java#7351
+            restoreComposingRegionIfDropped(composingStart, composingEnd)
+            return CursorUpdate.None
+        }
+        selection.resetTo(selStart, selEnd)
+        // a selection (rather than a cursor) leaves the composition to the next cursor report
+        if (selStart != selEnd) return CursorUpdate.None
+        if (composing.isEmpty()) return CursorUpdate.ResetIfNotEmpty
+        if (composing.contains(selStart)) {
+            if (ignoreSystemCursor) return CursorUpdate.None
+            // fcitx's cursor is relative to the preedit
+            val position = selStart - composing.start
+            if (position == composingText.cursor) return CursorUpdate.None
+            return CursorUpdate.MovePreeditCursor(composingText.codePointCountUntil(position), updateIndex)
+        }
+        CoreLog.d { "cursor left the composition: finish it in place, focus out/in" }
+        resetComposingState()
+        editor.finishComposingText()
+        return CursorUpdate.FocusOutIn
+    }
+
+    /**
+     * Shows fcitx's new preedit [text] as the editor's composing text, and predicts where that
+     * leaves the cursor.
+     *
+     * `setComposingText` can only leave the cursor outside the new text (see
+     * `BaseInputConnection.replaceText`), so a preedit cursor anywhere else takes a separate
+     * `setSelection`; the editor may report the intermediate position first, which the
+     * prediction absorbs.
+     *
+     * @param render the text as the editor should show it (the service adds highlight spans)
+     */
+    fun updateComposingText(
+        text: FormattedText,
+        render: (FormattedText) -> CharSequence = { it.toString() },
+    ) {
+        checkThread()
+        if (!editor.isAvailable) return
+        val lastSelection = selection.latest
+        editor.batchEdit {
+            if (composingText.spanEquals(text)) {
+                // Same text: only the cursor can have moved, and only a valid one in a
+                // non-empty preedit is followed.
+                if (text.length > 0 && text.cursor >= 0) {
+                    val p = text.cursor + composing.start
+                    if (p != lastSelection.start) {
+                        selection.predict(p)
+                        editor.setSelection(p, p)
+                    }
+                }
+            } else if (text.isEmpty()) {
+                // With nothing composed before either, composing.start means nothing; the cursor
+                // stays. Otherwise it goes back to where the composition started.
+                selection.predict(if (composing.isEmpty()) lastSelection.start else composing.start)
+                composing.clear()
+                editor.setComposingText("", 1)
+            } else {
+                val start = if (composing.isEmpty()) lastSelection.start else composing.start
+                composing.update(start, start + text.length)
+                if (text.cursor == text.length || text.cursor < 0) {
+                    // at the end (or no cursor): where setComposingText leaves it anyway
+                    selection.predict(composing.end)
+                    editor.setComposingText(render(text), 1)
+                } else {
+                    val p = text.cursor + composing.start
+                    selection.predict(p)
+                    editor.setComposingText(render(text), 1)
+                    editor.setSelection(p, p)
+                }
+            }
+            composingText = text
+        }
+        CoreLog.d { "composing '$text' at $composing, predicted ${selection.latest}" }
     }
 
     fun resetComposingState() {
@@ -255,25 +396,12 @@ class EditingSession(
     }
 
     /**
-     * Asks the editor to end its composing region, leaving the text in place. Does not touch
-     * this session's composing state -- callers that want that call [resetComposingState].
-     */
-    fun finishEditorComposing() {
-        checkThread()
-        editor.finishComposingText()
-    }
-
-    /**
      * Restores the composing region after an editor reported no composing span while this
      * session still believes there is one -- some editors drop it through an `InputFilter`.
-     *
-     * @return whether a restore was issued
      */
-    fun restoreComposingRegionIfDropped(reportedStart: Int, reportedEnd: Int): Boolean {
-        checkThread()
-        if (reportedStart != -1 || reportedEnd != -1) return false
-        if (composing.isEmpty()) return false
+    private fun restoreComposingRegionIfDropped(reportedStart: Int, reportedEnd: Int) {
+        if (reportedStart != -1 || reportedEnd != -1) return
+        if (composing.isEmpty()) return
         editor.setComposingRegion(composing.start, composing.end)
-        return true
     }
 }

@@ -45,14 +45,19 @@ open class EditingSessionOverRealEditorTest {
             }
         }
 
+        /** When set, the text the editor must end up with. */
+        var expectedText: String? = null
+
         fun mismatch(name: String): String? {
             val sel = Selection.getSelectionStart(editable) to Selection.getSelectionEnd(editable)
             val comp = BaseInputConnection.getComposingSpanStart(editable) to
                 BaseInputConnection.getComposingSpanEnd(editable)
             val predicted = session.selection.latest.let { it.start to it.end }
             val tracked = if (session.composing.isEmpty()) -1 to -1 else session.composing.let { it.start to it.end }
-            return if (predicted == sel && tracked == comp) null
-            else "$name: editor '$editable' sel=$sel comp=$comp; session predicted=$predicted composing=$tracked"
+            val textOk = expectedText == null || expectedText == editable.toString()
+            return if (predicted == sel && tracked == comp && textOk) null
+            else "$name: editor '$editable' sel=$sel comp=$comp; session predicted=$predicted composing=$tracked" +
+                (expectedText?.let { "; expected text '$it'" } ?: "")
         }
     }
 
@@ -103,6 +108,66 @@ open class EditingSessionOverRealEditorTest {
         },
         "a plain letter" to {
             Setup("ab", 2).apply { session.backspace(EditorTraits(acceptsDeleteSurrounding = true)) }
+        },
+    )
+
+    private fun preedit(text: String, cursor: Int) = FormattedText(arrayOf(text), intArrayOf(0), cursor)
+
+    /** fcitx's preedit shown in the editor, with its cursor at the end, in the middle, or unset. */
+    @Test
+    fun composing() = check(
+        "a first preedit at the cursor" to {
+            Setup("ab", 1).apply { session.updateComposingText(preedit("ni", 2)) }
+        },
+        "growing" to {
+            Setup("ab", 2).apply {
+                session.updateComposingText(preedit("n", 1))
+                session.updateComposingText(preedit("ni", 2))
+                session.updateComposingText(preedit("nih", -1))
+            }
+        },
+        "the preedit cursor in the middle" to {
+            Setup("ab", 2).apply { session.updateComposingText(preedit("nihao", 2)) }
+        },
+        "the same preedit, the cursor moved" to {
+            Setup("", 0).apply {
+                session.updateComposingText(preedit("nihao", 5))
+                session.updateComposingText(preedit("nihao", 1))
+            }
+        },
+        "a preedit over a selection" to {
+            Setup("abcdef", 1).apply {
+                session.applySelectionOffset(0, 2)
+                session.updateComposingText(preedit("ni", 2))
+                expectedText = "anidef"
+            }
+        },
+        "cleared" to {
+            Setup("ab", 1).apply {
+                session.updateComposingText(preedit("nihao", 3))
+                session.updateComposingText(FormattedText.Empty)
+                expectedText = "ab"
+            }
+        },
+        "committed as something else" to {
+            Setup("ab", 1).apply {
+                session.updateComposingText(preedit("nihao", 5))
+                session.commitText("你好")
+            }
+        },
+        "committed as itself, the cursor in the middle" to {
+            Setup("ab", 1).apply {
+                session.updateComposingText(preedit("abc", 1))
+                session.commitText("abc")
+            }
+        },
+        "the cursor leaving the composition" to {
+            Setup("xy", 2).apply {
+                session.updateComposingText(preedit("ni", 2))
+                Selection.setSelection(editable, 0) // the user taps at 0
+                session.onCursorUpdate(0, 0, 2, 4, ignoreSystemCursor = false)
+                expectedText = "xyni"
+            }
         },
     )
 
