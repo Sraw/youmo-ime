@@ -149,7 +149,11 @@ class EditingSession(
      * Only [before] shifts the cursor, so only it is predicted -- in UTF-16 units, which is
      * what the editor will report back, even when the deletion itself counts code points.
      * Measuring that costs one synchronous `getTextBeforeCursor`; fcitx asks for surrounding
-     * deletions rarely, so unlike Backspace this path can afford it.
+     * deletions rarely, so this path can afford it (Backspace pays the same round trip, but only
+     * for editors that opted in to direct deletion).
+     *
+     * The service always passes `inCodePoints = true`, as fcitx counts characters; the unit
+     * variant is kept because it is the editor's own contract and the tests hold the fake to it.
      */
     fun deleteSurrounding(before: Int, after: Int, inCodePoints: Boolean) {
         checkThread()

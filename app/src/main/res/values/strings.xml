@@ -340,8 +340,6 @@
     <string name="a11y_key_space_with_ime">Space, %1$s</string>
     <string name="a11y_key_quick_phrase">Quick phrase</string>
     <string name="a11y_key_switch_language">Switch language</string>
-    <string name="a11y_key_switch_layout">Switch keyboard layout</string>
-    <string name="a11y_key_switch_picker">Symbols and emoji</string>
     <string name="a11y_key_number_pad">Number pad</string>
     <string name="a11y_key_emoji">Emoji</string>
     <string name="a11y_candidates_prev_page">Previous candidates</string>

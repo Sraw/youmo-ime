@@ -35,10 +35,10 @@ class EventStateMachine<State : Any, Event : EventStateMachine.TransitionEvent<S
     fun push(event: Event) {
         val newState = event.accept(initialState, currentState) { externalBooleanStates[it] }
         if (newState == currentState) {
-            CoreLog.d { "At $currentState, $event didn't change the state" }
+            CoreLog.v { "At $currentState, $event didn't change the state" }
             return
         }
-        CoreLog.d { "At $currentState transited to $newState by $event" }
+        CoreLog.v { "At $currentState transited to $newState by $event" }
         currentState = newState
         onNewStateListener?.invoke(newState)
     }
@@ -115,7 +115,7 @@ class TransitionEventBuilder<State : Any, B : EventStateMachine.BooleanStateKey>
                     1 -> filtered[0].target
                     else -> {
                         val first = filtered[0].target
-                        CoreLog.d {
+                        CoreLog.v {
                             "More than one target states at $currentState: ${filtered.joinToString()}. Take the first one: $first"
                         }
                         first

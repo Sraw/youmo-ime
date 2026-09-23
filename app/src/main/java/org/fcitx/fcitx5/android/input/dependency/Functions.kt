@@ -29,9 +29,11 @@ fun DependencyManager.inputMethodService() =
     mustWrapped<UniqueComponentWrapper<FcitxInputMethodService>, FcitxInputMethodService>()
 
 /**
- * The coroutine scope of the input session.
+ * The input method service's `lifecycleScope`: it lives as long as the service, not as long
+ * as one input session or one InputView -- work launched here outlives both, and is only
+ * cancelled when the service is destroyed.
  *
- * Components that only need somewhere to launch session-scoped work should take this rather
+ * Components that only need somewhere to launch such work should take this rather
  * than the whole [FcitxInputMethodService]: it is the difference between depending on a
  * concrete `InputMethodService` and depending on a `CoroutineScope`.
  */

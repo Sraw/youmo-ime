@@ -153,14 +153,6 @@ class BackspaceSwipeBehaviorTest {
     }
 
     @Test
-    fun cancellingAbandonsTheGestureWithoutActing() {
-        behavior.onMove(composing = false)
-        behavior.cancel()
-        assertEquals(State.Stopped, behavior.state)
-        assertEquals("nothing is deleted on the next release", ReleaseEffect.None, behavior.onRelease(totalCount = -3))
-    }
-
-    @Test
     fun alternatingGesturesDoNotLeakStateIntoEachOther() {
         behavior.onMove(composing = true)
         assertEquals(ReleaseEffect.ResetComposition, behavior.onRelease(-1))

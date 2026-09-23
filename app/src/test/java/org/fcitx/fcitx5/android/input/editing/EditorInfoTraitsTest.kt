@@ -6,7 +6,6 @@ package org.fcitx.fcitx5.android.input.editing
 
 import android.text.InputType
 import android.view.inputmethod.EditorInfo
-import org.fcitx.fcitx5.android.input.FcitxInputMethodService
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -55,7 +54,7 @@ class EditorInfoTraitsTest {
 
     @Test
     fun onlyOurOwnPrivateOptionOptsIntoDeleteSurrounding() {
-        assertTrue(info { privateImeOptions = FcitxInputMethodService.DeleteSurroundingFlag }.acceptsDeleteSurrounding)
+        assertTrue(info { privateImeOptions = DeleteSurroundingFlag }.acceptsDeleteSurrounding)
         assertFalse(info { privateImeOptions = "nm,com.example.other" }.acceptsDeleteSurrounding)
         assertFalse(info { privateImeOptions = null }.acceptsDeleteSurrounding)
     }

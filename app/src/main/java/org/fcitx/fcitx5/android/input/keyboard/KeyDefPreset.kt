@@ -261,7 +261,8 @@ class ImageLayoutSwitchKey(
     percentWidth: Float = 0.1f,
     variant: Variant = Variant.AltForeground,
     viewId: Int = -1,
-    @StringRes contentDescription: Int = R.string.a11y_key_switch_layout
+    /** Required: the key goes somewhere different at each call site, so no default fits. */
+    @StringRes contentDescription: Int
 ) : KeyDef(
     Appearance.Image(
         src = icon,
@@ -282,7 +283,8 @@ class ImagePickerSwitchKey(
     percentWidth: Float = 0.1f,
     variant: Variant = Variant.AltForeground,
     viewId: Int = -1,
-    @StringRes contentDescription: Int = R.string.a11y_key_switch_picker
+    /** Required: the key goes somewhere different at each call site, so no default fits. */
+    @StringRes contentDescription: Int
 ) : KeyDef(
     Appearance.Image(
         src = icon,
