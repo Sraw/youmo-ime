@@ -148,7 +148,7 @@ class PickerWindow(
     override fun onAttached() {
         pickerLayout.embeddedKeyboard.also {
             pickerPagesAdapter.refreshIfNeeded()
-            it.onReturnDrawableUpdate(returnKeyDrawable.resourceId)
+            it.onReturnDrawableUpdate(returnKeyDrawable.appearance)
             it.keyActionListener = keyActionListener
         }
     }

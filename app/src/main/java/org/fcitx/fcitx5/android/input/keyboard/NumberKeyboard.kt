@@ -8,9 +8,9 @@ import android.annotation.SuppressLint
 import android.content.Context
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.data.theme.Theme
+import org.fcitx.fcitx5.android.input.broadcast.ReturnKeyAppearance
 import org.fcitx.fcitx5.android.input.picker.PickerWindow
 import org.fcitx.fcitx5.android.input.popup.PopupAction
-import splitties.views.imageResource
 
 @SuppressLint("ViewConstructor")
 class NumberKeyboard(
@@ -59,8 +59,8 @@ class NumberKeyboard(
     val space: TextKeyView by lazy { findViewById(R.id.button_mini_space) }
     val `return`: ImageKeyView by lazy { findViewById(R.id.button_return) }
 
-    override fun onReturnDrawableUpdate(returnDrawable: Int) {
-        `return`.img.imageResource = returnDrawable
+    override fun onReturnDrawableUpdate(appearance: ReturnKeyAppearance) {
+        `return`.showReturnAction(appearance)
     }
 
     @SuppressLint("MissingSuperCall")

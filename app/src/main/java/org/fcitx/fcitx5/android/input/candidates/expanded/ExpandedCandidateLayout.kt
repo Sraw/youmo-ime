@@ -12,12 +12,14 @@ import androidx.constraintlayout.widget.ConstraintLayout
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
+import org.fcitx.fcitx5.android.input.broadcast.ReturnKeyAppearance
 import org.fcitx.fcitx5.android.input.keyboard.BackspaceKey
 import org.fcitx.fcitx5.android.input.keyboard.BaseKeyboard
 import org.fcitx.fcitx5.android.input.keyboard.ImageKeyView
 import org.fcitx.fcitx5.android.input.keyboard.ImageLayoutSwitchKey
 import org.fcitx.fcitx5.android.input.keyboard.KeyDef
 import org.fcitx.fcitx5.android.input.keyboard.ReturnKey
+import org.fcitx.fcitx5.android.input.keyboard.showReturnAction
 import org.fcitx.fcitx5.android.utils.setVerticalScrollbarThumbColor
 import org.fcitx.fcitx5.android.utils.singleSideBorderDrawable
 import splitties.dimensions.dp
@@ -35,7 +37,6 @@ import splitties.views.dsl.constraintlayout.topOfParent
 import splitties.views.dsl.core.add
 import splitties.views.dsl.core.wrapContent
 import splitties.views.dsl.recyclerview.recyclerView
-import splitties.views.imageResource
 
 @SuppressLint("ViewConstructor")
 class ExpandedCandidateLayout(context: Context, theme: Theme) : ConstraintLayout(context) {
@@ -79,8 +80,8 @@ class ExpandedCandidateLayout(context: Context, theme: Theme) : ConstraintLayout
         val backspace: ImageKeyView by lazy { findViewById(R.id.button_backspace) }
         val `return`: ImageKeyView by lazy { findViewById(R.id.button_return) }
 
-        override fun onReturnDrawableUpdate(returnDrawable: Int) {
-            `return`.img.imageResource = returnDrawable
+        override fun onReturnDrawableUpdate(appearance: ReturnKeyAppearance) {
+            `return`.showReturnAction(appearance)
         }
     }
 

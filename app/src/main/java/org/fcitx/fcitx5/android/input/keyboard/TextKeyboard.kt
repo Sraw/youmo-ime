@@ -16,6 +16,7 @@ import org.fcitx.fcitx5.android.core.KeyStates
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.prefs.ManagedPreference
 import org.fcitx.fcitx5.android.data.theme.Theme
+import org.fcitx.fcitx5.android.input.broadcast.ReturnKeyAppearance
 import org.fcitx.fcitx5.android.input.popup.PopupAction
 import splitties.views.imageResource
 
@@ -155,8 +156,8 @@ class TextKeyboard(
         updateAlphabetKeys()
     }
 
-    override fun onReturnDrawableUpdate(returnDrawable: Int) {
-        `return`.img.imageResource = returnDrawable
+    override fun onReturnDrawableUpdate(appearance: ReturnKeyAppearance) {
+        `return`.showReturnAction(appearance)
     }
 
     override fun onPunctuationUpdate(mapping: Map<String, String>) {

@@ -8,10 +8,11 @@ import android.content.Context
 import android.graphics.Rect
 import android.view.MotionEvent
 import androidx.annotation.CallSuper
-import androidx.annotation.DrawableRes
 import androidx.constraintlayout.widget.ConstraintLayout
 import androidx.core.view.children
 import androidx.core.view.updateLayoutParams
+import kotlin.math.absoluteValue
+import kotlin.math.roundToInt
 import org.fcitx.fcitx5.android.core.FcitxKeyMapping
 import org.fcitx.fcitx5.android.core.InputMethodEntry
 import org.fcitx.fcitx5.android.core.KeyStates
@@ -20,6 +21,7 @@ import org.fcitx.fcitx5.android.data.InputFeedbacks
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.prefs.ManagedPreference
 import org.fcitx.fcitx5.android.data.theme.Theme
+import org.fcitx.fcitx5.android.input.broadcast.ReturnKeyAppearance
 import org.fcitx.fcitx5.android.input.keyboard.CustomGestureView.GestureType
 import org.fcitx.fcitx5.android.input.keyboard.CustomGestureView.OnGestureListener
 import org.fcitx.fcitx5.android.input.popup.PopupAction
@@ -38,8 +40,6 @@ import splitties.views.dsl.constraintlayout.rightOfParent
 import splitties.views.dsl.constraintlayout.rightToLeftOf
 import splitties.views.dsl.constraintlayout.topOfParent
 import splitties.views.dsl.core.add
-import kotlin.math.absoluteValue
-import kotlin.math.roundToInt
 
 abstract class BaseKeyboard(
     context: Context,
@@ -488,7 +488,7 @@ abstract class BaseKeyboard(
         // do nothing by default
     }
 
-    open fun onReturnDrawableUpdate(@DrawableRes returnDrawable: Int) {
+    open fun onReturnDrawableUpdate(appearance: ReturnKeyAppearance) {
         // do nothing by default
     }
 

@@ -86,8 +86,8 @@ class InputBroadcaster : UniqueComponent<InputBroadcaster>(), Dependent, InputBr
         receivers.forEach { it.onPreeditEmptyStateUpdate(empty) }
     }
 
-    override fun onReturnKeyDrawableUpdate(resourceId: Int) {
-        receivers.forEach { it.onReturnKeyDrawableUpdate(resourceId) }
+    override fun onReturnKeyDrawableUpdate(appearance: ReturnKeyAppearance) {
+        receivers.forEach { it.onReturnKeyDrawableUpdate(appearance) }
     }
 
 }

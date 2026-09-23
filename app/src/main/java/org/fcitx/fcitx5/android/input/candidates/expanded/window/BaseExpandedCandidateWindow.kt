@@ -155,7 +155,7 @@ abstract class BaseExpandedCandidateWindow<T : BaseExpandedCandidateWindow<T>> :
     override fun onAttached() {
         bar.expandButtonStateMachine.push(ExpandedCandidatesAttached)
         candidateLayout.embeddedKeyboard.also {
-            it.onReturnDrawableUpdate(returnKeyDrawable.resourceId)
+            it.onReturnDrawableUpdate(returnKeyDrawable.appearance)
             it.keyActionListener = keyActionListener
         }
         updateTabs(fcitx.runImmediately { inputPanelCached.tabs })

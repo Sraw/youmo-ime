@@ -10,6 +10,7 @@ import androidx.constraintlayout.widget.ConstraintLayout
 import androidx.viewpager2.widget.ViewPager2
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.data.theme.Theme
+import org.fcitx.fcitx5.android.input.broadcast.ReturnKeyAppearance
 import org.fcitx.fcitx5.android.input.keyboard.*
 import splitties.dimensions.dp
 import splitties.views.dsl.constraintlayout.above
@@ -21,7 +22,6 @@ import splitties.views.dsl.constraintlayout.matchConstraints
 import splitties.views.dsl.constraintlayout.topOfParent
 import splitties.views.dsl.core.add
 import splitties.views.dsl.core.view
-import splitties.views.imageResource
 
 @SuppressLint("ViewConstructor")
 class PickerLayout(context: Context, theme: Theme, switchKey: KeyDef) :
@@ -54,8 +54,8 @@ class PickerLayout(context: Context, theme: Theme, switchKey: KeyDef) :
 
         val `return`: ImageKeyView by lazy { findViewById(R.id.button_return) }
 
-        override fun onReturnDrawableUpdate(returnDrawable: Int) {
-            `return`.img.imageResource = returnDrawable
+        override fun onReturnDrawableUpdate(appearance: ReturnKeyAppearance) {
+            `return`.showReturnAction(appearance)
         }
     }
 

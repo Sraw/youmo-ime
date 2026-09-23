@@ -5,7 +5,6 @@
 package org.fcitx.fcitx5.android.input.broadcast
 
 import android.view.inputmethod.EditorInfo
-import androidx.annotation.DrawableRes
 import org.fcitx.fcitx5.android.core.Action
 import org.fcitx.fcitx5.android.core.CapabilityFlags
 import org.fcitx.fcitx5.android.core.FcitxEvent.CandidateListEvent
@@ -41,6 +40,6 @@ interface InputBroadcastReceiver {
 
     fun onPreeditEmptyStateUpdate(empty: Boolean) {}
 
-    fun onReturnKeyDrawableUpdate(@DrawableRes resourceId: Int) {}
+    fun onReturnKeyDrawableUpdate(appearance: ReturnKeyAppearance) {}
 
 }

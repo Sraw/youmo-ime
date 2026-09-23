@@ -330,6 +330,12 @@
     <string name="a11y_key_shift_lock">Caps lock</string>
     <string name="a11y_key_backspace">Backspace</string>
     <string name="a11y_key_enter">Enter</string>
+    <string name="a11y_key_action_go">Go</string>
+    <string name="a11y_key_action_search">Search</string>
+    <string name="a11y_key_action_send">Send</string>
+    <string name="a11y_key_action_next">Next</string>
+    <string name="a11y_key_action_done">Done</string>
+    <string name="a11y_key_action_previous">Previous</string>
     <string name="a11y_key_space">Space</string>
     <string name="a11y_key_space_with_ime">Space, %1$s</string>
     <string name="a11y_key_quick_phrase">Quick phrase</string>

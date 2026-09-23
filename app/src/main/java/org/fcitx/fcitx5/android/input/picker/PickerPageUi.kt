@@ -98,7 +98,8 @@ class PickerPageUi(
         src = R.drawable.ic_baseline_backspace_24,
         variant = Variant.Alternative,
         border = if (bordered) Border.On else Border.Off,
-        viewId = R.id.button_backspace
+        viewId = R.id.button_backspace,
+        contentDescription = R.string.a11y_key_backspace
     )
 
     private val backspaceKey by lazy {

@@ -17,6 +17,7 @@ import org.fcitx.fcitx5.android.core.InputMethodEntry
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.input.bar.KawaiiBarComponent
 import org.fcitx.fcitx5.android.input.broadcast.InputBroadcastReceiver
+import org.fcitx.fcitx5.android.input.broadcast.ReturnKeyAppearance
 import org.fcitx.fcitx5.android.input.broadcast.ReturnKeyDrawableComponent
 import org.fcitx.fcitx5.android.input.dependency.fcitx
 import org.fcitx.fcitx5.android.input.dependency.theme
@@ -109,7 +110,7 @@ class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), Essentia
             it.popupActionListener = popupActionListener
             keyboardView.apply { add(it, lParams(matchParent, matchParent)) }
             it.onAttach()
-            it.onReturnDrawableUpdate(returnKeyDrawable.resourceId)
+            it.onReturnDrawableUpdate(returnKeyDrawable.appearance)
             it.onInputMethodUpdate(fcitx.runImmediately { inputMethodEntryCached })
         }
     }
@@ -153,8 +154,8 @@ class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), Essentia
         currentKeyboard?.onPunctuationUpdate(mapping)
     }
 
-    override fun onReturnKeyDrawableUpdate(resourceId: Int) {
-        currentKeyboard?.onReturnDrawableUpdate(resourceId)
+    override fun onReturnKeyDrawableUpdate(appearance: ReturnKeyAppearance) {
+        currentKeyboard?.onReturnDrawableUpdate(appearance)
     }
 
     override fun onAttached() {
