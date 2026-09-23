@@ -75,6 +75,12 @@ class IdleUi(
         iconRotation = menuButtonRotation
     }
 
+    init {
+        // updateState keeps this current, but is not called for the initial state; without
+        // this the button starts out unlabelled
+        updateMenuButtonContentDescription()
+    }
+
     val hideKeyboardButton = ToolButton(ctx, R.drawable.ic_baseline_arrow_drop_down_24, theme)
 
     val emptyBar = Space(ctx)

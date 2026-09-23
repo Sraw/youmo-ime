@@ -331,6 +331,7 @@
     <string name="a11y_key_backspace">Backspace</string>
     <string name="a11y_key_enter">Enter</string>
     <string name="a11y_key_space">Space</string>
+    <string name="a11y_key_space_with_ime">Space, %1$s</string>
     <string name="a11y_key_quick_phrase">Quick phrase</string>
     <string name="a11y_key_switch_language">Switch language</string>
     <string name="a11y_key_switch_layout">Switch keyboard layout</string>

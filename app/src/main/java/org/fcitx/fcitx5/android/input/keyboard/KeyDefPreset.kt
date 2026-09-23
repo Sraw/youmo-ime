@@ -218,10 +218,10 @@ class SpaceKey : KeyDef(
         border = Border.Special,
         viewId = R.id.button_space,
         soundEffect = InputFeedbacks.SoundEffect.SpaceBar,
-        // displayText is a single space; without this the key is unlabelled. Note the trade-off:
-        // TalkBack speaks a focusable parent's description instead of its children's text, so
-        // the input method name drawn on the bar is no longer announced. UI automation still
-        // sees it as the inner TextView's node.
+        // displayText is a single space; without this the key is unlabelled. TalkBack speaks a
+        // focusable parent's description instead of its children's text, so a keyboard that
+        // draws the input method name on the bar must put it in the description as well
+        // (TextKeyboard.onInputMethodUpdate does).
         contentDescription = R.string.a11y_key_space
     ),
     setOf(

@@ -165,10 +165,14 @@ class TextKeyboard(
     }
 
     override fun onInputMethodUpdate(ime: InputMethodEntry) {
-        space.mainText.text = buildString {
+        val imeName = buildString {
             append(ime.displayName)
             ime.subMode.run { label.ifEmpty { name.ifEmpty { null } } }?.let { append(" ($it)") }
         }
+        space.mainText.text = imeName
+        // TalkBack reads the key's description instead of the text drawn on it, so the name
+        // has to be in the description too
+        space.contentDescription = context.getString(R.string.a11y_key_space_with_ime, imeName)
         if (capsState != CapsState.None) {
             switchCapsState()
         }
