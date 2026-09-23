@@ -6,7 +6,6 @@ package org.fcitx.fcitx5.android.data.punctuation
 
 import org.fcitx.fcitx5.android.core.RawConfig
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -96,17 +95,14 @@ class PunctuationTest {
     }
 
     /**
-     * Pins a latent crash -- see dev/ISSUES.md #5. `parseRawConfig` reads
-     * `raw.findByName("cfg")?.get(ENTRIES)?.subItems ?: return emptyList()`, and `get` is
-     * `findByName(name)!!`. The elvis covers a missing `cfg` and a null `subItems`, but a `cfg`
-     * node that simply has no `Entries` child throws instead of degrading to an empty list.
+     * A `cfg` node with no `Entries` child (a damaged config, or a language whose punctuation
+     * config was never filled in) degrades to an empty list instead of crashing the settings
+     * page. It used to throw, because `RawConfig.get` is `findByName(name)!!`.
      */
     @Test
-    fun aCfgNodeWithoutAnEntriesChildThrows() {
+    fun aCfgNodeWithoutAnEntriesChildYieldsNoEntries() {
         val raw = RawConfig(arrayOf(RawConfig("cfg", arrayOf(RawConfig("Unrelated", "x")))))
-        assertThrows(NullPointerException::class.java) {
-            PunctuationManager.parseRawConfig(raw)
-        }
+        assertTrue(PunctuationManager.parseRawConfig(raw).isEmpty())
     }
 
     @Test
