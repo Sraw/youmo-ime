@@ -36,7 +36,7 @@ interface FcitxAPI {
 
     fun setLogRule(verbose: Boolean)
 
-    fun getAddonReverseDependencies(addon: String): List<Pair<String, AddonDep>>
+    suspend fun getAddonReverseDependencies(addon: String): List<Pair<String, AddonDep>>
 
     fun translate(str: String, domain: String = "fcitx5"): String
 

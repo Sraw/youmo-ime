@@ -5,8 +5,11 @@
 package org.fcitx.fcitx5.android.ui.main.settings.addon
 
 import android.view.View
+import android.widget.CheckBox
 import androidx.annotation.StringRes
 import androidx.appcompat.app.AlertDialog
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.launch
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.core.AddonInfo
 import org.fcitx.fcitx5.android.core.FcitxAPI
@@ -17,6 +20,7 @@ import org.fcitx.fcitx5.android.ui.common.OnItemChangedListener
 import org.fcitx.fcitx5.android.ui.main.settings.ProgressFragment
 import org.fcitx.fcitx5.android.ui.main.settings.SettingsRoute
 import org.fcitx.fcitx5.android.utils.navigateWithAnim
+import timber.log.Timber
 
 class AddonListFragment : ProgressFragment(), OnItemChangedListener<AddonInfo> {
 
@@ -33,8 +37,30 @@ class AddonListFragment : ProgressFragment(), OnItemChangedListener<AddonInfo> {
         }
     }
 
-    private fun disableAddon(entry: AddonInfo, reset: () -> Unit) {
-        val dependents = fcitx.runImmediately { getAddonReverseDependencies(entry.uniqueName) }
+    private fun disableAddon(entry: AddonInfo, checkBox: CheckBox, reset: () -> Unit) {
+        lifecycleScope.launch {
+            // the lookup waits on the fcitx thread: hold the box still meanwhile, or a quick
+            // re-check would be undone by the answer arriving late
+            checkBox.isEnabled = false
+            val dependents = try {
+                fcitx.runOnReady { getAddonReverseDependencies(entry.uniqueName) }
+            } catch (e: IllegalStateException) {
+                // fcitx restarting under us
+                Timber.w(e, "Could not look up dependents of ${entry.uniqueName}")
+                reset()
+                return@launch
+            } finally {
+                checkBox.isEnabled = true
+            }
+            confirmDisable(entry, dependents, reset)
+        }
+    }
+
+    private fun confirmDisable(
+        entry: AddonInfo,
+        dependents: List<Pair<String, FcitxAPI.AddonDep>>,
+        reset: () -> Unit
+    ) {
         if (dependents.isNotEmpty()) {
             fun f(depTy: FcitxAPI.AddonDep) =
                 dependents.mapNotNull {
@@ -105,7 +131,7 @@ class AddonListFragment : ProgressFragment(), OnItemChangedListener<AddonInfo> {
                 isChecked = entry.enabled
                 setOnCheckedChangeListener { _, isChecked ->
                     if (!isChecked)
-                        disableAddon(entry) { this.isChecked = true }
+                        disableAddon(entry, this) { this.isChecked = true }
                     else
                         ui.updateItem(ui.indexItem(entry), entry.copy(enabled = true))
                 }

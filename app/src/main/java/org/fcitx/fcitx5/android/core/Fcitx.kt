@@ -11,14 +11,12 @@ import androidx.core.content.ContextCompat
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
-import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.core.data.DataManager
 import org.fcitx.fcitx5.android.data.clipboard.ClipboardManager
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
-import org.fcitx.fcitx5.android.utils.ImmutableGraph
 import org.fcitx.fcitx5.android.utils.Locales
 import org.fcitx.fcitx5.android.utils.appContext
 import org.fcitx.fcitx5.android.utils.toast
@@ -55,23 +53,14 @@ class Fcitx(private val context: Context) : FcitxAPI, FcitxLifecycleOwner {
         setupLogStream(verbose)
     }
 
-    // the computation is delayed to the first call of [getAddonReverseDependencies]
-    private var addonGraph: ImmutableGraph<String, FcitxAPI.AddonDep>? = null
+    // built on first use, and only ever touched on the fcitx thread (see
+    // [getAddonReverseDependencies]); reset by [stop] after the dispatcher is gone
+    private var addonGraph: AddonDependencyGraph? = null
 
-    private val addonReverseDependencies =
-        mutableMapOf<String, List<Pair<String, FcitxAPI.AddonDep>>>()
-
-    override fun getAddonReverseDependencies(addon: String) =
-        (addonGraph ?: run { computeAddonGraph().also { addonGraph = it } }).let { graph ->
-            addonReverseDependencies.computeIfAbsent(addon)
-            {
-                graph.bfs(it) { level, _, dep ->
-                    // stop when the direct child is an optional dependency
-                    dep == FcitxAPI.AddonDep.Required
-                            || (level == 1 && dep == FcitxAPI.AddonDep.Optional)
-                }
-            }
-        }
+    override suspend fun getAddonReverseDependencies(addon: String) = withFcitxContext {
+        (addonGraph ?: AddonDependencyGraph(addons()).also { addonGraph = it })
+            .reverseDependencies(addon)
+    }
 
     override fun translate(str: String, domain: String) = getFcitxTranslation(domain, str)
 
@@ -487,16 +476,6 @@ class Fcitx(private val context: Context) : FcitxAPI, FcitxLifecycleOwner {
         lifecycle.launchWhenReady { setClipboard(it.text, it.sensitive) }
     }
 
-    private fun computeAddonGraph() = runBlocking {
-        addons().flatMap { a ->
-            a.dependencies.map {
-                ImmutableGraph.Edge(it, a.uniqueName, FcitxAPI.AddonDep.Required)
-            } + a.optionalDependencies.map {
-                ImmutableGraph.Edge(it, a.uniqueName, FcitxAPI.AddonDep.Optional)
-            }
-        }.let { ImmutableGraph(it) }
-    }
-
     private var firstRun by AppPrefs.getInstance().internal.firstRun
 
     private fun handleFirstRunReadyEvent(event: FcitxEvent<*>) {
@@ -564,7 +543,6 @@ class Fcitx(private val context: Context) : FcitxAPI, FcitxLifecycleOwner {
         unregisterFcitxEventHandler(::handleFcitxEvent)
         // clear addon graph
         addonGraph = null
-        addonReverseDependencies.clear()
     }
 
 }
