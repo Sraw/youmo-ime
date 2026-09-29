@@ -16,7 +16,6 @@ import android.os.Build
 import android.os.Bundle
 import android.os.Looper
 import android.os.SystemClock
-import android.util.LruCache
 import android.util.Size
 import android.view.KeyCharacterMap
 import android.view.KeyEvent
@@ -70,7 +69,7 @@ import org.fcitx.fcitx5.android.input.editing.EditingSession
 import org.fcitx.fcitx5.android.input.editing.EditorKeyPolicy
 import org.fcitx.fcitx5.android.input.editing.ForwardedKeys
 import org.fcitx.fcitx5.android.input.editing.InputConnectionEditor
-import org.fcitx.fcitx5.android.input.editing.StickyMetaState
+import org.fcitx.fcitx5.android.input.editing.KeyEventRelay
 import org.fcitx.fcitx5.android.input.editing.toEditorTraits
 import org.fcitx.fcitx5.android.utils.InputMethodUtil
 import org.fcitx.fcitx5.android.utils.alpha
@@ -90,11 +89,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
 
     private var jobs = Channel<Job>(capacity = Channel.UNLIMITED)
 
-    private val cachedKeyEvents = LruCache<Int, KeyEvent>(78)
-    private var cachedKeyEventIndex = 0
-
-    /** Meta state of a hardware keyboard with sticky modifiers, to clear them in order. */
-    private val stickyMetaState = StickyMetaState()
+    private val keyEventRelay = KeyEventRelay { currentInputConnection }
 
     private lateinit var pkgNameCache: PackageNameCache
 
@@ -254,36 +249,8 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
                     }
                 } else {
                     // KeyEvent from physical keyboard (or input method engine forwardKey)
-                    // use cached event if available
-                    cachedKeyEvents.remove(it.timestamp)?.let { keyEvent ->
-                        /**
-                         * intercept the KeyEvent which would cause the default [android.text.method.QwertyKeyListener]
-                         * to show a Gingerbread-style CharacterPickerDialog
-                         */
-                        if (ForwardedKeys.opensCharacterPicker(keyEvent.unicodeChar)) {
-                            currentInputConnection?.sendKeyEvent(
-                                KeyEvent(
-                                    keyEvent.downTime, keyEvent.eventTime,
-                                    keyEvent.action, keyEvent.keyCode,
-                                    keyEvent.repeatCount, keyEvent.metaState, -1,
-                                    keyEvent.scanCode, keyEvent.flags, keyEvent.source
-                                )
-                            )
-                            return@event
-                        }
-                        currentInputConnection?.sendKeyEvent(keyEvent)
-                        if (KeyEvent.isModifierKey(keyEvent.keyCode)) {
-                            when (keyEvent.action) {
-                                KeyEvent.ACTION_DOWN -> stickyMetaState.onModifierDown(keyEvent.metaState)
-                                KeyEvent.ACTION_UP -> {
-                                    // tracked even with no editor to tell
-                                    val released = stickyMetaState.onModifierUp(keyEvent.metaState)
-                                    currentInputConnection?.clearMetaKeyStates(released)
-                                }
-                            }
-                        }
-                        return@event
-                    }
+                    // replay the original event if we still have it
+                    if (keyEventRelay.replay(it.timestamp)) return@event
                     // no original event to replay: simulate one
                     when (val action = ForwardedKeys.decide(it.sym.keyCode, it.up, it.unicode)) {
                         is ForwardedKeys.Action.SendKey -> {
@@ -521,12 +488,9 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     override fun onEvaluateFullscreenMode() = false
 
     private fun forwardKeyEvent(event: KeyEvent): Boolean {
-        // reason to use a self increment index rather than timestamp:
-        // KeyUp and KeyDown events actually can happen on the same time
-        val timestamp = cachedKeyEventIndex++
-        cachedKeyEvents.put(timestamp, event)
         val sym = KeySym.fromKeyEvent(event)
         if (sym != null) {
+            val timestamp = keyEventRelay.remember(event)
             val states = KeyStates.fromKeyEvent(event)
             val up = event.action == KeyEvent.ACTION_UP
             postFcitxJob {
@@ -866,8 +830,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     }
 
     override fun onUnbindInput() {
-        cachedKeyEvents.evictAll()
-        cachedKeyEventIndex = 0
+        keyEventRelay.clear()
         // currentInputBinding can be null on some devices under some special Multi-screen mode
         val uid = currentInputBinding?.uid ?: return
         Timber.d("onUnbindInput: uid=$uid")

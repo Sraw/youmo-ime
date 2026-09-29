@@ -115,9 +115,7 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
     private var isKeyboardLayoutNumber: Boolean = false
     private var isToolbarManuallyToggled: Boolean = false
 
-    private enum class NumberRowState { Auto, ForceShow, ForceHide }
-
-    private var numberRowState = NumberRowState.Auto
+    private var numberRowMode = IdleUiPolicy.NumberRowMode.Auto
 
     @Keep
     private val onClipboardUpdateListener =
@@ -175,20 +173,24 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
     }
 
     private fun evalIdleUiState(fromUser: Boolean = false) {
-        val newState = when {
-            numberRowState == NumberRowState.ForceShow -> IdleUi.State.NumberRow
-            isClipboardFresh -> IdleUi.State.Clipboard
-            isInlineSuggestionPresent -> IdleUi.State.InlineSuggestion
-            isCapabilityFlagsPassword && !isKeyboardLayoutNumber && numberRowState != NumberRowState.ForceHide -> IdleUi.State.NumberRow
-            /**
-             * state matrix:
-             *                               expandToolbarByDefault
-             *                          |   \   |    true |   false
-             * isToolbarManuallyToggled |  true |   Empty | Toolbar
-             *                          | false | Toolbar |   Empty
-             */
-            expandToolbarByDefault == isToolbarManuallyToggled -> IdleUi.State.Empty
-            else -> IdleUi.State.Toolbar
+        val newState = when (
+            IdleUiPolicy.decide(
+                IdleUiPolicy.Inputs(
+                    numberRowMode = numberRowMode,
+                    isClipboardFresh = isClipboardFresh,
+                    isInlineSuggestionPresent = isInlineSuggestionPresent,
+                    isPasswordField = isCapabilityFlagsPassword,
+                    isNumberLayout = isKeyboardLayoutNumber,
+                    expandToolbarByDefault = expandToolbarByDefault,
+                    isToolbarManuallyToggled = isToolbarManuallyToggled,
+                )
+            )
+        ) {
+            IdleUiPolicy.Display.Empty -> IdleUi.State.Empty
+            IdleUiPolicy.Display.Toolbar -> IdleUi.State.Toolbar
+            IdleUiPolicy.Display.Clipboard -> IdleUi.State.Clipboard
+            IdleUiPolicy.Display.NumberRow -> IdleUi.State.NumberRow
+            IdleUiPolicy.Display.InlineSuggestion -> IdleUi.State.InlineSuggestion
         }
         if (newState == idleUi.currentState) return
         idleUi.updateState(newState, fromUser)
@@ -236,7 +238,7 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
                         }
                         !in -45f..45f if distance > v.swipeThresholdY -> {
                             v.iconRotation = 90f * dir
-                            numberRowState = NumberRowState.ForceShow
+                            numberRowMode = IdleUiPolicy.NumberRowMode.ForceShow
                             evalIdleUiState(fromUser = true)
                             true
                         }
@@ -327,7 +329,7 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
             }
             numberRow.apply {
                 onCollapseListener = {
-                    numberRowState = NumberRowState.ForceHide
+                    numberRowMode = IdleUiPolicy.NumberRowMode.ForceHide
                     evalIdleUiState(fromUser = true)
                 }
             }
@@ -438,7 +440,7 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
         }
         isCapabilityFlagsPassword = toolbarNumRowOnPassword && capFlags.has(CapabilityFlag.Password)
         isInlineSuggestionPresent = false
-        numberRowState = NumberRowState.Auto
+        numberRowMode = IdleUiPolicy.NumberRowMode.Auto
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             idleUi.inlineSuggestionsBar.clear()
         }

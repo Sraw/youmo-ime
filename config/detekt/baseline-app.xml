@@ -32,7 +32,6 @@
     <ID>LongMethod:CustomThemeActivity.kt:CustomThemeActivity$override fun onCreate</ID>
     <ID>LongMethod:DataManager.kt:DataManager$fun detectPlugins: PluginSet</ID>
     <ID>LongMethod:DataManager.kt:DataManager$fun sync</ID>
-    <ID>LongMethod:FcitxInputMethodService.kt:FcitxInputMethodService$private fun handleFcitxEvent</ID>
     <ID>LongMethod:PreferenceScreenFactory.kt:PreferenceScreenFactory$private fun general</ID>
     <ID>LoopWithTooManyJumpStatements:DataManager.kt:DataManager$for</ID>
     <ID>LoopWithTooManyJumpStatements:GridDecoration.kt:GridDecoration$for</ID>
