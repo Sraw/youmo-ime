@@ -1,0 +1,50 @@
+# Layered over detekt's defaults (buildUponDefaultConfig). Only what differs is listed.
+# Philosophy: turn on rules that flag things which have actually bitten this codebase
+# (swallowed exceptions, oversized functions), and keep formatting rules off -- the code base was
+# never auto-formatted and a reformat would drown every real diff.
+#
+# Syntax-only: `./gradlew detekt` runs without type resolution. The typed tasks
+# (:app:detektDebug, ...) exist but report ~190 analysis errors on this AGP 9 / Kotlin 2.4 setup
+# and did not flag any of the 85 `!!` in :app, so rules that need types (UnsafeCallOnNullableType,
+# RedundantSuspendModifier, SuspendFunSwallowedCancellation, SleepInsteadOfDelay) are not enabled
+# here: they would look active and check nothing. Revisit when detekt 2.0 is stable.
+
+exceptions:
+  SwallowedException:
+    active: true
+  TooGenericExceptionCaught:
+    active: true
+
+potential-bugs:
+  LateinitUsage:
+    active: false   # 76 uses, mostly Android lifecycle fields; too noisy to be a signal
+
+complexity:
+  TooManyFunctions:
+    active: false   # flags Android View/Fragment subclasses for being what they are
+  LongMethod:
+    active: true
+    allowedLines: 80
+  CyclomaticComplexMethod:
+    active: true
+    allowedComplexity: 20
+  LargeClass:
+    active: true
+    allowedLines: 600
+
+style:
+  MagicNumber:
+    active: false
+  MaxLineLength:
+    active: false
+  WildcardImport:
+    active: true
+
+  NewLineAtEndOfFile:
+    active: false   # 135 pre-existing hits and no auto-format to fix them; pure noise
+  ReturnCount:
+    active: false   # guard clauses are idiomatic Kotlin
+  ForbiddenComment:
+    active: false   # TODO/FIXME are tracked in dev/ISSUES.md, not banned
+  ExplicitItLambdaMultipleParameters:
+    active: false

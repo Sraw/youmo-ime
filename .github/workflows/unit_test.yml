@@ -80,7 +80,14 @@ jobs:
 
       # debug variant only: AGP unit-tests just the testBuildType (debug) unless told otherwise
       - name: Run app unit tests
-        run: ./gradlew :app:test
+        run: ./gradlew :app:test :app:koverLogDebug
+
+      # After the tests, so a lint finding does not hide their results. Findings already present
+      # are frozen in config/detekt/baseline-*.xml; this fails on new ones only.
+      # Syntax rules only: type resolution does not work on this toolchain (see detekt.yml).
+      - name: Static analysis (detekt)
+        if: success() || failure()
+        run: ./gradlew detekt
 
       # a failed test shows up on the run page and the checks tab, not only inside the report
       # (without a file and line GitHub cannot place it in the diff; it shows the first 10)
@@ -118,5 +125,6 @@ jobs:
             lib/ime-core/build/reports/kover/
             lib/ime-core/build/test-results/
             app/build/reports/tests/
+            app/build/reports/detekt/
             app/build/test-results/
           retention-days: 14

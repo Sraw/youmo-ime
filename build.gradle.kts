@@ -6,6 +6,9 @@ plugins {
     alias(libs.plugins.kotlin.jvm) apply false
     alias(libs.plugins.kotlin.serialization) apply false
     alias(libs.plugins.kotlin.parcelize) apply false
+    alias(libs.plugins.detekt) apply false
+    // applies detekt to every Android/JVM Kotlin module, see DetektConventionPlugin
+    id("org.fcitx.fcitx5.android.detekt")
 }
 
 tasks.register("clean", Delete::class) {

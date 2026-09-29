@@ -21,6 +21,7 @@ dependencies {
     compileOnly(libs.android.gradlePlugin)
     compileOnly(libs.kotlin.gradlePlugin)
     compileOnly(libs.aboutlibraries.plugin)
+    compileOnly(libs.detekt.gradlePlugin)
     implementation(libs.kotlinx.serialization.json)
     // A workaround to enable version catalog usage in the convention plugin,
     // see https://github.com/gradle/gradle/issues/15383#issuecomment-779893192
@@ -48,6 +49,10 @@ gradlePlugin {
         register("dataDescriptor") {
             id = "org.fcitx.fcitx5.android.data-descriptor"
             implementationClass = "DataDescriptorPlugin"
+        }
+        register("detektConvention") {
+            id = "org.fcitx.fcitx5.android.detekt"
+            implementationClass = "DetektConventionPlugin"
         }
         register("fcitxComponent") {
             id = "org.fcitx.fcitx5.android.fcitx-component"

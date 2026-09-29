@@ -1,0 +1,11 @@
+<?xml version="1.0" ?>
+<SmellBaseline>
+  <ManuallySuppressedIssues/>
+  <CurrentIssues>
+    <ID>InvalidPackageDeclaration:StringEscapeTest.kt:package org.fcitx.fcitx5.android</ID>
+    <ID>LargeClass:EditingSessionTest.kt:EditingSessionTest</ID>
+    <ID>NestedBlockDepth:FormattedText.kt:FormattedText.Companion$@JvmStatic @Suppress("UNUSED") // called from JNI fun fromByteCursor: FormattedText</ID>
+    <ID>SwallowedException:QuickPhraseEntry.kt:QuickPhraseEntry.Companion$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:QuickPhraseEntry.kt:QuickPhraseEntry.Companion$e: Exception</ID>
+  </CurrentIssues>
+</SmellBaseline>

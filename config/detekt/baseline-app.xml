@@ -1,0 +1,82 @@
+<?xml version="1.0" ?>
+<SmellBaseline>
+  <ManuallySuppressedIssues/>
+  <CurrentIssues>
+    <ID>ComplexCondition:IdleUi.kt:IdleUi$!fromUser || disableAnimation || (state == State.InlineSuggestion || currentState == State.InlineSuggestion) || (state == State.NumberRow || currentState == State.NumberRow)</ID>
+    <ID>ComplexCondition:KeySym.kt:KeySym.Companion$charCode != 0 &amp;&amp; // skip \t, because it's charCode is different from KeySym charCode != '\t'.code &amp;&amp; // skip \n, because fcitx wants \r for return charCode != '\n'.code &amp;&amp; // skip Android's private-use character charCode != KeyCharacterMap.HEX_INPUT.code &amp;&amp; charCode != KeyCharacterMap.PICKER_DIALOG_INPUT.code</ID>
+    <ID>ComplexCondition:PopupKeyboardUi.kt:PopupKeyboardUi$newRow &lt; -2 || newRow &gt; rowCount + 1 || newColumn &lt; -2 || newColumn &gt; columnCount + 1</ID>
+    <ID>ConstructorParameterNaming:BuiltinQuickPhrase.kt:BuiltinQuickPhrase$private var _override: CustomQuickPhrase? = null</ID>
+    <ID>ConstructorParameterNaming:CustomQuickPhrase.kt:CustomQuickPhrase$private var _enabled: Boolean = false</ID>
+    <ID>ConstructorParameterNaming:CustomQuickPhrase.kt:CustomQuickPhrase$private var _file: File</ID>
+    <ID>CyclomaticComplexMethod:BaseKeyboard.kt:BaseKeyboard$private fun createKeyView: KeyView</ID>
+    <ID>CyclomaticComplexMethod:CapabilityFlag.kt:CapabilityFlags.Companion$fun fromEditorInfo: CapabilityFlags</ID>
+    <ID>CyclomaticComplexMethod:ConfigDescriptor.kt:ConfigDescriptor.Companion$override fun parse: Either&lt;ParseException, ConfigDescriptor&lt;*, *&gt;&gt;</ID>
+    <ID>CyclomaticComplexMethod:DataManager.kt:DataManager$fun detectPlugins: PluginSet</ID>
+    <ID>CyclomaticComplexMethod:DataManager.kt:DataManager$fun sync</ID>
+    <ID>CyclomaticComplexMethod:EditingSessionOverRealEditorTest.kt:EditingSessionOverRealEditorTest$@Test fun randomSessions</ID>
+    <ID>CyclomaticComplexMethod:FcitxInputMethodService.kt:FcitxInputMethodService$private fun handleFcitxEvent</ID>
+    <ID>CyclomaticComplexMethod:PreferenceScreenFactory.kt:PreferenceScreenFactory$private fun general</ID>
+    <ID>CyclomaticComplexMethod:StatusIconMapping.kt:StatusIconMapping$@DrawableRes fun fromEntry: Int</ID>
+    <ID>DestructuringDeclarationWithTooManyEntries:CandidatesView.kt:CandidatesView$val (horizontal, bottom, _, top) = anchor</ID>
+    <ID>EmptyFunctionBlock:CustomThemeActivity.kt:CustomThemeActivity.&lt;no name provided&gt;${}</ID>
+    <ID>EmptyFunctionBlock:EditorInfoWindow.kt:EditorInfoWindow${}</ID>
+    <ID>EmptyFunctionBlock:FcitxPreferenceFragment.kt:FcitxPreferenceFragment${ }</ID>
+    <ID>EmptyFunctionBlock:InlineSuggestionsUi.kt:InlineSuggestionsUi.&lt;no name provided&gt;${}</ID>
+    <ID>EmptyFunctionBlock:SeekBar.kt:&lt;no name provided&gt;${}</ID>
+    <ID>EmptyFunctionBlock:TextEditingWindow.kt:TextEditingWindow${}</ID>
+    <ID>LargeClass:FcitxInputMethodService.kt:FcitxInputMethodService : LifecycleInputMethodService</ID>
+    <ID>LongMethod:BaseKeyboard.kt:BaseKeyboard$private fun createKeyView: KeyView</ID>
+    <ID>LongMethod:CapabilityFlag.kt:CapabilityFlags.Companion$fun fromEditorInfo: CapabilityFlags</ID>
+    <ID>LongMethod:ConfigDescriptor.kt:ConfigDescriptor.Companion$override fun parse: Either&lt;ParseException, ConfigDescriptor&lt;*, *&gt;&gt;</ID>
+    <ID>LongMethod:CustomGestureView.kt:CustomGestureView$@SuppressLint("ClickableViewAccessibility") override fun onTouchEvent: Boolean</ID>
+    <ID>LongMethod:CustomThemeActivity.kt:CustomThemeActivity$override fun onCreate</ID>
+    <ID>LongMethod:DataManager.kt:DataManager$fun detectPlugins: PluginSet</ID>
+    <ID>LongMethod:DataManager.kt:DataManager$fun sync</ID>
+    <ID>LongMethod:FcitxInputMethodService.kt:FcitxInputMethodService$private fun handleFcitxEvent</ID>
+    <ID>LongMethod:PreferenceScreenFactory.kt:PreferenceScreenFactory$private fun general</ID>
+    <ID>LoopWithTooManyJumpStatements:DataManager.kt:DataManager$for</ID>
+    <ID>LoopWithTooManyJumpStatements:GridDecoration.kt:GridDecoration$for</ID>
+    <ID>NestedBlockDepth:FcitxInputMethodService.kt:FcitxInputMethodService$private fun handleFcitxEvent</ID>
+    <ID>NestedBlockDepth:StatusAreaWindow.kt:StatusAreaWindow.&lt;no name provided&gt;$override fun onItemClick</ID>
+    <ID>NestedBlockDepth:TextKeyboard.kt:TextKeyboard$private fun updatePunctuationKeys</ID>
+    <ID>PrintStackTrace:AdvancedSettingsFragment.kt:AdvancedSettingsFragment$e</ID>
+    <ID>SwallowedException:ClipboardEntryTransformer.kt:e: Exception</ID>
+    <ID>SwallowedException:DeviceUtil.kt:DeviceUtil$e: Exception</ID>
+    <ID>SwallowedException:FcitxDataProvider.kt:FcitxDataProvider$e: Exception</ID>
+    <ID>SwallowedException:FcitxDataProvider.kt:FcitxDataProvider$e: IOException</ID>
+    <ID>SwallowedException:ManagedPreference.kt:ManagedPreference.PBool$e: Exception</ID>
+    <ID>SwallowedException:ManagedPreference.kt:ManagedPreference.PFloat$e: Exception</ID>
+    <ID>SwallowedException:ManagedPreference.kt:ManagedPreference.PInt$e: Exception</ID>
+    <ID>SwallowedException:ManagedPreference.kt:ManagedPreference.PString$e: Exception</ID>
+    <ID>SwallowedException:ManagedPreference.kt:ManagedPreference.PStringLike$e: Exception</ID>
+    <ID>SwallowedException:NavigationBarHeight.kt:e: Resources.NotFoundException</ID>
+    <ID>SwallowedException:SystemProperty.kt:e: Exception</ID>
+    <ID>ThrowsCount:DataHierarchy.kt:DataHierarchy$fun install</ID>
+    <ID>TooGenericExceptionCaught:AdvancedSettingsFragment.kt:AdvancedSettingsFragment$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:ClipboardEntryTransformer.kt:e: Exception</ID>
+    <ID>TooGenericExceptionCaught:ClipboardManager.kt:ClipboardManager$exception: Exception</ID>
+    <ID>TooGenericExceptionCaught:CropImageActivity.kt:CropImageActivity$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:DeveloperFragment.kt:DeveloperFragment$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:DeviceUtil.kt:DeviceUtil$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:FcitxDataProvider.kt:FcitxDataProvider$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:FcitxPluginServices.kt:FcitxPluginServices$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:FcitxPluginServices.kt:FcitxPluginServices.PluginServiceConnection$e: Throwable</ID>
+    <ID>TooGenericExceptionCaught:FcitxRemoteService.kt:FcitxRemoteService$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:ManagedPreference.kt:ManagedPreference.PBool$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:ManagedPreference.kt:ManagedPreference.PFloat$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:ManagedPreference.kt:ManagedPreference.PInt$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:ManagedPreference.kt:ManagedPreference.PString$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:ManagedPreference.kt:ManagedPreference.PStringLike$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:PinyinDictionaryFragment.kt:PinyinDictionaryFragment$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:PreferenceScreenFactory.kt:PreferenceScreenFactory$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:QuickPhraseListFragment.kt:QuickPhraseListFragment$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:RecentlyUsed.kt:RecentlyUsed$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:ScrollbarDrawable.kt:e: Exception</ID>
+    <ID>TooGenericExceptionCaught:SystemProperty.kt:e: Exception</ID>
+    <ID>TooGenericExceptionCaught:TableInputMethodFragment.kt:TableInputMethodFragment$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:ThemeListFragment.kt:ThemeListFragment$e: Exception</ID>
+    <ID>TooGenericExceptionThrown:FcitxPluginServices.kt:FcitxPluginServices$throw Exception("Couldn't find service or not enough permission")</ID>
+    <ID>TopLevelPropertyNaming:EditorInfoTraits.kt:/** * `EditorInfo.privateImeOptions` value by which an editor opts in to having Backspace sent as * `deleteSurroundingText` instead of a key event. Only the app's own key preference UI sets it. */ @Suppress("ConstPropertyName") const val DeleteSurroundingFlag = "org.fcitx.fcitx5.android.DELETE_SURROUNDING"</ID>
+    <ID>WildcardImport:PickerLayout.kt:import org.fcitx.fcitx5.android.input.keyboard.*</ID>
+  </CurrentIssues>
+</SmellBaseline>
