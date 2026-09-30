@@ -5,10 +5,10 @@
 package org.fcitx.fcitx5.android.core
 
 import org.fcitx.fcitx5.android.FcitxApplication
-import org.fcitx.fcitx5.android.data.pinyin.PinyinDictManager
-import org.fcitx.fcitx5.android.data.table.TableManager
+import org.fcitx.fcitx5.android.engine.data.DataFormatException
 import org.fcitx.fcitx5.android.engine.host.EngineSettings
 import org.fcitx.fcitx5.android.engine.host.Engines
+import org.fcitx.fcitx5.android.engine.libime.LibimeFiles
 import org.fcitx.fcitx5.android.engine.user.LibimeImport
 import org.fcitx.fcitx5.android.utils.appContext
 import timber.log.Timber
@@ -62,8 +62,8 @@ object EngineBridge {
 
     /**
      * The table input method [im] the user imported (TableManager), as fcitx's table addon had it:
-     * `inputmethod/<im>.conf`, naming a libime `.dict` its converter gives back as text, and what
-     * the user set of it, kept in fcitx's config home as `table/<im>.conf`.
+     * `inputmethod/<im>.conf`, naming its table (libime's, or text), and what the user set of it,
+     * kept in fcitx's config home as `table/<im>.conf`.
      */
     private fun userTable(im: String): Engines.UserTable? {
         val data = dataDir()
@@ -71,24 +71,27 @@ object EngineBridge {
         return Engines.UserTable(
             conf.readText(),
             { File(data, it).let { dict -> "${dict.length()} ${dict.lastModified()}" } },
-            { File(data, it).let { dict -> text(dict) { src, dest -> TableManager.tableDictConv(src, dest, TableManager.MODE_BIN_TO_TXT) } } },
+            { tableText(File(data, it)) },
             File(fcitxHome(), "config/table/$im.conf").takeIf { it.isFile }?.readText().orEmpty(),
         )
     }
 
-    /**
-     * What libime's pinyin learned, where fcitx kept it (FCITX_DATA_HOME), as text: its own
-     * converters read its binary files.
-     */
+    /** A table the user imported: libime's, as saved before the engine, or its text. */
+    private fun tableText(file: File): BufferedReader {
+        val bytes = file.readBytes()
+        return if (LibimeFiles.isTable(bytes)) LibimeFiles.table(bytes).reader().buffered() else bytes.inputStream().bufferedReader()
+    }
+
+    /** What libime's pinyin learned, where fcitx kept it (FCITX_DATA_HOME), as text. */
     private fun legacy(): LibimeImport.Legacy? {
         val dir = pinyinDir()
         val dictionary = File(dir, "user.dict")
         val history = File(dir, "user.history")
         if (!dictionary.exists() && !history.exists()) return null
         return LibimeImport.Legacy(
-            lines(dictionary) { src, dest -> PinyinDictManager.pinyinDictConv(src, dest, true) },
-            lines(history, ::libimeHistoryDump),
-            ::libimeDecodePinyin,
+            libime(dictionary, LibimeFiles::pinyinDictionary),
+            libime(history, LibimeFiles::history),
+            { LibimeFiles.spell(it).orEmpty() },
         ).also { Timber.i("libime's pinyin: %d words, %d sentences", it.dictionary.size, it.history.size) }
     }
 
@@ -111,46 +114,25 @@ object EngineBridge {
         return Engines.Additions(phrases, seen) {
             dictionaries.flatMap { file ->
                 try {
-                    lines(file) { src, dest -> PinyinDictManager.pinyinDictConv(src, dest, true) }
+                    LibimeFiles.pinyinDictionary(file.readBytes())
                 } catch (e: IOException) {
                     Timber.w(e, "pinyin dictionary")
+                    emptyList()
+                } catch (e: DataFormatException) {
+                    Timber.w(e, "pinyin dictionary %s", file.name)
                     emptyList()
                 }
             }
         }
     }
 
-    private fun lines(file: File, convert: (String, String) -> Unit): List<String> =
-        if (file.exists()) text(file, convert).use { it.readLines() } else emptyList()
-
-    /** [file], one of libime's, as text [convert] writes out; the copy is gone once read. */
-    private fun text(file: File, convert: (String, String) -> Unit): BufferedReader {
-        // one name, so a copy of the user's typing left by a kill is gone the next time
-        val out = File(appContext.cacheDir, "libime-${file.name}.txt")
-        try {
-            convert(file.path, out.path)
-            return object : BufferedReader(out.reader()) {
-                override fun close() {
-                    try {
-                        super.close()
-                    } finally {
-                        out.delete()
-                    }
-                }
-            }
-        } catch (@Suppress("TooGenericExceptionCaught") e: Exception) {
-            out.delete()
-            // the native converters throw a bare Exception
-            throw e as? IOException ?: IOException("cannot read $file", e)
-        }
-    }
-
-    @JvmStatic
-    private external fun libimeHistoryDump(src: String, dest: String)
-
-    /** A reading as libime's history keeps it, spelled `pin'yin`; empty if it is none. */
-    @JvmStatic
-    private external fun libimeDecodePinyin(code: String): String
+    /**
+     * One of libime's files, as [read] gives it back. One that cannot be read fails the whole
+     * import, which is tried again next time: a reader fixed in an update still gets what the
+     * user's pinyin learned.
+     */
+    private fun libime(file: File, read: (ByteArray) -> List<String>): List<String> =
+        if (file.exists()) read(file.readBytes()) else emptyList()
 
     // mapped where it lies in the APK (stored uncompressed): nothing copied, and pages the OS may
     // drop. Signed with the APK, so the checksums need not be read through.

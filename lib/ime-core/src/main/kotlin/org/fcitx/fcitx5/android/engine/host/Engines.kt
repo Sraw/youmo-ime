@@ -165,9 +165,7 @@ class Engines(
         } catch (e: IOException) {
             onError(e)
         } catch (@Suppress("TooGenericExceptionCaught") e: RuntimeException) {
-            // old data, through native converters: no failure of theirs should stop typing
-            onError(IOException("cannot import libime's data", e))
-        } catch (e: LinkageError) {
+            // old data, however it came to be: no failure reading it should stop typing
             onError(IOException("cannot import libime's data", e))
         }
     }
@@ -272,9 +270,7 @@ class Engines(
         } catch (e: SourceException) {
             throw unreadable(im, e)
         } catch (@Suppress("TooGenericExceptionCaught") e: RuntimeException) {
-            // what the app reads the table with may be native: no failure of it should go unsaid
-            throw unreadable(im, e)
-        } catch (e: LinkageError) {
+            // a table file from anywhere (DataFormatException, say): no failure should go unsaid
             throw unreadable(im, e)
         }
         failed -= im

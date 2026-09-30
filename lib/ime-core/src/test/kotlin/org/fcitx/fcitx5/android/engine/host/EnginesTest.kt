@@ -5,6 +5,7 @@
 package org.fcitx.fcitx5.android.engine.host
 
 import org.fcitx.fcitx5.android.engine.data.CodeTable
+import org.fcitx.fcitx5.android.engine.data.DataFormatException
 import org.fcitx.fcitx5.android.engine.data.PinyinDataBuilder
 import org.fcitx.fcitx5.android.engine.pinyin.Fuzzy
 import org.fcitx.fcitx5.android.engine.pinyin.Syllables
@@ -366,17 +367,17 @@ class EnginesTest {
     fun libimesFilesThatCannotBeReadAreTriedAgainNextTime() {
         val dir = folder.newFolder("engine")
         val errors = ArrayList<IOException>()
-        val failures = ArrayDeque(listOf<Throwable>(IOException("unreadable"), IllegalStateException("native"), UnsatisfiedLinkError("gone")))
+        val failures = ArrayDeque(listOf<Throwable>(IOException("unreadable"), DataFormatException("corrupt")))
         val legacy: () -> LibimeImport.Legacy? = {
             failures.removeFirstOrNull()?.let { throw it }
             LibimeImport.Legacy(emptyList(), List(MAX_PICKS) { "拟\tni" })
         }
-        repeat(3) {
+        repeat(2) {
             Engines(::load, dir, onError = { errors += it }, legacy = legacy).use { engines ->
                 assertEquals(listOf("你", "拟"), engines.type(Engines.PINYIN, "ni").candidates)
             }
         }
-        assertEquals(listOf("unreadable", "native", "gone"), errors.map { it.cause?.message ?: it.message })
+        assertEquals(listOf("unreadable", "corrupt"), errors.map { it.cause?.message ?: it.message })
         Engines(::load, dir, legacy = legacy).use { engines ->
             assertEquals("拟", engines.type(Engines.PINYIN, "ni").candidates.first())
         }

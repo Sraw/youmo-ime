@@ -5,8 +5,10 @@
 package org.fcitx.fcitx5.android.eval
 
 import org.fcitx.fcitx5.android.engine.data.CodeTable
+import org.fcitx.fcitx5.android.engine.data.DataFormatException
 import org.fcitx.fcitx5.android.engine.data.PinyinData
 import org.fcitx.fcitx5.android.engine.lattice.Penalties
+import org.fcitx.fcitx5.android.engine.libime.LibimeFiles
 import org.fcitx.fcitx5.android.engine.pinyin.Fuzzy
 import org.fcitx.fcitx5.android.engine.pinyin.PinyinSegmenter
 import org.fcitx.fcitx5.android.engine.pinyin.Segmenter
@@ -15,6 +17,7 @@ import org.fcitx.fcitx5.android.engine.rerank.Reranker
 import org.fcitx.fcitx5.android.engine.rerank.SentenceModel
 import org.fcitx.fcitx5.android.engine.session.PinyinSession
 import java.io.File
+import java.io.IOException
 import java.io.RandomAccessFile
 import java.nio.channels.FileChannel
 import java.util.Locale
@@ -29,6 +32,7 @@ val USAGE = """usage: score <set.tsv> <result.tsv> [<baseline-result.tsv>] [--ha
        ksc <pinyin.data> <set.tsv> [--scheme <scheme>] [--fuzzy all|<pair>,...] [--half <half>]
        learn <pinyin.data> <set.tsv> [--scheme <scheme>] [--fuzzy all|<pair>,...]
        table <table.data> <set.tsv> [--preset <preset>]
+       libime pinyin|history|table <file>
 schemes: ${ShuangpinSet.SCHEMES.keys.joinToString(" ")}
 pairs: ${Fuzzy.entries.joinToString(" ") { it.name.lowercase() }}
 halves: ${Halves.NAMES.joinToString(" ")}
@@ -70,16 +74,8 @@ fun runCli(args: Array<String>, out: Appendable, err: Appendable): Int {
     val fuzzy = a.options["fuzzy"]?.let(::fuzzyPairs)
     val preset = a.options["preset"]
     val neighbours = a.options["neighbours"]
-    val ok = listOf(
-        half == null || half in Halves.NAMES,
-        scheme == null || scheme in ShuangpinSet.SCHEMES,
-        a.options["fuzzy"] == null || fuzzy != null,
-        preset == null || preset in TableRun.PRESETS,
-        // 双拼 reads no slips
-        neighbours == null || neighbours in ON_OFF && scheme == null,
-    ).all { it }
     return when {
-        !ok -> usage(err)
+        !optionsValid(a.options, fuzzy) -> usage(err)
         a.has("score", 3..4, "half") -> score(p[1], p[2], p.getOrNull(3), half, out)
         a.has("pinyin", 4..4, "scheme", "fuzzy", "half", "neighbours", "rerank") ->
             runPinyin(p[1], p[2], p[3], scheme, fuzzy.orEmpty(), half, neighbours == "on", a.options["rerank"])
@@ -90,8 +86,22 @@ fun runCli(args: Array<String>, out: Appendable, err: Appendable): Int {
         a.has("ksc", 3..3, "scheme", "fuzzy", "half") -> ksc(p[1], p[2], scheme, fuzzy.orEmpty(), half, out)
         a.has("learn", 3..3, "scheme", "fuzzy") -> learn(p[1], p[2], scheme, fuzzy.orEmpty(), out)
         a.has("table", 3..3, "preset") -> table(p[1], p[2], preset ?: "plain", out)
+        a.has("libime", 3..3) && p[1] in LIBIME_KINDS -> libime(p[1], p[2], out, err)
         else -> usage(err)
     }
+}
+
+private fun optionsValid(options: Map<String, String>, fuzzy: Set<Fuzzy>?): Boolean {
+    val scheme = options["scheme"]
+    val neighbours = options["neighbours"]
+    return listOf(
+        options["half"].let { it == null || it in Halves.NAMES },
+        scheme == null || scheme in ShuangpinSet.SCHEMES,
+        options["fuzzy"] == null || fuzzy != null,
+        options["preset"].let { it == null || it in TableRun.PRESETS },
+        // 双拼 reads no slips
+        neighbours == null || neighbours in ON_OFF && scheme == null,
+    ).all { it }
 }
 
 private fun usage(err: Appendable): Int {
@@ -232,6 +242,29 @@ private fun table(dataPath: String, setPath: String, preset: String, out: Append
     out.appendLine(TableRun.report(total, run.entries(ENTRY_STEP)))
     return 0
 }
+
+/** A libime file as the text libime's own tools write of it, to check the readers against them. */
+private fun libime(kind: String, path: String, out: Appendable, err: Appendable): Int {
+    val data = try {
+        File(path).readBytes()
+    } catch (e: IOException) {
+        err.appendLine("$path: ${e.message}")
+        return 1
+    }
+    try {
+        when (kind) {
+            "pinyin" -> LibimeFiles.pinyinDictionary(data).forEach { out.appendLine(it) }
+            "history" -> LibimeFiles.history(data).forEach { out.appendLine(it) }
+            else -> out.append(LibimeFiles.table(data))
+        }
+    } catch (e: DataFormatException) {
+        err.appendLine("$path: ${e.message}")
+        return 1
+    }
+    return 0
+}
+
+private val LIBIME_KINDS = setOf("pinyin", "history", "table")
 
 private val ON_OFF = setOf("on", "off")
 

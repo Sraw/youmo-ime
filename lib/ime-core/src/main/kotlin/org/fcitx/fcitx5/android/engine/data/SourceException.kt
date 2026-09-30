@@ -61,6 +61,20 @@ fun unescapeValue(value: String): String {
 
 private val ESCAPES = mapOf('n' to '\n', 'f' to '\u000C', 'r' to '\r', 't' to '\t', 'v' to '\u000B')
 
+/** [value] as fcitx's `escapeForValue` writes it, which [unescapeValue] reads back. */
+fun escapeValue(value: String): String {
+    if (value.none { it in NEEDS_QUOTES }) return value
+    val out = StringBuilder(value.length + 2).append('"')
+    for (c in value) {
+        val escape = ESCAPED[c]
+        if (escape != null) out.append('\\').append(escape) else out.append(c)
+    }
+    return out.append('"').toString()
+}
+
+private const val NEEDS_QUOTES = "\u000C\r\t\u000B \"\\\n"
+private val ESCAPED = ESCAPES.entries.associate { (k, v) -> v to k } + mapOf('"' to '"', '\\' to '\\')
+
 /**
  * Calls [block] with each line and its 1-based number, turning a failure inside it into a
  * [SourceException] that points at the line. A leading byte-order mark is dropped.

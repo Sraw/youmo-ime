@@ -34,8 +34,6 @@
 #include <unicode_public.h>
 #include <clipboard_public.h>
 
-#include <libime/core/historybigram.h>
-#include <libime/pinyin/pinyinencoder.h>
 #include <libime/pinyin/pinyindictionary.h>
 #include <libime/table/tablebaseddictionary.h>
 
@@ -1272,37 +1270,6 @@ Java_org_fcitx_fcitx5_android_data_pinyin_PinyinDictManager_pinyinDictConv(JNIEn
     }
 }
 
-// libime pinyin's history as text, for the engine to learn what the user typed with it
-extern "C"
-JNIEXPORT void JNICALL
-Java_org_fcitx_fcitx5_android_core_EngineBridge_libimeHistoryDump(JNIEnv *env, jclass clazz, jstring src, jstring dest) {
-    try {
-        libime::HistoryBigram history;
-        std::ifstream in(*CString(env, src), std::ios::in | std::ios::binary);
-        if (!in) throw std::runtime_error("cannot open history");
-        history.load(in);
-        std::ofstream out(*CString(env, dest), std::ios::out | std::ios::binary);
-        history.dump(out);
-        // the last of it is written only by the close
-        out.close();
-        if (out.fail()) throw std::runtime_error("cannot write history");
-    } catch (const std::exception &e) {
-        throwJavaException(env, e.what());
-    }
-}
-
-extern "C"
-JNIEXPORT jstring JNICALL
-Java_org_fcitx_fcitx5_android_core_EngineBridge_libimeDecodePinyin(JNIEnv *env, jclass clazz, jstring code) {
-    std::string spelled;
-    try {
-        spelled = libime::PinyinEncoder::decodeFullPinyin(*CString(env, code));
-    } catch (const std::exception &) {
-        // an odd length: no reading
-    }
-    return env->NewStringUTF(spelled.c_str());
-}
-
 extern "C"
 JNIEXPORT void JNICALL
 Java_org_fcitx_fcitx5_android_data_table_TableManager_tableDictConv(JNIEnv *env, jclass clazz, jstring src, jstring dest, jboolean mode) {
@@ -1316,23 +1283,6 @@ Java_org_fcitx_fcitx5_android_data_table_TableManager_tableDictConv(JNIEnv *env,
     } catch (const std::exception &e) {
         throwJavaException(env, e.what());
     }
-}
-
-extern "C"
-JNIEXPORT jboolean JNICALL
-Java_org_fcitx_fcitx5_android_data_table_TableManager_checkTableDictFormat(JNIEnv *env, jclass clazz, jstring src, jboolean user) {
-    using namespace libime;
-    TableBasedDictionary dict;
-    try {
-        if (user == JNI_TRUE) {
-            dict.loadUser(CString(env, src), TableFormat::Binary);
-        } else {
-            dict.load(*CString(env, src), TableFormat::Binary);
-        }
-    } catch (const std::exception &e) {
-        throwJavaException(env, e.what());
-    }
-    return JNI_TRUE;
 }
 
 extern "C"

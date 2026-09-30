@@ -120,9 +120,6 @@ object TableManager {
     @JvmStatic
     external fun tableDictConv(src: String, dest: String, mode: Boolean)
 
-    @JvmStatic
-    external fun checkTableDictFormat(src: String, user: Boolean = false): Boolean
-
     const val MODE_BIN_TO_TXT = true
     const val MODE_TXT_TO_BIN = false
 }

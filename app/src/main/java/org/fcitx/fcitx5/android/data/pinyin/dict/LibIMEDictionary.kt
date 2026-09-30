@@ -5,7 +5,7 @@
 package org.fcitx.fcitx5.android.data.pinyin.dict
 
 import org.fcitx.fcitx5.android.R
-import org.fcitx.fcitx5.android.data.pinyin.PinyinDictManager
+import org.fcitx.fcitx5.android.engine.libime.LibimeFiles
 import org.fcitx.fcitx5.android.utils.errorArg
 import java.io.File
 
@@ -56,11 +56,9 @@ class LibIMEDictionary(file: File) : PinyinDictionary() {
 
     override fun toTextDictionary(dest: File): TextDictionary {
         ensureTxt(dest)
-        PinyinDictManager.pinyinDictConv(
-            file.absolutePath,
-            dest.absolutePath,
-            PinyinDictManager.MODE_BIN_TO_TXT
-        )
+        dest.bufferedWriter().use { out ->
+            LibimeFiles.pinyinDictionary(file.readBytes()).forEach { out.write(it); out.write('\n'.code) }
+        }
         return TextDictionary(dest)
     }
 

@@ -5,7 +5,7 @@
 package org.fcitx.fcitx5.android.data.table.dict
 
 import org.fcitx.fcitx5.android.R
-import org.fcitx.fcitx5.android.data.table.TableManager
+import org.fcitx.fcitx5.android.engine.libime.LibimeFiles
 import org.fcitx.fcitx5.android.utils.errorArg
 import java.io.File
 
@@ -24,17 +24,14 @@ class LibIMEDictionary(file: File) : Dictionary() {
 
     override fun toTextDictionary(dest: File): TextDictionary {
         ensureTxt(dest)
-        TableManager.tableDictConv(
-            file.absolutePath,
-            dest.absolutePath,
-            TableManager.MODE_BIN_TO_TXT
-        )
+        dest.writeText(LibimeFiles.table(file.readBytes()))
         return TextDictionary(dest)
     }
 
     override fun toLibIMEDictionary(dest: File): LibIMEDictionary {
         ensureBin(dest)
-        TableManager.checkTableDictFormat(file.absolutePath)
+        // read through, as libime would load it: a table it could not is not taken
+        LibimeFiles.table(file.readBytes())
         file.copyTo(dest)
         return LibIMEDictionary(dest)
     }

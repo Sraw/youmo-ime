@@ -9,6 +9,8 @@ import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
+import java.io.ByteArrayOutputStream
+import java.io.DataOutputStream
 
 class MainTest {
 
@@ -39,6 +41,8 @@ class MainTest {
             arrayOf("ksc"),
             arrayOf("table", "d", "s", "--preset", "dvorak"),
             arrayOf("table", "d", "s", "--half", "tune"),
+            arrayOf("libime", "user", "f"),
+            arrayOf("libime", "table", "f", "--preset", "plain"),
             arrayOf(),
         )
         for (args in usageErrors) assertEquals(args.joinToString(" "), 2, exit(*args))
@@ -48,7 +52,7 @@ class MainTest {
     fun theUsageNamesEveryCommand() {
         val err = StringBuilder()
         assertEquals(2, runCli(arrayOf("help"), StringBuilder(), err))
-        for (command in listOf("score", "pinyin", "shuangpin", "slips", "tune", "table")) assertTrue(command, "$command <" in err)
+        for (command in listOf("score", "pinyin", "shuangpin", "slips", "tune", "table", "libime")) assertTrue(command, "$command <" in err || "$command pinyin" in err)
     }
 
     @Test
@@ -63,5 +67,30 @@ class MainTest {
         assertEquals("2", samples())
         // the two texts fall in different halves
         assertEquals(setOf("1"), Halves.NAMES.map { samples("--half", it) }.toSet())
+    }
+
+    @Test
+    fun libimesHistoryAsText() {
+        // libime's HistoryBigram, version 1: two pools, a sentence of a word in the first
+        val bytes = ByteArrayOutputStream()
+        DataOutputStream(bytes).apply {
+            writeInt(0x000fc315)
+            writeInt(1)
+            writeInt(1)
+            writeInt(1)
+            val word = "你好".toByteArray()
+            writeInt(word.size)
+            write(word)
+            writeInt(0)
+        }
+        val file = tmp.newFile("user.history").apply { writeBytes(bytes.toByteArray()) }
+        val out = StringBuilder()
+        assertEquals(0, runCli(arrayOf("libime", "history", file.path), out, StringBuilder()))
+        assertEquals("你好\n", out.toString())
+        // not libime's, or not there: said, not thrown
+        val err = StringBuilder()
+        assertEquals(1, runCli(arrayOf("libime", "pinyin", file.path), StringBuilder(), err))
+        assertEquals(1, runCli(arrayOf("libime", "table", file.path + ".gone"), StringBuilder(), err))
+        assertEquals(2, err.lines().count { it.startsWith(file.path) })
     }
 }

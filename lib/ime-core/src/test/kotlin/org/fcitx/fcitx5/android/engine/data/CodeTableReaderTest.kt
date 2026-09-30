@@ -122,6 +122,14 @@ class CodeTableReaderTest {
         assertEquals("", unescapeValue("\"\""))
     }
 
+    @Test
+    fun valuesEscapeAsFcitxEscapesThem() {
+        assertEquals("好", escapeValue("好"))
+        assertEquals("\"a b\"", escapeValue("a b"))
+        assertEquals("\"a\\nb\\tc\\\"d\\\\e\\f\\r\\v\"", escapeValue("a\nb\tc\"d\\e\u000c\r\u000b"))
+        for (value in listOf("", "a b", "\"", "a\\n", "　", "x\"y\"")) assertEquals(value, unescapeValue(escapeValue(value)))
+    }
+
     companion object {
         const val TINY_TABLE = """
             ;fcitx 版本 0x03 码表文件
