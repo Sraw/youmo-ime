@@ -123,24 +123,25 @@ class PinyinSegmenterTest {
     @Test
     fun aFinishedSyllableAtTheEndMayGoOn() {
         val zhan = plain.segment("zhan")
-        assertEquals(setOf("zha:SYLLABLE", "zhan:SYLLABLE", "zhan:PARTIAL"), zhan.leaving(0))
-        assertEquals("zhang…", zhan.matches(zhan.edge("zhan", Kind.PARTIAL)).toString())
+        // read apart from a syllable not yet finished, as the user more likely meant zhan
+        assertEquals(setOf("zha:SYLLABLE", "zhan:SYLLABLE", "zhan:EXTENDED"), zhan.leaving(0))
+        assertEquals("zhang…", zhan.matches(zhan.edge("zhan", Kind.EXTENDED)).toString())
         val xia = plain.segment("xia")
-        assertEquals("xian… xiang… xiao…", xia.matches(xia.edge("xia", Kind.PARTIAL)).toString())
+        assertEquals("xian… xiang… xiao…", xia.matches(xia.edge("xia", Kind.EXTENDED)).toString())
         // zhon spells zhong only as a slip; finishing it is the better reading
         val zhon = plain.segment("zhon")
         assertEquals("zhong…", zhon.matches(zhon.edge("zhon", Kind.PARTIAL)).toString())
         // nothing to go on to
-        assertFalse("zhang:PARTIAL" in plain.segment("zhang").leaving(0))
-        assertFalse("zhan:PARTIAL" in plain.segment("zhanb").leaving(0))
+        assertFalse("zhang:EXTENDED" in plain.segment("zhang").leaving(0))
+        assertFalse("zhan:EXTENDED" in plain.segment("zhanb").leaving(0))
         // a separator after a whole syllable closes it
-        assertFalse("zhan:PARTIAL" in plain.segment("zhan'g").leaving(0))
+        assertFalse("zhan:EXTENDED" in plain.segment("zhan'g").leaving(0))
         // a finished slip or fuzzy spelling is no start of one: jv goes on to jvan, not to ju
         val jv = plain.segment("jv")
         assertEquals("juan!… jue!… jun!…", jv.matches(jv.edge("jv", Kind.PARTIAL)).toString())
         val zan = PinyinSegmenter(setOf(Fuzzy.Z_ZH)).segment("zan")
         // zhan~ is what zan already is; zhang~ is what zang would be
-        assertEquals("zang… zhang~…", zan.matches(zan.edge("zan", Kind.PARTIAL)).toString())
+        assertEquals("zang… zhang~…", zan.matches(zan.edge("zan", Kind.EXTENDED)).toString())
     }
 
     @Test

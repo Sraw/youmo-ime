@@ -30,6 +30,13 @@ data class Penalties(
     val initial: Float = -1f,
     /** A syllable still being typed at the end: `zho` for zhong. */
     val partial: Float = -1f,
+    /**
+     * A whole syllable read as the start of a longer one: `xian` for xiang. Dearer than [partial],
+     * as the user more likely meant what they typed: at -1 有点像 beat 有点咸 for `youdianxian`.
+     * From -1.5 to -5 all read the same on the evaluation set (0.4 points more than -1 on it,
+     * 1.3 on the one with text before), with keystrokes to reach each sample unchanged.
+     */
+    val extended: Float = -2f,
     /** Input kept as typed, being no pinyin at all. */
     val raw: Float = -10f,
 )

@@ -152,6 +152,7 @@ class PinyinDecoder(
         Kind.SYLLABLE -> 0f
         Kind.INITIAL -> penalties.initial
         Kind.PARTIAL -> penalties.partial
+        Kind.EXTENDED -> penalties.extended
         Kind.RAW -> penalties.raw
     }
 

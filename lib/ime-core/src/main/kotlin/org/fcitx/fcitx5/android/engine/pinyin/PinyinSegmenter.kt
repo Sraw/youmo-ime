@@ -79,7 +79,7 @@ class PinyinSegmenter(
                 initial = length
                 initialMatches = alone
             } else if (more != null && mayGoOn(input, at + length, full == null)) {
-                edges.add(at, length, Kind.PARTIAL, more)
+                edges.add(at, length, if (full != null && full.anyWhole()) Kind.EXTENDED else Kind.PARTIAL, more)
             }
         }
         if (initialMatches != null && (longestSyllable <= initial || beforeConsonant(input, at, initial))) {
@@ -107,6 +107,9 @@ class PinyinSegmenter(
         /** A consonant initial of [length] at [at], with a consonant after it. */
         fun beforeConsonant(input: String, at: Int, length: Int) =
             input[at] !in VOWELS && input[at + length] !in VOWELS
+
+        /** Whether one of these is a syllable as typed, or its fuzzy partner: not only a slip (`zhon` for zhong). */
+        fun SyllableMatches.anyWhole() = (0 until size).any { flags(it) and SyllableMatches.TYPO == 0 }
 
         /**
          * Whether text ending at [at] may still become a longer syllable: at the end of the input,

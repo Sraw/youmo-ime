@@ -115,6 +115,8 @@ class PinyinDecoderTest {
         // 你好 through two initials, best as 你 then 好 (-2 - 0.75) rather than the word (-3)
         assertEquals(-2.75f + 2 * p.initial, decode("nh").sentences.first { it.text == "你好" }.score, 1e-4f)
         assertEquals(-2.75f + p.partial, decode("nih").sentences.first { it.text == "你好" }.score, 1e-4f)
+        // zhan finished, read as the start of zhang
+        assertEquals(-3f + p.extended, decode("zhan").sentences.first { it.text == "张" }.score, 1e-4f)
         assertEquals(-2f + p.fuzzy, decode("li", PinyinSegmenter(setOf(Fuzzy.L_N))).sentences.first().score, 1e-4f)
         val zagn = decode("zagn", PinyinSegmenter(setOf(Fuzzy.Z_ZH))).sentences.first()
         assertEquals("张", zagn.text)

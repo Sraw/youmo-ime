@@ -33,6 +33,9 @@ class SyllableGraph internal constructor(
         /** The start of a syllable, still being typed at the end of the input or closed by a separator: `zho`. */
         PARTIAL,
 
+        /** A whole syllable read as the start of a longer one, as [PARTIAL]: `xian` on the way to xiang. */
+        EXTENDED,
+
         /** Input that is no pinyin at all (`i`, a digit): no syllables, kept as typed. */
         RAW,
     }
