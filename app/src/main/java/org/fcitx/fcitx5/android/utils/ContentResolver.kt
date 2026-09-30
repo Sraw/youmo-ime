@@ -16,6 +16,15 @@ import android.provider.OpenableColumns
  * @see android.provider.DocumentsContract.Document#COLUMN_DISPLAY_NAME
  */
 fun ContentResolver.queryFileName(uri: Uri): String? =
-    query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use {
-        if (it.moveToFirst() && !it.isNull(0)) it.getString(0) else null
-    }
+    (
+        query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use {
+            if (it.moveToFirst() && !it.isNull(0)) it.getString(0) else null
+        }
+            // a file:// uri has no provider to ask, and some providers no display name: without a
+            // name the callers gave up silently, so the path's last segment stands in for it (a
+            // MediaStore id then fails their check for the file's kind, with an error shown)
+            ?: uri.lastPathSegment
+        )
+        // callers write a temporary file by this name: a provider's name, or a segment with an
+        // encoded slash (..%2Fx), must not reach outside their directory
+        ?.substringAfterLast('/')?.takeIf { it.isNotEmpty() && it != "." && it != ".." }
