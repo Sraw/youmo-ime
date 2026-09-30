@@ -75,6 +75,10 @@ class FakeFcitxAPI : FcitxAPI {
         calls += "reloadEngine()"
     }
 
+    override suspend fun engineContext(before: String) {
+        calls += "engineContext($before)"
+    }
+
     override suspend fun sendKey(key: String, states: UInt, code: Int, up: Boolean, timestamp: Int) {
         calls += "sendKey(key=$key, states=$states, code=$code, up=$up)"
     }

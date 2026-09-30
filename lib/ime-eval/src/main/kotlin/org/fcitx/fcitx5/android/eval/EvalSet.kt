@@ -4,20 +4,23 @@
  */
 package org.fcitx.fcitx5.android.eval
 
-/** One thing a user types, and what they meant by it. */
-data class Sample(val input: String, val expected: String, val tag: String)
+/**
+ * One thing a user types as [input], and what they meant by it, after [context] when there is
+ * any: the text before the cursor.
+ */
+data class Sample(val input: String, val expected: String, val tag: String, val context: String = "")
 
 object EvalSet {
 
-    /** `input<TAB>expected<TAB>tag`; `#` starts a comment line. */
+    /** `input<TAB>expected<TAB>tag[<TAB>context]`; `#` starts a comment line. */
     fun parse(lines: Sequence<String>): List<Sample> = lines
         .mapIndexedNotNull { index, line ->
             if (line.isBlank() || line.startsWith("#")) return@mapIndexedNotNull null
             val fields = line.split('\t')
-            require(fields.size == 3 && fields.none { it.isEmpty() }) {
-                "line ${index + 1}: expected input<TAB>expected<TAB>tag, got \"$line\""
+            require(fields.size in 3..4 && fields.none { it.isEmpty() }) {
+                "line ${index + 1}: expected input<TAB>expected<TAB>tag[<TAB>context], got \"$line\""
             }
-            Sample(fields[0], fields[1], fields[2])
+            Sample(fields[0], fields[1], fields[2], fields.getOrElse(3) { "" })
         }
         .toList()
 }

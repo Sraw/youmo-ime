@@ -71,6 +71,18 @@ class Keyboard(private val session: Session) {
         return shown
     }
 
+    /**
+     * [before] is the text before the cursor, which the user put somewhere the engine did not
+     * (a field focused, a tap): what is typed next follows it. Nothing on show is dropped, as the
+     * host would not know: the service resets fcitx first where there is something. [learning]
+     * is as for [onEvent], set before: this comes before any key typed in a field just focused.
+     */
+    fun context(before: String, learning: Boolean = true) {
+        if (shown.preedit.isNotEmpty() || shown.candidates.isNotEmpty()) return
+        session.learning = learning
+        shown = session.apply(Action.Context(before))
+    }
+
     private fun char(codePoint: Int): Snapshot {
         // past the BMP (an emoji key): no session reads one, but it still ends the input
         val c = if (codePoint in 0..Char.MAX_VALUE.code) codePoint.toChar() else REPLACEMENT

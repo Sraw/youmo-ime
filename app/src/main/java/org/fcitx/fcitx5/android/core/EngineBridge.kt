@@ -166,6 +166,12 @@ object EngineBridge {
         if (made.isInitialized()) engines.reload()
     }
 
+    /** See [Engines.context]; nothing to tell before the engine is first used. */
+    @JvmStatic
+    fun context(before: String) {
+        if (made.isInitialized()) engines.context(before)
+    }
+
     /** Text and hint of each candidate in [from, from + count), one after the other. */
     @JvmStatic
     fun candidates(im: String, from: Int, count: Int): Array<String> =

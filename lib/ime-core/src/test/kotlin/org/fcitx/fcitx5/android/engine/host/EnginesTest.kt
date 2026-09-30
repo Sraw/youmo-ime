@@ -35,6 +35,7 @@ class EnginesTest {
         .unigram("你", -2f, 0f)
         .unigram("拟", -3f, 0f)
         .unigram("好", -2.5f, 0f)
+        .bigram("好", "拟", -0.5f, 0f)
         .entry("你", syl("ni"))
         .entry("拟", syl("ni"))
         .entry("好", syl("hao"))
@@ -97,6 +98,16 @@ class EnginesTest {
         assertEquals(listOf("", "f"), s.hints)
         // wubi's pinyin lookup shares the pinyin data
         assertEquals(listOf("${Engines.TABLE_DIR}/wbx.data"), loaded)
+    }
+
+    @Test
+    fun theTextBeforeTheCursorIsTheContextOfWhatIsTypedNext() {
+        val engines = Engines(::load, null)
+        // no keyboard yet: nothing to tell
+        engines.context("好")
+        engines.onEvent(Engines.PINYIN, EngineEvent.RESET, 0)
+        engines.context("好")
+        assertEquals(listOf("拟", "你"), engines.type(Engines.PINYIN, "ni").candidates)
     }
 
     @Test

@@ -84,7 +84,7 @@ class KeyboardTest {
                     commit = input
                     input = ""
                 }
-                Action.Reset -> {
+                Action.Reset, is Action.Context -> {
                     input = ""
                     predicting = false
                 }
@@ -197,6 +197,27 @@ class KeyboardTest {
         assertFalse(s.handled)
         assertFalse(s.predicting)
         assertEquals(Action.Key(' '), session.actions.last())
+    }
+
+    @Test
+    fun theTextBeforeTheCursorGoesToTheSessionOnlyWithNothingShown() {
+        keyboard.context("你好")
+        assertEquals(Action.Context("你好"), session.actions.last())
+        type("ab")
+        keyboard.context("x")
+        assertEquals(Action.Key('b'), session.actions.last())
+        char(' ')
+        // a prediction shown
+        keyboard.context("x")
+        assertEquals(Action.Select(0), session.actions.last())
+        keyboard.onEvent(EngineEvent.RESET, 0)
+        keyboard.context("x")
+        assertEquals(Action.Context("x"), session.actions.last())
+        // set for it as for a key: it comes first in a field just focused
+        keyboard.context("y", learning = false)
+        assertFalse(session.learning)
+        keyboard.context("z")
+        assertTrue(session.learning)
     }
 
     @Test

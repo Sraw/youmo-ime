@@ -35,6 +35,9 @@ class KeystrokeRunTest {
         .unigram("尼", -3.5f, 0f)
         .unigram("号", -3f, 0f)
         .unigram("毫", -3.5f, 0f)
+        // no reading: only ever a context
+        .unigram("他", -2f, 0f)
+        .bigram("他", "号", -0.5f, 0f)
         .entry("你", syl("ni"))
         .entry("拟", syl("ni"))
         .entry("好", syl("hao"))
@@ -50,6 +53,16 @@ class KeystrokeRunTest {
 
     private fun run(pageSize: Int = PinyinSession.DEFAULT_PAGE_SIZE) =
         KeystrokeRun(PinyinSession(data, PinyinSegmenter(), pageSize = pageSize))
+
+    @Test
+    fun theContextIsWhatTheInputFollows() {
+        val sample = Sample("hao", "号", "pair")
+        assertFalse(run().type(sample).first)
+        // and not what an earlier sample left
+        val run = run()
+        assertTrue(run.type(sample.copy(context = "他")).first)
+        assertFalse(run.type(sample).first)
+    }
 
     @Test
     fun theFirstCandidateCostsOneKey() {

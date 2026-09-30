@@ -47,6 +47,12 @@ interface FcitxAPI {
     /** Reads again what the user added to the engine's input methods: custom phrases, dictionaries. */
     suspend fun reloadEngine()
 
+    /**
+     * Tells the engine [before], the text before the cursor, where the user put the cursor other
+     * than by typing (a field focused, a tap): what they type next follows it.
+     */
+    suspend fun engineContext(before: String)
+
     suspend fun sendKey(key: String, states: UInt = 0u, code: Int = 0, up: Boolean = false, timestamp: Int = -1)
 
     suspend fun sendKey(c: Char, states: UInt = 0u, code: Int = 0, up: Boolean = false, timestamp: Int = -1)

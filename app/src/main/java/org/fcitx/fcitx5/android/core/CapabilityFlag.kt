@@ -186,5 +186,11 @@ value class CapabilityFlags constructor(val flags: ULong) {
 
     fun has(flag: CapabilityFlag) = flags.hasFlag(flag.flag)
 
+    /**
+     * Whether any of [flag]'s bits is set: [has] needs them all, which a field rarely has of a
+     * combined flag such as [CapabilityFlag.PasswordOrSensitive].
+     */
+    fun hasAny(flag: CapabilityFlag) = (flags and flag.flag) != 0UL
+
     fun toLong() = flags.toLong()
 }

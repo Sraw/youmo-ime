@@ -10,6 +10,7 @@ import org.fcitx.fcitx5.android.engine.lattice.Candidate
 import org.fcitx.fcitx5.android.engine.lattice.Penalties
 import org.fcitx.fcitx5.android.engine.lattice.PinyinDecoder
 import org.fcitx.fcitx5.android.engine.lattice.Predictor
+import org.fcitx.fcitx5.android.engine.lattice.TextWords
 import org.fcitx.fcitx5.android.engine.lattice.WordScorer
 import org.fcitx.fcitx5.android.engine.phrase.CustomPhrases
 import org.fcitx.fcitx5.android.engine.pinyin.Segmenter
@@ -32,7 +33,8 @@ import java.util.Calendar
  * piece is dropped, so its keys are read again.
  *
  * The words committed stay the context of what is typed next, as they would be read together,
- * until [Action.Reset] or text committed as typed.
+ * until [Action.Reset] or text committed as typed; [Action.Context] makes the words the app's text
+ * ends with the context, as if committed (see [TextWords]).
  *
  * With a [user] model, what is committed is learned: its words and their order. Where the user
  * corrected the engine, putting the text together from pieces or picking a reading of several
@@ -40,7 +42,8 @@ import java.util.Calendar
  * prediction picked is not learned, as nothing says how it reads; text kept as typed is not either.
  *
  * With a [reranker], the best readings of the input are weighed again by how they read as a
- * sentence after the text committed before, by the same context.
+ * sentence after the text committed before, by the same context, or after the text the host
+ * says is before the cursor ([Action.Context]).
  *
  * @param spell show each syllable spelt out, not as typed: for 双拼, whose keys say little
  */
@@ -78,6 +81,7 @@ class PinyinSession(
         user = user,
     )
     private val predictor = Predictor(data.model, data.vocabulary, data.dictionary)
+    private val textWords by lazy { TextWords(data.model, data.wordIndex) }
 
     private val input = StringBuilder()
     private val pieces = ArrayList<Piece>()
@@ -107,6 +111,28 @@ class PinyinSession(
         Action.Reset -> {
             dropContext()
             clear()
+            snapshot()
+        }
+        is Action.Context -> {
+            // the text still ends with what was committed here: the cursor did not go anywhere
+            // (an editor reporting it where the service did not expect it), and the words the
+            // user picked say more than the model's reading of the text. The host reads less than
+            // is kept, so its text may be the end of it, long enough not to be so by chance
+            val before = action.before
+            val same = before.endsWith(recent) || before.length >= OVERLAP && recent.endsWith(before)
+            if (learning && recent.isNotEmpty() && same) {
+                clear()
+                return snapshot()
+            }
+            dropContext()
+            clear()
+            // what the app has is kept no longer than the input, and not at all where the user
+            // learns nothing, as what they commit; text ending in no word (a space, a letter) is
+            // no context for the reranker either, as after text committed as typed
+            if (learning) {
+                context = textWords.lastTwo(before)
+                if (context.isNotEmpty()) recent = tail(before)
+            }
             snapshot()
         }
     }
@@ -435,6 +461,10 @@ class PinyinSession(
         // for (39 tokens), so a commit drops only text it no longer reads, and it goes on from what
         // it read rather than read it all again
         private const val RECENT = 128
+
+        // as much of the host's text as makes it the end of what was committed, not a word that
+        // happens to be: as long as the text the context is read from
+        private const val OVERLAP = 24
 
         /** The last [RECENT] chars of [text], not starting in the middle of a pair. */
         internal fun tail(text: String): String {

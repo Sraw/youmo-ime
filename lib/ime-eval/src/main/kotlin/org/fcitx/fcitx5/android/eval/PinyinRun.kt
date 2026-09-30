@@ -4,9 +4,11 @@
  */
 package org.fcitx.fcitx5.android.eval
 
+import org.fcitx.fcitx5.android.engine.data.NgramModel.Companion.NO_WORD
 import org.fcitx.fcitx5.android.engine.data.PinyinData
 import org.fcitx.fcitx5.android.engine.lattice.Penalties
 import org.fcitx.fcitx5.android.engine.lattice.PinyinDecoder
+import org.fcitx.fcitx5.android.engine.lattice.TextWords
 import org.fcitx.fcitx5.android.engine.lattice.WordScorer
 import org.fcitx.fcitx5.android.engine.pinyin.PinyinSegmenter
 import org.fcitx.fcitx5.android.engine.pinyin.Segmenter
@@ -24,26 +26,33 @@ class PinyinRun(
     private val reranker: Reranker? = null,
 ) {
     private val decoder = PinyinDecoder(data.dictionary, data.vocabulary, WordScorer.of(data.model), penalties, beam)
+    private val textWords = TextWords(data.model, data.wordIndex)
 
     fun run(samples: List<Sample>): List<RunResult> {
         // the JIT compiles the hot loops during the first rounds; time only after them
-        repeat(WARMUP_ROUNDS) { samples.forEach { candidates(it.input) } }
+        repeat(WARMUP_ROUNDS) { samples.forEach { candidates(it.input, it.context) } }
         return samples.map { sample ->
             val latencies = (1..sample.input.length).map { length ->
                 val started = System.nanoTime()
-                candidates(sample.input.substring(0, length))
+                candidates(sample.input.substring(0, length), sample.context)
                 (System.nanoTime() - started) / NANOS_PER_MICRO
             }
-            RunResult(sample.input, candidates(sample.input), latencies)
+            RunResult(sample.input, candidates(sample.input, sample.context), latencies)
         }
     }
 
-    /** Whole-input readings first, then the words the input may start with, as a candidate list shows them. */
-    fun candidates(input: String): List<String> {
-        val decoding = decoder.decode(segmenter.segment(input))
+    /**
+     * Whole-input readings first, then the words the input may start with, as a candidate list
+     * shows them; typed after [context], the text the app has before it, as in a session.
+     */
+    fun candidates(input: String, context: String = ""): List<String> {
+        val words = textWords.lastTwo(context)
+        val prev = words.lastOrNull() ?: NO_WORD
+        val prev2 = if (words.size == 2) words[0] else NO_WORD
+        val decoding = decoder.decode(segmenter.segment(input), prev2, prev)
         val sentences = decoding.sentences.map { it.text }.toMutableList()
         if (reranker != null) {
-            val picked = reranker.pick("", sentences, decoding.sentences.map { it.score })
+            val picked = reranker.pick(context, sentences, decoding.sentences.map { it.score })
             if (picked > 0) sentences.add(0, sentences.removeAt(picked))
         }
         return (sentences + decoding.words.map { it.text }).distinct().take(CANDIDATES)

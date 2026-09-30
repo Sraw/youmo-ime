@@ -29,7 +29,7 @@ val USAGE = """usage: score <set.tsv> <result.tsv> [<baseline-result.tsv>] [--ha
        shuangpin <scheme> <set.tsv> <shuangpin-set.tsv>
        slips <set.tsv> <slip-set.tsv>
        tune <pinyin.data> <set.tsv> <slip-set.tsv>
-       ksc <pinyin.data> <set.tsv> [--scheme <scheme>] [--fuzzy all|<pair>,...] [--half <half>]
+       ksc <pinyin.data> <set.tsv> [--scheme <scheme>] [--fuzzy all|<pair>,...] [--half <half>] [--rerank <model.safetensors>]
        learn <pinyin.data> <set.tsv> [--scheme <scheme>] [--fuzzy all|<pair>,...]
        table <table.data> <set.tsv> [--preset <preset>]
        libime pinyin|history|table <file>
@@ -83,7 +83,7 @@ fun runCli(args: Array<String>, out: Appendable, err: Appendable): Int {
         a.has("shuangpin", 4..4) && p[1] in ShuangpinSet.SCHEMES -> writeShuangpinSet(p[1], p[2], p[3], out)
         a.has("slips", 3..3) -> writeSlipSet(p[1], p[2], out)
         a.has("tune", 4..4) -> tune(p[1], p[2], p[3], out)
-        a.has("ksc", 3..3, "scheme", "fuzzy", "half") -> ksc(p[1], p[2], scheme, fuzzy.orEmpty(), half, out)
+        a.has("ksc", 3..3, "scheme", "fuzzy", "half", "rerank") -> ksc(p[1], p[2], scheme, fuzzy.orEmpty(), half, a.options["rerank"], out)
         a.has("learn", 3..3, "scheme", "fuzzy") -> learn(p[1], p[2], scheme, fuzzy.orEmpty(), out)
         a.has("table", 3..3, "preset") -> table(p[1], p[2], preset ?: "plain", out)
         a.has("libime", 3..3) && p[1] in LIBIME_KINDS -> libime(p[1], p[2], out, err)
@@ -122,6 +122,8 @@ private fun mapFile(path: String) = RandomAccessFile(path, "r").use { it.channel
 
 private fun loadData(path: String): PinyinData = PinyinData.load(mapFile(path))
 
+private fun reranker(path: String) = Reranker(SentenceModel.load(mapFile(path), unpack = true))
+
 private fun score(setPath: String, resultPath: String, baselinePath: String?, half: String?, out: Appendable): Int {
     val samples = Halves.select(readSet(setPath), half)
     fun scoresOf(path: String) = Metrics.score(samples, File(path).useLines { RunResultFormat.parse(it) })
@@ -142,7 +144,7 @@ private fun runPinyin(
     neighbours: Boolean,
     rerankPath: String?,
 ): Int {
-    val reranker = rerankPath?.let { Reranker(SentenceModel.load(mapFile(it), unpack = true)) }
+    val reranker = rerankPath?.let(::reranker)
     val results = PinyinRun(loadData(dataPath), segmenter(scheme, fuzzy, neighbours), reranker = reranker).run(Halves.select(readSet(setPath), half))
     File(resultPath).printWriter().use { out -> results.forEach { out.println(RunResultFormat.format(it)) } }
     return 0
@@ -221,8 +223,16 @@ private fun tune(dataPath: String, setPath: String, slipsPath: String, out: Appe
     return 0
 }
 
-private fun ksc(dataPath: String, setPath: String, scheme: String?, fuzzy: Set<Fuzzy>, half: String?, out: Appendable): Int {
-    val session = PinyinSession(loadData(dataPath), segmenter(scheme, fuzzy), spell = scheme != null)
+private fun ksc(
+    dataPath: String,
+    setPath: String,
+    scheme: String?,
+    fuzzy: Set<Fuzzy>,
+    half: String?,
+    rerankPath: String?,
+    out: Appendable,
+): Int {
+    val session = PinyinSession(loadData(dataPath), segmenter(scheme, fuzzy), spell = scheme != null, reranker = rerankPath?.let(::reranker))
     val run = KeystrokeRun(session)
     out.appendLine(KeystrokeRun.report(Halves.select(readSet(setPath), half).map { run.type(it) }))
     return 0

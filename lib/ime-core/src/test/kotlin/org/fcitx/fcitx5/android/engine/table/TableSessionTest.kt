@@ -9,6 +9,7 @@ import org.fcitx.fcitx5.android.engine.data.DataFormatException
 import org.fcitx.fcitx5.android.engine.session.Action
 import org.fcitx.fcitx5.android.engine.session.Action.Backspace
 import org.fcitx.fcitx5.android.engine.session.Action.CommitRaw
+import org.fcitx.fcitx5.android.engine.session.Action.Context
 import org.fcitx.fcitx5.android.engine.session.Action.Forget
 import org.fcitx.fcitx5.android.engine.session.Action.Key
 import org.fcitx.fcitx5.android.engine.session.Action.NextPage
@@ -235,6 +236,9 @@ class TableSessionTest {
         assertFalse(t.apply(Key('1')).handled)
         t.type("aa")
         assertEquals("", t.apply(Reset).preedit)
+        // the app's text drops the input as a reset does
+        t.type("aa")
+        assertEquals("", t.apply(Context("工")).preedit)
     }
 
     @Test
@@ -266,6 +270,23 @@ class TableSessionTest {
         plain.type("aaaa")
         plain.apply(Select(1))
         assertEquals(listOf("工", "恭恭敬敬"), plain.type("aaaa").second.candidates)
+    }
+
+    @Test
+    fun theAppsTextKeepsWhatAPhraseIsMadeOfOnlyWhileItEndsWithIt() {
+        val stayed = session()
+        // its whole code, and nothing else has it: committed as typed
+        assertEquals("你", stayed.type("wqiy").first)
+        stayed.apply(Context("他说你"))
+        stayed.type("wun")
+        stayed.apply(Select(0))
+        assertEquals(listOf("你们"), stayed.type("wqwu").second.candidates)
+        val moved = session()
+        moved.type("wqiy")
+        moved.apply(Context("你说"))
+        moved.type("wun")
+        moved.apply(Select(0))
+        assertFalse("你们" in moved.type("wqwu").second.candidates)
     }
 
     @Test

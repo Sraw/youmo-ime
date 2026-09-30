@@ -1,0 +1,87 @@
+# SPDX-License-Identifier: LGPL-2.1-or-later
+# SPDX-FileCopyrightText: Copyright 2026 Fcitx5 for Android Contributors
+#
+# Pinyin typed after text already there, written for this project (no third-party text).
+# One sample per line: input<TAB>expected<TAB>tag<TAB>context, the context being the text before
+# the cursor when the input starts. Each input's reading alone leaves more than one likely text;
+# the context settles it, as it would for a reader. Pairs share an input and differ by context.
+# Tags:
+#   pair       one of two samples with the same input, told apart by their contexts
+#   single     the context makes one of several readings the likely one
+jingli	经理	pair	公司新来的
+jingli	经历	pair	他有丰富的工作
+shijian	时间	pair	你明天有
+shijian	事件	pair	这起交通
+chongzhi	充值	pair	手机话费不够了要
+chongzhi	重置	pair	忘记密码可以
+yiyuan	医院	pair	他生病住进了
+yiyuan	一元	pair	这瓶水只要
+chaoshi	超市	pair	我下班去
+chaoshi	超时	pair	网络太慢请求
+youyong	游泳	pair	夏天我喜欢去
+youyong	有用	pair	这本书对我很
+zhangdehenkuai	长得很快	pair	小孩子
+zhangdehenkuai	涨得很快	pair	今年的房价
+youxiang	邮箱	pair	文件发到我的
+youxiang	油箱	pair	汽车的
+xiezi	鞋子	pair	我买了一双新
+xiezi	写字	pair	他正在认真地
+daxue	大学	pair	我哥哥在读
+daxue	大雪	pair	昨天晚上下了一场
+shuiping	水平	pair	他的英语
+shuiping	水瓶	pair	桌子上放着一个
+yiqi	仪器	pair	实验室里的
+yiqi	一起	pair	周末我们
+shu	树	pair	公园里种了很多
+shu	书	pair	图书馆里有很多
+cha	茶	pair	我给客人倒了一杯
+cha	查	pair	这个词我去
+shiyan	实验	pair	化学课上我们做了一个
+shiyan	誓言	pair	他们在婚礼上说出了
+gongshi	公式	pair	这道数学题要用
+gongshi	公事	pair	他出差是为了
+kaishi	开始	pair	电影马上就要
+kaishi	开市	pair	股市九点半
+jiaoshi	教室	pair	同学们都回到了
+jiaoshi	教师	pair	她的妈妈是一名中学
+quanli	全力	pair	我们一定会
+quanli	权利	pair	每个人都有受教育的
+pingguo	苹果	single	我最喜欢吃的水果是
+kaoshi	考试	single	下周就要期末
+daisan	带伞	single	外面下雨了出门记得
+guanshang	关上	single	风太大了请把窗户
+shi	诗	single	他给她写了一首
+piao	票	single	我买了两张电影
+yanse	颜色	single	我不喜欢这件衣服的
+meidianle	没电了	single	我的手机
+zhongdule	中毒了	single	他的电脑好像
+xinhao	信号	single	地下室里手机没有
+ti	题	single	老师在黑板上写了一道
+tongxue	同学	single	他是我小学时的
+jiandan	简单	single	这个问题其实很
+piaoliang	漂亮	single	她今天穿得很
+jiaban	加班	single	老板让我今天晚上
+fangan	方案	single	我们需要重新做一个
+xiaoniao	小鸟	single	树上有一只
+kaihui	开会	single	明天下午两点
+qichuang	起床	single	我每天早上七点
+anquan	安全	single	开车的时候一定要注意
+jizhe	记者	single	她是电视台的一名
+ganmao	感冒	single	他昨天淋了雨
+shangban	上班	single	我每天坐地铁去
+shuijiao	睡觉	single	太晚了快去
+haochi	好吃	single	妈妈做的这道菜真
+shengri	生日	single	今天是我的
+qingjia	请假	single	我明天有事要
+jiage	价格	single	这件衣服的
+fashaole	发烧了	single	孩子晚上
+guahao	挂号	single	去医院看病先要
+kewen	课文	single	老师让我们背诵
+chengji	成绩	single	这次考试的
+qifeile	起飞了	single	飞机已经
+jieshule	结束了	single	会议已经
+xiyifu	洗衣服	single	妈妈在阳台上
+zhuanye	专业	single	你在大学学的是什么
+gongzi	工资	single	这个月的
+fangjia	放假	single	国庆节要
+zuoye	作业	single	我还没写完今天的

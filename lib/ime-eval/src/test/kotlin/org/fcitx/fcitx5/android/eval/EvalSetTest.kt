@@ -17,6 +17,12 @@ class EvalSetTest {
         assertEquals(listOf(Sample("nihao", "你好", "daily")), set)
     }
 
+    @Test
+    fun aFourthFieldIsTheContext() {
+        val set = EvalSet.parse(sequenceOf("jingli\t经理\tpair\t公司新来的"))
+        assertEquals(listOf(Sample("jingli", "经理", "pair", "公司新来的")), set)
+    }
+
     @Test(expected = IllegalArgumentException::class)
     fun aLineWithoutATagIsRejected() {
         EvalSet.parse(sequenceOf("nihao\t你好"))

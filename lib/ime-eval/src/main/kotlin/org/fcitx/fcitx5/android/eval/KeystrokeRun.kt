@@ -25,7 +25,7 @@ class KeystrokeRun(private val session: Session, private val maxPages: Int = MAX
     data class Outcome(val sample: Sample, val keys: Int, val reached: Boolean, val first: Boolean = false)
 
     fun type(sample: Sample): Outcome {
-        session.apply(Action.Reset)
+        session.apply(if (sample.context.isEmpty()) Action.Reset else Action.Context(sample.context))
         var shown: Snapshot? = null
         for (c in sample.input) shown = session.apply(Action.Key(c))
         var keys = sample.input.length

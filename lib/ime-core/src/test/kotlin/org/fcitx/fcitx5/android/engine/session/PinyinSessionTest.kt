@@ -176,6 +176,64 @@ class PinyinSessionTest {
     }
 
     @Test
+    fun theTextTheAppHasIsTheContextOfWhatIsTypedNext() {
+        val session = session()
+        val context = session.apply(Action.Context("他说我"))
+        // nothing is offered for it, as a prediction would be after a commit
+        assertEquals(emptyList<String>(), context.candidates)
+        assertEquals("再", session.type("zai").candidates.first())
+        // text ending with no word of the model's is nothing to go on from
+        session.apply(Action.Context("我 "))
+        assertEquals("在", session.type("zai").candidates.first())
+        session.apply(Action.Context("我"))
+        session.apply(Reset)
+        assertEquals("在", session.type("zai").candidates.first())
+    }
+
+    @Test
+    fun theAppsTextEndingWithWhatWasCommittedKeepsTheContextCommitted() {
+        val contexts = ArrayList<String>()
+        val session = PinyinSession(data, PinyinSegmenter()) { context, _, _ -> contexts += context; 0 }
+        session.type("wo")
+        assertEquals("我", session.apply(Select(0)).commit)
+        // the editor reports the cursor where the service did not expect it, but it did not move
+        session.apply(Action.Context("他说我"))
+        session.type("zai")
+        assertEquals("我", contexts.last())
+        // it did move
+        session.apply(Reset)
+        session.apply(Action.Context("他说你"))
+        session.type("zai")
+        assertEquals("他说你", contexts.last())
+        // more committed than the host reads of the text: its text ends what was
+        session.apply(Reset)
+        session.apply(Action.Context("我".repeat(70)))
+        session.type("zai")
+        assertEquals("再", session.apply(Select(0)).commit)
+        session.apply(Action.Context(("我".repeat(70) + "再").takeLast(64)))
+        session.type("zai")
+        assertEquals("我".repeat(70) + "再", contexts.last())
+        // but not a word of it that happens to be
+        session.apply(Action.Context("他说再"))
+        session.type("zai")
+        assertEquals("他说再", contexts.last())
+    }
+
+    @Test
+    fun whileLearningIsOffTheAppsTextIsNoContext() {
+        val contexts = ArrayList<String>()
+        val session = PinyinSession(data, PinyinSegmenter()) { context, _, _ -> contexts += context; 0 }
+        session.learning = false
+        session.apply(Action.Context("我"))
+        assertEquals("在", session.type("zai").candidates.first())
+        assertEquals(listOf(""), contexts.distinct())
+        session.learning = true
+        session.apply(Action.Context("我"))
+        assertEquals("再", session.type("zai").candidates.first())
+        assertEquals("我", contexts.last())
+    }
+
+    @Test
     fun theRerankerIsToldMoreThanItReadsSoACommitDropsNothingItDoes() {
         val contexts = ArrayList<String>()
         val session = PinyinSession(data, PinyinSegmenter()) { context, _, _ -> contexts += context; 0 }

@@ -37,6 +37,9 @@ class PinyinData private constructor(file: DataFile) {
     )
     val model = NgramModel(file, meta.int(META_LM_VOCABULARY), meta.int(META_UNKNOWN))
 
+    /** The model's words by their text, made when first asked for: see [WordIndex]. */
+    val wordIndex: WordIndex by lazy { WordIndex(vocabulary, model.vocabularySize) }
+
     init {
         ensureFormat(model.vocabularySize <= vocabulary.size) { "the model has more words than the vocabulary" }
     }

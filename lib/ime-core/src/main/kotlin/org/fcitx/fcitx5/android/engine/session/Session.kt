@@ -65,6 +65,13 @@ sealed class Action {
 
     /** Drops everything: the input, and what was committed as context (the cursor moved away). */
     object Reset : Action()
+
+    /**
+     * Drops everything as [Reset] does, then takes [before], the text before the cursor, as what
+     * the input to come follows: what the host read off the editor, where the engine committed
+     * nothing yet (a field focused, the cursor put somewhere).
+     */
+    data class Context(val before: String) : Action()
 }
 
 /**

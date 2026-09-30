@@ -192,6 +192,15 @@ class Engines(
         return keyboard.onEvent(event, arg, learning && tables[im]?.learns != false)
     }
 
+    /**
+     * [before] is the text before the cursor, put where the engines did not: see
+     * [Keyboard.context]. The host passes it only where the user learns, so each learns as its
+     * [onEvent] would.
+     */
+    fun context(before: String) = keyboards.forEach { (im, keyboard) ->
+        keyboard.context(before, tables[im]?.learns != false)
+    }
+
     /** Candidates of [im]'s input, from the [from]th, at most [count]; none if it has no session yet. */
     fun candidates(im: String, from: Int, count: Int): List<Choice> = sessions[im]?.candidates(from, count).orEmpty()
 

@@ -77,8 +77,10 @@ class TableSession(
             clear()
             snapshot(commit = text, handled = text.isNotEmpty())
         }
-        Action.Reset -> {
-            recent.clear()
+        // auto phrases are made of what was committed here, not of what the editor had: kept
+        // only while the text still ends with it (the cursor did not go anywhere)
+        Action.Reset, is Action.Context -> {
+            if (action !is Action.Context || !action.before.endsWith(recent.joinToString(""))) recent.clear()
             clear()
             snapshot()
         }
@@ -418,7 +420,7 @@ class TableSession(
                 endLookUp()
                 snapshot(commit = text)
             }
-            Action.Reset -> {
+            Action.Reset, is Action.Context -> {
                 endLookUp()
                 snapshot()
             }

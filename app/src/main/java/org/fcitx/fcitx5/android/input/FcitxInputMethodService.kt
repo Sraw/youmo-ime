@@ -46,6 +46,7 @@ import kotlinx.coroutines.channels.consumeEach
 import kotlinx.coroutines.launch
 import org.fcitx.fcitx5.android.BuildConfig
 import org.fcitx.fcitx5.android.R
+import org.fcitx.fcitx5.android.core.CapabilityFlag
 import org.fcitx.fcitx5.android.core.CapabilityFlags
 import org.fcitx.fcitx5.android.core.FcitxAPI
 import org.fcitx.fcitx5.android.core.FcitxEvent
@@ -612,6 +613,15 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
                 focus(true)
             }
         }
+        if (!isNullType) {
+            tellTextBeforeCursor {
+                // an editor that gives no initial text may still answer the connection
+                val initial =
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) attribute.getInitialTextBeforeCursor(ContextChars, 0)
+                    else null
+                initial ?: currentInputConnection?.getTextBeforeCursor(ContextChars, 0)
+            }
+        }
     }
 
     override fun onStartInputView(info: EditorInfo, restarting: Boolean) {
@@ -712,11 +722,14 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     private fun handleCursorUpdate(update: EditingSession.CursorUpdate) {
         when (update) {
             EditingSession.CursorUpdate.None -> {}
-            EditingSession.CursorUpdate.ResetIfNotEmpty -> postFcitxJob {
-                if (!isEmpty()) {
-                    Timber.d("handleCursorUpdate: reset")
-                    reset()
+            EditingSession.CursorUpdate.ResetIfNotEmpty -> {
+                postFcitxJob {
+                    if (!isEmpty()) {
+                        Timber.d("handleCursorUpdate: reset")
+                        reset()
+                    }
                 }
+                tellTextBeforeCursor { currentInputConnection?.getTextBeforeCursor(ContextChars, 0) }
             }
             is EditingSession.CursorUpdate.MovePreeditCursor -> postFcitxJob {
                 // onUpdateSelection can lag behind when the user types quickly enough, eg. long
@@ -725,10 +738,21 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
                 Timber.d("handleCursorUpdate: move fcitx cursor to ${update.codePointPosition}")
                 moveCursor(update.codePointPosition)
             }
-            EditingSession.CursorUpdate.FocusOutIn -> postFcitxJob {
-                focusOutIn()
+            EditingSession.CursorUpdate.FocusOutIn -> {
+                postFcitxJob { focusOutIn() }
+                tellTextBeforeCursor { currentInputConnection?.getTextBeforeCursor(ContextChars, 0) }
             }
         }
+    }
+
+    /**
+     * What the engine's input follows, after fcitx is done with what was there: not read at all
+     * in a password or other sensitive field, where the engine learns nothing either.
+     */
+    private inline fun tellTextBeforeCursor(read: () -> CharSequence?) {
+        if (capabilityFlags.hasAny(CapabilityFlag.PasswordOrSensitive)) return
+        val before = read()?.toString() ?: return
+        postFcitxJob { engineContext(before) }
     }
 
     private fun updateComposingText(text: FormattedText) =
@@ -873,5 +897,8 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     @Suppress("ConstPropertyName")
     companion object {
         const val DefaultHighlightColor = 0x008577  // material_deep_teal_500
+        // what the engine reads of the text before the cursor: its last two words, and what the
+        // reranker has room for
+        const val ContextChars = 64
     }
 }
