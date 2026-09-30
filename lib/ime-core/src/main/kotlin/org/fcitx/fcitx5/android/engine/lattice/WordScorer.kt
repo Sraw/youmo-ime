@@ -18,8 +18,21 @@ import org.fcitx.fcitx5.android.engine.data.NgramModel
 fun interface WordScorer {
     fun score(prev2: Int, prev: Int, word: Int): Float
 
+    /**
+     * (prev2, prev) made ready for [scoreAfter]. The decoder scores many words after each context,
+     * so a scorer that looks the context up (the n-gram model finds its bigram) does it here once.
+     */
+    fun context(prev2: Int, prev: Int): Long = (prev2.toLong() shl Int.SIZE_BITS) or (prev.toLong() and 0xffffffffL)
+
+    /** [score] of [word] after a [context] this scorer made. */
+    fun scoreAfter(context: Long, word: Int): Float = score((context shr Int.SIZE_BITS).toInt(), context.toInt(), word)
+
     companion object {
         /** [model], held to 0: a backoff sum from quantised values could come out a hair above it. */
-        fun of(model: NgramModel) = WordScorer { prev2, prev, word -> minOf(0f, model.score(prev2, prev, word)) }
+        fun of(model: NgramModel): WordScorer = object : WordScorer {
+            override fun score(prev2: Int, prev: Int, word: Int) = minOf(0f, model.score(prev2, prev, word))
+            override fun context(prev2: Int, prev: Int) = model.context(prev2, prev)
+            override fun scoreAfter(context: Long, word: Int) = minOf(0f, model.scoreAfter(context, word))
+        }
     }
 }

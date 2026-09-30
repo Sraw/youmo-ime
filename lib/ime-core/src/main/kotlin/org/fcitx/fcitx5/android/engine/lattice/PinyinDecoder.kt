@@ -60,6 +60,7 @@ class PinyinDecoder(
     private var stateWord = IntArray(0)
     private var statePrev = IntArray(0)
     private var stateBack = IntArray(0) // -1 for the empty sequence at the start
+    private val contexts = LongArray(beam) // of the beam being extended, from scorer
 
     /**
      * @param prev2 the word before [prev] in text already committed, or [NO_WORD]
@@ -160,19 +161,32 @@ class PinyinDecoder(
         beamSize.fill(0, from, n + 1)
         if (from == graph.start) insert(graph.start, 0f, prev, prev2, -1)
         for (at in graph.start until n) {
-            val size = beamSize[at]
-            if (size == 0) continue
-            for (a in arcs.start[at] until arcs.start[at + 1]) {
-                val to = arcs.to[a]
-                if (to < from) continue // that beam is kept
-                val word = arcs.word[a]
-                for (s in at * beam until at * beam + size) {
-                    val base = stateScore[s] + arcs.cost[a]
-                    // scores only fall from here, and the states come best first
-                    if (beamSize[to] == beam && base <= stateScore[to * beam + beam - 1]) break
-                    val lm = if (word == NO_WORD) 0f else scorer.score(statePrev[s], stateWord[s], word)
-                    insert(to, base + lm, word, stateWord[s], s)
-                }
+            if (beamSize[at] > 0) extend(at, from)
+        }
+    }
+
+    /** Extends the sequences ending at [at] by the arcs from there, those ending at [from] or later. */
+    private fun extend(at: Int, from: Int) {
+        val first = at * beam
+        val size = beamSize[at]
+        var looked = false
+        for (a in arcs.start[at] until arcs.start[at + 1]) {
+            val to = arcs.to[a]
+            if (to < from) continue // that beam is kept
+            if (!looked) {
+                // once per state rather than per arc: most of what scoring a word takes. Arcs only
+                // go forward, so this beam does not change while it is extended
+                for (k in 0 until size) contexts[k] = scorer.context(statePrev[first + k], stateWord[first + k])
+                looked = true
+            }
+            val word = arcs.word[a]
+            for (k in 0 until size) {
+                val s = first + k
+                val base = stateScore[s] + arcs.cost[a]
+                // scores only fall from here, and the states come best first
+                if (beamSize[to] == beam && base <= stateScore[to * beam + beam - 1]) break
+                val lm = if (word == NO_WORD) 0f else scorer.scoreAfter(contexts[k], word)
+                insert(to, base + lm, word, stateWord[s], s)
             }
         }
     }
@@ -275,12 +289,13 @@ class PinyinDecoder(
     private fun firstWords(graph: SyllableGraph, prev2: Int, prev: Int, limit: Int): List<Candidate> {
         val from = arcs.start[graph.start]
         val until = arcs.start[graph.start + 1]
+        val context = scorer.context(prev2, prev)
         val scores = FloatArray(until - from)
         // score, then arc, in one sortable long: best first, ties in arc order
         val order = LongArray(until - from) { i ->
             val a = from + i
             val word = arcs.word[a]
-            scores[i] = if (word == NO_WORD) Float.NEGATIVE_INFINITY else arcs.cost[a] + scorer.score(prev2, prev, word)
+            scores[i] = if (word == NO_WORD) Float.NEGATIVE_INFINITY else arcs.cost[a] + scorer.scoreAfter(context, word)
             (sortable(-scores[i]).toLong() shl Int.SIZE_BITS) or a.toLong()
         }
         order.sort()

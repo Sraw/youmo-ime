@@ -201,16 +201,28 @@ class NgramModel internal constructor(file: DataFile, val vocabularySize: Int, p
     }
 
     /** log10 P(word | prev2 prev) */
-    fun score(prev2: Int, prev: Int, word: Int): Float {
-        if (prev2 == NO_WORD || prev == NO_WORD) return score(prev, word)
-        val context = bigram(known(prev2), known(prev))
-        if (context < 0) return score(prev, word)
+    fun score(prev2: Int, prev: Int, word: Int): Float = scoreAfter(context(prev2, prev), word)
+
+    /**
+     * The context (prev2, prev) looked up once, for [scoreAfter] of the many words that may
+     * follow it: prev, and the index of the bigram (prev2, prev) or -1 if the model lacks it.
+     */
+    fun context(prev2: Int, prev: Int): Long {
+        val bigram = if (prev2 == NO_WORD || prev == NO_WORD) -1 else bigram(known(prev2), known(prev))
+        return (prev.toLong() shl Int.SIZE_BITS) or (bigram.toLong() and 0xffffffffL)
+    }
+
+    /** log10 P(word | [context]), a value from [context] */
+    fun scoreAfter(context: Long, word: Int): Float {
+        val prev = (context shr Int.SIZE_BITS).toInt()
+        val bigram = context.toInt()
+        if (bigram < 0) return score(prev, word)
         val w = known(word)
-        val from = biTrigramStart[context]
-        val to = biTrigramStart[context + 1]
+        val from = biTrigramStart[bigram]
+        val to = biTrigramStart[bigram + 1]
         val at = triWord.lowerBound(from, to, w)
         if (at < to && triWord[at] == w) return triProbTable[triProb.get(at).toInt() and 0xff]
-        return biBackoffTable[biBackoff.get(context).toInt() and 0xff] + score(prev, word)
+        return biBackoffTable[biBackoff.get(bigram).toInt() and 0xff] + score(prev, word)
     }
 
     /** log10 backoff weight of [word] as a context; 0 when it has none */
