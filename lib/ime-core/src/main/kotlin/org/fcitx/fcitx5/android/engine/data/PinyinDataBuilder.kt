@@ -206,6 +206,11 @@ internal class IntList {
     }
 
     operator fun get(i: Int) = a[i]
+    /** Empties the list, keeping its storage for reuse. */
+    fun clear() {
+        size = 0
+    }
+
     fun toArray(): IntArray = a.copyOf(size)
 }
 
@@ -220,5 +225,10 @@ internal class FloatList {
     }
 
     operator fun get(i: Int) = a[i]
+    /** Empties the list, keeping its storage for reuse. */
+    fun clear() {
+        size = 0
+    }
+
     fun toArray(): FloatArray = a.copyOf(size)
 }

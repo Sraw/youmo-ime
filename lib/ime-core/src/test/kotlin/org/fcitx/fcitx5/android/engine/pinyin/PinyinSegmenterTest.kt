@@ -89,8 +89,11 @@ class PinyinSegmenterTest {
         assertEquals(setOf("g:INITIAL"), zhongg.leaving(5))
         // zhon is the slip for zhong
         assertEquals(setOf("zhon:SYLLABLE", "zhong:SYLLABLE"), zhongg.leaving(0))
-        // the longer initial wins: zh, not z then h
-        assertEquals(setOf("zh:INITIAL"), plain.segment("zhg").leaving(0))
+        // zh alone, or z and h alone: zhrm is 中华人民
+        assertEquals(setOf("zh:INITIAL", "z:INITIAL"), plain.segment("zhg").leaving(0))
+        assertEquals(setOf("h:INITIAL"), plain.segment("zhg").leaving(1))
+        // but not where zh starts a syllable
+        assertEquals(setOf("zhon:SYLLABLE", "zhong:SYLLABLE"), plain.segment("zhongg").leaving(0))
         // ng is a syllable, but n before a consonant may still stand alone: 那个
         assertEquals(setOf("n:SYLLABLE", "ng:SYLLABLE", "n:INITIAL"), plain.segment("ng").leaving(0))
     }
@@ -145,11 +148,17 @@ class PinyinSegmenterTest {
         assertEquals("zan zang~ zhan~ zhang~", matchesOf(fuzzy, "zan").toString())
         assertEquals("zan~ zang~ zhan zhang~", matchesOf(fuzzy, "zhan").toString())
         assertEquals("zan", matchesOf(plain, "zan").toString())
-        val plainZ = plain.segment("zg").let { it.matches(it.edge("z", Kind.INITIAL)) }
-        assertEquals(-1, plainZ.indexOf(Syllables.id("zhong")))
-        val z = fuzzy.segment("zg").let { it.matches(it.edge("z", Kind.INITIAL)) }
-        assertEquals(FUZZY or COMPLETION, z.flags(z.indexOf(Syllables.id("zhong"))))
-        assertEquals(COMPLETION, z.flags(z.indexOf(Syllables.id("zong"))))
+        // an initial z stands for zh anyway (zg 中国), so the rule changes nothing there
+        for (segmenter in listOf(plain, fuzzy)) {
+            val z = segmenter.segment("zg").let { it.matches(it.edge("z", Kind.INITIAL)) }
+            assertEquals(COMPLETION, z.flags(z.indexOf(Syllables.id("zhong"))))
+            assertEquals(COMPLETION, z.flags(z.indexOf(Syllables.id("zong"))))
+        }
+        // but zh does not stand for z without it
+        val plainZh = plain.segment("zhg").let { it.matches(it.edge("zh", Kind.INITIAL)) }
+        assertEquals(-1, plainZh.indexOf(Syllables.id("zong")))
+        val zh = fuzzy.segment("zhg").let { it.matches(it.edge("zh", Kind.INITIAL)) }
+        assertEquals(FUZZY or COMPLETION, zh.flags(zh.indexOf(Syllables.id("zong"))))
     }
 
     @Test

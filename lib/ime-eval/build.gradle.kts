@@ -7,6 +7,7 @@
 // in the APK, so unlike :lib:ime-core it is free to use whatever the build's JDK offers.
 //
 //   ./gradlew :lib:ime-eval:run --args="score data/pinyin.tsv <result.tsv> [<baseline.tsv>]"
+//   ./gradlew :lib:ime-eval:run --args="pinyin <pinyin.data> data/pinyin.tsv <result.tsv>"
 //
 // Results come from an engine run: run-on-device.sh produces one for the engine the APK ships
 // (libime today); baseline/ keeps the libime result the new engine is measured against.
@@ -25,6 +26,7 @@ tasks.named<JavaExec>("run") {
 }
 
 dependencies {
+    implementation(project(":lib:ime-core"))
     testImplementation(libs.junit)
 }
 

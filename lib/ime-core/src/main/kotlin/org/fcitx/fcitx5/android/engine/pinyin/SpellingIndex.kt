@@ -48,8 +48,8 @@ internal class SpellingIndex(fuzzy: Set<Fuzzy>, typos: Boolean) {
     /**
      * If this node's key is an initial (`b`, `zh` ...), the syllables it may stand for alone
      * (简拼), flagged [SyllableMatches.COMPLETION]; otherwise null. `a`, `e` and `o` count, for
-     * the syllables they start (`ag` 爱国). Not the [completions]: those of `z` include every
-     * `zh` syllable, which `z` only stands for with [Fuzzy.Z_ZH].
+     * the syllables they start (`ag` 爱国), and `z`, `c` and `s` stand for `zh`, `ch` and `sh`
+     * syllables too (`zg` 中国), fuzzy or not.
      */
     fun initial(node: Int): SyllableMatches? = initials[node]
 
@@ -76,6 +76,8 @@ internal class SpellingIndex(fuzzy: Set<Fuzzy>, typos: Boolean) {
             val finalRules = fuzzy.filter { !it.onInitial && it.appliesAfter(init) }
             for ((i, iFlags) in variants(init, fuzzy.filter { it.onInitial })) {
                 keepBest(byInitial.getOrPut(i.ifEmpty { spelling.take(1) }) { TreeMap() }, id, iFlags or SyllableMatches.COMPLETION)
+                // as an initial, z also stands for zh (zg 中国, sm 什么) in every mainstream input method
+                if (i.length == 2 && i[1] == 'h') keepBest(byInitial.getOrPut(i.take(1)) { TreeMap() }, id, iFlags or SyllableMatches.COMPLETION)
                 for ((f, fFlags) in finals(fin, finalRules)) {
                     val flags = iFlags or fFlags
                     add(i + f, id, flags)

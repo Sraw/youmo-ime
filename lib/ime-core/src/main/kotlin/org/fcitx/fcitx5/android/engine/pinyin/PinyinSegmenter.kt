@@ -19,7 +19,8 @@ import org.fcitx.fcitx5.android.engine.pinyin.SyllableGraph.Kind
  * - the initial alone (简拼) where no longer syllable starts (`n` in `nh`), and also where one
  *   does if a consonant follows (`n` in `ng` for 那个, `ng` being a syllable too), but not if a
  *   vowel does (`n` in `nihao`). `a`, `e` and `o` stand for the syllables they start only
- *   where no longer syllable starts (`ag` 爱国, but not `an` 爱你);
+ *   where no longer syllable starts (`ag` 爱国, but not `an` 爱你). Where `zh` stands alone
+ *   and no vowel follows, so does `z` (`zhrm` for 中华人民; not in `zho`);
  * - syllables the text there may still become: at the end of the input (`zho` for zhong, `zhan`
  *   for zhang), or before a separator if the text is no syllable yet (`zho'`; `xi'` is closed);
  * - failing all of those, one character as typed.
@@ -35,55 +36,75 @@ class PinyinSegmenter(fuzzy: Set<Fuzzy> = emptySet(), typos: Boolean = true) {
 
     fun segment(input: String): SyllableGraph {
         val n = input.length
-        val firstEdge = IntArray(n + 2)
+        val edges = Edges(input)
+        val start = skipSeparators(input, 0)
+        val reachable = BooleanArray(n + 1).also { it[start] = true }
+        for (at in 0..n) {
+            edges.firstEdge[at] = edges.size
+            if (at == n || !reachable[at]) continue
+            val before = edges.size
+            walk(input, at, edges)
+            if (edges.size == before) edges.add(at, 1, Kind.RAW, SyllableMatches.EMPTY)
+            for (e in before until edges.size) reachable[edges.to[e]] = true
+        }
+        edges.firstEdge[n + 1] = edges.size
+        return edges.toGraph(start)
+    }
+
+    /** Adds the edges leaving [at]: a walk down the spelling trie along the input. */
+    private fun walk(input: String, at: Int, edges: Edges) {
+        var node = index.root
+        var longestSyllable = 0
+        var initial = 0
+        var initialMatches: SyllableMatches? = null
+        var shorter: SyllableMatches? = null
+        var shorterLength = 0
+        var length = 0
+        while (at + length < input.length) {
+            node = index.child(node, input[at + length])
+            if (node < 0) break
+            length++
+            val full = index.matches(node)
+            if (full != null) {
+                edges.add(at, length, Kind.SYLLABLE, full)
+                longestSyllable = length
+            }
+            val alone = index.initial(node)
+            val more = index.extensions(node)
+            if (alone != null) {
+                shorter = initialMatches
+                shorterLength = initial
+                initial = length
+                initialMatches = alone
+            } else if (more != null && mayGoOn(input, at + length, full == null)) {
+                edges.add(at, length, Kind.PARTIAL, more)
+            }
+        }
+        if (initialMatches != null && (longestSyllable <= initial || beforeConsonant(input, at, initial))) {
+            edges.add(at, initial, Kind.INITIAL, initialMatches)
+            if (shorter != null && longestSyllable <= initial && !startsSyllable(input, at + initial)) {
+                edges.add(at, shorterLength, Kind.INITIAL, shorter)
+            }
+        }
+    }
+
+    private class Edges(val input: String) {
+        val firstEdge = IntArray(input.length + 2)
         val from = IntList()
         val to = IntList()
         val kinds = ArrayList<Kind>()
         val matches = ArrayList<SyllableMatches>()
-        fun edge(at: Int, length: Int, kind: Kind, m: SyllableMatches) {
+        val size get() = from.size
+
+        fun add(at: Int, length: Int, kind: Kind, m: SyllableMatches) {
             from += at
             to += skipSeparators(input, at + length)
             kinds += kind
             matches += m
         }
 
-        val start = skipSeparators(input, 0)
-        val reachable = BooleanArray(n + 1).also { it[start] = true }
-        for (at in 0..n) {
-            firstEdge[at] = from.size
-            if (at == n || !reachable[at]) continue
-            val before = from.size
-            var node = index.root
-            var longestSyllable = 0
-            var initial = 0
-            var initialMatches: SyllableMatches? = null
-            var length = 0
-            while (at + length < n) {
-                node = index.child(node, input[at + length])
-                if (node < 0) break
-                length++
-                val full = index.matches(node)
-                if (full != null) {
-                    edge(at, length, Kind.SYLLABLE, full)
-                    longestSyllable = length
-                }
-                val alone = index.initial(node)
-                val more = index.extensions(node)
-                if (alone != null) {
-                    initial = length
-                    initialMatches = alone
-                } else if (more != null && mayGoOn(input, at + length, full == null)) {
-                    edge(at, length, Kind.PARTIAL, more)
-                }
-            }
-            if (initialMatches != null && (longestSyllable <= initial || beforeConsonant(input, at, initial))) {
-                edge(at, initial, Kind.INITIAL, initialMatches)
-            }
-            if (from.size == before) edge(at, 1, Kind.RAW, SyllableMatches.EMPTY)
-            for (e in before until from.size) reachable[to[e]] = true
-        }
-        firstEdge[n + 1] = from.size
-        return SyllableGraph(input, start, firstEdge, from.toArray(), to.toArray(), kinds.toTypedArray(), matches.toTypedArray())
+        fun toGraph(start: Int) =
+            SyllableGraph(input, start, firstEdge, from.toArray(), to.toArray(), kinds.toTypedArray(), matches.toTypedArray())
     }
 
     private companion object {
@@ -94,6 +115,9 @@ class PinyinSegmenter(fuzzy: Set<Fuzzy> = emptySet(), typos: Boolean = true) {
             while (i < input.length && input[i] == SEPARATOR) i++
             return i
         }
+
+        /** A vowel at [at]: what comes before it is the start of a syllable, not an initial alone. */
+        fun startsSyllable(input: String, at: Int) = at < input.length && input[at] in VOWELS
 
         /** A consonant initial of [length] at [at], with a consonant after it. */
         fun beforeConsonant(input: String, at: Int, length: Int) =
