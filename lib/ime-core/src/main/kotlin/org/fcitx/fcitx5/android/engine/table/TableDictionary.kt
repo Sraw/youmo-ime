@@ -21,7 +21,15 @@ class TableDictionary(private val table: CodeTable) {
     val maxLength: Int = table.header["码长"]?.toIntOrNull()?.takeIf { it > 0 }
         ?: throw DataFormatException("码长 \"${table.header["码长"]}\"")
     val rules = PhraseRules(table.rules)
+    private val sortedKeys = keys.sorted()
     private val construct = table.header["构词"]?.singleOrNull()
+
+    /**
+     * What marks the table's pinyin entries (拼音, 五笔拼音's `@`): with it, as in libime, what is
+     * typed is looked up as pinyin too, any letter a key. Null for a table that names a marker
+     * but has no such entries (fcitx's wbx): it types as one without.
+     */
+    val pinyinMarker: Char? = table.header["拼音"]?.singleOrNull()?.takeUnless { table.prefixRange(it.toString()).isEmpty() }
     private val ignored = table.header["规避字符"].orEmpty().toSet()
 
     /** Each character's longest code, and its 构词 code if the table gives one. */
@@ -67,21 +75,40 @@ class TableDictionary(private val table: CodeTable) {
             return IntArray((range.last - range.first + 1).coerceAtLeast(0)) { range.first + it }
         }
         val out = ArrayList<Int>()
-        for (i in table.prefixRange(pattern.substring(0, cut))) {
-            if (out.size == MAX_MATCHES) break
-            if (spells(i, pattern, wildcard!!, whole = true)) out += i
+        if (pattern.length > maxLength) return IntArray(0)
+        for (range in wildcardRanges(pattern, cut)) {
+            for (i in range) {
+                if (out.size == MAX_MATCHES) return out.toIntArray()
+                if (spells(i, pattern, wildcard!!, whole = true)) out += i
+            }
         }
         return out.toIntArray()
     }
 
     /**
-     * Whether some code starts with [pattern], [wildcard] standing for any key: whether typing
-     * on can lead anywhere (a wildcard code, unlike [match], by its start too, as in libime).
+     * Whether some code starts with [pattern], [wildcard] standing for any key, or some pinyin
+     * entry's: whether typing on can lead anywhere (a wildcard code, unlike [match], by its start
+     * too, as in libime).
      */
     fun hasMatch(pattern: String, wildcard: Char?): Boolean {
         val cut = if (wildcard == null) -1 else pattern.indexOf(wildcard)
+        // a pinyin entry's code is spelt as it is, the wildcard a letter too
+        if (pinyinMarker != null && !table.prefixRange("$pinyinMarker$pattern").isEmpty()) return true
         if (cut < 0) return !table.prefixRange(pattern).isEmpty()
-        return table.prefixRange(pattern.substring(0, cut)).any { spells(it, pattern, wildcard!!, whole = false) }
+        if (pattern.length > maxLength) return false
+        return wildcardRanges(pattern, cut).any { range -> range.any { spells(it, pattern, wildcard!!, whole = false) } }
+    }
+
+    /**
+     * The ranges of codes a [pattern] with a wildcard at [cut] can be among, in code order: those
+     * starting as it does before the wildcard. One leading the pattern is each key in turn, with
+     * what follows it up to the next: never the whole table (五笔拼音's z starts most pinyin).
+     */
+    private fun wildcardRanges(pattern: String, cut: Int): List<IntRange> {
+        if (cut > 0) return listOf(table.prefixRange(pattern.substring(0, cut)))
+        val next = pattern.indexOf(pattern[0], 1).let { if (it < 0) pattern.length else it }
+        val rest = pattern.substring(1, next)
+        return sortedKeys.map { table.prefixRange("$it$rest") }.filterNot { it.isEmpty() }
     }
 
     private fun spells(i: Int, pattern: String, wildcard: Char, whole: Boolean): Boolean {
@@ -94,6 +121,21 @@ class TableDictionary(private val table: CodeTable) {
         }
         return true
     }
+
+    /**
+     * The pinyin entries (see [pinyinMarker]) spelt [pinyin] whole, or also those it starts if
+     * [prefix], in table order; none if the table has none.
+     */
+    fun matchPinyin(pinyin: String, prefix: Boolean): IntArray {
+        val marker = pinyinMarker ?: return IntArray(0)
+        val range = table.prefixRange("$marker$pinyin")
+        if (range.isEmpty()) return IntArray(0)
+        if (prefix) return IntArray(range.last - range.first + 1) { range.first + it }
+        return range.filter { table.codeLength(it) == pinyin.length + 1 }.toIntArray()
+    }
+
+    /** Whether [index] is a pinyin entry. */
+    fun isPinyin(index: Int): Boolean = pinyinMarker != null && table.codeKey(index, 0) == pinyinMarker
 
     fun contains(code: String, text: String): Boolean = indexOf(code, text) >= 0
 

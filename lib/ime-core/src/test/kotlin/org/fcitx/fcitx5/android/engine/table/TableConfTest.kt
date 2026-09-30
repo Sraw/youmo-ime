@@ -44,7 +44,8 @@ class TableConfTest {
             """.trimIndent(),
         )
         assertEquals("table/wbx.main.dict", conf.file)
-        assertEquals(TableOptions.WUBI, conf.options)
+        // ` is no key of 五笔's codes: as an end key it never ends one
+        assertEquals(TableOptions.WUBI.copy(endKeys = "`"), conf.options)
         assertTrue(conf.learning)
     }
 
@@ -112,5 +113,19 @@ class TableConfTest {
         assertEquals("a", conf.file)
         assertFalse(conf.options.autoSelect)
         assertTrue(conf.options.hint)
+    }
+
+    @Test
+    fun endAndSelectionKeysAreKeyLists() {
+        val conf = TableConf.parse(
+            "[Table]\nFile=a\n[Table/EndKey]\n1=semicolon\n0=comma\n2=Control+a\n[Table/Selection]\n0=q\n1=w\n",
+            "[Table/Selection]\n0=a\n",
+        )
+        // in the order numbered, a key with modifiers dropped; the user's list over the conf's
+        assertEquals(",;", conf.options.endKeys)
+        assertEquals("a", conf.options.selectionKeys)
+        assertEquals("", TableConf.parse("[Table]\nFile=a\n").options.endKeys)
+        // a label is a byte on its way to the candidate list
+        assertEquals("q", TableConf.parse("[Table]\nFile=a\n[Table/Selection]\n0=，\n1=q\n").options.selectionKeys)
     }
 }

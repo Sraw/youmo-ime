@@ -12,7 +12,9 @@ import org.fcitx.fcitx5.android.engine.data.unescapeValue
  * off, what the user picks is not kept.
  *
  * Options the engine has no use for (PageSize, which the user sets for all, ExactMatch, the
- * keys of `[Table/...]`) are skipped, as are values that do not read.
+ * paging keys of `[Table/...]`) are skipped, as are values that do not read. Of the key lists,
+ * `[Table/EndKey]` and `[Table/Selection]` are read: keys with modifiers are dropped from them,
+ * and selection keys past printable ASCII.
  */
 class TableConf(val file: String, val options: TableOptions, val learning: Boolean) {
 
@@ -61,8 +63,18 @@ class TableConf(val file: String, val options: TableOptions, val learning: Boole
                 hint = bool("Hint", d.hint),
                 autoPhraseLength = int("AutoPhraseLength", d.autoPhraseLength),
                 saveAutoPhraseAfter = int("SaveAutoPhraseAfter", d.saveAutoPhraseAfter),
+                endKeys = keyList(text, settings, "Table/EndKey"),
+                // labels go to the candidate list a byte each: printable ASCII only
+                selectionKeys = keyList(text, settings, "Table/Selection").filter { it.code in 0x21..0x7E },
             )
             return TableConf(file, options, bool("Learning", true))
+        }
+
+        /** The characters of the key list [name] (`0=comma`, `1=period` ...), the user's if they set one. */
+        private fun keyList(text: String, settings: String, name: String): String {
+            val list = section(settings, name).ifEmpty { section(text, name) }
+            return list.entries.sortedBy { it.key.toIntOrNull() ?: Int.MAX_VALUE }
+                .mapNotNull { keyChar(it.value) }.joinToString("")
         }
 
         /** The keys of [name]'s section in the ini [text]: fcitx's format, `#` starting a comment. */

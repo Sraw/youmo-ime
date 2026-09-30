@@ -35,6 +35,10 @@ class LibimeMigrationTest {
             Layout=
 
             [Groups/0/Items/3]
+            Name=engine-wubi
+            Layout=
+
+            [Groups/0/Items/4]
             Name=pinyin
             Layout=
 
@@ -46,7 +50,7 @@ class LibimeMigrationTest {
             # Group Name
             Name=默认
             Default Layout=us
-            DefaultIM=engine-wubi
+            DefaultIM=engine-wubipinyin
 
             [Groups/0/Items/0]
             Name=keyboard-us
@@ -57,6 +61,10 @@ class LibimeMigrationTest {
             Layout=
 
             [Groups/0/Items/2]
+            Name=engine-wubipinyin
+            Layout=
+
+            [Groups/0/Items/3]
             Name=engine-pinyin
             Layout=
 
@@ -75,8 +83,8 @@ class LibimeMigrationTest {
 
     @Test
     fun eachGroupListsItsOwn() {
-        val profile = "[Groups/0/Items/0]\nName=wbx\n[Groups/0/Items/1]\nName=wbpy\n" +
-            "[Groups/1/Items/0]\nName=wbpy\n[Groups/1/Items/1]\nName=zrm\n"
+        val profile = "[Groups/0/Items/0]\nName=wbx\n[Groups/0/Items/1]\nName=engine-wubi\n" +
+            "[Groups/1/Items/0]\nName=wbx\n[Groups/1/Items/1]\nName=zrm\n"
         assertEquals(
             "[Groups/0/Items/0]\nName=engine-wubi\n\n" +
                 "[Groups/1/Items/0]\nName=engine-wubi\n\n[Groups/1/Items/1]\nName=engine-ziranma\n",
@@ -127,7 +135,7 @@ class LibimeMigrationTest {
     fun whatATableWasSetToCarriesOverUnderItsGroup() {
         val wbx = "[Table]\nAutoSelect=False\nOrderPolicy=Fast\nPageSize=5\nHint=True\n\n[Table/PrevPage]\n0=minus\n"
         val config = LibimeMigration.settings("", mapOf("wbx" to wbx, "cangjie" to "[Other]\nHint=True\n", "wbpy" to wbx))
-        assertEquals("[Wubi]\nAutoSelect=False\nHint=True\nOrderPolicy=Fast\n", config)
+        assertEquals("[Wubi]\nAutoSelect=False\nHint=True\nOrderPolicy=Fast\n\n[WubiPinyin]\nAutoSelect=False\nHint=True\nOrderPolicy=Fast\n", config)
         val settings = EngineSettings.parse("Wubi/AutoSelect=False\nWubi/OrderPolicy=Fast\nWubi/Hint=x\nErbi/AutoPhraseLength=3\nErbi/SaveAutoPhraseAfter=99\nFuzzy/L_N=True")
         assertEquals(
             mapOf("Wubi" to TableSettings(autoSelect = false, orderByUse = true), "Erbi" to TableSettings(autoPhraseLength = 3)),
@@ -149,10 +157,10 @@ class LibimeMigrationTest {
     }
 
     @Test
-    fun wubiPinyinsSettingsServeWhenWubisAreNotThere() {
-        assertEquals("[Wubi]\nHint=False\n", LibimeMigration.settings("", mapOf("wbpy" to "[Table]\nHint=False\n")))
+    fun wubiPinyinsSettingsAreItsOwn() {
         val both = mapOf("wbpy" to "[Table]\nHint=False\n", "wbx" to "[Table]\nPageSize=5\n")
-        assertEquals("[Wubi]\nHint=False\n", LibimeMigration.settings("", both))
+        assertEquals("[WubiPinyin]\nHint=False\n", LibimeMigration.settings("", both))
+        assertEquals("[Wanfeng]\nOrderPolicy=Freq\n", LibimeMigration.settings("", mapOf("wanfeng" to "[Table]\nOrderPolicy=Freq\n")))
     }
 
     @Test
@@ -178,8 +186,8 @@ class LibimeMigrationTest {
     @Test
     fun aListOfInputMethodsNamesTheEnginesEachOnce() {
         assertEquals(
-            "[EnabledIM]\n# a comment\n0=engine-pinyin\n1=engine-wubi\n2=rime\n\n[Other]\nx=pinyin\n",
-            LibimeMigration.inputMethodList("[EnabledIM]\n# a comment\n0=pinyin\n1=wbx\n2=\"wbpy\"\n3=rime\n\n[Other]\nx=pinyin\n"),
+            "[EnabledIM]\n# a comment\n0=engine-pinyin\n1=engine-wubi\n2=engine-wubipinyin\n3=rime\n\n[Other]\nx=pinyin\n",
+            LibimeMigration.inputMethodList("[EnabledIM]\n# a comment\n0=pinyin\n1=wbx\n2=\"wbpy\"\n3=engine-wubi\n4=rime\n\n[Other]\nx=pinyin\n"),
         )
         assertNull(LibimeMigration.inputMethodList("[EnabledIM]\n0=rime\n"))
         assertNull(LibimeMigration.inputMethodList("[Other]\n0=pinyin\n"))

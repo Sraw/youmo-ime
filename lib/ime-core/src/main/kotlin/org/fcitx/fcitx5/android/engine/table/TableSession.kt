@@ -18,11 +18,18 @@ import org.fcitx.fcitx5.android.engine.session.Snapshot
  *
  * With [TableOptions.autoSelect], typing commits by itself, as libime does: a code that leaves
  * one candidate, its code whole, commits it; a key past the longest code, or one that leads to no
- * entry, commits the first candidate on the page shown and starts a new code. A code with no
- * candidate is dropped by the key that ends it, as 五笔 users expect of 空码.
+ * entry, commits the first candidate on the page shown and starts a new code, or goes to the app
+ * when no code starts with it (a table's punctuation). A code with no candidate is dropped by the
+ * key that ends it, as 五笔 users expect of 空码.
  *
  * [TableOptions.pinyinKey] starting a code hands the keys after it to [pinyin], and its
  * candidates show their code here: the way to type a character whose code one does not know.
+ * A table with pinyin entries of its own ([TableDictionary.pinyinMarker], 五笔拼音) mixes them in
+ * instead, as libime does: any letter is typed, a code has no length limit, and the entries it
+ * spells come after the table's codes, never first, showing their code.
+ *
+ * A key of [TableOptions.endKeys] ends a code: the next key commits it. A key of
+ * [TableOptions.selectionKeys] picks while there are candidates, a code key too, as in fcitx.
  *
  * Characters committed one by one become phrases ([TableOptions.autoPhraseLength]) coded by the
  * table's 组词规则, offered last for their code. One picked, or typed character by character
@@ -36,8 +43,11 @@ class TableSession(
     private val user: TableUser = TableUser(table),
 ) : Session {
 
-    /** A candidate: a table entry (its [index]), or a phrase learned here ([index] -1). */
-    private class Item(val code: String, val text: String, val auto: Boolean, val index: Int = -1)
+    /**
+     * A candidate: a table entry (its [index]), or a phrase learned here ([index] -1). A [pinyin]
+     * entry's [code] is its pinyin, without the marker.
+     */
+    private class Item(val code: String, val text: String, val auto: Boolean, val index: Int = -1, val pinyin: Boolean = false)
 
     private val input = StringBuilder()
     private var ranking = Ranking.NONE
@@ -77,8 +87,12 @@ class TableSession(
     override fun reads(c: Char): Boolean = if (lookingUp) {
         c in 'a'..'z' || c == '\''
     } else {
-        c in table.keys || c == options.matchingKey || (c == options.pinyinKey && pinyin != null && input.isEmpty())
+        isCode(c) ||
+            (c == options.pinyinKey && pinyin != null && input.isEmpty()) ||
+            (input.isNotEmpty() && c in options.selectionKeys)
     }
+
+    private fun isCode(c: Char) = c in table.keys || c == options.matchingKey || (table.pinyinMarker != null && c in 'a'..'z')
 
     override fun candidates(from: Int, count: Int): List<Choice> {
         if (lookingUp) return pinyin!!.candidates(from, count).map { Choice(it.text, table.codeOf(it.text).orEmpty()) }
@@ -88,7 +102,11 @@ class TableSession(
 
     private fun type(c: Char): Snapshot {
         val startsLookUp = c == options.pinyinKey && pinyin != null
-        val isCode = c in table.keys || c == options.matchingKey
+        // a selection key picks while there are candidates, a key of the codes too, as in fcitx;
+        // with none it goes on as any other key
+        val selects = if (input.isNotEmpty() && ranking[0] != null) options.selectionKeys.indexOf(c) else -1
+        if (selects >= 0) return select(selects)
+        val isCode = isCode(c)
         if (!isCode && !(startsLookUp && input.isEmpty())) {
             // not a code key: what was typed is committed, then the key is the app's
             val text = if (input.isEmpty()) "" else autoCommit()
@@ -103,6 +121,12 @@ class TableSession(
             input.append(c)
             return snapshot(commit = commit)
         }
+        // a key no code starts is the app's, as fcitx hands it on: 晚风's , and . are its
+        // punctuation, typed after a code as well as alone
+        if (input.isEmpty() && !leadsAnywhere(c.toString())) {
+            recent.clear()
+            return snapshot(commit = commit, handled = false)
+        }
         input.append(c)
         update()
         val only = ranking.only()
@@ -110,15 +134,20 @@ class TableSession(
         return snapshot(commit = commit)
     }
 
-    /** Whether [c] cannot go on the code typed: it is full, or [c] would lead nowhere. */
+    /**
+     * Whether [c] cannot go on the code typed: it is full (pinyin has no length limit), ends
+     * with an end key, or [c] would lead nowhere.
+     */
     private fun endsCode(c: Char) =
-        input.length >= table.maxLength || (reaches(options.noMatchAutoSelectLength) && !leadsAnywhere("$input$c"))
+        (table.pinyinMarker == null && input.length >= table.maxLength) ||
+            input.last() in options.endKeys ||
+            (reaches(options.noMatchAutoSelectLength) && !leadsAnywhere("$input$c"))
 
     /** Whether [item], the only candidate, is committed without asking. */
     private fun commitsItself(item: Item): Boolean {
         // an auto phrase waits to be picked; so does a code found through the matching key
         if (!options.autoSelect || item.auto) return false
-        return item.code == input.toString() && reaches(options.autoSelectLength)
+        return item.code == input.toString() && input.length <= table.maxLength && reaches(options.autoSelectLength)
     }
 
     /** Whether what is typed is long enough for a length [limit] of [TableOptions]. */
@@ -181,7 +210,9 @@ class TableSession(
             recent.clear()
             return ""
         }
-        if (!learning) {
+        // what pinyin found is neither counted nor built into phrases: libime counts it in its
+        // history, but builds phrases from it with the pinyin as the code, which is a bug
+        if (!learning || item.pinyin) {
             recent.clear()
             return item.text
         }
@@ -229,14 +260,18 @@ class TableSession(
 
     /** The candidates of [code], ranked; decoded as they are asked for. */
     private fun rank(code: String): Ranking {
-        val entries = table.match(code, options.matchingKey)
+        val coded = table.match(code, options.matchingKey)
+        val spelt = table.matchPinyin(code, prefix = pinyinPrefix(code))
+        // the pinyin entries last, so a code and its pinyin as long rank the code first
+        val entries = if (spelt.isEmpty()) coded else coded + spelt
         // learned phrases are found by their plain code; the matching key is for the table's
         val learned = user.saved(code).map { (c, text) -> Item(c, text, false) }
         val noSort = minOf(code.length, options.noSortInputLength)
         // one sortable number per candidate: its group, length, picks, then where it was
         val keys = LongArray(learned.size + entries.size) { at ->
-            val length = if (at < learned.size) learned[at].code.length else table.codeLength(entries[at - learned.size])
-            val sorted = length > noSort
+            val isPinyin = at >= learned.size + coded.size
+            val length = if (at < learned.size) learned[at].code.length else table.codeLength(entries[at - learned.size]) - (if (isPinyin) 1 else 0)
+            val sorted = length > noSort || isPinyin
             val used = when {
                 !sorted || !options.orderByUse -> 0
                 at < learned.size -> user.picks(learned[at].code, learned[at].text)
@@ -249,6 +284,16 @@ class TableSession(
         }
         keys.sort()
         val order = IntArray(keys.size) { (keys[it] and POSITION_MASK).toInt() }
+        // a code's own candidate first, if it has one (libime's rule)
+        val pinyinFrom = learned.size + coded.size
+        if (order.isNotEmpty() && order[0] >= pinyinFrom) {
+            val own = order.indexOfFirst { it < pinyinFrom }
+            if (own > 0) {
+                val first = order[own]
+                System.arraycopy(order, 0, order, 1, own)
+                order[0] = first
+            }
+        }
         // the most recently seen first
         val auto = user.seen(code).map { (c, text) -> Item(c, text, true) }
         return Ranking { at ->
@@ -259,7 +304,20 @@ class TableSession(
         }
     }
 
-    private fun entryItem(index: Int) = Item(table.code(index), table.text(index), false, index)
+    private fun entryItem(index: Int) = if (table.isPinyin(index)) {
+        Item(table.code(index).substring(1), table.text(index), false, index, pinyin = true)
+    } else {
+        Item(table.code(index), table.text(index), false, index)
+    }
+
+    /**
+     * Whether pinyin entries the typed [code] starts are candidates too, not only those it
+     * spells: libime's heuristic, which with every preset's lengths means from the second key.
+     */
+    private fun pinyinPrefix(code: String): Boolean {
+        val n = code.length
+        return n > 1 && (n >= options.autoSelectLength || n > table.maxLength || n >= options.noMatchAutoSelectLength)
+    }
 
     /**
      * Ranked candidates made as needed, each text once: the first of it, which is its shortest
@@ -309,13 +367,21 @@ class TableSession(
             total = ranking.size,
             first = from,
             forgets = shown.isNotEmpty(),
+            labels = options.selectionKeys,
         )
     }
 
     private fun wild() = options.matchingKey != null && input.contains(options.matchingKey)
 
-    /** What is left of [item]'s code to type; all of it where a wildcard stands in the input. */
-    private fun hint(item: Item, wild: Boolean) = if (wild) item.code else item.code.substring(input.length)
+    /**
+     * What is left of [item]'s code to type; all of it where a wildcard stands in the input, and
+     * for a pinyin entry the table code it could have been typed by.
+     */
+    private fun hint(item: Item, wild: Boolean) = when {
+        item.pinyin -> table.codeOf(item.text).orEmpty()
+        wild -> item.code
+        else -> item.code.substring(input.length)
+    }
 
     /** An action while looking up by pinyin: [pinyin] reads the keys after the pinyin key. */
     private fun lookUp(action: Action): Snapshot {

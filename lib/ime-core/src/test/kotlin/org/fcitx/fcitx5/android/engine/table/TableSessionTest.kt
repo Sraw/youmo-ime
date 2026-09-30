@@ -101,12 +101,10 @@ class TableSessionTest {
         val t = session()
         val (commit, s) = t.type("wx")
         assertEquals("人", commit)
-        assertEquals("x", s.preedit)
-        assertEquals(emptyList<String>(), s.candidates)
-        // x has no entry: the next key drops it
-        val (dropped, after) = t.type("a")
-        assertEquals("", dropped)
-        assertEquals("a", after.preedit)
+        // no code starts with x: it is the app's to type, as fcitx hands it on
+        assertFalse(s.handled)
+        assertEquals("", s.preedit)
+        assertEquals("a", t.type("a").second.preedit)
     }
 
     @Test
@@ -197,7 +195,7 @@ class TableSessionTest {
     @Test
     fun spaceOnACodeWithNoCandidateDropsIt() {
         val t = session(TableOptions.CANGJIE)
-        t.type("xx")
+        assertEquals("wx", t.type("wx").second.preedit)
         val s = t.apply(Select(0))
         assertTrue(s.handled)
         assertEquals("", s.commit)
@@ -551,5 +549,139 @@ class TableSessionTest {
         assertTrue(d.match("*****", '*').isEmpty())
         assertTrue(d.contains("wqiy", "你"))
         assertFalse(d.contains("wqiy", "们"))
+    }
+
+    private val wubiPinyin = dictionary(
+        "a 工", "aa 式", "ai 蛙", "@a 啊", "@ai 爱", "@ai 哀", "@gong 公", "@gong 工", "@zhong 中", "@zhongguo 中国",
+        // few keys, so that most letters are pinyin's alone
+        header = mapOf("拼音" to "@", "键码" to "aiy"),
+    )
+
+    @Test
+    fun aTablesOwnPinyinEntriesComeAfterItsCodes() {
+        val t = TableSession(wubiPinyin, TableOptions.WUBI_PINYIN)
+        // one key: only what it spells whole, as libime has it
+        assertEquals(listOf("工", "啊", "式", "蛙"), t.type("a").second.candidates)
+        t.apply(Reset)
+        // then those it starts too, a code as long first
+        assertEquals(listOf("蛙", "爱", "哀"), t.type("ai").second.candidates)
+        t.apply(Reset)
+        // g is no key of the table's codes, but leads to pinyin: showing the code to learn
+        val gong = t.type("gong")
+        assertEquals("", gong.first)
+        assertEquals(listOf("公", "工"), gong.second.candidates)
+        assertEquals(listOf("", "a"), gong.second.hints)
+        assertTrue(t.reads('g'))
+    }
+
+    @Test
+    fun pinyinHasNoLengthLimitAndCommitsOnlyWhenPicked() {
+        val t = TableSession(wubiPinyin, TableOptions.WUBI_PINYIN)
+        // z, the wildcard, is a letter of pinyin as it is; past 码长 a code goes on
+        val (commit, s) = t.type("zhongguo")
+        assertEquals("", commit)
+        assertEquals("zhongguo", s.preedit)
+        assertEquals(listOf("中国"), s.candidates)
+        assertEquals("中国", t.apply(Select(0)).commit)
+        // a key leading nowhere commits the first, as for codes
+        assertEquals("中", t.type("zhongx").first)
+    }
+
+    @Test
+    fun aPinyinEntryIsNeverFirstWhenACodeHasACandidate() {
+        val d = dictionary("aa 式", "@a 啊", header = mapOf("拼音" to "@"))
+        val options = TableOptions.WUBI_PINYIN.copy(noSortInputLength = 0)
+        // 啊's pinyin is the shorter, yet 式 leads
+        assertEquals(listOf("式", "啊"), TableSession(d, options).type("a").second.candidates)
+    }
+
+    @Test
+    fun twoKeysOfPinyinFindWhatTheyStart() {
+        assertEquals(listOf("中", "中国"), TableSession(wubiPinyin, TableOptions.WUBI_PINYIN).type("zh").second.candidates)
+    }
+
+    @Test
+    fun whatPinyinFoundIsNotLearned() {
+        val user = TableUser(wubiPinyin)
+        val t = TableSession(wubiPinyin, TableOptions.WUBI_PINYIN, user = user)
+        t.type("ai")
+        assertEquals("哀", t.apply(Pick(2)).commit)
+        // 工 has a code, so two characters in a row could build a phrase
+        t.type("gong")
+        assertEquals("工", t.apply(Pick(1)).commit)
+        var records = 0
+        user.forEachRecord { records++ }
+        assertEquals(0, records)
+        assertEquals(listOf("蛙", "爱", "哀"), t.type("ai").second.candidates)
+    }
+
+    @Test
+    fun aMarkerWithoutEntriesIsNoPinyin() {
+        val d = dictionary("aaaa 工", "aaab 式", header = mapOf("拼音" to "@"))
+        assertEquals(null, d.pinyinMarker)
+        assertTrue(d.matchPinyin("a", prefix = true).isEmpty())
+        // so a full code commits the first on the next key, as without the marker
+        assertEquals("工", TableSession(d, TableOptions.WUBI_PINYIN).type("aaaaa").first)
+        assertEquals(listOf(4), wubiPinyin.matchPinyin("gong", prefix = false).map { wubiPinyin.codeLength(it) - 1 }.distinct())
+    }
+
+    @Test
+    fun anEndKeyEndsTheCode() {
+        val d = dictionary(
+            "a, 挨", "a, 哎", "a,b 暗", "a,bc 按", "b 不", "bc 部",
+            header = mapOf("键码" to "abc,"),
+        )
+        val (commit, s) = TableSession(d, TableOptions.WANFENG).type("a,b")
+        assertEquals("挨", commit)
+        assertEquals("b", s.preedit)
+        // without it, a,b is a code going on
+        assertEquals("a,b", TableSession(d, TableOptions.WANFENG.copy(endKeys = "")).type("a,b").second.preedit)
+    }
+
+    @Test
+    fun aKeyNoCodeStartsIsTheApps() {
+        // 晚风's , and . start no code: they are its punctuation
+        val d = dictionary("a, 挨", "a, 哎", "b 不", header = mapOf("键码" to "ab,"))
+        val t = TableSession(d, TableOptions.WANFENG)
+        val alone = t.apply(Key(','))
+        assertFalse(alone.handled)
+        assertEquals("", alone.preedit)
+        val (commit, s) = t.type("a,,")
+        assertEquals("挨", commit)
+        assertFalse(s.handled)
+        assertEquals("", s.preedit)
+    }
+
+    @Test
+    fun selectionKeysPickWhileACodeIsTyped() {
+        val d = dictionary("0 一", "0 丁", "00 七", "1 三", header = mapOf("键码" to "0123456789"))
+        val t = TableSession(d, TableOptions.DIANBAO)
+        assertFalse(t.reads('w'))
+        val typed = t.type("0").second
+        assertEquals(listOf("一", "丁", "七"), typed.candidates)
+        // labelled by the keys that pick them
+        assertEquals("qwertyuiop", typed.labels)
+        assertEquals("", session().type("a").second.labels)
+        assertTrue(t.reads('w'))
+        assertFalse(t.reads('a'))
+        assertEquals("丁", t.apply(Key('w')).commit)
+        // beyond the page: nothing
+        t.type("0")
+        assertEquals("", t.apply(Key('p')).commit)
+        assertEquals("0", t.apply(Key('p')).preedit)
+        // with no candidate to pick, a selection key is any other key
+        val none = TableSession(d, TableOptions.DIANBAO.copy(noMatchAutoSelectLength = 0))
+        assertEquals("05", none.type("05").second.preedit)
+        val passed = none.apply(Key('w'))
+        assertFalse(passed.handled)
+        assertEquals("", passed.preedit)
+    }
+
+    @Test
+    fun aSelectionKeyPicksBeforeItTypes() {
+        val d = dictionary("a 工", "a 式", "aa 戈")
+        val t = TableSession(d, TableOptions.WUBI.copy(selectionKeys = "as"))
+        t.type("a")
+        assertEquals("式", t.apply(Key('s')).commit)
     }
 }

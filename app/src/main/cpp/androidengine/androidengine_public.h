@@ -25,6 +25,8 @@ struct EngineSnapshot {
     int shown = 0;
     int total = 0;
     bool forgets = false;
+    // the keys picking the candidates shown, one ASCII character each; empty for the digits
+    std::string labels;
 };
 
 // What happened, numbered as ime-core's EngineEvent reads them. Which key does what is decided

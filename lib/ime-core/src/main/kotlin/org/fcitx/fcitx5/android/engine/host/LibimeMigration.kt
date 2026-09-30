@@ -23,11 +23,13 @@ object LibimeMigration {
         "pinyin" to Engines.PINYIN,
         "shuangpin" to Engines.SHUANGPIN,
         "wbx" to "engine-wubi",
-        // 五笔拼音: the engine's 五笔 looks characters up by pinyin after z
-        "wbpy" to "engine-wubi",
+        "wbpy" to "engine-wubipinyin",
         "cangjie" to "engine-cangjie",
         "zrm" to "engine-ziranma",
         "erbi" to "engine-erbi",
+        "db" to "engine-dianbao",
+        "qxm" to "engine-bingchan",
+        "wanfeng" to "engine-wanfeng",
     )
 
     const val ENABLED_IM = "EnabledIM"
@@ -46,7 +48,7 @@ object LibimeMigration {
 
     /**
      * [profile] with libime's input methods replaced by the engine's, each group listing one
-     * once (五笔 and 五笔拼音 are both the engine's 五笔 now); null if it names none of them.
+     * once (one already migrated beside libime's); null if it names none of them.
      */
     fun profile(profile: String): String? {
         val sections = sections(profile)
@@ -124,9 +126,9 @@ object LibimeMigration {
 
     /**
      * libime's tables whose settings carry over, kept as `table/<name>.conf` in fcitx's config
-     * home. 五笔拼音's go to the engine's 五笔 too, when 五笔's are not there.
+     * home, each under the engine's table it became.
      */
-    val TABLE_CONFIGS: List<String> = listOf("wbx", "wbpy", "cangjie", "zrm", "erbi")
+    val TABLE_CONFIGS: List<String> = listOf("wbx", "wbpy", "cangjie", "zrm", "erbi", "db", "qxm", "wanfeng")
 
     /**
      * The androidengine addon's config holding what [pinyinConfig], libime pinyin's, set of it,

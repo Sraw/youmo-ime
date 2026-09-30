@@ -62,7 +62,10 @@ public:
         const int size = static_cast<int>(words_.size());
         first_ = std::clamp(snapshot.first, 0, size);
         shown_ = std::clamp(snapshot.shown, 0, size - first_);
-        for (int i = 0; i < shown_; i++) labels_.emplace_back(std::to_string((i + 1) % 10));
+        for (int i = 0; i < shown_; i++) {
+            const auto at = static_cast<size_t>(i);
+            labels_.emplace_back(at < snapshot.labels.size() ? std::string(1, snapshot.labels[at]) : std::to_string((i + 1) % 10));
+        }
     }
 
     const Text &label(int idx) const override {
@@ -156,6 +159,10 @@ std::vector<InputMethodEntry> AndroidEngine::listInputMethods() {
             {"engine-cangjie", "倉", "仓颉", "fcitx-cangjie"},
             {"engine-ziranma", "自", "自然码", "fcitx-ziranma"},
             {"engine-erbi", "二", "二笔", "fcitx-erbi"},
+            {"engine-wubipinyin", "五", "五笔拼音", "fcitx-wubi"},
+            {"engine-dianbao", "电", "电报码", "fcitx-dianbaoma"},
+            {"engine-bingchan", "冰", "冰蟾全息", "fcitx-bingchan"},
+            {"engine-wanfeng", "晚", "晚风", "fcitx-wanfeng"},
     };
     std::vector<InputMethodEntry> result;
     for (const auto &m: methods) {

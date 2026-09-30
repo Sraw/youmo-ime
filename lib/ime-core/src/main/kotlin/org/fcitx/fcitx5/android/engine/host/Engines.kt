@@ -412,6 +412,10 @@ class Engines(
             "engine-cangjie" to TableMethod("cj.data", "Cangjie", TableOptions.CANGJIE),
             "engine-ziranma" to TableMethod("zrm.data", "Ziranma", TableOptions.ZIRANMA),
             "engine-erbi" to TableMethod("erbi.data", "Erbi", TableOptions.ERBI),
+            "engine-wubipinyin" to TableMethod("wbpy.data", "WubiPinyin", TableOptions.WUBI_PINYIN),
+            "engine-dianbao" to TableMethod("db.data", "Dianbaoma", TableOptions.DIANBAO),
+            "engine-bingchan" to TableMethod("qxm.data", "Bingchan", TableOptions.BINGCHAN),
+            "engine-wanfeng" to TableMethod("wanfeng.data", "Wanfeng", TableOptions.WANFENG),
         )
     }
 }

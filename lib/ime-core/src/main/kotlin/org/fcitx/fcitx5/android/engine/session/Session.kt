@@ -82,6 +82,8 @@ sealed class Action {
  * @property first the index among all of the first candidate of the page shown
  * @property forgets whether the candidates are the engine's to [forget][Action.Forget]: not a
  *   prediction, nor where nothing is learned
+ * @property labels the keys picking the candidates shown, in order, where they are not the
+ *   digits (电报码's `qwertyuiop`, its codes being digits); empty for the digits
  */
 data class Snapshot(
     val commit: String,
@@ -96,4 +98,5 @@ data class Snapshot(
     val total: Int = candidates.size,
     val first: Int = 0,
     val forgets: Boolean = false,
+    val labels: String = "",
 )
