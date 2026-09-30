@@ -37,6 +37,12 @@ data class Penalties(
      * 1.3 on the one with text before), with keystrokes to reach each sample unchanged.
      */
     val extended: Float = -2f,
+    /**
+     * A word reached by a syllable still being typed, scored as the likelier longer word it starts
+     * (咖 of `k` as 咖啡). At -0.5 the fewest keys: 0 and -0.25 read as many samples right and
+     * need more keys, -1 fewer right.
+     */
+    val lookAhead: Float = -0.5f,
     /** Input kept as typed, being no pinyin at all. */
     val raw: Float = -10f,
 )

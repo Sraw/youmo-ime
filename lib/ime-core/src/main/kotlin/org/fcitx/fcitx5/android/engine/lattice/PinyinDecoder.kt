@@ -48,6 +48,11 @@ class PinyinDecoder(
 
     private var arcs = Lattice()
 
+    // per dictionary node reached by a syllable still being typed, see extensionsOf; made once
+    // (a reference a node, under a megabyte) and kept when the scores change: they only pick
+    // which longer word stands in, and the model scores it as it is when a key is typed
+    private var extensions: Array<IntArray?>? = null
+
     // what the beams hold now came from these, or from nothing if lastEnd is -1
     private var lastArcs = Lattice()
     private var lastEnd = -1
@@ -137,6 +142,7 @@ class PinyinDecoder(
                     val words = minOf(dictionary.wordCount(child), limit)
                     for (w in 0 until words) arcs.add(to, dictionary.word(child, w), c + dictionary.weight(child, w))
                     more = dictionary.childCount(child) > 0
+                    if (to == graph.end) lookAhead(kind, to, child, c, words)
                 }
                 if (userChild >= 0 && user != null) {
                     // one reading each, so no weight; and few enough to take them all
@@ -146,6 +152,50 @@ class PinyinDecoder(
                 if (to < graph.end && more) collect(graph, to, child, userChild, c, limit)
             }
         }
+    }
+
+    /**
+     * The words at [node], reached by a syllable still being typed, scored again as the likeliest
+     * longer word each starts: `yibeik` is 一杯 and the start of 咖啡 more likely than 一杯可, though
+     * 咖 alone is rare. The text stays what was typed; the beam keeps the better of the two scores.
+     */
+    private fun lookAhead(kind: Kind, to: Int, node: Int, cost: Float, words: Int) {
+        if (kind != Kind.INITIAL && kind != Kind.PARTIAL || dictionary.childCount(node) == 0) return
+        val cache = extensions ?: arrayOfNulls<IntArray>(dictionary.nodeCount).also { extensions = it }
+        val longer = cache[node] ?: extensionsOf(node).also { cache[node] = it }
+        for (w in 0 until minOf(words, longer.size)) {
+            if (longer[w] != NO_WORD) arcs.add(to, dictionary.word(node, w), cost + dictionary.weight(node, w) + penalties.lookAhead, longer[w])
+        }
+    }
+
+    /**
+     * For the first [LOOK_AHEAD_WORDS] words at [node], the likeliest word a syllable longer that
+     * starts with it, or [NO_WORD] where none is likelier than the word itself. Worked out once a
+     * node, by the words alone: every word there against every one after it, too many for a key.
+     */
+    private fun extensionsOf(node: Int): IntArray {
+        val n = minOf(dictionary.wordCount(node), LOOK_AHEAD_WORDS)
+        val out = IntArray(n) { NO_WORD }
+        val context = scorer.context(NO_WORD, NO_WORD)
+        val prefixes = Array(n) { vocabulary.word(dictionary.word(node, it)) }
+        val best = FloatArray(n) { scorer.scoreAfter(context, dictionary.word(node, it)) }
+        val first = dictionary.firstChild(node)
+        for (next in first until first + dictionary.childCount(node)) {
+            for (i in 0 until minOf(dictionary.wordCount(next), EXTENSIONS_PER_READING)) {
+                val word = dictionary.word(next, i)
+                val score = scorer.scoreAfter(context, word)
+                var text: String? = null
+                for (w in 0 until n) {
+                    if (score <= best[w]) continue
+                    if (text == null) text = vocabulary.word(word)
+                    if (text.startsWith(prefixes[w])) {
+                        best[w] = score
+                        out[w] = word
+                    }
+                }
+            }
+        }
+        return out
     }
 
     private fun penalty(kind: Kind) = when (kind) {
@@ -197,12 +247,13 @@ class PinyinDecoder(
                 looked = true
             }
             val word = arcs.word[a]
+            val scored = arcs.scored[a]
             for (k in 0 until size) {
                 val s = first + k
                 val base = stateScore[s] + arcs.cost[a]
                 // scores only fall from here, and the states come best first
                 if (beamSize[to] == beam && base <= stateScore[to * beam + beam - 1]) break
-                val lm = if (word == NO_WORD) 0f else scorer.scoreAfter(contexts[k], word)
+                val lm = if (word == NO_WORD) 0f else scorer.scoreAfter(contexts[k], scored)
                 insert(to, base + lm, word, stateWord[s], s)
             }
         }
@@ -316,7 +367,7 @@ class PinyinDecoder(
         val order = LongArray(until - from) { i ->
             val a = from + i
             val word = arcs.word[a]
-            scores[i] = if (word == NO_WORD) Float.NEGATIVE_INFINITY else arcs.cost[a] + scorer.scoreAfter(context, word)
+            scores[i] = if (word == NO_WORD) Float.NEGATIVE_INFINITY else arcs.cost[a] + scorer.scoreAfter(context, arcs.scored[a])
             (sortable(-scores[i]).toLong() shl Int.SIZE_BITS) or a.toLong()
         }
         order.sort()
@@ -343,6 +394,7 @@ class PinyinDecoder(
         var start = IntArray(0)
         val to = IntList()
         val word = IntList() // NO_WORD for input kept as typed
+        val scored = IntList() // the word the model scores: word, or a longer one it starts
         val cost = FloatList()
         val size get() = to.size
 
@@ -350,6 +402,7 @@ class PinyinDecoder(
         private var ends = IntArray(0)
         private val toCopy = IntList()
         private val wordCopy = IntList()
+        private val scoredCopy = IntList()
         private val costCopy = FloatList()
 
         fun clear(end: Int) {
@@ -359,6 +412,7 @@ class PinyinDecoder(
             }
             to.clear()
             word.clear()
+            scored.clear()
             cost.clear()
         }
 
@@ -375,11 +429,13 @@ class PinyinDecoder(
             // a counting sort: ends[q] becomes where the arcs ending at q go
             toCopy.clear()
             wordCopy.clear()
+            scoredCopy.clear()
             costCopy.clear()
             ends.fill(0, 0, end + 1)
             for (a in first until size) {
                 toCopy += to[a]
                 wordCopy += word[a]
+                scoredCopy += scored[a]
                 costCopy += cost[a]
                 ends[to[a]]++
             }
@@ -389,18 +445,21 @@ class PinyinDecoder(
                 val a = ends[toCopy[i]]++
                 to[a] = toCopy[i]
                 word[a] = wordCopy[i]
+                scored[a] = scoredCopy[i]
                 cost[a] = costCopy[i]
             }
         }
 
-        fun add(to: Int, word: Int, cost: Float) {
+        fun add(to: Int, word: Int, cost: Float, scored: Int = word) {
             this.to += to
             this.word += word
+            this.scored += scored
             this.cost += cost
         }
 
         fun same(arc: Int, other: Lattice, otherArc: Int) =
-            to[arc] == other.to[otherArc] && word[arc] == other.word[otherArc] && cost[arc] == other.cost[otherArc]
+            to[arc] == other.to[otherArc] && word[arc] == other.word[otherArc] && scored[arc] == other.scored[otherArc] &&
+                cost[arc] == other.cost[otherArc]
     }
 
     companion object {
@@ -410,6 +469,10 @@ class PinyinDecoder(
         // time, and a beam of 64 gains one sample of 256 at four times the time
         const val DEFAULT_WORDS_PER_READING = 16
         const val DEFAULT_SENTENCES = 5
+        // the words at a node a longer word is looked for, and those taken of each longer reading:
+        // on the evaluation set 1 to 16 of the latter read the same
+        private const val LOOK_AHEAD_WORDS = 16
+        private const val EXTENSIONS_PER_READING = 4
     }
 }
 

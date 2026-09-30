@@ -124,6 +124,23 @@ class PinyinDecoderTest {
     }
 
     @Test
+    fun aSyllableStillBeingTypedIsScoredAsTheLongerWordItStarts() {
+        val p = Penalties()
+        // zh may go on to 中华 (-1.5): 中 is scored as that, above 张 (-3) and 中 alone (-3.5)
+        val s = decode("zh").sentences
+        assertEquals("中", s.first().text)
+        assertTrue(texts(s).indexOf("张") > 0)
+        assertEquals(-1.5f + p.initial + p.lookAhead, s.first().score, 1e-4f)
+        // what was typed is what it reads
+        assertEquals(listOf(id("中")), s.first().words.toList())
+        assertEquals(s.first().score, decode("zh").words.first { it.text == "中" }.score, 1e-4f)
+        // nor once the syllable is finished
+        assertEquals(-3.5f, decode("zhong").sentences.first().score, 1e-4f)
+        // where the longer word is no likelier, the word's own score stands: 你好 after 你 is rarer than 你
+        assertEquals(-2f + p.initial, decode("n").sentences.first { it.text == "你" }.score, 1e-4f)
+    }
+
+    @Test
     fun inputThatIsNoPinyinIsKeptAsTyped() {
         val s = decode("ni1").sentences.first()
         assertEquals("你1", s.text)
@@ -151,10 +168,11 @@ class PinyinDecoderTest {
 
     @Test
     fun aBetterReadingOfTheSameWordReplacesAWorseOne() {
-        // zhon reads zhong as a slip (first) and as unfinished (better); 中 is listed once, at the better
+        // zhon reads zhong as a slip (first) and as unfinished (better, and as the 中华 it may become);
+        // 中 is listed once, at the best
         val s = decode("zhon").sentences
         assertEquals(listOf("中"), texts(s))
-        assertEquals(-3.5f + Penalties().partial, s.first().score, 1e-4f)
+        assertEquals(-1.5f + Penalties().partial + Penalties().lookAhead, s.first().score, 1e-4f)
     }
 
     @Test
