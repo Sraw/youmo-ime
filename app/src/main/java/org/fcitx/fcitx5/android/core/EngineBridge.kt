@@ -5,7 +5,7 @@
 package org.fcitx.fcitx5.android.core
 
 import org.fcitx.fcitx5.android.FcitxApplication
-import org.fcitx.fcitx5.android.engine.data.DataFormatException
+import org.fcitx.fcitx5.android.data.pinyin.ImportedDictionaries
 import org.fcitx.fcitx5.android.engine.host.EngineSettings
 import org.fcitx.fcitx5.android.engine.host.Engines
 import org.fcitx.fcitx5.android.engine.libime.LibimeFiles
@@ -97,8 +97,8 @@ object EngineBridge {
 
     /**
      * The custom phrases and the dictionaries turned on, as the editors keep them; a file that
-     * cannot be read is left out, the rest still read. The dictionaries are converted only when
-     * the engine asks, and again only when one of them changed.
+     * cannot be read is left out, the rest still read. The dictionaries are read only when the
+     * engine asks, and again only when one of them changed; libime's are turned into text first.
      */
     private fun additions(): Engines.Additions {
         val dir = pinyinDir()
@@ -108,17 +108,15 @@ object EngineBridge {
             Timber.w(e, "custom phrases")
             ""
         }
-        val dictionaries = File(dir, "dictionaries").listFiles { f -> f.name.endsWith(".dict") }.orEmpty()
-            .sortedBy { it.name }
+        val dictionaryDir = File(dir, "dictionaries")
+        ImportedDictionaries.migrate(dictionaryDir)
+        val dictionaries = dictionaryDir.listFiles { f -> f.name.endsWith(".txt") }.orEmpty().sortedBy { it.name }
         val seen = dictionaries.joinToString("\n") { "${it.name} ${it.length()} ${it.lastModified()}" }
         return Engines.Additions(phrases, seen) {
             dictionaries.flatMap { file ->
                 try {
-                    LibimeFiles.pinyinDictionary(file.readBytes())
+                    file.readLines()
                 } catch (e: IOException) {
-                    Timber.w(e, "pinyin dictionary")
-                    emptyList()
-                } catch (e: DataFormatException) {
                     Timber.w(e, "pinyin dictionary %s", file.name)
                     emptyList()
                 }

@@ -27,12 +27,4 @@ class LibIMEDictionary(file: File) : Dictionary() {
         dest.writeText(LibimeFiles.table(file.readBytes()))
         return TextDictionary(dest)
     }
-
-    override fun toLibIMEDictionary(dest: File): LibIMEDictionary {
-        ensureBin(dest)
-        // read through, as libime would load it: a table it could not is not taken
-        LibimeFiles.table(file.readBytes())
-        file.copyTo(dest)
-        return LibIMEDictionary(dest)
-    }
 }

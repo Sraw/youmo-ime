@@ -6,6 +6,8 @@ package org.fcitx.fcitx5.android.engine.table
 
 import org.fcitx.fcitx5.android.engine.data.CodeTable
 import org.fcitx.fcitx5.android.engine.data.CodeTableReader
+import org.fcitx.fcitx5.android.engine.data.SourceException
+import java.io.BufferedReader
 import java.nio.ByteBuffer
 
 /** A code table's text made into what [CodeTable.load] reads. */
@@ -28,5 +30,17 @@ object TableText {
             if (code == null) uncoded++ else reader.builder.entry(code, phrase)
         }
         return uncoded
+    }
+
+    /**
+     * Reads [text] through as the engine will when its input method is first used, so that a
+     * table the user imports that cannot be typed with fails to import rather than to type.
+     *
+     * @throws SourceException where it cannot be read, or if it lists nothing to type
+     */
+    fun check(text: BufferedReader, source: String) {
+        val reader = CodeTableReader()
+        reader.read(text, source)
+        if (reader.entries == 0 && reader.phrases.isEmpty()) throw SourceException(source, 0, "nothing to type")
     }
 }

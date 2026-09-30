@@ -111,4 +111,22 @@ class CustomPhrasesTest {
         assertEquals(listOf("x"), phrases.place("abc", { error("asked") }, listOf("x"), { it }, { true }, { it }))
         assertEquals(listOf("x"), CustomPhrases.parse("ab,-1=甲").place("ab", listOf("x")))
     }
+
+    @Test
+    fun theSettingsListEveryPhraseAndSaveThemAsFcitxDoes() {
+        val phrases = CustomPhrases.parse("zz,2=乙\nab,-1=off\nzz,1=甲\nsig,1=\nline one\nline two\nq,1=\"\"\nD,1=大")
+        val all = phrases.all
+        assertEquals(listOf("D", "ab", "q", "sig", "zz", "zz"), all.map { it.key })
+        assertEquals(listOf(1, -1, 1, 1, 1, 2), all.map { it.order })
+        val text = CustomPhrases.format(all)
+        assertEquals("D,1=大\nab,-1=off\nq,1=\"\"\nsig,1=\"line one\\nline two\"\nzz,1=甲\nzz,2=乙\n", text)
+        // what is saved reads back the same
+        assertEquals(text, CustomPhrases.format(CustomPhrases.parse(text).all))
+        assertEquals(listOf(0 to "line one\nline two"), CustomPhrases.parse(text).lookup("sig", now))
+        // saved in the order given, a key's phrases together
+        val given = listOf(CustomPhrases.Phrase("b", 2, "x y"), CustomPhrases.Phrase("a", 1, "\"q\""), CustomPhrases.Phrase("b", 1, "z"))
+        assertEquals("a,1=\"\\\"q\\\"\"\nb,2=\"x y\"\nb,1=z\n", CustomPhrases.format(given))
+        assertEquals(listOf(0 to "\"q\""), CustomPhrases.parse(CustomPhrases.format(given)).lookup("a", now))
+        assertEquals("", CustomPhrases.format(emptyList()))
+    }
 }

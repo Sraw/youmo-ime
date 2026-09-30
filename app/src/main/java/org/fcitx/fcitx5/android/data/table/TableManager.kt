@@ -6,7 +6,6 @@ package org.fcitx.fcitx5.android.data.table
 
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.data.table.dict.Dictionary
-import org.fcitx.fcitx5.android.data.table.dict.LibIMEDictionary
 import org.fcitx.fcitx5.android.engine.host.LibimeMigration
 import org.fcitx.fcitx5.android.utils.appContext
 import org.fcitx.fcitx5.android.utils.errorRuntime
@@ -31,7 +30,7 @@ object TableManager {
             runCatching {
                 TableBasedInputMethod.new(confFile).apply {
                     runCatching {
-                        table = LibIMEDictionary(File(tableDicDir, tableFileName))
+                        table = Dictionary.new(File(tableDicDir, tableFileName))
                     }
                 }
             }.getOrNull()
@@ -85,9 +84,13 @@ object TableManager {
         }
         val table = Dictionary.new(dictFile)!!
         im.tableFileName = TableBasedInputMethod.fixedTableFileName(table.name)
-        runCatching {
-            im.table = table.toLibIMEDictionary(File(tableDicDir, im.tableFileName))
-        }.onFailure {
+        val dest = File(tableDicDir, im.tableFileName)
+        // another input method's
+        if (dest.exists()) {
+            im.file.delete()
+            errorRuntime(R.string.table_dict_already_exists, dest.name)
+        }
+        im.table = runCatching { ImportedTables.install(table, dest) }.getOrElse {
             im.file.delete()
             errorRuntime(R.string.invalid_table_dict, it.message)
         }
@@ -96,30 +99,33 @@ object TableManager {
         return im
     }
 
+    /**
+     * Replaces the table of [im]. One kept as libime's binary before the engine is replaced by
+     * text, under the name a table imported now would have.
+     */
     fun replaceTableDict(
         im: TableBasedInputMethod,
         dictName: String,
         dictStream: InputStream
-    ): Result<LibIMEDictionary> = runCatching {
+    ): Result<Dictionary> = runCatching {
         withTempDir { tempDir ->
             val dictFile = File(tempDir, dictName).also {
                 it.outputStream().use { o -> dictStream.use { i -> i.copyTo(o) } }
             }
             val dict = Dictionary.new(dictFile)!!
-            runCatching {
-                dict.toLibIMEDictionary(File(tempDir, im.tableFileName))
-            }.onSuccess {
-                it.file.copyTo(File(tableDicDir, im.tableFileName), overwrite = true)
-            }.onFailure {
-                dictFile.delete()
-                errorRuntime(R.string.invalid_table_dict, it.message)
-            }.getOrThrow()
+            val old = File(tableDicDir, im.tableFileName)
+            val name = TableBasedInputMethod.replacedTableFileName(old.name)
+            // another input method's
+            if (name != old.name && File(tableDicDir, name).exists())
+                errorRuntime(R.string.table_dict_already_exists, name)
+            val installed = runCatching { ImportedTables.install(dict, File(tableDicDir, name)) }
+                .getOrElse { errorRuntime(R.string.invalid_table_dict, it.message) }
+            if (installed.file != old) {
+                im.tableFileName = name
+                im.save()
+                old.delete()
+            }
+            installed
         }
     }
-
-    @JvmStatic
-    external fun tableDictConv(src: String, dest: String, mode: Boolean)
-
-    const val MODE_BIN_TO_TXT = true
-    const val MODE_TXT_TO_BIN = false
 }

@@ -20,7 +20,8 @@
 // half by their text (Halves): choose on one, report on the other.
 //
 // Results come from an engine run: run-on-device.sh produces one for the engine the APK ships
-// (libime today); baseline/ keeps the libime result the new engine is measured against.
+// (the own engine, since libime left the app); baseline/ keeps the libime result it was measured
+// against.
 plugins {
     application
     alias(libs.plugins.kotlin.jvm)

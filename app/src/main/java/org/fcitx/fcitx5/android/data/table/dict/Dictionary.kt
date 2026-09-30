@@ -27,20 +27,8 @@ abstract class Dictionary {
 
     abstract fun toTextDictionary(dest: File): TextDictionary
 
-    abstract fun toLibIMEDictionary(dest: File): LibIMEDictionary
-
     open val name: String
         get() = file.nameWithoutExtension
-
-    fun toTextDictionary(): TextDictionary {
-        val dest = file.resolveSibling(name + ".${Type.Text.ext}")
-        return toTextDictionary(dest)
-    }
-
-    fun toLibIMEDictionary(): LibIMEDictionary {
-        val dest = file.resolveSibling(name + ".${Type.LibIME.ext}")
-        return toLibIMEDictionary(dest)
-    }
 
     protected fun ensureFileExists() {
         if (!file.exists())
@@ -50,12 +38,6 @@ abstract class Dictionary {
     protected fun ensureTxt(dest: File) {
         if (dest.extension != Type.Text.ext)
             throw IllegalArgumentException("Dest file name must end with .${Type.Text.ext}")
-        dest.delete()
-    }
-
-    protected fun ensureBin(dest: File) {
-        if (dest.extension != Type.LibIME.ext)
-            throw IllegalArgumentException("Dest file name must end with .${Type.LibIME.ext}")
         dest.delete()
     }
 

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Runs an evaluation set through the engine the debug APK ships (libime today) on a connected
-# device or emulator, via EngineEvalRunner, and pulls the result, ready for
+# Runs an evaluation set through the engine the debug APK ships (the own engine, since libime
+# left the app) on a connected device or emulator, via EngineEvalRunner, and pulls the result, ready for
 #   ./gradlew :lib:ime-eval:run --args="score data/<set>.tsv <result.tsv> [baseline/<...>.tsv]"
 # Needs the native build (it installs the debug APK).
 #   lib/ime-eval/run-on-device.sh [set=pinyin] [ime=pinyin] [out-dir=build/eval]

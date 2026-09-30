@@ -16,6 +16,7 @@ import androidx.fragment.app.Fragment
 import androidx.fragment.app.activityViewModels
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
+import androidx.navigation.fragment.findNavController
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -29,14 +30,18 @@ import org.fcitx.fcitx5.android.ui.main.EditDeleteMenuProvider
 import org.fcitx.fcitx5.android.ui.main.MainViewModel
 import org.fcitx.fcitx5.android.ui.main.MainViewModel.ButtonMode
 import org.fcitx.fcitx5.android.utils.NaiveDustman
+import org.fcitx.fcitx5.android.utils.appContext
 import org.fcitx.fcitx5.android.utils.materialTextInput
 import org.fcitx.fcitx5.android.utils.onPositiveButtonClick
 import org.fcitx.fcitx5.android.utils.str
+import org.fcitx.fcitx5.android.utils.toast
 import splitties.views.dsl.core.add
 import splitties.views.dsl.core.lParams
 import splitties.views.dsl.core.matchParent
 import splitties.views.dsl.core.verticalLayout
 import splitties.views.setPaddingDp
+import timber.log.Timber
+import java.io.IOException
 import kotlin.math.absoluteValue
 import kotlin.math.min
 
@@ -48,7 +53,8 @@ class PinyinCustomPhraseFragment : Fragment(), OnItemChangedListener<PinyinCusto
 
     private val dustman = NaiveDustman<PinyinCustomPhrase>()
 
-    private val initialItems = CustomPhraseManager.load() ?: emptyArray()
+    // false when the file could not be read: the fragment leaves, and saves nothing over it
+    private var readable = true
 
     private var keyLabel = KEY
     private var orderLabel = ORDER
@@ -66,11 +72,18 @@ class PinyinCustomPhraseFragment : Fragment(), OnItemChangedListener<PinyinCusto
                 phraseLabel = translate(PHRASE, CHINESE_ADDONS_DOMAIN)
             }
         }
-        val initialEntries = initialItems.toList()
+        val initialItems = try {
+            CustomPhraseManager.load()
+        } catch (e: IOException) {
+            Timber.w(e, "custom phrases")
+            requireContext().toast(e)
+            readable = false
+            emptyList()
+        }
         ui = object : BaseDynamicListUi<PinyinCustomPhrase>(
             requireContext(),
             Mode.FreeAdd("", converter = { PinyinCustomPhrase("", 1, "") }),
-            initialItems.toList(),
+            initialItems,
             enableOrder = true,
             initCheckBox = { entry ->
                 isChecked = entry.enabled
@@ -151,7 +164,8 @@ class PinyinCustomPhraseFragment : Fragment(), OnItemChangedListener<PinyinCusto
                         } else {
                             keyField.error = null
                         }
-                        val order = orderField.str.toIntOrNull() ?: 1
+                        // a negative order is a phrase turned off; 0 would be neither, and vanish
+                        val order = orderField.str.toIntOrNull()?.takeIf { it != 0 } ?: 1
                         val phrase = phraseField.str
                         if (phrase.isEmpty()) {
                             phraseField.error = getString(R.string._cannot_be_empty, phraseLabel)
@@ -175,6 +189,10 @@ class PinyinCustomPhraseFragment : Fragment(), OnItemChangedListener<PinyinCusto
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
+        if (!readable) {
+            findNavController().popBackStack()
+            return
+        }
         viewModel.toolbarButton.value =
             if (ui.entries.isNotEmpty()) ButtonMode.EDIT else ButtonMode.NONE
         requireActivity().addMenuProvider(
@@ -208,11 +226,17 @@ class PinyinCustomPhraseFragment : Fragment(), OnItemChangedListener<PinyinCusto
     }
 
     private fun saveConfig() {
-        if (!dustman.dirty) return
+        if (!readable || !dustman.dirty) return
         resetDustman()
+        val items = ui.entries.toList()
         lifecycleScope.launch {
-            withContext(Dispatchers.IO) {
-                CustomPhraseManager.save(ui.entries.toTypedArray())
+            try {
+                withContext(Dispatchers.IO) { CustomPhraseManager.save(items) }
+            } catch (e: IOException) {
+                Timber.w(e, "custom phrases")
+                // the fragment may be gone by now
+                appContext.toast(e)
+                return@launch
             }
             viewModel.fcitx.runOnReady {
                 reloadPinyinCustomPhrase()

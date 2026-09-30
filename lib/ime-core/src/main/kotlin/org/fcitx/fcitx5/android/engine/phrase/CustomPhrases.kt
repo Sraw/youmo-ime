@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.engine.phrase
 
+import org.fcitx.fcitx5.android.engine.data.escapeValue
 import java.util.Calendar
 
 /**
@@ -22,7 +23,7 @@ import java.util.Calendar
 class CustomPhrases private constructor(private val phrases: Map<String, List<Phrase>>) {
 
     /** [value] under [key], at [order] (1 based), turned off if negative. */
-    private class Phrase(val key: String, val order: Int, val value: String) {
+    class Phrase(val key: String, val order: Int, val value: String) {
         val enabled get() = order > 0
 
         /** Filled in when offered, with the time then. */
@@ -32,6 +33,9 @@ class CustomPhrases private constructor(private val phrases: Map<String, List<Ph
     }
 
     val isEmpty get() = phrases.isEmpty()
+
+    /** Every phrase, turned off too, as the settings list them: by key, then in order. */
+    val all: List<Phrase> get() = phrases.keys.sorted().flatMap { phrases.getValue(it) }
 
     /**
      * The phrases turned on under [key], each once, as offered at [now]: its text and where it
@@ -107,6 +111,22 @@ class CustomPhrases private constructor(private val phrases: Map<String, List<Ph
             // stable: the file's order among phrases of one order
             for (list in phrases.values) list.sortBy { it.order }
             return CustomPhrases(phrases)
+        }
+
+        /**
+         * [phrases] as fcitx5-chinese-addons saves them, which [parse] reads back: by key, a
+         * line each in the order given, a value fcitx would escape in quotes. An empty value is
+         * written `""`, which would otherwise take the lines after it.
+         */
+        fun format(phrases: List<Phrase>): String {
+            val out = StringBuilder()
+            for ((key, list) in phrases.groupBy { it.key }.toSortedMap()) {
+                for (p in list) {
+                    out.append(key).append(',').append(p.order).append('=')
+                    out.append(if (p.value.isEmpty()) "\"\"" else escapeValue(p.value)).append('\n')
+                }
+            }
+            return out.toString()
         }
 
         /** A phrase line, or null if [line] is none. */

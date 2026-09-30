@@ -109,6 +109,14 @@ class CodeTableReaderTest {
     }
 
     @Test
+    fun aTableIsCheckedAsTheEngineWillReadIt() {
+        TableText.check(TINY_TABLE.trimIndent().reader().buffered(), "table")
+        TableText.check("键码=a\n[数据]\n[词组]\n工作\n".reader().buffered(), "table")
+        assertSourceError(2, "expected \"code text\"") { TableText.check("[数据]\nabc\n".reader().buffered(), "table") }
+        assertSourceError(0, "nothing to type") { TableText.check("键码=a\n[数据]\n".reader().buffered(), "table") }
+    }
+
+    @Test
     fun valuesUnescapeAsFcitxEscapesThem() {
         assertEquals("a\nb\tc\"d\\e", unescapeValue("\"a\\nb\\tc\\\"d\\\\e\""))
         assertEquals("\u000c\r\u000b", unescapeValue("\"\\f\\r\\v\""))
@@ -128,6 +136,21 @@ class CodeTableReaderTest {
         assertEquals("\"a b\"", escapeValue("a b"))
         assertEquals("\"a\\nb\\tc\\\"d\\\\e\\f\\r\\v\"", escapeValue("a\nb\tc\"d\\e\u000c\r\u000b"))
         for (value in listOf("", "a b", "\"", "a\\n", "　", "x\"y\"")) assertEquals(value, unescapeValue(escapeValue(value)))
+    }
+
+    @Test
+    fun valuesSplitAsFcitxConsumesThem() {
+        assertEquals(listOf("你好", "ni'hao", "0"), splitValues(" 你好\tni'hao \u000B0\r"))
+        assertEquals(listOf("a b", "c\\", "x\\ty\""), splitValues("\"a b\" \"c\\\\\"x\\ty\""))
+        assertEquals(listOf("x\ty\"", "q"), splitValues("\"x\\ty\\\"\" \"\\q\""))
+        // what follows a closing quote starts the next value
+        assertEquals(listOf("a", "b"), splitValues("\"a\"b"))
+        // a quote that never closes is the value's own
+        assertEquals(listOf("\"a", "b"), splitValues("\"a b"))
+        assertEquals(listOf("a\"b"), splitValues("a\"b"))
+        assertEquals(listOf("\"a\\\""), splitValues("\"a\\\""))
+        assertEquals(emptyList<String>(), splitValues(" \t"))
+        assertEquals(listOf(""), splitValues("\"\""))
     }
 
     companion object {

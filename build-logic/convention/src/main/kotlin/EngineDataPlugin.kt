@@ -51,7 +51,7 @@ import javax.inject.Inject
  * engine can map it straight out of the APK rather than copying it out first; it is also left
  * out of the data descriptor for that reason (the descriptor lists only src/main/assets).
  *
- * The sources are the same archives libime's CMake downloads, checked against the same SHA-256.
+ * The sources are the archives libime's CMake downloaded, checked against the same SHA-256.
  * Each step declares its inputs and outputs, so the download and the minute-long compile run
  * once and again only when a source or the tool changes.
  */
@@ -63,7 +63,7 @@ class EngineDataPlugin : Plugin<Project> {
         const val COMPILE_TASK = "compileEngineData"
         private const val BASE_URL = "https://download.fcitx-im.org/data/"
 
-        // keep in step with lib/libime/src/main/cpp/libime/data/CMakeLists.txt
+        // as libime's data/CMakeLists.txt had them (libime 1.1.15-14-g65003b6, before it left the app)
         private val LM = Source(
             "lm_sc.arpa-20260629.tar.zst",
             "06808333b9173e5374cf2cb5afc12d08f5625bf9abb536489cac376fc05f2e7f",

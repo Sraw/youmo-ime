@@ -83,16 +83,8 @@ fcitxComponent {
     includeLibs = listOf(
         "fcitx5",
         "fcitx5-lua",
-        "libime",
         "fcitx5-chinese-addons"
     )
-    // exclude (delete immediately after install) libime's pinyin and table addons and their input
-    // methods: the androidengine addon's replace them
-    val inputMethods = listOf("pinyin", "shuangpin", "wbx", "wbpy", "zrm", "db", "cangjie", "erbi", "qxm", "wanfeng")
-    excludeFiles = (
-        listOf("addon/pinyin.conf", "addon/table.conf", "pinyin/sp.dat.example", "pinyin/symbols") +
-            inputMethods.map { "inputmethod/$it.conf" }
-        ).map { "usr/share/fcitx5/$it" }
     installPrebuiltAssets = true
 }
 
@@ -115,7 +107,6 @@ dependencies {
     ksp(project(":codegen"))
     implementation(project(":lib:fcitx5"))
     implementation(project(":lib:fcitx5-lua"))
-    implementation(project(":lib:libime"))
     implementation(project(":lib:fcitx5-chinese-addons"))
     implementation(libs.kotlinx.coroutines)
     implementation(libs.kotlinx.serialization.json)

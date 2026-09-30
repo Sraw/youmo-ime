@@ -72,6 +72,45 @@ fun escapeValue(value: String): String {
     return out.append('"').toString()
 }
 
+/**
+ * [line] cut into values as fcitx's `consumeMaybeEscapedValue` cuts it at `FCITX_WHITESPACE`,
+ * which libime's text dictionaries are read by: a value starting with a quote runs, unescaped, to
+ * the quote closing it (what follows it starts the next value), and one whose quote never closes
+ * is taken as it is, to the next whitespace, quote and all.
+ */
+fun splitValues(line: String): List<String> {
+    val out = ArrayList<String>(4)
+    var i = 0
+    while (true) {
+        while (i < line.length && line[i] in WHITESPACE) i++
+        if (i == line.length) return out
+        if (line[i] == '"') {
+            val value = StringBuilder()
+            var j = i + 1
+            while (j < line.length && line[j] != '"') {
+                if (line[j] == '\\' && j + 1 < line.length) {
+                    j++
+                    value.append(ESCAPES[line[j]] ?: line[j])
+                } else {
+                    value.append(line[j])
+                }
+                j++
+            }
+            if (j < line.length) {
+                out += value.toString()
+                i = j + 1
+                continue
+            }
+        }
+        val start = i
+        i++
+        while (i < line.length && line[i] !in WHITESPACE) i++
+        out += line.substring(start, i)
+    }
+}
+
+private const val WHITESPACE = "\u000C\n\r\t\u000B "
+
 private const val NEEDS_QUOTES = "\u000C\r\t\u000B \"\\\n"
 private val ESCAPED = ESCAPES.entries.associate { (k, v) -> v to k } + mapOf('"' to '"', '\\' to '\\')
 

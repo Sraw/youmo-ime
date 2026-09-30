@@ -7,6 +7,8 @@ package org.fcitx.fcitx5.android.engine.user
 import org.fcitx.fcitx5.android.engine.data.NgramModel.Companion.NO_WORD
 import org.fcitx.fcitx5.android.engine.data.PinyinDictionary
 import org.fcitx.fcitx5.android.engine.data.Vocabulary
+import org.fcitx.fcitx5.android.engine.data.escapeValue
+import org.fcitx.fcitx5.android.engine.data.splitValues
 import org.fcitx.fcitx5.android.engine.pinyin.Syllables
 import org.fcitx.fcitx5.android.engine.user.UserModel.Entry
 
@@ -140,12 +142,25 @@ object LibimeImport {
         }
     }
 
-    /** The word of a line of the user dictionary; null for a blank or unreadable one. */
-    internal fun dictionaryEntry(line: String): Entry? {
-        val fields = words(line)
-        // a line of the text format has a cost after the reading; the history's words do not
-        if (fields.size != 3 || fields.any { it.code != null } || fields[2].text.toFloatOrNull() == null) return null
-        return entry(fields[0].text, fields[1].text)
+    /**
+     * The word of a line of a dictionary in libime's text format, as libime reads one: `text
+     * pin'yin`, a cost after it or not, apart by any whitespace, a value in quotes if fcitx
+     * escaped it. Null for a blank or unreadable line, which libime skips too.
+     */
+    fun dictionaryEntry(line: String): Entry? = dictionaryEntry(splitValues(line))
+
+    private fun dictionaryEntry(fields: List<String>): Entry? {
+        if (fields.size !in 2..3 || fields.getOrNull(2)?.toFloatOrNull() == null && fields.size == 3) return null
+        return entry(fields[0], fields[1])
+    }
+
+    /**
+     * The words of [lines], a dictionary in libime's text format, a line each as this engine keeps
+     * them (`text pin'yin cost`), those [dictionaryEntry] cannot read left out.
+     */
+    fun dictionaryText(lines: Sequence<String>): Sequence<String> = lines.mapNotNull { line ->
+        val fields = splitValues(line)
+        dictionaryEntry(fields)?.let { "${escapeValue(fields[0])} ${fields[1]} ${fields.getOrNull(2)?.toFloat() ?: 0f}" }
     }
 
     /**

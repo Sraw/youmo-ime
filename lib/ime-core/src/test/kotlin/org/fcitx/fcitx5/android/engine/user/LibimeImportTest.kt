@@ -43,10 +43,22 @@ class LibimeImportTest {
     fun aLineOfTheUserDictionaryIsTextReadingAndCost() {
         assertEquals(entry("你好", "ni", "hao"), LibimeImport.dictionaryEntry("你好 ni'hao 0"))
         assertEquals(entry("你好", "ni", "hao"), LibimeImport.dictionaryEntry("\"你好\" ni'hao -1.5"))
+        // as libime reads it: the cost may be left out, and a tab is whitespace like any
+        assertEquals(entry("你好", "ni", "hao"), LibimeImport.dictionaryEntry("你好 ni'hao"))
+        assertEquals(entry("你好", "ni", "hao"), LibimeImport.dictionaryEntry("  你好\tni'hao\t0\r"))
         assertNull(LibimeImport.dictionaryEntry(""))
-        assertNull(LibimeImport.dictionaryEntry("你好 ni'hao"))
+        assertNull(LibimeImport.dictionaryEntry("你好"))
         assertNull(LibimeImport.dictionaryEntry("你好 ni'hao x"))
         assertNull(LibimeImport.dictionaryEntry("你好\tni'hao 0 0"))
+    }
+
+    @Test
+    fun aDictionaryIsKeptAsTheEngineReadsIt() {
+        val text = LibimeImport.dictionaryText(
+            sequenceOf("你好\tni'hao\t0", "绿 lü", "\"你\\\"\" ni'hao -2.5", "你 nii 0", "# a comment", "", "虐 nüe 1e2"),
+        ).toList()
+        assertEquals(listOf("你好 ni'hao 0.0", "绿 lü 0.0", "\"你\\\"\" ni'hao -2.5", "虐 nüe 100.0"), text)
+        assertEquals(listOf(entry("你好", "ni", "hao"), entry("绿", "lv")), text.take(2).map { LibimeImport.dictionaryEntry(it) })
     }
 
     @Test

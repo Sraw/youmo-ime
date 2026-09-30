@@ -5,10 +5,8 @@
 package org.fcitx.fcitx5.android.data.pinyin
 
 import org.fcitx.fcitx5.android.R
-import org.fcitx.fcitx5.android.core.data.DataManager
-import org.fcitx.fcitx5.android.data.pinyin.dict.BuiltinDictionary
-import org.fcitx.fcitx5.android.data.pinyin.dict.LibIMEDictionary
 import org.fcitx.fcitx5.android.data.pinyin.dict.PinyinDictionary
+import org.fcitx.fcitx5.android.data.pinyin.dict.TextDictionary
 import org.fcitx.fcitx5.android.utils.appContext
 import org.fcitx.fcitx5.android.utils.errorArg
 import timber.log.Timber
@@ -22,50 +20,41 @@ object PinyinDictManager {
         appContext.getExternalFilesDir(null)!!, "data/pinyin/dictionaries"
     ).also { it.mkdirs() }
 
-    private val builtinPinyinDictDir = File(
-        DataManager.dataDir, "usr/share/fcitx5/pinyin/dictionaries"
-    )
-
     private val nativeDir = File(appContext.applicationInfo.nativeLibraryDir)
 
     private val scel2org5 by lazy { File(nativeDir, scel2org5Name) }
 
-    fun listDictionaries(): List<PinyinDictionary> {
-        val builtin = mutableListOf<PinyinDictionary>()
-        builtinPinyinDictDir.listFiles()?.forEach {
-            if (it.extension == PinyinDictionary.Type.LibIME.ext) {
-                builtin.add(BuiltinDictionary(it))
-            }
-        }
-        builtin.sortBy { it.name }
-        val user = mutableListOf<PinyinDictionary>()
-        pinyinDicDir.listFiles()?.forEach {
-            PinyinDictionary.new(it)?.let { dict ->
-                if (dict is LibIMEDictionary) {
-                    user.add(dict)
-                }
-            }
-        }
-        user.sortBy { it.name }
-        return builtin + user
+    /** The dictionaries the user imported, on or off, by name. */
+    fun listDictionaries(): List<TextDictionary> {
+        ImportedDictionaries.migrate(pinyinDicDir)
+        return pinyinDicDir.listFiles().orEmpty()
+            .filter { PinyinDictionary.Type.fromFileName(it.name) == PinyinDictionary.Type.Text }
+            .map(::TextDictionary)
+            .sortedBy { it.name }
     }
 
-    fun importFromFile(file: File): Result<LibIMEDictionary> = runCatching {
+    /** Imports [file], of any [PinyinDictionary.Type], as text the engine reads, named as it is. */
+    fun importFromFile(file: File): Result<TextDictionary> = runCatching {
         val raw =
             PinyinDictionary.new(file) ?: errorArg(R.string.exception_dict_filename, file.path)
-        // convert to libime format in dictionaries dir
-        // preserve original file name
-        val new = raw.toLibIMEDictionary(
-            File(
-                pinyinDicDir,
-                file.nameWithoutExtension + ".${PinyinDictionary.Type.LibIME.ext}"
-            )
-        )
-        Timber.d("Converted $raw to $new")
-        new
+        val text = File.createTempFile("import", ".${PinyinDictionary.Type.Text.ext}", appContext.cacheDir)
+        try {
+            raw.toTextDictionary(text)
+            val dest = File(pinyinDicDir, TextDictionary.fileName(raw.name))
+            // one of that name, on or off, is the user's: the list may not have shown it yet
+            if (dest.exists() || File(pinyinDicDir, TextDictionary.fileName(raw.name, false)).exists()) {
+                errorArg(R.string.dict_already_exists)
+            }
+            if (text.useLines { ImportedDictionaries.write(it, dest) } == 0) {
+                errorArg(R.string.exception_dict_no_words, file.name)
+            }
+            TextDictionary(dest).also { Timber.d("Imported $raw as $it") }
+        } finally {
+            text.delete()
+        }
     }
 
-    fun importFromInputStream(stream: InputStream, name: String): Result<LibIMEDictionary> {
+    fun importFromInputStream(stream: InputStream, name: String): Result<TextDictionary> {
         val tempFile = File(appContext.cacheDir, name)
         tempFile.outputStream().use {
             stream.copyTo(it)
@@ -87,11 +76,5 @@ object PinyinDictManager {
         }
     }
 
-    @JvmStatic
-    external fun pinyinDictConv(src: String, dest: String, mode: Boolean)
-
-    const val MODE_BIN_TO_TXT = true
-    const val MODE_TXT_TO_BIN = false
     private const val scel2org5Name = "libscel2org5.so"
-
 }

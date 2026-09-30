@@ -14,10 +14,9 @@ abstract class PinyinDictionary {
         companion object {
             fun fromFileName(name: String): Type? =
                 when {
-                    name.endsWith(".dict.disable") -> LibIME
                     name.endsWith(".dict") -> LibIME
                     name.endsWith(".scel") -> Sougou
-                    name.endsWith(".txt") -> Text
+                    name.endsWith(".txt") || name.endsWith(".txt.${TextDictionary.DISABLE}") -> Text
                     else -> null
                 }
         }
@@ -29,20 +28,8 @@ abstract class PinyinDictionary {
 
     abstract fun toTextDictionary(dest: File): TextDictionary
 
-    abstract fun toLibIMEDictionary(dest: File): LibIMEDictionary
-
     open val name: String
-        get() = file.nameWithoutExtension
-
-    fun toTextDictionary(): TextDictionary {
-        val dest = file.resolveSibling(name + ".${Type.Text.ext}")
-        return toTextDictionary(dest)
-    }
-
-    fun toLibIMEDictionary(): LibIMEDictionary {
-        val dest = file.resolveSibling(name + ".${Type.LibIME.ext}")
-        return toLibIMEDictionary(dest)
-    }
+        get() = nameOf(file.name)
 
     protected fun ensureFileExists() {
         if (!file.exists())
@@ -55,15 +42,13 @@ abstract class PinyinDictionary {
         dest.delete()
     }
 
-    protected fun ensureBin(dest: File) {
-        if (dest.extension != Type.LibIME.ext)
-            throw IllegalArgumentException("Dest file name must end with .${Type.LibIME.ext}")
-        dest.delete()
-    }
-
     override fun toString(): String = "${javaClass.simpleName}[$name -> ${file.path}]"
 
     companion object {
+        /** A dictionary's name, from its file's: what the extension (and `.disable`) leave. */
+        fun nameOf(fileName: String): String =
+            fileName.removeSuffix(".${TextDictionary.DISABLE}").substringBeforeLast('.')
+
         fun new(it: File): PinyinDictionary? = when (Type.fromFileName(it.name)) {
             Type.LibIME -> LibIMEDictionary(it)
             Type.Sougou -> SougouDictionary(it)

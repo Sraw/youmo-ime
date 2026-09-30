@@ -19,10 +19,10 @@ class PinyinDictionaryTypeTest {
         assertEquals(Type.Text, Type.fromFileName("words.txt"))
     }
 
-    /** A disabled LibIME dictionary keeps its type; only the `.disable` suffix marks it off. */
+    /** A dictionary the user imported is kept as text; `.disable` marks it off. */
     @Test
-    fun aDisabledLibImeDictionaryIsStillLibIme() {
-        assertEquals(Type.LibIME, Type.fromFileName("words.dict.disable"))
+    fun aDisabledDictionaryIsStillText() {
+        assertEquals(Type.Text, Type.fromFileName("words.txt.disable"))
     }
 
     @Test
@@ -32,11 +32,11 @@ class PinyinDictionaryTypeTest {
         assertNull(Type.fromFileName(""))
     }
 
-    /** Only LibIME has a disabled form; the others are not recognised with that suffix. */
+    /** Only text has a disabled form: libime's are turned into text, not kept (see ImportedDictionaries). */
     @Test
     fun theDisableSuffixIsNotRecognisedForOtherTypes() {
         assertNull(Type.fromFileName("words.scel.disable"))
-        assertNull(Type.fromFileName("words.txt.disable"))
+        assertNull(Type.fromFileName("words.dict.disable"))
     }
 
     /**

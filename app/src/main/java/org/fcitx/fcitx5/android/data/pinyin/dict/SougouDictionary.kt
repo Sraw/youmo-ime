@@ -26,12 +26,4 @@ class SougouDictionary(file: File) : PinyinDictionary() {
         PinyinDictManager.sougouDictConv(file.absolutePath, dest.absolutePath)
         return TextDictionary(dest)
     }
-
-    override fun toLibIMEDictionary(dest: File): LibIMEDictionary {
-        val txtDict = toTextDictionary()
-        val libimeDict = txtDict.toLibIMEDictionary(dest)
-        txtDict.file.delete()
-        return libimeDict
-    }
-
 }

@@ -137,6 +137,7 @@
     <string name="exception_text_dict_filename">%1$s的副檔名並不是純文字詞庫</string>
     <string name="exception_sougou_dict_filename">%1$s的副檔名並不是搜狗細胞詞庫</string>
     <string name="exception_dict_filename">%1$s 副檔名並不是字典</string>
+    <string name="exception_dict_no_words">%1$s 裡沒有本輸入法能讀的詞</string>
     <string name="exception_theme_json">無法找到主題 Json</string>
     <string name="exception_theme_name_clash">主題名稱與內建主題相沖突</string>
     <string name="exception_theme_src_image">無法儲存主題背景的原始影象</string>
@@ -183,6 +184,7 @@
     <string name="manage_table_im">管理碼表輸入法</string>
     <string name="exception_table_im_filename">\"%1$s\" 的副檔名不是碼表輸入法包（ .zip ）</string>
     <string name="table_already_exists">\"%1$s\" 碼表輸入法設定檔已存在</string>
+    <string name="table_dict_already_exists">碼表「%1$s」已屬於另一個輸入法</string>
     <string name="table_file_does_not_exist_title">碼表不可用</string>
     <string name="table_file_does_not_exist_message">碼表字典 \"%1$s\" 不存在。請檢查字典檔案或重新匯入。</string>
     <string name="import_table">匯入碼表</string>

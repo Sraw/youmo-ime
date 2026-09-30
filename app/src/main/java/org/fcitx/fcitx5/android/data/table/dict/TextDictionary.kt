@@ -5,7 +5,6 @@
 package org.fcitx.fcitx5.android.data.table.dict
 
 import org.fcitx.fcitx5.android.R
-import org.fcitx.fcitx5.android.data.table.TableManager
 import org.fcitx.fcitx5.android.utils.errorArg
 import java.io.File
 
@@ -26,15 +25,5 @@ class TextDictionary(file: File) : Dictionary() {
         ensureTxt(dest)
         file.copyTo(dest)
         return TextDictionary(dest)
-    }
-
-    override fun toLibIMEDictionary(dest: File): LibIMEDictionary {
-        ensureBin(dest)
-        TableManager.tableDictConv(
-            file.absolutePath,
-            dest.absolutePath,
-            TableManager.MODE_TXT_TO_BIN
-        )
-        return LibIMEDictionary(dest)
     }
 }

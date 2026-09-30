@@ -137,6 +137,7 @@
     <string name="exception_text_dict_filename">The filename extension of %1$s does not indicate a text dict</string>
     <string name="exception_sougou_dict_filename">The filename extension of %1$s does not indicate a sogou dict</string>
     <string name="exception_dict_filename">The filename extension of %1$s does not indicate a dict</string>
+    <string name="exception_dict_no_words">%1$s has no word this input method can read</string>
     <string name="exception_theme_json">Unable to find theme json</string>
     <string name="exception_theme_name_clash">Theme name clashes with builtin themes</string>
     <string name="exception_theme_src_image">Unable to save source image of theme background</string>
@@ -183,6 +184,7 @@
     <string name="manage_table_im">Manage Table-based Input Methods</string>
     <string name="exception_table_im_filename">The extension of \"%1$s\" does not indicate a table input method package (.zip)</string>
     <string name="table_already_exists">Configuration file of table-based input method \"%1$s\" already exists</string>
+    <string name="table_dict_already_exists">Table \"%1$s\" is another input method\'s</string>
     <string name="table_file_does_not_exist_title">Table unavailable</string>
     <string name="table_file_does_not_exist_message">Dictionary of table-based input methods \"%1$s\" does not exist. Please check the dict file or re-import.</string>
     <string name="import_table">Import Table</string>

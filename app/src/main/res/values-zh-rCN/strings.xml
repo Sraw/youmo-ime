@@ -137,6 +137,7 @@
     <string name="exception_text_dict_filename">文件 %1$s 的拓展名不是纯文本词库</string>
     <string name="exception_sougou_dict_filename">文件 %1$s 的拓展名不是搜狗细胞词库</string>
     <string name="exception_dict_filename">文件 %1$s 的拓展名不是词库</string>
+    <string name="exception_dict_no_words">%1$s 里没有本输入法能读的词</string>
     <string name="exception_theme_json">找不到主题 JSON</string>
     <string name="exception_theme_name_clash">主题名称与内置主题冲突</string>
     <string name="exception_theme_src_image">无法保存主题背景原图片</string>
@@ -183,6 +184,7 @@
     <string name="manage_table_im">管理码表输入法</string>
     <string name="exception_table_im_filename">\"%1$s\" 的拓展名不是码表输入法包（ .zip ）</string>
     <string name="table_already_exists">\"%1$s\" 码表输入法配置文件已存在</string>
+    <string name="table_dict_already_exists">码表“%1$s”已属于另一个输入法</string>
     <string name="table_file_does_not_exist_title">码表不可用</string>
     <string name="table_file_does_not_exist_message">码表词典 \"%1$s\" 不存在。请检查词典文件或重新导入。</string>
     <string name="import_table">导入码表</string>

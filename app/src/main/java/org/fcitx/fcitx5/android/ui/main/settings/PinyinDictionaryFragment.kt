@@ -25,8 +25,7 @@ import kotlinx.coroutines.withContext
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.core.reloadPinyinDict
 import org.fcitx.fcitx5.android.data.pinyin.PinyinDictManager
-import org.fcitx.fcitx5.android.data.pinyin.dict.BuiltinDictionary
-import org.fcitx.fcitx5.android.data.pinyin.dict.LibIMEDictionary
+import org.fcitx.fcitx5.android.data.pinyin.dict.TextDictionary
 import org.fcitx.fcitx5.android.data.pinyin.dict.PinyinDictionary
 import org.fcitx.fcitx5.android.ui.common.BaseDynamicListUi
 import org.fcitx.fcitx5.android.ui.common.OnItemChangedListener
@@ -54,21 +53,21 @@ class PinyinDictionaryFragment : Fragment(), OnItemChangedListener<PinyinDiction
 
     private var uiInitialized = false
 
+    // the list outlives the view: filled once
+    private var listed = false
+
     private val ui: BaseDynamicListUi<PinyinDictionary> by lazy {
         object : BaseDynamicListUi<PinyinDictionary>(
             requireContext(),
             Mode.Custom(),
-            PinyinDictManager.listDictionaries(),
+            // listed in onViewCreated, off the main thread: listing turns libime's into text first
+            emptyList(),
             initCheckBox = { entry ->
-                if (entry is LibIMEDictionary) {
-                    isChecked = entry.isEnabled
-                    setOnCheckedChangeListener { _, isChecked ->
-                        if (isChecked) entry.enable() else entry.disable()
-                        ui.updateItem(ui.indexItem(entry), entry)
-                    }
-                } else {
-                    isChecked = true
-                    isEnabled = false
+                entry as TextDictionary
+                isChecked = entry.isEnabled
+                setOnCheckedChangeListener { button, isChecked ->
+                    val done = if (isChecked) entry.enable() else entry.disable()
+                    if (done) ui.updateItem(ui.indexItem(entry), entry) else button.isChecked = !isChecked
                 }
             }
         ) {
@@ -82,7 +81,6 @@ class PinyinDictionaryFragment : Fragment(), OnItemChangedListener<PinyinDiction
                     launcher.launch("*/*")
                 }
                 setViewModel(viewModel)
-                removable = { e -> e !is BuiltinDictionary }
             }
 
             override fun updateFAB() {
@@ -108,10 +106,20 @@ class PinyinDictionaryFragment : Fragment(), OnItemChangedListener<PinyinDiction
     }
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
-        args.uri?.let { importFromUri(Uri.parse(it)) }
         super.onViewCreated(view, savedInstanceState)
-        viewModel.toolbarButton.value =
-            if (ui.entries.isNotEmpty()) ButtonMode.EDIT else ButtonMode.NONE
+        viewModel.toolbarButton.value = ButtonMode.NONE
+        viewLifecycleOwner.lifecycleScope.launch {
+            if (!listed) {
+                val dictionaries = withContext(Dispatchers.IO) { PinyinDictManager.listDictionaries() }
+                dictionaries.forEach { ui.addItem(item = it) }
+                resetDustman()
+                listed = true
+                // after the list, which the import checks its name against
+                args.uri?.let { importFromUri(Uri.parse(it)) }
+            }
+            viewModel.toolbarButton.value =
+                if (ui.entries.isNotEmpty()) ButtonMode.EDIT else ButtonMode.NONE
+        }
         requireActivity().addMenuProvider(
             EditDeleteMenuProvider(
                 buttonMode = viewModel.toolbarButton,
@@ -154,7 +162,7 @@ class PinyinDictionaryFragment : Fragment(), OnItemChangedListener<PinyinDiction
                 ctx.importErrorDialog(R.string.invalid_dict)
                 return@launch
             }
-            val entryName = fileName.substringBeforeLast('.')
+            val entryName = PinyinDictionary.nameOf(fileName)
             if (ui.entries.any { it.name == entryName }) {
                 ctx.importErrorDialog(R.string.dict_already_exists)
                 return@launch
@@ -208,17 +216,17 @@ class PinyinDictionaryFragment : Fragment(), OnItemChangedListener<PinyinDiction
     }
 
     private fun resetDustman() {
-        dustman.reset(ui.entries.mapNotNull { it as? LibIMEDictionary }
+        dustman.reset(ui.entries.mapNotNull { it as? TextDictionary }
             .associate { it.name to it.isEnabled })
     }
 
     override fun onItemAdded(idx: Int, item: PinyinDictionary) {
-        item as LibIMEDictionary
+        item as TextDictionary
         dustman.addOrUpdate(item.name, item.isEnabled)
     }
 
     override fun onItemRemoved(idx: Int, item: PinyinDictionary) {
-        item as LibIMEDictionary
+        item as TextDictionary
         item.file.delete()
         dustman.remove(item.name)
     }
@@ -228,7 +236,7 @@ class PinyinDictionaryFragment : Fragment(), OnItemChangedListener<PinyinDiction
     }
 
     override fun onItemUpdated(idx: Int, old: PinyinDictionary, new: PinyinDictionary) {
-        new as LibIMEDictionary
+        new as TextDictionary
         dustman.addOrUpdate(new.name, new.isEnabled)
     }
 

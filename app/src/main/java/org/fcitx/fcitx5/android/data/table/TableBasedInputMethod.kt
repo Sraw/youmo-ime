@@ -6,7 +6,7 @@ package org.fcitx.fcitx5.android.data.table
 
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.core.RawConfig
-import org.fcitx.fcitx5.android.data.table.dict.LibIMEDictionary
+import org.fcitx.fcitx5.android.data.table.dict.Dictionary
 import org.fcitx.fcitx5.android.engine.host.Engines
 import org.fcitx.fcitx5.android.engine.host.LibimeMigration
 import org.fcitx.fcitx5.android.utils.Ini
@@ -20,7 +20,7 @@ class TableBasedInputMethod(val file: File) {
 
     private var ini = Ini.parseIniFromFile(file) ?: errorRuntime(R.string.invalid_im, file.name)
 
-    var table: LibIMEDictionary? = null
+    var table: Dictionary? = null
 
     val name: String by lazy {
         ini.get(InputMethod)?.let {
@@ -76,7 +76,15 @@ class TableBasedInputMethod(val file: File) {
         fun fixedTableFileName(name: String) =
             name.split(' ')
                 .joinToString(separator = "-")
-                .lowercase() + ".main.dict"
+                .lowercase() + ".txt"
+
+        /**
+         * The file a table replacing the one in [oldName] goes to: the same, or for libime's
+         * binary the text one a table imported now would have (`db.main.dict`, `db.main.txt`).
+         */
+        fun replacedTableFileName(oldName: String) =
+            if (oldName.endsWith(".txt")) oldName
+            else fixedTableFileName(oldName.substringBeforeLast('.'))
 
         fun new(configFile: File): TableBasedInputMethod {
             val im = TableBasedInputMethod(configFile)
