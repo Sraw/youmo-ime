@@ -9,6 +9,7 @@ import java.io.OutputStream
 import java.nio.Buffer
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
+import java.util.zip.CRC32
 
 /**
  * The container every compiled engine data file uses: a header, then numbered sections, each a
@@ -17,7 +18,7 @@ import java.nio.ByteOrder
  *
  * ```
  * "FCITXIME"  u32 containerVersion  u32 kind  u32 sectionCount  u32 kindVersion
- * sectionCount x (u32 id, u32 0, u64 offset, u64 length)
+ * sectionCount x (u32 id, u32 crc32, u64 offset, u64 length)
  * sections, each starting on an 8-byte boundary
  * ```
  *
@@ -25,9 +26,13 @@ import java.nio.ByteOrder
  * changing the pinyin layout does not invalidate code tables a user compiled.
  *
  * A file whose versions or kind are not what the reader expects is rejected outright: an engine
- * quietly reading a file laid out differently would produce plausible-looking garbage.
+ * quietly reading a file laid out differently would produce plausible-looking garbage. So is one
+ * whose sections fail their checksums, when opened with `verify`: a file cut short fails the
+ * bounds checks, but blocks zeroed by a crash or bits flipped by bad storage would pass them and
+ * just rank words wrongly. A damaged section table either misplaces a section, which its checksum
+ * then catches, or loses one, which the reader asking for it catches.
  */
-class DataFile private constructor(buffer: ByteBuffer, expectedKind: Int, expectedKindVersion: Int) {
+class DataFile private constructor(buffer: ByteBuffer, expectedKind: Int, expectedKindVersion: Int, verify: Boolean) {
 
     // slice: offsets count from the caller's position, whatever buffer the file sits in
     private val buffer: ByteBuffer = buffer.slice().order(ByteOrder.LITTLE_ENDIAN)
@@ -52,13 +57,20 @@ class DataFile private constructor(buffer: ByteBuffer, expectedKind: Int, expect
         if (count !in 0..MAX_SECTIONS || HEADER_BYTES + count.toLong() * ENTRY_BYTES > b.capacity()) {
             throw DataFormatException("bad section count $count")
         }
+        val checksums = HashMap<Int, Int>()
         for (i in 0 until count) {
             val entry = HEADER_BYTES + i * ENTRY_BYTES
             val id = b.getInt(entry)
+            checksums[id] = b.getInt(entry + 4)
             val offset = b.getLong(entry + 8)
             val length = b.getLong(entry + 16)
             if (!fits(offset, length, b.capacity())) throw DataFormatException("section $id out of bounds")
             if (sections.put(id, offset until offset + length) != null) throw DataFormatException("section $id listed twice")
+        }
+        if (verify) {
+            for (id in sections.keys) {
+                if (crc32(section(id)) != checksums[id]) throw DataFormatException("section $id is damaged (checksum mismatch)")
+            }
         }
     }
 
@@ -120,7 +132,7 @@ class DataFile private constructor(buffer: ByteBuffer, expectedKind: Int, expect
             var offset = align(HEADER_BYTES.toLong() + sections.size * ENTRY_BYTES)
             val offsets = sections.map { (id, bytes) ->
                 header.writeInt(id)
-                header.writeInt(0)
+                header.writeInt(CRC32().apply { update(bytes) }.value.toInt())
                 header.writeLong(offset)
                 header.writeLong(bytes.size.toLong())
                 offset.also { offset = align(offset + bytes.size) }
@@ -139,7 +151,7 @@ class DataFile private constructor(buffer: ByteBuffer, expectedKind: Int, expect
     }
 
     companion object {
-        const val VERSION = 1
+        const val VERSION = 2
         const val KIND_PINYIN = 1
         const val KIND_TABLE = 2
 
@@ -148,12 +160,30 @@ class DataFile private constructor(buffer: ByteBuffer, expectedKind: Int, expect
         private const val ENTRY_BYTES = 24
         private const val MAX_SECTIONS = 256
         private const val MAX_META_BYTES = 64 * 1024
+        private const val CRC_CHUNK = 64 * 1024
 
         /**
-         * The file starts at [buffer]'s position and ends at its limit.
+         * The file starts at [buffer]'s position and ends at its limit. [verify] reads every byte
+         * to check the sections' checksums: on the host, 50 ms for the 49 MB pinyin data in a
+         * fresh JVM, against 9 ms to open it unchecked, and on a phone it reads a mapped file
+         * into memory whole. A caller that already checked this file (when it copied it into
+         * place), or can trust where it sits (inside the signed APK), can skip it.
          * @throws DataFormatException if it is not a well-formed file of [kind] at [kindVersion]
          */
-        fun open(buffer: ByteBuffer, kind: Int, kindVersion: Int): DataFile = DataFile(buffer, kind, kindVersion)
+        fun open(buffer: ByteBuffer, kind: Int, kindVersion: Int, verify: Boolean = true): DataFile =
+            DataFile(buffer, kind, kindVersion, verify)
+
+        // CRC32.update(ByteBuffer) needs API 26: copy through a small array instead
+        private fun crc32(buffer: ByteBuffer): Int {
+            val crc = CRC32()
+            val chunk = ByteArray(minOf(CRC_CHUNK, buffer.remaining()))
+            while (buffer.hasRemaining()) {
+                val n = minOf(chunk.size, buffer.remaining())
+                buffer.get(chunk, 0, n)
+                crc.update(chunk, 0, n)
+            }
+            return crc.value.toInt()
+        }
     }
 }
 

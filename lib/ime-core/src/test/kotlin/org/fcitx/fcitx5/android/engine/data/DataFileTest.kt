@@ -11,6 +11,7 @@ import org.junit.Assert.fail
 import org.junit.Test
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
+import java.util.zip.CRC32
 
 class DataFileTest {
 
@@ -112,6 +113,35 @@ class DataFileTest {
         assertRejected("not a data file at all, but long enough".toByteArray(), reason = "not an engine data file")
         assertRejected(ByteArray(3), reason = "too short")
     }
+
+    @Test
+    fun aDamagedSectionIsRejectedUnlessTheCallerSkipsTheCheck() {
+        val bytes = sample()
+        val header = ByteBuffer.wrap(bytes).order(ByteOrder.LITTLE_ENDIAN)
+        // the checksum sits beside each section's id: CRC32 of its bytes
+        val at = header.getLong(24 + 24 + 8).toInt()
+        val length = header.getLong(24 + 24 + 16).toInt()
+        assertEquals(CRC32().apply { update(bytes, at, length) }.value.toInt(), header.getInt(24 + 24 + 4))
+        bytes[at] = (bytes[at] + 1).toByte()
+        assertRejected(bytes, reason = "section 2 is damaged")
+        DataFile.open(ByteBuffer.wrap(bytes), DataFile.KIND_TABLE, KIND_VERSION, verify = false)
+    }
+
+    @Test
+    fun noDamagedByteGoesUnnoticed() {
+        val bytes = sample()
+        val ids = listOf(1, 2, 7)
+        val original = open(bytes).let { f -> ids.associateWith { f.bytes(it).toList() } }
+        for (i in bytes.indices) {
+            val damaged = bytes.copyOf().also { it[i] = (it[i].toInt() xor 0x40).toByte() }
+            val sections = runCatching { open(damaged).let { f -> ids.associateWith { f.bytes(it).toList() } } }
+            // rejected, or a section it holds went missing, or it hit padding and changed nothing
+            sections.exceptionOrNull()?.let { assertTrue("byte $i: $it", it is DataFormatException) }
+            sections.onSuccess { assertEquals("byte $i", original, it) }
+        }
+    }
+
+    private fun DataFile.bytes(id: Int) = section(id).let { s -> ByteArray(s.capacity()) { s.get(it) } }
 
     @Test
     fun aTruncatedFileIsRejected() {

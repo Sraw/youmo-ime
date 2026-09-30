@@ -181,7 +181,7 @@ class PinyinDataTest {
         val entry = (0 until count).map { 24 + it * 24 }.first { file.getInt(it) == PinyinData.Section.UNI_BACKOFF }
         file.putLong(entry + 16, file.getLong(entry + 16) - 4)
         try {
-            PinyinData.load(ByteBuffer.wrap(bytes))
+            PinyinData.load(ByteBuffer.wrap(bytes), verify = false)
             fail("loaded a short backoff array")
         } catch (e: DataFormatException) {
             assertTrue(e.message, e.message!!.contains("unigram arrays"))
@@ -217,7 +217,7 @@ class PinyinDataTest {
         val digit = at + needle.size - 1
         bytes[digit] = if (bytes[digit] == '1'.code.toByte()) '2'.code.toByte() else '1'.code.toByte()
         try {
-            PinyinData.load(ByteBuffer.wrap(bytes))
+            PinyinData.load(ByteBuffer.wrap(bytes), verify = false)
             fail("accepted a foreign syllable table")
         } catch (e: DataFormatException) {
             assertTrue(e.message, e.message!!.contains("different syllable table"))

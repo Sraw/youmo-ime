@@ -71,7 +71,14 @@ class Quantizer private constructor(private val centers: FloatArray, private val
         private const val LLOYD_ROUNDS = 100
 
         fun build(values: FloatArray, exactZero: Boolean): Quantizer {
-            val sorted = values.filter { !(exactZero && it == 0f) }.toFloatArray().apply { sort() }
+            // not values.filter: boxing the 4.8 million bigram values alone takes over 100 MB
+            val sorted = if (!exactZero) values.copyOf() else {
+                val kept = FloatArray(values.count { it != 0f })
+                var n = 0
+                for (v in values) if (v != 0f) kept[n++] = v
+                kept
+            }
+            sorted.sort()
             val h = Histogram(sorted)
             val bins = LEVELS - if (exactZero) 1 else 0
             // bin b holds distinct values [start[b], start[b + 1])

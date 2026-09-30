@@ -97,7 +97,11 @@ class CodeTable private constructor(file: DataFile) {
         private const val HEADER = "header."
         private const val RULE = "rule."
 
-        /** @throws DataFormatException if [buffer] is not a code table this build can read */
-        fun load(buffer: ByteBuffer): CodeTable = CodeTable(DataFile.open(buffer, DataFile.KIND_TABLE, VERSION))
+        /**
+         * [verify]: check every section's checksum first (see [DataFile.open]).
+         * @throws DataFormatException if [buffer] is not a code table this build can read
+         */
+        fun load(buffer: ByteBuffer, verify: Boolean = true): CodeTable =
+            CodeTable(DataFile.open(buffer, DataFile.KIND_TABLE, VERSION, verify))
     }
 }

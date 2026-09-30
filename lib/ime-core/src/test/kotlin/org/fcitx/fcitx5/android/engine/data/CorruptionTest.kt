@@ -13,7 +13,8 @@ import java.nio.ByteBuffer
 /**
  * Damages a small file one byte at a time and requires that it either fails to load with a
  * [DataFormatException] or loads and then survives every lookup. Anything else would crash the
- * input method on a key press rather than when the file is opened.
+ * input method on a key press rather than when the file is opened. Checksums would catch all of
+ * this, so they are skipped: a caller may skip them too, having checked the file before.
  */
 class CorruptionTest {
 
@@ -45,7 +46,7 @@ class CorruptionTest {
         .toByteArray()
 
     private fun walkPinyin(bytes: ByteArray) {
-        val data = PinyinData.load(ByteBuffer.wrap(bytes))
+        val data = PinyinData.load(ByteBuffer.wrap(bytes), verify = false)
         (0 until data.vocabulary.size).forEach { data.vocabulary.word(it) }
         // the model maps any id it does not know to <unk>, so try some it cannot know
         val ids = -2..data.vocabulary.size
@@ -72,7 +73,7 @@ class CorruptionTest {
     }
 
     private fun walkTable(bytes: ByteArray) {
-        val t = CodeTable.load(ByteBuffer.wrap(bytes))
+        val t = CodeTable.load(ByteBuffer.wrap(bytes), verify = false)
         t.header
         t.rules
         for (i in 0 until t.size) {

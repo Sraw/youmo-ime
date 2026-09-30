@@ -39,6 +39,10 @@ gradlePlugin {
             id = "org.fcitx.fcitx5.android.detekt"
             implementationClass = "DetektConventionPlugin"
         }
+        register("engineData") {
+            id = "org.fcitx.fcitx5.android.engine-data"
+            implementationClass = "EngineDataPlugin"
+        }
         register("fcitxComponent") {
             id = "org.fcitx.fcitx5.android.fcitx-component"
             implementationClass = "FcitxComponentPlugin"

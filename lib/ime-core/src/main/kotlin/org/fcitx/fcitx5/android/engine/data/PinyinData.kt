@@ -74,8 +74,12 @@ class PinyinData private constructor(file: DataFile) {
         internal const val META_LM_VOCABULARY = "lm.vocabulary"
         internal const val META_UNKNOWN = "lm.unknown"
 
-        /** @throws DataFormatException if [buffer] is not pinyin data this build can read */
-        fun load(buffer: ByteBuffer): PinyinData = PinyinData(DataFile.open(buffer, DataFile.KIND_PINYIN, VERSION))
+        /**
+         * [verify]: check every section's checksum first (see [DataFile.open]).
+         * @throws DataFormatException if [buffer] is not pinyin data this build can read
+         */
+        fun load(buffer: ByteBuffer, verify: Boolean = true): PinyinData =
+            PinyinData(DataFile.open(buffer, DataFile.KIND_PINYIN, VERSION, verify))
 
         private fun Map<String, String>.int(key: String): Int =
             get(key)?.toIntOrNull() ?: throw DataFormatException("meta $key missing")
