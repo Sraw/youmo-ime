@@ -206,6 +206,7 @@ internal class IntList {
     }
 
     operator fun get(i: Int) = a[i]
+    fun toArray(): IntArray = a.copyOf(size)
 }
 
 internal class FloatList {
