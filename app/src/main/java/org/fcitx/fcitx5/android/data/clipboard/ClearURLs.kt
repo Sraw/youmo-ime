@@ -2,20 +2,27 @@
  * SPDX-License-Identifier: LGPL-2.1-or-later
  * SPDX-FileCopyrightText: Copyright 2021-2025 Fcitx5 for Android Contributors
  */
-package org.fcitx.fcitx5.android.plugin.clipboard_filter
+package org.fcitx.fcitx5.android.data.clipboard
 
 import android.net.Uri
 import android.net.UrlQuerySanitizer
-import android.util.Log
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.MapSerializer
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.serializer
+import org.fcitx.fcitx5.android.BuildConfig
+import timber.log.Timber
 
 typealias RegexAsString = @Serializable(with = RegexSerializer::class) Regex
 
-object ClearURLs {
+/**
+ * Strips tracking parameters from copied URLs with the ClearURLs rule set
+ * (res/raw/clearurls_rules.json, from https://github.com/ClearURLs/Rules).
+ *
+ * Built in since the clipboard-filter plugin was folded into the app.
+ */
+class ClearURLs(rawRules: String) {
     @Serializable
     data class ClearURLsProvider(
         /** all patterns starts with https? */
@@ -29,35 +36,23 @@ object ClearURLs {
         val forceRedirection: Boolean = false
     )
 
-    private val providersSerializer: KSerializer<Map<String, ClearURLsProvider>> = serializer()
-    private val catalogSerializer: KSerializer<Map<String, Map<String, ClearURLsProvider>>> =
-        MapSerializer(serializer(), providersSerializer)
-
-    private var catalog: Map<String, ClearURLsProvider>? = null
-
-    fun initCatalog(rawRules: String) {
-        if (catalog != null) return
-        catalog = Json.decodeFromString(catalogSerializer, rawRules)["providers"]
-    }
-
-    private val urlPattern = Regex("^https?://", RegexOption.IGNORE_CASE)
+    private val catalog: Map<String, ClearURLsProvider> =
+        Json.decodeFromString(catalogSerializer, rawRules)["providers"]
+            ?: throw IllegalArgumentException("no \"providers\" in ClearURLs rules")
 
     fun transform(text: String): String {
         if (!urlPattern.matchesAt(text, 0)) return text
-        val map = catalog ?: throw IllegalStateException("Catalog is unavailable")
-        return transformWith(text, map)
+        return transformWith(text, catalog)
     }
 
     private fun transformWith(url: String, map: Map<String, ClearURLsProvider>): String {
         var x = url
         var matched = false
-        for ((_, provider) in map) {
-            // matches url pattern
-            if (!provider.urlPattern.containsMatchIn(x))
-                continue
-            // not in exceptions
-            if (provider.exceptions.any { it.containsMatchIn(x) })
-                continue
+        // lazy, so each provider is matched against the URL as the previous ones left it
+        val applicable = map.values.asSequence().filter { provider ->
+            provider.urlPattern.containsMatchIn(x) && provider.exceptions.none { it.containsMatchIn(x) }
+        }
+        for (provider in applicable) {
             matched = true
             // apply redirections
             provider.redirections.forEach { redirection ->
@@ -110,11 +105,6 @@ object ClearURLs {
 
     private fun encodeQuery(str: String) = Uri.encode(str, " ").replace(" ", "+")
 
-    private val querySanitizer = UrlQuerySanitizer().apply {
-        allowUnregisteredParamaters = true
-        unregisteredParameterValueSanitizer = UrlQuerySanitizer.getAllButNulLegal()
-    }
-
     private fun UrlQuerySanitizer.ParameterValuePair.stringify(encode: Boolean = true): String {
         val k = if (encode) encodeQuery(mParameter) else mParameter
         if (mValue.isEmpty()) return k
@@ -124,6 +114,11 @@ object ClearURLs {
 
     private fun filterParams(params: String?, rules: List<Regex>, encode: Boolean = true): String? {
         if (params.isNullOrEmpty()) return params
+        // a fresh sanitizer per call: it keeps the parsed parameters as state
+        val querySanitizer = UrlQuerySanitizer().apply {
+            allowUnregisteredParamaters = true
+            unregisteredParameterValueSanitizer = UrlQuerySanitizer.getAllButNulLegal()
+        }
         querySanitizer.parseQuery(params)
         return querySanitizer.parameterList
             .filter { param ->
@@ -137,6 +132,14 @@ object ClearURLs {
     }
 
     private fun log(msg: String) {
-        Log.d("ClearURLs", msg)
+        Timber.d(msg)
+    }
+
+    private companion object {
+        val providersSerializer: KSerializer<Map<String, ClearURLsProvider>> = serializer()
+        val catalogSerializer: KSerializer<Map<String, Map<String, ClearURLsProvider>>> =
+            MapSerializer(serializer(), providersSerializer)
+
+        val urlPattern = Regex("^https?://", RegexOption.IGNORE_CASE)
     }
 }

@@ -3,7 +3,7 @@
  * SPDX-FileCopyrightText: Copyright 2024 Fcitx5 for Android Contributors
  */
 
-package org.fcitx.fcitx5.android.plugin.clipboard_filter
+package org.fcitx.fcitx5.android.data.clipboard
 
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.descriptors.PrimitiveKind

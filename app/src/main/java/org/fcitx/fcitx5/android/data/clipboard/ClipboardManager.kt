@@ -17,6 +17,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.data.clipboard.db.ClipboardDao
 import org.fcitx.fcitx5.android.data.clipboard.db.ClipboardDatabase
 import org.fcitx.fcitx5.android.data.clipboard.db.ClipboardEntry
@@ -49,7 +50,25 @@ object ClipboardManager : ClipboardManager.OnPrimaryClipChangedListener,
 
     private val onUpdateListeners = WeakHashSet<OnClipboardUpdateListener>()
 
+    /** Set by [org.fcitx.fcitx5.android.FcitxRemoteService] for transformers registered over IPC. */
     var transformer: ((String) -> String)? = null
+
+    private val clearUrlsPref = AppPrefs.getInstance().clipboard.clipboardClearUrls
+
+    // parsing and compiling ~200 providers' regexes takes a while; only pay for it once needed
+    private val clearUrls by lazy {
+        runCatching {
+            val rules = appContext.resources.openRawResource(R.raw.clearurls_rules)
+                .bufferedReader().use { it.readText() }
+            ClearURLs(rules)
+        }.onFailure { Timber.w(it, "Failed to load ClearURLs rules") }.getOrNull()
+    }
+
+    private fun transform(text: String): String = transformClipboardText(
+        text,
+        if (clearUrlsPref.getValue()) clearUrls?.let { it::transform } else null,
+        transformer
+    )
 
     fun addOnUpdateListener(listener: OnClipboardUpdateListener) {
         onUpdateListeners.add(listener)
@@ -169,7 +188,7 @@ object ClipboardManager : ClipboardManager.OnPrimaryClipChangedListener,
         }
         launch {
             mutex.withLock {
-                val entry = ClipboardEntry.fromClipData(clip, transformer) ?: return@withLock
+                val entry = ClipboardEntry.fromClipData(clip, ::transform) ?: return@withLock
                 if (entry.text.isBlank()) return@withLock
                 try {
                     clbDao.find(entry.text, entry.sensitive)?.let {
@@ -206,4 +225,17 @@ object ClipboardManager : ClipboardManager.OnPrimaryClipChangedListener,
         }
     }
 
+}
+
+/**
+ * Built-in URL cleaning first, then whatever was registered over IPC.
+ * A cleaner that throws must not cost the user the clipboard entry.
+ */
+internal fun transformClipboardText(
+    text: String,
+    clearUrls: ((String) -> String)?,
+    transformer: ((String) -> String)?
+): String {
+    val cleaned = clearUrls?.let { runCatching { it(text) }.getOrNull() } ?: text
+    return transformer?.invoke(cleaned) ?: cleaned
 }
