@@ -125,6 +125,80 @@ class PinyinSessionTest {
     }
 
     @Test
+    fun theRerankerPutsItsPickFirstAfterWhatWasCommitted() {
+        val contexts = ArrayList<String>()
+        // the decoder's last reading, whatever it is
+        val session = PinyinSession(data, PinyinSegmenter(), pageSize = 20) { context, readings, scores ->
+            assertEquals(readings.size, scores.size)
+            contexts += context
+            readings.lastIndex
+        }
+        val plain = session(pageSize = 20).type("nizai").candidates
+        val readings = plain.takeWhile { it.length == 2 }
+        assertTrue(readings.size > 1)
+        val s = session.type("nizai")
+        assertEquals(listOf(readings.last()) + readings.dropLast(1), s.candidates.take(readings.size))
+        assertEquals(plain.drop(readings.size), s.candidates.drop(readings.size))
+        assertEquals(List(5) { "" }, contexts)
+        // the pick is what a space commits, and what follows reads after it and the pieces picked
+        val committed = session.apply(Select(0)).commit
+        assertEquals(readings.last(), committed)
+        contexts.clear()
+        val typed = session.type("nizai")
+        assertEquals(List(5) { committed }, contexts)
+        session.apply(Select(typed.candidates.indexOf("拟")))
+        assertEquals(committed + "拟", contexts.last())
+        // gone with a reset
+        session.apply(Reset)
+        contexts.clear()
+        session.type("ni")
+        assertEquals(listOf("", ""), contexts)
+    }
+
+    @Test
+    fun whatTheRerankerPutFirstIsLearnedAsPickedOverTheDecoder() {
+        val user = UserModel(data.dictionary, data.vocabulary)
+        val session = PinyinSession(data, PinyinSegmenter(), pageSize = 20, user = user) { _, readings, _ -> readings.lastIndex }
+        // the decoder's best, second now: nothing new
+        assertEquals("你在", session.type("nizai").candidates[1])
+        session.apply(Select(1))
+        assertEquals(0, user.size)
+        // the reranker's: learned as one word, for the decoder to have it first without it
+        val picked = session.type("nizai").candidates[0]
+        assertEquals(picked, session.apply(Select(0)).commit)
+        assertEquals(1, user.size)
+        assertEquals(picked, PinyinSession(data, PinyinSegmenter(), user = user).type("nizai").candidates.first())
+    }
+
+    @Test
+    fun theRerankerIsToldMoreThanItReadsSoACommitDropsNothingItDoes() {
+        val contexts = ArrayList<String>()
+        val session = PinyinSession(data, PinyinSegmenter()) { context, _, _ -> contexts += context; 0 }
+        val committed = StringBuilder()
+        repeat(40) {
+            session.type("nizai")
+            committed.append(session.apply(Select(0)).commit)
+        }
+        session.type("nizai")
+        assertTrue(committed.length > 64)
+        assertEquals(committed.toString(), contexts.last())
+        // cut where a pair of chars is not split
+        val pairs = "\uD840\uDC00".repeat(100)
+        assertEquals(pairs.substring(74) + "b", PinyinSession.tail("a" + pairs + "b"))
+    }
+
+    @Test
+    fun whileLearningIsOffTheRerankerIsToldNothingCommitted() {
+        val contexts = ArrayList<String>()
+        val session = PinyinSession(data, PinyinSegmenter()) { context, _, _ -> contexts += context; 0 }
+        session.learning = false
+        session.type("nizai")
+        session.apply(Select(0))
+        session.type("nizai")
+        assertEquals(listOf(""), contexts.distinct())
+    }
+
+    @Test
     fun aPiecePickedIsTheContextOfTheRest() {
         val session = session(pageSize = 20)
         val s = session.type("nizai")

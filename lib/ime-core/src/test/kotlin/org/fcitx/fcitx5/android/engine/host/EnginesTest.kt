@@ -8,6 +8,7 @@ import org.fcitx.fcitx5.android.engine.data.CodeTable
 import org.fcitx.fcitx5.android.engine.data.PinyinDataBuilder
 import org.fcitx.fcitx5.android.engine.pinyin.Fuzzy
 import org.fcitx.fcitx5.android.engine.pinyin.Syllables
+import org.fcitx.fcitx5.android.engine.rerank.TinyModel
 import org.fcitx.fcitx5.android.engine.session.Choice
 import org.fcitx.fcitx5.android.engine.user.LibimeImport
 import org.fcitx.fcitx5.android.engine.user.UserLog
@@ -49,6 +50,8 @@ class EnginesTest {
         .build()
         .toByteArray()
 
+    private var model = TinyModel().bytes()
+
     private val loaded = ArrayList<String>()
 
     private fun load(path: String): ByteBuffer {
@@ -57,6 +60,7 @@ class EnginesTest {
             when (path) {
                 Engines.PINYIN_DATA -> pinyin
                 "${Engines.TABLE_DIR}/wbx.data" -> wubi
+                Engines.SENTENCE_MODEL -> model
                 else -> throw IllegalArgumentException(path)
             },
         )
@@ -85,12 +89,13 @@ class EnginesTest {
     fun aTableIsLoadedOnlyWhenItsInputMethodIsUsed() {
         val engines = Engines(::load, null)
         engines.type(Engines.PINYIN, "ni")
-        assertEquals(listOf(Engines.PINYIN_DATA), loaded)
+        assertEquals(listOf(Engines.PINYIN_DATA, Engines.SENTENCE_MODEL), loaded)
+        loaded.clear()
         val s = engines.type("engine-wubi", "vbg")
         assertEquals(listOf("好", "妤"), s.candidates)
         assertEquals(listOf("", "f"), s.hints)
         // wubi's pinyin lookup shares the pinyin data
-        assertEquals(listOf(Engines.PINYIN_DATA, "${Engines.TABLE_DIR}/wbx.data"), loaded)
+        assertEquals(listOf("${Engines.TABLE_DIR}/wbx.data"), loaded)
     }
 
     @Test
@@ -145,6 +150,35 @@ class EnginesTest {
             }
             assertEquals("你", engines.type(Engines.PINYIN, "ni").candidates.first())
         }
+    }
+
+    @Test
+    fun theSentenceModelIsLoadedOnceForBothPinyinsUnlessTurnedOff() {
+        val engines = Engines(::load, null)
+        engines.type(Engines.PINYIN, "ni")
+        engines.type(Engines.SHUANGPIN, "ni")
+        assertEquals(1, loaded.count { it == Engines.SENTENCE_MODEL })
+        loaded.clear()
+        val off = Engines(::load, null)
+        off.settings = EngineSettings(sentenceModel = false)
+        assertEquals(listOf("你", "拟"), off.type(Engines.PINYIN, "ni").candidates)
+        assertFalse(Engines.SENTENCE_MODEL in loaded)
+        // dropped when turned off, and read again when turned back on
+        engines.settings = EngineSettings(sentenceModel = false)
+        engines.settings = EngineSettings()
+        engines.type(Engines.PINYIN, "ni")
+        assertEquals(1, loaded.count { it == Engines.SENTENCE_MODEL })
+    }
+
+    @Test
+    fun aSentenceModelThatCannotBeReadLeavesPinyinWorking() {
+        model = model.copyOf(100)
+        val errors = ArrayList<IOException>()
+        val engines = Engines(::load, null, onError = { errors += it })
+        assertEquals(listOf("你", "拟"), engines.type(Engines.PINYIN, "ni").candidates)
+        assertEquals("拟", engines.onEvent(Engines.PINYIN, EngineEvent.PICK, 1).commit)
+        assertEquals(1, errors.size)
+        assertTrue(errors[0].cause is IllegalArgumentException)
     }
 
     @Test

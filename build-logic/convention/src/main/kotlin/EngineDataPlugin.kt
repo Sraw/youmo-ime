@@ -45,7 +45,9 @@ import javax.inject.Inject
 /**
  * Compiles the own engine's data (lib/ime-dict-tool) from the text sources libime builds its own
  * from, and adds it to the app's assets as `engine/pinyin.data` and `engine/table/<name>.data`
- * for libime's code tables (五笔, 仓颉 ...). Stored uncompressed, so the
+ * for libime's code tables (五笔, 仓颉 ...), with chinese-ime-lm's sentence model as
+ * `engine/sentence-model.safetensors` (and its NOTICE, which Apache-2.0 asks to go along with it).
+ * Stored uncompressed, so the
  * engine can map it straight out of the APK rather than copying it out first; it is also left
  * out of the data descriptor for that reason (the descriptor lists only src/main/assets).
  *
@@ -78,6 +80,16 @@ class EngineDataPlugin : Plugin<Project> {
             listOf("cj", "db", "erbi", "qxm", "wanfeng", "wbpy", "wbx", "zrm").map { "$it.txt" },
         )
         const val TABLES_TASK = "compileEngineTables"
+        const val MODEL_TASK = "copySentenceModel"
+
+        // a revision of the model's repository, not main: what is downloaded is what was measured
+        private const val MODEL_URL =
+            "https://huggingface.co/metasequoiaime/pinyin-ime-reranker-4M/resolve/e5b1f7e768d7cb2b6ff334db4e34af153920c6ff/"
+        // name in the repository, its sha256, and the name it has among the app's assets
+        private val MODEL_FILES = listOf(
+            Triple("sentence-model.safetensors", "86ac529510cb3b4968a5e6ade83ec8080f5b34a0a681e75c362accbbd387d1c1", "sentence-model.safetensors"),
+            Triple("NOTICE", "b9489e8c8e3a271bf23131a57a7323264847d57561d36fc135101bf1eefd32f2", "sentence-model.NOTICE"),
+        )
         private const val TOOL_MAIN = "org.fcitx.fcitx5.android.dicttool.MainKt"
     }
 
@@ -122,13 +134,28 @@ class EngineDataPlugin : Plugin<Project> {
             outputDir.set(target.layout.buildDirectory.dir("generated/engine-tables"))
         }
 
+        val modelFiles = MODEL_FILES.map { (name, sha, asset) ->
+            // downloadSentenceModel, downloadSentenceModelNotice
+            val task = "downloadSentenceModel" + if (name == asset) "" else name.lowercase().replaceFirstChar { it.uppercase() }
+            target.tasks.register<DownloadTask>(task) {
+                url.set(MODEL_URL + name)
+                sha256.set(sha)
+                outputFile.set(sourcesDir.map { it.file("sentence-model/$asset") })
+            }
+        }
+        val model = target.tasks.register<CopyModel>(MODEL_TASK) {
+            files.from(modelFiles.map { task -> task.flatMap { it.outputFile } })
+            outputDir.set(target.layout.buildDirectory.dir("generated/engine-model"))
+        }
+
         target.extensions.configure<ApplicationExtension> {
             // matched as a plain suffix: "data" alone would catch charselectdata too
-            androidResources.noCompress += ".data"
+            androidResources.noCompress += listOf(".data", ".safetensors")
         }
         components.onVariants { variant ->
             variant.sources.assets?.addGeneratedSourceDirectory(compile, CompileEngineData::outputDir)
             variant.sources.assets?.addGeneratedSourceDirectory(tables, CompileTables::outputDir)
+            variant.sources.assets?.addGeneratedSourceDirectory(model, CopyModel::outputDir)
         }
     }
 
@@ -236,6 +263,25 @@ class EngineDataPlugin : Plugin<Project> {
         override fun exec() {
             output().parentFile.mkdirs()
             super.exec()
+        }
+    }
+
+    /** The sentence model's files under `engine/`, named as they were downloaded. */
+    @DisableCachingByDefault(because = "copying is quicker than the cache would be")
+    abstract class CopyModel : DefaultTask() {
+        @get:InputFiles
+        @get:PathSensitive(PathSensitivity.NAME_ONLY)
+        abstract val files: ConfigurableFileCollection
+
+        @get:OutputDirectory
+        abstract val outputDir: DirectoryProperty
+
+        @TaskAction
+        fun copy() {
+            val out = outputDir.get().asFile.resolve("engine")
+            out.deleteRecursively()
+            out.mkdirs()
+            for (file in files.files) file.copyTo(out.resolve(file.name), overwrite = true)
         }
     }
 

@@ -11,6 +11,8 @@ import org.fcitx.fcitx5.android.engine.pinyin.Fuzzy
 import org.fcitx.fcitx5.android.engine.pinyin.PinyinSegmenter
 import org.fcitx.fcitx5.android.engine.pinyin.Segmenter
 import org.fcitx.fcitx5.android.engine.pinyin.ShuangpinSegmenter
+import org.fcitx.fcitx5.android.engine.rerank.Reranker
+import org.fcitx.fcitx5.android.engine.rerank.SentenceModel
 import org.fcitx.fcitx5.android.engine.session.PinyinSession
 import java.io.File
 import java.io.RandomAccessFile
@@ -19,7 +21,8 @@ import java.util.Locale
 import kotlin.system.exitProcess
 
 val USAGE = """usage: score <set.tsv> <result.tsv> [<baseline-result.tsv>] [--half <half>]
-       pinyin <pinyin.data> <set.tsv> <result.tsv> [--scheme <scheme>] [--fuzzy all|<pair>,...] [--half <half>] [--neighbours on|off]
+       pinyin <pinyin.data> <set.tsv> <result.tsv> [--scheme <scheme>] [--fuzzy all|<pair>,...] [--half <half>] [--neighbours on|off] [--rerank <model.safetensors>]
+       lm <model.safetensors> <context> <text>...
        shuangpin <scheme> <set.tsv> <shuangpin-set.tsv>
        slips <set.tsv> <slip-set.tsv>
        tune <pinyin.data> <set.tsv> <slip-set.tsv>
@@ -78,8 +81,9 @@ fun runCli(args: Array<String>, out: Appendable, err: Appendable): Int {
     return when {
         !ok -> usage(err)
         a.has("score", 3..4, "half") -> score(p[1], p[2], p.getOrNull(3), half, out)
-        a.has("pinyin", 4..4, "scheme", "fuzzy", "half", "neighbours") ->
-            runPinyin(p[1], p[2], p[3], scheme, fuzzy.orEmpty(), half, neighbours == "on")
+        a.has("pinyin", 4..4, "scheme", "fuzzy", "half", "neighbours", "rerank") ->
+            runPinyin(p[1], p[2], p[3], scheme, fuzzy.orEmpty(), half, neighbours == "on", a.options["rerank"])
+        a.has("lm", 4..Int.MAX_VALUE) -> lm(p[1], p[2], p.drop(3), out)
         a.has("shuangpin", 4..4) && p[1] in ShuangpinSet.SCHEMES -> writeShuangpinSet(p[1], p[2], p[3], out)
         a.has("slips", 3..3) -> writeSlipSet(p[1], p[2], out)
         a.has("tune", 4..4) -> tune(p[1], p[2], p[3], out)
@@ -126,9 +130,20 @@ private fun runPinyin(
     fuzzy: Set<Fuzzy>,
     half: String?,
     neighbours: Boolean,
+    rerankPath: String?,
 ): Int {
-    val results = PinyinRun(loadData(dataPath), segmenter(scheme, fuzzy, neighbours)).run(Halves.select(readSet(setPath), half))
+    val reranker = rerankPath?.let { Reranker(SentenceModel.load(mapFile(it), unpack = true)) }
+    val results = PinyinRun(loadData(dataPath), segmenter(scheme, fuzzy, neighbours), reranker = reranker).run(Halves.select(readSet(setPath), half))
     File(resultPath).printWriter().use { out -> results.forEach { out.println(RunResultFormat.format(it)) } }
+    return 0
+}
+
+/** Each text's log-probability after the context, whole and per character, as the model reads it. */
+private fun lm(modelPath: String, context: String, texts: List<String>, out: Appendable): Int {
+    val model = SentenceModel.load(mapFile(modelPath))
+    model.Scorer().score(context, texts).forEachIndexed { i, score ->
+        out.appendLine(String.format(Locale.ROOT, "%8.3f %6.3f %s", score, score / texts[i].length, texts[i]))
+    }
     return 0
 }
 

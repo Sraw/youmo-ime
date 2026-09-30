@@ -57,6 +57,7 @@ FCITX_CONFIGURATION(
                 this, "ShuangpinProfile", _("Shuangpin Profile"), EngineShuangpinProfile::Ziranma};
         Option<int, IntConstrain> pageSize{this, "PageSize", _("Candidates Per Page"), 7, IntConstrain(3, 10)};
         Option<bool> prediction{this, "Prediction", _("Enable Prediction"), true};
+        Option<bool> sentenceModel{this, "SentenceModel", _("Weigh readings as whole sentences"), true};
         Option<EngineFuzzyConfig> fuzzy{this, "Fuzzy", _("Fuzzy Pinyin")};)
 
 #undef FCITX_GETTEXT_DOMAIN

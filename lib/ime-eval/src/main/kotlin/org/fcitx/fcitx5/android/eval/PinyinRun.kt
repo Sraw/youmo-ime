@@ -10,6 +10,7 @@ import org.fcitx.fcitx5.android.engine.lattice.PinyinDecoder
 import org.fcitx.fcitx5.android.engine.lattice.WordScorer
 import org.fcitx.fcitx5.android.engine.pinyin.PinyinSegmenter
 import org.fcitx.fcitx5.android.engine.pinyin.Segmenter
+import org.fcitx.fcitx5.android.engine.rerank.Reranker
 
 /**
  * Runs our own pinyin engine over an evaluation set on the host, a letter at a time as a user
@@ -20,6 +21,7 @@ class PinyinRun(
     private val segmenter: Segmenter = PinyinSegmenter(),
     penalties: Penalties = Penalties(),
     beam: Int = PinyinDecoder.DEFAULT_BEAM,
+    private val reranker: Reranker? = null,
 ) {
     private val decoder = PinyinDecoder(data.dictionary, data.vocabulary, WordScorer.of(data.model), penalties, beam)
 
@@ -39,7 +41,12 @@ class PinyinRun(
     /** Whole-input readings first, then the words the input may start with, as a candidate list shows them. */
     fun candidates(input: String): List<String> {
         val decoding = decoder.decode(segmenter.segment(input))
-        return (decoding.sentences.map { it.text } + decoding.words.map { it.text }).distinct().take(CANDIDATES)
+        val sentences = decoding.sentences.map { it.text }.toMutableList()
+        if (reranker != null) {
+            val picked = reranker.pick("", sentences, decoding.sentences.map { it.score })
+            if (picked > 0) sentences.add(0, sentences.removeAt(picked))
+        }
+        return (sentences + decoding.words.map { it.text }).distinct().take(CANDIDATES)
     }
 
     private companion object {

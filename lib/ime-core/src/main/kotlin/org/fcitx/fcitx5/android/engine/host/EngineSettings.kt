@@ -20,6 +20,8 @@ data class EngineSettings(
     /** Whether words that may follow are offered after a commit. */
     val prediction: Boolean = true,
     val pageSize: Int = DEFAULT_PAGE_SIZE,
+    /** Whether pinyin's readings are weighed again as whole sentences, by the sentence model. */
+    val sentenceModel: Boolean = true,
 ) {
     val scheme: ShuangpinScheme get() = SCHEMES[shuangpin] ?: ShuangpinScheme.ZIRANMA
 
@@ -28,6 +30,7 @@ data class EngineSettings(
         const val PAGE_SIZE = "PageSize"
         const val PREDICTION = "Prediction"
         const val FUZZY = "Fuzzy"
+        const val SENTENCE_MODEL = "SentenceModel"
 
         /** libime's key for its common misspellings (gn for ng); here it turns slips on too. */
         const val TYPOS = "NG_GN"
@@ -71,6 +74,7 @@ data class EngineSettings(
                 typos = flag("$FUZZY/$TYPOS") ?: default.typos,
                 prediction = flag(PREDICTION) ?: default.prediction,
                 pageSize = values[PAGE_SIZE]?.toIntOrNull()?.takeIf { it in PAGE_SIZES } ?: default.pageSize,
+                sentenceModel = flag(SENTENCE_MODEL) ?: default.sentenceModel,
             )
         }
     }

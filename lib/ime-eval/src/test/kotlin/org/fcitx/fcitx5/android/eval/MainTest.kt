@@ -30,6 +30,7 @@ class MainTest {
             arrayOf("pinyin", "d", "s", "r", "--color", "red"),
             arrayOf("pinyin", "d", "s", "r", "--neighbours", "maybe"),
             arrayOf("pinyin", "d", "s", "r", "--scheme", "ms", "--neighbours", "on"), // 双拼 reads none
+            arrayOf("lm", "m", "c"), // nothing to score
             arrayOf("score", "s", "r", "--scheme", "xiaohe"), // not score's
             arrayOf("shuangpin", "xiaohe", "s", "o", "--half", "tune"),
             arrayOf("shuangpin", "nope", "s", "o"),

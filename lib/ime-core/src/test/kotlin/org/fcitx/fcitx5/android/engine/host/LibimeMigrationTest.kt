@@ -128,6 +128,7 @@ class LibimeMigrationTest {
         assertEquals(EngineSettings(), EngineSettings.parse("ShuangpinProfile=Custom\nPageSize=99\nPrediction=1\n=x\nFuzzy/L_N=yes"))
         assertEquals(ShuangpinScheme.ZIRANMA, EngineSettings(shuangpin = "nothing").scheme)
         assertEquals(ShuangpinScheme.MICROSOFT, EngineSettings.parse("ShuangpinProfile=MS").scheme)
+        assertEquals(EngineSettings(sentenceModel = false), EngineSettings.parse("SentenceModel=False"))
     }
 
     @Test

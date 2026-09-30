@@ -8,6 +8,8 @@ import org.fcitx.fcitx5.android.engine.data.CodeTable
 import org.fcitx.fcitx5.android.engine.data.PinyinData
 import org.fcitx.fcitx5.android.engine.pinyin.PinyinSegmenter
 import org.fcitx.fcitx5.android.engine.pinyin.ShuangpinSegmenter
+import org.fcitx.fcitx5.android.engine.rerank.Reranker
+import org.fcitx.fcitx5.android.engine.rerank.SentenceModel
 import org.fcitx.fcitx5.android.engine.session.Choice
 import org.fcitx.fcitx5.android.engine.session.PinyinSession
 import org.fcitx.fcitx5.android.engine.session.Session
@@ -40,6 +42,27 @@ class Engines(
 
     // the files are signed with the app: no need to read them through for their checksums
     private val pinyinData by lazy(LazyThreadSafetyMode.NONE) { PinyinData.load(load(PINYIN_DATA), verify = false) }
+
+    // floats rather than int8 as stored: 17 MB rather than 4.5, and on ART two and a half times faster;
+    // dropped when turned off, loaded (or tried) again when turned on
+    private var sentenceModel: SentenceModel? = null
+    private var sentenceModelTried = false
+
+    private fun sentenceModel(): SentenceModel? {
+        if (sentenceModelTried) return sentenceModel
+        sentenceModelTried = true
+        sentenceModel = try {
+            SentenceModel.load(load(SENTENCE_MODEL), unpack = true)
+        } catch (e: IOException) {
+            onError(e)
+            null
+        } catch (e: IllegalArgumentException) {
+            // pinyin reads as well without it as before it was added
+            onError(IOException("cannot read $SENTENCE_MODEL", e))
+            null
+        }
+        return sentenceModel
+    }
 
     private var store: UserStore? = null
     private val user by lazy(LazyThreadSafetyMode.NONE) {
@@ -90,6 +113,10 @@ class Engines(
             field = value
             keyboards.clear()
             sessions.clear()
+            if (!value.sentenceModel) {
+                sentenceModel = null
+                sentenceModelTried = false
+            }
         }
 
     /** [event] of [im]'s keyboard; nothing picked is learned unless [learning]. */
@@ -106,11 +133,11 @@ class Engines(
         when (im) {
             PINYIN -> PinyinSession(
                 pinyinData, PinyinSegmenter(s.fuzzy, s.typos, neighbours = s.typos),
-                pageSize = s.pageSize, user = user, prediction = s.prediction,
+                pageSize = s.pageSize, user = user, prediction = s.prediction, reranker = reranker(),
             )
             SHUANGPIN -> PinyinSession(
                 pinyinData, ShuangpinSegmenter(s.scheme, s.fuzzy, s.typos), spell = true,
-                pageSize = s.pageSize, user = user, prediction = s.prediction,
+                pageSize = s.pageSize, user = user, prediction = s.prediction, reranker = reranker(),
             )
             else -> {
                 val (file, options) = TABLES[im] ?: throw IllegalArgumentException("no input method $im")
@@ -122,6 +149,9 @@ class Engines(
         }
     }
 
+    /** A reranker of the session's own, over the one model: each keeps what it ran for its input. */
+    private fun reranker(): Reranker? = if (settings.sentenceModel) sentenceModel()?.let { Reranker(it) } else null
+
     override fun close() {
         store?.close()
         store = null
@@ -132,6 +162,7 @@ class Engines(
         const val SHUANGPIN = "engine-shuangpin"
 
         const val PINYIN_DATA = "engine/pinyin.data"
+        const val SENTENCE_MODEL = "engine/sentence-model.safetensors"
         const val TABLE_DIR = "engine/table"
         const val USER_PINYIN = "pinyin.user"
 

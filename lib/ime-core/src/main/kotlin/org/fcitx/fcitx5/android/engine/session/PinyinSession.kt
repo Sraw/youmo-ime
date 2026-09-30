@@ -15,6 +15,7 @@ import org.fcitx.fcitx5.android.engine.pinyin.Segmenter
 import org.fcitx.fcitx5.android.engine.pinyin.SyllableGraph
 import org.fcitx.fcitx5.android.engine.pinyin.SyllableGraph.Kind
 import org.fcitx.fcitx5.android.engine.pinyin.Syllables
+import org.fcitx.fcitx5.android.engine.rerank.SentencePicker
 import org.fcitx.fcitx5.android.engine.user.UserModel
 import org.fcitx.fcitx5.android.engine.user.UserModel.Entry
 import org.fcitx.fcitx5.android.engine.user.UserScorer
@@ -36,6 +37,9 @@ import org.fcitx.fcitx5.android.engine.user.UserScorer
  * words other than the first, the text is learned as one word, found whole the next time. A
  * prediction picked is not learned, as nothing says how it reads; text kept as typed is not either.
  *
+ * With a [reranker], the best readings of the input are weighed again by how they read as a
+ * sentence after the text committed before, by the same context.
+ *
  * @param spell show each syllable spelt out, not as typed: for 双拼, whose keys say little
  */
 class PinyinSession(
@@ -47,6 +51,7 @@ class PinyinSession(
     private val user: UserModel? = null,
     /** Whether words that may follow are offered after a commit. */
     private val prediction: Boolean = true,
+    private val reranker: SentencePicker? = null,
 ) : Session {
     init {
         require(pageSize >= 1) { "page size $pageSize" }
@@ -71,9 +76,11 @@ class PinyinSession(
     private val pieces = ArrayList<Piece>()
     private var context = IntArray(0) // the words committed last, at most two
     private var lastEntry: Entry? = null // the last of them, if known how it reads
+    private var recent = "" // the text they end, for the reranker
     private var graph: SyllableGraph? = null // of the input read last
 
     private var candidates: List<Candidate> = emptyList()
+    private var promoted = 0 // where the decoder had the first sentence, if the reranker moved it
     private var preedit = ""
     private var page = 0
     private var predicting = false
@@ -90,8 +97,7 @@ class PinyinSession(
         Action.PreviousPage -> turn(page - 1)
         Action.CommitRaw -> commitRaw()
         Action.Reset -> {
-            context = IntArray(0)
-            lastEntry = null
+            forget()
             clear()
             snapshot()
         }
@@ -127,7 +133,7 @@ class PinyinSession(
             lastEntry = null
             return commit(c.text, c.words)
         }
-        pieces += Piece(c.text, c.words, readFrom() + c.end, if (user == null) null else entries(c), index > 0)
+        pieces += Piece(c.text, c.words, readFrom() + c.end, if (user == null) null else entries(c), overDecoder(index))
         if (pieces.last().end < input.length) {
             read()
             return snapshot()
@@ -189,8 +195,7 @@ class PinyinSession(
         val picked = if (input.isNotEmpty() && !predicting && candidates.isNotEmpty()) pick(0).commit else ""
         // the first candidate read only the start
         val rest = if (input.isNotEmpty()) commitRaw().commit else ""
-        context = IntArray(0)
-        lastEntry = null
+        forget()
         clear()
         return snapshot(commit = picked + rest, handled = false)
     }
@@ -202,19 +207,17 @@ class PinyinSession(
         }
         val text = pieces.joinToString("") { it.text } + input.substring(readFrom())
         // text as typed is no words: nothing to go on from
-        context = IntArray(0)
-        lastEntry = null
+        forget()
         clear()
         return snapshot(commit = text)
     }
 
     private fun commit(text: String, words: IntArray): Snapshot {
         context = (context + words).takeLast(2).toIntArray()
+        // what the user writes is kept no longer than it has to be where they learn nothing
+        recent = if (learning) tail(recent + text) else ""
         // text kept as typed ends the context
-        if (context.lastOrNull() == NO_WORD) {
-            context = IntArray(0)
-            lastEntry = null
-        }
+        if (context.lastOrNull() == NO_WORD) forget()
         clear()
         // what may follow a password is no one's business
         candidates = if (prediction && learning) predict() else emptyList()
@@ -232,6 +235,12 @@ class PinyinSession(
         val last = lastEntry
         if (prev == NO_WORD || prev < data.model.vocabularySize || last == null) return predictor.predict(prev2, prev)
         return predictor.predict(NO_WORD, predictor.tail(last.text, last.syllables))
+    }
+
+    private fun forget() {
+        context = IntArray(0)
+        lastEntry = null
+        recent = ""
     }
 
     private fun clear() {
@@ -260,10 +269,28 @@ class PinyinSession(
         this.graph = graph
         val (prev2, prev) = lastTwo(context + pieces.flatMap { it.words.asList() })
         val decoding = decoder.decode(graph, prev2, prev)
-        candidates = (decoding.sentences + decoding.words).distinctBy { it.text }
-        val best = decoding.sentences.firstOrNull()
+        val sentences = rerank(decoding.sentences)
+        candidates = (sentences + decoding.words).distinctBy { it.text }
+        val best = sentences.firstOrNull()
         preedit = pieces.joinToString("") { it.text } + (if (best == null) graph.input else preedit(graph, best))
     }
+
+    /** [sentences] with the one the [reranker] picks first. */
+    private fun rerank(sentences: List<Candidate>): List<Candidate> {
+        promoted = 0
+        val reranker = reranker ?: return sentences
+        val context = (if (learning) recent else "") + pieces.joinToString("") { it.text }
+        val picked = reranker.pick(context, sentences.map { it.text }, sentences.map { it.score })
+        if (picked == 0) return sentences
+        promoted = picked
+        return listOf(sentences[picked]) + sentences.filterIndexed { i, _ -> i != picked }
+    }
+
+    /**
+     * Whether candidate [index] was below the decoder's best: what the decoder is to learn from.
+     * The reranker's pick taken is, as the decoder is to have it first next time without it.
+     */
+    private fun overDecoder(index: Int) = if (promoted > 0) index != 1 else index > 0
 
     private fun lastTwo(words: IntArray): Pair<Int, Int> {
         val n = words.size
@@ -378,5 +405,16 @@ class PinyinSession(
         // the longest text put together from pieces that is learned as a word: past this, it is
         // a sentence, which would crowd the dictionary with things never typed again
         const val MAX_PHRASE = 8
+        // the text committed that the reranker reads before the input: well over what it has room
+        // for (39 tokens), so a commit drops only text it no longer reads, and it goes on from what
+        // it read rather than read it all again
+        private const val RECENT = 128
+
+        /** The last [RECENT] chars of [text], not starting in the middle of a pair. */
+        internal fun tail(text: String): String {
+            if (text.length <= RECENT) return text
+            val from = text.length - RECENT
+            return text.substring(if (Character.isLowSurrogate(text[from])) from + 1 else from)
+        }
     }
 }
