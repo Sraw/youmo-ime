@@ -40,7 +40,14 @@ object EngineBridge {
     )
 
     private val engines by lazy(LazyThreadSafetyMode.NONE) {
-        Engines(::asset, File(appContext.filesDir, "engine"), { Timber.w(it, "engine user data") }, ::legacy)
+        Engines(::asset, File(appContext.filesDir, "engine"), { Timber.w(it, "engine user data") }, ::legacy, ::additions)
+    }
+
+    // where fcitx kept libime pinyin's files (its data home, as Fcitx starts it), and where the
+    // app's editors still keep what the user adds
+    private fun pinyinDir(): File {
+        val context = FcitxApplication.getInstance().directBootAwareContext
+        return File(context.getExternalFilesDir(null) ?: context.filesDir, "data/pinyin")
     }
 
     /**
@@ -48,9 +55,7 @@ object EngineBridge {
      * converters read its binary files.
      */
     private fun legacy(): LibimeImport.Legacy? {
-        // where fcitx kept them: its data home, as Fcitx starts it
-        val context = FcitxApplication.getInstance().directBootAwareContext
-        val dir = File(context.getExternalFilesDir(null) ?: context.filesDir, "data/pinyin")
+        val dir = pinyinDir()
         val dictionary = File(dir, "user.dict")
         val history = File(dir, "user.history")
         if (!dictionary.exists() && !history.exists()) return null
@@ -59,6 +64,34 @@ object EngineBridge {
             text(history, ::libimeHistoryDump),
             ::libimeDecodePinyin,
         ).also { Timber.i("libime's pinyin: %d words, %d sentences", it.dictionary.size, it.history.size) }
+    }
+
+    /**
+     * The custom phrases and the dictionaries turned on, as the editors keep them; a file that
+     * cannot be read is left out, the rest still read. The dictionaries are converted only when
+     * the engine asks, and again only when one of them changed.
+     */
+    private fun additions(): Engines.Additions {
+        val dir = pinyinDir()
+        val phrases = try {
+            File(dir, "customphrase").takeIf { it.isFile }?.readText().orEmpty()
+        } catch (e: IOException) {
+            Timber.w(e, "custom phrases")
+            ""
+        }
+        val dictionaries = File(dir, "dictionaries").listFiles { f -> f.name.endsWith(".dict") }.orEmpty()
+            .sortedBy { it.name }
+        val seen = dictionaries.joinToString("\n") { "${it.name} ${it.length()} ${it.lastModified()}" }
+        return Engines.Additions(phrases, seen) {
+            dictionaries.flatMap { file ->
+                try {
+                    text(file) { src, dest -> PinyinDictManager.pinyinDictConv(src, dest, true) }
+                } catch (e: IOException) {
+                    Timber.w(e, "pinyin dictionary")
+                    emptyList()
+                }
+            }
+        }
     }
 
     private fun text(file: File, convert: (String, String) -> Unit): List<String> {
@@ -106,6 +139,12 @@ object EngineBridge {
     @JvmStatic
     fun configure(settings: String) {
         engines.settings = EngineSettings.parse(settings)
+    }
+
+    /** Reads [additions] again, the sessions made anew. */
+    @JvmStatic
+    fun reload() {
+        engines.reload()
     }
 
     /** Text and hint of each candidate in [from, from + count), one after the other. */

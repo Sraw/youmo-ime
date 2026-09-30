@@ -67,6 +67,7 @@ class Fcitx(private val context: Context) : FcitxAPI, FcitxLifecycleOwner {
 
     override suspend fun save() = withFcitxContext { saveFcitxState() }
     override suspend fun reloadConfig() = withFcitxContext { reloadFcitxConfig() }
+    override suspend fun reloadEngine() = withFcitxContext { EngineBridge.reload() }
 
     override suspend fun sendKey(
         key: String,

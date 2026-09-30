@@ -114,12 +114,6 @@ object PreferenceScreenFactory {
             }
         }
 
-        fun tableInputMethod() = Preference(context).apply {
-            setOnPreferenceClickListener {
-                navigate(SettingsRoute.TableInputMethods)
-            }
-        }
-
         fun pinyinCustomPhrase() = Preference(context).apply {
             setOnPreferenceClickListener {
                 navigate(SettingsRoute.PinyinCustomPhrase)
@@ -179,8 +173,6 @@ object PreferenceScreenFactory {
                 )
                 ConfigExternal.ETy.QuickPhrase -> quickPhraseEditor()
                 ConfigExternal.ETy.Chttrans -> addonConfigPreference("chttrans")
-                ConfigExternal.ETy.TableGlobal -> addonConfigPreference("table")
-                ConfigExternal.ETy.AndroidTable -> tableInputMethod()
                 ConfigExternal.ETy.PinyinCustomPhrase -> pinyinCustomPhrase()
                 else -> stubPreference()
             }

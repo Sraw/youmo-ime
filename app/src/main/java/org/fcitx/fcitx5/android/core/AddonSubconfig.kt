@@ -4,7 +4,8 @@
  */
 package org.fcitx.fcitx5.android.core
 
-suspend fun FcitxAPI.reloadPinyinDict() = setAddonSubConfig("pinyin", "dictmanager")
+// the engine's pinyin reads both; libime's pinyin addon that took them is gone
+suspend fun FcitxAPI.reloadPinyinDict() = reloadEngine()
 
 suspend fun FcitxAPI.getPunctuationConfig(lang: String) =
     getAddonSubConfig("punctuation", "punctuationmap/$lang")
@@ -14,4 +15,4 @@ suspend fun FcitxAPI.savePunctuationConfig(lang: String = "zh_CN", config: RawCo
 
 suspend fun FcitxAPI.reloadQuickPhrase() = setAddonSubConfig("quickphrase", "editor")
 
-suspend fun FcitxAPI.reloadPinyinCustomPhrase() = setAddonSubConfig("pinyin", "customphrase")
+suspend fun FcitxAPI.reloadPinyinCustomPhrase() = reloadEngine()

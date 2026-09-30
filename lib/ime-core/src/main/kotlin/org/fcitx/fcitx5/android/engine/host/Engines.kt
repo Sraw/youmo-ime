@@ -6,6 +6,7 @@ package org.fcitx.fcitx5.android.engine.host
 
 import org.fcitx.fcitx5.android.engine.data.CodeTable
 import org.fcitx.fcitx5.android.engine.data.PinyinData
+import org.fcitx.fcitx5.android.engine.phrase.CustomPhrases
 import org.fcitx.fcitx5.android.engine.pinyin.PinyinSegmenter
 import org.fcitx.fcitx5.android.engine.pinyin.ShuangpinSegmenter
 import org.fcitx.fcitx5.android.engine.rerank.Reranker
@@ -29,7 +30,8 @@ import java.nio.ByteBuffer
  * The input methods the androidengine addon lists, by name, each with its session made on first
  * use. [load] gives a data file by its path in the app's assets; what the user picks in pinyin is
  * kept under [userDir] (in memory only if null). When that log is made afresh, what libime's
- * pinyin learned ([legacy], if the user had it) is read into it first.
+ * pinyin learned ([legacy], if the user had it) is read into it first. What the user added to
+ * pinyin ([additions]) is read at first need, and again on [reload].
  *
  * Everything here runs on one thread, the one fcitx runs on.
  */
@@ -38,7 +40,17 @@ class Engines(
     private val userDir: File?,
     private val onError: (IOException) -> Unit = {},
     private val legacy: () -> LibimeImport.Legacy? = { null },
+    private val additions: () -> Additions? = { null },
 ) : Closeable {
+
+    /**
+     * What the user added to pinyin, as libime kept it: its custom phrases file, and the lines
+     * of its dictionaries turned on, in libime's text format (`你好 ni'hao 0`), read only when
+     * the user's words are made: they can be many, and are kept in the model, not here.
+     * [dictionaries] tells the dictionaries apart (their names, sizes and times, say): read again
+     * on [reload] only if it changed.
+     */
+    class Additions(val phrases: String, val dictionaries: String, val dictionary: () -> List<String>)
 
     // the files are signed with the app: no need to read them through for their checksums
     private val pinyinData by lazy(LazyThreadSafetyMode.NONE) { PinyinData.load(load(PINYIN_DATA), verify = false) }
@@ -64,21 +76,54 @@ class Engines(
         return sentenceModel
     }
 
+    private var added: Additions? = null
+    private var addedRead = false
+
+    private fun added(): Additions? {
+        if (addedRead) return added
+        addedRead = true
+        added = try {
+            additions()
+        } catch (e: IOException) {
+            onError(e)
+            null
+        }
+        return added
+    }
+
+    private var phrases: CustomPhrases? = null
+
+    private fun phrases(): CustomPhrases = phrases ?: CustomPhrases.parse(added()?.phrases.orEmpty()).also { phrases = it }
+
     private var store: UserStore? = null
-    private val user by lazy(LazyThreadSafetyMode.NONE) {
-        UserModel(pinyinData.dictionary, pinyinData.vocabulary).also { model ->
-            if (userDir != null) {
-                userDir.mkdirs()
-                val file = File(userDir, USER_PINYIN)
-                // a log that cannot be read or moved aside: learn in memory rather than not type
-                store = try {
-                    UserStore(file, model, onError = onError).apply { open(seed = ::importLegacy) }
-                } catch (e: IOException) {
-                    onError(e)
-                    null
-                }
+    private var userModel: UserModel? = null
+
+    // the dictionaries' words go in as words the user added, uncounted: scored as the model's
+    // unknown word until picked, and not kept in the log unless picked
+    private fun user(): UserModel = userModel ?: UserModel(pinyinData.dictionary, pinyinData.vocabulary).also { model ->
+        userModel = model
+        if (userDir != null) {
+            userDir.mkdirs()
+            val file = File(userDir, USER_PINYIN)
+            // a log that cannot be read or moved aside: learn in memory rather than not type
+            store = try {
+                UserStore(file, model, onError = onError).apply { open(seed = ::importLegacy) }
+            } catch (e: IOException) {
+                onError(e)
+                null
             }
         }
+        addDictionaries(model)
+    }
+
+    private fun addDictionaries(model: UserModel) {
+        val lines = try {
+            added()?.dictionary?.invoke().orEmpty()
+        } catch (e: IOException) {
+            onError(e)
+            emptyList()
+        }
+        for (line in lines) LibimeImport.dictionaryEntry(line)?.let { model.id(it) }
     }
 
     /**
@@ -133,11 +178,11 @@ class Engines(
         when (im) {
             PINYIN -> PinyinSession(
                 pinyinData, PinyinSegmenter(s.fuzzy, s.typos, neighbours = s.typos),
-                pageSize = s.pageSize, user = user, prediction = s.prediction, reranker = reranker(),
+                pageSize = s.pageSize, user = user(), prediction = s.prediction, reranker = reranker(), phrases = phrases(),
             )
             SHUANGPIN -> PinyinSession(
                 pinyinData, ShuangpinSegmenter(s.scheme, s.fuzzy, s.typos), spell = true,
-                pageSize = s.pageSize, user = user, prediction = s.prediction, reranker = reranker(),
+                pageSize = s.pageSize, user = user(), prediction = s.prediction, reranker = reranker(), phrases = phrases(),
             )
             else -> {
                 val (file, options) = TABLES[im] ?: throw IllegalArgumentException("no input method $im")
@@ -151,6 +196,30 @@ class Engines(
 
     /** A reranker of the session's own, over the one model: each keeps what it ran for its input. */
     private fun reranker(): Reranker? = if (settings.sentenceModel) sentenceModel()?.let { Reranker(it) } else null
+
+    /**
+     * Reads [additions] again, for the user changed them: the sessions are made anew, what was
+     * typed dropped. If the dictionaries changed, the user's words are read again from the log,
+     * with them; with no log, what was learned is only in memory, so the new words are added to it
+     * and the removed ones kept till the next start.
+     */
+    fun reload() {
+        val before = added?.dictionaries.orEmpty()
+        addedRead = false
+        phrases = null
+        keyboards.clear()
+        sessions.clear()
+        val model = userModel ?: return
+        if (added()?.dictionaries.orEmpty() == before) return
+        val log = store
+        if (log == null) {
+            addDictionaries(model)
+        } else {
+            log.close()
+            store = null
+            userModel = null
+        }
+    }
 
     override fun close() {
         store?.close()

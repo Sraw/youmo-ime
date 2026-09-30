@@ -44,6 +44,9 @@ interface FcitxAPI {
 
     suspend fun reloadConfig()
 
+    /** Reads again what the user added to the engine's input methods: custom phrases, dictionaries. */
+    suspend fun reloadEngine()
+
     suspend fun sendKey(key: String, states: UInt = 0u, code: Int = 0, up: Boolean = false, timestamp: Int = -1)
 
     suspend fun sendKey(c: Char, states: UInt = 0u, code: Int = 0, up: Boolean = false, timestamp: Int = -1)

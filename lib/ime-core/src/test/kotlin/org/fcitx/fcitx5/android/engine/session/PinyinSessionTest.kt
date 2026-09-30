@@ -17,6 +17,7 @@ import org.fcitx.fcitx5.android.engine.session.Action.CommitRaw
 import org.fcitx.fcitx5.android.engine.session.Action.Key
 import org.fcitx.fcitx5.android.engine.session.Action.NextPage
 import org.fcitx.fcitx5.android.engine.session.Action.Pick
+import org.fcitx.fcitx5.android.engine.phrase.CustomPhrases
 import org.fcitx.fcitx5.android.engine.session.Action.PreviousPage
 import org.fcitx.fcitx5.android.engine.session.Action.Reset
 import org.fcitx.fcitx5.android.engine.session.Action.Select
@@ -26,6 +27,8 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.util.Calendar
+import java.util.GregorianCalendar
 import java.nio.ByteBuffer
 
 class PinyinSessionTest {
@@ -500,5 +503,49 @@ class PinyinSessionTest {
         assertEquals(1, user.size)
         session.apply(Reset)
         assertEquals("拟再", session.type("nizai").candidates.first())
+    }
+
+    private fun phrased(text: String, user: UserModel? = null) = PinyinSession(
+        data, PinyinSegmenter(), pageSize = 20, user = user,
+        phrases = CustomPhrases.parse(text), now = { GregorianCalendar(2026, Calendar.SEPTEMBER, 30) },
+    )
+
+    @Test
+    fun aPhraseIsOfferedWhereItsOrderSaysForItsKey() {
+        val session = phrased("nizai,2=你在哪儿\nzai,1=#${'$'}{month}月${'$'}{day}日\nnizai,-1=不要")
+        val s = session.type("nizai")
+        assertEquals("你在", s.candidates[0])
+        assertEquals("你在哪儿", s.candidates[1])
+        assertFalse("不要" in s.candidates)
+        assertEquals("你在哪儿", session.apply(Select(1)).commit)
+        // what is left of the input, after a piece picked; filled in with the time
+        val t = session.type("nizai")
+        assertFalse("9月30日" in t.candidates)
+        val rest = session.apply(Select(t.candidates.indexOf("拟")))
+        assertEquals("9月30日", rest.candidates.first())
+        assertEquals("拟9月30日", session.apply(Select(0)).commit)
+    }
+
+    @Test
+    fun aCandidateOfAPhrasesTextThatReadsLessGivesWayToIt() {
+        // 你 reads ni only: the phrase is what nihao means, and takes it all
+        val session = phrased("nihao,1=你")
+        val s = session.type("nihao")
+        assertEquals("你", s.candidates[0])
+        assertEquals(1, s.candidates.count { it == "你" })
+        assertEquals("你", session.apply(Select(0)).commit)
+    }
+
+    @Test
+    fun aPhraseIsNotLearnedButACandidateItMovedIs() {
+        val user = UserModel(data.dictionary, data.vocabulary)
+        val session = phrased("nizai,1=你在哪儿\nni,1=拟", user)
+        assertEquals("你在哪儿", session.type("nizai").candidates.first())
+        session.apply(Select(0))
+        assertEquals(0f, user.total)
+        // 拟 moved first by a phrase is still the decoder's word, not its best
+        assertEquals("拟", session.type("ni").candidates.first())
+        session.apply(Select(0))
+        assertEquals(1f, user.total)
     }
 }

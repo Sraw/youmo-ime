@@ -58,7 +58,12 @@ FCITX_CONFIGURATION(
         Option<int, IntConstrain> pageSize{this, "PageSize", _("Candidates Per Page"), 7, IntConstrain(3, 10)};
         Option<bool> prediction{this, "Prediction", _("Enable Prediction"), true};
         Option<bool> sentenceModel{this, "SentenceModel", _("Weigh readings as whole sentences"), true};
-        Option<EngineFuzzyConfig> fuzzy{this, "Fuzzy", _("Fuzzy Pinyin")};)
+        Option<EngineFuzzyConfig> fuzzy{this, "Fuzzy", _("Fuzzy Pinyin")};
+        // opened by name in the app (ConfigDescriptor), the uri only says whose they are
+        ExternalOption dictmanager{this, "DictManager", _("Manage Dictionaries"),
+                                   "fcitx://config/addon/androidengine/dictmanager"};
+        ExternalOption customphrase{this, "CustomPhrase", _("Manage Custom Phrase"),
+                                    "fcitx://config/addon/androidengine/customphrase"};)
 
 #undef FCITX_GETTEXT_DOMAIN
 #define FCITX_GETTEXT_DOMAIN "fcitx5-android"

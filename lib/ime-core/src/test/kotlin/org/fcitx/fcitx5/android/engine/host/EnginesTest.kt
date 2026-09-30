@@ -152,6 +152,84 @@ class EnginesTest {
         }
     }
 
+    private var dictionaryReads = 0
+
+    private fun added(phrases: String, dictionaries: String, vararg lines: String) =
+        Engines.Additions(phrases, dictionaries) { dictionaryReads++; lines.toList() }
+
+    private fun Engines.pickUntilFirst(text: String) {
+        repeat(MAX_PICKS) {
+            onEvent(Engines.PINYIN, EngineEvent.RESET, 0)
+            val shown = type(Engines.PINYIN, "ni").candidates
+            if (shown.first() != text) onEvent(Engines.PINYIN, EngineEvent.PICK, shown.indexOf(text))
+        }
+        onEvent(Engines.PINYIN, EngineEvent.RESET, 0)
+        assertEquals(text, type(Engines.PINYIN, "ni").candidates.first())
+        onEvent(Engines.PINYIN, EngineEvent.RESET, 0)
+    }
+
+    @Test
+    fun whatTheUserAddedIsReadAtFirstNeedAndAgainOnReload() {
+        var additions = added("ni,1=呢\n", "a", "泥 ni 0", "nonsense")
+        var reads = 0
+        Engines(::load, folder.newFolder("engine"), additions = { reads++; additions }).use { engines ->
+            assertEquals(0, reads)
+            assertEquals(listOf("呢", "你", "拟", "泥"), engines.type(Engines.PINYIN, "ni").candidates)
+            engines.type(Engines.SHUANGPIN, "ni")
+            assertEquals(1, reads)
+            assertEquals(1, dictionaryReads)
+            // what was typed is dropped, and what changed is read: the phrases only
+            additions = added("", "a", "泥 ni 0")
+            engines.reload()
+            assertEquals(2, reads)
+            assertEquals(listOf("你", "拟", "泥"), engines.type(Engines.PINYIN, "ni").candidates)
+            assertEquals(1, dictionaryReads)
+            // the dictionaries too
+            additions = added("", "")
+            engines.reload()
+            assertEquals(listOf("你", "拟"), engines.type(Engines.PINYIN, "ni").candidates)
+            assertEquals(2, dictionaryReads)
+        }
+    }
+
+    @Test
+    fun whatWasLearnedOutlivesADictionaryChange() {
+        var additions = added("", "a", "泥 ni 0")
+        Engines(::load, folder.newFolder("engine"), additions = { additions }).use { engines ->
+            engines.pickUntilFirst("拟")
+            additions = added("", "b", "泥 ni 0", "尼 ni 0")
+            engines.reload()
+            val shown = engines.type(Engines.PINYIN, "ni").candidates
+            assertEquals("拟", shown.first())
+            assertTrue("尼" in shown)
+        }
+    }
+
+    @Test
+    fun withNoLogADictionaryChangeAddsToWhatIsInMemory() {
+        var additions = added("", "a", "泥 ni 0")
+        val engines = Engines(::load, null, additions = { additions })
+        engines.pickUntilFirst("拟")
+        additions = added("", "b", "尼 ni 0")
+        engines.reload()
+        val shown = engines.type(Engines.PINYIN, "ni").candidates
+        assertEquals("拟", shown.first())
+        assertTrue("尼" in shown && "泥" in shown)
+    }
+
+    @Test
+    fun additionsThatCannotBeReadLeavePinyinWorking() {
+        val errors = ArrayList<IOException>()
+        val engines = Engines(::load, null, { errors += it }, additions = { throw IOException("no") })
+        assertEquals(listOf("你", "拟"), engines.type(Engines.PINYIN, "ni").candidates)
+        assertEquals(1, errors.size)
+        val dictionaries = Engines(::load, null, { errors += it }, additions = {
+            Engines.Additions("ni,1=呢", "a") { throw IOException("no") }
+        })
+        assertEquals(listOf("呢", "你", "拟"), dictionaries.type(Engines.PINYIN, "ni").candidates)
+        assertEquals(2, errors.size)
+    }
+
     @Test
     fun theSentenceModelIsLoadedOnceForBothPinyinsUnlessTurnedOff() {
         val engines = Engines(::load, null)

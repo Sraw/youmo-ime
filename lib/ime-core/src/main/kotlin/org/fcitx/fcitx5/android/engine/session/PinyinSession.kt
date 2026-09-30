@@ -11,6 +11,7 @@ import org.fcitx.fcitx5.android.engine.lattice.Penalties
 import org.fcitx.fcitx5.android.engine.lattice.PinyinDecoder
 import org.fcitx.fcitx5.android.engine.lattice.Predictor
 import org.fcitx.fcitx5.android.engine.lattice.WordScorer
+import org.fcitx.fcitx5.android.engine.phrase.CustomPhrases
 import org.fcitx.fcitx5.android.engine.pinyin.Segmenter
 import org.fcitx.fcitx5.android.engine.pinyin.SyllableGraph
 import org.fcitx.fcitx5.android.engine.pinyin.SyllableGraph.Kind
@@ -19,6 +20,7 @@ import org.fcitx.fcitx5.android.engine.rerank.SentencePicker
 import org.fcitx.fcitx5.android.engine.user.UserModel
 import org.fcitx.fcitx5.android.engine.user.UserModel.Entry
 import org.fcitx.fcitx5.android.engine.user.UserScorer
+import java.util.Calendar
 
 /**
  * Pinyin typed and picked piece by piece. The candidates are the readings of all the input left,
@@ -51,6 +53,11 @@ class PinyinSession(
     private val user: UserModel? = null,
     /** Whether words that may follow are offered after a commit. */
     private val prediction: Boolean = true,
+    /** Offered where their order says when what is left of the input is their key. */
+    private val phrases: CustomPhrases = CustomPhrases.EMPTY,
+    /** The time a dynamic phrase is filled in with. */
+    private val now: () -> Calendar = { Calendar.getInstance() },
+    // last, so a test's picker can follow as a lambda
     private val reranker: SentencePicker? = null,
 ) : Session {
     init {
@@ -80,7 +87,7 @@ class PinyinSession(
     private var graph: SyllableGraph? = null // of the input read last
 
     private var candidates: List<Candidate> = emptyList()
-    private var promoted = 0 // where the decoder had the first sentence, if the reranker moved it
+    private var decoderFirst: Candidate? = null // the first before the reranker and phrases moved it
     private var preedit = ""
     private var page = 0
     private var predicting = false
@@ -133,7 +140,7 @@ class PinyinSession(
             lastEntry = null
             return commit(c.text, c.words)
         }
-        pieces += Piece(c.text, c.words, readFrom() + c.end, if (user == null) null else entries(c), overDecoder(index))
+        pieces += Piece(c.text, c.words, readFrom() + c.end, if (user == null) null else entries(c), c !== decoderFirst)
         if (pieces.last().end < input.length) {
             read()
             return snapshot()
@@ -269,28 +276,26 @@ class PinyinSession(
         this.graph = graph
         val (prev2, prev) = lastTwo(context + pieces.flatMap { it.words.asList() })
         val decoding = decoder.decode(graph, prev2, prev)
+        decoderFirst = decoding.sentences.firstOrNull() ?: decoding.words.firstOrNull()
         val sentences = rerank(decoding.sentences)
-        candidates = (sentences + decoding.words).distinctBy { it.text }
+        val rest = input.length - readFrom()
+        // a phrase is text, no word: nothing to learn, and what follows it reads after nothing
+        candidates = phrases.place(
+            input.substring(readFrom()), now, (sentences + decoding.words).distinctBy { it.text },
+            text = { it.text }, all = { it.end == rest },
+        ) { Candidate(it, rest, 0f, intArrayOf(NO_WORD), intArrayOf(rest)) }
         val best = sentences.firstOrNull()
         preedit = pieces.joinToString("") { it.text } + (if (best == null) graph.input else preedit(graph, best))
     }
 
     /** [sentences] with the one the [reranker] picks first. */
     private fun rerank(sentences: List<Candidate>): List<Candidate> {
-        promoted = 0
         val reranker = reranker ?: return sentences
         val context = (if (learning) recent else "") + pieces.joinToString("") { it.text }
         val picked = reranker.pick(context, sentences.map { it.text }, sentences.map { it.score })
         if (picked == 0) return sentences
-        promoted = picked
         return listOf(sentences[picked]) + sentences.filterIndexed { i, _ -> i != picked }
     }
-
-    /**
-     * Whether candidate [index] was below the decoder's best: what the decoder is to learn from.
-     * The reranker's pick taken is, as the decoder is to have it first next time without it.
-     */
-    private fun overDecoder(index: Int) = if (promoted > 0) index != 1 else index > 0
 
     private fun lastTwo(words: IntArray): Pair<Int, Int> {
         val n = words.size
