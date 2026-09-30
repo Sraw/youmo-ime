@@ -9,7 +9,7 @@ package org.fcitx.fcitx5.android.engine.pinyin
  * either spelling then also matches syllables spelt with the other. Pairs apply to a whole
  * initial or a whole final, and are not chained: with L_N and L_R, `n` does not reach `r`.
  */
-enum class Fuzzy(internal val a: String, internal val b: String, internal val onInitial: Boolean) {
+enum class Fuzzy(internal val a: String, internal val b: String, val onInitial: Boolean) {
     Z_ZH("z", "zh", true),
     C_CH("c", "ch", true),
     S_SH("s", "sh", true),
@@ -28,7 +28,7 @@ enum class Fuzzy(internal val a: String, internal val b: String, internal val on
     ;
 
     /** Whether this rule applies to a final after [initial]. */
-    internal fun appliesAfter(initial: String): Boolean = when (this) {
+    fun appliesAfter(initial: String): Boolean = when (this) {
         // the u of ju, qu, xu, yu is ü: jou is not a slip for it
         U_OU -> initial !in setOf("j", "q", "x", "y")
         // only l and n have both lü and lu
@@ -36,7 +36,8 @@ enum class Fuzzy(internal val a: String, internal val b: String, internal val on
         else -> true
     }
 
-    internal fun partner(part: String): String? = when (part) {
+    /** The other of the pair when [part] is one of them, else null. */
+    fun partner(part: String): String? = when (part) {
         a -> b
         b -> a
         else -> null

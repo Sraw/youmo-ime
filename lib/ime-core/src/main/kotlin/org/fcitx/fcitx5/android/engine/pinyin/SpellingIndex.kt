@@ -81,7 +81,7 @@ internal class SpellingIndex(fuzzy: Set<Fuzzy>, typos: Boolean) {
                 for ((f, fFlags) in finals(fin, finalRules)) {
                     val flags = iFlags or fFlags
                     add(i + f, id, flags)
-                    if (typos) typosOf(i, f).forEach { add(it, id, flags or SyllableMatches.TYPO) }
+                    if (typos) Typo.entries.mapNotNull { it.of(i, f) }.forEach { add(it, id, flags or SyllableMatches.TYPO) }
                 }
             }
         }
@@ -156,17 +156,6 @@ internal class SpellingIndex(fuzzy: Set<Fuzzy>, typos: Boolean) {
         /** As [variants], and lüe is written `lue` as often as `lve`: both are standard. */
         fun finals(fin: String, rules: List<Fuzzy>): List<Pair<String, Int>> =
             variants(fin, rules) + if (fin == "ve") listOf("ue" to 0) else emptyList()
-
-        private fun typosOf(init: String, fin: String): List<String> = listOfNotNull(
-            // gn for ng: zhagn, xign
-            if (fin.endsWith("ng")) init + fin.dropLast(2) + "gn" else null,
-            // a dropped g after o: zhon, xion
-            if (fin.endsWith("ong")) init + fin.dropLast(1) else null,
-            // v for the ü these initials spell as u: jv, xve, qvan
-            if (init in U_IS_V && fin.startsWith("u")) init + "v" + fin.substring(1) else null,
-        )
-
-        private val U_IS_V = setOf("j", "q", "x", "y")
 
         /** Fewer flags win: an exact spelling beats a fuzzy one beats a typo. */
         fun keepBest(into: MutableMap<Int, Int>, syllable: Int, flags: Int) {

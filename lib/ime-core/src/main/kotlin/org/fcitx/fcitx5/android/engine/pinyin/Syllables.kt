@@ -60,4 +60,10 @@ object Syllables {
 
     /** @return the id of [spelling], or -1 if it is not a syllable */
     fun id(spelling: String): Int = ids[spelling] ?: -1
+
+    /**
+     * The initial and final of [spelling], the initial empty for a, ai, er ...; null for a
+     * syllable that is no initial plus a final (m, ng, the Latin letters).
+     */
+    fun split(spelling: String): Pair<String, String>? = SpellingIndex.split(spelling)
 }

@@ -39,8 +39,8 @@ class PinyinRunTest {
         assertEquals(listOf("你好", "你hao", "你"), results[0].candidates)
 
         val shuangpin = tmp.newFile("shuangpin.tsv").apply { writeText("nihc\t你好\tdaily\n") }
-        assertEquals(0, runCli(arrayOf("pinyin", data.path, shuangpin.path, result.path, "xiaohe"), StringBuilder(), StringBuilder()))
+        assertEquals(0, runCli(arrayOf("pinyin", data.path, shuangpin.path, result.path, "--scheme", "xiaohe"), StringBuilder(), StringBuilder()))
         assertEquals("你好", result.useLines { RunResultFormat.parse(it) }.single().candidates.first())
-        assertEquals(2, runCli(arrayOf("pinyin", data.path, shuangpin.path, result.path, "nope"), StringBuilder(), StringBuilder()))
+        assertEquals(2, runCli(arrayOf("pinyin", data.path, shuangpin.path, result.path, "--scheme", "nope"), StringBuilder(), StringBuilder()))
     }
 }

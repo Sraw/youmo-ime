@@ -6,9 +6,15 @@
 // Measures input engines against the evaluation sets in data/. A host-side tool: it never ships
 // in the APK, so unlike :lib:ime-core it is free to use whatever the build's JDK offers.
 //
-//   ./gradlew :lib:ime-eval:run --args="score data/pinyin.tsv <result.tsv> [<baseline.tsv>]"
-//   ./gradlew :lib:ime-eval:run --args="pinyin <pinyin.data> data/pinyin.tsv <result.tsv> [<shuangpin scheme>]"
-//   ./gradlew :lib:ime-eval:run --args="shuangpin xiaohe data/pinyin.tsv <shuangpin-set.tsv>"
+//   ./gradlew :lib:ime-eval:run --args="score data/pinyin.tsv <result.tsv> [<baseline.tsv>] [--half tune]"
+//   ./gradlew :lib:ime-eval:run --args="pinyin <pinyin.data> data/pinyin.tsv <result.tsv> [--scheme xiaohe] [--fuzzy all] [--half tune]"
+//   ./gradlew :lib:ime-eval:run --args="shuangpin xiaohe data/pinyin.tsv data/shuangpin-xiaohe.tsv"
+//   ./gradlew :lib:ime-eval:run --args="slips data/pinyin.tsv data/pinyin-slips.tsv"
+//   ./gradlew :lib:ime-eval:run --args="tune <pinyin.data> data/pinyin.tsv data/pinyin-slips.tsv"
+//
+// data/pinyin.tsv is written by hand; the other sets are made from it by the commands above, and
+// a test fails until they are remade after it changes. Samples split into a tune and a held-out
+// half by their text (Halves): choose on one, report on the other.
 //
 // Results come from an engine run: run-on-device.sh produces one for the engine the APK ships
 // (libime today); baseline/ keeps the libime result the new engine is measured against.

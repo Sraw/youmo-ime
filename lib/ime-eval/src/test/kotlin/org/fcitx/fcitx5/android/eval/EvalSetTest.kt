@@ -49,12 +49,21 @@ class EvalSetTest {
     fun thePinyinSetIsWellFormed() {
         val samples = File("data/pinyin.tsv").useLines { EvalSet.parse(it) }
         val tags = setOf("daily", "written", "abbrev", "partial", "ambiguous")
-        assertTrue(samples.size >= 200)
+        assertTrue(samples.size >= 500)
         samples.forEach { s ->
             assertTrue("unknown tag in $s", s.tag in tags)
             assertTrue("input must be what a keyboard types: $s", s.input.all { it in 'a'..'z' || it == '\'' })
             assertTrue("expected must be Han characters: $s", s.expected.all { Character.UnicodeScript.of(it.code) == Character.UnicodeScript.HAN })
         }
         assertEquals("duplicate inputs", samples.size, samples.map { it.input }.toSet().size)
+    }
+
+    /** The derived sets are made by commands from data/pinyin.tsv; a change to it must remake them. */
+    @Test
+    fun theDerivedSetsAreUpToDate() {
+        val samples = File("data/pinyin.tsv").useLines { EvalSet.parse(it) }
+        fun committed(name: String) = File("data/$name").useLines { EvalSet.parse(it) }
+        assertEquals("rerun `slips`", SlipSet.generate(samples), committed("pinyin-slips.tsv"))
+        assertEquals("rerun `shuangpin xiaohe`", ShuangpinSet.convert(samples, ShuangpinSet.SCHEMES.getValue("xiaohe")), committed("shuangpin-xiaohe.tsv"))
     }
 }

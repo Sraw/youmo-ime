@@ -7,8 +7,9 @@ package org.fcitx.fcitx5.android.engine.lattice
 /**
  * What reading input other than as whole standard syllables costs, in log10 like the language
  * model's scores, so each is how much less likely such a reading is taken to be. Each applies
- * per syllable. Tuned on the evaluation set (`lib/ime-eval`); [fuzzy] and [typo] are guesses
- * until it has such input.
+ * per syllable. Tuned on the evaluation set (`lib/ime-eval`). [fuzzy] and [typo] were chosen by
+ * `ime-eval tune` on generated slips: -1 is best for [fuzzy], and [typo] changes nothing from -0.5
+ * to -4, a slip's reading competing only with reading its letters as 简拼.
  */
 data class Penalties(
     /** A [Fuzzy][org.fcitx.fcitx5.android.engine.pinyin.Fuzzy] partner of what was typed. */
