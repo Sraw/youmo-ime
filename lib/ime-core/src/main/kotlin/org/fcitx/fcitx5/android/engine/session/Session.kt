@@ -41,6 +41,9 @@ sealed class Action {
  * @property candidates the page shown
  * @property handled false when the action is the app's to act on (backspace with nothing typed)
  * @property predicting the candidates follow what was committed, and read no input (联想)
+ * @property hints shown beside each candidate, empty or one per candidate: what is left of its
+ *   code to type, or its whole code when the input does not spell it out (a wildcard in a
+ *   table's code, or a table's pinyin lookup)
  */
 data class Snapshot(
     val commit: String,
@@ -51,4 +54,5 @@ data class Snapshot(
     val hasNextPage: Boolean,
     val handled: Boolean,
     val predicting: Boolean,
+    val hints: List<String> = emptyList(),
 )

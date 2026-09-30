@@ -22,9 +22,13 @@ internal class StringTable(private val offsets: BitPacked, private val chars: By
 
     fun length(i: Int) = offsets[i + 1] - offsets[i]
 
-    private fun char(i: Int, at: Int) = chars.getChar((offsets[i] + at) * 2)
+    fun char(i: Int, at: Int) = chars.getChar((offsets[i] + at) * 2)
 
-    operator fun get(i: Int) = String(CharArray(length(i)) { char(i, it) })
+    operator fun get(i: Int): String {
+        // each offset read unpacks bits: read the start once
+        val start = offsets[i]
+        return String(CharArray(offsets[i + 1] - start) { chars.getChar((start + it) * 2) })
+    }
 
     fun compare(i: Int, key: String): Int {
         val n = length(i)

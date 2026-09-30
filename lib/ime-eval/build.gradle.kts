@@ -13,6 +13,7 @@
 //   ./gradlew :lib:ime-eval:run --args="tune <pinyin.data> data/pinyin.tsv data/pinyin-slips.tsv"
 //   ./gradlew :lib:ime-eval:run --args="ksc <pinyin.data> data/pinyin.tsv [--scheme xiaohe] [--fuzzy all] [--half tune]"
 //   ./gradlew :lib:ime-eval:run --args="learn <pinyin.data> data/pinyin.tsv [--scheme xiaohe] [--fuzzy all]"
+//   ./gradlew :lib:ime-eval:run --args="table <table.data> data/pinyin.tsv [--preset wubi]"
 //
 // data/pinyin.tsv is written by hand; the other sets are made from it by the commands above, and
 // a test fails until they are remade after it changes. Samples split into a tune and a held-out

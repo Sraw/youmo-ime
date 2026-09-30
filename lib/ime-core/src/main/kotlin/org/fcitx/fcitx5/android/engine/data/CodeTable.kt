@@ -33,6 +33,11 @@ class CodeTable private constructor(file: DataFile) {
     fun code(index: Int): String = codes[index]
     fun text(index: Int): String = texts[index]
 
+    /** The length of [index]'s code, and its key [at]: without making a string of it. */
+    fun codeLength(index: Int): Int = codes.length(index)
+
+    fun codeKey(index: Int, at: Int): Char = codes.char(index, at)
+
     /** The entries whose code starts with [prefix], as an index range (empty if none). */
     fun prefixRange(prefix: String): IntRange {
         val from = lowerBound(prefix)

@@ -1,0 +1,62 @@
+/*
+ * SPDX-License-Identifier: LGPL-2.1-or-later
+ * SPDX-FileCopyrightText: Copyright 2026 Fcitx5 for Android Contributors
+ */
+package org.fcitx.fcitx5.android.engine.table
+
+/**
+ * How a table input method behaves beyond what its data says: the options of fcitx's table
+ * `.conf` files, meaning what they mean to libime. A length limit of -1 holds at any length and
+ * 0 turns its rule off.
+ *
+ * @property autoSelect commit without being asked: a lone candidate, or the first one once the
+ *   code is full or the next key leads nowhere
+ * @property autoSelectLength a lone candidate whose code is all that was typed is committed once
+ *   the code is this long
+ * @property noMatchAutoSelectLength a key that leads to no entry commits the first candidate of
+ *   what was typed before it, once that is this long, and starts a new code
+ * @property noSortInputLength codes this long or shorter (and no longer than what was typed) come
+ *   first, in the table's order
+ * @property sortByCodeLength the other codes, shorter first
+ * @property orderByUse and among codes as long, what was picked most first (fcitx's OrderPolicy)
+ * @property matchingKey stands for any one key (五笔 z, 仓颉 *)
+ * @property pinyinKey typed first, looks a character up by its pinyin, showing its code
+ * @property hint show what is left of each candidate's code
+ * @property autoPhraseLength the last characters committed one by one, up to this many (-1: the
+ *   longest code), become phrases typed by their 组词规则 code; 0 turns them off
+ * @property saveAutoPhraseAfter an auto phrase typed this many times, character by character, or
+ *   picked once, joins the table's own entries; 0 or less: only once picked
+ */
+data class TableOptions(
+    val autoSelect: Boolean = true,
+    val autoSelectLength: Int = -1,
+    val noMatchAutoSelectLength: Int = -1,
+    val noSortInputLength: Int = 0,
+    val sortByCodeLength: Boolean = true,
+    val orderByUse: Boolean = false,
+    val matchingKey: Char? = null,
+    val pinyinKey: Char? = null,
+    val hint: Boolean = true,
+    val autoPhraseLength: Int = 0,
+    val saveAutoPhraseAfter: Int = 0,
+    val pageSize: Int = 5,
+) {
+    init {
+        require(pageSize >= 1) { "page size $pageSize" }
+    }
+
+    companion object {
+        /** fcitx's wbx.conf: 五笔 86 */
+        val WUBI = TableOptions(
+            noSortInputLength = 2,
+            orderByUse = true,
+            matchingKey = 'z',
+            pinyinKey = 'z',
+            autoPhraseLength = 4,
+            saveAutoPhraseAfter = 3,
+        )
+
+        /** fcitx's cangjie.conf */
+        val CANGJIE = TableOptions(noMatchAutoSelectLength = 0, matchingKey = '*', hint = false)
+    }
+}

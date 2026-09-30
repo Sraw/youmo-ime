@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.eval
 
+import org.fcitx.fcitx5.android.engine.data.CodeTable
 import org.fcitx.fcitx5.android.engine.data.PinyinData
 import org.fcitx.fcitx5.android.engine.lattice.Penalties
 import org.fcitx.fcitx5.android.engine.pinyin.Fuzzy
@@ -24,9 +25,11 @@ val USAGE = """usage: score <set.tsv> <result.tsv> [<baseline-result.tsv>] [--ha
        tune <pinyin.data> <set.tsv> <slip-set.tsv>
        ksc <pinyin.data> <set.tsv> [--scheme <scheme>] [--fuzzy all|<pair>,...] [--half <half>]
        learn <pinyin.data> <set.tsv> [--scheme <scheme>] [--fuzzy all|<pair>,...]
+       table <table.data> <set.tsv> [--preset <preset>]
 schemes: ${ShuangpinSet.SCHEMES.keys.joinToString(" ")}
 pairs: ${Fuzzy.entries.joinToString(" ") { it.name.lowercase() }}
-halves: ${Halves.NAMES.joinToString(" ")}"""
+halves: ${Halves.NAMES.joinToString(" ")}
+presets: ${TableRun.PRESETS.keys.joinToString(" ")}"""
 
 fun main(args: Array<String>) {
     exitProcess(runCli(args, System.out, System.err))
@@ -62,8 +65,9 @@ fun runCli(args: Array<String>, out: Appendable, err: Appendable): Int {
     val half = a.options["half"]
     val scheme = a.options["scheme"]
     val fuzzy = a.options["fuzzy"]?.let(::fuzzyPairs)
+    val preset = a.options["preset"]
     val ok = (half == null || half in Halves.NAMES) && (scheme == null || scheme in ShuangpinSet.SCHEMES) &&
-        (a.options["fuzzy"] == null || fuzzy != null)
+        (a.options["fuzzy"] == null || fuzzy != null) && (preset == null || preset in TableRun.PRESETS)
     return when {
         !ok -> usage(err)
         a.has("score", 3..4, "half") -> score(p[1], p[2], p.getOrNull(3), half, out)
@@ -73,6 +77,7 @@ fun runCli(args: Array<String>, out: Appendable, err: Appendable): Int {
         a.has("tune", 4..4) -> tune(p[1], p[2], p[3], out)
         a.has("ksc", 3..3, "scheme", "fuzzy", "half") -> ksc(p[1], p[2], scheme, fuzzy.orEmpty(), half, out)
         a.has("learn", 3..3, "scheme", "fuzzy") -> learn(p[1], p[2], scheme, fuzzy.orEmpty(), out)
+        a.has("table", 3..3, "preset") -> table(p[1], p[2], preset ?: "plain", out)
         else -> usage(err)
     }
 }
@@ -91,9 +96,9 @@ private fun fuzzyPairs(names: String): Set<Fuzzy>? {
 
 private fun readSet(path: String) = File(path).useLines { EvalSet.parse(it) }
 
-private fun loadData(path: String): PinyinData = RandomAccessFile(path, "r").use {
-    PinyinData.load(it.channel.map(FileChannel.MapMode.READ_ONLY, 0, it.length()))
-}
+private fun mapFile(path: String) = RandomAccessFile(path, "r").use { it.channel.map(FileChannel.MapMode.READ_ONLY, 0, it.length()) }
+
+private fun loadData(path: String): PinyinData = PinyinData.load(mapFile(path))
 
 private fun score(setPath: String, resultPath: String, baselinePath: String?, half: String?, out: Appendable): Int {
     val samples = Halves.select(readSet(setPath), half)
@@ -172,3 +177,14 @@ private fun learn(dataPath: String, setPath: String, scheme: String?, fuzzy: Set
     rows.forEach { (label, outcomes) -> out.appendLine(KeystrokeRun.row(label, outcomes)) }
     return 0
 }
+
+private fun table(dataPath: String, setPath: String, preset: String, out: Appendable): Int {
+    val run = TableRun(CodeTable.load(mapFile(dataPath)), TableRun.PRESETS.getValue(preset))
+    val texts = readSet(setPath).map { it.expected }.distinct()
+    val total = texts.fold(TableRun.Outcome.ZERO) { sum, text -> sum + run.type(text) }
+    out.appendLine(TableRun.report(total, run.entries(ENTRY_STEP)))
+    return 0
+}
+
+// about 2,000 of 五笔's 100,000 entries
+private const val ENTRY_STEP = 50

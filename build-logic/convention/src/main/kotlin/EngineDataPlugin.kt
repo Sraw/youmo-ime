@@ -14,6 +14,7 @@ import org.gradle.api.file.DirectoryProperty
 import org.gradle.api.file.RegularFileProperty
 import org.gradle.api.provider.Property
 import org.gradle.api.tasks.CacheableTask
+import org.gradle.api.tasks.Classpath
 import org.gradle.api.tasks.Input
 import org.gradle.api.tasks.InputFile
 import org.gradle.api.tasks.InputFiles
@@ -43,7 +44,8 @@ import javax.inject.Inject
 
 /**
  * Compiles the own engine's data (lib/ime-dict-tool) from the text sources libime builds its own
- * from, and adds it to the app's assets as `engine/pinyin.data`. Stored uncompressed, so the
+ * from, and adds it to the app's assets as `engine/pinyin.data` and `engine/table/<name>.data`
+ * for libime's code tables (五笔, 仓颉 ...). Stored uncompressed, so the
  * engine can map it straight out of the APK rather than copying it out first; it is also left
  * out of the data descriptor for that reason (the descriptor lists only src/main/assets).
  *
@@ -70,13 +72,20 @@ class EngineDataPlugin : Plugin<Project> {
             "c686cab6df8964c48d596f57d205bac31fc72870b06a83017e44503df8c09697",
             listOf("dict_sc.txt", "dict_extb.txt"),
         )
+        private val TABLE = Source(
+            "table-20240108.tar.zst",
+            "3e9d87b04a393f131723472c8eaa860dd23c378a3d4f6a9005513b2a95b3614b",
+            listOf("cj", "db", "erbi", "qxm", "wanfeng", "wbpy", "wbx", "zrm").map { "$it.txt" },
+        )
+        const val TABLES_TASK = "compileEngineTables"
+        private const val TOOL_MAIN = "org.fcitx.fcitx5.android.dicttool.MainKt"
     }
 
     override fun apply(target: Project) {
         val sourcesDir = target.layout.buildDirectory.dir("engine-sources")
         val components = target.extensions.getByType<ApplicationAndroidComponentsExtension>()
         val cmakeVersion = target.cmakeVersion
-        val extracted = listOf(LM, DICT).map { source ->
+        val extracted = listOf(LM, DICT, TABLE).map { source ->
             val download = target.tasks.register<DownloadTask>("download" + taskName(source)) {
                 url.set(BASE_URL + source.name)
                 sha256.set(source.sha256)
@@ -99,13 +108,18 @@ class EngineDataPlugin : Plugin<Project> {
 
         val compile = target.tasks.register<CompileEngineData>(COMPILE_TASK) {
             classpath = tool
-            mainClass.set("org.fcitx.fcitx5.android.dicttool.MainKt")
+            mainClass.set(TOOL_MAIN)
             // the whole language model is held in memory while it is sorted: 1.2 GB at most, as
             // measured; keep in step with ime-dict-tool's own run task
             maxHeapSize = "2g"
             lm.set(extracted[0].flatMap { it.outputDir.file(LM.files.single()) })
             dictionaries.from(DICT.files.map { name -> extracted[1].flatMap { it.outputDir.file(name) } })
             outputDir.set(target.layout.buildDirectory.dir("generated/engine-assets"))
+        }
+        val tables = target.tasks.register<CompileTables>(TABLES_TASK) {
+            classpath.from(tool)
+            tables.from(TABLE.files.map { name -> extracted[2].flatMap { it.outputDir.file(name) } })
+            outputDir.set(target.layout.buildDirectory.dir("generated/engine-tables"))
         }
 
         target.extensions.configure<ApplicationExtension> {
@@ -114,6 +128,7 @@ class EngineDataPlugin : Plugin<Project> {
         }
         components.onVariants { variant ->
             variant.sources.assets?.addGeneratedSourceDirectory(compile, CompileEngineData::outputDir)
+            variant.sources.assets?.addGeneratedSourceDirectory(tables, CompileTables::outputDir)
         }
     }
 
@@ -221,6 +236,36 @@ class EngineDataPlugin : Plugin<Project> {
         override fun exec() {
             output().parentFile.mkdirs()
             super.exec()
+        }
+    }
+
+    /** Compiles each code table's text into `engine/table/<name>.data`, one run of the tool each. */
+    @CacheableTask
+    abstract class CompileTables @Inject constructor(private val exec: ExecOperations) : DefaultTask() {
+        @get:Classpath
+        abstract val classpath: ConfigurableFileCollection
+
+        @get:InputFiles
+        @get:PathSensitive(PathSensitivity.NAME_ONLY)
+        abstract val tables: ConfigurableFileCollection
+
+        @get:OutputDirectory
+        abstract val outputDir: DirectoryProperty
+
+        @TaskAction
+        fun compile() {
+            val out = outputDir.get().asFile.resolve("engine/table")
+            out.deleteRecursively()
+            out.mkdirs()
+            for (table in tables.files) {
+                exec.javaexec {
+                    classpath = this@CompileTables.classpath
+                    mainClass.set(TOOL_MAIN)
+                    // a table is a few MB of text; the default heap is a quarter of the machine's
+                    maxHeapSize = "512m"
+                    args("table", "-o", out.resolve(table.nameWithoutExtension + ".data").path, table.path)
+                }
+            }
         }
     }
 }

@@ -34,6 +34,8 @@ class MainTest {
             arrayOf("slips", "s"),
             arrayOf("tune", "d", "s"),
             arrayOf("ksc"),
+            arrayOf("table", "d", "s", "--preset", "dvorak"),
+            arrayOf("table", "d", "s", "--half", "tune"),
             arrayOf(),
         )
         for (args in usageErrors) assertEquals(args.joinToString(" "), 2, exit(*args))
@@ -43,7 +45,7 @@ class MainTest {
     fun theUsageNamesEveryCommand() {
         val err = StringBuilder()
         assertEquals(2, runCli(arrayOf("help"), StringBuilder(), err))
-        for (command in listOf("score", "pinyin", "shuangpin", "slips", "tune")) assertTrue(command, "$command <" in err)
+        for (command in listOf("score", "pinyin", "shuangpin", "slips", "tune", "table")) assertTrue(command, "$command <" in err)
     }
 
     @Test
