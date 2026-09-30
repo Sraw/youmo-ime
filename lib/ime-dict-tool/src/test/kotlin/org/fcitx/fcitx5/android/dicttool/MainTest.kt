@@ -49,13 +49,14 @@ class MainTest {
 
     @Test
     fun aCodeTableIsCompiled() {
-        val table = file("t.txt", ReadersTest.TINY_TABLE)
+        val table = file("t.txt", TABLE)
         val output = tmp.root.resolve("t.data").path
         val (code, out, _) = run("table", "-o", output, table)
         assertEquals(0, code)
-        assertTrue(out, out.contains("table: 6 entries"))
+        assertTrue(out, out.contains("table: 4 entries, 1 phrases coded by the rules"))
+        assertTrue(out, out.contains("1 phrases the rules cannot code, left out"))
         assertTrue(out, out.contains("1 entries use characters outside 键码, e.g. a;b 怪"))
-        assertEquals(6, CodeTable.load(ByteBuffer.wrap(tmp.root.resolve("t.data").readBytes())).size)
+        assertEquals(5, CodeTable.load(ByteBuffer.wrap(tmp.root.resolve("t.data").readBytes())).size)
     }
 
     @Test
@@ -83,7 +84,7 @@ class MainTest {
     fun checkingSomethingOtherThanPinyinDataExitsWithAMessage() {
         val lm = file("lm.arpa", ReadersTest.TINY_ARPA)
         val table = tmp.root.resolve("t.data").path
-        assertEquals(0, run("table", "-o", table, file("t.txt", ReadersTest.TINY_TABLE)).first)
+        assertEquals(0, run("table", "-o", table, file("t.txt", TABLE)).first)
         val (code, _, err) = run("check", table, lm)
         assertEquals(1, code)
         assertEquals("file kind 2, expected 1\n", err)
@@ -103,5 +104,22 @@ class MainTest {
             assertEquals(args.toList().toString(), 2, code)
             assertEquals(USAGE + "\n", err)
         }
+    }
+
+    private companion object {
+        const val TABLE = """
+            键码=abc
+            码长=4
+            [组词规则]
+            e2=p11+p12+p21+p22
+            [数据]
+            ab 工
+            ab 式
+            a;b 怪
+            ca 作
+            [词组]
+            工作
+            工无
+        """
     }
 }

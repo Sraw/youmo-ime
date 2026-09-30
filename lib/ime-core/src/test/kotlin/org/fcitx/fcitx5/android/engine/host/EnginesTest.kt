@@ -386,7 +386,153 @@ class EnginesTest {
         }
     }
 
+    private fun userTable(
+        conf: String = "",
+        stamp: String = "1",
+        reads: () -> Unit = {},
+        text: String = MY_TABLE,
+        settings: String = "",
+    ) = Engines.UserTable("[Table]\nFile=table/my.main.dict\n$conf", { "$it $stamp" }, {
+        assertEquals("table/my.main.dict", it)
+        reads()
+        text.reader().buffered()
+    }, settings)
+
+    @Test
+    fun whatTheUserSetOfAnAddedTableIsReadAgainWithoutBuildingIt() {
+        var reads = 0
+        var settings = ""
+        Engines(::load, folder.newFolder("engine"), userTables = { userTable(reads = { reads++ }, settings = settings) }).use { engines ->
+            engines.type("my", "ab")
+            engines.onEvent("my", EngineEvent.PICK, 1)
+            assertEquals("工", engines.type("my", "ab").candidates.first())
+            settings = "[Table]\nOrderPolicy=Freq\n"
+            engines.reload()
+            // the pick kept all along, now what orders them
+            assertEquals("式", engines.type("my", "ab").candidates.first())
+        }
+        assertEquals(1, reads)
+    }
+
+    @Test
+    fun anAddedTableThatCannotBeKeptIsTypedAllTheSame() {
+        val dir = folder.newFolder("engine")
+        // where the tables would go, a file
+        dir.resolve(Engines.USER_TABLES).writeText("")
+        val errors = ArrayList<IOException>()
+        Engines(::load, dir, { errors += it }, userTables = { userTable() }).use { engines ->
+            assertEquals(listOf("工", "式", "工作"), engines.type("my", "ab").candidates)
+        }
+        // the table not kept, nor what it learned
+        assertEquals(2, errors.size)
+    }
+
+    @Test
+    fun aTableTheUserAddedIsBuiltOnceAndAgainOnlyWhenItChanges() {
+        val dir = folder.newFolder("engine")
+        var reads = 0
+        var stamp = "1"
+        val tables = { im: String -> if (im == "my") userTable(stamp = stamp, reads = { reads++ }) else null }
+        repeat(2) {
+            Engines(::load, dir, userTables = tables).use { engines ->
+                assertEquals(listOf("工", "式", "工作"), engines.type("my", "ab").candidates)
+                engines.onEvent("my", EngineEvent.RESET, 0)
+                // coded by the rules from its 词组
+                assertEquals(listOf("工作"), engines.type("my", "abcd").candidates)
+            }
+        }
+        assertEquals(1, reads)
+        stamp = "2"
+        Engines(::load, dir, userTables = tables).use { engines ->
+            engines.reload()
+            assertEquals(listOf("工", "式", "工作"), engines.type("my", "ab").candidates)
+        }
+        assertEquals(2, reads)
+        assertThrows(IllegalArgumentException::class.java) { Engines(::load, dir, userTables = tables).type("nope", "a") }
+    }
+
+    @Test
+    fun aTableTheUserAddedLearnsAsItsConfSays() {
+        val dir = folder.newFolder("engine")
+        for ((conf, first) in listOf("OrderPolicy=Freq\nLearning=False" to "工", "OrderPolicy=Freq" to "式")) {
+            val tables = { _: String -> userTable(conf) }
+            Engines(::load, dir, userTables = tables).use { engines ->
+                engines.type("my", "ab")
+                assertEquals("式", engines.onEvent("my", EngineEvent.PICK, 1).commit)
+                // not even for now, if it does not learn
+                assertEquals(first, engines.type("my", "ab").candidates.first())
+                engines.onEvent("my", EngineEvent.RESET, 0)
+            }
+            Engines(::load, dir, userTables = tables).use { engines ->
+                assertEquals(first, engines.type("my", "ab").candidates.first())
+            }
+        }
+        // the conf's own options, not the built-in tables'
+        Engines(::load, null, userTables = { userTable() }).use { engines ->
+            engines.type("my", "ab")
+            engines.onEvent("my", EngineEvent.PICK, 1)
+            assertEquals("工", engines.type("my", "ab").candidates.first())
+        }
+    }
+
+    @Test
+    fun aTableTheUserAddedThatCannotBeReadIsReportedOnceUntilReload() {
+        val errors = ArrayList<IOException>()
+        var asked = 0
+        var text = "键码=ab\n"
+        val engines = Engines(::load, folder.newFolder("engine"), { errors += it }, userTables = {
+            asked++
+            userTable(text = text)
+        })
+        repeat(2) { assertThrows(IllegalArgumentException::class.java) { engines.type("my", "a") } }
+        assertEquals(1, asked)
+        assertEquals(1, errors.size)
+        text = MY_TABLE
+        engines.reload()
+        assertEquals(listOf("工", "式", "工作"), engines.type("my", "ab").candidates)
+        assertEquals(2, asked)
+        // nor a .conf naming no table
+        val noFile = Engines(::load, null, { errors += it }, userTables = { Engines.UserTable("", { "1" }, { MY_TABLE.reader().buffered() }) })
+        assertThrows(IllegalArgumentException::class.java) { noFile.type("my", "a") }
+        // nor one the app cannot read
+        val gone = Engines(::load, null, { errors += it }, userTables = { throw IOException("gone") })
+        assertThrows(IllegalArgumentException::class.java) { gone.type("my", "a") }
+        assertEquals(listOf("gone"), errors.drop(2).map { it.message })
+        assertEquals(3, errors.size)
+    }
+
+    @Test
+    fun aBuiltTableCutShortIsBuiltAgain() {
+        val dir = folder.newFolder("engine")
+        val errors = ArrayList<IOException>()
+        var reads = 0
+        val tables = { _: String -> userTable(reads = { reads++ }) }
+        Engines(::load, dir, userTables = tables).use { it.type("my", "ab") }
+        val built = dir.resolve("${Engines.USER_TABLES}/my.table")
+        built.writeBytes(built.readBytes().copyOf(built.length().toInt() / 2))
+        Engines(::load, dir, { errors += it }, userTables = tables).use { engines ->
+            assertEquals(listOf("工", "式", "工作"), engines.type("my", "ab").candidates)
+        }
+        assertEquals(2, reads)
+        assertEquals(1, errors.size)
+        Engines(::load, dir, userTables = tables).use { it.type("my", "ab") }
+        assertEquals(2, reads)
+    }
+
     private companion object {
         const val MAX_PICKS = 10
+
+        val MY_TABLE = """
+            键码=abcd
+            码长=4
+            [组词规则]
+            e2=p11+p12+p21+p22
+            [数据]
+            ab 工
+            ab 式
+            cd 作
+            [词组]
+            工作
+        """.trimIndent()
     }
 }

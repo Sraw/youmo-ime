@@ -7,8 +7,11 @@ package org.fcitx.fcitx5.android.data.table
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.core.RawConfig
 import org.fcitx.fcitx5.android.data.table.dict.LibIMEDictionary
+import org.fcitx.fcitx5.android.engine.host.Engines
+import org.fcitx.fcitx5.android.engine.host.LibimeMigration
 import org.fcitx.fcitx5.android.utils.Ini
 import org.fcitx.fcitx5.android.utils.Locales
+import org.fcitx.fcitx5.android.utils.appContext
 import org.fcitx.fcitx5.android.utils.errorRuntime
 import timber.log.Timber
 import java.io.File
@@ -38,6 +41,11 @@ class TableBasedInputMethod(val file: File) {
             ini.set(Table, File, str = "table/$value")
         }
 
+    /** Made an input method of the app's engine, whichever addon the file was written for. */
+    fun useEngine() {
+        ini.set(InputMethod, Addon, str = LibimeMigration.ENGINE_ADDON)
+    }
+
     val tableFileExists
         get() = table != null
 
@@ -48,12 +56,16 @@ class TableBasedInputMethod(val file: File) {
     fun delete() {
         table?.file?.delete()
         table = null
+        // what the engine built of it and learned: a table imported later by its name starts afresh
+        val im = file.name.removeSuffix(".conf")
+        Engines.addedTableFiles(im).forEach { File(appContext.filesDir, "engine/$it").delete() }
         file.delete()
     }
 
     companion object {
         const val InputMethod = "InputMethod"
         const val Name = "Name"
+        const val Addon = "Addon"
         const val NameI18n = "Name[%s]"
         const val Table = "Table"
         const val File = "File"

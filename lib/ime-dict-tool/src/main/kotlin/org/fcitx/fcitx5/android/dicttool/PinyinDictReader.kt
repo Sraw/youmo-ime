@@ -5,6 +5,8 @@
 package org.fcitx.fcitx5.android.dicttool
 
 import org.fcitx.fcitx5.android.engine.data.PinyinDataBuilder
+import org.fcitx.fcitx5.android.engine.data.fields
+import org.fcitx.fcitx5.android.engine.data.forEachNumberedLine
 import org.fcitx.fcitx5.android.engine.pinyin.Syllables
 import java.io.BufferedReader
 import java.util.TreeMap

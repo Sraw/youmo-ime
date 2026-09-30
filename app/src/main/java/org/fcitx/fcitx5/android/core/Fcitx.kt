@@ -425,12 +425,20 @@ class Fcitx(private val context: Context) : FcitxAPI, FcitxLifecycleOwner {
             """.trimIndent()
             )
             with(FcitxApplication.getInstance().directBootAwareContext) {
-                EngineMigration.run(File(getExternalFilesDir(null) ?: filesDir, "config"))
+                val home = getExternalFilesDir(null) ?: filesDir
+                EngineMigration.run(File(home, "config"), File(home, "data"))
+                // what the user changed while fcitx was down (a table imported, say) is read anew
+                try {
+                    EngineBridge.reload()
+                } catch (@Suppress("TooGenericExceptionCaught") e: Exception) {
+                    // read again at first need all the same: that must not keep fcitx from starting
+                    Timber.w(e, "cannot reload the engine")
+                }
                 startupFcitx(
                     locale,
                     dataDir,
                     nativeLibDir,
-                    (getExternalFilesDir(null) ?: filesDir).absolutePath,
+                    home.absolutePath,
                     (externalCacheDir ?: cacheDir).absolutePath
                 )
             }

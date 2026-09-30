@@ -4,10 +4,13 @@
  */
 package org.fcitx.fcitx5.android.dicttool
 
+import org.fcitx.fcitx5.android.engine.data.CodeTableReader
 import org.fcitx.fcitx5.android.engine.data.DataFile
 import org.fcitx.fcitx5.android.engine.data.DataFormatException
 import org.fcitx.fcitx5.android.engine.data.PinyinData
 import org.fcitx.fcitx5.android.engine.data.PinyinDataBuilder
+import org.fcitx.fcitx5.android.engine.data.SourceException
+import org.fcitx.fcitx5.android.engine.table.TableText
 import java.io.File
 import java.io.IOException
 import java.io.RandomAccessFile
@@ -109,7 +112,9 @@ private fun pinyin(output: String, lm: String, dicts: List<String>, out: Appenda
 private fun table(output: String, input: String, out: Appendable) {
     val reader = CodeTableReader()
     File(input).bufferedReader().use { reader.read(it, input) }
-    out.appendLine("table: ${reader.entries} entries")
+    val uncoded = TableText.codePhrases(reader)
+    out.appendLine("table: ${reader.entries} entries, ${reader.phrases.size - uncoded} phrases coded by the rules")
+    if (uncoded > 0) out.appendLine("$uncoded phrases the rules cannot code, left out")
     if (reader.strayCodes.isNotEmpty()) {
         out.appendLine("${reader.strayCodes.size} entries use characters outside 键码, e.g. " +
             reader.strayCodes.take(STRAY_EXAMPLES).joinToString(" | "))

@@ -182,6 +182,7 @@ sealed class ConfigDescriptor<T, U> : Parcelable {
             QuickPhrase,
             Chttrans,
             PinyinCustomPhrase,
+            TableInputMethods,
         }
 
         override val ty: ConfigType<ConfigType.TyExternal>
@@ -318,6 +319,7 @@ sealed class ConfigDescriptor<T, U> : Parcelable {
                                 "QuickPhrase", "Editor" -> ConfigExternal.ETy.QuickPhrase
                                 "Chttrans" -> ConfigExternal.ETy.Chttrans
                                 "CustomPhrase" -> ConfigExternal.ETy.PinyinCustomPhrase
+                                "TableManager" -> ConfigExternal.ETy.TableInputMethods
                                 else -> null
                             }
                         )

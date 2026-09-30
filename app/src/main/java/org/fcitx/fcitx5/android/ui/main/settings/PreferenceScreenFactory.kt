@@ -174,6 +174,9 @@ object PreferenceScreenFactory {
                 ConfigExternal.ETy.QuickPhrase -> quickPhraseEditor()
                 ConfigExternal.ETy.Chttrans -> addonConfigPreference("chttrans")
                 ConfigExternal.ETy.PinyinCustomPhrase -> pinyinCustomPhrase()
+                ConfigExternal.ETy.TableInputMethods -> Preference(context).apply {
+                    setOnPreferenceClickListener { navigate(SettingsRoute.TableInputMethods) }
+                }
                 else -> stubPreference()
             }
             is ConfigInt -> {

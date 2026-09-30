@@ -5,7 +5,10 @@
 package org.fcitx.fcitx5.android.engine.host
 
 import org.fcitx.fcitx5.android.engine.data.CodeTable
+import org.fcitx.fcitx5.android.engine.data.CodeTableReader
+import org.fcitx.fcitx5.android.engine.data.DataFormatException
 import org.fcitx.fcitx5.android.engine.data.PinyinData
+import org.fcitx.fcitx5.android.engine.data.SourceException
 import org.fcitx.fcitx5.android.engine.phrase.CustomPhrases
 import org.fcitx.fcitx5.android.engine.pinyin.PinyinSegmenter
 import org.fcitx.fcitx5.android.engine.pinyin.ShuangpinSegmenter
@@ -15,24 +18,30 @@ import org.fcitx.fcitx5.android.engine.session.Choice
 import org.fcitx.fcitx5.android.engine.session.PinyinSession
 import org.fcitx.fcitx5.android.engine.session.Session
 import org.fcitx.fcitx5.android.engine.session.Snapshot
+import org.fcitx.fcitx5.android.engine.table.TableConf
 import org.fcitx.fcitx5.android.engine.table.TableDictionary
 import org.fcitx.fcitx5.android.engine.table.TableOptions
 import org.fcitx.fcitx5.android.engine.table.TableSession
+import org.fcitx.fcitx5.android.engine.table.TableText
 import org.fcitx.fcitx5.android.engine.table.TableUser
 import org.fcitx.fcitx5.android.engine.user.LibimeImport
 import org.fcitx.fcitx5.android.engine.user.UserModel
 import org.fcitx.fcitx5.android.engine.user.UserStore
+import java.io.BufferedReader
 import java.io.Closeable
 import java.io.File
 import java.io.IOException
+import java.io.RandomAccessFile
 import java.nio.ByteBuffer
+import java.nio.channels.FileChannel
 
 /**
  * The input methods the androidengine addon lists, by name, each with its session made on first
  * use. [load] gives a data file by its path in the app's assets; what the user picks, in pinyin
  * and in each table, is kept under [userDir] (in memory only if null). When pinyin's log is made
  * afresh, what libime's pinyin learned ([legacy], if the user had it) is read into it first. What the user added to
- * pinyin ([additions]) is read at first need, and again on [reload].
+ * pinyin ([additions]) is read at first need, and again on [reload]; so are the table input methods
+ * they added ([userTables]), asked for by a name the engine has none of.
  *
  * Everything here runs on one thread, the one fcitx runs on.
  */
@@ -42,7 +51,21 @@ class Engines(
     private val onError: (IOException) -> Unit = {},
     private val legacy: () -> LibimeImport.Legacy? = { null },
     private val additions: () -> Additions? = { null },
+    private val userTables: (String) -> UserTable? = { null },
 ) : Closeable {
+
+    /**
+     * A table input method the user added, as fcitx's table addon had it: its `.conf` ([TableConf])
+     * with what the user set of it over it ([settings]), and of the table file it names, the [text]
+     * ([CodeTableReader]), read only to build the table, which is kept built under the user
+     * directory until the file's [stamp] (its size and time, say) changes.
+     */
+    class UserTable(
+        val conf: String,
+        val stamp: (file: String) -> String,
+        val text: (file: String) -> BufferedReader,
+        val settings: String = "",
+    )
 
     /**
      * What the user added to pinyin, as libime kept it: its custom phrases file, and the lines
@@ -165,10 +188,10 @@ class Engines(
             }
         }
 
-    /** [event] of [im]'s keyboard; nothing picked is learned unless [learning]. */
+    /** [event] of [im]'s keyboard; nothing picked is learned unless [learning], nor by a table that does not learn. */
     fun onEvent(im: String, event: Int, arg: Int, learning: Boolean = true): Snapshot {
         val keyboard = keyboards[im] ?: Keyboard(session(im)).also { keyboards[im] = it }
-        return keyboard.onEvent(event, arg, learning)
+        return keyboard.onEvent(event, arg, learning && tables[im]?.learns != false)
     }
 
     /** Candidates of [im]'s input, from the [from]th, at most [count]; none if it has no session yet. */
@@ -186,9 +209,10 @@ class Engines(
                 pageSize = s.pageSize, user = user(), prediction = s.prediction, reranker = reranker(), phrases = phrases(),
             )
             else -> {
-                val method = TABLES[im] ?: throw IllegalArgumentException("no input method $im")
-                val options = (s.tables[method.group]?.applyTo(method.options) ?: method.options).copy(pageSize = s.pageSize)
-                val table = table(im)
+                val method = TABLES[im]
+                val table = if (method == null) addedTable(im) else table(im)
+                val own = method?.let { s.tables[it.group]?.applyTo(it.options) ?: it.options } ?: checkNotNull(table.options)
+                val options = own.copy(pageSize = s.pageSize)
                 // looking a character up by pinyin learns nothing: it is not how the user writes
                 val lookUp = if (options.pinyinKey == null) null else PinyinSession(pinyinData, PinyinSegmenter(), prediction = false)
                 TableSession(table.dictionary, options, lookUp, table.user)
@@ -196,25 +220,113 @@ class Engines(
         }
     }
 
-    /** A table and what the user taught it: both outlive the sessions made over them. */
-    private class Table(val dictionary: TableDictionary, val user: TableUser, val store: TableUser.Store?)
+    /**
+     * A table and what the user taught it: both outlive the sessions made over them. [options]:
+     * those of a table the user added, as its `.conf` has them; null for one of [TABLES]. Not
+     * [learns], as libime's table with Learning off, it keeps nothing, not even till the next start.
+     */
+    private class Table(
+        val dictionary: TableDictionary,
+        val user: TableUser,
+        val store: TableUser.Store?,
+        val options: TableOptions? = null,
+        val learns: Boolean = true,
+    )
 
     private val tables = HashMap<String, Table>()
 
     private fun table(im: String): Table = tables.getOrPut(im) {
         val dictionary = TableDictionary(CodeTable.load(load("$TABLE_DIR/${TABLES.getValue(im).file}"), verify = false))
         val user = TableUser(dictionary)
-        // a log that cannot be read or moved aside: learn in memory rather than not type
-        val store = userDir?.let { dir ->
-            dir.mkdirs()
+        Table(dictionary, user, userDir?.let { openStore(File(it, userTable(im)), user) })
+    }
+
+    // a log that cannot be read or moved aside: learn in memory rather than not type
+    private fun openStore(file: File, user: TableUser): TableUser.Store? {
+        file.parentFile?.mkdirs()
+        return try {
+            TableUser.Store(file, user, onError).apply { open() }
+        } catch (e: IOException) {
+            onError(e)
+            null
+        }
+    }
+
+    // added tables that failed, not tried again (on every key) until reload
+    private val failed = HashSet<String>()
+
+    /** A table the user added, built from its text unless built already; what fails is reported. */
+    private fun addedTable(im: String): Table = tables.getOrPut(im) {
+        require(im !in failed) { "input method $im failed to load" }
+        // until it loads: not tried again on every key
+        failed += im
+        val table = try {
+            val added = userTables(im) ?: throw IllegalArgumentException("no input method $im")
+            val conf = TableConf.parse(added.conf, added.settings)
+            val dictionary = TableDictionary(built(im, conf.file, added))
+            val user = TableUser(dictionary)
+            val store = if (conf.learning) userDir?.let { openStore(File(it, addedTableFiles(im).last()), user) } else null
+            Table(dictionary, user, store, conf.options, conf.learning)
+        } catch (e: IOException) {
+            throw unreadable(im, e)
+        } catch (e: SourceException) {
+            throw unreadable(im, e)
+        } catch (@Suppress("TooGenericExceptionCaught") e: RuntimeException) {
+            // what the app reads the table with may be native: no failure of it should go unsaid
+            throw unreadable(im, e)
+        } catch (e: LinkageError) {
+            throw unreadable(im, e)
+        }
+        failed -= im
+        table
+    }
+
+    private fun unreadable(im: String, e: Throwable): IllegalArgumentException {
+        onError(e as? IOException ?: IOException("cannot read input method $im", e))
+        return IllegalArgumentException("cannot read input method $im", e)
+    }
+
+    /**
+     * [added]'s table: as built before if its stamp is the same, else built from its text and
+     * kept for next time. One that cannot be kept is built again at the next start.
+     */
+    private fun built(im: String, file: String, added: UserTable): CodeTable {
+        // built again when the file changes, or how its text is read
+        val stamp = "$BUILD $file ${added.stamp(file)}"
+        val cache = userDir?.let { File(it, addedTableFiles(im).first()) }
+        if (cache != null && cache.isFile) {
             try {
-                TableUser.Store(File(dir, userTable(im)), user, onError).apply { open() }
+                val table = CodeTable.load(map(cache))
+                if (table.header[STAMP] == stamp) return table
+            } catch (e: DataFormatException) {
+                // cut short by a kill, or by a build that writes them otherwise: built again
+                onError(IOException("cannot read $cache", e))
             } catch (e: IOException) {
                 onError(e)
-                null
             }
         }
-        Table(dictionary, user, store)
+        val reader = CodeTableReader()
+        added.text(file).use { reader.read(it, file) }
+        TableText.codePhrases(reader)
+        reader.builder.header(STAMP, stamp)
+        val bytes = reader.builder.build().toByteArray()
+        if (cache != null) {
+            try {
+                cache.parentFile?.mkdirs()
+                val next = File(cache.path + ".new")
+                next.writeBytes(bytes)
+                if (!next.renameTo(cache)) throw IOException("cannot replace $cache")
+                // mapped, as at the next start: pages the OS may drop, not a heap the size of the table
+                return CodeTable.load(map(cache), verify = false)
+            } catch (e: IOException) {
+                onError(e)
+            }
+        }
+        return CodeTable.load(ByteBuffer.wrap(bytes), verify = false)
+    }
+
+    private fun map(file: File): ByteBuffer = RandomAccessFile(file, "r").use {
+        it.channel.map(FileChannel.MapMode.READ_ONLY, 0, it.length())
     }
 
     /** A reranker of the session's own, over the one model: each keeps what it ran for its input. */
@@ -232,13 +344,17 @@ class Engines(
         phrases = null
         keyboards.clear()
         sessions.clear()
+        // the tables the user added are asked for again: built again only if they changed
+        failed.clear()
+        for (im in tables.keys.filter { it !in TABLES }) tables.remove(im)?.store?.let(::closeQuietly)
         val model = userModel ?: return
         if (added()?.dictionaries.orEmpty() == before) return
         val log = store
         if (log == null) {
             addDictionaries(model)
         } else {
-            log.close()
+            // read again from the log all the same: what did not reach it is lost either way
+            closeQuietly(log)
             store = null
             userModel = null
         }
@@ -246,19 +362,21 @@ class Engines(
 
     override fun close() {
         // each on its own: one that fails to close must not leave the others open
-        (listOfNotNull(store) + tables.values.mapNotNull { it.store }).forEach {
-            try {
-                it.close()
-            } catch (e: IOException) {
-                onError(e)
-            }
-        }
+        (listOfNotNull(store) + tables.values.mapNotNull { it.store }).forEach(::closeQuietly)
         // used after all the same: each reads its log again, and appends to it
         store = null
         userModel = null
         tables.clear()
         sessions.clear()
         keyboards.clear()
+    }
+
+    private fun closeQuietly(closeable: Closeable) {
+        try {
+            closeable.close()
+        } catch (e: IOException) {
+            onError(e)
+        }
     }
 
     companion object {
@@ -269,6 +387,21 @@ class Engines(
         const val SENTENCE_MODEL = "engine/sentence-model.safetensors"
         const val TABLE_DIR = "engine/table"
         const val USER_PINYIN = "pinyin.user"
+
+        /** Under the user directory: the tables the user added, built, and what each learned. */
+        const val USER_TABLES = "tables"
+
+        // the header key a built table keeps its source's stamp under
+        private const val STAMP = "androidengine.stamp"
+
+        // raised when a table's text is read otherwise (CodeTableReader, TableText): built again
+        private const val BUILD = 1
+
+        /**
+         * Under the user directory, what is kept of a table the user added: the table built, and
+         * what it learned. Gone with the table, lest another of its name find them.
+         */
+        fun addedTableFiles(im: String): List<String> = listOf("$USER_TABLES/$im.table", "$USER_TABLES/$im.user")
 
         /** Where what the user taught the table input method [im] is kept: `wubi.user` and so on. */
         fun userTable(im: String) = im.removePrefix("engine-") + ".user"

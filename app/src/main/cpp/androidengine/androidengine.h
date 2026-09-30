@@ -97,7 +97,9 @@ FCITX_CONFIGURATION(
         ExternalOption dictmanager{this, "DictManager", _("Manage Dictionaries"),
                                    "fcitx://config/addon/androidengine/dictmanager"};
         ExternalOption customphrase{this, "CustomPhrase", _("Manage Custom Phrase"),
-                                    "fcitx://config/addon/androidengine/customphrase"};)
+                                    "fcitx://config/addon/androidengine/customphrase"};
+        ExternalOption tablemanager{this, "TableManager", _("Manage Table-based Input Methods"),
+                                    "fcitx://config/addon/androidengine/tablemanager"};)
 
 #undef FCITX_GETTEXT_DOMAIN
 #define FCITX_GETTEXT_DOMAIN "fcitx5-android"

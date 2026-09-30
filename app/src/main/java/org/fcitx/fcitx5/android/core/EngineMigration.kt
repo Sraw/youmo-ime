@@ -17,9 +17,11 @@ import java.io.IOException
  */
 object EngineMigration {
 
-    /** [configHome] is fcitx's (FCITX_CONFIG_HOME). */
-    fun run(configHome: File) {
+    /** [configHome] and [dataHome] are fcitx's (FCITX_CONFIG_HOME, FCITX_DATA_HOME). */
+    fun run(configHome: File, dataHome: File) {
         try {
+            // the tables the user imported: libime's table addon is not in the app any more
+            tables(File(dataHome, "inputmethod"))
             val profile = File(configHome, "profile")
             if (profile.exists()) LibimeMigration.profile(profile.readText())?.let { replace(profile, it) }
             val settings = File(configHome, "conf/androidengine.conf")
@@ -41,6 +43,22 @@ object EngineMigration {
             // run before every start: whatever it trips on must not keep fcitx from starting
             // fcitx starts with its defaults then: the old input methods are just not there
             Timber.w(e, "cannot migrate libime's config")
+        }
+    }
+
+    /**
+     * The tables the user imported: libime's table addon is not in the app any more. Not one named
+     * as libime's own (a wbx.conf of their own, say): the profile names the engine's for those.
+     */
+    private fun tables(dir: File) {
+        val confs = dir.listFiles { f -> f.isFile && f.name.endsWith(".conf") }.orEmpty()
+        for (conf in confs.filter { it.name.removeSuffix(".conf") !in LibimeMigration.INPUT_METHODS }) {
+            try {
+                LibimeMigration.tableInputMethod(conf.readText())?.let { replace(conf, it) }
+            } catch (e: IOException) {
+                // the others, and the rest of the migration, all the same
+                Timber.w(e, "cannot migrate %s", conf)
+            }
         }
     }
 

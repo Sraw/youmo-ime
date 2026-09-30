@@ -32,6 +32,12 @@ object LibimeMigration {
 
     const val ENABLED_IM = "EnabledIM"
     private const val TABLE = "Table"
+    private const val INPUT_METHOD = "InputMethod"
+    private const val ADDON = "Addon"
+    private const val TABLE_ADDON = "table"
+
+    /** The addon whose input methods are the engine's. */
+    const val ENGINE_ADDON = "androidengine"
 
     private class Section(val name: String, val lines: MutableList<String>)
 
@@ -94,6 +100,27 @@ object LibimeMigration {
         names.map { INPUT_METHODS[it] ?: it }.distinct().forEachIndexed { i, name -> list.lines += "$i=$name" }
         return write(sections)
     }
+
+    /**
+     * A table input method the user added, its `.conf` as fcitx's table addon read it, made the
+     * engine's: fcitx keeps an input method only while its addon is there, and libime's table is
+     * gone. Null if it is not the table addon's.
+     */
+    fun tableInputMethod(conf: String): String? {
+        val sections = sections(conf)
+        val im = sections.firstOrNull { it.name == INPUT_METHOD } ?: return null
+        if (value(im, ADDON) != TABLE_ADDON) return null
+        set(im, ADDON, ENGINE_ADDON)
+        return write(sections)
+    }
+
+    /**
+     * The name a table the user imports is kept by: one of libime's own ([INPUT_METHODS]) the
+     * profile would make the engine's at the next start, and one of the engine's would be the
+     * engine's own table, so those are named apart.
+     */
+    fun importedTableName(name: String): String =
+        if (name in INPUT_METHODS || name in INPUT_METHODS.values) "$name-table" else name
 
     /**
      * libime's tables whose settings carry over, kept as `table/<name>.conf` in fcitx's config

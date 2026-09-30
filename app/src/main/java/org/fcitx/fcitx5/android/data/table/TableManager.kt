@@ -7,6 +7,7 @@ package org.fcitx.fcitx5.android.data.table
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.data.table.dict.Dictionary
 import org.fcitx.fcitx5.android.data.table.dict.LibIMEDictionary
+import org.fcitx.fcitx5.android.engine.host.LibimeMigration
 import org.fcitx.fcitx5.android.utils.appContext
 import org.fcitx.fcitx5.android.utils.errorRuntime
 import org.fcitx.fcitx5.android.utils.extract
@@ -70,7 +71,8 @@ object TableManager {
     }
 
     private fun importFiles(confFile: File, dictFile: File): TableBasedInputMethod {
-        val importedConfFile = File(inputMethodDir, confFile.name.removeSuffix(".in")).also {
+        val name = LibimeMigration.importedTableName(confFile.name.removeSuffix(".in").removeSuffix(".conf"))
+        val importedConfFile = File(inputMethodDir, "$name.conf").also {
             if (it.exists())
                 errorRuntime(R.string.table_already_exists, it.name)
             confFile.copyTo(it)
@@ -89,6 +91,7 @@ object TableManager {
             im.file.delete()
             errorRuntime(R.string.invalid_table_dict, it.message)
         }
+        im.useEngine()
         im.save()
         return im
     }

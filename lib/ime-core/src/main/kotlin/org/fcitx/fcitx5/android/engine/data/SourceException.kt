@@ -2,7 +2,7 @@
  * SPDX-License-Identifier: LGPL-2.1-or-later
  * SPDX-FileCopyrightText: Copyright 2026 Fcitx5 for Android Contributors
  */
-package org.fcitx.fcitx5.android.dicttool
+package org.fcitx.fcitx5.android.engine.data
 
 import java.io.BufferedReader
 
@@ -14,12 +14,12 @@ class SourceException(val source: String, val line: Int, message: String, cause:
  * Spaces, tabs and a stray carriage return. Deliberately not [Char.isWhitespace]: that includes
  * the ideographic space U+3000, which code tables list as a character to type.
  */
-internal fun Char.isSeparator() = this == ' ' || this == '\t' || this == '\r'
+fun Char.isSeparator() = this == ' ' || this == '\t' || this == '\r'
 
-internal fun String.trimSeparators() = trim { it.isSeparator() }
+fun String.trimSeparators() = trim { it.isSeparator() }
 
 /** [isSeparator]-separated fields; a run of separators counts as one. */
-internal fun String.fields(): List<String> {
+fun String.fields(): List<String> {
     val out = ArrayList<String>(4)
     var start = -1
     for (i in indices) {
@@ -35,10 +35,37 @@ internal fun String.fields(): List<String> {
 }
 
 /**
+ * [value] as fcitx writes one with spaces, quotes or line breaks in it: quoted, `\` escaping a
+ * quote, a backslash or one of `n f r t v`, any other character escaped standing for itself.
+ * Unchanged if it is not quoted, or a quote ends it early: then the quotes are its own.
+ */
+fun unescapeValue(value: String): String {
+    if (value.length < 2 || value[0] != '"' || value[value.length - 1] != '"') return value
+    val out = StringBuilder(value.length)
+    var i = 1
+    while (i < value.length - 1) {
+        var c = value[i]
+        if (c == '"') return value
+        if (c == '\\') {
+            i++
+            c = value[i]
+            c = ESCAPES[c] ?: c
+            // the closing quote escaped: the value never closes
+            if (i == value.length - 1) return value
+        }
+        out.append(c)
+        i++
+    }
+    return out.toString()
+}
+
+private val ESCAPES = mapOf('n' to '\n', 'f' to '\u000C', 'r' to '\r', 't' to '\t', 'v' to '\u000B')
+
+/**
  * Calls [block] with each line and its 1-based number, turning a failure inside it into a
  * [SourceException] that points at the line. A leading byte-order mark is dropped.
  */
-internal inline fun BufferedReader.forEachNumberedLine(source: String, block: (line: String, number: Int) -> Unit) {
+inline fun BufferedReader.forEachNumberedLine(source: String, block: (line: String, number: Int) -> Unit) {
     var number = 0
     while (true) {
         val raw = readLine() ?: break

@@ -4,6 +4,10 @@
  */
 package org.fcitx.fcitx5.android.dicttool
 
+import org.fcitx.fcitx5.android.engine.data.SourceException
+import org.fcitx.fcitx5.android.engine.data.fields
+import org.fcitx.fcitx5.android.engine.data.forEachNumberedLine
+import org.fcitx.fcitx5.android.engine.data.trimSeparators
 import java.io.BufferedReader
 
 /**

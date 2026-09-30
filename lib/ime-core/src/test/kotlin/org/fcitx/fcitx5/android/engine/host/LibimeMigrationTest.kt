@@ -190,4 +190,24 @@ class LibimeMigrationTest {
         val settings = LibimeMigration.settings("ShuangpinProfile=\"GB Standard\"\n")
         assertEquals("ShuangpinProfile=\"GB Standard\"\n", settings)
     }
+
+    @Test
+    fun aTableTheUserAddedBecomesTheEngines() {
+        val conf = "[InputMethod]\nName=My\nAddon=table\n\n[Table]\nFile=table/my.main.dict\n"
+        assertEquals(
+            "[InputMethod]\nName=My\nAddon=androidengine\n\n[Table]\nFile=table/my.main.dict\n",
+            LibimeMigration.tableInputMethod(conf),
+        )
+        assertNull(LibimeMigration.tableInputMethod(conf.replace("Addon=table", "Addon=androidengine")))
+        // only the input method's addon, not a key of the same name elsewhere
+        assertNull(LibimeMigration.tableInputMethod("[InputMethod]\nName=My\n[Table]\nAddon=table\n"))
+        assertNull(LibimeMigration.tableInputMethod(""))
+    }
+
+    @Test
+    fun aTableImportedUnderOneOfLibimesNamesIsNamedApart() {
+        assertEquals("wbx-table", LibimeMigration.importedTableName("wbx"))
+        assertEquals("mydb", LibimeMigration.importedTableName("mydb"))
+        assertEquals("engine-wubi-table", LibimeMigration.importedTableName("engine-wubi"))
+    }
 }
