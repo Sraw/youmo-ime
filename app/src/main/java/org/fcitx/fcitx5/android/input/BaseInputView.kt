@@ -5,9 +5,15 @@
 
 package org.fcitx.fcitx5.android.input
 
+import android.os.SystemClock
+import android.view.MotionEvent
 import android.view.View
+import android.view.ViewGroup
 import android.view.WindowInsets
-import android.widget.PopupMenu
+import android.widget.ArrayAdapter
+import android.widget.FrameLayout
+import android.widget.ListAdapter
+import android.widget.ListPopupWindow
 import androidx.constraintlayout.widget.ConstraintLayout
 import androidx.core.text.bold
 import androidx.core.text.buildSpannedString
@@ -24,11 +30,12 @@ import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.data.theme.ThemePrefs
-import org.fcitx.fcitx5.android.utils.item
 import org.fcitx.fcitx5.android.utils.navbarFrameHeight
 import org.fcitx.fcitx5.android.utils.styledColorOrDefault
+import splitties.dimensions.dp
 import splitties.views.dsl.core.withTheme
 import kotlin.math.max
+import kotlin.math.min
 
 abstract class BaseInputView(
     val service: FcitxInputMethodService,
@@ -76,43 +83,94 @@ abstract class BaseInputView(
         fcitx.runIfReady { triggerCandidateAction(idx, actionIdx) }
     }
 
-    private var candidateActionMenu: PopupMenu? = null
+    private var candidateActionMenu: ListPopupWindow? = null
 
     val themedContext = context.withTheme(R.style.Theme_InputViewTheme)
 
+    // when the menu last closed, see [dispatchTouchEvent]
+    private var candidateActionMenuClosed = 0L
+
+    // the touch that closed the menu, till it is lifted
+    private var swallowing = false
+
     fun showCandidateActionMenu(idx: Int, text: String, view: View) {
         candidateActionMenu?.dismiss()
-        candidateActionMenu = null
         service.lifecycleScope.launch {
             val actions = fcitx.runOnReady { getCandidateActions(idx) }
-            if (actions.isEmpty()) return@launch
+            // another long press may have shown its menu meanwhile
+            candidateActionMenu?.dismiss()
+            // nor on a candidate view recycled meanwhile: no window to show it in
+            if (actions.isEmpty() || !view.isAttachedToWindow) return@launch
             InputFeedbacks.hapticFeedback(view, longPress = true)
-            candidateActionMenu = PopupMenu(themedContext, view).apply {
-                menu.add(buildSpannedString {
-                    bold {
-                        color(
-                            context.styledColorOrDefault(
-                                android.R.attr.colorAccent,
-                                theme.genericActiveForegroundColor
-                            )
-                        ) {
-                            append(text)
-                        }
+            val title = buildSpannedString {
+                bold {
+                    color(context.styledColorOrDefault(android.R.attr.colorAccent, theme.genericActiveForegroundColor)) {
+                        append(text)
                     }
-                }).apply {
-                    isEnabled = false
                 }
-                actions.forEach { action ->
-                    menu.item(action.text) {
-                        triggerCandidateAction(idx, action.id)
-                    }
+            }
+            val items = listOf<CharSequence>(title) + actions.map { it.text }
+            val adapter = object : ArrayAdapter<CharSequence>(themedContext, android.R.layout.simple_list_item_1, items) {
+                override fun areAllItemsEnabled() = false
+                override fun isEnabled(position: Int) = position > 0
+            }
+            // not a PopupMenu: that one takes the window focus from the editor, and some (the
+            // launcher's search) finish composing when they lose it and start the input anew when
+            // they get it back, so what was typed is gone before the action reaches it. Not
+            // focusable, the menu lets a touch outside it through as well: see [dispatchTouchEvent]
+            val menu = ListPopupWindow(themedContext, null, android.R.attr.popupMenuStyle)
+            // as wide as PopupMenu lets its menus grow
+            val widest = max(resources.displayMetrics.widthPixels / 2, dp(320))
+            candidateActionMenu = menu.apply {
+                isModal = false
+                anchorView = view
+                setAdapter(adapter)
+                setContentWidth(min(adapter.widest(FrameLayout(themedContext)), widest))
+                setOnItemClickListener { _, _, position, _ ->
+                    triggerCandidateAction(idx, actions[position - 1].id)
+                    dismiss()
                 }
                 setOnDismissListener {
-                    candidateActionMenu = null
+                    candidateActionMenuClosed = SystemClock.uptimeMillis()
+                    if (candidateActionMenu === menu) candidateActionMenu = null
                 }
                 show()
             }
         }
+    }
+
+    /**
+     * A touch that closes the menu only closes it, as it did when the menu was focusable: not a key
+     * typed or a candidate picked by the way. The menu may see it first and close, so a touch
+     * that went down before it closed counts too.
+     */
+    override fun dispatchTouchEvent(ev: MotionEvent): Boolean {
+        if (ev.actionMasked == MotionEvent.ACTION_DOWN) {
+            swallowing = candidateActionMenu != null || ev.downTime <= candidateActionMenuClosed
+            candidateActionMenu?.dismiss()
+        }
+        if (!swallowing) return super.dispatchTouchEvent(ev)
+        if (ev.actionMasked == MotionEvent.ACTION_UP || ev.actionMasked == MotionEvent.ACTION_CANCEL) {
+            swallowing = false
+        }
+        return true
+    }
+
+    override fun onWindowVisibilityChanged(visibility: Int) {
+        super.onWindowVisibilityChanged(visibility)
+        // the keyboard hidden with Back, which the menu does not take
+        if (visibility != VISIBLE) candidateActionMenu?.dismiss()
+    }
+
+    private fun ListAdapter.widest(parent: ViewGroup): Int {
+        val unspecified = View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED)
+        var widest = 0
+        for (i in 0 until count) {
+            val item = getView(i, null, parent)
+            item.measure(unspecified, unspecified)
+            widest = max(widest, item.measuredWidth)
+        }
+        return widest
     }
 
     private val navbarBackground by ThemeManager.prefs.navbarBackground
