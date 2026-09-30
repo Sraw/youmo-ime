@@ -213,23 +213,10 @@
     <string name="delete_theme">Delete Theme</string>
     <string name="delete_theme_msg">Do you really want to delete theme \"%1$s\"?</string>
     <string name="capture_heap_dump">Capture heap dump</string>
-    <string name="plugins">Plugins</string>
-    <string name="plugins_loaded">Loaded</string>
-    <string name="plugins_failed">Load failed</string>
-    <string name="missing_plugin_descriptor">Missing plugin descriptor</string>
-    <string name="invalid_plugin_descriptor">Invalid plugin descriptor</string>
-    <string name="missing_data_descriptor">Missing data descriptor</string>
-    <string name="invalid_data_descriptor">Invalid data descriptor</string>
-    <string name="incompatible_api">Incompatible API: %1$s</string>
-    <string name="path_conflict">Path \"%1$s\" is already owned by %2$s</string>
-    <string name="main_program">main program</string>
     <string name="edit_theme">Edit Theme</string>
     <string name="show_voice_input_button">Show voice input button</string>
     <string name="fcitx_daemon">Fcitx Daemon</string>
     <string name="restarting_fcitx">Restarting Fcitx</string>
-    <string name="plugin_needs_reload">Plugin changes detected, click here to reload</string>
-    <string name="no_plugins">No plugins available</string>
-    <string name="no_plugins_summary">Plugins are separate apps that add input methods (e.g. Rime, Anthy, Hangul) or features. Install one built for this same app and build type (release or debug), then come back here to load it.</string>
     <string name="removed_n_items">Removed %1$d item(s)</string>
     <string name="whether_reset_switch_preference">Would you like to reset this preference to default?</string>
     <string name="enabled">Enabled</string>
@@ -263,7 +250,6 @@
     <string name="clipboard_mask_sensitive">Mask sensitive data (such as passwords)</string>
     <string name="clipboard_clear_urls">Remove tracking parameters from links</string>
     <string name="clipboard_clear_urls_summary">Clean copied links with ClearURLs rules before they enter clipboard history. The system clipboard is left unchanged.</string>
-    <string name="open_rime_user_data_dir">Application data directory will be opened. RIME user data directory is located in \"data/rime\".</string>
     <string name="restart_to_apply_settings">Application will restart to apply new settings. Proceed?</string>
     <string name="space_swipe_move_cursor">Swipe on space key to move cursor</string>
     <string name="please_wait">Please wait…</string>
@@ -357,7 +343,6 @@
     <string name="section_candidates">Candidate bar</string>
     <string name="section_size_and_padding">Size &amp; padding</string>
     <string name="section_sound_and_vibration">Sound &amp; vibration</string>
-    <string name="rime" translatable="false">Rime</string>
     <string name="home_section_input">Input</string>
     <string name="home_section_keyboard">Keyboard</string>
     <string name="home_section_appearance">Appearance</string>

@@ -513,8 +513,7 @@ Java_org_fcitx_fcitx5_android_core_Fcitx_startupFcitx(
         jstring appData,
         jstring appLib,
         jstring extData,
-        jstring extCache,
-        jobjectArray extDomains) {
+        jstring extCache) {
     if (Fcitx::Instance().isRunning()) {
         FCITX_ERROR() << "Fcitx is already running!";
         return;
@@ -584,12 +583,6 @@ Java_org_fcitx_fcitx5_android_core_Fcitx_startupFcitx(
     fcitx::registerDomain("fcitx5-lua", locale_dir_char);
     fcitx::registerDomain("fcitx5-chinese-addons", locale_dir_char);
     fcitx::registerDomain("fcitx5-android", locale_dir_char);
-
-    const int extDomainsSize = env->GetArrayLength(extDomains);
-    for (int i = 0; i < extDomainsSize; i++) {
-        auto domain = JRef<jstring>(env, env->GetObjectArrayElement(extDomains, i));
-        fcitx::registerDomain(CString(env, domain), locale_dir_char);
-    }
 
     auto candidateListCallback = [](const std::vector<CandidateEntity> &candidates, const int total) {
         auto env = GlobalRef->AttachEnv();

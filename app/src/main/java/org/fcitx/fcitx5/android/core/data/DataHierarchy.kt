@@ -8,117 +8,47 @@ import android.util.Base64
 import java.security.MessageDigest
 
 /**
- * Merge [DataDescriptor]s
+ * Plans how to bring [DataManager.dataDir] from what the last run installed to what the app ships
+ * in its assets.
  *
- * It records files' sources, i.e. what [DataDescriptor] they belong to
+ * This used to merge the app's files with those of plugins; with plugins gone there is one source.
  */
-class DataHierarchy {
-    private val files = mutableMapOf<String, Pair<SHA256, FileSource>>()
-    private val descriptorSHA256 = mutableSetOf<SHA256>()
-    private val symlinks = mutableMapOf<String, Pair<String, FileSource>>()
-
-    data class PathConflict(val path: String, val src: FileSource) : Exception()
-    data class SymlinkConflict(val path: String, val src: FileSource) : Exception()
+object DataHierarchy {
 
     /**
-     * Merge a [DataDescriptor]
+     * The descriptor to save once [shipped] has been installed.
      *
-     * @throws PathConflict if a non-directory path already exists in the hierarchy
-     * @throws SymlinkConflict if a file or directory already exists when creating symlink
+     * Its checksum is derived as it was when descriptors were merged, so a data directory an older
+     * version installed compares equal as long as the assets haven't changed.
      */
-    fun install(descriptor: DataDescriptor, src: FileSource) {
-        val newFiles = descriptor.files.mapValues { (path, sha256) ->
-            files[path]?.also { old ->
-                // path conflict when at least one of them is not a directory (empty sha256)
-                if (old.first.isNotEmpty() || sha256.isNotEmpty()) {
-                    throw PathConflict(path, old.second)
-                }
-            }
-            Pair(sha256, src)
-        }
-        // merge new files only when there is no conflict with existing files
-        files.putAll(newFiles)
-        val newSymlinks = descriptor.symlinks.mapValues { (path, source) ->
-            // path we try to create is already a file or directory in our hierarchy
-            files[path]?.let { (_, src) ->
-                throw SymlinkConflict(path, src)
-            }
-            // path we try to create is already a symlink in our hierarchy
-            // but it refers to a different path
-            symlinks[path]?.let { (existedSource, src) ->
-                if (source != existedSource)
-                    throw PathConflict(path, src)
-            }
-            Pair(source, src)
-        }
-        symlinks.putAll(newSymlinks)
-        descriptorSHA256.add(descriptor.sha256)
-    }
+    fun installed(shipped: DataDescriptor) =
+        DataDescriptor(checksum(shipped), shipped.files, shipped.symlinks)
 
     /**
-     * Create a [DataDescriptor] from the file list, discarding other information
+     * [FileAction]s that turn the [old] installation into [shipped]; empty when nothing changed
      */
-    fun downToDataDescriptor() =
-        DataDescriptor(
-            sha256(this),
-            files.mapValues { it.value.first },
-            symlinks.mapValues { it.value.first })
-
-    companion object {
-        private val digest by lazy { MessageDigest.getInstance("SHA-256") }
-
-        /**
-         * Calculate checksum according to merged descriptors
-         *
-         * Note: This is different from sha256 calculated by gradle task,
-         * in which the it is the hash string of file list itself
-         */
-        private fun sha256(h: DataHierarchy): String =
-            digest.digest(h.descriptorSHA256.joinToString(separator = "").encodeToByteArray())
-                .let {
-                    Base64.encodeToString(it, 0).trim()
-                }
-
-        /**
-         * Compute the difference between a [DataDescriptor] and [DataHierarchy],
-         * generating [FileAction]s to migrate from the [old] to [new]
-         */
-        fun diff(old: DataDescriptor, new: DataHierarchy): List<FileAction> {
-            if (old.sha256 == sha256(new))
-                return emptyList()
-            val diffFiles = new.files.mapNotNull { (path, v) ->
-                val (sha256, src) = v
-                when {
-                    path !in old.files && sha256.isNotBlank() ->
-                        FileAction.CreateFile(path, src)
-                    old.files[path] != sha256 ->
-                        if (sha256.isNotBlank())
-                            FileAction.UpdateFile(path, src)
-                        else null
-                    else -> null
-                }
-            }.toMutableList<FileAction>().apply {
-                addAll(old.files.filterKeys { it !in new.files }
-                    .map { (path, sha256) ->
-                        if (sha256.isNotBlank())
-                            FileAction.DeleteFile(path)
-                        else
-                            FileAction.DeleteDir(path)
-                    })
+    fun diff(old: DataDescriptor, shipped: DataDescriptor): List<FileAction> {
+        if (old.sha256 == checksum(shipped))
+            return emptyList()
+        val diffFiles = shipped.files.mapNotNull { (path, sha256) ->
+            when {
+                // directories (empty sha256) are created along with the files in them
+                sha256.isBlank() -> null
+                path !in old.files -> FileAction.CreateFile(path)
+                old.files[path] != sha256 -> FileAction.UpdateFile(path)
+                else -> null
             }
-            val diffLinks = new.symlinks.mapNotNull { (target, v) ->
-                val (source, _) = v
-                if (old.symlinks[target] == source)
-                // old link will be overwritten
-                    null
-                else
-                    FileAction.CreateSymlink(target, source)
-            }.toMutableList<FileAction>().apply {
-                addAll(old.symlinks.filterKeys { it !in new.symlinks }.map { (target, _) ->
-                    FileAction.DeleteFile(target)
-                })
-            }
-            return diffFiles + diffLinks
+        } + old.files.filterKeys { it !in shipped.files }.map { (path, sha256) ->
+            if (sha256.isNotBlank()) FileAction.DeleteFile(path) else FileAction.DeleteDir(path)
         }
+        val diffLinks = shipped.symlinks.mapNotNull { (target, source) ->
+            // an unchanged link is left alone; a changed one is overwritten
+            if (old.symlinks[target] == source) null else FileAction.CreateSymlink(target, source)
+        } + old.symlinks.keys.filter { it !in shipped.symlinks }.map { FileAction.DeleteFile(it) }
+        return diffFiles + diffLinks
     }
+
+    private fun checksum(descriptor: DataDescriptor): SHA256 =
+        MessageDigest.getInstance("SHA-256").digest(descriptor.sha256.encodeToByteArray())
+            .let { Base64.encodeToString(it, 0).trim() }
 }

@@ -18,7 +18,6 @@ dependencyResolutionManagement {
 
 rootProject.name = "fcitx5-android"
 
-include(":lib:common")
 include(":lib:ime-core")
 include(":lib:fcitx5")
 include(":lib:fcitx5-lua")
@@ -26,12 +25,3 @@ include(":lib:libime")
 include(":lib:fcitx5-chinese-addons")
 include(":codegen")
 include(":app")
-include(":lib:plugin-base")
-include(":plugin:anthy")
-include(":plugin:unikey")
-include(":plugin:rime")
-include(":plugin:hangul")
-include(":plugin:chewing")
-include(":plugin:sayura")
-include(":plugin:jyutping")
-include(":plugin:thai")

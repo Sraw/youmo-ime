@@ -230,8 +230,7 @@ class Fcitx(private val context: Context) : FcitxAPI, FcitxLifecycleOwner {
             appData: String,
             appLib: String,
             extData: String,
-            extCache: String,
-            extDomains: Array<String>
+            extCache: String
         )
 
         @JvmStatic
@@ -414,35 +413,22 @@ class Fcitx(private val context: Context) : FcitxAPI, FcitxLifecycleOwner {
             DataManager.sync()
             val locale = Locales.fcitxLocale
             val dataDir = DataManager.dataDir.absolutePath
-            val plugins = DataManager.getLoadedPlugins()
-            val nativeLibDir = StringBuilder(context.applicationInfo.nativeLibraryDir)
-            val extDomains = arrayListOf<String>()
-            plugins.forEach {
-                if (it.nativeLibraryDir.isNotBlank()) {
-                    nativeLibDir.append(':')
-                    nativeLibDir.append(it.nativeLibraryDir)
-                }
-                it.domain?.let { d ->
-                    extDomains.add(d)
-                }
-            }
+            val nativeLibDir = context.applicationInfo.nativeLibraryDir
             Timber.d(
                 """
                Starting fcitx with:
                locale=$locale
                dataDir=$dataDir
                nativeLibDir=$nativeLibDir
-               extDomains=${extDomains.joinToString()}
             """.trimIndent()
             )
             with(FcitxApplication.getInstance().directBootAwareContext) {
                 startupFcitx(
                     locale,
                     dataDir,
-                    nativeLibDir.toString(),
+                    nativeLibDir,
                     (getExternalFilesDir(null) ?: filesDir).absolutePath,
-                    (externalCacheDir ?: cacheDir).absolutePath,
-                    extDomains.toTypedArray()
+                    (externalCacheDir ?: cacheDir).absolutePath
                 )
             }
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
@@ -519,9 +505,6 @@ class Fcitx(private val context: Context) : FcitxAPI, FcitxLifecycleOwner {
         registerFcitxEventHandler(::handleFcitxEvent)
         lifecycleRegistry.postEvent(FcitxLifecycle.Event.ON_START)
         ClipboardManager.addOnUpdateListener(onClipboardUpdate)
-        DataManager.addOnNextSyncedCallback {
-            FcitxPluginServices.connectAll()
-        }
         setupLogStream(AppPrefs.getInstance().internal.verboseLog.getValue())
         dispatcher.start()
     }
@@ -534,7 +517,6 @@ class Fcitx(private val context: Context) : FcitxAPI, FcitxLifecycleOwner {
         lifecycleRegistry.postEvent(FcitxLifecycle.Event.ON_STOP)
         Timber.i("Fcitx stop()")
         ClipboardManager.removeOnUpdateListener(onClipboardUpdate)
-        FcitxPluginServices.disconnectAll()
         dispatcher.stop().let {
             if (it.isNotEmpty())
                 Timber.w("${it.size} job(s) didn't get a chance to run!")

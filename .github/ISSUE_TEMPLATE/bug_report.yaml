@@ -74,10 +74,3 @@ body:
       label: 应用版本 / App Version
     validations:
       required: true
-
-  - type: input
-    id: plugins_version
-    attributes:
-      label: 插件版本 / Plugins Version
-    validations:
-      required: false

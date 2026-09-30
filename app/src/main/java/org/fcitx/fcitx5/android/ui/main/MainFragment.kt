@@ -15,13 +15,8 @@ import androidx.annotation.DrawableRes
 import androidx.annotation.StringRes
 import androidx.core.view.MenuProvider
 import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.lifecycleScope
-import androidx.lifecycle.repeatOnLifecycle
 import androidx.preference.PreferenceCategory
-import androidx.preference.PreferenceScreen
-import kotlinx.coroutines.launch
 import org.fcitx.fcitx5.android.R
-import org.fcitx.fcitx5.android.core.data.DataManager
 import org.fcitx.fcitx5.android.ui.common.PaddingPreferenceFragment
 import org.fcitx.fcitx5.android.ui.main.settings.SettingsRoute
 import org.fcitx.fcitx5.android.utils.Const
@@ -41,15 +36,6 @@ class MainFragment : PaddingPreferenceFragment() {
         requireActivity().addMenuProvider(
             AboutMenuProvider(), viewLifecycleOwner, Lifecycle.State.STARTED
         )
-        // plugins load asynchronously on a cold start, and may be reloaded from the plugin page.
-        // Scoped to the view: setting preferenceScreen after onDestroyView (we're on the back
-        // stack) would crash in PreferenceFragmentCompat.bindPreferences
-        viewLifecycleOwner.lifecycleScope.launch {
-            viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.RESUMED) {
-                DataManager.awaitSynced()
-                if (rimeLoaded() != rimeShown) preferenceScreen = createPreferenceScreen()
-            }
-        }
     }
 
     private inner class AboutMenuProvider : MenuProvider {
@@ -78,32 +64,15 @@ class MainFragment : PaddingPreferenceFragment() {
         }
     }
 
-    private var rimeShown = false
-
-    // the set is mutated by a running sync; only read it once that has finished
-    private fun rimeLoaded() =
-        DataManager.synced && DataManager.getLoadedPlugins().any { it.name == RIME_PLUGIN }
-
     override fun onCreatePreferences(savedInstanceState: Bundle?, rootKey: String?) {
-        preferenceScreen = createPreferenceScreen()
-    }
-
-    private fun createPreferenceScreen(): PreferenceScreen {
-        rimeShown = rimeLoaded()
         // grouped by what the user wants to adjust, not by which layer (fcitx or Android) owns the setting
-        return preferenceManager.createPreferenceScreen(requireContext()).apply {
+        preferenceScreen = preferenceManager.createPreferenceScreen(requireContext()).apply {
             addCategory(R.string.home_section_input) {
                 addDestinationPreference(
                     R.string.input_methods,
                     R.drawable.ic_baseline_language_24,
                     SettingsRoute.InputMethodList
                 )
-                // only once the plugin is loaded: before that the addon has no config to show
-                if (rimeShown) {
-                    addPreference(getString(R.string.rime), icon = R.drawable.ic_status_rime) {
-                        navigateWithAnim(SettingsRoute.AddonConfig(getString(R.string.rime), RIME_ADDON))
-                    }
-                }
                 addDestinationPreference(
                     R.string.global_options,
                     R.drawable.ic_baseline_tune_24,
@@ -151,23 +120,11 @@ class MainFragment : PaddingPreferenceFragment() {
             }
             addCategory(R.string.home_section_other) {
                 addDestinationPreference(
-                    R.string.plugins,
-                    R.drawable.ic_baseline_android_24,
-                    SettingsRoute.Plugin
-                )
-                addDestinationPreference(
                     R.string.advanced,
                     R.drawable.ic_baseline_more_horiz_24,
                     SettingsRoute.Advanced
                 )
             }
         }
-    }
-
-    companion object {
-        /** [org.fcitx.fcitx5.android.core.data.PluginDescriptor.name] of plugin/rime */
-        private const val RIME_PLUGIN = "rime"
-        /** fcitx5-rime's addon unique name */
-        private const val RIME_ADDON = "rime"
     }
 }

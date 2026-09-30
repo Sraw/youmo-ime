@@ -183,7 +183,6 @@ sealed class ConfigDescriptor<T, U> : Parcelable {
             Chttrans,
             TableGlobal,
             PinyinCustomPhrase,
-            RimeUserDataDir,
 
             // manually added on Android side for TableManager
             AndroidTable
@@ -324,7 +323,6 @@ sealed class ConfigDescriptor<T, U> : Parcelable {
                                 "Chttrans" -> ConfigExternal.ETy.Chttrans
                                 "TableGlobal" -> ConfigExternal.ETy.TableGlobal
                                 "CustomPhrase" -> ConfigExternal.ETy.PinyinCustomPhrase
-                                "UserDataDir" -> ConfigExternal.ETy.RimeUserDataDir
                                 "AndroidTable" -> ConfigExternal.ETy.AndroidTable
                                 else -> null
                             }

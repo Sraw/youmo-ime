@@ -105,12 +105,8 @@
     <string name="space_behavior_enumerate">Enumerar métodos de entrada</string>
     <string name="delete_theme">Eliminar tema</string>
     <string name="delete_theme_msg">¿Realmente quiere eliminar el tema «%1$s»?</string>
-    <string name="plugins">Complementos</string>
-    <string name="plugins_failed">Falló la carga</string>
-    <string name="main_program">programa principal</string>
     <string name="edit_theme">Editar tema</string>
     <string name="show_voice_input_button">Mostrar botón de entrada por voz</string>
-    <string name="no_plugins">No hay ningún complemento disponible</string>
     <string name="whether_reset_switch_preference">¿Quiere restablecer la preferencia a su valor predeterminado?</string>
     <string name="enabled">Activado</string>
     <string name="following_system_settings">Seguir configuración del sistema</string>

@@ -5,8 +5,6 @@
 package org.fcitx.fcitx5.android.ui.main.settings
 
 import android.content.Context
-import android.os.Build
-import androidx.appcompat.app.AlertDialog
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.FragmentManager
 import androidx.preference.DialogPreference
@@ -24,9 +22,6 @@ import org.fcitx.fcitx5.android.core.Key
 import org.fcitx.fcitx5.android.core.RawConfig
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.ui.main.modified.MySwitchPreference
-import org.fcitx.fcitx5.android.utils.LongClickPreference
-import org.fcitx.fcitx5.android.utils.buildDocumentsProviderIntent
-import org.fcitx.fcitx5.android.utils.buildPrimaryStorageIntent
 import org.fcitx.fcitx5.android.utils.config.ConfigDescriptor
 import org.fcitx.fcitx5.android.utils.config.ConfigDescriptor.ConfigBool
 import org.fcitx.fcitx5.android.utils.config.ConfigDescriptor.ConfigCustom
@@ -40,7 +35,6 @@ import org.fcitx.fcitx5.android.utils.config.ConfigDescriptor.ConfigString
 import org.fcitx.fcitx5.android.utils.config.ConfigType
 import org.fcitx.fcitx5.android.utils.navigateWithAnim
 import org.fcitx.fcitx5.android.utils.parcelableArray
-import org.fcitx.fcitx5.android.utils.toast
 import timber.log.Timber
 
 object PreferenceScreenFactory {
@@ -132,35 +126,6 @@ object PreferenceScreenFactory {
             }
         }
 
-        fun rimeUserDataDir(title: String): Preference = LongClickPreference(context).apply {
-            setOnPreferenceClickListener {
-                AlertDialog.Builder(context)
-                    .setTitle(title)
-                    .setMessage(R.string.open_rime_user_data_dir)
-                    .setNegativeButton(android.R.string.cancel, null)
-                    .setPositiveButton(android.R.string.ok) { _, _ ->
-                        try {
-                            context.startActivity(buildDocumentsProviderIntent())
-                        } catch (e: Exception) {
-                            context.toast(e)
-                        }
-                    }
-                    .show()
-                true
-            }
-
-            // make it a hidden option, because of compatibility issues
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                setOnPreferenceLongClickListener {
-                    try {
-                        context.startActivity(buildPrimaryStorageIntent("data/rime"))
-                    } catch (e: Exception) {
-                        context.toast(e)
-                    }
-                }
-            }
-        }
-
         fun listPreference(subtype: ConfigType<*>): Preference = object : Preference(context) {
             override fun onClick() {
                 navigate(SettingsRoute.ListConfig(cfg ?: RawConfig(), descriptor))
@@ -217,9 +182,6 @@ object PreferenceScreenFactory {
                 ConfigExternal.ETy.TableGlobal -> addonConfigPreference("table")
                 ConfigExternal.ETy.AndroidTable -> tableInputMethod()
                 ConfigExternal.ETy.PinyinCustomPhrase -> pinyinCustomPhrase()
-                ConfigExternal.ETy.RimeUserDataDir -> rimeUserDataDir(
-                    descriptor.description ?: descriptor.name
-                )
                 else -> stubPreference()
             }
             is ConfigInt -> {

@@ -42,12 +42,7 @@ class BuildMetadataPlugin : Plugin<Project> {
                         // create metadata file after package, because it's outputDirectory would
                         // be cleared at some time before package
                         mustRunAfter(packageTask)
-                        val fileName = target.path.let {
-                            // ":app" -> "" || ":plugin:anthy" -> ".plugin.anthy"
-                            val suffix = if (it == ":app") "" else it.replace(':', '.')
-                            "build-metadata${suffix}.json"
-                        }
-                        outputFile.set(packageTask.outputDirectory.file(fileName))
+                        outputFile.set(packageTask.outputDirectory.file("build-metadata.json"))
                     }.also {
                         target.tasks.getByName("assemble${variantName}").dependsOn(it)
                     }

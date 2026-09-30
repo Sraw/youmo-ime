@@ -15,26 +15,13 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <!-- Don't strip the Cropper library's queries with tools:node="removeAll": under AGP 9 it also
-         dropped these, so plugins and other input methods became invisible on Android 11+.
+         dropped this one, so other input methods became invisible on Android 11+.
          Its two extra queries (file pickers, camera apps) reveal nothing sensitive. -->
     <queries>
-        <intent>
-            <action android:name="${applicationId}.plugin.MANIFEST" />
-        </intent>
         <intent>
             <action android:name="android.view.InputMethod" />
         </intent>
     </queries>
-
-    <permission
-        android:name="${applicationId}.permission.IPC"
-        android:protectionLevel="signature" />
-
-    <permission
-        android:name="${applicationId}.permission.PLUGIN"
-        android:protectionLevel="signature" />
-
-    <uses-permission android:name="${applicationId}.permission.PLUGIN" />
 
     <application
         android:name=".FcitxApplication"
@@ -134,16 +121,6 @@
             <meta-data
                 android:name="android.view.im"
                 android:resource="@xml/input_method" />
-        </service>
-
-        <service
-            android:name=".FcitxRemoteService"
-            android:exported="true"
-            android:permission="${applicationId}.permission.IPC"
-            tools:ignore="SystemPermissionTypo">
-            <intent-filter>
-                <action android:name="${applicationId}.IPC" />
-            </intent-filter>
         </service>
 
         <provider

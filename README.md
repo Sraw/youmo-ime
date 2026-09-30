@@ -33,16 +33,7 @@ In case you want Fcitx5 on other platforms: [macOS](https://github.com/fcitx-con
 ### Supported Languages
 
 - English (with spell check)
-- Chinese
-  - Pinyin, Shuangpin, Wubi, Cangjie and custom tables (built-in, powered by [fcitx5-chinese-addons](https://github.com/fcitx/fcitx5-chinese-addons))
-  - Zhuyin/Bopomofo (via [Chewing Plugin](./plugin/chewing))
-  - Jyutping (via [Jyutping Plugin](./plugin/jyutping/), powered by [libime-jyutping](https://github.com/fcitx/libime-jyutping))
-- Vietnamese (via [UniKey Plugin](./plugin/unikey), supports Telex, VNI and VIQR)
-- Japanese (via [Anthy Plugin](./plugin/anthy))
-- Korean (via [Hangul Plugin](./plugin/hangul))
-- Sinhala (via [Sayura Plugin](./plugin/sayura))
-- Thai (via [Thai Plugin](./plugin/thai))
-- Generic (via [RIME Plugin](./plugin/rime), supports importing custom schemas)
+- Chinese: Pinyin, Shuangpin, Wubi, Cangjie and custom tables (powered by [fcitx5-chinese-addons](https://github.com/fcitx/fcitx5-chinese-addons))
 
 ### Implemented Features
 
@@ -53,13 +44,11 @@ In case you want Fcitx5 on other platforms: [macOS](https://github.com/fcitx-con
 - Popup preview on key press
 - Long press popup keyboard for convenient symbol input
 - Symbol and Emoji picker
-- Plugin System for loading addons from other installed apk
 - Floating candidates panel when using physical keyboard
 
 ### Planned Features
 
 - Customizable keyboard layout
-- More input methods (via plugin)
 
 ## Screenshots
 

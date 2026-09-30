@@ -24,4 +24,3 @@ jobs:
       - name: Build Release APK
         run: |
           nix develop .#noAS --command ./gradlew :app:assembleRelease
-          nix develop .#noAS --command ./gradlew :assembleReleasePlugins

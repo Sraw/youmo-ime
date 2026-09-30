@@ -61,30 +61,10 @@ jobs:
         uses: gradle/actions/setup-gradle@v6
 
       - name: Build Release APK
-        run: |
-          ./gradlew :app:assembleRelease
-          ./gradlew :assembleReleasePlugins
+        run: ./gradlew :app:assembleRelease
 
       - name: Upload app
         uses: actions/upload-artifact@v7
         with:
           name: app-${{ matrix.os }}
           path: app/build/outputs/apk/release/
-
-      - name: Pack plugins
-        shell: bash
-        run: |
-          mkdir plugins-to-upload
-          for i in $(ls plugin)
-          do
-            if [ -d "plugin/${i}" ]
-            then
-              mv "plugin/${i}/build/outputs/apk/release" "plugins-to-upload/${i}"
-            fi
-          done
-
-      - name: Upload plugins
-        uses: actions/upload-artifact@v7
-        with:
-          name: plugins-${{ matrix.os }}
-          path: plugins-to-upload

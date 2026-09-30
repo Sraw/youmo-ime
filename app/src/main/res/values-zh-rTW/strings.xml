@@ -213,22 +213,10 @@
     <string name="delete_theme">刪除主題</string>
     <string name="delete_theme_msg">確定要刪除主題 “%1$s” 嗎？</string>
     <string name="capture_heap_dump">捕獲堆積記憶體傾印資料</string>
-    <string name="plugins">外掛程式</string>
-    <string name="plugins_loaded">已載入</string>
-    <string name="plugins_failed">載入失敗</string>
-    <string name="missing_plugin_descriptor">缺少外掛程式描述元</string>
-    <string name="invalid_plugin_descriptor">無效的外掛程式描述元</string>
-    <string name="missing_data_descriptor">缺少資料描述元</string>
-    <string name="invalid_data_descriptor">無效的資料描述元</string>
-    <string name="incompatible_api">不相容的 API: %1$s</string>
-    <string name="path_conflict">路徑 “%1$s” 已被 %2$s 佔用</string>
-    <string name="main_program">主程式</string>
     <string name="edit_theme">編輯主題</string>
     <string name="show_voice_input_button">顯示語音輸入鍵</string>
     <string name="fcitx_daemon">Fcitx 常駐程式</string>
     <string name="restarting_fcitx">重新啟動 Fcitx</string>
-    <string name="plugin_needs_reload">偵測到有外掛程式變化，點此重新載入</string>
-    <string name="no_plugins">無可用外掛程式</string>
     <string name="removed_n_items">已移除 %1$d 個項目</string>
     <string name="whether_reset_switch_preference">是否要將此偏好設定重設為預設選項？</string>
     <string name="enabled">啟用</string>
@@ -262,7 +250,6 @@
     <string name="clipboard_mask_sensitive">隱藏敏感訊息（如密碼）</string>
     <string name="clipboard_clear_urls">移除連結中的追蹤參數</string>
     <string name="clipboard_clear_urls_summary">複製的連結存入剪貼簿紀錄前，依 ClearURLs 規則清理。不變更系統剪貼簿。</string>
-    <string name="open_rime_user_data_dir">即將開啓應用資料目錄。RIME 用户資料目錄位於 “data/rime”。</string>
     <string name="restart_to_apply_settings">應用程式將重新啓動以應用新設定。是否繼續？</string>
     <string name="space_swipe_move_cursor">划動空格以移動游標</string>
     <string name="please_wait">請稍候……</string>
@@ -366,5 +353,4 @@
     <string name="customized">已自訂：%1$s</string>
     <string name="reset_all_long_press_message">將所有按鍵的長按字元還原為內建預設值？</string>
     <string name="reset_all">全部還原預設</string>
-    <string name="no_plugins_summary">外掛程式是另外安裝的應用程式，可增加輸入法（如 Rime、Anthy、韓文）或功能。請安裝為本應用程式相同建置類型（正式版/偵錯版）打包的外掛程式，裝好後回到此頁載入。</string>
 </resources>

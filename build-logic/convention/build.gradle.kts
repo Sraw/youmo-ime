@@ -3,18 +3,7 @@ import org.gradle.accessors.dm.LibrariesForLibs
 plugins {
     `kotlin-dsl`
     kotlin("plugin.serialization") version embeddedKotlinVersion
-    `maven-publish`
-    alias(libs.plugins.gitVersion)
     `java-gradle-plugin`
-}
-
-group = "org.fcitx.fcitx5.android.build_logic"
-
-val gitVersion = extra["gitVersion"] as groovy.lang.Closure<*>
-version = gitVersion()
-
-java {
-    withSourcesJar()
 }
 
 dependencies {
@@ -37,10 +26,6 @@ gradlePlugin {
         register("androidLibConvention") {
             id = "org.fcitx.fcitx5.android.lib-convention"
             implementationClass = "AndroidLibConventionPlugin"
-        }
-        register("androidPluginAppConvention") {
-            id = "org.fcitx.fcitx5.android.plugin-app-convention"
-            implementationClass = "AndroidPluginAppConventionPlugin"
         }
         register("buildMetadata") {
             id = "org.fcitx.fcitx5.android.build-metadata"
@@ -69,19 +54,6 @@ gradlePlugin {
         register("nativeLibConvention") {
             id = "org.fcitx.fcitx5.android.native-lib-convention"
             implementationClass = "NativeLibConventionPlugin"
-        }
-    }
-}
-
-publishing {
-    repositories {
-        maven {
-            name = "GitHubPackages"
-            url = uri("https://maven.pkg.github.com/fcitx5-android/fcitx5-android")
-            credentials {
-                username = System.getenv("GITHUB_ACTOR")
-                password = System.getenv("GITHUB_TOKEN")
-            }
         }
     }
 }

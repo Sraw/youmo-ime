@@ -110,7 +110,6 @@ dependencies {
     implementation(project(":lib:fcitx5-lua"))
     implementation(project(":lib:libime"))
     implementation(project(":lib:fcitx5-chinese-addons"))
-    implementation(project(":lib:common"))
     implementation(libs.kotlinx.coroutines)
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.androidx.activity)

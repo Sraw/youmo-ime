@@ -92,4 +92,3 @@ ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
 aboutlibraries = { id = "com.mikepenz.aboutlibraries.plugin.android", version.ref = "aboutlibraries" }
 kotlin-parcelize = { id = "org.jetbrains.kotlin.plugin.parcelize", version.ref = "kotlin" }
 detekt = { id = "dev.detekt", version.ref = "detekt" }
-gitVersion = { id = "com.palantir.git-version", version = "5.0.0" }

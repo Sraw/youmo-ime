@@ -12,28 +12,17 @@ sealed interface FileAction {
      */
     val ordinal: Int
 
-    /**
-     * To create or update a file, we need its source.
-     */
-    interface Sourced {
-        val src: FileSource
-    }
-
     data class CreateSymlink(override val path: String, val src: String) : FileAction {
         override val ordinal: Int
             get() = -1
     }
 
-    data class CreateFile(override val path: String, override val src: FileSource) :
-        FileAction,
-        Sourced {
+    data class CreateFile(override val path: String) : FileAction {
         override val ordinal: Int
             get() = 3
     }
 
-    data class UpdateFile(override val path: String, override val src: FileSource) :
-        FileAction,
-        Sourced {
+    data class UpdateFile(override val path: String) : FileAction {
         override val ordinal: Int
             get() = 2
     }

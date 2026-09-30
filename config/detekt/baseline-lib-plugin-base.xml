@@ -1,8 +1,0 @@
-<?xml version="1.0" ?>
-<SmellBaseline>
-  <ManuallySuppressedIssues/>
-  <CurrentIssues>
-    <ID>NestedBlockDepth:AboutActivity.kt:AboutActivity.AboutContentFragment$@SuppressLint("DiscouragedApi") override fun onCreate</ID>
-    <ID>PackageNaming:AboutActivity.kt:package org.fcitx.fcitx5.android.lib.plugin_base</ID>
-  </CurrentIssues>
-</SmellBaseline>
