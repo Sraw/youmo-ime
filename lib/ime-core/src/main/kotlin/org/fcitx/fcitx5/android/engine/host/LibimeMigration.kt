@@ -31,6 +31,7 @@ object LibimeMigration {
     )
 
     const val ENABLED_IM = "EnabledIM"
+    private const val TABLE = "Table"
 
     private class Section(val name: String, val lines: MutableList<String>)
 
@@ -94,8 +95,18 @@ object LibimeMigration {
         return write(sections)
     }
 
-    /** The androidengine addon's config holding what [pinyinConfig], libime pinyin's, set of it. */
-    fun settings(pinyinConfig: String): String {
+    /**
+     * libime's tables whose settings carry over, kept as `table/<name>.conf` in fcitx's config
+     * home. 五笔拼音's go to the engine's 五笔 too, when 五笔's are not there.
+     */
+    val TABLE_CONFIGS: List<String> = listOf("wbx", "wbpy", "cangjie", "zrm", "erbi")
+
+    /**
+     * The androidengine addon's config holding what [pinyinConfig], libime pinyin's, set of it,
+     * and what each table's config of [tableConfigs] (by libime's name, as in [TABLE_CONFIGS]) set
+     * of what the engine's tables do.
+     */
+    fun settings(pinyinConfig: String, tableConfigs: Map<String, String> = emptyMap()): String {
         val sections = sections(pinyinConfig)
         val top = sections.firstOrNull { it.name.isEmpty() }
         val fuzzy = sections.firstOrNull { it.name == FUZZY }
@@ -103,7 +114,33 @@ object LibimeMigration {
         val out = ArrayList<Section>()
         out += Section("", listOf(SHUANGPIN_PROFILE, PAGE_SIZE, PREDICTION).mapNotNullTo(ArrayList()) { key -> top?.let { line(it, key) } })
         out += Section(FUZZY, keys.mapNotNullTo(ArrayList()) { key -> fuzzy?.let { line(it, key) } })
+        out += tableSections(tableConfigs)
         return write(out)
+    }
+
+    /**
+     * [config], the addon's, with the settings of [tableConfigs] (as for [settings]) for each
+     * table it has no group of yet; null if there is none. For a config written before tables
+     * had settings: fcitx writes every group once the user saves it.
+     */
+    fun withTables(config: String, tableConfigs: Map<String, String>): String? {
+        val have = sections(config).mapTo(HashSet()) { it.name }
+        val missing = tableSections(tableConfigs).filter { it.name !in have }
+        if (missing.isEmpty()) return null
+        val base = config.trimEnd()
+        return (if (base.isEmpty()) "" else base + "\n\n") + write(missing)
+    }
+
+    // each group's from the first of TABLE_CONFIGS that set any of it
+    private fun tableSections(tableConfigs: Map<String, String>): List<Section> {
+        val out = LinkedHashMap<String, Section>()
+        for (name in TABLE_CONFIGS) {
+            val group = Engines.TABLES.getValue(INPUT_METHODS.getValue(name)).group
+            val table = tableConfigs[name]?.let { config -> sections(config).firstOrNull { it.name == TABLE } }
+            val lines = table?.let { TableSettings.KEYS.mapNotNullTo(ArrayList()) { key -> line(it, key) } }
+            if (group !in out && !lines.isNullOrEmpty()) out[group] = Section(group, lines)
+        }
+        return out.values.toList()
     }
 
     private fun sections(text: String): List<Section> {

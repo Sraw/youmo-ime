@@ -56,7 +56,36 @@ data class TableOptions(
             saveAutoPhraseAfter = 3,
         )
 
-        /** fcitx's cangjie.conf */
-        val CANGJIE = TableOptions(noMatchAutoSelectLength = 0, matchingKey = '*', hint = false)
+        /**
+         * fcitx's cangjie.conf. Auto phrases as libime has them unless set, though its table has
+         * no 组词规则 to code them by.
+         */
+        val CANGJIE = TableOptions(
+            noMatchAutoSelectLength = 0,
+            matchingKey = '*',
+            hint = false,
+            autoPhraseLength = -1,
+            saveAutoPhraseAfter = -1,
+        )
+
+        /**
+         * fcitx's zrm.conf: OrderPolicy=Fast, which orders by use as Freq does, and auto phrases
+         * as libime has them unless set.
+         */
+        val ZIRANMA = TableOptions(orderByUse = true, autoPhraseLength = -1, saveAutoPhraseAfter = -1)
+
+        /**
+         * fcitx's erbi.conf. Its AutoSelectRegex is not needed: libime takes it or the length,
+         * and AutoSelectLength=-1 already holds at any length.
+         */
+        val ERBI = TableOptions(
+            noMatchAutoSelectLength = 0,
+            hint = false,
+            orderByUse = true,
+            matchingKey = '*',
+            pinyinKey = '[',
+            autoPhraseLength = 4,
+            saveAutoPhraseAfter = -1,
+        )
     }
 }

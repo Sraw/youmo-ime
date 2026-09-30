@@ -26,13 +26,14 @@ import org.fcitx.fcitx5.android.engine.session.Snapshot
  *
  * Characters committed one by one become phrases ([TableOptions.autoPhraseLength]) coded by the
  * table's 组词规则, offered last for their code. One picked, or typed character by character
- * [TableOptions.saveAutoPhraseAfter] times, joins the table's own. What is picked and learned is
- * kept in memory only.
+ * [TableOptions.saveAutoPhraseAfter] times, joins the table's own. What is picked and learned goes
+ * to [user], which may keep it.
  */
 class TableSession(
     private val table: TableDictionary,
     private val options: TableOptions = TableOptions(),
     private val pinyin: Session? = null,
+    private val user: TableUser = TableUser(table),
 ) : Session {
 
     /** A candidate: a table entry (its [index]), or a phrase learned here ([index] -1). */
@@ -51,14 +52,6 @@ class TableSession(
     // what was committed last, one character at a time, for auto phrases
     private val recent = ArrayList<String>()
     private val autoPhraseLength = if (options.autoPhraseLength < 0) table.maxLength else options.autoPhraseLength
-
-    // picks of table entries by index (at most one each), of saved phrases by code and text
-    private val picks = HashMap<Int, Int>()
-    private val savedPicks = HashMap<String, Int>()
-    private val saved = HashMap<String, MutableList<String>>()
-    private val autoPhrases = object : LinkedHashMap<String, Int>(16, 0.75f, true) {
-        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, Int>?) = size > MAX_AUTO_PHRASES
-    }
 
     override fun apply(action: Action): Snapshot = if (lookingUp) lookUp(action) else when (action) {
         is Action.Key -> type(action.char)
@@ -181,21 +174,11 @@ class TableSession(
             recent.clear()
             return item.text
         }
-        if (item.index >= 0) {
-            picks[item.index] = (picks[item.index] ?: 0) + 1
-        } else {
-            val key = key(item.code, item.text)
-            savedPicks[key] = (savedPicks[key] ?: 0) + 1
-        }
+        user.picked(item.code, item.text)
         // picked once, an auto phrase is the user's
-        if (item.auto) save(item.code, item.text)
+        if (item.auto) user.save(item.code, item.text)
         learnPhrases(item.text)
         return item.text
-    }
-
-    private fun save(code: String, text: String) {
-        autoPhrases.remove(key(code, text))
-        saved.getOrPut(code) { ArrayList() } += text
     }
 
     /** Offers the last characters committed one by one, [text] ending them, as phrases. */
@@ -215,9 +198,8 @@ class TableSession(
     /** Counts [phrase] typed once more, saving it when seen often enough. */
     private fun sighted(phrase: String) {
         val code = table.encode(phrase) ?: return
-        if (saved[code]?.contains(phrase) == true || table.contains(code, phrase)) return
-        val seen = (autoPhrases[key(code, phrase)] ?: 0) + 1
-        if (options.saveAutoPhraseAfter in 1..seen) save(code, phrase) else autoPhrases[key(code, phrase)] = seen
+        if (table.contains(code, phrase)) return
+        user.sighted(code, phrase, options.saveAutoPhraseAfter)
     }
 
     private fun clear() {
@@ -227,8 +209,7 @@ class TableSession(
     }
 
     /** Whether some entry, learned ones too, has a code [pattern] leads to. */
-    private fun leadsAnywhere(pattern: String) = table.hasMatch(pattern, options.matchingKey) ||
-        saved.keys.any { it.startsWith(pattern) } || autoPhrases.keys.any { it.startsWith(pattern) }
+    private fun leadsAnywhere(pattern: String) = table.hasMatch(pattern, options.matchingKey) || user.leadsAnywhere(pattern)
 
     private fun update() {
         page = 0
@@ -239,7 +220,7 @@ class TableSession(
     private fun rank(code: String): Ranking {
         val entries = table.match(code, options.matchingKey)
         // learned phrases are found by their plain code; the matching key is for the table's
-        val learned = saved.flatMap { (c, texts) -> if (c.startsWith(code)) texts.map { Item(c, it, false) } else emptyList() }
+        val learned = user.saved(code).map { (c, text) -> Item(c, text, false) }
         val noSort = minOf(code.length, options.noSortInputLength)
         // one sortable number per candidate: its group, length, picks, then where it was
         val keys = LongArray(learned.size + entries.size) { at ->
@@ -247,8 +228,8 @@ class TableSession(
             val sorted = length > noSort
             val used = when {
                 !sorted || !options.orderByUse -> 0
-                at < learned.size -> savedPicks[key(learned[at].code, learned[at].text)] ?: 0
-                else -> picks[entries[at - learned.size]] ?: 0
+                at < learned.size -> user.picks(learned[at].code, learned[at].text)
+                else -> user.picks(entries[at - learned.size])
             }
             (if (sorted) 1L shl GROUP_SHIFT else 0L) or
                 ((if (sorted && options.sortByCodeLength) minOf(length, MAX_LENGTH) else 0).toLong() shl LENGTH_SHIFT) or
@@ -258,10 +239,7 @@ class TableSession(
         keys.sort()
         val order = IntArray(keys.size) { (keys[it] and POSITION_MASK).toInt() }
         // the most recently seen first
-        val auto = autoPhrases.keys.filter { it.startsWith(code) }.asReversed().map {
-            val at = it.indexOf(SEPARATOR)
-            Item(it.substring(0, at), it.substring(at + 1), true)
-        }
+        val auto = user.seen(code).map { (c, text) -> Item(c, text, true) }
         return Ranking { at ->
             when {
                 at < order.size -> order[at].let { if (it < learned.size) learned[it] else entryItem(entries[it - learned.size]) }
@@ -400,10 +378,6 @@ class TableSession(
     }
 
     companion object {
-        private const val SEPARATOR = '\t'
-        // how many auto phrases not yet picked often enough are remembered
-        private const val MAX_AUTO_PHRASES = 1024
-
         // a ranking key: group, code length, picks (fewest last), position
         private const val GROUP_SHIFT = 62
         private const val LENGTH_SHIFT = 54
@@ -411,7 +385,5 @@ class TableSession(
         private const val MAX_LENGTH = 0xFF
         private const val MAX_PICKS = 0x3FFFFF
         private const val POSITION_MASK = 0xFFFFFFFFL
-
-        private fun key(code: String, text: String) = "$code$SEPARATOR$text"
     }
 }

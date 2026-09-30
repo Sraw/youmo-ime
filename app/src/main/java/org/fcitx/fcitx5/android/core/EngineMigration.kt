@@ -12,8 +12,8 @@ import java.io.IOException
 
 /**
  * Carries over the config of those who used libime's pinyin and tables, before fcitx reads it:
- * the profile names the engine's input methods instead, and pinyin's settings become the
- * androidengine addon's. What the user learned is read in later, by the engine (EngineBridge).
+ * the profile names the engine's input methods instead, and the settings of pinyin and of the
+ * tables become the androidengine addon's. What the user learned is read in later, by the engine (EngineBridge).
  */
 object EngineMigration {
 
@@ -24,7 +24,17 @@ object EngineMigration {
             if (profile.exists()) LibimeMigration.profile(profile.readText())?.let { replace(profile, it) }
             val settings = File(configHome, "conf/androidengine.conf")
             val pinyin = File(configHome, "conf/pinyin.conf")
-            if (!settings.exists() && pinyin.exists()) replace(settings, LibimeMigration.settings(pinyin.readText()))
+            // libime keeps a table's settings by the table's name, not under conf/ as addons do
+            val tables = LibimeMigration.TABLE_CONFIGS.map { it to File(configHome, "table/$it.conf") }
+                .filter { it.second.exists() }.associate { (name, file) -> name to file.readText() }
+            if (!settings.exists()) {
+                if (pinyin.exists() || tables.isNotEmpty()) {
+                    replace(settings, LibimeMigration.settings(if (pinyin.exists()) pinyin.readText() else "", tables))
+                }
+            } else if (tables.isNotEmpty()) {
+                // migrated by a build whose engine had no table settings yet
+                LibimeMigration.withTables(settings.readText(), tables)?.let { replace(settings, it) }
+            }
             val chttrans = File(configHome, "conf/chttrans.conf")
             if (chttrans.exists()) LibimeMigration.inputMethodList(chttrans.readText())?.let { replace(chttrans, it) }
         } catch (@Suppress("TooGenericExceptionCaught") e: Exception) {

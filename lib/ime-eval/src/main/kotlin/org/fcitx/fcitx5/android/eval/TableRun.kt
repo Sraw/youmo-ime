@@ -209,7 +209,13 @@ class TableRun(private val table: CodeTable, private val options: TableOptions) 
         const val MAX_PAGES = 10
         private const val MISSING = 1L shl 32
 
-        val PRESETS = mapOf("wubi" to TableOptions.WUBI, "cangjie" to TableOptions.CANGJIE, "plain" to TableOptions())
+        val PRESETS = mapOf(
+            "wubi" to TableOptions.WUBI,
+            "cangjie" to TableOptions.CANGJIE,
+            "ziranma" to TableOptions.ZIRANMA,
+            "erbi" to TableOptions.ERBI,
+            "plain" to TableOptions(),
+        )
 
         fun report(o: Outcome, e: EntryOutcome): String {
             fun pct(n: Int, of: Int) = if (of == 0) "-" else String.format(Locale.ROOT, "%.1f%%", 100.0 * n / of)

@@ -18,6 +18,7 @@ import org.fcitx.fcitx5.android.engine.session.Snapshot
 import org.fcitx.fcitx5.android.engine.table.TableDictionary
 import org.fcitx.fcitx5.android.engine.table.TableOptions
 import org.fcitx.fcitx5.android.engine.table.TableSession
+import org.fcitx.fcitx5.android.engine.table.TableUser
 import org.fcitx.fcitx5.android.engine.user.LibimeImport
 import org.fcitx.fcitx5.android.engine.user.UserModel
 import org.fcitx.fcitx5.android.engine.user.UserStore
@@ -28,9 +29,9 @@ import java.nio.ByteBuffer
 
 /**
  * The input methods the androidengine addon lists, by name, each with its session made on first
- * use. [load] gives a data file by its path in the app's assets; what the user picks in pinyin is
- * kept under [userDir] (in memory only if null). When that log is made afresh, what libime's
- * pinyin learned ([legacy], if the user had it) is read into it first. What the user added to
+ * use. [load] gives a data file by its path in the app's assets; what the user picks, in pinyin
+ * and in each table, is kept under [userDir] (in memory only if null). When pinyin's log is made
+ * afresh, what libime's pinyin learned ([legacy], if the user had it) is read into it first. What the user added to
  * pinyin ([additions]) is read at first need, and again on [reload].
  *
  * Everything here runs on one thread, the one fcitx runs on.
@@ -185,13 +186,35 @@ class Engines(
                 pageSize = s.pageSize, user = user(), prediction = s.prediction, reranker = reranker(), phrases = phrases(),
             )
             else -> {
-                val (file, options) = TABLES[im] ?: throw IllegalArgumentException("no input method $im")
-                val table = TableDictionary(CodeTable.load(load("$TABLE_DIR/$file"), verify = false))
+                val method = TABLES[im] ?: throw IllegalArgumentException("no input method $im")
+                val options = (s.tables[method.group]?.applyTo(method.options) ?: method.options).copy(pageSize = s.pageSize)
+                val table = table(im)
                 // looking a character up by pinyin learns nothing: it is not how the user writes
                 val lookUp = if (options.pinyinKey == null) null else PinyinSession(pinyinData, PinyinSegmenter(), prediction = false)
-                TableSession(table, options.copy(pageSize = s.pageSize), lookUp)
+                TableSession(table.dictionary, options, lookUp, table.user)
             }
         }
+    }
+
+    /** A table and what the user taught it: both outlive the sessions made over them. */
+    private class Table(val dictionary: TableDictionary, val user: TableUser, val store: TableUser.Store?)
+
+    private val tables = HashMap<String, Table>()
+
+    private fun table(im: String): Table = tables.getOrPut(im) {
+        val dictionary = TableDictionary(CodeTable.load(load("$TABLE_DIR/${TABLES.getValue(im).file}"), verify = false))
+        val user = TableUser(dictionary)
+        // a log that cannot be read or moved aside: learn in memory rather than not type
+        val store = userDir?.let { dir ->
+            dir.mkdirs()
+            try {
+                TableUser.Store(File(dir, userTable(im)), user, onError).apply { open() }
+            } catch (e: IOException) {
+                onError(e)
+                null
+            }
+        }
+        Table(dictionary, user, store)
     }
 
     /** A reranker of the session's own, over the one model: each keeps what it ran for its input. */
@@ -222,8 +245,20 @@ class Engines(
     }
 
     override fun close() {
-        store?.close()
+        // each on its own: one that fails to close must not leave the others open
+        (listOfNotNull(store) + tables.values.mapNotNull { it.store }).forEach {
+            try {
+                it.close()
+            } catch (e: IOException) {
+                onError(e)
+            }
+        }
+        // used after all the same: each reads its log again, and appends to it
         store = null
+        userModel = null
+        tables.clear()
+        sessions.clear()
+        keyboards.clear()
     }
 
     companion object {
@@ -235,12 +270,21 @@ class Engines(
         const val TABLE_DIR = "engine/table"
         const val USER_PINYIN = "pinyin.user"
 
-        /** Each table input method: its file, and how it behaves. */
-        val TABLES: Map<String, Pair<String, TableOptions>> = mapOf(
-            "engine-wubi" to ("wbx.data" to TableOptions.WUBI),
-            "engine-cangjie" to ("cj.data" to TableOptions.CANGJIE),
-            "engine-ziranma" to ("zrm.data" to TableOptions()),
-            "engine-erbi" to ("erbi.data" to TableOptions()),
+        /** Where what the user taught the table input method [im] is kept: `wubi.user` and so on. */
+        fun userTable(im: String) = im.removePrefix("engine-") + ".user"
+
+        /** Each table input method. */
+        val TABLES: Map<String, TableMethod> = mapOf(
+            "engine-wubi" to TableMethod("wbx.data", "Wubi", TableOptions.WUBI),
+            "engine-cangjie" to TableMethod("cj.data", "Cangjie", TableOptions.CANGJIE),
+            "engine-ziranma" to TableMethod("zrm.data", "Ziranma", TableOptions.ZIRANMA),
+            "engine-erbi" to TableMethod("erbi.data", "Erbi", TableOptions.ERBI),
         )
     }
 }
+
+/**
+ * A table input method: its [file] under [Engines.TABLE_DIR], the [group] of its settings in the
+ * addon's config (see [EngineSettings.tables]), and how it behaves unless those say otherwise.
+ */
+class TableMethod(val file: String, val group: String, val options: TableOptions)

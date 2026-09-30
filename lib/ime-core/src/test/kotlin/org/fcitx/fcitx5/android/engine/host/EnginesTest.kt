@@ -273,6 +273,45 @@ class EnginesTest {
     }
 
     @Test
+    fun whatATableLearnsOutlivesASettingChangedAndARestart() {
+        val dir = folder.newFolder("engine")
+        Engines(::load, dir).use { engines ->
+            // codes longer than what is typed go by use
+            engines.type("engine-wubi", "va")
+            assertEquals("二", engines.onEvent("engine-wubi", EngineEvent.PICK, 1).commit)
+            engines.settings = EngineSettings(pageSize = 3)
+            assertEquals(listOf("二", "一", "三"), engines.type("engine-wubi", "va").candidates)
+        }
+        assertTrue(dir.resolve(Engines.userTable("engine-wubi")).length() > 0)
+        Engines(::load, dir).use { engines ->
+            assertEquals("二", engines.type("engine-wubi", "va").candidates.first())
+        }
+    }
+
+    @Test
+    fun aTablesOwnSettingsApplyToItAlone() {
+        Engines(::load, null).use { engines ->
+            engines.settings = EngineSettings(pageSize = 3, tables = mapOf("Wubi" to TableSettings(orderByUse = false)))
+            engines.type("engine-wubi", "va")
+            assertEquals("二", engines.onEvent("engine-wubi", EngineEvent.PICK, 1).commit)
+            assertEquals(listOf("一", "二", "三"), engines.type("engine-wubi", "va").candidates)
+            engines.settings = EngineSettings(pageSize = 3, tables = mapOf("Cangjie" to TableSettings(orderByUse = false)))
+            assertEquals(listOf("二", "一", "三"), engines.type("engine-wubi", "va").candidates)
+        }
+    }
+
+    @Test
+    fun aTableLogThatCannotBeReadLeavesTheTableWorking() {
+        val dir = folder.newFolder("engine")
+        dir.resolve(Engines.userTable("engine-wubi")).mkdir()
+        val errors = ArrayList<IOException>()
+        Engines(::load, dir, onError = { errors += it }).use { engines ->
+            assertEquals(listOf("好", "妤"), engines.type("engine-wubi", "vbg").candidates)
+        }
+        assertEquals(1, errors.size)
+    }
+
+    @Test
     fun aKeySlippedIsReadAsMeantUnlessSlipsAreOff() {
         val engines = Engines(::load, null)
         // p is next to o

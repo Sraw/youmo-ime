@@ -6,6 +6,7 @@ package org.fcitx.fcitx5.android.engine.host
 
 import org.fcitx.fcitx5.android.engine.pinyin.Fuzzy
 import org.fcitx.fcitx5.android.engine.pinyin.ShuangpinScheme
+import org.fcitx.fcitx5.android.engine.table.TableOptions
 
 /**
  * What the user set for the input methods, in the androidengine addon's config. Its keys are
@@ -22,6 +23,8 @@ data class EngineSettings(
     val pageSize: Int = DEFAULT_PAGE_SIZE,
     /** Whether pinyin's readings are weighed again as whole sentences, by the sentence model. */
     val sentenceModel: Boolean = true,
+    /** What the user set for each table input method, by its group in the config (`Wubi`). */
+    val tables: Map<String, TableSettings> = emptyMap(),
 ) {
     val scheme: ShuangpinScheme get() = SCHEMES[shuangpin] ?: ShuangpinScheme.ZIRANMA
 
@@ -67,6 +70,22 @@ data class EngineSettings(
                 values[key].equals("False", ignoreCase = true) -> false
                 else -> null
             }
+            fun count(key: String, range: IntRange) = values[key]?.toIntOrNull()?.takeIf { it in range }
+            val tables = values.keys.mapNotNullTo(LinkedHashSet()) { key ->
+                key.substringBefore('/', "").takeIf { it.isNotEmpty() && key.substringAfter('/') in TableSettings.KEYS }
+            }.associateWith { group ->
+                TableSettings(
+                    autoSelect = flag("$group/${TableSettings.AUTO_SELECT}"),
+                    hint = flag("$group/${TableSettings.HINT}"),
+                    orderByUse = when (values["$group/${TableSettings.ORDER_POLICY}"]) {
+                        "Freq", "Fast" -> true
+                        "No" -> false
+                        else -> null
+                    },
+                    autoPhraseLength = count("$group/${TableSettings.AUTO_PHRASE_LENGTH}", TableSettings.AUTO_PHRASE_LENGTHS),
+                    saveAutoPhraseAfter = count("$group/${TableSettings.SAVE_AUTO_PHRASE_AFTER}", TableSettings.SAVES_AFTER),
+                )
+            }
             val default = EngineSettings()
             return EngineSettings(
                 shuangpin = values[SHUANGPIN_PROFILE]?.takeIf { it in SCHEMES } ?: default.shuangpin,
@@ -75,7 +94,41 @@ data class EngineSettings(
                 prediction = flag(PREDICTION) ?: default.prediction,
                 pageSize = values[PAGE_SIZE]?.toIntOrNull()?.takeIf { it in PAGE_SIZES } ?: default.pageSize,
                 sentenceModel = flag(SENTENCE_MODEL) ?: default.sentenceModel,
+                tables = tables,
             )
         }
+    }
+}
+
+/**
+ * What the user set for a table input method, under libime table's keys; what is null stays as
+ * the table's own [TableOptions] have it.
+ */
+data class TableSettings(
+    val autoSelect: Boolean? = null,
+    val hint: Boolean? = null,
+    val orderByUse: Boolean? = null,
+    val autoPhraseLength: Int? = null,
+    val saveAutoPhraseAfter: Int? = null,
+) {
+    /** [options] with what was set here instead. */
+    fun applyTo(options: TableOptions) = options.copy(
+        autoSelect = autoSelect ?: options.autoSelect,
+        hint = hint ?: options.hint,
+        orderByUse = orderByUse ?: options.orderByUse,
+        autoPhraseLength = autoPhraseLength ?: options.autoPhraseLength,
+        saveAutoPhraseAfter = saveAutoPhraseAfter ?: options.saveAutoPhraseAfter,
+    )
+
+    companion object {
+        const val AUTO_SELECT = "AutoSelect"
+        const val HINT = "Hint"
+        const val ORDER_POLICY = "OrderPolicy"
+        const val AUTO_PHRASE_LENGTH = "AutoPhraseLength"
+        const val SAVE_AUTO_PHRASE_AFTER = "SaveAutoPhraseAfter"
+        val KEYS = setOf(AUTO_SELECT, HINT, ORDER_POLICY, AUTO_PHRASE_LENGTH, SAVE_AUTO_PHRASE_AFTER)
+
+        val AUTO_PHRASE_LENGTHS = -1..8
+        val SAVES_AFTER = -1..10
     }
 }

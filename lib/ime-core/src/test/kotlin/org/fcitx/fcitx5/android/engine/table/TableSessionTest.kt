@@ -284,6 +284,21 @@ class TableSessionTest {
     }
 
     @Test
+    fun asLibimeHasItAPhraseRunsToTheLongestCodeAndIsSavedOnlyOncePicked() {
+        val t = session(TableOptions.WUBI.copy(autoPhraseLength = -1, saveAutoPhraseAfter = -1))
+        repeat(4) {
+            t.type("wqiy")
+            t.type("wun")
+        }
+        // never saved by count: offered, but waits to be picked
+        val (commit, s) = t.type("wqwu")
+        assertEquals("", commit)
+        assertEquals(listOf("你们"), s.candidates)
+        assertEquals("你们", t.apply(Select(0)).commit)
+        assertEquals("你们", t.type("wqwu").first)
+    }
+
+    @Test
     fun aKeyNotReadBreaksAPhrase() {
         val t = session()
         t.type("wqiy")
@@ -349,7 +364,7 @@ class TableSessionTest {
         t.type("wun")
         assertFalse("你们" in t.type("wqwu").second.candidates)
         // not learned without the option
-        val none = session(TableOptions.CANGJIE)
+        val none = session(TableOptions.CANGJIE.copy(autoPhraseLength = 0))
         none.type("wqiy")
         none.type("wun")
         assertEquals(emptyList<String>(), none.type("wqwu").second.candidates)

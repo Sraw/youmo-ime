@@ -50,3 +50,12 @@ msgstr "Android 弹出提示与通知"
 
 msgid "Hidden Notifications"
 msgstr "隐藏的通知"
+
+msgid "Android Engine"
+msgstr "拼音与码表引擎"
+
+msgid "Typos and slipped keys"
+msgstr "纠正错拼和按偏的键"
+
+msgid "Weigh readings as whole sentences"
+msgstr "按整句通顺程度排候选"

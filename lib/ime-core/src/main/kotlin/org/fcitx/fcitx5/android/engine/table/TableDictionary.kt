@@ -95,7 +95,10 @@ class TableDictionary(private val table: CodeTable) {
         return true
     }
 
-    fun contains(code: String, text: String): Boolean = table.exactRange(code).any { table.text(it) == text }
+    fun contains(code: String, text: String): Boolean = indexOf(code, text) >= 0
+
+    /** The entry of [text] under [code] exactly, or -1 if the table has none. */
+    fun indexOf(code: String, text: String): Int = table.exactRange(code).firstOrNull { table.text(it) == text } ?: -1
 
     /** [text]'s full code: a character's own, a phrase's put together by the rules; null if neither. */
     fun codeOf(text: String): String? = reverse.codes[text] ?: encode(text)
