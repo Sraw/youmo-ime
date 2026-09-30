@@ -16,6 +16,7 @@ import org.fcitx.fcitx5.android.engine.session.Action.Backspace
 import org.fcitx.fcitx5.android.engine.session.Action.CommitRaw
 import org.fcitx.fcitx5.android.engine.session.Action.Key
 import org.fcitx.fcitx5.android.engine.session.Action.NextPage
+import org.fcitx.fcitx5.android.engine.session.Action.Pick
 import org.fcitx.fcitx5.android.engine.session.Action.PreviousPage
 import org.fcitx.fcitx5.android.engine.session.Action.Reset
 import org.fcitx.fcitx5.android.engine.session.Action.Select
@@ -177,6 +178,39 @@ class PinyinSessionTest {
     }
 
     @Test
+    fun aHostListsAndPicksAmongAllCandidatesWhateverThePage() {
+        val session = session(pageSize = 1)
+        val s = session.type("ni")
+        val all = session.candidates(0, 100).map { it.text }
+        assertEquals(all.size, s.total)
+        assertTrue(all.size > 1)
+        assertEquals(all.drop(1).take(1), session.candidates(1, 1).map { it.text })
+        assertTrue(session.candidates(all.size, 5).isEmpty())
+        // the second, though page one shows only the first
+        assertEquals(all[1], session.apply(Pick(1)).commit)
+        // nothing there: the pick is ignored while something is typed
+        session.type("ni")
+        assertTrue(session.apply(Pick(all.size)).handled)
+        session.apply(Reset)
+        assertFalse(session.apply(Pick(0)).handled)
+    }
+
+    @Test
+    fun theKeysReadAreThoseOfTheSegmenterAndASeparatorWithinInput() {
+        val session = session()
+        assertTrue(session.reads('a'))
+        assertFalse(session.reads('1'))
+        assertFalse(session.reads(','))
+        assertFalse(session.reads('\''))
+        session.type("xi")
+        assertTrue(session.reads('\''))
+        // 双拼 reads what its scheme gives a part, ; in 微软
+        val ms = PinyinSession(data, ShuangpinSegmenter(ShuangpinScheme.MICROSOFT), spell = true)
+        assertTrue(ms.reads(';'))
+        assertFalse(session.reads(';'))
+    }
+
+    @Test
     fun enterCommitsWhatWasTyped() {
         val session = session()
         val s = session.type("nihao")
@@ -227,6 +261,48 @@ class PinyinSessionTest {
         val s = session.type("zong")
         assertEquals("中", s.candidates.first())
         assertEquals("zong", s.preedit)
+    }
+
+    @Test
+    fun aKeyNotReadCommitsTheFirstCandidateAndEndsTheContext() {
+        val session = session()
+        session.type("nihao")
+        val s = session.apply(Key(','))
+        assertEquals("你好", s.commit)
+        assertFalse(s.handled)
+        assertFalse(s.predicting)
+        assertTrue(s.candidates.isEmpty())
+        // 我 would have 再 follow it; after the space it is no context
+        session.type("wo")
+        assertTrue(session.apply(Select(0)).predicting)
+        assertFalse(session.apply(Key(' ')).handled)
+        assertEquals("在", session.type("zai").candidates.first())
+    }
+
+    @Test
+    fun aKeyNotReadKeepsWhatTheFirstCandidateLeavesAsTyped() {
+        val session = session(pageSize = 20)
+        val s = session.type("nizai")
+        session.apply(Select(s.candidates.indexOf("拟")))
+        // 再 reads the rest
+        assertEquals("拟再", session.apply(Key('.')).commit)
+        // nothing to commit: the key is the app's all the same
+        val separator = session.apply(Key('\''))
+        assertEquals("", separator.commit)
+        assertFalse(separator.handled)
+    }
+
+    @Test
+    fun nothingIsLearnedWhileLearningIsOff() {
+        val (session, user) = learning()
+        session.learning = false
+        val s = session.type("nizai")
+        session.apply(Select(s.candidates.indexOf("拟")))
+        val done = session.apply(Select(0))
+        assertEquals("拟再", done.commit)
+        assertFalse(done.predicting)
+        assertEquals(0f, user.total)
+        assertEquals(0, user.size)
     }
 
     private fun learning(pageSize: Int = 20): Pair<Session, UserModel> {

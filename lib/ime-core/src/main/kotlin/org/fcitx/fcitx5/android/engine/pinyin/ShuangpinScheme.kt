@@ -41,6 +41,9 @@ class ShuangpinScheme(keys: String, val zero: String) {
         require(zeroKeys.all(::isKey)) { "bad zero keys $zero" }
     }
 
+    /** Whether [c] types something: a letter, or another key the scheme gives a part (`;` in 微软). */
+    fun types(c: Char): Boolean = c in 'a'..'z' || c in zeroKeys || initials.values.any { c in it } || finals.values.any { c in it }
+
     /** The keys that type [init] followed by [fin], in the order a user would reach for them. */
     internal fun codes(init: String, fin: String): List<String> {
         val finalKeys = finalKeys(fin)

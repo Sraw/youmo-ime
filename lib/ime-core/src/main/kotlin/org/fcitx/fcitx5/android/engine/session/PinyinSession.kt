@@ -76,10 +76,14 @@ class PinyinSession(
     private var page = 0
     private var predicting = false
 
+    override var learning = true
+
     override fun apply(action: Action): Snapshot = when (action) {
         is Action.Key -> type(action.char)
         Action.Backspace -> backspace()
-        is Action.Select -> select(action.index)
+        // nothing to pick past the page: the key (space, a digit) is the app's
+        is Action.Select -> if (action.index in 0 until pageSize) pick(page * pageSize + action.index) else snapshot(handled = candidates.isNotEmpty())
+        is Action.Pick -> pick(action.index)
         Action.NextPage -> turn(page + 1)
         Action.PreviousPage -> turn(page - 1)
         Action.CommitRaw -> commitRaw()
@@ -92,11 +96,7 @@ class PinyinSession(
     }
 
     private fun type(c: Char): Snapshot {
-        // a separator with nothing to separate is the app's
-        if (input.isEmpty() && c == SyllableGraph.SEPARATOR) {
-            clear()
-            return snapshot(handled = false)
-        }
+        if (!reads(c)) return leave()
         input.append(c)
         read()
         return snapshot()
@@ -114,15 +114,18 @@ class PinyinSession(
         return snapshot()
     }
 
-    private fun select(index: Int): Snapshot {
-        val c = candidates.getOrNull(page * pageSize + index)
-        // nothing to pick: the key (space, a digit) is the app's
-        if (c == null || index !in 0 until pageSize) return snapshot(handled = candidates.isNotEmpty())
+    override fun reads(c: Char): Boolean = segmenter.reads(c) || (c == SyllableGraph.SEPARATOR && input.isNotEmpty())
+
+    override fun candidates(from: Int, count: Int): List<Choice> =
+        candidates.subList(minOf(from, candidates.size), minOf(from + count, candidates.size)).map { Choice(it.text) }
+
+    private fun pick(index: Int): Snapshot {
+        val c = candidates.getOrNull(index) ?: return snapshot(handled = candidates.isNotEmpty())
         if (predicting) {
             lastEntry = null
             return commit(c.text, c.words)
         }
-        pieces += Piece(c.text, c.words, readFrom() + c.end, if (user == null) null else entries(c), page * pageSize + index > 0)
+        pieces += Piece(c.text, c.words, readFrom() + c.end, if (user == null) null else entries(c), index > 0)
         if (pieces.last().end < input.length) {
             read()
             return snapshot()
@@ -155,7 +158,7 @@ class PinyinSession(
      * @return the words learned, or null if nothing was
      */
     private fun learn(text: String): IntArray? {
-        if (user == null) return null
+        if (user == null || !learning) return null
         val entries = pieces.map { it.entries ?: return null }
         val corrected = pieces.size > 1 || (pieces[0].corrected && pieces[0].words.size > 1)
         val sentence = if (corrected && text.codePointCount(0, text.length) <= MAX_PHRASE) {
@@ -174,6 +177,20 @@ class PinyinSession(
         if (to < 0 || to * pageSize >= candidates.size) return snapshot(handled = candidates.isNotEmpty())
         page = to
         return snapshot()
+    }
+
+    /**
+     * A key not read, going to the app: what is typed is committed as the first candidate reads
+     * it, the rest as typed, and nothing is predicted after it (`nihao,` gives 你好，).
+     */
+    private fun leave(): Snapshot {
+        val picked = if (input.isNotEmpty() && !predicting && candidates.isNotEmpty()) pick(0).commit else ""
+        // the first candidate read only the start
+        val rest = if (input.isNotEmpty()) commitRaw().commit else ""
+        context = IntArray(0)
+        lastEntry = null
+        clear()
+        return snapshot(commit = picked + rest, handled = false)
     }
 
     private fun commitRaw(): Snapshot {
@@ -198,7 +215,8 @@ class PinyinSession(
         }
         clear()
         val (prev2, prev) = lastTwo(context)
-        candidates = predictor.predict(prev2, prev)
+        // what may follow a password is no one's business
+        candidates = if (learning) predictor.predict(prev2, prev) else emptyList()
         predicting = candidates.isNotEmpty()
         return snapshot(commit = text)
     }
@@ -253,6 +271,8 @@ class PinyinSession(
             hasNextPage = from + pageSize < candidates.size,
             handled = handled,
             predicting = predicting,
+            total = candidates.size,
+            first = from,
         )
     }
 

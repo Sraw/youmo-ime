@@ -27,6 +27,7 @@
 #include <fcitx-utils/eventdispatcher.h>
 #include <fcitx-utils/standardpath.h>
 #include <fcitx-utils/stringutils.h>
+#include <fcitx-utils/utf8.h>
 #include <fcitx-config/iniparser.h>
 
 #include <quickphrase_public.h>
@@ -42,6 +43,7 @@
 
 #include "androidaddonloader/androidaddonloader.h"
 #include "androidfrontend/androidfrontend_public.h"
+#include "androidengine/androidengine_public.h"
 #include "jni-utils.h"
 #include "nativestreambuf.h"
 #include "helper-types.h"
@@ -81,7 +83,7 @@ public:
         return uv_run(get_event_base(), UV_RUN_ONCE);
     }
 
-    void startup(const std::function<void(fcitx::AddonInstance *)> &setupCallback) {
+    void startup(const std::function<void(fcitx::AddonInstance *, fcitx::AddonInstance *)> &setupCallback) {
         p_instance = std::make_unique<fcitx::Instance>(0, nullptr);
         p_instance->addonManager().registerLoader(std::make_unique<fcitx::AndroidSharedLibraryLoader>());
         p_dispatcher = std::make_unique<fcitx::EventDispatcher>();
@@ -92,7 +94,8 @@ public:
         p_quickphrase = addonMgr.addon("quickphrase");
         p_unicode = addonMgr.addon("unicode");
         p_clipboard = addonMgr.addon("clipboard", true);
-        setupCallback(p_frontend);
+        p_engine = addonMgr.addon("androidengine", true);
+        setupCallback(p_frontend, p_engine);
     }
 
     void reloadConfig() {
@@ -466,6 +469,7 @@ private:
     fcitx::AddonInstance *p_quickphrase = nullptr;
     fcitx::AddonInstance *p_unicode = nullptr;
     fcitx::AddonInstance *p_clipboard = nullptr;
+    fcitx::AddonInstance *p_engine = nullptr;
 
     void resetGlobalPointers() {
         p_instance.reset();
@@ -474,6 +478,7 @@ private:
         p_quickphrase = nullptr;
         p_unicode = nullptr;
         p_clipboard = nullptr;
+        p_engine = nullptr;
     }
 };
 
@@ -503,6 +508,65 @@ Java_org_fcitx_fcitx5_android_core_Fcitx_setupLogStream(JNIEnv *env, jclass claz
     static native_streambuf log_streambuf;
     static std::ostream stream(&log_streambuf);
     Fcitx::setLogStream(stream, verbose);
+}
+
+// JNI's "UTF" is modified UTF-8, which spells a character past U+FFFF (CJK Ext-B, in the tables)
+// as two surrogates fcitx cannot read: go through UTF-16 instead. A surrogate without its pair
+// has no UTF-8 at all, and becomes U+FFFD.
+static std::string utf8FromJString(JNIEnv *env, jstring str) {
+    if (!str) return {};
+    const jsize n = env->GetStringLength(str);
+    std::u16string units(static_cast<size_t>(n), u'\0');
+    env->GetStringRegion(str, 0, n, reinterpret_cast<jchar *>(units.data()));
+    std::string out;
+    // CJK is three bytes a unit
+    out.reserve(units.size() * 3);
+    for (size_t i = 0; i < units.size(); i++) {
+        uint32_t c = units[i];
+        if (c >= 0xD800 && c < 0xE000) {
+            if (c < 0xDC00 && i + 1 < units.size() && units[i + 1] >= 0xDC00 && units[i + 1] < 0xE000) {
+                c = 0x10000 + ((c - 0xD800) << 10) + (units[++i] - 0xDC00);
+            } else {
+                c = 0xFFFD;
+            }
+        }
+        if (c < 0x80) {
+            out += static_cast<char>(c);
+        } else if (c < 0x800) {
+            out += static_cast<char>(0xC0 | (c >> 6));
+            out += static_cast<char>(0x80 | (c & 0x3F));
+        } else if (c < 0x10000) {
+            out += static_cast<char>(0xE0 | (c >> 12));
+            out += static_cast<char>(0x80 | ((c >> 6) & 0x3F));
+            out += static_cast<char>(0x80 | (c & 0x3F));
+        } else {
+            out += static_cast<char>(0xF0 | (c >> 18));
+            out += static_cast<char>(0x80 | ((c >> 12) & 0x3F));
+            out += static_cast<char>(0x80 | ((c >> 6) & 0x3F));
+            out += static_cast<char>(0x80 | (c & 0x3F));
+        }
+    }
+    return out;
+}
+
+static std::vector<std::string> utf8FromJStringArray(JNIEnv *env, jobjectArray array) {
+    std::vector<std::string> out;
+    if (!array) return out;
+    const jsize n = env->GetArrayLength(array);
+    out.reserve(n);
+    for (jsize i = 0; i < n; i++) {
+        auto s = JRef<jstring>(env, env->GetObjectArrayElement(array, i));
+        out.push_back(utf8FromJString(env, s));
+    }
+    return out;
+}
+
+// An exception from the engine must not unwind through fcitx: log it, and the key goes to the app.
+static bool engineFailed(JNIEnv *env) {
+    if (!env->ExceptionCheck()) return false;
+    env->ExceptionDescribe();
+    env->ExceptionClear();
+    return true;
 }
 
 extern "C"
@@ -707,10 +771,39 @@ Java_org_fcitx_fcitx5_android_core_Fcitx_startupFcitx(
         env->CallStaticVoidMethod(GlobalRef->Fcitx, GlobalRef->ShowToast, *JString(env, s));
     };
 
+    auto engineEventCallback = [](const std::string &im, EngineEvent event, int arg, bool learning) {
+        auto env = GlobalRef->AttachEnv();
+        EngineSnapshot snapshot;
+        auto result = JRef(env, env->CallStaticObjectMethod(GlobalRef->EngineBridge, GlobalRef->EngineBridgeOnEvent,
+                                                             *JString(env, im), static_cast<jint>(event), arg,
+                                                             static_cast<jboolean>(learning)));
+        if (engineFailed(env) || !result) return snapshot;
+        snapshot.handled = env->GetBooleanField(result, GlobalRef->EngineResultHandled);
+        snapshot.commit = utf8FromJString(env, JRef<jstring>(env, env->GetObjectField(result, GlobalRef->EngineResultCommit)));
+        snapshot.preedit = utf8FromJString(env, JRef<jstring>(env, env->GetObjectField(result, GlobalRef->EngineResultPreedit)));
+        snapshot.candidates = utf8FromJStringArray(env, JRef<jobjectArray>(env, env->GetObjectField(result, GlobalRef->EngineResultCandidates)));
+        snapshot.hints = utf8FromJStringArray(env, JRef<jobjectArray>(env, env->GetObjectField(result, GlobalRef->EngineResultHints)));
+        snapshot.first = env->GetIntField(result, GlobalRef->EngineResultFirst);
+        snapshot.shown = env->GetIntField(result, GlobalRef->EngineResultShown);
+        snapshot.total = env->GetIntField(result, GlobalRef->EngineResultTotal);
+        return snapshot;
+    };
+    auto engineCandidatesCallback = [](const std::string &im, int from, int count) {
+        auto env = GlobalRef->AttachEnv();
+        std::vector<std::pair<std::string, std::string>> out;
+        // text and hint, one after the other
+        auto flat = JRef<jobjectArray>(env, env->CallStaticObjectMethod(GlobalRef->EngineBridge, GlobalRef->EngineBridgeCandidates,
+                                                                        *JString(env, im), from, count));
+        if (engineFailed(env) || !flat) return out;
+        auto strings = utf8FromJStringArray(env, flat);
+        for (size_t i = 0; i + 1 < strings.size(); i += 2) out.emplace_back(std::move(strings[i]), std::move(strings[i + 1]));
+        return out;
+    };
+
     umask(007);
     fcitx::StandardPaths::global().syncUmask();
 
-    Fcitx::Instance().startup([&](auto *androidfrontend) {
+    Fcitx::Instance().startup([&](auto *androidfrontend, auto *androidengine) {
         FCITX_INFO() << "Setting up callback";
         readyCallback();
         androidfrontend->template call<fcitx::IAndroidFrontend::setCandidateListCallback>(candidateListCallback);
@@ -724,6 +817,10 @@ Java_org_fcitx_fcitx5_android_core_Fcitx_startupFcitx(
         androidfrontend->template call<fcitx::IAndroidFrontend::setPagedCandidateCallback>(pagedCandidateCallback);
         androidfrontend->template call<fcitx::IAndroidFrontend::setSwitchInputMethodCallback>(switchInputMethodCallback);
         androidfrontend->template call<fcitx::IAndroidFrontend::setToastCallback>(toastCallback);
+        if (androidengine) {
+            androidengine->template call<fcitx::IAndroidEngine::setEventCallback>(engineEventCallback);
+            androidengine->template call<fcitx::IAndroidEngine::setCandidatesCallback>(engineCandidatesCallback);
+        }
     });
     FCITX_INFO() << "Finishing startup";
 }

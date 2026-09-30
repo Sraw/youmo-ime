@@ -11,9 +11,11 @@ import org.fcitx.fcitx5.android.engine.session.Action.Backspace
 import org.fcitx.fcitx5.android.engine.session.Action.CommitRaw
 import org.fcitx.fcitx5.android.engine.session.Action.Key
 import org.fcitx.fcitx5.android.engine.session.Action.NextPage
+import org.fcitx.fcitx5.android.engine.session.Action.Pick
 import org.fcitx.fcitx5.android.engine.session.Action.PreviousPage
 import org.fcitx.fcitx5.android.engine.session.Action.Reset
 import org.fcitx.fcitx5.android.engine.session.Action.Select
+import org.fcitx.fcitx5.android.engine.session.Choice
 import org.fcitx.fcitx5.android.engine.session.Session
 import org.fcitx.fcitx5.android.engine.session.Snapshot
 import org.junit.Assert.assertEquals
@@ -121,6 +123,46 @@ class TableSessionTest {
         assertTrue(t.apply(NextPage).handled)
         t.apply(Reset)
         assertFalse(t.apply(NextPage).handled)
+    }
+
+    @Test
+    fun aHostListsAndPicksAmongAllCandidatesWithTheirHints() {
+        val t = session()
+        val s = t.type("a").second
+        // more than a page: not counted until asked for
+        assertEquals(-1, s.total)
+        assertEquals(listOf(Choice("恭恭敬敬", "aaa"), Choice("工期", "aad")), t.candidates(4, 10))
+        assertEquals("工期", t.apply(Pick(5)).commit)
+        // a page's worth is counted
+        assertEquals(1, t.type("vb").second.total)
+        assertTrue(t.apply(Pick(9)).handled)
+        t.apply(Reset)
+        assertFalse(t.apply(Pick(0)).handled)
+        assertTrue(t.candidates(0, 5).isEmpty())
+    }
+
+    @Test
+    fun theKeysReadAreCodeKeysTheWildcardAndThePinyinKeyToStart() {
+        val t = session(pinyin = FakePinyin())
+        assertTrue(t.reads('a'))
+        assertTrue(t.reads('z'))
+        assertFalse(t.reads(','))
+        assertFalse(t.reads('1'))
+        // 仓颉's wildcard is not a code key, and no pinyin session: no lookup
+        val cangjie = session(TableOptions.CANGJIE)
+        assertTrue(cangjie.reads('*'))
+        assertFalse(cangjie.reads('z'))
+        // a pinyin key that is no code key only starts a code
+        val lookUpOnly = session(TableOptions(pinyinKey = '`'), FakePinyin())
+        assertTrue(lookUpOnly.reads('`'))
+        lookUpOnly.type("a")
+        assertFalse(lookUpOnly.reads('`'))
+        // looking up, pinyin is read, and what it offers listed with codes
+        t.type("zwo")
+        assertTrue(t.reads('\''))
+        assertFalse(t.reads('A'))
+        assertEquals(listOf(Choice("窝", "")), t.candidates(1, 5))
+        assertEquals(Choice("我", "trnt"), t.candidates(0, 1).single())
     }
 
     @Test
@@ -242,6 +284,33 @@ class TableSessionTest {
     }
 
     @Test
+    fun aKeyNotReadBreaksAPhrase() {
+        val t = session()
+        t.type("wqiy")
+        val comma = t.apply(Key(','))
+        assertFalse(comma.handled)
+        t.type("wun")
+        assertFalse("你们" in t.type("wqwu").second.candidates)
+    }
+
+    @Test
+    fun nothingIsLearnedWhileLearningIsOff() {
+        val t = session()
+        t.learning = false
+        t.type("wqiy")
+        t.type("wun")
+        assertFalse("你们" in t.type("wqwu").second.candidates)
+        // a pick moves what is picked up, unless learning is off
+        for (learning in listOf(true, false)) {
+            val u = session()
+            u.learning = learning
+            u.type("aaaa")
+            assertEquals("恭恭敬敬", u.apply(Select(1)).commit)
+            assertEquals(if (learning) "恭恭敬敬" else "工", u.type("aaaa").second.candidates.first())
+        }
+    }
+
+    @Test
     fun orTypedCharacterByCharacterOftenEnough() {
         val t = session()
         repeat(2) {
@@ -291,6 +360,7 @@ class TableSessionTest {
         val typed = StringBuilder()
         var resets = 0
         // "nini": 你 picked from the start, "ni" left
+        override var learning = true
         var picked = false
 
         private fun candidates() = when (typed.toString()) {
@@ -298,6 +368,10 @@ class TableSessionTest {
             "wo" -> listOf("我", "窝")
             else -> emptyList()
         }
+
+        override fun reads(c: Char) = c in 'a'..'z'
+
+        override fun candidates(from: Int, count: Int) = candidates().drop(from).take(count).map { Choice(it) }
 
         private fun snap(commit: String = "", handled: Boolean = true) =
             Snapshot(commit, typed.toString(), candidates(), 0, false, false, handled, predicting = commit.isNotEmpty())

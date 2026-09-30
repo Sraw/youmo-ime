@@ -24,7 +24,7 @@ import java.util.TreeMap
  * slip read with [typos] is ü typed with its own key after j, q, x, y (`jv` for ju), which libime
  * reads too; a slipped key otherwise lands on another syllable, not on a spelling to correct.
  */
-class ShuangpinSegmenter(scheme: ShuangpinScheme, fuzzy: Set<Fuzzy> = emptySet(), typos: Boolean = true) : Segmenter {
+class ShuangpinSegmenter(private val scheme: ShuangpinScheme, fuzzy: Set<Fuzzy> = emptySet(), typos: Boolean = true) : Segmenter {
 
     private val pairs = arrayOfNulls<SyllableMatches>(KEYS * KEYS)
     private val leads = arrayOfNulls<SyllableMatches>(KEYS)
@@ -77,6 +77,8 @@ class ShuangpinSegmenter(scheme: ShuangpinScheme, fuzzy: Set<Fuzzy> = emptySet()
             }
         }
     }
+
+    override fun reads(c: Char) = scheme.types(c)
 
     override fun segment(input: String): SyllableGraph = GraphEdges.build(input) { at, edges -> walk(input, at, edges) }
 

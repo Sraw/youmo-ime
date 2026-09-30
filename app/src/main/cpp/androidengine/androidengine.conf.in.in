@@ -1,0 +1,12 @@
+[Addon]
+Name=Android Engine
+Type=SharedLibrary
+Library=libandroidengine
+Category=InputMethod
+Version=@PROJECT_VERSION@
+Configurable=False
+
+[Addon/OptionalDependencies]
+0=punctuation
+1=fullwidth
+2=chttrans

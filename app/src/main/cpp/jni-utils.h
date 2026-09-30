@@ -144,6 +144,18 @@ public:
     jclass Candidate;
     jmethodID CandidateInit;
 
+    jclass EngineBridge;
+    jmethodID EngineBridgeOnEvent;
+    jmethodID EngineBridgeCandidates;
+    jfieldID EngineResultHandled;
+    jfieldID EngineResultCommit;
+    jfieldID EngineResultPreedit;
+    jfieldID EngineResultCandidates;
+    jfieldID EngineResultHints;
+    jfieldID EngineResultFirst;
+    jfieldID EngineResultShown;
+    jfieldID EngineResultTotal;
+
     explicit GlobalRefSingleton(JavaVM *jvm_) : jvm(jvm_) {
         JNIEnv *env;
         jvm->AttachCurrentThread(&env, nullptr);
@@ -196,6 +208,20 @@ public:
 
         Candidate = reinterpret_cast<jclass>(env->NewGlobalRef(env->FindClass("org/fcitx/fcitx5/android/core/CandidateWord")));
         CandidateInit = env->GetMethodID(Candidate, "<init>", "(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Z)V");
+
+        EngineBridge = reinterpret_cast<jclass>(env->NewGlobalRef(env->FindClass("org/fcitx/fcitx5/android/core/EngineBridge")));
+        EngineBridgeOnEvent = env->GetStaticMethodID(EngineBridge, "onEvent", "(Ljava/lang/String;IIZ)Lorg/fcitx/fcitx5/android/core/EngineBridge$Result;");
+        EngineBridgeCandidates = env->GetStaticMethodID(EngineBridge, "candidates", "(Ljava/lang/String;II)[Ljava/lang/String;");
+        jclass engineResult = env->FindClass("org/fcitx/fcitx5/android/core/EngineBridge$Result");
+        EngineResultHandled = env->GetFieldID(engineResult, "handled", "Z");
+        EngineResultCommit = env->GetFieldID(engineResult, "commit", "Ljava/lang/String;");
+        EngineResultPreedit = env->GetFieldID(engineResult, "preedit", "Ljava/lang/String;");
+        EngineResultCandidates = env->GetFieldID(engineResult, "candidates", "[Ljava/lang/String;");
+        EngineResultHints = env->GetFieldID(engineResult, "hints", "[Ljava/lang/String;");
+        EngineResultFirst = env->GetFieldID(engineResult, "first", "I");
+        EngineResultShown = env->GetFieldID(engineResult, "shown", "I");
+        EngineResultTotal = env->GetFieldID(engineResult, "total", "I");
+        env->DeleteLocalRef(engineResult);
     }
 
     [[nodiscard]] JEnv AttachEnv() const { return JEnv(jvm); }

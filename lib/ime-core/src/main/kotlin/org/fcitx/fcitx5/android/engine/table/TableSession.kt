@@ -5,6 +5,7 @@
 package org.fcitx.fcitx5.android.engine.table
 
 import org.fcitx.fcitx5.android.engine.session.Action
+import org.fcitx.fcitx5.android.engine.session.Choice
 import org.fcitx.fcitx5.android.engine.session.Session
 import org.fcitx.fcitx5.android.engine.session.Snapshot
 
@@ -45,6 +46,8 @@ class TableSession(
     private var lookingUp = false
     private var lookedUp: Snapshot? = null
 
+    override var learning = true
+
     // what was committed last, one character at a time, for auto phrases
     private val recent = ArrayList<String>()
     private val autoPhraseLength = if (options.autoPhraseLength < 0) table.maxLength else options.autoPhraseLength
@@ -61,6 +64,7 @@ class TableSession(
         is Action.Key -> type(action.char)
         Action.Backspace -> backspace()
         is Action.Select -> select(action.index)
+        is Action.Pick -> pick(action.index)
         Action.NextPage -> turn(page + 1)
         Action.PreviousPage -> turn(page - 1)
         Action.CommitRaw -> {
@@ -74,6 +78,18 @@ class TableSession(
             clear()
             snapshot()
         }
+    }
+
+    override fun reads(c: Char): Boolean = if (lookingUp) {
+        c in 'a'..'z' || c == '\''
+    } else {
+        c in table.keys || c == options.matchingKey || (c == options.pinyinKey && pinyin != null && input.isEmpty())
+    }
+
+    override fun candidates(from: Int, count: Int): List<Choice> {
+        if (lookingUp) return pinyin!!.candidates(from, count).map { Choice(it.text, table.codeOf(it.text).orEmpty()) }
+        val wild = wild()
+        return ranking.page(from, count).map { Choice(it.text, if (options.hint) hint(it, wild) else "") }
     }
 
     private fun type(c: Char): Snapshot {
@@ -142,6 +158,11 @@ class TableSession(
         return snapshot(commit = take(item))
     }
 
+    private fun pick(index: Int): Snapshot {
+        val item = ranking[index] ?: return snapshot(handled = input.isNotEmpty())
+        return snapshot(commit = take(item))
+    }
+
     private fun turn(to: Int): Snapshot {
         // a code on screen keeps the key, candidates or not
         if (to < 0 || ranking[to * options.pageSize] == null) return snapshot(handled = input.isNotEmpty())
@@ -155,6 +176,10 @@ class TableSession(
         if (item == null) {
             recent.clear()
             return ""
+        }
+        if (!learning) {
+            recent.clear()
+            return item.text
         }
         if (item.index >= 0) {
             picks[item.index] = (picks[item.index] ?: 0) + 1
@@ -268,6 +293,9 @@ class TableSession(
 
         fun only(): Item? = if (get(1) == null) get(0) else null
 
+        /** How many there are, -1 until all were made: a key's range may hold thousands. */
+        val size: Int get() = if (done) items.size else -1
+
         fun page(from: Int, size: Int): List<Item> = (from until from + size).mapNotNull { get(it) }
 
         companion object {
@@ -278,7 +306,7 @@ class TableSession(
     private fun snapshot(commit: String = "", handled: Boolean = true): Snapshot {
         val from = page * options.pageSize
         val shown = ranking.page(from, options.pageSize)
-        val wild = options.matchingKey != null && input.contains(options.matchingKey)
+        val wild = wild()
         return Snapshot(
             commit = commit,
             preedit = input.toString(),
@@ -288,9 +316,16 @@ class TableSession(
             hasNextPage = ranking[from + options.pageSize] != null,
             handled = handled,
             predicting = false,
-            hints = if (!options.hint || shown.isEmpty()) emptyList() else shown.map { if (wild) it.code else it.code.substring(input.length) },
+            hints = if (!options.hint || shown.isEmpty()) emptyList() else shown.map { hint(it, wild) },
+            total = ranking.size,
+            first = from,
         )
     }
+
+    private fun wild() = options.matchingKey != null && input.contains(options.matchingKey)
+
+    /** What is left of [item]'s code to type; all of it where a wildcard stands in the input. */
+    private fun hint(item: Item, wild: Boolean) = if (wild) item.code else item.code.substring(input.length)
 
     /** An action while looking up by pinyin: [pinyin] reads the keys after the pinyin key. */
     private fun lookUp(action: Action): Snapshot {

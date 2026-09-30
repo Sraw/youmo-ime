@@ -9,19 +9,47 @@ package org.fcitx.fcitx5.android.engine.session
  * (the fcitx5 addon) turns key events into [Action]s and renders each [Snapshot]; the engine
  * keeps everything else.
  */
-fun interface Session {
+interface Session {
     fun apply(action: Action): Snapshot
+
+    /**
+     * Whether [c] goes into the input now. Other keys are the host's to act on: space and digits
+     * pick; the rest are sent as [Action.Key] all the same, to end the input, then typed.
+     */
+    fun reads(c: Char): Boolean
+
+    /**
+     * Whether what the user picks is learned. The host turns it off where the app asks it not to
+     * (a password, an incognito tab), before the actions typed there.
+     */
+    var learning: Boolean
+
+    /**
+     * The candidates from the [from]th of all, at most [count]: for a host that shows more than
+     * the page, such as fcitx's candidate bar scrolled sideways.
+     */
+    fun candidates(from: Int, count: Int): List<Choice>
 }
+
+/** A candidate as a host lists it, with its [hint] (see [Snapshot.hints]). */
+data class Choice(val text: String, val hint: String = "")
 
 /** What a user does. */
 sealed class Action {
-    /** A key the engine reads: a letter, `'`, or a key a 双拼 scheme uses. */
+    /**
+     * A key typed. One the engine [reads][Session.reads] goes into the input; any other ends it,
+     * committed as the engine would have it, and is the app's (the snapshot is not
+     * [handled][Snapshot.handled]): what comes after it does not run on from what came before.
+     */
     data class Key(val char: Char) : Action()
 
     object Backspace : Action()
 
     /** The candidate at [index] on the page shown (a digit key; space is 0). */
     data class Select(val index: Int) : Action()
+
+    /** The candidate at [index] of all, whatever page is shown (a tap on the host's list). */
+    data class Pick(val index: Int) : Action()
 
     object NextPage : Action()
     object PreviousPage : Action()
@@ -44,6 +72,8 @@ sealed class Action {
  * @property hints shown beside each candidate, empty or one per candidate: what is left of its
  *   code to type, or its whole code when the input does not spell it out (a wildcard in a
  *   table's code, or a table's pinyin lookup)
+ * @property total how many candidates there are in all, -1 if not yet known
+ * @property first the index among all of the first candidate of the page shown
  */
 data class Snapshot(
     val commit: String,
@@ -55,4 +85,6 @@ data class Snapshot(
     val handled: Boolean,
     val predicting: Boolean,
     val hints: List<String> = emptyList(),
+    val total: Int = candidates.size,
+    val first: Int = 0,
 )
