@@ -342,8 +342,9 @@ class PinyinSessionTest {
         val committed = session.apply(Select(0))
         assertEquals("拟再", committed.commit)
         assertEquals(1, user.size)
-        // the model never saw the user's word: it has nothing to predict after it
-        assertFalse(committed.predicting)
+        // the model never saw the user's word: what follows is what follows its end, 再
+        assertTrue(committed.predicting)
+        assertEquals(listOf("见"), committed.candidates)
         session.apply(Reset)
         // found whole, and read as its syllables
         val again = session.type("nizai")

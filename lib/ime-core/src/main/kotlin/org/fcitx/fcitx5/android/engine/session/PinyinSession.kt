@@ -65,7 +65,7 @@ class PinyinSession(
         penalties,
         user = user,
     )
-    private val predictor = Predictor(data.model, data.vocabulary)
+    private val predictor = Predictor(data.model, data.vocabulary, data.dictionary)
 
     private val input = StringBuilder()
     private val pieces = ArrayList<Piece>()
@@ -216,11 +216,22 @@ class PinyinSession(
             lastEntry = null
         }
         clear()
-        val (prev2, prev) = lastTwo(context)
         // what may follow a password is no one's business
-        candidates = if (prediction && learning) predictor.predict(prev2, prev) else emptyList()
+        candidates = if (prediction && learning) predict() else emptyList()
         predicting = candidates.isNotEmpty()
         return snapshot(commit = text)
+    }
+
+    /**
+     * What may follow the words committed last. After one the model never saw (the user's own,
+     * put together from pieces, or a dictionary word it lacks) that is what follows its end, 再
+     * of 拟再: the model's context would be its unknown word, followed by anything.
+     */
+    private fun predict(): List<Candidate> {
+        val (prev2, prev) = lastTwo(context)
+        val last = lastEntry
+        if (prev == NO_WORD || prev < data.model.vocabularySize || last == null) return predictor.predict(prev2, prev)
+        return predictor.predict(NO_WORD, predictor.tail(last.text, last.syllables))
     }
 
     private fun clear() {

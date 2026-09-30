@@ -44,12 +44,18 @@ class PredictorTest {
                 .bigram("再", "见", -0.5f, 0f)
                 .bigram("再", "吗", -1f, 0f)
                 .trigram("我", "再", "见", -0.25f)
+                .unigram("再见", -4f, 0f)
                 .entry("你", intArrayOf(Syllables.id("ni")))
+                .entry("见", intArrayOf(Syllables.id("jian")))
+                .entry("再", intArrayOf(Syllables.id("zai")))
+                .entry("再见", intArrayOf(Syllables.id("zai"), Syllables.id("jian")))
                 .build().toByteArray(),
         ),
     )
 
-    private val predictor = Predictor(data.model, data.vocabulary)
+    private val predictor = Predictor(data.model, data.vocabulary, data.dictionary)
+
+    private fun syl(vararg s: String) = s.map { Syllables.id(it) }.toIntArray()
 
     private fun id(word: String) = (0 until data.vocabulary.size).first { data.vocabulary.word(it) == word }
 
@@ -96,5 +102,20 @@ class PredictorTest {
         assertTrue(predictor.predict(NO_WORD, NO_WORD).isEmpty())
         assertTrue(predictor.predict(id("你"), NO_WORD).isEmpty())
         assertTrue(predictor.predict(NO_WORD, id("见")).isEmpty())
+    }
+
+    @Test
+    fun anUnseenWordEndsInItsLastTwoCharactersOrItsLast() {
+        assertEquals(id("再见"), predictor.tail("说再见", syl("shuo", "zai", "jian")))
+        assertEquals(id("见"), predictor.tail("看见", syl("kan", "jian")))
+        // the end read otherwise is not the model's word
+        assertEquals(NO_WORD, predictor.tail("说再见", syl("shuo", "zai", "jie")))
+        // read as the model's word but written otherwise: the last character alone
+        assertEquals(id("见"), predictor.tail("说在见", syl("shuo", "zai", "jian")))
+        // a word no longer than its end is itself; characters and syllables that do not pair up
+        assertEquals(NO_WORD, predictor.tail("见", syl("jian")))
+        assertEquals(NO_WORD, predictor.tail("说再见", syl("zai", "jian")))
+        assertEquals(NO_WORD, Predictor(data.model, data.vocabulary).tail("看见", syl("kan", "jian")))
+        assertEquals(listOf("见", "吗"), texts(predictor.predict(NO_WORD, predictor.tail("说再", syl("shuo", "zai")))))
     }
 }

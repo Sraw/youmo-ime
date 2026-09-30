@@ -6,6 +6,7 @@ package org.fcitx.fcitx5.android.engine.lattice
 
 import org.fcitx.fcitx5.android.engine.data.NgramModel
 import org.fcitx.fcitx5.android.engine.data.NgramModel.Companion.NO_WORD
+import org.fcitx.fcitx5.android.engine.data.PinyinDictionary
 import org.fcitx.fcitx5.android.engine.data.Vocabulary
 
 /**
@@ -17,8 +18,15 @@ import org.fcitx.fcitx5.android.engine.data.Vocabulary
  * Only words of letters are offered (〇 is one, and · between them as in 马克·吐温): the model also
  * has punctuation and `<unk>`, which a candidate bar has no use for. A common word is followed by tens of thousands (的 by 86,000),
  * so text is made only for words good enough to be among those returned.
+ *
+ * After a word the model has not seen (one the user put together, say) what may follow is what
+ * follows its end: see [tail], which needs the [dictionary] to find it.
  */
-class Predictor(private val model: NgramModel, private val vocabulary: Vocabulary) {
+class Predictor(
+    private val model: NgramModel,
+    private val vocabulary: Vocabulary,
+    private val dictionary: PinyinDictionary? = null,
+) {
 
     /**
      * @param prev2 the word before [prev], or [NO_WORD]
@@ -48,6 +56,27 @@ class Predictor(private val model: NgramModel, private val vocabulary: Vocabular
         return List(size) { Candidate(vocabulary.word(words[it]), 0, scores[it], intArrayOf(words[it]), intArrayOf(0)) }
     }
 
+    /**
+     * The model's word for the end of [text], read as [syllables]: its last two characters, else
+     * its last; [NO_WORD] if neither is a word the model has, or [text] is no longer than that
+     * (it is then the word itself), or its characters and syllables do not pair up.
+     */
+    fun tail(text: String, syllables: IntArray): Int {
+        val dictionary = dictionary ?: return NO_WORD
+        val chars = text.codePointCount(0, text.length)
+        if (chars != syllables.size) return NO_WORD
+        for (n in minOf(TAIL, chars - 1) downTo 1) {
+            val node = dictionary.find(syllables.copyOfRange(chars - n, chars))
+            if (node < 0) continue
+            val end = text.substring(text.offsetByCodePoints(text.length, -n))
+            for (i in 0 until dictionary.wordCount(node)) {
+                val word = dictionary.word(node, i)
+                if (word < model.vocabularySize && vocabulary.word(word) == end) return word
+            }
+        }
+        return NO_WORD
+    }
+
     private fun offered(word: Int): Boolean {
         val text = vocabulary.word(word)
         var i = 0
@@ -66,6 +95,7 @@ class Predictor(private val model: NgramModel, private val vocabulary: Vocabular
 
     companion object {
         const val DEFAULT_LIMIT = 20
+        private const val TAIL = 2
         private const val MIDDLE_DOT = 0xb7
     }
 }
