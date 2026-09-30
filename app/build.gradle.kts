@@ -73,6 +73,8 @@ android {
             isIncludeAndroidResources = false
         }
     }
+    // the evaluation sets, for EngineEvalRunner (lib/ime-eval/run-on-device.sh)
+    sourceSets.getByName("androidTest").assets.srcDir("../lib/ime-eval/data")
 }
 
 fcitxComponent {
