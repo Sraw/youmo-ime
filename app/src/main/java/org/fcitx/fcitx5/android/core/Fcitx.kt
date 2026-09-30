@@ -21,6 +21,7 @@ import org.fcitx.fcitx5.android.utils.Locales
 import org.fcitx.fcitx5.android.utils.appContext
 import org.fcitx.fcitx5.android.utils.toast
 import timber.log.Timber
+import java.io.File
 import java.util.concurrent.CopyOnWriteArrayList
 
 /**
@@ -423,6 +424,7 @@ class Fcitx(private val context: Context) : FcitxAPI, FcitxLifecycleOwner {
             """.trimIndent()
             )
             with(FcitxApplication.getInstance().directBootAwareContext) {
+                EngineMigration.run(File(getExternalFilesDir(null) ?: filesDir, "config"))
                 startupFcitx(
                     locale,
                     dataDir,

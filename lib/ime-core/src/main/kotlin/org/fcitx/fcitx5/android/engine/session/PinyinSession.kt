@@ -45,6 +45,8 @@ class PinyinSession(
     private val spell: Boolean = false,
     private val pageSize: Int = DEFAULT_PAGE_SIZE,
     private val user: UserModel? = null,
+    /** Whether words that may follow are offered after a commit. */
+    private val prediction: Boolean = true,
 ) : Session {
     init {
         require(pageSize >= 1) { "page size $pageSize" }
@@ -216,7 +218,7 @@ class PinyinSession(
         clear()
         val (prev2, prev) = lastTwo(context)
         // what may follow a password is no one's business
-        candidates = if (learning) predictor.predict(prev2, prev) else emptyList()
+        candidates = if (prediction && learning) predictor.predict(prev2, prev) else emptyList()
         predicting = candidates.isNotEmpty()
         return snapshot(commit = text)
     }

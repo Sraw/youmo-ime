@@ -34,6 +34,8 @@
 #include <unicode_public.h>
 #include <clipboard_public.h>
 
+#include <libime/core/historybigram.h>
+#include <libime/pinyin/pinyinencoder.h>
 #include <libime/pinyin/pinyindictionary.h>
 #include <libime/table/tablebaseddictionary.h>
 
@@ -800,6 +802,12 @@ Java_org_fcitx_fcitx5_android_core_Fcitx_startupFcitx(
         return out;
     };
 
+    auto engineSettingsCallback = [](const std::string &settings) {
+        auto env = GlobalRef->AttachEnv();
+        env->CallStaticVoidMethod(GlobalRef->EngineBridge, GlobalRef->EngineBridgeConfigure, *JString(env, settings));
+        engineFailed(env);
+    };
+
     umask(007);
     fcitx::StandardPaths::global().syncUmask();
 
@@ -820,6 +828,7 @@ Java_org_fcitx_fcitx5_android_core_Fcitx_startupFcitx(
         if (androidengine) {
             androidengine->template call<fcitx::IAndroidEngine::setEventCallback>(engineEventCallback);
             androidengine->template call<fcitx::IAndroidEngine::setCandidatesCallback>(engineCandidatesCallback);
+            androidengine->template call<fcitx::IAndroidEngine::setSettingsCallback>(engineSettingsCallback);
         }
     });
     FCITX_INFO() << "Finishing startup";
@@ -1259,6 +1268,37 @@ Java_org_fcitx_fcitx5_android_data_pinyin_PinyinDictManager_pinyinDictConv(JNIEn
     } catch (const std::exception &e) {
         throwJavaException(env, e.what());
     }
+}
+
+// libime pinyin's history as text, for the engine to learn what the user typed with it
+extern "C"
+JNIEXPORT void JNICALL
+Java_org_fcitx_fcitx5_android_core_EngineBridge_libimeHistoryDump(JNIEnv *env, jclass clazz, jstring src, jstring dest) {
+    try {
+        libime::HistoryBigram history;
+        std::ifstream in(*CString(env, src), std::ios::in | std::ios::binary);
+        if (!in) throw std::runtime_error("cannot open history");
+        history.load(in);
+        std::ofstream out(*CString(env, dest), std::ios::out | std::ios::binary);
+        history.dump(out);
+        // the last of it is written only by the close
+        out.close();
+        if (out.fail()) throw std::runtime_error("cannot write history");
+    } catch (const std::exception &e) {
+        throwJavaException(env, e.what());
+    }
+}
+
+extern "C"
+JNIEXPORT jstring JNICALL
+Java_org_fcitx_fcitx5_android_core_EngineBridge_libimeDecodePinyin(JNIEnv *env, jclass clazz, jstring code) {
+    std::string spelled;
+    try {
+        spelled = libime::PinyinEncoder::decodeFullPinyin(*CString(env, code));
+    } catch (const std::exception &) {
+        // an odd length: no reading
+    }
+    return env->NewStringUTF(spelled.c_str());
 }
 
 extern "C"

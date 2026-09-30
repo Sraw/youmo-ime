@@ -86,10 +86,13 @@ fcitxComponent {
         "libime",
         "fcitx5-chinese-addons"
     )
-    // exclude (delete immediately after install) tables that nobody would use
-    excludeFiles = listOf("cangjie", "erbi", "qxm", "wanfeng").map {
-        "usr/share/fcitx5/inputmethod/$it.conf"
-    }
+    // exclude (delete immediately after install) libime's pinyin and table addons and their input
+    // methods: the androidengine addon's replace them
+    val inputMethods = listOf("pinyin", "shuangpin", "wbx", "wbpy", "zrm", "db", "cangjie", "erbi", "qxm", "wanfeng")
+    excludeFiles = (
+        listOf("addon/pinyin.conf", "addon/table.conf", "pinyin/sp.dat.example", "pinyin/symbols") +
+            inputMethods.map { "inputmethod/$it.conf" }
+        ).map { "usr/share/fcitx5/$it" }
     installPrebuiltAssets = true
 }
 

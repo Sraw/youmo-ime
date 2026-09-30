@@ -165,6 +165,46 @@ class UserStoreTest {
         assertEquals(emptyMap<String, Float>(), counts(session()))
     }
 
+    private val seed: (UserModel) -> Unit = { it.learn(null, listOf(entry("你", "ni"))); it.learn(null, listOf(entry("拟", "ni"))) }
+
+    @Test
+    fun aSeedIsWrittenOnceAsCountsAndLoggingGoesOnAfter() {
+        val disk = FailingDisk(failing = 0)
+        val m = model()
+        UserStore(file, m, UserStore.DEFAULT_COMPACT_AT, {}, disk).use { store ->
+            store.open(seed)
+            // no sentence appended: the counts were written whole, in a file of their own
+            assertEquals(0, disk.writes)
+            m.learn(null, listOf(entry("你", "ni")))
+            assertEquals(1, disk.writes)
+        }
+        assertEquals(mapOf("你(ni)" to 2f, "拟(ni)" to 1f), counts(session()))
+    }
+
+    @Test
+    fun onlyALogWithNothingLearnedIsSeeded() {
+        var seeded = 0
+        val counting: (UserModel) -> Unit = { seeded++; seed(it) }
+        // a header alone: killed before anything was learned
+        file.writeBytes(UserLog.header())
+        UserStore(file, model()).use { it.open(counting) }
+        assertEquals(1, seeded)
+        UserStore(file, model()).use { it.open(counting) }
+        assertEquals(1, seeded)
+        assertEquals(mapOf("你(ni)" to 1f, "拟(ni)" to 1f), counts(session()))
+    }
+
+    @Test
+    fun aSeedThatCannotBeWrittenFailsTheOpenAndIsTriedAgain() {
+        // where the counts would be written first
+        val blocker = File(file.path + ".compacting").apply { mkdir() }
+        assertThrows(IOException::class.java) { UserStore(file, model()).open(seed) }
+        assertFalse(file.exists())
+        blocker.delete()
+        UserStore(file, model()).use { it.open(seed) }
+        assertEquals(mapOf("你(ni)" to 1f, "拟(ni)" to 1f), counts(session()))
+    }
+
     /** Writes through to [file] but, on write [failing], only half the bytes, then fails. */
     private class FailingDisk(private val failing: Int) : (File) -> OutputStream {
         var writes = 0

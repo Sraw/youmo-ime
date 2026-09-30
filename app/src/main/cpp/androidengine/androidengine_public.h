@@ -45,10 +45,15 @@ enum class EngineEvent : int {
 typedef std::function<EngineSnapshot(const std::string &im, EngineEvent event, int arg, bool learning)> EngineEventCallback;
 // Candidates [from, from + count) of [im]'s session, each with its hint.
 typedef std::function<std::vector<std::pair<std::string, std::string>>(const std::string &im, int from, int count)> EngineCandidatesCallback;
+// The addon's config, `key=value` a line, a group's keys after its name (`Fuzzy/L_N=True`); called
+// once set, and on each change.
+typedef std::function<void(const std::string &settings)> EngineSettingsCallback;
 
 FCITX_ADDON_DECLARE_FUNCTION(AndroidEngine, setEventCallback,
                              void(const EngineEventCallback &))
 FCITX_ADDON_DECLARE_FUNCTION(AndroidEngine, setCandidatesCallback,
                              void(const EngineCandidatesCallback &))
+FCITX_ADDON_DECLARE_FUNCTION(AndroidEngine, setSettingsCallback,
+                             void(const EngineSettingsCallback &))
 
 #endif // FCITX5_ANDROID_ANDROIDENGINE_PUBLIC_H

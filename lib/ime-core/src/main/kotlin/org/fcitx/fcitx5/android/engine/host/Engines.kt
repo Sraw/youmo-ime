@@ -7,7 +7,6 @@ package org.fcitx.fcitx5.android.engine.host
 import org.fcitx.fcitx5.android.engine.data.CodeTable
 import org.fcitx.fcitx5.android.engine.data.PinyinData
 import org.fcitx.fcitx5.android.engine.pinyin.PinyinSegmenter
-import org.fcitx.fcitx5.android.engine.pinyin.ShuangpinScheme
 import org.fcitx.fcitx5.android.engine.pinyin.ShuangpinSegmenter
 import org.fcitx.fcitx5.android.engine.session.Choice
 import org.fcitx.fcitx5.android.engine.session.PinyinSession
@@ -16,6 +15,7 @@ import org.fcitx.fcitx5.android.engine.session.Snapshot
 import org.fcitx.fcitx5.android.engine.table.TableDictionary
 import org.fcitx.fcitx5.android.engine.table.TableOptions
 import org.fcitx.fcitx5.android.engine.table.TableSession
+import org.fcitx.fcitx5.android.engine.user.LibimeImport
 import org.fcitx.fcitx5.android.engine.user.UserModel
 import org.fcitx.fcitx5.android.engine.user.UserStore
 import java.io.Closeable
@@ -26,15 +26,16 @@ import java.nio.ByteBuffer
 /**
  * The input methods the androidengine addon lists, by name, each with its session made on first
  * use. [load] gives a data file by its path in the app's assets; what the user picks in pinyin is
- * kept under [userDir] (in memory only if null).
+ * kept under [userDir] (in memory only if null). When that log is made afresh, what libime's
+ * pinyin learned ([legacy], if the user had it) is read into it first.
  *
  * Everything here runs on one thread, the one fcitx runs on.
  */
 class Engines(
     private val load: (String) -> ByteBuffer,
     private val userDir: File?,
-    private val shuangpin: ShuangpinScheme = ShuangpinScheme.ZIRANMA,
     private val onError: (IOException) -> Unit = {},
+    private val legacy: () -> LibimeImport.Legacy? = { null },
 ) : Closeable {
 
     // the files are signed with the app: no need to read them through for their checksums
@@ -45,10 +46,10 @@ class Engines(
         UserModel(pinyinData.dictionary, pinyinData.vocabulary).also { model ->
             if (userDir != null) {
                 userDir.mkdirs()
-                val opened = UserStore(File(userDir, USER_PINYIN), model, onError = onError)
+                val file = File(userDir, USER_PINYIN)
                 // a log that cannot be read or moved aside: learn in memory rather than not type
                 store = try {
-                    opened.apply { open() }
+                    UserStore(file, model, onError = onError).apply { open(seed = ::importLegacy) }
                 } catch (e: IOException) {
                     onError(e)
                     null
@@ -57,8 +58,39 @@ class Engines(
         }
     }
 
+    /**
+     * What libime learned, into a log with nothing in it yet. Whatever fails is reported and
+     * pinyin goes on without it. Files that cannot be read leave the log empty, for the next
+     * start to try again; a failure while learning them keeps what was learned before it.
+     */
+    private fun importLegacy(model: UserModel) {
+        try {
+            val old = legacy() ?: return
+            LibimeImport.learn(
+                model, pinyinData.dictionary, pinyinData.vocabulary,
+                old.dictionary.asSequence(), old.history.asSequence(), old.decode,
+            )
+        } catch (e: IOException) {
+            onError(e)
+        } catch (@Suppress("TooGenericExceptionCaught") e: RuntimeException) {
+            // old data, through native converters: no failure of theirs should stop typing
+            onError(IOException("cannot import libime's data", e))
+        } catch (e: LinkageError) {
+            onError(IOException("cannot import libime's data", e))
+        }
+    }
+
     private val keyboards = HashMap<String, Keyboard>()
     private val sessions = HashMap<String, Session>()
+
+    /** What the user set; the sessions are made again for a change, what was typed dropped. */
+    var settings = EngineSettings()
+        set(value) {
+            if (value == field) return
+            field = value
+            keyboards.clear()
+            sessions.clear()
+        }
 
     /** [event] of [im]'s keyboard; nothing picked is learned unless [learning]. */
     fun onEvent(im: String, event: Int, arg: Int, learning: Boolean = true): Snapshot {
@@ -70,15 +102,22 @@ class Engines(
     fun candidates(im: String, from: Int, count: Int): List<Choice> = sessions[im]?.candidates(from, count).orEmpty()
 
     private fun session(im: String): Session = sessions.getOrPut(im) {
+        val s = settings
         when (im) {
-            PINYIN -> PinyinSession(pinyinData, PinyinSegmenter(), user = user)
-            SHUANGPIN -> PinyinSession(pinyinData, ShuangpinSegmenter(shuangpin), spell = true, user = user)
+            PINYIN -> PinyinSession(
+                pinyinData, PinyinSegmenter(s.fuzzy, s.typos),
+                pageSize = s.pageSize, user = user, prediction = s.prediction,
+            )
+            SHUANGPIN -> PinyinSession(
+                pinyinData, ShuangpinSegmenter(s.scheme, s.fuzzy, s.typos), spell = true,
+                pageSize = s.pageSize, user = user, prediction = s.prediction,
+            )
             else -> {
                 val (file, options) = TABLES[im] ?: throw IllegalArgumentException("no input method $im")
                 val table = TableDictionary(CodeTable.load(load("$TABLE_DIR/$file"), verify = false))
                 // looking a character up by pinyin learns nothing: it is not how the user writes
-                val lookUp = if (options.pinyinKey == null) null else PinyinSession(pinyinData, PinyinSegmenter())
-                TableSession(table, options, lookUp)
+                val lookUp = if (options.pinyinKey == null) null else PinyinSession(pinyinData, PinyinSegmenter(), prediction = false)
+                TableSession(table, options.copy(pageSize = s.pageSize), lookUp)
             }
         }
     }

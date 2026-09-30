@@ -4,11 +4,16 @@
  */
 package org.fcitx.fcitx5.android.core
 
+import org.fcitx.fcitx5.android.FcitxApplication
+import org.fcitx.fcitx5.android.data.pinyin.PinyinDictManager
+import org.fcitx.fcitx5.android.engine.host.EngineSettings
 import org.fcitx.fcitx5.android.engine.host.Engines
+import org.fcitx.fcitx5.android.engine.user.LibimeImport
 import org.fcitx.fcitx5.android.utils.appContext
 import timber.log.Timber
 import java.io.File
 import java.io.FileInputStream
+import java.io.IOException
 import java.nio.ByteBuffer
 import java.nio.channels.FileChannel
 
@@ -35,8 +40,48 @@ object EngineBridge {
     )
 
     private val engines by lazy(LazyThreadSafetyMode.NONE) {
-        Engines(::asset, File(appContext.filesDir, "engine")) { Timber.w(it, "engine user data") }
+        Engines(::asset, File(appContext.filesDir, "engine"), { Timber.w(it, "engine user data") }, ::legacy)
     }
+
+    /**
+     * What libime's pinyin learned, where fcitx kept it (FCITX_DATA_HOME), as text: its own
+     * converters read its binary files.
+     */
+    private fun legacy(): LibimeImport.Legacy? {
+        // where fcitx kept them: its data home, as Fcitx starts it
+        val context = FcitxApplication.getInstance().directBootAwareContext
+        val dir = File(context.getExternalFilesDir(null) ?: context.filesDir, "data/pinyin")
+        val dictionary = File(dir, "user.dict")
+        val history = File(dir, "user.history")
+        if (!dictionary.exists() && !history.exists()) return null
+        return LibimeImport.Legacy(
+            text(dictionary) { src, dest -> PinyinDictManager.pinyinDictConv(src, dest, true) },
+            text(history, ::libimeHistoryDump),
+            ::libimeDecodePinyin,
+        ).also { Timber.i("libime's pinyin: %d words, %d sentences", it.dictionary.size, it.history.size) }
+    }
+
+    private fun text(file: File, convert: (String, String) -> Unit): List<String> {
+        if (!file.exists()) return emptyList()
+        // one name, so a copy of the user's typing left by a kill is gone the next time
+        val out = File(appContext.cacheDir, "libime-${file.name}.txt")
+        try {
+            convert(file.path, out.path)
+            return out.readLines()
+        } catch (@Suppress("TooGenericExceptionCaught") e: Exception) {
+            // the native converters throw a bare Exception
+            throw e as? IOException ?: IOException("cannot read $file", e)
+        } finally {
+            out.delete()
+        }
+    }
+
+    @JvmStatic
+    private external fun libimeHistoryDump(src: String, dest: String)
+
+    /** A reading as libime's history keeps it, spelled `pin'yin`; empty if it is none. */
+    @JvmStatic
+    private external fun libimeDecodePinyin(code: String): String
 
     // mapped where it lies in the APK (stored uncompressed): nothing copied, and pages the OS may
     // drop. Signed with the APK, so the checksums need not be read through.
@@ -55,6 +100,12 @@ object EngineBridge {
             all.map { it.text }.toTypedArray(), all.map { it.hint }.toTypedArray(),
             s.first, s.candidates.size, s.total,
         )
+    }
+
+    /** The addon's config, flattened as [EngineSettings.parse] reads it; on the fcitx thread too. */
+    @JvmStatic
+    fun configure(settings: String) {
+        engines.settings = EngineSettings.parse(settings)
     }
 
     /** Text and hint of each candidate in [from, from + count), one after the other. */

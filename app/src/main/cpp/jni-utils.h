@@ -147,6 +147,7 @@ public:
     jclass EngineBridge;
     jmethodID EngineBridgeOnEvent;
     jmethodID EngineBridgeCandidates;
+    jmethodID EngineBridgeConfigure;
     jfieldID EngineResultHandled;
     jfieldID EngineResultCommit;
     jfieldID EngineResultPreedit;
@@ -212,6 +213,7 @@ public:
         EngineBridge = reinterpret_cast<jclass>(env->NewGlobalRef(env->FindClass("org/fcitx/fcitx5/android/core/EngineBridge")));
         EngineBridgeOnEvent = env->GetStaticMethodID(EngineBridge, "onEvent", "(Ljava/lang/String;IIZ)Lorg/fcitx/fcitx5/android/core/EngineBridge$Result;");
         EngineBridgeCandidates = env->GetStaticMethodID(EngineBridge, "candidates", "(Ljava/lang/String;II)[Ljava/lang/String;");
+        EngineBridgeConfigure = env->GetStaticMethodID(EngineBridge, "configure", "(Ljava/lang/String;)V");
         jclass engineResult = env->FindClass("org/fcitx/fcitx5/android/core/EngineBridge$Result");
         EngineResultHandled = env->GetFieldID(engineResult, "handled", "Z");
         EngineResultCommit = env->GetFieldID(engineResult, "commit", "Ljava/lang/String;");

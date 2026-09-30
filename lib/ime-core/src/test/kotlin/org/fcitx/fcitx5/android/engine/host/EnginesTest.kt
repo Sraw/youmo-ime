@@ -6,9 +6,13 @@ package org.fcitx.fcitx5.android.engine.host
 
 import org.fcitx.fcitx5.android.engine.data.CodeTable
 import org.fcitx.fcitx5.android.engine.data.PinyinDataBuilder
+import org.fcitx.fcitx5.android.engine.pinyin.Fuzzy
 import org.fcitx.fcitx5.android.engine.pinyin.Syllables
 import org.fcitx.fcitx5.android.engine.session.Choice
+import org.fcitx.fcitx5.android.engine.user.LibimeImport
+import org.fcitx.fcitx5.android.engine.user.UserLog
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -123,11 +127,12 @@ class EnginesTest {
     @Test
     fun afterAPageTurnAPickIsOfTheCandidateShown() {
         val engines = Engines(::load, null)
+        engines.settings = EngineSettings(pageSize = 3)
         engines.type("engine-wubi", "va")
         val page = engines.onEvent("engine-wubi", EngineEvent.PAGE_DOWN, 0)
-        assertEquals(5, page.first)
-        assertEquals(page.candidates, engines.candidates("engine-wubi", page.first, 5).map { it.text })
-        assertEquals("七", engines.onEvent("engine-wubi", EngineEvent.PICK, page.first + 1).commit)
+        assertEquals(3, page.first)
+        assertEquals(page.candidates, engines.candidates("engine-wubi", page.first, 3).map { it.text })
+        assertEquals("五", engines.onEvent("engine-wubi", EngineEvent.PICK, page.first + 1).commit)
     }
 
     @Test
@@ -153,6 +158,72 @@ class EnginesTest {
             assertEquals("拟", engines.onEvent(Engines.PINYIN, EngineEvent.PICK, 1).commit)
         }
         assertEquals(1, errors.size)
+    }
+
+    @Test
+    fun settingsShapeTheSessionsMadeAfterThem() {
+        val engines = Engines(::load, null)
+        assertEquals(EngineSettings.DEFAULT_PAGE_SIZE, engines.type("engine-wubi", "va").candidates.size)
+        // only the letters as typed
+        assertEquals(listOf("li"), engines.type(Engines.PINYIN, "li").candidates)
+        engines.settings = EngineSettings(pageSize = 3, fuzzy = setOf(Fuzzy.L_N))
+        // made again: what was typed is gone
+        assertEquals(listOf("一", "二", "三"), engines.type("engine-wubi", "va").candidates)
+        assertEquals(listOf("你", "拟"), engines.type(Engines.PINYIN, "li").candidates)
+        // the same settings again leave the input as it is
+        engines.settings = EngineSettings(pageSize = 3, fuzzy = setOf(Fuzzy.L_N))
+        assertEquals("你", engines.onEvent(Engines.PINYIN, EngineEvent.CHAR, ' '.code).commit)
+    }
+
+    @Test
+    fun whatLibimeLearnedIsReadIntoAFreshLogOnce() {
+        val dir = folder.newFolder("engine")
+        var asked = 0
+        val legacy = {
+            asked++
+            LibimeImport.Legacy(listOf("拟 ni 0"), List(MAX_PICKS) { "拟\tni" })
+        }
+        Engines(::load, dir, legacy = legacy).use { engines ->
+            assertEquals("拟", engines.type(Engines.PINYIN, "ni").candidates.first())
+        }
+        Engines(::load, dir, legacy = legacy).use { engines ->
+            assertEquals("拟", engines.type(Engines.PINYIN, "ni").candidates.first())
+        }
+        assertEquals(1, asked)
+    }
+
+    @Test
+    fun aLogKilledBeforeAnythingWasLearnedIsStillFilled() {
+        val dir = folder.newFolder("engine")
+        dir.resolve(Engines.USER_PINYIN).writeBytes(UserLog.header())
+        val legacy = { LibimeImport.Legacy(emptyList(), List(MAX_PICKS) { "拟\tni" }) }
+        Engines(::load, dir, legacy = legacy).use { engines ->
+            assertEquals("拟", engines.type(Engines.PINYIN, "ni").candidates.first())
+        }
+    }
+
+    @Test
+    fun libimesFilesThatCannotBeReadAreTriedAgainNextTime() {
+        val dir = folder.newFolder("engine")
+        val errors = ArrayList<IOException>()
+        val failures = ArrayDeque(listOf<Throwable>(IOException("unreadable"), IllegalStateException("native"), UnsatisfiedLinkError("gone")))
+        val legacy: () -> LibimeImport.Legacy? = {
+            failures.removeFirstOrNull()?.let { throw it }
+            LibimeImport.Legacy(emptyList(), List(MAX_PICKS) { "拟\tni" })
+        }
+        repeat(3) {
+            Engines(::load, dir, onError = { errors += it }, legacy = legacy).use { engines ->
+                assertEquals(listOf("你", "拟"), engines.type(Engines.PINYIN, "ni").candidates)
+            }
+        }
+        assertEquals(listOf("unreadable", "native", "gone"), errors.map { it.cause?.message ?: it.message })
+        Engines(::load, dir, legacy = legacy).use { engines ->
+            assertEquals("拟", engines.type(Engines.PINYIN, "ni").candidates.first())
+        }
+        // with none, nothing is asked of the log
+        Engines(::load, folder.newFolder("other"), legacy = { null }).use { engines ->
+            assertFalse(engines.type(Engines.PINYIN, "ni").candidates.isEmpty())
+        }
     }
 
     private companion object {

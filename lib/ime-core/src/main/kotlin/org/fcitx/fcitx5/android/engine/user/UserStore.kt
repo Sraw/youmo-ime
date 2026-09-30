@@ -50,8 +50,15 @@ class UserStore internal constructor(
     // the counts alone may outgrow compactAt: then compact again only once the log doubles
     private var compacted = 0L
 
-    /** Loads the log into the model, and keeps what the model learns from now on. Once only. */
-    fun open() {
+    /**
+     * Loads the log into the model, and keeps what the model learns from now on. Once only.
+     *
+     * A log with nothing learned in it (none yet, or a header alone) is first filled by [seed],
+     * from what another input method learned, and written as the counts it leaves, all or
+     * nothing: until that is written whole, the log stays empty and the next open seeds again.
+     * A seed that cannot be written fails the open.
+     */
+    fun open(seed: ((UserModel) -> Unit)? = null) {
         check(out == null && !closed) { "opened already" }
         if (file.exists()) {
             val bytes = file.readBytes()
@@ -65,8 +72,15 @@ class UserStore internal constructor(
                 else -> moveAside()
             }
         }
+        val seeding = seed != null && (!file.exists() || file.length() <= UserLog.header().size)
+        if (seeding) {
+            seed?.invoke(model)
+            writeCounts()
+        }
         if (!file.exists()) file.writeBytes(UserLog.header())
         end = file.length()
+        // a seed already written as counts: no call to write them again yet
+        if (seeding) compacted = end
         out = openAppend(file)
         model.journal = UserModel.Journal { prev, sentence -> append(prev, sentence) }
         if (tooLong()) compact()
@@ -113,22 +127,10 @@ class UserStore internal constructor(
     /** Rewrites the log as the model's counts. */
     internal fun compact() {
         check(out != null) { "not open" }
-        val next = File(file.path + COMPACTING)
         try {
-            FileOutputStream(next).use { raw ->
-                val stream = BufferedOutputStream(raw)
-                stream.write(UserLog.header())
-                model.forEachCount(
-                    { entry, count -> stream.write(UserLog.word(entry, count)) },
-                    { first, second, count -> stream.write(UserLog.pair(first, second, count)) },
-                )
-                stream.flush()
-                raw.fd.sync()
-            }
-            if (!next.renameTo(file)) throw IOException("cannot replace $file")
+            writeCounts()
         } catch (e: IOException) {
             onError(e)
-            next.delete()
             // the log as it was still holds everything; try again once it has doubled
             compacted = end
             return
@@ -146,6 +148,27 @@ class UserStore internal constructor(
         } catch (e: IOException) {
             onError(e)
             null
+        }
+    }
+
+    /** Writes the model's counts into a new file, renamed over [file] once it is all on disk. */
+    private fun writeCounts() {
+        val next = File(file.path + COMPACTING)
+        try {
+            FileOutputStream(next).use { raw ->
+                val stream = BufferedOutputStream(raw)
+                stream.write(UserLog.header())
+                model.forEachCount(
+                    { entry, count -> stream.write(UserLog.word(entry, count)) },
+                    { first, second, count -> stream.write(UserLog.pair(first, second, count)) },
+                )
+                stream.flush()
+                raw.fd.sync()
+            }
+            if (!next.renameTo(file)) throw IOException("cannot replace $file")
+        } catch (e: IOException) {
+            next.delete()
+            throw e
         }
     }
 

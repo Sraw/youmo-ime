@@ -129,9 +129,41 @@ std::vector<InputMethodEntry> AndroidEngine::listInputMethods() {
         result.emplace_back(std::move(
                 InputMethodEntry(m.name, m.text, "zh_CN", "androidengine")
                         .setLabel(m.label)
-                        .setIcon(m.icon)));
+                        .setIcon(m.icon)
+                        .setConfigurable(true)));
     }
     return result;
+}
+
+void AndroidEngine::reloadConfig() {
+    readAsIni(config_, ConfPath);
+    pushSettings();
+}
+
+void AndroidEngine::setConfig(const RawConfig &config) {
+    config_.load(config, true);
+    safeSaveAsIni(config_, ConfPath);
+    pushSettings();
+}
+
+void AndroidEngine::pushSettings() const {
+    if (!settingsCallback_) return;
+    RawConfig raw;
+    config_.save(raw);
+    std::string flat;
+    std::function<void(const RawConfig &, const std::string &)> walk = [&](const RawConfig &node, const std::string &path) {
+        for (const auto &name: node.subItems()) {
+            const auto item = node.get(name);
+            const auto key = path.empty() ? name : path + "/" + name;
+            if (item->hasSubItems()) {
+                walk(*item, key);
+            } else {
+                flat += key + "=" + item->value() + "\n";
+            }
+        }
+    };
+    walk(raw, "");
+    settingsCallback_(flat);
 }
 
 void AndroidEngine::activate(const InputMethodEntry &entry, InputContextEvent &event) {

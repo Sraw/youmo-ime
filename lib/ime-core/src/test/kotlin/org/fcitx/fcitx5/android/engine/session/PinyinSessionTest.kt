@@ -84,6 +84,16 @@ class PinyinSessionTest {
     }
 
     @Test
+    fun withPredictionOffNothingIsOfferedAfterACommit() {
+        val session = PinyinSession(data, PinyinSegmenter(), prediction = false)
+        session.type("wo")
+        val committed = session.apply(Select(0))
+        assertEquals("我", committed.commit)
+        assertFalse(committed.predicting)
+        assertTrue(committed.candidates.isEmpty())
+    }
+
+    @Test
     fun pickingEverythingCommitsItAndPredictsWhatFollows() {
         val session = session()
         session.type("wo")

@@ -4,7 +4,7 @@ Type=SharedLibrary
 Library=libandroidengine
 Category=InputMethod
 Version=@PROJECT_VERSION@
-Configurable=False
+Configurable=True
 
 [Addon/OptionalDependencies]
 0=punctuation

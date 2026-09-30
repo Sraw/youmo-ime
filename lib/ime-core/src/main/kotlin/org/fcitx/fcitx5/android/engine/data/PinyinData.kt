@@ -90,6 +90,10 @@ class PinyinData private constructor(file: DataFile) {
 class Vocabulary internal constructor(private val strings: StringTable) {
     val size: Int get() = strings.size
     fun word(id: Int): String = strings[id]
+
+    /** The UTF-16 length of word [id], and a char of it, without making a string of it. */
+    fun length(id: Int): Int = strings.length(id)
+    fun char(id: Int, at: Int): Char = strings.char(id, at)
 }
 
 /**
