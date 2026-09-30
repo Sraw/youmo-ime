@@ -175,14 +175,16 @@ class TwinSeekBarPreference @JvmOverloads constructor(
     private fun valueForProgress(progress: Int) = (progress * step) + min
 
     private fun textForValue(value: Int, default: Int? = null): String =
-        if (value == default && defaultLabel != null) defaultLabel!! else "$value $unit"
+        if (value == default && defaultLabel != null) defaultLabel!!
+        else if (unit.isEmpty()) "$value" else "$value $unit"
 
     object SimpleSummaryProvider : SummaryProvider<TwinSeekBarPreference> {
         override fun provideSummary(preference: TwinSeekBarPreference): CharSequence {
             return preference.run {
                 val primary = textForValue(value, default)
                 val secondary = textForValue(secondaryValue, secondaryDefault)
-                "$primary / $secondary"
+                // bare "a / b" doesn't say which is which (portrait? landscape?), so name both
+                "$label $primary · $secondaryLabel $secondary"
             }
         }
     }

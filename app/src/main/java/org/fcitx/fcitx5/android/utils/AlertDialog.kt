@@ -5,17 +5,18 @@
 
 package org.fcitx.fcitx5.android.utils
 
-import android.app.AlertDialog
+import android.content.DialogInterface
 import android.widget.Button
+import androidx.appcompat.app.AlertDialog
 
 val AlertDialog.positiveButton: Button
-    get() = getButton(AlertDialog.BUTTON_POSITIVE)
+    get() = getButton(DialogInterface.BUTTON_POSITIVE)
 
 val AlertDialog.negativeButton: Button
-    get() = getButton(AlertDialog.BUTTON_NEGATIVE)
+    get() = getButton(DialogInterface.BUTTON_NEGATIVE)
 
 val AlertDialog.neutralButton: Button
-    get() = getButton(AlertDialog.BUTTON_NEUTRAL)
+    get() = getButton(DialogInterface.BUTTON_NEUTRAL)
 
 /**
  * Change positive button listener **AFTER** [AlertDialog.show] has been called.

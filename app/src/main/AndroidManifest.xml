@@ -14,9 +14,9 @@
     <uses-permission android:name="android.permission.VIBRATE" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
-    <!-- remove intent queries merged from library manifest (namely Android-Image-Cropper) -->
-    <queries tools:node="removeAll" />
-
+    <!-- Don't strip the Cropper library's queries with tools:node="removeAll": under AGP 9 it also
+         dropped these, so plugins and other input methods became invisible on Android 11+.
+         Its two extra queries (file pickers, camera apps) reveal nothing sensitive. -->
     <queries>
         <intent>
             <action android:name="${applicationId}.plugin.MANIFEST" />

@@ -11,6 +11,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.fragment.app.activityViewModels
 import androidx.lifecycle.lifecycleScope
+import androidx.preference.PreferenceCategory
 import androidx.preference.PreferenceScreen
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -98,8 +99,17 @@ class AdvancedSettingsFragment : ManagedPreferenceFragment(AppPrefs.getInstance(
 
     override fun onPreferenceUiCreated(screen: PreferenceScreen) {
         val ctx = requireContext()
-        screen.addPreference(
+        // browse/export/import act on files rather than toggle a behavior; keep them apart from the switches
+        val userData = PreferenceCategory(ctx).apply {
+            setTitle(R.string.user_data)
+            isIconSpaceReserved = false
+        }
+        screen.addPreference(userData)
+        val canOpenPrimaryStorage = Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q
+        userData.addPreference(
             R.string.browse_user_data_dir,
+            // the long press is otherwise undiscoverable
+            summary = if (canOpenPrimaryStorage) R.string.browse_user_data_dir_summary else null,
             onClick = {
                 try {
                     ctx.startActivity(buildDocumentsProviderIntent())
@@ -107,7 +117,7 @@ class AdvancedSettingsFragment : ManagedPreferenceFragment(AppPrefs.getInstance(
                     ctx.toast(e)
                 }
             },
-            onLongClick = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) ({
+            onLongClick = if (canOpenPrimaryStorage) ({
                 try {
                     ctx.startActivity(buildPrimaryStorageIntent())
                 } catch (e: Exception) {
@@ -115,7 +125,7 @@ class AdvancedSettingsFragment : ManagedPreferenceFragment(AppPrefs.getInstance(
                 }
             }) else null
         )
-        screen.addPreference(R.string.export_user_data) {
+        userData.addPreference(R.string.export_user_data) {
             lifecycleScope.withLoadingDialog(ctx) {
                 viewModel.fcitx.runOnReady {
                     save()
@@ -124,7 +134,7 @@ class AdvancedSettingsFragment : ManagedPreferenceFragment(AppPrefs.getInstance(
                 exportLauncher.launch("fcitx5-android_${iso8601UTCDateTime(exportTimestamp)}.zip")
             }
         }
-        screen.addPreference(R.string.import_user_data) {
+        userData.addPreference(R.string.import_user_data) {
             AlertDialog.Builder(ctx)
                 .setIconAttribute(android.R.attr.alertDialogIcon)
                 .setTitle(R.string.import_user_data)

@@ -80,7 +80,6 @@ import org.fcitx.fcitx5.android.utils.monitorCursorAnchor
 import org.fcitx.fcitx5.android.utils.styledColorOrDefault
 import org.fcitx.fcitx5.android.utils.styledFloat
 import splitties.dimensions.dp
-import splitties.resources.styledColor
 import timber.log.Timber
 
 class FcitxInputMethodService : LifecycleInputMethodService() {

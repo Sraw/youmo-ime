@@ -5,7 +5,6 @@
 package org.fcitx.fcitx5.android.ui.main.settings.theme
 
 import android.annotation.SuppressLint
-import android.app.AlertDialog
 import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
@@ -26,12 +25,14 @@ import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContract
 import androidx.annotation.StringRes
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.widget.Toolbar
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.updateLayoutParams
 import androidx.lifecycle.lifecycleScope
+import com.google.android.material.R as MaterialR
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.parcelize.Parcelize
@@ -46,10 +47,10 @@ import org.fcitx.fcitx5.android.ui.main.CropImageActivity.CropResult
 import org.fcitx.fcitx5.android.utils.DarkenColorFilter
 import org.fcitx.fcitx5.android.utils.item
 import org.fcitx.fcitx5.android.utils.parcelable
+import org.fcitx.fcitx5.android.utils.styledColor
 import splitties.dimensions.dp
 import splitties.resources.color
 import splitties.resources.resolveThemeAttribute
-import splitties.resources.styledColor
 import splitties.resources.styledDrawable
 import splitties.views.backgroundColor
 import splitties.views.bottomPadding
@@ -105,8 +106,7 @@ class CustomThemeActivity : AppCompatActivity() {
 
     private val toolbar by lazy {
         view(::Toolbar) {
-            backgroundColor = styledColor(android.R.attr.colorPrimary)
-            elevation = dp(4f)
+            backgroundColor = styledColor(MaterialR.attr.colorSurface)
         }
     }
 

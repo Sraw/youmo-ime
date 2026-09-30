@@ -62,6 +62,166 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
     }
 
     inner class Keyboard : ManagedPreferenceCategory(R.string.virtual_keyboard, sharedPreferences) {
+        init {
+            section(R.string.section_keys)
+        }
+
+        val popupOnKeyPress = switch(R.string.popup_on_key_press, "popup_on_key_press", true)
+        val keepLettersUppercase = switch(
+            R.string.keep_keyboard_letters_uppercase,
+            "keep_keyboard_letters_uppercase",
+            false
+        )
+        val expandKeypressArea =
+            switch(R.string.expand_keypress_area, "expand_keypress_area", false)
+        val swipeSymbolDirection = enumList(
+            R.string.swipe_symbol_behavior,
+            "swipe_symbol_behavior",
+            SwipeSymbolDirection.Down
+        )
+        val longPressDelay = int(
+            R.string.keyboard_long_press_delay,
+            "keyboard_long_press_delay",
+            300,
+            100,
+            700,
+            "ms",
+            10
+        )
+        val spaceKeyLongPressBehavior = enumList(
+            R.string.space_long_press_behavior,
+            "space_long_press_behavior",
+            SpaceLongPressBehavior.None
+        )
+        val spaceSwipeMoveCursor =
+            switch(R.string.space_swipe_move_cursor, "space_swipe_move_cursor", true)
+        val showLangSwitchKey =
+            switch(R.string.show_lang_switch_key, "show_lang_switch_key", true)
+        val langSwitchKeyBehavior = enumList(
+            R.string.lang_switch_key_behavior,
+            "lang_switch_key_behavior",
+            LangSwitchBehavior.Enumerate
+        ) { showLangSwitchKey.getValue() }
+
+        val focusChangeResetKeyboard =
+            switch(R.string.reset_keyboard_on_focus_change, "reset_keyboard_on_focus_change", true)
+
+        init {
+            section(R.string.section_toolbar_and_panels)
+        }
+
+        val expandToolbarByDefault =
+            switch(R.string.expand_toolbar_by_default, "expand_toolbar_by_default", false)
+        val inlineSuggestions = switch(R.string.inline_suggestions, "inline_suggestions", true)
+        val toolbarNumRowOnPassword =
+            switch(R.string.toolbar_num_row_on_password, "toolbar_num_row_on_password", true)
+        val showVoiceInputButton =
+            switch(R.string.show_voice_input_button, "show_voice_input_button", false)
+        val preferredVoiceInput = voiceInputPreference(
+            R.string.preferred_voice_input, "preferred_voice_input", ""
+        ) { showVoiceInputButton.getValue() }
+        init {
+            section(R.string.section_candidates)
+        }
+
+        val horizontalCandidateStyle = enumList(
+            R.string.horizontal_candidate_style,
+            "horizontal_candidate_style",
+            HorizontalCandidateMode.AutoFillWidth
+        )
+        val expandedCandidateStyle = enumList(
+            R.string.expanded_candidate_style,
+            "expanded_candidate_style",
+            ExpandedCandidateStyle.Grid
+        )
+
+        val expandedCandidateGridSpanCount: ManagedPreference.PInt
+        val expandedCandidateGridSpanCountLandscape: ManagedPreference.PInt
+
+        init {
+            val (primary, secondary) = twinInt(
+                R.string.expanded_candidate_grid_span_count,
+                R.string.portrait,
+                "expanded_candidate_grid_span_count_portrait",
+                6,
+                R.string.landscape,
+                "expanded_candidate_grid_span_count_landscape",
+                8,
+                4,
+                12,
+            )
+            expandedCandidateGridSpanCount = primary
+            expandedCandidateGridSpanCountLandscape = secondary
+        }
+
+        init {
+            section(R.string.section_size_and_padding)
+        }
+
+        val keyboardHeightPercent: ManagedPreference.PInt
+        val keyboardHeightPercentLandscape: ManagedPreference.PInt
+
+        init {
+            val (primary, secondary) = twinInt(
+                R.string.keyboard_height,
+                R.string.portrait,
+                "keyboard_height_percent",
+                30,
+                R.string.landscape,
+                "keyboard_height_percent_landscape",
+                49,
+                10,
+                90,
+                "%"
+            )
+            keyboardHeightPercent = primary
+            keyboardHeightPercentLandscape = secondary
+        }
+
+        val keyboardSidePadding: ManagedPreference.PInt
+        val keyboardSidePaddingLandscape: ManagedPreference.PInt
+
+        init {
+            val (primary, secondary) = twinInt(
+                R.string.keyboard_side_padding,
+                R.string.portrait,
+                "keyboard_side_padding",
+                0,
+                R.string.landscape,
+                "keyboard_side_padding_landscape",
+                0,
+                0,
+                300,
+                "dp"
+            )
+            keyboardSidePadding = primary
+            keyboardSidePaddingLandscape = secondary
+        }
+
+        val keyboardBottomPadding: ManagedPreference.PInt
+        val keyboardBottomPaddingLandscape: ManagedPreference.PInt
+
+        init {
+            val (primary, secondary) = twinInt(
+                R.string.keyboard_bottom_padding,
+                R.string.portrait,
+                "keyboard_bottom_padding",
+                0,
+                R.string.landscape,
+                "keyboard_bottom_padding_landscape",
+                0,
+                0,
+                100,
+                "dp"
+            )
+            keyboardBottomPadding = primary
+            keyboardBottomPaddingLandscape = secondary
+        }
+
+        init {
+            section(R.string.section_sound_and_vibration)
+        }
+
         val hapticOnKeyPress =
             enumList(
                 R.string.button_haptic_feedback,
@@ -137,147 +297,6 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
         ) {
             soundOnKeyPress.getValue() != InputFeedbackMode.Disabled
         }
-        val focusChangeResetKeyboard =
-            switch(R.string.reset_keyboard_on_focus_change, "reset_keyboard_on_focus_change", true)
-        val expandToolbarByDefault =
-            switch(R.string.expand_toolbar_by_default, "expand_toolbar_by_default", false)
-        val inlineSuggestions = switch(R.string.inline_suggestions, "inline_suggestions", true)
-        val toolbarNumRowOnPassword =
-            switch(R.string.toolbar_num_row_on_password, "toolbar_num_row_on_password", true)
-        val popupOnKeyPress = switch(R.string.popup_on_key_press, "popup_on_key_press", true)
-        val keepLettersUppercase = switch(
-            R.string.keep_keyboard_letters_uppercase,
-            "keep_keyboard_letters_uppercase",
-            false
-        )
-
-        val showVoiceInputButton =
-            switch(R.string.show_voice_input_button, "show_voice_input_button", false)
-        val preferredVoiceInput = voiceInputPreference(
-            R.string.preferred_voice_input, "preferred_voice_input", ""
-        ) { showVoiceInputButton.getValue() }
-
-        val expandKeypressArea =
-            switch(R.string.expand_keypress_area, "expand_keypress_area", false)
-        val swipeSymbolDirection = enumList(
-            R.string.swipe_symbol_behavior,
-            "swipe_symbol_behavior",
-            SwipeSymbolDirection.Down
-        )
-        val longPressDelay = int(
-            R.string.keyboard_long_press_delay,
-            "keyboard_long_press_delay",
-            300,
-            100,
-            700,
-            "ms",
-            10
-        )
-        val spaceKeyLongPressBehavior = enumList(
-            R.string.space_long_press_behavior,
-            "space_long_press_behavior",
-            SpaceLongPressBehavior.None
-        )
-        val spaceSwipeMoveCursor =
-            switch(R.string.space_swipe_move_cursor, "space_swipe_move_cursor", true)
-        val showLangSwitchKey =
-            switch(R.string.show_lang_switch_key, "show_lang_switch_key", true)
-        val langSwitchKeyBehavior = enumList(
-            R.string.lang_switch_key_behavior,
-            "lang_switch_key_behavior",
-            LangSwitchBehavior.Enumerate
-        ) { showLangSwitchKey.getValue() }
-
-        val keyboardHeightPercent: ManagedPreference.PInt
-        val keyboardHeightPercentLandscape: ManagedPreference.PInt
-
-        init {
-            val (primary, secondary) = twinInt(
-                R.string.keyboard_height,
-                R.string.portrait,
-                "keyboard_height_percent",
-                30,
-                R.string.landscape,
-                "keyboard_height_percent_landscape",
-                49,
-                10,
-                90,
-                "%"
-            )
-            keyboardHeightPercent = primary
-            keyboardHeightPercentLandscape = secondary
-        }
-
-        val keyboardSidePadding: ManagedPreference.PInt
-        val keyboardSidePaddingLandscape: ManagedPreference.PInt
-
-        init {
-            val (primary, secondary) = twinInt(
-                R.string.keyboard_side_padding,
-                R.string.portrait,
-                "keyboard_side_padding",
-                0,
-                R.string.landscape,
-                "keyboard_side_padding_landscape",
-                0,
-                0,
-                300,
-                "dp"
-            )
-            keyboardSidePadding = primary
-            keyboardSidePaddingLandscape = secondary
-        }
-
-        val keyboardBottomPadding: ManagedPreference.PInt
-        val keyboardBottomPaddingLandscape: ManagedPreference.PInt
-
-        init {
-            val (primary, secondary) = twinInt(
-                R.string.keyboard_bottom_padding,
-                R.string.portrait,
-                "keyboard_bottom_padding",
-                0,
-                R.string.landscape,
-                "keyboard_bottom_padding_landscape",
-                0,
-                0,
-                100,
-                "dp"
-            )
-            keyboardBottomPadding = primary
-            keyboardBottomPaddingLandscape = secondary
-        }
-
-        val horizontalCandidateStyle = enumList(
-            R.string.horizontal_candidate_style,
-            "horizontal_candidate_style",
-            HorizontalCandidateMode.AutoFillWidth
-        )
-        val expandedCandidateStyle = enumList(
-            R.string.expanded_candidate_style,
-            "expanded_candidate_style",
-            ExpandedCandidateStyle.Grid
-        )
-
-        val expandedCandidateGridSpanCount: ManagedPreference.PInt
-        val expandedCandidateGridSpanCountLandscape: ManagedPreference.PInt
-
-        init {
-            val (primary, secondary) = twinInt(
-                R.string.expanded_candidate_grid_span_count,
-                R.string.portrait,
-                "expanded_candidate_grid_span_count_portrait",
-                6,
-                R.string.landscape,
-                "expanded_candidate_grid_span_count_landscape",
-                8,
-                4,
-                12,
-            )
-            expandedCandidateGridSpanCount = primary
-            expandedCandidateGridSpanCountLandscape = secondary
-        }
-
     }
 
     inner class Candidates :

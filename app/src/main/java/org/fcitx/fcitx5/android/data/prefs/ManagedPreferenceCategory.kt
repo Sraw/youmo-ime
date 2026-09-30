@@ -6,12 +6,26 @@ package org.fcitx.fcitx5.android.data.prefs
 
 import android.content.SharedPreferences
 import androidx.annotation.StringRes
+import androidx.preference.PreferenceCategory
+import androidx.preference.PreferenceGroup
 import androidx.preference.PreferenceScreen
 
 abstract class ManagedPreferenceCategory(
     @StringRes val title: Int,
     protected val sharedPreferences: SharedPreferences
 ) : ManagedPreferenceProvider() {
+
+    /** index of the first preference in a section -> the section's title */
+    private val sections = mutableMapOf<Int, Int>()
+
+    /** Preferences registered after this call, up to the next [section], are grouped under [title]. */
+    protected fun section(@StringRes title: Int) {
+        // two sections at the same index would silently drop the first title
+        require(managedPreferencesUi.size !in sections) {
+            "empty section before index ${managedPreferencesUi.size}"
+        }
+        sections[managedPreferencesUi.size] = title
+    }
 
     protected fun switch(
         @StringRes
@@ -147,10 +161,24 @@ abstract class ManagedPreferenceCategory(
 
     override fun createUi(screen: PreferenceScreen) {
         val ctx = screen.context
-        managedPreferencesUi.forEach {
-            screen.addPreference(it.createUi(ctx).apply {
+        var group: PreferenceGroup = screen
+        managedPreferencesUi.forEachIndexed { index, it ->
+            sections[index]?.let { title ->
+                group = PreferenceCategory(ctx).apply {
+                    key = sectionKey(title)
+                    setTitle(title)
+                    isIconSpaceReserved = false
+                }
+                screen.addPreference(group)
+            }
+            group.addPreference(it.createUi(ctx).apply {
                 isEnabled = it.isEnabled()
             })
         }
+    }
+
+    companion object {
+        /** Key of the [PreferenceCategory] created for [section], for fragments that append to it. */
+        fun sectionKey(@StringRes title: Int) = "section_$title"
     }
 }

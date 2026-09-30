@@ -27,8 +27,8 @@ import org.fcitx.fcitx5.android.utils.DeviceInfo
 import org.fcitx.fcitx5.android.utils.Logcat
 import org.fcitx.fcitx5.android.utils.iso8601UTCDateTime
 import org.fcitx.fcitx5.android.utils.item
+import org.fcitx.fcitx5.android.utils.styledColor
 import org.fcitx.fcitx5.android.utils.toast
-import splitties.resources.styledColor
 import splitties.views.topPadding
 
 class LogActivity : AppCompatActivity() {

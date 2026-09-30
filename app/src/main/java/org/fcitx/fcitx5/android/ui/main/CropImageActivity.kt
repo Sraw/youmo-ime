@@ -28,15 +28,16 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.updateLayoutParams
 import com.canhub.cropper.CropImageOptions
 import com.canhub.cropper.CropImageView
+import com.google.android.material.R as MaterialR
 import kotlinx.parcelize.IgnoredOnParcel
 import kotlinx.parcelize.Parcelize
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.utils.item
 import org.fcitx.fcitx5.android.utils.parcelable
+import org.fcitx.fcitx5.android.utils.styledColor
 import org.fcitx.fcitx5.android.utils.subMenu
 import org.fcitx.fcitx5.android.utils.toast
 import splitties.dimensions.dp
-import splitties.resources.styledColor
 import splitties.views.backgroundColor
 import splitties.views.dsl.constraintlayout.below
 import splitties.views.dsl.constraintlayout.bottomOfParent
@@ -151,8 +152,7 @@ class CropImageActivity : AppCompatActivity() {
 
     private fun setupRootView() {
         toolbar = view(::Toolbar) {
-            backgroundColor = styledColor(android.R.attr.colorPrimary)
-            elevation = dp(4f)
+            backgroundColor = styledColor(MaterialR.attr.colorSurface)
             navigationIcon = DrawerArrowDrawable(context).apply { progress = 1f }
             setupToolbarMenu(menu)
         }

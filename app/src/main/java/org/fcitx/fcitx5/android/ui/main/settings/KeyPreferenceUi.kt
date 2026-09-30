@@ -5,19 +5,20 @@
 package org.fcitx.fcitx5.android.ui.main.settings
 
 import android.content.Context
+import android.content.res.ColorStateList
 import android.view.KeyEvent
 import android.view.inputmethod.EditorInfo
 import androidx.core.widget.addTextChangedListener
+import com.google.android.material.R as MaterialR
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.core.Key
 import org.fcitx.fcitx5.android.core.KeyState
 import org.fcitx.fcitx5.android.core.KeyStates
 import org.fcitx.fcitx5.android.core.KeySym
 import org.fcitx.fcitx5.android.input.editing.DeleteSurroundingFlag
+import org.fcitx.fcitx5.android.utils.styledColor
 import splitties.dimensions.dp
 import splitties.resources.drawable
-import splitties.resources.styledColor
-import splitties.resources.styledColorSL
 import splitties.resources.styledDrawable
 import splitties.views.dsl.constraintlayout.above
 import splitties.views.dsl.constraintlayout.after
@@ -68,13 +69,13 @@ class KeyPreferenceUi(override val ctx: Context) : Ui {
             }
 
         fun applyStyles() = root.apply {
-            backgroundTintList = ctx.styledColorSL(
-                if (checked) android.R.attr.colorAccent else android.R.attr.colorBackgroundFloating
+            backgroundTintList = ColorStateList.valueOf(
+                ctx.styledColor(
+                    if (checked) android.R.attr.colorPrimary else MaterialR.attr.colorSurfaceContainerHighest
+                )
             )
             setTextColor(
-                ctx.styledColor(
-                    if (checked) android.R.attr.colorForegroundInverse else android.R.attr.colorForeground
-                )
+                ctx.styledColor(if (checked) MaterialR.attr.colorOnPrimary else MaterialR.attr.colorOnSurface)
             )
         }
     }

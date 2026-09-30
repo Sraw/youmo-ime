@@ -15,7 +15,7 @@ import org.fcitx.fcitx5.android.data.clipboard.db.ClipboardEntry
 import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.utils.DeviceUtil
 import org.fcitx.fcitx5.android.utils.item
-import splitties.resources.styledColor
+import org.fcitx.fcitx5.android.utils.styledColor
 import kotlin.math.min
 
 abstract class ClipboardAdapter(

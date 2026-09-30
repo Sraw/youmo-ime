@@ -15,6 +15,7 @@ import android.os.Process
 import androidx.core.content.ContextCompat
 import androidx.core.content.edit
 import androidx.preference.PreferenceManager
+import com.google.android.material.color.DynamicColors
 import kotlinx.coroutines.CoroutineName
 import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.plus
@@ -82,6 +83,8 @@ class FcitxApplication : Application() {
 
     override fun onCreate() {
         super.onCreate()
+        // settings screens follow the wallpaper palette on Android 12+; the keyboard has its own themes
+        DynamicColors.applyToActivitiesIfAvailable(this)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N && !userManager.isUserUnlocked) {
             isDirectBootMode = true
             registerReceiver(unlockReceiver, IntentFilter(Intent.ACTION_USER_UNLOCKED))

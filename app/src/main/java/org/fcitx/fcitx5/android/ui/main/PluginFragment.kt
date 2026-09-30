@@ -4,7 +4,6 @@
  */
 package org.fcitx.fcitx5.android.ui.main
 
-import android.annotation.SuppressLint
 import android.content.BroadcastReceiver
 import android.content.ComponentName
 import android.content.Context
@@ -18,7 +17,6 @@ import android.provider.Settings
 import androidx.lifecycle.lifecycleScope
 import androidx.preference.PreferenceScreen
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.suspendCancellableCoroutine
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.core.data.DataManager
 import org.fcitx.fcitx5.android.core.data.FileSource
@@ -43,17 +41,7 @@ class PluginFragment : PaddingPreferenceFragment() {
 
     private fun DataManager.whenSynced(block: () -> Unit) {
         lifecycleScope.launch {
-            if (!synced) {
-                suspendCancellableCoroutine {
-                    if (synced) {
-                        it.resumeWith(Result.success(Unit))
-                    } else {
-                        addOnNextSyncedCallback {
-                            it.resumeWith(Result.success(Unit))
-                        }
-                    }
-                }
-            }
+            awaitSynced()
             block.invoke()
         }
     }
@@ -106,9 +94,12 @@ class PluginFragment : PaddingPreferenceFragment() {
             if (synced != detected) {
                 addPreference(R.string.plugin_needs_reload, icon = R.drawable.ic_baseline_info_24) {
                     DataManager.addOnNextSyncedCallback {
-                        synced = DataManager.getSyncedPluginSet()
-                        detected = DataManager.detectPlugins()
-                        preferenceScreen = createPreferenceScreen()
+                        // the callback runs on the fcitx thread; views must be touched on main
+                        lifecycleScope.launch {
+                            synced = DataManager.getSyncedPluginSet()
+                            detected = DataManager.detectPlugins()
+                            preferenceScreen = createPreferenceScreen()
+                        }
                     }
                     // DataManager.sync and and restart fcitx
                     FcitxDaemon.restartFcitx()
@@ -116,14 +107,8 @@ class PluginFragment : PaddingPreferenceFragment() {
             }
             val (loaded, failed) = synced
             if (loaded.isEmpty() && failed.isEmpty()) {
-                // use PreferenceCategory to show a divider below the "reload" preference
-                addCategory(R.string.no_plugins) {
-                    isIconSpaceReserved = false
-                    @SuppressLint("PrivateResource")
-                    // we can't hide PreferenceCategory's title,
-                    // but we can make it looks like a normal preference
-                    layoutResource = androidx.preference.R.layout.preference_material
-                }
+                // a bare "no plugins" leaves users guessing what a plugin is and where to get one
+                addPreference(R.string.no_plugins, R.string.no_plugins_summary)
                 return@apply
             }
             if (loaded.isNotEmpty()) {

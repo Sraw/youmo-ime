@@ -13,11 +13,11 @@ import android.os.Bundle
 import android.view.View
 import android.widget.Button
 import androidx.activity.enableEdgeToEdge
+import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.NotificationCompat
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.fragment.app.Fragment
-import androidx.fragment.app.FragmentActivity
 import androidx.viewpager2.adapter.FragmentStateAdapter
 import androidx.viewpager2.widget.ViewPager2
 import org.fcitx.fcitx5.android.R
@@ -26,7 +26,7 @@ import org.fcitx.fcitx5.android.ui.setup.SetupPage.Companion.firstUndonePage
 import org.fcitx.fcitx5.android.ui.setup.SetupPage.Companion.isLastPage
 import org.fcitx.fcitx5.android.utils.notificationManager
 
-class SetupActivity : FragmentActivity() {
+class SetupActivity : AppCompatActivity() {
 
     private lateinit var viewPager: ViewPager2
 

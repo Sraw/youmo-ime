@@ -30,7 +30,6 @@ import org.fcitx.fcitx5.android.ui.setup.SetupActivity
 import org.fcitx.fcitx5.android.utils.navigateWithAnim
 import org.fcitx.fcitx5.android.utils.parcelable
 import org.fcitx.fcitx5.android.utils.startActivity
-import splitties.dimensions.dp
 import splitties.views.topPadding
 
 class MainActivity : AppCompatActivity() {
@@ -55,23 +54,15 @@ class MainActivity : AppCompatActivity() {
         }
         setContentView(binding.root)
         setSupportActionBar(binding.toolbar)
-        // always show toolbar back arrow icon
-        supportActionBar?.setDisplayHomeAsUpEnabled(true)
         navController = binding.navHostFragment.getFragment<NavHostFragment>().navController
         navController.graph = SettingsRoute.createGraph(navController)
         viewModel.toolbarTitle.observe(this) {
             supportActionBar!!.title = it
         }
-        viewModel.toolbarShadow.observe(this) {
-            binding.toolbar.elevation = dp(if (it) 4f else 0f)
-        }
         navController.addOnDestinationChangedListener { _, dest, _ ->
             dest.label?.let { viewModel.setToolbarTitle(it.toString()) }
-            if (dest.hasRoute<SettingsRoute.Theme>()) {
-                viewModel.disableToolbarShadow()
-            } else {
-                viewModel.enableToolbarShadow()
-            }
+            // the home page is the top level: no up arrow there (system back still leaves)
+            supportActionBar?.setDisplayHomeAsUpEnabled(!dest.hasRoute<SettingsRoute.Index>())
         }
         processIntent(intent)
         checkNotificationPermission()

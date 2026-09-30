@@ -8,9 +8,9 @@ import android.content.Context
 import android.view.ViewGroup
 import androidx.annotation.StringRes
 import org.fcitx.fcitx5.android.R
+import org.fcitx.fcitx5.android.utils.styledColor
 import splitties.dimensions.dp
 import splitties.resources.resolveThemeAttribute
-import splitties.resources.styledColor
 import splitties.resources.styledDimenPxSize
 import splitties.resources.styledDrawable
 import splitties.views.dsl.constraintlayout.above

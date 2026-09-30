@@ -13,8 +13,9 @@ import android.view.View
 import androidx.annotation.AttrRes
 import androidx.annotation.ColorInt
 import androidx.constraintlayout.widget.ConstraintLayout
+import androidx.fragment.app.Fragment
+import com.google.android.material.color.MaterialColors
 import splitties.experimental.InternalSplittiesApi
-import splitties.resources.styledColor
 import splitties.resources.withResolvedThemeAttribute
 import splitties.views.dsl.core.Ui
 
@@ -33,6 +34,23 @@ inline fun Ui.styledFloat(@AttrRes attrRes: Int) = ctx.styledFloat(attrRes)
 
 inline val ConstraintLayout.LayoutParams.unset
     get() = ConstraintLayout.LayoutParams.UNSET
+
+/**
+ * Replaces splitties' `styledColor`, which rejects anything but a plain color. Material 3 themes
+ * point attributes such as `colorControlNormal` at color state lists; this takes their default.
+ */
+@ColorInt
+fun Context.styledColor(@AttrRes attrRes: Int): Int =
+    MaterialColors.getColor(this, attrRes, "styledColor")
+
+@Suppress("NOTHING_TO_INLINE")
+inline fun View.styledColor(@AttrRes attrRes: Int) = context.styledColor(attrRes)
+
+@Suppress("NOTHING_TO_INLINE")
+inline fun Ui.styledColor(@AttrRes attrRes: Int) = ctx.styledColor(attrRes)
+
+@Suppress("NOTHING_TO_INLINE")
+inline fun Fragment.styledColor(@AttrRes attrRes: Int) = requireContext().styledColor(attrRes)
 
 @ColorInt
 fun Context.styledColorOrDefault(@AttrRes attrRes: Int, @ColorInt defaultValue: Int) =

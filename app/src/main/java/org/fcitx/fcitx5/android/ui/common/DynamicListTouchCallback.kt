@@ -13,10 +13,10 @@ import androidx.core.graphics.drawable.toBitmap
 import androidx.recyclerview.widget.ItemTouchHelper
 import androidx.recyclerview.widget.RecyclerView
 import org.fcitx.fcitx5.android.R
+import org.fcitx.fcitx5.android.utils.styledColor
 import splitties.dimensions.dp
 import splitties.resources.color
 import splitties.resources.drawable
-import splitties.resources.styledColor
 import kotlin.math.absoluteValue
 
 open class DynamicListTouchCallback<T>(

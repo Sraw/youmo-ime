@@ -5,13 +5,13 @@
 package org.fcitx.fcitx5.android.ui.common
 
 import android.annotation.SuppressLint
-import android.app.AlertDialog
 import android.content.Context
 import android.view.View
 import android.view.ViewGroup
 import android.widget.CheckBox
 import android.widget.ImageButton
 import androidx.activity.OnBackPressedDispatcher
+import androidx.appcompat.app.AlertDialog
 import androidx.coordinatorlayout.widget.CoordinatorLayout
 import androidx.core.content.ContextCompat
 import androidx.core.view.ViewCompat
@@ -28,9 +28,9 @@ import com.google.android.material.snackbar.Snackbar
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.utils.onPositiveButtonClick
 import org.fcitx.fcitx5.android.utils.str
+import org.fcitx.fcitx5.android.utils.styledColor
 import splitties.dimensions.dp
 import splitties.resources.drawable
-import splitties.resources.styledColor
 import splitties.views.backgroundColor
 import splitties.views.bottomPadding
 import splitties.views.dsl.constraintlayout.bottomOfParent
@@ -74,9 +74,8 @@ abstract class BaseDynamicListUi<T>(
     protected var shouldShowFab = false
 
     protected val fab = view(::FloatingActionButton) {
-        imageDrawable = drawable(R.drawable.ic_baseline_plus_24)!!.apply {
-            setTint(styledColor(android.R.attr.colorForegroundInverse))
-        }
+        // no manual tint: the Material 3 FAB tints its icon with colorOnPrimaryContainer
+        imageDrawable = drawable(R.drawable.ic_baseline_plus_24)
         // icon-only, so without this it is invisible to screen readers and to UI automation
         contentDescription = ctx.getString(R.string.a11y_add_item)
     }

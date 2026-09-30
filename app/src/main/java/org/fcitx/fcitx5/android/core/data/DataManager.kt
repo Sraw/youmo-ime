@@ -9,6 +9,8 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.content.res.AssetManager
 import android.os.Build
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import org.fcitx.fcitx5.android.BuildConfig
@@ -40,8 +42,18 @@ object DataManager {
 
     private val json by lazy { Json { prettyPrint = true } }
 
-    var synced = false
-        private set
+    private val syncedState = MutableStateFlow(false)
+
+    /** Whether the last [sync] has finished; false while one is running. */
+    val synced: Boolean get() = syncedState.value
+
+    /**
+     * Suspends until no [sync] is running. Unlike [addOnNextSyncedCallback], this can't miss a sync
+     * that finishes between checking [synced] and registering.
+     */
+    suspend fun awaitSynced() {
+        syncedState.first { it }
+    }
 
     // should be consistent with the deserialization in DataDescriptorPlugin (:build-logic)
     private fun deserializeDataDescriptor(raw: String): DataDescriptor {
@@ -179,7 +191,7 @@ object DataManager {
     }
 
     fun sync() = lock.withLock {
-        synced = false
+        syncedState.value = false
         loadedPlugins.clear()
         failedPlugins.clear()
 
@@ -278,7 +290,7 @@ object DataManager {
                 oldDataDir.resolve("usr").deleteRecursively()
             }
         }
-        synced = true
+        syncedState.value = true
         Timber.d("Synced")
     }
 

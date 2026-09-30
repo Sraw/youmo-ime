@@ -7,10 +7,10 @@ package org.fcitx.fcitx5.android.ui.main.modified
 import android.content.Context
 import androidx.appcompat.app.AlertDialog
 import androidx.preference.PreferenceViewHolder
-import androidx.preference.SwitchPreference
+import androidx.preference.SwitchPreferenceCompat
 import org.fcitx.fcitx5.android.R
 
-class MySwitchPreference(context: Context) : SwitchPreference(context) {
+class MySwitchPreference(context: Context) : SwitchPreferenceCompat(context) {
     override fun onBindViewHolder(holder: PreferenceViewHolder) {
         super.onBindViewHolder(holder)
         holder.itemView.setOnLongClickListener {

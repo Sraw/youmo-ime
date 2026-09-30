@@ -52,7 +52,6 @@ import org.fcitx.fcitx5.android.utils.item
 import org.fcitx.fcitx5.android.utils.styledColorOrDefault
 import org.mechdancer.dependency.manager.must
 import splitties.dimensions.dp
-import splitties.resources.styledColor
 import splitties.views.dsl.core.withTheme
 
 class ClipboardWindow : InputWindow.ExtendedInputWindow<ClipboardWindow>() {

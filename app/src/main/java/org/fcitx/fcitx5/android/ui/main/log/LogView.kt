@@ -15,7 +15,7 @@ import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.utils.Logcat
-import splitties.resources.styledColor
+import org.fcitx.fcitx5.android.utils.styledColor
 import splitties.views.bottomPadding
 import splitties.views.dsl.core.add
 import splitties.views.dsl.core.lParams

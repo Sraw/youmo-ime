@@ -15,7 +15,7 @@ import androidx.lifecycle.LiveData
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.ui.main.MainViewModel.ButtonMode
 import org.fcitx.fcitx5.android.utils.item
-import splitties.resources.styledColor
+import org.fcitx.fcitx5.android.utils.styledColor
 
 class EditDeleteMenuProvider<T>(
     private val buttonMode: LiveData<ButtonMode>,

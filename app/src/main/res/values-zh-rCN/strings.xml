@@ -229,6 +229,7 @@
     <string name="restarting_fcitx">正在重新启动 Fcitx</string>
     <string name="plugin_needs_reload">检测到插件更改，点此重新加载</string>
     <string name="no_plugins">无可用插件</string>
+    <string name="no_plugins_summary">插件是单独安装的应用，可增加输入法（如 Rime、Anthy、韩文）或功能。请安装为本应用同一构建类型（正式版/调试版）打包的插件，装好后回到此页加载。</string>
     <string name="removed_n_items">已移除 %1$d 个项目</string>
     <string name="whether_reset_switch_preference">是否要将此设置重置为默认值？</string>
     <string name="enabled">启用</string>
@@ -285,6 +286,8 @@
     <string name="restart_fcitx_instance_confirm">Fcitx 实例将被销毁并重新初始化。继续吗？</string>
     <string name="ignore_system_window_insets">忽略系统窗口边衬区 (WindowInsets)</string>
     <string name="browse_user_data_dir">浏览用户数据目录</string>
+    <string name="browse_user_data_dir_summary">长按改用系统文件管理器打开</string>
+    <string name="user_data">用户数据</string>
     <string name="haptic_on_repeat">重复按键时的振动反馈</string>
     <string name="redo">重做</string>
     <string name="status_area">状态区域</string>
@@ -343,6 +346,15 @@
     <string name="a11y_add_item">添加</string>
     <string name="a11y_copy">复制</string>
     <string name="long_press_characters">长按字符</string>
+    <string name="section_keys">按键</string>
+    <string name="section_toolbar_and_panels">工具栏与面板</string>
+    <string name="section_candidates">候选栏</string>
+    <string name="section_size_and_padding">尺寸与边距</string>
+    <string name="section_sound_and_vibration">声音与振动</string>
+    <string name="home_section_input">输入</string>
+    <string name="home_section_keyboard">键盘</string>
+    <string name="home_section_appearance">外观</string>
+    <string name="home_section_other">其他</string>
     <string name="long_press_characters_summary">自定义每个按键长按时弹出的字符</string>
     <string name="long_press_of">长按“%1$s”</string>
     <string name="long_press_editor_hint">用空格分隔多个字符。第一个是按住后直接松手得到的字符；留空则关闭该键的长按弹出。</string>

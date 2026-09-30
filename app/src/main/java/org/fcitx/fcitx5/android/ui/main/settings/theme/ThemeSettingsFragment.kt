@@ -5,7 +5,7 @@
 package org.fcitx.fcitx5.android.ui.main.settings.theme
 
 import android.os.Bundle
-import androidx.preference.SwitchPreference
+import androidx.preference.SwitchPreferenceCompat
 import org.fcitx.fcitx5.android.data.prefs.ManagedPreference
 import org.fcitx.fcitx5.android.data.prefs.ManagedPreferenceFragment
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
@@ -16,9 +16,9 @@ class ThemeSettingsFragment : ManagedPreferenceFragment(ThemeManager.prefs) {
 
     private var resumed = false
 
-    private lateinit var switchPreference: SwitchPreference
+    private lateinit var switchPreference: SwitchPreferenceCompat
 
-    // sync SwitchPreference's state when `followSystemDayNightTheme` changed in ThemeListFragment
+    // sync SwitchPreferenceCompat's state when `followSystemDayNightTheme` changed in ThemeListFragment
     private val listener = ManagedPreference.OnChangeListener<Boolean> { _, v ->
         if (resumed) return@OnChangeListener
         switchPreference.isChecked = v

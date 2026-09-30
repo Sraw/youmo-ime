@@ -17,22 +17,12 @@ class MainViewModel : ViewModel() {
 
     val toolbarTitle = MutableLiveData(appContext.getString(R.string.app_name))
 
-    val toolbarShadow = MutableLiveData(true)
-
     val toolbarButton = MutableLiveData(ButtonMode.NONE)
 
     val fcitx: FcitxConnection = FcitxDaemon.connect(javaClass.name)
 
     fun setToolbarTitle(title: String) {
         toolbarTitle.value = title
-    }
-
-    fun enableToolbarShadow() {
-        toolbarShadow.value = true
-    }
-
-    fun disableToolbarShadow() {
-        toolbarShadow.value = false
     }
 
     override fun onCleared() {
