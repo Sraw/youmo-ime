@@ -77,6 +77,8 @@ class TableSession(
             clear()
             snapshot(commit = text, handled = text.isNotEmpty())
         }
+        // nothing to weigh again: a table's order is its own
+        Action.Refine -> snapshot()
         // auto phrases are made of what was committed here, not of what the editor had: kept
         // only while the text still ends with it (the cursor did not go anywhere)
         Action.Reset, is Action.Context -> {

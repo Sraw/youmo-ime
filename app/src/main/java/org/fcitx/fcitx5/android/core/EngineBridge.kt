@@ -6,6 +6,7 @@ package org.fcitx.fcitx5.android.core
 
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.data.pinyin.ImportedDictionaries
+import org.fcitx.fcitx5.android.engine.host.EngineEvent
 import org.fcitx.fcitx5.android.engine.host.EngineSettings
 import org.fcitx.fcitx5.android.engine.host.Engines
 import org.fcitx.fcitx5.android.engine.libime.LibimeFiles
@@ -29,7 +30,8 @@ object EngineBridge {
      * A snapshot as the addon reads it, field by field. [candidates] run from the first of all,
      * through the page shown ([shown] of them from [first]), so the list the addon builds indexes
      * as the session does. [forgets]: whether "Forget word" is offered on them. [labels]: the
-     * keys picking those shown, empty for the digits.
+     * keys picking those shown, empty for the digits. [refines]: whether the addon is to send
+     * [EngineEvent.REFINE] while the user pauses.
      */
     class Result(
         @JvmField val handled: Boolean,
@@ -42,10 +44,11 @@ object EngineBridge {
         @JvmField val total: Int,
         @JvmField val forgets: Boolean,
         @JvmField val labels: String,
+        @JvmField val refines: Boolean,
     )
 
     private val made = lazy(LazyThreadSafetyMode.NONE) {
-        Engines(::asset, File(appContext.filesDir, "engine"), { Timber.w(it, "engine user data") }, ::legacy, ::additions, ::userTable)
+        Engines(::asset, File(appContext.filesDir, "engine"), { Timber.w(it, "engine user data") }, ::legacy, ::additions, ::userTable, NativeMatrixKernel)
     }
     private val engines by made
 
@@ -142,12 +145,14 @@ object EngineBridge {
     @JvmStatic
     fun onEvent(im: String, event: Int, arg: Int, learning: Boolean): Result {
         val s = engines.onEvent(im, event, arg, learning)
-        // the page shown and at least a chunk: the list rarely has to come back for more
-        val all = if (s.candidates.isEmpty()) emptyList() else engines.candidates(im, 0, maxOf(CHUNK, s.first + s.candidates.size))
+        // the page shown and at least a chunk: the list rarely has to come back for more; none
+        // for a slice of refining that changed nothing, which the addon does not show
+        val unshown = s.candidates.isEmpty() || (event == EngineEvent.REFINE && !s.handled)
+        val all = if (unshown) emptyList() else engines.candidates(im, 0, maxOf(CHUNK, s.first + s.candidates.size))
         return Result(
             s.handled, s.commit, s.preedit,
             all.map { it.text }.toTypedArray(), all.map { it.hint }.toTypedArray(),
-            s.first, s.candidates.size, s.total, s.forgets, s.labels,
+            s.first, s.candidates.size, s.total, s.forgets, s.labels, s.refines,
         )
     }
 

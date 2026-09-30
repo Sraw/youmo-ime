@@ -12,7 +12,9 @@ import org.fcitx.fcitx5.android.engine.data.SourceException
 import org.fcitx.fcitx5.android.engine.phrase.CustomPhrases
 import org.fcitx.fcitx5.android.engine.pinyin.PinyinSegmenter
 import org.fcitx.fcitx5.android.engine.pinyin.ShuangpinSegmenter
+import org.fcitx.fcitx5.android.engine.rerank.MatrixKernel
 import org.fcitx.fcitx5.android.engine.rerank.Reranker
+import org.fcitx.fcitx5.android.engine.rerank.SentenceRefiner
 import org.fcitx.fcitx5.android.engine.rerank.SentenceModel
 import org.fcitx.fcitx5.android.engine.session.Choice
 import org.fcitx.fcitx5.android.engine.session.PinyinSession
@@ -41,7 +43,8 @@ import java.nio.channels.FileChannel
  * and in each table, is kept under [userDir] (in memory only if null). When pinyin's log is made
  * afresh, what libime's pinyin learned ([legacy], if the user had it) is read into it first. What the user added to
  * pinyin ([additions]) is read at first need, and again on [reload]; so are the table input methods
- * they added ([userTables]), asked for by a name the engine has none of.
+ * they added ([userTables]), asked for by a name the engine has none of. The sentence models'
+ * int8 weights are multiplied by [kernel], if given (in C++, say); if not, by Kotlin.
  *
  * Everything here runs on one thread, the one fcitx runs on.
  */
@@ -52,6 +55,7 @@ class Engines(
     private val legacy: () -> LibimeImport.Legacy? = { null },
     private val additions: () -> Additions? = { null },
     private val userTables: (String) -> UserTable? = { null },
+    private val kernel: MatrixKernel? = null,
 ) : Closeable {
 
     /**
@@ -79,26 +83,38 @@ class Engines(
     // the files are signed with the app: no need to read them through for their checksums
     private val pinyinData by lazy(LazyThreadSafetyMode.NONE) { PinyinData.load(load(PINYIN_DATA), verify = false) }
 
-    // floats rather than int8 as stored: 17 MB rather than 4.5, and on ART two and a half times faster;
-    // dropped when turned off, loaded (or tried) again when turned on
-    private var sentenceModel: SentenceModel? = null
-    private var sentenceModelTried = false
+    /** A sentence model, read when first asked for; dropped when turned off, read (or tried) again when turned on. */
+    private inner class ModelFile(private val path: String, private val unpack: Boolean) {
+        private var model: SentenceModel? = null
+        private var tried = false
 
-    private fun sentenceModel(): SentenceModel? {
-        if (sentenceModelTried) return sentenceModel
-        sentenceModelTried = true
-        sentenceModel = try {
-            SentenceModel.load(load(SENTENCE_MODEL), unpack = true)
-        } catch (e: IOException) {
-            onError(e)
-            null
-        } catch (e: IllegalArgumentException) {
-            // pinyin reads as well without it as before it was added
-            onError(IOException("cannot read $SENTENCE_MODEL", e))
-            null
+        fun get(): SentenceModel? {
+            if (tried) return model
+            tried = true
+            model = try {
+                SentenceModel.load(load(path), unpack, kernel ?: MatrixKernel.JVM)
+            } catch (e: IOException) {
+                onError(e)
+                null
+            } catch (e: IllegalArgumentException) {
+                // pinyin reads as well without it as before it was added
+                onError(IOException("cannot read $path", e))
+                null
+            }
+            return model
         }
-        return sentenceModel
+
+        fun drop() {
+            model = null
+            tried = false
+        }
     }
+
+    // in Kotlin, floats rather than int8 as stored: 17 MB rather than 4.5, and on ART two and a
+    // half times faster; a kernel is faster still on int8
+    private val sentenceModel = ModelFile(SENTENCE_MODEL, unpack = kernel == null)
+    // int8 as stored: as floats it would be 100 MB, half of what an app may take on some phones
+    private val refiningModel = ModelFile(REFINING_MODEL, unpack = false)
 
     private var added: Additions? = null
     private var addedRead = false
@@ -181,8 +197,8 @@ class Engines(
             keyboards.clear()
             sessions.clear()
             if (!value.sentenceModel) {
-                sentenceModel = null
-                sentenceModelTried = false
+                sentenceModel.drop()
+                refiningModel.drop()
             }
         }
 
@@ -209,11 +225,13 @@ class Engines(
         when (im) {
             PINYIN -> PinyinSession(
                 pinyinData, PinyinSegmenter(s.fuzzy, s.typos, neighbours = s.typos),
-                pageSize = s.pageSize, user = user(), prediction = s.prediction, reranker = reranker(), phrases = phrases(),
+                pageSize = s.pageSize, user = user(), prediction = s.prediction, phrases = phrases(),
+                reranker = reranker(), refiner = refiner(),
             )
             SHUANGPIN -> PinyinSession(
                 pinyinData, ShuangpinSegmenter(s.scheme, s.fuzzy, s.typos), spell = true,
-                pageSize = s.pageSize, user = user(), prediction = s.prediction, reranker = reranker(), phrases = phrases(),
+                pageSize = s.pageSize, user = user(), prediction = s.prediction, phrases = phrases(),
+                reranker = reranker(), refiner = refiner(),
             )
             else -> {
                 val method = TABLES[im]
@@ -335,7 +353,24 @@ class Engines(
     }
 
     /** A reranker of the session's own, over the one model: each keeps what it ran for its input. */
-    private fun reranker(): Reranker? = if (settings.sentenceModel) sentenceModel()?.let { Reranker(it) } else null
+    private fun reranker(): Reranker? = if (settings.sentenceModel) sentenceModel.get()?.let { Reranker(it) } else null
+
+    /** As [reranker], over the larger model, which weighs the readings again while the user pauses. */
+    private fun refiner(): SentenceRefiner? = if (settings.sentenceModel) LateRefiner() else null
+
+    /**
+     * The larger model is read at the first pause, not when a session is made: 26 MB copied out
+     * of the asset on the fcitx thread would hold up the switch to pinyin. Unreadable, it has
+     * nothing to say, and the session stops asking.
+     */
+    private inner class LateRefiner : SentenceRefiner {
+        private var reranker: Reranker? = null
+
+        override fun refine(context: String, readings: List<String>, scores: List<Float>, budget: Int): Int? {
+            val r = reranker ?: refiningModel.get()?.let { Reranker(it, limit = Reranker.REFINE_LIMIT) }?.also { reranker = it }
+            return r?.refine(context, readings, scores, budget) ?: SentenceRefiner.NONE
+        }
+    }
 
     /**
      * Reads [additions] again, for the user changed them: the sessions are made anew, what was
@@ -390,6 +425,8 @@ class Engines(
 
         const val PINYIN_DATA = "engine/pinyin.data"
         const val SENTENCE_MODEL = "engine/sentence-model.safetensors"
+        /** Six times the work of [SENTENCE_MODEL], and right more often: see [PinyinSession]'s refiner. */
+        const val REFINING_MODEL = "engine/sentence-model-large.safetensors"
         const val TABLE_DIR = "engine/table"
         const val USER_PINYIN = "pinyin.user"
 

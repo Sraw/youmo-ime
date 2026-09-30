@@ -24,6 +24,8 @@ class PinyinRun(
     penalties: Penalties = Penalties(),
     beam: Int = PinyinDecoder.DEFAULT_BEAM,
     private val reranker: Reranker? = null,
+    /** Weighs the readings of the whole input once more, as the user pauses before picking; not timed. */
+    private val refiner: Reranker? = null,
 ) {
     private val decoder = PinyinDecoder(data.dictionary, data.vocabulary, WordScorer.of(data.model), penalties, beam)
     private val textWords = TextWords(data.model, data.wordIndex)
@@ -37,24 +39,25 @@ class PinyinRun(
                 candidates(sample.input.substring(0, length), sample.context)
                 (System.nanoTime() - started) / NANOS_PER_MICRO
             }
-            RunResult(sample.input, candidates(sample.input, sample.context), latencies)
+            RunResult(sample.input, candidates(sample.input, sample.context, paused = true), latencies)
         }
     }
 
     /**
      * Whole-input readings first, then the words the input may start with, as a candidate list
-     * shows them; typed after [context], the text the app has before it, as in a session.
+     * shows them; typed after [context], the text the app has before it, as in a session. Once
+     * the user [paused], as the [refiner] has them.
      */
-    fun candidates(input: String, context: String = ""): List<String> {
+    fun candidates(input: String, context: String = "", paused: Boolean = false): List<String> {
         val words = textWords.lastTwo(context)
         val prev = words.lastOrNull() ?: NO_WORD
         val prev2 = if (words.size == 2) words[0] else NO_WORD
         val decoding = decoder.decode(segmenter.segment(input), prev2, prev)
         val sentences = decoding.sentences.map { it.text }.toMutableList()
-        if (reranker != null) {
-            val picked = reranker.pick(context, sentences, decoding.sentences.map { it.score })
-            if (picked > 0) sentences.add(0, sentences.removeAt(picked))
-        }
+        val scores = decoding.sentences.map { it.score }
+        val picked = refiner?.takeIf { paused }?.refine(context, sentences, scores, Int.MAX_VALUE)
+            ?: reranker?.pick(context, sentences, scores) ?: 0
+        if (picked > 0) sentences.add(0, sentences.removeAt(picked))
         return (sentences + decoding.words.map { it.text }).distinct().take(CANDIDATES)
     }
 

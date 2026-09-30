@@ -63,6 +63,12 @@ sealed class Action {
     /** Commits what was typed, as typed (enter). */
     object CommitRaw : Action()
 
+    /**
+     * The user pauses: some of the work that may put a better reading first, where the
+     * snapshot [refines][Snapshot.refines]. Any other action drops what is left of it.
+     */
+    object Refine : Action()
+
     /** Drops everything: the input, and what was committed as context (the cursor moved away). */
     object Reset : Action()
 
@@ -91,6 +97,8 @@ sealed class Action {
  *   prediction, nor where nothing is learned
  * @property labels the keys picking the candidates shown, in order, where they are not the
  *   digits (电报码's `qwertyuiop`, its codes being digits); empty for the digits
+ * @property refines whether [Action.Refine] would do more: the host sends it while the user
+ *   pauses, till this is false
  */
 data class Snapshot(
     val commit: String,
@@ -106,4 +114,5 @@ data class Snapshot(
     val first: Int = 0,
     val forgets: Boolean = false,
     val labels: String = "",
+    val refines: Boolean = false,
 )

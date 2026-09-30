@@ -152,6 +152,7 @@ public:
     jfieldID EngineResultTotal;
     jfieldID EngineResultForgets;
     jfieldID EngineResultLabels;
+    jfieldID EngineResultRefines;
 
     explicit GlobalRefSingleton(JavaVM *jvm_) : jvm(jvm_) {
         JNIEnv *env;
@@ -215,6 +216,7 @@ public:
         EngineResultTotal = env->GetFieldID(engineResult, "total", "I");
         EngineResultForgets = env->GetFieldID(engineResult, "forgets", "Z");
         EngineResultLabels = env->GetFieldID(engineResult, "labels", "Ljava/lang/String;");
+        EngineResultRefines = env->GetFieldID(engineResult, "refines", "Z");
         env->DeleteLocalRef(engineResult);
     }
 

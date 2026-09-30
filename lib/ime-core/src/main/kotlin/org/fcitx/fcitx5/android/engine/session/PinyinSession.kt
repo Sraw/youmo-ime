@@ -17,7 +17,9 @@ import org.fcitx.fcitx5.android.engine.pinyin.Segmenter
 import org.fcitx.fcitx5.android.engine.pinyin.SyllableGraph
 import org.fcitx.fcitx5.android.engine.pinyin.SyllableGraph.Kind
 import org.fcitx.fcitx5.android.engine.pinyin.Syllables
+import org.fcitx.fcitx5.android.engine.rerank.Reranker
 import org.fcitx.fcitx5.android.engine.rerank.SentencePicker
+import org.fcitx.fcitx5.android.engine.rerank.SentenceRefiner
 import org.fcitx.fcitx5.android.engine.user.UserModel
 import org.fcitx.fcitx5.android.engine.user.UserModel.Entry
 import org.fcitx.fcitx5.android.engine.user.UserScorer
@@ -43,7 +45,10 @@ import java.util.Calendar
  *
  * With a [reranker], the best readings of the input are weighed again by how they read as a
  * sentence after the text committed before, by the same context, or after the text the host
- * says is before the cursor ([Action.Context]).
+ * says is before the cursor ([Action.Context]). With a [refiner] too, a better and slower one,
+ * the readings are weighed again by it while the user pauses ([Action.Refine]): the [reranker]
+ * decides as each key is typed, within a few milliseconds, the [refiner] then in slices of
+ * [REFINE_BUDGET] between them, till the next key.
  *
  * @param spell show each syllable spelt out, not as typed: for 双拼, whose keys say little
  */
@@ -60,6 +65,7 @@ class PinyinSession(
     private val phrases: CustomPhrases = CustomPhrases.EMPTY,
     /** The time a dynamic phrase is filled in with. */
     private val now: () -> Calendar = { Calendar.getInstance() },
+    private val refiner: SentenceRefiner? = null,
     // last, so a test's picker can follow as a lambda
     private val reranker: SentencePicker? = null,
 ) : Session {
@@ -91,6 +97,9 @@ class PinyinSession(
     private var graph: SyllableGraph? = null // of the input read last
 
     private var candidates: List<Candidate> = emptyList()
+    private var decoderWords: List<Candidate> = emptyList() // the decoder's words, after its sentences
+    private var unrefined: List<Candidate>? = null // the decoder's sentences, till the refiner picks one
+    private var refined = 0 // slices of refining spent on them
     private var decoderFirst: Candidate? = null // the first before the reranker and phrases moved it
     private var preedit = ""
     private var page = 0
@@ -98,7 +107,14 @@ class PinyinSession(
 
     override var learning = true
 
-    override fun apply(action: Action): Snapshot = when (action) {
+    override fun apply(action: Action): Snapshot {
+        // what the refiner weighs is the input as last read, on the first page
+        if (action != Action.Refine) unrefined = null
+        return act(action)
+    }
+
+    private fun act(action: Action): Snapshot = when (action) {
+        Action.Refine -> refine()
         is Action.Key -> type(action.char)
         Action.Backspace -> backspace()
         // nothing to pick past the page: the key (space, a digit) is the app's
@@ -301,6 +317,7 @@ class PinyinSession(
         graph = null
         pieces.clear()
         candidates = emptyList()
+        decoderWords = emptyList()
         preedit = ""
         page = 0
         predicting = false
@@ -314,6 +331,7 @@ class PinyinSession(
         page = 0
         if (input.isEmpty()) {
             candidates = emptyList()
+            decoderWords = emptyList()
             preedit = ""
             graph = null
             return
@@ -323,24 +341,50 @@ class PinyinSession(
         val (prev2, prev) = lastTwo(context + pieces.flatMap { it.words.asList() })
         val decoding = decoder.decode(graph, prev2, prev)
         decoderFirst = decoding.sentences.firstOrNull() ?: decoding.words.firstOrNull()
-        val sentences = rerank(decoding.sentences)
+        decoderWords = decoding.words
+        if (refiner != null && decoding.sentences.size > 1) {
+            unrefined = decoding.sentences
+            refined = 0
+        }
+        place(graph, rerank(decoding.sentences))
+    }
+
+    /** Lists [sentences], then the decoder's words, with the phrases the input has among them. */
+    private fun place(graph: SyllableGraph, sentences: List<Candidate>) {
         val rest = input.length - readFrom()
         // a phrase is text, no word: nothing to learn, and what follows it reads after nothing
         candidates = phrases.place(
-            input.substring(readFrom()), now, (sentences + decoding.words).distinctBy { it.text },
+            input.substring(readFrom()), now, (sentences + decoderWords).distinctBy { it.text },
             text = { it.text }, all = { it.end == rest },
         ) { Candidate(it, rest, 0f, intArrayOf(NO_WORD), intArrayOf(rest)) }
         val best = sentences.firstOrNull()
         preedit = pieces.joinToString("") { it.text } + (if (best == null) graph.input else preedit(graph, best))
     }
 
+    /** What the rerankers read before the input. */
+    private fun textBefore() = (if (learning) recent else "") + pieces.joinToString("") { it.text }
+
     /** [sentences] with the one the [reranker] picks first. */
     private fun rerank(sentences: List<Candidate>): List<Candidate> {
         val reranker = reranker ?: return sentences
-        val context = (if (learning) recent else "") + pieces.joinToString("") { it.text }
-        val picked = reranker.pick(context, sentences.map { it.text }, sentences.map { it.score })
-        if (picked == 0) return sentences
-        return listOf(sentences[picked]) + sentences.filterIndexed { i, _ -> i != picked }
+        return first(sentences, reranker.pick(textBefore(), sentences.map { it.text }, sentences.map { it.score }))
+    }
+
+    private fun first(sentences: List<Candidate>, picked: Int) =
+        if (picked == 0) sentences else listOf(sentences[picked]) + sentences.filterIndexed { i, _ -> i != picked }
+
+    /** A slice of the [refiner]'s work; once it picks, the decoder's sentences with that one first. */
+    private fun refine(): Snapshot {
+        val sentences = unrefined ?: return snapshot()
+        if (refined++ >= REFINE_SLICES) {
+            unrefined = null
+            return snapshot()
+        }
+        val picked = refiner!!.refine(textBefore(), sentences.map { it.text }, sentences.map { it.score }, REFINE_BUDGET)
+            ?: return snapshot()
+        unrefined = null
+        if (picked != SentenceRefiner.NONE) place(graph!!, first(sentences, picked))
+        return snapshot()
     }
 
     private fun lastTwo(words: IntArray): Pair<Int, Int> {
@@ -365,6 +409,7 @@ class PinyinSession(
             total = candidates.size,
             first = from,
             forgets = user != null && !predicting && candidates.isNotEmpty(),
+            refines = unrefined != null,
         )
     }
 
@@ -454,6 +499,17 @@ class PinyinSession(
 
     companion object {
         const val DEFAULT_PAGE_SIZE = 5
+        /**
+         * The [refiner]'s work at most per [Action.Refine], in [Reranker]'s units: one position of
+         * the large model, a few milliseconds on a phone. A key pressed meanwhile waits for it.
+         */
+        const val REFINE_BUDGET = 1
+        /**
+         * Slices of refining at most per input read; past them its order stands. On the evaluation
+         * set a pause takes 25 at the median, 60 at the 90th percentile and 137 at most: a reorder
+         * half a second after the key would move what the user is already reaching for.
+         */
+        const val REFINE_SLICES = 64
         // the longest text put together from pieces that is learned as a word: past this, it is
         // a sentence, which would crowd the dictionary with things never typed again
         const val MAX_PHRASE = 8

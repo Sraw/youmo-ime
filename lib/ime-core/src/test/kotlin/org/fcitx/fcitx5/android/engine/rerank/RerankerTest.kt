@@ -5,6 +5,7 @@
 package org.fcitx.fcitx5.android.engine.rerank
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import kotlin.math.ln
 
@@ -38,6 +39,15 @@ class RerankerTest {
     @Test
     fun withNoTimeTheDecoderKeepsItsOrder() {
         assertEquals(0, Reranker(model, budget = 0).pick("的", readings, even))
+    }
+
+    @Test
+    fun workSpreadOverCallsGoesOnFromWhereItStopped() {
+        val refiner = Reranker(model, limit = readings.size)
+        var calls = 1
+        while (refiner.refine("的", readings, even, 1) == null) calls++
+        assertTrue(calls > 1)
+        assertEquals(readings.lastIndex, refiner.refine("的", readings, even, 0))
     }
 
     @Test

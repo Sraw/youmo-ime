@@ -46,8 +46,9 @@ import javax.inject.Inject
 /**
  * Compiles the own engine's data (lib/ime-dict-tool) from the text sources libime builds its own
  * from and adds it to the app's assets as `engine/pinyin.data` and `engine/table/<name>.data`
- * for libime's code tables (五笔, 仓颉 ...), with chinese-ime-lm's sentence model as
- * `engine/sentence-model.safetensors` (and its NOTICE, which Apache-2.0 asks to go along with it).
+ * for libime's code tables (五笔, 仓颉 ...), with chinese-ime-lm's sentence models as
+ * `engine/sentence-model.safetensors` and `engine/sentence-model-large.safetensors` (and their
+ * NOTICE, which Apache-2.0 asks to go along with them).
  * The language model is first mixed with n-grams counted in LCCC's chat: what people type is
  * more chat than libime's news-heavy model knows.
  * Stored uncompressed, so the
@@ -64,6 +65,8 @@ import javax.inject.Inject
 class EngineDataPlugin : Plugin<Project> {
 
     private class Source(val name: String, val sha256: String, val files: List<String>)
+
+    private class ModelFile(val task: String, val url: String, val sha256: String, val asset: String)
 
     companion object {
         const val COMPILE_TASK = "compileEngineData"
@@ -91,10 +94,18 @@ class EngineDataPlugin : Plugin<Project> {
         // a revision of the model's repository, not main: what is downloaded is what was measured
         private const val MODEL_URL =
             "https://huggingface.co/metasequoiaime/pinyin-ime-reranker-4M/resolve/e5b1f7e768d7cb2b6ff334db4e34af153920c6ff/"
-        // name in the repository, its sha256, and the name it has among the app's assets
+        // the 25M one, weighing the readings again while the user pauses
+        private const val LARGE_MODEL_URL =
+            "https://huggingface.co/metasequoiaime/pinyin-ime-reranker-25M/resolve/75295b373a7ef0d14e9bebd32c1625c9cfcfea49/"
+        // the task fetching it, from where, its sha256, and the name it has among the app's assets;
+        // the larger's NOTICE is the same as the smaller's
         private val MODEL_FILES = listOf(
-            Triple("sentence-model.safetensors", "86ac529510cb3b4968a5e6ade83ec8080f5b34a0a681e75c362accbbd387d1c1", "sentence-model.safetensors"),
-            Triple("NOTICE", "b9489e8c8e3a271bf23131a57a7323264847d57561d36fc135101bf1eefd32f2", "sentence-model.NOTICE"),
+            ModelFile("downloadSentenceModel", MODEL_URL + "sentence-model.safetensors",
+                "86ac529510cb3b4968a5e6ade83ec8080f5b34a0a681e75c362accbbd387d1c1", "sentence-model.safetensors"),
+            ModelFile("downloadSentenceModelNotice", MODEL_URL + "NOTICE",
+                "b9489e8c8e3a271bf23131a57a7323264847d57561d36fc135101bf1eefd32f2", "sentence-model.NOTICE"),
+            ModelFile("downloadLargeSentenceModel", LARGE_MODEL_URL + "sentence-model.safetensors",
+                "0a6ecba69bf1d39c7eb49549c716477dd6c03fdf05757773e1f50435262fb469", "sentence-model-large.safetensors"),
         )
         // LCCC-base (MIT): 6.8 M conversations from Weibo and other chat, a line each
         private const val CHAT_URL =
@@ -161,13 +172,11 @@ class EngineDataPlugin : Plugin<Project> {
             outputDir.set(target.layout.buildDirectory.dir("generated/engine-tables"))
         }
 
-        val modelFiles = MODEL_FILES.map { (name, sha, asset) ->
-            // downloadSentenceModel, downloadSentenceModelNotice
-            val task = "downloadSentenceModel" + if (name == asset) "" else name.lowercase().replaceFirstChar { it.uppercase() }
-            target.tasks.register<DownloadTask>(task) {
-                url.set(MODEL_URL + name)
-                sha256.set(sha)
-                outputFile.set(downloadsDir.file("sentence-model/$asset"))
+        val modelFiles = MODEL_FILES.map { file ->
+            target.tasks.register<DownloadTask>(file.task) {
+                url.set(file.url)
+                sha256.set(file.sha256)
+                outputFile.set(downloadsDir.file("sentence-model/${file.asset}"))
             }
         }
         val model = target.tasks.register<CopyModel>(MODEL_TASK) {

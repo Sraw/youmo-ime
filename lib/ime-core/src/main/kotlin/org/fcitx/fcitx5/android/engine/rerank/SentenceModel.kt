@@ -108,17 +108,20 @@ class SentenceModel private constructor(
         val qkv = FloatArray(3 * width)
         val hidden = FloatArray(4 * width)
         val att = FloatArray(position + 1)
+        val add = FloatArray(width)
         for ((l, b) in blocks.withIndex()) {
             layerNorm(x, b.ln1, y)
             b.qkv.apply(y, b.qkvBias, qkv)
             System.arraycopy(qkv, width, keys[l], 0, width)
             System.arraycopy(qkv, 2 * width, values[l], 0, width)
             attend(qkv, chain, l, keys[l], values[l], att, y)
-            for (o in 0 until width) x[o] += b.proj.dot(y, 0, o) + b.projBias[o]
+            b.proj.times(y, add)
+            for (o in 0 until width) x[o] += add[o] + b.projBias[o]
             layerNorm(x, b.ln2, y)
             b.fc.apply(y, b.fcBias, hidden)
             for (i in hidden.indices) hidden[i] = gelu(hidden[i])
-            for (o in 0 until width) x[o] += b.out.dot(hidden, 0, o) + b.outBias[o]
+            b.out.times(hidden, add)
+            for (o in 0 until width) x[o] += add[o] + b.outBias[o]
         }
         return Node(parent, token, position, keys, values, x)
     }
@@ -161,7 +164,7 @@ class SentenceModel private constructor(
         }
 
     /** The logit of [token] after [node]: its log-probability but for [logSum]. */
-    fun logit(node: Node, token: Int): Float = tok.dot(normed(node), 0, token)
+    fun logit(node: Node, token: Int): Float = tok.dot(normed(node), token)
 
     /**
      * The log of the softmax's denominator after [node]: a logit for every token in the
@@ -171,11 +174,9 @@ class SentenceModel private constructor(
         if (node.summed) return node.logSum
         val normed = normed(node)
         val logits = FloatArray(config.vocab)
+        tok.times(normed, logits)
         var max = Float.NEGATIVE_INFINITY
-        for (v in 0 until config.vocab) {
-            logits[v] = tok.dot(normed, 0, v)
-            if (logits[v] > max) max = logits[v]
-        }
+        for (v in 0 until config.vocab) if (logits[v] > max) max = logits[v]
         var sum = 0.0
         for (v in 0 until config.vocab) sum += exp((logits[v] - max).toDouble())
         node.logSum = max + ln(sum).toFloat()
@@ -186,12 +187,15 @@ class SentenceModel private constructor(
     /** log P([token] next, after [node]). */
     fun logProb(node: Node, token: Int): Float = logit(node, token) - logSum(node)
 
+    // a node's keys and values for each layer, its output and that normed
+    private fun nodeFloats() = 2 * config.layers * config.width + 2 * config.width
+
     /**
      * Scores readings after one context, a keystroke at a time: what was run for one reading is
      * kept, by the tokens before it, for the next reading and the next keystroke; what was run
      * for the context, for a context that goes on from it.
      */
-    inner class Scorer(room: Int = ROOM, private val limit: Int = MAX_KEPT) {
+    inner class Scorer(room: Int = ROOM, private val limit: Int = KEPT_FLOATS / nodeFloats()) {
         /** Context tokens the window has room for, before [room] positions of reading. */
         private val maxContext = maxOf(0, window - 1 - room)
 
@@ -319,8 +323,11 @@ class SentenceModel private constructor(
         const val BOS = 2
         /** Positions left for readings after the context: as long as most sentences typed at once. */
         const val ROOM = 24
-        /** Steps kept at most: a node of this model is 11 KB, so some 6 MB. */
-        const val MAX_KEPT = 512
+        /**
+         * What a [Scorer] keeps of its readings' nodes, in floats: 6 MB, some 550 steps of the
+         * 4M model and 190 of the 25M one, whose node is three times the size.
+         */
+        const val KEPT_FLOATS = 1_500_000
         private const val EPS = 1e-5f
         private const val MAX_LAYERS = 64
 
@@ -356,8 +363,9 @@ class SentenceModel private constructor(
         /**
          * Reads a model from a safetensors file's bytes, with its weights as stored or, if
          * [unpack], as floats; [IllegalArgumentException] if it is no chinese-ime-lm v1 model.
+         * Weights as stored are multiplied by [kernel].
          */
-        fun load(buffer: ByteBuffer, unpack: Boolean = false): SentenceModel {
+        fun load(buffer: ByteBuffer, unpack: Boolean = false, kernel: MatrixKernel = MatrixKernel.JVM): SentenceModel {
             val file = Safetensors(buffer)
             val meta = file.metadata
             require(meta["format"] == "chinese-ime-lm" && meta["version"] == "1") { "not a chinese-ime-lm v1 model" }
@@ -366,7 +374,7 @@ class SentenceModel private constructor(
                 .map { requireNotNull(it as? String) { "bad vocab" } }
             require(vocab.size == config.vocab) { "vocab is ${vocab.size}, config ${config.vocab}" }
             val w = config.width
-            fun matrix(name: String, rows: Int, columns: Int) = file.matrix(name, rows, columns).let { if (unpack) it.unpacked() else it }
+            fun matrix(name: String, rows: Int, columns: Int) = file.matrix(name, rows, columns, kernel).let { if (unpack) it.unpacked() else it }
             fun norm(name: String) = Norm(file.floats("$name.weight", w), file.floats("$name.bias", w))
             val blocks = (0 until config.layers).map { i ->
                 val p = "blocks.$i."

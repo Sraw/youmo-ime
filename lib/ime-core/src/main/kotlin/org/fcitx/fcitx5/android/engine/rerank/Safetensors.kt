@@ -72,14 +72,14 @@ internal class Safetensors(buffer: ByteBuffer) {
         return out
     }
 
-    /** Tensor [name] of `[rows, columns]`: I8 with an F32 `.scale` per row, or F32. */
-    fun matrix(name: String, rows: Int, columns: Int): Matrix {
+    /** Tensor [name] of `[rows, columns]`: I8 with an F32 `.scale` per row, multiplied by [kernel], or F32. */
+    fun matrix(name: String, rows: Int, columns: Int, kernel: MatrixKernel = MatrixKernel.JVM): Matrix {
         val e = entry(name)
         require(e.shape == listOf(rows, columns)) { "$name: expected [$rows, $columns], got ${e.shape}" }
         if (e.dtype == "F32") return Matrix.of(rows, columns, floats(name, rows, columns))
         val q = ByteArray(e.to - e.from)
         at(dataStart + e.from).get(q)
-        return Matrix.quantized(rows, columns, q, floats("$name.scale", rows))
+        return Matrix.quantized(rows, columns, q, floats("$name.scale", rows), kernel)
     }
 
     private companion object {

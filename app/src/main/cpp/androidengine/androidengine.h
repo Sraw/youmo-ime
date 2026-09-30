@@ -5,12 +5,14 @@
 #ifndef FCITX5_ANDROID_ANDROIDENGINE_H
 #define FCITX5_ANDROID_ANDROIDENGINE_H
 
+#include <memory>
 #include <string>
 #include <vector>
 
 #include <fcitx-config/configuration.h>
 #include <fcitx-config/enum.h>
 #include <fcitx-config/iniparser.h>
+#include <fcitx-utils/event.h>
 #include <fcitx-utils/i18n.h>
 #include <fcitx/addonfactory.h>
 #include <fcitx/addoninstance.h>
@@ -155,6 +157,12 @@ public:
     }
 
 private:
+    /** Shows [snapshot], [im]'s: what it commits, its preedit and candidates. */
+    void show(InputContext *ic, std::string im, const EngineSnapshot &snapshot);
+
+    /** Sends Refine to [im]'s session after [delay] µs, unless another event comes first. */
+    void refineLater(InputContext *ic, const std::string &im, uint64_t delay);
+
     /** Commits the full-width form of a key the session passed on, if it has one; whether it did. */
     bool pushPunctuation(InputContext *ic, const Key &key);
 
@@ -169,6 +177,8 @@ private:
     EngineCandidatesCallback candidatesCallback_;
     EngineSettingsCallback settingsCallback_;
     AndroidEngineConfig config_;
+    // the pause a snapshot that refines waits for; any event ends it
+    std::unique_ptr<EventSourceTime> refine_;
 
     FCITX_ADDON_EXPORT_FUNCTION(AndroidEngine, setEventCallback);
     FCITX_ADDON_EXPORT_FUNCTION(AndroidEngine, setCandidatesCallback);

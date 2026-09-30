@@ -27,6 +27,8 @@ struct EngineSnapshot {
     bool forgets = false;
     // the keys picking the candidates shown, one ASCII character each; empty for the digits
     std::string labels;
+    // whether to send Refine while the user pauses
+    bool refines = false;
 };
 
 // What happened, numbered as ime-core's EngineEvent reads them. Which key does what is decided
@@ -42,6 +44,7 @@ enum class EngineEvent : int {
     Reset = 7,
     Other = 8,      // any other key: an arrow, Home, Tab, Delete
     Forget = 9,     // "Forget word" on a candidate; arg: the index among all candidates
+    Refine = 10,    // no key: the user pauses; handled only if the snapshot changed
 };
 
 // Hands an event to the session of input method [im]; called on the fcitx thread. [learning] is

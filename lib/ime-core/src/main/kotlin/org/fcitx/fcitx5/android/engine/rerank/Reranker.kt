@@ -15,6 +15,20 @@ fun interface SentencePicker {
     fun pick(context: String, readings: List<String>, scores: List<Float>): Int
 }
 
+/** A [SentencePicker] whose work may be spread over calls, as the user pauses. */
+fun interface SentenceRefiner {
+    /**
+     * As [SentencePicker.pick], or null if that takes more than [budget] (in [Reranker]'s units):
+     * the work done is kept, and a call with the same arguments goes on from it. [NONE] if it has
+     * nothing to say, the order shown left as it is.
+     */
+    fun refine(context: String, readings: List<String>, scores: List<Float>, budget: Int): Int?
+
+    companion object {
+        const val NONE = -1
+    }
+}
+
 /**
  * Reorders the decoder's best whole-input readings by adding what a [SentenceModel] thinks of
  * each, after what the user wrote before, to the decoder's own score. The decoder's n-gram sees
@@ -31,14 +45,16 @@ class Reranker(
     private val limit: Int = LIMIT,
     /** Positions run and denominators taken at most per keystroke; past it, the decoder's order stands. */
     private val budget: Int = BUDGET,
-) : SentencePicker {
+) : SentencePicker, SentenceRefiner {
 
     private val scorer = model.Scorer()
 
-    override fun pick(context: String, readings: List<String>, scores: List<Float>): Int {
+    override fun pick(context: String, readings: List<String>, scores: List<Float>): Int = refine(context, readings, scores, budget) ?: 0
+
+    override fun refine(context: String, readings: List<String>, scores: List<Float>, budget: Int): Int? {
         if (readings.size < 2) return 0
         val compared = readings.take(limit)
-        val model = scorer.within(context, compared, relative = true, budget = budget) ?: return 0
+        val model = scorer.within(context, compared, relative = true, budget = budget) ?: return null
         var best = 0
         var bestScore = Float.NEGATIVE_INFINITY
         for (i in compared.indices) {
@@ -62,6 +78,8 @@ class Reranker(
          * 95th percentile of a keystroke on an emulator from 8.1 to 5.7 ms.
          */
         const val BUDGET = 4
+        /** How many readings a refiner weighs, with time to: past the first two, it still finds some. */
+        const val REFINE_LIMIT = 5
         private val LN_10 = ln(10f)
     }
 }

@@ -29,6 +29,12 @@ object EngineEvent {
 
     /** "Forget word" on a candidate; the argument is its index among all of them. */
     const val FORGET = 9
+
+    /**
+     * No key: the user pauses, and the last snapshot [refines][Snapshot.refines]. The snapshot
+     * back is [handled][Snapshot.handled] only if it changed, to be shown in place of the last.
+     */
+    const val REFINE = 10
 }
 
 /**
@@ -66,6 +72,7 @@ class Keyboard(private val session: Session) {
             EngineEvent.FORGET -> session.apply(Action.Forget(arg))
             EngineEvent.RESET -> session.apply(Action.Reset).copy(handled = false)
             EngineEvent.OTHER -> if (composing) shown.copy(commit = "", handled = true) else passOn()
+            EngineEvent.REFINE -> refine()
             else -> passOn()
         }
         return shown
@@ -94,6 +101,13 @@ class Keyboard(private val session: Session) {
             composing && digit != null -> session.apply(Action.Select((digit + DIGITS - 1) % DIGITS))
             else -> session.apply(Action.Key(c)).copy(handled = false)
         }
+    }
+
+    private fun refine(): Snapshot {
+        val last = shown.copy(commit = "", handled = true)
+        if (!last.refines) return last.copy(handled = false)
+        val next = session.apply(Action.Refine)
+        return if (next.copy(refines = false) == last.copy(refines = false)) next.copy(handled = false) else next
     }
 
     /** The key is the app's; an offer of what may follow goes away with it. */

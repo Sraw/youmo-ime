@@ -35,6 +35,22 @@ class SentenceModelTest {
     }
 
     @Test
+    fun int8WeightsAreMultipliedByTheKernelGiven() {
+        val tokens = intArrayOf(3, 5, 4, 1, 7, 6)
+        val shapes = HashSet<Pair<Int, Int>>()
+        // the textbook sum, row by row, in doubles: what any kernel should come near
+        val kernel = MatrixKernel { q, scales, rows, columns, x, y ->
+            shapes += rows to columns
+            for (r in 0 until rows) y[r] = (0 until columns).sumOf { x[it].toDouble() * q[r * columns + it] }.toFloat() * scales[r]
+        }
+        val got = run(SentenceModel.load(ByteBuffer.wrap(tiny.bytes()), kernel = kernel), tokens)
+        assertArrayEquals(run(model, tokens), got, 1e-4f)
+        // tok, qkv, fc and out: the int8 ones
+        val w = tiny.width
+        assertEquals(setOf(tiny.vocab.size to w, 3 * w to w, 4 * w to w, w to 4 * w), shapes)
+    }
+
+    @Test
     fun whatFollowsIsADistribution() {
         val node = model.next(model.next(null, SentenceModel.BOS), 3)
         val total = (0 until tiny.vocab.size).sumOf { exp(model.logProb(node, it).toDouble()) }

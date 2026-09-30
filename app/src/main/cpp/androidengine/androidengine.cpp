@@ -21,6 +21,10 @@ namespace fcitx {
 
 namespace {
 
+// µs after a key before its snapshot is refined: long enough for a key typed right after it to
+// come first, short against the time a user takes to reach for a candidate
+constexpr uint64_t PauseBeforeRefine = 30000;
+
 class EngineCandidateWord : public CandidateWord {
 public:
     EngineCandidateWord(AndroidEngine *engine, std::string im, int index, const std::string &text, const std::string &hint)
@@ -246,6 +250,9 @@ void AndroidEngine::keyEvent(const InputMethodEntry &entry, KeyEvent &event) {
     if (event.isRelease()) return;
     const auto &key = event.key();
     if (key.isModifier()) return;
+    // any key ends a pause, shortcuts too: a refine landing after one would redraw a panel
+    // someone else may have put up since
+    refine_.reset();
     // shortcuts are the app's
     if (key.states().testAny(KeyStates{KeyState::Ctrl, KeyState::Alt, KeyState::Super, KeyState::Hyper})) return;
     EngineEvent what;
@@ -277,8 +284,34 @@ void AndroidEngine::keyEvent(const InputMethodEntry &entry, KeyEvent &event) {
 
 bool AndroidEngine::send(InputContext *ic, std::string im, EngineEvent event, int arg) {
     if (!eventCallback_) return false;
+    refine_.reset();
     const bool learning = !ic->capabilityFlags().testAny(CapabilityFlag::PasswordOrSensitive);
     const auto snapshot = eventCallback_(im, event, arg, learning);
+    // a key may be on its way: the pause starts a little after it, the next slice at once
+    if (snapshot.refines) refineLater(ic, im, event == EngineEvent::Refine ? 0 : PauseBeforeRefine);
+    // a slice of refining that changed nothing leaves the panel as it is, the list scrolled
+    if (event != EngineEvent::Refine || snapshot.handled) show(ic, std::move(im), snapshot);
+    return snapshot.handled;
+}
+
+void AndroidEngine::refineLater(InputContext *ic, const std::string &im, uint64_t delay) {
+    // deleted in its own callback by the send it makes, which fcitx allows for: its timer
+    // callback runs a copy of the function, and checks the source is still there after it
+    refine_ = instance_->eventLoop().addTimeEvent(
+            CLOCK_MONOTONIC, now(CLOCK_MONOTONIC) + delay, 0,
+            [this, ref = ic->watch(), im](EventSourceTime *, uint64_t) {
+                auto *ic = ref.get();
+                // still ours to show: the same input method, and our list on the panel, not a
+                // clipboard or quick phrase one put up meanwhile
+                if (ic && ic->hasFocus() && instance_->inputMethod(ic) == im &&
+                    dynamic_cast<EngineCandidateList *>(ic->inputPanel().candidateList().get())) {
+                    send(ic, im, EngineEvent::Refine);
+                }
+                return true;
+            });
+}
+
+void AndroidEngine::show(InputContext *ic, std::string im, const EngineSnapshot &snapshot) {
     if (!snapshot.commit.empty()) ic->commitString(snapshot.commit);
     auto &panel = ic->inputPanel();
     panel.reset();
@@ -295,7 +328,6 @@ bool AndroidEngine::send(InputContext *ic, std::string im, EngineEvent event, in
     if (!snapshot.candidates.empty()) panel.setCandidateList(std::make_unique<EngineCandidateList>(this, ic, std::move(im), snapshot));
     ic->updatePreedit();
     ic->updateUserInterface(UserInterfaceComponent::InputPanel);
-    return snapshot.handled;
 }
 
 void AndroidEngine::reset(const InputMethodEntry &entry, InputContextEvent &event) {

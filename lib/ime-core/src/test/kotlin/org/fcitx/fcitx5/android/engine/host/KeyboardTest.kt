@@ -18,13 +18,16 @@ class KeyboardTest {
     /**
      * Reads lower-case letters; offers the input upper-cased, then the input with a `!`. Picking
      * the second reads only the first letter, leaving the rest typed. A pick then offers `next`.
-     * Another key commits the first candidate.
+     * Another key commits the first candidate. Two [Action.Refine] after a letter turn the
+     * candidates round.
      */
     private class FakeSession : Session {
         val actions = ArrayList<Action>()
         val learned = ArrayList<Boolean>()
         private var input = ""
         private var predicting = false
+        private var slices = 0
+        private var refined = false
 
         override var learning = true
 
@@ -35,12 +38,18 @@ class KeyboardTest {
         private fun all() = when {
             predicting -> listOf("next")
             input.isEmpty() -> emptyList()
-            else -> listOf(input.uppercase(), input.take(1) + "!")
+            else -> listOf(input.uppercase(), input.take(1) + "!").let { if (refined) it.reversed() else it }
         }
 
         override fun apply(action: Action): Snapshot {
             actions += action
             learned += learning
+            if (action == Action.Refine) {
+                if (--slices == 0) refined = true
+            } else {
+                slices = 0
+                refined = false
+            }
             var commit = ""
             var handled = true
             when (action) {
@@ -48,6 +57,7 @@ class KeyboardTest {
                     predicting = false
                     if (reads(action.char)) {
                         input += action.char
+                        slices = 2
                     } else {
                         commit = input.uppercase()
                         input = ""
@@ -88,10 +98,10 @@ class KeyboardTest {
                     input = ""
                     predicting = false
                 }
-                Action.NextPage, Action.PreviousPage, is Action.Forget -> {}
+                Action.NextPage, Action.PreviousPage, is Action.Forget, Action.Refine -> {}
             }
             val shown = all()
-            return Snapshot(commit, input, shown, 0, false, false, handled, predicting)
+            return Snapshot(commit, input, shown, 0, false, false, handled, predicting, refines = slices > 0)
         }
     }
 
@@ -109,6 +119,29 @@ class KeyboardTest {
         assertTrue(s.handled)
         assertEquals("nih", s.preedit)
         assertEquals(listOf(Action.Key('n'), Action.Key('i'), Action.Key('h')), session.actions)
+    }
+
+    @Test
+    fun whileTheUserPausesTheSessionRefinesTillItHasNoMoreToDo() {
+        assertFalse(keyboard.onEvent(EngineEvent.REFINE, 0).handled)
+        assertTrue(session.actions.isEmpty())
+        type("ab")
+        // a slice that changed nothing is not shown again
+        val first = keyboard.onEvent(EngineEvent.REFINE, 0)
+        assertFalse(first.handled)
+        assertTrue(first.refines)
+        val second = keyboard.onEvent(EngineEvent.REFINE, 0)
+        assertTrue(second.handled)
+        assertFalse(second.refines)
+        assertEquals(listOf("a!", "AB"), second.candidates)
+        session.actions.clear()
+        assertFalse(keyboard.onEvent(EngineEvent.REFINE, 0).handled)
+        assertTrue(session.actions.isEmpty())
+        // what was committed with the last key is not committed again
+        char('c')
+        char(',')
+        type("d")
+        assertEquals("", keyboard.onEvent(EngineEvent.REFINE, 0).commit)
     }
 
     @Test

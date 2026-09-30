@@ -12,6 +12,7 @@ import org.fcitx.fcitx5.android.engine.pinyin.PinyinSegmenter
 import org.fcitx.fcitx5.android.engine.pinyin.ShuangpinScheme
 import org.fcitx.fcitx5.android.engine.pinyin.ShuangpinSegmenter
 import org.fcitx.fcitx5.android.engine.pinyin.Syllables
+import org.fcitx.fcitx5.android.engine.rerank.SentenceRefiner
 import org.fcitx.fcitx5.android.engine.session.Action.Backspace
 import org.fcitx.fcitx5.android.engine.session.Action.CommitRaw
 import org.fcitx.fcitx5.android.engine.session.Action.Forget
@@ -26,6 +27,7 @@ import org.fcitx.fcitx5.android.engine.user.UserModel
 import org.fcitx.fcitx5.android.engine.user.UserModelTest.Companion.inTrie
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -173,6 +175,59 @@ class PinyinSessionTest {
         assertEquals(picked, session.apply(Select(0)).commit)
         assertEquals(1, user.size)
         assertEquals(picked, PinyinSession(data, PinyinSegmenter(), user = user).type("nizai").candidates.first())
+    }
+
+    @Test
+    fun whileTheUserPausesTheRefinerPutsItsPickFirst() {
+        val budgets = ArrayList<Int>()
+        val refiner = SentenceRefiner { _, readings, _, budget ->
+            budgets += budget
+            if (budgets.size < 3) null else readings.lastIndex
+        }
+        val session = PinyinSession(data, PinyinSegmenter(), pageSize = 20, refiner = refiner) { _, _, _ -> 0 }
+        val typed = session.type("nizai")
+        assertTrue(typed.refines)
+        // slices that pick nothing leave it as it was
+        repeat(2) { assertEquals(typed, session.apply(Action.Refine)) }
+        val refined = session.apply(Action.Refine)
+        assertFalse(refined.refines)
+        assertNotEquals(typed.candidates[0], refined.candidates[0])
+        assertEquals(typed.candidates.toSet(), refined.candidates.toSet())
+        assertEquals(List(3) { PinyinSession.REFINE_BUDGET }, budgets)
+        // done: nothing more asked of it
+        assertEquals(refined, session.apply(Action.Refine))
+        assertEquals(3, budgets.size)
+        // any other action drops what was left: the refiner weighs the first page as last read
+        assertTrue(session.apply(Key('a')).refines)
+        assertFalse(session.apply(NextPage).refines)
+        session.apply(Action.Refine)
+        assertEquals(3, budgets.size)
+    }
+
+    @Test
+    fun aRefinerThatNeverPicksIsGivenUpOnAfterItsSlices() {
+        var asked = 0
+        val session = PinyinSession(data, PinyinSegmenter(), refiner = { _, _, _, _ -> asked++; null }) { _, _, _ -> 0 }
+        var shown = session.type("nizai")
+        var slices = 0
+        while (shown.refines) {
+            shown = session.apply(Action.Refine)
+            slices++
+            assertTrue(slices <= PinyinSession.REFINE_SLICES + 1)
+        }
+        assertEquals(PinyinSession.REFINE_SLICES, asked)
+        // the next input gets its own
+        assertTrue(session.apply(Key('a')).refines)
+    }
+
+    @Test
+    fun aRefinerWithNothingToSayLeavesTheRerankersPick() {
+        val refiner = SentenceRefiner { _, _, _, _ -> SentenceRefiner.NONE }
+        val session = PinyinSession(data, PinyinSegmenter(), refiner = refiner) { _, readings, _ -> readings.lastIndex }
+        val typed = session.type("nizai")
+        val refined = session.apply(Action.Refine)
+        assertFalse(refined.refines)
+        assertEquals(typed.candidates, refined.candidates)
     }
 
     @Test

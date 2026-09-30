@@ -9,8 +9,10 @@ import org.fcitx.fcitx5.android.engine.data.DataFormatException
 import org.fcitx.fcitx5.android.engine.data.PinyinDataBuilder
 import org.fcitx.fcitx5.android.engine.pinyin.Fuzzy
 import org.fcitx.fcitx5.android.engine.pinyin.Syllables
+import org.fcitx.fcitx5.android.engine.rerank.MatrixKernel
 import org.fcitx.fcitx5.android.engine.rerank.TinyModel
 import org.fcitx.fcitx5.android.engine.session.Choice
+import org.fcitx.fcitx5.android.engine.session.Snapshot
 import org.fcitx.fcitx5.android.engine.user.LibimeImport
 import org.fcitx.fcitx5.android.engine.user.UserLog
 import org.junit.Assert.assertEquals
@@ -53,6 +55,7 @@ class EnginesTest {
         .toByteArray()
 
     private var model = TinyModel().bytes()
+    private var refining = TinyModel().bytes()
 
     private val loaded = ArrayList<String>()
 
@@ -63,12 +66,25 @@ class EnginesTest {
                 Engines.PINYIN_DATA -> pinyin
                 "${Engines.TABLE_DIR}/wbx.data" -> wubi
                 Engines.SENTENCE_MODEL -> model
+                Engines.REFINING_MODEL -> refining
                 else -> throw IllegalArgumentException(path)
             },
         )
     }
 
     private fun Engines.type(im: String, keys: String) = keys.map { onEvent(im, EngineEvent.CHAR, it.code) }.last()
+
+    /** What the addon does while the user pauses after [typed]: refines till there is no more to do. */
+    private fun Engines.pause(im: String, typed: Snapshot): List<Snapshot> {
+        val slices = ArrayList<Snapshot>()
+        var s = typed
+        while (s.refines) {
+            s = onEvent(im, EngineEvent.REFINE, 0)
+            slices += s
+            assertTrue("never done", slices.size < MAX_SLICES)
+        }
+        return slices
+    }
 
     @Test
     fun pinyinIsTypedAndPicked() {
@@ -88,9 +104,20 @@ class EnginesTest {
     }
 
     @Test
+    fun aKernelGivenMultipliesTheSentenceModelsAsTheKotlinOneDoes() {
+        var calls = 0
+        val kernel = MatrixKernel { q, scales, rows, columns, x, y -> calls++; MatrixKernel.JVM.times(q, scales, rows, columns, x, y) }
+        val expected = Engines(::load, null).type(Engines.PINYIN, "nihao").candidates
+        assertEquals(0, calls)
+        assertEquals(expected, Engines(::load, null, kernel = kernel).type(Engines.PINYIN, "nihao").candidates)
+        assertTrue(calls > 0)
+    }
+
+    @Test
     fun aTableIsLoadedOnlyWhenItsInputMethodIsUsed() {
         val engines = Engines(::load, null)
         engines.type(Engines.PINYIN, "ni")
+        // the larger model only once the user pauses
         assertEquals(listOf(Engines.PINYIN_DATA, Engines.SENTENCE_MODEL), loaded)
         loaded.clear()
         val s = engines.type("engine-wubi", "vbg")
@@ -243,32 +270,53 @@ class EnginesTest {
     }
 
     @Test
-    fun theSentenceModelIsLoadedOnceForBothPinyinsUnlessTurnedOff() {
+    fun theSentenceModelsAreLoadedOnceForBothPinyinsUnlessTurnedOff() {
+        val models = listOf(Engines.SENTENCE_MODEL, Engines.REFINING_MODEL)
         val engines = Engines(::load, null)
-        engines.type(Engines.PINYIN, "ni")
-        engines.type(Engines.SHUANGPIN, "ni")
-        assertEquals(1, loaded.count { it == Engines.SENTENCE_MODEL })
+        engines.pause(Engines.PINYIN, engines.type(Engines.PINYIN, "ni"))
+        engines.pause(Engines.SHUANGPIN, engines.type(Engines.SHUANGPIN, "ni"))
+        assertEquals(models, loaded.filter { it in models })
         loaded.clear()
         val off = Engines(::load, null)
         off.settings = EngineSettings(sentenceModel = false)
         assertEquals(listOf("你", "拟"), off.type(Engines.PINYIN, "ni").candidates)
-        assertFalse(Engines.SENTENCE_MODEL in loaded)
+        assertTrue(loaded.none { it in models })
         // dropped when turned off, and read again when turned back on
         engines.settings = EngineSettings(sentenceModel = false)
         engines.settings = EngineSettings()
-        engines.type(Engines.PINYIN, "ni")
-        assertEquals(1, loaded.count { it == Engines.SENTENCE_MODEL })
+        engines.pause(Engines.PINYIN, engines.type(Engines.PINYIN, "ni"))
+        assertEquals(models, loaded.filter { it in models })
+    }
+
+    @Test
+    fun whileTheUserPausesTheLargerModelWeighsTheReadingsTillItHasNoMoreToDo() {
+        val engines = Engines(::load, null)
+        val typed = engines.type(Engines.PINYIN, "nihao")
+        assertTrue(typed.refines)
+        val slices = engines.pause(Engines.PINYIN, typed)
+        assertTrue(slices.isNotEmpty())
+        assertTrue(slices.all { it.commit.isEmpty() })
+        // shown only if it changed the order, and then once
+        assertTrue(slices.count { it.handled } <= 1)
+        assertEquals(typed.candidates.toSet(), slices.last().candidates.toSet())
+        assertFalse(engines.onEvent(Engines.PINYIN, EngineEvent.REFINE, 0).handled)
     }
 
     @Test
     fun aSentenceModelThatCannotBeReadLeavesPinyinWorking() {
-        model = model.copyOf(100)
-        val errors = ArrayList<IOException>()
-        val engines = Engines(::load, null, onError = { errors += it })
-        assertEquals(listOf("你", "拟"), engines.type(Engines.PINYIN, "ni").candidates)
-        assertEquals("拟", engines.onEvent(Engines.PINYIN, EngineEvent.PICK, 1).commit)
-        assertEquals(1, errors.size)
-        assertTrue(errors[0].cause is IllegalArgumentException)
+        val (small, large) = model to refining
+        for (broken in listOf(Engines.SENTENCE_MODEL, Engines.REFINING_MODEL)) {
+            model = if (broken == Engines.SENTENCE_MODEL) small.copyOf(100) else small
+            refining = if (broken == Engines.REFINING_MODEL) large.copyOf(100) else large
+            val errors = ArrayList<IOException>()
+            val engines = Engines(::load, null, onError = { errors += it })
+            val typed = engines.type(Engines.PINYIN, "ni")
+            assertEquals(broken, listOf("你", "拟"), typed.candidates)
+            assertTrue(engines.pause(Engines.PINYIN, typed).none { it.handled })
+            assertEquals("拟", engines.onEvent(Engines.PINYIN, EngineEvent.PICK, 1).commit)
+            assertEquals(broken, 1, errors.size)
+            assertTrue(errors[0].cause is IllegalArgumentException)
+        }
     }
 
     @Test
@@ -533,6 +581,7 @@ class EnginesTest {
 
     private companion object {
         const val MAX_PICKS = 10
+        const val MAX_SLICES = 10_000
 
         val MY_TABLE = """
             键码=abcd
