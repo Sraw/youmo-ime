@@ -17,6 +17,13 @@ data class Penalties(
     /** A common slip: `zhagn` for zhang. */
     val typo: Float = -1.5f,
     /**
+     * A letter slipped onto the key next to it: `nihap` for nihao. From -0.5 to -2 it reads as
+     * many slips right and costs clean input nothing; the most of that, to prune the most.
+     * Twice [initial], so where input has a vowel elsewhere, a consonant pair read as a slip
+     * (`xh` for xu in `woxhni`) ties with the two initials (喜欢) and the model decides.
+     */
+    val neighbour: Float = -2f,
+    /**
      * An initial standing for its syllable (简拼): `n` in `nh`. Accuracy barely depends on it, as
      * abbreviated readings mostly compete among themselves; a larger one prunes more.
      */

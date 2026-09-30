@@ -105,7 +105,7 @@ class Engines(
         val s = settings
         when (im) {
             PINYIN -> PinyinSession(
-                pinyinData, PinyinSegmenter(s.fuzzy, s.typos),
+                pinyinData, PinyinSegmenter(s.fuzzy, s.typos, neighbours = s.typos),
                 pageSize = s.pageSize, user = user, prediction = s.prediction,
             )
             SHUANGPIN -> PinyinSession(

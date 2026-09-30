@@ -161,6 +161,15 @@ class EnginesTest {
     }
 
     @Test
+    fun aKeySlippedIsReadAsMeantUnlessSlipsAreOff() {
+        val engines = Engines(::load, null)
+        // p is next to o
+        assertEquals("好", engines.type(Engines.PINYIN, "hap").candidates.first())
+        engines.settings = EngineSettings(typos = false)
+        assertEquals(listOf("hap"), engines.type(Engines.PINYIN, "hap").candidates)
+    }
+
+    @Test
     fun settingsShapeTheSessionsMadeAfterThem() {
         val engines = Engines(::load, null)
         assertEquals(EngineSettings.DEFAULT_PAGE_SIZE, engines.type("engine-wubi", "va").candidates.size)

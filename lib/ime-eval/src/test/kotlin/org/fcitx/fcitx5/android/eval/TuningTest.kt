@@ -30,7 +30,12 @@ class TuningTest {
         .build().toByteArray()
 
     private val clean = Sample("zhongguo", "中国", "daily")
-    private val slips = listOf(Sample("zongguo", "中国", "fuzzy-z_zh"), Sample("zhognguo", "中国", "typo-gn"))
+    private val slips = listOf(
+        Sample("zongguo", "中国", "fuzzy-z_zh"),
+        Sample("zhognguo", "中国", "typo-gn"),
+        // x is next to z
+        Sample("xhongguo", "中国", SlipSet.KEY),
+    )
 
     @Test
     fun eachRunCountsTheSamplesReadRight() {
@@ -52,6 +57,32 @@ class TuningTest {
     }
 
     @Test
+    fun aKeySlipIsReadOnlyWithSlipsOn() {
+        val tuning = Tuning(PinyinData.load(ByteBuffer.wrap(bytes)), listOf(clean), slips)
+        val half = Halves.of(clean)
+        assertEquals(listOf(1, 0), tuning.measureKeys(Penalties(), half, read = false).hits)
+        assertEquals(listOf(1, 1), tuning.measureKeys(Penalties(), half, read = true).hits)
+        val grid = tuning.searchKeys(listOf(-1f, -30f), half)
+        assertEquals(listOf(-1f, -30f), grid.map { it.penalties.neighbour })
+        assertEquals(listOf(1, 1), grid[0].hits)
+    }
+
+    @Test
+    fun theKeyPenaltyReadsMostSlipsWithoutLosingCleanInput() {
+        val tuning = Tuning(PinyinData.load(ByteBuffer.wrap(bytes)), emptyList(), emptyList())
+        val off = Tuning.Point(Penalties(), listOf(180, 0), listOf(200, 200))
+        val careless = Tuning.Point(Penalties(neighbour = 0f), listOf(170, 150), listOf(200, 200))
+        val lenient = Tuning.Point(Penalties(neighbour = -1f), listOf(179, 120), listOf(200, 200))
+        val strict = Tuning.Point(Penalties(neighbour = -2f), listOf(180, 120), listOf(200, 200))
+        // careless loses clean input; of the rest, strict keeps more of it
+        assertEquals(strict, tuning.chooseKeys(listOf(careless, lenient, strict), off))
+        assertEquals(null, tuning.chooseKeys(listOf(careless), off))
+        // a tie goes to the largest penalty: it prunes the most
+        val tied = Tuning.Point(Penalties(neighbour = -0.5f), listOf(180, 120), listOf(200, 200))
+        assertEquals(strict, tuning.chooseKeys(listOf(tied, strict), off))
+    }
+
+    @Test
     fun theDefaultStandsUnlessBeatenByTheMargin() {
         val default = Tuning.Point(Penalties(), listOf(100, 100), listOf(200, 200))
         val better = Tuning.Point(Penalties(fuzzy = -2f), listOf(102, 102), listOf(200, 200))
@@ -70,7 +101,8 @@ class TuningTest {
         val out = StringBuilder()
         assertEquals(0, runCli(arrayOf("tune", data.path, set.path, slipSet.path), out, StringBuilder()))
         val lines = out.lines().filter { it.isNotBlank() }
-        assertEquals(1 + Tuning.GRID.size * Tuning.GRID.size + 3, lines.size)
+        assertEquals(1 + Tuning.GRID.size * Tuning.GRID.size + 3 + Tuning.KEY_GRID.size + 6, lines.size)
+        assertTrue(lines.any { it.startsWith("neighbour (tune)") && "key/0" in it })
         assertTrue(lines[0], lines[0].startsWith("fuzzy typo (tune)"))
         val heldOut = lines[1 + Tuning.GRID.size * Tuning.GRID.size]
         // 中国 falls in the held-out half: the sizes say so

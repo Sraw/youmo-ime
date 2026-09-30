@@ -38,6 +38,13 @@ class PinyinRunTest {
         // sentences first, then words; 好 alone is not in this dictionary, so hao stays as typed
         assertEquals(listOf("你好", "你hao", "你"), results[0].candidates)
 
+        // p is next to o: a slip read only when asked
+        val slip = tmp.newFile("slip.tsv").apply { writeText("nihap\t你好\tkey\n") }
+        assertEquals(0, runCli(arrayOf("pinyin", data.path, slip.path, result.path, "--neighbours", "on"), StringBuilder(), StringBuilder()))
+        assertEquals("你好", result.useLines { RunResultFormat.parse(it) }.single().candidates.first())
+        assertEquals(0, runCli(arrayOf("pinyin", data.path, slip.path, result.path, "--neighbours", "off"), StringBuilder(), StringBuilder()))
+        assertEquals("你hap", result.useLines { RunResultFormat.parse(it) }.single().candidates.first())
+
         val shuangpin = tmp.newFile("shuangpin.tsv").apply { writeText("nihc\t你好\tdaily\n") }
         assertEquals(0, runCli(arrayOf("pinyin", data.path, shuangpin.path, result.path, "--scheme", "xiaohe"), StringBuilder(), StringBuilder()))
         assertEquals("你好", result.useLines { RunResultFormat.parse(it) }.single().candidates.first())

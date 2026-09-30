@@ -36,12 +36,16 @@ class SyllableMatches internal constructor(private val syllables: IntArray, priv
         /** The typing is only the start of the syllable (简拼 `zh`, or `zho` still being typed). */
         const val COMPLETION = 4
 
+        /** A letter slipped onto the key next to it: `nihap` for nihao. */
+        const val NEIGHBOUR = 8
+
         internal val EMPTY = SyllableMatches(IntArray(0), IntArray(0))
 
         private fun describe(flags: Int) = buildString {
             if (flags and FUZZY != 0) append('~')
             if (flags and TYPO != 0) append('!')
             if (flags and COMPLETION != 0) append('…')
+            if (flags and NEIGHBOUR != 0) append('?')
         }
     }
 }

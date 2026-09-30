@@ -15,6 +15,9 @@ import org.fcitx.fcitx5.android.engine.pinyin.SyllableGraph.Kind
  *
  * From each position the graph gets an edge for:
  * - every syllable the text there spells, of any length (`xian` and `xi`);
+ * - with `neighbours`, every syllable it spells with a letter slipped onto the key next to it
+ *   (`hap` for hao), where it spells nothing as typed; not in input of consonants alone, which
+ *   is 简拼 (`wxhn` is no slip for wxun);
  * - the initial alone (简拼) where no longer syllable starts (`n` in `nh`), and also where one
  *   does if a consonant follows (`n` in `ng` for 那个, `ng` being a syllable too), but not if a
  *   vowel does (`n` in `nihao`). `a`, `e` and `o` stand for the syllables they start only
@@ -22,21 +25,30 @@ import org.fcitx.fcitx5.android.engine.pinyin.SyllableGraph.Kind
  *   and no vowel follows, so does `z` (`zhrm` for 中华人民; not in `zho`);
  * - syllables the text there may still become: at the end of the input (`zho` for zhong, `zhan`
  *   for zhang), or before a separator if the text is no syllable yet (`zho'`; `xi'` is closed);
- * - failing all of those, one character as typed.
+ * - failing all of those, one character as typed (not where a slip starts: `uan` is yan, not
+ *   `u` then an; the character alone would cost more than the slip).
  *
  * Build one per settings change; [segment] is then cheap enough for every key press.
  *
  * Upper-case letters are the Latin-letter syllables (`A` in A股), so a caller wanting pinyin
  * from input that auto-capitalisation touched must lower-case it first.
  */
-class PinyinSegmenter(fuzzy: Set<Fuzzy> = emptySet(), typos: Boolean = true) : Segmenter {
+class PinyinSegmenter(
+    fuzzy: Set<Fuzzy> = emptySet(),
+    typos: Boolean = true,
+    neighbours: Boolean = false,
+) : Segmenter {
 
-    private val index = SpellingIndex(fuzzy, typos)
+    private val index = SpellingIndex(fuzzy, typos, neighbours)
 
-    override fun segment(input: String): SyllableGraph = GraphEdges.build(input) { at, edges -> walk(input, at, edges) }
+    override fun segment(input: String): SyllableGraph {
+        // read as slips, 简拼 turns into anything: 我喜欢你 into 网讯
+        val slips = input.any { it in VOWELS }
+        return GraphEdges.build(input) { at, edges -> walk(input, at, edges, slips) }
+    }
 
     /** Adds the edges leaving [at]: a walk down the spelling trie along the input. */
-    private fun walk(input: String, at: Int, edges: GraphEdges) {
+    private fun walk(input: String, at: Int, edges: GraphEdges, slips: Boolean) {
         var node = index.root
         var longestSyllable = 0
         var initial = 0
@@ -55,6 +67,12 @@ class PinyinSegmenter(fuzzy: Set<Fuzzy> = emptySet(), typos: Boolean = true) : S
             }
             val alone = index.initial(node)
             val more = index.extensions(node)
+            // no syllable for the rules below: what an initial stands for is read beside a slip.
+            // Nor where the text may still become one: `zho` on the way to zhong is no zhi, nor
+            // `zh` before `o`.
+            if (slips && !growing(input, at + length, node, alone != null || more != null)) {
+                index.slip(node)?.let { edges.add(at, length, Kind.SYLLABLE, it) }
+            }
             if (alone != null) {
                 shorter = initialMatches
                 shorterLength = initial
@@ -70,6 +88,14 @@ class PinyinSegmenter(fuzzy: Set<Fuzzy> = emptySet(), typos: Boolean = true) : S
                 edges.add(at, shorterLength, Kind.INITIAL, shorter)
             }
         }
+    }
+
+    /** Whether text spelled up to [node], ending at [end], [spells] the start of a syllable still being typed. */
+    private fun growing(input: String, end: Int, node: Int, spells: Boolean): Boolean {
+        if (!spells) return false
+        if (mayGoOn(input, end, true)) return true
+        val next = index.child(node, input[end])
+        return next >= 0 && (index.matches(next) != null || index.initial(next) != null || index.extensions(next) != null)
     }
 
     private companion object {

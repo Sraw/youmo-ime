@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.eval
 
+import org.fcitx.fcitx5.android.engine.pinyin.KeyNeighbours
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -24,11 +25,21 @@ class SlipSetTest {
         assertEquals("zongguo", zhongguo["fuzzy-z_zh"])
         assertEquals("zhognguo", zhongguo["typo-gn"])
         assertEquals("zhonguo", zhongguo["typo-on"])
-        assertEquals(setOf("fuzzy-z_zh", "typo-gn", "typo-on"), zhongguo.keys)
+        assertEquals(setOf("fuzzy-z_zh", "typo-gn", "typo-on", SlipSet.KEY), zhongguo.keys)
         val nihao = slips("nihao", "你好")
         assertEquals("lihao", nihao["fuzzy-l_n"])
         // a partner must be a syllable: fao is none
         assertTrue("fuzzy-f_h" !in nihao)
+    }
+
+    @Test
+    fun aKeySlipsOntoOneNextToIt() {
+        val slipped = slips("zhongguo", "中国").getValue(SlipSet.KEY)
+        val at = slipped.indices.single { slipped[it] != "zhongguo"[it] }
+        assertTrue(slipped, slipped[at] in KeyNeighbours.of("zhongguo"[at]))
+        // any letter, 简拼 too, but never a separator
+        assertEquals(2, slips("nh", "你好").getValue(SlipSet.KEY).length)
+        assertEquals('\'', slips("xi'an", "西安").getValue(SlipSet.KEY)[2])
     }
 
     @Test
@@ -44,7 +55,7 @@ class SlipSetTest {
     @Test
     fun separatorsAndTheRestOfTheInputAreKept() {
         assertEquals("xi'ang", slips("xi'an", "西安")["fuzzy-an_ang"])
-        assertEquals(emptyMap<String, String>(), slips("nh", "你好"))
+        assertEquals(setOf(SlipSet.KEY), slips("nh", "你好").keys)
     }
 
     @Test
@@ -59,7 +70,7 @@ class SlipSetTest {
         val out = tmp.newFile("slips.tsv")
         val printed = StringBuilder()
         assertEquals(0, runCli(arrayOf("slips", set.path, out.path), printed, StringBuilder()))
-        assertEquals("3 samples", printed.trim())
-        assertEquals(3, out.useLines { EvalSet.parse(it) }.size)
+        assertEquals("4 samples", printed.trim())
+        assertEquals(4, out.useLines { EvalSet.parse(it) }.size)
     }
 }

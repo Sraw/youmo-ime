@@ -7,6 +7,7 @@ package org.fcitx.fcitx5.android.engine.pinyin
 import org.fcitx.fcitx5.android.engine.pinyin.SyllableGraph.Kind
 import org.fcitx.fcitx5.android.engine.pinyin.SyllableMatches.Companion.COMPLETION
 import org.fcitx.fcitx5.android.engine.pinyin.SyllableMatches.Companion.FUZZY
+import org.fcitx.fcitx5.android.engine.pinyin.SyllableMatches.Companion.NEIGHBOUR
 import org.fcitx.fcitx5.android.engine.pinyin.SyllableMatches.Companion.TYPO
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -207,6 +208,59 @@ class PinyinSegmenterTest {
     }
 
     @Test
+    fun aLetterSlippedOntoTheNextKeyIsReadAsMeant() {
+        val slips = PinyinSegmenter(neighbours = true)
+        // p is next to o
+        assertEquals("hao?", matchesOf(slips, "hap").toString())
+        for (typed in listOf("nihap", "nihapma")) {
+            val g = slips.segment(typed)
+            assertEquals(typed, NEIGHBOUR, g.flags(g.edge("hap", Kind.SYLLABLE), "hao"))
+        }
+        // either letter may be the slip: w for a, e, q or s, i for o or u
+        assertEquals("ai? ei? qi? si? wo? wu?", matchesOf(slips, "wi").toString())
+        // what spells a syllable as typed is that syllable, not a slip for another
+        assertEquals("ni", matchesOf(slips, "ni").toString())
+        // a vowel slipped away is read where the input has one elsewhere
+        val yang = slips.segment("zenmeyqng")
+        assertEquals(NEIGHBOUR, yang.flags(yang.edge("yqng", Kind.SYLLABLE), "yang"))
+        // but input of consonants alone is 简拼: xhn is no slip for xun there
+        assertFalse(slips.segment("wxhn").let { g -> (0 until g.edgeCount).any { g.text(it) == "xhn" } })
+        assertEquals(setOf("n:SYLLABLE", "n:INITIAL"), slips.segment("ns").leaving(0))
+        // a slip is read only once typed in full: zhp is no start of zhong
+        assertEquals(setOf("z:INITIAL", "zh:INITIAL"), slips.segment("zhpn").leaving(0))
+        // fi is no syllable (only the start of fiao), so f still stands alone beside the slip
+        val fu = slips.segment("fide")
+        assertEquals(setOf("f:INITIAL", "fi:SYLLABLE"), fu.leaving(0))
+        assertEquals(NEIGHBOUR, fu.flags(fu.edge("fi", Kind.SYLLABLE), "fu"))
+        assertEquals(null, matchesOf(plain, "hap"))
+    }
+
+    @Test
+    fun whatIsStillBeingTypedIsNoSlip() {
+        val slips = PinyinSegmenter(neighbours = true)
+        // do on the way to dong or dou is no slip for di, nor fi for fu while fiao may come
+        assertEquals(setOf("d:INITIAL", "do:PARTIAL"), slips.segment("nihaodo").leaving(5))
+        assertEquals(setOf("f:INITIAL", "fi:PARTIAL"), slips.segment("fi").leaving(0))
+        assertEquals(setOf("zh:INITIAL", "zho:PARTIAL"), slips.segment("nizho").leaving(2))
+        assertEquals(setOf("zh:INITIAL", "zho:PARTIAL"), slips.segment("nizho'").leaving(2))
+        // but once more follows, it is: zho is no zhong before ba
+        val zhi = slips.segment("nizhoba")
+        assertEquals(NEIGHBOUR, zhi.flags(zhi.edge("zho", Kind.SYLLABLE), "zhi"))
+    }
+
+    @Test
+    fun whatAFuzzyPairOrTheOtherLueSpellsIsNoSlip() {
+        // sei is shei with s=sh, else a slip for wei
+        assertTrue("wei?" in matchesOf(PinyinSegmenter(neighbours = true), "sei").toString().split(' '))
+        assertEquals("shei~", matchesOf(PinyinSegmenter(setOf(Fuzzy.S_SH), neighbours = true), "sei").toString())
+        // lüe is spelled lue as often as lve, and slips from either: y is next to u, b to v
+        for (typed in listOf("lyeba", "lbeba")) {
+            val g = PinyinSegmenter(neighbours = true).segment(typed)
+            assertEquals(typed, NEIGHBOUR, g.flags(g.edge(typed.substring(0, 3), Kind.SYLLABLE), "lve"))
+        }
+    }
+
+    @Test
     fun whatIsNoPinyinIsKeptAsTyped() {
         val g = plain.segment("iu1")
         assertEquals(setOf("i:RAW"), g.leaving(0))
@@ -232,7 +286,7 @@ class PinyinSegmenterTest {
     fun everyPathReachesTheEnd() {
         val random = Random(7)
         val letters = "abcdefghijklmnopqrstuvwxyz''1A"
-        val segmenters = listOf(PinyinSegmenter(Fuzzy.entries.toSet()), PinyinSegmenter(typos = false))
+        val segmenters = listOf(PinyinSegmenter(Fuzzy.entries.toSet()), PinyinSegmenter(typos = false, neighbours = true))
         repeat(2000) {
             val segmenter = segmenters[it % 2]
             val input = String(CharArray(random.nextInt(0, 24)) { letters[random.nextInt(letters.length)] })

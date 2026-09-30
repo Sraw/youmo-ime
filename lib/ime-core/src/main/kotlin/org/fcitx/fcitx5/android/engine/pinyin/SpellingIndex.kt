@@ -9,12 +9,14 @@ import java.util.TreeMap
 /**
  * A character trie over everything a user may type for one syllable: the standard spellings,
  * their [Fuzzy] variants and, with [typos], common slips. Walking it along the input finds
- * every syllable a piece of input can be, without allocating.
+ * every syllable a piece of input can be, without allocating. With [neighbours], a standard
+ * spelling with one letter slipped onto a key next to it ([KeyNeighbours]) reads as the syllable
+ * too, where the slip spells nothing else: `hap` for hao, but not `gao` for hao.
  *
  * Each node knows the syllables its own key spells ([matches]) and those of every key below it
  * ([completions], [extensions]), the latter for input that stops part-way through a syllable.
  */
-internal class SpellingIndex(fuzzy: Set<Fuzzy>, typos: Boolean) {
+internal class SpellingIndex(fuzzy: Set<Fuzzy>, typos: Boolean, neighbours: Boolean = false) {
 
     private val childStart: IntArray
     private val childChar: CharArray
@@ -23,6 +25,7 @@ internal class SpellingIndex(fuzzy: Set<Fuzzy>, typos: Boolean) {
     private val completions: Array<SyllableMatches>
     private val extensions: Array<SyllableMatches?>
     private val initials: Array<SyllableMatches?>
+    private val slips: Array<SyllableMatches?>
 
     val root: Int get() = 0
 
@@ -53,17 +56,27 @@ internal class SpellingIndex(fuzzy: Set<Fuzzy>, typos: Boolean) {
      */
     fun initial(node: Int): SyllableMatches? = initials[node]
 
+    /**
+     * Syllables this node's key spells with one letter slipped onto a neighbouring key, flagged
+     * [SyllableMatches.NEIGHBOUR]; null if none. Only where the key spells nothing itself, and
+     * never as a completion: a slip is read only once it is typed in full.
+     */
+    fun slip(node: Int): SyllableMatches? = slips[node]
+
     private class Node {
         val children = TreeMap<Char, Node>()
         val matches = TreeMap<Int, Int>()
+        val slips = TreeMap<Int, Int>()
     }
 
     init {
         val root = Node()
         val byInitial = HashMap<String, TreeMap<Int, Int>>()
+        val spelt = HashSet<String>()
+        fun node(key: String) = key.fold(root) { n, c -> n.children.getOrPut(c) { Node() } }
         fun add(key: String, syllable: Int, flags: Int) {
-            val node = key.fold(root) { n, c -> n.children.getOrPut(c) { Node() } }
-            keepBest(node.matches, syllable, flags)
+            keepBest(node(key).matches, syllable, flags)
+            spelt += key
         }
         for (id in 0 until Syllables.count) {
             val spelling = Syllables.spelling(id)
@@ -85,6 +98,7 @@ internal class SpellingIndex(fuzzy: Set<Fuzzy>, typos: Boolean) {
                 }
             }
         }
+        if (neighbours) addSlips(spelt) { key, id -> keepBest(node(key).slips, id, SyllableMatches.NEIGHBOUR) }
 
         // breadth-first, so each node's children are consecutive
         val order = arrayListOf(root)
@@ -127,9 +141,29 @@ internal class SpellingIndex(fuzzy: Set<Fuzzy>, typos: Boolean) {
             for (c in key) node = if (node < 0) -1 else child(node, c)
             if (node >= 0) initials[node] = toMatches(syllables)
         }
+        slips = Array(order.size) { i -> order[i].slips.takeIf { it.isNotEmpty() }?.let(::toMatches) }
     }
 
     companion object {
+        /** Each standard spelling with one letter slipped, as [add] is to keep it, unless [spelt] already. */
+        fun addSlips(spelt: Set<String>, add: (String, Int) -> Unit) {
+            for (id in 0 until Syllables.count) {
+                val (init, fin) = split(Syllables.spelling(id)) ?: continue
+                for ((f, _) in finals(fin, emptyList())) {
+                    slips(init + f).filter { it !in spelt }.forEach { add(it, id) }
+                }
+            }
+        }
+
+        /** [spelling] with each of its letters in turn slipped onto each key next to it. */
+        fun slips(spelling: String): List<String> = if (spelling.length < 2) {
+            emptyList()
+        } else {
+            spelling.indices.flatMap { at ->
+                KeyNeighbours.of(spelling[at]).map { spelling.substring(0, at) + it + spelling.substring(at + 1) }
+            }
+        }
+
         /** Longest last, so the last one a spelling starts with is its initial. */
         val INITIALS = listOf(
             "b", "p", "m", "f", "d", "t", "n", "l", "g", "k", "h", "j", "q", "x",

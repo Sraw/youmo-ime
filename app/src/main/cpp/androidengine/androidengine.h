@@ -36,7 +36,7 @@ FCITX_CONFIG_ENUM_NAME_WITH_I18N(EngineShuangpinProfile, N_("Ziranma"), N_("MS")
 FCITX_CONFIGURATION(
         EngineFuzzyConfig,
         // here also a key slipped onto its neighbour
-        Option<bool> commonTypo{this, "NG_GN", _("Common Typo"), true};
+        Option<bool> commonTypo{this, "NG_GN", _("Typos and slipped keys"), true};
         Option<bool> v{this, "V_U", _("u <-> v"), false};
         Option<bool> an{this, "AN_ANG", _("an <-> ang"), false};
         Option<bool> en{this, "EN_ENG", _("en <-> eng"), false};

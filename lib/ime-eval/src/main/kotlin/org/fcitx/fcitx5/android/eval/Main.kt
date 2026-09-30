@@ -19,7 +19,7 @@ import java.util.Locale
 import kotlin.system.exitProcess
 
 val USAGE = """usage: score <set.tsv> <result.tsv> [<baseline-result.tsv>] [--half <half>]
-       pinyin <pinyin.data> <set.tsv> <result.tsv> [--scheme <scheme>] [--fuzzy all|<pair>,...] [--half <half>]
+       pinyin <pinyin.data> <set.tsv> <result.tsv> [--scheme <scheme>] [--fuzzy all|<pair>,...] [--half <half>] [--neighbours on|off]
        shuangpin <scheme> <set.tsv> <shuangpin-set.tsv>
        slips <set.tsv> <slip-set.tsv>
        tune <pinyin.data> <set.tsv> <slip-set.tsv>
@@ -66,12 +66,20 @@ fun runCli(args: Array<String>, out: Appendable, err: Appendable): Int {
     val scheme = a.options["scheme"]
     val fuzzy = a.options["fuzzy"]?.let(::fuzzyPairs)
     val preset = a.options["preset"]
-    val ok = (half == null || half in Halves.NAMES) && (scheme == null || scheme in ShuangpinSet.SCHEMES) &&
-        (a.options["fuzzy"] == null || fuzzy != null) && (preset == null || preset in TableRun.PRESETS)
+    val neighbours = a.options["neighbours"]
+    val ok = listOf(
+        half == null || half in Halves.NAMES,
+        scheme == null || scheme in ShuangpinSet.SCHEMES,
+        a.options["fuzzy"] == null || fuzzy != null,
+        preset == null || preset in TableRun.PRESETS,
+        // 双拼 reads no slips
+        neighbours == null || neighbours in ON_OFF && scheme == null,
+    ).all { it }
     return when {
         !ok -> usage(err)
         a.has("score", 3..4, "half") -> score(p[1], p[2], p.getOrNull(3), half, out)
-        a.has("pinyin", 4..4, "scheme", "fuzzy", "half") -> runPinyin(p[1], p[2], p[3], scheme, fuzzy.orEmpty(), half)
+        a.has("pinyin", 4..4, "scheme", "fuzzy", "half", "neighbours") ->
+            runPinyin(p[1], p[2], p[3], scheme, fuzzy.orEmpty(), half, neighbours == "on")
         a.has("shuangpin", 4..4) && p[1] in ShuangpinSet.SCHEMES -> writeShuangpinSet(p[1], p[2], p[3], out)
         a.has("slips", 3..3) -> writeSlipSet(p[1], p[2], out)
         a.has("tune", 4..4) -> tune(p[1], p[2], p[3], out)
@@ -107,11 +115,19 @@ private fun score(setPath: String, resultPath: String, baselinePath: String?, ha
     return 0
 }
 
-private fun segmenter(scheme: String?, fuzzy: Set<Fuzzy>): Segmenter =
-    scheme?.let { ShuangpinSegmenter(ShuangpinSet.SCHEMES.getValue(it), fuzzy) } ?: PinyinSegmenter(fuzzy)
+private fun segmenter(scheme: String?, fuzzy: Set<Fuzzy>, neighbours: Boolean = false): Segmenter =
+    scheme?.let { ShuangpinSegmenter(ShuangpinSet.SCHEMES.getValue(it), fuzzy) } ?: PinyinSegmenter(fuzzy, neighbours = neighbours)
 
-private fun runPinyin(dataPath: String, setPath: String, resultPath: String, scheme: String?, fuzzy: Set<Fuzzy>, half: String?): Int {
-    val results = PinyinRun(loadData(dataPath), segmenter(scheme, fuzzy)).run(Halves.select(readSet(setPath), half))
+private fun runPinyin(
+    dataPath: String,
+    setPath: String,
+    resultPath: String,
+    scheme: String?,
+    fuzzy: Set<Fuzzy>,
+    half: String?,
+    neighbours: Boolean,
+): Int {
+    val results = PinyinRun(loadData(dataPath), segmenter(scheme, fuzzy, neighbours)).run(Halves.select(readSet(setPath), half))
     File(resultPath).printWriter().use { out -> results.forEach { out.println(RunResultFormat.format(it)) } }
     return 0
 }
@@ -148,9 +164,9 @@ private fun tune(dataPath: String, setPath: String, slipsPath: String, out: Appe
                 if (rate == null) String.format(Locale.ROOT, "%17s", "-") else String.format(Locale.ROOT, "%16.1f%%", rate * 100)
             },
     )
-    fun header(label: String, point: Tuning.Point) = out.appendLine(
+    fun header(label: String, point: Tuning.Point, columns: List<String> = Tuning.COLUMNS) = out.appendLine(
         String.format(Locale.ROOT, "%-24s", label) +
-            (Tuning.COLUMNS.zip(point.sizes) { c, n -> "$c/$n" } + "mean").joinToString("") { String.format(Locale.ROOT, "%17s", it) },
+            (columns.zip(point.sizes) { c, n -> "$c/$n" } + "mean").joinToString("") { String.format(Locale.ROOT, "%17s", it) },
     )
     val default = tuning.measure(Penalties(), Halves.TUNE)
     val points = tuning.search()
@@ -161,6 +177,22 @@ private fun tune(dataPath: String, setPath: String, slipsPath: String, out: Appe
     header("held-out", heldOut)
     row("default", heldOut)
     row("chosen ${chosen.penalties.fuzzy} ${chosen.penalties.typo}", tuning.measure(chosen.penalties, Halves.HELD_OUT))
+
+    val off = tuning.measureKeys(Penalties(), Halves.TUNE, read = false)
+    header("neighbour (tune)", off, Tuning.KEY_COLUMNS)
+    row("off", off)
+    val keyPoints = tuning.searchKeys()
+    keyPoints.forEach { row("${it.penalties.neighbour}", it) }
+    val keyChoice = tuning.chooseKeys(keyPoints, off)
+    val offHeldOut = tuning.measureKeys(Penalties(), Halves.HELD_OUT, read = false)
+    header("held-out", offHeldOut, Tuning.KEY_COLUMNS)
+    row("off", offHeldOut)
+    row("default ${Penalties().neighbour}", tuning.measureKeys(Penalties(), Halves.HELD_OUT, read = true))
+    if (keyChoice == null) {
+        out.appendLine("chosen: none keeps clean input")
+    } else {
+        row("chosen ${keyChoice.penalties.neighbour}", tuning.measureKeys(keyChoice.penalties, Halves.HELD_OUT, read = true))
+    }
     return 0
 }
 
@@ -185,6 +217,8 @@ private fun table(dataPath: String, setPath: String, preset: String, out: Append
     out.appendLine(TableRun.report(total, run.entries(ENTRY_STEP)))
     return 0
 }
+
+private val ON_OFF = setOf("on", "off")
 
 // about 2,000 of 五笔's 100,000 entries
 private const val ENTRY_STEP = 50
