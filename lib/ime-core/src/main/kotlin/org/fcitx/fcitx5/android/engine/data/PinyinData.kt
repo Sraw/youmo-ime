@@ -225,6 +225,40 @@ class NgramModel internal constructor(file: DataFile, val vocabularySize: Int, p
         return biBackoffTable[biBackoff.get(bigram).toInt() and 0xff] + score(prev, word)
     }
 
+    /**
+     * Calls [visit] with every word the model saw after [context] (from [context]), in word order,
+     * each once, and its [scoreAfter]: those seen after prev, and those seen after both words.
+     * Nothing without a prev.
+     */
+    internal fun forEachAfter(context: Long, visit: WordVisitor) {
+        val prev = (context shr Int.SIZE_BITS).toInt()
+        if (prev == NO_WORD) return
+        val p = known(prev)
+        val bigram = context.toInt()
+        var b = uniBigramStart[p]
+        val bEnd = uniBigramStart[p + 1]
+        var t = if (bigram < 0) 0 else biTrigramStart[bigram]
+        val tEnd = if (bigram < 0) 0 else biTrigramStart[bigram + 1]
+        val backoff = if (bigram < 0) 0f else biBackoffTable[biBackoff.get(bigram).toInt() and 0xff]
+        // both runs are sorted by word: merge them
+        while (b < bEnd || t < tEnd) {
+            val bw = if (b < bEnd) biWord[b] else Int.MAX_VALUE
+            val tw = if (t < tEnd) triWord[t] else Int.MAX_VALUE
+            if (tw <= bw) {
+                visit.visit(tw, triProbTable[triProb.get(t).toInt() and 0xff])
+                t++
+                if (tw == bw) b++
+            } else {
+                visit.visit(bw, backoff + biProbTable[biProb.get(b).toInt() and 0xff])
+                b++
+            }
+        }
+    }
+
+    internal fun interface WordVisitor {
+        fun visit(word: Int, score: Float)
+    }
+
     /** log10 backoff weight of [word] as a context; 0 when it has none */
     fun backoff(word: Int): Float = uniBackoff.getFloat(known(word) * 4)
 

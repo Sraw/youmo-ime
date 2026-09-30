@@ -104,6 +104,31 @@ class PinyinDataTest {
     }
 
     @Test
+    fun theWordsSeenAfterAContextAreWalkedOnceWithTheirScores() {
+        // 拟 after 你 好 but never after 好 alone
+        val data = load(builder().bigram("好", "你", -1.3f, 0f).trigram("你", "好", "拟", -0.6f))
+        val m = data.model
+        fun after(prev2: Int, prev: Int): List<String> {
+            val context = m.context(prev2, prev)
+            val words = ArrayList<Int>()
+            m.forEachAfter(context) { word, score ->
+                words += word
+                assertEquals(m.scoreAfter(context, word), score, 0f)
+            }
+            assertEquals(words.distinct().sorted(), words)
+            return words.map { data.vocabulary.word(it) }
+        }
+        assertEquals(listOf("你", "吗"), after(NO_WORD, data.id("好")))
+        // 吗 is a trigram after 你 好 as well as a bigram after 好, and comes once; 你 backs off
+        assertEquals(listOf("你", "拟", "吗"), after(data.id("你"), data.id("好")))
+        assertEquals(listOf("好"), after(data.id("拟"), data.id("你")))
+        assertEquals(emptyList<String>(), after(data.id("你"), NO_WORD))
+        assertEquals(emptyList<String>(), after(NO_WORD, data.id("吗")))
+        // a word the model never saw is <unk>, which nothing follows here
+        assertEquals(emptyList<String>(), after(NO_WORD, data.id("妳好")))
+    }
+
+    @Test
     fun unknownWordsAndMissingContextsAreHandled() {
         val data = load()
         val m = data.model
