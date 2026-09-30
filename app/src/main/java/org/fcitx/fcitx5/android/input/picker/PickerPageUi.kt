@@ -277,8 +277,13 @@ class PickerPageUi(
     private fun onPopupTrigger(viewId: Int): Boolean {
         val triggerAction = PopupAction.TriggerAction(viewId)
         onPopupAction(triggerAction)
-        val action = triggerAction.outAction as? FcitxKeyAction ?: return false
-        onItemClick(action.act)
+        // a candidate longer than one character (user-entered) arrives as a CommitAction
+        val text = when (val action = triggerAction.outAction) {
+            is FcitxKeyAction -> action.act
+            is CommitAction -> action.text
+            else -> return false
+        }
+        onItemClick(text)
         onPopupAction(PopupAction.DismissAction(viewId))
         return true
     }

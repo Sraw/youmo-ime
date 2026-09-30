@@ -342,4 +342,15 @@
     <string name="a11y_candidates_next_page">更多候选词</string>
     <string name="a11y_add_item">添加</string>
     <string name="a11y_copy">复制</string>
+    <string name="long_press_characters">长按字符</string>
+    <string name="long_press_characters_summary">自定义每个按键长按时弹出的字符</string>
+    <string name="long_press_of">长按“%1$s”</string>
+    <string name="long_press_editor_hint">用空格分隔多个字符。第一个是按住后直接松手得到的字符；留空则关闭该键的长按弹出。</string>
+    <string name="letters">字母</string>
+    <string name="other_keys">其他按键</string>
+    <string name="add_key">添加其他按键</string>
+    <string name="key_label_hint">按键标签，例如 .</string>
+    <string name="customized">已自定义：%1$s</string>
+    <string name="reset_all_long_press_message">将所有按键的长按字符恢复为内置默认值？</string>
+    <string name="reset_all">全部恢复默认</string>
 </resources>

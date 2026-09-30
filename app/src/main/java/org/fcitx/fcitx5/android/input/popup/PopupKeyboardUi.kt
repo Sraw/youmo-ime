@@ -92,7 +92,8 @@ class PopupKeyboardUi(
     init {
         val keyCount: Float = keys.size.toFloat()
         rowCount = ceil(keyCount / 5).toInt()
-        columnCount = (keyCount / rowCount).roundToInt()
+        // round() left fewer slots than entries for 13, 17, 21 ... entries and hid the last ones
+        columnCount = ceil(keyCount / rowCount).toInt()
 
         focusRow = 0
         focusColumn = calcInitialFocusedColumn(columnCount, keyWidth, outerBounds, triggerBounds)
@@ -219,7 +220,10 @@ class PopupKeyboardUi(
 
     override fun onTrigger(): KeyAction? {
         val key = keys.getOrNull(focusedIndex) ?: return null
-        return KeyAction.FcitxKeyAction(key)
+        // one character goes through fcitx like any key; anything longer (a user-entered word, or
+        // text that happens to spell a key name such as "Tab") is not a key and is committed as text
+        return if (key.codePointCount(0, key.length) == 1) KeyAction.FcitxKeyAction(key)
+        else KeyAction.CommitAction(key)
     }
 
 }

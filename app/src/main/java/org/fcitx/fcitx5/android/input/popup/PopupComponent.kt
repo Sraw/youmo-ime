@@ -11,6 +11,7 @@ import android.widget.FrameLayout
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.input.broadcast.PunctuationComponent
 import org.fcitx.fcitx5.android.input.dependency.context
@@ -59,6 +60,19 @@ class PopupComponent :
         context.dp(ThemeManager.prefs.keyRadius.getValue()).toFloat()
     }
     private val hideThreshold = 100L
+
+    // parsed once per edit, not once per long press
+    private var overridesText = ""
+    private var overrides = PopupOverrides.Empty
+
+    private fun currentOverrides(): PopupOverrides {
+        val text = AppPrefs.getInstance().internal.popupOverrides.getValue()
+        if (text != overridesText) {
+            overridesText = text
+            overrides = PopupOverrides.parse(text)
+        }
+        return overrides
+    }
 
     private val rootLocation = intArrayOf(0, 0)
     private val rootBounds: Rect = Rect()
@@ -119,7 +133,7 @@ class PopupComponent :
         var labels: Array<String>
         when (keyboard) {
             is KeyDef.Popup.Keyboard.Preset -> {
-                val preset = PopupPreset[keyboard.label] ?: return
+                val preset = currentOverrides().resolve(keyboard.label, PopupPreset[keyboard.label]) ?: return
                 keys = preset
                 labels = if (keyboard.transformPunctuation && punctuation.enabled) {
                     Array(keys.size) { punctuation.transform(keys[it]) }

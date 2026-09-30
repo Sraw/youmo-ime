@@ -36,6 +36,9 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
         val pid = int("pid", 0)
         val editorInfoInspector = bool("editor_info_inspector", false)
         val needNotifications = bool("need_notifications", true)
+
+        /** See [org.fcitx.fcitx5.android.input.popup.PopupOverrides] for the format. */
+        val popupOverrides = string("popup_overrides", "")
     }
 
     inner class Advanced : ManagedPreferenceCategory(R.string.advanced, sharedPreferences) {
