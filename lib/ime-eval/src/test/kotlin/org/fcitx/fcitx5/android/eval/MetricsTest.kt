@@ -60,6 +60,15 @@ class MetricsTest {
     }
 
     @Test
+    fun theSameInputTypedAfterDifferentContextsIsMatchedToItsOwnResult() {
+        val s = listOf(Sample("jingli", "经理", "pair", "公司新来的"), Sample("jingli", "经历", "pair", "他有丰富的工作"))
+        val r = listOf(RunResult("jingli", listOf("经理", "经历"), emptyList()), RunResult("jingli", listOf("经历", "经理"), emptyList()))
+        assertEquals(1.0, Metrics.score(s, r).first().top1, 0.0)
+        // a result for the first only: the second is missing, not scored against it
+        assertEquals(1, Metrics.score(s, r.take(1)).first().missing)
+    }
+
+    @Test
     fun aRunawayFirstCandidateCostsNoMoreThanTheWholeSample() {
         val s = listOf(Sample("a", "啊", "t"))
         val r = listOf(RunResult("a", listOf("阿姨你好吗"), emptyList()))

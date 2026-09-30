@@ -28,16 +28,21 @@ object Metrics {
 
     /**
      * One [Score] per tag, in the order tags first appear in [samples], then [ALL]. Results are
-     * matched to samples by input; a sample typed twice in the set is scored against the same
-     * result both times.
+     * matched to samples by input, in order: the second sample typed `jingli` gets the second
+     * result for `jingli`, as the context set types one input after different contexts.
      */
     fun score(samples: List<Sample>, results: List<RunResult>): List<Score> {
-        val byInput = results.associateBy { it.input }
-        val groups = samples.groupBy { it.tag }.toList() + (ALL to samples)
-        return groups.map { (group, members) -> scoreGroup(group, members, byInput) }
+        val byInput = results.groupBy { it.input }
+        val taken = HashMap<String, Int>()
+        val matched = samples.map { sample ->
+            val n = taken.getOrDefault(sample.input, 0).also { taken[sample.input] = it + 1 }
+            sample to byInput[sample.input]?.getOrNull(n)
+        }
+        val groups = matched.groupBy { it.first.tag }.toList() + (ALL to matched)
+        return groups.map { (group, members) -> scoreGroup(group, members) }
     }
 
-    private fun scoreGroup(group: String, samples: List<Sample>, results: Map<String, RunResult>): Score {
+    private fun scoreGroup(group: String, samples: List<Pair<Sample, RunResult?>>): Score {
         var missing = 0
         var top1 = 0
         var top3 = 0
@@ -45,8 +50,7 @@ object Metrics {
         var charErrors = 0
         var chars = 0
         val latencies = mutableListOf<Long>()
-        for (sample in samples) {
-            val result = results[sample.input]
+        for ((sample, result) in samples) {
             if (result == null) missing++
             val candidates = result?.candidates.orEmpty()
             val rank = candidates.indexOf(sample.expected)
