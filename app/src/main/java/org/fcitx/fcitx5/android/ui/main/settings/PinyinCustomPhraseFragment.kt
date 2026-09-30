@@ -56,6 +56,9 @@ class PinyinCustomPhraseFragment : Fragment(), OnItemChangedListener<PinyinCusto
     // false when the file could not be read: the fragment leaves, and saves nothing over it
     private var readable = true
 
+    // the file as last loaded or saved here: what the keyboard changed since is kept on save
+    private var loaded = emptyList<PinyinCustomPhrase>()
+
     private var keyLabel = KEY
     private var orderLabel = ORDER
     private var phraseLabel = PHRASE
@@ -73,7 +76,7 @@ class PinyinCustomPhraseFragment : Fragment(), OnItemChangedListener<PinyinCusto
             }
         }
         val initialItems = try {
-            CustomPhraseManager.load()
+            CustomPhraseManager.load().also { loaded = it }
         } catch (e: IOException) {
             Timber.w(e, "custom phrases")
             requireContext().toast(e)
@@ -229,9 +232,11 @@ class PinyinCustomPhraseFragment : Fragment(), OnItemChangedListener<PinyinCusto
         if (!readable || !dustman.dirty) return
         resetDustman()
         val items = ui.entries.toList()
+        val base = loaded
         lifecycleScope.launch {
             try {
-                withContext(Dispatchers.IO) { CustomPhraseManager.save(items) }
+                // not saved: the next save still has what this one would have changed to do
+                loaded = withContext(Dispatchers.IO) { CustomPhraseManager.saveOver(base, items) }
             } catch (e: IOException) {
                 Timber.w(e, "custom phrases")
                 // the fragment may be gone by now

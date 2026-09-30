@@ -10,6 +10,7 @@ import org.fcitx.fcitx5.android.engine.data.DataFormatException
 import org.fcitx.fcitx5.android.engine.data.PinyinData
 import org.fcitx.fcitx5.android.engine.data.SourceException
 import org.fcitx.fcitx5.android.engine.phrase.CustomPhrases
+import org.fcitx.fcitx5.android.engine.phrase.PhraseBook
 import org.fcitx.fcitx5.android.engine.pinyin.PinyinSegmenter
 import org.fcitx.fcitx5.android.engine.pinyin.ShuangpinSegmenter
 import org.fcitx.fcitx5.android.engine.rerank.MatrixKernel
@@ -17,6 +18,7 @@ import org.fcitx.fcitx5.android.engine.rerank.Reranker
 import org.fcitx.fcitx5.android.engine.rerank.SentenceRefiner
 import org.fcitx.fcitx5.android.engine.rerank.SentenceModel
 import org.fcitx.fcitx5.android.engine.session.Choice
+import org.fcitx.fcitx5.android.engine.session.Offer
 import org.fcitx.fcitx5.android.engine.session.PinyinSession
 import org.fcitx.fcitx5.android.engine.session.Session
 import org.fcitx.fcitx5.android.engine.session.Snapshot
@@ -76,9 +78,15 @@ class Engines(
      * of its dictionaries turned on, in libime's text format (`你好 ni'hao 0`), read only when
      * the user's words are made: they can be many, and are kept in the model, not here.
      * [dictionaries] tells the dictionaries apart (their names, sizes and times, say): read again
-     * on [reload] only if it changed.
+     * on [reload] only if it changed. The custom phrases the user changes from the keyboard
+     * ([PhraseBook]) are handed to [savePhrases], all of them.
      */
-    class Additions(val phrases: String, val dictionaries: String, val dictionary: () -> List<String>)
+    class Additions(
+        val phrases: String,
+        val dictionaries: String,
+        val savePhrases: (CustomPhrases) -> Unit = {},
+        val dictionary: () -> List<String>,
+    )
 
     // the files are signed with the app: no need to read them through for their checksums
     private val pinyinData by lazy(LazyThreadSafetyMode.NONE) { PinyinData.load(load(PINYIN_DATA), verify = false) }
@@ -131,9 +139,16 @@ class Engines(
         return added
     }
 
-    private var phrases: CustomPhrases? = null
+    private var phrases: PhraseBook? = null
 
-    private fun phrases(): CustomPhrases = phrases ?: CustomPhrases.parse(added()?.phrases.orEmpty()).also { phrases = it }
+    private fun phrases(): PhraseBook = phrases ?: PhraseBook(CustomPhrases.parse(added()?.phrases.orEmpty())) {
+        try {
+            added?.savePhrases?.invoke(it)
+        } catch (e: IOException) {
+            // kept in memory: what the user sees stays as they asked, till the next start
+            onError(e)
+        }
+    }.also { phrases = it }
 
     private var store: UserStore? = null
     private var userModel: UserModel? = null
@@ -220,17 +235,20 @@ class Engines(
     /** Candidates of [im]'s input, from the [from]th, at most [count]; none if it has no session yet. */
     fun candidates(im: String, from: Int, count: Int): List<Choice> = sessions[im]?.candidates(from, count).orEmpty()
 
+    /** What a long press on the [index]th of [im]'s candidates offers; nothing if it has no session yet. */
+    fun offers(im: String, index: Int): Set<Offer> = sessions[im]?.offers(index).orEmpty()
+
     private fun session(im: String): Session = sessions.getOrPut(im) {
         val s = settings
         when (im) {
             PINYIN -> PinyinSession(
                 pinyinData, PinyinSegmenter(s.fuzzy, s.typos, neighbours = s.typos),
-                pageSize = s.pageSize, user = user(), prediction = s.prediction, phrases = phrases(),
+                pageSize = s.pageSize, user = user(), prediction = s.prediction, phraseBook = phrases(),
                 reranker = reranker(), refiner = refiner(),
             )
             SHUANGPIN -> PinyinSession(
                 pinyinData, ShuangpinSegmenter(s.scheme, s.fuzzy, s.typos), spell = true,
-                pageSize = s.pageSize, user = user(), prediction = s.prediction, phrases = phrases(),
+                pageSize = s.pageSize, user = user(), prediction = s.prediction, phraseBook = phrases(),
                 reranker = reranker(), refiner = refiner(),
             )
             else -> {

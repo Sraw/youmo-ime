@@ -772,7 +772,7 @@ Java_org_fcitx_fcitx5_android_core_Fcitx_startupFcitx(
         snapshot.first = env->GetIntField(result, GlobalRef->EngineResultFirst);
         snapshot.shown = env->GetIntField(result, GlobalRef->EngineResultShown);
         snapshot.total = env->GetIntField(result, GlobalRef->EngineResultTotal);
-        snapshot.forgets = env->GetBooleanField(result, GlobalRef->EngineResultForgets);
+        snapshot.actionable = env->GetBooleanField(result, GlobalRef->EngineResultActionable);
         snapshot.labels = utf8FromJString(env, JRef<jstring>(env, env->GetObjectField(result, GlobalRef->EngineResultLabels)));
         snapshot.refines = env->GetBooleanField(result, GlobalRef->EngineResultRefines);
         return snapshot;
@@ -787,6 +787,12 @@ Java_org_fcitx_fcitx5_android_core_Fcitx_startupFcitx(
         auto strings = utf8FromJStringArray(env, flat);
         for (size_t i = 0; i + 1 < strings.size(); i += 2) out.emplace_back(std::move(strings[i]), std::move(strings[i + 1]));
         return out;
+    };
+
+    auto engineOffersCallback = [](const std::string &im, int index) {
+        auto env = GlobalRef->AttachEnv();
+        const jint offers = env->CallStaticIntMethod(GlobalRef->EngineBridge, GlobalRef->EngineBridgeOffers, *JString(env, im), index);
+        return engineFailed(env) ? 0 : static_cast<int>(offers);
     };
 
     auto engineSettingsCallback = [](const std::string &settings) {
@@ -815,6 +821,7 @@ Java_org_fcitx_fcitx5_android_core_Fcitx_startupFcitx(
         if (androidengine) {
             androidengine->template call<fcitx::IAndroidEngine::setEventCallback>(engineEventCallback);
             androidengine->template call<fcitx::IAndroidEngine::setCandidatesCallback>(engineCandidatesCallback);
+            androidengine->template call<fcitx::IAndroidEngine::setOffersCallback>(engineOffersCallback);
             androidengine->template call<fcitx::IAndroidEngine::setSettingsCallback>(engineSettingsCallback);
         }
     });

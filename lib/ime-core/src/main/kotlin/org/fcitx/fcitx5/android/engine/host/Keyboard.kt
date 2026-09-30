@@ -35,6 +35,12 @@ object EngineEvent {
      * back is [handled][Snapshot.handled] only if it changed, to be shown in place of the last.
      */
     const val REFINE = 10
+
+    /** "Pin to top as custom phrase" on a candidate; the argument is its index among all of them. */
+    const val PIN = 11
+
+    /** "Delete from custom phrase" on a candidate; the argument is its index among all of them. */
+    const val UNPIN = 12
 }
 
 /**
@@ -69,7 +75,7 @@ class Keyboard(private val session: Session) {
             EngineEvent.PAGE_UP -> if (composing) session.apply(Action.PreviousPage) else passOn()
             EngineEvent.PAGE_DOWN -> if (composing) session.apply(Action.NextPage) else passOn()
             EngineEvent.PICK -> session.apply(Action.Pick(arg))
-            EngineEvent.FORGET -> session.apply(Action.Forget(arg))
+            EngineEvent.FORGET, EngineEvent.PIN, EngineEvent.UNPIN -> session.apply(pressed(event, arg))
             EngineEvent.RESET -> session.apply(Action.Reset).copy(handled = false)
             EngineEvent.OTHER -> if (composing) shown.copy(commit = "", handled = true) else passOn()
             EngineEvent.REFINE -> refine()
@@ -88,6 +94,13 @@ class Keyboard(private val session: Session) {
         if (shown.preedit.isNotEmpty() || shown.candidates.isNotEmpty()) return
         session.learning = learning
         shown = session.apply(Action.Context(before))
+    }
+
+    /** What a long press on the candidate at [index] offered, and the user chose. */
+    private fun pressed(event: Int, index: Int) = when (event) {
+        EngineEvent.FORGET -> Action.Forget(index)
+        EngineEvent.PIN -> Action.Pin(index)
+        else -> Action.Unpin(index)
     }
 
     private fun char(codePoint: Int): Snapshot {

@@ -147,9 +147,22 @@ public:
         return candidatesCallback_ ? candidatesCallback_(im, from, count) : std::vector<std::pair<std::string, std::string>>{};
     }
 
+    /**
+     * Stops what refining is left, till the next event: a candidate pressed is acted on by its
+     * index, which a reordered list would give to another.
+     */
+    void stopRefining() { refine_.reset(); }
+
+    /** EngineOffer bits: what a long press on the [index]th of [im]'s candidates offers. */
+    int offers(const std::string &im, int index) const {
+        return offersCallback_ ? offersCallback_(im, index) : 0;
+    }
+
     void setEventCallback(const EngineEventCallback &callback) { eventCallback_ = callback; }
 
     void setCandidatesCallback(const EngineCandidatesCallback &callback) { candidatesCallback_ = callback; }
+
+    void setOffersCallback(const EngineOffersCallback &callback) { offersCallback_ = callback; }
 
     void setSettingsCallback(const EngineSettingsCallback &callback) {
         settingsCallback_ = callback;
@@ -175,6 +188,7 @@ private:
     FCITX_ADDON_DEPENDENCY_LOADER(chttrans, instance_->addonManager());
     EngineEventCallback eventCallback_;
     EngineCandidatesCallback candidatesCallback_;
+    EngineOffersCallback offersCallback_;
     EngineSettingsCallback settingsCallback_;
     AndroidEngineConfig config_;
     // the pause a snapshot that refines waits for; any event ends it
@@ -182,6 +196,7 @@ private:
 
     FCITX_ADDON_EXPORT_FUNCTION(AndroidEngine, setEventCallback);
     FCITX_ADDON_EXPORT_FUNCTION(AndroidEngine, setCandidatesCallback);
+    FCITX_ADDON_EXPORT_FUNCTION(AndroidEngine, setOffersCallback);
     FCITX_ADDON_EXPORT_FUNCTION(AndroidEngine, setSettingsCallback);
 };
 

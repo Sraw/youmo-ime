@@ -19,7 +19,6 @@ import org.fcitx.fcitx5.android.engine.session.Action.Forget
 import org.fcitx.fcitx5.android.engine.session.Action.Key
 import org.fcitx.fcitx5.android.engine.session.Action.NextPage
 import org.fcitx.fcitx5.android.engine.session.Action.Pick
-import org.fcitx.fcitx5.android.engine.phrase.CustomPhrases
 import org.fcitx.fcitx5.android.engine.session.Action.PreviousPage
 import org.fcitx.fcitx5.android.engine.session.Action.Reset
 import org.fcitx.fcitx5.android.engine.session.Action.Select
@@ -31,50 +30,51 @@ import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
-import java.util.Calendar
-import java.util.GregorianCalendar
 import java.nio.ByteBuffer
+
+private fun syl(vararg s: String) = s.map { Syllables.id(it) }.toIntArray()
+
+/** The dictionary and model the pinyin session tests read. */
+internal fun sessionTestData() = PinyinData.load(
+    ByteBuffer.wrap(
+        PinyinDataBuilder()
+            .unigram("<unk>", -7f, 0f)
+            .unigram("你", -2f, 0f)
+            .unigram("好", -2.5f, 0f)
+            .unigram("你好", -3f, 0f)
+            .unigram("吗", -3.5f, 0f)
+            .unigram("拟", -5f, 0f)
+            .unigram("在", -2f, 0f)
+            .unigram("再", -2.5f, 0f)
+            .unigram("见", -3f, 0f)
+            .unigram("我", -2f, -1f)
+            .unigram("西安", -4f, 0f)
+            .unigram("先", -3f, 0f)
+            .unigram("中", -3.5f, 0f)
+            .bigram("你", "好", -0.75f, 0f)
+            .bigram("你好", "吗", -0.5f, 0f)
+            .bigram("再", "见", -0.5f, 0f)
+            .bigram("我", "再", -0.5f, 0f)
+            .bigram("拟", "再", -0.1f, 0f)
+            .entry("你", syl("ni"))
+            .entry("拟", syl("ni"))
+            .entry("好", syl("hao"))
+            .entry("你好", syl("ni", "hao"))
+            .entry("吗", syl("ma"))
+            .entry("在", syl("zai"))
+            .entry("再", syl("zai"))
+            .entry("见", syl("jian"))
+            .entry("我", syl("wo"))
+            .entry("西安", syl("xi", "an"))
+            .entry("先", syl("xian"))
+            .entry("中", syl("zhong"))
+            .build().toByteArray(),
+    ),
+)
 
 class PinyinSessionTest {
 
-    private fun syl(vararg s: String) = s.map { Syllables.id(it) }.toIntArray()
-
-    private val data = PinyinData.load(
-        ByteBuffer.wrap(
-            PinyinDataBuilder()
-                .unigram("<unk>", -7f, 0f)
-                .unigram("你", -2f, 0f)
-                .unigram("好", -2.5f, 0f)
-                .unigram("你好", -3f, 0f)
-                .unigram("吗", -3.5f, 0f)
-                .unigram("拟", -5f, 0f)
-                .unigram("在", -2f, 0f)
-                .unigram("再", -2.5f, 0f)
-                .unigram("见", -3f, 0f)
-                .unigram("我", -2f, -1f)
-                .unigram("西安", -4f, 0f)
-                .unigram("先", -3f, 0f)
-                .unigram("中", -3.5f, 0f)
-                .bigram("你", "好", -0.75f, 0f)
-                .bigram("你好", "吗", -0.5f, 0f)
-                .bigram("再", "见", -0.5f, 0f)
-                .bigram("我", "再", -0.5f, 0f)
-                .bigram("拟", "再", -0.1f, 0f)
-                .entry("你", syl("ni"))
-                .entry("拟", syl("ni"))
-                .entry("好", syl("hao"))
-                .entry("你好", syl("ni", "hao"))
-                .entry("吗", syl("ma"))
-                .entry("在", syl("zai"))
-                .entry("再", syl("zai"))
-                .entry("见", syl("jian"))
-                .entry("我", syl("wo"))
-                .entry("西安", syl("xi", "an"))
-                .entry("先", syl("xian"))
-                .entry("中", syl("zhong"))
-                .build().toByteArray(),
-        ),
-    )
+    private val data = sessionTestData()
 
     private fun session(pageSize: Int = PinyinSession.DEFAULT_PAGE_SIZE) = PinyinSession(data, PinyinSegmenter(), pageSize = pageSize)
 
@@ -587,7 +587,8 @@ class PinyinSessionTest {
         session.apply(Reset)
         val before = session.type("nizai")
         assertEquals(listOf("拟再"), before.candidates)
-        assertTrue(before.forgets)
+        assertTrue(before.actionable)
+        assertEquals(setOf(Offer.FORGET, Offer.PIN), session.offers(0))
         assertEquals(1, user.size)
         // forgotten from the second page, which stays shown
         session.apply(NextPage)
@@ -624,13 +625,15 @@ class PinyinSessionTest {
 
     @Test
     fun onlyWhatAUserModelLearnedIsForgotten() {
-        assertFalse(session().type("ni").forgets)
+        // pinned as a phrase, but nothing learned to forget
+        assertEquals(setOf(Offer.PIN), session().also { it.type("ni") }.offers(0))
         assertEquals(session().type("ni"), session().also { it.type("ni") }.apply(Forget(0)))
         val (session, user) = learning()
         session.type("wo")
         val predicted = session.apply(Select(0))
         assertTrue(predicted.predicting)
-        assertFalse(predicted.forgets)
+        assertFalse(predicted.actionable)
+        assertEquals(emptySet<Offer>(), session.offers(0))
         // a prediction offered: nothing forgotten
         assertEquals(predicted.copy(commit = ""), session.apply(Forget(0)))
         assertEquals(1f, user.total)
@@ -680,49 +683,5 @@ class PinyinSessionTest {
         assertEquals(1, user.size)
         session.apply(Reset)
         assertEquals("拟再", session.type("nizai").candidates.first())
-    }
-
-    private fun phrased(text: String, user: UserModel? = null) = PinyinSession(
-        data, PinyinSegmenter(), pageSize = 20, user = user,
-        phrases = CustomPhrases.parse(text), now = { GregorianCalendar(2026, Calendar.SEPTEMBER, 30) },
-    )
-
-    @Test
-    fun aPhraseIsOfferedWhereItsOrderSaysForItsKey() {
-        val session = phrased("nizai,2=你在哪儿\nzai,1=#${'$'}{month}月${'$'}{day}日\nnizai,-1=不要")
-        val s = session.type("nizai")
-        assertEquals("你在", s.candidates[0])
-        assertEquals("你在哪儿", s.candidates[1])
-        assertFalse("不要" in s.candidates)
-        assertEquals("你在哪儿", session.apply(Select(1)).commit)
-        // what is left of the input, after a piece picked; filled in with the time
-        val t = session.type("nizai")
-        assertFalse("9月30日" in t.candidates)
-        val rest = session.apply(Select(t.candidates.indexOf("拟")))
-        assertEquals("9月30日", rest.candidates.first())
-        assertEquals("拟9月30日", session.apply(Select(0)).commit)
-    }
-
-    @Test
-    fun aCandidateOfAPhrasesTextThatReadsLessGivesWayToIt() {
-        // 你 reads ni only: the phrase is what nihao means, and takes it all
-        val session = phrased("nihao,1=你")
-        val s = session.type("nihao")
-        assertEquals("你", s.candidates[0])
-        assertEquals(1, s.candidates.count { it == "你" })
-        assertEquals("你", session.apply(Select(0)).commit)
-    }
-
-    @Test
-    fun aPhraseIsNotLearnedButACandidateItMovedIs() {
-        val user = UserModel(data.dictionary, data.vocabulary)
-        val session = phrased("nizai,1=你在哪儿\nni,1=拟", user)
-        assertEquals("你在哪儿", session.type("nizai").candidates.first())
-        session.apply(Select(0))
-        assertEquals(0f, user.total)
-        // 拟 moved first by a phrase is still the decoder's word, not its best
-        assertEquals("拟", session.type("ni").candidates.first())
-        session.apply(Select(0))
-        assertEquals(1f, user.total)
     }
 }

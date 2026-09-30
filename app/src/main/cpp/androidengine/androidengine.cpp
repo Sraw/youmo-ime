@@ -50,15 +50,16 @@ private:
  * replaces the list, so what is fetched is always of the input shown. As a page it is the one the
  * session shows: candidate(i) is the (first + i)th of all.
  *
- * Where the session forgets what it learned, a long press on a candidate offers "Forget word", as
- * libime's pinyin and table do.
+ * A long press on a candidate offers what the session says it may do with it, as libime's pinyin
+ * and table did: "Forget word", and pinyin's custom phrases pinned or deleted. It is asked on the
+ * press, not sent for each candidate with the snapshot: few are ever pressed.
  */
 class EngineCandidateList : public CandidateList, public BulkCandidateList, public ActionableCandidateList {
 public:
     EngineCandidateList(AndroidEngine *engine, InputContext *ic, std::string im, const EngineSnapshot &snapshot)
-            : engine_(engine), ic_(ic), im_(std::move(im)), total_(snapshot.total), forgets_(snapshot.forgets) {
+            : engine_(engine), ic_(ic), im_(std::move(im)), total_(snapshot.total), actionable_(snapshot.actionable) {
         setBulk(this);
-        if (forgets_) setActionable(this);
+        if (actionable_) setActionable(this);
         for (size_t i = 0; i < snapshot.candidates.size(); i++) {
             const auto &hint = i < snapshot.hints.size() ? snapshot.hints[i] : std::string();
             words_.push_back(std::make_unique<EngineCandidateWord>(engine_, im_, static_cast<int>(i), snapshot.candidates[i], hint));
@@ -107,30 +108,44 @@ public:
     int totalSize() const override { return total_; }
 
     bool hasAction(const CandidateWord &candidate) const override {
-        return forgets_ && dynamic_cast<const EngineCandidateWord *>(&candidate);
+        return actionable_ && dynamic_cast<const EngineCandidateWord *>(&candidate);
     }
 
     std::vector<CandidateAction> candidateActions(const CandidateWord &candidate) const override {
         if (!hasAction(candidate)) return {};
-        CandidateAction forget;
-        forget.setId(ForgetAction);
-        // libime's table words it so; its pinyin says "Forget candidate"
-        forget.setText(D_("fcitx5-chinese-addons", "Forget word"));
+        engine_->stopRefining();
+        const int offers = engine_->offers(im_, static_cast<const EngineCandidateWord &>(candidate).index());
         std::vector<CandidateAction> actions;
-        actions.push_back(std::move(forget));
+        auto add = [&](EngineOffer offer, EngineEvent event, const char *text) {
+            if (!(offers & offer)) return;
+            CandidateAction action;
+            // the event it sends
+            action.setId(static_cast<int>(event));
+            action.setText(D_("fcitx5-chinese-addons", text));
+            actions.push_back(std::move(action));
+        };
+        // libime's table words it so; its pinyin says "Forget candidate"
+        add(OfferForget, EngineEvent::Forget, "Forget word");
+        add(OfferPin, EngineEvent::Pin, "Pin to top as custom phrase");
+        add(OfferUnpin, EngineEvent::Unpin, "Delete from custom phrase");
         return actions;
     }
 
     void triggerAction(const CandidateWord &candidate, int id) override {
         const auto *word = dynamic_cast<const EngineCandidateWord *>(&candidate);
-        if (!forgets_ || id != ForgetAction || !word) return;
+        const auto event = static_cast<EngineEvent>(id);
+        const int offer = event == EngineEvent::Forget ? OfferForget
+                        : event == EngineEvent::Pin    ? OfferPin
+                        : event == EngineEvent::Unpin  ? OfferUnpin
+                                                       : 0;
+        // asked again: only what the session still offers for the candidate at that index
+        if (!actionable_ || !word || !offer || !(engine_->offers(im_, word->index()) & offer)) return;
         // the snapshot that comes back replaces this list: nothing of it is touched after
-        engine_->send(ic_, im_, EngineEvent::Forget, word->index());
+        engine_->send(ic_, im_, event, word->index());
     }
 
 private:
     static constexpr int Chunk = 32;
-    static constexpr int ForgetAction = 0;
 
     void check(int idx) const {
         if (idx < 0 || idx >= shown_) throw std::invalid_argument("invalid index");
@@ -141,7 +156,7 @@ private:
     InputContext *ic_;
     std::string im_;
     mutable int total_;
-    bool forgets_;
+    bool actionable_;
     int first_;
     int shown_;
     mutable std::vector<std::unique_ptr<EngineCandidateWord>> words_;

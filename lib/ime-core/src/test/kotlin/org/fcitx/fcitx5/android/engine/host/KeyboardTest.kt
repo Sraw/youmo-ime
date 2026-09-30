@@ -6,6 +6,7 @@ package org.fcitx.fcitx5.android.engine.host
 
 import org.fcitx.fcitx5.android.engine.session.Action
 import org.fcitx.fcitx5.android.engine.session.Choice
+import org.fcitx.fcitx5.android.engine.session.Offer
 import org.fcitx.fcitx5.android.engine.session.Session
 import org.fcitx.fcitx5.android.engine.session.Snapshot
 import org.junit.Assert.assertEquals
@@ -34,6 +35,7 @@ class KeyboardTest {
         override fun reads(c: Char) = c in 'a'..'z'
 
         override fun candidates(from: Int, count: Int) = all().drop(from).take(count).map { Choice(it) }
+        override fun offers(index: Int) = emptySet<Offer>()
 
         private fun all() = when {
             predicting -> listOf("next")
@@ -98,7 +100,7 @@ class KeyboardTest {
                     input = ""
                     predicting = false
                 }
-                Action.NextPage, Action.PreviousPage, is Action.Forget, Action.Refine -> {}
+                Action.NextPage, Action.PreviousPage, is Action.Forget, is Action.Pin, is Action.Unpin, Action.Refine -> {}
             }
             val shown = all()
             return Snapshot(commit, input, shown, 0, false, false, handled, predicting, refines = slices > 0)
@@ -297,6 +299,15 @@ class KeyboardTest {
         assertEquals(Action.Forget(1), session.actions.last())
         assertEquals("ab", s.preedit)
         assertTrue(s.handled)
+    }
+
+    @Test
+    fun aPinAndAnUnpinAreByIndexAmongAll() {
+        type("ab")
+        keyboard.onEvent(EngineEvent.PIN, 1)
+        assertEquals(Action.Pin(1), session.actions.last())
+        keyboard.onEvent(EngineEvent.UNPIN, 0)
+        assertEquals(Action.Unpin(0), session.actions.last())
     }
 
     @Test

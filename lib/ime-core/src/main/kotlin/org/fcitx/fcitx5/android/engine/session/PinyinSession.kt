@@ -13,6 +13,8 @@ import org.fcitx.fcitx5.android.engine.lattice.Predictor
 import org.fcitx.fcitx5.android.engine.lattice.TextWords
 import org.fcitx.fcitx5.android.engine.lattice.WordScorer
 import org.fcitx.fcitx5.android.engine.phrase.CustomPhrases
+import org.fcitx.fcitx5.android.engine.phrase.CustomPhrases.Phrase
+import org.fcitx.fcitx5.android.engine.phrase.PhraseBook
 import org.fcitx.fcitx5.android.engine.pinyin.Segmenter
 import org.fcitx.fcitx5.android.engine.pinyin.SyllableGraph
 import org.fcitx.fcitx5.android.engine.pinyin.SyllableGraph.Kind
@@ -61,8 +63,11 @@ class PinyinSession(
     private val user: UserModel? = null,
     /** Whether words that may follow are offered after a commit. */
     private val prediction: Boolean = true,
-    /** Offered where their order says when what is left of the input is their key. */
-    private val phrases: CustomPhrases = CustomPhrases.EMPTY,
+    /**
+     * Offered where their order says when what is left of the input is their key; a candidate
+     * pinned ([Action.Pin]) or deleted ([Action.Unpin]) changes them.
+     */
+    private val phraseBook: PhraseBook = PhraseBook(),
     /** The time a dynamic phrase is filled in with. */
     private val now: () -> Calendar = { Calendar.getInstance() },
     private val refiner: SentenceRefiner? = null,
@@ -100,6 +105,7 @@ class PinyinSession(
     private var decoderWords: List<Candidate> = emptyList() // the decoder's words, after its sentences
     private var unrefined: List<Candidate>? = null // the decoder's sentences, till the refiner picks one
     private var refined = 0 // slices of refining spent on them
+    private var placed: Map<String, Phrase> = emptyMap() // the phrases among the candidates, by text
     private var decoderFirst: Candidate? = null // the first before the reranker and phrases moved it
     private var preedit = ""
     private var page = 0
@@ -120,7 +126,7 @@ class PinyinSession(
         // nothing to pick past the page: the key (space, a digit) is the app's
         is Action.Select -> if (action.index in 0 until pageSize) pick(page * pageSize + action.index) else snapshot(handled = candidates.isNotEmpty())
         is Action.Pick -> pick(action.index)
-        is Action.Forget -> forget(action.index)
+        is Action.Forget, is Action.Pin, is Action.Unpin -> pressed(action)
         Action.NextPage -> turn(page + 1)
         Action.PreviousPage -> turn(page - 1)
         Action.CommitRaw -> commitRaw()
@@ -193,6 +199,65 @@ class PinyinSession(
         // not learned, so no pair with what comes next either
         if (learned == null) lastEntry = null
         return commit(text, learned ?: pieces.flatMap { it.words.asList() }.toIntArray())
+    }
+
+    /** What a long press on a candidate offered, and the user chose: see [offers]. */
+    private fun pressed(action: Action) = when (action) {
+        is Action.Forget -> forget(action.index)
+        is Action.Pin -> pin(action.index)
+        is Action.Unpin -> unpin(action.index)
+        else -> error("not offered: $action")
+    }
+
+    override fun offers(index: Int): Set<Offer> {
+        val c = candidates.getOrNull(index)
+        if (c == null || predicting) return emptySet()
+        val phrase = placed[c.text]
+        return buildSet {
+            // text kept as typed and phrases hold no words to forget
+            if (user != null && entries(c) != null) add(Offer.FORGET)
+            // the first already, and a phrase: nothing to pin
+            if ((phrase == null || index != 0) && pinnable(c)) add(Offer.PIN)
+            if (phrase != null) add(Offer.UNPIN)
+        }
+    }
+
+    /**
+     * Whether [c] may be pinned as a phrase of what is left of the input: only one reading all
+     * of it, as fcitx5-chinese-addons has it, or typing that again would drop the rest of the
+     * keys; only to a key the file can keep; and not where nothing is to be kept, as the key
+     * would be what was typed there (a password).
+     */
+    private fun pinnable(c: Candidate) =
+        learning && c.end == input.length - readFrom() && CustomPhrases.isKey(input.substring(readFrom()))
+
+    /**
+     * Makes the candidate at [index] the first phrase of what is left of the input, as
+     * fcitx5-chinese-addons does: offered first whenever that is typed again. A phrase filled in
+     * when offered is pinned as the user wrote it, to be filled in again.
+     */
+    private fun pin(index: Int): Snapshot {
+        val c = candidates.getOrNull(index)
+        if (c == null || predicting || !pinnable(c)) return snapshot()
+        // read again whatever saving it does: the phrases changed all the same
+        try {
+            phraseBook.pin(input.substring(readFrom()), placed[c.text]?.value ?: c.text)
+        } finally {
+            read()
+        }
+        return snapshot()
+    }
+
+    /** Deletes the phrase the candidate at [index] is, then reads the input again. */
+    private fun unpin(index: Int): Snapshot {
+        val phrase = candidates.getOrNull(index)?.let { placed[it.text] }
+        if (phrase == null || predicting) return snapshot()
+        try {
+            phraseBook.remove(phrase.key, phrase.value)
+        } finally {
+            read()
+        }
+        return snapshot()
     }
 
     /**
@@ -318,6 +383,7 @@ class PinyinSession(
         pieces.clear()
         candidates = emptyList()
         decoderWords = emptyList()
+        placed = emptyMap()
         preedit = ""
         page = 0
         predicting = false
@@ -332,6 +398,7 @@ class PinyinSession(
         if (input.isEmpty()) {
             candidates = emptyList()
             decoderWords = emptyList()
+            placed = emptyMap()
             preedit = ""
             graph = null
             return
@@ -352,9 +419,14 @@ class PinyinSession(
     /** Lists [sentences], then the decoder's words, with the phrases the input has among them. */
     private fun place(graph: SyllableGraph, sentences: List<Candidate>) {
         val rest = input.length - readFrom()
+        val key = input.substring(readFrom())
+        val phrases = phraseBook.phrases
+        // the time asked once, for what is shown and what is kept of it to agree
+        val time = if (key in phrases) now() else null
+        placed = if (time == null) emptyMap() else phrases.offered(key, time).associate { it.text to it.phrase }
         // a phrase is text, no word: nothing to learn, and what follows it reads after nothing
         candidates = phrases.place(
-            input.substring(readFrom()), now, (sentences + decoderWords).distinctBy { it.text },
+            key, { checkNotNull(time) }, (sentences + decoderWords).distinctBy { it.text },
             text = { it.text }, all = { it.end == rest },
         ) { Candidate(it, rest, 0f, intArrayOf(NO_WORD), intArrayOf(rest)) }
         val best = sentences.firstOrNull()
@@ -408,7 +480,7 @@ class PinyinSession(
             predicting = predicting,
             total = candidates.size,
             first = from,
-            forgets = user != null && !predicting && candidates.isNotEmpty(),
+            actionable = !predicting && candidates.isNotEmpty(),
             refines = unrefined != null,
         )
     }

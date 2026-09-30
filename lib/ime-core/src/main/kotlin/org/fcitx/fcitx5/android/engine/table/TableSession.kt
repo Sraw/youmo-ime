@@ -6,6 +6,7 @@ package org.fcitx.fcitx5.android.engine.table
 
 import org.fcitx.fcitx5.android.engine.session.Action
 import org.fcitx.fcitx5.android.engine.session.Choice
+import org.fcitx.fcitx5.android.engine.session.Offer
 import org.fcitx.fcitx5.android.engine.session.Session
 import org.fcitx.fcitx5.android.engine.session.Snapshot
 
@@ -77,8 +78,8 @@ class TableSession(
             clear()
             snapshot(commit = text, handled = text.isNotEmpty())
         }
-        // nothing to weigh again: a table's order is its own
-        Action.Refine -> snapshot()
+        // nothing to weigh again: a table's order is its own; a table has no custom phrases
+        Action.Refine, is Action.Pin, is Action.Unpin -> snapshot()
         // auto phrases are made of what was committed here, not of what the editor had: kept
         // only while the text still ends with it (the cursor did not go anywhere)
         Action.Reset, is Action.Context -> {
@@ -86,6 +87,13 @@ class TableSession(
             clear()
             snapshot()
         }
+    }
+
+    // a lookup's pinyin has no phrases of the table's own to pin to
+    override fun offers(index: Int): Set<Offer> = when {
+        lookingUp -> pinyin!!.offers(index).intersect(setOf(Offer.FORGET))
+        ranking[index] != null -> setOf(Offer.FORGET)
+        else -> emptySet()
     }
 
     override fun reads(c: Char): Boolean = if (lookingUp) {
@@ -370,7 +378,7 @@ class TableSession(
             hints = if (!options.hint || shown.isEmpty()) emptyList() else shown.map { hint(it, wild) },
             total = ranking.size,
             first = from,
-            forgets = shown.isNotEmpty(),
+            actionable = shown.isNotEmpty(),
             labels = options.selectionKeys,
         )
     }
@@ -426,6 +434,8 @@ class TableSession(
                 endLookUp()
                 snapshot()
             }
+            // not offered (see offers): the lookup's pinyin has no phrases of the table's own
+            is Action.Pin, is Action.Unpin -> lookedUp ?: snapshot()
             // the pinyin key alone: nothing to pick, and space drops it
             is Action.Select -> if (input.length > 1) fromPinyin(pinyin.apply(action)) else {
                 endLookUp()

@@ -13,11 +13,13 @@ import org.fcitx.fcitx5.android.engine.session.Action.Context
 import org.fcitx.fcitx5.android.engine.session.Action.Forget
 import org.fcitx.fcitx5.android.engine.session.Action.Key
 import org.fcitx.fcitx5.android.engine.session.Action.NextPage
+import org.fcitx.fcitx5.android.engine.session.Action.Pin
 import org.fcitx.fcitx5.android.engine.session.Action.Pick
 import org.fcitx.fcitx5.android.engine.session.Action.PreviousPage
 import org.fcitx.fcitx5.android.engine.session.Action.Reset
 import org.fcitx.fcitx5.android.engine.session.Action.Select
 import org.fcitx.fcitx5.android.engine.session.Choice
+import org.fcitx.fcitx5.android.engine.session.Offer
 import org.fcitx.fcitx5.android.engine.session.Session
 import org.fcitx.fcitx5.android.engine.session.Snapshot
 import org.junit.Assert.assertEquals
@@ -325,7 +327,11 @@ class TableSessionTest {
         assertEquals("恭恭敬敬", t.apply(Select(1)).commit)
         val learned = t.type("aaaa").second
         assertEquals(listOf("恭恭敬敬", "工"), learned.candidates)
-        assertTrue(learned.forgets)
+        assertTrue(learned.actionable)
+        assertEquals(setOf(Offer.FORGET), t.offers(0))
+        assertEquals(emptySet<Offer>(), t.offers(2))
+        // no phrases to pin to
+        assertEquals(learned.copy(commit = ""), t.apply(Pin(0)).copy(commit = ""))
         val forgot = t.apply(Forget(0))
         assertEquals(listOf("工", "恭恭敬敬"), forgot.candidates)
         assertEquals("aaaa", forgot.preedit)
@@ -431,6 +437,7 @@ class TableSessionTest {
         override fun reads(c: Char) = c in 'a'..'z'
 
         override fun candidates(from: Int, count: Int) = candidates().drop(from).take(count).map { Choice(it) }
+        override fun offers(index: Int) = setOf(Offer.FORGET, Offer.PIN)
 
         private fun snap(commit: String = "", handled: Boolean = true) =
             Snapshot(commit, typed.toString(), candidates(), 0, false, false, handled, predicting = commit.isNotEmpty())
@@ -461,6 +468,9 @@ class TableSessionTest {
         // 窝 is not in the table and has no rule for one character
         assertEquals(listOf("trnt", ""), s.hints)
         assertFalse(s.predicting)
+        // what pinyin learned is forgotten, but no phrase of its own pinned
+        assertEquals(setOf(Offer.FORGET), t.offers(0))
+        assertEquals(s, t.apply(Pin(0)))
         val picked = t.apply(Select(0))
         assertEquals("我", picked.commit)
         assertEquals(1, pinyin.resets)

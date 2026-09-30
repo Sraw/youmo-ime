@@ -141,6 +141,7 @@ public:
     jclass EngineBridge;
     jmethodID EngineBridgeOnEvent;
     jmethodID EngineBridgeCandidates;
+    jmethodID EngineBridgeOffers;
     jmethodID EngineBridgeConfigure;
     jfieldID EngineResultHandled;
     jfieldID EngineResultCommit;
@@ -150,7 +151,7 @@ public:
     jfieldID EngineResultFirst;
     jfieldID EngineResultShown;
     jfieldID EngineResultTotal;
-    jfieldID EngineResultForgets;
+    jfieldID EngineResultActionable;
     jfieldID EngineResultLabels;
     jfieldID EngineResultRefines;
 
@@ -204,6 +205,7 @@ public:
         EngineBridge = reinterpret_cast<jclass>(env->NewGlobalRef(env->FindClass("org/fcitx/fcitx5/android/core/EngineBridge")));
         EngineBridgeOnEvent = env->GetStaticMethodID(EngineBridge, "onEvent", "(Ljava/lang/String;IIZ)Lorg/fcitx/fcitx5/android/core/EngineBridge$Result;");
         EngineBridgeCandidates = env->GetStaticMethodID(EngineBridge, "candidates", "(Ljava/lang/String;II)[Ljava/lang/String;");
+        EngineBridgeOffers = env->GetStaticMethodID(EngineBridge, "offers", "(Ljava/lang/String;I)I");
         EngineBridgeConfigure = env->GetStaticMethodID(EngineBridge, "configure", "(Ljava/lang/String;)V");
         jclass engineResult = env->FindClass("org/fcitx/fcitx5/android/core/EngineBridge$Result");
         EngineResultHandled = env->GetFieldID(engineResult, "handled", "Z");
@@ -214,7 +216,7 @@ public:
         EngineResultFirst = env->GetFieldID(engineResult, "first", "I");
         EngineResultShown = env->GetFieldID(engineResult, "shown", "I");
         EngineResultTotal = env->GetFieldID(engineResult, "total", "I");
-        EngineResultForgets = env->GetFieldID(engineResult, "forgets", "Z");
+        EngineResultActionable = env->GetFieldID(engineResult, "actionable", "Z");
         EngineResultLabels = env->GetFieldID(engineResult, "labels", "Ljava/lang/String;");
         EngineResultRefines = env->GetFieldID(engineResult, "refines", "Z");
         env->DeleteLocalRef(engineResult);

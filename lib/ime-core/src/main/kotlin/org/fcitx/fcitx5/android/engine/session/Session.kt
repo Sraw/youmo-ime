@@ -29,7 +29,13 @@ interface Session {
      * the page, such as fcitx's candidate bar scrolled sideways.
      */
     fun candidates(from: Int, count: Int): List<Choice>
+
+    /** What a long press on the candidate at [index] of all offers, where [Snapshot.actionable]. */
+    fun offers(index: Int): Set<Offer>
 }
+
+/** What a long press on a candidate may offer, each done by the [Action] of its name. */
+enum class Offer { FORGET, PIN, UNPIN }
 
 /** A candidate as a host lists it, with its [hint] (see [Snapshot.hints]). */
 data class Choice(val text: String, val hint: String = "")
@@ -53,9 +59,15 @@ sealed class Action {
 
     /**
      * Forgets what was learned of the candidate at [index] of all (a long press on it), then
-     * reads the input again: see [Snapshot.forgets].
+     * reads the input again: see [Session.offers].
      */
     data class Forget(val index: Int) : Action()
+
+    /** Makes the candidate at [index] of all a custom phrase of the input, the first of them. */
+    data class Pin(val index: Int) : Action()
+
+    /** Deletes the custom phrase the candidate at [index] of all is. */
+    data class Unpin(val index: Int) : Action()
 
     object NextPage : Action()
     object PreviousPage : Action()
@@ -93,8 +105,8 @@ sealed class Action {
  *   table's code, or a table's pinyin lookup)
  * @property total how many candidates there are in all, -1 if not yet known
  * @property first the index among all of the first candidate of the page shown
- * @property forgets whether the candidates are the engine's to [forget][Action.Forget]: not a
- *   prediction, nor where nothing is learned
+ * @property actionable whether a long press on a candidate may offer something: see
+ *   [Session.offers]
  * @property labels the keys picking the candidates shown, in order, where they are not the
  *   digits (电报码's `qwertyuiop`, its codes being digits); empty for the digits
  * @property refines whether [Action.Refine] would do more: the host sends it while the user
@@ -112,7 +124,7 @@ data class Snapshot(
     val hints: List<String> = emptyList(),
     val total: Int = candidates.size,
     val first: Int = 0,
-    val forgets: Boolean = false,
+    val actionable: Boolean = false,
     val labels: String = "",
     val refines: Boolean = false,
 )

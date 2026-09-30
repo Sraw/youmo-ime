@@ -12,6 +12,7 @@ import org.fcitx.fcitx5.android.engine.pinyin.Syllables
 import org.fcitx.fcitx5.android.engine.rerank.MatrixKernel
 import org.fcitx.fcitx5.android.engine.rerank.TinyModel
 import org.fcitx.fcitx5.android.engine.session.Choice
+import org.fcitx.fcitx5.android.engine.session.Offer
 import org.fcitx.fcitx5.android.engine.session.Snapshot
 import org.fcitx.fcitx5.android.engine.user.LibimeImport
 import org.fcitx.fcitx5.android.engine.user.UserLog
@@ -254,6 +255,30 @@ class EnginesTest {
         val shown = engines.type(Engines.PINYIN, "ni").candidates
         assertEquals("拟", shown.first())
         assertTrue("尼" in shown && "泥" in shown)
+    }
+
+    @Test
+    fun aCandidatePinnedFromEitherPinyinIsSavedAndOfferedInBoth() {
+        val saved = ArrayList<String>()
+        val errors = ArrayList<IOException>()
+        var fail = false
+        val additions = Engines.Additions("", "", { if (fail) throw IOException("full") else saved += it.all.joinToString(" ") }) { emptyList() }
+        val engines = Engines(::load, null, { errors += it }, additions = { additions })
+        assertEquals(emptySet<Offer>(), engines.offers(Engines.PINYIN, 0))
+        val shown = engines.type(Engines.PINYIN, "ni")
+        assertTrue(shown.actionable)
+        assertEquals(setOf(Offer.FORGET, Offer.PIN), engines.offers(Engines.PINYIN, 1))
+        assertEquals(listOf("拟", "你"), engines.onEvent(Engines.PINYIN, EngineEvent.PIN, 1).candidates)
+        assertEquals(listOf("ni,1=拟"), saved)
+        assertEquals(listOf("拟", "你"), engines.type(Engines.SHUANGPIN, "ni").candidates)
+        // the decoder's 拟 moved first: still a word to forget
+        assertEquals(setOf(Offer.FORGET, Offer.UNPIN), engines.offers(Engines.SHUANGPIN, 0))
+        // not saved: kept till the next start all the same
+        fail = true
+        assertEquals(listOf("你", "拟"), engines.onEvent(Engines.SHUANGPIN, EngineEvent.UNPIN, 0).candidates)
+        assertEquals(1, errors.size)
+        engines.onEvent(Engines.PINYIN, EngineEvent.RESET, 0)
+        assertEquals(listOf("你", "拟"), engines.type(Engines.PINYIN, "ni").candidates)
     }
 
     @Test

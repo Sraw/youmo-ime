@@ -34,20 +34,46 @@ class CustomPhrases private constructor(private val phrases: Map<String, List<Ph
 
     val isEmpty get() = phrases.isEmpty()
 
+    /** Whether [key] has phrases, turned on or off. */
+    operator fun contains(key: String) = key in phrases
+
     /** Every phrase, turned off too, as the settings list them: by key, then in order. */
     val all: List<Phrase> get() = phrases.keys.sorted().flatMap { phrases.getValue(it) }
+
+    /** A [phrase] as offered: its [text], filled in if dynamic, going at [index] among the candidates. */
+    class Offered(val index: Int, val text: String, val phrase: Phrase)
+
+    /** The phrases turned on under [key], each text once, as offered at [now], in order. */
+    fun offered(key: String, now: Calendar): List<Offered> {
+        val found = phrases[key] ?: return emptyList()
+        val seen = HashSet<String>()
+        return found.filter { it.enabled }.mapNotNull { p ->
+            val text = if (p.dynamic) evaluate(p.value.substring(1), now) else p.value
+            if (text.isEmpty() || !seen.add(text)) null else Offered(p.order - 1, text, p)
+        }
+    }
 
     /**
      * The phrases turned on under [key], each once, as offered at [now]: its text and where it
      * goes among the candidates, 0 based, in order.
      */
-    fun lookup(key: String, now: Calendar): List<Pair<Int, String>> {
-        val found = phrases[key] ?: return emptyList()
-        val seen = HashSet<String>()
-        return found.filter { it.enabled }.mapNotNull { p ->
-            val text = if (p.dynamic) evaluate(p.value.substring(1), now) else p.value
-            if (text.isEmpty() || !seen.add(text)) null else (p.order - 1) to text
-        }
+    fun lookup(key: String, now: Calendar): List<Pair<Int, String>> = offered(key, now).map { it.index to it.text }
+
+    /**
+     * These phrases with [value] the first under [key], as fcitx5-chinese-addons pins one: any
+     * other of that value under it goes, the rest keep their order.
+     */
+    fun pinned(key: String, value: String): CustomPhrases {
+        require(isKey(key)) { "not a key: $key" }
+        val list = listOf(Phrase(key, 1, value)) + phrases[key].orEmpty().filter { it.value != value }
+        // stable: the pinned one stays ahead of any other of order 1
+        return CustomPhrases(LinkedHashMap(phrases).apply { put(key, list.sortedBy { it.order }) })
+    }
+
+    /** These phrases without [value] under [key]. */
+    fun without(key: String, value: String): CustomPhrases {
+        val left = phrases[key]?.filter { it.value != value } ?: return this
+        return CustomPhrases(LinkedHashMap(phrases).apply { if (left.isEmpty()) remove(key) else put(key, left) })
     }
 
     /**
@@ -128,6 +154,9 @@ class CustomPhrases private constructor(private val phrases: Map<String, List<Ph
             }
             return out.toString()
         }
+
+        /** Whether [key] can be a phrase's: letters, as the file has them, where `'` or `;` would end it. */
+        fun isKey(key: String) = key.isNotEmpty() && key.all { it.isAsciiLetter() }
 
         /** A phrase line, or null if [line] is none. */
         private fun line(line: String): Phrase? {

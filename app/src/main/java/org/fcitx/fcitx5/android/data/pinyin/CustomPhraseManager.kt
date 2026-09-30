@@ -25,11 +25,40 @@ object CustomPhraseManager {
     }
 
     /** Saves [items] in their order, whole or not at all. */
-    fun save(items: List<PinyinCustomPhrase>, to: File = file) {
+    fun save(items: List<PinyinCustomPhrase>, to: File = file) =
+        write(items.map { CustomPhrases.Phrase(it.key, it.order, it.value) }, to)
+
+    /**
+     * Saves [mine], the editor's list of what it loaded as [base]. The keyboard may have pinned or
+     * deleted a phrase since (the engine writes the file too), which the editor's list does not
+     * show: then what the editor added and removed is applied to the file as it is now, rather
+     * than the editor's list written over it. [base] is as [load] gave it, or as this returned:
+     * what the file has now, in its order.
+     * @throws IOException if the file cannot be read or written
+     */
+    @Synchronized
+    fun saveOver(base: List<PinyinCustomPhrase>, mine: List<PinyinCustomPhrase>, to: File = file): List<PinyinCustomPhrase> {
+        val theirs = load(to)
+        if (theirs == base) {
+            save(mine, to)
+        } else {
+            val removed = base.toSet() - mine.toSet()
+            val added = mine.toSet() - base.toSet() - theirs.toSet()
+            save(theirs.filter { it !in removed } + added, to)
+        }
+        return load(to)
+    }
+
+    /**
+     * Saves [phrases] in their order, whole or not at all: the engine's, changed from the keyboard.
+     * One writer at a time, the editor's and the engine's sharing the file next to it.
+     */
+    @Synchronized
+    fun write(phrases: List<CustomPhrases.Phrase>, to: File = file) {
         to.parentFile?.mkdirs()
         val next = File(to.path + ".new")
         try {
-            next.writeText(CustomPhrases.format(items.map { CustomPhrases.Phrase(it.key, it.order, it.value) }))
+            next.writeText(CustomPhrases.format(phrases))
             if (!next.renameTo(to)) throw IOException("cannot replace $to")
         } finally {
             next.delete()

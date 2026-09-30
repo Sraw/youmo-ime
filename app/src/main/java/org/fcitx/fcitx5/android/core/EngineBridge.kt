@@ -5,11 +5,14 @@
 package org.fcitx.fcitx5.android.core
 
 import org.fcitx.fcitx5.android.FcitxApplication
+import org.fcitx.fcitx5.android.data.pinyin.CustomPhraseManager
 import org.fcitx.fcitx5.android.data.pinyin.ImportedDictionaries
 import org.fcitx.fcitx5.android.engine.host.EngineEvent
 import org.fcitx.fcitx5.android.engine.host.EngineSettings
 import org.fcitx.fcitx5.android.engine.host.Engines
 import org.fcitx.fcitx5.android.engine.libime.LibimeFiles
+import org.fcitx.fcitx5.android.engine.phrase.CustomPhrases
+import org.fcitx.fcitx5.android.engine.session.Offer
 import org.fcitx.fcitx5.android.engine.user.LibimeImport
 import org.fcitx.fcitx5.android.utils.appContext
 import timber.log.Timber
@@ -29,9 +32,9 @@ object EngineBridge {
     /**
      * A snapshot as the addon reads it, field by field. [candidates] run from the first of all,
      * through the page shown ([shown] of them from [first]), so the list the addon builds indexes
-     * as the session does. [forgets]: whether "Forget word" is offered on them. [labels]: the
-     * keys picking those shown, empty for the digits. [refines]: whether the addon is to send
-     * [EngineEvent.REFINE] while the user pauses.
+     * as the session does. [actionable]: whether a long press on one may offer something, asked
+     * of [offers] then. [labels]: the keys picking those shown, empty for the digits. [refines]:
+     * whether the addon is to send [EngineEvent.REFINE] while the user pauses.
      */
     class Result(
         @JvmField val handled: Boolean,
@@ -42,7 +45,7 @@ object EngineBridge {
         @JvmField val first: Int,
         @JvmField val shown: Int,
         @JvmField val total: Int,
-        @JvmField val forgets: Boolean,
+        @JvmField val actionable: Boolean,
         @JvmField val labels: String,
         @JvmField val refines: Boolean,
     )
@@ -105,17 +108,25 @@ object EngineBridge {
      */
     private fun additions(): Engines.Additions {
         val dir = pinyinDir()
+        val phraseFile = File(dir, "customphrase")
+        var read = true
         val phrases = try {
-            File(dir, "customphrase").takeIf { it.isFile }?.readText().orEmpty()
+            phraseFile.takeIf { it.isFile }?.readText().orEmpty()
         } catch (e: IOException) {
             Timber.w(e, "custom phrases")
+            read = false
             ""
         }
         val dictionaryDir = File(dir, "dictionaries")
         ImportedDictionaries.migrate(dictionaryDir)
         val dictionaries = dictionaryDir.listFiles { f -> f.name.endsWith(".txt") }.orEmpty().sortedBy { it.name }
         val seen = dictionaries.joinToString("\n") { "${it.name} ${it.length()} ${it.lastModified()}" }
-        return Engines.Additions(phrases, seen) {
+        // a file not read is not written: the phrases it has would be lost to the one pinned
+        val save = { p: CustomPhrases ->
+            if (!read) throw IOException("custom phrases were not read")
+            CustomPhraseManager.write(p.all, phraseFile)
+        }
+        return Engines.Additions(phrases, seen, save) {
             dictionaries.flatMap { file ->
                 try {
                     file.readLines()
@@ -152,7 +163,7 @@ object EngineBridge {
         return Result(
             s.handled, s.commit, s.preedit,
             all.map { it.text }.toTypedArray(), all.map { it.hint }.toTypedArray(),
-            s.first, s.candidates.size, s.total, s.forgets, s.labels, s.refines,
+            s.first, s.candidates.size, s.total, s.actionable, s.labels, s.refines,
         )
     }
 
@@ -181,6 +192,10 @@ object EngineBridge {
     @JvmStatic
     fun candidates(im: String, from: Int, count: Int): Array<String> =
         engines.candidates(im, from, count).flatMap { listOf(it.text, it.hint) }.toTypedArray()
+
+    /** What a long press on the [index]th of [im]'s candidates offers: a bit for each [Offer], by its order. */
+    @JvmStatic
+    fun offers(im: String, index: Int): Int = engines.offers(im, index).sumOf { 1 shl it.ordinal }
 
     private const val CHUNK = 32
 }

@@ -5,6 +5,9 @@
 package org.fcitx.fcitx5.android.engine.phrase
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertSame
+import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.util.Calendar
@@ -128,5 +131,35 @@ class CustomPhrasesTest {
         assertEquals("a,1=\"\\\"q\\\"\"\nb,2=\"x y\"\nb,1=z\n", CustomPhrases.format(given))
         assertEquals(listOf(0 to "\"q\""), CustomPhrases.parse(CustomPhrases.format(given)).lookup("a", now))
         assertEquals("", CustomPhrases.format(emptyList()))
+    }
+
+    @Test
+    fun aPinnedPhraseGoesFirstOfItsKeyAndADeletedOneGoes() {
+        val phrases = CustomPhrases.parse("yx,1=邮箱\nyx,1=信箱\nyx,3=a@b.c\nyx,-2=信箱\ndh,1=电话")
+        val pinned = phrases.pinned("yx", "a@b.c")
+        assertEquals(listOf(0 to "a@b.c", 0 to "邮箱", 0 to "信箱"), pinned.lookup("yx", now))
+        // one of the value, turned off or not: it is turned on
+        assertEquals(listOf(0 to "信箱", 0 to "邮箱", 2 to "a@b.c"), phrases.pinned("yx", "信箱").lookup("yx", now))
+        assertEquals("yx,1=信箱 yx,1=邮箱 yx,3=a@b.c", phrases.pinned("yx", "信箱").all.filter { it.key == "yx" }.joinToString(" "))
+        assertEquals(listOf(0 to "新"), phrases.pinned("xin", "新").lookup("xin", now))
+        // what it was is kept
+        assertEquals(listOf(0 to "邮箱", 0 to "信箱", 2 to "a@b.c"), phrases.lookup("yx", now))
+        val without = phrases.without("yx", "信箱")
+        assertEquals(listOf(0 to "邮箱", 2 to "a@b.c"), without.lookup("yx", now))
+        assertEquals("yx,1=邮箱 yx,3=a@b.c", without.all.filter { it.key == "yx" }.joinToString(" "))
+        assertFalse("dh" in phrases.without("dh", "电话"))
+        assertTrue("dh" in phrases)
+        assertSame(phrases, phrases.without("zz", "x"))
+        assertTrue(CustomPhrases.isKey("nihao"))
+        assertFalse(CustomPhrases.isKey("xi'an") || CustomPhrases.isKey(""))
+        assertThrows(IllegalArgumentException::class.java) { phrases.pinned("xi'an", "西安") }
+    }
+
+    @Test
+    fun aDynamicPhraseIsOfferedFilledInWithWhatWasWritten() {
+        val offered = CustomPhrases.parse("rq,1=#${'$'}{year}").offered("rq", now).single()
+        assertEquals(0, offered.index)
+        assertEquals("2023", offered.text)
+        assertEquals("#${'$'}{year}", offered.phrase.value)
     }
 }
