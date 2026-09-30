@@ -10,18 +10,22 @@ import org.fcitx.fcitx5.android.engine.data.DataFormatException
 import org.fcitx.fcitx5.android.engine.data.PinyinData
 import org.fcitx.fcitx5.android.engine.data.PinyinDataBuilder
 import org.fcitx.fcitx5.android.engine.data.SourceException
+import org.fcitx.fcitx5.android.engine.data.forEachNumberedLine
 import org.fcitx.fcitx5.android.engine.table.TableText
 import java.io.File
 import java.io.IOException
 import java.io.RandomAccessFile
 import java.nio.ByteBuffer
 import java.nio.channels.FileChannel
+import java.util.zip.GZIPInputStream
 import kotlin.math.abs
 import kotlin.system.exitProcess
 
 val USAGE = """
     usage: pinyin -o <out> --lm <lm.arpa> <dict.txt>...   compile a pinyin dictionary and model
            table -o <out> <table.txt>                     compile a code table
+           mix -o <out.arpa> --lm <lm.arpa> [--weight <w>] [--cutoffs <bigram>,<trigram>] <chat.jsonl.gz>
+                                                          mix a model with n-grams counted in chat
            check <pinyin data> <lm.arpa>                  compare compiled scores with the model
 """.trimIndent()
 
@@ -34,17 +38,9 @@ fun runCli(args: Array<String>, out: Appendable, err: Appendable): Int {
     val command = args.firstOrNull()
     val options = Options.parse(args.drop(1))
     return try {
-        when {
-            command == "pinyin" && options.output != null && options.lm != null && options.inputs.isNotEmpty() ->
-                pinyin(options.output, options.lm, options.inputs, out)
-            command == "table" && options.output != null && options.lm == null && options.inputs.size == 1 ->
-                table(options.output, options.inputs.single(), out)
-            command == "check" && options.output == null && options.lm == null && options.inputs.size == 2 ->
-                check(options.inputs[0], options.inputs[1], out)
-            else -> {
-                err.appendLine(USAGE)
-                return 2
-            }
+        if (options == null || !dispatch(command, options, out)) {
+            err.appendLine(USAGE)
+            return 2
         }
         0
     } catch (e: SourceException) {
@@ -64,24 +60,79 @@ fun runCli(args: Array<String>, out: Appendable, err: Appendable): Int {
     }
 }
 
-private class Options(val output: String?, val lm: String?, val inputs: List<String>) {
+/** @return false for a command or options it does not take */
+private fun dispatch(command: String?, options: Options, out: Appendable): Boolean {
+    when {
+        command == "pinyin" && options.output != null && options.lm != null && options.inputs.isNotEmpty() ->
+            pinyin(options.output, options.lm, options.inputs, out)
+        command == "table" && options.output != null && options.lm == null && options.inputs.size == 1 ->
+            table(options.output, options.inputs.single(), out)
+        command == "mix" && options.output != null && options.lm != null && options.inputs.size == 1 ->
+            mix(options, out)
+        command == "check" && options.output == null && options.lm == null && options.inputs.size == 2 ->
+            check(options.inputs[0], options.inputs[1], out)
+        else -> return false
+    }
+    return true
+}
+
+private class Options(
+    val output: String?,
+    val lm: String?,
+    val inputs: List<String>,
+    val weight: Double,
+    val cutoffs: Pair<Int, Int>,
+) {
     companion object {
-        fun parse(args: List<String>): Options {
+        // what measured best on the evaluation set (dev/ENGINE-DESIGN.md)
+        const val WEIGHT = 0.7
+        val CUTOFFS = 2 to 2
+
+        /** @return null for an option with a bad value */
+        fun parse(args: List<String>): Options? {
             var output: String? = null
             var lm: String? = null
+            var weight = WEIGHT
+            var cutoffs = CUTOFFS
             val inputs = ArrayList<String>()
             var i = 0
             while (i < args.size) {
                 when (args[i]) {
                     "-o" -> output = args.getOrNull(++i)
                     "--lm" -> lm = args.getOrNull(++i)
+                    "--weight" -> weight = args.getOrNull(++i)?.toDoubleOrNull()?.takeIf { it in 0.0..1.0 } ?: return null
+                    "--cutoffs" -> cutoffs = args.getOrNull(++i)?.split(',')?.mapNotNull { it.toIntOrNull() }
+                        // a trigram's context must be a bigram kept (Mixer)
+                        ?.takeIf { it.size == 2 && it[0] in 1..it[1] }?.let { it[0] to it[1] } ?: return null
                     else -> inputs += args[i]
                 }
                 i++
             }
-            return Options(output, lm, inputs)
+            return Options(output, lm, inputs, weight, cutoffs)
         }
     }
+}
+
+private fun mix(options: Options, out: Appendable) {
+    val lm = options.lm!!
+    val base = File(lm).bufferedReader().use { ArpaModel.read(it, lm) }
+    out.appendLine("model: ${base.size} / ${base.bigrams.size} / ${base.trigrams.size} n-grams")
+    val counts = ChatCounts(base)
+    val corpus = options.inputs.single()
+    var lines = 0
+    GZIPInputStream(File(corpus).inputStream().buffered()).bufferedReader().use { r ->
+        r.forEachNumberedLine(corpus) { line, _ ->
+            if (line.isBlank()) return@forEachNumberedLine
+            JsonStrings.parse(line).forEach(counts::add)
+            lines++
+        }
+    }
+    out.appendLine("chat: $lines conversations, ${counts.tokens} words, ${counts.bigrams.size} bigrams, ${counts.trigrams.size} trigrams")
+    val (minBigram, minTrigram) = options.cutoffs
+    val mixed = Mixer(base, counts, KneserNey(counts), options.weight, minBigram, minTrigram).mix()
+    out.appendLine("mixed: ${mixed.size} / ${mixed.bigrams.size} / ${mixed.trigrams.size} n-grams")
+    File(options.output!!).bufferedWriter().use { mixed.write(it) }
+    out.appendLine("wrote ${options.output}: ${File(options.output).length()} bytes")
 }
 
 private fun pinyin(output: String, lm: String, dicts: List<String>, out: Appendable) {

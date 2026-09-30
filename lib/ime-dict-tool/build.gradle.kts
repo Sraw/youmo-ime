@@ -9,10 +9,12 @@
 //
 //   ./gradlew :lib:ime-dict-tool:run --args="pinyin -o <out> --lm <lm.arpa> <dict.txt>..."
 //   ./gradlew :lib:ime-dict-tool:run --args="table -o <out> <table.txt>"
+//   ./gradlew :lib:ime-dict-tool:run --args="mix -o <out.arpa> --lm <lm.arpa> <chat.jsonl.gz>"
 //   ./gradlew :lib:ime-dict-tool:run --args="check <pinyin data> <lm.arpa>"
 //
 // The app build runs it through EngineDataPlugin (build-logic): `./gradlew :app:compileEngineData`
-// downloads libime's sources once and puts engine/pinyin.data into the app's assets.
+// downloads libime's sources and LCCC's chat once, mixes the chat into the model and puts
+// engine/pinyin.data into the app's assets.
 plugins {
     application
     alias(libs.plugins.kotlin.jvm)
@@ -20,8 +22,9 @@ plugins {
 
 application {
     mainClass.set("org.fcitx.fcitx5.android.dicttool.MainKt")
-    // the whole language model is held in memory while it is sorted
-    applicationDefaultJvmArgs = listOf("-Xmx2g")
+    // mix holds two language models and the chat's counts in memory; keep in step with
+    // EngineDataPlugin
+    applicationDefaultJvmArgs = listOf("-Xmx6g")
 }
 
 tasks.named<JavaExec>("run") {

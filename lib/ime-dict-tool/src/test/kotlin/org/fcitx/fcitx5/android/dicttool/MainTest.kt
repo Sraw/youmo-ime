@@ -12,6 +12,7 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
 import java.nio.ByteBuffer
+import java.util.zip.GZIPOutputStream
 
 class MainTest {
 
@@ -45,6 +46,29 @@ class MainTest {
         assertTrue(checkOut, checkOut.contains("1-grams: 3, probability max error 0.0000, mean 0.00000, backoff max error 0.0000"))
         assertTrue(checkOut, checkOut.contains("2-grams: 1, probability max error 0.0000, mean 0.00000, backoff max error 0.0000"))
         assertTrue(checkOut, checkOut.contains("3-grams: 1, probability max error 0.0000, mean 0.00000\n"))
+    }
+
+    @Test
+    fun aModelIsMixedWithChatAndCompiles() {
+        val lm = file("lm.arpa", ReadersTest.TINY_ARPA)
+        val chat = tmp.root.resolve("chat.jsonl.gz")
+        GZIPOutputStream(chat.outputStream()).bufferedWriter().use {
+            it.write("[\"你 好\", \"好 好\"]\n\n[\"你 x 好 你\"]\n")
+        }
+        val mixed = tmp.root.resolve("mixed.arpa").path
+        val (code, out, err) = run("mix", "-o", mixed, "--lm", lm, "--weight", "0.5", "--cutoffs", "1,1", chat.path)
+        assertEquals(err, 0, code)
+        assertTrue(out, out.contains("model: 3 / 1 / 1 n-grams"))
+        // each line its own start, split at the x: 你 好 | 好 好 | 你 | 好 你
+        assertTrue(out, out.contains("chat: 2 conversations, 7 words, 5 bigrams, 3 trigrams"))
+        // the model's 你 好 and the chat's 好 好 and 好 你; the chat's trigrams all begin at a start
+        assertTrue(out, out.contains("mixed: 3 / 3 / 1 n-grams"))
+        val dict = file("dict.txt", "你 ni\n好 hao\n")
+        assertEquals(0, run("pinyin", "-o", tmp.root.resolve("p.data").path, "--lm", mixed, dict).first)
+
+        for (bad in listOf(listOf("--cutoffs", "2"), listOf("--cutoffs", "3,2"), listOf("--weight", "2"), listOf("--weight"))) {
+            assertEquals(bad.toString(), 2, run(*(listOf("mix", "-o", mixed, "--lm", lm, chat.path) + bad).toTypedArray()).first)
+        }
     }
 
     @Test

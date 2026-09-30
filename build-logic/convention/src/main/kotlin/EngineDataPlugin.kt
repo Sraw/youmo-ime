@@ -34,6 +34,7 @@ import org.gradle.process.ExecOperations
 import org.gradle.work.DisableCachingByDefault
 import java.io.File
 import java.io.IOException
+import java.io.OutputStream
 import java.net.HttpURLConnection
 import java.net.URI
 import java.nio.file.Files
@@ -44,14 +45,19 @@ import javax.inject.Inject
 
 /**
  * Compiles the own engine's data (lib/ime-dict-tool) from the text sources libime builds its own
- * from, and adds it to the app's assets as `engine/pinyin.data` and `engine/table/<name>.data`
+ * from and adds it to the app's assets as `engine/pinyin.data` and `engine/table/<name>.data`
  * for libime's code tables (五笔, 仓颉 ...), with chinese-ime-lm's sentence model as
  * `engine/sentence-model.safetensors` (and its NOTICE, which Apache-2.0 asks to go along with it).
+ * The language model is first mixed with n-grams counted in LCCC's chat: what people type is
+ * more chat than libime's news-heavy model knows.
  * Stored uncompressed, so the
  * engine can map it straight out of the APK rather than copying it out first; it is also left
  * out of the data descriptor for that reason (the descriptor lists only src/main/assets).
  *
  * The sources are the archives libime's CMake downloaded, checked against the same SHA-256.
+ * Downloads go to the root project's `.gradle/engine-downloads`, out of `build`: half a gigabyte
+ * that `clean` should not fetch again, and where one put there by hand is not taken for a stale
+ * output and deleted.
  * Each step declares its inputs and outputs, so the download and the minute-long compile run
  * once and again only when a source or the tool changes.
  */
@@ -90,18 +96,24 @@ class EngineDataPlugin : Plugin<Project> {
             Triple("sentence-model.safetensors", "86ac529510cb3b4968a5e6ade83ec8080f5b34a0a681e75c362accbbd387d1c1", "sentence-model.safetensors"),
             Triple("NOTICE", "b9489e8c8e3a271bf23131a57a7323264847d57561d36fc135101bf1eefd32f2", "sentence-model.NOTICE"),
         )
+        // LCCC-base (MIT): 6.8 M conversations from Weibo and other chat, a line each
+        private const val CHAT_URL =
+            "https://huggingface.co/datasets/silver/lccc/resolve/5bd582fa28cd7143f2f9c852e08e23089d677c44/lccc_base_train.jsonl.gz"
+        private const val CHAT_SHA256 = "2162e0ed923fba62329cabf7e1493fbe59248afc94a62508e4abdea61e624627"
+        const val MIX_TASK = "mixEngineModel"
         private const val TOOL_MAIN = "org.fcitx.fcitx5.android.dicttool.MainKt"
     }
 
     override fun apply(target: Project) {
         val sourcesDir = target.layout.buildDirectory.dir("engine-sources")
+        val downloadsDir = target.rootProject.layout.projectDirectory.dir(".gradle/engine-downloads")
         val components = target.extensions.getByType<ApplicationAndroidComponentsExtension>()
         val cmakeVersion = target.cmakeVersion
         val extracted = listOf(LM, DICT, TABLE).map { source ->
             val download = target.tasks.register<DownloadTask>("download" + taskName(source)) {
                 url.set(BASE_URL + source.name)
                 sha256.set(source.sha256)
-                outputFile.set(sourcesDir.map { it.file(source.name) })
+                outputFile.set(downloadsDir.file(source.name))
             }
             target.tasks.register<ExtractTask>("extract" + taskName(source)) {
                 archive.set(download.flatMap { it.outputFile })
@@ -118,13 +130,28 @@ class EngineDataPlugin : Plugin<Project> {
         }
         target.dependencies.add(tool.name, target.dependencies.project(mapOf("path" to ":lib:ime-dict-tool")))
 
+        val downloadChat = target.tasks.register<DownloadTask>("downloadChat") {
+            url.set(CHAT_URL)
+            sha256.set(CHAT_SHA256)
+            outputFile.set(downloadsDir.file("lccc/lccc_base_train.jsonl.gz"))
+        }
+        val mix = target.tasks.register<MixEngineModel>(MIX_TASK) {
+            classpath = tool
+            mainClass.set(TOOL_MAIN)
+            // both models and the chat's counts: 4.8 GB resident, as measured; keep in step with
+            // ime-dict-tool's own run task
+            maxHeapSize = "6g"
+            lm.set(extracted[0].flatMap { it.outputDir.file(LM.files.single()) })
+            chat.set(downloadChat.flatMap { it.outputFile })
+            output.set(target.layout.buildDirectory.file("engine-model-mixed/lm_mixed.arpa"))
+        }
         val compile = target.tasks.register<CompileEngineData>(COMPILE_TASK) {
             classpath = tool
             mainClass.set(TOOL_MAIN)
-            // the whole language model is held in memory while it is sorted: 1.2 GB at most, as
-            // measured; keep in step with ime-dict-tool's own run task
-            maxHeapSize = "2g"
-            lm.set(extracted[0].flatMap { it.outputDir.file(LM.files.single()) })
+            // the whole language model is held in memory while it is sorted: the mixed one needs
+            // 3 GB, as measured
+            maxHeapSize = "4g"
+            lm.set(mix.flatMap { it.output })
             dictionaries.from(DICT.files.map { name -> extracted[1].flatMap { it.outputDir.file(name) } })
             outputDir.set(target.layout.buildDirectory.dir("generated/engine-assets"))
         }
@@ -140,7 +167,7 @@ class EngineDataPlugin : Plugin<Project> {
             target.tasks.register<DownloadTask>(task) {
                 url.set(MODEL_URL + name)
                 sha256.set(sha)
-                outputFile.set(sourcesDir.map { it.file("sentence-model/$asset") })
+                outputFile.set(downloadsDir.file("sentence-model/$asset"))
             }
         }
         val model = target.tasks.register<CopyModel>(MODEL_TASK) {
@@ -178,6 +205,8 @@ class EngineDataPlugin : Plugin<Project> {
         @TaskAction
         fun download() {
             val out = outputFile.get().asFile
+            // put there by hand (offline), or by a build whose history is gone
+            if (out.isFile && sha256Of(out) == sha256.get()) return
             val partial = File(out.path + ".part")
             val digest = MessageDigest.getInstance("SHA-256")
             val connection = URI(url.get()).toURL().openConnection() as HttpURLConnection
@@ -201,6 +230,12 @@ class EngineDataPlugin : Plugin<Project> {
                 throw IllegalStateException("${url.get()}: SHA-256 $actual, expected ${sha256.get()}")
             }
             Files.move(partial.toPath(), out.toPath(), StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE)
+        }
+
+        private fun sha256Of(file: File): String {
+            val digest = MessageDigest.getInstance("SHA-256")
+            DigestInputStream(file.inputStream(), digest).use { it.copyTo(OutputStream.nullOutputStream()) }
+            return digest.digest().joinToString("") { "%02x".format(it) }
         }
 
         private companion object {
@@ -235,6 +270,27 @@ class EngineDataPlugin : Plugin<Project> {
             exec.exec {
                 commandLine(cmake.path, "-E", "tar", "xf", archive.get().asFile.path)
                 workingDir = dir
+            }
+        }
+    }
+
+    /** The language model mixed with the chat's n-grams, as ARPA text (half a gigabyte). */
+    @CacheableTask
+    abstract class MixEngineModel : JavaExec() {
+        @get:InputFile
+        @get:PathSensitive(PathSensitivity.NAME_ONLY)
+        abstract val lm: RegularFileProperty
+
+        @get:InputFile
+        @get:PathSensitive(PathSensitivity.NAME_ONLY)
+        abstract val chat: RegularFileProperty
+
+        @get:OutputFile
+        abstract val output: RegularFileProperty
+
+        init {
+            argumentProviders += CommandLineArgumentProvider {
+                listOf("mix", "-o", output.get().asFile.path, "--lm", lm.get().asFile.path, chat.get().asFile.path)
             }
         }
     }
