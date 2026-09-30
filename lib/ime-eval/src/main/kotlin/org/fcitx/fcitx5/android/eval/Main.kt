@@ -8,7 +8,9 @@ import org.fcitx.fcitx5.android.engine.data.PinyinData
 import org.fcitx.fcitx5.android.engine.lattice.Penalties
 import org.fcitx.fcitx5.android.engine.pinyin.Fuzzy
 import org.fcitx.fcitx5.android.engine.pinyin.PinyinSegmenter
+import org.fcitx.fcitx5.android.engine.pinyin.Segmenter
 import org.fcitx.fcitx5.android.engine.pinyin.ShuangpinSegmenter
+import org.fcitx.fcitx5.android.engine.session.PinyinSession
 import java.io.File
 import java.io.RandomAccessFile
 import java.nio.channels.FileChannel
@@ -20,6 +22,8 @@ val USAGE = """usage: score <set.tsv> <result.tsv> [<baseline-result.tsv>] [--ha
        shuangpin <scheme> <set.tsv> <shuangpin-set.tsv>
        slips <set.tsv> <slip-set.tsv>
        tune <pinyin.data> <set.tsv> <slip-set.tsv>
+       ksc <pinyin.data> <set.tsv> [--scheme <scheme>] [--fuzzy all|<pair>,...] [--half <half>]
+       learn <pinyin.data> <set.tsv> [--scheme <scheme>] [--fuzzy all|<pair>,...]
 schemes: ${ShuangpinSet.SCHEMES.keys.joinToString(" ")}
 pairs: ${Fuzzy.entries.joinToString(" ") { it.name.lowercase() }}
 halves: ${Halves.NAMES.joinToString(" ")}"""
@@ -67,6 +71,8 @@ fun runCli(args: Array<String>, out: Appendable, err: Appendable): Int {
         a.has("shuangpin", 4..4) && p[1] in ShuangpinSet.SCHEMES -> writeShuangpinSet(p[1], p[2], p[3], out)
         a.has("slips", 3..3) -> writeSlipSet(p[1], p[2], out)
         a.has("tune", 4..4) -> tune(p[1], p[2], p[3], out)
+        a.has("ksc", 3..3, "scheme", "fuzzy", "half") -> ksc(p[1], p[2], scheme, fuzzy.orEmpty(), half, out)
+        a.has("learn", 3..3, "scheme", "fuzzy") -> learn(p[1], p[2], scheme, fuzzy.orEmpty(), out)
         else -> usage(err)
     }
 }
@@ -96,9 +102,11 @@ private fun score(setPath: String, resultPath: String, baselinePath: String?, ha
     return 0
 }
 
+private fun segmenter(scheme: String?, fuzzy: Set<Fuzzy>): Segmenter =
+    scheme?.let { ShuangpinSegmenter(ShuangpinSet.SCHEMES.getValue(it), fuzzy) } ?: PinyinSegmenter(fuzzy)
+
 private fun runPinyin(dataPath: String, setPath: String, resultPath: String, scheme: String?, fuzzy: Set<Fuzzy>, half: String?): Int {
-    val segmenter = scheme?.let { ShuangpinSegmenter(ShuangpinSet.SCHEMES.getValue(it), fuzzy) } ?: PinyinSegmenter(fuzzy)
-    val results = PinyinRun(loadData(dataPath), segmenter).run(Halves.select(readSet(setPath), half))
+    val results = PinyinRun(loadData(dataPath), segmenter(scheme, fuzzy)).run(Halves.select(readSet(setPath), half))
     File(resultPath).printWriter().use { out -> results.forEach { out.println(RunResultFormat.format(it)) } }
     return 0
 }
@@ -148,5 +156,19 @@ private fun tune(dataPath: String, setPath: String, slipsPath: String, out: Appe
     header("held-out", heldOut)
     row("default", heldOut)
     row("chosen ${chosen.penalties.fuzzy} ${chosen.penalties.typo}", tuning.measure(chosen.penalties, Halves.HELD_OUT))
+    return 0
+}
+
+private fun ksc(dataPath: String, setPath: String, scheme: String?, fuzzy: Set<Fuzzy>, half: String?, out: Appendable): Int {
+    val session = PinyinSession(loadData(dataPath), segmenter(scheme, fuzzy), spell = scheme != null)
+    val run = KeystrokeRun(session)
+    out.appendLine(KeystrokeRun.report(Halves.select(readSet(setPath), half).map { run.type(it) }))
+    return 0
+}
+
+private fun learn(dataPath: String, setPath: String, scheme: String?, fuzzy: Set<Fuzzy>, out: Appendable): Int {
+    val rows = Learning(loadData(dataPath), segmenter(scheme, fuzzy)).measure(readSet(setPath))
+    out.appendLine(KeystrokeRun.HEADER)
+    rows.forEach { (label, outcomes) -> out.appendLine(KeystrokeRun.row(label, outcomes)) }
     return 0
 }

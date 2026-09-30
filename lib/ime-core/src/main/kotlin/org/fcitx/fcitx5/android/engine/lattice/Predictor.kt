@@ -26,7 +26,8 @@ class Predictor(private val model: NgramModel, private val vocabulary: Vocabular
      * @return words with an [end][Candidate.end] of 0, as they read no input
      */
     fun predict(prev2: Int, prev: Int, limit: Int = DEFAULT_LIMIT): List<Candidate> {
-        if (prev == NO_WORD || limit <= 0) return emptyList()
+        // a word the model lacks (the user's own, say) would get the followers of <unk>
+        if (prev !in 0 until model.vocabularySize || limit <= 0) return emptyList()
         val words = IntArray(limit)
         val scores = FloatArray(limit)
         var size = 0
@@ -44,7 +45,7 @@ class Predictor(private val model: NgramModel, private val vocabulary: Vocabular
             scores[k] = score
             if (size < limit) size++
         }
-        return List(size) { Candidate(vocabulary.word(words[it]), 0, scores[it], intArrayOf(words[it])) }
+        return List(size) { Candidate(vocabulary.word(words[it]), 0, scores[it], intArrayOf(words[it]), intArrayOf(0)) }
     }
 
     private fun offered(word: Int): Boolean {

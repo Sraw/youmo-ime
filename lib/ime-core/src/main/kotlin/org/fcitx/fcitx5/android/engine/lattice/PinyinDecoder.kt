@@ -39,6 +39,8 @@ class PinyinDecoder(
     private val beam: Int = DEFAULT_BEAM,
     /** Words taken per reading past the first word, most probable first; the first gets them all. */
     private val wordsPerReading: Int = DEFAULT_WORDS_PER_READING,
+    /** The user's own words, found along with the dictionary's; learning them needs a [reset]. */
+    private val user: UserWords? = null,
 ) {
     init {
         require(beam >= 1 && wordsPerReading >= 1) { "beam $beam, words per reading $wordsPerReading" }
@@ -104,7 +106,7 @@ class PinyinDecoder(
             arcs.start[at] = arcs.size
             if (graph.edges(at).isEmpty()) continue
             val limit = if (at == graph.start) Int.MAX_VALUE else wordsPerReading
-            collect(graph, at, dictionary.root, 0f, limit)
+            collect(graph, at, dictionary.root, user?.root ?: -1, 0f, limit)
             // nothing in the dictionary starts here: keep what was typed, so every path goes on
             if (arcs.size == arcs.start[at]) {
                 for (e in graph.edges(at)) arcs.add(graph.to(e), NO_WORD, penalties.raw)
@@ -114,8 +116,11 @@ class PinyinDecoder(
         arcs.start[n + 1] = arcs.size
     }
 
-    /** Adds the words of every dictionary path from [node] that the graph spells from [at]. */
-    private fun collect(graph: SyllableGraph, at: Int, node: Int, cost: Float, limit: Int) {
+    /**
+     * Adds the words of every path from [node] in the dictionary, and [userNode] in the user's
+     * words, that the graph spells from [at]; -1 for a trie the path has left.
+     */
+    private fun collect(graph: SyllableGraph, at: Int, node: Int, userNode: Int, cost: Float, limit: Int) {
         for (e in graph.edges(at)) {
             val kind = graph.kind(e)
             if (kind == Kind.RAW) continue
@@ -123,12 +128,22 @@ class PinyinDecoder(
             val matches = graph.matches(e)
             val edgeCost = cost + penalty(kind)
             for (i in 0 until matches.size) {
-                val child = dictionary.child(node, matches.syllable(i))
-                if (child < 0) continue
+                val child = if (node < 0) -1 else dictionary.child(node, matches.syllable(i))
+                val userChild = if (userNode < 0 || user == null) -1 else user.child(userNode, matches.syllable(i))
+                if (child < 0 && userChild < 0) continue
                 val c = edgeCost + penalty(matches.flags(i))
-                val words = minOf(dictionary.wordCount(child), limit)
-                for (w in 0 until words) arcs.add(to, dictionary.word(child, w), c + dictionary.weight(child, w))
-                if (to < graph.end && dictionary.childCount(child) > 0) collect(graph, to, child, c, limit)
+                var more = false
+                if (child >= 0) {
+                    val words = minOf(dictionary.wordCount(child), limit)
+                    for (w in 0 until words) arcs.add(to, dictionary.word(child, w), c + dictionary.weight(child, w))
+                    more = dictionary.childCount(child) > 0
+                }
+                if (userChild >= 0 && user != null) {
+                    // one reading each, so no weight; and few enough to take them all
+                    for (w in 0 until user.wordCount(userChild)) arcs.add(to, user.word(userChild, w), c)
+                    more = more || user.childCount(userChild) > 0
+                }
+                if (to < graph.end && more) collect(graph, to, child, userChild, c, limit)
             }
         }
     }
@@ -272,15 +287,19 @@ class PinyinDecoder(
                 s = stateBack[s]
             }
             val text = path.joinToString("") { textOf(graph, it) }
-            if (seen.add(text)) out += Candidate(text, end, stateScore[last], IntArray(path.size) { stateWord[path[it]] })
+            if (seen.add(text)) {
+                out += Candidate(text, end, stateScore[last], IntArray(path.size) { stateWord[path[it]] }, IntArray(path.size) { path[it] / beam })
+            }
         }
         return out
     }
 
     private fun textOf(graph: SyllableGraph, state: Int): String {
         val word = stateWord[state]
-        return if (word == NO_WORD) graph.text(stateBack[state] / beam, state / beam) else vocabulary.word(word)
+        return if (word == NO_WORD) graph.text(stateBack[state] / beam, state / beam) else text(word)
     }
+
+    private fun text(word: Int) = if (word < vocabulary.size || user == null) vocabulary.word(word) else user.text(word)
 
     /**
      * Words the input may start with, best first, each once. An initial alone may start with
@@ -305,7 +324,9 @@ class PinyinDecoder(
         while (out.size < limit && next < order.size) {
             val a = order[next++].toInt()
             val word = arcs.word[a]
-            if (word != NO_WORD && seen.add(word)) out += Candidate(vocabulary.word(word), arcs.to[a], scores[a - from], intArrayOf(word))
+            if (word != NO_WORD && seen.add(word)) {
+                out += Candidate(text(word), arcs.to[a], scores[a - from], intArrayOf(word), intArrayOf(arcs.to[a]))
+            }
         }
         return out
     }
@@ -392,9 +413,16 @@ class PinyinDecoder(
 
 /**
  * Input read as [text], from the start of the input up to [end]; [words] are its vocabulary ids,
- * [NO_WORD] for text kept as typed.
+ * [NO_WORD] for text kept as typed, and [ends] where in the input each of them ends. A prediction
+ * reads no input: its end, and its word's, is 0.
  */
-class Candidate internal constructor(val text: String, val end: Int, val score: Float, val words: IntArray) {
+class Candidate internal constructor(
+    val text: String,
+    val end: Int,
+    val score: Float,
+    val words: IntArray,
+    val ends: IntArray,
+) {
     override fun toString() = "$text($end, $score)"
 }
 

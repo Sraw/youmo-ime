@@ -212,9 +212,12 @@ class NgramModel internal constructor(file: DataFile, val vocabularySize: Int, p
         return (prev.toLong() shl Int.SIZE_BITS) or (bigram.toLong() and 0xffffffffL)
     }
 
+    /** The prev a [context] was made for. */
+    fun prevOf(context: Long): Int = (context shr Int.SIZE_BITS).toInt()
+
     /** log10 P(word | [context]), a value from [context] */
     fun scoreAfter(context: Long, word: Int): Float {
-        val prev = (context shr Int.SIZE_BITS).toInt()
+        val prev = prevOf(context)
         val bigram = context.toInt()
         if (bigram < 0) return score(prev, word)
         val w = known(word)
@@ -231,7 +234,7 @@ class NgramModel internal constructor(file: DataFile, val vocabularySize: Int, p
      * Nothing without a prev.
      */
     internal fun forEachAfter(context: Long, visit: WordVisitor) {
-        val prev = (context shr Int.SIZE_BITS).toInt()
+        val prev = prevOf(context)
         if (prev == NO_WORD) return
         val p = known(prev)
         val bigram = context.toInt()
