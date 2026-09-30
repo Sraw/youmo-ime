@@ -15,6 +15,7 @@ import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.nio.ByteBuffer
+import kotlin.random.Random
 
 class PinyinDecoderTest {
 
@@ -210,5 +211,85 @@ class PinyinDecoderTest {
         d.decode(plain.segment("zaijiannihaoma"))
         d.decode(plain.segment("n"))
         assertEquals(first, texts(d.decode(plain.segment("nihaoma")).sentences))
+    }
+
+    private fun describe(d: Decoding) = (d.sentences + listOf(null) + d.words).map { c ->
+        c?.let { "${it.text} ${it.end} ${it.score} ${it.words.toList()}" }
+    }
+
+    @Test
+    fun buildingOnTheLastDecodeChangesNothing() {
+        val random = Random(7)
+        val pieces = listOf("n", "i", "h", "a", "o", "z", "m", "r", "g", "'", "1", "nihao", "zaijian", "zhong", "wo")
+        val kept = decoder(beam = 3)
+        val segmenter = PinyinSegmenter(setOf(Fuzzy.Z_ZH, Fuzzy.L_N))
+        var input = ""
+        var prev2 = NO_WORD
+        var prev = NO_WORD
+        repeat(4000) { step ->
+            val at = random.nextInt(input.length + 1)
+            val piece = pieces[random.nextInt(pieces.size)]
+            when (random.nextInt(24)) {
+                in 0..11 -> input += piece
+                in 12..16 -> input = input.dropLast(1 + random.nextInt(2))
+                17 -> input = input.drop(1)
+                18 -> input = input.substring(0, at) + piece + input.substring(at)
+                19 -> input = input.substring(0, at) + piece[0] + input.substring(minOf(at + 1, input.length))
+                20 -> prev = if (prev == NO_WORD) id("我") else NO_WORD
+                21 -> prev2 = if (prev2 == NO_WORD) id("我") else NO_WORD
+                22 -> prev = if (prev == NO_WORD) id("再") else NO_WORD
+                else -> input = ""
+            }
+            val graph = segmenter.segment(input)
+            val fresh = decoder(beam = 3).decode(graph, prev2, prev)
+            assertEquals("step $step: $input", describe(fresh), describe(kept.decode(graph, prev2, prev)))
+        }
+    }
+
+    @Test
+    fun aKeyAtTheEndSearchesOnlyTheEnd() {
+        var calls = 0
+        val counting = WordScorer { p2, p, w -> calls++; WordScorer.of(data.model).score(p2, p, w) }
+        fun count(d: PinyinDecoder, input: String): Int {
+            calls = 0
+            d.decode(plain.segment(input))
+            return calls
+        }
+        val d = PinyinDecoder(data.dictionary, data.vocabulary, counting)
+        // the same key costs the same however much input comes before it, once the beams are full
+        val building = listOf(8, 16, 32).map { n ->
+            val input = "nihao".repeat(n)
+            count(d, input)
+            count(d, input + "m")
+        }
+        assertEquals(1, building.distinct().size)
+        d.reset()
+        assertTrue(building.first() * 10 < count(d, "nihao".repeat(32) + "m"))
+    }
+
+    @Test
+    fun aResetSearchesWithTheNewScores() {
+        var favour = id("在")
+        val scorer = WordScorer { _, _, w -> if (w == favour) -1f else -2f }
+        val d = PinyinDecoder(data.dictionary, data.vocabulary, scorer)
+        assertEquals("在我", d.decode(plain.segment("zaiwo")).sentences.first().text)
+        favour = id("再")
+        // the search up to wo is kept, with the old scores
+        assertEquals("在我吗", d.decode(plain.segment("zaiwoma")).sentences.first().text)
+        d.reset()
+        assertEquals("再我吗", d.decode(plain.segment("zaiwoma")).sentences.first().text)
+    }
+
+    @Test
+    fun aDecodeThatThrewIsNotBuiltOn() {
+        var fail = false
+        val scorer = WordScorer { p2, p, w -> check(!fail); WordScorer.of(data.model).score(p2, p, w) }
+        val d = PinyinDecoder(data.dictionary, data.vocabulary, scorer)
+        d.decode(plain.segment("nihaonihao"))
+        fail = true
+        assertThrows(IllegalStateException::class.java) { d.decode(plain.segment("nihaonihaoma")) }
+        fail = false
+        val input = plain.segment("nihaonihaom")
+        assertEquals(describe(decoder().decode(input)), describe(d.decode(input)))
     }
 }

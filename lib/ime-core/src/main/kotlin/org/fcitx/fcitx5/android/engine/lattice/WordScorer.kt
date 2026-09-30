@@ -12,7 +12,8 @@ import org.fcitx.fcitx5.android.engine.data.NgramModel
  *
  * [NgramModel] is the scorer the engine ships; this is the seam for another (a model with user
  * words mixed in, a neural one). Scores must be log probabilities, so never above 0: the
- * decoder prunes on that.
+ * decoder prunes on that. A decoder keeps what it scored for the next key, so one whose scores
+ * change (the user's words learned) must be followed by [PinyinDecoder.reset].
  */
 fun interface WordScorer {
     fun score(prev2: Int, prev: Int, word: Int): Float

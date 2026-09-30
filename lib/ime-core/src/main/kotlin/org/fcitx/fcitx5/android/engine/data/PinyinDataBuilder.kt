@@ -206,6 +206,11 @@ internal class IntList {
     }
 
     operator fun get(i: Int) = a[i]
+
+    operator fun set(i: Int, v: Int) {
+        a[i] = v
+    }
+
     /** Empties the list, keeping its storage for reuse. */
     fun clear() {
         size = 0
@@ -225,6 +230,11 @@ internal class FloatList {
     }
 
     operator fun get(i: Int) = a[i]
+
+    operator fun set(i: Int, v: Float) {
+        a[i] = v
+    }
+
     /** Empties the list, keeping its storage for reuse. */
     fun clear() {
         size = 0

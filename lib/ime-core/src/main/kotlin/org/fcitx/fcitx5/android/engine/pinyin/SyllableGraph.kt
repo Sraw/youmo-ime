@@ -57,10 +57,13 @@ class SyllableGraph internal constructor(
     fun matches(edge: Int): SyllableMatches = edgeMatches[edge]
 
     /** The typed text of [edge], without separators. */
-    fun text(edge: Int): String {
-        var until = edgeTo[edge]
-        while (until > edgeFrom[edge] && input[until - 1] == SEPARATOR) until--
-        return input.substring(edgeFrom[edge], until)
+    fun text(edge: Int): String = text(edgeFrom[edge], edgeTo[edge])
+
+    /** The typed text from [from] to [to], without the separators it ends with. */
+    fun text(from: Int, to: Int): String {
+        var until = to
+        while (until > from && input[until - 1] == SEPARATOR) until--
+        return input.substring(from, until)
     }
 
     override fun toString(): String = (0 until edgeCount).joinToString("\n") { e ->

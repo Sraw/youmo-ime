@@ -24,6 +24,11 @@ import org.fcitx.fcitx5.android.engine.pinyin.SyllableMatches
  * candidate list and for a reranker to rescore. The price: one text reached through different
  * words (你好, 你 + 好) takes several places in the beam, so fewer distinct sentences come out.
  *
+ * Each decode builds on the last one: the beams before the first position a changed arc ends at
+ * are kept, so a key typed at the end of long input searches only its last syllables. Nearly
+ * all the time goes to [scorer], and without this the cost of a key would grow with the length
+ * of the input.
+ *
  * Reuses its buffers between calls: not thread-safe, and meant to live as long as the engine.
  */
 class PinyinDecoder(
@@ -39,23 +44,22 @@ class PinyinDecoder(
         require(beam >= 1 && wordsPerReading >= 1) { "beam $beam, words per reading $wordsPerReading" }
     }
 
-    // arcs, grouped by where they start
-    private var arcStart = IntArray(0)
-    private val arcTo = IntList()
-    private val arcWord = IntList() // NO_WORD for input kept as typed
-    private val arcEdge = IntList() // for input kept as typed, the graph edge holding its text
-    private val arcCost = FloatList()
+    private var arcs = Lattice()
 
-    // word sequences, each one word on from its back state
-    private val stateScore = FloatList()
-    private val stateWord = IntList()
-    private val statePrev = IntList()
-    private val stateBack = IntList()
-    private val stateArc = IntList()
+    // what the beams hold now came from these, or from nothing if lastEnd is -1
+    private var lastArcs = Lattice()
+    private var lastEnd = -1
+    private var lastStart = 0
+    private var lastPrev2 = NO_WORD
+    private var lastPrev = NO_WORD
 
-    // per position, up to [beam] states, best first
-    private var beams = IntArray(0)
+    // per position, up to [beam] word sequences, best first; a sequence is its last word and a
+    // link to the slot of the one it goes on from, which stays put once its position is searched
     private var beamSize = IntArray(0)
+    private var stateScore = FloatArray(0)
+    private var stateWord = IntArray(0)
+    private var statePrev = IntArray(0)
+    private var stateBack = IntArray(0) // -1 for the empty sequence at the start
 
     /**
      * @param prev2 the word before [prev] in text already committed, or [NO_WORD]
@@ -70,30 +74,43 @@ class PinyinDecoder(
         sentences: Int = DEFAULT_SENTENCES,
         words: Int = DEFAULT_WORDS,
     ): Decoding {
-        if (graph.start == graph.end) return Decoding(emptyList(), emptyList())
+        if (graph.start == graph.end) {
+            reset()
+            return Decoding(emptyList(), emptyList())
+        }
+        val last = lastEnd
+        // until the search is done: one that threw would leave beams and arcs that match nothing
+        lastEnd = -1
+        lastArcs = arcs.also { arcs = lastArcs }
         buildLattice(graph)
-        search(graph, prev2, prev)
+        search(graph, prev2, prev, last)
+        lastEnd = graph.end
+        lastStart = graph.start
+        lastPrev2 = prev2
+        lastPrev = prev
         return Decoding(sentences(graph, sentences), firstWords(graph, prev2, prev, words))
+    }
+
+    /** Forgets the last decode, so the next searches from scratch; needed when [scorer]'s scores change. */
+    fun reset() {
+        lastEnd = -1
     }
 
     private fun buildLattice(graph: SyllableGraph) {
         val n = graph.end
-        if (arcStart.size < n + 2) arcStart = IntArray(n + 2)
-        arcTo.clear()
-        arcWord.clear()
-        arcEdge.clear()
-        arcCost.clear()
+        arcs.clear(n)
         for (at in 0..n) {
-            arcStart[at] = arcTo.size
+            arcs.start[at] = arcs.size
             if (graph.edges(at).isEmpty()) continue
             val limit = if (at == graph.start) Int.MAX_VALUE else wordsPerReading
             collect(graph, at, dictionary.root, 0f, limit)
             // nothing in the dictionary starts here: keep what was typed, so every path goes on
-            if (arcTo.size == arcStart[at]) {
-                for (e in graph.edges(at)) addArc(graph.to(e), NO_WORD, e, penalties.raw)
+            if (arcs.size == arcs.start[at]) {
+                for (e in graph.edges(at)) arcs.add(graph.to(e), NO_WORD, penalties.raw)
             }
+            arcs.sortByEnd(arcs.start[at], n)
         }
-        arcStart[n + 1] = arcTo.size
+        arcs.start[n + 1] = arcs.size
     }
 
     /** Adds the words of every dictionary path from [node] that the graph spells from [at]. */
@@ -109,7 +126,7 @@ class PinyinDecoder(
                 if (child < 0) continue
                 val c = edgeCost + penalty(matches.flags(i))
                 val words = minOf(dictionary.wordCount(child), limit)
-                for (w in 0 until words) addArc(to, dictionary.word(child, w), -1, c + dictionary.weight(child, w))
+                for (w in 0 until words) arcs.add(to, dictionary.word(child, w), c + dictionary.weight(child, w))
                 if (to < graph.end && dictionary.childCount(child) > 0) collect(graph, to, child, c, limit)
             }
         }
@@ -129,94 +146,126 @@ class PinyinDecoder(
         return p
     }
 
-    private fun addArc(to: Int, word: Int, edge: Int, cost: Float) {
-        arcTo += to
-        arcWord += word
-        arcEdge += edge
-        arcCost += cost
-    }
-
-    private fun search(graph: SyllableGraph, prev2: Int, prev: Int) {
+    private fun search(graph: SyllableGraph, prev2: Int, prev: Int, last: Int) {
         val n = graph.end
         if (beamSize.size < n + 1) {
-            beamSize = IntArray(n + 1)
-            beams = IntArray((n + 1) * beam)
-        } else {
-            beamSize.fill(0, 0, n + 1)
+            beamSize = beamSize.copyOf(n + 1)
+            stateScore = stateScore.copyOf((n + 1) * beam)
+            stateWord = stateWord.copyOf((n + 1) * beam)
+            statePrev = statePrev.copyOf((n + 1) * beam)
+            stateBack = stateBack.copyOf((n + 1) * beam)
         }
-        stateScore.clear()
-        stateWord.clear()
-        statePrev.clear()
-        stateBack.clear()
-        stateArc.clear()
-        insert(graph.start, 0f, prev, prev2, -1, -1)
+        val sameContext = graph.start == lastStart && prev2 == lastPrev2 && prev == lastPrev
+        val from = if (sameContext && last >= 0) unchangedUntil(graph, last) else graph.start
+        beamSize.fill(0, from, n + 1)
+        if (from == graph.start) insert(graph.start, 0f, prev, prev2, -1)
         for (at in graph.start until n) {
             val size = beamSize[at]
             if (size == 0) continue
-            for (a in arcStart[at] until arcStart[at + 1]) {
-                val to = arcTo[a]
-                val word = arcWord[a]
-                for (k in 0 until size) {
-                    val s = beams[at * beam + k]
-                    val base = stateScore[s] + arcCost[a]
+            for (a in arcs.start[at] until arcs.start[at + 1]) {
+                val to = arcs.to[a]
+                if (to < from) continue // that beam is kept
+                val word = arcs.word[a]
+                for (s in at * beam until at * beam + size) {
+                    val base = stateScore[s] + arcs.cost[a]
                     // scores only fall from here, and the states come best first
-                    if (beamSize[to] == beam && base <= stateScore[beams[to * beam + beam - 1]]) break
+                    if (beamSize[to] == beam && base <= stateScore[to * beam + beam - 1]) break
                     val lm = if (word == NO_WORD) 0f else scorer.score(statePrev[s], stateWord[s], word)
-                    insert(to, base + lm, word, stateWord[s], s, a)
+                    insert(to, base + lm, word, stateWord[s], s)
                 }
             }
         }
     }
 
+    /**
+     * The first position whose beam may differ from the last decode's, or [SyllableGraph.start]
+     * to search it all. A beam depends only on the arcs ending there, in their order, and on the
+     * beams they start from; so beams before the first arc that differs are as the last decode
+     * left them. The typed text is not among that: text kept as typed is read from the input
+     * only when the candidates are made.
+     */
+    private fun unchangedUntil(graph: SyllableGraph, last: Int): Int {
+        var until = minOf(last, graph.end)
+        var at = graph.start
+        while (at < until) {
+            var a = lastArcs.start[at]
+            var b = arcs.start[at]
+            val aEnd = lastArcs.start[at + 1]
+            val bEnd = arcs.start[at + 1]
+            while (a < aEnd && b < bEnd && lastArcs.same(a, arcs, b)) {
+                a++
+                b++
+            }
+            // the groups differ from here on; being sorted by end, every arc ending before the
+            // first of these ends is in the same place in both
+            for (i in a until aEnd) until = minOf(until, lastArcs.to[i])
+            for (i in b until bEnd) until = minOf(until, arcs.to[i])
+            at++
+        }
+        return maxOf(until, graph.start)
+    }
+
     /** Puts a new state into the beam at [at], unless the beam is full of better ones. */
-    private fun insert(at: Int, score: Float, word: Int, prev: Int, back: Int, arc: Int) {
+    private fun insert(at: Int, score: Float, word: Int, prev: Int, back: Int) {
         val offset = at * beam
         var size = beamSize[at]
         // the same word on from the same state, by another reading of the same input: keep the best
-        for (k in 0 until size) {
-            val s = beams[offset + k]
+        for (s in offset until offset + size) {
             if (stateBack[s] == back && stateWord[s] == word) {
                 if (score <= stateScore[s]) return
-                beams.copyInto(beams, offset + k, offset + k + 1, offset + size)
+                for (t in s until offset + size - 1) move(t + 1, t)
                 size--
                 break
             }
         }
         // only a full beam gets here, so nothing was removed above
-        if (size == beam && score <= stateScore[beams[offset + size - 1]]) return
-        val state = stateScore.size
-        stateScore += score
-        stateWord += word
-        statePrev += prev
-        stateBack += back
-        stateArc += arc
-        var k = minOf(size, beam - 1)
-        while (k > 0 && stateScore[beams[offset + k - 1]] < score) {
-            beams[offset + k] = beams[offset + k - 1]
-            k--
+        if (size == beam && score <= stateScore[offset + size - 1]) return
+        var s = offset + minOf(size, beam - 1)
+        while (s > offset && stateScore[s - 1] < score) {
+            move(s - 1, s)
+            s--
         }
-        beams[offset + k] = state
+        stateScore[s] = score
+        stateWord[s] = word
+        statePrev[s] = prev
+        stateBack[s] = back
         beamSize[at] = minOf(size + 1, beam)
+    }
+
+    private fun move(from: Int, to: Int) {
+        stateScore[to] = stateScore[from]
+        stateWord[to] = stateWord[from]
+        statePrev[to] = statePrev[from]
+        stateBack[to] = stateBack[from]
     }
 
     private fun sentences(graph: SyllableGraph, limit: Int): List<Candidate> {
         val end = graph.end
         val out = ArrayList<Candidate>()
         val seen = HashSet<String>()
-        for (k in 0 until beamSize[end]) {
+        for (last in end * beam until end * beam + beamSize[end]) {
             if (out.size >= limit) break
-            val last = beams[end * beam + k]
-            val arcs = ArrayList<Int>()
+            var count = 0
             var s = last
             while (stateBack[s] >= 0) {
-                arcs += stateArc[s]
+                count++
                 s = stateBack[s]
             }
-            arcs.reverse()
-            val text = arcs.joinToString("") { textOf(graph, it) }
-            if (seen.add(text)) out += Candidate(text, end, stateScore[last], IntArray(arcs.size) { arcWord[arcs[it]] })
+            val path = IntArray(count)
+            s = last
+            while (count > 0) {
+                path[--count] = s
+                s = stateBack[s]
+            }
+            val text = path.joinToString("") { textOf(graph, it) }
+            if (seen.add(text)) out += Candidate(text, end, stateScore[last], IntArray(path.size) { stateWord[path[it]] })
         }
         return out
+    }
+
+    private fun textOf(graph: SyllableGraph, state: Int): String {
+        val word = stateWord[state]
+        return if (word == NO_WORD) graph.text(stateBack[state] / beam, state / beam) else vocabulary.word(word)
     }
 
     /**
@@ -224,14 +273,14 @@ class PinyinDecoder(
      * thousands (`s` is every sh and s syllable), so text is made only for those returned.
      */
     private fun firstWords(graph: SyllableGraph, prev2: Int, prev: Int, limit: Int): List<Candidate> {
-        val from = arcStart[graph.start]
-        val until = arcStart[graph.start + 1]
+        val from = arcs.start[graph.start]
+        val until = arcs.start[graph.start + 1]
         val scores = FloatArray(until - from)
         // score, then arc, in one sortable long: best first, ties in arc order
         val order = LongArray(until - from) { i ->
             val a = from + i
-            val word = arcWord[a]
-            scores[i] = if (word == NO_WORD) Float.NEGATIVE_INFINITY else arcCost[a] + scorer.score(prev2, prev, word)
+            val word = arcs.word[a]
+            scores[i] = if (word == NO_WORD) Float.NEGATIVE_INFINITY else arcs.cost[a] + scorer.score(prev2, prev, word)
             (sortable(-scores[i]).toLong() shl Int.SIZE_BITS) or a.toLong()
         }
         order.sort()
@@ -240,15 +289,80 @@ class PinyinDecoder(
         var next = 0
         while (out.size < limit && next < order.size) {
             val a = order[next++].toInt()
-            val word = arcWord[a]
-            if (word != NO_WORD && seen.add(word)) out += Candidate(vocabulary.word(word), arcTo[a], scores[a - from], intArrayOf(word))
+            val word = arcs.word[a]
+            if (word != NO_WORD && seen.add(word)) out += Candidate(vocabulary.word(word), arcs.to[a], scores[a - from], intArrayOf(word))
         }
         return out
     }
 
-    private fun textOf(graph: SyllableGraph, arc: Int): String {
-        val word = arcWord[arc]
-        return if (word == NO_WORD) graph.text(arcEdge[arc]) else vocabulary.word(word)
+    /**
+     * Arcs grouped by where they start: those from `at` are `start[at] until start[at + 1]`, in
+     * the order they end. That puts what a key changes, the arcs ending near the end of the
+     * input, last in each group; in the order the dictionary gives them, a change deep in a long
+     * word would come before the short arcs from the same place and hide that they are the same.
+     */
+    private class Lattice {
+        var start = IntArray(0)
+        val to = IntList()
+        val word = IntList() // NO_WORD for input kept as typed
+        val cost = FloatList()
+        val size get() = to.size
+
+        // for sorting
+        private var ends = IntArray(0)
+        private val toCopy = IntList()
+        private val wordCopy = IntList()
+        private val costCopy = FloatList()
+
+        fun clear(end: Int) {
+            if (start.size < end + 2) {
+                start = IntArray(end + 2)
+                ends = IntArray(end + 2)
+            }
+            to.clear()
+            word.clear()
+            cost.clear()
+        }
+
+        /** Orders the arcs from [first] on, none ending past [end], by where they end, keeping the order of those ending together. */
+        fun sortByEnd(first: Int, end: Int) {
+            var sorted = true
+            for (a in first + 1 until size) {
+                if (to[a] < to[a - 1]) {
+                    sorted = false
+                    break
+                }
+            }
+            if (sorted) return
+            // a counting sort: ends[q] becomes where the arcs ending at q go
+            toCopy.clear()
+            wordCopy.clear()
+            costCopy.clear()
+            ends.fill(0, 0, end + 1)
+            for (a in first until size) {
+                toCopy += to[a]
+                wordCopy += word[a]
+                costCopy += cost[a]
+                ends[to[a]]++
+            }
+            var next = first
+            for (q in 0..end) next += ends[q].also { ends[q] = next }
+            for (i in 0 until toCopy.size) {
+                val a = ends[toCopy[i]]++
+                to[a] = toCopy[i]
+                word[a] = wordCopy[i]
+                cost[a] = costCopy[i]
+            }
+        }
+
+        fun add(to: Int, word: Int, cost: Float) {
+            this.to += to
+            this.word += word
+            this.cost += cost
+        }
+
+        fun same(arc: Int, other: Lattice, otherArc: Int) =
+            to[arc] == other.to[otherArc] && word[arc] == other.word[otherArc] && cost[arc] == other.cost[otherArc]
     }
 
     companion object {
