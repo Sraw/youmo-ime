@@ -67,12 +67,12 @@ internal class SpellingIndex(fuzzy: Set<Fuzzy>, typos: Boolean) {
         }
         for (id in 0 until Syllables.count) {
             val spelling = Syllables.spelling(id)
-            if (spelling in STANDALONE || spelling[0].isUpperCase()) {
+            val parts = split(spelling)
+            if (parts == null) {
                 add(spelling, id, 0)
                 continue
             }
-            val init = INITIALS.lastOrNull { spelling.startsWith(it) && spelling.length > it.length } ?: ""
-            val fin = spelling.substring(init.length)
+            val (init, fin) = parts
             val finalRules = fuzzy.filter { !it.onInitial && it.appliesAfter(init) }
             for ((i, iFlags) in variants(init, fuzzy.filter { it.onInitial })) {
                 keepBest(byInitial.getOrPut(i.ifEmpty { spelling.take(1) }) { TreeMap() }, id, iFlags or SyllableMatches.COMPLETION)
@@ -131,7 +131,7 @@ internal class SpellingIndex(fuzzy: Set<Fuzzy>, typos: Boolean) {
 
     companion object {
         /** Longest last, so the last one a spelling starts with is its initial. */
-        private val INITIALS = listOf(
+        val INITIALS = listOf(
             "b", "p", "m", "f", "d", "t", "n", "l", "g", "k", "h", "j", "q", "x",
             "r", "z", "c", "s", "y", "w", "zh", "ch", "sh",
         )
@@ -139,12 +139,22 @@ internal class SpellingIndex(fuzzy: Set<Fuzzy>, typos: Boolean) {
         /** Syllables that are not an initial plus a final, so no rule applies to them. */
         private val STANDALONE = setOf("m", "n", "ng", "r")
 
+        /**
+         * The initial and final of [spelling], the initial empty for a, ai, er ...; null for a
+         * syllable that is no initial plus a final (m, ng, the Latin letters).
+         */
+        fun split(spelling: String): Pair<String, String>? {
+            if (spelling in STANDALONE || spelling[0].isUpperCase()) return null
+            val init = INITIALS.lastOrNull { spelling.startsWith(it) && spelling.length > it.length } ?: ""
+            return init to spelling.substring(init.length)
+        }
+
         /** [part] itself, then its partner under each enabled rule, flagged [SyllableMatches.FUZZY]. */
-        private fun variants(part: String, rules: List<Fuzzy>): List<Pair<String, Int>> =
+        fun variants(part: String, rules: List<Fuzzy>): List<Pair<String, Int>> =
             listOf(part to 0) + rules.mapNotNull { r -> r.partner(part)?.let { it to SyllableMatches.FUZZY } }
 
         /** As [variants], and lüe is written `lue` as often as `lve`: both are standard. */
-        private fun finals(fin: String, rules: List<Fuzzy>): List<Pair<String, Int>> =
+        fun finals(fin: String, rules: List<Fuzzy>): List<Pair<String, Int>> =
             variants(fin, rules) + if (fin == "ve") listOf("ue" to 0) else emptyList()
 
         private fun typosOf(init: String, fin: String): List<String> = listOfNotNull(
@@ -159,12 +169,12 @@ internal class SpellingIndex(fuzzy: Set<Fuzzy>, typos: Boolean) {
         private val U_IS_V = setOf("j", "q", "x", "y")
 
         /** Fewer flags win: an exact spelling beats a fuzzy one beats a typo. */
-        private fun keepBest(into: MutableMap<Int, Int>, syllable: Int, flags: Int) {
+        fun keepBest(into: MutableMap<Int, Int>, syllable: Int, flags: Int) {
             val old = into[syllable]
             if (old == null || flags < old) into[syllable] = flags
         }
 
-        private fun toMatches(m: Map<Int, Int>) =
+        fun toMatches(m: Map<Int, Int>) =
             SyllableMatches(m.keys.toIntArray(), m.values.toIntArray())
     }
 }

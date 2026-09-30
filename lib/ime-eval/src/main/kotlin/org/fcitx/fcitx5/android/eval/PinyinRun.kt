@@ -9,14 +9,18 @@ import org.fcitx.fcitx5.android.engine.lattice.Penalties
 import org.fcitx.fcitx5.android.engine.lattice.PinyinDecoder
 import org.fcitx.fcitx5.android.engine.lattice.WordScorer
 import org.fcitx.fcitx5.android.engine.pinyin.PinyinSegmenter
+import org.fcitx.fcitx5.android.engine.pinyin.Segmenter
 
 /**
  * Runs our own pinyin engine over an evaluation set on the host, a letter at a time as a user
  * types, timing each letter. Latencies are host JVM ones: good for comparing runs, not devices.
  */
-class PinyinRun(data: PinyinData, penalties: Penalties = Penalties(), beam: Int = PinyinDecoder.DEFAULT_BEAM) {
-
-    private val segmenter = PinyinSegmenter()
+class PinyinRun(
+    data: PinyinData,
+    private val segmenter: Segmenter = PinyinSegmenter(),
+    penalties: Penalties = Penalties(),
+    beam: Int = PinyinDecoder.DEFAULT_BEAM,
+) {
     private val decoder = PinyinDecoder(data.dictionary, data.vocabulary, WordScorer.of(data.model), penalties, beam)
 
     fun run(samples: List<Sample>): List<RunResult> {

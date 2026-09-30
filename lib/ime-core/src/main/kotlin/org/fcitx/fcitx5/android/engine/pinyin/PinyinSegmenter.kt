@@ -4,7 +4,6 @@
  */
 package org.fcitx.fcitx5.android.engine.pinyin
 
-import org.fcitx.fcitx5.android.engine.data.IntList
 import org.fcitx.fcitx5.android.engine.pinyin.SyllableGraph.Companion.SEPARATOR
 import org.fcitx.fcitx5.android.engine.pinyin.SyllableGraph.Kind
 
@@ -30,29 +29,14 @@ import org.fcitx.fcitx5.android.engine.pinyin.SyllableGraph.Kind
  * Upper-case letters are the Latin-letter syllables (`A` in A股), so a caller wanting pinyin
  * from input that auto-capitalisation touched must lower-case it first.
  */
-class PinyinSegmenter(fuzzy: Set<Fuzzy> = emptySet(), typos: Boolean = true) {
+class PinyinSegmenter(fuzzy: Set<Fuzzy> = emptySet(), typos: Boolean = true) : Segmenter {
 
     private val index = SpellingIndex(fuzzy, typos)
 
-    fun segment(input: String): SyllableGraph {
-        val n = input.length
-        val edges = Edges(input)
-        val start = skipSeparators(input, 0)
-        val reachable = BooleanArray(n + 1).also { it[start] = true }
-        for (at in 0..n) {
-            edges.firstEdge[at] = edges.size
-            if (at == n || !reachable[at]) continue
-            val before = edges.size
-            walk(input, at, edges)
-            if (edges.size == before) edges.add(at, 1, Kind.RAW, SyllableMatches.EMPTY)
-            for (e in before until edges.size) reachable[edges.to[e]] = true
-        }
-        edges.firstEdge[n + 1] = edges.size
-        return edges.toGraph(start)
-    }
+    override fun segment(input: String): SyllableGraph = GraphEdges.build(input) { at, edges -> walk(input, at, edges) }
 
     /** Adds the edges leaving [at]: a walk down the spelling trie along the input. */
-    private fun walk(input: String, at: Int, edges: Edges) {
+    private fun walk(input: String, at: Int, edges: GraphEdges) {
         var node = index.root
         var longestSyllable = 0
         var initial = 0
@@ -88,33 +72,8 @@ class PinyinSegmenter(fuzzy: Set<Fuzzy> = emptySet(), typos: Boolean = true) {
         }
     }
 
-    private class Edges(val input: String) {
-        val firstEdge = IntArray(input.length + 2)
-        val from = IntList()
-        val to = IntList()
-        val kinds = ArrayList<Kind>()
-        val matches = ArrayList<SyllableMatches>()
-        val size get() = from.size
-
-        fun add(at: Int, length: Int, kind: Kind, m: SyllableMatches) {
-            from += at
-            to += skipSeparators(input, at + length)
-            kinds += kind
-            matches += m
-        }
-
-        fun toGraph(start: Int) =
-            SyllableGraph(input, start, firstEdge, from.toArray(), to.toArray(), kinds.toTypedArray(), matches.toTypedArray())
-    }
-
     private companion object {
         const val VOWELS = "aeiouv"
-
-        fun skipSeparators(input: String, at: Int): Int {
-            var i = at
-            while (i < input.length && input[i] == SEPARATOR) i++
-            return i
-        }
 
         /** A vowel at [at]: what comes before it is the start of a syllable, not an initial alone. */
         fun startsSyllable(input: String, at: Int) = at < input.length && input[at] in VOWELS
