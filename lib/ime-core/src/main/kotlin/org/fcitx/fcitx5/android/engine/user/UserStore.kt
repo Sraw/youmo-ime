@@ -13,8 +13,8 @@ import java.io.OutputStream
 
 /**
  * Keeps a [UserModel] in [file], a [UserLog] kept by a [RecordStore]: [open] replays it, then
- * each sentence learned is appended as one write, and the log is compacted to the model's counts
- * now and then.
+ * each sentence learned, or words forgotten, is appended as one write, and the log is compacted
+ * to the model's counts now and then.
  */
 class UserStore internal constructor(
     file: File,
@@ -47,7 +47,10 @@ class UserStore internal constructor(
             },
             seed = seed?.let { { it(model) } },
         )
-        model.journal = UserModel.Journal { prev, sentence -> store.append(UserLog.sentence(prev, sentence)) }
+        model.journal = object : UserModel.Journal {
+            override fun record(prev: UserModel.Entry?, sentence: List<UserModel.Entry>) = store.append(UserLog.sentence(prev, sentence))
+            override fun forgot(words: List<UserModel.Entry>) = store.append(UserLog.forgot(words))
+        }
     }
 
     /** Rewrites the log as the model's counts. */

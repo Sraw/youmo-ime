@@ -14,7 +14,7 @@
 
 // What the engine shows after an event: ime-core's Snapshot. [candidates] are the first of
 // [total], through the page shown: [shown] of them from [first]. The rest are fetched through
-// EngineCandidatesCallback as the list scrolls.
+// EngineCandidatesCallback as the list scrolls. [forgets]: whether they offer "Forget word".
 struct EngineSnapshot {
     bool handled = false;
     std::string commit;
@@ -24,6 +24,7 @@ struct EngineSnapshot {
     int first = 0;
     int shown = 0;
     int total = 0;
+    bool forgets = false;
 };
 
 // What happened, numbered as ime-core's EngineEvent reads them. Which key does what is decided
@@ -38,6 +39,7 @@ enum class EngineEvent : int {
     Pick = 6,       // arg: the index among all candidates
     Reset = 7,
     Other = 8,      // any other key: an arrow, Home, Tab, Delete
+    Forget = 9,     // "Forget word" on a candidate; arg: the index among all candidates
 };
 
 // Hands an event to the session of input method [im]; called on the fcitx thread. [learning] is

@@ -100,11 +100,12 @@ class PinyinSession(
         // nothing to pick past the page: the key (space, a digit) is the app's
         is Action.Select -> if (action.index in 0 until pageSize) pick(page * pageSize + action.index) else snapshot(handled = candidates.isNotEmpty())
         is Action.Pick -> pick(action.index)
+        is Action.Forget -> forget(action.index)
         Action.NextPage -> turn(page + 1)
         Action.PreviousPage -> turn(page - 1)
         Action.CommitRaw -> commitRaw()
         Action.Reset -> {
-            forget()
+            dropContext()
             clear()
             snapshot()
         }
@@ -150,6 +151,25 @@ class PinyinSession(
         // not learned, so no pair with what comes next either
         if (learned == null) lastEntry = null
         return commit(text, learned ?: pieces.flatMap { it.words.asList() }.toIntArray())
+    }
+
+    /**
+     * Forgets what the user model learned of the words of the candidate at [index], then reads
+     * the input again, on the page shown if it still has candidates. Text kept as typed and
+     * phrases hold no words to forget.
+     */
+    private fun forget(index: Int): Snapshot {
+        val c = candidates.getOrNull(index)
+        val words = if (user == null || predicting || c == null) null else entries(c)
+        if (words == null) return snapshot()
+        user?.forget(words)
+        // or the next pick learns it again, as the word before it
+        if (lastEntry in words) dropContext()
+        decoder.reset()
+        val shown = page
+        read()
+        if (shown * pageSize < candidates.size) page = shown
+        return snapshot()
     }
 
     /** How each word of [c], of the input read last, reads; null if some is text kept as typed. */
@@ -202,7 +222,7 @@ class PinyinSession(
         val picked = if (input.isNotEmpty() && !predicting && candidates.isNotEmpty()) pick(0).commit else ""
         // the first candidate read only the start
         val rest = if (input.isNotEmpty()) commitRaw().commit else ""
-        forget()
+        dropContext()
         clear()
         return snapshot(commit = picked + rest, handled = false)
     }
@@ -214,7 +234,7 @@ class PinyinSession(
         }
         val text = pieces.joinToString("") { it.text } + input.substring(readFrom())
         // text as typed is no words: nothing to go on from
-        forget()
+        dropContext()
         clear()
         return snapshot(commit = text)
     }
@@ -224,7 +244,7 @@ class PinyinSession(
         // what the user writes is kept no longer than it has to be where they learn nothing
         recent = if (learning) tail(recent + text) else ""
         // text kept as typed ends the context
-        if (context.lastOrNull() == NO_WORD) forget()
+        if (context.lastOrNull() == NO_WORD) dropContext()
         clear()
         // what may follow a password is no one's business
         candidates = if (prediction && learning) predict() else emptyList()
@@ -244,7 +264,7 @@ class PinyinSession(
         return predictor.predict(NO_WORD, predictor.tail(last.text, last.syllables))
     }
 
-    private fun forget() {
+    private fun dropContext() {
         context = IntArray(0)
         lastEntry = null
         recent = ""
@@ -318,6 +338,7 @@ class PinyinSession(
             predicting = predicting,
             total = candidates.size,
             first = from,
+            forgets = user != null && !predicting && candidates.isNotEmpty(),
         )
     }
 

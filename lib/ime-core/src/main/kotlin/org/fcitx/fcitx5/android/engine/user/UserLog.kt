@@ -11,8 +11,8 @@ import java.io.DataInputStream
 import java.io.DataOutputStream
 
 /**
- * The user's words as a [RecordFormat] log: sentences learned as they are, and, once compacted,
- * the counts of words and of pairs.
+ * The user's words as a [RecordFormat] log: sentences learned and words forgotten as they are,
+ * and, once compacted, the counts of words and of pairs.
  *
  * Words are written as text and spelt syllables, not ids: the log outlives the dictionary it
  * was written against. A record whose syllables this build does not know is skipped.
@@ -24,6 +24,7 @@ object UserLog {
     private const val SENTENCE: Byte = 1
     private const val WORD: Byte = 2
     private const val PAIR: Byte = 3
+    private const val FORGOT: Byte = 4
 
     fun header(): ByteArray = FORMAT.header()
 
@@ -48,6 +49,11 @@ object UserLog {
         writeFloat(count)
     }
 
+    fun forgot(words: List<Entry>) = FORMAT.record(FORGOT) {
+        writeShort(words.size)
+        words.forEach { entry(it) }
+    }
+
     /**
      * Replays the records of [bytes], which start with the header, into [model].
      *
@@ -65,6 +71,7 @@ object UserLog {
                 }
                 WORD -> model.restore(input.entry(), input.readFloat())
                 PAIR -> model.restore(input.entry(), input.entry(), input.readFloat())
+                FORGOT -> model.forget(List(input.readShort().toInt()) { input.entry() })
                 // a type from a later version: what it held is lost, the rest still reads
                 else -> Unit
             }

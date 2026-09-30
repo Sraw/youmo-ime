@@ -156,6 +156,7 @@ public:
     jfieldID EngineResultFirst;
     jfieldID EngineResultShown;
     jfieldID EngineResultTotal;
+    jfieldID EngineResultForgets;
 
     explicit GlobalRefSingleton(JavaVM *jvm_) : jvm(jvm_) {
         JNIEnv *env;
@@ -223,6 +224,7 @@ public:
         EngineResultFirst = env->GetFieldID(engineResult, "first", "I");
         EngineResultShown = env->GetFieldID(engineResult, "shown", "I");
         EngineResultTotal = env->GetFieldID(engineResult, "total", "I");
+        EngineResultForgets = env->GetFieldID(engineResult, "forgets", "Z");
         env->DeleteLocalRef(engineResult);
     }
 

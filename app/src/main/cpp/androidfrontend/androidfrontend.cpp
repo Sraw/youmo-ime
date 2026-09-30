@@ -206,54 +206,42 @@ public:
         return candidates;
     }
 
-    std::vector<CandidateActionEntity> getCandidateAction(const int idx) {
+    /**
+     * The candidate idx names: on the page shown when paging, else among all of a bulk list,
+     * as selectCandidate reads it. Guessing from the page's size acted on another candidate
+     * whenever the bulk list showed a page past the first.
+     */
+    const CandidateWord *candidateAt(const int idx, const bool paged) {
+        const auto &list = inputPanel().candidateList();
+        if (!list) return nullptr;
+        try {
+            const auto &bulk = list->toBulk();
+            if (!paged && bulk) return &bulk->candidateFromAll(idx);
+            return &list->candidate(idx);
+        } catch (const std::exception &e) {
+            FCITX_WARN() << "candidate(" << idx << ") out of range: " << e.what();
+            return nullptr;
+        }
+    }
+
+    std::vector<CandidateActionEntity> getCandidateAction(const int idx, const bool paged) {
         std::vector<CandidateActionEntity> actions;
         const auto &list = inputPanel().candidateList();
-        if (list) {
-            const auto &actionable = list->toActionable();
-            if (actionable) {
-                if (idx >= list->size()) {
-                    const auto &bulk = list->toBulk();
-                    if (bulk) {
-                        try {
-                            const auto &c = bulk->candidateFromAll(idx);
-                            for (const auto &a: actionable->candidateActions(c)) {
-                                actions.emplace_back(a);
-                            }
-                        } catch (const std::exception &e) {
-                            FCITX_WARN() << "getCandidateAction(" << idx << ") failed:" << e.what();
-                        }
-                    }
-                } else {
-                    const auto &c = list->candidate(idx);
-                    for (const auto &a: actionable->candidateActions(c)) {
-                        actions.emplace_back(a);
-                    }
-                }
+        auto *actionable = list ? list->toActionable() : nullptr;
+        const auto *c = actionable ? candidateAt(idx, paged) : nullptr;
+        if (c) {
+            for (const auto &a: actionable->candidateActions(*c)) {
+                actions.emplace_back(a);
             }
         }
         return actions;
     }
 
-    void triggerCandidateAction(const int idx, const int actionIdx) {
+    void triggerCandidateAction(const int idx, const int actionIdx, const bool paged) {
         const auto &list = inputPanel().candidateList();
-        if (!list) return;
-        const auto &actionable = list->toActionable();
-        if (!actionable) return;
-        if (idx >= list->size()) {
-            const auto &bulk = list->toBulk();
-            if (bulk) {
-                try {
-                    const auto &c = bulk->candidateFromAll(idx);
-                    actionable->triggerAction(c, actionIdx);
-                } catch (const std::exception &e) {
-                    FCITX_WARN() << "triggerCandidateAction(" << idx << ") failed:" << e.what();
-                }
-            }
-        } else {
-            const auto &c = list->candidate(idx);
-            actionable->triggerAction(c, actionIdx);
-        }
+        auto *actionable = list ? list->toActionable() : nullptr;
+        const auto *c = actionable ? candidateAt(idx, paged) : nullptr;
+        if (c) actionable->triggerAction(*c, actionIdx);
     }
 
     void triggerTabAction(const int idx) {
@@ -410,12 +398,12 @@ bool AndroidFrontend::selectCandidate(int idx) {
 
 std::vector<CandidateActionEntity> AndroidFrontend::getCandidateActions(const int idx) {
     if (!activeIC_) return {};
-    return activeIC_->getCandidateAction(idx);
+    return activeIC_->getCandidateAction(idx, pagingMode_ != 0);
 }
 
 void AndroidFrontend::triggerCandidateAction(const int idx, const int actionIdx) {
     if (!activeIC_) return;
-    activeIC_->triggerCandidateAction(idx, actionIdx);
+    activeIC_->triggerCandidateAction(idx, actionIdx, pagingMode_ != 0);
 }
 
 void AndroidFrontend::triggerTabAction(const int idx) {

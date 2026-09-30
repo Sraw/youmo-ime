@@ -26,6 +26,9 @@ object EngineEvent {
 
     /** Any other key: an arrow, Home, Tab, Delete. */
     const val OTHER = 8
+
+    /** "Forget word" on a candidate; the argument is its index among all of them. */
+    const val FORGET = 9
 }
 
 /**
@@ -60,6 +63,7 @@ class Keyboard(private val session: Session) {
             EngineEvent.PAGE_UP -> if (composing) session.apply(Action.PreviousPage) else passOn()
             EngineEvent.PAGE_DOWN -> if (composing) session.apply(Action.NextPage) else passOn()
             EngineEvent.PICK -> session.apply(Action.Pick(arg))
+            EngineEvent.FORGET -> session.apply(Action.Forget(arg))
             EngineEvent.RESET -> session.apply(Action.Reset).copy(handled = false)
             EngineEvent.OTHER -> if (composing) shown.copy(commit = "", handled = true) else passOn()
             else -> passOn()

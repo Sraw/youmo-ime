@@ -124,7 +124,7 @@ class Engines(
             onError(e)
             emptyList()
         }
-        for (line in lines) LibimeImport.dictionaryEntry(line)?.let { model.id(it) }
+        for (line in lines) LibimeImport.dictionaryEntry(line)?.let { model.list(it) }
     }
 
     /**

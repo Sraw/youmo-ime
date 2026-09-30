@@ -48,6 +48,11 @@ abstract class BaseInputView(
     private fun setupFcitxEventHandler() {
         eventHandlerJob = service.lifecycleScope.launch {
             fcitx.runImmediately { eventFlow }.collect {
+                // the menu holds an index: in a list since changed it names another candidate,
+                // and "Forget word" would forget that one
+                if (it is FcitxEvent.CandidateListEvent || it is FcitxEvent.PagedCandidateEvent) {
+                    candidateActionMenu?.dismiss()
+                }
                 handleFcitxEvent(it)
             }
         }

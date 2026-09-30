@@ -10,6 +10,7 @@ import org.fcitx.fcitx5.android.engine.data.PinyinDataBuilder
 import org.fcitx.fcitx5.android.engine.pinyin.Syllables
 import org.fcitx.fcitx5.android.engine.user.UserModel.Entry
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
@@ -42,6 +43,13 @@ class UserModelTest {
         fun model(limit: Float = UserModel.DEFAULT_LIMIT) = UserModel(data.dictionary, data.vocabulary, limit)
 
         fun entry(text: String, vararg syllables: String) = Entry(text, syl(*syllables))
+
+        /** Whether the decoder finds [text] among [m]'s words, read as [syllables]. */
+        fun inTrie(m: UserModel, text: String, vararg syllables: String): Boolean {
+            var node = m.root
+            for (s in syllables) node = m.child(node, Syllables.id(s)).also { if (it < 0) return false }
+            return (0 until m.wordCount(node)).any { m.text(m.word(node, it)) == text }
+        }
     }
 
     private fun word(text: String) = (0 until data.vocabulary.size).first { data.vocabulary.word(it) == text }
@@ -183,5 +191,80 @@ class UserModelTest {
         assertEquals(1, c.size)
         assertEquals(1.5f, c[7919])
         assertThrows(IllegalArgumentException::class.java) { c.add(Long.MIN_VALUE, 1f) }
+    }
+
+    @Test
+    fun aWordForgottenLosesItsCountsAndPairs() {
+        val m = model()
+        val heard = ArrayList<String>()
+        m.learn(null, listOf(entry("你", "ni"), entry("好", "hao"), entry("吗", "ma")))
+        m.learn(null, listOf(entry("你", "ni")))
+        m.journal = object : UserModel.Journal {
+            override fun record(prev: Entry?, sentence: List<Entry>) = Unit
+            override fun forgot(words: List<Entry>) {
+                heard += words.joinToString()
+            }
+        }
+        m.forget(listOf(entry("好", "hao")))
+        assertEquals(listOf("好(hao)"), heard)
+        assertEquals(0f, m.probability(NO_WORD, word("好")))
+        assertEquals(3f, m.total)
+        // the pairs it was in are gone, those without it stay
+        val counted = HashMap<String, Float>()
+        m.forEachCount({ e, c -> counted[e.toString()] = c }, { a, b, c -> counted["$a $b"] = c })
+        assertEquals(mapOf("你(ni)" to 2f, "吗(ma)" to 1f), counted)
+        // nothing learned of it: nothing to forget, nothing heard
+        m.forget(listOf(entry("拟", "ni")))
+        assertEquals(1, heard.size)
+    }
+
+    @Test
+    fun theUsersWordForgottenAloneIsGoneUntilLearnedAgain() {
+        val m = model()
+        m.learn(null, listOf(entry("拟好", "ni", "hao"), entry("好", "ni")))
+        m.forget(listOf(entry("拟好", "ni", "hao"), entry("吗", "ma")))
+        // in a longer candidate: typeable still, its count gone
+        assertTrue(inTrie(m, "拟好", "ni", "hao"))
+        assertEquals(0f, m.probability(NO_WORD, m.id(entry("拟好", "ni", "hao"))))
+        m.forget(listOf(entry("拟好", "ni", "hao")))
+        assertTrue(!inTrie(m, "拟好", "ni", "hao"))
+        assertTrue(inTrie(m, "好", "ni"))
+        // learned again, a new word in the trie again
+        val again = m.learn(null, listOf(entry("拟好", "ni", "hao"))).single()
+        assertEquals(data.vocabulary.size + 2, again)
+        assertTrue(inTrie(m, "拟好", "ni", "hao"))
+        assertEquals(1f / 22f, m.probability(NO_WORD, again))
+    }
+
+    @Test
+    fun aWordForgottenIsNotMadeAgainAsTheWordBefore() {
+        val m = model()
+        val niZai = entry("拟再", "ni", "zai")
+        m.learn(null, listOf(niZai))
+        m.forget(listOf(niZai))
+        m.learn(niZai, listOf(entry("你", "ni")))
+        assertFalse(inTrie(m, "拟再", "ni", "zai"))
+        val counted = HashMap<String, Float>()
+        m.forEachCount({ e, c -> counted[e.toString()] = c }, { a, b, c -> counted["$a $b"] = c })
+        assertEquals(mapOf("你(ni)" to 1f), counted)
+        // one the dictionary has is the word before as ever
+        m.learn(entry("你", "ni"), listOf(entry("好", "hao")))
+        counted.clear()
+        m.forEachCount({ _, _ -> }, { a, b, c -> counted["$a $b"] = c })
+        assertEquals(mapOf("你(ni) 好(hao)" to 1f), counted)
+    }
+
+    @Test
+    fun aListedWordForgottenStaysToType() {
+        val m = model()
+        val niZai = entry("拟再", "ni", "zai")
+        val id = m.list(niZai)
+        assertEquals(id, m.list(niZai))
+        m.learn(null, listOf(niZai))
+        m.forget(listOf(niZai))
+        assertTrue(inTrie(m, "拟再", "ni", "zai"))
+        assertEquals(0f, m.probability(NO_WORD, id))
+        // the dictionary's own words are never listed: nothing to keep
+        assertEquals(word("你"), m.list(entry("你", "ni")))
     }
 }

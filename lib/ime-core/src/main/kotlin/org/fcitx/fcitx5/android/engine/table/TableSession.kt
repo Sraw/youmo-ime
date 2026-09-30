@@ -27,7 +27,7 @@ import org.fcitx.fcitx5.android.engine.session.Snapshot
  * Characters committed one by one become phrases ([TableOptions.autoPhraseLength]) coded by the
  * table's 组词规则, offered last for their code. One picked, or typed character by character
  * [TableOptions.saveAutoPhraseAfter] times, joins the table's own. What is picked and learned goes
- * to [user], which may keep it.
+ * to [user], which may keep it, and forgets it when asked to ([Action.Forget]).
  */
 class TableSession(
     private val table: TableDictionary,
@@ -58,6 +58,7 @@ class TableSession(
         Action.Backspace -> backspace()
         is Action.Select -> select(action.index)
         is Action.Pick -> pick(action.index)
+        is Action.Forget -> forget(action.index)
         Action.NextPage -> turn(page + 1)
         Action.PreviousPage -> turn(page - 1)
         Action.CommitRaw -> {
@@ -154,6 +155,16 @@ class TableSession(
     private fun pick(index: Int): Snapshot {
         val item = ranking[index] ?: return snapshot(handled = input.isNotEmpty())
         return snapshot(commit = take(item))
+    }
+
+    /** Forgets what was learned of the candidate at [index], ranking the code again on the page shown. */
+    private fun forget(index: Int): Snapshot {
+        val item = ranking[index] ?: return snapshot(handled = input.isNotEmpty())
+        user.forget(item.code, item.text)
+        val shown = page
+        update()
+        if (ranking[shown * options.pageSize] != null) page = shown
+        return snapshot()
     }
 
     private fun turn(to: Int): Snapshot {
@@ -297,6 +308,7 @@ class TableSession(
             hints = if (!options.hint || shown.isEmpty()) emptyList() else shown.map { hint(it, wild) },
             total = ranking.size,
             first = from,
+            forgets = shown.isNotEmpty(),
         )
     }
 

@@ -51,6 +51,12 @@ sealed class Action {
     /** The candidate at [index] of all, whatever page is shown (a tap on the host's list). */
     data class Pick(val index: Int) : Action()
 
+    /**
+     * Forgets what was learned of the candidate at [index] of all (a long press on it), then
+     * reads the input again: see [Snapshot.forgets].
+     */
+    data class Forget(val index: Int) : Action()
+
     object NextPage : Action()
     object PreviousPage : Action()
 
@@ -74,6 +80,8 @@ sealed class Action {
  *   table's code, or a table's pinyin lookup)
  * @property total how many candidates there are in all, -1 if not yet known
  * @property first the index among all of the first candidate of the page shown
+ * @property forgets whether the candidates are the engine's to [forget][Action.Forget]: not a
+ *   prediction, nor where nothing is learned
  */
 data class Snapshot(
     val commit: String,
@@ -87,4 +95,5 @@ data class Snapshot(
     val hints: List<String> = emptyList(),
     val total: Int = candidates.size,
     val first: Int = 0,
+    val forgets: Boolean = false,
 )

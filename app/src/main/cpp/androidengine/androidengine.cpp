@@ -6,6 +6,7 @@
 #include <memory>
 #include <stdexcept>
 
+#include <fcitx/candidateaction.h>
 #include <fcitx/candidatelist.h>
 #include <fcitx/inputcontext.h>
 #include <fcitx/inputpanel.h>
@@ -31,6 +32,8 @@ public:
         engine_->send(inputContext, im_, EngineEvent::Pick, index_);
     }
 
+    int index() const { return index_; }
+
 private:
     AndroidEngine *engine_;
     std::string im_;
@@ -42,12 +45,16 @@ private:
  * fetched from the session a chunk at a time as the keyboard asks for them. A new snapshot
  * replaces the list, so what is fetched is always of the input shown. As a page it is the one the
  * session shows: candidate(i) is the (first + i)th of all.
+ *
+ * Where the session forgets what it learned, a long press on a candidate offers "Forget word", as
+ * libime's pinyin and table do.
  */
-class EngineCandidateList : public CandidateList, public BulkCandidateList {
+class EngineCandidateList : public CandidateList, public BulkCandidateList, public ActionableCandidateList {
 public:
-    EngineCandidateList(AndroidEngine *engine, std::string im, const EngineSnapshot &snapshot)
-            : engine_(engine), im_(std::move(im)), total_(snapshot.total) {
+    EngineCandidateList(AndroidEngine *engine, InputContext *ic, std::string im, const EngineSnapshot &snapshot)
+            : engine_(engine), ic_(ic), im_(std::move(im)), total_(snapshot.total), forgets_(snapshot.forgets) {
         setBulk(this);
+        if (forgets_) setActionable(this);
         for (size_t i = 0; i < snapshot.candidates.size(); i++) {
             const auto &hint = i < snapshot.hints.size() ? snapshot.hints[i] : std::string();
             words_.push_back(std::make_unique<EngineCandidateWord>(engine_, im_, static_cast<int>(i), snapshot.candidates[i], hint));
@@ -92,16 +99,42 @@ public:
 
     int totalSize() const override { return total_; }
 
+    bool hasAction(const CandidateWord &candidate) const override {
+        return forgets_ && dynamic_cast<const EngineCandidateWord *>(&candidate);
+    }
+
+    std::vector<CandidateAction> candidateActions(const CandidateWord &candidate) const override {
+        if (!hasAction(candidate)) return {};
+        CandidateAction forget;
+        forget.setId(ForgetAction);
+        // libime's table words it so; its pinyin says "Forget candidate"
+        forget.setText(D_("fcitx5-chinese-addons", "Forget word"));
+        std::vector<CandidateAction> actions;
+        actions.push_back(std::move(forget));
+        return actions;
+    }
+
+    void triggerAction(const CandidateWord &candidate, int id) override {
+        const auto *word = dynamic_cast<const EngineCandidateWord *>(&candidate);
+        if (!forgets_ || id != ForgetAction || !word) return;
+        // the snapshot that comes back replaces this list: nothing of it is touched after
+        engine_->send(ic_, im_, EngineEvent::Forget, word->index());
+    }
+
 private:
     static constexpr int Chunk = 32;
+    static constexpr int ForgetAction = 0;
 
     void check(int idx) const {
         if (idx < 0 || idx >= shown_) throw std::invalid_argument("invalid index");
     }
 
     AndroidEngine *engine_;
+    // whose panel holds the list, so it outlives it
+    InputContext *ic_;
     std::string im_;
     mutable int total_;
+    bool forgets_;
     int first_;
     int shown_;
     mutable std::vector<std::unique_ptr<EngineCandidateWord>> words_;
@@ -252,7 +285,7 @@ bool AndroidEngine::send(InputContext *ic, std::string im, EngineEvent event, in
             panel.setPreedit(Text(snapshot.preedit));
         }
     }
-    if (!snapshot.candidates.empty()) panel.setCandidateList(std::make_unique<EngineCandidateList>(this, std::move(im), snapshot));
+    if (!snapshot.candidates.empty()) panel.setCandidateList(std::make_unique<EngineCandidateList>(this, ic, std::move(im), snapshot));
     ic->updatePreedit();
     ic->updateUserInterface(UserInterfaceComponent::InputPanel);
     return snapshot.handled;

@@ -6,6 +6,7 @@ package org.fcitx.fcitx5.android.engine.user
 
 import org.fcitx.fcitx5.android.engine.data.NgramModel.Companion.NO_WORD
 import org.fcitx.fcitx5.android.engine.user.UserModelTest.Companion.entry
+import org.fcitx.fcitx5.android.engine.user.UserModelTest.Companion.inTrie
 import org.fcitx.fcitx5.android.engine.user.UserModelTest.Companion.model
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
@@ -55,6 +56,31 @@ class UserStoreTest {
         assertEquals(counts(first), counts(second))
         assertEquals(1, second.size)
         assertEquals("拟好", second.text(second.id(entry("拟好", "ni", "hao"))))
+    }
+
+    @Test
+    fun whatIsForgottenStaysForgotten() {
+        val niHao = entry("拟好", "ni", "hao")
+        val first = session { m, _ ->
+            m.learn(null, listOf(entry("你", "ni"), niHao))
+            m.forget(listOf(niHao))
+            // the word before, forgotten: nothing to pair with
+            m.learn(niHao, listOf(entry("吗", "ma")))
+            m.learn(null, listOf(entry("拟再", "ni", "zai")))
+            m.forget(listOf(entry("拟再", "ni", "zai")))
+            // learned again after it was forgotten: a word again
+            m.learn(null, listOf(entry("拟再", "ni", "zai")))
+        }
+        val second = session()
+        assertEquals(mapOf("你(ni)" to 1f, "吗(ma)" to 1f, "拟再(ni zai)" to 1f), counts(second))
+        assertEquals(counts(first), counts(second))
+        assertFalse(inTrie(second, "拟好", "ni", "hao"))
+        assertTrue(inTrie(second, "拟再", "ni", "zai"))
+        // compacted, the same
+        session(compactAt = 1)
+        val compacted = session()
+        assertEquals(counts(first), counts(compacted))
+        assertFalse(inTrie(compacted, "拟好", "ni", "hao"))
     }
 
     @Test

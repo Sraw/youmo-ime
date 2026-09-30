@@ -85,6 +85,26 @@ class TableUser(private val table: TableDictionary) {
         }
     }
 
+    /**
+     * Forgets what was learned of [text] under [code], as the user asked: how often it was picked,
+     * and the phrase, saved or seen. The table's own entry stays, in the table's order.
+     */
+    fun forget(code: String, text: String) {
+        if (!drop(code, text)) return
+        journal?.invoke(TableLog.forgot(code, text))
+    }
+
+    private fun drop(code: String, text: String): Boolean {
+        val key = key(code, text)
+        val index = table.indexOf(code, text)
+        var dropped = (index >= 0 && picks.remove(index) != null) or (savedPicks.remove(key) != null) or (autoPhrases.remove(key) != null)
+        saved[code]?.let { texts ->
+            dropped = texts.remove(text) or dropped
+            if (texts.isEmpty()) saved.remove(code)
+        }
+        return dropped
+    }
+
     private fun count(index: Int, code: String, text: String, n: Int) {
         if (index >= 0) picks[index] = (picks[index] ?: 0) + n else savedPicks[key(code, text)] = (savedPicks[key(code, text)] ?: 0) + n
     }
@@ -118,14 +138,16 @@ class TableUser(private val table: TableDictionary) {
         private const val PICKED: Byte = 1
         private const val SAVED: Byte = 2
         private const val SEEN: Byte = 3
+        private const val FORGOT: Byte = 4
 
         fun picked(code: String, text: String, n: Int) = FORMAT.record(PICKED) { writeUTF(code); writeUTF(text); writeInt(n) }
         fun saved(code: String, text: String) = FORMAT.record(SAVED) { writeUTF(code); writeUTF(text) }
         fun seen(code: String, text: String, n: Int) = FORMAT.record(SEEN) { writeUTF(code); writeUTF(text); writeInt(n) }
+        fun forgot(code: String, text: String) = FORMAT.record(FORGOT) { writeUTF(code); writeUTF(text) }
 
         fun replay(type: Byte, input: DataInputStream, user: TableUser) {
             // a type from a later version: what it held is lost, the rest still reads
-            if (type != PICKED && type != SAVED && type != SEEN) return
+            if (type !in PICKED..FORGOT) return
             val code = input.readUTF()
             val text = input.readUTF()
             if (code.isEmpty() || text.isEmpty()) return
@@ -134,6 +156,7 @@ class TableUser(private val table: TableDictionary) {
                 PICKED -> user.count(index, code, text, input.readInt())
                 // a phrase a later table has as its own entry: the entry stands for it
                 SAVED -> if (index < 0) user.keep(code, text)
+                FORGOT -> user.drop(code, text)
                 else -> if (index < 0 && !user.isSaved(code, text)) {
                     val key = key(code, text)
                     user.autoPhrases[key] = (user.autoPhrases[key] ?: 0) + input.readInt()

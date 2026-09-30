@@ -201,6 +201,37 @@ class TableUserTest {
     }
 
     @Test
+    fun whatIsForgottenStaysForgotten() {
+        val file = folder.root.resolve("wubi.user")
+        stored(file).let { (session, store) ->
+            teach(session)
+            store.close()
+        }
+        val user = TableUser(wubi)
+        TableUser.Store(file, user).apply { open() }.use {
+            user.forget("aaaa", "恭恭敬敬")
+            user.forget("wqwu", "你们")
+            user.forget("wqvb", "你好")
+            // nothing learned of it: no record
+            val records = ArrayList<ByteArray>()
+            val journal = user.journal
+            user.journal = { records += it; journal?.invoke(it) }
+            user.forget("aaaa", "工")
+            assertTrue(records.isEmpty())
+        }
+        // as nothing was ever learned
+        val forgotten = shown(TableSession(wubi, TableOptions.WUBI))
+        val (again, reopened) = stored(file)
+        assertEquals(forgotten, shown(again))
+        reopened.close()
+        // compacted, the same
+        stored(file, compactAt = 1).second.close()
+        val (compacted, closing) = stored(file)
+        assertEquals(forgotten, shown(compacted))
+        closing.close()
+    }
+
+    @Test
     fun aPhraseSavedIsSavedOnce() {
         val user = TableUser(wubi)
         val records = ArrayList<ByteArray>()

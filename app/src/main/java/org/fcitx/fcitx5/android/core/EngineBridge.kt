@@ -26,7 +26,7 @@ object EngineBridge {
     /**
      * A snapshot as the addon reads it, field by field. [candidates] run from the first of all,
      * through the page shown ([shown] of them from [first]), so the list the addon builds indexes
-     * as the session does.
+     * as the session does. [forgets]: whether "Forget word" is offered on them.
      */
     class Result(
         @JvmField val handled: Boolean,
@@ -37,6 +37,7 @@ object EngineBridge {
         @JvmField val first: Int,
         @JvmField val shown: Int,
         @JvmField val total: Int,
+        @JvmField val forgets: Boolean,
     )
 
     private val engines by lazy(LazyThreadSafetyMode.NONE) {
@@ -131,7 +132,7 @@ object EngineBridge {
         return Result(
             s.handled, s.commit, s.preedit,
             all.map { it.text }.toTypedArray(), all.map { it.hint }.toTypedArray(),
-            s.first, s.candidates.size, s.total,
+            s.first, s.candidates.size, s.total, s.forgets,
         )
     }
 

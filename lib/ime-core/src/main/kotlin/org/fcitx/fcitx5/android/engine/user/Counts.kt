@@ -44,15 +44,21 @@ internal class Counts {
     }
 
     /** Multiplies every count by [factor], dropping those that fall below [min]. */
-    fun scale(factor: Float, min: Float) {
+    fun scale(factor: Float, min: Float) = rebuild { _, v -> (v * factor).takeIf { it >= min } }
+
+    /** Drops the counts whose key [drop] says; seldom done, so it is a rebuild. */
+    fun removeIf(drop: (Long) -> Boolean) = rebuild { key, v -> v.takeUnless { drop(key) } }
+
+    /** Each count as [map] makes it anew, or dropped where it gives null. */
+    private inline fun rebuild(map: (Long, Float) -> Float?) {
         val oldKeys = keys
         val oldValues = values
         keys = LongArray(oldKeys.size) { EMPTY }
         values = FloatArray(oldKeys.size)
         size = 0
         for (i in oldKeys.indices) {
-            val v = oldValues[i] * factor
-            if (oldKeys[i] != EMPTY && v >= min) add(oldKeys[i], v)
+            if (oldKeys[i] == EMPTY) continue
+            map(oldKeys[i], oldValues[i])?.let { add(oldKeys[i], it) }
         }
     }
 

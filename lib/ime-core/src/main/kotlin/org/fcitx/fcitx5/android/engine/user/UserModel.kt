@@ -45,9 +45,11 @@ class UserModel(
         override fun toString() = text + syllables.joinToString(" ", "(", ")") { Syllables.spelling(it) }
     }
 
-    /** Hears of each sentence learned, to keep it: see [UserStore]. */
+    /** Hears of each sentence learned, and of words forgotten, to keep it: see [UserStore]. */
     fun interface Journal {
         fun record(prev: Entry?, sentence: List<Entry>)
+
+        fun forgot(words: List<Entry>) = Unit
     }
 
     var journal: Journal? = null
@@ -57,6 +59,8 @@ class UserModel(
     private val ids = HashMap<Entry, Int>()
     // the entry each word was learned as, to write it out again
     private val entries = HashMap<Int, Entry>()
+    // those of them from the user's dictionaries: see list
+    private val listed = HashSet<Int>()
 
     // the trie of the new words: children by syllable, sorted, per node
     private val childSyllables = arrayListOf(IntArray(0))
@@ -72,14 +76,15 @@ class UserModel(
 
     /**
      * Counts [sentence], each word and each pair, the first after [prev] if given (the word
-     * committed before it). Words the dictionary lacks become the user's.
+     * committed before it) and still known: one forgotten since is not made a word again. Words
+     * of the sentence the dictionary lacks become the user's.
      *
      * @return the words' ids
      */
     fun learn(prev: Entry?, sentence: List<Entry>): IntArray {
         require(sentence.isNotEmpty()) { "nothing to learn" }
         val words = IntArray(sentence.size) { id(sentence[it]) }
-        var before = if (prev == null) NO_WORD else id(prev)
+        var before = if (prev == null) NO_WORD else known(prev)
         for (w in words) {
             add(NO_WORD, w, 1f)
             if (before != NO_WORD) add(before, w, 1f)
@@ -93,6 +98,29 @@ class UserModel(
         // after halving: the journal may compact, writing out the counts as they now are
         journal?.record(prev, sentence)
         return words
+    }
+
+    /**
+     * Forgets [words], a candidate the user asked to: their counts and every pair they are in.
+     * One of the user's own words, forgotten alone, is gone from the trie too, as libime drops
+     * it from its user dictionary. One [list]ed stays typeable, its counts gone; so does one in a
+     * longer candidate, till the next start, as does a word whose counts were halved away.
+     */
+    fun forget(words: List<Entry>) {
+        val ids = words.mapNotNull { ids[it] }.toSet()
+        if (ids.isEmpty()) return
+        counts.removeIf { first(it) in ids || second(it) in ids }
+        total = 0f
+        counts.forEach { key, count -> if (first(key) == NO_WORD) total += count }
+        val word = words.singleOrNull()
+        val id = word?.let { this.ids[it] } ?: NO_WORD
+        if (word != null && isOwn(id)) {
+            removeFromTrie(word.syllables, id)
+            // learned again, it is a new word, put back in the trie
+            this.ids.remove(word)
+            entries.remove(id)
+        }
+        journal?.forgot(words)
     }
 
     /** Adds [count] to [entry] as a word; for counts kept, as compaction writes them. */
@@ -128,17 +156,8 @@ class UserModel(
     /** The id of [entry]: the dictionary's word if it has it so read, else the user's. */
     fun id(entry: Entry): Int {
         ids[entry]?.let { return it }
-        val node = dictionary.find(entry.syllables)
-        var id = -1
-        if (node >= 0) {
-            for (i in 0 until dictionary.wordCount(node)) {
-                if (vocabulary.word(dictionary.word(node, i)) == entry.text) {
-                    id = dictionary.word(node, i)
-                    break
-                }
-            }
-        }
-        if (id < 0) {
+        var id = inDictionary(entry)
+        if (id == NO_WORD) {
             id = vocabulary.size + newWords.size
             newWords += entry
             addToTrie(entry.syllables, id)
@@ -148,7 +167,28 @@ class UserModel(
         return id
     }
 
-    /** How many words the user added to the dictionary's. */
+    /**
+     * [id] of a word from the user's dictionaries: one they did not make, so forgetting it drops
+     * what was learned of it but leaves it to type, as libime leaves its extra dictionaries be.
+     */
+    fun list(entry: Entry): Int = id(entry).also { if (it >= vocabulary.size) listed += it }
+
+    // a word the user made, not the dictionary's nor one of their dictionaries'
+    private fun isOwn(id: Int) = id >= vocabulary.size && id !in listed
+
+    // the id of entry if it has one, without making it the user's word
+    private fun known(entry: Entry): Int = if (entry in ids || inDictionary(entry) != NO_WORD) id(entry) else NO_WORD
+
+    private fun inDictionary(entry: Entry): Int {
+        val node = dictionary.find(entry.syllables)
+        if (node < 0) return NO_WORD
+        for (i in 0 until dictionary.wordCount(node)) {
+            if (vocabulary.word(dictionary.word(node, i)) == entry.text) return dictionary.word(node, i)
+        }
+        return NO_WORD
+    }
+
+    /** How many words the user added to the dictionary's, forgotten ones too: no id is given twice. */
     val size: Int get() = newWords.size
 
     override fun child(node: Int, syllable: Int): Int {
@@ -181,6 +221,16 @@ class UserModel(
             node = next
         }
         nodeWords[node] = nodeWords[node] + word
+    }
+
+    // the nodes stay: a walk down them finds no word, and the next start leaves them out
+    private fun removeFromTrie(syllables: IntArray, word: Int) {
+        var node = root
+        for (s in syllables) {
+            node = child(node, s)
+            if (node < 0) return
+        }
+        nodeWords[node] = nodeWords[node].filter { it != word }.toIntArray()
     }
 
     private fun IntArray.inserted(at: Int, value: Int) = IntArray(size + 1) {

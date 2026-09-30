@@ -9,6 +9,7 @@ import org.fcitx.fcitx5.android.engine.data.DataFormatException
 import org.fcitx.fcitx5.android.engine.session.Action
 import org.fcitx.fcitx5.android.engine.session.Action.Backspace
 import org.fcitx.fcitx5.android.engine.session.Action.CommitRaw
+import org.fcitx.fcitx5.android.engine.session.Action.Forget
 import org.fcitx.fcitx5.android.engine.session.Action.Key
 import org.fcitx.fcitx5.android.engine.session.Action.NextPage
 import org.fcitx.fcitx5.android.engine.session.Action.Pick
@@ -296,6 +297,30 @@ class TableSessionTest {
         assertEquals(listOf("你们"), s.candidates)
         assertEquals("你们", t.apply(Select(0)).commit)
         assertEquals("你们", t.type("wqwu").first)
+    }
+
+    @Test
+    fun whatIsForgottenIsRankedAsTheTableHasIt() {
+        val t = session(TableOptions.WUBI.copy(saveAutoPhraseAfter = -1))
+        t.type("aaaa")
+        assertEquals("恭恭敬敬", t.apply(Select(1)).commit)
+        val learned = t.type("aaaa").second
+        assertEquals(listOf("恭恭敬敬", "工"), learned.candidates)
+        assertTrue(learned.forgets)
+        val forgot = t.apply(Forget(0))
+        assertEquals(listOf("工", "恭恭敬敬"), forgot.candidates)
+        assertEquals("aaaa", forgot.preedit)
+        // a phrase saved, forgotten: offered no more
+        t.apply(Reset)
+        t.type("wqiy")
+        t.type("wun")
+        t.type("wqwu")
+        assertEquals("你们", t.apply(Select(0)).commit)
+        assertEquals(listOf("你们"), t.type("wqw").second.candidates)
+        assertTrue(t.apply(Forget(0)).candidates.isEmpty())
+        // nothing to forget: nothing typed
+        t.apply(Reset)
+        assertFalse(t.apply(Forget(0)).handled)
     }
 
     @Test

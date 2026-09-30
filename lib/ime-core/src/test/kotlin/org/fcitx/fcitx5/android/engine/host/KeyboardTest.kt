@@ -88,7 +88,7 @@ class KeyboardTest {
                     input = ""
                     predicting = false
                 }
-                Action.NextPage, Action.PreviousPage -> {}
+                Action.NextPage, Action.PreviousPage, is Action.Forget -> {}
             }
             val shown = all()
             return Snapshot(commit, input, shown, 0, false, false, handled, predicting)
@@ -234,6 +234,15 @@ class KeyboardTest {
         type("ab")
         assertEquals("a!", keyboard.onEvent(EngineEvent.PICK, 1).commit)
         assertEquals(Action.Pick(1), session.actions.last())
+    }
+
+    @Test
+    fun aForgetIsByIndexAmongAll() {
+        type("ab")
+        val s = keyboard.onEvent(EngineEvent.FORGET, 1)
+        assertEquals(Action.Forget(1), session.actions.last())
+        assertEquals("ab", s.preedit)
+        assertTrue(s.handled)
     }
 
     @Test

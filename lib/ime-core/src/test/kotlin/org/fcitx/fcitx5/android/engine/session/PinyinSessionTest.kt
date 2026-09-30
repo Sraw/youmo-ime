@@ -14,6 +14,7 @@ import org.fcitx.fcitx5.android.engine.pinyin.ShuangpinSegmenter
 import org.fcitx.fcitx5.android.engine.pinyin.Syllables
 import org.fcitx.fcitx5.android.engine.session.Action.Backspace
 import org.fcitx.fcitx5.android.engine.session.Action.CommitRaw
+import org.fcitx.fcitx5.android.engine.session.Action.Forget
 import org.fcitx.fcitx5.android.engine.session.Action.Key
 import org.fcitx.fcitx5.android.engine.session.Action.NextPage
 import org.fcitx.fcitx5.android.engine.session.Action.Pick
@@ -22,6 +23,7 @@ import org.fcitx.fcitx5.android.engine.session.Action.PreviousPage
 import org.fcitx.fcitx5.android.engine.session.Action.Reset
 import org.fcitx.fcitx5.android.engine.session.Action.Select
 import org.fcitx.fcitx5.android.engine.user.UserModel
+import org.fcitx.fcitx5.android.engine.user.UserModelTest.Companion.inTrie
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertThrows
@@ -456,6 +458,68 @@ class PinyinSessionTest {
         // a sentence with text kept as typed
         val s = session.type("nivvv")
         assertEquals("你vvv", session.apply(Select(s.candidates.indexOf("你vvv"))).commit)
+        assertEquals(1f, user.total)
+    }
+
+    @Test
+    fun aCandidateForgottenIsReadAsBeforeItWasLearned() {
+        val (session, user) = learning(pageSize = 1)
+        session.type("nizai")
+        val fresh = session.candidates(0, 20)
+        session.apply(Reset)
+        // 拟 then 再: learned as the user's word 拟再
+        session.type("nizai")
+        session.apply(Pick(session.candidates(0, 20).indexOfFirst { it.text == "拟" }))
+        session.apply(Select(0))
+        session.apply(Reset)
+        val before = session.type("nizai")
+        assertEquals(listOf("拟再"), before.candidates)
+        assertTrue(before.forgets)
+        assertEquals(1, user.size)
+        // forgotten from the second page, which stays shown
+        session.apply(NextPage)
+        val after = session.apply(Forget(session.candidates(0, 20).indexOfFirst { it.text == "拟再" }))
+        // read as before: 拟再 as the sentence 拟 再, not the user's word
+        assertEquals(fresh, session.candidates(0, 20))
+        assertEquals(1, after.page)
+        assertEquals("ni zai", after.preedit)
+        assertEquals(0f, user.total)
+        session.apply(Reset)
+        val again = session.type("nizai")
+        assertEquals(fresh.take(1).map { it.text }, again.candidates)
+        // past the candidates: nothing to forget
+        assertEquals(again, session.apply(Forget(99)))
+    }
+
+    @Test
+    fun aWordCommittedThenForgottenIsNotLearnedAgainAsTheWordBefore() {
+        val (session, user) = learning()
+        session.type("nizai")
+        session.apply(Pick(session.candidates(0, 20).indexOfFirst { it.text == "拟" }))
+        session.apply(Select(0))
+        // deleted in the app, typed again and forgotten: the context is still 拟再's
+        session.apply(Backspace)
+        session.type("nizai")
+        session.apply(Forget(session.candidates(0, 20).indexOfFirst { it.text == "拟再" }))
+        session.apply(Pick(session.candidates(0, 20).indexOfFirst { it.text == "你在" }))
+        assertFalse(inTrie(user, "拟再", "ni", "zai"))
+        val counted = ArrayList<String>()
+        user.forEachCount({ e, _ -> counted += e.toString() }, { a, b, _ -> counted += "$a $b" })
+        // 你 在 and their pair, none with 拟再
+        assertEquals(listOf("你(ni)", "你(ni) 在(zai)", "在(zai)"), counted.sorted())
+    }
+
+    @Test
+    fun onlyWhatAUserModelLearnedIsForgotten() {
+        assertFalse(session().type("ni").forgets)
+        assertEquals(session().type("ni"), session().also { it.type("ni") }.apply(Forget(0)))
+        val (session, user) = learning()
+        session.type("wo")
+        val predicted = session.apply(Select(0))
+        assertTrue(predicted.predicting)
+        assertFalse(predicted.forgets)
+        // a prediction offered: nothing forgotten
+        assertEquals(predicted.copy(commit = ""), session.apply(Forget(0)))
         assertEquals(1f, user.total)
     }
 
