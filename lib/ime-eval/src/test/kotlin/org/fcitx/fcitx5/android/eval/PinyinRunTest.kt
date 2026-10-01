@@ -4,30 +4,36 @@
  */
 package org.fcitx.fcitx5.android.eval
 
+import org.fcitx.fcitx5.android.engine.data.PinyinData
 import org.fcitx.fcitx5.android.engine.data.PinyinDataBuilder
 import org.fcitx.fcitx5.android.engine.pinyin.Syllables
+import org.fcitx.fcitx5.android.engine.rerank.SentencePicker
+import org.fcitx.fcitx5.android.engine.rerank.SentenceRefiner
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
+import java.io.File
+import java.nio.ByteBuffer
 
 class PinyinRunTest {
 
     @get:Rule
     val tmp = TemporaryFolder()
 
+    private val bytes = PinyinDataBuilder()
+        .unigram("<unk>", -7f, 0f)
+        .unigram("你", -2f, 0f)
+        .unigram("你好", -3f, 0f)
+        .entry("你", intArrayOf(Syllables.id("ni")))
+        .entry("你好", intArrayOf(Syllables.id("ni"), Syllables.id("hao")))
+        .build().toByteArray()
+
     @Test
     fun theEngineTypesEachInputALetterAtATime() {
         val data = tmp.newFile("pinyin.data")
-        data.writeBytes(
-            PinyinDataBuilder()
-                .unigram("<unk>", -7f, 0f)
-                .unigram("你", -2f, 0f)
-                .unigram("你好", -3f, 0f)
-                .entry("你", intArrayOf(Syllables.id("ni")))
-                .entry("你好", intArrayOf(Syllables.id("ni"), Syllables.id("hao")))
-                .build().toByteArray(),
-        )
+        data.writeBytes(bytes)
         val set = tmp.newFile("set.tsv").apply { writeText("nihao\t你好\tdaily\nnh\t你好\tabbrev\n") }
         val result = tmp.newFile("result.tsv")
         assertEquals(0, runCli(arrayOf("pinyin", data.path, set.path, result.path), StringBuilder(), StringBuilder()))
@@ -49,5 +55,54 @@ class PinyinRunTest {
         assertEquals(0, runCli(arrayOf("pinyin", data.path, shuangpin.path, result.path, "--scheme", "xiaohe"), StringBuilder(), StringBuilder()))
         assertEquals("你好", result.useLines { RunResultFormat.parse(it) }.single().candidates.first())
         assertEquals(2, runCli(arrayOf("pinyin", data.path, shuangpin.path, result.path, "--scheme", "nope"), StringBuilder(), StringBuilder()))
+    }
+
+    /** What each reranker made was asked about: the contexts it saw, and whether it was paused on. */
+    private class Recording : SentencePicker, SentenceRefiner {
+        val contexts = HashSet<String>()
+        var refined = 0
+
+        override fun pick(context: String, readings: List<String>, scores: List<Float>): Int {
+            contexts += context
+            return 0
+        }
+
+        override fun refine(context: String, readings: List<String>, scores: List<Float>, budget: Int): Int? {
+            contexts += context
+            refined++
+            return null
+        }
+    }
+
+    @Test
+    fun eachSampleIsWeighedByRerankersOfItsOwn() {
+        val pickers = ArrayList<Recording>()
+        val refiners = ArrayList<Recording>()
+        val run = PinyinRun(
+            PinyinData.load(ByteBuffer.wrap(bytes)),
+            reranker = { Recording().also { pickers += it } },
+            refiner = { Recording().also { refiners += it } },
+        )
+        val samples = listOf(Sample("nihao", "你好", "daily", "甲"), Sample("ni", "你", "daily", "乙"), Sample("nihao", "你好", "daily", "丙"))
+        run.run(samples)
+        // whatever a reranker keeps from one input cannot reach the next sample
+        assertEquals(pickers.size, refiners.size)
+        assertTrue(pickers.all { it.contexts.size == 1 && it.refined == 0 })
+        // the timed rounds: a picker for each sample's keys, a refiner for its pause
+        assertEquals(listOf("甲", "乙", "丙"), pickers.takeLast(3).map { it.contexts.single() })
+        assertEquals(listOf(1, 1, 1), refiners.takeLast(3).map { it.refined })
+    }
+
+    @Test
+    fun threadsChangeNothingButTheTime() {
+        val data = tmp.newFile("pinyin.data").apply { writeBytes(bytes) }
+        val set = tmp.newFile("set.tsv").apply { writeText("nihao\t你好\tdaily\tA\nnh\t你好\tabbrev\nni\t你\tdaily\tB\nnihao\t你好\tdaily\n") }
+        fun candidates(threads: String): List<Pair<String, List<String>>> {
+            val result = File(tmp.root, "result-$threads.tsv")
+            assertEquals(0, runCli(arrayOf("pinyin", data.path, set.path, result.path, "--threads", threads), StringBuilder(), StringBuilder()))
+            return result.useLines { RunResultFormat.parse(it) }.map { it.input to it.candidates }
+        }
+        assertEquals(listOf("nihao", "nh", "ni", "nihao"), candidates("1").map { it.first })
+        assertEquals(candidates("1"), candidates("3"))
     }
 }

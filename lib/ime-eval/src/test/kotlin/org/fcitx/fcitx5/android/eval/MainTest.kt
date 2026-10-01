@@ -32,6 +32,9 @@ class MainTest {
             arrayOf("pinyin", "d", "s", "r", "--color", "red"),
             arrayOf("pinyin", "d", "s", "r", "--neighbours", "maybe"),
             arrayOf("pinyin", "d", "s", "r", "--scheme", "ms", "--neighbours", "on"), // 双拼 reads none
+            arrayOf("pinyin", "d", "s", "r", "--threads", "0"),
+            arrayOf("ksc", "d", "s", "--threads", "many"),
+            arrayOf("tune", "d", "s", "l", "--threads", "4"), // not tune's
             arrayOf("lm", "m", "c"), // nothing to score
             arrayOf("score", "s", "r", "--scheme", "xiaohe"), // not score's
             arrayOf("shuangpin", "xiaohe", "s", "o", "--half", "tune"),
