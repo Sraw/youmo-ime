@@ -1,0 +1,11 @@
+{
+    "uniqueId": "HuggingFaceFW/fineweb-2",
+    "artifactVersion": "cmn_Hani 000_00000, 000_00001 (af9c133)",
+    "description": "Web text from CommonCrawl, by Hugging Face; the word n-grams of its chat-like Chinese pages are mixed into the pinyin language model in pinyin.data. Use of it is also subject to CommonCrawl's Terms of Use.",
+    "name": "FineWeb 2",
+    "website": "https://huggingface.co/datasets/HuggingFaceFW/fineweb-2",
+    "tag": "native",
+    "licenses": [
+        "ODC-By-1.0"
+    ]
+}

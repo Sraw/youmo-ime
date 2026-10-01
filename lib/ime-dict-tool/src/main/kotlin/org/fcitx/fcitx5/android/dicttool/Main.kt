@@ -24,8 +24,10 @@ import kotlin.system.exitProcess
 val USAGE = """
     usage: pinyin -o <out> --lm <lm.arpa> <dict.txt>...   compile a pinyin dictionary and model
            table -o <out> <table.txt>                     compile a code table
-           mix -o <out.arpa> --lm <lm.arpa> [--weight <w>] [--cutoffs <bigram>,<trigram>] <chat.jsonl.gz>
-                                                          mix a model with n-grams counted in chat
+           mix -o <out.arpa> --lm <lm.arpa> [--weight <w>] [--cutoffs <bigram>,<trigram>] <corpus>...
+                                                          mix a model with n-grams counted in chat:
+                                                          conversations a JSON array a line (.jsonl.gz),
+                                                          or FineWeb-2 shards' chat-like pages (.parquet)
            check <pinyin data> <lm.arpa>                  compare compiled scores with the model
 """.trimIndent()
 
@@ -54,7 +56,8 @@ fun runCli(args: Array<String>, out: Appendable, err: Appendable): Int {
         err.appendLine(e.toString())
         1
     } catch (e: IllegalArgumentException) {
-        // an inconsistency only visible once everything is read: a duplicate n-gram, no <unk> ...
+        // an inconsistency only visible once everything is read (a duplicate n-gram, no <unk> ...),
+        // or a path WebText refuses
         err.appendLine(e.message)
         1
     }
@@ -67,7 +70,7 @@ private fun dispatch(command: String?, options: Options, out: Appendable): Boole
             pinyin(options.output, options.lm, options.inputs, out)
         command == "table" && options.output != null && options.lm == null && options.inputs.size == 1 ->
             table(options.output, options.inputs.single(), out)
-        command == "mix" && options.output != null && options.lm != null && options.inputs.size == 1 ->
+        command == "mix" && options.output != null && options.lm != null && options.inputs.isNotEmpty() ->
             mix(options, out)
         command == "check" && options.output == null && options.lm == null && options.inputs.size == 2 ->
             check(options.inputs[0], options.inputs[1], out)
@@ -84,9 +87,9 @@ private class Options(
     val cutoffs: Pair<Int, Int>,
 ) {
     companion object {
-        // what measured best with LCCC over the written and the chat evaluation sets together
-        // (dev/ENGINE-DESIGN.md); more chat still helps chat, but costs written text
-        const val WEIGHT = 0.4
+        // what measured best with FineWeb-2's chat-like pages over the written and the chat
+        // evaluation sets together (dev/ENGINE-DESIGN.md)
+        const val WEIGHT = 0.6
         val CUTOFFS = 2 to 2
 
         /** @return null for an option with a bad value */
@@ -119,16 +122,24 @@ private fun mix(options: Options, out: Appendable) {
     val base = File(lm).bufferedReader().use { ArpaModel.read(it, lm) }
     out.appendLine("model: ${base.size} / ${base.bigrams.size} / ${base.trigrams.size} n-grams")
     val counts = ChatCounts(base)
-    val corpus = options.inputs.single()
-    var lines = 0
-    GZIPInputStream(File(corpus).inputStream().buffered()).bufferedReader().use { r ->
-        r.forEachNumberedLine(corpus) { line, _ ->
-            if (line.isBlank()) return@forEachNumberedLine
-            JsonStrings.parse(line).forEach(counts::add)
-            lines++
+    var documents = 0
+    for (corpus in options.inputs) {
+        if (corpus.endsWith(".parquet")) {
+            WebText.read(File(corpus)) { page ->
+                page.forEach(counts::add)
+                documents++
+            }
+        } else {
+            GZIPInputStream(File(corpus).inputStream().buffered()).bufferedReader().use { r ->
+                r.forEachNumberedLine(corpus) { line, _ ->
+                    if (line.isBlank()) return@forEachNumberedLine
+                    JsonStrings.parse(line).forEach(counts::add)
+                    documents++
+                }
+            }
         }
     }
-    out.appendLine("chat: $lines conversations, ${counts.tokens} words, ${counts.bigrams.size} bigrams, ${counts.trigrams.size} trigrams")
+    out.appendLine("chat: $documents documents, ${counts.tokens} words, ${counts.bigrams.size} bigrams, ${counts.trigrams.size} trigrams")
     val (minBigram, minTrigram) = options.cutoffs
     val mixed = Mixer(base, counts, KneserNey(counts), options.weight, minBigram, minTrigram).mix()
     out.appendLine("mixed: ${mixed.size} / ${mixed.bigrams.size} / ${mixed.trigrams.size} n-grams")

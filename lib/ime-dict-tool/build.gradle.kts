@@ -9,12 +9,12 @@
 //
 //   ./gradlew :lib:ime-dict-tool:run --args="pinyin -o <out> --lm <lm.arpa> <dict.txt>..."
 //   ./gradlew :lib:ime-dict-tool:run --args="table -o <out> <table.txt>"
-//   ./gradlew :lib:ime-dict-tool:run --args="mix -o <out.arpa> --lm <lm.arpa> <chat.jsonl.gz>"
+//   ./gradlew :lib:ime-dict-tool:run --args="mix -o <out.arpa> --lm <lm.arpa> <chat.jsonl.gz | fineweb.parquet>..."
 //   ./gradlew :lib:ime-dict-tool:run --args="check <pinyin data> <lm.arpa>"
 //
 // The app build runs it through EngineDataPlugin (build-logic): `./gradlew :app:compileEngineData`
-// downloads libime's sources once and puts engine/pinyin.data into the app's assets. `mix` is not
-// part of it: the only chat measured, LCCC, is for research (dev/ENGINE-DESIGN.md).
+// downloads libime's sources and two of FineWeb-2's Chinese shards once, mixes the shards'
+// chat-like pages into the model and puts engine/pinyin.data into the app's assets.
 plugins {
     application
     alias(libs.plugins.kotlin.jvm)
@@ -22,7 +22,8 @@ plugins {
 
 application {
     mainClass.set("org.fcitx.fcitx5.android.dicttool.MainKt")
-    // mix holds two language models and the chat's counts in memory: 4.8 GB resident, as measured
+    // mix holds two language models and the chat's counts in memory: 7 GB resident over two
+    // FineWeb-2 shards, as measured; keep in step with EngineDataPlugin
     applicationDefaultJvmArgs = listOf("-Xmx6g")
 }
 
@@ -33,6 +34,7 @@ tasks.named<JavaExec>("run") {
 
 dependencies {
     implementation(project(":lib:ime-core"))
+    implementation(libs.duckdb.jdbc)
     testImplementation(libs.junit)
 }
 

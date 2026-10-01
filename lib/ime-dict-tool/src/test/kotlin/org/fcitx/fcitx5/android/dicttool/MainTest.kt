@@ -60,7 +60,7 @@ class MainTest {
         assertEquals(err, 0, code)
         assertTrue(out, out.contains("model: 3 / 1 / 1 n-grams"))
         // each line its own start, split at the x: 你 好 | 好 好 | 你 | 好 你
-        assertTrue(out, out.contains("chat: 2 conversations, 7 words, 5 bigrams, 3 trigrams"))
+        assertTrue(out, out.contains("chat: 2 documents, 7 words, 5 bigrams, 3 trigrams"))
         // the model's 你 好 and the chat's 好 好 and 好 你; the chat's trigrams all begin at a start
         assertTrue(out, out.contains("mixed: 3 / 3 / 1 n-grams"))
         val dict = file("dict.txt", "你 ni\n好 hao\n")

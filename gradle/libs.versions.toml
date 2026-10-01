@@ -73,6 +73,8 @@ aboutlibraries-core = { module = "com.mikepenz:aboutlibraries-core", version.ref
 detekt-gradlePlugin = { module = "dev.detekt:detekt-gradle-plugin", version.ref = "detekt" }
 aboutlibraries-plugin = { module = "com.mikepenz.aboutlibraries.plugin:aboutlibraries-plugin", version.ref = "aboutlibraries" }
 junit = { module = "junit:junit", version = "4.13.2" }
+# reads FineWeb-2's parquet shards in ime-dict-tool, a host tool: not in the APK
+duckdb-jdbc = { module = "org.duckdb:duckdb_jdbc", version = "1.5.6.0" }
 androidx-test-runner = { module = "androidx.test:runner", version.ref = "test" }
 androidx-test-rules = { module = "androidx.test:rules", version.ref = "test" }
 androidx-test-core = { module = "androidx.test:core", version.ref = "test" }

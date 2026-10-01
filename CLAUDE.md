@@ -25,7 +25,7 @@ Free to restructure; upstream compatibility is not a constraint.
 | Static analysis (syntax rules only; type resolution doesn't work here) | `./gradlew detekt` |
 | Accept current findings after a deliberate batch (run alone, not with `detekt`; `:<module>:detektBaseline` for one module, bare `detektBaseline` rewrites every module) | `./gradlew :<module>:detektBaseline` |
 | App coverage (report only, no floor) | `./gradlew :app:koverLogDebug` |
-| Engine data into app assets (downloads libime's sources once; part of every app build) | `./gradlew :app:compileEngineData` |
+| Engine data into app assets (part of every app build; downloads libime's sources and two FineWeb-2 shards, ~10 GB, once; the FineWeb mix then takes 7 min and 7 GB RAM: `./gradlew --stop` first on 16 GB, and `-Pengine.mix=false` skips it) | `./gradlew :app:compileEngineData` |
 
 Unit tests need no submodules, NDK or CMake. Instrumented tests (`FcitxTest`, `SoftKeyboardTest`)
 need the native build and an emulator; CI runs them weekly / on PRs labelled `emulator`.

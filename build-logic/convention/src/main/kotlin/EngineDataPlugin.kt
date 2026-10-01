@@ -47,18 +47,22 @@ import javax.inject.Inject
  * Compiles the own engine's data (lib/ime-dict-tool) from the text sources libime builds its own
  * from and adds it to the app's assets as `engine/pinyin.data` and `engine/table/<name>.data`
  * for libime's code tables (五笔, 仓颉 ...).
- * No sentence model ships, nor is chat mixed into the language model: the ones measured
- * (chinese-ime-lm's, ime-dict-tool's `mix` over LCCC) learned from LCCC, whose README keeps it
- * to research. Stored uncompressed, so the
+ * Mixed into libime's language model are the n-grams of the chat-like pages of two of FineWeb-2's
+ * Chinese shards (ime-dict-tool's `mix`, which picks the pages): libime's model knows written
+ * text, and people type chat. No sentence model ships: the ones measured learned from LCCC,
+ * whose README keeps it to research. Stored uncompressed, so the
  * engine can map it straight out of the APK rather than copying it out first; it is also left
  * out of the data descriptor for that reason (the descriptor lists only src/main/assets).
  *
  * The sources are the archives libime's CMake downloaded, checked against the same SHA-256.
- * Downloads go to the root project's `.gradle/engine-downloads`, out of `build`: half a gigabyte
+ * FineWeb-2's are pinned to a revision of the dataset and checked against the SHA-256 it lists.
+ * Downloads go to the root project's `.gradle/engine-downloads`, out of `build`: ten gigabytes
  * that `clean` should not fetch again, and where one put there by hand is not taken for a stale
  * output and deleted.
- * Each step declares its inputs and outputs, so the download and the minute-long compile run
- * once and again only when a source or the tool changes.
+ * Each step declares its inputs and outputs, so the downloads, the seven-minute mix and the
+ * compile run once and again only when a source or the tool changes. `-Pengine.mix=false` compiles
+ * libime's model as it is, skipping FineWeb-2 altogether: for CI, whose runners have neither the
+ * memory nor the disk for it, and whose builds are not released.
  */
 class EngineDataPlugin : Plugin<Project> {
 
@@ -84,6 +88,16 @@ class EngineDataPlugin : Plugin<Project> {
             "3e9d87b04a393f131723472c8eaa860dd23c378a3d4f6a9005513b2a95b3614b",
             listOf("cj", "db", "erbi", "qxm", "wanfeng", "wbpy", "wbx", "zrm").map { "$it.txt" },
         )
+        // HuggingFaceFW/fineweb-2's cmn_Hani (ODC-By 1.0), at the revision measured: shard name to
+        // SHA-256. Two of its 370 shards hold some 0.4 billion characters of chat-like pages; more
+        // is a question for measuring (dev/ENGINE-DESIGN.md)
+        private const val FINEWEB_URL =
+            "https://huggingface.co/datasets/HuggingFaceFW/fineweb-2/resolve/af9c13333eb981300149d5ca60a8e9d659b276b9/data/cmn_Hani/train/"
+        private val FINEWEB = mapOf(
+            "000_00000.parquet" to "3e43fefabc3ee500f9874655ece1776f96b81568cf33e0a6376835425ce42598",
+            "000_00001.parquet" to "1829410bee959d64fee8c34efd3e741f22c368cfe62aaa7a971a56afabe1d92f",
+        )
+        const val MIX_TASK = "mixEngineModel"
         const val TABLES_TASK = "compileEngineTables"
         private const val TOOL_MAIN = "org.fcitx.fcitx5.android.dicttool.MainKt"
     }
@@ -106,6 +120,14 @@ class EngineDataPlugin : Plugin<Project> {
             }
         }
 
+        val shards = FINEWEB.entries.mapIndexed { i, (name, sha) ->
+            target.tasks.register<DownloadTask>("downloadFineweb$i") {
+                url.set(FINEWEB_URL + name)
+                sha256.set(sha)
+                outputFile.set(downloadsDir.file("fineweb2/$name"))
+            }
+        }
+
         val tool = target.configurations.create("engineDataTool") {
             isCanBeConsumed = false
             isCanBeResolved = true
@@ -114,13 +136,29 @@ class EngineDataPlugin : Plugin<Project> {
         }
         target.dependencies.add(tool.name, target.dependencies.project(mapOf("path" to ":lib:ime-dict-tool")))
 
+        val mix = target.tasks.register<MixEngineModel>(MIX_TASK) {
+            classpath = tool
+            mainClass.set(TOOL_MAIN)
+            // both models and the pages' counts: 7 GB resident, as measured; keep in step with
+            // ime-dict-tool's own run task
+            maxHeapSize = "6g"
+            lm.set(extracted[0].flatMap { it.outputDir.file(LM.files.single()) })
+            corpus.from(shards.map { download -> download.flatMap { it.outputFile } })
+            output.set(target.layout.buildDirectory.file("engine-model-mixed/lm_mixed.arpa"))
+        }
         val compile = target.tasks.register<CompileEngineData>(COMPILE_TASK) {
             classpath = tool
             mainClass.set(TOOL_MAIN)
-            // the whole language model is held in memory while it is sorted: 1.2 GB at most, as
-            // measured
-            maxHeapSize = "2g"
-            lm.set(extracted[0].flatMap { it.outputDir.file(LM.files.single()) })
+            // the whole mixed model is held in memory while it is sorted: 3.6 GB resident, as measured
+            maxHeapSize = "4g"
+            val mixed = target.providers.gradleProperty("engine.mix").orNull?.let {
+                requireNotNull(it.toBooleanStrictOrNull()) { "engine.mix: true or false, not $it" }
+            } ?: true
+            if (!mixed) {
+                lm.set(extracted[0].flatMap { it.outputDir.file(LM.files.single()) })
+            } else {
+                lm.set(mix.flatMap { it.output })
+            }
             dictionaries.from(DICT.files.map { name -> extracted[1].flatMap { it.outputDir.file(name) } })
             outputDir.set(target.layout.buildDirectory.dir("generated/engine-assets"))
         }
@@ -226,6 +264,27 @@ class EngineDataPlugin : Plugin<Project> {
             exec.exec {
                 commandLine(cmake.path, "-E", "tar", "xf", archive.get().asFile.path)
                 workingDir = dir
+            }
+        }
+    }
+
+    /** The language model mixed with the n-grams of web pages, as ARPA text (a gigabyte). */
+    @CacheableTask
+    abstract class MixEngineModel : JavaExec() {
+        @get:InputFile
+        @get:PathSensitive(PathSensitivity.NAME_ONLY)
+        abstract val lm: RegularFileProperty
+
+        @get:InputFiles
+        @get:PathSensitive(PathSensitivity.NAME_ONLY)
+        abstract val corpus: ConfigurableFileCollection
+
+        @get:OutputFile
+        abstract val output: RegularFileProperty
+
+        init {
+            argumentProviders += CommandLineArgumentProvider {
+                listOf("mix", "-o", output.get().asFile.path, "--lm", lm.get().asFile.path) + corpus.files.map { it.path }
             }
         }
     }
