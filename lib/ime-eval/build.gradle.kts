@@ -17,7 +17,11 @@
 //
 // data/pinyin.tsv is written by hand; the other sets are made from it by the commands above, and
 // a test fails until they are remade after it changes. Samples split into a tune and a held-out
-// half by their text (Halves): choose on one, report on the other.
+// half by their text (Halves): choose on one, report on the other. data/pinyin-chat.tsv is chat
+// text rather than written for the project, made once by tools/make-chat-set.py.
+//
+// `pinyin` and `ksc` run on every core unless given --threads; the results do not change with
+// it, but host latencies compare only between runs on as many threads.
 //
 // Results come from an engine run: run-on-device.sh produces one for the engine the APK ships
 // (the own engine, since libime left the app); baseline/ keeps the libime result it was measured

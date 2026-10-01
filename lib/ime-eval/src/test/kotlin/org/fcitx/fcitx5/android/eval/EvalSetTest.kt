@@ -64,6 +64,13 @@ class EvalSetTest {
         assertEquals("duplicate inputs", samples.size, samples.map { it.input }.toSet().size)
     }
 
+    @Test
+    fun everySetParses() {
+        val sets = File("data").listFiles { file -> file.name.endsWith(".tsv") }!!
+        assertTrue(sets.any { it.name == "pinyin-chat.tsv" })
+        for (set in sets) assertTrue(set.name, set.useLines { EvalSet.parse(it) }.isNotEmpty())
+    }
+
     /** The derived sets are made by commands from data/pinyin.tsv; a change to it must remake them. */
     @Test
     fun theDerivedSetsAreUpToDate() {

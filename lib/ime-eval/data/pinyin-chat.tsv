@@ -1,0 +1,2101 @@
+# SPDX-License-Identifier: MIT
+# SPDX-FileCopyrightText: Copyright (c) 2020 lemon234071 (LCCC, https://github.com/thu-coai/CDial-GPT)
+#
+# Chat lines as people type them: runs of 4 to 12 Han chars from LCCC-base's validation split
+# (Wang et al., 2020: Weibo and other chat, MIT; its README asks for research use), which the
+# engine's model is not mixed with. Picked and given readings for this project by
+# tools/make-chat-set.py; the text is kept as its writers typed it, slips and all, so a first
+# choice is sometimes judged wrong for being better written. Measures what a change does to chat
+# next to pinyin.tsv.
+# One sample per line: input<TAB>expected<TAB>chat[<TAB>context], the context being what came
+# before the run in the same turn.
+ouyuwodaguimi	偶遇我大闺蜜	chat	好好好，
+woyeshiyongxinliangkule	我也是用心良苦了	chat	为了你们新年有惊喜，
+keyishoucangma	可以收藏吗	chat
+yigejieshuyeshixindekaishi	一个结束也是新的开始	chat
+wozenmenameerne	我怎么那么二呢	chat	应该是的，
+niyouqianlizhuifenyou	你有千里追分油	chat	真可怜，我这有止疼膏给你贴个吧，哦对了，
+chaojinongnongkouwei	超级农农口味	chat
+dengwomendezuizhongbanbenchulai	等我们的最终版本出来	chat	哎呀！还是被你知道咯！再等等再等等；
+xiangbuxiangtingya	想不想听呀	chat	版本出来，唱给你听,好不好。歌词在去年就已经写好了，一直没找到会谱曲的人儿。直到前不久小胖才找到。初稿很好听哦,每晚伴着它睡觉。
+hahaxiexiekuaihuilaile	哈哈谢谢快回来了	chat
+buzhidaoniyitiangankaishenme	不知道你一天感慨什么	chat
+gaokaofanzhengliubaijishibashijie	高考反正六百几是吧师姐	chat	我如果学理科的话那我肯定喜欢啊，
+dainichixinxianguiyu	带你吃新鲜桂鱼	chat
+nizijixuanzeyixia	你自己选择一下	chat	那我肥肥？胖胖？
+haihaohaihao	还好还好	chat
+weitajiayoulou	为她加油喽	chat
+zhegediqueshikeyi	这个的确是可以	chat
+yingduanhaishifaduan	英短还是法短	chat
+haogongzuonan	好工作难	chat	你想想那么多毕业生，还有过年了马上一大推辞职的，工作不难，
+shuxuetongbuhaodepiaoguo	数学同不好的飘过	chat
+shijianshijianyanzhenlideweiyibiaozhun	时间是检验真理的唯一标准	chat
+zhezhongbijiaokaixin	这种比较开心	chat	每天吃喝睡，
+bingqiexishoubianhaogengrongyipang	并且吸收变好更容易胖	chat
+wanglianmamaojienixi	网恋吗猫借你吸	chat
+caizaichifan	才在吃饭	chat
+hahahahachaojikeai	哈哈哈哈超级可爱	chat
+womenwanfenxihuandelilandi	我们万分喜欢的李兰迪	chat	跨一步是成长的新篇，回头看是青春的足迹。想一个稚气的问题，梦一个惊异的天地，但你永远是你，
+jiuyijingrangwokudebunengziyi	就已经让我哭的不能自已	chat	刚看完芈月传的预告，
+niqimalaikankanwo	你起码来看看我	chat
+ganjuehaosuan	感觉好酸	chat	看着他们吃，
+manzuidoushikoushui	满嘴都是口水	chat	看着他们吃，感觉好酸，
+tatinghaogoutongde	她挺好沟通的	chat
+liaoliaolixiang	聊聊理想	chat	距离不是问题啊，我们随时可以聊聊人生，
+taxuyaodeshitiexinhetashi	她需要的是贴心和踏实	chat	摩羯不需要太多的浪漫，
+bietaipianjidaxiongdi	别太偏激大兄弟	chat	每个人都有素质之区分，这跟什么地区有关系吗？只有我一个人听出来了歧视外地人？北京人和任何地区的人都有没素质的，
+yongxiaomijiubushixiannvle	用小米就不是仙女了	chat
+keshiwojuedezhehuashuodehensha	可是我觉得这话说的很傻	chat	你很懂的样子。。。
+huitouzhaozhaoxiexie	回头找找谢谢	chat
+zijizhaoqu	自己找去	chat
+meiyoufensede	没有粉色的	chat
+zhudinggudu	注定孤独	chat
+yidianyudedoumeiyou	一点馀地都没有	chat	咋啦…
+xingfuchangyuanna	幸福长远呐	chat	爱油，动作迅猛呀！恭喜恭喜，百年好合，
+xinnianhaoxinnianhao	新年好新年好	chat
+couhechidianmaoliang	凑合吃点猫粮	chat
+qidaimingtianjian	期待明天见	chat
+chibaobaocaihao	吃饱饱才好	chat	不怕，
+nikenengwanquanmeibianya	你可能完全没变呀	chat	想开点万一是裤子减肥了呢？
+dengnimangwanlejiuyoushijiankanle	等你忙完了就有时间看了	chat	等着跟你一起看，
+kouxialiuqingashizhu	口下留情啊施主	chat
+huaqianshijianhenrangrenyukuaideshia	花钱是件很让人愉快的事啊	chat
+danfangengzhuanye	单反更专业	chat
+youshebiyoude	有舍必有得	chat	舍得舍得，
+genwochabuduone	跟我差不多呢	chat	哟，
+zaijianfeima	在减肥吗	chat
+niyoudiannaoma	你有电脑吗	chat
+haihuiweiwuqiong	还回味无穷	chat
+fashaokeyizhanggao	发烧可以长高	chat
+bijingtayijingguale	毕竟他已经挂了	chat	不能怪鸽子啦，
+woxianzaisuanbusuanaoye	我现在算不算熬夜	chat
+woyezheyangqipianziji	我也这样欺骗自己	chat
+wojuedeyoubiyao	我觉得有必要	chat
+jingyiluguo	经一路过	chat
+mingwanqujiewoba	明晚去接我吧	chat
+wojiushizhuangdayunle	我就是撞大运了	chat	不要这么称呼我！！！
+buguoxiangbishangbannianshishouletingduo	不过相比上半年是瘦了挺多	chat	哈哈，不记得你走的时候我什么身材…
+zaiweiyuejizherong	再为悦己者容	chat	都说女为悦己者容，但是我觉得吧，要先悦己，
+nihuizenmezuo	你会怎么做	chat	请问男生，女朋友突然生气了，你觉得没头脑而且还有点不可理喻的时候，
+diannaoyaogengxinhuandaihenkuaide	电脑要更新换代很快的	chat
+wojiushicaimaoxian	我就是猜毛线	chat
+jiayouwoyefanhuiqulehaha	加油我也翻回去了哈哈	chat
+meichiguodingduosantian	没吃过顶多三天	chat
+nizhebunengwanshoujile	你这不能玩手机了	chat
+zhijiebeipaichusuoxiejingmietuan	直接被派出所协警灭团	chat
+dageyeliuyikuaile	大哥也六一快乐	chat
+lingwaiwoshixiangshuo	另外我是想说	chat
+laogebanxiana	老葛半仙啊	chat
+guancharuwei	观察入微	chat	哈哈，
+nizheyangshuo	你这样说	chat
+meitiandoubuxiangkandaoxintu	每天都不想看到新图	chat
+muyoujuede	木有觉得	chat
+rongyifahuo	容易发火	chat
+wojuedetaifeidehaohedian	我觉得太妃的好喝点	chat
+zaichuzuchesijinali	在出租车司机那里	chat	抹除资料并且锁定，自己用不到也不能让别人用了，今年春天帮同事成功找回手机，
+chaohuapaimingshangshenghaokuai	超话排名上升好快	chat	晚安，博主是改名了吗？
+nizainalia	你在哪里啊	chat
+nikeqidianduizanmenxiaozhurenma	你客气点对咱们小主人嘛	chat
+woshenmeshihouguanzhudedoubuzhidao	我什么时候关注的都不知道	chat
+biezhuanglenijiushilaosiji	别装了你就是老司机	chat
+nanizhoumohuibuhuiwuliaoya	那你周末会不会无聊呀	chat
+tongshimendouganjuedaole	同事们都感觉到了	chat	佛山，
+daihuiguokenengkeyi	带回国可能可以	chat
+jiushiyoulayoutu	就是又拉又吐	chat	没发热，精神也没事，
+chengzihaodayigea	蛏子好大一个啊	chat	我也想，
+kanqilaizhendehaohaochia	看起来真的好好吃啊	chat
+panwangzheniqingchifan	盼望着你请吃饭	chat	哈哈哈哈哈不啊，
+bibuxiayuliangkuai	比不下雨凉快	chat
+nizhuyidian	你注意点	chat
+woyuelaiyuepangle	我越来越胖了	chat	亲，越来越瘦了~
+nishoudekeyile	你瘦得可以了	chat	礼拜六看到你以后我就郁闷到现在，我胖死了，
+yangqidehen	洋气得很	chat
+haibaozhoumoma	嗨爆周末嘛	chat
+yinweimeibangnia	因为没帮你啊	chat
+keyihenguaihennianren	可以很乖很粘人	chat
+chizaofanyeshijianfeideguanjian	吃早饭也是减肥的关键	chat	偶以为你特意要多休息，明天开始我喊你起床，吃早饭，身体倍儿棒，
+jushijiezuiniduxing	举世皆醉你独醒	chat
+meiyoumeiyoujiadejiade	没有没有假的假的	chat
+woyedanshenle	我也单身了	chat
+haishizuiaiqilixiang	还是最爱七里香	chat
+woyaozhuansantangche	我要转三趟车	chat	目测，
+danyouburenxin	但又不忍心	chat	大力气推倒，又双手轻轻扶她坐下；衣服丢在她身上，又细心的给她盖好。很爱她，想让她做自己的大阏氏，
+jiayoudengnihuilai	加油等你回来	chat	你的努力我们看在眼里，
+buchangzhongwengejiushizuidadechengyi	不唱中文歌就是最大的诚意	chat
+goudouzaiwogezudedifang	狗都在我哥租的地方	chat
+oyoumianfeiyinyongshuigongying	哦有免费饮用水供应	chat	这么好的设施还不满足？
+zuogeiwochi	做给我吃	chat
+wokeyikaishigenghaodeshenghuo	我可以开始更好的生活	chat	是最好的解药吧，这是一个难熬的过程，但无论如何都要用心的生活，让自己变得更好，等到突然释怀的那一瞬间你会发现幸好我没有放弃自己，
+kendingshiyuanyiweinigaibiande	肯定是愿意为你改变的	chat	要相信爱情的力量，
+nibashuozanliangjiazhouliuju	你爸说咱两家周六聚	chat
+nabixude	那必须的	chat
+bichigepingguohaigui	比吃个苹果还贵	chat
+zuimeihaodeqingchunshidai	最美好的青春时代	chat
+nibushasheisha	你不傻谁傻	chat
+sheiliandasheisha	谁脸大谁傻	chat
+wolaishuoyige	我来说一个	chat
+tingdagexiaohuozi	挺大个小伙子	chat	别哭啊~
+huirehaoma	会热好嘛	chat
+kelianmeirenai	可怜没人爱	chat
+buguohaihaonianqing	不过还好年轻	chat
+kaideqibenchifubuqizerenshima	开得起奔驰付不起责任是吗	chat	真给开车的丢脸！
+zenmezhemebuxiaoxina	怎么这么不小心啊	chat	你脚怎么了？砸伤了？
+chiwanlecaishaobaimuerde	吃完了才烧白木耳的	chat	s是的，冰糖绿豆汤前几天也吃了，
+beishakene	备啥课呢	chat
+suiranmeidajisui	虽然没大几岁	chat
+wusihedouaizheshimianle	乌斯河都挨着石棉了	chat
+laiwodahunanle	来我大湖南了	chat
+dabufenshijiandoudaizaizhebian	大部分时间都呆在这边	chat	但是湖南这边开发得好一些，
+nayezhishichuanwen	那也只是传闻	chat	他现在不可能有那心思。
+jintiankendingmang	今天肯定忙	chat	妹妹上午好！
+shuiyeshuibugou	睡也睡不够	chat
+duochiyidunyejiuzuiduopangyidianla	多吃一顿也就最多胖一点啦	chat
+douduodala	都多大啦	chat	唉，
+yunqihaoyunqihao	运气好运气好	chat	哈哈，
+kuaishandemudishishenme	快闪的目的是什么	chat
+youdeyoudekuailaiwan	有的有的快来玩	chat
+zaiqinshiguaiguaidedengwohuiqu	在寝室乖乖的等我回去	chat
+dangchunishuowopangniao	当初你说我胖鸟	chat	现在是，
+nizenmehemamashuohuade	你怎么和妈妈说话的	chat
+zenmebanhaoxiangyao	怎么办好想要	chat
+wenkenanpengyoudekeaizhichu	文科男朋友的可爱之处	chat
+taifeizhuliule	太非主流了	chat
+hahahadui	哈哈哈对	chat
+mianlaoshishengrikuaile	面老师生日快乐	chat
+shamianhaihaowozaiqunlishuole	傻面还好我在群里说了	chat
+liangjiaodingzhi	量脚定制	chat
+nanfangguniangtaimengleconglaibudapai	南方姑娘太萌了从来不打牌	chat
+yaohaihenxi	腰还很细	chat
+yibuxiaoxindanglejingchale	一不小心当了警察了	chat	曾经我也想当厨师，
+haimeiyoujishanglaide	还没有挤上来的	chat	对啊，
+zhegereno	这个人哦	chat	哈哈哈哈哈，
+xianzaizhenshishenmedounengmaidaole	现在真是什么都能买到了	chat
+haihuihuiqubu	还会回去不	chat
+wochuanguodeyebuzhiqian	我穿过的耶不值钱	chat
+womendengzhegeyijingliangnianle	我们等这个已经两年了	chat	萌萌，都要重制版了，能给我们长歌门一个待机和平砍吗，
+buyaobayijisijianqiangjiayuren	不要把一己私见强加于人	chat	你不要误会了，是你自己这么认为，我并不认同，也不是所有人都这样想，
+woyebingbuxianggaibianniyiyang	我也并不想改变你一样	chat	不要误会了，是你自己这么认为，我并不认同，也不是所有人都这样想，不要把一己私见强加于人，我觉得很年轻很美很喜欢很时髦，你不认同,
+fantiantianhaobuhao	范湉湉好不好	chat	真的搞笑！
+sheibeinvele	谁被虐了	chat
+nixihuanshenmeche	你喜欢什么车	chat
+kuaixixishuiba	快洗洗睡吧	chat
+dianlidoumeishenmerenlai	店里都没什么人来	chat	大家都要期末考，
+shibiaodazijiganshoudeyizhongfangshi	是表达自己感受的一种方式	chat	是的，我也觉得摄影和画画一样，
+wokuaidongsile	我快冻死了	chat	太幸福了！！
+haishiwuxianshinegaobudong	还是无显示呢搞不懂	chat	搜了，也投票了，
+womenzaiweishiliaoguoma	我们在微视聊过吗	chat	能否告知我你是谁？
+panwangzhepanwangzheyaoguonianle	盼望着盼望着要过年了	chat	嗯呐嗯呐，不知道什么时候能更新，
+xianghejiukaiyiping	想喝就开一瓶	chat	红酒，我的态度是：
+xianzaiwoyeeya	现在我也饿吖	chat
+zaochenganleyizaochendehuo	早晨干了一早晨的活	chat	早点休息，今天累坏了，
+mingtianyuandan	明天元旦	chat	恩，
+pinqiongdewoyitianfanqianbudaoliangkuai	贫穷的我一天饭钱不到两块	chat
+meigesushedouyouqipaa	每个宿舍都有奇葩啊	chat	天啊！要疯了！
+nizhenhuichi	你真会吃	chat	喔喔，
+jinglingtongkuan	精灵同款	chat	嘿嘿！
+woshimeishui	我是没睡	chat	，
+ninbushiyaoqulvyoumaqin	您不是要去旅游吗亲	chat	排队听课？
+haibianyujiamahahahaha	海边瑜伽吗哈哈哈哈	chat
+nitouxianghaoxiaren	你头像好吓人	chat	要得~
+haishitingzhongyaode	还是挺重要的	chat	哈哈~
+tongxuebienao	同学别闹	chat
+niyouquchishenmele	你又去吃什么了	chat	天哪！
+doubudaiwoquchi	都不带我去吃	chat	天哪！你又去吃什么了？
+weitanggangganghaoei	微糖刚刚好诶	chat
+huikandekanmendao	会看的看门道	chat
+zheshizhenli	这是真理	chat	我知道，宁愿痛快地发场烧，天天咳嗽觉睡不好，白天没精神好好吃药，多喝热水（
+nayouwomenmangzhezuoditie	哪有我们忙着坐地铁	chat
+nixiazhoujiyoushijianya	你下周几有时间呀	chat	真的吗好呀，
+zhouerwanshangyexing	周二晚上也行	chat
+faxianzijiyekeyiguodehenqingsong	发现自己也可以过得很轻松	chat	要学会接受自己啊，无论怎样这都是可爱优秀的自己，而且当我咨询完专业人员后真的如释重负，
+qiangzhanwenhua	抢占文化	chat	我眼中的韩国：
+zoukaiabuyaozailaishanghaiwole	走开啊不要再来伤害我了	chat
+zhengmingtaxihuanwole	证明他喜欢我了	chat	第一次抱他都没反抗,
+qunameyuanzhaonamelaodejiyou	去那么远找那么老的基友	chat
+suoyixingxingabuyaozuomengle	所以醒醒啊不要做梦了	chat
+nengshuijiaoma	能睡觉吗	chat	能能能……
+ranhouzaihaohaowan	然后再好好玩	chat	嗯嗯。你们就好好休息，养精蓄锐，
+shengerwulai	生而无赖	chat
+zaiqinbakanlehenduotiezi	在秦吧看了很多帖子	chat
+nimenzuotianshiyizhengtian	你们昨天是一整天	chat
+wanshangquhuagongle	晚上去化工了	chat	前天是一小时但昨天不是一整天，
+douyoukonglejiu	都有空了就	chat	考完吧，
+yicibaoduole	一次包多了	chat	吃了。
+henxianghemanmanyiqilvyouhaha	很想和满满一起旅游哈哈	chat
+haohaohaozou	好好好走	chat
+shiwoxihuandeguizunanhai	是我喜欢的贵族男孩	chat	眼神到位，姿势到位，
+meishuoshenmeshihoune	没说什么时候呢	chat
+wojiupaigu	我就排骨	chat
+nidoubupeiwoqumai	你都不陪我去买	chat
+douzaijiuli	都在酒里	chat	想说的话，
+worangnitiantianjian	我让你天天见	chat	有机会过来，
+jintianfengde	今天封的	chat
+yishouyanzhijiushanglaile	一瘦颜值就上来了	chat
+youdianxiaoxianmu	有点小羡慕	chat	额，经常看到你写去各个朋友家玩，
+dabutongnidedianhua	打不通你的电话	chat	手机怎么关机啦？
+yingyangmeiwei	营养美味	chat
+ruguolaidaohaifa	如果来到海法	chat
+qishiwotetaoyanzhezhongkaoshi	其实我特讨厌这种考试	chat
+wohaizaibeijingnebaobeier	我还在北京呢宝贝儿	chat
+zansaxiaojuxia	咱仨小聚下	chat	快到家了！明天呗！
+woxihuanderenyounvpengyoula	我喜欢的人有女朋友啦	chat
+yemaohaibushuia	夜猫还不睡啊	chat
+nagemingxingshenmeshihouya	哪个明星什么时候呀	chat
+gaosuwoweizhi	告诉我位置	chat	哈哈，
+haizongxiangtianmaxingkongdegaifangan	还总想天马行空的改方案	chat	对啊，
+ageitaweihuluobokuai	啊给它喂胡萝卜快	chat
+duanzhechagang	端着茶缸	chat
+baobaohaopa	宝宝好怕	chat
+ganjuenizheliangtianchaojigaoxing	感觉你这两天超级高兴	chat
+yinweiyourenshouhuzhugeliang	因为有人守护诸葛亮	chat	你感觉对了！
+shuibuzhaowoyoushenmebanfa	睡不着我有什么办法	chat
+bangzhetamenzhuzijiaone	帮着他们主子叫呢	chat	真受不了，自己把火点了，还赖百姓点灯了，一口一个姐姐叫的亲，
+woshihaoxuesheng	我是好学生	chat	不能，
+tamenjuedemeishenme	她们觉得没什么	chat	我好欺负，有时怼我还怼我朋友，天天半夜不睡觉，吵我睡觉，我睡眠浅，只好戴耳塞，可是也挡不住她的大声音。其他室友总是晚睡，睡眠沉，
+hehecongxinxueba	呵呵从新学吧	chat
+wozhishipeiheeryi	我只是配合而已	chat
+shuizhaoyihouzaiyebuhuixinglai	睡着以后再也不会醒来	chat	陪爱人一起喝醉，
+haideilagerenpeizhe	还得拉个人陪着	chat
+shashihouhuihangzhou	啥时候回杭州	chat
+shikanbudebierenxingfuma	是看不得别人幸福吗	chat
+tiantiandouzaiyuehui	天天都在约会	chat
+kelianwogukulingdingyigeren	可怜我孤苦伶仃一个人	chat
+keshiwomeiyoutongxingzheng	可是我没有通行证	chat
+woxianzaizaijiaanxinyangshenle	我现在在家安心养身了	chat	加油啊.......
+woyexiangchi	我也想吃	chat
+aizongshirangrenku	爱总是让人哭	chat	是啊，
+ruguoshixiujia	如果是休假	chat	过节遇上了上班，这种感觉不好！
+nizheshifanzulema	你这是返祖了吗	chat
+zhiyuxiangdeduo	至于想得多	chat	比方偏是不想说太实，理解随缘。
+guowannianjiuqubale	过完年就去拔了	chat
+buzhidaozenmequhongta	不知道怎么去哄他	chat	他也是爱宝宝啊！总是想给他关怀。
+jinjiaxiaoliumeiwentia	进价小六没问题啊	chat	这种水，
+yaojidezhuisuishijiedejiaobuo	要记得追随世界的脚步哦	chat	哈哈…
+nimashangchengganqingdashilezheweiqin	你马上成感情大师了这位亲	chat
+woyiweijiuwozheyang	我以为就我这样	chat	那两分钟我今天撸了一天，
+wozhendehencainiao	我真的很菜鸟	chat
+ninqunaa	您去哪啊	chat
+woxianzaiyaoganxiewodeliuhai	我现在要感谢我的刘海	chat	是的！！！
+jianyixuanzeanjingdebieshuxiaoqu	建议选择安静的别墅小区	chat
+shibushinanshenyuenichifanjidongde	是不是男神约你吃饭激动的	chat
+buxianghuolewokeyibangni	不想活了我可以帮你	chat	你有病得治，
+bushiyigexuexiaohaoba	不是一个学校好吧	chat
+yijingyouyiweishinidezhenbianrenle	已经有一位是你的枕边人了	chat	你还要求啊，
+taidiuleren	太丢了人	chat	我就看见一下，不小心刷新就没了，不知道是不是被删了，希望被删了吧，
+zhaodaobijiaohaodezaigennishuo	找到比较好的再跟你说	chat
+chaoxiaodajidoulaizishenbianpengyou	嘲笑打击都来自身边朋友	chat	感觉善良都是陌生人给的，
+shouzenmefeile	手怎么肥了	chat
+youhuandema	有换的吗	chat	所有福都有得，
+fuwuchaohao	服务超好	chat	是真的，
+wojiuyongdenagejiemaogaoqiaohaoyong	我就用的那个睫毛膏敲好用	chat
+xiexienine	谢谢你呢	chat
+huangehaomazuiqima	换个号嘛最起码	chat	那可不自己试自己的当然真了，
+baitianshuileyijiao	白天睡了一觉	chat	没有，
+wowangzhelanzuanshi	我王者兰钻石	chat
+youtuyouzhenxiang	有图有真相	chat
+aiyayishihutule	哎呀一时糊涂了	chat
+maidezhijiepeihaodequankeli	买的直接配好的全颗粒	chat
+woxuanjingranpangle	我萱竟然胖了	chat
+nibianhaole	你变好了	chat	璐璐！
+jiushiyaowomenzijixuangouwufenme	就是要我们自己选够五分么	chat	看不懂。。
+zhemerehaihanrenjiaqudongnanya	这么热还喊人家去东南亚	chat
+haiyiweiniyonglehenhaodehuli	还以为你用了很好的护理	chat	天生丽质啊羨慕嫉妒恨，
+woyeyunguo	我也晕过	chat	哈哈，我也晕针，
+buranlaojianrenjiashengxiadezenmezuo	不然老拣人家剩下的怎么做	chat	这身打扮没毛病，搞时装的就是要眼光独到，标新立异，
+guigehaomeng	圭哥好萌	chat	男友力！！
+nishizhendepi	你是真的皮	chat
+wodeshiliune	我的石榴呢	chat
+bushunxindeshizonghuiguoqude	不顺心的事总会过去的	chat	抱抱，别给自己太大压力，
+woquzhaoni	我去找你	chat	他不一定回来，没事，
+buxiangdongjiubuhuidianwaimianchifanle	不想动就不会点外面吃饭了	chat	躺在宿舍就懒了，懒了就不想动了，
+xiexiewoliuzong	谢谢我刘总	chat
+songkuaididehaoduodaizhege	送快递的好多带这个	chat
+meilidongrenditangtang	美丽动人滴唐唐	chat	明天啥活动啊，
+haipihaipiwoele	嗨皮嗨皮我饿了	chat
+zhuyikanyaoshi	注意看钥匙	chat
+bushibiaoqingbao	不是表情包	chat	你可能有什么误解……
+paonameyuan	跑那么远	chat
+geigehaomabei	给个号码呗	chat	帅小伙，
+wobatadaitoushang	我把它戴头上	chat
+zhegekeyi	这个可以	chat
+nashiyaohuantianxidididuofangdianyo	那是要欢天喜地滴多放点哟	chat
+meiyoudifangfangle	没有地方放了	chat
+zuoweiyigenanfangren	作为一个南方人	chat
+nihuijiajiufaweibona	你回家就发围脖纳	chat
+queshibunengleizhe	确实不能累着	chat	嗯，
+wojintiangangchilelaobadecai	我今天刚吃了老爸得菜	chat
+zuijinmaohenhuoma	最近猫很火嘛	chat
+ranernine	然而你呢	chat	你竟然在说静怡是小屁孩儿，我们都是小鲜肉，，
+woheyitingpijiujiuguale	我和一听啤酒就挂了	chat
+shishangxiajiu	是上下九	chat	当然不是啦。
+zhishiyouxinwuli	只是有心无力	chat	谁说不关心，
+kenengshitangde	可能是烫的	chat
+shencaibiwohao	身材比我好	chat	佛山，小比赛，只是跟我打的比我高，
+zhegebuyongguan	这个不用管	chat
+wozhidaoa	我知道啊	chat
+ganjuenishuohuaxiangnanhaizine	感觉你说话想男孩子呢	chat
+laohanershuozhishanleyiha	老汉儿说只闪了一哈	chat
+meishijiuhao	没事就好	chat
+niyiweiniyouwonatia	你以为你有我那体啊	chat	知道痛苦就去吃药，
+duiaxintengsile	对啊心疼死了	chat
+qiuqiunile	求求你了	chat
+ganjueyaoxiatianlene	感觉要夏天了呢	chat
+beifangyishibingxuetiandi	北方已是冰雪天地	chat	最近比较冷了，
+woyexihuanxiongmao	我也喜欢熊猫	chat	好，
+hahazhegemeimaobing	哈哈这个没毛病	chat
+kuailaijiaowowoyaoxuexi	快来教我我要学习	chat
+hahahahahahahuiyiqilailema	哈哈哈哈哈哈回忆起来了吗	chat
+woguodehaoyebuhao	我过得好也不好	chat	不太一样。
+ninhaiyoufumu	您还有父母	chat	叔叔，不能冲动，
+woainiakeaikeaikeai	我爱你啊可爱可爱可爱	chat
+zhecidianduile	这次点对了	chat
+niliashashihouyaohaizi	你俩啥时候要孩子	chat
+nigennigegedoushibeidadi	你跟你哥哥都是北大滴	chat	咿，
+shenmemimi	什么秘密	chat
+womeiyounagepinfan	我没有那个频繁	chat
+shenmezhongqiujie	什么中秋节	chat
+wuhaomaidianzibiaoa	五好买电子表啊	chat
+renxinbuzushetunxiang	人心不足蛇吞象	chat	所以……
+juranbuzhaowo	居然不找我	chat	你来西安啦？
+wotingnikequle	我听你课去了	chat	光荣啊……谢老师啦……
+laibujile	来不及了	chat	个昨天跟学妹跟场时小学妹哒哒哒跑得飞快喊我：学姐快一点！
+haiyaoxiazai	还要下载	chat	小爱，你干嘛不直接看，
+shuijiaojiubuele	睡觉就不饿了	chat
+woyijingqichuangle	我已经起床了	chat
+nishishaijiage	你是晒价格	chat
+zuimeidedaiyujiushibuyiyang	最美的待遇就是不一样	chat
+pingguojijiejienizhenkenai	苹果肌姐姐你真可耐	chat
+qianbeikebugandangcongzhegejianzhu	前辈可不敢当从这个建筑	chat	点评可以，
+yidongshadougui	移动啥都贵	chat	移动再不取消我就要换联通或者电信了，资费贵，套餐贵，
+dongyechulaile	东野出来了	chat
+wozhebuyeshiwenniyijume	我这不也是问你一句么	chat
+yiqianyechitingduode	以前也吃挺多的	chat
+sicuisicuidejintianzhongyudaole	死催死催的今天终于到了	chat
+danshibuzhichiyouxihuazhonghuagongneng	但是不支持游戏画中画功能	chat	X9s支持游戏勿扰功能，
+haishinihuisuanhanni	还是妳会算喊妳	chat	少了佣人，多了衣裳！嗯嗯。。。
+youmeiyoumailuhuijiaoo	有没有买芦荟胶哦	chat	都晒红了，
+bayidatuoliuliansaijintazuilide	把一大砣榴莲塞进他嘴里的	chat	前天我就是掰着我爸的嘴，
+woyebabudelikai	我也巴不得离开	chat
+jideyaobaohuwo	记得要保护我	chat
+nizaozhidaola	你早知道啦	chat	哎呀.
+chenglideshuiguorenhejijiedouyou	城里的水果任何季节都有	chat
+xianzaizhidaoleyemeiguoquduojiuya	现在知道了也没过去多久呀	chat
+nahaijiaoshadounengmengdao	那还叫啥都能梦到	chat
+pangweibiechile	胖威别吃了	chat
+shashihouanali	啥时候啊哪里	chat
+keshizijitaibuzhengqi	可是自己太不争气	chat	我想也是这么想的，
+heideshimuerma	黑的是木耳嘛	chat
+buchuzhuangkuangshichuba	不出状况是初八	chat
+shejingbinga	蛇精病啊	chat
+haiyoucaixiaorendewazi	还有踩小人的袜子	chat
+aishangwole	爱上我了	chat
+bixuzuodeshiqinglaishangresou	必须做的事情来上热搜	chat	呵呵，那里不下雪？哪里不扫雪？用这种应该做的，
+nvshenzhunbeihuilaiwanleme	女神准备回来玩了么	chat
+mingtianlaichiwanfan	明天来吃晚饭	chat
+jiutiaozhengdaojibengongxupinghengle	就调整到基本供需平衡了	chat	可能是的，你试着每次多吸出来一些，看会不会好一些～我之前奶多得吓人，排脓治疗后吃了几顿退奶的，然后再慢慢减少吸奶量，大概半个月，
+tianlenglebushimeiwenzile	天冷了不是没蚊子了	chat
+wodoumeichuguoguomen	我都没出过国门	chat
+wozuowanyezuolexiangsidemeng	我昨晚也做了相似的梦	chat
+daojialemei	到家了没	chat
+niyaokongjinijiji	你要控寂你挤几	chat	距离我最近的梦想成真的活生生的例子！所有的朋友都为你开心，今晚看起来，
+nandaonimendoumeilijiedao	难道你们都没理解到	chat
+yifujingshiditu	衣服竟是地图	chat
+meijigerenkaixinde	没几个人开心的	chat	天气是大半的原因，
+nizaxingzhemezao	你咋醒这么早	chat
+mingtianyaojiaoliudeshuwohaimeikanwan	明天要交流的书我还没看完	chat
+zheliyougeshamaotoupingguo	这里有个傻冒偷苹果	chat	喂，妖妖灵吗？
+wobuxinwobuxin	我不信我不信	chat
+wodexinqingyidianyebuyangguang	我的心情一点也不阳光	chat
+suoyitianheile	所以天黑了	chat
+suanleshangquba	算了上去吧	chat	爱你…………，
+zhishishouhuokenenglaidewan	只是收获可能来得晚	chat	对，努力不是会没有收获，
+youdaolehaichituderizile	有到了还吃土的日子了	chat	这个双十一过了过，
+wodengnilai	我等你来	chat	来吧，
+ninashidagaiyijingfiaoroupiaole	你那时大概已经覅肉票了	chat
+guanjianciweimaohuishishiyou	关键词为毛会是石油	chat
+danshiguanzhongshitingbudaode	但是观众是听不到的	chat	耳机里有伴奏，
+yiqiedoushifuyun	一切都是浮云	chat	直接在人网搜肖月，然后设定地址安徽芜湖。。相信你能找到的，我一眼就把小月月找到了。。。
+duochuandianyifuba	多穿点衣服吧	chat
+buyidingjiubuyaoshuren	不一定就不咬熟人	chat
+denggaotiekailewoqujiukuaile	等高铁开了我去就快了	chat
+xingjiabitaigaole	性价比太高了	chat	人像拍出来无压力很美，就是镜头塑料的，和奥巴完美配合，
+saojieshenqi	扫街神器	chat	人像拍出来无压力很美，就是镜头塑料的，和奥巴完美配合，性价比太高了，
+qukoudiandian	去抠点点	chat	地里有，
+hahazibeiyixiexiaomianbaoshade	哈哈自备一些小面包啥的	chat
+woqunibangongshichidian	我去你办公室吃点	chat
+wohenhuaiyi	我很怀疑	chat
+toutouganshenmene	偷偷干什么呢	chat	你们背着我！
+xiuchundaoxiuluozhanchang	绣春刀修罗战场	chat
+nadeihounianmayuene	那得猴年马月呢	chat
+feisukangfuzhong	飞速康复中	chat
+weidaohenputong	味道很普通	chat	嗯，我也不蛮喜欢恰，
+zuizandeshinalidekongtiao	最赞的是那里的空调	chat	还好吧我们在三楼包厢！一般聚会其实去那里也还不错，
+nibuhuishishuidaoxianzaiba	你不会是睡到现在吧	chat
+nenggezirunhaijiannan	能个滋润还艰难	chat
+qishidongquhaishibucuode	其实东区还是不错的	chat
+zhiyouyitiaokeyigeikefukanma	只有一条可以给客服看吗	chat	啊？？可能是因为单看真的很朴实吧！那我好好试试搭配一下。有一条项链是以前买过的。
+woyezhenmeibanfale	我也真没办法了	chat	下次买东西的时候和我们说一下吧，我再送你一个福袋，最近饰品衣服的物流都困难，
+nvshengeiwogeqianmingba	女神给我个签名吧	chat
+nixiangganma	你想干嘛	chat
+zenmesongdiannao	怎么送电脑	chat
+meiyouawohuifushiyifenzhong	没有啊我回复是一分钟	chat
+woqudeduo	我去的多	chat	刚好相反，
+womenzhelifengjuda	我们这里风巨大	chat
+yanqingxiaoshuomenagebuhuibian	言情小说么哪个不会编	chat	不要一天夏了夏天了，
+zhendehenwunai	真的很无奈	chat	冷死都不下雪的地方，
+weishabudama	为啥不打码	chat	终于找到和我一样想法的了。。
+suibianwanwandeya	随便玩玩的吖	chat
+youshabuyiyang	有啥不一样	chat
+hahalibai	哈哈李白	chat
+getougennimenchabuduo	个头跟你们差不多	chat	你女儿个头挺高的嘛，我家的快7岁，
+huoxuyouyixiangbudaodexiaoguoo	或许有意想不到的效果哦	chat	某天要离开家了给家里写封信吧，该说的，该希望的都可以写算是再尽力一次沟通交流吧，
+xixikankanzhenrenbei	嘻嘻看看真人呗	chat
+renjianxianjing	人间仙境	chat
+yinggaidamajiang	应该打麻将	chat
+nikeyidadianhuageiwode	你可以打电话给我的	chat	没事~
+shiyayoudianxiang	是呀有点想	chat
+shuaiderenzongyouyixiegongtongdian	帅的人总有一些共同点	chat
+zhoumokuaile	周末快乐	chat	谢谢！
+huihuihuahuizuofanhuichihuiwanhuishui	会绘画会做饭会吃会玩会睡	chat	我现在越来越佩服你了，
+tianzuozhengya	天作证呀	chat
+jiushimengjianzouzhezouzhediaogoulile	就是梦见走着走着掉沟里了	chat
+woxiangshuodeshiluhankanjiule	我想说的是鹿晗看久了	chat
+enenxiexie	嗯嗯谢谢	chat
+renjianxianjinga	人间仙境啊	chat
+wodexindoufuxiule	我的心都腐朽了	chat
+shenyefangdu	深夜放毒	chat
+beihoudoubuzhidaokuleduoshaolei	背后都不知道哭了多少泪	chat	人前欢乐嘛。
+woyemeiyouhanjialeyaobaobao	我也没有寒假了要抱抱	chat
+jiunimengouerliaa	就你们狗儿俩啊	chat
+youbushikaodeyuanlaidejuanzi	又不是考的原来的卷子	chat
+wozuoerhaoxianhaihao	我坐二号线还好	chat
+zhememeidenvpiao	这么美的女票	chat	好漂亮，
+chengjiduoshao	成绩多少	chat
+meiqianqubule	没钱去不了	chat
+zhishouxiangkanleiyan	执手相看泪眼	chat
+bulixiaobingle	不理小冰勒	chat	晕车中…
+womenhuiyizhipeizheta	我们会一直陪着他	chat	亲，
+kanjianshiwojiuwabikong	看见是我就挖鼻孔	chat
+nawoyihuilaiyanmingzhenshen	那我一会来验明真身	chat
+jiuzaichangzhoudaomatoupangbian	就在长州岛码头旁边	chat
+zhongwuhaoa	中午好啊	chat
+weilepengerpeng	为了捧而捧	chat	恕我直言，明日之子跟奔跑吧一样辣鸡，
+mingtiandaome	明天到么	chat
+zhunbeihuijia	准备回家	chat	没有，
+jiumeiyoushangxueshidai	就没有上学时代	chat	你这文化程度，
+meicitingturanhaoxiangni	每次听突然好想你	chat	羡慕你们这些有故事的人，
+youshouzuoshoumandongzuochongbo	右手左手慢动作重播	chat
+niyoumeiyouaishangwo	你有没有爱上我	chat
+dengwogeinihua	等我给你化	chat
+haoahaoa	好啊好啊	chat
+nizhenshitaiyouchaile	你真是太有柴了	chat	哇，
+naozhongdoubuyongle	闹钟都不用了	chat	对呀，
+jiuxiangwoaipuyanabanshenqie	就像我爱普雅那般深切	chat
+doushizhenai	都是真爱	chat	是啊，
+feinuoshuodengtataiguoguilaizaiyi	肥锘说等她泰国归来再议	chat
+gongxiqinaide	恭喜亲爱的	chat
+buyaotaizhaoji	不要太着急	chat	是想说…
+jinjinggankaola	进京赶考啦	chat
+haihaomeiliuzou	还好没流走	chat
+woyeshijiaoyingyude	我也是教英语的	chat
+yemaoziyimeizazuijindouzaigaozhe	夜猫子一枚杂最近都在搞着	chat
+zhishixiangshangganyixia	只是想伤感一下	chat	我没有自我犹怜！！！
+nanizhunbeijidianhui	那你准备几点回	chat
+guilinlishenzhenfenfenzhonggaotie	桂林离深圳分分钟高铁	chat	探探路好玩的话我也去！
+shoumangbuguolai	手忙不过来	chat	谢幕的时候，又要举望远镜花痴，又要鼓掌，
+waibojiushiboziwaile	歪脖就是脖子歪了	chat
+gainijiaba	该你加吧	chat	加油。。谁加，
+haiyingyingying	还嘤嘤嘤	chat
+muyouhekafei	木有喝咖啡	chat
+xianghuijialejiuhuiqukankan	想回家了就回去看看	chat
+zainibuzhidaodedifang	在你不知道的地方	chat	哈哈，
+shaixingfune	晒幸福呢	chat	哎哟喂！
+buanfendeqiexi	不安分的窃喜	chat	那里不会有身体上的舒适，在某种程度上是躁动，
+wojuedezuodetaijiule	我觉得坐得太久了	chat
+qumajiangle	去麻将了	chat
+renzhendeyangzizuihaokan	认真的样子最好看	chat
+wosuishidoudei	我随时都得	chat	讲真架...
+zheshisirendingzhima	这是私人定制吗	chat
+aininvshen	爱你女神	chat	同一天生日！
+jiezaijiaheniyiqidenga	姐在家和你一起等啊	chat
+woyoubiyaoshuojiahuama	我有必要说假话嘛	chat
+womenyeshifadebang	我们也是发德邦	chat
+zhehuawoaitingniguolebuyongkanle	这话我爱听你过了不用看了	chat
+wohuikaolv	我会考虑	chat	好的，
+gujishipianzi	估计是骗子	chat
+qingjinqinganliwo	请尽情安利我	chat
+nizhendechenglekouhongkong	你真的成了口红控	chat
+gaidongshoushijiudongshouya	该动手时就动手呀	chat
+womenlaohanxule	我们老含蓄了	chat
+zhejiufangxinle	这就放心了	chat
+zhendehenmei	真的很美	chat
+yemianzhaobudaole	页面找不到了	chat
+zhengyuanjiebushiliantongnage	郑渊洁不是恋童那个	chat
+mingtianshishi	明天试试	chat	可以吗？
+beiwenhouquanjia	被问候全家	chat
+shinianqiannamegui	十年前那么贵	chat
+zhongyuyouyigehaorenle	终于有一个好人了	chat
+baotuquanhaimeiqu	趵突泉还没去	chat	今天下午一直在大明湖，
+nashiyizhongshenmeganjue	那是一种什么感觉	chat	嘻嘻，
+xieyouqiannama	写有钱拿吗	chat	表示同情啊～
+yuannizaoriruyuanyichang	愿你早日如愿以偿	chat	加油，
+gangbiaoyanjieshu	刚表演结束	chat
+nixiaolema	你笑了吗	chat
+wobuhuikude	我不会哭的	chat
+womenburen	我们不认	chat	造谣一张嘴，子虚乌有的事儿，
+jingqiaoqiaodeganhuaishi	静悄悄的干坏事	chat
+liaodianyouyingyangdehaobu	聊点有营养的好不	chat
+quchaozhouderenmeizigeshuohua	去潮州的人没资格说话	chat
+kouhonggeiwoba	口红给我吧	chat
+haopingruchao	好评如潮	chat
+nijiuyigemaiguade	你就一个卖瓜的	chat	切，
+danshimeiyouhenxintongshishenmegui	但是没有很心痛是什么鬼	chat	谈了三年本来想着结婚，发现我没法跟他生活一辈子，分手了，
+danchenggongderenyidinghennuli	但成功的人一定很努力	chat	对的，努力的人不一定很成功，
+niyaodenanpengyou	你要的男朋友	chat	生日快乐！呐，
+kuaiguonianle	快过年了	chat
+nanhainvhai	男孩女孩	chat
+wojideyiqianqushanghaichibuguan	我记得以前去上海吃不惯	chat	上海动西都有点甜是不是？
+wozhichiduibushuanlianzidegou	我支持对不栓链子的狗	chat
+woqingnichishutiaoha	我请你吃薯条哈	chat
+nanishixuedeyasihaishituofu	那你是学的雅思还是托福	chat
+kandaopiaoliangdejiuyiqingbielianle	看到漂亮的就移情别恋了	chat	是真的好帅！巴贾少校~可惜就是感情不太专一，
+dengtongyuwudiyuyewoshidelangman	等同于无敌雨夜卧室的浪漫	chat	赤果果的炫富，
+wulunshipiaozhexiaoxuedeqingchen	无论是飘着小雪的清晨	chat	你要相信这个世界上一定会有一个爱你的人，无论你此刻正被光芒环绕、被掌声淹没，还是你正孤独地走在寒冷的街道被大雨淋湿。
+niyinggaiwen	你应该问	chat	小编，
+wobuhaoyisiyigerenduxiang	我不好意思一个人独享	chat	啊呀哥！
+zheshenmeqingkuang	这什么情况	chat
+yizhangdemingxinpiandoushedejigeini	一张的明信片都舍得寄给你	chat	么么哒，表叔其实很慷慨的哟连8毛（只算邮票的钱）（明信片是兔纸送的....我没有告诉你）
+jingchangyudao	经常遇到	chat
+keyizhoumodaochuguangguangkankanna	可以周末到处逛逛看看呐	chat
+wogangcaichangmaicaihuilai	我刚菜场买菜回来	chat
+fenqingkuanghaishidanxiaohaha	分情况还是胆小哈哈	chat
+tainaixiaoxiaobinle	太耐小小彬了	chat	那个到最后好感动的额。。
+youmeiyounanshengdejiangpin	有没有男生的奖品	chat
+juewuganggangde	觉悟杠杠的	chat
+fulishihouma	符离是犼吗	chat
+niweishenmezhemeshuo	你为什么这么说	chat
+weishenmeyaoxiabukeyizaixiankanma	为什么要下不可以在线看吗	chat
+yejiuziranyuegui	野就自然越贵	chat	因为人的生活水平越来越好,
+paidehaopiaoliang	拍的好漂亮	chat	万和的广告，
+wokandaolajiushixihuan	我看到啦就是喜欢	chat
+nixiabanle	你下班了	chat	恩,
+woxihuandeshinidedianping	我喜欢的是你的点评	chat
+hentuijianbucuode	很推荐不错的	chat	舞乐传奇，
+shuomingniduixianghaokan	说明你对象好看	chat	约就约了，约你对象是给你面子！
+zhecaiyingjing	这才应景	chat	想要成都麦鲁小城的图吱一声啊，
+sheinenggaosuwozheshilushenmejiemu	谁能告诉我这是录什么节目	chat
+zenmebaochizhixingde	怎么保持直行的	chat	刚落地时速度那么快，
+ganjuebinanzhulaohenduoa	感觉比男主老很多啊	chat	衣服架子确实不错。就是没有了雏菊时的灵气，
+baobaojiejie	抱抱姐姐	chat
+zuokanyunqishi	坐看云起时	chat	兴来每独往，胜事空自知。行到水穷处，
+tailugula	太露骨啦	chat	廖同学！
+shunbianyekeyizharou	顺便也可以榨肉	chat	榨果汁，嗯，
+nandaonvtongshibufangbantianjia	难道女同事不放半天假	chat
+jintiannandaobuchushan	今天难道不出山	chat
+weileqianhaishibuyaociba	为了钱还是不要辞吧	chat	没有理想，
+aiyaozenmeshuochukou	爱要怎么说出口	chat
+kaidaoyouxiangbaojingjiuchengma	开到油箱报警就成吗	chat	平时加95的油，最近一次不小心加成92了有事吗？马自达cx4多问一句，后续还想加95，
+haimeizhegedasuan	还没这个打算	chat
+woyoudianxiangnidankannichenmizhuixing	我有点想你但看你沉迷追星	chat
+zuishimamaxixin	最是妈妈细心	chat	哎哎～～～
+bunenggeinishuo	不能给你说	chat	嘘，
+kendingshijiaoaole	肯定是骄傲了	chat
+shiguojingqiana	时过境迁啊	chat
+duoroudechuntianqueshilaila	多肉的春天确实来啦	chat
+maobuyiaaaa	毛不易啊啊啊啊	chat
+niyongfangdajingkandema	你用放大镜看的吗	chat
+nikanwanle	你看完了	chat
+duoshaojine	多少集呢	chat	你看完了？
+wozuixihuannile	我最喜欢你了	chat	可以，么么哒，
+zaodianxiuxiba	早点休息吧	chat	注意身体呢！
+wolaobalaomadoushuile	我老爸老妈都睡了	chat
+bujinruciwohaichibaole	不仅如此我还吃饱了	chat
+jiushibuzhidaoyoumeiyoutongnian	就是不知道有没有同年	chat	同月同日，
+woxihuannia	我喜欢你啊	chat	师傅！
+shitazuoxiaosan	是他做小三	chat
+dabanyede	大半夜的	chat
+jinjinshuoyixiaxianzaidexinqing	仅仅说一下现在的心情	chat	额......
+yongdangzhuangyuanlangzouqi	勇当状元郎走起	chat	编八股辫子，
+bushidiyiwojiuhennanguo	不是第一我就很难过	chat
+xiaoquqiangwaicaishigaoxinqu	小区墙外才是高新区	chat	天府新区。。。
+haobawoyijingkaishile	好吧我已经开始了	chat
+daiwuhankuoyi	带武汉阔以	chat
+zhejiadechaohaochidezhaolehaojiu	这家的超好吃的找了好久	chat
+haoburongyidaojiudianle	好不容易到酒店了	chat	对呀！看见了我都气哭了。想想都委屈。运动员那么累。那么辛苦。
+buyaolaoxiangwonameshou	不要老像我那么瘦	chat	你最近有没长胖啊枫子，
+niyinggaigeiwojiyiben	你应该给我寄一本	chat
+zhongyukanjianyigeshuozhenhuaderenle	终于看见一个说真话的人了	chat
+gonglaoyedeishisongjiangde	功劳也得是宋江的	chat	你是协警，别人是正式交警，武松断臂擒方腊，
+nihaijianchibuxie	你还坚持不懈	chat
+daerduohuahua	大耳朵花花	chat
+xihuandushenmeshu	喜欢读什么书	chat	你为什么要读书，
+womenshizhouliukao	我们是周六考	chat
+gongzuomangma	工作忙嘛	chat
+haokeaidepangxiecan	好可爱的螃蟹餐	chat	哈哈哈，
+liujingchashuaima	刘警察帅吗	chat
+xingdezaomeibanfa	醒的早没办法	chat
+renyehenshao	人也很少	chat	听朋友旅游回来说过，路上基本看不到什么车，
+nikezuobingdaodaiyanren	你可做冰岛代言人	chat
+womeiyoujuedenibaoyuanha	我没有觉得你抱怨哈	chat	？？？没有没有，
+keaidexuemei	可爱的学妹	chat
+kenengshiming	可能是明	chat
+jintianyouqueaile	今天有缺爱了	chat
+yihouzhunijia	以后住你家	chat	可以,多温馨的,
+buranzhendejuedetailei	不然真的觉得太累	chat	还好这几天有买买买，
+weishachizhemeduo	为啥吃这么多	chat	你是不是傻，
+bingtangxuelilaiyiwanme	冰糖雪梨来一碗么	chat
+zongjuedetameishijiankanwode	总觉得他没时间看我的	chat
+yuanlainibudongwo	原来你不懂我	chat
+zaigeitasantiandeshijian	再给他三天的时间	chat
+yongnaozixiang	用脑子想	chat	呵呵，
+suiranjinzhifanghuo	虽然禁止放火	chat
+zuobuchujialideweidao	做不出家里的味道	chat	雨雨，武汉的土豆真的不香呢！
+piliangyinshuade	批量印刷的	chat
+natazheshisuanxihuanwoma	那他这是算喜欢我吗	chat	和一个男的互相聊天，几乎天天发消息，
+wobabudenixiaoshi	我巴不得你消失	chat	我紧张个蛋。问你女朋友去。。
+buzhidaokebukeyi	不知道可不可以	chat
+danshihaiyouyixie	但是还有一些	chat	包括他，
+zheboqueshitiandaowole	这波确实甜到我了	chat
+niliuzhifang	你流脂肪	chat	哎呀，不得了啊，你很瘦啊？很瘦啊？啊？啊？别人流汗，
+natanshigezaibanzishangmianme	那碳是搁在板子上面么	chat	我一直在思考这个烤台的结构。。。中间放了块板。。。
+doubuganmaile	都不敢买了	chat	你家什么时候能取消拆封无理由退货？
+ninengbunengyaodianlian	你能不能要点脸	chat
+zuijinmeidianyingkanle	最近没电影看了	chat
+shiliandeshihoushiheyuanxing	失恋的时候适合远行	chat
+dalewusui	大了五岁	chat	？？？
+qiusegongmeiweiyican	秋色共美味一餐	chat	玉手与大蚝俱肥，
+nihuinanningle	你回南宁了	chat	好早!!!!
+nibujuedenitaiduyouwentima	你不觉得你态度有问题吗	chat	这么多人说你，
+hahahashenmema	哈哈哈什么嘛	chat
+wojuedewobushihenzhi	我觉得我不是很直	chat	其实我也可以找女的，
+liangchuangbeizidoubunuan	两床被子都不暖	chat	我也不知道，
+shenghuojianxinna	生活艰辛呐	chat
+jiayoujiayouzhanbu	加油加油展卟	chat
+nixiangqinduixiangzhenduo	你相亲对象真多	chat
+ruguozaixiamenhuoxuyoukeneng	如果在厦门或许有可能	chat	不是我，
+haimeiyouchuanshangjingfu	还没有穿上警服	chat
+yishangwudejunxuncaijieshu	一上午的军训才结束	chat
+lengsinihaichulailiu	冷死你还出来溜	chat	我还没到6点就偷溜了回家洗澡穿烧了,
+zonghuiguoqude	总会过去的	chat
+chenduxiutongxue	陈独秀同学	chat	？？？
+wojuedemanhaoleaganjingjianjie	我觉得蛮好了啊干净简洁	chat
+yijijiatingdetuozhanhuodong	以及家庭的拓展活动	chat	兄弟我给你房管，组织一下各位贵宾，开展一下关于爱情，婚姻，
+zongshinameyumen	总是那么郁闷	chat	我妈38，我36。
+huilaidiyishijianjieduoduo	回来第一时间接多多	chat
+youdeyehenqiong	有的也很穷	chat	不全是有的很有钱，
+wenshijianqingweihewu	问世间情为何物	chat
+younanpengyoulezhaoyangchuchuliuqing	有男朋友了照样处处留情	chat	拒绝个毛线暧昧。
+zhecinengshanglianjianyimianbu	这次能赏脸见一面不	chat	这次来多久？
+nawojiubukeqile	那我就不客气了	chat
+banyesangengne	半夜三更呢	chat	发喃病啊，
+laizhaowowan	来找我玩	chat	发喃病啊，半夜三更呢。。。。
+qiexiayuhaotaoyan	切下雨好讨厌	chat
+jinnianweimiyidingyouni	今年维密一定有你	chat
+shudianyekeyizuoyitiana	书店也可以坐一天啊	chat	图书馆呢？
+nibandaonaliqule	你搬到哪里去了	chat
+taogebaibaiya	涛哥拜拜呀	chat
+shaochoudianjinge	稍稠点经饿	chat	煮点清淡有营养的粥，
+jieshaoyixiaa	介绍一下啊	chat	你是见人就问是吧？哈哈，
+gaozhongyourenshiyigebaiyangnv	高中有认识一个白羊女	chat
+renzhenkaolv	认真考虑	chat	这话说的好。
+yunqizhenhaoa	运气真好啊	chat
+tebiekeai	特别可爱	chat	其实我喜欢大毛这样的，
+jianghuzhongren	江湖中人	chat	哈哈哈，
+jiaonibuchifanlaizhe	叫你不吃饭来着	chat
+tabaofuxintaizhongle	它报复心太重了	chat	我的果断叶子全掉完了--不就是我有天没回来给它浇水么...
+wobangnitiehao	我帮你贴好	chat
+nijuransuowoshilaonvrennanguo	你居然索我是老女人难过	chat
+zhegebaotaihaokanlehaoba	这个包太好看了好吧	chat
+zhegemojingnalimaidea	这个墨镜哪里买的啊	chat
+shoujizhemeduoganma	收集这么多干嘛	chat
+chidehaozaoya	吃得好早呀	chat
+meilixuemeishudema	美丽学美术的嘛	chat
+henyouzizhizhiming	很有自知之明	chat	你这个照片照得很好啊，知道自己长得没脸见人、把脸挡起来、
+zainagedifango	在那个地方哦	chat
+buguowogaosuwo	不过我告诉我	chat
+rangnilaishengaobulai	让你来审稿不来	chat
+shuohuakendingbiwoguanyonga	说话肯定比我管用啊	chat	你都小武了，
+baobaobangbangde	宝宝棒棒的	chat
+qicishixianzai	其次是现在	chat	种一棵树最好的时间是十年前，
+dasimeiyouzhuanyekaoshile	大四没有专业考试了	chat
+jingzhidezhuzhu	精致的猪猪	chat
+tingmaoshuoliuliunabianyougehuameinan	听毛说刘刘那边有个花美男	chat
+nalihanguole	哪里韩国了	chat
+zuiduofengepingxingbigeini	最多分个瓶型笔给你	chat
+shangcichawantudousihourenzhenxiangxiang	上次查完土豆丝后认真想想	chat
+yaodianhuashuoxiaciyongchezhaoni	要电话说下次用车找你	chat
+duiyahaopiaoliangya	对呀好漂亮呀	chat
+zhebunikaidema	这不你开的吗	chat	很豪华，服务人员很正！！我一看名字，
+banniandouhaimeiyouhai	半年都还没有还	chat	不信算啦，我还借了同学钱的，
+zuijinhenmang	最近很忙	chat
+jiejieyouqiangdahoudun	姐姐有强大后盾	chat
+danpingguoxiangsuzhendegao	但苹果像素真的高	chat
+nishuodeokeyihahahaha	你说的哦可以哈哈哈哈	chat
+wozenmeyouyizhongbeinvedeganjue	我怎么有一种被虐的感觉	chat
+meiduzhiqianyetingsha	没读之前也挺傻	chat
+zijiquduohuagezhusuqian	自己去多花个住宿钱	chat	看你自己，都差不多，
+woyaokanchengpin	我要看成品	chat
+mantounizanengzhemehaokanhaoqio	馒头你咋能这么好看好气哦	chat
+zhewanquanbushizhongdiansa	这完全不是重点撒	chat
+natamendejiangshanjiudouzuowenle	那他们的江山就都坐稳了	chat	你怎么去哪个公司都得“送走”一批人呢？是他们太重感情了吧，就该先灭了你，
+zhongwuwojiuxiangchi	中午我就想吃	chat
+woyizhidigu	我一直嘀咕	chat
+zhechouyatoukuaizoukaia	这臭丫头快走开啊	chat	我一直嘀咕：
+doumuyouqingwonan	都木有请我喃	chat	19号？什么日子？你要结婚了？
+woyexiangshenggenver	我也想生个女儿	chat
+woshuodeshinazhong	我说的是那种	chat
+heshabujianronga	和啥不兼容啊	chat
+wodexianhuazongshihenkuaijiunianerle	我的鲜花总是很快就蔫儿了	chat	好漂亮～小兔的花能养几天呢？
+benlaijiumeiqiunilahaha	本来就没求你啦哈哈	chat
+genbenmaibuqi	根本买不起	chat
+shunqiziranhaole	顺其自然好了	chat	哈哈哈！哎，
+candiancaiyoujixing	惨点才有记性	chat	对啊，
+kanbuqingtazenmelikaide	看不清他怎么离开的	chat	刚才，问他“我这次是真的失去你了吗？”“恩。”“没有一点馀地了啊？”“没有。”看着他逆着灯光离开，
+danjiumeishijianguo	但就没实践过	chat	我就一直想出去玩，
+zhemeduonengliang	这么多能量	chat	打了鸡血了，
+zhoujielunyaojiehunle	周杰伦要结婚了	chat
+xiaoqurumenchu	小区入门处	chat
+jiushengxiajihuachaojiqingshuide	就剩下几话超级清水的	chat	m站被删的差不多了，有一点肉渣的都被禁了，
+laodongjienihaizaigongzuoma	劳动节你还在工作嘛	chat	老奚节日快乐啦，
+meiyourenguanxinweishenmehuiyaorenma	没有人关心为什么会咬人吗	chat
+womenweishenmebinimenlei	我们为什么比你们累	chat
+laikejiguan	来科技馆	chat
+renjiadoubuhuini	人家都不回你	chat
+youmeishijian	又没时间	chat	好啊。其实我一直都想打，可是没人打，
+haitianyixiandeganjuezhenhao	海天一线的感觉真好	chat	想看海了，，，
+ganghejiule	刚喝酒了	chat
+zhishuyuqiutian	只属于秋天	chat	银杏树的美，
+nihaiyoumukesha	你还有木颏沙	chat	不哭，
+suiranzhangdehenxiangni	虽然长得很像你	chat	对啊，
+xianzaishiguanmenxiuzheng	现在是关门修整	chat	盐湖的水都干了，要等段时间放水才能看到，
+jinbuqude	进不去的	chat	盐湖的水都干了，要等段时间放水才能看到，现在是关门修整，
+meirenbawodangxiaogongzhu	没人把我当小公主	chat
+bujiushixiaoxiannvmendezuiaima	不就是小仙女们的最爱嘛	chat	不怕被骂，大长腿，瘦，会穿搭，社会，酷到爆炸，
+nishinaliren	你是哪里人	chat
+wojiuxiangwen	我就想问	chat
+ranhouyunchuanglibianmeiyoula	然后云窗里边没有啦	chat	我无心法师看了十二集，
+nagedongwumeiyoucanjia	哪个动物没有参加	chat	宋丹丹：动物园开大会，
+yiqilairanglaobandainifeia	一起来让老板带你飞啊	chat
+renjiashixiannv	人家是仙女	chat	哼，
+chengdudetaiyanghendapai	成都的太阳很大牌	chat
+wobuxingle	我不行了	chat	你们太肉麻！！，
+kangmangbeibi	抗忙北鼻	chat
+woyizhidouzaifenghuangjihaoma	我一直都在凤凰集好吗	chat
+worenbuliaole	我忍不了了	chat
+suoyiqingnichile	所以请你吃了	chat
+duanxiuduankukaikongtiao	短袖短裤开空调	chat
+dianyingpiaohaikeyitui	电影票还可以退	chat
+zhegehuidajianzhibangdai	这个回答简直棒呆	chat	哇!!!
+wohaidasuanbulinile	我还打算不理你了	chat
+najiuhaona	那就好呐	chat	哈哈哈，
+danshimenhuadehaishibugouhao	但是门画得还是不够好	chat	给你点个赞，
+guorandajixuelehaibushui	果然打鸡血了还不睡	chat	哈哈，
+yougelvdougao	有个绿豆糕	chat
+huanyinglaihangzhou	欢迎来杭州	chat
+nishinanrenma	你是男人吗	chat
+yuanhongchengai	元洪城哎	chat	咦，
+zhezhangzhaopianwokeyibaocunma	这张照片我可以保存吗	chat	我说。
+nizijizhaodemahaoqingchu	你自己照的吗好清楚	chat
+xiangrenshixinpengyouyouma	想认识新朋友有吗	chat
+fenshougewandenazhong	分手割腕的那种	chat	网恋嘛。
+conggexingfuo	聪哥幸福哦	chat
+dengwoganmaoyihaojiuqukanni	等我感冒一好就去看你	chat	好的啦！！~~
+jinniannizhongyuyaomaiyifulema	今年你终于要买衣服了嘛	chat
+woyegangchulai	我也刚出来	chat
+woyaoyanglianbuchilade	我要养脸不吃辣的	chat
+tizhongbuchaoguoliangbai	体重不超过两百	chat	找个女友，身高不超过两米、
+nihaiyangqigoule	你还养起狗了	chat
+haihuitingxialai	还会停下来	chat	阿姨跟我同一站下车，无奈她走的慢，
+wohenxingyunyudaodeshiyoudouhenhao	我很幸运遇到的室友都很好	chat
+liuzoudeshiguangshizhuibuhuilaide	流走的时光是追不回来的	chat
+haimeidaoxiatianne	还没到夏天呢	chat
+youxiedongxihencuiruo	有些东西很脆弱	chat	不不不，我还是不赞成这样的。我宁愿一直不开心，也不想被欺骗。
+juranbeinifaxianle	居然被你发现了	chat
+nizazhemefenqingle	你咋这么愤青了	chat
+pijunxiaoniankuaile	屁君小年快乐	chat
+ainibulibuqi	爱你不离不弃	chat
+niyaogeiwojieshaoma	你要给我介绍吗	chat
+zheshishenjuba	这是神剧吧	chat	哈哈。
+woningketixianranhoubazheqianjuanle	我宁可提现然后把这钱捐了	chat	你说的是大家都不要送给易到呗？呵呵，这是200块钱的事么？全国有多少人提不到200？
+zuotianwanshangbujiewodianhua	昨天晚上不接我电话	chat
+nimeiyoudadianhuageiwoha	你没有打电话给我哈	chat	天地良心，
+naxiexiele	那谢谢了	chat
+niyeshuitayipansan	你也水他一盘三	chat
+meirenyaogeinichi	没人要给你吃	chat
+fangjiahuijiaquyiyuankanyixia	放假回家去医院看一下	chat	好的！
+woyijingdasuanquzuogejianchale	我已经打算去做个检查了	chat
+douheichengtanle	都黑成碳了	chat	你怎么都没被晒黑啊我也军训，
+mingmingshinizongshiqifuwolaoshi	明明是你总是欺负我老实	chat	你说说、我怎么欺负你了、
+wojiushihenlaoshia	我就是很老实啊	chat
+niyaogeiwohuanliu	你要给我换六	chat
+womensheizaichao	我们谁在吵	chat
+ganmaolema	感冒了吗	chat
+zhemeanle	这么暗了	chat	在外头吃饭所，
+zounagezhouzhuanyun	走哪个州转运	chat	很多问题的，用哪个公司比较好？
+bijibenyidaoretianjiushizheyang	笔记本一到热天就是这样	chat
+yiqianbuhuizheyang	以前不会这样	chat
+gailaiwomenzhele	改来我们这了	chat	现在它不去你们那了。
+youchidejiukeyia	有吃的就可以啊	chat	哪儿都成啊！！！
+shengxiawozhegedanshengoufenshen	剩下我这个单身狗分身	chat	阳光帅气的我可能谈恋爱去了，
+yingpanganjinmaiqilai	硬盘赶紧买起来	chat	目前不是还没有表态么？
+shuiguokaiwei	水果开胃	chat
+taikuminglewomen	太苦命了我们	chat
+woshimaihuoyedenage	我是买活页的那个	chat
+woxianzaiwaichu	我现在外出	chat
+aihenjiaojia	爱恨交加	chat
+qilaijiujuedetouhaotong	起来就觉得头好痛	chat	希望不是昨天睡不着，很晚才睡，
+wocaizhidaoyuanlaihaiyaochushixie	我才知道原来还要厨师鞋	chat
+congnamenuanhuodedifanghuishenyang	从那么暖和的地方回沈阳	chat
+xianmujiduhenleba	羡慕嫉妒恨了吧	chat
+jiushihuaqiangunahui	就是花千骨那会	chat	以前炸姐还收过唯一的徒弟呢，
+miejueshitai	灭绝师太	chat
+hahahayinweishiyingye	哈哈哈因为试营业	chat
+shikuaiqianwugeshenghao	十块钱五个生蚝	chat
+zenmehuichibuqine	怎么会吃不起呢	chat	十块钱五个生蚝，
+zhendebushihejuzhule	真的不适合居住了	chat
+hediancaomiyirentang	喝点糙米薏仁汤	chat
+gujitaliayebuhuichangjiude	估计他俩也不会长久的	chat	张翰和娜扎都分了，
+shuipingzuodebiaoshibufu	水瓶座的表示不服	chat
+yiqiannizijihaijiangguo	以前你自己还讲过	chat
+wohuilaizaole	我回来早了	chat
+nvrenyaohaomaqin	女人妖好吗亲	chat
+renshoubuzhuyijingtaokechulaile	忍受不住已经逃课出来了	chat
+dizhinalai	地址拿来	chat	来来来，
+wankaixinga	玩开心噶	chat
+keyijiangyixiamiyuechuzhuangma	可以讲一下芈月出装吗	chat	瓶子大神，
+nimennabianchitangyuanma	你们那边吃汤圆吗	chat	表示我不喜欢吃汤圆。
+fenleshikeyi	分了是可以	chat
+niquzaochuana	你去造船啊	chat
+chituxiaowangjifengla	吃土小王几疯啦	chat
+woyaoquzhaobierenle	我要去找别人了	chat	我不想跟你好了，
+nijiukaishizoushangmaiyouxi	你就开始走上买游戏	chat
+najiulihaile	那就厉害了	chat
+mingmingwocaishihaoren	明明我才是好人	chat	又是觉得对这个世道很无语，
+nayixiaojienengmaijigetiantianquan	那一小节能买几个甜甜圈	chat
+kaiwanxiaohaoma	开玩笑好吗	chat
+nanijiaowolema	那你叫我了吗	chat
+wosuiranyeyuanjiadanmeinizhemeyuan	我虽然也远嫁但没你这么远	chat	你是远嫁？
+tingshuonanfangdepingguoshilungemaide	听说南方的苹果是论个卖的	chat
+jimodeshaonva	寂寞的少女啊	chat
+wozhuanyeshinage	我专业是哪个	chat
+nanixihuanwoxihuannima	那你喜欢我喜欢你吗	chat
+woshuozanameliangkuaio	我说咋那么凉快哦	chat	我现在才晓得，
+nihenage	你和哪个	chat
+wufazhaobudao	无法找不到	chat
+niyaobuyaoqu	你要不要去	chat
+tajiuyilaji	她就一垃圾	chat
+wojuedehuochenglewenyiren	我觉得活成了文艺人	chat
+xinghangxingzhidaonigongzuojiushiwan	行行行知道你工作就是玩	chat
+zhegenongchaoeryoudianchao	这个弄潮儿有点吵	chat
+meiyouxinzhixiangxianren	没有心只像闲人	chat	沦为旧朋友是否又称心，
+gongshujidaojianguojici	龚枢机倒见过几次	chat	是啊，真是遗憾！我也没有见过尊敬的范主教。
+nantuangennvtuanbixiaoliang	男团跟女团比销量	chat
+ohaoxianzaizuo	哦好现在做	chat
+meiquguojiubade	没去过酒吧的	chat
+ganshouganshouni	感受感受腻	chat	没去过酒吧的“好孩纸”求问，芮姐什么时候带我去酒吧转转，
+nizaibeishangshenme	你在悲伤什么	chat
+haiyouqichengxin	还有七成新	chat	我有个男性朋友也是特别喜欢在欧洲买皮鞋，说是又便宜又耐穿，在土耳其买的一双皮鞋，天天穿，三年了，
+wojihubuzaiguoneimaixie	我几乎不在国内买鞋	chat	欧美的皮鞋确实舒适耐穿，而且时尚大方，
+nishibushishishikekezaiguanzhuwo	你是不是时时刻刻在关注我	chat
+buguoxiwangtamenzaodianjiehun	不过希望他们早点结婚	chat	恩恩！
+wopianyaojiang	我偏要讲	chat	你不听，
+zhenxinbushi	真心不是	chat
+niqueyingshuochengshiguai	你却硬说成是怪	chat	这就是你的卑劣之处了——人家明明在夸你的学生，
+xihuanbushigedongxi	喜欢不是个东西	chat
+weiletounengliangmahahaha	为了偷能量吗哈哈哈	chat
+xiangjianjianzijun	想见见子俊	chat	没啥事，
+kexiwoqubuchengai	可惜我去不成唉	chat
+yaozenmepeiyang	要怎么培养	chat	嗯....
+haitirenjiadabaobupingzhele	还替人家打抱不平着了	chat
+zaichuangzhengqushuijiaoa	在床争取睡觉啊	chat	不聊啦！
+dongtianganjuetebielan	冬天感觉特别懒	chat
+nihuyoujigea	你湖有几个啊	chat
+nizuikeaila	你最可爱啦	chat
+wuyuebuwashishanbibang	五月不挖是扇臂膀	chat
+meiganduoshijianquwen	没甘多时间去问	chat	算拉,
+jianchachulaide	检查出来的	chat
+nishoujihaolema	你手机好了吗	chat
+womeishoudao	我没收到	chat	我想问你们过年没出报纸么?
+yangdixianzaiyuelaihuitaolule	杨迪现在越来会套路了	chat
+nizhendeshisiwujidanga	你真的是肆无忌惮噶	chat
+gongzuozongjiaban	工作总加班	chat
+haoxiangyaotingshuideyangzi	好像要停水的样子	chat	好吧。回去洗个澡，哦，
+yikaishiwodoushiyitianfaliangsange	一开始我都是一天发两三个	chat
+bushihuancheme	不是还车么	chat
+foshandiantai	佛山电台	chat
+nagehaomazaojiumeiyongle	那个号码早就没用了	chat	八月底你们贴吧弄升级要我们验证手机号码，
+nimennenggeigehuifu	你们能给个回复	chat	直接说密码错误登不上了！申诉好多次根本没用！百度云也就直接废了！小号我刚才退出了一下然后重新登，为什么直接就变成了一个新的号了，
+huanyingdiliucio	欢迎第六次喔	chat
+zhegehaochima	这个好吃吗	chat
+shijinianyouchulaile	十几年又出来了	chat	可小可小的时候吃的..
+qingwenbangzaina	请问棒在哪	chat
+bixujianshixia	必须见识下	chat	怕啥的。。。。
+zhegekeyishishi	这个可以试试	chat
+woaisinile	我爱死你了	chat
+yizhihaimuyou	一只还木有	chat	我的一只绝育了，
+womingtianhuiqu	我明天回去	chat
+zhongqiukuaile	中秋快乐	chat
+meiyoulela	没有了啦	chat
+duoyifenwoyebuhuijiaoao	多一分我也不会骄傲	chat
+suanweinilude	算为你录的	chat	行，回头我要录了，艾特你，
+qunakuanianme	去那跨年么	chat	过年了还跑那啊？
+wolaiyangwangxingfulaile	我来仰望幸福来了	chat
+henjiumeichidaonisonglaideliulianle	很久没吃到你送来的榴莲勒	chat	欢迎榴莲，
+kongqihenhao	空气很好	chat
+keyiqudaliea	可以去打猎啊	chat	那时候不像现在，山里应该很多野生动物，
+woyexiangquchongqingwan	我也想去重庆玩	chat
+nikeyizhijieshengtun	你可以直接生吞	chat
+woyeshifenbankaoshi	我也是分班考试	chat	别难过了，不好的就总结吧，
+youfaxinlingjitang	又发心灵鸡汤	chat
+weiqunhaobang	围裙好棒	chat
+chengmingdelushunfengshunshui	成名的路顺风顺水	chat	这样骂下去，只会显得你素质很低，有毛线意义啊，身为艺人就要承受这些。
+keyiyonghenduodaitide	可以用很多代替的	chat	不会差太多，
+haishixiangladehao	还是香辣的好	chat	可能我才发现，
+zhuyaoshishengqian	主要是省钱	chat	这个新的瓶还小估计吃不了几次就没了，还得吃辣椒油的，
+xingbuxinganixiayune	行不行啊你下雨呢	chat
+nanixiangbaqianshexiangtoufangna	那你想把前摄像头放哪	chat	哦哦，
+ainiruyi	爱你如一	chat
+jiangxiangyuantangfendaka	酱香圆汤粉打卡	chat	滴～
+najiujiafacihou	那就家法伺候	chat
+shitabuxihuanhe	是他不喜欢喝	chat	不是不能喝，
+heiheiheixiexie	嘿嘿嘿谢谢	chat
+nijuranbushidachangchang	你居然不是打肠肠	chat
+zaizenmehao	再怎么好	chat	他再怎么谦虚，
+jinjiandaoqianle	今捡到钱了	chat
+buxunizhemeshuo	不许你这么说	chat	这照片是我最美的照片，水上漂，
+diqizhangtuihaochang	第七张腿好长	chat
+genlanglangdouzhidouyong	跟浪浪斗志斗勇	chat	额，那得变着法子刷，
+nanpengyouzuonituishanghaole	男朋友做你腿上好了	chat
+nishiyemaozime	你是夜猫子么	chat
+wojianainaishigehaochizui	我家奶奶是个好吃嘴	chat	对了，你公公咋样了。
+caiganduima	菜干对吗	chat
+nibianchengmaonulema	你变成猫奴了嘛	chat
+shuibuzhaole	睡不着了	chat	嗯嗯，
+kuaikuairangwoqunijiashuiliangtian	快快让我去你家睡两天	chat
+bijingguofudiyilaoyiren	毕竟国服第一老艺人	chat
+bushihenyanzhongdehua	不是很严重的话	chat	一样的感觉，
+zheyanghenhao	这样很好	chat
+xiangguonatiandoukeyi	想过那天都可以	chat
+huibuhuitouyun	会不会头晕	chat
+dengwoshoulewoyaoyueni	等我瘦了我要约你	chat
+chongqingjietoudeouyu	重庆街头的偶遇	chat
+haiyouzuotianjichangdexiehou	还有昨天机场的邂逅	chat	重庆街头的偶遇，
+longshuqiukanshoudiban	龙叔求看手底板	chat
+hahahagennishuileyijiao	哈哈哈跟你睡了一觉	chat
+ruguonibuzaisanxingganle	如果你不在三星干了	chat	下面的那个所谓的三星员工，
+zhaoleqitagongzuojiujiaobeipanhaha	找了其他工作就叫背叛哈哈	chat	下面的那个所谓的三星员工，如果你不在三星干了，你也别去找工作哦，
+shuoduowuyiwuxuzaishuoshi	说多无益无须再说时	chat	尽量少说这样的话，他说的某些语言觉得不对可以善意指出来，但立场不同人家做不到换位思考时，
+niwentaweishenmebudainiqu	你问她为什么不带你去	chat	旅游表演，
+youcuoshiyigejihui	又错失一个机会	chat	5555本来就难聚了！
+zenmezhegebiaoqing	怎么这个表情	chat
+yidingyaojiayou	一定要加油	chat	加油！
+dajiashuodetuoweixianxiangniyouma	大家说的拖尾现象你有吗	chat	请问一下，
+nichuangyele	你创业了	chat
+zuihaojiaoban	最好搅拌	chat
+dixianchenyixun	底线陈奕迅	chat
+nizenmeyouliuhaile	你怎么有刘海了	chat
+butailiaojie	不太了解	chat	额～
+wonalidouhuipao	我哪里都会跑	chat	只要有美食，
+shuobuguolejiukaishirenshengongji	说不过了就开始人身攻击	chat	嗯？
+chetoucheweishifeiheibaibufen	彻头彻尾是非黑白不分	chat	觉得你没救了，
+zhezhongsixiang	这种思想	chat	很危险啊你，
+nimenbushimeikongtiao	你们不是没空调	chat
+wodouhaojiumeichile	我都好久没吃了	chat	泡面看起来很好吃的样子，
+shuomingnilaole	说明你老了	chat
+zheshixuexiaodeezuoju	这是学校的恶作剧	chat
+zhimingyangmaobozhu	知名养猫博主	chat
+xiedehaihenhaokan	写得还很好看	chat	天老爷！
+niyuedulijienenglizenmele	你阅读理解能力怎么了	chat	实际上读个研究生出来的工资，还比直接本科毕业多挣钱，所以说其实你读书时是挣钱的，所以用“学校花钱请你读书”这种表达方式。我的天，
+xiagexueqijiudasile	下个学期就大四了	chat
+qianyiduanguominle	前一段过敏了	chat
+zhongdianshibai	重点是白	chat
+zhememengdema	这么猛的吗	chat
+haodeshoudao	好的收到	chat
+woyejuedeshimaileguaikuide	我也觉得是买了怪亏的	chat
+kendingdema	肯定的嘛	chat
+shuaidebuxingla	帅的不行啦	chat	是小样吧，
+buxingwomingtianxiawuhaiyaochuquwan	不行我明天下午还要出去玩	chat
+tiqianchiwanfan	提前吃晚饭	chat
+banwanzitoukepuyixia	半丸子头科普一下	chat
+shenmedoubunengshuo	什么都不能说	chat
+chongqingshuizhuyu	重庆水煮鱼	chat	逢甲夜市这边，西屯区西屯路二段269。
+wananwananba	晚安晚安吧	chat
+xiaohuobanmenlaihuhuanba	小伙伴们来互换吧	chat
+haiyougehuidepingchangdai	还有个灰的平常带	chat	嗯！
+tingtebiedede	挺特别的的	chat	还行，
+shencaizhendemeisheile	身材真的没谁了	chat
+wozaijianfeine	我在减肥呢	chat	徒弟，
+yaobuduokanxienimenzhuanyedeshu	要不多看些你们专业的书	chat
+aihenyouyou	爱恨悠悠	chat
+woyigerendepangyu	我一个人的胖鱼	chat
+shanggezhoumohuilaileyitang	上个周末回来了一趟	chat	姐，
+nizaichangsha	你在长沙	chat
+jinwanqutiaowuquba	今晚去跳舞去吧	chat	嗯嗯，行啊，
+haidehenma	嗨得很嘛	chat
+hehedengzhefenfenzhongdeshi	呵呵等着分分钟的事	chat
+shashiwozhuangaota	啥事我转告她	chat	我老公刚有点累，
+nayehenlihaile	那也很厉害了	chat
+yayuezhiwu	雅乐之舞	chat
+kaifengxiaochikeshiyoumingdea	开封小吃可是有名的啊	chat
+nanshenhuiqu	男神会去	chat	有要去快乐大本营的吗？
+nizoulezhihouwoyoupangleyijin	你走了之后我又胖了一斤	chat
+yinggaihuiba	应该会吧	chat	哦，
+wohuiwenroudekanniyiyan	我会温柔的看你一眼	chat
+xiaoshihoudenihenshi	小时候的你很是	chat
+xiaoshihoudouyoudangyingerdeqianzhi	小时候都有当鹰儿的潜质	chat
+beidaoshiliuzhele	被导师留着了	chat
+haoduoyantaide	好多烟台的	chat
+wobushixuebao	我不是学霸哦	chat
+biaoshidajiadeyouyichangjiudeyisi	表示大家的友谊长久的意思	chat	客人要走的时候，吃上一顿面条，面条代表长远，长久，比如大家过生日的时候都回习惯的吃上一顿长寿面，也是这个意思，送客的时候吃面条，
+jiuzaifuzhou	就在福州	chat	明年的比赛就是你去了。这次是则徐办的。
+woshangdaxuejiemaobianduanle	我上大学睫毛变短了	chat
+buranwodouyaorenbuchule	不然我都要认不出了	chat	你改了名字了哈哈，幸好头像没变，
+nalidangyangle	哪里荡漾了	chat
+jintianzhemezaona	今天这么早呐	chat
+hahahashizheyang	哈哈哈是这样	chat
+xianzaibuyongtiantianshiqinle	现在不用天天侍寝了	chat	哈哈哈贵公公好滋润！
+chuwoyiwaimeiyigenengsachulaide	除我以外没一个能撒出来的	chat	十年前我最深刻的印象是:考前上厕所，站一排人，
+zhebangsongbao	这帮怂包	chat	十年前我最深刻的印象是:考前上厕所，站一排人，除我以外没一个能撒出来的。当时我就想:
+hahahashoudaolexiexie	哈哈哈收到了谢谢	chat
+feixiangmingtian	飞向明天	chat
+xuyaonameshangganma	需要那么伤感吗	chat	我们班签了一个呀！去新疆。这才大四刚开始，
+jiejiebushiyibanrennengpaode	姐姐不是一般人能泡的	chat	我指天发誓，泡谁都不敢泡姐姐！
+weishenmeya	为什么呀	chat
+shuomingnijingyanfengfu	说明你经验丰富	chat
+xiangxiangyouhuishebude	想想又会舍不得	chat	头发枯了前段时间就剪啦~
+buyaoxianmushikuaiqian	不要羡慕十块钱	chat
+liuzheduzijianfeiba	留着肚子减肥吧	chat	那就别吃了！
+zhongshiguanzhong	忠实观众	chat
+nijikuaidiganma	你寄快递干嘛	chat
+jianzhemeduobeike	捡这么多贝壳	chat
+anshichiyao	按时吃药	chat	别忽冷忽热！我暑假也起了！
+daihaizeibijiaoyouyong	带海贼比较有用	chat
+wulitucao	无力吐槽	chat
+nayoudanzhuang	哪有淡妆	chat
+guolaidamajianga	过来打麻将啊	chat
+xinglejiubuxiangshuilegaofushuaia	醒了就不想睡了高富帅啊	chat
+bijiaoshaojianeryi	比较少见而已	chat	可以。我乡下来的，
+youbuhuilandaobieren	又不会拦到别人	chat	怎么啦，我是看台，
+wabeizhuanfale	哇被转发了	chat
+woyaonilaibasongwo	我要你来吧送我	chat
+yuzhiyewuguan	与职业无关	chat	梦还未破碎，你需要继续不断追寻，与年龄无关，
+huabunengzhemeshuo	话不能这么说	chat
+wozaigeiwoaidoudejinzhumaimingne	我在给我爱豆的金主卖命呢	chat	幼稚，
+lingbowanshanghao	玲波晚上好	chat
+erjisheidea	耳机谁的啊	chat	哈哈，还挺好看的，
+nagelajidaiwoqukande	那个辣鸡带我去看的	chat
+jintiandexinqingdouhaoqilaile	今天的心情都好起来了	chat	恭喜恭喜！！！看到这个消息，
+haoxiangyebushihenbeiya	好像也不是很北呀	chat
+quedingpoufula	确定剖腹啦	chat
+nawozhaogeruozhidenanpengyouhaole	那我找个弱智的男朋友好了	chat
+youpashuocuole	又怕说错了	chat	我就看着像古巴，
+haopiaoliangha	好漂亮哈	chat
+guannipishi	关你屁事	chat
+conglaibuyan	从来不艳	chat	我一直在遇，
+niyigerenyipingma	你一个人一瓶吗	chat
+shangbandouyinianduole	上班都一年多了	chat
+zhegeshitadezeren	这个是他的责任	chat	我们下次学车就给他说，你7月就入职了，学不出来只有拖很久了~~
+weishajiuninamekeai	为啥就你那么可爱	chat	都是女生，
+jingtouzaizhebian	镜头在这边	chat
+zhexiejiudoushinideyoudian	这些就都是你的优点	chat	遇到会欣赏的人，
+woxihuanta	我喜欢他	chat	和男友分手了，原因是沟通不够，
+fenshouhoucaizhidaogoutongyouduozhongyao	分手后才知道沟通有多重要	chat	和男友分手了，原因是沟通不够，我喜欢他，但是他不知道，
+fangzaichekuangli	放在车筐里	chat	用大的矿泉水瓶子装水啊，
+shashihoulaiguanzuiwo	啥时候来灌醉我	chat
+buguowoxihuanqingpingguo	不过我喜欢青苹果	chat	作为一个在大理居住的荆州人我要告诉你，大理这边2-3元一斤。
+nijianzhishihuachi	你简直是花癡	chat
+jiuchuquduozouzou	就出去多走走	chat	去找同学玩去了，待了几天，挺好玩的，嘿嘿，行啊，天暖和了，
+zhemedasuishuderenle	这么大岁数的人了	chat	今天听他的声音都没有底气，真是让人担心，
+yunfeidoubuzhishikuaileba	运费都不止十块了吧	chat	十元一吨…
+ganjuezhegerenting	感觉这个人挺	chat
+xuezhangnihuichangxiaoxingxingma	学长你会唱小星星吗	chat
+xitanghaiyaodengdengne	喜糖还要等等呢	chat
+kuailaijiuwo	快来救我	chat
+huozaidangxia	活在当下	chat	的确，
+guangtouayishinage	光头阿姨是哪个	chat
+maosinidouhenmanga	貌似你都很忙啊	chat
+nanizaishishi	那你再试试	chat	哈哈。。小心你媳妇看到这句话。
+woyijingjuedingyaozuoqichehuiqule	我已经决定要坐汽车回去了	chat	嗯哪，
+jinnianmeixiaxuelushangyinggaihaixing	今年没下雪路上应该还行	chat	恩，也行，
+ganjuenacihaoweixiana	感觉那次好危险啊	chat	你回去的时候次了人家给的润喉糖诶，
+shangciyeshishouchuneryi	上次也是手蠢而已	chat	好的好的好的好的诶，可是也不是每次都接人家的糖啊，
+kaitileba	开题了吧	chat	也是，
+nishenmeqingkuang	你什么情况	chat	刚准备睡，
+wozhenbuxiangren	我真不想忍	chat
+yaoshicuoguomobanchezenmebana	要是错过末班车怎么办啊	chat
+zhishujiehaizaoa	植树节还早啊	chat
+shuyetiaowudejijie	树叶跳舞的季节	chat	秋分…
+wonengfaguangme	我能发光么	chat
+wojiushuoma	我就说嘛	chat
+nixianzaidianhuaduoshaole	你现在电话多少了	chat
+yaopeibangeipeiban	要陪伴给陪伴	chat	玩啥给啥这句话为啥光指物质呢？也可以是要亲亲给亲亲，要抱抱给抱抱，
+beijingwumaiyouzhemeyanzhongma	北京雾霾有这么严重吗	chat
+xiangwojiuzhishuo	想我就直说	chat
+gaitiandaitakanni	改天带它看你	chat
+buwenyima	不文艺吗	chat
+haizhunbeibahuashuokaide	还准备把话说开的	chat	有些事，没有结果是最好的结果。。。只怪自己太懦弱，
+kanlaibanerdashuninshutoule	看来板儿大叔您熟透了	chat
+hexiehuozheaiguo	和谐或者爱国	chat
+wogennihuanjingyekeyima	我跟你换敬业可以吗	chat
+wokendingshebudesai	我肯定舍不得噻	chat
+haoduorendedeshouhuangenqiaokelidou	好多人得的手环跟巧克力豆	chat	帽子跟徽章，玩游戏得电影票，
+zhemekuaijiushangban	这么快就上班	chat	我透。十五中过了？
+dongtianyinggaimeiwentile	冬天应该没问题了	chat
+meicinizichao	每次你自嘲	chat
+wodoumeizheyangjiaoguota	我都没这样叫过他	chat	我说的是，不可以这样叫他...
+bicizunzhongjiuhao	彼此尊重就好	chat	看待事物的方式不同，不必强求他们能理解，
+zenmehuijinzhang	怎么会紧张	chat	不会啊，
+nagesheishuowochangdehennantingde	那个谁说我唱的很难听的	chat	不会啊，怎么会紧张，
+pangzizaibuzaixuexiao	胖子在不在学校	chat	不用了!你们要吃宵夜么?
+dianhuazhengzaitonghuazhong	电话正在通话中	chat	晕,,,
+zaoshangxueqiuyinnayangqilaide	早上学蚯蚓那样起来的	chat	我在上班了。。。
+ninlaoqunalikaixinqule	您老去哪里开心去了	chat
+xiangdekeduole	想的可多了	chat
+nashiyinweiwoganghaoxiangnile	那是因为我刚好想你了	chat
+yinweimeiyouyigedafashijianderen	因为没有一个打发时间的人	chat
+laibajuzipi	来吧橘子皮	chat
+nikeyichuankuziyiyangshuaiqi	你可以穿裤子一样帅气	chat
+nishuoshenmewotingbujian	你说什么我听不见	chat	哦是么，
+jiufaxingle	旧发型了	chat
+oyogennageguniangla	喔唷跟哪个姑娘啦	chat
+danshibuzhiyusila	但是不至于死啦	chat	开心是开心啦，
+tebiexihuan	特别喜欢	chat
+shengkaozhiweichulaimei	省考职位出来没	chat
+nizazhidao	你杂知道	chat
+wodefeihuazhongyuzhiqianle	我的废话终于值钱了	chat
+youqianjiushirenxing	有钱就是任性	chat
+natianfangjia	哪天放假	chat
+dayuezaidongji	大约在冬季	chat
+zuihouyigejiaqikuaidianlaiba	最后一个假期快点来把	chat	我也不想有假期我想毕业了！！！！
+houzilandeli	猴子懒得理	chat
+shuileyitian	睡了一天	chat
+nizaishandong	你在山东	chat
+nimenhenxingfu	你们很幸福	chat	当然，
+hanketangzaizuilihuihuanjiekesoune	含颗糖在嘴里会缓解咳嗽呢	chat
+wenzibieyaowomenjiahuahua	蚊子别咬我们家花花	chat
+nijiajiuzaiwojiapangbian	你家就在我家旁边	chat	我家就在你家旁边丫，
+ganwennijiazainali	敢问你家在哪里	chat	我家就在你家旁边丫，你家就在我家旁边。
+meiyoumeiyouyisishitaijuele	没有没有意思是太绝了	chat
+shibushizaizhunbeikaoyan	是不是在准备考研	chat
+guojitianjuhasa	过几天聚哈撒	chat	没有啊、现在天天在干嘛啊、
+xiangzhidaokejiguanquanchengjiaosha	想知道科技馆全称叫啥	chat
+wozhiyoubangnichierhaolelesa	我只有帮你吃儿好勒了撒	chat
+zhuyianquana	注意安全啊	chat
+wobenlaijiushishenmele	我本来就是什么了	chat
+zhendibuganle	真滴不敢了	chat	不敢不敢!
+nihaopina	你好拼啊	chat	这个点……
+danbugennizaiyiqigengjianao	但不跟你在一起更煎熬	chat	我会害怕痛苦，
+fanzhengwoliajuedetinghaokande	反正我俩觉得挺好看的	chat	看吧，
+keshiwoyedongganmaole	可是我也冻感冒了	chat
+cunbucunzaizhishiyizhongxingshidui	存不存在只是一种形式对	chat
+wodoumeiganyang	我都没敢养	chat	哈哈，一直听说熊掌有股臭味，
+zhendeshixiaohou	真的是小厚	chat
+buyaoyiqimaifan	不要一起买饭	chat
+qingqingchangxiangyinfuzaitiaoyueyiyang	轻轻唱像音符在跳跃一样	chat
+womenshanglaile	我们上来了	chat
+womenyeshuilede	我们也睡了的	chat
+huodexiaoxiaosasa	活的潇潇洒洒	chat	红尘作伴，
+laoshihaokeaia	老师好可爱啊	chat
+shizheliangtianbunengfatupian	是这两天不能发图片	chat
+tixianduigezideyingxiang	体现对各自的影响	chat	都可以看的，
+leheqilai	乐呵起来	chat
+yongbaoyizhidouhuizai	拥抱一直都会在	chat
+biehaixiula	别害羞啦	chat
+yihouhaiyoujihuide	以后还有机会的	chat	嗯，
+guanchazhemezixi	观察这么仔细	chat
+yigerenku	一个人哭	chat
+zaojiuxiabanle	早就下班了	chat
+quepeilizhiju	却配励志句	chat	老发美食图，
+anzhuangshibai	安装失败	chat	下载了更新固件，
+haoxiangyuanle	好像远了	chat
+bijingzhichawuliyingyule	毕竟只差物理英语了	chat	虽然明天也来得及，但我想睡个饱觉，
+meiyouhualidecizao	没有华丽的词藻	chat	没有奢华的生活，
+nimeidouwomenba	你没逗我们吧	chat	哥，巡演诶，
+shixiangshuowoyuelaiyueshuai	是想说我越来越帅	chat
+dashenglaoshinijinnianduodaa	大圣老师你今年多大啊	chat
+meiqianliaojiebule	没钱了解不了	chat
+shizheyiyi	逝者已矣	chat
+zailaitiaoshilijia	再来条士力架	chat	饿货，
+yaobumamahuishuonila	要不麻麻会说你啦	chat	好好呲饭啦，
+enhaitebieshangxin	嗯还特别伤心	chat
+shenmeganqingdouhuidan	什么感情都会淡	chat	反正我觉得距离一旦远了，
+jianzhijiushishewang	简直就是奢望	chat	想走就走，
+nayouhenduoa	那有很多啊	chat	。。。
+henannanyangdenongcunlaibulaia	河南南阳的农村来不来啊	chat
+wojuedeniyinggainianyixiajing	我觉得你应该念一下经	chat
+diannaozuotu	电脑作图	chat
+xinchunkuaile	新春快乐	chat	谢谢！P哒！
+nizahaizaidushu	你咋还在读书	chat
+mingtianbanjiale	明天搬家了	chat	嗯，
+zheweixuanshouqingbuyaojiazhuangzaihuida	这位选手请不要假装再回答	chat	一楼已回答正确，
+buzhidaodedangranbuhuidale	不知道的当然不回答了	chat	但凡回答的那都是知道的，
+shoushiyigeduoxiaoshile	收拾一个多小时了	chat
+tiandouqingle	天都晴了	chat
+tongnianlejiyiyouhuilaila	童年勒记忆又回来啦	chat	哈哈，
+buganzhezhoumohuihaoyidianba	不赶着周末会好一点吧	chat
+huodehaoxianshi	活的好现实	chat
+anzhaoshenmexianluhaone	按照什么线路好呢	chat	游五大道，
+guanjianshihaiyaowomachudianqian	关键是还要我妈出点钱	chat
+nalisuyanle	哪里素颜了	chat
+juedeshoudibuqilaile	觉得手递不起来了	chat	不算，心理作用，
+haojiumeiyiqidalea	好久没一起打了啊	chat
+zheshigecime	这是个词么	chat
+nishifanleduoyuan	你是翻了多远	chat	………
+woxiangquzouzou	我想去走走	chat
+buganduochi	不敢多吃	chat	偶尔借孩子光吃一顿，
+benrentiepiguohaojikuaile	本人铁皮过好几块了	chat
+dianleyeshimeiyoufanying	点了也是没有反应	chat	服妹，部分快捷栏技能无法用鼠标点，点了无反应，但是可以用键盘的快捷键。有时候人物，背包以及任务还有心法切换也不能用鼠标点，
+huijiahaishihuixuexiao	回家还是回学校	chat
+woshijuxie	我是巨蟹	chat
+woshoutongo	我手痛哦	chat
+zhudepojiushuozhudepo	住的破就说住的破	chat
+zhuozishangnandaoshijiaoyunshihuangshui	桌子上难道是娇韵诗黄水	chat
+zhunbeihuijiale	准备回家了	chat
+shuodehaoxiangzijiguolesijiyiyang	说的好像自己过了四级一样	chat
+hahahahahao	哈哈哈哈好	chat
+zouzaiwojiamenkou	奏在我家门口	chat
+zuicandeshiwomenbuzhunqingjia	最惨的是我们不准请假	chat
+yinweiliaomeihegugua	因为撩妹和菇菇啊	chat	好两年了。
+woshinulidepiqiu	我是努力的皮球	chat	啊哈哈，好的~
+shibanghaishibubang	是棒还是不棒	chat
+woshixiaogegeya	我是小哥哥呀	chat
+yixiajiuhaola	一下就好拉	chat	找个收废纸呢,
+nizhehaixing	你这还行	chat
+qunianwodouchengsan	去年我都撑伞	chat
+meikandongshenmeyisi	没看懂什么意思	chat
+tamenzenmehuizuizang	他们怎么会最脏	chat	你不嘴脏，
+manjuanshishuxiyukuang	漫卷诗书喜欲狂	chat	白日放歌需纵酒，
+huijiazuolaoshi	回家做老师	chat
+ganghuidaowucaikandaonitiaoxiaoxi	刚回到屋才看到你条消息	chat
+bukaixueyehensang	不开学也很丧	chat
+jiuzhidaonihuishuodianshenme	就知道你会说点什么	chat
+bukuzhenkechen	不哭真砢碜	chat
+wojingranbuzhidaonizaiguangzhou	我竟然不知道你在广州	chat	是咯。。
+yinglisusheaniyaoguolaikanwome	颖丽宿舍啊你要过来看我么	chat
+doukuaibannianmeigengxinle	都快半年没更新了	chat
+woyoufuqiang	我有富强	chat
+nishenmeshihouhuinanningya	你什么时候回南宁呀	chat
+ninalihuinamezaoo	你哪里回那么早噢	chat
+bilibiliyezhaobudaole	哔哩哔哩也找不到了	chat
+wodexiaoxiong	我的小熊	chat	口水泛滥了，房间被淹了，啊，
+nizaobushuo	你早不说	chat	哈哈哈。。。我要上班。。
+laibuqilaibuqi	来不起来不起	chat
+jinniuhaowanma	金牛好玩吗	chat	啊啊啊啊啊，
+chidongxigenyanjingyoushenmeguanxi	吃东西跟眼睛有什么关系	chat
+xiananxinyangtaiba	先安心养胎吧	chat
+renshengaizhu	人生爱竹	chat
+shuzhekuzihenzhuaiei	叔这裤子很拽诶	chat
+songhechangchun	松鹤长春	chat	师弟啊，生日快乐！师兄祝你福如东海长流水，寿比南山不老松，日月昌明，
+shuiyintaoyansilie	水印讨厌死咧	chat
+denglehaojiu	等了好久	chat
+zutuanhuijia	组团回家	chat	走！
+xiexieniuniuguli	谢谢妞妞鼓励	chat
+kanzhebucuo	看着不错	chat	一直没去过，
+jiushizhejiadian	就是这家店	chat
+nazhenshixinkunila	那真是辛苦你啦	chat
+bihanzhengshishenmeabuzhidaoa	闭汗症是什么啊不知道啊	chat
+tongxuetongxue	同学同学	chat
+xianzaizaikaigongsi	现在在开公司	chat
+woyouyaohuiqule	我又要回去了	chat
+danshiwoyaoren	但是我要忍	chat	我也想染…
+kanzhehenbucuodezheyangsan	看着很不错的遮阳伞	chat
+biebuhaoyisi	别不好意思	chat	你稀饭啊？
+wogengxiangjianjianqianren	我更想见见前任	chat
+suoyixianhuilaile	所以先回来了	chat	我怕她太想我，
+quedingmingtianzouleba	确定明天走了吧	chat
+esiledouyao	饿死了都要	chat	好想好想啊，昨天见他饭都没吃。今天运动会又没吃，
+caibuhuijuedetoufashao	才不会觉得头发少	chat	烫发就是要这种感觉，
+nizenmenongdezhexiezhaopian	你怎么弄得这些照片	chat	你好，我也挺喜欢三生三世十里桃花的，
+hahahahouyouyanguanga	哈哈哈猴有眼光啊	chat
+shougepingshinamedushe	手哥平时那么毒舌	chat	说真的，
+congcizaiwoxinli	从此在我心里	chat	之前给她说，我追剧的时候。她好高冷的问我，你除了追剧还能干嘛。结果自己追得比我厉害。
+xianmuqingsongdiaofende	羡慕轻松掉分的	chat
+nawohaishihendandingde	那我还是很淡定的	chat
+wobuzhidaoshuoshenme	我不知道说什么	chat
+duzidaohaihaowozhangroubijiaojunyun	肚子倒还好我长肉比较均匀	chat	我是过了个冬天就……
+ninatianshihexiaobianjiangde	你那天是和小编讲的	chat	俺不知道，
+jianfeishoulian	减肥瘦脸	chat
+jiejiejintianchihuoguo	姐姐今天吃火锅	chat
+shoujishifangzaizhentoupangbiande	手机是放在枕头旁边的	chat	......有两三次我在睡觉，
+yaobuyaochulaiquheliangcha	要不要出来去喝凉茶	chat
+wokeshimanglehen	我可是忙了狠	chat	中提前约我，
+weishenmebushuo	为什么不说	chat
+duiozhekuanjiushiheibaihaha	对哦这款就是黑白哈哈	chat
+zuowanyelileizhenyu	昨晚夜里雷阵雨	chat	哈哈哈，
+hahahahahahawoyaoxiaoyunle	哈哈哈哈哈哈我要笑晕了	chat
+womenlibudao	我们理不到	chat	无话可说，最后都停下来吧，和平，不想多说什么，你们爱说什么就什么吧，
+dajiahepinghuale	大家和平化了	chat	无话可说，最后都停下来吧，和平，不想多说什么，你们爱说什么就什么吧，我们理不到，一句话，
+haohaojihuazhoumoba	好好计划周末吧	chat
+woshizuipangde	我是最胖的	chat	猫猫，今天我只能用五个号试试做比赛加油，
+zaiwozhemeiqianshizhongdian	在我这没钱是重点	chat
+woyouwangle	我有望了	chat	谢谢谢谢，
+moteamei	模特啊没	chat	我还没机会拍古宁，
+haoxiangzhuanyanjiudale	好像转眼就大了	chat	是啊，
+yinweizaishuilidingbuzhua	因为在水里定不住啊	chat	呃，
+gennilianxingmeiguanxin	跟你脸型没关心	chat	哈哈哈哈哈那是她们年纪大了。
+youzaishenyebuhuoyizhixiaoni	又在深夜捕获一只小你	chat
+houlangjinertingdaya	后浪劲儿挺大呀	chat
+fuhuojiedao	复活节岛	chat
+fendoudemuhou	奋斗的幕后	chat
+najiuqushuijiaoa	那就去睡觉啊	chat
+benlaijiucubushinixihuandexing	本来就粗不是你喜欢的型	chat
+gaoyuanyoushenmeyisi	高原有什么意思	chat	为什么都想去西藏...
+putaohaoxiangmeiyouweidao	葡萄好像没有味道	chat
+dashenkuaigaosuwomen	大神快告诉我们	chat	桃蛋应该用什么土养呢？
+baqijiaoqiao	霸气娇俏	chat
+zhenlihaichisu	真厉害吃素	chat
+anihaimuyouchifanmaqin	啊你还木有吃饭吗亲	chat
+mingtianwanshanghaiyouchangbisaine	明天晚上还有场比赛呢	chat
+woyaohuijiaaaa	我要回家啊啊啊	chat
+haoxiuzhichihuoguojiukuile	好嗅只吃火锅就亏了	chat
+qingwenkeyihuanshei	请问可以换谁	chat
+dangranshihuaqianmaidela	当然是花钱买的啦	chat
+qudianlizhuangba	去店里装吧	chat
+meitianbawojiaoxingdebushinaozhong	每天把我叫醒的不是闹钟	chat
+wozhezhongzhahaimeiyouzuoguoshuqian	我这种渣还没有做过书签	chat
+cangejicijiuhaole	残个几次就好了	chat
+niannianbuwang	念念不忘	chat
+wobushidafeng	我不是大风	chat
+manhadundengnine	曼哈顿等你呢	chat	哦吼，回来撒，
+wanfandianqude	晚饭点去的	chat
+xingxingfanbangbangde	行星饭棒棒的	chat
+weishenmebunengqu	为什么不能去	chat
+zoulebuyaohuilaile	走了不要回来了	chat
+nalaidezhuang	哪来的妆	chat
+yiyangqianxiyuelaiyuebang	易烊千玺越来越棒	chat
+zaiyiqisannian	在一起三年	chat	分手三个月了，
+nishiwodeyilvzhinian	你是我的一缕执念	chat
+yuandanzhemezaojiufangjiale	元旦这么早就放假了	chat
+yandaihaibinishen	眼袋还比你深	chat
+chuandaoqiaotouziranzhi	船到桥头自然直	chat	唉，没事。
+zonghuiyoubanfade	总会有办法的	chat	唉，没事。船到桥头自然直，
+dongdeaiqingdelaizhibuyi	懂得爱情的来之不易	chat	。船到桥头自然直，总会有办法的，方法总比困难多嘛。坚持到最后才会看见彩虹，等到圆满了更会懂得珍惜，懂得当初的坚持是多么的有意义，
+haobahahaha	好吧哈哈哈	chat
+yanjijianzhile	演技简直了	chat	对，
+haohaoshuiyijiaojiuduile	好好睡一觉就对了	chat
+dagaishifenzhong	大概十分钟	chat
+wopatachulai	我怕她出来	chat
+woganjuewokenengliandizuoye	我感觉我可能连底座也	chat	说缺手机的你们查过那款牙刷多少钱么？
+niyoufaxianmeideyanjing	你有发现美的眼睛	chat
+changkuanyurongfujiezou	长款羽绒服节奏	chat	过分，
+wokanshangdekanbudaowo	我看上的看不到我	chat	那能咋办啊。。。。
+hahahahashiba	哈哈哈哈是吧	chat
+biaobaijiaerchanliandier	表白嘉尔蝉联第二	chat
+shoujihaojialemou	手机号加了某	chat
+danshimeideqi	但是没得骑	chat	是好骑，
+wozhaobuhunde	我找不婚的	chat
+damamuyoulai	大妈木有来	chat
+woxiangchizuoxiajiao	我想吃左下角	chat
+nashuohaole	那说好了	chat
+awozhegebushikannvrendehehe	啊我这个不是看女人的呵呵	chat
+weishayouchedaozhegele	为啥又扯到这个了	chat	啊？
+ganjuegezihengaodeyangzixifaner	感觉个子很高的样子喜翻儿	chat
+yinweibuluoyinweizhongzhongyuanyin	因为部落因为种种原因	chat
+zoudoubujianwoyimian	走都不见我一面	chat
+laolixianqiwozuodefantaiqingdan	老李嫌弃我做的饭太清淡	chat
+nandaoyouqiannianlaoyao	难道有千年老妖	chat	如果那些照片有几百年，
+zhezhangmeiyoulian	这张没有脸	chat
+xiaoshaonvniyehao	肖少女你也好	chat
+mianmomeizuo	面膜没做	chat
+dannizaozaofaleshuobuxie	丹妮早早发了说不写	chat
+wochideduodongdeduoa	我吃得多动得多啊	chat
+burenzhishiyo	不忍直视哟	chat	听说有闰土，我特意看了下。。
+shanshangdetaohua	山上的桃花	chat	啊。桃花也？
+wochichoudoufuhaichipalene	我吃臭豆腐还吃怕了呢	chat
+wodoumeichide	我都没吃得	chat	你倒好，
+buguoyedaibuleduojiu	不过也呆不了多久	chat	回呀，要回去拿东西的，
+paoniubipaonandejiandanduole	泡妞比泡男的简单多了	chat
+zhegedianyingzhendechaojihaokana	这个电影真的超级好看啊	chat
+rongrutamenba	融入她们吧	chat
+baokuozhutishibushichongfushenmede	包括主题是不是重复什么的	chat	好像是不太容易，它考虑的挺多的，
+zheyangpopoyetuixiule	这样婆婆也退休了	chat	找个年龄大几岁的男票，这样的男票会疼人，
+suoyiyudaolejiuyaodayijiame	所以遇到了就要打一架么	chat
+nidesanhaizaiwojia	你的伞还在我家	chat
+zenmexuweile	怎么虚伪了	chat
+haonaixianlikaiguangzhoudabashijian	好耐先离开广州大把时间	chat
+genbendoujibushang	根本都积不上	chat	这么大啊我同学昨晚集训回来在郊区的路灯下看到点点雪，
+wojintianshangwuganggangchongwenleyibian	我今天上午刚刚重温了一遍	chat
+buhuijiaozhitounabushiwangde	不会脚趾头那不是网的	chat
+tiantiandoushangkea	天天都上课啊	chat
+hahahahawokeleyiquweiguanle	哈哈哈哈我可乐意去围观了	chat
+zhidaoshishenmepaizima	知道是什么牌子吗	chat
+bushiyinweinageshei	不是因为那个谁	chat	那你心冷的什么，
+wodeyanzhizhengyishishenmegui	我的颜值正义是什么鬼	chat
+dingbagenaozhongyifenzhongyige	订八个闹钟一分钟一个	chat
+zuozijijiuhao	做自己就好	chat
+youbeizima	有被子吗	chat
+xianzaiyinweiyigezongyijiemuhuole	现在因为一个综艺节目火了	chat	我高三听的歌，
+youshaobingai	有烧饼哎	chat
+nidegongne	你的工呢	chat
+niyoudiushenmedongxile	你又丢什么东西了	chat
+chidaoyidian	吃到一点	chat	昨晚十二点起来做火锅，
+yaobuyaozhemegaoxiao	要不要这么搞笑	chat
+ranhouzuijinhuibiancongmingde	然后最近会变聪明的	chat	昨晚可能是在发挥作用，
+taduinvpengyouhuihenhaode	他对女朋友会很好的	chat	他人很好啊。只是我个人抱怨的话而已啦。
+zhegelingjiehenheshini	这个领结很合适你	chat
+wanshangwandianlaiqinshinaha	晚上晚点来寝室拿哈	chat	哎呀，，，乖啦，给你们买了果冻！
+haoxiangzaixunhuanyiyang	好像在循环一样	chat	是的，
+hahahakeyikeyizuodengkaijiang	哈哈哈可以可以坐等开奖	chat
+mahennantingdenazhong	骂很难听的那种	chat	我也很怕，会手脚全冰掉。但我以前骂不出声来，心里骂，也有用。
+kuaidaowocheshanglaiyouhaoduoyo	快到我车上来有好多哟	chat
+jiuhuifuwoyixia	就回复我一下	chat	你要是行，
+shayebuhuia	啥也不会啊	chat	我暂时上班很闲，
+wozhiyuexianrou	我只约鲜肉	chat
+nizaiyinjiya	你再尹集呀	chat	尹集镇？
+shuozhexiehuadebujiushizhixinjiejie	说这些话的不就是知心姐姐	chat
+womeidatongtaiduorendale	我没打通太多人打了	chat
+jiuzhidaoyuanyuanbuhuizhemehenxinde	就知道渊渊不会这么狠心的	chat
+kaikaixinxinxixiqingqing	开开心心喜喜庆庆	chat
+shunshunxinxin	顺顺心心	chat
+woquzhiqianbigedianhuanila	我去之前比个电话你啦	chat
+yourenzutuanqutamengongyudundianma	有人组团去他们公寓蹲点吗	chat	瞬间就不想回家了，
+nimenliangkouzierrenshijiea	你们两口子二人世界啊	chat
+wozhidaozhegeren	我知道这个人	chat	嗯，胖胖的一女的，
+wobangnisheng	我帮你生	chat	你需要吗？
+zhegenguangmeiguanxi	这跟光没关系	chat
+suoyidanshengoushuxingzaicishangshen	所以单身狗属性再次上身	chat
+kuailaikuailaishuyishu	快来快来数一数	chat
+wofenshouleshilianle	我分手了失恋了	chat
+meidangwomishizaiheiyeli	每当我迷失在黑夜里	chat
+nishizuoemenghaishibei	你是做噩梦还是被	chat	你在讲鬼故事？
+wuhuishangyetiao	舞会上也跳	chat	我跳探戈，
+womeifuguide	我没富贵的	chat
+nizhejitianhaihaoba	你这几天还好吧	chat	是呀！
+bingbupaniya	并不怕你呀	chat	可是，我好像，
+woyinggaizenmehong	我应该怎么哄	chat	异地，吵架了，原因在我，她不愿意说话，
+yekanbuqing	也看不清	chat
+baiweitongzhuangshoudongguanzhuangde	百威桶装手动罐装的	chat
+wohuiqumaishuangxiegongzijiuwanwanle	我回去买双鞋工资就玩完了	chat
+kafeiguanshengyihaoma	咖啡馆生意好吗	chat	学校开学了，
+haobawoshizhiwanbande	好吧我是值晚班的	chat
+womenyemeiyoumabierenba	我们也没有骂别人吧	chat	你知道?我发现你们好逗，
+haibukuaiqushuijiao	还不快去睡觉	chat
+dongzinishuoshibushibuhao	冻子你说是不是不好	chat	心塞的，我貌似太直白和太强硬了，
+meigerendeganjueziyoubutong	每个人的感觉自有不同	chat	嗯，对于同样的事物，
+wodouxialoule	我都下楼了	chat
+zhejiushiwosushedeyangtaidejingse	这就是我宿舍的阳台的景色	chat
+beishuzhunbeikaoshine	背书准备考试呢	chat
+chutangyiwei	初唐一位	chat	个人观点唐代十大诗人，
+luohounameduotuidaogaodi	落后那么多推到高地	chat	趁人家460打一波团灭，
+weijingzhengshi	未经证实	chat	所以，
+suoyiyaogenzhewozoudeshuo	所以要跟着我走的说	chat
+bieyanglewopamao	别养了我怕猫	chat
+daishangerji	戴上耳机	chat	一个人的生活，有时候会有点迷茫，选个阳光灿烂的日子，
+xuanzeshuyuzijidenafenjianchi	选择属于自己的那份坚持	chat	一个人的生活，有时候会有点迷茫，选个阳光灿烂的日子，戴上耳机，带上自由的自己，让生活过得不再拘谨，选择等待，
+zouamingtianquguangzhouwan	走啊明天去广州玩	chat
+zhunbeichifanleba	准备吃饭了吧	chat	午好，
+shexiangzongshihenmeihaodene	设想总是很美好的呢	chat
+benrengengmei	本人更美	chat	因为我见过你！
+datudouzi	大土豆子	chat
+zhousilazhousila	周四啦周四啦	chat
+bixuyonggankuailedexiao	必须勇敢快乐的笑	chat
+zhejuhuajiushishuogeinandetingde	这句话就是说给男的听的	chat	为什么不算，
+niashishilianlepuhahaha	你啊是失恋了噗哈哈哈	chat
+woyiqianzhipaoguobanma	我以前只跑过半马	chat
+zhaitengfeiniaoa	斋藤飞鸟啊	chat
+suoyinigenbenbuyongkaolv	所以你根本不用考虑	chat
+zoushizhemehuasuan	奏是这么划算	chat
+haizinengtiduodadeyaoqiune	孩子能提多大的要求呢	chat	我家没啥钱，我也满足孩子。
+haijiaonidamajiang	还叫你打麻将	chat	你脖子都抬不起来了，
+paisanfangxiajiuhao	拍散放下就好	chat	嗯，
+shenmeshihoudaya	什么时候打呀	chat
+gounuzhaorenfanbushimeiyoudaolide	狗奴招人烦不是没有道理的	chat
+buguorenjiameiduole	不过人家美多了	chat	突然觉得你长得有点像李侑菲诶，
+zijijuedebucuo	自己觉得不错	chat	不单单是女生，只要是朋友的照片，
+xihuanhuohaode	喜欢活好的	chat
+chunfengshiliburuni	春风十里不如你	chat
+sigecikezhengzhedayewanshenmewan	四个刺客争着打野玩什么玩	chat
+weishenmebujueyu	为什么不绝育	chat
+weiwenyiqingnian	伪文艺青年	chat
+wokandaodeshidongzhuohehuangshiyingma	我看到的是董卓和黄诗盈吗	chat	我能问下，
+woyezhidaozheyangbuhao	我也知道这样不好	chat
+woxuezheshencaizhenshibangbangde	我雪这身材真是棒棒的	chat
+yinweitahenpagoude	因为她很怕狗的	chat	没有噢…是朋友的…我婆婆想养说拿来玩玩感觉下…
+zhedoubeinizhidaole	这都被你知道了	chat	哇，
+qishiwozhendebuxiangshuonalianggezi	其实我真的不想说那两个字	chat
+niyeshiyidayixiao	你也是一大一小	chat
+danwobushi	但我不是	chat	你也是一大一小，
+yidayixiaokanbieren	一大一小看别人	chat
+meihuoleba	没货了吧	chat	是的，
+wohaimeizui	我还没醉	chat
+nitameanlishaole	你他么安利少了	chat
+shishihoumailianglaidoudoule	是时候买辆来兜兜了	chat
+yemeiyounamefuqian	也没有那么肤浅	chat	可以一看，不费脑子，
+tianerzhenhaoxiaomaoertinghaokan	天儿真好小帽儿挺好看	chat
+danshidiyicia	但是第一次啊	chat
+qianbixiedekeyichaxiaqu	铅笔写的可以搽下去	chat	如果他可以学校承担收上来假钱的所有赔偿那就不写。别拿着冠冕堂皇的理由在这找茬。
+wozainanshan	我在南山	chat	请我吃饭啊，
+nandaoniyekuaile	难道你也快了	chat	.......
+meigeyonghuzheyiniandedushuliang	每个用户这一年的读书量	chat	以前是有个人的年度总结，
+buquzaihubierendekanfajiuhao	不去在乎别人的看法就好	chat	过好自己的生活，
+xinkuzhuanqian	辛苦赚钱	chat	有时候有点不甘心。拼命工作，
+gankuaiyanghaoa	赶快养好啊	chat	好吧。
+guodetaixiaosa	过的太潇洒	chat	你，，
+nanihaishuoyaojieshao	那你还说要介绍	chat
+kuaigeigejihuirangwohaohaokuakuani	快给个机会让我好好夸夸你	chat
+nijianchizhu	你坚持住	chat	坚持就是胜利，我还在难看进行中。但是快胜利了。
+kanbuchulaitazaigaotieshangmazhishang	看不出来她在高铁上吗智商	chat
+hulebajibiaohuhude	虎了吧唧彪呼呼的	chat	...
+dabaodeweidaodoudiule	打包的味道都丢了	chat	你为啥不飞过来吃呢？
+tinglehuifuninedannimeihuifuwo	听了回复你呢但你没回复我	chat
+niyoudengwoma	你有等我吗	chat	亲，我一个小时前才回来…看画皮去了，
+guangzhouyeyouqinglv	广州也有青旅	chat
+tanghulukanqilaijiuhaohaochio	糖葫芦看起来就好好吃哦	chat
+yexushiwoboxueduocaiba	也许是我博学多才吧	chat	哈哈哈，我喜欢你这种直言不讳的人，
+xiandemeishierzuobei	闲的没事儿做呗	chat
+zhebiaoqingfadewoyoudianfang	这表情发的我有点方	chat
+woyaonuli	我要努力	chat	我可喜欢这种装修风格了，
+woyexiangyaogedafangzi	我也想要个大房子	chat
+wodouhaojiumeichimenmianle	我都好久没吃焖面了	chat
+nachabuduo	那差不多	chat
+nizenmehuizhemerenwei	你怎么会这么认为	chat
+liuzaichengduduohao	留在成都多好	chat	你为啥回老家啊？
+rengengmeiwa	人更美哇	chat
+namejiudeshile	那么久的事了	chat	瞎说个毛，
+turanela	突然饿啦	chat
+danshimeihaodeshiqinghaishihenduode	但是美好的事情还是很多的	chat	不知道该说什么。
+niqubuqulundun	你去不去伦敦	chat
+suoyihuilaiba	所以回来吧	chat
+dengnisanshuadexiaoxi	等你三刷的消息	chat
+qingxushirenchanshengfunengliang	情绪使人产生负能量	chat	无奈！
+yizhizaibeijinga	一直在北京啊	chat
+dantabuhaochi	蛋挞不好吃	chat	我知道、
+jianshouzaigongzuogangwei	坚守在工作岗位	chat
+ditiehaishangqianwanne	地铁还上千万呢	chat
+tayoutebieduodebuzu	他有特别多的不足	chat
+daqingzaojiuyuehuibutaihaoba	大清早就约会不太好吧	chat
+nikandajiadoumeifahuane	你看大家都没发话呢	chat
+mingzidoujidezhu	名字都记得住	chat	那你很厉害了，
+rendaozhongnianyixinxiangqian	人到中年一心向钱	chat
+youwozaibuhuidiu	有我在不会丢	chat
+nisixiangzhengchangdianma	你思想正常点嘛	chat
+libulelibule	理不了理不了	chat
+wodexuerensidiaole	我的雪人死掉了	chat
+geiwomaitangci	给我买糖次	chat
+yougongjiaojiuhenbucuolehaoma	有公交就很不错了好吗	chat
+wojintianxiawujiushuoyouyaofeng	我今天下午就说有妖风	chat
+woganjuewoyaoreshi	我感觉我要惹事	chat
+naniyinggaiguodebucuo	那你应该过的不错	chat	哦哦。。
+quleliangjiashudian	去了两家书店	chat
+niweishenmebuzaiwangshangmaia	你为什么不在网上买啊	chat
+worenshide	我认识的	chat	你你你，格格巫？
+shiliunengdaoshenmea	石榴能到什么啊	chat	最讨厌吃石榴啦。
+dengwohuilaidanaosanbaihuihema	等我回来大闹三百回合吗	chat
+konglelaia	空了来啊	chat
+jiusuibianfanjiye	就随便翻几页	chat	在上，不是很忙，
+guanzhanjibujiuxinglou	关战绩不就行喽	chat
+beishengbingdegougounaoxingle	被生病的狗狗闹醒了	chat
+haojiubujianmiaomiaomiao	好久不见喵喵喵	chat
+dengwoqunanianshulenidoubiyele	等我去那念书了你都毕业了	chat
+jinwanyidingyaozuowan	今晚一定要做完	chat	是呀是呀…泪，
+xiangyaoyousuoshouhuode	想要有所收获的	chat
+wulunzhishihaishijinqian	无论知识还是金钱	chat	想要有所收获的（
+wohuahaizeiduo	我话还贼多	chat
+wangzhexiagu	王者峡谷	chat
+dazhuanzenmele	大专怎么了	chat
+zhetiaozisequnzihaokan	这条紫色裙子好看	chat
+nihaishixingxingba	你还是醒醒吧	chat	小凤凤不会喜欢你的，
+kanlainikaoshiyouweixian	看来你考试有危险	chat	这张照片怎么这么奇怪，
+nizenmejiuhuijialenie	你怎么就回家了捏	chat
+gongzigaojiuxing	工资高就行	chat
+buhaowandela	不好玩的啦	chat	哎呀~
+buguobitahaokan	不过比他好看	chat	贼像我一同学，
+nitongxuezhidaoma	你同学知道吗	chat
+choulouerbuzizhi	丑陋而不自知	chat	我同学...
+yougushidenvlaoshi	有故事的女老师	chat
+xitouhaomafan	洗头好麻烦	chat	我也得剪了，
+daguanggaone	打广告呢	chat
+shouladedouwangle	手辣的都忘了	chat	修完图才发现自己居然有专门的修美食的软件，
+woxiwangxiaxueqihainengkanjianni	我希望下学期还能看见你	chat
+woshiyigetuolidijiquweideren	我是一个脱离低级趣味的人	chat	我是一个苦口婆心的人，
+yaowozhaozhengju	要我找证据	chat
+baobeijiadeyanhuitingzhenhaokan	宝贝家的宴会厅真好看	chat
+nibushimeikandaowoma	你不是没看到我嘛	chat
+anmeijianguonige	俺没见过你哥	chat	拜托，
+womingtianquguanchan	我明天去观产	chat
+hahahayouma	哈哈哈有吗	chat
+wojuedekenengweibeichengdale	我觉得可能胃被撑大了	chat
+tarenzhendehaohao	他人真的好好	chat	我说能给我签名么？他说等会儿。
+bunihewoyiqi	不你和我一起	chat
+xianzaichaduole	现在差多了	chat
+shiguanghaizaojiulaji	时光还造就垃圾	chat	时光不光造就经典，
+mejifalegongzijiuqingni	么急发了工资就请你	chat
+yiqiandehaibucuoxingjiabiyehaixing	以前的还不错性价比也还行	chat
+deikuibuzailanzhou	得亏不在兰州	chat
+woyaoyuantuqiunile	我要原图求你了	chat
+gengbotaiman	更博太慢	chat
+baobeierxinniankuaile	宝贝儿新年快乐	chat
+nishibushidaiguoyatao	你是不是带过牙套	chat
+nibiaodianfuhaoyongcuole	你标点符号用错了	chat	第一，海没有彼岸，地球是个球体，海洋是相连的，没有起点，没有终点。第二，慢慢长途如果是个直线，绕地球一圈，那就没有回转。第三，
+nilikeshengdenaodaibeidiulema	你理科生的脑袋被丢了吗	chat	球体，海洋是相连的，没有起点，没有终点。第二，慢慢长途如果是个直线，绕地球一圈，那就没有回转。第三，你标点符号用错了，少了分号。
+qingnizuohaoxinlizhunbei	请你做好心理准备	chat	我就算不延误也要十点落地了啊，
+kandedourenbuzhu	看得都忍不住	chat	相册好厚都是照片，
+zhejiaobuyueertong	这叫不约而同	chat
+woxianzaihaimeishuine	我现在还没睡呢	chat
+zaierhaibuqufuxi	崽儿还不去复习	chat
+zhedoubushiliyou	这都不是理由	chat	你走，
+chizhemeimeideyidun	吃这美美的一顿	chat
+quyiyuankan	去医院看	chat	下面2颗这样的，我该拿它们怎么办。
+jienijiyankeshitakanshoujihengji	借你吉言可是他看手机哼唧	chat
+zuogehaomeng	做个好梦	chat	老大，跟你说声晚安哦，虽然没有在此长聊，但是偶一直都在！祝老大睡个好觉，
+xinkulewodelan	辛苦了我的澜	chat
+ruguozhenshizheyangnazhenshijihaode	如果真是这样那真是极好的	chat
+baobaoyingyingying	抱抱嘤嘤婴	chat
+womenshilandagua	我们是蓝大褂	chat	耶，原来当赵医生了，
+kuqidanche	酷骑单车	chat
+woyeburenshini	我也不认识你	chat	二姐，你怎么又出去丢人了，
+bushimianhua	不是棉花	chat	虽然你说每一条都是事实，但是证据呢？不要告诉我就是网上那些流传的照片，加上各路人士的说辞。声明我是星星，
+youfuqianghuanhexiema	有富强换和谐吗	chat
+dengwokaichudatiangou	等我开出大天狗	chat	嘻嘻嘻，
+jierikuaileo	节日快乐哦	chat
+ganjindegeiwobeizhe	赶紧的给我备着	chat	我快生日了，
+yigeyigedeguo	一个一个的过	chat
+womenguonianchulaihaobuhao	我们过年出来好不好	chat
+qishimeishenme	其实没什么	chat	是啊！4S买保险会有送一些保养券什么的，或者在外面找熟的修理厂保养！
+youshabuzixinde	有啥不自信的	chat	你挺优秀的，
+yongbukepengchu	永不可碰触	chat	从此与孤独为伴，在最深最柔软的角落，
+dagaisidianzuoyou	大概四点左右	chat
+zheliyintian	这里阴天	chat
+woshuoyizhebushiwoshizhangma	我说咦这不是我师丈吗	chat	我男朋友有天在看你照片，和我说这是全国最牛的健身达人，
+nihaowojiuhao	你好我就好	chat
+dezhegexingxiangbeipojianlile	的这个形象被迫建立了	chat	死了，“我是个很八卦的师姐”
+taibaishigong	太白是攻	chat
+wohaoxianghuichengdu	我好想回成都	chat	我想你了，远远，一点也不好玩，
+huaerbushide	华而不实的	chat
+hahahahaliushuizhang	哈哈哈哈流水账	chat
+kuanianhaishizaizuoyuezi	跨年还是在坐月子	chat
+wojintianqujiaxingxueyuanle	我今天去嘉兴学院了	chat	还有两个地方我要去的还没去过，去完后估计就会少去了。。。
+honghonghuohuohuanghuanghuhuxinteng	红红火火恍恍惚惚心疼	chat
+woyeshiluoyangde	我也是洛阳的	chat	我的妈呀，老师，
+younizhemeqifurendema	有你这么欺负人的吗	chat
+shuidechiwa	睡得迟哇	chat
+chulaizhengzhengma	出来整整嘛	chat	过年有事做没，
+wojinwosuonengma	我尽我所能嘛	chat	呃，，，，大家都今年才换老手机，，，
+ganmazaiyitaiduoa	干嘛在意太多啊	chat	随意点就好了，
+ninageshoujibushiyebaofeileme	你那个手机不是也报废了么	chat
+zhegejiaonenlu	这个叫嫩绿	chat
+woyeshijiukanhaoping	我也是就看好评	chat
+kuaigeiwoshuonixianzaishaxinqing	快给我说你现在啥心情	chat
+maimoshuiyaochitu	买墨水要吃土	chat
+yiweinimangzhewangchile	以为你忙着忘吃了	chat	那就好，
+zhendeshizhaowanjiujianle	真的是照完就剪了	chat
+nanfangmeiyounuanqizenmeguodong	南方没有暖气怎么过冬	chat
+wojiashihudie	我家是蝴蝶	chat	差不多，
+jiuzhiyouyigekongfangjian	就只有一个空房间	chat	你不知道我这边的情况，
+nizhenshigoule	你真是够了	chat
+guduchichengfei	孤独吃丞飞	chat	我坠站飞丞嘛！！！我哭了，
+woshihewanhun	我适合晚婚	chat
+manaitihaochiduole	马奶提好吃多了	chat	很多年前在我们怀来县吃到过一种特别小的葡萄，很甜，特别好吃，比什么红提、
+namehuigongkaipiyaone	那么会公开辟谣呢	chat	任何事情都需要证据，证据没找完也没确定，
+gankaishenghuo	感慨生活	chat
+yourenshihenduopengyoula	有认识很多朋友啦	chat
+haobeifanzhengmudidixiangtong	好呗反正目的地相同	chat
+bushizhiyoulianggexuanxiangba	不是只有两个选项吧	chat	这样更好看……
+nanshenniyehao	男神你也好	chat
+banyemeiganhaoshi	半夜没干好事	chat
+zijidebaobaodoushizuikeaide	自己的宝宝都是最可爱的	chat	都想生龙宝宝呗！其实不管啥宝宝，
+dasuanzhaoshenmegongzuo	打算找什么工作	chat	呵呵！
+haibuzhidaomailejige	还不知道买了几个	chat
+haishihebingmeiba	还是喝冰美吧	chat
+tongxitongxi	同喜同喜	chat
+congnalinachulai	从哪里拿出来	chat
+xintengniyimiaozhong	心疼你一秒钟	chat
+dengsiwujinlejiubatamaile	等四五斤了就把她卖了	chat	太丑了。。。
+zhendeshitaitianle	真的是太甜了	chat	我也是，
+qianxulebushi	谦虚了不是	chat
+yuanyinongshiduifangbuyuanyinong	愿意弄是对方不愿意弄	chat
+doujieguohunderenle	都结过婚的人了	chat
+woyouyigetongxuejiaomaimaiti	我有一个同学叫买买提	chat
+bachuanghukaile	把窗户开了	chat	刚刚加了衣服…因为要看月亮…
+nichifanmeiyou	你吃饭没有	chat	还没有，在车上，等等就去吃，
+hahahawohaoaiwodegouza	哈哈哈我好爱我的狗砸	chat
+taigefengshanhuilai	抬个风扇回来	chat	走，
+bushixiaopihai	不是小屁孩	chat
+zuijinhundezayanga	最近混的咋样啊	chat	嗯嗯，是啊是啊～～～我在家休假呢～～～～
+bamujibianchenghongzhaji	把母鸡变成轰炸机	chat
+wancanchiguolene	晚餐吃过了呢	chat
+nihaohaowan	你好好玩	chat	哈哈，
+nishiwangxianxia	你是网线侠	chat	不，
+nengbunengzaiweiwotiaoyizhiwu	能不能再为我跳一支舞	chat
+niyougongmingma	你有共鸣吗	chat
+yihoujinglideshihaihuihenduo	以后经历的事还会很多	chat	努力了就好，
+jialiyehenlenga	家里也很冷啊	chat
+zaixiandengzhibo	在线等直播	chat	撒子情况？
+naodeshuibuzhao	闹得睡不着	chat	货车从这边过，
+lenggedoukeyia	楞个都可以啊	chat
+xihongshichaojidan	西红柿炒鸡蛋	chat	山药排骨汤，
+zuowantaisiniannile	昨晚太思念你了	chat
+wodeyegangshoudao	我的也刚收到	chat	赞，
+ganmaxihuanziyanziyu	干嘛喜欢自言自语	chat
+chongxiudetong	重修的痛	chat
+shenmashihoufeilai	神马时候肥来	chat
+manyuemeihaochi	蔓越莓好吃	chat
+dengnixiuxide	等你休息的	chat
+yuanxinxiangshicheng	愿心想事成	chat
+woxinlitashihenduo	我心里踏实很多	chat	看到很多人说揍他一顿，
+qitadoutingfangbiande	其他都挺方便的	chat	就他一个腿长不方便，
+bixushuile	必须睡了	chat	好的。我来不起了，我的胃饿得遭不住，痛~
+zaiyuxiaomoshijian	在于消磨时间	chat	不在于去哪儿逛，
+yuanlainiliarenshia	原来你俩认识啊	chat	猴哥，
+diyidemudibuyiyang	第一的目的不一样	chat	哈哈，
+haoxindongdetiaojian	好心动的条件	chat
+zainashangbanne	在哪上班呢	chat
+jiubeijule	就悲剧了	chat	看到别人游到泳道的尽头，翻一个跟头，脚一蹬墙就又出去了〜我试了下，
+kuaiquchifan	快去吃饭	chat
+zaijiababi	在家爸比	chat
+budaiwochi	不带我吃	chat
+kanzhetinghaochi	看着挺好吃	chat
+xiacidainichi	下次带你吃	chat
+wokeshiaixindashi	我可是爱心大使	chat	是你啊，还是那群孩子啊？？哈哈！！
+daodifashengleshenmeshi	到底发生了什么事	chat
+nizuikeaio	你最可爱哦	chat
+xiaoyuanliyiyanjiudezayangle	校园礼仪研究的咋样了	chat
+haifanggesiliuji	还放个四六级	chat	放个五年模拟三年高考。
+xiexiechoufengfeng	谢谢臭峰峰	chat
+dunshijiuhuainianle	顿时就怀念了	chat	够怀旧的吧。。我们班今天过儿童节啊一样水气球乱飞简直象时空穿梭回到那时候一样。。
+fanzhengniyijingdayushibale	反正你已经大于十八了	chat
+xiangyaojiaosu	想要酵素	chat
+huashuozhexuezhanglaoxiangdoukuaiyaozoule	话说这学长老乡都快要走了	chat	先不说这个，
+haishigaobudonglingduisiyedetaidu	还是搞不懂零对四叶的态度	chat
+xiangxiangkaixindema	想想开心的嘛	chat
+jizhuwodehua	记住我的话	chat
+zaiwangshangkanyoumeikandaodutediande	在网上看又没看到独特点的	chat	嗯呐、
+zenmeshuohuade	怎么说话的	chat
+haoxihuanniozenmepo	好喜欢你哦怎么破	chat
+nengmaidaopiao	能买到票	chat
+chiwanjiuhaole	吃完就好了	chat
+guiqiulushaonvziyuan	跪求鹿少女资源	chat
+xianghepengyouqu	想和朋友去	chat	现在有葡萄摘了吗？
+suiranwojintiancaixidetoufa	虽然我今天才洗的头发	chat	这个可以有~
+bizhaoxiaohuizhishanggaobabaibei	比赵小灰智商高八百倍	chat	天啊！
+daochuzheteng	到处折腾	chat	，不认识的人根本抢不走的。还会自己买火腿肠吃特别逆天。据说金毛1岁以前是魔鬼，1岁以后就是天使了，特别善解人意。小时候爱啃东西，
+maozongdebeiwohuoshengshengdeqianglaile	毛总的被我活生生的抢来了	chat	毛总和你一样。。。
+haibuxiuxi	还不休息	chat
+ernishifanergongjiyanyuan	而你是反而攻击演员	chat	每个人有自己的评判标准，也许他从收入等方面判断。但不管怎么说这都是层主的问题，
+zhangchulaixindele	长出来心得了	chat	我们家仙人掌特别恐怖,
+niganzijimaiyigema	你敢自己买一个吗	chat	没出息的！
+paolaipaoqutaileile	跑来跑去太累了	chat	我只心疼我自己，
+zaikaolvzhong	在考虑中	chat	汗，暂时木有啊，
+ninayoushiermei	你那有事儿没	chat
+hahasuoyinideshoudouyaoqiuwoqing	哈哈所以你的手都要求我请	chat
+zhenzhuzenmenamegui	珍珠怎么那么贵	chat
+zhexiaohaizhangdetingxiangwangdazhi	这小孩长得挺像王大治	chat
+shierxiaoshihuochehaishidongche	十二小时火车还是动车	chat
+feichangxuyao	非常需要	chat
+shuangxiabaguai	双下巴怪	chat
+huaweihaoyongma	华为好用吗	chat
+qingwenbahenguikekeyiqume	请问疤痕贵科可以祛么	chat
+yekeyidadianhuayuyuexia	也可以打电话预约下	chat	可以的哦，是什么原因造成的疤痕呢？
+yidaduibiaoqingbao	一大堆表情包	chat	你变了，
+meilaiguoyunnanba	没来过云南吧	chat
+woyaoxiaoqunzi	我要小裙子	chat
+momingxiangxiao	莫名想笑	chat	哈哈哈，
+yiqiesuiyuan	一切随缘	chat
+renshenanquandebudaobaoxian	人身安全得不到保险	chat	北极荒无人烟，
+wodouzaicheshangle	我都在车上了	chat	肯定是昨天晚上没耍好，。闹脾气呢！
+dianshijugequhenyouyunwei	电视剧歌曲很有韵味	chat	友晚上好！这几天没过来影评大有长进，不管是采集选择还是剧情表诉大有提高，
+shuimianbuhao	睡眠不好	chat
+shuohuafudianzerenhaoba	说话负点责任好吧	chat	什么叫只要有关系想考什么岗位有什么岗位？！
+doubugouguanzhuzhuyejun	都不够关注主页君	chat
+niyezhidaodeya	你也知道的呀	chat	哟呵，
+ertongjiekuaile	儿童节快乐	chat	也祝你这个资深儿童“六一”
+hushuobadaonimingmingshiwokanniba	胡说八道你明明是我看你吧	chat
+wokeyibangbangni	我可以帮帮你	chat	愿意跟我说说么？或许，
+nibupanga	你不胖啊	chat
+shuidebizhuhaisideyidingshini	睡得比猪还死的一定是你	chat	到时候，
+wojiuzhijierengdishangle	我就直接扔地上了	chat	现在也有。
+xiexieniwoyaopanghaobuhao	谢谢你我要胖好不好	chat
+niyaoshenmeshihouhuiqu	你要什么时候回去	chat
+yaoshikeyijiubushifujile	要是刻意就不是腹肌了	chat
+maoyeyoujiayifutaiduiweikou	茂业有家衣服太对胃口	chat	没有怎么逛～
+fanghanjiale	放寒假了	chat
+niyaoxiangwoo	你要想我哦	chat
+zhemezaoa	这么早啊	chat
+youmeihuatadeqian	又没花他的钱	chat	我就是想出去玩，想旅游，
+renshengyidingyaochuangyepinyici	人生一定要创业拼一次	chat
+nizairuce	你在如厕	chat
+youkongquzhaonimenyiqichifana	有空去找你们一起吃饭啊	chat	最近在网申找工作了。哈哈，好啊，
+kexuezhenweida	科学真伟大	chat
+haowencaishiqinghuayi	好文采诗情画意	chat	好诗，
+yaobuyaopeiwowoqujieni	要不要陪我我去接你	chat	一个人去市里，
+niquganma	你去干嘛	chat
+woyaokanshua	我要看书阿	chat	你去干嘛，
+yiqiedouhuibianhaode	一切都会变好的	chat	摸摸，不开心只是暂时的~
+najiushubiaozhijienazoubei	那就鼠标直接拿走呗	chat
+meijianguozhemejijijianjiazhangde	没见过这么积极见家长的	chat	见过怕见家长的，
+huodemingbai	活得明白	chat
+xiaxuelene	下雪了呢	chat
+zaojiemanleshuile	早接满了水了	chat
+dayinglequzuobaogao	答应了去做报告	chat	我下周一去你们学校，
+buzhidaoduohao	不知道多好	chat
+nijiazainalia	你家在哪里啊	chat	回家呢！！超级棒~
+xiangjushiguangtaiduanzan	相聚时光太短暂	chat
+niheshuiyepang	你喝水也胖	chat
+gaosutamen	告诉她们	chat
+nizenmezhidaoshizhuangshan	你怎么知道是撞衫	chat
+qingwencongnatoukui	请问从哪偷窥	chat
+zuijinhennulidezaixuexine	最近很努力的在学习呢	chat	没有呢，
+meiyouxinhuan	没有新欢	chat
+xianmunenghuijiadehaizi	羡慕能回家的孩子	chat
+lailiudayiquan	来溜达一圈	chat	啦啦啦，
+doubuhuia	都不会啊	chat	哈哈，最近很久不学英语，
+jiubuyaoranggeiwola	就不要让给我啦	chat	哈哈，谢谢诶。既然你有如此宝贵的机会，
+congjichudesumiaojihetikaishi	从基础的素描几何体开始	chat
+qingbuyaofachide	请不要发吃的	chat	夜深了，
+huilaileguoduanquliudaa	回来了果断去溜达啊	chat
+yehaihaoba	也还好吧	chat
+meyouaile	么有爱了	chat
+youdebuzhide	有的不值得	chat	我看见这句话，脑子里突然就想到有的人值得被爱，
+niyezaiweiwomenfanyingyuan	你也在为我们反应援	chat	因为想让你开心，
+yingyeyuantingdafangde	营业员挺大方的	chat
+shibushiniyabuzoule	是不是你丫不走了	chat
+nashigehaoxuexiaogaozhongyalihaoda	那是个好学校高中压力好大	chat
+nayeshishouteng	那也是手疼	chat
+tongwentongwen	同问同问	chat
+qingnizuogeren	请你做个人	chat	……王嘉尔不能吃辣椒，
+yeyoutabunengchilajiao	也有他不能吃辣椒	chat	跑男也是，
+woyijingxixingemian	我已经洗心革面	chat
+nifangjialema	你放假了吗	chat	回家了，
+guoleniqingwochifanbei	过了你请我吃饭呗	chat	刚看完世界杯，终于可以放下一切杂念，心如止水的看司考啦！
+dengxiangjizuodengxiangji	等相机坐等相机	chat
+yikaishixiangzheliliuhaijiuxingle	一开始想着理刘海就行了	chat
+beimashale	被骂傻了	chat
+weilezijixihuandeshiqing	为了自己喜欢的事情	chat
+suihuayangqundewo	碎花洋裙的我	chat
+nihaoxinjio	你好心急喔	chat	团长~
+woshangqianglea	我上墙了啊	chat
+youjiegezhenzhe	有介个镇着	chat	木事，
+zhufuzhufuhaishizhufu	祝福祝福还是祝福	chat	今天看东方卫视娱乐星天地，老公终于心有所属啦，看来77不会孤单了，
+shangcimeilaideji	上次没来的急	chat	恬〜我们都在你身边，阿姨说她很喜欢你！我回去我们一起吃饭，
+zhegetukeyishoucangma	这个图可以收藏吗	chat	看一次笑一次，哈哈，
+woshixiangchide	我是想吃的	chat
+qingmingquqingchengshangengyouyijing	清明去青城山更有意境	chat
+nichoumeishiwoxia	你丑没事我瞎	chat
+nanilikaishantouyiduanshijianba	那你离开汕头一段时间吧	chat
+enenjianjiankangkangzuizhongyao	嗯嗯健健康康最重要	chat
+taoyandehen	讨厌的很	chat	昨天中午到的，今天就下雨了，
+xiangyaoyoushan	想要友善	chat
+meiyouhaiyoukaoshi	没有还有考试	chat
+xiangqinqulema	相亲去了吗	chat
+bububushi	不不不是	chat
+nideweilaihuihenmeihao	你的未来会很美好	chat
+nideshaonvxinbaopenga	你的少女心爆棚啊	chat	哎吗～
+gennanshengdaqiu	跟男生打球	chat
+hahahahataiduile	哈哈哈哈太对了	chat
+hongshaodoufu	红烧豆腐	chat	冷冷的坐在街边想菜谱，香菇排骨汤，清蒸鲑鱼，
+yanzhizizhiwuye	焉知子之悟也	chat	吾非子，
+woyiqianaikanleshi	我以前爱看乐视	chat	我不是水军，
+meirenyueniya	没人约你呀	chat
+luosendaiyanren	罗森代言人	chat
+zhegebianjiaokendingbushichangyongchangjing	这个变焦肯定不是常用场景	chat
+woxiageyueyequ	我下个月也去	chat	安逸。。等到看你们的经验。
+shigeiyuangongliansema	是给员工脸色吗	chat	老板这么早到，
+qinggeiwozhangsheng	请给我掌声	chat
+biyoukehenzhichu	必有可恨之处	chat	“可怜人”
+quanxinquanyi	全心全意	chat
+quanshijiedouzaiouyuhuachenyu	全世界都在偶遇华晨宇	chat
+haoanyiwomenjintianjiushangbanle	好安逸我们今天就上班了	chat
+nimennianqianfangdezaoma	你们年前放的早嘛	chat
+youbaozheshuijiaoma	有抱着睡觉吗	chat
+zhidaoshisheima	知道是谁吗	chat
+deyuqishuohuahaome	的语气说话好么	chat	您为毛要用也…抱歉我和您不是一种生物请不要带着一种“阿终于找到同类了”
+nijingranmeilai	你竟然没来	chat
+wojintianchuchai	我今天出差	chat
+gangquliuleyan	刚去留了言	chat
+suiyueshibadao	岁月是把刀	chat
+shibushishangcengnibuyongguan	是不是上层你不用管	chat
+nawoxuannikeyiba	那我选你可以吧	chat
+duiawodouyaohuiqule	对啊我都要回去了	chat
+zaidengliangtiangujiyenayang	再等两天估计也那样	chat	唉！
+zuinandeyige	最难的一个	chat	明天要考试了。
+wohuipeizheniyiqijiayoude	我会陪着你一起加油的	chat	加油！
+wodaoyaoshikankansheiyanjingnamexia	我到要是看看谁眼睛那么瞎	chat	等你有对象了一定告诉我，
+wojiujiazhuangdabuguoni	我就假装打不过你	chat
+ounijiangqiuyuantu	欧尼酱求原图	chat
+maiyigexinde	买一个新的	chat
+zhenidouzhidao	这你都知道	chat
+zhishixiangjiagengnongyuleyidian	只是想家更浓郁了一点	chat	对我这种在外地不能回家，并且是一个人的孤独。中秋并没有什么，和平常一样，
+youshujiazhenhao	有暑假真好	chat
+zhiyaowogaoxingzaileitayeyuanyi	只要我高兴再累他也愿意	chat	嗯嗯我爸对我说别让我伤心，看见我不开心他也不开心，
+zhuanmenweinizhunbei	专门为你准备	chat
+yizhoujiuliangjieke	一周就两节课	chat	来吧来吧。。我下学期好有空。。
+erqieqianwuzhouzhiyouyijie	而且前五周只有一节	chat	周三一节，周四一节，
+nvshengdoufande	女生都烦的	chat
+nicaishinanshen	你才是男神	chat
+xianzaikaishibopianhuala	现在开始播片花啦	chat	别走啦！
+zhiyoutanqinnengjiuni	只有弹琴能救你	chat
+mingtianquwanshenmea	明天去玩什么啊	chat
+kanzhehaihaoa	看着还好啊	chat
+xiwangyunitiantianjian	希望与你天天见	chat
+weiguanrichangjiupinghudui	围观日常九瓶互怼	chat
+nishiyoumingdetuzi	你是有名的兔子	chat	哪里偷偷，人家正大光明好不，
+niyouluguoleshei	你又路过了谁	chat
+niyidingshihaojiaoguan	你一定是好教官	chat
+shangbangouzhencan	上班狗真惨	chat	本人睁不开眼了昨晚三点半多睡的，
+zongjuedenijinjinianjiabule	总觉得你近几年嫁不了	chat
+guanlekongtiaoyaoming	关了空调要命	chat	昨晚还好，前天半夜给我冻醒了。开着空调太燥，
+woshixiaolongrena	我是小龙人啊	chat
+nijiubunengzhengchanghanwoa	你就不能正常喊我啊	chat
+nizhuzhazainaliya	你驻扎在哪里呀	chat
+jinqudedoushuolimianhaopiaoliang	进去的都说里面好漂亮	chat	是啊！我走慢没进去啊！
+pumianerlaidejiaoqing	扑面而来的矫情	chat	真矫情，
+baitianzhuiwoge	白天追我哥	chat	你说我容易吗，
+shenghuotiaojianbinihao	生活条件比你好	chat	在穷好像也比你富裕吧。你这是眼红我们收入比你高，
+youxierenshuoguozaijian	有些人说过再见	chat
+onidezhiyegenyirenyouguan	哦你的职业根艺人有关	chat
+shashidoushiwomenhenanrendeguo	啥事都是我们河南人的锅	chat	你这人真的好没意思啊，我都说了你随意，别回了……你说你没说你就没说吧，对，
+niweishenmefeiyaodanggegouzhongyilei	你为什么非要当个狗中异类	chat	狗是我们人类的忠实朋友，
+haiyousansi	还有三四	chat	你好有才…认识一一…
+zhegexiaokonglonghaokeai	这个小恐龙好可爱	chat
+enwozhidaotuzitebiedenixin	嗯我知道兔子特别得你心	chat
+qiudaiwochukeng	求带我出坑	chat	大神，
+ziranshiyaohaide	自然是要还的	chat
+fuqianghuanniaiguo	富强换你爱国	chat
+douweiwoquzhengzhoukaitonggaotiela	都为我去郑州开通高铁啦	chat	我也这么觉得，
+meiyoujiangyelaikanni	没有奖也来看你	chat
+zheyangbuhuinanweiziji	这样不会难为自己	chat	你不动，你不变，不是所有都和你一起不变不动。去享吧，
+shenmeshihoutaiana	什么时候泰安啊	chat	我去。。
+woyexiangzhidaojiuturanbujianle	我也想知道就突然不见了	chat
+yinweijiusuzixina	因为就素自信啊	chat
+huquguanba	互取关吧	chat
+jiushuowonengbunengkaoshangyoudianxuana	就说我能不能考上有点悬啊	chat
+yidinghuizaijian	一定会再见	chat
+xihuanlehaojiu	喜欢了好久	chat	西班牙的！
+nazuoshenme	那做什么	chat
+zhezhiwuguanhaopiaoliang	这只五官好漂亮	chat
+xiaobailianwa	小白脸哇	chat	哈哈，
+congmingruwo	聪明如我	chat
+bushibiaozhunbubiaozhunde	不是标准不标准的	chat
+xiaowangzilainuannuannidexin	小王子来暖暖你的心	chat
+yaobuyaoqiuerbanzhuan	要不要丘二搬砖	chat
+wodoubuzhidaoyongleganshenme	我都不知道用了干什么	chat
+niyizhouzuojicidonggandanche	你一周做几次动感单车	chat
+shijiebeisheishiguanjun	世界杯谁是冠军	chat
+haishikaowanshinatianjiandeba	还是考完试那天见的吧	chat
+haolihaihaoxiangchi	好厉害好想吃	chat
+zhegeqianbidai	这个铅笔袋	chat
+shenmedoubieshuo	什么都别说	chat	我的感情总是熬得过七夕熬不过情人节。杯具。调整好我们自己。
+yijingshouleba	已经瘦了吧	chat	圆圆，
+yaobushikanjianjiegenbenrenbuchule	要不是看简介根本认不出了	chat	我的妈呀你竟然换了马甲，
+wozhixiangzhidaopiantoudekouhongsehao	我只想知道片头的口红色号	chat
+tuanzhangbushizuiaishenshetoume	团长不是最爱伸舌头么	chat
+yourenchizuihao	有人吃最好	chat	不用不好意思，多的饭空姐还要负责处理特别麻烦，
+jiushizhege	就是这个	chat	对对对，
+jinzhanbuhong	近战不红	chat
+wonengbushuoma	我能不说吗	chat
+yinggaishuoniduiwomenbuhao	应该说你对我们不好	chat
+fujinzhandianshiguomaotianhong	附近站点是国贸天虹	chat
+buranzaokuale	不然早垮了	chat	遭个屁！还不是哥的70块支持的它继续开展下切，
+zhongyuchengrentuicudeshishilema	终于承认腿粗的事实了吗	chat
+shunlizainalitianzainali	顺利在哪里甜在哪里	chat	男朋友都还没找到。
+zhemouzhongchengduyebujiaobushunliba	这某种程度也不叫不顺利吧	chat	不是啊，如果你人生规划里面没有男朋友的选项。那都无所谓。可是问题是一直在找男朋友但没找到。
+xixikuailekuaile	嘻嘻快乐快乐	chat
+xiaobianermahahahaha	小辫儿吗哈哈哈哈	chat
+zhenzhenkanbukanyifanzhuizong	针针看不看疑犯追踪	chat
+nixianzaizainaa	你现在在哪啊	chat	老王好。。。
+zhewenhuarenjiushibuyiyang	这文化人就是不一样	chat
+kandaobingrenjiashu	看到病人家属	chat	木有啊～～
+meicidoushixiayinian	每次都是下一年	chat
+nandezhunbeijiehun	难得准备结婚	chat	不嘛。
+guaiwotaitianzhen	怪我太天真	chat
+nizainanfangwennuanruchun	你在南方温暖如春	chat
+zijikaixinkaixin	自己开心开心	chat	T.T受受、我现在才到家，累得我，，，受受少对别人说手机的事情，
+aiwozoubulezhemeyuan	唉我走不了这么远	chat
+chizhongyaotiaoliyixiabijiaohao	吃中药调理一下比较好	chat
+nimendoudainaozikanjuqingmeiyou	你们都带脑子看剧情没有	chat	人家相遇没房间，是故意开放不，
+yaobuyaohewojiaowang	要不要和我交往	chat	怎样，
+womenqinshilengdaomeipengyou	我们寝室冷到没朋友	chat
+meikanguozhiqiande	没看过之前的	chat	百度了一下，是之前的人物，只看过最新的，
+zaigeiwoyicijihui	再给我一次机会	chat
+woyaozijizhaochide	我要自己找吃的	chat	羡慕，
+womenhuiquanliyifudezhichini	我们会全力以赴的支持你	chat	你必须开开心心的做自己，
+woyiweinikaiwanxiaone	我以为你开玩笑呢	chat	真没对象啊，
+houyingyazhebushiqiangwomaimaime	候莹雅这不是抢我买卖么	chat
+hahahayiliudaxueyiliuderencai	哈哈哈一流大学一流的人才	chat
+hahajiushihaiyouxianggujiang	哈哈就是还有香菇酱	chat
+mingtianmailiangpingchiqu	明天买两瓶吃去	chat
+shuoshibiye	硕士毕业	chat
+nigeialijiukenenghui	你给阿丽就可能会	chat
+womeiwanggouguoa	我没网购过啊	chat	网上买啊，
+haojiudoumuyouxiaoxile	好久都木有消息了	chat
+qujiangetoufajiuhaole	去剪个头发就好了	chat
+geinigeyongbao	给你个拥抱	chat	好吧！
+suiranbushihentian	虽然不是很甜	chat
+turanxinglewo	突然醒了我	chat	么么哒，
+budongwoshiyiludouxiayuzuile	不懂我是一路都下雨醉了	chat
+wenzhubiehuangwentibuda	稳住别慌问题不大	chat
+yongyuanshiqisui	永远十七岁	chat	手王生日快乐爱你爱你爱你重要的事情说三遍！
+xiexieninhaorenyishengpingan	谢谢您好人一生平安	chat
+xuanyixiaoshuo	悬疑小说	chat	书！！东野圭吾！！
+yanshuwoyanshubingheimuwo	眼熟我眼熟并黑幕我	chat
+dashenpaidezhaopianjiushibuyiyang	大神拍的照片就是不一样	chat
+jiejiewolaijiuni	姐姐我来救你	chat
+xiabanlemaiyaoqu	下班了买药去	chat	喝热水去，
+qingshuiwutaikaifanglema	清水舞台开放了吗	chat
+hahanishuodea	哈哈你说的啊	chat
+shixiongyougushia	师兄有故事啊	chat
+youxiangbiandechuzhonghezhuoyue	又想变得出众和卓越	chat	是这样的，
+queshishia	确实是啊	chat
+renwuwanren	人无完人	chat
+jiaolianshichengzhanglema	教练是成长了吗	chat
+wobuxiangbianhei	我不想变黑	chat	还找我下梅县，
+xuebadeshijie	学霸的世界	chat
+duoduoguanzhujiemule	多多关注节目了	chat
+xiazhiweizhi	夏至未至	chat
+zhongdianshisheibanirudaochuangshangde	重点是谁把你缛到床上的	chat
+nitaipangle	你太胖了	chat
+jintiankandaonijiemu	今天看到你节目	chat	又在吃，
+chishenmeyaone	吃什么药呢	chat
+baobaoniwenshenshishenmezi	宝宝你纹身是什么字	chat
+zijiyixinxiangchongjinqu	自己一心想冲进去	chat	最让我佩服的是，11岁以下的儿童不能入内，然而一位妈妈居然把自己的小孩丢给印度人，
+wozhangdehaishinengjianrendema	我长得还是能见人的吗	chat
+nizakaishizuozongzile	你咋开始做粽子了	chat	端午节好像还没到啊，
+laoziyinggaishilikesheng	老子应该是理科生	chat	我看见这个莫名兴奋，内心有个声音在咆哮:
+danideo	打你的哦	chat	还不瘦啊，
+fanzhengnidabudaowo	反正你打不到我	chat
+chaojibukaixin	超级不开心	chat	本来我是下周要去威海玩儿的。
+shuowanjiushuile	说完就睡了	chat
+kongpaganbuchudisangeng	恐怕赶不出第三更	chat	目前还在回北京的路上……
+ganjuenipifuhaohaoya	感觉你皮肤好好呀	chat
+shendenengmeilewo	深的能没了我	chat	有深有浅，
+shendewoyebuganquya	深的我也不敢去呀	chat	我就是在那个池子泡了一下午，
+jiudeizaoqile	就得早起了	chat	可是晚睡晚起心情好啊后天就要开学了。。。
+nalidouqu	哪里都去	chat	四处漂泊，
+shuoshiyouyong	说是有用	chat
+wojuedekoukouxianghenhaochiya	我觉得口口香很好吃呀	chat
+bugeiwonishigou	不给我你是狗	chat
+dousannianle	都三年了	chat
+shouhuodexiyue	收获的喜悦	chat
+shijianzhengminglenidezhongcheng	时间证明了你的忠诚	chat
+kanwanmingbaiwoxuyaoxiufupingzhang	看完明白我需要修复屏障	chat
+haimeirongyuan	还美容院	chat	生活太腐朽，
+woyixiangdaomingtiankeyibuyongqi	我一想到明天可以不用起	chat
+buxuyaoxiexie	不需要谢谢	chat
+nidaduile	你答对了	chat
+zheshinidejueding	这是你的决定	chat
+zhiyouyizhijiandingderen	只有意志坚定的人	chat	生活就像海洋，
+danshizheyangshanggangshangxianzhendehaoma	但是这样上纲上线真的好吗	chat	拜托~真要等到狗发狂咬死人了，你们才会觉得人重要?到时候是不是又会有家长指责学校?也许警察叔叔处理的方式不是很人道，
+wojuedetinghaodea	我觉得挺好的啊	chat
+zhemexiwangwosi	这么希望我死	chat
+nizichengde	你自称的	chat
+womenhubeirenbucuo	我们湖北人不错	chat	加油！姗姗！
+danyahuanagezhendebushihouqi	但压花那个真的不是后期	chat	道具不道具不清楚，
+huanjinghaodedifangkeyichangshou	环境好的地方可以长寿	chat	是呀！
+nishizhuanyede	你是专业的	chat	毕竟，
+nanigenglihaile	那你更厉害了	chat
+nijintianchideshenme	你今天吃的什么	chat
+biekouziyanhaobu	别扣字眼好不	chat	呵呵，
+zhegefasehaohaokan	这个发色好好看	chat
+meiyoudehua	没有的话	chat	就是啊，明天正式上班了，你的衣服丢没有，
+buguokenenghuichidian	不过可能会迟点	chat	谁叫你买那么多衣服啊。要不要出来啊。
+yongxinliangku	用心良苦	chat
+youhuidaodaniuyaola	又回到大扭腰啦	chat
+niaitesheiwoshidanshengou	你艾特谁我是单身狗	chat
+jiushuonishishizuoyongzhe	就说你是始作俑者	chat	她昨天跟我们吐槽你半天，
+meixiangdaoxianzaifazhandehenhao	没想到现在发展地很好	chat	六年前离开了海盐没回去过，
+woyexuyaojingjing	我也需要静静	chat
+nikaidianlema	你开店了吗	chat
+nanirenweihuishishenmeyangzi	那你认为会是什么样子	chat
+wohaimeiyoubianhei	我还没有变黑	chat	不！
+wodianbukai	我点不开	chat
+woyeshitongxiao	我也是同校	chat

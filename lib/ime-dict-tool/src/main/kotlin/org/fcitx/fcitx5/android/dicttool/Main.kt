@@ -84,8 +84,9 @@ private class Options(
     val cutoffs: Pair<Int, Int>,
 ) {
     companion object {
-        // what measured best on the evaluation set (dev/ENGINE-DESIGN.md)
-        const val WEIGHT = 0.7
+        // what measured best over the written and the chat evaluation sets together
+        // (dev/ENGINE-DESIGN.md); more chat still helps chat, but costs written text
+        const val WEIGHT = 0.4
         val CUTOFFS = 2 to 2
 
         /** @return null for an option with a bad value */
