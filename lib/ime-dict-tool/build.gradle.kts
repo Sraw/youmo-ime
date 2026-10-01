@@ -13,8 +13,8 @@
 //   ./gradlew :lib:ime-dict-tool:run --args="check <pinyin data> <lm.arpa>"
 //
 // The app build runs it through EngineDataPlugin (build-logic): `./gradlew :app:compileEngineData`
-// downloads libime's sources and LCCC's chat once, mixes the chat into the model and puts
-// engine/pinyin.data into the app's assets.
+// downloads libime's sources once and puts engine/pinyin.data into the app's assets. `mix` is not
+// part of it: the only chat measured, LCCC, is for research (dev/ENGINE-DESIGN.md).
 plugins {
     application
     alias(libs.plugins.kotlin.jvm)
@@ -22,8 +22,7 @@ plugins {
 
 application {
     mainClass.set("org.fcitx.fcitx5.android.dicttool.MainKt")
-    // mix holds two language models and the chat's counts in memory; keep in step with
-    // EngineDataPlugin
+    // mix holds two language models and the chat's counts in memory: 4.8 GB resident, as measured
     applicationDefaultJvmArgs = listOf("-Xmx6g")
 }
 

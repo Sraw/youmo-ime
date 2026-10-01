@@ -2,8 +2,8 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
 # SPDX-FileCopyrightText: Copyright 2026 Fcitx5 for Android Contributors
 """
-Makes data/pinyin-chat.tsv from LCCC-base's validation split (MIT), which the engine's language
-model does not see (it mixes in the train split only):
+Makes data/pinyin-chat.tsv from LCCC-base's validation split (MIT; its README asks for research
+use, so nothing the app ships learns from LCCC):
 
     python3 tools/make-chat-set.py lccc_base_valid.jsonl.gz <dict_sc.txt> <lm_sc.arpa> > data/pinyin-chat.tsv
 
@@ -47,8 +47,8 @@ HEADER = """\
 # SPDX-FileCopyrightText: Copyright (c) 2020 lemon234071 (LCCC, https://github.com/thu-coai/CDial-GPT)
 #
 # Chat lines as people type them: runs of 4 to 12 Han chars from LCCC-base's validation split
-# (Wang et al., 2020: Weibo and other chat, MIT; its README asks for research use), which the
-# engine's model is not mixed with. Picked and given readings for this project by
+# (Wang et al., 2020: Weibo and other chat, MIT; its README asks for research use, so nothing the
+# app ships learns from it). Picked and given readings for this project by
 # tools/make-chat-set.py; the text is kept as its writers typed it, slips and all, so a first
 # choice is sometimes judged wrong for being better written. Measures what a change does to chat
 # next to pinyin.tsv.

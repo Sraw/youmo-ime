@@ -46,12 +46,10 @@ import javax.inject.Inject
 /**
  * Compiles the own engine's data (lib/ime-dict-tool) from the text sources libime builds its own
  * from and adds it to the app's assets as `engine/pinyin.data` and `engine/table/<name>.data`
- * for libime's code tables (五笔, 仓颉 ...), with chinese-ime-lm's sentence models as
- * `engine/sentence-model.safetensors` and `engine/sentence-model-large.safetensors` (and their
- * NOTICE, which Apache-2.0 asks to go along with them).
- * The language model is first mixed with n-grams counted in LCCC's chat: what people type is
- * more chat than libime's news-heavy model knows.
- * Stored uncompressed, so the
+ * for libime's code tables (五笔, 仓颉 ...).
+ * No sentence model ships, nor is chat mixed into the language model: the ones measured
+ * (chinese-ime-lm's, ime-dict-tool's `mix` over LCCC) learned from LCCC, whose README keeps it
+ * to research. Stored uncompressed, so the
  * engine can map it straight out of the APK rather than copying it out first; it is also left
  * out of the data descriptor for that reason (the descriptor lists only src/main/assets).
  *
@@ -65,8 +63,6 @@ import javax.inject.Inject
 class EngineDataPlugin : Plugin<Project> {
 
     private class Source(val name: String, val sha256: String, val files: List<String>)
-
-    private class ModelFile(val task: String, val url: String, val sha256: String, val asset: String)
 
     companion object {
         const val COMPILE_TASK = "compileEngineData"
@@ -89,29 +85,6 @@ class EngineDataPlugin : Plugin<Project> {
             listOf("cj", "db", "erbi", "qxm", "wanfeng", "wbpy", "wbx", "zrm").map { "$it.txt" },
         )
         const val TABLES_TASK = "compileEngineTables"
-        const val MODEL_TASK = "copySentenceModel"
-
-        // a revision of the model's repository, not main: what is downloaded is what was measured
-        private const val MODEL_URL =
-            "https://huggingface.co/metasequoiaime/pinyin-ime-reranker-4M/resolve/e5b1f7e768d7cb2b6ff334db4e34af153920c6ff/"
-        // the 25M one, weighing the readings again while the user pauses
-        private const val LARGE_MODEL_URL =
-            "https://huggingface.co/metasequoiaime/pinyin-ime-reranker-25M/resolve/75295b373a7ef0d14e9bebd32c1625c9cfcfea49/"
-        // the task fetching it, from where, its sha256, and the name it has among the app's assets;
-        // the larger's NOTICE is the same as the smaller's
-        private val MODEL_FILES = listOf(
-            ModelFile("downloadSentenceModel", MODEL_URL + "sentence-model.safetensors",
-                "86ac529510cb3b4968a5e6ade83ec8080f5b34a0a681e75c362accbbd387d1c1", "sentence-model.safetensors"),
-            ModelFile("downloadSentenceModelNotice", MODEL_URL + "NOTICE",
-                "b9489e8c8e3a271bf23131a57a7323264847d57561d36fc135101bf1eefd32f2", "sentence-model.NOTICE"),
-            ModelFile("downloadLargeSentenceModel", LARGE_MODEL_URL + "sentence-model.safetensors",
-                "0a6ecba69bf1d39c7eb49549c716477dd6c03fdf05757773e1f50435262fb469", "sentence-model-large.safetensors"),
-        )
-        // LCCC-base (MIT): 6.8 M conversations from Weibo and other chat, a line each
-        private const val CHAT_URL =
-            "https://huggingface.co/datasets/silver/lccc/resolve/5bd582fa28cd7143f2f9c852e08e23089d677c44/lccc_base_train.jsonl.gz"
-        private const val CHAT_SHA256 = "2162e0ed923fba62329cabf7e1493fbe59248afc94a62508e4abdea61e624627"
-        const val MIX_TASK = "mixEngineModel"
         private const val TOOL_MAIN = "org.fcitx.fcitx5.android.dicttool.MainKt"
     }
 
@@ -141,28 +114,13 @@ class EngineDataPlugin : Plugin<Project> {
         }
         target.dependencies.add(tool.name, target.dependencies.project(mapOf("path" to ":lib:ime-dict-tool")))
 
-        val downloadChat = target.tasks.register<DownloadTask>("downloadChat") {
-            url.set(CHAT_URL)
-            sha256.set(CHAT_SHA256)
-            outputFile.set(downloadsDir.file("lccc/lccc_base_train.jsonl.gz"))
-        }
-        val mix = target.tasks.register<MixEngineModel>(MIX_TASK) {
-            classpath = tool
-            mainClass.set(TOOL_MAIN)
-            // both models and the chat's counts: 4.8 GB resident, as measured; keep in step with
-            // ime-dict-tool's own run task
-            maxHeapSize = "6g"
-            lm.set(extracted[0].flatMap { it.outputDir.file(LM.files.single()) })
-            chat.set(downloadChat.flatMap { it.outputFile })
-            output.set(target.layout.buildDirectory.file("engine-model-mixed/lm_mixed.arpa"))
-        }
         val compile = target.tasks.register<CompileEngineData>(COMPILE_TASK) {
             classpath = tool
             mainClass.set(TOOL_MAIN)
-            // the whole language model is held in memory while it is sorted: the mixed one needs
-            // 3 GB, as measured
-            maxHeapSize = "4g"
-            lm.set(mix.flatMap { it.output })
+            // the whole language model is held in memory while it is sorted: 1.2 GB at most, as
+            // measured
+            maxHeapSize = "2g"
+            lm.set(extracted[0].flatMap { it.outputDir.file(LM.files.single()) })
             dictionaries.from(DICT.files.map { name -> extracted[1].flatMap { it.outputDir.file(name) } })
             outputDir.set(target.layout.buildDirectory.dir("generated/engine-assets"))
         }
@@ -172,26 +130,15 @@ class EngineDataPlugin : Plugin<Project> {
             outputDir.set(target.layout.buildDirectory.dir("generated/engine-tables"))
         }
 
-        val modelFiles = MODEL_FILES.map { file ->
-            target.tasks.register<DownloadTask>(file.task) {
-                url.set(file.url)
-                sha256.set(file.sha256)
-                outputFile.set(downloadsDir.file("sentence-model/${file.asset}"))
-            }
-        }
-        val model = target.tasks.register<CopyModel>(MODEL_TASK) {
-            files.from(modelFiles.map { task -> task.flatMap { it.outputFile } })
-            outputDir.set(target.layout.buildDirectory.dir("generated/engine-model"))
-        }
-
         target.extensions.configure<ApplicationExtension> {
             // matched as a plain suffix: "data" alone would catch charselectdata too
+            // and a sentence model, should one ship again: openFd cannot read one compressed, and
+            // the engine takes that for none shipped
             androidResources.noCompress += listOf(".data", ".safetensors")
         }
         components.onVariants { variant ->
             variant.sources.assets?.addGeneratedSourceDirectory(compile, CompileEngineData::outputDir)
             variant.sources.assets?.addGeneratedSourceDirectory(tables, CompileTables::outputDir)
-            variant.sources.assets?.addGeneratedSourceDirectory(model, CopyModel::outputDir)
         }
     }
 
@@ -283,27 +230,6 @@ class EngineDataPlugin : Plugin<Project> {
         }
     }
 
-    /** The language model mixed with the chat's n-grams, as ARPA text (half a gigabyte). */
-    @CacheableTask
-    abstract class MixEngineModel : JavaExec() {
-        @get:InputFile
-        @get:PathSensitive(PathSensitivity.NAME_ONLY)
-        abstract val lm: RegularFileProperty
-
-        @get:InputFile
-        @get:PathSensitive(PathSensitivity.NAME_ONLY)
-        abstract val chat: RegularFileProperty
-
-        @get:OutputFile
-        abstract val output: RegularFileProperty
-
-        init {
-            argumentProviders += CommandLineArgumentProvider {
-                listOf("mix", "-o", output.get().asFile.path, "--lm", lm.get().asFile.path, chat.get().asFile.path)
-            }
-        }
-    }
-
     @CacheableTask
     abstract class CompileEngineData : JavaExec() {
         @get:InputFiles
@@ -328,25 +254,6 @@ class EngineDataPlugin : Plugin<Project> {
         override fun exec() {
             output().parentFile.mkdirs()
             super.exec()
-        }
-    }
-
-    /** The sentence model's files under `engine/`, named as they were downloaded. */
-    @DisableCachingByDefault(because = "copying is quicker than the cache would be")
-    abstract class CopyModel : DefaultTask() {
-        @get:InputFiles
-        @get:PathSensitive(PathSensitivity.NAME_ONLY)
-        abstract val files: ConfigurableFileCollection
-
-        @get:OutputDirectory
-        abstract val outputDir: DirectoryProperty
-
-        @TaskAction
-        fun copy() {
-            val out = outputDir.get().asFile.resolve("engine")
-            out.deleteRecursively()
-            out.mkdirs()
-            for (file in files.files) file.copyTo(out.resolve(file.name), overwrite = true)
         }
     }
 

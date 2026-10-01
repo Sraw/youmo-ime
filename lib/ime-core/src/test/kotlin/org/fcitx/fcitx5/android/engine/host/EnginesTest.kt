@@ -23,6 +23,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
+import java.io.FileNotFoundException
 import java.io.IOException
 import java.nio.ByteBuffer
 
@@ -55,22 +56,22 @@ class EnginesTest {
         .build()
         .toByteArray()
 
-    private var model = TinyModel().bytes()
-    private var refining = TinyModel().bytes()
+    private var model: ByteArray? = TinyModel().bytes()
+    private var refining: ByteArray? = TinyModel().bytes()
 
     private val loaded = ArrayList<String>()
 
     private fun load(path: String): ByteBuffer {
         loaded += path
-        return ByteBuffer.wrap(
-            when (path) {
-                Engines.PINYIN_DATA -> pinyin
-                "${Engines.TABLE_DIR}/wbx.data" -> wubi
-                Engines.SENTENCE_MODEL -> model
-                Engines.REFINING_MODEL -> refining
-                else -> throw IllegalArgumentException(path)
-            },
-        )
+        val bytes = when (path) {
+            Engines.PINYIN_DATA -> pinyin
+            "${Engines.TABLE_DIR}/wbx.data" -> wubi
+            Engines.SENTENCE_MODEL -> model
+            Engines.REFINING_MODEL -> refining
+            else -> throw IllegalArgumentException(path)
+        }
+        // as the app's assets do of a file it has not got
+        return ByteBuffer.wrap(bytes ?: throw FileNotFoundException(path))
     }
 
     private fun Engines.type(im: String, keys: String) = keys.map { onEvent(im, EngineEvent.CHAR, it.code) }.last()
@@ -328,8 +329,22 @@ class EnginesTest {
     }
 
     @Test
+    fun withNoSentenceModelsPinyinWorksAndNothingIsReported() {
+        model = null
+        refining = null
+        val errors = ArrayList<IOException>()
+        val engines = Engines(::load, null, onError = { errors += it })
+        val typed = engines.type(Engines.PINYIN, "ni")
+        assertEquals(listOf("你", "拟"), typed.candidates)
+        assertTrue(engines.pause(Engines.PINYIN, typed).none { it.handled })
+        assertEquals("拟", engines.onEvent(Engines.PINYIN, EngineEvent.PICK, 1).commit)
+        assertEquals(listOf(Engines.SENTENCE_MODEL, Engines.REFINING_MODEL), loaded.filter { it.endsWith(".safetensors") })
+        assertTrue(errors.isEmpty())
+    }
+
+    @Test
     fun aSentenceModelThatCannotBeReadLeavesPinyinWorking() {
-        val (small, large) = model to refining
+        val (small, large) = model!! to refining!!
         for (broken in listOf(Engines.SENTENCE_MODEL, Engines.REFINING_MODEL)) {
             model = if (broken == Engines.SENTENCE_MODEL) small.copyOf(100) else small
             refining = if (broken == Engines.REFINING_MODEL) large.copyOf(100) else large

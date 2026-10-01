@@ -34,6 +34,7 @@ import org.fcitx.fcitx5.android.engine.user.UserStore
 import java.io.BufferedReader
 import java.io.Closeable
 import java.io.File
+import java.io.FileNotFoundException
 import java.io.IOException
 import java.io.RandomAccessFile
 import java.nio.ByteBuffer
@@ -101,6 +102,9 @@ class Engines(
             tried = true
             model = try {
                 SentenceModel.load(load(path), unpack, kernel ?: MatrixKernel.JVM)
+            } catch (_: FileNotFoundException) {
+                // none ships at present (dev/ENGINE-DESIGN.md): pinyin reads without one
+                null
             } catch (e: IOException) {
                 onError(e)
                 null
@@ -442,6 +446,7 @@ class Engines(
         const val SHUANGPIN = "engine-shuangpin"
 
         const val PINYIN_DATA = "engine/pinyin.data"
+        /** Read if the app has one: none ships at present, the ones measured having learned from research-only chat. */
         const val SENTENCE_MODEL = "engine/sentence-model.safetensors"
         /** Six times the work of [SENTENCE_MODEL], and right more often: see [PinyinSession]'s refiner. */
         const val REFINING_MODEL = "engine/sentence-model-large.safetensors"
