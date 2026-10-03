@@ -46,6 +46,8 @@ class NewWordsTest {
         val chifan = found.first { it.text == "吃饭" }
         assertTrue(chifan.known)
         assertEquals(2, chifan.count)
+        // a known word's neighbours are not gathered
+        assertTrue(chifan.leftEntropy.isNaN())
         // 饭搭子: three times, always followed by 一/来/啊 but preceded by 个/有/没 ... counted as a run of three
         assertEquals(2, found.first { it.text == "饭搭子" }.count)
         // a run across two words (一起|吃饭): nothing before or after it ever varies

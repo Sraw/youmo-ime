@@ -22,7 +22,10 @@ import kotlin.math.log10
  * those whose two parts one shorter the sketch found frequent enough, which every frequent
  * run's are; the pass after counts exactly the runs the sketch admitted, which a sketch only
  * overestimates, so none frequent is missed. The last pass gathers the neighbours of the runs
- * that reached [minCount].
+ * that reached [minCount], are not [known] (the dictionary's words need no telling apart; their
+ * entropies come out NaN) and hold together at all ([GATHER_PMI]); when those are many, it
+ * looks at every n-th page only, as the pairs of run and neighbour would not fit either, and an
+ * entropy from a sample of a frequent run's neighbours is near enough.
  */
 class NewWords(
     private val known: Set<String>,
@@ -41,7 +44,7 @@ class NewWords(
         val year: Int,
         /** log10 of its count over what its likeliest split's parts predict: how much more it occurs than by chance. */
         val pmi: Double,
-        /** Of the character before it (nats); the more different ones, the freer the word stands. */
+        /** Of the character before it (nats); the more different ones, the freer the word stands. NaN for a known word. */
         val leftEntropy: Double,
         val rightEntropy: Double,
         /** Whether the dictionary has it: counted all the same, to calibrate the rest against the model. */
@@ -59,10 +62,13 @@ class NewWords(
     var chars = 0L
         private set
 
-    // the last pass: the runs that reached minCount, and (run, side, neighbour) counts by their index
+    // the last pass: the runs whose neighbours are gathered, (run, side, neighbour) counts by
+    // their index, and every how many-th page is looked at
     private val kept = LongIndex(1 shl 16)
     private val neighbours = LongIndex(1 shl 20)
     private val neighbourCounts = IntColumn(1 shl 20)
+    private var stride = 1
+    private var pages = 0L
 
     /**
      * The pass under way, from 1: the first counts the characters, pass n from 2 sketches the runs
@@ -83,8 +89,14 @@ class NewWords(
         if (pass == maxLength + 1) {
             for (length in 2..maxLength) {
                 val index = runs[length]
-                for (i in 0 until index.size) if (counts[length][i] >= minCount) kept.add(index.keyAt(i))
+                for (i in 0 until index.size) {
+                    val key = index.keyAt(i)
+                    if (counts[length][i] < minCount) continue
+                    val text = text(key, length)
+                    if (text !in known && pmi(text, counts[length][i]) >= GATHER_PMI) kept.add(key)
+                }
             }
+            stride = maxOf(1, kept.size / GATHER_RUNS)
         }
         pass++
         // as many cells as the corpus could have different runs, four times over, up to the width given
@@ -94,6 +106,7 @@ class NewWords(
     /** Counts [text], a page dated [date] (`2023-06-14...`, or empty), for the pass under way. */
     fun add(text: String, date: String) {
         require(!done) { "the passes are done" }
+        if (pass == passes && pages++ % stride != 0L) return
         val year = date.take(4).toIntOrNull()?.takeIf { it in 1990..2100 } ?: 0
         var begin = 0
         for (i in 0..text.length) {
@@ -181,24 +194,39 @@ class NewWords(
             return if (totals[slot] == 0) 0.0 else ln(totals[slot].toDouble()) - sums[slot] / totals[slot]
         }
         val out = ArrayList<Candidate>()
-        val total = chars.toDouble()
         for (i in 0 until kept.size) {
             val key = kept.keyAt(i)
             val length = lengthOf(key)
             val count = countOf(length, key)
             val text = text(key, length)
-            // the split whose parts predict it best: log10(count / (left × right / total))
-            var expected = 0.0
-            for (split in 1 until length) {
-                val left = countOf(split, key(text, 0, split)).coerceAtLeast(1)
-                val right = countOf(length - split, key(text, split, length - split)).coerceAtLeast(1)
-                expected = maxOf(expected, left.toDouble() * right / total)
-            }
             val year = years[length][runs[length].indexOf(key)]
-            out += Candidate(text, count, year, log10(count / expected), entropy(i, 0), entropy(i, 1), text in known)
+            out += Candidate(text, count, year, pmi(text, count), entropy(i, 0), entropy(i, 1), known = false)
+        }
+        // the known words and the runs that do not hold together, with their counts for calibration
+        for (length in 2..maxLength) {
+            val index = runs[length]
+            for (i in 0 until index.size) {
+                val key = index.keyAt(i)
+                val count = counts[length][i]
+                if (count < minCount || kept.indexOf(key) >= 0) continue
+                val text = text(key, length)
+                out += Candidate(text, count, years[length][i], pmi(text, count), Double.NaN, Double.NaN, text in known)
+            }
         }
         out.sortWith(compareByDescending<Candidate> { it.count }.thenBy { it.text })
         return out
+    }
+
+    /** log10 of [count] over what [text]'s likeliest split's parts predict by chance. */
+    private fun pmi(text: String, count: Int): Double {
+        val length = text.length
+        var expected = 0.0
+        for (split in 1 until length) {
+            val left = countOf(split, key(text, 0, split)).coerceAtLeast(1)
+            val right = countOf(length - split, key(text, split, length - split)).coerceAtLeast(1)
+            expected = maxOf(expected, left.toDouble() * right / chars)
+        }
+        return log10(count / expected)
     }
 
     /** A count-min sketch of two rows in one array: counts a run never under, seldom much over. */
@@ -229,6 +257,12 @@ class NewWords(
         /** 2^27 cells, half a gigabyte a length: a billion characters' runs collide little. */
         const val SKETCH_BITS = 27
         const val MIN_SKETCH_BITS = 12
+
+        /** Neighbours are gathered for runs this much above chance (log10) only: threshold enough for any caller. */
+        const val GATHER_PMI = 0.5
+
+        /** Past this many runs to gather for, pages are sampled. */
+        const val GATHER_RUNS = 500_000
         private const val LEFT = 0
         private const val RIGHT = 1
         private const val NONE = '\u0000'
