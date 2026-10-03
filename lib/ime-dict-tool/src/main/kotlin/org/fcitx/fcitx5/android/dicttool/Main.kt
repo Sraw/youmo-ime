@@ -208,8 +208,8 @@ private fun words(options: Options, out: Appendable) {
 /**
  * The candidates of `words` that pass the thresholds and are not plainly phrases or fragments
  * ([Phrases]), as a word pack: each read by its characters' likeliest readings, scored on the
- * model's unigram scale by its count ([CountFit] over the candidates the model knows). One with a
- * character no reading is known for is left out.
+ * model's unigram scale by its count ([CountFit] over the candidates the model knows). One with
+ * a character no reading is known for is left out.
  */
 private fun pack(options: Options, out: Appendable) {
     val data = PinyinData.load(map(options.data!!))
@@ -221,6 +221,8 @@ private fun pack(options: Options, out: Appendable) {
         val id = data.wordIndex.find(f[0], 0, f[0].length)
         if (id >= 0 && id < data.model.vocabularySize) f[1].toLong() to data.model.score(id) else null
     }
+    // the slope fitted too, not held at 1 as frequencies would have it: the pages are not the
+    // model's kind of text, and the flatter line measured better (dev/TRAINING-PLAN.md 11.7)
     val fit = CountFit.of(known)
     out.appendLine("fit: log10 P = %.3f + %.3f log10(count + 1), over ${known.size} words the model has".format(fit.a, fit.b))
     var unread = 0
