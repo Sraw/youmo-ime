@@ -62,7 +62,7 @@ jobs:
         uses: gradle/actions/setup-gradle@v6
 
       - name: Build the app and its tests
-        run: ./gradlew -Pengine.mix=false :app:assembleDebug :app:assembleDebugAndroidTest
+        run: ./gradlew -Pengine.mix=false :app:assembleOfflineDebug :app:assembleOfflineDebugAndroidTest
 
       - name: Enable KVM
         run: |
@@ -78,7 +78,7 @@ jobs:
           target: google_apis
           disable-animations: true
           emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
-          script: ./gradlew :app:connectedDebugAndroidTest
+          script: ./gradlew :app:connectedOfflineDebugAndroidTest
 
       - name: Upload test report
         if: always()

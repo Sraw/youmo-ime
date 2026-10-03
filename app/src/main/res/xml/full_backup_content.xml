@@ -12,4 +12,7 @@
     <exclude
         domain="file"
         path="README.md" />
+    <exclude
+        domain="root"
+        path="no_backup" />
 </full-backup-content>

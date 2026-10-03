@@ -80,8 +80,13 @@ class PinyinRun(
             val decoding = decode(input, context)
             val sentences = decoding.sentences.map { it.text }.toMutableList()
             val scores = decoding.sentences.map { it.score }
-            val picked = refine?.takeIf { paused }?.refine(context, sentences, scores, Int.MAX_VALUE)
-                ?: picker?.pick(context, sentences, scores) ?: 0
+            // a refiner waiting on a server says so with null: asked again, as the session would
+            val refined = refine?.takeIf { paused }?.let { r ->
+                var picked: Int? = null
+                while (picked == null) picked = r.refine(context, sentences, scores, Int.MAX_VALUE)
+                picked
+            }
+            val picked = refined?.takeIf { it != SentenceRefiner.NONE } ?: picker?.pick(context, sentences, scores) ?: 0
             if (picked > 0) sentences.add(0, sentences.removeAt(picked))
             return (sentences + decoding.words.map { it.text }).distinct().take(CANDIDATES)
         }

@@ -1,8 +1,8 @@
 name: Unit Tests
 
 # JVM unit tests only. Deliberately separate from the build workflow:
-#   - no submodules (verified: `:app:test` configures and runs on a submodule-free checkout)
-#   - no NDK, no CMake (the task graph for `:app:test` contains no native tasks)
+#   - no submodules (verified: `:app:testOfflineDebugUnitTest` configures and runs on a submodule-free checkout)
+#   - no NDK, no CMake (the task graph for `:app:testOfflineDebugUnitTest` contains no native tasks)
 #   - single OS
 # so it takes a few minutes rather than the build jobs' half hour, and can gate every push.
 #
@@ -79,9 +79,9 @@ jobs:
       - name: Run core logic and dict tool tests, API level check and coverage floors
         run: ./gradlew --continue :lib:ime-core:check :lib:ime-core:koverHtmlReport :lib:ime-dict-tool:test
 
-      # debug variant only: AGP unit-tests just the testBuildType (debug) unless told otherwise
+      # offline debug only: the cloud flavour differs in its manifest alone, its code is all in main
       - name: Run app unit tests
-        run: ./gradlew :app:test :app:koverLogDebug
+        run: ./gradlew :app:testOfflineDebugUnitTest :app:koverLogOfflineDebug
 
       # After the tests, so a lint finding does not hide their results. Findings already present
       # are frozen in config/detekt/baseline-*.xml; this fails on new ones only.

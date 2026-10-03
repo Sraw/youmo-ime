@@ -359,4 +359,27 @@
     <string name="customized">Customized: %1$s</string>
     <string name="reset_all_long_press_message">Restore every key to its built-in long-press characters?</string>
     <string name="reset_all">Reset all</string>
+    <string name="cloud">Cloud model</string>
+    <string name="cloud_enabled">Ask my server</string>
+    <string name="cloud_enabled_summary">While you pause, send the text before the cursor and the first few candidates to your server, for a larger model to reorder them. Never from password fields or incognito keyboards.</string>
+    <string name="cloud_server">Server address</string>
+    <string name="cloud_token">Access token</string>
+    <string name="cloud_confirm_title">Send text to your server?</string>
+    <string name="cloud_confirm_message">While you type, the text before the cursor (up to 128 characters) and the first five candidates go to %1$s. Run the server yourself (see cloud/README.md): whoever can use that computer can read what you type. Password fields and incognito keyboards are never sent.</string>
+    <string name="cloud_server_missing">Set the server address first.</string>
+    <string name="cloud_server_malformed">Not an address: write it as https://host:port.</string>
+    <string name="cloud_server_scheme">Only https:// addresses.</string>
+    <string name="cloud_server_not_https">Only https://, even to 127.0.0.1 (server.py serves it by default).</string>
+    <string name="cloud_token_invalid">A token is letters, digits and ASCII punctuation, without spaces.</string>
+    <string name="cloud_key">Server key</string>
+    <string name="cloud_key_none">Not trusted yet: turning the server on shows its key to compare</string>
+    <string name="cloud_confirm_key">The server presents the key\n%1$s\nTurn it on only if this is the key server.py printed when it started. If it is not, something else is answering in its place.</string>
+    <string name="cloud_server_unreachable">Could not reach the server: %1$s</string>
+    <string name="cloud_key_changed">This is not the key you trusted before (%1$s): the server made a new one, or something else is answering.</string>
+    <string name="cloud_server_changed">The address changed meanwhile: turn it on again.</string>
+    <string name="cloud_connected">Connected: %1$s</string>
+    <string name="cloud_check_failed">On, but the server did not answer: %1$s</string>
+    <string name="cloud_token_rejected">On, but the server refused the access token.</string>
+    <string name="not_set">Not set</string>
+    <string name="set_hidden">Set (hidden)</string>
 </resources>

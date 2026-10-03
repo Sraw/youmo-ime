@@ -9,6 +9,7 @@ import org.fcitx.fcitx5.android.engine.data.DataFormatException
 import org.fcitx.fcitx5.android.engine.data.PinyinDataBuilder
 import org.fcitx.fcitx5.android.engine.pinyin.Fuzzy
 import org.fcitx.fcitx5.android.engine.pinyin.Syllables
+import org.fcitx.fcitx5.android.engine.remote.RemoteModel
 import org.fcitx.fcitx5.android.engine.rerank.MatrixKernel
 import org.fcitx.fcitx5.android.engine.rerank.TinyModel
 import org.fcitx.fcitx5.android.engine.session.Choice
@@ -18,6 +19,7 @@ import org.fcitx.fcitx5.android.engine.user.LibimeImport
 import org.fcitx.fcitx5.android.engine.user.UserLog
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -26,6 +28,8 @@ import org.junit.rules.TemporaryFolder
 import java.io.FileNotFoundException
 import java.io.IOException
 import java.nio.ByteBuffer
+import java.util.concurrent.CompletableFuture
+import java.util.concurrent.Future
 
 class EnginesTest {
 
@@ -312,6 +316,35 @@ class EnginesTest {
         engines.settings = EngineSettings()
         engines.pause(Engines.PINYIN, engines.type(Engines.PINYIN, "ni"))
         assertEquals(models, loaded.filter { it in models })
+    }
+
+    /** Puts the last of what it is asked about first, and offers 好久不见; counts the questions. */
+    private class Server : RemoteModel {
+        var scored = 0
+        override fun score(context: String, candidates: List<String>): Future<FloatArray> {
+            scored++
+            return CompletableFuture.completedFuture(FloatArray(candidates.size) { if (it == candidates.lastIndex) 0f else -100f })
+        }
+    }
+
+    @Test
+    fun theUsersServerIsAskedAsTheyPauseWhileItIsOn() {
+        val server = Server()
+        var on = true
+        val engines = Engines(::load, null, remote = { server.takeIf { on } })
+        val typed = engines.type(Engines.PINYIN, "ni")
+        val refined = engines.pause(Engines.PINYIN, typed).last()
+        assertEquals(1, server.scored)
+        assertNotEquals(typed.candidates.first(), refined.candidates.first())
+        assertEquals(refined.candidates.first(), engines.onEvent(Engines.PINYIN, EngineEvent.PICK, 0).commit)
+        // after a commit the predictions are the phone's alone: the server is not asked
+        engines.type(Engines.PINYIN, "hao")
+        assertFalse(engines.onEvent(Engines.PINYIN, EngineEvent.PICK, 0).refines)
+        assertEquals(1, server.scored)
+        // turned off: asked no more
+        on = false
+        engines.pause(Engines.PINYIN, engines.type(Engines.PINYIN, "ni"))
+        assertEquals(1, server.scored)
     }
 
     @Test

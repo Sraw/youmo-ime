@@ -213,11 +213,34 @@ class PinyinSessionTest {
         while (shown.refines) {
             shown = session.apply(Action.Refine)
             slices++
-            assertTrue(slices <= PinyinSession.REFINE_SLICES + 1)
+            assertTrue(slices <= SentenceRefiner.SLICES + 1)
         }
-        assertEquals(PinyinSession.REFINE_SLICES, asked)
+        assertEquals(SentenceRefiner.SLICES, asked)
         // the next input gets its own
         assertTrue(session.apply(Key('a')).refines)
+    }
+
+    @Test
+    fun aPasswordIsRefinedOnlyByWhatStaysOnTheDevice() {
+        var remoteAsked = 0
+        var localAsked = 0
+        val local = SentenceRefiner { _, _, _, _ -> localAsked++; SentenceRefiner.NONE }
+        val remote = object : SentenceRefiner {
+            override fun refine(context: String, readings: List<String>, scores: List<Float>, budget: Int): Int {
+                remoteAsked++
+                return SentenceRefiner.NONE
+            }
+            override fun offline() = local
+        }
+        val session = PinyinSession(data, PinyinSegmenter(), refiner = remote) { _, _, _ -> 0 }
+        session.learning = false
+        session.type("nizai")
+        session.apply(Action.Refine)
+        assertEquals(0 to 1, remoteAsked to localAsked)
+        session.learning = true
+        session.type("a")
+        session.apply(Action.Refine)
+        assertEquals(1 to 1, remoteAsked to localAsked)
     }
 
     @Test

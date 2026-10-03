@@ -57,6 +57,23 @@ android {
         }
     }
 
+    // Two builds: offline, published by default, asks for no network permission at all; cloud adds
+    // INTERNET for the user's own scoring server (cloud/), off until they turn it on. Permissions
+    // are fixed at install, so it is a build, not a switch.
+    flavorDimensions += "network"
+    productFlavors {
+        create("offline") {
+            dimension = "network"
+            isDefault = true
+            buildConfigField("boolean", "CLOUD", "false")
+        }
+        create("cloud") {
+            dimension = "network"
+            versionNameSuffix = "-cloud"
+            buildConfigField("boolean", "CLOUD", "true")
+        }
+    }
+
     androidResources {
         @Suppress("UnstableApiUsage")
         generateLocaleConfig = true

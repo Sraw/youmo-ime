@@ -13,7 +13,7 @@ PKG=${FCITX_PKG:-io.github.sraw.youmo.debug}
 OUT=${3:-$HERE/build/eval}
 
 cd "$REPO"
-./gradlew :app:installDebug :app:installDebugAndroidTest --offline -q
+./gradlew :app:installOfflineDebug :app:installOfflineDebugAndroidTest --offline -q
 # the runner starts its own engine in the app's process; if fcitx were the active keyboard, its
 # service would hold a second engine there, on the same data files
 adb shell ime set com.google.android.inputmethod.latin/com.android.inputmethod.latin.LatinIME >/dev/null 2>&1 || true

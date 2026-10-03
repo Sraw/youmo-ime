@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.core
 
+import org.fcitx.fcitx5.android.BuildConfig
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.data.pinyin.CustomPhraseManager
 import org.fcitx.fcitx5.android.data.pinyin.ImportedDictionaries
@@ -51,7 +52,10 @@ object EngineBridge {
     )
 
     private val made = lazy(LazyThreadSafetyMode.NONE) {
-        Engines(::asset, File(appContext.filesDir, "engine"), { Timber.w(it, "engine user data") }, ::legacy, ::additions, ::userTable, NativeMatrixKernel)
+        Engines(
+            ::asset, File(appContext.filesDir, "engine"), { Timber.w(it, "engine user data") }, ::legacy, ::additions, ::userTable, NativeMatrixKernel,
+            remote = if (BuildConfig.CLOUD) CloudServer.instance::current else null,
+        )
     }
     private val engines by made
 

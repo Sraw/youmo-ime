@@ -1,0 +1,598 @@
+# SPDX-License-Identifier: MIT
+# SPDX-FileCopyrightText: Copyright (c) 2020 lemon234071 (LCCC, https://github.com/thu-coai/CDial-GPT)
+#
+# Chat runs typed after the same speaker's previous turn in a dialogue, from LCCC-base's validation
+# split (Wang et al., 2020; MIT, research use: nothing the app ships learns from it). Made by
+# tools/make-dialog-sets.py; a run's context is that previous turn, a space, then the earlier part
+# of its own turn, at most the last 64 chars.
+# One sample per line: input<TAB>expected<TAB>dialog<TAB>context.
+xianzaizhixiangzaqiangzamen	现在只想砸墙砸门	dialog	电话套
+hahayinweichihuomeiyouyeshenghuo	哈哈因为吃货没有夜生活	dialog	阳台吗
+shangxuejiuyouyaomangle	上学就又要忙了	dialog	闲的时候就特别想脱团 国庆假很闲，
+nizenmelaozheyangyaoshuobushuode	你怎么老这样要说不说的	dialog	你想表达什么朋友
+woyidianyebuqidai	我一点也不期待	dialog	我受不了啦！别哪天咱俩领证去了
+yaoguantoucaixing	要罐头才行	dialog	这个的确是可以。。。
+zhiqiangennishuoguohuanggonga	之前跟你说过皇宫啊	dialog	我每次去都没看见你
+maiyuanxiaolema	买元宵了吗	dialog	妈妈，你要把我推向全世界吗 炮什么啊炮，明元宵节了，
+erwoyijingfenbuqing	而我已经分不清	dialog	亲家母你坐下，咱们说说心里话
+nashihoujiuzhemexiangde	那时候就这么想的	dialog	我小时候就想长大之后有个男朋友骑摩托车带我去兜风，那时不很酷吗。 真的，
+wojiadelianggexiaopengyoudouhaihao	我家的两个小朋友都还好	dialog	过年的时候放鞭炮有没有反应呀>
+woganggangyechilegewuren	我刚刚也吃了个五仁	dialog	伱没告诉我月饼什么馅的呢
+haoyouyude	好忧郁的	dialog	什么很久 是啊，
+buyaozhangwo	不要张我	dialog	平昌不属于达州？巴中也是达州的吧？ 哈哈，我文盲，
+dengnibiyedeshihouqubanshu	等你毕业的时候去搬书	dialog	有空去你哪里淘淘书 好吧，
+nizaiyingguonabianyoumeiyouhenlenga	你在英国那边有没有很冷啊	dialog	这是英国的大红灯笼吗 没有！不过估计快了。我开始准备行李了。
+wopengyoumaileliangtiaoyitiaoquanwen	我朋友买了两条一条犬瘟	dialog	捡了只狗在网上找人收养了，前两天又捡了只猫，也找人收养了，现在都好好的，领养的人也都带去看过，都没有问题，一定不要去狗市随便买，
+yitiaoxixiao	一条细小	dialog	，前两天又捡了只猫，也找人收养了，现在都好好的，领养的人也都带去看过，都没有问题，一定不要去狗市随便买，我朋友买了两条一条犬瘟，
+yeshihuozaimengli	也是活在梦里	dialog	嘻嘻，毕竟也是36D
+xianmusiwole	羡慕死我了	dialog	亲，越来越瘦了~我越来越胖了~ 礼拜六看到你以后我就郁闷到现在，我胖死了，你瘦得可以了~好强啊~
+wuhanzhanmingnian	武汉站明年	dialog	武汉站啥时候哦
+daodiqubuqua	到底去不去啊	dialog	你就是眼子
+kandexiaren	看的吓人	dialog	小福子就是双胞胎肚子巨大的那个网友????
+tashijiefangle	她是解放了	dialog	就是那个超大肚子的
+wogujiyaoshiyihoucaihuiqu	我估计要十一后才回去	dialog	嗯大四学姐欢迎你。 喔喔当然可以呀。但是你开学我还不回学校呢。
+buxuyaole	不需要了	dialog	算严重
+chidiankaixueyaoliudianduojiuqichuang	迟点开学要六点多就起床	dialog	不是的十点就要起床
+xianzaiwojiuxiangshuile	现在我就想睡了	dialog	到时候你会早睡的啦 哈欠～
+shenmeshiaijiuo	甚么是艾灸哦	dialog	你的毛好像画上去的
+xiaohuobanmenzouqia	小伙伴们走起啊	dialog	感觉，现在的二叔真的是好喜欢哦，因为我平时很理智，现在朋友圈里天天发二叔，大家都觉得我疯了哦 哈哈，有道理，我都想过两天去泰山，
+wanshangjiuzuoledian	晚上就做了点	dialog	我今天晚上也做了饼干！！！ 昨天烤箱刚刚到，
+wohuianpaide	我会安排的	dialog	放不开好吧 嗯，
+buyaozheyangma	不要这样嘛	dialog	好吧…葱孩你真乖… 嘻嘻…
+gangadexiangsi	尴尬的想死	dialog	没有遇见帅哥！！！ 我就能悔心！！！长的一点也不好看…要不是我妈同意给我一千块钱我那块想去看对象！！！
+taxianzaibukenengyounaxinsi	他现在不可能有那心思	dialog	请问于玮是谁？
+geidianerjianyiba	给点儿建议吧	dialog	我也想问：能网购吗？
+kanyibianjiuhaolehaoba	看一遍就好了好吧	dialog	我是昨天看的啊
+bushewangxiangshou	不奢望享受	dialog	哎哟喂，让我嫉妒 额……避开躲着，
+wobushihefangjia	我不适合放假	dialog	我这个年都成怨妇了，心情一直处于冷死，好烦 还烦其他事，诶，
+kaichewana	开车玩啊	dialog	没有。在家呢。
+beijixiongyouxiame	北极熊有夏么	dialog	要的是夏天
+dengnimangwanzailiao	等你忙完再聊	dialog	祝幸福伴随你 忙就先不要来看我了，
+nagujiniyaolaibeijingcainengxing	那估计你要来北京才能行	dialog	恭喜
+taijiumeichuquleba	太久没出去了吧	dialog	我想是有别的原因吧… 不知道…
+nishenmeshihouqu	你什么时候去	dialog	亲爱的，去吧去吧，这娃儿是什么都阻止不了的了。
+wodongwodong	我懂我懂	dialog	感觉你又活过来了把我的你还给我。。
+xiatianjiushiyaoyanqilai	夏天就是要艳起来	dialog	早就换了啊
+mingerwanshang	明儿晚上	dialog	真的吗好呀，你下周几有时间呀
+wobenlaijiushinvhaier	我本来就是女孩儿	dialog	好吧
+buyaozaiyouyule	不要再犹豫了	dialog	所以我终于去看医生吃药了 当年觉得自己抑郁了的时候，
+wokeyikaolvyuanliangni	我可以考虑原谅你	dialog	他撩的明明是我，你记错了吧 记错就说，
+nawodaodizenmeban	那我到底怎么办	dialog	那我还是每天看《新闻联播》？？？？
+nihaolihai	你好厉害	dialog	哇噻啾啾~还有这个奖励。
+nimenzugeduilaizhanguankanwoba	你们组个队来展馆看我吧	dialog	八卦？拉不近？这是啥情况？
+annihuadeyisi	按你话的意思	dialog	你要燃烧多久啊？！别把自己给烧着…
+gaoqingguizezailaishezhan	搞清规则再来舌战	dialog	违章限号行驶，觉得还挺有趣？！心理素质不错啊，还能好意思出来讲故事。。。。 外地车本地车都是违章限号，明白？
+laobanlaile	老板来了	dialog	那就不要玩了好好工作 你上班还出来，
+natingnande	那挺难的	dialog	走你
+ninagezouyuanlao	你那个走远老	dialog	洋气，洋气！多亏了我这个经纪人的帮忙！ 到时候在说嘛。
+kuaiquchiyaoxiuxi	快去吃药休息	dialog	赶紧降温
+yicandingsancan	一餐顶三餐	dialog	猪肯定是吃得多过人的啦，就像是你嘛 一天吃一餐，
+yonggandequba	勇敢的去把	dialog	你想怎么死就怎么死 我还没活够了，所以鼓励你，
+wojiushizaiqinshibuxiangshuohua	我就是在寝室不想说话	dialog	的大声音。其他室友总是晚睡，睡眠沉，她们觉得没什么，一年了，我受不了了，我就搬到我同学寝室睡，我其他室友就说我小题大做了 对啊，
+hehezixueyemeixuehaoa	呵呵自学也没学好啊	dialog	哈哈你上学时的语文老师是体育老师教的吧
+qingfeirunhou	清肺润喉	dialog	你喜欢荔枝？ 为什么不喜欢雪梨？
+hahahahawogangdakaijiukandaole	哈哈哈哈我刚打开就看到了	dialog	下午好
+kanzhebudaa	看着不大阿	dialog	这娃娃牙齿好整齐
+erqiehaishizuoji	而且还是座机	dialog	宝塔镇河妖？？我的脑袋是'联想'的，，没办法，哈哈 嗯嗯，固话，。
+dierzhanghaoxiang	第二张好像	dialog	我觉得啊鸟长得有点像靓靓姐啊
+shiyansebuyiyangdeyanhuo	是颜色不一样的烟火	dialog	你是要模仿我的脸，还是要模仿我的面！ 我就是我，
+zhulianbihe	珠联璧合	dialog	志同道合
+yehaihaole	也还好了	dialog	诶....不知道说什么好
+woshentihaihaoburuo	我身体还好不弱	dialog	好像算是十年第一吐 对啊，
+yuwendiergeshishenme	语文第二个是什么	dialog	胖子是好人 胖子!
+zuowantamenfapengyouquanshuojiezhile	昨晚他们发朋友圈说截止了	dialog	对呀，昨天晚上加的。
+buchibuchi	不迟不迟	dialog	我不养牛的 现在才明，嗯！
+ditiefangbianma	地铁方便吗	dialog	酒店离景区近吗，行李一直在酒店吗
+haodexiexiela	好的谢谢拉	dialog	地铁方便吗
+haimeijinbucaiyaoshoune	还没进步才夭兽呢	dialog	刚开始都不会…都不知道怎么的，刚开始就关注了三十一个人，害我一个个删得好辛苦… 都高四了还天天上网，不被骂死才怪！读得我好痛苦，
+nahainenghuoma	那还能活吗	dialog	节食一顿没用的，还是吃吧
+lixiangkeyiyou	理想可以有	dialog	不觉得会有两年之后的再次重逢。现在的人，等两个月都可能等不起。算了，这样的片子，少看为好。不要给自己太多浪漫的想象，会要人命的。
+wanshangyuehejiu	晚上约喝酒	dialog	明天约
+guolaiyigeyuele	过来一个月了	dialog	广州出差吗还是 是啊，
+jitihuijiama	集体回家吗	dialog	国庆打算在家上网吗
+dengwodainifei	等我带你飞	dialog	我要求合照
+nishizhensha	你是真傻	dialog	我们都跟静怡一样大，说我岂不是在说静怡？第一次听说老鲜肉……我应该吃包辣条去学习了 你不是装傻，
+ranhouguoqubisai	然后过去比赛	dialog	都没怎么好好训练，天天偷懒，唉 我现在好好努力，那就是好好的睡一觉，
+nadaoxiamenguorizi	那到厦门过日子	dialog	最近比较冷了，北方已是冰雪天地，不知你那儿还好吧，战友保重。 真是好天气，
+hahahahasuoyibuyongdanxin	哈哈哈哈所以不用担心	dialog	我徐掉头发了呢是不是每天思考太多了哈哈哈哈用脑过度吃点维生素管用
+niyemeichuan	你也没穿	dialog	看看穿九分裤光着脚的你就不冷了
+bochulaile	播出来了	dialog	宁波现在在下雨了。
+nisushemeidiannaodeme	你宿舍没电脑的么	dialog	小爱，你干嘛不直接看，还要下载，浪费内存和占用网速呢。 晕死。
+pingshihuiqufangfangyinyue	平时回去放放音乐	dialog	额，不会啊。那没上班的时候不会很无聊的么 我知道啊。
+renjiazhishixiangfangdakanqingnidemei	人家只是想放大看清你的美	dialog	有头屑
+zhendeyijingyanshengweihennilao	真的已经衍生为恨你老	dialog	恨不死你！嫉妒羡慕恨！又看到他老！！！ 看到你和他合照那张！卷福还指到你！
+jiehunshiyibeizideshi	结婚是一辈子的事	dialog	孩子之后花销大了，存钱难...算了，找个疼你爱你的男人才是重要的，就算他家财万母贯，但对你不好又有什么意义呢？ 宁缺勿滥啊...
+zhendeshixingqiliu	真的是星期六	dialog	看成5月了，星期一就难办了。
+wobuzhiduoqingchunne	我不知多青春呢	dialog	先生，没事别那么假啦，烦死了你 你才大婶！
+shinibugan	是你不敢	dialog	你试试看
+jiangeburu	间隔不入	dialog	扬帆起航
+woxiaciqushuhehua	我下次去束河画	dialog	把我画丑了，对吧，呜呜。
+haitingyiting	还挺一挺	dialog	别吓我 我不用拔牙啦，
+pinmingnulishenghuozhe	拼命努力生活着	dialog	也可以变好。一直努力减肥，准备明年整容，家里人也支持，真的，没有什么是亘古不变的！ 对，努力不是会没有收获，只是收获可能来得晚，
+nagebinguan	那个宾馆	dialog	你是直接到县里了？
+doushihaoshiqingma	都是好事情吗	dialog	元芳你怎么看？
+naliliubi	哪里流弊	dialog	你在高新园上班吗
+niliadaodishuidoushuia	你俩到底谁逗谁啊	dialog	吼吼，又不乖啦
+nanfangshangxuequhoumenmaijianbing	南方上学去后门买煎饼	dialog	也不是只有高个子的姑娘
+douhuihaoqilaidezhufu	都会好起来的祝福	dialog	以给客服看吗？要是不行就算了，我送朋友好了。还是爱店主店主家以前上架的的饰品可都是好好看的。 谢谢店主。相信祖国会解决好一切的。
+yinggaijiushiwangjijuanyidianba	应该就是忘记卷一点吧	dialog	目前这个是自然往里面卷的之前烫的都被我剪了
+zhezhangbushiwodehaha	这张不是我的哈哈	dialog	你一定记错了
+woxiwanga	我希望啊	dialog	只要别人记得我生日我就满足的不行了哎习惯了习惯被忽视 。。。。。
+weiwodehanguoxingzuohaozhunbei	为我的韩国行做好准备	dialog	亲，你们自由行是旅行社包来回机票，然后住宿那些都是自己找的吗？ 谢谢啦，
+qingchuanlilihanyangshu	晴川历历汉阳树	dialog	流水落花春去也
+buxiangzhidaole	不想知道了	dialog	废话
+helewuwu	喝了呜呜	dialog	呜呜胃好疼
+zhegezhizhuxiadeyifu	这个蜘蛛侠的衣服	dialog	你不这衣服都有钱了
+najiuzuoxia	那就坐下	dialog	要不要跟陈独秀聊聊？
+duibuqiwoaini	对不起我爱你	dialog	生命有许多你做了却不想负责的事这就是三哥
+woyiranxiangxinheniyouxingfu	我依然相信和你有幸福	dialog	对不起我爱你!?你觉不觉得你这样很不哪起
+butingaimeidexiaoguniangme	不挺爱美的小姑娘嚒	dialog	看见是我就挖鼻孔？矜持点 是吗？不是吧。
+xiazhouwukaoshile	下周五考试了	dialog	是的。悲催吗。
+shenmeyiming	什么艺名	dialog	你发的这些你选择匿名投稿还是实名
+yaogenwoliaoliaoma	要跟我聊聊吗	dialog	你求我呀
+nifuzelufeime	你负责路费么	dialog	真不负责任啊
+wotiantianshangbantiantianzuozhewandiannao	我天天上班天天坐着玩电脑	dialog	不上哦，周末休息。下个星期五放假过去找你看球撒。 不要说无聊，
+baxiangcaihemalatanghunyihunshiba	把香菜和麻辣烫混一混是吧	dialog	刚吃完麻辣烫发现忘放香菜了，我该怎么办 哈哈哈哈哈哈哈然后翻个跟头，
+meicikandaonijingyadekanzhewo	每次看到你惊讶地看着我	dialog	原来靓女是你 我是小乔，
+xianzaihaimeiding	现在还没定	dialog	星期天回去呢
+youkenengzaoshang	有可能早上	dialog	星期天回去呢 现在还没定，
+gaosangangbiye	高三刚毕业	dialog	额额。。。没关系的 ！？
+guonianshishadiao	过年时杀掉	dialog	你跑到哪儿去了。羊肉处理的好的话就可好吃 那是，你不常吃就是吃不惯。我们过年都有羊肉汤喝的，以前家里每年年底买只羊，
+kendingbuzhengzong	肯定不正宗	dialog	你是混社会的。到哪里都想到啥子罩不罩的。
+jiayoujiayoumemedaniyidingnengxing	加油加油么么哒你一定能行	dialog	好吧。加油哦
+wojiuyingyingyingjinwan	我就嘤嘤嘤今晚	dialog	我错了嘤嘤嘤
+shuobudingjialirenyexiangnile	说不定家里人也想你了	dialog	不敢归家？？？？ 你真乃神人也，最好回家看看吧！
+dongzuohaokuai	动作好快	dialog	小狸最近有找妹子了吗
+mingwanwomenyiqi	明晚我们一起	dialog	去麻将了
+yibainiandoububian	一百年都不变	dialog	明晚我们一起
+daoshishiwomendengtamenle	到时是我们等他们了	dialog	太早在家没事做啊，等我回去找你
+juranbuxinwo	居然不信我	dialog	谢谢你阿……有你真好 我有必要说假话嘛？
+daoshihoufanidexinxingxiangkankan	到时候发你的新形象看看	dialog	染头发还是电头发啊？！ 哈哈哈~
+gujihaizaixia	估计还在下	dialog	不知道，看情况吧，安庆下雨没。
+renjiatingbudongnizaishuoshenmeo	人家听不懂你在说什么哦	dialog	你得先回答我，你最喜欢谁
+hahahagei	哈哈哈给	dialog	想问好用么plus会不会太大
+xiaoshihoudezhinianle	小时候的执念了	dialog	终于等来了这一天！老胡还有希望 我也是执念了，
+haibuwenhouhuiqua	还不问候回去啊	dialog	虽然我也比较希望骑士夺冠，但是这样的球迷也是醉了啊。
+daonizhezahuafengjiubianle	到你这咋画风就变了	dialog	鸡翅的酱，一拿上来就有股刺鼻的氨水的味道…你敢想？我还吃了…简直 …你为啥这么执着于快递，别个都是哎呀你回来的时候带回来就是了，
+shangxueqijingchang	上学期经常	dialog	好吧哈哈
+qishiyetingyuande	其实也挺远的	dialog	求带 嗯~要避开假期~
+tangcongbingshisha	糖葱饼是啥	dialog	无手信
+zenmeshengrizaiwoqianmianle	怎么生日在我前面了	dialog	生日快乐 你不是比我小吗？？
+nahaishibujiandehao	那还是不见得好	dialog	等我跑到在跑回来可能就是运动会了
+danyuanwozhepiyeyoua	但愿我这批也有啊	dialog	哪个公司这么好？还有早餐哪？ 不错啊~说的我好期待啊~
+kendingtuikuana	肯定退款啊	dialog	跟老板说赶快麻溜的再送一个过来
+laibalaiba	来吧来吧	dialog	寝室妹子说我嫁不出去，太能吃，没人养的起
+woyebuhui	我也不会	dialog	那你自己泡去
+keaiheaibuyiyanghaofa	可爱和爱不一样好伐	dialog	那说明你太博爱了
+woyizhizaidoubi	我一直在逗比	dialog	我竟无言以对
+wobuxihuanzaixiankan	我不喜欢在线看	dialog	好的我先去下
+nandaotaqiangninanpengyoule	难道她抢你男朋友了	dialog	她为什么要避？她只是尽自己努力完成自己的工作，她一没抢谁男朋友二没做错什么，凭什么要避？
+weishenmebudangchangkugeitamenkan	为什么不当场哭给他们看	dialog	看猫儿冲出来
+wozaicixi	我在慈溪	dialog	都不好看的...而且感觉有点假 有榴莲干哦，
+shouxianwozhidao	首先我知道	dialog	有女盆友的情况下才算出轨吧
+nishuochulaiwohaoxiangjiuxinle	你说出来我好像就信了	dialog	你真的是小仙女喔
+woyenongbutaiqingchude	我也弄不太清楚的	dialog	哈哈，你现在应该处于筑巢期吧？几个月啦 哈哈，
+wozuixihuanle	我最喜欢了	dialog	回来面八一下。
+jiubunenghaohaoliaotianma	就不能好好聊天吗	dialog	我听的是你先挂了
+zhexiedouhaoxiaode	这些都好小的	dialog	好多只啊... ..
+buzhidaoyahuaweidoumeilaheiwo	不知道呀华为都没拉黑我	dialog	哔哩哔哩弹幕网，我都没怼它它就把我拉黑了
+youmeidiede	有没叠的	dialog	求评分标准！明明地不能更干净了！
+yinggaishuojingchekaidao	应该说警车开道	dialog	刘警察帅吗 不要误导大家，和警察没关系，
+huilaojiahedale	回老家喝大了	dialog	你是哪种
+woyequeshui	我也缺水	dialog	~~我已经催了N次啦，一直在说马上就来。。。先去服饰部那边倒吧 ？？？没有没有，我没有觉得你抱怨哈，哈哈哈哈……跟你说下情况哈，
+houtiangengnan	后天更难	dialog	每逢考试必下雨！ 可能是明、
+reliangtaigao	热量太高	dialog	我又没狠命造 真不能去了，
+douhuixingfuda	都会幸福哒	dialog	有缘再见吧 嘿嘿嘿～你也特别好了～
+buguozhongwufansuishikeyiyuea	不过中午饭随时可以约啊	dialog	迟来的生快啊！大妹子 我下个月啊哈哈哈！我们俩就差一个月。我断奶失败，
+bianpaibutaigeilia	编排不太给力啊	dialog	我是多么希望把宝贵的机会给大嘴 小鸭梨那个俯平衡真是赞。不过我觉得她和大嘴有个相同的问题，成套的音乐舞蹈没什么能让人记住的瞬间，
+wozaiguojitianqu	我再过几天去	dialog	去北京么！ 真好…
+nishibushixia	你是不是瞎	dialog	你旁边呢个女生真好看
+nawomenshashihouchuqune	那我们啥时候出去呢	dialog	纳尼这货还有这外号？以前你经常跟小蚊子还有这家伙一起走她在中间从后面看你们仨就是…额…等差数列… 今儿回来啦？
+jinerqudongtou	今儿去洞头	dialog	还好没大太阳
+zahaibushuijiao	咋还不睡觉	dialog	你咋事情多的很
+xinghaoshixiwanzaocaitingde	幸好是洗完澡才停的	dialog	是的呢，刚刚在下大暴雨，刚停了。。。 我们这停了现在，不过还是没来电，
+shuodeyeshixintengzijixueshawangsha	说得也是心疼自己学啥忘啥	dialog	好！感觉高考之前学的英语都还给老师了
+nimeiyoushouxialaideming	你没有瘦下来的命	dialog	25 吃货，
+ganjueyouyaomaimaimaile	感觉又要买买买了	dialog	书名是啥
+caicaizuijinzenyang	蔡蔡最近怎样	dialog	广州始飞？ 懂了，
+woxihuanluweide	我喜欢卤味的	dialog	鸡爪，我也爱吃
+womensangeshuohaole	我们三个说好了	dialog	次得开心点，庆祝某伦的最后的单身之夜 呵呵，
+xinniankuailealian	新年快乐阿莲	dialog	城堡烟花，叔叔心态已经很年轻了
+dadaoliya	大道理呀	dialog	可是其他条件不好呀
+shegongshizenyanglianchengde	社工是怎样炼成的	dialog	强大吧 唉，
+nashibixude	那是必须的	dialog	很少见你化妆，真好看、
+tiannanijingrangeiwohuifule	天哪你竟然给我回复了	dialog	爱你
+nizazhemekuailei	你咋这么快嘞	dialog	不闹呀~妹纸
+meichiguoyigexiaoshi	没吃过一个小时	dialog	连续好几个晚上，你喂她了吗？会不会是饿？ 有的时候吃奶哄，都是她困了给她吃，吃一会就睡着了。
+najiujingmingdian	那就精明点	dialog	读书读傻了呢
+nimenjishiqu	你们几时去	dialog	本来还想问要不要一起的，看来不用问了……
+mashangganjueqingchunhaoduole	马上感觉清纯好多了	dialog	清纯妹哦~~~ 真的啊~
+xiangquyuandiandedifang	想去远点的地方	dialog	我就一直想出去玩，但就没实践过，总结起来就是懒啊 是，还有一条，
+chenweishenmeqingli	陈为什么清理	dialog	门把手是谁清理？
+nijuedeshisheiqinglide	你觉得是谁清理的	dialog	陈的可能性最大，其他人有什么必要清理把手？ 抹掉痕迹吧，
+xianmuwoba	羡慕我吧	dialog	想看海了，，，海天一线的感觉真好，， 哈哈，
+wanxiaodanding	玩笑淡定	dialog	你才丑你最丑
+shenmedianyingwusuowei	什么电影无所谓	dialog	明晚就回去了，等我～
+zaibulaiyixia	再不来一下	dialog	怀我女儿可以
+wohaoduohao	我好多号	dialog	对的带躺
+chihuojiushizhemerenxing	吃货就是这么任性	dialog	是想直接吃掉所有的美食，最后撑死了的节奏
+bielihuitamenya	别理会他们吖	dialog	怎么喇哲
+woshuowozaidenglingdiannixinme	我说我在等零点你信么	dialog	破蛋快乐亲
+woyemeipingjiataleibuleiya	我也没评价她累不累呀	dialog	你还知道你天天出来作啊累不累啊？ 我也没说我累呀，
+woyeyaoqukanyishengle	我也要去看医生了	dialog	真的是有问题的……要去看医生！（认真脸）
+gangmaideshihoukendingbuhuizheyangla	刚买的时候肯定不会这样啦	dialog	笔记本一到热天就是这样
+nijihaokaixuea	你几号开学啊	dialog	吃吃吃二十号你来上海我带你吃
+hahahaikeyi	哈哈还可以	dialog	我觉得区别在你涂了口红…表拿发型说事，哈哈
+zuowanshuidehenhao	昨晚睡得很好	dialog	要不怎么睡不着
+jueshihaonanren	绝世好男人	dialog	只是想告诉失眠的你不过她也失眠你们两个怎么都这样 好男人，
+bunengmaren	不能骂人	dialog	小孩还骂人。 小孩要听话，
+dachaohuifeiyanmie	大吵灰飞烟灭	dialog	手？能吵架就说明已经关系很牢固了，不需要在对方面前装温柔、偶尔吵吵还能给感情加分，吵3次就分手那还是恋爱？那是练爱吧 小吵怡情，
+nishilubaiwanhaoma	你是鹿百万好嘛	dialog	4月决赛有票啊为什么不去现场看
+xiaciyiqiwan	下次一起玩	dialog	就是突然不嗨了做什么都没意思
+youkongzhaowone	有空找我呢	dialog	想你了，
+nibuzaijia	你不在家	dialog	必然的~请了5天假 那你怎么那么早回去啦~
+wobuyouzhi	我不幼稚	dialog	就这破东西都动力啦想要我也给你写
+butaihaolei	不太好嘞	dialog	能把玩啵 额，据说小孩都认生，
+haibuhuirenrenne	还不会认人呢	dialog	来带一天试试！很好玩的！快来！
+xiabanshiqukechuanyixiamotuolao	下班时去客串一下摩托老	dialog	未有钱……有钱先买…… 哈哈……我都有喃过噶……
+kuinishuodechu	亏你说的出	dialog	我的计划，通常是在心里制定的！我一般都会有些规划！
+yebizhegehaokan	也比这个好看	dialog	我求求你们了，别在花3000买个500的货了 抱歉，p20在难看，
+yiyifeifan	意义非凡	dialog	开门大吉
+zisunmantang	子孙满堂	dialog	意义非凡
+buzhidaojintianhuibuhuidelai	不知道今天回不回的来	dialog	好困
+wojianpengyoua	我见朋友啊	dialog	人家化妆不带眼镜的
+qizaohuiyitian	起早毁一天	dialog	好早啊，干嘛呀 晚睡毁上午，
+heiniyixia	黑你一下	dialog	你黑了。
+wodoushiduxingxiachabuduo	我都是独行侠差不多	dialog	有阿，一直都有阿，哥哥没看到么，人人里发的比较多
+yaoduohebierenjiaoliua	要多和别人交流啊	dialog	陌生人不认识当然都会紧张啊！ 在人前面试多展示自己多和人沟通就会好的！
+weileziji	为了自己	dialog	噢，以后上班对你发展不好 是的，
+ninayidian	你那一点	dialog	我米有巧克力。。。
+laiwanergouba	来玩儿狗吧	dialog	新欢? 你们下午跳不?
+nayebiesi	那也别死	dialog	努力工作，做好自己的工作。
+nizijidoumeizijihuiquguoa	你自己都没自己回去过啊	dialog	你啥时候回来啊？
+xingfudejiaozilaidiancu	幸福的饺子来点醋	dialog	开饭
+tabuxihuanre	他不喜欢热	dialog	辟谷的原因我记得 不是不能喝，是他不喜欢喝，
+tashuoshipigudeyuanyin	她说是辟谷的原因	dialog	辟谷为什么不能喝热水
+tamenjiaderoudouhaoci	他们家的肉都好次	dialog	木槿花开啊！！！！！ 好想次！
+gaoxingdeshiyekeyijianzheyoufen	高兴的事也可以见者有份	dialog	今捡到钱了,这么高兴哇!是不是见者有份呢!
+biezhikankandejiande	别只看看得见的	dialog	据农学院某位资深老师认可他是俄罗斯小帅哥 .....俄罗斯小帅哥就只有皮肤白一个特点么说的是气质！！
+yaobukaolvxiazuohaomingdeshimei	要不考虑下做灏明的师妹	dialog	加油咯，你也行的 哈哈。那也不错噢！
+yaozenmegaishan	要怎么改善	dialog	指哪方面
+buyonglaguolejiuguolela	不用啦过了就过了啦	dialog	都过啦
+hahahahabiaoqingkeaiya	哈哈哈哈表情可爱呀	dialog	这个男生不会玩成语接龙
+dengwomaigezhaguozhidejiuzha	等我买个炸果汁的就炸	dialog	我也好想喝
+zhaobuhuilaiyebugaosuwo	找不回来也不告诉我	dialog	小号不告诉我
+meishizaina	美食在哪	dialog	看了你的“一锅端”感觉很不错，巧。赞一个。早上好。 只要有美食，我哪里都会跑。
+woyeshiha	我也是哈	dialog	冬天更需要春天的心啊~春心~
+zuowankanwan	昨晚看完	dialog	拥抱太阳的月亮！！！！！！几年前的！！！好看哭！ 好看哇。看了两遍。
+ninyaoqingwomenan	您要请我们安	dialog	我不搭理你了。
+wozhunbeiqiongyouhuiluguowuxi	我准备穷游会路过无锡	dialog	无锡有好玩的么？ 啥？
+niyoubugenwowan	你又不跟我玩	dialog	重点是图 对啊。。
+daizaibeiwolijiuxingle	待在被窝里就行了	dialog	放假回家了？ 今年就是特别冷。不过放假了，
+kendinghuiqude	肯定会去的	dialog	非常适合情侣吃饭的地方，浪漫极了。
+duomehaodefenweiya	多么好的氛围呀	dialog	非常适合情侣吃饭的地方，浪漫极了。 肯定会去的，
+haolangfeima	好浪费吗	dialog	所以早上赖床了么 ……
+nayounengzenmebanne	那又能怎么办呢	dialog	什么都不能说，不过也蛮好的
+daizhexiaohuoshihenchenmo	带着笑或是很沉默	dialog	总想起当天的星光
+meicidouyaoquerenshibushibenren	每次都要确认是不是本人	dialog	p的累不累？ 我看的累，
+nishiyigerenzhuma	你是一个人住吗	dialog	你已经搬好了么？ 哈哈，
+danshijieguodaozuihou	但是结果到最后	dialog	只能说，受众终究还是俗人多，大多数人已经不太看重文笔了 有时候标点用起来都要斟酌一番，
+chadiancuoguoleyigeyi	差点错过了一个亿	dialog	我怎么没有 哇哇哇谢告知，
+hennanjueze	很难抉择	dialog	只要有时间，会遇到的。 怕是在错误的时间，遇到对的人，
+shizaicankui	实在惭愧	dialog	也是呢，在家看电视
+wozhishinameyishuo	我只是那么一说	dialog	这也是民间艺术，以后不见得有人会都。所以值得收藏，200年之后，品相好的话肯定值钱！！！！
+womenzhetaifeng	我们这台风	dialog	妹，不活跃就老了！
+turanjuededouqianle	突然觉得都签了	dialog	好~呜呜，我们班签了好多了，感觉要分别了
+zhuiqiuxingfushirenrenpingdengde	追求幸福是人人平等的	dialog	总好过没努力就放弃。 所以，放手去追。
+nigelailemeiyou	你哥来了没有	dialog	你一个人？没车回去了？
+buguannile	不管你了	dialog	我就笨，你管我a 对的。
+yidinghuishoude	一定会瘦的	dialog	怎么会胖？确实，不吃饭饿着或者不好好吃饭就不会胖了 心情不好，吃饭就吃一点，
+ninahuijiajiezhezaizhongshang	你拿回家接着再种上	dialog	绿的这么假 行啊，到时候我也不扔我直接递到你的手里，把幸福代代相传，
+bujubeizhaodaikerendenengli	不具备招待客人的能力	dialog	经常下厨。我今晚一个人煮饺子吃，是她三妹以前送的。 自己一家人吃没问题，
+fanzhengxuehuaidedoulaiwo	反正学坏的都赖我	dialog	嚯哟，变脸比变天还快。
+wojiashihenande	我家是河南的	dialog	那可不，等一场雪多难啊
+wojidenihaizaifuguonianshulaizhe	我记得你还在腐国念书来着	dialog	大米都上班啦！ 纳尼！！！
+renzhenpinduba	认真品读吧	dialog	爱的痴迷 嗯，
+wozhiqiangeinijiangguoa	我之前给你讲过啊	dialog	你就看到后面两句昂？
+ninianqingpiaoliangshencaihao	你年轻漂亮身材好	dialog	韩国偶吧也很帅很温柔，我不介意你的异国恋
+kandechulaidanshiwoyaoquerenyixia	看得出来但是我要确认一下	dialog	你是班长吗
+wohuanchengshangwule	我换成上午了	dialog	我调的明天上午值班，下午回去，但是夜里还要回去。 OKay，我本来下午值班的，
+woyexianghe	我也想喝	dialog	比玩都几点了 早说阿，
+hahahahaguliguli	哈哈哈哈鼓励鼓励	dialog	没看见是儿童套餐，一定是普通套餐
+huadehaoshaoa	花的好少啊	dialog	吃饭700多？ 那你每天在家吃饭吗？
+shiwobijiaonengchiba	是我比较能吃吧	dialog	哇，6块就可以解决，太棒了，我俩每天吃饭大概要100块
+biwodehao	比我的好	dialog	什么车，刹车失灵
+nayaonijinziyongzaisheideshenshangle	那要你金子用在谁的身上了	dialog	那你的金子什么时候会发光
+jianzhiduoluo	简直堕落	dialog	大凌晨的
+nikendingshaogeidongxitachile	你肯定少给东西他吃了	dialog	额～我哪知道这么多啊！诶…… 晕～他一点都不胖！
+baochizhuma	包吃住吗	dialog	我要
+zhegexuyaoyingduihaole	这个需要应对好了	dialog	看待事物的方式不同，不必强求他们能理解，彼此尊重就好。
+nichuxianzhegewentilema	你出现这个问题了吗	dialog	是不是不太好控制在迷宫中走动？有玩家反应游戏结束没有显示经验值、我在犹豫买不买 为啥我玩到仙灵岛后面就没有游戏音效了啊，
+woyijingzaijialea	我已经在家了啊	dialog	啥时候回家
+meimeiniyeshio	妹妹你也是哦	dialog	睡不着，只想聊聊天
+yidinggeiniliuzhe	一定给你留着	dialog	是啊，准备检票了 好，
+dagaimeitianpaoduojiune	大概每天跑多久呢	dialog	做起来超级难哇每天跑步可以瘦不?
+meichulaine	没出来呢	dialog	国考海关的面试没过，准备省考呗
+wokeshixiaohuozi	我可是小伙子	dialog	辛苦窗帘了
+ranhoubangniqu	然后帮你取	dialog	是时候找个男朋友了 你可以找一个追求者，
+haoguomeiyou	好过没有	dialog	你有男票
+xiamenbushihenleng	厦门不是很冷	dialog	现在？！
+haimeikaideyeshizheyang	还没开的也是这样	dialog	那再拿出来会不会变质，放阴凉的地方
+sheyouyijingquxuexiaotingkele	舍友已经去学校听课了	dialog	丝儿，早安，从不开口求关注。关不关注只是一直形式，互不互动才是我在乎的。丝儿，你说对不 丝儿，今天要上班的吧，
+taiganrenle	太感人了	dialog	人不为己天诛地灭
+zhedoubeinihuaxianle	这都被你花现了	dialog	快来找我哥处于半放假状态中… 哈哈，
+yongyuandadangxiaqu	永远搭档下去	dialog	好搭档
+shengerweihe	生而为何	dialog	一个人如果足够强大，或许他就可以不要婚姻。
+tahewomenshiyiyangde	他和我们是一样的	dialog	相信林更新会很有压力、会感到心累、会不快乐。他这么做不过为了娱乐大众。可我不想把他当作一个逗大家乐的小丑、他是个普通人、大哥哥。
+meiyoumeiyoudongxixiaxiaoluosi	没有没有东西下小螺丝	dialog	嗯嗯
+namingtianzhaozhuanyederenlaixiuba	那明天找专业的人来修吧	dialog	关机重启呢？也不行
+suoyiqingsongyidian	所以轻松一点	dialog	想太多会变胖的 当然，
+lainanjingyemenerqingnichifan	来南京爷们儿请你吃饭	dialog	现在说这些还太早，说不定分数还可以，大不了明年陪我一起考，而且找工作也不是啥坏事 乐呵起来，马上过年了～
+zaijiaxiandewuliao	在家闲得无聊	dialog	别害羞啦！ 还好！
+wojiuqianbao	我就钱包	dialog	东西真多啊
+mingwanzaishuo	明晚再说	dialog	我明天再赶祝好运 我也是！！！物理只做了一半，
+keliandeyuer	可怜的鱼儿	dialog	家里的鱼儿么?
+zijitingting	自己听听	dialog	不知道那个录音能传上来不。晚安 我是说传手机么，
+shinizongjiechulaidejingyanba	是你总结出来的经验吧	dialog	嗯，增长很缓慢了 哈哈，！
+nanixuyaoshei	那你需要谁	dialog	我暖你
+bubububububububububu	不不不不不不不不不不	dialog	你一笑倾城..哥出人工了.钱不是问题了
+qujiniana	去几年啊	dialog	怎么去哪里啦。。上学那吗。。 哦哦哦是交换生吗什么时候走的啊真是的不说一声！！！
+danwobuchang	但我不唱	dialog	姐只是个传说…… 会！
+wowentichongqibule	我问题重启不了	dialog	本本关不了机了，求帮助
+nawozhezhouqu	那我这周去	dialog	游泳池洗澡是热水么？
+wozaiyicimeizuodaozaodianshui	我再一次没做到早点睡	dialog	哥现在不在线了，
+niganshane	你干啥呢	dialog	……做ppt 小意思~
+yizhixiangxinnimen	一直相信你们	dialog	不要被流言蜚语影响之后的比赛，也要记得在头两局的失败里找症结，继续努力，期待你们的4强表现。 加油加油，
+benlaijiuhenmei	本来就很美	dialog	整个人是重点。
+laiaxianzhufubu	来啊先祝福不	dialog	恭喜…祝福长长久久幸福美满
+hahahadiannitoufa	哈哈哈点你头发	dialog	那帮情侣能把清明节都过成情人节
+haibulaiqingwochidunfan	还不来请我吃顿饭	dialog	还以为你会成为金融大亨，原来去当足疗小弟去了，出息！ 我明天一天坐标建国门，
+zuohenjiucaihuiqu	坐很久才回去	dialog	店里有人 他们没那么快回家、每次我都不喜欢他们、
+haiburuezhe	还不如饿着	dialog	一点也不饿 睡前加餐...不消化的亲，
+jixunianyumoshui	继续鲶鱼墨水	dialog	生日莫嚣张，嚣张遭雷劈。 无视…
+xiaonaimaodeshihouya	小奶猫的时候呀	dialog	哈哈领养的
+jiushixiaoqudejiuzhuzhan	就是小区的救助站	dialog	小奶猫的时候呀，现在才六个月
+nihaocongming	你好聪明	dialog	加了个效果更黑了
+changlitiantianchi	厂里天天吃	dialog	还有吗？我也要吃 面包不吃，
+shenmeshihoukaishiyingyene	什么时候开始营业呢	dialog	福州店，一直打了4个电话都没人接啊 汗，还以为开始营业了，
+shihuishiquhaishibeihai	是回市区还是北海	dialog	m不来了？ 没车？
+duiwulijiusangeren	队伍里就三个人	dialog	谢谢谢谢，我有望了！ 那完了，
+xiexiexiaokeai	谢谢小可爱	dialog	那完了，队伍里就三个人
+zhejiaofuqixiang	这叫夫妻相	dialog	你跟他的眉毛眼睛鼻子嘴脸耳朵相似度高达90%
+tameishoudaoduanxinya	他没收到短信呀	dialog	没钱啊
+aibushihenxiangyuanliang	唉不是很想原谅	dialog	唉你忘了是不是
+nandegennijiuchan	难得跟你纠缠	dialog	你有本事就过来让我玩
+wokeyishuoxiangjianburuhuainianman	我可以说相见不如怀念蛮	dialog	我要回家啊啊啊！！！
+wojiadadequeshibuchun	我家大的确实不纯	dialog	哈哈哈，毛比较蓬松而已。。。脸可不像。 嗯，
+buguoxiaodeshichunbixiongla	不过小的是纯比熊啦	dialog	哈哈哈，毛比较蓬松而已。。。脸可不像。 嗯，我家大的确实不纯，
+dejianchizhu	得坚持住	dialog	胖了20
+ouweinichi	偶喂你吃	dialog	难道你不喜欢吗？小冰会伤心的 张开嘴，
+najiurangshijianzhengmingba	那就让时间证明吧	dialog	是啊，所以说这样的一盆冷水泼到的是我的坚持。 嘿嘿，我明白了。
+nagejingquo	哪个景区哦	dialog	我看到了弟娃绝望的侧影
+zaolequnianhuande	早了去年换的	dialog	等你来只要你来
+haohaobaozhongo	好好保重哦	dialog	好好睡一觉就对了！
+chileyihuierjiubuchile	吃了一会儿就不吃了	dialog	结了一次婚是吧
+wohewolaogongdeanyu	我和我老公的暗语	dialog	面膜哈哈哈哈哈哈
+huandiezhanpianla	换谍战片啦	dialog	哎，落伍了 爱情片看完，
+kanhuahuadebiaoyan	看花花的表演	dialog	谢谢你的祝福，嘿嘿！国庆快乐！
+nidoumeisheng	你都没生	dialog	返老还童了！
+dawanshangzhuanqian	大晚上赚钱	dialog	你猜 啊哈。
+daoshihouhuigeinituomeng	到时候会给你托梦	dialog	不在思考如何穿越
+bashenshangrougeini	把身上肉给你	dialog	快抱紧我
+haodongxibupawan	好东西不怕晚	dialog	我高三听的歌，现在因为一个综艺节目火了
+hahahacongyenengshangtiandea	哈哈哈葱也能上天的啊	dialog	这葱是要是要上天的节奏啊哪根都不算我不是葱
+buzenmeyang	不怎么样	dialog	不一样，简历是必须带的，最好多带几份，还有你的成绩单、证书原件，复印件，正装可以面试的时候再穿，现场面试的比较少，不过也有例外的
+daoyinjichezhanjiejiabei	到尹集车站接驾呗	dialog	尹集镇？你再尹集呀 我家在哪儿，明天回去，后天一早到家，
+wadeyishengkuchulaishixiaoyouma	哇的一声哭出来是校友吗	dialog	山东理工大学学校的小仙女小仙男们快来啦快来为我们学校疯狂打call
+niquedingfeideqilai	你确定飞的起来	dialog	还是姜锅对我好，听说你们办公室也有不明飞行物哇
+woxianzaiyizhouyongyici	我现在一周用一次	dialog	药店买康王，一周一两次 能止痒，
+nijiushihei	你就是黑	dialog	衣服你都脱了还敢这么说？ 这跟光没关系，
+shentizhongyaodouhaishinide	身体重要都还是你的	dialog	好胃口！好心情！ 亲，多吃点，
+womenyiqitiaowuqu	我们一起跳舞去	dialog	不是……生气较劲呢，剩我自己在家呢 你也快减肥！
+tiaowushuipingwobuxing	跳舞水平我不行	dialog	我跳探戈，舞会上也跳 社交活动，
+woyehaoduonianbutiaole	我也好多年不跳了	dialog	姐跳起来一定好看
+nayeyaowoxiangbuxiangrangniqina	那也要我想不想让你亲啊	dialog	我才不要你亲呢有口水
+zhangdeshuaibuyinggaipama	长得帅不应该怕吗	dialog	你报警试试？ 为什么不怕，
+mingtianwentaqu	明天问他去	dialog	一乃的那个没租给人家?
+haoakaiwanhuiwoquzhaoni	好啊开完会我去找你	dialog	哎呀，东西还好吧？
+wosongzhufuai	我送祝福唉	dialog	姐。祝你好运 没撒。
+gangcaishicuojue	刚才是错觉	dialog	等哥耳朵旁边的圆圈是个啥 哦！
+qiantishidengwoyouqian	前提是等我有钱	dialog	我已经想好了我要整一只我妈没有反对！ 不过！
+jiaodianfangzainashiguanjian	焦点放在哪是关键	dialog	多谢兄弟夸奖 我通常是从球到人身边时开始拍，
+fanzhengjiushishengfan	反正就是剩饭	dialog	抓不到，抓到我都给她做了 鱼。煎鱼。还有煮汤的骨头。
+shenmedoubuchima	什么都不吃吗	dialog	健康。。。我这几天吃的像猪一样
+dangranyeshiyidayixiao	当然也是一大一小	dialog	你也是一大一小，但我不是 一大一小看别人，
+changshiyounaoziderendouzhidao	常识有脑子的人都知道	dialog	客观的讲是有些人明显有些人不明显而已。 很抱歉让您失望了，我属于不明显也就是你说的不是一大一小。
+shuochunidetiaojian	说出你的条件	dialog	去寻找吧，少女！
+buyaozheyangzila	不要这样子啦	dialog	莫生气，新年多笑笑，笑~
+nicaicaikan	你猜猜看	dialog	小女子年方二八，你猜我多大？ 宁缺毋滥。
+yaoxuehuichangshi	要学会尝试	dialog	坚持就是胜利，我还在难看进行中。但是快胜利了。你坚持住，暑假回来咱俩一起中分。然后一起剪了。
+buxingzanliajianmianyihouhujian	不行咱俩见面以后互剪	dialog	还有三个月……我还要忍受多久这样的尴尬发型到时候不好看就白受苦了…… 我也觉得我不太爱改变，好吧，为了我阿姨你，丑就丑几个月吧！
+haobashuaiqidetoufashipianrende	好吧帅气的头发是骗人的	dialog	头发真的假的
+tagangshuixingba	牠刚睡醒吧	dialog	牠苦恋着苦栋.
+quanguogedidouyou	全国各地都有	dialog	广州吖 有的。
+nalilengma	那里冷吗	dialog	呵呵～去哪里玩乐？好玩吗？ 小心你的肚子哦～
+guanjianshiwobuyongchonghuafeia	关键是我不用充话费啊	dialog	我的移动卡学校发的一个月60-70个G每个月100话费我已经快一年没充过话费了
+woyounengshuoshenmene	我又能说什么呢	dialog	又喝酒。
+weibushufu	胃不舒服	dialog	好吧你不知道我话里的意思算了我什么都没说你要怎样就怎样吧。 嗯。顺风。我继续睡了。
+woyeyaohuijiale	我也要回家了	dialog	我还在上课呢
+youmeiyoushenmehaochide	有没有什么好吃的	dialog	那你们现在到了么？还是回来了 好吧，
+shangbanneguoxiaoniancaihuilai	上班呢过小年才回来	dialog	感觉肯定很好
+bailishouyuelideyuana	百里守约离得远啊	dialog	求求你们了，能不能削一下猴子，战士都受不了，何况是坦克
+bushibuxing	不是不行	dialog	带那么多话题作甚？
+yaodeyaodexiangnikanqi	要的要的像你看齐	dialog	真美幸福的人
+zhaidiaoyanjingjiuliangliangle	摘掉眼镜就凉凉了	dialog	屏下指纹是对面部识别的一个补充吧，毕竟面部识别使用还是受周边环境限制
+zhedianxiaoxinsidoubeinizaole	这点小心思都被你造了	dialog	昨天是阴历的啦谢谢星月姐 哈哈，
+nashizenmele	那是怎么了	dialog	不想睡吧
+banshazishi	办啥子事	dialog	倒处跑也
+nishashihouzuizhemetianle	你啥时候嘴这么甜了	dialog	没有，你丧失了被我吐槽的机会。。。睡了，祝你起x xxx=不死长，
+youshangbanma	有上班吗	dialog	下午没课了，陪奶奶公园走走 你呢？
+qingjiaotatuhaojin	请叫他土豪金	dialog	小狗哲论家会很想你的
+duianibaqiangeiwoa	对啊你把钱给我啊	dialog	我也可以帮你开通一个
+zhoumobushangbankeyixiuxide	周末不上班可以休息的	dialog	坐车还要做差不多一个小时 六点钟就下班了，
+guolainajiuxila	过来拿就系啦	dialog	来拿啦
+niyinggaixihuankanzhezhong	你应该喜欢看这种	dialog	科幻片，还可以，活埋男主角 教父，调音师，肖申克的救赎，
+najiuzuihouliugenianxiangba	那就最后留个念想吧	dialog	还沉浸在自己的世界里
+nayigeshitang	哪一个食堂	dialog	拉仇恨
+bijingnirenmei	毕竟你人美	dialog	太怕疼？？？不过在耳骨上刚打的90天真的是折磨。。
+zhesuanwangyoujuhuima	这算网友聚会吗	dialog	我们俩谁跟谁啊~
+duidenitailiaojiele	对的你太了解了	dialog	不是呀我真的喜欢啊。我的梦想就是有个房车去哪里玩都行
+yexingbajinliangbuyaochichengle	也行吧尽量不要吃撑了	dialog	不是肥是胃承受不了啊
+naqianlema	那签了嘛	dialog	好帅！！！我真的超级喜欢这款！讲话没？
+rentaiduoletagenbenmeifatingxialai	人太多了他根本没法停下来	dialog	我说能给我签名么？他说等会儿。他人真的好好！爱死了 没有，
+kankuaibenyejiuzhinengkandaoluzhi	看快本也就只能看到录制	dialog	没有，人太多了他根本没法停下来 按照上次的经历，
+wuliaodafashijianbuxinga	无聊打发时间不行啊	dialog	艾特我围观撒
+yinianyidudenvedasai	一年一度的虐大赛	dialog	你不也是
+meilianxiyijiyigexiaogushi	美联系一集一个小故事	dialog	第一部好笑第二部不怎么样？正准备看第3
+xianzaichifankenanshou	现在吃饭可难受	dialog	我已经拔了那感觉简直了！
+geinikankanwodefenzuming	给你看看我的分组名	dialog	喜欢的人
+dangbuzhunituhaodehonghuangzhili	挡不住你土豪的洪荒之力	dialog	真有钱我栋
+woshenmeshidoushishouzhede	我什么事都是收着的	dialog	心里太不平衡了，气死
+niuburongyi	妞不容易	dialog	明天来陪我加班啊
+woxianzaimeitianzaoshangdoubuxiangqichuang	我现在每天早上都不想起床	dialog	我是因为明天不上班不想睡
+wozhikandaoyijuhua	我只看到一句话	dialog	梦见啥了，这么早 上边我没看见，
+wozheshiyinyuanzhi	我这是姻缘指	dialog	我替你掐指一算，不远了，你的那个他就要出现了。
+jiugenhuairenshuozijishihaorenyiyang	就跟坏人说自己是好人一样	dialog	你忘了，咱阿嫲据说也是怼遍村里无对手的厉害人物。基因决定的。反正欺负人好过被欺负 呵呵，你不怼人，
+fangzibinihaipo	房子比你还破	dialog	你要知足…… 我的情况跟你一样……都没的！
+wozijimaide	我自己买的	dialog	背心呀
+haoyazhoumojiewoba	好呀周末借我吧	dialog	我一直不知道你有琴
+zhendeyixiazijiukandaole	真的一下子就看到了	dialog	饼我要表白你
+nishanishanicaisha	你傻你傻你才傻	dialog	送你一个社会的嘿嘿吧
+qishibuguanshabaobao	其实不管啥宝宝	dialog	这可快了，俺们单位那八大金刚都生了，前几天又生了俩。日子忒快了！一定要平稳心态！姐姐加油！ 都想生龙宝宝呗！
+shiqunishitadesunshi	失去你是他的损失	dialog	加油控制好自己心态
+nijintianshengri	你今天生日	dialog	谢谢亲
+zenmeshenmedoujujue	怎么什么都拒绝	dialog	那这样吧，给你寄点别的吧 你这人好小气啊，
+zhexiejimolao	这些寂寞老	dialog	货车从这边过，闹得睡不着，全部疯老！！ 是楞个的...
+youyuduifangshezhi	由于对方设置	dialog	发不过去，你设置了
+yiqiquwangba	一起去网吧	dialog	和他一起玩，有什么话游戏里说
+yaobiaobaijiuzaodian	要表白就早点	dialog	聚餐时，情绪失控
+taibugongpingle	太不公平了	dialog	为什么到头来你喜欢的人不是我呢
+woshuodeshidashihuame	我说的是大实话么	dialog	阿？你入迷什么？？感觉很对？ 。
+xuyaoshijiezhengjiunishenme	需要世界拯救你什么	dialog	拯救世界任务完成了？ 你是会发光的，
+yougongtongyuyanma	有共同语言吗	dialog	相亲是什么感觉？
+zhaopianhaobuxiang	照片好不像	dialog	女生是？？
+wochabuduoershisihaoquxiamen	我差不多二十四号去厦门	dialog	眼睛怎么了？ 还没啊！
+gongzuozhaodaoleshime	工作找到了是么	dialog	不知道呢，早上起来就感觉眼睛痛。你实习了吗？ 池店，
+xiangxianghaokepa	想想好可怕	dialog	蚯蚓是吧！好的好的，我去挖。我刚看见亲鸟衔着虫子在附近了，不知道喂到了没。 弄碎蚯蚓这件事…
+niyaoshiqulenibamajiugudule	你要是去了你爸妈就孤独了	dialog	你去哪？都是打酱油的！还不如去广州！ 也是！那时你说了，
+bushiyehaochengyipiaonanqiuma	不是也号称一票难求吗	dialog	你去主场看踢鲁能？有票？ 能买到票？
+wodechuxinnashi	我的初心那是	dialog	终于等来了这一天！老胡还有希望
+woyeshiwoyeshi	我也是我也是	dialog	说得好偷偷赞一波
+zhezhouzhusushitingmanyide	这周住宿是挺满意的	dialog	这是酒店房间送的花不是公司
+woyeshixiatianzidongjiujianle	我也是夏天自动就减了	dialog	十月以来长了四斤
+youhaodetuijian	有好的推荐	dialog	原来还有专业名词.见识了.见识了. 不卖.
+woshiyua	我是鱼啊	dialog	额，憋水里？ 哈哈，
+yitianzhidadejiuyiban	一天直达的就一班	dialog	真的是……旅游的心情快要被消磨光了。现在在解决回去的事。 还没。
+mofeizhizhidiandiandeneirongshi	莫非指指点点的内容是	dialog	你爱的男子
+yuanlainimeiyouduideshihoua	原来你没有对的时候啊	dialog	你说对了 哦，
+biaoshiyemeitingguo	表示也没听过	dialog	女朋友是车么
+zhidaonishihaoxin	知道你是好心	dialog	你少乌鸦嘴好不，这东西好的不灵坏的灵
+woshiqubaozongzi	我是去包粽子	dialog	你自己小心哈。估计等哈我就要被压往医院了~~
+wolianhuidoumeiyouhuiqu	我连回都没有回去	dialog	并没有
+citubixubaocun	此图必须保存	dialog	第一次发现涟水那么美
+zhenshiwuweizachenadangran	真是五味杂陈啊当然	dialog	伤心了 唉...
+tamaosimeishuaini	他貌似没甩你	dialog	红衣裳是你？哈哈
+niyinggaichongshangqubaodeta	你应该冲上去抱得他	dialog	红衣裳是你？哈哈 他貌似没甩你？
+youshijianlainantong	有时间来南通	dialog	去吃过吗？
+shashihoushengayi	啥时候生啊姨	dialog	你佳姨已经是结婚的人了
+qishizhemexiangdenvshengyebushao	其实这么想的女生也不少	dialog	其实有些女生有爱情就很满足了，毕竟钱我们可以自己挣。
+jiushizuoa	就是作阿	dialog	一个人去市里，要不要陪我我去接你 你们这些，
+woshichaoxingyundebanbujiang	我是超幸运的斑布酱	dialog	摸摸，不开心只是暂时的~一切都会变好的
+nizuijinzoukeailuxianle	你最近走可爱路线了	dialog	默默差点没有认出来 头像换了小白兔，
+jianguojicile	见过几次了	dialog	恩恩是啊我见过见到真人我都惊讶脸小的程度
+niyekeyikai	你也可以开	dialog	开启疯狂模式
+xianzaidefangzishenmeshihoudaoqiya	现在的房子什么时候到期呀	dialog	求合租亲~还找室友蛮？
+nanixianzaishizenmehuifude	那你现在是怎么回复的	dialog	去哪家面试？
+dabianshunli	答辩顺利	dialog	我周六去南京看梅花，当天往返
+dangnixiangtayiyangchouloudeshihou	当你想她一样丑陋的时候	dialog	磊磊别这么想不收你也是
+nizhangdebiwojun	你长得比我俊	dialog	我还想还给人家的…
+youdianmeiyongqi	有点没勇气	dialog	大秦帝国！好看吗？ 噢噢～感觉大部头，
+fengjinghenbucuode	风景很不错的	dialog	滨海大道,红树林 恩恩,
+nibushigudanyigeren	你不是孤单一个人	dialog	你一直不是一个人哦
+qiantishitayexihuanni	前提是他也喜欢你	dialog	加油，勇敢一点就能遇到喜欢的了！ 喜欢就主动，憋着藏着是浪费大好光阴，
+kaoshanglejiuyougongzilema	考上了就有工资了嘛	dialog	太多太多了…………谢老师开学了蛮？
+jintianyouxiaoledian	今天又小了点	dialog	你就是承认你脸大，好不容易逮到个我脸大的 我脸大不脸大她们都清楚！！喔~你也清楚~好烦哦，
+woxiangtoudaonengliangyiyang	我像偷到能量一样	dialog	万一实现的呢！可是万一之前众人彷徨和失重自己，都无处安放，同意这句话，却也害怕着实力不够挤不进去…… 谢谢你，在你身上，
+wozhejitianhaixing	我这几天还行	dialog	等喝完以后你把手电筒打开让他顺着灯柱往上爬等爬到一半的时候你在把手电筒关上让他掉下来 谢了！
+wobaozhengwobuhuixiaode	我保证我不会笑的	dialog	你要相信我的人品阿，我保证我会忍住的，放心！ 悄悄地发过来，
+meitaiyanghaikanbudaone	没太阳还看不到呢	dialog	去广深沿海高速看晚霞 高速还没投入使用，当然是骑着了，
+yaoduoyundongle	要多运动了	dialog	忙啥呢？出去赏花啦 人到中年，
+shimamabingle	是妈妈病了	dialog	跑医院
+yandeyehao	演的也好	dialog	是，你看了？ 是吧，我超喜欢她，
+huorankailang	豁然开朗	dialog	我以为只有我这样想还在想是不是我有问题原来。。
+wodailejingulahaha	我带了金箍啦哈哈	dialog	跟我一起去西安看师傅把
+huozheshuozhennanidanggemenle	或者说真拿你当哥们了	dialog	跟男生打球，注定受伤的是你！你太猛了，太威武了！ 只能说他们太不怜香惜玉了！
+shidebudaobashijin	是的不到八十斤	dialog	所以啊情是你的一半以下呀
+yixiangjiaonaixidangaobigaodi	以香蕉奶昔蛋糕比高低	dialog	到底要哪家
+zuotianhewomendegouyedaleyijia	昨天和我们的狗也打了一架	dialog	又香又嫩，我是蚊子我都叮。我还想帮你分担点列，但我那曾经和猫打过架的伤痕皮肤。又臭又老！我也爱莫能助啊！ 噢！
+ruguobushigangganggeitaweinai	如果不是刚刚给他喂奶	dialog	我也是 那确实，
+xialoushikaizoule	下楼时开走了	dialog	总觉得拉不下脸
+danyinidesuzhihaobuliaonali	但以你的素质好不了哪里	dialog	可悲一辈子下层人默默无闻。 是不是上层你不用管。
+xianzainibushikandaoguo	现在你不是看到过	dialog	有个小鬼我认识
+yaobuhaishimingtianbaitianfangba	要不还是明天白天放吧	dialog	6星结界卡要不要
+keyiguolaiwanjitian	可以过来玩几天	dialog	回家了啊…
+namexinkua	那么辛苦啊	dialog	怎么还不睡
+youchiduolejianfeijihuapomie	又吃多了减肥计划破灭	dialog	开心开心我洗澡吃饭哈哈爱你
+nijiuhengxiayikexin	你就横下一颗心	dialog	顺滴，我自己都好骄傲哦，尽显女汉子本色哈 我的经验就是，只要医生说你能顺，
+dengzhekanqiua	等着看球啊	dialog	不戒烟找不到
+buhuidangshanghai	不会挡伤害	dialog	妲己的伤害太无脑，需要限制一下了 妲己我只想说增加一下下的预判啊，有时候队友坑，
+shujiaxuechezuichikui	暑假学车最吃亏	dialog	你还在武汉啊？
+haoxingfudeganjiao	好幸福的赶脚	dialog	希望与你天天见
+renjiazhengdaguangminghaobu	人家正大光明好不	dialog	心仪的粗陶杯组上镜了呀 哪里偷偷，
+keyitiqianyudingma	可以提前预定吗	dialog	简单之极！深圳明天多云,温度为33°C
+jieshanlaoyatang	界山老鸭汤	dialog	知不知道南陵老鸭汤？ 不是，
+nimeizheliangxinshuoshenmene	你昧着良心说什么呢	dialog	你喜欢我的脸？我喜欢你的
+zhedoubixudebi	这都必须的必	dialog	某人去看动画片了。待会儿就回
+xingfendaoshuibuzhao	兴奋到睡不着	dialog	本人睁不开眼了昨晚三点半多睡的，上班狗真惨
+nishinaderen	你是那的人	dialog	是啊，真的打啊，不拿东西，只能拳头..
+bielaoshikulian	别老是哭脸	dialog	乖啦～有人会吃醋的～ 好啦，
+wojuedewopaidechaojiyouganjue	我觉得我拍的超级有感觉	dialog	路中间
+wentiwoyoubuchou	问题我又不丑	dialog	川普：今天就抓一个小朋友去白宫跟我玩耍，到底是哪个幸运鹅呢 兄弟，我侄子也还很小，不知道他为什么看到我就哭，我也很绝望啊，
+woyeshida	我也是哒	dialog	迟到的祝福呢
+geiwozhaochutilide	给我找出体力的	dialog	我就喜欢干出体力的活，坐办公室坐不住
+nigentahenpeiya	你跟她很配呀	dialog	学长！ 是吗？
+buzenmecongming	不怎么聪明	dialog	你进步的空间还很大
+zhehuayenenghedatailaizuobijiao	这话也能和打胎来做比较	dialog	谁这辈子还没帮闺蜜撒个谎
+qingheyikanna	情何以堪哪	dialog	你不是很来得及吗？为何熬夜？！！ 现在就开始p图难道来不及？那我还在做模型，
+nanagezhuadaoderenhaolihaia	那那个抓到的人好厉害啊	dialog	你好厉害。。。。我从来不得过
+nihuijiangxiaohuabu	你会讲笑话不	dialog	「见哭兴悲」 休息，休息一下，
+zongshuolianaidesuanchouwei	总说恋爱的酸臭味	dialog	敢秀就敢当 你最近是不是疯了，
+leiyeyaoai	累也要爱	dialog	每天一个我自己，别说不认识我
+guolejiuhaola	过了就好啦	dialog	嘿嘿今天还有个面试~一天200到300的工作好安逸但是有点难吧
+nizaiganmaalalala	你在干嘛啊啦啦啦	dialog	我其实是在等手机充电可以拿到床上玩
+niyouzaipianshei	你又在骗谁	dialog	军队是我的绿花。 哈哈，
+shishuixianshuohuade	是谁先说话的	dialog	这种智商的人我也不会认识，你别跟我说，拉低智商
+zhengdaochuzhaonine	正到处找你呢	dialog	我穿越了 嗯，小娥啊，我把族长他们都带回来了，
+nadoumeiyisilema	那都没意思了嘛	dialog	到时候就知道了，
+zheshiwoweiyidelequ	这是我唯一的乐趣	dialog	我已经孵了九个怪物了~还有两个蛋没窝孵~ 这段时间晚上房间没网络，
+wohaishiheixihuanchihuoguo	我还是黑喜欢吃火锅	dialog	做为一个在重庆上大学的烟台人告诉你，洪崖洞的什么都不好吃 可能你说的是小吃吧哈哈，
+wojuedingyigeyuebuchila	我决定一个月不吃辣	dialog	上千就睡觉
+buyiyangde	不一样的	dialog	你想吖，他们觉得这边空气不好又不了解其实没什么，害他们担心
+shizhiqianderenwu	是之前的人物	dialog	彩蛋没看懂 百度了一下，
+shibushitaxuanzehebierenshuoxinshi	是不是她选择和别人说心事	dialog	嗯，想成为聆听者，需要尝试站在他人的立场想一想。认真地顾及别人的想法，要让别人觉得你有认真在听 为什么啊？
+shujiadoubuxiaodehuilaidechenglebu	暑假都不晓得回来得成了不	dialog	我也想。哈哈哈。这样的假期真的一辈子随时想到都会笑
+yesuanyoucaiyiderenle	也算有才艺的人了	dialog	别说了…我还没吃饭呢 你也行了…
+zhemejimobuganshuonalide	这么寂寞不敢说哪里的	dialog	那个谁，楼下的，你怎么看？
+jimonannaiojimonannai	寂寞难耐哦寂寞难耐	dialog	这么寂寞不敢说哪里的 哦~哦~
+xiaodeyangzi	笑的样子	dialog	教练是成长了吗？还是暴露了不好的属性 肯定啊，教练最喜欢女饭了。我感觉教练这么温柔的人，天天看到她都在“额嘿嘿嘿嘿嘿嘿”
+renhaimeijianguo	人还没见过	dialog	看谁被谁打劫还不知道呢？要不要试试看 你知道我行踪嘛，
+shiyaofangjialetiqianjidongxiama	是要放假了提前激动下吗	dialog	你咋起这么早
+haibushoua	还不瘦啊	dialog	你怕啥你这么瘦
+enhaodezhuyishenti	嗯好的注意身体	dialog	等更新啊大大，昨天就一更么？那今天会不会三更呢
+nayeshichaojiwudideshaonv	那也是超级无敌的少女	dialog	还是学生嘛，青葱着呢
+sichupiaobo	四处漂泊	dialog	在上班啊，来供电局签个字
+wuyifangjiajihuahao	五一放假计划好	dialog	去旅游吧，缓解一下压力
+yaonibuhewoyiqiqugulangyu	要你不和我一起去鼓浪屿	dialog	二晴你飞奔去哪里啊？ 哼哼。
+zhiyougenghao	只有更好	dialog	当然更有看头了 没有最好，
+chiyaoleme	吃药了么	dialog	你这是什么意思啊？ 怎么弄的啊？
+tudouyexihuanyadou	土豆也喜欢牙豆	dialog	快看芝麻 那必须滴！
+yaoxuehuijieshoujujueyuxianshi	要学会接受拒绝与现实	dialog	小倩是小倩，你是你~~~ 一个人长大了，
+wojiuyigerenzhuo	我就一个人住哦	dialog	我下学期都想搬去那里~说下房子怎么样啊
+damayaode	打麻药的	dialog	你怕扎针吗？但是效果好
+doudingmingtian	都定明天	dialog	妹子啊妹子~~再出来见叭！！！除了初四，你们定时间啊，有啥好去处不？我真不知 想吃牛排。。。。。。
+zhecifendaochongqingle	这次分到重庆了	dialog	不得回来哦，都开始上班了
+qianwanbuneng	千万不能	dialog	尚臣妾大姨妈这两天也来了
+woshijuedelimianderenyoudianchou	我是觉得里面的人有点丑	dialog	哈哈哈，我也没看过
+yimaokeyima	一毛可以吗	dialog	快过来给打一顿先
+hedianfenleishiwu	和淀粉类食物	dialog	嘻嘻比以前瘦点啦 天天晚上不吃饭，平时多喝水，减少油炸，肉，
+zhendejiadenandaobushichaohume	真的假的难道不是巢湖么	dialog	你为什么在马鞍山

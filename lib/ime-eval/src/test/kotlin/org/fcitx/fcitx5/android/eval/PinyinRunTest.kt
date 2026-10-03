@@ -98,7 +98,7 @@ class PinyinRunTest {
         override fun refine(context: String, readings: List<String>, scores: List<Float>, budget: Int): Int? {
             contexts += context
             refined++
-            return null
+            return SentenceRefiner.NONE
         }
     }
 

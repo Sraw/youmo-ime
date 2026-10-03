@@ -61,7 +61,8 @@ RUN = re.compile(r'^[一-鿿]{4,12}$')
 PUNCTUATION = re.compile(r'([，。！？、,.!?~～…；;：:\s“”"（）()]+)')
 
 
-def main(chat, dictionary, arpa):
+def loaders(dictionary, arpa):
+    """(words of a run, reading of a word after what came before it) from the dictionary and model."""
     readings = defaultdict(set)
     with open(dictionary, encoding='utf-8') as f:
         for line in f:
@@ -107,6 +108,11 @@ def main(chat, dictionary, arpa):
             return next(iter(readings[word]))
         return READINGS.get(word)
 
+    return words, reading
+
+
+def main(chat, dictionary, arpa):
+    words, reading = loaders(dictionary, arpa)
     print(HEADER)
     seen = set()
     with gzip.open(chat, 'rt', encoding='utf-8') as f:

@@ -21,10 +21,10 @@ Free to restructure; upstream compatibility is not a constraint.
 | What | Command |
 |---|---|
 | Core logic tests + API-level check + coverage floors | `./gradlew :lib:ime-core:check` |
-| App JVM tests (Robolectric where needed) | `./gradlew :app:testDebugUnitTest` |
+| App JVM tests (Robolectric where needed) | `./gradlew :app:testOfflineDebugUnitTest` |
 | Static analysis (syntax rules only; type resolution doesn't work here) | `./gradlew detekt` |
 | Accept current findings after a deliberate batch (run alone, not with `detekt`; `:<module>:detektBaseline` for one module, bare `detektBaseline` rewrites every module) | `./gradlew :<module>:detektBaseline` |
-| App coverage (report only, no floor) | `./gradlew :app:koverLogDebug` |
+| App coverage (report only, no floor) | `./gradlew :app:koverLogOfflineDebug` |
 | Engine data into app assets (part of every app build; downloads libime's sources and two FineWeb-2 shards, ~10 GB, once; the FineWeb mix then takes 7 min and 7 GB RAM: `./gradlew --stop` first on 16 GB, and `-Pengine.mix=false` skips it) | `./gradlew :app:compileEngineData` |
 | Sentence models into app assets (part of every app build; fetched from this fork's release `sentence-models-*`, SHA-256 checked) | `./gradlew :app:copySentenceModels` |
 

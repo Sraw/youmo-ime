@@ -104,6 +104,7 @@ class PinyinSession(
     private var candidates: List<Candidate> = emptyList()
     private var decoderWords: List<Candidate> = emptyList() // the decoder's words, after its sentences
     private var unrefined: List<Candidate>? = null // the decoder's sentences, till the refiner picks one
+    private var refining: SentenceRefiner? = null // the refiner for them, chosen as they were read
     private var refined = 0 // slices of refining spent on them
     private var placed: Map<String, Phrase> = emptyMap() // the phrases among the candidates, by text
     private var decoderFirst: Candidate? = null // the first before the reranker and phrases moved it
@@ -409,7 +410,8 @@ class PinyinSession(
         val decoding = decoder.decode(graph, prev2, prev)
         decoderFirst = decoding.sentences.firstOrNull() ?: decoding.words.firstOrNull()
         decoderWords = decoding.words
-        if (refiner != null && decoding.sentences.size > 1) {
+        refining = refiner()
+        if (refining != null && decoding.sentences.size > 1) {
             unrefined = decoding.sentences
             refined = 0
         }
@@ -445,14 +447,21 @@ class PinyinSession(
     private fun first(sentences: List<Candidate>, picked: Int) =
         if (picked == 0) sentences else listOf(sentences[picked]) + sentences.filterIndexed { i, _ -> i != picked }
 
+    // a password's or an incognito field's text is not sent off the device
+    private val offlineRefiner by lazy { refiner?.offline() }
+
+    private fun refiner() = if (learning) refiner else offlineRefiner
+
     /** A slice of the [refiner]'s work; once it picks, the decoder's sentences with that one first. */
     private fun refine(): Snapshot {
         val sentences = unrefined ?: return snapshot()
-        if (refined++ >= REFINE_SLICES) {
+        // the one chosen as the input was read: a password's sentences stay on the device to the end
+        val refiner = refining
+        if (refiner == null || refined++ >= refiner.slices) {
             unrefined = null
             return snapshot()
         }
-        val picked = refiner!!.refine(textBefore(), sentences.map { it.text }, sentences.map { it.score }, REFINE_BUDGET)
+        val picked = refiner.refine(textBefore(), sentences.map { it.text }, sentences.map { it.score }, REFINE_BUDGET)
             ?: return snapshot()
         unrefined = null
         if (picked != SentenceRefiner.NONE) place(graph!!, first(sentences, picked))
@@ -576,12 +585,6 @@ class PinyinSession(
          * the large model, a few milliseconds on a phone. A key pressed meanwhile waits for it.
          */
         const val REFINE_BUDGET = 1
-        /**
-         * Slices of refining at most per input read; past them its order stands. On the evaluation
-         * set a pause takes 25 at the median, 60 at the 90th percentile and 137 at most: a reorder
-         * half a second after the key would move what the user is already reaching for.
-         */
-        const val REFINE_SLICES = 64
         // the longest text put together from pieces that is learned as a word: past this, it is
         // a sentence, which would crowd the dictionary with things never typed again
         const val MAX_PHRASE = 8

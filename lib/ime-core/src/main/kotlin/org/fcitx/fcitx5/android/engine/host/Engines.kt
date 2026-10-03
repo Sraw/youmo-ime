@@ -13,6 +13,8 @@ import org.fcitx.fcitx5.android.engine.phrase.CustomPhrases
 import org.fcitx.fcitx5.android.engine.phrase.PhraseBook
 import org.fcitx.fcitx5.android.engine.pinyin.PinyinSegmenter
 import org.fcitx.fcitx5.android.engine.pinyin.ShuangpinSegmenter
+import org.fcitx.fcitx5.android.engine.remote.RemoteModel
+import org.fcitx.fcitx5.android.engine.remote.RemoteRefiner
 import org.fcitx.fcitx5.android.engine.rerank.MatrixKernel
 import org.fcitx.fcitx5.android.engine.rerank.Reranker
 import org.fcitx.fcitx5.android.engine.rerank.SentenceRefiner
@@ -59,6 +61,11 @@ class Engines(
     private val additions: () -> Additions? = { null },
     private val userTables: (String) -> UserTable? = { null },
     private val kernel: MatrixKernel? = null,
+    /**
+     * The user's own server, in the cloud build: asked as they pause, after the models here. Asked
+     * for at each question, as the user may turn it off or move it; null in the offline build.
+     */
+    remote: (() -> RemoteModel?)? = null,
 ) : Closeable {
 
     /**
@@ -377,8 +384,13 @@ class Engines(
     /** A reranker of the session's own, over the one model: each keeps what it ran for its input. */
     private fun reranker(): Reranker? = if (settings.sentenceModel) sentenceModel.get()?.let { Reranker(it) } else null
 
+    private val remote = remote?.let { RemoteModel.deferred(it) }
+
     /** As [reranker], over the larger model, which weighs the readings again while the user pauses. */
-    private fun refiner(): SentenceRefiner? = if (settings.sentenceModel) LateRefiner() else null
+    private fun refiner(): SentenceRefiner? {
+        val local = if (settings.sentenceModel) LateRefiner() else null
+        return remote?.let { RemoteRefiner(local, it) } ?: local
+    }
 
     /**
      * The larger model is read at the first pause, not when a session is made: 26 MB copied out
@@ -390,7 +402,9 @@ class Engines(
 
         override fun refine(context: String, readings: List<String>, scores: List<Float>, budget: Int): Int? {
             val r = reranker ?: refiningModel.get()?.let { Reranker(it, limit = Reranker.REFINE_LIMIT) }?.also { reranker = it }
-            return r?.refine(context, readings, scores, budget) ?: SentenceRefiner.NONE
+                ?: return SentenceRefiner.NONE
+            // null is not done yet, more slices to come: not NONE, which would end it after the first
+            return r.refine(context, readings, scores, budget)
         }
     }
 

@@ -24,8 +24,21 @@ fun interface SentenceRefiner {
      */
     fun refine(context: String, readings: List<String>, scores: List<Float>, budget: Int): Int?
 
+    /** Calls at most for one input; past them the order shown stands. */
+    val slices: Int get() = SLICES
+
+    /** This refiner without what sends the text off the device: for a password, or an incognito field. */
+    fun offline(): SentenceRefiner? = this
+
     companion object {
         const val NONE = -1
+
+        /**
+         * On the evaluation set a pause takes 25 slices of the large model at the median, 60 at
+         * the 90th percentile and 137 at most: a reorder half a second after the key would move
+         * what the user is already reaching for.
+         */
+        const val SLICES = 64
     }
 }
 

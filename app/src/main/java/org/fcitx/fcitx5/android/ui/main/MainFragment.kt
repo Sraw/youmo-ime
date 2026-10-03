@@ -16,6 +16,7 @@ import androidx.annotation.StringRes
 import androidx.core.view.MenuProvider
 import androidx.lifecycle.Lifecycle
 import androidx.preference.PreferenceCategory
+import org.fcitx.fcitx5.android.BuildConfig
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.ui.common.PaddingPreferenceFragment
 import org.fcitx.fcitx5.android.ui.main.settings.SettingsRoute
@@ -119,6 +120,13 @@ class MainFragment : PaddingPreferenceFragment() {
                 )
             }
             addCategory(R.string.home_section_other) {
+                if (BuildConfig.CLOUD) {
+                    addDestinationPreference(
+                        R.string.cloud,
+                        R.drawable.ic_baseline_cloud_24,
+                        SettingsRoute.Cloud
+                    )
+                }
                 addDestinationPreference(
                     R.string.advanced,
                     R.drawable.ic_baseline_more_horiz_24,
