@@ -5,6 +5,8 @@
 package org.fcitx.fcitx5.android.engine.user
 
 import org.fcitx.fcitx5.android.engine.data.NgramModel.Companion.NO_WORD
+import org.fcitx.fcitx5.android.engine.data.WordLayers
+import org.fcitx.fcitx5.android.engine.lattice.LayerPrior
 import org.fcitx.fcitx5.android.engine.user.UserModelTest.Companion.entry
 import org.fcitx.fcitx5.android.engine.user.UserModelTest.Companion.inTrie
 import org.fcitx.fcitx5.android.engine.user.UserModelTest.Companion.model
@@ -175,6 +177,48 @@ class UserStoreTest {
             store.compact()
         }
         assertEquals(3, counts(session()).count { !it.key.contains(' ') })
+    }
+
+    @Test
+    fun aLayersPriorIsKeptInTheLogAndTakenBackByName() {
+        val layers = WordLayers(listOf("base", "wanxiang", "new2025"), null, 0)
+        val prior = LayerPrior(layers, step = 0.5f)
+        UserStore(file, model(), prior = prior).use {
+            it.open()
+            prior.learn(intArrayOf(), intArrayOf()) // nothing: no words of any layer
+            prior.restore("wanxiang", 0.25f) // restoring is not learning: not logged
+            assertTrue(prior.restore("new2025", -0.75f))
+        }
+        // only what was learned reaches the log
+        val again = LayerPrior(layers)
+        UserStore(file, model(), prior = again).use { it.open() }
+        assertEquals(0f, again[1], 0f)
+        assertEquals(0f, again[2], 0f)
+        // what is learned comes back
+        UserStore(file, model(), prior = prior).use {
+            it.open()
+            prior.journal!!.changed("wanxiang", 0.5f)
+            prior.journal!!.changed("new2025", -0.5f)
+        }
+        val fresh = LayerPrior(layers)
+        UserStore(file, model(), prior = fresh).use { it.open() }
+        assertEquals(0.5f, fresh[1], 0f)
+        assertEquals(-0.5f, fresh[2], 0f)
+        // a build without a layer keeps its value, through compaction too, for one that has it
+        val twoLayers = WordLayers(listOf("base", "wanxiang"), null, 0)
+        val older = LayerPrior(twoLayers)
+        UserStore(file, model(), prior = older).use {
+            it.open()
+            assertEquals(0.5f, older[1], 0f)
+        }
+        val still = LayerPrior(layers)
+        UserStore(file, model(), prior = still).use { it.open() }
+        assertEquals(-0.5f, still[2], 0f)
+        UserStore(file, model(), prior = LayerPrior(twoLayers)).use { it.open(); it.compact() }
+        val after = LayerPrior(layers)
+        UserStore(file, model(), prior = after).use { it.open() }
+        assertEquals(0.5f, after[1], 0f)
+        assertEquals(-0.5f, after[2], 0f)
     }
 
     @Test

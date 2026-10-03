@@ -4,9 +4,11 @@
  */
 package org.fcitx.fcitx5.android.data.pinyin
 
+import org.fcitx.fcitx5.android.engine.data.SourceException
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertThrows
+import org.junit.Assert.fail
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
@@ -42,6 +44,23 @@ class ImportedDictionariesTest {
         assertEquals(0, ImportedDictionaries.write(sequenceOf("junk", ""), dest))
         assertEquals("你 ni 0.0\n", dest.readText())
         assertEquals(listOf("a.txt"), names())
+    }
+
+    @Test
+    fun aWordPackIsKeptAsItCameOnceReadThrough() {
+        val dest = File(dir, "2026q1.words")
+        val lines = sequenceOf("\uFEFF# youmo words 1", "# layer: 2026q1", "搭子 da'zi -5.6", "", "# end")
+        assertEquals(1, ImportedDictionaries.writePack(lines, dest))
+        assertEquals("# youmo words 1\n# layer: 2026q1\n搭子 da'zi -5.6\n\n# end\n", dest.readText())
+        // one with no word, or a bad line, is not written
+        assertEquals(0, ImportedDictionaries.writePack(sequenceOf("# youmo words 1"), File(dir, "empty.words")))
+        try {
+            ImportedDictionaries.writePack(sequenceOf("# youmo words 1", "搭子 da'zi"), File(dir, "bad.words"))
+            fail("read a bad pack")
+        } catch (e: SourceException) {
+            assertEquals("bad.words:2: expected \"word pin'yin log10P\"", e.message)
+        }
+        assertEquals(listOf("2026q1.words"), names())
     }
 
     @Test

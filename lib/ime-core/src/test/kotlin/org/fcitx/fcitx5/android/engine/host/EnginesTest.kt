@@ -25,6 +25,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
+import java.io.File
 import java.io.FileNotFoundException
 import java.io.IOException
 import java.nio.ByteBuffer
@@ -211,6 +212,33 @@ class EnginesTest {
         onEvent(Engines.PINYIN, EngineEvent.RESET, 0)
         assertEquals(text, type(Engines.PINYIN, "ni").candidates.first())
         onEvent(Engines.PINYIN, EngineEvent.RESET, 0)
+    }
+
+    @Test
+    fun aWordPackIsTypedScoredAsItSaysAndItsLayerLearned() {
+        val errors = ArrayList<IOException>()
+        val pack = "# youmo words 1\n# layer: 2026q1\n泥 ni -2.5\n妮 ni -9\n"
+        val additions = Engines.Additions("", "p", packs = { listOf("new.words" to pack.lineSequence(), "old.words" to "你 ni 0".lineSequence()) }) { emptyList() }
+        Engines(::load, folder.newFolder("engine"), { errors += it }, additions = { additions }).use { engines ->
+            // 泥 at -2.5 sits between 你 (-2) and 拟 (-3); 妮 under the unknown word's -7
+            assertEquals(listOf("你", "泥", "拟", "妮"), engines.type(Engines.PINYIN, "ni").candidates)
+            engines.onEvent(Engines.PINYIN, EngineEvent.PICK, 1)
+            // the file that is no pack is reported, the pack still read
+            assertEquals(1, errors.size)
+            assertEquals("old.words:1: not a word pack: expected \"# youmo words 1\"", errors[0].message)
+        }
+        // the prior learned is kept with the user's words, and the pack's words come back scored
+        Engines(::load, File(folder.root, "engine"), { errors += it }, additions = { additions }).use { engines ->
+            assertEquals(listOf("你", "泥", "拟", "妮"), engines.type(Engines.PINYIN, "ni").candidates)
+            repeat(10) {
+                engines.onEvent(Engines.PINYIN, EngineEvent.RESET, 0)
+                engines.type(Engines.PINYIN, "ni")
+                engines.onEvent(Engines.PINYIN, EngineEvent.PICK, 1)
+            }
+            engines.onEvent(Engines.PINYIN, EngineEvent.RESET, 0)
+            // 11 picks of 0.05 on its layer, and its own counts: 泥 over 你
+            assertEquals("泥", engines.type(Engines.PINYIN, "ni").candidates.first())
+        }
     }
 
     @Test

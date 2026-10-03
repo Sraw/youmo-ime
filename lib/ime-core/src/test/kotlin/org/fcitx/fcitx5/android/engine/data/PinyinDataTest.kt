@@ -7,6 +7,7 @@ package org.fcitx.fcitx5.android.engine.data
 import org.fcitx.fcitx5.android.engine.data.NgramModel.Companion.NO_WORD
 import org.fcitx.fcitx5.android.engine.pinyin.Syllables
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
 import org.junit.Test
@@ -72,6 +73,29 @@ class PinyinDataTest {
         assertEquals(1, d.childCount(ni))
         assertEquals(0, d.wordCount(d.root))
         assertEquals(5, d.nodeCount) // root, ni, hao, ma, ni-hao
+    }
+
+    @Test
+    fun layersAreNamedAndAWordIsOfTheFirstItIsIn() {
+        // without layers named, everything is of the base
+        val plain = load()
+        assertEquals(listOf(WordLayers.BASE), plain.layers.names)
+        assertEquals(0, plain.layers.layer(plain.id("妳好")))
+        val layered = load(
+            builder().layers(listOf("base", "wanxiang", "new2025"))
+                .entry("你好", syl("ni", "hao"), layer = 1) // also in the base: of the base
+                .entry("尼豪", syl("ni", "hao"), layer = 2)
+                .entry("尼豪", syl("ni", "hao"), -1f, layer = 1) // the earliest of its layers
+                .unigram("嘛", -4f, 0f) // a model word with no entry
+        )
+        assertEquals(listOf("base", "wanxiang", "new2025"), layered.layers.names)
+        assertEquals(3, layered.layers.count)
+        assertEquals(0, layered.layers.layer(layered.id("你好")))
+        assertEquals(1, layered.layers.layer(layered.id("尼豪")))
+        assertEquals(0, layered.layers.layer(layered.id("嘛")))
+        assertThrows(IllegalArgumentException::class.java) { builder().entry("x", syl("ni"), layer = 1) }
+        assertThrows(IllegalArgumentException::class.java) { builder().layers(listOf("base", "base")) }
+        assertThrows(IllegalArgumentException::class.java) { builder().layers(listOf("a,b")) }
     }
 
     @Test

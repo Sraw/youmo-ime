@@ -30,6 +30,14 @@ class PinyinDataBuilder {
     private val triWord = IntList()
     private val triProb = FloatList()
     private val entries = ArrayList<Entry>()
+    private var layerNames = listOf(WordLayers.BASE)
+
+    /** Names the dictionary's layers, [names] indexed as [entry]'s layer; the first is the base. */
+    fun layers(names: List<String>) = apply {
+        require(names.isNotEmpty() && names.all { it.isNotEmpty() && ',' !in it }) { "layer names $names" }
+        require(names.toSet().size == names.size) { "a layer named twice in $names" }
+        layerNames = names
+    }
 
     fun unigram(word: String, prob: Float, backoff: Float) = apply {
         finite(word, prob, backoff)
@@ -38,6 +46,9 @@ class PinyinDataBuilder {
         uniProb += prob
         uniBackoff += backoff
     }
+
+    /** [word]'s unigram probability, or null if it was not added as one. */
+    fun unigramOf(word: String): Float? = ids[word]?.let { uniProb[it] }
 
     fun bigram(prev: String, word: String, prob: Float, backoff: Float) = apply {
         finite("$prev $word", prob, backoff)
@@ -60,11 +71,12 @@ class PinyinDataBuilder {
      * this reading: 0 for most words, below 0 for a polyphone's rarer reading (呆 as ai rather
      * than dai). libime's data also has a few small positive ones, so it is not a probability.
      */
-    fun entry(word: String, syllables: IntArray, weight: Float = 0f) = apply {
+    fun entry(word: String, syllables: IntArray, weight: Float = 0f, layer: Int = 0) = apply {
         require(syllables.isNotEmpty()) { "\"$word\" has no syllables" }
         syllables.forEach { require(it in 0 until Syllables.count) { "\"$word\": bad syllable id $it" } }
         require(weight.isFinite()) { "\"$word\": weight $weight" }
-        entries += Entry(syllables, word, weight)
+        require(layer in layerNames.indices) { "\"$word\": layer $layer of ${layerNames.size}" }
+        entries += Entry(syllables, word, weight, layer)
     }
 
     // a NaN would poison the quantiser: it equals nothing, so it breaks every bin it lands in
@@ -91,17 +103,30 @@ class PinyinDataBuilder {
                 PinyinData.META_SYLLABLE_CHECKSUM to Syllables.checksum().toString(),
                 PinyinData.META_LM_VOCABULARY to lmSize.toString(),
                 PinyinData.META_UNKNOWN to unknown.toString(),
+                PinyinData.META_LAYERS to layerNames.joinToString(","),
             )
         )
         writeVocabulary(out)
         writeDictionary(out) { id -> uniProb[if (id < lmSize) id else unknown] }
+        writeLayers(out)
         writeModel(out, lmSize)
         return out
     }
 
     private fun writeVocabulary(out: DataFile.Writer) = StringTable.write(out, Section.VOCAB_OFFSETS, Section.VOCAB_CHARS, words)
 
-    private class Entry(val syllables: IntArray, val word: String, val weight: Float)
+    private class Entry(val syllables: IntArray, val word: String, val weight: Float, val layer: Int)
+
+    /** A word's layer is the first it has an entry in; a model word with no entry is of the base. */
+    private fun writeLayers(out: DataFile.Writer) {
+        if (layerNames.size == 1) return
+        val layer = IntArray(words.size) { -1 }
+        entries.forEach { e ->
+            val id = ids.getValue(e.word)
+            layer[id] = if (layer[id] < 0) e.layer else minOf(layer[id], e.layer)
+        }
+        out.add(Section.WORD_LAYER, BitPacked.encode(words.size) { maxOf(layer[it], 0) })
+    }
 
     private class Node(val syllable: Int) {
         val children = sortedMapOf<Int, Node>()

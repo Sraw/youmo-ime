@@ -16,6 +16,10 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import androidx.fragment.app.activityViewModels
+import org.fcitx.fcitx5.android.core.reloadPinyinDict
+import org.fcitx.fcitx5.android.data.pinyin.PinyinDictManager
+import org.fcitx.fcitx5.android.ui.main.MainViewModel
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.core.CloudServer
 import org.fcitx.fcitx5.android.engine.remote.CloudConfig
@@ -39,6 +43,8 @@ class CloudSettingsFragment : PaddingPreferenceFragment() {
     private lateinit var server: EditTextPreference
     private lateinit var token: EditTextPreference
     private lateinit var trusted: Preference
+    private lateinit var words: Preference
+    private val viewModel: MainViewModel by activityViewModels()
     private var fetching: Job? = null
 
     override fun onCreatePreferences(savedInstanceState: Bundle?, rootKey: String?) {
@@ -67,8 +73,14 @@ class CloudSettingsFragment : PaddingPreferenceFragment() {
             setTitle(R.string.cloud_key)
             isSelectable = false
         }
+        words = Preference(context).apply {
+            key = "cloud_words"
+            setTitle(R.string.cloud_words)
+            setSummary(R.string.cloud_words_summary)
+            setOnPreferenceClickListener { fetchWords(); true }
+        }
         preferenceScreen = preferenceManager.createPreferenceScreen(context).apply {
-            listOf(enabled, server, token, trusted).forEach {
+            listOf(enabled, server, token, trusted, words).forEach {
                 it.isIconSpaceReserved = false
                 it.isSingleLineTitle = false
                 it.isPersistent = false
@@ -153,6 +165,29 @@ class CloudSettingsFragment : PaddingPreferenceFragment() {
             .show()
     }
 
+    /** Fetches the server's word pack now, whether the cloud is on or not, and reads it in. */
+    private fun fetchWords() {
+        val target = cloud.config().target()
+        if (target == null) {
+            requireContext().toast(R.string.cloud_server_missing)
+            return
+        }
+        viewLifecycleOwner.lifecycleScope.launch {
+            val got = withContext(Dispatchers.IO) {
+                runCatching { HttpRemoteModel(target.url, target.token, { it.run() }, target.key, WORDS_TIMEOUT).words() }
+                    .mapCatching { words -> words?.let { PinyinDictManager.importPack(it.name, it.text).getOrThrow() } }
+            }
+            got.onSuccess { pack ->
+                if (pack == null) {
+                    requireContext().toast(R.string.cloud_words_none)
+                } else {
+                    viewModel.fcitx.runOnReady { reloadPinyinDict() }
+                    requireContext().toast(getString(R.string.cloud_words_got, pack.name))
+                }
+            }.onFailure { requireContext().toast(getString(R.string.cloud_words_failed, it.message ?: it.javaClass.simpleName)) }
+        }
+    }
+
     /** Asks the server, with the token, what it runs: a wrong token would otherwise only ever be a server that says nothing. */
     private fun check() {
         val target = cloud.config().target() ?: return
@@ -179,5 +214,7 @@ class CloudSettingsFragment : PaddingPreferenceFragment() {
 
     private companion object {
         const val FETCH_TIMEOUT = 5000
+        // a pack is megabytes at most, and the user is watching
+        const val WORDS_TIMEOUT = 30_000
     }
 }

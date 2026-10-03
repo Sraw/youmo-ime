@@ -61,6 +61,9 @@ class UserModel(
     private val entries = HashMap<Int, Entry>()
     // those of them from the user's dictionaries: see list
     private val listed = HashSet<Int>()
+    // from a word pack: the score of a word the model lacks, and the layer, by id
+    private val packScores = HashMap<Int, Float>()
+    private val packLayers = HashMap<Int, Int>()
 
     // the trie of the new words: children by syllable, sorted, per node
     private val childSyllables = arrayListOf(IntArray(0))
@@ -172,6 +175,28 @@ class UserModel(
      * what was learned of it but leaves it to type, as libime leaves its extra dictionaries be.
      */
     fun list(entry: Entry): Int = id(entry).also { if (it >= vocabulary.size) listed += it }
+
+    /**
+     * [list]s a word of a [WordPack], of [layer] (an index [org.fcitx.fcitx5.android.engine.lattice.LayerPrior]
+     * gave its name) and scored [score] if the model lacks it: see [score] and [layerOf]. A word
+     * of the model's (an id below [modelWords]) keeps the model's score and the dictionary's
+     * layer. Listed twice, the later holds: a pack read again replaces what it said before.
+     */
+    fun list(entry: Entry, score: Float, layer: Int, modelWords: Int = 0): Int {
+        require(score <= 0f && score.isFinite()) { "score $score" }
+        val id = list(entry)
+        if (id >= modelWords) {
+            packScores[id] = score
+            packLayers[id] = layer
+        }
+        return id
+    }
+
+    /** The log10 probability a pack gave word [id], or NaN: [UserScorer] uses it where the model has no word. */
+    fun score(id: Int): Float = packScores[id] ?: Float.NaN
+
+    /** The layer a pack put word [id] in, 0 (the base) if none did. */
+    fun layerOf(id: Int): Int = packLayers[id] ?: 0
 
     // a word the user made, not the dictionary's nor one of their dictionaries'
     private fun isOwn(id: Int) = id >= vocabulary.size && id !in listed

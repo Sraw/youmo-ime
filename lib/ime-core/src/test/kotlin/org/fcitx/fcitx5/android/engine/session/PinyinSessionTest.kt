@@ -8,6 +8,7 @@ import org.fcitx.fcitx5.android.engine.data.NgramModel.Companion.NO_WORD
 import org.fcitx.fcitx5.android.engine.data.PinyinData
 import org.fcitx.fcitx5.android.engine.data.PinyinDataBuilder
 import org.fcitx.fcitx5.android.engine.pinyin.Fuzzy
+import org.fcitx.fcitx5.android.engine.lattice.LayerPrior
 import org.fcitx.fcitx5.android.engine.pinyin.PinyinSegmenter
 import org.fcitx.fcitx5.android.engine.pinyin.ShuangpinScheme
 import org.fcitx.fcitx5.android.engine.pinyin.ShuangpinSegmenter
@@ -160,6 +161,47 @@ class PinyinSessionTest {
         contexts.clear()
         session.type("ni")
         assertEquals(listOf("", ""), contexts)
+    }
+
+    @Test
+    fun aPickPastTheFirstChoiceLiftsItsLayerUntilItComesFirst() {
+        // 拟 of another layer, scored 2.5 orders under 你; a step of 1 lifts it over in three picks
+        val layered = PinyinData.load(
+            ByteBuffer.wrap(
+                PinyinDataBuilder()
+                    .layers(listOf("base", "new"))
+                    .unigram("<unk>", -7f, 0f)
+                    .unigram("你", -2f, 0f)
+                    .unigram("拟", -4.5f, 0f)
+                    .entry("你", syl("ni"))
+                    .entry("拟", syl("ni"), layer = 1)
+                    .build().toByteArray(),
+            ),
+        )
+        val prior = LayerPrior(layered.layers, step = 1f, bound = 4f)
+        val session = PinyinSession(layered, PinyinSegmenter(), prior = prior, prediction = false)
+        assertEquals(listOf("你", "拟"), session.type("ni").candidates)
+        // the first choice taken: nothing learned
+        session.apply(Select(0))
+        assertEquals(0f, prior[1], 0f)
+        repeat(3) {
+            assertEquals("你", session.type("ni").candidates[0])
+            assertEquals("拟", session.apply(Select(1)).commit)
+        }
+        assertEquals(3f, prior[1], 0f)
+        // 拟 first now, and taking it there teaches nothing more
+        assertEquals(listOf("拟", "你"), session.type("ni").candidates)
+        session.apply(Select(0))
+        assertEquals(3f, prior[1], 0f)
+        // 你 picked over it: back down one
+        session.type("ni")
+        session.apply(Select(1))
+        assertEquals(2f, prior[1], 0f)
+        // not while learning is off
+        session.learning = false
+        session.type("ni")
+        session.apply(Select(1))
+        assertEquals(2f, prior[1], 0f)
     }
 
     @Test

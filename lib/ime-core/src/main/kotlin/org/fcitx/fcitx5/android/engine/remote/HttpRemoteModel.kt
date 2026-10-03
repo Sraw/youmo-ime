@@ -5,6 +5,7 @@
 package org.fcitx.fcitx5.android.engine.remote
 
 import org.fcitx.fcitx5.android.engine.rerank.Json
+import org.fcitx.fcitx5.android.engine.user.WordPack
 import java.io.ByteArrayOutputStream
 import java.io.IOException
 import java.io.InputStream
@@ -65,6 +66,23 @@ class HttpRemoteModel(
     fun health(): String =
         (send("/health", null) as? Map<*, *>)?.get("model") as? String ?: throw IOException("bad answer")
 
+    /** A word pack the server hands out ([WordPack]): its name, and its text. */
+    class Words(val name: String, val text: String)
+
+    /** The server's word pack (`/words`), or null if it has none. Blocks; the text is not checked here. */
+    fun words(): Words? {
+        val answer = try {
+            send("/words", null, MAX_WORDS)
+        } catch (e: StatusException) {
+            if (e.code == HttpURLConnection.HTTP_NOT_FOUND) return null else throw e
+        }
+        val map = answer as? Map<*, *>
+        val name = map?.get("name") as? String
+        val text = map?.get("text") as? String
+        if (name == null || text == null || !WordPack.validName(name)) throw IOException("bad answer")
+        return Words(name, text)
+    }
+
     private fun <T> submit(path: String, request: String, read: (Any?) -> T): Future<T> {
         if (unreachableUntil?.let { clock() - it < 0 } == true) return failed("unreachable")
         return FutureTask {
@@ -89,8 +107,8 @@ class HttpRemoteModel(
         return connection
     }
 
-    /** POSTs [request], or with none GETs. */
-    private fun send(path: String, request: String?): Any? {
+    /** POSTs [request], or with none GETs; an answer past [limit] bytes is cut there. */
+    private fun send(path: String, request: String?, limit: Int = MAX_ANSWER): Any? {
         val connection = open(path)
         try {
             connection.connectTimeout = timeoutMillis
@@ -108,7 +126,7 @@ class HttpRemoteModel(
             // set up before connecting: none of it can be changed after
             connect(connection)
             if (bytes != null) connection.outputStream.use { it.write(bytes) }
-            return answer(connection)
+            return answer(connection, limit)
         } catch (e: IOException) {
             connection.disconnect()
             throw e
@@ -131,11 +149,11 @@ class HttpRemoteModel(
         if (backoff > 0) unreachableUntil = clock() + backoff
     }
 
-    private fun answer(connection: HttpURLConnection): Any? {
+    private fun answer(connection: HttpURLConnection, limit: Int): Any? {
         val code = connection.responseCode
         if (code == HttpURLConnection.HTTP_UNAUTHORIZED) letBe()
         if (code != HttpURLConnection.HTTP_OK) throw StatusException(code)
-        val body = connection.inputStream.use { String(it.readBytes(MAX_ANSWER), Charsets.UTF_8) }
+        val body = connection.inputStream.use { String(it.readBytes(limit), Charsets.UTF_8) }
         return try {
             Json.parse(body)
         } catch (e: IllegalArgumentException) {
@@ -162,6 +180,8 @@ class HttpRemoteModel(
         const val CONTEXT = 128
         const val MAX_CHARS = 64
         private const val MAX_ANSWER = 1 shl 16
+        // a season's words are tens of thousands of lines at most
+        private const val MAX_WORDS = 16 shl 20
         private const val BUFFER = 4096
 
         /** [s] as a JSON string. */

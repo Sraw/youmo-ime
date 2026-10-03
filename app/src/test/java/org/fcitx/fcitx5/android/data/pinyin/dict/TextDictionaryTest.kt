@@ -36,6 +36,21 @@ class TextDictionaryTest {
     }
 
     @Test
+    fun aWordPackIsTextOfItsOwnTypeAndKeepsItWhenTurnedOffAndOn() {
+        val pack = dictionary("2026q1.words")
+        assertEquals(PinyinDictionary.Type.Words, pack.type)
+        assertEquals("2026q1", pack.name)
+        assertTrue(pack.isEnabled)
+        assertTrue(pack.disable())
+        assertEquals("2026q1.words.disable", pack.file.name)
+        assertEquals(PinyinDictionary.Type.Words, pack.type)
+        assertFalse(pack.isEnabled)
+        assertTrue(pack.enable())
+        assertEquals("2026q1.words", pack.file.name)
+        assertEquals(PinyinDictionary.Type.Text, dictionary("plain.txt").type)
+    }
+
+    @Test
     fun turningOffAndOnRenamesTheFile() {
         val words = dictionary("words.txt")
         assertTrue(words.disable())

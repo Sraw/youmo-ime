@@ -8,6 +8,7 @@ import com.sun.net.httpserver.HttpServer
 import org.junit.After
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -134,6 +135,26 @@ class HttpRemoteModelTest {
         assertEquals("Bearer s3cret", headers.single())
         answer = 401 to """{"error": "unauthorized"}"""
         assertEquals(401, assertThrows(HttpRemoteModel.StatusException::class.java) { model("wrong").health() }.code)
+    }
+
+    @Test
+    fun aWordPackComesNamedOrNotAtAll() {
+        answer = 200 to """{"name": "2026q1", "text": "# youmo words 1\n搭子 da'zi -5.6\n"}"""
+        val words = model("s3cret").words()!!
+        assertEquals("2026q1", words.name)
+        assertEquals("# youmo words 1\n搭子 da'zi -5.6\n", words.text)
+        assertEquals("GET /words ", requests.single())
+        assertEquals("Bearer s3cret", headers.single())
+        // none on the server
+        answer = 404 to """{"error": "no word pack"}"""
+        assertNull(model().words())
+        // a name that is no file name, or no text: not taken
+        answer = 200 to """{"name": "../etc", "text": ""}"""
+        assertThrows(IOException::class.java) { model().words() }
+        answer = 200 to """{"name": "ok"}"""
+        assertThrows(IOException::class.java) { model().words() }
+        answer = 500 to ""
+        assertEquals(500, assertThrows(HttpRemoteModel.StatusException::class.java) { model().words() }.code)
     }
 
     @Test

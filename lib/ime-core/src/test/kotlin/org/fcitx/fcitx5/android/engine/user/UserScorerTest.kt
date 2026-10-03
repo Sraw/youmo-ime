@@ -43,6 +43,21 @@ class UserScorerTest {
     }
 
     @Test
+    fun aPacksWordTakesItsScoreInPlaceOfTheUnknownWordsUnderTheSameBackoff() {
+        val m = model()
+        val ni = m.id(entry("你", "ni"))
+        val nihao = m.list(entry("拟好", "ni", "hao"), -4f, 1)
+        val scorer = UserScorer(data.model, m)
+        assertEquals(-4f, scorer.score(NO_WORD, NO_WORD, nihao), 1e-6f)
+        // after 你: the unknown word's score there, moved by the same amount
+        assertEquals(plain.score(NO_WORD, ni, nihao) + 3f, scorer.score(NO_WORD, ni, nihao), 1e-6f)
+        // a model word listed by a pack scores as the model says
+        assertEquals(-2f, m.list(entry("你", "ni"), -1f, 1).let { scorer.score(NO_WORD, NO_WORD, it) }, 1e-6f)
+        // and never above 0
+        assertEquals(0f, UserScorer(data.model, m).score(NO_WORD, NO_WORD, m.list(entry("拟吗", "ni", "ma"), 0f, 1)), 0f)
+    }
+
+    @Test
     fun scoresStayLogProbabilities() {
         val m = model()
         val ni = m.learn(null, listOf(entry("你", "ni")))[0]

@@ -9,6 +9,8 @@ import org.fcitx.fcitx5.android.engine.data.PinyinDataBuilder
 import org.fcitx.fcitx5.android.engine.pinyin.Syllables
 import org.fcitx.fcitx5.android.engine.rerank.SentencePicker
 import org.fcitx.fcitx5.android.engine.rerank.SentenceRefiner
+import org.junit.Assert.assertThrows
+import org.fcitx.fcitx5.android.engine.data.SourceException
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -70,6 +72,29 @@ class PinyinRunTest {
         assertEquals(run.sentences("nihao").flatMap { listOf(it.first, it.second.toString()) }, lines[0].drop(1))
         assertEquals("你好", lines[0][1])
         assertTrue(run.sentences("nihao").zipWithNext().all { (a, b) -> a.second >= b.second })
+    }
+
+    @Test
+    fun aWordPackIsTypedAsTheUsersAtTheScoreItSays() {
+        val data = tmp.newFile("pinyin.data").apply { writeBytes(bytes) }
+        val set = tmp.newFile("set.tsv").apply { writeText("ni\t泥\tdaily\n") }
+        val result = tmp.newFile("result.tsv")
+        fun first(vararg more: String): String {
+            assertEquals(0, runCli(arrayOf("pinyin", data.path, set.path, result.path, *more), StringBuilder(), StringBuilder()))
+            return result.useLines { RunResultFormat.parse(it) }.single().candidates.first()
+        }
+        assertEquals("你", first())
+        // 泥, which the data lacks, scored above 你 (-2)
+        val pack = tmp.newFile("new.words").apply { writeText("# youmo words 1\n# layer: test\n泥\tni\t-1.5\n") }
+        assertEquals("泥", first("--pack", pack.path))
+        val worse = tmp.newFile("old.words").apply { writeText("# youmo words 1\n泥\tni\t-2.5\n") }
+        assertEquals("你", first("--pack", worse.path))
+        // a bad pack is an error with its line, as a bad set is
+        val broken = tmp.newFile("broken.words").apply { writeText("# youmo words 1\n泥\tni\t0.5\n") }
+        val e = assertThrows(SourceException::class.java) {
+            runCli(arrayOf("pinyin", data.path, set.path, result.path, "--pack", broken.path), StringBuilder(), StringBuilder())
+        }
+        assertEquals("${broken.path}:2: expected \"word pin'yin log10P\"", e.message)
     }
 
     @Test

@@ -9,6 +9,7 @@ import org.fcitx.fcitx5.android.engine.remote.CloudConfig
 import org.fcitx.fcitx5.android.engine.remote.HttpRemoteModel
 import org.fcitx.fcitx5.android.engine.remote.RemoteModel
 import org.fcitx.fcitx5.android.utils.appContext
+import timber.log.Timber
 import java.io.File
 import java.io.IOException
 import java.util.Properties
@@ -79,6 +80,32 @@ class CloudServer(path: File) {
             .also { made = target to it }
     }
 
+    /**
+     * Asks the server for its word pack ([HttpRemoteModel.words]) if the cloud is on and it was not
+     * asked today, and hands what comes to [keep], on the server's thread. What fails is tried
+     * again tomorrow: a pack is not worth a retry storm. Nothing is sent when the cloud is off.
+     */
+    fun updateWords(now: Long = System.currentTimeMillis(), keep: (HttpRemoteModel.Words) -> Unit) {
+        val target = config().target() ?: return
+        val stamp = File(file.baseFile.parentFile, WORDS_CHECKED)
+        if (now - stamp.lastModified() < WORDS_EVERY) return
+        try {
+            stamp.createNewFile()
+        } catch (_: IOException) {
+            return
+        }
+        if (!stamp.setLastModified(now)) return
+        executor.execute {
+            val words = try {
+                HttpRemoteModel(target.url, target.token, { it.run() }, target.key, WORDS_TIMEOUT, wanted = { config().target() == target }).words()
+            } catch (e: IOException) {
+                Timber.i(e, "cloud word pack")
+                null
+            }
+            if (words != null) keep(words)
+        }
+    }
+
     private fun load(): CloudConfig {
         val p = Properties().apply { file.openRead().use { load(it) } }
         return CloudConfig(p.getProperty(ENABLED) == "true", p.getProperty(SERVER).orEmpty(), p.getProperty(TOKEN).orEmpty(), p.getProperty(KEY).orEmpty())
@@ -91,5 +118,8 @@ class CloudServer(path: File) {
         private const val SERVER = "server"
         private const val TOKEN = "token"
         private const val KEY = "key"
+        private const val WORDS_CHECKED = "cloud-words.checked"
+        private const val WORDS_EVERY = 24 * 60 * 60 * 1000L
+        private const val WORDS_TIMEOUT = 30_000
     }
 }

@@ -16,7 +16,7 @@ class TextDictionary(file: File) : PinyinDictionary() {
     override var file: File = file
         private set
 
-    override val type: Type = Type.Text
+    override val type: Type = if (Type.fromFileName(file.name) == Type.Words) Type.Words else Type.Text
 
     var isEnabled: Boolean = true
         private set
@@ -41,7 +41,7 @@ class TextDictionary(file: File) : PinyinDictionary() {
 
     private fun rename(enabled: Boolean): Boolean {
         if (isEnabled == enabled) return true
-        val newFile = file.resolveSibling(fileName(name, enabled))
+        val newFile = file.resolveSibling(fileName(name, enabled, type))
         // renameTo replaces a file there on most filesystems: never another dictionary
         if (newFile.exists() || !file.renameTo(newFile)) return false
         file = newFile
@@ -58,6 +58,6 @@ class TextDictionary(file: File) : PinyinDictionary() {
     companion object {
         const val DISABLE = "disable"
 
-        fun fileName(name: String, enabled: Boolean = true) = "$name.${Type.Text.ext}" + if (enabled) "" else ".$DISABLE"
+        fun fileName(name: String, enabled: Boolean = true, type: Type = Type.Text) = "$name.${type.ext}" + if (enabled) "" else ".$DISABLE"
     }
 }

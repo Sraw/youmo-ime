@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.engine.user
 
+import org.fcitx.fcitx5.android.engine.lattice.LayerPrior
 import org.fcitx.fcitx5.android.engine.store.RecordStore
 import java.io.Closeable
 import java.io.File
@@ -22,13 +23,16 @@ class UserStore internal constructor(
     compactAt: Long,
     onError: (IOException) -> Unit,
     openAppend: (File) -> OutputStream,
+    /** Kept in the same log, by layer name, if given. */
+    private val prior: LayerPrior? = null,
 ) : Closeable {
     constructor(
         file: File,
         model: UserModel,
         compactAt: Long = DEFAULT_COMPACT_AT,
         onError: (IOException) -> Unit = {},
-    ) : this(file, model, compactAt, onError, { FileOutputStream(it, true) })
+        prior: LayerPrior? = null,
+    ) : this(file, model, compactAt, onError, { FileOutputStream(it, true) }, prior)
 
     private val store = RecordStore(file, UserLog.FORMAT, compactAt, onError, openAppend)
 
@@ -38,12 +42,13 @@ class UserStore internal constructor(
      */
     fun open(seed: ((UserModel) -> Unit)? = null) {
         store.open(
-            replay = { type, input -> UserLog.replay(type, input, model) },
+            replay = { type, input -> UserLog.replay(type, input, model, prior) },
             counts = { write ->
                 model.forEachCount(
                     { entry, count -> write(UserLog.word(entry, count)) },
                     { first, second, count -> write(UserLog.pair(first, second, count)) },
                 )
+                prior?.forEach { name, value -> write(UserLog.prior(name, value)) }
             },
             seed = seed?.let { { it(model) } },
         )
@@ -51,6 +56,7 @@ class UserStore internal constructor(
             override fun record(prev: UserModel.Entry?, sentence: List<UserModel.Entry>) = store.append(UserLog.sentence(prev, sentence))
             override fun forgot(words: List<UserModel.Entry>) = store.append(UserLog.forgot(words))
         }
+        prior?.journal = LayerPrior.Journal { name, value -> store.append(UserLog.prior(name, value)) }
     }
 
     /** Rewrites the log as the model's counts. */
@@ -58,6 +64,7 @@ class UserStore internal constructor(
 
     override fun close() {
         model.journal = null
+        prior?.journal = null
         store.close()
     }
 

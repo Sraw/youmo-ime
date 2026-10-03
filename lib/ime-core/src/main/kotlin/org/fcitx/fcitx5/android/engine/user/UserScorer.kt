@@ -13,6 +13,9 @@ import kotlin.math.pow
  * [model]'s scores with [user]'s counts added in: log10(P_model + [weight] · P_user). Adding
  * rather than interpolating leaves every word the user never typed as the model scores it, so
  * learning moves only what was learned; the sum is held to 0, as a score must be.
+ *
+ * A word the model lacks that a word pack scored ([UserModel.score]) takes that score in place
+ * of the unknown word's, under the same backoff from the context.
  */
 class UserScorer(
     private val model: NgramModel,
@@ -24,7 +27,12 @@ class UserScorer(
     override fun context(prev2: Int, prev: Int) = model.context(prev2, prev)
 
     override fun scoreAfter(context: Long, word: Int): Float {
-        val base = minOf(0f, model.scoreAfter(context, word))
+        var base = model.scoreAfter(context, word)
+        if (word >= model.vocabularySize) {
+            val packed = user.score(word)
+            if (!packed.isNaN()) base += packed - model.unknownScore
+        }
+        base = minOf(0f, base)
         val p = user.probability(model.prevOf(context), word)
         if (p == 0f) return base
         return minOf(0f, log10(10f.pow(base) + weight * p))

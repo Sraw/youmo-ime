@@ -7,6 +7,7 @@ package org.fcitx.fcitx5.android.eval
 import org.fcitx.fcitx5.android.engine.data.NgramModel.Companion.NO_WORD
 import org.fcitx.fcitx5.android.engine.data.PinyinData
 import org.fcitx.fcitx5.android.engine.lattice.Decoding
+import org.fcitx.fcitx5.android.engine.lattice.LayerPrior
 import org.fcitx.fcitx5.android.engine.lattice.Penalties
 import org.fcitx.fcitx5.android.engine.lattice.PinyinDecoder
 import org.fcitx.fcitx5.android.engine.lattice.TextWords
@@ -15,6 +16,9 @@ import org.fcitx.fcitx5.android.engine.pinyin.PinyinSegmenter
 import org.fcitx.fcitx5.android.engine.pinyin.Segmenter
 import org.fcitx.fcitx5.android.engine.rerank.SentencePicker
 import org.fcitx.fcitx5.android.engine.rerank.SentenceRefiner
+import org.fcitx.fcitx5.android.engine.user.UserModel
+import org.fcitx.fcitx5.android.engine.user.UserScorer
+import org.fcitx.fcitx5.android.engine.user.WordPack
 
 /**
  * Runs our own pinyin engine over an evaluation set on the host, a letter at a time as a user
@@ -26,6 +30,10 @@ class PinyinRun(
     private val segmenter: Segmenter = PinyinSegmenter(),
     penalties: Penalties = Penalties(),
     beam: Int = PinyinDecoder.DEFAULT_BEAM,
+    /** A prior per layer of the dictionary, if any, on top of the model. */
+    prior: LayerPrior? = null,
+    /** A word pack listed as the user's, its words in layer 1. */
+    pack: WordPack? = null,
     /**
      * Makes the reranker of a sample's keys. A fresh one per sample, as a reranker keeps what it
      * read for the next input: a sample's result would hang on the one before it, and so on how the
@@ -35,7 +43,12 @@ class PinyinRun(
     /** Makes what weighs the readings of the whole input once more, as the user pauses before picking; not timed. */
     private val refiner: (() -> SentenceRefiner)? = null,
 ) {
-    private val decoder = PinyinDecoder(data.dictionary, data.vocabulary, WordScorer.of(data.model), penalties, beam)
+    private val user = pack?.let { p -> UserModel(data.dictionary, data.vocabulary).also { u -> p.words.forEach { u.list(it.entry, it.score, 1, data.model.vocabularySize) } } }
+    private val decoder = PinyinDecoder(
+        data.dictionary, data.vocabulary,
+        (if (user == null) WordScorer.of(data.model) else UserScorer(data.model, user)).let { if (prior == null) it else prior.scorer(it) },
+        penalties, beam, user = user,
+    )
     private val textWords = TextWords(data.model, data.wordIndex)
 
     fun run(samples: List<Sample>): List<RunResult> {

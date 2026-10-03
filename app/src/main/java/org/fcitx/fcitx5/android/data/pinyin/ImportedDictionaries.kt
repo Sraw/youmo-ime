@@ -8,6 +8,7 @@ import org.fcitx.fcitx5.android.data.pinyin.dict.TextDictionary
 import org.fcitx.fcitx5.android.engine.data.DataFormatException
 import org.fcitx.fcitx5.android.engine.libime.LibimeFiles
 import org.fcitx.fcitx5.android.engine.user.LibimeImport
+import org.fcitx.fcitx5.android.engine.user.WordPack
 import timber.log.Timber
 import java.io.File
 import java.io.IOException
@@ -43,6 +44,28 @@ object ImportedDictionaries {
             temp.delete()
         }
         return words
+    }
+
+    /**
+     * Writes [lines], a word pack, to [dest] as it is (but for a byte order mark), whole or not
+     * at all, once it is read through: the engine reads it again as it is kept.
+     *
+     * @return how many words it has; none, and nothing is written
+     * @throws SourceException if it is no word pack, saying where
+     * @throws IOException if it could not be written
+     */
+    fun writePack(lines: Sequence<String>, dest: File): Int {
+        val kept = ArrayList<String>()
+        val pack = WordPack.parse(lines.mapIndexed { i, l -> (if (i == 0) l.removePrefix("\uFEFF") else l).also { kept += it } }, dest.name)
+        if (pack.words.isEmpty()) return 0
+        val temp = File(dest.path + ".tmp")
+        try {
+            temp.bufferedWriter().use { out -> kept.forEach { out.write(it); out.write('\n'.code) } }
+            if (!temp.renameTo(dest)) throw IOException("cannot write ${dest.name}")
+        } finally {
+            temp.delete()
+        }
+        return pack.words.size
     }
 
     /**

@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.engine.user
 
+import org.fcitx.fcitx5.android.engine.lattice.LayerPrior
 import org.fcitx.fcitx5.android.engine.pinyin.Syllables
 import org.fcitx.fcitx5.android.engine.store.RecordFormat
 import org.fcitx.fcitx5.android.engine.user.UserModel.Entry
@@ -25,6 +26,7 @@ object UserLog {
     private const val WORD: Byte = 2
     private const val PAIR: Byte = 3
     private const val FORGOT: Byte = 4
+    private const val PRIOR: Byte = 5
 
     fun header(): ByteArray = FORMAT.header()
 
@@ -49,6 +51,12 @@ object UserLog {
         writeFloat(count)
     }
 
+    /** A layer's prior ([LayerPrior]) as it is now. */
+    fun prior(name: String, value: Float) = FORMAT.record(PRIOR) {
+        writeUTF(name)
+        writeFloat(value)
+    }
+
     fun forgot(words: List<Entry>) = FORMAT.record(FORGOT) {
         writeShort(words.size)
         words.forEach { entry(it) }
@@ -59,9 +67,10 @@ object UserLog {
      *
      * @return the length of the records read whole: past it the log was cut short
      */
-    fun read(bytes: ByteArray, model: UserModel): Int = FORMAT.read(bytes) { type, input -> replay(type, input, model) }
+    fun read(bytes: ByteArray, model: UserModel, prior: LayerPrior? = null): Int =
+        FORMAT.read(bytes) { type, input -> replay(type, input, model, prior) }
 
-    internal fun replay(type: Byte, input: DataInputStream, model: UserModel) {
+    internal fun replay(type: Byte, input: DataInputStream, model: UserModel, prior: LayerPrior?) {
         try {
             when (type) {
                 SENTENCE -> {
@@ -72,6 +81,12 @@ object UserLog {
                 WORD -> model.restore(input.entry(), input.readFloat())
                 PAIR -> model.restore(input.entry(), input.entry(), input.readFloat())
                 FORGOT -> model.forget(List(input.readShort().toInt()) { input.entry() })
+                PRIOR -> {
+                    val name = input.readUTF()
+                    val value = input.readFloat()
+                    // a layer this build does not have is left behind
+                    prior?.restore(name, value)
+                }
                 // a type from a later version: what it held is lost, the rest still reads
                 else -> Unit
             }

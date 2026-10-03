@@ -37,6 +37,13 @@ class PinyinData private constructor(file: DataFile) {
     )
     val model = NgramModel(file, meta.int(META_LM_VOCABULARY), meta.int(META_UNKNOWN))
 
+    /** Which layer of the dictionary each word is from: data without the section is all one layer. */
+    val layers = WordLayers(
+        meta[META_LAYERS]?.split(',') ?: listOf(WordLayers.BASE),
+        if (file.has(Section.WORD_LAYER)) file.bitPacked(Section.WORD_LAYER) else null,
+        vocabulary.size,
+    )
+
     /** The model's words by their text, made when first asked for: see [WordIndex]. */
     val wordIndex: WordIndex by lazy { WordIndex(vocabulary, model.vocabularySize) }
 
@@ -66,6 +73,7 @@ class PinyinData private constructor(file: DataFile) {
         const val TRI_PROB_CODEBOOK = 19
         const val DICT_WEIGHT = 20
         const val DICT_WEIGHT_CODEBOOK = 21
+        const val WORD_LAYER = 22
     }
 
     companion object {
@@ -76,6 +84,7 @@ class PinyinData private constructor(file: DataFile) {
         internal const val META_SYLLABLE_CHECKSUM = "syllables.checksum"
         internal const val META_LM_VOCABULARY = "lm.vocabulary"
         internal const val META_UNKNOWN = "lm.unknown"
+        internal const val META_LAYERS = "layers"
 
         /**
          * [verify]: check every section's checksum first (see [DataFile.open]).
@@ -90,6 +99,33 @@ class PinyinData private constructor(file: DataFile) {
 }
 
 /** Word ids to text. Ids below [NgramModel.vocabularySize] are the model's own words. */
+/**
+ * The layers of the dictionary, by [names] (libime's words, 万象's, a year's new words ...), and
+ * the one each word is from: what a prior per layer ([org.fcitx.fcitx5.android.engine.lattice.LayerPrior])
+ * goes by. A word in several layers is of the first, the oldest.
+ */
+class WordLayers internal constructor(val names: List<String>, private val packed: BitPacked?, val words: Int) {
+    init {
+        ensureFormat(names.isNotEmpty() && names.all { it.isNotEmpty() }) { "layer names ${names.joinToString(",")}" }
+        ensureFormat(packed == null || packed.size == words) { "layers for ${packed?.size} of $words words" }
+    }
+
+    val count: Int get() = names.size
+
+    /** Of a word not in the dictionary (the user's own, [NgramModel.NO_WORD]): the base. */
+    fun layer(word: Int): Int {
+        if (packed == null || word !in 0 until packed.size) return 0
+        val layer = packed[word]
+        ensureFormat(layer < names.size) { "word $word in layer $layer of ${names.size}" }
+        return layer
+    }
+
+    companion object {
+        /** The layer with no name given: libime's dictionary. */
+        const val BASE = "base"
+    }
+}
+
 class Vocabulary internal constructor(private val strings: StringTable) {
     val size: Int get() = strings.size
     fun word(id: Int): String = strings[id]
@@ -201,6 +237,9 @@ class NgramModel internal constructor(file: DataFile, val vocabularySize: Int, p
 
     /** log10 P(word) */
     fun score(word: Int): Float = uniProb.getFloat(known(word) * 4)
+
+    /** log10 P of the unknown word: what a word the model lacks scores as, before any context. */
+    val unknownScore: Float get() = uniProb.getFloat(unknown * 4)
 
     /** log10 P(word | prev); a [NO_WORD] context is the unigram score */
     fun score(prev: Int, word: Int): Float {

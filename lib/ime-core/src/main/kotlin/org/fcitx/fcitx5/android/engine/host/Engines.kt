@@ -30,9 +30,11 @@ import org.fcitx.fcitx5.android.engine.table.TableOptions
 import org.fcitx.fcitx5.android.engine.table.TableSession
 import org.fcitx.fcitx5.android.engine.table.TableText
 import org.fcitx.fcitx5.android.engine.table.TableUser
+import org.fcitx.fcitx5.android.engine.lattice.LayerPrior
 import org.fcitx.fcitx5.android.engine.user.LibimeImport
 import org.fcitx.fcitx5.android.engine.user.UserModel
 import org.fcitx.fcitx5.android.engine.user.UserStore
+import org.fcitx.fcitx5.android.engine.user.WordPack
 import java.io.BufferedReader
 import java.io.Closeable
 import java.io.File
@@ -93,6 +95,8 @@ class Engines(
         val phrases: String,
         val dictionaries: String,
         val savePhrases: (CustomPhrases) -> Unit = {},
+        /** The word packs turned on ([WordPack]), each named (its file) with its lines; [dictionaries] tells these apart too. */
+        val packs: () -> List<Pair<String, Sequence<String>>> = { emptyList() },
         val dictionary: () -> List<String>,
     )
 
@@ -163,6 +167,10 @@ class Engines(
 
     private var store: UserStore? = null
     private var userModel: UserModel? = null
+    private var layerPrior: LayerPrior? = null
+
+    /** Learned with the user model, and kept in its log; one for the life of the engine. */
+    private fun prior(): LayerPrior = layerPrior ?: LayerPrior(pinyinData.layers, extra = { id -> userModel?.layerOf(id) ?: 0 }).also { layerPrior = it }
 
     // the dictionaries' words go in as words the user added, uncounted: scored as the model's
     // unknown word until picked, and not kept in the log unless picked
@@ -173,7 +181,7 @@ class Engines(
             val file = File(userDir, USER_PINYIN)
             // a log that cannot be read or moved aside: learn in memory rather than not type
             store = try {
-                UserStore(file, model, onError = onError).apply { open(seed = ::importLegacy) }
+                UserStore(file, model, onError = onError, prior = prior()).apply { open(seed = ::importLegacy) }
             } catch (e: IOException) {
                 onError(e)
                 null
@@ -190,6 +198,24 @@ class Engines(
             emptyList()
         }
         for (line in lines) LibimeImport.dictionaryEntry(line)?.let { model.list(it) }
+        val packs = try {
+            added()?.packs?.invoke().orEmpty()
+        } catch (e: IOException) {
+            onError(e)
+            emptyList()
+        }
+        val modelWords = pinyinData.model.vocabularySize
+        for ((name, lines) in packs) {
+            // one that does not read is left out, the rest still go in
+            val pack = try {
+                WordPack.parse(lines, name)
+            } catch (e: SourceException) {
+                onError(IOException(e.message, e))
+                continue
+            }
+            val layer = prior().layer(pack.layer)
+            pack.words.forEach { model.list(it.entry, it.score, layer, modelWords) }
+        }
     }
 
     /**
@@ -254,12 +280,12 @@ class Engines(
         when (im) {
             PINYIN -> PinyinSession(
                 pinyinData, PinyinSegmenter(s.fuzzy, s.typos, neighbours = s.typos),
-                pageSize = s.pageSize, user = user(), prediction = s.prediction, phraseBook = phrases(),
+                pageSize = s.pageSize, user = user(), prediction = s.prediction, prior = prior(), phraseBook = phrases(),
                 reranker = reranker(), refiner = refiner(),
             )
             SHUANGPIN -> PinyinSession(
                 pinyinData, ShuangpinSegmenter(s.scheme, s.fuzzy, s.typos), spell = true,
-                pageSize = s.pageSize, user = user(), prediction = s.prediction, phraseBook = phrases(),
+                pageSize = s.pageSize, user = user(), prediction = s.prediction, prior = prior(), phraseBook = phrases(),
                 reranker = reranker(), refiner = refiner(),
             )
             else -> {

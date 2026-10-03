@@ -7,6 +7,8 @@ package org.fcitx.fcitx5.android.eval
 import org.fcitx.fcitx5.android.engine.data.CodeTable
 import org.fcitx.fcitx5.android.engine.data.DataFormatException
 import org.fcitx.fcitx5.android.engine.data.PinyinData
+import org.fcitx.fcitx5.android.engine.lattice.LayerPrior
+import org.fcitx.fcitx5.android.engine.user.WordPack
 import org.fcitx.fcitx5.android.engine.lattice.Penalties
 import org.fcitx.fcitx5.android.engine.libime.LibimeFiles
 import org.fcitx.fcitx5.android.engine.pinyin.Fuzzy
@@ -32,7 +34,7 @@ import java.util.concurrent.TimeUnit
 import kotlin.system.exitProcess
 
 val USAGE = """usage: score <set.tsv> <result.tsv> [<baseline-result.tsv>] [--half <half>]
-       pinyin <pinyin.data> <set.tsv> <result.tsv> [--scheme <scheme>] [--fuzzy all|<pair>,...] [--half <half>] [--neighbours on|off] [--rerank <model.safetensors>] [--refine <model.safetensors>] [--weight <rerank>[,<refine>]] [--remote <url>] [--remote-timeout <ms>] [--penalty <p>] [--threads <n>]
+       pinyin <pinyin.data> <set.tsv> <result.tsv> [--scheme <scheme>] [--fuzzy all|<pair>,...] [--half <half>] [--neighbours on|off] [--rerank <model.safetensors>] [--refine <model.safetensors>] [--weight <rerank>[,<refine>]] [--remote <url>] [--remote-timeout <ms>] [--penalty <p>] [--layers <name>=<log10>,...] [--pack <file.words>] [--threads <n>]
        predict <pinyin.data> <predict.tsv> [--offers <out.tsv>] [--threads <n>]
        sentences <pinyin.data> <set.tsv> <out.tsv> [--neighbours on|off] [--threads <n>]
        lm <model.safetensors> <context> <text>...
@@ -88,8 +90,8 @@ fun runCli(args: Array<String>, out: Appendable, err: Appendable): Int {
     return when {
         !optionsValid(a.options, fuzzy) -> usage(err)
         a.has("score", 3..4, "half") -> score(p[1], p[2], p.getOrNull(3), half, out)
-        a.has("pinyin", 4..4, "scheme", "fuzzy", "half", "neighbours", "rerank", "refine", "weight", *REMOTE, "threads") ->
-            runPinyin(p[1], p[2], p[3], scheme, fuzzy.orEmpty(), half, neighbours == "on", Models(a.options), threads)
+        a.has("pinyin", 4..4, "scheme", "fuzzy", "half", "neighbours", "rerank", "refine", "weight", *REMOTE, "layers", "pack", "threads") ->
+            runPinyin(p[1], p[2], p[3], scheme, fuzzy.orEmpty(), half, neighbours == "on", Models(a.options), a.options["layers"], a.options["pack"], threads)
         a.has("predict", 3..3, "threads", "offers") -> predict(p[1], p[2], threads, a.options["offers"], out)
         a.has("sentences", 4..4, "neighbours", "threads") -> sentences(p[1], p[2], p[3], neighbours == "on", threads)
         a.has("lm", 4..Int.MAX_VALUE) -> lm(p[1], p[2], p.drop(3), out)
@@ -238,11 +240,16 @@ private fun runPinyin(
     half: String?,
     neighbours: Boolean,
     models: Models,
+    layers: String?,
+    packPath: String?,
     threads: Int,
 ): Int {
+    val pack = packPath?.let { path -> File(path).useLines { WordPack.parse(it, path) } }
     // a data file each: its buffers are not to be shared
     val results = dealt(Halves.select(readSet(setPath), half), threads, {
-        PinyinRun(loadData(dataPath), segmenter(scheme, fuzzy, neighbours), reranker = models.reranker, refiner = models.refiner)
+        val data = loadData(dataPath)
+        val prior = layers?.let { LayerPrior.parse(data.layers, it) }
+        PinyinRun(data, segmenter(scheme, fuzzy, neighbours), prior = prior, pack = pack, reranker = models.reranker, refiner = models.refiner)
     }) { hand -> run(hand) }
     File(resultPath).printWriter().use { out -> results.forEach { out.println(RunResultFormat.format(it)) } }
     return 0

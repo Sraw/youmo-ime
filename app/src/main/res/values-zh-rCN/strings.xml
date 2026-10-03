@@ -376,6 +376,11 @@
     <string name="cloud_connected">已连接：%1$s</string>
     <string name="cloud_check_failed">已打开，但服务器没有应答：%1$s</string>
     <string name="cloud_token_rejected">已打开，但服务器不接受这个访问令牌。</string>
+    <string name="cloud_words">服务器的新词包</string>
+    <string name="cloud_words_summary">取服务器上最新的新词包（server.py --words）。云端模型打开时，云端构建每天也会自动取一次。</string>
+    <string name="cloud_words_none">服务器没有新词包。</string>
+    <string name="cloud_words_got">新词包 %1$s 已更新。</string>
+    <string name="cloud_words_failed">取不到新词包：%1$s</string>
     <string name="not_set">未设置</string>
     <string name="set_hidden">已设置（隐藏）</string>
 </resources>

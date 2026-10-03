@@ -4,6 +4,7 @@
 
 POST /score    {"context": "...", "candidates": ["...", ...]}   -> {"scores": [log P, ...]}
 GET  /health                                                    -> {"model": "...", "gpu_peak_gb": ...}
+GET  /words                                                     -> {"name": "...", "text": "..."}: the word pack --words names, or 404
 
 A score is log P(candidate | context) in nats, as the training measured it (dev/training/score_lists.py):
 the context, a newline when there is none, and the candidate are tokenized apart and only the
@@ -35,6 +36,7 @@ MAX_CONNECTIONS = 32
 TIMEOUT = 15  # seconds a connection may be idle or slow, in the handshake as after it
 LOWEST = -1e4  # a score below it is no likelier; -inf would not be JSON
 TOKEN = re.compile(r'[!-~]*')  # what goes in a header as it is: printable ASCII, no spaces
+WORDS_NAME = re.compile(r'([A-Za-z0-9_-][A-Za-z0-9._-]{0,63})\.words')  # a file name the phone keeps it under
 
 
 class Model:
@@ -83,7 +85,26 @@ class Model:
             return [round(x, 4) if math.isfinite(x) and x > LOWEST else LOWEST for x in (lp * cand[:, 1:]).sum(1).tolist()]
 
 
-def handler(model, token):
+def word_pack(path):
+    """The word pack at [path] as /words answers it, read again when the file changes; None without a path."""
+    cache = {}
+
+    def current():
+        if not path:
+            return None
+        stamp = os.stat(path).st_mtime_ns
+        if cache.get('stamp') != stamp:
+            with open(path, encoding='utf-8') as f:
+                text = f.read()
+            if not text.startswith(('\ufeff# youmo words 1', '# youmo words 1')):
+                raise ValueError(f'{path}: not a word pack')
+            cache.update(stamp=stamp, answer={'name': WORDS_NAME.fullmatch(os.path.basename(path)).group(1), 'text': text.lstrip('\ufeff')})
+        return cache['answer']
+
+    return current
+
+
+def handler(model, token, words=lambda: None):
     class Handler(BaseHTTPRequestHandler):
         protocol_version = 'HTTP/1.1'
         timeout = TIMEOUT
@@ -114,6 +135,13 @@ def handler(model, token):
                 return self.reply(401, {'error': 'unauthorized'})
             if self.path == '/health':
                 return self.reply(200, model.health())
+            if self.path == '/words':
+                try:
+                    pack = words()
+                except (OSError, ValueError) as e:  # the file went, or was replaced by something else
+                    self.log_message('/words failed: %r', e)
+                    return self.reply(500, {'error': 'word pack unreadable'})
+                return self.reply(200, pack) if pack else self.reply(404, {'error': 'no word pack'})
             self.reply(404, {'error': 'not found'})
 
         def do_POST(self):
@@ -237,6 +265,7 @@ def main():
     p.add_argument('--keyfile', help="the certificate's private key (PEM)")
     p.add_argument('--plain', action='store_true', help='serve plain HTTP: only with --host 127.0.0.1')
     p.add_argument('--threads', type=int, help='CPU threads for the model')
+    p.add_argument('--words', help='a word pack (<name>.words, see WordPack.kt) to hand phones that ask for /words; read again whenever the file changes')
     args = p.parse_args()
     if args.plain and args.host != '127.0.0.1':
         p.error('--plain only with --host 127.0.0.1: on a network, what is typed would go in the clear')
@@ -246,6 +275,11 @@ def main():
         p.error('--certfile and --keyfile go together')
     if args.context_chars < 1:
         p.error('--context-chars: at least 1')
+    if args.words and not WORDS_NAME.fullmatch(os.path.basename(args.words)):
+        p.error('--words: named <name>.words, the name letters, digits, . _ - (up to 64)')
+    words = word_pack(args.words)
+    if args.words:
+        print(f'word pack: {args.words}, {len(words()["text"].splitlines())} lines', flush=True)
     if not args.token and args.host != '127.0.0.1' and not args.no_token:
         p.error('--token: on a network, anyone who reaches the port could use the model (--no-token if that is meant)')
     if not args.plain:
@@ -259,7 +293,7 @@ def main():
     if model.device.startswith('cuda'):
         import torch
         print(f'GPU memory: {torch.cuda.max_memory_allocated() / 2**30:.1f} GB at most so far', flush=True)
-    server = Server((args.host, args.port), handler(model, args.token))
+    server = Server((args.host, args.port), handler(model, args.token, words))
     if not args.plain:
         server.tls = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
         server.tls.load_cert_chain(certfile, keyfile)

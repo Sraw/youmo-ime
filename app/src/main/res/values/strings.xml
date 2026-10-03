@@ -380,6 +380,11 @@
     <string name="cloud_connected">Connected: %1$s</string>
     <string name="cloud_check_failed">On, but the server did not answer: %1$s</string>
     <string name="cloud_token_rejected">On, but the server refused the access token.</string>
+    <string name="cloud_words">Word pack from the server</string>
+    <string name="cloud_words_summary">Fetch the newest words the server offers (server.py --words). The cloud build also asks once a day while the cloud model is on.</string>
+    <string name="cloud_words_none">The server offers no word pack.</string>
+    <string name="cloud_words_got">Word pack %1$s updated.</string>
+    <string name="cloud_words_failed">Could not fetch the word pack: %1$s</string>
     <string name="not_set">Not set</string>
     <string name="set_hidden">Set (hidden)</string>
 </resources>

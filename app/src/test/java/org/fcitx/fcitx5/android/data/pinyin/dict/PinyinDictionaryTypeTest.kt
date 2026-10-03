@@ -17,6 +17,8 @@ class PinyinDictionaryTypeTest {
         assertEquals(Type.LibIME, Type.fromFileName("words.dict"))
         assertEquals(Type.Sougou, Type.fromFileName("words.scel"))
         assertEquals(Type.Text, Type.fromFileName("words.txt"))
+        assertEquals(Type.Words, Type.fromFileName("new.words"))
+        assertEquals(Type.Words, Type.fromFileName("new.words.disable"))
     }
 
     /** A dictionary the user imported is kept as text; `.disable` marks it off. */

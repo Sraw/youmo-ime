@@ -5,6 +5,7 @@
 package org.fcitx.fcitx5.android.eval
 
 import org.fcitx.fcitx5.android.engine.data.PinyinData
+import org.fcitx.fcitx5.android.engine.lattice.LayerPrior
 import org.fcitx.fcitx5.android.engine.pinyin.Segmenter
 import org.fcitx.fcitx5.android.engine.session.PinyinSession
 import org.fcitx.fcitx5.android.engine.user.UserModel
@@ -27,7 +28,7 @@ class Learning(private val data: PinyinData, private val segmenter: Segmenter) {
         val plain = KeystrokeRun(PinyinSession(data, segmenter))
         val fresh = learner()
         val learner = learner()
-        return listOf(
+        val rows = mutableListOf(
             "tune, learning nothing" to tune.map { plain.type(it) },
             "tune, typed once" to tune.map { learner.type(it) },
             "tune, typed again" to tune.map { learner.type(it) },
@@ -35,7 +36,21 @@ class Learning(private val data: PinyinData, private val segmenter: Segmenter) {
             "held-out, learning" to heldOut.map { fresh.type(it) },
             "held-out, tune learned" to heldOut.map { learner.type(it) },
         )
+        // with layers, the same again learning the prior per layer too, and where it ended up
+        if (data.layers.count > 1) {
+            val priorFresh = LayerPrior(data.layers)
+            val priorTuned = LayerPrior(data.layers)
+            val freshWithPrior = learner(priorFresh)
+            val tunedWithPrior = learner(priorTuned)
+            rows += "tune, typed once, prior learned" to tune.map { tunedWithPrior.type(it) }
+            val afterTune = priorTuned.toString()
+            rows += "held-out, learning, prior learned" to heldOut.map { freshWithPrior.type(it) }
+            rows += "held-out, tune learned, prior learned" to heldOut.map { tunedWithPrior.type(it) }
+            rows += "prior after tune: ${afterTune.ifEmpty { "0" }}; after held-out alone: ${priorFresh.toString().ifEmpty { "0" }}" to emptyList()
+        }
+        return rows
     }
 
-    private fun learner() = KeystrokeRun(PinyinSession(data, segmenter, user = UserModel(data.dictionary, data.vocabulary)))
+    private fun learner(prior: LayerPrior? = null) =
+        KeystrokeRun(PinyinSession(data, segmenter, user = UserModel(data.dictionary, data.vocabulary), prior = prior))
 }

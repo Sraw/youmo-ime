@@ -255,6 +255,26 @@ class UserModelTest {
     }
 
     @Test
+    fun aPacksWordKeepsWhatItWasListedWithLastAndIsListed() {
+        val m = model()
+        val id = m.list(entry("拟好", "ni", "hao"), -5f, 1)
+        assertEquals(id, m.list(entry("拟好", "ni", "hao"), -6f, 2))
+        assertEquals(-6f, m.score(id), 0f)
+        assertEquals(2, m.layerOf(id))
+        // a word of the model's: the pack's score and layer are not taken
+        val ni = m.id(entry("你", "ni"))
+        assertEquals(ni, m.list(entry("你", "ni"), -1f, 1, modelWords = ni + 1))
+        assertTrue(m.score(ni).isNaN())
+        assertEquals(0, m.layerOf(ni))
+        assertTrue(inTrie(m, "拟好", "ni", "hao"))
+        // listed: forgetting it drops nothing but its counts
+        m.forget(listOf(entry("拟好", "ni", "hao")))
+        assertTrue(inTrie(m, "拟好", "ni", "hao"))
+        assertEquals(-6f, m.score(id), 0f)
+        assertThrows(IllegalArgumentException::class.java) { m.list(entry("拟", "ni"), 0.5f, 1) }
+    }
+
+    @Test
     fun aListedWordForgottenStaysToType() {
         val m = model()
         val niZai = entry("拟再", "ni", "zai")

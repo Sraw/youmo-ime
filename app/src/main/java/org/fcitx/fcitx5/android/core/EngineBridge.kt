@@ -124,13 +124,24 @@ object EngineBridge {
         val dictionaryDir = File(dir, "dictionaries")
         ImportedDictionaries.migrate(dictionaryDir)
         val dictionaries = dictionaryDir.listFiles { f -> f.name.endsWith(".txt") }.orEmpty().sortedBy { it.name }
-        val seen = dictionaries.joinToString("\n") { "${it.name} ${it.length()} ${it.lastModified()}" }
+        val packs = dictionaryDir.listFiles { f -> f.name.endsWith(".words") }.orEmpty().sortedBy { it.name }
+        val seen = (dictionaries + packs).joinToString("\n") { "${it.name} ${it.length()} ${it.lastModified()}" }
         // a file not read is not written: the phrases it has would be lost to the one pinned
         val save = { p: CustomPhrases ->
             if (!read) throw IOException("custom phrases were not read")
             CustomPhraseManager.write(p.all, phraseFile)
         }
-        return Engines.Additions(phrases, seen, save) {
+        val readPacks = {
+            packs.mapNotNull { file ->
+                try {
+                    file.name to file.readLines().asSequence()
+                } catch (e: IOException) {
+                    Timber.w(e, "word pack %s", file.name)
+                    null
+                }
+            }
+        }
+        return Engines.Additions(phrases, seen, save, readPacks) {
             dictionaries.flatMap { file ->
                 try {
                     file.readLines()

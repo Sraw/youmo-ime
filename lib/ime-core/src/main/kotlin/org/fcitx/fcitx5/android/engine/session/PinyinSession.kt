@@ -7,6 +7,7 @@ package org.fcitx.fcitx5.android.engine.session
 import org.fcitx.fcitx5.android.engine.data.NgramModel.Companion.NO_WORD
 import org.fcitx.fcitx5.android.engine.data.PinyinData
 import org.fcitx.fcitx5.android.engine.lattice.Candidate
+import org.fcitx.fcitx5.android.engine.lattice.LayerPrior
 import org.fcitx.fcitx5.android.engine.lattice.Penalties
 import org.fcitx.fcitx5.android.engine.lattice.PinyinDecoder
 import org.fcitx.fcitx5.android.engine.lattice.Predictor
@@ -63,6 +64,8 @@ class PinyinSession(
     private val user: UserModel? = null,
     /** Whether words that may follow are offered after a commit. */
     private val prediction: Boolean = true,
+    /** Learned from what is picked, while [learning]. */
+    private val prior: LayerPrior? = null,
     /**
      * Offered where their order says when what is left of the input is their key; a candidate
      * pinned ([Action.Pin]) or deleted ([Action.Unpin]) changes them.
@@ -87,7 +90,7 @@ class PinyinSession(
     private val decoder = PinyinDecoder(
         data.dictionary,
         data.vocabulary,
-        if (user == null) WordScorer.of(data.model) else UserScorer(data.model, user),
+        (if (user == null) WordScorer.of(data.model) else UserScorer(data.model, user)).let { if (prior == null) it else prior.scorer(it) },
         penalties,
         user = user,
     )
@@ -191,6 +194,7 @@ class PinyinSession(
             return commit(c.text, c.words)
         }
         pieces += Piece(c.text, c.words, readFrom() + c.end, if (user == null) null else entries(c), c !== decoderFirst)
+        learnPrior(c)
         if (pieces.last().end < input.length) {
             read()
             return snapshot()
@@ -314,6 +318,19 @@ class PinyinSession(
         // the scores the decoder kept are stale
         decoder.reset()
         return words
+    }
+
+    /**
+     * What [picked] says of its layers against the first choice, as far as it read: see
+     * [LayerPrior.learn]. The first choice as the user saw it, after the reranker and the pinned
+     * phrases: what they passed over is the signal, whoever put it there.
+     */
+    private fun learnPrior(picked: Candidate) {
+        if (prior == null || !learning) return
+        val first = candidates.firstOrNull()
+        if (first == null || picked === first) return
+        val offered = first.words.filterIndexed { i, _ -> first.ends[i] <= picked.end }.toIntArray()
+        if (prior.learn(picked.words, offered)) decoder.reset()
     }
 
     private fun turn(to: Int): Snapshot {

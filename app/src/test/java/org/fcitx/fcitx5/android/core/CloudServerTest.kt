@@ -6,6 +6,7 @@ package org.fcitx.fcitx5.android.core
 
 import org.fcitx.fcitx5.android.engine.remote.CloudConfig
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNotSame
 import org.junit.Assert.assertNull
@@ -39,6 +40,24 @@ class CloudServerTest {
         // a new address is off again
         cloud.save(cloud.config().withServer("https://example.org"))
         assertNull(cloud.current())
+    }
+
+    @Test
+    fun wordsAreAskedForOnceADayAndOnlyWhileOn() {
+        val stamp = File(app.noBackupFilesDir, "cloud-words.checked")
+        var day = 1_700_000_000_000L
+        cloud.updateWords(day) { }
+        assertFalse(stamp.exists())
+        // on, to a port nothing listens on: asked (and the asking fails on its own thread), stamped
+        cloud.save(CloudConfig().withServer("https://127.0.0.1:1").on(key))
+        cloud.updateWords(day) { }
+        assertEquals(day, stamp.lastModified())
+        // not again today
+        cloud.updateWords(day + 60 * 60 * 1000) { }
+        assertEquals(day, stamp.lastModified())
+        day += 25 * 60 * 60 * 1000
+        cloud.updateWords(day) { }
+        assertEquals(day, stamp.lastModified())
     }
 
     @Test
