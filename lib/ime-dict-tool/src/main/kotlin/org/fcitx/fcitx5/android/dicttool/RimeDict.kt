@@ -43,6 +43,9 @@ class RimeDict {
 
     val words: Int get() = counts.size
 
+    /** Each word's count over all its readings. */
+    fun totals(): Sequence<Pair<String, Long>> = counts.asSequence().map { (word, readings) -> word to readings.values.sum() }
+
     /** Each reading as `word`, `pin'yin`, weight. */
     fun entries(): Sequence<Triple<String, String, Float>> = counts.asSequence().flatMap { (word, readings) ->
         val top = readings.values.max()

@@ -14,6 +14,8 @@
   只经 HTTPS 发送（连本机 127.0.0.1 也是），并且只发给打开时你核对过密钥的那台服务器；密码框、无痕键盘里从不发送；
   关闭它就不再发送。服务器由你自己运行，我们收不到这些内容；能使用这台服务器的人可以看到它们。
   这些设置（地址、令牌、密钥）只存在手机本地，不进系统备份，也不进“导出用户数据”。
+  打开后每天至多一次（以及你在设置里点“服务器的新词包”时），还会向同一台服务器要一次新词包（`GET /words`）；这个请求不带任何
+  你输入的内容。
 
 除此之外，两个版本相同：
 
@@ -38,7 +40,8 @@ There are two builds:
   only (even to this device, 127.0.0.1), and only to the server whose key you compared when turning it on; nothing
   is sent from password fields or incognito keyboards; turning it off stops it. You run the server, so we never receive any of
   it; whoever can use that server can. These settings (address, token, key) stay on the phone: not in system backups, not in
-  "Export user data".
+  "Export user data". While it is on, the app also asks the same server for a word pack (`GET /words`) at most once a day, and
+  when you tap "Word pack from the server" in the settings; that request carries nothing you typed.
 
 Otherwise the two builds are the same:
 

@@ -25,6 +25,9 @@ class PinyinDictReader(private val into: PinyinDataBuilder) {
     var entries = 0
         private set
 
+    /** The layer ([org.fcitx.fcitx5.android.engine.data.WordLayers]) the readings read from now on are of. */
+    var layer = 0
+
     /** Unknown syllable to how many readings it made us skip. */
     val unknownSyllables = TreeMap<String, Int>()
 
@@ -49,7 +52,7 @@ class PinyinDictReader(private val into: PinyinDataBuilder) {
             unknown.forEach { unknownSyllables[it] = (unknownSyllables[it] ?: 0) + 1 }
             return
         }
-        into.entry(word, ids, weight)
+        into.entry(word, ids, weight, layer)
         entries++
     }
 }

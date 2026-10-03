@@ -9,6 +9,9 @@ import org.fcitx.fcitx5.android.engine.data.DataFile
 import org.fcitx.fcitx5.android.engine.data.DataFormatException
 import org.fcitx.fcitx5.android.engine.data.PinyinData
 import org.fcitx.fcitx5.android.engine.data.PinyinDataBuilder
+import org.fcitx.fcitx5.android.engine.data.WordLayers
+import org.fcitx.fcitx5.android.engine.pinyin.Syllables
+import org.fcitx.fcitx5.android.engine.user.WordPack
 import org.fcitx.fcitx5.android.engine.data.SourceException
 import org.fcitx.fcitx5.android.engine.data.forEachNumberedLine
 import org.fcitx.fcitx5.android.engine.table.TableText
@@ -22,7 +25,8 @@ import kotlin.math.abs
 import kotlin.system.exitProcess
 
 val USAGE = """
-    usage: pinyin -o <out> --lm <lm.arpa> <dict>...       compile a pinyin dictionary and model, from
+    usage: pinyin -o <out> --lm <lm.arpa> [--rime-unigrams <min count>] <dict>...
+                                                          compile a pinyin dictionary and model, from
                                                           libime's text or Rime's .dict.yaml
            table -o <out> <table.txt>                     compile a code table
            mix -o <out.arpa> --lm <lm.arpa> [--weight <w>] [--cutoffs <bigram>,<trigram>] <corpus>...
@@ -30,6 +34,10 @@ val USAGE = """
                                                           conversations a JSON array a line (.jsonl.gz),
                                                           or FineWeb-2 shards' chat-like pages (.parquet)
            check <pinyin data> <lm.arpa>                  compare compiled scores with the model
+           words -o <out.tsv> --data <pinyin.data> [--min-count <n>] <shard.parquet>...
+                                                          the words the pages use that the data lacks (NewWords)
+           pack -o <out.words> --data <pinyin.data> --layer <name> [--min-count <n>] [--min-pmi <x>] [--min-entropy <x>] <candidates.tsv>
+                                                          a word pack (WordPack) of the candidates that pass
 """.trimIndent()
 
 fun main(args: Array<String>) {
@@ -66,16 +74,14 @@ fun runCli(args: Array<String>, out: Appendable, err: Appendable): Int {
 
 /** @return false for a command or options it does not take */
 private fun dispatch(command: String?, options: Options, out: Appendable): Boolean {
-    when {
-        command == "pinyin" && options.output != null && options.lm != null && options.inputs.isNotEmpty() ->
-            pinyin(options.output, options.lm, options.inputs, out)
-        command == "table" && options.output != null && options.lm == null && options.inputs.size == 1 ->
-            table(options.output, options.inputs.single(), out)
-        command == "mix" && options.output != null && options.lm != null && options.inputs.isNotEmpty() ->
-            mix(options, out)
-        command == "check" && options.output == null && options.lm == null && options.inputs.size == 2 ->
-            check(options.inputs[0], options.inputs[1], out)
-        else -> return false
+    if (!options.fit(command)) return false
+    when (command) {
+        "pinyin" -> pinyin(options.output!!, options.lm!!, options.inputs, options.rimeUnigrams, out)
+        "table" -> table(options.output!!, options.inputs.single(), out)
+        "mix" -> mix(options, out)
+        "check" -> check(options.inputs[0], options.inputs[1], out)
+        "words" -> words(options, out)
+        "pack" -> pack(options, out)
     }
     return true
 }
@@ -86,36 +92,159 @@ private class Options(
     val inputs: List<String>,
     val weight: Double,
     val cutoffs: Pair<Int, Int>,
+    /** Rime words the model lacks with at least this count get a unigram from it ([CountFit]); null for none. */
+    val rimeUnigrams: Long?,
+    /** `words`, `pack`: the pinyin data whose words are known. */
+    val data: String?,
+    /** `words`: how often a run must occur to be a candidate; `pack`: to go in. */
+    val minCount: Int,
+    /** `pack`: the layer the words are of, and the least pmi and entropy (either side) a candidate needs. */
+    val layer: String?,
+    val minPmi: Double,
+    val minEntropy: Double,
 ) {
+    /** Whether [command] takes these options. */
+    fun fit(command: String?): Boolean {
+        val some = inputs.isNotEmpty()
+        return when (command) {
+            "pinyin", "mix" -> output != null && lm != null && some
+            "table" -> output != null && lm == null && inputs.size == 1
+            "check" -> output == null && lm == null && inputs.size == 2
+            "words" -> output != null && data != null && some
+            "pack" -> output != null && data != null && layer != null && inputs.size == 1
+            else -> false
+        }
+    }
+
     companion object {
         // what measured best with FineWeb-2's chat-like pages over the written and the chat
         // evaluation sets together (dev/ENGINE-DESIGN.md)
         const val WEIGHT = 0.6
         val CUTOFFS = 2 to 2
+        // a word of the last years in 0.4 billion characters of chat-like pages: hundreds of times
+        const val MIN_COUNT = 50
+        // a run ten times as frequent as its parts predict, with a handful of different neighbours
+        const val MIN_PMI = 1.0
+        const val MIN_ENTROPY = 1.5
 
-        /** @return null for an option with a bad value */
+        // every option takes a value
+        private val FLAGS = setOf("-o", "--lm", "--weight", "--cutoffs", "--rime-unigrams", "--data", "--min-count", "--layer", "--min-pmi", "--min-entropy")
+
+        /** @return null for an option with a bad or missing value */
         fun parse(args: List<String>): Options? {
-            var output: String? = null
-            var lm: String? = null
-            var weight = WEIGHT
-            var cutoffs = CUTOFFS
+            val values = HashMap<String, String>()
             val inputs = ArrayList<String>()
             var i = 0
             while (i < args.size) {
-                when (args[i]) {
-                    "-o" -> output = args.getOrNull(++i)
-                    "--lm" -> lm = args.getOrNull(++i)
-                    "--weight" -> weight = args.getOrNull(++i)?.toDoubleOrNull()?.takeIf { it in 0.0..1.0 } ?: return null
-                    "--cutoffs" -> cutoffs = args.getOrNull(++i)?.split(',')?.mapNotNull { it.toIntOrNull() }
-                        // a trigram's context must be a bigram kept (Mixer)
-                        ?.takeIf { it.size == 2 && it[0] in 1..it[1] }?.let { it[0] to it[1] } ?: return null
-                    else -> inputs += args[i]
-                }
+                if (args[i] in FLAGS) values[args[i]] = args.getOrNull(++i) ?: return null else inputs += args[i]
                 i++
             }
-            return Options(output, lm, inputs, weight, cutoffs)
+            fun <T : Any> read(flag: String, default: T, value: (String) -> T?): T? = values[flag]?.let(value) ?: default.takeIf { flag !in values }
+            return Options(
+                output = values["-o"],
+                lm = values["--lm"],
+                inputs = inputs,
+                weight = read("--weight", WEIGHT) { it.toDoubleOrNull()?.takeIf { w -> w in 0.0..1.0 } } ?: return null,
+                // a trigram's context must be a bigram kept (Mixer)
+                cutoffs = read("--cutoffs", CUTOFFS) { v ->
+                    v.split(',').mapNotNull { it.toIntOrNull() }.takeIf { it.size == 2 && it[0] in 1..it[1] }?.let { it[0] to it[1] }
+                } ?: return null,
+                rimeUnigrams = values["--rime-unigrams"]?.let { it.toLongOrNull()?.takeIf { c -> c >= 0 } ?: return null },
+                data = values["--data"],
+                minCount = read("--min-count", MIN_COUNT) { it.toIntOrNull()?.takeIf { c -> c >= 1 } } ?: return null,
+                layer = values["--layer"]?.let { it.takeIf(WordPack::validLayer) ?: return null },
+                minPmi = read("--min-pmi", MIN_PMI) { it.toDoubleOrNull()?.takeIf(Double::isFinite) } ?: return null,
+                minEntropy = read("--min-entropy", MIN_ENTROPY) { it.toDoubleOrNull()?.takeIf(Double::isFinite) } ?: return null,
+            )
         }
     }
+}
+
+/**
+ * The runs of Han characters the pages use that the data's base layer lacks, with what tells a
+ * word from a chance run: `text count year pmi left-entropy right-entropy known`, a line each,
+ * most frequent first ([NewWords]). Lines starting `#` are comments.
+ */
+private fun words(options: Options, out: Appendable) {
+    val data = PinyinData.load(map(options.data!!))
+    // the base layer's words: the others (Rime's) are the kind a pack is for, scored by true counts
+    val known = HashSet<String>(data.vocabulary.size * 2)
+    for (id in 0 until data.vocabulary.size) if (data.layers.layer(id) == 0) known += data.vocabulary.word(id)
+    val finder = NewWords(known, options.minCount)
+    val shards = options.inputs.map(::File)
+    var pages = 0
+    while (!finder.done) {
+        pages = 0
+        for (shard in shards) {
+            WebText.read(shard) { page, date ->
+                page.forEach { finder.add(it, date) }
+                pages++
+            }
+        }
+        out.appendLine("pass ${finder.pass}: $pages pages")
+        finder.nextPass()
+    }
+    val candidates = finder.candidates()
+    File(options.output!!).bufferedWriter().use { w ->
+        w.write("# text\tcount\tyear\tpmi\tleft_entropy\tright_entropy\tknown\n")
+        candidates.forEach { c ->
+            w.write("%s\t%d\t%d\t%.3f\t%.3f\t%.3f\t%d\n".format(c.text, c.count, c.year, c.pmi, c.leftEntropy, c.rightEntropy, if (c.known) 1 else 0))
+        }
+    }
+    out.appendLine("words: ${candidates.size} runs of at least ${options.minCount}, ${candidates.count { !it.known }} of them not in the data")
+}
+
+/**
+ * The candidates of `words` that pass the thresholds, as a word pack: each read by its characters'
+ * likeliest readings, scored on the model's unigram scale by its count ([CountFit] over the
+ * candidates the model knows). One with a character no reading is known for is left out.
+ */
+private fun pack(options: Options, out: Appendable) {
+    val data = PinyinData.load(map(options.data!!))
+    val readings = CharReadings(data)
+    val rows = File(options.inputs.single()).useLines { lines ->
+        lines.filter { it.isNotBlank() && !it.startsWith('#') }.map { it.split('\t') }.toList()
+    }
+    val known = rows.mapNotNull { f ->
+        val id = data.wordIndex.find(f[0], 0, f[0].length)
+        if (id >= 0 && id < data.model.vocabularySize) f[1].toLong() to data.model.score(id) else null
+    }
+    val fit = CountFit.of(known)
+    out.appendLine("fit: log10 P = %.3f + %.3f log10(count + 1), over ${known.size} words the model has".format(fit.a, fit.b))
+    var unread = 0
+    val words = rows.filter { f ->
+        f[6] == "0" && f[1].toInt() >= options.minCount && f[3].toDouble() >= options.minPmi &&
+            minOf(f[4].toDouble(), f[5].toDouble()) >= options.minEntropy
+    }
+    File(options.output!!).bufferedWriter().use { w ->
+        w.write("${WordPack.HEADER}\n# layer: ${options.layer}\n")
+        for (f in words) {
+            val pinyin = readings.of(f[0]) ?: run { unread++; continue }
+            w.write("%s\t%s\t%.3f\n".format(f[0], pinyin, minOf(0f, fit.prob(f[1].toLong()))))
+        }
+    }
+    out.appendLine("pack: ${words.size - unread} words, $unread left out for want of a reading")
+}
+
+/** The likeliest reading of each character the dictionary has alone. */
+private class CharReadings(data: PinyinData) {
+    private val best = HashMap<Char, Pair<Int, Float>>()
+
+    init {
+        val d = data.dictionary
+        for (i in 0 until d.childCount(d.root)) {
+            val node = d.firstChild(d.root) + i
+            for (w in 0 until d.wordCount(node)) {
+                val word = data.vocabulary.word(d.word(node, w))
+                if (word.length != 1) continue
+                val weight = d.weight(node, w)
+                if ((best[word[0]]?.second ?: Float.NEGATIVE_INFINITY) < weight) best[word[0]] = d.syllable(node) to weight
+            }
+        }
+    }
+
+    /** `pin'yin` for [text], or null if a character of it has no reading. */
+    fun of(text: String): String? = text.map { best[it]?.first ?: return null }.joinToString("'") { Syllables.spelling(it) }
 }
 
 private fun mix(options: Options, out: Appendable) {
@@ -126,7 +255,7 @@ private fun mix(options: Options, out: Appendable) {
     var documents = 0
     for (corpus in options.inputs) {
         if (corpus.endsWith(".parquet")) {
-            WebText.read(File(corpus)) { page ->
+            WebText.read(File(corpus)) { page, _ ->
                 page.forEach(counts::add)
                 documents++
             }
@@ -149,8 +278,10 @@ private fun mix(options: Options, out: Appendable) {
 }
 
 private const val RIME_SUFFIX = ".dict.yaml"
+/** The layer of the words from Rime's dictionaries: 万象's, the only ones read so far. */
+private const val WANXIANG_LAYER = "wanxiang"
 
-private fun pinyin(output: String, lm: String, dicts: List<String>, out: Appendable) {
+private fun pinyin(output: String, lm: String, dicts: List<String>, rimeUnigrams: Long?, out: Appendable) {
     val builder = PinyinDataBuilder()
     val counts = File(lm).bufferedReader().use { r ->
         ArpaReader.read(r, lm) { words, prob, backoff ->
@@ -165,12 +296,25 @@ private fun pinyin(output: String, lm: String, dicts: List<String>, out: Appenda
     val reader = PinyinDictReader(builder)
     // Rime's are read together, after libime's: a word's weights there depend on every file it is in
     val (rime, libime) = dicts.partition { it.endsWith(RIME_SUFFIX) }
+    builder.layers(if (rime.isEmpty()) listOf(WordLayers.BASE) else listOf(WordLayers.BASE, WANXIANG_LAYER))
     libime.forEach { path -> File(path).bufferedReader().use { reader.read(it, path) } }
     if (rime.isNotEmpty()) {
+        reader.layer = 1
         val rimeDict = RimeDict()
         rime.forEach { path -> File(path).bufferedReader().use { rimeDict.read(it, path) } }
         rimeDict.entries().forEach { (word, pinyin, weight) -> reader.add(word, pinyin, weight) }
         out.appendLine("rime: ${rimeDict.words} words")
+        if (rimeUnigrams != null) {
+            val fit = CountFit.of(rimeDict.totals().mapNotNull { (word, count) -> builder.unigramOf(word)?.let { count to it } }.toList())
+            var added = 0
+            rimeDict.totals().forEach { (word, count) ->
+                if (count >= rimeUnigrams && builder.unigramOf(word) == null) {
+                    builder.unigram(word, fit.prob(count), 0f)
+                    added++
+                }
+            }
+            out.appendLine("rime: $added words the model lacks scored by their counts, log10 P = %.3f + %.3f log10(count + 1)".format(fit.a, fit.b))
+        }
     }
     out.appendLine("dictionary: ${reader.entries} readings")
     if (reader.skipped > 0) {

@@ -44,10 +44,11 @@ object WebText {
     }
 
     /**
-     * The lines of each page of [shard] that [accepts] takes, a page at a time, in the shard's order.
+     * The lines of each page of [shard] that [accepts] takes, and the page's date (`2023-06-14T...`,
+     * or empty), a page at a time, in the shard's order.
      * @throws IOException if DuckDB cannot read it
      */
-    fun read(shard: File, page: (List<String>) -> Unit) {
+    fun read(shard: File, page: (List<String>, String) -> Unit) {
         // read_parquet takes these for a glob
         require(shard.path.none { it in "*?[" }) { "a path DuckDB would take for a glob: $shard" }
         val path = shard.path.replace("'", "''")
@@ -62,7 +63,7 @@ object WebText {
         }
     }
 
-    private fun query(statement: Statement, path: String, page: (List<String>) -> Unit) {
+    private fun query(statement: Statement, path: String, page: (List<String>, String) -> Unit) {
         // in the file's order (DuckDB's default, made explicit): the mixed model must come out the
         // same every build
         statement.execute("SET preserve_insertion_order = true")
@@ -71,10 +72,11 @@ object WebText {
         statement.execute("SET memory_limit = '1GB'")
         // each thread buffers row groups of its own; mix is single-threaded past the read anyway
         statement.execute("SET threads = 2")
-        statement.executeQuery("SELECT coalesce(url, ''), text FROM read_parquet('$path') WHERE text IS NOT NULL").use { rows ->
+        val columns = "coalesce(url, ''), text, coalesce(CAST(date AS VARCHAR), '')"
+        statement.executeQuery("SELECT $columns FROM read_parquet('$path') WHERE text IS NOT NULL").use { rows ->
             while (rows.next()) {
                 val text = rows.getString(2)
-                if (accepts(rows.getString(1), text)) page(text.split('\n').map(String::trim).filter(String::isNotEmpty))
+                if (accepts(rows.getString(1), text)) page(text.split('\n').map(String::trim).filter(String::isNotEmpty), rows.getString(3))
             }
         }
     }

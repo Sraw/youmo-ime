@@ -62,9 +62,17 @@ class ReadersTest {
         reader.read("好\thao\t0\n\n好 hao'ni -0.5\n好\txyz\t0\n耗 hao\n好\tni'xyz'xyz\n".reader().buffered(), "dict")
         assertEquals(3, reader.entries)
         assertEquals(mapOf("xyz" to 3), reader.unknownSyllables)
+        // read into another layer from here on
+        builder.layers(listOf("base", "more"))
+        reader.layer = 1
+        reader.read("耗子 hao'zi\n".reader().buffered(), "dict")
+        assertEquals(4, reader.entries)
         assertEquals(3, reader.skipped)
         val data = PinyinData.load(ByteBuffer.wrap(builder.build().toByteArray()))
         assertEquals(2, data.dictionary.wordCount(data.dictionary.find(intArrayOf(org.fcitx.fcitx5.android.engine.pinyin.Syllables.id("hao")))))
+        assertEquals(listOf("base", "more"), data.layers.names)
+        assertEquals(1, data.layers.layer((0 until data.vocabulary.size).first { data.vocabulary.word(it) == "耗子" }))
+        assertEquals(0, data.layers.layer((0 until data.vocabulary.size).first { data.vocabulary.word(it) == "好" }))
     }
 
     @Test
@@ -79,6 +87,7 @@ class ReadersTest {
         val entries = rime.entries().toList()
         assertEquals(listOf("绿" to "lv", "绿" to "lu", "略" to "lve", "绿色" to "lv'se", "绿色" to "lu'se"), entries.map { it.first to it.second })
         assertEquals(listOf(0f, -1.02936f, 0f, 0f, -3.36605f), entries.map { it.third })
+        assertEquals(listOf("绿" to 1905L, "略" to 0L, "绿色" to 2322L), rime.totals().toList())
         assertEquals("nv", RimeDict.toneless("Nǚ"))
         assertEquals("lv", RimeDict.toneless("LǙ"))
         assertEquals("zhang", RimeDict.toneless("zhāng"))
