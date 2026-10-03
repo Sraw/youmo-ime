@@ -44,7 +44,9 @@ class NewWords(private val known: Set<String>, private val minCount: Int, privat
     private val runs = Array(maxLength + 1) { LongIndex(if (it <= 1) 1 shl 12 else 1 shl 20) }
     private val counts = Array(maxLength + 1) { IntColumn(if (it <= 1) 1 shl 12 else 1 shl 20) }
     private val years = Array(maxLength + 1) { IntColumn(if (it <= 1) 1 shl 12 else 1 shl 20) }
-    private var chars = 0L
+    /** The Han characters counted, after the first pass. */
+    var chars = 0L
+        private set
 
     // the last pass: the runs that reached minCount, and (run, side, neighbour) counts by their index
     private val kept = LongIndex(1 shl 16)

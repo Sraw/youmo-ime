@@ -84,18 +84,20 @@ class MainTest {
         val candidates = tmp.root.resolve("candidates.tsv").path
         // the test corpus is a parquet shard: WebTextTest covers reading one; here the candidates are written
         File(candidates).writeText(
-            "# text\tcount\tyear\tpmi\tleft_entropy\tright_entropy\tknown\n" +
-                "你\t99\t0\t0.000\t3.000\t3.000\t1\n好\t9\t0\t0.000\t3.000\t3.000\t1\n" +
-                "你好\t99\t2020\t2.000\t3.000\t3.000\t1\n好你\t99\t2023\t2.000\t2.000\t2.000\t0\n" +
-                "耗子\t9\t2024\t2.000\t2.000\t2.000\t0\n好好\t99\t2023\t0.500\t2.000\t2.000\t0\n" +
-                "你你\t99\t2023\t2.000\t1.000\t2.000\t0\n嗯好\t99\t2023\t2.000\t2.000\t2.000\t0\n",
+            "# text\tcount\tyear\tpmi\tleft_entropy\tright_entropy\tsurprise\tknown\n# chars\t1000\n" +
+                "你\t99\t0\t0.000\t3.000\t3.000\t0.000\t1\n好\t9\t0\t0.000\t3.000\t3.000\t0.000\t1\n" +
+                "你好\t99\t2020\t2.000\t3.000\t3.000\t0.300\t1\n好你\t99\t2023\t2.000\t2.000\t2.000\t1.500\t0\n" +
+                "耗子\t9\t2024\t2.000\t2.000\t2.000\t1.500\t0\n好好\t99\t2023\t0.500\t2.000\t2.000\t1.500\t0\n" +
+                "你你\t99\t2023\t2.000\t1.000\t2.000\t1.500\t0\n嗯好\t99\t2023\t2.000\t2.000\t2.000\t1.500\t0\n" +
+                "好你好\t99\t2023\t2.000\t2.000\t2.000\t0.500\t0\n",
         )
         val pack = tmp.root.resolve("new.words").path
         val (code, out, err) = run("pack", "-o", pack, "--data", output, "--layer", "2026q3", "--min-count", "5", candidates)
         assertEquals(err, 0, code)
         // 你 (99) and 好 (9) fit log10 P = -2 + 0.5 log10(c + 1) exactly; 你好, which the model lacks, does not count
         assertTrue(out, out.contains("fit: log10 P = -2.000 + 0.500 log10(count + 1), over 2 words"))
-        // 好好 held together too little, 你你 too few different neighbours, 嗯 has no reading
+        // 好好 held together too little, 你你 too few different neighbours, 好你好 no more frequent than
+        // the model says of 好 你好, 嗯 has no reading
         assertTrue(out, out.contains("pack: 2 words, 1 left out for want of a reading"))
         assertEquals(
             "# youmo words 1\n# layer: 2026q3\n好你\thao'ni\t-1.000\n耗子\thao'zi\t-1.500\n",

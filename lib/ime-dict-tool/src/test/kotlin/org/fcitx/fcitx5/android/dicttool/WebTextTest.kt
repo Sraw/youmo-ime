@@ -31,6 +31,10 @@ class WebTextTest {
     fun writtenPagesAreLeftOut() {
         // not a particle in it
         assertFalse(WebText.accepts("https://news.example.com/1", "今年一季度我国工业经济增势良好，新产业持续发力。"))
+        // news is taken when every page is asked for, an encyclopedia's or a traditional one never
+        assertTrue(WebText.accepts("https://news.example.com/1", "今年一季度我国工业经济增势良好，新产业持续发力。", chatOnly = false))
+        assertFalse(WebText.accepts("https://zh.wikipedia.org/wiki/x", "今年一季度我国工业经济增势良好。", chatOnly = false))
+        assertFalse(WebText.accepts("https://news.example.com/1", "這些年來經濟發展很好", chatOnly = false))
         // exactly 5 a thousand is enough, one fewer is not
         val han = "国".repeat(995)
         assertTrue(WebText.accepts("https://a.example.com/", han + "吗呢吧啊呀"))
@@ -100,17 +104,22 @@ class WebTextTest {
         val dict = tmp.newFile("dict.txt").apply { writeText("你\tni\t0\n好 hao\n") }.path
         val data = tmp.root.resolve("pinyin.data").path
         assertEquals(0, runCli(arrayOf("pinyin", "-o", data, "--lm", lm, dict), StringBuilder(), StringBuilder()))
-        val shard = parquet("https://a.example.com/1" to "你好吧，好你呢\n你好啊", "https://b.example.com/2" to "你好吗")
+        // the news page has no particles: taken for words all the same
+        val shard = parquet("https://a.example.com/1" to "你好吧，好你呢\n你好啊", "https://b.example.com/2" to "你好吗", "https://c.example.com/3" to "你好")
         val out = StringBuilder()
         val candidates = tmp.root.resolve("candidates.tsv")
         val code = runCli(arrayOf("words", "-o", candidates.path, "--data", data, "--min-count", "2", shard.path), out, StringBuilder())
         assertEquals(out.toString(), 0, code)
-        assertTrue(out.toString(), out.contains("pass 1: 2 pages"))
+        assertTrue(out.toString(), out.contains("pass 1: 3 pages"))
         assertTrue(out.toString(), out.contains("words: 1 runs of at least 2, 1 of them not in the data"))
-        val rows = candidates.readLines().filter { !it.startsWith("#") }.map { it.split("\t") }
+        val lines = candidates.readLines()
+        assertEquals("# chars\t14", lines[1])
+        val rows = lines.filter { !it.startsWith("#") }.map { it.split("\t") }
         assertEquals(listOf("你好"), rows.map { it[0] })
         // three times, first on the dated page; 吧/啊/吗 are single and no words of the data: not counted
-        assertEquals(listOf("3", "2023", "0"), listOf(rows[0][1], rows[0][2], rows[0][6]))
+        assertEquals(listOf("4", "2023", "0"), listOf(rows[0][1], rows[0][2], rows[0][7]))
+        // log10(4 / 14) against the model's 你 (-1) 好 after 你 (-0.3)
+        assertEquals(0.756, rows[0][6].toDouble(), 1e-3)
     }
 
     @Test

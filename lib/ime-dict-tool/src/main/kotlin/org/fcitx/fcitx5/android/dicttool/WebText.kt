@@ -20,8 +20,11 @@ import java.util.Properties
  */
 object WebText {
 
-    /** Whether the page at [url] with [text] is taken. */
-    fun accepts(url: String, text: String): Boolean {
+    /**
+     * Whether the page at [url] with [text] is taken: not an encyclopedia's, not traditional, and
+     * unless [chatOnly] is off, written the way people write to each other (particles enough).
+     */
+    fun accepts(url: String, text: String, chatOnly: Boolean = true): Boolean {
         // Wikipedia's text is CC BY-SA, whose terms over statistics drawn from it are unsettled; so
         // are its mirrors', Wikimedia's other sites' and the big Chinese wikis' (some NC too), and
         // 百科's are their sites' own
@@ -40,15 +43,15 @@ object WebText {
             }
         }
         // cmn_Hani is Taiwan's and Hong Kong's pages too, whose words the model has not got
-        return traditional * TRADITIONAL_SHARE <= simplified && particles * PER_MILLE >= MIN_PARTICLES * maxOf(1, han)
+        return traditional * TRADITIONAL_SHARE <= simplified && (!chatOnly || particles * PER_MILLE >= MIN_PARTICLES * maxOf(1, han))
     }
 
     /**
-     * The lines of each page of [shard] that [accepts] takes, and the page's date (`2023-06-14T...`,
-     * or empty), a page at a time, in the shard's order.
+     * The lines of each page of [shard] that [accepts] takes (with [chatOnly]), and the page's date
+     * (`2023-06-14T...`, or empty), a page at a time, in the shard's order.
      * @throws IOException if DuckDB cannot read it
      */
-    fun read(shard: File, page: (List<String>, String) -> Unit) {
+    fun read(shard: File, chatOnly: Boolean = true, page: (List<String>, String) -> Unit) {
         // read_parquet takes these for a glob
         require(shard.path.none { it in "*?[" }) { "a path DuckDB would take for a glob: $shard" }
         val path = shard.path.replace("'", "''")
@@ -56,14 +59,14 @@ object WebText {
         val streaming = Properties().apply { setProperty("jdbc_stream_results", "true") }
         try {
             DriverManager.getConnection("jdbc:duckdb:", streaming).use { connection ->
-                connection.createStatement().use { statement -> query(statement, path, page) }
+                connection.createStatement().use { statement -> query(statement, path, chatOnly, page) }
             }
         } catch (e: SQLException) {
             throw IOException("$shard: ${e.message}", e)
         }
     }
 
-    private fun query(statement: Statement, path: String, page: (List<String>, String) -> Unit) {
+    private fun query(statement: Statement, path: String, chatOnly: Boolean, page: (List<String>, String) -> Unit) {
         // in the file's order (DuckDB's default, made explicit): the mixed model must come out the
         // same every build
         statement.execute("SET preserve_insertion_order = true")
@@ -76,7 +79,7 @@ object WebText {
         statement.executeQuery("SELECT $columns FROM read_parquet('$path') WHERE text IS NOT NULL").use { rows ->
             while (rows.next()) {
                 val text = rows.getString(2)
-                if (accepts(rows.getString(1), text)) page(text.split('\n').map(String::trim).filter(String::isNotEmpty), rows.getString(3))
+                if (accepts(rows.getString(1), text, chatOnly)) page(text.split('\n').map(String::trim).filter(String::isNotEmpty), rows.getString(3))
             }
         }
     }

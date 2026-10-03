@@ -36,7 +36,7 @@ val USAGE = """
            check <pinyin data> <lm.arpa>                  compare compiled scores with the model
            words -o <out.tsv> --data <pinyin.data> [--min-count <n>] <shard.parquet>...
                                                           the words the pages use that the data lacks (NewWords)
-           pack -o <out.words> --data <pinyin.data> --layer <name> [--min-count <n>] [--min-pmi <x>] [--min-entropy <x>] <candidates.tsv>
+           pack -o <out.words> --data <pinyin.data> --layer <name> [--min-count <n>] [--min-pmi <x>] [--min-entropy <x>] [--min-surprise <x>] <candidates.tsv>
                                                           a word pack (WordPack) of the candidates that pass
 """.trimIndent()
 
@@ -98,10 +98,11 @@ private class Options(
     val data: String?,
     /** `words`: how often a run must occur to be a candidate; `pack`: to go in. */
     val minCount: Int,
-    /** `pack`: the layer the words are of, and the least pmi and entropy (either side) a candidate needs. */
+    /** `pack`: the layer the words are of, and the least pmi, entropy (either side) and surprise a candidate needs. */
     val layer: String?,
     val minPmi: Double,
     val minEntropy: Double,
+    val minSurprise: Double,
 ) {
     /** Whether [command] takes these options. */
     fun fit(command: String?): Boolean {
@@ -126,9 +127,13 @@ private class Options(
         // a run ten times as frequent as its parts predict, with a handful of different neighbours
         const val MIN_PMI = 1.0
         const val MIN_ENTROPY = 1.5
+        // ten times as frequent as the model predicts of its parts
+        const val MIN_SURPRISE = 1.0
 
         // every option takes a value
-        private val FLAGS = setOf("-o", "--lm", "--weight", "--cutoffs", "--rime-unigrams", "--data", "--min-count", "--layer", "--min-pmi", "--min-entropy")
+        private val FLAGS = setOf(
+            "-o", "--lm", "--weight", "--cutoffs", "--rime-unigrams", "--data", "--min-count", "--layer", "--min-pmi", "--min-entropy", "--min-surprise",
+        )
 
         /** @return null for an option with a bad or missing value */
         fun parse(args: List<String>): Options? {
@@ -155,6 +160,7 @@ private class Options(
                 layer = values["--layer"]?.let { it.takeIf(WordPack::validLayer) ?: return null },
                 minPmi = read("--min-pmi", MIN_PMI) { it.toDoubleOrNull()?.takeIf(Double::isFinite) } ?: return null,
                 minEntropy = read("--min-entropy", MIN_ENTROPY) { it.toDoubleOrNull()?.takeIf(Double::isFinite) } ?: return null,
+                minSurprise = read("--min-surprise", MIN_SURPRISE) { it.toDoubleOrNull()?.takeIf(Double::isFinite) } ?: return null,
             )
         }
     }
@@ -162,8 +168,8 @@ private class Options(
 
 /**
  * The runs of Han characters the pages use that the data's base layer lacks, with what tells a
- * word from a chance run: `text count year pmi left-entropy right-entropy known`, a line each,
- * most frequent first ([NewWords]). Lines starting `#` are comments.
+ * word from a chance run: `text count year pmi left-entropy right-entropy surprise known`, a
+ * line each, most frequent first ([NewWords], [Surprise]). Lines starting `#` are comments.
  */
 private fun words(options: Options, out: Appendable) {
     val data = PinyinData.load(map(options.data!!))
@@ -176,7 +182,8 @@ private fun words(options: Options, out: Appendable) {
     while (!finder.done) {
         pages = 0
         for (shard in shards) {
-            WebText.read(shard) { page, date ->
+            // every simplified page, not only the chat-like: new words are in the news too
+            WebText.read(shard, chatOnly = false) { page, date ->
                 page.forEach { finder.add(it, date) }
                 pages++
             }
@@ -185,10 +192,13 @@ private fun words(options: Options, out: Appendable) {
         finder.nextPass()
     }
     val candidates = finder.candidates()
+    val surprise = Surprise(data)
     File(options.output!!).bufferedWriter().use { w ->
-        w.write("# text\tcount\tyear\tpmi\tleft_entropy\tright_entropy\tknown\n")
+        w.write("# text\tcount\tyear\tpmi\tleft_entropy\tright_entropy\tsurprise\tknown\n")
+        w.write("# chars\t${finder.chars}\n")
         candidates.forEach { c ->
-            w.write("%s\t%d\t%d\t%.3f\t%.3f\t%.3f\t%d\n".format(c.text, c.count, c.year, c.pmi, c.leftEntropy, c.rightEntropy, if (c.known) 1 else 0))
+            val s = surprise.of(c.text, c.count, finder.chars)
+            w.write("%s\t%d\t%d\t%.3f\t%.3f\t%.3f\t%.3f\t%d\n".format(c.text, c.count, c.year, c.pmi, c.leftEntropy, c.rightEntropy, s, if (c.known) 1 else 0))
         }
     }
     out.appendLine("words: ${candidates.size} runs of at least ${options.minCount}, ${candidates.count { !it.known }} of them not in the data")
@@ -213,8 +223,8 @@ private fun pack(options: Options, out: Appendable) {
     out.appendLine("fit: log10 P = %.3f + %.3f log10(count + 1), over ${known.size} words the model has".format(fit.a, fit.b))
     var unread = 0
     val words = rows.filter { f ->
-        f[6] == "0" && f[1].toInt() >= options.minCount && f[3].toDouble() >= options.minPmi &&
-            minOf(f[4].toDouble(), f[5].toDouble()) >= options.minEntropy
+        f[7] == "0" && f[1].toInt() >= options.minCount && f[3].toDouble() >= options.minPmi &&
+            minOf(f[4].toDouble(), f[5].toDouble()) >= options.minEntropy && f[6].toDouble() >= options.minSurprise
     }
     File(options.output!!).bufferedWriter().use { w ->
         w.write("${WordPack.HEADER}\n# layer: ${options.layer}\n")
