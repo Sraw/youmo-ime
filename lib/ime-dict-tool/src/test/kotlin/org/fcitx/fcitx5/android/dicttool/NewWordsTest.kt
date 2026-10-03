@@ -65,5 +65,9 @@ class NewWordsTest {
         assertThrows(IllegalArgumentException::class.java) { NewWords(emptySet(), 0) }
         assertThrows(IllegalArgumentException::class.java) { NewWords(emptySet(), 1, 5) }
         assertEquals("搭子", NewWords.text(NewWords.key("饭搭子", 1, 2), 2))
+        // four chars from the top of the Han block: the key must stay a non-negative long (a LongIndex key)
+        val high = NewWords.key("鼠鼠我鿿", 0, 4)
+        assertTrue(high >= 0)
+        assertEquals("鼠鼠我鿿", NewWords.text(high, 4))
     }
 }

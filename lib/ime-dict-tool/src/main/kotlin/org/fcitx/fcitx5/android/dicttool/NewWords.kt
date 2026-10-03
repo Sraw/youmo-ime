@@ -166,16 +166,19 @@ class NewWords(private val known: Set<String>, private val minCount: Int, privat
 
         fun isHan(c: Char) = c in '一'..'鿿' || c in '㐀'..'䶿'
 
-        /** [length] chars of [text] from [start], 16 bits each, the first highest. */
+        // the chars are counted from the first Han one: four then fit a LongIndex key, which is never negative
+        private const val FIRST = '\u3400'
+
+        /** [length] Han chars of [text] from [start], 16 bits each, the first highest. */
         fun key(text: CharSequence, start: Int, length: Int): Long {
             var key = 0L
-            for (i in 0 until length) key = (key shl 16) or text[start + i].code.toLong()
+            for (i in 0 until length) key = (key shl 16) or (text[start + i] - FIRST).toLong()
             return key
         }
 
         fun text(key: Long, length: Int): String {
             val out = CharArray(length)
-            for (i in 0 until length) out[length - 1 - i] = ((key ushr (16 * i)) and 0xffff).toInt().toChar()
+            for (i in 0 until length) out[length - 1 - i] = FIRST + ((key ushr (16 * i)) and 0xffff).toInt()
             return String(out)
         }
 
