@@ -15,7 +15,9 @@ android {
     namespace = "org.fcitx.fcitx5.android"
 
     defaultConfig {
-        applicationId = "org.fcitx.fcitx5.android"
+        applicationId = "io.github.sraw.youmo"
+        // UserDataOrigin: what this id was before, for importing backups made under it
+        buildConfigField("String", "APPLICATION_ID_ROOT", "\"$applicationId\"")
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         @Suppress("UnstableApiUsage")

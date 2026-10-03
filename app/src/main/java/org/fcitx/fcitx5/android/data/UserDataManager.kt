@@ -56,6 +56,9 @@ object UserDataManager {
     private val externalDir = appContext.getExternalFilesDir(null)!!
     private val recentlyUsedDir = appContext.filesDir.resolve(RecentlyUsed.DIR_NAME)
 
+    // the engine's user store (EngineBridge): what it learnt of the user's words, user tables
+    private val engineDir = appContext.filesDir.resolve("engine")
+
     @OptIn(ExperimentalSerializationApi::class)
     fun export(dest: OutputStream, timestamp: Long = System.currentTimeMillis()) = runCatching {
         ZipOutputStream(dest.buffered()).use { zipStream ->
@@ -65,6 +68,8 @@ object UserDataManager {
             writeFileTree(dataBasesDir, "databases", zipStream)
             // external
             writeFileTree(externalDir, "external", zipStream)
+            // engine
+            if (engineDir.isDirectory) writeFileTree(engineDir, "engine", zipStream)
             // recently_used moved to SharedPreference and shoud not be exported
             // metadata
             zipStream.putNextEntry(ZipEntry("metadata.json"))
@@ -97,11 +102,19 @@ object UserDataManager {
                 val metadataFile = extracted.find { it.name == "metadata.json" }
                     ?: errorRuntime(R.string.exception_user_data_metadata)
                 val metadata = json.decodeFromString<Metadata>(metadataFile.readText())
-                if (metadata.packageName != BuildConfig.APPLICATION_ID)
-                    errorRuntime(R.string.exception_user_data_package_name_mismatch)
+                val origin = UserDataOrigin.of(
+                    metadata.packageName, BuildConfig.APPLICATION_ID, BuildConfig.APPLICATION_ID_ROOT
+                ) ?: errorRuntime(R.string.exception_user_data_package_name_mismatch)
+                if (origin is UserDataOrigin.Legacy) {
+                    val prefs = File(tempDir, "shared_prefs")
+                    File(prefs, origin.preferences).takeIf { it.exists() }?.renameTo(File(prefs, origin.renamed))
+                }
                 copyDir(File(tempDir, "shared_prefs"), sharedPrefsDir)
                 copyDir(File(tempDir, "databases"), dataBasesDir)
                 copyDir(File(tempDir, "external"), externalDir)
+                // fcitx is stopped, so is the engine: its open logs are replaced, not written into
+                // (copyRecursively deletes a file before writing it), and the app exits right after
+                if (File(tempDir, "engine").exists()) copyDir(File(tempDir, "engine"), engineDir)
                 // keep importing recently_used for backwords compatibility
                 copyDir(File(tempDir, "recently_used"), recentlyUsedDir)
                 metadata

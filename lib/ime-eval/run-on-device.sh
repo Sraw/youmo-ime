@@ -9,7 +9,7 @@ HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO="$(cd "$HERE/../.." && pwd)"
 SET=${1:-pinyin}
 IME=${2:-pinyin}
-PKG=org.fcitx.fcitx5.android.debug
+PKG=${FCITX_PKG:-io.github.sraw.youmo.debug}
 OUT=${3:-$HERE/build/eval}
 
 cd "$REPO"

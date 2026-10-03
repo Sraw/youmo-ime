@@ -1,151 +1,219 @@
-# fcitx5-android
+# 幽默输入法 · Youmo IME
 
-[Fcitx5](https://github.com/fcitx/fcitx5) input method framework and engines ported to Android.
+[中文](#幽默输入法) · [English](#youmo-ime)
 
-## Download
+---
 
-[<img src="https://github.com/rubenpgrady/get-it-on-github/raw/refs/heads/main/get-it-on-github.png" alt="Git it on GitHub" width="207" height="80">](https://github.com/fcitx5-android/fcitx5-android/releases/latest)
-[<img src="https://fdroid.gitlab.io/artwork/badge/get-it-on.png" alt="Get it on F-Droid" width="207" height="80">](https://f-droid.org/packages/org.fcitx.fcitx5.android)
-[<img alt="Get it on Google Play" src="https://play.google.com/intl/en_us/badges/static/images/badges/en_badge_web_generic.png" width="207" height="80">](https://play.google.com/store/apps/details?id=org.fcitx.fcitx5.android)
+## 幽默输入法
 
-You can also download the **latest CI build** on our Jeninks server: [![build status](https://img.shields.io/jenkins/build.svg?jobUrl=https://jenkins.fcitx-im.org/job/android/job/fcitx5-android/)](https://jenkins.fcitx-im.org/job/android/job/fcitx5-android/)
+一个在手机上**完全离线**运行的 Android 中文输入法。它基于 [fcitx5-android](https://github.com/fcitx5-android/fcitx5-android)，
+保留 [Fcitx5](https://github.com/fcitx/fcitx5) 作为输入法框架，拼音引擎是自己用 Kotlin 写的，取代了原来的 libime，
+并且在 n-gram 解码器之上加了两个小型神经网络模型给整句候选重新排序。
 
-> [!NOTE]
-> APKs downloaded from GitHub Release/F-Droid/Jenkins have the same signature, which means they're compatible when upgrading, but Google Play's do not.
-> <details>
-> <summary>(click here for detailed signature info)</summary>
-> <ul>
-> <li>Package Name: <code>org.fcitx.fcitx5.android</code></li>
-> <li>Certificate SHA-256 fingerprint:</li>
-> <ul>
-> <li>GitHub Release/Jenkins/F-Droid</li>
-> <code>E4:DB:1E:9E:DF:F1:36:29:D0:7D:E4:BB:F8:16:5F:E9:BD:85:57:AB:55:09:26:72:DA:8E:40:DB:E4:84:EC:D7</code>
-> <li>Google Play</li>
-> <code>06:53:6F:F6:E8:76:C0:14:E1:4B:44:6F:61:FA:2B:80:9E:06:67:39:A1:D1:17:0D:0A:7A:89:88:4C:48:00:33</code>
-> </ul>
-> </ul>
-> </details>
+> 这是一个独立维护的分支，与 Fcitx5 和 fcitx5-android 官方无关，也不会合并回上游。问题请在本仓库反馈，不要报给上游。
 
-In case you want Fcitx5 on other platforms: [macOS](https://github.com/fcitx-contrib/fcitx5-macos), [iOS](https://github.com/fcitx-contrib/fcitx5-ios), [HarmonyOS](https://github.com/fcitx-contrib/fcitx5-harmony), [ChromeOS](https://github.com/fcitx-contrib/fcitx5-chrome), [Windows](https://github.com/fcitx-contrib/fcitx5-windows); or [try Fcitx5 in the browser](https://fcitx-contrib.github.io/online/index.html)
+### 特点
 
-## Project status
+- **自己的拼音引擎**：全拼、双拼（8 种方案），按整句解码；简拼、半截输入、相邻键打错的纠正；按前文给出联想。
+- **神经网络重排**：
+  - 每次按键，4M 参数的模型（4.5 MB）在解码器的前两个整句里重排；
+  - 停顿时，25M 参数的模型（25 MB）在前五个整句里精排；
+  - 两个模型都会读输入框里光标前的文字作为上下文（密码框等敏感输入框不读）。
+- **越用越顺手**：用户词库、调频；可以导入词库，支持自定义短语；长按候选可以删除或置顶词组。
+- **码表输入**：五笔、仓颉、自然码、二笔等，用自己的码表引擎，也可以导入码表。
+- **不联网**：应用不申请网络权限，输入的内容不会离开手机（[隐私政策](PRIVACY.md)）。
+- **其他**：Material 3 界面、可自定义长按字符、主题、剪贴板管理（复制链接时自动去掉跟踪参数）、表情与符号、实体键盘下的悬浮候选栏。
 
-### Supported Languages
+### 效果
 
-- English (with spell check)
-- Chinese: Pinyin, Shuangpin, Wubi, Cangjie and custom tables (powered by [fcitx5-chinese-addons](https://github.com/fcitx/fcitx5-chinese-addons))
+首选正确率（%）。"解码器"指只用 n-gram 解码器，"+ 模型"指加上 4M 和 25M 两个模型。
 
-### Implemented Features
+| 测试集 | 解码器 | + 模型 |
+|---|---|---|
+| 主集（日常与书面句子） | 88.5 | 91.1 |
+| 聊天 | 69.5 | 73.3 |
+| 万象 246 | 64.2 | 68.7 |
+| 大集（取 1/10，22317 句） | 74.1 | 78.8 |
 
-- Virtual Keyboard (layout not customizable yet)
-- Expandable candidate view
-- Clipboard management (plain text only)
-- Theming (custom color scheme, background image and dynamic color aka monet color after Android 12)
-- Popup preview on key press
-- Long press popup keyboard for convenient symbol input
-- Symbol and Emoji picker
-- Floating candidates panel when using physical keyboard
+测法见 `lib/ime-eval`。
 
-### Planned Features
+### 下载
 
-- Customizable keyboard layout
+安装包会发布在 [Releases](https://github.com/Sraw/fcitx5-android/releases)；在那之前请按下文自行构建。
 
-## Screenshots
+包名是 `io.github.sraw.youmo`，可以和上游的 Fcitx5（`org.fcitx.fcitx5.android`）同时安装。
+从本分支改名前的版本换过来，可以在旧版的“高级”设置里导出用户数据，再到新版里导入：设置、主题、剪贴板会带过来；
+旧版的备份不含引擎学到的词和词频，这部分要重新积累（新版的备份包含它们）。
 
-|拼音, Material Light theme, key border enabled|自然码双拼, Pixel Dark theme, key border disabled|
-|:-:|:-:|
-|<img src="https://github.com/fcitx5-android/fcitx5-android/assets/13914967/bd429247-62d9-4c78-bab8-70ef3ce47588" width="360px">|<img src="https://github.com/fcitx5-android/fcitx5-android/assets/13914967/3ae969c1-7ed0-4f92-a5df-19dc8c90a8c3" width="360px">|
+### 数据与许可
 
-|Emoji picker, Pixel Light theme, key border enabled|Symbol picker, Material Dark theme, key border disabled|
-|:-:|:-:|
-|<img src="https://user-images.githubusercontent.com/13914967/202181845-6a5f6bb2-a877-468c-851a-fd7e66e64ed4.png" width="360px">|<img src="https://user-images.githubusercontent.com/13914967/202181861-dd253439-1d5e-4f5f-9535-934f28796a6b.png" width="360px">|
+- 代码：LGPL-2.1-or-later，与上游相同。
+- 词典、拼音语言模型、码表：来自 [libime](https://github.com/fcitx/libime) 发布的文本源（LGPL-2.1-or-later），构建时编译成本引擎的格式。
+  拼音语言模型里混入了 [FineWeb-2](https://huggingface.co/datasets/HuggingFaceFW/fineweb-2) 中文类聊天网页的 n-gram（ODC-By 1.0）。
+- 句子模型：本项目自己训练（Apache-2.0）。先在 FineWeb-2 中文网页上训练语言模型，再用 Qwen3.5-9B-Base（Apache-2.0）给候选列表打分做蒸馏。
+  文件发布在 [sentence-models-20261001](https://github.com/Sraw/fcitx5-android/releases/tag/sentence-models-20261001)。
+- 不使用任何仅限科研用途的数据。
 
-## Get involved
+### 构建
 
-Trello kanban: https://trello.com/b/gftk6ZdV/kanban
+需要：
 
-Matrix Room: https://matrix.to/#/#fcitx5-android:mozilla.org
+- Android SDK Platform 36 与 Build-Tools 36.1.0；
+- Android NDK 28.0.13004108 与 CMake 3.31.6；
+- [extra-cmake-modules](https://github.com/KDE/extra-cmake-modules)、GNU gettext ≥ 0.20。
 
-Discuss on Telegram: [@fcitx5_android_group](https://t.me/fcitx5_android_group) ([@fcitx5_android](https://t.me/fcitx5_android) originally)
-
-## Build
-
-### Dependencies
-
-- Android SDK Platform & Build-Tools 35.
-- Android NDK (Side by side) 25 & CMake 3.22.1, they can be installed using SDK Manager in Android Studio or `sdkmanager` command line.
-- [KDE/extra-cmake-modules](https://github.com/KDE/extra-cmake-modules)
-- GNU Gettext >= 0.20 (for `msgfmt` binary; or install `appstream` if you really have to use gettext <= 0.19.)
-
-### How to set up development environment
-
-<details>
-<summary>Prerequisites for Windows</summary>
-
-- Enable [Developer Mode](https://learn.microsoft.com/en-us/windows/apps/get-started/enable-your-device-for-development) so that symlinks can be created without administrator privilege.
-
-- Enable symlink support for `git`:
-
-    ```shell
-    git config --global core.symlinks true
-    ```
-
-</details>
-
-First, clone this repository and fetch all submodules:
+版本以 [Versions.kt](build-logic/convention/src/main/kotlin/Versions.kt) 为准。
 
 ```shell
-git clone git@github.com:fcitx5-android/fcitx5-android.git
+git clone https://github.com/Sraw/fcitx5-android.git
+cd fcitx5-android
 git submodule update --init --recursive
+sudo apt install extra-cmake-modules gettext   # Debian/Ubuntu；Arch：pacman -S extra-cmake-modules；macOS：brew install extra-cmake-modules gettext
+./gradlew :app:assembleDebug
 ```
 
-Install `extra-cmake-modules` and `gettext` with your system package manager:
+构建会自动下载引擎数据和句子模型，并按 SHA-256 校验：
+
+- 第一次下载 libime 的数据源和两个 FineWeb-2 分片，约 10 GB；
+- 混入 FineWeb-2 这一步大约要 7 分钟、7 GB 内存。内存只有 16 GB 的机器先运行 `./gradlew --stop`。
+  加 `-Pengine.mix=false` 可以跳过这一步，但拼音模型就不含聊天语料了。
+
+正式版需要签名。把以下三项写进 `~/.gradle/gradle.properties`（也可以用环境变量 `SIGN_KEY_FILE`、`SIGN_KEY_ALIAS`、`SIGN_KEY_PWD`；
+密钥文件也可以用 base64 写在 `signKeyBase64` / `SIGN_KEY_BASE64` 里），然后运行 `./gradlew :app:assembleRelease`。
+没有配置密钥，或者密钥文件路径不存在时，构建不会报错，而是生成未签名的安装包。
+
+```properties
+signKeyFile=/path/to/release.p12
+signKeyAlias=...
+signKeyPwd=...
+```
+
+### 开发
+
+| 位置 | 内容 |
+|---|---|
+| `lib/ime-core` | 纯 JVM 模块，不依赖 Android：拼音与码表引擎、解码器、句子模型推理，以及各种决策逻辑 |
+| `app` | Android 部分：界面、`InputMethodService`、设置、与 Fcitx5 的 JNI 桥 |
+| `lib/ime-eval` | 评测：用测试集模拟打字，算首选正确率等指标 |
+| `lib/ime-dict-tool` | 从文本源构建引擎数据（只在构建时用，不进安装包） |
+
+| 做什么 | 命令 |
+|---|---|
+| 核心逻辑测试、API 级别检查、覆盖率门槛 | `./gradlew :lib:ime-core:check` |
+| 应用的 JVM 测试 | `./gradlew :app:testDebugUnitTest` |
+| 静态检查 | `./gradlew detekt` |
+
+### 致谢
+
+[fcitx5-android](https://github.com/fcitx5-android/fcitx5-android)、[Fcitx5](https://github.com/fcitx/fcitx5)、[libime](https://github.com/fcitx/libime)、
+[fcitx5-chinese-addons](https://github.com/fcitx/fcitx5-chinese-addons)、[FineWeb-2](https://huggingface.co/datasets/HuggingFaceFW/fineweb-2)、[Qwen](https://github.com/QwenLM)。
+
+---
+
+## Youmo IME
+
+*幽默 (yōumò) means humor.*
+
+An Android Chinese input method that runs **entirely offline** on the phone. It is built on
+[fcitx5-android](https://github.com/fcitx5-android/fcitx5-android) and keeps [Fcitx5](https://github.com/fcitx/fcitx5)
+as the input method framework. The pinyin engine is its own, written in Kotlin in place of libime, and two
+small neural models rerank the n-gram decoder's whole-sentence candidates.
+
+> This is an independently maintained fork, not affiliated with Fcitx5 or fcitx5-android, and it will not be
+> merged upstream. Please report issues here, not upstream.
+
+### Features
+
+- **Its own pinyin engine**: full pinyin and shuangpin (8 schemes), decoded as whole sentences; abbreviations, half-typed syllables and slipped neighbouring keys; next-word suggestions from what you have typed.
+- **Neural reranking**:
+  - at every key, a 4M-parameter model (4.5 MB) reorders the decoder's best two sentences;
+  - when you pause, a 25M-parameter model (25 MB) reorders the best five;
+  - both read the text before the cursor in the input field as context (never in password or other sensitive fields).
+- **Learns as you type**: user words and frequencies, imported dictionaries, custom phrases; long-press a candidate to remove or pin it.
+- **Code tables**: Wubi, Cangjie, Ziranma, Erbi and more, on its own table engine; tables can be imported.
+- **No network**: the app asks for no network permission, and what you type never leaves the phone ([privacy policy](PRIVACY.md)).
+- **More**: Material 3 interface, configurable long-press characters, themes, clipboard management (tracking parameters stripped from copied links), emoji and symbols, a floating candidate bar with a physical keyboard.
+
+### Accuracy
+
+Top-1 accuracy (%). "Decoder" is the n-gram decoder alone; "+ models" adds the 4M and 25M models.
+
+| Set | Decoder | + models |
+|---|---|---|
+| Main (everyday and written sentences) | 88.5 | 91.1 |
+| Chat | 69.5 | 73.3 |
+| Wanxiang 246 | 64.2 | 68.7 |
+| Large set (a tenth, 22,317 sentences) | 74.1 | 78.8 |
+
+See `lib/ime-eval` for how these are measured.
+
+### Download
+
+Builds will be published on [Releases](https://github.com/Sraw/fcitx5-android/releases); until then, build it yourself as below.
+
+The package name is `io.github.sraw.youmo`, so it installs alongside upstream Fcitx5 (`org.fcitx.fcitx5.android`).
+To move from this fork's builds before the renaming, export your user data in the old app's Advanced settings and import it in the new one.
+Settings, themes and the clipboard come along. The old app's backups leave out the words and frequencies the engine has learnt, so those start again (the new app's backups include them).
+
+### Data and licences
+
+- Code: LGPL-2.1-or-later, as upstream.
+- Dictionary, pinyin language model and code tables: compiled at build time from the text sources published by [libime](https://github.com/fcitx/libime) (LGPL-2.1-or-later).
+  The pinyin language model also mixes in n-grams from chat-like Chinese pages of [FineWeb-2](https://huggingface.co/datasets/HuggingFaceFW/fineweb-2) (ODC-By 1.0).
+- Sentence models: this project's own (Apache-2.0). A language model is first trained on FineWeb-2's Chinese pages, then distilled from Qwen3.5-9B-Base's (Apache-2.0) scores of candidate lists.
+  The files are published at [sentence-models-20261001](https://github.com/Sraw/fcitx5-android/releases/tag/sentence-models-20261001).
+- No research-only data is used.
+
+### Building
+
+Requirements:
+
+- Android SDK Platform 36 and Build-Tools 36.1.0;
+- Android NDK 28.0.13004108 and CMake 3.31.6;
+- [extra-cmake-modules](https://github.com/KDE/extra-cmake-modules) and GNU gettext ≥ 0.20.
+
+[Versions.kt](build-logic/convention/src/main/kotlin/Versions.kt) has the current versions.
 
 ```shell
-# For Arch Linux (Arch has gettext in it's base meta package)
-sudo pacman -S extra-cmake-modules
-
-# For Debian/Ubuntu
-sudo apt install extra-cmake-modules gettext
-
-# For macOS
-brew install extra-cmake-modules gettext
-
-# For Windows, install MSYS2 and execute in its shell (UCRT64)
-pacman -S mingw-w64-ucrt-x86_64-extra-cmake-modules mingw-w64-ucrt-x86_64-gettext
-# then add C:\msys64\ucrt64\bin to PATH
+git clone https://github.com/Sraw/fcitx5-android.git
+cd fcitx5-android
+git submodule update --init --recursive
+sudo apt install extra-cmake-modules gettext   # Debian/Ubuntu; Arch: pacman -S extra-cmake-modules; macOS: brew install extra-cmake-modules gettext
+./gradlew :app:assembleDebug
 ```
 
-Install Android SDK Platform, Android SDK Build-Tools, Android NDK and cmake via SDK Manager in Android Studio:
+The build downloads the engine data and the sentence models and checks their SHA-256:
 
-<details>
-<summary>Detailed steps (screenshots)</summary>
+- the first build downloads libime's data sources and two FineWeb-2 shards, about 10 GB;
+- mixing in FineWeb-2 takes about 7 minutes and 7 GB of memory. On a 16 GB machine, run `./gradlew --stop` first.
+  `-Pengine.mix=false` skips the mix, at the cost of the chat text in the pinyin model.
 
-**Note:** These screenshots are for references and the versions in them may be out of date.
-The current recommended versions are recorded in [Versions.kt](build-logic/convention/src/main/kotlin/Versions.kt) file.
+A release build needs a signing key. Put these three in `~/.gradle/gradle.properties` (or the environment variables `SIGN_KEY_FILE`, `SIGN_KEY_ALIAS` and `SIGN_KEY_PWD`;
+the key file can also be given base64-encoded as `signKeyBase64` / `SIGN_KEY_BASE64`), then run `./gradlew :app:assembleRelease`.
+Without a key, or with a key file path that does not exist, the build does not fail: it makes an unsigned APK.
 
-![Open SDK Manager](https://user-images.githubusercontent.com/13914967/202184493-3ee1546b-0a83-4cc9-9e41-d20b0904a0cf.png)
+```properties
+signKeyFile=/path/to/release.p12
+signKeyAlias=...
+signKeyPwd=...
+```
 
-![Install SDK Platform](https://user-images.githubusercontent.com/13914967/202184534-340a9e7c-7c42-49bd-9cf5-1ec9dcafcf32.png)
+### Development
 
-![Install SDK Build-Tools](https://user-images.githubusercontent.com/13914967/202185945-0c7a9f39-1fcc-4018-9c81-b3d2bf1c2d3f.png)
+| Where | What |
+|---|---|
+| `lib/ime-core` | Plain JVM, no Android: the pinyin and table engines, the decoder, sentence-model inference, and the decision logic |
+| `app` | The Android part: views, the `InputMethodService`, preferences, the JNI bridge to Fcitx5 |
+| `lib/ime-eval` | Evaluation: types the test sets and measures top-1 accuracy and more |
+| `lib/ime-dict-tool` | Builds the engine data from text sources (build time only, not in the APK) |
 
-![Install NDK](https://user-images.githubusercontent.com/13914967/202185601-0cf877ea-e148-4b88-bd2f-70533189b3d4.png)
+| To | Run |
+|---|---|
+| Test the core logic, check the API level and coverage floors | `./gradlew :lib:ime-core:check` |
+| Run the app's JVM tests | `./gradlew :app:testDebugUnitTest` |
+| Run static analysis | `./gradlew detekt` |
 
-![Install CMake](https://user-images.githubusercontent.com/13914967/202184655-3c1ab47c-432f-4bd7-a508-92096482de50.png)
+### Thanks
 
-</details>
-
-### Trouble-shooting
-
-- Android Studio indexing takes forever to complete and cosumes a lot of memory.
-
-    Switch to "Project" view in the "Project" tool window (namely the file tree side bar), right click `lib/fcitx5/src/main/cpp/prebuilt` directory, then select "Mark Directory as > Excluded". You may also need to restart the IDE to interrupt ongoing indexing process.
-
-- Gradle error: "No variants found for ':app'. Check build files to ensure at least one variant exists." or "[CXX1210] <whatever>/CMakeLists.txt debug|arm64-v8a : No compatible library found"
-
-    Examine if there are environment variables set such as `_JAVA_OPTIONS` or `JAVA_TOOL_OPTIONS`. You might want to clear them (maybe in the startup script `studio.sh` of Android Studio), as some gradle plugin treats anything in stderr as errors and aborts.
-
-## Nix
-
-Appropriate Android SDK with NDK is available in the development shell.  The `gradlew` should work out-of-the-box, so you can install the app to your phone with `./gradlew installDebug` after applying the patch mentioned above. For development, you may want to install the unstable version of Android Studio, and point the project SDK path to `$ANDROID_SDK_ROOT` defined in the shell. Notice that Android Studio may generate wrong `local.properties` which sets the SDK location to `~/Android/SDK` (installed by SDK Manager). In such case, you need specify `sdk.dir` as the project SDK in that file manually, in case Android Studio sticks to the wrong global SDK.
+[fcitx5-android](https://github.com/fcitx5-android/fcitx5-android), [Fcitx5](https://github.com/fcitx/fcitx5), [libime](https://github.com/fcitx/libime),
+[fcitx5-chinese-addons](https://github.com/fcitx/fcitx5-chinese-addons), [FineWeb-2](https://huggingface.co/datasets/HuggingFaceFW/fineweb-2), [Qwen](https://github.com/QwenLM).

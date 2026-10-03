@@ -52,19 +52,29 @@ object ThemeFilesManager {
                     Timber.w("Failed to decode theme file ${it.absolutePath}: ${e.message}")
                     return@decode null
                 }
-                if (theme.backgroundImage != null) {
-                    if (!File(theme.backgroundImage.croppedFilePath).exists() ||
-                        !File(theme.backgroundImage.srcFilePath).exists()
-                    ) {
+                // the paths are absolute; a backup imported from another package id (the renaming to
+                // 幽默输入法) has them in that app's directory, while the images came along into this one
+                val image = theme.backgroundImage
+                val found = if (image == null ||
+                    File(image.croppedFilePath).exists() && File(image.srcFilePath).exists()
+                ) {
+                    theme
+                } else {
+                    val here = image.copy(
+                        croppedFilePath = File(dir, File(image.croppedFilePath).name).path,
+                        srcFilePath = File(dir, File(image.srcFilePath).name).path
+                    )
+                    if (!File(here.croppedFilePath).exists() || !File(here.srcFilePath).exists()) {
                         Timber.w("Cannot find background image file for theme ${theme.name}")
                         return@decode null
                     }
+                    theme.copy(backgroundImage = here)
                 }
-                // Update the saved file if migration happens
-                if (migrated) {
-                    saveThemeFiles(theme)
+                // Update the saved file if migration happens or the images were found elsewhere
+                if (migrated || found !== theme) {
+                    saveThemeFiles(found)
                 }
-                return@decode theme
+                return@decode found
             }.toMutableList()
     }
 
