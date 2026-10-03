@@ -127,8 +127,9 @@ private class Options(
         // a run ten times as frequent as its parts predict, with a handful of different neighbours
         const val MIN_PMI = 1.0
         const val MIN_ENTROPY = 1.5
-        // ten times as frequent as the model predicts of its parts
-        const val MIN_SURPRISE = 1.0
+        // no least surprise: on FineWeb-2 it told the model's domain from the pages' more than
+        // phrases from words (dev/TRAINING-PLAN.md 11.7), but a corpus nearer the model's can ask for one
+        val MIN_SURPRISE = Double.NEGATIVE_INFINITY
 
         // every option takes a value
         private val FLAGS = setOf(
@@ -205,9 +206,10 @@ private fun words(options: Options, out: Appendable) {
 }
 
 /**
- * The candidates of `words` that pass the thresholds, as a word pack: each read by its characters'
- * likeliest readings, scored on the model's unigram scale by its count ([CountFit] over the
- * candidates the model knows). One with a character no reading is known for is left out.
+ * The candidates of `words` that pass the thresholds and are not plainly phrases or fragments
+ * ([Phrases]), as a word pack: each read by its characters' likeliest readings, scored on the
+ * model's unigram scale by its count ([CountFit] over the candidates the model knows). One with a
+ * character no reading is known for is left out.
  */
 private fun pack(options: Options, out: Appendable) {
     val data = PinyinData.load(map(options.data!!))
@@ -222,9 +224,11 @@ private fun pack(options: Options, out: Appendable) {
     val fit = CountFit.of(known)
     out.appendLine("fit: log10 P = %.3f + %.3f log10(count + 1), over ${known.size} words the model has".format(fit.a, fit.b))
     var unread = 0
+    val phrases = Phrases(rows)
     val words = rows.filter { f ->
         f[7] == "0" && f[1].toInt() >= options.minCount && f[3].toDouble() >= options.minPmi &&
-            minOf(f[4].toDouble(), f[5].toDouble()) >= options.minEntropy && f[6].toDouble() >= options.minSurprise
+            minOf(f[4].toDouble(), f[5].toDouble()) >= options.minEntropy && f[6].toDouble() >= options.minSurprise &&
+            !phrases.isPhrase(f[0], f[1].toInt())
     }
     File(options.output!!).bufferedWriter().use { w ->
         w.write("${WordPack.HEADER}\n# layer: ${options.layer}\n")
@@ -234,6 +238,40 @@ private fun pack(options: Options, out: Appendable) {
         }
     }
     out.appendLine("pack: ${words.size - unread} words, $unread left out for want of a reading")
+}
+
+/**
+ * What tells a phrase or a fragment of a word from a word among the candidates of `words`, which
+ * pmi and entropy let through as readily (的事情, 一个人, 务员): a function character at either
+ * end (a verb's 了/过 excepted: 哭了, 累了 are typed as one), 的 anywhere, or most of its count
+ * inside one longer candidate.
+ */
+private class Phrases(rows: List<List<String>>) {
+    // the most any one candidate a character longer counts, by the candidate it contains
+    private val longest = HashMap<String, Int>()
+
+    init {
+        for (f in rows) {
+            val text = f[0]
+            if (text.length < 3) continue
+            val count = f[1].toInt()
+            for (part in listOf(text.dropLast(1), text.drop(1))) longest.merge(part, count, ::maxOf)
+        }
+    }
+
+    fun isPhrase(text: String, count: Int): Boolean {
+        if (INSIDE.any { it in text }) return true
+        if (text.first() in STOP) return true
+        if (text.last() in STOP && !(text.length == 2 && text.last() in VERB_END)) return true
+        return (longest[text] ?: 0) > count * FRAGMENT_SHARE
+    }
+
+    private companion object {
+        const val STOP = "的了是在就都也不和与着过得地吗呢吧啊呀哦嘛我你他她它们这那个把被将让给对从向为以之其此些很太更最又再还才并或而但却如若因所比跟没有要会能可"
+        const val VERB_END = "了过"
+        const val INSIDE = "的"
+        const val FRAGMENT_SHARE = 0.5
+    }
 }
 
 /** The likeliest reading of each character the dictionary has alone. */

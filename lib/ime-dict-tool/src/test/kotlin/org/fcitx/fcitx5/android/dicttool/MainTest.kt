@@ -76,7 +76,7 @@ class MainTest {
     @Test
     fun newWordsAreFoundAndPackedScoredOnTheModelsScale() {
         val lm = file("lm.arpa", ReadersTest.TINY_ARPA)
-        val dict = file("dict.txt", "你\tni\t0\n好 hao\n你好 ni'hao\n耗 hao\n子 zi\n")
+        val dict = file("dict.txt", "你\tni\t0\n好 hao\n你好 ni'hao\n耗 hao\n子 zi\n了 le\n")
         // 耗子 in the Rime layer: not a base word, so a candidate all the same
         val rime = file("x.dict.yaml", "---\nname: x\n...\n耗子\thào zi\t9\n")
         val output = tmp.root.resolve("pinyin.data").path
@@ -86,21 +86,24 @@ class MainTest {
         File(candidates).writeText(
             "# text\tcount\tyear\tpmi\tleft_entropy\tright_entropy\tsurprise\tknown\n# chars\t1000\n" +
                 "你\t99\t0\t0.000\t3.000\t3.000\t0.000\t1\n好\t9\t0\t0.000\t3.000\t3.000\t0.000\t1\n" +
-                "你好\t99\t2020\t2.000\t3.000\t3.000\t0.300\t1\n好你\t99\t2023\t2.000\t2.000\t2.000\t1.500\t0\n" +
-                "耗子\t9\t2024\t2.000\t2.000\t2.000\t1.500\t0\n好好\t99\t2023\t0.500\t2.000\t2.000\t1.500\t0\n" +
+                "你好\t99\t2020\t2.000\t3.000\t3.000\t0.300\t1\n耗好\t99\t2023\t2.000\t2.000\t2.000\t1.500\t0\n" +
+                "耗子\t20\t2024\t2.000\t2.000\t2.000\t1.500\t0\n好好\t99\t2023\t0.500\t2.000\t2.000\t1.500\t0\n" +
                 "你你\t99\t2023\t2.000\t1.000\t2.000\t1.500\t0\n嗯好\t99\t2023\t2.000\t2.000\t2.000\t1.500\t0\n" +
-                "好你好\t99\t2023\t2.000\t2.000\t2.000\t0.500\t0\n",
+                "好你好\t30\t2023\t2.000\t2.000\t2.000\t0.300\t0\n" +
+                // a phrase (的 inside), a fragment (子好 is mostly 耗子好, which 1.0 entropy keeps out), a verb with 了 (typed as one)
+                "你的好\t99\t2023\t2.000\t2.000\t2.000\t1.500\t0\n子好\t15\t2023\t2.000\t2.000\t2.000\t1.500\t0\n" +
+                "耗子好\t9\t2023\t2.000\t1.000\t2.000\t1.500\t0\n好了\t99\t2023\t2.000\t2.000\t2.000\t1.500\t0\n",
         )
         val pack = tmp.root.resolve("new.words").path
-        val (code, out, err) = run("pack", "-o", pack, "--data", output, "--layer", "2026q3", "--min-count", "5", candidates)
+        val (code, out, err) = run("pack", "-o", pack, "--data", output, "--layer", "2026q3", "--min-count", "5", "--min-surprise", "0.4", candidates)
         assertEquals(err, 0, code)
         // 你 (99) and 好 (9) fit log10 P = -2 + 0.5 log10(c + 1) exactly; 你好, which the model lacks, does not count
         assertTrue(out, out.contains("fit: log10 P = -2.000 + 0.500 log10(count + 1), over 2 words"))
         // 好好 held together too little, 你你 too few different neighbours, 好你好 no more frequent than
         // the model says of 好 你好, 嗯 has no reading
-        assertTrue(out, out.contains("pack: 2 words, 1 left out for want of a reading"))
+        assertTrue(out, out.contains("pack: 3 words, 1 left out for want of a reading"))
         assertEquals(
-            "# youmo words 1\n# layer: 2026q3\n好你\thao'ni\t-1.000\n耗子\thao'zi\t-1.500\n",
+            "# youmo words 1\n# layer: 2026q3\n耗好\thao'hao\t-1.000\n耗子\thao'zi\t-1.339\n好了\thao'le\t-1.000\n",
             File(pack).readText(),
         )
         assertEquals(2, run("pack", "-o", pack, "--data", output, "--layer", "bad name", candidates).first)
