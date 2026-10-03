@@ -52,7 +52,9 @@ import javax.inject.Inject
  * text, and people type chat. The sentence models, `engine/sentence-model.safetensors` (4M,
  * weighing the readings at each key) and `engine/sentence-model-large.safetensors` (25M, while the
  * user pauses), are this fork's own (dev/TRAINING-PLAN.md: FineWeb-2 pages scored by
- * Qwen3.5-9B-Base), fetched from a release of the fork. The .data files and the models are
+ * Qwen3.5-9B-Base), fetched from a release of the fork. Beside libime's dictionary go 万象拼音's
+ * (rime_wanxiang, CC-BY-4.0), read as Rime writes them: libime's has few words of the last years.
+ * It stands in until the fork finds its own new words, and `-Pengine.wanxiang=false` leaves it out. The .data files and the models are
  * stored uncompressed, so the engine can map them straight out of the APK rather than copying
  * them out first; they are also left out of the data descriptor for that reason (the descriptor lists only src/main/assets).
  *
@@ -99,6 +101,17 @@ class EngineDataPlugin : Plugin<Project> {
             "000_00000.parquet" to "3e43fefabc3ee500f9874655ece1776f96b81568cf33e0a6376835425ce42598",
             "000_00001.parquet" to "1829410bee959d64fee8c34efd3e741f22c368cfe62aaa7a971a56afabe1d92f",
         )
+        // amzxyz/rime_wanxiang's dictionaries at the commit measured (dev/TRAINING-PLAN.md 10.5): name to SHA-256
+        private const val WANXIANG_URL =
+            "https://raw.githubusercontent.com/amzxyz/rime_wanxiang/55fbad487c637d64a0371b74d177302ac1cdd16e/dicts/"
+        private val WANXIANG = mapOf(
+            "zi.dict.yaml" to "4be1b3689bb6a5e9316583b3aa2e8c1cb83a33a7efe3775568e957212943b35a",
+            "jichu.dict.yaml" to "99c09968033e4a8e4e73f9e1cca7240ddb48a2af75cf2e745659a0b534e4c502",
+            "lianxiang.dict.yaml" to "46ad9ba434e5f1c5e2a38adefa3a8d542d26aa1c9eb588407bea82a9240e1c3f",
+            "duoyin.dict.yaml" to "36d3110e14cc58910bcb586cef0c0cb193d4f571332baf517932c39d9498f9ac",
+            "diming.dict.yaml" to "627b351e6fa660a40cef86dd923a4bafdeb0bc052c3f2b5eb36600b0d839e0d2",
+            "renming.dict.yaml" to "4c171aa4f5608934f5c504d8435c0e85dc06b938a1337a1fb041819dca1ca631",
+        )
         const val MIX_TASK = "mixEngineModel"
         const val MODEL_TASK = "copySentenceModels"
         // a tag of its own, not "latest": what is downloaded is what was measured
@@ -139,6 +152,14 @@ class EngineDataPlugin : Plugin<Project> {
             }
         }
 
+        val wanxiang = WANXIANG.entries.mapIndexed { i, (name, sha) ->
+            target.tasks.register<DownloadTask>("downloadWanxiang$i") {
+                url.set(WANXIANG_URL + name)
+                sha256.set(sha)
+                outputFile.set(downloadsDir.file("wanxiang/$name"))
+            }
+        }
+
         val tool = target.configurations.create("engineDataTool") {
             isCanBeConsumed = false
             isCanBeResolved = true
@@ -162,15 +183,13 @@ class EngineDataPlugin : Plugin<Project> {
             mainClass.set(TOOL_MAIN)
             // the whole mixed model is held in memory while it is sorted: 3.6 GB resident, as measured
             maxHeapSize = "4g"
-            val mixed = target.providers.gradleProperty("engine.mix").orNull?.let {
-                requireNotNull(it.toBooleanStrictOrNull()) { "engine.mix: true or false, not $it" }
-            } ?: true
-            if (!mixed) {
+            if (!flag(target, "engine.mix")) {
                 lm.set(extracted[0].flatMap { it.outputDir.file(LM.files.single()) })
             } else {
                 lm.set(mix.flatMap { it.output })
             }
             dictionaries.from(DICT.files.map { name -> extracted[1].flatMap { it.outputDir.file(name) } })
+            if (flag(target, "engine.wanxiang")) dictionaries.from(wanxiang.map { download -> download.flatMap { it.outputFile } })
             outputDir.set(target.layout.buildDirectory.dir("generated/engine-assets"))
         }
         val tables = target.tasks.register<CompileTables>(TABLES_TASK) {
@@ -201,6 +220,11 @@ class EngineDataPlugin : Plugin<Project> {
             variant.sources.assets?.addGeneratedSourceDirectory(model, CopyModels::outputDir)
         }
     }
+
+    /** A `-P<name>=true|false` switch, on unless said otherwise. */
+    private fun flag(target: Project, name: String) = target.providers.gradleProperty(name).orNull?.let {
+        requireNotNull(it.toBooleanStrictOrNull()) { "$name: true or false, not $it" }
+    } ?: true
 
     private fun stem(source: Source) = source.name.substringBefore('-').substringBefore('.')
 

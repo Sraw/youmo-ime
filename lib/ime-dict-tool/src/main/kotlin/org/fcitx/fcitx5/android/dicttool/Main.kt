@@ -22,7 +22,8 @@ import kotlin.math.abs
 import kotlin.system.exitProcess
 
 val USAGE = """
-    usage: pinyin -o <out> --lm <lm.arpa> <dict.txt>...   compile a pinyin dictionary and model
+    usage: pinyin -o <out> --lm <lm.arpa> <dict>...       compile a pinyin dictionary and model, from
+                                                          libime's text or Rime's .dict.yaml
            table -o <out> <table.txt>                     compile a code table
            mix -o <out.arpa> --lm <lm.arpa> [--weight <w>] [--cutoffs <bigram>,<trigram>] <corpus>...
                                                           mix a model with n-grams counted in chat:
@@ -147,6 +148,8 @@ private fun mix(options: Options, out: Appendable) {
     out.appendLine("wrote ${options.output}: ${File(options.output).length()} bytes")
 }
 
+private const val RIME_SUFFIX = ".dict.yaml"
+
 private fun pinyin(output: String, lm: String, dicts: List<String>, out: Appendable) {
     val builder = PinyinDataBuilder()
     val counts = File(lm).bufferedReader().use { r ->
@@ -160,7 +163,15 @@ private fun pinyin(output: String, lm: String, dicts: List<String>, out: Appenda
     }
     out.appendLine("model: ${counts.joinToString(" / ")} n-grams")
     val reader = PinyinDictReader(builder)
-    dicts.forEach { path -> File(path).bufferedReader().use { reader.read(it, path) } }
+    // Rime's are read together, after libime's: a word's weights there depend on every file it is in
+    val (rime, libime) = dicts.partition { it.endsWith(RIME_SUFFIX) }
+    libime.forEach { path -> File(path).bufferedReader().use { reader.read(it, path) } }
+    if (rime.isNotEmpty()) {
+        val rimeDict = RimeDict()
+        rime.forEach { path -> File(path).bufferedReader().use { rimeDict.read(it, path) } }
+        rimeDict.entries().forEach { (word, pinyin, weight) -> reader.add(word, pinyin, weight) }
+        out.appendLine("rime: ${rimeDict.words} words")
+    }
     out.appendLine("dictionary: ${reader.entries} readings")
     if (reader.skipped > 0) {
         out.appendLine("skipped ${reader.skipped} readings with unknown syllables: " +

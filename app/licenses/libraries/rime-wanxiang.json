@@ -1,0 +1,11 @@
+{
+    "uniqueId": "amzxyz/rime_wanxiang",
+    "artifactVersion": "dicts: zi, jichu, lianxiang, duoyin, diming, renming (55fbad4)",
+    "description": "万象拼音 by amzxyz: its dictionaries' words, readings and counts are compiled into pinyin.data (tones dropped, each reading weighted against the word's likeliest), beside libime's.",
+    "name": "rime_wanxiang (万象拼音)",
+    "website": "https://github.com/amzxyz/rime_wanxiang",
+    "tag": "native",
+    "licenses": [
+        "CC-BY-4.0"
+    ]
+}

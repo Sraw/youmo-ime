@@ -25,7 +25,7 @@ Free to restructure; upstream compatibility is not a constraint.
 | Static analysis (syntax rules only; type resolution doesn't work here) | `./gradlew detekt` |
 | Accept current findings after a deliberate batch (run alone, not with `detekt`; `:<module>:detektBaseline` for one module, bare `detektBaseline` rewrites every module) | `./gradlew :<module>:detektBaseline` |
 | App coverage (report only, no floor) | `./gradlew :app:koverLogOfflineDebug` |
-| Engine data into app assets (part of every app build; downloads libime's sources and two FineWeb-2 shards, ~10 GB, once; the FineWeb mix then takes 7 min and 7 GB RAM: `./gradlew --stop` first on 16 GB, and `-Pengine.mix=false` skips it) | `./gradlew :app:compileEngineData` |
+| Engine data into app assets (part of every app build; downloads libime's sources, 万象's dictionaries and two FineWeb-2 shards, ~10 GB, once (`-Pengine.wanxiang=false` leaves 万象 out); the FineWeb mix then takes 7 min and 7 GB RAM: `./gradlew --stop` first on 16 GB, and `-Pengine.mix=false` skips it) | `./gradlew :app:compileEngineData` |
 | Sentence models into app assets (part of every app build; fetched from this fork's release `sentence-models-*`, SHA-256 checked) | `./gradlew :app:copySentenceModels` |
 
 Unit tests need no submodules, NDK or CMake. Instrumented tests (`FcitxTest`, `SoftKeyboardTest`)

@@ -52,6 +52,8 @@
 - 代码：LGPL-2.1-or-later，与上游相同。
 - 词典、拼音语言模型、码表：来自 [libime](https://github.com/fcitx/libime) 发布的文本源（LGPL-2.1-or-later），构建时编译成本引擎的格式。
   拼音语言模型里混入了 [FineWeb-2](https://huggingface.co/datasets/HuggingFaceFW/fineweb-2) 中文类聊天网页的 n-gram（ODC-By 1.0）。
+  词典还并入了[万象拼音](https://github.com/amzxyz/rime_wanxiang)（amzxyz，CC-BY-4.0）的词条、读音和词频，补上近几年的新词；
+  这是过渡做法，本项目会逐步用自己从语料里找出的新词替代它（构建时加 `-Pengine.wanxiang=false` 可去掉）。
 - 句子模型：本项目自己训练（Apache-2.0）。先在 FineWeb-2 中文网页上训练语言模型，再用 Qwen3.5-9B-Base（Apache-2.0）给候选列表打分做蒸馏。
   文件发布在 [sentence-models-20261001](https://github.com/Sraw/youmo-ime/releases/tag/sentence-models-20261001)。
 - 不使用任何仅限科研用途的数据。
@@ -111,7 +113,7 @@ signKeyPwd=...
 ### 致谢
 
 [fcitx5-android](https://github.com/fcitx5-android/fcitx5-android)、[Fcitx5](https://github.com/fcitx/fcitx5)、[libime](https://github.com/fcitx/libime)、
-[fcitx5-chinese-addons](https://github.com/fcitx/fcitx5-chinese-addons)、[FineWeb-2](https://huggingface.co/datasets/HuggingFaceFW/fineweb-2)、[Qwen](https://github.com/QwenLM)。
+[fcitx5-chinese-addons](https://github.com/fcitx/fcitx5-chinese-addons)、[万象拼音](https://github.com/amzxyz/rime_wanxiang)、[FineWeb-2](https://huggingface.co/datasets/HuggingFaceFW/fineweb-2)、[Qwen](https://github.com/QwenLM)。
 
 ---
 
@@ -167,6 +169,9 @@ Settings, themes and the clipboard come along. The old app's backups leave out t
 - Code: LGPL-2.1-or-later, as upstream.
 - Dictionary, pinyin language model and code tables: compiled at build time from the text sources published by [libime](https://github.com/fcitx/libime) (LGPL-2.1-or-later).
   The pinyin language model also mixes in n-grams from chat-like Chinese pages of [FineWeb-2](https://huggingface.co/datasets/HuggingFaceFW/fineweb-2) (ODC-By 1.0).
+  The dictionary also takes the words, readings and counts of [rime_wanxiang](https://github.com/amzxyz/rime_wanxiang) (万象拼音, by
+  amzxyz, CC-BY-4.0), for the words of the last few years; this stands in until the project finds new words in text of its own
+  (`-Pengine.wanxiang=false` leaves it out of a build).
 - Sentence models: this project's own (Apache-2.0). A language model is first trained on FineWeb-2's Chinese pages, then distilled from Qwen3.5-9B-Base's (Apache-2.0) scores of candidate lists.
   The files are published at [sentence-models-20261001](https://github.com/Sraw/youmo-ime/releases/tag/sentence-models-20261001).
 - No research-only data is used.
@@ -226,4 +231,4 @@ signKeyPwd=...
 ### Thanks
 
 [fcitx5-android](https://github.com/fcitx5-android/fcitx5-android), [Fcitx5](https://github.com/fcitx/fcitx5), [libime](https://github.com/fcitx/libime),
-[fcitx5-chinese-addons](https://github.com/fcitx/fcitx5-chinese-addons), [FineWeb-2](https://huggingface.co/datasets/HuggingFaceFW/fineweb-2), [Qwen](https://github.com/QwenLM).
+[fcitx5-chinese-addons](https://github.com/fcitx/fcitx5-chinese-addons), [rime_wanxiang](https://github.com/amzxyz/rime_wanxiang), [FineWeb-2](https://huggingface.co/datasets/HuggingFaceFW/fineweb-2), [Qwen](https://github.com/QwenLM).

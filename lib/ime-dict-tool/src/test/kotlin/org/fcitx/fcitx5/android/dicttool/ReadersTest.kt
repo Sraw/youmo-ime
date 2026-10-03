@@ -68,6 +68,23 @@ class ReadersTest {
     }
 
     @Test
+    fun rimeDictionariesAreTonelessHanOnlyAndWeighedAcrossFiles() {
+        val rime = RimeDict()
+        val header = "---\nname: x\nversion: \"1\"\n...\n"
+        rime.read((header + "绿\tlǜ\t1643\n绿\tlù\t162\n# a comment\n\nABC\ta b c\t9\n略\tlüè\n").reader().buffered(), "zi")
+        // the same reading in another file adds to its count; a header line is not an entry
+        // a count that is no number (diming has -1) counts as none
+        rime.read((header + "绿\tlǜ\t100\n绿色\tlǜ sè\t2322\n绿色\tlu se\t-1\n").reader().buffered(), "jichu")
+        assertEquals(3, rime.words)
+        val entries = rime.entries().toList()
+        assertEquals(listOf("绿" to "lv", "绿" to "lu", "略" to "lve", "绿色" to "lv'se", "绿色" to "lu'se"), entries.map { it.first to it.second })
+        assertEquals(listOf(0f, -1.02936f, 0f, 0f, -3.36605f), entries.map { it.third })
+        assertEquals("nv", RimeDict.toneless("Nǚ"))
+        assertEquals("lv", RimeDict.toneless("LǙ"))
+        assertEquals("zhang", RimeDict.toneless("zhāng"))
+    }
+
+    @Test
     fun badDictionaryLinesPointAtTheirLine() {
         val reader = PinyinDictReader(PinyinDataBuilder())
         assertSourceError(2, "expected \"word pinyin [weight]\"") { reader.read("好 hao\n好\n".reader().buffered(), "dict") }

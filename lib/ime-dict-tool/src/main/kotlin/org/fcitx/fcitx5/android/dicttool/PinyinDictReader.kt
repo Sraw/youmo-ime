@@ -36,15 +36,20 @@ class PinyinDictReader(private val into: PinyinDataBuilder) {
             if (f.isEmpty()) return@forEachNumberedLine
             require(f.size in 2..3) { "expected \"word pinyin [weight]\", got \"$line\"" }
             val weight = if (f.size == 3) requireNotNull(f[2].toFloatOrNull()) { "bad weight \"${f[2]}\"" } else 0f
-            val spellings = f[1].split('\'')
-            val ids = IntArray(spellings.size) { Syllables.id(spellings[it]) }
-            val unknown = spellings.filterIndexed { i, _ -> ids[i] < 0 }
-            if (unknown.isNotEmpty()) {
-                unknown.forEach { unknownSyllables[it] = (unknownSyllables[it] ?: 0) + 1 }
-                return@forEachNumberedLine
-            }
-            into.entry(f[0], ids, weight)
-            entries++
+            add(f[0], f[1], weight)
         }
+    }
+
+    /** One reading, [pinyin] with its syllables separated by `'`. */
+    fun add(word: String, pinyin: String, weight: Float) {
+        val spellings = pinyin.split('\'')
+        val ids = IntArray(spellings.size) { Syllables.id(spellings[it]) }
+        val unknown = spellings.filterIndexed { i, _ -> ids[i] < 0 }
+        if (unknown.isNotEmpty()) {
+            unknown.forEach { unknownSyllables[it] = (unknownSyllables[it] ?: 0) + 1 }
+            return
+        }
+        into.entry(word, ids, weight)
+        entries++
     }
 }
