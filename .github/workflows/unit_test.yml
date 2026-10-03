@@ -20,7 +20,7 @@ on:
       - "**.md"
   push:
     branches:
-      - master
+      - main
     paths-ignore:
       - "**.md"
   workflow_dispatch:
@@ -29,7 +29,7 @@ permissions:
   contents: read
 
 # a newer push to a pull request makes an in-flight run pointless, so a PR shares one group and
-# cancels. A push to master gets a group of its own (per commit): a shared group would still
+# cancels. A push to main gets a group of its own (per commit): a shared group would still
 # drop queued runs beyond the first, and with them the results of commits in a burst.
 concurrency:
   group: unit-test-${{ github.event_name == 'pull_request' && github.ref || github.sha }}
