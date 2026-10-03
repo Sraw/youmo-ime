@@ -23,7 +23,7 @@ class NewWordsTest {
     )
 
     private fun find(minCount: Int = 2, maxLength: Int = 3): List<NewWords.Candidate> {
-        val finder = NewWords(setOf("吃饭", "一起", "旅游", "健身", "考研"), minCount, maxLength)
+        val finder = NewWords(setOf("吃饭", "一起", "旅游", "健身", "考研"), minCount, maxLength, sketchBits = 12)
         while (!finder.done) {
             pages.forEach { (text, date) -> finder.add(text, date) }
             finder.nextPass()
@@ -60,14 +60,25 @@ class NewWordsTest {
     @Test
     fun runsUnderTheCountAreNotKeptAndThePassesMustBeWalked() {
         assertTrue(find(minCount = 7).isEmpty())
-        val finder = NewWords(emptySet(), 1)
+        val finder = NewWords(emptySet(), 1, sketchBits = 12)
         assertThrows(IllegalArgumentException::class.java) { finder.candidates() }
         assertThrows(IllegalArgumentException::class.java) { NewWords(emptySet(), 0) }
         assertThrows(IllegalArgumentException::class.java) { NewWords(emptySet(), 1, 5) }
+        assertEquals(listOf(1, 2, 3, 4), listOf("㐀", "㐀㐀", "鿿一二", "一二三四").map { NewWords.lengthOf(NewWords.key(it, 0, it.length)) })
         assertEquals("搭子", NewWords.text(NewWords.key("饭搭子", 1, 2), 2))
         // four chars from the top of the Han block: the key must stay a non-negative long (a LongIndex key)
         val high = NewWords.key("鼠鼠我鿿", 0, 4)
         assertTrue(high >= 0)
         assertEquals("鼠鼠我鿿", NewWords.text(high, 4))
+    }
+
+    @Test
+    fun aSketchNeverCountsUnderAndACollisionOnlyOver() {
+        val sketch = NewWords.Sketch(4)
+        val keys = (1L..40L).map { it * 7919 }
+        keys.forEachIndexed { i, k -> repeat(i + 1) { sketch.add(k) } }
+        keys.forEachIndexed { i, k -> assertTrue("$k", sketch.count(k) >= i + 1) }
+        // sixteen cells for forty keys: some counts are over, but the smallest key, added once, no more than its collisions
+        assertTrue(sketch.count(keys[0]) >= 1)
     }
 }

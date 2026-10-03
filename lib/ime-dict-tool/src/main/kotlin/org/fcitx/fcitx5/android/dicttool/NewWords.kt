@@ -15,13 +15,21 @@ import kotlin.math.log10
  * date they were seen on. The classic unsupervised recipe; the thresholds are the caller's, as
  * what is wanted of them differs (dev/TRAINING-PLAN.md section 11.7).
  *
- * The corpus is read in [passes] + 1 passes, each over every page in turn ([add] takes a page's
- * text and date; [nextPass] ends a pass). Counting every run of four at once would not fit:
- * pass n counts the runs of n characters, from the second only those whose two parts one
- * shorter were counted enough, which every frequent run's were. The last pass gathers the
- * neighbours of the runs that reached [minCount].
+ * The corpus is read in [passes] passes, each over every page in turn ([add] takes a page's
+ * text and date; [nextPass] ends a pass). Counting every run exactly would not fit: billions
+ * of characters have hundreds of millions of different runs of three. So pass n (from 2)
+ * sketches the runs of n characters in a count-min sketch of up to [sketchBits] bits' width, only
+ * those whose two parts one shorter the sketch found frequent enough, which every frequent
+ * run's are; the pass after counts exactly the runs the sketch admitted, which a sketch only
+ * overestimates, so none frequent is missed. The last pass gathers the neighbours of the runs
+ * that reached [minCount].
  */
-class NewWords(private val known: Set<String>, private val minCount: Int, private val maxLength: Int = MAX_LENGTH) {
+class NewWords(
+    private val known: Set<String>,
+    private val minCount: Int,
+    private val maxLength: Int = MAX_LENGTH,
+    private val sketchBits: Int = SKETCH_BITS,
+) {
     init {
         require(minCount >= 1 && maxLength in 2..MAX_LENGTH) { "min count $minCount, max length $maxLength" }
     }
@@ -40,10 +48,13 @@ class NewWords(private val known: Set<String>, private val minCount: Int, privat
         val known: Boolean,
     )
 
-    // the runs of each length, keyed by their chars packed 16 bits each, with count and first year
+    // the runs of each length counted exactly, keyed by their chars packed 16 bits each, with
+    // count and first year: single chars all, longer ones those the sketch admitted
     private val runs = Array(maxLength + 1) { LongIndex(if (it <= 1) 1 shl 12 else 1 shl 20) }
     private val counts = Array(maxLength + 1) { IntColumn(if (it <= 1) 1 shl 12 else 1 shl 20) }
     private val years = Array(maxLength + 1) { IntColumn(if (it <= 1) 1 shl 12 else 1 shl 20) }
+    private val sketches = arrayOfNulls<Sketch>(maxLength + 1)
+
     /** The Han characters counted, after the first pass. */
     var chars = 0L
         private set
@@ -53,29 +64,36 @@ class NewWords(private val known: Set<String>, private val minCount: Int, privat
     private val neighbours = LongIndex(1 shl 20)
     private val neighbourCounts = IntColumn(1 shl 20)
 
-    /** The pass under way, from 1: the length counted, or [passes] + 1 gathering neighbours. */
+    /**
+     * The pass under way, from 1: the first counts the characters, pass n from 2 sketches the runs
+     * of n and counts those of n - 1 the sketch admitted, [maxLength] + 1 counts those of
+     * [maxLength], [passes] gathers neighbours.
+     */
     var pass = 1
         private set
 
-    val passes: Int get() = maxLength
+    val passes: Int get() = maxLength + 2
 
     /** Whether every pass is done: [candidates] can be asked for. */
-    val done: Boolean get() = pass > passes + 1
+    val done: Boolean get() = pass > passes
 
     /** Ends the pass under way. */
     fun nextPass() {
-        require(!done) { "no pass after ${passes + 1}" }
-        if (pass == passes) {
+        require(!done) { "no pass after $passes" }
+        if (pass == maxLength + 1) {
             for (length in 2..maxLength) {
                 val index = runs[length]
                 for (i in 0 until index.size) if (counts[length][i] >= minCount) kept.add(index.keyAt(i))
             }
         }
         pass++
+        // as many cells as the corpus could have different runs, four times over, up to the width given
+        if (pass in 2..maxLength) sketches[pass] = Sketch(minOf(sketchBits, maxOf(MIN_SKETCH_BITS, Long.SIZE_BITS - java.lang.Long.numberOfLeadingZeros(chars * 4))))
     }
 
     /** Counts [text], a page dated [date] (`2023-06-14...`, or empty), for the pass under way. */
     fun add(text: String, date: String) {
+        require(!done) { "the passes are done" }
         val year = date.take(4).toIntOrNull()?.takeIf { it in 1990..2100 } ?: 0
         var begin = 0
         for (i in 0..text.length) {
@@ -87,24 +105,50 @@ class NewWords(private val known: Set<String>, private val minCount: Int, privat
     }
 
     private fun run(text: String, begin: Int, end: Int, year: Int) {
-        require(!done) { "the passes are done" }
-        val length = pass
-        if (length > maxLength) return gather(text, begin, end)
-        if (length == 1) chars += end - begin
-        for (start in begin..end - length) {
-            // both parts one shorter must have been counted enough: a frequent run's were
-            if (length > 2 && (countOf(length - 1, key(text, start, length - 1)) < minCount ||
-                    countOf(length - 1, key(text, start + 1, length - 1)) < minCount)
-            ) continue
-            val at = runs[length].add(key(text, start, length))
-            counts[length].add(at, 1)
-            if (year > 0 && (years[length][at] == 0 || year < years[length][at])) years[length][at] = year
+        when {
+            pass == 1 -> {
+                chars += end - begin
+                for (start in begin until end) count(1, key(text, start, 1), year)
+            }
+            pass <= maxLength -> {
+                sketch(pass, text, begin, end)
+                if (pass > 2) exact(pass - 1, text, begin, end, year)
+            }
+            pass == maxLength + 1 -> exact(maxLength, text, begin, end, year)
+            else -> gather(text, begin, end)
         }
     }
 
+    private fun sketch(length: Int, text: String, begin: Int, end: Int) {
+        val sketch = sketches[length]!!
+        val parts = sketches[length - 1]
+        for (start in begin..end - length) {
+            // both parts one shorter must have been found frequent enough: a frequent run's were
+            if (parts != null && (parts.count(key(text, start, length - 1)) < minCount ||
+                    parts.count(key(text, start + 1, length - 1)) < minCount)
+            ) continue
+            sketch.add(key(text, start, length))
+        }
+    }
+
+    private fun exact(length: Int, text: String, begin: Int, end: Int, year: Int) {
+        val sketch = sketches[length]!!
+        for (start in begin..end - length) {
+            val key = key(text, start, length)
+            if (sketch.count(key) >= minCount) count(length, key, year)
+        }
+    }
+
+    private fun count(length: Int, key: Long, year: Int) {
+        val at = runs[length].add(key)
+        counts[length].add(at, 1)
+        if (year > 0 && (years[length][at] == 0 || year < years[length][at])) years[length][at] = year
+    }
+
+    /** The exact count of a run, or the sketch's for one the sketch did not admit. */
     private fun countOf(length: Int, key: Long): Int {
         val at = runs[length].indexOf(key)
-        return if (at < 0) 0 else counts[length][at]
+        return if (at >= 0) counts[length][at] else sketches[length]?.count(key) ?: 0
     }
 
     private fun gather(text: String, begin: Int, end: Int) {
@@ -138,38 +182,62 @@ class NewWords(private val known: Set<String>, private val minCount: Int, privat
         }
         val out = ArrayList<Candidate>()
         val total = chars.toDouble()
-        for (length in 2..maxLength) {
-            val index = runs[length]
-            for (i in 0 until index.size) {
-                val count = counts[length][i]
-                if (count < minCount) continue
-                val key = index.keyAt(i)
-                val text = text(key, length)
-                // the split whose parts predict it best: log10(count / (left × right / total))
-                var expected = 0.0
-                for (split in 1 until length) {
-                    val left = countOf(split, key(text, 0, split)).coerceAtLeast(1)
-                    val right = countOf(length - split, key(text, split, length - split)).coerceAtLeast(1)
-                    expected = maxOf(expected, left.toDouble() * right / total)
-                }
-                val run = kept.indexOf(key)
-                out += Candidate(text, count, years[length][i], log10(count / expected), entropy(run, 0), entropy(run, 1), text in known)
+        for (i in 0 until kept.size) {
+            val key = kept.keyAt(i)
+            val length = lengthOf(key)
+            val count = countOf(length, key)
+            val text = text(key, length)
+            // the split whose parts predict it best: log10(count / (left × right / total))
+            var expected = 0.0
+            for (split in 1 until length) {
+                val left = countOf(split, key(text, 0, split)).coerceAtLeast(1)
+                val right = countOf(length - split, key(text, split, length - split)).coerceAtLeast(1)
+                expected = maxOf(expected, left.toDouble() * right / total)
             }
+            val year = years[length][runs[length].indexOf(key)]
+            out += Candidate(text, count, year, log10(count / expected), entropy(i, 0), entropy(i, 1), text in known)
         }
         out.sortWith(compareByDescending<Candidate> { it.count }.thenBy { it.text })
         return out
     }
 
+    /** A count-min sketch of two rows in one array: counts a run never under, seldom much over. */
+    class Sketch(bits: Int) {
+        private val cells = IntArray(1 shl bits)
+        private val shift = Long.SIZE_BITS - bits
+
+        fun add(key: Long) {
+            val a = slot(key)
+            val b = slot(key * MIX + 1)
+            if (cells[a] < Int.MAX_VALUE) cells[a]++
+            if (cells[b] < Int.MAX_VALUE) cells[b]++
+        }
+
+        fun count(key: Long): Int = minOf(cells[slot(key)], cells[slot(key * MIX + 1)])
+
+        private fun slot(key: Long) = ((key * GOLDEN) ushr shift).toInt()
+
+        private companion object {
+            const val GOLDEN = -0x61c8864680b583ebL // 2^64 / φ
+            const val MIX = 0x2545F4914F6CDD1DL
+        }
+    }
+
     companion object {
         const val MAX_LENGTH = 4
+
+        /** 2^27 cells, half a gigabyte a length: a billion characters' runs collide little. */
+        const val SKETCH_BITS = 27
+        const val MIN_SKETCH_BITS = 12
         private const val LEFT = 0
         private const val RIGHT = 1
         private const val NONE = '\u0000'
 
-        fun isHan(c: Char) = c in '一'..'鿿' || c in '㐀'..'䶿'
+        // the chars are counted from just below the first Han one: four then fit a LongIndex key,
+        // which is never negative, and none is 0, so a key's top char tells its length
+        private const val FIRST = '㏿'
 
-        // the chars are counted from the first Han one: four then fit a LongIndex key, which is never negative
-        private const val FIRST = '\u3400'
+        fun isHan(c: Char) = c in '一'..'鿿' || c in '㐀'..'䶿'
 
         /** [length] Han chars of [text] from [start], 16 bits each, the first highest. */
         fun key(text: CharSequence, start: Int, length: Int): Long {
@@ -182,6 +250,13 @@ class NewWords(private val known: Set<String>, private val minCount: Int, privat
             val out = CharArray(length)
             for (i in 0 until length) out[length - 1 - i] = FIRST + ((key ushr (16 * i)) and 0xffff).toInt()
             return String(out)
+        }
+
+        /** How many chars [key] packs. */
+        fun lengthOf(key: Long): Int {
+            var length = 1
+            while (length < MAX_LENGTH && (key ushr (16 * length)) != 0L) length++
+            return length
         }
 
         private fun neighbourKey(run: Int, side: Int, neighbour: Char): Long =
