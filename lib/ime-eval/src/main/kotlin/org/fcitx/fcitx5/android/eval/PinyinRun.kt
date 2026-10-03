@@ -6,6 +6,7 @@ package org.fcitx.fcitx5.android.eval
 
 import org.fcitx.fcitx5.android.engine.data.NgramModel.Companion.NO_WORD
 import org.fcitx.fcitx5.android.engine.data.PinyinData
+import org.fcitx.fcitx5.android.engine.lattice.Decoding
 import org.fcitx.fcitx5.android.engine.lattice.Penalties
 import org.fcitx.fcitx5.android.engine.lattice.PinyinDecoder
 import org.fcitx.fcitx5.android.engine.lattice.TextWords
@@ -59,16 +60,24 @@ class PinyinRun(
     fun candidates(input: String, context: String = "", paused: Boolean = false): List<String> =
         Typing().candidates(input, context, paused)
 
+    /** The whole-input readings of [input] typed after [context], best first, each with the decoder's score. */
+    fun sentences(input: String, context: String = ""): List<Pair<String, Float>> =
+        decode(input, context).sentences.map { it.text to it.score }
+
+    private fun decode(input: String, context: String): Decoding {
+        val words = textWords.lastTwo(context)
+        val prev = words.lastOrNull() ?: NO_WORD
+        val prev2 = if (words.size == 2) words[0] else NO_WORD
+        return decoder.decode(segmenter.segment(input), prev2, prev)
+    }
+
     /** One sample typed, with rerankers of its own. */
     private inner class Typing {
         private val picker = reranker?.invoke()
         private val refine = refiner?.invoke()
 
         fun candidates(input: String, context: String, paused: Boolean = false): List<String> {
-            val words = textWords.lastTwo(context)
-            val prev = words.lastOrNull() ?: NO_WORD
-            val prev2 = if (words.size == 2) words[0] else NO_WORD
-            val decoding = decoder.decode(segmenter.segment(input), prev2, prev)
+            val decoding = decode(input, context)
             val sentences = decoding.sentences.map { it.text }.toMutableList()
             val scores = decoding.sentences.map { it.score }
             val picked = refine?.takeIf { paused }?.refine(context, sentences, scores, Int.MAX_VALUE)

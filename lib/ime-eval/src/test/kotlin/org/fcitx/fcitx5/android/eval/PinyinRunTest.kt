@@ -57,6 +57,34 @@ class PinyinRunTest {
         assertEquals(2, runCli(arrayOf("pinyin", data.path, shuangpin.path, result.path, "--scheme", "nope"), StringBuilder(), StringBuilder()))
     }
 
+    @Test
+    fun sentencesAreTheDecodersReadingsWithItsScores() {
+        val data = tmp.newFile("pinyin.data").apply { writeBytes(bytes) }
+        val set = tmp.newFile("set.tsv").apply { writeText("nihao\t你好\tdaily\nni\t你\tdaily\t你好\n") }
+        val out = tmp.newFile("sentences.tsv")
+        assertEquals(0, runCli(arrayOf("sentences", data.path, set.path, out.path, "--threads", "2"), StringBuilder(), StringBuilder()))
+        val lines = out.readLines().map { it.split('\t') }
+        assertEquals(listOf("nihao", "ni"), lines.map { it[0] })
+        // text, score, text, score: best first, as the engine ranks them before any model
+        val run = PinyinRun(PinyinData.load(ByteBuffer.wrap(bytes)))
+        assertEquals(run.sentences("nihao").flatMap { listOf(it.first, it.second.toString()) }, lines[0].drop(1))
+        assertEquals("你好", lines[0][1])
+        assertTrue(run.sentences("nihao").zipWithNext().all { (a, b) -> a.second >= b.second })
+    }
+
+    @Test
+    fun aWeightIsOneOrTwoNumbers() {
+        val data = tmp.newFile("pinyin.data").apply { writeBytes(bytes) }
+        val set = tmp.newFile("set.tsv").apply { writeText("nihao\t你好\tdaily\n") }
+        val result = tmp.newFile("result.tsv")
+        fun run(weight: String) = runCli(arrayOf("pinyin", data.path, set.path, result.path, "--weight", weight), StringBuilder(), StringBuilder())
+        assertEquals(0, run("0.7"))
+        assertEquals(0, run("0.4,1"))
+        assertEquals(2, run("much"))
+        assertEquals(2, run("-1"))
+        assertEquals(2, run("1,2,3"))
+    }
+
     /** What each reranker made was asked about: the contexts it saw, and whether it was paused on. */
     private class Recording : SentencePicker, SentenceRefiner {
         val contexts = HashSet<String>()

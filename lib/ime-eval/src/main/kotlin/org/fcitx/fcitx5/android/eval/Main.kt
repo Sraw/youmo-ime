@@ -24,12 +24,13 @@ import java.util.Locale
 import kotlin.system.exitProcess
 
 val USAGE = """usage: score <set.tsv> <result.tsv> [<baseline-result.tsv>] [--half <half>]
-       pinyin <pinyin.data> <set.tsv> <result.tsv> [--scheme <scheme>] [--fuzzy all|<pair>,...] [--half <half>] [--neighbours on|off] [--rerank <model.safetensors>] [--refine <model.safetensors>] [--threads <n>]
+       pinyin <pinyin.data> <set.tsv> <result.tsv> [--scheme <scheme>] [--fuzzy all|<pair>,...] [--half <half>] [--neighbours on|off] [--rerank <model.safetensors>] [--refine <model.safetensors>] [--weight <rerank>[,<refine>]] [--threads <n>]
+       sentences <pinyin.data> <set.tsv> <out.tsv> [--neighbours on|off] [--threads <n>]
        lm <model.safetensors> <context> <text>...
        shuangpin <scheme> <set.tsv> <shuangpin-set.tsv>
        slips <set.tsv> <slip-set.tsv>
        tune <pinyin.data> <set.tsv> <slip-set.tsv>
-       ksc <pinyin.data> <set.tsv> [--scheme <scheme>] [--fuzzy all|<pair>,...] [--half <half>] [--rerank <model.safetensors>] [--refine <model.safetensors>] [--threads <n>]
+       ksc <pinyin.data> <set.tsv> [--scheme <scheme>] [--fuzzy all|<pair>,...] [--half <half>] [--rerank <model.safetensors>] [--refine <model.safetensors>] [--weight <rerank>[,<refine>]] [--threads <n>]
        learn <pinyin.data> <set.tsv> [--scheme <scheme>] [--fuzzy all|<pair>,...]
        table <table.data> <set.tsv> [--preset <preset>]
        libime pinyin|history|table <file>
@@ -78,14 +79,15 @@ fun runCli(args: Array<String>, out: Appendable, err: Appendable): Int {
     return when {
         !optionsValid(a.options, fuzzy) -> usage(err)
         a.has("score", 3..4, "half") -> score(p[1], p[2], p.getOrNull(3), half, out)
-        a.has("pinyin", 4..4, "scheme", "fuzzy", "half", "neighbours", "rerank", "refine", "threads") ->
-            runPinyin(p[1], p[2], p[3], scheme, fuzzy.orEmpty(), half, neighbours == "on", Models(a.options["rerank"], a.options["refine"]), threads)
+        a.has("pinyin", 4..4, "scheme", "fuzzy", "half", "neighbours", "rerank", "refine", "weight", "threads") ->
+            runPinyin(p[1], p[2], p[3], scheme, fuzzy.orEmpty(), half, neighbours == "on", Models(a.options["rerank"], a.options["refine"], a.options["weight"]), threads)
+        a.has("sentences", 4..4, "neighbours", "threads") -> sentences(p[1], p[2], p[3], neighbours == "on", threads)
         a.has("lm", 4..Int.MAX_VALUE) -> lm(p[1], p[2], p.drop(3), out)
         a.has("shuangpin", 4..4) && p[1] in ShuangpinSet.SCHEMES -> writeShuangpinSet(p[1], p[2], p[3], out)
         a.has("slips", 3..3) -> writeSlipSet(p[1], p[2], out)
         a.has("tune", 4..4) -> tune(p[1], p[2], p[3], out)
-        a.has("ksc", 3..3, "scheme", "fuzzy", "half", "rerank", "refine", "threads") ->
-            ksc(p[1], p[2], scheme, fuzzy.orEmpty(), half, Models(a.options["rerank"], a.options["refine"]), threads, out)
+        a.has("ksc", 3..3, "scheme", "fuzzy", "half", "rerank", "refine", "weight", "threads") ->
+            ksc(p[1], p[2], scheme, fuzzy.orEmpty(), half, Models(a.options["rerank"], a.options["refine"], a.options["weight"]), threads, out)
         a.has("learn", 3..3, "scheme", "fuzzy") -> learn(p[1], p[2], scheme, fuzzy.orEmpty(), out)
         a.has("table", 3..3, "preset") -> table(p[1], p[2], preset ?: "plain", out)
         a.has("libime", 3..3) && p[1] in LIBIME_KINDS -> libime(p[1], p[2], out, err)
@@ -102,6 +104,7 @@ private fun optionsValid(options: Map<String, String>, fuzzy: Set<Fuzzy>?): Bool
         options["fuzzy"] == null || fuzzy != null,
         options["preset"].let { it == null || it in TableRun.PRESETS },
         options["threads"].let { it == null || it.toIntOrNull()?.let { n -> n > 0 } == true },
+        options["weight"].let { it == null || weights(it) != null },
         // 双拼 reads no slips
         neighbours == null || neighbours in ON_OFF && scheme == null,
     ).all { it }
@@ -125,19 +128,31 @@ private fun mapFile(path: String) = RandomAccessFile(path, "r").use { it.channel
 
 private fun loadData(path: String): PinyinData = PinyinData.load(mapFile(path))
 
+/** `<rerank>[,<refine>]`: the sentence models' weights against the decoder, the refiner's the reranker's if not given. */
+private fun weights(spec: String): Pair<Float, Float>? {
+    val parts = spec.split(',').map { it.toFloatOrNull()?.takeIf { w -> w >= 0 && w.isFinite() } ?: return null }
+    return when (parts.size) {
+        1 -> parts[0] to parts[0]
+        2 -> parts[0] to parts[1]
+        else -> null
+    }
+}
+
 /**
  * The sentence models: the one weighing the readings at each key, and the one while the user
  * pauses. Loaded once and shared by the threads; each reranker keeps its own state.
  */
-private class Models(rerankPath: String?, refinePath: String?) {
+private class Models(rerankPath: String?, refinePath: String?, weight: String? = null) {
+    private val weights = weight?.let(::weights) ?: (Reranker.WEIGHT to Reranker.WEIGHT)
+
     // floats, as the app has the smaller: the same scores, sooner
     private val rerank by lazy { rerankPath?.let { SentenceModel.load(mapFile(it), unpack = true) } }
     private val refine by lazy { refinePath?.let { SentenceModel.load(mapFile(it), unpack = true) } }
 
     /** Makes a reranker: none when there is no model. */
-    val reranker: (() -> Reranker)? get() = rerank?.let { model -> { Reranker(model) } }
+    val reranker: (() -> Reranker)? get() = rerank?.let { model -> { Reranker(model, weights.first) } }
 
-    val refiner: (() -> Reranker)? get() = refine?.let { model -> { Reranker(model, limit = Reranker.REFINE_LIMIT) } }
+    val refiner: (() -> Reranker)? get() = refine?.let { model -> { Reranker(model, weights.second, limit = Reranker.REFINE_LIMIT) } }
 }
 
 private fun score(setPath: String, resultPath: String, baselinePath: String?, half: String?, out: Appendable): Int {
@@ -166,6 +181,24 @@ private fun runPinyin(
         PinyinRun(loadData(dataPath), segmenter(scheme, fuzzy, neighbours), reranker = models.reranker, refiner = models.refiner)
     }) { hand -> run(hand) }
     File(resultPath).printWriter().use { out -> results.forEach { out.println(RunResultFormat.format(it)) } }
+    return 0
+}
+
+/**
+ * Each sample's whole-input readings as the decoder ranks them, each with its score (log10), a
+ * line per sample: `input<TAB>text<TAB>score...`. What a sentence model is added to in the app,
+ * for training one on top of it (dev/training). The lines are in the set's order, one per sample
+ * that [EvalSet.parse] keeps (blank and `#` lines are not samples): that is how the training
+ * scripts join them back to the set's expected text, so nothing else is repeated here.
+ */
+private fun sentences(dataPath: String, setPath: String, outPath: String, neighbours: Boolean, threads: Int): Int {
+    val lines = dealt(readSet(setPath), threads, { PinyinRun(loadData(dataPath), segmenter(null, emptySet(), neighbours)) }) { hand ->
+        hand.map { sample ->
+            (listOf(sample.input) + sentences(sample.input, sample.context).flatMap { (text, score) -> listOf(text, score.toString()) })
+                .joinToString("\t")
+        }
+    }
+    File(outPath).printWriter().use { out -> lines.forEach(out::println) }
     return 0
 }
 
