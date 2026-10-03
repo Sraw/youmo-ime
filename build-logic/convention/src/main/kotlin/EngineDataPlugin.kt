@@ -49,10 +49,12 @@ import javax.inject.Inject
  * for libime's code tables (五笔, 仓颉 ...).
  * Mixed into libime's language model are the n-grams of the chat-like pages of two of FineWeb-2's
  * Chinese shards (ime-dict-tool's `mix`, which picks the pages): libime's model knows written
- * text, and people type chat. No sentence model ships: the ones measured learned from LCCC,
- * whose README keeps it to research. Stored uncompressed, so the
- * engine can map it straight out of the APK rather than copying it out first; it is also left
- * out of the data descriptor for that reason (the descriptor lists only src/main/assets).
+ * text, and people type chat. The sentence models, `engine/sentence-model.safetensors` (4M,
+ * weighing the readings at each key) and `engine/sentence-model-large.safetensors` (25M, while the
+ * user pauses), are this fork's own (dev/TRAINING-PLAN.md: FineWeb-2 pages scored by
+ * Qwen3.5-9B-Base), fetched from a release of the fork. The .data files and the models are
+ * stored uncompressed, so the engine can map them straight out of the APK rather than copying
+ * them out first; they are also left out of the data descriptor for that reason (the descriptor lists only src/main/assets).
  *
  * The sources are the archives libime's CMake downloaded, checked against the same SHA-256.
  * FineWeb-2's are pinned to a revision of the dataset and checked against the SHA-256 it lists.
@@ -98,6 +100,15 @@ class EngineDataPlugin : Plugin<Project> {
             "000_00001.parquet" to "1829410bee959d64fee8c34efd3e741f22c368cfe62aaa7a971a56afabe1d92f",
         )
         const val MIX_TASK = "mixEngineModel"
+        const val MODEL_TASK = "copySentenceModels"
+        // a tag of its own, not "latest": what is downloaded is what was measured
+        private const val MODEL_URL =
+            "https://github.com/Sraw/fcitx5-android/releases/download/sentence-models-20261001/"
+        // asset name (the release's and the app's) to SHA-256
+        private val MODELS = mapOf(
+            "sentence-model.safetensors" to "342ae775e1ee64b6c42af782f55f736c5bf58b904f3b880ee77a576e2268e7fb",
+            "sentence-model-large.safetensors" to "6f7fcb724738e2fbe4c26db70fd53aa5b5729cb4af7ce7f1e7bfea73003e669a",
+        )
         const val TABLES_TASK = "compileEngineTables"
         private const val TOOL_MAIN = "org.fcitx.fcitx5.android.dicttool.MainKt"
     }
@@ -167,16 +178,27 @@ class EngineDataPlugin : Plugin<Project> {
             tables.from(TABLE.files.map { name -> extracted[2].flatMap { it.outputDir.file(name) } })
             outputDir.set(target.layout.buildDirectory.dir("generated/engine-tables"))
         }
+        val models = MODELS.entries.mapIndexed { i, (name, sha) ->
+            target.tasks.register<DownloadTask>("downloadSentenceModel$i") {
+                url.set(MODEL_URL + name)
+                sha256.set(sha)
+                outputFile.set(downloadsDir.file("sentence-models/$name"))
+            }
+        }
+        val model = target.tasks.register<CopyModels>(MODEL_TASK) {
+            files.from(models.map { task -> task.flatMap { it.outputFile } })
+            outputDir.set(target.layout.buildDirectory.dir("generated/engine-models"))
+        }
 
         target.extensions.configure<ApplicationExtension> {
-            // matched as a plain suffix: "data" alone would catch charselectdata too
-            // and a sentence model, should one ship again: openFd cannot read one compressed, and
-            // the engine takes that for none shipped
+            // matched as a plain suffix: "data" alone would catch charselectdata too; and the
+            // sentence models: openFd cannot read one compressed, and the engine takes that for none
             androidResources.noCompress += listOf(".data", ".safetensors")
         }
         components.onVariants { variant ->
             variant.sources.assets?.addGeneratedSourceDirectory(compile, CompileEngineData::outputDir)
             variant.sources.assets?.addGeneratedSourceDirectory(tables, CompileTables::outputDir)
+            variant.sources.assets?.addGeneratedSourceDirectory(model, CopyModels::outputDir)
         }
     }
 
@@ -313,6 +335,25 @@ class EngineDataPlugin : Plugin<Project> {
         override fun exec() {
             output().parentFile.mkdirs()
             super.exec()
+        }
+    }
+
+    /** The sentence models under `engine/`, named as they were downloaded. */
+    @DisableCachingByDefault(because = "copying is quicker than the cache would be")
+    abstract class CopyModels : DefaultTask() {
+        @get:InputFiles
+        @get:PathSensitive(PathSensitivity.NAME_ONLY)
+        abstract val files: ConfigurableFileCollection
+
+        @get:OutputDirectory
+        abstract val outputDir: DirectoryProperty
+
+        @TaskAction
+        fun copy() {
+            val out = outputDir.get().asFile.resolve("engine")
+            out.deleteRecursively()
+            out.mkdirs()
+            for (file in files.files) file.copyTo(out.resolve(file.name), overwrite = true)
         }
     }
 

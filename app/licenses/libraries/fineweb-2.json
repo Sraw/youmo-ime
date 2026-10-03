@@ -1,7 +1,7 @@
 {
     "uniqueId": "HuggingFaceFW/fineweb-2",
-    "artifactVersion": "cmn_Hani 000_00000, 000_00001 (af9c133)",
-    "description": "Web text from CommonCrawl, by Hugging Face; the word n-grams of its chat-like Chinese pages are mixed into the pinyin language model in pinyin.data. Use of it is also subject to CommonCrawl's Terms of Use.",
+    "artifactVersion": "cmn_Hani 000_00000, 000_00001 (n-gram mix), 000_00002, 000_00003 (sentence models) (af9c133)",
+    "description": "Web text from CommonCrawl, by Hugging Face; the word n-grams of its chat-like Chinese pages are mixed into the pinyin language model in pinyin.data, and the sentence models are trained on its Chinese pages. Use of it is also subject to CommonCrawl's Terms of Use.",
     "name": "FineWeb 2",
     "website": "https://huggingface.co/datasets/HuggingFaceFW/fineweb-2",
     "tag": "native",

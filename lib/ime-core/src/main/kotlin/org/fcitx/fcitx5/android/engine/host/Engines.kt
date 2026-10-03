@@ -103,7 +103,7 @@ class Engines(
             model = try {
                 SentenceModel.load(load(path), unpack, kernel ?: MatrixKernel.JVM)
             } catch (_: FileNotFoundException) {
-                // none ships at present (dev/ENGINE-DESIGN.md): pinyin reads without one
+                // a build without them (EngineDataPlugin fetches them): pinyin reads by the decoder alone
                 null
             } catch (e: IOException) {
                 onError(e)
@@ -446,7 +446,7 @@ class Engines(
         const val SHUANGPIN = "engine-shuangpin"
 
         const val PINYIN_DATA = "engine/pinyin.data"
-        /** Read if the app has one: none ships at present, the ones measured having learned from research-only chat. */
+        /** Read if the app has one; without it the engine types by the decoder alone. */
         const val SENTENCE_MODEL = "engine/sentence-model.safetensors"
         /** Six times the work of [SENTENCE_MODEL], and right more often: see [PinyinSession]'s refiner. */
         const val REFINING_MODEL = "engine/sentence-model-large.safetensors"
