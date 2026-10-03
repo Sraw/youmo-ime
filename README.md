@@ -10,7 +10,7 @@
 保留 [Fcitx5](https://github.com/fcitx/fcitx5) 作为输入法框架，拼音引擎是自己用 Kotlin 写的，取代了原来的 libime，
 并且在 n-gram 解码器之上加了两个小型神经网络模型给整句候选重新排序。
 
-> 这是一个独立维护的分支，与 Fcitx5 和 fcitx5-android 官方无关，也不会合并回上游。问题请在本仓库反馈，不要报给上游。
+> 这是一个独立的项目，与 Fcitx5 和 fcitx5-android 官方无关；它从 fcitx5-android 分出，保留了完整的历史，但不会合并回上游。问题请在本仓库反馈，不要报给上游。
 
 ### 特点
 
@@ -39,7 +39,7 @@
 
 ### 下载
 
-安装包会发布在 [Releases](https://github.com/Sraw/fcitx5-android/releases)；在那之前请按下文自行构建。
+安装包会发布在 [Releases](https://github.com/Sraw/youmo-ime/releases)；在那之前请按下文自行构建。
 
 包名是 `io.github.sraw.youmo`，可以和上游的 Fcitx5（`org.fcitx.fcitx5.android`）同时安装。
 从本分支改名前的版本换过来，可以在旧版的“高级”设置里导出用户数据，再到新版里导入：设置、主题、剪贴板会带过来；
@@ -51,7 +51,7 @@
 - 词典、拼音语言模型、码表：来自 [libime](https://github.com/fcitx/libime) 发布的文本源（LGPL-2.1-or-later），构建时编译成本引擎的格式。
   拼音语言模型里混入了 [FineWeb-2](https://huggingface.co/datasets/HuggingFaceFW/fineweb-2) 中文类聊天网页的 n-gram（ODC-By 1.0）。
 - 句子模型：本项目自己训练（Apache-2.0）。先在 FineWeb-2 中文网页上训练语言模型，再用 Qwen3.5-9B-Base（Apache-2.0）给候选列表打分做蒸馏。
-  文件发布在 [sentence-models-20261001](https://github.com/Sraw/fcitx5-android/releases/tag/sentence-models-20261001)。
+  文件发布在 [sentence-models-20261001](https://github.com/Sraw/youmo-ime/releases/tag/sentence-models-20261001)。
 - 不使用任何仅限科研用途的数据。
 
 ### 构建
@@ -65,8 +65,8 @@
 版本以 [Versions.kt](build-logic/convention/src/main/kotlin/Versions.kt) 为准。
 
 ```shell
-git clone https://github.com/Sraw/fcitx5-android.git
-cd fcitx5-android
+git clone https://github.com/Sraw/youmo-ime.git
+cd youmo-ime
 git submodule update --init --recursive
 sudo apt install extra-cmake-modules gettext   # Debian/Ubuntu；Arch：pacman -S extra-cmake-modules；macOS：brew install extra-cmake-modules gettext
 ./gradlew :app:assembleDebug
@@ -119,8 +119,8 @@ An Android Chinese input method that runs **entirely offline** on the phone. It 
 as the input method framework. The pinyin engine is its own, written in Kotlin in place of libime, and two
 small neural models rerank the n-gram decoder's whole-sentence candidates.
 
-> This is an independently maintained fork, not affiliated with Fcitx5 or fcitx5-android, and it will not be
-> merged upstream. Please report issues here, not upstream.
+> This is an independent project, not affiliated with Fcitx5 or fcitx5-android. It branched off fcitx5-android,
+> keeping the full history, and will not be merged upstream. Please report issues here, not upstream.
 
 ### Features
 
@@ -149,7 +149,7 @@ See `lib/ime-eval` for how these are measured.
 
 ### Download
 
-Builds will be published on [Releases](https://github.com/Sraw/fcitx5-android/releases); until then, build it yourself as below.
+Builds will be published on [Releases](https://github.com/Sraw/youmo-ime/releases); until then, build it yourself as below.
 
 The package name is `io.github.sraw.youmo`, so it installs alongside upstream Fcitx5 (`org.fcitx.fcitx5.android`).
 To move from this fork's builds before the renaming, export your user data in the old app's Advanced settings and import it in the new one.
@@ -161,7 +161,7 @@ Settings, themes and the clipboard come along. The old app's backups leave out t
 - Dictionary, pinyin language model and code tables: compiled at build time from the text sources published by [libime](https://github.com/fcitx/libime) (LGPL-2.1-or-later).
   The pinyin language model also mixes in n-grams from chat-like Chinese pages of [FineWeb-2](https://huggingface.co/datasets/HuggingFaceFW/fineweb-2) (ODC-By 1.0).
 - Sentence models: this project's own (Apache-2.0). A language model is first trained on FineWeb-2's Chinese pages, then distilled from Qwen3.5-9B-Base's (Apache-2.0) scores of candidate lists.
-  The files are published at [sentence-models-20261001](https://github.com/Sraw/fcitx5-android/releases/tag/sentence-models-20261001).
+  The files are published at [sentence-models-20261001](https://github.com/Sraw/youmo-ime/releases/tag/sentence-models-20261001).
 - No research-only data is used.
 
 ### Building
@@ -175,8 +175,8 @@ Requirements:
 [Versions.kt](build-logic/convention/src/main/kotlin/Versions.kt) has the current versions.
 
 ```shell
-git clone https://github.com/Sraw/fcitx5-android.git
-cd fcitx5-android
+git clone https://github.com/Sraw/youmo-ime.git
+cd youmo-ime
 git submodule update --init --recursive
 sudo apt install extra-cmake-modules gettext   # Debian/Ubuntu; Arch: pacman -S extra-cmake-modules; macOS: brew install extra-cmake-modules gettext
 ./gradlew :app:assembleDebug

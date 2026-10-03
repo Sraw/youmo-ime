@@ -1,4 +1,4 @@
-# fcitx5-android (maintained fork, not merged upstream)
+# youmo-ime, 幽默输入法 (branched from fcitx5-android; never merged upstream)
 
 Free to restructure; upstream compatibility is not a constraint.
 

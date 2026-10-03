@@ -103,7 +103,7 @@ class EngineDataPlugin : Plugin<Project> {
         const val MODEL_TASK = "copySentenceModels"
         // a tag of its own, not "latest": what is downloaded is what was measured
         private const val MODEL_URL =
-            "https://github.com/Sraw/fcitx5-android/releases/download/sentence-models-20261001/"
+            "https://github.com/Sraw/youmo-ime/releases/download/sentence-models-20261001/"
         // asset name (the release's and the app's) to SHA-256
         private val MODELS = mapOf(
             "sentence-model.safetensors" to "342ae775e1ee64b6c42af782f55f736c5bf58b904f3b880ee77a576e2268e7fb",

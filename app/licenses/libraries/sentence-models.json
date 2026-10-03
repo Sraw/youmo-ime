@@ -1,9 +1,9 @@
 {
-    "uniqueId": "Sraw/fcitx5-android/sentence-models",
+    "uniqueId": "Sraw/youmo-ime/sentence-models",
     "artifactVersion": "sentence-models-20261001",
     "description": "the pinyin engine's sentence models (4M, and 25M while the user pauses), this fork's own: trained on FineWeb-2's Chinese pages and distilled from the scores of Qwen3.5-9B-Base (Qwen, Apache-2.0)",
     "name": "Sentence models",
-    "website": "https://github.com/Sraw/fcitx5-android/releases/tag/sentence-models-20261001",
+    "website": "https://github.com/Sraw/youmo-ime/releases/tag/sentence-models-20261001",
     "tag": "native",
     "licenses": [
         "Apache-2.0"
