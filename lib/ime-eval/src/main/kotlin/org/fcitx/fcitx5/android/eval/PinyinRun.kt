@@ -30,9 +30,9 @@ class PinyinRun(
     private val segmenter: Segmenter = PinyinSegmenter(),
     penalties: Penalties = Penalties(),
     beam: Int = PinyinDecoder.DEFAULT_BEAM,
-    /** A prior per layer of the dictionary, if any, on top of the model. */
-    prior: LayerPrior? = null,
-    /** A word pack listed as the user's, its words in layer 1. */
+    /** A fixed prior per layer, `name=value,...` ([LayerPrior.parse]), the [pack]'s layer among them; on top of the model. */
+    layers: String? = null,
+    /** A word pack listed as the user's, its words in its layer. */
     pack: WordPack? = null,
     /**
      * Makes the reranker of a sample's keys. A fresh one per sample, as a reranker keeps what it
@@ -43,7 +43,12 @@ class PinyinRun(
     /** Makes what weighs the readings of the whole input once more, as the user pauses before picking; not timed. */
     private val refiner: (() -> SentenceRefiner)? = null,
 ) {
-    private val user = pack?.let { p -> UserModel(data.dictionary, data.vocabulary).also { u -> p.words.forEach { u.list(it.entry, it.score, 1, data.model.vocabularySize) } } }
+    // the user model is read only when scoring, by then made
+    private val prior: LayerPrior? = layers?.let { spec -> LayerPrior.parse(data.layers, spec, listOfNotNull(pack?.layer)) { id -> user?.layerOf(id) ?: 0 } }
+    private val user: UserModel? = pack?.let { p ->
+        val layer = prior?.layer(p.layer) ?: 1
+        UserModel(data.dictionary, data.vocabulary).also { u -> p.words.forEach { u.list(it.entry, it.score, layer, data.model.vocabularySize) } }
+    }
     private val decoder = PinyinDecoder(
         data.dictionary, data.vocabulary,
         (if (user == null) WordScorer.of(data.model) else UserScorer(data.model, user)).let { if (prior == null) it else prior.scorer(it) },

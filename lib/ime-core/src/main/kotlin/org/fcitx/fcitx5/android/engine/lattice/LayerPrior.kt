@@ -118,16 +118,21 @@ class LayerPrior(
         const val STEP = 0.05f
         const val BOUND = 1f
 
-        /** [spec] as `name=value,name=value` over [layers]' names; a layer not named is 0. */
-        fun parse(layers: WordLayers, spec: String): LayerPrior {
-            val values = FloatArray(layers.count)
+        /**
+         * [spec] as `name=value,name=value` over [layers]' names and [packs]' (each given its
+         * index in that order, for [extra] to return); a layer not named is 0. Fixed values, for
+         * measuring: not held to [BOUND] as learned ones are.
+         */
+        fun parse(layers: WordLayers, spec: String, packs: List<String> = emptyList(), extra: (Int) -> Int = { 0 }): LayerPrior {
+            val prior = LayerPrior(layers, extra = extra)
+            packs.forEach { prior.layer(it) }
             spec.split(',').filter { it.isNotEmpty() }.forEach { part ->
                 val name = part.substringBefore('=')
-                val index = layers.names.indexOf(name)
-                require(index >= 0) { "no layer \"$name\" among ${layers.names}" }
-                values[index] = requireNotNull(part.substringAfter('=', "").toFloatOrNull()) { "bad prior \"$part\"" }
+                val index = prior.names.indexOf(name)
+                require(index >= 0) { "no layer \"$name\" among ${prior.names}" }
+                prior.values[index] = requireNotNull(part.substringAfter('=', "").toFloatOrNull()) { "bad prior \"$part\"" }
             }
-            return LayerPrior(layers, values)
+            return prior
         }
     }
 }

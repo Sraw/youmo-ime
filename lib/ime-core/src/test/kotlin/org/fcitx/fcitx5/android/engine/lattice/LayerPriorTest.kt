@@ -113,6 +113,10 @@ class LayerPriorTest {
         assertEquals(0f, LayerPrior.parse(data.layers, "")[1], 0f)
         assertEquals(-1f, LayerPrior.parse(data.layers, "base=-1,wanxiang=0.5")[0], 0f)
         assertThrows(IllegalArgumentException::class.java) { LayerPrior.parse(data.layers, "new=1") }
+        // a pack's layer once the pack is named, after the data's; its words found through extra
+        val packed = LayerPrior.parse(data.layers, "new=1.5", listOf("new")) { 2 }
+        assertEquals(2, packed.layer("new"))
+        assertEquals(1.5f, packed.of(0), 0f)
         assertThrows(IllegalArgumentException::class.java) { LayerPrior.parse(data.layers, "wanxiang=x") }
         assertThrows(IllegalArgumentException::class.java) { LayerPrior(data.layers, floatArrayOf(0f)) }
         assertThrows(IllegalArgumentException::class.java) { LayerPrior(data.layers, floatArrayOf(0f, Float.NaN)) }

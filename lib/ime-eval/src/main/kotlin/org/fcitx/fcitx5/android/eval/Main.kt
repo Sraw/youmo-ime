@@ -7,7 +7,6 @@ package org.fcitx.fcitx5.android.eval
 import org.fcitx.fcitx5.android.engine.data.CodeTable
 import org.fcitx.fcitx5.android.engine.data.DataFormatException
 import org.fcitx.fcitx5.android.engine.data.PinyinData
-import org.fcitx.fcitx5.android.engine.lattice.LayerPrior
 import org.fcitx.fcitx5.android.engine.user.WordPack
 import org.fcitx.fcitx5.android.engine.lattice.Penalties
 import org.fcitx.fcitx5.android.engine.libime.LibimeFiles
@@ -248,8 +247,7 @@ private fun runPinyin(
     // a data file each: its buffers are not to be shared
     val results = dealt(Halves.select(readSet(setPath), half), threads, {
         val data = loadData(dataPath)
-        val prior = layers?.let { LayerPrior.parse(data.layers, it) }
-        PinyinRun(data, segmenter(scheme, fuzzy, neighbours), prior = prior, pack = pack, reranker = models.reranker, refiner = models.refiner)
+        PinyinRun(data, segmenter(scheme, fuzzy, neighbours), layers = layers, pack = pack, reranker = models.reranker, refiner = models.refiner)
     }) { hand -> run(hand) }
     File(resultPath).printWriter().use { out -> results.forEach { out.println(RunResultFormat.format(it)) } }
     return 0

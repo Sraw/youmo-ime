@@ -89,6 +89,9 @@ class PinyinRunTest {
         assertEquals("泥", first("--pack", pack.path))
         val worse = tmp.newFile("old.words").apply { writeText("# youmo words 1\n泥\tni\t-2.5\n") }
         assertEquals("你", first("--pack", worse.path))
+        // the pack's layer raised above 你 by a fixed prior, by its name
+        val tier = tmp.newFile("tier.words").apply { writeText("# youmo words 1\n# layer: tier\n泥\tni\t-2.5\n") }
+        assertEquals("泥", first("--pack", tier.path, "--layers", "tier=1"))
         // a bad pack is an error with its line, as a bad set is
         val broken = tmp.newFile("broken.words").apply { writeText("# youmo words 1\n泥\tni\t0.5\n") }
         val e = assertThrows(SourceException::class.java) {
