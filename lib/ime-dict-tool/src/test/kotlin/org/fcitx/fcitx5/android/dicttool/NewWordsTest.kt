@@ -94,8 +94,9 @@ class NewWordsTest {
         }
         val out = ArrayList<NewWords.Candidate>().also { c -> finder.candidates { c += it } }
         val dazi = out.first { it.text == "搭子" }
-        // 饭 before it both times; after it the full stop, which stands for a different char each time
+        // 饭 before it both times; after it the full stop, which stands for a different char each
+        // time: ln 2 over two, and Miller-Madow's (2 - 1) / 4 on top
         assertEquals(0.0, dazi.leftEntropy, 1e-9)
-        assertEquals(Math.log(2.0), dazi.rightEntropy, 1e-9)
+        assertEquals(Math.log(2.0) + 0.25, dazi.rightEntropy, 1e-9)
     }
 }

@@ -7,6 +7,7 @@ package org.fcitx.fcitx5.android.data.pinyin
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.data.pinyin.dict.PinyinDictionary
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -38,6 +39,10 @@ class PinyinDictManagerTest {
         assertEquals(PinyinDictionary.Type.Words, first.type)
         assertEquals(listOf("2026q1.words"), names())
         assertTrue(first.disable())
+        // the same text again, a BOM or a trailing newline apart, is already there; more words are not
+        assertTrue(PinyinDictManager.hasSamePack("2026q1", "\uFEFF" + pack.trimEnd()))
+        assertFalse(PinyinDictManager.hasSamePack("2026q1", pack + "智驾 zhi'jia -5.9\n"))
+        assertFalse(PinyinDictManager.hasSamePack("nope", pack))
         PinyinDictManager.importPack("2026q1", pack + "智驾 zhi'jia -5.9\n").getOrThrow()
         assertEquals(listOf("2026q1.words.disable"), names())
         assertTrue(File(dir, "2026q1.words.disable").readText().contains("智驾"))

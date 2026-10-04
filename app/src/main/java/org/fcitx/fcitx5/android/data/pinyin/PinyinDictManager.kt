@@ -69,6 +69,14 @@ object PinyinDictManager {
         TextDictionary(dest)
     }
 
+    /** Whether the pack called [name] is already there, on or off, as [text] has it: nothing to import then. */
+    fun hasSamePack(name: String, text: String): Boolean {
+        val file = listOf(true, false).map { File(pinyinDicDir, TextDictionary.fileName(name, it, PinyinDictionary.Type.Words)) }.firstOrNull { it.exists() }
+            ?: return false
+        val lines = text.lineSequence().mapIndexed { i, l -> if (i == 0) l.removePrefix("\uFEFF") else l }.toList().dropLastWhile { it.isEmpty() }
+        return runCatching { file.useLines { it.toList().dropLastWhile { l -> l.isEmpty() } } }.getOrNull() == lines
+    }
+
     private fun hasDictionary(name: String) = listOf(PinyinDictionary.Type.Text, PinyinDictionary.Type.Words).any { type ->
         listOf(true, false).any { File(pinyinDicDir, TextDictionary.fileName(name, it, type)).exists() }
     }

@@ -25,7 +25,9 @@ import kotlin.math.log10
  * that reached [minCount], are not [known] (the dictionary's words need no telling apart; their
  * entropies come out NaN) and hold together at all ([GATHER_PMI]); when those are many, it
  * looks at every n-th page only, as the pairs of run and neighbour would not fit either, and an
- * entropy from a sample of a frequent run's neighbours is near enough.
+ * entropy from a sample of a frequent run's neighbours is near enough; a rare run's, from a
+ * handful of observations, comes out low all the same (bias-corrected, but ln of a handful is
+ * the most it can be), so a threshold on it is partly one on the count.
  */
 class NewWords(
     private val known: Set<String>,
@@ -184,22 +186,31 @@ class NewWords(
      */
     fun candidates(sink: (Candidate) -> Unit) {
         require(done) { "the passes are not done" }
-        // H = ln(total) - sum(n ln n) / total, summed over the neighbours of each run and side; a
-        // boundary (punctuation, a space, the page's end) counts as a neighbour never seen before
-        // each time: a word between 《》 or before a full stop stands as free as one among others,
-        // where a fragment never sits at one
+        // H = ln(total) - sum(n ln n) / total, summed over the neighbours of each run and side, plus
+        // Miller-Madow's (distinct - 1) / 2 total, as from a few observations (a rare run, or any
+        // run when pages are sampled) the plain estimate runs low. A boundary (punctuation, a
+        // space, the page's end) counts as a neighbour never seen before each time: a word between
+        // 《》 or before a full stop stands as free as one among others, where a fragment never sits
+        // at one
         val totals = IntArray(kept.size * 2)
+        val distinct = IntArray(kept.size * 2)
         val sums = DoubleArray(kept.size * 2)
         for (i in 0 until neighbours.size) {
             val key = neighbours.keyAt(i)
             val slot = (key ushr 16).toInt()
             val n = neighbourCounts[i]
             totals[slot] += n
-            if ((key and 0xffff).toInt().toChar() != NONE) sums[slot] += n * ln(n.toDouble())
+            if ((key and 0xffff).toInt().toChar() == NONE) {
+                distinct[slot] += n
+            } else {
+                distinct[slot]++
+                sums[slot] += n * ln(n.toDouble())
+            }
         }
         fun entropy(run: Int, side: Int): Double {
             val slot = run * 2 + side
-            return if (totals[slot] == 0) 0.0 else ln(totals[slot].toDouble()) - sums[slot] / totals[slot]
+            val n = totals[slot]
+            return if (n == 0) 0.0 else ln(n.toDouble()) - sums[slot] / n + (distinct[slot] - 1) / (2.0 * n)
         }
         for (i in 0 until kept.size) {
             val key = kept.keyAt(i)

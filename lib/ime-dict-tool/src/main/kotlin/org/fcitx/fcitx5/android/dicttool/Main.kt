@@ -16,6 +16,7 @@ import org.fcitx.fcitx5.android.engine.data.SourceException
 import org.fcitx.fcitx5.android.engine.data.forEachNumberedLine
 import org.fcitx.fcitx5.android.engine.table.TableText
 import java.io.File
+import java.util.Locale
 import java.io.IOException
 import java.io.RandomAccessFile
 import java.nio.ByteBuffer
@@ -200,7 +201,7 @@ private fun words(options: Options, out: Appendable) {
         w.write("# chars\t${finder.chars}\n")
         finder.candidates { c ->
             val s = surprise.of(c.text, c.count, finder.chars)
-            w.write("%s\t%d\t%d\t%.3f\t%.3f\t%.3f\t%.3f\t%d\n".format(c.text, c.count, c.year, c.pmi, c.leftEntropy, c.rightEntropy, s, if (c.known) 1 else 0))
+            w.write("%s\t%d\t%d\t%.3f\t%.3f\t%.3f\t%.3f\t%d\n".format(Locale.ROOT, c.text, c.count, c.year, c.pmi, c.leftEntropy, c.rightEntropy, s, if (c.known) 1 else 0))
             all++
             if (!c.known) unknown++
         }
@@ -229,7 +230,7 @@ private fun pack(options: Options, out: Appendable) {
     // the slope fitted too, not held at 1 as frequencies would have it: the pages are not the
     // model's kind of text, and the flatter line measured better (dev/TRAINING-PLAN.md 11.7)
     val fit = CountFit.of(known)
-    out.appendLine("fit: log10 P = %.3f + %.3f log10(count + 1), over ${known.size} words the model has".format(fit.a, fit.b))
+    out.appendLine("fit: log10 P = %.3f + %.3f log10(count + 1), over ${known.size} words the model has".format(Locale.ROOT, fit.a, fit.b))
     var words = 0
     var unread = 0
     var rare = 0
@@ -253,11 +254,13 @@ private fun pack(options: Options, out: Appendable) {
                 unread++
                 return@forEachRow
             }
-            w.write("%s\t%s\t%.3f\n".format(text, pinyin, minOf(0f, fit.prob(count.toLong()))))
+            w.write("%s\t%s\t%.3f\n".format(Locale.ROOT, text, pinyin, minOf(0f, fit.prob(count.toLong()))))
             words++
         }
     }
     out.appendLine("pack: $words words, $rare left out for a character the model hardly has, $unread for want of a reading")
+    val size = File(options.output).length()
+    if (size > MAX_FETCHED) out.appendLine("pack: ${size shr 20} MB, more than the app fetches from a server (${MAX_FETCHED shr 20} MB): import by hand only")
 }
 
 /** Each candidate row of `words`'s output, split; the comment lines skipped. */
@@ -267,6 +270,9 @@ private fun File.forEachRow(row: (List<String>) -> Unit) = useLines { lines ->
 
 // log10: a character under this in the model is as good as not in it (the dictionary's rarest are around -6)
 private const val RARE_CHAR = -6.5f
+
+// what the app's daily fetch takes at most (HttpRemoteModel.MAX_WORDS)
+private const val MAX_FETCHED = 16L shl 20
 
 /**
  * What tells a phrase or a fragment of a word from a word among the candidates of `words`, which
@@ -392,7 +398,7 @@ private fun pinyin(output: String, lm: String, dicts: List<String>, rimeUnigrams
                     added++
                 }
             }
-            out.appendLine("rime: $added words the model lacks scored by their counts, log10 P = %.3f + %.3f log10(count + 1)".format(fit.a, fit.b))
+            out.appendLine("rime: $added words the model lacks scored by their counts, log10 P = %.3f + %.3f log10(count + 1)".format(Locale.ROOT, fit.a, fit.b))
         }
     }
     out.appendLine("dictionary: ${reader.entries} readings")
@@ -475,7 +481,7 @@ private class ErrorStats {
     }
 
     fun describe(order: Int) =
-        if (count[order] == 0) "-" else "max error ${"%.4f".format(worst[order])}, mean ${"%.5f".format(total[order] / count[order])}"
+        if (count[order] == 0) "-" else "max error ${"%.4f".format(Locale.ROOT, worst[order])}, mean ${"%.5f".format(Locale.ROOT, total[order] / count[order])}"
 }
 
 private const val STRAY_EXAMPLES = 5
