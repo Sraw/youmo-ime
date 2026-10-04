@@ -79,8 +79,11 @@ class WordPack(val layer: String, val words: List<Word>) {
 
         private const val MAX_NAME = 64
 
-        /** A name that fits a `name=value,...` list and a header line: no comma, no space, not empty. */
-        fun validLayer(name: String) = name.isNotEmpty() && name.none { it == ',' || it == '=' || it.isWhitespace() }
+        /**
+         * A name that fits a `name=value,...` list, a header line and the user log's `writeUTF`
+         * (64 KB at most, thrown from inside a pick past that): no comma, no space, 1 to 64 chars.
+         */
+        fun validLayer(name: String) = name.length in 1..MAX_NAME && name.none { it == ',' || it == '=' || it.isWhitespace() }
 
         private fun word(line: String): Word? {
             val f = line.fields()

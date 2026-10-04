@@ -52,6 +52,7 @@ class WordPackTest {
         failsAt(2, "bad layer name \"a b\"", "# youmo words 1\n# layer: a b\n")
         failsAt(2, "bad layer name \"\"", "# youmo words 1\n# layer:\n")
         failsAt(2, "bad layer name \"a,b\"", "# youmo words 1\n# layer: a,b\n")
+        failsAt(2, "bad layer name \"${"x".repeat(65)}\"", "# youmo words 1\n# layer: ${"x".repeat(65)}\n")
         failsAt(3, "expected \"word pin'yin log10P\"", "# youmo words 1\n搭子 da'zi -1\n搭子 da'zi\n")
         failsAt(2, "expected \"word pin'yin log10P\"", "# youmo words 1\n搭子 da'zi 0.5\n")
         failsAt(2, "expected \"word pin'yin log10P\"", "# youmo words 1\n搭子 da'zi NaN\n")
