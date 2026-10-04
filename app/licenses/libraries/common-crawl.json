@@ -1,6 +1,6 @@
 {
     "uniqueId": "Common Crawl",
-    "artifactVersion": "CC-MAIN-2026-39, WET files 10 to 1509 (engine-data-20261004)",
+    "artifactVersion": "CC-MAIN-2026-39 and CC-MAIN-2026-34, WET files 10 to 1509 of each (engine-data-20261005)",
     "description": "Web text crawled by the Common Crawl Foundation: the word n-grams of its Chinese pages are mixed into the pinyin language model in pinyin.data. Use of it is subject to Common Crawl's Terms of Use (https://commoncrawl.org/terms-of-use).",
     "name": "Common Crawl",
     "website": "https://commoncrawl.org",

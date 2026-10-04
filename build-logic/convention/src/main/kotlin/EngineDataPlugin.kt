@@ -99,9 +99,9 @@ class EngineDataPlugin : Plugin<Project> {
         )
         // the language model engine-data.sh made (its manifest.txt in the release says from what),
         // repacked as the tar CMake unpacks; a tag of its own, not "latest", as the models'
-        private const val LM_RELEASE = "engine-data-20261004"
+        private const val LM_RELEASE = "engine-data-20261005"
         private const val LM_URL = "https://github.com/Sraw/youmo-ime/releases/download/$LM_RELEASE/lm.tar.zst"
-        private const val LM_SHA256 = "a59565f27bcd21b606f918253fb3607ec56b74ee581425ac543be20b36da8546"
+        private const val LM_SHA256 = "eb40f73ca1a89dac8951a3f0db1becfcb4147a7e207c66a1e0ba3a391ac0440d"
         private const val LM_FILE = "lm.arpa"
         const val MODEL_TASK = "copySentenceModels"
         // a tag of its own, not "latest": what is downloaded is what was measured

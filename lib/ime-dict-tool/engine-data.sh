@@ -24,13 +24,14 @@
 # it was; done/ is beside out/, not in it, as most steps' work is too, so out/ copied onto another
 # machine does not pass for the work there. Needs java 21, curl, zstd, sha256sum.
 #
-# What goes in is what was measured (11.7d): CC-MAIN-2026-39's WET files 10 to 1509, mixed at 0.6
-# beside FineWeb-2's two shards; candidates seen 15 times, pmi 1 and entropy 1 or more. A newer
+# What goes in is what was measured (11.7d, 12.10): CC-MAIN-2026-39's and CC-MAIN-2026-34's WET files
+# 10 to 1509, mixed at 0.6 beside FineWeb-2's two shards (0.4 and 0.8 did no better); candidates seen
+# 15 times, pmi 1 and entropy 1 or more. A newer
 # crawl: CRAWL=CC-MAIN-... (and FROM, FILES); several, CRAWL="CC-MAIN-... CC-MAIN-...", the same files of each.
 set -o pipefail
 WORK=${1:?usage: engine-data.sh <work dir>}
 : "${TOOL:?TOOL: the ime-dict-tool launcher}"
-CRAWL=${CRAWL:-CC-MAIN-2026-39}
+CRAWL=${CRAWL:-CC-MAIN-2026-39 CC-MAIN-2026-34}
 FROM=${FROM:-10}
 FILES=${FILES:-1500}
 WEIGHT=${WEIGHT:-0.6}
