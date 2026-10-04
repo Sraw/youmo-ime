@@ -285,14 +285,21 @@ private class Phrases {
 
     fun isPhrase(text: String, count: Int): Boolean {
         if (INSIDE.any { it in text }) return true
-        if (text.first() in STOP) return true
-        if (text.last() in STOP && !(text.length == 2 && text.last() in VERB_END)) return true
+        if (text.first() in STOP || endsAsOne(text)) return true
         return (longest[text] ?: 0) > count * FRAGMENT_SHARE
+    }
+
+    private fun endsAsOne(text: String): Boolean {
+        val last = text.last()
+        if (last !in STOP || last in LAST_IS_FINE) return false
+        return !(text.length == 2 && last in VERB_END)
     }
 
     private companion object {
         const val STOP = "的了是在就都也不和与着过得地吗呢吧啊呀哦嘛我你他她它们这那个把被将让给对从向为以之其此些很太更最又再还才并或而但却如若因所比跟没有要会能可"
         const val VERB_END = "了过"
+        // function characters at the start of a phrase that end words too: 碳中和, 保有
+        const val LAST_IS_FINE = "和有"
         const val INSIDE = "的"
         const val FRAGMENT_SHARE = 0.5
     }

@@ -55,6 +55,7 @@ class NewWordsTest {
         assertEquals(2, qichi.count)
         assertEquals(0.0, qichi.leftEntropy, 1e-9)
         assertEquals(0.0, qichi.rightEntropy, 1e-9)
+
     }
 
     @Test
@@ -80,5 +81,21 @@ class NewWordsTest {
         keys.forEachIndexed { i, k -> assertTrue("$k", sketch.count(k) >= i + 1) }
         // sixteen cells for forty keys: some counts are over, but the smallest key, added once, no more than its collisions
         assertTrue(sketch.count(keys[0]) >= 1)
+    }
+
+    @Test
+    fun aBoundaryIsANeighbourNeverSeenBefore() {
+        val finder = NewWords(emptySet(), 2, 2, sketchBits = 12)
+        while (!finder.done) {
+            repeat(2) { finder.add("饭搭子。", "") }
+            // other text, so that 搭子 is more than chance
+            finder.add("你好吗", "")
+            finder.nextPass()
+        }
+        val out = ArrayList<NewWords.Candidate>().also { c -> finder.candidates { c += it } }
+        val dazi = out.first { it.text == "搭子" }
+        // 饭 before it both times; after it the full stop, which stands for a different char each time
+        assertEquals(0.0, dazi.leftEntropy, 1e-9)
+        assertEquals(Math.log(2.0), dazi.rightEntropy, 1e-9)
     }
 }

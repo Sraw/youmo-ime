@@ -184,14 +184,18 @@ class NewWords(
      */
     fun candidates(sink: (Candidate) -> Unit) {
         require(done) { "the passes are not done" }
-        // H = ln(total) - sum(n ln n) / total, summed over the neighbours of each run and side
+        // H = ln(total) - sum(n ln n) / total, summed over the neighbours of each run and side; a
+        // boundary (punctuation, a space, the page's end) counts as a neighbour never seen before
+        // each time: a word between 《》 or before a full stop stands as free as one among others,
+        // where a fragment never sits at one
         val totals = IntArray(kept.size * 2)
         val sums = DoubleArray(kept.size * 2)
         for (i in 0 until neighbours.size) {
-            val slot = (neighbours.keyAt(i) ushr 16).toInt()
+            val key = neighbours.keyAt(i)
+            val slot = (key ushr 16).toInt()
             val n = neighbourCounts[i]
             totals[slot] += n
-            sums[slot] += n * ln(n.toDouble())
+            if ((key and 0xffff).toInt().toChar() != NONE) sums[slot] += n * ln(n.toDouble())
         }
         fun entropy(run: Int, side: Int): Double {
             val slot = run * 2 + side
