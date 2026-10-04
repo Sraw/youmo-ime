@@ -113,7 +113,7 @@ class MainTest {
             File(pack).readText(),
         )
         // with a list of the words: what is on it, the pmi and entropy asked for being low; an entropy not measured no bar
-        val only = tmp.root.resolve("titles.txt").apply { writeText("耗子\n好好\tzhwiki\n子了\n耗好\n") }.path
+        val only = tmp.root.resolve("titles.txt").apply { writeText("# titles\n耗子\n好好\tzhwiki\n子了\n耗好\n# 好了\n") }.path
         assertEquals(0, run("pack", "-o", pack, "--data", output, "--layer", "wiki", "--min-count", "5", "--min-pmi", "0", "--min-entropy", "1", "--only", only, candidates).first)
         assertEquals(
             "# youmo words 1\n# layer: wiki\n耗好\thao'hao\t-1.000\n耗子\thao'zi\t-1.339\n好好\thao'hao\t-1.000\n子了\tzi'le\t-1.000\n",
