@@ -39,6 +39,11 @@ val USAGE = """
                                                           the words the pages use that the data lacks (NewWords)
            pack -o <out.words> --data <pinyin.data> --layer <name> [--min-count <n>] [--min-pmi <x>] [--min-entropy <x>] [--min-surprise <x>] [--only <words.txt>] <candidates.tsv>
                                                           a word pack (WordPack) of the candidates that pass
+           cc -o <out dir> --crawl <CC-MAIN-...> [--from <n>] --files <n> [--base <url>]
+                                                          the Chinese pages of a CommonCrawl crawl's WET files,
+                                                          a shard of 100 files each (CommonCrawl)
+           clean -o <out dir> <shard.parquet>...          the shards without their boilerplate and spam,
+                                                          a shard each, of the same name (PageCleaner)
 """.trimIndent()
 
 fun main(args: Array<String>) {
@@ -83,6 +88,8 @@ private fun dispatch(command: String?, options: Options, out: Appendable): Boole
         "check" -> check(options.inputs[0], options.inputs[1], out)
         "words" -> words(options, out)
         "pack" -> pack(options, out)
+        "cc" -> options.crawl.let { CommonCrawl.extract(it.name!!, it.from, it.files!!, File(options.output!!), it.base) { line -> out.appendLine(line) } }
+        "clean" -> clean(options, out)
     }
     return true
 }
@@ -106,18 +113,39 @@ private class Options(
     val minSurprise: Double,
     /** `pack`: a file of the only words that may go in (the first field of each line), if any. */
     val only: String?,
+    val crawl: Crawl,
 ) {
-    /** Whether [command] takes these options. */
-    fun fit(command: String?): Boolean {
-        val some = inputs.isNotEmpty()
-        return when (command) {
-            "pinyin", "mix" -> output != null && lm != null && some
-            "table" -> output != null && lm == null && inputs.size == 1
-            "check" -> output == null && lm == null && inputs.size == 2
-            "words" -> output != null && data != null && some
-            "pack" -> output != null && data != null && layer != null && inputs.size == 1
-            else -> false
+    /** `cc`: the crawl, its first WET file and how many, and where CommonCrawl is. */
+    class Crawl(val name: String?, val from: Int, val files: Int?, val base: String) {
+        companion object {
+            /** @return null for a bad value */
+            fun parse(values: Map<String, String>): Crawl? = Crawl(
+                name = values["--crawl"],
+                from = values["--from"]?.let { it.toIntOrNull()?.takeIf { n -> n >= 0 } ?: return null } ?: 0,
+                files = values["--files"]?.let { it.toIntOrNull()?.takeIf { n -> n >= 1 } ?: return null },
+                base = values["--base"] ?: CommonCrawl.BASE,
+            )
         }
+    }
+
+    /** Whether [command] takes these options. */
+    fun fit(command: String?): Boolean = when (command) {
+        "pinyin", "mix", "table", "check" -> fitModel(command)
+        "words", "pack", "cc", "clean" -> fitCorpus(command)
+        else -> false
+    }
+
+    private fun fitModel(command: String): Boolean = when (command) {
+        "table" -> output != null && lm == null && inputs.size == 1
+        "check" -> output == null && lm == null && inputs.size == 2
+        else -> output != null && lm != null && inputs.isNotEmpty()
+    }
+
+    private fun fitCorpus(command: String): Boolean = output != null && when (command) {
+        "words" -> data != null && inputs.isNotEmpty()
+        "pack" -> data != null && layer != null && inputs.size == 1
+        "cc" -> crawl.name != null && crawl.files != null && inputs.isEmpty()
+        else -> inputs.isNotEmpty()
     }
 
     companion object {
@@ -137,6 +165,7 @@ private class Options(
         // every option takes a value
         private val FLAGS = setOf(
             "-o", "--lm", "--weight", "--cutoffs", "--rime-unigrams", "--data", "--min-count", "--layer", "--min-pmi", "--min-entropy", "--min-surprise", "--only",
+            "--crawl", "--from", "--files", "--base",
         )
 
         /** @return null for an option with a bad or missing value */
@@ -166,9 +195,35 @@ private class Options(
                 minEntropy = read("--min-entropy", MIN_ENTROPY) { it.toDoubleOrNull()?.takeIf(Double::isFinite) } ?: return null,
                 minSurprise = read("--min-surprise", MIN_SURPRISE) { it.toDoubleOrNull()?.takeIf(Double::isFinite) } ?: return null,
                 only = values["--only"],
+                crawl = Crawl.parse(values) ?: return null,
             )
         }
     }
+}
+
+/**
+ * Each shard without its boilerplate and spam, written to the output directory under its name:
+ * every shard's lines are counted first, as a menu repeats over pages of more than one shard.
+ */
+private fun clean(options: Options, out: Appendable) {
+    val dir = File(options.output!!)
+    if (!dir.isDirectory && !dir.mkdirs()) throw IOException("cannot make $dir")
+    val shards = options.inputs.map(::File)
+    require(shards.map { it.name }.toSet().size == shards.size) { "two shards of one name: one would overwrite the other" }
+    val cleaner = PageCleaner()
+    var pages = 0L
+    shards.forEach { shard -> WebText.pages(shard) { cleaner.count(it.text); pages++ } }
+    var kept = 0L
+    var han = 0L
+    for (shard in shards) {
+        val clean = ArrayList<WebText.Page>()
+        WebText.pages(shard) { page -> cleaner.clean(page.text)?.let { clean += WebText.Page(page.url, it, page.date) } }
+        WebText.write(File(dir, shard.name), clean)
+        kept += clean.size
+        han += clean.sumOf { page -> page.text.count { it in '一'..'鿿' } }
+        out.appendLine("${shard.name}: ${clean.size} pages kept")
+    }
+    out.appendLine("clean: $kept of $pages pages kept, $han Han characters")
 }
 
 /**

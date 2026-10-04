@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.dicttool
 
+import org.duckdb.DuckDBConnection
 import java.io.File
 import java.io.IOException
 import java.sql.DriverManager
@@ -51,22 +52,63 @@ object WebText {
      * (`2023-06-14T...`, or empty), a page at a time, in the shard's order.
      * @throws IOException if DuckDB cannot read it
      */
-    fun read(shard: File, chatOnly: Boolean = true, page: (List<String>, String) -> Unit) {
+    fun read(shard: File, chatOnly: Boolean = true, page: (List<String>, String) -> Unit) = select(shard) { statement, path ->
+        query(statement, path, chatOnly, page)
+    }
+
+    /** A page as a shard holds it: where it was, its text, and when (`2023-06-14T...`, or empty). */
+    class Page(val url: String, val text: String, val date: String)
+
+    /**
+     * Every page of [shard] as it is, none left out, in the shard's order.
+     * @throws IOException if DuckDB cannot read it
+     */
+    fun pages(shard: File, page: (Page) -> Unit) = select(shard) { statement, path ->
+        rows(statement, path) { url, text, date -> page(Page(url, text, date)) }
+    }
+
+    /**
+     * Writes [pages] to [shard] as `url, text, date`, what [read] and [pages] take, through a file
+     * beside it: a shard is there whole or not at all.
+     * @throws IOException if DuckDB cannot write it
+     */
+    fun write(shard: File, pages: List<Page>) {
+        val temp = File(shard.path + ".tmp")
+        try {
+            DriverManager.getConnection("jdbc:duckdb:").use { connection ->
+                connection.createStatement().use { it.execute("CREATE TABLE pages (url VARCHAR, text VARCHAR, date VARCHAR)") }
+                (connection as DuckDBConnection).createAppender("pages").use { appender ->
+                    for (p in pages) appender.beginRow().append(p.url).append(p.text).append(p.date).endRow()
+                }
+                // zstd, as FineWeb-2's own: a third the size of the default snappy for Chinese text
+                connection.createStatement().use { it.execute("COPY pages TO '${quoted(temp)}' (FORMAT parquet, COMPRESSION zstd)") }
+            }
+        } catch (e: SQLException) {
+            temp.delete()
+            throw IOException("$shard: ${e.message}", e)
+        }
+        if (!temp.renameTo(shard)) throw IOException("cannot write $shard")
+    }
+
+    private fun quoted(file: File): String {
         // read_parquet takes these for a glob
-        require(shard.path.none { it in "*?[" }) { "a path DuckDB would take for a glob: $shard" }
-        val path = shard.path.replace("'", "''")
+        require(file.path.none { it in "*?[" }) { "a path DuckDB would take for a glob: $file" }
+        return file.path.replace("'", "''")
+    }
+
+    private fun select(shard: File, query: (Statement, String) -> Unit) {
         // without streaming DuckDB's JDBC driver holds the whole result, a shard's text unpacked
         val streaming = Properties().apply { setProperty("jdbc_stream_results", "true") }
         try {
             DriverManager.getConnection("jdbc:duckdb:", streaming).use { connection ->
-                connection.createStatement().use { statement -> query(statement, path, chatOnly, page) }
+                connection.createStatement().use { statement -> query(statement, quoted(shard)) }
             }
         } catch (e: SQLException) {
             throw IOException("$shard: ${e.message}", e)
         }
     }
 
-    private fun query(statement: Statement, path: String, chatOnly: Boolean, page: (List<String>, String) -> Unit) {
+    private fun rows(statement: Statement, path: String, row: (String, String, String) -> Unit) {
         // in the file's order (DuckDB's default, made explicit): the mixed model must come out the
         // same every build
         statement.execute("SET preserve_insertion_order = true")
@@ -77,12 +119,14 @@ object WebText {
         statement.execute("SET threads = 2")
         val columns = "coalesce(url, ''), text, coalesce(CAST(date AS VARCHAR), '')"
         statement.executeQuery("SELECT $columns FROM read_parquet('$path') WHERE text IS NOT NULL").use { rows ->
-            while (rows.next()) {
-                val text = rows.getString(2)
-                if (accepts(rows.getString(1), text, chatOnly)) page(text.split('\n').map(String::trim).filter(String::isNotEmpty), rows.getString(3))
-            }
+            while (rows.next()) row(rows.getString(1), rows.getString(2), rows.getString(3))
         }
     }
+
+    private fun query(statement: Statement, path: String, chatOnly: Boolean, page: (List<String>, String) -> Unit) =
+        rows(statement, path) { url, text, date ->
+            if (accepts(url, text, chatOnly)) page(text.split('\n').map(String::trim).filter(String::isNotEmpty), date)
+        }
 
     private val HOST = Regex("""^[A-Za-z]+://([^/:?#]+)""")
     private val ENCYCLOPEDIA = Regex(
