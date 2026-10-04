@@ -61,7 +61,9 @@ word  add|reject  kind  reading (add only)  note (optional, short)
 ```
 
 and `python3 lexicon/tools/apply.py <dir>/batch-NNN.out.tsv` checks it against the batch and adds it
-to the lists, dated.
+to the lists, dated. An add whose reading shares under half its syllables with the suggested one
+needs a note saying why (婠婠 wan'wan: 婠 is wan, not guan): a curator that slipped a line gives
+each word the next one's reading, which a syllable count alone does not catch.
 
 Two passes keep the reading down: `--brief` batches hold 1000 candidates with the word, reading,
 count and the engine's candidates only, where a curator may also answer `unsure` (nothing else on

@@ -36,11 +36,19 @@ def words(path):
         return [line.split('\t', 1)[0].strip() for line in f if line.strip() and not line.startswith('#')]
 
 
+def suggested(path):
+    """The batch's suggested reading of each word."""
+    with open(path, encoding='utf-8') as f:
+        rows = [line.rstrip('\n').split('\t') for line in f if line.strip() and not line.startswith('#')]
+    return {r[0].strip(): r[1].strip().split("'") for r in rows if len(r) > 1}
+
+
 def check(out, seen):
     batch = out.replace('.out.tsv', '.tsv')
     if batch == out or not os.path.exists(batch):
         raise SystemExit(f'{out}: no batch beside it ({batch})')
     asked = set(words(batch))
+    suggestion = suggested(batch)
     add, reject, unsure, errors, here = [], [], [], [], set()
     with open(out, encoding='utf-8') as f:
         for n, line in enumerate(f, 1):
@@ -61,9 +69,16 @@ def check(out, seen):
                 syllables = reading.split("'")
                 if kind not in TAKE:
                     errors.append(f'{where}: kind {kind!r}, not one of {sorted(TAKE)}')
+                note = f_[4] if len(f_) > 4 else ''
                 if len(syllables) != length(word) or not all(s in SYLLABLES for s in syllables):
                     errors.append(f'{where}: reading {reading!r}')
-                add.append((word, reading, kind, f_[4] if len(f_) > 4 else ''))
+                elif word in suggestion and not note:
+                    # a curator that slipped a line gives each word the next one's reading
+                    agree = sum(a == b for a, b in zip(syllables, suggestion[word]))
+                    if agree * 2 < len(syllables):
+                        errors.append(f"{where}: reading {reading!r} far from the suggested "
+                                      f"{"'".join(suggestion[word])!r}, with no note saying why")
+                add.append((word, reading, kind, note))
             elif verdict == 'reject':
                 if kind not in LEAVE:
                     errors.append(f'{where}: kind {kind!r}, not one of {sorted(LEAVE)}')
