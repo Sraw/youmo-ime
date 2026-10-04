@@ -74,15 +74,41 @@ class MainTest {
     }
 
     @Test
+    fun aPackedWordIsReadAsTheDictionarysWordsInIt() {
+        val lm = file(
+            "lm.arpa",
+            ReadersTest.TINY_ARPA.replace("ngram 1=3", "ngram 1=7").replace("-1.5\t好", "-1.5\t好\n-3.0\t阿\n-3.0\t谁\n-3.0\t长\n-3.0\t大"),
+        )
+        // 长 alone is likelier chang, in 长大 zhang; 阿谁's two readings weigh the same, and 谁 alone is shui
+        val dict = file("dict.txt", "你 ni\n好 hao\n阿 a\n谁 shui\n长 chang 0\n长 zhang -1\n大 da\n长大 zhang'da\n阿谁 a'shei\n阿谁 a'shui\n")
+        val output = tmp.root.resolve("pinyin.data").path
+        assertEquals(0, run("pinyin", "-o", output, "--lm", lm, dict).first)
+        val candidates = tmp.root.resolve("candidates.tsv").path
+        File(candidates).writeText(
+            "# text\tcount\tyear\tpmi\tleft_entropy\tright_entropy\tsurprise\tknown\n# chars\t1000\n" +
+                "你\t99\t0\t0.000\t3.000\t3.000\t0.000\t1\n好\t9\t0\t0.000\t3.000\t3.000\t0.000\t1\n" +
+                "长大谁\t20\t2024\t2.000\t2.000\t2.000\t1.500\t0\n阿谁\t20\t2024\t2.000\t2.000\t2.000\t1.500\t0\n" +
+                "长谁\t20\t2024\t2.000\t2.000\t2.000\t1.500\t0\n",
+        )
+        val pack = tmp.root.resolve("p.words").path
+        assertEquals(0, run("pack", "-o", pack, "--data", output, "--layer", "new", "--min-count", "5", candidates).first)
+        assertEquals(
+            listOf("长大谁\tzhang'da'shui", "阿谁\ta'shui", "长谁\tchang'shui"),
+            File(pack).readLines().drop(2).map { it.substringBeforeLast('\t') },
+        )
+    }
+
+    @Test
     fun newWordsAreFoundAndPackedScoredOnTheModelsScale() {
         // the model has the characters of the words to pack; 嗯 it has not, 丂 all but not
         val lm = file(
             "lm.arpa",
             ReadersTest.TINY_ARPA.replace("ngram 1=3", "ngram 1=7").replace("-1.5\t好", "-1.5\t好\n-3.0\t耗\n-3.0\t子\n-2.0\t了\n-7.0\t丂"),
         )
-        val dict = file("dict.txt", "你\tni\t0\n好 hao\n你好 ni'hao\n耗 hao\n子 zi\n了 le\n丂 kao\n")
-        // 耗子 in the Rime layer: not a base word, so a candidate all the same
-        val rime = file("x.dict.yaml", "---\nname: x\n...\n耗子\thào zi\t9\n")
+        val dict = file("dict.txt", "你\tni\t0\n好 hao\n你好 ni'hao\n耗 hao\n子 zi\n了 le\n丂 kao\n你耗 ni'hao\n好耗 hao'hao\n")
+        // 耗子 in the Rime layer: not a base word, so a candidate all the same; 子了 read as no
+        // character of it alone is likeliest
+        val rime = file("x.dict.yaml", "---\nname: x\n...\n耗子\thào zi\t9\n子了\tzǐ liǎo\t9\n")
         val output = tmp.root.resolve("pinyin.data").path
         assertEquals(0, run("pinyin", "-o", output, "--lm", lm, dict, rime).first)
         val candidates = tmp.root.resolve("candidates.tsv").path
@@ -98,7 +124,11 @@ class MainTest {
                 "你的好\t99\t2023\t2.000\t2.000\t2.000\t1.500\t0\n子好\t15\t2023\t2.000\t2.000\t2.000\t1.500\t0\n" +
                 "耗子好\t9\t2023\t2.000\t1.000\t2.000\t1.500\t0\n好了\t99\t2023\t2.000\t2.000\t2.000\t1.500\t0\n" +
                 // too low a pmi for its neighbours to be gathered
-                "子了\t99\t2023\t0.300\tNaN\tNaN\t1.500\t0\n",
+                "子了\t99\t2023\t0.300\tNaN\tNaN\t1.500\t0\n" +
+                // a fragment of words the dictionary has, 你耗 and 好耗: neither run is half of 耗了 (20),
+                // both together are
+                "耗了\t20\t2023\t2.000\t2.000\t2.000\t1.500\t0\n你耗了\t6\t2023\t0.500\t2.000\t2.000\t1.500\t0\n" +
+                "好耗了\t6\t2023\t0.500\t2.000\t2.000\t1.500\t0\n",
         )
         val pack = tmp.root.resolve("new.words").path
         val (code, out, err) = run("pack", "-o", pack, "--data", output, "--layer", "2026q3", "--min-count", "5", "--min-surprise", "0.4", candidates)
@@ -112,13 +142,29 @@ class MainTest {
             "# youmo words 1\n# layer: 2026q3\n耗好\thao'hao\t-1.000\n耗子\thao'zi\t-1.339\n好了\thao'le\t-1.000\n",
             File(pack).readText(),
         )
-        // with a list of the words: what is on it, the pmi and entropy asked for being low; an entropy not measured no bar
+        // with a list of the words: what is on it, the pmi and entropy asked for being low; an entropy not
+        // measured no bar; 子了 read as the dictionary has the word, not as its characters alone
         val only = tmp.root.resolve("titles.txt").apply { writeText("# titles\n耗子\n好好\tzhwiki\n子了\n耗好\n# 好了\n") }.path
         assertEquals(0, run("pack", "-o", pack, "--data", output, "--layer", "wiki", "--min-count", "5", "--min-pmi", "0", "--min-entropy", "1", "--only", only, candidates).first)
         assertEquals(
-            "# youmo words 1\n# layer: wiki\n耗好\thao'hao\t-1.000\n耗子\thao'zi\t-1.339\n好好\thao'hao\t-1.000\n子了\tzi'le\t-1.000\n",
+            "# youmo words 1\n# layer: wiki\n耗好\thao'hao\t-1.000\n耗子\thao'zi\t-1.339\n好好\thao'hao\t-1.000\n子了\tzi'liao\t-1.000\n",
             File(pack).readText(),
         )
+        // a curated list: its words alone, as it reads them, whatever the thresholds; one the
+        // candidates lack scored as the least count (5: -2 + 0.5 log10 6)
+        val lexicon = tmp.root.resolve("add.tsv").apply { writeText("# word\treading\n好好\thao'hao\tword\n你的好\tni'di'hao\n好你\thao'ni\n") }.path
+        val (curated, curatedOut, _) = run("pack", "-o", pack, "--data", output, "--layer", "new", "--min-count", "5", "--lexicon", lexicon, candidates)
+        assertEquals(0, curated)
+        assertTrue(curatedOut, curatedOut.contains("pack: 1 of the list's words not among the candidates, scored as seen 5 times"))
+        assertEquals(
+            "# youmo words 1\n# layer: new\n好好\thao'hao\t-1.000\n你的好\tni'di'hao\t-1.000\n好你\thao'ni\t-1.611\n",
+            File(pack).readText(),
+        )
+        // a reading the engine cannot type, or of the wrong length
+        File(lexicon).writeText("好好\thao'hoa\n")
+        assertEquals(1, run("pack", "-o", pack, "--data", output, "--layer", "new", "--lexicon", lexicon, candidates).first)
+        File(lexicon).writeText("好好\thao\n")
+        assertEquals(1, run("pack", "-o", pack, "--data", output, "--layer", "new", "--lexicon", lexicon, candidates).first)
         assertEquals(2, run("pack", "-o", pack, "--data", output, "--layer", "bad name", candidates).first)
         assertEquals(2, run("pack", "-o", pack, "--data", output, candidates).first)
         assertEquals(2, run("words", "-o", candidates, output).first)

@@ -9,6 +9,7 @@ import org.fcitx.fcitx5.android.engine.data.DataFile
 import org.fcitx.fcitx5.android.engine.data.DataFormatException
 import org.fcitx.fcitx5.android.engine.data.PinyinData
 import org.fcitx.fcitx5.android.engine.data.PinyinDataBuilder
+import org.fcitx.fcitx5.android.engine.data.WordIndex
 import org.fcitx.fcitx5.android.engine.data.WordLayers
 import org.fcitx.fcitx5.android.engine.pinyin.Syllables
 import org.fcitx.fcitx5.android.engine.user.WordPack
@@ -37,13 +38,16 @@ val USAGE = """
            check <pinyin data> <lm.arpa>                  compare compiled scores with the model
            words -o <out.tsv> --data <pinyin.data> [--min-count <n>] <shard.parquet>...
                                                           the words the pages use that the data lacks (NewWords)
-           pack -o <out.words> --data <pinyin.data> --layer <name> [--min-count <n>] [--min-pmi <x>] [--min-entropy <x>] [--min-surprise <x>] [--only <words.txt>] <candidates.tsv>
-                                                          a word pack (WordPack) of the candidates that pass
+           pack -o <out.words> --data <pinyin.data> --layer <name> [--min-count <n>] [--min-pmi <x>] [--min-entropy <x>] [--min-surprise <x>] [--only <words.txt>] [--lexicon <add.tsv>] <candidates.tsv>
+                                                          a word pack (WordPack) of the candidates that pass,
+                                                          or of the words a curated list takes (lexicon/)
            cc -o <out dir> --crawl <CC-MAIN-...> [--from <n>] --files <n> [--base <url>]
                                                           the Chinese pages of a CommonCrawl crawl's WET files,
                                                           a shard of 100 files each (CommonCrawl)
            clean -o <out dir> <shard.parquet>...          the shards without their boilerplate and spam,
                                                           a shard each, of the same name (PageCleaner)
+           examples -o <out.tsv> --only <words.txt> [--per-word <n>] <shard.parquet>...
+                                                          sentences of the pages that use each word (Examples)
 """.trimIndent()
 
 fun main(args: Array<String>) {
@@ -90,6 +94,7 @@ private fun dispatch(command: String?, options: Options, out: Appendable): Boole
         "pack" -> pack(options, out)
         "cc" -> options.crawl.let { CommonCrawl.extract(it.name!!, it.from, it.files!!, File(options.output!!), it.base) { line -> out.appendLine(line) } }
         "clean" -> clean(options, out)
+        "examples" -> examples(options, out)
     }
     return true
 }
@@ -111,8 +116,12 @@ private class Options(
     val minPmi: Double,
     val minEntropy: Double,
     val minSurprise: Double,
-    /** `pack`: a file of the only words that may go in (the first field of each line), if any. */
+    /** `pack`: a file of the only words that may go in (the first field of each line), if any; `examples`: the words. */
     val only: String?,
+    /** `examples`: sentences a word. */
+    val perWord: Int,
+    /** `pack`: a curated list, `word<TAB>reading...` (lexicon/add.tsv): its words and no other, as it reads them. */
+    val lexicon: String?,
     val crawl: Crawl,
 ) {
     /** `cc`: the crawl, its first WET file and how many, and where CommonCrawl is. */
@@ -131,7 +140,7 @@ private class Options(
     /** Whether [command] takes these options. */
     fun fit(command: String?): Boolean = when (command) {
         "pinyin", "mix", "table", "check" -> fitModel(command)
-        "words", "pack", "cc", "clean" -> fitCorpus(command)
+        "words", "pack", "cc", "clean", "examples" -> fitCorpus(command)
         else -> false
     }
 
@@ -145,6 +154,7 @@ private class Options(
         "words" -> data != null && inputs.isNotEmpty()
         "pack" -> data != null && layer != null && inputs.size == 1
         "cc" -> crawl.name != null && crawl.files != null && inputs.isEmpty()
+        "examples" -> only != null && inputs.isNotEmpty()
         else -> inputs.isNotEmpty()
     }
 
@@ -165,7 +175,7 @@ private class Options(
         // every option takes a value
         private val FLAGS = setOf(
             "-o", "--lm", "--weight", "--cutoffs", "--rime-unigrams", "--data", "--min-count", "--layer", "--min-pmi", "--min-entropy", "--min-surprise", "--only",
-            "--crawl", "--from", "--files", "--base",
+            "--crawl", "--from", "--files", "--base", "--per-word", "--lexicon",
         )
 
         /** @return null for an option with a bad or missing value */
@@ -195,10 +205,73 @@ private class Options(
                 minEntropy = read("--min-entropy", MIN_ENTROPY) { it.toDoubleOrNull()?.takeIf(Double::isFinite) } ?: return null,
                 minSurprise = read("--min-surprise", MIN_SURPRISE) { it.toDoubleOrNull()?.takeIf(Double::isFinite) } ?: return null,
                 only = values["--only"],
+                perWord = read("--per-word", Examples.PER_WORD) { it.toIntOrNull()?.takeIf { n -> n >= 1 } } ?: return null,
                 crawl = Crawl.parse(values) ?: return null,
+                lexicon = values["--lexicon"],
             )
         }
     }
+}
+
+/** The first field of each line of [file], its comments (`#`) and blank lines left out, in its order. */
+private fun wordList(file: File): LinkedHashSet<String> = file.useLines { lines ->
+    lines.map { it.substringBefore('\t').trim() }.filter { it.isNotEmpty() && !it.startsWith('#') }.toCollection(LinkedHashSet())
+}
+
+/**
+ * Whether a candidate's numbers pass the thresholds. An entropy not measured (NaN: the run's pmi
+ * was too low to gather its neighbours) is no reason to leave it out when the pmi asked for is
+ * lower still.
+ */
+private fun Options.passes(f: List<String>): Boolean = f[7] == "0" && f[1].toInt() >= minCount && f[3].toDouble() >= minPmi &&
+    !(minOf(f[4].toDouble(), f[5].toDouble()) < minEntropy) && f[6].toDouble() >= minSurprise
+
+/**
+ * Whether a character of [text] is one the model all but never saw: a traditional one (視頻, 圖片)
+ * on a page the page filter let through, or a typo, no word for a simplified typist either way.
+ */
+private fun rare(data: PinyinData, text: String): Boolean =
+    text.indices.any { i -> data.wordIndex.find(text, i, i + 1).let { it < 0 || data.model.score(it) < RARE_CHAR } }
+
+/**
+ * A curated list's words and readings: `word<TAB>pin'yin[<TAB>...]` a line, `#` comments.
+ * @throws SourceException for a line without a reading, a syllable the engine does not know, or
+ * a reading of more or fewer syllables than the word has characters
+ */
+private fun lexicon(file: File): Map<String, String> {
+    val words = LinkedHashMap<String, String>()
+    file.bufferedReader().use { reader ->
+        reader.forEachNumberedLine(file.path) { line, n ->
+            if (line.isBlank() || line.startsWith('#')) return@forEachNumberedLine
+            val f = line.split('\t')
+            val text = f[0].trim()
+            val reading = f.getOrNull(1)?.trim().orEmpty()
+            val syllables = reading.split('\'')
+            if (syllables.size != text.length || syllables.any { Syllables.id(it) < 0 }) {
+                throw SourceException(file.path, n, "\"$reading\" is no reading of $text")
+            }
+            words[text] = reading
+        }
+    }
+    return words
+}
+
+/** `word<TAB>sentence...`, a line for each word of the list found, in the list's order. */
+private fun examples(options: Options, out: Appendable) {
+    val words = wordList(File(options.only!!))
+    val examples = Examples(words, options.perWord)
+    var pages = 0L
+    options.inputs.forEach { shard -> WebText.pages(File(shard)) { examples.page(it.text); pages++ } }
+    val found = examples.sentences()
+    File(options.output!!).bufferedWriter().use { w ->
+        for (word in words) {
+            val sentences = found[word] ?: continue
+            w.write(word)
+            for (s in sentences) w.write("\t" + s.replace('\t', ' '))
+            w.write("\n")
+        }
+    }
+    out.appendLine("examples: ${found.size} of ${words.size} words found in $pages pages")
 }
 
 /**
@@ -269,17 +342,19 @@ private fun words(options: Options, out: Appendable) {
 
 /**
  * The candidates of `words` that pass the thresholds and are not plainly phrases or fragments
- * ([Phrases]), as a word pack: each read by its characters' likeliest readings, scored on the
+ * ([Phrases]), as a word pack: each read as the dictionary's words in it are ([Readings]), scored on the
  * model's unigram scale by its count ([CountFit] over the candidates the model knows). One with
  * a character no reading is known for is left out.
  */
 private fun pack(options: Options, out: Appendable) {
     val data = PinyinData.load(map(options.data!!))
-    val readings = CharReadings(data)
+    val readings = Readings(data)
     val input = File(options.inputs.single())
     // two reads of the candidates rather than all of them in memory: there are millions
     val known = ArrayList<Pair<Long, Float>>()
-    val phrases = Phrases()
+    // every word of the dictionary, not the model's alone (data.wordIndex): most are not the model's
+    val dictionary = WordIndex(data.vocabulary, data.vocabulary.size)
+    val phrases = Phrases { text, from, to -> dictionary.find(text, from, to) >= 0 }
     input.forEachRow { f ->
         val id = data.wordIndex.find(f[0], 0, f[0].length)
         if (id >= 0 && id < data.model.vocabularySize) known += f[1].toLong() to data.model.score(id)
@@ -291,9 +366,10 @@ private fun pack(options: Options, out: Appendable) {
     out.appendLine("fit: log10 P = %.3f + %.3f log10(count + 1), over ${known.size} words the model has".format(Locale.ROOT, fit.a, fit.b))
     // a list that says which runs are words (an encyclopedia's titles): what pmi and entropy only
     // guess at, and most of what they let through is not (dev/TRAINING-PLAN.md 11.7b)
-    val only = options.only?.let { path ->
-        File(path).useLines { lines -> lines.map { it.substringBefore('\t').trim() }.filter { it.isNotEmpty() && !it.startsWith('#') }.toHashSet() }
-    }
+    val only = options.only?.let { wordList(File(it)) }
+    // what a curator took, as it reads it: no threshold or guess of ours second-guesses that
+    val lexicon = options.lexicon?.let { lexicon(File(it)) }
+    val unseen = lexicon?.keys?.toMutableSet()
     var words = 0
     var unread = 0
     var rare = 0
@@ -302,15 +378,16 @@ private fun pack(options: Options, out: Appendable) {
         input.forEachRow { f ->
             val text = f[0]
             val count = f[1].toInt()
-            // an entropy not measured (NaN: the run's pmi was too low to gather its neighbours) is
-            // no reason to leave it out when the pmi asked for is lower still
-            val passes = f[7] == "0" && count >= options.minCount && f[3].toDouble() >= options.minPmi &&
-                !(minOf(f[4].toDouble(), f[5].toDouble()) < options.minEntropy) && f[6].toDouble() >= options.minSurprise &&
-                (only == null || text in only) && !phrases.isPhrase(text, count)
-            if (!passes) return@forEachRow
-            // a character the model all but never saw is a traditional one (視頻, 圖片) on a page the
-            // page filter let through, or a typo: no word for a simplified typist either way
-            if (text.any { c -> data.wordIndex.find(text, text.indexOf(c), text.indexOf(c) + 1).let { it < 0 || data.model.score(it) < RARE_CHAR } }) {
+            if (lexicon != null) {
+                if (unseen!!.remove(text)) {
+                    w.write("%s\t%s\t%.3f\n".format(Locale.ROOT, text, lexicon.getValue(text), minOf(0f, fit.prob(count.toLong()))))
+                    words++
+                }
+                return@forEachRow
+            }
+            val listed = only == null || text in only
+            if (!listed || !options.passes(f) || phrases.isPhrase(text, count)) return@forEachRow
+            if (rare(data, text)) {
                 rare++
                 return@forEachRow
             }
@@ -322,7 +399,14 @@ private fun pack(options: Options, out: Appendable) {
             w.write("%s\t%s\t%.3f\n".format(Locale.ROOT, text, pinyin, minOf(0f, fit.prob(count.toLong()))))
             words++
         }
+        // taken from elsewhere than the pages (a report of a missing word, a failed evaluation):
+        // scored as the least a candidate is counted
+        unseen?.forEach { text ->
+            w.write("%s\t%s\t%.3f\n".format(Locale.ROOT, text, lexicon.getValue(text), minOf(0f, fit.prob(options.minCount.toLong()))))
+            words++
+        }
     }
+    if (unseen != null) out.appendLine("pack: ${unseen.size} of the list's words not among the candidates, scored as seen ${options.minCount} times")
     out.appendLine("pack: $words words, $rare left out for a character the model hardly has, $unread for want of a reading")
     val size = File(options.output).length()
     if (size > MAX_FETCHED) out.appendLine("pack: ${size shr 20} MB, more than the app fetches from a server (${MAX_FETCHED shr 20} MB): import by hand only")
@@ -345,19 +429,28 @@ private const val MAX_FETCHED = 16L shl 20
  * end (a verb's 了/过 excepted: 哭了, 累了 are typed as one), 的 anywhere, or most of its count
  * inside one longer candidate ([saw] every candidate first).
  */
-private class Phrases {
+private class Phrases(private val known: (String, Int, Int) -> Boolean) {
     // the most any one candidate a character longer counts, by the candidate it contains
     private val longest = HashMap<String, Int>()
+
+    // by the run a character shorter: how often a word the dictionary has runs into it from the
+    // character before (洛阳 into 阳市, 巷子 into 子里), and out of it into the character after.
+    // Each such word alone is a fraction of the run (洛阳市, 贵阳市, 沈阳市 ...), together most of it
+    private val crossedIn = HashMap<String, Int>()
+    private val crossedOut = HashMap<String, Int>()
 
     fun saw(text: String, count: Int) {
         if (text.length < 3) return
         for (part in listOf(text.dropLast(1), text.drop(1))) longest.merge(part, count, ::maxOf)
+        if ((2..text.length).any { end -> known(text, 0, end) }) crossedIn.merge(text.drop(1), count, Int::plus)
+        if ((0..text.length - 2).any { start -> known(text, start, text.length) }) crossedOut.merge(text.dropLast(1), count, Int::plus)
     }
 
     fun isPhrase(text: String, count: Int): Boolean {
         if (INSIDE.any { it in text }) return true
         if (text.first() in STOP || endsAsOne(text)) return true
-        return (longest[text] ?: 0) > count * FRAGMENT_SHARE
+        val crossed = maxOf(crossedIn[text] ?: 0, crossedOut[text] ?: 0)
+        return maxOf(longest[text] ?: 0, crossed) > count * FRAGMENT_SHARE
     }
 
     private fun endsAsOne(text: String): Boolean {
@@ -376,9 +469,21 @@ private class Phrases {
     }
 }
 
-/** The likeliest reading of each character the dictionary has alone. */
-private class CharReadings(data: PinyinData) {
-    private val best = HashMap<Char, Pair<Int, Float>>()
+/**
+ * The reading of a run of characters, as the dictionary reads its words: the run is cut into the
+ * fewest words the dictionary has, each read as the dictionary reads it likeliest. Read character
+ * by character instead, 长期服用 came out zhang'qi'fu'yong and 行业标杆 xing'ye'biao'gan: in a
+ * pack, words under readings no one types, pushing out what is typed (dev/TRAINING-PLAN.md 12.10).
+ * Most readings weigh the same (a weight marks a polyphone's rarer one only), so ties are broken:
+ * between two readings of a word, the one more of its characters are likeliest read as alone;
+ * between two cuts, the likelier reading weights, then the words the model finds commoner.
+ */
+private class Readings(private val data: PinyinData) {
+    private class Reading(val syllables: IntArray, val weight: Float, val agreement: Int)
+
+    private val best = HashMap<String, Reading>()
+    private val alone = HashMap<Char, Pair<Int, Float>>()
+    private var longest = 1
 
     init {
         val d = data.dictionary
@@ -386,15 +491,83 @@ private class CharReadings(data: PinyinData) {
             val node = d.firstChild(d.root) + i
             for (w in 0 until d.wordCount(node)) {
                 val word = data.vocabulary.word(d.word(node, w))
-                if (word.length != 1) continue
                 val weight = d.weight(node, w)
-                if ((best[word[0]]?.second ?: Float.NEGATIVE_INFINITY) < weight) best[word[0]] = d.syllable(node) to weight
+                if (word.length == 1 && (alone[word[0]]?.second ?: Float.NEGATIVE_INFINITY) < weight) alone[word[0]] = d.syllable(node) to weight
             }
+        }
+        val path = IntArray(MAX_WORD)
+        fun visit(node: Int, depth: Int) {
+            for (w in 0 until d.wordCount(node)) {
+                val word = data.vocabulary.word(d.word(node, w))
+                // a reading a character, as every word of the dictionary has
+                if (word.length == depth) offer(word, path.copyOf(depth), d.weight(node, w))
+            }
+            if (depth == MAX_WORD) return
+            for (i in 0 until d.childCount(node)) {
+                val child = d.firstChild(node) + i
+                path[depth] = d.syllable(child)
+                visit(child, depth + 1)
+            }
+        }
+        visit(d.root, 0)
+    }
+
+    private fun offer(word: String, syllables: IntArray, weight: Float) {
+        val agreement = word.indices.count { alone[word[it]]?.first == syllables[it] }
+        val held = best[word]
+        val better = held == null || compareValuesBy(Reading(syllables, weight, agreement), held, { it.weight }, { it.agreement }) > 0
+        if (better) {
+            best[word] = Reading(syllables, weight, agreement)
+            if (word.length > longest) longest = word.length
         }
     }
 
+    private fun commonness(word: String): Float {
+        val id = data.wordIndex.find(word)
+        return if (id >= 0 && id < data.model.vocabularySize) data.model.score(id) else UNKNOWN
+    }
+
     /** `pin'yin` for [text], or null if a character of it has no reading. */
-    fun of(text: String): String? = text.map { best[it]?.first ?: return null }.joinToString("'") { Syllables.spelling(it) }
+    fun of(text: String): String? {
+        // fewest words to each position, then the most weight, then the commonest words
+        val words = IntArray(text.length + 1) { if (it == 0) 0 else Int.MAX_VALUE }
+        val weight = FloatArray(text.length + 1)
+        val common = FloatArray(text.length + 1)
+        val from = IntArray(text.length + 1)
+        for (end in 1..text.length) {
+            for (start in maxOf(0, end - longest) until end) {
+                val part = text.substring(start, end)
+                val reading = best[part]
+                if (reading == null || words[start] == Int.MAX_VALUE) continue
+                val n = words[start] + 1
+                val w = weight[start] + reading.weight
+                val c = common[start] + commonness(part)
+                // fewer words first, then more weight, then commoner ones
+                val order = compareValues(words[end], n).takeIf { it != 0 } ?: compareValues(w, weight[end]).takeIf { it != 0 } ?: compareValues(c, common[end])
+                if (order > 0) {
+                    words[end] = n
+                    weight[end] = w
+                    common[end] = c
+                    from[end] = start
+                }
+            }
+        }
+        if (words[text.length] == Int.MAX_VALUE) return null
+        val syllables = ArrayList<Int>()
+        var end = text.length
+        while (end > 0) {
+            syllables.addAll(0, best.getValue(text.substring(from[end], end)).syllables.asList())
+            end = from[end]
+        }
+        return syllables.joinToString("'") { Syllables.spelling(it) }
+    }
+
+    private companion object {
+        // the dictionary's words are seldom longer; a longer one is read in parts
+        const val MAX_WORD = 8
+        // a word the model has not: rarer than any it has
+        const val UNKNOWN = -99f
+    }
 }
 
 private fun mix(options: Options, out: Appendable) {
