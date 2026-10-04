@@ -96,7 +96,9 @@ class MainTest {
                 "好你好\t30\t2023\t2.000\t2.000\t2.000\t0.300\t0\n丂子\t99\t2023\t2.000\t2.000\t2.000\t1.500\t0\n" +
                 // a phrase (的 inside), a fragment (子好 is mostly 耗子好, which 1.0 entropy keeps out), a verb with 了 (typed as one)
                 "你的好\t99\t2023\t2.000\t2.000\t2.000\t1.500\t0\n子好\t15\t2023\t2.000\t2.000\t2.000\t1.500\t0\n" +
-                "耗子好\t9\t2023\t2.000\t1.000\t2.000\t1.500\t0\n好了\t99\t2023\t2.000\t2.000\t2.000\t1.500\t0\n",
+                "耗子好\t9\t2023\t2.000\t1.000\t2.000\t1.500\t0\n好了\t99\t2023\t2.000\t2.000\t2.000\t1.500\t0\n" +
+                // too low a pmi for its neighbours to be gathered
+                "子了\t99\t2023\t0.300\tNaN\tNaN\t1.500\t0\n",
         )
         val pack = tmp.root.resolve("new.words").path
         val (code, out, err) = run("pack", "-o", pack, "--data", output, "--layer", "2026q3", "--min-count", "5", "--min-surprise", "0.4", candidates)
@@ -108,6 +110,13 @@ class MainTest {
         assertTrue(out, out.contains("pack: 3 words, 2 left out for a character the model hardly has, 0 for want of a reading"))
         assertEquals(
             "# youmo words 1\n# layer: 2026q3\n耗好\thao'hao\t-1.000\n耗子\thao'zi\t-1.339\n好了\thao'le\t-1.000\n",
+            File(pack).readText(),
+        )
+        // with a list of the words: what is on it, the pmi and entropy asked for being low; an entropy not measured no bar
+        val only = tmp.root.resolve("titles.txt").apply { writeText("耗子\n好好\tzhwiki\n子了\n耗好\n") }.path
+        assertEquals(0, run("pack", "-o", pack, "--data", output, "--layer", "wiki", "--min-count", "5", "--min-pmi", "0", "--min-entropy", "1", "--only", only, candidates).first)
+        assertEquals(
+            "# youmo words 1\n# layer: wiki\n耗好\thao'hao\t-1.000\n耗子\thao'zi\t-1.339\n好好\thao'hao\t-1.000\n子了\tzi'le\t-1.000\n",
             File(pack).readText(),
         )
         assertEquals(2, run("pack", "-o", pack, "--data", output, "--layer", "bad name", candidates).first)

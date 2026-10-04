@@ -37,7 +37,7 @@ val USAGE = """
            check <pinyin data> <lm.arpa>                  compare compiled scores with the model
            words -o <out.tsv> --data <pinyin.data> [--min-count <n>] <shard.parquet>...
                                                           the words the pages use that the data lacks (NewWords)
-           pack -o <out.words> --data <pinyin.data> --layer <name> [--min-count <n>] [--min-pmi <x>] [--min-entropy <x>] [--min-surprise <x>] <candidates.tsv>
+           pack -o <out.words> --data <pinyin.data> --layer <name> [--min-count <n>] [--min-pmi <x>] [--min-entropy <x>] [--min-surprise <x>] [--only <words.txt>] <candidates.tsv>
                                                           a word pack (WordPack) of the candidates that pass
 """.trimIndent()
 
@@ -104,6 +104,8 @@ private class Options(
     val minPmi: Double,
     val minEntropy: Double,
     val minSurprise: Double,
+    /** `pack`: a file of the only words that may go in (the first field of each line), if any. */
+    val only: String?,
 ) {
     /** Whether [command] takes these options. */
     fun fit(command: String?): Boolean {
@@ -134,7 +136,7 @@ private class Options(
 
         // every option takes a value
         private val FLAGS = setOf(
-            "-o", "--lm", "--weight", "--cutoffs", "--rime-unigrams", "--data", "--min-count", "--layer", "--min-pmi", "--min-entropy", "--min-surprise",
+            "-o", "--lm", "--weight", "--cutoffs", "--rime-unigrams", "--data", "--min-count", "--layer", "--min-pmi", "--min-entropy", "--min-surprise", "--only",
         )
 
         /** @return null for an option with a bad or missing value */
@@ -163,6 +165,7 @@ private class Options(
                 minPmi = read("--min-pmi", MIN_PMI) { it.toDoubleOrNull()?.takeIf(Double::isFinite) } ?: return null,
                 minEntropy = read("--min-entropy", MIN_ENTROPY) { it.toDoubleOrNull()?.takeIf(Double::isFinite) } ?: return null,
                 minSurprise = read("--min-surprise", MIN_SURPRISE) { it.toDoubleOrNull()?.takeIf(Double::isFinite) } ?: return null,
+                only = values["--only"],
             )
         }
     }
@@ -231,6 +234,11 @@ private fun pack(options: Options, out: Appendable) {
     // model's kind of text, and the flatter line measured better (dev/TRAINING-PLAN.md 11.7)
     val fit = CountFit.of(known)
     out.appendLine("fit: log10 P = %.3f + %.3f log10(count + 1), over ${known.size} words the model has".format(Locale.ROOT, fit.a, fit.b))
+    // a list that says which runs are words (an encyclopedia's titles): what pmi and entropy only
+    // guess at, and most of what they let through is not (dev/TRAINING-PLAN.md 11.7b)
+    val only = options.only?.let { path ->
+        File(path).useLines { lines -> lines.map { it.substringBefore('\t').trim() }.filter { it.isNotEmpty() && !it.startsWith('#') }.toHashSet() }
+    }
     var words = 0
     var unread = 0
     var rare = 0
@@ -239,9 +247,11 @@ private fun pack(options: Options, out: Appendable) {
         input.forEachRow { f ->
             val text = f[0]
             val count = f[1].toInt()
+            // an entropy not measured (NaN: the run's pmi was too low to gather its neighbours) is
+            // no reason to leave it out when the pmi asked for is lower still
             val passes = f[7] == "0" && count >= options.minCount && f[3].toDouble() >= options.minPmi &&
-                minOf(f[4].toDouble(), f[5].toDouble()) >= options.minEntropy && f[6].toDouble() >= options.minSurprise &&
-                !phrases.isPhrase(text, count)
+                !(minOf(f[4].toDouble(), f[5].toDouble()) < options.minEntropy) && f[6].toDouble() >= options.minSurprise &&
+                (only == null || text in only) && !phrases.isPhrase(text, count)
             if (!passes) return@forEachRow
             // a character the model all but never saw is a traditional one (視頻, 圖片) on a page the
             // page filter let through, or a typo: no word for a simplified typist either way
