@@ -17,6 +17,8 @@
 #                   each packed one, and what the engine types for its reading now (with EVAL): the
 #                   rest of a curator's batches (lexicon/tools/batches.py)
 #   report.txt      the evaluation (with EVAL), of the model alone and with each pack
+#   weights.txt     with WEIGHTS="0.4 0.8" (and EVAL): the model alone mixed at each of those weights,
+#                   evaluated as report.txt's first line, to choose the next release's weight by
 #   manifest.txt    what went in, the SHA-256 of what came out
 # Each step leaves done/<step> and is skipped when run again, so a run stopped halfway goes on where
 # it was; done/ is beside out/, not in it, as most steps' work is too, so out/ copied onto another
@@ -24,7 +26,7 @@
 #
 # What goes in is what was measured (11.7d): CC-MAIN-2026-39's WET files 10 to 1509, mixed at 0.6
 # beside FineWeb-2's two shards; candidates seen 15 times, pmi 1 and entropy 1 or more. A newer
-# crawl: CRAWL=CC-MAIN-... (and FROM, FILES).
+# crawl: CRAWL=CC-MAIN-... (and FROM, FILES); several, CRAWL="CC-MAIN-... CC-MAIN-...", the same files of each.
 set -o pipefail
 WORK=${1:?usage: engine-data.sh <work dir>}
 : "${TOOL:?TOOL: the ime-dict-tool launcher}"
@@ -80,8 +82,18 @@ sources() {
 }
 DICTS="src/dict_sc.txt src/dict_extb.txt src/zi.dict.yaml src/jichu.dict.yaml src/lianxiang.dict.yaml src/duoyin.dict.yaml src/diming.dict.yaml src/renming.dict.yaml"
 
-crawl() { "$TOOL" cc -o cc/raw --crawl "$CRAWL" --from "$FROM" --files "$FILES"; }
-clean() { "$TOOL" clean -o cc/clean cc/raw/*.parquet; }
+# a shard is named by its crawl, so several crawls' lie side by side
+crawl() {
+  local c
+  for c in $CRAWL; do "$TOOL" cc -o cc/raw --crawl "$c" --from "$FROM" --files "$FILES" || return 1; done
+}
+# a bit wider a doubling of the lines, so two crawls' collide no more than the one measured's (PageCleaner)
+clean() {
+  local n bits=27
+  n=$(echo $CRAWL | wc -w)
+  while [ "$n" -gt 1 ]; do bits=$((bits + 1)); n=$(((n + 1) / 2)); done
+  "$TOOL" clean -o cc/clean --sketch-bits $bits cc/raw/*.parquet
+}
 mix() { "$TOOL" mix -o lm.arpa --weight "$WEIGHT" --lm src/lm_sc.arpa src/000_0000?.parquet cc/clean/*.parquet; }
 # shellcheck disable=SC2086
 data() {
@@ -108,14 +120,15 @@ compress() {
 
 # evaluate <pack|->: the top choice right, a column a set, then the score weighted as 12.7 weighs them;
 # ime-eval's threads are as many as the JVM sees, the container's quota and not the host's cores
+# DATA and TAG for a model other than pinyin.data, REPORT for another file than report.txt
 evaluate() {
   local pack=$1 tag line="" spec name set weight half score
-  tag=$(basename "$pack" .words)
+  tag=${TAG:-$(basename "$pack" .words)}
   for spec in new:$SETS/pinyin-new.tsv:0.25: pinyin:$SETS/pinyin.tsv:0.10:held-out \
       context:$SETS/pinyin-context.tsv:0.05:held-out chat:$SETS/pinyin-chat.tsv:0.35:held-out \
       dialog:$SETS/pinyin-dialog.tsv:0.20: small:$SETS/small.tsv:0.05:; do
     IFS=: read -r name set weight half <<< "$spec"
-    "$EVAL" pinyin pinyin.data "$set" evals/$name-$tag.tsv ${half:+--half $half} \
+    "$EVAL" pinyin "${DATA:-pinyin.data}" "$set" evals/$name-$tag.tsv ${half:+--half $half} \
       --rerank src/sentence-model.safetensors --refine src/sentence-model-large.safetensors \
       $([ "$pack" != - ] && echo --pack "$pack") > /dev/null 2> evals/$name-$tag.err || return 1
     score=$("$EVAL" score "$set" evals/$name-$tag.tsv ${half:+--half $half} | awk '$1=="all"{print $4}') && [ -n "$score" ] ||
@@ -123,13 +136,20 @@ evaluate() {
     line="$line $name=$score:$weight"
   done
   echo "$tag$line" | awk '{ s = 0; for (i = 2; i <= NF; i++) { split($i, a, /[=%:]/); s += a[2] * a[4] } printf "%s weighted=%.1f%%\n", $0, s }' \
-    | sed 's/:0\.[0-9]*//g' >> out/report.txt
+    | sed 's/:0\.[0-9]*//g' >> "${REPORT:-out/report.txt}"
 }
 report() {
   mkdir -p evals && rm -f out/report.txt
   fetch ${MODELS}sentence-model.safetensors src/sentence-model.safetensors 342ae775e1ee64b6c42af782f55f736c5bf58b904f3b880ee77a576e2268e7fb &&
     fetch ${MODELS}sentence-model-large.safetensors src/sentence-model-large.safetensors 6f7fcb724738e2fbe4c26db70fd53aa5b5729cb4af7ce7f1e7bfea73003e669a &&
     evaluate - && evaluate out/pack.words && { [ ! -f out/new.words ] || evaluate out/new.words; } && cat out/report.txt
+}
+# the model mixed at another weight, alone: its data built and evaluated, then let go (a few GB each)
+weight() {
+  local w=$1
+  mkdir -p evals && "$TOOL" mix -o lm-$w.arpa --weight "$w" --lm src/lm_sc.arpa src/000_0000?.parquet cc/clean/*.parquet &&
+    "$TOOL" pinyin -o pinyin-$w.data --lm lm-$w.arpa $DICTS > data-$w.log &&
+    DATA=pinyin-$w.data TAG=weight-$w REPORT=out/weights.txt evaluate - && rm -f lm-$w.arpa pinyin-$w.data
 }
 manifest() {
   {
@@ -158,6 +178,8 @@ step examples examples || exit 1
 if [ -n "$EVAL" ]; then step probe probe || exit 1; fi
 step compress compress || exit 1
 if [ -n "$EVAL" ]; then step report report || exit 1; fi
+# shellcheck disable=SC2086
+if [ -n "$EVAL" ]; then for w in $WEIGHTS; do step weight-$w weight $w || exit 1; done; fi
 step manifest manifest || exit 1
 echo "$(now) end"
 [ ! -f out/FAILED ]

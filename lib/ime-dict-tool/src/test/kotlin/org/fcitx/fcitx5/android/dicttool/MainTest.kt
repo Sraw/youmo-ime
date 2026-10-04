@@ -171,6 +171,21 @@ class MainTest {
     }
 
     @Test
+    fun cleanTakesAWiderSketchForMoreCrawls() {
+        val shard = tmp.root.resolve("CC-MAIN-2026-39-0-1.parquet")
+        val prose = "这是一段足够长的中文句子，用来测试清洗之后页面仍然留下。".repeat(10)
+        WebText.write(shard, listOf(WebText.Page("https://a/", prose, "")))
+        val out = tmp.root.resolve("clean").path
+        assertEquals(0, run("clean", "-o", out, "--sketch-bits", "20", shard.path).first)
+        var kept = 0
+        WebText.pages(File(out, shard.name)) { kept++ }
+        assertEquals(1, kept)
+        // past what an array holds, or a bad value
+        assertEquals(2, run("clean", "-o", out, "--sketch-bits", "31", shard.path).first)
+        assertEquals(2, run("clean", "-o", out, "--sketch-bits", "x", shard.path).first)
+    }
+
+    @Test
     fun aModelIsMixedWithChatAndCompiles() {
         val lm = file("lm.arpa", ReadersTest.TINY_ARPA)
         val chat = tmp.root.resolve("chat.jsonl.gz")

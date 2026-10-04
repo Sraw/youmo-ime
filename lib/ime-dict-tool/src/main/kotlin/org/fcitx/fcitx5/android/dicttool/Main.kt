@@ -44,8 +44,10 @@ val USAGE = """
            cc -o <out dir> --crawl <CC-MAIN-...> [--from <n>] --files <n> [--base <url>]
                                                           the Chinese pages of a CommonCrawl crawl's WET files,
                                                           a shard of 100 files each (CommonCrawl)
-           clean -o <out dir> <shard.parquet>...          the shards without their boilerplate and spam,
-                                                          a shard each, of the same name (PageCleaner)
+           clean -o <out dir> [--sketch-bits <n>] <shard.parquet>...
+                                                          the shards without their boilerplate and spam,
+                                                          a shard each, of the same name (PageCleaner); a
+                                                          bit more a doubling of the lines past one crawl's
            examples -o <out.tsv> --only <words.txt> [--per-word <n>] <shard.parquet>...
                                                           sentences of the pages that use each word (Examples)
 """.trimIndent()
@@ -122,6 +124,8 @@ private class Options(
     val perWord: Int,
     /** `pack`: a curated list, `word<TAB>reading...` (lexicon/add.tsv): its words and no other, as it reads them. */
     val lexicon: String?,
+    /** `clean`: the line sketch's width, so twice the lines collide no more than one crawl's did. */
+    val sketchBits: Int,
     val crawl: Crawl,
 ) {
     /** `cc`: the crawl, its first WET file and how many, and where CommonCrawl is. */
@@ -172,11 +176,20 @@ private class Options(
         // phrases from words (dev/TRAINING-PLAN.md 11.7), but a corpus nearer the model's can ask for one
         val MIN_SURPRISE = Double.NEGATIVE_INFINITY
 
+        const val MAX_SKETCH_BITS = 30
+
         // every option takes a value
         private val FLAGS = setOf(
             "-o", "--lm", "--weight", "--cutoffs", "--rime-unigrams", "--data", "--min-count", "--layer", "--min-pmi", "--min-entropy", "--min-surprise", "--only",
-            "--crawl", "--from", "--files", "--base", "--per-word", "--lexicon",
+            "--crawl", "--from", "--files", "--base", "--per-word", "--lexicon", "--sketch-bits",
         )
+
+        /** [flag]'s value, [default] without one, null for a bad one. */
+        private fun <T : Any> Map<String, String>.read(flag: String, default: T, value: (String) -> T?): T? =
+            this[flag]?.let(value) ?: default.takeIf { flag !in this }
+
+        private fun Map<String, String>.count(flag: String, default: Int, range: IntRange): Int? =
+            read(flag, default) { it.toIntOrNull()?.takeIf { n -> n in range } }
 
         /** @return null for an option with a bad or missing value */
         fun parse(args: List<String>): Options? {
@@ -187,27 +200,28 @@ private class Options(
                 if (args[i] in FLAGS) values[args[i]] = args.getOrNull(++i) ?: return null else inputs += args[i]
                 i++
             }
-            fun <T : Any> read(flag: String, default: T, value: (String) -> T?): T? = values[flag]?.let(value) ?: default.takeIf { flag !in values }
             return Options(
                 output = values["-o"],
                 lm = values["--lm"],
                 inputs = inputs,
-                weight = read("--weight", WEIGHT) { it.toDoubleOrNull()?.takeIf { w -> w in 0.0..1.0 } } ?: return null,
+                weight = values.read("--weight", WEIGHT) { it.toDoubleOrNull()?.takeIf { w -> w in 0.0..1.0 } } ?: return null,
                 // a trigram's context must be a bigram kept (Mixer)
-                cutoffs = read("--cutoffs", CUTOFFS) { v ->
+                cutoffs = values.read("--cutoffs", CUTOFFS) { v ->
                     v.split(',').mapNotNull { it.toIntOrNull() }.takeIf { it.size == 2 && it[0] in 1..it[1] }?.let { it[0] to it[1] }
                 } ?: return null,
                 rimeUnigrams = values["--rime-unigrams"]?.let { it.toLongOrNull()?.takeIf { c -> c >= 0 } ?: return null },
                 data = values["--data"],
-                minCount = read("--min-count", MIN_COUNT) { it.toIntOrNull()?.takeIf { c -> c >= 1 } } ?: return null,
+                minCount = values.count("--min-count", MIN_COUNT, 1..Int.MAX_VALUE) ?: return null,
                 layer = values["--layer"]?.let { it.takeIf(WordPack::validLayer) ?: return null },
-                minPmi = read("--min-pmi", MIN_PMI) { it.toDoubleOrNull()?.takeIf(Double::isFinite) } ?: return null,
-                minEntropy = read("--min-entropy", MIN_ENTROPY) { it.toDoubleOrNull()?.takeIf(Double::isFinite) } ?: return null,
-                minSurprise = read("--min-surprise", MIN_SURPRISE) { it.toDoubleOrNull()?.takeIf(Double::isFinite) } ?: return null,
+                minPmi = values.read("--min-pmi", MIN_PMI) { it.toDoubleOrNull()?.takeIf(Double::isFinite) } ?: return null,
+                minEntropy = values.read("--min-entropy", MIN_ENTROPY) { it.toDoubleOrNull()?.takeIf(Double::isFinite) } ?: return null,
+                minSurprise = values.read("--min-surprise", MIN_SURPRISE) { it.toDoubleOrNull()?.takeIf(Double::isFinite) } ?: return null,
                 only = values["--only"],
-                perWord = read("--per-word", Examples.PER_WORD) { it.toIntOrNull()?.takeIf { n -> n >= 1 } } ?: return null,
+                perWord = values.count("--per-word", Examples.PER_WORD, 1..Int.MAX_VALUE) ?: return null,
                 crawl = Crawl.parse(values) ?: return null,
                 lexicon = values["--lexicon"],
+                // past 30 the cells would not fit an array
+                sketchBits = values.count("--sketch-bits", NewWords.SKETCH_BITS, NewWords.MIN_SKETCH_BITS..MAX_SKETCH_BITS) ?: return null,
             )
         }
     }
@@ -283,7 +297,7 @@ private fun clean(options: Options, out: Appendable) {
     if (!dir.isDirectory && !dir.mkdirs()) throw IOException("cannot make $dir")
     val shards = options.inputs.map(::File)
     require(shards.map { it.name }.toSet().size == shards.size) { "two shards of one name: one would overwrite the other" }
-    val cleaner = PageCleaner()
+    val cleaner = PageCleaner(options.sketchBits)
     var pages = 0L
     shards.forEach { shard -> WebText.pages(shard) { cleaner.count(it.text); pages++ } }
     var kept = 0L
