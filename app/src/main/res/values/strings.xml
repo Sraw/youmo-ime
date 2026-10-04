@@ -66,6 +66,10 @@
     <string name="clipboard_suggestion_timeout">Clipboard suggestion timeout</string>
     <string name="version">Version</string>
     <string name="build_time">Build time</string>
+    <string name="engine_data">Engine data</string>
+    <string name="download_word_packs">Download word packs</string>
+    <string name="data_outdated">This version is over half a year old</string>
+    <string name="data_outdated_summary">New words come with new versions and word packs: tap to see the releases</string>
     <string name="build_git_hash">Build Git hash</string>
     <string name="source_code">Source code</string>
     <string name="privacy_policy">Privacy policy</string>

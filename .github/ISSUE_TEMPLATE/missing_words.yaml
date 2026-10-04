@@ -1,0 +1,52 @@
+name: 缺词反馈 / Missing Words
+description: 打不出来或排得太靠后的词、读音错的词、不该有的词 / Words the keyboard cannot type, ranks too low, reads wrong, or should not have
+title: "缺词："
+labels:
+  - lexicon
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        每条反馈都会由校对流程（`lexicon/README.md`）看过，收下的词进 `lexicon/add.tsv`，随下一个词包发布。
+        一行一个词；同一个问题的词可以写在一条反馈里。
+        Each report goes through the curation in `lexicon/README.md`; accepted words land in `lexicon/add.tsv` and ship with the next word pack.
+
+  - type: textarea
+    id: words
+    attributes:
+      label: 词与拼音 / Words and pinyin
+      description: 一行一个：词、拼音、你打出来的是什么（如果打得出）。 / One a line: the word, its pinyin, what the keyboard gives instead.
+      placeholder: |
+        吗喽  ma lou  打出来是"马楼"
+        浐灞  chan ba  没有这个词
+    validations:
+      required: true
+
+  - type: dropdown
+    id: kind
+    attributes:
+      label: 问题 / Problem
+      options:
+        - 没有这个词 / The word is missing
+        - 有，但排得太靠后 / It is there but ranks too low
+        - 读音不对 / Wrong pinyin
+        - 不该有的词（错字、垃圾词）/ A word that should not be there
+    validations:
+      required: true
+
+  - type: textarea
+    id: example
+    attributes:
+      label: 例句或出处 / Example or source
+      description: 这个词一般用在什么句子里，或哪里能看到它（新闻、作品名、圈子用语……）。 / A sentence that uses it, or where people use it.
+    validations:
+      required: false
+
+  - type: input
+    id: version
+    attributes:
+      label: 应用版本 / App version
+      description: 设置首页右上角菜单 → 关于："当前版本"和"基础数据"。 / Settings, top-right menu → About: current version and engine data.
+    validations:
+      required: false

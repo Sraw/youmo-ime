@@ -4,7 +4,8 @@
 
 POST /score    {"context": "...", "candidates": ["...", ...]}   -> {"scores": [log P, ...]}
 GET  /health                                                    -> {"model": "...", "gpu_peak_gb": ...}
-GET  /words                                                     -> {"name": "...", "text": "..."}: the word pack --words names, or 404
+GET  /words                                                     -> {"name": "...", "text": "..."}: the word pack --words names
+                                                                   (or --official-words keeps), or 404
 
 A score is log P(candidate | context) in nats, as the training measured it (dev/training/score_lists.py):
 the context, a newline when there is none, and the candidate are tokenized apart and only the
@@ -27,6 +28,7 @@ import ssl
 import sys
 import threading
 import time
+import urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 MAX_CANDIDATES = 16
@@ -37,6 +39,15 @@ TIMEOUT = 15  # seconds a connection may be idle or slow, in the handshake as af
 LOWEST = -1e4  # a score below it is no likelier; -inf would not be JSON
 TOKEN = re.compile(r'[!-~]*')  # what goes in a header as it is: printable ASCII, no spaces
 WORDS_NAME = re.compile(r'([A-Za-z0-9_-][A-Za-z0-9._-]{0,63})\.words')  # a file name the phone keeps it under
+WORDS_HEADER = ('\ufeff# youmo words 1', '# youmo words 1')
+# the official word packs: releases tagged words-YYYYMM, one .words each (dev/TRAINING-PLAN.md 12.3)
+RELEASES = 'https://api.github.com/repos/Sraw/youmo-ime/releases?per_page=30'
+WORDS_TAG = re.compile(r'words-\d{6}')
+# the official pack is kept under one name whatever its release calls it: a phone replaces a pack by name,
+# so a name a month would pile up a pack a month beside the last
+OFFICIAL_NAME = 'youmo-new.words'
+MAX_PACK = 8 * 2**20  # half what the phone takes (HttpRemoteModel.MAX_WORDS): JSON writes each tab and newline as two
+RETRY = 3600  # seconds to the next look after a failed one: a server started before its network is up
 
 
 class Model:
@@ -86,22 +97,95 @@ class Model:
 
 
 def word_pack(path):
-    """The word pack at [path] as /words answers it, read again when the file changes; None without a path."""
+    """The word pack at [path] (or where a function of no arguments says it is now) as /words answers it, read
+    again when the file changes; None without a path."""
     cache = {}
 
     def current():
-        if not path:
+        where = path() if callable(path) else path
+        if not where:
             return None
-        stamp = os.stat(path).st_mtime_ns
+        stamp = (where, os.stat(where).st_mtime_ns)
         if cache.get('stamp') != stamp:
-            with open(path, encoding='utf-8') as f:
+            with open(where, encoding='utf-8') as f:
                 text = f.read()
-            if not text.startswith(('\ufeff# youmo words 1', '# youmo words 1')):
-                raise ValueError(f'{path}: not a word pack')
-            cache.update(stamp=stamp, answer={'name': WORDS_NAME.fullmatch(os.path.basename(path)).group(1), 'text': text.lstrip('\ufeff')})
+            if not text.startswith(WORDS_HEADER):
+                raise ValueError(f'{where}: not a word pack')
+            cache.update(stamp=stamp, answer={'name': WORDS_NAME.fullmatch(os.path.basename(where)).group(1), 'text': text.lstrip('\ufeff')})
         return cache['answer']
 
     return current
+
+
+class OfficialWords:
+    """The newest official word pack, kept in [directory] and looked for again every [interval] seconds: the phone
+    talks to this server only, so the server fetches what the offline build's user would download by hand.
+    A pack is taken only as its release lists it (GitHub's SHA-256 digest of the asset); a failed look keeps the
+    one there was. [path] is the file /words hands out, or None before the first pack."""
+
+    def __init__(self, directory, interval=24 * 3600, urlopen=urllib.request.urlopen, log=print):
+        self.directory, self.interval, self.urlopen, self.log = directory, interval, urlopen, log
+        os.makedirs(directory, exist_ok=True)
+        for f in os.listdir(directory):  # what a stop halfway through a write left
+            if f.endswith('.part'):
+                os.remove(os.path.join(directory, f))
+        held = os.path.join(directory, OFFICIAL_NAME)
+        self.path = held if os.path.exists(held) else None
+        self.tag = None
+
+    def get(self, url):
+        request = urllib.request.Request(url, headers={'User-Agent': 'youmo-cloud', 'Accept': 'application/vnd.github+json'})
+        with self.urlopen(request, timeout=60) as r:
+            data = r.read(MAX_PACK + 1)
+        if len(data) > MAX_PACK:
+            raise ValueError(f'{url}: over {MAX_PACK} bytes')
+        return data
+
+    def check(self):
+        """Looks once; True when a new pack was taken."""
+        releases = json.loads(self.get(RELEASES))
+        if not isinstance(releases, list) or not all(isinstance(r, dict) for r in releases):
+            raise ValueError('releases: not a list of releases')
+        newest = max((r for r in releases if WORDS_TAG.fullmatch(r.get('tag_name', '')) and not r.get('draft') and not r.get('prerelease')),
+                     key=lambda r: r['tag_name'], default=None)
+        if newest is None or newest['tag_name'] == self.tag:
+            return False
+        assets = [a for a in newest.get('assets', []) if isinstance(a, dict) and WORDS_NAME.fullmatch(a.get('name', ''))]
+        if len(assets) != 1:
+            raise ValueError(f'{newest["tag_name"]}: {len(assets)} word packs, not one')
+        asset = assets[0]
+        digest = asset.get('digest') or ''
+        if not digest.startswith('sha256:'):
+            raise ValueError(f'{newest["tag_name"]}: no SHA-256 for {asset["name"]}')
+        url = asset.get('browser_download_url', '')
+        if not url.startswith('https://'):
+            raise ValueError(f'{asset["name"]}: not over https ({url!r})')
+        data = self.get(url)
+        if hashlib.sha256(data).hexdigest() != digest[len('sha256:'):]:
+            raise ValueError(f'{asset["name"]}: not the file the release lists')
+        if not data.decode('utf-8').startswith(WORDS_HEADER):
+            raise ValueError(f'{asset["name"]}: not a word pack')
+        dest = os.path.join(self.directory, OFFICIAL_NAME)
+        with open(dest + '.part', 'wb') as f:
+            f.write(data)
+        os.replace(dest + '.part', dest)
+        self.path, self.tag = dest, newest['tag_name']
+        self.log(f'official word pack: {newest["tag_name"]} {asset["name"]}', flush=True)
+        return True
+
+    def run(self):
+        while True:
+            try:
+                self.check()
+                wait = self.interval
+            except Exception as e:  # offline, rate-limited, cut off, or a release not as expected: the thread goes on
+                self.log(f'official word pack: not fetched ({e!r}); {self.path or "none"} kept', flush=True)
+                wait = min(RETRY, self.interval)
+            time.sleep(wait)
+
+    def start(self):
+        threading.Thread(target=self.run, daemon=True, name='official-words').start()
+        return lambda: self.path
 
 
 def handler(model, token, words=lambda: None):
@@ -266,6 +350,8 @@ def main():
     p.add_argument('--plain', action='store_true', help='serve plain HTTP: only with --host 127.0.0.1')
     p.add_argument('--threads', type=int, help='CPU threads for the model')
     p.add_argument('--words', help='a word pack (<name>.words, see WordPack.kt) to hand phones that ask for /words; read again whenever the file changes')
+    p.add_argument('--official-words', action='store_true',
+                   help="hand phones the newest official word pack (this project's words-YYYYMM releases), fetched from GitHub once a day into <key-dir>/words")
     args = p.parse_args()
     if args.plain and args.host != '127.0.0.1':
         p.error('--plain only with --host 127.0.0.1: on a network, what is typed would go in the clear')
@@ -277,7 +363,9 @@ def main():
         p.error('--context-chars: at least 1')
     if args.words and not WORDS_NAME.fullmatch(os.path.basename(args.words)):
         p.error('--words: named <name>.words, the name letters, digits, . _ - (up to 64)')
-    words = word_pack(args.words)
+    if args.words and args.official_words:
+        p.error('--words or --official-words: /words hands out one pack')
+    words = word_pack(OfficialWords(os.path.join(args.key_dir, 'words')).start() if args.official_words else args.words)
     if args.words:
         print(f'word pack: {args.words}, {len(words()["text"].splitlines())} lines', flush=True)
     if not args.token and args.host != '127.0.0.1' and not args.no_token:

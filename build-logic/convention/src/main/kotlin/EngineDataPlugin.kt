@@ -99,7 +99,8 @@ class EngineDataPlugin : Plugin<Project> {
         )
         // the language model engine-data.sh made (its manifest.txt in the release says from what),
         // repacked as the tar CMake unpacks; a tag of its own, not "latest", as the models'
-        private const val LM_URL = "https://github.com/Sraw/youmo-ime/releases/download/engine-data-20261004/lm.tar.zst"
+        private const val LM_RELEASE = "engine-data-20261004"
+        private const val LM_URL = "https://github.com/Sraw/youmo-ime/releases/download/$LM_RELEASE/lm.tar.zst"
         private const val LM_SHA256 = "a59565f27bcd21b606f918253fb3607ec56b74ee581425ac543be20b36da8546"
         private const val LM_FILE = "lm.arpa"
         const val MODEL_TASK = "copySentenceModels"
@@ -191,6 +192,8 @@ class EngineDataPlugin : Plugin<Project> {
             // matched as a plain suffix: "data" alone would catch charselectdata too; and the
             // sentence models: openFd cannot read one compressed, and the engine takes that for none
             androidResources.noCompress += listOf(".data", ".safetensors")
+            // what the settings show as the engine's data, and the release a missing-word report names
+            defaultConfig.buildConfigField("String", "ENGINE_DATA", "\"$LM_RELEASE\"")
         }
         components.onVariants { variant ->
             variant.sources.assets?.addGeneratedSourceDirectory(compile, CompileEngineData::outputDir)

@@ -66,6 +66,10 @@
     <string name="clipboard_suggestion_timeout">剪貼簿項目逾時</string>
     <string name="version">版本</string>
     <string name="build_time">建構時間</string>
+    <string name="engine_data">基礎資料</string>
+    <string name="download_word_packs">去下載詞包</string>
+    <string name="data_outdated">這一版已超過半年</string>
+    <string name="data_outdated_summary">新詞隨新版本和詞包發佈，點此去下載</string>
     <string name="build_git_hash">建構 Git 雜湊值</string>
     <string name="source_code">原始碼</string>
     <string name="privacy_policy">隱私權政策</string>

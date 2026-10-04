@@ -5,13 +5,17 @@
 
 package org.fcitx.fcitx5.android.utils
 
+import android.content.ActivityNotFoundException
+import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
 import android.os.Parcelable
 import android.provider.DocumentsContract
+import android.widget.Toast
 import androidx.annotation.RequiresApi
 import org.fcitx.fcitx5.android.BuildConfig
+import timber.log.Timber
 
 inline fun <reified T : Parcelable> Intent.parcelable(key: String): T? {
     // https://issuetracker.google.com/issues/240585930#comment6
@@ -29,6 +33,16 @@ inline fun <reified T : Parcelable> Intent.parcelableArray(key: String): Array<T
     } else {
         @Suppress("DEPRECATION", "UNCHECKED_CAST")
         getParcelableArrayExtra(key) as? Array<T>
+    }
+}
+
+/** Opens [url] in a browser; with none to open it (some work profiles, TVs) shows the address instead. */
+fun Context.openUrl(url: String) {
+    try {
+        startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+    } catch (e: ActivityNotFoundException) {
+        Timber.w(e, "no browser for %s", url)
+        toast(url, Toast.LENGTH_LONG)
     }
 }
 

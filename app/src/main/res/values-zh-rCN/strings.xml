@@ -66,6 +66,10 @@
     <string name="clipboard_suggestion_timeout">剪贴板提示超时</string>
     <string name="version">版本</string>
     <string name="build_time">构建时间</string>
+    <string name="engine_data">基础数据</string>
+    <string name="download_word_packs">去下载词包</string>
+    <string name="data_outdated">这一版已超过半年</string>
+    <string name="data_outdated_summary">新词随新版本和词包发布，点此去下载</string>
     <string name="build_git_hash">构建 Git 哈希</string>
     <string name="source_code">源代码</string>
     <string name="privacy_policy">隐私政策</string>

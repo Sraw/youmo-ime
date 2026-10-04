@@ -10,11 +10,15 @@ import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.view.LayoutInflater
+import android.view.Menu
+import android.view.MenuInflater
+import android.view.MenuItem
 import android.view.View
 import android.view.ViewGroup
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.app.NotificationCompat
+import androidx.core.view.MenuProvider
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.activityViewModels
 import androidx.lifecycle.Lifecycle
@@ -32,10 +36,13 @@ import org.fcitx.fcitx5.android.ui.common.OnItemChangedListener
 import org.fcitx.fcitx5.android.ui.main.EditDeleteMenuProvider
 import org.fcitx.fcitx5.android.ui.main.MainViewModel
 import org.fcitx.fcitx5.android.ui.main.MainViewModel.ButtonMode
+import org.fcitx.fcitx5.android.utils.Const
 import org.fcitx.fcitx5.android.utils.NaiveDustman
 import org.fcitx.fcitx5.android.utils.importErrorDialog
+import org.fcitx.fcitx5.android.utils.item
 import org.fcitx.fcitx5.android.utils.lazyRoute
 import org.fcitx.fcitx5.android.utils.notificationManager
+import org.fcitx.fcitx5.android.utils.openUrl
 import org.fcitx.fcitx5.android.utils.queryFileName
 import java.util.concurrent.atomic.AtomicBoolean
 
@@ -131,6 +138,20 @@ class PinyinDictionaryFragment : Fragment(), OnItemChangedListener<PinyinDiction
             viewLifecycleOwner,
             Lifecycle.State.STARTED
         )
+        // no network permission: the browser downloads a pack, the + button imports it
+        requireActivity().addMenuProvider(
+            object : MenuProvider {
+                override fun onCreateMenu(menu: Menu, menuInflater: MenuInflater) {
+                    menu.item(R.string.download_word_packs) {
+                        requireContext().openUrl(Const.wordPacksUrl)
+                    }
+                }
+
+                override fun onMenuItemSelected(menuItem: MenuItem): Boolean = false
+            },
+            viewLifecycleOwner,
+            Lifecycle.State.STARTED
+        )
     }
 
     private fun createNotificationChannel() {
@@ -163,7 +184,10 @@ class PinyinDictionaryFragment : Fragment(), OnItemChangedListener<PinyinDiction
                 return@launch
             }
             val entryName = PinyinDictionary.nameOf(fileName)
-            if (ui.entries.any { it.name == entryName }) {
+            // a pack of the same name is the next one (each month's official pack is youmo-new.words): it replaces
+            val replaced = ui.entries.firstOrNull { it.name == entryName }
+            val pack = PinyinDictionary.Type.Words
+            if (replaced != null && (replaced.type != pack || PinyinDictionary.Type.fromFileName(fileName) != pack)) {
                 ctx.importErrorDialog(R.string.dict_already_exists)
                 return@launch
             }
@@ -178,9 +202,19 @@ class PinyinDictionaryFragment : Fragment(), OnItemChangedListener<PinyinDiction
             try {
                 val imported = withContext(Dispatchers.IO) {
                     val inputStream = cr.openInputStream(uri)!!
-                    PinyinDictManager.importFromInputStream(inputStream, fileName).getOrThrow()
+                    if (replaced == null) {
+                        PinyinDictManager.importFromInputStream(inputStream, fileName).getOrThrow()
+                    } else {
+                        PinyinDictManager.importPack(entryName, inputStream.bufferedReader().use { it.readText() }).getOrThrow()
+                    }
                 }
-                ui.addItem(item = imported)
+                if (replaced == null) {
+                    ui.addItem(item = imported)
+                } else {
+                    ui.updateItem(ui.indexItem(replaced), imported)
+                    // the same name, on or off as it was: the dustman sees no change, so reload here
+                    viewModel.fcitx.runOnReady { reloadPinyinDict() }
+                }
             } catch (e: Exception) {
                 ctx.importErrorDialog(e)
             }

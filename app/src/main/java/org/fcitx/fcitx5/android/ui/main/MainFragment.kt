@@ -4,8 +4,6 @@
  */
 package org.fcitx.fcitx5.android.ui.main
 
-import android.content.Intent
-import android.net.Uri
 import android.os.Bundle
 import android.view.Menu
 import android.view.MenuInflater
@@ -18,6 +16,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.preference.PreferenceCategory
 import org.fcitx.fcitx5.android.BuildConfig
 import org.fcitx.fcitx5.android.R
+import org.fcitx.fcitx5.android.engine.data.DataAge
 import org.fcitx.fcitx5.android.ui.common.PaddingPreferenceFragment
 import org.fcitx.fcitx5.android.ui.main.settings.SettingsRoute
 import org.fcitx.fcitx5.android.utils.Const
@@ -25,6 +24,7 @@ import org.fcitx.fcitx5.android.utils.addCategory
 import org.fcitx.fcitx5.android.utils.addPreference
 import org.fcitx.fcitx5.android.utils.item
 import org.fcitx.fcitx5.android.utils.navigateWithAnim
+import org.fcitx.fcitx5.android.utils.openUrl
 
 class MainFragment : PaddingPreferenceFragment() {
 
@@ -42,7 +42,7 @@ class MainFragment : PaddingPreferenceFragment() {
     private inner class AboutMenuProvider : MenuProvider {
         override fun onCreateMenu(menu: Menu, menuInflater: MenuInflater) {
             menu.item(R.string.faq) {
-                startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(Const.faqUrl)))
+                requireContext().openUrl(Const.faqUrl)
             }
             menu.item(R.string.developer) {
                 navigateWithAnim(SettingsRoute.Developer)
@@ -68,6 +68,12 @@ class MainFragment : PaddingPreferenceFragment() {
     override fun onCreatePreferences(savedInstanceState: Bundle?, rootKey: String?) {
         // grouped by what the user wants to adjust, not by which layer (fcitx or Android) owns the setting
         preferenceScreen = preferenceManager.createPreferenceScreen(requireContext()).apply {
+            // the offline build fetches nothing itself: new words come with a new version or a pack
+            if (DataAge.isStale(BuildConfig.BUILD_TIME, System.currentTimeMillis())) {
+                addPreference(R.string.data_outdated, R.string.data_outdated_summary) {
+                    requireContext().openUrl(Const.releasesUrl)
+                }
+            }
             addCategory(R.string.home_section_input) {
                 addDestinationPreference(
                     R.string.input_methods,

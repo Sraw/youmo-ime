@@ -4,8 +4,6 @@
  */
 package org.fcitx.fcitx5.android.ui.main
 
-import android.content.Intent
-import android.net.Uri
 import android.os.Bundle
 import androidx.appcompat.app.AlertDialog
 import androidx.lifecycle.lifecycleScope
@@ -15,6 +13,7 @@ import kotlinx.coroutines.launch
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.ui.common.PaddingPreferenceFragment
 import org.fcitx.fcitx5.android.utils.addPreference
+import org.fcitx.fcitx5.android.utils.openUrl
 
 class LicensesFragment : PaddingPreferenceFragment() {
 
@@ -63,9 +62,7 @@ class LicensesFragment : PaddingPreferenceFragment() {
     }
 
     private fun showLicenseContent(license: License) {
-        if (license.url?.isNotBlank() == true) {
-            startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(license.url)))
-        }
+        license.url?.takeIf { it.isNotBlank() }?.let { requireContext().openUrl(it) }
     }
 
 }

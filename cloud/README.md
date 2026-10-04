@@ -58,7 +58,7 @@ key: EDD3 27B9 4ACA 9ACF F2A6 7256 1FB6 E738 C3D0 879F 965B 3ED1 37B4 EC8F F30C 
 |---|---|
 | `POST /score` `{"context": "...", "candidates": ["...", ...]}` | `{"scores": [...]}`：每个候选的 log P（自然对数），上下文为空时用换行 |
 | `GET /health` | `{"model": "...", "gpu_peak_gb": ...}`：显存峰值只在用显卡时有 |
-| `GET /words` | `{"name": "...", "text": "..."}`：`--words <名字>.words` 指定的新词包（格式见 `WordPack.kt`），文件改了下次就是新的；没指定则 404。云端构建的手机每天取一次，也可以在云端设置里手动取 |
+| `GET /words` | `{"name": "...", "text": "..."}`：`--words <名字>.words` 指定的新词包（格式见 `WordPack.kt`），文件改了下次就是新的；没指定则 404。`--official-words` 则改为每天从本项目 GitHub 的 `words-YYYYMM` 发布取最新的官方词包（按发布列出的 SHA-256 校验，存在 `<key-dir>/words`，取不到就留着上一个）。云端构建的手机每天取一次，也可以在云端设置里手动取 |
 
 有 `--token` 时每个请求都要带 `Authorization: Bearer <token>`。
 
@@ -126,6 +126,6 @@ sent. A new address turns it off and forgets the key, to be compared again.
 |---|---|
 | `POST /score` `{"context": "...", "candidates": ["...", ...]}` | `{"scores": [...]}`: each candidate's log P (natural log); an empty context reads as a newline |
 | `GET /health` | `{"model": "...", "gpu_peak_gb": ...}`: the GPU memory peak, on a GPU only |
-| `GET /words` | `{"name": "...", "text": "..."}`: the word pack `--words <name>.words` names (format: `WordPack.kt`), the file as it is now; 404 without one. A cloud-build phone asks once a day, and when the user asks in the cloud settings |
+| `GET /words` | `{"name": "...", "text": "..."}`: the word pack `--words <name>.words` names (format: `WordPack.kt`), the file as it is now; 404 without one. With `--official-words` it is instead the newest official pack of this project's `words-YYYYMM` GitHub releases, fetched once a day, checked against the SHA-256 the release lists and kept in `<key-dir>/words` (a failed fetch keeps the last one). A cloud-build phone asks once a day, and when the user asks in the cloud settings |
 
 With `--token`, every request needs `Authorization: Bearer <token>`.
