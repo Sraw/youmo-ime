@@ -217,51 +217,70 @@ private fun words(options: Options, out: Appendable) {
 private fun pack(options: Options, out: Appendable) {
     val data = PinyinData.load(map(options.data!!))
     val readings = CharReadings(data)
-    val rows = File(options.inputs.single()).useLines { lines ->
-        lines.filter { it.isNotBlank() && !it.startsWith('#') }.map { it.split('\t') }.toList()
-    }
-    val known = rows.mapNotNull { f ->
+    val input = File(options.inputs.single())
+    // two reads of the candidates rather than all of them in memory: there are millions
+    val known = ArrayList<Pair<Long, Float>>()
+    val phrases = Phrases()
+    input.forEachRow { f ->
         val id = data.wordIndex.find(f[0], 0, f[0].length)
-        if (id >= 0 && id < data.model.vocabularySize) f[1].toLong() to data.model.score(id) else null
+        if (id >= 0 && id < data.model.vocabularySize) known += f[1].toLong() to data.model.score(id)
+        phrases.saw(f[0], f[1].toInt())
     }
     // the slope fitted too, not held at 1 as frequencies would have it: the pages are not the
     // model's kind of text, and the flatter line measured better (dev/TRAINING-PLAN.md 11.7)
     val fit = CountFit.of(known)
     out.appendLine("fit: log10 P = %.3f + %.3f log10(count + 1), over ${known.size} words the model has".format(fit.a, fit.b))
+    var words = 0
     var unread = 0
-    val phrases = Phrases(rows)
-    val words = rows.filter { f ->
-        f[7] == "0" && f[1].toInt() >= options.minCount && f[3].toDouble() >= options.minPmi &&
-            minOf(f[4].toDouble(), f[5].toDouble()) >= options.minEntropy && f[6].toDouble() >= options.minSurprise &&
-            !phrases.isPhrase(f[0], f[1].toInt())
-    }
+    var rare = 0
     File(options.output!!).bufferedWriter().use { w ->
         w.write("${WordPack.HEADER}\n# layer: ${options.layer}\n")
-        for (f in words) {
-            val pinyin = readings.of(f[0]) ?: run { unread++; continue }
-            w.write("%s\t%s\t%.3f\n".format(f[0], pinyin, minOf(0f, fit.prob(f[1].toLong()))))
+        input.forEachRow { f ->
+            val text = f[0]
+            val count = f[1].toInt()
+            val passes = f[7] == "0" && count >= options.minCount && f[3].toDouble() >= options.minPmi &&
+                minOf(f[4].toDouble(), f[5].toDouble()) >= options.minEntropy && f[6].toDouble() >= options.minSurprise &&
+                !phrases.isPhrase(text, count)
+            if (!passes) return@forEachRow
+            // a character the model all but never saw is a traditional one (視頻, 圖片) on a page the
+            // page filter let through, or a typo: no word for a simplified typist either way
+            if (text.any { c -> data.wordIndex.find(text, text.indexOf(c), text.indexOf(c) + 1).let { it < 0 || data.model.score(it) < RARE_CHAR } }) {
+                rare++
+                return@forEachRow
+            }
+            val pinyin = readings.of(text)
+            if (pinyin == null) {
+                unread++
+                return@forEachRow
+            }
+            w.write("%s\t%s\t%.3f\n".format(text, pinyin, minOf(0f, fit.prob(count.toLong()))))
+            words++
         }
     }
-    out.appendLine("pack: ${words.size - unread} words, $unread left out for want of a reading")
+    out.appendLine("pack: $words words, $rare left out for a character the model hardly has, $unread for want of a reading")
 }
+
+/** Each candidate row of `words`'s output, split; the comment lines skipped. */
+private fun File.forEachRow(row: (List<String>) -> Unit) = useLines { lines ->
+    lines.filter { it.isNotBlank() && !it.startsWith('#') }.forEach { row(it.split('\t')) }
+}
+
+// log10: a character under this in the model is as good as not in it (the dictionary's rarest are around -6)
+private const val RARE_CHAR = -6.5f
 
 /**
  * What tells a phrase or a fragment of a word from a word among the candidates of `words`, which
  * pmi and entropy let through as readily (的事情, 一个人, 务员): a function character at either
  * end (a verb's 了/过 excepted: 哭了, 累了 are typed as one), 的 anywhere, or most of its count
- * inside one longer candidate.
+ * inside one longer candidate ([saw] every candidate first).
  */
-private class Phrases(rows: List<List<String>>) {
+private class Phrases {
     // the most any one candidate a character longer counts, by the candidate it contains
     private val longest = HashMap<String, Int>()
 
-    init {
-        for (f in rows) {
-            val text = f[0]
-            if (text.length < 3) continue
-            val count = f[1].toInt()
-            for (part in listOf(text.dropLast(1), text.drop(1))) longest.merge(part, count, ::maxOf)
-        }
+    fun saw(text: String, count: Int) {
+        if (text.length < 3) return
+        for (part in listOf(text.dropLast(1), text.drop(1))) longest.merge(part, count, ::maxOf)
     }
 
     fun isPhrase(text: String, count: Int): Boolean {
