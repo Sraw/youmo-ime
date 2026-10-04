@@ -84,14 +84,14 @@ class CommonCrawlTest {
         val out = tmp.newFolder("out")
         val log = ArrayList<String>()
         CommonCrawl.extract("CC-TEST", 1, 2, out, base.path) { log += it }
-        val shard = File(out, "CC-TEST-00001.parquet")
+        val shard = File(out, "CC-TEST-00001-00003.parquet")
         val urls = ArrayList<String>().also { list -> WebText.pages(shard) { list += it.url } }
         assertEquals(listOf(names[1], names[1], names[2], names[2]).mapIndexed { i, n -> "https://$n/${i % 2 + 1}" }, urls)
-        assertEquals(listOf("CC-TEST-00001.parquet: 2 files, 4 pages, 256 Han characters"), log)
+        assertEquals(listOf("CC-TEST-00001-00003.parquet: 2 files, 4 pages, 256 Han characters"), log)
         // run again, the shard is kept as it is
         val written = shard.lastModified()
         CommonCrawl.extract("CC-TEST", 1, 2, out, base.path) { log += it }
-        assertEquals("CC-TEST-00001.parquet: there already", log.last())
+        assertEquals("CC-TEST-00001-00003.parquet: there already", log.last())
         assertEquals(written, shard.lastModified())
         assertTrue(out.list()!!.none { it.endsWith(".tmp") })
         // past the crawl's files

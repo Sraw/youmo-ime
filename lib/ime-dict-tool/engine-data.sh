@@ -11,8 +11,9 @@
 # training data (pinyin, pinyin-context, pinyin-chat, pinyin-dialog, small).
 # Out, in <work dir>/out: lm.arpa.zst, new.words, candidates.tsv.zst (every candidate with its
 # numbers, for curating), report.txt (the evaluation, with EVAL) and manifest.txt (what went in,
-# the SHA-256 of what came out). Each step leaves out/done/<step> and is skipped when run again,
-# so a run stopped halfway goes on where it was. Needs java 21, curl, zstd, sha256sum.
+# the SHA-256 of what came out). Each step leaves done/<step> and is skipped when run again, so a
+# run stopped halfway goes on where it was; done/ is beside out/, not in it, as most steps' work is
+# too, so out/ copied onto another machine does not pass for the work there. Needs java 21, curl, zstd, sha256sum.
 #
 # What goes in is what was measured (11.7d): CC-MAIN-2026-39's WET files 10 to 1509, mixed at 0.6
 # beside FineWeb-2's two shards; candidates seen 15 times, pmi 1 and entropy 1 or more. A newer
@@ -26,15 +27,19 @@ FILES=${FILES:-1500}
 WEIGHT=${WEIGHT:-0.6}
 # mix held 7 GB and words 6 GB over these inputs, as measured; room for a bigger crawl
 export JAVA_OPTS=${JAVA_OPTS:--Xmx12g}
-mkdir -p "$WORK"/out/done "$WORK"/src "$WORK"/cc || exit 1
+mkdir -p "$WORK"/out "$WORK"/done "$WORK"/src "$WORK"/cc || exit 1
 cd "$WORK" || exit 1
 rm -f out/FAILED
+# a work directory is for one crawl and weight: its finished steps and shards are of those
+params="$CRAWL $FROM $FILES $WEIGHT"
+[ -f params ] || echo "$params" > params
+[ "$(cat params)" = "$params" ] || { echo "$WORK was made with $(cat params), not $params: use another"; exit 2; }
 now() { date '+%F %T'; }
 step() {
   local name=$1; shift
-  [ -f out/done/$name ] && return
+  [ -f done/$name ] && return
   echo "$(now) == $name"
-  if "$@"; then touch out/done/$name; else echo "$(now) FAILED $name"; echo $name >> out/FAILED; return 1; fi
+  if "$@"; then touch done/$name; else echo "$(now) FAILED $name"; echo $name >> out/FAILED; return 1; fi
 }
 # fetch <url> <file> <sha256>: a file there already is checked, not fetched again
 fetch() {
@@ -83,25 +88,27 @@ pack() {
 }
 compress() { zstd -q -19 -T0 -f lm.arpa -o out/lm.arpa.zst && zstd -q -19 -T0 -f candidates.tsv -o out/candidates.tsv.zst; }
 
-# evaluate <pack|->: the top choice right, a column a set, then the score weighted as 12.7 weighs them
+# evaluate <pack|->: the top choice right, a column a set, then the score weighted as 12.7 weighs them;
+# ime-eval's threads are as many as the JVM sees, the container's quota and not the host's cores
 evaluate() {
-  local pack=$1 tag line="" spec name set half score
+  local pack=$1 tag line="" spec name set weight half score
   tag=$(basename "$pack" .words)
   for spec in new:$SETS/pinyin-new.tsv:0.25: pinyin:$SETS/pinyin.tsv:0.10:held-out \
       context:$SETS/pinyin-context.tsv:0.05:held-out chat:$SETS/pinyin-chat.tsv:0.35:held-out \
       dialog:$SETS/pinyin-dialog.tsv:0.20: small:$SETS/small.tsv:0.05:; do
     IFS=: read -r name set weight half <<< "$spec"
-    "$EVAL" pinyin pinyin.data "$set" eval/$name-$tag.tsv ${half:+--half $half} --threads "$(nproc)" \
+    "$EVAL" pinyin pinyin.data "$set" evals/$name-$tag.tsv ${half:+--half $half} \
       --rerank src/sentence-model.safetensors --refine src/sentence-model-large.safetensors \
-      $([ "$pack" != - ] && echo --pack "$pack") > /dev/null 2> eval/$name-$tag.err || return 1
-    score=$("$EVAL" score "$set" eval/$name-$tag.tsv ${half:+--half $half} | awk '$1=="all"{print $4}')
+      $([ "$pack" != - ] && echo --pack "$pack") > /dev/null 2> evals/$name-$tag.err || return 1
+    score=$("$EVAL" score "$set" evals/$name-$tag.tsv ${half:+--half $half} | awk '$1=="all"{print $4}') && [ -n "$score" ] ||
+      { echo "$name: no score"; return 1; }
     line="$line $name=$score:$weight"
   done
   echo "$tag$line" | awk '{ s = 0; for (i = 2; i <= NF; i++) { split($i, a, /[=%:]/); s += a[2] * a[4] } printf "%s weighted=%.1f%%\n", $0, s }' \
     | sed 's/:0\.[0-9]*//g' >> out/report.txt
 }
 report() {
-  mkdir -p eval && rm -f out/report.txt
+  mkdir -p evals && rm -f out/report.txt
   fetch ${MODELS}sentence-model.safetensors src/sentence-model.safetensors 342ae775e1ee64b6c42af782f55f736c5bf58b904f3b880ee77a576e2268e7fb &&
     fetch ${MODELS}sentence-model-large.safetensors src/sentence-model-large.safetensors 6f7fcb724738e2fbe4c26db70fd53aa5b5729cb4af7ce7f1e7bfea73003e669a &&
     evaluate - && evaluate out/new.words && cat out/report.txt
@@ -111,8 +118,10 @@ manifest() {
     echo "made $(now)${COMMIT:+ by ime-dict-tool at $COMMIT}"
     echo "crawl $CRAWL WET files $FROM to $((FROM + FILES - 1)), mixed at $WEIGHT"
     echo "$SOURCES" | awk 'NF { print "source", $2, $3 }'
-    (cd out && sha256sum lm.arpa.zst new.words candidates.tsv.zst)
-  } > out/manifest.txt
+    # what ran, whatever COMMIT says: a stale installDist shows here
+    sha256sum "$(dirname "$TOOL")"/../lib/ime-*.jar | awk '{ n = split($2, p, "/"); print "tool", p[n], $1 }'
+  } > out/manifest.txt || return 1
+  (cd out && sha256sum lm.arpa.zst new.words candidates.tsv.zst) >> out/manifest.txt
 }
 
 echo "$(now) start: $(nproc) cores, $(free -g | awk '/^Mem/{print $2}') GB, $(java -version 2>&1 | head -1)"

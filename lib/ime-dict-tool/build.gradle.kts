@@ -12,6 +12,9 @@
 //   ./gradlew :lib:ime-dict-tool:run --args="mix -o <out.arpa> --lm <lm.arpa> <chat.jsonl.gz | fineweb.parquet>..."
 //   ./gradlew :lib:ime-dict-tool:run --args="check <pinyin data> <lm.arpa>"
 //
+// A release's data (a CommonCrawl crawl's Chinese pages, cleaned and mixed in, and its new words)
+// is engine-data.sh's to make, a job of hours for a rented machine (dev/TRAINING-PLAN.md 12.9).
+//
 // The app build runs it through EngineDataPlugin (build-logic): `./gradlew :app:compileEngineData`
 // downloads libime's sources and two of FineWeb-2's Chinese shards once, mixes the shards'
 // chat-like pages into the model and puts engine/pinyin.data into the app's assets.

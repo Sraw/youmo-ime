@@ -14,6 +14,10 @@ package org.fcitx.fcitx5.android.dicttool
  *
  * Two passes: [count] every page, then [clean] each. Lines are counted by a 64-bit hash in a
  * count-min sketch: a collision may take out a rare line now and then, never leaves a common one in.
+ * Over 1500 files' 190 million lines that is 1 in 200 rare lines, 1% of the text kept, as simulated;
+ * twice the lines would make it some 20%, so a bigger crawl wants more [sketchBits].
+ * The Python script measured first (dev/TRAINING-PLAN.md 11.7d) told lines apart by an ASCII trim
+ * only: here a full-width indent goes too, so a line indented on one page and not on another is one.
  */
 class PageCleaner(sketchBits: Int = NewWords.SKETCH_BITS, private val minRepeats: Int = MIN_REPEATS) {
 

@@ -83,11 +83,12 @@ object WebText {
                 // zstd, as FineWeb-2's own: a third the size of the default snappy for Chinese text
                 connection.createStatement().use { it.execute("COPY pages TO '${quoted(temp)}' (FORMAT parquet, COMPRESSION zstd)") }
             }
+            if (!temp.renameTo(shard)) throw IOException("cannot write $shard")
         } catch (e: SQLException) {
-            temp.delete()
             throw IOException("$shard: ${e.message}", e)
+        } finally {
+            temp.delete()
         }
-        if (!temp.renameTo(shard)) throw IOException("cannot write $shard")
     }
 
     private fun quoted(file: File): String {

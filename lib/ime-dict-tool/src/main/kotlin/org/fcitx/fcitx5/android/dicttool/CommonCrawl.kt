@@ -20,6 +20,7 @@ import java.util.concurrent.ExecutionException
 import java.util.Locale
 import java.util.concurrent.Executors
 import java.util.zip.GZIPInputStream
+import kotlin.random.Random
 
 /**
  * The Chinese pages of a CommonCrawl crawl (commoncrawl.org, under its terms of use), out of its
@@ -39,8 +40,9 @@ object CommonCrawl {
     /**
      * Writes the Chinese pages of WET files [from] until [from] + [files] of [crawl], in the order
      * of its `wet.paths.gz`, to [outDir]: a shard of [FILES_PER_SHARD] files each,
-     * `<crawl>-<first file>.parquet`, its pages in the files' order. A shard already there is
-     * kept, so a run stopped halfway goes on where it was. [base] is CommonCrawl's, or for a test
+     * `<crawl>-<first file>-<last file + 1>.parquet`, its pages in the files' order. A shard already
+     * there is kept, so a run stopped halfway goes on where it was; named by both ends, a shorter
+     * last shard of an earlier run is not taken for a whole one. [base] is CommonCrawl's, or for a test
      * a directory laid out as it.
      * @throws IOException if a file cannot be fetched after some tries, or is not WARC
      */
@@ -52,12 +54,12 @@ object CommonCrawl {
         val pool = Executors.newFixedThreadPool(THREADS)
         try {
             for (first in from until from + files step FILES_PER_SHARD) {
-                val shard = File(outDir, "%s-%05d.parquet".format(Locale.ROOT, crawl, first))
+                val until = minOf(first + FILES_PER_SHARD, from + files)
+                val shard = File(outDir, "%s-%05d-%05d.parquet".format(Locale.ROOT, crawl, first, until))
                 if (shard.exists()) {
                     log("${shard.name}: there already")
                     continue
                 }
-                val until = minOf(first + FILES_PER_SHARD, from + files)
                 val fetched = (first until until).map { i ->
                     pool.submit(Callable { ArrayList<WebText.Page>().also { list -> pages(ByteArrayInputStream(fetch(base, paths[i])), list::add) } })
                 }
@@ -78,7 +80,8 @@ object CommonCrawl {
 
     /**
      * The Chinese pages of a WET file, [wet]: gzip members of a WARC record each, a `conversion`
-     * record a page.
+     * record a page. [wet] must tell its [InputStream.available] bytes truly (a file read into
+     * memory does): GZIPInputStream reads on past a member only while there are some.
      * @throws IOException if it is not WARC
      */
     fun pages(wet: InputStream, page: (WebText.Page) -> Unit) {
@@ -142,7 +145,12 @@ object CommonCrawl {
                 failure = IOException("$path: HTTP $status")
                 if (!passing(status)) throw failure
             }
-            Thread.sleep(PAUSE_MILLIS * attempt)
+            // twice as long each time, up to minutes, and at random within half of it: the threads
+            // slowed down together must not come back together
+            if (attempt < TRIES) {
+                val pause = minOf(PAUSE_MILLIS shl (attempt - 1), MAX_PAUSE_MILLIS)
+                Thread.sleep(pause + Random.nextLong(pause / 2))
+            }
         }
         throw failure ?: IOException("$path: not fetched")
     }
@@ -154,6 +162,7 @@ object CommonCrawl {
     private const val THREADS = 8
     private const val TRIES = 8
     private const val PAUSE_MILLIS = 10_000L
+    private const val MAX_PAUSE_MILLIS = 300_000L
     private const val CONNECT_SECONDS = 30L
     private const val FETCH_MINUTES = 5L
     private const val BUFFER = 1 shl 16
