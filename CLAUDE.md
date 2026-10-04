@@ -25,7 +25,8 @@ Free to restructure; upstream compatibility is not a constraint.
 | Static analysis (syntax rules only; type resolution doesn't work here) | `./gradlew detekt` |
 | Accept current findings after a deliberate batch (run alone, not with `detekt`; `:<module>:detektBaseline` for one module, bare `detektBaseline` rewrites every module) | `./gradlew :<module>:detektBaseline` |
 | App coverage (report only, no floor) | `./gradlew :app:koverLogOfflineDebug` |
-| Engine data into app assets (part of every app build; downloads libime's sources, 万象's dictionaries and two FineWeb-2 shards, ~10 GB, once (`-Pengine.wanxiang=false` leaves 万象 out); the FineWeb mix then takes 7 min and 7 GB RAM: `./gradlew --stop` first on 16 GB, and `-Pengine.mix=false` skips it) | `./gradlew :app:compileEngineData` |
+| Engine data into app assets (part of every app build; downloads libime's sources, 万象's dictionaries and the mixed model of this fork's release `engine-data-*`, SHA-256 checked, once; `-Pengine.wanxiang=false` leaves 万象 out) | `./gradlew :app:compileEngineData` |
+| A new `engine-data` release's files (CommonCrawl crawl, cleaning, mix, new words, evaluation; ~100 GB down, an hour on a rented 16-core box via `dev/training/jobs/engine-data.json`) | `TOOL=… EVAL=… SETS=… lib/ime-dict-tool/engine-data.sh <work dir>` |
 | Sentence models into app assets (part of every app build; fetched from this fork's release `sentence-models-*`, SHA-256 checked) | `./gradlew :app:copySentenceModels` |
 
 Unit tests need no submodules, NDK or CMake. Instrumented tests (`FcitxTest`, `SoftKeyboardTest`)

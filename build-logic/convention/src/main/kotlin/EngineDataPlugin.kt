@@ -44,29 +44,28 @@ import java.security.MessageDigest
 import javax.inject.Inject
 
 /**
- * Compiles the own engine's data (lib/ime-dict-tool) from the text sources libime builds its own
- * from and adds it to the app's assets as `engine/pinyin.data` and `engine/table/<name>.data`
- * for libime's code tables (五笔, 仓颉 ...).
- * Mixed into libime's language model are the n-grams of the chat-like pages of two of FineWeb-2's
- * Chinese shards (ime-dict-tool's `mix`, which picks the pages): libime's model knows written
- * text, and people type chat. The sentence models, `engine/sentence-model.safetensors` (4M,
- * weighing the readings at each key) and `engine/sentence-model-large.safetensors` (25M, while the
- * user pauses), are this fork's own (dev/TRAINING-PLAN.md: FineWeb-2 pages scored by
- * Qwen3.5-9B-Base), fetched from a release of the fork. Beside libime's dictionary go 万象拼音's
- * (rime_wanxiang, CC-BY-4.0), read as Rime writes them: libime's has few words of the last years.
- * It stands in until the fork finds its own new words, and `-Pengine.wanxiang=false` leaves it out. The .data files and the models are
- * stored uncompressed, so the engine can map them straight out of the APK rather than copying
- * them out first; they are also left out of the data descriptor for that reason (the descriptor lists only src/main/assets).
+ * Compiles the own engine's data (lib/ime-dict-tool) and adds it to the app's assets as
+ * `engine/pinyin.data` and `engine/table/<name>.data` for libime's code tables (五笔, 仓颉 ...).
+ * The language model is this fork's own, fetched from its `engine-data-*` release: libime's,
+ * mixed with the n-grams of chat-like web pages (FineWeb-2's and a CommonCrawl crawl's), which
+ * lib/ime-dict-tool/engine-data.sh makes on a rented machine, a job of an hour that downloads a
+ * hundred gigabytes and so no part of a build (dev/TRAINING-PLAN.md 12). Compiled with it are
+ * libime's dictionary and, beside it, 万象拼音's (rime_wanxiang, CC-BY-4.0), read as Rime writes
+ * them: libime's has few words of the last years. 万象's stands in until the fork's own lexicon
+ * finds its words, and `-Pengine.wanxiang=false` leaves it out. The sentence models,
+ * `engine/sentence-model.safetensors` (4M, weighing the readings at each key) and
+ * `engine/sentence-model-large.safetensors` (25M, while the user pauses), are this fork's own too
+ * (dev/TRAINING-PLAN.md: FineWeb-2 pages scored by Qwen3.5-9B-Base), from another release. The
+ * .data files and the models are stored uncompressed, so the engine can map them straight out of
+ * the APK rather than copying them out first; they are also left out of the data descriptor for
+ * that reason (the descriptor lists only src/main/assets).
  *
- * The sources are the archives libime's CMake downloaded, checked against the same SHA-256.
- * FineWeb-2's are pinned to a revision of the dataset and checked against the SHA-256 it lists.
- * Downloads go to the root project's `.gradle/engine-downloads`, out of `build`: ten gigabytes
- * that `clean` should not fetch again, and where one put there by hand is not taken for a stale
- * output and deleted.
- * Each step declares its inputs and outputs, so the downloads, the seven-minute mix and the
- * compile run once and again only when a source or the tool changes. `-Pengine.mix=false` compiles
- * libime's model as it is, skipping FineWeb-2 altogether: for CI, whose runners have neither the
- * memory nor the disk for it, and whose builds are not released.
+ * Every download is checked against a SHA-256: libime's archives against the ones its CMake had,
+ * the releases' files against the ones they were published with. Downloads go to the root
+ * project's `.gradle/engine-downloads`, out of `build`: what `clean` should not fetch again, and
+ * where one put there by hand is not taken for a stale output and deleted.
+ * Each step declares its inputs and outputs, so the downloads and the compile run once and again
+ * only when a source or the tool changes. Local builds and CI's compile the same data.
  */
 class EngineDataPlugin : Plugin<Project> {
 
@@ -77,11 +76,6 @@ class EngineDataPlugin : Plugin<Project> {
         private const val BASE_URL = "https://download.fcitx-im.org/data/"
 
         // as libime's data/CMakeLists.txt had them (libime 1.1.15-14-g65003b6, before it left the app)
-        private val LM = Source(
-            "lm_sc.arpa-20260629.tar.zst",
-            "06808333b9173e5374cf2cb5afc12d08f5625bf9abb536489cac376fc05f2e7f",
-            listOf("lm_sc.arpa"),
-        )
         private val DICT = Source(
             "dict-20260703.tar.zst",
             "c686cab6df8964c48d596f57d205bac31fc72870b06a83017e44503df8c09697",
@@ -91,15 +85,6 @@ class EngineDataPlugin : Plugin<Project> {
             "table-20240108.tar.zst",
             "3e9d87b04a393f131723472c8eaa860dd23c378a3d4f6a9005513b2a95b3614b",
             listOf("cj", "db", "erbi", "qxm", "wanfeng", "wbpy", "wbx", "zrm").map { "$it.txt" },
-        )
-        // HuggingFaceFW/fineweb-2's cmn_Hani (ODC-By 1.0), at the revision measured: shard name to
-        // SHA-256. Two of its 370 shards hold some 0.4 billion characters of chat-like pages; more
-        // is a question for measuring (dev/ENGINE-DESIGN.md)
-        private const val FINEWEB_URL =
-            "https://huggingface.co/datasets/HuggingFaceFW/fineweb-2/resolve/af9c13333eb981300149d5ca60a8e9d659b276b9/data/cmn_Hani/train/"
-        private val FINEWEB = mapOf(
-            "000_00000.parquet" to "3e43fefabc3ee500f9874655ece1776f96b81568cf33e0a6376835425ce42598",
-            "000_00001.parquet" to "1829410bee959d64fee8c34efd3e741f22c368cfe62aaa7a971a56afabe1d92f",
         )
         // amzxyz/rime_wanxiang's dictionaries at the commit measured (dev/TRAINING-PLAN.md 10.5): name to SHA-256
         private const val WANXIANG_URL =
@@ -112,7 +97,11 @@ class EngineDataPlugin : Plugin<Project> {
             "diming.dict.yaml" to "627b351e6fa660a40cef86dd923a4bafdeb0bc052c3f2b5eb36600b0d839e0d2",
             "renming.dict.yaml" to "4c171aa4f5608934f5c504d8435c0e85dc06b938a1337a1fb041819dca1ca631",
         )
-        const val MIX_TASK = "mixEngineModel"
+        // the language model engine-data.sh made (its manifest.txt in the release says from what),
+        // repacked as the tar CMake unpacks; a tag of its own, not "latest", as the models'
+        private const val LM_URL = "https://github.com/Sraw/youmo-ime/releases/download/engine-data-20261004/lm.tar.zst"
+        private const val LM_SHA256 = "a59565f27bcd21b606f918253fb3607ec56b74ee581425ac543be20b36da8546"
+        private const val LM_FILE = "lm.arpa"
         const val MODEL_TASK = "copySentenceModels"
         // a tag of its own, not "latest": what is downloaded is what was measured
         private const val MODEL_URL =
@@ -131,7 +120,7 @@ class EngineDataPlugin : Plugin<Project> {
         val downloadsDir = target.rootProject.layout.projectDirectory.dir(".gradle/engine-downloads")
         val components = target.extensions.getByType<ApplicationAndroidComponentsExtension>()
         val cmakeVersion = target.cmakeVersion
-        val extracted = listOf(LM, DICT, TABLE).map { source ->
+        val extracted = listOf(DICT, TABLE).map { source ->
             val download = target.tasks.register<DownloadTask>("download" + taskName(source)) {
                 url.set(BASE_URL + source.name)
                 sha256.set(source.sha256)
@@ -144,12 +133,15 @@ class EngineDataPlugin : Plugin<Project> {
             }
         }
 
-        val shards = FINEWEB.entries.mapIndexed { i, (name, sha) ->
-            target.tasks.register<DownloadTask>("downloadFineweb$i") {
-                url.set(FINEWEB_URL + name)
-                sha256.set(sha)
-                outputFile.set(downloadsDir.file("fineweb2/$name"))
-            }
+        val lmDownload = target.tasks.register<DownloadTask>("downloadEngineModel") {
+            url.set(LM_URL)
+            sha256.set(LM_SHA256)
+            outputFile.set(downloadsDir.file("engine-data/" + LM_URL.substringAfter("/download/").replace('/', '-')))
+        }
+        val lm = target.tasks.register<ExtractTask>("extractEngineModel") {
+            archive.set(lmDownload.flatMap { it.outputFile })
+            cmake.set(components.sdkComponents.sdkDirectory.map { it.file("cmake/$cmakeVersion/bin/cmake") })
+            outputDir.set(sourcesDir.map { it.dir("lm_mixed") })
         }
 
         val wanxiang = WANXIANG.entries.mapIndexed { i, (name, sha) ->
@@ -168,33 +160,19 @@ class EngineDataPlugin : Plugin<Project> {
         }
         target.dependencies.add(tool.name, target.dependencies.project(mapOf("path" to ":lib:ime-dict-tool")))
 
-        val mix = target.tasks.register<MixEngineModel>(MIX_TASK) {
-            classpath = tool
-            mainClass.set(TOOL_MAIN)
-            // both models and the pages' counts: 7 GB resident, as measured; keep in step with
-            // ime-dict-tool's own run task
-            maxHeapSize = "6g"
-            lm.set(extracted[0].flatMap { it.outputDir.file(LM.files.single()) })
-            corpus.from(shards.map { download -> download.flatMap { it.outputFile } })
-            output.set(target.layout.buildDirectory.file("engine-model-mixed/lm_mixed.arpa"))
-        }
         val compile = target.tasks.register<CompileEngineData>(COMPILE_TASK) {
             classpath = tool
             mainClass.set(TOOL_MAIN)
             // the whole mixed model is held in memory while it is sorted: 3.6 GB resident, as measured
             maxHeapSize = "4g"
-            if (!flag(target, "engine.mix")) {
-                lm.set(extracted[0].flatMap { it.outputDir.file(LM.files.single()) })
-            } else {
-                lm.set(mix.flatMap { it.output })
-            }
-            dictionaries.from(DICT.files.map { name -> extracted[1].flatMap { it.outputDir.file(name) } })
+            this.lm.set(lm.flatMap { it.outputDir.file(LM_FILE) })
+            dictionaries.from(DICT.files.map { name -> extracted[0].flatMap { it.outputDir.file(name) } })
             if (flag(target, "engine.wanxiang")) dictionaries.from(wanxiang.map { download -> download.flatMap { it.outputFile } })
             outputDir.set(target.layout.buildDirectory.dir("generated/engine-assets"))
         }
         val tables = target.tasks.register<CompileTables>(TABLES_TASK) {
             classpath.from(tool)
-            tables.from(TABLE.files.map { name -> extracted[2].flatMap { it.outputDir.file(name) } })
+            tables.from(TABLE.files.map { name -> extracted[1].flatMap { it.outputDir.file(name) } })
             outputDir.set(target.layout.buildDirectory.dir("generated/engine-tables"))
         }
         val models = MODELS.entries.mapIndexed { i, (name, sha) ->
@@ -310,27 +288,6 @@ class EngineDataPlugin : Plugin<Project> {
             exec.exec {
                 commandLine(cmake.path, "-E", "tar", "xf", archive.get().asFile.path)
                 workingDir = dir
-            }
-        }
-    }
-
-    /** The language model mixed with the n-grams of web pages, as ARPA text (a gigabyte). */
-    @CacheableTask
-    abstract class MixEngineModel : JavaExec() {
-        @get:InputFile
-        @get:PathSensitive(PathSensitivity.NAME_ONLY)
-        abstract val lm: RegularFileProperty
-
-        @get:InputFiles
-        @get:PathSensitive(PathSensitivity.NAME_ONLY)
-        abstract val corpus: ConfigurableFileCollection
-
-        @get:OutputFile
-        abstract val output: RegularFileProperty
-
-        init {
-            argumentProviders += CommandLineArgumentProvider {
-                listOf("mix", "-o", output.get().asFile.path, "--lm", lm.get().asFile.path) + corpus.files.map { it.path }
             }
         }
     }

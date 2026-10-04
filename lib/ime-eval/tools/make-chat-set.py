@@ -7,7 +7,7 @@ use, so nothing the app ships learns from LCCC):
 
     python3 tools/make-chat-set.py lccc_base_valid.jsonl.gz <dict_sc.txt> <lm_sc.arpa> > data/pinyin-chat.tsv
 
-with app/build/engine-sources/{dict/dict_sc.txt,lm_sc/lm_sc.arpa} as the dictionary and model.
+with libime's dict_sc.txt (app/build/engine-sources/dict) and lm_sc.arpa (download.fcitx-im.org/data/lm_sc.arpa-20260629.tar.zst) as the dictionary and model.
 Each turn is cut at punctuation; a run of 4 to 12 Han chars becomes a sample when its text hashes
 into the kept 1/25, the run's earlier part of the same turn being its context. The run is split
 into the dictionary's words the way the model finds likeliest (the sum of unigram scores), and

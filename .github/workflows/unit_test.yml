@@ -74,7 +74,7 @@ jobs:
       # than an Android build problem. `check` = tests, the Android API level guard
       # (animal-sniffer, which Android lint cannot provide for a JVM module) and the coverage
       # floors (Kover). :lib:ime-dict-tool, the host tool that builds the engine's data, is
-      # plain JVM too; its tests are what covers the FineWeb mix, which CI's builds skip.
+      # plain JVM too; its tests are what covers the mix and the crawl, whose output builds download.
       # --continue: the coverage report is wanted most when a check has failed
       - name: Run core logic and dict tool tests, API level check and coverage floors
         run: ./gradlew --continue :lib:ime-core:check :lib:ime-core:koverHtmlReport :lib:ime-dict-tool:test

@@ -9,7 +9,7 @@
 # The launchers are `installDist`'s (`./gradlew :lib:ime-dict-tool:installDist :lib:ime-eval:installDist`);
 # SETS holds the evaluation sets: lib/ime-eval/data/pinyin-new.tsv and the held-out ones of the
 # training data (pinyin, pinyin-context, pinyin-chat, pinyin-dialog, small).
-# Out, in <work dir>/out: lm.arpa.zst, new.words, candidates.tsv.zst (every candidate with its
+# Out, in <work dir>/out: lm.tar.zst (lm.arpa, as the app build unpacks it), new.words, candidates.tsv.zst (every candidate with its
 # numbers, for curating), report.txt (the evaluation, with EVAL) and manifest.txt (what went in,
 # the SHA-256 of what came out). Each step leaves done/<step> and is skipped when run again, so a
 # run stopped halfway goes on where it was; done/ is beside out/, not in it, as most steps' work is
@@ -47,7 +47,7 @@ fetch() {
   curl -fsSL --retry 5 -o "$2.part" "$1" && echo "$3  $2.part" | sha256sum -c --quiet - && mv "$2.part" "$2"
 }
 
-# keep in step with build-logic's EngineDataPlugin: libime's sources, 万象's dictionaries, FineWeb-2's shards
+# libime's sources and 万象's dictionaries as build-logic's EngineDataPlugin pins them; FineWeb-2's shards
 LIBIME=https://download.fcitx-im.org/data/
 WANXIANG=https://raw.githubusercontent.com/amzxyz/rime_wanxiang/55fbad487c637d64a0371b74d177302ac1cdd16e/dicts/
 FINEWEB=https://huggingface.co/datasets/HuggingFaceFW/fineweb-2/resolve/af9c13333eb981300149d5ca60a8e9d659b276b9/data/cmn_Hani/train/
@@ -86,7 +86,7 @@ words() { "$TOOL" words -o candidates.tsv --data pinyin.data --min-count 15 cc/c
 pack() {
   "$TOOL" pack -o out/new.words --data pinyin.data --layer new --min-count 15 --min-pmi 1 --min-entropy 1 candidates.tsv
 }
-compress() { zstd -q -19 -T0 -f lm.arpa -o out/lm.arpa.zst && zstd -q -19 -T0 -f candidates.tsv -o out/candidates.tsv.zst; }
+compress() { tar -I 'zstd -19 -T0' -cf out/lm.tar.zst lm.arpa && zstd -q -19 -T0 -f candidates.tsv -o out/candidates.tsv.zst; }
 
 # evaluate <pack|->: the top choice right, a column a set, then the score weighted as 12.7 weighs them;
 # ime-eval's threads are as many as the JVM sees, the container's quota and not the host's cores
@@ -121,7 +121,7 @@ manifest() {
     # what ran, whatever COMMIT says: a stale installDist shows here
     sha256sum "$(dirname "$TOOL")"/../lib/ime-*.jar | awk '{ n = split($2, p, "/"); print "tool", p[n], $1 }'
   } > out/manifest.txt || return 1
-  (cd out && sha256sum lm.arpa.zst new.words candidates.tsv.zst) >> out/manifest.txt
+  (cd out && sha256sum lm.tar.zst new.words candidates.tsv.zst) >> out/manifest.txt
 }
 
 echo "$(now) start: $(nproc) cores, $(free -g | awk '/^Mem/{print $2}') GB, $(java -version 2>&1 | head -1)"

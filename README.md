@@ -51,7 +51,9 @@
 
 - 代码：LGPL-2.1-or-later，与上游相同。
 - 词典、拼音语言模型、码表：来自 [libime](https://github.com/fcitx/libime) 发布的文本源（LGPL-2.1-or-later），构建时编译成本引擎的格式。
-  拼音语言模型里混入了 [FineWeb-2](https://huggingface.co/datasets/HuggingFaceFW/fineweb-2) 中文类聊天网页的 n-gram（ODC-By 1.0）。
+  拼音语言模型里混入了 [FineWeb-2](https://huggingface.co/datasets/HuggingFaceFW/fineweb-2) 中文类聊天网页（ODC-By 1.0）和
+  [Common Crawl](https://commoncrawl.org) 一次抓取里中文网页（遵守其使用条款）的 n-gram。混好的模型放在本仓库的
+  `engine-data-*` release 里，由 `lib/ime-dict-tool/engine-data.sh` 在发版前生成。
   词典还并入了[万象拼音](https://github.com/amzxyz/rime_wanxiang)（amzxyz，CC-BY-4.0）的词条、读音和词频，补上近几年的新词；
   这是过渡做法，本项目会逐步用自己从语料里找出的新词替代它（构建时加 `-Pengine.wanxiang=false` 可去掉）。
 - 句子模型：本项目自己训练（Apache-2.0）。先在 FineWeb-2 中文网页上训练语言模型，再用 Qwen3.5-9B-Base（Apache-2.0）给候选列表打分做蒸馏。
@@ -81,9 +83,8 @@ sudo apt install extra-cmake-modules gettext   # Debian/Ubuntu；Arch：pacman -
 
 构建会自动下载引擎数据和句子模型，并按 SHA-256 校验：
 
-- 第一次下载 libime 的数据源和两个 FineWeb-2 分片，约 10 GB；
-- 混入 FineWeb-2 这一步大约要 7 分钟、7 GB 内存。内存只有 16 GB 的机器先运行 `./gradlew --stop`。
-  加 `-Pengine.mix=false` 可以跳过这一步，但拼音模型就不含聊天语料了。
+- 第一次下载 libime 的数据源、万象拼音的词典和本仓库 release 里混好的语言模型，约 400 MB（解开后语言模型占 1 GB 磁盘）；
+- 编译拼音数据大约要 2 分钟、5 GB 内存。
 
 正式版需要签名。把以下三项写进 `~/.gradle/gradle.properties`（也可以用环境变量 `SIGN_KEY_FILE`、`SIGN_KEY_ALIAS`、`SIGN_KEY_PWD`；
 密钥文件也可以用 base64 写在 `signKeyBase64` / `SIGN_KEY_BASE64` 里），然后运行 `./gradlew :app:assembleRelease`。
@@ -113,7 +114,7 @@ signKeyPwd=...
 ### 致谢
 
 [fcitx5-android](https://github.com/fcitx5-android/fcitx5-android)、[Fcitx5](https://github.com/fcitx/fcitx5)、[libime](https://github.com/fcitx/libime)、
-[fcitx5-chinese-addons](https://github.com/fcitx/fcitx5-chinese-addons)、[万象拼音](https://github.com/amzxyz/rime_wanxiang)、[FineWeb-2](https://huggingface.co/datasets/HuggingFaceFW/fineweb-2)、[Qwen](https://github.com/QwenLM)。
+[fcitx5-chinese-addons](https://github.com/fcitx/fcitx5-chinese-addons)、[万象拼音](https://github.com/amzxyz/rime_wanxiang)、[FineWeb-2](https://huggingface.co/datasets/HuggingFaceFW/fineweb-2)、[Common Crawl](https://commoncrawl.org)、[Qwen](https://github.com/QwenLM)。
 
 ---
 
@@ -168,7 +169,9 @@ Settings, themes and the clipboard come along. The old app's backups leave out t
 
 - Code: LGPL-2.1-or-later, as upstream.
 - Dictionary, pinyin language model and code tables: compiled at build time from the text sources published by [libime](https://github.com/fcitx/libime) (LGPL-2.1-or-later).
-  The pinyin language model also mixes in n-grams from chat-like Chinese pages of [FineWeb-2](https://huggingface.co/datasets/HuggingFaceFW/fineweb-2) (ODC-By 1.0).
+  The pinyin language model also mixes in n-grams from chat-like Chinese pages of [FineWeb-2](https://huggingface.co/datasets/HuggingFaceFW/fineweb-2) (ODC-By 1.0)
+  and from the Chinese pages of a [Common Crawl](https://commoncrawl.org) crawl (under its terms of use). The mixed model is in
+  this repository's `engine-data-*` releases, made before a release by `lib/ime-dict-tool/engine-data.sh`.
   The dictionary also takes the words, readings and counts of [rime_wanxiang](https://github.com/amzxyz/rime_wanxiang) (万象拼音, by
   amzxyz, CC-BY-4.0), for the words of the last few years; this stands in until the project finds new words in text of its own
   (`-Pengine.wanxiang=false` leaves it out of a build).
@@ -199,9 +202,9 @@ There are two builds: `offline`, published by default, with no network permissio
 
 The build downloads the engine data and the sentence models and checks their SHA-256:
 
-- the first build downloads libime's data sources and two FineWeb-2 shards, about 10 GB;
-- mixing in FineWeb-2 takes about 7 minutes and 7 GB of memory. On a 16 GB machine, run `./gradlew --stop` first.
-  `-Pengine.mix=false` skips the mix, at the cost of the chat text in the pinyin model.
+- the first build downloads libime's data sources, rime_wanxiang's dictionaries and the mixed language model from this
+  repository's releases, about 400 MB (the model takes 1 GB of disk unpacked);
+- compiling the pinyin data takes about 2 minutes and 5 GB of memory.
 
 A release build needs a signing key. Put these three in `~/.gradle/gradle.properties` (or the environment variables `SIGN_KEY_FILE`, `SIGN_KEY_ALIAS` and `SIGN_KEY_PWD`;
 the key file can also be given base64-encoded as `signKeyBase64` / `SIGN_KEY_BASE64`), then run `./gradlew :app:assembleRelease`.
@@ -231,4 +234,4 @@ signKeyPwd=...
 ### Thanks
 
 [fcitx5-android](https://github.com/fcitx5-android/fcitx5-android), [Fcitx5](https://github.com/fcitx/fcitx5), [libime](https://github.com/fcitx/libime),
-[fcitx5-chinese-addons](https://github.com/fcitx/fcitx5-chinese-addons), [rime_wanxiang](https://github.com/amzxyz/rime_wanxiang), [FineWeb-2](https://huggingface.co/datasets/HuggingFaceFW/fineweb-2), [Qwen](https://github.com/QwenLM).
+[fcitx5-chinese-addons](https://github.com/fcitx/fcitx5-chinese-addons), [rime_wanxiang](https://github.com/amzxyz/rime_wanxiang), [FineWeb-2](https://huggingface.co/datasets/HuggingFaceFW/fineweb-2), [Common Crawl](https://commoncrawl.org), [Qwen](https://github.com/QwenLM).

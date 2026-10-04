@@ -13,11 +13,11 @@
 //   ./gradlew :lib:ime-dict-tool:run --args="check <pinyin data> <lm.arpa>"
 //
 // A release's data (a CommonCrawl crawl's Chinese pages, cleaned and mixed in, and its new words)
-// is engine-data.sh's to make, a job of hours for a rented machine (dev/TRAINING-PLAN.md 12.9).
+// is engine-data.sh's to make, a job of an hour for a rented machine (dev/TRAINING-PLAN.md 12.9).
 //
 // The app build runs it through EngineDataPlugin (build-logic): `./gradlew :app:compileEngineData`
-// downloads libime's sources and two of FineWeb-2's Chinese shards once, mixes the shards'
-// chat-like pages into the model and puts engine/pinyin.data into the app's assets.
+// downloads libime's sources and the model engine-data.sh mixed (a release's) once, and puts
+// engine/pinyin.data into the app's assets.
 plugins {
     application
     alias(libs.plugins.kotlin.jvm)
@@ -26,7 +26,7 @@ plugins {
 application {
     mainClass.set("org.fcitx.fcitx5.android.dicttool.MainKt")
     // mix holds two language models and the chat's counts in memory: 7 GB resident over two
-    // FineWeb-2 shards, as measured; keep in step with EngineDataPlugin
+    // FineWeb-2 shards, as measured (engine-data.sh sets its own)
     applicationDefaultJvmArgs = listOf("-Xmx6g")
 }
 
