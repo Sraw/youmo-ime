@@ -28,7 +28,7 @@ class NewWordsTest {
             pages.forEach { (text, date) -> finder.add(text, date) }
             finder.nextPass()
         }
-        return finder.candidates()
+        return ArrayList<NewWords.Candidate>().also { out -> finder.candidates { out += it } }
     }
 
     @Test
@@ -55,15 +55,13 @@ class NewWordsTest {
         assertEquals(2, qichi.count)
         assertEquals(0.0, qichi.leftEntropy, 1e-9)
         assertEquals(0.0, qichi.rightEntropy, 1e-9)
-        // most frequent first
-        assertEquals(found.map { it.count }.sortedDescending(), found.map { it.count })
     }
 
     @Test
     fun runsUnderTheCountAreNotKeptAndThePassesMustBeWalked() {
         assertTrue(find(minCount = 7).isEmpty())
         val finder = NewWords(emptySet(), 1, sketchBits = 12)
-        assertThrows(IllegalArgumentException::class.java) { finder.candidates() }
+        assertThrows(IllegalArgumentException::class.java) { finder.candidates {} }
         assertThrows(IllegalArgumentException::class.java) { NewWords(emptySet(), 0) }
         assertThrows(IllegalArgumentException::class.java) { NewWords(emptySet(), 1, 5) }
         assertEquals(listOf(1, 2, 3, 4), listOf("㐀", "㐀㐀", "鿿一二", "一二三四").map { NewWords.lengthOf(NewWords.key(it, 0, it.length)) })

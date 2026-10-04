@@ -170,7 +170,7 @@ private class Options(
 /**
  * The runs of Han characters the pages use that the data's base layer lacks, with what tells a
  * word from a chance run: `text count year pmi left-entropy right-entropy surprise known`, a
- * line each, most frequent first ([NewWords], [Surprise]). Lines starting `#` are comments.
+ * line each, in no order ([NewWords], [Surprise]). Lines starting `#` are comments.
  */
 private fun words(options: Options, out: Appendable) {
     val data = PinyinData.load(map(options.data!!))
@@ -192,17 +192,20 @@ private fun words(options: Options, out: Appendable) {
         out.appendLine("pass ${finder.pass}: $pages pages")
         finder.nextPass()
     }
-    val candidates = finder.candidates()
     val surprise = Surprise(data)
+    var all = 0
+    var unknown = 0
     File(options.output!!).bufferedWriter().use { w ->
         w.write("# text\tcount\tyear\tpmi\tleft_entropy\tright_entropy\tsurprise\tknown\n")
         w.write("# chars\t${finder.chars}\n")
-        candidates.forEach { c ->
+        finder.candidates { c ->
             val s = surprise.of(c.text, c.count, finder.chars)
             w.write("%s\t%d\t%d\t%.3f\t%.3f\t%.3f\t%.3f\t%d\n".format(c.text, c.count, c.year, c.pmi, c.leftEntropy, c.rightEntropy, s, if (c.known) 1 else 0))
+            all++
+            if (!c.known) unknown++
         }
     }
-    out.appendLine("words: ${candidates.size} runs of at least ${options.minCount}, ${candidates.count { !it.known }} of them not in the data")
+    out.appendLine("words: $all runs of at least ${options.minCount}, $unknown of them not in the data")
 }
 
 /**

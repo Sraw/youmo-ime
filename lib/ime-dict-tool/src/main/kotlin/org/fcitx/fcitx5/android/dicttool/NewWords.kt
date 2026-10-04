@@ -177,8 +177,12 @@ class NewWords(
         }
     }
 
-    /** The runs kept, most frequent first; only after the last pass. */
-    fun candidates(): List<Candidate> {
+    /**
+     * The runs that reached [minCount], each to [sink], in no order; only after the last pass.
+     * Handed over one at a time: millions of them in a list at once was too much on top of the
+     * counts.
+     */
+    fun candidates(sink: (Candidate) -> Unit) {
         require(done) { "the passes are not done" }
         // H = ln(total) - sum(n ln n) / total, summed over the neighbours of each run and side
         val totals = IntArray(kept.size * 2)
@@ -193,14 +197,13 @@ class NewWords(
             val slot = run * 2 + side
             return if (totals[slot] == 0) 0.0 else ln(totals[slot].toDouble()) - sums[slot] / totals[slot]
         }
-        val out = ArrayList<Candidate>()
         for (i in 0 until kept.size) {
             val key = kept.keyAt(i)
             val length = lengthOf(key)
             val count = countOf(length, key)
             val text = text(key, length)
             val year = years[length][runs[length].indexOf(key)]
-            out += Candidate(text, count, year, pmi(text, count), entropy(i, 0), entropy(i, 1), known = false)
+            sink(Candidate(text, count, year, pmi(text, count), entropy(i, 0), entropy(i, 1), known = false))
         }
         // the known words and the runs that do not hold together, with their counts for calibration
         for (length in 2..maxLength) {
@@ -210,11 +213,9 @@ class NewWords(
                 val count = counts[length][i]
                 if (count < minCount || kept.indexOf(key) >= 0) continue
                 val text = text(key, length)
-                out += Candidate(text, count, years[length][i], pmi(text, count), Double.NaN, Double.NaN, text in known)
+                sink(Candidate(text, count, years[length][i], pmi(text, count), Double.NaN, Double.NaN, text in known))
             }
         }
-        out.sortWith(compareByDescending<Candidate> { it.count }.thenBy { it.text })
-        return out
     }
 
     /** log10 of [count] over what [text]'s likeliest split's parts predict by chance. */
