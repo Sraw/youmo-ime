@@ -5,6 +5,29 @@
 package org.fcitx.fcitx5.android.eval
 
 import kotlin.math.ceil
+import kotlin.math.exp
+import kotlin.math.ln
+
+/** Of a group's [samples], how many a run has first that its baseline had not ([won]), and the reverse. */
+data class Flips(val group: String, val samples: Int, val won: Int, val lost: Int) {
+    /**
+     * Two-sided exact sign test over the samples that changed: how likely a split at least this
+     * uneven is when either way is as likely, as when the change made no difference.
+     */
+    val p: Double
+        get() {
+            val n = won + lost
+            if (n == 0) return 1.0
+            // log of n choose k, summed over the tail, halves each
+            var logChoose = 0.0
+            var tail = 0.0
+            for (k in 0..minOf(won, lost)) {
+                if (k > 0) logChoose += ln((n - k + 1).toDouble()) - ln(k.toDouble())
+                tail += exp(logChoose - n * ln(2.0))
+            }
+            return minOf(1.0, 2 * tail)
+        }
+}
 
 /** Scores for one group of samples (a tag, or everything). Rates are 0..1. */
 data class Score(
@@ -32,14 +55,37 @@ object Metrics {
      * result for `jingli`, as the context set types one input after different contexts.
      */
     fun score(samples: List<Sample>, results: List<RunResult>): List<Score> {
-        val byInput = results.groupBy { it.input }
-        val taken = HashMap<String, Int>()
-        val matched = samples.map { sample ->
-            val n = taken.getOrDefault(sample.input, 0).also { taken[sample.input] = it + 1 }
-            sample to byInput[sample.input]?.getOrNull(n)
-        }
+        val matched = samples.zip(match(samples, results))
         val groups = matched.groupBy { it.first.tag }.toList() + (ALL to matched)
         return groups.map { (group, members) -> scoreGroup(group, members) }
+    }
+
+    /** Each sample's result, as [score] matches them. */
+    private fun match(samples: List<Sample>, results: List<RunResult>): List<RunResult?> {
+        val byInput = results.groupBy { it.input }
+        val taken = HashMap<String, Int>()
+        return samples.map { sample ->
+            val n = taken.getOrDefault(sample.input, 0).also { taken[sample.input] = it + 1 }
+            byInput[sample.input]?.getOrNull(n)
+        }
+    }
+
+    /**
+     * Two runs of the same samples compared sample by sample, a [Flips] per group as [score]
+     * groups them: on a few hundred samples a point up or down is as often chance as not, while
+     * the samples that changed, and which way, tell (McNemar's test).
+     */
+    fun flips(samples: List<Sample>, results: List<RunResult>, baseline: List<RunResult>): List<Flips> {
+        fun first(result: RunResult, sample: Sample) = result.candidates.firstOrNull() == sample.expected
+        // a sample one run lacks (a set grown since the baseline) is no flip either way: counted
+        // as lost before, it would be won now, and could hide a real loss
+        val changed = samples.zip(match(samples, results)).zip(match(samples, baseline)) { (sample, now), before ->
+            if (now == null || before == null) null else Triple(sample.tag, first(now, sample), first(before, sample))
+        }.filterNotNull()
+        val groups = changed.groupBy { it.first }.toList() + (ALL to changed)
+        return groups.map { (group, members) ->
+            Flips(group, members.size, members.count { it.second && !it.third }, members.count { !it.second && it.third })
+        }
     }
 
     private fun scoreGroup(group: String, samples: List<Pair<Sample, RunResult?>>): Score {

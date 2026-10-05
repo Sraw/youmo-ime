@@ -28,6 +28,19 @@ object Report {
                 millis(s.latencyP99Micros),
             )
         }
+        return render(header, rows)
+    }
+
+    /**
+     * The samples a run has first that its baseline had not, and the reverse, with how likely so
+     * uneven a split is by chance: `p` under 0.05 is a change, above it as likely noise.
+     */
+    fun flips(flips: List<Flips>): String = render(
+        listOf("group", "n", "won", "lost", "p"),
+        flips.map { listOf(it.group, it.samples.toString(), it.won.toString(), it.lost.toString(), String.format(Locale.ROOT, "%.4f", it.p)) },
+    )
+
+    private fun render(header: List<String>, rows: List<List<String>>): String {
         val all = listOf(header) + rows
         val widths = header.indices.map { col -> all.maxOf { it[col].length } }
         return all.joinToString("\n") { row ->

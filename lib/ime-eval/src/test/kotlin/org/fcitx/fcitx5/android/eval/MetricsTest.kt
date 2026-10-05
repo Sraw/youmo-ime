@@ -100,4 +100,24 @@ class MetricsTest {
         assertEquals(1, Metrics.editDistance("我到楼下了", "我到楼下"))
         assertEquals(3, Metrics.editDistance("kitten", "sitting"))
     }
+
+    @Test
+    fun flipsCountTheSamplesThatChangedEachWay() {
+        // now: 你好 first, 中国 not, 那会 not; before: 中国 first, 你好 not, nothing for nh
+        val before = listOf(
+            RunResult("nihao", listOf("拟好", "你好"), listOf(1)),
+            RunResult("zhongguo", listOf("中国"), listOf(1)),
+        )
+        val flips = Metrics.flips(samples, results, before).associateBy { it.group }
+        assertEquals(Flips("daily", 2, won = 1, lost = 1), flips.getValue("daily"))
+        // the two samples the baseline has no result for are left out, not counted as won
+        assertEquals(Flips(Metrics.ALL, 2, won = 1, lost = 1), flips.getValue(Metrics.ALL))
+        assertEquals(1.0, flips.getValue("daily").p, 1e-12)
+        assertEquals(1.0, Flips("x", 9, 0, 0).p, 0.0)
+        // 9 against 1: 2 (1 + 10) / 1024
+        assertEquals(22.0 / 1024, Flips("x", 50, 9, 1).p, 1e-12)
+        // thousands changed, evenly: no change, and no overflow
+        assertEquals(1.0, Flips("x", 9000, 2000, 2000).p, 0.02)
+        assertEquals(0.0, Flips("x", 9000, 2200, 1800).p, 1e-4)
+    }
 }

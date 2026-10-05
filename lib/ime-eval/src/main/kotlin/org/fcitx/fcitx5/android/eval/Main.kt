@@ -222,8 +222,12 @@ private fun predict(dataPath: String, setPath: String, threads: Int, offersPath:
 
 private fun score(setPath: String, resultPath: String, baselinePath: String?, half: String?, out: Appendable): Int {
     val samples = Halves.select(readSet(setPath), half)
-    fun scoresOf(path: String) = Metrics.score(samples, File(path).useLines { RunResultFormat.parse(it) })
-    out.appendLine(Report.table(scoresOf(resultPath), baselinePath?.let(::scoresOf)))
+    fun resultsOf(path: String) = File(path).useLines { RunResultFormat.parse(it).toList() }
+    val results = resultsOf(resultPath)
+    val baseline = baselinePath?.let(::resultsOf)
+    out.appendLine(Report.table(Metrics.score(samples, results), baseline?.let { Metrics.score(samples, it) }))
+    // which samples changed: a delta of a point on a few hundred is as often chance as not
+    if (baseline != null) out.appendLine().appendLine(Report.flips(Metrics.flips(samples, results, baseline)))
     return 0
 }
 

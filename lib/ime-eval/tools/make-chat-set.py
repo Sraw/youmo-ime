@@ -7,6 +7,12 @@ use, so nothing the app ships learns from LCCC):
 
     python3 tools/make-chat-set.py lccc_base_valid.jsonl.gz <dict_sc.txt> <lm_sc.arpa> > data/pinyin-chat.tsv
 
+and data/pinyin-web.tsv the same way from the chat-like pages of a crawl's WET files the engine
+data never took, held out (`ime-dict-tool cc --from` past engine-data.sh's FROM + FILES, `clean`,
+then `text`), one run in WEB_KEEP_ONE_IN:
+
+    python3 tools/make-chat-set.py --web <crawl and files> held-out.jsonl.gz <dict_sc.txt> <lm_sc.arpa> > data/pinyin-web.tsv
+
 with libime's dict_sc.txt (app/build/engine-sources/dict) and lm_sc.arpa (download.fcitx-im.org/data/lm_sc.arpa-20260629.tar.zst) as the dictionary and model.
 Each turn is cut at punctuation; a run of 4 to 12 Han chars becomes a sample when its text hashes
 into the kept 1/25, the run's earlier part of the same turn being its context. The run is split
@@ -54,7 +60,18 @@ HEADER = """\
 # next to pinyin.tsv.
 # One sample per line: input<TAB>expected<TAB>chat[<TAB>context], the context being what came
 # before the run in the same turn."""
+WEB_HEADER = """\
+# SPDX-License-Identifier: LGPL-2.1-or-later
+# SPDX-FileCopyrightText: Copyright 2026 Fcitx5 for Android Contributors
+#
+# Text of recent pages as people write it: runs of 4 to 12 Han chars from the chat-like pages of
+# CommonCrawl {}, WET files the engine data never took. Picked and given readings by
+# tools/make-chat-set.py --web, kept as written. Measures what a change does to text of the
+# crawls' time beside the older chat of pinyin-chat.tsv.
+# One sample per line: input<TAB>expected<TAB>web[<TAB>context], the context being what came
+# before the run in the same line."""
 KEEP_ONE_IN = 25
+WEB_KEEP_ONE_IN = 40
 MAX_WORD = 8
 CONTEXT = 64
 RUN = re.compile(r'^[一-鿿]{4,12}$')
@@ -111,9 +128,10 @@ def loaders(dictionary, arpa):
     return words, reading
 
 
-def main(chat, dictionary, arpa):
+def main(chat, dictionary, arpa, web=None):
     words, reading = loaders(dictionary, arpa)
-    print(HEADER)
+    print(WEB_HEADER.format(web) if web else HEADER)
+    keep, tag = (WEB_KEEP_ONE_IN, 'web') if web else (KEEP_ONE_IN, 'chat')
     seen = set()
     with gzip.open(chat, 'rt', encoding='utf-8') as f:
         for line in f:
@@ -122,12 +140,12 @@ def main(chat, dictionary, arpa):
                 # LCCC puts a space between chars; any other blank, a tab say, must not reach a line
                 for part in PUNCTUATION.split(re.sub(r'\s+', '', turn)):
                     if RUN.match(part) and part not in seen and \
-                            int(hashlib.md5(part.encode()).hexdigest(), 16) % KEEP_ONE_IN == 0:
+                            int(hashlib.md5(part.encode()).hexdigest(), 16) % keep == 0:
                         seen.add(part)
                         split = words(part)
                         syllables = split and [reading(word, ''.join(split[:i])) for i, word in enumerate(split)]
                         if syllables and None not in syllables:
-                            sample = [''.join(syllables).replace(' ', ''), part, 'chat']
+                            sample = [''.join(syllables).replace(' ', ''), part, tag]
                             if before:
                                 sample.append(before[-CONTEXT:])
                             print('\t'.join(sample))
@@ -135,4 +153,7 @@ def main(chat, dictionary, arpa):
 
 
 if __name__ == '__main__':
-    main(*sys.argv[1:])
+    if sys.argv[1] == '--web':
+        main(*sys.argv[3:], web=sys.argv[2])
+    else:
+        main(*sys.argv[1:])

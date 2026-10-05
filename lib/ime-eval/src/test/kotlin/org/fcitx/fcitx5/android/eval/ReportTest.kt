@@ -65,4 +65,12 @@ class ReportTest {
         // every sample of the set has a result in the baseline
         assertTrue(all, Regex("""^all\s+${File("data/pinyin.tsv").useLines { EvalSet.parse(it) }.size}\s+0\s""").containsMatchIn(all))
     }
+
+    @Test
+    fun flipsShowEachWayAndTheirChance() {
+        val table = Report.flips(listOf(Flips("chat", 1064, 30, 10), Flips(Metrics.ALL, 1064, 30, 10)))
+        assertEquals("30", column(table, 1, "won"))
+        assertEquals("10", column(table, 1, "lost"))
+        assertEquals("0.0022", column(table, 1, "p"))
+    }
 }
