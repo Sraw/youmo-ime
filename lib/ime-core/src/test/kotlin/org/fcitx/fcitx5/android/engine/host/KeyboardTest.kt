@@ -100,7 +100,7 @@ class KeyboardTest {
                     input = ""
                     predicting = false
                 }
-                Action.NextPage, Action.PreviousPage, is Action.Forget, is Action.Pin, is Action.Unpin, Action.Refine -> {}
+                Action.NextPage, Action.PreviousPage, is Action.Forget, is Action.Pin, is Action.Unpin, is Action.Block, Action.Refine -> {}
             }
             val shown = all()
             return Snapshot(commit, input, shown, 0, false, false, handled, predicting, refines = slices > 0)
@@ -302,12 +302,14 @@ class KeyboardTest {
     }
 
     @Test
-    fun aPinAndAnUnpinAreByIndexAmongAll() {
+    fun aPinAnUnpinAndABlockAreByIndexAmongAll() {
         type("ab")
         keyboard.onEvent(EngineEvent.PIN, 1)
         assertEquals(Action.Pin(1), session.actions.last())
         keyboard.onEvent(EngineEvent.UNPIN, 0)
         assertEquals(Action.Unpin(0), session.actions.last())
+        keyboard.onEvent(EngineEvent.BLOCK, 2)
+        assertEquals(Action.Block(2), session.actions.last())
     }
 
     @Test

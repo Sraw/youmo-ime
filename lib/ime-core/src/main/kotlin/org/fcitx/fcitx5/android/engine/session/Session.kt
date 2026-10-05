@@ -35,7 +35,7 @@ interface Session {
 }
 
 /** What a long press on a candidate may offer, each done by the [Action] of its name. */
-enum class Offer { FORGET, PIN, UNPIN }
+enum class Offer { FORGET, PIN, UNPIN, BLOCK }
 
 /** A candidate as a host lists it, with its [hint] (see [Snapshot.hints]). */
 data class Choice(val text: String, val hint: String = "")
@@ -68,6 +68,9 @@ sealed class Action {
 
     /** Deletes the custom phrase the candidate at [index] of all is. */
     data class Unpin(val index: Int) : Action()
+
+    /** Never offers again the word the candidate at [index] of all is (the user can unblock it in the settings). */
+    data class Block(val index: Int) : Action()
 
     object NextPage : Action()
     object PreviousPage : Action()

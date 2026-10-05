@@ -52,3 +52,6 @@ msgstr ""
 
 msgid "Weigh readings as whole sentences"
 msgstr ""
+
+msgid "Never show this word"
+msgstr ""

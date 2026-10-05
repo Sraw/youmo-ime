@@ -26,6 +26,8 @@ class Predictor(
     private val model: NgramModel,
     private val vocabulary: Vocabulary,
     private val dictionary: PinyinDictionary? = null,
+    /** For the words the user blocked, which are not predicted either. */
+    private val user: UserWords? = null,
 ) {
 
     /**
@@ -42,7 +44,7 @@ class Predictor(
         model.forEachAfter(model.context(prev2, prev)) { word, score ->
             // ties go to the word seen first, being the lower id
             if (size == limit && score <= scores[size - 1]) return@forEachAfter
-            if (!offered(word)) return@forEachAfter
+            if (!offered(word) || user?.blockedAnyhow(word) == true) return@forEachAfter
             var k = minOf(size, limit - 1)
             while (k > 0 && scores[k - 1] < score) {
                 words[k] = words[k - 1]

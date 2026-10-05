@@ -23,4 +23,14 @@ interface UserWords {
 
     /** The text of [word], one of this trie's. */
     fun text(word: Int): String
+
+    /**
+     * Whether the user blocked [word] as read at [node], the dictionary's node for a word of the
+     * dictionary's (one of its readings: 行 blocked as hang is still xing), -1 for one of this
+     * trie's (which has one reading): it is then never offered so read.
+     */
+    fun blocked(word: Int, node: Int): Boolean = false
+
+    /** Whether [word] is blocked in some reading: not predicted, as a prediction has none. */
+    fun blockedAnyhow(word: Int): Boolean = false
 }

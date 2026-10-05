@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <memory>
 #include <stdexcept>
+#include <utility>
 
 #include <fcitx/candidateaction.h>
 #include <fcitx/candidatelist.h>
@@ -116,18 +117,19 @@ public:
         engine_->stopRefining();
         const int offers = engine_->offers(im_, static_cast<const EngineCandidateWord &>(candidate).index());
         std::vector<CandidateAction> actions;
-        auto add = [&](EngineOffer offer, EngineEvent event, const char *text) {
+        auto add = [&](EngineOffer offer, EngineEvent event, const char *text, const char *domain = "fcitx5-chinese-addons") {
             if (!(offers & offer)) return;
             CandidateAction action;
             // the event it sends
             action.setId(static_cast<int>(event));
-            action.setText(D_("fcitx5-chinese-addons", text));
+            action.setText(D_(domain, text));
             actions.push_back(std::move(action));
         };
         // libime's table words it so; its pinyin says "Forget candidate"
         add(OfferForget, EngineEvent::Forget, "Forget word");
         add(OfferPin, EngineEvent::Pin, "Pin to top as custom phrase");
         add(OfferUnpin, EngineEvent::Unpin, "Delete from custom phrase");
+        add(OfferBlock, EngineEvent::Block, N_("Never show this word"), "fcitx5-android");
         return actions;
     }
 
@@ -137,6 +139,7 @@ public:
         const int offer = event == EngineEvent::Forget ? OfferForget
                         : event == EngineEvent::Pin    ? OfferPin
                         : event == EngineEvent::Unpin  ? OfferUnpin
+                        : event == EngineEvent::Block  ? OfferBlock
                                                        : 0;
         // asked again: only what the session still offers for the candidate at that index
         if (!actionable_ || !word || !offer || !(engine_->offers(im_, word->index()) & offer)) return;
@@ -201,6 +204,51 @@ void AndroidEngine::reloadConfig() {
 
 void AndroidEngine::setConfig(const RawConfig &config) {
     config_.load(config, true);
+    safeSaveAsIni(config_, ConfPath);
+    pushSettings();
+}
+
+Option<EngineTableConfig> *AndroidEngine::table(const std::string &im) {
+    // as listInputMethods names them
+    static const std::pair<const char *, Option<EngineTableConfig> AndroidEngineConfig::*> tables[] = {
+            {"engine-wubi", &AndroidEngineConfig::wubi},
+            {"engine-cangjie", &AndroidEngineConfig::cangjie},
+            {"engine-ziranma", &AndroidEngineConfig::ziranma},
+            {"engine-erbi", &AndroidEngineConfig::erbi},
+            {"engine-wubipinyin", &AndroidEngineConfig::wubiPinyin},
+            {"engine-dianbao", &AndroidEngineConfig::dianbaoma},
+            {"engine-bingchan", &AndroidEngineConfig::bingchan},
+            {"engine-wanfeng", &AndroidEngineConfig::wanfeng},
+    };
+    for (const auto &[name, option]: tables) {
+        if (im == name) return &(config_.*option);
+    }
+    return nullptr;
+}
+
+const Configuration *AndroidEngine::getConfigForInputMethod(const InputMethodEntry &entry) const {
+    if (auto *option = const_cast<AndroidEngine *>(this)->table(entry.uniqueName())) {
+        return &option->value();
+    }
+    RawConfig raw;
+    config_.save(raw);
+    if (entry.uniqueName() == "engine-shuangpin") {
+        shuangpinPage_.load(raw, true);
+        return &shuangpinPage_;
+    }
+    pinyinPage_.load(raw, true);
+    return &pinyinPage_;
+}
+
+void AndroidEngine::setConfigForInputMethod(const InputMethodEntry &entry, const RawConfig &config) {
+    if (auto *option = table(entry.uniqueName())) {
+        EngineTableConfig value = option->value();
+        value.load(config, true);
+        option->setValue(value);
+    } else {
+        // the page's keys are config_'s own
+        config_.load(config, true);
+    }
     safeSaveAsIni(config_, ConfPath);
     pushSettings();
 }

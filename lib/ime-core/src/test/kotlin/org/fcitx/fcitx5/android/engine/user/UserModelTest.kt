@@ -287,4 +287,35 @@ class UserModelTest {
         // the dictionary's own words are never listed: nothing to keep
         assertEquals(word("你"), m.list(entry("你", "ni")))
     }
+
+    @Test
+    fun aWordIsBlockedInTheReadingItWasBlockedIn() {
+        val m = model()
+        val nihao = data.dictionary.find(syl("ni", "hao"))
+        assertTrue(m.block(entry("你好", "ni", "hao")))
+        assertTrue(m.blocked(word("你好"), nihao))
+        assertTrue(m.blockedAnyhow(word("你好")))
+        // the same word at another node, another reading of it
+        assertFalse(m.blocked(word("你好"), data.dictionary.find(syl("ni"))))
+        m.unblock(entry("你好", "ni", "hao"))
+        assertFalse(m.blocked(word("你好"), nihao))
+        assertFalse(m.blockedAnyhow(word("你好")))
+    }
+
+    @Test
+    fun aWordBlockedBeforeItIsMadeIsBlockedAsItIsMadeAndAgainOnceForgotten() {
+        val m = model()
+        val word = entry("拟好", "ni", "hao")
+        // no such word yet: nothing to block now
+        assertFalse(m.block(word))
+        val id = m.learn(null, listOf(word)).single()
+        assertTrue(m.blocked(id, -1))
+        assertEquals(emptyList<Pair<Entry, Float>>(), m.ownWords())
+        m.forget(listOf(word))
+        val again = m.learn(null, listOf(word)).single()
+        assertTrue(m.blocked(again, -1))
+        m.unblock(word)
+        assertFalse(m.blocked(again, -1))
+        assertEquals(listOf(word), m.ownWords().map { it.first })
+    }
 }

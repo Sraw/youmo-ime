@@ -48,6 +48,7 @@ enum class EngineEvent : int {
     Refine = 10,    // no key: the user pauses; handled only if the snapshot changed
     Pin = 11,       // "Pin to top as custom phrase" on a candidate; arg: the index among all
     Unpin = 12,     // "Delete from custom phrase" on a candidate; arg: the index among all
+    Block = 13,     // "Never show this word" on a candidate; arg: the index among all
 };
 
 // What a long press on a candidate offers, as bits of what EngineOffersCallback returns: ime-core's
@@ -56,6 +57,7 @@ enum EngineOffer : int {
     OfferForget = 1 << 0,
     OfferPin = 1 << 1,
     OfferUnpin = 1 << 2,
+    OfferBlock = 1 << 3,
 };
 
 // Hands an event to the session of input method [im]; called on the fcitx thread. [learning] is

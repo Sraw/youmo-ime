@@ -25,7 +25,9 @@ import org.fcitx.fcitx5.android.data.prefs.ManagedPreferenceFragment
 import org.fcitx.fcitx5.android.ui.common.withLoadingDialog
 import org.fcitx.fcitx5.android.ui.main.MainViewModel
 import org.fcitx.fcitx5.android.utils.AppUtil
+import org.fcitx.fcitx5.android.ui.main.settings.SettingsRoute
 import org.fcitx.fcitx5.android.utils.addPreference
+import org.fcitx.fcitx5.android.utils.navigateWithAnim
 import org.fcitx.fcitx5.android.utils.buildDocumentsProviderIntent
 import org.fcitx.fcitx5.android.utils.buildPrimaryStorageIntent
 import org.fcitx.fcitx5.android.utils.formatDateTime
@@ -99,6 +101,20 @@ class AdvancedSettingsFragment : ManagedPreferenceFragment(AppPrefs.getInstance(
 
     override fun onPreferenceUiCreated(screen: PreferenceScreen) {
         val ctx = requireContext()
+        // what a phone's user seldom needs, kept off the main page
+        val more = PreferenceCategory(ctx).apply {
+            setTitle(R.string.more_settings)
+            isIconSpaceReserved = false
+        }
+        screen.addPreference(more)
+        more.addPreference(R.string.global_options) { navigateWithAnim(SettingsRoute.GlobalConfig) }
+        more.addPreference(R.string.candidates_window) { navigateWithAnim(SettingsRoute.CandidatesWindow) }
+        more.addPreference(R.string.quickphrase_editor) { navigateWithAnim(SettingsRoute.QuickPhraseList) }
+        // the punctuation addon's own page went with the list of addons
+        more.addPreference(R.string.punctuation_map) {
+            navigateWithAnim(SettingsRoute.Punctuation(getString(R.string.punctuation_map), "zh_CN"))
+        }
+        more.addPreference(R.string.table_im) { navigateWithAnim(SettingsRoute.TableInputMethods) }
         // browse/export/import act on files rather than toggle a behavior; keep them apart from the switches
         val userData = PreferenceCategory(ctx).apply {
             setTitle(R.string.user_data)

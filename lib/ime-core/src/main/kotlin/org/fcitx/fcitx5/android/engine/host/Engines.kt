@@ -13,6 +13,7 @@ import org.fcitx.fcitx5.android.engine.phrase.CustomPhrases
 import org.fcitx.fcitx5.android.engine.phrase.PhraseBook
 import org.fcitx.fcitx5.android.engine.pinyin.PinyinSegmenter
 import org.fcitx.fcitx5.android.engine.pinyin.ShuangpinSegmenter
+import org.fcitx.fcitx5.android.engine.pinyin.Syllables
 import org.fcitx.fcitx5.android.engine.remote.RemoteModel
 import org.fcitx.fcitx5.android.engine.remote.RemoteRefiner
 import org.fcitx.fcitx5.android.engine.rerank.MatrixKernel
@@ -33,7 +34,9 @@ import org.fcitx.fcitx5.android.engine.table.TableUser
 import org.fcitx.fcitx5.android.engine.lattice.LayerPrior
 import org.fcitx.fcitx5.android.engine.user.LibimeImport
 import org.fcitx.fcitx5.android.engine.user.UserModel
+import org.fcitx.fcitx5.android.engine.user.UserModel.Entry
 import org.fcitx.fcitx5.android.engine.user.UserStore
+import org.fcitx.fcitx5.android.engine.user.WordLists
 import org.fcitx.fcitx5.android.engine.user.WordPack
 import java.io.BufferedReader
 import java.io.Closeable
@@ -188,6 +191,117 @@ class Engines(
             }
         }
         addDictionaries(model)
+        lists.applyTo(model)
+    }
+
+    // in the user directory with the log, in memory without one
+    private val lists by lazy(LazyThreadSafetyMode.NONE) { WordLists(userDir, onError) }
+
+    /** A word of the user's, as the settings list them; [pinyin] its syllables apart by spaces. */
+    data class UserWord(val text: String, val pinyin: String, val kind: Kind, val count: Float = 0f) {
+        enum class Kind {
+            /** Added by hand, in the settings. */
+            ADDED,
+
+            /** Put together by the user from pieces as they typed. */
+            LEARNED,
+
+            /** Blocked, a long press on a candidate or in the settings: never offered. */
+            BLOCKED,
+        }
+    }
+
+    private fun Entry.word(kind: UserWord.Kind, count: Float = 0f) =
+        UserWord(text, syllables.joinToString(" ") { Syllables.spelling(it) }, kind, count)
+
+    /** The words the user added, those they made as they typed (most typed first), and those they blocked. */
+    fun userWords(): List<UserWord> =
+        lists.addedWords.map { it.word(UserWord.Kind.ADDED) } +
+            user().ownWords().sortedByDescending { it.second }.map { (entry, count) -> entry.word(UserWord.Kind.LEARNED, count) } +
+            lists.blockedWords.map { it.word(UserWord.Kind.BLOCKED) }
+
+    /**
+     * How the dictionary reads [text]: as few of its words as make it up, each read as it most
+     * likely is; syllables apart by spaces, null if some character is none of its words. For
+     * the user to check, as a character of several readings may be read the other way.
+     */
+    fun pinyinOf(text: String): String? {
+        val chars = text.codePointCount(0, text.length)
+        if (chars == 0 || chars > MAX_WORD_CHARS) return null
+        val offsets = IntArray(chars + 1) { if (it == chars) text.length else text.offsetByCodePoints(0, it) }
+        val pieces = HashSet<String>()
+        for (i in 0 until chars) for (j in i + 1..chars) pieces += text.substring(offsets[i], offsets[j])
+        val readings = LibimeImport.readings(pinyinData.dictionary, pinyinData.vocabulary, pieces)
+        // fewest pieces to each character, and the piece that got there
+        val fewest = IntArray(chars + 1) { if (it == 0) 0 else Int.MAX_VALUE }
+        val from = IntArray(chars + 1)
+        for (j in 1..chars) for (i in 0 until j) {
+            if (fewest[i] == Int.MAX_VALUE || text.substring(offsets[i], offsets[j]) !in readings) continue
+            if (fewest[i] + 1 < fewest[j]) {
+                fewest[j] = fewest[i] + 1
+                from[j] = i
+            }
+        }
+        if (fewest[chars] == Int.MAX_VALUE) return null
+        val syllables = ArrayList<Int>()
+        var j = chars
+        while (j > 0) {
+            val i = from[j]
+            syllables.addAll(0, readings.getValue(text.substring(offsets[i], offsets[j])).asList())
+            j = i
+        }
+        return syllables.joinToString(" ") { Syllables.spelling(it) }
+    }
+
+    /** Adds [text] read as [pinyin] (see [WordLists.entry]); false if it does not read so. */
+    fun addWord(text: String, pinyin: String): Boolean {
+        val entry = WordLists.entry(text, pinyin) ?: return false
+        // unblocked, as the user asks for it
+        if (lists.unblock(entry)) userModel?.unblock(entry)
+        if (lists.add(entry)) userModel?.list(entry)
+        sessions.clear()
+        keyboards.clear()
+        return true
+    }
+
+    /** Blocks [text] read as [pinyin] from the settings; false if it does not read so. */
+    fun blockWord(text: String, pinyin: String): Boolean {
+        val entry = WordLists.entry(text, pinyin) ?: return false
+        block(entry)
+        sessions.clear()
+        keyboards.clear()
+        return true
+    }
+
+    // from a long press too, the session that asked going on with its input: not dropped, as the
+    // host fetches its candidates next; the others read the model as they decode
+    private fun block(entry: Entry) {
+        lists.block(entry)
+        user().block(entry)
+    }
+
+    /** Takes [word] off its list: an added word is no longer typeable, a learned one forgotten, a blocked one offered again. */
+    fun removeWord(word: UserWord) {
+        val entry = WordLists.entry(word.text, word.pinyin) ?: return
+        when (word.kind) {
+            UserWord.Kind.ADDED -> if (lists.remove(entry)) dropUser()
+            UserWord.Kind.LEARNED -> user().forget(listOf(entry))
+            UserWord.Kind.BLOCKED -> if (lists.unblock(entry)) userModel?.unblock(entry)
+        }
+        sessions.clear()
+        keyboards.clear()
+    }
+
+    /**
+     * Makes the user's words again from the log, the dictionaries and the lists: a word listed
+     * cannot be taken out of the model, only left out of the next one. With no log, the model
+     * is all there is of what was learned, so it is kept, the word typeable till the next start.
+     */
+    private fun dropUser() {
+        val log = store ?: return
+        closeQuietly(log)
+        store = null
+        userModel = null
     }
 
     private fun addDictionaries(model: UserModel) {
@@ -281,12 +395,12 @@ class Engines(
             PINYIN -> PinyinSession(
                 pinyinData, PinyinSegmenter(s.fuzzy, s.typos, neighbours = s.typos),
                 pageSize = s.pageSize, user = user(), prediction = s.prediction, prior = prior(), phraseBook = phrases(),
-                reranker = reranker(), refiner = refiner(),
+                reranker = reranker(), refiner = refiner(), block = ::block,
             )
             SHUANGPIN -> PinyinSession(
                 pinyinData, ShuangpinSegmenter(s.scheme, s.fuzzy, s.typos), spell = true,
                 pageSize = s.pageSize, user = user(), prediction = s.prediction, prior = prior(), phraseBook = phrases(),
-                reranker = reranker(), refiner = refiner(),
+                reranker = reranker(), refiner = refiner(), block = ::block,
             )
             else -> {
                 val method = TABLES[im]
@@ -451,14 +565,12 @@ class Engines(
         for (im in tables.keys.filter { it !in TABLES }) tables.remove(im)?.store?.let(::closeQuietly)
         val model = userModel ?: return
         if (added()?.dictionaries.orEmpty() == before) return
-        val log = store
-        if (log == null) {
+        if (store == null) {
             addDictionaries(model)
+            lists.applyTo(model)
         } else {
             // read again from the log all the same: what did not reach it is lost either way
-            closeQuietly(log)
-            store = null
-            userModel = null
+            dropUser()
         }
     }
 
@@ -482,6 +594,9 @@ class Engines(
     }
 
     companion object {
+        // longer is a sentence, not a word: and the dictionary is walked as deep
+        private const val MAX_WORD_CHARS = 8
+
         const val PINYIN = "engine-pinyin"
         const val SHUANGPIN = "engine-shuangpin"
 

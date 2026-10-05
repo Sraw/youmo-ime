@@ -10,6 +10,7 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import org.fcitx.fcitx5.android.daemon.FcitxConnection
+import org.fcitx.fcitx5.android.engine.host.Engines
 
 /**
  * In-memory stand-in for the engine, so that code written against [FcitxAPI] runs on the JVM
@@ -73,6 +74,31 @@ class FakeFcitxAPI : FcitxAPI {
 
     override suspend fun reloadEngine() {
         calls += "reloadEngine()"
+    }
+
+    /** The user's words, as the engine would list them: kept as given, the pinyin not read. */
+    val userWords = ArrayList<Engines.UserWord>()
+
+    override suspend fun userWords(): List<Engines.UserWord> = userWords.toList()
+
+    // no dictionary to read it by
+    override suspend fun pinyinOf(text: String): String? = null
+
+    override suspend fun addUserWord(text: String, pinyin: String): Boolean {
+        calls += "addUserWord($text, $pinyin)"
+        userWords += Engines.UserWord(text, pinyin, Engines.UserWord.Kind.ADDED)
+        return true
+    }
+
+    override suspend fun blockUserWord(text: String, pinyin: String): Boolean {
+        calls += "blockUserWord($text, $pinyin)"
+        userWords += Engines.UserWord(text, pinyin, Engines.UserWord.Kind.BLOCKED)
+        return true
+    }
+
+    override suspend fun removeUserWord(word: Engines.UserWord) {
+        calls += "removeUserWord(${word.text})"
+        userWords -= word
     }
 
     override suspend fun engineContext(before: String) {

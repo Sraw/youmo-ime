@@ -5,6 +5,7 @@
 package org.fcitx.fcitx5.android.core
 
 import kotlinx.coroutines.flow.SharedFlow
+import org.fcitx.fcitx5.android.engine.host.Engines
 
 /**
  * API of fcitx that hides lifecycle stuffs from [Fcitx]
@@ -46,6 +47,21 @@ interface FcitxAPI {
 
     /** Reads again what the user added to the engine's input methods: custom phrases, dictionaries. */
     suspend fun reloadEngine()
+
+    /** The words the user added, made as they typed, and blocked: see [Engines.userWords]. */
+    suspend fun userWords(): List<Engines.UserWord>
+
+    /** How the dictionary reads [text], for the user to check: see [Engines.pinyinOf]. */
+    suspend fun pinyinOf(text: String): String?
+
+    /** Adds [text] read as [pinyin]; false if it does not read so. */
+    suspend fun addUserWord(text: String, pinyin: String): Boolean
+
+    /** Blocks [text] read as [pinyin], never offered again; false if it does not read so. */
+    suspend fun blockUserWord(text: String, pinyin: String): Boolean
+
+    /** Takes [word] off its list: see [Engines.removeWord]. */
+    suspend fun removeUserWord(word: Engines.UserWord)
 
     /**
      * Tells the engine [before], the text before the cursor, where the user put the cursor other

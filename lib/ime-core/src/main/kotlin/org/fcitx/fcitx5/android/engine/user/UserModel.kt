@@ -73,6 +73,12 @@ class UserModel(
     // unigrams under NO_WORD, bigrams under their first word
     private val counts = Counts()
 
+    // the words the user blocked (see block): as they read, so a word made later is blocked as
+    // it is made; and as the decoder asks, the dictionary's by node and id, the user's by id
+    private val blockedEntries = HashSet<Entry>()
+    private val blockedReadings = HashSet<Long>()
+    private val blockedIds = HashMap<Int, Int>()
+
     /** The sum of the words' counts. */
     var total = 0f
         private set
@@ -167,6 +173,7 @@ class UserModel(
         }
         ids[entry] = id
         entries[id] = entry
+        if (entry in blockedEntries && id >= vocabulary.size) resolveBlock(entry, id, add = true)
         return id
     }
 
@@ -212,6 +219,49 @@ class UserModel(
         }
         return NO_WORD
     }
+
+    /**
+     * Blocks [entry], the dictionary's word or one of the user's, so it is never offered; whether
+     * there is such a word. One the dictionary lacks and the user never typed is none: nothing
+     * offers it to block.
+     */
+    fun block(entry: Entry): Boolean {
+        if (!blockedEntries.add(entry)) return true
+        val id = known(entry)
+        if (id == NO_WORD) return false
+        resolveBlock(entry, id, add = true)
+        return true
+    }
+
+    /** Offers [entry] again, if [block]ed. */
+    fun unblock(entry: Entry) {
+        if (!blockedEntries.remove(entry)) return
+        val id = known(entry)
+        if (id != NO_WORD) resolveBlock(entry, id, add = false)
+    }
+
+    // a word of the dictionary's is blocked at its node, one reading of several; the user's has one
+    private fun resolveBlock(entry: Entry, id: Int, add: Boolean) {
+        if (id < vocabulary.size) {
+            val reading = key(dictionary.find(entry.syllables), id)
+            if (add) blockedReadings += reading else blockedReadings -= reading
+        }
+        val readings = (blockedIds[id] ?: 0) + if (add) 1 else -1
+        if (readings > 0) blockedIds[id] = readings else blockedIds -= id
+    }
+
+    override fun blocked(word: Int, node: Int) =
+        word in blockedIds && (word >= vocabulary.size || key(node, word) in blockedReadings)
+
+    override fun blockedAnyhow(word: Int) = word in blockedIds
+
+    /**
+     * The words the user made, by putting a reading together from pieces, with how often each
+     * was typed (as its counts now are, halved over time): not those of their dictionaries or
+     * packs, nor those forgotten.
+     */
+    fun ownWords(): List<Pair<Entry, Float>> = entries.filter { (id, entry) -> isOwn(id) && entry !in blockedEntries }
+        .map { (id, entry) -> entry to counts[key(NO_WORD, id)] }
 
     /** How many words the user added to the dictionary's, forgotten ones too: no id is given twice. */
     val size: Int get() = newWords.size

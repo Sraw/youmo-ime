@@ -107,6 +107,24 @@ FCITX_CONFIGURATION(
         ExternalOption tablemanager{this, "TableManager", _("Manage Table-based Input Methods"),
                                     "fcitx://config/addon/androidengine/tablemanager"};)
 
+// What each input method's own page shows of AndroidEngineConfig, under the same keys: a page
+// with every table's options on it read as if pinyin had them all
+FCITX_CONFIGURATION(
+        EnginePinyinPage,
+        Option<int, IntConstrain> pageSize{this, "PageSize", _("Candidates Per Page"), 7, IntConstrain(3, 10)};
+        Option<bool> prediction{this, "Prediction", _("Enable Prediction"), true};
+        Option<bool> sentenceModel{this, "SentenceModel", D_("fcitx5-android", "Weigh readings as whole sentences"), true};
+        Option<EngineFuzzyConfig> fuzzy{this, "Fuzzy", _("Fuzzy Pinyin")};)
+
+FCITX_CONFIGURATION(
+        EngineShuangpinPage,
+        OptionWithAnnotation<EngineShuangpinProfile, EngineShuangpinProfileI18NAnnotation> shuangpinProfile{
+                this, "ShuangpinProfile", _("Shuangpin Profile"), EngineShuangpinProfile::Ziranma};
+        Option<int, IntConstrain> pageSize{this, "PageSize", _("Candidates Per Page"), 7, IntConstrain(3, 10)};
+        Option<bool> prediction{this, "Prediction", _("Enable Prediction"), true};
+        Option<bool> sentenceModel{this, "SentenceModel", D_("fcitx5-android", "Weigh readings as whole sentences"), true};
+        Option<EngineFuzzyConfig> fuzzy{this, "Fuzzy", _("Fuzzy Pinyin")};)
+
 #undef FCITX_GETTEXT_DOMAIN
 #define FCITX_GETTEXT_DOMAIN "fcitx5-android"
 
@@ -126,6 +144,11 @@ public:
     const Configuration *getConfig() const override { return &config_; }
 
     void setConfig(const RawConfig &config) override;
+
+    /** Only [entry]'s own options: pinyin's, shuangpin's or its table's. */
+    const Configuration *getConfigForInputMethod(const InputMethodEntry &entry) const override;
+
+    void setConfigForInputMethod(const InputMethodEntry &entry, const RawConfig &config) override;
 
     std::vector<InputMethodEntry> listInputMethods() override;
 
@@ -191,6 +214,12 @@ private:
     EngineOffersCallback offersCallback_;
     EngineSettingsCallback settingsCallback_;
     AndroidEngineConfig config_;
+    // filled from config_ as a page is opened
+    mutable EnginePinyinPage pinyinPage_;
+    mutable EngineShuangpinPage shuangpinPage_;
+
+    /** The table options of [im], one of the table input methods; null for pinyin and shuangpin. */
+    Option<EngineTableConfig> *table(const std::string &im);
     // the pause a snapshot that refines waits for; any event ends it
     std::unique_ptr<EventSourceTime> refine_;
 

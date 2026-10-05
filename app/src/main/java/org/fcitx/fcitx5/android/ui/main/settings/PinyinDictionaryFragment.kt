@@ -45,6 +45,13 @@ import org.fcitx.fcitx5.android.utils.notificationManager
 import org.fcitx.fcitx5.android.utils.openUrl
 import org.fcitx.fcitx5.android.utils.queryFileName
 import java.util.concurrent.atomic.AtomicBoolean
+import android.widget.TextView
+import splitties.views.dsl.core.add
+import splitties.views.dsl.core.lParams
+import splitties.views.dsl.core.matchParent
+import splitties.views.dsl.core.verticalLayout
+import splitties.views.dsl.core.wrapContent
+import splitties.views.setPaddingDp
 
 class PinyinDictionaryFragment : Fragment(), OnItemChangedListener<PinyinDictionary> {
 
@@ -109,7 +116,18 @@ class PinyinDictionaryFragment : Fragment(), OnItemChangedListener<PinyinDiction
         registerLauncher()
         ui.addOnItemChangedListener(this)
         resetDustman()
-        return ui.root
+        // the list holds only what the user imported: an empty one read as no dictionary at all
+        val ctx = requireContext()
+        val builtIn = TextView(ctx).apply {
+            text = "${getString(R.string.builtin_words)}\n${getString(R.string.builtin_words_summary)}"
+            setPaddingDp(20, 12, 20, 12)
+        }
+        // the list outlives the view: off the one it was in before
+        (ui.root.parent as? ViewGroup)?.removeView(ui.root)
+        return ctx.verticalLayout {
+            add(builtIn, lParams(matchParent, wrapContent))
+            add(ui.root, lParams(matchParent, 0) { weight = 1f })
+        }
     }
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {

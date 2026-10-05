@@ -140,17 +140,32 @@ class PinyinDecoder(
                 var more = false
                 if (child >= 0) {
                     val words = minOf(dictionary.wordCount(child), limit)
-                    for (w in 0 until words) arcs.add(to, dictionary.word(child, w), c + dictionary.weight(child, w))
+                    addWords(to, child, words, c)
                     more = dictionary.childCount(child) > 0
                     if (to == graph.end) lookAhead(kind, to, child, c, words)
                 }
                 if (userChild >= 0 && user != null) {
-                    // one reading each, so no weight; and few enough to take them all
-                    for (w in 0 until user.wordCount(userChild)) arcs.add(to, user.word(userChild, w), c)
+                    addUserWords(to, user, userChild, c)
                     more = more || user.childCount(userChild) > 0
                 }
                 if (to < graph.end && more) collect(graph, to, child, userChild, c, limit)
             }
+        }
+    }
+
+    // the first [words] of the dictionary's at [node], those the user blocked left out
+    private fun addWords(to: Int, node: Int, words: Int, cost: Float) {
+        for (w in 0 until words) {
+            val word = dictionary.word(node, w)
+            if (user?.blocked(word, node) != true) arcs.add(to, word, cost + dictionary.weight(node, w))
+        }
+    }
+
+    // one reading each, so no weight; and few enough to take them all
+    private fun addUserWords(to: Int, user: UserWords, node: Int, cost: Float) {
+        for (w in 0 until user.wordCount(node)) {
+            val word = user.word(node, w)
+            if (!user.blocked(word, -1)) arcs.add(to, word, cost)
         }
     }
 
@@ -164,7 +179,10 @@ class PinyinDecoder(
         val cache = extensions ?: arrayOfNulls<IntArray>(dictionary.nodeCount).also { extensions = it }
         val longer = cache[node] ?: extensionsOf(node).also { cache[node] = it }
         for (w in 0 until minOf(words, longer.size)) {
-            if (longer[w] != NO_WORD) arcs.add(to, dictionary.word(node, w), cost + dictionary.weight(node, w) + penalties.lookAhead, longer[w])
+            val word = dictionary.word(node, w)
+            if (longer[w] != NO_WORD && user?.blocked(word, node) != true) {
+                arcs.add(to, word, cost + dictionary.weight(node, w) + penalties.lookAhead, longer[w])
+            }
         }
     }
 

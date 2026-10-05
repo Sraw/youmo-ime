@@ -74,6 +74,8 @@ class PinyinSession(
     /** The time a dynamic phrase is filled in with. */
     private val now: () -> Calendar = { Calendar.getInstance() },
     private val refiner: SentenceRefiner? = null,
+    /** Keeps a word the user blocked ([Action.Block]), blocked in [user] too; none offered without. */
+    private val block: ((Entry) -> Unit)? = null,
     // last, so a test's picker can follow as a lambda
     private val reranker: SentencePicker? = null,
 ) : Session {
@@ -94,7 +96,7 @@ class PinyinSession(
         penalties,
         user = user,
     )
-    private val predictor = Predictor(data.model, data.vocabulary, data.dictionary)
+    private val predictor = Predictor(data.model, data.vocabulary, data.dictionary, user)
     private val textWords by lazy { TextWords(data.model, data.wordIndex) }
 
     private val input = StringBuilder()
@@ -130,7 +132,7 @@ class PinyinSession(
         // nothing to pick past the page: the key (space, a digit) is the app's
         is Action.Select -> if (action.index in 0 until pageSize) pick(page * pageSize + action.index) else snapshot(handled = candidates.isNotEmpty())
         is Action.Pick -> pick(action.index)
-        is Action.Forget, is Action.Pin, is Action.Unpin -> pressed(action)
+        is Action.Forget, is Action.Pin, is Action.Unpin, is Action.Block -> pressed(action)
         Action.NextPage -> turn(page + 1)
         Action.PreviousPage -> turn(page - 1)
         Action.CommitRaw -> commitRaw()
@@ -211,6 +213,7 @@ class PinyinSession(
         is Action.Forget -> forget(action.index)
         is Action.Pin -> pin(action.index)
         is Action.Unpin -> unpin(action.index)
+        is Action.Block -> block(action.index)
         else -> error("not offered: $action")
     }
 
@@ -224,6 +227,7 @@ class PinyinSession(
             // the first already, and a phrase: nothing to pin
             if ((phrase == null || index != 0) && pinnable(c)) add(Offer.PIN)
             if (phrase != null) add(Offer.UNPIN)
+            if (phrase == null && blockable(c)) add(Offer.BLOCK)
         }
     }
 
@@ -277,6 +281,22 @@ class PinyinSession(
         user?.forget(words)
         // or the next pick learns it again, as the word before it
         if (lastEntry in words) dropContext()
+        decoder.reset()
+        val shown = page
+        read()
+        if (shown * pageSize < candidates.size) page = shown
+        return snapshot()
+    }
+
+    // a word, not a sentence of them: blocking every word of one would block common ones
+    private fun blockable(c: Candidate) = block != null && user != null && entries(c)?.size == 1
+
+    private fun block(index: Int): Snapshot {
+        val c = candidates.getOrNull(index)
+        val word = if (user == null || predicting || c == null) null else entries(c)?.singleOrNull()
+        if (word == null || block == null) return snapshot()
+        block.invoke(word)
+        if (lastEntry == word) dropContext()
         decoder.reset()
         val shown = page
         read()

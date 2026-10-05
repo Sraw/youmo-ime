@@ -300,7 +300,7 @@ class EnginesTest {
         assertEquals(emptySet<Offer>(), engines.offers(Engines.PINYIN, 0))
         val shown = engines.type(Engines.PINYIN, "ni")
         assertTrue(shown.actionable)
-        assertEquals(setOf(Offer.FORGET, Offer.PIN), engines.offers(Engines.PINYIN, 1))
+        assertEquals(setOf(Offer.FORGET, Offer.PIN, Offer.BLOCK), engines.offers(Engines.PINYIN, 1))
         assertEquals(listOf("拟", "你"), engines.onEvent(Engines.PINYIN, EngineEvent.PIN, 1).candidates)
         assertEquals(listOf("ni,1=拟"), saved)
         assertEquals(listOf("拟", "你"), engines.type(Engines.SHUANGPIN, "ni").candidates)

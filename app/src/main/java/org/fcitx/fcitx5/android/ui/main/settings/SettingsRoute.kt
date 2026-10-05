@@ -23,7 +23,6 @@ import org.fcitx.fcitx5.android.ui.main.DeveloperFragment
 import org.fcitx.fcitx5.android.ui.main.LicensesFragment
 import org.fcitx.fcitx5.android.ui.main.MainFragment
 import org.fcitx.fcitx5.android.ui.main.settings.addon.AddonConfigFragment
-import org.fcitx.fcitx5.android.ui.main.settings.addon.AddonListFragment
 import org.fcitx.fcitx5.android.ui.main.settings.behavior.AdvancedSettingsFragment
 import org.fcitx.fcitx5.android.ui.main.settings.behavior.CloudSettingsFragment
 import org.fcitx.fcitx5.android.ui.main.settings.behavior.CandidatesSettingsFragment
@@ -56,9 +55,6 @@ sealed class SettingsRoute : Parcelable {
 
     @Serializable
     data class InputMethodConfig(val name: String, val uniqueName: String) : SettingsRoute()
-
-    @Serializable
-    data object AddonList : SettingsRoute()
 
     @Serializable
     data class AddonConfig(val name: String, val uniqueName: String) : SettingsRoute()
@@ -181,6 +177,9 @@ sealed class SettingsRoute : Parcelable {
     data object PinyinCustomPhrase : SettingsRoute()
 
     @Serializable
+    data object UserWords : SettingsRoute()
+
+    @Serializable
     data object PopupOverrides : SettingsRoute()
 
     companion object {
@@ -200,9 +199,6 @@ sealed class SettingsRoute : Parcelable {
                 label = ctx.getString(R.string.input_methods)
             }
             fragment<InputMethodConfigFragment, InputMethodConfig>()
-            fragment<AddonListFragment, AddonList> {
-                label = ctx.getString(R.string.addons)
-            }
             fragment<AddonConfigFragment, AddonConfig>()
 
             /* ========== Android ========== */
@@ -244,7 +240,10 @@ sealed class SettingsRoute : Parcelable {
                 typeMap = mapOf(typeOf<ListConfig.Params>() to ListConfig.Params.NavType)
             )
             fragment<PinyinDictionaryFragment, PinyinDict> {
-                label = ctx.getString(R.string.pinyin_dict)
+                label = ctx.getString(R.string.word_packs)
+            }
+            fragment<UserWordsFragment, UserWords> {
+                label = ctx.getString(R.string.my_words)
             }
             fragment<PunctuationEditorFragment, Punctuation>()
             fragment<QuickPhraseListFragment, QuickPhraseList> {
@@ -256,7 +255,9 @@ sealed class SettingsRoute : Parcelable {
             fragment<TableInputMethodFragment, TableInputMethods> {
                 label = ctx.getString(R.string.table_im)
             }
-            fragment<PinyinCustomPhraseFragment, PinyinCustomPhrase>()
+            fragment<PinyinCustomPhraseFragment, PinyinCustomPhrase> {
+                label = ctx.getString(R.string.custom_phrases)
+            }
             fragment<PopupOverridesFragment, PopupOverrides> {
                 label = ctx.getString(R.string.long_press_characters)
             }

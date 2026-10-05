@@ -387,4 +387,37 @@
     <string name="cloud_words_failed">取不到新词包：%1$s</string>
     <string name="not_set">未设置</string>
     <string name="set_hidden">已设置（隐藏）</string>
+    <string name="my_words">我的词</string>
+    <string name="my_words_added">我加的词</string>
+    <string name="my_words_learned">打字时学到的词</string>
+    <string name="my_words_blocked">屏蔽的词</string>
+    <string name="my_words_none">暂无</string>
+    <string name="add_word">添加词</string>
+    <string name="add_word_summary">词和它的拼音，如 幽默 you mo</string>
+    <string name="block_word">屏蔽一个词</string>
+    <string name="block_word_summary">不再出现在候选里。在键盘上长按候选也能屏蔽</string>
+    <string name="word_text">词</string>
+    <string name="word_pinyin">拼音，如 you mo（留空自动填）</string>
+    <string name="word_pinyin_invalid">拼音和词对不上：每个字一个音节</string>
+    <plurals name="word_typed_times">
+        <item quantity="other">%1$s · 打过 %2$d 次</item>
+    </plurals>
+    <string name="forget_word">忘掉</string>
+    <string name="unblock_word">恢复显示</string>
+    <string name="search">搜索</string>
+    <string name="search_words_hint">词或拼音</string>
+    <string name="search_clear">只显示“%1$s” · 点此显示全部</string>
+    <string name="home_section_words">词库</string>
+    <string name="home_section_keyboard_look">键盘与外观</string>
+    <string name="home_section_clipboard_emoji">剪贴板与表情</string>
+    <string name="custom_phrases">自定义短语</string>
+    <string name="custom_phrases_summary">用短的编码打出长文本，如 dz → 你的地址</string>
+    <string name="word_packs">词库包</string>
+    <string name="word_packs_summary">内置词库，以及你导入的词库</string>
+    <string name="my_words_summary">添加、修改、忘掉或屏蔽词</string>
+    <string name="more_settings">更多设置</string>
+    <string name="builtin_words">内置词库</string>
+    <string name="builtin_words_summary">大词库和新词库随应用一起更新。不想看到某个词，可以在“我的词”里屏蔽，或在键盘上长按它</string>
+    <string name="word_pinyin_unknown">找不到读音，请填写拼音</string>
+    <string name="punctuation_map">中文标点</string>
 </resources>

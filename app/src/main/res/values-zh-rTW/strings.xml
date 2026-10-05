@@ -359,4 +359,37 @@
     <string name="customized">已自訂：%1$s</string>
     <string name="reset_all_long_press_message">將所有按鍵的長按字元還原為內建預設值？</string>
     <string name="reset_all">全部還原預設</string>
+    <string name="my_words">我的詞</string>
+    <string name="my_words_added">我加的詞</string>
+    <string name="my_words_learned">打字時學到的詞</string>
+    <string name="my_words_blocked">屏蔽的詞</string>
+    <string name="my_words_none">暫無</string>
+    <string name="add_word">添加詞</string>
+    <string name="add_word_summary">詞和它的拼音，如 幽默 you mo</string>
+    <string name="block_word">屏蔽一個詞</string>
+    <string name="block_word_summary">不再出現在候選裡。在鍵盤上長按候選也能屏蔽</string>
+    <string name="word_text">詞</string>
+    <string name="word_pinyin">拼音，如 you mo（留空自動填）</string>
+    <string name="word_pinyin_invalid">拼音和詞對不上：每個字一個音節</string>
+    <plurals name="word_typed_times">
+        <item quantity="other">%1$s · 打過 %2$d 次</item>
+    </plurals>
+    <string name="forget_word">忘掉</string>
+    <string name="unblock_word">恢復顯示</string>
+    <string name="search">搜索</string>
+    <string name="search_words_hint">詞或拼音</string>
+    <string name="search_clear">只顯示“%1$s” · 點此顯示全部</string>
+    <string name="home_section_words">詞庫</string>
+    <string name="home_section_keyboard_look">鍵盤與外觀</string>
+    <string name="home_section_clipboard_emoji">剪貼板與表情</string>
+    <string name="custom_phrases">自定義短語</string>
+    <string name="custom_phrases_summary">用短的編碼打出長文本，如 dz → 你的地址</string>
+    <string name="word_packs">詞庫包</string>
+    <string name="word_packs_summary">內置詞庫，以及你導入的詞庫</string>
+    <string name="my_words_summary">添加、修改、忘掉或屏蔽詞</string>
+    <string name="more_settings">更多設定</string>
+    <string name="builtin_words">內置詞庫</string>
+    <string name="builtin_words_summary">大詞庫和新詞庫隨應用一起更新。不想看到某個詞，可以在「我的詞」裡屏蔽，或在鍵盤上長按它</string>
+    <string name="word_pinyin_unknown">找不到讀音，請填寫拼音</string>
+    <string name="punctuation_map">中文標點</string>
 </resources>

@@ -66,7 +66,9 @@ class MainFragment : PaddingPreferenceFragment() {
     }
 
     override fun onCreatePreferences(savedInstanceState: Bundle?, rootKey: String?) {
-        // grouped by what the user wants to adjust, not by which layer (fcitx or Android) owns the setting
+        // grouped by what the user wants to adjust, not by which layer (fcitx or Android) owns the
+        // setting; what a phone's user seldom needs (a physical keyboard's candidate window, fcitx's
+        // global options) is under Advanced
         preferenceScreen = preferenceManager.createPreferenceScreen(requireContext()).apply {
             // the offline build fetches nothing itself: new words come with a new version or a pack
             if (DataAge.isStale(BuildConfig.BUILD_TIME, System.currentTimeMillis())) {
@@ -80,18 +82,30 @@ class MainFragment : PaddingPreferenceFragment() {
                     R.drawable.ic_baseline_language_24,
                     SettingsRoute.InputMethodList
                 )
+            }
+            addCategory(R.string.home_section_words) {
                 addDestinationPreference(
-                    R.string.global_options,
-                    R.drawable.ic_baseline_tune_24,
-                    SettingsRoute.GlobalConfig
+                    R.string.my_words,
+                    R.drawable.ic_baseline_library_books_24,
+                    SettingsRoute.UserWords
                 )
                 addDestinationPreference(
-                    R.string.addons,
-                    R.drawable.ic_baseline_extension_24,
-                    SettingsRoute.AddonList
+                    R.string.custom_phrases,
+                    R.drawable.ic_baseline_text_format_24,
+                    SettingsRoute.PinyinCustomPhrase
+                )
+                addDestinationPreference(
+                    R.string.word_packs,
+                    R.drawable.ic_baseline_list_alt_24,
+                    SettingsRoute.PinyinDict("")
                 )
             }
-            addCategory(R.string.home_section_keyboard) {
+            addCategory(R.string.home_section_keyboard_look) {
+                addDestinationPreference(
+                    R.string.theme,
+                    R.drawable.ic_baseline_palette_24,
+                    SettingsRoute.Theme
+                )
                 addDestinationPreference(
                     R.string.virtual_keyboard,
                     R.drawable.ic_baseline_keyboard_24,
@@ -102,6 +116,8 @@ class MainFragment : PaddingPreferenceFragment() {
                     R.drawable.ic_baseline_text_format_24,
                     SettingsRoute.PopupOverrides
                 )
+            }
+            addCategory(R.string.home_section_clipboard_emoji) {
                 addDestinationPreference(
                     R.string.clipboard,
                     R.drawable.ic_clipboard,
@@ -111,18 +127,6 @@ class MainFragment : PaddingPreferenceFragment() {
                     R.string.emoji_and_symbols,
                     R.drawable.ic_baseline_emoji_symbols_24,
                     SettingsRoute.Symbol
-                )
-            }
-            addCategory(R.string.home_section_appearance) {
-                addDestinationPreference(
-                    R.string.theme,
-                    R.drawable.ic_baseline_palette_24,
-                    SettingsRoute.Theme
-                )
-                addDestinationPreference(
-                    R.string.candidates_window,
-                    R.drawable.ic_baseline_list_alt_24,
-                    SettingsRoute.CandidatesWindow
                 )
             }
             addCategory(R.string.home_section_other) {

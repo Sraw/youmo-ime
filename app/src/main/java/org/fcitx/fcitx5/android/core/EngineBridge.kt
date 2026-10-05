@@ -57,7 +57,8 @@ object EngineBridge {
             remote = if (BuildConfig.CLOUD) CloudServer.instance::current else null,
         )
     }
-    private val engines by made
+    /** Made when first used; on the fcitx thread only, as the addon uses it there. */
+    val engines by made
 
     // fcitx's data home, as Fcitx starts it: where libime kept its files, and where the app's
     // editors still keep what the user adds
