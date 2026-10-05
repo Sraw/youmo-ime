@@ -27,6 +27,33 @@ abstract class ManagedPreferenceCategory(
         sections[managedPreferencesUi.size] = title
     }
 
+    /**
+     * The preferences [block] declares, kept without a UI: a phone's user is not shown every knob
+     * the code has; what they are set to (their default, or what an older version set) stays.
+     */
+    protected fun <T> hidden(block: () -> T): T {
+        hidingUi = true
+        try {
+            return block()
+        } finally {
+            hidingUi = false
+        }
+    }
+
+    /**
+     * One choice of a few [levels] for the int preferences [keys] (each with its default): the
+     * user picks how big or how strong, not a number of dp for each.
+     */
+    protected fun levels(
+        @StringRes title: Int,
+        key: String,
+        keys: List<Pair<String, Int>>,
+        levels: List<ManagedPreferenceUi.Levels.Level>,
+        enableUiOn: (() -> Boolean)? = null
+    ) {
+        ManagedPreferenceUi.Levels(title, key, sharedPreferences, keys, levels, enableUiOn).registerUi()
+    }
+
     protected fun switch(
         @StringRes
         title: Int,

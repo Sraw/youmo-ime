@@ -225,13 +225,30 @@ class Engines(
      * likely is; syllables apart by spaces, null if some character is none of its words. For
      * the user to check, as a character of several readings may be read the other way.
      */
-    fun pinyinOf(text: String): String? {
-        val chars = text.codePointCount(0, text.length)
-        if (chars == 0 || chars > MAX_WORD_CHARS) return null
-        val offsets = IntArray(chars + 1) { if (it == chars) text.length else text.offsetByCodePoints(0, it) }
+    fun pinyinOf(text: String): String? = pinyinsOf(listOf(text))[text]
+
+    /**
+     * [pinyinOf] of each of [texts], the dictionary walked once for them all: a walk is the
+     * whole of it, a thousand words imported with no pinyin would be a thousand walks.
+     */
+    fun pinyinsOf(texts: Collection<String>): Map<String, String?> {
+        val offsets = texts.associateWith { text ->
+            val chars = text.codePointCount(0, text.length)
+            if (chars == 0 || chars > MAX_WORD_CHARS) null
+            else IntArray(chars + 1) { if (it == chars) text.length else text.offsetByCodePoints(0, it) }
+        }
         val pieces = HashSet<String>()
-        for (i in 0 until chars) for (j in i + 1..chars) pieces += text.substring(offsets[i], offsets[j])
+        for ((text, at) in offsets) {
+            if (at == null) continue
+            for (i in 0 until at.size - 1) for (j in i + 1 until at.size) pieces += text.substring(at[i], at[j])
+        }
         val readings = LibimeImport.readings(pinyinData.dictionary, pinyinData.vocabulary, pieces)
+        return offsets.mapValues { (text, at) -> at?.let { reading(text, it, readings) } }
+    }
+
+    // as few of the dictionary's words as make [text] up, apart at [offsets]
+    private fun reading(text: String, offsets: IntArray, readings: Map<String, IntArray>): String? {
+        val chars = offsets.size - 1
         // fewest pieces to each character, and the piece that got there
         val fewest = IntArray(chars + 1) { if (it == 0) 0 else Int.MAX_VALUE }
         val from = IntArray(chars + 1)
@@ -256,18 +273,25 @@ class Engines(
     /** Adds [text] read as [pinyin] (see [WordLists.entry]); false if it does not read so. */
     fun addWord(text: String, pinyin: String): Boolean {
         val entry = WordLists.entry(text, pinyin) ?: return false
-        // unblocked, as the user asks for it
-        if (lists.unblock(entry)) userModel?.unblock(entry)
-        if (lists.add(entry)) userModel?.list(entry)
+        add(listOf(entry))
+        return true
+    }
+
+    /** Adds [entries]; how many were not there already. */
+    private fun add(entries: List<Entry>): Int {
+        // unblocked, as the user asks for them
+        lists.unblockAll(entries).forEach { userModel?.unblock(it) }
+        val added = lists.addAll(entries)
+        added.forEach { userModel?.list(it) }
         sessions.clear()
         keyboards.clear()
-        return true
+        return added.size
     }
 
     /** Blocks [text] read as [pinyin] from the settings; false if it does not read so. */
     fun blockWord(text: String, pinyin: String): Boolean {
         val entry = WordLists.entry(text, pinyin) ?: return false
-        block(entry)
+        blockAll(listOf(entry))
         sessions.clear()
         keyboards.clear()
         return true
@@ -275,21 +299,73 @@ class Engines(
 
     // from a long press too, the session that asked going on with its input: not dropped, as the
     // host fetches its candidates next; the others read the model as they decode
-    private fun block(entry: Entry) {
-        lists.block(entry)
-        user().block(entry)
+    private fun block(entry: Entry) = blockAll(listOf(entry))
+
+    /** Blocks [entries]; how many were not already. */
+    private fun blockAll(entries: List<Entry>): Int {
+        val blocked = lists.blockAll(entries)
+        val model = user()
+        entries.forEach { model.block(it) }
+        return blocked.size
     }
 
     /** Takes [word] off its list: an added word is no longer typeable, a learned one forgotten, a blocked one offered again. */
-    fun removeWord(word: UserWord) {
-        val entry = WordLists.entry(word.text, word.pinyin) ?: return
-        when (word.kind) {
-            UserWord.Kind.ADDED -> if (lists.remove(entry)) dropUser()
-            UserWord.Kind.LEARNED -> user().forget(listOf(entry))
-            UserWord.Kind.BLOCKED -> if (lists.unblock(entry)) userModel?.unblock(entry)
-        }
+    fun removeWord(word: UserWord) = removeWords(listOf(word))
+
+    /** [removeWord] for each of [words], a list written once. */
+    fun removeWords(words: Collection<UserWord>) {
+        val byKind = words.groupBy({ it.kind }, { it.entry() })
+        byKind[UserWord.Kind.ADDED]?.let { if (lists.removeAll(it.filterNotNull()).isNotEmpty()) dropUser() }
+        byKind[UserWord.Kind.LEARNED]?.let { user().forget(it.filterNotNull()) }
+        byKind[UserWord.Kind.BLOCKED]?.let { entries -> lists.unblockAll(entries.filterNotNull()).forEach { userModel?.unblock(it) } }
         sessions.clear()
         keyboards.clear()
+    }
+
+    // as listed: one syllable a space, so read back as it was, not split again
+    private fun UserWord.entry() = LibimeImport.entry(text, pinyin.replace(' ', '\''))
+
+    /** What [importWords] made of the lines: words added and blocked that were not already, lines it could not read. */
+    data class Imported(val added: Int, val blocked: Int, val unread: Int)
+
+    /**
+     * The words of a list the user imports, a word a line (see [WordLists.line]): added, or
+     * blocked where marked so; one with no pinyin read as the dictionary reads it ([pinyinOf]).
+     */
+    fun importWords(lines: Sequence<String>): Imported {
+        val add = LinkedHashSet<Entry>()
+        val block = LinkedHashSet<Entry>()
+        var unread = 0
+        val read = lines.mapNotNull { WordLists.line(it) }.toList()
+        val guessed = pinyinsOf(read.filter { it.pinyin == null && it.text.isNotEmpty() }.map { it.text })
+        for (line in read) {
+            val pinyin = line.pinyin ?: guessed[line.text]
+            val entry = pinyin?.let { WordLists.entry(line.text, it) }
+            when {
+                entry == null -> unread++
+                line.blocked -> block += entry
+                else -> add += entry
+            }
+        }
+        // a word the file has both ways: blocked, the safer of the two
+        add -= block
+        val added = if (add.isEmpty()) 0 else add(add.toList())
+        var blocked = 0
+        if (block.isNotEmpty()) {
+            blocked = blockAll(block.toList())
+            sessions.clear()
+            keyboards.clear()
+        }
+        return Imported(added, blocked, unread)
+    }
+
+    /**
+     * The user's words as [importWords] reads them back: the added and the learned (most typed
+     * first) as `幽默 you'mo`, the blocked with a `!` before them.
+     */
+    fun exportWords(): List<String> = userWords().map {
+        val line = "${it.text} ${it.pinyin.replace(' ', '\'')}"
+        if (it.kind == UserWord.Kind.BLOCKED) "!$line" else line
     }
 
     /**

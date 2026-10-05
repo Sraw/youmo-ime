@@ -4,7 +4,6 @@
  */
 package org.fcitx.fcitx5.android.ui.main.settings.behavior
 
-import android.os.Build
 import android.os.Bundle
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
@@ -24,12 +23,10 @@ import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.prefs.ManagedPreferenceFragment
 import org.fcitx.fcitx5.android.ui.common.withLoadingDialog
 import org.fcitx.fcitx5.android.ui.main.MainViewModel
-import org.fcitx.fcitx5.android.utils.AppUtil
 import org.fcitx.fcitx5.android.ui.main.settings.SettingsRoute
+import org.fcitx.fcitx5.android.utils.AppUtil
 import org.fcitx.fcitx5.android.utils.addPreference
 import org.fcitx.fcitx5.android.utils.navigateWithAnim
-import org.fcitx.fcitx5.android.utils.buildDocumentsProviderIntent
-import org.fcitx.fcitx5.android.utils.buildPrimaryStorageIntent
 import org.fcitx.fcitx5.android.utils.formatDateTime
 import org.fcitx.fcitx5.android.utils.importErrorDialog
 import org.fcitx.fcitx5.android.utils.iso8601UTCDateTime
@@ -107,41 +104,20 @@ class AdvancedSettingsFragment : ManagedPreferenceFragment(AppPrefs.getInstance(
             isIconSpaceReserved = false
         }
         screen.addPreference(more)
-        more.addPreference(R.string.global_options) { navigateWithAnim(SettingsRoute.GlobalConfig) }
         more.addPreference(R.string.candidates_window) { navigateWithAnim(SettingsRoute.CandidatesWindow) }
-        more.addPreference(R.string.quickphrase_editor) { navigateWithAnim(SettingsRoute.QuickPhraseList) }
         // the punctuation addon's own page went with the list of addons
         more.addPreference(R.string.punctuation_map) {
             navigateWithAnim(SettingsRoute.Punctuation(getString(R.string.punctuation_map), "zh_CN"))
         }
         more.addPreference(R.string.table_im) { navigateWithAnim(SettingsRoute.TableInputMethods) }
-        // browse/export/import act on files rather than toggle a behavior; keep them apart from the switches
+        // the whole of the user's data in and out, as one file: where it lies on the phone is no
+        // business of theirs (fcitx's global options and its data folder are not shown either)
         val userData = PreferenceCategory(ctx).apply {
             setTitle(R.string.user_data)
             isIconSpaceReserved = false
         }
         screen.addPreference(userData)
-        val canOpenPrimaryStorage = Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q
-        userData.addPreference(
-            R.string.browse_user_data_dir,
-            // the long press is otherwise undiscoverable
-            summary = if (canOpenPrimaryStorage) R.string.browse_user_data_dir_summary else null,
-            onClick = {
-                try {
-                    ctx.startActivity(buildDocumentsProviderIntent())
-                } catch (e: Exception) {
-                    ctx.toast(e)
-                }
-            },
-            onLongClick = if (canOpenPrimaryStorage) ({
-                try {
-                    ctx.startActivity(buildPrimaryStorageIntent())
-                } catch (e: Exception) {
-                    ctx.toast(e)
-                }
-            }) else null
-        )
-        userData.addPreference(R.string.export_user_data) {
+        userData.addPreference(R.string.export_user_data, R.string.export_user_data_summary) {
             lifecycleScope.withLoadingDialog(ctx) {
                 viewModel.fcitx.runOnReady {
                     save()

@@ -96,10 +96,17 @@ class FakeFcitxAPI : FcitxAPI {
         return true
     }
 
-    override suspend fun removeUserWord(word: Engines.UserWord) {
-        calls += "removeUserWord(${word.text})"
-        userWords -= word
+    override suspend fun removeUserWords(words: List<Engines.UserWord>) {
+        calls += "removeUserWords(${words.joinToString(",") { it.text }})"
+        userWords -= words.toSet()
     }
+
+    override suspend fun importUserWords(lines: List<String>): Engines.Imported {
+        calls += "importUserWords(${lines.size})"
+        return Engines.Imported(0, 0, lines.size)
+    }
+
+    override suspend fun exportUserWords(): List<String> = userWords.map { "${it.text} ${it.pinyin}" }
 
     override suspend fun engineContext(before: String) {
         calls += "engineContext($before)"

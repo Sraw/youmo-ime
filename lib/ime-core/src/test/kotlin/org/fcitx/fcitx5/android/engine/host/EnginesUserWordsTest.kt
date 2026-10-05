@@ -132,4 +132,53 @@ class EnginesUserWordsTest {
         assertTrue(engines.addWord("行", "hang"))
         assertTrue("行" in engines.type(Engines.PINYIN, "hang").candidates)
     }
+
+    @Test
+    fun aListImportedIsAddedAndBlockedAndExportsAsItWasImported() {
+        val engines = Engines(::load, folder.newFolder())
+        val imported = engines.importWords(
+            sequenceOf(
+                "# a comment",
+                "妮浩 ni'hao",
+                // the other way round, a count after it, and no pinyin to read as the dictionary does
+                "hang xing 航星 12",
+                "好你",
+                "!拟 ni",
+                // pinyin it does not read as, a character the dictionary has not
+                "妮浩 nizz",
+                "妮x",
+                "妮 c=3",
+                // both ways: blocked
+                "你好 ni'hao",
+                "!你好 ni'hao",
+                "",
+            ),
+        )
+        assertEquals(Engines.Imported(added = 3, blocked = 2, unread = 3), imported)
+        assertEquals(listOf("妮浩 ni'hao", "航星 hang'xing", "好你 hao'ni", "!拟 ni", "!你好 ni'hao"), engines.exportWords())
+        assertTrue("妮浩" in engines.type(Engines.PINYIN, "nihao").candidates)
+        engines.onEvent(Engines.PINYIN, EngineEvent.RESET, 0)
+        assertFalse("拟" in engines.type(Engines.PINYIN, "ni").candidates)
+        engines.onEvent(Engines.PINYIN, EngineEvent.RESET, 0)
+        // read back: nothing new
+        assertEquals(Engines.Imported(added = 0, blocked = 0, unread = 0), engines.importWords(engines.exportWords().asSequence()))
+        assertEquals(5, engines.userWords().size)
+    }
+
+    @Test
+    fun aThousandWordsAreAddedAndRemovedAtOnce() {
+        val dir = folder.newFolder()
+        val engines = Engines(::load, dir)
+        val chars = listOf("你" to "ni", "拟" to "ni", "好" to "hao", "行" to "xing", "航" to "hang", "星" to "xing")
+        // every word of four of the characters: 1296, each its own
+        val words = chars.flatMap { a -> chars.flatMap { b -> chars.flatMap { c -> chars.map { d -> listOf(a, b, c, d) } } } }
+            .map { w -> "${w.joinToString("") { it.first }} ${w.joinToString("'") { it.second }}" }
+        assertEquals(Engines.Imported(added = words.size, blocked = 0, unread = 0), engines.importWords(words.asSequence()))
+        val listed = engines.userWords()
+        assertEquals(words.size, listed.size)
+        engines.removeWords(listed.drop(1))
+        assertEquals(listOf(listed.first()), engines.userWords())
+        engines.close()
+        assertEquals(listOf(listed.first()), Engines(::load, dir).userWords())
+    }
 }

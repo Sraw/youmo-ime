@@ -60,8 +60,14 @@ interface FcitxAPI {
     /** Blocks [text] read as [pinyin], never offered again; false if it does not read so. */
     suspend fun blockUserWord(text: String, pinyin: String): Boolean
 
-    /** Takes [word] off its list: see [Engines.removeWord]. */
-    suspend fun removeUserWord(word: Engines.UserWord)
+    /** Takes [words] off their lists: see [Engines.removeWords]. */
+    suspend fun removeUserWords(words: List<Engines.UserWord>)
+
+    /** Adds and blocks the words of a list the user imports, a word a line: see [Engines.importWords]. */
+    suspend fun importUserWords(lines: List<String>): Engines.Imported
+
+    /** The user's words as [importUserWords] reads them: see [Engines.exportWords]. */
+    suspend fun exportUserWords(): List<String>
 
     /**
      * Tells the engine [before], the text before the cursor, where the user put the cursor other

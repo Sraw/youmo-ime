@@ -5,6 +5,8 @@
 package org.fcitx.fcitx5.android.data.prefs
 
 import android.content.Context
+import android.content.SharedPreferences
+import androidx.core.content.edit
 import androidx.annotation.StringRes
 import androidx.preference.EditTextPreference
 import androidx.preference.ListPreference
@@ -16,6 +18,7 @@ import org.fcitx.fcitx5.android.ui.main.settings.EditTextIntPreference
 import org.fcitx.fcitx5.android.ui.main.settings.TwinSeekBarPreference
 import org.fcitx.fcitx5.android.utils.InputMethodUtil
 import org.fcitx.fcitx5.android.utils.includes
+import kotlin.math.abs
 
 abstract class ManagedPreferenceUi<T : Preference>(
     val key: String,
@@ -25,6 +28,58 @@ abstract class ManagedPreferenceUi<T : Preference>(
     abstract fun createUi(context: Context): T
 
     fun isEnabled() = enableUiOn?.invoke() ?: true
+
+    /**
+     * A choice of a few [levels], each setting the int preferences [keys] at once; itself stored
+     * nowhere: shown as the level nearest what they hold, so a value set by an older version
+     * shows as its nearest level and stays till the user picks one.
+     */
+    class Levels(
+        @StringRes
+        val title: Int,
+        key: String,
+        private val store: SharedPreferences,
+        private val keys: List<Pair<String, Int>>,
+        private val levels: List<Level>,
+        enableUiOn: (() -> Boolean)? = null
+    ) : ManagedPreferenceUi<ListPreference>(key, enableUiOn) {
+
+        /** A level named [label]: [values] for the keys, in their order. */
+        class Level(@StringRes val label: Int, vararg val values: Int)
+
+        /** The level nearest what the keys hold. */
+        fun current(): Int = levels.indices.minBy { i ->
+            keys.indices.sumOf { k -> abs(store.getInt(keys[k].first, keys[k].second) - levels[i].values[k]) }
+        }
+
+        /** Sets the keys to level [index]; false if there is none such. */
+        fun pick(index: Int): Boolean {
+            val level = levels.getOrNull(index) ?: return false
+            // the nearest, as the list shows it when the page opens: not written over what is there
+            if (index == current()) return true
+            store.edit {
+                keys.forEachIndexed { k, (name, _) -> putInt(name, level.values[k]) }
+            }
+            return true
+        }
+
+        override fun createUi(context: Context) = object : ListPreference(context) {
+            override fun getPersistedString(defaultReturnValue: String?) = current().toString()
+
+            override fun persistString(value: String?) = pick(value?.toIntOrNull() ?: -1)
+        }.apply {
+            key = this@Levels.key
+            isIconSpaceReserved = false
+            isSingleLineTitle = false
+            entryValues = levels.indices.map { it.toString() }.toTypedArray()
+            entries = levels.map { context.getString(it.label) }.toTypedArray()
+            summaryProvider = ListPreference.SimpleSummaryProvider.getInstance()
+            // stored nowhere: without a default the list would not read the level at all
+            setDefaultValue("0")
+            setTitle(this@Levels.title)
+            setDialogTitle(this@Levels.title)
+        }
+    }
 
     class Switch(
         @StringRes

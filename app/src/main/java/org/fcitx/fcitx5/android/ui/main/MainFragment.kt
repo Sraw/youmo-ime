@@ -102,7 +102,7 @@ class MainFragment : PaddingPreferenceFragment() {
             }
             addCategory(R.string.home_section_keyboard_look) {
                 addDestinationPreference(
-                    R.string.theme,
+                    R.string.theme_and_size,
                     R.drawable.ic_baseline_palette_24,
                     SettingsRoute.Theme
                 )
@@ -110,11 +110,6 @@ class MainFragment : PaddingPreferenceFragment() {
                     R.string.virtual_keyboard,
                     R.drawable.ic_baseline_keyboard_24,
                     SettingsRoute.VirtualKeyboard
-                )
-                addDestinationPreference(
-                    R.string.long_press_characters,
-                    R.drawable.ic_baseline_text_format_24,
-                    SettingsRoute.PopupOverrides
                 )
             }
             addCategory(R.string.home_section_clipboard_emoji) {
@@ -137,6 +132,11 @@ class MainFragment : PaddingPreferenceFragment() {
                         SettingsRoute.Cloud
                     )
                 }
+                addPreference(
+                    R.string.app_language,
+                    getString(AppLanguage.label(AppLanguage.current())),
+                    R.drawable.ic_baseline_language_24
+                ) { AppLanguage.choose(requireContext()) }
                 addDestinationPreference(
                     R.string.advanced,
                     R.drawable.ic_baseline_more_horiz_24,

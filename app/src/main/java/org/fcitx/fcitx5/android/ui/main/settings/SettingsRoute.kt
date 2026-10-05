@@ -180,6 +180,9 @@ sealed class SettingsRoute : Parcelable {
     data object UserWords : SettingsRoute()
 
     @Serializable
+    data class UserWordList(val kind: String) : SettingsRoute()
+
+    @Serializable
     data object PopupOverrides : SettingsRoute()
 
     companion object {
@@ -204,7 +207,7 @@ sealed class SettingsRoute : Parcelable {
             /* ========== Android ========== */
 
             fragment<ThemeFragment, Theme> {
-                label = ctx.getString(R.string.theme)
+                label = ctx.getString(R.string.theme_and_size)
             }
             fragment<KeyboardSettingsFragment, VirtualKeyboard> {
                 label = ctx.getString(R.string.virtual_keyboard)
@@ -245,6 +248,7 @@ sealed class SettingsRoute : Parcelable {
             fragment<UserWordsFragment, UserWords> {
                 label = ctx.getString(R.string.my_words)
             }
+            fragment<UserWordListFragment, UserWordList>()
             fragment<PunctuationEditorFragment, Punctuation>()
             fragment<QuickPhraseListFragment, QuickPhraseList> {
                 label = ctx.getString(R.string.quickphrase_editor)

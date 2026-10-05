@@ -44,8 +44,11 @@ abstract class ManagedPreferenceProvider {
         preference.fireChange()
     }
 
+    /** While set, preferences are registered without a UI: kept, at their value, but not shown. */
+    protected var hidingUi = false
+
     fun ManagedPreferenceUi<*>.registerUi() {
-        _managedPreferencesUi.add(this)
+        if (!hidingUi) _managedPreferencesUi.add(this)
     }
 
     fun ManagedPreference<*>.register() {

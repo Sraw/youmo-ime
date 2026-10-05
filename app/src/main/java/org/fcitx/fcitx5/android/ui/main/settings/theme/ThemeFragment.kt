@@ -20,6 +20,8 @@ import com.google.android.material.tabs.TabLayout
 import com.google.android.material.tabs.TabLayoutMediator
 import kotlinx.coroutines.launch
 import org.fcitx.fcitx5.android.R
+import org.fcitx.fcitx5.android.data.prefs.AppPrefs
+import org.fcitx.fcitx5.android.data.prefs.ManagedPreferenceProvider
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.utils.styledColor
 import splitties.dimensions.dp
@@ -51,6 +53,17 @@ class ThemeFragment : Fragment() {
         }
     }
 
+    // the size and the keys as the user picks them, so they see what a level does before typing
+    @Keep
+    private val onSizeChangeListener = ManagedPreferenceProvider.OnChangeListener { key ->
+        if (key in SIZE_KEYS) lifecycleScope.launch { previewUi.recalculateSize() }
+    }
+
+    @Keep
+    private val onKeysChangeListener = ManagedPreferenceProvider.OnChangeListener { key ->
+        if (key in KEY_KEYS) lifecycleScope.launch { previewUi.setTheme(ThemeManager.activeTheme) }
+    }
+
     override fun onCreateView(
         inflater: LayoutInflater,
         container: ViewGroup?,
@@ -58,6 +71,8 @@ class ThemeFragment : Fragment() {
     ): View = with(requireContext()) {
         previewUi = KeyboardPreviewUi(this, ThemeManager.activeTheme)
         ThemeManager.addOnChangedListener(onThemeChangeListener)
+        AppPrefs.getInstance().keyboard.registerOnChangeListener(onSizeChangeListener)
+        ThemeManager.prefs.registerOnChangeListener(onKeysChangeListener)
         val preview = previewUi.root.apply {
             scaleX = 0.5f
             scaleY = 0.5f
@@ -81,7 +96,7 @@ class ThemeFragment : Fragment() {
             tab.text = getString(
                 when (position) {
                     0 -> R.string.theme
-                    else -> R.string.configure
+                    else -> R.string.configure_look
                 }
             )
         }.attach()
@@ -123,6 +138,22 @@ class ThemeFragment : Fragment() {
 
     override fun onDestroy() {
         ThemeManager.removeOnChangedListener(onThemeChangeListener)
+        AppPrefs.getInstance().keyboard.unregisterOnChangeListener(onSizeChangeListener)
+        ThemeManager.prefs.unregisterOnChangeListener(onKeysChangeListener)
         super.onDestroy()
+    }
+
+    companion object {
+        private val SIZE_KEYS = setOf(
+            "keyboard_height_percent", "keyboard_height_percent_landscape",
+            "keyboard_side_padding", "keyboard_side_padding_landscape",
+            "keyboard_bottom_padding", "keyboard_bottom_padding_landscape",
+        )
+        private val KEY_KEYS = setOf(
+            "key_border", "key_radius",
+            "key_horizontal_margin", "key_horizontal_margin_landscape",
+            "key_vertical_margin", "key_vertical_margin_landscape",
+            "punctuation_position",
+        )
     }
 }

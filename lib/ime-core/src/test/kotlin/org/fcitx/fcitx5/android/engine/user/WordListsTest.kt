@@ -70,4 +70,36 @@ class WordListsTest {
         assertEquals(listOf(entry("你好", "ni", "hao")), lists.addedWords)
         assertEquals(1, errors.size)
     }
+
+    @Test
+    fun aLineToImportIsAWordAndItsPinyinEitherWayRound() {
+        assertEquals(WordLists.Line("幽默", "you'mo", false), WordLists.line("幽默 you'mo"))
+        assertEquals(WordLists.Line("幽默", "you mo", false), WordLists.line("you mo\t幽默\t3"))
+        assertEquals(WordLists.Line("幽默", null, true), WordLists.line("!幽默"))
+        assertEquals(WordLists.Line("幽默", "youmo", false), WordLists.line("\uFEFF幽默 youmo"))
+        assertNull(WordLists.line("  "))
+        assertNull(WordLists.line("# 幽默 you'mo"))
+        assertEquals(WordLists.Line.UNREAD, WordLists.line("you mo"))
+        assertEquals(WordLists.Line.UNREAD, WordLists.line("幽默 风趣"))
+    }
+
+    @Test
+    fun aListIsReadInTheEncodingOtherInputMethodsWriteIn() {
+        val text = "幽默 you'mo\n"
+        assertEquals(text, WordLists.decode(text.toByteArray(Charsets.UTF_8)))
+        assertEquals(text, WordLists.decode(byteArrayOf(0xFF.toByte(), 0xFE.toByte()) + text.toByteArray(Charsets.UTF_16LE)))
+        assertEquals(text, WordLists.decode(byteArrayOf(0xFE.toByte(), 0xFF.toByte()) + text.toByteArray(Charsets.UTF_16BE)))
+        assertEquals(text, WordLists.decode(text.toByteArray(charset("GB18030"))))
+    }
+
+    @Test
+    fun aLetterIsASyllableAsSpelledAndReadsBackSo() {
+        val stock = WordLists.entry("A股", "A'gu")!!
+        assertEquals("A股 A'gu", "${stock.text} ${WordLists.code(stock.syllables)}")
+        assertEquals(stock, WordLists.entry("A股", "A gu"))
+        // typed in capitals, a word of pinyin still reads
+        assertEquals(entry("你好", "ni", "hao"), WordLists.entry("你好", "Ni Hao"))
+        // a capital where the word has no letter: the syllable
+        assertEquals(entry("啊", "a"), WordLists.entry("啊", "A"))
+    }
 }

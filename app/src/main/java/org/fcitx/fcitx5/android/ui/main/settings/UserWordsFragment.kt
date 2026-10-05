@@ -4,237 +4,149 @@
  */
 package org.fcitx.fcitx5.android.ui.main.settings
 
+import android.net.Uri
 import android.os.Bundle
-import android.text.InputType
-import android.view.Menu
-import android.view.MenuInflater
-import android.view.MenuItem
-import android.view.View
-import android.view.inputmethod.EditorInfo
+import androidx.activity.result.ActivityResultLauncher
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
-import androidx.core.view.MenuProvider
 import androidx.fragment.app.activityViewModels
-import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
+import androidx.preference.Preference
 import androidx.preference.PreferenceCategory
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.fcitx.fcitx5.android.R
-import org.fcitx.fcitx5.android.core.FcitxAPI
 import org.fcitx.fcitx5.android.engine.host.Engines.UserWord
 import org.fcitx.fcitx5.android.engine.user.WordLists
 import org.fcitx.fcitx5.android.ui.common.PaddingPreferenceFragment
+import org.fcitx.fcitx5.android.ui.common.withLoadingDialog
 import org.fcitx.fcitx5.android.ui.main.MainViewModel
 import org.fcitx.fcitx5.android.utils.addPreference
-import org.fcitx.fcitx5.android.utils.item
-import org.fcitx.fcitx5.android.utils.materialTextInput
-import org.fcitx.fcitx5.android.utils.onPositiveButtonClick
-import org.fcitx.fcitx5.android.utils.str
-import org.fcitx.fcitx5.android.utils.styledColor
-import splitties.views.dsl.core.add
-import splitties.views.dsl.core.lParams
-import splitties.views.dsl.core.matchParent
-import splitties.views.dsl.core.verticalLayout
-import splitties.views.setPaddingDp
-import kotlin.math.roundToInt
+import org.fcitx.fcitx5.android.utils.navigateWithAnim
+import org.fcitx.fcitx5.android.utils.toast
+import java.io.IOException
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 /**
- * The user's words, in three lists: those they added here, those the engine learned as they put
- * a reading together from pieces, and those they blocked (here, or by a long press on a
- * candidate). A word is added, edited, forgotten, blocked or shown again from here.
+ * The user dictionary at a glance: how many words each of its lists holds, a page of its own
+ * for each (see [UserWordListFragment]: a list may run to thousands), and the whole of it
+ * imported or exported as a text file.
  */
 class UserWordsFragment : PaddingPreferenceFragment() {
 
     private val viewModel: MainViewModel by activityViewModels()
 
-    private var words = emptyList<UserWord>()
-    private var filter = ""
+    private val lists = mutableMapOf<UserWord.Kind, Preference>()
+
+    private lateinit var importLauncher: ActivityResultLauncher<String>
+    private lateinit var exportLauncher: ActivityResultLauncher<String>
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        importLauncher = registerForActivityResult(ActivityResultContracts.GetContent()) { it?.let(::import) }
+        exportLauncher = registerForActivityResult(ActivityResultContracts.CreateDocument("text/plain")) { it?.let(::export) }
+    }
 
     override fun onCreatePreferences(savedInstanceState: Bundle?, rootKey: String?) {
-        preferenceScreen = preferenceManager.createPreferenceScreen(requireContext())
-        refresh()
-    }
-
-    override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
-        super.onViewCreated(view, savedInstanceState)
-        requireActivity().addMenuProvider(object : MenuProvider {
-            override fun onCreateMenu(menu: Menu, menuInflater: MenuInflater) {
-                val tint = requireContext().styledColor(android.R.attr.colorControlNormal)
-                menu.item(R.string.search, R.drawable.ic_baseline_search_24, tint, showAsAction = true) { search() }
+        val ctx = requireContext()
+        val screen = preferenceManager.createPreferenceScreen(ctx)
+        preferenceScreen = screen
+        val words = category(R.string.words_section_manage)
+        for (kind in UserWord.Kind.entries) {
+            lists[kind] = Preference(ctx).apply {
+                setTitle(title(kind))
+                isIconSpaceReserved = false
+                setOnPreferenceClickListener {
+                    navigateWithAnim(SettingsRoute.UserWordList(kind.name))
+                    true
+                }
+                words.addPreference(this)
             }
-
-            override fun onMenuItemSelected(menuItem: MenuItem) = false
-        }, viewLifecycleOwner, Lifecycle.State.STARTED)
+        }
+        val files = category(R.string.words_section_files)
+        files.addPreference(R.string.import_words, R.string.import_words_summary) {
+            importLauncher.launch("text/*")
+        }
+        files.addPreference(R.string.export_words, R.string.export_words_summary) {
+            exportLauncher.launch("youmo-words-${SimpleDateFormat("yyyyMMdd", Locale.ROOT).format(Date())}.txt")
+        }
     }
 
-    private fun refresh() {
+    private fun category(title: Int) = PreferenceCategory(requireContext()).apply {
+        setTitle(title)
+        isIconSpaceReserved = false
+        preferenceScreen.addPreference(this)
+    }
+
+    override fun onResume() {
+        super.onResume()
+        // back from a list: counted again
+        refreshCounts()
+    }
+
+    private fun refreshCounts() {
         lifecycleScope.launch {
-            words = viewModel.fcitx.runOnReady { userWords() }
-            show()
+            val counts = viewModel.fcitx.runOnReady { userWords() }.groupingBy { it.kind }.eachCount()
+            lists.forEach { (kind, pref) -> pref.summary = count(counts[kind] ?: 0) }
         }
     }
 
-    private fun show() {
-        val screen = preferenceScreen
-        screen.removeAll()
-        if (filter.isNotEmpty()) {
-            screen.addPreference(getString(R.string.search_clear, filter)) {
-                filter = ""
-                show()
-            }
-        }
-        screen.addPreference(R.string.add_word, R.string.add_word_summary, R.drawable.ic_baseline_plus_24) {
-            edit(R.string.add_word, null) { text, pinyin -> addUserWord(text, pinyin) }
-        }
-        val shown = words.filter { filter.isEmpty() || filter in it.text || filter in it.pinyin.replace(" ", "") }
-        section(R.string.my_words_added, shown, UserWord.Kind.ADDED)
-        section(R.string.my_words_learned, shown, UserWord.Kind.LEARNED)
-        section(R.string.my_words_blocked, shown, UserWord.Kind.BLOCKED) {
-            addPreference(R.string.block_word, R.string.block_word_summary) {
-                edit(R.string.block_word, null) { text, pinyin -> blockUserWord(text, pinyin) }
-            }
-        }
-    }
+    private fun count(n: Int) = resources.getQuantityString(R.plurals.word_count, n, n)
 
-    private fun section(title: Int, shown: List<UserWord>, kind: UserWord.Kind, head: PreferenceCategory.() -> Unit = {}) {
-        val category = PreferenceCategory(requireContext()).apply {
-            setTitle(title)
-            isIconSpaceReserved = false
-        }
-        preferenceScreen.addPreference(category)
-        category.head()
-        val ofKind = shown.filter { it.kind == kind }
-        if (ofKind.isEmpty()) {
-            category.addPreference(R.string.my_words_none)
-            return
-        }
-        for (word in ofKind) {
-            val summary = if (kind == UserWord.Kind.LEARNED) {
-                val times = word.count.roundToInt().coerceAtLeast(1)
-                resources.getQuantityString(R.plurals.word_typed_times, times, word.pinyin, times)
-            } else {
-                word.pinyin
-            }
-            category.addPreference(word.text, summary) { act(word) }
-        }
-    }
-
-    /** What can be done to [word]: edited (as an added word), taken off its list. */
-    private fun act(word: UserWord) {
+    private fun import(uri: Uri) {
         val ctx = requireContext()
-        val remove = when (word.kind) {
-            UserWord.Kind.ADDED -> R.string.delete
-            UserWord.Kind.LEARNED -> R.string.forget_word
-            UserWord.Kind.BLOCKED -> R.string.unblock_word
-        }
-        val actions = buildList {
-            if (word.kind != UserWord.Kind.BLOCKED) add(R.string.edit)
-            add(remove)
-        }
-        AlertDialog.Builder(ctx)
-            .setTitle("${word.text}  ${word.pinyin}")
-            .setItems(actions.map { getString(it) }.toTypedArray()) { _, which ->
-                when (actions[which]) {
-                    R.string.edit -> edit(R.string.edit, word) { text, pinyin ->
-                        // added before the old is taken off: a word that does not read so leaves both be
-                        addUserWord(text, pinyin).also { if (it) removeUserWord(word) }
-                    }
-                    else -> lifecycleScope.launch {
-                        viewModel.fcitx.runOnReady { removeUserWord(word) }
-                        refresh()
-                    }
+        lifecycleScope.withLoadingDialog(ctx) {
+            try {
+                val lines = withContext(Dispatchers.IO) {
+                    val bytes = (ctx.contentResolver.openInputStream(uri) ?: throw IOException("cannot read $uri")).use { it.readBytes() }
+                    WordLists.decode(bytes).lines()
                 }
+                val imported = viewModel.fcitx.runOnReady { importUserWords(lines) }
+                AlertDialog.Builder(ctx)
+                    .setTitle(R.string.import_words)
+                    .setMessage(getString(R.string.import_words_done, imported.added, imported.blocked, imported.unread))
+                    .setPositiveButton(android.R.string.ok, null)
+                    .show()
+                refreshCounts()
+            } catch (e: IOException) {
+                ctx.toast(e)
+            } catch (e: SecurityException) {
+                // a file the picker gave that its provider will not open after all
+                ctx.toast(e)
             }
-            .show()
+        }
     }
 
-    /**
-     * Asks for a word and its pinyin, prefilled with [word]'s, and hands them to [save]; kept
-     * open, with an error under the pinyin, while they do not read together. Left blank, the
-     * pinyin is filled in as the dictionary reads the word, for the user to check and save.
-     */
-    private fun edit(title: Int, word: UserWord?, save: suspend FcitxAPI.(String, String) -> Boolean) {
+    private fun export(uri: Uri) {
         val ctx = requireContext()
-        val (textLayout, textField) = ctx.materialTextInput { hint = getString(R.string.word_text) }
-        textField.apply {
-            isSingleLine = true
-            imeOptions = EditorInfo.IME_ACTION_NEXT
-        }
-        val (pinyinLayout, pinyinField) = ctx.materialTextInput { hint = getString(R.string.word_pinyin) }
-        pinyinField.apply {
-            isSingleLine = true
-            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS or InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD
-        }
-        word?.let {
-            textField.setText(it.text)
-            pinyinField.setText(it.pinyin)
-        }
-        val layout = ctx.verticalLayout {
-            setPaddingDp(20, 10, 20, 0)
-            add(textLayout, lParams(matchParent))
-            add(pinyinLayout, lParams(matchParent))
-        }
-        AlertDialog.Builder(ctx)
-            .setTitle(title)
-            .setView(layout)
-            .setPositiveButton(android.R.string.ok, null)
-            .setNegativeButton(android.R.string.cancel, null)
-            .show()
-            .onPositiveButtonClick onClick@{
-                val text = textField.str.trim()
-                val pinyin = pinyinField.str
-                if (text.isEmpty()) {
-                    textField.error = getString(R.string._cannot_be_empty, getString(R.string.word_text))
-                    return@onClick false
-                }
-                val dialog = this
-                if (pinyin.isBlank()) {
-                    // read as the dictionary reads it, shown for the user to check before saving
-                    lifecycleScope.launch {
-                        val guessed = viewModel.fcitx.runOnReady { pinyinOf(text) }
-                        if (guessed == null) {
-                            pinyinField.error = getString(R.string.word_pinyin_unknown)
-                        } else {
-                            pinyinField.setText(guessed)
-                        }
-                    }
-                    return@onClick false
-                }
-                val entry = WordLists.entry(text, pinyin)
-                if (entry == null) {
-                    pinyinField.error = getString(R.string.word_pinyin_invalid)
-                    return@onClick false
-                }
-                // unchanged: nothing to do
-                if (word != null && WordLists.entry(word.text, word.pinyin) == entry) return@onClick true
-                lifecycleScope.launch {
-                    if (viewModel.fcitx.runOnReady { save(text, pinyin) }) {
-                        dialog.dismiss()
-                        refresh()
-                    } else {
-                        pinyinField.error = getString(R.string.word_pinyin_invalid)
+        lifecycleScope.withLoadingDialog(ctx) {
+            try {
+                val lines = viewModel.fcitx.runOnReady { exportUserWords() }
+                withContext(Dispatchers.IO) {
+                    (ctx.contentResolver.openOutputStream(uri) ?: throw IOException("cannot write $uri")).bufferedWriter().use { out ->
+                        out.write(getString(R.string.export_words_header))
+                        out.write("\n")
+                        lines.forEach { out.write(it); out.write("\n") }
                     }
                 }
-                false
+                ctx.toast(count(lines.size))
+            } catch (e: IOException) {
+                ctx.toast(e)
+            } catch (e: SecurityException) {
+                // a file the picker gave that its provider will not open after all
+                ctx.toast(e)
             }
+        }
     }
 
-    private fun search() {
-        val ctx = requireContext()
-        val (layout, field) = ctx.materialTextInput { hint = getString(R.string.search_words_hint) }
-        field.isSingleLine = true
-        field.setText(filter)
-        val padded = ctx.verticalLayout {
-            setPaddingDp(20, 10, 20, 0)
-            add(layout, lParams(matchParent))
+    companion object {
+        fun title(kind: UserWord.Kind) = when (kind) {
+            UserWord.Kind.ADDED -> R.string.my_words_added
+            UserWord.Kind.LEARNED -> R.string.my_words_learned
+            UserWord.Kind.BLOCKED -> R.string.my_words_blocked
         }
-        AlertDialog.Builder(ctx)
-            .setTitle(R.string.search)
-            .setView(padded)
-            .setPositiveButton(android.R.string.ok) { _, _ ->
-                filter = field.str.trim().replace(" ", "")
-                show()
-            }
-            .setNegativeButton(android.R.string.cancel, null)
-            .show()
     }
 }

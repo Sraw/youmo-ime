@@ -9,6 +9,10 @@ import org.fcitx.fcitx5.android.engine.pinyin.Syllables
 import org.fcitx.fcitx5.android.engine.user.UserModel.Entry
 import java.io.File
 import java.io.IOException
+import java.nio.ByteBuffer
+import java.nio.charset.CharacterCodingException
+import java.nio.charset.Charset
+import java.nio.charset.CodingErrorAction
 
 /**
  * The words the user added by hand and the words they blocked, as they edit them in the settings
@@ -24,13 +28,27 @@ class WordLists(private val dir: File?, private val onError: (IOException) -> Un
     val blockedWords: List<Entry> get() = blocked.toList()
 
     /** Adds [entry]; whether it was not there already. */
-    fun add(entry: Entry): Boolean = added.add(entry).also { if (it) write(ADDED, added) }
+    fun add(entry: Entry): Boolean = addAll(listOf(entry)).isNotEmpty()
 
-    fun remove(entry: Entry): Boolean = added.remove(entry).also { if (it) write(ADDED, added) }
+    fun remove(entry: Entry): Boolean = removeAll(listOf(entry)).isNotEmpty()
 
-    fun block(entry: Entry): Boolean = blocked.add(entry).also { if (it) write(BLOCKED, blocked) }
+    fun block(entry: Entry): Boolean = blockAll(listOf(entry)).isNotEmpty()
 
-    fun unblock(entry: Entry): Boolean = blocked.remove(entry).also { if (it) write(BLOCKED, blocked) }
+    fun unblock(entry: Entry): Boolean = unblockAll(listOf(entry)).isNotEmpty()
+
+    // a list written once however many change: a thousand words imported are one write, not a thousand
+
+    /** Adds [entries]; those that were not there already. */
+    fun addAll(entries: Collection<Entry>): List<Entry> = change(ADDED, added, entries) { added.add(it) }
+
+    fun removeAll(entries: Collection<Entry>): List<Entry> = change(ADDED, added, entries) { added.remove(it) }
+
+    fun blockAll(entries: Collection<Entry>): List<Entry> = change(BLOCKED, blocked, entries) { blocked.add(it) }
+
+    fun unblockAll(entries: Collection<Entry>): List<Entry> = change(BLOCKED, blocked, entries) { blocked.remove(it) }
+
+    private inline fun change(name: String, list: Set<Entry>, entries: Collection<Entry>, op: (Entry) -> Boolean) =
+        entries.filter(op).also { if (it.isNotEmpty()) write(name, list) }
 
     /** Lists the added words in [model], and blocks the blocked ones there. */
     fun applyTo(model: UserModel) {
@@ -65,9 +83,61 @@ class WordLists(private val dir: File?, private val onError: (IOException) -> Un
         }
     }
 
+    /**
+     * A line of a word list the user imports, as other input methods export them too: a word
+     * and its pinyin either way round (`幽默 you'mo`, `you mo 幽默`), a count after them left
+     * out; a word alone, its [pinyin] null, for the dictionary to read. `!` before the word
+     * blocks it, as [Engines][org.fcitx.fcitx5.android.engine.host.Engines] exports the blocked.
+     */
+    data class Line(val text: String, val pinyin: String?, val blocked: Boolean) {
+        companion object {
+            /** A line with no word in it this reads: counted, so a file read as nothing does not say so silently. */
+            val UNREAD = Line("", null, false)
+        }
+    }
+
     companion object {
         const val ADDED = "words.added"
         const val BLOCKED = "words.blocked"
+
+        /**
+         * A word list as other input methods write theirs: UTF-8, or UTF-16 with its byte order
+         * mark (Sogou's export), or else GB18030 (older Windows ones).
+         */
+        fun decode(bytes: ByteArray): String {
+            fun bom(vararg b: Int) = bytes.size >= b.size && b.indices.all { bytes[it] == b[it].toByte() }
+            return when {
+                bom(0xFF, 0xFE) -> String(bytes, 2, bytes.size - 2, Charsets.UTF_16LE)
+                bom(0xFE, 0xFF) -> String(bytes, 2, bytes.size - 2, Charsets.UTF_16BE)
+                else -> try {
+                    Charsets.UTF_8.newDecoder()
+                        .onMalformedInput(CodingErrorAction.REPORT)
+                        .onUnmappableCharacter(CodingErrorAction.REPORT)
+                        .decode(ByteBuffer.wrap(bytes)).toString()
+                } catch (_: CharacterCodingException) {
+                    String(bytes, Charset.forName("GB18030"))
+                }
+            }
+        }
+
+        /** [line] as a word to import; null for a blank line or a `#` comment, [Line.UNREAD] for one with no word in it. */
+        fun line(line: String): Line? {
+            var rest = line.trim().removePrefix("\uFEFF")
+            if (rest.isEmpty() || rest.startsWith("#")) return null
+            val blocked = rest.startsWith("!")
+            if (blocked) rest = rest.substring(1)
+            var text: String? = null
+            val pinyin = ArrayList<String>()
+            for (token in rest.split(Regex("\\s+"))) when {
+                token.isEmpty() || token.all { it.isDigit() || it == '.' } -> {}
+                token.all { it in 'a'..'z' || it in 'A'..'Z' || it == '\'' || it == 'ü' } -> pinyin += token
+                text == null -> text = token
+                // a second word: not a line this reads
+                else -> return Line.UNREAD
+            }
+            text ?: return Line.UNREAD
+            return Line(text, pinyin.joinToString(" ").ifEmpty { null }, blocked)
+        }
 
         /** [syllables] as libime's text dictionaries spell them: `ni'hao`. */
         fun code(syllables: IntArray) = syllables.joinToString("'") { Syllables.spelling(it) }
@@ -80,6 +150,13 @@ class WordLists(private val dir: File?, private val onError: (IOException) -> Un
         fun entry(text: String, pinyin: String): Entry? {
             val word = text.trim()
             val chars = word.codePointCount(0, word.length)
+            // as spelled first: a letter is a syllable of its own (A股 A'gu), lowercased a vowel or none
+            val given = pinyin.trim().replace('ü', 'v').split(Regex("[\\s']+")).filter { it.isNotEmpty() }
+            // only where the word has that letter: 啊 A is the syllable a, not the letter
+            val letters = given.size == chars && word.isNotEmpty() && given.withIndex().all { (i, part) ->
+                part.none { it.isUpperCase() } || part == String(Character.toChars(word.codePointAt(word.offsetByCodePoints(0, i))))
+            }
+            if (letters) LibimeImport.entry(word, given.joinToString("'"))?.let { return it }
             val parts = pinyin.trim().lowercase().replace('ü', 'v').split(Regex("[\\s']+")).filter { it.isNotEmpty() }
             if (word.isEmpty() || parts.isEmpty()) return null
             val syllables = if (parts.size == chars) parts else split(parts.joinToString(""), chars) ?: return null

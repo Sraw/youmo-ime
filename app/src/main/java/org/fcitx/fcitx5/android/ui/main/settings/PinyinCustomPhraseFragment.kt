@@ -4,14 +4,21 @@
  */
 package org.fcitx.fcitx5.android.ui.main.settings
 
+import android.net.Uri
 import android.os.Bundle
 import android.text.InputFilter
 import android.text.InputType
 import android.view.LayoutInflater
+import android.view.Menu
+import android.view.MenuInflater
+import android.view.MenuItem
 import android.view.View
 import android.view.ViewGroup
 import android.view.inputmethod.EditorInfo
+import androidx.activity.result.ActivityResultLauncher
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
+import androidx.core.view.MenuProvider
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.activityViewModels
 import androidx.lifecycle.Lifecycle
@@ -24,6 +31,8 @@ import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.core.reloadPinyinCustomPhrase
 import org.fcitx.fcitx5.android.data.pinyin.CustomPhraseManager
 import org.fcitx.fcitx5.android.data.pinyin.customphrase.PinyinCustomPhrase
+import org.fcitx.fcitx5.android.engine.phrase.CustomPhrases
+import org.fcitx.fcitx5.android.engine.user.WordLists
 import org.fcitx.fcitx5.android.ui.common.BaseDynamicListUi
 import org.fcitx.fcitx5.android.ui.common.OnItemChangedListener
 import org.fcitx.fcitx5.android.ui.main.EditDeleteMenuProvider
@@ -41,6 +50,7 @@ import splitties.views.dsl.core.matchParent
 import splitties.views.dsl.core.verticalLayout
 import splitties.views.setPaddingDp
 import timber.log.Timber
+import java.io.File
 import java.io.IOException
 import kotlin.math.absoluteValue
 import kotlin.math.min
@@ -58,6 +68,15 @@ class PinyinCustomPhraseFragment : Fragment(), OnItemChangedListener<PinyinCusto
 
     // the file as last loaded or saved here: what the keyboard changed since is kept on save
     private var loaded = emptyList<PinyinCustomPhrase>()
+
+    private lateinit var importLauncher: ActivityResultLauncher<String>
+    private lateinit var exportLauncher: ActivityResultLauncher<String>
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        importLauncher = registerForActivityResult(ActivityResultContracts.GetContent()) { it?.let(::importPhrases) }
+        exportLauncher = registerForActivityResult(ActivityResultContracts.CreateDocument("text/plain")) { it?.let(::exportPhrases) }
+    }
 
     private var keyLabel = KEY
     private var orderLabel = ORDER
@@ -209,6 +228,64 @@ class PinyinCustomPhraseFragment : Fragment(), OnItemChangedListener<PinyinCusto
             viewLifecycleOwner,
             Lifecycle.State.STARTED
         )
+        // in the overflow: a file of phrases, as fcitx writes them, in and out
+        requireActivity().addMenuProvider(object : MenuProvider {
+            override fun onCreateMenu(menu: Menu, menuInflater: MenuInflater) {
+                menu.add(R.string.import_file).setOnMenuItemClickListener {
+                    importLauncher.launch("text/*")
+                    true
+                }
+                menu.add(R.string.export_file).setOnMenuItemClickListener {
+                    exportLauncher.launch("youmo-phrases.txt")
+                    true
+                }
+            }
+
+            override fun onMenuItemSelected(menuItem: MenuItem) = false
+        }, viewLifecycleOwner, Lifecycle.State.STARTED)
+    }
+
+    /** Adds the phrases of a file the user picks, those the list has not already; saved as the page is left. */
+    private fun importPhrases(uri: Uri) {
+        val ctx = requireContext()
+        lifecycleScope.launch {
+            try {
+                val text = withContext(Dispatchers.IO) {
+                    WordLists.decode((ctx.contentResolver.openInputStream(uri) ?: throw IOException("cannot read $uri")).use { it.readBytes() })
+                }
+                val have = ui.entries.mapTo(HashSet()) { it.serialize() }
+                val phrases = CustomPhrases.parse(text).all
+                    .map { PinyinCustomPhrase(it.key, it.order, it.value) }
+                    .filter { have.add(it.serialize()) }
+                phrases.forEach { ui.addItem(item = it) }
+                ctx.toast(getString(R.string.import_phrases_done, phrases.size))
+            } catch (e: IOException) {
+                ctx.toast(e)
+            } catch (e: SecurityException) {
+                // a file the picker gave that its provider will not open after all
+                ctx.toast(e)
+            }
+        }
+    }
+
+    private fun exportPhrases(uri: Uri) {
+        val ctx = requireContext()
+        val items = ui.entries
+        lifecycleScope.launch {
+            try {
+                withContext(Dispatchers.IO) {
+                    val temp = File(ctx.cacheDir, "customphrase.export")
+                    CustomPhraseManager.save(items, temp)
+                    (ctx.contentResolver.openOutputStream(uri) ?: throw IOException("cannot write $uri")).use { out -> temp.inputStream().use { it.copyTo(out) } }
+                    temp.delete()
+                }
+            } catch (e: IOException) {
+                ctx.toast(e)
+            } catch (e: SecurityException) {
+                // a file the picker gave that its provider will not open after all
+                ctx.toast(e)
+            }
+        }
     }
 
     override fun onItemAdded(idx: Int, item: PinyinCustomPhrase) {
