@@ -87,14 +87,14 @@ class EngineDataPlugin : Plugin<Project> {
         )
         // the language model engine-data.sh made (its manifest.txt in the release says from what),
         // repacked as the tar CMake unpacks; a tag of its own, not "latest", as the models'
-        private const val LM_RELEASE = "engine-data-20261005-2"
+        private const val LM_RELEASE = "engine-data-20261005-3"
         private const val LM_URL = "https://github.com/Sraw/youmo-ime/releases/download/$LM_RELEASE/lm.tar.zst"
-        private const val LM_SHA256 = "7a11fae10e80d6e3afb9386014841a4ba1399300f61c5ecc03b26f3822a152dc"
+        private const val LM_SHA256 = "be95e2528a7c3e0b0d466e9547399a72b05c21131e09f156ac10fa5d84052b67"
         private const val LM_FILE = "lm.arpa"
         // the curated new words (lexicon/add.tsv) as packed for that model, a layer of pinyin.data:
         // the words libime's dictionary has not got, which a build with no pack the user put in has too
         private const val WORDS_URL = "https://github.com/Sraw/youmo-ime/releases/download/words-202610/youmo-new.words"
-        private const val WORDS_SHA256 = "cafe96827bd0490313e7d201146a485b094528e89d6b45e5db41674290ec16aa"
+        private const val WORDS_SHA256 = "92fec7e7b8d0e9540676a87a27e93d824428e170e7bcf183a5c9af924dc52b76"
         const val MODEL_TASK = "copySentenceModels"
         // a tag of its own, not "latest": what is downloaded is what was measured
         private const val MODEL_URL =
