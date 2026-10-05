@@ -36,6 +36,8 @@ class SetupFragment : Fragment() {
             actionButton.visibility = if (done) View.GONE else View.VISIBLE
             actionButton.text = page.getButtonText(requireContext())
             actionButton.setOnClickListener { page.getButtonAction(requireContext()) }
+            // the icon sits where the button is: left visible it covered the button's text
+            doneIcon.visibility = if (done) View.VISIBLE else View.GONE
             doneText.visibility = if (done) View.VISIBLE else View.GONE
         }
     }
