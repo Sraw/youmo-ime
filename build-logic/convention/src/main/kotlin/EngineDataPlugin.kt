@@ -14,12 +14,10 @@ import org.gradle.api.file.DirectoryProperty
 import org.gradle.api.file.RegularFileProperty
 import org.gradle.api.provider.Property
 import org.gradle.api.tasks.CacheableTask
-import org.gradle.api.tasks.Classpath
 import org.gradle.api.tasks.Input
 import org.gradle.api.tasks.InputFile
 import org.gradle.api.tasks.InputFiles
 import org.gradle.api.tasks.Internal
-import org.gradle.api.tasks.JavaExec
 import org.gradle.api.tasks.OutputDirectory
 import org.gradle.api.tasks.OutputFile
 import org.gradle.api.tasks.PathSensitive
@@ -29,7 +27,6 @@ import org.gradle.kotlin.dsl.configure
 import org.gradle.kotlin.dsl.getByType
 import org.gradle.kotlin.dsl.named
 import org.gradle.kotlin.dsl.register
-import org.gradle.process.CommandLineArgumentProvider
 import org.gradle.process.ExecOperations
 import org.gradle.work.DisableCachingByDefault
 import java.io.File
@@ -150,11 +147,13 @@ class EngineDataPlugin : Plugin<Project> {
         }
         target.dependencies.add(tool.name, target.dependencies.project(mapOf("path" to ":lib:ime-dict-tool")))
 
+        // the tool's code that a run reaches, not all of :lib:ime-core it is built with (ToolFingerprint)
+        // read as the inputs are snapshotted, after the jars are built: with the configuration cache on
+        // it would be read when the cache is stored, before them, and go stale
+        val fingerprint = target.provider { ToolFingerprint.of(tool.files, TOOL_MAIN) }
         val compile = target.tasks.register<CompileEngineData>(COMPILE_TASK) {
-            classpath = tool
-            mainClass.set(TOOL_MAIN)
-            // the whole mixed model is held in memory while it is sorted: 3.6 GB resident, as measured
-            maxHeapSize = "4g"
+            classpath.from(tool)
+            toolCode.set(fingerprint)
             this.lm.set(lm.flatMap { it.outputDir.file(LM_FILE) })
             dictionaries.from(DICT.files.map { name -> extracted[0].flatMap { it.outputDir.file(name) } })
             dictionaries.from(words.flatMap { it.outputFile })
@@ -166,6 +165,7 @@ class EngineDataPlugin : Plugin<Project> {
         }
         val tables = target.tasks.register<CompileTables>(TABLES_TASK) {
             classpath.from(tool)
+            toolCode.set(fingerprint)
             tables.from(TABLE.files.map { name -> extracted[1].flatMap { it.outputDir.file(name) } })
             outputDir.set(target.layout.buildDirectory.dir("generated/engine-tables"))
         }
@@ -284,7 +284,18 @@ class EngineDataPlugin : Plugin<Project> {
     }
 
     @CacheableTask
-    abstract class CompileEngineData : JavaExec() {
+    abstract class CompileEngineData @Inject constructor(private val exec: ExecOperations) : DefaultTask() {
+        // built before this runs, but keyed on by toolCode only
+        @get:Internal
+        abstract val classpath: ConfigurableFileCollection
+
+        @get:Input
+        abstract val toolCode: Property<String>
+
+        init {
+            dependsOn(classpath)
+        }
+
         @get:InputFiles
         @get:PathSensitive(PathSensitivity.NAME_ONLY)
         abstract val lm: RegularFileProperty
@@ -304,20 +315,23 @@ class EngineDataPlugin : Plugin<Project> {
         @get:OutputDirectory
         abstract val outputDir: DirectoryProperty
 
-        init {
-            argumentProviders += CommandLineArgumentProvider {
-                listOf(
-                    "pinyin", "-o", output().path, "--lm", lm.get().asFile.path,
-                    "--remove", remove.get().asFile.path, "--readings", readings.get().asFile.path,
-                ) + dictionaries.files.map { it.path }
-            }
-        }
-
         private fun output() = outputDir.get().asFile.resolve("engine/pinyin.data")
 
-        override fun exec() {
+        @TaskAction
+        fun compile() {
             output().parentFile.mkdirs()
-            super.exec()
+            exec.javaexec {
+                classpath = this@CompileEngineData.classpath
+                mainClass.set(TOOL_MAIN)
+                // the whole mixed model is held in memory while it is sorted: 3.6 GB resident, as measured
+                maxHeapSize = "4g"
+                args(
+                    listOf(
+                        "pinyin", "-o", output().path, "--lm", lm.get().asFile.path,
+                        "--remove", remove.get().asFile.path, "--readings", readings.get().asFile.path,
+                    ) + dictionaries.files.map { it.path }
+                )
+            }
         }
     }
 
@@ -343,8 +357,15 @@ class EngineDataPlugin : Plugin<Project> {
     /** Compiles each code table's text into `engine/table/<name>.data`, one run of the tool each. */
     @CacheableTask
     abstract class CompileTables @Inject constructor(private val exec: ExecOperations) : DefaultTask() {
-        @get:Classpath
+        @get:Internal
         abstract val classpath: ConfigurableFileCollection
+
+        @get:Input
+        abstract val toolCode: Property<String>
+
+        init {
+            dependsOn(classpath)
+        }
 
         @get:InputFiles
         @get:PathSensitive(PathSensitivity.NAME_ONLY)
