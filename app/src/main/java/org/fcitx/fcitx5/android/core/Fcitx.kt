@@ -17,6 +17,7 @@ import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.core.data.DataManager
 import org.fcitx.fcitx5.android.data.clipboard.ClipboardManager
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
+import org.fcitx.fcitx5.android.engine.host.Engines
 import org.fcitx.fcitx5.android.utils.Locales
 import org.fcitx.fcitx5.android.utils.appContext
 import org.fcitx.fcitx5.android.utils.toast
@@ -396,6 +397,14 @@ class Fcitx(private val context: Context) : FcitxAPI, FcitxLifecycleOwner {
         // will be called in fcitx main thread
         private fun onFirstRun() {
             Timber.i("onFirstRun")
+            // fcitx builds the first group from the system's language: on a phone not set to
+            // Chinese that is the keyboard alone, and this is a pinyin input method first. First in
+            // the group, as a field starts with the group's first (the globe key then toggles to the
+            // keyboard)
+            if (availableInputMethods()?.any { it.uniqueName == Engines.PINYIN } == true) {
+                val enabled = listInputMethods()?.map { it.uniqueName }.orEmpty().filter { it != Engines.PINYIN }
+                setEnabledInputMethods((listOf(Engines.PINYIN) + enabled).toTypedArray())
+            }
         }
 
         /**

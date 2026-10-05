@@ -25,12 +25,21 @@ object SubtypeManager {
         return knownSubtypes[inputMethod]
     }
 
-    fun inputMethodOf(subtype: InputMethodSubtype): String {
-        return subtype.extraValue.ifEmpty { IM_KEYBOARD }
+    /**
+     * The fcitx input method of one of our subtypes; null for one without (the system's, before
+     * [syncWith] has run on a fresh install), which says nothing of what the user picked: taking it
+     * for the keyboard opened every first field in English.
+     */
+    fun inputMethodOf(subtype: InputMethodSubtype): String? {
+        return subtype.extraValue.ifEmpty { null }
     }
 
     @RequiresApi(Build.VERSION_CODES.UPSIDE_DOWN_CAKE)
-    fun syncWith(inputMethods: Array<InputMethodEntry>) {
+    fun syncWith(enabled: Array<InputMethodEntry>) {
+        // the system takes the first subtype registered for the current one until the user picks
+        // another, and the first field switches to it: the keyboard first opened every fresh
+        // install in English
+        val inputMethods = enabled.sortedBy { it.uniqueName == IM_KEYBOARD }
         knownSubtypes.clear()
         val size = inputMethods.size
         val subtypes = arrayOfNulls<InputMethodSubtype>(size)

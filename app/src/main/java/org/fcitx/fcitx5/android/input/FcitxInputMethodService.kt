@@ -553,7 +553,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
             //    app to a subtype of ours via system input method picker (on 34+)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
                 val subtype = inputMethodManager.currentInputMethodSubtype ?: return
-                val im = SubtypeManager.inputMethodOf(subtype)
+                val im = SubtypeManager.inputMethodOf(subtype) ?: return
                 postFcitxJob {
                     activateIme(im)
                 }
@@ -573,7 +573,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     override fun onCurrentInputMethodSubtypeChanged(newSubtype: InputMethodSubtype) {
         super.onCurrentInputMethodSubtypeChanged(newSubtype)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-            val im = SubtypeManager.inputMethodOf(newSubtype)
+            val im = SubtypeManager.inputMethodOf(newSubtype) ?: return
             Timber.d("onCurrentInputMethodSubtypeChanged: im=$im")
             // don't change input method if this "subtype change" was our notify to system
             // see [^1]
