@@ -4,14 +4,16 @@
 # has that the dictionaries lack, as a word pack. A release-time job, run on a rented machine or
 # at home, never in an app build: it downloads some 100 GB and wants 16 GB of memory.
 #
-#   TOOL=<ime-dict-tool launcher> [EVAL=<ime-eval launcher> SETS=<dir>] [LEXICON=<add.tsv>] [WORDS=<pack.words>] engine-data.sh <work dir>
+#   TOOL=<ime-dict-tool launcher> [EVAL=<ime-eval launcher> SETS=<dir>] [LEXICON=<add.tsv>] [WORDS=<pack.words>]
+#     [REMOVE=<remove.tsv>] [READINGS=<readings.tsv>] engine-data.sh <work dir>
 #
 # The launchers are `installDist`'s (`./gradlew :lib:ime-dict-tool:installDist :lib:ime-eval:installDist`);
 # SETS holds the evaluation sets: lib/ime-eval/data/pinyin-new.tsv and the held-out ones of the
 # training data (pinyin, pinyin-context, pinyin-chat, pinyin-dialog, small).
 # LEXICON is the curated list, lexicon/add.tsv, by an absolute path; WORDS the last words-* release's
 # pack of it, by an absolute path: its words join the model's vocabulary, so the pages are split into
-# them and they get a context, not a unigram alone (13.1). Out, in <work dir>/out:
+# them and they get a context, not a unigram alone (13.1). REMOVE and READINGS are lexicon/'s
+# corrections of libime's dictionary, as the app build applies them. Out, in <work dir>/out:
 #   lm.tar.zst      the model (lm.arpa, as the app build unpacks it)
 #   new.words       the curated list's words as a pack (with LEXICON)
 #   pack.words      every candidate that passes, read as the dictionary reads its words: for curating
@@ -79,6 +81,7 @@ sources() {
   tar -I zstd -xf src/lm_sc.arpa-20260629.tar.zst -C src && tar -I zstd -xf src/dict-20260703.tar.zst -C src
 }
 DICTS="src/dict_sc.txt src/dict_extb.txt"
+CORRECT="${REMOVE:+--remove $REMOVE} ${READINGS:+--readings $READINGS}"
 
 # a shard is named by its crawl, so several crawls' lie side by side
 crawl() {
@@ -97,7 +100,7 @@ mix() { "$TOOL" mix -o lm.arpa --weight "$WEIGHT" --lm src/lm_sc.arpa ${WORDS:+"
 # sees what a user would
 # shellcheck disable=SC2086
 data() {
-  "$TOOL" pinyin -o pinyin.data --lm lm.arpa $DICTS ${WORDS:+"$WORDS"} > data.log || return 1
+  "$TOOL" pinyin -o pinyin.data --lm lm.arpa $DICTS $CORRECT ${WORDS:+"$WORDS"} > data.log || return 1
   grep -v '^wrote\|^trie' data.log
   return 0
 }
@@ -148,7 +151,7 @@ report() {
 weight() {
   local w=$1
   mkdir -p evals && "$TOOL" mix -o lm-$w.arpa --weight "$w" --lm src/lm_sc.arpa ${WORDS:+"$WORDS"} src/000_0000?.parquet cc/clean/*.parquet &&
-    "$TOOL" pinyin -o pinyin-$w.data --lm lm-$w.arpa $DICTS ${WORDS:+"$WORDS"} > data-$w.log &&
+    "$TOOL" pinyin -o pinyin-$w.data --lm lm-$w.arpa $DICTS $CORRECT ${WORDS:+"$WORDS"} > data-$w.log &&
     DATA=pinyin-$w.data TAG=weight-$w REPORT=out/weights.txt evaluate - && rm -f lm-$w.arpa pinyin-$w.data
 }
 manifest() {
@@ -159,7 +162,9 @@ manifest() {
     # what ran, whatever COMMIT says: a stale installDist shows here
     sha256sum "$(dirname "$TOOL")"/../lib/ime-*.jar | awk '{ n = split($2, p, "/"); print "tool", p[n], $1 }' &&
       { [ -z "$LEXICON" ] || sha256sum "$LEXICON" | awk '{ print "lexicon add.tsv", $1 }'; } &&
-      { [ -z "$WORDS" ] || sha256sum "$WORDS" | awk '{ print "words", $1 }'; }
+      { [ -z "$WORDS" ] || sha256sum "$WORDS" | awk '{ print "words", $1 }'; } &&
+      { [ -z "$READINGS" ] || sha256sum "$READINGS" | awk '{ print "lexicon readings.tsv", $1 }'; } &&
+      { [ -z "$REMOVE" ] || sha256sum "$REMOVE" | awk '{ print "lexicon remove.tsv", $1 }'; }
   } > out/manifest.txt || return 1
   # shellcheck disable=SC2046
   (cd out && sha256sum lm.tar.zst $(ls new.words pack.words ./*.tsv.zst 2> /dev/null)) >> out/manifest.txt
