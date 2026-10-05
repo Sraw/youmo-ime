@@ -451,11 +451,25 @@ class PinyinSession(
         decoderFirst = decoding.sentences.firstOrNull() ?: decoding.words.firstOrNull()
         decoderWords = decoding.words
         refining = refiner()
-        if (refining != null && decoding.sentences.size > 1) {
+        // a syllable still being typed (wo xiang m) is no reading to weigh: the refiner's pick there
+        // (我项目 over 我想买) only flashed on the bar, some 30 ms before the next key replaced it
+        if (refining != null && decoding.sentences.size > 1 && endsOnSyllable(graph)) {
             unrefined = decoding.sentences
             refined = 0
         }
         place(graph, rerank(decoding.sentences))
+    }
+
+    /**
+     * Whether the input's longest last syllable is whole: zhong, not zho (whose o alone is a
+     * syllable too, but not what is being typed), nor an initial. n, m, ng and r (嗯, 呣), and a,
+     * o and e, are syllables as well as initials: at the end, likelier the start of a longer one.
+     */
+    private fun endsOnSyllable(graph: SyllableGraph): Boolean {
+        val last = (0 until graph.edgeCount).filter { graph.to(it) == graph.end }
+        val from = last.minOfOrNull { graph.from(it) } ?: return false
+        val longest = last.filter { graph.from(it) == from }.map { graph.kind(it) }
+        return Kind.SYLLABLE in longest && Kind.INITIAL !in longest
     }
 
     /** Lists [sentences], then the decoder's words, with the phrases the input has among them. */
