@@ -21,8 +21,8 @@ import org.fcitx.fcitx5.android.engine.user.UserModel.Entry
  * The first line is [HEADER]. `layer` names the layer the words are of, for [LayerPrior]
  * ([org.fcitx.fcitx5.android.engine.lattice.LayerPrior]) to weigh against the user's picks;
  * [DEFAULT_LAYER] without it. Then a word a line: its text, how it reads (libime's `pin'yin`),
- * and its log10 probability on the model's unigram scale (万象's 搭子, seen 342 times, comes to
- * -5.9 against the mixed model; the unknown word is -6.5). Lines starting `#` are comments.
+ * and its log10 probability on the model's unigram scale (the unknown word is -6.5). Lines
+ * starting `#` are comments.
  *
  * A word of the pack that the model knows is listed but scored as the model says; one the model
  * lacks is scored as the pack says, in place of the unknown word ([UserScorer]).

@@ -49,11 +49,10 @@ import javax.inject.Inject
  * The language model is this fork's own, fetched from its `engine-data-*` release: libime's,
  * mixed with the n-grams of chat-like web pages (FineWeb-2's and a CommonCrawl crawl's), which
  * lib/ime-dict-tool/engine-data.sh makes on a rented machine, a job of an hour that downloads a
- * hundred gigabytes and so no part of a build (dev/TRAINING-PLAN.md 12). Compiled with it are
- * libime's dictionary and, beside it, 万象拼音's (rime_wanxiang, CC-BY-4.0), read as Rime writes
- * them: libime's has few words of the last years. 万象's stands in until the fork's own lexicon
- * finds its words, and `-Pengine.wanxiang=false` leaves it out. The sentence models,
- * `engine/sentence-model.safetensors` (4M, weighing the readings at each key) and
+ * hundred gigabytes and so no part of a build (dev/TRAINING-PLAN.md 12). Compiled with it is
+ * libime's dictionary and, as a layer of its own, the words of the last years it lacks: the fork's
+ * curated lexicon (`lexicon/`), packed for that model and published as a `words-*` release. The
+ * sentence models, `engine/sentence-model.safetensors` (4M, weighing the readings at each key) and
  * `engine/sentence-model-large.safetensors` (25M, while the user pauses), are this fork's own too
  * (dev/TRAINING-PLAN.md: FineWeb-2 pages scored by Qwen3.5-9B-Base), from another release. The
  * .data files and the models are stored uncompressed, so the engine can map them straight out of
@@ -86,23 +85,16 @@ class EngineDataPlugin : Plugin<Project> {
             "3e9d87b04a393f131723472c8eaa860dd23c378a3d4f6a9005513b2a95b3614b",
             listOf("cj", "db", "erbi", "qxm", "wanfeng", "wbpy", "wbx", "zrm").map { "$it.txt" },
         )
-        // amzxyz/rime_wanxiang's dictionaries at the commit measured (dev/TRAINING-PLAN.md 10.5): name to SHA-256
-        private const val WANXIANG_URL =
-            "https://raw.githubusercontent.com/amzxyz/rime_wanxiang/55fbad487c637d64a0371b74d177302ac1cdd16e/dicts/"
-        private val WANXIANG = mapOf(
-            "zi.dict.yaml" to "4be1b3689bb6a5e9316583b3aa2e8c1cb83a33a7efe3775568e957212943b35a",
-            "jichu.dict.yaml" to "99c09968033e4a8e4e73f9e1cca7240ddb48a2af75cf2e745659a0b534e4c502",
-            "lianxiang.dict.yaml" to "46ad9ba434e5f1c5e2a38adefa3a8d542d26aa1c9eb588407bea82a9240e1c3f",
-            "duoyin.dict.yaml" to "36d3110e14cc58910bcb586cef0c0cb193d4f571332baf517932c39d9498f9ac",
-            "diming.dict.yaml" to "627b351e6fa660a40cef86dd923a4bafdeb0bc052c3f2b5eb36600b0d839e0d2",
-            "renming.dict.yaml" to "4c171aa4f5608934f5c504d8435c0e85dc06b938a1337a1fb041819dca1ca631",
-        )
         // the language model engine-data.sh made (its manifest.txt in the release says from what),
         // repacked as the tar CMake unpacks; a tag of its own, not "latest", as the models'
         private const val LM_RELEASE = "engine-data-20261005"
         private const val LM_URL = "https://github.com/Sraw/youmo-ime/releases/download/$LM_RELEASE/lm.tar.zst"
         private const val LM_SHA256 = "eb40f73ca1a89dac8951a3f0db1becfcb4147a7e207c66a1e0ba3a391ac0440d"
         private const val LM_FILE = "lm.arpa"
+        // the curated new words (lexicon/add.tsv) as packed for that model, a layer of pinyin.data:
+        // the words libime's dictionary has not got, which a build with no pack the user put in has too
+        private const val WORDS_URL = "https://github.com/Sraw/youmo-ime/releases/download/words-202610/youmo-new.words"
+        private const val WORDS_SHA256 = "3cdc94001a5cd021c8d9acc678e03cadd205c0a5606f401cebc5dafbe0e32e71"
         const val MODEL_TASK = "copySentenceModels"
         // a tag of its own, not "latest": what is downloaded is what was measured
         private const val MODEL_URL =
@@ -144,13 +136,10 @@ class EngineDataPlugin : Plugin<Project> {
             cmake.set(components.sdkComponents.sdkDirectory.map { it.file("cmake/$cmakeVersion/bin/cmake") })
             outputDir.set(sourcesDir.map { it.dir("lm_mixed") })
         }
-
-        val wanxiang = WANXIANG.entries.mapIndexed { i, (name, sha) ->
-            target.tasks.register<DownloadTask>("downloadWanxiang$i") {
-                url.set(WANXIANG_URL + name)
-                sha256.set(sha)
-                outputFile.set(downloadsDir.file("wanxiang/$name"))
-            }
+        val words = target.tasks.register<DownloadTask>("downloadEngineWords") {
+            url.set(WORDS_URL)
+            sha256.set(WORDS_SHA256)
+            outputFile.set(downloadsDir.file("engine-data/" + WORDS_URL.substringAfter("/download/").replace('/', '-')))
         }
 
         val tool = target.configurations.create("engineDataTool") {
@@ -168,7 +157,7 @@ class EngineDataPlugin : Plugin<Project> {
             maxHeapSize = "4g"
             this.lm.set(lm.flatMap { it.outputDir.file(LM_FILE) })
             dictionaries.from(DICT.files.map { name -> extracted[0].flatMap { it.outputDir.file(name) } })
-            if (flag(target, "engine.wanxiang")) dictionaries.from(wanxiang.map { download -> download.flatMap { it.outputFile } })
+            dictionaries.from(words.flatMap { it.outputFile })
             outputDir.set(target.layout.buildDirectory.dir("generated/engine-assets"))
         }
         val tables = target.tasks.register<CompileTables>(TABLES_TASK) {
@@ -201,11 +190,6 @@ class EngineDataPlugin : Plugin<Project> {
             variant.sources.assets?.addGeneratedSourceDirectory(model, CopyModels::outputDir)
         }
     }
-
-    /** A `-P<name>=true|false` switch, on unless said otherwise. */
-    private fun flag(target: Project, name: String) = target.providers.gradleProperty(name).orNull?.let {
-        requireNotNull(it.toBooleanStrictOrNull()) { "$name: true or false, not $it" }
-    } ?: true
 
     private fun stem(source: Source) = source.name.substringBefore('-').substringBefore('.')
 

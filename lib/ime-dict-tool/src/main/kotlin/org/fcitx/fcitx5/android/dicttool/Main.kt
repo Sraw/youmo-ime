@@ -27,9 +27,9 @@ import kotlin.math.abs
 import kotlin.system.exitProcess
 
 val USAGE = """
-    usage: pinyin -o <out> --lm <lm.arpa> [--rime-unigrams <min count>] <dict>...
-                                                          compile a pinyin dictionary and model, from
-                                                          libime's text or Rime's .dict.yaml
+    usage: pinyin -o <out> --lm <lm.arpa> <dict>...        compile a pinyin dictionary and model, from
+                                                          libime's text and word packs (.words), each
+                                                          pack a layer of its own
            table -o <out> <table.txt>                     compile a code table
            mix -o <out.arpa> --lm <lm.arpa> [--weight <w>] [--cutoffs <bigram>,<trigram>] <corpus>...
                                                           mix a model with n-grams counted in chat:
@@ -88,7 +88,7 @@ fun runCli(args: Array<String>, out: Appendable, err: Appendable): Int {
 private fun dispatch(command: String?, options: Options, out: Appendable): Boolean {
     if (!options.fit(command)) return false
     when (command) {
-        "pinyin" -> pinyin(options.output!!, options.lm!!, options.inputs, options.rimeUnigrams, out)
+        "pinyin" -> pinyin(options.output!!, options.lm!!, options.inputs, out)
         "table" -> table(options.output!!, options.inputs.single(), out)
         "mix" -> mix(options, out)
         "check" -> check(options.inputs[0], options.inputs[1], out)
@@ -107,8 +107,6 @@ private class Options(
     val inputs: List<String>,
     val weight: Double,
     val cutoffs: Pair<Int, Int>,
-    /** Rime words the model lacks with at least this count get a unigram from it ([CountFit]); null for none. */
-    val rimeUnigrams: Long?,
     /** `words`, `pack`: the pinyin data whose words are known. */
     val data: String?,
     /** `words`: how often a run must occur to be a candidate; `pack`: to go in. */
@@ -180,7 +178,7 @@ private class Options(
 
         // every option takes a value
         private val FLAGS = setOf(
-            "-o", "--lm", "--weight", "--cutoffs", "--rime-unigrams", "--data", "--min-count", "--layer", "--min-pmi", "--min-entropy", "--min-surprise", "--only",
+            "-o", "--lm", "--weight", "--cutoffs", "--data", "--min-count", "--layer", "--min-pmi", "--min-entropy", "--min-surprise", "--only",
             "--crawl", "--from", "--files", "--base", "--per-word", "--lexicon", "--sketch-bits",
         )
 
@@ -209,7 +207,6 @@ private class Options(
                 cutoffs = values.read("--cutoffs", CUTOFFS) { v ->
                     v.split(',').mapNotNull { it.toIntOrNull() }.takeIf { it.size == 2 && it[0] in 1..it[1] }?.let { it[0] to it[1] }
                 } ?: return null,
-                rimeUnigrams = values["--rime-unigrams"]?.let { it.toLongOrNull()?.takeIf { c -> c >= 0 } ?: return null },
                 data = values["--data"],
                 minCount = values.count("--min-count", MIN_COUNT, 1..Int.MAX_VALUE) ?: return null,
                 layer = values["--layer"]?.let { it.takeIf(WordPack::validLayer) ?: return null },
@@ -320,7 +317,7 @@ private fun clean(options: Options, out: Appendable) {
  */
 private fun words(options: Options, out: Appendable) {
     val data = PinyinData.load(map(options.data!!))
-    // the base layer's words: the others (Rime's) are the kind a pack is for, scored by true counts
+    // the base layer's words: the others are a pack's, the kind a pack is for, scored by true counts
     val known = HashSet<String>(data.vocabulary.size * 2)
     for (id in 0 until data.vocabulary.size) if (data.layers.layer(id) == 0) known += data.vocabulary.word(id)
     val finder = NewWords(known, options.minCount)
@@ -614,11 +611,9 @@ private fun mix(options: Options, out: Appendable) {
     out.appendLine("wrote ${options.output}: ${File(options.output).length()} bytes")
 }
 
-private const val RIME_SUFFIX = ".dict.yaml"
-/** The layer of the words from Rime's dictionaries: 万象's, the only ones read so far. */
-private const val WANXIANG_LAYER = "wanxiang"
+private const val PACK_SUFFIX = ".words"
 
-private fun pinyin(output: String, lm: String, dicts: List<String>, rimeUnigrams: Long?, out: Appendable) {
+private fun pinyin(output: String, lm: String, dicts: List<String>, out: Appendable) {
     val builder = PinyinDataBuilder()
     val counts = File(lm).bufferedReader().use { r ->
         ArpaReader.read(r, lm) { words, prob, backoff ->
@@ -631,27 +626,24 @@ private fun pinyin(output: String, lm: String, dicts: List<String>, rimeUnigrams
     }
     out.appendLine("model: ${counts.joinToString(" / ")} n-grams")
     val reader = PinyinDictReader(builder)
-    // Rime's are read together, after libime's: a word's weights there depend on every file it is in
-    val (rime, libime) = dicts.partition { it.endsWith(RIME_SUFFIX) }
-    builder.layers(if (rime.isEmpty()) listOf(WordLayers.BASE) else listOf(WordLayers.BASE, WANXIANG_LAYER))
-    libime.forEach { path -> File(path).bufferedReader().use { reader.read(it, path) } }
-    if (rime.isNotEmpty()) {
-        reader.layer = 1
-        val rimeDict = RimeDict()
-        rime.forEach { path -> File(path).bufferedReader().use { rimeDict.read(it, path) } }
-        rimeDict.entries().forEach { (word, pinyin, weight) -> reader.add(word, pinyin, weight) }
-        out.appendLine("rime: ${rimeDict.words} words")
-        if (rimeUnigrams != null) {
-            val fit = CountFit.of(rimeDict.totals().mapNotNull { (word, count) -> builder.unigramOf(word)?.let { count to it } }.toList())
-            var added = 0
-            rimeDict.totals().forEach { (word, count) ->
-                if (count >= rimeUnigrams && builder.unigramOf(word) == null) {
-                    builder.unigram(word, fit.prob(count), 0f)
-                    added++
-                }
+    val (packFiles, texts) = dicts.partition { it.endsWith(PACK_SUFFIX) }
+    val packs = packFiles.map { path -> File(path).useLines { WordPack.parse(it, path) } }
+    val layers = (listOf(WordLayers.BASE) + packs.map { it.layer }).distinct()
+    builder.layers(layers)
+    texts.forEach { path -> File(path).bufferedReader().use { reader.read(it, path) } }
+    // scored as the engine scores a pack the user put in: a word the model lacks as the pack says.
+    // Unlike one put in, a word the dictionary has stays in its layer, and the first pack to list a word holds
+    for ((path, pack) in packFiles.zip(packs)) {
+        val layer = layers.indexOf(pack.layer)
+        var scored = 0
+        for (word in pack.words) {
+            builder.entry(word.entry.text, word.entry.syllables, 0f, layer)
+            if (builder.unigramOf(word.entry.text) == null) {
+                builder.unigram(word.entry.text, word.score, 0f)
+                scored++
             }
-            out.appendLine("rime: $added words the model lacks scored by their counts, log10 P = %.3f + %.3f log10(count + 1)".format(Locale.ROOT, fit.a, fit.b))
         }
+        out.appendLine("${File(path).name}: ${pack.words.size} words in layer ${pack.layer}, $scored of them scored as the pack says")
     }
     out.appendLine("dictionary: ${reader.entries} readings")
     if (reader.skipped > 0) {

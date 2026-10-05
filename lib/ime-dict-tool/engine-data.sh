@@ -57,20 +57,13 @@ fetch() {
   curl -fsSL --retry 5 -o "$2.part" "$1" && echo "$3  $2.part" | sha256sum -c --quiet - && mv "$2.part" "$2"
 }
 
-# libime's sources and 万象's dictionaries as build-logic's EngineDataPlugin pins them; FineWeb-2's shards
+# libime's sources as build-logic's EngineDataPlugin pins them; FineWeb-2's shards
 LIBIME=https://download.fcitx-im.org/data/
-WANXIANG=https://raw.githubusercontent.com/amzxyz/rime_wanxiang/55fbad487c637d64a0371b74d177302ac1cdd16e/dicts/
 FINEWEB=https://huggingface.co/datasets/HuggingFaceFW/fineweb-2/resolve/af9c13333eb981300149d5ca60a8e9d659b276b9/data/cmn_Hani/train/
 MODELS=https://github.com/Sraw/youmo-ime/releases/download/sentence-models-20261001/
 SOURCES="
 $LIBIME lm_sc.arpa-20260629.tar.zst 06808333b9173e5374cf2cb5afc12d08f5625bf9abb536489cac376fc05f2e7f
 $LIBIME dict-20260703.tar.zst c686cab6df8964c48d596f57d205bac31fc72870b06a83017e44503df8c09697
-$WANXIANG zi.dict.yaml 4be1b3689bb6a5e9316583b3aa2e8c1cb83a33a7efe3775568e957212943b35a
-$WANXIANG jichu.dict.yaml 99c09968033e4a8e4e73f9e1cca7240ddb48a2af75cf2e745659a0b534e4c502
-$WANXIANG lianxiang.dict.yaml 46ad9ba434e5f1c5e2a38adefa3a8d542d26aa1c9eb588407bea82a9240e1c3f
-$WANXIANG duoyin.dict.yaml 36d3110e14cc58910bcb586cef0c0cb193d4f571332baf517932c39d9498f9ac
-$WANXIANG diming.dict.yaml 627b351e6fa660a40cef86dd923a4bafdeb0bc052c3f2b5eb36600b0d839e0d2
-$WANXIANG renming.dict.yaml 4c171aa4f5608934f5c504d8435c0e85dc06b938a1337a1fb041819dca1ca631
 $FINEWEB 000_00000.parquet 3e43fefabc3ee500f9874655ece1776f96b81568cf33e0a6376835425ce42598
 $FINEWEB 000_00001.parquet 1829410bee959d64fee8c34efd3e741f22c368cfe62aaa7a971a56afabe1d92f
 "
@@ -81,7 +74,7 @@ sources() {
   done || return 1
   tar -I zstd -xf src/lm_sc.arpa-20260629.tar.zst -C src && tar -I zstd -xf src/dict-20260703.tar.zst -C src
 }
-DICTS="src/dict_sc.txt src/dict_extb.txt src/zi.dict.yaml src/jichu.dict.yaml src/lianxiang.dict.yaml src/duoyin.dict.yaml src/diming.dict.yaml src/renming.dict.yaml"
+DICTS="src/dict_sc.txt src/dict_extb.txt"
 
 # a shard is named by its crawl, so several crawls' lie side by side
 crawl() {

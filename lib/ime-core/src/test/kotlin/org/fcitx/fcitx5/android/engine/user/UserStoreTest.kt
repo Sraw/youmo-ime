@@ -181,12 +181,12 @@ class UserStoreTest {
 
     @Test
     fun aLayersPriorIsKeptInTheLogAndTakenBackByName() {
-        val layers = WordLayers(listOf("base", "wanxiang", "new2025"), null, 0)
+        val layers = WordLayers(listOf("base", "places", "new2025"), null, 0)
         val prior = LayerPrior(layers, step = 0.5f)
         UserStore(file, model(), prior = prior).use {
             it.open()
             prior.learn(intArrayOf(), intArrayOf()) // nothing: no words of any layer
-            prior.restore("wanxiang", 0.25f) // restoring is not learning: not logged
+            prior.restore("places", 0.25f) // restoring is not learning: not logged
             assertTrue(prior.restore("new2025", -0.75f))
         }
         // only what was learned reaches the log
@@ -197,7 +197,7 @@ class UserStoreTest {
         // what is learned comes back
         UserStore(file, model(), prior = prior).use {
             it.open()
-            prior.journal!!.changed("wanxiang", 0.5f)
+            prior.journal!!.changed("places", 0.5f)
             prior.journal!!.changed("new2025", -0.5f)
         }
         val fresh = LayerPrior(layers)
@@ -205,7 +205,7 @@ class UserStoreTest {
         assertEquals(0.5f, fresh[1], 0f)
         assertEquals(-0.5f, fresh[2], 0f)
         // a build without a layer keeps its value, through compaction too, for one that has it
-        val twoLayers = WordLayers(listOf("base", "wanxiang"), null, 0)
+        val twoLayers = WordLayers(listOf("base", "places"), null, 0)
         val older = LayerPrior(twoLayers)
         UserStore(file, model(), prior = older).use {
             it.open()

@@ -380,12 +380,15 @@ class PinyinSession(
     /**
      * What may follow the words committed last. After one the model never saw (the user's own,
      * put together from pieces, or a dictionary word it lacks) that is what follows its end, 再
-     * of 拟再: the model's context would be its unknown word, followed by anything.
+     * of 拟再: the model's context would be its unknown word, followed by anything. So too after
+     * a word the model has but never saw anything after: a new word of the compiled word pack
+     * is a unigram alone.
      */
     private fun predict(): List<Candidate> {
         val (prev2, prev) = lastTwo(context)
         val last = lastEntry
-        if (prev == NO_WORD || prev < data.model.vocabularySize || last == null) return predictor.predict(prev2, prev)
+        if (prev == NO_WORD || last == null) return predictor.predict(prev2, prev)
+        if (prev < data.model.vocabularySize) predictor.predict(prev2, prev).let { if (it.isNotEmpty()) return it }
         return predictor.predict(NO_WORD, predictor.tail(last.text, last.syllables))
     }
 

@@ -19,7 +19,7 @@ class LayerPriorTest {
     private val data = PinyinData.load(
         ByteBuffer.wrap(
             PinyinDataBuilder()
-                .layers(listOf("base", "wanxiang"))
+                .layers(listOf("base", "places"))
                 .unigram("<unk>", -7f, 0f)
                 .unigram("打字", -3f, 0f)
                 .entry("打字", intArrayOf(Syllables.id("da"), Syllables.id("zi")))
@@ -33,7 +33,7 @@ class LayerPriorTest {
     @Test
     fun theLayersWordsAreLiftedAsOneAndHeldToZero() {
         val base = WordScorer.of(data.model)
-        val prior = LayerPrior.parse(data.layers, "wanxiang=2.5")
+        val prior = LayerPrior.parse(data.layers, "places=2.5")
         assertEquals(2.5f, prior[1], 0f)
         assertEquals(0f, prior.of(dazi), 0f)
         assertEquals(2.5f, prior.of(dazi2), 0f)
@@ -42,7 +42,7 @@ class LayerPriorTest {
         assertEquals(base.score(-1, -1, dazi2) + 2.5f, scorer.score(-1, -1, dazi2), 1e-6f)
         assertEquals(base.scoreAfter(scorer.context(-1, -1), dazi2) + 2.5f, scorer.scoreAfter(scorer.context(-1, -1), dazi2), 1e-6f)
         // never above 0
-        assertEquals(0f, LayerPrior.parse(data.layers, "wanxiang=20").scorer(base).score(-1, -1, dazi2), 0f)
+        assertEquals(0f, LayerPrior.parse(data.layers, "places=20").scorer(base).score(-1, -1, dazi2), 0f)
     }
 
     @Test
@@ -64,8 +64,8 @@ class LayerPriorTest {
         repeat(3) { prior.learn(intArrayOf(dazi), intArrayOf(dazi2)) }
         assertEquals(-0.6f, prior[1], 1e-6f)
         assertFalse(prior.learn(intArrayOf(dazi), intArrayOf(dazi2)))
-        assertEquals(listOf("wanxiang=0.25", "wanxiang=0.0", "wanxiang=-0.25", "wanxiang=-0.5", "wanxiang=-0.6"), changes)
-        assertEquals("wanxiang=-0.6", prior.toString())
+        assertEquals(listOf("places=0.25", "places=0.0", "places=-0.25", "places=-0.5", "places=-0.6"), changes)
+        assertEquals("places=-0.6", prior.toString())
         // words outside the dictionary (the user's own, NO_WORD) are of the base
         assertEquals(0f, prior.of(-1), 0f)
         assertEquals(0f, prior.of(data.vocabulary.size + 5), 0f)
@@ -74,18 +74,18 @@ class LayerPriorTest {
     @Test
     fun aValueIsTakenBackByNameWithinBoundsAndNotForTheBase() {
         val prior = LayerPrior(data.layers, bound = 0.5f)
-        assertTrue(prior.restore("wanxiang", 0.3f))
+        assertTrue(prior.restore("places", 0.3f))
         assertEquals(0.3f, prior[1], 0f)
-        assertTrue(prior.restore("wanxiang", -2f))
+        assertTrue(prior.restore("places", -2f))
         assertEquals(-0.5f, prior[1], 0f)
         assertFalse(prior.restore("base", 0.3f))
-        assertFalse(prior.restore("wanxiang", Float.NaN))
+        assertFalse(prior.restore("places", Float.NaN))
         // a name of no layer of this build is kept all the same: a pack may bring it
         assertTrue(prior.restore("new2031", 0.3f))
         assertEquals(3, prior.count)
         val seen = ArrayList<String>()
         prior.forEach { name, value -> seen += "$name=$value" }
-        assertEquals(listOf("wanxiang=-0.5", "new2031=0.3"), seen)
+        assertEquals(listOf("places=-0.5", "new2031=0.3"), seen)
     }
 
     @Test
@@ -111,13 +111,13 @@ class LayerPriorTest {
     @Test
     fun aSpecNamesLayersAndNothingElse() {
         assertEquals(0f, LayerPrior.parse(data.layers, "")[1], 0f)
-        assertEquals(-1f, LayerPrior.parse(data.layers, "base=-1,wanxiang=0.5")[0], 0f)
+        assertEquals(-1f, LayerPrior.parse(data.layers, "base=-1,places=0.5")[0], 0f)
         assertThrows(IllegalArgumentException::class.java) { LayerPrior.parse(data.layers, "new=1") }
         // a pack's layer once the pack is named, after the data's; its words found through extra
         val packed = LayerPrior.parse(data.layers, "new=1.5", listOf("new")) { 2 }
         assertEquals(2, packed.layer("new"))
         assertEquals(1.5f, packed.of(0), 0f)
-        assertThrows(IllegalArgumentException::class.java) { LayerPrior.parse(data.layers, "wanxiang=x") }
+        assertThrows(IllegalArgumentException::class.java) { LayerPrior.parse(data.layers, "places=x") }
         assertThrows(IllegalArgumentException::class.java) { LayerPrior(data.layers, floatArrayOf(0f)) }
         assertThrows(IllegalArgumentException::class.java) { LayerPrior(data.layers, floatArrayOf(0f, Float.NaN)) }
     }

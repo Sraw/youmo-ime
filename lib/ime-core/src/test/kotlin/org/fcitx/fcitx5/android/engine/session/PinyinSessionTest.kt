@@ -117,6 +117,31 @@ class PinyinSessionTest {
     }
 
     @Test
+    fun aModelWordNothingWasSeenAfterPredictsWhatFollowsItsEnd() {
+        // 拟再 as a compiled word pack has it: a unigram with no bigram of its own
+        val packed = PinyinData.load(
+            ByteBuffer.wrap(
+                PinyinDataBuilder()
+                    .unigram("<unk>", -7f, 0f)
+                    .unigram("再", -2.5f, 0f)
+                    .unigram("见", -3f, 0f)
+                    .unigram("拟再", -2f, 0f)
+                    .bigram("再", "见", -0.5f, 0f)
+                    .entry("再", syl("zai"))
+                    .entry("见", syl("jian"))
+                    .entry("拟再", syl("ni", "zai"))
+                    .build().toByteArray(),
+            ),
+        )
+        // what was committed is known to read ni zai as a learning session knows it
+        val session = PinyinSession(packed, PinyinSegmenter(), user = UserModel(packed.dictionary, packed.vocabulary))
+        val committed = session.type("nizai").let { session.apply(Select(it.candidates.indexOf("拟再"))) }
+        assertEquals("拟再", committed.commit)
+        assertTrue(committed.predicting)
+        assertEquals(listOf("见"), committed.candidates)
+    }
+
+    @Test
     fun whatWasCommittedIsTheContextOfWhatIsTypedNext() {
         val session = session()
         assertEquals("在", session.type("zai").candidates.first())

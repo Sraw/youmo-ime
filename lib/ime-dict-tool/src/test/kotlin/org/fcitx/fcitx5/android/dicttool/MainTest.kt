@@ -50,27 +50,27 @@ class MainTest {
     }
 
     @Test
-    fun rimeWordsGoInTheirOwnLayerAndThoseTheModelLacksAreScoredByTheirCounts() {
+    fun aWordPackIsALayerOfItsOwnAndScoresTheWordsTheModelLacks() {
         val lm = file("lm.arpa", ReadersTest.TINY_ARPA)
         val dict = file("dict.txt", "你\tni\t0\n好 hao\n")
-        // 你 and 好 fit log10 P = -2 + 0.5 log10(c + 1) exactly; 耗子 (9999) then comes out at 0
-        val rime = file("x.dict.yaml", "---\nname: x\n...\n你\tnǐ\t99\n好\thǎo\t9\n耗子\thào zi\t9999\n号\thào\t9\n")
+        // 好 the model has (its score stays) and the dictionary too (its layer stays the base)
+        val pack = file("new.words", "# youmo words 1\n# layer: new\n耗子\thao'zi\t-4.000\n好\thao\t-3.000\n")
         val output = tmp.root.resolve("pinyin.data").path
-        val (code, out, err) = run("pinyin", "-o", output, "--lm", lm, "--rime-unigrams", "10", dict, rime)
+        val (code, out, err) = run("pinyin", "-o", output, "--lm", lm, dict, pack)
         assertEquals(err, 0, code)
-        assertTrue(out, out.contains("rime: 4 words\n"))
-        assertTrue(out, out.contains("rime: 1 words the model lacks scored by their counts, log10 P = -2.000 + 0.500 log10(count + 1)"))
-        assertTrue(out, out.contains("vocabulary: 5 words, 4 of them in the model"))
+        assertTrue(out, out.contains("new.words: 2 words in layer new, 1 of them scored as the pack says"))
         val data = PinyinData.load(ByteBuffer.wrap(tmp.root.resolve("pinyin.data").readBytes()))
-        assertEquals(listOf("base", "wanxiang"), data.layers.names)
+        assertEquals(listOf("base", "new"), data.layers.names)
         val id = { word: String -> (0 until data.vocabulary.size).first { data.vocabulary.word(it) == word } }
-        assertEquals(0, data.layers.layer(id("你")))
         assertEquals(1, data.layers.layer(id("耗子")))
-        assertEquals(1, data.layers.layer(id("号")))
-        assertEquals(0f, data.model.score(-1, -1, id("耗子")), 1e-6f)
-        // under the count asked for: scored as the unknown word still
-        assertEquals(-5f, data.model.score(-1, -1, id("号")), 1e-6f)
-        assertEquals(2, run("pinyin", "-o", output, "--lm", lm, "--rime-unigrams", "-1", dict, rime).first)
+        assertEquals(0, data.layers.layer(id("好")))
+        assertEquals(-4f, data.model.score(-1, -1, id("耗子")), 1e-6f)
+        assertEquals(-1.5f, data.model.score(-1, -1, id("好")), 1e-6f)
+
+        val bad = file("bad.words", "# youmo words 1\n耗子\thao\t-4\n")
+        val (badCode, _, badErr) = run("pinyin", "-o", output, "--lm", lm, dict, bad)
+        assertEquals(1, badCode)
+        assertTrue(badErr, badErr.contains("bad.words") && badErr.contains("2"))
     }
 
     @Test
@@ -105,12 +105,10 @@ class MainTest {
             "lm.arpa",
             ReadersTest.TINY_ARPA.replace("ngram 1=3", "ngram 1=7").replace("-1.5\t好", "-1.5\t好\n-3.0\t耗\n-3.0\t子\n-2.0\t了\n-7.0\t丂"),
         )
-        val dict = file("dict.txt", "你\tni\t0\n好 hao\n你好 ni'hao\n耗 hao\n子 zi\n了 le\n丂 kao\n你耗 ni'hao\n好耗 hao'hao\n")
-        // 耗子 in the Rime layer: not a base word, so a candidate all the same; 子了 read as no
-        // character of it alone is likeliest
-        val rime = file("x.dict.yaml", "---\nname: x\n...\n耗子\thào zi\t9\n子了\tzǐ liǎo\t9\n")
+        // 子了 is the dictionary's, read as it has it
+        val dict = file("dict.txt", "你\tni\t0\n好 hao\n你好 ni'hao\n耗 hao\n子 zi\n了 le\n丂 kao\n你耗 ni'hao\n好耗 hao'hao\n子了 zi'liao\n")
         val output = tmp.root.resolve("pinyin.data").path
-        assertEquals(0, run("pinyin", "-o", output, "--lm", lm, dict, rime).first)
+        assertEquals(0, run("pinyin", "-o", output, "--lm", lm, dict).first)
         val candidates = tmp.root.resolve("candidates.tsv").path
         // the test corpus is a parquet shard: WebTextTest covers reading one; here the candidates are written
         File(candidates).writeText(

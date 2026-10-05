@@ -34,10 +34,10 @@
 |---|---|---|
 | 主集（日常与书面句子） | 88.5 | 91.1 |
 | 聊天 | 69.5 | 73.3 |
-| 万象 246 | 64.2 | 68.7 |
+| 小集（246 句） | 64.2 | 68.7 |
 | 大集（取 1/10，22317 句） | 74.1 | 78.8 |
 
-测法见 `lib/ime-eval`。
+测法见 `lib/ime-eval`。这些数是词典里还并着万象拼音的词时测的，去掉后待重测。
 
 ### 下载
 
@@ -54,8 +54,7 @@
   拼音语言模型里混入了 [FineWeb-2](https://huggingface.co/datasets/HuggingFaceFW/fineweb-2) 中文类聊天网页（ODC-By 1.0）和
   [Common Crawl](https://commoncrawl.org) 一次抓取里中文网页（遵守其使用条款）的 n-gram。混好的模型放在本仓库的
   `engine-data-*` release 里，由 `lib/ime-dict-tool/engine-data.sh` 在发版前生成。
-  词典还并入了[万象拼音](https://github.com/amzxyz/rime_wanxiang)（amzxyz，CC-BY-4.0）的词条、读音和词频，补上近几年的新词；
-  这是过渡做法，本项目会逐步用自己从语料里找出的新词替代它（构建时加 `-Pengine.wanxiang=false` 可去掉）。
+  近几年的新词由本项目自己从上述网页里找出、逐个校对（`lexicon/`），打成词包发布在 `words-*` release 里，构建时编进词典的单独一层。
 - 句子模型：本项目自己训练（Apache-2.0）。先在 FineWeb-2 中文网页上训练语言模型，再用 Qwen3.5-9B-Base（Apache-2.0）给候选列表打分做蒸馏。
   文件发布在 [sentence-models-20261001](https://github.com/Sraw/youmo-ime/releases/tag/sentence-models-20261001)。
 - 不使用任何仅限科研用途的数据。
@@ -83,7 +82,7 @@ sudo apt install extra-cmake-modules gettext   # Debian/Ubuntu；Arch：pacman -
 
 构建会自动下载引擎数据和句子模型，并按 SHA-256 校验：
 
-- 第一次下载 libime 的数据源、万象拼音的词典和本仓库 release 里混好的语言模型，约 400 MB（解开后语言模型占 1 GB 磁盘）；
+- 第一次下载 libime 的数据源和本仓库 release 里混好的语言模型与新词包，约 400 MB（解开后语言模型占 1 GB 磁盘）；
 - 编译拼音数据大约要 2 分钟、5 GB 内存。
 
 正式版需要签名。把以下三项写进 `~/.gradle/gradle.properties`（也可以用环境变量 `SIGN_KEY_FILE`、`SIGN_KEY_ALIAS`、`SIGN_KEY_PWD`；
@@ -114,7 +113,7 @@ signKeyPwd=...
 ### 致谢
 
 [fcitx5-android](https://github.com/fcitx5-android/fcitx5-android)、[Fcitx5](https://github.com/fcitx/fcitx5)、[libime](https://github.com/fcitx/libime)、
-[fcitx5-chinese-addons](https://github.com/fcitx/fcitx5-chinese-addons)、[万象拼音](https://github.com/amzxyz/rime_wanxiang)、[FineWeb-2](https://huggingface.co/datasets/HuggingFaceFW/fineweb-2)、[Common Crawl](https://commoncrawl.org)、[Qwen](https://github.com/QwenLM)。
+[fcitx5-chinese-addons](https://github.com/fcitx/fcitx5-chinese-addons)、[FineWeb-2](https://huggingface.co/datasets/HuggingFaceFW/fineweb-2)、[Common Crawl](https://commoncrawl.org)、[Qwen](https://github.com/QwenLM)。
 
 ---
 
@@ -152,10 +151,10 @@ Top-1 accuracy (%). "Decoder" is the n-gram decoder alone; "+ models" adds the 4
 |---|---|---|
 | Main (everyday and written sentences) | 88.5 | 91.1 |
 | Chat | 69.5 | 73.3 |
-| Wanxiang 246 | 64.2 | 68.7 |
+| Small set (246 sentences) | 64.2 | 68.7 |
 | Large set (a tenth, 22,317 sentences) | 74.1 | 78.8 |
 
-See `lib/ime-eval` for how these are measured.
+See `lib/ime-eval` for how these are measured. They were measured while the dictionary still had rime_wanxiang's words in it, and are to be measured again.
 
 ### Download
 
@@ -172,9 +171,8 @@ Settings, themes and the clipboard come along. The old app's backups leave out t
   The pinyin language model also mixes in n-grams from chat-like Chinese pages of [FineWeb-2](https://huggingface.co/datasets/HuggingFaceFW/fineweb-2) (ODC-By 1.0)
   and from the Chinese pages of a [Common Crawl](https://commoncrawl.org) crawl (under its terms of use). The mixed model is in
   this repository's `engine-data-*` releases, made before a release by `lib/ime-dict-tool/engine-data.sh`.
-  The dictionary also takes the words, readings and counts of [rime_wanxiang](https://github.com/amzxyz/rime_wanxiang) (万象拼音, by
-  amzxyz, CC-BY-4.0), for the words of the last few years; this stands in until the project finds new words in text of its own
-  (`-Pengine.wanxiang=false` leaves it out of a build).
+  The words of the last few years are the project's own: found in those pages and curated one by one (`lexicon/`), packed and
+  published as `words-*` releases, and compiled into a layer of the dictionary at build time.
 - Sentence models: this project's own (Apache-2.0). A language model is first trained on FineWeb-2's Chinese pages, then distilled from Qwen3.5-9B-Base's (Apache-2.0) scores of candidate lists.
   The files are published at [sentence-models-20261001](https://github.com/Sraw/youmo-ime/releases/tag/sentence-models-20261001).
 - No research-only data is used.
@@ -202,7 +200,7 @@ There are two builds: `offline`, published by default, with no network permissio
 
 The build downloads the engine data and the sentence models and checks their SHA-256:
 
-- the first build downloads libime's data sources, rime_wanxiang's dictionaries and the mixed language model from this
+- the first build downloads libime's data sources, and the mixed language model and the new-word pack from this
   repository's releases, about 400 MB (the model takes 1 GB of disk unpacked);
 - compiling the pinyin data takes about 2 minutes and 5 GB of memory.
 
@@ -234,4 +232,4 @@ signKeyPwd=...
 ### Thanks
 
 [fcitx5-android](https://github.com/fcitx5-android/fcitx5-android), [Fcitx5](https://github.com/fcitx/fcitx5), [libime](https://github.com/fcitx/libime),
-[fcitx5-chinese-addons](https://github.com/fcitx/fcitx5-chinese-addons), [rime_wanxiang](https://github.com/amzxyz/rime_wanxiang), [FineWeb-2](https://huggingface.co/datasets/HuggingFaceFW/fineweb-2), [Common Crawl](https://commoncrawl.org), [Qwen](https://github.com/QwenLM).
+[fcitx5-chinese-addons](https://github.com/fcitx/fcitx5-chinese-addons), [FineWeb-2](https://huggingface.co/datasets/HuggingFaceFW/fineweb-2), [Common Crawl](https://commoncrawl.org), [Qwen](https://github.com/QwenLM).

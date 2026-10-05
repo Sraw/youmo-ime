@@ -82,13 +82,13 @@ class PinyinDataTest {
         assertEquals(listOf(WordLayers.BASE), plain.layers.names)
         assertEquals(0, plain.layers.layer(plain.id("妳好")))
         val layered = load(
-            builder().layers(listOf("base", "wanxiang", "new2025"))
+            builder().layers(listOf("base", "places", "new2025"))
                 .entry("你好", syl("ni", "hao"), layer = 1) // also in the base: of the base
                 .entry("尼豪", syl("ni", "hao"), layer = 2)
                 .entry("尼豪", syl("ni", "hao"), -1f, layer = 1) // the earliest of its layers
                 .unigram("嘛", -4f, 0f) // a model word with no entry
         )
-        assertEquals(listOf("base", "wanxiang", "new2025"), layered.layers.names)
+        assertEquals(listOf("base", "places", "new2025"), layered.layers.names)
         assertEquals(3, layered.layers.count)
         assertEquals(0, layered.layers.layer(layered.id("你好")))
         assertEquals(1, layered.layers.layer(layered.id("尼豪")))

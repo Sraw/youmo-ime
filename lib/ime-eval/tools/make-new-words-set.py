@@ -5,7 +5,8 @@
 Makes data/pinyin-new.tsv: words of the last years (internet usage, news, products, titles),
 each typed after a few characters of context, tagged with the year it became common:
     python3 tools/make-new-words-set.py <zi.dict.yaml> <jichu.dict.yaml> [more .dict.yaml ...] > data/pinyin-new.tsv
-with rime_wanxiang's dictionaries (the build fetches them to .gradle/engine-downloads/wanxiang/).
+with rime_wanxiang's dictionaries at commit 55fbad48, the readings the set was made with (the app
+no longer uses them: fetch them from github.com/amzxyz/rime_wanxiang to run this again).
 The words and years are written here by hand (2026-10); the old evaluation sets are older text
 and hold almost none of them, so a dictionary's coverage of recent words is measured on this one.
 A word's reading is the one rime_wanxiang counts most for it; a word it lacks is read character

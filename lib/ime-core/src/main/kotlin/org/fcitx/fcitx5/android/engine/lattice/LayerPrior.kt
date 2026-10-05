@@ -51,8 +51,8 @@ class LayerPrior(
     fun of(word: Int): Float = values[layerOf(word)]
 
     private fun layerOf(word: Int): Int {
-        // a pack's word is the pack's layer even when the dictionary has it in a layer of its own
-        // (Rime's), as it is the pack that scores it then
+        // a pack's word is the pack's layer even when the dictionary has it in a layer of its own,
+        // as it is the pack that scores it then
         val packed = extra(word)
         return if (packed != 0 || word >= layers.words) packed else layers.layer(word)
     }

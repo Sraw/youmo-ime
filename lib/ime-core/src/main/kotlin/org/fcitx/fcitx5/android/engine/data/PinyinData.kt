@@ -100,7 +100,7 @@ class PinyinData private constructor(file: DataFile) {
 
 /** Word ids to text. Ids below [NgramModel.vocabularySize] are the model's own words. */
 /**
- * The layers of the dictionary, by [names] (libime's words, 万象's, a year's new words ...), and
+ * The layers of the dictionary, by [names] (libime's words, a year's new words ...), and
  * the one each word is from: what a prior per layer ([org.fcitx.fcitx5.android.engine.lattice.LayerPrior])
  * goes by. A word in several layers is of the first, the oldest.
  */
