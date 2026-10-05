@@ -4,19 +4,21 @@
 # has that the dictionaries lack, as a word pack. A release-time job, run on a rented machine or
 # at home, never in an app build: it downloads some 100 GB and wants 16 GB of memory.
 #
-#   TOOL=<ime-dict-tool launcher> [EVAL=<ime-eval launcher> SETS=<dir>] [LEXICON=<add.tsv>] engine-data.sh <work dir>
+#   TOOL=<ime-dict-tool launcher> [EVAL=<ime-eval launcher> SETS=<dir>] [LEXICON=<add.tsv>] [WORDS=<pack.words>] engine-data.sh <work dir>
 #
 # The launchers are `installDist`'s (`./gradlew :lib:ime-dict-tool:installDist :lib:ime-eval:installDist`);
 # SETS holds the evaluation sets: lib/ime-eval/data/pinyin-new.tsv and the held-out ones of the
 # training data (pinyin, pinyin-context, pinyin-chat, pinyin-dialog, small).
-# LEXICON is the curated list, lexicon/add.tsv, by an absolute path. Out, in <work dir>/out:
+# LEXICON is the curated list, lexicon/add.tsv, by an absolute path; WORDS the last words-* release's
+# pack of it, by an absolute path: its words join the model's vocabulary, so the pages are split into
+# them and they get a context, not a unigram alone (13.1). Out, in <work dir>/out:
 #   lm.tar.zst      the model (lm.arpa, as the app build unpacks it)
 #   new.words       the curated list's words as a pack (with LEXICON)
 #   pack.words      every candidate that passes, read as the dictionary reads its words: for curating
 #   candidates.tsv.zst, examples.tsv.zst, probe.tsv.zst  every candidate's numbers, three sentences of
 #                   each packed one, and what the engine types for its reading now (with EVAL): the
 #                   rest of a curator's batches (lexicon/tools/batches.py)
-#   report.txt      the evaluation (with EVAL), of the model alone and with each pack
+#   report.txt      the evaluation (with EVAL), of the model alone (with WORDS, as the app has it) and with each pack
 #   weights.txt     with WEIGHTS="0.4 0.8" (and EVAL): the model alone mixed at each of those weights,
 #                   evaluated as report.txt's first line, to choose the next release's weight by
 #   manifest.txt    what went in, the SHA-256 of what came out
@@ -26,7 +28,7 @@
 #
 # What goes in is what was measured (11.7d, 12.10): CC-MAIN-2026-39's and CC-MAIN-2026-34's WET files
 # 10 to 1509, mixed at 0.6 beside FineWeb-2's two shards (0.4 and 0.8 did no better); candidates seen
-# 15 times, pmi 1 and entropy 1 or more. A newer
+# 15 times, pmi 1 and entropy 1 or more (a run of two entropy alone: NewWords.GATHER_PMI). A newer
 # crawl: CRAWL=CC-MAIN-... (and FROM, FILES); several, CRAWL="CC-MAIN-... CC-MAIN-...", the same files of each.
 set -o pipefail
 WORK=${1:?usage: engine-data.sh <work dir>}
@@ -35,13 +37,15 @@ CRAWL=${CRAWL:-CC-MAIN-2026-39 CC-MAIN-2026-34}
 FROM=${FROM:-10}
 FILES=${FILES:-1500}
 WEIGHT=${WEIGHT:-0.6}
-# mix held 7 GB and words 6 GB over these inputs, as measured; room for a bigger crawl
+# mix held 7 GB and words 6 GB over these inputs, as measured, words before it gathered every run of two
+# and each run's rare occurrences (NewWords): give it more (the job gives 40 GB)
 export JAVA_OPTS=${JAVA_OPTS:--Xmx12g}
+[ -z "$WORDS" ] || [ -f "$WORDS" ] || { echo "WORDS: $WORDS not found"; exit 2; }
 mkdir -p "$WORK"/out "$WORK"/done "$WORK"/src "$WORK"/cc || exit 1
 cd "$WORK" || exit 1
 rm -f out/FAILED
 # a work directory is for one crawl and weight: its finished steps and shards are of those
-params="$CRAWL $FROM $FILES $WEIGHT"
+params="$CRAWL $FROM $FILES $WEIGHT${WORDS:+ $(sha256sum "$WORDS" | cut -c1-16)}"
 [ -f params ] || echo "$params" > params
 [ "$(cat params)" = "$params" ] || { echo "$WORK was made with $(cat params), not $params: use another"; exit 2; }
 now() { date '+%F %T'; }
@@ -88,10 +92,12 @@ clean() {
   while [ "$n" -gt 1 ]; do bits=$((bits + 1)); n=$(((n + 1) / 2)); done
   "$TOOL" clean -o cc/clean --sketch-bits $bits cc/raw/*.parquet
 }
-mix() { "$TOOL" mix -o lm.arpa --weight "$WEIGHT" --lm src/lm_sc.arpa src/000_0000?.parquet cc/clean/*.parquet; }
+mix() { "$TOOL" mix -o lm.arpa --weight "$WEIGHT" --lm src/lm_sc.arpa ${WORDS:+"$WORDS"} src/000_0000?.parquet cc/clean/*.parquet; }
+# with WORDS as the app build has it: a curated word is no candidate of the base layer, and the probe
+# sees what a user would
 # shellcheck disable=SC2086
 data() {
-  "$TOOL" pinyin -o pinyin.data --lm lm.arpa $DICTS > data.log || return 1
+  "$TOOL" pinyin -o pinyin.data --lm lm.arpa $DICTS ${WORDS:+"$WORDS"} > data.log || return 1
   grep -v '^wrote\|^trie' data.log
   return 0
 }
@@ -141,8 +147,8 @@ report() {
 # the model mixed at another weight, alone: its data built and evaluated, then let go (a few GB each)
 weight() {
   local w=$1
-  mkdir -p evals && "$TOOL" mix -o lm-$w.arpa --weight "$w" --lm src/lm_sc.arpa src/000_0000?.parquet cc/clean/*.parquet &&
-    "$TOOL" pinyin -o pinyin-$w.data --lm lm-$w.arpa $DICTS > data-$w.log &&
+  mkdir -p evals && "$TOOL" mix -o lm-$w.arpa --weight "$w" --lm src/lm_sc.arpa ${WORDS:+"$WORDS"} src/000_0000?.parquet cc/clean/*.parquet &&
+    "$TOOL" pinyin -o pinyin-$w.data --lm lm-$w.arpa $DICTS ${WORDS:+"$WORDS"} > data-$w.log &&
     DATA=pinyin-$w.data TAG=weight-$w REPORT=out/weights.txt evaluate - && rm -f lm-$w.arpa pinyin-$w.data
 }
 manifest() {
@@ -152,7 +158,8 @@ manifest() {
     echo "$SOURCES" | awk 'NF { print "source", $2, $3 }'
     # what ran, whatever COMMIT says: a stale installDist shows here
     sha256sum "$(dirname "$TOOL")"/../lib/ime-*.jar | awk '{ n = split($2, p, "/"); print "tool", p[n], $1 }' &&
-      { [ -z "$LEXICON" ] || sha256sum "$LEXICON" | awk '{ print "lexicon add.tsv", $1 }'; }
+      { [ -z "$LEXICON" ] || sha256sum "$LEXICON" | awk '{ print "lexicon add.tsv", $1 }'; } &&
+      { [ -z "$WORDS" ] || sha256sum "$WORDS" | awk '{ print "words", $1 }'; }
   } > out/manifest.txt || return 1
   # shellcheck disable=SC2046
   (cd out && sha256sum lm.tar.zst $(ls new.words pack.words ./*.tsv.zst 2> /dev/null)) >> out/manifest.txt

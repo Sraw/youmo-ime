@@ -34,7 +34,8 @@ val USAGE = """
            mix -o <out.arpa> --lm <lm.arpa> [--weight <w>] [--cutoffs <bigram>,<trigram>] <corpus>...
                                                           mix a model with n-grams counted in chat:
                                                           conversations a JSON array a line (.jsonl.gz),
-                                                          or FineWeb-2 shards' chat-like pages (.parquet)
+                                                          or FineWeb-2 shards' chat-like pages (.parquet);
+                                                          a word pack's words (.words) join the model's
            check <pinyin data> <lm.arpa>                  compare compiled scores with the model
            words -o <out.tsv> --data <pinyin.data> [--min-count <n>] <shard.parquet>...
                                                           the words the pages use that the data lacks (NewWords)
@@ -232,10 +233,18 @@ private fun wordList(file: File): LinkedHashSet<String> = file.useLines { lines 
 /**
  * Whether a candidate's numbers pass the thresholds. An entropy not measured (NaN: the run's pmi
  * was too low to gather its neighbours) is no reason to leave it out when the pmi asked for is
- * lower still.
+ * lower still. A run of two whose entropy was measured is held to that alone: its pmi says little
+ * (NewWords.GATHER_PMI).
  */
-private fun Options.passes(f: List<String>): Boolean = f[7] == "0" && f[1].toInt() >= minCount && f[3].toDouble() >= minPmi &&
-    !(minOf(f[4].toDouble(), f[5].toDouble()) < minEntropy) && f[6].toDouble() >= minSurprise
+private fun Options.passes(f: List<String>): Boolean {
+    if (f[7] != "0" || f[1].toInt() < minCount || f[6].toDouble() < minSurprise) return false
+    val entropy = minOf(f[4].toDouble(), f[5].toDouble())
+    return when {
+        entropy.isNaN() -> f[3].toDouble() >= minPmi
+        f[0].length == 2 -> entropy >= minEntropy
+        else -> f[3].toDouble() >= minPmi && entropy >= minEntropy
+    }
+}
 
 /**
  * Whether a character of [text] is one the model all but never saw: a traditional one (視頻, 圖片)
@@ -368,7 +377,8 @@ private fun pack(options: Options, out: Appendable) {
     val phrases = Phrases { text, from, to -> dictionary.find(text, from, to) >= 0 }
     input.forEachRow { f ->
         val id = data.wordIndex.find(f[0], 0, f[0].length)
-        if (id >= 0 && id < data.model.vocabularySize) known += f[1].toLong() to data.model.score(id)
+        // the base layer's alone: a curated word the model has took its score from an earlier fit
+        if (id >= 0 && id < data.model.vocabularySize && data.layers.layer(id) == 0) known += f[1].toLong() to data.model.score(id)
         phrases.saw(f[0], f[1].toInt())
     }
     // the slope fitted too, not held at 1 as frequencies would have it: the pages are not the
@@ -583,11 +593,22 @@ private class Readings(private val data: PinyinData) {
 
 private fun mix(options: Options, out: Appendable) {
     val lm = options.lm!!
-    val base = File(lm).bufferedReader().use { ArpaModel.read(it, lm) }
+    var base = File(lm).bufferedReader().use { ArpaModel.read(it, lm) }
     out.appendLine("model: ${base.size} / ${base.bigrams.size} / ${base.trigrams.size} n-grams")
+    // a word pack's words join the vocabulary the text is split into, at the pack's scores: only
+    // a unigram the model has gets n-grams, and a curated word would otherwise never have a context
+    val (packFiles, corpora) = options.inputs.partition { it.endsWith(PACK_SUFFIX) }
+    if (packFiles.isNotEmpty()) {
+        val words = packFiles.flatMap { path ->
+            File(path).useLines { WordPack.parse(it, path) }.words.map { it.entry.text to it.score.toDouble() }
+        }
+        val before = base.size
+        base = base.withUnigrams(words)
+        out.appendLine("packs: ${words.size} words, ${base.size - before} of them new to the model")
+    }
     val counts = ChatCounts(base)
     var documents = 0
-    for (corpus in options.inputs) {
+    for (corpus in corpora) {
         if (corpus.endsWith(".parquet")) {
             WebText.read(File(corpus)) { page, _ ->
                 page.forEach(counts::add)

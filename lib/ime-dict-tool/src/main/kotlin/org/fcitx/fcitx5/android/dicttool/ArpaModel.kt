@@ -6,6 +6,8 @@ package org.fcitx.fcitx5.android.dicttool
 
 import java.io.BufferedReader
 import java.util.Locale
+import kotlin.math.log10
+import kotlin.math.pow
 
 /** Word ids side by side in a long, [BITS] bits each: an n-gram's key in a [LongIndex]. */
 object NgramKey {
@@ -48,6 +50,28 @@ class ArpaModel(
         if (trigram >= 0) return trigramProb[trigram]
         val context = bigrams.indexOf(NgramKey.of(u, v))
         return (if (context >= 0) bigramBackoff[context] else 0.0) + log10(v, w)
+    }
+
+    /**
+     * This model with those of [added]'s words it lacks as unigrams, at the log10 probabilities
+     * given, the old unigrams scaled to leave them room; the first of a word given holds. They have
+     * no n-grams: a mix splits text into them too and counts theirs, so a word the model never had
+     * gets a context.
+     */
+    fun withUnigrams(added: List<Pair<String, Double>>): ArpaModel {
+        val known = HashSet(words)
+        val more = added.filter { (word, _) -> known.add(word) }
+        // one id more for ChatCounts' start
+        require(size + more.size < NgramKey.MAX_WORDS) { "${size + more.size} words leave no id for the start" }
+        val mass = more.sumOf { (_, p) -> 10.0.pow(p) }
+        require(mass < 1) { "the words added take ${"%.3f".format(Locale.ROOT, mass)} of the probability" }
+        val scale = log10(1 - mass)
+        return ArpaModel(
+            words + more.map { it.first },
+            DoubleArray(size + more.size) { if (it < size) unigramProb[it] + scale else more[it - size].second },
+            unigramBackoff.copyOf(size + more.size),
+            bigrams, bigramProb, bigramBackoff, trigrams, trigramProb,
+        )
     }
 
     /** Writes the model as ARPA text: what [ArpaReader] and the `pinyin` command read. */

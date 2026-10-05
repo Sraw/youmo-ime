@@ -99,4 +99,24 @@ class NewWordsTest {
         assertEquals(0.0, dazi.leftEntropy, 1e-9)
         assertEquals(Math.log(2.0) + 0.25, dazi.rightEntropy, 1e-9)
     }
+
+    @Test
+    fun aFrequentRunsNeighboursAreSampledAndARunOfTwoBelowChanceStillGathered() {
+        val finder = NewWords(emptySet(), 2, 2, sketchBits = 12)
+        while (!finder.done) {
+            // 搭子 on 80 pages, after a different character each time: every other page looked at
+            repeat(80) { finder.add("${'一' + it}搭子", "") }
+            // 社 and 牛 far more often apart than together: 社牛 below chance, gathered all the same
+            repeat(3) { finder.add("社牛。${"社会".repeat(20)}${"牛奶".repeat(20)}", "") }
+            finder.nextPass()
+        }
+        val out = ArrayList<NewWords.Candidate>().also { c -> finder.candidates { c += it } }
+        val dazi = out.first { it.text == "搭子" }
+        assertEquals(80, dazi.count)
+        // 40 different characters once each, and Miller-Madow's 39 / 80
+        assertEquals(Math.log(40.0) + 39.0 / 80, dazi.leftEntropy, 1e-9)
+        val sheniu = out.first { it.text == "社牛" }
+        assertTrue("pmi ${sheniu.pmi}", sheniu.pmi < NewWords.GATHER_PMI)
+        assertFalse(sheniu.leftEntropy.isNaN())
+    }
 }

@@ -23,11 +23,12 @@ import kotlin.math.log10
  * run's are; the pass after counts exactly the runs the sketch admitted, which a sketch only
  * overestimates, so none frequent is missed. The last pass gathers the neighbours of the runs
  * that reached [minCount], are not [known] (the dictionary's words need no telling apart; their
- * entropies come out NaN) and hold together at all ([GATHER_PMI]); when those are many, it
- * looks at every n-th page only, as the pairs of run and neighbour would not fit either, and an
- * entropy from a sample of a frequent run's neighbours is near enough; a rare run's, from a
- * handful of observations, comes out low all the same (bias-corrected, but ln of a handful is
- * the most it can be), so a threshold on it is partly one on the count.
+ * entropies come out NaN) and hold together at all ([GATHER_PMI]; a run of two whatever its pmi,
+ * see there). The pairs of run and neighbour would not all fit, so a run's are gathered from
+ * every n-th page, n its count over [GATHER_PER_RUN]: a frequent run's entropy from a sample is
+ * near enough, while a rare run's every occurrence counts. Pages sampled alike for all runs, a
+ * rare run's entropy came from a handful of observations and out near nothing (耗子尾汁, 丸辣:
+ * 0), which no threshold could tell from a fragment's.
  */
 class NewWords(
     private val known: Set<String>,
@@ -64,13 +65,13 @@ class NewWords(
     var chars = 0L
         private set
 
-    // the last pass: the runs whose neighbours are gathered, (run, side, neighbour) counts by
-    // their index, and every how many-th page is looked at
+    // the last pass: the runs whose neighbours are gathered, every how many-th page each is
+    // looked at, and (run, side, neighbour) counts by their index
     private val kept = LongIndex(1 shl 16)
+    private val strides = IntColumn(1 shl 16)
     private val neighbours = LongIndex(1 shl 20)
     private val neighbourCounts = IntColumn(1 shl 20)
-    private var stride = 1
-    private var pages = 0L
+    private var page = -1L
 
     /**
      * The pass under way, from 1: the first counts the characters, pass n from 2 sketches the runs
@@ -93,22 +94,22 @@ class NewWords(
                 val index = runs[length]
                 for (i in 0 until index.size) {
                     val key = index.keyAt(i)
-                    if (counts[length][i] < minCount) continue
-                    val text = text(key, length)
-                    if (text !in known && pmi(text, counts[length][i]) >= GATHER_PMI) kept.add(key)
+                    val count = counts[length][i]
+                    if (count >= minCount && gathers(text(key, length), count)) strides[kept.add(key)] = (count + GATHER_PER_RUN - 1) / GATHER_PER_RUN
                 }
             }
-            stride = maxOf(1, kept.size / GATHER_RUNS)
         }
         pass++
         // as many cells as the corpus could have different runs, four times over, up to the width given
         if (pass in 2..maxLength) sketches[pass] = Sketch(minOf(sketchBits, maxOf(MIN_SKETCH_BITS, Long.SIZE_BITS - java.lang.Long.numberOfLeadingZeros(chars * 4))))
     }
 
+    private fun gathers(text: String, count: Int) = text !in known && (text.length == 2 || pmi(text, count) >= GATHER_PMI)
+
     /** Counts [text], a page dated [date] (`2023-06-14...`, or empty), for the pass under way. */
     fun add(text: String, date: String) {
         require(!done) { "the passes are done" }
-        if (pass == passes && pages++ % stride != 0L) return
+        if (pass == passes) page++
         val year = date.take(4).toIntOrNull()?.takeIf { it in 1990..2100 } ?: 0
         var begin = 0
         for (i in 0..text.length) {
@@ -170,7 +171,7 @@ class NewWords(
         for (length in 2..maxLength) {
             for (start in begin..end - length) {
                 val run = kept.indexOf(key(text, start, length))
-                if (run < 0) continue
+                if (run < 0 || page % strides[run] != 0L) continue
                 val left = if (start > begin) text[start - 1] else NONE
                 val right = if (start + length < end) text[start + length] else NONE
                 neighbourCounts.add(neighbours.add(neighbourKey(run, LEFT, left)), 1)
@@ -210,7 +211,8 @@ class NewWords(
         fun entropy(run: Int, side: Int): Double {
             val slot = run * 2 + side
             val n = totals[slot]
-            return if (n == 0) 0.0 else ln(n.toDouble()) - sums[slot] / n + (distinct[slot] - 1) / (2.0 * n)
+            // none sampled (a run on few lines, every one skipped): not measured
+            return if (n == 0) Double.NaN else ln(n.toDouble()) - sums[slot] / n + (distinct[slot] - 1) / (2.0 * n)
         }
         for (i in 0 until kept.size) {
             val key = kept.keyAt(i)
@@ -274,11 +276,16 @@ class NewWords(
         const val SKETCH_BITS = 27
         const val MIN_SKETCH_BITS = 12
 
-        /** Neighbours are gathered for runs this much above chance (log10) only: threshold enough for any caller. */
+        /**
+         * Neighbours are gathered for runs this much above chance (log10) only: threshold enough
+         * for any caller. Not for runs of two: their characters' counts are mostly other words',
+         * so a word of two common ones comes out below chance (社牛, 问界, 麻了; of the
+         * dictionary's words of two seen 50 times or more, two in three under 1, one in three under 0)
+         */
         const val GATHER_PMI = 0.5
 
-        /** Past this many runs to gather for, pages are sampled. */
-        const val GATHER_RUNS = 500_000
+        /** At most about as many of each run's occurrences as its neighbours are gathered from. */
+        const val GATHER_PER_RUN = 40
         private const val LEFT = 0
         private const val RIGHT = 1
         private const val NONE = '\u0000'

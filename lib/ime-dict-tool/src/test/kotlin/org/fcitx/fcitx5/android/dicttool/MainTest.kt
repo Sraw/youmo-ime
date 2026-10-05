@@ -133,11 +133,12 @@ class MainTest {
         assertEquals(err, 0, code)
         // 你 (99) and 好 (9) fit log10 P = -2 + 0.5 log10(c + 1) exactly; 你好, which the model lacks, does not count
         assertTrue(out, out.contains("fit: log10 P = -2.000 + 0.500 log10(count + 1), over 2 words"))
-        // 好好 held together too little, 你你 too few different neighbours, 好你好 no more frequent than
-        // the model says of 好 你好, 嗯 and 丂 the model has not got (嗯 no reading either)
-        assertTrue(out, out.contains("pack: 3 words, 2 left out for a character the model hardly has, 0 for want of a reading"))
+        // 你耗了 and 好耗了 held together too little, while 好好 (as little) is a run of two, held to its
+        // entropy alone; 你你 too few different neighbours, 好你好 no more frequent than the model says
+        // of 好 你好, 嗯 and 丂 the model has not got (嗯 no reading either)
+        assertTrue(out, out.contains("pack: 4 words, 2 left out for a character the model hardly has, 0 for want of a reading"))
         assertEquals(
-            "# youmo words 1\n# layer: 2026q3\n耗好\thao'hao\t-1.000\n耗子\thao'zi\t-1.339\n好了\thao'le\t-1.000\n",
+            "# youmo words 1\n# layer: 2026q3\n耗好\thao'hao\t-1.000\n耗子\thao'zi\t-1.339\n好好\thao'hao\t-1.000\n好了\thao'le\t-1.000\n",
             File(pack).readText(),
         )
         // with a list of the words: what is on it, the pmi and entropy asked for being low; an entropy not
@@ -200,6 +201,15 @@ class MainTest {
         assertTrue(out, out.contains("mixed: 3 / 3 / 1 n-grams"))
         val dict = file("dict.txt", "你 ni\n好 hao\n")
         assertEquals(0, run("pinyin", "-o", tmp.root.resolve("p.data").path, "--lm", mixed, dict).first)
+
+        // a pack's word joins the vocabulary, so the chat is split into it and its n-grams counted
+        val pack = file("new.words", "# youmo words 1\n# layer: new\n你好\tni'hao\t-0.5\n你\tni\t-3.0\n")
+        val (packed, packedOut, packedErr) = run("mix", "-o", mixed, "--lm", lm, "--weight", "0.5", "--cutoffs", "1,1", pack, chat.path)
+        assertEquals(packedErr, 0, packed)
+        assertTrue(packedOut, packedOut.contains("packs: 2 words, 1 of them new to the model"))
+        // 你好 | 好 好 | 你 | 好 你: 你好 now one word
+        assertTrue(packedOut, packedOut.contains("chat: 2 documents, 6 words"))
+        assertTrue(File(mixed).readText().contains("\t你好\t"))
 
         for (bad in listOf(listOf("--cutoffs", "2"), listOf("--cutoffs", "3,2"), listOf("--weight", "2"), listOf("--weight"))) {
             assertEquals(bad.toString(), 2, run(*(listOf("mix", "-o", mixed, "--lm", lm, chat.path) + bad).toTypedArray()).first)

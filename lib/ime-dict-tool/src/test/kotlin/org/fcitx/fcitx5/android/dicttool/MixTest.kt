@@ -183,4 +183,16 @@ class MixTest {
         // six significant digits, as the file has them
         for (u in ids) for (v in ids) for (w in ids) assertEquals(mixed.log10(u, v, w), read.log10(u, v, w), 1e-4)
     }
+
+    @Test
+    fun addedUnigramsTakeTheirShareAndTheRestScales() {
+        val added = uniform.withUnigrams(listOf("你们" to log10(0.1), "你" to -1.0, "你们" to -2.0, "好吗" to log10(0.2)))
+        assertEquals(words + listOf("你们", "好吗"), added.words)
+        assertEquals(log10(0.1), added.unigramProb[words.size], 1e-12)
+        // the file is read as floats
+        assertEquals(log10(1.0 / words.size * 0.7), added.unigramProb[1], 1e-6)
+        assertEquals(1.0, added.unigramProb.sumOf { 10.0.pow(it) }, 1e-6)
+        assertEquals(0.0, added.unigramBackoff.last(), 0.0)
+        assertThrows(IllegalArgumentException::class.java) { uniform.withUnigrams(listOf("你们" to 0.0)) }
+    }
 }
