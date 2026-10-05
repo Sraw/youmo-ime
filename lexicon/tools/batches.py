@@ -2,7 +2,7 @@
 """batches.py: candidates for a curator (lexicon/README.md), in batches of 200.
 
   batches.py --pack P --candidates C --probe O --examples E --out DIR [--size N] [--lexicon DIR]
-             [--brief] [--words W] [--first N]
+             [--brief] [--words W] [--first N] [--right-from N]
 
 P: a word pack, the candidates with their suggested readings (`ime-dict-tool pack`).
 C: the candidates' numbers (`ime-dict-tool words`).
@@ -13,7 +13,10 @@ A candidate the engine already types right alone, or one the lists decide, is le
 the first changes nothing, and the second was decided. The rest go most frequent first.
 --brief: the first pass, 1000 a batch without the sentences (a fifth of the reading), where a
 curator may say `unsure`; --words: only the words a file lists (the unsure ones, for a second
-pass with the sentences); --first: only the N most frequent.
+pass with the sentences); --first: only the N most frequent; --right-from: also a candidate the
+engine types right alone, when seen N times or more: none is a word of the dictionary (`pack` leaves
+those out), so the engine only puts it together from shorter ones, which a context can undo
+(砍一刀 alone, 看一道 after 帮我).
 """
 import argparse
 import math
@@ -46,6 +49,7 @@ def main():
     a.add_argument('--brief', action='store_true')
     a.add_argument('--words')
     a.add_argument('--first', type=int)
+    a.add_argument('--right-from', type=int)
     a.add_argument('--lexicon', default=os.path.join(os.path.dirname(os.path.abspath(__file__)), '..'))
     args = a.parse_args()
     size = args.size if args.size is not None else (1000 if args.brief else 200)
@@ -62,12 +66,16 @@ def main():
     if len(probe) != len(pack):
         raise SystemExit(f'{args.probe}: {len(probe)} lines, the pack {len(pack)} words')
     skip = decided(args.lexicon)
+    # only when asked: the candidates of a crawl are millions
+    counts = {r[0]: int(r[1]) for r in rows(args.candidates)} if args.right_from is not None else {}
     todo = {}
     for (word, reading), out in zip(pack, probe):
         if out[0] != reading.replace("'", ''):
             raise SystemExit(f'{args.probe}: {out[0]} where the pack reads {word} {reading}')
         top = out[2:5]
-        if word not in skip and (not top or top[0] != word) and (only is None or word in only):
+        often = args.right_from is not None and counts.get(word, 0) >= args.right_from
+        ask = not top or top[0] != word or often
+        if word not in skip and ask and (only is None or word in only):
             todo[word] = [reading, '/'.join(top)]
     for r in rows(args.candidates):
         if r[0] in todo:

@@ -52,8 +52,10 @@ python3 lexicon/tools/batches.py --pack <pack.words> --candidates <candidates.ts
 ```
 
 writes `<dir>/batch-NNN.tsv`, 200 candidates each, most frequent first, leaving out what the lists
-already decide and what the engine already types right alone. Its columns: word, suggested
-reading, count in the crawl, pmi, the lesser entropy, the engine's first three candidates for the
+already decide and what the engine already types right alone. `--right-from N` keeps those seen N
+times or more anyway: no candidate is a word of the dictionary, so one typed right alone is put
+together from shorter words, and a context can undo that (砍一刀 alone, 看一道 after 帮我).
+Its columns: word, suggested reading, count in the crawl, pmi, the lesser entropy, the engine's first three candidates for the
 reading, and up to three sentences. A curator writes `<dir>/batch-NNN.out.tsv`, a line each:
 
 ```
