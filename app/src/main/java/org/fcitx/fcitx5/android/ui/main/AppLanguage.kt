@@ -9,13 +9,14 @@ import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.core.os.LocaleListCompat
 import org.fcitx.fcitx5.android.R
+import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 
 /**
  * The language the app shows itself in, the phone's or one the user picks, as Android 13's
  * per-app language has it (appcompat stores it on older versions). Only the languages the app is
  * translated into in full; each named in itself, as a user who cannot read the current one looks
- * for their own. Below Android 13 appcompat applies it to the activities only: the keyboard there
- * stays in the phone's language.
+ * for their own. The keyboard, which Android leaves in the phone's language, takes it on itself
+ * (FcitxInputMethodService.getResources).
  */
 object AppLanguage {
 
@@ -55,6 +56,7 @@ object AppLanguage {
     }
 
     fun set(tag: String) {
+        AppPrefs.getInstance().internal.appLanguage.setValue(tag)
         AppCompatDelegate.setApplicationLocales(
             if (tag.isEmpty()) LocaleListCompat.getEmptyLocaleList() else LocaleListCompat.forLanguageTags(tag)
         )

@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.input.status
 
+import android.content.Context
 import androidx.annotation.DrawableRes
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.core.Action
@@ -18,7 +19,6 @@ sealed class StatusAreaEntry(
         StatusAreaEntry(label, icon, false) {
         enum class Type {
             InputMethod,
-            ReloadConfig,
             Keyboard,
             ThemeList
         }
@@ -55,9 +55,18 @@ sealed class StatusAreaEntry(
             }
         }
 
-        fun fromAction(it: Action): Fcitx {
+        fun fromAction(context: Context, it: Action): Fcitx {
             val active = it.icon.endsWith("-active") || it.isChecked
-            return Fcitx(it, it.shortText, drawableFromIconName(it.icon), active)
+            return Fcitx(it, label(context, it.name, active) ?: it.shortText, drawableFromIconName(it.icon), active)
         }
+
+        // fcitx names its actions in its own language, not the app's (InputMethodNames)
+        private fun label(context: Context, action: String, active: Boolean) = when (action) {
+            "punctuation" -> if (active) R.string.status_punctuation_chinese else R.string.status_punctuation_english
+            "fullwidth" -> if (active) R.string.status_full_width else R.string.status_half_width
+            "chttrans" -> if (active) R.string.status_traditional else R.string.status_simplified
+            "androidkeyboard-word-hint" -> R.string.im_word_hint
+            else -> null
+        }?.let(context::getString)
     }
 }

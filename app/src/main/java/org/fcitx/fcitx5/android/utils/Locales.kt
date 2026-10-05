@@ -4,10 +4,30 @@
  */
 package org.fcitx.fcitx5.android.utils
 
+import android.app.LocaleManager
+import android.content.Context
 import android.content.res.Configuration
 import android.os.Build
+import androidx.appcompat.app.AppCompatDelegate
+import androidx.core.os.LocaleListCompat
+import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 
 object Locales {
+
+    /**
+     * The languages the user picked for the app (in its settings or, from Android 13 on, the
+     * phone's), empty for the phone's own. Below 13 appcompat keeps them, but knows them only
+     * once an activity of the app has started: the keyboard, started first, reads the app's copy.
+     */
+    fun picked(context: Context): LocaleListCompat =
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            LocaleListCompat.wrap(context.getSystemService(LocaleManager::class.java).applicationLocales)
+        } else {
+            AppCompatDelegate.getApplicationLocales().takeUnless { it.isEmpty }
+                ?: AppPrefs.getInstance().internal.appLanguage.getValue().let {
+                    if (it.isEmpty()) LocaleListCompat.getEmptyLocaleList() else LocaleListCompat.forLanguageTags(it)
+                }
+        }
 
     lateinit var fcitxLocale: String
         private set

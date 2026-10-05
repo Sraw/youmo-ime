@@ -99,7 +99,6 @@
     <string name="reset">リセット</string>
     <string name="quickphrase_keyword">キーワード</string>
     <string name="quickphrase_phrase">フレーズ</string>
-    <string name="reload_config">設定の再読み込み</string>
     <string name="input_method_options">インプットメソッドのオプション</string>
     <string name="theme">テーマ</string>
     <string name="key_ripple_effect">キーの波紋効果を有効にする</string>

@@ -4,16 +4,27 @@
  */
 package org.fcitx.fcitx5.android.input.picker
 
+import androidx.annotation.StringRes
 import org.fcitx.fcitx5.android.R
 
 object PickerData {
 
-    data class Category(val label: String = "", val icon: Int = 0)
+    /** [name] heads the category's section in the list, [label] when it has none */
+    data class Category(val label: String = "", val icon: Int = 0, @StringRes val name: Int = 0)
 
-    val RecentlyUsedCategory = Category("⟳", R.drawable.ic_baseline_access_time_24)
+    val RecentlyUsedCategory = Category("⟳", R.drawable.ic_baseline_access_time_24, R.string.picker_recent)
 
     val Symbol: List<Pair<Category, Array<String>>> = listOf(
-        Category("1?#", R.drawable.symbol_number_punctuation) to arrayOf(
+        // what a Chinese text needs most, then the ASCII ones it borrows: the picker opens here
+        Category("，。", R.drawable.symbol_common, R.string.picker_common) to arrayOf(
+            "，", "。", "？", "！", "、", "：", "；", "……", "——", "·",
+            "“", "”", "‘", "’", "（", "）", "《", "》", "【", "】",
+            "～", "@", "#", "%", "&", "*", "+", "-", "=", "/",
+            ",", ".", "?", "!", ":", ";", "\"", "'", "(", ")",
+            "_", "\\", "|", "<", ">", "[", "]", "{", "}", "^",
+            "$", "¥", "€", "£", "°", "℃", "×", "÷", "√", "±"
+        ),
+        Category("1?#", R.drawable.symbol_number_punctuation, R.string.picker_ascii) to arrayOf(
             "1", "2", "3", "4", "5", "6", "7", "8", "9", "0",
             "!", "@", "#", "$", "%", "^", "&", "*", "(", ")",
             "'", "\"", "=", "_", "`", ":", ";", "?",
@@ -24,7 +35,7 @@ object PickerData {
             "⁄", "‼", "⁇", "⁈", "⁉", "√", "π", "±", "×", "÷",
             "¶", "∆", "¤", "µ", "‹", "›", "«", "»"
         ),
-        Category("( )", R.drawable.symbol_bracket) to arrayOf(
+        Category("( )", R.drawable.symbol_bracket, R.string.picker_brackets) to arrayOf(
             "(", ")", "[", "]", "{", "}", "（", "）", "［", "］",
             "｛", "｝", "❨", "❩", "❲", "❳", "❴", "❵", "‘", "’",
             "“", "”", "❛", "❜", "❝", "❞", "<", ">",
@@ -32,7 +43,7 @@ object PickerData {
             "「", "」", "『", "』", "︵", "︶", "︷", "︸", "︹", "︺",
             "︻", "︼", "︽", "︾", "︿", "﹀", "﹁", "﹂",
         ),
-        Category("⇄", R.drawable.symbol_arrow) to arrayOf(
+        Category("⇄", R.drawable.symbol_arrow, R.string.picker_arrows) to arrayOf(
             "←", "↑", "→", "↓", "↔", "↕", "↖", "↗", "↘", "↙",
             "↚", "↛", "↜", "↝", "↞", "↟", "↠", "↡", "↢", "↣",
             "↤", "↥", "↦", "↧", "↨", "↩", "↪", "↫",
@@ -43,7 +54,7 @@ object PickerData {
             "⇒", "⇓", "⇔", "⇕", "⇖", "⇗", "⇘", "⇙", "⇚", "⇛",
             "⇜", "⇝", "⇞", "⇟", "⇠", "⇡", "⇢", "⇣"
         ),
-        Category("±", R.drawable.symbol_math) to arrayOf(
+        Category("±", R.drawable.symbol_math, R.string.picker_math) to arrayOf(
             "+", "-", "×", "÷", "±", "∓", "=", "≠", "∼", "≅",
             "<", ">", "≤", "≥", "√", "∛", "≈", "≡", "⁺", "⁻",
             "⊕", "⊗", "%", "‰", "∀", "∂", "∃", "∅",
@@ -57,7 +68,7 @@ object PickerData {
             "Η", "Θ", "Ι", "Κ", "Λ", "Μ", "Ν", "Ξ", "Ο", "Π",
             "Ρ", "Σ", "Τ", "Υ", "Φ", "Χ", "Ψ", "Ω",
         ),
-        Category("①", R.drawable.symbol_ordinal) to arrayOf(
+        Category("①", R.drawable.symbol_ordinal, R.string.picker_ordinals) to arrayOf(
             "①", "②", "③", "④", "⑤", "⑥", "⑦", "⑧", "⑨", "⑩",
             "⑴", "⑵", "⑶", "⑷", "⑸", "⑹", "⑺", "⑻", "⑼", "⑽",
             "❶", "❷", "❸", "❹", "❺", "❻", "❼", "❽",
@@ -68,7 +79,7 @@ object PickerData {
             "ⅺ", "ⅻ", "ⅼ", "ⅽ", "ⅾ", "ⅿ", "¹", "²", "³", "⁴",
             "₁", "₂", "₃", "₄", "½", "⅓", "⅔", "㊣"
         ),
-        Category("◇", R.drawable.symbol_other) to arrayOf(
+        Category("◇", R.drawable.symbol_other, R.string.picker_shapes) to arrayOf(
             "⚫", "⚪", "●", "○", "■", "□", "⬛", "⬜", "★", "☆",
             "◆", "◇", "▲", "△", "▶", "▷", "▼", "▽", "◀", "◁",
             "◐", "◑", "♀", "♂", "♤", "♡", "♧", "♢",
@@ -82,7 +93,7 @@ object PickerData {
             "❏", "❐", "❑", "❒", "◈", "◉", "◊", "○", "◢", "◣",
             "◤", "◥", "❢", "❣", "❤", "❥", "❦", "❧"
         ),
-        Category("[全]", R.drawable.symbol_fullwidth) to arrayOf(
+        Category("[全]", R.drawable.symbol_fullwidth, R.string.picker_fullwidth) to arrayOf(
             "１", "２", "３", "４", "５", "６", "７", "８", "９", "０",
             "！", "＠", "＃", "＄", "％", "＾", "＆", "＊", "（", "）",
             "‘", "’", "＝", "＿", "｀", "：", "；", "？",
@@ -93,7 +104,7 @@ object PickerData {
     )
 
     val Emoji: List<Pair<Category, Array<String>>> = listOf(
-        Category("🙂", R.drawable.ic_baseline_tag_faces_24) to arrayOf(
+        Category("🙂", R.drawable.ic_baseline_tag_faces_24, R.string.picker_smileys) to arrayOf(
             "😀", "😃", "😄", "😁", "😆", "😅", "🤣", "😂", "🙂", "🙃", "🫠", "😉", "😊",
             "😇", "🥰", "😍", "🤩", "😘", "😗", "☺️", "😚", "😙", "🥲", "😋", "😛", "😜",
             "🤪", "😝", "🤑", "🤗", "🤭", "🫢", "🫣", "🤫", "🤔", "🫡", "🤐", "🤨", "😐",
@@ -108,7 +119,7 @@ object PickerData {
             "💚", "💙", "💜", "🤎", "🖤", "🤍", "🩷", "🩵", "🩶", "💯", "💢", "💥", "💫", "💦", "💨", "🕳️",
             "💣", "💬", "👁️‍🗨️", "🗨️", "🗯️", "💭", "💤",
         ),
-        Category("🧑", R.drawable.ic_baseline_emoji_people_24) to arrayOf(
+        Category("🧑", R.drawable.ic_baseline_emoji_people_24, R.string.picker_people) to arrayOf(
             "👋", "🤚", "🖐️", "✋", "🖖", "🫱", "🫲", "🫸", "🫷", "🫳", "🫴", "👌", "🤌", "🤏", "✌️",
             "🤞", "🫰", "🤟", "🤘", "🤙", "👈", "👉", "👆", "🖕", "👇", "☝️", "🫵", "👍",
             "👎", "✊", "👊", "🤛", "🤜", "👏", "🙌", "🫶", "👐", "🤲", "🤝", "🙏", "✍️",
@@ -138,7 +149,7 @@ object PickerData {
             "👨‍👨‍👧‍👦", "👨‍👨‍👦‍👦", "👨‍👨‍👧‍👧", "👩‍👩‍👦", "👩‍👩‍👧", "👩‍👩‍👧‍👦", "👩‍👩‍👦‍👦", "👩‍👩‍👧‍👧", "👨‍👦", "👨‍👦‍👦", "👨‍👧", "👨‍👧‍👦", "👨‍👧‍👧",
             "👩‍👦", "👩‍👦‍👦", "👩‍👧", "👩‍👧‍👦", "👩‍👧‍👧", "🧑‍🧑‍🧒", "🧑‍🧑‍🧒‍🧒", "🧑‍🧒", "🧑‍🧒‍🧒", "🗣️", "👤", "👥", "🫂", "👣"
         ),
-        Category("🌸", R.drawable.ic_baseline_flower_24) to arrayOf(
+        Category("🌸", R.drawable.ic_baseline_flower_24, R.string.picker_nature) to arrayOf(
             "🐵", "🐒", "🦍", "🦧", "🐶", "🐕", "🦮", "🐕‍🦺", "🐩", "🐺", "🦊", "🦝", "🐱",
             "🐈", "🐈‍⬛", "🦁", "🐯", "🐅", "🐆", "🐴", "🐎", "🦄", "🦓", "🦌", "🦬", "🐮",
             "🐂", "🐃", "🐄", "🐷", "🐖", "🐗", "🐽", "🐏", "🐑", "🐐", "🐪", "🐫", "🦙",
@@ -152,7 +163,7 @@ object PickerData {
             "🪴", "🌲", "🌳", "🌴", "🪾", "🌵", "🌾", "🌿", "☘️", "🍀", "🍁", "🍂", "🍃", "🪹",
             "🪺"
         ),
-        Category("🎂", R.drawable.ic_baseline_cake_24) to arrayOf(
+        Category("🎂", R.drawable.ic_baseline_cake_24, R.string.picker_food) to arrayOf(
             "🍇", "🍈", "🍉", "🍊", "🍋", "🍋‍🟩", "🍌", "🍍", "🥭", "🍎", "🍏", "🍐", "🍑", "🍒",
             "🍓", "🫐", "🥝", "🍅", "🫒", "🥥", "🥑", "🍆", "🥔", "🥕", "🌽", "🌶️", "🫑", "🫛",
             "🥒", "🥬", "🥦", "🧄", "🧅", "🫚", "🫜", "🍄", "🍄‍🟫", "🥜", "🫘", "🌰", "🍞", "🥐", "🥖", "🫓",
@@ -165,7 +176,7 @@ object PickerData {
             "🥂", "🥃", "🫗", "🥤", "🧋", "🧃", "🧉", "🧊", "🥢", "🍽️", "🍴", "🥄", "🔪",
             "🫙", "🏺"
         ),
-        Category("🚘", R.drawable.ic_baseline_directions_car_24) to arrayOf(
+        Category("🚘", R.drawable.ic_baseline_directions_car_24, R.string.picker_travel) to arrayOf(
             "🌍", "🌎", "🌏", "🌐", "🗺️", "🗾", "🧭", "🏔️", "⛰️", "🌋", "🗻", "🏕️", "🏖️",
             "🏜️", "🏝️", "🏞️", "🏟️", "🏛️", "🏗️", "🧱", "🪨", "🪵", "🛖", "🏘️", "🏚️", "🏠",
             "🏡", "🏢", "🏣", "🏤", "🏥", "🏦", "🏨", "🏩", "🏪", "🏫", "🏬", "🏭", "🏯",
@@ -184,7 +195,7 @@ object PickerData {
             "🌤️", "🌥️", "🌦️", "🌧️", "🌨️", "🌩️", "🌪️", "🌫️", "🌬️", "🌀", "🌈", "🌂", "☂️",
             "☔", "⛱️", "⚡", "❄️", "☃️", "⛄", "☄️", "🔥", "💧", "🌊"
         ),
-        Category("⚽", R.drawable.ic_baseline_sports_basketball_24) to arrayOf(
+        Category("⚽", R.drawable.ic_baseline_sports_basketball_24, R.string.picker_activities) to arrayOf(
             "🎃", "🎄", "🎆", "🎇", "🧨", "✨", "🎈", "🎉", "🎊", "🎋", "🎍", "🎎", "🎏",
             "🎐", "🎑", "🧧", "🎀", "🎁", "🎗️", "🎟️", "🎫", "🎖️", "🏆", "🏅", "🥇", "🥈",
             "🥉", "⚽", "⚾", "🥎", "🏀", "🏐", "🏈", "🏉", "🎾", "🥏", "🎳", "🏏", "🏑",
@@ -193,7 +204,7 @@ object PickerData {
             "🎲", "🧩", "🧸", "🪅", "🪩", "🪆", "♠️", "♥️", "♦️", "♣️", "♟️", "🃏", "🀄",
             "🎴", "🎭", "🖼️", "🎨", "🧵", "🪡", "🧶", "🪢"
         ),
-        Category("💡", R.drawable.ic_baseline_emoji_objects_24) to arrayOf(
+        Category("💡", R.drawable.ic_baseline_emoji_objects_24, R.string.picker_objects) to arrayOf(
             "👓", "🕶️", "🥽", "🥼", "🦺", "👔", "👕", "👖", "🧣", "🧤", "🧥", "🧦", "👗",
             "👘", "🥻", "🩱", "🩲", "🩳", "👙", "👚", "👛", "👜", "👝", "🛍️", "🎒", "🩴",
             "👞", "👟", "🥾", "🥿", "👠", "👡", "🩰", "👢", "👑", "👒", "🎩", "🎓", "🧢",
@@ -215,7 +226,7 @@ object PickerData {
             "🪤", "🪒", "🧴", "🧷", "🧹", "🪏", "🧺", "🧻", "🪣", "🧼", "🫧", "🫟", "🪥", "🪮", "🧽", "🧯",
             "🛒", "🚬", "⚰️", "🪦", "⚱️", "🗿", "🪧", "🪪"
         ),
-        Category("🔣", R.drawable.ic_baseline_emoji_symbols_24) to arrayOf(
+        Category("🔣", R.drawable.ic_baseline_emoji_symbols_24, R.string.picker_symbols) to arrayOf(
             "🏧", "🚮", "🚰", "♿", "🚹", "🚺", "🚻", "🚼", "🚾", "🛂", "🛃", "🛄", "🛅",
             "⚠️", "🚸", "⛔", "🚫", "🚳", "🚭", "🚯", "🚱", "🚷", "📵", "🔞", "☢️", "☣️",
             "⬆️", "↗️", "➡️", "↘️", "⬇️", "↙️", "⬅️", "↖️", "↕️", "↔️", "↩️", "↪️", "⤴️", "⤵️",
@@ -234,7 +245,7 @@ object PickerData {
             "🟨", "🟩", "🟦", "🟪", "🟫", "⬛", "⬜", "◼️", "◻️", "◾", "◽", "▪️", "▫️",
             "🔶", "🔷", "🔸", "🔹", "🔺", "🔻", "💠", "🔘", "🔳", "🔲"
         ),
-        Category("🏁", R.drawable.ic_baseline_flag_24) to arrayOf(
+        Category("🏁", R.drawable.ic_baseline_flag_24, R.string.picker_flags) to arrayOf(
             "🏁", "🚩", "🎌", "🏴", "🏳️", "🏳️‍🌈", "🏳️‍⚧️", "🏴‍☠️", "🇦🇨", "🇦🇩", "🇦🇪", "🇦🇫", "🇦🇬",
             "🇦🇮", "🇦🇱", "🇦🇲", "🇦🇴", "🇦🇶", "🇦🇷", "🇦🇸", "🇦🇹", "🇦🇺", "🇦🇼", "🇦🇽", "🇦🇿", "🇧🇦",
             "🇧🇧", "🇧🇩", "🇧🇪", "🇧🇫", "🇧🇬", "🇧🇭", "🇧🇮", "🇧🇯", "🇧🇱", "🇧🇲", "🇧🇳", "🇧🇴", "🇧🇶",

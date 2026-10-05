@@ -6,7 +6,7 @@ package org.fcitx.fcitx5.android.input.picker
 
 import androidx.core.content.ContextCompat
 import androidx.transition.Transition
-import androidx.viewpager2.widget.ViewPager2
+import androidx.recyclerview.widget.RecyclerView
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.input.broadcast.ReturnKeyDrawableComponent
 import org.fcitx.fcitx5.android.input.dependency.theme
@@ -26,7 +26,7 @@ import org.mechdancer.dependency.manager.must
 class PickerWindow(
     override val key: Key,
     private val data: List<Pair<PickerData.Category, Array<String>>>,
-    private val density: PickerPageUi.Density,
+    private val density: PickerGridView.Density,
     private val switchKey: KeyDef,
     private val popupPreview: Boolean = true,
     private val followKeyBorder: Boolean = true,
@@ -48,7 +48,10 @@ class PickerWindow(
     private val keyBorder by ThemeManager.prefs.keyBorder
 
     private lateinit var pickerLayout: PickerLayout
-    private lateinit var pickerPagesAdapter: PickerPagesAdapter
+    private lateinit var adapter: PickerGridAdapter
+
+    /** a tab tapped: shown as picked, though a short last section cannot scroll to the top */
+    private var tabPicked = false
 
     override fun enterAnimation(lastWindow: InputWindow): Transition? = null
 
@@ -75,7 +78,7 @@ class PickerWindow(
 
             else -> {
                 if (it is KeyAction.CommitAction) {
-                    pickerPagesAdapter.insertRecent(it.text)
+                    adapter.insertRecent(it.text)
                 }
                 commonKeyActionListener.listener.onKeyAction(it, source)
             }
@@ -89,12 +92,8 @@ class PickerWindow(
                     if (!popupPreview) return@PopupActionListener
                 }
                 is PopupAction.ShowKeyboardAction -> {
-                    // prevent ViewPager from consuming swipe gesture when popup keyboard shown
-                    pickerLayout.pager.isUserInputEnabled = false
-                }
-                is PopupAction.DismissAction -> {
-                    // restore ViewPager scrolling
-                    pickerLayout.pager.isUserInputEnabled = true
+                    // the finger moving over the popup keyboard is not the list scrolling
+                    pickerLayout.grid.requestDisallowInterceptTouchEvent(true)
                 }
                 else -> {}
             }
@@ -102,52 +101,44 @@ class PickerWindow(
         }
     }
 
-    override fun onCreateView() = PickerLayout(context, theme, switchKey).apply {
+    override fun onCreateView() = PickerLayout(context, theme, switchKey, density).apply {
         pickerLayout = this
         val bordered = followKeyBorder && keyBorder
-        pickerPagesAdapter = PickerPagesAdapter(
-            theme, keyActionListener, popupActionListener, data,
-            density, key.name, bordered, policy
-        )
+        adapter = PickerGridAdapter(grid, keyActionListener, popupActionListener, data, key.name, bordered, policy)
+        grid.adapter = adapter
         tabsUi.apply {
-            setTabs(pickerPagesAdapter.getCategoryList())
-            setOnTabClickListener { i ->
-                pager.setCurrentItem(pickerPagesAdapter.getRangeOfCategoryIndex(i).first, false)
+            setTabs(adapter.categories)
+            setOnTabClickListener { i -> show(i) }
+        }
+        grid.addOnScrollListener(object : RecyclerView.OnScrollListener() {
+            override fun onScrollStateChanged(recyclerView: RecyclerView, newState: Int) {
+                if (newState == RecyclerView.SCROLL_STATE_DRAGGING) tabPicked = false
             }
-        }
-        pager.apply {
-            adapter = pickerPagesAdapter
-            // show first symbol category by default, rather than recently used
-            val range = pickerPagesAdapter.getRangeOfCategoryIndex(1)
-            setCurrentItem(range.first, false)
-            // update initial tab and page manually to avoid
-            // "Adding or removing callbacks during dispatch to callbacks"
-            tabsUi.activateTab(1)
-            paginationUi.updatePageCount(range.run { last - first + 1 })
-            registerOnPageChangeCallback(object : ViewPager2.OnPageChangeCallback() {
-                override fun onPageScrolled(
-                    position: Int,
-                    positionOffset: Float,
-                    positionOffsetPixels: Int
-                ) {
-                    val range = pickerPagesAdapter.getCategoryRangeOfPage(position)
-                    paginationUi.updatePageCount(range.run { last - first + 1 })
-                    paginationUi.updateScrollProgress(position - range.first, positionOffset)
-                }
 
-                override fun onPageSelected(position: Int) {
-                    tabsUi.activateTab(pickerPagesAdapter.getCategoryIndexOfPage(position))
-                    popup.dismissAll()
-                }
-            })
-        }
+            override fun onScrolled(recyclerView: RecyclerView, dx: Int, dy: Int) {
+                if (tabPicked) return
+                tabsUi.activateTab(adapter.categoryAt(grid.gridLayoutManager.findFirstVisibleItemPosition()))
+            }
+        })
+    }
+
+    private fun show(category: Int) {
+        // what was picked since the picker opened: no finger is in the list while a tab is tapped
+        if (category == 0) adapter.rebuild()
+        tabPicked = true
+        // nothing used yet: the tab of what is shown, not one that looks empty
+        pickerLayout.tabsUi.activateTab(adapter.categoryAt(adapter.startOf(category)))
+        pickerLayout.grid.stopScroll()
+        pickerLayout.grid.gridLayoutManager.scrollToPositionWithOffset(adapter.startOf(category), 0)
     }
 
     override fun onCreateBarExtension() = pickerLayout.tabsUi.root
 
     override fun onAttached() {
+        // opens on the first category (the common symbols), not on what was recently used
+        adapter.rebuild()
+        show(FirstCategory)
         pickerLayout.embeddedKeyboard.also {
-            pickerPagesAdapter.refreshIfNeeded()
             it.onReturnDrawableUpdate(returnKeyDrawable.appearance)
             it.keyActionListener = keyActionListener
         }
@@ -159,4 +150,9 @@ class PickerWindow(
     }
 
     override val showTitle = false
+
+    companion object {
+        /** the common symbols (or the first emoji), not the recently used before them */
+        private const val FirstCategory = 1
+    }
 }

@@ -10,6 +10,7 @@ import android.app.Dialog
 import android.content.pm.ActivityInfo
 import android.content.res.ColorStateList
 import android.content.res.Configuration
+import android.content.res.Resources
 import android.graphics.Color
 import android.graphics.drawable.Icon
 import android.os.Build
@@ -37,6 +38,8 @@ import androidx.autofill.inline.common.ImageViewStyle
 import androidx.autofill.inline.common.TextViewStyle
 import androidx.autofill.inline.common.ViewStyle
 import androidx.autofill.inline.v1.InlineSuggestionUi
+import androidx.core.os.ConfigurationCompat
+import androidx.core.os.LocaleListCompat
 import androidx.core.view.updateLayoutParams
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.CoroutineStart
@@ -45,12 +48,10 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.consumeEach
 import kotlinx.coroutines.launch
 import org.fcitx.fcitx5.android.BuildConfig
-import org.fcitx.fcitx5.android.data.pinyin.PinyinDictManager
-import org.fcitx.fcitx5.android.core.reloadPinyinDict
-import org.fcitx.fcitx5.android.core.CloudServer
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.core.CapabilityFlag
 import org.fcitx.fcitx5.android.core.CapabilityFlags
+import org.fcitx.fcitx5.android.core.CloudServer
 import org.fcitx.fcitx5.android.core.FcitxAPI
 import org.fcitx.fcitx5.android.core.FcitxEvent
 import org.fcitx.fcitx5.android.core.FcitxKeyMapping
@@ -59,10 +60,12 @@ import org.fcitx.fcitx5.android.core.KeyStates
 import org.fcitx.fcitx5.android.core.KeySym
 import org.fcitx.fcitx5.android.core.ScancodeMapping
 import org.fcitx.fcitx5.android.core.SubtypeManager
+import org.fcitx.fcitx5.android.core.reloadPinyinDict
 import org.fcitx.fcitx5.android.core.toSpannedString
 import org.fcitx.fcitx5.android.daemon.FcitxConnection
 import org.fcitx.fcitx5.android.daemon.FcitxDaemon
 import org.fcitx.fcitx5.android.data.InputFeedbacks
+import org.fcitx.fcitx5.android.data.pinyin.PinyinDictManager
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.prefs.ManagedPreference
 import org.fcitx.fcitx5.android.data.prefs.ManagedPreferenceProvider
@@ -76,6 +79,7 @@ import org.fcitx.fcitx5.android.input.editing.InputConnectionEditor
 import org.fcitx.fcitx5.android.input.editing.KeyEventRelay
 import org.fcitx.fcitx5.android.input.editing.toEditorTraits
 import org.fcitx.fcitx5.android.utils.InputMethodUtil
+import org.fcitx.fcitx5.android.utils.Locales
 import org.fcitx.fcitx5.android.utils.alpha
 import org.fcitx.fcitx5.android.utils.forceShowSelf
 import org.fcitx.fcitx5.android.utils.inputMethodManager
@@ -205,6 +209,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     }
 
     override fun onCreate() {
+        pickedLocalesChanged()
         fcitx = FcitxDaemon.connect(javaClass.name)
         lifecycleScope.launch {
             jobs.consumeEach { it.join() }
@@ -222,13 +227,14 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         ThemeManager.addOnChangedListener(onThemeChangeListener)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
             postFcitxJob {
-                SubtypeManager.syncWith(enabledIme())
+                SubtypeManager.syncWith(enabledIme(), this@FcitxInputMethodService)
             }
         }
         super.onCreate()
         decorView = window.window!!.decorView
         contentView = decorView.findViewById(android.R.id.content)
-        lastKnownConfig = resources.configuration
+        // the system's, as onConfigurationChanged is given: not the app's language over it
+        lastKnownConfig = Configuration(super.getResources().configuration)
     }
 
     private fun handleFcitxEvent(event: FcitxEvent<*>) {
@@ -399,6 +405,36 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     fun cancelSelection() = editingSession.cancelSelection()
 
     private lateinit var lastKnownConfig: Configuration
+
+    /** [Locales.picked], as the input view was last made in; null until [onCreate] (and while the
+     * service is constructed, should the framework read resources that early) */
+    private var appLocales: LocaleListCompat? = null
+    private var localizedResources: Resources? = null
+
+    /**
+     * The app's language, where the user picked one: an input method's window takes the
+     * display's configuration, the phone's language, even where Android 13 gives the app its
+     * own. The keyboard's views are made with this service, and read their strings here.
+     */
+    override fun getResources(): Resources {
+        val base = super.getResources()
+        val locales = appLocales
+        if (locales == null || locales.isEmpty) return base
+        // the locales alone over the base: the system keeps these resources up with any other
+        // change (orientation, dark mode), for those that hold on to them, the input window first
+        return localizedResources ?: createConfigurationContext(
+            Configuration().also { ConfigurationCompat.setLocales(it, locales) }
+        ).resources.also { localizedResources = it }
+    }
+
+    /** Whether the language picked for the app changed since the input view was made. */
+    private fun pickedLocalesChanged(): Boolean {
+        val picked = Locales.picked(this)
+        if (picked == appLocales) return false
+        appLocales = picked
+        localizedResources = null
+        return true
+    }
 
     override fun onConfigurationChanged(newConfig: Configuration) {
         postFcitxJob { reset() }
@@ -639,6 +675,13 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
 
     override fun onStartInputView(info: EditorInfo, restarting: Boolean) {
         Timber.d("onStartInputView: restarting=$restarting")
+        // the app's language picked anew in its settings: shown in it from now on
+        if (pickedLocalesChanged()) {
+            replaceInputViews(ThemeManager.activeTheme)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                postFcitxJob { SubtypeManager.syncWith(enabledIme(), this@FcitxInputMethodService) }
+            }
+        }
         postFcitxJob {
             focus(true)
         }

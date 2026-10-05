@@ -8,6 +8,7 @@ import android.os.Build
 import android.view.View
 import androidx.lifecycle.Lifecycle
 import org.fcitx.fcitx5.android.core.InputMethodEntry
+import org.fcitx.fcitx5.android.core.InputMethodNames
 import org.fcitx.fcitx5.android.core.SubtypeManager
 import org.fcitx.fcitx5.android.daemon.launchOnReady
 import org.fcitx.fcitx5.android.ui.common.BaseDynamicListUi
@@ -46,11 +47,11 @@ class InputMethodListFragment : ProgressFragment(), OnItemChangedListener<InputM
             initSettingsButton = { entry ->
                 setOnClickListener {
                     navigateWithAnim(
-                        SettingsRoute.InputMethodConfig(entry.displayName, entry.uniqueName),
+                        SettingsRoute.InputMethodConfig(InputMethodNames.of(requireContext(), entry), entry.uniqueName),
                     )
                 }
             },
-            show = { it.displayName }
+            show = { InputMethodNames.of(requireContext(), it) }
         )
         ui.addOnItemChangedListener(this@InputMethodListFragment)
         ui.setViewModel(viewModel)

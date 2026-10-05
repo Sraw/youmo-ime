@@ -78,22 +78,15 @@ class PinyinCustomPhraseFragment : Fragment(), OnItemChangedListener<PinyinCusto
         exportLauncher = registerForActivityResult(ActivityResultContracts.CreateDocument("text/plain")) { it?.let(::exportPhrases) }
     }
 
-    private var keyLabel = KEY
-    private var orderLabel = ORDER
-    private var phraseLabel = PHRASE
+    private val keyLabel by lazy { getString(R.string.custom_phrase_key) }
+    private val orderLabel by lazy { getString(R.string.custom_phrase_order) }
+    private val phraseLabel by lazy { getString(R.string.custom_phrase_phrase) }
 
     override fun onCreateView(
         inflater: LayoutInflater,
         container: ViewGroup?,
         savedInstanceState: Bundle?
     ): View {
-        lifecycleScope.launch {
-            viewModel.fcitx.runOnReady {
-                keyLabel = translate(KEY, CHINESE_ADDONS_DOMAIN)
-                orderLabel = translate(ORDER, CHINESE_ADDONS_DOMAIN)
-                phraseLabel = translate(PHRASE, CHINESE_ADDONS_DOMAIN)
-            }
-        }
         val initialItems = try {
             CustomPhraseManager.load().also { loaded = it }
         } catch (e: IOException) {
@@ -330,16 +323,6 @@ class PinyinCustomPhraseFragment : Fragment(), OnItemChangedListener<PinyinCusto
         dustman.reset(ui.entries.associateBy { it.serialize() })
     }
 
-    override fun onStart() {
-        super.onStart()
-        lifecycleScope.launch {
-            val title = viewModel.fcitx.runOnReady {
-                translate(MANAGE_CUSTOM_PHRASE, CHINESE_ADDONS_DOMAIN)
-            }
-            viewModel.setToolbarTitle(title)
-        }
-    }
-
     override fun onStop() {
         saveConfig()
         ui.exitMultiSelect()
@@ -349,14 +332,6 @@ class PinyinCustomPhraseFragment : Fragment(), OnItemChangedListener<PinyinCusto
     override fun onDestroy() {
         ui.removeItemChangedListener()
         super.onDestroy()
-    }
-
-    companion object {
-        const val CHINESE_ADDONS_DOMAIN = "fcitx5-chinese-addons"
-        const val KEY = "Key"
-        const val ORDER = "Order"
-        const val PHRASE = "Phrase"
-        const val MANAGE_CUSTOM_PHRASE = "Manage Custom Phrase"
     }
 
 }

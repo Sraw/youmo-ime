@@ -4,25 +4,43 @@
  */
 package org.fcitx.fcitx5.android.ui.main.settings
 
+import android.content.Context
+import android.content.res.ColorStateList
 import android.os.Bundle
 import android.text.InputType
+import android.view.Gravity
+import android.view.LayoutInflater
+import android.view.View
+import android.view.ViewGroup
+import android.view.inputmethod.EditorInfo
 import android.widget.EditText
-import android.widget.FrameLayout
+import android.widget.LinearLayout
+import android.widget.ScrollView
+import android.widget.TextView
 import androidx.appcompat.app.AlertDialog
-import androidx.preference.Preference
-import androidx.preference.PreferenceCategory
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.isVisible
+import androidx.fragment.app.Fragment
+import com.google.android.flexbox.FlexWrap
+import com.google.android.flexbox.FlexboxLayout
+import com.google.android.material.button.MaterialButton
+import com.google.android.material.chip.Chip
+import com.google.android.material.chip.ChipGroup
+import com.google.android.material.R as MaterialR
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.input.popup.PopupOverrides
 import org.fcitx.fcitx5.android.input.popup.PopupPreset
-import org.fcitx.fcitx5.android.ui.common.PaddingPreferenceFragment
+import org.fcitx.fcitx5.android.utils.styledColor
 import splitties.dimensions.dp
 
 /**
- * Edits what a long press on a key offers. The decisions (replace, disable, carry over to
- * Shift) live in [PopupOverrides]; this only shows the table and writes it back.
+ * Edits what a long press on a key offers, on a keyboard drawn as the user sees it: each key
+ * with its first long-press character in the corner, a changed one outlined. The decisions
+ * (replace, disable, carry over to Shift) live in [PopupOverrides]; this shows and writes them.
  */
-class PopupOverridesFragment : PaddingPreferenceFragment() {
+class PopupOverridesFragment : Fragment() {
 
     private val pref get() = AppPrefs.getInstance().internal.popupOverrides
 
@@ -30,94 +48,193 @@ class PopupOverridesFragment : PaddingPreferenceFragment() {
         get() = PopupOverrides.parse(pref.getValue())
         set(value) = pref.setValue(value.serialize())
 
-    override fun onCreatePreferences(savedInstanceState: Bundle?, rootKey: String?) {
-        preferenceScreen = preferenceManager.createPreferenceScreen(preferenceManager.context)
+    private lateinit var content: LinearLayout
+
+    override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
+        val ctx = requireContext()
+        content = LinearLayout(ctx).apply {
+            orientation = LinearLayout.VERTICAL
+            val pad = ctx.dp(16)
+            setPadding(pad, ctx.dp(8), pad, pad)
+        }
+        return ScrollView(ctx).apply {
+            clipToPadding = false
+            addView(content)
+            ViewCompat.setOnApplyWindowInsetsListener(this) { view, insets ->
+                view.setPadding(0, 0, 0, insets.getInsets(WindowInsetsCompat.Type.navigationBars()).bottom)
+                insets
+            }
+        }
+    }
+
+    override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         rebuild()
     }
 
     private fun rebuild() {
         val ctx = requireContext()
         val current = overrides
-        val screen = preferenceScreen.apply { removeAll() }
+        content.removeAllViews()
+        content.addView(text(ctx, getString(R.string.long_press_page_hint), body = true))
 
-        val letters = ('a'..'z').map { it.toString() }
-        screen.addPreference(PreferenceCategory(ctx).apply {
-            setTitle(R.string.letters)
-            screen.addPreference(this)
-            letters.forEach { addPreference(keyPreference(it, current)) }
+        content.addView(heading(ctx, R.string.letters))
+        Rows.forEachIndexed { i, row ->
+            content.addView(LinearLayout(ctx).apply {
+                // the rows staggered as on the keyboard: half a key in, then one and a half
+                weightSum = Rows[0].length.toFloat()
+                gravity = Gravity.CENTER_HORIZONTAL
+                row.forEach { addView(key(ctx, it.toString(), current), keyParams(ctx, weight = 1f)) }
+            }, LinearLayout.LayoutParams(-1, -2).apply { if (i > 0) topMargin = ctx.dp(6) })
+        }
+
+        content.addView(heading(ctx, R.string.other_keys))
+        content.addView(FlexboxLayout(ctx).apply {
+            flexWrap = FlexWrap.WRAP
+            current.labels.filter { it !in Letters }.forEach { addView(key(ctx, it, current), otherParams(ctx)) }
+            addView(KeyCaps.key(ctx, "+", "", marked = false, dimmed = false).apply {
+                contentDescription = getString(R.string.add_key)
+                setOnClickListener { askLabel() }
+            }, otherParams(ctx))
         })
-        val others = current.labels.filter { it !in letters }
-        screen.addPreference(PreferenceCategory(ctx).apply {
-            setTitle(R.string.other_keys)
-            screen.addPreference(this)
-            others.forEach { addPreference(keyPreference(it, current)) }
-            addPreference(Preference(ctx).apply {
-                setTitle(R.string.add_key)
-                setOnPreferenceClickListener { askLabel(); true }
-            })
+
+        content.addView(text(ctx, getString(R.string.long_press_legend), body = false).apply {
+            setPadding(0, ctx.dp(16), 0, 0)
         })
         if (!current.isEmpty) {
-            screen.addPreference(Preference(ctx).apply {
-                setTitle(R.string.reset_all)
-                setOnPreferenceClickListener { confirmResetAll(); true }
-            })
+            content.addView(MaterialButton(ctx, null, MaterialR.attr.materialButtonOutlinedStyle).apply {
+                setText(R.string.reset_all)
+                setOnClickListener { confirmResetAll() }
+            }, LinearLayout.LayoutParams(-2, -2).apply { topMargin = ctx.dp(12) })
         }
     }
 
-    private fun keyPreference(label: String, current: PopupOverrides) = Preference(requireContext()).apply {
-        title = label
+    private fun key(ctx: Context, label: String, current: PopupOverrides): View {
+        val shown = current.resolve(label, PopupPreset[label])?.toList().orEmpty()
         val custom = current[label]
-        summary = when {
-            custom == null -> PopupPreset[label]?.joinToString(" ") ?: getString(R.string.none)
-            custom.isEmpty() -> getString(R.string.disabled)
-            else -> getString(R.string.customized, custom.joinToString(" "))
+        return KeyCaps.key(ctx, label, shown.firstOrNull().orEmpty(), marked = custom != null, dimmed = shown.isEmpty()).apply {
+            setOnClickListener { edit(label) }
         }
-        setOnPreferenceClickListener { edit(label); true }
     }
 
-    private fun input(text: String, hint: String? = null): Pair<FrameLayout, EditText> {
-        val ctx = requireContext()
-        val field = EditText(ctx).apply {
-            setText(text)
-            setSelection(text.length)
-            this.hint = hint
-            inputType = InputType.TYPE_CLASS_TEXT
-        }
-        val margin = ctx.dp(20)
-        val box = FrameLayout(ctx).apply {
-            addView(field, FrameLayout.LayoutParams(-1, -2).apply { setMargins(margin, margin / 2, margin, 0) })
-        }
-        return box to field
+    private fun keyParams(ctx: Context, weight: Float) = LinearLayout.LayoutParams(0, ctx.dp(KeyHeight), weight).apply {
+        marginStart = ctx.dp(2)
+        marginEnd = ctx.dp(2)
     }
 
+    private fun otherParams(ctx: Context) = FlexboxLayout.LayoutParams(ctx.dp(OtherKeyWidth), ctx.dp(KeyHeight)).apply {
+        setMargins(0, 0, ctx.dp(6), ctx.dp(6))
+    }
+
+    private fun heading(ctx: Context, title: Int) = TextView(ctx).apply {
+        setText(title)
+        textSize = 14f
+        setTextColor(ctx.styledColor(android.R.attr.colorPrimary))
+        setPadding(0, ctx.dp(20), 0, ctx.dp(8))
+    }
+
+    private fun text(ctx: Context, s: String, body: Boolean) = TextView(ctx).apply {
+        text = s
+        textSize = if (body) 14f else 12f
+        setTextColor(ctx.styledColor(MaterialR.attr.colorOnSurfaceVariant))
+    }
+
+    /** The characters as chips: tap one to make it the first (what letting go gives), × to drop it */
     private fun edit(label: String) {
+        val ctx = requireContext()
         val preset = PopupPreset[label]
         val current = overrides
-        val shown = current.resolve(label, preset)?.toList().orEmpty()
-        val (box, field) = input(shown.joinToString(" "))
-        AlertDialog.Builder(requireContext())
+        val items = current.resolve(label, preset)?.toMutableList() ?: mutableListOf()
+        val chips = ChipGroup(ctx)
+        val empty = text(ctx, getString(R.string.long_press_none), body = true)
+        fun render() {
+            chips.removeAllViews()
+            items.forEachIndexed { i, item ->
+                chips.addView(Chip(ctx).apply {
+                    text = item
+                    textSize = 18f
+                    isCloseIconVisible = true
+                    if (i == 0) {
+                        chipStrokeWidth = ctx.dp(2).toFloat()
+                        chipStrokeColor = ColorStateList.valueOf(ctx.styledColor(android.R.attr.colorPrimary))
+                    }
+                    setOnClickListener {
+                        items.removeAt(i)
+                        items.add(0, item)
+                        render()
+                    }
+                    setOnCloseIconClickListener {
+                        items.removeAt(i)
+                        render()
+                    }
+                })
+            }
+            empty.isVisible = items.isEmpty()
+        }
+        val field = EditText(ctx).apply {
+            hint = getString(R.string.long_press_add_hint)
+            inputType = InputType.TYPE_CLASS_TEXT
+            imeOptions = EditorInfo.IME_ACTION_DONE
+            isSingleLine = true
+        }
+        fun add() {
+            val added = PopupOverrides.tokens(field.text.toString()).distinct().filter { it !in items }
+            items.addAll(added)
+            field.text = null
+            render()
+        }
+        field.setOnEditorActionListener { _, _, _ -> add(); true }
+        val addRow = LinearLayout(ctx).apply {
+            gravity = Gravity.CENTER_VERTICAL
+            addView(field, LinearLayout.LayoutParams(0, -2, 1f))
+            addView(MaterialButton(ctx, null, androidx.appcompat.R.attr.borderlessButtonStyle).apply {
+                setText(R.string.add)
+                setOnClickListener { add() }
+            })
+        }
+        val layout = LinearLayout(ctx).apply {
+            orientation = LinearLayout.VERTICAL
+            val pad = ctx.dp(24)
+            setPadding(pad, ctx.dp(8), pad, 0)
+            addView(text(ctx, getString(R.string.long_press_editor_hint), body = false))
+            addView(chips, LinearLayout.LayoutParams(-1, -2).apply { topMargin = ctx.dp(12) })
+            addView(empty)
+            addView(addRow, LinearLayout.LayoutParams(-1, -2).apply { topMargin = ctx.dp(8) })
+        }
+        render()
+        val builder = AlertDialog.Builder(ctx)
             .setTitle(getString(R.string.long_press_of, label))
-            .setMessage(R.string.long_press_editor_hint)
-            .setView(box)
+            .setView(ScrollView(ctx).apply { addView(layout) })
             .setPositiveButton(android.R.string.ok) { _, _ ->
-                val items = PopupOverrides.tokens(field.text.toString())
-                // typing the built-in list back is not an edit
-                // a key with no built-in list has nothing to disable
+                // a word left typed in the field counts as added
+                items.addAll(PopupOverrides.tokens(field.text.toString()).distinct().filter { it !in items })
+                // putting the built-in list back is not an edit
                 overrides = if (items == preset?.toList().orEmpty()) current.without(label)
                 else current.with(label, items)
                 rebuild()
             }
-            .setNeutralButton(R.string.reset) { _, _ ->
+            .setNegativeButton(android.R.string.cancel, null)
+        if (current[label] != null) {
+            builder.setNeutralButton(R.string.reset) { _, _ ->
                 overrides = current.without(label)
                 rebuild()
             }
-            .setNegativeButton(android.R.string.cancel, null)
-            .show()
+        }
+        builder.show().setCanceledOnTouchOutside(false)
     }
 
     private fun askLabel() {
-        val (box, field) = input("", getString(R.string.key_label_hint))
-        AlertDialog.Builder(requireContext())
+        val ctx = requireContext()
+        val field = EditText(ctx).apply {
+            hint = getString(R.string.key_label_hint)
+            inputType = InputType.TYPE_CLASS_TEXT
+            isSingleLine = true
+        }
+        val box = LinearLayout(ctx).apply {
+            val pad = ctx.dp(24)
+            setPadding(pad, ctx.dp(8), pad, 0)
+            addView(field, LinearLayout.LayoutParams(-1, -2))
+        }
+        AlertDialog.Builder(ctx)
             .setTitle(R.string.add_key)
             .setView(box)
             .setPositiveButton(android.R.string.ok) { _, _ ->
@@ -138,5 +255,12 @@ class PopupOverridesFragment : PaddingPreferenceFragment() {
             }
             .setNegativeButton(android.R.string.cancel, null)
             .show()
+    }
+
+    companion object {
+        private val Rows = listOf("qwertyuiop", "asdfghjkl", "zxcvbnm")
+        private val Letters = ('a'..'z').map { it.toString() }.toSet()
+        private const val KeyHeight = 52
+        private const val OtherKeyWidth = 44
     }
 }

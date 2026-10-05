@@ -89,6 +89,5 @@
     <string name="reset">재설정</string>
     <string name="quickphrase_keyword">키워드</string>
     <string name="quickphrase_phrase">구문</string>
-    <string name="reload_config">구성 새로고침</string>
     <string name="input_method_options">입력기 옵션</string>
     </resources>

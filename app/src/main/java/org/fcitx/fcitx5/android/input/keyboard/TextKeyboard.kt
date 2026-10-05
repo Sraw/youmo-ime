@@ -12,6 +12,7 @@ import androidx.core.view.ViewCompat
 import androidx.core.view.allViews
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.core.InputMethodEntry
+import org.fcitx.fcitx5.android.core.InputMethodNames
 import org.fcitx.fcitx5.android.core.KeyState
 import org.fcitx.fcitx5.android.core.KeyStates
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
@@ -168,7 +169,7 @@ class TextKeyboard(
 
     override fun onInputMethodUpdate(ime: InputMethodEntry) {
         val imeName = buildString {
-            append(ime.displayName)
+            append(InputMethodNames.of(context, ime))
             ime.subMode.run { label.ifEmpty { name.ifEmpty { null } } }?.let { append(" ($it)") }
         }
         // A change of input method (or of its sub-mode, e.g. an ASCII toggle) is otherwise

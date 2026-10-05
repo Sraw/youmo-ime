@@ -7,24 +7,20 @@ package org.fcitx.fcitx5.android.input.picker
 import android.annotation.SuppressLint
 import android.content.Context
 import androidx.constraintlayout.widget.ConstraintLayout
-import androidx.viewpager2.widget.ViewPager2
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.input.broadcast.ReturnKeyAppearance
 import org.fcitx.fcitx5.android.input.keyboard.*
-import splitties.dimensions.dp
 import splitties.views.dsl.constraintlayout.above
 import splitties.views.dsl.constraintlayout.below
 import splitties.views.dsl.constraintlayout.bottomOfParent
 import splitties.views.dsl.constraintlayout.centerHorizontally
 import splitties.views.dsl.constraintlayout.lParams
-import splitties.views.dsl.constraintlayout.matchConstraints
 import splitties.views.dsl.constraintlayout.topOfParent
 import splitties.views.dsl.core.add
-import splitties.views.dsl.core.view
 
 @SuppressLint("ViewConstructor")
-class PickerLayout(context: Context, theme: Theme, switchKey: KeyDef) :
+class PickerLayout(context: Context, theme: Theme, switchKey: KeyDef, density: PickerGridView.Density) :
     ConstraintLayout(context) {
 
     class Keyboard(context: Context, theme: Theme, switchKey: KeyDef) : BaseKeyboard(
@@ -35,6 +31,8 @@ class PickerLayout(context: Context, theme: Theme, switchKey: KeyDef) :
                 switchKey,
                 SpaceKey(),
                 PunctuationKey("."),
+                // here, not in the list: it stays put while the list scrolls
+                BackspaceKey(),
                 ReturnKey()
             )
         )
@@ -61,27 +59,21 @@ class PickerLayout(context: Context, theme: Theme, switchKey: KeyDef) :
 
     val embeddedKeyboard = Keyboard(context, theme, switchKey)
 
-    val pager = view(::ViewPager2) { }
+    val grid = PickerGridView(context, theme, density)
 
     val tabsUi = PickerTabsUi(context, theme)
 
-    val paginationUi = PickerPaginationUi(context, theme)
-
     init {
-        add(pager, lParams {
+        add(grid, lParams {
             topOfParent()
             centerHorizontally()
             above(embeddedKeyboard)
         })
         add(embeddedKeyboard, lParams {
-            below(pager)
+            below(grid)
             centerHorizontally()
             bottomOfParent()
             matchConstraintPercentHeight = 0.25f
-        })
-        add(paginationUi.root, lParams(matchConstraints, dp(2)) {
-            centerHorizontally()
-            below(pager, dp(-1))
         })
     }
 }

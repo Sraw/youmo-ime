@@ -9,6 +9,7 @@ import android.view.View
 import androidx.activity.OnBackPressedCallback
 import androidx.fragment.app.activityViewModels
 import androidx.lifecycle.lifecycleScope
+import androidx.preference.PreferenceScreen
 import androidx.navigation.fragment.findNavController
 import androidx.preference.isEmpty
 import kotlinx.coroutines.CoroutineScope
@@ -96,9 +97,7 @@ abstract class FcitxPreferenceFragment : PaddingPreferenceFragment() {
             raw = fcitx.runOnReady { obtainConfig(this) }
             configLoaded = raw.findByName("cfg") != null && raw.findByName("desc") != null
             preferenceScreen = if (configLoaded) {
-                PreferenceScreenFactory.create(
-                    preferenceManager, parentFragmentManager, raw, ::save
-                ).apply {
+                createScreen(raw).apply {
                     if (isEmpty()) {
                         addPreference(R.string.no_config_options)
                     }
@@ -110,6 +109,10 @@ abstract class FcitxPreferenceFragment : PaddingPreferenceFragment() {
             }
         }
     }
+
+    /** The page of [raw] (its "cfg" and "desc"): fcitx's description of it, unless overridden */
+    protected open fun createScreen(raw: RawConfig, save: () -> Unit = ::save): PreferenceScreen =
+        PreferenceScreenFactory.create(preferenceManager, parentFragmentManager, raw, save)
 
     override fun onStart() {
         super.onStart()

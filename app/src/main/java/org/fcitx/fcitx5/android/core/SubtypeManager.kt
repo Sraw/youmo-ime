@@ -5,6 +5,7 @@
 
 package org.fcitx.fcitx5.android.core
 
+import android.content.Context
 import android.os.Build
 import android.view.inputmethod.InputMethodSubtype
 import android.view.inputmethod.InputMethodSubtype.InputMethodSubtypeBuilder
@@ -43,7 +44,7 @@ object SubtypeManager {
         enabled.sortedBy { it.uniqueName == IM_KEYBOARD }
 
     @RequiresApi(Build.VERSION_CODES.UPSIDE_DOWN_CAKE)
-    fun syncWith(enabled: Array<InputMethodEntry>) {
+    fun syncWith(enabled: Array<InputMethodEntry>, names: Context = appContext) {
         val inputMethods = registrationOrder(enabled)
         knownSubtypes.clear()
         val size = inputMethods.size
@@ -53,7 +54,7 @@ object SubtypeManager {
             val subtype = InputMethodSubtypeBuilder()
                 .setSubtypeId(im.uniqueName.hashCode())
                 .setSubtypeExtraValue(im.uniqueName)
-                .setSubtypeNameOverride(im.displayName)
+                .setSubtypeNameOverride(InputMethodNames.of(names, im))
                 .setSubtypeMode(MODE_KEYBOARD)
                 .setIsAsciiCapable(im.uniqueName == IM_KEYBOARD)
                 .build()

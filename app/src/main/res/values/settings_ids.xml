@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <item name="punctuation_key" type="id"/>
+    <item name="punctuation_mapping" type="id"/>
+    <item name="punctuation_pair" type="id"/>
+</resources>

@@ -7,14 +7,12 @@ package org.fcitx.fcitx5.android.input.status
 import android.os.Build
 import android.view.View
 import android.widget.PopupMenu
-import android.widget.Toast
-import androidx.core.content.ContextCompat
 import androidx.core.text.buildSpannedString
 import androidx.core.text.color
 import kotlinx.coroutines.launch
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.core.Action
-import org.fcitx.fcitx5.android.core.SubtypeManager
+import org.fcitx.fcitx5.android.core.InputMethodNames
 import org.fcitx.fcitx5.android.daemon.FcitxConnection
 import org.fcitx.fcitx5.android.daemon.launchOnReady
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
@@ -27,7 +25,6 @@ import org.fcitx.fcitx5.android.input.dependency.theme
 import org.fcitx.fcitx5.android.input.editorinfo.EditorInfoWindow
 import org.fcitx.fcitx5.android.input.status.StatusAreaEntry.Android.Type.InputMethod
 import org.fcitx.fcitx5.android.input.status.StatusAreaEntry.Android.Type.Keyboard
-import org.fcitx.fcitx5.android.input.status.StatusAreaEntry.Android.Type.ReloadConfig
 import org.fcitx.fcitx5.android.input.status.StatusAreaEntry.Android.Type.ThemeList
 import org.fcitx.fcitx5.android.input.wm.InputWindow
 import org.fcitx.fcitx5.android.input.wm.InputWindowManager
@@ -65,11 +62,6 @@ class StatusAreaWindow : InputWindow.ExtendedInputWindow<StatusAreaWindow>(),
                 context.getString(R.string.input_method_options),
                 R.drawable.ic_baseline_language_24,
                 InputMethod
-            ),
-            StatusAreaEntry.Android(
-                context.getString(R.string.reload_config),
-                R.drawable.ic_baseline_sync_24,
-                ReloadConfig
             ),
             StatusAreaEntry.Android(
                 context.getString(R.string.virtual_keyboard),
@@ -137,18 +129,8 @@ class StatusAreaWindow : InputWindow.ExtendedInputWindow<StatusAreaWindow>(),
                     is StatusAreaEntry.Android -> when (entry.type) {
                         InputMethod -> fcitx.runImmediately { inputMethodEntryCached }.let {
                             AppUtil.launchMainToInputMethodConfig(
-                                context, it.uniqueName, it.displayName
+                                context, it.uniqueName, InputMethodNames.of(context, it)
                             )
-                        }
-                        ReloadConfig -> fcitx.launchOnReady { f ->
-                            f.reloadConfig()
-                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-                                SubtypeManager.syncWith(f.enabledIme())
-                            }
-                            // feedback for work that outlives this view, so not on its scope
-                            ContextCompat.getMainExecutor(context).execute {
-                                Toast.makeText(context, R.string.done, Toast.LENGTH_SHORT).show()
-                            }
                         }
                         Keyboard -> AppUtil.launchMainToKeyboard(context)
                         ThemeList -> AppUtil.launchMainToThemeList(context)
@@ -175,7 +157,7 @@ class StatusAreaWindow : InputWindow.ExtendedInputWindow<StatusAreaWindow>(),
     override fun onStatusAreaUpdate(actions: Array<Action>) {
         adapter.entries = arrayOf(
             *staticEntries,
-            *Array(actions.size) { StatusAreaEntry.fromAction(actions[it]) }
+            *Array(actions.size) { StatusAreaEntry.fromAction(context, actions[it]) }
         )
     }
 

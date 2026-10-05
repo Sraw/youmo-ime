@@ -87,7 +87,6 @@
     <string name="reset">Zurücksetzen</string>
     <string name="quickphrase_keyword">Schlüsselwort</string>
     <string name="quickphrase_phrase">Phrase</string>
-    <string name="reload_config">Konfiguration neu laden</string>
     <string name="input_method_options">Optionen der Eingabemethode</string>
     <string name="theme">Thema</string>
     <string name="brightness">Helligkeit</string>

@@ -100,7 +100,6 @@
     <string name="reset">Перезагрузить</string>
     <string name="quickphrase_keyword">Ключевое слово</string>
     <string name="quickphrase_phrase">Фраза</string>
-    <string name="reload_config">Перезагрузить конфигурацию</string>
     <string name="input_method_options">Параметры метода ввода</string>
     <string name="theme">Тема</string>
     <string name="key_ripple_effect">Включить эффект пульсации клавиш</string>

@@ -65,7 +65,6 @@
     <string name="reset">Restablecer</string>
     <string name="quickphrase_keyword">Palabra clave</string>
     <string name="quickphrase_phrase">Frase</string>
-    <string name="reload_config">Recargar configuración</string>
     <string name="input_method_options">Opciones de método de entrada</string>
     <string name="theme">Tema</string>
     <string name="brightness">Brillo</string>
