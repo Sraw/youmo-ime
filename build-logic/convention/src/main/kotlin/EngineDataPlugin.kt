@@ -94,7 +94,7 @@ class EngineDataPlugin : Plugin<Project> {
         // the curated new words (lexicon/add.tsv) as packed for that model, a layer of pinyin.data:
         // the words libime's dictionary has not got, which a build with no pack the user put in has too
         private const val WORDS_URL = "https://github.com/Sraw/youmo-ime/releases/download/words-202610/youmo-new.words"
-        private const val WORDS_SHA256 = "3cdc94001a5cd021c8d9acc678e03cadd205c0a5606f401cebc5dafbe0e32e71"
+        private const val WORDS_SHA256 = "cafe96827bd0490313e7d201146a485b094528e89d6b45e5db41674290ec16aa"
         const val MODEL_TASK = "copySentenceModels"
         // a tag of its own, not "latest": what is downloaded is what was measured
         private const val MODEL_URL =
