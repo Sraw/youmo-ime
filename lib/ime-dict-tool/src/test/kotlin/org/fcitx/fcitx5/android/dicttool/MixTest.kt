@@ -66,6 +66,8 @@ class MixTest {
     fun aConversationIsAJsonArrayOfStrings() {
         assertEquals(listOf("你 好", "a\"b\\c/", "你\n"), JsonStrings.parse(""" [ "你 好" , "a\"b\\c\/", "\u4f60\n" ] """))
         assertEquals(emptyList<String>(), JsonStrings.parse("[]"))
+        val odd = listOf("你 好", "a\"b\\c", "tab\there\n", "")
+        assertEquals(odd, JsonStrings.parse(JsonStrings.format(odd)))
         for (bad in listOf("{}", "[\"a\"", "[\"a\" \"b\"]", "[\"a\"] x", "[\"\\x\"]", "[1]")) {
             assertThrows(bad, IllegalArgumentException::class.java) { JsonStrings.parse(bad) }
         }

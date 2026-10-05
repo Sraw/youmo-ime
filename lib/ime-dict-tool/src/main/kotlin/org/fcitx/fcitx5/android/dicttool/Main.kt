@@ -23,13 +23,16 @@ import java.io.RandomAccessFile
 import java.nio.ByteBuffer
 import java.nio.channels.FileChannel
 import java.util.zip.GZIPInputStream
+import java.util.zip.GZIPOutputStream
 import kotlin.math.abs
 import kotlin.system.exitProcess
 
 val USAGE = """
-    usage: pinyin -o <out> --lm <lm.arpa> <dict>...        compile a pinyin dictionary and model, from
+    usage: pinyin -o <out> --lm <lm.arpa> [--remove <remove.tsv>] [--readings <readings.tsv>] <dict>...
+                                                          compile a pinyin dictionary and model, from
                                                           libime's text and word packs (.words), each
-                                                          pack a layer of its own
+                                                          pack a layer of its own; the text's words
+                                                          corrected by lexicon/'s lists
            table -o <out> <table.txt>                     compile a code table
            mix -o <out.arpa> --lm <lm.arpa> [--weight <w>] [--cutoffs <bigram>,<trigram>] <corpus>...
                                                           mix a model with n-grams counted in chat:
@@ -51,6 +54,8 @@ val USAGE = """
                                                           bit more a doubling of the lines past one crawl's
            examples -o <out.tsv> --only <words.txt> [--per-word <n>] <shard.parquet>...
                                                           sentences of the pages that use each word (Examples)
+           text -o <out.jsonl.gz> <shard.parquet>...      the chat-like pages as mix takes them, a JSON array
+                                                          of a page's lines a line: an evaluation set's source
 """.trimIndent()
 
 fun main(args: Array<String>) {
@@ -89,7 +94,7 @@ fun runCli(args: Array<String>, out: Appendable, err: Appendable): Int {
 private fun dispatch(command: String?, options: Options, out: Appendable): Boolean {
     if (!options.fit(command)) return false
     when (command) {
-        "pinyin" -> pinyin(options.output!!, options.lm!!, options.inputs, out)
+        "pinyin" -> pinyin(options, out)
         "table" -> table(options.output!!, options.inputs.single(), out)
         "mix" -> mix(options, out)
         "check" -> check(options.inputs[0], options.inputs[1], out)
@@ -98,6 +103,7 @@ private fun dispatch(command: String?, options: Options, out: Appendable): Boole
         "cc" -> options.crawl.let { CommonCrawl.extract(it.name!!, it.from, it.files!!, File(options.output!!), it.base) { line -> out.appendLine(line) } }
         "clean" -> clean(options, out)
         "examples" -> examples(options, out)
+        "text" -> text(options, out)
     }
     return true
 }
@@ -125,6 +131,9 @@ private class Options(
     val lexicon: String?,
     /** `clean`: the line sketch's width, so twice the lines collide no more than one crawl's did. */
     val sketchBits: Int,
+    /** `pinyin`: lexicon/remove.tsv, words the dictionaries have wrongly, and lexicon/readings.tsv, readings put right. */
+    val remove: String?,
+    val readings: String?,
     val crawl: Crawl,
 ) {
     /** `cc`: the crawl, its first WET file and how many, and where CommonCrawl is. */
@@ -143,7 +152,7 @@ private class Options(
     /** Whether [command] takes these options. */
     fun fit(command: String?): Boolean = when (command) {
         "pinyin", "mix", "table", "check" -> fitModel(command)
-        "words", "pack", "cc", "clean", "examples" -> fitCorpus(command)
+        "words", "pack", "cc", "clean", "examples", "text" -> fitCorpus(command)
         else -> false
     }
 
@@ -180,7 +189,7 @@ private class Options(
         // every option takes a value
         private val FLAGS = setOf(
             "-o", "--lm", "--weight", "--cutoffs", "--data", "--min-count", "--layer", "--min-pmi", "--min-entropy", "--min-surprise", "--only",
-            "--crawl", "--from", "--files", "--base", "--per-word", "--lexicon", "--sketch-bits",
+            "--crawl", "--from", "--files", "--base", "--per-word", "--lexicon", "--sketch-bits", "--remove", "--readings",
         )
 
         /** [flag]'s value, [default] without one, null for a bad one. */
@@ -220,6 +229,8 @@ private class Options(
                 lexicon = values["--lexicon"],
                 // past 30 the cells would not fit an array
                 sketchBits = values.count("--sketch-bits", NewWords.SKETCH_BITS, NewWords.MIN_SKETCH_BITS..MAX_SKETCH_BITS) ?: return null,
+                remove = values["--remove"],
+                readings = values["--readings"],
             )
         }
     }
@@ -274,6 +285,21 @@ private fun lexicon(file: File): Map<String, String> {
         }
     }
     return words
+}
+
+/** Each chat-like page's texts as a JSON array of strings, a line a page, gzipped: for the eval-set tools. */
+private fun text(options: Options, out: Appendable) {
+    var pages = 0
+    GZIPOutputStream(File(options.output!!).outputStream().buffered()).bufferedWriter().use { w ->
+        options.inputs.forEach { shard ->
+            WebText.read(File(shard)) { page, _ ->
+                w.write(JsonStrings.format(page))
+                w.write("\n")
+                pages++
+            }
+        }
+    }
+    out.appendLine("text: $pages pages")
 }
 
 /** `word<TAB>sentence...`, a line for each word of the list found, in the list's order. */
@@ -634,7 +660,10 @@ private fun mix(options: Options, out: Appendable) {
 
 private const val PACK_SUFFIX = ".words"
 
-private fun pinyin(output: String, lm: String, dicts: List<String>, out: Appendable) {
+private fun pinyin(options: Options, out: Appendable) {
+    val output = options.output!!
+    val lm = options.lm!!
+    val dicts = options.inputs
     val builder = PinyinDataBuilder()
     val counts = File(lm).bufferedReader().use { r ->
         ArpaReader.read(r, lm) { words, prob, backoff ->
@@ -646,12 +675,23 @@ private fun pinyin(output: String, lm: String, dicts: List<String>, out: Appenda
         }
     }
     out.appendLine("model: ${counts.joinToString(" / ")} n-grams")
-    val reader = PinyinDictReader(builder)
+    // lexicon/remove.tsv's first field; lexicon/readings.tsv's first two, a line a reading
+    val removed = options.remove?.let { wordList(File(it)) }.orEmpty()
+    val readings = options.readings?.let { path ->
+        File(path).useLines { lines ->
+            lines.filter { it.isNotBlank() && !it.startsWith('#') }.map { it.split('\t') }
+                .onEach { require(it.size >= 2) { "$path: expected \"word<TAB>reading...\", got \"${it.joinToString("\t")}\"" } }
+                .groupBy({ it[0].trim() }, { it[1].trim() })
+        }
+    }.orEmpty()
+    val reader = PinyinDictReader(builder, removed, readings)
     val (packFiles, texts) = dicts.partition { it.endsWith(PACK_SUFFIX) }
     val packs = packFiles.map { path -> File(path).useLines { WordPack.parse(it, path) } }
     val layers = (listOf(WordLayers.BASE) + packs.map { it.layer }).distinct()
     builder.layers(layers)
     texts.forEach { path -> File(path).bufferedReader().use { reader.read(it, path) } }
+    reader.corrected()
+    if (reader.corrections > 0) out.appendLine("corrected: ${reader.corrections} readings of the dictionaries left out or replaced")
     // scored as the engine scores a pack the user put in: a word the model lacks as the pack says.
     // Unlike one put in, a word the dictionary has stays in its layer, and the first pack to list a word holds
     for ((path, pack) in packFiles.zip(packs)) {

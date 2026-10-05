@@ -87,9 +87,9 @@ class EngineDataPlugin : Plugin<Project> {
         )
         // the language model engine-data.sh made (its manifest.txt in the release says from what),
         // repacked as the tar CMake unpacks; a tag of its own, not "latest", as the models'
-        private const val LM_RELEASE = "engine-data-20261005"
+        private const val LM_RELEASE = "engine-data-20261005-2"
         private const val LM_URL = "https://github.com/Sraw/youmo-ime/releases/download/$LM_RELEASE/lm.tar.zst"
-        private const val LM_SHA256 = "eb40f73ca1a89dac8951a3f0db1becfcb4147a7e207c66a1e0ba3a391ac0440d"
+        private const val LM_SHA256 = "7a11fae10e80d6e3afb9386014841a4ba1399300f61c5ecc03b26f3822a152dc"
         private const val LM_FILE = "lm.arpa"
         // the curated new words (lexicon/add.tsv) as packed for that model, a layer of pinyin.data:
         // the words libime's dictionary has not got, which a build with no pack the user put in has too
@@ -158,6 +158,10 @@ class EngineDataPlugin : Plugin<Project> {
             this.lm.set(lm.flatMap { it.outputDir.file(LM_FILE) })
             dictionaries.from(DICT.files.map { name -> extracted[0].flatMap { it.outputDir.file(name) } })
             dictionaries.from(words.flatMap { it.outputFile })
+            // the base layer as this project corrects it: libime's words wrongly there, readings put right
+            val lexicon = target.rootProject.layout.projectDirectory.dir("lexicon")
+            remove.set(lexicon.file("remove.tsv"))
+            readings.set(lexicon.file("readings.tsv"))
             outputDir.set(target.layout.buildDirectory.dir("generated/engine-assets"))
         }
         val tables = target.tasks.register<CompileTables>(TABLES_TASK) {
@@ -289,12 +293,23 @@ class EngineDataPlugin : Plugin<Project> {
         @get:PathSensitive(PathSensitivity.NAME_ONLY)
         abstract val dictionaries: ConfigurableFileCollection
 
+        @get:InputFile
+        @get:PathSensitive(PathSensitivity.NAME_ONLY)
+        abstract val remove: RegularFileProperty
+
+        @get:InputFile
+        @get:PathSensitive(PathSensitivity.NAME_ONLY)
+        abstract val readings: RegularFileProperty
+
         @get:OutputDirectory
         abstract val outputDir: DirectoryProperty
 
         init {
             argumentProviders += CommandLineArgumentProvider {
-                listOf("pinyin", "-o", output().path, "--lm", lm.get().asFile.path) + dictionaries.files.map { it.path }
+                listOf(
+                    "pinyin", "-o", output().path, "--lm", lm.get().asFile.path,
+                    "--remove", remove.get().asFile.path, "--readings", readings.get().asFile.path,
+                ) + dictionaries.files.map { it.path }
             }
         }
 

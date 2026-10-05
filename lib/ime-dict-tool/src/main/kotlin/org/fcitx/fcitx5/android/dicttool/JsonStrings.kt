@@ -10,6 +10,21 @@ package org.fcitx.fcitx5.android.dicttool
  */
 object JsonStrings {
 
+    /** [strings] as such an array, what [parse] reads back. */
+    fun format(strings: List<String>): String = strings.joinToString(",", "[", "]") { s ->
+        buildString {
+            append('"')
+            for (c in s) {
+                when {
+                    c == '"' || c == '\\' -> append('\\').append(c)
+                    c < ' ' -> append("\\u%04x".format(c.code))
+                    else -> append(c)
+                }
+            }
+            append('"')
+        }
+    }
+
     fun parse(line: String): List<String> {
         val out = ArrayList<String>()
         var i = skipSpace(line, 0)

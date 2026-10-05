@@ -19,10 +19,22 @@ import java.util.TreeMap
  * A reading with a syllable [Syllables] does not know is skipped and counted rather than fatal,
  * so a new dictionary release with one odd entry still builds; [unknownSyllables] says what to
  * add.
+ *
+ * The curated corrections of `lexicon/` apply as it reads: a word of [removed] is left out, and a
+ * word of [readings] is read as listed there instead of as the dictionary has it ([corrected]
+ * adds those, once all is read).
  */
-class PinyinDictReader(private val into: PinyinDataBuilder) {
+class PinyinDictReader(
+    private val into: PinyinDataBuilder,
+    private val removed: Set<String> = emptySet(),
+    private val readings: Map<String, List<String>> = emptyMap(),
+) {
 
     var entries = 0
+        private set
+
+    /** Readings of the dictionaries left out for a word of [removed], or replaced by [readings]. */
+    var corrections = 0
         private set
 
     /** Unknown syllable to how many readings it made us skip. */
@@ -36,8 +48,13 @@ class PinyinDictReader(private val into: PinyinDataBuilder) {
             if (f.isEmpty()) return@forEachNumberedLine
             require(f.size in 2..3) { "expected \"word pinyin [weight]\", got \"$line\"" }
             val weight = if (f.size == 3) requireNotNull(f[2].toFloatOrNull()) { "bad weight \"${f[2]}\"" } else 0f
-            add(f[0], f[1], weight)
+            if (f[0] in removed || f[0] in readings) corrections++ else add(f[0], f[1], weight)
         }
+    }
+
+    /** The words of [readings], each under the readings listed: after every dictionary is read. */
+    fun corrected() {
+        for ((word, list) in readings) list.forEach { add(word, it, 0f) }
     }
 
     /** One reading, [pinyin] with its syllables separated by `'`. */

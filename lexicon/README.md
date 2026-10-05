@@ -11,6 +11,8 @@ put before a curator again.
 |---|---|
 | `add.tsv` | `word  reading  kind  date  note`: goes in the `new` layer, read as written |
 | `reject.tsv` | `word  kind  date  note`: never goes in |
+| `remove.tsv` | `word  kind  date  note`: a word of libime's dictionary (the base layer) that should not be there; left out when pinyin.data is compiled |
+| `readings.tsv` | `word  reading  date  note`: a word of libime's dictionary it reads wrongly; compiled under the readings listed here (a line each) instead |
 
 Tab-separated, `#` starts a comment. A reading is `pin'yin`, a syllable a character, `v` for ü.
 

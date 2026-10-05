@@ -7,6 +7,7 @@ package org.fcitx.fcitx5.android.dicttool
 import org.fcitx.fcitx5.android.engine.data.CodeTable
 import org.fcitx.fcitx5.android.engine.data.PinyinData
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -71,6 +72,33 @@ class MainTest {
         val (badCode, _, badErr) = run("pinyin", "-o", output, "--lm", lm, dict, bad)
         assertEquals(1, badCode)
         assertTrue(badErr, badErr.contains("bad.words") && badErr.contains("2"))
+    }
+
+    @Test
+    fun theDictionarysWordsAreCorrectedByTheCuratedLists() {
+        val lm = file("lm.arpa", ReadersTest.TINY_ARPA.replace("ngram 1=3", "ngram 1=5").replace("-1.5\t好", "-1.5\t好\n-3.0\t长\n-3.0\t大"))
+        val dict = file("dict.txt", "你 ni\n好 hao\n你好 ni'hao\n长 chang\n大 da\n长大 chang'da\n长大 chang'tai\n")
+        // 你好 the dictionary should not have; 长大 it reads wrong, twice
+        val remove = file("remove.tsv", "# word\tkind\n你好\tjunk\t2026-10-05\n")
+        val readings = file("readings.tsv", "# word\treading\n长大\tzhang'da\t2026-10-05\t长 is zhang here\n")
+        val output = tmp.root.resolve("pinyin.data").path
+        val (code, out, err) = run("pinyin", "-o", output, "--lm", lm, "--remove", remove, "--readings", readings, dict)
+        assertEquals(err, 0, code)
+        assertTrue(out, out.contains("corrected: 3 readings of the dictionaries left out or replaced"))
+        assertTrue(out, out.contains("dictionary: 5 readings"))
+        val data = PinyinData.load(ByteBuffer.wrap(tmp.root.resolve("pinyin.data").readBytes()))
+        val words = (0 until data.vocabulary.size).map { data.vocabulary.word(it) }
+        assertFalse(words.toString(), "你好" in words)
+        // the pack reads a run as the dictionary reads its words: 长大 now as corrected
+        val candidates = tmp.root.resolve("candidates.tsv").path
+        File(candidates).writeText(
+            "# text\tcount\tyear\tpmi\tleft_entropy\tright_entropy\tsurprise\tknown\n# chars\t1000\n" +
+                "你\t99\t0\t0.000\t3.000\t3.000\t0.000\t1\n好\t9\t0\t0.000\t3.000\t3.000\t0.000\t1\n" +
+                "长大好\t20\t2024\t2.000\t2.000\t2.000\t1.500\t0\n",
+        )
+        val pack = tmp.root.resolve("p.words").path
+        assertEquals(0, run("pack", "-o", pack, "--data", output, "--layer", "new", "--min-count", "5", candidates).first)
+        assertEquals(listOf("长大好\tzhang'da'hao"), File(pack).readLines().drop(2).map { it.substringBeforeLast('\t') })
     }
 
     @Test
