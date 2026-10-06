@@ -74,3 +74,23 @@ count and the engine's candidates only, where a curator may also answer `unsure`
 the line). Most candidates need no sentences: a fragment, a brand of a gambling site or a set
 phrase shows as one. apply.py writes the unsure ones to `batch-NNN.unsure.txt`, and
 `batches.py --words <that file>` makes the second pass's batches, with the sentences.
+
+## Words in the code tables (a release standard)
+
+Every release's code tables (五笔, 二笔, 自然码 ...) take the words of pinyin.data, base dictionary and new-word
+pack alike, coded by each table's 组词规则 (`table --words --pinyin`, `TableText.addWords`); and so whenever new
+words are added or a pack is settled into the base dictionary, the tables are compiled again by the same rule,
+decided 2026-10-06 on measurements of 五笔 86 (share of words typed, weighted by use):
+
+- Under each code of the longest length, the commonest first (the model's unigram, or the pack's score), so
+  space commits what is most likely meant: 61% of words typed first with the table alone, 74% now.
+- A word less than a tenth as common as the commonest of its code's others (characters, words not new) goes, the
+  table's own too (it is still typed character by character; one the user picked before stays theirs): a code
+  left with one candidate commits it by itself (唯一自动上屏). Punctuation and sayings with a comma stay: the
+  model counts none of them.
+- A new word (the pack's) never goes and counts ten times its use: it is new, not rare; its count lags.
+- A character never goes. Codes shorter than the longest, the table's 简码, are left as they are, and a word goes
+  in only where no key that led nowhere (顶屏) would lead on.
+
+Measured alternatives, for the record: new words before everything 59% first; no new words 61%; by use alone,
+new words unprotected, 78% first but the newest words lost.

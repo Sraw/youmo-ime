@@ -72,7 +72,6 @@ class CodeTable private constructor(file: DataFile) {
         private val header = LinkedHashMap<String, String>()
         private val rules = LinkedHashMap<String, String>()
         private val entries = ArrayList<Pair<String, String>>()
-        private val leading = ArrayList<Pair<String, String>>()
 
         fun header(key: String, value: String) = apply { header[key] = value }
         fun rule(key: String, value: String) = apply { rules[key] = value }
@@ -81,15 +80,19 @@ class CodeTable private constructor(file: DataFile) {
             entries += code to text
         }
 
-        /** [entry], but before every [entry] of [code]: after those led before it. */
-        fun lead(code: String, text: String) = apply {
-            require(code.isNotEmpty() && text.isNotEmpty()) { "empty code or text: \"$code\" \"$text\"" }
-            leading += code to text
+        /** The entries so far, code and text, in the order given. */
+        val entryList: List<Pair<String, String>> get() = entries
+
+        /** The entries [arrange] returns for those so far, in its order. */
+        fun arrange(arrange: (List<Pair<String, String>>) -> List<Pair<String, String>>) = apply {
+            val next = arrange(entries.toList())
+            entries.clear()
+            next.forEach { (code, text) -> entry(code, text) }
         }
 
         fun build(): DataFile.Writer {
             // stable: entries sharing a code keep their source order
-            val sorted = (leading + entries).sortedBy { it.first }
+            val sorted = entries.sortedBy { it.first }
             return DataFile.Writer(DataFile.KIND_TABLE, VERSION)
                 .addMeta(META, header.mapKeys { HEADER + it.key } + rules.mapKeys { RULE + it.key })
                 .also { StringTable.write(it, CODE_OFFSETS, CODE_CHARS, sorted.map { e -> e.first }) }

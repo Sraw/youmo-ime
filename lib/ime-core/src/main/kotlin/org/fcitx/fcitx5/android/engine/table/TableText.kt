@@ -32,28 +32,34 @@ object TableText {
         return uncoded
     }
 
+    /** What [addWords] did to a table. */
+    class Added(val fresh: Int, val others: Int, val dropped: Int)
+
     /**
-     * Adds [words], the best first, to the table [reader] read (its phrases coded), each coded by
-     * its 组词规则 -- so a 五笔 user types 内卷 as the rules spell it -- before the table's own
-     * entries of its code, new words being what is wanted: what had the code, or the code one
-     * shorter, alone no longer commits itself (唯一自动上屏), and where it was first for a shorter
-     * code too, the new word is first there. What else the table's shorter codes do stays as it was:
-     * - each shorter code it starts with led somewhere already: else a key that led nowhere and
-     *   committed (顶屏) would lead on;
-     * - and to its own code or one it comes after: else the first candidate of the shorter code,
-     *   which space commits, would be another;
-     * - nor is it a pinyin entry's spelling (五笔拼音), which a code of its own would be put before.
-     * Not a word the table has; a table without rules gets none.
-     *
-     * @return how many were added
+     * Adds [words] to the table [reader] read (its phrases coded), each coded by its 组词规则 --
+     * so a 五笔 user types 内卷 as the rules spell it -- and arranges each code of the longest
+     * length by use, [score] a text's log10 probability: the commonest first, space committing it,
+     * and a code left with one candidate committing that by itself (唯一自动上屏). So:
+     * - a word less than a tenth as common as the commonest of the code's others (characters and
+     *   words not [fresh]), or never seen, goes; the table's own too, typed character by character
+     *   still, and kept where the user picked it before (TableUser). Not a [fresh] word (the
+     *   new-word pack's): new, it is more used than any count of the past says, taken as
+     *   [FRESH_BOOST] more;
+     * - a character always stays, typed by no other code perhaps; so does an entry not all Han
+     *   (—— ……, a saying with a comma), which no count is of;
+     * - codes shorter than the longest, the table's 简码, stay as they were.
+     * A word goes in only where each shorter code it starts with led somewhere already (else a
+     * key that led nowhere and committed, 顶屏, would lead on), to its own code or one it comes
+     * after (a shorter code's first candidate changes only where it was of this code), and not
+     * under a pinyin entry's spelling (五笔拼音). Not a word the table has; a table without rules
+     * gets none and loses none.
      */
-    fun addWords(reader: CodeTableReader, words: Iterable<String>): Int {
+    fun addWords(reader: CodeTableReader, words: Iterable<String>, score: (String) -> Float, fresh: (String) -> Boolean): Added {
         val table = CodeTable.load(ByteBuffer.wrap(reader.builder.build().toByteArray()), verify = false)
-        if (table.rules.isEmpty()) return 0
+        if (table.rules.isEmpty()) return Added(0, 0, 0)
         val dictionary = TableDictionary(table)
         val texts = HashSet<String>(table.size)
         for (i in 0 until table.size) texts += table.text(i)
-        var added = 0
         val marker = dictionary.pinyinMarker
         // ranked with no picks, an entry is after one of a code no longer and earlier in the table
         fun follows(code: String) = (1 until code.length).all { n ->
@@ -63,14 +69,67 @@ object TableText {
         // of the longest length: no code leads on from it
         fun fits(code: String) = code.length == dictionary.maxLength &&
             (marker == null || table.prefixRange("$marker$code").isEmpty()) && follows(code)
+        val added = HashMap<String, MutableList<String>>()
+        val new = HashSet<String>()
         for (word in words) {
             val code = word.takeIf { it.length >= 2 && it !in texts }?.let(dictionary::encode)?.takeIf(::fits) ?: continue
             texts += word
-            reader.builder.lead(code, word)
-            added++
+            new += word
+            added.getOrPut(code) { ArrayList() } += word
         }
-        return added
+        var dropped = 0
+        reader.builder.arrange { entries ->
+            // the longest codes, each with the words coded to it; the rest as they were
+            val (full, kept) = entries.partition { (code, _) -> code.length == dictionary.maxLength && (marker == null || code[0] != marker) }
+            val byCode = LinkedHashMap<String, MutableList<String>>()
+            for ((code, text) in full) byCode.getOrPut(code) { ArrayList() } += text
+            for ((code, list) in added) byCode.getOrPut(code) { ArrayList() } += list
+            kept + byCode.flatMap { (code, list) ->
+                val (stay, gone) = arrange(list, score) { isWord(it) && fresh(it) }
+                dropped += gone.count { it !in new }
+                stay.map { code to it }
+            }
+        }
+        val left = reader.builder.entryList.mapTo(HashSet()) { it.second }
+        val freshAdded = new.count { it in left && fresh(it) }
+        return Added(freshAdded, new.count { it in left } - freshAdded, dropped)
     }
+
+    /**
+     * [texts] of one code kept, the commonest first (as listed where as common, never seen last),
+     * and those that go: see [addWords].
+     */
+    internal fun arrange(texts: List<String>, score: (String) -> Float, fresh: (String) -> Boolean): Pair<List<String>, List<String>> {
+        val others = texts.filterNot(fresh)
+        val top = others.maxOfOrNull(score) ?: Float.NEGATIVE_INFINITY
+        val common = others.filter { !isWord(it) || (score(it) > Float.NEGATIVE_INFINITY && score(it) >= top - KEEP_WITHIN) }
+        // never all of them for a few never seen: the first stays
+        val keep = (texts.filter(fresh) + common.ifEmpty { others.take(1) }).toSet()
+        val ranked = texts.filter { it in keep }.sortedByDescending { if (fresh(it)) score(it) + FRESH_BOOST else score(it) }
+        return ranked to texts.filter { it !in keep }
+    }
+
+    /**
+     * Words of Han characters, two or more, the model scores; not a character (one outside the
+     * BMP is two chars), nor punctuation or a saying with a comma in it (五笔's —— and ……, 吃一堑，
+     * 长一智), which no model count says anything of.
+     */
+    private fun isWord(text: String): Boolean {
+        if (text.codePointCount(0, text.length) < 2) return false
+        var i = 0
+        while (i < text.length) {
+            val c = text.codePointAt(i)
+            if (!Character.isIdeographic(c)) return false
+            i += Character.charCount(c)
+        }
+        return true
+    }
+
+    /** log10: a fresh word counts ten times its use. */
+    const val FRESH_BOOST = 1f
+
+    /** log10: a word a tenth as common as its code's commonest goes. */
+    const val KEEP_WITHIN = 1f
 
     /**
      * Reads [text] through as the engine will when its input method is first used, so that a

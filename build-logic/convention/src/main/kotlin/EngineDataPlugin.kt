@@ -181,6 +181,7 @@ class EngineDataPlugin : Plugin<Project> {
             tables.from(TABLE.files.map { name -> extracted[1].flatMap { it.outputDir.file(name) } })
             this.words.set(words.flatMap { it.outputFile })
             this.strokes.set(strokes.flatMap { it.outputFile })
+            pinyin.set(compile.flatMap { it.outputDir.file("engine/pinyin.data") })
             outputDir.set(target.layout.buildDirectory.dir("generated/engine-tables"))
         }
         val models = MODELS.entries.mapIndexed { i, (name, sha) ->
@@ -395,6 +396,11 @@ class EngineDataPlugin : Plugin<Project> {
         @get:PathSensitive(PathSensitivity.NAME_ONLY)
         abstract val words: RegularFileProperty
 
+        /** The compiled pinyin data, whose words go into the tables too, the commonest first. */
+        @get:InputFile
+        @get:PathSensitive(PathSensitivity.NONE)
+        abstract val pinyin: RegularFileProperty
+
         /** rime-stroke's dictionary, compiled beside the tables as `engine/stroke.data`. */
         @get:InputFile
         @get:PathSensitive(PathSensitivity.NAME_ONLY)
@@ -412,11 +418,12 @@ class EngineDataPlugin : Plugin<Project> {
                 exec.javaexec {
                     classpath = this@CompileTables.classpath
                     mainClass.set(TOOL_MAIN)
-                    // a table is a few MB of text; the default heap is a quarter of the machine's
-                    maxHeapSize = "512m"
+                    // a table is a few MB of text, the pinyin data mapped, its 800k words listed; the
+                    // default heap is a quarter of the machine's
+                    maxHeapSize = "1g"
                     args(
                         "table", "-o", out.resolve(table.nameWithoutExtension + ".data").path,
-                        "--words", words.get().asFile.path, table.path,
+                        "--words", words.get().asFile.path, "--pinyin", pinyin.get().asFile.path, table.path,
                     )
                 }
             }

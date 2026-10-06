@@ -153,7 +153,11 @@ class TableUser(private val table: TableDictionary) {
             if (code.isEmpty() || text.isEmpty()) return
             val index = user.table.indexOf(code, text)
             when (type) {
-                PICKED -> user.count(index, code, text, input.readInt())
+                PICKED -> {
+                    user.count(index, code, text, input.readInt())
+                    // an entry a later table left out as rare: picked, it is the user's, kept as a phrase
+                    if (index < 0) user.keep(code, text)
+                }
                 // a phrase a later table has as its own entry: the entry stands for it
                 SAVED -> if (index < 0) user.keep(code, text)
                 FORGOT -> user.drop(code, text)

@@ -35,9 +35,10 @@ val USAGE = """
                                                           libime's text and word packs (.words), each
                                                           pack a layer of its own; the text's words
                                                           corrected by lexicon/'s lists
-           table -o <out> [--words <pack.words>] <table.txt>
-                                                          compile a code table, with a word pack's
-                                                          words its 组词规则 can code where no code clashes
+           table -o <out> [--words <pack.words>] [--pinyin <pinyin.data>] <table.txt>
+                                                          compile a code table, with the words of a
+                                                          word pack and of compiled pinyin data its
+                                                          组词规则 can code, the commonest first
            strokes -o <out> <stroke.dict.yaml>            compile rime-stroke's characters by their strokes
            mix -o <out.arpa> --lm <lm.arpa> [--weight <w>] [--cutoffs <bigram>,<trigram>] <corpus>...
                                                           mix a model with n-grams counted in chat:
@@ -100,7 +101,7 @@ private fun dispatch(command: String?, options: Options, out: Appendable): Boole
     if (!options.fit(command)) return false
     when (command) {
         "pinyin" -> pinyin(options, out)
-        "table" -> table(options.output!!, options.inputs.single(), options.words, out)
+        "table" -> table(options.output!!, options.inputs.single(), options.words, options.pinyin, out)
         "strokes" -> strokes(options.output!!, options.inputs.single(), out)
         "mix" -> mix(options, out)
         "check" -> check(options.inputs[0], options.inputs[1], out)
@@ -144,6 +145,8 @@ private class Options(
     val misreadings: String?,
     /** `table`: a word pack whose words go in, coded by the table's rules. */
     val words: String?,
+    /** `table`: compiled pinyin data whose words go in too. */
+    val pinyin: String?,
     val crawl: Crawl,
 ) {
     /** `cc`: the crawl, its first WET file and how many, and where CommonCrawl is. */
@@ -200,7 +203,7 @@ private class Options(
         private val FLAGS = setOf(
             "-o", "--lm", "--weight", "--cutoffs", "--data", "--min-count", "--layer", "--min-pmi", "--min-entropy", "--min-surprise", "--only",
             "--crawl", "--from", "--files", "--base", "--per-word", "--lexicon", "--sketch-bits", "--remove", "--readings",
-            "--words", "--misreadings",
+            "--words", "--misreadings", "--pinyin",
         )
 
         /** [flag]'s value, [default] without one, null for a bad one. */
@@ -244,6 +247,7 @@ private class Options(
                 readings = values["--readings"],
                 misreadings = values["--misreadings"],
                 words = values["--words"],
+                pinyin = values["--pinyin"],
             )
         }
     }
@@ -734,23 +738,53 @@ private fun pinyin(options: Options, out: Appendable) {
     out.appendLine("trie: ${data.dictionary.nodeCount} nodes")
 }
 
-private fun table(output: String, input: String, words: String?, out: Appendable) {
+private fun table(output: String, input: String, words: String?, pinyin: String?, out: Appendable) {
     val reader = CodeTableReader()
     File(input).bufferedReader().use { reader.read(it, input) }
     val uncoded = TableText.codePhrases(reader)
     out.appendLine("table: ${reader.entries} entries, ${reader.phrases.size - uncoded} phrases coded by the rules")
     if (uncoded > 0) out.appendLine("$uncoded phrases the rules cannot code, left out")
-    if (words != null) {
-        val pack = File(words).useLines { WordPack.parse(it, words) }
-        val all = pack.words.sortedByDescending { it.score }.map { it.entry.text }
-        val added = TableText.addWords(reader, all)
-        out.appendLine("${pack.layer}: $added of ${all.size} words added, the rest known, uncodable or changing a shorter code")
+    if (words != null || pinyin != null) {
+        val pack = words?.let { path -> File(path).useLines { WordPack.parse(it, path) } }
+        val data = pinyin?.let { PinyinData.load(map(it), verify = false) }
+        val packed = pack?.words.orEmpty().map { it.entry.text to it.score }
+        val all = wordsByUse(packed, data)
+        val packScore = HashMap<String, Float>().apply { packed.forEach { (text, s) -> merge(text, s, ::maxOf) } }
+        val index = data?.wordIndex
+        fun score(text: String): Float {
+            val id = index?.find(text) ?: -1
+            val model = if (id < 0) Float.NEGATIVE_INFINITY else data!!.model.score(id)
+            return maxOf(model, packScore[text] ?: Float.NEGATIVE_INFINITY)
+        }
+        val added = TableText.addWords(reader, all, ::score) { it in packScore }
+        out.appendLine("words: ${added.fresh} new words and ${added.others} others of ${all.size} added, " +
+            "${added.dropped} of the table's own left out as rare beside their code's commonest")
     }
     if (reader.strayCodes.isNotEmpty()) {
         out.appendLine("${reader.strayCodes.size} entries use characters outside 键码, e.g. " +
             reader.strayCodes.take(STRAY_EXAMPLES).joinToString(" | "))
     }
     write(output, reader.builder.build(), out)
+}
+
+/**
+ * Words of Han characters, two or more, from [pack] (text and log10 score) and [data]'s
+ * vocabulary, the commonest first: by the model's unigram score, or the pack's for a word the
+ * model lacks; then the dictionary's words the model has no score for, as listed.
+ */
+internal fun wordsByUse(pack: List<Pair<String, Float>>, data: PinyinData?): List<String> {
+    fun han(text: String) = text.length >= 2 && text.all { Character.UnicodeScript.of(it.code) == Character.UnicodeScript.HAN }
+    val score = HashMap<String, Float>()
+    for ((text, s) in pack) if (han(text)) score.merge(text, s, ::maxOf)
+    val unscored = LinkedHashSet<String>()
+    if (data != null) {
+        for (id in 0 until data.vocabulary.size) {
+            val text = data.vocabulary.word(id)
+            if (!han(text)) continue
+            if (id < data.model.vocabularySize) score.merge(text, data.model.score(id), ::maxOf) else unscored += text
+        }
+    }
+    return score.entries.sortedByDescending { it.value }.map { it.key } + unscored.filter { it !in score }
 }
 
 private fun strokes(output: String, input: String, out: Appendable) {

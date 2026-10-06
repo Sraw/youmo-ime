@@ -99,14 +99,14 @@ class TableUserTest {
     }
 
     @Test
-    fun aPickOfAnEntryGoneFromTheTableCountsAsAPhrases() {
+    fun aPickOfAnEntryGoneFromTheTableIsTheUsersPhrase() {
         val file = folder.root.resolve("wubi.user")
         val (session, store) = stored(file)
         teach(session)
         store.close()
-        // a later table without 恭恭敬敬
+        // a later table without 恭恭敬敬, left out as rare: the user picked it, it stays theirs
         val (again, reopened) = stored(file, table = dictionary("aaaa 工", "aaaa 敬", "wqiy 你", "wun 们", "vbg 好"))
-        assertEquals(listOf("工", "敬"), again.type("aaaa").candidates)
+        assertEquals(listOf("恭恭敬敬", "工", "敬"), again.type("aaaa").candidates)
         reopened.close()
     }
 

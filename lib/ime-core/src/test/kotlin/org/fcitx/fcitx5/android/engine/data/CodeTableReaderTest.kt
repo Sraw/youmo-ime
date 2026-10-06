@@ -108,8 +108,12 @@ class CodeTableReaderTest {
         assertEquals(0, TableText.codePhrases(read("键码=a\n[数据]\na 工\n")))
     }
 
+    // all fresh, none ever seen: in as listed, after the table's own, none left out
+    private fun add(reader: CodeTableReader, words: List<String>) =
+        TableText.addWords(reader, words, { Float.NEGATIVE_INFINITY }) { true }.let { it.fresh + it.others }
+
     @Test
-    fun newWordsGoInBeforeTheTablesOwnOfTheirCode() {
+    fun newWordsGoInUnderTheirRulesCode() {
         val reader = read(
             """
             键码=abcdefgh
@@ -131,7 +135,7 @@ class CodeTableReaderTest {
             cdaa 乙
             """,
         )
-        val added = TableText.addWords(
+        val added = add(
             reader,
             // known; coded; no rule for three; coded; known; under the code of an entry (式子 is
             // ac+dh, 样's); no code for 无; a single character
@@ -139,13 +143,12 @@ class CodeTableReaderTest {
         )
         assertEquals(3, added)
         val table = reader.table()
-        // the best first, before what the table had under the code
         assertEquals(listOf("内卷"), table.texts("efgh"))
         assertEquals(listOf("作工"), table.texts("cdab"))
         assertEquals(listOf("工作"), table.texts("abcd"))
-        assertEquals(listOf("式子", "样"), table.texts("acdh"))
+        assertEquals(listOf("样", "式子"), table.texts("acdh"))
         // no rules, no words
-        assertEquals(0, TableText.addWords(read("键码=a\n[数据]\na 工\n"), listOf("工工")))
+        assertEquals(0, add(read("键码=a\n[数据]\na 工\n"), listOf("工工")))
     }
 
     @Test
@@ -169,7 +172,7 @@ class CodeTableReaderTest {
             @efab 夜
             """,
         )
-        val added = TableText.addWords(
+        val added = add(
             reader,
             // ccdd: cc led to ccda, ccd to it too, and comes after it; abba: aba led nowhere, 顶屏
             // there; 内式 is ccce, and ccc led nowhere; efab is a pinyin spelling; 式卷 (cedd) and
@@ -196,9 +199,45 @@ class CodeTableReaderTest {
             """,
         )
         // 工做 and 工作 both abcd, in the order given; abc led to 式 alone, which now waits for a key
-        assertEquals(2, TableText.addWords(reader, listOf("工做", "工作", "工作")))
+        assertEquals(2, add(reader, listOf("工做", "工作", "工作")))
         assertEquals(listOf("工做", "工作"), reader.table().texts("abcd"))
         assertEquals(listOf("式", "工做", "工作"), reader.table().prefixRange("abc").map { reader.table().text(it) })
+    }
+
+    @Test
+    fun eachFullCodeIsArrangedByUseTheRareWordsGoingButNoCharacterNorNewWord() {
+        val reader = read(
+            """
+            键码=abcdefgh
+            码长=4
+            [组词规则]
+            e2=p11+p12+p21+p22
+            [数据]
+            ab 工
+            cd 作
+            ef 内
+            gh 卷
+            abcd 攻错
+            abcd 恭
+            efgh 内眷
+            ab 共
+            abcd 𠃌
+            abcd ——
+            """,
+        )
+        val score = mapOf("工作" to -3f, "攻错" to -4.5f, "恭" to -6f, "内卷" to -5f, "内眷" to -5.5f)
+        val added = TableText.addWords(reader, listOf("工作", "内卷"), { score[it] ?: Float.NEGATIVE_INFINITY }) { it == "内卷" }
+        assertEquals(1, added.fresh)
+        assertEquals(1, added.others)
+        // 攻错 a thirtieth of 工作: gone; 恭, a character, stays, as does 𠃌 (outside the BMP) and ——,
+        // which no count is of, the never seen last
+        assertEquals(1, added.dropped)
+        val table = reader.table()
+        assertEquals(listOf("工作", "恭", "𠃌", "——"), table.texts("abcd"))
+        // fresh, 内卷 counts ten times: before 内眷, which stays, alone beside the new word
+        assertEquals(listOf("内卷", "内眷"), table.texts("efgh"))
+        // a shorter code as it was
+        assertEquals(listOf("工", "共"), table.texts("ab"))
     }
 
     @Test
