@@ -605,6 +605,34 @@ Java_com_k2fsa_sherpa_onnx_OfflineRecognizer_createStreamWithHotwords(
   return (jlong)p;
 }
 
+// youmo: hotwords and phrases never to recognize, each "/"-separated
+SHERPA_ONNX_EXTERN_C
+JNIEXPORT jlong JNICALL
+Java_com_k2fsa_sherpa_onnx_OfflineRecognizer_createStreamWithBlocked(
+    JNIEnv *env, jobject /*obj*/, jlong ptr, jstring j_hotwords,
+    jstring j_blocked) {
+  return SafeJNI(
+      env, "OfflineRecognizer_createStreamWithBlocked",
+      [&]() -> jlong {
+        auto recognizer =
+            reinterpret_cast<sherpa_onnx::OfflineRecognizer *>(ptr);
+        auto str = [env](jstring j) {
+          std::string s;
+          if (!j) return s;
+          const char *utf = env->GetStringUTFChars(j, nullptr);
+          if (utf) {
+            s = utf;
+            env->ReleaseStringUTFChars(j, utf);
+          }
+          return s;
+        };
+        std::unique_ptr<sherpa_onnx::OfflineStream> s =
+            recognizer->CreateStream(str(j_hotwords), str(j_blocked));
+        return (jlong)s.release();
+      },
+      (jlong)0);
+}
+
 SHERPA_ONNX_EXTERN_C
 JNIEXPORT void JNICALL Java_com_k2fsa_sherpa_onnx_OfflineRecognizer_decode(
     JNIEnv *env, jobject /*obj*/, jlong ptr, jlong stream_ptr) {
@@ -661,7 +689,8 @@ Java_com_k2fsa_sherpa_onnx_OfflineRecognizer_getResult(JNIEnv *env,
   jmethodID ctor =
       env->GetMethodID(cls, "<init>",
                        "(Ljava/lang/String;[Ljava/lang/String;[FLjava/lang/"
-                       "String;Ljava/lang/String;Ljava/lang/String;[F)V");
+                       "String;Ljava/lang/String;Ljava/lang/String;[F"
+                       "[Ljava/lang/String;[F)V");
   jstring jtext = SafeNewStringUTF(env, result.text);
 
   jclass string_cls = env->FindClass("java/lang/String");
@@ -687,8 +716,25 @@ Java_com_k2fsa_sherpa_onnx_OfflineRecognizer_getResult(JNIEnv *env,
   env->SetFloatArrayRegion(jdurations, 0, result.durations.size(),
                            result.durations.data());
 
-  jobject jresult = env->NewObject(cls, ctor, jtext, jtokens, jtimestamps,
-                                   jlang, jemotion, jevent, jdurations);
+  // youmo: the beam's hypotheses, best first, and their scores
+  jclass string_cls2 = env->FindClass("java/lang/String");
+  jobjectArray jnbest =
+      env->NewObjectArray(result.nbest.size(), string_cls2, nullptr);
+  env->DeleteLocalRef(string_cls2);
+  for (size_t i = 0; i < result.nbest.size(); ++i) {
+    jstring s = SafeNewStringUTF(env, result.nbest[i]);
+    env->SetObjectArrayElement(jnbest, i, s);
+    env->DeleteLocalRef(s);
+  }
+  jfloatArray jnbest_scores = env->NewFloatArray(result.nbest_scores.size());
+  env->SetFloatArrayRegion(jnbest_scores, 0, result.nbest_scores.size(),
+                           result.nbest_scores.data());
+
+  jobject jresult =
+      env->NewObject(cls, ctor, jtext, jtokens, jtimestamps, jlang, jemotion,
+                     jevent, jdurations, jnbest, jnbest_scores);
+  env->DeleteLocalRef(jnbest);
+  env->DeleteLocalRef(jnbest_scores);
 
   env->DeleteLocalRef(jtext);
   env->DeleteLocalRef(jtokens);

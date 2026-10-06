@@ -68,6 +68,9 @@ struct Hypothesis {
 
   const ContextState *context_state;
 
+  // youmo: its state in the stream's graph of blocked phrases, if any
+  const ContextState *block_state = nullptr;
+
   // TODO(fangjun): Make it configurable
   // the minimum of tokens in a chunk for streaming RNN LM
   int32_t lm_rescore_min_chunk = 2;  // a const

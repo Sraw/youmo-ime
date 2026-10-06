@@ -12,6 +12,11 @@ data class OfflineRecognizerResult(
 
     // valid only for TDT models
     val durations: FloatArray,
+
+    // youmo: the beam's hypotheses, best first (text the first), and the score
+    // each was ranked by: transducers' modified_beam_search only, else empty
+    val nbest: Array<String> = emptyArray(),
+    val nbestScores: FloatArray = FloatArray(0),
 )
 
 data class OfflineTransducerModelConfig(
@@ -213,6 +218,12 @@ class OfflineRecognizer(
         return OfflineStream(p)
     }
 
+    // youmo: and phrases, "/"-separated as the hotwords, its result never contains
+    fun createStream(hotwords: String, blocked: String): OfflineStream {
+        val p = createStreamWithBlocked(ptr, hotwords, blocked)
+        return OfflineStream(p)
+    }
+
     fun getResult(stream: OfflineStream): OfflineRecognizerResult {
         return getResult(stream.ptr)
     }
@@ -226,6 +237,8 @@ class OfflineRecognizer(
     private external fun createStream(ptr: Long): Long
 
     private external fun createStreamWithHotwords(ptr: Long, hotwords: String): Long
+
+    private external fun createStreamWithBlocked(ptr: Long, hotwords: String, blocked: String): Long
 
     private external fun setConfig(ptr: Long, config: OfflineRecognizerConfig)
 

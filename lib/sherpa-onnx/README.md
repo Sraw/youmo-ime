@@ -14,6 +14,16 @@ upstream's AAR, so that it is ours to change.
   (kaldi-native-fbank, kaldi-decoder, simple-sentencepiece, eigen, json), each SHA-256 checked by
   its `cmake/*.cmake`. Only the app's `voice` flavor depends on the module.
 
+## What we changed
+
+- **Blocked phrases:** `OfflineRecognizer::CreateStream(hotwords, blocked)` (Kotlin
+  `createStream(hotwords, blocked)`): a transducer's modified beam search does not let a hypothesis
+  complete any of them (`ContextGraph::CompletingTokens`), so the next best is written instead.
+- **N-best:** `OfflineRecognizerResult.nbest` and `nbestScores`, the beam's hypotheses best first.
+
+Each change is marked `youmo` in the source. Their C++ unit tests run on this machine with
+`lib/sherpa-onnx/host-test.sh`; the app's `VoiceEngineTest` covers them through the JNI.
+
 ## Updating upstream
 
 Copy the same paths of the new release over `src/main/cpp` in a commit of its own, then bring our

@@ -31,21 +31,23 @@ class VoiceHotwordsTest {
     }
 
     @Test
-    fun theUsersWordsButThoseBlocked() {
+    fun theUsersWordsListenedForAndThoseBlockedNever() {
         val words = listOf(
             UserWord("幽默", "you mo", Kind.ADDED),
             UserWord("佛系", "fo xi", Kind.LEARNED, 3f),
             UserWord("幽默", "you mo", Kind.LEARNED, 2f),
             UserWord("OK", "", Kind.ADDED),
             UserWord("尬聊", "ga liao", Kind.BLOCKED),
+            UserWord("内卷", "nei juan", Kind.BLOCKED),
+            UserWord("X", "", Kind.BLOCKED),
         )
-        assertEquals("幽 默/佛 系", VoiceHotwords.ofUser(words))
-        assertEquals("", VoiceHotwords.ofUser(emptyList()))
+        assertEquals(VoiceHotwords.Words("幽 默/佛 系", "尬 聊/内 卷"), VoiceHotwords.ofUser(words))
+        assertEquals(VoiceHotwords.Words.NONE, VoiceHotwords.ofUser(emptyList()))
     }
 
     @Test
     fun atMostSoMany() {
         val words = (0 until VoiceHotwords.MAX_USER + 10).map { UserWord("词" + ('一' + it), "", Kind.LEARNED) }
-        assertEquals(VoiceHotwords.MAX_USER, VoiceHotwords.ofUser(words).split('/').size)
+        assertEquals(VoiceHotwords.MAX_USER, VoiceHotwords.ofUser(words).hotwords.split('/').size)
     }
 }

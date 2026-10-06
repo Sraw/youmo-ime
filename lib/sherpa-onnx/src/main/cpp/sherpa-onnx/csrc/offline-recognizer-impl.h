@@ -41,6 +41,13 @@ class OfflineRecognizerImpl {
 
   virtual std::unique_ptr<OfflineStream> CreateStream() const = 0;
 
+  // youmo: with phrases its result must not contain, "/"-separated as the
+  // hotwords; only a transducer's modified beam search heeds them
+  virtual std::unique_ptr<OfflineStream> CreateStream(
+      const std::string &hotwords, const std::string &blocked) const {
+    return hotwords.empty() ? CreateStream() : CreateStream(hotwords);
+  }
+
   virtual void DecodeStreams(OfflineStream **ss, int32_t n) const = 0;
 
   virtual void SetConfig(const OfflineRecognizerConfig &config);

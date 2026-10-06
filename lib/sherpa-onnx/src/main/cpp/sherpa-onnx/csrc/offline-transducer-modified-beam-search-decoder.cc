@@ -5,6 +5,7 @@
 #include "sherpa-onnx/csrc/offline-transducer-modified-beam-search-decoder.h"
 
 #include <deque>
+#include <limits>
 #include <utility>
 #include <vector>
 
@@ -40,16 +41,24 @@ OfflineTransducerModifiedBeamSearchDecoder::Decode(
   std::vector<Hypothesis> prev;
 
   std::vector<ContextGraphPtr> context_graphs(batch_size, nullptr);
+  std::vector<ContextGraphPtr> block_graphs(batch_size, nullptr);
 
   for (int32_t i = 0; i < batch_size; ++i) {
     const ContextState *context_state = nullptr;
+    Hypothesis blank(blanks, 0, nullptr);
     if (ss != nullptr) {
       context_graphs[i] =
           ss[packed_encoder_out.sorted_indexes[i]]->GetContextGraph();
       if (context_graphs[i] != nullptr)
         context_state = context_graphs[i]->Root();
+      block_graphs[i] =
+          ss[packed_encoder_out.sorted_indexes[i]]->GetBlockGraph();
+      if (block_graphs[i] != nullptr)
+        blank.block_state = block_graphs[i]->Root();
     }
-    Hypotheses blank_hyp({{blanks, 0, context_state}});
+    blank.context_state = context_state;
+    Hypotheses blank_hyp;
+    blank_hyp.Add(std::move(blank));
     cur.emplace_back(std::move(blank_hyp));
   }
 
@@ -116,6 +125,18 @@ OfflineTransducerModifiedBeamSearchDecoder::Decode(
     }
     p_logprob = p_logit;  // we changed p_logprob in the above for loop
 
+    // youmo: a token that would complete a blocked phrase is never taken. The
+    // rows of utterance i are its hyps, prev in the order cur listed them
+    for (int32_t i = 0; i != n; ++i) {
+      if (block_graphs[i] == nullptr) continue;
+      for (int32_t h = hyps_row_splits[i]; h != hyps_row_splits[i + 1]; ++h) {
+        for (auto token : block_graphs[i]->CompletingTokens(prev[h].block_state)) {
+          p_logprob[h * vocab_size + token] =
+              -std::numeric_limits<float>::infinity();
+        }
+      }
+    }
+
     // Now compute top_k for each utterance
     for (int32_t i = 0; i != n; ++i) {
       int32_t start = hyps_row_splits[i];
@@ -147,6 +168,10 @@ OfflineTransducerModifiedBeamSearchDecoder::Decode(
                 context_state, new_token, false /* non-strict mode */);
             context_score = std::get<0>(context_res);
             new_hyp.context_state = std::get<1>(context_res);
+          }
+          if (block_graphs[i] != nullptr) {
+            new_hyp.block_state = std::get<1>(block_graphs[i]->ForwardOneStep(
+                new_hyp.block_state, new_token, true /* strict mode */));
           }
         }
 
@@ -186,6 +211,12 @@ OfflineTransducerModifiedBeamSearchDecoder::Decode(
     Hypothesis hyp = cur[i].GetMostProbable(true);
 
     auto &r = unsorted_ans[packed_encoder_out.sorted_indexes[i]];
+
+    // youmo: the others too, ranked as the best was
+    for (const auto &h : cur[i].GetTopK(max_active_paths_, true)) {
+      r.nbest_tokens.emplace_back(h.ys.begin() + context_size, h.ys.end());
+      r.nbest_scores.push_back(h.TotalLogProb() / h.ys.size());
+    }
 
     // strip leading blanks
     r.tokens = {hyp.ys.begin() + context_size, hyp.ys.end()};

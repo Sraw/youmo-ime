@@ -8,6 +8,7 @@
 #include <cmath>
 #include <map>
 #include <random>
+#include <set>
 #include <string>
 #include <utility>
 #include <vector>
@@ -98,6 +99,53 @@ TEST(ContextGraph, Benchmark) {
     SHERPA_ONNX_LOGE("Construct context graph for %d item takes %d us.", num,
                      static_cast<int32_t>(duration.count()));
   }
+}
+
+// youmo: CompletingTokens is exactly the tokens on which ForwardOneStep, in
+// strict mode as the blocked phrases are followed, reaches a matched phrase:
+// checked from every state a random walk passes, over the whole alphabet, with
+// phrases that are suffixes and prefixes of one another
+TEST(ContextGraph, CompletingTokensAreThoseThatMatch) {
+  std::mt19937 rng(7);
+  std::uniform_int_distribution<int32_t> letter(0, 4);
+  for (int32_t round = 0; round != 50; ++round) {
+    std::vector<std::vector<int32_t>> phrases;
+    for (int32_t p = 0; p != 6; ++p) {
+      std::vector<int32_t> phrase(1 + rng() % 4);
+      for (auto &t : phrase) t = letter(rng);
+      phrases.push_back(phrase);
+    }
+    ContextGraph graph(phrases, 0.0f);
+    auto state = graph.Root();
+    for (int32_t step = 0; step != 200; ++step) {
+      std::set<int32_t> expected;
+      for (int32_t t = 0; t != 5; ++t) {
+        if (std::get<2>(graph.ForwardOneStep(state, t, true)) != nullptr) {
+          expected.insert(t);
+        }
+      }
+      const auto &got = graph.CompletingTokens(state);
+      EXPECT_EQ(std::set<int32_t>(got.begin(), got.end()), expected);
+      EXPECT_EQ(got.size(), expected.size());  // each token once
+      state = std::get<1>(graph.ForwardOneStep(state, letter(rng), true));
+    }
+  }
+}
+
+TEST(ContextGraph, CompletingTokensOfASuffix) {
+  // "CAB" and "AB": after "XA" (no C), B still completes "AB"; after "CA", B
+  // completes "CAB"; after "C" nothing completes
+  std::vector<std::vector<int32_t>> phrases = {{'C', 'A', 'B'}, {'A', 'B'}};
+  ContextGraph graph(phrases, 0.0f);
+  auto walk = [&](const std::string &s) {
+    auto state = graph.Root();
+    for (auto c : s) state = std::get<1>(graph.ForwardOneStep(state, c, true));
+    return graph.CompletingTokens(state);
+  };
+  EXPECT_EQ(walk("XA"), std::vector<int32_t>{'B'});
+  EXPECT_EQ(walk("CA"), std::vector<int32_t>{'B'});
+  EXPECT_TRUE(walk("C").empty());
+  EXPECT_TRUE(walk("").empty());
 }
 
 }  // namespace sherpa_onnx

@@ -31,6 +31,15 @@
 
 namespace sherpa_onnx {
 
+// youmo: tokens to text as Convert below writes the best one's
+static std::string TokensToText(const std::vector<int64_t> &tokens,
+                                const SymbolTable &sym_table) {
+  std::string text;
+  for (auto i : tokens) text.append(sym_table[i]);
+  if (sym_table.IsByteBpe()) text = sym_table.DecodeByteBpe(text);
+  return RemoveSpaceBetweenCjk(text);
+}
+
 static OfflineRecognitionResult Convert(
     const OfflineTransducerDecoderResult &src, const SymbolTable &sym_table,
     int32_t frame_shift_ms, int32_t subsampling_factor) {
@@ -77,6 +86,11 @@ static OfflineRecognitionResult Convert(
 
   // Copy token log probabilities (confidence scores)
   r.ys_log_probs = src.ys_log_probs;
+
+  for (const auto &tokens : src.nbest_tokens) {
+    r.nbest.push_back(TokensToText(tokens, sym_table));
+  }
+  r.nbest_scores = src.nbest_scores;
 
   return r;
 }
@@ -202,6 +216,39 @@ class OfflineRecognizerTransducerImpl : public OfflineRecognizerImpl {
                                            hotwords_graph_);
   }
 
+  std::unique_ptr<OfflineStream> CreateStream(
+      const std::string &hotwords, const std::string &blocked) const override {
+    auto s = hotwords.empty() ? CreateStream() : CreateStream(hotwords);
+    if (blocked.empty()) return s;
+
+    // one at a time: a phrase with a token the model lacks is left out, not
+    // shortened to what it has (which would block something else)
+    std::vector<std::vector<int32_t>> phrases;
+    int32_t left_out = 0;
+    std::istringstream all(blocked);
+    for (std::string line; std::getline(all, line, '/');) {
+      std::istringstream is(line);
+      std::vector<std::vector<int32_t>> encoded;
+      std::vector<float> unused_scores;
+      if (EncodeHotwords(is, config_.model_config.modeling_unit, symbol_table_,
+                         bpe_encoder_.get(), &encoded, &unused_scores) &&
+          encoded.size() == 1) {
+        phrases.push_back(std::move(encoded[0]));
+      } else if (!line.empty()) {
+        ++left_out;
+      }
+    }
+    // the user's words, not for the log: how many only
+    if (left_out > 0) {
+      SHERPA_ONNX_LOGE("%d blocked phrases left out, not encodable", left_out);
+    }
+    if (!phrases.empty()) {
+      // matched, never scored: the decoder only asks where a phrase ends
+      s->SetBlockGraph(std::make_shared<ContextGraph>(phrases, 0.0f));
+    }
+    return s;
+  }
+
   void DecodeStreams(OfflineStream **ss, int32_t n) const override {
     auto memory_info =
         Ort::MemoryInfo::CreateCpu(OrtDeviceAllocator, OrtMemTypeDefault);
@@ -252,6 +299,9 @@ class OfflineRecognizerTransducerImpl : public OfflineRecognizerImpl {
                        model_->SubsamplingFactor());
       r.text = ApplyInverseTextNormalization(std::move(r.text));
       r.text = ApplyHomophoneReplacer(std::move(r.text));
+      for (auto &text : r.nbest) {
+        text = ApplyHomophoneReplacer(ApplyInverseTextNormalization(std::move(text)));
+      }
 
       ss[i]->SetResult(r);
     }

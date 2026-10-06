@@ -27,6 +27,11 @@ struct OfflineTransducerDecoderResult {
 
   /// ys_log_probs[i] contains the log probability (confidence) for tokens[i].
   std::vector<float> ys_log_probs;
+
+  /// youmo: the beam's hypotheses, best first, `tokens` the first of them
+  /// (modified beam search only), and the score each was ranked by
+  std::vector<std::vector<int64_t>> nbest_tokens;
+  std::vector<float> nbest_scores;
 };
 
 class OfflineTransducerDecoder {

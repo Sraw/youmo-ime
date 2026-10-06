@@ -112,6 +112,33 @@ std::pair<float, const ContextState *> ContextGraph::Finalize(
   return std::make_pair(score, root_.get());
 }
 
+const std::vector<int32_t> &ContextGraph::CompletingTokens(
+    const ContextState *state) const {
+  std::lock_guard<std::mutex> lock(completing_mutex_);
+  return CompletingLocked(state);
+}
+
+const std::vector<int32_t> &ContextGraph::CompletingLocked(
+    const ContextState *state) const {
+  auto it = completing_.find(state);
+  if (it != completing_.end()) return it->second;
+
+  std::vector<int32_t> ans;
+  // a token is taken by the state's own arc if it has one, else as its fail
+  // state would take it
+  for (const auto &kv : state->next) {
+    const ContextState *node = kv.second.get();
+    if (node->is_end || node->output != nullptr) ans.push_back(kv.first);
+  }
+  if (state->token != -1) {  // not root, whose fail is itself
+    for (auto token : CompletingLocked(state->fail)) {
+      if (state->next.count(token) == 0) ans.push_back(token);
+    }
+  }
+  // the map's nodes stay put as it grows: the reference outlives the lock
+  return completing_.emplace(state, std::move(ans)).first->second;
+}
+
 std::pair<bool, const ContextState *> ContextGraph::IsMatched(
     const ContextState *state) const {
   bool status = false;

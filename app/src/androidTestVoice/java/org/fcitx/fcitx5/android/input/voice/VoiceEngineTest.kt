@@ -24,7 +24,7 @@ class VoiceEngineTest {
 
     @Test
     fun aRecordingIsCutAtItsPausesAndEachStretchRecognized() {
-        val texts = hear("")
+        val texts = hear(VoiceHotwords.Words.NONE)
         assertEquals(texts.toString(), 2, texts.size)
         for (text in texts) {
             // 开饭时间早上九点至下午五点, the numbers made digits. The first syllable comes back 开饭,
@@ -39,14 +39,44 @@ class VoiceEngineTest {
     fun theUsersWordsAreListenedFor() {
         // the pack's hotwords read from the assets, the user's put in for each stretch: of the
         // two, the first goes from 开放 to 开饭 with the bonus (the second is said more like 开放)
-        fun heard(hotwords: String) = hear(hotwords).count { it.startsWith("开饭") }
         val word = Engines.UserWord("开饭", "kai fan", Engines.UserWord.Kind.ADDED)
         val with = heard(VoiceHotwords.ofUser(listOf(word)))
-        val without = heard("")
+        val without = heard(VoiceHotwords.Words.NONE)
         assertTrue("$with with, $without without", with > without)
     }
 
-    private fun hear(hotwords: String): List<String> {
+    @Test
+    fun aBlockedWordIsNeverWrittenEvenListenedFor() {
+        // the bonus that made 开饭 of the first stretch, and the word blocked: the block wins
+        val listened = heard(VoiceHotwords.Words(hotwords = "开 饭", blocked = ""))
+        val blocked = hear(VoiceHotwords.Words(hotwords = "开 饭", blocked = "开 饭"))
+        assertTrue("$listened 开饭 listened for", listened > 0)
+        assertTrue(blocked.toString(), blocked.none { "开饭" in it })
+        // the rest still heard
+        assertTrue(blocked.toString(), blocked.all { "时间早上九点" in it || "时间早上9点" in it })
+    }
+
+    @Test
+    fun theBeamsOtherHypothesesComeBackBestFirst() {
+        val recognizer = VoiceEngine.acquire(app.assets)
+        try {
+            val stream = VoiceEngine.stream(recognizer, VoiceHotwords.Words.NONE)
+            stream.acceptWaveform(wav("zh.wav"), VoiceEngine.SAMPLE_RATE)
+            recognizer.decode(stream)
+            val result = recognizer.getResult(stream)
+            stream.release()
+            assertTrue(result.nbest.toList().toString(), result.nbest.size > 1)
+            assertEquals(result.text, result.nbest[0])
+            assertEquals(result.nbest.size, result.nbestScores.size)
+            assertTrue(result.nbestScores.toList().toString(), result.nbestScores.toList().zipWithNext().all { (a, b) -> a >= b })
+        } finally {
+            VoiceEngine.release()
+        }
+    }
+
+    private fun heard(words: VoiceHotwords.Words) = hear(words).count { it.startsWith("开饭") }
+
+    private fun hear(hotwords: VoiceHotwords.Words): List<String> {
         val recognizer = VoiceEngine.acquire(app.assets)
         val vad = VoiceEngine.vad(app.assets)
         val history = VoiceEngine.history()

@@ -269,6 +269,10 @@ class OfflineStream::Impl {
 
   const ContextGraphPtr &GetContextGraph() const { return context_graph_; }
 
+  void SetBlockGraph(ContextGraphPtr g) { block_graph_ = std::move(g); }
+
+  const ContextGraphPtr &GetBlockGraph() const { return block_graph_; }
+
   void SetOption(const std::string &key, const std::string &value) {
     options_[key] = value;
   }
@@ -354,6 +358,7 @@ class OfflineStream::Impl {
   knf::MfccOptions mfcc_opts_;
   OfflineRecognitionResult r_;
   ContextGraphPtr context_graph_;
+  ContextGraphPtr block_graph_;
   bool is_ced_ = false;
   bool is_moonshine_ = false;
   bool is_omnilingual_asr_ = false;
@@ -401,6 +406,14 @@ void OfflineStream::SetResult(const OfflineRecognitionResult &r) {
 
 const ContextGraphPtr &OfflineStream::GetContextGraph() const {
   return impl_->GetContextGraph();
+}
+
+void OfflineStream::SetBlockGraph(ContextGraphPtr block_graph) {
+  impl_->SetBlockGraph(std::move(block_graph));
+}
+
+const ContextGraphPtr &OfflineStream::GetBlockGraph() const {
+  return impl_->GetBlockGraph();
 }
 
 const OfflineRecognitionResult &OfflineStream::GetResult() const {

@@ -6,6 +6,7 @@
 #define SHERPA_ONNX_CSRC_CONTEXT_GRAPH_H_
 
 #include <memory>
+#include <mutex>  // NOLINT
 #include <string>
 #include <tuple>
 #include <unordered_map>
@@ -77,6 +78,13 @@ class ContextGraph {
 
   const ContextState *Root() const { return root_.get(); }
 
+  // youmo: the tokens that, decoded next from `state`, would complete one of
+  // the graph's phrases (as ForwardOneStep would follow them, fail arcs
+  // included): what a graph of blocked phrases must not let a hypothesis take.
+  // Worked out once a state, from its fail state's: the beam search asks for
+  // each hypothesis at each frame.
+  const std::vector<int32_t> &CompletingTokens(const ContextState *state) const;
+
  private:
   float context_score_;
   float ac_threshold_;
@@ -86,6 +94,14 @@ class ContextGraph {
              const std::vector<std::string> &phrases,
              const std::vector<float> &ac_thresholds) const;
   void FillFailOutput() const;
+
+  // youmo: CompletingTokens', a state's once worked out; the lock for a graph
+  // shared by streams decoded at once
+  mutable std::unordered_map<const ContextState *, std::vector<int32_t>>
+      completing_;
+  mutable std::mutex completing_mutex_;
+  const std::vector<int32_t> &CompletingLocked(
+      const ContextState *state) const;
 };
 
 }  // namespace sherpa_onnx

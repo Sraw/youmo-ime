@@ -166,6 +166,11 @@ std::unique_ptr<OfflineStream> OfflineRecognizer::CreateStream(
   return impl_->CreateStream(hotwords);
 }
 
+std::unique_ptr<OfflineStream> OfflineRecognizer::CreateStream(
+    const std::string &hotwords, const std::string &blocked) const {
+  return impl_->CreateStream(hotwords, blocked);
+}
+
 std::unique_ptr<OfflineStream> OfflineRecognizer::CreateStream() const {
   return impl_->CreateStream();
 }
@@ -176,6 +181,7 @@ void OfflineRecognizer::DecodeStreams(OfflineStream **ss, int32_t n) const {
   for (int32_t i = 0; i < n; ++i) {
     auto r = ss[i]->GetResult();
     r.text = RemoveLeadingSpaces(r.text);
+    for (auto &text : r.nbest) text = RemoveLeadingSpaces(text);  // youmo
     ss[i]->SetResult(r);
   }
 }

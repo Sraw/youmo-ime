@@ -55,6 +55,11 @@ struct OfflineRecognitionResult {
   std::vector<float> segment_durations;    // duration of each segment
   std::vector<std::string> segment_texts;  // text of each segment
 
+  // youmo: the beam's hypotheses as text, best first (`text` the first), and
+  // the score each was ranked by: transducers' modified beam search only
+  std::vector<std::string> nbest;
+  std::vector<float> nbest_scores;
+
   std::string AsJsonString() const;
 };
 
@@ -125,6 +130,10 @@ class OfflineStream {
 
   /** Get the ContextGraph of this stream */
   const ContextGraphPtr &GetContextGraph() const;
+
+  /** youmo: the phrases this stream's result must not contain, or null */
+  void SetBlockGraph(ContextGraphPtr block_graph);
+  const ContextGraphPtr &GetBlockGraph() const;
 
   // Generic per-stream option mechanism (key-value string pairs).
   void SetOption(const std::string &key, const std::string &value);

@@ -76,12 +76,16 @@ object VoiceEngine {
     }
 
     /**
-     * A stream to recognize a stretch in, listening for [hotwords] (VoiceHotwords.ofUser) besides
-     * the pack's. With some, the recognizer builds its graph of hotwords again, the pack's 78
-     * thousand too: a tenth of a second or more, so made before the stretch it is for.
+     * A stream to recognize a stretch in, listening for the user's [words] (VoiceHotwords.ofUser)
+     * besides the pack's and never writing those they blocked. With hotwords of theirs, the
+     * recognizer builds its graph of hotwords again, the pack's 78 thousand too: a tenth of a
+     * second or more, so made before the stretch it is for.
      */
-    fun stream(r: OfflineRecognizer, hotwords: String): OfflineStream =
-        if (hotwords.isEmpty()) r.createStream() else r.createStream(hotwords)
+    fun stream(r: OfflineRecognizer, words: VoiceHotwords.Words): OfflineStream = when {
+        words.blocked.isNotEmpty() -> r.createStream(words.hotwords, words.blocked)
+        words.hotwords.isNotEmpty() -> r.createStream(words.hotwords)
+        else -> r.createStream()
+    }
 
     /** A stretch of speech to text, in [stream], which it releases. */
     fun recognize(r: OfflineRecognizer, stream: OfflineStream, samples: FloatArray): String {
@@ -95,8 +99,8 @@ object VoiceEngine {
     }
 
     /** the words the user added and made (VoiceHotwords.ofUser), read again for each listener */
-    suspend fun userHotwords(fcitx: FcitxConnection): String =
-        withTimeoutOrNull(USER_WORDS_MS) { VoiceHotwords.ofUser(fcitx.runOnReady { userWords() }) }.orEmpty()
+    suspend fun userHotwords(fcitx: FcitxConnection): VoiceHotwords.Words =
+        withTimeoutOrNull(USER_WORDS_MS) { VoiceHotwords.ofUser(fcitx.runOnReady { userWords() }) } ?: VoiceHotwords.Words.NONE
 
     // the engine still starting: voice input without the user's words, not a wait
     private const val USER_WORDS_MS = 2000L

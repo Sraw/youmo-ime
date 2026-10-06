@@ -100,6 +100,15 @@ class OfflineRecognizer {
   std::unique_ptr<OfflineStream> CreateStream(
       const std::string &hotwords) const;
 
+  /** youmo: as CreateStream(hotwords), and the result does not contain any of
+   *  the "/"-separated phrases of `blocked` (written as hotwords are), as a run
+   *  of tokens anywhere: the beam search does not let a hypothesis complete
+   *  one. A transducer's modified_beam_search only, others ignore `blocked`;
+   *  a phrase with a token the model lacks is left out.
+   */
+  std::unique_ptr<OfflineStream> CreateStream(
+      const std::string &hotwords, const std::string &blocked) const;
+
   /** Decode a single stream
    *
    * @param s The stream to decode.

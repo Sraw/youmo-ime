@@ -13,9 +13,12 @@ import org.fcitx.fcitx5.android.engine.host.Engines
  * from 89 to some 104 of 138 heard, the rest of the speech much as it was; a larger bonus
  * hears more of them and mishears more of everything else.
  *
- * A word the user blocked is not listened for among theirs, but is among the pack's if it is one:
- * sherpa-onnx keeps the larger of two bonuses on a word, and the pack's list, read from the assets,
- * is fixed. Each stream with the user's words holds a graph of the pack's too, some 37 MB.
+ * A word the user blocked is not written, the pack's or not: our sherpa-onnx's beam search
+ * (lib/sherpa-onnx) does not let a hypothesis complete one, so the next best is. As a run of
+ * characters, so within a longer one too (开饭 blocked, 打开饭盒 is not written either). Only
+ * those [spelled]: two to twelve Chinese characters, [MAX_USER] of them; and only once the
+ * engine has told the listener the user's words (VoiceEngine.userHotwords waits so long).
+ * Each stream with the user's words holds a graph of the pack's too, some 37 MB.
  */
 object VoiceHotwords {
 
@@ -41,14 +44,27 @@ object VoiceHotwords {
         return word.toList().joinToString(" ")
     }
 
+    /** What a stream is told of the user's words: each list's words [spelled], apart by `/`. */
+    data class Words(val hotwords: String, val blocked: String) {
+        companion object {
+            val NONE = Words("", "")
+        }
+    }
+
     /**
-     * The user's words as one stream's hotwords, apart by `/`: those they added first, then those
-     * they made as they typed, most used first ([Engines.userWords]' order); none they blocked.
+     * The user's words for one stream: as hotwords, those they added first, then those they made
+     * as they typed, most used first ([Engines.userWords]' order); blocked, those they blocked.
      */
-    fun ofUser(words: List<Engines.UserWord>): String = words.asSequence()
-        .filter { it.kind != Engines.UserWord.Kind.BLOCKED }
-        .mapNotNull { spelled(it.text) }
-        .distinct()
-        .take(MAX_USER)
-        .joinToString("/")
+    fun ofUser(words: List<Engines.UserWord>): Words {
+        fun spell(kinds: (Engines.UserWord.Kind) -> Boolean) = words.asSequence()
+            .filter { kinds(it.kind) }
+            .mapNotNull { spelled(it.text) }
+            .distinct()
+            .take(MAX_USER)
+            .joinToString("/")
+        return Words(
+            hotwords = spell { it != Engines.UserWord.Kind.BLOCKED },
+            blocked = spell { it == Engines.UserWord.Kind.BLOCKED },
+        )
+    }
 }

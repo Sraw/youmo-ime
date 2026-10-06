@@ -40,8 +40,8 @@ import kotlin.math.sqrt
 class VoiceListener(
     private val assets: AssetManager,
     private val events: Events,
-    /** the user's words to listen for (VoiceHotwords.ofUser), asked for as the models load */
-    private val hotwords: suspend () -> String,
+    /** the user's words to listen for and blocked (VoiceHotwords.ofUser), asked for as the models load */
+    private val hotwords: suspend () -> VoiceHotwords.Words,
 ) {
 
     enum class Failure { NoModel, NoMicrophone }
@@ -78,7 +78,7 @@ class VoiceListener(
     private val pending: MutableList<Job> = Collections.synchronizedList(mutableListOf())
 
     // the decoder's: the hotwords, and the stream made ready for the next stretch
-    private var words = ""
+    private var words = VoiceHotwords.Words.NONE
     private var next: OfflineStream? = null
     private var capture: Job? = null
     // read off the main thread too, as the models load
@@ -152,7 +152,7 @@ class VoiceListener(
     } catch (@Suppress("TooGenericExceptionCaught") e: Exception) {
         // voice input without them, not none
         Timber.w(e, "voice hotwords")
-        ""
+        VoiceHotwords.Words.NONE
     }
 
     /**
