@@ -11,6 +11,10 @@ Free to restructure; upstream compatibility is not a constraint.
 - `app` — Android glue: Views, the `InputMethodService`, preferences, file-backed managers,
   JNI-facing `core/`. Keep it thin: read prefs / Android state, pass *values* into ime-core
   classes, apply the returned decision.
+- `app/src/voice` / `app/src/text` — the `speech` flavor dimension (beside `network`: four builds).
+  Voice input (sherpa-onnx, SenseVoice, silero VAD; `VoiceDataPlugin`) and `RECORD_AUDIO` exist
+  only in `voice`; main code reaches it through `VoiceFeature`, which each flavor defines with the
+  same signatures. Its decisions (`input/voice/` in ime-core) are tested like the rest.
 - Pattern to follow (see `PendingInputPolicy`, `LayoutSwitchPolicy`, `BackspaceSwipeBehavior`):
   pure class, preferences passed in as arguments, no `AppPrefs`, no `Context`.
 - Deliberately **not** done (measured, see `dev/PLAN.md` P6 if present): an `ImeHost` interface
@@ -21,10 +25,10 @@ Free to restructure; upstream compatibility is not a constraint.
 | What | Command |
 |---|---|
 | Core logic tests + API-level check + coverage floors | `./gradlew :lib:ime-core:check` |
-| App JVM tests (Robolectric where needed) | `./gradlew :app:testOfflineDebugUnitTest` |
+| App JVM tests (Robolectric where needed) | `./gradlew :app:testOfflineTextDebugUnitTest` |
 | Static analysis (syntax rules only; type resolution doesn't work here) | `./gradlew detekt` |
 | Accept current findings after a deliberate batch (run alone, not with `detekt`; `:<module>:detektBaseline` for one module, bare `detektBaseline` rewrites every module) | `./gradlew :<module>:detektBaseline` |
-| App coverage (report only, no floor) | `./gradlew :app:koverLogOfflineDebug` |
+| App coverage (report only, no floor) | `./gradlew :app:koverLogOfflineTextDebug` |
 | Engine data into app assets (part of every app build; downloads libime's sources, the mixed model of this fork's release `engine-data-*` and the curated new-word pack of `words-*`, SHA-256 checked, once) | `./gradlew :app:compileEngineData` |
 | A new `engine-data` release's files (CommonCrawl crawl, cleaning, mix, new words, evaluation; ~100 GB down, an hour on a rented 16-core box via `dev/training/jobs/engine-data.json`) | `TOOL=… EVAL=… SETS=… lib/ime-dict-tool/engine-data.sh <work dir>` |
 | Sentence models into app assets (part of every app build; fetched from this fork's release `sentence-models-*`, SHA-256 checked) | `./gradlew :app:copySentenceModels` |

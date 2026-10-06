@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- voice input, recognized on the phone: nothing heard leaves it -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+
+    <application>
+        <!-- an input method cannot ask for a permission itself: this asks, and closes -->
+        <activity
+            android:name="org.fcitx.fcitx5.android.input.voice.VoicePermissionActivity"
+            android:excludeFromRecents="true"
+            android:exported="false"
+            android:noHistory="true"
+            android:taskAffinity=""
+            android:theme="@android:style/Theme.Translucent.NoTitleBar" />
+    </application>
+</manifest>

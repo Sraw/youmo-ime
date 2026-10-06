@@ -96,6 +96,12 @@ class IdleUi(
         }
     }
 
+    /** Voice input, in a voice build only (VoiceFeature): beside the emoji, as on Sogou's bar */
+    val voiceButton = ToolButton(ctx, R.drawable.ic_baseline_keyboard_voice_24, theme).apply {
+        contentDescription = ctx.getString(R.string.voice_input)
+        visibility = View.GONE
+    }
+
     val emptyBar = Space(ctx)
 
     val buttonsUi = ButtonsBarUi(ctx, theme)
@@ -142,8 +148,12 @@ class IdleUi(
             endOfParent()
             centerVertically()
         })
-        add(emojiButton, lParams(size, size) {
+        add(voiceButton, lParams(size, size) {
             before(hideKeyboardButton)
+            centerVertically()
+        })
+        add(emojiButton, lParams(size, size) {
+            before(voiceButton)
             centerVertically()
         })
         add(animator, lParams(matchConstraints, matchParent) {

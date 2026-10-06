@@ -5,6 +5,7 @@ plugins {
     id("org.fcitx.fcitx5.android.data-descriptor")
     id("org.fcitx.fcitx5.android.fcitx-component")
     id("org.fcitx.fcitx5.android.engine-data")
+    id("org.fcitx.fcitx5.android.voice-data")
     alias(libs.plugins.kotlin.parcelize)
     alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.ksp)
@@ -60,8 +61,20 @@ android {
     // Two builds: offline, published by default, asks for no network permission at all; cloud adds
     // INTERNET for the user's own scoring server (cloud/), off until they turn it on. Permissions
     // are fixed at install, so it is a build, not a switch.
-    flavorDimensions += "network"
+    // And text or voice: voice adds RECORD_AUDIO and the speech recognizer with its ~240 MB of
+    // models (VoiceDataPlugin), for those who want them; text, the default, has neither.
+    flavorDimensions += listOf("network", "speech")
     productFlavors {
+        create("text") {
+            dimension = "speech"
+            isDefault = true
+            buildConfigField("boolean", "VOICE", "false")
+        }
+        create("voice") {
+            dimension = "speech"
+            versionNameSuffix = "-voice"
+            buildConfigField("boolean", "VOICE", "true")
+        }
         create("offline") {
             dimension = "network"
             isDefault = true

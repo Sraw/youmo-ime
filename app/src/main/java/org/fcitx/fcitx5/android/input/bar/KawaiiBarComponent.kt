@@ -19,6 +19,7 @@ import android.widget.ViewAnimator
 import android.widget.inline.InlineContentView
 import androidx.annotation.Keep
 import androidx.annotation.RequiresApi
+import androidx.core.view.isVisible
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -64,6 +65,7 @@ import org.fcitx.fcitx5.android.input.keyboard.CustomGestureView
 import org.fcitx.fcitx5.android.input.keyboard.KeyboardWindow
 import org.fcitx.fcitx5.android.input.popup.PopupComponent
 import org.fcitx.fcitx5.android.input.status.StatusAreaWindow
+import org.fcitx.fcitx5.android.input.voice.VoiceFeature
 import org.fcitx.fcitx5.android.input.wm.InputWindow
 import org.fcitx.fcitx5.android.input.wm.InputWindowManager
 import org.fcitx.fcitx5.android.utils.AppUtil
@@ -286,6 +288,9 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
                     launchClipboardTimeoutJob()
                 }
             }
+            voiceButton.setOnClickListener {
+                VoiceFeature.window()?.let { windowManager.attachWindow(it) }
+            }
             hideKeyboardButton.apply {
                 setOnClickListener(hideKeyboardCallback)
                 swipeEnabled = true
@@ -447,6 +452,8 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
         voiceInputSubtype = InputMethodUtil.findVoiceSubtype(preferredVoiceInput)
         val shouldShowVoiceInput =
             showVoiceInputButton && voiceInputSubtype != null && !capFlags.has(CapabilityFlag.Password)
+        // nothing said out loud goes into a password
+        idleUi.voiceButton.isVisible = VoiceFeature.AVAILABLE && !capFlags.has(CapabilityFlag.Password)
         idleUi.setHideKeyboardIsVoiceInput(
             shouldShowVoiceInput,
             if (shouldShowVoiceInput) switchToVoiceInputCallback else hideKeyboardCallback

@@ -1,8 +1,8 @@
 name: Unit Tests
 
 # JVM unit tests only. Deliberately separate from the build workflow:
-#   - no submodules (verified: `:app:testOfflineDebugUnitTest` configures and runs on a submodule-free checkout)
-#   - no NDK, no CMake (the task graph for `:app:testOfflineDebugUnitTest` contains no native tasks)
+#   - no submodules (verified: `:app:testOfflineTextDebugUnitTest` configures and runs on a submodule-free checkout)
+#   - no NDK, no CMake (the task graph for `:app:testOfflineTextDebugUnitTest` contains no native tasks)
 #   - single OS
 # so it takes a few minutes rather than the build jobs' half hour, and can gate every push.
 #
@@ -81,7 +81,7 @@ jobs:
 
       # offline debug only: the cloud flavour differs in its manifest alone, its code is all in main
       - name: Run app unit tests
-        run: ./gradlew :app:testOfflineDebugUnitTest :app:koverLogOfflineDebug
+        run: ./gradlew :app:testOfflineTextDebugUnitTest :app:koverLogOfflineTextDebug
 
       # After the tests, so a lint finding does not hide their results. Findings already present
       # are frozen in config/detekt/baseline-*.xml; this fails on new ones only.

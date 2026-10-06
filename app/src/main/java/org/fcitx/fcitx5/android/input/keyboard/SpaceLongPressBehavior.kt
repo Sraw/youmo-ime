@@ -11,5 +11,8 @@ enum class SpaceLongPressBehavior(override val stringRes: Int) : ManagedPreferen
     None(R.string.space_behavior_none),
     Enumerate(R.string.space_behavior_enumerate),
     ToggleActivate(R.string.space_behavior_activate),
-    ShowPicker(R.string.space_behavior_picker);
+    ShowPicker(R.string.space_behavior_picker),
+
+    /** a voice build's default; a text build lists it not, and does nothing for it */
+    Voice(R.string.voice_input);
 }

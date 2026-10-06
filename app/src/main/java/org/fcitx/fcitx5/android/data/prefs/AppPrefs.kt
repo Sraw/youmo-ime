@@ -23,6 +23,7 @@ import org.fcitx.fcitx5.android.input.keyboard.SpaceLongPressBehavior
 import org.fcitx.fcitx5.android.input.keyboard.SwipeSymbolDirection
 import org.fcitx.fcitx5.android.input.picker.PickerWindow
 import org.fcitx.fcitx5.android.input.popup.EmojiModifier
+import org.fcitx.fcitx5.android.input.voice.VoiceFeature
 import org.fcitx.fcitx5.android.utils.DeviceUtil
 import org.fcitx.fcitx5.android.utils.appContext
 import org.fcitx.fcitx5.android.utils.vibrator
@@ -101,10 +102,12 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
                 listOf(Level(R.string.level_short, 200), Level(R.string.level_medium, 300), Level(R.string.level_long, 450))
             )
         }
+        // voice input, in a build that has it, as Sogou's long press on the space
         val spaceKeyLongPressBehavior = enumList(
             R.string.space_long_press_behavior,
             "space_long_press_behavior",
-            SpaceLongPressBehavior.None
+            if (VoiceFeature.AVAILABLE) SpaceLongPressBehavior.Voice else SpaceLongPressBehavior.None,
+            entryValues = SpaceLongPressBehavior.entries.filter { it != SpaceLongPressBehavior.Voice || VoiceFeature.AVAILABLE }
         )
         val spaceSwipeMoveCursor =
             switch(R.string.space_swipe_move_cursor, "space_swipe_move_cursor", true)

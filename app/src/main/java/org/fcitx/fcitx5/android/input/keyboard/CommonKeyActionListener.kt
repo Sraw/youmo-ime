@@ -33,6 +33,7 @@ import org.fcitx.fcitx5.android.input.keyboard.KeyAction.SpaceLongPressAction
 import org.fcitx.fcitx5.android.input.keyboard.KeyAction.SymAction
 import org.fcitx.fcitx5.android.input.keyboard.KeyAction.UnicodeAction
 import org.fcitx.fcitx5.android.input.picker.PickerWindow
+import org.fcitx.fcitx5.android.input.voice.VoiceFeature
 import org.fcitx.fcitx5.android.input.wm.InputWindowManager
 import org.fcitx.fcitx5.android.utils.switchToNextIME
 import org.mechdancer.dependency.Dependent
@@ -167,6 +168,12 @@ class CommonKeyActionListener :
                             toggleIme()
                         }
                         SpaceLongPressBehavior.ShowPicker -> showInputMethodPicker()
+                        SpaceLongPressBehavior.Voice -> if (!service.inPasswordField) {
+                            // as the picker: not while the key's touch is being handled
+                            ContextCompat.getMainExecutor(context).execute {
+                                VoiceFeature.window()?.let { windowManager.attachWindow(it) }
+                            }
+                        }
                     }
                 }
                 else -> {}

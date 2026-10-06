@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="voice_loading">正在載入語音模型…</string>
+    <string name="voice_listening">請說話</string>
+    <string name="voice_hearing">正在聽…</string>
+    <string name="voice_recognizing">正在辨識…</string>
+    <string name="voice_paused">已暫停，點話筒繼續</string>
+    <string name="voice_no_permission">語音輸入需要麥克風權限，點話筒授權</string>
+    <string name="voice_no_model">語音模型載入失敗</string>
+    <string name="voice_no_microphone">無法使用麥克風</string>
+    <string name="voice_hint">說完稍停，文字自動上屏。全部在手機上辨識，聲音不會離開手機</string>
+    <string name="voice_model_credit">語音辨識：SenseVoice-Small（FunAudioLLM，阿里巴巴），依 FunASR 模型授權使用；由 sherpa-onnx（k2-fsa）與 silero VAD 執行</string>
+</resources>

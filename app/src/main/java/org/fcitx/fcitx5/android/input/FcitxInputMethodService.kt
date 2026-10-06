@@ -123,6 +123,9 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
 
     private var capabilityFlags = CapabilityFlags.DefaultFlags
 
+    /** nothing said out loud goes into a password */
+    val inPasswordField get() = capabilityFlags.has(CapabilityFlag.Password)
+
     private val editingSession = EditingSession(
         InputConnectionEditor { currentInputConnection },
         checkThread = if (BuildConfig.DEBUG) ({
@@ -888,6 +891,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         Timber.d("onFinishInputView: finishingInput=$finishingInput")
         decorLocationUpdated = false
         inputDeviceMgr.onFinishInputView()
+        inputView?.finishInput()
         currentInputConnection?.apply {
             finishComposingText()
             monitorCursorAnchor(false)

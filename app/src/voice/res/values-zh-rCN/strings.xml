@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="voice_loading">正在载入语音模型…</string>
+    <string name="voice_listening">请说话</string>
+    <string name="voice_hearing">正在听…</string>
+    <string name="voice_recognizing">正在识别…</string>
+    <string name="voice_paused">已暂停，点话筒继续</string>
+    <string name="voice_no_permission">语音输入需要麦克风权限，点话筒授权</string>
+    <string name="voice_no_model">语音模型载入失败</string>
+    <string name="voice_no_microphone">无法使用麦克风</string>
+    <string name="voice_hint">说完稍停，文字自动上屏。全部在手机上识别，声音不会离开手机</string>
+    <string name="voice_model_credit">语音识别：SenseVoice-Small（FunAudioLLM，阿里巴巴），依 FunASR 模型许可使用；由 sherpa-onnx（k2-fsa）与 silero VAD 运行</string>
+</resources>

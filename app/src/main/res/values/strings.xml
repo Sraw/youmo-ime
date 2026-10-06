@@ -338,6 +338,7 @@
     <string name="a11y_key_switch_language">Switch language</string>
     <string name="a11y_key_number_pad">Number pad</string>
     <string name="a11y_key_emoji">Emoji</string>
+    <string name="voice_input">Voice input</string>
     <string name="a11y_candidates_prev_page">Previous candidates</string>
     <string name="a11y_candidates_next_page">More candidates</string>
     <string name="a11y_add_item">Add</string>

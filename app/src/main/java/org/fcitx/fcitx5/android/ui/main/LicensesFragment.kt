@@ -11,6 +11,7 @@ import com.mikepenz.aboutlibraries.Libs
 import com.mikepenz.aboutlibraries.entity.License
 import kotlinx.coroutines.launch
 import org.fcitx.fcitx5.android.R
+import org.fcitx.fcitx5.android.input.voice.VoiceFeature
 import org.fcitx.fcitx5.android.ui.common.PaddingPreferenceFragment
 import org.fcitx.fcitx5.android.utils.addPreference
 import org.fcitx.fcitx5.android.utils.openUrl
@@ -20,6 +21,11 @@ class LicensesFragment : PaddingPreferenceFragment() {
     override fun onCreatePreferences(savedInstanceState: Bundle?, rootKey: String?) {
         lifecycleScope.launch {
             preferenceScreen = preferenceManager.createPreferenceScreen(requireContext()).apply {
+                VoiceFeature.credits(requireContext()).forEach { credit ->
+                    addPreference(title = credit.title, summary = credit.licence) {
+                        requireContext().openUrl(credit.url)
+                    }
+                }
                 val jsonString = resources.openRawResource(R.raw.aboutlibraries)
                     .bufferedReader()
                     .use { it.readText() }

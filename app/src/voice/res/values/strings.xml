@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="voice_loading">Loading the speech model…</string>
+    <string name="voice_listening">Speak</string>
+    <string name="voice_hearing">Listening…</string>
+    <string name="voice_recognizing">Recognizing…</string>
+    <string name="voice_paused">Paused: tap the microphone to go on</string>
+    <string name="voice_no_permission">Voice input needs the microphone: tap it to allow</string>
+    <string name="voice_no_model">The speech model could not be loaded</string>
+    <string name="voice_no_microphone">The microphone cannot be used</string>
+    <string name="voice_hint">Pause and what you said is typed. Recognized on the phone: nothing heard leaves it.</string>
+    <string name="voice_model_credit">Speech recognition: SenseVoice-Small (FunAudioLLM, Alibaba), under the FunASR model licence; run with sherpa-onnx (k2-fsa) and silero VAD</string>
+</resources>

@@ -39,6 +39,8 @@ class DetektConventionPlugin : Plugin<Project> {
             config.setFrom(rootProject.file("config/detekt/detekt.yml"))
             baseline.set(rootProject.file("config/detekt/baseline-${path.removePrefix(":").replace(':', '-')}.xml"))
             parallel.set(true)
+            // the app's flavors keep code of their own (src/voice: voice input), checked as main's
+            source.from(listOf("src/text/java", "src/voice/java").map(::file).filter { it.exists() })
         }
     }
 

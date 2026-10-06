@@ -39,6 +39,10 @@ gradlePlugin {
             id = "org.fcitx.fcitx5.android.detekt"
             implementationClass = "DetektConventionPlugin"
         }
+        register("voiceData") {
+            id = "org.fcitx.fcitx5.android.voice-data"
+            implementationClass = "VoiceDataPlugin"
+        }
         register("engineData") {
             id = "org.fcitx.fcitx5.android.engine-data"
             implementationClass = "EngineDataPlugin"

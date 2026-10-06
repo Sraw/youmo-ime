@@ -334,6 +334,7 @@
     <string name="a11y_key_switch_language">切换语言</string>
     <string name="a11y_key_number_pad">数字键盘</string>
     <string name="a11y_key_emoji">表情</string>
+    <string name="voice_input">语音输入</string>
     <string name="a11y_candidates_prev_page">上一页候选词</string>
     <string name="a11y_candidates_next_page">更多候选词</string>
     <string name="a11y_add_item">添加</string>

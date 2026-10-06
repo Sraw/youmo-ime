@@ -74,11 +74,12 @@ git clone https://github.com/Sraw/youmo-ime.git
 cd youmo-ime
 git submodule update --init --recursive
 sudo apt install extra-cmake-modules gettext   # Debian/Ubuntu；Arch：pacman -S extra-cmake-modules；macOS：brew install extra-cmake-modules gettext
-./gradlew :app:assembleOfflineDebug   # 云端版：:app:assembleCloudDebug
+./gradlew :app:assembleOfflineTextDebug   # 云端版：:app:assembleCloudTextDebug；带语音：:app:assembleOfflineVoiceDebug
 ```
 
-有两个版本：`offline`（离线版，默认发布，不申请网络权限）和 `cloud`（云端版，多一个网络权限，用于自建云端）。
-`./gradlew :app:assembleRelease` 会两个都打。
+版本分两个维度，共四个：`offline`（离线版，默认发布，不申请网络权限）或 `cloud`（云端版，多一个网络权限，用于自建云端）；
+`text`（纯文字，默认）或 `voice`（离线语音输入，多一个录音权限和约 240 MB 的语音模型）。
+`./gradlew :app:assembleRelease` 会四个都打。
 
 构建会自动下载引擎数据和句子模型，并按 SHA-256 校验：
 
@@ -107,7 +108,7 @@ signKeyPwd=...
 | 做什么 | 命令 |
 |---|---|
 | 核心逻辑测试、API 级别检查、覆盖率门槛 | `./gradlew :lib:ime-core:check` |
-| 应用的 JVM 测试 | `./gradlew :app:testOfflineDebugUnitTest` |
+| 应用的 JVM 测试 | `./gradlew :app:testOfflineTextDebugUnitTest` |
 | 静态检查 | `./gradlew detekt` |
 
 ### 致谢
@@ -192,11 +193,12 @@ git clone https://github.com/Sraw/youmo-ime.git
 cd youmo-ime
 git submodule update --init --recursive
 sudo apt install extra-cmake-modules gettext   # Debian/Ubuntu; Arch: pacman -S extra-cmake-modules; macOS: brew install extra-cmake-modules gettext
-./gradlew :app:assembleOfflineDebug   # the cloud build: :app:assembleCloudDebug
+./gradlew :app:assembleOfflineTextDebug   # the cloud build: :app:assembleCloudTextDebug; with voice: :app:assembleOfflineVoiceDebug
 ```
 
-There are two builds: `offline`, published by default, with no network permission, and `cloud`, with network access for your own server.
-`./gradlew :app:assembleRelease` makes both.
+Builds vary in two ways, four in all: `offline`, published by default, with no network permission, or `cloud`, with network access for
+your own server; and `text`, the default, or `voice`, offline voice input, with the microphone permission and a ~240 MB speech model.
+`./gradlew :app:assembleRelease` makes all four.
 
 The build downloads the engine data and the sentence models and checks their SHA-256:
 
@@ -226,7 +228,7 @@ signKeyPwd=...
 | To | Run |
 |---|---|
 | Test the core logic, check the API level and coverage floors | `./gradlew :lib:ime-core:check` |
-| Run the app's JVM tests | `./gradlew :app:testOfflineDebugUnitTest` |
+| Run the app's JVM tests | `./gradlew :app:testOfflineTextDebugUnitTest` |
 | Run static analysis | `./gradlew detekt` |
 
 ### Thanks

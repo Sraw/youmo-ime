@@ -20,6 +20,9 @@ interface InputBroadcastReceiver {
 
     fun onStartInput(info: EditorInfo, capFlags: CapabilityFlags) {}
 
+    /** the keyboard hidden, or the field left: what is going on for it, such as voice input, stops */
+    fun onFinishInput() {}
+
     fun onClientPreeditUpdate(data: FormattedText) {}
 
     fun onInputPanelUpdate(data: InputPanelEvent.Data) {}

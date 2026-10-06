@@ -352,6 +352,11 @@ class InputView(
         }
     }
 
+    /** called when [InputView] is hidden, or its field left */
+    fun finishInput() {
+        broadcaster.onFinishInput()
+    }
+
     override fun onStartHandleFcitxEvent() {
         val inputPanelData = fcitx.runImmediately { inputPanelCached }
         val inputMethodEntry = fcitx.runImmediately { inputMethodEntryCached }
@@ -407,6 +412,9 @@ class InputView(
     override fun onDetachedFromWindow() {
         advancedPrefs.unregisterOnChangeListener(onKeyboardSizeChangeListener)
         keyboardPrefs.unregisterOnChangeListener(onKeyboardSizeChangeListener)
+        // replaced (a rotation, a theme) its windows are never detached: what they had going,
+        // the microphone above all, stops here
+        broadcaster.onFinishInput()
         // clear DynamicScope, implies that InputView should not be attached again after detached.
         scope.clear()
         viewScope.cancel()

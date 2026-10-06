@@ -327,6 +327,7 @@
     <string name="a11y_key_switch_language">切換語言</string>
     <string name="a11y_key_number_pad">數字鍵盤</string>
     <string name="a11y_key_emoji">表情</string>
+    <string name="voice_input">語音輸入</string>
     <string name="a11y_candidates_prev_page">上一頁候選詞</string>
     <string name="a11y_candidates_next_page">更多候選詞</string>
     <string name="a11y_add_item">新增</string>
