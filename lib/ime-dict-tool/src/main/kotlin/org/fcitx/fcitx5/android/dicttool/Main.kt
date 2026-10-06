@@ -33,7 +33,9 @@ val USAGE = """
                                                           libime's text and word packs (.words), each
                                                           pack a layer of its own; the text's words
                                                           corrected by lexicon/'s lists
-           table -o <out> <table.txt>                     compile a code table
+           table -o <out> [--words <pack.words>] <table.txt>
+                                                          compile a code table, with a word pack's
+                                                          words its 组词规则 can code where no code clashes
            mix -o <out.arpa> --lm <lm.arpa> [--weight <w>] [--cutoffs <bigram>,<trigram>] <corpus>...
                                                           mix a model with n-grams counted in chat:
                                                           conversations a JSON array a line (.jsonl.gz),
@@ -95,7 +97,7 @@ private fun dispatch(command: String?, options: Options, out: Appendable): Boole
     if (!options.fit(command)) return false
     when (command) {
         "pinyin" -> pinyin(options, out)
-        "table" -> table(options.output!!, options.inputs.single(), out)
+        "table" -> table(options.output!!, options.inputs.single(), options.words, out)
         "mix" -> mix(options, out)
         "check" -> check(options.inputs[0], options.inputs[1], out)
         "words" -> words(options, out)
@@ -134,6 +136,8 @@ private class Options(
     /** `pinyin`: lexicon/remove.tsv, words the dictionaries have wrongly, and lexicon/readings.tsv, readings put right. */
     val remove: String?,
     val readings: String?,
+    /** `table`: a word pack whose words go in, coded by the table's rules. */
+    val words: String?,
     val crawl: Crawl,
 ) {
     /** `cc`: the crawl, its first WET file and how many, and where CommonCrawl is. */
@@ -190,6 +194,7 @@ private class Options(
         private val FLAGS = setOf(
             "-o", "--lm", "--weight", "--cutoffs", "--data", "--min-count", "--layer", "--min-pmi", "--min-entropy", "--min-surprise", "--only",
             "--crawl", "--from", "--files", "--base", "--per-word", "--lexicon", "--sketch-bits", "--remove", "--readings",
+            "--words",
         )
 
         /** [flag]'s value, [default] without one, null for a bad one. */
@@ -231,6 +236,7 @@ private class Options(
                 sketchBits = values.count("--sketch-bits", NewWords.SKETCH_BITS, NewWords.MIN_SKETCH_BITS..MAX_SKETCH_BITS) ?: return null,
                 remove = values["--remove"],
                 readings = values["--readings"],
+                words = values["--words"],
             )
         }
     }
@@ -717,12 +723,18 @@ private fun pinyin(options: Options, out: Appendable) {
     out.appendLine("trie: ${data.dictionary.nodeCount} nodes")
 }
 
-private fun table(output: String, input: String, out: Appendable) {
+private fun table(output: String, input: String, words: String?, out: Appendable) {
     val reader = CodeTableReader()
     File(input).bufferedReader().use { reader.read(it, input) }
     val uncoded = TableText.codePhrases(reader)
     out.appendLine("table: ${reader.entries} entries, ${reader.phrases.size - uncoded} phrases coded by the rules")
     if (uncoded > 0) out.appendLine("$uncoded phrases the rules cannot code, left out")
+    if (words != null) {
+        val pack = File(words).useLines { WordPack.parse(it, words) }
+        val all = pack.words.sortedByDescending { it.score }.map { it.entry.text }
+        val added = TableText.addWords(reader, all)
+        out.appendLine("${pack.layer}: $added of ${all.size} words added, the rest known, uncodable or clashing")
+    }
     if (reader.strayCodes.isNotEmpty()) {
         out.appendLine("${reader.strayCodes.size} entries use characters outside 键码, e.g. " +
             reader.strayCodes.take(STRAY_EXAMPLES).joinToString(" | "))

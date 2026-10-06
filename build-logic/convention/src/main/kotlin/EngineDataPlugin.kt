@@ -167,6 +167,7 @@ class EngineDataPlugin : Plugin<Project> {
             classpath.from(tool)
             toolCode.set(fingerprint)
             tables.from(TABLE.files.map { name -> extracted[1].flatMap { it.outputDir.file(name) } })
+            this.words.set(words.flatMap { it.outputFile })
             outputDir.set(target.layout.buildDirectory.dir("generated/engine-tables"))
         }
         val models = MODELS.entries.mapIndexed { i, (name, sha) ->
@@ -371,6 +372,11 @@ class EngineDataPlugin : Plugin<Project> {
         @get:PathSensitive(PathSensitivity.NAME_ONLY)
         abstract val tables: ConfigurableFileCollection
 
+        /** The new-word pack, its words added to each table its rules can code them for. */
+        @get:InputFile
+        @get:PathSensitive(PathSensitivity.NAME_ONLY)
+        abstract val words: RegularFileProperty
+
         @get:OutputDirectory
         abstract val outputDir: DirectoryProperty
 
@@ -385,7 +391,10 @@ class EngineDataPlugin : Plugin<Project> {
                     mainClass.set(TOOL_MAIN)
                     // a table is a few MB of text; the default heap is a quarter of the machine's
                     maxHeapSize = "512m"
-                    args("table", "-o", out.resolve(table.nameWithoutExtension + ".data").path, table.path)
+                    args(
+                        "table", "-o", out.resolve(table.nameWithoutExtension + ".data").path,
+                        "--words", words.get().asFile.path, table.path,
+                    )
                 }
             }
         }

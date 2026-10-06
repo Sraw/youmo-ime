@@ -109,6 +109,78 @@ class CodeTableReaderTest {
     }
 
     @Test
+    fun newWordsGoInWhereTheirCodeIsFree() {
+        val reader = read(
+            """
+            键码=abcdefgh
+            码长=4
+            [组词规则]
+            e2=p11+p12+p21+p22
+            [数据]
+            ab 工
+            cd 作
+            ef 内
+            gh 卷
+            ac 式
+            dh 子
+            abcd 工作
+            acdh 样
+            efg 丁
+            efga 甲
+            cda 丙
+            cdaa 乙
+            """,
+        )
+        val added = TableText.addWords(
+            reader,
+            // known; coded; code taken by an earlier new word; known; the code of an entry (式子
+            // is ac+dh, 样's); no code for 无; a single character
+            listOf("工作", "内卷", "内卷儿", "作工", "工作", "式子", "工无", "工"),
+        )
+        assertEquals(2, added)
+        val table = reader.table()
+        assertEquals(listOf("内卷"), table.texts("efgh"))
+        assertEquals(listOf("作工"), table.texts("cdab"))
+        assertEquals(listOf("工作"), table.texts("abcd"))
+        assertEquals(listOf("样"), table.texts("acdh"))
+        // no rules, no words
+        assertEquals(0, TableText.addWords(read("键码=a\n[数据]\na 工\n"), listOf("工工")))
+    }
+
+    @Test
+    fun newWordsChangeNothingTheTablesShorterCodesDo() {
+        val reader = read(
+            """
+            键码=abcdefgh
+            码长=4
+            拼音=@
+            [组词规则]
+            e2=p11+p12+p21+p22
+            [数据]
+            ab 工
+            ba 作
+            cc 内
+            dd 卷
+            ce 式
+            ccda 样
+            ccdb 杨
+            ef 子
+            @efab 夜
+            """,
+        )
+        val added = TableText.addWords(
+            reader,
+            // ccdd: cc led to ccda, ccd to it too, and comes after it; abba: aba led nowhere, 顶屏
+            // there; 内式 is ccce, and ccc led nowhere; efab is a pinyin spelling
+            listOf("内卷", "工作", "内式", "子工", "式卷", "式内"),
+        )
+        // 式卷 (cedd): ce led only to 式, which commits itself; 式内 (cecc) as much
+        assertEquals(1, added)
+        assertEquals(listOf("内卷"), reader.table().texts("ccdd"))
+
+    }
+
+    @Test
     fun aTableIsCheckedAsTheEngineWillReadIt() {
         TableText.check(TINY_TABLE.trimIndent().reader().buffered(), "table")
         TableText.check("键码=a\n[数据]\n[词组]\n工作\n".reader().buffered(), "table")
