@@ -27,6 +27,7 @@ object UserLog {
     private const val PAIR: Byte = 3
     private const val FORGOT: Byte = 4
     private const val PRIOR: Byte = 5
+    private const val HABIT: Byte = 6
 
     fun header(): ByteArray = FORMAT.header()
 
@@ -57,6 +58,13 @@ object UserLog {
         writeFloat(value)
     }
 
+    /** A key habit's count ([KeyHabits]) as it is now, its keys scoped; zero is gone. */
+    fun habit(scopedKeys: String, text: String, count: Float) = FORMAT.record(HABIT) {
+        writeUTF(scopedKeys)
+        writeUTF(text)
+        writeFloat(count)
+    }
+
     fun forgot(words: List<Entry>) = FORMAT.record(FORGOT) {
         writeShort(words.size)
         words.forEach { entry(it) }
@@ -67,10 +75,10 @@ object UserLog {
      *
      * @return the length of the records read whole: past it the log was cut short
      */
-    fun read(bytes: ByteArray, model: UserModel, prior: LayerPrior? = null): Int =
-        FORMAT.read(bytes) { type, input -> replay(type, input, model, prior) }
+    fun read(bytes: ByteArray, model: UserModel, prior: LayerPrior? = null, habits: KeyHabits? = null): Int =
+        FORMAT.read(bytes) { type, input -> replay(type, input, model, prior, habits) }
 
-    internal fun replay(type: Byte, input: DataInputStream, model: UserModel, prior: LayerPrior?) {
+    internal fun replay(type: Byte, input: DataInputStream, model: UserModel, prior: LayerPrior?, habits: KeyHabits? = null) {
         try {
             when (type) {
                 SENTENCE -> {
@@ -86,6 +94,12 @@ object UserLog {
                     val value = input.readFloat()
                     // a layer this build does not have is left behind
                     prior?.restore(name, value)
+                }
+                HABIT -> {
+                    val keys = input.readUTF()
+                    val text = input.readUTF()
+                    val count = input.readFloat()
+                    habits?.restore(keys, text, count)
                 }
                 // a type from a later version: what it held is lost, the rest still reads
                 else -> Unit

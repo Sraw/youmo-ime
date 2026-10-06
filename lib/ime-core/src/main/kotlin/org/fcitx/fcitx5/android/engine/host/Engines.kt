@@ -37,6 +37,7 @@ import org.fcitx.fcitx5.android.engine.table.TableUser
 import org.fcitx.fcitx5.android.engine.user.LibimeImport
 import org.fcitx.fcitx5.android.engine.user.UserModel
 import org.fcitx.fcitx5.android.engine.user.UserModel.Entry
+import org.fcitx.fcitx5.android.engine.user.KeyHabits
 import org.fcitx.fcitx5.android.engine.user.UserStore
 import org.fcitx.fcitx5.android.engine.user.WordLists
 import org.fcitx.fcitx5.android.engine.user.WordPack
@@ -195,7 +196,7 @@ class Engines(
             val file = File(userDir, USER_PINYIN)
             // a log that cannot be read or moved aside: learn in memory rather than not type
             store = try {
-                UserStore(file, model, onError = onError, prior = prior()).apply { open(seed = ::importLegacy) }
+                UserStore(file, model, onError = onError, prior = prior(), habits = habits).apply { open(seed = ::importLegacy) }
             } catch (e: IOException) {
                 onError(e)
                 null
@@ -204,6 +205,9 @@ class Engines(
         addDictionaries(model)
         lists.applyTo(model)
     }
+
+    // kept in the user model's log, read with it: asked for after user()
+    private val habits = KeyHabits()
 
     // in the user directory with the log, in memory without one
     private val lists by lazy(LazyThreadSafetyMode.NONE) { WordLists(userDir, onError) }
@@ -325,6 +329,7 @@ class Engines(
         val blocked = lists.blockAll(entries)
         val model = user()
         entries.forEach { model.block(it) }
+        habits.forgetAll(entries.mapTo(HashSet()) { it.text })
         return blocked.size
     }
 
@@ -335,7 +340,10 @@ class Engines(
     fun removeWords(words: Collection<UserWord>) {
         val byKind = words.groupBy({ it.kind }, { it.entry() })
         byKind[UserWord.Kind.ADDED]?.let { if (lists.removeAll(it.filterNotNull()).isNotEmpty()) dropUser() }
-        byKind[UserWord.Kind.LEARNED]?.let { user().forget(it.filterNotNull()) }
+        byKind[UserWord.Kind.LEARNED]?.let { learned ->
+            user().forget(learned.filterNotNull())
+            habits.forgetAll(learned.filterNotNull().mapTo(HashSet()) { it.text })
+        }
         byKind[UserWord.Kind.BLOCKED]?.let { entries -> lists.unblockAll(entries.filterNotNull()).forEach { userModel?.unblock(it) } }
         sessions.clear()
         keyboards.clear()
@@ -502,12 +510,12 @@ class Engines(
             PINYIN -> PinyinSession(
                 pinyinData, PinyinSegmenter(s.fuzzy, s.typos, neighbours = s.typos),
                 pageSize = s.pageSize, user = user(), prediction = s.prediction, prior = prior(), phraseBook = phrases(),
-                reranker = reranker(), refiner = refiner(), block = ::block,
+                reranker = reranker(), refiner = refiner(), block = ::block, habits = habits.scope(PINYIN),
             )
             SHUANGPIN -> PinyinSession(
                 pinyinData, ShuangpinSegmenter(s.scheme, s.fuzzy, s.typos), spell = true,
                 pageSize = s.pageSize, user = user(), prediction = s.prediction, prior = prior(), phraseBook = phrases(),
-                reranker = reranker(), refiner = refiner(), block = ::block,
+                reranker = reranker(), refiner = refiner(), block = ::block, habits = habits.scope("$SHUANGPIN/${s.shuangpin}"),
             )
             else -> {
                 val method = TABLES[im]

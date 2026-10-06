@@ -33,7 +33,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.nio.ByteBuffer
 
-private fun syl(vararg s: String) = s.map { Syllables.id(it) }.toIntArray()
+internal fun syl(vararg s: String) = s.map { Syllables.id(it) }.toIntArray()
 
 /** The dictionary and model the pinyin session tests read. */
 internal fun sessionTestData() = PinyinData.load(

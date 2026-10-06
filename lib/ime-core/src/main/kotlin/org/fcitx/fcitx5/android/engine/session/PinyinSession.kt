@@ -23,6 +23,7 @@ import org.fcitx.fcitx5.android.engine.pinyin.Syllables
 import org.fcitx.fcitx5.android.engine.rerank.Reranker
 import org.fcitx.fcitx5.android.engine.rerank.SentencePicker
 import org.fcitx.fcitx5.android.engine.rerank.SentenceRefiner
+import org.fcitx.fcitx5.android.engine.user.KeyHabits
 import org.fcitx.fcitx5.android.engine.user.UserModel
 import org.fcitx.fcitx5.android.engine.user.UserModel.Entry
 import org.fcitx.fcitx5.android.engine.user.UserScorer
@@ -76,6 +77,8 @@ class PinyinSession(
     private val refiner: SentenceRefiner? = null,
     /** Keeps a word the user blocked ([Action.Block]), blocked in [user] too; none offered without. */
     private val block: ((Entry) -> Unit)? = null,
+    /** What the user puts together from pieces for what they type, offered first when they type it again, while [learning]. */
+    private val habits: KeyHabits.Scope? = null,
     // last, so a test's picker can follow as a lambda
     private val reranker: SentencePicker? = null,
 ) : Session {
@@ -113,6 +116,10 @@ class PinyinSession(
     private var refined = 0 // slices of refining spent on them
     private var placed: Map<String, Phrase> = emptyMap() // the phrases among the candidates, by text
     private var decoderFirst: Candidate? = null // the first before the reranker and phrases moved it
+    private var habit: String? = null // the habit offered for what is left of the input, if any
+    private var ownFirst: String? = null // the first as the engine offers it, habits aside, for ownFirstKeys
+    private var ownFirstKeys: String? = null
+    private var firstBeforeHabit: Candidate? = null // of the candidates now, before the habit was put first
     private var preedit = ""
     private var page = 0
     private var predicting = false
@@ -202,6 +209,11 @@ class PinyinSession(
             return snapshot()
         }
         val text = pieces.joinToString("") { it.text }
+        // put together from pieces, what learning its words does not bring up (嗯嗯 for ee, read
+        // en en only at a penalty a syllable); or the habit offered, picked or passed over. A word
+        // picked alone is learned by the user model: a habit would put it first whatever came
+        // before, as 泥 for ni every time once picked
+        if (learning && (pieces.size > 1 || habit != null)) input.toString().let { habits?.learn(it, text, ownFirstOf(it)) }
         val learned = learn(text)
         // not learned, so no pair with what comes next either
         if (learned == null) lastEntry = null
@@ -222,8 +234,8 @@ class PinyinSession(
         if (c == null || predicting) return emptySet()
         val phrase = placed[c.text]
         return buildSet {
-            // text kept as typed and phrases hold no words to forget
-            if (user != null && entries(c) != null) add(Offer.FORGET)
+            // text kept as typed and phrases hold no words to forget; a habit is forgotten as such
+            if (user != null && entries(c) != null || c.text == habit) add(Offer.FORGET)
             // the first already, and a phrase: nothing to pin
             if ((phrase == null || index != 0) && pinnable(c)) add(Offer.PIN)
             if (phrase != null) add(Offer.UNPIN)
@@ -276,8 +288,12 @@ class PinyinSession(
      */
     private fun forget(index: Int): Snapshot {
         val c = candidates.getOrNull(index)
+        if (c != null && !predicting) habits?.forget(c.text)
         val words = if (user == null || predicting || c == null) null else entries(c)
-        if (words == null) return snapshot()
+        if (words == null) {
+            if (c != null && c.text == habit) read()
+            return snapshot()
+        }
         user?.forget(words)
         // or the next pick learns it again, as the word before it
         if (lastEntry in words) dropContext()
@@ -347,7 +363,8 @@ class PinyinSession(
      */
     private fun learnPrior(picked: Candidate) {
         if (prior == null || !learning) return
-        val first = candidates.firstOrNull()
+        // a habit passed over says nothing of the layers: the decoder did not put it there
+        val first = firstBeforeHabit?.takeIf { f -> candidates.any { it === f } } ?: candidates.firstOrNull()
         if (first == null || picked === first) return
         val offered = first.words.filterIndexed { i, _ -> first.ends[i] <= picked.end }.toIntArray()
         if (prior.learn(picked.words, offered)) decoder.reset()
@@ -425,6 +442,10 @@ class PinyinSession(
         candidates = emptyList()
         decoderWords = emptyList()
         placed = emptyMap()
+        habit = null
+        ownFirst = null
+        ownFirstKeys = null
+        firstBeforeHabit = null
         preedit = ""
         page = 0
         predicting = false
@@ -440,6 +461,7 @@ class PinyinSession(
             candidates = emptyList()
             decoderWords = emptyList()
             placed = emptyMap()
+            habit = null
             preedit = ""
             graph = null
             return
@@ -485,8 +507,44 @@ class PinyinSession(
             key, { checkNotNull(time) }, (sentences + decoderWords).distinctBy { it.text },
             text = { it.text }, all = { it.end == rest },
         ) { Candidate(it, rest, 0f, intArrayOf(NO_WORD), intArrayOf(rest)) }
+        if (pieces.isEmpty()) {
+            ownFirst = candidates.firstOrNull()?.text
+            ownFirstKeys = key
+        }
+        firstBeforeHabit = candidates.firstOrNull()
+        candidates = withHabit(key, rest, candidates)
         val best = sentences.firstOrNull()
         preedit = pieces.joinToString("") { it.text } + (if (best == null) graph.input else preedit(graph, best))
+    }
+
+    /**
+     * The first the engine offers for [keys], the whole input, habits aside: as it was shown, or,
+     * keys typed after a piece was picked (nih, 你, ao), read again as a whole -- by the decoder
+     * alone, without the reranker or pinned phrases, which at worst counts one commit too many.
+     */
+    private fun ownFirstOf(keys: String): String? {
+        if (keys == ownFirstKeys) return ownFirst
+        val (prev2, prev) = lastTwo(context)
+        val decoding = decoder.decode(segmenter.segment(keys), prev2, prev)
+        // the input it read last is not this
+        decoder.reset()
+        return (decoding.sentences.firstOrNull() ?: decoding.words.firstOrNull())?.text
+    }
+
+    /**
+     * [candidates] with the habit of [key] ([habits]) first, but after a phrase pinned first: the
+     * candidate of that text reading all [rest] keys moved up, or one of text alone if none is.
+     */
+    private fun withHabit(key: String, rest: Int, candidates: List<Candidate>): List<Candidate> {
+        habit = if (learning) habits?.habit(key) else null
+        val text = habit ?: return candidates
+        val found = candidates.firstOrNull { it.text == text && it.end == rest }
+        val others = candidates.filter { it !== found && it.text != text }
+        val first = found ?: Candidate(text, rest, 0f, intArrayOf(NO_WORD), intArrayOf(rest))
+        // the habit a phrase pinned first itself stays first
+        val pinnedFirst = candidates.firstOrNull()?.let { it.text != text && placed[it.text] != null } == true
+        val at = if (pinnedFirst) 1 else 0
+        return others.take(at) + first + others.drop(at)
     }
 
     /** What the rerankers read before the input. */

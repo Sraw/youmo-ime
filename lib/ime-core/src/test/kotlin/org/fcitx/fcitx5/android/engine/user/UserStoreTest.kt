@@ -353,4 +353,27 @@ class UserStoreTest {
         assertEquals(mapOf("好(hao)" to 1f), counts(session()))
         assertEquals(long.size + 1f, m.total)
     }
+
+    @Test
+    fun keyHabitsAreKeptInTheLogThroughCompaction() {
+        val habits = KeyHabits()
+        UserStore(file, model(), habits = habits).use {
+            it.open()
+            habits.scope("pinyin").learn("ee", "嗯嗯", own = "呃呃")
+            habits.scope("pinyin").learn("e", "饿", own = "呃")
+            habits.scope("pinyin").forget("饿")
+        }
+        val again = KeyHabits()
+        UserStore(file, model(), habits = again).use {
+            it.open()
+            assertEquals("嗯嗯", again.scope("pinyin").habit("ee"))
+            assertEquals(1, again.size)
+            it.compact()
+        }
+        val compacted = KeyHabits()
+        UserStore(file, model(), habits = compacted).use { it.open() }
+        assertEquals("嗯嗯", compacted.scope("pinyin").habit("ee"))
+        // a build without habits reads the rest of the log
+        UserStore(file, model()).use { it.open() }
+    }
 }
