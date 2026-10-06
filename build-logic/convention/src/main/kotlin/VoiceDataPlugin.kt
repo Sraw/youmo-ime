@@ -26,8 +26,8 @@ import org.gradle.kotlin.dsl.register
  * speech recognizer and its models, none of them in a text build, which asks for no microphone
  * either (dev/TRAINING-PLAN.md 14).
  *
- * - sherpa-onnx's Android library (k2-fsa, Apache-2.0): the recognizer and onnxruntime, JNI for
- *   each ABI; the ABI splits keep the one an APK is for.
+ * - sherpa-onnx (k2-fsa, Apache-2.0), the recognizer: the :lib:sherpa-onnx module, built from
+ *   source, ours to change.
  * - X-ASR zh-en (Gilgamesh-J, Apache-2.0), int8, as sherpa-onnx exports it: a Zipformer transducer
  *   trained on some million hours, Mandarin and English with punctuation. Of the models sherpa-onnx
  *   runs, the most accurate on the voice evaluation sets (AISHELL-1, FLEURS, ASCEND mixed speech)
@@ -45,10 +45,6 @@ class VoiceDataPlugin : Plugin<Project> {
 
     companion object {
         const val FLAVOR = "voice"
-        private const val SHERPA_VERSION = "1.13.8"
-        private const val SHERPA_URL =
-            "https://github.com/k2-fsa/sherpa-onnx/releases/download/v$SHERPA_VERSION/sherpa-onnx-$SHERPA_VERSION.aar"
-        private const val SHERPA_SHA256 = "633c24321e06b1fe79feafa03ea16cbc0f8a286641e2da3559bac91bdb13bd96"
         private const val MODEL_NAME = "sherpa-onnx-x-asr-zipformer-transducer-zh-en-punct-int8-2026-06-03"
         private const val MODEL_URL = "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/$MODEL_NAME.tar.bz2"
         private const val MODEL_SHA256 = "5d02c36d7b44e886b7c8f0d8e051f8713acab96c264bb6ef9e718be39a6a2224"
@@ -69,11 +65,6 @@ class VoiceDataPlugin : Plugin<Project> {
         val components = target.extensions.getByType<ApplicationAndroidComponentsExtension>()
         val cmakeVersion = target.cmakeVersion
 
-        val sherpa = target.tasks.register<EngineDataPlugin.DownloadTask>("downloadSherpaOnnx") {
-            url.set(SHERPA_URL)
-            sha256.set(SHERPA_SHA256)
-            outputFile.set(downloadsDir.file("sherpa-onnx-$SHERPA_VERSION.aar"))
-        }
         val modelArchive = target.tasks.register<EngineDataPlugin.DownloadTask>("downloadVoiceModel") {
             url.set(MODEL_URL)
             sha256.set(MODEL_SHA256)
@@ -99,7 +90,7 @@ class VoiceDataPlugin : Plugin<Project> {
 
         // the flavor's configuration exists once the build script has declared the flavors
         target.configurations.matching { it.name == "${FLAVOR}Implementation" }.configureEach {
-            dependencies.add(target.dependencies.create(target.files(sherpa.flatMap { it.outputFile }).builtBy(sherpa)))
+            dependencies.add(target.dependencies.project(mapOf("path" to ":lib:sherpa-onnx")))
         }
         target.extensions.configure<ApplicationExtension> {
             androidResources.noCompress += ".onnx"
