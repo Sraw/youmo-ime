@@ -7,6 +7,8 @@ package org.fcitx.fcitx5.android.input.picker
 import androidx.core.content.ContextCompat
 import androidx.transition.Transition
 import androidx.recyclerview.widget.RecyclerView
+import org.fcitx.fcitx5.android.R
+import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.input.broadcast.ReturnKeyDrawableComponent
 import org.fcitx.fcitx5.android.input.dependency.theme
@@ -28,6 +30,8 @@ class PickerWindow(
     private val data: List<Pair<PickerData.Category, Array<String>>>,
     private val density: PickerGridView.Density,
     private val switchKey: KeyDef,
+    /** the symbols' way, after Sogou's: [SymbolPanel] */
+    private val panel: Boolean = false,
     private val popupPreview: Boolean = true,
     private val followKeyBorder: Boolean = true,
     private val policy: PickerPolicy = DefaultPickerPolicy()
@@ -46,6 +50,10 @@ class PickerWindow(
     private val returnKeyDrawable: ReturnKeyDrawableComponent by manager.must()
 
     private val keyBorder by ThemeManager.prefs.keyBorder
+
+    private var locked by AppPrefs.getInstance().internal.symbolPanelLocked
+
+    private val sidePanel by lazy { SymbolPanel(adapter.categories.size, FirstCategory) }
 
     private lateinit var pickerLayout: PickerLayout
     private lateinit var adapter: PickerGridAdapter
@@ -76,11 +84,22 @@ class PickerWindow(
                 commonKeyActionListener.listener.onKeyAction(KeyAction.CommitAction(it.act), source)
             }
 
+            KeyAction.PanelBackAction -> backToKeyboard()
+
+            KeyAction.PanelLockAction -> {
+                locked = !locked
+                pickerLayout.embeddedKeyboard.showLocked(locked)
+            }
+
             else -> {
                 if (it is KeyAction.CommitAction) {
                     adapter.insertRecent(it.text)
+                    // locked, the panel stays: the recently used are there to go to now
+                    if (panel) pickerLayout.side?.setShown(SymbolPanel.RECENT, !adapter.recentEmpty)
                 }
                 commonKeyActionListener.listener.onKeyAction(it, source)
+                // a symbol picked from the panel (the keys below it send no CommitAction)
+                if (panel && it is KeyAction.CommitAction && sidePanel.returnsAfterPick(locked)) backToKeyboard()
             }
         }
     }
@@ -101,11 +120,24 @@ class PickerWindow(
         }
     }
 
-    override fun onCreateView() = PickerLayout(context, theme, switchKey, density).apply {
+    private fun backToKeyboard() {
+        // after the key's own handling, not while the view it was pressed on is taken away
+        ContextCompat.getMainExecutor(context).execute {
+            // gone already (two quick picks, or the bar's back arrow): not the keyboard again
+            if (windowManager.isAttached(this)) windowManager.attachWindow(KeyboardWindow)
+        }
+    }
+
+    override fun onCreateView() = PickerLayout(context, theme, switchKey, density, panel).apply {
         pickerLayout = this
         val bordered = followKeyBorder && keyBorder
         adapter = PickerGridAdapter(grid, keyActionListener, popupActionListener, data, key.name, bordered, policy)
         grid.adapter = adapter
+        side?.apply {
+            setCategories(adapter.categories.map { context.getString(if (it.short != 0) it.short else it.name) })
+            onPick = ::select
+        }
+        if (panel) return@apply
         tabsUi.apply {
             setTabs(adapter.categories)
             setOnTabClickListener { i -> show(i) }
@@ -132,12 +164,32 @@ class PickerWindow(
         pickerLayout.grid.gridLayoutManager.scrollToPositionWithOffset(adapter.startOf(category), 0)
     }
 
-    override fun onCreateBarExtension() = pickerLayout.tabsUi.root
+    /** The panel's [category], alone beside the side, from its top. */
+    private fun select(category: Int) {
+        sidePanel.select(category)
+        adapter.only = category
+        adapter.rebuild()
+        pickerLayout.side?.activate(category)
+        pickerLayout.grid.stopScroll()
+        pickerLayout.grid.scrollToPosition(0)
+    }
+
+    // the panel: the title bar, its back arrow and "符号"; the emoji: their tabs
+    override fun onCreateBarExtension() = if (panel) null else pickerLayout.tabsUi.root
+
+    override val title: String get() = if (panel) context.getString(R.string.picker_title) else ""
 
     override fun onAttached() {
-        // opens on the first category (the common symbols), not on what was recently used
-        adapter.rebuild()
-        show(FirstCategory)
+        if (panel) {
+            sidePanel.open(adapter.recentEmpty)
+            pickerLayout.side?.setShown(SymbolPanel.RECENT, sidePanel.shows(SymbolPanel.RECENT, adapter.recentEmpty))
+            select(sidePanel.selected)
+            pickerLayout.embeddedKeyboard.showLocked(locked)
+        } else {
+            // opens on the first category (the common symbols), not on what was recently used
+            adapter.rebuild()
+            show(FirstCategory)
+        }
         pickerLayout.embeddedKeyboard.also {
             it.onReturnDrawableUpdate(returnKeyDrawable.appearance)
             it.keyActionListener = keyActionListener
@@ -149,7 +201,7 @@ class PickerWindow(
         pickerLayout.embeddedKeyboard.keyActionListener = null
     }
 
-    override val showTitle = false
+    override val showTitle get() = panel
 
     companion object {
         /** the common symbols (or the first emoji), not the recently used before them */

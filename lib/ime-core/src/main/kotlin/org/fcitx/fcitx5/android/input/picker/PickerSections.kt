@@ -5,11 +5,11 @@
 package org.fcitx.fcitx5.android.input.picker
 
 /**
- * The symbol picker as one list: each category that has anything, a header and then its items.
+ * The emoji picker as one list: each category that has anything, a header and then its items.
  * A tab scrolls to where its category starts, and shows as current while the list's top row is
- * one of the category's.
+ * one of the category's. The symbol panel shows [only] one category, its items and no header.
  */
-class PickerSections(lists: List<List<String>>) {
+class PickerSections(lists: List<List<String>>, only: Int? = null) {
 
     class Row(val text: String, val category: Int, val header: Boolean)
 
@@ -22,8 +22,10 @@ class PickerSections(lists: List<List<String>>) {
         val rows = mutableListOf<Row>()
         starts = IntArray(lists.size) { i ->
             val start = rows.size
-            if (lists[i].isNotEmpty()) {
+            if (only == null && lists[i].isNotEmpty()) {
                 rows.add(Row("", i, header = true))
+                lists[i].mapTo(rows) { Row(it, i, header = false) }
+            } else if (i == only) {
                 lists[i].mapTo(rows) { Row(it, i, header = false) }
             }
             start

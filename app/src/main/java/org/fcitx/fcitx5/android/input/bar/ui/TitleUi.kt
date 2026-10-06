@@ -63,6 +63,9 @@ class TitleUi(override val ctx: Context, theme: Theme) : Ui {
 
     fun setTitle(title: String) {
         titleText.text = title
+        // shown again: a window before may have hidden them with an extension of its own
+        backButton.isVisible = true
+        titleText.isVisible = true
     }
 
     fun addExtension(view: View, showTitle: Boolean) {

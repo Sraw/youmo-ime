@@ -603,4 +603,13 @@
     <string name="import_into_user">Taken as words you added yourself, ranked first: for a few thousand words you use at most</string>
     <string name="words_page_hint">To stop a word showing, block it in User dictionary, or long-press it on the keyboard</string>
     <string name="dict_change_failed">Could not change it</string>
+    <string name="picker_back">Back</string>
+    <string name="picker_lock">Stay after a symbol is picked</string>
+    <string name="picker_unlock">Go back after a symbol is picked</string>
+    <string name="picker_title">Symbols</string>
+    <string name="picker_chinese">Chinese punctuation</string>
+    <string name="picker_short_recent">Recent</string>
+    <string name="picker_short_chinese">Chinese</string>
+    <string name="picker_short_ascii">ASCII</string>
+    <string name="picker_short_math">Math</string>
 </resources>

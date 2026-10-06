@@ -17,9 +17,10 @@ import splitties.dimensions.dp
 import kotlin.math.max
 
 /**
- * The picker's symbols in one list scrolled up and down, a section for each category. It replaced
- * pages swiped sideways, which said nothing of there being more, and did what the tabs above
- * already do: the list shows a sliver of the row below, fades at its edges and has a scroll bar.
+ * The picker's items in a list scrolled up and down: the emoji a section for each category, the
+ * symbol panel the one category picked beside it. It replaced pages swiped sideways, which said
+ * nothing of there being more: the list shows a sliver of the row below, fades at its edges and
+ * has a scroll bar.
  */
 @SuppressLint("ViewConstructor")
 class PickerGridView(context: Context, val theme: Theme, val density: Density) : RecyclerView(context) {
@@ -28,10 +29,12 @@ class PickerGridView(context: Context, val theme: Theme, val density: Density) :
         val columnCount: Int,
         val rowCount: Int,
         val textSize: Float,
-        val autoScale: Boolean
+        val autoScale: Boolean,
+        /** a header over each category's items; the symbol panel names them at its side */
+        val headers: Boolean = true
     ) {
-        // symbol
-        High(10, 3, 19f, false),
+        // the symbol panel: keys as big as a narrower list allows
+        Panel(6, 4, 22f, false, headers = false),
 
         // emoji
         Medium(7, 3, 23.7f, false),
@@ -47,7 +50,7 @@ class PickerGridView(context: Context, val theme: Theme, val density: Density) :
 
     val headerHeight = dp(24)
 
-    /** [Density.rowCount] rows under a header, and a sliver of the next one */
+    /** [Density.rowCount] rows (under a header, if any), and a sliver of the next one */
     var rowHeight = 0
         private set
 
@@ -63,7 +66,8 @@ class PickerGridView(context: Context, val theme: Theme, val density: Density) :
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
         super.onSizeChanged(w, h, oldw, oldh)
         // at least a pixel: a height of -1 or -2 would read as match or wrap
-        val row = ((h - headerHeight) / (density.rowCount + SLIVER)).toInt().coerceAtLeast(1)
+        val header = if (density.headers) headerHeight else 0
+        val row = ((h - header) / (density.rowCount + SLIVER)).toInt().coerceAtLeast(1)
         if (row == rowHeight) return
         rowHeight = row
         // keys bound before, at another height (or none, in a measure pass before the first size)

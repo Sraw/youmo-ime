@@ -13,11 +13,13 @@ import org.fcitx.fcitx5.android.input.keyboard.TextPickerSwitchKey
 fun symbolPicker(): PickerWindow = PickerWindow(
     key = PickerWindow.Key.Symbol,
     data = PickerData.Symbol,
-    density = PickerGridView.Density.High,
+    density = PickerGridView.Density.Panel,
     switchKey = ImageLayoutSwitchKey(
         R.drawable.ic_number_pad, NumberKeyboard.Name,
+        percentWidth = 0.12f,
         contentDescription = R.string.a11y_key_number_pad
-    )
+    ),
+    panel = true
 )
 
 fun emojiPicker(): PickerWindow = PickerWindow(

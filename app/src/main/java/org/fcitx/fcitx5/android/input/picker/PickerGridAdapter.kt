@@ -30,7 +30,10 @@ import org.fcitx.fcitx5.android.input.popup.PopupActionListener
 import org.fcitx.fcitx5.android.utils.alpha
 import splitties.dimensions.dp
 
-/** The sections of [PickerGridView]: recently used first, then [rawData]'s categories. */
+/**
+ * The sections of [PickerGridView]: recently used first, then [rawData]'s categories; or [only]
+ * one of them, as the symbol panel shows it.
+ */
 class PickerGridAdapter(
     private val grid: PickerGridView,
     private val keyActionListener: KeyActionListener,
@@ -44,6 +47,11 @@ class PickerGridAdapter(
     val categories = listOf(PickerData.RecentlyUsedCategory) + rawData.map { it.first }
 
     private var sections = PickerSections.Empty
+
+    /** the one category shown, from the next [rebuild]; null for all of them */
+    var only: Int? = null
+
+    val recentEmpty get() = recentlyUsed.items.isEmpty()
 
     private val recentlyUsed = RecentlyUsed(recentlyUsedFileName, grid.density.recentLimit)
 
@@ -82,7 +90,7 @@ class PickerGridAdapter(
             filteredKey = key
             filtered = rawData.map { (_, items) -> items.filter(policy::filter) }
         }
-        sections = PickerSections(listOf(recentlyUsed.items) + filtered)
+        sections = PickerSections(listOf(recentlyUsed.items) + filtered, only)
         notifyDataSetChanged()
     }
 

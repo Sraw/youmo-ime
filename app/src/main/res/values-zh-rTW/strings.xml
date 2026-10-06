@@ -565,4 +565,13 @@
     <string name="import_into_user">當成你自己加的詞，排在最前；適合幾千個以內你常用的詞</string>
     <string name="words_page_hint">不想看到某個詞，可以在「使用者詞庫」裡封鎖，或在鍵盤上長按它</string>
     <string name="dict_change_failed">修改失敗</string>
+    <string name="picker_back">返回</string>
+    <string name="picker_lock">選完符號後停留</string>
+    <string name="picker_unlock">選完符號後返回</string>
+    <string name="picker_title">符號</string>
+    <string name="picker_chinese">中文標點</string>
+    <string name="picker_short_recent">最近</string>
+    <string name="picker_short_chinese">中文</string>
+    <string name="picker_short_ascii">英文</string>
+    <string name="picker_short_math">數學</string>
 </resources>

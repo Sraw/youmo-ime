@@ -9,10 +9,18 @@ import org.fcitx.fcitx5.android.R
 
 object PickerData {
 
-    /** [name] heads the category's section in the list, [label] when it has none */
-    data class Category(val label: String = "", val icon: Int = 0, @StringRes val name: Int = 0)
+    /**
+     * [name] heads the category's section in the list, [label] when it has none; [short] (or
+     * [name]) is what the symbol panel's narrow side lists it as
+     */
+    data class Category(
+        val label: String = "",
+        val icon: Int = 0,
+        @StringRes val name: Int = 0,
+        @StringRes val short: Int = 0
+    )
 
-    val RecentlyUsedCategory = Category("⟳", R.drawable.ic_baseline_access_time_24, R.string.picker_recent)
+    val RecentlyUsedCategory = Category("⟳", R.drawable.ic_baseline_access_time_24, R.string.picker_recent, R.string.picker_short_recent)
 
     val Symbol: List<Pair<Category, Array<String>>> = listOf(
         // what a Chinese text needs most, then the ASCII ones it borrows: the picker opens here
@@ -24,7 +32,14 @@ object PickerData {
             "_", "\\", "|", "<", ">", "[", "]", "{", "}", "^",
             "$", "¥", "€", "£", "°", "℃", "×", "÷", "√", "±"
         ),
-        Category("1?#", R.drawable.symbol_number_punctuation, R.string.picker_ascii) to arrayOf(
+        Category("中", 0, R.string.picker_chinese, R.string.picker_short_chinese) to arrayOf(
+            "，", "。", "？", "！", "、", "：", "；", "……", "——", "·",
+            "“", "”", "‘", "’", "（", "）", "《", "》", "〈", "〉",
+            "【", "】", "「", "」", "『", "』", "〔", "〕", "〖", "〗",
+            "～", "—", "－", "﹏", "＿", "￥", "＃", "％", "＆", "＊",
+            "＠", "｜", "／", "＼", "々", "〃", "〇", "※", "§", "№"
+        ),
+        Category("1?#", R.drawable.symbol_number_punctuation, R.string.picker_ascii, R.string.picker_short_ascii) to arrayOf(
             "1", "2", "3", "4", "5", "6", "7", "8", "9", "0",
             "!", "@", "#", "$", "%", "^", "&", "*", "(", ")",
             "'", "\"", "=", "_", "`", ":", ";", "?",
@@ -54,7 +69,7 @@ object PickerData {
             "⇒", "⇓", "⇔", "⇕", "⇖", "⇗", "⇘", "⇙", "⇚", "⇛",
             "⇜", "⇝", "⇞", "⇟", "⇠", "⇡", "⇢", "⇣"
         ),
-        Category("±", R.drawable.symbol_math, R.string.picker_math) to arrayOf(
+        Category("±", R.drawable.symbol_math, R.string.picker_math, R.string.picker_short_math) to arrayOf(
             "+", "-", "×", "÷", "±", "∓", "=", "≠", "∼", "≅",
             "<", ">", "≤", "≥", "√", "∛", "≈", "≡", "⁺", "⁻",
             "⊕", "⊗", "%", "‰", "∀", "∂", "∃", "∅",

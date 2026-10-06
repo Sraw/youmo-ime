@@ -30,6 +30,13 @@ class PickerSectionsTest {
     }
 
     @Test
+    fun oneCategoryShownAloneHasNoHeaderAndKeepsItsNumber() {
+        val one = PickerSections(listOf(listOf("，"), listOf("，", "。", "？"), listOf("→")), only = 1)
+        assertEquals(listOf("，", "。", "？"), one.rows.map { it.text })
+        assertEquals(listOf(1, 1, 1), one.rows.map { it.category })
+    }
+
+    @Test
     fun nothingUsedRecentlyLeavesNoEmptyHeader() {
         val noRecent = PickerSections(listOf(emptyList(), listOf("，", "。")))
         assertEquals(3, noRecent.rows.size)

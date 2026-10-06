@@ -43,4 +43,10 @@ sealed class KeyAction {
     data class PickerSwitchAction(val key: PickerWindow.Key? = null) : KeyAction()
 
     data object SpaceLongPressAction : KeyAction()
+
+    /** The symbol panel's 返回: the keyboard it was opened from. */
+    data object PanelBackAction : KeyAction()
+
+    /** The symbol panel's lock: it stays after a symbol is picked, for a run of them. */
+    data object PanelLockAction : KeyAction()
 }
