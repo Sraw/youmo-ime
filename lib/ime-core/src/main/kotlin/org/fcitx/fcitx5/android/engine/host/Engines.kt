@@ -28,6 +28,8 @@ import org.fcitx.fcitx5.android.engine.session.Offer
 import org.fcitx.fcitx5.android.engine.session.PinyinSession
 import org.fcitx.fcitx5.android.engine.session.Session
 import org.fcitx.fcitx5.android.engine.session.Snapshot
+import org.fcitx.fcitx5.android.engine.stroke.StrokeLookup
+import org.fcitx.fcitx5.android.engine.stroke.Strokes
 import org.fcitx.fcitx5.android.engine.table.TableConf
 import org.fcitx.fcitx5.android.engine.table.TableDictionary
 import org.fcitx.fcitx5.android.engine.table.TableOptions
@@ -507,10 +509,13 @@ class Engines(
     private fun session(im: String): Session = sessions.getOrPut(im) {
         val s = settings
         when (im) {
-            PINYIN -> PinyinSession(
-                pinyinData, PinyinSegmenter(s.fuzzy, s.typos, neighbours = s.typos),
-                pageSize = s.pageSize, user = user(), prediction = s.prediction, prior = prior(), phraseBook = phrases(),
-                reranker = reranker(), refiner = refiner(), block = ::block, habits = habits.scope(PINYIN),
+            PINYIN -> StrokeLookup(
+                PinyinSession(
+                    pinyinData, PinyinSegmenter(s.fuzzy, s.typos, neighbours = s.typos),
+                    pageSize = s.pageSize, user = user(), prediction = s.prediction, prior = prior(), phraseBook = phrases(),
+                    reranker = reranker(), refiner = refiner(), block = ::block, habits = habits.scope(PINYIN),
+                ),
+                ::strokes, ::charReading, s.pageSize,
             )
             SHUANGPIN -> PinyinSession(
                 pinyinData, ShuangpinSegmenter(s.scheme, s.fuzzy, s.typos), spell = true,
@@ -543,6 +548,54 @@ class Engines(
     )
 
     private val tables = HashMap<String, Table>()
+
+    // null till asked for; an app without the data has no lookup
+    private var strokeTable: Strokes? = null
+    private var strokesTried = false
+
+    private fun strokes(): Strokes? {
+        if (!strokesTried) {
+            strokesTried = true
+            strokeTable = try {
+                val words = pinyinData.wordIndex
+                val model = pinyinData.model
+                Strokes(CodeTable.load(load(STROKE_DATA), verify = false)) { c ->
+                    val id = words.find(c)
+                    if (id < 0) Float.NEGATIVE_INFINITY else model.score(id)
+                }
+            } catch (_: FileNotFoundException) {
+                null
+            } catch (e: IOException) {
+                onError(e)
+                null
+            } catch (e: DataFormatException) {
+                onError(IOException(e))
+                null
+            }
+        }
+        return strokeTable
+    }
+
+    // a character to its readings, the likeliest first, for the stroke lookup to show
+    private val charReadings: Map<String, String> by lazy(LazyThreadSafetyMode.NONE) {
+        val dictionary = pinyinData.dictionary
+        val vocabulary = pinyinData.vocabulary
+        val readings = HashMap<String, MutableList<Pair<Float, String>>>()
+        val first = dictionary.firstChild(dictionary.root)
+        for (node in first until first + dictionary.childCount(dictionary.root)) {
+            for (i in 0 until dictionary.wordCount(node)) {
+                val word = dictionary.word(node, i)
+                if (vocabulary.length(word) != 1) continue
+                readings.getOrPut(vocabulary.word(word)) { ArrayList() } +=
+                    dictionary.weight(node, i) to Syllables.spelling(dictionary.syllable(node))
+            }
+        }
+        readings.mapValues { (_, r) ->
+            r.sortedByDescending { it.first }.map { it.second }.distinct().take(MAX_READINGS).joinToString("/")
+        }
+    }
+
+    private fun charReading(c: String): String = charReadings[c].orEmpty()
 
     private fun table(im: String): Table = tables.getOrPut(im) {
         val dictionary = TableDictionary(CodeTable.load(load("$TABLE_DIR/${TABLES.getValue(im).file}"), verify = false))
@@ -720,6 +773,10 @@ class Engines(
         const val SHUANGPIN = "engine-shuangpin"
 
         const val PINYIN_DATA = "engine/pinyin.data"
+
+        /** Characters by their strokes (rime-stroke), for pinyin's `u` lookup; read if the app has it. */
+        const val STROKE_DATA = "engine/stroke.data"
+        private const val MAX_READINGS = 3
         /** Read if the app has one; without it the engine types by the decoder alone. */
         const val SENTENCE_MODEL = "engine/sentence-model.safetensors"
         /** Six times the work of [SENTENCE_MODEL], and right more often: see [PinyinSession]'s refiner. */

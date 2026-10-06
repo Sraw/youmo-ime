@@ -15,6 +15,7 @@ import org.fcitx.fcitx5.android.engine.pinyin.Syllables
 import org.fcitx.fcitx5.android.engine.user.WordPack
 import org.fcitx.fcitx5.android.engine.data.SourceException
 import org.fcitx.fcitx5.android.engine.data.forEachNumberedLine
+import org.fcitx.fcitx5.android.engine.stroke.Strokes
 import org.fcitx.fcitx5.android.engine.table.TableText
 import java.io.File
 import java.util.Locale
@@ -36,6 +37,7 @@ val USAGE = """
            table -o <out> [--words <pack.words>] <table.txt>
                                                           compile a code table, with a word pack's
                                                           words its 组词规则 can code where no code clashes
+           strokes -o <out> <stroke.dict.yaml>            compile rime-stroke's characters by their strokes
            mix -o <out.arpa> --lm <lm.arpa> [--weight <w>] [--cutoffs <bigram>,<trigram>] <corpus>...
                                                           mix a model with n-grams counted in chat:
                                                           conversations a JSON array a line (.jsonl.gz),
@@ -98,6 +100,7 @@ private fun dispatch(command: String?, options: Options, out: Appendable): Boole
     when (command) {
         "pinyin" -> pinyin(options, out)
         "table" -> table(options.output!!, options.inputs.single(), options.words, out)
+        "strokes" -> strokes(options.output!!, options.inputs.single(), out)
         "mix" -> mix(options, out)
         "check" -> check(options.inputs[0], options.inputs[1], out)
         "words" -> words(options, out)
@@ -155,13 +158,13 @@ private class Options(
 
     /** Whether [command] takes these options. */
     fun fit(command: String?): Boolean = when (command) {
-        "pinyin", "mix", "table", "check" -> fitModel(command)
+        "pinyin", "mix", "table", "strokes", "check" -> fitModel(command)
         "words", "pack", "cc", "clean", "examples", "text" -> fitCorpus(command)
         else -> false
     }
 
     private fun fitModel(command: String): Boolean = when (command) {
-        "table" -> output != null && lm == null && inputs.size == 1
+        "table", "strokes" -> output != null && lm == null && inputs.size == 1
         "check" -> output == null && lm == null && inputs.size == 2
         else -> output != null && lm != null && inputs.isNotEmpty()
     }
@@ -740,6 +743,13 @@ private fun table(output: String, input: String, words: String?, out: Appendable
             reader.strayCodes.take(STRAY_EXAMPLES).joinToString(" | "))
     }
     write(output, reader.builder.build(), out)
+}
+
+private fun strokes(output: String, input: String, out: Appendable) {
+    val builder = File(input).bufferedReader().use { Strokes.read(it, input) }
+    val writer = builder.build()
+    out.appendLine("strokes: read $input")
+    write(output, writer, out)
 }
 
 private fun write(output: String, writer: DataFile.Writer, out: Appendable) {

@@ -1,0 +1,11 @@
+{
+    "uniqueId": "rime/rime-stroke",
+    "artifactVersion": "1e8fff9b",
+    "description": "characters by their strokes, for pinyin's u lookup (from CNS11643 and the 北大中文論壇 table, as rime-stroke gathered them)",
+    "name": "rime/rime-stroke",
+    "website": "https://github.com/rime/rime-stroke",
+    "tag": "native",
+    "licenses": [
+        "LGPL-3.0-only"
+    ]
+}

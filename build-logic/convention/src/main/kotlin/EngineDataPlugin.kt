@@ -92,6 +92,11 @@ class EngineDataPlugin : Plugin<Project> {
         // the words libime's dictionary has not got, which a build with no pack the user put in has too
         private const val WORDS_URL = "https://github.com/Sraw/youmo-ime/releases/download/words-202610/youmo-new.words"
         private const val WORDS_SHA256 = "92fec7e7b8d0e9540676a87a27e93d824428e170e7bcf183a5c9af924dc52b76"
+
+        // rime-stroke (LGPL-3.0): characters by their strokes, for pinyin's u lookup
+        private const val STROKES_COMMIT = "1e8fff9b9494ddec23b0cbc526bcfd8171a6fd48"
+        private const val STROKES_URL = "https://raw.githubusercontent.com/rime/rime-stroke/$STROKES_COMMIT/stroke.dict.yaml"
+        private const val STROKES_SHA256 = "b3e93dce89c185f45c3d6e189b86b3a8626913352cc85e1094c786579a665791"
         const val MODEL_TASK = "copySentenceModels"
         // a tag of its own, not "latest": what is downloaded is what was measured
         private const val MODEL_URL =
@@ -139,6 +144,12 @@ class EngineDataPlugin : Plugin<Project> {
             outputFile.set(downloadsDir.file("engine-data/" + WORDS_URL.substringAfter("/download/").replace('/', '-')))
         }
 
+        val strokes = target.tasks.register<DownloadTask>("downloadStrokes") {
+            url.set(STROKES_URL)
+            sha256.set(STROKES_SHA256)
+            outputFile.set(downloadsDir.file("engine-data/stroke-$STROKES_COMMIT.dict.yaml"))
+        }
+
         val tool = target.configurations.create("engineDataTool") {
             isCanBeConsumed = false
             isCanBeResolved = true
@@ -168,6 +179,7 @@ class EngineDataPlugin : Plugin<Project> {
             toolCode.set(fingerprint)
             tables.from(TABLE.files.map { name -> extracted[1].flatMap { it.outputDir.file(name) } })
             this.words.set(words.flatMap { it.outputFile })
+            this.strokes.set(strokes.flatMap { it.outputFile })
             outputDir.set(target.layout.buildDirectory.dir("generated/engine-tables"))
         }
         val models = MODELS.entries.mapIndexed { i, (name, sha) ->
@@ -355,7 +367,7 @@ class EngineDataPlugin : Plugin<Project> {
         }
     }
 
-    /** Compiles each code table's text into `engine/table/<name>.data`, one run of the tool each. */
+    /** Compiles each code table's text into `engine/table/<name>.data`, one run of the tool each, and the strokes into `engine/stroke.data`. */
     @CacheableTask
     abstract class CompileTables @Inject constructor(private val exec: ExecOperations) : DefaultTask() {
         @get:Internal
@@ -377,6 +389,11 @@ class EngineDataPlugin : Plugin<Project> {
         @get:PathSensitive(PathSensitivity.NAME_ONLY)
         abstract val words: RegularFileProperty
 
+        /** rime-stroke's dictionary, compiled beside the tables as `engine/stroke.data`. */
+        @get:InputFile
+        @get:PathSensitive(PathSensitivity.NAME_ONLY)
+        abstract val strokes: RegularFileProperty
+
         @get:OutputDirectory
         abstract val outputDir: DirectoryProperty
 
@@ -396,6 +413,12 @@ class EngineDataPlugin : Plugin<Project> {
                         "--words", words.get().asFile.path, table.path,
                     )
                 }
+            }
+            exec.javaexec {
+                classpath = this@CompileTables.classpath
+                mainClass.set(TOOL_MAIN)
+                maxHeapSize = "512m"
+                args("strokes", "-o", out.resolveSibling("stroke.data").path, strokes.get().asFile.path)
             }
         }
     }

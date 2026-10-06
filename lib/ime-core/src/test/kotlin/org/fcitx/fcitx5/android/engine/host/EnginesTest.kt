@@ -15,6 +15,7 @@ import org.fcitx.fcitx5.android.engine.rerank.TinyModel
 import org.fcitx.fcitx5.android.engine.session.Choice
 import org.fcitx.fcitx5.android.engine.session.Offer
 import org.fcitx.fcitx5.android.engine.session.Snapshot
+import org.fcitx.fcitx5.android.engine.stroke.Strokes
 import org.fcitx.fcitx5.android.engine.user.LibimeImport
 import org.fcitx.fcitx5.android.engine.user.UserLog
 import org.junit.Assert.assertEquals
@@ -64,6 +65,9 @@ class EnginesTest {
     private var model: ByteArray? = TinyModel().bytes()
     private var refining: ByteArray? = TinyModel().bytes()
 
+    private var strokes: ByteArray? = Strokes.read("...\n你\tpsnpzsn\n好\tzphzsh\n".reader().buffered(), "stroke")
+        .build().toByteArray()
+
     private val loaded = ArrayList<String>()
 
     private fun load(path: String): ByteBuffer {
@@ -73,6 +77,7 @@ class EnginesTest {
             "${Engines.TABLE_DIR}/wbx.data" -> wubi
             Engines.SENTENCE_MODEL -> model
             Engines.REFINING_MODEL -> refining
+            Engines.STROKE_DATA -> strokes
             else -> throw IllegalArgumentException(path)
         }
         // as the app's assets do of a file it has not got
@@ -723,5 +728,18 @@ class EnginesTest {
             [词组]
             工作
         """.trimIndent()
+    }
+
+    @Test
+    fun uLooksACharacterUpByItsStrokesShowingItsPinyin() {
+        val engines = Engines(::load, null)
+        val s = engines.type(Engines.PINYIN, "uz")
+        assertEquals("u乛", s.preedit)
+        assertEquals(listOf("好"), s.candidates)
+        assertEquals("hao", engines.candidates(Engines.PINYIN, 0, 1).single().hint)
+        assertEquals("好", engines.onEvent(Engines.PINYIN, EngineEvent.CHAR, ' '.code).commit)
+        // an app without the data: u is pinyin's
+        strokes = null
+        assertEquals("u", Engines(::load, null).type(Engines.PINYIN, "u").preedit.replace(" ", ""))
     }
 }
