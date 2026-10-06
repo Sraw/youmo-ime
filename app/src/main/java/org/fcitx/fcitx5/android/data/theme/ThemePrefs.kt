@@ -163,7 +163,8 @@ class ThemePrefs(sharedPreferences: SharedPreferences) :
     val punctuationPosition = enumList(
         R.string.punctuation_position,
         "punctuation_position",
-        PunctuationPosition.Bottom
+        // small in the corner, as Sogou's: under the letter, it crowded the key
+        PunctuationPosition.TopRight
     )
 
     enum class NavbarBackground(override val stringRes: Int) : ManagedPreferenceEnum {
