@@ -119,4 +119,13 @@ class VoiceSessionTest {
         assertEquals("嗯，好的。", VoiceText.clean("嗯，好的。"))
         assertEquals("OK.", VoiceText.clean("OK."))
     }
+
+    @Test
+    fun spacedAsTyped() {
+        assertEquals("对啊，大家最近都是觉得AI有一天能够replace人类。", VoiceText.clean("对啊， 大家最近都是觉得 AI 有一天能够 replace 人类。"))
+        assertEquals("委员会CEP中宣誓就职。", VoiceText.clean("委员会 C E P 中宣誓就职。"))
+        assertEquals("Make friends.", VoiceText.clean("Make friends."))
+        assertEquals("I am OK", VoiceText.clean("I am OK"))
+        assertEquals("1990年，由于沙漠的威胁", VoiceText.clean("一九九零年， 由于沙漠的威胁"))
+    }
 }

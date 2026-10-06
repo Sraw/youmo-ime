@@ -9,5 +9,5 @@
     <string name="voice_no_model">語音模型載入失敗</string>
     <string name="voice_no_microphone">無法使用麥克風</string>
     <string name="voice_hint">說完稍停，文字自動上屏。全部在手機上辨識，聲音不會離開手機</string>
-    <string name="voice_model_credit">語音辨識：SenseVoice-Small（FunAudioLLM，阿里巴巴），依 FunASR 模型授權使用；由 sherpa-onnx（k2-fsa）與 silero VAD 執行</string>
+    <string name="voice_model_credit">語音辨識：X-ASR 中英模型（Gilgamesh-J）；由 sherpa-onnx（k2-fsa）與 silero VAD 執行</string>
 </resources>

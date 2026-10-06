@@ -10,13 +10,22 @@ object VoiceText {
     // a cough or a breath taken for speech comes back as one of these
     private val FILLER = Regex("^[嗯呃额啊唔哦噢欸诶呀。，、！？.,!?…\\s]+$")
 
+    // X-ASR spaces Chinese as it does English: "对啊， 大家觉得 AI 有一天"
+    private const val CJK = "\\p{IsHan}，。！？、：；“”‘’（）《》…—"
+    private val SPACE_BY_CJK = Regex("(?<=[$CJK])\\s+|\\s+(?=[$CJK])")
+
+    // and spells an abbreviation out: "C E P"
+    private val SPELLED = Regex("\\b[A-Z](?: [A-Z]\\b)+")
+
     /**
-     * [raw] trimmed; null when nothing is left worth typing: punctuation alone, or a filler sound
-     * alone ("嗯。"), which the recognizer writes for a noise as often as for a word.
+     * [raw] as typed: no spaces in Chinese, an abbreviation in one piece, numbers in digits
+     * ([ChineseNumbers]); null when nothing is left worth typing: punctuation alone, or a filler
+     * sound alone ("嗯。"), which the recognizer writes for a noise as often as for a word.
      */
     fun clean(raw: String): String? {
         val text = raw.trim()
         if (text.isEmpty() || FILLER.matches(text)) return null
-        return text
+        val spaced = SPELLED.replace(SPACE_BY_CJK.replace(text, "")) { it.value.replace(" ", "") }
+        return ChineseNumbers.convert(spaced)
     }
 }

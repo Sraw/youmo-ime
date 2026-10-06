@@ -11,14 +11,14 @@ import com.k2fsa.sherpa.onnx.FeatureConfig
 import com.k2fsa.sherpa.onnx.OfflineModelConfig
 import com.k2fsa.sherpa.onnx.OfflineRecognizer
 import com.k2fsa.sherpa.onnx.OfflineRecognizerConfig
-import com.k2fsa.sherpa.onnx.OfflineSenseVoiceModelConfig
+import com.k2fsa.sherpa.onnx.OfflineTransducerModelConfig
 import com.k2fsa.sherpa.onnx.SileroVadModelConfig
 import com.k2fsa.sherpa.onnx.Vad
 import com.k2fsa.sherpa.onnx.VadModelConfig
 
 /**
- * The recognizer (SenseVoice-Small, VoiceDataPlugin): read in once, which takes a few seconds and
- * some 300 MB, and kept while voice input is in use; let go a while after the panel closes, so
+ * The recognizer (X-ASR, VoiceDataPlugin): read in once, which takes a second or two and some
+ * 200 MB, and kept while voice input is in use; let go a while after the panel closes, so
  * that coming back to it soon is instant and the memory is not held all day.
  */
 object VoiceEngine {
@@ -94,7 +94,7 @@ object VoiceEngine {
                 minSilenceDuration = 0.6f,
                 minSpeechDuration = 0.25f,
                 windowSize = WINDOW,
-                // SenseVoice takes up to 30 s at a time; a long run is cut and goes in by parts
+                // a long run is cut and goes in by parts, each recognized while the next is heard
                 maxSpeechDuration = 20f,
             ),
             sampleRate = SAMPLE_RATE,
@@ -105,13 +105,10 @@ object VoiceEngine {
     private fun config() = OfflineRecognizerConfig(
         featConfig = FeatureConfig(sampleRate = SAMPLE_RATE, featureDim = 80),
         modelConfig = OfflineModelConfig(
-            senseVoice = OfflineSenseVoiceModelConfig(
-                model = "$DIR/model.int8.onnx",
-                // Mandarin first (dev/TRAINING-PLAN.md 14.3): told so, it does not hear a short
-                // phrase as Cantonese or Japanese; English words in it still come out English
-                language = "zh",
-                // punctuation, and numbers written as numbers
-                useInverseTextNormalization = true,
+            transducer = OfflineTransducerModelConfig(
+                encoder = "$DIR/encoder.onnx",
+                decoder = "$DIR/decoder.onnx",
+                joiner = "$DIR/joiner.onnx",
             ),
             tokens = "$DIR/tokens.txt",
             numThreads = THREADS,

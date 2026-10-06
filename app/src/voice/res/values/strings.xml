@@ -9,5 +9,5 @@
     <string name="voice_no_model">The speech model could not be loaded</string>
     <string name="voice_no_microphone">The microphone cannot be used</string>
     <string name="voice_hint">Pause and what you said is typed. Recognized on the phone: nothing heard leaves it.</string>
-    <string name="voice_model_credit">Speech recognition: SenseVoice-Small (FunAudioLLM, Alibaba), under the FunASR model licence; run with sherpa-onnx (k2-fsa) and silero VAD</string>
+    <string name="voice_model_credit">Speech recognition: X-ASR zh-en (Gilgamesh-J); run with sherpa-onnx (k2-fsa) and silero VAD</string>
 </resources>

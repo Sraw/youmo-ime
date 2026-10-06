@@ -78,7 +78,7 @@ sudo apt install extra-cmake-modules gettext   # Debian/Ubuntu；Arch：pacman -
 ```
 
 版本分两个维度，共四个：`offline`（离线版，默认发布，不申请网络权限）或 `cloud`（云端版，多一个网络权限，用于自建云端）；
-`text`（纯文字，默认）或 `voice`（离线语音输入，多一个录音权限和约 240 MB 的语音模型）。
+`text`（纯文字，默认）或 `voice`（离线语音输入，多一个录音权限和约 180 MB 的语音模型）。
 `./gradlew :app:assembleRelease` 会四个都打。
 
 构建会自动下载引擎数据和句子模型，并按 SHA-256 校验：
@@ -197,7 +197,7 @@ sudo apt install extra-cmake-modules gettext   # Debian/Ubuntu; Arch: pacman -S 
 ```
 
 Builds vary in two ways, four in all: `offline`, published by default, with no network permission, or `cloud`, with network access for
-your own server; and `text`, the default, or `voice`, offline voice input, with the microphone permission and a ~240 MB speech model.
+your own server; and `text`, the default, or `voice`, offline voice input, with the microphone permission and a ~180 MB speech model.
 `./gradlew :app:assembleRelease` makes all four.
 
 The build downloads the engine data and the sentence models and checks their SHA-256:

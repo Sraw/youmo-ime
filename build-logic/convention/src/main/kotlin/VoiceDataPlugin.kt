@@ -27,10 +27,11 @@ import org.gradle.kotlin.dsl.register
  *
  * - sherpa-onnx's Android library (k2-fsa, Apache-2.0): the recognizer and onnxruntime, JNI for
  *   each ABI; the ABI splits keep the one an APK is for.
- * - SenseVoice-Small, int8, as sherpa-onnx exports it (FunAudioLLM; FunASR model licence: free to
- *   use and share, crediting the source and keeping the model's name, which the about page does):
- *   Mandarin, Cantonese, English, Japanese, Korean, with punctuation. Not streaming: each stretch
- *   of speech is recognized when it ends.
+ * - X-ASR zh-en (Gilgamesh-J, Apache-2.0), int8, as sherpa-onnx exports it: a Zipformer transducer
+ *   trained on some million hours, Mandarin and English with punctuation. Of the models sherpa-onnx
+ *   runs, the most accurate on the voice evaluation sets (AISHELL-1, FLEURS, ASCEND mixed speech)
+ *   but for those five to fifteen times slower, the fastest, and the smallest; and, a transducer,
+ *   it takes hotwords. Numbers it writes in characters: VoiceText puts them in digits.
  * - silero VAD (MIT): where a stretch of speech ends.
  *
  * Downloaded once, SHA-256 checked (EngineDataPlugin.DownloadTask), into the voice variants'
@@ -44,11 +45,17 @@ class VoiceDataPlugin : Plugin<Project> {
         private const val SHERPA_URL =
             "https://github.com/k2-fsa/sherpa-onnx/releases/download/v$SHERPA_VERSION/sherpa-onnx-$SHERPA_VERSION.aar"
         private const val SHERPA_SHA256 = "633c24321e06b1fe79feafa03ea16cbc0f8a286641e2da3559bac91bdb13bd96"
-        // FunAudioLLM's own, not the 2025-09-09 one beside it: that is a Cantonese fine-tune
-        // (ASLP-lab WSYue), which hears Mandarin as Cantonese and writes no punctuation
-        private const val MODEL_NAME = "sherpa-onnx-sense-voice-zh-en-ja-ko-yue-int8-2024-07-17"
+        private const val MODEL_NAME = "sherpa-onnx-x-asr-zipformer-transducer-zh-en-punct-int8-2026-06-03"
         private const val MODEL_URL = "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/$MODEL_NAME.tar.bz2"
-        private const val MODEL_SHA256 = "7d1efa2138a65b0b488df37f8b89e3d91a60676e416f515b952358d83dfd347e"
+        private const val MODEL_SHA256 = "5d02c36d7b44e886b7c8f0d8e051f8713acab96c264bb6ef9e718be39a6a2224"
+
+        /** the archive's files and the names they are given in the assets */
+        private val MODEL_FILES = mapOf(
+            "encoder-epoch-99-avg-1.int8.onnx" to "encoder.onnx",
+            "decoder-epoch-99-avg-1.onnx" to "decoder.onnx",
+            "joiner-epoch-99-avg-1.int8.onnx" to "joiner.onnx",
+            "tokens.txt" to "tokens.txt",
+        )
         private const val VAD_URL = "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/silero_vad.onnx"
         private const val VAD_SHA256 = "9e2449e1087496d8d4caba907f23e0bd3f78d91fa552479bb9c23ac09cbb1fd6"
     }
@@ -115,7 +122,7 @@ class VoiceDataPlugin : Plugin<Project> {
             out.deleteRecursively()
             out.mkdirs()
             val dir = model.get().asFile.resolve(MODEL_NAME)
-            for (name in listOf("model.int8.onnx", "tokens.txt")) dir.resolve(name).copyTo(out.resolve(name))
+            for ((name, asset) in MODEL_FILES) dir.resolve(name).copyTo(out.resolve(asset))
             vad.get().asFile.copyTo(out.resolve("silero_vad.onnx"))
         }
     }

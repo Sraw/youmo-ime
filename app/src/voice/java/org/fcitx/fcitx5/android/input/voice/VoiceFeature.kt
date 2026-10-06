@@ -16,9 +16,9 @@ object VoiceFeature {
 
     fun window(): InputWindow = VoiceWindow()
 
-    /** on the licences page: the model's licence asks for its source, authors and name */
+    /** on the licences page */
     fun credits(context: Context) = listOf(
-        Credit(context.getString(R.string.voice_model_credit), "FunASR Model License 1.1", "https://github.com/modelscope/FunASR/blob/main/MODEL_LICENSE"),
+        Credit(context.getString(R.string.voice_model_credit), "Apache-2.0", "https://github.com/Gilgamesh-J/X-ASR"),
         Credit("sherpa-onnx:1.13.8", "Apache-2.0", "https://github.com/k2-fsa/sherpa-onnx/blob/master/LICENSE"),
         Credit("silero-vad", "MIT", "https://github.com/snakers4/silero-vad/blob/master/LICENSE"),
     )
