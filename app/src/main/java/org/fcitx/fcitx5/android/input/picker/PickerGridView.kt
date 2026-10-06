@@ -33,8 +33,9 @@ class PickerGridView(context: Context, val theme: Theme, val density: Density) :
         /** a header over each category's items; the symbol panel names them at its side */
         val headers: Boolean = true
     ) {
-        // the symbol panel: four keys a row, as Sogou's; six were crowded
-        Panel(4, 4, 24f, false, headers = false),
+        // the symbol panel: four keys a row and three rows, as Sogou's; six by four were crowded,
+        // and four by four too flat
+        Panel(4, 3, 24f, false, headers = false),
 
         // emoji
         Medium(7, 3, 23.7f, false),
