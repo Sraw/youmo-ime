@@ -4,6 +4,11 @@
  */
 package org.fcitx.fcitx5.android.input.voice
 
+import android.Manifest
+import android.content.pm.PackageManager
+import android.widget.FrameLayout
+import androidx.core.content.ContextCompat
+import org.fcitx.fcitx5.android.input.InputView
 import android.content.Context
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.input.wm.InputWindow
@@ -15,6 +20,19 @@ object VoiceFeature {
     const val AVAILABLE = true
 
     fun window(): InputWindow = VoiceWindow()
+
+    /**
+     * Hold to talk: the long press on space has fired, its finger still down; what is said is
+     * [commit]ted once it lifts. Without the microphone permission, asks for it instead.
+     */
+    fun hold(inputView: InputView, overlay: FrameLayout, commit: (String) -> Unit) {
+        val context = inputView.context
+        if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+            VoicePermissionActivity.start(context)
+            return
+        }
+        VoiceHoldOverlay(inputView, overlay, commit).begin()
+    }
 
     /** on the licences page */
     fun credits(context: Context) = listOf(

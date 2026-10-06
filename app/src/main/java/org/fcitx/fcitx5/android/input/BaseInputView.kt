@@ -6,6 +6,7 @@
 package org.fcitx.fcitx5.android.input
 
 import android.os.SystemClock
+import android.util.SparseArray
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
@@ -140,11 +141,37 @@ abstract class BaseInputView(
     }
 
     /**
+     * Voice's hold to talk, while one goes on: it follows the finger that long-pressed space,
+     * which the key itself no longer reports once its long press has fired, and ends with the
+     * field or the keyboard (InputView's startInput and finishInput).
+     */
+    interface Hold {
+        /** each touch event, before the keys see it */
+        fun touched(ev: MotionEvent)
+
+        fun inputEnded()
+    }
+
+    var hold: Hold? = null
+
+    /** the finger of the key whose long press fired last ([CustomGestureView]) */
+    var longPressPointer = MotionEvent.INVALID_POINTER_ID
+
+    // where each finger down went down, in this view
+    private val downYs = SparseArray<Float>()
+
+    fun downY(pointer: Int): Float = downYs.get(pointer, 0f)
+
+    /**
      * A touch that closes the menu only closes it, as it did when the menu was focusable: not a key
      * typed or a candidate picked by the way. The menu may see it first and close, so a touch
      * that went down before it closed counts too.
      */
     override fun dispatchTouchEvent(ev: MotionEvent): Boolean {
+        if (ev.actionMasked == MotionEvent.ACTION_DOWN || ev.actionMasked == MotionEvent.ACTION_POINTER_DOWN) {
+            downYs.put(ev.getPointerId(ev.actionIndex), ev.getY(ev.actionIndex))
+        }
+        hold?.touched(ev)
         if (ev.actionMasked == MotionEvent.ACTION_DOWN) {
             swallowing = candidateActionMenu != null || ev.downTime <= candidateActionMenuClosed
             candidateActionMenu?.dismiss()

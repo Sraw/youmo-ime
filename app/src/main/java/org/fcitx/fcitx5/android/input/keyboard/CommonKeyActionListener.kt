@@ -18,6 +18,8 @@ import org.fcitx.fcitx5.android.input.candidates.horizontal.HorizontalCandidateC
 import org.fcitx.fcitx5.android.input.dependency.context
 import org.fcitx.fcitx5.android.input.dependency.fcitx
 import org.fcitx.fcitx5.android.input.dependency.inputMethodService
+import org.fcitx.fcitx5.android.input.dependency.inputView
+import org.fcitx.fcitx5.android.input.popup.PopupComponent
 import org.fcitx.fcitx5.android.input.dialog.AddMoreInputMethodsPrompt
 import org.fcitx.fcitx5.android.input.dialog.InputMethodPickerDialog
 import org.fcitx.fcitx5.android.input.keyboard.KeyAction.BeginSelectionSwipeAction
@@ -51,6 +53,8 @@ class CommonKeyActionListener :
     private val preeditState: PreeditEmptyStateComponent by manager.must()
     private val horizontalCandidate: HorizontalCandidateComponent by manager.must()
     private val windowManager: InputWindowManager by manager.must()
+    private val inputView by manager.inputView()
+    private val popup: PopupComponent by manager.must()
 
     private var lastPickerType by AppPrefs.getInstance().internal.lastPickerType
 
@@ -85,7 +89,7 @@ class CommonKeyActionListener :
         }
     }
 
-    val listener by lazy {
+    val listener: KeyActionListener by lazy {
         KeyActionListener { action, _ ->
             when (action) {
                 is FcitxKeyAction -> service.postFcitxJob {
@@ -168,10 +172,10 @@ class CommonKeyActionListener :
                             toggleIme()
                         }
                         SpaceLongPressBehavior.ShowPicker -> showInputMethodPicker()
+                        // hold to talk: the keyboard stays, the key's finger followed till it lifts
                         SpaceLongPressBehavior.Voice -> if (!service.inPasswordField) {
-                            // as the picker: not while the key's touch is being handled
-                            ContextCompat.getMainExecutor(context).execute {
-                                VoiceFeature.window()?.let { windowManager.attachWindow(it) }
+                            VoiceFeature.hold(inputView, popup.root) { text ->
+                                listener.onKeyAction(KeyAction.CommitAction(text), KeyActionListener.Source.Keyboard)
                             }
                         }
                     }

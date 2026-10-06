@@ -10,4 +10,9 @@
     <string name="voice_no_microphone">The microphone cannot be used</string>
     <string name="voice_hint">Pause and what you said is typed. Recognized on the phone: nothing heard leaves it.</string>
     <string name="voice_model_credit">Speech recognition: X-ASR zh-en (Gilgamesh-J); run with sherpa-onnx (k2-fsa) and silero VAD</string>
+    <string name="voice_hold_listening">Listening…</string>
+    <string name="voice_hold_recognizing">Recognizing…</string>
+    <string name="voice_hold_cancel">Release to cancel</string>
+    <string name="voice_hold_hint">Release to type · slide up to cancel</string>
+    <string name="voice_hold_nothing">Didn\'t catch that</string>
 </resources>

@@ -16,6 +16,8 @@ import com.k2fsa.sherpa.onnx.OfflineTransducerModelConfig
 import com.k2fsa.sherpa.onnx.SileroVadModelConfig
 import com.k2fsa.sherpa.onnx.Vad
 import com.k2fsa.sherpa.onnx.VadModelConfig
+import kotlinx.coroutines.withTimeoutOrNull
+import org.fcitx.fcitx5.android.daemon.FcitxConnection
 
 /**
  * The recognizer (X-ASR, VoiceDataPlugin): read in once, which takes a second or two and some
@@ -91,6 +93,13 @@ object VoiceEngine {
             stream.release()
         }
     }
+
+    /** the words the user added and made (VoiceHotwords.ofUser), read again for each listener */
+    suspend fun userHotwords(fcitx: FcitxConnection): String =
+        withTimeoutOrNull(USER_WORDS_MS) { VoiceHotwords.ofUser(fcitx.runOnReady { userWords() }) }.orEmpty()
+
+    // the engine still starting: voice input without the user's words, not a wait
+    private const val USER_WORDS_MS = 2000L
 
     /** One for each time the microphone opens: it keeps the state of what it has heard. */
     fun vad(assets: AssetManager) = Vad(

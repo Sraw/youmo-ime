@@ -345,6 +345,7 @@ class InputView(
      * called when [InputView] is about to show, or restart
      */
     fun startInput(info: EditorInfo, capFlags: CapabilityFlags, restarting: Boolean = false) {
+        hold?.inputEnded()
         broadcaster.onStartInput(info, capFlags)
         returnKeyDrawable.updateDrawableOnEditorInfo(info)
         if (focusChangeResetKeyboard || !restarting) {
@@ -354,6 +355,7 @@ class InputView(
 
     /** called when [InputView] is hidden, or its field left */
     fun finishInput() {
+        hold?.inputEnded()
         broadcaster.onFinishInput()
     }
 

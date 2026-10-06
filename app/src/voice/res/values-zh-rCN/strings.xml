@@ -10,4 +10,9 @@
     <string name="voice_no_microphone">无法使用麦克风</string>
     <string name="voice_hint">说完稍停，文字自动上屏。全部在手机上识别，声音不会离开手机</string>
     <string name="voice_model_credit">语音识别：X-ASR 中英模型（Gilgamesh-J）；由 sherpa-onnx（k2-fsa）与 silero VAD 运行</string>
+    <string name="voice_hold_listening">正在听…</string>
+    <string name="voice_hold_recognizing">识别中…</string>
+    <string name="voice_hold_cancel">松开手指，取消输入</string>
+    <string name="voice_hold_hint">松开 上屏 · 上滑 取消</string>
+    <string name="voice_hold_nothing">没有听清</string>
 </resources>

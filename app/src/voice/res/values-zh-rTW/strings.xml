@@ -10,4 +10,9 @@
     <string name="voice_no_microphone">無法使用麥克風</string>
     <string name="voice_hint">說完稍停，文字自動上屏。全部在手機上辨識，聲音不會離開手機</string>
     <string name="voice_model_credit">語音辨識：X-ASR 中英模型（Gilgamesh-J）；由 sherpa-onnx（k2-fsa）與 silero VAD 執行</string>
+    <string name="voice_hold_listening">正在聽…</string>
+    <string name="voice_hold_recognizing">辨識中…</string>
+    <string name="voice_hold_cancel">鬆開手指，取消輸入</string>
+    <string name="voice_hold_hint">鬆開 上屏 · 上滑 取消</string>
+    <string name="voice_hold_nothing">沒有聽清</string>
 </resources>

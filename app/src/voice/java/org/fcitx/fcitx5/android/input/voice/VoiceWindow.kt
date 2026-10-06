@@ -16,7 +16,6 @@ import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.core.content.ContextCompat
-import kotlinx.coroutines.withTimeoutOrNull
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.core.CapabilityFlags
 import org.fcitx.fcitx5.android.core.FcitxKeyMapping
@@ -55,6 +54,7 @@ class VoiceWindow : InputWindow.ExtendedInputWindow<VoiceWindow>(), InputBroadca
 
     private lateinit var status: TextView
     private lateinit var halo: View
+    private lateinit var wave: VoiceWaveView
     private lateinit var mic: ImageView
 
     override fun onCreateView(): View {
@@ -93,6 +93,7 @@ class VoiceWindow : InputWindow.ExtendedInputWindow<VoiceWindow>(), InputBroadca
             addView(micBox, LinearLayout.LayoutParams(ctx.dp(MIC * 2), ctx.dp(MIC * 2)))
             addView(key(R.drawable.ic_baseline_keyboard_return_24, R.string.a11y_key_enter, FcitxKeyMapping.FcitxKey_Return, repeat = false), side())
         }
+        wave = VoiceWaveView(ctx).apply { color = theme.accentKeyBackgroundColor }
         val hint = TextView(ctx).apply {
             setText(R.string.voice_hint)
             textSize = 12f
@@ -103,6 +104,10 @@ class VoiceWindow : InputWindow.ExtendedInputWindow<VoiceWindow>(), InputBroadca
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER
             addView(status, LinearLayout.LayoutParams(-1, -2))
+            addView(wave, LinearLayout.LayoutParams(ctx.dp(WAVE_WIDTH), ctx.dp(WAVE_HEIGHT)).apply {
+                gravity = Gravity.CENTER
+                topMargin = ctx.dp(6)
+            })
             addView(row, LinearLayout.LayoutParams(-1, 0, 1f))
             addView(hint, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = ctx.dp(12) })
         }
@@ -167,17 +172,13 @@ class VoiceWindow : InputWindow.ExtendedInputWindow<VoiceWindow>(), InputBroadca
         session.unloaded()
     }
 
-    /** the words the user added and made, read again each time the models are asked for */
-    private suspend fun userHotwords(): String =
-        withTimeoutOrNull(USER_WORDS_MS) { VoiceHotwords.ofUser(fcitx.runOnReady { userWords() }) }.orEmpty()
-
     /** The microphone and the models as [session] wants them: the one place either opens. */
     private fun sync() {
         if (service.inPasswordField) session.pause()
         if (!session.wantsModels) {
             listener?.stop()
         } else {
-            val l = listener ?: VoiceListener(service.assets, events, ::userHotwords).also {
+            val l = listener ?: VoiceListener(service.assets, events) { VoiceEngine.userHotwords(fcitx) }.also {
                 listener = it
                 it.load()
             }
@@ -244,6 +245,7 @@ class VoiceWindow : InputWindow.ExtendedInputWindow<VoiceWindow>(), InputBroadca
         override fun level(level: Float) {
             val scale = if (session.listening) 1f + level * HALO_GROWTH else 1f
             halo.animate().scaleX(scale).scaleY(scale).setDuration(LEVEL_MS).start()
+            wave.level(level)
         }
     }
 
@@ -263,6 +265,7 @@ class VoiceWindow : InputWindow.ExtendedInputWindow<VoiceWindow>(), InputBroadca
             }
         )
         mic.alpha = if (session.listening) 1f else IDLE_ALPHA
+        wave.active = session.listening
         if (!session.listening) halo.animate().scaleX(1f).scaleY(1f).setDuration(LEVEL_MS).start()
     }
 
@@ -273,8 +276,7 @@ class VoiceWindow : InputWindow.ExtendedInputWindow<VoiceWindow>(), InputBroadca
         private const val HALO_GROWTH = 0.8f
         private const val IDLE_ALPHA = 0.5f
         private const val LEVEL_MS = 100L
-
-        // the engine still starting: voice input without the user's words, not a wait
-        private const val USER_WORDS_MS = 2000L
+        private const val WAVE_WIDTH = 120
+        private const val WAVE_HEIGHT = 32
     }
 }

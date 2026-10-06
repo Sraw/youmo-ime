@@ -15,6 +15,7 @@ import com.k2fsa.sherpa.onnx.OfflineRecognizer
 import com.k2fsa.sherpa.onnx.OfflineStream
 import com.k2fsa.sherpa.onnx.Vad
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -24,9 +25,11 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.isActive
+import kotlinx.coroutines.joinAll
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import timber.log.Timber
+import java.util.Collections
 import kotlin.math.sqrt
 
 /**
@@ -66,6 +69,12 @@ class VoiceListener(
 
     private var recognizer: OfflineRecognizer? = null
 
+    // the recognizer once in: the microphone may open first (hold to talk), its stretches wait
+    private val ready = CompletableDeferred<OfflineRecognizer>()
+
+    // the stretches heard and not yet recognized: what finish and close wait for
+    private val pending: MutableList<Job> = Collections.synchronizedList(mutableListOf())
+
     // the decoder's: the hotwords, and the stream made ready for the next stretch
     private var words = ""
     private var next: OfflineStream? = null
@@ -94,10 +103,12 @@ class VoiceListener(
                 // sherpa-onnx's IllegalArgumentException for a model it could not read, or worse
                 Timber.w(e, "voice model")
                 user.cancel()
+                ready.completeExceptionally(e)
                 tell { failed(VoiceSession.Failure.NoModel) }
                 return@launch
             }
-            // acquired, released whatever happens next until it is handed over
+            // acquired, released whatever happens (an Error too) until it is handed over
+            var handed = false
             try {
                 val words = user.await()
                 // closed meanwhile: not the graph of hotwords built for nothing
@@ -107,21 +118,29 @@ class VoiceListener(
                         next = VoiceEngine.stream(loaded, words)
                     }
                 }
+                handed = true
             } catch (e: CancellationException) {
-                VoiceEngine.release()
                 throw e
             } catch (@Suppress("TooGenericExceptionCaught") e: Exception) {
                 Timber.w(e, "voice stream")
-                VoiceEngine.release()
                 tell { failed(VoiceSession.Failure.NoModel) }
-                return@launch
+            } finally {
+                if (!handed) {
+                    VoiceEngine.release()
+                    // what waits for the models: dropped, not waiting for good
+                    ready.cancel()
+                }
             }
+            if (!handed) return@launch
             main.post {
                 if (closed) {
+                    // what was heard before it closed is not recognized: it is not told either
+                    ready.cancel()
                     scope.launch(decoder) { letGoNext() }
                     VoiceEngine.release()
                 } else {
                     recognizer = loaded
+                    ready.complete(loaded)
                     events.loaded()
                 }
             }
@@ -138,15 +157,31 @@ class VoiceListener(
         ""
     }
 
-    /** Opens the microphone once the models are in; the caller has checked the permission. */
+    /**
+     * Opens the microphone; the caller has checked the permission. The models may still be
+     * loading: what is heard meanwhile is recognized once they are in.
+     */
     fun start() {
-        val r = recognizer ?: return
         if (closed || capture?.isActive == true) return
         // the last one still closing, quickly paused and resumed: one microphone at a time
         val last = capture
         capture = scope.launch {
             last?.join()
-            record(r)
+            record()
+        }
+    }
+
+    /**
+     * Closes the microphone and, once what was heard is all recognized and told, [done]: the
+     * finger lifted from holding to talk. Not if closed meanwhile.
+     */
+    fun finish(done: () -> Unit) {
+        stop()
+        val last = capture
+        scope.launch {
+            last?.join()
+            pending.toList().joinAll()
+            main.post { if (!closed) done() }
         }
     }
 
@@ -165,19 +200,20 @@ class VoiceListener(
         closed = true
         this.keepLast = keepLast
         stop()
-        val r = recognizer ?: return
+        // still loading: once in, it is let go there, and what waits for it dropped
+        recognizer ?: return
         recognizer = null
         val last = capture
         scope.launch {
             last?.join()
-            // queued after the stretches the capture's end left to recognize: run after them
+            pending.toList().joinAll()
             withContext(decoder) { letGoNext() }
             main.post { VoiceEngine.release() }
         }
     }
 
     @SuppressLint("MissingPermission")
-    private suspend fun record(r: OfflineRecognizer) {
+    private suspend fun record() {
         val vad = VoiceEngine.vad(assets)
         val history = VoiceEngine.history()
         val min = AudioRecord.getMinBufferSize(VoiceEngine.SAMPLE_RATE, CHANNEL, ENCODING)
@@ -197,18 +233,18 @@ class VoiceListener(
         }
         try {
             record.startRecording()
-            listen(record, vad, r, history)
+            listen(record, vad, history)
         } finally {
             record.stop()
             record.release()
             // the last stretch, cut short by the pause
             vad.flush()
-            drain(vad, r, history)
+            drain(vad, history)
             vad.release()
         }
     }
 
-    private suspend fun listen(record: AudioRecord, vad: Vad, r: OfflineRecognizer, history: AudioHistory) {
+    private suspend fun listen(record: AudioRecord, vad: Vad, history: AudioHistory) {
         val buffer = FloatArray(VoiceEngine.WINDOW)
         var speaking = false
         var windows = 0
@@ -225,7 +261,7 @@ class VoiceListener(
             val now = vad.isSpeechDetected()
             if (now && !speaking) tell { speechStarted() }
             speaking = now
-            drain(vad, r, history)
+            drain(vad, history)
             if (++windows % LEVEL_EVERY == 0) {
                 val level = rms(samples)
                 tell { level(level) }
@@ -233,11 +269,20 @@ class VoiceListener(
         }
     }
 
-    private fun drain(vad: Vad, r: OfflineRecognizer, history: AudioHistory) {
+    private fun drain(vad: Vad, history: AudioHistory) {
         while (!vad.empty()) {
             val samples = VoiceEngine.nextStretch(vad, history)
             tell { speechEnded() }
-            scope.launch(decoder) {
+            val job = scope.launch(decoder) {
+                // dropped, not told, if the models never came in (told as such) or it closed first
+                val r = try {
+                    ready.await()
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (@Suppress("TooGenericExceptionCaught") e: Exception) {
+                    Timber.d(e, "voice: a stretch dropped, no models")
+                    return@launch
+                }
                 val text = try {
                     val stream = next ?: VoiceEngine.stream(r, words)
                     next = null
@@ -258,6 +303,8 @@ class VoiceListener(
                     null
                 }
             }
+            pending += job
+            job.invokeOnCompletion { pending -= job }
         }
     }
 

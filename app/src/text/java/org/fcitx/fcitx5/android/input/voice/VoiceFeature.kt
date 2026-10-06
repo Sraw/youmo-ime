@@ -5,6 +5,8 @@
 package org.fcitx.fcitx5.android.input.voice
 
 import android.content.Context
+import android.widget.FrameLayout
+import org.fcitx.fcitx5.android.input.InputView
 import org.fcitx.fcitx5.android.input.wm.InputWindow
 
 /** A text build's: no voice input, no microphone (the voice flavor's has them). */
@@ -19,4 +21,7 @@ object VoiceFeature {
 
     @Suppress("UnusedParameter")
     fun credits(context: Context): List<Credit> = emptyList()
+
+    @Suppress("UnusedParameter")
+    fun hold(inputView: InputView, overlay: FrameLayout, commit: (String) -> Unit) = Unit
 }
