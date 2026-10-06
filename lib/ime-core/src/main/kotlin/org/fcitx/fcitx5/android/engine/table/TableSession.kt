@@ -42,6 +42,7 @@ class TableSession(
     private val options: TableOptions = TableOptions(),
     private val pinyin: Session? = null,
     private val user: TableUser = TableUser(table),
+    private val shared: SharedWords = SharedWords.NONE,
 ) : Session {
 
     /**
@@ -70,6 +71,7 @@ class TableSession(
         is Action.Select -> select(action.index)
         is Action.Pick -> pick(action.index)
         is Action.Forget -> forget(action.index)
+        is Action.Block -> block(action.index)
         Action.NextPage -> turn(page + 1)
         Action.PreviousPage -> turn(page - 1)
         Action.CommitRaw -> {
@@ -79,7 +81,7 @@ class TableSession(
             snapshot(commit = text, handled = text.isNotEmpty())
         }
         // nothing to weigh again: a table's order is its own; a table has no custom phrases
-        Action.Refine, is Action.Pin, is Action.Unpin, is Action.Block -> snapshot()
+        Action.Refine, is Action.Pin, is Action.Unpin -> snapshot()
         // auto phrases are made of what was committed here, not of what the editor had: kept
         // only while the text still ends with it (the cursor did not go anywhere)
         Action.Reset, is Action.Context -> {
@@ -92,7 +94,7 @@ class TableSession(
     // a lookup's pinyin has no phrases of the table's own to pin to
     override fun offers(index: Int): Set<Offer> = when {
         lookingUp -> pinyin!!.offers(index).intersect(setOf(Offer.FORGET))
-        ranking[index] != null -> setOf(Offer.FORGET)
+        ranking[index] != null -> if (shared.blockable(ranking[index]!!.text)) setOf(Offer.FORGET, Offer.BLOCK) else setOf(Offer.FORGET)
         else -> emptySet()
     }
 
@@ -202,6 +204,19 @@ class TableSession(
     private fun forget(index: Int): Snapshot {
         val item = ranking[index] ?: return snapshot(handled = input.isNotEmpty())
         user.forget(item.code, item.text)
+        // a phrase saved here, or a word of the other input methods: forgotten by all of them, or
+        // it would be back as theirs; a table's own entry is only picked less
+        if (item.index < 0 && !item.pinyin && !item.auto) shared.forget(item.text)
+        val shown = page
+        update()
+        if (ranking[shown * options.pageSize] != null) page = shown
+        return snapshot()
+    }
+
+    /** Blocks the candidate at [index] for every input method (see [SharedWords]), ranking the code again. */
+    private fun block(index: Int): Snapshot {
+        val item = ranking[index] ?: return snapshot(handled = input.isNotEmpty())
+        if (!shared.block(item.text)) return snapshot()
         val shown = page
         update()
         if (ranking[shown * options.pageSize] != null) page = shown
@@ -263,14 +278,18 @@ class TableSession(
     }
 
     /** Whether some entry, learned ones too, has a code [pattern] leads to. */
-    private fun leadsAnywhere(pattern: String) = table.hasMatch(pattern, options.matchingKey) || user.leadsAnywhere(pattern)
+    private fun leadsAnywhere(pattern: String) =
+        table.hasMatch(pattern, options.matchingKey) || user.leadsAnywhere(pattern) || shared.leadsAnywhere(pattern)
 
     private fun update() {
         page = 0
         ranking = if (input.isEmpty()) Ranking.NONE else rank(input.toString())
     }
 
-    /** The candidates of [code], ranked; decoded as they are asked for. */
+    /**
+     * The candidates of [code], ranked; decoded as they are asked for. The user's words of the
+     * other input methods ([shared]) after the table's own as long; none blocked.
+     */
     private fun rank(code: String): Ranking {
         val coded = table.match(code, options.matchingKey)
         val spelt = table.matchPinyin(code, prefix = pinyinPrefix(code))
@@ -278,41 +297,53 @@ class TableSession(
         val entries = if (spelt.isEmpty()) coded else coded + spelt
         // learned phrases are found by their plain code; the matching key is for the table's
         val learned = user.saved(code).map { (c, text) -> Item(c, text, false) }
+        val others = shared.words(code).filterNot { (c, text) -> user.isSaved(c, text) }.map { (c, text) -> Item(c, text, false) }
         val noSort = minOf(code.length, options.noSortInputLength)
+        val sharedFrom = learned.size + entries.size
+        fun item(at: Int): Item? = when {
+            at < learned.size -> learned[at]
+            at >= sharedFrom -> others[at - sharedFrom]
+            else -> null
+        }
+        val pinyinFrom = learned.size + coded.size
+        fun spelt(at: Int) = at in pinyinFrom until sharedFrom
         // one sortable number per candidate: its group, length, picks, then where it was
-        val keys = LongArray(learned.size + entries.size) { at ->
-            val isPinyin = at >= learned.size + coded.size
-            val length = if (at < learned.size) learned[at].code.length else table.codeLength(entries[at - learned.size]) - (if (isPinyin) 1 else 0)
-            val sorted = length > noSort || isPinyin
-            val used = when {
-                !sorted || !options.orderByUse -> 0
-                at < learned.size -> user.picks(learned[at].code, learned[at].text)
-                else -> user.picks(entries[at - learned.size])
-            }
-            (if (sorted) 1L shl GROUP_SHIFT else 0L) or
-                ((if (sorted && options.sortByCodeLength) minOf(length, MAX_LENGTH) else 0).toLong() shl LENGTH_SHIFT) or
-                ((MAX_PICKS - minOf(used, MAX_PICKS)).toLong() shl PICKS_SHIFT) or
-                at.toLong()
+        val keys = LongArray(sharedFrom + others.size) { at ->
+            val extra = item(at)
+            if (extra != null) key(at, extra.code.length, noSort, false) { user.picks(extra.code, extra.text) }
+            else entries[at - learned.size].let { e -> key(at, table.codeLength(e) - (if (spelt(at)) 1 else 0), noSort, spelt(at)) { user.picks(e) } }
         }
         keys.sort()
         val order = IntArray(keys.size) { (keys[it] and POSITION_MASK).toInt() }
-        // a code's own candidate first, if it has one (libime's rule)
-        val pinyinFrom = learned.size + coded.size
-        if (order.isNotEmpty() && order[0] >= pinyinFrom) {
-            val own = order.indexOfFirst { it < pinyinFrom }
-            if (own > 0) {
-                val first = order[own]
-                System.arraycopy(order, 0, order, 1, own)
-                order[0] = first
-            }
-        }
+        ownFirst(order, ::spelt)
         // the most recently seen first
         val auto = user.seen(code).map { (c, text) -> Item(c, text, true) }
-        return Ranking { at ->
+        return Ranking(shared::blocked) { at ->
             when {
-                at < order.size -> order[at].let { if (it < learned.size) learned[it] else entryItem(entries[it - learned.size]) }
+                at < order.size -> order[at].let { item(it) ?: entryItem(entries[it - learned.size]) }
                 else -> auto.getOrNull(at - order.size)
             }
+        }
+    }
+
+    /** A candidate's sortable number: its group, length, picks (asked for only when they count), then [at]. */
+    private fun key(at: Int, length: Int, noSort: Int, isPinyin: Boolean, picks: () -> Int): Long {
+        val sorted = length > noSort || isPinyin
+        val used = if (sorted && options.orderByUse) picks() else 0
+        return (if (sorted) 1L shl GROUP_SHIFT else 0L) or
+            ((if (sorted && options.sortByCodeLength) minOf(length, MAX_LENGTH) else 0).toLong() shl LENGTH_SHIFT) or
+            ((MAX_PICKS - minOf(used, MAX_PICKS)).toLong() shl PICKS_SHIFT) or
+            at.toLong()
+    }
+
+    /** A code's own candidate first, if it has one (libime's rule): before what pinyin [spelt]. */
+    private fun ownFirst(order: IntArray, spelt: (Int) -> Boolean) {
+        if (order.isEmpty() || !spelt(order[0])) return
+        val own = order.indexOfFirst { !spelt(it) }
+        if (own > 0) {
+            val first = order[own]
+            System.arraycopy(order, 0, order, 1, own)
+            order[0] = first
         }
     }
 
@@ -336,7 +367,7 @@ class TableSession(
      * code when codes are sorted by length. Unsorted, the first stays (libime would show the
      * shorter code in its place); no preset turns sorting off.
      */
-    private class Ranking(private val source: (Int) -> Item?) {
+    private class Ranking(private val blocked: (String) -> Boolean = { false }, private val source: (Int) -> Item?) {
         private val items = ArrayList<Item>()
         private val seen = HashSet<String>()
         private var next = 0
@@ -345,7 +376,7 @@ class TableSession(
         operator fun get(i: Int): Item? {
             while (items.size <= i && !done) {
                 val item = source(next++)
-                if (item == null) done = true else if (seen.add(item.text)) items += item
+                if (item == null) done = true else if (!blocked(item.text) && seen.add(item.text)) items += item
             }
             return items.getOrNull(i)
         }

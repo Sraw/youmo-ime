@@ -30,6 +30,8 @@ import org.fcitx.fcitx5.android.engine.session.Session
 import org.fcitx.fcitx5.android.engine.session.Snapshot
 import org.fcitx.fcitx5.android.engine.stroke.StrokeLookup
 import org.fcitx.fcitx5.android.engine.stroke.Strokes
+import org.fcitx.fcitx5.android.engine.table.CodedWords
+import org.fcitx.fcitx5.android.engine.table.SharedWords
 import org.fcitx.fcitx5.android.engine.table.TableConf
 import org.fcitx.fcitx5.android.engine.table.TableDictionary
 import org.fcitx.fcitx5.android.engine.table.TableOptions
@@ -305,6 +307,7 @@ class Engines(
     /** Adds [entries]; how many were not there already. */
     private fun add(entries: List<Entry>): Int {
         // unblocked, as the user asks for them
+        blockedTexts = null
         lists.unblockAll(entries).forEach { userModel?.unblock(it) }
         val added = lists.addAll(entries)
         added.forEach { userModel?.list(it) }
@@ -328,6 +331,7 @@ class Engines(
 
     /** Blocks [entries]; how many were not already. */
     private fun blockAll(entries: List<Entry>): Int {
+        blockedTexts = null
         val blocked = lists.blockAll(entries)
         val model = user()
         entries.forEach { model.block(it) }
@@ -345,8 +349,12 @@ class Engines(
         byKind[UserWord.Kind.LEARNED]?.let { learned ->
             user().forget(learned.filterNotNull())
             habits.forgetAll(learned.filterNotNull().mapTo(HashSet()) { it.text })
+            forgetInTables(learned.filterNotNull().map { it.text })
         }
-        byKind[UserWord.Kind.BLOCKED]?.let { entries -> lists.unblockAll(entries.filterNotNull()).forEach { userModel?.unblock(it) } }
+        byKind[UserWord.Kind.BLOCKED]?.let { entries ->
+            blockedTexts = null
+            lists.unblockAll(entries.filterNotNull()).forEach { userModel?.unblock(it) }
+        }
         sessions.clear()
         keyboards.clear()
     }
@@ -515,7 +523,7 @@ class Engines(
                     pageSize = s.pageSize, user = user(), prediction = s.prediction, prior = prior(), phraseBook = phrases(),
                     reranker = reranker(), refiner = refiner(), block = ::block, habits = habits.scope(PINYIN),
                 ),
-                ::strokes, ::charReading, s.pageSize,
+                ::strokes, ::charReading, s.pageSize, blocked = ::isBlocked,
             )
             SHUANGPIN -> PinyinSession(
                 pinyinData, ShuangpinSegmenter(s.scheme, s.fuzzy, s.typos), spell = true,
@@ -529,7 +537,7 @@ class Engines(
                 val options = own.copy(pageSize = s.pageSize)
                 // looking a character up by pinyin learns nothing: it is not how the user writes
                 val lookUp = if (options.pinyinKey == null) null else PinyinSession(pinyinData, PinyinSegmenter(), prediction = false)
-                TableSession(table.dictionary, options, lookUp, table.user)
+                TableSession(table.dictionary, options, lookUp, table.user, shared(table, im))
             }
         }
     }
@@ -545,7 +553,124 @@ class Engines(
         val store: TableUser.Store?,
         val options: TableOptions? = null,
         val learns: Boolean = true,
-    )
+    ) {
+        var shared: SharedWords? = null
+
+        // the user's words coded for this table: those of their dictionaries, made once a user
+        // model; and those they made or typed, as of its changes then
+        var listed: CodedWords? = null
+        var own: CodedWords? = null
+        var codedFor: UserModel? = null
+        var listedAt = -1
+        var ownAt = -1
+    }
+
+    /**
+     * One user lexicon for every input method: [table] offers the words the user made, added or
+     * typed with pinyin, coded by its rules, as of now; the phrases it saves become pinyin's
+     * words (those saved before this, once); what is blocked or forgotten anywhere is so here.
+     */
+    private fun shared(table: Table, im: String): SharedWords = table.shared ?: object : SharedWords {
+        override fun words(prefix: String) = coded().flatMap { it.words(prefix) }
+        override fun leadsAnywhere(prefix: String) = coded().any { it.leadsAnywhere(prefix) }
+        override fun blocked(text: String) = isBlockedWord(text)
+        override fun blockable(text: String) = text.codePointCount(0, text.length) >= 2 && pinyinOf(text) != null
+        override fun block(text: String) = blockText(text)
+        override fun forget(text: String) = forgetEverywhere(text)
+
+        private fun coded(): List<CodedWords> {
+            val model = user()
+            if (table.codedFor !== model) {
+                table.listed = null
+                table.own = null
+                table.codedFor = model
+            }
+            val listed = table.listed?.takeIf { table.listedAt == model.listings }
+                ?: CodedWords(table.dictionary, model.listedTexts()).also {
+                    table.listed = it
+                    table.listedAt = model.listings
+                }
+            val own = table.own?.takeIf { table.ownAt == model.changes }
+                ?: CodedWords(table.dictionary, model.ownTexts()).also {
+                    table.own = it
+                    table.ownAt = model.changes
+                }
+            return listOf(own, listed)
+        }
+    }.also { shared ->
+        table.shared = shared
+        if (table.learns) {
+            table.user.onSaved = { learnSaved(listOf(it), again = true) }
+            tellPinyinOnce(table, im)
+        }
+    }
+
+    /**
+     * What [table] saved before pinyin heard of its phrases, told it once: a phrase the user took
+     * out of pinyin's words later is not put back.
+     */
+    private fun tellPinyinOnce(table: Table, im: String) {
+        val log = if (im in TABLES) userTable(im) else addedTableFiles(im).last()
+        val told = userDir?.let { File(it, log + TOLD) }
+        if (told?.exists() == true) return
+        learnSaved(table.user.savedTexts(), again = false)
+        try {
+            told?.createNewFile()
+        } catch (_: IOException) {
+            // told again next time, harmlessly: pinyin learns only those it lacks; where the log
+            // cannot be kept either, that is reported already
+        }
+    }
+
+    /** Phrases a table saved, as pinyin's words: learned once more [again], else only those pinyin lacks. */
+    private fun learnSaved(texts: Collection<String>, again: Boolean) {
+        if (texts.isEmpty()) return
+        val model = user()
+        for ((text, reading) in pinyinsOf(texts)) {
+            val entry = reading?.let { LibimeImport.entry(text, it.replace(' ', '\'')) } ?: continue
+            if (again || !model.knows(entry)) model.learn(null, listOf(entry))
+        }
+    }
+
+    /** Forgets [text] in pinyin, however read, and in every table that saved it. */
+    private fun forgetEverywhere(text: String) {
+        user().forgetText(text)
+        habits.forgetAll(setOf(text))
+        forgetInTables(listOf(text))
+    }
+
+    // the tables loaded, and those with a log on disk: a phrase saved there would be shared again
+    private fun forgetInTables(texts: Collection<String>) {
+        val logged = TABLES.keys.filter { im -> im in tables || userDir?.let { File(it, userTable(im)).exists() } == true }
+        for (im in logged) {
+            val user = table(im).user
+            texts.forEach(user::forgetText)
+        }
+        for ((im, table) in tables) if (im !in TABLES) texts.forEach(table.user::forgetText)
+    }
+
+    // the texts blocked, of any reading: a table has no readings to tell apart
+    private var blockedTexts: Set<String>? = null
+
+    private fun blockedTexts(): Set<String> = blockedTexts ?: lists.blockedWords.mapTo(HashSet()) { it.text }.also { blockedTexts = it }
+
+    /** A character blocked in pinyin, for its strokes: found by strokes, it is the character, any reading. */
+    private fun isBlocked(text: String): Boolean = text in blockedTexts()
+
+    /**
+     * A word blocked, for a table. Not a character: blocked in pinyin under one reading (了 liao),
+     * a table, which has no readings, would lose it under all.
+     */
+    private fun isBlockedWord(text: String): Boolean = text.codePointCount(0, text.length) >= 2 && text in blockedTexts()
+
+    /** Blocks [text] from a table's candidate, as the dictionary reads it and as the user typed it: false if it reads none. */
+    private fun blockText(text: String): Boolean {
+        val read = pinyinOf(text)?.let { LibimeImport.entry(text, it.replace(' ', '\'')) }
+        val entries = (listOfNotNull(read) + user().entriesOf(text)).distinct()
+        if (entries.isEmpty()) return false
+        blockAll(entries)
+        return true
+    }
 
     private val tables = HashMap<String, Table>()
 
@@ -783,6 +908,9 @@ class Engines(
         const val REFINING_MODEL = "engine/sentence-model-large.safetensors"
         const val TABLE_DIR = "engine/table"
         const val USER_PINYIN = "pinyin.user"
+
+        /** Beside a table's log: its phrases saved before were told to pinyin (see shared). */
+        const val TOLD = ".told"
 
         /** Under the user directory: the tables the user added, built, and what each learned. */
         const val USER_TABLES = "tables"

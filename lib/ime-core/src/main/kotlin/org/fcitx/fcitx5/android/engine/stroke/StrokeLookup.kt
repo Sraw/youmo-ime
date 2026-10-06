@@ -17,13 +17,15 @@ import org.fcitx.fcitx5.android.engine.session.Snapshot
  * committed, and the pinyin goes on after it. Any other letter is no stroke and does nothing;
  * any other key commits the first candidate and is the app's, as in pinyin.
  *
- * [strokes] is asked for at the first lookup: null, there are none, and [KEY] is [pinyin]'s.
+ * [strokes] is asked for at the first lookup: null, there are none, and [KEY] is [pinyin]'s. A
+ * character the user [blocked] is not found.
  */
 class StrokeLookup(
     private val pinyin: Session,
     private val strokes: () -> Strokes?,
     private val reading: (String) -> String = { "" },
     private val pageSize: Int = DEFAULT_PAGE_SIZE,
+    private val blocked: (String) -> Boolean = { false },
 ) : Session {
 
     private var looking = false
@@ -83,7 +85,7 @@ class StrokeLookup(
 
     private inline fun lookUp(change: () -> Unit = {}): Snapshot {
         change()
-        found = strokes()?.find(input.toString()).orEmpty()
+        found = strokes()?.find(input.toString()).orEmpty().filterNot(blocked)
         page = 0
         return snapshot()
     }

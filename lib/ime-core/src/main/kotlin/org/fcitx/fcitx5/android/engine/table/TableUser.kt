@@ -34,8 +34,14 @@ class TableUser(private val table: TableDictionary) {
     /** Hears each record of what was learned, as it is learned. */
     var journal: ((ByteArray) -> Unit)? = null
 
+    /** Hears of each phrase saved as it is, not as a log is read back: a word for the other input methods too. */
+    var onSaved: ((String) -> Unit)? = null
+
     /** How often the table's entry at [index] was picked. */
     fun picks(index: Int): Int = picks[index] ?: 0
+
+    /** The phrases saved, each once. */
+    fun savedTexts(): Set<String> = saved.values.flatMapTo(LinkedHashSet()) { it }
 
     /** How often the saved phrase [text] under [code] was picked. */
     fun picks(code: String, text: String): Int = savedPicks[key(code, text)] ?: 0
@@ -68,6 +74,7 @@ class TableUser(private val table: TableDictionary) {
     fun save(code: String, text: String) {
         if (!keep(code, text)) return
         journal?.invoke(TableLog.saved(code, text))
+        onSaved?.invoke(text)
     }
 
     /**
@@ -92,6 +99,12 @@ class TableUser(private val table: TableDictionary) {
     fun forget(code: String, text: String) {
         if (!drop(code, text)) return
         journal?.invoke(TableLog.forgot(code, text))
+    }
+
+    /** [forget] of [text] under whatever code it was saved or seen. */
+    fun forgetText(text: String) {
+        val codes = saved.filterValues { text in it }.keys + autoPhrases.keys.filter { it.endsWith("$SEPARATOR$text") }.map { it.substringBefore(SEPARATOR) }
+        codes.toSet().forEach { forget(it, text) }
     }
 
     private fun drop(code: String, text: String): Boolean {

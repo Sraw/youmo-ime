@@ -318,4 +318,36 @@ class UserModelTest {
         assertFalse(m.blocked(again, -1))
         assertEquals(listOf(word), m.ownWords().map { it.first })
     }
+
+    @Test
+    fun theTextsSharedAreTheUsersTheirDictionariesApartAndChangesSay() {
+        val m = model()
+        val before = m.changes
+        m.list(entry("拟好", "ni", "hao"))
+        assertEquals(listOf("拟好"), m.listedTexts())
+        // made from pieces, and the dictionary's typed: their own
+        m.learn(null, listOf(entry("好吗", "hao", "ma")))
+        m.learn(null, listOf(entry("你好", "ni", "hao")))
+        assertEquals(setOf("好吗", "你好"), m.ownTexts().toSet())
+        val learned = m.changes
+        assertEquals(true, learned > before)
+        // typed again, nothing new to share
+        m.learn(null, listOf(entry("你好", "ni", "hao")))
+        assertEquals(learned, m.changes)
+        m.block(entry("好吗", "hao", "ma"))
+        assertEquals(setOf("你好"), m.ownTexts().toSet())
+        assertEquals(true, m.changes > learned)
+    }
+
+    @Test
+    fun aTextIsForgottenHoweverItWasRead() {
+        val m = model()
+        m.learn(null, listOf(entry("好吗", "hao", "ma")))
+        m.learn(null, listOf(entry("好吗", "hao", "ma"), entry("吗", "ma")))
+        assertEquals(1, m.entriesOf("好吗").size)
+        m.forgetText("好吗")
+        assertEquals(false, "好吗" in m.ownTexts())
+        assertEquals(false, inTrie(m, "好吗", "hao", "ma"))
+    }
+
 }

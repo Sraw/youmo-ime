@@ -84,6 +84,17 @@ class UserModel(
         private set
 
     /**
+     * Goes up as [ownTexts] may change: a word made, typed a first time, forgotten, blocked or
+     * offered again, counts halved. For another input method to know its copy of them is stale.
+     */
+    var changes = 0
+        private set
+
+    /** Goes up as [listedTexts] change: a word of the user's dictionaries listed. */
+    var listings = 0
+        private set
+
+    /**
      * Counts [sentence], each word and each pair, the first after [prev] if given (the word
      * committed before it) and still known: one forgotten since is not made a word again. Words
      * of the sentence the dictionary lacks become the user's.
@@ -101,6 +112,8 @@ class UserModel(
         }
         if (total > limit) {
             counts.scale(HALF, MIN_COUNT)
+            // a word typed once long ago may be gone from ownTexts
+            changes++
             total = 0f
             counts.forEach { key, count -> if (first(key) == NO_WORD) total += count }
         }
@@ -129,6 +142,7 @@ class UserModel(
             this.ids.remove(word)
             entries.remove(id)
         }
+        changes++
         journal?.forgot(words)
     }
 
@@ -169,6 +183,7 @@ class UserModel(
         if (id == NO_WORD) {
             id = vocabulary.size + newWords.size
             newWords += entry
+            changes++
             addToTrie(entry.syllables, id)
         }
         ids[entry] = id
@@ -181,7 +196,7 @@ class UserModel(
      * [id] of a word from the user's dictionaries: one they did not make, so forgetting it drops
      * what was learned of it but leaves it to type, as libime leaves its extra dictionaries be.
      */
-    fun list(entry: Entry): Int = id(entry).also { if (it >= vocabulary.size) listed += it }
+    fun list(entry: Entry): Int = id(entry).also { if (it >= vocabulary.size && listed.add(it)) listings++ }
 
     /**
      * [list]s a word of a [WordPack], of [layer] (an index [org.fcitx.fcitx5.android.engine.lattice.LayerPrior]
@@ -227,6 +242,7 @@ class UserModel(
      */
     fun block(entry: Entry): Boolean {
         if (!blockedEntries.add(entry)) return true
+        changes++
         val id = known(entry)
         if (id == NO_WORD) return false
         resolveBlock(entry, id, add = true)
@@ -236,6 +252,7 @@ class UserModel(
     /** Offers [entry] again, if [block]ed. */
     fun unblock(entry: Entry) {
         if (!blockedEntries.remove(entry)) return
+        changes++
         val id = known(entry)
         if (id != NO_WORD) resolveBlock(entry, id, add = false)
     }
@@ -262,6 +279,37 @@ class UserModel(
      */
     fun ownWords(): List<Pair<Entry, Float>> = entries.filter { (id, entry) -> isOwn(id) && entry !in blockedEntries }
         .map { (id, entry) -> entry to counts[key(NO_WORD, id)] }
+
+    /**
+     * The texts of the words of the user's dictionaries and packs, and those they added, for
+     * the other input methods to offer too, blocked ones as well: those ask what is blocked as
+     * they offer. See [listings].
+     */
+    fun listedTexts(): List<String> = listed.mapNotNullTo(LinkedHashSet()) { id -> entries[id]?.text }.toList()
+
+    /**
+     * The texts of the words the user made, and of the dictionary's they typed, for the other
+     * input methods to offer too; not those blocked or forgotten. See [changes].
+     */
+    fun ownTexts(): List<String> {
+        val texts = LinkedHashSet<String>()
+        for ((id, entry) in entries) if (isOwn(id) && entry !in blockedEntries) texts += entry.text
+        counts.forEach { key, count ->
+            val id = second(key)
+            val typed = first(key) == NO_WORD && count > 0f
+            if (typed && id < vocabulary.size && id !in blockedIds) texts += vocabulary.word(id)
+        }
+        return texts.toList()
+    }
+
+    /** Every reading of [text] the model has an id for: those typed, made, listed. */
+    fun entriesOf(text: String): List<Entry> = ids.keys.filter { it.text == text }
+
+    /** Forgets [text] however it was read: see [forget]. */
+    fun forgetText(text: String) = entriesOf(text).forEach { forget(listOf(it)) }
+
+    /** Whether the dictionary or the user has [entry] as a word already. */
+    fun knows(entry: Entry): Boolean = entry in ids || inDictionary(entry) != NO_WORD
 
     /** How many words the user added to the dictionary's, forgotten ones too: no id is given twice. */
     val size: Int get() = newWords.size
@@ -317,6 +365,7 @@ class UserModel(
     }
 
     private fun add(first: Int, second: Int, count: Float) {
+        if (first == NO_WORD && counts[key(first, second)] == 0f) changes++
         counts.add(key(first, second), count)
         if (first == NO_WORD) total += count
     }
