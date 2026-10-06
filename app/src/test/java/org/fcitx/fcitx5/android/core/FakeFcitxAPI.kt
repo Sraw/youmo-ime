@@ -84,6 +84,9 @@ class FakeFcitxAPI : FcitxAPI {
     // no dictionary to read it by
     override suspend fun pinyinOf(text: String): String? = null
 
+    // no model: each char a word of its own
+    override suspend fun wordBoundaries(texts: List<String>) = texts.associateWith { IntArray(it.length + 1) { i -> i } }
+
     override suspend fun addUserWord(text: String, pinyin: String): Boolean {
         calls += "addUserWord($text, $pinyin)"
         userWords += Engines.UserWord(text, pinyin, Engines.UserWord.Kind.ADDED)

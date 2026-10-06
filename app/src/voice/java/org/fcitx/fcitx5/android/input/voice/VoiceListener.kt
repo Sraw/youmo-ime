@@ -27,6 +27,8 @@ import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.joinAll
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import timber.log.Timber
 import java.util.Collections
@@ -42,6 +44,8 @@ class VoiceListener(
     private val events: Events,
     /** the user's words to listen for and blocked (VoiceHotwords.ofUser), asked for as the models load */
     private val hotwords: suspend () -> VoiceHotwords.Words,
+    /** where texts split into words (VoiceEngine.wordBoundaries): for the blocked words */
+    private val boundaries: suspend (List<String>) -> Map<String, IntArray>,
 ) {
 
     enum class Failure { NoModel, NoMicrophone }
@@ -66,6 +70,9 @@ class VoiceListener(
     // one stretch at a time, in the order said
     @OptIn(ExperimentalCoroutinesApi::class)
     private val decoder = Dispatchers.Default.limitedParallelism(1)
+
+    // a stretch's from its start to its text told and the next stream made, across suspensions
+    private val serial = Mutex()
 
     private val main = Handler(Looper.getMainLooper())
 
@@ -143,6 +150,16 @@ class VoiceListener(
                 }
             }
         }
+    }
+
+    private suspend fun split(texts: List<String>) = try {
+        boundaries(texts)
+    } catch (e: CancellationException) {
+        throw e
+    } catch (@Suppress("TooGenericExceptionCaught") e: Exception) {
+        // none: each taken as having the word, searched again with it blocked
+        Timber.w(e, "voice word boundaries")
+        emptyMap()
     }
 
     private suspend fun userHotwords() = try {
@@ -270,33 +287,36 @@ class VoiceListener(
             val samples = VoiceEngine.nextStretch(vad, history)
             tell { speechEnded() }
             val job = scope.launch(decoder) {
-                // dropped, not told, if the models never came in (told as such) or it closed first
-                val r = try {
-                    ready.await()
-                } catch (e: CancellationException) {
-                    throw e
-                } catch (@Suppress("TooGenericExceptionCaught") e: Exception) {
-                    Timber.d(e, "voice: a stretch dropped, no models")
-                    return@launch
-                }
-                val text = try {
-                    val stream = next ?: VoiceEngine.stream(r, words)
-                    next = null
-                    VoiceEngine.recognize(r, stream, samples)
-                } catch (e: CancellationException) {
-                    throw e
-                } catch (@Suppress("TooGenericExceptionCaught") e: Exception) {
-                    // one stretch lost, not the panel
-                    Timber.w(e, "recognize")
-                    ""
-                }
-                tell { recognized(text) }
-                // the next one's, made while it is said, once this one's text is out
-                next = try {
-                    VoiceEngine.stream(r, words)
-                } catch (@Suppress("TooGenericExceptionCaught") e: Exception) {
-                    Timber.w(e, "voice stream")
-                    null
+                // the stretch before it suspended (its words split on the fcitx thread): still in order
+                serial.withLock {
+                    // dropped, not told, if the models never came in (told as such) or it closed first
+                    val r = try {
+                        ready.await()
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (@Suppress("TooGenericExceptionCaught") e: Exception) {
+                        Timber.d(e, "voice: a stretch dropped, no models")
+                        return@launch
+                    }
+                    val text = try {
+                        val stream = next ?: VoiceEngine.stream(r, words)
+                        next = null
+                        VoiceEngine.recognize(r, stream, samples, words, ::split)
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (@Suppress("TooGenericExceptionCaught") e: Exception) {
+                        // one stretch lost, not the panel
+                        Timber.w(e, "recognize")
+                        ""
+                    }
+                    tell { recognized(text) }
+                    // the next one's, made while it is said, once this one's text is out
+                    next = try {
+                        VoiceEngine.stream(r, words)
+                    } catch (@Suppress("TooGenericExceptionCaught") e: Exception) {
+                        Timber.w(e, "voice stream")
+                        null
+                    }
                 }
             }
             pending += job

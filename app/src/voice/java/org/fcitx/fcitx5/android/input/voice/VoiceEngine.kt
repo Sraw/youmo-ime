@@ -10,6 +10,7 @@ import android.os.Looper
 import com.k2fsa.sherpa.onnx.FeatureConfig
 import com.k2fsa.sherpa.onnx.OfflineModelConfig
 import com.k2fsa.sherpa.onnx.OfflineRecognizer
+import com.k2fsa.sherpa.onnx.OfflineRecognizerResult
 import com.k2fsa.sherpa.onnx.OfflineRecognizerConfig
 import com.k2fsa.sherpa.onnx.OfflineStream
 import com.k2fsa.sherpa.onnx.OfflineTransducerModelConfig
@@ -77,25 +78,49 @@ object VoiceEngine {
 
     /**
      * A stream to recognize a stretch in, listening for the user's [words] (VoiceHotwords.ofUser)
-     * besides the pack's and never writing those they blocked. With hotwords of theirs, the
-     * recognizer builds its graph of hotwords again, the pack's 78 thousand too: a tenth of a
-     * second or more, so made before the stretch it is for.
+     * besides the pack's; with [block], its search never completing a word they blocked, even
+     * within a longer one (see [recognize]). With hotwords of theirs, the recognizer builds its
+     * graph of hotwords again, the pack's 78 thousand too: a tenth of a second or more, so made
+     * before the stretch it is for.
      */
-    fun stream(r: OfflineRecognizer, words: VoiceHotwords.Words): OfflineStream = when {
-        words.blocked.isNotEmpty() -> r.createStream(words.hotwords, words.blocked)
+    fun stream(r: OfflineRecognizer, words: VoiceHotwords.Words, block: Boolean = false): OfflineStream = when {
+        block && words.blocked.isNotEmpty() -> r.createStream(words.hotwords, words.blocked)
         words.hotwords.isNotEmpty() -> r.createStream(words.hotwords)
         else -> r.createStream()
     }
 
-    /** A stretch of speech to text, in [stream], which it releases. */
-    fun recognize(r: OfflineRecognizer, stream: OfflineStream, samples: FloatArray): String {
+    /** A stretch of speech to the recognizer's result, in [stream], which it releases. */
+    fun result(r: OfflineRecognizer, stream: OfflineStream, samples: FloatArray): OfflineRecognizerResult {
         return try {
             stream.acceptWaveform(samples, SAMPLE_RATE)
             r.decode(stream)
-            r.getResult(stream).text
+            r.getResult(stream)
         } finally {
             stream.release()
         }
+    }
+
+    /**
+     * A stretch of speech to text, in [stream] (made by [stream] for [words], not blocking),
+     * which it releases: with none of the words the user blocked standing as a word in it
+     * ([VoiceBlocking], the suspects split by [boundaries]); if each hypothesis has one, the
+     * stretch searched again with them blocked.
+     */
+    suspend fun recognize(
+        r: OfflineRecognizer,
+        stream: OfflineStream,
+        samples: FloatArray,
+        words: VoiceHotwords.Words,
+        boundaries: suspend (List<String>) -> Map<String, IntArray>,
+    ): String {
+        val result = result(r, stream, samples)
+        val blocked = words.blockedWords
+        if (blocked.isEmpty()) return result.text
+        val nbest = result.nbest.toList().ifEmpty { listOf(result.text) }
+        val suspects = VoiceBlocking.suspects(nbest, blocked)
+        if (suspects.isEmpty()) return result.text
+        VoiceBlocking.pick(nbest, blocked, boundaries(suspects))?.let { return nbest[it] }
+        return result(r, VoiceEngine.stream(r, words, block = true), samples).text
     }
 
     /** the words the user added and made (VoiceHotwords.ofUser), read again for each listener */
@@ -104,6 +129,13 @@ object VoiceEngine {
 
     // the engine still starting: voice input without the user's words, not a wait
     private const val USER_WORDS_MS = 2000L
+
+    /**
+     * Where each of [texts] splits into words, as the pinyin engine's model has it; none for
+     * those it could not split in time (VoiceBlocking takes them as having the word).
+     */
+    suspend fun wordBoundaries(fcitx: FcitxConnection, texts: List<String>): Map<String, IntArray> =
+        withTimeoutOrNull(USER_WORDS_MS) { fcitx.runOnReady { wordBoundaries(texts) } }.orEmpty()
 
     /** One for each time the microphone opens: it keeps the state of what it has heard. */
     fun vad(assets: AssetManager) = Vad(

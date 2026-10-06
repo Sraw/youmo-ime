@@ -13,11 +13,11 @@ import org.fcitx.fcitx5.android.engine.host.Engines
  * from 89 to some 104 of 138 heard, the rest of the speech much as it was; a larger bonus
  * hears more of them and mishears more of everything else.
  *
- * A word the user blocked is not written, the pack's or not: our sherpa-onnx's beam search
- * (lib/sherpa-onnx) does not let a hypothesis complete one, so the next best is. As a run of
- * characters, so within a longer one too (开饭 blocked, 打开饭盒 is not written either). Only
- * those [spelled]: two to twelve Chinese characters, [MAX_USER] of them; and only once the
- * engine has told the listener the user's words (VoiceEngine.userHotwords waits so long).
+ * A word the user blocked is not written, the pack's or not, as a word: [VoiceBlocking] picks a
+ * hypothesis without it, else our sherpa-onnx's beam search (lib/sherpa-onnx) is told not to let
+ * one complete it. Only those [spelled]: two to twelve Chinese characters, [MAX_USER] of them;
+ * and only once the engine has told the listener the user's words (VoiceEngine.userHotwords
+ * waits so long).
  * Each stream with the user's words holds a graph of the pack's too, some 37 MB.
  */
 object VoiceHotwords {
@@ -46,6 +46,9 @@ object VoiceHotwords {
 
     /** What a stream is told of the user's words: each list's words [spelled], apart by `/`. */
     data class Words(val hotwords: String, val blocked: String) {
+        /** the blocked words as written, not [spelled] */
+        val blockedWords: List<String> get() = blocked.split('/').filter { it.isNotEmpty() }.map { it.replace(" ", "") }
+
         companion object {
             val NONE = Words("", "")
         }

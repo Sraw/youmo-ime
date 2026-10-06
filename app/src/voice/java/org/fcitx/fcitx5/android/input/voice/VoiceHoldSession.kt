@@ -76,7 +76,12 @@ class VoiceHoldSession(
 
     /** The press: the microphone opens now, the models load meanwhile. */
     fun begin() {
-        listener = VoiceListener(service.assets, events) { VoiceEngine.userHotwords(fcitx) }.also {
+        listener = VoiceListener(
+            service.assets,
+            events,
+            hotwords = { VoiceEngine.userHotwords(fcitx) },
+            boundaries = { VoiceEngine.wordBoundaries(fcitx, it) },
+        ).also {
             it.load()
             it.start()
         }

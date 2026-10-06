@@ -72,4 +72,14 @@ class TextWordsTest {
     fun onlyTheEndOfLongTextIsRead() {
         assertEquals(listOf("你好", "吗"), lastTwo("x".repeat(10_000) + "你好".repeat(20) + "吗"))
     }
+
+    @Test
+    fun theWholeTextSplitIntoWords() {
+        assertEquals(listOf(0, 2, 3), words.boundaries("你好吗").toList())
+        assertEquals(listOf(0, 2, 3, 4, 6), words.boundaries("中国人x你好").toList())
+        assertEquals(listOf(0), words.boundaries("").toList())
+        // longer than the window lastTwo looks at
+        val long = "你好吗".repeat(10)
+        assertEquals((0..30).filter { it % 3 != 1 }, words.boundaries(long).toList())
+    }
 }

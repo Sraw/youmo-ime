@@ -4,12 +4,14 @@
  */
 package org.fcitx.fcitx5.android.engine.host
 
-import org.fcitx.fcitx5.android.engine.data.WordLayers
 import org.fcitx.fcitx5.android.engine.data.CodeTable
 import org.fcitx.fcitx5.android.engine.data.CodeTableReader
 import org.fcitx.fcitx5.android.engine.data.DataFormatException
 import org.fcitx.fcitx5.android.engine.data.PinyinData
 import org.fcitx.fcitx5.android.engine.data.SourceException
+import org.fcitx.fcitx5.android.engine.data.WordLayers
+import org.fcitx.fcitx5.android.engine.lattice.LayerPrior
+import org.fcitx.fcitx5.android.engine.lattice.TextWords
 import org.fcitx.fcitx5.android.engine.phrase.CustomPhrases
 import org.fcitx.fcitx5.android.engine.phrase.PhraseBook
 import org.fcitx.fcitx5.android.engine.pinyin.PinyinSegmenter
@@ -19,8 +21,8 @@ import org.fcitx.fcitx5.android.engine.remote.RemoteModel
 import org.fcitx.fcitx5.android.engine.remote.RemoteRefiner
 import org.fcitx.fcitx5.android.engine.rerank.MatrixKernel
 import org.fcitx.fcitx5.android.engine.rerank.Reranker
-import org.fcitx.fcitx5.android.engine.rerank.SentenceRefiner
 import org.fcitx.fcitx5.android.engine.rerank.SentenceModel
+import org.fcitx.fcitx5.android.engine.rerank.SentenceRefiner
 import org.fcitx.fcitx5.android.engine.session.Choice
 import org.fcitx.fcitx5.android.engine.session.Offer
 import org.fcitx.fcitx5.android.engine.session.PinyinSession
@@ -32,7 +34,6 @@ import org.fcitx.fcitx5.android.engine.table.TableOptions
 import org.fcitx.fcitx5.android.engine.table.TableSession
 import org.fcitx.fcitx5.android.engine.table.TableText
 import org.fcitx.fcitx5.android.engine.table.TableUser
-import org.fcitx.fcitx5.android.engine.lattice.LayerPrior
 import org.fcitx.fcitx5.android.engine.user.LibimeImport
 import org.fcitx.fcitx5.android.engine.user.UserModel
 import org.fcitx.fcitx5.android.engine.user.UserModel.Entry
@@ -279,6 +280,11 @@ class Engines(
         }
         return syllables.joinToString(" ") { Syllables.spelling(it) }
     }
+
+    private val textWords by lazy(LazyThreadSafetyMode.NONE) { TextWords(pinyinData.model, pinyinData.wordIndex) }
+
+    /** Where each of [texts] splits into words, as the model finds likeliest: TextWords.boundaries. */
+    fun wordBoundaries(texts: Collection<String>): Map<String, IntArray> = texts.associateWith { textWords.boundaries(it) }
 
     /** Adds [text] read as [pinyin] (see [WordLists.entry]); false if it does not read so. */
     fun addWord(text: String, pinyin: String): Boolean {

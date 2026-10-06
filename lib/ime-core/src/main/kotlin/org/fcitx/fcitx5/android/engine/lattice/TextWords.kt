@@ -25,6 +25,37 @@ class TextWords(private val model: NgramModel, private val index: WordIndex) {
         val from = maxOf(0, text.length - WINDOW)
         val n = text.length - from
         if (n == 0) return IntArray(0)
+        val split = split(text, from)
+        val last = split.word[n]
+        if (last == NO_WORD) return IntArray(0)
+        val begin = split.start[n]
+        // the window holds more than two words can: neither is cut short
+        return if (begin == 0) intArrayOf(last) else intArrayOf(split.word[begin], last)
+    }
+
+    /**
+     * Where [text] splits into words, split whole as [lastTwo] splits its end: the offsets
+     * between them, 0 and the length included, ascending. A char no word covers is one of its own.
+     */
+    fun boundaries(text: CharSequence): IntArray {
+        if (text.isEmpty()) return intArrayOf(0)
+        val split = split(text, 0)
+        val ends = ArrayList<Int>()
+        var end = text.length
+        while (end > 0) {
+            ends += end
+            end = split.start[end]
+        }
+        ends += 0
+        return ends.asReversed().toIntArray()
+    }
+
+    // the likeliest split of text from [from] on, word by word: the word ending at each offset
+    // (relative to from) and where it starts
+    private class Split(val word: IntArray, val start: IntArray)
+
+    private fun split(text: CharSequence, from: Int): Split {
+        val n = text.length - from
         val best = FloatArray(n + 1) { Float.NEGATIVE_INFINITY }
         val word = IntArray(n + 1) { NO_WORD }
         val start = IntArray(n + 1)
@@ -46,11 +77,7 @@ class TextWords(private val model: NgramModel, private val index: WordIndex) {
                 }
             }
         }
-        val last = word[n]
-        if (last == NO_WORD) return IntArray(0)
-        val begin = start[n]
-        // the window holds more than two words can: neither is cut short
-        return if (begin == 0) intArrayOf(last) else intArrayOf(word[begin], last)
+        return Split(word, start)
     }
 
     private companion object {
