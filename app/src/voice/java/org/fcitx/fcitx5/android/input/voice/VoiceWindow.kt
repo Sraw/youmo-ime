@@ -5,10 +5,16 @@
 package org.fcitx.fcitx5.android.input.voice
 
 import android.Manifest
+import android.annotation.SuppressLint
 import android.content.pm.PackageManager
 import android.content.res.ColorStateList
 import android.graphics.drawable.GradientDrawable
+import android.os.Handler
+import android.os.Looper
+import android.text.TextUtils
 import android.view.Gravity
+import android.view.HapticFeedbackConstants
+import android.view.MotionEvent
 import android.view.View
 import android.view.inputmethod.EditorInfo
 import android.widget.FrameLayout
@@ -29,16 +35,16 @@ import org.fcitx.fcitx5.android.input.keyboard.CommonKeyActionListener
 import org.fcitx.fcitx5.android.input.keyboard.CustomGestureView
 import org.fcitx.fcitx5.android.input.keyboard.KeyAction
 import org.fcitx.fcitx5.android.input.keyboard.KeyActionListener
-import org.fcitx.fcitx5.android.input.voice.VoiceSession.Failure
-import org.fcitx.fcitx5.android.input.voice.VoiceSession.State
 import org.fcitx.fcitx5.android.input.wm.InputWindow
 import org.mechdancer.dependency.manager.must
 import splitties.dimensions.dp
 
 /**
- * Voice input, in place of the keyboard, as Sogou's: a big microphone that listens as soon as the
- * panel opens, what is said typed at each pause. A tap on it pauses and resumes; deleting and a
- * new line beside it; the bar's arrow back to the keyboard. Recognized on the phone (VoiceEngine).
+ * Voice input, in place of the keyboard, as WeChat's and Sogou's: a big microphone to hold while
+ * talking, what was said typed when it is let go, dropped if the finger slides up first
+ * ([VoiceHoldSession], as the space key's hold). Rings go out from it with the voice, and what
+ * is heard shows above. Deleting and a new line beside it; the
+ * bar's arrow back to the keyboard. Recognized on the phone (VoiceEngine).
  */
 class VoiceWindow : InputWindow.ExtendedInputWindow<VoiceWindow>(), InputBroadcastReceiver {
 
@@ -47,82 +53,97 @@ class VoiceWindow : InputWindow.ExtendedInputWindow<VoiceWindow>(), InputBroadca
     private val commonKeyActionListener: CommonKeyActionListener by manager.must()
     private val fcitx by manager.fcitx()
 
-    private val session = VoiceSession()
-    private var listener: VoiceListener? = null
-
     override val title: String by lazy { context.getString(R.string.voice_input) }
 
-    private lateinit var status: TextView
-    private lateinit var halo: View
-    private lateinit var wave: VoiceWaveView
+    private val main = Handler(Looper.getMainLooper())
+    private var session: VoiceHoldSession? = null
+    private var downY = 0f
+
+    // this touch started the session: its moves, its lift and its cancel are the session's
+    private var holding = false
+
+    private lateinit var heard: TextView
+    private lateinit var pulse: VoicePulseView
     private lateinit var mic: ImageView
+    private lateinit var micBackground: GradientDrawable
+    private lateinit var label: TextView
 
     override fun onCreateView(): View {
         val ctx = context
-        status = TextView(ctx).apply {
-            textSize = 16f
+        heard = TextView(ctx).apply {
+            textSize = 18f
             gravity = Gravity.CENTER
-            setTextColor(theme.keyTextColor)
+            maxLines = 3
+            // the end of a long one is what was just said
+            ellipsize = TextUtils.TruncateAt.START
         }
-        halo = View(ctx).apply {
-            background = GradientDrawable().apply {
-                shape = GradientDrawable.OVAL
-                setColor(theme.accentKeyBackgroundColor)
-            }
-            alpha = HALO_ALPHA
+        pulse = VoicePulseView(ctx).apply {
+            color = theme.accentKeyBackgroundColor
+            inner = ctx.dp(MIC / 2).toFloat()
+        }
+        micBackground = GradientDrawable().apply {
+            shape = GradientDrawable.OVAL
+            setColor(theme.accentKeyBackgroundColor)
         }
         mic = ImageView(ctx).apply {
             setImageResource(R.drawable.ic_baseline_keyboard_voice_24)
             imageTintList = ColorStateList.valueOf(theme.accentKeyTextColor)
-            scaleType = ImageView.ScaleType.CENTER_INSIDE
-            background = GradientDrawable().apply {
-                shape = GradientDrawable.OVAL
-                setColor(theme.accentKeyBackgroundColor)
-            }
-            setPadding(ctx.dp(22), ctx.dp(22), ctx.dp(22), ctx.dp(22))
-            contentDescription = ctx.getString(R.string.voice_input)
-            setOnClickListener { tapped() }
+            scaleType = ImageView.ScaleType.FIT_CENTER
+            background = micBackground
+            val pad = ctx.dp(MIC_PADDING)
+            setPadding(pad, pad, pad, pad)
+            elevation = ctx.dp(3).toFloat()
+            contentDescription = ctx.getString(R.string.voice_press_to_talk)
+            setOnTouchListener(::touched)
         }
-        val micBox = FrameLayout(ctx).apply {
-            addView(halo, FrameLayout.LayoutParams(ctx.dp(MIC), ctx.dp(MIC), Gravity.CENTER))
+        val stage = FrameLayout(ctx).apply {
+            clipChildren = false
+            addView(pulse, FrameLayout.LayoutParams(-1, -1))
             addView(mic, FrameLayout.LayoutParams(ctx.dp(MIC), ctx.dp(MIC), Gravity.CENTER))
         }
         val row = LinearLayout(ctx).apply {
             gravity = Gravity.CENTER
+            clipChildren = false
             addView(key(R.drawable.ic_baseline_backspace_24, R.string.backspace, FcitxKeyMapping.FcitxKey_BackSpace, repeat = true), side())
-            addView(micBox, LinearLayout.LayoutParams(ctx.dp(MIC * 2), ctx.dp(MIC * 2)))
+            addView(stage, LinearLayout.LayoutParams(ctx.dp(STAGE), ctx.dp(STAGE)))
             addView(key(R.drawable.ic_baseline_keyboard_return_24, R.string.a11y_key_enter, FcitxKeyMapping.FcitxKey_Return, repeat = false), side())
         }
-        wave = VoiceWaveView(ctx).apply { color = theme.accentKeyBackgroundColor }
+        label = TextView(ctx).apply {
+            textSize = 14f
+            gravity = Gravity.CENTER
+            setTextColor(theme.keyTextColor)
+        }
         val hint = TextView(ctx).apply {
             setText(R.string.voice_hint)
-            textSize = 12f
+            textSize = 11f
             gravity = Gravity.CENTER
             setTextColor(theme.altKeyTextColor)
         }
+        idle()
         return LinearLayout(ctx).apply {
             orientation = LinearLayout.VERTICAL
-            gravity = Gravity.CENTER
-            addView(status, LinearLayout.LayoutParams(-1, -2))
-            addView(wave, LinearLayout.LayoutParams(ctx.dp(WAVE_WIDTH), ctx.dp(WAVE_HEIGHT)).apply {
-                gravity = Gravity.CENTER
-                topMargin = ctx.dp(6)
-            })
-            addView(row, LinearLayout.LayoutParams(-1, 0, 1f))
-            addView(hint, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = ctx.dp(12) })
+            gravity = Gravity.CENTER_HORIZONTAL
+            clipChildren = false
+            val pad = ctx.dp(16)
+            setPadding(pad, ctx.dp(8), pad, ctx.dp(10))
+            addView(heard, LinearLayout.LayoutParams(-1, 0, 1f))
+            addView(row, LinearLayout.LayoutParams(-1, -2))
+            addView(label, LinearLayout.LayoutParams(-1, -2))
+            addView(hint, LinearLayout.LayoutParams(-1, -2).apply { topMargin = ctx.dp(6) })
         }
     }
 
     private fun side() = LinearLayout.LayoutParams(context.dp(KEY), context.dp(KEY)).apply {
-        marginStart = context.dp(24)
-        marginEnd = context.dp(24)
+        marginStart = context.dp(12)
+        marginEnd = context.dp(12)
     }
 
     private fun key(icon: Int, description: Int, sym: Int, repeat: Boolean) = CustomGestureView(context).apply {
         background = GradientDrawable().apply {
-            cornerRadius = context.dp(8).toFloat()
+            shape = GradientDrawable.OVAL
             setColor(theme.keyBackgroundColor)
         }
+        elevation = context.dp(1).toFloat()
         addView(ImageView(context).apply {
             setImageResource(icon)
             imageTintList = ColorStateList.valueOf(theme.keyTextColor)
@@ -137,146 +158,148 @@ class VoiceWindow : InputWindow.ExtendedInputWindow<VoiceWindow>(), InputBroadca
         }
     }
 
-    override fun onAttached() {
-        if (!permitted()) session.failed(Failure.NoPermission)
-        sync()
-    }
-
-    /** the field left for the keyboard in: what is recognized once it is left too is dropped */
-    private var leftIn: EditorInfo? = null
-
-    /** back to the keyboard, in the same field: what was said up to now is still typed */
-    override fun onDetached() {
-        // a new field gets a new EditorInfo: the one detached in, compared when the text comes
-        leftIn = service.currentInputEditorInfo
-        close(keepLast = true)
-    }
-
-    /**
-     * The keyboard hidden, the field left, or the view thrown away (a rotation, a theme): the
-     * microphone closes and nothing more is typed, until a tap. Whatever the state: the models
-     * still loading, it must not open once they are in.
-     */
-    override fun onFinishInput() {
-        session.pause()
-        close(keepLast = false)
-        show()
-    }
-
-    /** another field, or the same one restarted (a password field now, perhaps) */
-    override fun onStartInput(info: EditorInfo, capFlags: CapabilityFlags) = onFinishInput()
-
-    private fun close(keepLast: Boolean) {
-        listener?.close(keepLast)
-        listener = null
-        session.unloaded()
-    }
-
-    /** The microphone and the models as [session] wants them: the one place either opens. */
-    private fun sync() {
-        if (service.inPasswordField) session.pause()
-        if (!session.wantsModels) {
-            listener?.stop()
-        } else {
-            val l = listener ?: VoiceListener(service.assets, events) { VoiceEngine.userHotwords(fcitx) }.also {
-                listener = it
-                it.load()
+    // the microphone's own touch: the whole of a hold, down to up, slides included
+    @SuppressLint("ClickableViewAccessibility")
+    private fun touched(v: View, ev: MotionEvent): Boolean {
+        when (ev.actionMasked) {
+            MotionEvent.ACTION_DOWN -> {
+                downY = ev.rawY
+                holding = false
+                press(v)
             }
-            if (session.listening) l.start()
+            // a press while the last is recognized was not one: its cancel drops nothing
+            MotionEvent.ACTION_MOVE -> if (holding) session?.moved(ev.rawY - downY)
+            MotionEvent.ACTION_UP -> if (holding) session?.lift()
+            MotionEvent.ACTION_CANCEL -> if (holding) session?.drop()
         }
-        show()
+        if (ev.actionMasked == MotionEvent.ACTION_UP || ev.actionMasked == MotionEvent.ACTION_CANCEL) holding = false
+        return true
+    }
+
+    private fun press(v: View) {
+        // the last still being recognized: it is typed first, then another
+        if (session?.over == false) return
+        main.removeCallbacksAndMessages(null)
+        when {
+            !permitted() -> {
+                VoicePermissionActivity.start(context)
+                say(R.string.voice_no_permission)
+            }
+            service.inPasswordField -> say(R.string.voice_no_password)
+            else -> {
+                v.parent.requestDisallowInterceptTouchEvent(true)
+                v.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
+                session = VoiceHoldSession(service, fcitx, context.dp(CANCEL).toFloat(), ui) { text ->
+                    // as the emoji's: a pinyin being typed is committed first, not overwritten
+                    commonKeyActionListener.listener.onKeyAction(KeyAction.CommitAction(text), KeyActionListener.Source.Keyboard)
+                }.also { it.begin() }
+                holding = true
+                talking()
+            }
+        }
     }
 
     private fun permitted() =
         ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
 
-    private fun tapped() {
-        if (session.state == State.Failed) {
-            if (session.failure == Failure.NoPermission && !permitted()) {
-                VoicePermissionActivity.start(context)
-                return
-            }
-            // granted meanwhile, in the settings; or the microphone, the models: another try
-            session.reset()
-        } else {
-            session.tap()
-        }
-        sync()
+    /** The field left, the keyboard hidden: what is being said is dropped. */
+    private fun drop() {
+        session?.drop()
+        session = null
+    }
+
+    override fun onAttached() {
+        main.removeCallbacksAndMessages(null)
+        idle()
     }
 
     /**
-     * The listener's, apart: the dependency manager reads a window's supertypes by reflection, and
-     * R8 merges an interface away that only one class implements (a release build crashed on it).
+     * Back to the keyboard: still talking, dropped; let go, what was said is still typed (the
+     * same field, it checks), as it would have been a moment later.
      */
-    private val events = object : VoiceListener.Events {
-        override fun loaded() {
-            session.loaded()
-            sync()
-        }
+    override fun onDetached() {
+        if (session?.released != true) drop()
+    }
 
-        override fun failed(why: Failure) {
-            // the permission's failure stands: it is the one a tap mends
-            if (session.failure != Failure.NoPermission) session.failed(why)
-            close(keepLast = true)
-            show()
-        }
+    override fun onFinishInput() = drop()
 
-        override fun speechStarted() {
-            session.speechStarted()
-            show()
-        }
+    /** another field, or the same one restarted (a password field now, perhaps) */
+    override fun onStartInput(info: EditorInfo, capFlags: CapabilityFlags) = drop()
 
-        override fun speechEnded() {
-            session.speechEnded()
-            show()
-        }
-
-        override fun recognized(text: String) {
-            val typed = session.recognized(text)
-            // nothing said out loud goes into a password, nor into a field it was not said for
-            val sameField = leftIn.let { it == null || it === service.currentInputEditorInfo }
-            if (typed != null && sameField && !service.inPasswordField) {
-                // as the emoji's: a pinyin being typed is committed first, not overwritten
-                commonKeyActionListener.listener.onKeyAction(KeyAction.CommitAction(typed), KeyActionListener.Source.Keyboard)
-            }
-            show()
+    // the ui the session tells, apart: the dependency manager reads a window's supertypes by
+    // reflection, and R8 merges an interface away that only one class implements (a release
+    // build crashed on it)
+    private val ui = object : VoiceHoldSession.Ui {
+        override fun heard(text: String) {
+            heard.text = text
+            heard.setTextColor(theme.keyTextColor)
         }
 
         override fun level(level: Float) {
-            val scale = if (session.listening) 1f + level * HALO_GROWTH else 1f
-            halo.animate().scaleX(scale).scaleY(scale).setDuration(LEVEL_MS).start()
-            wave.level(level)
+            pulse.level(level)
+        }
+
+        override fun zone(cancel: Boolean) {
+            mic.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
+            val color = if (cancel) CANCEL_RED else theme.accentKeyBackgroundColor
+            micBackground.setColor(color)
+            pulse.color = color
+            label.setText(if (cancel) R.string.voice_release_to_cancel else R.string.voice_release_to_type)
+            label.setTextColor(if (cancel) CANCEL_RED else theme.keyTextColor)
+        }
+
+        override fun recognizing() {
+            settle()
+            label.setText(R.string.voice_hold_recognizing)
+        }
+
+        override fun ended(message: Int?) {
+            settle()
+            label.setText(R.string.voice_press_to_talk)
+            if (message == null) {
+                idle()
+            } else {
+                say(message)
+                main.postDelayed(::idle, VoiceHoldSession.MESSAGE_MS)
+            }
         }
     }
 
-    private fun show() {
-        if (!::status.isInitialized) return
-        status.setText(
-            when (session.state) {
-                State.Loading -> R.string.voice_loading
-                State.Listening -> if (session.pending > 0) R.string.voice_recognizing else R.string.voice_listening
-                State.Hearing -> R.string.voice_hearing
-                State.Paused -> if (session.pending > 0) R.string.voice_recognizing else R.string.voice_paused
-                State.Failed -> when (session.failure) {
-                    Failure.NoPermission -> R.string.voice_no_permission
-                    Failure.NoModel -> R.string.voice_no_model
-                    else -> R.string.voice_no_microphone
-                }
-            }
-        )
-        mic.alpha = if (session.listening) 1f else IDLE_ALPHA
-        wave.active = session.listening
-        if (!session.listening) halo.animate().scaleX(1f).scaleY(1f).setDuration(LEVEL_MS).start()
+    private fun talking() {
+        say(R.string.voice_hold_listening)
+        label.setText(R.string.voice_release_to_type)
+        mic.animate().scaleX(PRESSED_SCALE).scaleY(PRESSED_SCALE).setDuration(ANIMATE_MS).start()
+        pulse.active = true
+    }
+
+    // the microphone let go: back to its size and colour, the rings out
+    private fun settle() {
+        mic.animate().scaleX(1f).scaleY(1f).setDuration(ANIMATE_MS).start()
+        pulse.active = false
+        micBackground.setColor(theme.accentKeyBackgroundColor)
+        pulse.color = theme.accentKeyBackgroundColor
+        label.setTextColor(theme.keyTextColor)
+    }
+
+    private fun idle() {
+        heard.setText(R.string.voice_panel_prompt)
+        heard.setTextColor(theme.altKeyTextColor)
+        label.setText(R.string.voice_press_to_talk)
+    }
+
+    private fun say(message: Int) {
+        heard.setText(message)
+        heard.setTextColor(theme.altKeyTextColor)
     }
 
     companion object {
-        private const val MIC = 72
-        private const val KEY = 56
-        private const val HALO_ALPHA = 0.3f
-        private const val HALO_GROWTH = 0.8f
-        private const val IDLE_ALPHA = 0.5f
-        private const val LEVEL_MS = 100L
-        private const val WAVE_WIDTH = 120
-        private const val WAVE_HEIGHT = 32
+        private const val MIC = 76
+        private const val MIC_PADDING = 22
+        private const val STAGE = 136
+        private const val KEY = 52
+        private const val CANCEL = 96
+        private const val PRESSED_SCALE = 1.1f
+        private const val ANIMATE_MS = 150L
+        private const val CANCEL_RED = 0xFFC62828.toInt()
     }
 }

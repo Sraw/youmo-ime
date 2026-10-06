@@ -21,6 +21,7 @@ import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.input.broadcast.ReturnKeyAppearance
 import org.fcitx.fcitx5.android.input.picker.PickerWindow
 import org.fcitx.fcitx5.android.input.popup.PopupAction
+import org.fcitx.fcitx5.android.input.voice.VoiceFeature
 import splitties.views.imageResource
 
 @SuppressLint("ViewConstructor")
@@ -99,9 +100,23 @@ class TextKeyboard(
 
     private val keepLettersUppercase by AppPrefs.getInstance().keyboard.keepLettersUppercase
 
+    private val spaceLongPress = AppPrefs.getInstance().keyboard.spaceKeyLongPressBehavior
+
+    @Keep
+    private val spaceLongPressListener = ManagedPreference.OnChangeListener<SpaceLongPressBehavior> { _, v ->
+        updateSpaceBadge(v)
+    }
+
     init {
         updateLangSwitchKey(showLangSwitchKey.getValue())
         showLangSwitchKey.registerOnChangeListener(showLangSwitchKeyListener)
+        updateSpaceBadge(spaceLongPress.getValue())
+        spaceLongPress.registerOnChangeListener(spaceLongPressListener)
+    }
+
+    // holding the space to talk: a microphone on it says so, or no one would know
+    private fun updateSpaceBadge(behavior: SpaceLongPressBehavior) {
+        space.showBadge(if (behavior == SpaceLongPressBehavior.Voice && VoiceFeature.AVAILABLE) R.drawable.ic_baseline_keyboard_voice_24 else null)
     }
 
     private val textKeys: List<TextKeyView> by lazy {

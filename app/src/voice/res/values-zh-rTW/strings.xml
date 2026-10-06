@@ -1,18 +1,18 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="voice_loading">正在載入語音模型…</string>
-    <string name="voice_listening">請說話</string>
-    <string name="voice_hearing">正在聽…</string>
-    <string name="voice_recognizing">正在辨識…</string>
-    <string name="voice_paused">已暫停，點話筒繼續</string>
-    <string name="voice_no_permission">語音輸入需要麥克風權限，點話筒授權</string>
+    <string name="voice_no_permission">語音輸入需要麥克風權限，按住話筒授權</string>
     <string name="voice_no_model">語音模型載入失敗</string>
     <string name="voice_no_microphone">無法使用麥克風</string>
-    <string name="voice_hint">說完稍停，文字自動上屏。全部在手機上辨識，聲音不會離開手機</string>
+    <string name="voice_hint">全部在手機上辨識，聲音不會離開手機</string>
     <string name="voice_model_credit">語音辨識：X-ASR 中英模型（Gilgamesh-J）；由 sherpa-onnx（k2-fsa）與 silero VAD 執行</string>
     <string name="voice_hold_listening">正在聽…</string>
     <string name="voice_hold_recognizing">辨識中…</string>
     <string name="voice_hold_cancel">鬆開手指，取消輸入</string>
     <string name="voice_hold_hint">鬆開 上屏 · 上滑 取消</string>
     <string name="voice_hold_nothing">沒有聽清</string>
+    <string name="voice_press_to_talk">按住 說話</string>
+    <string name="voice_release_to_type">鬆開 上屏</string>
+    <string name="voice_release_to_cancel">鬆開 取消</string>
+    <string name="voice_panel_prompt">按住話筒說話 · 上滑取消</string>
+    <string name="voice_no_password">密碼框裡不能用語音輸入</string>
 </resources>

@@ -44,9 +44,11 @@ class VoiceListener(
     private val hotwords: suspend () -> String,
 ) {
 
+    enum class Failure { NoModel, NoMicrophone }
+
     interface Events {
         fun loaded()
-        fun failed(why: VoiceSession.Failure)
+        fun failed(why: Failure)
         fun speechStarted()
         fun speechEnded()
         fun recognized(text: String)
@@ -58,7 +60,7 @@ class VoiceListener(
     // a native error is the panel's to show, not the keyboard's to crash on
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO + CoroutineExceptionHandler { _, e ->
         Timber.w(e, "voice")
-        tell { failed(VoiceSession.Failure.NoMicrophone) }
+        tell { failed(Failure.NoMicrophone) }
     })
 
     // one stretch at a time, in the order said
@@ -83,12 +85,8 @@ class VoiceListener(
     @Volatile
     private var closed = false
 
-    /** closed, the stretches heard before are still told (the main thread's, as [closed]) */
-    private var keepLast = false
-
-    /** [stretch]: a stretch recognized, the one event still told after close(keepLast = true) */
-    private fun tell(stretch: Boolean = false, event: Events.() -> Unit) {
-        main.post { if (!closed || (stretch && keepLast)) events.event() }
+    private fun tell(event: Events.() -> Unit) {
+        main.post { if (!closed) events.event() }
     }
 
     fun load() {
@@ -104,7 +102,7 @@ class VoiceListener(
                 Timber.w(e, "voice model")
                 user.cancel()
                 ready.completeExceptionally(e)
-                tell { failed(VoiceSession.Failure.NoModel) }
+                tell { failed(Failure.NoModel) }
                 return@launch
             }
             // acquired, released whatever happens (an Error too) until it is handed over
@@ -123,7 +121,7 @@ class VoiceListener(
                 throw e
             } catch (@Suppress("TooGenericExceptionCaught") e: Exception) {
                 Timber.w(e, "voice stream")
-                tell { failed(VoiceSession.Failure.NoModel) }
+                tell { failed(Failure.NoModel) }
             } finally {
                 if (!handed) {
                     VoiceEngine.release()
@@ -191,14 +189,12 @@ class VoiceListener(
     }
 
     /**
-     * Closes the microphone, for good. [keepLast]: the stretches already heard are still told
-     * (the panel left for the keyboard, in the same field); else nothing more is (the field left,
-     * the keyboard hidden). The recognizer is let go once the last of them is recognized.
+     * Closes the microphone, for good: nothing more is told. The recognizer is let go once what
+     * was heard is recognized.
      */
-    fun close(keepLast: Boolean) {
+    fun close() {
         if (closed) return
         closed = true
-        this.keepLast = keepLast
         stop()
         // still loading: once in, it is let go there, and what waits for it dropped
         recognizer ?: return
@@ -228,7 +224,7 @@ class VoiceListener(
         if (record == null || record.state != AudioRecord.STATE_INITIALIZED) {
             record?.release()
             vad.release()
-            tell { failed(VoiceSession.Failure.NoMicrophone) }
+            tell { failed(Failure.NoMicrophone) }
             return
         }
         try {
@@ -251,7 +247,7 @@ class VoiceListener(
         while (currentCoroutineContext().isActive) {
             val n = record.read(buffer, 0, buffer.size, AudioRecord.READ_BLOCKING)
             if (n < 0) {
-                tell { failed(VoiceSession.Failure.NoMicrophone) }
+                tell { failed(Failure.NoMicrophone) }
                 return
             }
             if (n == 0) continue
@@ -294,7 +290,7 @@ class VoiceListener(
                     Timber.w(e, "recognize")
                     ""
                 }
-                tell(stretch = true) { recognized(text) }
+                tell { recognized(text) }
                 // the next one's, made while it is said, once this one's text is out
                 next = try {
                     VoiceEngine.stream(r, words)

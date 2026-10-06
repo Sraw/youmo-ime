@@ -36,7 +36,9 @@ import org.fcitx.fcitx5.android.utils.unset
 import splitties.dimensions.dp
 import splitties.views.dsl.constraintlayout.centerHorizontally
 import splitties.views.dsl.constraintlayout.centerInParent
+import splitties.views.dsl.constraintlayout.centerVertically
 import splitties.views.dsl.constraintlayout.constraintLayout
+import splitties.views.dsl.constraintlayout.endOfParent
 import splitties.views.dsl.constraintlayout.lParams
 import splitties.views.dsl.constraintlayout.parentId
 import splitties.views.dsl.core.add
@@ -281,6 +283,33 @@ open class TextKeyView(ctx: Context, theme: Theme, def: KeyDef.Appearance.Text) 
                 centerInParent()
             })
         }
+    }
+
+    private var badge: ImageView? = null
+
+    /**
+     * A small icon at the key's end, null for none: what holding it does, where that is not the
+     * usual (voice input on the space).
+     */
+    fun showBadge(@DrawableRes icon: Int?) {
+        if (icon == null) {
+            badge?.let { appearanceView.removeView(it) }
+            badge = null
+            return
+        }
+        val img = badge ?: imageView { configure(theme, icon, Variant.AltForeground) }.also {
+            badge = it
+            appearanceView.add(it, appearanceView.lParams(dp(BADGE), dp(BADGE)) {
+                centerVertically()
+                endOfParent(hMargin + dp(BADGE_MARGIN))
+            })
+        }
+        img.setImageResource(icon)
+    }
+
+    private companion object {
+        const val BADGE = 15
+        const val BADGE_MARGIN = 8
     }
 }
 

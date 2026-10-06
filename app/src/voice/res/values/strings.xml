@@ -1,18 +1,18 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="voice_loading">Loading the speech model…</string>
-    <string name="voice_listening">Speak</string>
-    <string name="voice_hearing">Listening…</string>
-    <string name="voice_recognizing">Recognizing…</string>
-    <string name="voice_paused">Paused: tap the microphone to go on</string>
-    <string name="voice_no_permission">Voice input needs the microphone: tap it to allow</string>
+    <string name="voice_no_permission">Voice input needs the microphone: hold it to allow</string>
     <string name="voice_no_model">The speech model could not be loaded</string>
     <string name="voice_no_microphone">The microphone cannot be used</string>
-    <string name="voice_hint">Pause and what you said is typed. Recognized on the phone: nothing heard leaves it.</string>
+    <string name="voice_hint">Recognized on the phone: nothing heard leaves it.</string>
     <string name="voice_model_credit">Speech recognition: X-ASR zh-en (Gilgamesh-J); run with sherpa-onnx (k2-fsa) and silero VAD</string>
     <string name="voice_hold_listening">Listening…</string>
     <string name="voice_hold_recognizing">Recognizing…</string>
     <string name="voice_hold_cancel">Release to cancel</string>
     <string name="voice_hold_hint">Release to type · slide up to cancel</string>
     <string name="voice_hold_nothing">Didn\'t catch that</string>
+    <string name="voice_press_to_talk">Hold to talk</string>
+    <string name="voice_release_to_type">Release to type</string>
+    <string name="voice_release_to_cancel">Release to cancel</string>
+    <string name="voice_panel_prompt">Hold the microphone and talk · slide up to cancel</string>
+    <string name="voice_no_password">No voice input in a password field</string>
 </resources>

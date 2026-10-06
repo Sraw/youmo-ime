@@ -17,49 +17,45 @@ import android.view.View
 import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.TextView
-import androidx.core.view.ViewCompat
-import androidx.core.view.WindowInsetsCompat
+import androidx.core.graphics.ColorUtils
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.input.BaseInputView
 import org.fcitx.fcitx5.android.input.InputView
 import splitties.dimensions.dp
 
 /**
- * Hold to talk on the space key ([VoiceHold]): over the keyboard while the finger is down, the
- * bars moving with the voice, what is heard so far, and where to slide to drop it; typed into
- * the field ([commit]) once the finger lifts and the last of it is recognized. The keyboard's
- * view stays under it, so the key keeps the touch: [BaseInputView.hold] follows the finger.
+ * Hold to talk on the space key ([VoiceHoldSession]): over the keyboard while the finger is down,
+ * the bars moving with the voice, what is heard so far, and where to slide to drop it; typed into
+ * the field ([commit]) once the finger lifts. All of it in the upper part, the lower left empty:
+ * the finger is on the space, at the bottom, and covers what is under it. The keyboard's view
+ * stays under the overlay, so the key keeps the touch: [BaseInputView.hold] follows the finger.
  */
 class VoiceHoldOverlay(
     private val inputView: InputView,
     private val overlay: FrameLayout,
-    private val commit: (String) -> Unit,
-) : BaseInputView.Hold {
-    private val service = inputView.service
+    commit: (String) -> Unit,
+) : BaseInputView.Hold, VoiceHoldSession.Ui {
     private val theme = inputView.theme
     private val ctx = inputView.context
     private val keyboard = inputView.keyboardView
-    private val hold = VoiceHold(cancelDistance = keyboard.height * CANCEL_SHARE)
 
-    // the field and the finger the long press was for
-    private val field = service.currentInputEditorInfo
+    // the finger the long press was for
     private val pointer = inputView.longPressPointer
     private val downY = inputView.downY(pointer)
 
+    private val session = VoiceHoldSession(inputView.service, inputView.fcitx, keyboard.height * CANCEL_SHARE, this, commit)
     private val main = Handler(Looper.getMainLooper())
-    private var listener: VoiceListener? = null
-    private var over = false
+    private var gone = false
 
     private val talkColor = theme.keyboardColor
-    private val cancelColor = CANCEL_RED
     private val background = GradientDrawable().apply { setColor(talkColor) }
     private var colorAnimator: ValueAnimator? = null
     private var currentColor = talkColor
 
     private val heard = TextView(ctx).apply {
         textSize = 18f
-        gravity = Gravity.CENTER
-        maxLines = 3
+        gravity = Gravity.CENTER or Gravity.BOTTOM
+        maxLines = 2
         // the end of a long one is what was just said
         ellipsize = TextUtils.TruncateAt.START
         setTextColor(theme.keyTextColor)
@@ -67,6 +63,16 @@ class VoiceHoldOverlay(
     private val wave = VoiceWaveView(ctx).apply {
         color = theme.accentKeyBackgroundColor
         active = true
+    }
+
+    // the bars on a pill of their own, as a bubble the voice is in
+    private val pillColor = ColorUtils.setAlphaComponent(theme.accentKeyBackgroundColor, PILL_ALPHA)
+    private val pill = FrameLayout(ctx).apply {
+        background = GradientDrawable().apply {
+            cornerRadius = ctx.dp(PILL_HEIGHT / 2).toFloat()
+            setColor(pillColor)
+        }
+        addView(wave, FrameLayout.LayoutParams(ctx.dp(WAVE_WIDTH), ctx.dp(WAVE_HEIGHT), Gravity.CENTER))
     }
     private val status = TextView(ctx).apply {
         textSize = 15f
@@ -82,47 +88,26 @@ class VoiceHoldOverlay(
     }
     private val card = LinearLayout(ctx).apply {
         orientation = LinearLayout.VERTICAL
-        gravity = Gravity.CENTER
+        gravity = Gravity.CENTER_HORIZONTAL
         background = this@VoiceHoldOverlay.background
-        val pad = ctx.dp(16)
-        // the keyboard's view runs under the navigation bar: the hint above it
-        val bar = ViewCompat.getRootWindowInsets(inputView)?.getInsets(WindowInsetsCompat.Type.navigationBars())?.bottom ?: 0
-        setPadding(pad, pad, pad, pad + bar)
+        val pad = ctx.dp(12)
+        setPadding(pad, pad, pad, 0)
         addView(heard, LinearLayout.LayoutParams(-1, 0, 1f))
-        addView(wave, LinearLayout.LayoutParams(ctx.dp(WAVE_WIDTH), ctx.dp(WAVE_HEIGHT)).apply { gravity = Gravity.CENTER })
-        addView(status, LinearLayout.LayoutParams(-1, -2).apply { topMargin = ctx.dp(12) })
-        addView(hint, LinearLayout.LayoutParams(-1, -2).apply { topMargin = ctx.dp(8) })
+        addView(pill, LinearLayout.LayoutParams(ctx.dp(PILL_WIDTH), ctx.dp(PILL_HEIGHT)).apply { topMargin = ctx.dp(8) })
+        addView(status, LinearLayout.LayoutParams(-1, -2).apply { topMargin = ctx.dp(8) })
+        addView(hint, LinearLayout.LayoutParams(-1, -2).apply { topMargin = ctx.dp(2) })
+        // under the finger: nothing there, it would not be seen. The keyboard's view runs under
+        // the navigation bar too: from where the finger went down to the bottom, and its tip above
+        val under = (keyboard.bottom - downY + ctx.dp(FINGER)).toInt().coerceIn(0, keyboard.height / 2)
+        addView(View(ctx), LinearLayout.LayoutParams(-1, under))
         // a touch on it is the held finger's, not the keys' under it
         isClickable = true
         addOnAttachStateChangeListener(object : View.OnAttachStateChangeListener {
             override fun onViewAttachedToWindow(v: View) = Unit
 
             // the keyboard thrown away under it (hidden, rotated): nothing typed
-            override fun onViewDetachedFromWindow(v: View) = drop()
+            override fun onViewDetachedFromWindow(v: View) = session.drop()
         })
-    }
-
-    private val events = object : VoiceListener.Events {
-        override fun loaded() = Unit
-        override fun speechStarted() = Unit
-        override fun speechEnded() = Unit
-
-        override fun recognized(text: String) {
-            hold.heard(text)
-            heard.text = hold.text
-        }
-
-        override fun level(level: Float) = wave.level(level)
-
-        override fun failed(why: VoiceSession.Failure) {
-            status.setText(
-                when (why) {
-                    VoiceSession.Failure.NoModel -> R.string.voice_no_model
-                    else -> R.string.voice_no_microphone
-                }
-            )
-            end(after = MESSAGE_MS)
-        }
     }
 
     /** The long press has fired: the microphone opens now, the models load meanwhile. */
@@ -132,35 +117,38 @@ class VoiceHoldOverlay(
             topMargin = keyboard.top
         })
         card.alpha = 0f
-        card.scaleX = APPEAR_SCALE
-        card.scaleY = APPEAR_SCALE
-        card.animate().alpha(1f).scaleX(1f).scaleY(1f).setDuration(APPEAR_MS).start()
+        pill.scaleX = APPEAR_SCALE
+        pill.scaleY = APPEAR_SCALE
+        card.animate().alpha(1f).setDuration(APPEAR_MS).start()
+        pill.animate().scaleX(1f).scaleY(1f).setDuration(APPEAR_MS * 2).start()
         inputView.hold = this
-        listener = VoiceListener(service.assets, events) { VoiceEngine.userHotwords(inputView.fcitx) }.also {
-            it.load()
-            it.start()
-        }
+        session.begin()
     }
 
     override fun touched(ev: MotionEvent) {
         // lifted, the rest is the recognizer's: a tap or a stray cancel drops nothing said
-        if (over || hold.released) return
+        if (session.over || session.released) return
         when (ev.actionMasked) {
             MotionEvent.ACTION_MOVE -> {
                 val i = ev.findPointerIndex(pointer)
-                if (i >= 0 && hold.moved(ev.getY(i) - downY)) zoneChanged()
+                if (i >= 0) session.moved(ev.getY(i) - downY)
             }
-            MotionEvent.ACTION_UP -> lifted()
-            MotionEvent.ACTION_POINTER_UP -> if (ev.getPointerId(ev.actionIndex) == pointer) lifted()
-            MotionEvent.ACTION_CANCEL -> drop()
+            MotionEvent.ACTION_UP -> session.lift()
+            MotionEvent.ACTION_POINTER_UP -> if (ev.getPointerId(ev.actionIndex) == pointer) session.lift()
+            MotionEvent.ACTION_CANCEL -> session.drop()
         }
     }
 
     /** another field, or the keyboard hidden: nothing typed, the microphone closed */
-    override fun inputEnded() = drop()
+    override fun inputEnded() = session.drop()
 
-    private fun zoneChanged() {
-        val cancel = hold.zone == VoiceHold.Zone.Cancel
+    override fun heard(text: String) {
+        heard.text = text
+    }
+
+    override fun level(level: Float) = wave.level(level)
+
+    override fun zone(cancel: Boolean) {
         card.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
         status.setText(if (cancel) R.string.voice_hold_cancel else R.string.voice_hold_listening)
         val text = if (cancel) CANCEL_TEXT else theme.keyTextColor
@@ -168,8 +156,9 @@ class VoiceHoldOverlay(
         heard.setTextColor(text)
         hint.visibility = if (cancel) View.INVISIBLE else View.VISIBLE
         wave.color = if (cancel) CANCEL_TEXT else theme.accentKeyBackgroundColor
+        (pill.background as GradientDrawable).setColor(if (cancel) CANCEL_PILL else pillColor)
         colorAnimator?.cancel()
-        colorAnimator = ValueAnimator.ofObject(ArgbEvaluator(), currentColor, if (cancel) cancelColor else talkColor).apply {
+        colorAnimator = ValueAnimator.ofObject(ArgbEvaluator(), currentColor, if (cancel) CANCEL_RED else talkColor).apply {
             duration = APPEAR_MS
             addUpdateListener {
                 currentColor = it.animatedValue as Int
@@ -179,59 +168,37 @@ class VoiceHoldOverlay(
         }
     }
 
-    private fun lifted() {
-        if (!hold.release()) {
-            drop()
-            return
-        }
+    override fun recognizing() {
         status.setText(R.string.voice_hold_recognizing)
         hint.visibility = View.INVISIBLE
         wave.active = false
-        // the models not coming in, or a stretch not coming back: not the keyboard covered for good
-        main.postDelayed(::giveUp, FINISH_MS)
-        listener?.finish {
-            main.removeCallbacksAndMessages(null)
-            val text = hold.text
-            // still the field it was said for: not text landing somewhere else
-            if (text.isNotEmpty() && service.currentInputEditorInfo === field && !service.inPasswordField) {
-                commit(text)
-                end()
-            } else {
-                status.setText(R.string.voice_hold_nothing)
-                end(after = MESSAGE_MS)
-            }
-        }
     }
 
-    /** dropped: nothing typed, whatever was heard */
-    private fun drop() = end()
-
-    private fun giveUp() {
-        status.setText(R.string.voice_hold_nothing)
-        end(after = MESSAGE_MS)
-    }
-
-    private fun end(after: Long = 0L) {
-        if (over) return
-        over = true
+    override fun ended(message: Int?) {
         if (inputView.hold === this) inputView.hold = null
-        listener?.close(keepLast = false)
-        listener = null
+        if (gone) return
+        gone = true
+        message?.let { status.setText(it) }
         main.postDelayed({
             card.animate().alpha(0f).setDuration(APPEAR_MS).withEndAction { overlay.removeView(card) }.start()
-        }, after)
+        }, if (message != null) VoiceHoldSession.MESSAGE_MS else 0L)
     }
 
     companion object {
         // slid up a quarter of the keyboard's height: no slip of the finger, and still in reach
         private const val CANCEL_SHARE = 0.25f
+
+        // how far above the point it touches a finger still covers, in dp
+        private const val FINGER = 32
         private const val CANCEL_RED = 0xFFC62828.toInt()
+        private const val CANCEL_PILL = 0x33FFFFFF
         private const val CANCEL_TEXT = 0xFFFFFFFF.toInt()
-        private const val WAVE_WIDTH = 140
-        private const val WAVE_HEIGHT = 56
-        private const val APPEAR_SCALE = 0.96f
+        private const val PILL_ALPHA = 0x29
+        private const val PILL_WIDTH = 168
+        private const val PILL_HEIGHT = 52
+        private const val WAVE_WIDTH = 104
+        private const val WAVE_HEIGHT = 32
+        private const val APPEAR_SCALE = 0.85f
         private const val APPEAR_MS = 150L
-        private const val MESSAGE_MS = 1200L
-        private const val FINISH_MS = 15_000L
     }
 }

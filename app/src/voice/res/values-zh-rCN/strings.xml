@@ -1,18 +1,18 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="voice_loading">正在载入语音模型…</string>
-    <string name="voice_listening">请说话</string>
-    <string name="voice_hearing">正在听…</string>
-    <string name="voice_recognizing">正在识别…</string>
-    <string name="voice_paused">已暂停，点话筒继续</string>
-    <string name="voice_no_permission">语音输入需要麦克风权限，点话筒授权</string>
+    <string name="voice_no_permission">语音输入需要麦克风权限，按住话筒授权</string>
     <string name="voice_no_model">语音模型载入失败</string>
     <string name="voice_no_microphone">无法使用麦克风</string>
-    <string name="voice_hint">说完稍停，文字自动上屏。全部在手机上识别，声音不会离开手机</string>
+    <string name="voice_hint">全部在手机上识别，声音不会离开手机</string>
     <string name="voice_model_credit">语音识别：X-ASR 中英模型（Gilgamesh-J）；由 sherpa-onnx（k2-fsa）与 silero VAD 运行</string>
     <string name="voice_hold_listening">正在听…</string>
     <string name="voice_hold_recognizing">识别中…</string>
     <string name="voice_hold_cancel">松开手指，取消输入</string>
     <string name="voice_hold_hint">松开 上屏 · 上滑 取消</string>
     <string name="voice_hold_nothing">没有听清</string>
+    <string name="voice_press_to_talk">按住 说话</string>
+    <string name="voice_release_to_type">松开 上屏</string>
+    <string name="voice_release_to_cancel">松开 取消</string>
+    <string name="voice_panel_prompt">按住话筒说话 · 上滑取消</string>
+    <string name="voice_no_password">密码框里不能用语音输入</string>
 </resources>
