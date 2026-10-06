@@ -39,7 +39,7 @@ import splitties.dimensions.dp
  * panel opens, what is said typed at each pause. A tap on it pauses and resumes; deleting and a
  * new line beside it; the bar's arrow back to the keyboard. Recognized on the phone (VoiceEngine).
  */
-class VoiceWindow : InputWindow.ExtendedInputWindow<VoiceWindow>(), InputBroadcastReceiver, VoiceListener.Events {
+class VoiceWindow : InputWindow.ExtendedInputWindow<VoiceWindow>(), InputBroadcastReceiver {
 
     private val service: FcitxInputMethodService by manager.inputMethodService()
     private val theme by manager.theme()
@@ -170,7 +170,7 @@ class VoiceWindow : InputWindow.ExtendedInputWindow<VoiceWindow>(), InputBroadca
         if (!session.wantsModels) {
             listener?.stop()
         } else {
-            val l = listener ?: VoiceListener(service.assets, this).also {
+            val l = listener ?: VoiceListener(service.assets, events).also {
                 listener = it
                 it.load()
             }
@@ -196,42 +196,48 @@ class VoiceWindow : InputWindow.ExtendedInputWindow<VoiceWindow>(), InputBroadca
         sync()
     }
 
-    override fun loaded() {
-        session.loaded()
-        sync()
-    }
-
-    override fun failed(why: Failure) {
-        // the permission's failure stands: it is the one a tap mends
-        if (session.failure != Failure.NoPermission) session.failed(why)
-        close(keepLast = true)
-        show()
-    }
-
-    override fun speechStarted() {
-        session.speechStarted()
-        show()
-    }
-
-    override fun speechEnded() {
-        session.speechEnded()
-        show()
-    }
-
-    override fun recognized(text: String) {
-        val typed = session.recognized(text)
-        // nothing said out loud goes into a password, nor into a field it was not said for
-        val sameField = leftIn.let { it == null || it === service.currentInputEditorInfo }
-        if (typed != null && sameField && !service.inPasswordField) {
-            // as the emoji's: a pinyin being typed is committed first, not overwritten
-            commonKeyActionListener.listener.onKeyAction(KeyAction.CommitAction(typed), KeyActionListener.Source.Keyboard)
+    /**
+     * The listener's, apart: the dependency manager reads a window's supertypes by reflection, and
+     * R8 merges an interface away that only one class implements (a release build crashed on it).
+     */
+    private val events = object : VoiceListener.Events {
+        override fun loaded() {
+            session.loaded()
+            sync()
         }
-        show()
-    }
 
-    override fun level(level: Float) {
-        val scale = if (session.listening) 1f + level * HALO_GROWTH else 1f
-        halo.animate().scaleX(scale).scaleY(scale).setDuration(LEVEL_MS).start()
+        override fun failed(why: Failure) {
+            // the permission's failure stands: it is the one a tap mends
+            if (session.failure != Failure.NoPermission) session.failed(why)
+            close(keepLast = true)
+            show()
+        }
+
+        override fun speechStarted() {
+            session.speechStarted()
+            show()
+        }
+
+        override fun speechEnded() {
+            session.speechEnded()
+            show()
+        }
+
+        override fun recognized(text: String) {
+            val typed = session.recognized(text)
+            // nothing said out loud goes into a password, nor into a field it was not said for
+            val sameField = leftIn.let { it == null || it === service.currentInputEditorInfo }
+            if (typed != null && sameField && !service.inPasswordField) {
+                // as the emoji's: a pinyin being typed is committed first, not overwritten
+                commonKeyActionListener.listener.onKeyAction(KeyAction.CommitAction(typed), KeyActionListener.Source.Keyboard)
+            }
+            show()
+        }
+
+        override fun level(level: Float) {
+            val scale = if (session.listening) 1f + level * HALO_GROWTH else 1f
+            halo.animate().scaleX(scale).scaleY(scale).setDuration(LEVEL_MS).start()
+        }
     }
 
     private fun show() {
