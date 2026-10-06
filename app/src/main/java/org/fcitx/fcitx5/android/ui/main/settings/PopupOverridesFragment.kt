@@ -27,6 +27,7 @@ import com.google.android.material.button.MaterialButton
 import com.google.android.material.R as MaterialR
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
+import org.fcitx.fcitx5.android.input.popup.PopupEditor
 import org.fcitx.fcitx5.android.input.popup.PopupOverrides
 import org.fcitx.fcitx5.android.input.popup.PopupPreset
 import org.fcitx.fcitx5.android.utils.styledColor
@@ -144,43 +145,34 @@ class PopupOverridesFragment : Fragment() {
         val ctx = requireContext()
         val preset = PopupPreset[label]
         val current = overrides
-        val items = current.resolve(label, preset)?.toMutableList() ?: mutableListOf()
-        var selected = -1
+        val editor = PopupEditor(current.resolve(label, preset)?.toList().orEmpty())
         val keys = FlexboxLayout(ctx).apply { flexWrap = FlexWrap.WRAP }
         val empty = text(ctx, getString(R.string.long_press_none), body = true)
         val actions = FlexboxLayout(ctx).apply { flexWrap = FlexWrap.WRAP }
         lateinit var render: () -> Unit
-        // each button with when it applies to the selected index, and what it makes that index
-        fun action(text: Int, enabled: (Int) -> Boolean, act: (Int) -> Int) = MaterialButton(
-            ctx, null, MaterialR.attr.materialButtonOutlinedStyle
-        ).apply {
-            setText(text)
-            setOnClickListener {
-                selected = act(selected)
-                render()
-            }
-        } to enabled
+        // each button with when it applies
         val buttons = listOf(
-            action(R.string.long_press_make_first, { it > 0 }) { i -> items.add(0, items.removeAt(i)); 0 },
-            action(R.string.long_press_move_left, { it > 0 }) { i -> items.add(i - 1, items.removeAt(i)); i - 1 },
-            action(R.string.long_press_move_right, { it in 0 until items.lastIndex }) { i -> items.add(i + 1, items.removeAt(i)); i + 1 },
-            action(R.string.delete, { it >= 0 }) { i -> items.removeAt(i); if (items.isEmpty()) -1 else minOf(i, items.lastIndex) },
-        )
-        buttons.forEach { (button, _) ->
+            R.string.long_press_make_first to (editor::canMakeFirst to editor::makeFirst),
+            R.string.long_press_move_left to (editor::canMoveLeft to editor::moveLeft),
+            R.string.long_press_move_right to (editor::canMoveRight to editor::moveRight),
+            R.string.delete to (editor::canDelete to editor::delete),
+        ).map { (text, action) ->
+            val button = MaterialButton(ctx, null, MaterialR.attr.materialButtonOutlinedStyle).apply {
+                setText(text)
+                setOnClickListener { action.second(); render() }
+            }
             actions.addView(button, FlexboxLayout.LayoutParams(-2, -2).apply { marginEnd = ctx.dp(8) })
+            button to action.first
         }
         render = {
             keys.removeAllViews()
-            items.forEachIndexed { i, item ->
-                keys.addView(KeyCaps.key(ctx, item, "", marked = i == 0, dimmed = false, selected = i == selected).apply {
-                    setOnClickListener {
-                        selected = if (selected == i) -1 else i
-                        render()
-                    }
-                }, otherParams(ctx))
+            editor.items.forEachIndexed { i, item ->
+                val key = KeyCaps.key(ctx, item, "", marked = i == 0, dimmed = false, selected = i == editor.selected)
+                key.setOnClickListener { editor.tap(i); render() }
+                keys.addView(key, otherParams(ctx))
             }
-            empty.isVisible = items.isEmpty()
-            buttons.forEach { (button, enabled) -> button.isEnabled = enabled(selected) }
+            empty.isVisible = editor.items.isEmpty()
+            buttons.forEach { (button, enabled) -> button.isEnabled = enabled() }
         }
         val field = EditText(ctx).apply {
             hint = getString(R.string.long_press_add_hint)
@@ -189,8 +181,7 @@ class PopupOverridesFragment : Fragment() {
             isSingleLine = true
         }
         fun add() {
-            val added = PopupOverrides.tokens(field.text.toString()).distinct().filter { it !in items }
-            items.addAll(added)
+            editor.add(field.text.toString())
             field.text = null
             render()
         }
@@ -219,10 +210,10 @@ class PopupOverridesFragment : Fragment() {
             .setView(ScrollView(ctx).apply { addView(layout) })
             .setPositiveButton(android.R.string.ok) { _, _ ->
                 // a word left typed in the field counts as added
-                items.addAll(PopupOverrides.tokens(field.text.toString()).distinct().filter { it !in items })
+                editor.add(field.text.toString())
                 // putting the built-in list back is not an edit
-                overrides = if (items == preset?.toList().orEmpty()) current.without(label)
-                else current.with(label, items)
+                overrides = if (editor.items == preset?.toList().orEmpty()) current.without(label)
+                else current.with(label, editor.items)
                 rebuild()
             }
             .setNegativeButton(android.R.string.cancel, null)
