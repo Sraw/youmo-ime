@@ -266,6 +266,21 @@ open class InputEditorContractTest {
         )
     )
 
+    @Test
+    fun textAfterCursor() = run(
+        listOf(
+            Scenario("at the end", "abc", 3) { it += "${editor.textAfterCursor(2)}" },
+            Scenario("in the middle", "abcdef", 2) { it += "${editor.textAfterCursor(2)}" },
+            Scenario("more than there is", "abc", 1) { it += "${editor.textAfterCursor(10)}" },
+            Scenario("after a selection", "abcdef", 1, 3) { it += "${editor.textAfterCursor(10)}" },
+            Scenario("after a reversed selection", "abcdef", 3, 1) { it += "${editor.textAfterCursor(10)}" },
+            Scenario("ignores the composing region", "abcdef", 2) {
+                editor.setComposingRegion(2, 4)
+                it += "${editor.textAfterCursor(10)}"
+            },
+        )
+    )
+
     /**
      * Random sequences of every operation, text with surrogate pairs and the odd lone surrogate,
      * positions in and out of range. Seeded, so a failure names a reproducible sequence.

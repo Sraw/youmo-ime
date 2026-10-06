@@ -36,6 +36,9 @@ class EditingSession(
     /** The range currently held as composing text, in editor coordinates. */
     val composing = CursorRange()
 
+    /** Brackets and quotes typed in pairs, in this editor. */
+    val pairs = AutoPairs(this, editor)
+
     /** The content of that range, as fcitx formatted it. */
     var composingText: FormattedText = FormattedText.Empty
         private set
@@ -115,6 +118,9 @@ class EditingSession(
             return CursorUpdate.None
         }
         selection.resetTo(selStart, selEnd)
+        // the user moved the cursor, or the app changed the text: the pairs are not around it,
+        // unless it moved within what is composed between them
+        if (selStart != selEnd || !composing.contains(selStart)) pairs.forget()
         // a selection (rather than a cursor) leaves the composition to the next cursor report
         if (selStart != selEnd) return CursorUpdate.None
         if (composing.isEmpty()) return CursorUpdate.ResetIfNotEmpty
@@ -250,6 +256,8 @@ class EditingSession(
         if (!editor.isAvailable) return
         val lastSelection = selection.latest
         if (lastSelection.isEmpty()) return
+        // what the pairs were laid out in is not there to the same length
+        pairs.forget()
         selection.predict(lastSelection.start)
         if (composing.isEmpty()) {
             editor.commitText("", 1)
@@ -310,6 +318,7 @@ class EditingSession(
     fun deleteSurrounding(before: Int, after: Int, inCodePoints: Boolean) {
         checkThread()
         if (!editor.isAvailable) return
+        pairs.forget()
         val (overhangBefore, overhangAfter) = composingOverhang()
         if (before > 0) {
             // null: malformed text, which the editor refuses to delete at all

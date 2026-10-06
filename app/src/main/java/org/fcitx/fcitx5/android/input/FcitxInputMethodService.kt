@@ -72,6 +72,7 @@ import org.fcitx.fcitx5.android.data.prefs.ManagedPreferenceProvider
 import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.input.cursor.CursorRange
+import org.fcitx.fcitx5.android.input.editing.ContextMemory
 import org.fcitx.fcitx5.android.input.editing.EditingSession
 import org.fcitx.fcitx5.android.input.editing.EditorKeyPolicy
 import org.fcitx.fcitx5.android.input.editing.ForwardedKeys
@@ -149,6 +150,10 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     private val prefs = AppPrefs.getInstance()
     private val inlineSuggestions by prefs.keyboard.inlineSuggestions
     private val ignoreSystemCursor by prefs.advanced.ignoreSystemCursor
+    private val autoPairs by prefs.keyboard.autoPairs
+
+    /** What was written in each app, the engine's context where a field has none of its own. */
+    private val contextMemory = ContextMemory()
 
     private val recreateInputViewPrefs: Array<ManagedPreference<*>> = arrayOf(
         prefs.keyboard.expandKeypressArea,
@@ -243,7 +248,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     private fun handleFcitxEvent(event: FcitxEvent<*>) {
         when (event) {
             is FcitxEvent.CommitStringEvent -> {
-                commitText(event.data.text, event.data.cursor)
+                commitTyped(event.data.text, event.data.cursor)
             }
             is FcitxEvent.KeyEvent -> event.data.let event@{
                 if (it.states.virtual) {
@@ -254,7 +259,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
                         FcitxKeyMapping.FcitxKey_Left -> handleArrowKey(EditorKeyPolicy.Direction.Left)
                         FcitxKeyMapping.FcitxKey_Right -> handleArrowKey(EditorKeyPolicy.Direction.Right)
                         else -> if (it.unicode > 0) {
-                            commitText(Character.toString(it.unicode))
+                            commitTyped(Character.toString(it.unicode))
                         } else {
                             Timber.w("Unhandled Virtual KeyEvent: $it")
                         }
@@ -314,12 +319,36 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
 
     private fun handleDeleteSurrounding(before: Int, after: Int) {
         editingSession.deleteSurrounding(before, after, inCodePoints = true)
+        repeat(before) { contextMemory.deleted() }
     }
 
     private fun handleBackspaceKey() {
+        val deleting = selection.latest
+        if (deleting.isNotEmpty()) contextMemory.cut() else if (deleting.start > 0) contextMemory.deleted()
+        // an empty pair put in goes whole: its closing one here, the opening one as ever
+        if (pairing) editingSession.pairs.backspace()
         if (!editingSession.backspace(currentInputEditorInfo.toEditorTraits())) {
             sendDownUpKeyEvents(KeyEvent.KEYCODE_DEL)
         }
+    }
+
+    /**
+     * Brackets and quotes typed in pairs, where the user wants it -- not in a password, where
+     * what is typed is all there is, nor where the editor takes key events only.
+     */
+    private val pairing get() = autoPairs && !inPasswordField && !currentInputEditorInfo.isTypeNull()
+
+    /** What the user typed, a key or the engine's commit: a bracket or quote may go in paired. */
+    private fun commitTyped(text: String, cursor: Int = -1) {
+        if (cursor != -1 || !pairing || !editingSession.pairs.type(text)) {
+            // fcitx's punctuation may put a pair in itself, the cursor between
+            val start = selection.latest.start.takeIf { editingSession.composing.isEmpty() }
+            commitText(text, cursor)
+            if (pairing && start != null) editingSession.pairs.committed(text, cursor, start)
+            return
+        }
+        // paired or stepped over: either way the cursor is after [text]
+        contextMemory.committed(text, now = SystemClock.elapsedRealtime())
     }
 
     private fun handleReturnKey() {
@@ -345,7 +374,10 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         }
     }
 
-    fun commitText(text: String, cursor: Int = -1) = editingSession.commitText(text, cursor)
+    fun commitText(text: String, cursor: Int = -1) {
+        editingSession.commitText(text, cursor)
+        contextMemory.committed(text, cursor, SystemClock.elapsedRealtime())
+    }
 
     private fun sendDownKeyEvent(eventTime: Long, keyEventCode: Int, metaState: Int = 0) {
         currentInputConnection?.sendKeyEvent(
@@ -644,6 +676,11 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         resetComposingState()
         val flags = CapabilityFlags.fromEditorInfo(attribute)
         capabilityFlags = flags
+        editingSession.pairs.forget()
+        // nothing of a password or a field that asks not to be learned from is kept
+        contextMemory.focus(
+            "${attribute.packageName}#${attribute.fieldId}".takeUnless { flags.hasAny(CapabilityFlag.PasswordOrSensitive) }
+        )
         // EditorInfo may change between onStartInput and onStartInputView
         inputDeviceMgr.notifyOnStartInput(attribute)
         Timber.d("onStartInput: initialSel=${selection.current}, restarting=$restarting")
@@ -666,12 +703,16 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
             }
         }
         if (!isNullType) {
-            tellTextBeforeCursor {
-                // an editor that gives no initial text may still answer the connection
-                val initial =
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) attribute.getInitialTextBeforeCursor(ContextChars, 0)
-                    else null
-                initial ?: currentInputConnection?.getTextBeforeCursor(ContextChars, 0)
+            // an editor that gives no initial text may still answer the connection
+            val initial = Build.VERSION.SDK_INT >= Build.VERSION_CODES.R
+            tellTextBeforeCursor(
+                after = {
+                    (if (initial) attribute.getInitialTextAfterCursor(1, 0) else null)
+                        ?: currentInputConnection?.getTextAfterCursor(1, 0)
+                },
+            ) {
+                (if (initial) attribute.getInitialTextBeforeCursor(ContextChars, 0) else null)
+                    ?: currentInputConnection?.getTextBeforeCursor(ContextChars, 0)
             }
         }
     }
@@ -714,11 +755,15 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         candidatesEnd: Int
     ) {
         Timber.d("onUpdateSelection: old=[$oldSelStart,$oldSelEnd] new=[$newSelStart,$newSelEnd] cand=[$candidatesStart,$candidatesEnd]")
-        handleCursorUpdate(
-            editingSession.onCursorUpdate(
-                newSelStart, newSelEnd, candidatesStart, candidatesEnd, ignoreSystemCursor
-            )
+        val quoteOpen = editingSession.pairs.quoteOpen
+        val update = editingSession.onCursorUpdate(
+            newSelStart, newSelEnd, candidatesStart, candidatesEnd, ignoreSystemCursor
         )
+        // the user left a “” put in without typing its ”: fcitx's punctuation still counts the “
+        // open, and would make the next quote a lone ”. Nothing composed is lost (the cursor
+        // left it, finished in place), and the context the update tells fcitx comes after
+        if (quoteOpen && !editingSession.pairs.quoteOpen && editingSession.composing.isEmpty()) postFcitxJob { reset() }
+        handleCursorUpdate(update)
         inputView?.updateSelection(newSelStart, newSelEnd)
     }
 
@@ -808,10 +853,18 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
      * What the engine's input follows, after fcitx is done with what was there: not read at all
      * in a password or other sensitive field, where the engine learns nothing either.
      */
-    private inline fun tellTextBeforeCursor(read: () -> CharSequence?) {
+    private inline fun tellTextBeforeCursor(
+        after: () -> CharSequence? = { currentInputConnection?.getTextAfterCursor(1, 0) },
+        read: () -> CharSequence?,
+    ) {
         if (capabilityFlags.hasAny(CapabilityFlag.PasswordOrSensitive)) return
         val before = read()?.toString() ?: return
-        postFcitxJob { engineContext(before) }
+        // a field with nothing in it, as a chat's box once a message is sent: what was written
+        // in it last is the context, if still fresh; asked only then, a round trip
+        val now = SystemClock.elapsedRealtime()
+        val empty = if (before.isEmpty() && contextMemory.remembers(now)) after()?.isEmpty() else false
+        val context = contextMemory.context(before, empty, now)
+        postFcitxJob { engineContext(context) }
     }
 
     private fun updateComposingText(text: FormattedText) =

@@ -4,6 +4,8 @@
  */
 package org.fcitx.fcitx5.android.core
 
+import android.text.InputType
+import android.view.inputmethod.EditorInfo
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -19,5 +21,14 @@ class CapabilityFlagsTest {
         assertTrue(incognito.hasAny(CapabilityFlag.PasswordOrSensitive))
         assertFalse(password.has(CapabilityFlag.PasswordOrSensitive))
         assertFalse(CapabilityFlags(CapabilityFlag.Preedit).hasAny(CapabilityFlag.PasswordOrSensitive))
+    }
+
+    @Test
+    fun aPinIsAPassword() {
+        fun flags(type: Int) = CapabilityFlags.fromEditorInfo(EditorInfo().apply { inputType = type })
+        val pin = flags(InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_VARIATION_PASSWORD)
+        assertTrue(pin.has(CapabilityFlag.Password))
+        // a signed number shares no bit of the variation
+        assertFalse(flags(InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_FLAG_SIGNED).has(CapabilityFlag.Password))
     }
 }

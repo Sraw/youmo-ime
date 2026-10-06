@@ -43,6 +43,9 @@ class InputConnectionEditor(private val connection: () -> InputConnection?) : In
     override fun textBeforeCursor(length: Int): CharSequence? =
         connection()?.getTextBeforeCursor(length, 0)
 
+    override fun textAfterCursor(length: Int): CharSequence? =
+        connection()?.getTextAfterCursor(length, 0)
+
     override fun deleteSurroundingText(
         before: Int,
         after: Int,

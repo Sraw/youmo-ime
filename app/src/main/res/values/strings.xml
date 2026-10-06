@@ -256,6 +256,7 @@
     <string name="clipboard_clear_urls">Remove tracking parameters from links</string>
     <string name="clipboard_clear_urls_summary">Clean copied links with ClearURLs rules before they enter clipboard history. The system clipboard is left unchanged.</string>
     <string name="restart_to_apply_settings">Application will restart to apply new settings. Proceed?</string>
+    <string name="auto_pairs">Type brackets and quotes in pairs</string>
     <string name="space_swipe_move_cursor">Swipe on space key to move cursor</string>
     <string name="please_wait">Please wait…</string>
     <string name="rotate">Rotate</string>

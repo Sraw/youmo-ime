@@ -256,6 +256,7 @@
     <string name="clipboard_clear_urls">去除链接中的跟踪参数</string>
     <string name="clipboard_clear_urls_summary">复制的链接存入剪贴板历史前，按 ClearURLs 规则清理。不改动系统剪贴板。</string>
     <string name="restart_to_apply_settings">应用将重启以应用新设置。继续吗？</string>
+    <string name="auto_pairs">括号和引号成对输入，光标停在中间</string>
     <string name="space_swipe_move_cursor">划动空格键以移动光标</string>
     <string name="please_wait">请稍候…</string>
     <string name="rotate">旋转</string>

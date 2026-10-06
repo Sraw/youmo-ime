@@ -43,6 +43,12 @@ interface InputEditor {
     fun textBeforeCursor(length: Int): CharSequence?
 
     /**
+     * Up to [length] UTF-16 units immediately after the cursor (after the selection end, when
+     * there is a selection), or null when the editor will not say.
+     */
+    fun textAfterCursor(length: Int): CharSequence?
+
+    /**
      * Deletes around the selection -- widened to include the composing region, as editors do.
      *
      * @param inCodePoints delete whole code points rather than UTF-16 units, so one press

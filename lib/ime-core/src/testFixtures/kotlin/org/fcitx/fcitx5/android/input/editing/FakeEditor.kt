@@ -150,6 +150,14 @@ class FakeEditor(
         }
     }
 
+    override fun textAfterCursor(length: Int): CharSequence? {
+        calls += "textAfterCursor($length)"
+        val limit = revealLimit ?: return null
+        val b = maxOf(selectionStart, selectionEnd)
+        val n = minOf(length, limit, buffer.length - b)
+        return buffer.substring(b, b + maxOf(n, 0))
+    }
+
     override fun textBeforeCursor(length: Int): CharSequence? {
         calls += "textBeforeCursor($length)"
         val limit = revealLimit ?: return null
