@@ -109,7 +109,7 @@ class CodeTableReaderTest {
     }
 
     @Test
-    fun newWordsGoInWhereTheirCodeIsFree() {
+    fun newWordsGoInBeforeTheTablesOwnOfTheirCode() {
         val reader = read(
             """
             键码=abcdefgh
@@ -133,22 +133,23 @@ class CodeTableReaderTest {
         )
         val added = TableText.addWords(
             reader,
-            // known; coded; code taken by an earlier new word; known; the code of an entry (式子
-            // is ac+dh, 样's); no code for 无; a single character
+            // known; coded; no rule for three; coded; known; under the code of an entry (式子 is
+            // ac+dh, 样's); no code for 无; a single character
             listOf("工作", "内卷", "内卷儿", "作工", "工作", "式子", "工无", "工"),
         )
-        assertEquals(2, added)
+        assertEquals(3, added)
         val table = reader.table()
+        // the best first, before what the table had under the code
         assertEquals(listOf("内卷"), table.texts("efgh"))
         assertEquals(listOf("作工"), table.texts("cdab"))
         assertEquals(listOf("工作"), table.texts("abcd"))
-        assertEquals(listOf("样"), table.texts("acdh"))
+        assertEquals(listOf("式子", "样"), table.texts("acdh"))
         // no rules, no words
         assertEquals(0, TableText.addWords(read("键码=a\n[数据]\na 工\n"), listOf("工工")))
     }
 
     @Test
-    fun newWordsChangeNothingTheTablesShorterCodesDo() {
+    fun newWordsChangeNotWhatTheTablesShorterCodesDo() {
         val reader = read(
             """
             键码=abcdefgh
@@ -171,13 +172,33 @@ class CodeTableReaderTest {
         val added = TableText.addWords(
             reader,
             // ccdd: cc led to ccda, ccd to it too, and comes after it; abba: aba led nowhere, 顶屏
-            // there; 内式 is ccce, and ccc led nowhere; efab is a pinyin spelling
+            // there; 内式 is ccce, and ccc led nowhere; efab is a pinyin spelling; 式卷 (cedd) and
+            // 式内 (cecc): ced and cec led nowhere
             listOf("内卷", "工作", "内式", "子工", "式卷", "式内"),
         )
-        // 式卷 (cedd): ce led only to 式, which commits itself; 式内 (cecc) as much
         assertEquals(1, added)
         assertEquals(listOf("内卷"), reader.table().texts("ccdd"))
+    }
 
+    @Test
+    fun newWordsUnderOneCodeGoTheBestFirstAndALoneShorterCodeTakesThem() {
+        val reader = read(
+            """
+            键码=abcdefgh
+            码长=4
+            [组词规则]
+            e2=p11+p12+p21+p22
+            [数据]
+            ab 工
+            cd 作
+            cd 做
+            abc 式
+            """,
+        )
+        // 工做 and 工作 both abcd, in the order given; abc led to 式 alone, which now waits for a key
+        assertEquals(2, TableText.addWords(reader, listOf("工做", "工作", "工作")))
+        assertEquals(listOf("工做", "工作"), reader.table().texts("abcd"))
+        assertEquals(listOf("式", "工做", "工作"), reader.table().prefixRange("abc").map { reader.table().text(it) })
     }
 
     @Test

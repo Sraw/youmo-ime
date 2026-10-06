@@ -34,16 +34,16 @@ object TableText {
 
     /**
      * Adds [words], the best first, to the table [reader] read (its phrases coded), each coded by
-     * its 组词规则 -- so a 五笔 user types 内卷 as the rules spell it -- where that leaves what
-     * the table's codes do as it was:
-     * - not a word it has, nor one under a code it uses or leads on to: a second entry under a
-     *   code would stop the first committing itself (五笔's 唯一自动上屏);
-     * - each shorter code it starts with led somewhere already, to more than one text, and to
-     *   something it comes after: else a key that led nowhere and committed (顶屏) would lead on,
-     *   a lone candidate would no longer commit itself, or the first candidate of the shorter
-     *   code, which space commits, would be another;
-     * - nor a pinyin entry's spelling (五笔拼音), which a code of its own would be put before.
-     * A table without rules gets none.
+     * its 组词规则 -- so a 五笔 user types 内卷 as the rules spell it -- before the table's own
+     * entries of its code, new words being what is wanted: what had the code, or the code one
+     * shorter, alone no longer commits itself (唯一自动上屏), and where it was first for a shorter
+     * code too, the new word is first there. What else the table's shorter codes do stays as it was:
+     * - each shorter code it starts with led somewhere already: else a key that led nowhere and
+     *   committed (顶屏) would lead on;
+     * - and to its own code or one it comes after: else the first candidate of the shorter code,
+     *   which space commits, would be another;
+     * - nor is it a pinyin entry's spelling (五笔拼音), which a code of its own would be put before.
+     * Not a word the table has; a table without rules gets none.
      *
      * @return how many were added
      */
@@ -53,24 +53,20 @@ object TableText {
         val dictionary = TableDictionary(table)
         val texts = HashSet<String>(table.size)
         for (i in 0 until table.size) texts += table.text(i)
-        // codes added, all of the longest length: none leads on to another
-        val taken = HashSet<String>()
         var added = 0
         val marker = dictionary.pinyinMarker
-        // ranked with no picks, an entry is after one of a code no longer and earlier in the table;
-        // and a shorter code with one text only commits it by itself, which a second would stop
+        // ranked with no picks, an entry is after one of a code no longer and earlier in the table
         fun follows(code: String) = (1 until code.length).all { n ->
             val shorter = table.prefixRange(code.substring(0, n))
-            !shorter.isEmpty() && table.code(shorter.first) < code &&
-                shorter.any { table.text(it) != table.text(shorter.first) }
+            !shorter.isEmpty() && table.code(shorter.first) <= code
         }
-        fun free(code: String) = code.length == dictionary.maxLength && code !in taken && table.prefixRange(code).isEmpty() &&
+        // of the longest length: no code leads on from it
+        fun fits(code: String) = code.length == dictionary.maxLength &&
             (marker == null || table.prefixRange("$marker$code").isEmpty()) && follows(code)
         for (word in words) {
-            val code = word.takeIf { it.length >= 2 && it !in texts }?.let(dictionary::encode)?.takeIf(::free) ?: continue
-            taken += code
+            val code = word.takeIf { it.length >= 2 && it !in texts }?.let(dictionary::encode)?.takeIf(::fits) ?: continue
             texts += word
-            reader.builder.entry(code, word)
+            reader.builder.lead(code, word)
             added++
         }
         return added

@@ -744,7 +744,7 @@ private fun table(output: String, input: String, words: String?, out: Appendable
         val pack = File(words).useLines { WordPack.parse(it, words) }
         val all = pack.words.sortedByDescending { it.score }.map { it.entry.text }
         val added = TableText.addWords(reader, all)
-        out.appendLine("${pack.layer}: $added of ${all.size} words added, the rest known, uncodable or clashing")
+        out.appendLine("${pack.layer}: $added of ${all.size} words added, the rest known, uncodable or changing a shorter code")
     }
     if (reader.strayCodes.isNotEmpty()) {
         out.appendLine("${reader.strayCodes.size} entries use characters outside 键码, e.g. " +
