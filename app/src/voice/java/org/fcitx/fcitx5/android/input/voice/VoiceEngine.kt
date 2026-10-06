@@ -11,6 +11,7 @@ import com.k2fsa.sherpa.onnx.FeatureConfig
 import com.k2fsa.sherpa.onnx.OfflineModelConfig
 import com.k2fsa.sherpa.onnx.OfflineRecognizer
 import com.k2fsa.sherpa.onnx.OfflineRecognizerConfig
+import com.k2fsa.sherpa.onnx.OfflineStream
 import com.k2fsa.sherpa.onnx.OfflineTransducerModelConfig
 import com.k2fsa.sherpa.onnx.SileroVadModelConfig
 import com.k2fsa.sherpa.onnx.Vad
@@ -31,6 +32,7 @@ object VoiceEngine {
     private const val DIR = "voice"
     private const val KEEP_MS = 2 * 60 * 1000L
     private const val THREADS = 4
+    private const val BEAM = 4
 
     private val lock = Any()
     private var recognizer: OfflineRecognizer? = null
@@ -71,9 +73,16 @@ object VoiceEngine {
         return history.before(segment.start.toLong(), LEAD_IN) + segment.samples
     }
 
-    /** A stretch of speech to text. */
-    fun recognize(r: OfflineRecognizer, samples: FloatArray): String {
-        val stream = r.createStream()
+    /**
+     * A stream to recognize a stretch in, listening for [hotwords] (VoiceHotwords.ofUser) besides
+     * the pack's. With some, the recognizer builds its graph of hotwords again, the pack's 78
+     * thousand too: a tenth of a second or more, so made before the stretch it is for.
+     */
+    fun stream(r: OfflineRecognizer, hotwords: String): OfflineStream =
+        if (hotwords.isEmpty()) r.createStream() else r.createStream(hotwords)
+
+    /** A stretch of speech to text, in [stream], which it releases. */
+    fun recognize(r: OfflineRecognizer, stream: OfflineStream, samples: FloatArray): String {
         return try {
             stream.acceptWaveform(samples, SAMPLE_RATE)
             r.decode(stream)
@@ -112,6 +121,13 @@ object VoiceEngine {
             ),
             tokens = "$DIR/tokens.txt",
             numThreads = THREADS,
+            modelingUnit = "bpe",
+            bpeVocab = "$DIR/bpe.vocab",
         ),
+        // hotwords need the beam search; it is no slower here than the greedy one
+        decodingMethod = "modified_beam_search",
+        maxActivePaths = BEAM,
+        hotwordsFile = "$DIR/hotwords.txt",
+        hotwordsScore = VoiceHotwords.SCORE,
     )
 }

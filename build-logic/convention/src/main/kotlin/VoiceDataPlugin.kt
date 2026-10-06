@@ -18,6 +18,7 @@ import org.gradle.api.tasks.PathSensitivity
 import org.gradle.api.tasks.TaskAction
 import org.gradle.kotlin.dsl.configure
 import org.gradle.kotlin.dsl.getByType
+import org.gradle.kotlin.dsl.named
 import org.gradle.kotlin.dsl.register
 
 /**
@@ -33,6 +34,9 @@ import org.gradle.kotlin.dsl.register
  *   but for those five to fifteen times slower, the fastest, and the smallest; and, a transducer,
  *   it takes hotwords. Numbers it writes in characters: VoiceText puts them in digits.
  * - silero VAD (MIT): where a stretch of speech ends.
+ * - Hotwords: the new-word pack (EngineDataPlugin's `downloadEngineWords`), each word's characters
+ *   apart by spaces as VoiceHotwords.spelled has them, and the model's BPE vocabulary, which
+ *   sherpa-onnx encodes them with, read out of its SentencePiece model.
  *
  * Downloaded once, SHA-256 checked (EngineDataPlugin.DownloadTask), into the voice variants'
  * assets under `voice/`, uncompressed: read whole into memory as the recognizer loads them.
@@ -85,9 +89,11 @@ class VoiceDataPlugin : Plugin<Project> {
             sha256.set(VAD_SHA256)
             outputFile.set(downloadsDir.file("silero_vad.onnx"))
         }
+        val words = target.tasks.named<EngineDataPlugin.DownloadTask>("downloadEngineWords")
         val assets = target.tasks.register<CopyVoiceModels>("copyVoiceModels") {
             model.set(modelDir.flatMap { it.outputDir })
             this.vad.set(vad.flatMap { it.outputFile })
+            this.words.set(words.flatMap { it.outputFile })
             outputDir.set(target.layout.buildDirectory.dir("generated/voice-assets"))
         }
 
@@ -103,7 +109,7 @@ class VoiceDataPlugin : Plugin<Project> {
         }
     }
 
-    /** The model and its tokens, and the VAD, as `voice/` in the assets. */
+    /** The model and its tokens, the VAD and the hotwords, as `voice/` in the assets. */
     abstract class CopyVoiceModels : DefaultTask() {
         @get:InputDirectory
         @get:PathSensitive(PathSensitivity.RELATIVE)
@@ -112,6 +118,10 @@ class VoiceDataPlugin : Plugin<Project> {
         @get:InputFile
         @get:PathSensitive(PathSensitivity.NAME_ONLY)
         abstract val vad: RegularFileProperty
+
+        @get:InputFile
+        @get:PathSensitive(PathSensitivity.NAME_ONLY)
+        abstract val words: RegularFileProperty
 
         @get:OutputDirectory
         abstract val outputDir: DirectoryProperty
@@ -124,6 +134,73 @@ class VoiceDataPlugin : Plugin<Project> {
             val dir = model.get().asFile.resolve(MODEL_NAME)
             for ((name, asset) in MODEL_FILES) dir.resolve(name).copyTo(out.resolve(asset))
             vad.get().asFile.copyTo(out.resolve("silero_vad.onnx"))
+            out.resolve("bpe.vocab").writeText(vocabulary(dir.resolve("bpe.model").readBytes()))
+            out.resolve("hotwords.txt").writeText(hotwords(words.get().asFile.readLines()))
+        }
+
+        // as VoiceHotwords.spelled: all Chinese, two to twelve characters, a token each
+        private fun hotwords(lines: List<String>) = lines.asSequence()
+            .filterNot { it.startsWith("#") }
+            .map { it.substringBefore('\t') }
+            .filter { w -> w.length in 2..12 && w.all { !it.isSurrogate() && Character.UnicodeScript.of(it.code) == Character.UnicodeScript.HAN } }
+            .distinct()
+            .joinToString("") { it.toList().joinToString(" ") + "\n" }
+
+        /**
+         * A SentencePiece model's pieces and their scores, `piece<TAB>score` a line, as
+         * sherpa-onnx's bpe_vocab has them (its export_bpe_vocab.py, without the protobuf
+         * library): ModelProto's field 1, each a SentencePiece of piece (1) and score (2).
+         */
+        private fun vocabulary(model: ByteArray): String {
+            val out = StringBuilder()
+            Proto(model).fields { field, piece ->
+                if (field != 1 || piece !is ByteArray) return@fields
+                var text = ""
+                var score = 0f
+                Proto(piece).fields { f, v ->
+                    if (f == 1 && v is ByteArray) text = String(v, Charsets.UTF_8)
+                    if (f == 2 && v is Int) score = Float.fromBits(v)
+                }
+                out.append(text).append('\t').append(score).append('\n')
+            }
+            return out.toString()
+        }
+    }
+
+    /** The fields of a protobuf message: a varint as a Long, fixed32 as an Int, bytes as bytes. */
+    private class Proto(private val bytes: ByteArray) {
+        private var at = 0
+
+        private fun varint(): Long {
+            var value = 0L
+            var shift = 0
+            while (true) {
+                val b = bytes[at++].toInt()
+                value = value or ((b and 0x7f).toLong() shl shift)
+                if (b and 0x80 == 0) return value
+                shift += 7
+            }
+        }
+
+        private fun fixed(n: Int): Long {
+            var value = 0L
+            for (i in 0 until n) value = value or ((bytes[at++].toLong() and 0xff) shl (8 * i))
+            return value
+        }
+
+        fun fields(each: (Int, Any) -> Unit) {
+            while (at < bytes.size) {
+                val key = varint()
+                val field = (key ushr 3).toInt()
+                val value: Any = when ((key and 7).toInt()) {
+                    0 -> varint()
+                    1 -> fixed(8)
+                    2 -> varint().toInt().let { n -> bytes.copyOfRange(at, at + n).also { at += n } }
+                    5 -> fixed(4).toInt()
+                    else -> error("protobuf wire type ${key and 7} in a SentencePiece model")
+                }
+                each(field, value)
+            }
         }
     }
 }

@@ -16,12 +16,14 @@ import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.core.content.ContextCompat
+import kotlinx.coroutines.withTimeoutOrNull
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.core.CapabilityFlags
 import org.fcitx.fcitx5.android.core.FcitxKeyMapping
 import org.fcitx.fcitx5.android.core.KeySym
 import org.fcitx.fcitx5.android.input.FcitxInputMethodService
 import org.fcitx.fcitx5.android.input.broadcast.InputBroadcastReceiver
+import org.fcitx.fcitx5.android.input.dependency.fcitx
 import org.fcitx.fcitx5.android.input.dependency.inputMethodService
 import org.fcitx.fcitx5.android.input.dependency.theme
 import org.fcitx.fcitx5.android.input.keyboard.CommonKeyActionListener
@@ -44,6 +46,7 @@ class VoiceWindow : InputWindow.ExtendedInputWindow<VoiceWindow>(), InputBroadca
     private val service: FcitxInputMethodService by manager.inputMethodService()
     private val theme by manager.theme()
     private val commonKeyActionListener: CommonKeyActionListener by manager.must()
+    private val fcitx by manager.fcitx()
 
     private val session = VoiceSession()
     private var listener: VoiceListener? = null
@@ -164,13 +167,17 @@ class VoiceWindow : InputWindow.ExtendedInputWindow<VoiceWindow>(), InputBroadca
         session.unloaded()
     }
 
+    /** the words the user added and made, read again each time the models are asked for */
+    private suspend fun userHotwords(): String =
+        withTimeoutOrNull(USER_WORDS_MS) { VoiceHotwords.ofUser(fcitx.runOnReady { userWords() }) }.orEmpty()
+
     /** The microphone and the models as [session] wants them: the one place either opens. */
     private fun sync() {
         if (service.inPasswordField) session.pause()
         if (!session.wantsModels) {
             listener?.stop()
         } else {
-            val l = listener ?: VoiceListener(service.assets, events).also {
+            val l = listener ?: VoiceListener(service.assets, events, ::userHotwords).also {
                 listener = it
                 it.load()
             }
@@ -266,5 +273,8 @@ class VoiceWindow : InputWindow.ExtendedInputWindow<VoiceWindow>(), InputBroadca
         private const val HALO_GROWTH = 0.8f
         private const val IDLE_ALPHA = 0.5f
         private const val LEVEL_MS = 100L
+
+        // the engine still starting: voice input without the user's words, not a wait
+        private const val USER_WORDS_MS = 2000L
     }
 }

@@ -12,6 +12,7 @@ import android.media.MediaRecorder
 import android.os.Handler
 import android.os.Looper
 import com.k2fsa.sherpa.onnx.OfflineRecognizer
+import com.k2fsa.sherpa.onnx.OfflineStream
 import com.k2fsa.sherpa.onnx.Vad
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineExceptionHandler
@@ -19,6 +20,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.isActive
@@ -32,7 +34,12 @@ import kotlin.math.sqrt
  * at each pause and recognizes each stretch on a thread of its own, the reading going on meanwhile.
  * Tells [events] of it all on the main thread, until [close]d. Used from the main thread.
  */
-class VoiceListener(private val assets: AssetManager, private val events: Events) {
+class VoiceListener(
+    private val assets: AssetManager,
+    private val events: Events,
+    /** the user's words to listen for (VoiceHotwords.ofUser), asked for as the models load */
+    private val hotwords: suspend () -> String,
+) {
 
     interface Events {
         fun loaded()
@@ -58,7 +65,13 @@ class VoiceListener(private val assets: AssetManager, private val events: Events
     private val main = Handler(Looper.getMainLooper())
 
     private var recognizer: OfflineRecognizer? = null
+
+    // the decoder's: the hotwords, and the stream made ready for the next stretch
+    private var words = ""
+    private var next: OfflineStream? = null
     private var capture: Job? = null
+    // read off the main thread too, as the models load
+    @Volatile
     private var closed = false
 
     /** closed, the stretches heard before are still told (the main thread's, as [closed]) */
@@ -71,6 +84,8 @@ class VoiceListener(private val assets: AssetManager, private val events: Events
 
     fun load() {
         scope.launch {
+            // asked for while the models load, not after: the engine may be busy a while
+            val user = async { userHotwords() }
             val loaded = try {
                 VoiceEngine.acquire(assets)
             } catch (e: CancellationException) {
@@ -78,11 +93,32 @@ class VoiceListener(private val assets: AssetManager, private val events: Events
             } catch (@Suppress("TooGenericExceptionCaught") e: Exception) {
                 // sherpa-onnx's IllegalArgumentException for a model it could not read, or worse
                 Timber.w(e, "voice model")
+                user.cancel()
+                tell { failed(VoiceSession.Failure.NoModel) }
+                return@launch
+            }
+            // acquired, released whatever happens next until it is handed over
+            try {
+                val words = user.await()
+                // closed meanwhile: not the graph of hotwords built for nothing
+                if (!closed) {
+                    withContext(decoder) {
+                        this@VoiceListener.words = words
+                        next = VoiceEngine.stream(loaded, words)
+                    }
+                }
+            } catch (e: CancellationException) {
+                VoiceEngine.release()
+                throw e
+            } catch (@Suppress("TooGenericExceptionCaught") e: Exception) {
+                Timber.w(e, "voice stream")
+                VoiceEngine.release()
                 tell { failed(VoiceSession.Failure.NoModel) }
                 return@launch
             }
             main.post {
                 if (closed) {
+                    scope.launch(decoder) { letGoNext() }
                     VoiceEngine.release()
                 } else {
                     recognizer = loaded
@@ -90,6 +126,16 @@ class VoiceListener(private val assets: AssetManager, private val events: Events
                 }
             }
         }
+    }
+
+    private suspend fun userHotwords() = try {
+        hotwords()
+    } catch (e: CancellationException) {
+        throw e
+    } catch (@Suppress("TooGenericExceptionCaught") e: Exception) {
+        // voice input without them, not none
+        Timber.w(e, "voice hotwords")
+        ""
     }
 
     /** Opens the microphone once the models are in; the caller has checked the permission. */
@@ -125,7 +171,7 @@ class VoiceListener(private val assets: AssetManager, private val events: Events
         scope.launch {
             last?.join()
             // queued after the stretches the capture's end left to recognize: run after them
-            withContext(decoder) { Timber.d("voice: %s let go", r) }
+            withContext(decoder) { letGoNext() }
             main.post { VoiceEngine.release() }
         }
     }
@@ -193,7 +239,9 @@ class VoiceListener(private val assets: AssetManager, private val events: Events
             tell { speechEnded() }
             scope.launch(decoder) {
                 val text = try {
-                    VoiceEngine.recognize(r, samples)
+                    val stream = next ?: VoiceEngine.stream(r, words)
+                    next = null
+                    VoiceEngine.recognize(r, stream, samples)
                 } catch (e: CancellationException) {
                     throw e
                 } catch (@Suppress("TooGenericExceptionCaught") e: Exception) {
@@ -202,8 +250,20 @@ class VoiceListener(private val assets: AssetManager, private val events: Events
                     ""
                 }
                 tell(stretch = true) { recognized(text) }
+                // the next one's, made while it is said, once this one's text is out
+                next = try {
+                    VoiceEngine.stream(r, words)
+                } catch (@Suppress("TooGenericExceptionCaught") e: Exception) {
+                    Timber.w(e, "voice stream")
+                    null
+                }
             }
         }
+    }
+
+    private fun letGoNext() {
+        next?.release()
+        next = null
     }
 
     private fun rms(samples: FloatArray): Float {
