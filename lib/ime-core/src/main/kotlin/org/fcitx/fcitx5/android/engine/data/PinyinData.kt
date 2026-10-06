@@ -121,8 +121,11 @@ class WordLayers internal constructor(val names: List<String>, private val packe
     }
 
     companion object {
-        /** The layer with no name given: libime's dictionary. */
+        /** The layer with no name given: libime's dictionary, the base dictionary. */
         const val BASE = "base"
+
+        /** The new words dictionary's layer: the curated words libime's lacks, as its pack names it. */
+        const val NEW = "new"
     }
 }
 

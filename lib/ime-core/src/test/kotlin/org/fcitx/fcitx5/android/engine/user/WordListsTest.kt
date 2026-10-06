@@ -75,6 +75,9 @@ class WordListsTest {
     fun aLineToImportIsAWordAndItsPinyinEitherWayRound() {
         assertEquals(WordLists.Line("幽默", "you'mo", false), WordLists.line("幽默 you'mo"))
         assertEquals(WordLists.Line("幽默", "you mo", false), WordLists.line("you mo\t幽默\t3"))
+        // a word pack's line, its score after the pinyin: imported into the user dictionary as well
+        assertEquals(WordLists.Line("搭子", "da'zi", false), WordLists.line("搭子\tda'zi\t-5.6"))
+        assertEquals(WordLists.Line("3D", "san'di", false), WordLists.line("3D san'di"))
         assertEquals(WordLists.Line("幽默", null, true), WordLists.line("!幽默"))
         assertEquals(WordLists.Line("幽默", "youmo", false), WordLists.line("\uFEFF幽默 youmo"))
         assertNull(WordLists.line("  "))

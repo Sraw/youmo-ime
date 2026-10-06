@@ -215,10 +215,37 @@ class EnginesTest {
     }
 
     @Test
+    fun aDictionaryMergedIntoTheNewWordsIsScoredAsOneOfThem() {
+        // no scores in a dictionary: 泥, merged into the new words, at their typical score; 妮,
+        // merged into the base, at the unknown word's until picked
+        val additions = Engines.Additions("", "d", newDictionary = { listOf("泥 ni 0") }) { listOf("妮 ni 0") }
+        Engines(::load, folder.newFolder("engine"), { throw it }, additions = { additions }).use { engines ->
+            assertEquals(listOf("你", "拟", "泥", "妮"), engines.type(Engines.PINYIN, "ni").candidates)
+        }
+    }
+
+    @Test
+    fun aPackMergedIntoTheBaseIsScoredAsItSaysButNotWeighedAsALayer() {
+        val pack = "# youmo words 1\n# layer: 2026q1\n泥 ni -2.5\n"
+        val additions = Engines.Additions("", "p", packs = { listOf(Engines.Pack("p.words", pack.lineSequence())) }) { emptyList() }
+        Engines(::load, folder.newFolder("engine"), { throw it }, additions = { additions }).use { engines ->
+            repeat(10) {
+                engines.onEvent(Engines.PINYIN, EngineEvent.RESET, 0)
+                engines.type(Engines.PINYIN, "ni")
+                engines.onEvent(Engines.PINYIN, EngineEvent.PICK, 1)
+            }
+        }
+        // the base's weight is fixed: nothing of the picks but 泥's own counts is kept
+        assertFalse(File(folder.root, "engine/${Engines.USER_PINYIN}").readText().contains("2026q1"))
+    }
+
+    @Test
     fun aWordPackIsTypedScoredAsItSaysAndItsLayerLearned() {
         val errors = ArrayList<IOException>()
         val pack = "# youmo words 1\n# layer: 2026q1\n泥 ni -2.5\n妮 ni -9\n"
-        val additions = Engines.Additions("", "p", packs = { listOf("new.words" to pack.lineSequence(), "old.words" to "你 ni 0".lineSequence()) }) { emptyList() }
+        val additions = Engines.Additions("", "p", packs = {
+            listOf(Engines.Pack("new.words", pack.lineSequence(), intoNew = true), Engines.Pack("old.words", "你 ni 0".lineSequence()))
+        }) { emptyList() }
         Engines(::load, folder.newFolder("engine"), { errors += it }, additions = { additions }).use { engines ->
             // 泥 at -2.5 sits between 你 (-2) and 拟 (-3); 妮 under the unknown word's -7
             assertEquals(listOf("你", "泥", "拟", "妮"), engines.type(Engines.PINYIN, "ni").candidates)

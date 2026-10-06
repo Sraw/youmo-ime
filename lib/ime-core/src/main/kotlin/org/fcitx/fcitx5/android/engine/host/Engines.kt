@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.engine.host
 
+import org.fcitx.fcitx5.android.engine.data.WordLayers
 import org.fcitx.fcitx5.android.engine.data.CodeTable
 import org.fcitx.fcitx5.android.engine.data.CodeTableReader
 import org.fcitx.fcitx5.android.engine.data.DataFormatException
@@ -98,10 +99,19 @@ class Engines(
         val phrases: String,
         val dictionaries: String,
         val savePhrases: (CustomPhrases) -> Unit = {},
-        /** The word packs turned on ([WordPack]), each named (its file) with its lines; [dictionaries] tells these apart too. */
-        val packs: () -> List<Pair<String, Sequence<String>>> = { emptyList() },
+        /**
+         * The word packs turned on ([WordPack]), each named (its file) with its lines and whether
+         * it is merged into the new words dictionary rather than the base one; [dictionaries]
+         * tells these apart too.
+         */
+        val packs: () -> List<Pack> = { emptyList() },
+        /** The lines of the dictionaries turned on that are merged into the new words dictionary. */
+        val newDictionary: () -> List<String> = { emptyList() },
+        /** The lines of the dictionaries turned on that are merged into the base dictionary. */
         val dictionary: () -> List<String>,
     )
+
+    class Pack(val name: String, val lines: Sequence<String>, val intoNew: Boolean = false)
 
     // the files are signed with the app: no need to read them through for their checksums
     private val pinyinData by lazy(LazyThreadSafetyMode.NONE) { PinyinData.load(load(PINYIN_DATA), verify = false) }
@@ -388,22 +398,34 @@ class Engines(
             emptyList()
         }
         for (line in lines) LibimeImport.dictionaryEntry(line)?.let { model.list(it) }
+        val modelWords = pinyinData.model.vocabularySize
+        val newLayer = prior().layer(WordLayers.NEW)
+        val newLines = try {
+            added()?.newDictionary?.invoke().orEmpty()
+        } catch (e: IOException) {
+            onError(e)
+            emptyList()
+        }
+        // a dictionary has no scores of its own: its words the model lacks are scored as the new
+        // words dictionary's typical one, and weighed with it
+        for (line in newLines) LibimeImport.dictionaryEntry(line)?.let { model.list(it, NEW_WORD_SCORE, newLayer, modelWords) }
         val packs = try {
             added()?.packs?.invoke().orEmpty()
         } catch (e: IOException) {
             onError(e)
             emptyList()
         }
-        val modelWords = pinyinData.model.vocabularySize
-        for ((name, lines) in packs) {
+        for (imported in packs) {
             // one that does not read is left out, the rest still go in
             val pack = try {
-                WordPack.parse(lines, name)
+                WordPack.parse(imported.lines, imported.name)
             } catch (e: SourceException) {
                 onError(IOException(e.message, e))
                 continue
             }
-            val layer = prior().layer(pack.layer)
+            // merged into the layer the user put it in, whatever layer the pack names: one weight
+            // for the new words, however many packs they came in
+            val layer = if (imported.intoNew) newLayer else 0
             pack.words.forEach { model.list(it.entry, it.score, layer, modelWords) }
         }
     }
@@ -672,6 +694,10 @@ class Engines(
     companion object {
         // longer is a sentence, not a word: and the dictionary is walked as deep
         private const val MAX_WORD_CHARS = 8
+
+        // the median score of the new words dictionary's 78 thousand words (words-202610): what a
+        // word of a dictionary merged into it, which has no score, is taken to be
+        const val NEW_WORD_SCORE = -6.2f
 
         const val PINYIN = "engine-pinyin"
         const val SHUANGPIN = "engine-shuangpin"

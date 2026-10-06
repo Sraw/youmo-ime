@@ -100,6 +100,9 @@ class WordLists(private val dir: File?, private val onError: (IOException) -> Un
         const val ADDED = "words.added"
         const val BLOCKED = "words.blocked"
 
+        // not toFloat's: 3D and NaN are words
+        private val NUMBER = Regex("-?\\d+(\\.\\d+)?")
+
         /**
          * A word list as other input methods write theirs: UTF-8, or UTF-16 with its byte order
          * mark (Sogou's export), or else GB18030 (older Windows ones).
@@ -129,7 +132,8 @@ class WordLists(private val dir: File?, private val onError: (IOException) -> Un
             var text: String? = null
             val pinyin = ArrayList<String>()
             for (token in rest.split(Regex("\\s+"))) when {
-                token.isEmpty() || token.all { it.isDigit() || it == '.' } -> {}
+                // a count, a cost, or a word pack's score (-5.6)
+                token.isEmpty() || NUMBER.matches(token) -> {}
                 token.all { it in 'a'..'z' || it in 'A'..'Z' || it == '\'' || it == 'ü' } -> pinyin += token
                 text == null -> text = token
                 // a second word: not a line this reads

@@ -4,7 +4,9 @@
  */
 package org.fcitx.fcitx5.android.data.pinyin
 
+import org.fcitx.fcitx5.android.data.pinyin.dict.PinyinDictionary
 import org.fcitx.fcitx5.android.data.pinyin.dict.TextDictionary
+import org.fcitx.fcitx5.android.engine.data.WordLayers
 import org.fcitx.fcitx5.android.engine.data.DataFormatException
 import org.fcitx.fcitx5.android.engine.libime.LibimeFiles
 import org.fcitx.fcitx5.android.engine.user.LibimeImport
@@ -115,4 +117,56 @@ object ImportedDictionaries {
 
     /** Where libime's dictionaries go once [migrate] went through them, among the text ones. */
     const val LIBIME = ".libime"
+
+    /**
+     * The names of the dictionaries and packs merged into the new words dictionary, one a line;
+     * the rest are merged into the base dictionary. A dot file: no dictionary to list.
+     */
+    const val INTO_NEW = ".new-words"
+
+    /** The names [INTO_NEW] in [dir] lists; none if it cannot be read, all then in the base. */
+    fun intoNew(dir: File): Set<String> = try {
+        readIntoNew(dir)
+    } catch (e: IOException) {
+        Timber.w(e, "dictionaries merged into the new words")
+        emptySet()
+    }
+
+    private fun readIntoNew(dir: File): Set<String> {
+        val file = File(dir, INTO_NEW)
+        if (!file.isFile) return packsOfTheirOwnLayer(dir)
+        return file.readLines().map { it.trim() }.filter { it.isNotEmpty() }.toSet()
+    }
+
+    /**
+     * Before [INTO_NEW] was kept, a pack was weighed as the layer its header named (the cloud's
+     * new words as `new`), only `base` as the base: those are the new words still, until the
+     * user moves one.
+     */
+    private fun packsOfTheirOwnLayer(dir: File): Set<String> =
+        dir.listFiles().orEmpty().filter { PinyinDictionary.Type.fromFileName(it.name) == PinyinDictionary.Type.Words }
+            .filter { file ->
+                val layer = file.useLines { lines -> lines.take(HEADER_LINES).firstOrNull { it.startsWith(LAYER_KEY) } }
+                layer?.substring(LAYER_KEY.length)?.trim() != WordLayers.BASE
+            }
+            .map { PinyinDictionary.nameOf(it.name) }.toSet()
+
+    /**
+     * Merges dictionary [name] into the new words dictionary ([into]) or the base one. The
+     * settings and the keyboard (fetching the cloud's new words) both write it, from any thread.
+     */
+    @Synchronized
+    fun setIntoNew(dir: File, name: String, into: Boolean) {
+        // a list that does not read is not written over with one name: the rest would be lost
+        val names = readIntoNew(dir)
+        val now = if (into) names + name else names - name
+        val file = File(dir, INTO_NEW)
+        if (now == names && file.isFile) return
+        val temp = File(dir, "$INTO_NEW.tmp")
+        temp.writeText(now.sorted().joinToString("") { "$it\n" })
+        if (!temp.renameTo(file)) throw IOException("cannot write $INTO_NEW")
+    }
+
+    private const val LAYER_KEY = "# layer:"
+    private const val HEADER_LINES = 3
 }

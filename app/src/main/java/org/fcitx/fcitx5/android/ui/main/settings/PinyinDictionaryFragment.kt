@@ -1,59 +1,54 @@
 /*
  * SPDX-License-Identifier: LGPL-2.1-or-later
- * SPDX-FileCopyrightText: Copyright 2021-2025 Fcitx5 for Android Contributors
+ * SPDX-FileCopyrightText: Copyright 2021-2026 Fcitx5 for Android Contributors
  */
 package org.fcitx.fcitx5.android.ui.main.settings
 
-import android.app.NotificationChannel
-import android.app.NotificationManager
+import android.graphics.Typeface
 import android.net.Uri
-import android.os.Build
 import android.os.Bundle
-import android.view.LayoutInflater
-import android.view.Menu
-import android.view.MenuInflater
-import android.view.MenuItem
+import android.text.SpannableStringBuilder
+import android.text.style.RelativeSizeSpan
+import android.text.style.StyleSpan
 import android.view.View
-import android.view.ViewGroup
+import android.widget.Toast
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.core.app.NotificationCompat
-import androidx.core.view.MenuProvider
-import androidx.fragment.app.Fragment
+import androidx.appcompat.app.AlertDialog
+import androidx.core.text.inSpans
 import androidx.fragment.app.activityViewModels
-import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
+import androidx.preference.Preference
+import androidx.preference.PreferenceCategory
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.core.reloadPinyinDict
+import org.fcitx.fcitx5.android.daemon.launchOnReady
 import org.fcitx.fcitx5.android.data.pinyin.PinyinDictManager
-import org.fcitx.fcitx5.android.data.pinyin.dict.TextDictionary
 import org.fcitx.fcitx5.android.data.pinyin.dict.PinyinDictionary
-import org.fcitx.fcitx5.android.ui.common.BaseDynamicListUi
-import org.fcitx.fcitx5.android.ui.common.OnItemChangedListener
-import org.fcitx.fcitx5.android.ui.main.EditDeleteMenuProvider
+import org.fcitx.fcitx5.android.data.pinyin.dict.TextDictionary
+import org.fcitx.fcitx5.android.ui.common.PaddingPreferenceFragment
+import org.fcitx.fcitx5.android.ui.common.withLoadingDialog
 import org.fcitx.fcitx5.android.ui.main.MainViewModel
 import org.fcitx.fcitx5.android.ui.main.MainViewModel.ButtonMode
 import org.fcitx.fcitx5.android.utils.Const
-import org.fcitx.fcitx5.android.utils.NaiveDustman
+import org.fcitx.fcitx5.android.utils.addPreference
 import org.fcitx.fcitx5.android.utils.importErrorDialog
-import org.fcitx.fcitx5.android.utils.item
 import org.fcitx.fcitx5.android.utils.lazyRoute
-import org.fcitx.fcitx5.android.utils.notificationManager
+import org.fcitx.fcitx5.android.utils.navigateWithAnim
 import org.fcitx.fcitx5.android.utils.openUrl
 import org.fcitx.fcitx5.android.utils.queryFileName
-import java.util.concurrent.atomic.AtomicBoolean
-import android.widget.TextView
-import splitties.views.dsl.core.add
-import splitties.views.dsl.core.lParams
-import splitties.views.dsl.core.matchParent
-import splitties.views.dsl.core.verticalLayout
-import splitties.views.dsl.core.wrapContent
-import splitties.views.setPaddingDp
 
-class PinyinDictionaryFragment : Fragment(), OnItemChangedListener<PinyinDictionary> {
+/**
+ * The three layers of the dictionary, as they rank: the user dictionary, the new words, the
+ * base. A dictionary the user imports is merged into one of them, as asked when it is imported;
+ * those merged into a layer rank alike, and can be turned off, moved or deleted.
+ */
+class PinyinDictionaryFragment : PaddingPreferenceFragment() {
 
     private val args by lazyRoute<SettingsRoute.PinyinDict>()
 
@@ -61,255 +56,218 @@ class PinyinDictionaryFragment : Fragment(), OnItemChangedListener<PinyinDiction
 
     private lateinit var launcher: ActivityResultLauncher<String>
 
-    private val dustman = NaiveDustman<Boolean>()
+    /** a dictionary turned on or off, moved or deleted: the engine reads them again on leaving */
+    private var changed = false
 
-    private val busy: AtomicBoolean = AtomicBoolean(false)
+    private class Listed(val dictionary: TextDictionary, val intoNew: Boolean, val words: Int)
 
-    private var uiInitialized = false
+    private enum class Layer { USER, NEW, BASE }
 
-    // the list outlives the view: filled once
-    private var listed = false
-
-    private val ui: BaseDynamicListUi<PinyinDictionary> by lazy {
-        object : BaseDynamicListUi<PinyinDictionary>(
-            requireContext(),
-            Mode.Custom(),
-            // listed in onViewCreated, off the main thread: listing turns libime's into text first
-            emptyList(),
-            initCheckBox = { entry ->
-                entry as TextDictionary
-                isChecked = entry.isEnabled
-                setOnCheckedChangeListener { button, isChecked ->
-                    val done = if (isChecked) entry.enable() else entry.disable()
-                    if (done) ui.updateItem(ui.indexItem(entry), entry) else button.isChecked = !isChecked
-                }
-            }
-        ) {
-            init {
-                enableUndo = false
-                addTouchCallback()
-                // since FAB is always shown in this fragment,
-                // set shouldShowFab to true to hide it when entering multi select mode
-                shouldShowFab = true
-                fab.setOnClickListener {
-                    launcher.launch("*/*")
-                }
-                setViewModel(viewModel)
-            }
-
-            override fun updateFAB() {
-                // do nothing
-            }
-
-            override fun showEntry(x: PinyinDictionary): String = x.name
-        }.also {
-            uiInitialized = true
-        }
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        launcher = registerForActivityResult(ActivityResultContracts.GetContent()) { it?.let(::askLayer) }
     }
 
-    override fun onCreateView(
-        inflater: LayoutInflater,
-        container: ViewGroup?,
-        savedInstanceState: Bundle?
-    ): View {
-        createNotificationChannel()
-        registerLauncher()
-        ui.addOnItemChangedListener(this)
-        resetDustman()
-        // the list holds only what the user imported: an empty one read as no dictionary at all
-        val ctx = requireContext()
-        val builtIn = TextView(ctx).apply {
-            text = "${getString(R.string.builtin_words)}\n${getString(R.string.builtin_words_summary)}"
-            setPaddingDp(20, 12, 20, 12)
-        }
-        // the list outlives the view: off the one it was in before
-        (ui.root.parent as? ViewGroup)?.removeView(ui.root)
-        return ctx.verticalLayout {
-            add(builtIn, lParams(matchParent, wrapContent))
-            add(ui.root, lParams(matchParent, 0) { weight = 1f })
-        }
+    override fun onCreatePreferences(savedInstanceState: Bundle?, rootKey: String?) {
+        preferenceScreen = preferenceManager.createPreferenceScreen(requireContext())
     }
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
         viewModel.toolbarButton.value = ButtonMode.NONE
-        viewLifecycleOwner.lifecycleScope.launch {
-            if (!listed) {
-                val dictionaries = withContext(Dispatchers.IO) { PinyinDictManager.listDictionaries() }
-                dictionaries.forEach { ui.addItem(item = it) }
-                resetDustman()
-                listed = true
-                // after the list, which the import checks its name against
-                args.uri?.let { importFromUri(Uri.parse(it)) }
-            }
-            viewModel.toolbarButton.value =
-                if (ui.entries.isNotEmpty()) ButtonMode.EDIT else ButtonMode.NONE
-        }
-        requireActivity().addMenuProvider(
-            EditDeleteMenuProvider(
-                buttonMode = viewModel.toolbarButton,
-                editButtonAction = { ui.enterMultiSelect(requireActivity().onBackPressedDispatcher) },
-                deleteButtonAction = { ui.deleteSelected(); ui.exitMultiSelect() },
-                menuHost = requireActivity(),
-                lifecycleOwner = viewLifecycleOwner,
-            ),
-            viewLifecycleOwner,
-            Lifecycle.State.STARTED
-        )
-        // no network permission: the browser downloads a pack, the + button imports it
-        requireActivity().addMenuProvider(
-            object : MenuProvider {
-                override fun onCreateMenu(menu: Menu, menuInflater: MenuInflater) {
-                    menu.item(R.string.download_word_packs) {
-                        requireContext().openUrl(Const.wordPacksUrl)
-                    }
+        rebuild()
+        // a file opened with the app, once (the home page passes none, as "")
+        if (savedInstanceState == null) args.uri?.takeIf { it.isNotEmpty() }?.let { askLayer(Uri.parse(it)) }
+    }
+
+    /** the list being read: one asked for later replaces it, not to be overwritten by it */
+    private var listing: Job? = null
+
+    private fun rebuild() {
+        if (view == null) return
+        listing?.cancel()
+        listing = viewLifecycleOwner.lifecycleScope.launch {
+            val listed = withContext(Dispatchers.IO) {
+                PinyinDictManager.listDictionaries().map {
+                    Listed(it, PinyinDictManager.isIntoNew(it.name), PinyinDictManager.wordCount(it))
                 }
+            }
+            show(listed)
+        }
+    }
 
-                override fun onMenuItemSelected(menuItem: MenuItem): Boolean = false
+    private fun show(listed: List<Listed>) {
+        val ctx = context ?: return
+        val screen = preferenceScreen.apply { removeAll() }
+        val user = category(R.string.layer_user)
+        user.addPreference(R.string.my_words, R.string.layer_user_summary) {
+            navigateWithAnim(SettingsRoute.UserWords)
+        }
+        val new = category(R.string.layer_new)
+        new.addPreference(builtIn(R.string.builtin_new_title, R.string.builtin_new_summary))
+        listed.filter { it.intoNew }.forEach { new.addPreference(row(it)) }
+        val base = category(R.string.layer_base)
+        base.addPreference(builtIn(R.string.builtin_base_title, R.string.builtin_base_summary))
+        listed.filter { !it.intoNew }.forEach { base.addPreference(row(it)) }
+        val files = category(R.string.import_section)
+        files.addPreference(R.string.import_dict, R.string.import_dict_summary) { launcher.launch("*/*") }
+        // no network permission: the browser downloads a pack, importing it is as for any file
+        files.addPreference(R.string.download_word_packs) { ctx.openUrl(Const.wordPacksUrl) }
+        screen.addPreference(Preference(ctx).apply {
+            setSummary(R.string.words_page_hint)
+            isSelectable = false
+            isIconSpaceReserved = false
+        })
+    }
+
+    private fun category(title: Int) = PreferenceCategory(requireContext()).apply {
+        setTitle(title)
+        isIconSpaceReserved = false
+        preferenceScreen.addPreference(this)
+    }
+
+    private fun builtIn(title: Int, summary: Int) = Preference(requireContext()).apply {
+        setTitle(title)
+        setSummary(summary)
+        isSelectable = false
+        isIconSpaceReserved = false
+    }
+
+    private fun row(item: Listed) = Preference(requireContext()).apply {
+        val dictionary = item.dictionary
+        title = dictionary.name
+        val state = getString(if (dictionary.isEnabled) R.string.dict_on else R.string.dict_off)
+        summary = getString(R.string.dict_summary, state, resources.getQuantityString(R.plurals.word_count, item.words, item.words))
+        isIconSpaceReserved = false
+        setOnPreferenceClickListener { act(item); true }
+    }
+
+    private fun act(item: Listed) {
+        val dictionary = item.dictionary
+        val actions = listOf(
+            (if (dictionary.isEnabled) R.string.dict_turn_off else R.string.dict_turn_on) to {
+                done(if (dictionary.isEnabled) dictionary.disable() else dictionary.enable())
             },
-            viewLifecycleOwner,
-            Lifecycle.State.STARTED
+            (if (item.intoNew) R.string.dict_move_to_base else R.string.dict_move_to_new) to {
+                done(PinyinDictManager.setIntoNew(dictionary.name, !item.intoNew).isSuccess)
+            },
+            R.string.delete to { confirmDelete(dictionary) },
         )
+        AlertDialog.Builder(requireContext())
+            .setTitle(dictionary.name)
+            .setItems(actions.map { getString(it.first) }.toTypedArray()) { _, which -> actions[which].second() }
+            .show()
     }
 
-    private fun createNotificationChannel() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val channel = NotificationChannel(
-                CHANNEL_ID,
-                getText(R.string.pinyin_dict),
-                NotificationManager.IMPORTANCE_HIGH
-            ).apply { description = CHANNEL_ID }
-            requireContext().notificationManager.createNotificationChannel(channel)
-        }
+    private fun done(succeeded: Boolean) {
+        if (!succeeded) Toast.makeText(requireContext(), R.string.dict_change_failed, Toast.LENGTH_SHORT).show()
+        changed = true
+        rebuild()
     }
 
-    private fun registerLauncher() {
-        launcher = registerForActivityResult(ActivityResultContracts.GetContent()) { uri ->
-            if (uri != null)
-                importFromUri(uri)
-        }
+    private fun confirmDelete(dictionary: TextDictionary) {
+        AlertDialog.Builder(requireContext())
+            .setTitle(R.string.delete)
+            .setMessage(getString(R.string.dict_delete_confirm, dictionary.name))
+            .setPositiveButton(android.R.string.ok) { _, _ ->
+                done(PinyinDictManager.delete(dictionary))
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
     }
 
-    private fun importFromUri(uri: Uri) {
+    /** Which layer a file is merged into: the base unless asked otherwise, the safest of the three. */
+    private fun askLayer(uri: Uri) {
+        val ctx = requireContext()
+        val layers = listOf(
+            Layer.BASE to (R.string.layer_base to R.string.import_into_base),
+            Layer.NEW to (R.string.layer_new to R.string.import_into_new),
+            Layer.USER to (R.string.layer_user to R.string.import_into_user),
+        )
+        val items = layers.map { (_, text) ->
+            SpannableStringBuilder()
+                .inSpans(StyleSpan(Typeface.BOLD)) { append(getString(text.first)) }
+                .append("\n")
+                .inSpans(RelativeSizeSpan(SMALL)) { append(getString(text.second)) }
+                // a gap under each: three of two lines each read as one block without
+                .inSpans(RelativeSizeSpan(GAP)) { append("\n") }
+        }.toTypedArray<CharSequence>()
+        var picked = 0
+        AlertDialog.Builder(ctx)
+            .setTitle(R.string.import_into_title)
+            .setSingleChoiceItems(items, picked) { _, which -> picked = which }
+            .setPositiveButton(R.string.import_dict) { _, _ -> import(uri, layers[picked].first) }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
+    }
+
+    private fun import(uri: Uri, layer: Layer) {
         val ctx = requireContext()
         val cr = ctx.contentResolver
-        val nm = ctx.notificationManager
-        lifecycleScope.launch {
-            val id = IMPORT_ID++
-            val fileName = cr.queryFileName(uri) ?: return@launch
-            if (PinyinDictionary.Type.fromFileName(fileName) == null) {
-                ctx.importErrorDialog(R.string.invalid_dict)
-                return@launch
-            }
-            val entryName = PinyinDictionary.nameOf(fileName)
-            // a pack of the same name is the next one (each month's official pack is youmo-new.words): it replaces
-            val replaced = ui.entries.firstOrNull { it.name == entryName }
-            val pack = PinyinDictionary.Type.Words
-            if (replaced != null && (replaced.type != pack || PinyinDictionary.Type.fromFileName(fileName) != pack)) {
-                ctx.importErrorDialog(R.string.dict_already_exists)
-                return@launch
-            }
-            NotificationCompat.Builder(ctx, CHANNEL_ID)
-                .setSmallIcon(R.drawable.ic_baseline_library_books_24)
-                .setContentTitle(getString(R.string.pinyin_dict))
-                .setContentText("${getString(R.string.importing)} $entryName")
-                .setOngoing(true)
-                .setProgress(100, 0, true)
-                .setPriority(NotificationCompat.PRIORITY_HIGH)
-                .build().let { nm.notify(id, it) }
+        lifecycleScope.withLoadingDialog(ctx, R.string.importing) {
             try {
-                val imported = withContext(Dispatchers.IO) {
-                    val inputStream = cr.openInputStream(uri)!!
+                val fileName = cr.queryFileName(uri) ?: return@withLoadingDialog
+                if (PinyinDictionary.Type.fromFileName(fileName) == null) {
+                    ctx.importErrorDialog(R.string.invalid_dict)
+                    return@withLoadingDialog
+                }
+                if (layer == Layer.USER) {
+                    importIntoUser(uri, fileName)
+                    return@withLoadingDialog
+                }
+                val name = PinyinDictionary.nameOf(fileName)
+                val pack = PinyinDictionary.Type.Words
+                val replaced = withContext(Dispatchers.IO) { PinyinDictManager.listDictionaries() }.firstOrNull { it.name == name }
+                // a pack of the same name is its next one (each month's official pack is youmo-new.words): it replaces
+                if (replaced != null && (replaced.type != pack || PinyinDictionary.Type.fromFileName(fileName) != pack)) {
+                    ctx.importErrorDialog(R.string.dict_already_exists)
+                    return@withLoadingDialog
+                }
+                withContext(Dispatchers.IO) {
+                    val stream = cr.openInputStream(uri) ?: throw java.io.IOException("cannot read $uri")
                     if (replaced == null) {
-                        PinyinDictManager.importFromInputStream(inputStream, fileName).getOrThrow()
+                        PinyinDictManager.importFromInputStream(stream, fileName, layer == Layer.NEW).getOrThrow()
                     } else {
-                        PinyinDictManager.importPack(entryName, inputStream.bufferedReader().use { it.readText() }).getOrThrow()
+                        // the layer first: a pack that then fails to replace is the last one, as asked
+                        PinyinDictManager.setIntoNew(name, layer == Layer.NEW).getOrThrow()
+                        PinyinDictManager.importPack(name, stream.bufferedReader().use { it.readText() }).getOrThrow()
                     }
                 }
-                if (replaced == null) {
-                    ui.addItem(item = imported)
-                } else {
-                    ui.updateItem(ui.indexItem(replaced), imported)
-                    // the same name, on or off as it was: the dustman sees no change, so reload here
-                    viewModel.fcitx.runOnReady { reloadPinyinDict() }
-                }
+                viewModel.fcitx.runOnReady { reloadPinyinDict() }
+                rebuild()
+            } catch (e: CancellationException) {
+                // the page left: nothing to show the error on
+                throw e
             } catch (e: Exception) {
                 ctx.importErrorDialog(e)
             }
-            nm.cancel(id)
         }
     }
 
-    private fun reloadDict() {
-        if (!dustman.dirty) return
-        resetDustman()
-        // Save the reference to NotificationManager, because reloadDict() could be called
-        // right before the Fragment detached from Activity, and at the time reload completes,
-        // Fragment is no longer attached to a Context, thus unable to cancel the notification.
-        val nm = requireContext().notificationManager
-        lifecycleScope.launch {
-            if (busy.compareAndSet(false, true)) {
-                val id = RELOAD_ID++
-                NotificationCompat.Builder(requireContext(), CHANNEL_ID)
-                    .setSmallIcon(R.drawable.ic_baseline_library_books_24)
-                    .setContentTitle(getString(R.string.pinyin_dict))
-                    .setContentText(getString(R.string.reloading))
-                    .setOngoing(true)
-                    .setProgress(100, 0, true)
-                    .setPriority(NotificationCompat.PRIORITY_HIGH)
-                    .build().let { nm.notify(id, it) }
-                viewModel.fcitx.runOnReady {
-                    reloadPinyinDict()
-                }
-                nm.cancel(id)
-                busy.set(false)
-            }
+    private suspend fun importIntoUser(uri: Uri, fileName: String) {
+        val ctx = requireContext()
+        val lines = withContext(Dispatchers.IO) {
+            val stream = ctx.contentResolver.openInputStream(uri) ?: throw java.io.IOException("cannot read $uri")
+            PinyinDictManager.readWords(stream, fileName).getOrThrow()
         }
-    }
-
-    private fun resetDustman() {
-        dustman.reset(ui.entries.mapNotNull { it as? TextDictionary }
-            .associate { it.name to it.isEnabled })
-    }
-
-    override fun onItemAdded(idx: Int, item: PinyinDictionary) {
-        item as TextDictionary
-        dustman.addOrUpdate(item.name, item.isEnabled)
-    }
-
-    override fun onItemRemoved(idx: Int, item: PinyinDictionary) {
-        item as TextDictionary
-        item.file.delete()
-        dustman.remove(item.name)
-    }
-
-    override fun onItemRemovedBatch(indexed: List<Pair<Int, PinyinDictionary>>) {
-        batchRemove(indexed)
-    }
-
-    override fun onItemUpdated(idx: Int, old: PinyinDictionary, new: PinyinDictionary) {
-        new as TextDictionary
-        dustman.addOrUpdate(new.name, new.isEnabled)
+        val imported = viewModel.fcitx.runOnReady { importUserWords(lines) }
+        AlertDialog.Builder(ctx)
+            .setTitle(R.string.import_dict)
+            .setMessage(getString(R.string.import_words_done, imported.added, imported.blocked, imported.unread))
+            .setPositiveButton(android.R.string.ok, null)
+            .show()
     }
 
     override fun onStop() {
-        reloadDict()
-        if (uiInitialized) {
-            ui.exitMultiSelect()
+        if (changed) {
+            changed = false
+            viewModel.fcitx.launchOnReady { it.reloadPinyinDict() }
         }
         super.onStop()
     }
 
-    override fun onDestroy() {
-        if (uiInitialized) {
-            ui.removeItemChangedListener()
-        }
-        super.onDestroy()
-    }
-
     companion object {
-        private var RELOAD_ID = 0
-        private var IMPORT_ID = 0
-        const val CHANNEL_ID = "pinyin_dict"
+        private const val SMALL = 0.85f
+        private const val GAP = 0.6f
     }
 }

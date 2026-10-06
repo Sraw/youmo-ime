@@ -8,6 +8,7 @@ import org.fcitx.fcitx5.android.BuildConfig
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.data.pinyin.CustomPhraseManager
 import org.fcitx.fcitx5.android.data.pinyin.ImportedDictionaries
+import org.fcitx.fcitx5.android.data.pinyin.dict.PinyinDictionary
 import org.fcitx.fcitx5.android.engine.host.EngineEvent
 import org.fcitx.fcitx5.android.engine.host.EngineSettings
 import org.fcitx.fcitx5.android.engine.host.Engines
@@ -126,7 +127,10 @@ object EngineBridge {
         ImportedDictionaries.migrate(dictionaryDir)
         val dictionaries = dictionaryDir.listFiles { f -> f.name.endsWith(".txt") }.orEmpty().sortedBy { it.name }
         val packs = dictionaryDir.listFiles { f -> f.name.endsWith(".words") }.orEmpty().sortedBy { it.name }
-        val seen = (dictionaries + packs).joinToString("\n") { "${it.name} ${it.length()} ${it.lastModified()}" }
+        val intoNew = ImportedDictionaries.intoNew(dictionaryDir)
+        fun File.intoNew() = PinyinDictionary.nameOf(name) in intoNew
+        // a dictionary moved to another layer is a change too
+        val seen = (dictionaries + packs).joinToString("\n") { "${it.name} ${it.length()} ${it.lastModified()} ${it.intoNew()}" }
         // a file not read is not written: the phrases it has would be lost to the one pinned
         val save = { p: CustomPhrases ->
             if (!read) throw IOException("custom phrases were not read")
@@ -135,23 +139,23 @@ object EngineBridge {
         val readPacks = {
             packs.mapNotNull { file ->
                 try {
-                    file.name to file.readLines().asSequence()
+                    Engines.Pack(file.name, file.readLines().asSequence(), file.intoNew())
                 } catch (e: IOException) {
                     Timber.w(e, "word pack %s", file.name)
                     null
                 }
             }
         }
-        return Engines.Additions(phrases, seen, save, readPacks) {
-            dictionaries.flatMap { file ->
-                try {
-                    file.readLines()
-                } catch (e: IOException) {
-                    Timber.w(e, "pinyin dictionary %s", file.name)
-                    emptyList()
-                }
+        fun read(files: List<File>) = files.flatMap { file ->
+            try {
+                file.readLines()
+            } catch (e: IOException) {
+                Timber.w(e, "pinyin dictionary %s", file.name)
+                emptyList()
             }
         }
+        val (newDictionaries, baseDictionaries) = dictionaries.partition { it.intoNew() }
+        return Engines.Additions(phrases, seen, save, readPacks, { read(newDictionaries) }) { read(baseDictionaries) }
     }
 
     /**
