@@ -5,7 +5,6 @@
 package org.fcitx.fcitx5.android.ui.main.settings
 
 import android.content.Context
-import android.content.res.ColorStateList
 import android.os.Bundle
 import android.text.InputType
 import android.view.Gravity
@@ -25,8 +24,6 @@ import androidx.fragment.app.Fragment
 import com.google.android.flexbox.FlexWrap
 import com.google.android.flexbox.FlexboxLayout
 import com.google.android.material.button.MaterialButton
-import com.google.android.material.chip.Chip
-import com.google.android.material.chip.ChipGroup
 import com.google.android.material.R as MaterialR
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
@@ -138,37 +135,52 @@ class PopupOverridesFragment : Fragment() {
         setTextColor(ctx.styledColor(MaterialR.attr.colorOnSurfaceVariant))
     }
 
-    /** The characters as chips: tap one to make it the first (what letting go gives), × to drop it */
+    /**
+     * The characters drawn as the popup draws them, the first (what letting go gives) outlined.
+     * A tap only selects one; what is done with it is up to the buttons below, apart from it: a
+     * tap that moved or removed a character was a surprise, and a × beside it easily hit.
+     */
     private fun edit(label: String) {
         val ctx = requireContext()
         val preset = PopupPreset[label]
         val current = overrides
         val items = current.resolve(label, preset)?.toMutableList() ?: mutableListOf()
-        val chips = ChipGroup(ctx)
+        var selected = -1
+        val keys = FlexboxLayout(ctx).apply { flexWrap = FlexWrap.WRAP }
         val empty = text(ctx, getString(R.string.long_press_none), body = true)
-        fun render() {
-            chips.removeAllViews()
+        val actions = FlexboxLayout(ctx).apply { flexWrap = FlexWrap.WRAP }
+        lateinit var render: () -> Unit
+        // each button with when it applies to the selected index, and what it makes that index
+        fun action(text: Int, enabled: (Int) -> Boolean, act: (Int) -> Int) = MaterialButton(
+            ctx, null, MaterialR.attr.materialButtonOutlinedStyle
+        ).apply {
+            setText(text)
+            setOnClickListener {
+                selected = act(selected)
+                render()
+            }
+        } to enabled
+        val buttons = listOf(
+            action(R.string.long_press_make_first, { it > 0 }) { i -> items.add(0, items.removeAt(i)); 0 },
+            action(R.string.long_press_move_left, { it > 0 }) { i -> items.add(i - 1, items.removeAt(i)); i - 1 },
+            action(R.string.long_press_move_right, { it in 0 until items.lastIndex }) { i -> items.add(i + 1, items.removeAt(i)); i + 1 },
+            action(R.string.delete, { it >= 0 }) { i -> items.removeAt(i); if (items.isEmpty()) -1 else minOf(i, items.lastIndex) },
+        )
+        buttons.forEach { (button, _) ->
+            actions.addView(button, FlexboxLayout.LayoutParams(-2, -2).apply { marginEnd = ctx.dp(8) })
+        }
+        render = {
+            keys.removeAllViews()
             items.forEachIndexed { i, item ->
-                chips.addView(Chip(ctx).apply {
-                    text = item
-                    textSize = 18f
-                    isCloseIconVisible = true
-                    if (i == 0) {
-                        chipStrokeWidth = ctx.dp(2).toFloat()
-                        chipStrokeColor = ColorStateList.valueOf(ctx.styledColor(android.R.attr.colorPrimary))
-                    }
+                keys.addView(KeyCaps.key(ctx, item, "", marked = i == 0, dimmed = false, selected = i == selected).apply {
                     setOnClickListener {
-                        items.removeAt(i)
-                        items.add(0, item)
+                        selected = if (selected == i) -1 else i
                         render()
                     }
-                    setOnCloseIconClickListener {
-                        items.removeAt(i)
-                        render()
-                    }
-                })
+                }, otherParams(ctx))
             }
             empty.isVisible = items.isEmpty()
+            buttons.forEach { (button, enabled) -> button.isEnabled = enabled(selected) }
         }
         val field = EditText(ctx).apply {
             hint = getString(R.string.long_press_add_hint)
@@ -196,8 +208,9 @@ class PopupOverridesFragment : Fragment() {
             val pad = ctx.dp(24)
             setPadding(pad, ctx.dp(8), pad, 0)
             addView(text(ctx, getString(R.string.long_press_editor_hint), body = false))
-            addView(chips, LinearLayout.LayoutParams(-1, -2).apply { topMargin = ctx.dp(12) })
+            addView(keys, LinearLayout.LayoutParams(-1, -2).apply { topMargin = ctx.dp(12) })
             addView(empty)
+            addView(actions, LinearLayout.LayoutParams(-1, -2).apply { topMargin = ctx.dp(4) })
             addView(addRow, LinearLayout.LayoutParams(-1, -2).apply { topMargin = ctx.dp(8) })
         }
         render()

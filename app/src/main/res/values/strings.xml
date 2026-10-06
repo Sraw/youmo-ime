@@ -354,7 +354,7 @@
     <string name="home_section_other">Other</string>
     <string name="long_press_characters_summary">Choose what each key offers when you hold it</string>
     <string name="long_press_of">Long press on “%1$s”</string>
-    <string name="long_press_editor_hint">Tap a character to make it the first one, the one you get by holding the key and letting go. Tap × to remove it.</string>
+    <string name="long_press_editor_hint">The outlined one is what you get by holding the key and letting go. Tap a character to select it, then use the buttons below.</string>
     <string name="letters">Letters</string>
     <string name="other_keys">Other keys</string>
     <string name="add_key">Add another key</string>
@@ -416,7 +416,7 @@
     <string name="my_words_summary">Words you added, learned and blocked; import and export</string>
     <string name="more_settings">More settings</string>
     <string name="builtin_words">Built in</string>
-    <string name="builtin_words_summary">The dictionary and the new words come with the app and are updated with it. To stop a word showing, block it in User dictionary, or long-press it on the keyboard</string>
+    <string name="builtin_words_summary">The base dictionary and the new words dictionary come with the app and are updated with it. To stop a word showing, block it in User dictionary, or long-press it on the keyboard</string>
     <string name="word_pinyin_unknown">No reading found: please type the pinyin</string>
     <string name="punctuation_map">Chinese punctuation</string>
     <string name="word_list_empty">No words yet</string>
@@ -578,4 +578,7 @@
     <string name="punctuation_add">Add a key</string>
     <string name="punctuation_choice">choice</string>
     <string name="punctuation_first">First among this key\'s choices</string>
+    <string name="long_press_make_first">Make first</string>
+    <string name="long_press_move_left">Move left</string>
+    <string name="long_press_move_right">Move right</string>
 </resources>

@@ -20,10 +20,10 @@ import splitties.dimensions.dp
  */
 object KeyCaps {
 
-    /** A key's face: [marked] (the user changed it) outlined in the accent colour */
-    fun background(ctx: Context, marked: Boolean = false, radius: Int = 8) = GradientDrawable().apply {
+    /** A key's face: [marked] outlined in the accent colour, [selected] filled with it */
+    fun background(ctx: Context, marked: Boolean = false, radius: Int = 8, selected: Boolean = false) = GradientDrawable().apply {
         cornerRadius = ctx.dp(radius).toFloat()
-        setColor(ctx.styledColor(MaterialR.attr.colorSurfaceContainerHighest))
+        setColor(ctx.styledColor(if (selected) MaterialR.attr.colorPrimaryContainer else MaterialR.attr.colorSurfaceContainerHighest))
         if (marked) setStroke(ctx.dp(2), ctx.styledColor(android.R.attr.colorPrimary))
     }
 
@@ -39,8 +39,8 @@ object KeyCaps {
      * A key with [text] on it and [hint] small in its corner, as the keyboard shows the first
      * long-press character; [dimmed] for a key whose long press is turned off.
      */
-    fun key(ctx: Context, text: String, hint: String, marked: Boolean, dimmed: Boolean) = FrameLayout(ctx).apply {
-        background = background(ctx, marked)
+    fun key(ctx: Context, text: String, hint: String, marked: Boolean, dimmed: Boolean, selected: Boolean = false) = FrameLayout(ctx).apply {
+        background = background(ctx, marked, selected = selected)
         isClickable = true
         isFocusable = true
         foreground = ctx.obtainStyledAttributes(intArrayOf(android.R.attr.selectableItemBackground)).run {

@@ -350,7 +350,7 @@
     <string name="home_section_other">其他</string>
     <string name="long_press_characters_summary">自訂每個按鍵長按時彈出的字元</string>
     <string name="long_press_of">長按「%1$s」</string>
-    <string name="long_press_editor_hint">點一個字元設為首選，即按住後直接放開得到的字元；點 × 刪除。</string>
+    <string name="long_press_editor_hint">帶框的那個是按住後直接放開得到的字元。點一個字元選取它，再用下面的按鈕調整。</string>
     <string name="letters">字母</string>
     <string name="other_keys">其他按鍵</string>
     <string name="add_key">新增其他按鍵</string>
@@ -383,7 +383,7 @@
     <string name="my_words_summary">手動新增、自動學到和封鎖的詞，可匯入匯出</string>
     <string name="more_settings">更多設定</string>
     <string name="builtin_words">內置詞庫</string>
-    <string name="builtin_words_summary">大詞庫和新詞庫隨應用一起更新。不想看到某個詞，可以在「使用者詞庫」裡封鎖，或在鍵盤上長按它</string>
+    <string name="builtin_words_summary">基礎詞庫和新詞庫隨應用一起更新。不想看到某個詞，可以在「使用者詞庫」裡封鎖，或在鍵盤上長按它</string>
     <string name="word_pinyin_unknown">找不到讀音，請填寫拼音</string>
     <string name="punctuation_map">中文標點</string>
     <string name="word_list_empty">還沒有詞</string>
@@ -540,4 +540,7 @@
     <string name="punctuation_add">新增按鍵</string>
     <string name="punctuation_choice">可選</string>
     <string name="punctuation_first">排在這個鍵的候選首位</string>
+    <string name="long_press_make_first">設為首選</string>
+    <string name="long_press_move_left">左移</string>
+    <string name="long_press_move_right">右移</string>
 </resources>

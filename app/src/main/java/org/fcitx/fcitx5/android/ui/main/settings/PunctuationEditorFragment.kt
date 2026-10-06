@@ -214,6 +214,8 @@ class PunctuationEditorFragment : ProgressFragment() {
                 val m = ctx.dp(4)
                 setMargins(m, m, m, m)
             }
+            // the key, the arrow and the mark on one line whatever the caption: it sits in the
+            // corner, out of the line, which it pushed up when under the mark
             addView(LinearLayout(ctx).apply {
                 gravity = Gravity.CENTER
                 addView(KeyCaps.label(ctx, "").apply {
@@ -227,23 +229,20 @@ class PunctuationEditorFragment : ProgressFragment() {
                     marginStart = ctx.dp(8)
                     marginEnd = ctx.dp(8)
                 })
-                addView(LinearLayout(ctx).apply {
-                    orientation = LinearLayout.VERTICAL
-                    gravity = Gravity.CENTER_HORIZONTAL
-                    addView(TextView(ctx).apply {
-                        id = R.id.punctuation_mapping
-                        textSize = 22f
-                        maxLines = 1
-                        setTextColor(ctx.styledColor(MaterialR.attr.colorOnSurface))
-                    })
-                    addView(TextView(ctx).apply {
-                        id = R.id.punctuation_pair
-                        setText(R.string.punctuation_pair)
-                        textSize = 10f
-                        setTextColor(ctx.styledColor(android.R.attr.colorPrimary))
-                    })
+                addView(TextView(ctx).apply {
+                    id = R.id.punctuation_mapping
+                    textSize = 22f
+                    maxLines = 1
+                    setTextColor(ctx.styledColor(MaterialR.attr.colorOnSurface))
                 })
             }, FrameLayout.LayoutParams(-1, -1))
+            addView(TextView(ctx).apply {
+                id = R.id.punctuation_pair
+                textSize = 10f
+                setTextColor(ctx.styledColor(android.R.attr.colorPrimary))
+            }, FrameLayout.LayoutParams(-2, -2, Gravity.BOTTOM or Gravity.END).apply {
+                setMargins(0, 0, ctx.dp(8), ctx.dp(4))
+            })
         }
     }
 
