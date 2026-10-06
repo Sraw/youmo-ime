@@ -10,4 +10,10 @@ fun interface Segmenter {
 
     /** Whether [c] is a key of this way of typing: what a keyboard hands to the engine. */
     fun reads(c: Char): Boolean = c in 'a'..'z'
+
+    /**
+     * Whether the keys are the letters of the pinyin, as typed; false for the nine keys, whose
+     * input is digits, the syllables shown spelt and taken one by one ([T9Segmenter]).
+     */
+    val typesLetters: Boolean get() = true
 }

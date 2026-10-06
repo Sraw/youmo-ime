@@ -17,6 +17,7 @@ object InputMethodNames {
     private val names = mapOf(
         "engine-pinyin" to R.string.im_pinyin,
         "engine-shuangpin" to R.string.im_shuangpin,
+        "engine-t9" to R.string.im_t9,
         "engine-wubi" to R.string.im_wubi,
         "engine-cangjie" to R.string.im_cangjie,
         "engine-ziranma" to R.string.im_ziranma,

@@ -440,6 +440,7 @@
     <string name="section_voice">語音輸入</string>
     <string name="im_pinyin">拼音</string>
     <string name="im_shuangpin">雙拼</string>
+    <string name="im_t9">九鍵拼音</string>
     <string name="im_wubi">五筆</string>
     <string name="im_cangjie">倉頡</string>
     <string name="im_ziranma">自然碼</string>

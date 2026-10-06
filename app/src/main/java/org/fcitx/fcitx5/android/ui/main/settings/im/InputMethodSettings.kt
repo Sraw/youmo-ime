@@ -181,7 +181,7 @@ object InputMethodSettings {
 
     /** The page of [uniqueName], or null for an input method the app does not know. */
     fun of(uniqueName: String): List<Item>? = when (uniqueName) {
-        "engine-pinyin" -> pinyin(shuangpin = false)
+        "engine-pinyin", "engine-t9" -> pinyin(shuangpin = false)
         "engine-shuangpin" -> pinyin(shuangpin = true)
         "keyboard-us" -> english
         else -> if (uniqueName.startsWith("engine-")) table else null

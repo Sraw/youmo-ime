@@ -4,6 +4,8 @@
  */
 package org.fcitx.fcitx5.android.core
 
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import org.fcitx.fcitx5.android.BuildConfig
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.data.pinyin.CustomPhraseManager
@@ -51,6 +53,16 @@ object EngineBridge {
         @JvmField val labels: String,
         @JvmField val refines: Boolean,
     )
+
+    /**
+     * What the nine-key keyboard shows beside its keys, as the last event of [Engines.T9] left
+     * it: whether anything is typed, and what its first digits not yet taken may be (see
+     * Snapshot.syllables). Set on the fcitx thread, read on the main one.
+     */
+    data class T9State(val composing: Boolean = false, val syllables: List<String> = emptyList())
+
+    private val t9State = MutableStateFlow(T9State())
+    val t9: StateFlow<T9State> = t9State
 
     private val made = lazy(LazyThreadSafetyMode.NONE) {
         Engines(
@@ -176,6 +188,7 @@ object EngineBridge {
     @JvmStatic
     fun onEvent(im: String, event: Int, arg: Int, learning: Boolean): Result {
         val s = engines.onEvent(im, event, arg, learning)
+        if (im == Engines.T9 && (event != EngineEvent.REFINE || s.handled)) t9State.value = T9State(s.preedit.isNotEmpty(), s.syllables)
         // the page shown and at least a chunk: the list rarely has to come back for more; none
         // for a slice of refining that changed nothing, which the addon does not show
         val unshown = s.candidates.isEmpty() || (event == EngineEvent.REFINE && !s.handled)

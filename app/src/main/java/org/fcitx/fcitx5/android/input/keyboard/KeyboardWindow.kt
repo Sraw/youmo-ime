@@ -15,6 +15,7 @@ import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.core.CapabilityFlags
 import org.fcitx.fcitx5.android.core.InputMethodEntry
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
+import org.fcitx.fcitx5.android.engine.host.Engines
 import org.fcitx.fcitx5.android.input.bar.KawaiiBarComponent
 import org.fcitx.fcitx5.android.input.broadcast.InputBroadcastReceiver
 import org.fcitx.fcitx5.android.input.broadcast.ReturnKeyAppearance
@@ -67,6 +68,7 @@ class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), Essentia
     private val keyboards: HashMap<String, BaseKeyboard> by lazy {
         hashMapOf(
             TextKeyboard.Name to TextKeyboard(context, theme),
+            T9Keyboard.Name to T9Keyboard(context, theme),
             NumberKeyboard.Name to NumberKeyboard(context, theme)
         )
     }
@@ -119,17 +121,22 @@ class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), Essentia
         LayoutSwitchPolicy(keyboards.keys, TextKeyboard.Name, PickerWindow.Key.Symbol.name)
     }
 
+    // the letters' keyboard of the input method: 九键 for its own
+    private var textLayout = TextKeyboard.Name
+
     fun switchLayout(to: String, remember: Boolean = true) {
         // read now, as before: the memory is what it was when the key was pressed
         val lastSymbol = lastSymbolType
         ContextCompat.getMainExecutor(context).execute {
-            val outcome = layoutSwitchPolicy.switchTo(to, lastSymbol, currentKeyboardName, remember)
+            // the policy knows the letters' keyboard as Text, whichever it is
+            val current = if (currentKeyboardName == textLayout) TextKeyboard.Name else currentKeyboardName
+            val outcome = layoutSwitchPolicy.switchTo(to, lastSymbol, current, remember)
             outcome.remember?.let { lastSymbolType = it }
             when (val target = outcome.target) {
                 LayoutSwitchPolicy.Target.Unchanged -> {}
                 is LayoutSwitchPolicy.Target.Keyboard -> {
                     detachCurrentLayout()
-                    attachLayout(target.name)
+                    attachLayout(if (target.name == TextKeyboard.Name) textLayout else target.name)
                     if (windowManager.isAttached(this)) {
                         notifyBarLayoutChanged()
                     }
@@ -150,6 +157,16 @@ class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), Essentia
     }
 
     override fun onImeUpdate(ime: InputMethodEntry) {
+        val layout = if (ime.uniqueName == Engines.T9) T9Keyboard.Name else TextKeyboard.Name
+        if (layout != textLayout) {
+            val showing = currentKeyboardName == textLayout
+            textLayout = layout
+            if (showing) {
+                detachCurrentLayout()
+                attachLayout(layout)
+                if (windowManager.isAttached(this)) notifyBarLayoutChanged()
+            }
+        }
         currentKeyboard?.onInputMethodUpdate(ime)
     }
 

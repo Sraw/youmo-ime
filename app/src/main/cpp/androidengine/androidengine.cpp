@@ -177,6 +177,7 @@ std::vector<InputMethodEntry> AndroidEngine::listInputMethods() {
     static const Method methods[] = {
             {"engine-pinyin", "拼", "拼音", "fcitx-pinyin"},
             {"engine-shuangpin", "双", "双拼", "fcitx-shuangpin"},
+            {"engine-t9", "九", "九键拼音", "fcitx-pinyin"},
             {"engine-wubi", "五", "五笔", "fcitx-wubi"},
             {"engine-cangjie", "倉", "仓颉", "fcitx-cangjie"},
             {"engine-ziranma", "自", "自然码", "fcitx-ziranma"},

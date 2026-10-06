@@ -56,6 +56,13 @@ import java.util.Calendar
  * [REFINE_BUDGET] between them, till the next key.
  *
  * @param spell show each syllable spelt out, not as typed: for 双拼, whose keys say little
+ *
+ * On the nine keys (a [segmenter] that does not [type letters][Segmenter.typesLetters]) the
+ * input is digits, shown as the pinyin of the best reading. What the first digits not taken yet
+ * may be is offered ([Snapshot.syllables]); one taken ([Action.Syllable]) goes into the input as
+ * its letters and a separator, read as that syllable alone, and the offer moves on to the digits
+ * after it. Backspace with no key typed since a syllable was taken gives its digits back, as 搜狗
+ * does: the last taken first; with keys typed since, it deletes those first.
  */
 class PinyinSession(
     private val data: PinyinData,
@@ -122,6 +129,8 @@ class PinyinSession(
     private var ownFirstKeys: String? = null
     private var firstBeforeHabit: Candidate? = null // of the candidates now, before the habit was put first
     private var preedit = ""
+    private var restShown = "" // the end of the preedit: what is left of the input, as shown
+    private val nineKeys = if (segmenter.typesLetters) null else NineKeys(data)
     private var page = 0
     private var predicting = false
 
@@ -140,6 +149,7 @@ class PinyinSession(
         // nothing to pick past the page: the key (space, a digit) is the app's
         is Action.Select -> if (action.index in 0 until pageSize) pick(page * pageSize + action.index) else snapshot(handled = candidates.isNotEmpty())
         is Action.Pick -> pick(action.index)
+        is Action.Syllable -> takeSyllable(action.index)
         is Action.Forget, is Action.Pin, is Action.Unpin, is Action.Block -> pressed(action)
         Action.NextPage -> turn(page + 1)
         Action.PreviousPage -> turn(page - 1)
@@ -149,33 +159,36 @@ class PinyinSession(
             clear()
             snapshot()
         }
-        is Action.Context -> {
-            // the text still ends with what was committed here: the cursor did not go anywhere
-            // (an editor reporting it where the service did not expect it), and the words the
-            // user picked say more than the model's reading of the text. The host reads less than
-            // is kept, so its text may be the end of it, long enough not to be so by chance
-            val before = action.before
-            val same = before.endsWith(recent) || before.length >= OVERLAP && recent.endsWith(before)
-            if (learning && recent.isNotEmpty() && same) {
-                clear()
-                return snapshot()
-            }
-            dropContext()
+        is Action.Context -> takeContext(action.before)
+    }
+
+    /** See [Action.Context]. */
+    private fun takeContext(before: String): Snapshot {
+        // the text still ends with what was committed here: the cursor did not go anywhere
+        // (an editor reporting it where the service did not expect it), and the words the
+        // user picked say more than the model's reading of the text. The host reads less than
+        // is kept, so its text may be the end of it, long enough not to be so by chance
+        val same = before.endsWith(recent) || before.length >= OVERLAP && recent.endsWith(before)
+        if (learning && recent.isNotEmpty() && same) {
             clear()
-            // what the app has is kept no longer than the input, and not at all where the user
-            // learns nothing, as what they commit; text ending in no word (a space, a letter) is
-            // no context for the reranker either, as after text committed as typed
-            if (learning) {
-                context = textWords.lastTwo(before)
-                if (context.isNotEmpty()) recent = tail(before)
-            }
-            snapshot()
+            return snapshot()
         }
+        dropContext()
+        clear()
+        // what the app has is kept no longer than the input, and not at all where the user
+        // learns nothing, as what they commit; text ending in no word (a space, a letter) is
+        // no context for the reranker either, as after text committed as typed
+        if (learning) {
+            context = textWords.lastTwo(before)
+            if (context.isNotEmpty()) recent = tail(before)
+        }
+        return snapshot()
     }
 
     private fun type(c: Char): Snapshot {
         if (!reads(c)) return leave()
-        input.append(c)
+        // on the nine keys 1 is 分词
+        input.append(if (c == NINE_KEYS_SEPARATOR && nineKeys != null) SyllableGraph.SEPARATOR else c)
         read()
         return snapshot()
     }
@@ -186,13 +199,26 @@ class PinyinSession(
             clear()
             return snapshot(handled = false)
         }
-        input.setLength(input.length - 1)
-        while (pieces.isNotEmpty() && pieces.last().end >= input.length) pieces.removeAt(pieces.size - 1)
+        // the syllable taken last, given back as its digits
+        val given = nineKeys?.giveBack(input) ?: -1
+        if (given >= 0) {
+            while (pieces.isNotEmpty() && pieces.last().end > given) pieces.removeAt(pieces.size - 1)
+        } else {
+            input.setLength(input.length - 1)
+            while (pieces.isNotEmpty() && pieces.last().end >= input.length) pieces.removeAt(pieces.size - 1)
+        }
         read()
         return snapshot()
     }
 
-    override fun reads(c: Char): Boolean = segmenter.reads(c) || (c == SyllableGraph.SEPARATOR && input.isNotEmpty())
+    /** Takes the syllable at [index] of those offered: see the class. */
+    private fun takeSyllable(index: Int): Snapshot {
+        if (!predicting && nineKeys?.take(input, index) == true) read()
+        return snapshot()
+    }
+
+    override fun reads(c: Char): Boolean =
+        segmenter.reads(c) || (c == SyllableGraph.SEPARATOR || c == NINE_KEYS_SEPARATOR && nineKeys != null) && input.isNotEmpty()
 
     override fun candidates(from: Int, count: Int): List<Choice> =
         candidates.subList(minOf(from, candidates.size), minOf(from + count, candidates.size)).map { Choice(it.text, hint(it)) }
@@ -408,7 +434,11 @@ class PinyinSession(
             clear()
             return snapshot(handled = false)
         }
-        val text = pieces.joinToString("") { it.text } + input.substring(readFrom())
+        // digits say nothing: the pinyin shown for them, as 搜狗 commits it
+        // digits no reading took stay as typed
+        val shown = restShown.filter { it != ' ' && it != SyllableGraph.SEPARATOR }
+        val rest = if (nineKeys == null || shown.isEmpty()) input.substring(readFrom()) else shown
+        val text = pieces.joinToString("") { it.text } + rest
         // text as typed is no words: nothing to go on from
         dropContext()
         clear()
@@ -452,6 +482,7 @@ class PinyinSession(
     private fun clear() {
         input.setLength(0)
         graph = null
+        nineKeys?.clear()
         pieces.clear()
         candidates = emptyList()
         decoderWords = emptyList()
@@ -478,6 +509,7 @@ class PinyinSession(
             habit = null
             preedit = ""
             graph = null
+            nineKeys?.clear()
             return
         }
         val graph = segmenter.segment(input.substring(readFrom()))
@@ -528,7 +560,10 @@ class PinyinSession(
         firstBeforeHabit = candidates.firstOrNull()
         candidates = withHabit(key, rest, candidates)
         val best = sentences.firstOrNull()
-        preedit = pieces.joinToString("") { it.text } + (if (best == null) graph.input else preedit(graph, best))
+        nineKeys?.forgetBest()
+        restShown = if (best == null) graph.input else preedit(graph, best)
+        preedit = pieces.joinToString("") { it.text } + restShown
+        if (!predicting) nineKeys?.offer(input, readFrom(), graph)
     }
 
     /**
@@ -618,6 +653,7 @@ class PinyinSession(
             first = from,
             actionable = !predicting && candidates.isNotEmpty(),
             refines = unrefined != null,
+            syllables = nineKeys?.offered.orEmpty(),
         )
     }
 
@@ -637,6 +673,7 @@ class PinyinSession(
             if (reading != null) {
                 parts += reading.shown
                 ends += reading.ends
+                nineKeys?.note((listOf(from) + reading.ends.dropLast(1)).map { readFrom() + it }, reading.syllables)
                 raw = false
             } else if (raw) {
                 parts[parts.size - 1] = parts.last() + graph.text(from, to)
@@ -658,6 +695,14 @@ class PinyinSession(
 
     /** How [word] reads from [from] to [to] of [graph]: what each syllable shows, where it ends, and its id. */
     private class Reading(val shown: List<String>, val ends: List<Int>, val syllables: IntArray)
+
+    /** How [edge] of [graph] shows, read as [syllable]: as typed, spelt for 双拼, letters for digits. */
+    private fun shown(graph: SyllableGraph, edge: Int, syllable: Int): String = when {
+        // digits say nothing: as many letters of the syllable as were typed
+        !segmenter.typesLetters -> Syllables.spelling(syllable).take(graph.text(edge).length)
+        spell && graph.kind(edge) == Kind.SYLLABLE -> Syllables.spelling(syllable)
+        else -> graph.text(edge)
+    }
 
     /**
      * The syllables along a path of [graph] from [from] to [to] that spell [word], exact readings
@@ -689,7 +734,7 @@ class PinyinSession(
                 for (i in (0 until m.size).sortedBy { m.flags(it) }) {
                     val child = child(node, m.syllable(i))
                     if (child < 0) continue
-                    shown += if (spell && graph.kind(e) == Kind.SYLLABLE) Syllables.spelling(m.syllable(i)) else graph.text(e)
+                    shown += shown(graph, e, m.syllable(i))
                     ends += graph.to(e)
                     syllables += m.syllable(i)
                     if (walk(graph.to(e), child)) return true
@@ -707,6 +752,10 @@ class PinyinSession(
 
     companion object {
         const val DEFAULT_PAGE_SIZE = 5
+
+        /** The nine keys' 分词 key: a separator while something is typed, the app's 1 otherwise. */
+        const val NINE_KEYS_SEPARATOR = '1'
+
         /**
          * The [refiner]'s work at most per [Action.Refine], in [Reranker]'s units: one position of
          * the large model, a few milliseconds on a phone. A key pressed meanwhile waits for it.

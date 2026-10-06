@@ -75,6 +75,12 @@ sealed class Action {
     object NextPage : Action()
     object PreviousPage : Action()
 
+    /**
+     * Takes the syllable at [index] of [Snapshot.syllables] for the first keys it was offered
+     * for: on the nine keys, where those keys type several (`64` ni, mi, o …).
+     */
+    data class Syllable(val index: Int) : Action()
+
     /** Commits what was typed, as typed (enter). */
     object CommitRaw : Action()
 
@@ -114,6 +120,8 @@ sealed class Action {
  *   digits (电报码's `qwertyuiop`, its codes being digits); empty for the digits
  * @property refines whether [Action.Refine] would do more: the host sends it while the user
  *   pauses, till this is false
+ * @property syllables what the first keys not yet taken as a syllable may be, likeliest first,
+ *   a letter for an initial last: on the nine keys, for [Action.Syllable]; empty elsewhere
  */
 data class Snapshot(
     val commit: String,
@@ -130,4 +138,5 @@ data class Snapshot(
     val actionable: Boolean = false,
     val labels: String = "",
     val refines: Boolean = false,
+    val syllables: List<String> = emptyList(),
 )

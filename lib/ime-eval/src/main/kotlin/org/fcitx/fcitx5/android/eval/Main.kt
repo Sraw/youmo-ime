@@ -14,6 +14,7 @@ import org.fcitx.fcitx5.android.engine.pinyin.Fuzzy
 import org.fcitx.fcitx5.android.engine.pinyin.PinyinSegmenter
 import org.fcitx.fcitx5.android.engine.pinyin.Segmenter
 import org.fcitx.fcitx5.android.engine.pinyin.ShuangpinSegmenter
+import org.fcitx.fcitx5.android.engine.pinyin.T9Segmenter
 import org.fcitx.fcitx5.android.engine.remote.HttpRemoteModel
 import org.fcitx.fcitx5.android.engine.remote.RemoteRefiner
 import org.fcitx.fcitx5.android.engine.remote.ServerAddress
@@ -38,13 +39,14 @@ val USAGE = """usage: score <set.tsv> <result.tsv> [<baseline-result.tsv>] [--ha
        sentences <pinyin.data> <set.tsv> <out.tsv> [--neighbours on|off] [--threads <n>]
        lm <model.safetensors> <context> <text>...
        shuangpin <scheme> <set.tsv> <shuangpin-set.tsv>
+       t9 <set.tsv> <t9-set.tsv>
        slips <set.tsv> <slip-set.tsv>
        tune <pinyin.data> <set.tsv> <slip-set.tsv>
        ksc <pinyin.data> <set.tsv> [--scheme <scheme>] [--fuzzy all|<pair>,...] [--half <half>] [--rerank <model.safetensors>] [--refine <model.safetensors>] [--weight <rerank>[,<refine>]] [--remote <url>] [--remote-timeout <ms>] [--penalty <p>] [--threads <n>]
        learn <pinyin.data> <set.tsv> [--scheme <scheme>] [--fuzzy all|<pair>,...]
        table <table.data> <set.tsv> [--preset <preset>]
        libime pinyin|history|table <file>
-schemes: ${ShuangpinSet.SCHEMES.keys.joinToString(" ")}
+schemes: ${(ShuangpinSet.SCHEMES.keys + T9Set.SCHEMES).joinToString(" ")}
 pairs: ${Fuzzy.entries.joinToString(" ") { it.name.lowercase() }}
 halves: ${Halves.NAMES.joinToString(" ")}
 presets: ${TableRun.PRESETS.keys.joinToString(" ")}"""
@@ -95,6 +97,7 @@ fun runCli(args: Array<String>, out: Appendable, err: Appendable): Int {
         a.has("sentences", 4..4, "neighbours", "threads") -> sentences(p[1], p[2], p[3], neighbours == "on", threads)
         a.has("lm", 4..Int.MAX_VALUE) -> lm(p[1], p[2], p.drop(3), out)
         a.has("shuangpin", 4..4) && p[1] in ShuangpinSet.SCHEMES -> writeShuangpinSet(p[1], p[2], p[3], out)
+        a.has("t9", 3..3) -> writeT9Set(p[1], p[2], out)
         a.has("slips", 3..3) -> writeSlipSet(p[1], p[2], out)
         a.has("tune", 4..4) -> tune(p[1], p[2], p[3], out)
         a.has("ksc", 3..3, "scheme", "fuzzy", "half", "rerank", "refine", "weight", *REMOTE, "threads") ->
@@ -111,7 +114,7 @@ private fun optionsValid(options: Map<String, String>, fuzzy: Set<Fuzzy>?): Bool
     val neighbours = options["neighbours"]
     return listOf(
         options["half"].let { it == null || it in Halves.NAMES },
-        scheme == null || scheme in ShuangpinSet.SCHEMES,
+        scheme == null || scheme in ShuangpinSet.SCHEMES || scheme in T9Set.SCHEMES,
         options["fuzzy"] == null || fuzzy != null,
         options["preset"].let { it == null || it in TableRun.PRESETS },
         options["threads"].let { it == null || it.toIntOrNull()?.let { n -> n > 0 } == true },
@@ -232,7 +235,11 @@ private fun score(setPath: String, resultPath: String, baselinePath: String?, ha
 }
 
 private fun segmenter(scheme: String?, fuzzy: Set<Fuzzy>, neighbours: Boolean = false): Segmenter =
-    scheme?.let { ShuangpinSegmenter(ShuangpinSet.SCHEMES.getValue(it), fuzzy) } ?: PinyinSegmenter(fuzzy, neighbours = neighbours)
+    when (scheme) {
+        null -> PinyinSegmenter(fuzzy, neighbours = neighbours)
+        in T9Set.SCHEMES -> T9Segmenter(fuzzy, abbreviations = scheme == "t9")
+        else -> ShuangpinSegmenter(ShuangpinSet.SCHEMES.getValue(scheme), fuzzy)
+    }
 
 private fun runPinyin(
     dataPath: String,
@@ -291,6 +298,14 @@ private fun writeSet(outPath: String, header: String, samples: List<Sample>) {
         w.println("# $header")
         samples.forEach { w.println("${it.input}\t${it.expected}\t${it.tag}") }
     }
+}
+
+private fun writeT9Set(setPath: String, outPath: String, out: Appendable): Int {
+    val samples = readSet(setPath)
+    val converted = T9Set.convert(samples)
+    writeSet(outPath, "$setPath typed on the nine keys by `t9`; samples without one exact reading left out", converted)
+    out.appendLine("${converted.size} of ${samples.size} samples typed on the nine keys")
+    return 0
 }
 
 private fun writeShuangpinSet(scheme: String, setPath: String, outPath: String, out: Appendable): Int {

@@ -478,6 +478,7 @@
     <string name="section_voice">Voice input</string>
     <string name="im_pinyin">Pinyin</string>
     <string name="im_shuangpin">Shuangpin</string>
+    <string name="im_t9">Pinyin (9 keys)</string>
     <string name="im_wubi">Wubi</string>
     <string name="im_cangjie">Cangjie</string>
     <string name="im_ziranma">Ziranma</string>

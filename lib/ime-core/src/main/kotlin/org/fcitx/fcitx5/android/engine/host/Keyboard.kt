@@ -74,7 +74,8 @@ class Keyboard(private val session: Session) {
             EngineEvent.CHAR -> char(arg)
             EngineEvent.BACKSPACE -> session.apply(Action.Backspace)
             EngineEvent.ENTER -> if (composing) session.apply(Action.CommitRaw) else passOn()
-            EngineEvent.ESCAPE -> if (composing || shown.predicting) session.apply(Action.Reset) else passOn()
+            // the nine keys' 重输 is Escape: with nothing typed, nothing to start over, not the app's
+            EngineEvent.ESCAPE -> if (composing || shown.predicting) session.apply(Action.Reset) else if (session.reads('2')) IDLE.copy(handled = true) else passOn()
             EngineEvent.PAGE_UP -> if (composing) session.apply(Action.PreviousPage) else passOn()
             EngineEvent.PAGE_DOWN -> if (composing) session.apply(Action.NextPage) else passOn()
             EngineEvent.PICK -> session.apply(Action.Pick(arg))
@@ -110,8 +111,11 @@ class Keyboard(private val session: Session) {
     private fun char(codePoint: Int): Snapshot {
         // past the BMP (an emoji key): no session reads one, but it still ends the input
         val c = if (codePoint in 0..Char.MAX_VALUE.code) codePoint.toChar() else REPLACEMENT
+        val nineKeys = session.reads('2')
+        if (c in SYLLABLES && nineKeys) return session.apply(Action.Syllable(c - SYLLABLES.first))
         if (session.reads(c)) return session.apply(Action.Key(c))
-        val digit = c.digitToIntOrNull()
+        // on the nine keys a digit is a key: one not read (0) ends the input, as punctuation does
+        val digit = c.digitToIntOrNull()?.takeUnless { nineKeys }
         return when {
             composing && c == ' ' -> session.apply(Action.Select(0))
             // 1 is the first; 0 the tenth
@@ -133,6 +137,13 @@ class Keyboard(private val session: Session) {
     companion object {
         private const val DIGITS = 10
         private const val REPLACEMENT = '\uFFFD'
+
+        /**
+         * Characters of the private use area the nine-key keyboard sends for a syllable it offers
+         * (see [Snapshot.syllables]): the first for the first. fcitx passes any character on, so
+         * this needs no event of its own; no keyboard types one otherwise.
+         */
+        val SYLLABLES = '\uE000'..'\uE0FF'
 
         private val IDLE = Snapshot(
             commit = "",

@@ -16,6 +16,7 @@ import org.fcitx.fcitx5.android.engine.phrase.CustomPhrases
 import org.fcitx.fcitx5.android.engine.phrase.PhraseBook
 import org.fcitx.fcitx5.android.engine.pinyin.PinyinSegmenter
 import org.fcitx.fcitx5.android.engine.pinyin.ShuangpinSegmenter
+import org.fcitx.fcitx5.android.engine.pinyin.T9Segmenter
 import org.fcitx.fcitx5.android.engine.pinyin.Syllables
 import org.fcitx.fcitx5.android.engine.remote.RemoteModel
 import org.fcitx.fcitx5.android.engine.remote.RemoteRefiner
@@ -525,6 +526,12 @@ class Engines(
                 ),
                 ::strokes, ::charReading, s.pageSize, blocked = ::isBlocked,
             )
+            // 简拼 only where the digits read nothing else: as common on the evaluation set, and faster
+            T9 -> PinyinSession(
+                pinyinData, T9Segmenter(s.fuzzy, abbreviations = false), spell = true,
+                pageSize = s.pageSize, user = user(), prediction = s.prediction, prior = prior(), phraseBook = phrases(),
+                reranker = reranker(), refiner = refiner(), block = ::block, habits = habits.scope(T9),
+            )
             SHUANGPIN -> PinyinSession(
                 pinyinData, ShuangpinSegmenter(s.scheme, s.fuzzy, s.typos), spell = true,
                 pageSize = s.pageSize, user = user(), prediction = s.prediction, prior = prior(), phraseBook = phrases(),
@@ -896,6 +903,9 @@ class Engines(
 
         const val PINYIN = "engine-pinyin"
         const val SHUANGPIN = "engine-shuangpin"
+
+        /** Pinyin on a phone's nine keys (九键). */
+        const val T9 = "engine-t9"
 
         const val PINYIN_DATA = "engine/pinyin.data"
 
