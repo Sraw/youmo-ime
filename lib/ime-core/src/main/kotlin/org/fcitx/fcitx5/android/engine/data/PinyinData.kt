@@ -47,6 +47,15 @@ class PinyinData private constructor(file: DataFile) {
     /** The model's words by their text, made when first asked for: see [WordIndex]. */
     val wordIndex: WordIndex by lazy { WordIndex(vocabulary, model.vocabularySize) }
 
+    /** Words often read wrongly, by word: see [Misreadings]. */
+    val misreadings: Map<String, Misreadings> by lazy {
+        meta.mapNotNull { (key, value) ->
+            if (!key.startsWith(Misreadings.META_PREFIX)) return@mapNotNull null
+            val word = key.removePrefix(Misreadings.META_PREFIX)
+            Misreadings.fromMeta(word, value)?.let { word to it }
+        }.toMap()
+    }
+
     init {
         ensureFormat(model.vocabularySize <= vocabulary.size) { "the model has more words than the vocabulary" }
     }

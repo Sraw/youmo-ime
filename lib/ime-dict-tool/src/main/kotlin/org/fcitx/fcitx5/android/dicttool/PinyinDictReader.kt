@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.dicttool
 
+import org.fcitx.fcitx5.android.engine.data.Misreadings
 import org.fcitx.fcitx5.android.engine.data.PinyinDataBuilder
 import org.fcitx.fcitx5.android.engine.data.fields
 import org.fcitx.fcitx5.android.engine.data.forEachNumberedLine
@@ -22,12 +23,14 @@ import java.util.TreeMap
  *
  * The curated corrections of `lexicon/` apply as it reads: a word of [removed] is left out, and a
  * word of [readings] is read as listed there instead of as the dictionary has it ([corrected]
- * adds those, once all is read).
+ * adds those, once all is read); so is a word of [misread], its reading first, the rest
+ * misreadings at [Misreadings.WEIGHT].
  */
 class PinyinDictReader(
     private val into: PinyinDataBuilder,
     private val removed: Set<String> = emptySet(),
     private val readings: Map<String, List<String>> = emptyMap(),
+    private val misread: Map<String, List<String>> = emptyMap(),
 ) {
 
     var entries = 0
@@ -48,13 +51,14 @@ class PinyinDictReader(
             if (f.isEmpty()) return@forEachNumberedLine
             require(f.size in 2..3) { "expected \"word pinyin [weight]\", got \"$line\"" }
             val weight = if (f.size == 3) requireNotNull(f[2].toFloatOrNull()) { "bad weight \"${f[2]}\"" } else 0f
-            if (f[0] in removed || f[0] in readings) corrections++ else add(f[0], f[1], weight)
+            if (f[0] in removed || f[0] in readings || f[0] in misread) corrections++ else add(f[0], f[1], weight)
         }
     }
 
     /** The words of [readings], each under the readings listed: after every dictionary is read. */
     fun corrected() {
-        for ((word, list) in readings) list.forEach { add(word, it, 0f) }
+        for ((word, list) in readings) if (word !in misread) list.forEach { add(word, it, 0f) }
+        for ((word, list) in misread) list.forEachIndexed { i, r -> add(word, r, if (i == 0) 0f else Misreadings.WEIGHT) }
     }
 
     /** One reading, [pinyin] with its syllables separated by `'`. */

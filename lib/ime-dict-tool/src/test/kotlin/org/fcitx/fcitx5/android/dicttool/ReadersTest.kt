@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.dicttool
 
+import org.fcitx.fcitx5.android.engine.data.Misreadings
 import org.fcitx.fcitx5.android.engine.data.PinyinData
 import org.fcitx.fcitx5.android.engine.data.PinyinDataBuilder
 import org.fcitx.fcitx5.android.engine.data.SourceException
@@ -65,6 +66,23 @@ class ReadersTest {
         assertEquals(3, reader.skipped)
         val data = PinyinData.load(ByteBuffer.wrap(builder.build().toByteArray()))
         assertEquals(2, data.dictionary.wordCount(data.dictionary.find(intArrayOf(org.fcitx.fcitx5.android.engine.pinyin.Syllables.id("hao")))))
+    }
+
+    @Test
+    fun aMisreadWordIsTypedByItsReadingAndLessByItsMisreadingsOnly() {
+        val builder = PinyinDataBuilder().unigram("<unk>", -5f, 0f).unigram("般若", -4f, 0f)
+        val reader = PinyinDictReader(builder, misread = mapOf("般若" to listOf("bo're", "ban'ruo")))
+        reader.read("般若\tban'ruo\t0\n般若\tpan're\t0\n".reader().buffered(), "dict")
+        reader.corrected()
+        assertEquals(2, reader.corrections)
+        val data = PinyinData.load(ByteBuffer.wrap(builder.build().toByteArray()))
+        fun weight(vararg reading: String): Float? {
+            val node = data.dictionary.find(reading.map { org.fcitx.fcitx5.android.engine.pinyin.Syllables.id(it) }.toIntArray())
+            return if (node < 0 || data.dictionary.wordCount(node) == 0) null else data.dictionary.weight(node, 0)
+        }
+        assertEquals(0f, weight("bo", "re"))
+        assertEquals(Misreadings.WEIGHT, weight("ban", "ruo")!!, 0.1f)
+        assertEquals(null, weight("pan", "re"))
     }
 
     @Test

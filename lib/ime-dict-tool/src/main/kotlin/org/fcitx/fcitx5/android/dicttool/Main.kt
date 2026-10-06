@@ -5,6 +5,7 @@
 package org.fcitx.fcitx5.android.dicttool
 
 import org.fcitx.fcitx5.android.engine.data.CodeTableReader
+import org.fcitx.fcitx5.android.engine.data.Misreadings
 import org.fcitx.fcitx5.android.engine.data.DataFile
 import org.fcitx.fcitx5.android.engine.data.DataFormatException
 import org.fcitx.fcitx5.android.engine.data.PinyinData
@@ -29,7 +30,7 @@ import kotlin.math.abs
 import kotlin.system.exitProcess
 
 val USAGE = """
-    usage: pinyin -o <out> --lm <lm.arpa> [--remove <remove.tsv>] [--readings <readings.tsv>] <dict>...
+    usage: pinyin -o <out> --lm <lm.arpa> [--remove <remove.tsv>] [--readings <readings.tsv>] [--misreadings <misreadings.tsv>] <dict>...
                                                           compile a pinyin dictionary and model, from
                                                           libime's text and word packs (.words), each
                                                           pack a layer of its own; the text's words
@@ -139,6 +140,8 @@ private class Options(
     /** `pinyin`: lexicon/remove.tsv, words the dictionaries have wrongly, and lexicon/readings.tsv, readings put right. */
     val remove: String?,
     val readings: String?,
+    /** `pinyin`: lexicon/misreadings.tsv, words often read wrongly, typed either way. */
+    val misreadings: String?,
     /** `table`: a word pack whose words go in, coded by the table's rules. */
     val words: String?,
     val crawl: Crawl,
@@ -197,7 +200,7 @@ private class Options(
         private val FLAGS = setOf(
             "-o", "--lm", "--weight", "--cutoffs", "--data", "--min-count", "--layer", "--min-pmi", "--min-entropy", "--min-surprise", "--only",
             "--crawl", "--from", "--files", "--base", "--per-word", "--lexicon", "--sketch-bits", "--remove", "--readings",
-            "--words",
+            "--words", "--misreadings",
         )
 
         /** [flag]'s value, [default] without one, null for a bad one. */
@@ -239,6 +242,7 @@ private class Options(
                 sketchBits = values.count("--sketch-bits", NewWords.SKETCH_BITS, NewWords.MIN_SKETCH_BITS..MAX_SKETCH_BITS) ?: return null,
                 remove = values["--remove"],
                 readings = values["--readings"],
+                misreadings = values["--misreadings"],
                 words = values["--words"],
             )
         }
@@ -693,7 +697,8 @@ private fun pinyin(options: Options, out: Appendable) {
                 .groupBy({ it[0].trim() }, { it[1].trim() })
         }
     }.orEmpty()
-    val reader = PinyinDictReader(builder, removed, readings)
+    val misread = options.misreadings?.let { path -> File(path).useLines { Misreadings.parse(it, path) } }.orEmpty()
+    val reader = PinyinDictReader(builder, removed, readings, misread.associate { it.word to (listOf(it.typed) + it.misread) })
     val (packFiles, texts) = dicts.partition { it.endsWith(PACK_SUFFIX) }
     val packs = packFiles.map { path -> File(path).useLines { WordPack.parse(it, path) } }
     val layers = (listOf(WordLayers.BASE) + packs.map { it.layer }).distinct()
@@ -720,7 +725,10 @@ private fun pinyin(options: Options, out: Appendable) {
         out.appendLine("skipped ${reader.skipped} readings with unknown syllables: " +
             reader.unknownSyllables.entries.joinToString(" ") { "${it.key}×${it.value}" })
     }
-    write(output, builder.build(mapOf("source" to (listOf(lm) + dicts).joinToString(",") { File(it).name })), out)
+    if (misread.isNotEmpty()) out.appendLine("misread: ${misread.size} words, typed by their misreadings too")
+    val meta = mapOf("source" to (listOf(lm) + dicts).joinToString(",") { File(it).name }) +
+        misread.associate { Misreadings.META_PREFIX + it.word to Misreadings.meta(it) }
+    write(output, builder.build(meta), out)
     val data = PinyinData.load(map(output))
     out.appendLine("vocabulary: ${data.vocabulary.size} words, ${data.model.vocabularySize} of them in the model")
     out.appendLine("trie: ${data.dictionary.nodeCount} nodes")

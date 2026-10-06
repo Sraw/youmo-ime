@@ -5,6 +5,7 @@
 package org.fcitx.fcitx5.android.engine.session
 
 import org.fcitx.fcitx5.android.engine.data.NgramModel.Companion.NO_WORD
+import org.fcitx.fcitx5.android.engine.data.Misreadings
 import org.fcitx.fcitx5.android.engine.data.PinyinData
 import org.fcitx.fcitx5.android.engine.lattice.Candidate
 import org.fcitx.fcitx5.android.engine.lattice.LayerPrior
@@ -194,7 +195,20 @@ class PinyinSession(
     override fun reads(c: Char): Boolean = segmenter.reads(c) || (c == SyllableGraph.SEPARATOR && input.isNotEmpty())
 
     override fun candidates(from: Int, count: Int): List<Choice> =
-        candidates.subList(minOf(from, candidates.size), minOf(from + count, candidates.size)).map { Choice(it.text) }
+        candidates.subList(minOf(from, candidates.size), minOf(from + count, candidates.size)).map { Choice(it.text, hint(it)) }
+
+    /**
+     * A word often read wrongly ([PinyinData.misreadings]) typed by a misreading: the reading,
+     * with its tones (般若 typed banruo: bō rě). Not for 简拼 or a syllable half typed, which
+     * are no misreading; nor for 双拼, whose keys are no reading to compare.
+     */
+    private fun hint(c: Candidate): String {
+        if (spell || predicting) return ""
+        val word = data.misreadings[c.text] ?: return ""
+        val from = readFrom()
+        val typed = input.substring(from, minOf(input.length, from + c.end)).filter { it != SyllableGraph.SEPARATOR }
+        return if (word.misread.any { it.replace("'", "") == typed }) word.reading else ""
+    }
 
     private fun pick(index: Int): Snapshot {
         val c = candidates.getOrNull(index) ?: return snapshot(handled = candidates.isNotEmpty())
@@ -599,6 +613,7 @@ class PinyinSession(
             hasNextPage = from + pageSize < candidates.size,
             handled = handled,
             predicting = predicting,
+            hints = shown.map(::hint).takeIf { h -> h.any { it.isNotEmpty() } }.orEmpty(),
             total = candidates.size,
             first = from,
             actionable = !predicting && candidates.isNotEmpty(),

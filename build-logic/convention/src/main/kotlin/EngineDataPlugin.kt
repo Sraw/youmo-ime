@@ -172,6 +172,7 @@ class EngineDataPlugin : Plugin<Project> {
             val lexicon = target.rootProject.layout.projectDirectory.dir("lexicon")
             remove.set(lexicon.file("remove.tsv"))
             readings.set(lexicon.file("readings.tsv"))
+            misreadings.set(lexicon.file("misreadings.tsv"))
             outputDir.set(target.layout.buildDirectory.dir("generated/engine-assets"))
         }
         val tables = target.tasks.register<CompileTables>(TABLES_TASK) {
@@ -325,6 +326,10 @@ class EngineDataPlugin : Plugin<Project> {
         @get:PathSensitive(PathSensitivity.NAME_ONLY)
         abstract val readings: RegularFileProperty
 
+        @get:InputFile
+        @get:PathSensitive(PathSensitivity.NAME_ONLY)
+        abstract val misreadings: RegularFileProperty
+
         @get:OutputDirectory
         abstract val outputDir: DirectoryProperty
 
@@ -342,6 +347,7 @@ class EngineDataPlugin : Plugin<Project> {
                     listOf(
                         "pinyin", "-o", output().path, "--lm", lm.get().asFile.path,
                         "--remove", remove.get().asFile.path, "--readings", readings.get().asFile.path,
+                        "--misreadings", misreadings.get().asFile.path,
                     ) + dictionaries.files.map { it.path }
                 )
             }
