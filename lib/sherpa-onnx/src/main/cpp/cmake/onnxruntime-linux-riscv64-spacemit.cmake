@@ -1,0 +1,93 @@
+message(STATUS "CMAKE_SYSTEM_NAME: ${CMAKE_SYSTEM_NAME}")
+message(STATUS "CMAKE_SYSTEM_PROCESSOR: ${CMAKE_SYSTEM_PROCESSOR}")
+
+if(NOT CMAKE_SYSTEM_NAME STREQUAL Linux)
+  message(FATAL_ERROR "This file is for Linux only. Given: ${CMAKE_SYSTEM_NAME}")
+endif()
+
+if(NOT CMAKE_SYSTEM_PROCESSOR STREQUAL riscv64)
+  message(FATAL_ERROR "This file is for riscv64 only. Given: ${CMAKE_SYSTEM_PROCESSOR}")
+endif()
+
+if(NOT BUILD_SHARED_LIBS)
+  message(FATAL_ERROR "This file is for building shared libraries. BUILD_SHARED_LIBS: ${BUILD_SHARED_LIBS}, SHERPA_ONNX_ENABLE_SPACEMIT: ${SHERPA_ONNX_ENABLE_SPACEMIT}")
+endif()
+
+set(onnxruntime_version "2.0.6")
+set(onnxruntime_pkg_name "spacemit-ort.riscv64.${onnxruntime_version}.tar.gz")
+set(onnxruntime_URL  "https://github.com/spacemit-com/onnxruntime/releases/download/${onnxruntime_version}/${onnxruntime_pkg_name}")
+set(onnxruntime_HASH "SHA256=bebcdfb7df6b49eefa3863afcd85a3da2aa83c3ae9252d7d856188c38a70b0e6")
+
+# If you don't have access to the Internet,
+# please download onnxruntime to one of the following locations.
+# You can add more if you want.
+set(possible_file_locations
+  $ENV{HOME}/Downloads/${onnxruntime_pkg_name}
+  ${CMAKE_SOURCE_DIR}/${onnxruntime_pkg_name}
+  ${CMAKE_BINARY_DIR}/${onnxruntime_pkg_name}
+  /tmp/${onnxruntime_pkg_name}
+  /star-fj/fangjun/download/github/${onnxruntime_pkg_name}
+)
+
+foreach(f IN LISTS possible_file_locations)
+  if(EXISTS ${f})
+    set(onnxruntime_URL  "${f}")
+    file(TO_CMAKE_PATH "${onnxruntime_URL}" onnxruntime_URL)
+    message(STATUS "Found local downloaded onnxruntime: ${onnxruntime_URL}")
+    break()
+  endif()
+endforeach()
+
+FetchContent_Declare(onnxruntime
+  URL
+    ${onnxruntime_URL}
+  URL_HASH          ${onnxruntime_HASH}
+)
+
+FetchContent_GetProperties(onnxruntime)
+if(NOT onnxruntime_POPULATED)
+  message(STATUS "Downloading onnxruntime from ${onnxruntime_URL}")
+  FetchContent_Populate(onnxruntime)
+endif()
+message(STATUS "onnxruntime is downloaded to ${onnxruntime_SOURCE_DIR}")
+
+find_library(location_onnxruntime
+  NAMES onnxruntime
+  PATHS "${onnxruntime_SOURCE_DIR}/lib"
+  NO_CMAKE_SYSTEM_PATH
+)
+
+message(STATUS "location_onnxruntime: ${location_onnxruntime}")
+
+find_library(location_spacemit_ep
+  NAMES spacemit_ep
+  PATHS "${onnxruntime_SOURCE_DIR}/lib"
+  NO_CMAKE_SYSTEM_PATH
+)
+
+message(STATUS "location_spacemit_ep: ${location_spacemit_ep}")
+
+add_library(onnxruntime SHARED IMPORTED)
+add_library(spacemit_ep SHARED IMPORTED)
+
+set_target_properties(onnxruntime PROPERTIES
+  IMPORTED_LOCATION ${location_onnxruntime}
+  IMPORTED_LOCATION "${onnxruntime_SOURCE_DIR}/lib/libonnxruntime.so"
+  INTERFACE_INCLUDE_DIRECTORIES "${onnxruntime_SOURCE_DIR}/include/"
+)
+
+set_target_properties(spacemit_ep PROPERTIES
+  IMPORTED_LOCATION ${location_spacemit_ep}
+  IMPORTED_LOCATION "${onnxruntime_SOURCE_DIR}/lib/libspacemit_ep.so"
+  INTERFACE_INCLUDE_DIRECTORIES "${onnxruntime_SOURCE_DIR}/include/"
+)
+
+file(GLOB onnxruntime_lib_files
+  "${onnxruntime_SOURCE_DIR}/lib/libonnxruntime*")
+message(STATUS "onnxruntime lib files: ${onnxruntime_lib_files}")
+install(FILES ${onnxruntime_lib_files} DESTINATION lib)
+
+file(GLOB spacemit_ep_lib_files
+  "${onnxruntime_SOURCE_DIR}/lib/libspacemit_ep*")
+message(STATUS "spacemit_ep lib files: ${spacemit_ep_lib_files}")
+install(FILES ${spacemit_ep_lib_files} DESTINATION lib)
