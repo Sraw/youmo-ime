@@ -5,6 +5,7 @@
 package org.fcitx.fcitx5.android.input.picker
 
 import android.annotation.SuppressLint
+import android.util.TypedValue
 import android.view.Gravity
 import android.view.ViewGroup
 import android.widget.TextView
@@ -136,8 +137,18 @@ class PickerGridAdapter(
         if (entry.category == 0) bindAsIs(key, entry.text) else bind(key, entry.text)
     }
 
+    /**
+     * A symbol of two characters at a single's size reads as a bar across the panel's key: the
+     * Chinese dash —— (two em dashes, drawn joined) and ellipsis …… are each two wide.
+     */
+    private fun label(key: TextKeyView, text: String) {
+        key.mainText.text = text
+        val long = grid.density == PickerGridView.Density.Panel && text.codePointCount(0, text.length) > 1
+        key.mainText.setTextSize(TypedValue.COMPLEX_UNIT_DIP, grid.density.textSize * if (long) LONG else 1f)
+    }
+
     private fun bindAsIs(key: TextKeyView, item: String) = key.apply {
-        mainText.text = item
+        label(this, item)
         setOnClickListener { commit(item) }
         setOnLongClickListener(null)
         swipeEnabled = false
@@ -146,7 +157,7 @@ class PickerGridAdapter(
 
     private fun bind(key: TextKeyView, item: String) = key.apply {
         val transformed = policy.transform(item)
-        mainText.text = transformed
+        label(this, transformed)
         setOnClickListener { commit(transformed) }
         setOnLongClickListener longClick@{ view ->
             if (view !is KeyView) return@longClick false
@@ -210,6 +221,7 @@ class PickerGridAdapter(
     companion object {
         private const val KEY = 0
         private const val HEADER = 1
+        private const val LONG = 0.6f
         private val Digit = IntRange('0'.code, '9'.code)
         private val FullWidthDigit = IntRange('０'.code, '９'.code)
     }
