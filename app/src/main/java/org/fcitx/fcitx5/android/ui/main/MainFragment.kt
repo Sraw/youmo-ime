@@ -84,11 +84,8 @@ class MainFragment : PaddingPreferenceFragment() {
                 )
             }
             addCategory(R.string.home_section_words) {
-                addDestinationPreference(
-                    R.string.my_words,
-                    R.drawable.ic_baseline_library_books_24,
-                    SettingsRoute.UserWords
-                )
+                // the user dictionary is the first of the three layers on the dictionaries' page:
+                // one way in, not a second one here
                 addDestinationPreference(
                     R.string.custom_phrases,
                     R.drawable.ic_baseline_text_format_24,

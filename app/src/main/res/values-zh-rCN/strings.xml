@@ -406,7 +406,7 @@
     <string name="home_section_clipboard_emoji">剪贴板与表情</string>
     <string name="custom_phrases">自定义短语</string>
     <string name="custom_phrases_summary">用短的编码打出长文本，如 dz → 你的地址</string>
-    <string name="word_packs">词库包</string>
+    <string name="word_packs">词库</string>
     <string name="my_words_summary">手动添加、自动学到和屏蔽的词，可导入导出</string>
     <string name="more_settings">更多设置</string>
     <string name="word_pinyin_unknown">找不到读音，请填写拼音</string>

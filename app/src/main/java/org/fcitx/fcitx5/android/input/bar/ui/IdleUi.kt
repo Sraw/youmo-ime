@@ -24,6 +24,8 @@ import org.fcitx.fcitx5.android.input.bar.ui.idle.ClipboardSuggestionUi
 import org.fcitx.fcitx5.android.input.bar.ui.idle.InlineSuggestionsUi
 import org.fcitx.fcitx5.android.input.bar.ui.idle.NumberRow
 import org.fcitx.fcitx5.android.input.keyboard.CommonKeyActionListener
+import org.fcitx.fcitx5.android.input.keyboard.KeyAction
+import org.fcitx.fcitx5.android.input.keyboard.KeyActionListener
 import org.fcitx.fcitx5.android.input.popup.PopupComponent
 import splitties.dimensions.dp
 import splitties.views.dsl.constraintlayout.after
@@ -83,6 +85,17 @@ class IdleUi(
 
     val hideKeyboardButton = ToolButton(ctx, R.drawable.ic_baseline_arrow_drop_down_24, theme)
 
+    /**
+     * The emoji, on the bar whenever it is idle, as Sogou's 表情: a long press on the comma was
+     * all there was, and nobody finds that. Opens the emoji or kaomoji, whichever was last.
+     */
+    val emojiButton = ToolButton(ctx, R.drawable.ic_baseline_tag_faces_24, theme).apply {
+        contentDescription = ctx.getString(R.string.a11y_key_emoji)
+        setOnClickListener {
+            commonKeyActionListener.listener.onKeyAction(KeyAction.PickerSwitchAction(), KeyActionListener.Source.Keyboard)
+        }
+    }
+
     val emptyBar = Space(ctx)
 
     val buttonsUi = ButtonsBarUi(ctx, theme)
@@ -129,9 +142,13 @@ class IdleUi(
             endOfParent()
             centerVertically()
         })
+        add(emojiButton, lParams(size, size) {
+            before(hideKeyboardButton)
+            centerVertically()
+        })
         add(animator, lParams(matchConstraints, matchParent) {
             after(menuButton)
-            before(hideKeyboardButton)
+            before(emojiButton)
             centerVertically()
         })
     }

@@ -378,7 +378,7 @@
     <string name="home_section_clipboard_emoji">剪貼板與表情</string>
     <string name="custom_phrases">自定義短語</string>
     <string name="custom_phrases_summary">用短的編碼打出長文本，如 dz → 你的地址</string>
-    <string name="word_packs">詞庫包</string>
+    <string name="word_packs">詞庫</string>
     <string name="my_words_summary">手動新增、自動學到和封鎖的詞，可匯入匯出</string>
     <string name="more_settings">更多設定</string>
     <string name="word_pinyin_unknown">找不到讀音，請填寫拼音</string>

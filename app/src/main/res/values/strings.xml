@@ -411,7 +411,7 @@
     <string name="home_section_clipboard_emoji">Clipboard &amp; emoji</string>
     <string name="custom_phrases">Custom phrases</string>
     <string name="custom_phrases_summary">Short keys that type longer text, e.g. dz → your address</string>
-    <string name="word_packs">Word packs</string>
+    <string name="word_packs">Dictionaries</string>
     <string name="my_words_summary">Words you added, learned and blocked; import and export</string>
     <string name="more_settings">More settings</string>
     <string name="word_pinyin_unknown">No reading found: please type the pinyin</string>
