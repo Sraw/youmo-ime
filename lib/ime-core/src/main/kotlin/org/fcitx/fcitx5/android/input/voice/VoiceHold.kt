@@ -9,8 +9,11 @@ package org.fcitx.fcitx5.android.input.voice
  * the microphone, what is said is typed when the finger lifts, and lifting it after sliding up
  * [cancelDistance] or more drops it. What is heard meanwhile is shown, not typed: a stretch is
  * recognized at each pause, the last one once the finger lifts.
+ *
+ * [around]: held on a round button instead (the voice panel's microphone), the finger measured
+ * from its centre: out of the circle of [cancelDistance], whichever way, drops it.
  */
-class VoiceHold(private val cancelDistance: Float) {
+class VoiceHold(private val cancelDistance: Float, private val around: Boolean = false) {
 
     enum class Zone { Talk, Cancel }
 
@@ -23,10 +26,14 @@ class VoiceHold(private val cancelDistance: Float) {
 
     private val pieces = mutableListOf<String>()
 
-    /** The finger [dy] below where it went down (up is negative); whether the zone changed. */
-    fun moved(dy: Float): Boolean {
+    /**
+     * The finger [dx] right of and [dy] below where it went down, or the button's centre if
+     * [around] (left and up are negative); whether the zone changed.
+     */
+    fun moved(dx: Float, dy: Float): Boolean {
         if (released) return false
-        val now = if (-dy >= cancelDistance) Zone.Cancel else Zone.Talk
+        val out = if (around) dx * dx + dy * dy > cancelDistance * cancelDistance else -dy >= cancelDistance
+        val now = if (out) Zone.Cancel else Zone.Talk
         if (now == zone) return false
         zone = now
         return true

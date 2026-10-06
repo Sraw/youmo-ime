@@ -43,7 +43,7 @@ class VoiceHoldOverlay(
     private val pointer = inputView.longPressPointer
     private val downY = inputView.downY(pointer)
 
-    private val session = VoiceHoldSession(inputView.service, inputView.fcitx, keyboard.height * CANCEL_SHARE, this, commit)
+    private val session = VoiceHoldSession(inputView.service, inputView.fcitx, VoiceHold(keyboard.height * CANCEL_SHARE), this, commit)
     private val main = Handler(Looper.getMainLooper())
     private var gone = false
 
@@ -131,7 +131,7 @@ class VoiceHoldOverlay(
         when (ev.actionMasked) {
             MotionEvent.ACTION_MOVE -> {
                 val i = ev.findPointerIndex(pointer)
-                if (i >= 0) session.moved(ev.getY(i) - downY)
+                if (i >= 0) session.moved(0f, ev.getY(i) - downY)
             }
             MotionEvent.ACTION_UP -> session.lift()
             MotionEvent.ACTION_POINTER_UP -> if (ev.getPointerId(ev.actionIndex) == pointer) session.lift()

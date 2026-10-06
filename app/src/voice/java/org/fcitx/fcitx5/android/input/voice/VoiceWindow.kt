@@ -8,10 +8,13 @@ import android.Manifest
 import android.annotation.SuppressLint
 import android.content.pm.PackageManager
 import android.content.res.ColorStateList
+import android.graphics.Color
 import android.graphics.drawable.GradientDrawable
+import android.graphics.drawable.RippleDrawable
 import android.os.Handler
 import android.os.Looper
 import android.text.TextUtils
+import android.util.TypedValue
 import android.view.Gravity
 import android.view.HapticFeedbackConstants
 import android.view.MotionEvent
@@ -21,7 +24,10 @@ import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
+import androidx.appcompat.widget.AppCompatTextView
 import androidx.core.content.ContextCompat
+import androidx.core.graphics.ColorUtils
+import androidx.core.widget.TextViewCompat
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.core.CapabilityFlags
 import org.fcitx.fcitx5.android.core.FcitxKeyMapping
@@ -57,7 +63,8 @@ class VoiceWindow : InputWindow.ExtendedInputWindow<VoiceWindow>(), InputBroadca
 
     private val main = Handler(Looper.getMainLooper())
     private var session: VoiceHoldSession? = null
-    private var downY = 0f
+    private var centreX = 0f
+    private var centreY = 0f
 
     // this touch started the session: its moves, its lift and its cancel are the session's
     private var holding = false
@@ -70,20 +77,22 @@ class VoiceWindow : InputWindow.ExtendedInputWindow<VoiceWindow>(), InputBroadca
 
     override fun onCreateView(): View {
         val ctx = context
-        heard = TextView(ctx).apply {
-            textSize = 18f
+        // AppCompat's: autosizing below Android 8.1 too
+        heard = AppCompatTextView(ctx).apply {
             gravity = Gravity.CENTER
-            maxLines = 3
+            maxLines = 2
             // the end of a long one is what was just said
             ellipsize = TextUtils.TruncateAt.START
         }
+        // smaller rather than cut, on a short keyboard
+        TextViewCompat.setAutoSizeTextTypeUniformWithConfiguration(heard, TEXT_MIN, TEXT_MAX, 1, TypedValue.COMPLEX_UNIT_SP)
         pulse = VoicePulseView(ctx).apply {
             color = theme.accentKeyBackgroundColor
             inner = ctx.dp(MIC / 2).toFloat()
         }
         micBackground = GradientDrawable().apply {
             shape = GradientDrawable.OVAL
-            setColor(theme.accentKeyBackgroundColor)
+            micColors(theme.accentKeyBackgroundColor)
         }
         mic = ImageView(ctx).apply {
             setImageResource(R.drawable.ic_baseline_keyboard_voice_24)
@@ -92,7 +101,7 @@ class VoiceWindow : InputWindow.ExtendedInputWindow<VoiceWindow>(), InputBroadca
             background = micBackground
             val pad = ctx.dp(MIC_PADDING)
             setPadding(pad, pad, pad, pad)
-            elevation = ctx.dp(3).toFloat()
+            elevation = ctx.dp(4).toFloat()
             contentDescription = ctx.getString(R.string.voice_press_to_talk)
             setOnTouchListener(::touched)
         }
@@ -109,15 +118,10 @@ class VoiceWindow : InputWindow.ExtendedInputWindow<VoiceWindow>(), InputBroadca
             addView(key(R.drawable.ic_baseline_keyboard_return_24, R.string.a11y_key_enter, FcitxKeyMapping.FcitxKey_Return, repeat = false), side())
         }
         label = TextView(ctx).apply {
-            textSize = 14f
+            textSize = 13f
             gravity = Gravity.CENTER
+            letterSpacing = LABEL_SPACING
             setTextColor(theme.keyTextColor)
-        }
-        val hint = TextView(ctx).apply {
-            setText(R.string.voice_hint)
-            textSize = 11f
-            gravity = Gravity.CENTER
-            setTextColor(theme.altKeyTextColor)
         }
         idle()
         return LinearLayout(ctx).apply {
@@ -125,30 +129,41 @@ class VoiceWindow : InputWindow.ExtendedInputWindow<VoiceWindow>(), InputBroadca
             gravity = Gravity.CENTER_HORIZONTAL
             clipChildren = false
             val pad = ctx.dp(16)
-            setPadding(pad, ctx.dp(8), pad, ctx.dp(10))
-            addView(heard, LinearLayout.LayoutParams(-1, 0, 1f))
+            setPadding(pad, ctx.dp(6), pad, ctx.dp(10))
+            addView(heard, LinearLayout.LayoutParams(-1, 0, 1f).apply { bottomMargin = ctx.dp(2) })
             addView(row, LinearLayout.LayoutParams(-1, -2))
             addView(label, LinearLayout.LayoutParams(-1, -2))
-            addView(hint, LinearLayout.LayoutParams(-1, -2).apply { topMargin = ctx.dp(6) })
         }
+    }
+
+    // a light top left to the colour itself bottom right: the button lit from above, not flat
+    private fun GradientDrawable.micColors(color: Int) {
+        colors = intArrayOf(ColorUtils.blendARGB(color, Color.WHITE, LIGHT), color)
+        orientation = GradientDrawable.Orientation.TL_BR
     }
 
     private fun side() = LinearLayout.LayoutParams(context.dp(KEY), context.dp(KEY)).apply {
-        marginStart = context.dp(12)
-        marginEnd = context.dp(12)
+        marginStart = context.dp(SIDE_GAP)
+        marginEnd = context.dp(SIDE_GAP)
     }
 
+    /** Deleting and a new line: light rings beside the microphone, not buttons as big as it. */
     private fun key(icon: Int, description: Int, sym: Int, repeat: Boolean) = CustomGestureView(context).apply {
-        background = GradientDrawable().apply {
+        val ring = GradientDrawable().apply {
             shape = GradientDrawable.OVAL
-            setColor(theme.keyBackgroundColor)
+            setColor(ColorUtils.setAlphaComponent(theme.keyTextColor, KEY_FILL))
+            setStroke(context.dp(1), ColorUtils.setAlphaComponent(theme.keyTextColor, KEY_STROKE))
         }
-        elevation = context.dp(1).toFloat()
+        val mask = GradientDrawable().apply {
+            shape = GradientDrawable.OVAL
+            setColor(Color.WHITE)
+        }
+        background = RippleDrawable(ColorStateList.valueOf(theme.keyPressHighlightColor), ring, mask)
         addView(ImageView(context).apply {
             setImageResource(icon)
-            imageTintList = ColorStateList.valueOf(theme.keyTextColor)
-            scaleType = ImageView.ScaleType.CENTER
-        }, FrameLayout.LayoutParams(-1, -1))
+            imageTintList = ColorStateList.valueOf(theme.altKeyTextColor)
+            scaleType = ImageView.ScaleType.FIT_CENTER
+        }, FrameLayout.LayoutParams(context.dp(ICON), context.dp(ICON), Gravity.CENTER))
         contentDescription = context.getString(description)
         val press = { commonKeyActionListener.listener.onKeyAction(KeyAction.SymAction(KeySym(sym)), KeyActionListener.Source.Keyboard) }
         setOnClickListener { press() }
@@ -163,12 +178,15 @@ class VoiceWindow : InputWindow.ExtendedInputWindow<VoiceWindow>(), InputBroadca
     private fun touched(v: View, ev: MotionEvent): Boolean {
         when (ev.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
-                downY = ev.rawY
+                // the finger measured from the button's centre: off the button, it is dropped
+                val at = IntArray(2).also { v.getLocationOnScreen(it) }
+                centreX = at[0] + v.width / 2f
+                centreY = at[1] + v.height / 2f
                 holding = false
                 press(v)
             }
             // a press while the last is recognized was not one: its cancel drops nothing
-            MotionEvent.ACTION_MOVE -> if (holding) session?.moved(ev.rawY - downY)
+            MotionEvent.ACTION_MOVE -> if (holding) session?.moved(ev.rawX - centreX, ev.rawY - centreY)
             MotionEvent.ACTION_UP -> if (holding) session?.lift()
             MotionEvent.ACTION_CANCEL -> if (holding) session?.drop()
         }
@@ -189,7 +207,9 @@ class VoiceWindow : InputWindow.ExtendedInputWindow<VoiceWindow>(), InputBroadca
             else -> {
                 v.parent.requestDisallowInterceptTouchEvent(true)
                 v.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
-                session = VoiceHoldSession(service, fcitx, context.dp(CANCEL).toFloat(), ui) { text ->
+                // off the button, grown as it is while held, and a finger's slack
+                val off = context.dp(MIC) / 2f * PRESSED_SCALE + context.dp(SLACK)
+                session = VoiceHoldSession(service, fcitx, VoiceHold(off, around = true), ui) { text ->
                     // as the emoji's: a pinyin being typed is committed first, not overwritten
                     commonKeyActionListener.listener.onKeyAction(KeyAction.CommitAction(text), KeyActionListener.Source.Keyboard)
                 }.also { it.begin() }
@@ -242,7 +262,7 @@ class VoiceWindow : InputWindow.ExtendedInputWindow<VoiceWindow>(), InputBroadca
         override fun zone(cancel: Boolean) {
             mic.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
             val color = if (cancel) CANCEL_RED else theme.accentKeyBackgroundColor
-            micBackground.setColor(color)
+            micBackground.micColors(color)
             pulse.color = color
             label.setText(if (cancel) R.string.voice_release_to_cancel else R.string.voice_release_to_type)
             label.setTextColor(if (cancel) CANCEL_RED else theme.keyTextColor)
@@ -276,7 +296,7 @@ class VoiceWindow : InputWindow.ExtendedInputWindow<VoiceWindow>(), InputBroadca
     private fun settle() {
         mic.animate().scaleX(1f).scaleY(1f).setDuration(ANIMATE_MS).start()
         pulse.active = false
-        micBackground.setColor(theme.accentKeyBackgroundColor)
+        micBackground.micColors(theme.accentKeyBackgroundColor)
         pulse.color = theme.accentKeyBackgroundColor
         label.setTextColor(theme.keyTextColor)
     }
@@ -293,11 +313,19 @@ class VoiceWindow : InputWindow.ExtendedInputWindow<VoiceWindow>(), InputBroadca
     }
 
     companion object {
-        private const val MIC = 76
-        private const val MIC_PADDING = 22
-        private const val STAGE = 136
-        private const val KEY = 52
-        private const val CANCEL = 96
+        private const val MIC = 72
+        private const val MIC_PADDING = 21
+        private const val STAGE = 120
+        private const val KEY = 46
+        private const val ICON = 20
+        private const val SIDE_GAP = 22
+        private const val KEY_FILL = 0x0F
+        private const val KEY_STROKE = 0x33
+        private const val SLACK = 12
+        private const val LIGHT = 0.18f
+        private const val LABEL_SPACING = 0.08f
+        private const val TEXT_MIN = 12
+        private const val TEXT_MAX = 17
         private const val PRESSED_SCALE = 1.1f
         private const val ANIMATE_MS = 150L
         private const val CANCEL_RED = 0xFFC62828.toInt()

@@ -20,7 +20,8 @@ import org.fcitx.fcitx5.android.input.FcitxInputMethodService
 class VoiceHoldSession(
     private val service: FcitxInputMethodService,
     private val fcitx: FcitxConnection,
-    cancelDistance: Float,
+    /** VoiceHold's: how far the finger goes to drop it, and whether around a round button */
+    private val hold: VoiceHold,
     private val ui: Ui,
     private val commit: (String) -> Unit,
 ) {
@@ -41,7 +42,6 @@ class VoiceHoldSession(
         fun ended(@StringRes message: Int?)
     }
 
-    private val hold = VoiceHold(cancelDistance)
 
     // the field it is said for
     private val field = service.currentInputEditorInfo
@@ -82,9 +82,9 @@ class VoiceHoldSession(
         }
     }
 
-    /** The finger [dy] below where it went down (up is negative). */
-    fun moved(dy: Float) {
-        if (!over && hold.moved(dy)) ui.zone(hold.zone == VoiceHold.Zone.Cancel)
+    /** The finger moved: as [VoiceHold.moved]. */
+    fun moved(dx: Float, dy: Float) {
+        if (!over && hold.moved(dx, dy)) ui.zone(hold.zone == VoiceHold.Zone.Cancel)
     }
 
     fun lift() {

@@ -12,7 +12,7 @@ import android.view.View
 
 /**
  * Rings going out from a round button while it listens, wider the louder it hears ([level]), as
- * a ripple on water; they fade out once it stops. [inner] is the button's radius: they start at
+ * a ripple on water; they fade out once it stops, to a soft halo. [inner] is the button's radius: they start at
  * its edge. Drawn a frame at a time while there is something to draw, nothing otherwise.
  */
 class VoicePulseView(context: Context) : View(context) {
@@ -53,6 +53,9 @@ class VoicePulseView(context: Context) : View(context) {
         val outer = minOf(cx, cy)
         val reach = (outer - inner) * (QUIET_REACH + (1f - QUIET_REACH) * shown)
         val alpha = paint.alpha
+        // at rest, a soft halo round the button: it stands out of the panel even before a press
+        paint.alpha = (HALO_ALPHA * (1f - presence)).toInt()
+        canvas.drawCircle(cx, cy, inner * HALO_SCALE, paint)
         val t = SystemClock.uptimeMillis() / PERIOD_MS
         for (i in 0 until RINGS) {
             // each ring a share of the period behind the last
@@ -72,5 +75,7 @@ class VoicePulseView(context: Context) : View(context) {
         private const val FADE = 0.12f
         private const val QUIET_REACH = 0.45f
         private const val SETTLED = 0.01f
+        private const val HALO_ALPHA = 36
+        private const val HALO_SCALE = 1.16f
     }
 }

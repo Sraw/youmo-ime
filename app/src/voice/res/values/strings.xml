@@ -3,7 +3,6 @@
     <string name="voice_no_permission">Voice input needs the microphone: hold it to allow</string>
     <string name="voice_no_model">The speech model could not be loaded</string>
     <string name="voice_no_microphone">The microphone cannot be used</string>
-    <string name="voice_hint">Recognized on the phone: nothing heard leaves it.</string>
     <string name="voice_model_credit">Speech recognition: X-ASR zh-en (Gilgamesh-J); run with sherpa-onnx (k2-fsa) and silero VAD</string>
     <string name="voice_hold_listening">Listening…</string>
     <string name="voice_hold_recognizing">Recognizing…</string>
@@ -13,6 +12,6 @@
     <string name="voice_press_to_talk">Hold to talk</string>
     <string name="voice_release_to_type">Release to type</string>
     <string name="voice_release_to_cancel">Release to cancel</string>
-    <string name="voice_panel_prompt">Hold the microphone and talk · slide up to cancel</string>
+    <string name="voice_panel_prompt">Hold the microphone and talk · slide off it to cancel</string>
     <string name="voice_no_password">No voice input in a password field</string>
 </resources>
