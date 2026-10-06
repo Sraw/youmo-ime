@@ -160,7 +160,6 @@ class LibimeMigrationTest {
     fun wubiPinyinsSettingsAreItsOwn() {
         val both = mapOf("wbpy" to "[Table]\nHint=False\n", "wbx" to "[Table]\nPageSize=5\n")
         assertEquals("[WubiPinyin]\nHint=False\n", LibimeMigration.settings("", both))
-        assertEquals("[Wanfeng]\nOrderPolicy=Freq\n", LibimeMigration.settings("", mapOf("wanfeng" to "[Table]\nOrderPolicy=Freq\n")))
     }
 
     @Test

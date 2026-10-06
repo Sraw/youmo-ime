@@ -26,10 +26,10 @@ package org.fcitx.fcitx5.android.engine.table
  *   longest code), become phrases typed by their 组词规则 code; 0 turns them off
  * @property saveAutoPhraseAfter an auto phrase typed this many times, character by character, or
  *   picked once, joins the table's own entries; 0 or less: only once picked
- * @property endKeys keys that end a code (晚风's `,./;`): the next key starts another, the first
+ * @property endKeys keys that end a code (a `.conf`'s EndKey, as 晚风's `,./;`): the next key starts another, the first
  *   candidate committed (fcitx's EndKey)
  * @property selectionKeys keys that pick a candidate while something is typed, the first key the
- *   first on the page: for a table whose codes are digits (电报码's `qwertyuiop`)
+ *   first on the page: for a table whose codes are digits (a `.conf`'s Selection, as 电报码's `qwertyuiop`)
  */
 data class TableOptions(
     val autoSelect: Boolean = true,
@@ -67,25 +67,6 @@ data class TableOptions(
          * (no key to start a lookup).
          */
         val WUBI_PINYIN = WUBI.copy(pinyinKey = null)
-
-        /** fcitx's db.conf: codes of digits, so letters pick. */
-        val DIANBAO = TableOptions(
-            orderByUse = true,
-            autoPhraseLength = -1,
-            saveAutoPhraseAfter = -1,
-            selectionKeys = "qwertyuiop",
-        )
-
-        /** fcitx's qxm.conf: OrderPolicy=Fast. */
-        val BINGCHAN = TableOptions(orderByUse = true, matchingKey = '*', autoPhraseLength = 4, saveAutoPhraseAfter = 3)
-
-        /** fcitx's wanfeng.conf: a code ends with one of its punctuation keys. */
-        val WANFENG = TableOptions(
-            noMatchAutoSelectLength = 1,
-            autoPhraseLength = -1,
-            saveAutoPhraseAfter = -1,
-            endKeys = ",;/.",
-        )
 
         /**
          * fcitx's cangjie.conf. Auto phrases as libime has them unless set, though its table has

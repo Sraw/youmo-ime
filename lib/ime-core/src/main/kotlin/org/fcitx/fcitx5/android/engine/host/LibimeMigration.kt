@@ -27,9 +27,6 @@ object LibimeMigration {
         "cangjie" to "engine-cangjie",
         "zrm" to "engine-ziranma",
         "erbi" to "engine-erbi",
-        "db" to "engine-dianbao",
-        "qxm" to "engine-bingchan",
-        "wanfeng" to "engine-wanfeng",
     )
 
     const val ENABLED_IM = "EnabledIM"
@@ -128,7 +125,7 @@ object LibimeMigration {
      * libime's tables whose settings carry over, kept as `table/<name>.conf` in fcitx's config
      * home, each under the engine's table it became.
      */
-    val TABLE_CONFIGS: List<String> = listOf("wbx", "wbpy", "cangjie", "zrm", "erbi", "db", "qxm", "wanfeng")
+    val TABLE_CONFIGS: List<String> = listOf("wbx", "wbpy", "cangjie", "zrm", "erbi")
 
     /**
      * The androidengine addon's config holding what [pinyinConfig], libime pinyin's, set of it,

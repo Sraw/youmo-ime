@@ -656,24 +656,30 @@ class TableSessionTest {
         assertEquals(listOf(4), wubiPinyin.matchPinyin("gong", prefix = false).map { wubiPinyin.codeLength(it) - 1 }.distinct())
     }
 
+    // as 晚风's .conf had it: a code ends with one of its punctuation keys
+    private val ending = TableOptions(noMatchAutoSelectLength = 1, autoPhraseLength = -1, saveAutoPhraseAfter = -1, endKeys = ",;/.")
+
+    // as 电报码's: codes of digits, so letters pick
+    private val digits = TableOptions(orderByUse = true, autoPhraseLength = -1, saveAutoPhraseAfter = -1, selectionKeys = "qwertyuiop")
+
     @Test
     fun anEndKeyEndsTheCode() {
         val d = dictionary(
             "a, 挨", "a, 哎", "a,b 暗", "a,bc 按", "b 不", "bc 部",
             header = mapOf("键码" to "abc,"),
         )
-        val (commit, s) = TableSession(d, TableOptions.WANFENG).type("a,b")
+        val (commit, s) = TableSession(d, ending).type("a,b")
         assertEquals("挨", commit)
         assertEquals("b", s.preedit)
         // without it, a,b is a code going on
-        assertEquals("a,b", TableSession(d, TableOptions.WANFENG.copy(endKeys = "")).type("a,b").second.preedit)
+        assertEquals("a,b", TableSession(d, ending.copy(endKeys = "")).type("a,b").second.preedit)
     }
 
     @Test
     fun aKeyNoCodeStartsIsTheApps() {
         // 晚风's , and . start no code: they are its punctuation
         val d = dictionary("a, 挨", "a, 哎", "b 不", header = mapOf("键码" to "ab,"))
-        val t = TableSession(d, TableOptions.WANFENG)
+        val t = TableSession(d, ending)
         val alone = t.apply(Key(','))
         assertFalse(alone.handled)
         assertEquals("", alone.preedit)
@@ -686,7 +692,7 @@ class TableSessionTest {
     @Test
     fun selectionKeysPickWhileACodeIsTyped() {
         val d = dictionary("0 一", "0 丁", "00 七", "1 三", header = mapOf("键码" to "0123456789"))
-        val t = TableSession(d, TableOptions.DIANBAO)
+        val t = TableSession(d, digits)
         assertFalse(t.reads('w'))
         val typed = t.type("0").second
         assertEquals(listOf("一", "丁", "七"), typed.candidates)
@@ -701,7 +707,7 @@ class TableSessionTest {
         assertEquals("", t.apply(Key('p')).commit)
         assertEquals("0", t.apply(Key('p')).preedit)
         // with no candidate to pick, a selection key is any other key
-        val none = TableSession(d, TableOptions.DIANBAO.copy(noMatchAutoSelectLength = 0))
+        val none = TableSession(d, digits.copy(noMatchAutoSelectLength = 0))
         assertEquals("05", none.type("05").second.preedit)
         val passed = none.apply(Key('w'))
         assertFalse(passed.handled)

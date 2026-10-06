@@ -80,7 +80,7 @@ class EngineDataPlugin : Plugin<Project> {
         private val TABLE = Source(
             "table-20240108.tar.zst",
             "3e9d87b04a393f131723472c8eaa860dd23c378a3d4f6a9005513b2a95b3614b",
-            listOf("cj", "db", "erbi", "qxm", "wanfeng", "wbpy", "wbx", "zrm").map { "$it.txt" },
+            listOf("cj", "erbi", "wbpy", "wbx", "zrm").map { "$it.txt" },
         )
         // the language model engine-data.sh made (its manifest.txt in the release says from what),
         // repacked as the tar CMake unpacks; a tag of its own, not "latest", as the models'

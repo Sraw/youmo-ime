@@ -96,9 +96,6 @@ FCITX_CONFIGURATION(
         Option<EngineTableConfig> ziranma{this, "Ziranma", "自然码", engineTable(true, EngineOrderPolicy::Fast, -1, -1)};
         Option<EngineTableConfig> erbi{this, "Erbi", "二笔", engineTable(false, EngineOrderPolicy::Freq, 4, -1)};
         Option<EngineTableConfig> wubiPinyin{this, "WubiPinyin", "五笔拼音", engineTable(true, EngineOrderPolicy::Freq, 4, 3)};
-        Option<EngineTableConfig> dianbaoma{this, "Dianbaoma", "电报码", engineTable(true, EngineOrderPolicy::Freq, -1, -1)};
-        Option<EngineTableConfig> bingchan{this, "Bingchan", "冰蟾全息", engineTable(true, EngineOrderPolicy::Fast, 4, 3)};
-        Option<EngineTableConfig> wanfeng{this, "Wanfeng", "晚风", engineTable(true, EngineOrderPolicy::No, -1, -1)};
         // opened by name in the app (ConfigDescriptor), the uri only says whose they are
         ExternalOption dictmanager{this, "DictManager", _("Manage Dictionaries"),
                                    "fcitx://config/addon/androidengine/dictmanager"};

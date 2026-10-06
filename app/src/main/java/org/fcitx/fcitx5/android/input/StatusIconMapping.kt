@@ -18,7 +18,6 @@ object StatusIconMapping {
             "fcitx-wubi", "fcitx-wbpy" -> return R.drawable.ic_status_wubi
             "fcitx-cangjie" -> return R.drawable.ic_status_cangjie
             "fcitx-ziranma" -> return R.drawable.ic_status_ziranma
-            "fcitx-dianbaoma" -> return R.drawable.ic_status_dianbaoma
             "fcitx-zhengma", "fcitx_zhengma" -> return R.drawable.ic_status_zhengma
         }
         when (entry.languageCode) {

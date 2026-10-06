@@ -19,7 +19,7 @@ class InputMethodSettingsTest {
 
     private val names = listOf(
         "engine-pinyin", "engine-shuangpin", "engine-wubi", "engine-cangjie", "engine-ziranma", "engine-erbi",
-        "engine-wubipinyin", "engine-dianbao", "engine-bingchan", "engine-wanfeng", "keyboard-us",
+        "engine-wubipinyin", "keyboard-us",
     )
 
     private fun List<Item>.flat(): List<Item> = flatMap { if (it is Section) it.items.flat() else listOf(it) }

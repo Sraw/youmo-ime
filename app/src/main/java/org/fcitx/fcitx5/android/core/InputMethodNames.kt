@@ -22,9 +22,6 @@ object InputMethodNames {
         "engine-ziranma" to R.string.im_ziranma,
         "engine-erbi" to R.string.im_erbi,
         "engine-wubipinyin" to R.string.im_wubipinyin,
-        "engine-dianbao" to R.string.im_dianbao,
-        "engine-bingchan" to R.string.im_bingchan,
-        "engine-wanfeng" to R.string.im_wanfeng,
         "keyboard-us" to R.string.im_english,
     )
 

@@ -182,9 +182,6 @@ std::vector<InputMethodEntry> AndroidEngine::listInputMethods() {
             {"engine-ziranma", "自", "自然码", "fcitx-ziranma"},
             {"engine-erbi", "二", "二笔", "fcitx-erbi"},
             {"engine-wubipinyin", "五", "五笔拼音", "fcitx-wubi"},
-            {"engine-dianbao", "电", "电报码", "fcitx-dianbaoma"},
-            {"engine-bingchan", "冰", "冰蟾全息", "fcitx-bingchan"},
-            {"engine-wanfeng", "晚", "晚风", "fcitx-wanfeng"},
     };
     std::vector<InputMethodEntry> result;
     for (const auto &m: methods) {
@@ -216,9 +213,6 @@ Option<EngineTableConfig> *AndroidEngine::table(const std::string &im) {
             {"engine-ziranma", &AndroidEngineConfig::ziranma},
             {"engine-erbi", &AndroidEngineConfig::erbi},
             {"engine-wubipinyin", &AndroidEngineConfig::wubiPinyin},
-            {"engine-dianbao", &AndroidEngineConfig::dianbaoma},
-            {"engine-bingchan", &AndroidEngineConfig::bingchan},
-            {"engine-wanfeng", &AndroidEngineConfig::wanfeng},
     };
     for (const auto &[name, option]: tables) {
         if (im == name) return &(config_.*option);

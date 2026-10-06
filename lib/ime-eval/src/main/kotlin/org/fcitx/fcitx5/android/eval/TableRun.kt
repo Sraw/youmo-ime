@@ -215,9 +215,6 @@ class TableRun(private val table: CodeTable, private val options: TableOptions) 
             "ziranma" to TableOptions.ZIRANMA,
             "erbi" to TableOptions.ERBI,
             "wubipinyin" to TableOptions.WUBI_PINYIN,
-            "dianbao" to TableOptions.DIANBAO,
-            "bingchan" to TableOptions.BINGCHAN,
-            "wanfeng" to TableOptions.WANFENG,
             "plain" to TableOptions(),
         )
 
