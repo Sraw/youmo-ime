@@ -80,7 +80,7 @@ class VoiceHoldSession(
             service.assets,
             events,
             hotwords = { VoiceEngine.userHotwords(fcitx) },
-            boundaries = { VoiceEngine.wordBoundaries(fcitx, it) },
+            language = VoiceEngine.language(fcitx),
         ).also {
             it.load()
             it.start()

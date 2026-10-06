@@ -38,41 +38,45 @@ class VoiceEngineTest {
 
     @Test
     fun theUsersWordsAreListenedFor() {
-        // the pack's hotwords read from the assets, the user's put in for each stretch: of the
-        // two, the first goes from 开放 to 开饭 with the bonus (the second is said more like 开放)
-        val word = Engines.UserWord("开饭", "kai fan", Engines.UserWord.Kind.ADDED)
-        val with = heard(VoiceHotwords.ofUser(listOf(word)))
-        val without = heard(VoiceHotwords.Words.NONE)
+        // the pack's hotwords read from the assets, the user's put in for each stretch: 早上, said,
+        // scored the higher for the bonus. (It was 开饭 made of the first stretch's 开放, but with
+        // a beam of 16 the search keeps 开放 heard, rightly. Not 开放 either: the pack has 开放时间,
+        // and a hotword ending where a longer one goes on takes the search back to the start of
+        // the graph, the longer one's bonus lost.)
+        val word = Engines.UserWord("早上", "zao shang", Engines.UserWord.Kind.ADDED)
+        val with = topScore(VoiceHotwords.ofUser(listOf(word)))
+        val without = topScore(VoiceHotwords.Words.NONE)
         assertTrue("$with with, $without without", with > without)
     }
 
     @Test
-    fun aBlockedWordStandingAloneIsNotWrittenEvenListenedFor() {
-        // the bonus that made 开饭 of the first stretch, and the word blocked: split char by char,
-        // 开饭 stands as words wherever it is, and another hypothesis or the search again wins
-        val listened = heard(VoiceHotwords.Words(hotwords = "开 饭", blocked = ""))
-        val blocked = hear(VoiceHotwords.Words(hotwords = "开 饭", blocked = "开 饭")) { IntArray(it.length + 1) { i -> i } }
-        assertTrue("$listened 开饭 listened for", listened > 0)
-        assertTrue(blocked.toString(), blocked.none { "开饭" in it })
+    fun aBlockedWordStandingAloneIsNotWritten() {
+        // 开放, said in each stretch, blocked: split char by char, it stands as words wherever it
+        // is, and another hypothesis or the search again wins
+        val blocked = hear(VoiceHotwords.Words(hotwords = "", blocked = "开 放")) { IntArray(it.length + 1) { i -> i } }
+        assertEquals(blocked.toString(), 2, blocked.size)
+        assertTrue(blocked.toString(), blocked.none { "开放" in it })
         // the rest still heard
         assertTrue(blocked.toString(), blocked.all { "时间早上九点" in it || "时间早上9点" in it })
     }
 
     @Test
     fun aBlockedWordWithinALongerOneIsWritten() {
-        // each stretch one word: 开饭 within it, not standing, kept as heard
-        val listened = heard(VoiceHotwords.Words(hotwords = "开 饭", blocked = ""))
-        val within = heard(VoiceHotwords.Words(hotwords = "开 饭", blocked = "开 饭")) { intArrayOf(0, it.length) }
-        assertEquals(listened, within)
+        // each stretch one word: 开放 within it, not standing, kept as heard
+        val heard = hear(VoiceHotwords.Words.NONE)
+        val within = hear(VoiceHotwords.Words(hotwords = "", blocked = "开 放")) { intArrayOf(0, it.length) }
+        assertTrue(heard.toString(), heard.any { "开放" in it })
+        assertEquals(heard, within)
     }
 
     @Test
     fun theBlockInTheSearchTakesTheWordWhereverItIs() {
-        val blocked = VoiceHotwords.Words(hotwords = "开 饭", blocked = "开 饭")
+        val blocked = VoiceHotwords.Words(hotwords = "", blocked = "开 放")
         val recognizer = VoiceEngine.acquire(app.assets)
         try {
             val text = VoiceEngine.result(recognizer, VoiceEngine.stream(recognizer, blocked, block = true), wav("zh.wav")).text
-            assertTrue(text, "开饭" !in text)
+            assertTrue(text, "开放" !in text)
+            assertTrue(text, "时间" in text)
         } finally {
             VoiceEngine.release()
         }
@@ -96,8 +100,43 @@ class VoiceEngineTest {
         }
     }
 
-    private fun heard(words: VoiceHotwords.Words, split: (String) -> IntArray = { IntArray(0) }) =
-        hear(words, split).count { it.startsWith("开饭") }
+    @Test
+    fun theLanguageModelPicksAmongWhatWasHeardAlike() {
+        val samples = wav("zh.wav")
+        val recognizer = VoiceEngine.acquire(app.assets)
+        try {
+            val heard = VoiceEngine.result(recognizer, VoiceEngine.stream(recognizer, VoiceHotwords.Words.NONE), samples)
+            val candidates = VoiceRerank.candidates(
+                VoiceRerank.distinct(heard.nbest.indices.map { VoiceRerank.Hypothesis(heard.nbest[it], heard.nbestScores[it]) }),
+            )
+            assertTrue(candidates.toString(), candidates.size > 1)
+            // a model sure of the last of them, the bare texts asked about
+            var asked = emptyList<String>()
+            val sure = object : VoiceEngine.Language {
+                override suspend fun boundaries(texts: List<String>) = emptyMap<String, IntArray>()
+                override suspend fun logProbs(texts: List<String>): FloatArray {
+                    asked = texts
+                    return FloatArray(texts.size) { if (it == texts.size - 1) 0f else -1000f }
+                }
+            }
+            val text = runBlocking {
+                VoiceEngine.recognize(recognizer, VoiceEngine.stream(recognizer, VoiceHotwords.Words.NONE), samples, VoiceHotwords.Words.NONE, sure)
+            }
+            assertEquals(candidates.map { VoiceRerank.bare(it.text) }, asked)
+            assertEquals(candidates.last().text, text)
+        } finally {
+            VoiceEngine.release()
+        }
+    }
+
+    private fun topScore(words: VoiceHotwords.Words): Float {
+        val recognizer = VoiceEngine.acquire(app.assets)
+        try {
+            return VoiceEngine.result(recognizer, VoiceEngine.stream(recognizer, words), wav("zh.wav")).nbestScores[0]
+        } finally {
+            VoiceEngine.release()
+        }
+    }
 
     // split: TextWords.boundaries in place of the engine's
     private fun hear(hotwords: VoiceHotwords.Words, split: (String) -> IntArray = { IntArray(0) }): List<String> {
@@ -117,9 +156,7 @@ class VoiceEngineTest {
                 while (!vad.empty()) {
                     val stretch = VoiceEngine.nextStretch(vad, history)
                     texts += runBlocking {
-                        VoiceEngine.recognize(recognizer, VoiceEngine.stream(recognizer, hotwords), stretch, hotwords) { suspects ->
-                            suspects.associateWith(split)
-                        }
+                        VoiceEngine.recognize(recognizer, VoiceEngine.stream(recognizer, hotwords), stretch, hotwords, language(split))
                     }
                 }
             }
@@ -139,5 +176,11 @@ class VoiceEngineTest {
 
     companion object {
         private const val WAV_HEADER = 44
+    }
+
+    // the recognizer's order, and split as [split] says
+    private fun language(split: (String) -> IntArray) = object : VoiceEngine.Language {
+        override suspend fun boundaries(texts: List<String>) = texts.associateWith(split)
+        override suspend fun logProbs(texts: List<String>) = null
     }
 }

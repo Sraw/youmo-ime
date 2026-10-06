@@ -44,8 +44,8 @@ class VoiceListener(
     private val events: Events,
     /** the user's words to listen for and blocked (VoiceHotwords.ofUser), asked for as the models load */
     private val hotwords: suspend () -> VoiceHotwords.Words,
-    /** where texts split into words (VoiceEngine.wordBoundaries): for the blocked words */
-    private val boundaries: suspend (List<String>) -> Map<String, IntArray>,
+    /** the pinyin engine's models (VoiceEngine.language): to rank what is heard, and for the blocked words */
+    private val language: VoiceEngine.Language,
 ) {
 
     enum class Failure { NoModel, NoMicrophone }
@@ -152,14 +152,25 @@ class VoiceListener(
         }
     }
 
-    private suspend fun split(texts: List<String>) = try {
-        boundaries(texts)
-    } catch (e: CancellationException) {
-        throw e
-    } catch (@Suppress("TooGenericExceptionCaught") e: Exception) {
-        // none: each taken as having the word, searched again with it blocked
-        Timber.w(e, "voice word boundaries")
-        emptyMap()
+    // the engine failing: the text as heard, and each taken as having a blocked word
+    private val safeLanguage = object : VoiceEngine.Language {
+        override suspend fun boundaries(texts: List<String>) = try {
+            language.boundaries(texts)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (@Suppress("TooGenericExceptionCaught") e: Exception) {
+            Timber.w(e, "voice word boundaries")
+            emptyMap()
+        }
+
+        override suspend fun logProbs(texts: List<String>) = try {
+            language.logProbs(texts)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (@Suppress("TooGenericExceptionCaught") e: Exception) {
+            Timber.w(e, "voice log probs")
+            null
+        }
     }
 
     private suspend fun userHotwords() = try {
@@ -301,7 +312,7 @@ class VoiceListener(
                     val text = try {
                         val stream = next ?: VoiceEngine.stream(r, words)
                         next = null
-                        VoiceEngine.recognize(r, stream, samples, words, ::split)
+                        VoiceEngine.recognize(r, stream, samples, words, safeLanguage)
                     } catch (e: CancellationException) {
                         throw e
                     } catch (@Suppress("TooGenericExceptionCaught") e: Exception) {

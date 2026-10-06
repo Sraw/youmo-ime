@@ -54,6 +54,9 @@ interface FcitxAPI {
     /** Where each of [texts] splits into words: see [Engines.wordBoundaries]. */
     suspend fun wordBoundaries(texts: List<String>): Map<String, IntArray>
 
+    /** How likely each of [texts] is: see [Engines.logProbs]. */
+    suspend fun logProbs(texts: List<String>): FloatArray
+
     /** How the dictionary reads [text], for the user to check: see [Engines.pinyinOf]. */
     suspend fun pinyinOf(text: String): String?
 

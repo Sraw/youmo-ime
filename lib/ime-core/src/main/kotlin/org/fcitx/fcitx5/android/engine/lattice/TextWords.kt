@@ -50,6 +50,35 @@ class TextWords(private val model: NgramModel, private val index: WordIndex) {
         return ends.asReversed().toIntArray()
     }
 
+    /**
+     * log10 P of [text] as the model has it, split into words as makes it likeliest, each word
+     * after the two before it: a char no word covers is `<unk>`. For ranking texts heard alike.
+     */
+    fun logProb(text: CharSequence): Float {
+        val n = text.length
+        if (n == 0) return 0f
+        // at each offset, the words a split can end on there: the best score to it and the word before
+        val at = Array(n + 1) { HashMap<Int, Best>() }
+        at[0][NO_WORD] = Best(0f, NO_WORD)
+        for (begin in 0 until n) {
+            val from = at[begin]
+            if (from.isEmpty()) continue
+            for (length in 1..minOf(MAX_WORD, n - begin)) {
+                val id = index.find(text, begin, begin + length)
+                if (id == NO_WORD && length > 1) continue
+                val to = at[begin + length]
+                for ((prev, best) in from) {
+                    val score = best.score + model.score(best.prev, prev, id)
+                    val there = to[id]
+                    if (there == null || score > there.score) to[id] = Best(score, prev)
+                }
+            }
+        }
+        return at[n].values.maxOf { it.score }
+    }
+
+    private class Best(val score: Float, val prev: Int)
+
     // the likeliest split of text from [from] on, word by word: the word ending at each offset
     // (relative to from) and where it starts
     private class Split(val word: IntArray, val start: IntArray)

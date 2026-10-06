@@ -476,6 +476,21 @@ std::string OfflineRecognitionResult::AsJsonString() const {
   }
   os << "], ";
 
+  // youmo: the beam's hypotheses and their scores, for evaluating reranking off the device
+  os << "\"nbest\": [";
+  sep = "";
+  for (const auto &n : nbest) {
+    os << sep << std::quoted(n);
+    sep = ", ";
+  }
+  os << "], \"nbest_scores\": [";
+  sep = "";
+  for (auto n : nbest_scores) {
+    os << sep << std::fixed << std::setprecision(4) << n;
+    sep = ", ";
+  }
+  os << "], ";
+
   os << "\""
      << "durations"
      << "\""

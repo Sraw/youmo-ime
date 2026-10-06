@@ -82,4 +82,16 @@ class TextWordsTest {
         val long = "你好吗".repeat(10)
         assertEquals((0..30).filter { it % 3 != 1 }, words.boundaries(long).toList())
     }
+
+    @Test
+    fun aTextScoredAsItsLikeliestSplit() {
+        // unigrams only here: 你好 吗 (-6.5) over 你 好 吗 (-8)
+        assertEquals(-6.5f, words.logProb("你好吗"), 1e-4f)
+        // 中国 人 and 中 国人 alike, the better
+        assertEquals(-5f, words.logProb("中国人"), 1e-4f)
+        // x no word: <unk>
+        assertEquals(-7f - 3f, words.logProb("x你好"), 1e-4f)
+        assertEquals(0f, words.logProb(""), 0f)
+        assert(words.logProb("你好吗") > words.logProb("吗你好吗"))
+    }
 }

@@ -19,10 +19,13 @@ upstream's AAR, so that it is ours to change.
 - **Blocked phrases:** `OfflineRecognizer::CreateStream(hotwords, blocked)` (Kotlin
   `createStream(hotwords, blocked)`): a transducer's modified beam search does not let a hypothesis
   complete any of them (`ContextGraph::CompletingTokens`), so the next best is written instead.
-- **N-best:** `OfflineRecognizerResult.nbest` and `nbestScores`, the beam's hypotheses best first.
+- **N-best:** `OfflineRecognizerResult.nbest` and `nbestScores`, the beam's hypotheses best first
+  (in `AsJsonString` too). The app ranks them again with its pinyin model (`VoiceRerank`).
 
 Each change is marked `youmo` in the source. Their C++ unit tests run on this machine with
 `lib/sherpa-onnx/host-test.sh`; the app's `VoiceEngineTest` covers them through the JNI.
+`lib/sherpa-onnx/host-eval.sh` builds `sherpa-onnx-offline` for this machine, to evaluate the
+recognizer on the app's code without a phone.
 
 ## Updating upstream
 

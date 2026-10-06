@@ -87,6 +87,9 @@ class FakeFcitxAPI : FcitxAPI {
     // no model: each char a word of its own
     override suspend fun wordBoundaries(texts: List<String>) = texts.associateWith { IntArray(it.length + 1) { i -> i } }
 
+    // all alike: the recognizer's order kept
+    override suspend fun logProbs(texts: List<String>) = FloatArray(texts.size)
+
     override suspend fun addUserWord(text: String, pinyin: String): Boolean {
         calls += "addUserWord($text, $pinyin)"
         userWords += Engines.UserWord(text, pinyin, Engines.UserWord.Kind.ADDED)

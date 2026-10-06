@@ -35,7 +35,9 @@ object VoiceEngine {
     private const val DIR = "voice"
     private const val KEEP_MS = 2 * 60 * 1000L
     private const val THREADS = 4
-    private const val BEAM = 4
+    // hypotheses kept: the n-best VoiceRerank ranks again; a quarter slower to decode than 4,
+    // the encoder most of the work either way
+    private const val BEAM = 16
 
     private val lock = Any()
     private var recognizer: OfflineRecognizer? = null
@@ -100,26 +102,44 @@ object VoiceEngine {
         }
     }
 
+    /** What the pinyin engine knows of Chinese, asked of it on its thread: for [recognize]. */
+    interface Language {
+        /** where each of [texts] splits into words (Engines.wordBoundaries), none for some if it cannot say */
+        suspend fun boundaries(texts: List<String>): Map<String, IntArray>
+
+        /** how likely each of [texts] is (Engines.logProbs), null if it cannot say */
+        suspend fun logProbs(texts: List<String>): FloatArray?
+    }
+
     /**
      * A stretch of speech to text, in [stream] (made by [stream] for [words], not blocking),
-     * which it releases: with none of the words the user blocked standing as a word in it
-     * ([VoiceBlocking], the suspects split by [boundaries]); if each hypothesis has one, the
-     * stretch searched again with them blocked.
+     * which it releases. The best of the recognizer's hypotheses by [language]'s model too
+     * ([VoiceRerank]); of them, that first, the first with none of the words the user blocked standing as a
+     * word in it ([VoiceBlocking]); if each has one, the stretch searched again with them blocked.
      */
     suspend fun recognize(
         r: OfflineRecognizer,
         stream: OfflineStream,
         samples: FloatArray,
         words: VoiceHotwords.Words,
-        boundaries: suspend (List<String>) -> Map<String, IntArray>,
+        language: Language,
     ): String {
         val result = result(r, stream, samples)
+        val heard = VoiceRerank.distinct(
+            result.nbest.indices.map { VoiceRerank.Hypothesis(result.nbest[it], result.nbestScores.getOrElse(it) { 0f }) }
+                .ifEmpty { listOf(VoiceRerank.Hypothesis(result.text, 0f)) },
+        )
+        // the best first, the rest as the recognizer has them
+        val candidates = VoiceRerank.candidates(heard)
+        val best = if (candidates.size < 2) heard[0] else {
+            VoiceRerank.best(candidates, language.logProbs(candidates.map { VoiceRerank.bare(it.text) }))
+        }
+        val texts = listOf(best.text) + heard.filter { it !== best }.map { it.text }
         val blocked = words.blockedWords
-        if (blocked.isEmpty()) return result.text
-        val nbest = result.nbest.toList().ifEmpty { listOf(result.text) }
-        val suspects = VoiceBlocking.suspects(nbest, blocked)
-        if (suspects.isEmpty()) return result.text
-        VoiceBlocking.pick(nbest, blocked, boundaries(suspects))?.let { return nbest[it] }
+        if (blocked.isEmpty()) return texts[0]
+        val suspects = VoiceBlocking.suspects(texts, blocked)
+        if (suspects.isEmpty()) return texts[0]
+        VoiceBlocking.pick(texts, blocked, language.boundaries(suspects))?.let { return texts[it] }
         return result(r, VoiceEngine.stream(r, words, block = true), samples).text
     }
 
@@ -131,11 +151,19 @@ object VoiceEngine {
     private const val USER_WORDS_MS = 2000L
 
     /**
-     * Where each of [texts] splits into words, as the pinyin engine's model has it; none for
-     * those it could not split in time (VoiceBlocking takes them as having the word).
+     * The pinyin engine's [Language], each answer in time or none: no boundaries (VoiceBlocking
+     * takes a text as having the word), no scores (the recognizer's order).
      */
-    suspend fun wordBoundaries(fcitx: FcitxConnection, texts: List<String>): Map<String, IntArray> =
-        withTimeoutOrNull(USER_WORDS_MS) { fcitx.runOnReady { wordBoundaries(texts) } }.orEmpty()
+    fun language(fcitx: FcitxConnection) = object : Language {
+        override suspend fun boundaries(texts: List<String>) =
+            withTimeoutOrNull(LANGUAGE_MS) { fcitx.runOnReady { wordBoundaries(texts) } }.orEmpty()
+
+        override suspend fun logProbs(texts: List<String>) =
+            withTimeoutOrNull(LANGUAGE_MS) { fcitx.runOnReady { logProbs(texts) } }
+    }
+
+    // the engine busy or starting: the text as heard, not a wait
+    private const val LANGUAGE_MS = 1000L
 
     /** One for each time the microphone opens: it keeps the state of what it has heard. */
     fun vad(assets: AssetManager) = Vad(
@@ -169,7 +197,7 @@ object VoiceEngine {
             modelingUnit = "bpe",
             bpeVocab = "$DIR/bpe.vocab",
         ),
-        // hotwords need the beam search; it is no slower here than the greedy one
+        // hotwords and the n-best need the beam search
         decodingMethod = "modified_beam_search",
         maxActivePaths = BEAM,
         hotwordsFile = "$DIR/hotwords.txt",

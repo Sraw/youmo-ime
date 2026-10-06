@@ -286,6 +286,9 @@ class Engines(
     /** Where each of [texts] splits into words, as the model finds likeliest: TextWords.boundaries. */
     fun wordBoundaries(texts: Collection<String>): Map<String, IntArray> = texts.associateWith { textWords.boundaries(it) }
 
+    /** log10 P of each of [texts] under the pinyin model (TextWords.logProb): for ranking what voice input heard. */
+    fun logProbs(texts: List<String>): FloatArray = FloatArray(texts.size) { textWords.logProb(texts[it]) }
+
     /** Adds [text] read as [pinyin] (see [WordLists.entry]); false if it does not read so. */
     fun addWord(text: String, pinyin: String): Boolean {
         val entry = WordLists.entry(text, pinyin) ?: return false
