@@ -1,5 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<!-- HTTPS only, as ServerAddress takes it: before API 28 plain HTTP is allowed unless said otherwise -->
-<network-security-config>
-    <base-config cleartextTrafficPermitted="false" />
-</network-security-config>

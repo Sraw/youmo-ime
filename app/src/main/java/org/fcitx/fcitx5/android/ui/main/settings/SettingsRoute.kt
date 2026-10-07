@@ -24,7 +24,6 @@ import org.fcitx.fcitx5.android.ui.main.LicensesFragment
 import org.fcitx.fcitx5.android.ui.main.MainFragment
 import org.fcitx.fcitx5.android.ui.main.settings.addon.AddonConfigFragment
 import org.fcitx.fcitx5.android.ui.main.settings.behavior.AdvancedSettingsFragment
-import org.fcitx.fcitx5.android.ui.main.settings.behavior.CloudSettingsFragment
 import org.fcitx.fcitx5.android.ui.main.settings.behavior.CandidatesSettingsFragment
 import org.fcitx.fcitx5.android.ui.main.settings.behavior.ClipboardSettingsFragment
 import org.fcitx.fcitx5.android.ui.main.settings.behavior.KeyboardSettingsFragment
@@ -78,9 +77,6 @@ sealed class SettingsRoute : Parcelable {
 
     @Serializable
     data object Advanced : SettingsRoute()
-
-    @Serializable
-    data object Cloud : SettingsRoute()
 
     @Serializable
     data object Developer : SettingsRoute()
@@ -223,9 +219,6 @@ sealed class SettingsRoute : Parcelable {
             }
             fragment<AdvancedSettingsFragment, Advanced> {
                 label = ctx.getString(R.string.advanced)
-            }
-            fragment<CloudSettingsFragment, Cloud> {
-                label = ctx.getString(R.string.cloud)
             }
             fragment<DeveloperFragment, Developer> {
                 label = ctx.getString(R.string.developer)

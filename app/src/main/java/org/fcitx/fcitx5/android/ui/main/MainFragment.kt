@@ -122,13 +122,6 @@ class MainFragment : PaddingPreferenceFragment() {
                 )
             }
             addCategory(R.string.home_section_other) {
-                if (BuildConfig.CLOUD) {
-                    addDestinationPreference(
-                        R.string.cloud,
-                        R.drawable.ic_baseline_cloud_24,
-                        SettingsRoute.Cloud
-                    )
-                }
                 addPreference(
                     R.string.app_language,
                     getString(AppLanguage.label(AppLanguage.current())),

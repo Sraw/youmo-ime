@@ -19,8 +19,6 @@ import org.fcitx.fcitx5.android.engine.pinyin.PinyinSegmenter
 import org.fcitx.fcitx5.android.engine.pinyin.ShuangpinSegmenter
 import org.fcitx.fcitx5.android.engine.pinyin.T9Segmenter
 import org.fcitx.fcitx5.android.engine.pinyin.Syllables
-import org.fcitx.fcitx5.android.engine.remote.RemoteModel
-import org.fcitx.fcitx5.android.engine.remote.RemoteRefiner
 import org.fcitx.fcitx5.android.engine.rerank.MatrixKernel
 import org.fcitx.fcitx5.android.engine.rerank.Reranker
 import org.fcitx.fcitx5.android.engine.rerank.SentenceModel
@@ -75,11 +73,6 @@ class Engines(
     private val additions: () -> Additions? = { null },
     private val userTables: (String) -> UserTable? = { null },
     private val kernel: MatrixKernel? = null,
-    /**
-     * The user's own server, in the cloud build: asked as they pause, after the models here. Asked
-     * for at each question, as the user may turn it off or move it; null in the offline build.
-     */
-    remote: (() -> RemoteModel?)? = null,
 ) : Closeable {
 
     /**
@@ -828,13 +821,8 @@ class Engines(
     /** A reranker of the session's own, over the one model: each keeps what it ran for its input. */
     private fun reranker(): Reranker? = if (settings.sentenceModel) sentenceModel.get()?.let { Reranker(it) } else null
 
-    private val remote = remote?.let { RemoteModel.deferred(it) }
-
     /** As [reranker], over the larger model, which weighs the readings again while the user pauses. */
-    private fun refiner(): SentenceRefiner? {
-        val local = if (settings.sentenceModel) LateRefiner() else null
-        return remote?.let { RemoteRefiner(local, it) } ?: local
-    }
+    private fun refiner(): SentenceRefiner? = if (settings.sentenceModel) LateRefiner() else null
 
     /**
      * The larger model is read at the first pause, not when a session is made: 26 MB copied out

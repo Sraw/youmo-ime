@@ -17,10 +17,6 @@ import org.fcitx.fcitx5.android.engine.pinyin.PinyinSegmenter
 import org.fcitx.fcitx5.android.engine.pinyin.Segmenter
 import org.fcitx.fcitx5.android.engine.pinyin.ShuangpinSegmenter
 import org.fcitx.fcitx5.android.engine.pinyin.T9Segmenter
-import org.fcitx.fcitx5.android.engine.remote.HttpRemoteModel
-import org.fcitx.fcitx5.android.engine.remote.RemoteRefiner
-import org.fcitx.fcitx5.android.engine.remote.ServerAddress
-import org.fcitx.fcitx5.android.engine.remote.ServerKey
 import org.fcitx.fcitx5.android.engine.rerank.Reranker
 import org.fcitx.fcitx5.android.engine.rerank.SentenceRefiner
 import org.fcitx.fcitx5.android.engine.rerank.SentenceModel
@@ -28,15 +24,12 @@ import org.fcitx.fcitx5.android.engine.session.PinyinSession
 import java.io.File
 import java.io.IOException
 import java.io.RandomAccessFile
-import java.net.URL
 import java.nio.channels.FileChannel
 import java.util.Locale
-import java.util.concurrent.Executors
-import java.util.concurrent.TimeUnit
 import kotlin.system.exitProcess
 
 val USAGE = """usage: score <set.tsv> <result.tsv> [<baseline-result.tsv>] [--half <half>]
-       pinyin <pinyin.data> <set.tsv> <result.tsv> [--scheme <scheme>] [--fuzzy all|<pair>,...] [--half <half>] [--neighbours on|off] [--rerank <model.safetensors>] [--refine <model.safetensors>] [--weight <rerank>[,<refine>]] [--remote <url>] [--remote-timeout <ms>] [--penalty <p>] [--layers <name>=<log10>,...] [--pack <file.words>] [--threads <n>]
+       pinyin <pinyin.data> <set.tsv> <result.tsv> [--scheme <scheme>] [--fuzzy all|<pair>,...] [--half <half>] [--neighbours on|off] [--rerank <model.safetensors>] [--refine <model.safetensors>] [--weight <rerank>[,<refine>]] [--layers <name>=<log10>,...] [--pack <file.words>] [--threads <n>]
        predict <pinyin.data> <predict.tsv> [--offers <out.tsv>] [--threads <n>] [--rerank <model.safetensors> [--weight <w>]]
        predict-learn <pinyin.data> <set.tsv> [--user-weight <w>]
        predict-set <pinyin.data> <set.tsv> <predict.tsv>
@@ -46,7 +39,7 @@ val USAGE = """usage: score <set.tsv> <result.tsv> [<baseline-result.tsv>] [--ha
        t9 <set.tsv> <t9-set.tsv>
        slips <set.tsv> <slip-set.tsv>
        tune <pinyin.data> <set.tsv> <slip-set.tsv>
-       ksc <pinyin.data> <set.tsv> [--scheme <scheme>] [--fuzzy all|<pair>,...] [--half <half>] [--rerank <model.safetensors>] [--refine <model.safetensors>] [--weight <rerank>[,<refine>]] [--remote <url>] [--remote-timeout <ms>] [--penalty <p>] [--threads <n>]
+       ksc <pinyin.data> <set.tsv> [--scheme <scheme>] [--fuzzy all|<pair>,...] [--half <half>] [--rerank <model.safetensors>] [--refine <model.safetensors>] [--weight <rerank>[,<refine>]] [--threads <n>]
        learn <pinyin.data> <set.tsv> [--scheme <scheme>] [--fuzzy all|<pair>,...]
        table <table.data> <set.tsv> [--preset <preset>]
        libime pinyin|history|table <file>
@@ -95,14 +88,14 @@ fun runCli(args: Array<String>, out: Appendable, err: Appendable): Int {
     return when {
         !optionsValid(a.options, fuzzy) -> usage(err)
         a.has("score", 3..4, "half") -> score(p[1], p[2], p.getOrNull(3), half, out)
-        a.has("pinyin", 4..4, "scheme", "fuzzy", "half", "neighbours", "rerank", "refine", "weight", *REMOTE, "layers", "pack", "threads") ->
+        a.has("pinyin", 4..4, "scheme", "fuzzy", "half", "neighbours", "rerank", "refine", "weight", "layers", "pack", "threads") ->
             runPinyin(p[1], p[2], p[3], scheme, fuzzy.orEmpty(), half, neighbours == "on", Models(a.options), a.options["layers"], a.options["pack"], threads)
         p.firstOrNull() in PREDICT_COMMANDS -> predictCommand(a, threads, out) ?: usage(err)
         a.has("sentences", 4..4, "neighbours", "threads") -> sentences(p[1], p[2], p[3], neighbours == "on", threads)
         a.has("lm", 4..Int.MAX_VALUE) -> lm(p[1], p[2], p.drop(3), out)
         p.firstOrNull() in SET_WRITERS -> writeSet(a, out) ?: usage(err)
         a.has("tune", 4..4) -> tune(p[1], p[2], p[3], out)
-        a.has("ksc", 3..3, "scheme", "fuzzy", "half", "rerank", "refine", "weight", *REMOTE, "threads") ->
+        a.has("ksc", 3..3, "scheme", "fuzzy", "half", "rerank", "refine", "weight", "threads") ->
             ksc(p[1], p[2], scheme, fuzzy.orEmpty(), half, Models(a.options), threads, out)
         a.has("learn", 3..3, "scheme", "fuzzy") -> learn(p[1], p[2], scheme, fuzzy.orEmpty(), out)
         a.has("table", 3..3, "preset") -> table(p[1], p[2], preset ?: "plain", out)
@@ -166,19 +159,10 @@ private fun optionsValid(options: Map<String, String>, fuzzy: Set<Fuzzy>?): Bool
         options["preset"].let { it == null || it in TableRun.PRESETS },
         options["threads"].let { it == null || it.toIntOrNull()?.let { n -> n > 0 } == true },
         options["weight"].let { it == null || weights(it) != null },
-        remoteValid(options),
         // 双拼 reads no slips
         neighbours == null || neighbours in ON_OFF && scheme == null,
     ).all { it }
 }
-
-/** The options for the user's server, each absent or good. */
-private fun remoteValid(options: Map<String, String>) = listOf(
-    options["remote"].let { it == null || ServerAddress.check(it, plainLoopback = true) is ServerAddress.Valid },
-    // an hour at most: in nanoseconds, more would overflow added to a clock's reading
-    options["remote-timeout"].let { it == null || it.toLongOrNull()?.let { ms -> ms in 1..MAX_REMOTE_TIMEOUT } == true },
-    options["penalty"].let { it == null || it.toFloatOrNull()?.let { p -> p >= 0 && p.isFinite() } == true },
-).all { it }
 
 private fun usage(err: Appendable): Int {
     err.appendLine(USAGE)
@@ -208,25 +192,14 @@ private fun weights(spec: String): Pair<Float, Float>? {
     }
 }
 
-private val REMOTE = arrayOf("remote", "remote-timeout", "penalty")
-private const val MAX_REMOTE_TIMEOUT = 3_600_000L
-
 /**
  * The sentence models: the one weighing the readings at each key, and the one while the user
- * pauses, then the user's server if one is given (`cloud/server.py`; its token, if any, from
- * `YOUMO_TOKEN`, and over HTTPS the key it printed from `YOUMO_KEY`). Loaded once and shared by the threads; each reranker keeps its own state.
+ * pauses. Loaded once and shared by the threads; each reranker keeps its own state.
  */
 private class Models(options: Map<String, String>) {
     private val rerankPath = options["rerank"]
     private val refinePath = options["refine"]
     private val weights = options["weight"]?.let(::weights) ?: (Reranker.WEIGHT to Reranker.WEIGHT)
-    private val remote = options["remote"]?.let { (ServerAddress.check(it, plainLoopback = true) as ServerAddress.Valid).url }
-    // measuring what the server knows, not how fast it is: by default it is waited for
-    private val remoteTimeout = TimeUnit.MILLISECONDS.toNanos(options["remote-timeout"]?.toLong() ?: 120_000)
-    private val penalty = options["penalty"]?.toFloat() ?: RemoteRefiner.PENALTY
-    private val executor by lazy {
-        Executors.newCachedThreadPool { r -> Thread(r).apply { isDaemon = true } }
-    }
 
     // floats, as the app has the smaller: the same scores, sooner
     private val rerank by lazy { rerankPath?.let { SentenceModel.load(mapFile(it), unpack = true) } }
@@ -235,28 +208,7 @@ private class Models(options: Map<String, String>) {
     /** Makes a reranker: none when there is no model. */
     val reranker: (() -> Reranker)? get() = rerank?.let { model -> { Reranker(model, weights.first) } }
 
-    private val local: (() -> Reranker)? get() = refine?.let { model -> { Reranker(model, weights.second, limit = Reranker.REFINE_LIMIT) } }
-
-    val refiner: (() -> SentenceRefiner)? get() {
-        val local = local
-        val url = remote ?: return local
-        val model = remoteModel(url)
-        return { RemoteRefiner(local?.invoke(), model, remoteTimeout, WAIT, penalty) }
-    }
-
-    // the token, and over HTTPS the server's key (as server.py prints it), from the environment:
-    // not on a command line, where other users of the machine can read them
-    private fun remoteModel(url: URL) = HttpRemoteModel(
-        url, System.getenv("YOUMO_TOKEN"), executor, System.getenv("YOUMO_KEY")?.let(ServerKey::normalized),
-        timeoutMillis = TimeUnit.NANOSECONDS.toMillis(remoteTimeout).toInt() + SOCKET_SLACK,
-        // every question asked: a server that missed one would otherwise drop the next 30 s of them, unseen
-        backoff = 0,
-    )
-
-    private companion object {
-        val WAIT = TimeUnit.MILLISECONDS.toNanos(50)
-        const val SOCKET_SLACK = 1000
-    }
+    val refiner: (() -> SentenceRefiner)? get() = refine?.let { model -> { Reranker(model, weights.second, limit = Reranker.REFINE_LIMIT) } }
 }
 
 private fun predict(dataPath: String, setPath: String, threads: Int, offersPath: String?, rerank: String?, weight: Float, out: Appendable): Int {

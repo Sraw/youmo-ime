@@ -77,8 +77,8 @@ object PinyinDictManager {
     }
 
     /**
-     * Keeps [text], the word pack the server hands out as [name], in place of the one of that name
-     * fetched before, on or off as the user left it. A plain dictionary of the name is not touched.
+     * Keeps [text], a word pack the user imports as [name], in place of the one of that name
+     * imported before, on or off as the user left it. A plain dictionary of the name is not touched.
      */
     fun importPack(name: String, text: String): Result<TextDictionary> = runCatching {
         if (!WordPack.validName(name)) errorArg(R.string.exception_dict_filename, name)
@@ -86,20 +86,12 @@ object PinyinDictManager {
         val off = File(pinyinDicDir, TextDictionary.fileName(name, false, PinyinDictionary.Type.Words))
         val on = File(pinyinDicDir, TextDictionary.fileName(name, true, PinyinDictionary.Type.Words))
         val dest = if (off.exists()) off else on
-        // new words, as the server hands them out: merged into the new words dictionary when
-        // first fetched, then where the user left it
+        // new words: merged into the new words dictionary when first imported, then where the
+        // user left it
         val first = !off.exists() && !on.exists()
         if (ImportedDictionaries.writePack(text.lineSequence(), dest) == 0) errorArg(R.string.exception_dict_no_words, name)
         if (first) ImportedDictionaries.setIntoNew(pinyinDicDir, name, true)
         TextDictionary(dest)
-    }
-
-    /** Whether the pack called [name] is already there, on or off, as [text] has it: nothing to import then. */
-    fun hasSamePack(name: String, text: String): Boolean {
-        val file = listOf(true, false).map { File(pinyinDicDir, TextDictionary.fileName(name, it, PinyinDictionary.Type.Words)) }.firstOrNull { it.exists() }
-            ?: return false
-        val lines = text.lineSequence().mapIndexed { i, l -> if (i == 0) l.removePrefix("\uFEFF") else l }.toList().dropLastWhile { it.isEmpty() }
-        return runCatching { file.useLines { it.toList().dropLastWhile { l -> l.isEmpty() } } }.getOrNull() == lines
     }
 
     private fun hasDictionary(name: String) = listOf(PinyinDictionary.Type.Text, PinyinDictionary.Type.Words).any { type ->

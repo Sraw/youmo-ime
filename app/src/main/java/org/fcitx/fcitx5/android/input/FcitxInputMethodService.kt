@@ -51,7 +51,6 @@ import org.fcitx.fcitx5.android.BuildConfig
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.core.CapabilityFlag
 import org.fcitx.fcitx5.android.core.CapabilityFlags
-import org.fcitx.fcitx5.android.core.CloudServer
 import org.fcitx.fcitx5.android.core.FcitxAPI
 import org.fcitx.fcitx5.android.core.FcitxEvent
 import org.fcitx.fcitx5.android.core.FcitxKeyMapping
@@ -658,15 +657,6 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         }
     }
 
-    /** The cloud build asks its server for new words once a day, and reads them in as they come. */
-    private fun updateCloudWords() = CloudServer.instance.updateWords { words ->
-        // the same pack as yesterday: no rewrite, so no reload under the user's typing
-        if (PinyinDictManager.hasSamePack(words.name, words.text)) return@updateWords
-        PinyinDictManager.importPack(words.name, words.text)
-            .onSuccess { postFcitxJob { reloadPinyinDict() } }
-            .onFailure { Timber.w(it, "cloud word pack %s", words.name) }
-    }
-
     override fun onStartInput(attribute: EditorInfo, restarting: Boolean) {
         // update selection as soon as possible
         // sometimes when restarting input, onUpdateSelection happens before onStartInput, and
@@ -684,7 +674,6 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         // EditorInfo may change between onStartInput and onStartInputView
         inputDeviceMgr.notifyOnStartInput(attribute)
         Timber.d("onStartInput: initialSel=${selection.current}, restarting=$restarting")
-        if (BuildConfig.CLOUD) updateCloudWords()
         val isNullType = attribute.isTypeNull()
         // wait until InputContext created/activated
         postFcitxJob {

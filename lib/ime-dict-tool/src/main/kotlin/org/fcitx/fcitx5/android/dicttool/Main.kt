@@ -472,8 +472,6 @@ private fun pack(options: Options, out: Appendable) {
     }
     if (unseen != null) out.appendLine("pack: ${unseen.size} of the list's words not among the candidates, scored as seen ${options.minCount} times")
     out.appendLine("pack: $words words, $rare left out for a character the model hardly has, $unread for want of a reading")
-    val size = File(options.output).length()
-    if (size > MAX_FETCHED) out.appendLine("pack: ${size shr 20} MB, more than the app fetches from a server (${MAX_FETCHED shr 20} MB): import by hand only")
 }
 
 /** Each candidate row of `words`'s output, split; the comment lines skipped. */
@@ -483,9 +481,6 @@ private fun File.forEachRow(row: (List<String>) -> Unit) = useLines { lines ->
 
 // log10: a character under this in the model is as good as not in it (the dictionary's rarest are around -6)
 private const val RARE_CHAR = -6.5f
-
-// what the app's daily fetch takes at most (HttpRemoteModel.MAX_WORDS)
-private const val MAX_FETCHED = 16L shl 20
 
 /**
  * What tells a phrase or a fragment of a word from a word among the candidates of `words`, which

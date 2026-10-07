@@ -25,10 +25,10 @@ Free to restructure; upstream compatibility is not a constraint.
 | What | Command |
 |---|---|
 | Core logic tests + API-level check + coverage floors | `./gradlew :lib:ime-core:check` |
-| App JVM tests (Robolectric where needed) | `./gradlew :app:testOfflineTextDebugUnitTest` |
+| App JVM tests (Robolectric where needed) | `./gradlew :app:testTextDebugUnitTest` |
 | Static analysis (syntax rules only; type resolution doesn't work here) | `./gradlew detekt` |
 | Accept current findings after a deliberate batch (run alone, not with `detekt`; `:<module>:detektBaseline` for one module, bare `detektBaseline` rewrites every module) | `./gradlew :<module>:detektBaseline` |
-| App coverage (report only, no floor) | `./gradlew :app:koverLogOfflineTextDebug` |
+| App coverage (report only, no floor) | `./gradlew :app:koverLogTextDebug` |
 | Engine data into app assets (part of every app build; downloads libime's sources, the mixed model of this fork's release `engine-data-*` and the curated new-word pack of `words-*`, SHA-256 checked, once) | `./gradlew :app:compileEngineData` |
 | A new `engine-data` release's files (CommonCrawl crawl, cleaning, mix, new words, evaluation; ~100 GB down, an hour on a rented 16-core box via `dev/training/jobs/engine-data.json`) | `TOOL=… EVAL=… SETS=… lib/ime-dict-tool/engine-data.sh <work dir>` |
 | Sentence models into app assets (part of every app build; fetched from this fork's release `sentence-models-*`, SHA-256 checked) | `./gradlew :app:copySentenceModels` |

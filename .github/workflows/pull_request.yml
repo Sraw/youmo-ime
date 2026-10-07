@@ -61,7 +61,7 @@ jobs:
         uses: gradle/actions/setup-gradle@v6
 
       - name: Build Release APK
-        run: ./gradlew :app:assembleOfflineTextRelease :app:assembleCloudTextRelease
+        run: ./gradlew :app:assembleTextRelease
 
       - name: Upload app
         uses: actions/upload-artifact@v7

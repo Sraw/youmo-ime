@@ -58,12 +58,10 @@ android {
         }
     }
 
-    // Two builds: offline, published by default, asks for no network permission at all; cloud adds
-    // INTERNET for the user's own scoring server (cloud/), off until they turn it on. Permissions
-    // are fixed at install, so it is a build, not a switch.
-    // And text or voice: voice adds RECORD_AUDIO and the speech recognizer with its ~240 MB of
-    // models (VoiceDataPlugin), for those who want them; text, the default, has neither.
-    flavorDimensions += listOf("network", "speech")
+    // Everything runs on the phone, with no network permission at all. Two builds, text or voice:
+    // voice adds RECORD_AUDIO and the speech recognizer with its ~240 MB of models
+    // (VoiceDataPlugin), for those who want them; text, the default, has neither.
+    flavorDimensions += listOf("speech")
     productFlavors {
         create("text") {
             dimension = "speech"
@@ -74,16 +72,6 @@ android {
             dimension = "speech"
             versionNameSuffix = "-voice"
             buildConfigField("boolean", "VOICE", "true")
-        }
-        create("offline") {
-            dimension = "network"
-            isDefault = true
-            buildConfigField("boolean", "CLOUD", "false")
-        }
-        create("cloud") {
-            dimension = "network"
-            versionNameSuffix = "-cloud"
-            buildConfigField("boolean", "CLOUD", "true")
         }
     }
 

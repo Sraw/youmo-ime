@@ -67,7 +67,6 @@ object EngineBridge {
     private val made = lazy(LazyThreadSafetyMode.NONE) {
         Engines(
             ::asset, File(appContext.filesDir, "engine"), { Timber.w(it, "engine user data") }, ::legacy, ::additions, ::userTable, NativeMatrixKernel,
-            remote = if (BuildConfig.CLOUD) CloudServer.instance::current else null,
         )
     }
     /** Made when first used; on the fcitx thread only, as the addon uses it there. */

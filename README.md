@@ -21,9 +21,7 @@
   - 两个模型都会读输入框里光标前的文字作为上下文（密码框等敏感输入框不读）。
 - **越用越顺手**：用户词库、调频；可以导入词库，支持自定义短语；长按候选可以删除或置顶词组。
 - **码表输入**：五笔、仓颉、自然码、二笔等，用自己的码表引擎，也可以导入码表。
-- **不联网**：默认的离线版不申请网络权限，输入的内容不会离开手机（[隐私政策](PRIVACY.md)）。
-- **可选的自建云端（云端版）**：在自己的电脑上运行 [`cloud/server.py`](cloud/README.md)（Qwen3.5 4B，8 GB 显卡就行），停顿时由它给前五个整句重新打分；
-  默认关闭，只经 HTTPS 发到你核对过密钥的服务器，密码框和无痕键盘从不发送。云端版是单独的安装包，多一个网络权限，与离线版互相替换安装。
+- **不联网**：不申请网络权限，全部在手机上运行，输入的内容不会离开手机（[隐私政策](PRIVACY.md)）。
 - **其他**：Material 3 界面、可自定义长按字符、主题、剪贴板管理（复制链接时自动去掉跟踪参数）、表情与符号、实体键盘下的悬浮候选栏。
 
 ### 效果
@@ -74,12 +72,11 @@ git clone https://github.com/Sraw/youmo-ime.git
 cd youmo-ime
 git submodule update --init --recursive
 sudo apt install extra-cmake-modules gettext   # Debian/Ubuntu；Arch：pacman -S extra-cmake-modules；macOS：brew install extra-cmake-modules gettext
-./gradlew :app:assembleOfflineTextDebug   # 云端版：:app:assembleCloudTextDebug；带语音：:app:assembleOfflineVoiceDebug
+./gradlew :app:assembleTextDebug   # 带语音：:app:assembleVoiceDebug
 ```
 
-版本分两个维度，共四个：`offline`（离线版，默认发布，不申请网络权限）或 `cloud`（云端版，多一个网络权限，用于自建云端）；
-`text`（纯文字，默认）或 `voice`（离线语音输入，多一个录音权限和约 180 MB 的语音模型）。
-`./gradlew :app:assembleRelease` 会四个都打。
+版本有两个：`text`（纯文字，默认）或 `voice`（离线语音输入，多一个录音权限和约 180 MB 的语音模型），都不申请网络权限。
+`./gradlew :app:assembleRelease` 两个都打。
 
 构建会自动下载引擎数据和句子模型，并按 SHA-256 校验：
 
@@ -108,7 +105,7 @@ signKeyPwd=...
 | 做什么 | 命令 |
 |---|---|
 | 核心逻辑测试、API 级别检查、覆盖率门槛 | `./gradlew :lib:ime-core:check` |
-| 应用的 JVM 测试 | `./gradlew :app:testOfflineTextDebugUnitTest` |
+| 应用的 JVM 测试 | `./gradlew :app:testTextDebugUnitTest` |
 | 静态检查 | `./gradlew detekt` |
 
 ### 致谢
@@ -139,9 +136,7 @@ small neural models rerank the n-gram decoder's whole-sentence candidates.
   - both read the text before the cursor in the input field as context (never in password or other sensitive fields).
 - **Learns as you type**: user words and frequencies, imported dictionaries, custom phrases; long-press a candidate to remove or pin it.
 - **Code tables**: Wubi, Cangjie, Ziranma, Erbi and more, on its own table engine; tables can be imported.
-- **No network**: the default offline build asks for no network permission, and what you type never leaves the phone ([privacy policy](PRIVACY.md)).
-- **Your own server, optionally (cloud build)**: run [`cloud/server.py`](cloud/README.md) (Qwen3.5 4B; an 8 GB graphics card will do) on your own computer, and when you pause it rescores the best five sentences.
-  Off by default; it sends only over HTTPS to the server whose key you checked, never from password fields or incognito keyboards. The cloud build is a separate package with one more permission, network access; it installs over the offline build and the other way round.
+- **No network**: it asks for no network permission and runs entirely on the phone; what you type never leaves it ([privacy policy](PRIVACY.md)).
 - **More**: Material 3 interface, configurable long-press characters, themes, clipboard management (tracking parameters stripped from copied links), emoji and symbols, a floating candidate bar with a physical keyboard.
 
 ### Accuracy
@@ -193,12 +188,11 @@ git clone https://github.com/Sraw/youmo-ime.git
 cd youmo-ime
 git submodule update --init --recursive
 sudo apt install extra-cmake-modules gettext   # Debian/Ubuntu; Arch: pacman -S extra-cmake-modules; macOS: brew install extra-cmake-modules gettext
-./gradlew :app:assembleOfflineTextDebug   # the cloud build: :app:assembleCloudTextDebug; with voice: :app:assembleOfflineVoiceDebug
+./gradlew :app:assembleTextDebug   # with voice: :app:assembleVoiceDebug
 ```
 
-Builds vary in two ways, four in all: `offline`, published by default, with no network permission, or `cloud`, with network access for
-your own server; and `text`, the default, or `voice`, offline voice input, with the microphone permission and a ~180 MB speech model.
-`./gradlew :app:assembleRelease` makes all four.
+There are two builds, neither with a network permission: `text`, the default, or `voice`, offline voice input, with the microphone
+permission and a ~180 MB speech model. `./gradlew :app:assembleRelease` makes both.
 
 The build downloads the engine data and the sentence models and checks their SHA-256:
 
@@ -228,7 +222,7 @@ signKeyPwd=...
 | To | Run |
 |---|---|
 | Test the core logic, check the API level and coverage floors | `./gradlew :lib:ime-core:check` |
-| Run the app's JVM tests | `./gradlew :app:testOfflineTextDebugUnitTest` |
+| Run the app's JVM tests | `./gradlew :app:testTextDebugUnitTest` |
 | Run static analysis | `./gradlew detekt` |
 
 ### Thanks

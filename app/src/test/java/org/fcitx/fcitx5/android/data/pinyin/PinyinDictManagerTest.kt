@@ -35,18 +35,14 @@ class PinyinDictManagerTest {
     }
 
     @Test
-    fun aPackFromTheServerReplacesTheLastOfItsNameOnOrOffAsItWas() {
+    fun aPackReplacesTheLastOfItsNameOnOrOffAsItWas() {
         val first = PinyinDictManager.importPack("2026q1", pack).getOrThrow()
         assertEquals(PinyinDictionary.Type.Words, first.type)
         assertEquals(listOf("2026q1.words"), names())
-        // new words, as the server hands them out: merged into the new words dictionary
+        // new words: merged into the new words dictionary
         assertTrue(PinyinDictManager.isIntoNew("2026q1"))
         PinyinDictManager.setIntoNew("2026q1", false).getOrThrow()
         assertTrue(first.disable())
-        // the same text again, a BOM or a trailing newline apart, is already there; more words are not
-        assertTrue(PinyinDictManager.hasSamePack("2026q1", "\uFEFF" + pack.trimEnd()))
-        assertFalse(PinyinDictManager.hasSamePack("2026q1", pack + "智驾 zhi'jia -5.9\n"))
-        assertFalse(PinyinDictManager.hasSamePack("nope", pack))
         PinyinDictManager.importPack("2026q1", pack + "智驾 zhi'jia -5.9\n").getOrThrow()
         assertEquals(listOf("2026q1.words.disable"), names())
         assertTrue(File(dir, "2026q1.words.disable").readText().contains("智驾"))

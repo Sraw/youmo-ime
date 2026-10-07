@@ -153,7 +153,7 @@ object ImportedDictionaries {
 
     /**
      * Merges dictionary [name] into the new words dictionary ([into]) or the base one. The
-     * settings and the keyboard (fetching the cloud's new words) both write it, from any thread.
+     * settings write it, from any thread.
      */
     @Synchronized
     fun setIntoNew(dir: File, name: String, into: Boolean) {

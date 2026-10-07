@@ -13,10 +13,6 @@
         <exclude
             domain="file"
             path="README.md" />
-        <!-- said outright, though Android leaves it out anyway: the cloud server's settings (CloudServer) -->
-        <exclude
-            domain="root"
-            path="no_backup" />
     </cloud-backup>
     <device-transfer>
         <exclude

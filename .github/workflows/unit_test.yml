@@ -1,8 +1,8 @@
 name: Unit Tests
 
 # JVM unit tests only. Deliberately separate from the build workflow:
-#   - no submodules (verified: `:app:testOfflineTextDebugUnitTest` configures and runs on a submodule-free checkout)
-#   - no NDK, no CMake (the task graph for `:app:testOfflineTextDebugUnitTest` contains no native tasks)
+#   - no submodules (verified: `:app:testTextDebugUnitTest` configures and runs on a submodule-free checkout)
+#   - no NDK, no CMake (the task graph for `:app:testTextDebugUnitTest` contains no native tasks)
 #   - single OS
 # so it takes a few minutes rather than the build jobs' half hour, and can gate every push.
 #
@@ -79,9 +79,9 @@ jobs:
       - name: Run core logic and dict tool tests, API level check and coverage floors
         run: ./gradlew --continue :lib:ime-core:check :lib:ime-core:koverHtmlReport :lib:ime-dict-tool:test
 
-      # offline debug only: the cloud flavour differs in its manifest alone, its code is all in main
+      # text debug only: the voice flavour's own code is tested by the voice tests in ime-core
       - name: Run app unit tests
-        run: ./gradlew :app:testOfflineTextDebugUnitTest :app:koverLogOfflineTextDebug
+        run: ./gradlew :app:testTextDebugUnitTest :app:koverLogTextDebug
 
       # After the tests, so a lint finding does not hide their results. Findings already present
       # are frozen in config/detekt/baseline-*.xml; this fails on new ones only.

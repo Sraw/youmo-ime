@@ -1,8 +1,0 @@
-# torch: on a GPU, the CUDA build from https://pytorch.org/get-started/locally/
-torch>=2.6
-transformers>=5.0
-accelerate
-# the server's own key and certificate for HTTPS (not needed with --plain)
-cryptography
-# --4bit only (a GPU): the 4B in 3.9 GB, the 9B in 8.1 GB
-# bitsandbytes>=0.45
