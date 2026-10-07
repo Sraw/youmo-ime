@@ -120,8 +120,11 @@ class Engines(
     // the Latin words full pinyin reads as typed in lower case (iphone for iPhone)
     private val latinWords by lazy(LazyThreadSafetyMode.NONE) { LatinWords.of(pinyinData.dictionary) }
 
-    /** A sentence model, read when first asked for; dropped when turned off, read (or tried) again when turned on. */
-    private inner class ModelFile(private val path: String, private val unpack: Boolean) {
+    /**
+     * A sentence model, read when first asked for; dropped when turned off, read (or tried) again
+     * when turned on. A build without the file has [instead]'s, if given.
+     */
+    private inner class ModelFile(private val path: String, private val unpack: Boolean, private val instead: ModelFile? = null) {
         private var model: SentenceModel? = null
         private var tried = false
 
@@ -132,7 +135,7 @@ class Engines(
                 SentenceModel.load(load(path), unpack, kernel ?: MatrixKernel.JVM)
             } catch (_: FileNotFoundException) {
                 // a build without them (EngineDataPlugin fetches them): pinyin reads by the decoder alone
-                null
+                instead?.get()
             } catch (e: IOException) {
                 onError(e)
                 null
@@ -155,6 +158,11 @@ class Engines(
     private val sentenceModel = ModelFile(SENTENCE_MODEL, unpack = kernel == null)
     // int8 as stored: as floats it would be 100 MB, half of what an app may take on some phones
     private val refiningModel = ModelFile(REFINING_MODEL, unpack = false)
+
+    // the nine keys' own pair, trained on what the decoder reads from digits: the readings it
+    // weighs there differ (瘙痒症 against 盼望着你 for the same keys), and full pinyin's stay as they are
+    private val t9SentenceModel = ModelFile(T9_SENTENCE_MODEL, unpack = kernel == null, instead = sentenceModel)
+    private val t9RefiningModel = ModelFile(T9_REFINING_MODEL, unpack = false, instead = refiningModel)
 
     private var added: Additions? = null
     private var addedRead = false
@@ -488,6 +496,8 @@ class Engines(
             if (!value.sentenceModel) {
                 sentenceModel.drop()
                 refiningModel.drop()
+                t9SentenceModel.drop()
+                t9RefiningModel.drop()
             }
         }
 
@@ -527,7 +537,7 @@ class Engines(
             T9 -> PinyinSession(
                 pinyinData, T9Segmenter(s.fuzzy, abbreviations = false), spell = true,
                 pageSize = s.pageSize, user = user(), prediction = s.prediction, prior = prior(), phraseBook = phrases(),
-                reranker = reranker(), refiner = refiner(), block = ::block, habits = habits.scope(T9),
+                reranker = reranker(t9SentenceModel), refiner = refiner(t9RefiningModel), block = ::block, habits = habits.scope(T9),
             )
             SHUANGPIN -> PinyinSession(
                 pinyinData, ShuangpinSegmenter(s.scheme, s.fuzzy, s.typos), spell = true,
@@ -819,21 +829,21 @@ class Engines(
     }
 
     /** A reranker of the session's own, over the one model: each keeps what it ran for its input. */
-    private fun reranker(): Reranker? = if (settings.sentenceModel) sentenceModel.get()?.let { Reranker(it) } else null
+    private fun reranker(model: ModelFile = sentenceModel): Reranker? = if (settings.sentenceModel) model.get()?.let { Reranker(it) } else null
 
     /** As [reranker], over the larger model, which weighs the readings again while the user pauses. */
-    private fun refiner(): SentenceRefiner? = if (settings.sentenceModel) LateRefiner() else null
+    private fun refiner(model: ModelFile = refiningModel): SentenceRefiner? = if (settings.sentenceModel) LateRefiner(model) else null
 
     /**
      * The larger model is read at the first pause, not when a session is made: 26 MB copied out
      * of the asset on the fcitx thread would hold up the switch to pinyin. Unreadable, it has
      * nothing to say, and the session stops asking.
      */
-    private inner class LateRefiner : SentenceRefiner {
+    private inner class LateRefiner(private val model: ModelFile) : SentenceRefiner {
         private var reranker: Reranker? = null
 
         override fun refine(context: String, readings: List<String>, scores: List<Float>, budget: Int): Int? {
-            val r = reranker ?: refiningModel.get()?.let { Reranker(it, limit = Reranker.REFINE_LIMIT) }?.also { reranker = it }
+            val r = reranker ?: model.get()?.let { Reranker(it, limit = Reranker.REFINE_LIMIT) }?.also { reranker = it }
                 ?: return SentenceRefiner.NONE
             // null is not done yet, more slices to come: not NONE, which would end it after the first
             return r.refine(context, readings, scores, budget)
@@ -908,6 +918,9 @@ class Engines(
         const val SENTENCE_MODEL = "engine/sentence-model.safetensors"
         /** Six times the work of [SENTENCE_MODEL], and right more often: see [PinyinSession]'s refiner. */
         const val REFINING_MODEL = "engine/sentence-model-large.safetensors"
+        /** The nine keys' [SENTENCE_MODEL] and [REFINING_MODEL]; the general ones where a build has none. */
+        const val T9_SENTENCE_MODEL = "engine/sentence-model-t9.safetensors"
+        const val T9_REFINING_MODEL = "engine/sentence-model-t9-large.safetensors"
         const val TABLE_DIR = "engine/table"
         const val USER_PINYIN = "pinyin.user"
 
