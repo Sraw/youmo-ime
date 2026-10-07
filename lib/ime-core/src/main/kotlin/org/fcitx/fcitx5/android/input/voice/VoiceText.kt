@@ -14,8 +14,10 @@ object VoiceText {
     private const val CJK = "\\p{IsHan}，。！？、：；“”‘’（）《》…—"
     private val SPACE_BY_CJK = Regex("(?<=[$CJK])\\s+|\\s+(?=[$CJK])")
 
-    // and spells an abbreviation out: "C E P"
-    private val SPELLED = Regex("\\b[A-Z](?: [A-Z]\\b)+")
+    // and spells an abbreviation out: "C E P". Not \b: Android's regex (ICU) and Java up to 18
+    // count 了 as a word char, so 订了C had no boundary there and C E P stayed spelled; Java 19+
+    // looks at ASCII only, which hid it on the desktop
+    private val SPELLED = Regex("(?<![A-Za-z0-9])[A-Z](?: [A-Z](?![A-Za-z0-9]))+")
 
     /**
      * [raw] as typed: no spaces in Chinese, an abbreviation in one piece, numbers in digits
