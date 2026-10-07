@@ -573,19 +573,38 @@ class PinyinSessionTest {
     }
 
     @Test
-    fun predictionsAndTextAsTypedAreNotLearned() {
+    fun aPredictionPickedIsLearnedTextAsTypedIsNot() {
         val (session, user) = learning()
         session.type("wo")
         session.apply(Select(0))
-        // 再, predicted after 我: nothing says how it was read
+        // 再, predicted after 我: learned as the dictionary reads it, after 我
         assertEquals("再", session.apply(Select(0)).commit)
-        assertEquals(1f, user.total)
+        assertEquals(2f, user.total)
+        assertTrue(user.probability(user.id(UserModel.Entry("我", syl("wo"))), user.id(UserModel.Entry("再", syl("zai")))) > 0.3f)
         session.type("vvv")
         session.apply(CommitRaw)
         // a sentence with text kept as typed
         val s = session.type("nivvv")
         assertEquals("你vvv", session.apply(Select(s.candidates.indexOf("你vvv"))).commit)
-        assertEquals(1f, user.total)
+        assertEquals(2f, user.total)
+    }
+
+    @Test
+    fun whatIsOftenTypedAfterAWordIsPredictedAfterIt() {
+        val (session, _) = learning()
+        // 我 then 你好 (你 and 好, as the model splits it), as 用 then 中文: the model has 再 after 我
+        repeat(5) {
+            session.type("wo")
+            assertEquals(if (it == 0) listOf("再") else listOf("再", "你"), session.apply(Select(0)).candidates.take(2))
+            assertEquals("你好", session.type("nihao").let { session.apply(Select(0)) }.commit)
+            session.apply(Reset)
+        }
+        session.type("wo")
+        assertEquals("你", session.apply(Select(0)).candidates.first())
+        // picked, what follows it is offered in turn
+        val next = session.apply(Select(0))
+        assertEquals("你", next.commit)
+        assertEquals("好", next.candidates.first())
     }
 
     @Test
@@ -654,6 +673,41 @@ class PinyinSessionTest {
     }
 
     private fun word(text: String) = (0 until data.vocabulary.size).first { data.vocabulary.word(it) == text }
+
+    @Test
+    fun aPredictionLearnedMayBeForgottenAndAnyBlocked() {
+        val user = UserModel(data.dictionary, data.vocabulary)
+        val blocked = ArrayList<String>()
+        val session = PinyinSession(data, PinyinSegmenter(), user = user, block = { blocked += it.text; user.block(it) })
+        session.type("wo")
+        session.apply(Select(0))
+        assertEquals(setOf(Offer.BLOCK), session.offers(0))
+        // 再 picked after 我: learned, so it may be forgotten
+        session.apply(Select(0))
+        session.apply(Reset)
+        session.type("wo")
+        assertEquals("再", session.apply(Select(0)).candidates.first())
+        assertEquals(setOf(Offer.FORGET, Offer.BLOCK), session.offers(0))
+        val forgotten = session.apply(Forget(0))
+        assertTrue(forgotten.predicting)
+        assertEquals(0f, user.probability(word("我"), word("再")))
+        assertEquals(setOf(Offer.BLOCK), session.offers(0))
+        // blocked, nothing is left to offer after 我
+        val after = session.apply(Action.Block(0))
+        assertEquals(listOf("再"), blocked)
+        assertFalse(after.predicting)
+        assertTrue(after.candidates.isEmpty())
+    }
+
+    @Test
+    fun aPredictionPickedAfterTheAppsTextIsLearnedAfterItsLastWord() {
+        val (session, user) = learning()
+        session.apply(Action.Context("我"))
+        session.type("zai")
+        session.apply(Select(session.candidates(0, 20).indexOfFirst { it.text == "再" }))
+        assertEquals("见", session.apply(Select(0)).commit)
+        assertTrue(user.probability(word("再"), word("见")) > 0.3f)
+    }
 
     @Test
     fun theWordCommittedBeforeIsLearnedWithTheNext() {

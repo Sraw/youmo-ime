@@ -72,6 +72,8 @@ class UserModel(
 
     // unigrams under NO_WORD, bigrams under their first word
     private val counts = Counts()
+    // the second words of the bigrams, by the first: to find them without going through every count
+    private val followers = HashMap<Int, HashSet<Int>>()
 
     // the words the user blocked (see block): as they read, so a word made later is blocked as
     // it is made; and as the decoder asks, the dictionary's by node and id, the user's by id
@@ -112,6 +114,7 @@ class UserModel(
         }
         if (total > limit) {
             counts.scale(HALF, MIN_COUNT)
+            indexFollowers()
             // a word typed once long ago may be gone from ownTexts
             changes++
             total = 0f
@@ -132,6 +135,7 @@ class UserModel(
         val ids = words.mapNotNull { ids[it] }.toSet()
         if (ids.isEmpty()) return
         counts.removeIf { first(it) in ids || second(it) in ids }
+        indexFollowers()
         total = 0f
         counts.forEach { key, count -> if (first(key) == NO_WORD) total += count }
         val word = words.singleOrNull()
@@ -166,7 +170,7 @@ class UserModel(
      * the pair's share of what followed [prev], leaning on the word's own share when [prev] was
      * seldom typed. 0 for a word never committed, which is nearly all the decoder asks about.
      */
-    fun probability(prev: Int, word: Int): Float {
+    override fun probability(prev: Int, word: Int): Float {
         val count = counts[key(NO_WORD, word)]
         if (count == 0f) return 0f
         val alone = count / (total + UNSEEN)
@@ -174,6 +178,16 @@ class UserModel(
         val before = counts[key(NO_WORD, prev)]
         if (before == 0f) return alone
         return (counts[key(prev, word)] + PRIOR * alone) / (before + PRIOR)
+    }
+
+    override fun forEachAfter(prev: Int, visit: (Int) -> Unit) {
+        if (prev == NO_WORD) return
+        followers[prev]?.forEach { if (counts[key(prev, it)] > 0f) visit(it) }
+    }
+
+    private fun indexFollowers() {
+        followers.clear()
+        counts.forEach { key, _ -> if (first(key) != NO_WORD) followers.getOrPut(first(key)) { HashSet() } += second(key) }
     }
 
     /** The id of [entry]: the dictionary's word if it has it so read, else the user's. */
@@ -328,6 +342,9 @@ class UserModel(
 
     override fun text(word: Int) = newWords[word - vocabulary.size].text
 
+    // as learned: a word of the dictionary's too, read as the user typed it (行 as hang)
+    override fun reading(word: Int) = entries[word]?.syllables ?: newWords.getOrNull(word - vocabulary.size)?.syllables
+
     private fun addToTrie(syllables: IntArray, word: Int) {
         var node = root
         for (s in syllables) {
@@ -367,7 +384,7 @@ class UserModel(
     private fun add(first: Int, second: Int, count: Float) {
         if (first == NO_WORD && counts[key(first, second)] == 0f) changes++
         counts.add(key(first, second), count)
-        if (first == NO_WORD) total += count
+        if (first == NO_WORD) total += count else followers.getOrPut(first) { HashSet() } += second
     }
 
     private fun key(first: Int, second: Int) = (first.toLong() shl Int.SIZE_BITS) or (second.toLong() and 0xffffffffL)

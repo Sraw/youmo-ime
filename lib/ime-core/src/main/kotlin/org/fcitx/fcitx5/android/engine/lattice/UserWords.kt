@@ -33,4 +33,13 @@ interface UserWords {
 
     /** Whether [word] is blocked in some reading: not predicted, as a prediction has none. */
     fun blockedAnyhow(word: Int): Boolean = false
+
+    /** Each word the user typed after [prev]: what they may type there again (联想). */
+    fun forEachAfter(prev: Int, visit: (Int) -> Unit) {}
+
+    /** The syllables of [word] as the user typed it, of this trie's or the dictionary's; null if never. */
+    fun reading(word: Int): IntArray? = null
+
+    /** The chance the user types [word] after [prev], from what they typed: 0 for a word never typed. */
+    fun probability(prev: Int, word: Int): Float = 0f
 }

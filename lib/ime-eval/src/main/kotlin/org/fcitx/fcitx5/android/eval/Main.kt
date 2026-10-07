@@ -8,6 +8,7 @@ import org.fcitx.fcitx5.android.engine.data.CodeTable
 import org.fcitx.fcitx5.android.engine.data.DataFormatException
 import org.fcitx.fcitx5.android.engine.data.PinyinData
 import org.fcitx.fcitx5.android.engine.user.WordPack
+import org.fcitx.fcitx5.android.engine.lattice.Predictor
 import org.fcitx.fcitx5.android.engine.lattice.Penalties
 import org.fcitx.fcitx5.android.engine.libime.LibimeFiles
 import org.fcitx.fcitx5.android.engine.pinyin.Fuzzy
@@ -35,7 +36,9 @@ import kotlin.system.exitProcess
 
 val USAGE = """usage: score <set.tsv> <result.tsv> [<baseline-result.tsv>] [--half <half>]
        pinyin <pinyin.data> <set.tsv> <result.tsv> [--scheme <scheme>] [--fuzzy all|<pair>,...] [--half <half>] [--neighbours on|off] [--rerank <model.safetensors>] [--refine <model.safetensors>] [--weight <rerank>[,<refine>]] [--remote <url>] [--remote-timeout <ms>] [--penalty <p>] [--layers <name>=<log10>,...] [--pack <file.words>] [--threads <n>]
-       predict <pinyin.data> <predict.tsv> [--offers <out.tsv>] [--threads <n>]
+       predict <pinyin.data> <predict.tsv> [--offers <out.tsv>] [--threads <n>] [--rerank <model.safetensors> [--weight <w>]]
+       predict-learn <pinyin.data> <set.tsv> [--user-weight <w>]
+       predict-set <pinyin.data> <set.tsv> <predict.tsv>
        sentences <pinyin.data> <set.tsv> <out.tsv> [--neighbours on|off] [--threads <n>]
        lm <model.safetensors> <context> <text>...
        shuangpin <scheme> <set.tsv> <shuangpin-set.tsv>
@@ -87,18 +90,16 @@ fun runCli(args: Array<String>, out: Appendable, err: Appendable): Int {
     val fuzzy = a.options["fuzzy"]?.let(::fuzzyPairs)
     val preset = a.options["preset"]
     val neighbours = a.options["neighbours"]
-    val threads = a.options["threads"]?.toIntOrNull() ?: Runtime.getRuntime().availableProcessors()
+    val threads = threads(a.options)
     return when {
         !optionsValid(a.options, fuzzy) -> usage(err)
         a.has("score", 3..4, "half") -> score(p[1], p[2], p.getOrNull(3), half, out)
         a.has("pinyin", 4..4, "scheme", "fuzzy", "half", "neighbours", "rerank", "refine", "weight", *REMOTE, "layers", "pack", "threads") ->
             runPinyin(p[1], p[2], p[3], scheme, fuzzy.orEmpty(), half, neighbours == "on", Models(a.options), a.options["layers"], a.options["pack"], threads)
-        a.has("predict", 3..3, "threads", "offers") -> predict(p[1], p[2], threads, a.options["offers"], out)
+        p.firstOrNull() in PREDICT_COMMANDS -> predictCommand(a, threads, out) ?: usage(err)
         a.has("sentences", 4..4, "neighbours", "threads") -> sentences(p[1], p[2], p[3], neighbours == "on", threads)
         a.has("lm", 4..Int.MAX_VALUE) -> lm(p[1], p[2], p.drop(3), out)
-        a.has("shuangpin", 4..4) && p[1] in ShuangpinSet.SCHEMES -> writeShuangpinSet(p[1], p[2], p[3], out)
-        a.has("t9", 3..3) -> writeT9Set(p[1], p[2], out)
-        a.has("slips", 3..3) -> writeSlipSet(p[1], p[2], out)
+        p.firstOrNull() in SET_WRITERS -> writeSet(a, out) ?: usage(err)
         a.has("tune", 4..4) -> tune(p[1], p[2], p[3], out)
         a.has("ksc", 3..3, "scheme", "fuzzy", "half", "rerank", "refine", "weight", *REMOTE, "threads") ->
             ksc(p[1], p[2], scheme, fuzzy.orEmpty(), half, Models(a.options), threads, out)
@@ -106,6 +107,48 @@ fun runCli(args: Array<String>, out: Appendable, err: Appendable): Int {
         a.has("table", 3..3, "preset") -> table(p[1], p[2], preset ?: "plain", out)
         a.has("libime", 3..3) && p[1] in LIBIME_KINDS -> libime(p[1], p[2], out, err)
         else -> usage(err)
+    }
+}
+
+private fun threads(options: Map<String, String>) = options["threads"]?.toIntOrNull() ?: Runtime.getRuntime().availableProcessors()
+
+private val SET_WRITERS = setOf("shuangpin", "t9", "slips")
+
+/** An evaluation set written from another: null for a usage error. */
+private fun writeSet(a: Arguments, out: Appendable): Int? {
+    val p = a.positional
+    return when {
+        a.has("shuangpin", 4..4) && p[1] in ShuangpinSet.SCHEMES -> writeShuangpinSet(p[1], p[2], p[3], out)
+        a.has("t9", 3..3) -> writeT9Set(p[1], p[2], out)
+        a.has("slips", 3..3) -> writeSlipSet(p[1], p[2], out)
+        else -> null
+    }
+}
+
+private val PREDICT_COMMANDS = setOf("predict", "predict-learn", "predict-set")
+
+/** 联想 measured, or a set to measure it on written: null for a usage error. */
+private fun predictCommand(a: Arguments, threads: Int, out: Appendable): Int? {
+    val p = a.positional
+    // checked already: see optionsValid
+    val weight = a.options["weight"]?.let { weights(it)?.first }
+    return when {
+        a.has("predict", 3..3, "threads", "offers", "rerank", "weight") ->
+            predict(p[1], p[2], threads, a.options["offers"], a.options["rerank"], weight ?: Reranker.WEIGHT, out)
+        a.has("predict-learn", 3..3, "user-weight") -> {
+            val userWeight = a.options["user-weight"]?.let { it.toFloatOrNull() ?: return null } ?: Predictor.USER_WEIGHT
+            val rows = PredictLearning(loadData(p[1]), userWeight).measure(readSet(p[2]))
+            rows.forEach { (label, score) -> out.appendLine("%-28s %s".format(label, score)) }
+            0
+        }
+        a.has("predict-set", 4..4) -> {
+            // after each word of a pinyin set's sentences, what follows: for `predict`
+            File(p[3]).printWriter().use { w ->
+                PredictLearning(loadData(p[1]), 0f).continuations(readSet(p[2])).forEach { w.println("${it.context}\t${it.next}") }
+            }
+            0
+        }
+        else -> null
     }
 }
 
@@ -212,9 +255,10 @@ private class Models(options: Map<String, String>) {
     }
 }
 
-private fun predict(dataPath: String, setPath: String, threads: Int, offersPath: String?, out: Appendable): Int {
+private fun predict(dataPath: String, setPath: String, threads: Int, offersPath: String?, rerank: String?, weight: Float, out: Appendable): Int {
     val samples = File(setPath).useLines { PredictRun.parse(it) }
-    val offers = dealt(samples, threads, { PredictRun(loadData(dataPath)) }) { hand -> hand.map { offers(it.context) } }
+    val model = rerank?.let { SentenceModel.load(mapFile(it), unpack = true) }
+    val offers = dealt(samples, threads, { PredictRun(loadData(dataPath), model, weight) }) { hand -> hand.map { offers(it.context) } }
     // what was offered, for a look at the misses: context<TAB>next<TAB>offers, space-separated
     offersPath?.let { path ->
         File(path).printWriter().use { w -> samples.zip(offers).forEach { (s, o) -> w.println("${s.context}\t${s.next}\t${o.joinToString(" ")}") } }

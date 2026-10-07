@@ -46,7 +46,8 @@ import java.util.Calendar
  * With a [user] model, what is committed is learned: its words and their order. Where the user
  * corrected the engine, putting the text together from pieces or picking a reading of several
  * words other than the first, the text is learned as one word, found whole the next time. A
- * prediction picked is not learned, as nothing says how it reads; text kept as typed is not either.
+ * prediction picked is learned too, after what came before it, as its likeliest reading: 中文
+ * picked after 用 comes up after 用 again. Text kept as typed is not learned.
  *
  * With a [reranker], the best readings of the input are weighed again by how they read as a
  * sentence after the text committed before, by the same context, or after the text the host
@@ -239,7 +240,7 @@ class PinyinSession(
     private fun pick(index: Int): Snapshot {
         val c = candidates.getOrNull(index) ?: return snapshot(handled = candidates.isNotEmpty())
         if (predicting) {
-            lastEntry = null
+            lastEntry = learnPrediction(c)
             return commit(c.text, c.words)
         }
         pieces += Piece(c.text, c.words, readFrom() + c.end, if (user == null) null else entries(c), c !== decoderFirst)
@@ -270,8 +271,8 @@ class PinyinSession(
     }
 
     override fun offers(index: Int): Set<Offer> {
-        val c = candidates.getOrNull(index)
-        if (c == null || predicting) return emptySet()
+        val c = candidates.getOrNull(index) ?: return emptySet()
+        if (predicting) return predictionOffers(c)
         val phrase = placed[c.text]
         return buildSet {
             // text kept as typed and phrases hold no words to forget; a habit is forgotten as such
@@ -280,6 +281,16 @@ class PinyinSession(
             if ((phrase == null || index != 0) && pinnable(c)) add(Offer.PIN)
             if (phrase != null) add(Offer.UNPIN)
             if (phrase == null && blockable(c)) add(Offer.BLOCK)
+        }
+    }
+
+    // a prediction the user taught is forgotten, as are the words learned; any may be blocked
+    private fun predictionOffers(c: Candidate): Set<Offer> {
+        val word = c.words.singleOrNull()
+        if (user == null || word == null || entries(c) == null) return emptySet()
+        return buildSet {
+            if (user.probability(NO_WORD, word) > 0f) add(Offer.FORGET)
+            if (block != null) add(Offer.BLOCK)
         }
     }
 
@@ -329,7 +340,7 @@ class PinyinSession(
     private fun forget(index: Int): Snapshot {
         val c = candidates.getOrNull(index)
         if (c != null && !predicting) habits?.forget(c.text)
-        val words = if (user == null || predicting || c == null) null else entries(c)
+        val words = if (user == null || c == null) null else entries(c)
         if (words == null) {
             if (c != null && c.text == habit) read()
             return snapshot()
@@ -338,6 +349,17 @@ class PinyinSession(
         // or the next pick learns it again, as the word before it
         if (lastEntry in words) dropContext()
         decoder.reset()
+        return again()
+    }
+
+    /** The candidates anew, after what was learned changed: on the page shown, if it still has some. */
+    private fun again(): Snapshot {
+        if (predicting) {
+            candidates = predict()
+            predicting = candidates.isNotEmpty()
+            page = 0
+            return snapshot()
+        }
         val shown = page
         read()
         if (shown * pageSize < candidates.size) page = shown
@@ -349,19 +371,20 @@ class PinyinSession(
 
     private fun block(index: Int): Snapshot {
         val c = candidates.getOrNull(index)
-        val word = if (user == null || predicting || c == null) null else entries(c)?.singleOrNull()
+        val word = if (user == null || c == null) null else entries(c)?.singleOrNull()
         if (word == null || block == null) return snapshot()
         block.invoke(word)
         if (lastEntry == word) dropContext()
         decoder.reset()
-        val shown = page
-        read()
-        if (shown * pageSize < candidates.size) page = shown
-        return snapshot()
+        return again()
     }
 
-    /** How each word of [c], of the input read last, reads; null if some is text kept as typed. */
+    /**
+     * How each word of [c], of the input read last, reads; null if some is text kept as typed.
+     * A prediction read no input: its likeliest reading.
+     */
     private fun entries(c: Candidate): List<Entry>? {
+        if (predicting) return c.words.singleOrNull()?.let { w -> predictor.reading(w)?.let { listOf(Entry(c.text, it)) } }
         val graph = graph ?: return null
         var from = graph.start
         return c.words.indices.map { i ->
@@ -373,6 +396,17 @@ class PinyinSession(
     }
 
     private fun text(word: Int) = if (word < data.vocabulary.size || user == null) data.vocabulary.word(word) else user.text(word)
+
+    /** Learns [c], a prediction picked, after the word before it: what it was learned as, or null. */
+    private fun learnPrediction(c: Candidate): Entry? {
+        if (user == null || !learning) return null
+        val entry = entries(c)?.singleOrNull() ?: return null
+        // after the app's text, its last word as the model has it
+        val before = lastEntry ?: context.lastOrNull()?.takeIf { it != NO_WORD }?.let { w -> predictor.reading(w)?.let { Entry(text(w), it) } }
+        user.learn(before, listOf(entry))
+        decoder.reset()
+        return entry
+    }
 
     /**
      * Learns the pieces about to be committed as [text]: as one word if the user corrected the
@@ -467,10 +501,8 @@ class PinyinSession(
      */
     private fun predict(): List<Candidate> {
         val (prev2, prev) = lastTwo(context)
-        val last = lastEntry
-        if (prev == NO_WORD || last == null) return predictor.predict(prev2, prev)
-        if (prev < data.model.vocabularySize) predictor.predict(prev2, prev).let { if (it.isNotEmpty()) return it }
-        return predictor.predict(NO_WORD, predictor.tail(last.text, last.syllables))
+        val last = lastEntry ?: return predictor.predict(prev2, prev)
+        return predictor.predict(prev2, prev) { predictor.tail(last.text, last.syllables) }
     }
 
     private fun dropContext() {

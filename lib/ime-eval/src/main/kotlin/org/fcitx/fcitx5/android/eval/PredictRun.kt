@@ -8,6 +8,8 @@ import org.fcitx.fcitx5.android.engine.data.NgramModel.Companion.NO_WORD
 import org.fcitx.fcitx5.android.engine.data.PinyinData
 import org.fcitx.fcitx5.android.engine.lattice.Predictor
 import org.fcitx.fcitx5.android.engine.lattice.TextWords
+import org.fcitx.fcitx5.android.engine.rerank.SentenceModel
+import kotlin.math.ln
 
 /** A prediction sample: what was written, and what came next. */
 data class Continuation(val context: String, val next: String)
@@ -16,9 +18,13 @@ data class Continuation(val context: String, val next: String)
  * What is offered after [Continuation.context] (联想), as a session offers it after a commit: the
  * model's words. An offer is a hit when the text that came next starts with it: picked, it saves
  * the keys of its characters. (A server's model was measured against them, on `--offers`'s output,
- * with dev/training/predict_exp.py: none was better.)
+ * with dev/training/predict_exp.py: none was better.) With `--rerank`, the offers reordered by a
+ * sentence model as well, as the reranker weighs readings: on this set and on `predict-set`'s of
+ * the chat set, top1 within ±0.5 point and top5 up 1 to 2, not worth a model run every commit.
  */
-class PredictRun(data: PinyinData) {
+class PredictRun(data: PinyinData, model: SentenceModel? = null, private val weight: Float = 0f) {
+    private val scorer = model?.Scorer()
+
     private val predictor = Predictor(data.model, data.vocabulary, data.dictionary)
     private val textWords = TextWords(data.model, data.wordIndex)
 
@@ -26,7 +32,11 @@ class PredictRun(data: PinyinData) {
         val words = textWords.lastTwo(context)
         val prev = words.lastOrNull() ?: NO_WORD
         val prev2 = if (words.size == 2) words[0] else NO_WORD
-        return predictor.predict(prev2, prev).map { it.text }.distinct()
+        val offered = predictor.predict(prev2, prev)
+        val scorer = scorer ?: return offered.map { it.text }.distinct()
+        if (offered.isEmpty()) return emptyList()
+        val lm = scorer.score(context, offered.map { it.text })
+        return offered.indices.sortedByDescending { offered[it].score * LN_10 + weight * lm[it] }.map { offered[it].text }.distinct()
     }
 
     /** Hits among the first 1 and [SHOWN] offers, and the characters the first hit saves, summed. */
@@ -39,6 +49,7 @@ class PredictRun(data: PinyinData) {
 
     companion object {
         const val SHOWN = 5
+        private val LN_10 = ln(10f)
 
         fun score(samples: List<Continuation>, offers: List<List<String>>): Score {
             var top1 = 0

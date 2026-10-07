@@ -8,6 +8,8 @@ import org.fcitx.fcitx5.android.engine.data.NgramModel
 import org.fcitx.fcitx5.android.engine.data.NgramModel.Companion.NO_WORD
 import org.fcitx.fcitx5.android.engine.data.PinyinDictionary
 import org.fcitx.fcitx5.android.engine.data.Vocabulary
+import kotlin.math.log10
+import kotlin.math.pow
 
 /**
  * Words to offer after text is committed, before anything is typed (联想): those the model saw
@@ -21,30 +23,76 @@ import org.fcitx.fcitx5.android.engine.data.Vocabulary
  *
  * After a word the model has not seen (one the user put together, say) what may follow is what
  * follows its end: see [tail], which needs the [dictionary] to find it.
+ *
+ * What the [user] typed after the last word counts too, as the decoder counts it (see
+ * [org.fcitx.fcitx5.android.engine.user.UserScorer]) but at [userWeight], higher: a word they
+ * typed after this one a few times comes first, 中文 after 用 once they typed 用中文 again and
+ * again. Their own words too, which the model has none of.
  */
 class Predictor(
     private val model: NgramModel,
     private val vocabulary: Vocabulary,
     private val dictionary: PinyinDictionary? = null,
-    /** For the words the user blocked, which are not predicted either. */
     private val user: UserWords? = null,
+    private val userWeight: Float = USER_WEIGHT,
 ) {
 
     /**
      * @param prev2 the word before [prev], or [NO_WORD]
      * @param prev the last word committed; nothing is predicted without one
+     * @param tail the model's word to go on from where it has nothing after [prev2] and [prev]:
+     *   one of [prev]'s end ([tail]), or [NO_WORD]
      * @return words with an [end][Candidate.end] of 0, as they read no input
      */
-    fun predict(prev2: Int, prev: Int, limit: Int = DEFAULT_LIMIT): List<Candidate> {
+    fun predict(prev2: Int, prev: Int, limit: Int = DEFAULT_LIMIT, tail: () -> Int = { NO_WORD }): List<Candidate> {
+        if (prev == NO_WORD || limit <= 0) return emptyList()
+        val typed = HashMap<Int, Float>()
+        user?.forEachAfter(prev) { word -> typed[word] = userWeight * user.probability(prev, word) }
+        val best = Best(limit)
         // a word the model lacks (the user's own, say) would get the followers of <unk>
-        if (prev !in 0 until model.vocabularySize || limit <= 0) return emptyList()
-        val words = IntArray(limit)
-        val scores = FloatArray(limit)
-        var size = 0
-        model.forEachAfter(model.context(prev2, prev)) { word, score ->
+        var context = if (prev < model.vocabularySize) model.context(prev2, prev) else NO_CONTEXT
+        if (context != NO_CONTEXT && !offerFollowers(context, typed, best)) context = NO_CONTEXT
+        if (context == NO_CONTEXT) {
+            val end = tail()
+            if (end != NO_WORD) {
+                context = model.context(NO_WORD, end)
+                offerFollowers(context, typed, best)
+            }
+        }
+        // typed after prev, and not among the model's words after it
+        for ((word, p) in typed) {
+            if (p <= 0f || !offered(word)) continue
+            val base = if (context != NO_CONTEXT && word < model.vocabularySize) 10f.pow(model.scoreAfter(context, word)) else 0f
+            best.offer(word, minOf(0f, log10(base + p)))
+        }
+        return best.candidates()
+    }
+
+    // the model's words after context, each with what the user typed of it there: whether it has any to offer
+    private fun offerFollowers(context: Long, typed: HashMap<Int, Float>, best: Best): Boolean {
+        var any = false
+        model.forEachAfter(context) { word, modelScore ->
+            // what the model has after it may be only punctuation, or what the user blocked
+            if (!any && offered(word)) any = true
+            val p = typed.remove(word)
+            val score = if (p == null || p <= 0f) modelScore else minOf(0f, log10(10f.pow(modelScore) + p))
             // ties go to the word seen first, being the lower id
-            if (size == limit && score <= scores[size - 1]) return@forEachAfter
-            if (!offered(word) || user?.blockedAnyhow(word) == true) return@forEachAfter
+            if (!best.takes(score) || !offered(word)) return@forEachAfter
+            best.offer(word, score)
+        }
+        return any
+    }
+
+    /** The [limit] best words offered, best first. */
+    private inner class Best(private val limit: Int) {
+        private val words = IntArray(limit)
+        private val scores = FloatArray(limit)
+        private var size = 0
+
+        fun takes(score: Float) = size < limit || score > scores[size - 1]
+
+        fun offer(word: Int, score: Float) {
+            if (!takes(score)) return
             var k = minOf(size, limit - 1)
             while (k > 0 && scores[k - 1] < score) {
                 words[k] = words[k - 1]
@@ -55,7 +103,9 @@ class Predictor(
             scores[k] = score
             if (size < limit) size++
         }
-        return List(size) { Candidate(vocabulary.word(words[it]), 0, scores[it], intArrayOf(words[it]), intArrayOf(0)) }
+
+        // a word of the user's may be written as one of the dictionary's, read otherwise (银行 as yin xing)
+        fun candidates() = List(size) { Candidate(textOf(words[it]), 0, scores[it], intArrayOf(words[it]), intArrayOf(0)) }.distinctBy { it.text }
     }
 
     /**
@@ -79,8 +129,70 @@ class Predictor(
         return NO_WORD
     }
 
-    private fun offered(word: Int): Boolean {
+    /**
+     * The syllables [word] is likeliest read as, to learn, forget or block it as a prediction:
+     * as the user typed it if they did, which is how it was learned, else the dictionary's
+     * reading of highest weight; null for a word neither reads.
+     */
+    fun reading(word: Int): IntArray? {
+        user?.reading(word)?.let { return it }
+        if (word >= vocabulary.size) return null
+        val dictionary = dictionary ?: return null
         val text = vocabulary.word(word)
+        val options = ArrayList<IntArray>()
+        var i = 0
+        while (i < text.length) {
+            val c = Character.codePointAt(text, i)
+            options += charReadings[c] ?: return null
+            i += Character.charCount(c)
+        }
+        var best: IntArray? = null
+        var bestWeight = Float.NEGATIVE_INFINITY
+        val path = IntArray(options.size)
+        var tried = 0
+        fun visit(depth: Int, node: Int) {
+            if (tried >= MAX_READINGS) return
+            if (depth == path.size) {
+                tried++
+                for (k in 0 until dictionary.wordCount(node)) {
+                    if (dictionary.word(node, k) == word && dictionary.weight(node, k) > bestWeight) {
+                        bestWeight = dictionary.weight(node, k)
+                        best = path.copyOf()
+                    }
+                }
+                return
+            }
+            for (s in options[depth]) {
+                val child = dictionary.child(node, s)
+                if (child < 0) continue
+                path[depth] = s
+                visit(depth + 1, child)
+            }
+        }
+        visit(0, dictionary.root)
+        return best
+    }
+
+    // the syllables each character of the dictionary is read as, from its words of one character
+    private val charReadings: Map<Int, IntArray> by lazy(LazyThreadSafetyMode.NONE) {
+        val dictionary = dictionary ?: return@lazy emptyMap()
+        val readings = HashMap<Int, MutableList<Int>>()
+        val first = dictionary.firstChild(dictionary.root)
+        for (node in first until first + dictionary.childCount(dictionary.root)) {
+            for (k in 0 until dictionary.wordCount(node)) {
+                val text = vocabulary.word(dictionary.word(node, k))
+                if (text.isEmpty() || Character.charCount(text.codePointAt(0)) != text.length) continue
+                readings.getOrPut(text.codePointAt(0)) { ArrayList() } += dictionary.syllable(node)
+            }
+        }
+        readings.mapValues { (_, list) -> list.toIntArray() }
+    }
+
+    private fun textOf(word: Int) = if (word < vocabulary.size) vocabulary.word(word) else user?.text(word).orEmpty()
+
+    private fun offered(word: Int): Boolean {
+        if (user?.blockedAnyhow(word) == true) return false
+        val text = textOf(word)
         var i = 0
         while (i < text.length) {
             val c = Character.codePointAt(text, i)
@@ -97,6 +209,15 @@ class Predictor(
 
     companion object {
         const val DEFAULT_LIMIT = 20
+        /**
+         * Under `ime-eval predict-learn` on the chat set, the half typed once then predicted
+         * again: top1 13.0% learning nothing, 19.6 / 30.9 / 34.1 / 36.4% at 0.1 / 0.3 / 0.5 / 1;
+         * the other half, never typed, 13.0% falling to 13.0 / 12.7 / 12.6 / 12.5%.
+         */
+        const val USER_WEIGHT = 0.5f
+        private const val NO_CONTEXT = Long.MIN_VALUE
+        // readings of a word tried at most: 7 characters of 3 readings each
+        private const val MAX_READINGS = 2187
         private const val TAIL = 2
         private const val MIDDLE_DOT = 0xb7
     }
