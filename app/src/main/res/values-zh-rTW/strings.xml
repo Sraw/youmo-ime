@@ -219,7 +219,6 @@
     <string name="delete_theme_msg">確定要刪除主題 “%1$s” 嗎？</string>
     <string name="capture_heap_dump">捕獲堆積記憶體傾印資料</string>
     <string name="edit_theme">編輯主題</string>
-    <string name="show_voice_input_button">顯示語音輸入鍵</string>
     <string name="fcitx_daemon">Fcitx 常駐程式</string>
     <string name="restarting_fcitx">重新啟動 Fcitx</string>
     <string name="removed_n_items">已移除 %1$d 個項目</string>
@@ -285,7 +284,6 @@
     <string name="status_area">狀態區</string>
     <string name="expand_candidates_list">展開選字列表</string>
     <string name="hide_candidates_list">隱藏選字列表</string>
-    <string name="switch_to_voice_input">切換到語音輸入</string>
     <string name="hide_keyboard">隱藏鍵盤</string>
     <string name="private_mode">隱私模式（點擊以切換工具欄）</string>
     <string name="hide_toolbar">隱藏工具列</string>
@@ -310,7 +308,6 @@
     <string name="emoji_skin_tone_type_5">🏾 中等深膚色 (Type-5)</string>
     <string name="emoji_skin_tone_type_6">🏿 深膚色 (Type-6)</string>
     <string name="hide_unsupported_emojis">隱藏不支援的表情</string>
-    <string name="preferred_voice_input">首選語音輸入</string>
     <string name="a11y_key_shift">Shift</string>
     <string name="a11y_state_shift_once">僅下一個字母大寫</string>
     <string name="a11y_state_caps_lock">大寫鎖定</string>
@@ -350,9 +347,9 @@
     <string name="home_section_keyboard">鍵盤</string>
     <string name="home_section_appearance">外觀</string>
     <string name="home_section_other">其他</string>
-    <string name="long_press_characters_summary">自訂每個鍵長按彈出的字元；第一個也是滑動輸入、顯示在鍵角上的字元</string>
+    <string name="long_press_characters_summary">自訂每個鍵長按彈出的字元；第一個也是滑動輸入的字元，也就是鍵上的小字</string>
     <string name="long_press_of">長按「%1$s」</string>
-    <string name="long_press_editor_hint">帶框的第一個是長按後直接放開得到的字元，也是滑動這個鍵輸入、顯示在鍵角上的字元。點一個字元選取它，再用下面的按鈕調整。</string>
+    <string name="long_press_editor_hint">帶框的第一個是長按後直接放開得到的字元，也是滑動這個鍵輸入的字元，也就是鍵上的小字。點一個字元選取它，再用下面的按鈕調整。</string>
     <string name="letters">字母</string>
     <string name="other_keys">其他按鍵</string>
     <string name="add_key">新增其他按鍵</string>
@@ -441,7 +438,6 @@
     <string name="import_file">匯入</string>
     <string name="export_file">匯出</string>
     <string name="import_phrases_done">匯入了 %1$d 條短語</string>
-    <string name="section_voice">語音輸入</string>
     <string name="im_pinyin">拼音</string>
     <string name="im_shuangpin">雙拼</string>
     <string name="im_t9">九鍵拼音</string>
@@ -532,7 +528,7 @@
     <string name="picker_objects">物品</string>
     <string name="picker_symbols">符號</string>
     <string name="picker_flags">旗幟</string>
-    <string name="long_press_page_hint">點一個鍵，修改長按它彈出的字元。鍵角上的小字就是其中第一個：長按後直接放開，或者滑動這個鍵，得到的都是它。</string>
+    <string name="long_press_page_hint">點一個鍵，修改長按它彈出的字元。鍵上的小字就是其中第一個：長按後直接放開，或者滑動這個鍵，得到的都是它。</string>
     <string name="long_press_legend">帶框的鍵是改過的；變淡的鍵長按不彈出字元，滑動也不輸入。</string>
     <string name="long_press_none">長按這個鍵不彈出字元。</string>
     <string name="long_press_add_hint">新增字元，空格分隔</string>

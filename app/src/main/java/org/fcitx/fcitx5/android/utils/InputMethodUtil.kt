@@ -9,8 +9,6 @@ import android.content.Context
 import android.content.Intent
 import android.os.Build
 import android.provider.Settings
-import android.view.inputmethod.InputMethodInfo
-import android.view.inputmethod.InputMethodSubtype
 import org.fcitx.fcitx5.android.BuildConfig
 import org.fcitx.fcitx5.android.input.FcitxInputMethodService
 
@@ -46,48 +44,6 @@ object InputMethodUtil {
 
     fun showPicker() = appContext.inputMethodManager.showInputMethodPicker()
 
-    fun listVoiceInputMethods(): List<Pair<InputMethodInfo, InputMethodSubtype>> {
-        return appContext.inputMethodManager.enabledInputMethodList
-            .mapNotNull { info ->
-                info.firstVoiceSubtype()?.let { info to it }
-            }
-    }
 
-    /**
-     * Find input method with `"voice"` subtype, preferring one with [id]
-     */
-    fun findVoiceSubtype(id: String): Pair<String, InputMethodSubtype>? {
-        val inputMethods = appContext.inputMethodManager.enabledInputMethodList
-        if (inputMethods.isEmpty()) return null
-        var firstId: String? = null
-        var firstSubtype: InputMethodSubtype? = null
-        inputMethods.forEach {
-            val voiceSubtype = it.firstVoiceSubtype() ?: return@forEach
-            if (it.id == id) {
-                return id to voiceSubtype
-            }
-            if (firstId == null) {
-                firstId = it.id
-                firstSubtype = voiceSubtype
-            }
-        }
-        if (firstId != null && firstSubtype != null) {
-            return firstId to firstSubtype
-        }
-        return null
-    }
 
-    fun switchInputMethod(
-        service: FcitxInputMethodService,
-        id: String,
-        subtype: InputMethodSubtype
-    ) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-            service.switchInputMethod(id, subtype)
-        } else {
-            @Suppress("DEPRECATION")
-            appContext.inputMethodManager
-                .setInputMethodAndSubtype(service.window.window!!.attributes.token, id, subtype)
-        }
-    }
 }

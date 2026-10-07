@@ -213,7 +213,6 @@
     <string name="delete_theme_msg">Вы действительно хотите удалить тему \"%1$s\"?</string>
     <string name="capture_heap_dump">Захватить дамп кучи</string>
     <string name="edit_theme">Изменить тему</string>
-    <string name="show_voice_input_button">Показывать кнопку голосового ввода</string>
     <string name="fcitx_daemon">Демон Fcitx</string>
     <string name="restarting_fcitx">Перезапуск Fcitx</string>
     <string name="removed_n_items">Удаленный %1$d элемент(ы)</string>
@@ -276,7 +275,6 @@
     <string name="status_area">Область состояния</string>
     <string name="expand_candidates_list">Развернуть список кандидатов</string>
     <string name="hide_candidates_list">Скрыть список кандидатов</string>
-    <string name="switch_to_voice_input">Переключиться на голосовой ввод</string>
     <string name="hide_keyboard">Скрыть клавиатуру</string>
     <string name="private_mode">Приватный режим (нажмите, чтобы переключить панель инструментов)</string>
     <string name="hide_toolbar">Скрыть панель инструментов</string>
@@ -302,6 +300,5 @@
     <string name="emoji_skin_tone_type_6">🏿 Type-6</string>
     <string name="hide_unsupported_emojis">Скрыть неподдерживаемые эмодзи</string>
     <string name="key_border_stroke">Включить обводку для границы клавиши</string>
-    <string name="preferred_voice_input">Предпочтительный голосовой ввод</string>
     <string name="edit_text_playground">Тестовое поле EditText</string>
     </resources>

@@ -83,7 +83,9 @@ class IdleUi(
         updateMenuButtonContentDescription()
     }
 
-    val hideKeyboardButton = ToolButton(ctx, R.drawable.ic_baseline_arrow_drop_down_24, theme)
+    val hideKeyboardButton = ToolButton(ctx, R.drawable.ic_baseline_arrow_drop_down_24, theme).apply {
+        contentDescription = ctx.getString(R.string.hide_keyboard)
+    }
 
     /**
      * The emoji, on the bar whenever it is idle, as Sogou's 表情: a long press on the comma was
@@ -202,17 +204,6 @@ class IdleUi(
                 iconRotation = targetRotation
             }
         }
-    }
-
-    fun setHideKeyboardIsVoiceInput(isVoiceInput: Boolean, callback: View.OnClickListener) {
-        if (isVoiceInput) {
-            hideKeyboardButton.setIcon(R.drawable.ic_baseline_keyboard_voice_24)
-            hideKeyboardButton.contentDescription = ctx.getString(R.string.switch_to_voice_input)
-        } else {
-            hideKeyboardButton.setIcon(R.drawable.ic_baseline_arrow_drop_down_24)
-            hideKeyboardButton.contentDescription = ctx.getString(R.string.hide_keyboard)
-        }
-        hideKeyboardButton.setOnClickListener(callback)
     }
 
     private fun clearAnimation() {

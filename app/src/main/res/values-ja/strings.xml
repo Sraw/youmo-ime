@@ -208,7 +208,6 @@
     <string name="delete_theme_msg">本当に\"%1$s\"テーマを削除しますか？</string>
     <string name="capture_heap_dump">ヒープダンプを取得する</string>
     <string name="edit_theme">テーマを編集</string>
-    <string name="show_voice_input_button">音声入力ボタンを表示する</string>
     <string name="fcitx_daemon">Fcitxデーモン</string>
     <string name="restarting_fcitx">Fcitxを再起動中</string>
     <string name="removed_n_items">%1$s 個のアイテムを削除しました</string>

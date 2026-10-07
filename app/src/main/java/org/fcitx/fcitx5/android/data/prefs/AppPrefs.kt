@@ -126,20 +126,11 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
         val focusChangeResetKeyboard =
             hidden { switch(R.string.reset_keyboard_on_focus_change, "reset_keyboard_on_focus_change", true) }
 
-        init {
-            section(R.string.section_voice)
-        }
-
         val expandToolbarByDefault =
             hidden { switch(R.string.expand_toolbar_by_default, "expand_toolbar_by_default", false) }
         val inlineSuggestions = hidden { switch(R.string.inline_suggestions, "inline_suggestions", true) }
         val toolbarNumRowOnPassword =
             hidden { switch(R.string.toolbar_num_row_on_password, "toolbar_num_row_on_password", true) }
-        val showVoiceInputButton =
-            switch(R.string.show_voice_input_button, "show_voice_input_button", false)
-        val preferredVoiceInput = voiceInputPreference(
-            R.string.preferred_voice_input, "preferred_voice_input", ""
-        ) { showVoiceInputButton.getValue() }
 
         val horizontalCandidateStyle = hidden { enumList(
             R.string.horizontal_candidate_style,

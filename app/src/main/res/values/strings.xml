@@ -219,7 +219,6 @@
     <string name="delete_theme_msg">Do you really want to delete theme \"%1$s\"?</string>
     <string name="capture_heap_dump">Capture heap dump</string>
     <string name="edit_theme">Edit Theme</string>
-    <string name="show_voice_input_button">Show voice input button</string>
     <string name="fcitx_daemon">Fcitx Daemon</string>
     <string name="restarting_fcitx">Restarting Fcitx</string>
     <string name="removed_n_items">Removed %1$d item(s)</string>
@@ -287,7 +286,6 @@
     <string name="status_area">Status area</string>
     <string name="expand_candidates_list">Expand candidates list</string>
     <string name="hide_candidates_list">Hide candidates list</string>
-    <string name="switch_to_voice_input">Switch to voice input</string>
     <string name="hide_keyboard">Hide keyboard</string>
     <string name="private_mode">Private mode (tap to toggle toolbar)</string>
     <string name="hide_toolbar">Hide toolbar</string>
@@ -313,7 +311,6 @@
     <string name="emoji_skin_tone_type_6">🏿 Type-6</string>
     <string name="hide_unsupported_emojis">Hide unsupported Emojis</string>
     <string name="key_border_stroke">Enable stroke for key border</string>
-    <string name="preferred_voice_input">Preferred voice input</string>
     <string name="edit_text_playground">EditText Playground</string>
     <string name="keyboard_height_percent_base">Keyboard height percent base</string>
     <string name="display_metrics">Display metrics (Resources.getDisplayMetrics)</string>
@@ -354,9 +351,9 @@
     <string name="home_section_keyboard">Keyboard</string>
     <string name="home_section_appearance">Appearance</string>
     <string name="home_section_other">Other</string>
-    <string name="long_press_characters_summary">Choose what each key offers when you hold it; the first is also what swiping it types, shown in its corner</string>
+    <string name="long_press_characters_summary">Choose what each key offers when you hold it; the first is also what swiping it types, and the small character on the key</string>
     <string name="long_press_of">Long press on “%1$s”</string>
-    <string name="long_press_editor_hint">The outlined one is what you get by holding the key and letting go, and by swiping it; it is shown in the key\'s corner. Tap a character to select it, then use the buttons below.</string>
+    <string name="long_press_editor_hint">The outlined one is what you get by holding the key and letting go, and by swiping it, and the small character on the key. Tap a character to select it, then use the buttons below.</string>
     <string name="letters">Letters</string>
     <string name="other_keys">Other keys</string>
     <string name="add_key">Add another key</string>
@@ -450,7 +447,6 @@
     <string name="import_file">Import</string>
     <string name="export_file">Export</string>
     <string name="import_phrases_done">Imported %1$d phrases</string>
-    <string name="section_voice">Voice input</string>
     <string name="im_pinyin">Pinyin</string>
     <string name="im_shuangpin">Shuangpin</string>
     <string name="im_t9">Pinyin (9 keys)</string>
@@ -542,7 +538,7 @@
     <string name="picker_objects">Objects</string>
     <string name="picker_symbols">Symbols</string>
     <string name="picker_flags">Flags</string>
-    <string name="long_press_page_hint">Tap a key to change the characters it offers when you hold it. The small character in its corner is the first of them: what holding and letting go gives, and what swiping the key types.</string>
+    <string name="long_press_page_hint">Tap a key to change the characters it offers when you hold it. The small character on it is the first of them: what holding and letting go gives, and what swiping the key types.</string>
     <string name="long_press_legend">Outlined keys are ones you changed. A faded key offers nothing when held, and types nothing when swiped.</string>
     <string name="long_press_none">Holding this key offers nothing.</string>
     <string name="long_press_add_hint">Add, space between several</string>

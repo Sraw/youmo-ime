@@ -219,7 +219,6 @@
     <string name="delete_theme_msg">确定要删除主题“%1$s”吗？</string>
     <string name="capture_heap_dump">捕获堆内存转储</string>
     <string name="edit_theme">编辑主题</string>
-    <string name="show_voice_input_button">显示语音输入按钮</string>
     <string name="fcitx_daemon">Fcitx 守护程序</string>
     <string name="restarting_fcitx">正在重新启动 Fcitx</string>
     <string name="removed_n_items">已移除 %1$d 个项目</string>
@@ -287,7 +286,6 @@
     <string name="status_area">状态区域</string>
     <string name="expand_candidates_list">展开候选词列表</string>
     <string name="hide_candidates_list">隐藏</string>
-    <string name="switch_to_voice_input">切换到语音输入</string>
     <string name="hide_keyboard">隐藏键盘</string>
     <string name="private_mode">隐私模式（点击以切换工具栏）</string>
     <string name="hide_toolbar">隐藏工具栏</string>
@@ -313,7 +311,6 @@
     <string name="emoji_skin_tone_type_6">🏿 深肤色 (Type-6)</string>
     <string name="hide_unsupported_emojis">隐藏不支持的表情</string>
     <string name="key_border_stroke">启用按键边框描边</string>
-    <string name="preferred_voice_input">首选语音输入</string>
     <string name="edit_text_playground">文本输入框 (EditText) 演练场</string>
     <string name="keyboard_height_percent_base">键盘高度百分比</string>
     <string name="display_metrics">显示指标 (Resources.getDisplayMetrics)</string>
@@ -350,9 +347,9 @@
     <string name="home_section_keyboard">键盘</string>
     <string name="home_section_appearance">外观</string>
     <string name="home_section_other">其他</string>
-    <string name="long_press_characters_summary">自定义每个键长按弹出的字符；第一个也是滑动输入、显示在键角上的字符</string>
+    <string name="long_press_characters_summary">自定义每个键长按弹出的字符；第一个也是滑动输入的字符，也就是键上的小字</string>
     <string name="long_press_of">长按“%1$s”</string>
-    <string name="long_press_editor_hint">带框的第一个是长按后直接松手得到的字符，也是滑动这个键输入、显示在键角上的字符。点一个字符选中它，再用下面的按钮调整。</string>
+    <string name="long_press_editor_hint">带框的第一个是长按后直接松手得到的字符，也是滑动这个键输入的字符，也就是键上的小字。点一个字符选中它，再用下面的按钮调整。</string>
     <string name="letters">字母</string>
     <string name="other_keys">其他按键</string>
     <string name="add_key">添加其他按键</string>
@@ -441,7 +438,6 @@
     <string name="import_file">导入</string>
     <string name="export_file">导出</string>
     <string name="import_phrases_done">导入了 %1$d 条短语</string>
-    <string name="section_voice">语音输入</string>
     <string name="im_pinyin">拼音</string>
     <string name="im_shuangpin">双拼</string>
     <string name="im_t9">九键拼音</string>
@@ -532,7 +528,7 @@
     <string name="picker_objects">物品</string>
     <string name="picker_symbols">符号</string>
     <string name="picker_flags">旗帜</string>
-    <string name="long_press_page_hint">点一个键，修改长按它弹出的字符。键角上的小字就是其中第一个：长按后直接松手，或者滑动这个键，得到的都是它。</string>
+    <string name="long_press_page_hint">点一个键，修改长按它弹出的字符。键上的小字就是其中第一个：长按后直接松手，或者滑动这个键，得到的都是它。</string>
     <string name="long_press_legend">带框的键是改过的；变淡的键长按不弹出字符，滑动也不输入。</string>
     <string name="long_press_none">长按这个键不弹出字符。</string>
     <string name="long_press_add_hint">添加字符，空格分隔</string>

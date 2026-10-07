@@ -151,7 +151,6 @@
     <string name="show_lang_switch_key">Sprachwechseltaste anzeigen</string>
     <string name="horizontal_candidate_style">Stil der horizonttalen Kandidaten</string>
     <string name="num_items_deleted">%1$d Element(e) gelöscht</string>
-    <string name="show_voice_input_button">Taste Spracheingabe zeigen</string>
     <string name="fcitx_daemon">Fcitx Daemon</string>
     <string name="removed_n_items"> %1$d Element(e) entfernt</string>
     <string name="whether_reset_switch_preference">Wollen Sie diese Einstellung auf den Standard zurücksetzen?</string>

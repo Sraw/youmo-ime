@@ -35,7 +35,7 @@ import splitties.dimensions.dp
 
 /**
  * Edits what a long press on a key offers, on a keyboard drawn as the user sees it: each key
- * with its first long-press character in the corner, a changed one outlined. The decisions
+ * with its first long-press character small where the keyboard shows it, a changed one outlined. The decisions
  * (replace, disable, carry over to Shift) live in [PopupOverrides]; this shows and writes them.
  */
 class PopupOverridesFragment : Fragment() {
