@@ -10,6 +10,7 @@ import org.fcitx.fcitx5.android.engine.data.PinyinData
 import org.fcitx.fcitx5.android.engine.user.WordPack
 import org.fcitx.fcitx5.android.engine.lattice.Predictor
 import org.fcitx.fcitx5.android.engine.lattice.Penalties
+import org.fcitx.fcitx5.android.engine.lattice.PinyinDecoder
 import org.fcitx.fcitx5.android.engine.libime.LibimeFiles
 import org.fcitx.fcitx5.android.engine.pinyin.Fuzzy
 import org.fcitx.fcitx5.android.engine.pinyin.LatinWords
@@ -29,11 +30,11 @@ import java.util.Locale
 import kotlin.system.exitProcess
 
 val USAGE = """usage: score <set.tsv> <result.tsv> [<baseline-result.tsv>] [--half <half>]
-       pinyin <pinyin.data> <set.tsv> <result.tsv> [--scheme <scheme>] [--fuzzy all|<pair>,...] [--half <half>] [--neighbours on|off] [--rerank <model.safetensors>] [--refine <model.safetensors>] [--weight <rerank>[,<refine>]] [--layers <name>=<log10>,...] [--pack <file.words>] [--threads <n>]
+       pinyin <pinyin.data> <set.tsv> <result.tsv> [--scheme <scheme>] [--fuzzy all|<pair>,...] [--half <half>] [--neighbours on|off] [--rerank <model.safetensors>] [--refine <model.safetensors>] [--weight <rerank>[,<refine>]] [--limit <rerank>[,<refine>]] [--beam <n>] [--sentences <n>] [--layers <name>=<log10>,...] [--pack <file.words>] [--threads <n>]
        predict <pinyin.data> <predict.tsv> [--offers <out.tsv>] [--threads <n>] [--rerank <model.safetensors> [--weight <w>]]
        predict-learn <pinyin.data> <set.tsv> [--user-weight <w>]
        predict-set <pinyin.data> <set.tsv> <predict.tsv>
-       sentences <pinyin.data> <set.tsv> <out.tsv> [--neighbours on|off] [--threads <n>]
+       sentences <pinyin.data> <set.tsv> <out.tsv> [--scheme <scheme>] [--neighbours on|off] [--beam <n>] [--sentences <n>] [--threads <n>]
        lm <model.safetensors> <context> <text>...
        shuangpin <scheme> <set.tsv> <shuangpin-set.tsv>
        t9 <set.tsv> <t9-set.tsv>
@@ -71,6 +72,8 @@ private class Arguments(args: Array<String>) {
         }
     }
 
+    fun int(name: String, default: Int): Int = options[name]?.toInt() ?: default
+
     fun has(command: String, count: IntRange, vararg allowed: String) =
         valid && positional.firstOrNull() == command && positional.size in count && options.keys.all { it in allowed }
 }
@@ -88,10 +91,13 @@ fun runCli(args: Array<String>, out: Appendable, err: Appendable): Int {
     return when {
         !optionsValid(a.options, fuzzy) -> usage(err)
         a.has("score", 3..4, "half") -> score(p[1], p[2], p.getOrNull(3), half, out)
-        a.has("pinyin", 4..4, "scheme", "fuzzy", "half", "neighbours", "rerank", "refine", "weight", "layers", "pack", "threads") ->
-            runPinyin(p[1], p[2], p[3], scheme, fuzzy.orEmpty(), half, neighbours == "on", Models(a.options), a.options["layers"], a.options["pack"], threads)
+        a.has("pinyin", 4..4, "scheme", "fuzzy", "half", "neighbours", "rerank", "refine", "weight", "limit", "beam", "sentences", "layers", "pack", "threads") ->
+            runPinyin(p[1], p[2], p[3], scheme, fuzzy.orEmpty(), half, neighbours == "on", Models(a.options), a.options["layers"], a.options["pack"], threads,
+                a.int("beam", PinyinDecoder.DEFAULT_BEAM), a.int("sentences", PinyinDecoder.DEFAULT_SENTENCES))
         p.firstOrNull() in PREDICT_COMMANDS -> predictCommand(a, threads, out) ?: usage(err)
-        a.has("sentences", 4..4, "neighbours", "threads") -> sentences(p[1], p[2], p[3], neighbours == "on", threads)
+        a.has("sentences", 4..4, "scheme", "neighbours", "beam", "sentences", "threads") ->
+            sentences(p[1], p[2], p[3], scheme, neighbours == "on", a.int("beam", PinyinDecoder.DEFAULT_BEAM),
+                a.int("sentences", PinyinDecoder.DEFAULT_SENTENCES), threads)
         a.has("lm", 4..Int.MAX_VALUE) -> lm(p[1], p[2], p.drop(3), out)
         p.firstOrNull() in SET_WRITERS -> writeSet(a, out) ?: usage(err)
         a.has("tune", 4..4) -> tune(p[1], p[2], p[3], out)
@@ -200,15 +206,17 @@ private class Models(options: Map<String, String>) {
     private val rerankPath = options["rerank"]
     private val refinePath = options["refine"]
     private val weights = options["weight"]?.let(::weights) ?: (Reranker.WEIGHT to Reranker.WEIGHT)
+    private val limits = options["limit"]?.split(',')?.map(String::toInt)?.let { it[0] to it.getOrElse(1) { _ -> it[0] } }
+        ?: (Reranker.LIMIT to Reranker.REFINE_LIMIT)
 
     // floats, as the app has the smaller: the same scores, sooner
     private val rerank by lazy { rerankPath?.let { SentenceModel.load(mapFile(it), unpack = true) } }
     private val refine by lazy { refinePath?.let { SentenceModel.load(mapFile(it), unpack = true) } }
 
     /** Makes a reranker: none when there is no model. */
-    val reranker: (() -> Reranker)? get() = rerank?.let { model -> { Reranker(model, weights.first) } }
+    val reranker: (() -> Reranker)? get() = rerank?.let { model -> { Reranker(model, weights.first, limit = limits.first) } }
 
-    val refiner: (() -> SentenceRefiner)? get() = refine?.let { model -> { Reranker(model, weights.second, limit = Reranker.REFINE_LIMIT) } }
+    val refiner: (() -> SentenceRefiner)? get() = refine?.let { model -> { Reranker(model, weights.second, limit = limits.second) } }
 }
 
 private fun predict(dataPath: String, setPath: String, threads: Int, offersPath: String?, rerank: String?, weight: Float, out: Appendable): Int {
@@ -258,12 +266,14 @@ private fun runPinyin(
     layers: String?,
     packPath: String?,
     threads: Int,
+    beam: Int,
+    count: Int,
 ): Int {
     val pack = packPath?.let { path -> File(path).useLines { WordPack.parse(it, path) } }
     // a data file each: its buffers are not to be shared
     val results = dealt(Halves.select(readSet(setPath), half), threads, {
         val data = loadData(dataPath)
-        PinyinRun(data, segmenter(scheme, fuzzy, neighbours, data), layers = layers, pack = pack, reranker = models.reranker, refiner = models.refiner)
+        PinyinRun(data, segmenter(scheme, fuzzy, neighbours, data), beam = beam, sentenceCount = count, layers = layers, pack = pack, reranker = models.reranker, refiner = models.refiner)
     }) { hand -> run(hand) }
     File(resultPath).printWriter().use { out -> results.forEach { out.println(RunResultFormat.format(it)) } }
     return 0
@@ -276,8 +286,8 @@ private fun runPinyin(
  * that [EvalSet.parse] keeps (blank and `#` lines are not samples): that is how the training
  * scripts join them back to the set's expected text, so nothing else is repeated here.
  */
-private fun sentences(dataPath: String, setPath: String, outPath: String, neighbours: Boolean, threads: Int): Int {
-    val lines = dealt(readSet(setPath), threads, { loadData(dataPath).let { PinyinRun(it, segmenter(null, emptySet(), neighbours, it)) } }) { hand ->
+private fun sentences(dataPath: String, setPath: String, outPath: String, scheme: String?, neighbours: Boolean, beam: Int, count: Int, threads: Int): Int {
+    val lines = dealt(readSet(setPath), threads, { loadData(dataPath).let { PinyinRun(it, segmenter(scheme, emptySet(), neighbours, it), beam = beam, sentenceCount = count) } }) { hand ->
         hand.map { sample ->
             (listOf(sample.input) + sentences(sample.input, sample.context).flatMap { (text, score) -> listOf(text, score.toString()) })
                 .joinToString("\t")
@@ -301,7 +311,8 @@ private fun writeSet(outPath: String, header: String, samples: List<Sample>) {
         w.println("# SPDX-License-Identifier: LGPL-2.1-or-later")
         w.println("# SPDX-FileCopyrightText: Copyright 2026 Fcitx5 for Android Contributors")
         w.println("# $header")
-        samples.forEach { w.println("${it.input}\t${it.expected}\t${it.tag}") }
+        // the context too: without it the models are measured reading nothing before the input
+        samples.forEach { w.println(listOf(it.input, it.expected, it.tag, it.context).joinToString("\t").trimEnd('\t')) }
     }
 }
 

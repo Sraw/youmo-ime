@@ -37,12 +37,12 @@ class ShuangpinSetTest {
 
     @Test
     fun theCommandWritesAnEvaluationSet() {
-        val set = tmp.newFile("set.tsv").apply { writeText("nihao\t你好\tdaily\nnh\t你好\tabbrev\n") }
+        val set = tmp.newFile("set.tsv").apply { writeText("nihao\t你好\tdaily\tAh，\nnh\t你好\tabbrev\n") }
         val converted = tmp.newFile("sp.tsv")
         val out = StringBuilder()
         assertEquals(0, runCli(arrayOf("shuangpin", "xiaohe", set.path, converted.path), out, StringBuilder()))
         assertEquals("1 of 2 samples typed in xiaohe", out.trim())
-        assertEquals(listOf(Sample("nihc", "你好", "daily")), converted.useLines { EvalSet.parse(it) })
+        assertEquals(listOf(Sample("nihc", "你好", "daily", "Ah，")), converted.useLines { EvalSet.parse(it) })
         assertEquals(2, runCli(arrayOf("shuangpin", "nope", set.path, converted.path), out, StringBuilder()))
     }
 }

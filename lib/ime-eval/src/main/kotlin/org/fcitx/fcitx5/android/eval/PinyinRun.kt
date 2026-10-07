@@ -30,6 +30,8 @@ class PinyinRun(
     private val segmenter: Segmenter = PinyinSegmenter(),
     penalties: Penalties = Penalties(),
     beam: Int = PinyinDecoder.DEFAULT_BEAM,
+    /** How many whole-input readings the decoder gives the rerankers. */
+    private val sentenceCount: Int = PinyinDecoder.DEFAULT_SENTENCES,
     /** A fixed prior per layer, `name=value,...` ([LayerPrior.parse]), the [pack]'s layer among them; on top of the model. */
     layers: String? = null,
     /** A word pack listed as the user's, its words in its layer. */
@@ -86,7 +88,7 @@ class PinyinRun(
         val words = textWords.lastTwo(context)
         val prev = words.lastOrNull() ?: NO_WORD
         val prev2 = if (words.size == 2) words[0] else NO_WORD
-        return decoder.decode(segmenter.segment(input), prev2, prev)
+        return decoder.decode(segmenter.segment(input), prev2, prev, sentenceCount)
     }
 
     /** One sample typed, with rerankers of its own. */
@@ -106,7 +108,8 @@ class PinyinRun(
             }
             val picked = refined?.takeIf { it != SentenceRefiner.NONE } ?: picker?.pick(context, sentences, scores) ?: 0
             if (picked > 0) sentences.add(0, sentences.removeAt(picked))
-            return (sentences + decoding.words.map { it.text }).distinct().take(CANDIDATES)
+            // those past the decoder's usual few are there to be weighed, not shown
+            return (sentences.take(PinyinDecoder.DEFAULT_SENTENCES) + decoding.words.map { it.text }).distinct().take(CANDIDATES)
         }
     }
 
