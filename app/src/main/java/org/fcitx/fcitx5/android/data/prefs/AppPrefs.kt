@@ -43,11 +43,11 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
         /** [org.fcitx.fcitx5.android.ui.main.AppLanguage]'s tag, read where appcompat cannot know it yet */
         val appLanguage = string("app_language", "")
 
-        /** See [org.fcitx.fcitx5.android.input.popup.PopupOverrides] for the format. */
+        /**
+         * See [org.fcitx.fcitx5.android.input.popup.PopupOverrides] for the format. A letter's first
+         * is also what swiping it types, drawn in its corner.
+         */
         val popupOverrides = string("popup_overrides", "")
-
-        /** See [org.fcitx.fcitx5.android.input.keyboard.SwipeOverrides] for the format. */
-        val swipeOverrides = string("swipe_overrides", "")
     }
 
     inner class Advanced : ManagedPreferenceCategory(R.string.advanced, sharedPreferences) {

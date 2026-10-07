@@ -156,7 +156,7 @@ abstract class BaseKeyboard(
         spaceKeys.forEach { (it as? TextKeyView)?.showBadge(icon) }
     }
 
-    /** What swiping [view] types where the user chose it ([TextKeyboard]); null for what its key says. */
+    /** What swiping [view] types where the user chose it ([TextKeyboard]): null for what its key says, "" for nothing. */
     protected open fun swipeText(view: KeyView): String? = null
 
     // ASCII punctuation or a digit goes to fcitx as its key, to be a full-width ， where the input
@@ -260,8 +260,10 @@ abstract class BaseKeyboard(
                         onGestureListener = OnGestureListener { view, event ->
                             when (event.type) {
                                 GestureType.Up -> {
-                                    if (!event.consumed && swipeSymbolDirection.checkY(event.totalY)) {
-                                        onAction(swipeText(view as KeyView)?.let(::textAction) ?: it.action)
+                                    val chosen = swipeText(view as KeyView)
+                                    // "": the user left the key nothing to swipe to
+                                    if (!event.consumed && swipeSymbolDirection.checkY(event.totalY) && chosen != "") {
+                                        onAction(chosen?.let(::textAction) ?: it.action)
                                         true
                                     } else {
                                         false
@@ -337,7 +339,7 @@ abstract class BaseKeyboard(
                                     )
                                     GestureType.Move -> {
                                         val triggered = swipeSymbolDirection.checkY(event.totalY)
-                                        val text = if (triggered) swipeText(view) ?: it.alternative else it.content
+                                        val text = if (triggered) swipeText(view)?.ifEmpty { it.content } ?: it.alternative else it.content
                                         onPopupAction(
                                             PopupAction.PreviewUpdateAction(view.id, text)
                                         )

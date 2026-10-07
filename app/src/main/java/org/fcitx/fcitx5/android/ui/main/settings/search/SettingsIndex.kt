@@ -45,7 +45,8 @@ object SettingsIndex {
         page(R.string.my_words, SettingsRoute.UserWords, R.string.word_packs)
         managed(context, R.string.theme_and_size, SettingsRoute.Theme, ThemeManager.prefs, this)
         managed(context, R.string.virtual_keyboard, SettingsRoute.VirtualKeyboard, AppPrefs.getInstance().keyboard, this)
-        page(R.string.long_press_characters, SettingsRoute.PopupOverrides, R.string.virtual_keyboard)
+        add(Entry(context.getString(R.string.long_press_characters), context.getString(R.string.long_press_characters_summary),
+            listOf(context.getString(R.string.virtual_keyboard)), Target(SettingsRoute.PopupOverrides, null)))
         managed(context, R.string.clipboard, SettingsRoute.Clipboard, AppPrefs.getInstance().clipboard, this)
         managed(context, R.string.emoji_and_symbols, SettingsRoute.Symbol, AppPrefs.getInstance().symbols, this)
         managed(context, R.string.advanced, SettingsRoute.Advanced, AppPrefs.getInstance().advanced, this)

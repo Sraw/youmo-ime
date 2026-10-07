@@ -21,6 +21,8 @@ import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.input.broadcast.ReturnKeyAppearance
 import org.fcitx.fcitx5.android.input.picker.PickerWindow
 import org.fcitx.fcitx5.android.input.popup.PopupAction
+import org.fcitx.fcitx5.android.input.popup.PopupOverrides
+import org.fcitx.fcitx5.android.input.popup.PopupPreset
 import splitties.views.imageResource
 
 @SuppressLint("ViewConstructor")
@@ -81,10 +83,6 @@ class TextKeyboard(
                 ReturnKey()
             )
         )
-
-        /** What swiping each letter key types as built in, by the letter in lower case. */
-        val SwipePreset: Map<String, String> = Layout.flatten().filterIsInstance<AlphabetKey>()
-            .associate { it.character.lowercase() to it.punctuation }
     }
 
     val caps: ImageKeyView by lazy { findViewById(R.id.button_caps) }
@@ -103,19 +101,20 @@ class TextKeyboard(
 
     private val keepLettersUppercase by AppPrefs.getInstance().keyboard.keepLettersUppercase
 
-    private val swipeOverridesPref = AppPrefs.getInstance().internal.swipeOverrides
-    private var swipeOverrides = SwipeOverrides.parse(swipeOverridesPref.getValue())
+    // what the user made of the long press: a letter's first is its swipe and its corner too
+    private val popupOverridesPref = AppPrefs.getInstance().internal.popupOverrides
+    private var popupOverrides = PopupOverrides.parse(popupOverridesPref.getValue())
 
     @Keep
-    private val swipeOverridesListener = ManagedPreference.OnChangeListener<String> { _, v ->
-        swipeOverrides = SwipeOverrides.parse(v)
+    private val popupOverridesListener = ManagedPreference.OnChangeListener<String> { _, v ->
+        popupOverrides = PopupOverrides.parse(v)
         updatePunctuationKeys()
     }
 
     init {
         updateLangSwitchKey(showLangSwitchKey.getValue())
         showLangSwitchKey.registerOnChangeListener(showLangSwitchKeyListener)
-        swipeOverridesPref.registerOnChangeListener(swipeOverridesListener)
+        popupOverridesPref.registerOnChangeListener(popupOverridesListener)
     }
 
     private val textKeys: List<TextKeyView> by lazy {
@@ -315,11 +314,16 @@ class TextKeyboard(
     }
 
 
-    // the user's choice for a letter key, drawn in its corner too (updatePunctuationKeys)
+    // a letter's swipe is the first of its long press, as built in (q: 1, then Q) and as the user
+    // changed it: one thing, drawn in its corner too (updatePunctuationKeys); none when the user
+    // turned its long press off
     override fun swipeText(view: KeyView): String? =
         ((view as? AltTextKeyView)?.def as? KeyDef.Appearance.AltText)?.let(::swipeOverride)
 
-    private fun swipeOverride(def: KeyDef.Appearance.AltText): String? =
-        def.displayText.takeIf { it.length == 1 && it[0].isLetter() }?.let { swipeOverrides[it] }
+    private fun swipeOverride(def: KeyDef.Appearance.AltText): String? {
+        val letter = def.displayText.takeIf { it.length == 1 && it[0].isLetter() }?.lowercase() ?: return null
+        if (popupOverrides[letter] == null) return null
+        return popupOverrides.resolve(letter, PopupPreset[letter])?.firstOrNull().orEmpty()
+    }
 
 }
