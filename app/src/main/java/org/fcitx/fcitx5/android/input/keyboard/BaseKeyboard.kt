@@ -8,11 +8,13 @@ import android.content.Context
 import android.graphics.Rect
 import android.view.MotionEvent
 import androidx.annotation.CallSuper
+import androidx.annotation.Keep
 import androidx.constraintlayout.widget.ConstraintLayout
 import androidx.core.view.children
 import androidx.core.view.updateLayoutParams
 import kotlin.math.absoluteValue
 import kotlin.math.roundToInt
+import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.core.FcitxKeyMapping
 import org.fcitx.fcitx5.android.core.InputMethodEntry
 import org.fcitx.fcitx5.android.core.KeyStates
@@ -26,6 +28,7 @@ import org.fcitx.fcitx5.android.input.keyboard.CustomGestureView.GestureType
 import org.fcitx.fcitx5.android.input.keyboard.CustomGestureView.OnGestureListener
 import org.fcitx.fcitx5.android.input.popup.PopupAction
 import org.fcitx.fcitx5.android.input.popup.PopupActionListener
+import org.fcitx.fcitx5.android.input.voice.VoiceFeature
 import splitties.dimensions.dp
 import splitties.views.dsl.constraintlayout.above
 import splitties.views.dsl.constraintlayout.below
@@ -57,10 +60,18 @@ abstract class BaseKeyboard(
 
     private val spaceSwipeMoveCursor = prefs.keyboard.spaceSwipeMoveCursor
     private val spaceKeys = mutableListOf<KeyView>()
+    @Keep
     private val spaceSwipeChangeListener = ManagedPreference.OnChangeListener<Boolean> { _, v ->
         spaceKeys.forEach {
             it.swipeEnabled = v
         }
+    }
+
+    private val spaceLongPress = prefs.keyboard.spaceKeyLongPressBehavior
+
+    @Keep
+    private val spaceLongPressListener = ManagedPreference.OnChangeListener<SpaceLongPressBehavior> { _, v ->
+        updateSpaceBadges(v)
     }
 
     private val vivoKeypressWorkaround by prefs.advanced.vivoKeypressWorkaround
@@ -135,6 +146,14 @@ abstract class BaseKeyboard(
             })
         }
         spaceSwipeMoveCursor.registerOnChangeListener(spaceSwipeChangeListener)
+        updateSpaceBadges(spaceLongPress.getValue())
+        spaceLongPress.registerOnChangeListener(spaceLongPressListener)
+    }
+
+    // holding the space to talk: a microphone on every keyboard's space says so, or no one would know
+    private fun updateSpaceBadges(behavior: SpaceLongPressBehavior) {
+        val icon = if (behavior == SpaceLongPressBehavior.Voice && VoiceFeature.AVAILABLE) R.drawable.ic_baseline_keyboard_voice_24 else null
+        spaceKeys.forEach { (it as? TextKeyView)?.showBadge(icon) }
     }
 
     private fun createKeyView(def: KeyDef): KeyView {
