@@ -43,7 +43,4 @@ object InputMethodUtil {
         })
 
     fun showPicker() = appContext.inputMethodManager.showInputMethodPicker()
-
-
-
 }
