@@ -256,6 +256,7 @@
     <string name="clipboard_clear_urls">移除連結中的追蹤參數</string>
     <string name="clipboard_clear_urls_summary">複製的連結存入剪貼簿紀錄前，依 ClearURLs 規則清理。不變更系統剪貼簿。</string>
     <string name="restart_to_apply_settings">應用程式將重新啓動以應用新設定。是否繼續？</string>
+    <string name="auto_pairs">括號和引號成對輸入，游標停在中間</string>
     <string name="space_swipe_move_cursor">划動空格以移動游標</string>
     <string name="please_wait">請稍候……</string>
     <string name="rotate">旋轉</string>
@@ -339,7 +340,7 @@
     <string name="keyboard_height_percent_base">鍵盤高度百分比</string>
     <string name="display_metrics">顯示指標 (Resources.getDisplayMetrics)</string>
     <string name="real_size">真實尺寸 (Display.getRealSize)</string>
-    <string name="long_press_characters">長按字元</string>
+    <string name="long_press_characters">按鍵字元</string>
     <string name="section_keys">按鍵</string>
     <string name="section_toolbar_and_panels">工具列與面板</string>
     <string name="section_candidates">候選欄</string>
@@ -349,14 +350,14 @@
     <string name="home_section_keyboard">鍵盤</string>
     <string name="home_section_appearance">外觀</string>
     <string name="home_section_other">其他</string>
-    <string name="long_press_characters_summary">自訂每個按鍵長按時彈出的字元</string>
+    <string name="long_press_characters_summary">自訂每個按鍵滑動和長按時得到的字元</string>
     <string name="long_press_of">長按「%1$s」</string>
     <string name="long_press_editor_hint">帶框的那個是按住後直接放開得到的字元。點一個字元選取它，再用下面的按鈕調整。</string>
     <string name="letters">字母</string>
     <string name="other_keys">其他按鍵</string>
     <string name="add_key">新增其他按鍵</string>
     <string name="key_label_hint">按鍵標籤，例如 .</string>
-    <string name="reset_all_long_press_message">將所有按鍵的長按字元還原為內建預設值？</string>
+    <string name="reset_all_long_press_message">將所有按鍵的滑動和長按字元還原為內建預設值？</string>
     <string name="reset_all">全部還原預設</string>
     <string name="my_words">使用者詞庫</string>
     <string name="my_words_added">手動新增的詞</string>
@@ -372,8 +373,11 @@
     </plurals>
     <string name="forget_word">忘掉</string>
     <string name="unblock_word">恢復顯示</string>
-    <string name="search">搜索</string>
+    <string name="search">搜尋</string>
     <string name="search_words_hint">搜尋詞或拼音</string>
+    <string name="search_settings">搜尋設定</string>
+    <string name="search_settings_hint">搜尋設定</string>
+    <string name="search_settings_none">沒有找到相關的設定</string>
     <string name="home_section_words">詞庫</string>
     <string name="home_section_keyboard_look">鍵盤與外觀</string>
     <string name="home_section_clipboard_emoji">剪貼板與表情</string>
@@ -528,8 +532,10 @@
     <string name="picker_objects">物品</string>
     <string name="picker_symbols">符號</string>
     <string name="picker_flags">旗幟</string>
-    <string name="long_press_page_hint">點一個鍵，修改長按它時彈出的字元。鍵角上的小字是按住後直接放開得到的字元。</string>
+    <string name="long_press_page_hint">點一個鍵，修改滑動它輸入的字元和長按它彈出的字元。字母鍵角上的小字是滑動輸入的字元，和鍵盤上一樣；其他鍵角上的小字是按住後直接放開得到的字元。</string>
     <string name="long_press_legend">帶框的鍵是改過的；變淡的鍵長按不彈出字元。</string>
+    <string name="key_of">「%1$s」鍵</string>
+    <string name="swipe_hint">滑動輸入（鍵角上的小字）：</string>
     <string name="long_press_none">長按這個鍵不彈出字元。</string>
     <string name="long_press_add_hint">新增字元，空格分隔</string>
     <string name="punctuation_page_hint">打中文時，按左邊的鍵打出右邊的標點；一個鍵對應幾個標點時可以選。點一項可修改或刪除。</string>

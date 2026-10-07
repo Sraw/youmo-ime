@@ -23,6 +23,7 @@ import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.prefs.ManagedPreferenceProvider
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
+import org.fcitx.fcitx5.android.ui.main.settings.search.SearchHighlight
 import org.fcitx.fcitx5.android.utils.styledColor
 import splitties.dimensions.dp
 import splitties.views.backgroundColor
@@ -91,6 +92,9 @@ class ThemeFragment : Fragment() {
                 }
             }
         }
+
+        // a search result here is a setting of the look, on the second tab (the first lists themes)
+        if (SearchHighlight.isWaiting()) viewPager.setCurrentItem(1, false)
 
         TabLayoutMediator(tabLayout, viewPager) { tab, position ->
             tab.text = getString(

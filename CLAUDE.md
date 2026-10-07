@@ -11,7 +11,7 @@ Free to restructure; upstream compatibility is not a constraint.
 - `app` — Android glue: Views, the `InputMethodService`, preferences, file-backed managers,
   JNI-facing `core/`. Keep it thin: read prefs / Android state, pass *values* into ime-core
   classes, apply the returned decision.
-- `app/src/voice` / `app/src/text` — the `speech` flavor dimension (beside `network`: four builds).
+- `app/src/voice` / `app/src/text` — the `speech` flavor dimension: the two builds.
   Voice input (sherpa-onnx, X-ASR, silero VAD; `VoiceDataPlugin`) and `RECORD_AUDIO` exist
   only in `voice`; main code reaches it through `VoiceFeature`, which each flavor defines with the
   same signatures. Its decisions (`input/voice/` in ime-core) are tested like the rest.

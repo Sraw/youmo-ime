@@ -31,6 +31,7 @@ import org.fcitx.fcitx5.android.ui.main.settings.behavior.SymbolSettingsFragment
 import org.fcitx.fcitx5.android.ui.main.settings.global.GlobalConfigFragment
 import org.fcitx.fcitx5.android.ui.main.settings.im.InputMethodConfigFragment
 import org.fcitx.fcitx5.android.ui.main.settings.im.InputMethodListFragment
+import org.fcitx.fcitx5.android.ui.main.settings.search.SettingsSearchFragment
 import org.fcitx.fcitx5.android.ui.main.settings.theme.ThemeFragment
 import org.fcitx.fcitx5.android.utils.config.ConfigDescriptor
 import org.fcitx.fcitx5.android.utils.parcelable
@@ -181,6 +182,9 @@ sealed class SettingsRoute : Parcelable {
     @Serializable
     data object PopupOverrides : SettingsRoute()
 
+    @Serializable
+    data object Search : SettingsRoute()
+
     companion object {
         fun createGraph(controller: NavController) = controller.createGraph(Index) {
             val ctx = controller.context
@@ -257,6 +261,9 @@ sealed class SettingsRoute : Parcelable {
             }
             fragment<PopupOverridesFragment, PopupOverrides> {
                 label = ctx.getString(R.string.long_press_characters)
+            }
+            fragment<SettingsSearchFragment, Search> {
+                label = ctx.getString(R.string.search_settings)
             }
         }
     }

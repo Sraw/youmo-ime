@@ -45,6 +45,9 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
 
         /** See [org.fcitx.fcitx5.android.input.popup.PopupOverrides] for the format. */
         val popupOverrides = string("popup_overrides", "")
+
+        /** See [org.fcitx.fcitx5.android.input.keyboard.SwipeOverrides] for the format. */
+        val swipeOverrides = string("swipe_overrides", "")
     }
 
     inner class Advanced : ManagedPreferenceCategory(R.string.advanced, sharedPreferences) {

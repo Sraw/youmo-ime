@@ -81,6 +81,10 @@ class TextKeyboard(
                 ReturnKey()
             )
         )
+
+        /** What swiping each letter key types as built in, by the letter in lower case. */
+        val SwipePreset: Map<String, String> = Layout.flatten().filterIsInstance<AlphabetKey>()
+            .associate { it.character.lowercase() to it.punctuation }
     }
 
     val caps: ImageKeyView by lazy { findViewById(R.id.button_caps) }
@@ -99,9 +103,19 @@ class TextKeyboard(
 
     private val keepLettersUppercase by AppPrefs.getInstance().keyboard.keepLettersUppercase
 
+    private val swipeOverridesPref = AppPrefs.getInstance().internal.swipeOverrides
+    private var swipeOverrides = SwipeOverrides.parse(swipeOverridesPref.getValue())
+
+    @Keep
+    private val swipeOverridesListener = ManagedPreference.OnChangeListener<String> { _, v ->
+        swipeOverrides = SwipeOverrides.parse(v)
+        updatePunctuationKeys()
+    }
+
     init {
         updateLangSwitchKey(showLangSwitchKey.getValue())
         showLangSwitchKey.registerOnChangeListener(showLangSwitchKeyListener)
+        swipeOverridesPref.registerOnChangeListener(swipeOverridesListener)
     }
 
     private val textKeys: List<TextKeyView> by lazy {
@@ -289,7 +303,7 @@ class TextKeyboard(
         textKeys.forEach {
             if (it is AltTextKeyView) {
                 it.def as KeyDef.Appearance.AltText
-                it.altText.text = transformPunctuation(it.def.altText)
+                it.altText.text = transformPunctuation(swipeOverride(it.def) ?: it.def.altText)
             } else {
                 it.def as KeyDef.Appearance.Text
                 it.mainText.text = it.def.displayText.let { str ->
@@ -299,5 +313,13 @@ class TextKeyboard(
             }
         }
     }
+
+
+    // the user's choice for a letter key, drawn in its corner too (updatePunctuationKeys)
+    override fun swipeText(view: KeyView): String? =
+        ((view as? AltTextKeyView)?.def as? KeyDef.Appearance.AltText)?.let(::swipeOverride)
+
+    private fun swipeOverride(def: KeyDef.Appearance.AltText): String? =
+        def.displayText.takeIf { it.length == 1 && it[0].isLetter() }?.let { swipeOverrides[it] }
 
 }

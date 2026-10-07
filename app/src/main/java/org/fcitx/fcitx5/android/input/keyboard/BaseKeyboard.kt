@@ -156,6 +156,16 @@ abstract class BaseKeyboard(
         spaceKeys.forEach { (it as? TextKeyView)?.showBadge(icon) }
     }
 
+    /** What swiping [view] types where the user chose it ([TextKeyboard]); null for what its key says. */
+    protected open fun swipeText(view: KeyView): String? = null
+
+    // ASCII punctuation or a digit goes to fcitx as its key, to be a full-width ， where the input
+    // method makes punctuation so, as the built-in swipes are; anything else, a letter too (the
+    // keyboard would change its case), is typed as it is
+    private fun textAction(text: String): KeyAction =
+        if (text.length == 1 && text[0].code in ASCII_PRINTABLE && !text[0].isLetter()) KeyAction.FcitxKeyAction(text)
+        else KeyAction.CommitAction(text)
+
     private fun createKeyView(def: KeyDef): KeyView {
         return when (def.appearance) {
             is KeyDef.Appearance.AltText -> AltTextKeyView(context, theme, def.appearance)
@@ -251,7 +261,7 @@ abstract class BaseKeyboard(
                             when (event.type) {
                                 GestureType.Up -> {
                                     if (!event.consumed && swipeSymbolDirection.checkY(event.totalY)) {
-                                        onAction(it.action)
+                                        onAction(swipeText(view as KeyView)?.let(::textAction) ?: it.action)
                                         true
                                     } else {
                                         false
@@ -327,7 +337,7 @@ abstract class BaseKeyboard(
                                     )
                                     GestureType.Move -> {
                                         val triggered = swipeSymbolDirection.checkY(event.totalY)
-                                        val text = if (triggered) it.alternative else it.content
+                                        val text = if (triggered) swipeText(view) ?: it.alternative else it.content
                                         onPopupAction(
                                             PopupAction.PreviewUpdateAction(view.id, text)
                                         )
@@ -529,3 +539,6 @@ abstract class BaseKeyboard(
     }
 
 }
+
+// the characters a key of a US keyboard types, space aside
+private val ASCII_PRINTABLE = 0x21..0x7e

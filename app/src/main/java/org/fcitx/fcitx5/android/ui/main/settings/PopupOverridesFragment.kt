@@ -27,6 +27,8 @@ import com.google.android.material.button.MaterialButton
 import com.google.android.material.R as MaterialR
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
+import org.fcitx.fcitx5.android.input.keyboard.SwipeOverrides
+import org.fcitx.fcitx5.android.input.keyboard.TextKeyboard
 import org.fcitx.fcitx5.android.input.popup.PopupEditor
 import org.fcitx.fcitx5.android.input.popup.PopupOverrides
 import org.fcitx.fcitx5.android.input.popup.PopupPreset
@@ -34,9 +36,11 @@ import org.fcitx.fcitx5.android.utils.styledColor
 import splitties.dimensions.dp
 
 /**
- * Edits what a long press on a key offers, on a keyboard drawn as the user sees it: each key
- * with its first long-press character in the corner, a changed one outlined. The decisions
- * (replace, disable, carry over to Shift) live in [PopupOverrides]; this shows and writes them.
+ * Edits what a long press on a key offers, and what swiping a letter key types, on a keyboard
+ * drawn as the user sees it: each letter with its swipe in the corner as the keyboard has it (any
+ * other key with its first long-press character), a changed one outlined. The decisions (replace,
+ * disable, carry over to Shift) live in [PopupOverrides] and [SwipeOverrides]; this shows and
+ * writes them.
  */
 class PopupOverridesFragment : Fragment() {
 
@@ -45,6 +49,12 @@ class PopupOverridesFragment : Fragment() {
     private var overrides: PopupOverrides
         get() = PopupOverrides.parse(pref.getValue())
         set(value) = pref.setValue(value.serialize())
+
+    private val swipePref get() = AppPrefs.getInstance().internal.swipeOverrides
+
+    private var swipes: SwipeOverrides
+        get() = SwipeOverrides.parse(swipePref.getValue())
+        set(value) = swipePref.setValue(value.serialize())
 
     private lateinit var content: LinearLayout
 
@@ -98,7 +108,7 @@ class PopupOverridesFragment : Fragment() {
         content.addView(text(ctx, getString(R.string.long_press_legend), body = false).apply {
             setPadding(0, ctx.dp(16), 0, 0)
         })
-        if (!current.isEmpty) {
+        if (!current.isEmpty || !swipes.isEmpty) {
             content.addView(MaterialButton(ctx, null, MaterialR.attr.materialButtonOutlinedStyle).apply {
                 setText(R.string.reset_all)
                 setOnClickListener { confirmResetAll() }
@@ -108,11 +118,15 @@ class PopupOverridesFragment : Fragment() {
 
     private fun key(ctx: Context, label: String, current: PopupOverrides): View {
         val shown = current.resolve(label, PopupPreset[label])?.toList().orEmpty()
-        val custom = current[label]
-        return KeyCaps.key(ctx, label, shown.firstOrNull().orEmpty(), marked = custom != null, dimmed = shown.isEmpty()).apply {
+        val swipe = TextKeyboard.SwipePreset[label]?.let { swipes.resolve(label, it) }
+        return KeyCaps.key(ctx, label, swipe ?: shown.firstOrNull().orEmpty(), marked = changed(label, current), dimmed = shown.isEmpty()).apply {
             setOnClickListener { edit(label) }
         }
     }
+
+    // a letter's swipe is the lower case key's: "Q" among the other keys has none of its own
+    private fun changed(label: String, current: PopupOverrides) =
+        current[label] != null || label in TextKeyboard.SwipePreset && swipes[label] != null
 
     private fun keyParams(ctx: Context, weight: Float) = LinearLayout.LayoutParams(0, ctx.dp(KeyHeight), weight).apply {
         marginStart = ctx.dp(2)
@@ -180,24 +194,17 @@ class PopupOverridesFragment : Fragment() {
             imeOptions = EditorInfo.IME_ACTION_DONE
             isSingleLine = true
         }
-        fun add() {
+        val addRow = addRow(ctx, field) {
             editor.add(field.text.toString())
             field.text = null
             render()
         }
-        field.setOnEditorActionListener { _, _, _ -> add(); true }
-        val addRow = LinearLayout(ctx).apply {
-            gravity = Gravity.CENTER_VERTICAL
-            addView(field, LinearLayout.LayoutParams(0, -2, 1f))
-            addView(MaterialButton(ctx, null, androidx.appcompat.R.attr.borderlessButtonStyle).apply {
-                setText(R.string.add)
-                setOnClickListener { add() }
-            })
-        }
+        val swipe = TextKeyboard.SwipePreset[label]?.let { SwipeEdit(ctx, label, it) }
         val layout = LinearLayout(ctx).apply {
             orientation = LinearLayout.VERTICAL
             val pad = ctx.dp(24)
             setPadding(pad, ctx.dp(8), pad, 0)
+            swipe?.addTo(this)
             addView(text(ctx, getString(R.string.long_press_editor_hint), body = false))
             addView(keys, LinearLayout.LayoutParams(-1, -2).apply { topMargin = ctx.dp(12) })
             addView(empty)
@@ -206,7 +213,7 @@ class PopupOverridesFragment : Fragment() {
         }
         render()
         val builder = AlertDialog.Builder(ctx)
-            .setTitle(getString(R.string.long_press_of, label))
+            .setTitle(getString(if (swipe != null) R.string.key_of else R.string.long_press_of, label))
             .setView(ScrollView(ctx).apply { addView(layout) })
             .setPositiveButton(android.R.string.ok) { _, _ ->
                 // a word left typed in the field counts as added
@@ -214,16 +221,52 @@ class PopupOverridesFragment : Fragment() {
                 // putting the built-in list back is not an edit
                 overrides = if (editor.items == preset?.toList().orEmpty()) current.without(label)
                 else current.with(label, editor.items)
+                swipe?.save()
                 rebuild()
             }
             .setNegativeButton(android.R.string.cancel, null)
-        if (current[label] != null) {
+        if (changed(label, current)) {
             builder.setNeutralButton(R.string.reset) { _, _ ->
                 overrides = current.without(label)
+                if (label in TextKeyboard.SwipePreset) swipes = swipes.without(label)
                 rebuild()
             }
         }
         builder.show().setCanceledOnTouchOutside(false)
+    }
+
+    private fun addRow(ctx: Context, field: EditText, add: () -> Unit): LinearLayout {
+        field.setOnEditorActionListener { _, _, _ -> add(); true }
+        return LinearLayout(ctx).apply {
+            gravity = Gravity.CENTER_VERTICAL
+            addView(field, LinearLayout.LayoutParams(0, -2, 1f))
+            addView(MaterialButton(ctx, null, androidx.appcompat.R.attr.borderlessButtonStyle).apply {
+                setText(R.string.add)
+                setOnClickListener { add() }
+            })
+        }
+    }
+
+    /** What swiping letter [label]'s key types: a field over it, above the long press's editor. */
+    private inner class SwipeEdit(private val ctx: Context, private val label: String, private val preset: String) {
+        private val field = EditText(ctx).apply {
+            hint = preset
+            setText(swipes.resolve(label, preset))
+            inputType = InputType.TYPE_CLASS_TEXT
+            isSingleLine = true
+        }
+
+        fun addTo(layout: LinearLayout) {
+            layout.addView(text(ctx, getString(R.string.swipe_hint), body = false))
+            layout.addView(field, LinearLayout.LayoutParams(-1, -2))
+            layout.addView(text(ctx, getString(R.string.long_press_of, label), body = true).apply {
+                setPadding(0, ctx.dp(16), 0, ctx.dp(4))
+            })
+        }
+
+        fun save() {
+            swipes = swipes.with(label, field.text.toString(), preset)
+        }
     }
 
     private fun askLabel() {
@@ -255,6 +298,7 @@ class PopupOverridesFragment : Fragment() {
             .setMessage(R.string.reset_all_long_press_message)
             .setPositiveButton(android.R.string.ok) { _, _ ->
                 overrides = PopupOverrides.Empty
+                swipes = SwipeOverrides.Empty
                 rebuild()
             }
             .setNegativeButton(android.R.string.cancel, null)

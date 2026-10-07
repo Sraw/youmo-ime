@@ -25,6 +25,7 @@ import org.fcitx.fcitx5.android.utils.addPreference
 import org.fcitx.fcitx5.android.utils.item
 import org.fcitx.fcitx5.android.utils.navigateWithAnim
 import org.fcitx.fcitx5.android.utils.openUrl
+import org.fcitx.fcitx5.android.utils.styledColor
 
 class MainFragment : PaddingPreferenceFragment() {
 
@@ -32,7 +33,7 @@ class MainFragment : PaddingPreferenceFragment() {
         view: View, savedInstanceState: Bundle?
     ) {
         super.onViewCreated(view, savedInstanceState)
-        // AboutMenuProvider is tied to viewLifecycleOwner, so the about menu items
+        // AboutMenuProvider is tied to viewLifecycleOwner, so the search and about menu items
         // are automatically shown when this Fragment is visible and removed when it's not
         requireActivity().addMenuProvider(
             AboutMenuProvider(), viewLifecycleOwner, Lifecycle.State.STARTED
@@ -41,6 +42,10 @@ class MainFragment : PaddingPreferenceFragment() {
 
     private inner class AboutMenuProvider : MenuProvider {
         override fun onCreateMenu(menu: Menu, menuInflater: MenuInflater) {
+            val tint = requireContext().styledColor(android.R.attr.colorControlNormal)
+            menu.item(R.string.search_settings, R.drawable.ic_baseline_search_24, tint, showAsAction = true) {
+                navigateWithAnim(SettingsRoute.Search)
+            }
             menu.item(R.string.faq) {
                 requireContext().openUrl(Const.faqUrl)
             }
