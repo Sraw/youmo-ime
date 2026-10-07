@@ -32,11 +32,18 @@ import org.fcitx.fcitx5.android.engine.pinyin.SyllableGraph.Kind
  *
  * Upper-case letters are the Latin-letter syllables (`A` in A股), so a caller wanting pinyin
  * from input that auto-capitalisation touched must lower-case it first.
+ *
+ * With [latin], where the input spells one of its words (`iphone`, `app`) each of its letters
+ * also gets an edge as its letter syllable ([Kind.LETTER]): the dictionary has the word so
+ * spelt, and the model weighs it against the pinyin the same letters read as. With hundreds of
+ * two-letter words (OK, PC) that is most letters of most input, every position one to read
+ * words from: measured, the first candidates stay as they were and a key costs ~0.2 ms more.
  */
 class PinyinSegmenter(
     fuzzy: Set<Fuzzy> = emptySet(),
     typos: Boolean = true,
     neighbours: Boolean = false,
+    private val latin: LatinWords? = null,
 ) : Segmenter {
 
     private val index = SpellingIndex(fuzzy, typos, neighbours)
@@ -44,7 +51,23 @@ class PinyinSegmenter(
     override fun segment(input: String): SyllableGraph {
         // read as slips, 简拼 turns into anything: 我喜欢你 into 网讯
         val slips = input.any { it in VOWELS }
-        return GraphEdges.build(input) { at, edges -> walk(input, at, edges, slips) }
+        val letters = latin?.let { lettersOfWords(input, it) }
+        return GraphEdges.build(input) { at, edges ->
+            walk(input, at, edges, slips)
+            if (letters != null && letters[at]) edges.add(at, 1, Kind.LETTER, LETTERS[input[at] - 'a'])
+        }
+    }
+
+    // where a Latin word is typed, each of its letters: true
+    private fun lettersOfWords(input: String, latin: LatinWords): BooleanArray? {
+        var marks: BooleanArray? = null
+        for (at in input.indices) {
+            latin.forEachAt(input, at) { length ->
+                val m = marks ?: BooleanArray(input.length).also { marks = it }
+                for (i in at until at + length) m[i] = true
+            }
+        }
+        return marks
     }
 
     /** Adds the edges leaving [at]: a walk down the spelling trie along the input. */
@@ -100,6 +123,8 @@ class PinyinSegmenter(
 
     private companion object {
         const val VOWELS = "aeiouv"
+
+        val LETTERS = Array(26) { SyllableMatches(intArrayOf(LatinWords.syllable('a' + it)), intArrayOf(0)) }
 
         /** A vowel at [at]: what comes before it is the start of a syllable, not an initial alone. */
         fun startsSyllable(input: String, at: Int) = at < input.length && input[at] in VOWELS

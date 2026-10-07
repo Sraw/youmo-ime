@@ -23,6 +23,8 @@ data class EngineSettings(
     val pageSize: Int = DEFAULT_PAGE_SIZE,
     /** Whether pinyin's readings are weighed again as whole sentences, by the sentence model. */
     val sentenceModel: Boolean = true,
+    /** Whether full pinyin reads the Latin words typed in it (iphone for iPhone). */
+    val latinWords: Boolean = true,
     /** What the user set for each table input method, by its group in the config (`Wubi`). */
     val tables: Map<String, TableSettings> = emptyMap(),
 ) {
@@ -34,6 +36,7 @@ data class EngineSettings(
         const val PREDICTION = "Prediction"
         const val FUZZY = "Fuzzy"
         const val SENTENCE_MODEL = "SentenceModel"
+        const val LATIN_WORDS = "LatinWords"
 
         /** libime's key for its common misspellings (gn for ng); here it turns slips on too. */
         const val TYPOS = "NG_GN"
@@ -94,6 +97,7 @@ data class EngineSettings(
                 prediction = flag(PREDICTION) ?: default.prediction,
                 pageSize = values[PAGE_SIZE]?.toIntOrNull()?.takeIf { it in PAGE_SIZES } ?: default.pageSize,
                 sentenceModel = flag(SENTENCE_MODEL) ?: default.sentenceModel,
+                latinWords = flag(LATIN_WORDS) ?: default.latinWords,
                 tables = tables,
             )
         }

@@ -89,6 +89,7 @@ FCITX_CONFIGURATION(
         Option<int, IntConstrain> pageSize{this, "PageSize", _("Candidates Per Page"), 7, IntConstrain(3, 10)};
         Option<bool> prediction{this, "Prediction", _("Enable Prediction"), true};
         Option<bool> sentenceModel{this, "SentenceModel", D_("fcitx5-android", "Weigh readings as whole sentences"), true};
+        Option<bool> latinWords{this, "LatinWords", D_("fcitx5-android", "Type English words in pinyin"), true};
         Option<EngineFuzzyConfig> fuzzy{this, "Fuzzy", _("Fuzzy Pinyin")};
         // named as the input methods are listed (androidengine.cpp)
         Option<EngineTableConfig> wubi{this, "Wubi", "五笔", engineTable(true, EngineOrderPolicy::Freq, 4, 3)};
@@ -111,6 +112,7 @@ FCITX_CONFIGURATION(
         Option<int, IntConstrain> pageSize{this, "PageSize", _("Candidates Per Page"), 7, IntConstrain(3, 10)};
         Option<bool> prediction{this, "Prediction", _("Enable Prediction"), true};
         Option<bool> sentenceModel{this, "SentenceModel", D_("fcitx5-android", "Weigh readings as whole sentences"), true};
+        Option<bool> latinWords{this, "LatinWords", D_("fcitx5-android", "Type English words in pinyin"), true};
         Option<EngineFuzzyConfig> fuzzy{this, "Fuzzy", _("Fuzzy Pinyin")};)
 
 FCITX_CONFIGURATION(

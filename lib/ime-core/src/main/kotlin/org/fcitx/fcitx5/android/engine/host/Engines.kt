@@ -14,6 +14,7 @@ import org.fcitx.fcitx5.android.engine.lattice.LayerPrior
 import org.fcitx.fcitx5.android.engine.lattice.TextWords
 import org.fcitx.fcitx5.android.engine.phrase.CustomPhrases
 import org.fcitx.fcitx5.android.engine.phrase.PhraseBook
+import org.fcitx.fcitx5.android.engine.pinyin.LatinWords
 import org.fcitx.fcitx5.android.engine.pinyin.PinyinSegmenter
 import org.fcitx.fcitx5.android.engine.pinyin.ShuangpinSegmenter
 import org.fcitx.fcitx5.android.engine.pinyin.T9Segmenter
@@ -122,6 +123,9 @@ class Engines(
 
     // the files are signed with the app: no need to read them through for their checksums
     private val pinyinData by lazy(LazyThreadSafetyMode.NONE) { PinyinData.load(load(PINYIN_DATA), verify = false) }
+
+    // the Latin words full pinyin reads as typed in lower case (iphone for iPhone)
+    private val latinWords by lazy(LazyThreadSafetyMode.NONE) { LatinWords.of(pinyinData.dictionary) }
 
     /** A sentence model, read when first asked for; dropped when turned off, read (or tried) again when turned on. */
     private inner class ModelFile(private val path: String, private val unpack: Boolean) {
@@ -520,7 +524,7 @@ class Engines(
         when (im) {
             PINYIN -> StrokeLookup(
                 PinyinSession(
-                    pinyinData, PinyinSegmenter(s.fuzzy, s.typos, neighbours = s.typos),
+                    pinyinData, PinyinSegmenter(s.fuzzy, s.typos, neighbours = s.typos, latin = if (s.latinWords) latinWords else null),
                     pageSize = s.pageSize, user = user(), prediction = s.prediction, prior = prior(), phraseBook = phrases(),
                     reranker = reranker(), refiner = refiner(), block = ::block, habits = habits.scope(PINYIN),
                 ),

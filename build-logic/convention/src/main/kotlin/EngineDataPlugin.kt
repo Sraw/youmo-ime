@@ -173,6 +173,8 @@ class EngineDataPlugin : Plugin<Project> {
             remove.set(lexicon.file("remove.tsv"))
             readings.set(lexicon.file("readings.tsv"))
             misreadings.set(lexicon.file("misreadings.tsv"))
+            // the Latin words typed inside Chinese (iPhone, APP), a layer of their own: lexicon/tools/latin.py
+            dictionaries.from(lexicon.file("latin.words"))
             outputDir.set(target.layout.buildDirectory.dir("generated/engine-assets"))
         }
         val tables = target.tasks.register<CompileTables>(TABLES_TASK) {

@@ -118,11 +118,14 @@ object InputMethodSettings {
         }
         add(
             Section(
-                R.string.im_section_typing, listOf(
+                R.string.im_section_typing, listOfNotNull(
                     Choice("PageSize", R.string.im_page_size, PAGE_SIZES, label = { _, v -> v }, nearest = numbers(3..10)),
                     Toggle("Prediction", text(R.string.im_prediction), R.string.im_prediction_summary),
                     Toggle("SentenceModel", text(R.string.im_sentence_model), R.string.im_sentence_model_summary),
                     Toggle("Fuzzy/NG_GN", text(R.string.im_typos), R.string.im_typos_summary, unused = if (nineKeys) R.string.im_not_for_t9 else 0),
+                    // full pinyin's alone: 双拼 types its letters otherwise, the nine keys digits
+                    Toggle("LatinWords", text(R.string.im_latin_words), R.string.im_latin_words_summary, unused = if (nineKeys) R.string.im_not_for_t9 else 0)
+                        .takeUnless { shuangpin },
                     Flags("Fuzzy", R.string.im_fuzzy, R.string.im_fuzzy_none, FUZZY, unused = if (nineKeys) setOf("V_U") else emptySet()),
                 )
             )

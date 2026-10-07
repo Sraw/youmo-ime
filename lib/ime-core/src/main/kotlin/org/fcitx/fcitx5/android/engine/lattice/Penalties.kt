@@ -45,4 +45,6 @@ data class Penalties(
     val lookAhead: Float = -0.5f,
     /** Input kept as typed, being no pinyin at all. */
     val raw: Float = -10f,
+    /** A letter of a Latin word typed in lower case (`iphone` for iPhone), a letter at a time. */
+    val letter: Float = 0f,
 )

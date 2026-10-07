@@ -21,6 +21,10 @@ class LicensesFragment : PaddingPreferenceFragment() {
     override fun onCreatePreferences(savedInstanceState: Bundle?, rootKey: String?) {
         lifecycleScope.launch {
             preferenceScreen = preferenceManager.createPreferenceScreen(requireContext()).apply {
+                // the engine's data: whose text its words and model are counted from
+                ENGINE_DATA.forEach { (title, licence, url) ->
+                    addPreference(title = getString(title), summary = licence) { requireContext().openUrl(url) }
+                }
                 VoiceFeature.credits(requireContext()).forEach { credit ->
                     addPreference(title = credit.title, summary = credit.licence) {
                         requireContext().openUrl(credit.url)
@@ -71,4 +75,11 @@ class LicensesFragment : PaddingPreferenceFragment() {
         license.url?.takeIf { it.isNotBlank() }?.let { requireContext().openUrl(it) }
     }
 
+
+    private companion object {
+        val ENGINE_DATA = listOf(
+            Triple(R.string.engine_data_libime, "LGPL-2.1-or-later", "https://github.com/fcitx/libime"),
+            Triple(R.string.engine_data_fineweb, "ODC-By-1.0", "https://huggingface.co/datasets/HuggingFaceFW/fineweb-2"),
+        )
+    }
 }

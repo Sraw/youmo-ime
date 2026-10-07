@@ -12,6 +12,7 @@ import org.fcitx.fcitx5.android.engine.lattice.Predictor
 import org.fcitx.fcitx5.android.engine.lattice.Penalties
 import org.fcitx.fcitx5.android.engine.libime.LibimeFiles
 import org.fcitx.fcitx5.android.engine.pinyin.Fuzzy
+import org.fcitx.fcitx5.android.engine.pinyin.LatinWords
 import org.fcitx.fcitx5.android.engine.pinyin.PinyinSegmenter
 import org.fcitx.fcitx5.android.engine.pinyin.Segmenter
 import org.fcitx.fcitx5.android.engine.pinyin.ShuangpinSegmenter
@@ -49,7 +50,7 @@ val USAGE = """usage: score <set.tsv> <result.tsv> [<baseline-result.tsv>] [--ha
        learn <pinyin.data> <set.tsv> [--scheme <scheme>] [--fuzzy all|<pair>,...]
        table <table.data> <set.tsv> [--preset <preset>]
        libime pinyin|history|table <file>
-schemes: ${(ShuangpinSet.SCHEMES.keys + T9Set.SCHEMES).joinToString(" ")}
+schemes: ${(ShuangpinSet.SCHEMES.keys + T9Set.SCHEMES + NO_LATIN).joinToString(" ")}
 pairs: ${Fuzzy.entries.joinToString(" ") { it.name.lowercase() }}
 halves: ${Halves.NAMES.joinToString(" ")}
 presets: ${TableRun.PRESETS.keys.joinToString(" ")}"""
@@ -112,6 +113,9 @@ fun runCli(args: Array<String>, out: Appendable, err: Appendable): Int {
 
 private fun threads(options: Map<String, String>) = options["threads"]?.toIntOrNull() ?: Runtime.getRuntime().availableProcessors()
 
+/** Full pinyin without the Latin words. */
+private const val NO_LATIN = "no-latin"
+
 private val SET_WRITERS = setOf("shuangpin", "t9", "slips")
 
 /** An evaluation set written from another: null for a usage error. */
@@ -157,7 +161,7 @@ private fun optionsValid(options: Map<String, String>, fuzzy: Set<Fuzzy>?): Bool
     val neighbours = options["neighbours"]
     return listOf(
         options["half"].let { it == null || it in Halves.NAMES },
-        scheme == null || scheme in ShuangpinSet.SCHEMES || scheme in T9Set.SCHEMES,
+        scheme == null || scheme == NO_LATIN || scheme in ShuangpinSet.SCHEMES || scheme in T9Set.SCHEMES,
         options["fuzzy"] == null || fuzzy != null,
         options["preset"].let { it == null || it in TableRun.PRESETS },
         options["threads"].let { it == null || it.toIntOrNull()?.let { n -> n > 0 } == true },
@@ -278,9 +282,14 @@ private fun score(setPath: String, resultPath: String, baselinePath: String?, ha
     return 0
 }
 
-private fun segmenter(scheme: String?, fuzzy: Set<Fuzzy>, neighbours: Boolean = false): Segmenter =
+/**
+ * Full pinyin reads the Latin words of [data] as the app does, unless the scheme is [NO_LATIN]:
+ * what it was before them.
+ */
+private fun segmenter(scheme: String?, fuzzy: Set<Fuzzy>, neighbours: Boolean = false, data: PinyinData? = null): Segmenter =
     when (scheme) {
-        null -> PinyinSegmenter(fuzzy, neighbours = neighbours)
+        null -> PinyinSegmenter(fuzzy, neighbours = neighbours, latin = data?.let { LatinWords.of(it.dictionary) })
+        NO_LATIN -> PinyinSegmenter(fuzzy, neighbours = neighbours)
         in T9Set.SCHEMES -> T9Segmenter(fuzzy, abbreviations = scheme == "t9")
         else -> ShuangpinSegmenter(ShuangpinSet.SCHEMES.getValue(scheme), fuzzy)
     }
@@ -302,7 +311,7 @@ private fun runPinyin(
     // a data file each: its buffers are not to be shared
     val results = dealt(Halves.select(readSet(setPath), half), threads, {
         val data = loadData(dataPath)
-        PinyinRun(data, segmenter(scheme, fuzzy, neighbours), layers = layers, pack = pack, reranker = models.reranker, refiner = models.refiner)
+        PinyinRun(data, segmenter(scheme, fuzzy, neighbours, data), layers = layers, pack = pack, reranker = models.reranker, refiner = models.refiner)
     }) { hand -> run(hand) }
     File(resultPath).printWriter().use { out -> results.forEach { out.println(RunResultFormat.format(it)) } }
     return 0
@@ -316,7 +325,7 @@ private fun runPinyin(
  * scripts join them back to the set's expected text, so nothing else is repeated here.
  */
 private fun sentences(dataPath: String, setPath: String, outPath: String, neighbours: Boolean, threads: Int): Int {
-    val lines = dealt(readSet(setPath), threads, { PinyinRun(loadData(dataPath), segmenter(null, emptySet(), neighbours)) }) { hand ->
+    val lines = dealt(readSet(setPath), threads, { loadData(dataPath).let { PinyinRun(it, segmenter(null, emptySet(), neighbours, it)) } }) { hand ->
         hand.map { sample ->
             (listOf(sample.input) + sentences(sample.input, sample.context).flatMap { (text, score) -> listOf(text, score.toString()) })
                 .joinToString("\t")
@@ -419,7 +428,7 @@ private fun ksc(
 ): Int {
     // a session per sample, rerankers and all: one keeps what it read for the next input, which
     // would make a sample's result hang on the one before it, and so on how they are dealt
-    val outcomes = dealt(Halves.select(readSet(setPath), half), threads, { loadData(dataPath) to segmenter(scheme, fuzzy) }) { hand ->
+    val outcomes = dealt(Halves.select(readSet(setPath), half), threads, { loadData(dataPath).let { it to segmenter(scheme, fuzzy, data = it) } }) { hand ->
         val (data, segmenter) = this
         hand.map { sample ->
             val session = PinyinSession(
@@ -433,7 +442,8 @@ private fun ksc(
 }
 
 private fun learn(dataPath: String, setPath: String, scheme: String?, fuzzy: Set<Fuzzy>, out: Appendable): Int {
-    val rows = Learning(loadData(dataPath), segmenter(scheme, fuzzy)).measure(readSet(setPath))
+    val data = loadData(dataPath)
+    val rows = Learning(data, segmenter(scheme, fuzzy, data = data)).measure(readSet(setPath))
     out.appendLine(KeystrokeRun.HEADER)
     rows.forEach { (label, outcomes) -> out.appendLine(KeystrokeRun.row(label, outcomes)) }
     return 0

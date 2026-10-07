@@ -504,6 +504,10 @@
     <string name="im_sentence_model_summary">Put first what makes the whole sentence read best</string>
     <string name="im_typos">Fix typos and slipped keys</string>
     <string name="im_typos_summary">Such as gn for ng, or a key next to the one meant</string>
+    <string name="im_latin_words">Type English words</string>
+    <string name="im_latin_words_summary">In pinyin, as iphone for iPhone or app for APP</string>
+    <string name="engine_data_libime">Pinyin dictionary and language model: libime</string>
+    <string name="engine_data_fineweb">Web text the language model and the English words are counted from: FineWeb-2</string>
     <string name="im_auto_select">Commit a lone candidate at once</string>
     <string name="im_auto_select_summary">And the first one once the code is full</string>
     <string name="im_hint">Show the keys left</string>

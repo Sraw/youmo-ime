@@ -38,6 +38,9 @@ class SyllableGraph internal constructor(
 
         /** Input that is no pinyin at all (`i`, a digit): no syllables, kept as typed. */
         RAW,
+
+        /** A letter of a Latin word typed in lower case, as its letter syllable: `i` of iPhone as I. */
+        LETTER,
     }
 
     val end: Int get() = input.length

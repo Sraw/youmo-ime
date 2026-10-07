@@ -466,6 +466,10 @@
     <string name="im_sentence_model_summary">整句讀起來最通順的排在前面</string>
     <string name="im_typos">糾正錯拼和按偏的鍵</string>
     <string name="im_typos_summary">比如把 gn 當成 ng，或按到了旁邊的鍵</string>
+    <string name="im_latin_words">中英混輸</string>
+    <string name="im_latin_words_summary">拼音裡直接打英文單詞，比如 iphone 出 iPhone</string>
+    <string name="engine_data_libime">拼音詞典和語言模型：libime</string>
+    <string name="engine_data_fineweb">語言模型和英文詞表統計用的網頁文本：FineWeb-2</string>
     <string name="im_auto_select">只有一個候選時直接上屏</string>
     <string name="im_auto_select_summary">編碼打滿時也直接上屏第一個</string>
     <string name="im_hint">顯示編碼提示</string>

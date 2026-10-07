@@ -13,6 +13,7 @@ put before a curator again.
 | `reject.tsv` | `word  kind  date  note`: never goes in |
 | `remove.tsv` | `word  kind  date  note`: a word of libime's dictionary (the base layer) that should not be there; left out when pinyin.data is compiled |
 | `readings.tsv` | `word  reading  date  note`: a word of libime's dictionary it reads wrongly; compiled under the readings listed here (a line each) instead |
+| `latin.words` | a word pack (`word  R'E'A'D'I'N'G  log10P`, layer `latin`): the Latin words typed inside Chinese, made by `tools/latin.py` from `tools/latin_counts.py`'s counts of FineWeb-2 (ODC-By 1.0) — not by hand; its junk goes in `reject.tsv` |
 
 Tab-separated, `#` starts a comment. A reading is `pin'yin`, a syllable a character, `v` for ü.
 

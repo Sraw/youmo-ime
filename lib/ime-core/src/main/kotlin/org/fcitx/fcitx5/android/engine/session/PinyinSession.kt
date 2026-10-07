@@ -17,6 +17,7 @@ import org.fcitx.fcitx5.android.engine.lattice.WordScorer
 import org.fcitx.fcitx5.android.engine.phrase.CustomPhrases
 import org.fcitx.fcitx5.android.engine.phrase.CustomPhrases.Phrase
 import org.fcitx.fcitx5.android.engine.phrase.PhraseBook
+import org.fcitx.fcitx5.android.engine.pinyin.LatinWords
 import org.fcitx.fcitx5.android.engine.pinyin.Segmenter
 import org.fcitx.fcitx5.android.engine.pinyin.SyllableGraph
 import org.fcitx.fcitx5.android.engine.pinyin.SyllableGraph.Kind
@@ -703,7 +704,12 @@ class PinyinSession(
             val to = best.ends[i]
             val word = best.words[i]
             val reading = if (word == NO_WORD) null else reading(graph, from, to, word)
-            if (reading != null) {
+            if (reading != null && reading.syllables.size > 1 && reading.syllables.all(LatinWords::isLetter)) {
+                // a Latin word shows as typed, not a letter at a time
+                parts += reading.shown.joinToString("")
+                ends += reading.ends.last()
+                raw = false
+            } else if (reading != null) {
                 parts += reading.shown
                 ends += reading.ends
                 nineKeys?.note((listOf(from) + reading.ends.dropLast(1)).map { readFrom() + it }, reading.syllables)

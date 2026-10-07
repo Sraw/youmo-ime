@@ -222,6 +222,7 @@ class PinyinDecoder(
         Kind.PARTIAL -> penalties.partial
         Kind.EXTENDED -> penalties.extended
         Kind.RAW -> penalties.raw
+        Kind.LETTER -> penalties.letter
     }
 
     private fun penalty(flags: Int): Float {
