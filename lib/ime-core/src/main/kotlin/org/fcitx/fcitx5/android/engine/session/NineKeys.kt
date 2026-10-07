@@ -27,13 +27,24 @@ internal class NineKeys(private val data: PinyinData) {
         private set
     private var offeredAt = -1 // where in the input those digits start
 
+    /** Which list [offered] is: see [Snapshot.syllablesId]. */
+    var id = 0
+        private set
+
     // where in the input the best reading has a syllable start, and which
     private var best: Map<Int, Int> = emptyMap()
 
     fun clear() {
         taken.clear()
-        offered = emptyList()
-        offeredAt = -1
+        show(emptyList(), -1)
+    }
+
+    // a list unlike the last gets another id: a pick from the last is stale
+    private fun show(syllables: List<String>, at: Int) {
+        if (syllables == offered && at == offeredAt) return
+        offered = syllables
+        offeredAt = at
+        id = (id + 1) % Action.Syllable.IDS
     }
 
     /** Before the best reading of the input read again is noted: see [note]. */
@@ -55,9 +66,11 @@ internal class NineKeys(private val data: PinyinData) {
      * is taken.
      */
     fun offer(input: CharSequence, from: Int, graph: SyllableGraph) {
-        offered = emptyList()
-        offeredAt = -1
-        val at = (from until input.length).firstOrNull { input[it] in '2'..'9' } ?: return
+        val at = (from until input.length).firstOrNull { input[it] in '2'..'9' }
+        if (at == null) {
+            show(emptyList(), -1)
+            return
+        }
         val found = LinkedHashMap<Int, Int>() // syllable to its length
         for (e in graph.edges(at - from)) {
             if (graph.kind(e) != Kind.SYLLABLE) continue
@@ -71,12 +84,15 @@ internal class NineKeys(private val data: PinyinData) {
             compareByDescending<Int> { it == first }.thenByDescending { found.getValue(it) }.thenByDescending { weights[it] },
         )
         val letters = T9Segmenter.letters(input[at]).filter { it in INITIAL_LETTERS }.map { it.toString() }
-        offered = order.map { Syllables.spelling(it) } + letters
-        offeredAt = at
+        show((order.map { Syllables.spelling(it) } + letters).take(Action.Syllable.MAX), at)
     }
 
-    /** Puts the syllable at [index] of [offered] into [input] for its digits; false if there is none. */
-    fun take(input: StringBuilder, index: Int): Boolean {
+    /**
+     * Puts the syllable at [index] of [offered] into [input] for its digits; false if there is
+     * none, or the pick was [of] another list (see [Action.Syllable]).
+     */
+    fun take(input: StringBuilder, index: Int, of: Int): Boolean {
+        if (of != Action.Syllable.ANY && of != id) return false
         val spelling = offered.getOrNull(index) ?: return false
         val at = offeredAt
         val end = at + spelling.length

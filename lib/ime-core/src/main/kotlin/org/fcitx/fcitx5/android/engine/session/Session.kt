@@ -77,9 +77,21 @@ sealed class Action {
 
     /**
      * Takes the syllable at [index] of [Snapshot.syllables] for the first keys it was offered
-     * for: on the nine keys, where those keys type several (`64` ni, mi, o …).
+     * for: on the nine keys, where those keys type several (`64` ni, mi, o …). [of] is the
+     * [Snapshot.syllablesId] of the list it was picked from, [ANY] for whichever is offered: a
+     * pick from a list a key typed since replaced is no pick, or it would take another syllable.
      */
-    data class Syllable(val index: Int) : Action()
+    data class Syllable(val index: Int, val of: Int = ANY) : Action() {
+        companion object {
+            const val ANY = -1
+
+            /** Ids of the syllables offered run from 0 to this, less one, then again. */
+            const val IDS = 100
+
+            /** At most this many syllables are offered. */
+            const val MAX = 64
+        }
+    }
 
     /** Commits what was typed, as typed (enter). */
     object CommitRaw : Action()
@@ -122,6 +134,8 @@ sealed class Action {
  *   pauses, till this is false
  * @property syllables what the first keys not yet taken as a syllable may be, likeliest first,
  *   a letter for an initial last: on the nine keys, for [Action.Syllable]; empty elsewhere
+ * @property syllablesId which list [syllables] is: another for each change of it, below
+ *   [Action.Syllable.IDS]
  */
 data class Snapshot(
     val commit: String,
@@ -139,4 +153,5 @@ data class Snapshot(
     val labels: String = "",
     val refines: Boolean = false,
     val syllables: List<String> = emptyList(),
+    val syllablesId: Int = 0,
 )

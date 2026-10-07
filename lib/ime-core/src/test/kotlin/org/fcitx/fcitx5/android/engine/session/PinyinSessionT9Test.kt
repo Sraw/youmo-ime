@@ -89,8 +89,8 @@ class PinyinSessionT9Test {
     @Test
     fun theKeyboardSendsASyllableAsACharacterOfThePrivateUseArea() {
         val keyboard = Keyboard(session())
-        "64426".forEach { keyboard.onEvent(EngineEvent.CHAR, it.code) }
-        val s = keyboard.onEvent(EngineEvent.CHAR, Keyboard.SYLLABLES.first.code + 1)
+        val typed = "64426".map { keyboard.onEvent(EngineEvent.CHAR, it.code) }.last()
+        val s = keyboard.onEvent(EngineEvent.CHAR, Keyboard.syllableKey(1, typed.syllablesId).code)
         assertEquals("米糕", s.candidates[0])
         // 0 is no key on the nine keys: it ends the input as typed
         val zero = keyboard.onEvent(EngineEvent.CHAR, '0'.code)
@@ -141,7 +141,7 @@ class PinyinSessionT9Test {
         assertEquals(true, keyboard.onEvent(EngineEvent.ESCAPE, 0).handled)
         // nor is a syllable for a session without the nine keys
         val full = Keyboard(PinyinSession(data, org.fcitx.fcitx5.android.engine.pinyin.PinyinSegmenter(), prediction = false))
-        assertEquals(false, full.onEvent(EngineEvent.CHAR, Keyboard.SYLLABLES.first.code).handled)
+        assertEquals(false, full.onEvent(EngineEvent.CHAR, Keyboard.syllableKey(0, 0).code).handled)
         assertEquals(false, full.onEvent(EngineEvent.ESCAPE, 0).handled)
     }
 
@@ -157,6 +157,27 @@ class PinyinSessionT9Test {
         val back = session.apply(Backspace)
         assertEquals(listOf("ni", "mi", "o", "m", "n"), back.syllables)
         assertEquals("ni", back.preedit)
+    }
+
+
+    @Test
+    fun aPickFromAListAKeyReplacedIsDropped() {
+        val session = session()
+        val shown = session.type("6")
+        assertEquals("o", shown.syllables[0])
+        // 4 typed before the pick reached the engine: its list is another
+        val typed = session.type("4")
+        assertTrue(typed.syllablesId != shown.syllablesId)
+        val stale = session.apply(Action.Syllable(0, shown.syllablesId))
+        assertEquals("ni", stale.preedit)
+        assertEquals(typed.syllables, stale.syllables)
+        // picked from the list shown now, taken
+        assertEquals("ni", session.apply(Action.Syllable(0, typed.syllablesId)).preedit)
+        assertEquals(emptyList<String>(), session.apply(Action.Syllable(0, typed.syllablesId)).syllables)
+        // the same list again keeps its id: a pause that changed nothing stales no pick
+        val again = session()
+        val first = again.type("64")
+        assertEquals(first.syllablesId, again.apply(Action.Refine).syllablesId)
     }
 
 }

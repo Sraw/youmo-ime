@@ -5,6 +5,10 @@
 package org.fcitx.fcitx5.android.ui.main.settings.im
 
 import android.content.Context
+import android.view.View
+import android.view.ViewGroup
+import android.widget.ArrayAdapter
+import android.widget.ListView
 import androidx.annotation.StringRes
 import androidx.appcompat.app.AlertDialog
 import androidx.preference.ListPreference
@@ -27,13 +31,18 @@ object InputMethodSettings {
 
     sealed interface Item
 
-    /** [key] (a/b for b under a) is "True" or "False", unless [read] and [write] say otherwise. */
+    /**
+     * [key] (a/b for b under a) is "True" or "False", unless [read] and [write] say otherwise.
+     * With [unused], shown greyed with that as its summary: an option of the engine this input
+     * method has no use for, kept for the others that share it.
+     */
     class Toggle(
         val key: String,
         val title: (Context) -> String,
         @StringRes val summary: Int = 0,
         val read: (String) -> Boolean = { it == "True" },
         val write: (Boolean) -> String = { if (it) "True" else "False" },
+        @StringRes val unused: Int = 0,
     ) : Item
 
     /** One of [values]; a value stored that is not one of them shows as the one [nearest] to it. */
@@ -46,12 +55,16 @@ object InputMethodSettings {
         val nearest: (String) -> String = { it },
     ) : Item
 
-    /** Switches of the same kind, picked together in one dialog: [flags] of key and label, under [path]. */
+    /**
+     * Switches of the same kind, picked together in one dialog: [flags] of key and label, under
+     * [path]; those [unused] by this input method greyed there, as [Toggle.unused].
+     */
     class Flags(
         val path: String,
         @StringRes val title: Int,
         @StringRes val none: Int,
         val flags: List<Pair<String, String>>,
+        val unused: Set<String> = emptySet(),
     ) : Item
 
     class Section(@StringRes val title: Int, val items: List<Item>) : Item
@@ -88,7 +101,8 @@ object InputMethodSettings {
         "F_H" to "f ↔ h", "L_N" to "l ↔ n", "L_R" to "l ↔ r", "S_SH" to "s ↔ sh", "Z_ZH" to "z ↔ zh",
     )
 
-    private fun pinyin(shuangpin: Boolean) = buildList {
+    /** [nineKeys]: the options 九键 has no use for greyed: slips onto a neighbouring key, u ↔ v (both on 8). */
+    private fun pinyin(shuangpin: Boolean, nineKeys: Boolean = false) = buildList {
         if (shuangpin) {
             add(
                 Section(
@@ -108,8 +122,8 @@ object InputMethodSettings {
                     Choice("PageSize", R.string.im_page_size, PAGE_SIZES, label = { _, v -> v }, nearest = numbers(3..10)),
                     Toggle("Prediction", text(R.string.im_prediction), R.string.im_prediction_summary),
                     Toggle("SentenceModel", text(R.string.im_sentence_model), R.string.im_sentence_model_summary),
-                    Toggle("Fuzzy/NG_GN", text(R.string.im_typos), R.string.im_typos_summary),
-                    Flags("Fuzzy", R.string.im_fuzzy, R.string.im_fuzzy_none, FUZZY),
+                    Toggle("Fuzzy/NG_GN", text(R.string.im_typos), R.string.im_typos_summary, unused = if (nineKeys) R.string.im_not_for_t9 else 0),
+                    Flags("Fuzzy", R.string.im_fuzzy, R.string.im_fuzzy_none, FUZZY, unused = if (nineKeys) setOf("V_U") else emptySet()),
                 )
             )
         )
@@ -181,7 +195,8 @@ object InputMethodSettings {
 
     /** The page of [uniqueName], or null for an input method the app does not know. */
     fun of(uniqueName: String): List<Item>? = when (uniqueName) {
-        "engine-pinyin", "engine-t9" -> pinyin(shuangpin = false)
+        "engine-pinyin" -> pinyin(shuangpin = false)
+        "engine-t9" -> pinyin(shuangpin = false, nineKeys = true)
         "engine-shuangpin" -> pinyin(shuangpin = true)
         "keyboard-us" -> english
         else -> if (uniqueName.startsWith("engine-")) table else null
@@ -210,6 +225,10 @@ object InputMethodSettings {
                         isSingleLineTitle = false
                         title = item.title(context)
                         if (item.summary != 0) setSummary(item.summary)
+                        if (item.unused != 0) {
+                            isEnabled = false
+                            setSummary(item.unused)
+                        }
                         isChecked = item.read(raw.value)
                         setOnPreferenceChangeListener { _, value ->
                             raw.value = item.write(value as Boolean)
@@ -250,9 +269,7 @@ object InputMethodSettings {
                             val checked = BooleanArray(raws.size) { raws[it].value == "True" }
                             AlertDialog.Builder(context)
                                 .setTitle(title)
-                                .setMultiChoiceItems(item.flags.map { it.second }.toTypedArray(), checked) { _, which, isChecked ->
-                                    checked[which] = isChecked
-                                }
+                                .setView(flagList(context, item, checked))
                                 .setNegativeButton(android.R.string.cancel, null)
                                 .setPositiveButton(android.R.string.ok) { _, _ ->
                                     checked.forEachIndexed { i, on -> raws[i].value = if (on) "True" else "False" }
@@ -273,4 +290,25 @@ object InputMethodSettings {
         items.forEach { add(it, screen::addPreference) }
         return screen
     }
+
+    /**
+     * [item]'s flags as a list of check boxes over [checked], those it has no use for greyed and
+     * marked so: a dialog's own multi-choice list cannot grey one.
+     */
+    private fun flagList(context: Context, item: Flags, checked: BooleanArray): ListView {
+        val note = context.getString(R.string.im_not_for_t9)
+        val labels = item.flags.map { (key, label) -> if (key in item.unused) "$label（$note）" else label }
+        val list = ListView(context)
+        list.choiceMode = ListView.CHOICE_MODE_MULTIPLE
+        list.adapter = object : ArrayAdapter<String>(context, android.R.layout.simple_list_item_multiple_choice, labels) {
+            override fun isEnabled(position: Int) = item.flags[position].first !in item.unused
+            override fun areAllItemsEnabled() = item.unused.isEmpty()
+            override fun getView(position: Int, convertView: View?, parent: ViewGroup): View =
+                super.getView(position, convertView, parent).also { it.isEnabled = isEnabled(position) }
+        }
+        checked.forEachIndexed { i, on -> list.setItemChecked(i, on) }
+        list.setOnItemClickListener { _, _, position, _ -> checked[position] = list.isItemChecked(position) }
+        return list
+    }
+
 }

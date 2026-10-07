@@ -56,10 +56,10 @@ object EngineBridge {
 
     /**
      * What the nine-key keyboard shows beside its keys, as the last event of [Engines.T9] left
-     * it: whether anything is typed, and what its first digits not yet taken may be (see
-     * Snapshot.syllables). Set on the fcitx thread, read on the main one.
+     * it: whether anything is typed, what its first digits not yet taken may be, and which list
+     * that is (see Snapshot.syllables, syllablesId). Set on the fcitx thread, read on the main one.
      */
-    data class T9State(val composing: Boolean = false, val syllables: List<String> = emptyList())
+    data class T9State(val composing: Boolean = false, val syllables: List<String> = emptyList(), val id: Int = 0)
 
     private val t9State = MutableStateFlow(T9State())
     val t9: StateFlow<T9State> = t9State
@@ -188,7 +188,7 @@ object EngineBridge {
     @JvmStatic
     fun onEvent(im: String, event: Int, arg: Int, learning: Boolean): Result {
         val s = engines.onEvent(im, event, arg, learning)
-        if (im == Engines.T9 && (event != EngineEvent.REFINE || s.handled)) t9State.value = T9State(s.preedit.isNotEmpty(), s.syllables)
+        if (im == Engines.T9 && (event != EngineEvent.REFINE || s.handled)) t9State.value = T9State(s.preedit.isNotEmpty(), s.syllables, s.syllablesId)
         // the page shown and at least a chunk: the list rarely has to come back for more; none
         // for a slice of refining that changed nothing, which the addon does not show
         val unshown = s.candidates.isEmpty() || (event == EngineEvent.REFINE && !s.handled)

@@ -112,7 +112,10 @@ class Keyboard(private val session: Session) {
         // past the BMP (an emoji key): no session reads one, but it still ends the input
         val c = if (codePoint in 0..Char.MAX_VALUE.code) codePoint.toChar() else REPLACEMENT
         val nineKeys = session.reads('2')
-        if (c in SYLLABLES && nineKeys) return session.apply(Action.Syllable(c - SYLLABLES.first))
+        if (c in SYLLABLES && nineKeys) {
+            val n = c - SYLLABLES.first
+            return session.apply(Action.Syllable(n % Action.Syllable.MAX, n / Action.Syllable.MAX))
+        }
         if (session.reads(c)) return session.apply(Action.Key(c))
         // on the nine keys a digit is a key: one not read (0) ends the input, as punctuation does
         val digit = c.digitToIntOrNull()?.takeUnless { nineKeys }
@@ -140,10 +143,16 @@ class Keyboard(private val session: Session) {
 
         /**
          * Characters of the private use area the nine-key keyboard sends for a syllable it offers
-         * (see [Snapshot.syllables]): the first for the first. fcitx passes any character on, so
-         * this needs no event of its own; no keyboard types one otherwise.
+         * (see [Snapshot.syllables]): [syllableKey]. fcitx passes any character on, so this needs
+         * no event of its own; no keyboard types one otherwise.
          */
-        val SYLLABLES = '\uE000'..'\uE0FF'
+        val SYLLABLES = '\uE000'..'\uF8FF'
+
+        /** The character for the syllable at [index] of the list [id] ([Snapshot.syllablesId]). */
+        fun syllableKey(index: Int, id: Int): Char {
+            require(index in 0 until Action.Syllable.MAX && id in 0 until Action.Syllable.IDS) { "syllable $index of $id" }
+            return SYLLABLES.first + id * Action.Syllable.MAX + index
+        }
 
         private val IDLE = Snapshot(
             commit = "",

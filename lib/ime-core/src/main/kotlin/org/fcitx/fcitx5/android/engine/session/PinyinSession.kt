@@ -149,7 +149,7 @@ class PinyinSession(
         // nothing to pick past the page: the key (space, a digit) is the app's
         is Action.Select -> if (action.index in 0 until pageSize) pick(page * pageSize + action.index) else snapshot(handled = candidates.isNotEmpty())
         is Action.Pick -> pick(action.index)
-        is Action.Syllable -> takeSyllable(action.index)
+        is Action.Syllable -> takeSyllable(action.index, action.of)
         is Action.Forget, is Action.Pin, is Action.Unpin, is Action.Block -> pressed(action)
         Action.NextPage -> turn(page + 1)
         Action.PreviousPage -> turn(page - 1)
@@ -212,8 +212,8 @@ class PinyinSession(
     }
 
     /** Takes the syllable at [index] of those offered: see the class. */
-    private fun takeSyllable(index: Int): Snapshot {
-        if (!predicting && nineKeys?.take(input, index) == true) read()
+    private fun takeSyllable(index: Int, of: Int): Snapshot {
+        if (!predicting && nineKeys?.take(input, index, of) == true) read()
         return snapshot()
     }
 
@@ -654,6 +654,7 @@ class PinyinSession(
             actionable = !predicting && candidates.isNotEmpty(),
             refines = unrefined != null,
             syllables = nineKeys?.offered.orEmpty(),
+            syllablesId = nineKeys?.id ?: 0,
         )
     }
 

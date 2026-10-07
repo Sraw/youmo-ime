@@ -47,8 +47,8 @@ import splitties.views.existingOrNewId
  * symbols, numbers, space, the language switch and return below. Swiping a digit key types the
  * digit itself; 1 is the engine's to read, a separator while something is typed, else the digit.
  *
- * A syllable is sent to the engine as a character of [Keyboard.SYLLABLES], the first for the
- * first offered.
+ * A syllable is sent to the engine as a character of [Keyboard.SYLLABLES], saying which of
+ * which list it is ([Keyboard.syllableKey]).
  */
 @SuppressLint("ViewConstructor")
 class T9Keyboard(
@@ -199,7 +199,8 @@ class T9Keyboard(
         labels.forEachIndexed { i, label ->
             items.addView(item(label) {
                 val action = if (syllables) {
-                    KeyAction.SymAction(KeySym(UNICODE + Keyboard.SYLLABLES.first.code + i), KeyStates.Virtual)
+                    // with the list's id: shown before a key typed since replaced it, the pick is dropped
+                    KeyAction.SymAction(KeySym(UNICODE + Keyboard.syllableKey(i, state.id).code), KeyStates.Virtual)
                 } else {
                     KeyAction.CommitAction(label)
                 }

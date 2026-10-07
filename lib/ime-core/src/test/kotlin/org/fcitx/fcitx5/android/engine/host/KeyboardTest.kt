@@ -22,7 +22,7 @@ class KeyboardTest {
      * Another key commits the first candidate. Two [Action.Refine] after a letter turn the
      * candidates round.
      */
-    private class FakeSession : Session {
+    private class FakeSession(private val nineKeys: Boolean = false) : Session {
         val actions = ArrayList<Action>()
         val learned = ArrayList<Boolean>()
         private var input = ""
@@ -32,7 +32,7 @@ class KeyboardTest {
 
         override var learning = true
 
-        override fun reads(c: Char) = c in 'a'..'z'
+        override fun reads(c: Char) = c in 'a'..'z' || nineKeys && c in '2'..'9'
 
         override fun candidates(from: Int, count: Int) = all().drop(from).take(count).map { Choice(it) }
         override fun offers(index: Int) = emptySet<Offer>()
@@ -113,6 +113,20 @@ class KeyboardTest {
     private fun char(c: Char) = keyboard.onEvent(EngineEvent.CHAR, c.code)
 
     private fun type(text: String) = text.forEach { char(it) }
+
+    @Test
+    fun aSyllablePickComesThroughAsItsIndexAndList() {
+        val nine = FakeSession(nineKeys = true)
+        val keyboard = Keyboard(nine)
+        for ((index, id) in listOf(0 to 0, 5 to 7, Action.Syllable.MAX - 1 to Action.Syllable.IDS - 1)) {
+            keyboard.onEvent(EngineEvent.CHAR, Keyboard.syllableKey(index, id).code)
+        }
+        assertEquals(Keyboard.SYLLABLES.last, Keyboard.syllableKey(Action.Syllable.MAX - 1, Action.Syllable.IDS - 1))
+        assertEquals(
+            listOf(Action.Syllable(0, 0), Action.Syllable(5, 7), Action.Syllable(Action.Syllable.MAX - 1, Action.Syllable.IDS - 1)),
+            nine.actions,
+        )
+    }
 
     @Test
     fun lettersTheSessionReadsAreTyped() {

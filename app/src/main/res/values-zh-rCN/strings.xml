@@ -470,6 +470,7 @@
     <string name="im_pinyin">拼音</string>
     <string name="im_shuangpin">双拼</string>
     <string name="im_t9">九键拼音</string>
+    <string name="im_not_for_t9">九键不适用</string>
     <string name="im_wubi">五笔</string>
     <string name="im_cangjie">仓颉</string>
     <string name="im_ziranma">自然码</string>
