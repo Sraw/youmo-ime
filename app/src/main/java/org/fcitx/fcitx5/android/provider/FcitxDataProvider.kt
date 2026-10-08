@@ -15,6 +15,7 @@ import android.provider.DocumentsContract.Root
 import android.provider.DocumentsProvider
 import android.webkit.MimeTypeMap
 import org.fcitx.fcitx5.android.R
+import org.fcitx.fcitx5.android.utils.isPlainFileName
 import java.io.File
 import java.io.FileNotFoundException
 import java.io.IOException
@@ -72,10 +73,16 @@ class FcitxDataProvider : DocumentsProvider() {
     private lateinit var docIdPrefix: String
     private lateinit var textFilePaths: Array<String>
 
+    // lazy: canonicalFile can throw, and onCreate runs at app start
+    private val canonicalBaseDir by lazy { baseDir.canonicalFile }
+
     private val File.docId
         get() = absolutePath.removePrefix(docIdPrefix)
 
-    private fun fileFromDocId(docId: String) = File(docIdPrefix, docId)
+    // ids come from other apps: one like "files/../.." would reach the IME's internal storage with its permissions
+    private fun fileFromDocId(docId: String) =
+        File(docIdPrefix, docId).normalizedWithin(canonicalBaseDir)
+            ?: throw FileNotFoundException("document id=$docId is outside ${baseDir.docId}")
 
     override fun onCreate(): Boolean {
         baseDir = context!!.getExternalFilesDir(null) ?: return false
@@ -177,7 +184,11 @@ class FcitxDataProvider : DocumentsProvider() {
     }
 
     override fun isChildDocument(parentDocumentId: String, documentId: String): Boolean {
-        return documentId.startsWith(parentDocumentId)
+        return try {
+            fileFromDocId(documentId).normalizedWithin(fileFromDocId(parentDocumentId).canonicalFile) != null
+        } catch (_: IOException) {
+            false
+        }
     }
 
     @Throws(FileNotFoundException::class)
@@ -204,7 +215,10 @@ class FcitxDataProvider : DocumentsProvider() {
     @Throws(FileNotFoundException::class)
     override fun renameDocument(documentId: String, displayName: String): String {
         val oldFile = fileFromDocId(documentId)
-        val newFile = oldFile.resolveSibling(displayName)
+        requirePlainDisplayName(displayName)
+        // a sibling of the root itself is outside it
+        val newFile = oldFile.resolveSibling(displayName).normalizedWithin(canonicalBaseDir)
+            ?: throw FileNotFoundException("renameDocument id=$documentId to $displayName failed: outside the root")
         if (newFile.exists()) {
             throw FileNotFoundException("renameDocument id=$documentId to $displayName failed: target exists")
         }
@@ -245,7 +259,14 @@ class FcitxDataProvider : DocumentsProvider() {
             else -> MimeTypeMap.getSingleton().getMimeTypeFromExtension(extension) ?: MIME_TYPE_BIN
         }
 
+    private fun requirePlainDisplayName(displayName: String) {
+        if (!isPlainFileName(displayName)) {
+            throw FileNotFoundException("invalid display name $displayName")
+        }
+    }
+
     private fun createAbstractFile(parentDocumentId: String, displayName: String): File {
+        requirePlainDisplayName(displayName)
         val parent = fileFromDocId(parentDocumentId)
         var newFile = parent.resolve(displayName)
         var noConflictId = 2
@@ -294,3 +315,7 @@ class FcitxDataProvider : DocumentsProvider() {
         }
     }
 }
+
+/** This file normalized, or null if it resolves, symlinks followed, outside [canonicalRoot]. */
+internal fun File.normalizedWithin(canonicalRoot: File): File? =
+    normalize().takeIf { it.canonicalFile.startsWith(canonicalRoot) }
