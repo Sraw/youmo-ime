@@ -72,8 +72,6 @@ class EnginesTest {
             "${Engines.TABLE_DIR}/wbx.data" -> wubi
             Engines.SENTENCE_MODEL -> model
             Engines.REFINING_MODEL -> refining
-            // the nine keys' own pair: none, as in a build without them
-            Engines.T9_SENTENCE_MODEL, Engines.T9_REFINING_MODEL -> null
             Engines.STROKE_DATA -> strokes
             else -> throw IllegalArgumentException(path)
         }

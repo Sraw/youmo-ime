@@ -36,9 +36,6 @@ class EnginesModelTest {
 
     private var model: ByteArray? = TinyModel().bytes()
     private var refining: ByteArray? = TinyModel().bytes()
-    // the nine keys' own pair; none unless a test gives them, as in a build without them
-    private var t9Model: ByteArray? = null
-    private var t9Refining: ByteArray? = null
 
     private val loaded = ArrayList<String>()
 
@@ -48,8 +45,6 @@ class EnginesModelTest {
             Engines.PINYIN_DATA -> pinyin
             Engines.SENTENCE_MODEL -> model
             Engines.REFINING_MODEL -> refining
-            Engines.T9_SENTENCE_MODEL -> t9Model
-            Engines.T9_REFINING_MODEL -> t9Refining
             else -> null
         }
         // as the app's assets do of a file it has not got
@@ -100,26 +95,15 @@ class EnginesModelTest {
     }
 
     @Test
-    fun theNineKeysReadTheirOwnModelsAndFullPinyinNeverDoes() {
-        t9Model = TinyModel().bytes()
-        t9Refining = TinyModel().bytes()
-        val engines = Engines(::load, null)
-        engines.pause(Engines.T9, engines.type(Engines.T9, "64426"))
-        assertEquals(listOf(Engines.T9_SENTENCE_MODEL, Engines.T9_REFINING_MODEL), loaded.filter { it.endsWith(".safetensors") })
-        loaded.clear()
-        engines.pause(Engines.PINYIN, engines.type(Engines.PINYIN, "nihao"))
-        assertEquals(listOf(Engines.SENTENCE_MODEL, Engines.REFINING_MODEL), loaded.filter { it.endsWith(".safetensors") })
-    }
-
-    @Test
-    fun withoutTheirOwnTheNineKeysHaveFullPinyinsModels() {
+    fun theNineKeysReadTheModelsFullPinyinReads() {
         val errors = ArrayList<IOException>()
         val engines = Engines(::load, null, onError = { errors += it })
         engines.pause(Engines.T9, engines.type(Engines.T9, "64426"))
-        assertEquals(
-            listOf(Engines.T9_SENTENCE_MODEL, Engines.SENTENCE_MODEL, Engines.T9_REFINING_MODEL, Engines.REFINING_MODEL),
-            loaded.filter { it.endsWith(".safetensors") },
-        )
+        assertEquals(listOf(Engines.SENTENCE_MODEL, Engines.REFINING_MODEL), loaded.filter { it.endsWith(".safetensors") })
+        // the one pair in memory, whichever of the two the user types with
+        loaded.clear()
+        engines.pause(Engines.PINYIN, engines.type(Engines.PINYIN, "nihao"))
+        assertTrue(loaded.none { it.endsWith(".safetensors") })
         assertTrue(errors.isEmpty())
     }
 

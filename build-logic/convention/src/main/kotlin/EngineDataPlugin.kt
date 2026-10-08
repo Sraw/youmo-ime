@@ -51,8 +51,7 @@ import javax.inject.Inject
  * curated lexicon (`lexicon/`), packed for that model and published as a `words-*` release. The
  * sentence models, `engine/sentence-model.safetensors` (4M, weighing the readings at each key) and
  * `engine/sentence-model-large.safetensors` (25M, while the user pauses), are this fork's own too
- * (dev/TRAINING-PLAN.md: FineWeb-2 pages scored by Qwen3.5-9B-Base), from another release, and
- * the nine keys' pair of them (`sentence-model-t9*.safetensors`) from a third. The
+ * (dev/TRAINING-PLAN.md: FineWeb-2 pages scored by Qwen3.5-9B-Base), from another release. The
  * .data files and the models are stored uncompressed, so the engine can map them straight out of
  * the APK rather than copying them out first; they are also left out of the data descriptor for
  * that reason (the descriptor lists only src/main/assets).
@@ -99,19 +98,13 @@ class EngineDataPlugin : Plugin<Project> {
         private const val STROKES_URL = "https://raw.githubusercontent.com/rime/rime-stroke/$STROKES_COMMIT/stroke.dict.yaml"
         private const val STROKES_SHA256 = "b3e93dce89c185f45c3d6e189b86b3a8626913352cc85e1094c786579a665791"
         const val MODEL_TASK = "copySentenceModels"
-        private const val RELEASES = "https://github.com/Sraw/youmo-ime/releases/download/"
-        // asset name (the release's and the app's) to its release and SHA-256; a tag of its own,
-        // not "latest": what is downloaded is what was measured
+        // a tag of its own, not "latest": what is downloaded is what was measured
+        private const val MODEL_URL =
+            "https://github.com/Sraw/youmo-ime/releases/download/sentence-models-20261001/"
+        // asset name (the release's and the app's) to SHA-256
         private val MODELS = mapOf(
-            "sentence-model.safetensors" to
-                ("sentence-models-20261001" to "342ae775e1ee64b6c42af782f55f736c5bf58b904f3b880ee77a576e2268e7fb"),
-            "sentence-model-large.safetensors" to
-                ("sentence-models-20261001" to "6f7fcb724738e2fbe4c26db70fd53aa5b5729cb4af7ce7f1e7bfea73003e669a"),
-            // the nine keys' own pair, trained on from the two above (dev/TRAINING-PLAN.md, 九键)
-            "sentence-model-t9.safetensors" to
-                ("sentence-models-t9-20261007" to "659b709aee3da16f92a25017e2876e02a347b56a0fcff3944ee03b6982f831e6"),
-            "sentence-model-t9-large.safetensors" to
-                ("sentence-models-t9-20261007" to "ba63eca1ddc4819bdadb12e3cd87e2c9d58164ab6a1aecb0abe838463139ebbf"),
+            "sentence-model.safetensors" to "342ae775e1ee64b6c42af782f55f736c5bf58b904f3b880ee77a576e2268e7fb",
+            "sentence-model-large.safetensors" to "6f7fcb724738e2fbe4c26db70fd53aa5b5729cb4af7ce7f1e7bfea73003e669a",
         )
         const val TABLES_TASK = "compileEngineTables"
         private const val TOOL_MAIN = "org.fcitx.fcitx5.android.dicttool.MainKt"
@@ -193,10 +186,9 @@ class EngineDataPlugin : Plugin<Project> {
             pinyin.set(compile.flatMap { it.outputDir.file("engine/pinyin.data") })
             outputDir.set(target.layout.buildDirectory.dir("generated/engine-tables"))
         }
-        val models = MODELS.entries.mapIndexed { i, (name, release) ->
-            val (tag, sha) = release
+        val models = MODELS.entries.mapIndexed { i, (name, sha) ->
             target.tasks.register<DownloadTask>("downloadSentenceModel$i") {
-                url.set("$RELEASES$tag/$name")
+                url.set(MODEL_URL + name)
                 sha256.set(sha)
                 outputFile.set(downloadsDir.file("sentence-models/$name"))
             }
