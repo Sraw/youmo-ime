@@ -5,7 +5,6 @@
 package org.fcitx.fcitx5.android.data.clipboard
 
 import android.net.Uri
-import android.net.UrlQuerySanitizer
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.MapSerializer
@@ -56,10 +55,13 @@ class ClearURLs(rawRules: String) {
             matched = true
             // apply redirections
             provider.redirections.forEach { redirection ->
-                redirection.matchAt(x, 0)?.groupValues?.getOrNull(1)?.let {
-                    x = decodeURL(it)
-                    log(if (BuildConfig.DEBUG) "$url ~> $x" else "(redirect)")
-                    return x
+                redirection.matchAt(x, 0)?.let { match ->
+                    match.groupValues.getOrNull(1)?.let {
+                        val start = match.groups[1]?.range?.first ?: 0
+                        x = decodeURL(it, isQueryValue = x.getOrNull(start - 1) == '=')
+                        log(if (BuildConfig.DEBUG) "$url ~> $x" else "(redirect)")
+                        return x
+                    }
                 }
             }
             provider.rawRules.forEach { rawRule ->
@@ -72,16 +74,21 @@ class ClearURLs(rawRules: String) {
              */
             val rules = provider.rules + provider.referralMarketing
             val uri = Uri.parse(x)
-            x = uri.buildUpon()
-                .encodedQuery(filterParams(uri.query, rules))
-                /**
-                 * clear #fragments too
-                 * https://github.com/ClearURLs/Addon/blob/deec80b763179fa5c3559a37e3c9a6f1b28d0886/clearurls.js#L109
-                 * but skip URL encode because of reasons
-                 * https://github.com/ClearURLs/Addon/blob/d8da43ac297e5df51a9c7276579ac3332adfa801/core_js/utils/URLHashParams.js#L65
-                 */
-                .encodedFragment(filterParams(uri.fragment, rules, encode = false))
-                .toString()
+            val query = uri.encodedQuery
+            val fragment = uri.encodedFragment
+            val cleanQuery = filterParams(query, rules)
+            /**
+             * clear #fragments too
+             * https://github.com/ClearURLs/Addon/blob/deec80b763179fa5c3559a37e3c9a6f1b28d0886/clearurls.js#L109
+             */
+            val cleanFragment = filterParams(fragment, rules)
+            // rebuilt only when a parameter went, so a link with nothing to clear is kept as copied
+            if (cleanQuery != query || cleanFragment != fragment) {
+                x = uri.buildUpon()
+                    .encodedQuery(cleanQuery)
+                    .encodedFragment(cleanFragment)
+                    .toString()
+            }
         }
         if (matched) {
             log(if (BuildConfig.DEBUG) "$url -> $x" else "(clear)")
@@ -90,45 +97,43 @@ class ClearURLs(rawRules: String) {
     }
 
     /**
-     * mimic the js impl
+     * decode once per layer of encoding, as many as the target's scheme shows: none for a raw tail
+     * that reads "https://" (href.li's, govdelivery's), but one for a query value that does (google's
+     * q=, adurl=), which the redirecting server decodes once too; one for a target without a scheme;
+     * unlike the js impl, which decodes until nothing changes and so also decodes the target's
+     * own %26 or %2B
      * https://github.com/ClearURLs/Addon/blob/deec80b763179fa5c3559a37e3c9a6f1b28d0886/core_js/tools.js#L243
      */
-    private fun decodeURL(str: String): String {
-        var a: String
-        var b: String = str
-        do {
-            a = b
-            b = Uri.decode(b)
-        } while (a != b)
-        return b
-    }
-
-    private fun encodeQuery(str: String) = Uri.encode(str, " ").replace(" ", "+")
-
-    private fun UrlQuerySanitizer.ParameterValuePair.stringify(encode: Boolean = true): String {
-        val k = if (encode) encodeQuery(mParameter) else mParameter
-        if (mValue.isEmpty()) return k
-        val v = if (encode) encodeQuery(mValue) else mValue
-        return "$k=$v"
-    }
-
-    private fun filterParams(params: String?, rules: List<Regex>, encode: Boolean = true): String? {
-        if (params.isNullOrEmpty()) return params
-        // a fresh sanitizer per call: it keeps the parsed parameters as state
-        val querySanitizer = UrlQuerySanitizer().apply {
-            allowUnregisteredParamaters = true
-            unregisteredParameterValueSanitizer = UrlQuerySanitizer.getAllButNulLegal()
+    private fun decodeURL(str: String, isQueryValue: Boolean): String {
+        if (!isQueryValue && urlPattern.matchesAt(str, 0)) return str
+        var decoded = Uri.decode(str)
+        while (encodedSchemePattern.matchesAt(decoded, 0)) {
+            val next = Uri.decode(decoded)
+            if (next == decoded) break
+            decoded = next
         }
-        querySanitizer.parseQuery(params)
-        return querySanitizer.parameterList
-            .filter { param ->
-                /**
-                 * match rules with search parameter keys
-                 * https://github.com/ClearURLs/Addon/blob/deec80b763179fa5c3559a37e3c9a6f1b28d0886/clearurls.js#L122
-                 */
-                rules.all { !it.matches(param.mParameter) }
-            }
-            .joinToString("&") { it.stringify(encode) }
+        return decoded
+    }
+
+    /**
+     * Kept parameters are written back as they were, as the js impl does for #fragments: decoding
+     * and re-encoding them changes what %26, %2B or %20 in a value mean
+     * https://github.com/ClearURLs/Addon/blob/d8da43ac297e5df51a9c7276579ac3332adfa801/core_js/utils/URLHashParams.js#L65
+     *
+     * @return [params] itself when no parameter matches
+     */
+    private fun filterParams(params: String?, rules: List<Regex>): String? {
+        if (params.isNullOrEmpty()) return params
+        val pairs = params.split('&').filter { it.isNotEmpty() }
+        val kept = pairs.filter { pair ->
+            /**
+             * match rules with search parameter keys
+             * https://github.com/ClearURLs/Addon/blob/deec80b763179fa5c3559a37e3c9a6f1b28d0886/clearurls.js#L122
+             */
+            val key = Uri.decode(pair.substringBefore('='))
+            rules.none { it.matches(key) }
+        }
+        return if (kept.size == pairs.size) params else kept.joinToString("&")
     }
 
     private fun log(msg: String) {
@@ -141,5 +146,8 @@ class ClearURLs(rawRules: String) {
             MapSerializer(serializer(), providersSerializer)
 
         val urlPattern = Regex("^https?://", RegexOption.IGNORE_CASE)
+
+        // a redirect target still encoded reads "http%3A", or awstrack's "http:%2F", where its "://" belongs
+        val encodedSchemePattern = Regex("^https?:?%", RegexOption.IGNORE_CASE)
     }
 }
