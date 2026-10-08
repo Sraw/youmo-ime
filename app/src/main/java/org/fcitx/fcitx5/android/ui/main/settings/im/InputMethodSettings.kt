@@ -243,16 +243,18 @@ object InputMethodSettings {
                 is Choice -> {
                     val raw = raw(item.key)
                     into(ListPreference(context).apply {
+                        // its dialog finds it by key (MyPreferenceFragment); still never stored
+                        key = item.key
                         isPersistent = false
                         isIconSpaceReserved = false
                         isSingleLineTitle = false
                         setTitle(item.title)
                         dialogTitle = title
-                        if (item.message != 0) setDialogMessage(item.message)
                         entries = item.values.map { item.label(context, it) }.toTypedArray()
                         entryValues = item.values.toTypedArray()
                         value = item.nearest(raw.value)
-                        summaryProvider = ListPreference.SimpleSummaryProvider.getInstance()
+                        // the explanation goes under the value: a dialog message would replace the list of choices
+                        summaryProvider = choiceSummary(context, item)
                         setOnPreferenceChangeListener { _, value ->
                             raw.value = value as String
                             save()
@@ -293,6 +295,14 @@ object InputMethodSettings {
         items.forEach { add(it, screen::addPreference) }
         return screen
     }
+
+    private fun choiceSummary(context: Context, item: Choice): Preference.SummaryProvider<ListPreference> =
+        if (item.message == 0) {
+            ListPreference.SimpleSummaryProvider.getInstance()
+        } else {
+            val message = context.getString(item.message)
+            Preference.SummaryProvider<ListPreference> { "${it.entry}\n$message" }
+        }
 
     /**
      * [item]'s flags as a list of check boxes over [checked], those it has no use for greyed and

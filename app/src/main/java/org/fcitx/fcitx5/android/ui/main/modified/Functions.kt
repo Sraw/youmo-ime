@@ -42,6 +42,8 @@ fun <T : ListPreference> T.restore() {
     }
 }
 
+fun <T : ListPreference> T.hasDefault() = def() is String
+
 fun <T : SwitchPreferenceCompat> T.restore() {
     (def() as? Boolean)?.let {
         if (callChangeListener(it)) {
