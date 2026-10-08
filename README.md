@@ -55,7 +55,7 @@
   近几年的新词由本项目自己从上述网页里找出、逐个校对（`lexicon/`），打成词包发布在 `words-*` release 里，构建时编进词典的单独一层。
 - 句子模型：本项目自己训练（Apache-2.0）。先在 FineWeb-2 中文网页上训练语言模型，再用 Qwen3.5-9B-Base（Apache-2.0）给候选列表打分做蒸馏。
   文件发布在 [sentence-models-20261001](https://github.com/Sraw/youmo-ime/releases/tag/sentence-models-20261001)。
-- 不使用任何仅限科研用途的数据。
+- 安装包里的词典、语言模型和句子模型都没有用仅限科研用途的数据训练。`lib/ime-eval` 里的聊天与对话评测集取自 [LCCC](https://github.com/thu-coai/CDial-GPT)（其说明要求仅用于科研），只用来评测和选参数：语言模型的混合权重和 `Predictor.USER_WEIGHT` 是按包含这些集的分数选的。
 
 ### 构建
 
@@ -171,7 +171,7 @@ Settings, themes and the clipboard come along. The old app's backups leave out t
   published as `words-*` releases, and compiled into a layer of the dictionary at build time.
 - Sentence models: this project's own (Apache-2.0). A language model is first trained on FineWeb-2's Chinese pages, then distilled from Qwen3.5-9B-Base's (Apache-2.0) scores of candidate lists.
   The files are published at [sentence-models-20261001](https://github.com/Sraw/youmo-ime/releases/tag/sentence-models-20261001).
-- No research-only data is used.
+- The dictionary, language model and sentence models in the app are not trained on research-only data. The chat and dialog evaluation sets in `lib/ime-eval` come from [LCCC](https://github.com/thu-coai/CDial-GPT), whose README asks for research use only, and are used only to evaluate and to choose parameters: the language model's mix weight and `Predictor.USER_WEIGHT` were tuned on scores that include them.
 
 ### Building
 

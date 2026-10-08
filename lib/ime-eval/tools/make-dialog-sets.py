@@ -2,8 +2,8 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
 # SPDX-FileCopyrightText: Copyright 2026 Fcitx5 for Android Contributors
 """
-Makes two sets from LCCC-base's validation split (MIT; research use, so only measured with,
-nothing the app ships learns from it), with make-chat-set.py's runs and readings:
+Makes two sets from LCCC-base's validation split (MIT; research use, so they only measure and help
+choose parameters; nothing the app ships is trained on it), with make-chat-set.py's runs and readings:
 
     python3 tools/make-dialog-sets.py lccc_base_valid.jsonl.gz <dict_sc.txt> <lm_sc.arpa> data/pinyin-dialog.tsv data/predict/chat.tsv
 
@@ -33,7 +33,8 @@ DIALOG_HEADER = """# SPDX-License-Identifier: MIT
 # SPDX-FileCopyrightText: Copyright (c) 2020 lemon234071 (LCCC, https://github.com/thu-coai/CDial-GPT)
 #
 # Chat runs typed after the same speaker's previous turn in a dialogue, from LCCC-base's validation
-# split (Wang et al., 2020; MIT, research use: nothing the app ships learns from it). Made by
+# split (Wang et al., 2020; MIT, research use: the set only measures and helps choose parameters;
+# nothing the app ships is trained on it). Made by
 # tools/make-dialog-sets.py; a run's context is that previous turn, a space, then the earlier part
 # of its own turn, at most the last 64 chars.
 # One sample per line: input<TAB>expected<TAB>dialog<TAB>context."""
@@ -42,7 +43,8 @@ PREDICT_HEADER = """# SPDX-License-Identifier: MIT
 # SPDX-FileCopyrightText: Copyright (c) 2020 lemon234071 (LCCC, https://github.com/thu-coai/CDial-GPT)
 #
 # What follows the first word of a chat run (联想), from LCCC-base's validation split (MIT,
-# research use: only measured with). Made by tools/make-dialog-sets.py.
+# research use: the set only measures and helps choose parameters; nothing the app ships is
+# trained on it). Made by tools/make-dialog-sets.py.
 # One sample per line: context<TAB>next, the context the turn up to and with that word."""
 
 

@@ -2,7 +2,8 @@
 # SPDX-FileCopyrightText: Copyright (c) 2020 lemon234071 (LCCC, https://github.com/thu-coai/CDial-GPT)
 #
 # Chat runs typed after the same speaker's previous turn in a dialogue, from LCCC-base's validation
-# split (Wang et al., 2020; MIT, research use: nothing the app ships learns from it). Made by
+# split (Wang et al., 2020; MIT, research use: the set only measures and helps choose parameters;
+# nothing the app ships is trained on it). Made by
 # tools/make-dialog-sets.py; a run's context is that previous turn, a space, then the earlier part
 # of its own turn, at most the last 64 chars.
 # One sample per line: input<TAB>expected<TAB>dialog<TAB>context.

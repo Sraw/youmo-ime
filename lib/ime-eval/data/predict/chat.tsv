@@ -2,7 +2,8 @@
 # SPDX-FileCopyrightText: Copyright (c) 2020 lemon234071 (LCCC, https://github.com/thu-coai/CDial-GPT)
 #
 # What follows the first word of a chat run (联想), from LCCC-base's validation split (MIT,
-# research use: only measured with). Made by tools/make-dialog-sets.py.
+# research use: the set only measures and helps choose parameters; nothing the app ships is
+# trained on it). Made by tools/make-dialog-sets.py.
 # One sample per line: context<TAB>next, the context the turn up to and with that word.
 我先去穿衣服，准备	走了
 世界上最	远的距离
