@@ -23,9 +23,10 @@
         </intent>
     </queries>
 
+    <!-- no cloud backup: learned words and the clipboard stay on the phone (PRIVACY.md) -->
     <application
         android:name=".FcitxApplication"
-        android:allowBackup="true"
+        android:allowBackup="false"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:fullBackupContent="@xml/full_backup_content"
         android:icon="@mipmap/app_icon"
