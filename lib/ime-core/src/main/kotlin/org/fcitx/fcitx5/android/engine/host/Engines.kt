@@ -353,9 +353,11 @@ class Engines(
         val byKind = words.groupBy({ it.kind }, { it.entry() })
         byKind[UserWord.Kind.ADDED]?.let { if (lists.removeAll(it.filterNotNull()).isNotEmpty()) dropUser() }
         byKind[UserWord.Kind.LEARNED]?.let { learned ->
-            user().forget(learned.filterNotNull())
+            user().forgetEach(learned.filterNotNull())
             habits.forgetAll(learned.filterNotNull().mapTo(HashSet()) { it.text })
             forgetInTables(learned.filterNotNull().map { it.text })
+            // a record a word, each read at a start as a pass over all the counts
+            if (learned.size > 1) compactUser()
         }
         byKind[UserWord.Kind.BLOCKED]?.let { entries ->
             blockedTexts = null
@@ -421,6 +423,15 @@ class Engines(
         closeQuietly(log)
         store = null
         userModel = null
+    }
+
+    /** Rewrites the user's log as the counts now are: a start then reads none of what was forgotten. */
+    private fun compactUser() {
+        try {
+            store?.compact()
+        } catch (_: IllegalStateException) {
+            // a log that stopped taking writes after one failed: nothing of what was forgotten reached it
+        }
     }
 
     private fun addDictionaries(model: UserModel) {

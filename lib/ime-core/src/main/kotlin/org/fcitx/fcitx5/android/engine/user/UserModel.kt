@@ -134,20 +134,40 @@ class UserModel(
     fun forget(words: List<Entry>) {
         val ids = words.mapNotNull { ids[it] }.toSet()
         if (ids.isEmpty()) return
-        counts.removeIf { first(it) in ids || second(it) in ids }
+        forgetCounts(ids)
+        val word = words.singleOrNull()
+        val id = word?.let { this.ids[it] } ?: NO_WORD
+        if (word != null && isOwn(id)) dropOwn(word, id)
+        changes++
+        journal?.forgot(words)
+    }
+
+    /**
+     * [forget]s each of [words] alone, as the settings take words off their list: each of the
+     * user's own is gone from the trie, the counts gone through once for them all, and each is
+     * journaled alone, so it reads back so.
+     */
+    fun forgetEach(words: Collection<Entry>) {
+        val known = words.filter { it in ids }.associateWith { ids.getValue(it) }
+        if (known.isEmpty()) return
+        forgetCounts(known.values.toSet())
+        for ((word, id) in known) if (isOwn(id)) dropOwn(word, id)
+        changes++
+        for (word in known.keys) journal?.forgot(listOf(word))
+    }
+
+    private fun forgetCounts(forgotten: Set<Int>) {
+        counts.removeIf { first(it) in forgotten || second(it) in forgotten }
         indexFollowers()
         total = 0f
         counts.forEach { key, count -> if (first(key) == NO_WORD) total += count }
-        val word = words.singleOrNull()
-        val id = word?.let { this.ids[it] } ?: NO_WORD
-        if (word != null && isOwn(id)) {
-            removeFromTrie(word.syllables, id)
-            // learned again, it is a new word, put back in the trie
-            this.ids.remove(word)
-            entries.remove(id)
-        }
-        changes++
-        journal?.forgot(words)
+    }
+
+    private fun dropOwn(word: Entry, id: Int) {
+        removeFromTrie(word.syllables, id)
+        // learned again, it is a new word, put back in the trie
+        ids.remove(word)
+        entries.remove(id)
     }
 
     /** Adds [count] to [entry] as a word; for counts kept, as compaction writes them. */

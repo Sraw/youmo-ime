@@ -265,6 +265,21 @@ class UserStoreTest {
     }
 
     @Test
+    fun aLogCompactedToNothingIsNotSeededAgain() {
+        var seeded = 0
+        val counting: (UserModel) -> Unit = { seeded++; seed(it) }
+        val m = model()
+        UserStore(file, m).use {
+            it.open(counting)
+            m.forgetEach(listOf(entry("你", "ni"), entry("拟", "ni")))
+            it.compact()
+        }
+        UserStore(file, model()).use { it.open(counting) }
+        assertEquals(1, seeded)
+        assertEquals(emptyMap<String, Float>(), counts(session()))
+    }
+
+    @Test
     fun aSeedThatCannotBeWrittenFailsTheOpenAndIsTriedAgain() {
         // where the counts would be written first
         val blocker = File(file.path + ".compacting").apply { mkdir() }

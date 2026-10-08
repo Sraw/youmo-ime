@@ -58,7 +58,8 @@ class RecordStore internal constructor(
      * A log with nothing in it (none yet, or a header alone) is first filled by [seed], from what
      * another input method learned, and written as the counts it leaves, all or nothing: until
      * that is written whole, the log stays empty and the next open seeds again. A seed that
-     * cannot be written fails the open.
+     * cannot be written fails the open. A log compacted to no counts is not empty: what the user
+     * had forgotten is not seeded back.
      */
     fun open(replay: (Byte, DataInputStream) -> Unit, counts: ((ByteArray) -> Unit) -> Unit, seed: (() -> Unit)? = null) {
         check(out == null && !closed) { "opened already" }
@@ -67,7 +68,7 @@ class RecordStore internal constructor(
             val bytes = file.readBytes()
             when {
                 format.hasHeader(bytes) -> {
-                    val end = format.read(bytes, replay)
+                    val end = format.read(bytes) { type, input -> if (type != EMPTIED) replay(type, input) }
                     if (end < bytes.size) RandomAccessFile(file, "rw").use { it.setLength(end.toLong()) }
                 }
                 // killed before the header was all written: nothing to keep
@@ -78,7 +79,7 @@ class RecordStore internal constructor(
         val seeding = seed != null && (!file.exists() || file.length() <= RecordFormat.HEADER_SIZE)
         if (seeding) {
             seed?.invoke()
-            writeCounts()
+            writeCounts(seeding = true)
         }
         if (!file.exists()) file.writeBytes(format.header())
         end = file.length()
@@ -154,13 +155,19 @@ class RecordStore internal constructor(
     }
 
     /** Writes the counts into a new file, renamed over [file] once it is all on disk. */
-    private fun writeCounts() {
+    private fun writeCounts(seeding: Boolean = false) {
         val next = File(file.path + COMPACTING)
         try {
             FileOutputStream(next).use { raw ->
                 val stream = BufferedOutputStream(raw)
                 stream.write(format.header())
-                counts { stream.write(it) }
+                var none = true
+                counts {
+                    stream.write(it)
+                    none = false
+                }
+                // a header alone is seeded again: meant for a seed that found nothing, not for all forgotten
+                if (none && !seeding) stream.write(format.record(EMPTIED) {})
                 stream.flush()
                 raw.fd.sync()
             }
@@ -181,5 +188,7 @@ class RecordStore internal constructor(
         const val DEFAULT_COMPACT_AT = 1L shl 20
         const val UNREADABLE = ".unreadable"
         private const val COMPACTING = ".compacting"
+        // of no fields, and a type no format's records have: they count from 1, and skip types they do not know
+        private const val EMPTIED: Byte = 0
     }
 }

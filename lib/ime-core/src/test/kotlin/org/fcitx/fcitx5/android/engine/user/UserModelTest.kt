@@ -15,6 +15,7 @@ import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.io.ByteArrayOutputStream
 import java.nio.ByteBuffer
 
 class UserModelTest {
@@ -350,4 +351,33 @@ class UserModelTest {
         assertEquals(false, inTrie(m, "好吗", "hao", "ma"))
     }
 
+    @Test
+    fun wordsForgottenEachAloneAreAllGoneAndReadBackSo() {
+        val m = model()
+        val heard = ArrayList<String>()
+        val log = ByteArrayOutputStream().apply { write(UserLog.header()) }
+        m.journal = object : UserModel.Journal {
+            override fun record(prev: Entry?, sentence: List<Entry>) = log.write(UserLog.sentence(prev, sentence))
+            override fun forgot(words: List<Entry>) {
+                heard += words.joinToString()
+                log.write(UserLog.forgot(words))
+            }
+        }
+        val niHao = entry("拟好", "ni", "hao")
+        val haoMa = entry("好吗", "hao", "ma")
+        m.learn(null, listOf(niHao, haoMa, entry("你", "ni")))
+        // 拟 was never typed: nothing to forget
+        m.forgetEach(listOf(niHao, haoMa, entry("拟", "ni")))
+        assertEquals(listOf("拟好(ni hao)", "好吗(hao ma)"), heard)
+        assertFalse(inTrie(m, "拟好", "ni", "hao"))
+        assertFalse(inTrie(m, "好吗", "hao", "ma"))
+        assertEquals(emptyList<Pair<Entry, Float>>(), m.ownWords())
+        assertEquals(listOf("你"), m.ownTexts())
+        assertEquals(1f, m.total)
+        // each written as forgotten alone: read back, neither is a word of the user's any more
+        val again = model().also { UserLog.read(log.toByteArray(), it) }
+        assertEquals(emptyList<Pair<Entry, Float>>(), again.ownWords())
+        assertFalse(inTrie(again, "拟好", "ni", "hao"))
+        assertEquals(1f, again.total)
+    }
 }

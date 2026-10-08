@@ -4,15 +4,20 @@
  */
 package org.fcitx.fcitx5.android.engine.host
 
+import org.fcitx.fcitx5.android.engine.data.PinyinData
 import org.fcitx.fcitx5.android.engine.data.PinyinDataBuilder
 import org.fcitx.fcitx5.android.engine.pinyin.Syllables
 import org.fcitx.fcitx5.android.engine.session.Offer
+import org.fcitx.fcitx5.android.engine.user.LibimeImport
+import org.fcitx.fcitx5.android.engine.user.UserLog
+import org.fcitx.fcitx5.android.engine.user.UserModel
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
+import java.io.File
 import java.nio.ByteBuffer
 
 /** The words the user adds, makes and blocks, as the settings list them ([Engines.userWords]). */
@@ -107,6 +112,52 @@ class EnginesUserWordsTest {
         assertEquals("ni hao", learned.pinyin)
         engines.removeWord(learned)
         assertEquals(emptyList<Engines.UserWord>(), engines.userWords())
+    }
+
+    @Test
+    fun wordsTheUserPutTogetherAreRemovedAtOnceForGood() {
+        val dir = folder.newFolder()
+        val engines = Engines(::load, dir)
+        fun putTogether(keys: String, vararg pieces: String) {
+            engines.type(Engines.PINYIN, keys)
+            for (p in pieces) engines.onEvent(Engines.PINYIN, EngineEvent.PICK, engines.candidates(Engines.PINYIN, 0, 20).indexOfFirst { it.text == p })
+            engines.onEvent(Engines.PINYIN, EngineEvent.RESET, 0)
+        }
+        putTogether("nihao", "拟", "好")
+        putTogether("haoxing", "好", "星")
+        val learned = engines.userWords()
+        assertEquals(setOf("拟好", "好星"), learned.map { it.text }.toSet())
+        engines.removeWords(learned)
+        assertEquals(emptyList<Engines.UserWord>(), engines.userWords())
+        engines.close()
+        assertEquals(emptyList<Engines.UserWord>(), Engines(::load, dir).userWords())
+        // compacted: a start does not make them words again only to forget them
+        val replayed = PinyinData.load(ByteBuffer.wrap(pinyin)).let { UserModel(it.dictionary, it.vocabulary) }
+        UserLog.read(File(dir, Engines.USER_PINYIN).readBytes(), replayed)
+        assertEquals(0, replayed.size)
+    }
+
+    @Test
+    fun wordsLibimeLearnedStayRemovedThoughItsFilesStay() {
+        val dir = folder.newFolder()
+        var asked = 0
+        // its user dictionary's own words, nothing typed since: once they go, the log has nothing left
+        val legacy = {
+            asked++
+            LibimeImport.Legacy(listOf("拟好 ni'hao 0", "好星 hao'xing 0"), emptyList())
+        }
+        val engines = Engines(::load, dir, legacy = legacy)
+        val added = Engines.UserWord("妮浩", "ni hao", Engines.UserWord.Kind.ADDED)
+        assertTrue(engines.addWord("妮浩", "nihao"))
+        val learned = engines.userWords() - added
+        assertEquals(setOf("拟好", "好星"), learned.map { it.text }.toSet())
+        engines.removeWords(learned)
+        // the log read again without a restart
+        engines.removeWord(added)
+        assertEquals(emptyList<Engines.UserWord>(), engines.userWords())
+        engines.close()
+        assertEquals(emptyList<Engines.UserWord>(), Engines(::load, dir, legacy = legacy).userWords())
+        assertEquals(1, asked)
     }
 
     @Test
