@@ -50,10 +50,12 @@ open class DynamicListTouchCallback<T>(
         recyclerView: RecyclerView,
         viewHolder: RecyclerView.ViewHolder
     ): Int {
-        val item = adapter.entries[viewHolder.bindingAdapterPosition]
-        if (adapter.multiselect || !adapter.removable(item))
-            return if (adapter.enableOrder) ItemTouchHelper.UP or ItemTouchHelper.DOWN
-            else ItemTouchHelper.ACTION_STATE_IDLE
+        val position = viewHolder.bindingAdapterPosition
+        // a row being laid out or taken away has no entry to swipe
+        if (position == RecyclerView.NO_POSITION) return 0
+        val item = adapter.entries[position]
+        // no direction at all: up and down here would make a vertical move a swipe, and so a delete
+        if (adapter.multiselect || !adapter.removable(item)) return 0
         return super.getSwipeDirs(recyclerView, viewHolder)
     }
 

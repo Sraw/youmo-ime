@@ -31,6 +31,7 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.floatingactionbutton.FloatingActionButton
 import com.google.android.material.textfield.TextInputLayout
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -48,6 +49,7 @@ import org.fcitx.fcitx5.android.utils.materialTextInput
 import org.fcitx.fcitx5.android.utils.onPositiveButtonClick
 import org.fcitx.fcitx5.android.utils.str
 import org.fcitx.fcitx5.android.utils.styledColor
+import org.fcitx.fcitx5.android.utils.toast
 import splitties.dimensions.dp
 import splitties.resources.styledDrawable
 import splitties.views.backgroundColor
@@ -261,13 +263,21 @@ class UserWordListFragment : Fragment() {
     }
 
     private fun remove(words: List<UserWord>) {
+        val ctx = requireContext()
         // thousands at once take a moment: the added words' model is made again without them
-        lifecycleScope.withLoadingDialog(requireContext()) {
-            viewModel.fcitx.runOnReady { removeUserWords(words) }
-            selected.removeAll(words.toSet())
-            all = viewModel.fcitx.runOnReady { userWords() }.filter { it.kind == kind }
-            filter(immediately = true)
-            selectionChanged()
+        lifecycleScope.withLoadingDialog(ctx) {
+            try {
+                viewModel.fcitx.runOnReady { removeUserWords(words) }
+                selected.removeAll(words.toSet())
+                all = viewModel.fcitx.runOnReady { userWords() }.filter { it.kind == kind }
+                filter(immediately = true)
+                selectionChanged()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (@Suppress("TooGenericExceptionCaught") e: Exception) {
+                // a word list that could not be written: shown, where uncaught it would close the app
+                ctx.toast(e)
+            }
         }
     }
 

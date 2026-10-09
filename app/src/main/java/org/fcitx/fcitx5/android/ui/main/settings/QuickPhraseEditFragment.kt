@@ -9,10 +9,10 @@ import android.view.View
 import android.view.inputmethod.EditorInfo
 import androidx.appcompat.app.AlertDialog
 import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.data.quickphrase.QuickPhrase
 import org.fcitx.fcitx5.android.data.quickphrase.QuickPhraseData
@@ -159,12 +159,15 @@ class QuickPhraseEditFragment : ProgressFragment(), OnItemChangedListener<QuickP
     private fun saveConfig() {
         if (!dustman.dirty) return
         resetDustman()
-        lifecycleScope.launch {
+        // taken now: a popped page is detached by the time the save is done
+        val parent = parentFragmentManager
+        // the app's scope: a pop ends the page's right after onStop, and with it the result
+        FcitxApplication.getInstance().coroutineScope.launch {
             withContext(Dispatchers.IO) {
                 quickPhrase.saveData(QuickPhraseData(ui.entries))
             }
             // tell parent that we need to reload
-            parentFragmentManager.setFragmentResult(
+            parent.setFragmentResult(
                 RESULT,
                 Bundle().apply { putParcelable(RESULT, quickPhrase) }
             )

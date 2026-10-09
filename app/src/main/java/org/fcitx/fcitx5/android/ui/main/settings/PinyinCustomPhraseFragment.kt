@@ -25,8 +25,10 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.navigation.fragment.findNavController
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.core.reloadPinyinCustomPhrase
 import org.fcitx.fcitx5.android.data.pinyin.CustomPhraseManager
@@ -68,6 +70,9 @@ class PinyinCustomPhraseFragment : Fragment(), OnItemChangedListener<PinyinCusto
 
     // the file as last loaded or saved here: what the keyboard changed since is kept on save
     private var loaded = emptyList<PinyinCustomPhrase>()
+
+    // the last save failed: the dustman, reset as it began, no longer tells of what it was to save
+    private var unsaved = false
 
     private lateinit var importLauncher: ActivityResultLauncher<String>
     private lateinit var exportLauncher: ActivityResultLauncher<String>
@@ -243,14 +248,17 @@ class PinyinCustomPhraseFragment : Fragment(), OnItemChangedListener<PinyinCusto
         val ctx = requireContext()
         lifecycleScope.launch {
             try {
-                val text = withContext(Dispatchers.IO) {
-                    WordLists.decode((ctx.contentResolver.openInputStream(uri) ?: throw IOException("cannot read $uri")).use { it.readBytes() })
+                val bytes = withContext(Dispatchers.IO) {
+                    (ctx.contentResolver.openInputStream(uri) ?: throw IOException("cannot read $uri")).use { it.readImported() }
                 }
                 val have = ui.entries.mapTo(HashSet()) { it.serialize() }
-                val phrases = CustomPhrases.parse(text).all
-                    .map { PinyinCustomPhrase(it.key, it.order, it.value) }
-                    .filter { have.add(it.serialize()) }
-                phrases.forEach { ui.addItem(item = it) }
+                // off the main thread: a file of thousands of phrases would hold it for seconds
+                val phrases = withContext(Dispatchers.Default) {
+                    CustomPhrases.parse(WordLists.decode(bytes)).all
+                        .map { PinyinCustomPhrase(it.key, it.order, it.value) }
+                        .filter { have.add(it.serialize()) }
+                }
+                ui.addItems(phrases)
                 ctx.toast(getString(R.string.import_phrases_done, phrases.size))
             } catch (e: IOException) {
                 ctx.toast(e)
@@ -263,14 +271,18 @@ class PinyinCustomPhraseFragment : Fragment(), OnItemChangedListener<PinyinCusto
 
     private fun exportPhrases(uri: Uri) {
         val ctx = requireContext()
-        val items = ui.entries
+        // a copy: written on another thread while the list may change
+        val items = ui.entries.toList()
         lifecycleScope.launch {
             try {
                 withContext(Dispatchers.IO) {
                     val temp = File(ctx.cacheDir, "customphrase.export")
-                    CustomPhraseManager.save(items, temp)
-                    (ctx.contentResolver.openOutputStream(uri) ?: throw IOException("cannot write $uri")).use { out -> temp.inputStream().use { it.copyTo(out) } }
-                    temp.delete()
+                    try {
+                        CustomPhraseManager.save(items, temp)
+                        (ctx.contentResolver.openOutputStream(uri) ?: throw IOException("cannot write $uri")).use { out -> temp.inputStream().use { it.copyTo(out) } }
+                    } finally {
+                        temp.delete()
+                    }
                 }
             } catch (e: IOException) {
                 ctx.toast(e)
@@ -299,23 +311,29 @@ class PinyinCustomPhraseFragment : Fragment(), OnItemChangedListener<PinyinCusto
     }
 
     private fun saveConfig() {
-        if (!readable || !dustman.dirty) return
+        if (!readable || !(dustman.dirty || unsaved)) return
+        unsaved = false
         resetDustman()
         val items = ui.entries.toList()
         val base = loaded
-        lifecycleScope.launch {
+        // outlives the page, whose scope leaving cancels; begun at once: a page made anew reads the file next
+        val saved = FcitxApplication.getInstance().coroutineScope.async(Dispatchers.Main.immediate) {
             try {
-                // not saved: the next save still has what this one would have changed to do
                 loaded = withContext(Dispatchers.IO) { CustomPhraseManager.saveOver(base, items) }
+                true
             } catch (e: IOException) {
                 Timber.w(e, "custom phrases")
                 // the fragment may be gone by now
                 appContext.toast(e)
-                return@launch
+                // not saved: the next save is tried, changed since or not
+                unsaved = true
+                false
             }
-            viewModel.fcitx.runOnReady {
-                reloadPinyinCustomPhrase()
-            }
+        }
+        val fcitx = viewModel.fcitx
+        // the connection checked now, in onStop, while the page has it; dropped if fcitx stops before the save ends
+        fcitx.lifecycleScope.launch(Dispatchers.Main.immediate) {
+            fcitx.runOnReady<Unit> { if (saved.await()) reloadPinyinCustomPhrase() }
         }
     }
 

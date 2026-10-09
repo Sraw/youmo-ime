@@ -53,6 +53,8 @@ class NaiveDustman<T> {
     fun reset(initial: Map<String, T>) {
         dirty = false
         dirtyStatus.clear()
+        // a key left from an earlier reset makes an entry deleted then added back look unchanged
+        initialValues.clear()
         initialValues.putAll(initial)
     }
 

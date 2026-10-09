@@ -206,6 +206,16 @@ abstract class DynamicListAdapter<T>(
         mainViewModel?.toolbarButton?.value = ButtonMode.EDIT
     }
 
+    /** Adds [items] at the end, drawn as one insertion: thousands of them one by one hold the main thread. */
+    fun addItems(items: List<T>) {
+        if (items.isEmpty()) return
+        val start = _entries.size
+        _entries.addAll(items)
+        notifyItemRangeInserted(start, items.size)
+        listener?.onItemAddedBatch(items.mapIndexed { i, item -> start + i to item })
+        mainViewModel?.toolbarButton?.value = ButtonMode.EDIT
+    }
+
     @CallSuper
     open fun removeItem(idx: Int): T {
         val item = _entries.removeAt(idx)

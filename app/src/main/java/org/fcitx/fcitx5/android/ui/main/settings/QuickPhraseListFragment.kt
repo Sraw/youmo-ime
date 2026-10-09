@@ -24,6 +24,7 @@ import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.core.reloadQuickPhrase
 import org.fcitx.fcitx5.android.data.quickphrase.BuiltinQuickPhrase
@@ -53,6 +54,7 @@ import splitties.views.dsl.core.matchParent
 import splitties.views.dsl.core.verticalLayout
 import splitties.views.imageDrawable
 import splitties.views.setPaddingDp
+import java.io.IOException
 import java.util.concurrent.atomic.AtomicBoolean
 
 class QuickPhraseListFragment : Fragment(), OnItemChangedListener<QuickPhrase> {
@@ -186,7 +188,20 @@ class QuickPhraseListFragment : Fragment(), OnItemChangedListener<QuickPhrase> {
                         } else {
                             editText.error = null
                         }
-                        ui.addItem(item = QuickPhraseManager.newEmpty(name))
+                        newQuickPhraseNameError(name, ui.entries.map { it.name })?.let {
+                            editText.error = getString(it)
+                            editText.requestFocus()
+                            return@onClick false
+                        }
+                        val created = try {
+                            QuickPhraseManager.newEmpty(name)
+                        } catch (e: IOException) {
+                            // a name the file system refuses, such as one too long
+                            editText.error = e.localizedMessage ?: getString(R.string.invalid_value)
+                            editText.requestFocus()
+                            return@onClick false
+                        }
+                        ui.addItem(item = created)
                         return@onClick true
                     }
             }
@@ -264,7 +279,9 @@ class QuickPhraseListFragment : Fragment(), OnItemChangedListener<QuickPhrase> {
         // save the reference to NotificationManager, in case we need to cancel notification
         // after Fragment detached
         val nm = requireContext().notificationManager
-        lifecycleScope.launch {
+        // the app's scope: leaving the page ends the page's right after onStop, and with it the
+        // reload and the cancel; immediate as that one is, so what reads the fragment runs now
+        FcitxApplication.getInstance().coroutineScope.launch(Dispatchers.Main.immediate) {
             if (busy.compareAndSet(false, true)) {
                 val id = RELOAD_ID++
                 NotificationCompat.Builder(requireContext(), CHANNEL_ID)
@@ -275,11 +292,14 @@ class QuickPhraseListFragment : Fragment(), OnItemChangedListener<QuickPhrase> {
                     .setProgress(100, 0, true)
                     .setPriority(NotificationCompat.PRIORITY_HIGH)
                     .build().let { nm.notify(id, it) }
-                viewModel.fcitx.runOnReady {
-                    reloadQuickPhrase()
+                try {
+                    viewModel.fcitx.runOnReady {
+                        reloadQuickPhrase()
+                    }
+                } finally {
+                    nm.cancel(id)
+                    busy.set(false)
                 }
-                nm.cancel(id)
-                busy.set(false)
             }
         }
     }
@@ -354,4 +374,13 @@ class QuickPhraseListFragment : Fragment(), OnItemChangedListener<QuickPhrase> {
         private var IMPORT_ID = 0
         const val CHANNEL_ID = "quickphrase"
     }
+}
+
+/** The message for a name a new quick phrase list cannot take beside [taken], or null if it can. */
+internal fun newQuickPhraseNameError(name: String, taken: List<String>): Int? = when {
+    // the list is the file <name>.mb: a slash makes a path, whose directory does not exist
+    '/' in name -> R.string.invalid_value
+    // two rows over one file, removing either deletes both; the phone's storage ignores case
+    taken.any { it.equals(name, ignoreCase = true) } -> R.string.quickphrase_already_exists
+    else -> null
 }

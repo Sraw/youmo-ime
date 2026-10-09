@@ -6,13 +6,14 @@
 package org.fcitx.fcitx5.android.ui.common
 
 import android.animation.ValueAnimator
+import android.app.Activity
 import android.content.Context
 import android.os.Build
 import android.provider.Settings
 import androidx.annotation.StringRes
 import androidx.appcompat.app.AlertDialog
 import androidx.lifecycle.LifecycleCoroutineScope
-import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.fcitx.fcitx5.android.R
@@ -64,14 +65,39 @@ fun LifecycleCoroutineScope.withLoadingDialog(
     threshold: Long = 200L,
     action: suspend () -> Unit
 ) {
-    var loadingDialog: AlertDialog? = null
+    launch {
+        withLoading<AlertDialog>(
+            threshold,
+            show = { context.ProgressBarDialogIndeterminate(title).show() },
+            dismiss = {
+                // a destroyed activity has taken the dialog's window down: dismissing it then throws
+                if ((context as? Activity)?.isDestroyed != true) it.dismiss()
+            },
+            action = action
+        )
+    }
+}
+
+/**
+ * Runs [action], showing what [show] makes once it has taken [threshold] ms, and [dismiss]es it
+ * however [action] ends: thrown or cancelled too, as a non-cancelable dialog left up blocks the page.
+ */
+internal suspend fun <D : Any> withLoading(
+    threshold: Long,
+    show: () -> D,
+    dismiss: (D) -> Unit,
+    action: suspend () -> Unit
+) = coroutineScope {
+    var loadingDialog: D? = null
     val loadingJob = launch {
         delay(threshold)
-        loadingDialog = context.ProgressBarDialogIndeterminate(title).show()
+        loadingDialog = show()
     }
-    launch {
+    try {
         action()
-        loadingJob.cancelAndJoin()
-        loadingDialog?.dismiss()
+    } finally {
+        // not joined, as a cancelled coroutine cannot wait: on this one thread it cannot reach show() now
+        loadingJob.cancel()
+        loadingDialog?.let(dismiss)
     }
 }
