@@ -32,7 +32,8 @@ public:
 
     void keyEvent(const Key &key, bool isRelease, int timestamp);
     void forwardKey(const Key &key, bool isRelease);
-    bool selectCandidate(int idx);
+    // text: what the UI showed at idx (empty: unchecked); dropped when the candidate there shows another
+    bool selectCandidate(int idx, const std::string &text);
     bool isInputPanelEmpty();
     void resetInputContext();
     void repositionCursor(int idx);
@@ -43,7 +44,8 @@ public:
     void setCapabilityFlags(uint64_t flag);
     std::vector<CandidateEntity> getCandidates(int offset, int limit);
     std::vector<CandidateActionEntity> getCandidateActions(int idx);
-    void triggerCandidateAction(int idx, int actionIdx);
+    // dropped, as selectCandidate, when the candidate at idx no longer shows text
+    void triggerCandidateAction(int idx, int actionIdx, const std::string &text);
     void triggerTabAction(int idx);
     void deleteSurrounding(int before, int after);
     void showToast(const std::string &s);

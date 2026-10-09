@@ -28,7 +28,7 @@ class PagedCandidatesUi(
     override val ctx: Context,
     val theme: Theme,
     private val setupTextView: TextView.() -> Unit,
-    private val onCandidateClick: (Int) -> Unit,
+    private val onCandidateClick: (Int, String) -> Unit,
     private val onCandidateAction: (Int, String, View) -> Unit,
     private val onPrevPage: () -> Unit,
     private val onNextPage: () -> Unit
@@ -79,7 +79,7 @@ class PagedCandidatesUi(
                     val candidate = data.candidates[position]
                     holder.ui.update(candidate, active = position == data.cursorIndex)
                     holder.ui.root.setOnClickListener {
-                        onCandidateClick.invoke(position)
+                        onCandidateClick.invoke(position, candidate.text)
                     }
                     holder.ui.root.setOnLongClickListener { v ->
                         onCandidateAction.invoke(position, candidate.text, v)

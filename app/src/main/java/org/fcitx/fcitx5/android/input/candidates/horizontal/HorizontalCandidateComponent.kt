@@ -93,7 +93,7 @@ class HorizontalCandidateComponent :
                     flexGrow = layoutFlexGrow
                 }
                 holder.itemView.setOnClickListener {
-                    fcitx.launchOnReady { it.select(holder.idx) }
+                    fcitx.launchOnReady(holder.pick())
                 }
                 holder.itemView.setOnLongClickListener {
                     inputView.showCandidateActionMenu(holder.idx, holder.candidate.text, holder.ui.root)

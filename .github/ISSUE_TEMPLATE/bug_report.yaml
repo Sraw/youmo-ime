@@ -36,7 +36,7 @@ body:
     id: log
     attributes:
       label: 日志 / Log
-      description: 附上日志以帮助定位问题。 / Attach log to help locate the bug.
+      description: 附上日志以帮助定位问题。日志可能含有你输入过的文字，附上前请检查并删去敏感内容。 / Attach log to help locate the bug. The log may contain text you typed; review it and remove anything sensitive before attaching.
     validations:
       required: false
 

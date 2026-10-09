@@ -105,7 +105,9 @@ class Fcitx(private val context: Context) : FcitxAPI, FcitxLifecycleOwner {
     ) =
         withFcitxContext { sendKeySymToFcitx(sym.sym, states.toInt(), code, up, timestamp) }
 
-    override suspend fun select(idx: Int): Boolean = withFcitxContext { selectCandidate(idx) }
+    override suspend fun select(idx: Int, text: String?): Boolean =
+        withFcitxContext { selectCandidate(idx, text) }
+
     override suspend fun isEmpty(): Boolean = withFcitxContext { isInputPanelEmpty() }
     override suspend fun reset() = withFcitxContext { resetInputContext() }
     override suspend fun moveCursor(position: Int) = withFcitxContext { repositionCursor(position) }
@@ -187,8 +189,8 @@ class Fcitx(private val context: Context) : FcitxAPI, FcitxLifecycleOwner {
     override suspend fun getCandidateActions(idx: Int): Array<CandidateAction> =
         withFcitxContext { getFcitxCandidateActions(idx) ?: emptyArray() }
 
-    override suspend fun triggerCandidateAction(idx: Int, actionIdx: Int) =
-        withFcitxContext { triggerFcitxCandidateAction(idx, actionIdx) }
+    override suspend fun triggerCandidateAction(idx: Int, actionIdx: Int, text: String) =
+        withFcitxContext { triggerFcitxCandidateAction(idx, actionIdx, text) }
 
     override suspend fun setCandidatePagingMode(mode: Int) =
         withFcitxContext { setFcitxCandidatePagingMode(mode) }
@@ -275,7 +277,7 @@ class Fcitx(private val context: Context) : FcitxAPI, FcitxLifecycleOwner {
         external fun sendKeySymToFcitx(sym: Int, state: Int, code: Int, up: Boolean, timestamp: Int)
 
         @JvmStatic
-        external fun selectCandidate(idx: Int): Boolean
+        external fun selectCandidate(idx: Int, text: String?): Boolean
 
         @JvmStatic
         external fun isInputPanelEmpty(): Boolean
@@ -374,7 +376,7 @@ class Fcitx(private val context: Context) : FcitxAPI, FcitxLifecycleOwner {
         external fun getFcitxCandidateActions(idx: Int): Array<CandidateAction>?
 
         @JvmStatic
-        external fun triggerFcitxCandidateAction(idx: Int, actionIdx: Int)
+        external fun triggerFcitxCandidateAction(idx: Int, actionIdx: Int, text: String)
 
         @JvmStatic
         external fun setFcitxCandidatePagingMode(mode: Int)
@@ -398,7 +400,8 @@ class Fcitx(private val context: Context) : FcitxAPI, FcitxLifecycleOwner {
         @JvmStatic
         fun handleFcitxEvent(type: Int, params: Array<Any>) {
             val event = FcitxEvent.create(type, params)
-            Timber.d("Handling $event")
+            // the type only: the contents are what the user types, password fields included
+            Timber.d("Handling ${event.eventType}")
             fcitxEventHandlers.forEach { it.invoke(event) }
             eventFlow_.tryEmit(event)
         }

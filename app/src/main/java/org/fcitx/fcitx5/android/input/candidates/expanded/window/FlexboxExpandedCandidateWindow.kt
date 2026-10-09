@@ -87,6 +87,8 @@ class FlexboxExpandedCandidateWindow :
 
     override fun nextPage() {
         layoutManager.apply {
+            // the first page not loaded yet (Down is enabled till then): -1 would throw
+            if (itemCount == 0) return
             var next = findLastCompletelyVisibleItemPosition() + 1
             if (next >= itemCount) next = itemCount - 1
             startSmoothScroll(object : LinearSmoothScroller(context) {

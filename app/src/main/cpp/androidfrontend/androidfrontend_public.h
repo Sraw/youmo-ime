@@ -28,7 +28,7 @@ FCITX_ADDON_DECLARE_FUNCTION(AndroidFrontend, keyEvent,
                              void(const fcitx::Key &, bool isRelease, const int timestamp))
 
 FCITX_ADDON_DECLARE_FUNCTION(AndroidFrontend, selectCandidate,
-                             bool(int idx))
+                             bool(int idx, const std::string &text))
 
 FCITX_ADDON_DECLARE_FUNCTION(AndroidFrontend, isInputPanelEmpty,
                              bool())
@@ -61,7 +61,7 @@ FCITX_ADDON_DECLARE_FUNCTION(AndroidFrontend, getCandidateActions,
                              std::vector<CandidateActionEntity>(const int))
 
 FCITX_ADDON_DECLARE_FUNCTION(AndroidFrontend, triggerCandidateAction,
-                             void(const int, const int))
+                             void(const int, const int, const std::string &))
 
 FCITX_ADDON_DECLARE_FUNCTION(AndroidFrontend, triggerTabAction,
                              void(const int))

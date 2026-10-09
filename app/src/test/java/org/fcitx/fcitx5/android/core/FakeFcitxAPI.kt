@@ -136,9 +136,9 @@ class FakeFcitxAPI : FcitxAPI {
         calls += "sendKey(sym=${sym.sym}, states=${states.states}, code=$code, up=$up)"
     }
 
-    override suspend fun select(idx: Int): Boolean {
-        calls += "select($idx)"
-        return idx in candidates.indices
+    override suspend fun select(idx: Int, text: String?): Boolean {
+        calls += if (text == null) "select($idx)" else "select($idx, $text)"
+        return idx in candidates.indices && (text == null || candidates[idx].text == text)
     }
 
     override suspend fun isEmpty() = inputPanelCached.preedit.isEmpty() && candidates.isEmpty()
@@ -256,8 +256,8 @@ class FakeFcitxAPI : FcitxAPI {
 
     override suspend fun getCandidateActions(idx: Int): Array<CandidateAction> = emptyArray()
 
-    override suspend fun triggerCandidateAction(idx: Int, actionIdx: Int) {
-        calls += "triggerCandidateAction($idx, $actionIdx)"
+    override suspend fun triggerCandidateAction(idx: Int, actionIdx: Int, text: String) {
+        calls += "triggerCandidateAction($idx, $actionIdx, $text)"
     }
 
     override suspend fun setCandidatePagingMode(mode: Int) {

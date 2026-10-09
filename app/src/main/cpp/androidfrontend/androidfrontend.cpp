@@ -147,18 +147,16 @@ public:
         frontend_->updatePagedCandidate(paged);
     }
 
-    bool selectCandidateBulk(int idx) {
+    bool selectCandidateBulk(int idx, const std::string &text) {
         const auto &list = inputPanel().candidateList();
         if (!list) {
             return false;
         }
         const auto &bulk = list->toBulk();
         try {
-            if (bulk) {
-                bulk->candidateFromAll(idx).select(this);
-            } else {
-                list->candidate(idx).select(this);
-            }
+            const auto &candidate = bulk ? bulk->candidateFromAll(idx) : list->candidate(idx);
+            if (!shows(candidate, text)) return false;
+            candidate.select(this);
         } catch (const std::invalid_argument &e) {
             FCITX_WARN() << "selectCandidate index out of range";
             return false;
@@ -166,13 +164,15 @@ public:
         return true;
     }
 
-    bool selectCandidatePaged(int idx) {
+    bool selectCandidatePaged(int idx, const std::string &text) {
         const auto &list = inputPanel().candidateList();
         if (!list) {
             return false;
         }
         try {
-            list->candidate(idx).select(this);
+            const auto &candidate = list->candidate(idx);
+            if (!shows(candidate, text)) return false;
+            candidate.select(this);
         } catch (const std::invalid_argument &e) {
             FCITX_WARN() << "selectCandidate index out of range";
             return false;
@@ -237,11 +237,11 @@ public:
         return actions;
     }
 
-    void triggerCandidateAction(const int idx, const int actionIdx, const bool paged) {
+    void triggerCandidateAction(const int idx, const int actionIdx, const std::string &text, const bool paged) {
         const auto &list = inputPanel().candidateList();
         auto *actionable = list ? list->toActionable() : nullptr;
         const auto *c = actionable ? candidateAt(idx, paged) : nullptr;
-        if (c) actionable->triggerAction(*c, actionIdx);
+        if (c && shows(*c, text)) actionable->triggerAction(*c, actionIdx);
     }
 
     void triggerTabAction(const int idx) {
@@ -287,6 +287,12 @@ private:
 
     inline std::string filterString(const Text &orig) {
         return filterText(orig).toString();
+    }
+
+    // the word the user tapped, by the text candidateEntity sent for it: a refine slice may reorder
+    // the list before the tap's job runs. An empty text (a key's pick) is not checked
+    bool shows(const CandidateWord &candidate, const std::string &text) {
+        return text.empty() || filterString(candidate.text()) == text;
     }
 
     CandidateEntity candidateEntity(const CandidateWord &candidate) {
@@ -387,12 +393,12 @@ void AndroidFrontend::releaseInputContext(const int uid) {
     icCache_.release(uid);
 }
 
-bool AndroidFrontend::selectCandidate(int idx) {
+bool AndroidFrontend::selectCandidate(int idx, const std::string &text) {
     if (!activeIC_) return false;
     if (pagingMode_) {
-        return activeIC_->selectCandidatePaged(idx);
+        return activeIC_->selectCandidatePaged(idx, text);
     } else {
-        return activeIC_->selectCandidateBulk(idx);
+        return activeIC_->selectCandidateBulk(idx, text);
     }
 }
 
@@ -401,9 +407,9 @@ std::vector<CandidateActionEntity> AndroidFrontend::getCandidateActions(const in
     return activeIC_->getCandidateAction(idx, pagingMode_ != 0);
 }
 
-void AndroidFrontend::triggerCandidateAction(const int idx, const int actionIdx) {
+void AndroidFrontend::triggerCandidateAction(const int idx, const int actionIdx, const std::string &text) {
     if (!activeIC_) return;
-    activeIC_->triggerCandidateAction(idx, actionIdx, pagingMode_ != 0);
+    activeIC_->triggerCandidateAction(idx, actionIdx, text, pagingMode_ != 0);
 }
 
 void AndroidFrontend::triggerTabAction(const int idx) {
@@ -483,6 +489,8 @@ void AndroidFrontend::showToast(const std::string &s) {
 
 void AndroidFrontend::setCandidatePagingMode(const int mode) {
     pagingMode_ = mode;
+    // the device may change with no input context active: the next one shows in this mode
+    if (!activeIC_) return;
     if (mode == 0) {
         activeIC_->updateCandidatesBulk();
     } else {

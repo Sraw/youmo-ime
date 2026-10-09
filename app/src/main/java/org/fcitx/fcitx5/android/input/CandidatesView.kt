@@ -99,7 +99,7 @@ class CandidatesView(
 
     private val candidatesUi = PagedCandidatesUi(
         ctx, theme, setupTextView,
-        onCandidateClick = { index -> fcitx.launchOnReady { it.select(index) } },
+        onCandidateClick = { index, text -> fcitx.launchOnReady { it.select(index, text) } },
         onCandidateAction = { index, text, view -> showCandidateActionMenu(index, text, view) },
         onPrevPage = { fcitx.launchOnReady { it.offsetCandidatePage(-1) } },
         onNextPage = { fcitx.launchOnReady { it.offsetCandidatePage(1) } }

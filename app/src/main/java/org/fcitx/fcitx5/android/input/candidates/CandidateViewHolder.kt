@@ -6,7 +6,9 @@
 package org.fcitx.fcitx5.android.input.candidates
 
 import androidx.recyclerview.widget.RecyclerView
+import kotlinx.coroutines.CoroutineScope
 import org.fcitx.fcitx5.android.core.CandidateWord
+import org.fcitx.fcitx5.android.core.FcitxAPI
 
 class CandidateViewHolder(val ui: CandidateItemUi) : RecyclerView.ViewHolder(ui.root) {
     var idx = -1
@@ -25,5 +27,15 @@ class CandidateViewHolder(val ui: CandidateItemUi) : RecyclerView.ViewHolder(ui.
 
     fun clear() {
         update(-1, CandidateWord.Empty)
+    }
+
+    /**
+     * The pick of the candidate shown now, for a tap: read on the tap, as the holder may be bound
+     * to another candidate before the job runs.
+     */
+    fun pick(): suspend CoroutineScope.(FcitxAPI) -> Unit {
+        val index = idx
+        val text = candidate.text
+        return { it.select(index, text) }
     }
 }

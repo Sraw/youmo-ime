@@ -77,11 +77,13 @@ abstract class BaseInputView(
             } else {
                 eventHandlerJob?.cancel()
                 eventHandlerJob = null
+                // the candidate events that close it are no longer collected: its index would age unchecked
+                candidateActionMenu?.dismiss()
             }
         }
 
-    private fun triggerCandidateAction(idx: Int, actionIdx: Int) {
-        fcitx.runIfReady { triggerCandidateAction(idx, actionIdx) }
+    private fun triggerCandidateAction(idx: Int, actionIdx: Int, text: String) {
+        fcitx.runIfReady { triggerCandidateAction(idx, actionIdx, text) }
     }
 
     private var candidateActionMenu: ListPopupWindow? = null
@@ -128,7 +130,7 @@ abstract class BaseInputView(
                 setAdapter(adapter)
                 setContentWidth(min(adapter.widest(FrameLayout(themedContext)), widest))
                 setOnItemClickListener { _, _, position, _ ->
-                    triggerCandidateAction(idx, actions[position - 1].id)
+                    triggerCandidateAction(idx, actions[position - 1].id, text)
                     dismiss()
                 }
                 setOnDismissListener {

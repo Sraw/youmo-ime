@@ -8,6 +8,9 @@
 
 #include <memory>
 #include <future>
+#include <string>
+#include <unordered_map>
+#include <unordered_set>
 
 #include <android/log.h>
 
@@ -110,8 +113,8 @@ public:
         p_frontend->call<fcitx::IAndroidFrontend::keyEvent>(key, up, timestamp);
     }
 
-    bool select(int idx) {
-        return p_frontend->call<fcitx::IAndroidFrontend::selectCandidate>(idx);
+    bool select(int idx, const std::string &text) {
+        return p_frontend->call<fcitx::IAndroidFrontend::selectCandidate>(idx, text);
     }
 
     bool isInputPanelEmpty() {
@@ -417,8 +420,8 @@ public:
         return actions;
     }
 
-    void triggerCandidateAction(int idx, int actionIdx) {
-        return p_frontend->call<fcitx::IAndroidFrontend::triggerCandidateAction>(idx, actionIdx);
+    void triggerCandidateAction(int idx, int actionIdx, const std::string &text) {
+        return p_frontend->call<fcitx::IAndroidFrontend::triggerCandidateAction>(idx, actionIdx, text);
     }
 
     void setCandidatePagingMode(int mode) {
@@ -554,10 +557,32 @@ static std::vector<std::string> utf8FromJStringArray(JNIEnv *env, jobjectArray a
 }
 
 // An exception from the engine must not unwind through fcitx: log it, and the key goes to the app.
-static bool engineFailed(JNIEnv *env) {
+// Its trace once for each call, input method, event and exception class, then a line with the
+// count at the 2nd, 4th, 8th... alike: still failing, not a stack on every key. Never an event's
+// arg (a character typed), nor the message.
+static bool engineFailed(JNIEnv *env, const char *call, const std::string &im = "", int event = -1) {
     if (!env->ExceptionCheck()) return false;
-    env->ExceptionDescribe();
+    auto e = JRef<jthrowable>(env, env->ExceptionOccurred());
+    // nothing else may be called while it is pending
     env->ExceptionClear();
+    static const jmethodID getName = [env] {
+        auto c = JRef<jclass>(env, env->FindClass("java/lang/Class"));
+        return env->GetMethodID(c, "getName", "()Ljava/lang/String;");
+    }();
+    auto type = JRef<jclass>(env, env->GetObjectClass(e));
+    const auto name = utf8FromJString(env, JRef<jstring>(env, env->CallObjectMethod(type, getName)));
+    env->ExceptionClear();
+    static std::unordered_map<std::string, unsigned long> failures;
+    const auto where = std::string(call) + " " + im + (event < 0 ? std::string() : " " + std::to_string(event)) + " " + name;
+    const auto count = ++failures[where];
+    if (count == 1) {
+        FCITX_ERROR() << "engine failed: " << where;
+        env->Throw(e);
+        env->ExceptionDescribe();
+        env->ExceptionClear();
+    } else if ((count & (count - 1)) == 0) {
+        FCITX_ERROR() << "engine failed again: " << where << ", " << count << " times";
+    }
     return true;
 }
 
@@ -763,7 +788,21 @@ Java_org_fcitx_fcitx5_android_core_Fcitx_startupFcitx(
         auto result = JRef(env, env->CallStaticObjectMethod(GlobalRef->EngineBridge, GlobalRef->EngineBridgeOnEvent,
                                                              *JString(env, im), static_cast<jint>(event), arg,
                                                              static_cast<jboolean>(learning)));
-        if (engineFailed(env) || !result) return snapshot;
+        // input methods whose session has answered: one that never did has nothing to drop
+        static std::unordered_set<std::string> answered;
+        if (engineFailed(env, "onEvent", im, static_cast<int>(event))) {
+            // the panel is cleared for it (but for a slice of refining, not shown): so must the
+            // session be, or what it had comes back with the next key
+            if (event != EngineEvent::Reset && event != EngineEvent::Refine && answered.count(im)) {
+                JRef(env, env->CallStaticObjectMethod(GlobalRef->EngineBridge, GlobalRef->EngineBridgeOnEvent,
+                                                      *JString(env, im), static_cast<jint>(EngineEvent::Reset), 0,
+                                                      static_cast<jboolean>(learning)));
+                engineFailed(env, "onEvent", im, static_cast<int>(EngineEvent::Reset));
+            }
+            return snapshot;
+        }
+        answered.insert(im);
+        if (!result) return snapshot;
         snapshot.handled = env->GetBooleanField(result, GlobalRef->EngineResultHandled);
         snapshot.commit = utf8FromJString(env, JRef<jstring>(env, env->GetObjectField(result, GlobalRef->EngineResultCommit)));
         snapshot.preedit = utf8FromJString(env, JRef<jstring>(env, env->GetObjectField(result, GlobalRef->EngineResultPreedit)));
@@ -783,7 +822,7 @@ Java_org_fcitx_fcitx5_android_core_Fcitx_startupFcitx(
         // text and hint, one after the other
         auto flat = JRef<jobjectArray>(env, env->CallStaticObjectMethod(GlobalRef->EngineBridge, GlobalRef->EngineBridgeCandidates,
                                                                         *JString(env, im), from, count));
-        if (engineFailed(env) || !flat) return out;
+        if (engineFailed(env, "candidates", im) || !flat) return out;
         auto strings = utf8FromJStringArray(env, flat);
         for (size_t i = 0; i + 1 < strings.size(); i += 2) out.emplace_back(std::move(strings[i]), std::move(strings[i + 1]));
         return out;
@@ -792,13 +831,13 @@ Java_org_fcitx_fcitx5_android_core_Fcitx_startupFcitx(
     auto engineOffersCallback = [](const std::string &im, int index) {
         auto env = GlobalRef->AttachEnv();
         const jint offers = env->CallStaticIntMethod(GlobalRef->EngineBridge, GlobalRef->EngineBridgeOffers, *JString(env, im), index);
-        return engineFailed(env) ? 0 : static_cast<int>(offers);
+        return engineFailed(env, "offers", im) ? 0 : static_cast<int>(offers);
     };
 
     auto engineSettingsCallback = [](const std::string &settings) {
         auto env = GlobalRef->AttachEnv();
         env->CallStaticVoidMethod(GlobalRef->EngineBridge, GlobalRef->EngineBridgeConfigure, *JString(env, settings));
-        engineFailed(env);
+        engineFailed(env, "configure");
     };
 
     umask(007);
@@ -888,9 +927,10 @@ Java_org_fcitx_fcitx5_android_core_Fcitx_sendKeySymToFcitx(JNIEnv *env, jclass c
 
 extern "C"
 JNIEXPORT jboolean JNICALL
-Java_org_fcitx_fcitx5_android_core_Fcitx_selectCandidate(JNIEnv *env, jclass clazz, jint idx) {
+Java_org_fcitx_fcitx5_android_core_Fcitx_selectCandidate(JNIEnv *env, jclass clazz, jint idx, jstring text) {
     RETURN_VALUE_IF_NOT_RUNNING(false)
-    return Fcitx::Instance().select(idx);
+    // not CString: its modified UTF-8 never matches a candidate past U+FFFF. Null, a key's pick, is ""
+    return Fcitx::Instance().select(idx, utf8FromJString(env, text));
 }
 
 extern "C"
@@ -1180,9 +1220,9 @@ Java_org_fcitx_fcitx5_android_core_Fcitx_getFcitxCandidateActions(JNIEnv *env, j
 
 extern "C"
 JNIEXPORT void JNICALL
-Java_org_fcitx_fcitx5_android_core_Fcitx_triggerFcitxCandidateAction(JNIEnv *env, jclass clazz, jint idx, jint action_idx) {
+Java_org_fcitx_fcitx5_android_core_Fcitx_triggerFcitxCandidateAction(JNIEnv *env, jclass clazz, jint idx, jint action_idx, jstring text) {
     RETURN_IF_NOT_RUNNING
-    Fcitx::Instance().triggerCandidateAction(idx, action_idx);
+    Fcitx::Instance().triggerCandidateAction(idx, action_idx, utf8FromJString(env, text));
 }
 
 extern "C"

@@ -22,15 +22,23 @@ class CandidatesPagingSource(val fcitx: FcitxConnection, val total: Int, val off
             getCandidates(startIndex, pageSize)
         }
         val prevKey = if (startIndex >= pageSize) startIndex - pageSize else null
-        val nextKey = if (total > 0) {
-            if (startIndex + pageSize + 1 >= total) null else startIndex + pageSize
-        } else {
-            if (candidates.size < pageSize) null else startIndex + pageSize
-        }
-        return LoadResult.Page(candidates.toList(), prevKey, nextKey)
+        return LoadResult.Page(candidates.toList(), prevKey, nextKey(startIndex, candidates.size, pageSize, total))
     }
 
     // always reload from beginning
     override fun getRefreshKey(state: PagingState<Int, CandidateWord>) = null
+
+    companion object {
+        /**
+         * Where the page after [loaded] candidates asked for from [startIndex], [pageSize] of
+         * them, starts; null when that page was the last: it reached [total], where that is
+         * known (above 0), or else came back short.
+         */
+        fun nextKey(startIndex: Int, loaded: Int, pageSize: Int, total: Int): Int? = when {
+            total > 0 -> if (startIndex + pageSize >= total) null else startIndex + pageSize
+            loaded < pageSize -> null
+            else -> startIndex + pageSize
+        }
+    }
 
 }
