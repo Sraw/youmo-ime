@@ -243,9 +243,20 @@ class CodeTableReaderTest {
     @Test
     fun aTableIsCheckedAsTheEngineWillReadIt() {
         TableText.check(TINY_TABLE.trimIndent().reader().buffered(), "table")
-        TableText.check("键码=a\n[数据]\n[词组]\n工作\n".reader().buffered(), "table")
+        TableText.check("键码=a\n码长=4\n[数据]\n[词组]\n工作\n".reader().buffered(), "table")
         assertSourceError(2, "expected \"code text\"") { TableText.check("[数据]\nabc\n".reader().buffered(), "table") }
         assertSourceError(0, "nothing to type") { TableText.check("键码=a\n[数据]\n".reader().buffered(), "table") }
+        // what the engine cannot build fails here, not at the input method's first key
+        assertSourceError(0, "no 键码") { TableText.check("码长=4\n[数据]\na 工\n".reader().buffered(), "table") }
+        assertSourceError(0, "码长") { TableText.check("键码=a\n[数据]\na 工\n".reader().buffered(), "table") }
+        assertSourceError(0, "码长") { TableText.check("键码=a\n码长=0\n[数据]\na 工\n".reader().buffered(), "table") }
+        assertSourceError(0, "rule \"a10\"") {
+            TableText.check("键码=a\n码长=4\n[组词规则]\na10=p11+p21+p31+n11\n[数据]\na 工\n".reader().buffered(), "table")
+        }
+        // the same where phrases are coded by the rules
+        assertSourceError(0, "in e2") {
+            TableText.check("键码=a\n码长=4\n[组词规则]\ne2=p11+\n[数据]\na 工\n[词组]\n工工\n".reader().buffered(), "table")
+        }
     }
 
     @Test

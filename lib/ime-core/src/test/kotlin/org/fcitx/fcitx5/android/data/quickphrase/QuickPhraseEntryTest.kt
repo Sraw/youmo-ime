@@ -50,6 +50,14 @@ class QuickPhraseEntryTest {
         assertEquals(QuickPhraseEntry("k", "v"), parse("   k v   "))
     }
 
+    /** Only fcitx's ASCII whitespace is trimmed: a phrase may be or end with U+3000 or U+00A0. */
+    @Test
+    fun unicodeSpacesAreNotTrimmed() {
+        assertEquals(QuickPhraseEntry("kg", "\u3000"), parse("kg \u3000"))
+        assertEquals(QuickPhraseEntry("k", "a\u3000"), parse("k a\u3000"))
+        assertEquals(QuickPhraseEntry("k", "\u00a0b\u00a0"), parse("k \u00a0b\u00a0"))
+    }
+
     @Test
     fun phraseKeepsItsInternalSpacing() {
         assertEquals(QuickPhraseEntry("k", "a  b"), parse("""k "a  b""""))
@@ -105,6 +113,13 @@ class QuickPhraseEntryTest {
         assertEquals(QuickPhraseEntry("k", "\"unterminated"), parse("""k "unterminated"""))
     }
 
+    /** A quote closing before the end is no value: fcitx skips the line, so no empty phrase is made of it. */
+    @Test
+    fun aQuoteClosingBeforeTheEndIsSkipped() {
+        assertNull(parse("""k "a"b""""))
+        assertNull(parse("""k "a" b""""))
+    }
+
     // endregion
 
     // region serialize
@@ -140,6 +155,9 @@ class QuickPhraseEntryTest {
             QuickPhraseEntry("nihao", "你好"),
             QuickPhraseEntry(":)", "😀"),
             QuickPhraseEntry("k", "a\\b"),
+            QuickPhraseEntry("kg", "\u3000"),
+            QuickPhraseEntry("k", "a\u3000"),
+            QuickPhraseEntry("k", "\u00a0"),
         )
         for (entry in entries) {
             assertEquals("round trip of $entry", entry, parse(entry.serialize()))

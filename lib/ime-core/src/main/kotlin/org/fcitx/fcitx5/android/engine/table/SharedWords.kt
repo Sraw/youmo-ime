@@ -42,7 +42,11 @@ interface SharedWords {
     }
 }
 
-/** [texts], words of two characters or more, each under its [table] code; those it has so left out. */
+/**
+ * [texts], words of two characters or more, each under its [table] code; those it has so left out.
+ * Unlike the words [TableText.addWords] builds in, under any code: a key after which the table's
+ * codes led nowhere, and so committed (顶屏), may lead on to one.
+ */
 class CodedWords(private val table: TableDictionary, texts: Collection<String>) {
     private val byCode = TreeMap<String, MutableList<String>>()
 

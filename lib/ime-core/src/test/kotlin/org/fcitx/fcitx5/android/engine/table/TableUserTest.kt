@@ -232,6 +232,22 @@ class TableUserTest {
     }
 
     @Test
+    fun aSharedWordPickedHereAndForgottenByItsTextIsNotBackAtTheNextStart() {
+        val file = folder.root.resolve("wubi.user")
+        val user = TableUser(wubi)
+        TableUser.Store(file, user).apply { open() }.use {
+            // as a session counts a pick of pinyin's 你们 by its code: no entry of the table's
+            user.picked("wqwu", "你们")
+            // then taken out of pinyin's words
+            user.forgetText("你们")
+        }
+        val back = TableUser(wubi).also { TableUser.Store(file, it).apply { open(); close() } }
+        assertFalse(back.isSaved("wqwu", "你们"))
+        assertEquals(0, back.picks("wqwu", "你们"))
+        assertEquals(emptyList<Pair<String, String>>(), back.saved("wq"))
+    }
+
+    @Test
     fun aPhraseSavedIsSavedOnce() {
         val user = TableUser(wubi)
         val records = ArrayList<ByteArray>()

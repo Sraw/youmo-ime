@@ -26,7 +26,7 @@ class ImportedTablesTest {
 
     @Test
     fun aTextTableIsKeptAsItIs() {
-        val text = "键码=ab\n[数据]\na 工\n"
+        val text = "键码=ab\n码长=4\n[数据]\na 工\n"
         val table = Dictionary.new(File(source, "my.txt").apply { writeText(text) })!!
         val installed = ImportedTables.install(table, File(dir, "my.txt"))
         assertEquals(File(dir, "my.txt"), installed.file)

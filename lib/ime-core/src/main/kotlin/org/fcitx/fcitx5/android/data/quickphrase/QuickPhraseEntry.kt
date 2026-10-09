@@ -16,14 +16,16 @@ data class QuickPhraseEntry(val keyword: String, val phrase: String) {
 
         // https://github.com/fcitx/fcitx5/blob/5.1.5/src/modules/quickphrase/quickphraseprovider.cpp#L67
         fun fromLine(line: String): QuickPhraseEntry? {
-            val text = line.trim()
+            // not trim(): U+3000 and U+00A0 are characters a phrase may be, fcitx trims ASCII alone
+            val text = line.trim { it in WhiteSpaces }
             if (text.isEmpty()) return null
             val pos = text.indexOfAny(WhiteSpaces)
             if (pos < 0) return null
             val word = text.substring(pos).indexOfFirst { c -> !WhiteSpaces.contains(c) }
             if (word < 0) return null
             return try {
-                val wordString = FcitxUtils.unescapeForValue(text.substring(pos + word))
+                // a quote closing before the end: fcitx skips the line
+                val wordString = FcitxUtils.unescapeForValue(text.substring(pos + word)) ?: return null
                 val key = text.substring(0, pos)
                 QuickPhraseEntry(key, wordString)
             } catch (e: Exception) {

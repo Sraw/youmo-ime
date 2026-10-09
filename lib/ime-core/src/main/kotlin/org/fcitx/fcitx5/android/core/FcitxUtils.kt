@@ -20,10 +20,11 @@ object FcitxUtils {
     )
 
     // https://github.com/fcitx/fcitx5/blob/5.1.21/src/lib/fcitx-utils/stringutils.cpp#L390
-    fun unescapeForValue(str: String): String {
+    // null where a quote closes before the end, as fcitx's std::nullopt
+    fun unescapeForValue(str: String): String? {
         if (str.length > 2 && str.startsWith('"') && str.endsWith('"')) {
             val (consumed, result) = consumeMaybeEscapedValue(str)
-            return if (consumed.length == str.length) result else ""
+            return if (consumed.length == str.length) result else null
         }
         return str
     }

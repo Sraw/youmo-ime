@@ -14,7 +14,7 @@ import org.fcitx.fcitx5.android.engine.data.unescapeValue
  * Options the engine has no use for (PageSize, which the user sets for all, ExactMatch, the
  * paging keys of `[Table/...]`) are skipped, as are values that do not read. Of the key lists,
  * `[Table/EndKey]` and `[Table/Selection]` are read: keys with modifiers are dropped from them,
- * and selection keys past printable ASCII.
+ * and selection keys past printable ASCII; a selection key dropped drops those after it too.
  */
 class TableConf(val file: String, val options: TableOptions, val learning: Boolean) {
 
@@ -63,18 +63,21 @@ class TableConf(val file: String, val options: TableOptions, val learning: Boole
                 hint = bool("Hint", d.hint),
                 autoPhraseLength = int("AutoPhraseLength", d.autoPhraseLength),
                 saveAutoPhraseAfter = int("SaveAutoPhraseAfter", d.saveAutoPhraseAfter),
-                endKeys = keyList(text, settings, "Table/EndKey"),
-                // labels go to the candidate list a byte each: printable ASCII only
-                selectionKeys = keyList(text, settings, "Table/Selection").filter { it.code in 0x21..0x7E },
+                endKeys = keyList(text, settings, "Table/EndKey").filterNotNull().joinToString(""),
+                // labels go to the candidate list a byte each: printable ASCII only; a key's place
+                // is the candidate it picks, so none after one dropped, which would pick the one before
+                selectionKeys = keyList(text, settings, "Table/Selection").takeWhile { it != null && it.code in 0x21..0x7E }.joinToString(""),
             )
             return TableConf(file, options, bool("Learning", true))
         }
 
-        /** The characters of the key list [name] (`0=comma`, `1=period` ...), the user's if they set one. */
-        private fun keyList(text: String, settings: String, name: String): String {
+        /**
+         * The characters of the key list [name] (`0=comma`, `1=period` ...), the user's if they set
+         * one; null for a key that types none (see [keyChar]).
+         */
+        private fun keyList(text: String, settings: String, name: String): List<Char?> {
             val list = section(settings, name).ifEmpty { section(text, name) }
-            return list.entries.sortedBy { it.key.toIntOrNull() ?: Int.MAX_VALUE }
-                .mapNotNull { keyChar(it.value) }.joinToString("")
+            return list.entries.sortedBy { it.key.toIntOrNull() ?: Int.MAX_VALUE }.map { keyChar(it.value) }
         }
 
         /** The keys of [name]'s section in the ini [text]: fcitx's format, `#` starting a comment. */

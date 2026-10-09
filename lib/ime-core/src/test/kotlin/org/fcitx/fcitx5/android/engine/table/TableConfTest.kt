@@ -116,6 +116,22 @@ class TableConfTest {
     }
 
     @Test
+    fun whatAnImportedTablesPageWritesIsOverTheConf() {
+        val conf = "[Table]\nFile=a\nAutoSelect=False\nHint=False\nOrderPolicy=Freq\nAutoPhraseLength=10\n"
+        // what the page changed, as androidengine writes it, and a section the file had before
+        val saved = TableConf.parse(conf, "[Table]\nAutoSelect=True\nHint=True\nOrderPolicy=No\n\n[Table/Selection]\n0=q\n\n")
+        assertTrue(saved.options.autoSelect)
+        assertTrue(saved.options.hint)
+        assertFalse(saved.options.orderByUse)
+        assertEquals("not written, the table's", 10, saved.options.autoPhraseLength)
+        assertEquals("q", saved.options.selectionKeys)
+        // fcitx's own save writes a value equal to its option's default as a comment: the .conf's stays
+        val commented = TableConf.parse(conf, "[Table]\n# Auto select candidate\n# AutoSelect=True\n# Hint=True\n")
+        assertFalse(commented.options.autoSelect)
+        assertFalse(commented.options.hint)
+    }
+
+    @Test
     fun endAndSelectionKeysAreKeyLists() {
         val conf = TableConf.parse(
             "[Table]\nFile=a\n[Table/EndKey]\n1=semicolon\n0=comma\n2=Control+a\n[Table/Selection]\n0=q\n1=w\n",
@@ -125,7 +141,11 @@ class TableConfTest {
         assertEquals(",;", conf.options.endKeys)
         assertEquals("a", conf.options.selectionKeys)
         assertEquals("", TableConf.parse("[Table]\nFile=a\n").options.endKeys)
-        // a label is a byte on its way to the candidate list
-        assertEquals("q", TableConf.parse("[Table]\nFile=a\n[Table/Selection]\n0=，\n1=q\n").options.selectionKeys)
+        // a label is a byte on its way to the candidate list; q, the second, picks no first candidate
+        assertEquals("", TableConf.parse("[Table]\nFile=a\n[Table/Selection]\n0=，\n1=q\n").options.selectionKeys)
+        // the keys before one dropped keep their place, those after it go
+        assertEquals("q", TableConf.parse("[Table]\nFile=a\n[Table/Selection]\n0=q\n1=，\n2=w\n").options.selectionKeys)
+        assertEquals("q", TableConf.parse("[Table]\nFile=a\n[Table/Selection]\n0=q\n1=Control+1\n2=w\n").options.selectionKeys)
+        assertEquals("qw", TableConf.parse("[Table]\nFile=a\n[Table/Selection]\n1=w\n0=q\n").options.selectionKeys)
     }
 }

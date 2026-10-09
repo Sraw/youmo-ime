@@ -101,9 +101,14 @@ class TableUser(private val table: TableDictionary) {
         journal?.invoke(TableLog.forgot(code, text))
     }
 
-    /** [forget] of [text] under whatever code it was saved or seen. */
+    /**
+     * [forget] of [text] under whatever code it was saved, seen or picked as a phrase: a word of
+     * the other input methods picked here is kept as its pick alone, and read back it is saved.
+     */
     fun forgetText(text: String) {
-        val codes = saved.filterValues { text in it }.keys + autoPhrases.keys.filter { it.endsWith("$SEPARATOR$text") }.map { it.substringBefore(SEPARATOR) }
+        val tail = "$SEPARATOR$text"
+        val codes = saved.filterValues { text in it }.keys +
+            (autoPhrases.keys + savedPicks.keys).filter { it.endsWith(tail) }.map { it.substringBefore(SEPARATOR) }
         codes.toSet().forEach { forget(it, text) }
     }
 
