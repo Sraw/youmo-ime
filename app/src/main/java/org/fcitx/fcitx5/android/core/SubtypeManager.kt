@@ -20,7 +20,9 @@ object SubtypeManager {
 
     private const val IM_KEYBOARD = "keyboard-us"
 
-    private val knownSubtypes: HashMap<String, InputMethodSubtype> = hashMapOf()
+    // replaced whole, never changed in place: the main thread reads it while another thread syncs
+    @Volatile
+    private var knownSubtypes: Map<String, InputMethodSubtype> = emptyMap()
 
     fun subtypeOf(inputMethod: String): InputMethodSubtype? {
         return knownSubtypes[inputMethod]
@@ -44,10 +46,11 @@ object SubtypeManager {
         enabled.sortedBy { it.uniqueName == IM_KEYBOARD }
 
     @RequiresApi(Build.VERSION_CODES.UPSIDE_DOWN_CAKE)
+    @Synchronized
     fun syncWith(enabled: Array<InputMethodEntry>, names: Context = appContext) {
         val inputMethods = registrationOrder(enabled)
-        knownSubtypes.clear()
         val size = inputMethods.size
+        val known = HashMap<String, InputMethodSubtype>(size)
         val subtypes = arrayOfNulls<InputMethodSubtype>(size)
         val hashCodes = IntArray(size)
         inputMethods.forEachIndexed { i, im ->
@@ -61,8 +64,9 @@ object SubtypeManager {
             val hashCode = subtype.hashCode()
             subtypes[i] = subtype
             hashCodes[i] = hashCode
-            knownSubtypes[im.uniqueName] = subtype
+            known[im.uniqueName] = subtype
         }
+        knownSubtypes = known
         val imm = appContext.inputMethodManager
         val imiId = InputMethodUtil.componentName
         // although this method has been marked as deprecated,

@@ -33,6 +33,16 @@ object AppUtil {
         }
     }
 
+    /**
+     * Whether [route] is one [launchMainToDest] sends, the only ones MainActivity opens from an
+     * intent: it is exported, and a route such as a quick phrase editor names any file it likes.
+     */
+    fun isLaunchRoute(route: SettingsRoute) = when (route) {
+        SettingsRoute.VirtualKeyboard, SettingsRoute.InputMethodList, SettingsRoute.Theme,
+        is SettingsRoute.InputMethodConfig -> true
+        else -> false
+    }
+
     fun launchMainToKeyboard(context: Context) =
         launchMainToDest(context, SettingsRoute.VirtualKeyboard)
 

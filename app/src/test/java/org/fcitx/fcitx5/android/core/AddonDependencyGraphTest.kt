@@ -59,6 +59,25 @@ class AddonDependencyGraphTest {
     }
 
     @Test
+    fun theOptionalDependentsOfEveryDirectDependentAreFollowedAlike() {
+        val addons = listOf(
+            addon("core"),
+            addon("a", deps = listOf("core")),
+            addon("b", deps = listOf("core")),
+            addon("p", opt = listOf("a")),
+            addon("q", opt = listOf("b")),
+            addon("x", deps = listOf("p")),
+            addon("y", deps = listOf("q")),
+        )
+        val expected = listOf(
+            "a" to Required, "b" to Required, "p" to Optional, "q" to Optional, "x" to Required, "y" to Required
+        )
+        assertEquals(expected, graph(*addons.toTypedArray()).reverseDependencies("core"))
+        // the order the engine lists addons in decides nothing but the order of the answer
+        assertEquals(expected.toSet(), graph(*addons.reversed().toTypedArray()).reverseDependencies("core").toSet())
+    }
+
+    @Test
     fun anAddonReachableTwiceIsListedOnce() {
         val g = graph(
             addon("core"),

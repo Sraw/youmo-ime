@@ -31,14 +31,21 @@ import java.io.File
 
 class DeveloperFragment : PaddingPreferenceFragment() {
 
-    private lateinit var hprofFile: File
+    // the dump waiting on the file picker, which a recreation or process death of this page outlives
+    private var hprofFile: File? = null
     private lateinit var launcher: ActivityResultLauncher<String>
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        val cacheDir = requireContext().cacheDir
+        hprofFile = savedInstanceState?.getString(HPROF_FILE)?.let { cacheDir.resolve(it) }
+        // a dump no export is waiting on: the whole heap, typed text and clipboard with it
+        cacheDir.listFiles()?.filter { it.name.endsWith(".hprof") && it != hprofFile }?.forEach { it.delete() }
         launcher = registerForActivityResult(CreateDocument("application/octet-stream")) { uri ->
+            val file = hprofFile ?: return@registerForActivityResult
+            hprofFile = null
             if (uri == null) {
-                hprofFile.delete()
+                file.delete()
                 return@registerForActivityResult
             }
             val ctx = requireContext()
@@ -46,7 +53,7 @@ class DeveloperFragment : PaddingPreferenceFragment() {
                 try {
                     withContext(Dispatchers.IO) {
                         ctx.contentResolver.openOutputStream(uri)!!.use { o ->
-                            hprofFile.inputStream().use { i -> i.copyTo(o) }
+                            file.inputStream().use { i -> i.copyTo(o) }
                         }
                     }
                 } catch (e: Exception) {
@@ -54,12 +61,17 @@ class DeveloperFragment : PaddingPreferenceFragment() {
                 } finally {
                     withContext(NonCancellable) {
                         withContext(Dispatchers.IO) {
-                            hprofFile.delete()
+                            file.delete()
                         }
                     }
                 }
             }
         }
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        hprofFile?.let { outState.putString(HPROF_FILE, it.name) }
     }
 
     override fun onCreatePreferences(savedInstanceState: Bundle?, rootKey: String?) {
@@ -134,12 +146,18 @@ class DeveloperFragment : PaddingPreferenceFragment() {
             }
             addPreference(R.string.capture_heap_dump) {
                 val fileName = "${context.packageName}_${iso8601UTCDateTime()}.hprof"
-                hprofFile = context.cacheDir.resolve(fileName)
+                val file = context.cacheDir.resolve(fileName)
+                hprofFile = file
                 System.gc()
-                Debug.dumpHprofData(hprofFile.absolutePath)
+                // kept on the main thread: ART stops every thread for a dump, and no recreation can split dump and picker
+                Debug.dumpHprofData(file.absolutePath)
                 launcher.launch(fileName)
             }
         }
+    }
+
+    companion object {
+        private const val HPROF_FILE = "hprof_file"
     }
 
 }

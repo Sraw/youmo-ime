@@ -29,30 +29,32 @@ class ImmutableGraph<V, L>(
         }
     }
 
+    private data class Step(val vertex: Int, val label: Int, val cont: Boolean, val depth: Int)
+
     /**
-     * @param predicate: whether to continue searching after this node
+     * @param predicate: whether to continue searching after this node, given the depth of the
+     * node it was reached from (0 for [vertex])
      */
     fun bfs(vertex: V, predicate: (Int, V, L) -> Boolean = { _, _, _ -> true }): List<Pair<V, L>> {
         val start = vertices.indexOf(vertex).takeIf { it != -1 } ?: return emptyList()
         val visited = BooleanArray(vertices.size)
-        val queue: Queue<Triple<Int, Int, Boolean>> = LinkedList()
+        val queue: Queue<Step> = LinkedList()
         val result = mutableListOf<Pair<Int, Int>>()
-        var level = 0
         visited[start] = true
-        queue.add(Triple(start, -1, true))
+        queue.add(Step(start, -1, true, 0))
         while (queue.isNotEmpty()) {
-            val (x, v, cont) = queue.remove()
+            val step = queue.remove()
+            val x = step.vertex
             if (start != x)
-                result.add(x to v)
-            if (cont)
+                result.add(x to step.label)
+            if (step.cont)
                 visited.indices.forEach { i ->
                     val l = adjacencyMatrix[x][i].takeIf { it != -1 }
                     if (l != null && !visited[i]) {
-                        queue.add(Triple(i, l, predicate(level, vertices[i], labels[l])))
+                        queue.add(Step(i, l, predicate(step.depth, vertices[i], labels[l]), step.depth + 1))
                         visited[i] = true
                     }
                 }
-            level++
         }
         return result.map { (v, l) -> vertices[v] to labels[l] }
     }

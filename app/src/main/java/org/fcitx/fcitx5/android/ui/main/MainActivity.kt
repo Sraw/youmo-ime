@@ -27,10 +27,12 @@ import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.databinding.ActivityMainBinding
 import org.fcitx.fcitx5.android.ui.main.settings.SettingsRoute
 import org.fcitx.fcitx5.android.ui.setup.SetupActivity
+import org.fcitx.fcitx5.android.utils.AppUtil
 import org.fcitx.fcitx5.android.utils.navigateWithAnim
 import org.fcitx.fcitx5.android.utils.parcelable
 import org.fcitx.fcitx5.android.utils.startActivity
 import splitties.views.topPadding
+import timber.log.Timber
 
 class MainActivity : AppCompatActivity() {
 
@@ -55,6 +57,7 @@ class MainActivity : AppCompatActivity() {
         setContentView(binding.root)
         setSupportActionBar(binding.toolbar)
         navController = binding.navHostFragment.getFragment<NavHostFragment>().navController
+        intent.dropDeepLinks()
         navController.graph = SettingsRoute.createGraph(navController)
         viewModel.toolbarTitle.observe(this) {
             supportActionBar!!.title = it
@@ -64,12 +67,14 @@ class MainActivity : AppCompatActivity() {
             // the home page is the top level: no up arrow there (system back still leaves)
             supportActionBar?.setDisplayHomeAsUpEnabled(!dest.hasRoute<SettingsRoute.Index>())
         }
-        processIntent(intent)
+        // made again (a rotation, a new app language): the pages are restored, the intent was acted on
+        if (savedInstanceState == null) processIntent(intent)
         checkNotificationPermission()
     }
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
+        setIntent(intent)
         processIntent(intent)
     }
 
@@ -101,7 +106,15 @@ class MainActivity : AppCompatActivity() {
                     .show()
             }
             Intent.ACTION_RUN -> {
-                val route = intent.parcelable<SettingsRoute>(EXTRA_SETTINGS_ROUTE) ?: return
+                val route = try {
+                    intent.parcelable<SettingsRoute>(EXTRA_SETTINGS_ROUTE)
+                } catch (@Suppress("TooGenericExceptionCaught") e: RuntimeException) {
+                    // exported: another app's parcel need not read
+                    Timber.w(e, "Unreadable settings route")
+                    null
+                }
+                // any app can send this: only the pages the keyboard itself opens
+                if (route == null || !AppUtil.isLaunchRoute(route)) return
                 navController.popBackStack(SettingsRoute.Index, false)
                 navController.navigateWithAnim(route)
             }
@@ -157,4 +170,20 @@ class MainActivity : AppCompatActivity() {
         const val EXTRA_SETTINGS_ROUTE = "${BuildConfig.APPLICATION_ID}.EXTRA_SETTINGS_ROUTE"
     }
 
+}
+
+/**
+ * Takes out of this intent the deep links Navigation opens on the first graph: MainActivity is
+ * exported, and the app sends none, so they could only be another app's way to any page.
+ */
+internal fun Intent.dropDeepLinks() {
+    try {
+        removeExtra(NavController.KEY_DEEP_LINK_IDS)
+        removeExtra(NavController.KEY_DEEP_LINK_ARGS)
+        removeExtra(NavController.KEY_DEEP_LINK_EXTRAS)
+    } catch (@Suppress("TooGenericExceptionCaught") e: RuntimeException) {
+        // unreadable extras would crash Navigation as well; the app's own always read
+        Timber.w(e, "Dropped unreadable intent extras")
+        replaceExtras(null as Bundle?)
+    }
 }

@@ -23,7 +23,8 @@ inline fun <reified T> getGlobalSettings(name: String): T {
 
 inline fun <reified T> getSecureSettings(name: String): T {
     return when (T::class.java) {
-        String::class.java -> Settings.Secure.getString(appContext.contentResolver, name)
+        // unset reads as empty, as an unset number reads as 0: null would fail the cast to String
+        String::class.java -> Settings.Secure.getString(appContext.contentResolver, name) ?: ""
         Float::class.javaObjectType -> Settings.Secure.getFloat(appContext.contentResolver, name, 0f)
         Long::class.javaObjectType -> Settings.Secure.getLong(appContext.contentResolver, name, 0L)
         Int::class.javaObjectType -> Settings.Secure.getInt(appContext.contentResolver, name, 0)
