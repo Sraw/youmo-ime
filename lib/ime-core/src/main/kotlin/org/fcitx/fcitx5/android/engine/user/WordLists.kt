@@ -8,6 +8,7 @@ import org.fcitx.fcitx5.android.engine.data.escapeValue
 import org.fcitx.fcitx5.android.engine.pinyin.Syllables
 import org.fcitx.fcitx5.android.engine.user.UserModel.Entry
 import java.io.File
+import java.io.FileOutputStream
 import java.io.IOException
 import java.nio.ByteBuffer
 import java.nio.charset.CharacterCodingException
@@ -21,6 +22,8 @@ import java.nio.charset.CodingErrorAction
  * by hand, short, and unlike the log ([UserStore]) not counts. With no [dir], kept in memory.
  */
 class WordLists(private val dir: File?, private val onError: (IOException) -> Unit = {}) {
+    // the lists whose file did not read: what is in memory is not all of them, so not written over them
+    private val unread = HashSet<String>()
     private val added = read(ADDED)
     private val blocked = read(BLOCKED)
 
@@ -64,20 +67,27 @@ class WordLists(private val dir: File?, private val onError: (IOException) -> Un
             }
         } catch (e: IOException) {
             onError(e)
+            unread += name
             LinkedHashSet()
         }
     }
 
     private fun write(name: String, entries: Collection<Entry>) {
         val dir = dir ?: return
+        val temp = File(dir, "$name.new")
         try {
-            dir.mkdirs()
             val file = File(dir, name)
-            val temp = File(dir, "$name.new")
-            temp.writeText(entries.joinToString("") { "${escapeValue(it.text)} ${code(it.syllables)}\n" })
+            if (name in unread) throw IOException("$file did not read: not written over")
+            dir.mkdirs()
+            FileOutputStream(temp).use { out ->
+                out.write(entries.joinToString("") { "${escapeValue(it.text)} ${code(it.syllables)}\n" }.toByteArray())
+                // on disk before the rename: after a power cut, a list renamed in may otherwise be empty
+                out.fd.sync()
+            }
             // a whole list or the one before it, never half of one
             if (!temp.renameTo(file)) throw IOException("cannot write $file")
         } catch (e: IOException) {
+            temp.delete()
             // kept in memory: what the user sees stays as they asked, till the next start
             onError(e)
         }
@@ -169,6 +179,8 @@ class WordLists(private val dir: File?, private val onError: (IOException) -> Un
 
         // spelling as [count] syllables, if one way only does it
         private fun split(spelling: String, count: Int): List<String>? {
+            // the tables below are (n+1)×(count+1): a line of an imported file can be any length
+            if (count > MAX_SPLIT || spelling.length > count * MAX_SPELLING) return null
             // ways[i][k]: the splits of spelling[i:] into k syllables, up to 2 (more is as bad as 2)
             val n = spelling.length
             val ways = Array(n + 1) { IntArray(count + 1) }
@@ -197,5 +209,8 @@ class WordLists(private val dir: File?, private val onError: (IOException) -> Un
         }
 
         private const val MAX_SPELLING = 6
+
+        // characters of a word whose pinyin is run together: a word, not a sentence
+        private const val MAX_SPLIT = 32
     }
 }

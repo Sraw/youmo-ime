@@ -18,6 +18,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
+import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.FileOutputStream
 import java.io.FilterOutputStream
@@ -110,6 +111,88 @@ class UserStoreTest {
         bytes[bytes.size - 6] = (bytes[bytes.size - 6] + 1).toByte()
         file.writeBytes(bytes)
         assertEquals(mapOf("你(ni)" to 1f), counts(session()))
+    }
+
+    @Test
+    fun aLogDamagedFurtherBackThanACrashLeavesIsKeptAsideAndNotSeededOver() {
+        val garbled = UserLog.sentence(null, listOf(entry("好", "hao"))).also { it[it.size - 1] = (it[it.size - 1] + 1).toByte() }
+        val after = UserLog.sentence(null, listOf(entry("吗", "ma")))
+        // more after the bad record than one torn append could have left
+        val damaged = ByteArrayOutputStream().apply {
+            write(UserLog.header())
+            write(garbled)
+            repeat(UserLog.MAX_RECORD / after.size + 1) { write(after) }
+        }.toByteArray()
+        file.writeBytes(damaged)
+        var seeded = 0
+        val counting: (UserModel) -> Unit = { seeded++; seed(it) }
+        val errors = ArrayList<IOException>()
+        val m = model()
+        UserStore(file, m, onError = { errors += it }).use {
+            it.open(counting)
+            m.learn(null, listOf(entry("你", "ni")))
+        }
+        assertEquals(1, errors.size)
+        assertArrayEquals(damaged, File(file.path + UserStore.UNREADABLE).readBytes())
+        // what libime had is not brought back over it, then or at the next start
+        UserStore(file, model()).use { it.open(counting) }
+        assertEquals(0, seeded)
+        assertEquals(mapOf("你(ni)" to 1f), counts(session()))
+    }
+
+    @Test
+    fun aSmallLogGarbledAtItsFirstRecordIsKeptAsideAndNotSeededOver() {
+        val garbled = UserLog.sentence(null, listOf(entry("好", "hao"))).also { it[it.size - 1] = (it[it.size - 1] + 1).toByte() }
+        // far less than 64 KB after the bad record, but it is all there: no torn append
+        val damaged = UserLog.header() + garbled + UserLog.sentence(null, listOf(entry("吗", "ma")))
+        file.writeBytes(damaged)
+        var seeded = 0
+        val counting: (UserModel) -> Unit = { seeded++; seed(it) }
+        val errors = ArrayList<IOException>()
+        val m = model()
+        UserStore(file, m, onError = { errors += it }).use {
+            it.open(counting)
+            m.learn(null, listOf(entry("你", "ni")))
+        }
+        assertEquals(1, errors.size)
+        assertArrayEquals(damaged, File(file.path + UserStore.UNREADABLE).readBytes())
+        UserStore(file, model()).use { it.open(counting) }
+        assertEquals(0, seeded)
+        assertEquals(mapOf("你(ni)" to 1f), counts(session()))
+    }
+
+    @Test
+    fun onlyALastRecordCutShortIsCutWithoutAWord() {
+        val good = UserLog.sentence(null, listOf(entry("你", "ni")))
+        val errors = ArrayList<IOException>()
+        fun opened() = model().also { m -> UserStore(file, m, onError = { errors += it }).use { it.open() } }
+        // killed while writing the second record
+        file.writeBytes(UserLog.header() + good + good.copyOf(good.size - 3))
+        assertEquals(mapOf("你(ni)" to 1f), counts(opened()))
+        assertEquals(emptyList<IOException>(), errors)
+        assertFalse(File(file.path + UserStore.UNREADABLE).exists())
+        // a length no record has, a record before the last
+        val noLength = good.copyOf().also { ByteBuffer.wrap(it).putInt(0, 0) }
+        file.writeBytes(UserLog.header() + good + noLength + good)
+        assertEquals(mapOf("你(ni)" to 1f), counts(opened()))
+        assertEquals(1, errors.size)
+        assertTrue(File(file.path + UserStore.UNREADABLE).exists())
+    }
+
+    @Test
+    fun aRecordReplayCannotTakeIsSkippedAndSaidSo() {
+        // its CRC right, a sentence of -1 words: a writer's bug, not the end of the log
+        val bad = UserLog.FORMAT.record(1) {
+            writeBoolean(false)
+            writeShort(-1)
+        }
+        file.writeBytes(UserLog.header() + bad + UserLog.sentence(null, listOf(entry("你", "ni"))))
+        val errors = ArrayList<IOException>()
+        val m = model()
+        UserStore(file, m, onError = { errors += it }).use { it.open() }
+        assertEquals(mapOf("你(ni)" to 1f), counts(m))
+        assertTrue(errors.single().cause is IllegalArgumentException)
+        assertEquals(file.length().toInt(), UserLog.read(file.readBytes(), model()))
     }
 
     @Test

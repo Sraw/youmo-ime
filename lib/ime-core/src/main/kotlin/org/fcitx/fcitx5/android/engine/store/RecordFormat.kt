@@ -42,12 +42,13 @@ class RecordFormat(magic: String, val version: Int) {
 
     /**
      * Hands each record of [bytes], which start with the header, to [replay] with its type and
-     * its fields to read. A record whose fields run short or do not read is skipped: its CRC held,
-     * so that is a writer's bug rather than damage.
+     * its fields to read. A record whose fields run short or do not read, or make no sense to
+     * [replay] (a count below zero), is skipped, and [skipped] hears why: its CRC held, so that
+     * is a writer's bug rather than damage.
      *
      * @return the length of the records read whole: past it the log was cut short
      */
-    fun read(bytes: ByteArray, replay: (Byte, DataInputStream) -> Unit): Int {
+    fun read(bytes: ByteArray, skipped: (Exception) -> Unit = {}, replay: (Byte, DataInputStream) -> Unit): Int {
         require(hasHeader(bytes)) { "not a log of ${String(magic, Charsets.US_ASCII)} $version" }
         var at = HEADER_SIZE
         var length = wholeRecord(bytes, at)
@@ -55,8 +56,12 @@ class RecordFormat(magic: String, val version: Int) {
             val input = DataInputStream(ByteArrayInputStream(bytes, at + 4, length))
             try {
                 replay(input.readByte(), input)
-            } catch (_: IOException) {
+            } catch (e: IOException) {
                 // skipped: the bytes are in memory, so this is a record read wrong, not the disk
+                skipped(e)
+            } catch (@Suppress("TooGenericExceptionCaught") e: RuntimeException) {
+                // one record the replay cannot take must not keep the rest of the log from opening
+                skipped(e)
             }
             at += 4 + length + 4
             length = wholeRecord(bytes, at)

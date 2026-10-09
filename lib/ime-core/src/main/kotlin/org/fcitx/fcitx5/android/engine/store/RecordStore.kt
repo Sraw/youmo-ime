@@ -12,6 +12,7 @@ import java.io.FileOutputStream
 import java.io.IOException
 import java.io.OutputStream
 import java.io.RandomAccessFile
+import java.nio.ByteBuffer
 
 /**
  * Keeps what the user taught an input method in [file], a log of [format]: [open] replays it into
@@ -22,7 +23,9 @@ import java.io.RandomAccessFile
  *
  * A log cut short loses its last record, which is cut from the file so appends go on from a
  * record's end. A file of another format or version is kept aside as `<name>.unreadable` rather
- * than overwritten, and learning starts afresh.
+ * than overwritten, and learning starts afresh. A log that stops reading anywhere but in a last
+ * record cut short, as a torn append leaves it, is damaged: it is kept aside whole as well, and
+ * goes on from what read.
  *
  * Writing never fails the learning that asked for it: text the user picked must reach the app
  * whatever the disk does. A failed write is reported to [onError] and cut back off the file, so
@@ -68,8 +71,14 @@ class RecordStore internal constructor(
             val bytes = file.readBytes()
             when {
                 format.hasHeader(bytes) -> {
-                    val end = format.read(bytes) { type, input -> if (type != EMPTIED) replay(type, input) }
-                    if (end < bytes.size) RandomAccessFile(file, "rw").use { it.setLength(end.toLong()) }
+                    var unread = 0
+                    var cause: Exception? = null
+                    val end = format.read(bytes, skipped = {
+                        unread++
+                        cause = cause ?: it
+                    }) { type, input -> if (type != EMPTIED) replay(type, input) }
+                    if (unread > 0) onError(IOException("$file: $unread unreadable records skipped", cause))
+                    if (end < bytes.size) cut(bytes, end)
                 }
                 // killed before the header was all written: nothing to keep
                 format.header().copyOf(bytes.size).contentEquals(bytes) -> file.writeBytes(format.header())
@@ -89,12 +98,52 @@ class RecordStore internal constructor(
         if (tooLong()) compact()
     }
 
-    // never over an earlier file kept aside: that may be a newer version's log, still wanted
+    /**
+     * Cuts the log back to [end], where its records stop reading whole. Anywhere but in a last
+     * record cut short, that is damage: the log is first kept whole aside, and, left with no
+     * record, it is marked emptied so that no seed is written over what the user had learned.
+     */
+    private fun cut(bytes: ByteArray, end: Int) {
+        val damaged = !tornAppend(bytes, end)
+        if (damaged) {
+            val aside = aside()
+            // on disk before the log is cut: else a power cut could lose both
+            FileOutputStream(aside).use {
+                it.write(bytes)
+                it.fd.sync()
+            }
+            onError(IOException("$file damaged at byte $end: kept whole as ${aside.name}"))
+        }
+        RandomAccessFile(file, "rw").use {
+            it.setLength(end.toLong())
+            if (damaged && end <= RecordFormat.HEADER_SIZE) {
+                it.seek(end.toLong())
+                it.write(format.record(EMPTIED) {})
+            }
+        }
+    }
+
+    /** Whether the records stop at [end] as a torn append leaves them: in a last record whose length, or the bytes it says, run past the end. */
+    private fun tornAppend(bytes: ByteArray, end: Int): Boolean {
+        val left = bytes.size - end
+        if (left < 4) return true
+        val length = ByteBuffer.wrap(bytes).getInt(end)
+        // append writes none longer: a length past it, or none at all, is garbage
+        return length in 1..RecordFormat.MAX_RECORD && left < 4 + length + 4
+    }
+
     private fun moveAside() {
+        val aside = aside()
+        if (!file.renameTo(aside)) throw IOException("cannot move $file aside")
+        onError(IOException("$file is not a log this reads: kept as ${aside.name}"))
+    }
+
+    // never over an earlier file kept aside: that may be a newer version's log, still wanted
+    private fun aside(): File {
         var aside = File(file.path + UNREADABLE)
         var n = 1
         while (aside.exists()) aside = File(file.path + UNREADABLE + "." + n++)
-        if (!file.renameTo(aside)) throw IOException("cannot move $file aside")
+        return aside
     }
 
     private fun tooLong() = end > maxOf(compactAt, 2 * compacted)

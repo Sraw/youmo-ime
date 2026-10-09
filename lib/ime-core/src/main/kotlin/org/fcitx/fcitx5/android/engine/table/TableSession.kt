@@ -35,7 +35,9 @@ import org.fcitx.fcitx5.android.engine.session.Snapshot
  * Characters committed one by one become phrases ([TableOptions.autoPhraseLength]) coded by the
  * table's 组词规则, offered last for their code. One picked, or typed character by character
  * [TableOptions.saveAutoPhraseAfter] times, joins the table's own. What is picked and learned goes
- * to [user], which may keep it, and forgets it when asked to ([Action.Forget]).
+ * to [user], which may keep it, and forgets it when asked to ([Action.Forget]). A table that does
+ * not [learn][learns] (`Learning=False` in its `.conf`) keeps nothing picked, but forgets and
+ * blocks as the user asks all the same: that is no learning.
  */
 class TableSession(
     private val table: TableDictionary,
@@ -43,6 +45,7 @@ class TableSession(
     private val pinyin: Session? = null,
     private val user: TableUser = TableUser(table),
     private val shared: SharedWords = SharedWords.NONE,
+    private val learns: Boolean = true,
 ) : Session {
 
     /**
@@ -93,6 +96,8 @@ class TableSession(
 
     // a lookup's pinyin has no phrases of the table's own to pin to
     override fun offers(index: Int): Set<Offer> = when {
+        // not where nothing is to be kept (a password): forgetting and blocking record the word
+        !learning -> emptySet()
         lookingUp -> pinyin!!.offers(index).intersect(setOf(Offer.FORGET))
         ranking[index] != null -> if (shared.blockable(ranking[index]!!.text)) setOf(Offer.FORGET, Offer.BLOCK) else setOf(Offer.FORGET)
         else -> emptySet()
@@ -202,6 +207,8 @@ class TableSession(
 
     /** Forgets what was learned of the candidate at [index], ranking the code again on the page shown. */
     private fun forget(index: Int): Snapshot {
+        // as offered: nothing recorded where nothing is to be kept
+        if (!learning) return snapshot()
         val item = ranking[index] ?: return snapshot(handled = input.isNotEmpty())
         user.forget(item.code, item.text)
         // a phrase saved here, or a word of the other input methods: forgotten by all of them, or
@@ -215,6 +222,7 @@ class TableSession(
 
     /** Blocks the candidate at [index] for every input method (see [SharedWords]), ranking the code again. */
     private fun block(index: Int): Snapshot {
+        if (!learning) return snapshot()
         val item = ranking[index] ?: return snapshot(handled = input.isNotEmpty())
         if (!shared.block(item.text)) return snapshot()
         val shown = page
@@ -239,7 +247,7 @@ class TableSession(
         }
         // what pinyin found is neither counted nor built into phrases: libime counts it in its
         // history, but builds phrases from it with the pinyin as the code, which is a bug
-        if (!learning || item.pinyin) {
+        if (!learning || !learns || item.pinyin) {
             recent.clear()
             return item.text
         }
@@ -441,9 +449,10 @@ class TableSession(
                     lookedUp ?: snapshot()
                 }
             } else {
-                // what was looked up is committed, then the key is the app's
+                // what was looked up is committed, or else what was typed as Enter has it; then
+                // the key is the app's
                 var text = if (input.length > 1) pinyin.apply(Action.Select(0)).commit else ""
-                if (text.isEmpty()) text = pinyin.apply(Action.CommitRaw).commit
+                if (text.isEmpty()) text = typedInLookUp(pinyin)
                 endLookUp()
                 snapshot(commit = text, handled = false)
             }
@@ -455,9 +464,7 @@ class TableSession(
                 snapshot()
             }
             Action.CommitRaw -> {
-                // as typed, the pinyin key too, unless a word was picked from the start of it
-                val raw = if (input.length > 1) pinyin.apply(action).commit else ""
-                val text = if (raw == input.substring(1)) input.toString() else raw
+                val text = typedInLookUp(pinyin)
                 endLookUp()
                 snapshot(commit = text)
             }
@@ -474,6 +481,12 @@ class TableSession(
             }
             else -> fromPinyin(pinyin.apply(action))
         }
+    }
+
+    /** What was typed in a lookup, as typed: the pinyin key too, unless a word was picked from the start of it. */
+    private fun typedInLookUp(pinyin: Session): String {
+        val raw = if (input.length > 1) pinyin.apply(Action.CommitRaw).commit else ""
+        return if (raw == input.substring(1)) input.toString() else raw
     }
 
     private fun fromPinyin(s: Snapshot): Snapshot {

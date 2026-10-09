@@ -122,7 +122,7 @@ class EnginesModelTest {
     }
 
     @Test
-    fun withNoSentenceModelsPinyinWorksAndNothingIsReported() {
+    fun withNoSentenceModelsPinyinWorksAndEachMissingOneIsReportedOnce() {
         model = null
         refining = null
         val errors = ArrayList<IOException>()
@@ -132,7 +132,9 @@ class EnginesModelTest {
         assertTrue(engines.pause(Engines.PINYIN, typed).none { it.handled })
         assertEquals("拟", engines.onEvent(Engines.PINYIN, EngineEvent.PICK, 1).commit)
         assertEquals(listOf(Engines.SENTENCE_MODEL, Engines.REFINING_MODEL), loaded.filter { it.endsWith(".safetensors") })
-        assertTrue(errors.isEmpty())
+        // a build that lost them (stored compressed, say) says why pinyin reads worse
+        assertEquals(listOf(Engines.SENTENCE_MODEL, Engines.REFINING_MODEL), errors.map { it.cause?.message })
+        assertTrue(errors.all { it.cause is FileNotFoundException })
     }
 
     @Test

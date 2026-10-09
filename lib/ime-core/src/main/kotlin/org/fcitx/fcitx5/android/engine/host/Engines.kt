@@ -23,6 +23,7 @@ import org.fcitx.fcitx5.android.engine.rerank.MatrixKernel
 import org.fcitx.fcitx5.android.engine.rerank.Reranker
 import org.fcitx.fcitx5.android.engine.rerank.SentenceModel
 import org.fcitx.fcitx5.android.engine.rerank.SentenceRefiner
+import org.fcitx.fcitx5.android.engine.session.Action
 import org.fcitx.fcitx5.android.engine.session.Choice
 import org.fcitx.fcitx5.android.engine.session.Offer
 import org.fcitx.fcitx5.android.engine.session.PinyinSession
@@ -130,8 +131,9 @@ class Engines(
             tried = true
             model = try {
                 SentenceModel.load(load(path), unpack, kernel ?: MatrixKernel.JVM)
-            } catch (_: FileNotFoundException) {
+            } catch (e: FileNotFoundException) {
                 // a build without them (EngineDataPlugin fetches them): pinyin reads by the decoder alone
+                onError(IOException("cannot open $path: pinyin reads by the decoder alone", e))
                 null
             } catch (e: IOException) {
                 onError(e)
@@ -343,7 +345,17 @@ class Engines(
     /** [removeWord] for each of [words], a list written once. */
     fun removeWords(words: Collection<UserWord>) {
         val byKind = words.groupBy({ it.kind }, { it.entry() })
-        byKind[UserWord.Kind.ADDED]?.let { if (lists.removeAll(it.filterNotNull()).isNotEmpty()) dropUser() }
+        byKind[UserWord.Kind.ADDED]?.let { added ->
+            val removed = lists.removeAll(added.filterNotNull())
+            if (removed.isNotEmpty()) {
+                // or the log's picks of them make them the user's own words again as it is read back
+                user().forgetEach(removed)
+                // and a table's pick of one is read back as its saved phrase
+                forgetInTables(removed.map { it.text })
+                if (removed.size > 1) compactUser()
+                dropUser()
+            }
+        }
         byKind[UserWord.Kind.LEARNED]?.let { learned ->
             user().forgetEach(learned.filterNotNull())
             habits.forgetAll(learned.filterNotNull().mapTo(HashSet()) { it.text })
@@ -504,8 +516,9 @@ class Engines(
 
     /** [event] of [im]'s keyboard; nothing picked is learned unless [learning], nor by a table that does not learn. */
     fun onEvent(im: String, event: Int, arg: Int, learning: Boolean = true): Snapshot {
-        val keyboard = keyboards[im] ?: Keyboard(session(im)).also { keyboards[im] = it }
-        return keyboard.onEvent(event, arg, learning && tables[im]?.learns != false)
+        val keyboard = keyboards[im] ?: Keyboard(session(im), nineKeys = im == T9).also { keyboards[im] = it }
+        // the field's alone: a table that does not learn still forgets and blocks as asked (TableSession.learns)
+        return keyboard.onEvent(event, arg, learning)
     }
 
     /**
@@ -513,9 +526,7 @@ class Engines(
      * [Keyboard.context]. The host passes it only where the user learns, so each learns as its
      * [onEvent] would.
      */
-    fun context(before: String) = keyboards.forEach { (im, keyboard) ->
-        keyboard.context(before, tables[im]?.learns != false)
-    }
+    fun context(before: String) = keyboards.values.forEach { it.context(before) }
 
     /** Candidates of [im]'s input, from the [from]th, at most [count]; none if it has no session yet. */
     fun candidates(im: String, from: Int, count: Int): List<Choice> = sessions[im]?.candidates(from, count).orEmpty()
@@ -526,25 +537,25 @@ class Engines(
     private fun session(im: String): Session = sessions.getOrPut(im) {
         val s = settings
         when (im) {
-            PINYIN -> StrokeLookup(
-                PinyinSession(
+            PINYIN -> {
+                val pinyin = PinyinSession(
                     pinyinData, PinyinSegmenter(s.fuzzy, s.typos, neighbours = s.typos, latin = if (s.latinWords) latinWords else null),
                     pageSize = s.pageSize, user = user(), prediction = s.prediction, prior = prior(), phraseBook = phrases(),
                     reranker = reranker(), refiner = refiner(), block = ::block, habits = habits.scope(PINYIN),
-                ),
-                ::strokes, ::charReading, s.pageSize, blocked = ::isBlocked,
-            )
+                )
+                ForgetsInTables(StrokeLookup(pinyin, ::strokes, ::charReading, s.pageSize, blocked = ::isBlocked, follow = pinyin::follow))
+            }
             // 简拼 only where the digits read nothing else: as common on the evaluation set, and faster
-            T9 -> PinyinSession(
+            T9 -> ForgetsInTables(PinyinSession(
                 pinyinData, T9Segmenter(s.fuzzy, abbreviations = false), spell = true,
                 pageSize = s.pageSize, user = user(), prediction = s.prediction, prior = prior(), phraseBook = phrases(),
                 reranker = reranker(), refiner = refiner(), block = ::block, habits = habits.scope(T9),
-            )
-            SHUANGPIN -> PinyinSession(
+            ))
+            SHUANGPIN -> ForgetsInTables(PinyinSession(
                 pinyinData, ShuangpinSegmenter(s.scheme, s.fuzzy, s.typos), spell = true,
                 pageSize = s.pageSize, user = user(), prediction = s.prediction, prior = prior(), phraseBook = phrases(),
                 reranker = reranker(), refiner = refiner(), block = ::block, habits = habits.scope("$SHUANGPIN/${s.shuangpin}"),
-            )
+            ))
             else -> {
                 val method = TABLES[im]
                 val table = if (method == null) addedTable(im) else table(im)
@@ -552,7 +563,7 @@ class Engines(
                 val options = own.copy(pageSize = s.pageSize)
                 // looking a character up by pinyin learns nothing: it is not how the user writes
                 val lookUp = if (options.pinyinKey == null) null else PinyinSession(pinyinData, PinyinSegmenter(), prediction = false)
-                TableSession(table.dictionary, options, lookUp, table.user, shared(table, im))
+                TableSession(table.dictionary, options, lookUp, table.user, shared(table, im), learns = table.learns)
             }
         }
     }
@@ -625,7 +636,7 @@ class Engines(
      * out of pinyin's words later is not put back.
      */
     private fun tellPinyinOnce(table: Table, im: String) {
-        val log = if (im in TABLES) userTable(im) else addedTableFiles(im).last()
+        val log = if (im in TABLES) userTable(im) else addedTableLog(im)
         val told = userDir?.let { File(it, log + TOLD) }
         if (told?.exists() == true) return
         learnSaved(table.user.savedTexts(), again = false)
@@ -662,6 +673,74 @@ class Engines(
             texts.forEach(user::forgetText)
         }
         for ((im, table) in tables) if (im !in TABLES) texts.forEach(table.user::forgetText)
+        // those the user added, which reload() unloads: forgotten as each loads next, as building
+        // one here would hold up the keys typed after it, for seconds where it changed
+        val dir = userDir ?: return
+        val names = File(dir, USER_TABLES).list().orEmpty().toSet()
+        for (im in names.mapTo(HashSet()) { it.substringBeforeLast('.') }) {
+            if (!forgetsAsItLoads(im, names)) continue
+            keepForgotten(File(dir, addedTableLog(im) + FORGOTTEN), texts)
+        }
+    }
+
+    /**
+     * Whether [im] is an added table with its log among [names] that does not read it now (not
+     * loaded, or loaded with no log open, as when it learns nothing) and may as it loads ([mayReadLog], last).
+     */
+    private fun forgetsAsItLoads(im: String, names: Set<String>): Boolean =
+        im !in TABLES && tables[im]?.store == null && File(addedTableLog(im)).name in names && mayReadLog(im)
+
+    /**
+     * Whether the added table [im] may read its log as it loads, as its `.conf` (read alone) says:
+     * one that learns nothing now does once Learning is on again; not one since removed, nor one
+     * that names no table, for which what is forgotten would be kept for good.
+     */
+    private fun mayReadLog(im: String): Boolean = try {
+        userTables(im)?.let { TableConf.parse(it.conf, it.settings) } != null
+    } catch (_: IOException) {
+        // unreadable now, it may read as it loads, which reports it if not
+        true
+    } catch (_: IllegalArgumentException) {
+        false
+    }
+
+    /** Keeps [texts] in [file], each once, for an added table to forget as it loads ([forgetKept]). */
+    private fun keepForgotten(file: File, texts: Collection<String>) {
+        try {
+            val text = if (file.isFile) file.readText() else ""
+            val kept = forgottenIn(text)
+            // a table's phrase holds no line break
+            val more = texts.filter { '\n' !in it && it !in kept }.distinct()
+            if (more.isEmpty()) return
+            // not run on into a last line cut short by a kill, which would take it with it
+            val start = if (text.isNotEmpty() && !text.endsWith('\n')) "\n" else ""
+            file.appendText(more.joinToString("", prefix = start) { "$it\n" })
+        } catch (e: IOException) {
+            onError(e)
+        }
+    }
+
+    /** What was forgotten while [im]'s table did not read its log ([keepForgotten]), forgotten in [user] now. */
+    private fun forgetKept(im: String, user: TableUser) {
+        val file = userDir?.let { File(it, addedTableLog(im) + FORGOTTEN) }?.takeIf { it.isFile } ?: return
+        try {
+            forgottenIn(file.readText()).forEach(user::forgetText)
+            file.delete()
+        } catch (e: IOException) {
+            // forgotten at the next load
+            onError(e)
+        }
+    }
+
+    // whole lines only: one cut short by a kill is no text that was forgotten
+    private fun forgottenIn(text: String): Set<String> = text.split('\n').dropLast(1).toSet()
+
+    /** [pinyin], what a long press forgets there forgotten in every table too, as [shared] has it. */
+    private inner class ForgetsInTables(private val pinyin: Session) : Session by pinyin {
+        override fun apply(action: Action): Snapshot {
+            val forgotten = if (action is Action.Forget && Offer.FORGET in pinyin.offers(action.index)) pinyin.candidates(action.index, 1).firstOrNull() else null
+            return pinyin.apply(action).also { if (forgotten != null) forgetInTables(listOf(forgotten.text)) }
+        }
     }
 
     // the texts blocked, of any reading: a table has no readings to tell apart
@@ -703,7 +782,8 @@ class Engines(
                     val id = words.find(c)
                     if (id < 0) Float.NEGATIVE_INFINITY else model.score(id)
                 }
-            } catch (_: FileNotFoundException) {
+            } catch (e: FileNotFoundException) {
+                onError(IOException("cannot open $STROKE_DATA: no lookup by strokes", e))
                 null
             } catch (e: IOException) {
                 onError(e)
@@ -767,7 +847,9 @@ class Engines(
             val conf = TableConf.parse(added.conf, added.settings)
             val dictionary = TableDictionary(built(im, conf.file, added))
             val user = TableUser(dictionary)
-            val store = if (conf.learning) userDir?.let { openStore(File(it, addedTableFiles(im).last()), user) } else null
+            val store = if (conf.learning) userDir?.let { openStore(File(it, addedTableLog(im)), user) } else null
+            // with no log read there is nothing to forget: kept for a load that reads one
+            if (store != null) forgetKept(im, user)
             Table(dictionary, user, store, conf.options, conf.learning)
         } catch (e: IOException) {
             throw unreadable(im, e)
@@ -781,9 +863,9 @@ class Engines(
         table
     }
 
-    private fun unreadable(im: String, e: Throwable): IllegalArgumentException {
+    private fun unreadable(im: String, e: Throwable): UnreadableInputMethod {
         onError(e as? IOException ?: IOException("cannot read input method $im", e))
-        return IllegalArgumentException("cannot read input method $im", e)
+        return UnreadableInputMethod(im, e)
     }
 
     /**
@@ -925,6 +1007,9 @@ class Engines(
         /** Beside a table's log: its phrases saved before were told to pinyin (see shared). */
         const val TOLD = ".told"
 
+        /** Beside an added table's log: what was forgotten while the table did not read it, forgotten there as it next does. */
+        const val FORGOTTEN = ".forgotten"
+
         /** Under the user directory: the tables the user added, built, and what each learned. */
         const val USER_TABLES = "tables"
 
@@ -936,9 +1021,14 @@ class Engines(
 
         /**
          * Under the user directory, what is kept of a table the user added: the table built, and
-         * what it learned. Gone with the table, lest another of its name find them.
+         * what it learned, with what is kept beside that ([TOLD], [FORGOTTEN]). Gone with the
+         * table, lest another of its name find them.
          */
-        fun addedTableFiles(im: String): List<String> = listOf("$USER_TABLES/$im.table", "$USER_TABLES/$im.user")
+        fun addedTableFiles(im: String): List<String> =
+            addedTableLog(im).let { listOf("$USER_TABLES/$im.table", it, it + TOLD, it + FORGOTTEN) }
+
+        // under the user directory, what a table the user added learned
+        private fun addedTableLog(im: String) = "$USER_TABLES/$im.user"
 
         /** Where what the user taught the table input method [im] is kept: `wubi.user` and so on. */
         fun userTable(im: String) = im.removePrefix("engine-") + ".user"
@@ -959,3 +1049,9 @@ class Engines(
  * addon's config (see [EngineSettings.tables]), and how it behaves unless those say otherwise.
  */
 class TableMethod(val file: String, val group: String, val options: TableOptions)
+
+/**
+ * What [Engines] throws for a table input method the user added that it cannot read: its `.conf`
+ * or table gone, unreadable, or no table. Not thrown again for it till [Engines.reload].
+ */
+class UnreadableInputMethod(im: String, cause: Throwable) : IllegalArgumentException("cannot read input method $im", cause)

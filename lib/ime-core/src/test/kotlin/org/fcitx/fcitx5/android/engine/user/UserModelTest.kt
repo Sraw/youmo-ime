@@ -145,6 +145,26 @@ class UserModelTest {
     }
 
     @Test
+    fun theUsersOwnWordKeepsAQuarterAsCountsHalveAndIsWrittenOutSo() {
+        val m = model(limit = 2.5f)
+        val niHao = entry("拟好", "ni", "hao")
+        m.learn(null, listOf(niHao))
+        m.learn(null, listOf(entry("好", "hao")))
+        // halved three times: 拟好 and 好, typed once, would fall below a quarter
+        repeat(4) { m.learn(null, listOf(entry("你", "ni"))) }
+        val counted = HashMap<String, Float>()
+        m.forEachCount({ e, c -> counted[e.text] = c }, { a, b, c -> counted[a.text + b.text] = c })
+        // the dictionary's 好 goes; the user's word keeps a quarter
+        assertEquals(mapOf("拟好" to 0.25f, "你" to 1.125f), counted)
+        assertEquals(1.375f, m.total)
+        // what a compaction writes, a start reads back: the word still there to type
+        val restored = model()
+        m.forEachCount({ e, c -> restored.restore(e, c) }, { a, b, c -> restored.restore(a, b, c) })
+        assertTrue(inTrie(restored, "拟好", "ni", "hao"))
+        assertEquals(listOf(niHao), restored.ownWords().map { it.first })
+    }
+
+    @Test
     fun countsWrittenOutRestoreTheSame() {
         val m = model()
         m.learn(null, listOf(entry("你", "ni"), entry("拟好", "ni", "hao"), entry("吗", "ma")))

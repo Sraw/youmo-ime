@@ -8,6 +8,7 @@ import org.fcitx.fcitx5.android.engine.data.CodeTable
 import org.fcitx.fcitx5.android.engine.data.DataFormatException
 import org.fcitx.fcitx5.android.engine.session.Action
 import org.fcitx.fcitx5.android.engine.session.Action.Backspace
+import org.fcitx.fcitx5.android.engine.session.Action.Block
 import org.fcitx.fcitx5.android.engine.session.Action.CommitRaw
 import org.fcitx.fcitx5.android.engine.session.Action.Context
 import org.fcitx.fcitx5.android.engine.session.Action.Forget
@@ -376,6 +377,75 @@ class TableSessionTest {
     }
 
     @Test
+    fun whileLearningIsOffNothingIsForgottenOrBlocked() {
+        val user = TableUser(wubi)
+        val records = ArrayList<ByteArray>()
+        val forgotten = ArrayList<String>()
+        val blocks = ArrayList<String>()
+        // 你们, wqwu by the rules: a word of the other input methods
+        val shared = object : SharedWords {
+            val coded = CodedWords(wubi, listOf("你们"))
+            override fun words(prefix: String) = coded.words(prefix)
+            override fun leadsAnywhere(prefix: String) = coded.leadsAnywhere(prefix)
+            override fun blocked(text: String) = false
+            override fun blockable(text: String) = true
+            override fun block(text: String) = blocks.add(text)
+            override fun forget(text: String) {
+                forgotten += text
+            }
+        }
+        val t = TableSession(wubi, TableOptions.WUBI, user = user, shared = shared)
+        t.type("aaaa")
+        assertEquals("恭恭敬敬", t.apply(Select(1)).commit)
+        t.learning = false
+        user.journal = { records += it }
+        t.type("aaaa")
+        assertEquals(emptySet<Offer>(), t.offers(0))
+        // its pick kept: still first
+        assertEquals(listOf("恭恭敬敬", "工"), t.apply(Forget(0)).candidates)
+        t.apply(Reset)
+        assertEquals(listOf("你们"), t.type("wqw").second.candidates)
+        assertEquals(emptySet<Offer>(), t.offers(0))
+        assertEquals(listOf("你们"), t.apply(Forget(0)).candidates)
+        assertEquals(listOf("你们"), t.apply(Block(0)).candidates)
+        assertEquals(0, records.size)
+        assertEquals(emptyList<String>(), forgotten)
+        assertEquals(emptyList<String>(), blocks)
+        // learning again: offered again
+        t.learning = true
+        assertEquals(setOf(Offer.FORGET, Offer.BLOCK), t.offers(0))
+    }
+
+    @Test
+    fun aTableThatDoesNotLearnStillForgetsAndBlocksAsAsked() {
+        val forgotten = ArrayList<String>()
+        val blocks = ArrayList<String>()
+        val shared = object : SharedWords {
+            val coded = CodedWords(wubi, listOf("你们"))
+            override fun words(prefix: String) = coded.words(prefix)
+            override fun leadsAnywhere(prefix: String) = coded.leadsAnywhere(prefix)
+            override fun blocked(text: String) = text in blocks
+            override fun blockable(text: String) = true
+            override fun block(text: String) = blocks.add(text)
+            override fun forget(text: String) {
+                forgotten += text
+            }
+        }
+        val t = TableSession(wubi, TableOptions.WUBI, shared = shared, learns = false)
+        t.type("aaaa")
+        assertEquals("恭恭敬敬", t.apply(Select(1)).commit)
+        // the pick not counted
+        assertEquals("工", t.type("aaaa").second.candidates.first())
+        t.apply(Reset)
+        assertEquals(listOf("你们"), t.type("wqw").second.candidates)
+        assertEquals(setOf(Offer.FORGET, Offer.BLOCK), t.offers(0))
+        t.apply(Forget(0))
+        assertEquals(listOf("你们"), forgotten)
+        assertEquals(emptyList<String>(), t.apply(Block(0)).candidates)
+        assertEquals(listOf("你们"), blocks)
+    }
+
+    @Test
     fun orTypedCharacterByCharacterOftenEnough() {
         val t = session()
         repeat(2) {
@@ -493,7 +563,10 @@ class TableSessionTest {
         assertEquals("你", s.commit)
         assertFalse(s.handled)
         t.type("zq")
-        assertEquals("q", t.apply(Key('.')).commit)
+        // nothing found: what was typed, as Enter commits it, the pinyin key too
+        assertEquals("zq", t.apply(Key('.')).commit)
+        t.type("z")
+        assertEquals("z", t.apply(Key(',')).commit)
         t.type("z")
         assertEquals("", t.apply(Select(0)).preedit)
         t.type("zwo")

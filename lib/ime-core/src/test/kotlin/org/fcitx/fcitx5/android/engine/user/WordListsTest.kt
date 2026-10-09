@@ -9,11 +9,13 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
+import org.junit.Assume.assumeTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
 import java.io.File
 import java.io.IOException
+import java.nio.file.Files
 
 class WordListsTest {
 
@@ -72,6 +74,47 @@ class WordListsTest {
     }
 
     @Test
+    fun aListThatDidNotReadIsNotWrittenOver() {
+        val dir = folder.newFolder()
+        val link = File(dir, WordLists.ADDED)
+        // a list there that cannot be read as one, yet could be renamed over
+        assumeTrue(runCatching { Files.createSymbolicLink(link.toPath(), folder.newFolder().toPath()) }.isSuccess)
+        val errors = ArrayList<IOException>()
+        val lists = WordLists(dir, errors::add)
+        assertEquals(1, errors.size)
+        assertTrue(lists.add(entry("你好", "ni", "hao")))
+        assertEquals(listOf(entry("你好", "ni", "hao")), lists.addedWords)
+        assertEquals(2, errors.size)
+        assertTrue(Files.isSymbolicLink(link.toPath()))
+        // the other list is written as ever
+        assertTrue(lists.block(entry("拟", "ni")))
+        assertEquals("拟 ni\n", File(dir, WordLists.BLOCKED).readText())
+        assertEquals(2, errors.size)
+    }
+
+    @Test
+    fun aListThatCannotBeRenamedInLeavesNoTempFile() {
+        val dir = folder.newFolder()
+        val errors = ArrayList<IOException>()
+        val lists = WordLists(dir, errors::add)
+        // where the list goes, a directory
+        File(dir, WordLists.ADDED).mkdir()
+        assertTrue(lists.add(entry("你好", "ni", "hao")))
+        assertEquals(1, errors.size)
+        assertFalse(File(dir, "${WordLists.ADDED}.new").exists())
+    }
+
+    @Test
+    fun pinyinRunTogetherIsSplitForAWordNotASentence() {
+        fun nis(chars: Int) = UserModel.Entry("你".repeat(chars), IntArray(chars) { Syllables.id("ni") })
+        assertEquals(nis(WORD), WordLists.entry("你".repeat(WORD), "ni".repeat(WORD)))
+        assertNull(WordLists.entry("你".repeat(WORD + 1), "ni".repeat(WORD + 1)))
+        // apart, nothing to split: as long as it is
+        assertEquals(nis(WORD + 1), WordLists.entry("你".repeat(WORD + 1), "ni ".repeat(WORD + 1)))
+        assertNull(WordLists.entry("你好", "a".repeat(100_000)))
+    }
+
+    @Test
     fun aLineToImportIsAWordAndItsPinyinEitherWayRound() {
         assertEquals(WordLists.Line("幽默", "you'mo", false), WordLists.line("幽默 you'mo"))
         assertEquals(WordLists.Line("幽默", "you mo", false), WordLists.line("you mo\t幽默\t3"))
@@ -104,5 +147,10 @@ class WordListsTest {
         assertEquals(entry("你好", "ni", "hao"), WordLists.entry("你好", "Ni Hao"))
         // a capital where the word has no letter: the syllable
         assertEquals(entry("啊", "a"), WordLists.entry("啊", "A"))
+    }
+
+    private companion object {
+        // the longest word whose pinyin, run together, is split
+        const val WORD = 32
     }
 }

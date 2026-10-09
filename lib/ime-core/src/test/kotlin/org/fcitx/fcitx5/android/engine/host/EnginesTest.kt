@@ -4,16 +4,12 @@
  */
 package org.fcitx.fcitx5.android.engine.host
 
-import org.fcitx.fcitx5.android.engine.data.CodeTable
 import org.fcitx.fcitx5.android.engine.data.DataFormatException
 import org.fcitx.fcitx5.android.engine.data.PinyinDataBuilder
 import org.fcitx.fcitx5.android.engine.pinyin.Fuzzy
-import org.fcitx.fcitx5.android.engine.pinyin.Syllables
-import org.fcitx.fcitx5.android.engine.rerank.TinyModel
 import org.fcitx.fcitx5.android.engine.session.Choice
 import org.fcitx.fcitx5.android.engine.session.Offer
 import org.fcitx.fcitx5.android.engine.session.Snapshot
-import org.fcitx.fcitx5.android.engine.stroke.Strokes
 import org.fcitx.fcitx5.android.engine.user.LibimeImport
 import org.fcitx.fcitx5.android.engine.user.UserLog
 import org.junit.Assert.assertEquals
@@ -24,62 +20,13 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
 import java.io.File
-import java.io.FileNotFoundException
 import java.io.IOException
 import java.nio.ByteBuffer
 
-class EnginesTest {
+class EnginesTest : EnginesFixture() {
 
     @get:Rule
     val folder = TemporaryFolder()
-
-    private fun syl(vararg s: String) = s.map { Syllables.id(it) }.toIntArray()
-
-    private val pinyin = PinyinDataBuilder()
-        .unigram("<unk>", -7f, 0f)
-        .unigram("你", -2f, 0f)
-        .unigram("拟", -3f, 0f)
-        .unigram("好", -2.5f, 0f)
-        .bigram("好", "拟", -0.5f, 0f)
-        .entry("你", syl("ni"))
-        .entry("拟", syl("ni"))
-        .entry("好", syl("hao"))
-        .build()
-        .toByteArray()
-
-    private val wubi = CodeTable.Builder()
-        .header("键码", "abcdefghijklmnopqrstuvwxy")
-        .header("码长", "4")
-        .entry("wqiy", "你")
-        .entry("vbg", "好")
-        .entry("vbgf", "妤")
-        .apply { "一二三四五六七".forEachIndexed { i, c -> entry("va" + ('a' + i) + "a", c.toString()) } }
-        .build()
-        .toByteArray()
-
-    private var model: ByteArray? = TinyModel().bytes()
-    private var refining: ByteArray? = TinyModel().bytes()
-
-    private var strokes: ByteArray? = Strokes.read("...\n你\tpsnpzsn\n好\tzphzsh\n".reader().buffered(), "stroke")
-        .build().toByteArray()
-
-    private val loaded = ArrayList<String>()
-
-    private fun load(path: String): ByteBuffer {
-        loaded += path
-        val bytes = when (path) {
-            Engines.PINYIN_DATA -> pinyin
-            "${Engines.TABLE_DIR}/wbx.data" -> wubi
-            Engines.SENTENCE_MODEL -> model
-            Engines.REFINING_MODEL -> refining
-            Engines.STROKE_DATA -> strokes
-            else -> throw IllegalArgumentException(path)
-        }
-        // as the app's assets do of a file it has not got
-        return ByteBuffer.wrap(bytes ?: throw FileNotFoundException(path))
-    }
-
-    private fun Engines.type(im: String, keys: String) = keys.map { onEvent(im, EngineEvent.CHAR, it.code) }.last()
 
     /** What the addon does while the user pauses after [typed]: refines till there is no more to do. */
     private fun Engines.pause(im: String, typed: Snapshot): List<Snapshot> {
@@ -471,155 +418,28 @@ class EnginesTest {
         }
     }
 
-    private fun userTable(
-        conf: String = "",
-        stamp: String = "1",
-        reads: () -> Unit = {},
-        text: String = MY_TABLE,
-        settings: String = "",
-    ) = Engines.UserTable("[Table]\nFile=table/my.main.dict\n$conf", { "$it $stamp" }, {
-        assertEquals("table/my.main.dict", it)
-        reads()
-        text.reader().buffered()
-    }, settings)
-
     @Test
-    fun whatTheUserSetOfAnAddedTableIsReadAgainWithoutBuildingIt() {
-        var reads = 0
-        var settings = ""
-        Engines(::load, folder.newFolder("engine"), userTables = { userTable(reads = { reads++ }, settings = settings) }).use { engines ->
-            engines.type("my", "ab")
-            engines.onEvent("my", EngineEvent.PICK, 1)
-            assertEquals("工", engines.type("my", "ab").candidates.first())
-            settings = "[Table]\nOrderPolicy=Freq\n"
-            engines.reload()
-            // the pick kept all along, now what orders them
-            assertEquals("式", engines.type("my", "ab").candidates.first())
-        }
-        assertEquals(1, reads)
-    }
-
-    @Test
-    fun anAddedTableThatCannotBeKeptIsTypedAllTheSame() {
+    fun aWordAddedAndPickedIsNotTypeableOnceRemoved() {
         val dir = folder.newFolder("engine")
-        // where the tables would go, a file
-        dir.resolve(Engines.USER_TABLES).writeText("")
-        val errors = ArrayList<IOException>()
-        Engines(::load, dir, { errors += it }, userTables = { userTable() }).use { engines ->
-            assertEquals(listOf("工", "式", "工作"), engines.type("my", "ab").candidates)
+        Engines(::load, dir).use { engines ->
+            assertTrue(engines.addWord("妮浩", "nihao"))
+            engines.type(Engines.PINYIN, "nihao")
+            val at = engines.candidates(Engines.PINYIN, 0, 20).indexOfFirst { it.text == "妮浩" }
+            assertEquals("妮浩", engines.onEvent(Engines.PINYIN, EngineEvent.PICK, at).commit)
+            engines.onEvent(Engines.PINYIN, EngineEvent.RESET, 0)
+            engines.removeWord(Engines.UserWord("妮浩", "ni hao", Engines.UserWord.Kind.ADDED))
+            // its pick in the log does not make it a word of the user's own when read back
+            assertEquals(emptyList<Engines.UserWord>(), engines.userWords())
+            assertFalse("妮浩" in engines.type(Engines.PINYIN, "nihao").candidates)
         }
-        // the table not kept, nor what it learned
-        assertEquals(2, errors.size)
-    }
-
-    @Test
-    fun aTableTheUserAddedIsBuiltOnceAndAgainOnlyWhenItChanges() {
-        val dir = folder.newFolder("engine")
-        var reads = 0
-        var stamp = "1"
-        val tables = { im: String -> if (im == "my") userTable(stamp = stamp, reads = { reads++ }) else null }
-        repeat(2) {
-            Engines(::load, dir, userTables = tables).use { engines ->
-                assertEquals(listOf("工", "式", "工作"), engines.type("my", "ab").candidates)
-                engines.onEvent("my", EngineEvent.RESET, 0)
-                // coded by the rules from its 词组
-                assertEquals(listOf("工作"), engines.type("my", "abcd").candidates)
-            }
+        Engines(::load, dir).use { engines ->
+            assertEquals(emptyList<Engines.UserWord>(), engines.userWords())
         }
-        assertEquals(1, reads)
-        stamp = "2"
-        Engines(::load, dir, userTables = tables).use { engines ->
-            engines.reload()
-            assertEquals(listOf("工", "式", "工作"), engines.type("my", "ab").candidates)
-        }
-        assertEquals(2, reads)
-        assertThrows(IllegalArgumentException::class.java) { Engines(::load, dir, userTables = tables).type("nope", "a") }
-    }
-
-    @Test
-    fun aTableTheUserAddedLearnsAsItsConfSays() {
-        val dir = folder.newFolder("engine")
-        for ((conf, first) in listOf("OrderPolicy=Freq\nLearning=False" to "工", "OrderPolicy=Freq" to "式")) {
-            val tables = { _: String -> userTable(conf) }
-            Engines(::load, dir, userTables = tables).use { engines ->
-                engines.type("my", "ab")
-                assertEquals("式", engines.onEvent("my", EngineEvent.PICK, 1).commit)
-                // not even for now, if it does not learn
-                assertEquals(first, engines.type("my", "ab").candidates.first())
-                engines.onEvent("my", EngineEvent.RESET, 0)
-            }
-            Engines(::load, dir, userTables = tables).use { engines ->
-                assertEquals(first, engines.type("my", "ab").candidates.first())
-            }
-        }
-        // the conf's own options, not the built-in tables'
-        Engines(::load, null, userTables = { userTable() }).use { engines ->
-            engines.type("my", "ab")
-            engines.onEvent("my", EngineEvent.PICK, 1)
-            assertEquals("工", engines.type("my", "ab").candidates.first())
-        }
-    }
-
-    @Test
-    fun aTableTheUserAddedThatCannotBeReadIsReportedOnceUntilReload() {
-        val errors = ArrayList<IOException>()
-        var asked = 0
-        var text = "键码=ab\n"
-        val engines = Engines(::load, folder.newFolder("engine"), { errors += it }, userTables = {
-            asked++
-            userTable(text = text)
-        })
-        repeat(2) { assertThrows(IllegalArgumentException::class.java) { engines.type("my", "a") } }
-        assertEquals(1, asked)
-        assertEquals(1, errors.size)
-        text = MY_TABLE
-        engines.reload()
-        assertEquals(listOf("工", "式", "工作"), engines.type("my", "ab").candidates)
-        assertEquals(2, asked)
-        // nor a .conf naming no table
-        val noFile = Engines(::load, null, { errors += it }, userTables = { Engines.UserTable("", { "1" }, { MY_TABLE.reader().buffered() }) })
-        assertThrows(IllegalArgumentException::class.java) { noFile.type("my", "a") }
-        // nor one the app cannot read
-        val gone = Engines(::load, null, { errors += it }, userTables = { throw IOException("gone") })
-        assertThrows(IllegalArgumentException::class.java) { gone.type("my", "a") }
-        assertEquals(listOf("gone"), errors.drop(2).map { it.message })
-        assertEquals(3, errors.size)
-    }
-
-    @Test
-    fun aBuiltTableCutShortIsBuiltAgain() {
-        val dir = folder.newFolder("engine")
-        val errors = ArrayList<IOException>()
-        var reads = 0
-        val tables = { _: String -> userTable(reads = { reads++ }) }
-        Engines(::load, dir, userTables = tables).use { it.type("my", "ab") }
-        val built = dir.resolve("${Engines.USER_TABLES}/my.table")
-        built.writeBytes(built.readBytes().copyOf(built.length().toInt() / 2))
-        Engines(::load, dir, { errors += it }, userTables = tables).use { engines ->
-            assertEquals(listOf("工", "式", "工作"), engines.type("my", "ab").candidates)
-        }
-        assertEquals(2, reads)
-        assertEquals(1, errors.size)
-        Engines(::load, dir, userTables = tables).use { it.type("my", "ab") }
-        assertEquals(2, reads)
     }
 
     private companion object {
         const val MAX_PICKS = 10
         const val MAX_SLICES = 10_000
-
-        val MY_TABLE = """
-            键码=abcd
-            码长=4
-            [组词规则]
-            e2=p11+p12+p21+p22
-            [数据]
-            ab 工
-            ab 式
-            cd 作
-            [词组]
-            工作
-        """.trimIndent()
     }
 
     @Test
@@ -630,8 +450,36 @@ class EnginesTest {
         assertEquals(listOf("好"), s.candidates)
         assertEquals("hao", engines.candidates(Engines.PINYIN, 0, 1).single().hint)
         assertEquals("好", engines.onEvent(Engines.PINYIN, EngineEvent.CHAR, ' '.code).commit)
-        // an app without the data: u is pinyin's
+        // an app without the data: u is pinyin's, and that is reported
         strokes = null
-        assertEquals("u", Engines(::load, null).type(Engines.PINYIN, "u").preedit.replace(" ", ""))
+        val errors = ArrayList<IOException>()
+        assertEquals("u", Engines(::load, null, { errors += it }).type(Engines.PINYIN, "u").preedit.replace(" ", ""))
+        assertEquals(listOf(Engines.STROKE_DATA), errors.map { it.cause?.message })
+    }
+
+    @Test
+    fun aCharacterLookedUpByItsStrokesIsReadAfterTheTextBeforeIt() {
+        // 你 after 你好, 拟 after 好 alone
+        val data = PinyinDataBuilder()
+            .unigram("<unk>", -7f, 0f)
+            .unigram("你", -2f, 0f)
+            .unigram("拟", -3f, 0f)
+            .unigram("好", -2.5f, 0f)
+            .bigram("你", "好", -1f, -2f)
+            .bigram("好", "拟", -0.5f, 0f)
+            .trigram("你", "好", "你", -0.2f)
+            .entry("你", syl("ni"))
+            .entry("拟", syl("ni"))
+            .entry("好", syl("hao"))
+            .build()
+            .toByteArray()
+        val engines = Engines({ if (it == Engines.PINYIN_DATA) ByteBuffer.wrap(data) else load(it) }, null)
+        // the decoder's reading alone
+        engines.settings = EngineSettings(sentenceModel = false)
+        engines.onEvent(Engines.PINYIN, EngineEvent.RESET, 0)
+        engines.context("你")
+        engines.type(Engines.PINYIN, "uz")
+        assertEquals("好", engines.onEvent(Engines.PINYIN, EngineEvent.CHAR, ' '.code).commit)
+        assertEquals("你", engines.type(Engines.PINYIN, "ni").candidates.first())
     }
 }

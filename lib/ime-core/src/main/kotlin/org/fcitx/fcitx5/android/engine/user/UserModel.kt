@@ -19,9 +19,10 @@ import org.fcitx.fcitx5.android.engine.pinyin.Syllables
  * dictionary is rebuilt with other ids: that is what [Entry] is and what the journal keeps.
  *
  * Counts halve when their sum passes [limit], dropping those that fall below a quarter: what
- * was typed long ago gives way to what is typed now, and the counts stay bounded. A new word
- * whose count is dropped stays in the trie, scored as the model's unknown word, until the next
- * start: few enough, at a word per sentence typed, not to be worth rebuilding the trie for.
+ * was typed long ago gives way to what is typed now, and the counts stay bounded. A word the user
+ * made keeps a quarter, though, for it is theirs to type however seldom they do. A new word
+ * whose count is gone, forgotten in a longer candidate, stays in the trie, scored as the model's
+ * unknown word, until the next start: few enough not to be worth rebuilding the trie for.
  */
 class UserModel(
     private val dictionary: PinyinDictionary,
@@ -113,7 +114,10 @@ class UserModel(
             before = w
         }
         if (total > limit) {
+            // dropped, a word the user made (or brought from libime) would be gone at the next start
+            val own = entries.keys.filter { isOwn(it) && counts[key(NO_WORD, it)] > 0f }
             counts.scale(HALF, MIN_COUNT)
+            for (id in own) if (counts[key(NO_WORD, id)] == 0f) counts.add(key(NO_WORD, id), MIN_COUNT)
             indexFollowers()
             // a word typed once long ago may be gone from ownTexts
             changes++
@@ -129,7 +133,7 @@ class UserModel(
      * Forgets [words], a candidate the user asked to: their counts and every pair they are in.
      * One of the user's own words, forgotten alone, is gone from the trie too, as libime drops
      * it from its user dictionary. One [list]ed stays typeable, its counts gone; so does one in a
-     * longer candidate, till the next start, as does a word whose counts were halved away.
+     * longer candidate, till the next start.
      */
     fun forget(words: List<Entry>) {
         val ids = words.mapNotNull { ids[it] }.toSet()
