@@ -198,7 +198,10 @@ private:
     /** Sends Refine to [im]'s session after [delay] µs, unless another event comes first. */
     void refineLater(InputContext *ic, const std::string &im, uint64_t delay);
 
-    /** Commits the full-width form of a key the session passed on, if it has one; whether it did. */
+    /**
+     * Commits the full-width form of a key the session passed on, if it has one; one with several
+     * offers them all as candidates, the first going in unless another is picked. Whether it did.
+     */
     bool pushPunctuation(InputContext *ic, const Key &key);
 
     /** Hands the config to the engine, flattened as EngineSettingsCallback says. */

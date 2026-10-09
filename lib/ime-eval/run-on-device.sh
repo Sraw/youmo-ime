@@ -3,12 +3,12 @@
 # left the app) on a connected device or emulator, via EngineEvalRunner, and pulls the result, ready for
 #   ./gradlew :lib:ime-eval:run --args="score data/<set>.tsv <result.tsv> [baseline/<...>.tsv]"
 # Needs the native build (it installs the debug APK).
-#   lib/ime-eval/run-on-device.sh [set=pinyin] [ime=pinyin] [out-dir=build/eval]
+#   lib/ime-eval/run-on-device.sh [set=pinyin] [ime=engine-pinyin] [out-dir=build/eval]
 set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO="$(cd "$HERE/../.." && pwd)"
 SET=${1:-pinyin}
-IME=${2:-pinyin}
+IME=${2:-engine-pinyin}
 PKG=${FCITX_PKG:-io.github.sraw.youmo.debug}
 OUT=${3:-$HERE/build/eval}
 

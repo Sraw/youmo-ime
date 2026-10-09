@@ -18,25 +18,29 @@ import androidx.appcompat.app.AlertDialog
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.updateLayoutParams
+import androidx.core.widget.doAfterTextChanged
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.card.MaterialCardView
 import com.google.android.material.checkbox.MaterialCheckBox
 import com.google.android.material.floatingactionbutton.FloatingActionButton
 import com.google.android.material.R as MaterialR
+import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.core.getPunctuationConfig
-import org.fcitx.fcitx5.android.daemon.launchOnReady
 import org.fcitx.fcitx5.android.data.punctuation.PunctuationManager
 import org.fcitx.fcitx5.android.data.punctuation.PunctuationMapEntry
 import org.fcitx.fcitx5.android.ui.main.MainViewModel.ButtonMode
+import org.fcitx.fcitx5.android.utils.appContext
 import org.fcitx.fcitx5.android.utils.lazyRoute
 import org.fcitx.fcitx5.android.utils.materialTextInput
 import org.fcitx.fcitx5.android.utils.onPositiveButtonClick
 import org.fcitx.fcitx5.android.utils.str
 import org.fcitx.fcitx5.android.utils.styledColor
+import org.fcitx.fcitx5.android.utils.toast
 import splitties.dimensions.dp
 import splitties.resources.drawable
+import timber.log.Timber
 
 /**
  * The Chinese punctuation map as cards, the key drawn as a key and what it types beside it.
@@ -54,6 +58,14 @@ class PunctuationEditorFragment : ProgressFragment() {
     private lateinit var adapter: Adapter
 
     private lateinit var list: RecyclerView
+
+    // one save at a time, the newest last, on the app's scope: separate saves waiting for fcitx
+    // could land in any order, and fcitx's own scope drops what waits on it when it stops
+    private val saves = LatestWriter(FcitxApplication.getInstance().coroutineScope) {
+        Timber.w(it, "punctuation")
+        // the fragment may be gone by now
+        appContext.toast(it)
+    }
 
     override suspend fun initialize(): View {
         lang = args.lang ?: DEFAULT_LANG
@@ -99,7 +111,9 @@ class PunctuationEditorFragment : ProgressFragment() {
 
     private fun save() {
         val snapshot = entries.toList()
-        fcitx.launchOnReady { PunctuationManager.save(it, lang, snapshot) }
+        val connection = fcitx
+        val language = lang
+        saves.submit { connection.runOnReady { PunctuationManager.save(this, language, snapshot) } }
     }
 
     @SuppressLint("NotifyDataSetChanged")
@@ -117,7 +131,17 @@ class PunctuationEditorFragment : ProgressFragment() {
             altField.setText(it.altMapping)
         }
         // a key's cards are its candidates in order: this puts one before the others
-        val first = MaterialCheckBox(ctx).apply { setText(R.string.punctuation_first) }
+        val first = MaterialCheckBox(ctx).apply {
+            setText(R.string.punctuation_first)
+            // checked for the card that is first already, so that unchecking it hands the place on
+            isChecked = entries.firstBoxChecked(index, keyField.str)
+        }
+        // the place it holds is its own key's: a changed key, the box left alone, does not give it the new one's
+        var firstSetByHand = false
+        first.setOnClickListener { firstSetByHand = true }
+        keyField.doAfterTextChanged {
+            if (!firstSetByHand) first.isChecked = entries.firstBoxChecked(index, keyField.str)
+        }
         val layout = LinearLayout(ctx).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(ctx.dp(20), ctx.dp(10), ctx.dp(20), 0)
@@ -144,6 +168,11 @@ class PunctuationEditorFragment : ProgressFragment() {
                 keyField.requestFocus()
                 return@onClick false
             }
+            if (!isPunctuationKey(key)) {
+                keyField.error = getString(R.string.invalid_value)
+                keyField.requestFocus()
+                return@onClick false
+            }
             val mapping = mappingField.str
             if (mapping.isBlank()) {
                 mappingField.error = getString(R.string._cannot_be_empty, getString(R.string.punctuation_mapping))
@@ -152,14 +181,9 @@ class PunctuationEditorFragment : ProgressFragment() {
             }
             // a key may have several cards: typing it offers their marks as candidates
             val new = PunctuationMapEntry(key, mapping, altField.str)
-            var at = index ?: entries.size
-            if (index == null) entries.add(new) else entries[index] = new
-            val firstOfKey = entries.indexOfFirst { it.key == key }
-            if (first.isChecked && firstOfKey < at) {
-                entries.removeAt(at)
-                entries.add(firstOfKey, new)
-                at = firstOfKey
-            }
+            if (index != null) entries.removeAt(index)
+            val at = punctuationCardPosition(entries, key, index ?: entries.size, first.isChecked)
+            entries.add(at, new)
             // whether a key has choices shows on each of its cards, and cards may have moved
             adapter.notifyDataSetChanged()
             list.scrollToPosition(at + 1)
@@ -251,9 +275,46 @@ class PunctuationEditorFragment : ProgressFragment() {
         viewModel.setToolbarTitle(args.title)
     }
 
+    override fun onDestroy() {
+        saves.close()
+        super.onDestroy()
+    }
+
     companion object {
         const val DEFAULT_LANG = "zh_CN"
         private const val HEADER = 0
         private const val CARD = 1
+    }
+}
+
+/** fcitx's punctuation map keeps a key only when it is one character, and typing looks one up. */
+internal fun isPunctuationKey(key: String) = key.codePointCount(0, key.length) == 1
+
+/** Whether the card at [index] is the first of several for its key, the one the key types. */
+internal fun List<PunctuationMapEntry>.isFirstOfSeveral(index: Int): Boolean {
+    val key = this[index].key
+    return indexOfFirst { it.key == key } == index && count { it.key == key } > 1
+}
+
+/**
+ * Whether the "first" box of the card at [index] (null for a new one), left alone, is checked
+ * while [typed] is in its key field: for the first of several cards of a key, and only while that
+ * key is typed, since a changed key's first card is another one.
+ */
+internal fun List<PunctuationMapEntry>.firstBoxChecked(index: Int?, typed: String) =
+    index != null && isFirstOfSeveral(index) && typed.trim() == this[index].key
+
+/**
+ * Where a card for [key] goes among [others], the cards without it, [at] being where it was (the
+ * end for a new one). It goes first of its key only when [first] asks for it; left where it was
+ * ahead of the key's other cards (a changed key can put it there), it goes after them instead.
+ */
+internal fun punctuationCardPosition(others: List<PunctuationMapEntry>, key: String, at: Int, first: Boolean): Int {
+    val firstOfKey = others.indexOfFirst { it.key == key }
+    return when {
+        firstOfKey < 0 -> at
+        first -> minOf(at, firstOfKey)
+        at <= firstOfKey -> others.indexOfLast { it.key == key } + 1
+        else -> at
     }
 }

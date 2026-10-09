@@ -16,6 +16,7 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import org.fcitx.fcitx5.android.core.Fcitx
 import org.fcitx.fcitx5.android.core.FcitxEvent
+import org.fcitx.fcitx5.android.engine.host.Engines
 import org.junit.Assert.assertEquals
 import org.junit.Assume.assumeTrue
 import org.junit.Test
@@ -34,7 +35,7 @@ class EngineEvalRunner {
         val args = InstrumentationRegistry.getArguments()
         val set = args.getString("evalSet")
         assumeTrue("pass -e evalSet <name> to run", set != null)
-        val ime = args.getString("evalIme") ?: "pinyin"
+        val ime = args.getString("evalIme") ?: Engines.PINYIN
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val testContext = InstrumentationRegistry.getInstrumentation().context
         val inputs = testContext.assets.open("$set.tsv").bufferedReader().useLines { lines ->

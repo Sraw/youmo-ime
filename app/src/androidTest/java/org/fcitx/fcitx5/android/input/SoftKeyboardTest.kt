@@ -21,8 +21,11 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.core.FcitxAPI
+import org.fcitx.fcitx5.android.core.InputMethodEntry
+import org.fcitx.fcitx5.android.core.InputMethodNames
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.daemon.FcitxDaemon
+import org.fcitx.fcitx5.android.engine.host.Engines
 import org.junit.After
 import org.junit.AfterClass
 import org.junit.Assert.assertEquals
@@ -58,16 +61,28 @@ class SoftKeyboardTest {
         scenario = ActivityScenario.launch(intent)
         // the keyboard is up once its Backspace is
         key(By.pkg(imePkg).desc(string(R.string.a11y_key_backspace)))
-        val name = withFcitx {
+        val ime = withFcitx {
             if (originalIms == null) originalIms = enabledIme().map { it.uniqueName }.toTypedArray()
             if (enabledIme().none { it.uniqueName == inputMethod }) {
                 setEnabledIme((enabledIme().map { it.uniqueName } + inputMethod).toTypedArray())
             }
             activateIme(inputMethod)
-            enabledIme().first { it.uniqueName == inputMethod }.displayName
+            // with its sub-mode, which only the active input context's status has
+            currentIme()
         }
+        assertEquals("the input method switched to", inputMethod, ime.uniqueName)
         // the Space key names the input method; wait for the switch to show
-        key(onKeyboard().desc(string(R.string.a11y_key_space_with_ime, name)))
+        key(onKeyboard().desc(string(R.string.a11y_key_space_with_ime, spaceName(ime))))
+    }
+
+    /**
+     * Space's name for [ime], as TextKeyboard.onInputMethodUpdate puts it: the app's name for the
+     * input method, in the app's language (fcitx names the engine's own in Chinese only: 拼音), and
+     * its sub-mode's.
+     */
+    private fun spaceName(ime: InputMethodEntry) = buildString {
+        append(InputMethodNames.of(context, ime))
+        ime.subMode.run { label.ifEmpty { name.ifEmpty { null } } }?.let { append(" ($it)") }
     }
 
     @Before
@@ -141,22 +156,22 @@ class SoftKeyboardTest {
     }
 
     /**
-     * After a pick, Pinyin offers predictions (的, 了, ...) for what might come next. The first
-     * Backspace dismisses them -- the engine takes the key for that -- and only the next one
-     * deletes. Looks like a lost key press if the predictions go unnoticed.
+     * After a pick, Pinyin offers predictions (的, 了, ...) for what might come next. A Backspace
+     * then goes to the app, which deletes, and the predictions go away with it (PinyinSession's
+     * backspace with nothing typed); libime's pinyin instead took the first one only to dismiss them.
      */
     @Test
-    fun backspaceAfterAPickFirstDismissesThePredictions() {
+    fun backspaceAfterAPickDeletesAndDismissesThePredictions() {
         launch(inputMethod = PINYIN)
         tapLetters("nihao")
         key(candidate("你好")).click()
         assertFieldBecomes("你好")
         key(anyCandidate()) // predictions, whichever the dictionary offers
         tap(R.string.a11y_key_backspace)
-        assertTrue("predictions dismissed", device.wait(Until.gone(anyCandidate()), 5_000))
-        assertFieldBecomes("你好")
-        tap(R.string.a11y_key_backspace)
         assertFieldBecomes("你")
+        assertTrue("predictions dismissed", device.wait(Until.gone(anyCandidate()), 5_000))
+        tap(R.string.a11y_key_backspace)
+        assertFieldBecomes("")
     }
 
     @Test
@@ -332,7 +347,7 @@ class SoftKeyboardTest {
     }
 
     private companion object {
-        const val PINYIN = "pinyin"
+        const val PINYIN = Engines.PINYIN
         const val ENGLISH = "keyboard-us"
 
         val instrumentation = InstrumentationRegistry.getInstrumentation()!!
