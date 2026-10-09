@@ -119,6 +119,26 @@ class AutoPairsTest {
         assertEquals("|））", t.shown)
     }
 
+    /** Nothing composed is the range (0,0), which holds 0: a move there is a move all the same. */
+    @Test
+    fun theCursorMovedToTheStartForgetsThePairs() {
+        val t = Typing("")
+        t.type("“")
+        t.session.onCursorUpdate(1, 1, -1, -1, ignoreSystemCursor = false)
+        t.editor.setSelection(0, 0)
+        t.session.onCursorUpdate(0, 0, -1, -1, ignoreSystemCursor = false)
+        assertFalse(t.pairs.quoteOpen)
+        // the app deleted what was before a closing one put in: one typed there is typed, not
+        // stepped over
+        val d = Typing("")
+        d.type("（")
+        d.session.onCursorUpdate(1, 1, -1, -1, ignoreSystemCursor = false)
+        d.editor.deleteSurroundingText(1, 0, inCodePoints = false)
+        d.session.onCursorUpdate(0, 0, -1, -1, ignoreSystemCursor = false)
+        d.type("）")
+        assertEquals("）|）", d.shown)
+    }
+
     @Test
     fun aSelectionOrAPreeditIsLeftToTheCaller() {
         val t = Typing("abc", cursor = 0)
@@ -142,7 +162,15 @@ class AutoPairsTest {
         // fcitx reset meanwhile: the quote key gives “ again
         t.type("“")
         assertEquals("“好”|", t.shown)
+        // which fcitx now counts open: quoteOpen says so till the cursor report, where the service
+        // sees it fall and resets fcitx; else the next quote would be a lone ”
+        assertTrue(t.pairs.quoteOpen)
+        t.session.onCursorUpdate(3, 3, -1, -1, ignoreSystemCursor = false)
         assertFalse(t.pairs.quoteOpen)
+        // fcitx's own ” closed what it counted: nothing to reset
+        val s = Typing("")
+        s.type("“好”")
+        assertFalse(s.pairs.quoteOpen)
     }
 
     @Test

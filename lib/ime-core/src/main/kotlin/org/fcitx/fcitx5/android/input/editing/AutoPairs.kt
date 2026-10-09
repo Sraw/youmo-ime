@@ -22,6 +22,8 @@ package org.fcitx.fcitx5.android.input.editing
  *
  * fcitx's punctuation turns `"` into “ or ” by the quotes it saw open, so either of them typed
  * at a ” put in steps over it: fcitx reset (the screen turned) may have taken the ” for an “.
+ * It then counts that “ open, so [quoteOpen] holds till the next cursor report, for the service
+ * to reset fcitx there as when a pair is left.
  */
 class AutoPairs internal constructor(private val session: EditingSession, private val editor: InputEditor) {
 
@@ -30,8 +32,14 @@ class AutoPairs internal constructor(private val session: EditingSession, privat
 
     private val pairs = ArrayList<Pair>()
 
-    /** Whether a ” or ’ put in is remembered: fcitx counts its “ as open till the ” is typed. */
-    val quoteOpen: Boolean get() = pairs.any { it.closer in QUOTE_CLOSERS }
+    /** A ” or ’ stepped over with “ or ‘, its cursor report still to come; see [cursorReported]. */
+    private var steppedOverWithOpener = false
+
+    /**
+     * Whether fcitx counts a “ or ‘ open: one put in here, till its ” or ’ is typed, or one typed
+     * to step over a ” or ’, till the cursor report after it.
+     */
+    val quoteOpen: Boolean get() = steppedOverWithOpener || pairs.any { it.closer in QUOTE_CLOSERS }
 
     /**
      * [text] typed, a character the user means to insert: true if it was handled here, as a
@@ -48,6 +56,7 @@ class AutoPairs internal constructor(private val session: EditingSession, privat
         val closes = c == top || QUOTES[c] == top
         if (top != null && after == top && closes) {
             pairs.removeAt(pairs.lastIndex)
+            if (c in QUOTES) steppedOverWithOpener = true
             session.applySelectionOffset(1, 1)
             return true
         }
@@ -88,6 +97,14 @@ class AutoPairs internal constructor(private val session: EditingSession, privat
 
     /** The pairs put in are no longer where the cursor is: none steps over or goes with Backspace. */
     fun forget() = pairs.clear()
+
+    /**
+     * A cursor report reached [EditingSession.onCursorUpdate]. A step over with “ no longer
+     * counts as [quoteOpen] after it: the service, seeing that fall, resets fcitx's count.
+     */
+    internal fun cursorReported() {
+        steppedOverWithOpener = false
+    }
 
     // nothing composing (a preedit is fcitx's to commit) and no selection (typing replaces it)
     private fun plainCursor() = editor.isAvailable && session.composing.isEmpty() && session.selection.latest.isEmpty()

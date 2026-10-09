@@ -5,6 +5,7 @@
 package org.fcitx.fcitx5.android.input.editing
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotEquals
 import org.junit.Test
 
 class ContextMemoryTest {
@@ -99,5 +100,32 @@ class ContextMemoryTest {
         assertEquals(false, memory.remembers(now = 3))
         assertEquals("", memory.context("", empty = true, now = 3))
         assertEquals(false, ContextMemory().remembers(now = 0))
+    }
+
+    @Test
+    fun aBackspaceTakesTheSelectionOrTheCodePointBeforeTheCursor() {
+        memory.committed("你好", now = 0)
+        // at the start of the text: nothing before the cursor to take
+        memory.backspace(start = 0, end = 0)
+        assertEquals("你好", memory.context("", empty = true, now = 1))
+        memory.backspace(start = 2, end = 2)
+        assertEquals("你", memory.context("", empty = true, now = 2))
+        memory.backspace(start = 0, end = 1)
+        assertEquals("", memory.context("", empty = true, now = 3))
+    }
+
+    @Test
+    fun theFieldsOfOneViewAreToldApartByWhatTheySayOfThemselves() {
+        val chat = ContextMemory.field("app", 1, type = 1, name = null, hint = "Message")
+        val search = ContextMemory.field("app", 1, type = 1, name = null, hint = "Search")
+        assertEquals(chat, ContextMemory.field("app", 1, type = 1, name = null, hint = "Message"))
+        assertNotEquals(chat, ContextMemory.field("app", 1, type = 0x20001, name = null, hint = "Message"))
+        assertNotEquals(chat, ContextMemory.field("app", 1, type = 1, name = "to", hint = "Message"))
+        val shared = ContextMemory().apply { focus(chat) }
+        shared.committed("在吗", now = 0)
+        shared.focus(search)
+        assertEquals("", shared.context("", empty = true, now = 1))
+        shared.focus(chat)
+        assertEquals("在吗", shared.context("", empty = true, now = 2))
     }
 }

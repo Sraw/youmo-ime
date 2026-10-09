@@ -109,6 +109,7 @@ class EditingSession(
     ): CursorUpdate {
         checkThread()
         val updateIndex = ++cursorUpdateIndex
+        pairs.cursorReported()
         if (selection.consume(selStart, selEnd)) {
             // Only when the prediction matched: an InputFilter can also change the text, and
             // then the old range may no longer be the composition.
@@ -119,8 +120,8 @@ class EditingSession(
         }
         selection.resetTo(selStart, selEnd)
         // the user moved the cursor, or the app changed the text: the pairs are not around it,
-        // unless it moved within what is composed between them
-        if (selStart != selEnd || !composing.contains(selStart)) pairs.forget()
+        // unless it moved within what is composed between them (the empty range still holds 0)
+        if (selStart != selEnd || composing.isEmpty() || !composing.contains(selStart)) pairs.forget()
         // a selection (rather than a cursor) leaves the composition to the next cursor report
         if (selStart != selEnd) return CursorUpdate.None
         if (composing.isEmpty()) return CursorUpdate.ResetIfNotEmpty
@@ -188,7 +189,8 @@ class EditingSession(
             }
             composingText = text
         }
-        CoreLog.d { "composing '$text' at $composing, predicted ${selection.latest}" }
+        // its length only: the debug log can be exported, and the preedit is what the user typed
+        CoreLog.d { "composing ${text.length} chars at $composing, predicted ${selection.latest}" }
     }
 
     fun resetComposingState() {
@@ -220,14 +222,15 @@ class EditingSession(
         checkThread()
         if (!editor.isAvailable) return
         // When the commit is exactly what is already composing, there is nothing to replace:
-        // finish the composition as-is and only move the cursor if it is not already there.
+        // finish the composition as-is and only move the cursor if it is not already there, or on
+        // its way there: a pending move (the preedit cursor's, say) is where the caret will be.
         // Re-committing identical text would make the editor redraw and can drop spans.
         if (composing.isNotEmpty() && composingText.toString() == text) {
             val c = if (cursor == -1) text.length else cursor
             val target = composing.start + c
             resetComposingState()
             editor.batchEdit {
-                if (selection.current.start != target) {
+                if (selection.latest.start != target) {
                     selection.predict(target)
                     editor.setSelection(target, target)
                 }

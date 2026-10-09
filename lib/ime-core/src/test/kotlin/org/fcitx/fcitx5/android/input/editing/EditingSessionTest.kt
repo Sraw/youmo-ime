@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.input.editing
 
+import org.fcitx.fcitx5.android.core.CoreLog
 import org.fcitx.fcitx5.android.core.FormattedText
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -145,22 +146,25 @@ class EditingSessionTest {
     }
 
     /**
-     * Pins upstream behaviour: this branch compares against the *confirmed* cursor, where every
-     * other path uses the latest prediction. With a move to 0 still unconfirmed and the editor
-     * last seen at 2 (the target), no setSelection is sent -- so if the pending move does land,
-     * the caret ends up at 0 rather than after the composition.
+     * A move the editor has not reported yet is where the caret is going, so this branch
+     * compares with the latest prediction, as every other path does. With the confirmed cursor
+     * (2, the target) no move was sent, and the pending move to 0 left the caret inside the
+     * committed text.
      */
     @Test
-    fun finishingAnIdenticalCompositionComparesWithTheConfirmedCursorNotAPendingOne() {
+    fun finishingAnIdenticalCompositionMovesTheCursorOnFromAPendingMove() {
         val (s, e) = session("你好", cursor = 2)
         s.compose("你好", start = 0)
         s.selection.resetTo(2)
-        s.selection.predict(0) // e.g. an arrow key the editor has not acknowledged yet
+        // a preedit cursor move (updateComposingText), sent but not reported yet
+        s.selection.predict(0)
+        e.setSelection(0, 0)
 
         s.commitText("你好")
 
-        assertFalse("no move sent, as the confirmed cursor is already there", e.calls.any { it.startsWith("setSelection") })
-        assertTrue("and the pending prediction is left as it was", s.selection.latest.rangeEquals(0))
+        assertTrue("moved after the composition", e.calls.contains("setSelection(2, 2)"))
+        assertEquals(2, e.selectionStart)
+        assertTrue("and predicted there", s.selection.latest.rangeEquals(2))
     }
 
     @Test
@@ -912,6 +916,20 @@ class EditingSessionTest {
         s.updateComposingText(preedit("ni", cursor = 2)) { it.toString().uppercase() }
         assertEquals("NI", e.text)
         assertEquals("the formatted text is what is remembered", "ni", s.composingText.toString())
+    }
+
+    @Test
+    fun theDebugLogHasThePreeditsLengthNotItsText() {
+        val logged = ArrayList<String>()
+        CoreLog.sink = { logged += it }
+        try {
+            val (s, _) = session("", cursor = 0)
+            s.updateComposingText(preedit("nihao", cursor = 5))
+        } finally {
+            CoreLog.sink = null
+        }
+        assertTrue(logged.any { "composing 5 chars" in it })
+        assertFalse(logged.any { "nihao" in it })
     }
 
     @Test

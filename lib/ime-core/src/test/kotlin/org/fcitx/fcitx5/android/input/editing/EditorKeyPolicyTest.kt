@@ -91,6 +91,33 @@ class EditorKeyPolicyTest {
         )
     }
 
+    private val wave = String(Character.toChars(0x1F44B)) // two UTF-16 units
+
+    /** An arrow at [cursor] in [text], with the editor showing what is beside the cursor. */
+    private fun arrow(direction: Direction, text: String, cursor: Int) = EditorKeyPolicy.onArrow(
+        EditorTraits(), direction, cursor, cursor,
+        textBefore = { text.substring((cursor - it).coerceAtLeast(0), cursor) },
+        textAfter = { text.substring(cursor, (cursor + it).coerceAtMost(text.length)) },
+    )
+
+    /** One unit beside an emoji is between its surrogates, where the next commit would split it. */
+    @Test
+    fun anArrowStepsOverAWholeEmoji() {
+        val text = "a${wave}b"
+        assertEquals(ArrowAction.MoveCursor(1), arrow(Direction.Left, text, 3))
+        assertEquals(ArrowAction.MoveCursor(3), arrow(Direction.Right, text, 1))
+        // a letter beside one is still one unit
+        assertEquals(ArrowAction.MoveCursor(3), arrow(Direction.Left, text, 4))
+        assertEquals(ArrowAction.MoveCursor(1), arrow(Direction.Right, text, 0))
+    }
+
+    /** A lone half (malformed, or the cursor already between the halves) or no text: one unit. */
+    @Test
+    fun anArrowMovesOneUnitWhereTheTextTellsNoCodePoint() {
+        assertEquals(ArrowAction.MoveCursor(3), arrow(Direction.Right, "a${wave}b", 2))
+        assertEquals(ArrowAction.MoveCursor(-1), arrow(Direction.Left, "ab", 0))
+    }
+
     /** Browsers take the arrow key in the address bar to accept the highlighted suggestion. */
     @Test
     fun aUrlFieldGetsTheKeyEvent() {

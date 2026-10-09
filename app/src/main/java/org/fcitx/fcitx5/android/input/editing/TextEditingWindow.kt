@@ -78,7 +78,7 @@ class TextEditingWindow : InputWindow.ExtendedInputWindow<TextEditingWindow>(),
             cutButton.setOnClickListener {
                 // deactivate select button after operation
                 userSelection = false
-                service.currentInputConnection?.performContextMenuAction(android.R.id.cut)
+                service.performContextMenuAction(android.R.id.cut)
             }
             copyButton.setOnClickListener {
                 userSelection = false
@@ -86,11 +86,11 @@ class TextEditingWindow : InputWindow.ExtendedInputWindow<TextEditingWindow>(),
             }
             pasteButton.setOnClickListener {
                 userSelection = false
-                service.currentInputConnection?.performContextMenuAction(android.R.id.paste)
+                service.performContextMenuAction(android.R.id.paste)
             }
             backspaceButton.onClickWithRepeating {
                 userSelection = false
-                service.sendDownUpKeyEvents(KeyEvent.KEYCODE_DEL)
+                service.sendBackspaceKey()
             }
             clipboardButton.setOnClickListener {
                 windowManager.attachWindow(ClipboardWindow())

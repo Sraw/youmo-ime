@@ -31,4 +31,20 @@ class CapabilityFlagsTest {
         // a signed number shares no bit of the variation
         assertFalse(flags(InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_FLAG_SIGNED).has(CapabilityFlag.Password))
     }
+
+    @Test
+    fun aShownPasswordIsAPasswordToTheKeyboardOnly() {
+        fun info(type: Int, options: Int = 0) = EditorInfo().apply { inputType = type; imeOptions = options }
+        val shown = info(InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD)
+        assertTrue(CapabilityFlags.isPassword(shown))
+        // fcitx is told what it was told before: a sensitive field
+        assertFalse(CapabilityFlags.fromEditorInfo(shown).has(CapabilityFlag.Password))
+        assertTrue(CapabilityFlags.isPassword(info(InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD)))
+        assertTrue(CapabilityFlags.isPassword(info(InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_VARIATION_PASSWORD)))
+        assertFalse(CapabilityFlags.isPassword(info(InputType.TYPE_CLASS_TEXT)))
+        // sensitive too, but no password
+        assertFalse(CapabilityFlags.isPassword(info(InputType.TYPE_CLASS_TEXT, EditorInfo.IME_FLAG_NO_PERSONALIZED_LEARNING)))
+        // the variation's bits mean something else in another class
+        assertFalse(CapabilityFlags.isPassword(info(InputType.TYPE_CLASS_NUMBER or InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD)))
+    }
 }

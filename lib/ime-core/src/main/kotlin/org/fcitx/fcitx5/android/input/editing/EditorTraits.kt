@@ -63,21 +63,48 @@ object EditorKeyPolicy {
     }
 
     /**
-     * An arrow moves a collapsed cursor by one unit; on a selection it collapses to the side
-     * it points at without moving further, as it does in desktop editors.
+     * An arrow moves a collapsed cursor by one code point, never between the halves of a
+     * surrogate pair (an emoji), where the next commit would split it; on a selection it
+     * collapses to the side it points at without moving further, as it does in desktop editors.
+     *
+     * [textBefore] and [textAfter] give up to that many units beside the cursor, as
+     * `getTextBeforeCursor`/`getTextAfterCursor` do; only the side moved over is asked, and only
+     * for a collapsed cursor. Where that tells nothing (null, no text, a lone half) the move is
+     * one unit. That cursor must be the one at [start]: [ArrowKeys] keeps it so over a run of
+     * presses the editor has not reported yet.
      *
      * The target can be -1 at the very start of the text (or past the end, at the end). The
      * editor ignores an out-of-range selection, so the key simply does nothing there, as it
      * always has.
      */
-    fun onArrow(traits: EditorTraits, direction: Direction, start: Int, end: Int): ArrowAction {
+    fun onArrow(
+        traits: EditorTraits,
+        direction: Direction,
+        start: Int,
+        end: Int,
+        textBefore: (length: Int) -> CharSequence? = { null },
+        textAfter: (length: Int) -> CharSequence? = { null },
+    ): ArrowAction {
         if (traits.isRawKeyInput || traits.isUri) return ArrowAction.SendKey
-        val offset = if (start == end) 1 else 0
+        val offset = if (start == end) codePointUnits(direction, textBefore, textAfter) else 0
         return ArrowAction.MoveCursor(
             when (direction) {
                 Direction.Left -> start - offset
                 Direction.Right -> end + offset
             }
         )
+    }
+
+    private fun codePointUnits(
+        direction: Direction,
+        textBefore: (Int) -> CharSequence?,
+        textAfter: (Int) -> CharSequence?,
+    ): Int {
+        // two units hold a surrogate pair
+        val units = when (direction) {
+            Direction.Left -> textBefore(2)?.let { CodePoints.lengthOfLast(it, 1) }
+            Direction.Right -> textAfter(2)?.let { CodePoints.lengthOfFirst(it, 1) }
+        }
+        return units?.takeIf { it > 0 } ?: 1
     }
 }

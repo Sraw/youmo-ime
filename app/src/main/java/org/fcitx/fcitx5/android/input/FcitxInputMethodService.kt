@@ -71,6 +71,8 @@ import org.fcitx.fcitx5.android.data.prefs.ManagedPreferenceProvider
 import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.input.cursor.CursorRange
+import org.fcitx.fcitx5.android.input.editing.ArrowKeys
+import org.fcitx.fcitx5.android.input.editing.CodePoints
 import org.fcitx.fcitx5.android.input.editing.ContextMemory
 import org.fcitx.fcitx5.android.input.editing.EditingSession
 import org.fcitx.fcitx5.android.input.editing.EditorKeyPolicy
@@ -123,8 +125,9 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
 
     private var capabilityFlags = CapabilityFlags.DefaultFlags
 
-    /** nothing said out loud goes into a password */
-    val inPasswordField get() = capabilityFlags.has(CapabilityFlag.Password)
+    /** nothing said out loud goes into a password, its characters shown or not */
+    var inPasswordField = false
+        private set
 
     private val editingSession = EditingSession(
         InputConnectionEditor { currentInputConnection },
@@ -142,6 +145,9 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     val currentInputSelection: CursorRange
         get() = selection.latest
 
+    /** The arrow keys, ahead of the editor's cursor reports. */
+    private val arrowKeys = ArrowKeys(editingSession.selection)
+
     private fun resetComposingState() = editingSession.resetComposingState()
 
     private var highlightColor: Int = DefaultHighlightColor
@@ -153,6 +159,9 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
 
     /** What was written in each app, the engine's context where a field has none of its own. */
     private val contextMemory = ContextMemory()
+
+    // onFinishInputView's focus out dropped the engine's context, and no onStartInput told it since
+    private var contextDropped = false
 
     private val recreateInputViewPrefs: Array<ManagedPreference<*>> = arrayOf(
         prefs.keyboard.expandKeypressArea,
@@ -323,12 +332,41 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
 
     private fun handleBackspaceKey() {
         val deleting = selection.latest
-        if (deleting.isNotEmpty()) contextMemory.cut() else if (deleting.start > 0) contextMemory.deleted()
+        contextMemory.backspace(deleting.start, deleting.end)
         // an empty pair put in goes whole: its closing one here, the opening one as ever
-        if (pairing) editingSession.pairs.backspace()
+        if (pairing) {
+            val quoteOpen = editingSession.pairs.quoteOpen
+            editingSession.pairs.backspace()
+            // an empty “” gone: fcitx's punctuation does not take its “ back on Backspace, and would
+            // make the next quote a lone ”. Its context is read now, less the “: the key event sent
+            // next may not have landed by a read after it
+            if (quoteOpen && !editingSession.pairs.quoteOpen) {
+                postFcitxJob { reset() }
+                tellTextBeforeCursor {
+                    currentInputConnection?.getTextBeforeCursor(ContextChars + 1, 0)
+                        ?.let { it.dropLast(CodePoints.lengthOfLast(it, 1) ?: 1) }
+                }
+            }
+        }
         if (!editingSession.backspace(currentInputEditorInfo.toEditorTraits())) {
             sendDownUpKeyEvents(KeyEvent.KEYCODE_DEL)
         }
+    }
+
+    /** The text-editing panel's Backspace, a key event as ever: what it takes is not kept as context. */
+    fun sendBackspaceKey() {
+        val deleting = selection.latest
+        contextMemory.backspace(deleting.start, deleting.end)
+        sendDownUpKeyEvents(KeyEvent.KEYCODE_DEL)
+    }
+
+    /**
+     * The text-editing panel's menu action, done by the editor: a selection a cut or a paste
+     * takes away is not kept as context any more than Backspace's.
+     */
+    fun performContextMenuAction(id: Int) {
+        if ((id == android.R.id.cut || id == android.R.id.paste) && selection.latest.isNotEmpty()) contextMemory.cut()
+        currentInputConnection?.performContextMenuAction(id)
     }
 
     /**
@@ -363,9 +401,10 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
             EditorKeyPolicy.Direction.Left -> KeyEvent.KEYCODE_DPAD_LEFT
             EditorKeyPolicy.Direction.Right -> KeyEvent.KEYCODE_DPAD_RIGHT
         }
-        val (start, end) = currentInputSelection
-        when (val action = EditorKeyPolicy.onArrow(
-            currentInputEditorInfo.toEditorTraits(), direction, start, end
+        when (val action = arrowKeys.onArrow(
+            currentInputEditorInfo.toEditorTraits(), direction,
+            textBefore = { currentInputConnection?.getTextBeforeCursor(it, 0) },
+            textAfter = { currentInputConnection?.getTextAfterCursor(it, 0) },
         )) {
             EditorKeyPolicy.ArrowAction.SendKey -> sendDownUpKeyEvents(keyCode)
             is EditorKeyPolicy.ArrowAction.MoveCursor ->
@@ -492,6 +531,9 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
          */
         if (diff and f != diff) {
             super.onConfigurationChanged(newConfig)
+        } else if (currentInputStarted && currentInputEditorInfo?.isTypeNull() == false) {
+            // the reset above dropped the engine's context, and no input restarts to tell it anew
+            tellTextBeforeCursor { currentInputConnection?.getTextBeforeCursor(ContextChars, 0) }
         }
         lastKnownConfig = newConfig
     }
@@ -666,10 +708,14 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         resetComposingState()
         val flags = CapabilityFlags.fromEditorInfo(attribute)
         capabilityFlags = flags
+        inPasswordField = CapabilityFlags.isPassword(attribute)
         editingSession.pairs.forget()
+        arrowKeys.forget()
         // nothing of a password or a field that asks not to be learned from is kept
         contextMemory.focus(
-            "${attribute.packageName}#${attribute.fieldId}".takeUnless { flags.hasAny(CapabilityFlag.PasswordOrSensitive) }
+            ContextMemory.field(
+                attribute.packageName, attribute.fieldId, attribute.inputType, attribute.fieldName, attribute.hintText
+            ).takeUnless { flags.hasAny(CapabilityFlag.PasswordOrSensitive) }
         )
         // EditorInfo may change between onStartInput and onStartInputView
         inputDeviceMgr.notifyOnStartInput(attribute)
@@ -691,6 +737,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
                 focus(true)
             }
         }
+        contextDropped = false
         if (!isNullType) {
             // an editor that gives no initial text may still answer the connection
             val initial = Build.VERSION.SDK_INT >= Build.VERSION_CODES.R
@@ -733,6 +780,11 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
             }
             showStatusIcon(StatusIconMapping.fromEntry(fcitx.runImmediately { inputMethodEntryCached }))
         }
+        // shown again in the field it was hidden in, no onStartInput between to tell it anew
+        if (contextDropped) {
+            contextDropped = false
+            if (!info.isTypeNull()) tellTextBeforeCursor { currentInputConnection?.getTextBeforeCursor(ContextChars, 0) }
+        }
     }
 
     override fun onUpdateSelection(
@@ -748,11 +800,17 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         val update = editingSession.onCursorUpdate(
             newSelStart, newSelEnd, candidatesStart, candidatesEnd, ignoreSystemCursor
         )
-        // the user left a “” put in without typing its ”: fcitx's punctuation still counts the “
-        // open, and would make the next quote a lone ”. Nothing composed is lost (the cursor
-        // left it, finished in place), and the context the update tells fcitx comes after
-        if (quoteOpen && !editingSession.pairs.quoteOpen && editingSession.composing.isEmpty()) postFcitxJob { reset() }
+        arrowKeys.cursorReported(newSelStart, newSelEnd)
+        // the user left a “” put in without typing its ”, or stepped over its ” with a “: fcitx's
+        // punctuation still counts the “ open, and would make the next quote a lone ”. Nothing
+        // composed is lost (the cursor left it, finished in place), and the context comes after:
+        // the update's, or told here where the update tells none (a reset drops it)
+        val quoteReset = quoteOpen && !editingSession.pairs.quoteOpen && editingSession.composing.isEmpty()
+        if (quoteReset) postFcitxJob { reset() }
         handleCursorUpdate(update)
+        if (quoteReset && update == EditingSession.CursorUpdate.None) {
+            tellTextBeforeCursor { currentInputConnection?.getTextBeforeCursor(ContextChars, 0) }
+        }
         inputView?.updateSelection(newSelStart, newSelEnd)
     }
 
@@ -942,6 +1000,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         postFcitxJob {
             focusOutIn()
         }
+        contextDropped = true
         hideStatusIcon()
         showingDialog?.dismiss()
     }
@@ -952,6 +1011,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
             focus(false)
         }
         capabilityFlags = CapabilityFlags.DefaultFlags
+        inPasswordField = false
     }
 
     override fun onUnbindInput() {

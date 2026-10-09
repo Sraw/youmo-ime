@@ -8,8 +8,9 @@ package org.fcitx.fcitx5.android.input.editing
  * The end of what was written in each field, for the engine's context where the field has none: a
  * chat clears its box once a message is sent, and the reply typed next follows it more than it
  * follows nothing. Kept as long as it is [fresh], for the last [apps] fields, in memory only; the
- * service tells it nothing of a password or other sensitive field, and names a field by its app
- * and id, so a browser's sites do not share one.
+ * service tells it nothing of a password or other sensitive field, and names a field as [field]
+ * does: fields that say no more of themselves than their app and view share one, as a browser's
+ * sites or a chat app's conversations may.
  *
  * The text is what the editor showed before the cursor, the last time it was read, with what was
  * committed since and less what Backspace took: not read back each time, which would cost a round
@@ -76,6 +77,11 @@ class ContextMemory(
         last.setLength(last.length - Character.charCount(Character.codePointBefore(last, last.length)))
     }
 
+    /** A Backspace about to go where [start] to [end] is selected: the selection, or the code point before the cursor. */
+    fun backspace(start: Int, end: Int) {
+        if (start != end) cut() else if (start > 0) deleted()
+    }
+
     private fun remember(app: String, now: Long): Written {
         val last = written.getOrPut(app) { Written(StringBuilder(), now) }
         last.at = now
@@ -92,5 +98,13 @@ class ContextMemory(
 
         const val APPS = 8
         private const val LOAD = 0.75f
+
+        /**
+         * The name [focus] is given for a field: its [app], its view's [id], and what it says of
+         * itself ([type], [name], [hint]), which tells apart the fields one view holds (a Compose
+         * screen's, a browser's) where they differ.
+         */
+        fun field(app: String?, id: Int, type: Int, name: String?, hint: CharSequence?): String =
+            "$app#$id#$type#${name.orEmpty()}#${hint ?: ""}"
     }
 }

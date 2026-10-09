@@ -182,6 +182,16 @@ value class CapabilityFlags constructor(val flags: ULong) {
             }
             return CapabilityFlags(flags)
         }
+
+        /**
+         * Whether [info] is a password's, its characters hidden or shown: fcitx is told a shown
+         * one is only [CapabilityFlag.Sensitive], so what the keyboard keeps out of a password
+         * (pairs, voice) asks here.
+         */
+        fun isPassword(info: EditorInfo): Boolean =
+            fromEditorInfo(info).has(CapabilityFlag.Password) ||
+                (info.inputType and (InputType.TYPE_MASK_CLASS or InputType.TYPE_MASK_VARIATION)) ==
+                (InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD)
     }
 
     constructor(vararg flags: CapabilityFlag) : this(mergeFlags(flags))
