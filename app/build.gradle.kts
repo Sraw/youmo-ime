@@ -76,8 +76,10 @@ android {
     }
 
     androidResources {
+        // Android 13's per-app languages are xml/locales_config.xml, AppLanguage's: generated, they
+        // would offer every values-* directory, the partial translations too
         @Suppress("UnstableApiUsage")
-        generateLocaleConfig = true
+        generateLocaleConfig = false
     }
 
     testOptions {

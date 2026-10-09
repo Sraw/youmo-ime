@@ -51,7 +51,7 @@
     <string name="expanded_candidate_style_flexbox">Flexbox</string>
     <string name="no_more_input_methods">Методов ввода для переключения больше нет</string>
     <string name="add_more_input_methods">Хотите добавить больше методов ввода?</string>
-    <string name="about">О fcitx5 для Android</string>
+    <string name="about">О программе</string>
     <string name="faq">FAQ</string>
     <string name="current_version">Текущая версия</string>
     <string name="real_time_logs">Журналы в реальном времени</string>
@@ -62,11 +62,11 @@
     <string name="delete">Удалить</string>
     <string name="clipboard">Буфер обмена</string>
     <string name="keyboard_height">Высота клавиатуры</string>
-    <string name="virtual_keyboard">Виртуальная клавиатура</string>
+    <string name="virtual_keyboard">Клавиши и отклик</string>
     <string name="clipboard_suggestion_timeout">Тайм-аут предложения буфера обмена</string>
     <string name="version">Версия</string>
     <string name="build_time">Время сборки</string>
-    <string name="build_git_hash">Построить хэш Git</string>
+    <string name="build_git_hash">Git-хэш сборки</string>
     <string name="source_code">Исходный код</string>
     <string name="privacy_policy">Политика конфиденциальности</string>
     <string name="license">Лицензия</string>
@@ -97,7 +97,7 @@
     <string name="invalid_quickphrase">Неверный тип быстрой фразы</string>
     <string name="create_new">Создать новый</string>
     <string name="name">Имя</string>
-    <string name="reset">Перезагрузить</string>
+    <string name="reset">Сбросить</string>
     <string name="quickphrase_keyword">Ключевое слово</string>
     <string name="quickphrase_phrase">Фраза</string>
     <string name="input_method_options">Параметры метода ввода</string>
@@ -216,6 +216,7 @@
     <string name="fcitx_daemon">Демон Fcitx</string>
     <string name="restarting_fcitx">Перезапуск Fcitx</string>
     <string name="removed_n_items">Удаленный %1$d элемент(ы)</string>
+    <string name="added_n_items">Добавлено элементов: %1$d</string>
     <string name="whether_reset_switch_preference">Вы хотите сбросить этот параметр по умолчанию?</string>
     <string name="enabled">Включено</string>
     <string name="following_system_settings">Следовать системным настройкам</string>

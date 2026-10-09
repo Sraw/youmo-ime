@@ -2,6 +2,7 @@
  * SPDX-License-Identifier: LGPL-2.1-or-later
  * SPDX-FileCopyrightText: Copyright 2021-2026 Fcitx5 for Android Contributors
  */
+import com.android.build.api.artifact.SingleArtifact
 import com.android.build.api.dsl.ApplicationExtension
 import com.android.build.api.variant.ApplicationAndroidComponentsExtension
 import com.android.build.gradle.internal.tasks.CompileArtProfileTask
@@ -9,14 +10,23 @@ import com.android.build.gradle.internal.tasks.ExpandArtProfileWildcardsTask
 import com.android.build.gradle.internal.tasks.MergeArtProfileTask
 import com.android.build.gradle.tasks.PackageApplication
 import com.mikepenz.aboutlibraries.plugin.AboutLibrariesExtension
+import org.gradle.api.DefaultTask
 import org.gradle.api.Project
 import org.gradle.api.file.RegularFile
+import org.gradle.api.file.RegularFileProperty
 import org.gradle.api.internal.provider.AbstractProperty
 import org.gradle.api.internal.provider.Providers
 import org.gradle.api.plugins.BasePluginExtension
+import org.gradle.api.tasks.InputFile
+import org.gradle.api.tasks.OutputFile
+import org.gradle.api.tasks.PathSensitive
+import org.gradle.api.tasks.PathSensitivity
+import org.gradle.api.tasks.TaskAction
 import org.gradle.kotlin.dsl.configure
 import org.gradle.kotlin.dsl.withType
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
+import org.w3c.dom.Element
+import javax.xml.parsers.DocumentBuilderFactory
 
 /**
  * The prototype of an Android Application
@@ -24,6 +34,7 @@ import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
  * - Configure dependency for [DataDescriptorPlugin] task (If have)
  * - Provide default configuration for `android {...}`
  * - Add desugar JDK libs
+ * - Fail the build if the merged manifest asks for a network permission ([NoNetworkPermissionTask])
  */
 @Suppress("unused")
 class AndroidAppConventionPlugin : AndroidBaseConventionPlugin() {
@@ -125,6 +136,15 @@ class AndroidAppConventionPlugin : AndroidBaseConventionPlugin() {
                     }
                 }
             }
+            // Check the merged manifest in its own path, so no APK or bundle is built without it
+            onVariants { v ->
+                val permissionCheck = target.tasks.register(
+                    "checkNoNetworkPermission${v.name.capitalized()}", NoNetworkPermissionTask::class.java
+                )
+                v.artifacts.use(permissionCheck)
+                    .wiredWithFiles(NoNetworkPermissionTask::mergedManifest, NoNetworkPermissionTask::checkedManifest)
+                    .toTransform(SingleArtifact.MERGED_MANIFEST)
+            }
             // Make data descriptor depend on fcitx component if have
             // Since we are using finalizeDsl, there is no need to do afterEvaluate
             finalizeDsl {
@@ -160,6 +180,43 @@ class AndroidAppConventionPlugin : AndroidBaseConventionPlugin() {
         }
 
         target.dependencies.add("coreLibraryDesugaring", target.libs.android.desugarJDKLibs)
+    }
+
+    /**
+     * Fails the build if the merged manifest asks for a network permission, and otherwise passes it
+     * on unchanged. The app promises to have none (README, PRIVACY.md), and a dependency's manifest
+     * would merge one in without a line of this repository changing.
+     */
+    abstract class NoNetworkPermissionTask : DefaultTask() {
+        @get:InputFile
+        @get:PathSensitive(PathSensitivity.NONE)
+        abstract val mergedManifest: RegularFileProperty
+
+        @get:OutputFile
+        abstract val checkedManifest: RegularFileProperty
+
+        @TaskAction
+        fun execute() {
+            val manifest = mergedManifest.get().asFile
+            val root = DocumentBuilderFactory.newInstance().apply { isNamespaceAware = true }
+                .newDocumentBuilder().parse(manifest).documentElement
+            val found = PERMISSION_TAGS.flatMap { tag ->
+                val nodes = root.getElementsByTagName(tag)
+                (0 until nodes.length).map { (nodes.item(it) as Element).getAttributeNS(ANDROID_NS, "name") }
+            }.filter { it in NETWORK_PERMISSIONS }
+            check(found.isEmpty()) {
+                "The merged manifest asks for ${found.joinToString()}, but the app has no network permission " +
+                    "(PRIVACY.md): build/outputs/logs/manifest-merger-*-report.txt names the dependency that adds it"
+            }
+            manifest.copyTo(checkedManifest.get().asFile, overwrite = true)
+        }
+
+        companion object {
+            private const val ANDROID_NS = "http://schemas.android.com/apk/res/android"
+            private val PERMISSION_TAGS = listOf("uses-permission", "uses-permission-sdk-23")
+            private val NETWORK_PERMISSIONS =
+                setOf("android.permission.INTERNET", "android.permission.ACCESS_NETWORK_STATE")
+        }
     }
 
 }

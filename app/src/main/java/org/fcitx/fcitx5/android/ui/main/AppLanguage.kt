@@ -9,7 +9,11 @@ import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.core.os.LocaleListCompat
 import org.fcitx.fcitx5.android.R
+import org.fcitx.fcitx5.android.daemon.FcitxDaemon
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
+import org.fcitx.fcitx5.android.utils.Locales
+import org.fcitx.fcitx5.android.utils.appContext
+import java.util.Locale
 
 /**
  * The language the app shows itself in, the phone's or one the user picks, as Android 13's
@@ -23,16 +27,20 @@ object AppLanguage {
     /** A language tag; empty for the phone's. */
     val tags = listOf("", "zh-CN", "zh-TW", "en")
 
+    /** One of [tags]; or, for a language picked in the phone's settings that they lack, its own tag. */
     fun current(): String {
         val locales = AppCompatDelegate.getApplicationLocales()
-        if (locales.isEmpty) return ""
-        val locale = locales[0] ?: return ""
-        return when {
-            locale.language != "zh" -> if (locale.language == "en") "en" else ""
-            // Hant, or a region that writes it
-            locale.script == "Hant" || locale.country in setOf("TW", "HK", "MO") -> "zh-TW"
-            else -> "zh-CN"
-        }
+        return if (locales.isEmpty) "" else tagOf(locales[0])
+    }
+
+    internal fun tagOf(locale: Locale?): String = when {
+        locale == null || locale.language.isEmpty() -> ""
+        locale.language == "en" -> "en"
+        // one the phone's settings picked: read as "", it showed as the phone's, and choosing that did nothing
+        locale.language != "zh" -> locale.toLanguageTag()
+        // Hant, or a region that writes it
+        locale.script == "Hant" || locale.country in setOf("TW", "HK", "MO") -> "zh-TW"
+        else -> "zh-CN"
     }
 
     fun label(tag: String) = when (tag) {
@@ -42,12 +50,20 @@ object AppLanguage {
         else -> R.string.language_follow_system
     }
 
+    /** [tag]'s name, in itself; one not in [tags] as the platform names it. */
+    fun name(context: Context, tag: String): String {
+        if (tag in tags) return context.getString(label(tag))
+        val locale = Locale.forLanguageTag(tag)
+        return locale.getDisplayName(locale).replaceFirstChar { it.titlecase(locale) }
+    }
+
     /** Asks for a language and switches to it: the activities are made again in it. */
     fun choose(context: Context) {
+        // -1, none ticked, for a language not in the list: then any choice switches
         val current = tags.indexOf(current())
         AlertDialog.Builder(context)
             .setTitle(R.string.app_language)
-            .setSingleChoiceItems(tags.map { context.getString(label(it)) }.toTypedArray(), current) { dialog, which ->
+            .setSingleChoiceItems(tags.map { name(context, it) }.toTypedArray(), current) { dialog, which ->
                 dialog.dismiss()
                 if (which != current) set(tags[which])
             }
@@ -60,5 +76,9 @@ object AppLanguage {
         AppCompatDelegate.setApplicationLocales(
             if (tag.isEmpty()) LocaleListCompat.getEmptyLocaleList() else LocaleListCompat.forLanguageTags(tag)
         )
+        // fcitx names its input methods and config pages in the language it starts in;
+        // one not running starts in this one anyway
+        Locales.onLocalesPicked(appContext)
+        if (FcitxDaemon.getFirstConnectionOrNull() != null) FcitxDaemon.restartFcitx()
     }
 }

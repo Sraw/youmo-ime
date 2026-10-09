@@ -61,7 +61,7 @@
     <string name="delete">削除</string>
     <string name="clipboard">クリップボード</string>
     <string name="keyboard_height">キーボードの高さ</string>
-    <string name="virtual_keyboard">ソフトウェアキーボード</string>
+    <string name="virtual_keyboard">キーとフィードバック</string>
     <string name="clipboard_suggestion_timeout">クリップボード候補のタイムアウト</string>
     <string name="version">バージョン</string>
     <string name="build_time">ビルド時間</string>
@@ -116,7 +116,7 @@
     <string name="navbar_bkg_color_only">キーボードの色に従う</string>
     <string name="navbar_bkg_full">キーボードの背景画像</string>
     <string name="punctuation_position">記号の位置</string>
-    <string name="punctuation_pos_bottom">ボタン（縦置きのみ）</string>
+    <string name="punctuation_pos_bottom">下部（縦置きのみ）</string>
     <string name="punctuation_pos_top_right">右上</string>
     <string name="expand_toolbar_by_default">デフォルトでツールバーを展開する</string>
     <string name="popup_on_key_press">キー押下時にポップアップする</string>
@@ -144,7 +144,7 @@
     <string name="skip">スキップ</string>
     <string name="horizontal_candidate_growth">残りの幅に合わせるため水平候補を引き伸ばす</string>
     <string name="none">なし</string>
-    <string name="theme_migrated">テーマは現在のバージョンに以降されました</string>
+    <string name="theme_migrated">テーマは現在のバージョンに移行されました</string>
     <string name="keep_keyboard_letters_uppercase">キーボードの文字を大文字にする</string>
     <string name="choose_input_method">インプットメゾッドを選択</string>
     <string name="edit_clipboard">クリップボードを編集</string>
@@ -211,6 +211,7 @@
     <string name="fcitx_daemon">Fcitxデーモン</string>
     <string name="restarting_fcitx">Fcitxを再起動中</string>
     <string name="removed_n_items">%1$s 個のアイテムを削除しました</string>
+    <string name="added_n_items">%1$d 個のアイテムを追加しました</string>
     <string name="whether_reset_switch_preference">この設定をデフォルトの設定にリセットしますか？</string>
     <string name="enabled">有効</string>
     <string name="following_system_settings">システム設定に従う</string>

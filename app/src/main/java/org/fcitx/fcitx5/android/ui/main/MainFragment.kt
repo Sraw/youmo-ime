@@ -129,7 +129,7 @@ class MainFragment : PaddingPreferenceFragment() {
             addCategory(R.string.home_section_other) {
                 addPreference(
                     R.string.app_language,
-                    getString(AppLanguage.label(AppLanguage.current())),
+                    AppLanguage.name(requireContext(), AppLanguage.current()),
                     R.drawable.ic_baseline_language_24
                 ) { AppLanguage.choose(requireContext()) }
                 addDestinationPreference(

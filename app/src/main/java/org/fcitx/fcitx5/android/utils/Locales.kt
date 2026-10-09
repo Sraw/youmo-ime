@@ -11,6 +11,7 @@ import android.os.Build
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.core.os.LocaleListCompat
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
+import java.util.Locale
 
 object Locales {
 
@@ -39,35 +40,66 @@ object Locales {
         private set
 
     fun onLocaleChange(configuration: Configuration) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-            val locales = LinkedHashSet<String>()
+        val system = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
             val localeList = configuration.locales
-            for (i in 0..<localeList.size()) {
-                val it = localeList[i]
-                locales.add("${it.language}_${it.country}")
-                // fcitx5 only has zh_CN for simplified Chinese and zh_TW for traditional
-                if (it.language == "zh") {
-                    if (it.script == "Hans" && it.country != "CN") {
-                        locales.add("zh_CN")
-                    } else if (it.script == "Hant" && it.country != "TW") {
-                        locales.add("zh_TW")
-                    }
-                }
-                locales.add("${it.language}")
-                // since there is not an `en.mo` file, `en` must be the only locale
-                // in order to use default English translation
-                if (i == 0 && it.language == "en") break
-            }
-            languageWithCountry = locales.firstOrNull() ?: ""
-            language = languageWithCountry.substringBefore(':')
-            fcitxLocale = locales.joinToString(":")
+            (0..<localeList.size()).map { localeList[it] }
         } else {
             @Suppress("DEPRECATION")
-            val it = configuration.locale
-            languageWithCountry = "${it.language}_${it.country}"
-            language = it.language
-            fcitxLocale = "$languageWithCountry:$language"
+            val locale = configuration.locale
+            listOf(locale)
         }
+        // fcitx translates its own strings too: from Android 13 on the configuration has the app's
+        // language, below that only appcompat and the app's prefs know it
+        val app = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            emptyList<Locale>()
+        } else {
+            picked(appContext).let { list -> (0..<list.size()).mapNotNull { list[it] } }
+        }
+        update(app + system)
+    }
+
+    /**
+     * [onLocaleChange] once the user picked the app's languages. From Android 13 on, the app's
+     * configuration gets them only when the system sends it, after this: here the phone's own
+     * languages are read from the system instead, behind the picked ones.
+     */
+    fun onLocalesPicked(context: Context) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            val app = picked(context).let { list -> (0..<list.size()).mapNotNull { list[it] } }
+            val system = context.getSystemService(LocaleManager::class.java).systemLocales
+            update(app + (0..<system.size()).map { system[it] })
+        } else {
+            onLocaleChange(context.resources.configuration)
+        }
+    }
+
+    private fun update(preferred: List<Locale>) {
+        val locales = fcitxLocales(preferred)
+        languageWithCountry = locales.firstOrNull() ?: ""
+        language = languageWithCountry.substringBefore('_')
+        fcitxLocale = locales.joinToString(":")
+    }
+
+    /** The `language_COUNTRY` and `language` names fcitx looks for, most preferred first. */
+    fun fcitxLocales(preferred: List<Locale>): List<String> {
+        val locales = LinkedHashSet<String>()
+        for (i in preferred.indices) {
+            val it = preferred[i]
+            if (it.country.isNotEmpty()) locales.add("${it.language}_${it.country}")
+            // fcitx5 only has zh_CN for simplified Chinese and zh_TW for traditional
+            if (it.language == "zh") {
+                if (it.script == "Hans" && it.country != "CN") {
+                    locales.add("zh_CN")
+                } else if (it.script == "Hant" && it.country != "TW") {
+                    locales.add("zh_TW")
+                }
+            }
+            locales.add("${it.language}")
+            // since there is not an `en.mo` file, `en` must be the only locale
+            // in order to use default English translation
+            if (i == 0 && it.language == "en") break
+        }
+        return locales.toList()
     }
 
 }
