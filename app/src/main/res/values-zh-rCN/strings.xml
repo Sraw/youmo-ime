@@ -222,6 +222,7 @@
     <string name="fcitx_daemon">Fcitx 守护程序</string>
     <string name="restarting_fcitx">正在重新启动 Fcitx</string>
     <string name="removed_n_items">已移除 %1$d 个项目</string>
+    <string name="added_n_items">已添加 %1$d 个项目</string>
     <string name="whether_reset_switch_preference">是否要将此设置重置为默认值？</string>
     <string name="enabled">启用</string>
     <string name="following_system_settings">跟随系统设置</string>
@@ -432,7 +433,7 @@
     <string name="level_loud">大</string>
     <string name="theme_and_size">主题与大小</string>
     <string name="configure_look">大小与按键</string>
-    <string name="export_user_data_summary">设置、学到和添加的词、自定义短语和主题，存成一个文件</string>
+    <string name="export_user_data_summary">设置、学到和添加的词、自定义短语、主题和剪贴板记录（复制过的密码也在内），存成一个文件</string>
     <string name="app_language">界面语言</string>
     <string name="language_follow_system">跟随系统</string>
     <string name="import_file">导入</string>
@@ -569,6 +570,14 @@
     <string name="import_into_user">当成你自己加的词，排在最前；适合几千个以内你常用的词</string>
     <string name="words_page_hint">不想看到某个词，可以在「用户词库」里屏蔽，或在键盘上长按它</string>
     <string name="dict_change_failed">修改失败</string>
+    <string name="dict_unread_title">有词库没能读入</string>
+    <string name="dict_unread_message">以下词库无法读取，已另外保存，没有载入：</string>
+    <string name="dict_unread_line">%1$s（%2$s）</string>
+    <string name="dict_unread_too_large">太大，内存不够</string>
+    <string name="dict_unread_damaged">文件已损坏</string>
+    <string name="dict_unread_no_words">没有可读的词</string>
+    <string name="dict_unread_unknown">未能读入</string>
+    <string name="dict_unread_import_again">可以重新导入（例如换一个较新的版本）。</string>
     <string name="picker_back">返回</string>
     <string name="picker_lock">选完符号后停留</string>
     <string name="picker_unlock">选完符号后返回</string>
@@ -578,4 +587,5 @@
     <string name="picker_short_chinese">中文</string>
     <string name="picker_short_ascii">英文</string>
     <string name="picker_short_math">数学</string>
+    <string name="engine_unloadable">输入法数据无法加载，请重新安装应用；如果是导入的码表，请重新导入。</string>
 </resources>

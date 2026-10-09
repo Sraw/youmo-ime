@@ -14,7 +14,9 @@ import java.util.Arrays
  * (libime writes one), is corrupt, as zstd's library takes it.
  *
  * The whole output is kept, so a match may reach back as far as the frame goes; libime's files
- * are a few megabytes at most.
+ * are tens of megabytes at most. It is decoded twice: counted, then written into an array of just
+ * that size. Grown as it was written, by doubling, then cut to size, it took up to three times
+ * its size at once.
  */
 object Zstd {
 
@@ -22,11 +24,12 @@ object Zstd {
     private const val SKIPPABLE_MAGIC = 0x184D2A50
     private const val SKIPPABLE_MASK = 0xFFFFFFF0.toInt()
 
-    // libime's own pinyin dictionary is 9 MB unpacked; a big imported one some times that
+    // fcitx5-pinyin-zhwiki's dictionary is 64.5 MiB unpacked (its 20260416 release), moegirl's
+    // 5 MiB: about twice the larger, for it to grow
     private const val MAX_OUTPUT = 1 shl 27
 
-    // what a frame's claimed size is given before any of it is read: a claim is not the bytes
-    private const val PRESIZE = 1 shl 24
+    // RFC 8878's Block_Maximum_Size: what a block holds, or makes, at most
+    private const val MAX_BLOCK = 1 shl 17
 
     /** Whether [data] starts as a zstd frame does. */
     fun isFrame(data: ByteArray, from: Int = 0): Boolean = data.size - from >= 4 && le32(data, from) == FRAME_MAGIC
@@ -37,7 +40,13 @@ object Zstd {
      * @throws DataFormatException past [limit] bytes too: a few bytes of zstd can claim gigabytes
      */
     fun decompress(data: ByteArray, from: Int = 0, limit: Int = MAX_OUTPUT): ByteArray {
-        val out = Output(data.size * 4, limit)
+        val bytes = ByteArray(frames(data, from, Output(null, limit)))
+        frames(data, from, Output(bytes, limit))
+        return bytes
+    }
+
+    /** The frames in [data] from [from] to its end, into [out]; how many bytes they make. */
+    private fun frames(data: ByteArray, from: Int, out: Output): Int {
         var pos = from
         try {
             while (pos < data.size) {
@@ -56,34 +65,35 @@ object Zstd {
         } catch (@Suppress("TooGenericExceptionCaught") e: IndexOutOfBoundsException) {
             throw DataFormatException("zstd data cut short or corrupt", e)
         }
-        return if (out.size == out.bytes.size) out.bytes else out.bytes.copyOf(out.size)
+        return out.size
     }
 
-    private class Output(capacity: Int, private val limit: Int) {
-        var bytes = ByteArray(capacity.coerceIn(minOf(64, limit), minOf(limit, PRESIZE)))
+    /** What the frames make: only counted with no [bytes], else written into [bytes], of the size counted. */
+    private class Output(val bytes: ByteArray?, private val limit: Int) {
         var size = 0
 
-        /** Room for [extra] bytes to come, as a frame's header claims: checked, taken on trust only so far. */
+        // where the block being read began
+        var blockStart = 0
+
+        /** Room for [extra] bytes to come, as a frame's header claims. */
         fun reserve(extra: Long) {
             if (extra > limit - size) corrupt("zstd output past $limit bytes")
-            val want = size + minOf(extra, PRESIZE.toLong()).toInt()
-            if (want > bytes.size) bytes = bytes.copyOf(want)
         }
 
         fun ensure(extra: Int) {
             if (extra < 0 || extra > limit - size) corrupt("zstd output past $limit bytes")
-            if (size + extra > bytes.size) bytes = bytes.copyOf(minOf(maxOf(bytes.size * 2, size + extra), limit))
+            if (extra > MAX_BLOCK - (size - blockStart)) corrupt("zstd block makes more than $MAX_BLOCK bytes")
         }
 
         fun write(src: ByteArray, from: Int, length: Int) {
             ensure(length)
-            System.arraycopy(src, from, bytes, size, length)
+            if (bytes != null) System.arraycopy(src, from, bytes, size, length)
             size += length
         }
 
         fun fill(value: Byte, length: Int) {
             ensure(length)
-            Arrays.fill(bytes, size, size + length, value)
+            if (bytes != null) Arrays.fill(bytes, size, size + length, value)
             size += length
         }
 
@@ -91,6 +101,10 @@ object Zstd {
         fun match(offset: Int, length: Int, frameStart: Int) {
             if (offset <= 0 || offset > size - frameStart) corrupt("zstd offset $offset out of reach")
             ensure(length)
+            if (bytes == null) {
+                size += length
+                return
+            }
             var from = size - offset
             if (offset >= length) {
                 System.arraycopy(bytes, from, bytes, size, length)
@@ -132,7 +146,9 @@ object Zstd {
             val produced = out.size - frameStart
             if (contentSize >= 0 && produced.toLong() != contentSize) corrupt("zstd frame is $produced bytes, not $contentSize")
             if (descriptor and 0x04 != 0) {
-                if (le32(src, p) != xxh64(out.bytes, frameStart, produced).toInt()) corrupt("zstd checksum does not match")
+                // counted only: no bytes yet to check
+                val bytes = out.bytes
+                if (bytes != null && le32(src, p) != xxh64(bytes, frameStart, produced).toInt()) corrupt("zstd checksum does not match")
                 p += 4
             }
             return p
@@ -153,6 +169,8 @@ object Zstd {
                 val header = u8(src, p) or (u8(src, p + 1) shl 8) or (u8(src, p + 2) shl 16)
                 p += 3
                 val size = header ushr 3
+                if (size > MAX_BLOCK) corrupt("zstd block of $size bytes")
+                out.blockStart = out.size
                 when ((header ushr 1) and 3) {
                     0 -> {
                         out.write(src, p, size)
@@ -220,10 +238,13 @@ object Zstd {
                     val table = huffman ?: corrupt("zstd literals repeat no table")
                     literals = ByteArray(literalsSize)
                     literalsFrom = 0
-                    if (sizeFormat == 0) {
-                        table.decode(src, q, streamsEnd, literals, 0, literalsSize)
-                    } else {
-                        table.decode4(src, q, streamsEnd, literals)
+                    // decoded only when written: a count needs only how many there are
+                    if (out.bytes != null) {
+                        if (sizeFormat == 0) {
+                            table.decode(src, q, streamsEnd, literals, 0, literalsSize)
+                        } else {
+                            table.decode4(src, q, streamsEnd, literals)
+                        }
                     }
                     p = streamsEnd
                 }

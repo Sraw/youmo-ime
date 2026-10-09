@@ -30,10 +30,16 @@ object PinyinDictManager {
     fun listDictionaries(): List<TextDictionary> {
         ImportedDictionaries.migrate(pinyinDicDir)
         return pinyinDicDir.listFiles().orEmpty()
-            .filter { PinyinDictionary.Type.fromFileName(it.name).let { t -> t == PinyinDictionary.Type.Text || t == PinyinDictionary.Type.Words } }
+            .filter { PinyinDictionary.Type.fromFileName(it.name, ignoreCase = false).let { t -> t == PinyinDictionary.Type.Text || t == PinyinDictionary.Type.Words } }
             .map(::TextDictionary)
             .sortedBy { it.name }
     }
+
+    /** The dictionaries libime's migration put aside unread, until [forgetUnread] is told of them. */
+    fun unread() = ImportedDictionaries.unread(pinyinDicDir)
+
+    /** Forgets [told], the dictionaries put aside unread the user was told of. */
+    fun forgetUnread(told: List<ImportedDictionaries.Unread>) = runCatching { ImportedDictionaries.forgetUnread(pinyinDicDir, told) }
 
     /** Whether dictionary [name] is merged into the new words dictionary rather than the base one. */
     fun isIntoNew(name: String) = name in ImportedDictionaries.intoNew(pinyinDicDir)
@@ -81,7 +87,8 @@ object PinyinDictManager {
      * imported before, on or off as the user left it. A plain dictionary of the name is not touched.
      */
     fun importPack(name: String, text: String): Result<TextDictionary> = runCatching {
-        if (!WordPack.validName(name)) errorArg(R.string.exception_dict_filename, name)
+        // any name importFromFile kept one under, but no path
+        if (name.isEmpty() || '/' in name) errorArg(R.string.exception_dict_filename, name)
         if (listOf(true, false).any { File(pinyinDicDir, TextDictionary.fileName(name, it)).exists() }) errorArg(R.string.dict_already_exists)
         val off = File(pinyinDicDir, TextDictionary.fileName(name, false, PinyinDictionary.Type.Words))
         val on = File(pinyinDicDir, TextDictionary.fileName(name, true, PinyinDictionary.Type.Words))
@@ -98,8 +105,14 @@ object PinyinDictManager {
         listOf(true, false).any { File(pinyinDicDir, TextDictionary.fileName(name, it, type)).exists() }
     }
 
+    // each type's reader checks its extension in lowercase: a file manager's WORDS.SCEL is one too
+    private fun withLowercaseExtension(name: String): String {
+        val dot = name.lastIndexOf('.')
+        return if (dot < 0) name else name.substring(0, dot) + name.substring(dot).lowercase()
+    }
+
     fun importFromInputStream(stream: InputStream, name: String, intoNew: Boolean = false): Result<TextDictionary> {
-        val tempFile = File(appContext.cacheDir, name)
+        val tempFile = File(appContext.cacheDir, withLowercaseExtension(name))
         tempFile.outputStream().use {
             stream.copyTo(it)
         }
@@ -114,7 +127,7 @@ object PinyinDictManager {
      */
     fun readWords(stream: InputStream, name: String): Result<List<String>> = runCatching {
         // the name a provider gives is no path to trust: only its extension, which tells the type
-        val raw = File.createTempFile("import", ".${name.substringAfterLast('.', "")}", appContext.cacheDir)
+        val raw = File.createTempFile("import", ".${name.substringAfterLast('.', "").lowercase()}", appContext.cacheDir)
         val text = File.createTempFile("import", ".${PinyinDictionary.Type.Text.ext}", appContext.cacheDir)
         try {
             raw.outputStream().use { stream.copyTo(it) }

@@ -101,7 +101,7 @@ class UserWordsFragment : PaddingPreferenceFragment() {
         lifecycleScope.withLoadingDialog(ctx) {
             try {
                 val lines = withContext(Dispatchers.IO) {
-                    val bytes = (ctx.contentResolver.openInputStream(uri) ?: throw IOException("cannot read $uri")).use { it.readBytes() }
+                    val bytes = (ctx.contentResolver.openInputStream(uri) ?: throw IOException("cannot read $uri")).use { it.readImported() }
                     WordLists.decode(bytes).lines()
                 }
                 val imported = viewModel.fcitx.runOnReady { importUserWords(lines) }

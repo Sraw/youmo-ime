@@ -28,6 +28,7 @@ import kotlinx.coroutines.withContext
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.core.reloadPinyinDict
 import org.fcitx.fcitx5.android.daemon.launchOnReady
+import org.fcitx.fcitx5.android.data.pinyin.ImportedDictionaries.Unread
 import org.fcitx.fcitx5.android.data.pinyin.PinyinDictManager
 import org.fcitx.fcitx5.android.data.pinyin.dict.PinyinDictionary
 import org.fcitx.fcitx5.android.data.pinyin.dict.TextDictionary
@@ -59,7 +60,21 @@ class PinyinDictionaryFragment : PaddingPreferenceFragment() {
     /** a dictionary turned on or off, moved or deleted: the engine reads them again on leaving */
     private var changed = false
 
+    /** the file opened with the app asked about: the view, made anew back from My words, has no saved state to tell */
+    private var asked = false
+
+    /** whether this view told of the dictionaries put aside unread: the list is built again after each change */
+    private var toldUnread = false
+
     private class Listed(val dictionary: TextDictionary, val intoNew: Boolean, val words: Int)
+
+    /** A file to import: a word pack or not, told by its first line whatever the file is called, as the import tells one. */
+    private class Incoming(val fileName: String, val pack: Boolean) {
+        /** what it is kept as, and replaces one of if a pack */
+        val name = if (pack) PackImport.name(fileName) else PinyinDictionary.nameOf(fileName)
+
+        val keptAs get() = if (pack) TextDictionary.fileName(name, type = PinyinDictionary.Type.Words) else fileName
+    }
 
     private enum class Layer { USER, NEW, BASE }
 
@@ -75,9 +90,11 @@ class PinyinDictionaryFragment : PaddingPreferenceFragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
         viewModel.toolbarButton.value = ButtonMode.NONE
+        toldUnread = false
         rebuild()
         // a file opened with the app, once (the home page passes none, as "")
-        if (savedInstanceState == null) args.uri?.takeIf { it.isNotEmpty() }?.let { askLayer(Uri.parse(it)) }
+        if (savedInstanceState == null && !asked) args.uri?.takeIf { it.isNotEmpty() }?.let { askLayer(Uri.parse(it)) }
+        asked = true
     }
 
     /** the list being read: one asked for later replaces it, not to be overwritten by it */
@@ -86,14 +103,44 @@ class PinyinDictionaryFragment : PaddingPreferenceFragment() {
     private fun rebuild() {
         if (view == null) return
         listing?.cancel()
+        val tell = !toldUnread
         listing = viewLifecycleOwner.lifecycleScope.launch {
             val listed = withContext(Dispatchers.IO) {
                 PinyinDictManager.listDictionaries().map {
                     Listed(it, PinyinDictManager.isIntoNew(it.name), PinyinDictManager.wordCount(it))
                 }
             }
+            // read after the list: listing it runs the migration when the engine has not yet
+            val unread = if (tell) withContext(Dispatchers.IO) { PinyinDictManager.unread() } else emptyList()
             show(listed)
+            if (tell) {
+                toldUnread = true
+                tellUnread(unread)
+            }
         }
+    }
+
+    /** Tells of [unread], the dictionaries the migration put aside unread; its OK forgets them. */
+    private fun tellUnread(unread: List<Unread>) {
+        val message = unreadNotice(unread, getString(R.string.dict_unread_message), getString(R.string.dict_unread_import_again)) {
+            val reason = when (it.reason) {
+                Unread.Reason.TOO_LARGE -> R.string.dict_unread_too_large
+                Unread.Reason.DAMAGED -> R.string.dict_unread_damaged
+                Unread.Reason.NO_WORDS -> R.string.dict_unread_no_words
+                Unread.Reason.UNKNOWN -> R.string.dict_unread_unknown
+            }
+            getString(R.string.dict_unread_line, it.fileName, getString(reason))
+        } ?: return
+        AlertDialog.Builder(requireContext())
+            .setTitle(R.string.dict_unread_title)
+            .setMessage(message)
+            // only OK forgets them: one sent away by Back would be told again
+            .setCancelable(false)
+            .setPositiveButton(android.R.string.ok) { _, _ ->
+                // not forgotten, they are told again the next time the page shows
+                lifecycleScope.launch(Dispatchers.IO) { PinyinDictManager.forgetUnread(unread) }
+            }
+            .show()
     }
 
     private fun show(listed: List<Listed>) {
@@ -176,57 +223,83 @@ class PinyinDictionaryFragment : PaddingPreferenceFragment() {
             .show()
     }
 
-    /** Which layer a file is merged into: the base unless asked otherwise, the safest of the three. */
+    /**
+     * Which layer a file is merged into: the base unless asked otherwise, the safest of the three;
+     * for a pack replacing one, the layer that one is in.
+     */
     private fun askLayer(uri: Uri) {
         val ctx = requireContext()
-        val layers = listOf(
-            Layer.BASE to (R.string.layer_base to R.string.import_into_base),
-            Layer.NEW to (R.string.layer_new to R.string.import_into_new),
-            Layer.USER to (R.string.layer_user to R.string.import_into_user),
-        )
-        val items = layers.map { (_, text) ->
-            SpannableStringBuilder()
-                .inSpans(StyleSpan(Typeface.BOLD)) { append(getString(text.first)) }
-                .append("\n")
-                .inSpans(RelativeSizeSpan(SMALL)) { append(getString(text.second)) }
-                // a gap under each: three of two lines each read as one block without
-                .inSpans(RelativeSizeSpan(GAP)) { append("\n") }
-        }.toTypedArray<CharSequence>()
-        var picked = 0
-        AlertDialog.Builder(ctx)
-            .setTitle(R.string.import_into_title)
-            .setSingleChoiceItems(items, picked) { _, which -> picked = which }
-            .setPositiveButton(R.string.import_dict) { _, _ -> import(uri, layers[picked].first) }
-            .setNegativeButton(android.R.string.cancel, null)
-            .show()
+        val cr = ctx.contentResolver
+        lifecycleScope.withLoadingDialog(ctx) {
+            try {
+                val fileName = withContext(Dispatchers.IO) { cr.queryFileName(uri) } ?: return@withLoadingDialog
+                val type = PinyinDictionary.Type.fromFileName(fileName)
+                if (type == null) {
+                    ctx.importErrorDialog(R.string.invalid_dict)
+                    return@withLoadingDialog
+                }
+                val incoming = withContext(Dispatchers.IO) {
+                    val text = type == PinyinDictionary.Type.Text || type == PinyinDictionary.Type.Words
+                    Incoming(fileName, text && (cr.openInputStream(uri) ?: throw java.io.IOException("cannot read $uri")).use(PackImport::isPack))
+                }
+                // a pack replacing one stays where that one is when the import is taken as offered
+                val offered = withContext(Dispatchers.IO) {
+                    val replaced = PinyinDictManager.listDictionaries().firstOrNull { it.name == incoming.name }
+                    val action = PackImport.action(incoming.pack, replaced?.type)
+                    if (offersNewLayer(action, PinyinDictManager.isIntoNew(incoming.name))) Layer.NEW else Layer.BASE
+                }
+                val layers = listOf(
+                    Layer.BASE to (R.string.layer_base to R.string.import_into_base),
+                    Layer.NEW to (R.string.layer_new to R.string.import_into_new),
+                    Layer.USER to (R.string.layer_user to R.string.import_into_user),
+                )
+                val items = layers.map { (_, text) ->
+                    SpannableStringBuilder()
+                        .inSpans(StyleSpan(Typeface.BOLD)) { append(getString(text.first)) }
+                        .append("\n")
+                        .inSpans(RelativeSizeSpan(SMALL)) { append(getString(text.second)) }
+                        // a gap under each: three of two lines each read as one block without
+                        .inSpans(RelativeSizeSpan(GAP)) { append("\n") }
+                }.toTypedArray<CharSequence>()
+                var picked = layers.indexOfFirst { it.first == offered }
+                AlertDialog.Builder(ctx)
+                    .setTitle(R.string.import_into_title)
+                    .setSingleChoiceItems(items, picked) { _, which -> picked = which }
+                    .setPositiveButton(R.string.import_dict) { _, _ -> import(uri, incoming, layers[picked].first) }
+                    .setNegativeButton(android.R.string.cancel, null)
+                    .show()
+            } catch (e: CancellationException) {
+                // the page left: nothing to show the error on
+                throw e
+            } catch (@Suppress("TooGenericExceptionCaught") e: Exception) {
+                // a provider's error comes back through the binder as any kind (a SecurityException for
+                // a file the picker gave that it will not open after all): shown, as import() does
+                ctx.importErrorDialog(e)
+            }
+        }
     }
 
-    private fun import(uri: Uri, layer: Layer) {
+    private fun import(uri: Uri, incoming: Incoming, layer: Layer) {
         val ctx = requireContext()
         val cr = ctx.contentResolver
         lifecycleScope.withLoadingDialog(ctx, R.string.importing) {
             try {
-                val fileName = cr.queryFileName(uri) ?: return@withLoadingDialog
-                if (PinyinDictionary.Type.fromFileName(fileName) == null) {
-                    ctx.importErrorDialog(R.string.invalid_dict)
-                    return@withLoadingDialog
-                }
                 if (layer == Layer.USER) {
-                    importIntoUser(uri, fileName)
+                    importIntoUser(uri, incoming.fileName)
                     return@withLoadingDialog
                 }
-                val name = PinyinDictionary.nameOf(fileName)
-                val pack = PinyinDictionary.Type.Words
+                val name = incoming.name
                 val replaced = withContext(Dispatchers.IO) { PinyinDictManager.listDictionaries() }.firstOrNull { it.name == name }
                 // a pack of the same name is its next one (each month's official pack is youmo-new.words): it replaces
-                if (replaced != null && (replaced.type != pack || PinyinDictionary.Type.fromFileName(fileName) != pack)) {
+                val action = PackImport.action(incoming.pack, replaced?.type)
+                if (action == PackImport.Action.REFUSE) {
                     ctx.importErrorDialog(R.string.dict_already_exists)
                     return@withLoadingDialog
                 }
                 withContext(Dispatchers.IO) {
                     val stream = cr.openInputStream(uri) ?: throw java.io.IOException("cannot read $uri")
-                    if (replaced == null) {
-                        PinyinDictManager.importFromInputStream(stream, fileName, layer == Layer.NEW).getOrThrow()
+                    if (action == PackImport.Action.IMPORT) {
+                        PinyinDictManager.importFromInputStream(stream, incoming.keptAs, layer == Layer.NEW).getOrThrow()
                     } else {
                         // the layer first: a pack that then fails to replace is the last one, as asked
                         PinyinDictManager.setIntoNew(name, layer == Layer.NEW).getOrThrow()
@@ -271,3 +344,16 @@ class PinyinDictionaryFragment : PaddingPreferenceFragment() {
         private const val GAP = 0.6f
     }
 }
+
+/**
+ * Whether importing a file that does [action] offers the new words rather than the base: a pack
+ * replacing one merged into the new words ([intoNew]) stays there (each month's youmo-new.words).
+ */
+internal fun offersNewLayer(action: PackImport.Action, intoNew: Boolean) = action == PackImport.Action.REPLACE && intoNew
+
+/**
+ * The notice of [unread], the dictionaries the migration put aside unread: [intro], a line each
+ * as [line] words it, and [outro]; none, and no dialog, without one.
+ */
+internal fun unreadNotice(unread: List<Unread>, intro: String, outro: String, line: (Unread) -> String): String? =
+    if (unread.isEmpty()) null else (listOf(intro) + unread.map(line) + outro).joinToString("\n")

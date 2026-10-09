@@ -12,8 +12,10 @@ import org.fcitx.fcitx5.android.engine.data.DataFormatException
  *
  * A file is not trusted to be a tree. A node is a child only of the one its check names, so
  * with the root never a child each is walked once; tails, which keys could share, are read no
- * more than their length all told, as in any trie cedar saves. A crafted file cannot make it
- * walk, or keep, much more than it holds.
+ * more than their length all told, as in any trie cedar saves. Keys share their paths too, so a
+ * long path to many leaves would hand out its length for each: the keys handed out come to no
+ * more than a few times the trie's size. A crafted file cannot make it walk, keep, or hand out
+ * much more than it holds.
  */
 internal class LibimeTrie private constructor(
     private val tail: ByteArray,
@@ -32,6 +34,7 @@ internal class LibimeTrie private constructor(
     fun forEach(visitor: Visitor) {
         if (base.isEmpty()) return
         tailRead = 0
+        keyBytes = 0
         try {
             walk(0, 0, ByteArray(64), visitor)
         } catch (@Suppress("TooGenericExceptionCaught") e: IndexOutOfBoundsException) {
@@ -40,6 +43,10 @@ internal class LibimeTrie private constructor(
     }
 
     private var tailRead = 0
+    private var keyBytes = 0L
+
+    // what its keys may come to: the trie as saved, a node 10 bytes
+    private val maxKeyBytes = KEYS_PER_BYTE * (tail.size + 10L * base.size)
 
     private fun walk(from: Int, depth: Int, keyBuffer: ByteArray, visitor: Visitor) {
         var key = keyBuffer
@@ -84,7 +91,10 @@ internal class LibimeTrie private constructor(
 
     // cedar's marks for a key erased, or a node kept with none, are no value to read
     private fun visit(visitor: Visitor, key: ByteArray, length: Int, value: Int) {
-        if (value !in NO_VALUES) visitor.visit(key, length, value)
+        if (value in NO_VALUES) return
+        keyBytes += length
+        if (keyBytes > maxKeyBytes) throw DataFormatException("libime trie's keys come to more than $KEYS_PER_BYTE times its size")
+        visitor.visit(key, length, value)
     }
 
     private fun node(index: Int, parent: Int, placeholder: Boolean = false): Int {
@@ -99,6 +109,10 @@ internal class LibimeTrie private constructor(
     companion object {
         // keys branch near their start, their rest kept in the tail
         private const val MAX_DEPTH = 1024
+
+        // the 电报码 table libime ships hands out a third of its tries' size in keys, the zhwiki and
+        // moegirl dictionaries 0.6 of theirs: room to spare
+        private const val KEYS_PER_BYTE = 4L
 
         // NO_VALUE and NO_PATH: -1 and -2 in an integer trie, NaN 1 and 2 in a float one
         private val NO_VALUES = intArrayOf(-1, -2, 0x7fc00001, 0x7fc00002)

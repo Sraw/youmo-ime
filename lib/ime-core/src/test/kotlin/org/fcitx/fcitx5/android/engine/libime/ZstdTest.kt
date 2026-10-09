@@ -11,6 +11,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.io.ByteArrayOutputStream
 import java.security.MessageDigest
 import java.util.Random
 
@@ -117,6 +118,31 @@ class ZstdTest {
     }
 
     @Test
+    fun aBlockMakesNoMoreThan128KiB() {
+        assertArrayEquals(ByteArray(2 * MAX_BLOCK) { 7 }, Zstd.decompress(rle(2, MAX_BLOCK)))
+        assertThrows(DataFormatException::class.java) { Zstd.decompress(rle(1, MAX_BLOCK + 1)) }
+    }
+
+    @Test
+    fun aFewBytesMakingMoreThan128MiBFail() {
+        // as much as zhwiki's dictionary unpacks to (64.5 MiB) reads
+        assertEquals(520 * MAX_BLOCK, Zstd.decompress(rle(520, MAX_BLOCK)).size)
+        // four bytes a block: four kilobytes of file for 128 MiB
+        assertThrows(DataFormatException::class.java) { Zstd.decompress(rle(1025, MAX_BLOCK)) }
+    }
+
+    /** A frame of [blocks] RLE blocks, each [size] bytes of 7, with no size or checksum said. */
+    private fun rle(blocks: Int, size: Int): ByteArray {
+        val out = ByteArrayOutputStream()
+        out.write(byteArrayOf(0x28, 0xB5.toByte(), 0x2F, 0xFD.toByte(), 0, 0x58))
+        repeat(blocks) {
+            val header = (size shl 3) or (1 shl 1) or (if (it == blocks - 1) 1 else 0)
+            out.write(byteArrayOf(header.toByte(), (header ushr 8).toByte(), (header ushr 16).toByte(), 7))
+        }
+        return out.toByteArray()
+    }
+
+    @Test
     fun theChecksumIsXxh64sLowHalf() {
         // XXH64's published values, seed 0; the fixtures check the long inputs
         assertEquals(0xEF46DB3751D8E999UL.toLong(), Zstd.xxh64(ByteArray(0), 0, 0))
@@ -162,6 +188,9 @@ class ZstdTest {
 
     companion object {
         private const val TEXT = "cfd5fa92102fe0b9e17460daad0a8a6e26bb9e6757835da0a03fcea93b9bf7b4"
+
+        // RFC 8878's Block_Maximum_Size
+        private const val MAX_BLOCK = 1 shl 17
 
         fun resource(name: String): ByteArray =
             ZstdTest::class.java.getResourceAsStream("/libime/$name")!!.use { it.readBytes() }

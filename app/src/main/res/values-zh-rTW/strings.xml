@@ -197,7 +197,7 @@
     <string name="table_conf_select_title">輸入法設定檔（ .conf 或 .conf.in ）</string>
     <string name="table_dict_select_title">碼表字典檔案（ .dict 或 .txt ）</string>
     <string name="exception_table_conf_filename">\"%1$s\" 的副檔名不是碼表輸入法的設定檔（ .conf 或 .conf.in ）</string>
-    <string name="exception_table_dict_filename">\"%1$s\" 的副檔名不是碼表字典（ .conf 或 .conf.in ）</string>
+    <string name="exception_table_dict_filename">\"%1$s\" 的副檔名不是碼表字典（ .dict 或 .txt ）</string>
     <string name="exception_table_import_both_files">請先選擇以上兩個檔案匯入</string>
     <string name="notification_permission_message">尚未賦予通知權限，因此無法在耗時較長的操作完成後給您發送通知。</string>
     <string name="notification_permission_title">沒有通知權限</string>
@@ -222,6 +222,7 @@
     <string name="fcitx_daemon">Fcitx 常駐程式</string>
     <string name="restarting_fcitx">重新啟動 Fcitx</string>
     <string name="removed_n_items">已移除 %1$d 個項目</string>
+    <string name="added_n_items">已新增 %1$d 個項目</string>
     <string name="whether_reset_switch_preference">是否要將此偏好設定重設為預設選項？</string>
     <string name="enabled">啟用</string>
     <string name="following_system_settings">跟隨系統設定</string>
@@ -432,7 +433,7 @@
     <string name="level_loud">大</string>
     <string name="theme_and_size">主題與大小</string>
     <string name="configure_look">大小與按鍵</string>
-    <string name="export_user_data_summary">設定、學到和新增的詞、自訂短語和主題，存成一個檔案</string>
+    <string name="export_user_data_summary">設定、學到和新增的詞、自訂短語、主題和剪貼簿紀錄（複製過的密碼也在內），存成一個檔案</string>
     <string name="app_language">介面語言</string>
     <string name="language_follow_system">跟隨系統</string>
     <string name="import_file">匯入</string>
@@ -569,6 +570,14 @@
     <string name="import_into_user">當成你自己加的詞，排在最前；適合幾千個以內你常用的詞</string>
     <string name="words_page_hint">不想看到某個詞，可以在「使用者詞庫」裡封鎖，或在鍵盤上長按它</string>
     <string name="dict_change_failed">修改失敗</string>
+    <string name="dict_unread_title">有詞庫沒能讀入</string>
+    <string name="dict_unread_message">以下詞庫無法讀取，已另外保存，沒有載入：</string>
+    <string name="dict_unread_line">%1$s（%2$s）</string>
+    <string name="dict_unread_too_large">太大，記憶體不夠</string>
+    <string name="dict_unread_damaged">檔案已損壞</string>
+    <string name="dict_unread_no_words">沒有可讀的詞</string>
+    <string name="dict_unread_unknown">未能讀入</string>
+    <string name="dict_unread_import_again">可以重新匯入（例如換一個較新的版本）。</string>
     <string name="picker_back">返回</string>
     <string name="picker_lock">選完符號後停留</string>
     <string name="picker_unlock">選完符號後返回</string>
@@ -578,4 +587,5 @@
     <string name="picker_short_chinese">中文</string>
     <string name="picker_short_ascii">英文</string>
     <string name="picker_short_math">數學</string>
+    <string name="engine_unloadable">輸入法資料無法載入，請重新安裝應用程式；如果是匯入的碼表，請重新匯入。</string>
 </resources>

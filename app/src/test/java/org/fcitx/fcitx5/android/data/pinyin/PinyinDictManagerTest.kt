@@ -75,6 +75,23 @@ class PinyinDictManagerTest {
     }
 
     @Test
+    fun aDictionaryWhoseExtensionIsInCapitalsIsImported() {
+        val imported = PinyinDictManager.importFromInputStream("搭子 da'zi 0\n".byteInputStream(), "MINE.TXT").getOrThrow()
+        assertEquals("MINE", imported.name)
+        assertEquals(listOf("MINE.txt"), names())
+        assertEquals(listOf("搭子 da'zi 0"), PinyinDictManager.readWords("搭子 da'zi 0\n".byteInputStream(), "WORDS.TXT").getOrThrow())
+    }
+
+    @Test
+    fun aPackFirstImportedUnderAnyNameIsReplacedByItsNext() {
+        val file = File(RuntimeEnvironment.getApplication().cacheDir, "新词 2026.words").apply { writeText(pack) }
+        PinyinDictManager.importFromFile(file).getOrThrow()
+        PinyinDictManager.importPack("新词 2026", pack + "智驾 zhi'jia -5.9\n").getOrThrow()
+        assertEquals(listOf("新词 2026.words"), names())
+        assertTrue(File(dir, "新词 2026.words").readText().contains("智驾"))
+    }
+
+    @Test
     fun packsFromBeforeTheLayersWereChosenStayWhereTheirHeadersPutThem() {
         File(dir, "cloud.words").writeText("# youmo words 1\n# layer: new\n搭子 da'zi -5.6\n")
         File(dir, "plain.words.disable").writeText("# youmo words 1\n# layer: base\n搭子 da'zi -5.6\n")

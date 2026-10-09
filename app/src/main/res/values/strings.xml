@@ -222,6 +222,7 @@
     <string name="fcitx_daemon">Fcitx Daemon</string>
     <string name="restarting_fcitx">Restarting Fcitx</string>
     <string name="removed_n_items">Removed %1$d item(s)</string>
+    <string name="added_n_items">Added %1$d item(s)</string>
     <string name="whether_reset_switch_preference">Would you like to reset this preference to default?</string>
     <string name="enabled">Enabled</string>
     <string name="following_system_settings">Follow system settings</string>
@@ -438,7 +439,7 @@
     <string name="level_loud">Loud</string>
     <string name="theme_and_size">Theme and size</string>
     <string name="configure_look">Size and keys</string>
-    <string name="export_user_data_summary">Settings, words learned and added, custom phrases and themes, in one file</string>
+    <string name="export_user_data_summary">Settings, words learned and added, custom phrases, themes and the clipboard history (copied passwords too), in one file</string>
     <string name="app_language">App language</string>
     <string name="language_follow_system">Same as the phone</string>
     <string name="language_zh_cn" translatable="false">简体中文</string>
@@ -579,6 +580,14 @@
     <string name="import_into_user">Taken as words you added yourself, ranked first: for a few thousand words you use at most</string>
     <string name="words_page_hint">To stop a word showing, block it in User dictionary, or long-press it on the keyboard</string>
     <string name="dict_change_failed">Could not change it</string>
+    <string name="dict_unread_title">Some dictionaries could not be read</string>
+    <string name="dict_unread_message">These dictionaries could not be read. They are kept aside, not loaded:</string>
+    <string name="dict_unread_line">%1$s (%2$s)</string>
+    <string name="dict_unread_too_large">too large for memory</string>
+    <string name="dict_unread_damaged">the file is damaged</string>
+    <string name="dict_unread_no_words">no word this input method can read</string>
+    <string name="dict_unread_unknown">could not be read</string>
+    <string name="dict_unread_import_again">You can import a dictionary again (a newer version, for example).</string>
     <string name="picker_back">Back</string>
     <string name="picker_lock">Stay after a symbol is picked</string>
     <string name="picker_unlock">Go back after a symbol is picked</string>
@@ -588,4 +597,5 @@
     <string name="picker_short_chinese">Chinese</string>
     <string name="picker_short_ascii">ASCII</string>
     <string name="picker_short_math">Math</string>
+    <string name="engine_unloadable">Input method data could not be loaded. Reinstall the app; for an imported table, import it again.</string>
 </resources>
