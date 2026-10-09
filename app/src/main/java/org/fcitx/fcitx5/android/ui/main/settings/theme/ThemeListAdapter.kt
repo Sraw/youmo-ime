@@ -8,7 +8,6 @@ import android.view.ViewGroup
 import androidx.recyclerview.widget.RecyclerView
 import org.fcitx.fcitx5.android.data.theme.Theme
 import splitties.views.dsl.core.Ui
-import kotlin.math.sign
 
 abstract class ThemeListAdapter : RecyclerView.Adapter<ThemeListAdapter.ViewHolder>() {
     class ViewHolder(val ui: Ui) : RecyclerView.ViewHolder(ui.root)
@@ -69,21 +68,27 @@ abstract class ThemeListAdapter : RecyclerView.Adapter<ThemeListAdapter.ViewHold
         notifyItemInserted(OFFSET)
     }
 
-    private fun removedOffset(removedIndex: Int, index: Int): Int {
-        return if (index == -1) 0 else (removedIndex - OFFSET - index).sign
+    // removedIndex is an entry's, index a position: those after it move up, its own is gone
+    private fun removeIndex(removedIndex: Int, index: Int): Int = when {
+        index == removedIndex + OFFSET -> -1
+        index > removedIndex + OFFSET -> index - 1
+        else -> index
     }
 
     fun removeTheme(name: String) {
         val index = entries.indexOfFirst { it.name == name }
         entries.removeAt(index)
         notifyItemRemoved(index + OFFSET)
-        activeIndex += removedOffset(index, activeIndex)
-        lightIndex += removedOffset(index, lightIndex)
-        darkIndex += removedOffset(index, darkIndex)
+        activeIndex = removeIndex(index, activeIndex)
+        lightIndex = removeIndex(index, lightIndex)
+        darkIndex = removeIndex(index, darkIndex)
     }
 
-    private fun replaceIndex(replacedIndex: Int, index: Int): Int {
-        return if (replacedIndex + OFFSET == index) OFFSET else index
+    // the replaced entry goes first, and those it passes move down one
+    private fun replaceIndex(replacedIndex: Int, index: Int): Int = when (index) {
+        replacedIndex + OFFSET -> OFFSET
+        in OFFSET until replacedIndex + OFFSET -> index + 1
+        else -> index
     }
 
     fun replaceTheme(theme: Theme) {
@@ -95,6 +100,13 @@ abstract class ThemeListAdapter : RecyclerView.Adapter<ThemeListAdapter.ViewHold
         darkIndex = replaceIndex(index, darkIndex)
         notifyItemMoved(index + OFFSET, OFFSET)
         notifyItemChanged(OFFSET)
+    }
+
+    internal fun stateAt(position: Int) = when (position) {
+        darkIndex -> ThemeThumbnailUi.State.DarkMode
+        lightIndex -> ThemeThumbnailUi.State.LightMode
+        activeIndex -> ThemeThumbnailUi.State.Selected
+        else -> ThemeThumbnailUi.State.Normal
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int) =
@@ -112,14 +124,7 @@ abstract class ThemeListAdapter : RecyclerView.Adapter<ThemeListAdapter.ViewHold
             THEME -> (holder.ui as ThemeThumbnailUi).apply {
                 val theme = entryAt(position)!!
                 setTheme(theme)
-                setChecked(
-                    when (position) {
-                        darkIndex -> ThemeThumbnailUi.State.DarkMode
-                        lightIndex -> ThemeThumbnailUi.State.LightMode
-                        activeIndex -> ThemeThumbnailUi.State.Selected
-                        else -> ThemeThumbnailUi.State.Normal
-                    }
-                )
+                setChecked(stateAt(position))
                 root.setOnClickListener {
                     onSelectTheme(theme)
                 }

@@ -34,6 +34,9 @@ import androidx.core.view.updateLayoutParams
 import androidx.lifecycle.lifecycleScope
 import com.google.android.material.R as MaterialR
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.parcelize.Parcelize
 import org.fcitx.fcitx5.android.R
@@ -217,7 +220,8 @@ class CustomThemeActivity : AppCompatActivity() {
     private class BackgroundStates {
         lateinit var launcher: ActivityResultLauncher<CropOption>
         var srcImageExtension: String? = null
-        var srcImageBuffer: ByteArray? = null
+        var srcImageCopy: File? = null
+        var srcImageCopyJob: Job? = null
         var cropRect: Rect? = null
         var cropRotation: Int = 0
         lateinit var croppedBitmap: Bitmap
@@ -253,6 +257,8 @@ class CustomThemeActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // a copy of a picked photo a killed process left: none is wanted before this page picks one
+        cacheDir.listFiles()?.filter { it.name.startsWith(SRC_COPY) && it.name.endsWith(".tmp") }?.forEach { it.delete() }
         // recover from bundle
         val originTheme = intent?.parcelable<Theme.Custom>(ORIGIN_THEME)?.also { t ->
             theme = t
@@ -315,9 +321,7 @@ class CustomThemeActivity : AppCompatActivity() {
                         if (newCreated) {
                             srcImageExtension = MimeTypeMap.getSingleton()
                                 .getExtensionFromMimeType(contentResolver.getType(it.srcUri))
-                            srcImageBuffer =
-                                contentResolver.openInputStream(it.srcUri)!!
-                                    .use { x -> x.readBytes() }
+                            copySrcImage(it.srcUri)
                         }
                         cropRect = it.rect
                         cropRotation = it.rotation
@@ -382,6 +386,38 @@ class CustomThemeActivity : AppCompatActivity() {
         }
     }
 
+    // opened at once, as the read grant on it ends with the crop screen; copied off the main thread
+    private fun BackgroundStates.copySrcImage(uri: Uri) {
+        // cropped again: the copy of the last image is of no use
+        srcImageCopyJob?.cancel()
+        srcImageCopy?.delete()
+        val input = contentResolver.openInputStream(uri)!!
+        val copy = File(cacheDir, "$SRC_COPY${System.nanoTime()}.tmp")
+        srcImageCopy = copy
+        srcImageCopyJob = lifecycleScope.launch(Dispatchers.IO) {
+            input.use { i ->
+                copy.outputStream().use { o ->
+                    val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
+                    var n = i.read(buffer)
+                    while (n >= 0) {
+                        ensureActive()
+                        o.write(buffer, 0, n)
+                        n = i.read(buffer)
+                    }
+                }
+            }
+        }.apply {
+            // cut short, maybe before it ran: nothing else closes the stream, and the copy may be
+            // made after onDestroy deleted it
+            invokeOnCompletion {
+                if (it != null) {
+                    input.close()
+                    copy.delete()
+                }
+            }
+        }
+    }
+
     @SuppressLint("SetTextI18n")
     private fun BackgroundStates.updateState() {
         val progress = brightnessSeekBar.progress
@@ -415,7 +451,8 @@ class CustomThemeActivity : AppCompatActivity() {
                                 )
                             )
                         }
-                        srcImageFile.writeBytes(srcImageBuffer!!)
+                        srcImageCopyJob!!.join()
+                        srcImageCopy!!.copyTo(srcImageFile, overwrite = true)
                     }
                 }
             }
@@ -468,7 +505,7 @@ class CustomThemeActivity : AppCompatActivity() {
     override fun onCreateOptionsMenu(menu: Menu): Boolean {
         if (!newCreated) {
             val iconTint = color(R.color.red_400)
-            menu.item(R.string.save, R.drawable.ic_baseline_delete_24, iconTint, true) {
+            menu.item(R.string.delete, R.drawable.ic_baseline_delete_24, iconTint, true) {
                 promptDelete()
             }
         }
@@ -487,8 +524,16 @@ class CustomThemeActivity : AppCompatActivity() {
         else -> super.onOptionsItemSelected(item)
     }
 
+    override fun onDestroy() {
+        whenHasBackground { srcImageCopy?.delete() }
+        super.onDestroy()
+    }
+
     companion object {
         const val RESULT = "result"
         const val ORIGIN_THEME = "origin_theme"
+
+        // the picked photo's copy in cacheDir, till saved into the theme
+        private const val SRC_COPY = "src"
     }
 }

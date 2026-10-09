@@ -30,9 +30,12 @@ object SettingsIndex {
     /** The page to open, and the setting on it to point at (its title), if not the page itself. */
     data class Target(val route: SettingsRoute, val title: String?)
 
-    // the app's own input methods, whose pages InputMethodSettings draws; a table's is one for all
-    private val InputMethods = listOf("engine-pinyin", "engine-t9", "engine-shuangpin", "keyboard-us")
-    private const val ANY_TABLE = "engine-table"
+    // the app's own input methods, whose pages InputMethodSettings draws; each table has a page of its own
+    private val InputMethods = listOf(
+        "engine-pinyin", "engine-t9", "engine-shuangpin",
+        "engine-wubi", "engine-cangjie", "engine-ziranma", "engine-erbi", "engine-wubipinyin",
+        "keyboard-us",
+    )
 
     fun build(context: Context): List<Entry<Target>> = buildList {
         fun page(@StringRes title: Int, route: SettingsRoute, vararg under: Int) =
@@ -96,15 +99,15 @@ object SettingsIndex {
     // a list's summary is its value, read from storage, which is no description to search
     private fun summary(pref: Preference): String = if (pref.summaryProvider != null) "" else pref.summary?.toString().orEmpty()
 
-    private fun inputMethods(context: Context, into: MutableList<Entry<Target>>) {
+    internal fun inputMethods(context: Context, into: MutableList<Entry<Target>>) {
         val top = context.getString(R.string.input_methods)
-        for (name in InputMethods + ANY_TABLE) {
+        for (name in InputMethods) {
             val items = InputMethodSettings.of(name) ?: continue
-            val page = if (name == ANY_TABLE) context.getString(R.string.table_im) else InputMethodNames.of(context, name, name)
-            val route = if (name == ANY_TABLE) SettingsRoute.TableInputMethods else SettingsRoute.InputMethodConfig(page, name)
+            val page = InputMethodNames.of(context, name, name)
+            val route = SettingsRoute.InputMethodConfig(page, name)
             into += Entry(page, "", listOf(top), Target(route, null))
             items(context, items, listOf(top, page)) { title, summary, path ->
-                into += Entry(title, summary, path, Target(route, title.takeIf { name != ANY_TABLE }))
+                into += Entry(title, summary, path, Target(route, title))
             }
         }
     }
