@@ -129,4 +129,14 @@ class FcitxDataProviderTest {
         assertEquals("$rootId/b.txt", provider.renameDocument("$rootId/a.txt", "b.txt"))
         assertTrue(File(root, "b.txt").isFile)
     }
+
+    @Test
+    fun aRenameOrMoveThatFailsSaysSoRatherThanNamingNoFile() {
+        File(root, "dir").mkdirs()
+        // gone since the file manager listed it: there is nothing to rename or move
+        assertThrows(FileNotFoundException::class.java) { provider.renameDocument("$rootId/gone.txt", "b.txt") }
+        assertThrows(FileNotFoundException::class.java) { provider.moveDocument("$rootId/gone.txt", rootId, "$rootId/dir") }
+        assertFalse(File(root, "b.txt").exists())
+        assertFalse(File(root, "dir/gone.txt").exists())
+    }
 }

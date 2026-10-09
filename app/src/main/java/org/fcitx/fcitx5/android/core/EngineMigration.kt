@@ -4,10 +4,10 @@
  */
 package org.fcitx.fcitx5.android.core
 
+import org.fcitx.fcitx5.android.data.replaceFile
 import org.fcitx.fcitx5.android.engine.host.LibimeMigration
 import timber.log.Timber
 import java.io.File
-import java.io.FileOutputStream
 import java.io.IOException
 
 /**
@@ -63,13 +63,8 @@ object EngineMigration {
     }
 
     // a profile cut short by a kill would lose every group
-    private fun replace(file: File, text: String) {
-        val next = File(file.path + ".new")
-        // on disk before the rename: else a power cut may leave the new name on an empty file
-        FileOutputStream(next).use {
-            it.write(text.toByteArray())
-            it.fd.sync()
-        }
-        if (!next.renameTo(file)) throw IOException("cannot replace $file")
+    private fun replace(file: File, text: String) = replaceFile(file, File(file.path + ".new")) {
+        it.writeText(text)
+        true
     }
 }

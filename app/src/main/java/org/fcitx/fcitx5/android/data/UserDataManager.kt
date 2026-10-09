@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.data
 
+import android.content.Context
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
@@ -96,29 +97,51 @@ object UserDataManager {
     }
 
     fun import(src: InputStream) = runCatching {
-        ZipInputStream(src).use { zipStream ->
-            withTempDir { tempDir ->
-                val extracted = zipStream.extract(tempDir)
-                val metadataFile = extracted.find { it.name == "metadata.json" }
-                    ?: errorRuntime(R.string.exception_user_data_metadata)
-                val metadata = json.decodeFromString<Metadata>(metadataFile.readText())
-                val origin = UserDataOrigin.of(
-                    metadata.packageName, BuildConfig.APPLICATION_ID, BuildConfig.APPLICATION_ID_ROOT
-                ) ?: errorRuntime(R.string.exception_user_data_package_name_mismatch)
-                if (origin is UserDataOrigin.Legacy) {
-                    val prefs = File(tempDir, "shared_prefs")
-                    File(prefs, origin.preferences).takeIf { it.exists() }?.renameTo(File(prefs, origin.renamed))
-                }
-                copyDir(File(tempDir, "shared_prefs"), sharedPrefsDir)
-                copyDir(File(tempDir, "databases"), dataBasesDir)
-                copyDir(File(tempDir, "external"), externalDir)
-                // fcitx is stopped, so is the engine: its open logs are replaced, not written into
-                // (copyRecursively deletes a file before writing it), and the app exits right after
-                if (File(tempDir, "engine").exists()) copyDir(File(tempDir, "engine"), engineDir)
-                // keep importing recently_used for backwords compatibility
-                copyDir(File(tempDir, "recently_used"), recentlyUsedDir)
-                metadata
+        withTempDir { tempDir ->
+            // closed before anything is copied: nothing may fail the import once the engine's is in
+            val extracted = ZipInputStream(src).use { it.extract(tempDir) }
+            val metadataFile = extracted.find { it.name == "metadata.json" }
+                ?: errorRuntime(R.string.exception_user_data_metadata)
+            val metadata = json.decodeFromString<Metadata>(metadataFile.readText())
+            val origin = UserDataOrigin.of(
+                metadata.packageName, BuildConfig.APPLICATION_ID, BuildConfig.APPLICATION_ID_ROOT
+            ) ?: errorRuntime(R.string.exception_user_data_package_name_mismatch)
+            if (origin is UserDataOrigin.Legacy) {
+                val prefs = File(tempDir, "shared_prefs")
+                File(prefs, origin.preferences).takeIf { it.exists() }?.renameTo(File(prefs, origin.renamed))
             }
+            // the settings it brings that have no UI go back to their defaults at the next start:
+            // not here, where AppPrefs would write its own copy over the imported one
+            importedUserDataMarker(appContext).createNewFile()
+            copyDir(File(tempDir, "shared_prefs"), sharedPrefsDir)
+            copyDir(File(tempDir, "databases"), dataBasesDir)
+            copyDir(File(tempDir, "external"), externalDir)
+            // keep importing recently_used for backwords compatibility
+            copyDir(File(tempDir, "recently_used"), recentlyUsedDir)
+            // last, for the same reason
+            if (File(tempDir, "engine").exists()) importEngine(File(tempDir, "engine"))
+            metadata
+        }
+    }
+
+    /**
+     * [source] copied over [engineDir], as [copyDir] would, but put in place in one rename: fcitx
+     * stopped leaves the engine's logs open, and starts again if the import fails, so a log
+     * replaced on its own would then be written where nothing reads it, and what it learns lost.
+     */
+    private fun importEngine(source: File) {
+        // no directory: copyDir says so, and copies nothing
+        if (!source.isDirectory) return copyDir(source, engineDir)
+        replaceDirectory(engineDir, File(engineDir.path + ".import")) { staged ->
+            if (engineDir.isDirectory) engineDir.copyRecursively(staged)
+            source.copyRecursively(staged, overwrite = true)
         }
     }
 }
+
+/**
+ * Left by [UserDataManager.import] for the next start, which puts the settings without a UI back
+ * to their defaults ([org.fcitx.fcitx5.android.data.prefs.AppPrefs.resetHiddenSettings]); outside
+ * the object, which the app's start must not make (it needs the external storage).
+ */
+fun importedUserDataMarker(context: Context) = File(context.noBackupFilesDir, "user_data_imported")

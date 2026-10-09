@@ -10,6 +10,7 @@ import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.data.prefs.ManagedPreferenceUi.Levels.Level
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -52,5 +53,28 @@ class LevelsTest {
         assertTrue(levels.pick(0))
         assertEquals(27, store.getInt("height", 0))
         assertFalse(levels.pick(3))
+    }
+
+    @Test
+    fun keysOfOtherUnitsWeighAlike() {
+        // as the vibration's: ms, and amplitudes of 0..255 where 0 is the device's own
+        val vibration = ManagedPreferenceUi.Levels(
+            R.string.vibration_strength, "vibration_level", store,
+            listOf("press" to 0, "long_press" to 0, "press_amplitude" to 0, "long_press_amplitude" to 0),
+            listOf(
+                Level(R.string.system_default, 0, 0, 0, 0),
+                Level(R.string.level_light, 10, 20, 60, 90),
+                Level(R.string.level_medium, 20, 30, 128, 160),
+                Level(R.string.level_strong, 35, 45, 220, 255),
+            )
+        )
+        // an older version's 35/45 ms, which vibrates: not shown as the system's, nor left so when it is picked
+        store.edit {
+            putInt("press", 35)
+            putInt("long_press", 45)
+        }
+        assertNotEquals(0, vibration.current())
+        assertTrue(vibration.pick(0))
+        assertEquals(0 to 0, store.getInt("press", -1) to store.getInt("long_press", -1))
     }
 }

@@ -1,31 +1,30 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- DataManager.dataDir's assets, synced again on the next start, live in device-protected
+     storage (device_root), not in files/ -->
 <data-extraction-rules>
     <cloud-backup>
         <exclude
-            domain="file"
+            domain="device_root"
             path="usr" />
         <exclude
-            domain="file"
+            domain="device_root"
             path="descriptor.json" />
         <exclude
-            domain="file"
-            path="licenses.json" />
-        <exclude
-            domain="file"
+            domain="device_root"
             path="README.md" />
+        <exclude
+            domain="root"
+            path="no_backup" />
     </cloud-backup>
     <device-transfer>
         <exclude
-            domain="file"
+            domain="device_root"
             path="usr" />
         <exclude
-            domain="file"
+            domain="device_root"
             path="descriptor.json" />
         <exclude
-            domain="file"
-            path="licenses.json" />
-        <exclude
-            domain="file"
+            domain="device_root"
             path="README.md" />
         <exclude
             domain="root"

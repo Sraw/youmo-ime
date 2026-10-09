@@ -21,6 +21,7 @@ import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.plus
 import org.fcitx.fcitx5.android.daemon.FcitxDaemon
 import org.fcitx.fcitx5.android.data.clipboard.ClipboardManager
+import org.fcitx.fcitx5.android.data.importedUserDataMarker
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.ui.main.LogActivity
@@ -129,6 +130,11 @@ class FcitxApplication : Application() {
         Timber.d("isDirectBootMode=$isDirectBootMode")
 
         AppPrefs.init(sharedPrefs)
+        // the settings without a UI back to their defaults: once, and after an import of the user's
+        // data (in direct boot these are the device's copy, and the import's marker cannot be read)
+        val imported = if (isDirectBootMode) null else importedUserDataMarker(this).takeIf { it.exists() }
+        AppPrefs.getInstance().resetHiddenSettings(again = imported != null)
+        imported?.delete()
         // record last pid for crash logs
         AppPrefs.getInstance().internal.pid.apply {
             val currentPid = Process.myPid()

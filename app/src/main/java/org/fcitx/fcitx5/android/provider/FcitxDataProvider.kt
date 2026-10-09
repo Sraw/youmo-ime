@@ -218,12 +218,13 @@ class FcitxDataProvider : DocumentsProvider() {
         requirePlainDisplayName(displayName)
         // a sibling of the root itself is outside it
         val newFile = oldFile.resolveSibling(displayName).normalizedWithin(canonicalBaseDir)
-            ?: throw FileNotFoundException("renameDocument id=$documentId to $displayName failed: outside the root")
-        if (newFile.exists()) {
-            throw FileNotFoundException("renameDocument id=$documentId to $displayName failed: target exists")
+        val reason = when {
+            newFile == null -> ": outside the root"
+            newFile.exists() -> ": target exists"
+            oldFile.renameTo(newFile) -> return newFile.docId
+            else -> ""
         }
-        oldFile.renameTo(newFile)
-        return newFile.docId
+        throw FileNotFoundException("renameDocument id=$documentId to $displayName failed$reason")
     }
 
     @Throws(FileNotFoundException::class)
@@ -234,7 +235,9 @@ class FcitxDataProvider : DocumentsProvider() {
     ): String {
         val oldFile = fileFromDocId(sourceDocumentId)
         val newFile = createAbstractFile(targetParentDocumentId, oldFile.name)
-        oldFile.renameTo(newFile)
+        if (!oldFile.renameTo(newFile)) {
+            throw FileNotFoundException("moveDocument id=$sourceDocumentId to ${newFile.docId} failed")
+        }
         return newFile.docId
     }
 

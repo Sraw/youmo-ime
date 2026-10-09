@@ -18,6 +18,9 @@ abstract class ManagedPreferenceCategory(
     /** index of the first preference in a section -> the section's title */
     private val sections = mutableMapOf<Int, Int>()
 
+    /** Keys of what [hidden] declares, but for those a [levels] sets. */
+    private val resettableKeys = mutableListOf<String>()
+
     /** Preferences registered after this call, up to the next [section], are grouped under [title]. */
     protected fun section(@StringRes title: Int) {
         // two sections at the same index would silently drop the first title
@@ -29,15 +32,25 @@ abstract class ManagedPreferenceCategory(
 
     /**
      * The preferences [block] declares, kept without a UI: a phone's user is not shown every knob
-     * the code has; what they are set to (their default, or what an older version set) stays.
+     * the code has. Those of [AppPrefs] go back to their defaults once, and after an import of the
+     * user's data ([AppPrefs.resetHiddenSettings]), for what an older version or a backup set
+     * there could not be changed back; but not when [setByLevels], where a [levels] (in this
+     * category or another) still sets them.
      */
-    protected fun <T> hidden(block: () -> T): T {
+    protected fun <T> hidden(setByLevels: Boolean = false, block: () -> T): T {
+        val before = managedPreferences.keys.toSet()
         hidingUi = true
         try {
             return block()
         } finally {
             hidingUi = false
+            if (!setByLevels) resettableKeys += managedPreferences.keys - before
         }
+    }
+
+    /** Puts what [hidden] declares back to its defaults, but what a [levels] sets. */
+    fun resetHidden(editor: SharedPreferences.Editor) {
+        resettableKeys.forEach { editor.remove(it) }
     }
 
     /**
@@ -99,7 +112,8 @@ abstract class ManagedPreferenceCategory(
         noinline enableUiOn: (() -> Boolean)? = null
     ): ManagedPreference.PStringLike<T> where T : Enum<T>, T : ManagedPreferenceEnum {
         val codec = object : ManagedPreference.StringLikeCodec<T> {
-            override fun decode(raw: String): T = enumValueOf(raw)
+            // one the list does not offer (a voice build's Voice in a text build) reads as the default
+            override fun decode(raw: String): T? = enumValueOf<T>(raw).takeIf { it in entryValues }
         }
         val entryLabels = entryValues.map { it.stringRes }
         return list(title, key, defaultValue, codec, entryValues, entryLabels, enableUiOn)

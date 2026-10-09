@@ -15,13 +15,18 @@ fun ZipInputStream.extract(destDir: File): List<File> {
     var entry = nextEntry
     val canonicalDest = destDir.canonicalPath
     while (entry != null) {
+        val file = File(destDir, entry.name)
+        val canonicalPath = file.canonicalPath
+        // without the separator "../<dest>x/f" passes as inside; only a directory entry may be dest itself
+        if (!canonicalPath.startsWith(canonicalDest + File.separator) &&
+            !(entry.isDirectory && canonicalPath == canonicalDest)
+        ) throw SecurityException("Zip entry outside of the destination: ${entry.name}")
         if (!entry.isDirectory) {
-            val file = File(destDir, entry.name)
-            if (!file.canonicalPath.startsWith(canonicalDest)) throw SecurityException()
-            copyTo(file.outputStream())
+            // a zip need not have entries for the directories of its files
+            file.parentFile?.mkdirs()
+            file.outputStream().use { copyTo(it) }
         } else {
-            val dir = File(destDir, entry.name)
-            dir.mkdir()
+            file.mkdirs()
         }
         entry = nextEntry
     }

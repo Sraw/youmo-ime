@@ -44,9 +44,15 @@ abstract class ManagedPreferenceUi<T : Preference>(
         /** A level named [label]: [values] for the keys, in their order. */
         class Level(@StringRes val label: Int, vararg val values: Int)
 
+        /** How far apart the levels set each key: one in ms and one of 0..255 then weigh alike. */
+        private val spans = keys.indices.map { k -> levels.maxOf { it.values[k] } - levels.minOf { it.values[k] } }
+
         /** The level nearest what the keys hold. */
         fun current(): Int = levels.indices.minBy { i ->
-            keys.indices.sumOf { k -> abs(store.getInt(keys[k].first, keys[k].second) - levels[i].values[k]) }
+            keys.indices.sumOf { k ->
+                val held = store.getInt(keys[k].first, keys[k].second)
+                abs(held - levels[i].values[k]).toDouble() / spans[k].coerceAtLeast(1)
+            }
         }
 
         /** Sets the keys to level [index]; false if there is none such. */
@@ -109,7 +115,14 @@ abstract class ManagedPreferenceUi<T : Preference>(
         val entryLabels: List<Int>,
         enableUiOn: (() -> Boolean)? = null
     ) : ManagedPreferenceUi<ListPreference>(key, enableUiOn) {
-        override fun createUi(context: Context) = ListPreference(context).apply {
+        override fun createUi(context: Context) = object : ListPreference(context) {
+            // a stored value the list does not offer shows as what it reads as: the default
+            override fun getPersistedString(defaultReturnValue: String?): String? {
+                val stored = super.getPersistedString(defaultReturnValue)
+                if (stored == null || findIndexOfValue(stored) >= 0) return stored
+                return codec.encode(this@StringList.defaultValue)
+            }
+        }.apply {
             key = this@StringList.key
             isIconSpaceReserved = false
             isSingleLineTitle = false

@@ -13,9 +13,10 @@ import androidx.lifecycle.lifecycleScope
 import androidx.preference.PreferenceCategory
 import androidx.preference.PreferenceScreen
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.daemon.FcitxDaemon
 import org.fcitx.fcitx5.android.data.UserDataManager
@@ -56,26 +57,30 @@ class AdvancedSettingsFragment : ManagedPreferenceFragment(AppPrefs.getInstance(
                         ctx.importErrorDialog(R.string.exception_user_data_filename, name)
                         return@withLoadingDialog
                     }
-                    try {
-                        // stop fcitx before overwriting files
-                        FcitxDaemon.stopFcitx()
-                        val metadata = withContext(Dispatchers.IO) {
-                            val inputStream = cr.openInputStream(uri)!!
-                            UserDataManager.import(inputStream).getOrThrow()
-                        }
-                        AppUtil.showRestartNotification(ctx)
-                        val exportTime = formatDateTime(metadata.exportTime)
-                        ctx.toast(getString(R.string.user_data_imported, exportTime))
-                        // delay exit to ensure Notification and Toast has been created
-                        lifecycleScope.launch {
+                    // outlives the page, which a rotation cancels: once the engine's files are
+                    // replaced the app must exit, else fcitx comes back writing to the old ones
+                    val failed = FcitxApplication.getInstance().coroutineScope.async(Dispatchers.Main.immediate) {
+                        try {
+                            // stop fcitx before overwriting files
+                            FcitxDaemon.stopFcitx()
+                            val metadata = withContext(Dispatchers.IO) {
+                                val inputStream = cr.openInputStream(uri)!!
+                                UserDataManager.import(inputStream).getOrThrow()
+                            }
+                            AppUtil.showRestartNotification(ctx)
+                            val exportTime = formatDateTime(metadata.exportTime)
+                            ctx.toast(ctx.getString(R.string.user_data_imported, exportTime))
+                            // delay exit to ensure Notification and Toast has been created
                             delay(400L)
                             AppUtil.exit()
+                            null
+                        } catch (e: Exception) {
+                            // restart fcitx in case importing failed
+                            FcitxDaemon.startFcitx()
+                            e
                         }
-                    } catch (e: Exception) {
-                        // restart fcitx in case importing failed
-                        FcitxDaemon.startFcitx()
-                        ctx.importErrorDialog(e)
                     }
+                    failed.await()?.let { ctx.importErrorDialog(it) }
                 }
             }
         exportLauncher =

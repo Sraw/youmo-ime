@@ -48,6 +48,9 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
          * is also what swiping it types, drawn in its corner.
          */
         val popupOverrides = string("popup_overrides", "")
+
+        /** Whether [resetHiddenSettings] ran: on the first start of a version with it, and so once. */
+        val hiddenSettingsReset = bool("hidden_settings_reset", false)
     }
 
     inner class Advanced : ManagedPreferenceCategory(R.string.advanced, sharedPreferences) {
@@ -88,7 +91,7 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
             "swipe_symbol_behavior",
             SwipeSymbolDirection.Down
         )
-        val longPressDelay = hidden { int(
+        val longPressDelay = hidden(setByLevels = true) { int(
             R.string.keyboard_long_press_delay,
             "keyboard_long_press_delay",
             300,
@@ -169,7 +172,7 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
         val keyboardHeightPercentLandscape: ManagedPreference.PInt
 
         init {
-            val (primary, secondary) = hidden {
+            val (primary, secondary) = hidden(setByLevels = true) {
                 twinInt(
                     R.string.keyboard_height,
                     R.string.portrait,
@@ -191,7 +194,7 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
         val keyboardSidePaddingLandscape: ManagedPreference.PInt
 
         init {
-            val (primary, secondary) = hidden {
+            val (primary, secondary) = hidden(setByLevels = true) {
                 twinInt(
                     R.string.keyboard_side_padding,
                     R.string.portrait,
@@ -213,7 +216,7 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
         val keyboardBottomPaddingLandscape: ManagedPreference.PInt
 
         init {
-            val (primary, secondary) = hidden {
+            val (primary, secondary) = hidden(setByLevels = true) {
                 twinInt(
                     R.string.keyboard_bottom_padding,
                     R.string.portrait,
@@ -252,7 +255,7 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
         val buttonLongPressVibrationMilliseconds: ManagedPreference.PInt
 
         init {
-            val (primary, secondary) = hidden {
+            val (primary, secondary) = hidden(setByLevels = true) {
                 twinInt(
                     R.string.button_vibration_milliseconds,
                     R.string.button_press,
@@ -275,7 +278,7 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
         val buttonLongPressVibrationAmplitude: ManagedPreference.PInt
 
         init {
-            val (primary, secondary) = hidden {
+            val (primary, secondary) = hidden(setByLevels = true) {
                 twinInt(
                     R.string.button_vibration_amplitude,
                     R.string.button_press,
@@ -317,7 +320,7 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
             "sound_on_keypress",
             InputFeedbackMode.FollowingSystem
         )
-        val soundOnKeyPressVolume = hidden { int(
+        val soundOnKeyPressVolume = hidden(setByLevels = true) { int(
             R.string.button_sound_volume,
             "button_sound_volume",
             0,
@@ -483,6 +486,8 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
             listOf(
                 internal.verboseLog,
                 internal.editorInfoInspector,
+                // the long-press and swipe characters: a password may be typed with them before the first unlock
+                internal.popupOverrides,
                 advanced.ignoreSystemCursor,
                 advanced.disableAnimation,
                 advanced.vivoKeypressWorkaround
@@ -498,6 +503,20 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
                     it.value.putValueTo(this@edit)
                 }
             }
+        }
+    }
+
+    /**
+     * Puts the settings that have no UI back to their defaults ([ManagedPreferenceCategory.hidden]):
+     * once, and [again] after an import of the user's data, for what an older version or a backup
+     * set there could not be changed back.
+     */
+    fun resetHiddenSettings(again: Boolean = false) {
+        if (!again && internal.hiddenSettingsReset.getValue()) return
+        // on disk before an import's marker goes
+        sharedPreferences.edit(commit = true) {
+            listOf(keyboard, candidates, clipboard, symbols, advanced).forEach { it.resetHidden(this@edit) }
+            putBoolean(internal.hiddenSettingsReset.key, true)
         }
     }
 

@@ -38,7 +38,8 @@ object DataManager {
     }
 
     // If Android version supports direct boot, we put the hierarchy in device encrypted storage
-    // instead of credential encrypted storage so that data can be accessed before user unlock
+    // instead of credential encrypted storage so that data can be accessed before user unlock.
+    // The backup rules (res/xml) leave it out by these domains, device_root and root: move them along
     val dataDir: File = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
         Timber.d("Using device protected storage")
         appContext.createDeviceProtectedStorageContext().dataDir

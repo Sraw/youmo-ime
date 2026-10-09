@@ -4,11 +4,11 @@
  */
 package org.fcitx.fcitx5.android.data.table
 
+import org.fcitx.fcitx5.android.data.replaceFile
 import org.fcitx.fcitx5.android.data.table.dict.Dictionary
 import org.fcitx.fcitx5.android.data.table.dict.TextDictionary
 import org.fcitx.fcitx5.android.engine.table.TableText
 import java.io.File
-import java.io.IOException
 
 /** The tables the user imported, kept as text the engine reads, whatever they came as. */
 object ImportedTables {
@@ -19,13 +19,10 @@ object ImportedTables {
      */
     fun install(dict: Dictionary, dest: File): TextDictionary {
         // named .txt as the conversion wants, hidden till it is checked
-        val temp = File(dest.parentFile, ".${dest.name}")
-        try {
+        replaceFile(dest, File(dest.parentFile, ".${dest.name}")) { temp ->
             dict.toTextDictionary(temp)
             temp.bufferedReader().use { TableText.check(it, dict.file.name) }
-            if (!temp.renameTo(dest)) throw IOException("cannot write ${dest.name}")
-        } finally {
-            temp.delete()
+            true
         }
         return TextDictionary(dest)
     }
