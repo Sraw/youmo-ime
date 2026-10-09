@@ -12,7 +12,10 @@ upstream's AAR, so that it is ours to change.
 - **Built:** by the module's CMake build (`build.gradle.kts`), recognizer, VAD and JNI only, no
   speech synthesis. CMake downloads onnxruntime's Android libraries and the small dependencies
   (kaldi-native-fbank, kaldi-decoder, simple-sentencepiece, eigen, json), each SHA-256 checked by
-  its `cmake/*.cmake`. Only the app's `voice` flavor depends on the module.
+  its `cmake/*.cmake`. kaldi-decoder brings kaldifst and openfst with it, kaldi-native-fbank kissfft.
+  Each of them is credited on the app's licences page (`VoiceFeature.credits` in `app/src/voice`):
+  a dependency added or updated here is changed there too. Only the app's `voice` flavor depends
+  on the module.
 
 ## What we changed
 

@@ -115,7 +115,8 @@ object VoiceEngine {
      * A stretch of speech to text, in [stream] (made by [stream] for [words], not blocking),
      * which it releases. The best of the recognizer's hypotheses by [language]'s model too
      * ([VoiceRerank]); of them, that first, the first with none of the words the user blocked standing as a
-     * word in it ([VoiceBlocking]); if each has one, the stretch searched again with them blocked.
+     * word in it ([VoiceBlocking]); if each has one, the stretch searched again with them blocked,
+     * and of that search's hypotheses again the first with none, its best if each still has one.
      */
     suspend fun recognize(
         r: OfflineRecognizer,
@@ -140,7 +141,12 @@ object VoiceEngine {
         val suspects = VoiceBlocking.suspects(texts, blocked)
         if (suspects.isEmpty()) return texts[0]
         VoiceBlocking.pick(texts, blocked, language.boundaries(suspects))?.let { return texts[it] }
-        return result(r, VoiceEngine.stream(r, words, block = true), samples).text
+        val again = result(r, VoiceEngine.stream(r, words, block = true), samples)
+        // the search blocks a word as the model spells it: written in other tokens it can still win
+        val retried = again.nbest.toList().ifEmpty { listOf(again.text) }
+        val still = VoiceBlocking.suspects(retried, blocked)
+        if (still.isEmpty()) return again.text
+        return VoiceBlocking.pick(retried, blocked, language.boundaries(still))?.let { retried[it] } ?: again.text
     }
 
     /** the words the user added and made (VoiceHotwords.ofUser), read again for each listener */

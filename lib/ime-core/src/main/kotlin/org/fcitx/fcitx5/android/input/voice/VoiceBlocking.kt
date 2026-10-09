@@ -14,9 +14,12 @@ package org.fcitx.fcitx5.android.input.voice
  */
 object VoiceBlocking {
 
-    /** Of [nbest], those with a blocked word in them at all: the only ones to split. */
+    /**
+     * Of [nbest], each as typed (without the recognizer's spaces, as VoiceText types it), those
+     * with a blocked word in them at all: the only ones to split.
+     */
     fun suspects(nbest: List<String>, blocked: List<String>): List<String> =
-        nbest.filter { text -> blocked.any { it in text } }.distinct()
+        nbest.map { typed(it) }.filter { text -> blocked.any { it in text } }.distinct()
 
     /**
      * The first of [nbest] in which none of [blocked] stands as words, given [boundaries] of the
@@ -25,9 +28,13 @@ object VoiceBlocking {
      */
     fun pick(nbest: List<String>, blocked: List<String>, boundaries: Map<String, IntArray>): Int? =
         nbest.indices.firstOrNull { i ->
-            val text = nbest[i]
+            val text = typed(nbest[i])
             blocked.none { word -> word in text && stands(text, word, boundaries[text]) }
         }
+
+    // as far as a blocked word goes, what is typed: VoiceText takes out the spaces X-ASR puts by
+    // Chinese (开 饭 typed 开饭), and a blocked word is all Chinese (VoiceHotwords.spelled)
+    private fun typed(text: String) = text.filterNot { it.isWhitespace() }
 
     // some occurrence of word starts and ends between words
     private fun stands(text: String, word: String, boundaries: IntArray?): Boolean {

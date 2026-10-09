@@ -6,6 +6,7 @@ package org.fcitx.fcitx5.android.input.voice
 
 import org.junit.Assert.assertEquals
 import org.junit.Test
+import java.util.Locale
 
 /** The cases are the recognizer's own output, on the voice evaluation sets. */
 class ChineseNumbersTest {
@@ -79,6 +80,10 @@ class ChineseNumbersTest {
         check("10点整", "十点整")
         check("10点05分", "十点零五分")
         check("有2点半的会", "有两点半的会")
+        check("1点半开会", "一点半开会")
+        // "a bit" (一点半点) only with 一 for the hour, and no time word before it
+        check("7点半点外卖", "七点半点外卖")
+        check("下午1点半点名", "下午一点半点名")
         // a long run before 点 is no hour, and does not throw
         check("12345678901234567890.5分", "一二三四五六七八九零一二三四五六七八九零点五分")
         // no 分: a time or a decimal, not to be guessed
@@ -99,6 +104,22 @@ class ChineseNumbersTest {
             // sayings
             "十字路口", "十有八九", "三十而立", "十万火急", "十万八千里", "三三两两", "七七八八",
             "百分之三十几", "差一点整天", "一千零零五", "一千零", "他有一点十分奇怪", "还有两点十分重要",
+            // 一点 as "a bit"
+            "没有一点半点", "有一点半信半疑",
         )) check(word, word)
+    }
+
+    @Test
+    fun digitsWhateverThePhonesLanguage() {
+        // %02d wrote 10点٠٥分 with the phone in Arabic or Persian
+        val format = Locale.getDefault(Locale.Category.FORMAT)
+        try {
+            for (tag in listOf("ar-EG", "fa-IR")) {
+                Locale.setDefault(Locale.Category.FORMAT, Locale.forLanguageTag(tag))
+                check("10点05分", "十点零五分")
+            }
+        } finally {
+            Locale.setDefault(Locale.Category.FORMAT, format)
+        }
     }
 }

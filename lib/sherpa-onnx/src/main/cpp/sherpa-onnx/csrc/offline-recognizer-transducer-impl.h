@@ -182,8 +182,8 @@ class OfflineRecognizerTransducerImpl : public OfflineRecognizerImpl {
     std::vector<float> current_scores;
     if (!EncodeHotwords(is, config_.model_config.modeling_unit, symbol_table_,
                         bpe_encoder_.get(), &current, &current_scores)) {
-      SHERPA_ONNX_LOGE("Encode hotwords failed, skipping, hotwords are : '%s'",
-                       hotwords.c_str());
+      // youmo: the user's words, not for the log
+      SHERPA_ONNX_LOGE("Encode hotwords failed, skipping some");
     }
 
     int32_t num_default_hws = hotwords_.size();

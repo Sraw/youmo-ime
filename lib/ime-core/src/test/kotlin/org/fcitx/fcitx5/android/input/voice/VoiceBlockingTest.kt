@@ -52,6 +52,14 @@ class VoiceBlockingTest {
     }
 
     @Test
+    fun asTypedWithoutTheRecognizersSpaces() {
+        // X-ASR spaces Chinese as it does English, and 开 饭 is typed 开饭
+        assertEquals("开饭了", VoiceText.clean("开 饭了"))
+        assertEquals(listOf("开饭了"), VoiceBlocking.suspects(listOf("开 饭了", "开饭 了"), blocked))
+        assertEquals(1, VoiceBlocking.pick(listOf("开 饭了", "开放了"), blocked, mapOf("开饭了" to intArrayOf(0, 2, 3))))
+    }
+
+    @Test
     fun theBlockedWordsAsWritten() {
         assertEquals(listOf("开饭", "内卷"), VoiceHotwords.Words("", "开 饭/内 卷").blockedWords)
         assertEquals(emptyList<String>(), VoiceHotwords.Words.NONE.blockedWords)

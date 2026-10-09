@@ -36,11 +36,16 @@ static bool EncodeBase(const std::vector<std::string> &lines,
   bool has_thresholds = false;
   bool has_phrases = false;
   bool has_oov = false;
+  // youmo: a line with a token not in the table is left out, not shortened to
+  // the tokens it has (another phrase); the lines may be the user's words, so
+  // how many only for the log
+  int32_t left_out = 0;
 
   for (const auto &line : lines) {
     float score = 0;
     float threshold = 0;
     std::string phrase = "";
+    bool line_oov = false;
 
     std::istringstream iss(line);
     while (iss >> word) {
@@ -62,20 +67,26 @@ static bool EncodeBase(const std::vector<std::string> &lines,
             has_phrases = true;
             break;
           default:
-            SHERPA_ONNX_LOGE(
-                "Cannot find ID for token %s at line: %s. (Hint: Check the "
-                "tokens.txt see if %s in it)",
-                word.c_str(), line.c_str(), word.c_str());
             has_oov = true;
+            line_oov = true;
             break;
         }
       }
+    }
+    if (line_oov) {
+      ++left_out;
+      tmp_ids = {};
+      continue;
     }
     ids->push_back(std::move(tmp_ids));
     tmp_ids = {};
     tmp_scores.push_back(score);
     tmp_phrases.push_back(phrase);
     tmp_thresholds.push_back(threshold);
+  }
+  if (left_out > 0) {
+    SHERPA_ONNX_LOGE("%d lines left out, each with a token not in tokens.txt",
+                     left_out);
   }
   if (scores != nullptr) {
     if (has_scores) {

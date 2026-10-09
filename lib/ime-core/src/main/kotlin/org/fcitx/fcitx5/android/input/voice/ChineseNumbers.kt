@@ -36,6 +36,8 @@ object ChineseNumbers {
     private const val NOT_HOUR_BEFORE = "这那哪第每几"
     // 点整 that goes on as a word: 这一点整体来看, 差一点整天
     private const val NOT_SHARP_AFTER = "体个理齐洁合数改顿治天晚夜"
+    // 一点半 that goes on as a word, 一点 being "a bit": 没有一点半点, 有一点半信半疑
+    private const val NOT_HALF_AFTER = "点信"
 
     // what goes on from a time's 十分 (三点十分出发), where 十分 as "very" goes on to a word (十分奇怪)
     private const val AFTER_TEN_PAST = "的左右前后起到开见了出就才时，。、！？,.!? "
@@ -123,13 +125,13 @@ object ChineseNumbers {
 
     /**
      * 六点半, 九点十五分: a time; none if its hour is past 24 or its minutes past 59 (八点五百分之一),
-     * or if it is a point made (这一点十分重要).
+     * or if it is a point made (这一点十分重要) or a bit (没有一点半点).
      */
     private fun time(text: String, start: Int, point: Int, whole: String): Run? {
         val hour = whole.toLongOrNull()
         if (hour == null || hour > HOURS || text.getOrNull(start - 1)?.let { it in NOT_HOUR_BEFORE } == true) return null
         val next = text[point + 1]
-        if (next == '半' || (next == '整' && text.getOrNull(point + 2)?.let { it in NOT_SHARP_AFTER } != true)) {
+        if (halfOrSharp(next, text.getOrNull(point + 2), whole)) {
             return Run(point + 2, "${whole}点$next", text.substring(start, point + 2), time = true)
         }
         var m = point + 1
@@ -139,9 +141,16 @@ object ChineseNumbers {
         if (text.getOrNull(m) != '分' || minutes >= MINUTES || text.getOrNull(m + 1) == '钟') return null
         // 一点十分奇怪: "a bit very strange", no time
         if (said == "十" && text.getOrNull(m + 1)?.let { it !in AFTER_TEN_PAST } == true) return null
-        // 十点零五分 as 10点05分
-        val written = if (said.startsWith('零')) "%02d".format(minutes) else "$minutes"
+        // 十点零五分 as 10点05分; not %02d, which writes the phone's language's digits (٠٥ in Arabic)
+        val written = if (said.startsWith('零')) "$minutes".padStart(2, '0') else "$minutes"
         return Run(m + 1, "${whole}点${written}分", text.substring(start, m + 1), time = true)
+    }
+
+    /** 六点半 or 八点整, from [next] after the 点 of the hour [whole] and [after] after it; not 一点半点 or 一点整体. */
+    private fun halfOrSharp(next: Char, after: Char?, whole: String) = when (next) {
+        '半' -> !(whole == "1" && after?.let { it in NOT_HALF_AFTER } == true)
+        '整' -> after?.let { it in NOT_SHARP_AFTER } != true
+        else -> false
     }
 
     /** 十三点六, 三点五亿; 九点五十, with no 分, neither a decimal nor sure to be a time. */

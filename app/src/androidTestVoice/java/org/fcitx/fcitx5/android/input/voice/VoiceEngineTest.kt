@@ -83,6 +83,20 @@ class VoiceEngineTest {
     }
 
     @Test
+    fun theBlockInTheSearchTakesAWordWithinTheSentenceToo() {
+        // 早上, not where the sentence starts: its tokens there are blocked as at the start
+        val blocked = VoiceHotwords.Words(hotwords = "", blocked = "早 上")
+        val recognizer = VoiceEngine.acquire(app.assets)
+        try {
+            val text = VoiceEngine.result(recognizer, VoiceEngine.stream(recognizer, blocked, block = true), wav("zh.wav")).text
+            assertTrue(text, "早上" !in text)
+            assertTrue(text, "时间" in text && "下午" in text)
+        } finally {
+            VoiceEngine.release()
+        }
+    }
+
+    @Test
     fun theBeamsOtherHypothesesComeBackBestFirst() {
         val recognizer = VoiceEngine.acquire(app.assets)
         try {

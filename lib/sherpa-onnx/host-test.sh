@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # The C++ unit tests of what we changed in sherpa-onnx, run on this machine rather than a phone:
-# googletest (as upstream's cmake/googletest.cmake pins it, SHA-256 checked) and the few sources
-# they need, compiled with the host's g++. Usage: lib/sherpa-onnx/host-test.sh
+# googletest and simple-sentencepiece (as upstream's cmake/googletest.cmake and
+# cmake/simple-sentencepiece.cmake pin them, SHA-256 checked) and the few sources they need,
+# compiled with the host's g++. Usage: lib/sherpa-onnx/host-test.sh
 set -euo pipefail
 here=$(cd "$(dirname "$0")" && pwd)
 src=$here/src/main/cpp
@@ -21,8 +22,22 @@ fi
   ar rcs libgtest.a gtest-all.o gtest_main.o
 }
 
+# utils.h includes its header, utils.cc calls its encoder
+ssp=simple-sentencepiece-0.7
+if [ ! -d $ssp ]; then
+  curl -sSL -o $ssp.tar.gz https://github.com/pkufool/simple-sentencepiece/archive/refs/tags/v0.7.tar.gz
+  echo "1748a822060a35baa9f6609f84efc8eb54dc0e74b9ece3d82367b7119fdc75af  $ssp.tar.gz" | sha256sum -c --quiet
+  tar xzf $ssp.tar.gz
+fi
+
 csrc=$src/sherpa-onnx/csrc
 g++ -std=c++17 -O1 -I "$src" -I $gtest/googletest/include \
   "$csrc/context-graph-test.cc" "$csrc/context-graph.cc" "$csrc/log.cc" \
   libgtest.a -lpthread -o context-graph-test
 ./context-graph-test --gtest_filter='-ContextGraph.Benchmark'
+
+g++ -std=c++17 -O1 -I "$src" -I $ssp -I $gtest/googletest/include \
+  "$csrc/utils-test.cc" "$csrc/utils.cc" "$csrc/symbol-table.cc" "$csrc/text-utils.cc" \
+  "$csrc/bbpe.cc" "$csrc/base64-decode.cc" "$csrc/file-utils.cc" "$csrc/log.cc" \
+  $ssp/ssentencepiece/csrc/ssentencepiece.cc libgtest.a -lpthread -o utils-test
+./utils-test

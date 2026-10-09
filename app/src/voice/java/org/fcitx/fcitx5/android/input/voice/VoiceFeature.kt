@@ -39,5 +39,17 @@ object VoiceFeature {
         Credit(context.getString(R.string.voice_model_credit), "Apache-2.0", "https://github.com/Gilgamesh-J/X-ASR"),
         Credit("sherpa-onnx:1.13.8", "Apache-2.0", "https://github.com/k2-fsa/sherpa-onnx/blob/master/LICENSE"),
         Credit("silero-vad", "MIT", "https://github.com/snakers4/silero-vad/blob/master/LICENSE"),
+        // what sherpa-onnx is built with (lib/sherpa-onnx/README.md): in its library in the APK, or beside it
+        Credit("onnxruntime:1.28.2", "MIT", "https://github.com/microsoft/onnxruntime/blob/main/LICENSE"),
+        // others' code built into libonnxruntime.so: the notices of the release it is built from
+        Credit("onnxruntime third-party notices:1.28.2", "Apache-2.0, BSD-3-Clause, MIT and others", "https://github.com/microsoft/onnxruntime/blob/v1.28.2/ThirdPartyNotices.txt"),
+        Credit("kaldi-native-fbank:1.22.3", "Apache-2.0", "https://github.com/csukuangfj/kaldi-native-fbank/blob/master/LICENSE"),
+        Credit("kissfft", "BSD-3-Clause", "https://github.com/mborgerding/kissfft/blob/master/COPYING"),
+        Credit("kaldi-decoder:0.3.0", "Apache-2.0", "https://github.com/k2-fsa/kaldi-decoder/blob/master/LICENSE"),
+        Credit("kaldifst:1.8.0", "Apache-2.0", "https://github.com/k2-fsa/kaldifst/blob/master/LICENSE"),
+        Credit("openfst:1.8.5", "Apache-2.0", "https://github.com/csukuangfj/openfst"),
+        Credit("simple-sentencepiece:0.7", "Apache-2.0", "https://github.com/pkufool/simple-sentencepiece/blob/master/LICENSE"),
+        Credit("eigen:5.0.1", "MPL-2.0", "https://gitlab.com/libeigen/eigen/-/blob/master/COPYING.MPL2"),
+        Credit("nlohmann/json:3.12.0", "MIT", "https://github.com/nlohmann/json/blob/develop/LICENSE.MIT"),
     )
 }

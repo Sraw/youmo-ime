@@ -206,7 +206,7 @@ class VoiceListener(
         val last = capture
         scope.launch {
             last?.join()
-            pending.toList().joinAll()
+            stillPending().joinAll()
             main.post { if (!closed) done() }
         }
     }
@@ -230,50 +230,67 @@ class VoiceListener(
         val last = capture
         scope.launch {
             last?.join()
-            pending.toList().joinAll()
+            stillPending().joinAll()
             withContext(decoder) { letGoNext() }
             main.post { VoiceEngine.release() }
         }
     }
 
-    @SuppressLint("MissingPermission")
+    // toList() reads the size, then the first: a stretch done between the two would throw
+    private fun stillPending() = synchronized(pending) { pending.toList() }
+
     private suspend fun record() {
-        val vad = VoiceEngine.vad(assets)
-        val history = VoiceEngine.history()
-        val min = AudioRecord.getMinBufferSize(VoiceEngine.SAMPLE_RATE, CHANNEL, ENCODING)
-        // a second's room, should the reading fall behind
-        val size = maxOf(min, VoiceEngine.SAMPLE_RATE * Float.SIZE_BYTES)
-        val record = try {
-            AudioRecord(MediaRecorder.AudioSource.VOICE_RECOGNITION, VoiceEngine.SAMPLE_RATE, CHANNEL, ENCODING, size)
-        } catch (e: IllegalArgumentException) {
-            Timber.w(e, "microphone")
-            null
-        }
-        if (record == null || record.state != AudioRecord.STATE_INITIALIZED) {
-            record?.release()
-            vad.release()
+        val record = open()
+        if (record == null) {
             tell { failed(Failure.NoMicrophone) }
             return
         }
+        val history = VoiceEngine.history()
+        var vad: Vad? = null
         try {
             record.startRecording()
+            // the VAD's model read in once the microphone is on, not before: what is said meanwhile
+            // waits in the record's second
+            vad = VoiceEngine.vad(assets)
             listen(record, vad, history)
         } finally {
             record.stop()
             record.release()
-            // the last stretch, cut short by the pause
-            vad.flush()
-            drain(vad, history)
-            vad.release()
+            vad?.let {
+                // the last stretch, cut short by the pause
+                it.flush()
+                drain(it, history)
+                it.release()
+            }
         }
+    }
+
+    /** The microphone, in the first of [ENCODINGS] it records in; null if in none. */
+    @SuppressLint("MissingPermission")
+    private fun open(): AudioRecord? {
+        for ((encoding, bytes) in ENCODINGS) {
+            val min = AudioRecord.getMinBufferSize(VoiceEngine.SAMPLE_RATE, CHANNEL, encoding)
+            // a second's room, should the reading fall behind
+            val size = maxOf(min, VoiceEngine.SAMPLE_RATE * bytes)
+            val record = try {
+                AudioRecord(MediaRecorder.AudioSource.VOICE_RECOGNITION, VoiceEngine.SAMPLE_RATE, CHANNEL, encoding, size)
+            } catch (e: IllegalArgumentException) {
+                Timber.w(e, "microphone")
+                null
+            }
+            if (record?.state == AudioRecord.STATE_INITIALIZED) return record
+            record?.release()
+        }
+        return null
     }
 
     private suspend fun listen(record: AudioRecord, vad: Vad, history: AudioHistory) {
         val buffer = FloatArray(VoiceEngine.WINDOW)
+        val shorts = if (record.audioFormat == AudioFormat.ENCODING_PCM_16BIT) ShortArray(VoiceEngine.WINDOW) else null
         var speaking = false
         var windows = 0
         while (currentCoroutineContext().isActive) {
-            val n = record.read(buffer, 0, buffer.size, AudioRecord.READ_BLOCKING)
+            val n = read(record, buffer, shorts)
             if (n < 0) {
                 tell { failed(Failure.NoMicrophone) }
                 return
@@ -291,6 +308,14 @@ class VoiceListener(
                 tell { level(level) }
             }
         }
+    }
+
+    /** A window into [buffer], as [AudioRecord.read]: a 16-bit record's through [shorts], to -1 to 1. */
+    private fun read(record: AudioRecord, buffer: FloatArray, shorts: ShortArray?): Int {
+        if (shorts == null) return record.read(buffer, 0, buffer.size, AudioRecord.READ_BLOCKING)
+        val n = record.read(shorts, 0, shorts.size, AudioRecord.READ_BLOCKING)
+        for (i in 0 until n) buffer[i] = shorts[i] / PCM_16BIT_SCALE
+        return n
     }
 
     private fun drain(vad: Vad, history: AudioHistory) {
@@ -349,7 +374,13 @@ class VoiceListener(
 
     companion object {
         private const val CHANNEL = AudioFormat.CHANNEL_IN_MONO
-        private const val ENCODING = AudioFormat.ENCODING_PCM_FLOAT
+        // float as the VAD and the recognizer take it, where the capture path has it; else 16-bit,
+        // which every device records in. Each with its bytes a sample
+        private val ENCODINGS = listOf(
+            AudioFormat.ENCODING_PCM_FLOAT to Float.SIZE_BYTES,
+            AudioFormat.ENCODING_PCM_16BIT to Short.SIZE_BYTES,
+        )
+        private const val PCM_16BIT_SCALE = 32768f
         private const val LEVEL_EVERY = 3
         private const val LEVEL_SCALE = 5f
     }
