@@ -5,6 +5,7 @@
 package org.fcitx.fcitx5.android.data.pinyin
 
 import org.fcitx.fcitx5.android.data.pinyin.customphrase.PinyinCustomPhrase
+import org.fcitx.fcitx5.android.data.replaceFile
 import org.fcitx.fcitx5.android.engine.phrase.CustomPhrases
 import org.fcitx.fcitx5.android.utils.appContext
 import java.io.File
@@ -50,18 +51,36 @@ object CustomPhraseManager {
     }
 
     /**
+     * [saveOver] for the engine, which keeps its own list: nothing read back. A key whose phrases
+     * [mine] changed since [base] has them in the order of [mine] (a phrase pinned first), less
+     * those the file lost since, then those it gained; any other key's are as the file has them.
+     * @throws IOException if the file cannot be read or written
+     */
+    @Synchronized
+    fun saveKeysOver(base: List<PinyinCustomPhrase>, mine: List<PinyinCustomPhrase>, to: File = file) {
+        val theirs = load(to)
+        if (theirs == base) return save(mine, to)
+        val before = base.groupBy { it.key }
+        val now = theirs.groupBy { it.key }
+        val wanted = mine.groupBy { it.key }
+        save((now.keys + wanted.keys).flatMap { key ->
+            val b = before[key].orEmpty()
+            val t = now[key].orEmpty()
+            val m = wanted[key].orEmpty()
+            if (m == b) t else m.filter { it !in b || it in t } + t.filter { it !in b && it !in m }
+        }, to)
+    }
+
+    /**
      * Saves [phrases] in their order, whole or not at all: the engine's, changed from the keyboard.
      * One writer at a time, the editor's and the engine's sharing the file next to it.
      */
     @Synchronized
     fun write(phrases: List<CustomPhrases.Phrase>, to: File = file) {
         to.parentFile?.mkdirs()
-        val next = File(to.path + ".new")
-        try {
-            next.writeText(CustomPhrases.format(phrases))
-            if (!next.renameTo(to)) throw IOException("cannot replace $to")
-        } finally {
-            next.delete()
+        replaceFile(to, File(to.path + ".new")) {
+            it.writeText(CustomPhrases.format(phrases))
+            true
         }
     }
 }

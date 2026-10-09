@@ -4,21 +4,29 @@
  */
 package org.fcitx.fcitx5.android.core
 
+import android.widget.Toast
+import androidx.core.content.ContextCompat
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import org.fcitx.fcitx5.android.BuildConfig
 import org.fcitx.fcitx5.android.FcitxApplication
+import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.data.pinyin.CustomPhraseManager
 import org.fcitx.fcitx5.android.data.pinyin.ImportedDictionaries
+import org.fcitx.fcitx5.android.data.pinyin.customphrase.PinyinCustomPhrase
 import org.fcitx.fcitx5.android.data.pinyin.dict.PinyinDictionary
+import org.fcitx.fcitx5.android.data.restoreDirectory
+import org.fcitx.fcitx5.android.engine.data.DataFormatException
 import org.fcitx.fcitx5.android.engine.host.EngineEvent
 import org.fcitx.fcitx5.android.engine.host.EngineSettings
 import org.fcitx.fcitx5.android.engine.host.Engines
+import org.fcitx.fcitx5.android.engine.host.UnreadableInputMethod
 import org.fcitx.fcitx5.android.engine.libime.LibimeFiles
 import org.fcitx.fcitx5.android.engine.phrase.CustomPhrases
 import org.fcitx.fcitx5.android.engine.session.Offer
 import org.fcitx.fcitx5.android.engine.user.LibimeImport
 import org.fcitx.fcitx5.android.utils.appContext
+import org.fcitx.fcitx5.android.utils.toast
 import timber.log.Timber
 import java.io.BufferedReader
 import java.io.File
@@ -26,6 +34,8 @@ import java.io.FileInputStream
 import java.io.IOException
 import java.nio.ByteBuffer
 import java.nio.channels.FileChannel
+import java.util.concurrent.Executor
+import java.util.concurrent.Executors
 
 /**
  * Where the androidengine addon (native) reaches ime-core's input methods. Called only on the
@@ -65,12 +75,69 @@ object EngineBridge {
     val t9: StateFlow<T9State> = t9State
 
     private val made = lazy(LazyThreadSafetyMode.NONE) {
+        val userDir = File(appContext.filesDir, "engine")
+        // before the engine makes it anew: a user-data import killed between its two renames left
+        // the engine's files only in engine.old, which the next import would delete
+        try {
+            restoreDirectory(userDir)
+        } catch (e: IOException) {
+            Timber.w(e, "engine user data")
+        }
         Engines(
-            ::asset, File(appContext.filesDir, "engine"), { Timber.w(it, "engine user data") }, ::legacy, ::additions, ::userTable, NativeMatrixKernel,
+            ::asset, userDir, { Timber.w(it, "engine user data") }, ::legacy, ::additions, ::userTable, NativeMatrixKernel,
         )
     }
     /** Made when first used; on the fcitx thread only, as the addon uses it there. */
     val engines by made
+
+    // what cannot load is not loaded again on every key: the keys go to the app, the user told once
+    private val unloadable = Unloadable { im, e ->
+        Timber.e("%s cannot load (%s): not called again till the engine is reloaded", im, e.javaClass.name)
+        ContextCompat.getMainExecutor(appContext).execute { appContext.toast(R.string.engine_unloadable, Toast.LENGTH_LONG) }
+    }
+
+    /**
+     * The input methods whose engine could not be made (its data unreadable, say), not to be
+     * called again till [clear]: what one throws before it first answered is taken for that if it
+     * is what [Engines] throws for data it cannot read, with no memory run out (a [VirtualMachineError])
+     * among its causes, and [latched] is told, once. Anything else it throws, before or after (a bug,
+     * memory run out, however wrapped), is that event's alone; it is called again.
+     */
+    internal class Unloadable(private val latched: (im: String, e: Throwable) -> Unit) {
+        private val answered = HashSet<String>()
+        private val failed = HashSet<String>()
+
+        operator fun contains(im: String) = im in failed
+
+        /** [block], a call of [im]'s engine; what it throws is thrown on, for the addon to log. */
+        fun <T> call(im: String, block: () -> T): T {
+            val result = try {
+                block()
+            } catch (@Suppress("TooGenericExceptionCaught") e: Throwable) {
+                if (im !in answered && cannotLoad(e) && failed.add(im)) latched(im, e)
+                throw e
+            }
+            answered += im
+            return result
+        }
+
+        fun clear() {
+            answered.clear()
+            failed.clear()
+        }
+
+        // an asset or table that cannot be opened or is none, or a table the user imported that cannot be
+        // read; not memory run out mapping one, FileChannel.map's IOException "Map failed", even as the
+        // cause of an UnreadableInputMethod
+        private fun cannotLoad(e: Throwable) =
+            (e is IOException || e is DataFormatException || e is UnreadableInputMethod) && chain(e).none { it is VirtualMachineError }
+
+        // [e] and its causes, each once: initCause refuses only a throwable itself, so a chain may loop back
+        private fun chain(e: Throwable): Sequence<Throwable> {
+            val seen = HashSet<Throwable>()
+            return generateSequence(e) { it.cause }.takeWhile(seen::add)
+        }
+    }
 
     // fcitx's data home, as Fcitx starts it: where libime kept its files, and where the app's
     // editors still keep what the user adds
@@ -126,6 +193,8 @@ object EngineBridge {
     private fun additions(): Engines.Additions {
         val dir = pinyinDir()
         val phraseFile = File(dir, "customphrase")
+        // what the keyboard changed just before is in the file as it is read again
+        phraseSaves.submit(Runnable {}).get()
         var read = true
         val phrases = try {
             phraseFile.takeIf { it.isFile }?.readText().orEmpty()
@@ -142,11 +211,7 @@ object EngineBridge {
         fun File.intoNew() = PinyinDictionary.nameOf(name) in intoNew
         // a dictionary moved to another layer is a change too
         val seen = (dictionaries + packs).joinToString("\n") { "${it.name} ${it.length()} ${it.lastModified()} ${it.intoNew()}" }
-        // a file not read is not written: the phrases it has would be lost to the one pinned
-        val save = { p: CustomPhrases ->
-            if (!read) throw IOException("custom phrases were not read")
-            CustomPhraseManager.write(p.all, phraseFile)
-        }
+        val save = PhraseFile(phraseFile, phrases, read, phraseSaves)::save
         val readPacks = {
             packs.mapNotNull { file ->
                 try {
@@ -170,6 +235,43 @@ object EngineBridge {
     }
 
     /**
+     * Saves [phrases], the engine's, as what it changed since [base] (those it read or last saved)
+     * applied to [file] as it is now: the editor may have saved since, its reload of the engine
+     * not run, and what it saved is kept.
+     */
+    internal fun savePhrases(base: CustomPhrases, phrases: CustomPhrases, file: File) {
+        fun CustomPhrases.items() = all.map { PinyinCustomPhrase(it.key, it.order, it.value) }
+        CustomPhraseManager.saveKeysOver(base.items(), phrases.items(), file)
+    }
+
+    // the engine's phrases saved off the fcitx thread, which takes the keys too; one at a time, in order
+    private val phraseSaves = Executors.newSingleThreadExecutor { Thread(it, "engine-phrases") }
+
+    /**
+     * The custom phrases the engine read from [file] as [text] ([read] false if it could not),
+     * saved there as the keyboard changes them ([savePhrases]), on [saves]: what the engine has
+     * as last saved, the base of the next, is that thread's.
+     */
+    internal class PhraseFile(private val file: File, private val text: String, private val read: Boolean, private val saves: Executor) {
+        private var base: CustomPhrases? = null
+
+        fun save(phrases: CustomPhrases) {
+            // a file not read is not written: the phrases it has would be lost to the one pinned
+            if (!read) throw IOException("custom phrases were not read")
+            saves.execute {
+                try {
+                    savePhrases(base ?: CustomPhrases.parse(text), phrases, file)
+                    // only once saved: else the next save takes what this one changed as in the file
+                    base = phrases
+                } catch (@Suppress("TooGenericExceptionCaught") e: Exception) {
+                    // on that thread, it would end the process: kept in memory, as the engine does
+                    Timber.w(e, "custom phrases")
+                }
+            }
+        }
+    }
+
+    /**
      * One of libime's files, as [read] gives it back. One that cannot be read fails the whole
      * import, which is tried again next time: a reader fixed in an update still gets what the
      * user's pinyin learned.
@@ -186,7 +288,8 @@ object EngineBridge {
     /** [learning] is false in a password or other sensitive field: nothing typed there is kept. */
     @JvmStatic
     fun onEvent(im: String, event: Int, arg: Int, learning: Boolean): Result {
-        val s = engines.onEvent(im, event, arg, learning)
+        if (im in unloadable) return unhandled
+        val s = unloadable.call(im) { engines.onEvent(im, event, arg, learning) }
         if (im == Engines.T9 && (event != EngineEvent.REFINE || s.handled)) t9State.value = T9State(s.preedit.isNotEmpty(), s.syllables, s.syllablesId)
         // the page shown and at least a chunk: the list rarely has to come back for more; none
         // for a slice of refining that changed nothing, which the addon does not show
@@ -207,10 +310,11 @@ object EngineBridge {
 
     /**
      * Reads [additions] and the tables the user imported again, the sessions made anew; nothing to
-     * do before the engine is first used.
+     * do before the engine is first used. An input method that could not load is tried again.
      */
     @JvmStatic
     fun reload() {
+        unloadable.clear()
         if (made.isInitialized()) engines.reload()
     }
 
@@ -228,6 +332,9 @@ object EngineBridge {
     /** What a long press on the [index]th of [im]'s candidates offers: a bit for each [Offer], by its order. */
     @JvmStatic
     fun offers(im: String, index: Int): Int = engines.offers(im, index).sumOf { 1 shl it.ordinal }
+
+    // as when the engine fails: the key is the app's, the panel cleared
+    private val unhandled = Result(false, "", "", emptyArray(), emptyArray(), 0, 0, 0, false, "", false)
 
     private const val CHUNK = 32
 }

@@ -59,4 +59,37 @@ class CustomPhraseManagerTest {
         val c = PinyinCustomPhrase("sj", 1, "手机")
         assertEquals(listOf(b, pinned, c), CustomPhraseManager.saveOver(saved, listOf(b, c), file))
     }
+
+    @Test
+    fun aPhrasePinnedFromTheKeyboardGoesFirstThoughTheEditorSavedMeanwhile() {
+        val file = File(folder.root, "customphrase")
+        val a = PinyinCustomPhrase("yx", 1, "邮箱")
+        val b = PinyinCustomPhrase("dh", 1, "电话")
+        val c = PinyinCustomPhrase("sj", 1, "手机")
+        val pinned = PinyinCustomPhrase("yx", 1, "信箱")
+        CustomPhraseManager.save(listOf(a, b), file)
+        val base = CustomPhraseManager.load(file)
+        // the editor adds c, the engine not reloaded
+        CustomPhraseManager.save(listOf(a, b, c), file)
+        // a phrase new to its key pinned, then the one it went above pinned back
+        CustomPhraseManager.saveKeysOver(base, listOf(b, pinned, a), file)
+        assertEquals(listOf(b, c, pinned, a), CustomPhraseManager.load(file))
+        CustomPhraseManager.saveKeysOver(listOf(b, pinned, a), listOf(b, a, pinned), file)
+        assertEquals(listOf(b, c, a, pinned), CustomPhraseManager.load(file))
+    }
+
+    @Test
+    fun whatTheEditorDeletedAndAddedUnderAKeyPinnedFromTheKeyboardIsKept() {
+        val file = File(folder.root, "customphrase")
+        val a = PinyinCustomPhrase("yx", 1, "邮箱")
+        val b = PinyinCustomPhrase("yx", 1, "箱子")
+        val c = PinyinCustomPhrase("yx", 1, "邮件")
+        val pinned = PinyinCustomPhrase("yx", 1, "信箱")
+        CustomPhraseManager.save(listOf(a, b), file)
+        val base = CustomPhraseManager.load(file)
+        // the editor deletes b and adds c, the engine not reloaded; then 信箱 is pinned
+        CustomPhraseManager.save(listOf(a, c), file)
+        CustomPhraseManager.saveKeysOver(base, listOf(pinned, a, b), file)
+        assertEquals(listOf(pinned, a, c), CustomPhraseManager.load(file))
+    }
 }
