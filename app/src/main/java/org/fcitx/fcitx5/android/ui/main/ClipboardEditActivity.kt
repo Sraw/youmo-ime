@@ -18,6 +18,7 @@ import kotlinx.coroutines.launch
 import org.fcitx.fcitx5.android.data.clipboard.ClipboardManager
 import org.fcitx.fcitx5.android.data.clipboard.db.ClipboardEntry
 import org.fcitx.fcitx5.android.databinding.ActivityClipboardEditBinding
+import org.fcitx.fcitx5.android.utils.appContext
 import org.fcitx.fcitx5.android.utils.clipboardManager
 import org.fcitx.fcitx5.android.utils.inputMethodManager
 import org.fcitx.fcitx5.android.utils.str
@@ -46,10 +47,12 @@ class ClipboardEditActivity : Activity() {
 
     private fun finishEditing(copy: Boolean = false) {
         val str = editText.str
-        scope.launch {
-            ClipboardManager.updateText(entryId, str)
+        val id = entryId
+        // the app's scope, not this one: onDestroy cancels it right after finish(), losing the edit and the copy
+        ClipboardManager.launch {
+            ClipboardManager.updateText(id, str)
             if (copy) {
-                clipboardManager.setPrimaryClip(ClipData.newPlainText("", str))
+                appContext.clipboardManager.setPrimaryClip(ClipData.newPlainText("", str))
             }
         }
         finish()

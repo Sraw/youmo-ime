@@ -154,7 +154,9 @@ class ClipboardWindow : InputWindow.ExtendedInputWindow<ClipboardWindow>() {
                 }
 
                 override fun onSwiped(viewHolder: RecyclerView.ViewHolder, direction: Int) {
-                    val entry = adapter.getEntryAt(viewHolder.bindingAdapterPosition) ?: return
+                    // NO_POSITION while a page update is pending: getItem(-1) would throw
+                    val position = viewHolder.bindingAdapterPosition.takeIf { it != RecyclerView.NO_POSITION } ?: return
+                    val entry = adapter.getEntryAt(position) ?: return
                     service.lifecycleScope.launch {
                         ClipboardManager.delete(entry.id)
                         showUndoSnackbar(entry.id)
@@ -211,9 +213,11 @@ class ClipboardWindow : InputWindow.ExtendedInputWindow<ClipboardWindow>() {
             .setTextColor(theme.popupTextColor)
             .setActionTextColor(theme.genericActiveBackgroundColor)
             .setAction(R.string.undo) {
+                // taken now: a delete made while this is written is another snackbar's to undo
+                val ids = pendingDeleteIds.toIntArray()
+                pendingDeleteIds.clear()
                 service.lifecycleScope.launch {
-                    ClipboardManager.undoDelete(*pendingDeleteIds.toIntArray())
-                    pendingDeleteIds.clear()
+                    ClipboardManager.undoDelete(*ids)
                 }
             }
             .addCallback(object : Snackbar.Callback() {
@@ -225,9 +229,11 @@ class ClipboardWindow : InputWindow.ExtendedInputWindow<ClipboardWindow>() {
                         BaseCallback.DISMISS_EVENT_SWIPE,
                         BaseCallback.DISMISS_EVENT_MANUAL,
                         BaseCallback.DISMISS_EVENT_TIMEOUT -> {
+                            // now, not after the purge: a delete made meanwhile keeps its id to undo
+                            val ids = pendingDeleteIds.toIntArray()
+                            pendingDeleteIds.clear()
                             service.lifecycleScope.launch {
-                                ClipboardManager.realDelete()
-                                pendingDeleteIds.clear()
+                                ClipboardManager.realDelete(*ids)
                             }
                         }
                         BaseCallback.DISMISS_EVENT_ACTION,

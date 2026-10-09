@@ -42,6 +42,79 @@ class ClearURLsTest {
     }
 
     @Test
+    fun textAfterTheLinkIsNoPartOfIt() {
+        // not dropped with the tracker it follows, as when the whole clip was read as one link
+        assertEquals(
+            "https://example.com/page?id=42 看这个\n第二行",
+            clearUrls.transform("https://example.com/page?id=42&utm_source=x 看这个\n第二行")
+        )
+    }
+
+    @Test
+    fun chinesePunctuationStraightAfterTheLinkEndsIt() {
+        assertEquals(
+            "https://example.com/page?id=42，看这个",
+            clearUrls.transform("https://example.com/page?id=42&utm_source=x，看这个")
+        )
+        assertEquals(
+            "https://example.com/page?id=42。」",
+            clearUrls.transform("https://example.com/page?id=42&fbclid=abc。」")
+        )
+        assertEquals(
+            "https://example.com/page?id=42”他说",
+            clearUrls.transform("https://example.com/page?id=42&utm_campaign=y”他说")
+        )
+    }
+
+    @Test
+    fun chineseTextStraightAfterATrackerIsKept() {
+        // removing the tracker would take the text with it, or run the text into id's value
+        val text = "https://example.com/page?id=42&utm_source=x看这个"
+        assertEquals(text, clearUrls.transform(text))
+        val campaign = "https://example.com/page?id=1&utm_campaign=618大促"
+        assertEquals(campaign, clearUrls.transform(campaign))
+    }
+
+    @Test
+    fun aTrackerWhoseValueIsChineseFromItsStartIsRemovedWhole() {
+        // no ASCII before the Chinese, so it is the tracker's raw value and not text after the link
+        assertEquals(
+            "https://example.com/page?id=42",
+            clearUrls.transform("https://example.com/page?id=42&utm_term=输入法")
+        )
+    }
+
+    @Test
+    fun chineseTextRunOnFromARewrittenValueKeepsTheClipAsCopied() {
+        // the rawRule's or the redirect's result would otherwise run into the text
+        val path = "https://www.amazon.com/dp/B0X/ref=sr_1中文"
+        assertEquals(path, clearUrls.transform(path))
+        val redirect = "https://www.google.com/url?q=https%3A%2F%2Fexample.com%2Fa&sa=D看这个"
+        assertEquals(redirect, clearUrls.transform(redirect))
+    }
+
+    @Test
+    fun chineseTextRunOnFromAKeptValueStaysInIt() {
+        assertEquals(
+            "https://example.com/page?id=42看这个",
+            clearUrls.transform("https://example.com/page?utm_source=a&id=42看这个")
+        )
+    }
+
+    @Test
+    fun theLettersAndNumbersOfTheCjkBlocksDoNotEndTheLink() {
+        // 〇 and 々 are in the CJK punctuation block, １ and Ａ in the full-width forms
+        assertEquals(
+            "https://example.com/二〇二六年/佐々木?q=二〇二四",
+            clearUrls.transform("https://example.com/二〇二六年/佐々木?q=二〇二四&utm_source=x")
+        )
+        assertEquals(
+            "https://example.com/search?q=１２３Ａｂ&page=2",
+            clearUrls.transform("https://example.com/search?q=１２３Ａｂ&utm_source=x&page=2")
+        )
+    }
+
+    @Test
     fun keptParametersKeepTheirEscapes() {
         assertEquals(
             "https://example.com/search?q=a%26b%2Bc%20d&next=https%3A%2F%2Fexample.org%2F%3Fa%3D1",

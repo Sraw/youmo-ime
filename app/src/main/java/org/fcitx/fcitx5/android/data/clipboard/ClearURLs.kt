@@ -41,7 +41,16 @@ class ClearURLs(rawRules: String) {
 
     fun transform(text: String): String {
         if (!urlPattern.matchesAt(text, 0)) return text
-        return transformWith(text, catalog)
+        // the link a clip starts with ends at the first space, or at the first mark of Chinese
+        // punctuation, written straight after it: what follows is kept as copied
+        val end = text.indexOfFirst { it.isWhitespace() || isProsePunctuation(it) }.takeIf { it >= 0 } ?: text.length
+        val link = transformWith(text.substring(0, end), catalog)
+        // Chinese run on from the last value (…&utm_source=x看这个) may be its own or text after
+        // the link: when the two readings clean differently, one loses the text and the other
+        // runs it into what is kept
+        val cut = chineseTextStart(text, end)
+        if (cut < end && transformWith(text.substring(0, cut), catalog) + text.substring(cut, end) != link) return text
+        return link + text.substring(end)
     }
 
     private fun transformWith(url: String, map: Map<String, ClearURLsProvider>): String {
@@ -149,5 +158,31 @@ class ClearURLs(rawRules: String) {
 
         // a redirect target still encoded reads "http%3A", or awstrack's "http:%2F", where its "://" belongs
         val encodedSchemePattern = Regex("^https?:?%", RegexOption.IGNORE_CASE)
+
+        /**
+         * The punctuation and symbols (Unicode categories P and S) of the CJK and full-width blocks
+         * (，。：「」【】～ and the half-width 。「」、・), and the dashes, quotes and ellipsis Chinese
+         * prose uses: a link holds none of them unescaped. The letters and numbers of those blocks
+         * (々, 〇, １, Ａ) are not among them, nor are Chinese characters, as a link may hold those
+         * raw (example.com/搜索?q=二〇二四).
+         */
+        fun isProsePunctuation(c: Char) =
+            (c in '\u3000'..'\u303F' || c in '\uFF00'..'\uFF65' || c in '\u2010'..'\u2027') &&
+                c.category.code[0] in "PS"
+
+        // what the last value of a link starts after; + spaces the words of a query value
+        val valueDelimiters = charArrayOf('/', '?', '&', '#', '=', '+')
+
+        /**
+         * Where Chinese text that may be written straight after the link in [text], which ends by
+         * [end], begins: where it runs on from the ASCII of the link's last value (…&utm_source=x看这个),
+         * which would take it along when that value's tracker is removed. [end] when there is none: a
+         * last value that is Chinese from its start (?q=中文, ?utm_term=输入法) is the link's own.
+         */
+        fun chineseTextStart(text: String, end: Int): Int {
+            val value = text.lastIndexOfAny(valueDelimiters, end - 1) + 1
+            if (value == end || text[value] >= '\u0080') return end
+            return (value until end).firstOrNull { Character.isIdeographic(text.codePointAt(it)) } ?: end
+        }
     }
 }

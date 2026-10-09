@@ -108,7 +108,11 @@ object ClipboardManager : ClipboardManager.OnPrimaryClipChangedListener,
         enabledPref.registerOnChangeListener(enabledListener)
         limitListener.onChange(limitPref.key, limitPref.getValue())
         limitPref.registerOnChangeListener(limitListener)
-        launch { updateItemCount() }
+        launch {
+            // marked by a process that died with its undo snackbar up: nothing can undo them now
+            clbDao.realDelete()
+            updateItemCount()
+        }
     }
 
     suspend fun get(id: Int) = clbDao.get(id)
@@ -149,8 +153,8 @@ object ClipboardManager : ClipboardManager.OnPrimaryClipChangedListener,
         updateItemCount()
     }
 
-    suspend fun realDelete() {
-        clbDao.realDelete()
+    suspend fun realDelete(vararg ids: Int) {
+        clbDao.realDelete(*ids)
     }
 
     suspend fun nukeTable() {
@@ -211,15 +215,20 @@ object ClipboardManager : ClipboardManager.OnPrimaryClipChangedListener,
         val unpinned = clbDao.getAllUnpinned()
         if (unpinned.size > limit) {
             // the last one we will keep
-            val last = unpinned
-                .sortedBy { it.id }
-                .getOrNull(unpinned.size - limit)
-            // delete all unpinned before that, or delete all when limit <= 0
-            clbDao.markUnpinnedAsDeletedEarlierThan(last?.timestamp ?: System.currentTimeMillis())
+            val last = keptSince(unpinned.map { it.timestamp }, limit)
+            // delete all unpinned before that, or delete all when limit <= 0; outright, as no undo
+            // offers them back and a purge takes only what its snackbar showed
+            clbDao.deleteUnpinnedEarlierThan(last ?: System.currentTimeMillis())
         }
     }
 
 }
+
+/**
+ * When the last kept of the unpinned entries copied at [timestamps] was copied: the [limit]th
+ * newest time, null for none. By time, not id: an entry copied again is new, its id old.
+ */
+internal fun keptSince(timestamps: List<Long>, limit: Int): Long? = timestamps.sortedDescending().getOrNull(limit - 1)
 
 /**
  * Applies [clearUrls] if its rules could be loaded. A cleaner that throws must not cost the user
