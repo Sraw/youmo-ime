@@ -103,6 +103,8 @@ class InlineSuggestionsUi(override val ctx: Context) : Ui {
 
     @RequiresApi(Build.VERSION_CODES.R)
     fun setScrollableViews(views: List<InlineContentView?>) {
+        // the last response's surfaces, reparented onto the scroll view's, stay drawn otherwise
+        clearScrollView()
         val flexbox = view(::FlexboxLayout) {
             flexWrap = FlexWrap.NOWRAP
             justifyContent = JustifyContent.CENTER
@@ -126,8 +128,6 @@ class InlineSuggestionsUi(override val ctx: Context) : Ui {
             }
         }
         scrollView.apply {
-            scrollTo(0, 0)
-            removeAllViews()
             add(flexbox, lParams(wrapContent, matchParent))
         }
     }

@@ -107,6 +107,8 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
 
     private var clipboardTimeoutJob: Job? = null
 
+    private var inlineSuggestionsJob: Job? = null
+
     private var isClipboardFresh: Boolean = false
     private var isInlineSuggestionPresent: Boolean = false
     private var isCapabilityFlagsPassword: Boolean = false
@@ -167,6 +169,7 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
             delay(timeout)
             isClipboardFresh = false
             clipboardTimeoutJob = null
+            evalIdleUiState()
         }
     }
 
@@ -199,7 +202,7 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
     }
 
     private val swipeDownExpandCallback = CustomGestureView.OnGestureListener { _, e ->
-        if (e.type == CustomGestureView.GestureType.Up && e.totalY > 0) {
+        if (e.type == CustomGestureView.GestureType.Up && !e.cancelled && e.totalY > 0) {
             service.requestHideSelf(0)
             true
         } else false
@@ -229,7 +232,7 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
                     v.iconRotation = angle
                 }
                 CustomGestureView.GestureType.Up -> {
-                    val handled = when (angle) {
+                    val handled = !e.cancelled && when (angle) {
                         in -45f..45f if distance > v.swipeThresholdX -> {
                             service.requestHideSelf(0)
                             true
@@ -249,7 +252,8 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
             }
         }
 
-        if (e.type == CustomGestureView.GestureType.Up && abs(e.totalY) > abs(e.totalX) && e.totalY > 0) {
+        val swipedDown = abs(e.totalY) > abs(e.totalX) && e.totalY > 0
+        if (e.type == CustomGestureView.GestureType.Up && !e.cancelled && swipedDown) {
             service.requestHideSelf(0)
             true
         } else false
@@ -419,7 +423,8 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
         ClipboardManager.lastEntry?.let {
             val now = System.currentTimeMillis()
             val clipboardTimeout = clipboardItemTimeout.getValue() * 1000L
-            if (now - it.timestamp < clipboardTimeout) {
+            // below 0: it never times out
+            if (clipboardTimeout < 0L || now - it.timestamp < clipboardTimeout) {
                 onClipboardUpdateListener.onUpdate(it)
             }
         }
@@ -436,10 +441,11 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
         isInlineSuggestionPresent = false
         numberRowMode = IdleUiPolicy.NumberRowMode.Auto
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            inlineSuggestionsJob?.cancel()
             idleUi.inlineSuggestionsBar.clear()
         }
         // nothing said out loud goes into a password
-        idleUi.voiceButton.isVisible = VoiceFeature.AVAILABLE && !capFlags.has(CapabilityFlag.Password)
+        idleUi.voiceButton.isVisible = VoiceFeature.AVAILABLE && !service.inPasswordField
         evalIdleUiState()
     }
 
@@ -479,6 +485,8 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
 
     @RequiresApi(Build.VERSION_CODES.R)
     fun handleInlineSuggestions(response: InlineSuggestionsResponse): Boolean {
+        // an older response's views, inflated after this one's, would replace them
+        inlineSuggestionsJob?.cancel()
         val suggestions = response.inlineSuggestions
         if (suggestions.isEmpty()) {
             isInlineSuggestionPresent = false
@@ -500,14 +508,14 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
                 scrollable.add(it)
             }
         }
-        imeScope.launch {
-            idleUi.inlineSuggestionsBar.setPinnedView(
-                pinned?.let { inflateInlineContentView(it) }
-            )
-        }
-        imeScope.launch {
+        inlineSuggestionsJob = imeScope.launch {
+            launch {
+                idleUi.inlineSuggestionsBar.setPinnedView(
+                    pinned?.let { inflateInlineContentView(it) }
+                )
+            }
             val views = scrollable.map { s ->
-                imeScope.async {
+                async {
                     inflateInlineContentView(s)
                 }
             }.awaitAll()

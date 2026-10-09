@@ -4,13 +4,18 @@
  */
 package org.fcitx.fcitx5.android.input.picker
 
+import android.view.inputmethod.EditorInfo
 import androidx.core.content.ContextCompat
 import androidx.transition.Transition
 import androidx.recyclerview.widget.RecyclerView
 import org.fcitx.fcitx5.android.R
+import org.fcitx.fcitx5.android.core.CapabilityFlag
+import org.fcitx.fcitx5.android.core.CapabilityFlags
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
+import org.fcitx.fcitx5.android.input.broadcast.InputBroadcastReceiver
 import org.fcitx.fcitx5.android.input.broadcast.ReturnKeyDrawableComponent
+import org.fcitx.fcitx5.android.input.dependency.inputMethodService
 import org.fcitx.fcitx5.android.input.dependency.theme
 import org.fcitx.fcitx5.android.input.keyboard.CommonKeyActionListener
 import org.fcitx.fcitx5.android.input.keyboard.KeyAction
@@ -35,7 +40,7 @@ class PickerWindow(
     private val popupPreview: Boolean = true,
     private val followKeyBorder: Boolean = true,
     private val policy: PickerPolicy = DefaultPickerPolicy()
-) : InputWindow.ExtendedInputWindow<PickerWindow>(), EssentialWindow {
+) : InputWindow.ExtendedInputWindow<PickerWindow>(), EssentialWindow, InputBroadcastReceiver {
 
     enum class Key : EssentialWindow.Key {
         Symbol,
@@ -44,6 +49,7 @@ class PickerWindow(
     }
 
     private val theme by manager.theme()
+    private val service by manager.inputMethodService()
     private val windowManager: InputWindowManager by manager.must()
     private val commonKeyActionListener: CommonKeyActionListener by manager.must()
     private val popup: PopupComponent by manager.must()
@@ -60,6 +66,15 @@ class PickerWindow(
 
     /** a tab tapped: shown as picked, though a short last section cannot scroll to the top */
     private var tabPicked = false
+
+    // what is picked in a password, or in a field that asks not to be learned from, is not kept as recent
+    private var keepsNoRecent = false
+
+    override fun onStartInput(info: EditorInfo, capFlags: CapabilityFlags) {
+        keepsNoRecent = capFlags.hasAny(CapabilityFlag.PasswordOrSensitive)
+        // the space's badge asks what the hold to talk asks (CommonKeyActionListener), a shown password too
+        if (::pickerLayout.isInitialized) pickerLayout.embeddedKeyboard.inPasswordField = service.inPasswordField
+    }
 
     override fun enterAnimation(lastWindow: InputWindow): Transition? = null
 
@@ -92,7 +107,7 @@ class PickerWindow(
             }
 
             else -> {
-                if (it is KeyAction.CommitAction) {
+                if (it is KeyAction.CommitAction && !keepsNoRecent) {
                     adapter.insertRecent(it.text)
                     // locked, the panel stays: the recently used are there to go to now
                     if (panel) pickerLayout.side?.setShown(SymbolPanel.RECENT, !adapter.recentEmpty)
@@ -180,6 +195,10 @@ class PickerWindow(
     override val title: String get() = if (panel) context.getString(R.string.picker_title) else ""
 
     override fun onAttached() {
+        // a view made anew mid-field (a dark-mode switch replaces it) is told of no start: the field is asked
+        service.currentInputEditorInfo?.let {
+            keepsNoRecent = CapabilityFlags.fromEditorInfo(it).hasAny(CapabilityFlag.PasswordOrSensitive)
+        }
         if (panel) {
             sidePanel.open(adapter.recentEmpty)
             pickerLayout.side?.setShown(SymbolPanel.RECENT, sidePanel.shows(SymbolPanel.RECENT, adapter.recentEmpty))
@@ -193,6 +212,7 @@ class PickerWindow(
         pickerLayout.embeddedKeyboard.also {
             it.onReturnDrawableUpdate(returnKeyDrawable.appearance)
             it.keyActionListener = keyActionListener
+            it.inPasswordField = service.inPasswordField
         }
     }
 

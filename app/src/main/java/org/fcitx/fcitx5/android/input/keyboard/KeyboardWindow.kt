@@ -21,6 +21,7 @@ import org.fcitx.fcitx5.android.input.broadcast.InputBroadcastReceiver
 import org.fcitx.fcitx5.android.input.broadcast.ReturnKeyAppearance
 import org.fcitx.fcitx5.android.input.broadcast.ReturnKeyDrawableComponent
 import org.fcitx.fcitx5.android.input.dependency.fcitx
+import org.fcitx.fcitx5.android.input.dependency.inputMethodService
 import org.fcitx.fcitx5.android.input.dependency.theme
 import org.fcitx.fcitx5.android.input.picker.PickerWindow
 import org.fcitx.fcitx5.android.input.popup.PopupActionListener
@@ -75,6 +76,9 @@ class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), Essentia
     private var currentKeyboardName = ""
     private var lastSymbolType: String by AppPrefs.getInstance().internal.lastSymbolLayout
 
+    // the space's badge asks what the hold to talk asks (CommonKeyActionListener), a shown password too
+    private val service by manager.inputMethodService()
+
     private val currentKeyboard: BaseKeyboard? get() = keyboards[currentKeyboardName]
 
     private val keyActionListener = KeyActionListener { it, source ->
@@ -110,6 +114,7 @@ class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), Essentia
         currentKeyboard?.let {
             it.keyActionListener = keyActionListener
             it.popupActionListener = popupActionListener
+            it.inPasswordField = service.inPasswordField
             keyboardView.apply { add(it, lParams(matchParent, matchParent)) }
             it.onAttach()
             it.onReturnDrawableUpdate(returnKeyDrawable.appearance)
@@ -148,6 +153,8 @@ class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), Essentia
     }
 
     override fun onStartInput(info: EditorInfo, capFlags: CapabilityFlags) {
+        // the layout may stay as it is, so the one shown is told now
+        currentKeyboard?.inPasswordField = service.inPasswordField
         val targetLayout = when (info.inputType and InputType.TYPE_MASK_CLASS) {
             InputType.TYPE_CLASS_NUMBER -> NumberKeyboard.Name
             InputType.TYPE_CLASS_PHONE -> NumberKeyboard.Name

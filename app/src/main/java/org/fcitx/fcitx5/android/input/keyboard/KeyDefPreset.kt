@@ -114,7 +114,8 @@ class LayoutSwitchKey(
     displayText: String,
     val to: String = "",
     percentWidth: Float = 0.15f,
-    variant: Variant = Variant.Alternative
+    variant: Variant = Variant.Alternative,
+    longPress: KeyAction? = null
 ) : KeyDef(
     Appearance.Text(
         displayText,
@@ -123,8 +124,9 @@ class LayoutSwitchKey(
         percentWidth = percentWidth,
         variant = variant
     ),
-    setOf(
-        Behavior.Press(KeyAction.LayoutSwitchAction(to))
+    setOfNotNull(
+        Behavior.Press(KeyAction.LayoutSwitchAction(to)),
+        longPress?.let { Behavior.LongPress(it) }
     )
 )
 

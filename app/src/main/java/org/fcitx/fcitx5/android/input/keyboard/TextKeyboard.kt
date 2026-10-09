@@ -73,9 +73,10 @@ class TextKeyboard(
             ),
             listOf(
                 // Sogou's row: symbols and numbers each a key of their own, the comma and the
-                // full stop either side of the space, the language switch after them
-                LayoutSwitchKey("符", PickerWindow.Key.Symbol.name, 0.12f),
-                LayoutSwitchKey("123", NumberKeyboard.Name, 0.12f),
+                // full stop either side of the space, the language switch after them; held, 符
+                // and 123 open quick phrase and Unicode input, which have no key in this row
+                LayoutSwitchKey("符", PickerWindow.Key.Symbol.name, 0.12f, longPress = KeyAction.QuickPhraseAction),
+                LayoutSwitchKey("123", NumberKeyboard.Name, 0.12f, longPress = KeyAction.UnicodeAction),
                 SymbolKey(",", 0.1f, KeyDef.Appearance.Variant.Alternative),
                 SpaceKey(),
                 SymbolKey(".", 0.1f, KeyDef.Appearance.Variant.Alternative),
@@ -87,7 +88,6 @@ class TextKeyboard(
 
     val caps: ImageKeyView by lazy { findViewById(R.id.button_caps) }
     val backspace: ImageKeyView by lazy { findViewById(R.id.button_backspace) }
-    val quickphrase: ImageKeyView by lazy { findViewById(R.id.button_quickphrase) }
     val lang: ImageKeyView by lazy { findViewById(R.id.button_lang) }
     val space: TextKeyView by lazy { findViewById(R.id.button_space) }
     val `return`: ImageKeyView by lazy { findViewById(R.id.button_return) }
@@ -163,6 +163,8 @@ class TextKeyboard(
                     }
                 }
             }
+            // a word from the long press (or a letter's swipe, its first) is typed too: Shift-once is used up
+            is KeyAction.CommitAction -> if (capsState == CapsState.Once) switchCapsState()
             is KeyAction.CapsAction -> switchCapsState(action.lock)
             else -> {}
         }
@@ -173,6 +175,7 @@ class TextKeyboard(
         capsState = CapsState.None
         updateCapsButtonIcon()
         updateAlphabetKeys()
+        updatePunctuationKeys()
     }
 
     override fun onReturnDrawableUpdate(appearance: ReturnKeyAppearance) {
@@ -247,6 +250,8 @@ class TextKeyboard(
             }
         updateCapsButtonIcon()
         updateAlphabetKeys()
+        // a letter's corner is its swipe, which follows Shift (swipeOverride)
+        updatePunctuationKeys()
     }
 
     /** The input method name last shown on the Space key; null until the first update. */
@@ -322,8 +327,17 @@ class TextKeyboard(
 
     private fun swipeOverride(def: KeyDef.Appearance.AltText): String? {
         val letter = def.displayText.takeIf { it.length == 1 && it[0].isLetter() }?.lowercase() ?: return null
-        if (popupOverrides[letter] == null) return null
-        return popupOverrides.resolve(letter, PopupPreset[letter])?.firstOrNull().orEmpty()
+        // under Shift the long press shows the upper-case label's list (onPopupAction): so does the swipe
+        return popupOverrides.swipeOf(letter, transformAlphabet(letter))
     }
 
+}
+
+/**
+ * The first of [label]'s long press as the user changed it, [label] being [letter] as Shift shows it:
+ * null where the user changed neither (the built-in swipe), "" where that long press is off.
+ */
+internal fun PopupOverrides.swipeOf(letter: String, label: String): String? {
+    if (this[letter] == null && this[label] == null) return null
+    return resolve(label, PopupPreset[label])?.firstOrNull().orEmpty()
 }

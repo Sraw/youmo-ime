@@ -25,9 +25,15 @@ class RecentlyUsed(val type: String, val limit: Int) {
 
     private val map = LinkedHashMap<String, Boolean>(limit).apply {
         (migrate() ?: load()).forEach { put(it, true) }
+        dropOldest()
     }
 
     val items: List<String> get() = map.keys.reversed()
+
+    // a LinkedHashMap's capacity is no cap: the picker shows every item kept
+    private fun MutableMap<String, Boolean>.dropOldest() {
+        while (size > limit) remove(keys.first())
+    }
 
     private fun load(): List<String> {
         val rawValue = sharedPreferences.getString(type, "") ?: ""
@@ -60,6 +66,7 @@ class RecentlyUsed(val type: String, val limit: Int) {
             }
             map.put(item, true)
         }
+        map.dropOldest()
         save()
     }
 

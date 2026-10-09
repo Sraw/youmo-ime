@@ -175,7 +175,7 @@ class PickerGridAdapter(
                     false
                 }
                 CustomGestureView.GestureType.Move -> changeFocus(view.id, event.x, event.y)
-                CustomGestureView.GestureType.Up -> trigger(view.id).also {
+                CustomGestureView.GestureType.Up -> (!event.cancelled && trigger(view.id)).also {
                     popupActionListener.onPopupAction(PopupAction.DismissAction(view.id))
                 }
             }

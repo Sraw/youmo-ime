@@ -5,6 +5,7 @@
 package org.fcitx.fcitx5.android.ui.main.settings
 
 import android.content.Context
+import android.os.Build
 import android.os.Bundle
 import android.text.InputType
 import android.view.Gravity
@@ -67,6 +68,14 @@ class PopupOverridesFragment : Fragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         rebuild()
+    }
+
+    override fun onStop() {
+        // before the first unlock the keyboard reads them from device-protected storage
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+            AppPrefs.getInstance().syncToDeviceEncryptedStorage()
+        }
+        super.onStop()
     }
 
     private fun rebuild() {
@@ -211,9 +220,7 @@ class PopupOverridesFragment : Fragment() {
             .setPositiveButton(android.R.string.ok) { _, _ ->
                 // a word left typed in the field counts as added
                 editor.add(field.text.toString())
-                // putting the built-in list back is not an edit
-                overrides = if (editor.items == preset?.toList().orEmpty()) current.without(label)
-                else current.with(label, editor.items)
+                overrides = current.withEdit(label, editor.items, preset)
                 rebuild()
             }
             .setNegativeButton(android.R.string.cancel, null)
@@ -267,4 +274,14 @@ class PopupOverridesFragment : Fragment() {
         private const val KeyHeight = 52
         private const val OtherKeyWidth = 44
     }
+}
+
+/**
+ * [items] as what [label] offers. Putting back what the key offers without an override of its own
+ * is not an edit; for an upper-case key that is its lower-case key's edit, not the built-in list,
+ * so the built-in list put back there is stored like any other.
+ */
+internal fun PopupOverrides.withEdit(label: String, items: List<String>, preset: Array<String>?): PopupOverrides {
+    val unedited = without(label)
+    return if (unedited.resolve(label, preset)?.toList().orEmpty() == items) unedited else with(label, items)
 }

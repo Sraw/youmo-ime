@@ -33,7 +33,9 @@ open class CustomGestureView(ctx: Context) : FrameLayout(ctx) {
         val countX: Int,
         val countY: Int,
         val totalX: Int,
-        val totalY: Int
+        val totalY: Int,
+        /** an Up for a touch the system took away (ACTION_CANCEL): end what it shows, type nothing */
+        val cancelled: Boolean = false
     )
 
     fun interface OnGestureListener {
@@ -235,7 +237,7 @@ open class CustomGestureView(ctx: Context) : FrameLayout(ctx) {
                 return true
             }
             MotionEvent.ACTION_CANCEL -> {
-                dispatchGestureEvent(GestureType.Up, event.x, event.y)
+                dispatchGestureEvent(GestureType.Up, event.x, event.y, cancelled = true)
                 cancelGestures()
                 return true
             }
@@ -248,11 +250,12 @@ open class CustomGestureView(ctx: Context) : FrameLayout(ctx) {
         x: Float,
         y: Float,
         countX: Int = 0,
-        countY: Int = 0
+        countY: Int = 0,
+        cancelled: Boolean = false
     ) {
         val event = Event(
             type, recognizer.gestureConsumed, x, y,
-            countX, countY, recognizer.swipeTotalX, recognizer.swipeTotalY
+            countX, countY, recognizer.swipeTotalX, recognizer.swipeTotalY, cancelled
         )
         val consumed = onGestureListener?.onGesture(this, event) ?: return
         if (consumed) {

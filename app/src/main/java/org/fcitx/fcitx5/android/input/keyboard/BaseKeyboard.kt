@@ -6,6 +6,7 @@ package org.fcitx.fcitx5.android.input.keyboard
 
 import android.content.Context
 import android.graphics.Rect
+import android.view.InputDevice
 import android.view.MotionEvent
 import androidx.annotation.CallSuper
 import androidx.annotation.Keep
@@ -28,6 +29,7 @@ import org.fcitx.fcitx5.android.input.keyboard.CustomGestureView.GestureType
 import org.fcitx.fcitx5.android.input.keyboard.CustomGestureView.OnGestureListener
 import org.fcitx.fcitx5.android.input.popup.PopupAction
 import org.fcitx.fcitx5.android.input.popup.PopupActionListener
+import org.fcitx.fcitx5.android.input.popup.PopupKeyboardUi
 import org.fcitx.fcitx5.android.input.voice.VoiceFeature
 import splitties.dimensions.dp
 import splitties.views.dsl.constraintlayout.above
@@ -73,6 +75,14 @@ abstract class BaseKeyboard(
     private val spaceLongPressListener = ManagedPreference.OnChangeListener<SpaceLongPressBehavior> { _, v ->
         updateSpaceBadges(v)
     }
+
+    /** Set per field ([KeyboardWindow]): no hold to talk in a password (CommonKeyActionListener), so no badge. */
+    var inPasswordField = false
+        set(value) {
+            if (field == value) return
+            field = value
+            updateSpaceBadges(spaceLongPress.getValue())
+        }
 
     private val vivoKeypressWorkaround by prefs.advanced.vivoKeypressWorkaround
 
@@ -152,19 +162,13 @@ abstract class BaseKeyboard(
 
     // holding the space to talk: a microphone on every keyboard's space says so, or no one would know
     private fun updateSpaceBadges(behavior: SpaceLongPressBehavior) {
-        val icon = if (behavior == SpaceLongPressBehavior.Voice && VoiceFeature.AVAILABLE) R.drawable.ic_baseline_keyboard_voice_24 else null
+        val voice = behavior == SpaceLongPressBehavior.Voice && VoiceFeature.AVAILABLE && !inPasswordField
+        val icon = if (voice) R.drawable.ic_baseline_keyboard_voice_24 else null
         spaceKeys.forEach { (it as? TextKeyView)?.showBadge(icon) }
     }
 
     /** What swiping [view] types where the user chose it ([TextKeyboard]): null for what its key says, "" for nothing. */
     protected open fun swipeText(view: KeyView): String? = null
-
-    // ASCII punctuation or a digit goes to fcitx as its key, to be a full-width ， where the input
-    // method makes punctuation so, as the built-in swipes are; anything else, a letter too (the
-    // keyboard would change its case), is typed as it is
-    private fun textAction(text: String): KeyAction =
-        if (text.length == 1 && text[0].code in ASCII_PRINTABLE && !text[0].isLetter()) KeyAction.FcitxKeyAction(text)
-        else KeyAction.CommitAction(text)
 
     private fun createKeyView(def: KeyDef): KeyView {
         return when (def.appearance) {
@@ -225,7 +229,8 @@ abstract class BaseKeyboard(
                             } else false
                         }
                         GestureType.Up -> {
-                            onAction(KeyAction.DeleteSelectionAction(event.totalX))
+                            // cancelled, the selection stays selected; the next Down resets the swipe
+                            if (!event.cancelled) onAction(KeyAction.DeleteSelectionAction(event.totalX))
                             false
                         }
                         else -> false
@@ -260,10 +265,16 @@ abstract class BaseKeyboard(
                         onGestureListener = OnGestureListener { view, event ->
                             when (event.type) {
                                 GestureType.Up -> {
-                                    val chosen = swipeText(view as KeyView)
-                                    // "": the user left the key nothing to swipe to
-                                    if (!event.consumed && swipeSymbolDirection.checkY(event.totalY) && chosen != "") {
-                                        onAction(chosen?.let(::textAction) ?: it.action)
+                                    if (!event.consumed && !event.cancelled && swipeSymbolDirection.checkY(event.totalY)) {
+                                        val chosen = swipeText(view as KeyView)
+                                        when {
+                                            chosen == null -> onAction(it.action)
+                                            // the user left the key nothing to swipe to: consumed all the same,
+                                            // or a swipe that stayed on the key would type it as a tap
+                                            chosen.isEmpty() -> {}
+                                            // the first of the long press, typed as the long press types it
+                                            else -> onAction(PopupKeyboardUi.keyAction(chosen), KeyActionListener.Source.Popup)
+                                        }
                                         true
                                     } else {
                                         false
@@ -300,7 +311,7 @@ abstract class BaseKeyboard(
                                     onPopupChangeFocus(view.id, event.x, event.y)
                                 }
                                 GestureType.Up -> {
-                                    onPopupTrigger(view.id)
+                                    onPopupTrigger(view.id, event.cancelled)
                                 }
                                 else -> false
                             } || oldOnGestureListener.onGesture(view, event)
@@ -322,7 +333,7 @@ abstract class BaseKeyboard(
                                     onPopupChangeFocus(view.id, event.x, event.y)
                                 }
                                 GestureType.Up -> {
-                                    onPopupTrigger(view.id)
+                                    onPopupTrigger(view.id, event.cancelled)
                                 }
                                 else -> false
                             } || oldOnGestureListener.onGesture(view, event)
@@ -419,15 +430,7 @@ abstract class BaseKeyboard(
         pointerIndex: Int,
         target: TouchTarget
     ) {
-        val childX = event.getX(pointerIndex) - target.hitRect.left
-        val childY = event.getY(pointerIndex) - target.hitRect.top
-        val e = MotionEvent.obtain(
-            event.downTime, event.eventTime, action,
-            childX, childY, event.getPressure(pointerIndex), event.getSize(pointerIndex),
-            event.metaState, event.xPrecision, event.yPrecision,
-            event.deviceId, event.edgeFlags
-        )
-        target.view.dispatchTouchEvent(e)
+        target.view.dispatchTouchEvent(event.forKey(action, pointerIndex, target.hitRect))
     }
 
     override fun onInterceptTouchEvent(ev: MotionEvent): Boolean {
@@ -510,7 +513,12 @@ abstract class BaseKeyboard(
         return changeFocusAction.outResult
     }
 
-    private fun onPopupTrigger(viewId: Int): Boolean {
+    private fun onPopupTrigger(viewId: Int, cancelled: Boolean): Boolean {
+        if (cancelled) {
+            // consumed: the listeners under this one would dismiss it a second time
+            onPopupAction(PopupAction.DismissAction(viewId))
+            return true
+        }
         val triggerAction = PopupAction.TriggerAction(viewId)
         // ask popup keyboard whether there's a pending KeyAction
         onPopupAction(triggerAction)
@@ -542,5 +550,20 @@ abstract class BaseKeyboard(
 
 }
 
-// the characters a key of a US keyboard types, space aside
-private val ASCII_PRINTABLE = 0x21..0x7e
+/**
+ * Finger [pointerIndex] of this event alone, as [action], in the coordinates of the key at [hitRect].
+ * Its id stays the finger's: hold to talk follows that id in the real events (VoiceHoldOverlay).
+ */
+internal fun MotionEvent.forKey(action: Int, pointerIndex: Int, hitRect: Rect): MotionEvent {
+    val properties = MotionEvent.PointerProperties().apply { id = getPointerId(pointerIndex) }
+    val coords = MotionEvent.PointerCoords().apply {
+        x = getX(pointerIndex) - hitRect.left
+        y = getY(pointerIndex) - hitRect.top
+        pressure = getPressure(pointerIndex)
+        size = getSize(pointerIndex)
+    }
+    return MotionEvent.obtain(
+        downTime, eventTime, action, 1, arrayOf(properties), arrayOf(coords),
+        metaState, 0, xPrecision, yPrecision, deviceId, edgeFlags, InputDevice.SOURCE_UNKNOWN, 0
+    )
+}

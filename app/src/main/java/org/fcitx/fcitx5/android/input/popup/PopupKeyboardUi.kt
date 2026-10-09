@@ -8,6 +8,7 @@ import android.content.Context
 import android.graphics.Rect
 import android.graphics.drawable.GradientDrawable
 import android.view.ViewOutlineProvider
+import android.widget.Space
 import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.input.AutoScaleTextView
 import org.fcitx.fcitx5.android.input.keyboard.KeyAction
@@ -21,8 +22,6 @@ import splitties.views.dsl.core.matchParent
 import splitties.views.dsl.core.verticalLayout
 import splitties.views.dsl.core.view
 import splitties.views.gravityCenter
-import splitties.views.gravityEnd
-import splitties.views.gravityStart
 import kotlin.math.ceil
 import kotlin.math.floor
 import kotlin.math.roundToInt
@@ -169,15 +168,9 @@ class PopupKeyboardUi(
             val order = keyOrders[i]
             add(horizontalLayout row@{
                 for (j in 0 until columnCount) {
-                    val keyUi = keyUis.getOrNull(order[j])
-                    if (keyUi == null) {
-                        // align columns to right (end) when first column is empty, eg.
-                        // |   | 6 | 5 | 4 |(no free space)
-                        // | 3 | 2 | 1 | 0 |(no free space)
-                        gravity = if (j == 0) gravityEnd else gravityStart
-                    } else {
-                        add(keyUi.root, lParams(keyWidth, keyHeight))
-                    }
+                    // an empty slot keeps its column, so each key is drawn where onChangeFocus selects it
+                    val slot = keyUis.getOrNull(order[j])?.root ?: Space(ctx)
+                    add(slot, lParams(keyWidth, keyHeight))
                 }
             }, lParams(width = matchParent))
         }
@@ -220,10 +213,16 @@ class PopupKeyboardUi(
 
     override fun onTrigger(): KeyAction? {
         val key = keys.getOrNull(focusedIndex) ?: return null
-        // one character goes through fcitx like any key; anything longer (a user-entered word, or
-        // text that happens to spell a key name such as "Tab") is not a key and is committed as text
-        return if (key.codePointCount(0, key.length) == 1) KeyAction.FcitxKeyAction(key)
-        else KeyAction.CommitAction(key)
+        return keyAction(key)
+    }
+
+    companion object {
+        /** What picking [key] types: from the long press, and from a letter's swipe (its first). */
+        fun keyAction(key: String): KeyAction =
+            // one character goes through fcitx like any key; anything longer (a user-entered word, or
+            // text that happens to spell a key name such as "Tab") is not a key and is committed as text
+            if (key.codePointCount(0, key.length) == 1) KeyAction.FcitxKeyAction(key)
+            else KeyAction.CommitAction(key)
     }
 
 }
