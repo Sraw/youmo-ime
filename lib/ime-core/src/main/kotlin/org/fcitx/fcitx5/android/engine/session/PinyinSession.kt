@@ -164,6 +164,12 @@ class PinyinSession(
         is Action.Context -> takeContext(action.before)
     }
 
+    /**
+     * Takes [text], committed by a session over this one (a character looked up by its strokes),
+     * as what the input to come follows: the app's text is what this committed, then [text].
+     */
+    fun follow(text: String): Snapshot = takeText(recent + text)
+
     /** See [Action.Context]. */
     private fun takeContext(before: String): Snapshot {
         // the text still ends with what was committed here: the cursor did not go anywhere
@@ -175,6 +181,11 @@ class PinyinSession(
             clear()
             return snapshot()
         }
+        return takeText(before)
+    }
+
+    /** [before], the app's text, as what the input to come follows, in place of what was committed. */
+    private fun takeText(before: String): Snapshot {
         dropContext()
         clear()
         // what the app has is kept no longer than the input, and not at all where the user
@@ -276,8 +287,7 @@ class PinyinSession(
         if (predicting) return predictionOffers(c)
         val phrase = placed[c.text]
         return buildSet {
-            // text kept as typed and phrases hold no words to forget; a habit is forgotten as such
-            if (user != null && entries(c) != null || c.text == habit) add(Offer.FORGET)
+            if (forgettable(c)) add(Offer.FORGET)
             // the first already, and a phrase: nothing to pin
             if ((phrase == null || index != 0) && pinnable(c)) add(Offer.PIN)
             if (phrase != null) add(Offer.UNPIN)
@@ -285,9 +295,14 @@ class PinyinSession(
         }
     }
 
+    // text kept as typed and phrases hold no words to forget; a habit is forgotten as such.
+    // Not where nothing is to be kept (a password): forgetting records the word
+    private fun forgettable(c: Candidate) = learning && (user != null && entries(c) != null || c.text == habit)
+
     // a prediction the user taught is forgotten, as are the words learned; any may be blocked
     private fun predictionOffers(c: Candidate): Set<Offer> {
         val word = c.words.singleOrNull()
+        if (!learning) return emptySet()
         if (user == null || word == null || entries(c) == null) return emptySet()
         return buildSet {
             if (user.probability(NO_WORD, word) > 0f) add(Offer.FORGET)
@@ -339,6 +354,8 @@ class PinyinSession(
      * phrases hold no words to forget.
      */
     private fun forget(index: Int): Snapshot {
+        // as offered: nothing recorded where nothing is to be kept
+        if (!learning) return snapshot()
         val c = candidates.getOrNull(index)
         if (c != null && !predicting) habits?.forget(c.text)
         val words = if (user == null || c == null) null else entries(c)
@@ -367,13 +384,14 @@ class PinyinSession(
         return snapshot()
     }
 
-    // a word, not a sentence of them: blocking every word of one would block common ones
-    private fun blockable(c: Candidate) = block != null && user != null && entries(c)?.size == 1
+    // a word, not a sentence of them: blocking every word of one would block common ones; and not
+    // where nothing is to be kept, as the word blocked is
+    private fun blockable(c: Candidate) = learning && block != null && user != null && entries(c)?.size == 1
 
     private fun block(index: Int): Snapshot {
         val c = candidates.getOrNull(index)
         val word = if (user == null || c == null) null else entries(c)?.singleOrNull()
-        if (word == null || block == null) return snapshot()
+        if (word == null || block == null || !learning) return snapshot()
         block.invoke(word)
         if (lastEntry == word) dropContext()
         decoder.reset()
@@ -684,7 +702,8 @@ class PinyinSession(
             hints = shown.map(::hint).takeIf { h -> h.any { it.isNotEmpty() } }.orEmpty(),
             total = candidates.size,
             first = from,
-            actionable = !predicting && candidates.isNotEmpty(),
+            // a prediction too: what was learned of it may be forgotten (see predictionOffers)
+            actionable = candidates.isNotEmpty(),
             refines = unrefined != null,
             syllables = nineKeys?.offered.orEmpty(),
             syllablesId = nineKeys?.id ?: 0,
@@ -737,7 +756,9 @@ class PinyinSession(
 
     /** How [edge] of [graph] shows, read as [syllable]: as typed, spelt for 双拼, letters for digits. */
     private fun shown(graph: SyllableGraph, edge: Int, syllable: Int): String = when {
-        // digits say nothing: as many letters of the syllable as were typed
+        // digits say nothing: the syllable read, a fuzzy one too (9664 as zhong with z for zh), and
+        // of one still being typed as many letters as were typed
+        !segmenter.typesLetters && graph.kind(edge) == Kind.SYLLABLE -> Syllables.spelling(syllable)
         !segmenter.typesLetters -> Syllables.spelling(syllable).take(graph.text(edge).length)
         spell && graph.kind(edge) == Kind.SYLLABLE -> Syllables.spelling(syllable)
         else -> graph.text(edge)

@@ -59,9 +59,13 @@ object EngineEvent {
  * While words that may follow are offered, any key the session does not read goes to the app and
  * the offer goes away: space after a word is a space, not the first prediction.
  *
+ * [nineKeys]: the session is the nine keys' (九键), whose 重输 is Escape and whose syllables come
+ * as [SYLLABLES]. The host says so: a table whose codes are digits reads 2 as well, and its
+ * Escape and characters are the app's. Unsaid, a session that reads 2 is taken for it.
+ *
  * [learning] is passed to the session: off where the app asks that nothing be learned.
  */
-class Keyboard(private val session: Session) {
+class Keyboard(private val session: Session, private val nineKeys: Boolean = session.reads('2')) {
 
     private var shown: Snapshot = IDLE
 
@@ -75,7 +79,7 @@ class Keyboard(private val session: Session) {
             EngineEvent.BACKSPACE -> session.apply(Action.Backspace)
             EngineEvent.ENTER -> if (composing) session.apply(Action.CommitRaw) else passOn()
             // the nine keys' 重输 is Escape: with nothing typed, nothing to start over, not the app's
-            EngineEvent.ESCAPE -> if (composing || shown.predicting) session.apply(Action.Reset) else if (session.reads('2')) IDLE.copy(handled = true) else passOn()
+            EngineEvent.ESCAPE -> if (composing || shown.predicting) session.apply(Action.Reset) else if (nineKeys) IDLE.copy(handled = true) else passOn()
             EngineEvent.PAGE_UP -> if (composing) session.apply(Action.PreviousPage) else passOn()
             EngineEvent.PAGE_DOWN -> if (composing) session.apply(Action.NextPage) else passOn()
             EngineEvent.PICK -> session.apply(Action.Pick(arg))
@@ -111,7 +115,6 @@ class Keyboard(private val session: Session) {
     private fun char(codePoint: Int): Snapshot {
         // past the BMP (an emoji key): no session reads one, but it still ends the input
         val c = if (codePoint in 0..Char.MAX_VALUE.code) codePoint.toChar() else REPLACEMENT
-        val nineKeys = session.reads('2')
         if (c in SYLLABLES && nineKeys) {
             val n = c - SYLLABLES.first
             return session.apply(Action.Syllable(n % Action.Syllable.MAX, n / Action.Syllable.MAX))

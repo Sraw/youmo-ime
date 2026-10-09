@@ -129,6 +129,18 @@ class KeyboardTest {
     }
 
     @Test
+    fun onlyOnTheNineKeysIsEscapeWithNothingTypedSwallowedOrACharacterASyllable() {
+        // a table whose codes are digits reads 2 as the nine keys do
+        val digits = FakeSession(nineKeys = true)
+        val table = Keyboard(digits, nineKeys = false)
+        assertFalse(table.onEvent(EngineEvent.ESCAPE, 0).handled)
+        val c = Keyboard.syllableKey(0, 0)
+        assertFalse(table.onEvent(EngineEvent.CHAR, c.code).handled)
+        assertEquals(listOf<Action>(Action.Key(c)), digits.actions)
+        assertTrue(Keyboard(FakeSession(), nineKeys = true).onEvent(EngineEvent.ESCAPE, 0).handled)
+    }
+
+    @Test
     fun lettersTheSessionReadsAreTyped() {
         type("ni")
         val s = char('h')

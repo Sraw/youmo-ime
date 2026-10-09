@@ -246,6 +246,8 @@ class SentenceModel private constructor(
             val first = start(context) ?: return null
             // the last token of each is not run, only read after the one before: one more fits
             val tokens = readings.map { r -> encode(r).let { it.copyOf(minOf(it.size, window - first.position)) } }
+            // all of it dropped, a scoring that needs more than the limit would start over every try
+            if (kept.size > limit) keepOnly(tokens)
             val shared = if (relative) shared(tokens) else 0
             val n = readings.size
             // the tokens so far of each, as chars: token ids are below 2^16
@@ -278,14 +280,22 @@ class SentenceModel private constructor(
                 var common = 0
                 while (common < chain.size && common < target.size && chain[common].token == target[common]) common++
                 while (chain.size > common) chain.removeAt(chain.size - 1)
-            } else if (kept.size > limit) {
-                kept.clear()
             }
             while (chain.size < target.size) {
                 if (spent++ >= budget) return null
                 chain += next(chain.lastOrNull() ?: bos, target[chain.size])
             }
             return chain.lastOrNull() ?: bos
+        }
+
+        /** Drops the steps that none of [tokens], the readings being scored, goes through. */
+        private fun keepOnly(tokens: List<IntArray>) {
+            val needed = HashSet<String>()
+            for (reading in tokens) {
+                val key = StringBuilder()
+                for (token in reading) needed += key.append(token.toChar()).toString()
+            }
+            kept.keys.retainAll(needed)
         }
 
         /**
@@ -325,7 +335,8 @@ class SentenceModel private constructor(
         const val ROOM = 24
         /**
          * What a [Scorer] keeps of its readings' nodes, in floats: 6 MB, some 550 steps of the
-         * 4M model and 190 of the 25M one, whose node is three times the size.
+         * 4M model and 190 of the 25M one, whose node is three times the size. Past it, only the
+         * steps of the readings being scored are kept, which their scoring cannot finish without.
          */
         const val KEPT_FLOATS = 1_500_000
         private const val EPS = 1e-5f

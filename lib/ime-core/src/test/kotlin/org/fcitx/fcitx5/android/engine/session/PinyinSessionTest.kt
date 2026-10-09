@@ -665,7 +665,8 @@ class PinyinSessionTest {
         session.type("wo")
         val predicted = session.apply(Select(0))
         assertTrue(predicted.predicting)
-        assertFalse(predicted.actionable)
+        // a long press on a prediction may offer something; on this one nothing, none of it learned
+        assertTrue(predicted.actionable)
         assertEquals(emptySet<Offer>(), session.offers(0))
         // a prediction offered: nothing forgotten
         assertEquals(predicted.copy(commit = ""), session.apply(Forget(0)))
@@ -680,7 +681,8 @@ class PinyinSessionTest {
         val blocked = ArrayList<String>()
         val session = PinyinSession(data, PinyinSegmenter(), user = user, block = { blocked += it.text; user.block(it) })
         session.type("wo")
-        session.apply(Select(0))
+        // the host asks what a long press offers only where the snapshot is actionable
+        assertTrue(session.apply(Select(0)).actionable)
         assertEquals(setOf(Offer.BLOCK), session.offers(0))
         // 再 picked after 我: learned, so it may be forgotten
         session.apply(Select(0))
@@ -697,6 +699,27 @@ class PinyinSessionTest {
         assertEquals(listOf("再"), blocked)
         assertFalse(after.predicting)
         assertTrue(after.candidates.isEmpty())
+    }
+
+    @Test
+    fun whileLearningIsOffNothingIsForgottenOrBlocked() {
+        val user = UserModel(data.dictionary, data.vocabulary)
+        val blocked = ArrayList<String>()
+        val session = PinyinSession(data, PinyinSegmenter(), user = user, block = { blocked += it.text; user.block(it) })
+        session.type("wo")
+        session.apply(Select(0))
+        session.apply(Reset)
+        assertEquals(1f, user.total)
+        // a password: what is forgotten or blocked is kept, and it is near what is typed there
+        session.learning = false
+        session.type("wo")
+        assertEquals(emptySet<Offer>(), session.offers(0))
+        session.apply(Forget(0))
+        session.apply(Action.Block(0))
+        assertEquals(1f, user.total)
+        assertEquals(emptyList<String>(), blocked)
+        session.learning = true
+        assertEquals(setOf(Offer.FORGET, Offer.PIN, Offer.BLOCK), session.offers(0))
     }
 
     @Test

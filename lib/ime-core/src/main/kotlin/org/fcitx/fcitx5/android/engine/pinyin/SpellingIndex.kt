@@ -92,6 +92,8 @@ internal class SpellingIndex(fuzzy: Set<Fuzzy>, typos: Boolean, neighbours: Bool
                 // as an initial, z also stands for zh (zg 中国, sm 什么) in every mainstream input method
                 if (i.length == 2 && i[1] == 'h') keepBest(byInitial.getOrPut(i.take(1)) { TreeMap() }, id, iFlags or SyllableMatches.COMPLETION)
                 for ((f, fFlags) in finals(fin, finalRules)) {
+                    // with no initial the final is the syllable: ou's partner u is none, so u stays as typed
+                    if (i.isEmpty() && Syllables.id(f) < 0) continue
                     val flags = iFlags or fFlags
                     add(i + f, id, flags)
                     if (typos) Typo.entries.mapNotNull { it.of(i, f) }.forEach { add(it, id, flags or SyllableMatches.TYPO) }

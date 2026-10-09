@@ -19,9 +19,11 @@ import java.util.TreeMap
  * From each digit the graph gets:
  * - every syllable the digits there type, of any length, with their [Fuzzy] partners;
  * - at the end of the input or before a separator, every syllable the digits may still become
- *   ([Kind.PARTIAL], or [Kind.EXTENDED] where they are a syllable too: `64` on the way to nian);
+ *   ([Kind.PARTIAL], or [Kind.EXTENDED] where they are a syllable of two letters or more too: `64`
+ *   on the way to nian, but not `6`, 哦, on the way to men);
  * - with [abbreviations], the initials the digits type (简拼, `94` zh), where no longer syllable
- *   starts or another digit follows; without, only where nothing else is read.
+ *   starts or another digit follows; without, only where nothing else is read but a syllable of
+ *   one letter (`25` is 北京 too, not only 啊 then j …).
  *
  * A syllable the user chose for the first digits not yet chosen ([lock]) is in the input as its
  * letters and a separator: read as that syllable alone, or as an initial for a letter (`h`).
@@ -36,8 +38,9 @@ class T9Segmenter(fuzzy: Set<Fuzzy> = emptySet(), private val abbreviations: Boo
     // a chosen letter, as an initial: its syllables
     private val byInitial = HashMap<String, SyllableMatches>()
 
-    // digits typing a syllable of an initial and a final, or a final alone: not only 呣, 嗯 or 儿,
-    // which would keep 简拼 off every 6 and 7
+    // digits typing a syllable of an initial and a final, or a final alone, of two letters or more:
+    // 啊, 呃, 哦, 呣, 嗯 and 儿 alone would keep 简拼 off every 2, 3, 6 and 7, and make each syllable
+    // those digits start EXTENDED at the end
     private val regular = HashSet<String>()
 
     init {
@@ -58,12 +61,15 @@ class T9Segmenter(fuzzy: Set<Fuzzy> = emptySet(), private val abbreviations: Boo
                 if (init.isNotEmpty()) keepBest(letterIds.getOrPut(init) { TreeMap() }, id, SyllableMatches.COMPLETION)
                 SpellingIndex.variants(init, initialRules).flatMap { (i, iFlags) ->
                     if (i.isNotEmpty()) keepBest(initialIds.getOrPut(digits(i)) { TreeMap() }, id, iFlags or SyllableMatches.COMPLETION)
-                    SpellingIndex.finals(fin, finalRules).map { (f, fFlags) -> i + f to (iFlags or fFlags) }
+                    // with no initial the final is the syllable: ou's partner u is none, as in 双拼
+                    SpellingIndex.finals(fin, finalRules).mapNotNull { (f, fFlags) ->
+                        if (i.isEmpty() && Syllables.id(f) < 0) null else i + f to (iFlags or fFlags)
+                    }
                 }
             }
             for ((s, flags) in spellings) {
                 val keys = digits(s)
-                if (parts != null) regular += keys
+                if (parts != null && s.length > 1) regular += keys
                 keepBest(wholeIds.getOrPut(keys) { TreeMap() }, id, flags)
                 for (n in 1 until keys.length) keepBest(startIds.getOrPut(keys.substring(0, n)) { TreeMap() }, id, flags or SyllableMatches.COMPLETION)
             }
@@ -110,7 +116,7 @@ class T9Segmenter(fuzzy: Set<Fuzzy> = emptySet(), private val abbreviations: Boo
             }
             val next = at + length
             if (next == input.length || input[next] == SEPARATOR) {
-                starts[keys]?.let { edges.add(at, length, if (full != null) Kind.EXTENDED else Kind.PARTIAL, it) }
+                starts[keys]?.let { edges.add(at, length, if (keys in regular) Kind.EXTENDED else Kind.PARTIAL, it) }
             }
             initials[keys]?.let { initialEdges += length to it }
         }

@@ -114,6 +114,29 @@ class SentenceModelTest {
     }
 
     @Test
+    fun aScoringThatNeedsMoreThanIsKeptGoesOnFromWhatItGotDone() {
+        // no start shared: nine steps, against a limit of three
+        val readings = listOf("我好你", "你好的", "天的我")
+        val whole = model.Scorer().score("好", readings, relative = true)
+        val scorer = model.Scorer(limit = 3)
+        var got: FloatArray? = null
+        var tries = 0
+        while (got == null) {
+            got = scorer.within("好", readings, relative = true, budget = 1)
+            assertTrue("never done", ++tries < 100)
+        }
+        assertArrayEquals(whole, got, 1e-6f)
+        // still a limit: steps the next readings do not go through are dropped, where a roomy scorer keeps them
+        val other = listOf("好的", "的好")
+        scorer.score("好", other)
+        assertEquals(null, scorer.within("好", readings, relative = true, budget = 0))
+        val roomy = model.Scorer()
+        roomy.score("好", readings, relative = true)
+        roomy.score("好", other)
+        assertArrayEquals(whole, roomy.within("好", readings, relative = true, budget = 0), 1e-6f)
+    }
+
+    @Test
     fun onlyWhatFitsTheWindowIsRead() {
         // window 8, room for 5: 2 of the context fit, and 1 is read when it all does not
         val scorer = model.Scorer(room = 5)

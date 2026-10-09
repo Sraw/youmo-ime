@@ -5,12 +5,19 @@
 package org.fcitx.fcitx5.android.engine.stroke
 
 import org.fcitx.fcitx5.android.engine.data.CodeTable
+import org.fcitx.fcitx5.android.engine.data.PinyinData
+import org.fcitx.fcitx5.android.engine.data.PinyinDataBuilder
 import org.fcitx.fcitx5.android.engine.data.SourceException
+import org.fcitx.fcitx5.android.engine.pinyin.LatinWords
+import org.fcitx.fcitx5.android.engine.pinyin.PinyinSegmenter
 import org.fcitx.fcitx5.android.engine.session.Action
 import org.fcitx.fcitx5.android.engine.session.Choice
 import org.fcitx.fcitx5.android.engine.session.Offer
+import org.fcitx.fcitx5.android.engine.session.PinyinSession
 import org.fcitx.fcitx5.android.engine.session.Session
 import org.fcitx.fcitx5.android.engine.session.Snapshot
+import org.fcitx.fcitx5.android.engine.session.sessionTestData
+import org.fcitx.fcitx5.android.engine.session.syl
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertThrows
@@ -39,7 +46,7 @@ class StrokesTest {
 
     private val scores = mapOf("一" to -2f, "十" to -3f, "土" to -3.5f, "王" to -3.2f, "丰" to -4f, "干" to -3.1f)
 
-    private fun strokes() = Strokes(
+    private fun strokes(dict: String = this.dict) = Strokes(
         CodeTable.load(ByteBuffer.wrap(Strokes.read(dict.reader().buffered(), "stroke").build().toByteArray())),
     ) { scores[it] ?: Float.NEGATIVE_INFINITY }
 
@@ -96,9 +103,59 @@ class StrokesTest {
         assertEquals(listOf("", "wang", ""), s.hints)
         assertEquals("wang", l.candidates(1, 1).single().hint)
         assertEquals(emptySet<Offer>(), l.offers(0))
-        // not a stroke: nothing
-        assertEquals("u一一", l.apply(Action.Key('a')).preedit)
         assertEquals("王", l.apply(Action.Select(1)).commit)
+    }
+
+    @Test
+    fun aLetterNoStrokeEndsTheLookupItsKeysTypedAsPinyin() {
+        val pinyin = Pinyin()
+        val l = lookup(pinyin)
+        l.apply(Action.Key('u'))
+        l.apply(Action.Key('h'))
+        l.apply(Action.Key('h'))
+        // not a stroke: what was typed is pinyin's, as typed
+        assertEquals("uhha", l.apply(Action.Key('a')).preedit)
+        assertEquals("uhha".map { Action.Key(it) }, pinyin.actions)
+        assertEquals(listOf(Choice("拼")), l.candidates(0, 1))
+        assertEquals(setOf(Offer.FORGET), l.offers(0))
+        // pinyin's from then on, u too
+        assertEquals("uhhau", l.apply(Action.Key('u')).preedit)
+    }
+
+    @Test
+    fun aLatinWordStartingWithUIsTypedAsPinyinReadsIt() {
+        val data = PinyinData.load(
+            ByteBuffer.wrap(
+                PinyinDataBuilder()
+                    .unigram("<unk>", -7f, 0f)
+                    .unigram("USB", -5f, 0f)
+                    .entry("USB", syl("U", "S", "B"))
+                    .build().toByteArray(),
+            ),
+        )
+        val l = StrokeLookup(PinyinSession(data, PinyinSegmenter(latin = LatinWords.of(data.dictionary))), { strokes() })
+        l.apply(Action.Key('u'))
+        // s is 丨, b no stroke
+        assertEquals("u丨", l.apply(Action.Key('s')).preedit)
+        val s = l.apply(Action.Key('b'))
+        assertEquals("USB", s.candidates.first())
+        assertEquals("usb", s.preedit)
+    }
+
+    @Test
+    fun aCharacterPickedFollowsWhatThePinyinCommittedBefore() {
+        val contexts = ArrayList<String>()
+        val pinyin = PinyinSession(sessionTestData(), PinyinSegmenter()) { context, _, _ -> contexts += context; 0 }
+        val zai = strokes("...\n再\th\n")
+        val l = StrokeLookup(pinyin, { zai }, follow = pinyin::follow)
+        "wo".forEach { l.apply(Action.Key(it)) }
+        assertEquals("我", l.apply(Action.Select(0)).commit)
+        l.apply(Action.Key('u'))
+        l.apply(Action.Key('h'))
+        assertEquals("再", l.apply(Action.Pick(0)).commit)
+        // the reranker reads the text before the cursor: both, not 再 alone
+        "zai".forEach { l.apply(Action.Key(it)) }
+        assertEquals("我再", contexts.last())
     }
 
     @Test
@@ -157,5 +214,19 @@ class StrokesTest {
         assertEquals("", l.apply(Action.Reset).preedit)
         l.learning = false
         assertFalse(l.learning)
+    }
+
+    @Test
+    fun anotherKeyWithNothingFoundCommitsWhatWasTypedAsEnterDoes() {
+        val l = lookup()
+        l.apply(Action.Key('u'))
+        val comma = l.apply(Action.Key(','))
+        assertEquals("u", comma.commit)
+        assertFalse(comma.handled)
+        // strokes no character has
+        l.apply(Action.Key('u'))
+        l.apply(Action.Key('z'))
+        assertEquals(emptyList<String>(), l.apply(Action.Key('z')).candidates)
+        assertEquals("uzz", l.apply(Action.Key('.')).commit)
     }
 }

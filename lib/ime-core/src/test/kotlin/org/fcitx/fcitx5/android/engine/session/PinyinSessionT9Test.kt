@@ -8,6 +8,7 @@ import org.fcitx.fcitx5.android.engine.data.PinyinData
 import org.fcitx.fcitx5.android.engine.data.PinyinDataBuilder
 import org.fcitx.fcitx5.android.engine.host.Keyboard
 import org.fcitx.fcitx5.android.engine.host.EngineEvent
+import org.fcitx.fcitx5.android.engine.pinyin.Fuzzy
 import org.fcitx.fcitx5.android.engine.pinyin.Syllables
 import org.fcitx.fcitx5.android.engine.pinyin.T9Segmenter
 import org.fcitx.fcitx5.android.engine.session.Action.Backspace
@@ -133,6 +134,25 @@ class PinyinSessionT9Test {
         val commit = session.apply(Action.CommitRaw).commit
         assertEquals(shown.filter { it != ' ' && it != '\'' }, commit)
         assertTrue(commit.startsWith("ni") && commit.length == 6)
+    }
+
+    @Test
+    fun aFuzzyReadingShowsAndCommitsItsWholeSyllable() {
+        val zhong = PinyinData.load(
+            ByteBuffer.wrap(
+                PinyinDataBuilder()
+                    .unigram("<unk>", -7f, 0f)
+                    .unigram("中", -3.5f, 0f)
+                    .entry("中", syl("zhong"))
+                    .build().toByteArray(),
+            ),
+        )
+        val session = PinyinSession(zhong, T9Segmenter(setOf(Fuzzy.Z_ZH), abbreviations = false), spell = true, prediction = false)
+        // 9664 types zong, and z stands for zh: zhong, not its first four letters
+        val s = session.type("9664")
+        assertEquals("中", s.candidates[0])
+        assertEquals("zhong", s.preedit)
+        assertEquals("zhong", session.apply(Action.CommitRaw).commit)
     }
 
     @Test

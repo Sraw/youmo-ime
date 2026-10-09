@@ -43,6 +43,31 @@ class T9SegmenterTest {
     }
 
     @Test
+    fun aSyllableOfOneLetterKeepsNoInitialOffItsDigitNorReadsWhatItStartsAsExtended() {
+        val strict = T9Segmenter(abbreviations = false)
+        // 2 is 啊 and 6 哦 too: b and n stand for their syllables all the same, 北京 and 南京
+        assertTrue("bei" in strict.segment("25").read(0, 1, Kind.INITIAL))
+        assertTrue("nan" in strict.segment("65").read(0, 1, Kind.INITIAL))
+        assertTrue("a" in strict.segment("25").read(0, 1))
+        // typed last, the start of a syllable still being typed, not a whole one read on
+        val six = segmenter.segment("6")
+        assertTrue(setOf("men", "ni", "ou").all { it in six.read(0, 1, Kind.PARTIAL) })
+        assertTrue(six.read(0, 1, Kind.EXTENDED).isEmpty())
+        assertTrue("ba" in segmenter.segment("2").read(0, 1, Kind.PARTIAL))
+    }
+
+    @Test
+    fun uAloneIsNoSpellingOfOuUnderTheFuzzyPair() {
+        val ou = T9Segmenter(setOf(Fuzzy.U_OU), abbreviations = false)
+        // 8 types no syllable, so its t still stands for its syllables: 86 他们
+        val g = ou.segment("86")
+        assertTrue(g.read(0, 1).isEmpty())
+        assertTrue("ta" in g.read(0, 1, Kind.INITIAL))
+        // after an initial the pair holds: 68 is mou too
+        assertTrue(setOf("mu", "mou").all { it in ou.segment("68").read(0, 2) })
+    }
+
+    @Test
     fun aSyllableTakenIsReadAsItselfAlone() {
         val g = segmenter.segment("ni'426")
         assertEquals(setOf("ni"), g.read(0, 3))

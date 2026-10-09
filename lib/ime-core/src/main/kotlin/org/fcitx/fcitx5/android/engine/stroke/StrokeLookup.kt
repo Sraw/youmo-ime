@@ -14,11 +14,14 @@ import org.fcitx.fcitx5.android.engine.session.Snapshot
  * Pinyin with a character looked up by its strokes, as 搜狗 has it: [KEY] typed with nothing
  * else typed starts the lookup (no pinyin starts with u), then `h s p n z` are the strokes
  * ([Strokes]); each candidate shows its pinyin ([reading]) to learn it by. Picked, it is
- * committed, and the pinyin goes on after it. Any other letter is no stroke and does nothing;
- * any other key commits the first candidate and is the app's, as in pinyin.
+ * committed, and the pinyin goes on after it. Any other letter ends the lookup, its keys and the
+ * letter typed into pinyin instead: a Latin word (`usb` for USB) or a slip (`uan` for yan). Any
+ * other key commits the first candidate, or with none what was typed, and is the app's, as in pinyin.
  *
  * [strokes] is asked for at the first lookup: null, there are none, and [KEY] is [pinyin]'s. A
- * character the user [blocked] is not found.
+ * character the user [blocked] is not found. A character picked is handed to [follow], for the
+ * pinyin to go on after: by default as the app's text ([Action.Context]); a PinyinSession's
+ * `follow` keeps what it committed before too, whatever wraps either session.
  */
 class StrokeLookup(
     private val pinyin: Session,
@@ -26,6 +29,7 @@ class StrokeLookup(
     private val reading: (String) -> String = { "" },
     private val pageSize: Int = DEFAULT_PAGE_SIZE,
     private val blocked: (String) -> Boolean = { false },
+    private val follow: (String) -> Snapshot = { pinyin.apply(Action.Context(it)) },
 ) : Session {
 
     private var looking = false
@@ -78,9 +82,18 @@ class StrokeLookup(
 
     private fun type(c: Char): Snapshot = when {
         c in Strokes.KEYS -> lookUp { input.append(c) }
-        c in 'a'..'z' -> snapshot()
-        // a key not read: the first candidate, then the key is the app's
-        else -> end(commit = found.firstOrNull().orEmpty(), handled = false)
+        c in 'a'..'z' -> toPinyin(c)
+        // a key not read: the first candidate, or what was typed as Enter has it; then the key is the app's
+        else -> end(commit = found.firstOrNull() ?: "$KEY$input", handled = false)
+    }
+
+    /** Ends the lookup, [KEY], the strokes and [c] typed into [pinyin] instead. */
+    private fun toPinyin(c: Char): Snapshot {
+        val keys = "$KEY$input$c"
+        end()
+        val typed = keys.map { pinyin.apply(Action.Key(it)) }
+        idle = typed.last().preedit.isEmpty()
+        return typed.last().copy(commit = typed.joinToString("") { it.commit })
     }
 
     private inline fun lookUp(change: () -> Unit = {}): Snapshot {
@@ -92,8 +105,8 @@ class StrokeLookup(
 
     private fun pick(index: Int): Snapshot {
         val text = found.getOrNull(index) ?: return snapshot()
-        // what follows follows it, as the pinyin would have it
-        val after = pinyin.apply(Action.Context(text))
+        // what follows follows it, after what the pinyin committed before, as the pinyin would have it
+        val after = follow(text)
         idle = after.preedit.isEmpty()
         return end(commit = text)
     }
