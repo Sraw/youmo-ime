@@ -9,6 +9,12 @@ import android.content.pm.ProviderInfo
 import android.os.Looper
 import android.os.ParcelFileDescriptor
 import android.provider.DocumentsContract.Document
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.test.advanceUntilIdle
+import kotlinx.coroutines.test.runTest
+import org.fcitx.fcitx5.android.core.FakeFcitxAPI
+import org.fcitx.fcitx5.android.core.FakeFcitxConnection
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -21,8 +27,10 @@ import org.robolectric.Robolectric
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.Shadows.shadowOf
+import org.robolectric.annotation.Config
 import java.io.File
 import java.io.FileNotFoundException
+import java.io.FileOutputStream
 import java.nio.file.Files
 
 /**
@@ -207,6 +215,14 @@ class FcitxDataProviderTest {
         assertFalse(File(root, "notes.txt").isReadOnReload(root))
     }
 
+    /** The engine last: a reloadConfig alone once left the candidates unshown till fcitx restarted. */
+    @Test
+    fun aReloadReadsTheEngineAgainAfterFcitxsConfig() {
+        val fcitx = FakeFcitxAPI()
+        runBlocking { fcitx.reloadWritten() }
+        assertEquals(listOf("reloadConfig()", "reloadEngine()"), fcitx.calls)
+    }
+
     /** A write of a file fcitx reads on reload reloads it once closed; a read, or a write of another file, does not. */
     @Test
     fun aFinishedWriteOfAFileFcitxReadsOnReloadReloadsIt() {
@@ -225,5 +241,27 @@ class FcitxDataProviderTest {
         assertEquals("b", File(root, "config/x").readText())
         assertEquals("b", File(root, "notes.txt").readText())
         assertEquals(listOf("x"), reloaded)
+    }
+
+    /**
+     * What that reload asks of fcitx: [reloadWritten]'s config, then the engine. At minSdk: from
+     * Android 14 the subtypes are synced after them, which needs the app these tests go without.
+     */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    @Config(sdk = [23])
+    fun aFinishedWriteHasFcitxReadItsConfigThenTheEngine() = runTest {
+        val fcitx = FakeFcitxConnection(this)
+        provider.connection = { fcitx }
+        File(root, "config/config").apply { parentFile!!.mkdirs(); writeText("a") }
+        // not through an AutoCloseOutputStream: at SDK 23 it closes the descriptor first, and Robolectric's
+        // shadow, re-entered from the stream it closes, reports that one close twice; a device reports it once
+        provider.openDocument("$rootId/config/config", "wt", null).use { pfd ->
+            FileOutputStream(pfd.fileDescriptor).use { it.write("b".toByteArray()) }
+        }
+        // the close is reported on the main looper, the reload then run in fcitx's scope
+        shadowOf(Looper.getMainLooper()).idle()
+        advanceUntilIdle()
+        assertEquals(listOf("reloadConfig()", "reloadEngine()"), fcitx.api.calls)
     }
 }

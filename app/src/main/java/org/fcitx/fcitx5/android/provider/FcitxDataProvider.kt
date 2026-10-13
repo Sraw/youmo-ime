@@ -17,7 +17,9 @@ import android.provider.DocumentsContract.Root
 import android.provider.DocumentsProvider
 import android.webkit.MimeTypeMap
 import org.fcitx.fcitx5.android.R
+import org.fcitx.fcitx5.android.core.FcitxAPI
 import org.fcitx.fcitx5.android.core.SubtypeManager
+import org.fcitx.fcitx5.android.daemon.FcitxConnection
 import org.fcitx.fcitx5.android.daemon.FcitxDaemon
 import org.fcitx.fcitx5.android.utils.isPlainFileName
 import timber.log.Timber
@@ -161,9 +163,12 @@ class FcitxDataProvider : DocumentsProvider() {
     // a test counts the calls instead: reloading needs fcitx running
     internal var reload: (File) -> Unit = { reloadFcitx(it) }
 
+    // a test's fake instead, to see what a reload asks of fcitx
+    internal var connection: () -> FcitxConnection? = { FcitxDaemon.getFirstConnectionOrNull() }
+
     // fcitx that is not running reads the files when it starts
     private fun reloadFcitx(written: File) {
-        val fcitx = FcitxDaemon.getFirstConnectionOrNull()
+        val fcitx = connection()
         if (fcitx == null) {
             Timber.d("Not reloading fcitx for %s: it is not running", written.name)
             return
@@ -171,7 +176,7 @@ class FcitxDataProvider : DocumentsProvider() {
         // runIfReady drops it without a word while fcitx is still starting
         Timber.d("Reloading fcitx for %s, if it is ready", written.name)
         fcitx.runIfReady {
-            reloadConfig()
+            reloadWritten()
             // what the removed status-area entry did: config/profile holds the enabled input methods
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
                 SubtypeManager.syncWith(enabledIme())
@@ -381,3 +386,14 @@ private fun File.canonical(): File = try {
 /** Whether fcitx reads [this] again on reload: its own and its addons' config, and the punctuation tables. */
 internal fun File.isReadOnReload(root: File): Boolean =
     startsWith(root.resolve("config")) || startsWith(root.resolve("data/punctuation"))
+
+/**
+ * Reads again what [isReadOnReload] lists, then the engine, as the nine keys' letters are read
+ * (15fb15963b): for those a reloadConfig alone left the candidates unshown till fcitx restarted,
+ * for a cause not found in the code. That the engine read after it brings them back is not shown:
+ * FcitxTest checks only that the bar has them after both.
+ */
+internal suspend fun FcitxAPI.reloadWritten() {
+    reloadConfig()
+    reloadEngine()
+}

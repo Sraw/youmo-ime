@@ -21,7 +21,10 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.fragment.app.Fragment
 import com.google.android.material.R as MaterialR
 import com.google.android.material.button.MaterialButton
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import org.fcitx.fcitx5.android.R
+import org.fcitx.fcitx5.android.daemon.FcitxConnection
 import org.fcitx.fcitx5.android.daemon.FcitxDaemon
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
@@ -34,6 +37,7 @@ import splitties.views.dsl.core.lParams
 import splitties.views.dsl.core.matchParent
 import splitties.views.dsl.core.verticalLayout
 import splitties.views.dsl.core.wrapInScrollView
+import kotlin.coroutines.CoroutineContext
 
 /**
  * Sets which letters each of 九键's digit keys types, on its keys drawn as the keyboard has them:
@@ -44,14 +48,11 @@ class NineKeyLettersFragment : Fragment() {
 
     private val pref get() = AppPrefs.getInstance().keyboard.t9Letters
 
-    private var letters: NineKeyLetters
-        get() = NineKeyLetters.parse(pref.getValue())
-        set(value) {
-            pref.setValue(value.serialize())
-            // the engine reads them again as it reads the user's words: not all of fcitx's config,
-            // whose reload left the candidates unshown
-            FcitxDaemon.getFirstConnectionOrNull()?.runIfReady { reloadEngine() }
-        }
+    private val letters: NineKeyLetters get() = NineKeyLetters.parse(pref.getValue())
+
+    /** Keeps [value] for the keyboard and has the engine read it. */
+    private fun save(value: NineKeyLetters) =
+        saveLetters(value, letters, { pref.setValue(it.serialize()) }, FcitxDaemon.getFirstConnectionOrNull())
 
     private lateinit var content: LinearLayout
 
@@ -149,14 +150,13 @@ class NineKeyLettersFragment : Fragment() {
             .setTitle(getString(R.string.t9_letters_of, digit.toString()))
             .setView(box)
             .setPositiveButton(android.R.string.ok) { _, _ ->
-                // emptied: as on a phone, as the hint says, not a key typing nothing
-                letters = current.with(digit, field.text.toString().ifEmpty { default })
+                save(current.withEdit(digit, field.text.toString()))
                 rebuild()
             }
             .setNegativeButton(android.R.string.cancel, null)
         if (current.letters(digit) != default) {
             builder.setNeutralButton(R.string.reset) { _, _ ->
-                letters = current.with(digit, default)
+                save(current.withEdit(digit, default))
                 rebuild()
             }
         }
@@ -170,7 +170,7 @@ class NineKeyLettersFragment : Fragment() {
             .setTitle(R.string.reset_all)
             .setMessage(R.string.t9_letters_reset_all_message)
             .setPositiveButton(android.R.string.ok) { _, _ ->
-                letters = NineKeyLetters.STANDARD
+                save(NineKeyLetters.STANDARD)
                 rebuild()
             }
             .setNegativeButton(android.R.string.cancel, null)
@@ -189,6 +189,33 @@ class NineKeyLettersFragment : Fragment() {
     }
 }
 
-/** These letters with [digit]'s [typed] as it may be kept. */
-internal fun NineKeyLetters.with(digit: Char, typed: String): NineKeyLetters =
-    NineKeyLetters.of(('2'..'9').map { if (it == digit) typed else letters(it) })
+/**
+ * These letters with [digit]'s [typed] as it may be kept; typed with no letter, [digit] is as on a
+ * phone, as its field's hint says, not a key typing nothing.
+ */
+internal fun NineKeyLetters.withEdit(digit: Char, typed: String): NineKeyLetters {
+    val kept = NineKeyLetters.normalize(typed).ifEmpty { NineKeyLetters.STANDARD.letters(digit) }
+    return NineKeyLetters.of(('2'..'9').map { if (it == digit) kept else letters(it) })
+}
+
+/**
+ * Keeps [value] in place of the letters [kept], as [keep] writes it, and has the engine of [fcitx]
+ * read it once fcitx is ready, waiting on [context]; without [fcitx], fcitx is not running and
+ * reads them as it starts.
+ */
+internal fun saveLetters(
+    value: NineKeyLetters,
+    kept: NineKeyLetters,
+    keep: (NineKeyLetters) -> Unit,
+    fcitx: FcitxConnection?,
+    context: CoroutineContext = Dispatchers.Main.immediate,
+) {
+    // as they were: the engine's reload, which reads the user's words again too, is for nothing
+    if (value == kept) return
+    keep(value)
+    if (fcitx == null) return
+    // the engine reads them again as it reads the user's words: not all of fcitx's config,
+    // whose reload left the candidates unshown. Once ready: fcitx still starting may have read
+    // the old ones, and runIfReady would drop the reload
+    fcitx.lifecycleScope.launch(context) { fcitx.runOnReady { reloadEngine() } }
+}
