@@ -55,12 +55,12 @@ class ProjectExtensionsTest {
     }
 
     @Test
-    fun withNoAppReleaseTheVersionIsTheBaseVersion() {
+    fun withNoAppReleaseTheVersionIsTheBaseVersionMarkedUntagged() {
         assumeUnset("BUILD_VERSION_NAME")
         git("init", "-q")
         git("commit", "-q", "--allow-empty", "-m", "data")
         git("tag", "words-202610")
-        assertEquals(Versions.baseVersionName, project().buildVersionName)
+        assertEquals("${Versions.baseVersionName}-untagged", project().buildVersionName)
     }
 
     @Test
@@ -71,15 +71,23 @@ class ProjectExtensionsTest {
         git("commit", "-q", "--allow-empty", "-m", "upstream's release")
         git("tag", "0.1.3")
         git("commit", "-q", "--allow-empty", "-m", "this app's work")
-        assertEquals(Versions.baseVersionName, project().buildVersionName)
+        assertEquals("${Versions.baseVersionName}-untagged", project().buildVersionName)
     }
 
     @Test
     fun theVersionAtItsTagIsTheBareNumber() {
         assertEquals("0.1.0", appVersionName("v0.1.0-0-gabc1234", "0.1.0"))
         assertEquals("0.1.0-4-gabc1234", appVersionName("v0.1.0-4-gabc1234", "0.1.0"))
-        // no tag: runCmd's default
-        assertEquals("0.1.0", appVersionName("", "0.1.0"))
+        // no tag: runCmd's default, and not the release v0.1.0's name
+        assertEquals("0.1.0-untagged", appVersionName("", "0.1.0"))
+    }
+
+    @Test
+    fun theBuildTimeIsTheCommits() {
+        assumeUnset("BUILD_TIMESTAMP")
+        git("init", "-q")
+        git("commit", "-q", "--allow-empty", "-m", "first", env = mapOf("GIT_COMMITTER_DATE" to "@1790812800 +0000"))
+        assertEquals("1790812800000", project().buildTimestamp)
     }
 
     @Test

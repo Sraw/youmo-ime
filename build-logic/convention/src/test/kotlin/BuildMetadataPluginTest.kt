@@ -19,14 +19,14 @@ class BuildMetadataPluginTest {
         val project = ProjectBuilder.builder().withProjectDir(folder.newFolder("app")).build()
         val task = project.tasks.register("generateBuildMetadata", BuildMetadataPlugin.BuildMetadataTask::class.java).get()
         val out = folder.root.resolve("build-metadata.json")
-        task.versionName.set("v0.2.0-1-gb6868b7")
+        task.versionName.set("0.2.0-1-gb6868b7")
         task.commitHash.set("b6868b7f798bf318454a21602333417cac412b47")
         task.timestamp.set("1790812800000")
         task.outputFile.set(out)
         task.execute()
         assertEquals(
             BuildMetadataPlugin.BuildMetadataTask.BuildMetadata(
-                "v0.2.0-1-gb6868b7", "b6868b7f798bf318454a21602333417cac412b47", "1790812800000",
+                "0.2.0-1-gb6868b7", "b6868b7f798bf318454a21602333417cac412b47", "1790812800000",
             ),
             Json.decodeFromString(BuildMetadataPlugin.BuildMetadataTask.BuildMetadata.serializer(), out.readText()),
         )

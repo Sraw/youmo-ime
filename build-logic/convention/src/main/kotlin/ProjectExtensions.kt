@@ -54,10 +54,11 @@ val Project.buildVersionName
 
 /**
  * The version [described] names, as `git describe --long` gives it (`v<version>-<commits>-g<hash>`):
- * `0.1.0` at the tag, `0.1.0-5-gabc1234` past it; [base] with no tag.
+ * `0.1.0` at the tag, `0.1.0-5-gabc1234` past it. With no tag (a source archive, a fork without the
+ * tags), [base] marked `-untagged`: bare, it would read on the About page as the release of that name.
  */
 internal fun appVersionName(described: String, base: String): String {
-    val (version, commits, hash) = DESCRIBED.matchEntire(described)?.destructured ?: return base
+    val (version, commits, hash) = DESCRIBED.matchEntire(described)?.destructured ?: return "$base-untagged"
     return if (commits == "0") version else "$version-$commits-g$hash"
 }
 
