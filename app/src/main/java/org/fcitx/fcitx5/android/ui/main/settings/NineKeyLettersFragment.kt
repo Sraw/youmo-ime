@@ -214,8 +214,8 @@ internal fun saveLetters(
     if (value == kept) return
     keep(value)
     if (fcitx == null) return
-    // the engine reads them again as it reads the user's words: not all of fcitx's config,
-    // whose reload left the candidates unshown. Once ready: fcitx still starting may have read
-    // the old ones, and runIfReady would drop the reload
+    // the engine reads them again as it reads the user's words (EngineBridge.reload): they are the
+    // app's, not fcitx's config. Once ready: fcitx still starting may have read the old ones, and
+    // runIfReady would drop the reload
     fcitx.lifecycleScope.launch(context) { fcitx.runOnReady { reloadEngine() } }
 }

@@ -16,7 +16,6 @@ import org.fcitx.fcitx5.android.data.punctuation.PunctuationMapEntry
 import org.fcitx.fcitx5.android.engine.host.EngineSettings
 import org.fcitx.fcitx5.android.engine.host.Engines
 import org.fcitx.fcitx5.android.engine.host.Keyboard
-import org.fcitx.fcitx5.android.provider.reloadWritten
 import org.junit.After
 import org.junit.AfterClass
 import org.junit.Assert
@@ -273,21 +272,23 @@ class FcitxTest {
     }
 
     /**
-     * What a file written through the documents provider has fcitx do, reloadWritten (its config
-     * read again, then the engine), leaves the bar its candidates. It does not show that the engine
-     * read is what keeps them: it is not run with a reloadConfig alone, which for the nine keys'
-     * letters left them unshown till fcitx restarted (15fb15963b).
+     * A file written through the documents provider, or the punctuation edited, has fcitx read its
+     * config again, and nothing more: the bar has its candidates after it, in pinyin and on the nine
+     * keys, for which a reload once left them unshown till fcitx restarted (15fb15963b; not seen
+     * since on redroid, 2026-10-13).
      */
     @Test
     fun theBarGetsCandidatesAfterFcitxReadsItsConfigAgain(): Unit = runBlocking {
-        fcitx.setEnabledIme(arrayOf(Engines.PINYIN))
-        fcitx.reloadWritten()
-        awaitQuiet()
-        sendString("ni")
-        val bar = eventsTillQuiet().filterIsInstance<FcitxEvent.CandidateListEvent>().lastOrNull()
-            ?.data?.candidates?.map { it.text }.orEmpty()
-        Assert.assertTrue("你 in the bar for 'ni': $bar", "你" in bar)
-        fcitx.reset()
+        for ((im, keys) in listOf(Engines.PINYIN to "ni", Engines.T9 to "64")) {
+            fcitx.setEnabledIme(arrayOf(im))
+            fcitx.reloadConfig()
+            awaitQuiet()
+            sendString(keys)
+            val bar = eventsTillQuiet().filterIsInstance<FcitxEvent.CandidateListEvent>().lastOrNull()
+                ?.data?.candidates?.map { it.text }.orEmpty()
+            Assert.assertTrue("你 in the bar for $keys in $im: $bar", "你" in bar)
+            fcitx.reset()
+        }
     }
 
     @Test

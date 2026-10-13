@@ -16,8 +16,8 @@ import android.provider.DocumentsContract.Document
 import android.provider.DocumentsContract.Root
 import android.provider.DocumentsProvider
 import android.webkit.MimeTypeMap
+import kotlinx.coroutines.launch
 import org.fcitx.fcitx5.android.R
-import org.fcitx.fcitx5.android.core.FcitxAPI
 import org.fcitx.fcitx5.android.core.SubtypeManager
 import org.fcitx.fcitx5.android.daemon.FcitxConnection
 import org.fcitx.fcitx5.android.daemon.FcitxDaemon
@@ -173,16 +173,17 @@ class FcitxDataProvider : DocumentsProvider() {
             Timber.d("Not reloading fcitx for %s: it is not running", written.name)
             return
         }
-        // runIfReady drops it without a word while fcitx is still starting
-        Timber.d("Reloading fcitx for %s, if it is ready", written.name)
-        fcitx.runIfReady {
-            reloadWritten()
+        // once ready: fcitx still starting may have read the file before it was written, and
+        // runIfReady would drop the reload
+        Timber.d("Reloading fcitx for %s once it is ready", written.name)
+        fcitx.lifecycleScope.launch { fcitx.runOnReady {
+            reloadConfig()
             // what the removed status-area entry did: config/profile holds the enabled input methods
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
                 SubtypeManager.syncWith(enabledIme())
             }
             Timber.d("Reloaded fcitx for %s", written.name)
-        }
+        } }
     }
 
     @Throws(FileNotFoundException::class)
@@ -387,13 +388,3 @@ private fun File.canonical(): File = try {
 internal fun File.isReadOnReload(root: File): Boolean =
     startsWith(root.resolve("config")) || startsWith(root.resolve("data/punctuation"))
 
-/**
- * Reads again what [isReadOnReload] lists, then the engine, as the nine keys' letters are read
- * (15fb15963b): for those a reloadConfig alone left the candidates unshown till fcitx restarted,
- * for a cause not found in the code. That the engine read after it brings them back is not shown:
- * FcitxTest checks only that the bar has them after both.
- */
-internal suspend fun FcitxAPI.reloadWritten() {
-    reloadConfig()
-    reloadEngine()
-}
