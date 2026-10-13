@@ -165,16 +165,8 @@ class T9Keyboard(
         private fun letter(c: Char, again: Boolean) =
             KeyAction.SymAction(KeySym(UNICODE + Keyboard.letterKey(c, again)), KeyStates.Virtual)
 
-        /**
-         * The run [setting] times. 连按 is the letters': off, a digit key pressed again is a key of
-         * its own ([NO_LETTERS]), but 1's punctuation, with no letters to guess, still cycles, at
-         * the default pace.
-         */
-        internal fun multiTapOf(setting: T9MultiTap) =
-            MultiTap(if (setting == T9MultiTap.Off) T9MultiTap.Medium.timeout else setting.timeout)
-
-        // what a digit key pressed again goes through with 连按 off: nothing, each press a key
-        private val NO_LETTERS = NineKeyLetters.of(('2'..'9').map { "" })
+        /** The run [setting] times: off, every press of a digit key or 1 is a key of its own. */
+        internal fun multiTapOf(setting: T9MultiTap) = MultiTap(setting.timeout)
 
         // the column is drawn over these placeholders, so they are never touched
         private fun spacer() = KeyDef(
@@ -246,15 +238,10 @@ class T9Keyboard(
     private val showLangSwitchKey = AppPrefs.getInstance().keyboard.showLangSwitchKey
 
     private val multiTapPref = AppPrefs.getInstance().keyboard.t9MultiTap
-    private var multiTapSetting = multiTapPref.getValue()
-    private var multiTap = multiTapOf(multiTapSetting)
-
-    // what a digit key pressed again soon goes through
-    private val tapLetters get() = if (multiTapSetting == T9MultiTap.Off) NO_LETTERS else letters
+    private var multiTap = multiTapOf(multiTapPref.getValue())
 
     @Keep
     private val multiTapListener = ManagedPreference.OnChangeListener<T9MultiTap> { _, v ->
-        multiTapSetting = v
         multiTap = multiTapOf(v)
     }
 
@@ -391,7 +378,7 @@ class T9Keyboard(
         val key = (action as? KeyAction.FcitxKeyAction)?.act?.singleOrNull()
         val time = pressed?.takeIf { it.digit == key }?.time ?: SystemClock.uptimeMillis()
         pressed = null
-        val out = resolve(action, source, multiTap, time, typing, tapLetters)
+        val out = resolve(action, source, multiTap, time, typing, letters)
         // a key the engine reads as typing: 1 right after it is the separator, though the engine
         // has not told of what is typed yet
         if (isTypingKey(out)) typing = true
@@ -422,7 +409,7 @@ class T9Keyboard(
                 val digit = digitOf[action.viewId]
                 val now = SystemClock.uptimeMillis()
                 pressed = digit?.let { Pressed(it, now) }
-                val letter = digit?.let { multiTap.peek(it, tapLetters.letters(it), now) }
+                val letter = digit?.let { multiTap.peek(it, letters.letters(it), now) }
                 previewing = letter?.let { Previewing(action.viewId, action.content, it.uppercase()) }
                 previewing?.let { action.copy(content = it.letter) }
             }

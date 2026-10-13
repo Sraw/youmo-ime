@@ -285,7 +285,7 @@ class T9KeyboardTest {
 
     @Test
     @Config(application = FcitxApplication::class)
-    fun withMultiTapOffADigitIsAKeyEachPressButOneStillCycles() {
+    fun withMultiTapOffADigitAndOneAreAKeyEachPress() {
         val multiTap = AppPrefs.getInstance().keyboard.t9MultiTap
         val was = multiTap.getValue()
         multiTap.setValue(T9MultiTap.Off)
@@ -298,7 +298,8 @@ class T9KeyboardTest {
             tap(keyboard.key('4'))
             tap(keyboard.key('4'))
             val four = KeyAction.FcitxKeyAction("4")
-            assertEquals(listOf(KeyAction.CommitAction("，"), KeyAction.CommitAction("。", replacing = "，"), four, four), sent)
+            // 1's punctuation too: two quick presses are two ，, the rest picked from the column
+            assertEquals(listOf(KeyAction.CommitAction("，"), KeyAction.CommitAction("，"), four, four), sent)
             assertEquals(listOf("GHI", "GHI"), previews.filterIsInstance<PopupAction.PreviewAction>().map { it.content })
         } finally {
             multiTap.setValue(was)
