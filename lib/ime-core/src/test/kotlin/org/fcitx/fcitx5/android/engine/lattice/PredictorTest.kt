@@ -224,4 +224,16 @@ class PredictorTest {
         val after = Predictor(data.model, data.vocabulary, data.dictionary, coarse = coarse).predict(NO_WORD, id("你"))
         assertEquals(listOf("吗", "A股", "马克·吐温"), texts(after))
     }
+
+    // typed once, it is the user's: predicted as any other
+    @Test
+    fun aCoarseWordTheUserTypedIsPredicted() {
+        val user = UserModel(data.dictionary, data.vocabulary)
+        val coarse = CoarseWords.of({ data.wordIndex.find(it) }, listOf("见"))
+        val predicting = Predictor(data.model, data.vocabulary, data.dictionary, user, coarse = coarse)
+        assertEquals(listOf("吗"), texts(predicting.predict(NO_WORD, id("再"))))
+        // after no word: 见 after 再 is the model's alone
+        user.learn(null, listOf(Entry("见", syl("jian"))))
+        assertEquals(listOf("见", "吗"), texts(predicting.predict(NO_WORD, id("再"))))
+    }
 }

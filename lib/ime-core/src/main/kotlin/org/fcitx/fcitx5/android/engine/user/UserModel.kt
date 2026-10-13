@@ -73,6 +73,9 @@ class UserModel(
     private val counts = Counts()
     // the second words of the bigrams, by the first: to find them without going through every count
     private val followers = HashMap<Int, HashSet<Int>>()
+    // the texts of the words counted, for typed, asked on a key: ids holds every word of the user's
+    // dictionaries as well, hundreds of thousands after a large import
+    private val typedTexts = HashSet<String>()
 
     // the words the user blocked (see block): as they read, so a word made later is blocked as
     // it is made; and as the decoder asks, the dictionary's by node and id, the user's by id, with
@@ -105,7 +108,7 @@ class UserModel(
      */
     fun learn(prev: Entry?, sentence: List<Entry>): IntArray {
         require(sentence.isNotEmpty()) { "nothing to learn" }
-        val words = IntArray(sentence.size) { typed(sentence[it]) }
+        val words = IntArray(sentence.size) { idAsTyped(sentence[it]) }
         // a word before whose reading is not kept yet takes this one: its pair is written out with it
         var before = if (prev != null && knows(prev)) id(prev).also { entries.getOrPut(it) { prev } } else NO_WORD
         for (w in words) {
@@ -119,6 +122,7 @@ class UserModel(
             counts.scale(HALF, MIN_COUNT)
             for (id in own) if (counts[key(NO_WORD, id)] == 0f) counts.add(key(NO_WORD, id), MIN_COUNT)
             indexFollowers()
+            indexTyped()
             // a word typed once long ago may be gone from ownTexts
             changes++
             recomputeTotal()
@@ -162,6 +166,7 @@ class UserModel(
     private fun forgetCounts(forgotten: Set<Int>) {
         counts.removeIf { first(it) in forgotten || second(it) in forgotten }
         indexFollowers()
+        indexTyped()
         recomputeTotal()
     }
 
@@ -178,10 +183,10 @@ class UserModel(
     }
 
     /** Adds [count] to [entry] as a word; for counts kept, as compaction writes them. */
-    fun addCount(entry: Entry, count: Float) = add(NO_WORD, typed(entry), count)
+    fun addCount(entry: Entry, count: Float) = add(NO_WORD, idAsTyped(entry), count)
 
     /** Adds [count] to [second] after [first]. */
-    fun addCount(first: Entry, second: Entry, count: Float) = add(typed(first), typed(second), count)
+    fun addCount(first: Entry, second: Entry, count: Float) = add(idAsTyped(first), idAsTyped(second), count)
 
     /** Calls [word] with every word counted, then [pair] with every pair. */
     fun forEachCount(word: (Entry, Float) -> Unit, pair: (Entry, Entry, Float) -> Unit) {
@@ -219,6 +224,11 @@ class UserModel(
         counts.forEach { key, _ -> if (first(key) != NO_WORD) followers.getOrPut(first(key)) { HashSet() } += second(key) }
     }
 
+    private fun indexTyped() {
+        typedTexts.clear()
+        counts.forEach { key, count -> if (first(key) == NO_WORD && count > 0f) entries[second(key)]?.let { typedTexts += it.text } }
+    }
+
     /** The id of [entry]: the dictionary's word if it has it so read, else the user's. */
     fun id(entry: Entry): Int {
         ids[entry]?.let { return it }
@@ -236,7 +246,7 @@ class UserModel(
     }
 
     // the id of entry as typed: a word of the dictionary's is then read so, not as it was listed or blocked
-    private fun typed(entry: Entry): Int = id(entry).also { entries[it] = entry }
+    private fun idAsTyped(entry: Entry): Int = id(entry).also { entries[it] = entry }
 
     /**
      * [id] of a word from the user's dictionaries: one they did not make, so forgetting it drops
@@ -351,7 +361,7 @@ class UserModel(
     fun entriesOf(text: String): List<Entry> = ids.keys.filter { it.text == text }
 
     /** Whether the user typed [text] as a word with an id here, however read. */
-    fun typed(text: String): Boolean = ids.any { (entry, id) -> entry.text == text && count(id) > 0f }
+    fun typed(text: String): Boolean = text in typedTexts
 
     /** Whether [entriesOf] lists any reading of [text]: no list made, and gone through only to the first. */
     fun hasText(text: String): Boolean = ids.keys.any { it.text == text }
@@ -382,6 +392,7 @@ class UserModel(
         if (first == NO_WORD && counts[key(first, second)] == 0f) changes++
         counts.add(key(first, second), count)
         if (first == NO_WORD) total += count else followers.getOrPut(first) { HashSet() } += second
+        if (first == NO_WORD && counts[key(first, second)] > 0f) entries[second]?.let { typedTexts += it.text }
     }
 
     private fun key(first: Int, second: Int) = (first.toLong() shl Int.SIZE_BITS) or (second.toLong() and 0xffffffffL)

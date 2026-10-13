@@ -1,7 +1,10 @@
 # Words never offered unasked (CoarseWords): never predicted, ranked lower when typed, never an
 # English correction. Only sexual slang, porn's words and hard insults, which the web taught the
-# models as common: words a user types on purpose in chat (卧槽, 妈的, 屌丝) and plain anatomy or
-# news words (阴道, 乳房, 卖淫, 色情) stay out, as ranking them lower would get in the way.
+# models as common: words a user types on purpose in chat (卧槽, 妈的, 屌丝, 很屌), plain anatomy or
+# news words (阴道, 乳房, 卖淫, 色情, porn) and words as common in another sense (杂种优势,
+# 啪啪啪地鼓掌, cum laude) stay out, as ranking them lower would get in the way. Held back all the
+# same: a word an everyday word sounds the same as, which the web would put first (自慰, 手淫, 精液
+# and 强奸, for 自卫, 手印, 敬业 and 强健).
 # One word a line; Chinese and English alike.
 
 # 中文：性俚语与色情用语
@@ -22,8 +25,6 @@
 大鸡巴
 阳具
 大屌
-屌
-龟头
 奶子
 大奶子
 巨乳
@@ -42,7 +43,6 @@
 婊子
 贱货
 做爱
-性交
 口交
 肛交
 乳交
@@ -59,17 +59,13 @@
 打飞机
 撸管
 约炮
-啪啪啪
 射精
 吞精
 精液
 黄片
 毛片
 春药
-迷奸
 强奸
-轮奸
-乱伦
 # 中文：重度辱骂
 傻逼
 傻屄
@@ -84,7 +80,6 @@
 去你妈的
 狗日的
 贱人
-杂种
 狗杂种
 
 # English
@@ -101,12 +96,10 @@ dick
 dicks
 cock
 cocks
-cum
 cumshot
 blowjob
 handjob
 dildo
-porn
 porno
 slut
 sluts

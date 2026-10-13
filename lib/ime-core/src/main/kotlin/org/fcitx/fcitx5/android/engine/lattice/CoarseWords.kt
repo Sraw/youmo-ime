@@ -31,8 +31,9 @@ class CoarseWords private constructor(private val ids: BitSet, private val texts
      * list's the user never typed.
      */
     fun unasked(word: Int, user: UserWords?, vocabularySize: Int): Boolean {
-        if (user != null && user.count(word) > 0f) return false
-        return has(word) || word >= vocabularySize && user != null && has(user.text(word))
+        // asked of every arc of a lattice, nearly none of the list: the list first, the counts after
+        val listed = has(word) || word >= vocabularySize && user != null && has(user.text(word))
+        return listed && (user == null || user.count(word) <= 0f)
     }
 
     companion object {
@@ -46,9 +47,12 @@ class CoarseWords private constructor(private val ids: BitSet, private val texts
         val NONE = CoarseWords(BitSet(), emptySet())
 
         /** The list, a word a line, `#` starting a comment. */
-        val LIST: List<String> by lazy {
-            val stream = requireNotNull(CoarseWords::class.java.getResourceAsStream("coarse.txt")) { "coarse.txt" }
-            stream.bufferedReader().useLines { lines ->
+        val LIST: List<String> by lazy { listLines(CoarseWords::class.java, "coarse.txt") }
+
+        /** The lines of the resource [name] beside [owner], trimmed, those blank or a comment (`#`) left out. */
+        internal fun listLines(owner: Class<*>, name: String): List<String> {
+            val stream = requireNotNull(owner.getResourceAsStream(name)) { name }
+            return stream.bufferedReader().useLines { lines ->
                 lines.map { it.trim() }.filter { it.isNotEmpty() && !it.startsWith("#") }.toList()
             }
         }

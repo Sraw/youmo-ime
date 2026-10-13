@@ -437,6 +437,43 @@ class UserModelTest {
     }
 
     @Test
+    fun aTextIsTypedInAnyReadingTillItsCountIsGone() {
+        val m = model()
+        val niHao = entry("拟好", "ni", "hao")
+        // listed, a word the dictionary lacks: an id, never typed
+        m.list(niHao)
+        assertFalse(m.typed("拟好"))
+        m.learn(null, listOf(niHao))
+        // 好 read as ni, which the dictionary lacks: 好 typed all the same
+        m.learn(null, listOf(entry("好", "ni")))
+        assertTrue(m.typed("拟好"))
+        assertTrue(m.typed("好"))
+        assertFalse(m.typed("你"))
+        // what a compaction writes, a start reads back
+        val restored = model()
+        m.forEachCount({ e, c -> restored.addCount(e, c) }, { a, b, c -> restored.addCount(a, b, c) })
+        assertTrue(restored.typed("拟好"))
+        m.forget(listOf(entry("好", "ni")))
+        assertFalse(m.typed("好"))
+        m.forget(listOf(niHao))
+        assertFalse(m.typed("拟好"))
+    }
+
+    @Test
+    fun aTextWhoseCountHalvedAwayIsNoLongerTyped() {
+        val m = model(limit = 2.5f)
+        val niHao = entry("拟好", "ni", "hao")
+        m.list(niHao)
+        m.learn(null, listOf(entry("你", "ni"), niHao))
+        // 你 typed again: at a half as 拟好 goes at an eighth, not on the quarter below which a count goes
+        repeat(2) { m.learn(null, listOf(entry("你", "ni"))) }
+        repeat(3) { m.learn(null, listOf(entry("吗", "ma"))) }
+        // listed, not made by the user: no quarter is kept for it, and below a quarter it goes
+        assertFalse(m.typed("拟好"))
+        assertTrue(m.typed("你"))
+    }
+
+    @Test
     fun wordsForgottenEachAloneAreAllGoneAndReadBackSo() {
         val m = model()
         val heard = ArrayList<String>()
