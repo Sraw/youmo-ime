@@ -7,13 +7,13 @@ package org.fcitx.fcitx5.android.engine.lattice
 import org.fcitx.fcitx5.android.engine.data.FloatList
 import org.fcitx.fcitx5.android.engine.data.IntList
 import org.fcitx.fcitx5.android.engine.data.NgramModel.Companion.NO_WORD
+import org.fcitx.fcitx5.android.engine.data.NgramModel.Trigrams
 import org.fcitx.fcitx5.android.engine.data.PinyinDictionary
 import org.fcitx.fcitx5.android.engine.data.Vocabulary
 import org.fcitx.fcitx5.android.engine.pinyin.SyllableGraph
 import org.fcitx.fcitx5.android.engine.pinyin.SyllableGraph.Kind
 import org.fcitx.fcitx5.android.engine.pinyin.SyllableMatches
 import org.fcitx.fcitx5.android.engine.pinyin.Syllables
-import org.fcitx.fcitx5.android.engine.pinyin.T9Segmenter
 
 /**
  * Reads a [SyllableGraph] as Chinese. Every dictionary word along every path of the graph
@@ -54,6 +54,8 @@ class PinyinDecoder(
     private val wholeFirst: Boolean = true,
     /** Words ranked [CoarseWords.PENALTY] lower, the dictionary's: see [CoarseWords]. */
     private val coarse: CoarseWords = CoarseWords.NONE,
+    /** How text kept as typed shows: on the nine keys, [T9Segmenter.asTyped][org.fcitx.fcitx5.android.engine.pinyin.T9Segmenter.asTyped]. */
+    private val asTyped: (String) -> String = { it },
 ) {
     init {
         require(beam >= 1 && wordsPerReading >= 1) { "beam $beam, words per reading $wordsPerReading" }
@@ -82,6 +84,11 @@ class PinyinDecoder(
     private var firstScores = FloatArray(0)
     private var firstScored = 0
 
+    // those arcs as firstWords ranked them, of rankedGraph (null until it is done): more of its
+    // words are those further on, read with no decode
+    private var firstRanked = LongArray(0)
+    private var rankedGraph: SyllableGraph? = null
+
     // per position, up to [beam] word sequences, best first; a sequence is its last word and a
     // link to the slot of the one it goes on from, which stays put once its position is searched
     private var beamSize = IntArray(0)
@@ -90,6 +97,7 @@ class PinyinDecoder(
     private var statePrev = IntArray(0)
     private var stateBack = IntArray(0) // -1 for the empty sequence at the start
     private val contexts = LongArray(beam) // of the beam being extended, from scorer
+    private val runs = LongArray(beam) // the scorer's trigrams of each of contexts, by their bits
 
     /**
      * @param prev2 the word before [prev] in text already committed, or [NO_WORD]
@@ -114,6 +122,7 @@ class PinyinDecoder(
         // until the search is done: one that threw would leave beams and arcs that match nothing
         lastEnd = -1
         firstScored = 0
+        rankedGraph = null
         lastArcs = arcs.also { arcs = lastArcs }
         buildLattice(graph)
         search(graph, prev2, prev, last)
@@ -127,6 +136,15 @@ class PinyinDecoder(
     /** Forgets the last decode, so the next searches from scratch; needed when [scorer]'s scores change. */
     fun reset() {
         lastEnd = -1
+    }
+
+    /**
+     * The first [words] words [graph] may start with, as [decode]'s are, where it gave fewer: read
+     * on from those it ranked, if the last decode was of [graph] in this context, else decoded again.
+     */
+    fun words(graph: SyllableGraph, prev2: Int = NO_WORD, prev: Int = NO_WORD, words: Int): List<Candidate> {
+        val ranked = graph === rankedGraph && lastEnd == graph.end && prev2 == lastPrev2 && prev == lastPrev
+        return if (ranked) rankedWords(graph, words) else decode(graph, prev2, prev, words = words).words
     }
 
     private fun buildLattice(graph: SyllableGraph) {
@@ -192,7 +210,9 @@ class PinyinDecoder(
     private fun coarseness(word: Int) = if (coarse.unasked(word, user, vocabulary.size)) CoarseWords.PENALTY else 0f
 
     // what a word of the user's is spared of typing it short; not a character, whose initial
-    // alone would cut every sentence into the characters the user types most (w for 我)
+    // alone would cut every sentence into the characters the user types most (w for 我). A whole
+    // syllable read as the start of a longer one is spared too, as ee for 嗯嗯 needs: 方向 then ties
+    // the exact 防线 for fangxian, the user's word ahead by what they typed of it
     private fun spared(word: Int, short: Float): Float {
         if (short == 0f || user == null || user.count(word) < LEARNED) return 0f
         val text = if (word < vocabulary.size) vocabulary.word(word) else user.text(word)
@@ -233,13 +253,14 @@ class PinyinDecoder(
         val n = minOf(dictionary.wordCount(node), LOOK_AHEAD_WORDS)
         val out = IntArray(n) { NO_WORD }
         val context = scorer.context(NO_WORD, NO_WORD)
+        val trigrams = scorer.trigrams(context)
         val prefixes = Array(n) { vocabulary.word(dictionary.word(node, it)) }
-        val best = FloatArray(n) { scorer.scoreAfter(context, dictionary.word(node, it)) }
+        val best = FloatArray(n) { scorer.scoreAfter(context, trigrams, dictionary.word(node, it)) }
         val first = dictionary.firstChild(node)
         for (next in first until first + dictionary.childCount(node)) {
             for (i in 0 until minOf(dictionary.wordCount(next), EXTENSIONS_PER_READING)) {
                 val word = dictionary.word(next, i)
-                val score = scorer.scoreAfter(context, word)
+                val score = scorer.scoreAfter(context, trigrams, word)
                 var text: String? = null
                 for (w in 0 until n) {
                     if (score <= best[w]) continue
@@ -308,7 +329,10 @@ class PinyinDecoder(
             if (!looked) {
                 // once per state rather than per arc: most of what scoring a word takes. Arcs only
                 // go forward, so this beam does not change while it is extended
-                for (k in 0 until size) contexts[k] = scorer.context(statePrev[first + k], stateWord[first + k])
+                for (k in 0 until size) {
+                    contexts[k] = scorer.context(statePrev[first + k], stateWord[first + k])
+                    runs[k] = scorer.trigrams(contexts[k]).bits
+                }
                 looked = true
             }
             val word = arcs.word[a]
@@ -318,7 +342,7 @@ class PinyinDecoder(
                 val base = stateScore[s] + arcs.cost[a]
                 // scores only fall from here, and the states come best first
                 if (beamSize[to] == beam && base <= stateScore[to * beam + beam - 1]) break
-                val lm = if (word == NO_WORD) 0f else scorer.scoreAfter(contexts[k], scored)
+                val lm = if (word == NO_WORD) 0f else scorer.scoreAfter(contexts[k], Trigrams(runs[k]), scored)
                 insert(to, base + lm, word, stateWord[s], s)
             }
         }
@@ -414,9 +438,7 @@ class PinyinDecoder(
 
     private fun textOf(graph: SyllableGraph, state: Int): String {
         val word = stateWord[state]
-        // as typed, a letter typed as itself on the nine keys (upper case in the input) as the letter,
-        // a key pressed again as its digit
-        return if (word == NO_WORD) T9Segmenter.plain(graph.text(stateBack[state] / beam, state / beam)).lowercase() else text(word)
+        return if (word == NO_WORD) asTyped(graph.text(stateBack[state] / beam, state / beam)) else text(word)
     }
 
     private fun text(word: Int) = if (word < vocabulary.size || user == null) vocabulary.word(word) else user.text(word)
@@ -432,6 +454,7 @@ class PinyinDecoder(
         val from = arcs.start[graph.start]
         val until = arcs.start[graph.start + 1]
         val context = scorer.context(prev2, prev)
+        val trigrams = scorer.trigrams(context)
         if (firstScores.size < until - from) firstScores = firstScores.copyOf(until - from)
         val scores = firstScores
         var same = 0
@@ -443,7 +466,7 @@ class PinyinDecoder(
         val order = LongArray(until - from) { i ->
             val a = from + i
             val word = arcs.word[a]
-            if (i >= same) scores[i] = if (word == NO_WORD) Float.NEGATIVE_INFINITY else arcs.cost[a] + scorer.scoreAfter(context, arcs.scored[a])
+            if (i >= same) scores[i] = if (word == NO_WORD) Float.NEGATIVE_INFINITY else arcs.cost[a] + scorer.scoreAfter(context, trigrams, arcs.scored[a])
             (sortable(-scores[i]).toLong() shl Int.SIZE_BITS) or a.toLong()
         }
         firstScored = until - from
@@ -452,19 +475,26 @@ class PinyinDecoder(
         // score alone the common characters of a part of it (几 家 加 of jiao) came before a
         // rarer one of all of it (觉), far down the list. Not longest first: a word picked piece
         // by piece is mostly short
-        val ranked = if (!wholeFirst) order else LongArray(order.size).also { ranked ->
+        firstRanked = if (!wholeFirst) order else LongArray(order.size).also { ranked ->
             var at = 0
             for (k in order) if (arcs.to[k.toInt()] == graph.end) ranked[at++] = k
             for (k in order) if (arcs.to[k.toInt()] != graph.end) ranked[at++] = k
         }
+        rankedGraph = graph
+        return rankedWords(graph, limit)
+    }
+
+    /** The first [limit] words, each once, of the arcs from the start of [graph] as [firstWords] ranked them. */
+    private fun rankedWords(graph: SyllableGraph, limit: Int): List<Candidate> {
+        val from = arcs.start[graph.start]
         var next = 0
         val out = ArrayList<Candidate>()
         val seen = HashSet<Int>()
-        while (out.size < limit && next < ranked.size) {
-            val a = ranked[next++].toInt()
+        while (out.size < limit && next < firstRanked.size) {
+            val a = firstRanked[next++].toInt()
             val word = arcs.word[a]
             if (word != NO_WORD && seen.add(word)) {
-                out += Candidate(text(word), arcs.to[a], scores[a - from], intArrayOf(word), intArrayOf(arcs.to[a]))
+                out += Candidate(text(word), arcs.to[a], firstScores[a - from], intArrayOf(word), intArrayOf(arcs.to[a]))
             }
         }
         return out

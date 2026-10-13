@@ -53,6 +53,17 @@ class PinyinSessionT9Test {
     private fun session(user: UserModel? = null, refiner: SentenceRefiner? = null) =
         PinyinSession(data, T9Segmenter(abbreviations = false), spell = true, user = user, prediction = false, refiner = refiner)
 
+    // a dictionary of [words], each with its score and its syllables apart by spaces
+    private fun dataOf(vararg words: Triple<String, Float, String>) = PinyinData.load(
+        ByteBuffer.wrap(
+            PinyinDataBuilder().unigram("<unk>", -7f, 0f)
+                .apply { words.forEach { (w, score, reading) -> unigram(w, score, 0f).entry(w, syl(*reading.split(' ').toTypedArray())) } }
+                .build().toByteArray(),
+        ),
+    )
+
+    private fun sessionOf(data: PinyinData) = PinyinSession(data, T9Segmenter(abbreviations = false), spell = true, prediction = false)
+
     private fun Session.type(keys: String): Snapshot = keys.map { apply(Key(it)) }.last()
 
     // [digit] pressed [times] fast, as the keyboard sends it: the key, then each press again its next letter
@@ -356,5 +367,69 @@ class PinyinSessionT9Test {
         val one = PinyinSession(data, T9Segmenter(abbreviations = false, letters = keys), spell = true, prediction = false)
         one.apply(Action.Letter('h', again = true))
         assertTrue(one.apply(Key('4')).candidates.isNotEmpty())
+    }
+
+    /** A key pressed again that no reading takes was the private character it stands as in the input. */
+    @Test
+    fun aKeyPressedAgainKeptAsTypedIsItsDigit() {
+        val session = session()
+        // no word of w, x, y or z here
+        val s = session.press('9', 8)
+        assertEquals("99999999", s.candidates[0])
+        val commit = session.apply(Action.CommitRaw).commit
+        assertEquals("99999999", commit)
+        assertTrue(commit.none { it in T9Segmenter.AGAIN })
+    }
+
+    /** 屄 held past the first page still gave the preedit, the column and Enter its bi, 爱 first. */
+    @Test
+    fun theFirstReadingShownNotACoarseOneHeldPastThePageIsWhatThePreeditShows() {
+        val session = sessionOf(dataOf(Triple("屄", -1f, "bi"), Triple("爱", -6f, "ai")))
+        val s = session.type("24")
+        assertEquals("爱", s.candidates[0])
+        assertEquals("ai", s.preedit)
+        assertEquals("ai", s.syllables[0])
+        assertEquals("ai", session.apply(Action.CommitRaw).commit)
+    }
+
+    /** Every reading of 24 held, the preedit, the column and Enter still went by 屄 while 啊 came first. */
+    @Test
+    fun everyReadingHeldThePreeditGoesByTheCandidateShownFirst() {
+        // five of the list, read bi here, each likelier than 啊 then 4 as typed: no reading of all of it is left
+        val held = listOf("屄", "骚屄", "嫩屄", "肉棒", "鸡巴").mapIndexed { i, w -> Triple(w, -0.1f * (i + 1), "bi") }
+        val session = sessionOf(dataOf(*held.toTypedArray(), Triple("啊", -2f, "a")))
+        val s = session.type("24")
+        assertEquals("啊", s.candidates[0])
+        assertEquals("a 4", s.preedit)
+        assertEquals("a", s.syllables[0])
+        assertEquals("a4", session.apply(Action.CommitRaw).commit)
+    }
+
+    /** 3 3 fast read as 鹅点, e of one press: taking e took both, and 鹅好 was read of the rest. */
+    @Test
+    fun theBestReadingsSyllableTakenStandsForThePressesItRead() {
+        val session = sessionOf(dataOf(Triple("鹅", -2f, "e"), Triple("点", -2f, "dian"), Triple("的", -5f, "de"), Triple("好", -5f, "hao")))
+        session.press('3', 2)
+        val s = session.type("426")
+        assertEquals("鹅点", s.candidates[0])
+        assertEquals("e", s.syllables[0])
+        val taken = session.apply(Action.Syllable(0))
+        assertEquals("e'dian", taken.preedit)
+        assertEquals("鹅点", taken.candidates[0])
+    }
+
+    /** 2, a pick the keyboard did not see, then 2 2 fast: the keyboard showed c, the run read b. */
+    @Test
+    fun aPressAgainNotCountedFromTheKeyBeforeIsAKeyOfItsOwn() {
+        val data = dataOf(Triple("不", -2f, "bu"), Triple("啊", -4f, "a"))
+        val session = sessionOf(data)
+        // nothing typed: the keyboard counted the 2 before the pick
+        session.apply(Action.Letter('b', again = true))
+        session.apply(Action.Letter('c', again = true))
+        val s = session.type("8")
+        // 2 2 8 as keys, no B to read 不 of
+        val keys = sessionOf(data).type("228")
+        assertEquals(keys.candidates, s.candidates)
+        assertEquals(keys.preedit, s.preedit)
     }
 }

@@ -37,6 +37,17 @@ class PinyinSessionTest {
 
     private fun Session.type(keys: String): Snapshot = keys.map { apply(Key(it)) }.last()
 
+    // more characters of shi than the decoder gives at first
+    private val chars = (0 until 100).map { (0x4E00 + it).toChar().toString() }
+
+    private fun many() = PinyinData.load(
+        ByteBuffer.wrap(
+            PinyinDataBuilder().unigram("<unk>", -7f, 0f)
+                .apply { chars.forEachIndexed { i, c -> unigram(c, -2f - i / 64f, 0f).entry(c, syl("shi")) } }
+                .build().toByteArray(),
+        ),
+    )
+
     @Test
     fun theWholeInputIsReadFirst() {
         val s = session().type("nihaoma")
@@ -518,16 +529,7 @@ class PinyinSessionTest {
      */
     @Test
     fun wordsPastTheFirstAreReadAsTheListIsShownThatFar() {
-        // more characters of shi than the decoder gives at first
-        val chars = (0 until 100).map { (0x4E00 + it).toChar().toString() }
-        val many = PinyinData.load(
-            ByteBuffer.wrap(
-                PinyinDataBuilder().unigram("<unk>", -7f, 0f)
-                    .apply { chars.forEachIndexed { i, c -> unigram(c, -2f - i / 64f, 0f).entry(c, syl("shi")) } }
-                    .build().toByteArray(),
-            ),
-        )
-        val session = PinyinSession(many, PinyinSegmenter(), pageSize = 10)
+        val session = PinyinSession(many(), PinyinSegmenter(), pageSize = 10)
         val shown = session.type("shi")
         assertEquals("not counted yet", -1, shown.total)
         assertTrue(shown.hasNextPage)
@@ -544,15 +546,7 @@ class PinyinSessionTest {
     /** A page turned past the first words reads the decoder's next. */
     @Test
     fun aPageTurnedPastTheFirstWordsReadsTheNext() {
-        val chars = (0 until 100).map { (0x4E00 + it).toChar().toString() }
-        val many = PinyinData.load(
-            ByteBuffer.wrap(
-                PinyinDataBuilder().unigram("<unk>", -7f, 0f)
-                    .apply { chars.forEachIndexed { i, c -> unigram(c, -2f - i / 64f, 0f).entry(c, syl("shi")) } }
-                    .build().toByteArray(),
-            ),
-        )
-        val session = PinyinSession(many, PinyinSegmenter(), pageSize = 10)
+        val session = PinyinSession(many(), PinyinSegmenter(), pageSize = 10)
         session.type("shi")
         var page = session.apply(NextPage)
         repeat(5) { page = session.apply(NextPage) }
@@ -566,19 +560,22 @@ class PinyinSessionTest {
     /** A phrase placed past the decoder's first words is there from the start: it does not move as the rest are read. */
     @Test
     fun aPhrasePlacedPastTheFirstWordsStaysWhereItIs() {
-        val chars = (0 until 100).map { (0x4E00 + it).toChar().toString() }
-        val many = PinyinData.load(
-            ByteBuffer.wrap(
-                PinyinDataBuilder().unigram("<unk>", -7f, 0f)
-                    .apply { chars.forEachIndexed { i, c -> unigram(c, -2f - i / 64f, 0f).entry(c, syl("shi")) } }
-                    .build().toByteArray(),
-            ),
-        )
-        val session = PinyinSession(many, PinyinSegmenter(), pageSize = 10, phraseBook = PhraseBook(CustomPhrases.parse("shi,70=短语")) {})
+        val session = PinyinSession(many(), PinyinSegmenter(), pageSize = 10, phraseBook = PhraseBook(CustomPhrases.parse("shi,70=短语")) {})
         session.type("shi")
         val first = session.candidates(0, 80).map { it.text }
         // order 70: the 70th
         assertEquals("短语", first[69])
         assertEquals(first, session.candidates(0, 200).map { it.text }.take(80))
+    }
+
+    /** A word forgotten on a page past the decoder's first words went back to the first page. */
+    @Test
+    fun aWordForgottenPastTheFirstWordsStaysOnThePageShown() {
+        val many = many()
+        val session = PinyinSession(many, PinyinSegmenter(), pageSize = 10, user = UserModel(many.dictionary, many.vocabulary))
+        session.type("shi")
+        repeat(7) { session.apply(NextPage) }
+        assertTrue(Offer.FORGET in session.offers(72))
+        assertEquals(7, session.apply(Action.Forget(72)).page)
     }
 }

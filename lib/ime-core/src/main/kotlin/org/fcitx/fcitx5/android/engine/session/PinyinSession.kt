@@ -97,6 +97,8 @@ class PinyinSession(
      * over the same [user] and [prior], to share.
      */
     extensions: () -> Array<IntArray?> = { arrayOfNulls<IntArray>(data.dictionary.nodeCount) },
+    /** The words the user added by hand (UserLexicon.addWord): theirs, as a word they typed is, so none is held back as coarse (see CoarseWords). */
+    addedWords: Set<String> = emptySet(),
     // last, so a test's picker can follow as a lambda
     private val reranker: SentencePicker? = null,
 ) : Session {
@@ -111,25 +113,38 @@ class PinyinSession(
     private class Piece(val text: String, val words: IntArray, val end: Int, val entries: List<Entry>?, val corrected: Boolean)
 
     /**
+     * What the decoder read of the input after the pieces: its sentences as placed, the reranker's
+     * or refiner's pick first, then its words, [more] of which may be read as a list is shown that
+     * far; [first], its first before the reranker and phrases moved it.
+     */
+    private data class Decoded(
+        val graph: SyllableGraph,
+        val sentences: List<Candidate>,
+        val words: List<Candidate>,
+        val more: Boolean,
+        val first: Candidate?,
+    )
+
+    /**
      * The input after the pieces as read last, or the predictions after a commit, which read no
      * input: replaced whole as it is read again or cleared, so nothing of one reading is left
      * with the next.
      */
     private class Read(
         val candidates: List<Candidate> = emptyList(),
-        val graph: SyllableGraph? = null,
-        val decoderWords: List<Candidate> = emptyList(), // the decoder's words, after its sentences
-        val sentences: List<Candidate> = emptyList(), // the decoder's sentences, as placed: the reranker's or refiner's pick first
-        val moreWords: Boolean = false, // whether the decoder may have words past decoderWords, read when a list is shown that far
+        val decoded: Decoded? = null,
         val time: Calendar? = null, // when the phrases were filled in, if the input has any: the same as more words are read
-        val decoderFirst: Candidate? = null, // the first before the reranker and phrases moved it
         val placed: Map<String, Phrase> = emptyMap(), // the phrases among the candidates, by text
         val preedit: String = "",
         val restShown: String = "", // the end of the preedit: what is left of the input, as shown
-    )
+        val unsettled: Boolean = false, // a coarse candidate waits past a first page the list does not fill yet
+    ) {
+        val moreWords get() = decoded?.more == true
+    }
 
     // a few hundred lookups: made with each session, as the data's index is
-    private val coarse = CoarseWords.of({ data.wordIndex.find(it) })
+    private val coarse = CoarseWords.of({ data.wordIndex.find(it) }, CoarseWords.LIST - addedWords)
+    private val coarseCandidates = CoarseCandidates(coarse, data, user)
 
     private val decoder = PinyinDecoder(
         data.dictionary,
@@ -140,6 +155,7 @@ class PinyinSession(
         extensions = extensions,
         wholeFirst = segmenter.typesLetters,
         coarse = coarse,
+        asTyped = ::asTyped,
     )
     private val predictor = Predictor(data.model, data.vocabulary, data.dictionary, user, coarse = coarse, charReadings = charReadings)
     private val textWords by lazy { TextWords(data.model, data.wordIndex) }
@@ -290,12 +306,12 @@ class PinyinSession(
     private fun readUntil(count: Int) {
         while (lastRead.moreWords && candidates.size < count) {
             val read = lastRead
-            val graph = read.graph ?: return
+            val decoded = read.decoded ?: return
             val (prev2, prev) = TextWords.previous(context + pieces.flatMap { it.words.asList() })
-            val asked = maxOf(read.decoderWords.size * 2, read.decoderWords.size + count - candidates.size)
-            // the same input in the same context: the decoder builds on what it read last, if it was this
-            val words = decoder.decode(graph, prev2, prev, words = asked).words
-            place(graph, words, read.decoderFirst, read.sentences, more = words.size >= asked, time = read.time)
+            val asked = maxOf(decoded.words.size * 2, decoded.words.size + count - candidates.size)
+            // the same input in the same context: the decoder reads on from the words it ranked last, if it was this
+            val words = decoder.words(decoded.graph, prev2, prev, asked)
+            place(decoded.copy(words = words, more = words.size >= asked), read.time)
         }
     }
 
@@ -318,7 +334,7 @@ class PinyinSession(
             lastEntry = learnPrediction(c)
             return commit(c.text, c.words)
         }
-        pieces += Piece(c.text, c.words, readFrom() + c.end, if (user == null) null else entries(c), c !== lastRead.decoderFirst)
+        pieces += Piece(c.text, c.words, readFrom() + c.end, if (user == null) null else entries(c), c !== lastRead.decoded?.first)
         learnPrior(c)
         if (pieces.last().end < input.length) {
             read()
@@ -435,6 +451,8 @@ class PinyinSession(
         }
         val shown = page
         read()
+        // a page past the words read at first: read on to it, as turning to it did
+        readUntil((shown + 1) * pageSize + 1)
         if (shown * pageSize < candidates.size) page = shown
         return snapshot()
     }
@@ -459,7 +477,7 @@ class PinyinSession(
      */
     private fun entries(c: Candidate): List<Entry>? {
         if (predicting) return c.words.singleOrNull()?.let { w -> predictor.reading(w)?.let { listOf(Entry(c.text, it)) } }
-        val graph = lastRead.graph ?: return null
+        val graph = lastRead.decoded?.graph ?: return null
         var from = graph.start
         return c.words.indices.map { i ->
             val word = c.words[i]
@@ -537,37 +555,6 @@ class PinyinSession(
         return snapshot(commit = picked + rest, handled = false)
     }
 
-    // a candidate with a coarse word the user never typed waits past the first page: see CoarseWords
-    private fun coarseAfterFirstPage(listed: List<Candidate>): List<Candidate> {
-        val typedOnce = HashMap<String, Boolean>()
-        val (held, rest) = listed.partition { isCoarse(it, typedOnce) }
-        return if (held.isEmpty()) listed else rest.take(pageSize) + held + rest.drop(pageSize)
-    }
-
-    // a word of the vocabulary or of the user's own
-    private fun typed(text: String): Boolean {
-        val user = user ?: return false
-        val word = data.wordIndex.find(text)
-        return word >= 0 && user.count(word) > 0f || user.typed(text)
-    }
-
-    // one of its words coarse, or words in turn spelling one the user never typed: 射 then 精 is
-    // 射精 as well, and once typed it is read as 射, 精 still
-    private fun isCoarse(c: Candidate, typedOnce: MutableMap<String, Boolean>): Boolean {
-        val words = c.words
-        for (i in words.indices) {
-            if (coarse.unasked(words[i], user, data.vocabulary.size)) return true
-            val run = StringBuilder()
-            for (j in i until words.size) {
-                if (words[j] == NO_WORD || run.length >= coarse.longest) break
-                run.append(text(words[j]))
-                val text = run.toString()
-                if (j > i && coarse.has(text) && !typedOnce.getOrPut(text) { typed(text) }) return true
-            }
-        }
-        return false
-    }
-
     private fun commitRaw(): Snapshot {
         if (input.isEmpty()) {
             clear()
@@ -577,7 +564,7 @@ class PinyinSession(
         // digits no reading took stay as typed
         val shown = lastRead.restShown.filter { it != ' ' && it != SyllableGraph.SEPARATOR }
         // a letter typed as itself (九键) is upper case in the input; no other input has one
-        val rest = if (nineKeys == null || shown.isEmpty()) T9Segmenter.plain(input.substring(readFrom())).lowercase() else shown
+        val rest = if (nineKeys == null || shown.isEmpty()) asTyped(input.substring(readFrom())) else shown
         val text = pieces.joinToString("") { it.text } + rest
         // text as typed is no words: nothing to go on from
         dropContext()
@@ -650,26 +637,20 @@ class PinyinSession(
             refined = 0
         }
         nineKeys?.forgetBest()
-        place(
-            graph, decoding.words, decoding.sentences.firstOrNull() ?: decoding.words.firstOrNull(), rerank(decoding.sentences),
-            more = decoding.words.size >= PinyinDecoder.DEFAULT_WORDS,
-        )
+        val decoderFirst = decoding.sentences.firstOrNull() ?: decoding.words.firstOrNull()
+        val more = decoding.words.size >= PinyinDecoder.DEFAULT_WORDS
+        place(Decoded(graph, rerank(decoding.sentences), decoding.words, more = more, first = decoderFirst))
         // a phrase goes where its order says only in a list that long, else last: read that far,
         // or it would move as the rest are read
         lastRead.placed.values.maxOfOrNull { it.order }?.let { readUntil(it + lastRead.placed.size + 1) }
+        // so would a coarse word waiting past a first page the words read so far do not fill
+        while (lastRead.unsettled && lastRead.moreWords) readUntil(candidates.size + 1)
         // offered here only: the refiner's pick reordering them would drop a tap on the list shown
         nineKeys?.offer(input, readFrom(), graph)
     }
 
-    /** Lists [sentences] of [graph], then [decoderWords], with the phrases the input has among them. */
-    private fun place(
-        graph: SyllableGraph,
-        decoderWords: List<Candidate>,
-        decoderFirst: Candidate?,
-        sentences: List<Candidate>,
-        more: Boolean,
-        time: Calendar? = null,
-    ) {
+    /** Lists the sentences [decoded] has, then its words, with the phrases the input has among them. */
+    private fun place(decoded: Decoded, time: Calendar? = null) {
         val rest = input.length - readFrom()
         val key = input.substring(readFrom())
         val phrases = phraseBook.phrases
@@ -678,24 +659,29 @@ class PinyinSession(
         val placed: Map<String, Phrase> = if (time == null) emptyMap() else phrases.offered(key, time).associate { it.text to it.phrase }
         // a phrase is text, no word: nothing to learn, and what follows it reads after nothing
         val listed = phrases.place(
-            key, { checkNotNull(time) }, (sentences + decoderWords).distinctBy { it.text },
+            key, { checkNotNull(time) }, (decoded.sentences + decoded.words).distinctBy { it.text },
             text = { it.text }, all = { it.end == rest },
         ) { Candidate(it, rest, 0f, intArrayOf(NO_WORD), intArrayOf(rest)) }
-        val best = sentences.firstOrNull()
-        val restShown = if (best == null) T9Segmenter.plain(graph.input) else preedit(graph, best)
+        val held = coarseCandidates.held(listed, pageSize)
+        val ordered = coarseCandidates.order(listed, pageSize, held)
+        // the first reading shown: the preedit, the syllables offered and Enter's text go by it. Every
+        // sentence held, that is the candidate shown first, the rest of the input as typed after it
+        val best = decoded.sentences.firstOrNull { it !in held }
+            ?: ordered.firstOrNull()?.takeIf { decoded.sentences.isNotEmpty() }?.let { throughEnd(it, decoded.graph.end) }
+        val restShown = if (best == null) asTyped(decoded.graph.input) else preedit(decoded.graph, best)
         lastRead = Read(
-            candidates = coarseAfterFirstPage(listed),
-            graph = graph,
-            decoderWords = decoderWords,
-            sentences = sentences,
-            moreWords = more,
+            candidates = ordered,
+            decoded = decoded,
             time = time,
-            decoderFirst = decoderFirst,
             placed = placed,
             preedit = pieces.joinToString("") { it.text } + restShown,
             restShown = restShown,
+            unsettled = held.isNotEmpty() && listed.size - held.size < pageSize,
         )
     }
+
+    // [c] read on to [end] as typed: a word of the start of the input, shown for all of it
+    private fun throughEnd(c: Candidate, end: Int) = if (c.end >= end) c else Candidate(c.text, end, c.score, c.words + NO_WORD, c.ends + end)
 
     /** What the rerankers read before the input. */
     private fun textBefore() = (if (learning) recent else "") + pieces.joinToString("") { it.text }
@@ -719,9 +705,8 @@ class PinyinSession(
         val picked = refiner.refine(textBefore(), sentences.map { it.text }, sentences.map { it.score }, REFINE_BUDGET)
             ?: return snapshot()
         unrefined = null
-        if (picked != SentenceRefiner.NONE) {
-            place(lastRead.graph!!, lastRead.decoderWords, lastRead.decoderFirst, first(sentences, picked), lastRead.moreWords, lastRead.time)
-        }
+        val decoded = lastRead.decoded
+        if (picked != SentenceRefiner.NONE && decoded != null) place(decoded.copy(sentences = first(sentences, picked)), lastRead.time)
         return snapshot()
     }
 
@@ -770,14 +755,14 @@ class PinyinSession(
             } else if (reading != null) {
                 parts += reading.shown
                 ends += reading.ends
-                nineKeys?.note((listOf(from) + reading.ends.dropLast(1)).map { readFrom() + it }, reading.syllables)
+                nineKeys?.note(readFrom() + from, reading.ends.map { readFrom() + it }, reading.syllables)
                 raw = false
             } else if (raw) {
-                parts[parts.size - 1] = parts.last() + T9Segmenter.plain(graph.text(from, to)).lowercase()
+                parts[parts.size - 1] = parts.last() + asTyped(graph.text(from, to))
                 ends[ends.size - 1] = to
             } else {
                 // as rest in commitRaw
-                parts += T9Segmenter.plain(graph.text(from, to)).lowercase()
+                parts += asTyped(graph.text(from, to))
                 ends += to
                 raw = true
             }
@@ -797,14 +782,16 @@ class PinyinSession(
     /** How [edge] of [graph] shows, read as [syllable]: as typed, spelt for 双拼, letters for digits. */
     private fun shown(graph: SyllableGraph, edge: Int, syllable: Int): String = when {
         // digits say nothing: the syllable read, a fuzzy one too (9664 as zhong with z for zh), and
-        // of one still being typed as many letters as were typed
-        !segmenter.typesLetters && graph.kind(edge) == Kind.SYLLABLE -> Syllables.spelling(syllable)
-        // a run of a key pressed again may be one letter
-        segmenter is T9Segmenter -> Syllables.spelling(syllable).take(segmenter.lettersOf(graph.text(edge), syllable))
-        !segmenter.typesLetters -> Syllables.spelling(syllable).take(graph.text(edge).length)
+        // of one still being typed as many letters as were typed, a run of a key pressed again maybe one
+        segmenter is T9Segmenter -> Syllables.spelling(syllable).let {
+            if (graph.kind(edge) == Kind.SYLLABLE) it else it.take(segmenter.lettersOf(graph.text(edge), syllable))
+        }
         spell && graph.kind(edge) == Kind.SYLLABLE -> Syllables.spelling(syllable)
         else -> graph.text(edge)
     }
+
+    // text kept as typed as it shows and is committed: see T9Segmenter.asTyped
+    private fun asTyped(text: String) = if (segmenter is T9Segmenter) T9Segmenter.asTyped(text) else text
 
     /**
      * The syllables along a path of [graph] from [from] to [to] that spell [word], exact readings

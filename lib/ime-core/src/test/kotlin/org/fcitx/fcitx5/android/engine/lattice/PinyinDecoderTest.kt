@@ -4,8 +4,6 @@
  */
 package org.fcitx.fcitx5.android.engine.lattice
 
-import org.fcitx.fcitx5.android.engine.user.UserScorer
-import org.fcitx.fcitx5.android.engine.user.UserModel
 import org.fcitx.fcitx5.android.engine.data.NgramModel.Companion.NO_WORD
 import org.fcitx.fcitx5.android.engine.data.PinyinData
 import org.fcitx.fcitx5.android.engine.data.PinyinDataBuilder
@@ -13,6 +11,8 @@ import org.fcitx.fcitx5.android.engine.pinyin.Fuzzy
 import org.fcitx.fcitx5.android.engine.pinyin.PinyinSegmenter
 import org.fcitx.fcitx5.android.engine.pinyin.Syllables
 import org.fcitx.fcitx5.android.engine.pinyin.T9Segmenter
+import org.fcitx.fcitx5.android.engine.user.UserModel
+import org.fcitx.fcitx5.android.engine.user.UserScorer
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
@@ -445,5 +445,62 @@ class PinyinDecoderTest {
         assertEquals(score(decoder(CoarseWords.NONE), "zai", listOf(id("在"))) + CoarseWords.PENALTY, lowered, 1e-4f)
         user.learn(null, listOf(UserModel.Entry("在", syl("zai"))))
         assertTrue(score(decoder(coarse), "zai", listOf(id("在"))) > lowered - CoarseWords.PENALTY - 1e-4f)
+    }
+
+    /**
+     * A word the user committed twice costs no more typed short than typed whole, a whole syllable
+     * read as the start of a longer one too (ee for 嗯嗯): 方向 read from fangxian ties the exact
+     * 防线, where by what was typed it was [Penalties.extended] below.
+     */
+    @Test
+    fun aLearnedWordReadOnFromAWholeSyllableTiesTheExactReading() {
+        val fang = PinyinData.load(
+            ByteBuffer.wrap(
+                PinyinDataBuilder()
+                    .unigram("<unk>", -7f, 0f)
+                    .unigram("方向", -3f, 0f)
+                    .unigram("防线", -3f, 0f)
+                    .entry("方向", syl("fang", "xiang"))
+                    .entry("防线", syl("fang", "xian"))
+                    .build().toByteArray(),
+            ),
+        )
+        val user = UserModel(fang.dictionary, fang.vocabulary)
+        fun score(input: String, text: String) = PinyinDecoder(fang.dictionary, fang.vocabulary, WordScorer.of(fang.model), user = user)
+            .decode(plain.segment(input)).sentences.first { it.text == text }.score
+        val whole = score("fangxiang", "方向")
+        assertEquals(whole + Penalties().extended, score("fangxian", "方向"), 1e-4f)
+        user.addCount(UserModel.Entry("方向", syl("fang", "xiang")), PinyinDecoder.LEARNED)
+        assertEquals(whole, score("fangxian", "方向"), 1e-4f)
+        assertEquals(score("fangxian", "防线"), score("fangxian", "方向"), 1e-4f)
+    }
+
+    /** A page turned past the first words read the whole lattice again, every time it doubled them. */
+    @Test
+    fun moreWordsAreReadOnFromTheLastDecodeAsALargerOneGivesThem() {
+        var calls = 0
+        val counting = WordScorer { p2, p, w -> calls++; WordScorer.of(data.model).score(p2, p, w) }
+        fun words(c: List<Candidate>) = c.map { "${it.text} ${it.end} ${it.score} ${it.words.toList()}" }
+        val d = PinyinDecoder(data.dictionary, data.vocabulary, counting)
+        val graph = plain.segment("nihaoma")
+        assertEquals(1, d.decode(graph, words = 1).words.size)
+        calls = 0
+        assertEquals(words(decoder().decode(graph).words), words(d.words(graph, words = PinyinDecoder.DEFAULT_WORDS)))
+        assertEquals(0, calls)
+        // in another context, decoded again
+        val wo = id("我")
+        assertEquals(words(decoder().decode(graph, prev = wo).words), words(d.words(graph, prev = wo, words = PinyinDecoder.DEFAULT_WORDS)))
+        assertTrue(calls > 0)
+    }
+
+    /** Text kept as typed is the segmenter's to show: a key pressed again on the nine keys as its digit. */
+    @Test
+    fun textKeptAsTypedShowsAsAskedOrAsTyped() {
+        val a8 = T9Segmenter.again('8')
+        // no word starts with t, u or v here
+        val graph = T9Segmenter().segment("8$a8")
+        val nineKeys = PinyinDecoder(data.dictionary, data.vocabulary, WordScorer.of(data.model), asTyped = { T9Segmenter.asTyped(it) })
+        assertEquals("88", nineKeys.decode(graph).sentences.first().text)
+        assertEquals("8$a8", decoder().decode(graph).sentences.first().text)
     }
 }

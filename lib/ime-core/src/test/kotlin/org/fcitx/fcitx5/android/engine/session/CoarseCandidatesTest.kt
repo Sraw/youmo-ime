@@ -6,6 +6,7 @@ package org.fcitx.fcitx5.android.engine.session
 
 import org.fcitx.fcitx5.android.engine.data.PinyinData
 import org.fcitx.fcitx5.android.engine.data.PinyinDataBuilder
+import org.fcitx.fcitx5.android.engine.lattice.PinyinDecoder
 import org.fcitx.fcitx5.android.engine.pinyin.PinyinSegmenter
 import org.fcitx.fcitx5.android.engine.pinyin.Syllables
 import org.fcitx.fcitx5.android.engine.session.Action.Key
@@ -93,5 +94,40 @@ class CoarseCandidatesTest {
         val user = UserModel(data.dictionary, data.vocabulary)
         user.learn(null, listOf(UserModel.Entry("小穴", syl("xiao", "xue"))))
         assertTrue("小穴" in session(user).type("xiaoxue").candidates)
+    }
+
+    @Test
+    fun aWordTheUserAddedIsTheirs() {
+        // added by hand, it is listed with no count: never typed, yet asked for
+        val s = PinyinSession(data, PinyinSegmenter(), pageSize = 2, prediction = false, addedWords = setOf("小穴"))
+        assertTrue("小穴" in s.type("xiaoxue").candidates)
+    }
+
+    /**
+     * Only the first page waits: one found among the words read as the list was shown further put
+     * itself at the second page's start, every candidate listed since one place on, so a tap on
+     * one the keyboard had fetched picked its neighbour; one lower down moved up to there too.
+     */
+    @Test
+    fun aCoarseWordPastTheFirstPageKeepsItsPlaceAndMovesNothing() {
+        // 小穴 41st of the words read at first, 骚穴 last, read only as the list is shown that far
+        val words = (0 until 100).map { (0x4E00 + it).toChar().toString().repeat(2) }
+        val many = PinyinData.load(
+            ByteBuffer.wrap(
+                PinyinDataBuilder().unigram("<unk>", -7f, 0f)
+                    .apply { words.forEachIndexed { i, w -> unigram(w, -1f - i / 8f, 0f).entry(w, syl("xiao", "xue")) } }
+                    .unigram("小穴", -2.06f, 0f).entry("小穴", syl("xiao", "xue"))
+                    .unigram("骚穴", -9.5f, 0f).entry("骚穴", syl("xiao", "xue"))
+                    .build().toByteArray(),
+            ),
+        )
+        val session = PinyinSession(many, PinyinSegmenter(), pageSize = 10, prediction = false)
+        session.type("xiaoxue")
+        val shown = session.candidates(0, 40).map { it.text }
+        val all = session.candidates(0, 200).map { it.text }
+        assertEquals(shown, all.take(40))
+        assertTrue(all.take(10).none { it == "小穴" || it == "骚穴" })
+        assertTrue(all.indexOf("小穴") > 10)
+        assertTrue(all.indexOf("骚穴") >= PinyinDecoder.DEFAULT_WORDS)
     }
 }
