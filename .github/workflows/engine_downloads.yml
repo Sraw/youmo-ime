@@ -5,7 +5,8 @@ name: Engine Data Downloads
 # request's run reads the caches of its own branch and of main alone, so without one saved on
 # main each new pull request fetched it all again. The key is EngineDataPlugin's hash: run as it
 # changes on main, the downloads alone and no build (the whole release on every push to main was
-# why nix.yml, which saved it before, went).
+# why nix.yml, which saved it before, went). GitHub drops a cache unread for 7 days: read twice a
+# week, it outlives a quiet one.
 
 on:
   push:
@@ -13,6 +14,8 @@ on:
       - main
     paths:
       - build-logic/convention/src/main/kotlin/EngineDataPlugin.kt
+  schedule:
+    - cron: "41 4 * * 1,4"
   workflow_dispatch:
 
 permissions:
@@ -31,7 +34,8 @@ jobs:
           fetch-depth: 0
           submodules: false
 
-      # as pull_request.yml's; only looked up, and saved at the end where it was missing
+      # as pull_request.yml's; only looked up, and saved at the end where it was missing. The
+      # scheduled run restores it, a read for certain to GitHub's 7 days, which a lookup may not be
       - name: Cache engine data downloads
         id: cache
         uses: actions/cache@v6
@@ -40,7 +44,7 @@ jobs:
             .gradle/engine-downloads
             !.gradle/engine-downloads/voice
           key: engine-downloads-${{ hashFiles('build-logic/convention/src/main/kotlin/EngineDataPlugin.kt') }}
-          lookup-only: true
+          lookup-only: ${{ github.event_name != 'schedule' }}
 
       - name: Setup Java
         if: steps.cache.outputs.cache-hit != 'true'
