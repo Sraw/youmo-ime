@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.engine.pinyin
 
+import org.fcitx.fcitx5.android.engine.host.Keyboard
 import org.fcitx.fcitx5.android.engine.pinyin.SyllableGraph.Kind
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -184,5 +185,82 @@ class T9SegmenterTest {
         assertEquals(3, segmenter.lettersOf("74$a4", Syllables.id("shi")))
         assertEquals("744", T9Segmenter.plain("74$a4"))
         assertTrue(T9Segmenter.isKey(a4) && T9Segmenter.digitOf(a4) == '4')
+    }
+
+    /** The B of 2 2 fast went on as EXTENDED, its starts paying for the 22 that is ba, unlike B typed as itself. */
+    @Test
+    fun eachReadingOfARunStartsItsSyllablesAsItself() {
+        val a2 = T9Segmenter.again('2')
+        val a4 = T9Segmenter.again('4')
+        // 22 is ba, so what it starts is read on from a syllable; B is none, so what it starts is only started
+        val b = segmenter.segment("2$a2")
+        assertTrue("ban…" in b.marked(0, 2, Kind.EXTENDED))
+        assertTrue("bu…*" in b.marked(0, 2, Kind.PARTIAL))
+        assertFalse("bu" in b.read(0, 2, Kind.EXTENDED))
+        // 744 is shi and starts none: sh of 7 then 4 4 fast only starts sha, shang
+        val shi = segmenter.segment("74$a4")
+        assertTrue("shang" in shi.read(0, 3, Kind.PARTIAL))
+        assertTrue(shi.read(0, 3, Kind.EXTENDED).isEmpty())
+    }
+
+    /** 4 pressed again then 26 lost h'hao and g'hao (还好, 很好, 刚好), which 4426 typed slowly reads. */
+    @Test
+    fun aRunReadAsItsLetterKeepsNoInitialOffTheKeys() {
+        val fast = segmenter.segment("4${T9Segmenter.again('4')}26")
+        assertTrue(setOf("ga", "ha").all { it in fast.read(0, 1, Kind.INITIAL) })
+        assertEquals(segmenter.segment("4426").read(0, 1, Kind.INITIAL), fast.read(0, 1, Kind.INITIAL))
+        // the run is still read as its letter: H then 26, hao
+        assertTrue("hao" in fast.read(0, 4))
+    }
+
+    @Test
+    fun twoRunsInOneInputReadEachAsItsLetterWhereTheOtherIsOne() {
+        val a3 = T9Segmenter.again('3')
+        val a4 = T9Segmenter.again('4')
+        // 4 4 then 3 3 fast: H then E, the second run found after the first is one letter
+        val he = "4${a4}3$a3"
+        assertTrue("he*" in segmenter.segment(he).marked(0, 4))
+        assertEquals(2, segmenter.lettersOf(he, Syllables.id("he")))
+        // a run not at the start: 7, then 4 4 and 3 3 fast
+        assertTrue("he*" in segmenter.segment("74${a4}3$a3").marked(1, 5))
+    }
+
+    /**
+     * 12 presses was all a syllable could take, as on a phone's keys: one of 13 on the user's was read as keys alone.
+     * Each letter counted at its nearest key, one typed from a farther key or going round a key was read so too,
+     * and with one round of a key for the whole syllable, one with two letters gone round.
+     */
+    @Test
+    fun aSyllableTypedALetterAtATimeTakesAsManyPressesAsTheUsersKeysNeed() {
+        // z fifth on 9: zhuang letter by letter is 13 presses
+        val keys = NineKeyLetters.of(listOf("abc", "def", "ghi", "jkl", "mno", "pqrs", "tuv", "lwxyz"))
+        fun pressed(digit: Char, times: Int) = digit.toString() + T9Segmenter.again(digit).toString().repeat(times - 1)
+        val zhuang = pressed('9', 5) + pressed('4', 2) + pressed('8', 2) + "2" + pressed('6', 2) + "4"
+        assertEquals(13, zhuang.length)
+        assertTrue("zhuang" in T9Segmenter(abbreviations = false, letters = keys).segment(zhuang).read(0, 13))
+        // s fifth on 9 and fourth on 7: shuang with s from 9 is 13 presses, from 7 12
+        val farther = NineKeyLetters.of(listOf("abc", "def", "ghi", "jkl", "mno", "pqrs", "tuv", "wxyzs"))
+        val shuang = pressed('9', 5) + pressed('4', 2) + pressed('8', 2) + "2" + pressed('6', 2) + "4"
+        assertTrue("shuang" in T9Segmenter(abbreviations = false, letters = farther).segment(shuang).read(0, 13))
+        // a as 2 four times, round to a again: shuang in 15 presses on a phone's keys
+        val round = pressed('7', 4) + pressed('4', 2) + pressed('8', 2) + pressed('2', 4) + pressed('6', 2) + "4"
+        assertEquals(15, round.length)
+        assertTrue("shuang" in segmenter.segment(round).read(0, 15))
+        // a as 2 four times and n as 6 five times: 18 presses
+        val twice = pressed('7', 4) + pressed('4', 2) + pressed('8', 2) + pressed('2', 4) + pressed('6', 5) + "4"
+        assertEquals(18, twice.length)
+        assertTrue("shuang" in segmenter.segment(twice).read(0, 18))
+        // every letter of zhuang gone round its key once more: the most on a phone's keys, 31
+        val everyLetter = pressed('9', 8) + pressed('4', 5) + pressed('8', 5) + pressed('2', 4) + pressed('6', 5) + pressed('4', 4)
+        assertEquals(31, everyLetter.length)
+        assertTrue("zhuang" in segmenter.segment(everyLetter).read(0, 31))
+    }
+
+    @Test
+    fun aKeyPressedAgainIsShownAsItsDigitAndStandsForNoSyllableOfTheKeyboard() {
+        val a4 = T9Segmenter.again('4')
+        assertEquals("744h", T9Segmenter.asTyped("74${a4}H"))
+        // the private use area is the keyboard's syllables
+        assertTrue(T9Segmenter.AGAIN.none { it in Keyboard.SYLLABLES })
     }
 }

@@ -59,6 +59,15 @@ class T9Segmenter(
     // 啊, 呃, 哦, 呣, 嗯 and 儿 alone would keep 简拼 off every 2, 3, 6 and 7
     private val regular = HashSet<String>()
 
+    // the most presses a syllable takes typed a letter at a time (连按), each letter from the farthest key
+    // it is on and gone round that key once more (2 2 2 2 is a again): 31 on a phone's keys (shuang,
+    // zhuang), more where the user put a letter fifth on a key. One round for the whole syllable left
+    // shuang with a as 2 2 2 2 and n as 6 6 6 6 6 read as keys alone. It binds only while some reading
+    // still starts a syllable or a run goes on (walk), so other typing is walked no further
+    private val maxPresses = (0 until Syllables.count).map(Syllables::spelling).filter { !it[0].isUpperCase() }.maxOf { s ->
+        s.sumOf { c -> letters.keysOf(c).maxOfOrNull { k -> letters.letters(k).let { onKey -> onKey.indexOf(c) + 1 + onKey.length } } ?: 1 }
+    }
+
     init {
         val wholeIds = HashMap<String, TreeMap<Int, Int>>()
         val startIds = HashMap<String, TreeMap<Int, Int>>()
@@ -124,14 +133,17 @@ class T9Segmenter(
     private fun walk(input: String, at: Int, edges: GraphEdges) {
         var longest = 0
         var length = 0
+        var readings = listOf("" to false)
         val initialEdges = ArrayList<Pair<Int, SyllableMatches>>()
-        while (at + length < input.length && isKey(input[at + length]) && length < MAX_PRESSES) {
+        while (at + length < input.length && isKey(input[at + length]) && length < maxPresses) {
             length++
+            readings = readOn(readings, input, at, at + length)
             val read = Read()
-            for ((typed, tapped) in readings(input, at, at + length)) read.add(typed, tapped, endsAt(input, at + length))
+            for ((typed, tapped) in readings) read.add(typed, tapped, endsAt(input, at + length))
             if (read.regular) longest = length
             if (read.full.isNotEmpty()) edges.add(at, length, Kind.SYLLABLE, merged(read.full))
-            if (read.started.isNotEmpty()) edges.add(at, length, if (read.full.isNotEmpty()) Kind.EXTENDED else Kind.PARTIAL, merged(read.started))
+            if (read.extended.isNotEmpty()) edges.add(at, length, Kind.EXTENDED, merged(read.extended))
+            if (read.partial.isNotEmpty()) edges.add(at, length, Kind.PARTIAL, merged(read.partial))
             if (read.initial.isNotEmpty()) initialEdges += length to merged(read.initial)
             // no syllable goes on from any reading: nor from a longer one, but for a run going on
             // past here, which a press more may make a letter
@@ -147,7 +159,8 @@ class T9Segmenter(
     /** What the readings of some presses are, whole syllables, the starts of some, initials: each reading [add]ed. */
     private inner class Read {
         val full = ArrayList<SyllableMatches>()
-        val started = ArrayList<SyllableMatches>()
+        val extended = ArrayList<SyllableMatches>() // the starts of a reading that is a syllable too
+        val partial = ArrayList<SyllableMatches>() // the starts of one that is none
         val initial = ArrayList<SyllableMatches>()
         var regular = false
         var goesOn = false // whether some reading starts a syllable longer
@@ -155,48 +168,46 @@ class T9Segmenter(
         /** The reading [typed], [tapped] if a run is a letter in it, at the end of the input or of a syllable separated if [atEnd]. */
         fun add(typed: String, tapped: Boolean, atEnd: Boolean) {
             if (typed.length > MAX_SYLLABLE) return
-            // a letter typed as itself as any key typing it: every way to type a syllable is indexed
-            val keys = buildString(typed.length) { typed.forEach { append(letters.key(it.lowercaseChar())) } }
+            val keys = keysOf(typed)
             fun read(m: SyllableMatches?) = m?.let { fitting(it, typed) }?.let { if (tapped) it.with(SyllableMatches.TAPPED) else it }
-            read(whole[keys])?.let {
+            val syllable = read(whole[keys])
+            syllable?.let {
                 full += it
-                if (isRegular(keys, it)) regular = true
+                // a run read as its letter keeps no initial off the keys as typed: 4 4 2 6 fast is
+                // h'hao and g'hao too, as at any pace
+                if (!tapped && isRegular(keys, it)) regular = true
             }
             if (keys in starts) goesOn = true
-            if (atEnd) read(starts[keys])?.let { started += it }
+            // each reading's own: the B of 2 2 fast only starts bu, though 22 is ba
+            if (atEnd) read(starts[keys])?.let { if (syllable != null) extended += it else partial += it }
             read(initials[keys])?.let { initial += it }
         }
     }
 
+    // a letter typed as itself as any key typing it: every way to type a syllable is indexed
+    private fun keysOf(typed: String) = buildString(typed.length) { typed.forEach { append(if (it in '2'..'9') it else letters.key(it.lowercaseChar())) } }
+
     /**
-     * Each way the presses of [input] from [at] to [end] read, as letters typed as themselves and
-     * digits are: every key pressed again a digit, and each run of a key pressed again whole in
-     * them the letter it came to, or not. A run going on before [at] or past [end] is keys alone.
+     * [readings], the ways the presses of [input] from [at] to [end] - 1 read, each read on by the
+     * press at [end] - 1: as letters typed as themselves and digits are, every key pressed again a
+     * digit; where the press ends a run of a key pressed again, each also with the run the letter it
+     * came to (the runs before it read either way already). A run going on before [at] or past [end]
+     * is keys alone.
      */
-    private fun readings(input: String, at: Int, end: Int): List<Pair<String, Boolean>> {
-        val plain = plain(input.subSequence(at, end))
-        var readings = listOf(plain to false)
-        var p = at
-        while (p < end) {
-            val digit = digitOf(input[p])
-            var q = p + 1
-            while (q < input.length && input[q] == again(digit)) q++
-            val whole = q <= end && (p == 0 || !continues(input, p))
-            if (whole && q - p > 1 && digit in '2'..'9') {
-                val keyLetters = letters.letters(digit)
-                if (keyLetters.isNotEmpty()) {
-                    val letter = keyLetters[(q - p - 1) % keyLetters.length].uppercaseChar()
-                    // the runs before this one read either way: this one too, from where it is in each
-                    val from = p - at
-                    readings = readings.flatMap { (r, tapped) ->
-                        val start = r.length - (end - at - from)
-                        listOf(r to tapped, r.substring(0, start) + letter + r.substring(start + q - p) to true)
-                    }
-                }
-            }
-            p = minOf(q, end)
-        }
-        return readings
+    private fun readOn(readings: List<Pair<String, Boolean>>, input: String, at: Int, end: Int): List<Pair<String, Boolean>> {
+        val digit = digitOf(input[end - 1])
+        var runStart = end - 1
+        while (runStart > at && continues(input, runStart)) runStart--
+        val run = end - runStart
+        // a reading longer than a syllable before the run stays so whatever the run reads as: dropped,
+        // or a user's keys of five letters, typed letter by letter, would double them each letter
+        val typed = readings.map { (r, tapped) -> r + digit to tapped }.filter { it.first.length - run < MAX_SYLLABLE }
+        val keyLetters = letters.letters(digit)
+        val ended = run > 1 && !(runStart > 0 && continues(input, runStart)) && !continues(input, end)
+        if (!ended || keyLetters.isEmpty()) return typed
+        val letter = keyLetters[(run - 1) % keyLetters.length].uppercaseChar()
+        // the run's presses are the last of each reading, as digits: counted from its end
+        return typed.flatMap { (r, tapped) -> listOf(r to tapped, r.substring(0, r.length - run) + letter to true) }
     }
 
     // [input] at [p] is a key pressed again after the key before it
@@ -208,8 +219,9 @@ class T9Segmenter(
      */
     fun lettersOf(text: String, syllable: Int): Int {
         val spelling = Syllables.spelling(syllable)
-        return readings(text, 0, text.length).map { it.first }.firstOrNull { typed ->
-            val keys = buildString(typed.length) { typed.forEach { append(letters.key(it.lowercaseChar())) } }
+        val readings = (1..text.length).fold(listOf("" to false)) { readings, end -> readOn(readings, text, 0, end) }
+        return readings.map { it.first }.firstOrNull { typed ->
+            val keys = keysOf(typed)
             spelling.length >= typed.length && listOfNotNull(whole[keys], starts[keys], initials[keys])
                 .any { m -> fitting(m, typed)?.let { it.indexOf(syllable) >= 0 } == true }
         }?.length ?: text.length
@@ -252,13 +264,12 @@ class T9Segmenter(
     companion object {
         private const val MAX_SYLLABLE = 6
 
-        // presses of a syllable, the runs of a key pressed again in it letters each
-        private const val MAX_PRESSES = 2 * MAX_SYLLABLE
-
         /** A letter typed as itself, as it stands in the input: see the class. */
         val FIXED = 'A'..'Z'
 
-        private const val AGAIN_BASE = '\uE000'
+        // a noncharacter, for a program's own use: the private use area is the keyboard's syllables
+        // (Keyboard.SYLLABLES), and these stand in no text but the session's input
+        private const val AGAIN_BASE = '\uFDD0'
 
         /** [digit] pressed again soon after itself (连按), as it stands in the input: see the class. */
         fun again(digit: Char): Char = AGAIN_BASE + (digit - '0')
@@ -269,8 +280,11 @@ class T9Segmenter(
         /** The digit [c] is, a key pressed again or not; else [c]. */
         fun digitOf(c: Char): Char = if (c in AGAIN) '0' + (c - AGAIN_BASE) else c
 
-        /** [text] with each key pressed again as its digit: as it is shown or committed. */
+        /** [text] with each key pressed again as its digit. */
         fun plain(text: CharSequence): String = buildString(text.length) { text.forEach { append(digitOf(it)) } }
+
+        /** [text], of the input, as it is shown or committed: a key pressed again as its digit, a letter typed as itself lower case. */
+        fun asTyped(text: CharSequence): String = plain(text).lowercase()
 
         /** Whether [c] is a key typed: a digit, pressed again or not, or a letter typed as itself. */
         fun isKey(c: Char): Boolean = c in '2'..'9' || c in FIXED || c in AGAIN

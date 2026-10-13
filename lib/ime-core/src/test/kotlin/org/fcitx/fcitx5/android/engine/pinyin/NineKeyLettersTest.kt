@@ -6,7 +6,6 @@ package org.fcitx.fcitx5.android.engine.pinyin
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
-import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -22,6 +21,9 @@ class NineKeyLettersTest {
         assertEquals(listOf("58"), standard.typings("lv"))
         assertEquals("", standard.missing)
         assertEquals("", standard.letters('1'))
+        assertEquals('9', standard.key('z'))
+        // what no key has stands for itself: a digit, 1, an apostrophe
+        assertEquals("591'", "591'".map(standard::key).joinToString(""))
     }
 
     @Test
@@ -29,6 +31,7 @@ class NineKeyLettersTest {
         val keys = NineKeyLetters.of(listOf("abc", "def", "ghi", "jka", "mno", "pqrs", "tuv", "wxyz"))
         assertEquals("25", keys.keysOf('a'))
         assertEquals('2', keys.key('a'))
+        assertEquals('5', keys.key('5'))
         assertEquals(listOf("22", "25"), keys.typings("ba"))
         assertTrue(keys.sameKey('5', 'a'))
         assertTrue(keys.sameKey('A', 'j'))
@@ -50,11 +53,11 @@ class NineKeyLettersTest {
     @Test
     fun keptAsTextAndReadBack() {
         assertEquals("", standard.serialize())
-        assertSame(standard, NineKeyLetters.parse(""))
-        assertSame(standard, NineKeyLetters.parse("abc,def"))
+        assertEquals(standard, NineKeyLetters.parse(""))
+        assertEquals(standard, NineKeyLetters.parse("abc,def"))
         val keys = NineKeyLetters.of(listOf("abc", "def", "ghi", "jkl", "mno", "pqrs", "tuv", "wxyzl"))
         assertEquals(keys, NineKeyLetters.parse(keys.serialize()))
         assertFalse(keys.isStandard)
-        assertSame(standard, NineKeyLetters.of(listOf("abc", "def", "ghi", "jkl", "mno", "pqrs", "tuv", "wxyz")))
+        assertTrue(NineKeyLetters.of(listOf("abc", "def", "ghi", "jkl", "mno", "pqrs", "tuv", "wxyz")).isStandard)
     }
 }

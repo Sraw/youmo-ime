@@ -18,7 +18,11 @@ class NineKeyLetters private constructor(private val keys: List<String>) {
     fun keysOf(c: Char): String = buildString { keys.forEachIndexed { k, letters -> if (c in letters) append('2' + k) } }
 
     /** The first key typing [c], to stand for it in the input; [c] itself where none does. */
-    fun key(c: Char): Char = keys.indexOfFirst { c in it }.let { if (it < 0) c else '2' + it }
+    fun key(c: Char): Char {
+        // the keys hold a to z alone (normalize), and a digit, most of what is read, is none of them
+        if (c !in 'a'..'z') return c
+        return keys.indexOfFirst { c in it }.let { if (it < 0) c else '2' + it }
+    }
 
     /** Whether [key], a digit or a letter typed as itself (upper case or not), shares a key with the letter [c]. */
     fun sameKey(key: Char, c: Char): Boolean =
