@@ -17,6 +17,7 @@ import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
 import androidx.annotation.Keep
+import androidx.core.view.children
 import androidx.core.view.isVisible
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -122,11 +123,12 @@ class T9Keyboard(
         )
 
         /**
-         * What [action] from [source] types: a digit key's press [MultiTap] reads at [time], a
-         * letter or digit of its long press; 1, while nothing is [composing], punctuation ([ONE]),
-         * a symbol of its long press as it is; anything else resets [tap] and types as it is.
+         * What [action] from [source] types: a digit key's press [MultiTap] reads at [time]
+         * through [letters], a letter or digit of its long press; 1, while nothing is [composing],
+         * punctuation ([ONE]), a symbol of its long press as it is; anything else resets [tap] and
+         * types as it is.
          */
-        internal fun typed(
+        internal fun resolve(
             action: KeyAction,
             source: KeyActionListener.Source,
             tap: MultiTap,
@@ -162,6 +164,17 @@ class T9Keyboard(
 
         private fun letter(c: Char, again: Boolean) =
             KeyAction.SymAction(KeySym(UNICODE + Keyboard.letterKey(c, again)), KeyStates.Virtual)
+
+        /**
+         * The run [setting] times. 连按 is the letters': off, a digit key pressed again is a key of
+         * its own ([NO_LETTERS]), but 1's punctuation, with no letters to guess, still cycles, at
+         * the default pace.
+         */
+        internal fun multiTapOf(setting: T9MultiTap) =
+            MultiTap(if (setting == T9MultiTap.Off) T9MultiTap.Medium.timeout else setting.timeout)
+
+        // what a digit key pressed again goes through with 连按 off: nothing, each press a key
+        private val NO_LETTERS = NineKeyLetters.of(('2'..'9').map { "" })
 
         // the column is drawn over these placeholders, so they are never touched
         private fun spacer() = KeyDef(
@@ -217,19 +230,32 @@ class T9Keyboard(
 
     private val space: TextKeyView by lazy { findViewById(R.id.button_space) }
 
+    // the keys 1 to 9 by their digits
+    private val digitKeys: Map<Char, AltTextKeyView> = keyRows.flatMap { it.children.toList() }
+        .filterIsInstance<AltTextKeyView>()
+        .associateBy { (it.def as KeyDef.Appearance.AltText).altText.single() }
+
+    // a key's preview names it by its view's id, not by its letters, which two keys may share
+    private val digitOf: Map<Int, Char> = digitKeys.entries.associate { (digit, key) -> key.existingOrNewId to digit }
+
     // 1, its label as what is typed has it
-    private val one: AltTextKeyView by lazy { keyRows[0].getChildAt(1) as AltTextKeyView }
+    private val one: AltTextKeyView = digitKeys.getValue('1')
     private val `return`: ImageKeyView by lazy { findViewById(R.id.button_return) }
     private val lang: ImageKeyView by lazy { findViewById(R.id.button_lang) }
 
     private val showLangSwitchKey = AppPrefs.getInstance().keyboard.showLangSwitchKey
 
     private val multiTapPref = AppPrefs.getInstance().keyboard.t9MultiTap
-    private var multiTap = MultiTap(multiTapPref.getValue().timeout)
+    private var multiTapSetting = multiTapPref.getValue()
+    private var multiTap = multiTapOf(multiTapSetting)
+
+    // what a digit key pressed again soon goes through
+    private val tapLetters get() = if (multiTapSetting == T9MultiTap.Off) NO_LETTERS else letters
 
     @Keep
     private val multiTapListener = ManagedPreference.OnChangeListener<T9MultiTap> { _, v ->
-        multiTap = MultiTap(v.timeout)
+        multiTapSetting = v
+        multiTap = multiTapOf(v)
     }
 
     @Keep
@@ -265,9 +291,9 @@ class T9Keyboard(
     // something typed, as the engine last told, or a key sent since that types
     private var typing = false
 
-    // a digit, or a letter a digit key's long press or 连按 sends
-    private fun types(action: KeyAction) = when (action) {
-        is KeyAction.FcitxKeyAction -> action.act.singleOrNull()?.let { it in '2'..'9' } == true
+    // a digit with letters (one with none the app types as it is), or a letter a digit key's long press or 连按 sends
+    private fun isTypingKey(action: KeyAction) = when (action) {
+        is KeyAction.FcitxKeyAction -> action.act.singleOrNull()?.let { it in '2'..'9' && letters.letters(it).isNotEmpty() } == true
         is KeyAction.SymAction -> action.sym.sym - UNICODE in Keyboard.LETTERS
         else -> false
     }
@@ -330,10 +356,12 @@ class T9Keyboard(
         // what was typed gone (a candidate picked on the bar, which is not this keyboard's): the
         // next press is a key of its own. Only then: 1's punctuation resets the engine, which tells
         // of nothing typed again, and its next press must still be the next symbol
-        if (!state.composing && columnState.composing) multiTap.reset()
+        val was = columnState.composing
+        if (!state.composing && was) multiTap.reset()
         columnState = state
         typing = state.composing
-        one.mainText.text = if (state.composing) SEPARATOR else ONE
+        // only when it changes: setText does not skip the same text, and may lay the row out again
+        if (state.composing != was) one.mainText.text = if (state.composing) SEPARATOR else ONE
         val labels = labels(state)
         while (items.childCount < labels.size) items.addView(item(items.childCount))
         for (i in 0 until items.childCount) {
@@ -361,35 +389,46 @@ class T9Keyboard(
     override fun onAction(action: KeyAction, source: KeyActionListener.Source) {
         // a digit key's press as its preview counted it, when it went down
         val key = (action as? KeyAction.FcitxKeyAction)?.act?.singleOrNull()
-        val time = pressed?.takeIf { it.first == key }?.second ?: SystemClock.uptimeMillis()
+        val time = pressed?.takeIf { it.digit == key }?.time ?: SystemClock.uptimeMillis()
         pressed = null
-        val out = typed(action, source, multiTap, time, typing, letters)
+        val out = resolve(action, source, multiTap, time, typing, tapLetters)
         // a key the engine reads as typing: 1 right after it is the separator, though the engine
         // has not told of what is typed yet
-        if (types(out)) typing = true
+        if (isTypingKey(out)) typing = true
         super.onAction(out, source)
     }
 
-    // the letters a digit key's preview shows in place of its own (GHI), while it is held
-    private var previewing: Pair<String, String>? = null
+    /**
+     * The cursor moved, not by this keyboard's own commit (a tap in the text, the app): 1 pressed
+     * next is a symbol of its own, not one in place of a ， now before the cursor.
+     */
+    fun cursorMoved() = multiTap.reset()
 
-    // the digit key gone down last, and when: the press counts from then, as its preview did
-    private var pressed: Pair<Char, Long>? = null
+    /** A digit key gone down at [time]: its press counts from then, as its preview did. */
+    private class Pressed(val digit: Char, val time: Long)
+
+    /** The [letter] the preview of the key of view [viewId] shows in place of its own [letters] (GHI), while it is held. */
+    private class Previewing(val viewId: Int, val letters: String, val letter: String)
+
+    private var previewing: Previewing? = null
+
+    // the digit key gone down last
+    private var pressed: Pressed? = null
 
     // a digit key's preview shows the letter pressing it again now types
     override fun onPopupAction(action: PopupAction) {
         val shown = when (action) {
             is PopupAction.PreviewAction -> {
-                // a digit key's preview is its letters, upper case
-                val digit = ('2'..'9').firstOrNull { letters.letters(it).uppercase() == action.content }
+                val digit = digitOf[action.viewId]
                 val now = SystemClock.uptimeMillis()
-                pressed = digit?.let { it to now }
-                val letter = digit?.let { multiTap.peek(it, letters.letters(it), now) }
-                previewing = letter?.let { action.content to it.uppercase() }
-                previewing?.let { action.copy(content = it.second) }
+                pressed = digit?.let { Pressed(it, now) }
+                val letter = digit?.let { multiTap.peek(it, tapLetters.letters(it), now) }
+                previewing = letter?.let { Previewing(action.viewId, action.content, it.uppercase()) }
+                previewing?.let { action.copy(content = it.letter) }
             }
             // back from the digit a swipe shows
-            is PopupAction.PreviewUpdateAction -> previewing?.takeIf { it.first == action.content }?.let { action.copy(content = it.second) }
+            is PopupAction.PreviewUpdateAction ->
+                previewing?.takeIf { it.viewId == action.viewId && it.letters == action.content }?.let { action.copy(content = it.letter) }
             else -> null
         }
         super.onPopupAction(shown ?: action)
