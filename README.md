@@ -71,7 +71,7 @@
 
 - **每月发一版**，主要更新词库：把近期出现的新词收进来。应用不联网，新词只随新版本到达。
 - 有值得尽快修的 bug 时，随时发修复版。
-- 装的版本超过半年时，设置首页会提醒你更新。
+- 装的版本里的数据超过半年时，设置首页会提醒你更新。
 
 ### 下一步计划
 
@@ -175,7 +175,7 @@ The user's manual, in Chinese, is in [docs/](docs/README.md): setting it up, eve
 
 - **One release a month**, mostly for the dictionary: the words that have newly appeared. The app has no network access, so new words come only with new versions.
 - A fix release whenever a bug is worth fixing at once.
-- When the installed version is more than six months old, the settings page says so.
+- When the data in the installed version is more than six months old, the settings page says so.
 
 ### Next
 

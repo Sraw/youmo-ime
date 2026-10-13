@@ -20,7 +20,7 @@ measurement that decided it.
 | `data` | File formats: `DataFile` (the container), `PinyinData`, `CodeTable`, `NgramTables`, `BitPacked`, `EliasFano` (the trigram runs' starts; a lookup costs more, so not for the unigrams'), `Quantizer`, `StringTable`, `WordIndex`, `PinyinDataBuilder`, readers of text sources, `Misreadings`, `DataAge` |
 | `store` | `RecordFormat` / `RecordStore`: append-only logs with CRC'd records, compacted by rename |
 | `libime` | Reading libime's binary files without libime (its `DATrie`, zstd): for users coming from upstream and for importing `.dict` |
-| `host` | `Engines` (the input methods by name, sessions made on first use), `EngineAssets`, `EngineSettings` (+ `ModelLevel`), `TableRegistry`, `UserLexicon`, `Keyboard` (the addon's event numbers), `LibimeMigration`, `AddonDefaults` |
+| `host` | `Engines` (the input methods by name, sessions made on first use), `EngineAssets`, `EngineSettings` (+ `ModelLevel`), `TableRegistry`, `UserLexicon`, `EnglishLexicon` (the English words the user committed, kept in `english.user`), `Keyboard` (the addon's event numbers), `LibimeMigration`, `AddonDefaults` |
 
 ## Pinyin, from keys to candidates
 

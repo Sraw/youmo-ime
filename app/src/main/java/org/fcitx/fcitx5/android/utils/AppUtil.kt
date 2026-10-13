@@ -29,7 +29,7 @@ object AppUtil {
 
     /**
      * Whether [route] is one [launchMainToDest] sends, the only ones MainActivity opens from an
-     * intent: it is exported, and a route such as a quick phrase editor names any file it likes.
+     * intent: it is exported, and a route such as the pinyin dictionaries' names any file it likes.
      */
     fun isLaunchRoute(route: SettingsRoute) = when (route) {
         SettingsRoute.VirtualKeyboard, SettingsRoute.InputMethodList, SettingsRoute.Theme,
@@ -63,7 +63,10 @@ object AppUtil {
 
     /**
      * Ends the process and opens the settings again, in a new one: the app's files were replaced
-     * under it. The system starts the new process for the activity asked for just before.
+     * under it. The system starts the new process for the activity asked for just before. Left for
+     * another app meanwhile, it only ends: Android 10 and later block a page an app in the
+     * background opens, and a notice to tap would need the notification permission the app does
+     * not ask for. The data is restored all the same, the toast says so, and the app opens as usual.
      */
     fun restart(context: Context) {
         context.startActivity<MainActivity> {

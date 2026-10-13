@@ -16,7 +16,8 @@ Needs: SDK platform 36, build-tools 36.1.0, NDK 28.0.13004108, CMake 3.31.6 (or 
 code targets Java 11). Versions are in `build-logic/convention/src/main/kotlin/Versions.kt`. Submodules:
 `git submodule update --init --recursive` (fcitx5, its prebuilt dependencies, chinese-addons).
 
-Memory: compiling the pinyin data alone is ~4 GB resident and three table compiles run at once
+Memory: compiling the pinyin data alone is ~4 GB resident (3.6 GB measured, in a JVM of its own;
+BUILDING.md's 5 GB counts the Gradle daemon beside it) and three table compiles run at once
 (1 GB each); a native rebuild of fcitx5 peaks around 4 GB with Gradle. The repository sets
 `-Xmx2048m`; on a small machine run without the daemon and do not build while an emulator runs.
 
@@ -34,7 +35,7 @@ Memory: compiling the pinyin data alone is ~4 GB resident and three table compil
 | `BuildMetadataPlugin` | build time and git hash into `BuildConfig` (the data release names are `EngineDataPlugin`'s fields) |
 | `DetektConventionPlugin` | detekt on every Kotlin module, one config, a baseline per module |
 | `ToolFingerprint` | hashes the classes the dict tool's `main` reaches, so the data task re-runs only when code that makes data changes, not on every ime-core edit |
-| `ProjectExtensions` | version name from `git describe --match v[0-9]*` |
+| `ProjectExtensions` | version name from `git describe --tags --long --match v[0-9]*` |
 
 Any edit to build-logic changes the data task's implementation, so the next build compiles the
 engine data again (a few minutes). Expected.
@@ -61,12 +62,23 @@ files as a new release (public: the build downloads anonymously), update the tag
 `EngineDataPlugin`, rebuild, run the evaluation (see [testing.md](testing.md)), and update the
 numbers in README if they moved. Data releases still in use are never deleted.
 
+A change to how `english-lm` counts (`EnglishVocabulary`'s words and slips, `EnglishCounts`,
+`EnglishText`'s sentences) reaches the app only with the next `english-data` release. Before
+publishing one, run `english-lm` on the same shards with the dict tool as at the last release and as
+now; compare the two `pass one` lines (words, slips, and how many are under a tenth of their group's
+commonest, held to another spelling) and the two models' words (their 1-grams); and run ime-eval's
+`english` set on both compiled models. `EnglishVocabulary.CONTRACTION_SHARE` (1%), the least share of
+its group's commonest that a spelling held to another must have (we'll beside well, wed beside we'd),
+is not tuned on FineWeb: it should drop slips such as th'e and keep words such as we'll and user's.
+
 ### Licences of what ships
 
 Everything in the APK must be licensed for distribution. Before adding a corpus, a dictionary or a
 pretrained model, read both its licence and its README/data card for use restrictions
 ("research only", non-commercial), and the training data of any model. LCCC is research-only: it is
-an evaluation set in `lib/ime-eval` and nothing derived from it ships. New third-party data gets an
+an evaluation set in `lib/ime-eval`. It measures, and it helps choose parameters that ship: the
+language model's mix weight (`engine-data.sh`'s score counts its chat and dialog sets) and
+`Predictor.USER_WEIGHT`. No model or dictionary is trained on it. New third-party data gets an
 entry in `app/licenses/libraries/` and in README's data section.
 
 ### `lexicon/`
@@ -89,10 +101,13 @@ trap in [pitfalls.md](pitfalls.md#kotlin-ic-and-interface-delegation) before bui
 
 ## Versions and releases
 
-- The version name comes only from annotated `v*` tags: `0.1.0` at `v0.1.0`, `0.1.0-5-gabc1234`
-  five commits later, `Versions.baseVersionName` with no tag.
-- `versionCode = baseVersionCode × 10 + ABI id`. Raise `Versions.baseVersionCode` (and
-  `baseVersionName`) for each release.
+- The version name comes only from `v*` tags, lightweight or annotated (`git describe --tags`; a
+  release is tagged with `git tag -a`): `0.1.0` at `v0.1.0`, `0.1.0-5-gabc1234` five commits later,
+  `Versions.baseVersionName` marked `-untagged` (`0.1.0-untagged`) with no tag, as a source archive
+  or a fork without the tags builds: never the name of a release.
+- `versionCode = baseVersionCode × 10 + ABI id`, and `baseVersionCode` follows from
+  `Versions.baseVersionName` (`versionCodeOf`: 12 at 0.1.0, 1 more a patch, 100 a minor, 10,000 a
+  major; minor and patch below 100). Raise `baseVersionName` for each release.
 - A release: bump versions → commit → `git tag -a vX.Y.Z` → build both release APKs for arm64-v8a
   signed with the release key (kept outside the repo; `signKeyFile`/`signKeyAlias`/`signKeyPwd` in
   `~/.gradle/gradle.properties` or `SIGN_KEY_*` env; unsigned if absent) → install over the last
@@ -108,4 +123,5 @@ trap in [pitfalls.md](pitfalls.md#kotlin-ic-and-interface-delegation) before bui
 |---|---|---|
 | `unit_test.yml` | push, PR | `:lib:ime-core:check`, dict-tool and eval tests, build-logic tests, `:app:testTextDebugUnitTest`, voice test compile, native host tests |
 | `pull_request.yml` | PR | `assembleTextRelease` and `assembleVoiceRelease` on Ubuntu (unsigned) |
+| `engine_downloads.yml` | push to main changing `EngineDataPlugin.kt`, on demand | the engine data's download tasks alone, saving the `engine-downloads-*` cache a new pull request's build reads |
 | `emulator_test.yml` | weekly, and PRs labelled `emulator` | instrumented tests (`FcitxTest`, `SoftKeyboardTest` …) for Text and Voice on an API 35 emulator |

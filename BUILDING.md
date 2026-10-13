@@ -44,7 +44,7 @@ x86_64 的模拟器或 redroid 加 `-PbuildABI=x86_64`。
 | `english-data-*` | 英文词表和语言模型 | `engine/english.data` |
 | `voice-models-*` | 转成 ORT 格式的语音识别模型（只用于 `voice`） | `voice/*.ort` |
 
-第一次构建，文字版约下载 600 MB，语音版再多约 260 MB（拼音语言模型解开后占 1 GB 磁盘）。编译拼音数据大约要 2 分钟、5 GB 内存。
+第一次构建，文字版约下载 500 MB，语音版再多约 260 MB（拼音语言模型解开后占 1 GB 磁盘）。编译拼音数据大约要 2 分钟、5 GB 内存。
 
 每个数据 release 里都有 `manifest.txt`，写明它从哪些数据、用什么命令生成。重新生成的方法见
 [specs/data-and-build.md](specs/data-and-build.md)：拼音语言模型用 `lib/ime-dict-tool/engine-data.sh`，英文用
@@ -127,7 +127,7 @@ The build downloads its data and checks the SHA-256 of each file:
 | `english-data-*` | English words and language model | `engine/english.data` |
 | `voice-models-*` | The speech recognizer in ORT format (`voice` only) | `voice/*.ort` |
 
-The first build downloads about 600 MB for `text` and some 260 MB more for `voice` (the pinyin model takes 1 GB of disk unpacked). Compiling the pinyin data takes about 2 minutes and 5 GB of memory.
+The first build downloads about 500 MB for `text` and some 260 MB more for `voice` (the pinyin model takes 1 GB of disk unpacked). Compiling the pinyin data takes about 2 minutes and 5 GB of memory.
 
 Each data release has a `manifest.txt` saying what it was made from and by which command. How to make them again is in
 [specs/data-and-build.md](specs/data-and-build.md): the pinyin model by `lib/ime-dict-tool/engine-data.sh`, English by

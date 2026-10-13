@@ -35,7 +35,7 @@ the tool or build-logic tests if those changed. Unit tests need no submodules, N
   with the case that bit as the example. A test that only restates the implementation is not worth
   its maintenance.
 - Engine tests build small data in memory (`PinyinDataBuilder`, text tables) rather than loading the
-  real 1 GB model; the evaluation is where the real data is judged.
+  real model (`pinyin.data`); the evaluation is where the real data is judged.
 - No `@Ignore`, `.only`, skipped or placeholder tests left behind.
 - Kover: 90% lines overall in ime-core, 60% per package. A new package needs its tests.
 

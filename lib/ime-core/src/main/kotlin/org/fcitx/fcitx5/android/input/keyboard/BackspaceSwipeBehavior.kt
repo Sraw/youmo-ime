@@ -68,8 +68,9 @@ class BackspaceSwipeBehavior {
     }
 
     /**
-     * @param composing whether something is being composed (a preedit, or candidates on offer)
-     * when the gesture begins. Only consulted on the first movement.
+     * @param composing whether something typed is being composed (a preedit) when the gesture
+     * begins; candidates offered with nothing typed, the words that may come next, are not.
+     * Only consulted on the first movement.
      */
     fun onMove(composing: Boolean): MoveEffect = when (state) {
         State.Stopped -> {

@@ -5,9 +5,9 @@
 package org.fcitx.fcitx5.android.engine.data
 
 /**
- * Whether the settings should say a build's data is old. The offline build cannot fetch anything
- * itself, so new words reach it only with a new version or a word pack the user downloads; the
- * data is refreshed every quarter, so half a year is two refreshes missed.
+ * Whether the settings should say a build's data is old: [builtAt] is the day of the newest data
+ * release in it (MainFragment's dataDay), not the build's. The offline build fetches nothing
+ * itself, so new words reach it only with a new version, one a month: half a year is six missed.
  */
 object DataAge {
     const val STALE_DAYS = 183

@@ -43,9 +43,12 @@ characters come from `PopupPreset` (built in) overridden by the user's `PopupOve
 of them is also what swiping the key types and the small label in its corner: one concept, one
 setting.
 
-Address fields swap the comma and the full stop for `/` or `@` and `.com` (`AddressKeys`); the
-nine keys' column, separator and multi-tap are in `T9Keyboard` with decisions in `MultiTap`,
-`NineKeys`.
+Address fields swap the comma and the full stop for `/` or `@` and `.com` (`AddressKeys`); a key's
+digit or symbol goes in there as it is, what is typed committed as typed
+(`PendingInputPolicy.typesAsIs`, in `CommonKeyActionListener`), but for a key the input method
+types with (`Engines.readsAsKey`: the nine keys' digits, 微软双拼's `;`, the pinyins' `'` and a
+table's keys, 二笔's `;`, while something is typed, the table's from `Engines.tableKeys`); the nine
+keys' column, separator and multi-tap are in `T9Keyboard` with decisions in `MultiTap`, `NineKeys`.
 
 ## Settings
 

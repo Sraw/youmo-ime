@@ -9,7 +9,7 @@
 | `app/src/text`, `app/src/voice` | flavor source sets (`speech` dimension) | Each defines `VoiceFeature` with the same signatures; only `voice` has voice input, sherpa-onnx and `RECORD_AUDIO`. |
 | `lib/ime-eval` | JVM CLI | Typing simulated over test sets; top-1 accuracy, predictions, English, learning. Never shipped. |
 | `lib/ime-dict-tool` | JVM CLI | Compiles text sources into the engine's data files (pinyin, tables, strokes, English), mixes models, packs word packs, finds new words. Runs on the build host only. |
-| `lib/fcitx5`, `lib/fcitx5-chinese-addons` | native (CMake) | Fcitx5 (with its quickphrase and unicode modules) and, of chinese-addons, only punctuation, chttrans (简繁), fullwidth and scel2org5 (reading 搜狗 `.scel`), as submodules built for Android. Its pinyin and table engines are not built: the input methods are `ime-core`'s. |
+| `lib/fcitx5`, `lib/fcitx5-chinese-addons` | native (CMake) | Fcitx5 (with its quickphrase, unicode, clipboard, imselector and spell modules) and, of chinese-addons, only punctuation, chttrans (简繁), fullwidth and scel2org5 (reading 搜狗 `.scel`), as submodules built for Android. Its pinyin and table engines are not built: the input methods are `ime-core`'s. |
 | `lib/sherpa-onnx` | native | The speech recognizer, vendored and built from source; voice build only. |
 | `codegen` | annotation processing | Generates the app's key and scancode mapping tables. |
 | `build-logic` | included build | Gradle convention plugins: Android/native conventions, data download and compile, voice data, permission check, version from tags, detekt. |
@@ -39,8 +39,16 @@ One process. Inside it:
   The engine's sessions run here too: the native `androidengine` addon calls `EngineBridge` through
   JNI on this thread, so the sessions are this thread's alone and nothing in them locks.
 - **IO / Default dispatchers**: file work (imports, backups, the clipboard database), and the
-  engine's own background saves (the custom phrases file, the user log's compaction runs on the
-  thread that learns but only every few thousand records).
+  engine's own background saves (the custom phrases file).
+- **`record-compaction`** (`Engines`): a daemon thread for each compaction of a user log
+  (`RecordStore`), at most every few thousand records. The fcitx thread, which learns, reads the
+  counts; this thread writes and syncs them to a new file, which the next append on the fcitx
+  thread puts in place.
+- **`engine-warm-up`** (`Engines`): a daemon thread for each warm-up, once for each `Engines` (made
+  anew as fcitx starts again after it exited, `EngineBridge.close()`): pinyin's data and word index
+  as the first field starts, English's keys and word index as its session is first made. A session
+  made meanwhile waits for them: `EngineAssets.pinyinData` and the word indexes are synchronized
+  lazies.
 - **Voice** (voice build): the microphone reader, the VAD and the recognizer on threads of their own
   (`VoiceListener`).
 
@@ -78,15 +86,27 @@ that asks not to be learned from) and sends it as `Action.Context`, so the langu
 sentence models score what follows it. `ContextMemory` keeps the end of what was written in a chat
 box that clears itself, for the reply typed next.
 
+The preedit goes into the app's text as composing text where the field takes it
+(`CapabilityFlag.Preedit`). A Chinese one is pinyin, not text, so a field that outlives the
+keyboard must not keep it: as the keyboard goes it is taken out
+(`PendingInputPolicy.keepsPreeditOnLeaving`), and `LeftPreedit` takes out what an app that made its
+activity anew saved with the field's text (see
+[pitfalls.md](pitfalls.md#rotation-with-chinese-half-typed)). Shown only on the keyboard's bar,
+the preedit would never reach the app's text, ending that kind of bug at the cost of seeing the
+pinyin where it goes; it is kept inline. A case `LeftPreedit` misses is a reason to weigh the
+bar-only preedit, not to widen its guards (same app and field id, the text just before the
+cursor, no selection, 3 seconds).
+
 ## The engine host
 
 `Engines` (`engine/host`) lists the input methods by name (`Engines.PINYIN`, `T9`, `SHUANGPIN`,
 `TABLES`, the English keyboard) and makes each session at first use. `EngineAssets` loads the data
 from the APK's assets: `engine/pinyin.data`, `engine/table/<name>.data`, `engine/english.data`,
 `engine/stroke.data` and the two `.safetensors` models. They are stored uncompressed in the APK
-(`noCompress`) and memory-mapped in place (`EngineBridge.asset`), so a 1 GB language model costs
-no heap. `TableRegistry` loads tables on demand; `UserLexicon` owns the user's words (learned,
-added, blocked, imported dictionaries, custom phrases) shared across every input method.
+(`noCompress`) and memory-mapped in place (`EngineBridge.asset`), so the language model (about
+156 MB of `pinyin.data`) costs no heap. `TableRegistry` loads tables on demand; `UserLexicon`
+owns the user's words (learned, added, blocked, imported dictionaries, custom phrases) shared
+across every input method.
 
 Settings for the engine live in fcitx's config of the `androidengine` addon (its options are in
 `androidengine.h`, keyed as libime's pinyin config was so old settings carry over;

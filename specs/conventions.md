@@ -16,7 +16,8 @@
   method has its own page; fcitx's internals are not shown.
 - **Never upstream.** The fork does not go back to fcitx5-android: no upstream PRs, no
   compatibility shims for it. Change whatever should change; prefer the proper fix over a shim.
-- **Licences.** Nothing research-only or non-commercial ships (LCCC is evaluation-only). Check a
+- **Licences.** Nothing research-only or non-commercial ships, and nothing that ships is trained on
+  it (LCCC only measures, and helps choose parameters such as the model's mix weight). Check a
   dataset's README/data card as well as its LICENSE, and a model's training data.
 - **Privacy.** Nothing is read from or learned in sensitive fields (`FieldPolicy`); a backup is a
   plain zip, so what an app marks sensitive stays out of it.
