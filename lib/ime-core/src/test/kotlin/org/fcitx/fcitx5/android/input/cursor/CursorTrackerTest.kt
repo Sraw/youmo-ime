@@ -4,7 +4,9 @@
  */
 package org.fcitx.fcitx5.android.input.cursor
 
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -299,6 +301,48 @@ class CursorTrackerTest {
         assertTrue("the 100th prediction is retained", t.latest.rangeEquals(100, 100))
         assertTrue("and the first is still matchable", t.consume(1))
         assertTrue("with the rest still in flight", t.latest.rangeEquals(100, 100))
+    }
+
+    // endregion
+
+    // region settled and changes
+
+    /** One deleted and one put in: back where the editor reported, which it has not reported yet. */
+    @Test
+    fun settledOnlyOnceEveryPredictionIsReported() {
+        val t = tracker(4)
+        assertTrue(t.settled)
+        t.predictOffset(-1)
+        t.predict(4)
+        assertTrue("latest equals current", t.latest.rangeEquals(t.current))
+        assertFalse(t.settled)
+        assertTrue(t.consume(3))
+        assertFalse("4 is still in flight", t.settled)
+        assertTrue(t.consume(4))
+        assertTrue(t.settled)
+    }
+
+    // what PostedCommit reads of it is only whether it is the same at two reads, not by how much it moved
+    @Test
+    fun changesCountsPredictionsUnexpectedReportsAndResetsButNotConfirmations() {
+        val t = tracker(0)
+        var before = t.changes
+        t.predict(1)
+        assertNotEquals("a prediction", before, t.changes)
+        before = t.changes
+        // even of where it already is
+        t.predict(1)
+        assertNotEquals("a prediction of where it is", before, t.changes)
+        before = t.changes
+        assertTrue(t.consume(1))
+        assertEquals("a confirmation changes nothing", before, t.changes)
+        assertTrue("the editor reporting where current is", t.consume(1))
+        assertEquals("nor does that", before, t.changes)
+        assertFalse(t.consume(9))
+        assertNotEquals("a report none expected", before, t.changes)
+        before = t.changes
+        t.resetTo(2)
+        assertNotEquals("a reset", before, t.changes)
     }
 
     // endregion
