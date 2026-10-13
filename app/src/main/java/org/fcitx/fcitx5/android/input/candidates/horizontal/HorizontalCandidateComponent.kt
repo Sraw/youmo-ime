@@ -26,6 +26,7 @@ import org.fcitx.fcitx5.android.input.bar.KawaiiBarComponent
 import org.fcitx.fcitx5.android.input.broadcast.InputBroadcastReceiver
 import org.fcitx.fcitx5.android.input.candidates.CandidateViewHolder
 import org.fcitx.fcitx5.android.input.candidates.expanded.decoration.FlexboxVerticalDecoration
+import org.fcitx.fcitx5.android.input.candidates.horizontal.HorizontalCandidateMode.AlwaysFillWidth
 import org.fcitx.fcitx5.android.input.candidates.horizontal.HorizontalCandidateMode.AutoFillWidth
 import org.fcitx.fcitx5.android.input.candidates.horizontal.HorizontalCandidateMode.NeverFillWidth
 import org.fcitx.fcitx5.android.input.dependency.UniqueViewComponent
@@ -178,26 +179,25 @@ class HorizontalCandidateComponent :
         val candidates = data.candidates
         val total = data.total
         val maxSpanCount = maxSpanCountPref.getValue()
-        when {
-            english -> {
-                layoutMinWidth = view.width / ENGLISH_SLOTS - dividerDrawable.intrinsicWidth
-                // fewer words keep their slots, not the whole bar
-                layoutFlexGrow = if (candidates.size < ENGLISH_SLOTS) 0f else 1f
-                secondLayoutPassNeeded = false
-            }
-            fillStyle == NeverFillWidth -> {
+        if (english) {
+            layoutMinWidth = view.width / ENGLISH_SLOTS - dividerDrawable.intrinsicWidth
+            // fewer words keep their slots, not the whole bar
+            layoutFlexGrow = if (candidates.size < ENGLISH_SLOTS) 0f else 1f
+            secondLayoutPassNeeded = false
+        } else when (fillStyle) {
+            NeverFillWidth -> {
                 layoutMinWidth = 0
                 layoutFlexGrow = 0f
                 secondLayoutPassNeeded = false
             }
-            fillStyle == AutoFillWidth -> {
+            AutoFillWidth -> {
                 layoutMinWidth = view.width / maxSpanCount - dividerDrawable.intrinsicWidth
                 layoutFlexGrow = if (candidates.size < maxSpanCount) 0f else 1f
                 // [^1] total candidates count < maxSpanCount
                 secondLayoutPassNeeded = candidates.size < maxSpanCount
                 secondLayoutPassDone = false
             }
-            else -> {
+            AlwaysFillWidth -> {
                 layoutMinWidth = 0
                 layoutFlexGrow = 1f
                 secondLayoutPassNeeded = false

@@ -37,8 +37,6 @@ class TextKeyboard(
     companion object {
         const val Name = "Text"
 
-        private val ADDRESS_KEYS = setOf(R.id.button_slash, R.id.button_at, R.id.button_dot, R.id.button_domain)
-
         val Layout: List<List<KeyDef>> = listOf(
             listOf(
                 AlphabetKey("Q", "1"),
@@ -149,9 +147,17 @@ class TextKeyboard(
 
     private val autoCaps = AutoCaps()
 
+    /** Caps lock on: no sentence start changes Shift. */
+    val capsLocked: Boolean get() = capsState == CapsState.Lock
+
     /** Shift on by itself where the editor [wants] a capital next, as [AutoCaps] decides. */
-    fun sentenceStart(wants: Boolean) {
-        val next = when (autoCaps.next(AutoCaps.Caps.entries[capsState.ordinal], wants)) {
+    fun applyAutoCaps(wants: Boolean) {
+        val current = when (capsState) {
+            CapsState.None -> AutoCaps.Caps.NONE
+            CapsState.Once -> AutoCaps.Caps.ONCE
+            CapsState.Lock -> AutoCaps.Caps.LOCK
+        }
+        val next = when (autoCaps.next(current, wants)) {
             AutoCaps.Caps.NONE -> CapsState.None
             AutoCaps.Caps.ONCE -> CapsState.Once
             AutoCaps.Caps.LOCK -> CapsState.Lock
@@ -235,16 +241,12 @@ class TextKeyboard(
         }
     }
 
-    private fun transformPopupPreview(c: String): String {
-        if (c.length != 1) return c
-        if (c[0].isLetter()) return transformAlphabet(c)
-        return transformPunctuation(c)
-    }
+    private fun transformPopupPreview(viewId: Int, c: String) = previewOf(c, viewId, ::transformAlphabet, ::transformPunctuation)
 
     override fun onPopupAction(action: PopupAction) {
         val newAction = when (action) {
-            is PopupAction.PreviewAction -> action.copy(content = transformPopupPreview(action.content))
-            is PopupAction.PreviewUpdateAction -> action.copy(content = transformPopupPreview(action.content))
+            is PopupAction.PreviewAction -> action.copy(content = transformPopupPreview(action.viewId, action.content))
+            is PopupAction.PreviewUpdateAction -> action.copy(content = transformPopupPreview(action.viewId, action.content))
             is PopupAction.ShowKeyboardAction -> {
                 when (action.keyboard) {
                     is KeyDef.Popup.Keyboard.Preset -> {
@@ -352,6 +354,20 @@ class TextKeyboard(
 
 /** What [label]'s long press offers: the user's list, else the built-in one; null where it is off. */
 internal fun PopupOverrides.longPressOf(label: String): Array<String>? = resolve(label, PopupPreset[label])
+
+// here, not in the companion: previewOf's JVM test would otherwise load TextKeyboard, a View
+private val ADDRESS_KEYS = setOf(R.id.button_slash, R.id.button_at, R.id.button_dot, R.id.button_domain)
+
+/**
+ * What the preview bubble of the key [viewId] shows for [content]: a letter as Shift has it
+ * ([letter]), punctuation as the input method maps it ([punctuation]); an address's keys what they
+ * commit, . not 。, as their labels show (TextKeyboard.updatePunctuationKeys).
+ */
+internal fun previewOf(content: String, viewId: Int, letter: (String) -> String, punctuation: (String) -> String): String = when {
+    content.length != 1 || viewId in ADDRESS_KEYS -> content
+    content[0].isLetter() -> letter(content)
+    else -> punctuation(content)
+}
 
 /**
  * The first of [label]'s long press ([longPressOf]) as the user changed it, [label] being [letter] as

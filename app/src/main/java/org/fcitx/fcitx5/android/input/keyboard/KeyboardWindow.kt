@@ -144,7 +144,7 @@ class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), Essentia
         detachCurrentLayout()
         attachLayout(target)
         // the letters back from the symbols, Shift off as they attach: at a sentence start, on again
-        capitalize()
+        updateAutoCaps()
         if (windowManager.isAttached(this)) {
             notifyBarLayoutChanged()
         }
@@ -184,18 +184,25 @@ class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), Essentia
         }
         switchLayout(targetLayout, remember = false)
         // after the layout, which switchLayout posts
-        ContextCompat.getMainExecutor(context).execute(::capitalize)
+        ContextCompat.getMainExecutor(context).execute(::updateAutoCaps)
     }
 
-    override fun onSelectionUpdate(start: Int, end: Int) = capitalize()
+    override fun onSelectionUpdate(start: Int, end: Int) = updateAutoCaps()
+
+    // the cursor moved by other than the service's own commit: the nine keys' 1 starts anew
+    fun cursorMoved() {
+        (currentKeyboard as? T9Keyboard)?.cursorMoved()
+    }
 
     // what the field's caps flags make of the text before the cursor: a capital where a sentence starts
-    private fun capitalize() {
+    private fun updateAutoCaps() {
         val keyboard = currentKeyboard as? TextKeyboard ?: return
-        if (composing) return
-        val wants = english && autoCapsPref.getValue() &&
-            (service.currentInputConnection?.getCursorCapsMode(service.currentInputEditorInfo.inputType) ?: 0) != 0
-        keyboard.sentenceStart(wants)
+        if (composing || keyboard.capsLocked) return
+        // null after the input is bound and before it first starts
+        val inputType = service.currentInputEditorInfo?.inputType
+        val wants = english && autoCapsPref.getValue() && inputType != null &&
+            (service.currentInputConnection?.getCursorCapsMode(inputType) ?: 0) != 0
+        keyboard.applyAutoCaps(wants)
     }
 
     override fun onImeUpdate(ime: InputMethodEntry) {
@@ -205,7 +212,7 @@ class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), Essentia
         // a layout shown anew is told the input method as it is attached
         if (shown != null) showLayout(shown) else currentKeyboard?.let(spaceKeys::show)
         english = ime.uniqueName == InputMethodNames.KEYBOARD
-        capitalize()
+        updateAutoCaps()
     }
 
     override fun onPunctuationUpdate(mapping: Map<String, String>) {

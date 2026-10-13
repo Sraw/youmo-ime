@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.input.keyboard
 
+import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.input.popup.PopupOverrides
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
@@ -55,5 +56,19 @@ class TextKeyboardTest {
         val overrides = PopupOverrides.parse("Q 7 8")
         assertNull(overrides.swipeOf("q", "q"))
         assertEquals("7", overrides.swipeOf("q", "Q"))
+    }
+
+    /** An address's keys commit as they are: under Chinese the full stop's bubble showed 。 while it typed . */
+    @Test
+    fun anAddressKeysBubbleShowsWhatItCommits() {
+        val zh = mapOf("." to "。", "/" to "、")
+        val punctuation = { p: String -> zh.getOrDefault(p, p) }
+        val shift = { c: String -> c.uppercase() }
+        assertEquals(".", previewOf(".", R.id.button_dot, shift, punctuation))
+        assertEquals("/", previewOf("/", R.id.button_slash, shift, punctuation))
+        assertEquals(".com", previewOf(".com", R.id.button_domain, shift, punctuation))
+        // the full stop beside the space is the input method's, and a letter is as Shift has it
+        assertEquals("。", previewOf(".", R.id.button_period, shift, punctuation))
+        assertEquals("Q", previewOf("q", -1, shift, punctuation))
     }
 }

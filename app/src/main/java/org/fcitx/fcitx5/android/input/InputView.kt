@@ -401,6 +401,8 @@ class InputView(
         broadcaster.onSelectionUpdate(start, end)
     }
 
+    fun cursorMoved() = keyboardWindow.cursorMoved()
+
     @RequiresApi(Build.VERSION_CODES.R)
     fun handleInlineSuggestions(response: InlineSuggestionsResponse): Boolean {
         return kawaiiBar.handleInlineSuggestions(response)
