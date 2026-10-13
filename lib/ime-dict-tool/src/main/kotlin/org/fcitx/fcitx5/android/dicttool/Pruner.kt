@@ -106,8 +106,9 @@ class Pruner(
     }
 
     private fun rebuild(keepBigram: BooleanArray, keepTrigram: BooleanArray): ArpaModel {
-        val bigrams = LongIndex(keepBigram.count { it })
-        val p2 = DoubleColumn(bigrams.size)
+        val bigramCount = keepBigram.count { it }
+        val bigrams = LongIndex(bigramCount)
+        val p2 = DoubleColumn(bigramCount)
         val sum2 = DoubleArray(size)
         val lower2 = DoubleArray(size)
         for (i in keepBigram.indices) {
@@ -120,8 +121,9 @@ class Pruner(
         }
         val backoff1 = DoubleArray(size) { v -> Mixer.backoff(sum2[v], lower2[v]) { model.words[v] } }
 
-        val trigrams = LongIndex(keepTrigram.count { it })
-        val p3 = DoubleColumn(trigrams.size)
+        val trigramCount = keepTrigram.count { it }
+        val trigrams = LongIndex(trigramCount)
+        val p3 = DoubleColumn(trigramCount)
         val sum3 = DoubleColumn(bigrams.size)
         val lower3 = DoubleColumn(bigrams.size)
         for (i in keepTrigram.indices) {

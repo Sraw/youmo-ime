@@ -84,6 +84,14 @@ class PrunerTest {
         assertTrue(pruned.has("b", "a"))
     }
 
+    // <s> a tells the model 0.0204 nats, weighed by how often a word starts its sentence (0.1): 0.002.
+    // At <s>'s own unigram (1e-8) it would go at 1e-4 too, at SRILM's 1 stay at 5e-3
+    @Test
+    fun aSentenceStartWeighsAsOftenAsAWordStartsOne() {
+        assertTrue(prune(1e-4).has("<s>", "a"))
+        assertTrue(!prune(5e-3).has("<s>", "a"))
+    }
+
     @Test
     fun atAHighThresholdOnlyTheUnigramsAreLeftAndTheyAreUntouched() {
         val pruned = prune(1.0)

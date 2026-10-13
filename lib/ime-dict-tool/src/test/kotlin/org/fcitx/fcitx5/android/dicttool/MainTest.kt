@@ -7,10 +7,13 @@ package org.fcitx.fcitx5.android.dicttool
 import org.fcitx.fcitx5.android.engine.data.CodeTable
 import org.fcitx.fcitx5.android.engine.data.Misreadings
 import org.fcitx.fcitx5.android.engine.data.PinyinData
+import org.fcitx.fcitx5.android.engine.english.EnglishData
+import org.fcitx.fcitx5.android.engine.english.EnglishText
 import org.fcitx.fcitx5.android.engine.pinyin.Syllables
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -18,6 +21,7 @@ import org.junit.rules.TemporaryFolder
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.nio.ByteBuffer
+import java.nio.ByteOrder
 import java.util.zip.GZIPInputStream
 import java.util.zip.GZIPOutputStream
 
@@ -397,6 +401,81 @@ class MainTest {
     }
 
     @Test
+    fun anEnglishModelIsCompiledAndPruned() {
+        val lm = file("english.arpa", ENGLISH_ARPA)
+        val output = tmp.root.resolve("english.data").path
+        val (code, out, err) = run("english", "-o", output, "--lm", lm)
+        assertEquals(err, 0, code)
+        assertTrue(out, out.contains("model: 4 / 2 / 1 n-grams"))
+        val data = EnglishData.load(ByteBuffer.wrap(File(output).readBytes()))
+        assertEquals(EnglishText.START, data.word(data.start))
+        // the words typed, by their keys: the model's own are none
+        assertEquals(listOf("am", "I"), (0 until data.keyed).map { data.word(data.keyedWord(it)) })
+
+        // <s> I is worth 0.51 nats to its context: past 0.1 once a sentence's start is as likely as 0.9, not at English's 1/14
+        val pruned = tmp.root.resolve("pruned.arpa").path
+        val (pruneCode, pruneOut, pruneErr) = run("prune", "-o", pruned, "--lm", lm, "--threshold", "0.1")
+        assertEquals(pruneErr, 0, pruneCode)
+        assertTrue(pruneOut, pruneOut.contains("pruned: 4 / 0 / 0 n-grams"))
+        val (startCode, startOut, startErr) = run("prune", "-o", pruned, "--lm", lm, "--threshold", "0.1", "--start-prob", "0.9")
+        assertEquals(startErr, 0, startCode)
+        assertTrue(startOut, startOut.contains("pruned: 4 / 1 / 0 n-grams"))
+        assertEquals(0, run("english", "-o", output, "--lm", pruned).first)
+        // a likelihood of none or all, or no number
+        for (bad in listOf("0", "1", "x")) {
+            assertEquals(bad, 2, run("prune", "-o", pruned, "--lm", lm, "--threshold", "0.1", "--start-prob", bad).first)
+        }
+        val (noStart, _, noStartErr) = run("prune", "-o", pruned, "--lm", file("lm.arpa", ReadersTest.TINY_ARPA), "--threshold", "0.1")
+        assertEquals(1, noStart)
+        assertTrue(noStartErr, noStartErr.contains("no <s>"))
+    }
+
+    @Test
+    fun anEnglishModelIsCountedFromThePagesTheirSlipsLeftOut() {
+        // the 300 times as common as teh, an edit from it: teh is a slip of the, unless a dictionary has it
+        val shard = tmp.root.resolve("en.parquet")
+        val text = "the ".repeat(300) + "teh cat sat on the mat. I'll go home. You and I are here."
+        WebText.write(shard, listOf(WebText.Page("https://a.example.com/", text, "")))
+        val lm = tmp.root.resolve("en.arpa").path
+        val (code, out, err) = run("english-lm", "-o", lm, "--cutoffs", "1,1", shard.path)
+        assertEquals(err, 0, code)
+        assertTrue(out, out.contains(" words, 1 slips"))
+        assertEquals(listOf("teh\tthe"), File("$lm.slips").readLines())
+        val known = tmp.root.resolve("en_dict.fscd").apply { writeBytes(fscd("teh", "cat")) }
+        val (knownCode, knownOut, knownErr) = run("english-lm", "-o", lm, "--known", known.path, "--cutoffs", "1,1", shard.path)
+        assertEquals(knownErr, 0, knownCode)
+        assertTrue(knownOut, knownOut.contains(" words, 0 slips"))
+        // as every app build compiles the release's
+        val data = tmp.root.resolve("english.data").path
+        val (compiled, _, compiledErr) = run("english", "-o", data, "--lm", lm)
+        assertEquals(compiledErr, 0, compiled)
+        val english = EnglishData.load(ByteBuffer.wrap(File(data).readBytes()))
+        assertTrue(english.id("teh") >= 0 && english.id("I'll") >= 0)
+    }
+
+    @Test
+    fun aSpellDictionarysWordsAreReadAsFarAsItHoldsThem() {
+        assertEquals(listOf("teh", "don't"), spellWords(fscd("teh", "don't")))
+        // a broken count, past what the file holds or below nothing: its words, no list made room for so many
+        assertEquals(listOf("teh", "don't"), spellWords(fscd("teh", "don't", count = Int.MAX_VALUE)))
+        assertEquals(emptyList<String>(), spellWords(fscd("teh", count = -1)))
+        // the last word without its 0
+        val whole = fscd("teh", "cat")
+        assertEquals(listOf("teh", "cat"), spellWords(whole.copyOf(whole.size - 1)))
+        assertThrows(IllegalArgumentException::class.java) { spellWords("FSCD0001".toByteArray() + ByteArray(Int.SIZE_BYTES)) }
+    }
+
+    /** fcitx's spell dictionary (`en_dict.fscd`) of [words], each of weight 1, saying it has [count]. */
+    private fun fscd(vararg words: String, count: Int = words.size): ByteArray {
+        val encoded = words.map { it.toByteArray() }
+        val magic = "FSCD0000".toByteArray(Charsets.US_ASCII)
+        val b = ByteBuffer.allocate(magic.size + Int.SIZE_BYTES + encoded.sumOf { Short.SIZE_BYTES + it.size + 1 }).order(ByteOrder.LITTLE_ENDIAN)
+        b.put(magic).putInt(count)
+        for (word in encoded) b.putShort(1.toShort()).put(word).put(0.toByte())
+        return b.array()
+    }
+
+    @Test
     fun badSourcesExitWithTheirLocation() {
         val lm = file("lm.arpa", ReadersTest.TINY_ARPA)
         val dict = file("dict.txt", "你\n")
@@ -458,6 +537,12 @@ class MainTest {
     }
 
     private companion object {
+        // as KenLM writes one: <s>, never predicted, at -99
+        const val ENGLISH_ARPA = "\\data\\\nngram 1=4\nngram 2=2\nngram 3=1\n\n" +
+            "\\1-grams:\n-5.0\t<unk>\n-99\t<s>\t-0.3\n-1.0\tI\t-0.2\n-1.2\tam\n\n" +
+            "\\2-grams:\n-0.3\t<s> I\t-0.1\n-0.4\tI am\n\n" +
+            "\\3-grams:\n-0.2\t<s> I am\n\n\\end\\\n"
+
         const val TABLE = """
             键码=abc
             码长=4

@@ -145,10 +145,12 @@ private val COMMANDS = listOf(
     ),
     Command("english -o <out> --lm <english.arpa>", "compile the English words and model (EnglishData)", 0..0, ::english),
     Command(
-        "prune -o <out.arpa> --lm <lm.arpa> --threshold <t>",
+        "prune -o <out.arpa> --lm <lm.arpa> --threshold <t> [--start-prob <p>]",
         """
             the model less the n-grams that tell it less than t
-            in relative entropy (Pruner, SRILM's -prune)
+            in relative entropy (Pruner, SRILM's -prune); p how
+            often a word is its sentence's first, the one after
+            <s>: measured on English, 1/14, if not given
         """,
         0..0,
         ::prune,
@@ -249,6 +251,8 @@ private class Options(
     val known: String?,
     /** `prune`: the least relative entropy an n-gram must be worth to stay. */
     val threshold: Double,
+    /** `prune`: how often a word is the first of its sentence, the likelihood of `<s>` as a context. */
+    val startProb: Double,
     val crawl: Crawl,
 ) {
     /** `cc`: the crawl, its first WET file and how many, and where CommonCrawl is. */
@@ -283,6 +287,9 @@ private class Options(
         // Gboard's own lists are of this order; what the pages have past it is mostly names and slips
         const val VOCABULARY = 200_000
 
+        // how often a word starts its sentence: lib/ime-eval/data/english.txt has 19,669 words in 1,500
+        const val START_PROB = 1.0 / 14
+
         // every command's flags, each taking a value: a value is none of them
         private val FLAGS = COMMANDS.flatMapTo(HashSet()) { it.flags }
 
@@ -292,6 +299,12 @@ private class Options(
 
         private fun Map<String, String>.count(flag: String, default: Int, range: IntRange): Int? =
             read(flag, default) { it.toIntOrNull()?.takeIf { n -> n in range } }
+
+        // a trigram's context must be a bigram kept (Mixer); every field a number, 2,x,3 no 2,3
+        private fun cutoffsOf(value: String): Pair<Int, Int>? {
+            val n = value.split(',').map { it.toIntOrNull() ?: return null }
+            return n.takeIf { it.size == 2 && it[0] in 1..it[1] }?.let { it[0] to it[1] }
+        }
 
         /**
          * [args] as the values of [command]'s flags and its inputs; null for a flag it does not take
@@ -328,11 +341,7 @@ private class Options(
                 lm = values["--lm"],
                 inputs = inputs,
                 weight = values.read("--weight", WEIGHT) { it.toDoubleOrNull()?.takeIf { w -> w in 0.0..1.0 } } ?: return null,
-                // a trigram's context must be a bigram kept (Mixer); every field a number, 2,x,3 no 2,3
-                cutoffs = values.read("--cutoffs", CUTOFFS) { v ->
-                    val n = v.split(',').map { it.toIntOrNull() ?: return@read null }
-                    n.takeIf { it.size == 2 && it[0] in 1..it[1] }?.let { it[0] to it[1] }
-                } ?: return null,
+                cutoffs = values.read("--cutoffs", CUTOFFS, ::cutoffsOf) ?: return null,
                 data = values["--data"],
                 minCount = values.count("--min-count", MIN_COUNT, 1..Int.MAX_VALUE) ?: return null,
                 layer = values["--layer"]?.let { it.takeIf(WordPack::validLayer) ?: return null },
@@ -355,6 +364,8 @@ private class Options(
                 tokens = values.read("--tokens", Long.MAX_VALUE) { it.toLongOrNull()?.takeIf { n -> n >= 1 } } ?: return null,
                 known = values["--known"],
                 threshold = values.read("--threshold", 0.0) { it.toDoubleOrNull()?.takeIf { t -> t >= 0 && t.isFinite() } } ?: return null,
+                // what Pruner takes: a bad value is a usage error, not its exception
+                startProb = values.read("--start-prob", START_PROB) { it.toDoubleOrNull()?.takeIf { p -> p > 0 && p < 1 } } ?: return null,
             )
         }
     }
@@ -721,13 +732,14 @@ private const val PACK_SUFFIX = ".words"
  * The words of fcitx's spell dictionary (`en_dict.fscd`): `FSCD0000`, the count, then per word a
  * little-endian 16-bit weight and the word, 0-ended.
  */
-private fun spellWords(bytes: ByteArray): List<String> {
+internal fun spellWords(bytes: ByteArray): List<String> {
     val b = ByteBuffer.wrap(bytes).order(ByteOrder.LITTLE_ENDIAN)
     val magic = "FSCD0000"
     require(bytes.size >= magic.length + Int.SIZE_BYTES && String(bytes, 0, magic.length, Charsets.US_ASCII) == magic) { "not a spell dictionary" }
     b.position(magic.length)
     val count = b.int
-    val words = ArrayList<String>(count)
+    // the file's count, which a broken one has past anything it holds: a word takes three bytes at least
+    val words = ArrayList<String>(count.coerceIn(0, bytes.size / MIN_SPELL_ENTRY))
     while (words.size < count && b.remaining() > Short.SIZE_BYTES) {
         b.short
         val start = b.position()
@@ -738,6 +750,9 @@ private fun spellWords(bytes: ByteArray): List<String> {
     return words
 }
 
+// a word's weight and one char, its 0 left off as the last one's may be
+private const val MIN_SPELL_ENTRY = 3
+
 private fun englishLm(options: Options, out: Appendable) {
     val shards = options.inputs.map(::File)
     val vocabulary = EnglishVocabulary()
@@ -747,10 +762,10 @@ private fun englishLm(options: Options, out: Appendable) {
         spellWords(File(path).readBytes()).mapTo(HashSet(), EnglishVocabulary::key)
     }.orEmpty()
     val words = vocabulary.words(options.vocabulary, known)
-    out.appendLine("pass one: ${vocabulary.spellings} spellings, ${words.list.size} words, ${words.slips.size} slips")
+    out.appendLine("pass one: ${vocabulary.spellings} spellings, ${words.list.size} words, ${words.slips.size} slips, ${words.exempted} under a tenth of their group's commonest")
     // for a look at what was taken for a slip, and of what
     File(options.output!! + ".slips").printWriter().use { w -> words.slips.toSortedMap().forEach { (slip, of) -> w.println("$slip\t$of") } }
-    val counts = EnglishCounts(words)
+    val counts = EnglishCounts(words, vocabulary.tokens)
     readEnglish(shards, options.tokens, counts::add)
     out.appendLine("pass two: ${counts.tokens} words, ${counts.bigrams.size} bigrams, ${counts.trigrams.size} trigrams")
     // no model to mix with: Kneser-Ney's alone, its n-grams cut off and the backoff weights worked out
@@ -763,8 +778,9 @@ private fun englishLm(options: Options, out: Appendable) {
     out.appendLine("wrote ${options.output}: ${File(options.output).length()} bytes")
 }
 
-// what a model mixed in at weight 0 gives every word: anything finite, as it is multiplied by 0
-private const val NO_PROB = -99.0
+// what the model of no n-grams gives every word: 10^-∞ is 0, so the mix at weight 0 is Kneser-Ney's
+// whole, whatever a weight would multiply it by
+private const val NO_PROB = Double.NEGATIVE_INFINITY
 
 /** Each run of words of [shards]' pages, as [EnglishText] splits them, till [tokens] words are read. */
 private fun readEnglish(shards: List<File>, tokens: Long, run: (List<String>, Boolean) -> Unit) {
@@ -915,14 +931,11 @@ private fun prune(options: Options, out: Appendable) {
     out.appendLine("model: ${model.size} / ${model.bigrams.size} / ${model.trigrams.size} n-grams")
     val start = model.words.indexOf(EnglishText.START)
     require(start >= 0) { "no ${EnglishText.START} in $lm" }
-    val pruned = Pruner(model, options.threshold, start, SENTENCE_START).prune()
+    val pruned = Pruner(model, options.threshold, start, options.startProb).prune()
     out.appendLine("pruned: ${pruned.size} / ${pruned.bigrams.size} / ${pruned.trigrams.size} n-grams")
     File(options.output!!).bufferedWriter().use { pruned.write(it) }
     out.appendLine("wrote ${options.output}: ${File(options.output).length()} bytes")
 }
-
-// how often a word starts its sentence: lib/ime-eval/data/english.txt has 19,669 words in 1,500
-private const val SENTENCE_START = 1.0 / 14
 
 private fun english(options: Options, out: Appendable) {
     val lm = options.lm!!
