@@ -48,8 +48,10 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6.4.0
 
-      # libime's sources, the engine-data release's model and the sentence models, some 400 MB:
-      # keyed on EngineDataPlugin, which names them and their SHA-256. Paths as in every workflow
+      # libime's sources, the engine-data release's model and words, the strokes, English's model
+      # and the sentence models, some 500 MB:
+      # keyed on EngineDataPlugin, which names them and their SHA-256. Paths as in every workflow;
+      # saved on main by engine_downloads.yml, where a new pull request's first run finds it
       - name: Cache engine data downloads
         uses: actions/cache@v6
         with:

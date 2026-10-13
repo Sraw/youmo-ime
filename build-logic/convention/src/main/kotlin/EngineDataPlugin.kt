@@ -85,6 +85,7 @@ class EngineDataPlugin : Plugin<Project> {
 
     companion object {
         const val COMPILE_TASK = "compileEngineData"
+        const val DOWNLOADS_TASK = "downloadEngineData"
         private const val BASE_URL = "https://download.fcitx-im.org/data/"
         private const val RELEASES_URL = "https://github.com/Sraw/youmo-ime/releases/download/"
 
@@ -164,6 +165,8 @@ class EngineDataPlugin : Plugin<Project> {
     }
 
     override fun apply(target: Project) {
+        // every download registerDownload makes, none of the voice's: what engine_downloads.yml runs to fill its cache
+        target.tasks.register(DOWNLOADS_TASK)
         val sourcesDir = target.layout.buildDirectory.dir("engine-sources")
         val downloadsDir = target.rootProject.layout.projectDirectory.dir(".gradle/engine-downloads")
         val components = target.extensions.getByType<ApplicationAndroidComponentsExtension>()
@@ -260,7 +263,7 @@ class EngineDataPlugin : Plugin<Project> {
             url.set(download.url)
             sha256.set(download.sha256)
             outputFile.set(downloads.file(download.file))
-        }
+        }.also { task -> target.tasks.named(DOWNLOADS_TASK).configure { dependsOn(task) } }
 
     private fun registerExtract(target: Project, name: String, download: TaskProvider<DownloadTask>, into: Provider<Directory>) =
         target.tasks.register<ExtractTask>(name) {
@@ -352,6 +355,7 @@ class EngineDataPlugin : Plugin<Project> {
     }
 
     /** English's words and model as `engine/english.data`, compiled from the arpa of the release. */
+    @CacheableTask
     abstract class CompileEnglishData @Inject constructor(private val exec: ExecOperations) : DefaultTask() {
         // built before this runs, but keyed on by toolCode only
         @get:Internal

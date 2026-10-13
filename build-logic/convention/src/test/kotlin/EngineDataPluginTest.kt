@@ -3,20 +3,24 @@
  * SPDX-FileCopyrightText: Copyright 2026 Fcitx5 for Android Contributors
  */
 import org.gradle.api.Action
+import org.gradle.api.DefaultTask
 import org.gradle.api.file.ConfigurableFileCollection
 import org.gradle.api.file.FileCollection
 import org.gradle.api.model.ObjectFactory
 import org.gradle.api.provider.Property
 import org.gradle.api.services.BuildServiceParameters
+import org.gradle.api.tasks.CacheableTask
 import org.gradle.process.ExecOperations
 import org.gradle.process.ExecResult
 import org.gradle.process.ExecSpec
 import org.gradle.process.JavaExecSpec
 import org.gradle.testfixtures.ProjectBuilder
+import org.gradle.work.DisableCachingByDefault
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
@@ -83,6 +87,20 @@ class EngineDataPluginTest {
         assertFalse(ProjectBuilder.builder().withProjectDir(folder.newFolder("bare")).build().localCmake.isPresent)
         val sdkOnly = folder.newFolder("sdk-only").apply { resolve("local.properties").writeText("sdk.dir=/opt/android-sdk\n") }
         assertFalse(ProjectBuilder.builder().withProjectDir(sdkOnly).build().localCmake.isPresent)
+    }
+
+    /** A task saying neither is never kept in the build cache, which CI restores (english.data compiled again each run). */
+    @Test
+    fun eachTaskSaysWhetherTheBuildCacheKeepsItTheCompilesThatItDoes() {
+        val tasks = EngineDataPlugin::class.java.declaredClasses.filter { DefaultTask::class.java.isAssignableFrom(it) }
+        assertTrue(tasks.isNotEmpty())
+        for (task in tasks) {
+            val says = task.isAnnotationPresent(CacheableTask::class.java) || task.isAnnotationPresent(DisableCachingByDefault::class.java)
+            assertTrue(task.simpleName, says)
+        }
+        for (compile in listOf(EngineDataPlugin.CompileEngineData::class.java, EngineDataPlugin.CompileEnglishData::class.java, EngineDataPlugin.CompileTables::class.java)) {
+            assertTrue(compile.simpleName, compile.isAnnotationPresent(CacheableTask::class.java))
+        }
     }
 
     @Test

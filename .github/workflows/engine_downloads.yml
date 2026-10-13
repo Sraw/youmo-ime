@@ -1,0 +1,64 @@
+name: Engine Data Downloads
+
+# The engine data a build downloads (libime's sources, the engine-data release's model and words,
+# the strokes, English's model, the sentence models: some 500 MB), cached on main: a pull
+# request's run reads the caches of its own branch and of main alone, so without one saved on
+# main each new pull request fetched it all again. The key is EngineDataPlugin's hash: run as it
+# changes on main, the downloads alone and no build (the whole release on every push to main was
+# why nix.yml, which saved it before, went).
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - build-logic/convention/src/main/kotlin/EngineDataPlugin.kt
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  engine_downloads:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Fetch source code
+        uses: actions/checkout@v7
+        with:
+          # full history: build-logic runs `git describe` at configuration. No submodules, as
+          # unit_test.yml's: the app configures without them, and the downloads need none
+          fetch-depth: 0
+          submodules: false
+
+      # as pull_request.yml's; only looked up, and saved at the end where it was missing
+      - name: Cache engine data downloads
+        id: cache
+        uses: actions/cache@v6
+        with:
+          path: |
+            .gradle/engine-downloads
+            !.gradle/engine-downloads/voice
+          key: engine-downloads-${{ hashFiles('build-logic/convention/src/main/kotlin/EngineDataPlugin.kt') }}
+          lookup-only: true
+
+      - name: Setup Java
+        if: steps.cache.outputs.cache-hit != 'true'
+        uses: actions/setup-java@v5
+        with:
+          distribution: "temurin"
+          java-version: "17"
+
+      - name: Setup Android environment
+        if: steps.cache.outputs.cache-hit != 'true'
+        uses: android-actions/setup-android@be39fa834029ff78f1a44aa3bb0819b8fc2bd8fd # v4.0.4
+
+      - name: Setup Gradle
+        if: steps.cache.outputs.cache-hit != 'true'
+        uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6.4.0
+
+      # EngineDataPlugin's downloads, each checked against its SHA-256: downloadEngineData depends on
+      # every one it registers, so one it adds is fetched and cached too
+      - name: Download engine data
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: ./gradlew :app:downloadEngineData
