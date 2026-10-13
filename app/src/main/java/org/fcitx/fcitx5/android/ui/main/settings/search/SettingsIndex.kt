@@ -115,11 +115,8 @@ object SettingsIndex {
         fun text(@StringRes id: Int) = if (id == 0) "" else context.getString(id)
         for (item in items) when (item) {
             is InputMethodSettings.Toggle -> visit(item.title(context), text(item.summary), item.key, path)
-            is InputMethodSettings.Choice -> visit(text(item.title), text(item.summary), item.key, path)
             is InputMethodSettings.Flags -> visit(text(item.title), item.flags.joinToString(" ") { it.second }, item.path, path)
-            is InputMethodSettings.AppChoice<*> -> visit(text(item.title), text(item.summary), item.key, path)
-            is InputMethodSettings.AppToggle -> visit(text(item.title), text(item.summary), item.key, path)
-            is InputMethodSettings.Page -> visit(text(item.title), text(item.summary), item.key, path)
+            is InputMethodSettings.Titled -> visit(text(item.title), text(item.summary), item.key, path)
             is InputMethodSettings.Section -> items(context, item.items, path + text(item.title), visit)
         }
     }

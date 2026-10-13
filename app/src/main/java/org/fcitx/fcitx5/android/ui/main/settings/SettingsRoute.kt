@@ -138,8 +138,9 @@ sealed class SettingsRoute : Parcelable {
     @Serializable
     data object PopupOverrides : SettingsRoute()
 
+    // not NineKeyLetters, the letters' class that NineKeyLettersFragment edits
     @Serializable
-    data object NineKeyLetters : SettingsRoute()
+    data object T9Letters : SettingsRoute()
 
     @Serializable
     data object Search : SettingsRoute()
@@ -210,7 +211,7 @@ sealed class SettingsRoute : Parcelable {
             fragment<PopupOverridesFragment, PopupOverrides> {
                 label = ctx.getString(R.string.long_press_characters)
             }
-            fragment<NineKeyLettersFragment, NineKeyLetters> {
+            fragment<NineKeyLettersFragment, T9Letters> {
                 label = ctx.getString(R.string.t9_letters)
             }
             fragment<SettingsSearchFragment, Search> {

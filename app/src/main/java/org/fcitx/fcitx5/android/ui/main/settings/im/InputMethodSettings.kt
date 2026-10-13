@@ -44,6 +44,13 @@ object InputMethodSettings {
 
     sealed interface Item
 
+    /** An item titled and summed up by string resources (0 for no summary): the settings search finds it by its [key]. */
+    sealed interface Titled : Item {
+        val key: String
+        @get:StringRes val title: Int
+        @get:StringRes val summary: Int
+    }
+
     /**
      * [key] (a/b for b under a) is "True" or "False", unless [read] and [write] say otherwise.
      * With [unused], shown greyed with that as its summary: an option of the engine this input
@@ -60,13 +67,13 @@ object InputMethodSettings {
 
     /** One of [values]; a value stored that is not one of them shows as the one [nearest] to it. */
     class Choice(
-        val key: String,
-        @StringRes val title: Int,
+        override val key: String,
+        @StringRes override val title: Int,
         val values: List<String>,
-        @StringRes val summary: Int = 0,
+        @StringRes override val summary: Int = 0,
         val label: (Context, String) -> String,
         val nearest: (String) -> String = { it },
-    ) : Item
+    ) : Titled
 
     /**
      * Switches of the same kind, picked together in one dialog: [flags] of key and label, under
@@ -87,23 +94,28 @@ object InputMethodSettings {
      * [key], [pref] asked for only when the page is made.
      */
     class AppChoice<T>(
-        val key: String,
-        @StringRes val title: Int,
-        @StringRes val summary: Int,
+        override val key: String,
+        @StringRes override val title: Int,
+        @StringRes override val summary: Int,
         val values: List<T>,
         val pref: () -> ManagedPreference.PStringLike<T>,
-    ) : Item where T : Enum<T>, T : ManagedPreferenceEnum
+    ) : Titled where T : Enum<T>, T : ManagedPreferenceEnum
 
     /** A switch over the app's own preference [pref], as [AppChoice] is a list. */
     class AppToggle(
-        val key: String,
-        @StringRes val title: Int,
-        @StringRes val summary: Int,
+        override val key: String,
+        @StringRes override val title: Int,
+        @StringRes override val summary: Int,
         val pref: () -> ManagedPreference<Boolean>,
-    ) : Item
+    ) : Titled
 
     /** A page of its own, [route], as the app's settings open one: not an option of fcitx's. */
-    class Page(val key: String, @StringRes val title: Int, @StringRes val summary: Int, val route: SettingsRoute) : Item
+    class Page(
+        override val key: String,
+        @StringRes override val title: Int,
+        @StringRes override val summary: Int,
+        val route: SettingsRoute,
+    ) : Titled
 
     class Section(@StringRes val title: Int, val items: List<Item>) : Item
 
@@ -165,10 +177,10 @@ object InputMethodSettings {
             Section(
                 R.string.im_section_typing, listOfNotNull(
                     // the keyboard's: how it sends a key pressed again
-                    AppChoice(T9MultiTap.KEY, R.string.t9_multi_tap, R.string.t9_multi_tap_summary, T9MultiTap.entries) {
+                    AppChoice(AppPrefs.T9_MULTI_TAP, R.string.t9_multi_tap, R.string.t9_multi_tap_summary, T9MultiTap.entries) {
                         AppPrefs.getInstance().keyboard.t9MultiTap
                     }.takeIf { nineKeys },
-                    Page(T9_LETTERS, R.string.t9_letters, R.string.t9_letters_summary, SettingsRoute.NineKeyLetters).takeIf { nineKeys },
+                    Page(T9_LETTERS, R.string.t9_letters, R.string.t9_letters_summary, SettingsRoute.T9Letters).takeIf { nineKeys },
                     Choice(EngineSettings.PAGE_SIZE, R.string.im_page_size, PAGE_SIZES, label = { _, v -> v }, nearest = numbers(EngineSettings.PAGE_SIZES)),
                     Toggle(EngineSettings.PREDICTION, text(R.string.im_prediction), R.string.im_prediction_summary),
                     Choice(
@@ -294,7 +306,7 @@ object InputMethodSettings {
         items: List<Item>,
         cfg: RawConfig,
         save: () -> Unit,
-        open: (SettingsRoute) -> Unit = {},
+        open: (SettingsRoute) -> Unit,
     ): PreferenceScreen {
         val context = manager.context
         val screen = manager.createPreferenceScreen(context)
@@ -356,21 +368,7 @@ object InputMethodSettings {
                 is Flags -> into(flagsPreference(context, item, item.flags.map { raw("${item.path}/${it.first}") }, save))
                 is AppChoice<*> -> into(appChoice(context, item))
                 is Page -> into(page(context, item, open))
-                is AppToggle -> into(SwitchPreferenceCompat(context).apply {
-                    val pref = item.pref()
-                    key = item.key
-                    // the app's preference set by hand: this screen's store is fcitx's config
-                    isPersistent = false
-                    isIconSpaceReserved = false
-                    isSingleLineTitle = false
-                    setTitle(item.title)
-                    setSummary(item.summary)
-                    isChecked = pref.getValue()
-                    setOnPreferenceChangeListener { _, value ->
-                        pref.setValue(value as Boolean)
-                        true
-                    }
-                })
+                is AppToggle -> into(appToggle(context, item))
             }
         }
         items.forEach { add(it, screen::addPreference) }
@@ -426,6 +424,22 @@ object InputMethodSettings {
                 true
             }
         }
+
+    private fun appToggle(context: Context, item: AppToggle) = SwitchPreferenceCompat(context).apply {
+        val pref = item.pref()
+        key = item.key
+        // the app's preference set by hand: this screen's store is fcitx's config
+        isPersistent = false
+        isIconSpaceReserved = false
+        isSingleLineTitle = false
+        setTitle(item.title)
+        setSummary(item.summary)
+        isChecked = pref.getValue()
+        setOnPreferenceChangeListener { _, value ->
+            pref.setValue(value as Boolean)
+            true
+        }
+    }
 
     private fun choiceSummary(context: Context, item: Choice): Preference.SummaryProvider<ListPreference> {
         val simple = ListPreference.SimpleSummaryProvider.getInstance()

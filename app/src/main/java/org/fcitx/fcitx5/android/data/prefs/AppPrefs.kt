@@ -131,22 +131,29 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
             switch(R.string.space_swipe_move_cursor, "space_swipe_move_cursor", true)
         val autoPairs = switch(R.string.auto_pairs, "auto_pairs", true)
 
+        // set on an input method's page, with no UI here: not hidden { }, which would put them back to their defaults
+        private fun bool(key: String, defaultValue: Boolean) =
+            ManagedPreference.PBool(sharedPreferences, key, defaultValue).apply { register() }
+
+        private fun string(key: String, defaultValue: String) =
+            ManagedPreference.PString(sharedPreferences, key, defaultValue).apply { register() }
+
+        private fun <T : Any> stringLike(key: String, codec: ManagedPreference.StringLikeCodec<T>, defaultValue: T) =
+            ManagedPreference.PStringLike(sharedPreferences, key, defaultValue, codec).apply { register() }
+
         /** Shown on the 九键 page (InputMethodSettings), not here: one input method's alone. */
-        val t9MultiTap = ManagedPreference.PStringLike(
-            sharedPreferences, T9MultiTap.KEY, T9MultiTap.Medium,
-            object : ManagedPreference.StringLikeCodec<T9MultiTap> {
-                override fun decode(raw: String) = T9MultiTap.entries.firstOrNull { it.name == raw }
-            },
-        ).apply { register() }
+        val t9MultiTap = stringLike(T9_MULTI_TAP, object : ManagedPreference.StringLikeCodec<T9MultiTap> {
+            override fun decode(raw: String) = T9MultiTap.entries.firstOrNull { it.name == raw }
+        }, T9MultiTap.Medium)
 
         /**
          * What each of 九键's digit keys types ([NineKeyLetters.serialize], empty as on a phone):
          * set on its own page from the 九键 page, read by the keyboard and the engine alike.
          */
-        val t9Letters = ManagedPreference.PString(sharedPreferences, "t9_letters", "").apply { register() }
+        val t9Letters = string("t9_letters", "")
 
         /** Shown on the English page (InputMethodSettings), not here: English's alone. */
-        val englishAutoCaps = ManagedPreference.PBool(sharedPreferences, ENGLISH_AUTO_CAPS, true).apply { register() }
+        val englishAutoCaps = bool(ENGLISH_AUTO_CAPS, true)
         val showLangSwitchKey =
             switch(R.string.show_lang_switch_key, "show_lang_switch_key", true)
         val langSwitchKeyBehavior = hidden {
@@ -579,6 +586,8 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
     companion object {
         private var instance: AppPrefs? = null
 
+        // keys an input method's page names its rows by (InputMethodSettings); the others are only this file's
+        const val T9_MULTI_TAP = "t9_multi_tap"
         const val ENGLISH_AUTO_CAPS = "english_auto_caps"
 
         /**

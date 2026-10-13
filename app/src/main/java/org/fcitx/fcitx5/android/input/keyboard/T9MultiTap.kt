@@ -12,10 +12,5 @@ enum class T9MultiTap(override val stringRes: Int, val timeout: Long) : ManagedP
     Off(R.string.t9_multi_tap_off, 0),
     Fast(R.string.t9_multi_tap_fast, 400),
     Medium(R.string.t9_multi_tap_medium, 600),
-    Slow(R.string.t9_multi_tap_slow, 900);
-
-    companion object {
-        /** Its key in the app's preferences ([AppPrefs.Keyboard.t9MultiTap][org.fcitx.fcitx5.android.data.prefs.AppPrefs.Keyboard.t9MultiTap]). */
-        const val KEY = "t9_multi_tap"
-    }
+    Slow(R.string.t9_multi_tap_slow, 900)
 }

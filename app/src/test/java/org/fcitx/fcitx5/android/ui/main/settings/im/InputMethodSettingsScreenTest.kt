@@ -10,6 +10,7 @@ import androidx.preference.Preference
 import androidx.preference.PreferenceGroup
 import androidx.preference.PreferenceManager
 import androidx.preference.PreferenceScreen
+import androidx.preference.SwitchPreferenceCompat
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.core.InputMethodNames
@@ -48,7 +49,7 @@ class InputMethodSettingsScreenTest {
 
     private fun create(items: List<Item>, cfg: RawConfig = RawConfig(), save: () -> Unit = {}): PreferenceScreen {
         val ctx = PlaceholderStrings(RuntimeEnvironment.getApplication())
-        return InputMethodSettings.create(PreferenceManager(ctx), items, cfg, save)
+        return InputMethodSettings.create(PreferenceManager(ctx), items, cfg, save, open = {})
     }
 
     private fun screen(page: String, cfg: RawConfig = RawConfig(), save: () -> Unit = {}) =
@@ -102,14 +103,30 @@ class InputMethodSettingsScreenTest {
         pref.setValue(T9MultiTap.Medium)
         val cfg = RawConfig()
         var saved = 0
-        val list = screen(Engines.T9, cfg) { saved++ }.findPreference<ListPreference>(T9MultiTap.KEY)!!
+        val list = screen(Engines.T9, cfg) { saved++ }.findPreference<ListPreference>(AppPrefs.T9_MULTI_TAP)!!
         assertEquals(T9MultiTap.Medium.name, list.value)
         assertTrue(list.callChangeListener(T9MultiTap.Off.name))
         assertEquals(T9MultiTap.Off, pref.getValue())
         assertEquals(0, saved)
-        assertTrue(T9MultiTap.KEY !in cfg.flattened())
-        assertNull(screen(Engines.PINYIN).findPreference<ListPreference>(T9MultiTap.KEY))
+        assertTrue(AppPrefs.T9_MULTI_TAP !in cfg.flattened())
+        assertNull(screen(Engines.PINYIN).findPreference<ListPreference>(AppPrefs.T9_MULTI_TAP))
         pref.setValue(T9MultiTap.Medium)
+    }
+
+    // as multi-tap: the keyboard's own, nothing of it in fcitx's config
+    @Test
+    fun autoCapsOnTheEnglishPageIsTheAppsPreference() {
+        val pref = AppPrefs.getInstance().keyboard.englishAutoCaps
+        pref.setValue(true)
+        val cfg = RawConfig()
+        var saved = 0
+        val toggle = screen(InputMethodNames.KEYBOARD, cfg) { saved++ }.findPreference<SwitchPreferenceCompat>(AppPrefs.ENGLISH_AUTO_CAPS)!!
+        assertTrue(toggle.isChecked)
+        assertTrue(toggle.callChangeListener(false))
+        assertFalse(pref.getValue())
+        assertEquals(0, saved)
+        assertTrue(AppPrefs.ENGLISH_AUTO_CAPS !in cfg.flattened())
+        pref.setValue(true)
     }
 
     // a dialog message would leave the list's dialog with no choices in it

@@ -28,6 +28,9 @@ import org.robolectric.annotation.Config
 
 /** A search result for an input method's option opens the page that has it. */
 @RunWith(RobolectricTestRunner::class)
+// the real application, which initialises the AppPrefs the nine keys' and English pages read: a test
+// run alone, or first, found none
+@Config(application = FcitxApplication::class)
 class SettingsIndexTest {
 
     private fun context(): Context = PlaceholderStrings(RuntimeEnvironment.getApplication())
@@ -36,7 +39,7 @@ class SettingsIndexTest {
 
     /** [uniqueName]'s page, as InputMethodConfigFragment draws it. */
     private fun pageOf(ctx: Context, uniqueName: String): PreferenceScreen =
-        InputMethodSettings.create(PreferenceManager(ctx), InputMethodSettings.of(uniqueName)!!, RawConfig(), save = {})
+        InputMethodSettings.create(PreferenceManager(ctx), InputMethodSettings.of(uniqueName)!!, RawConfig(), save = {}, open = {})
 
     /** The keys of the settings on [uniqueName]'s page. */
     private fun keysOn(ctx: Context, uniqueName: String): Set<String> {
@@ -80,7 +83,6 @@ class SettingsIndexTest {
      * and point at nothing, or at the other. The page itself is the one result with none.
      */
     @Test
-    @Config(application = FcitxApplication::class)
     fun eachPageIsFoundOnceAndEachSettingOnItByAKeyOfItsOwn() {
         for ((route, on) in SettingsIndex.build(context()).groupBy { it.target.route }) {
             assertEquals("$route", 1, on.count { it.target.key == null })
@@ -94,7 +96,6 @@ class SettingsIndexTest {
      * did would pin each default the user never touched, at every search.
      */
     @Test
-    @Config(application = FcitxApplication::class)
     fun buildingTheIndexSavesNothing() {
         // where a preference attached with no data store saves, and where AppPrefs (and a level) does
         val stores = listOf(
