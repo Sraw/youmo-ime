@@ -69,13 +69,22 @@ class TableLoneCodeTest {
         time = 1000
         assertTrue(t.reads(' '))
         assertTrue(t.apply(Key(' ')).handled)
-        // past the second: typed
+        // past the second: typed. Read all the same, the clock asked once, as it is applied: asked as
+        // it is read too, a space read within the second and applied past it fell between the two
         time = 0
         val u = session { time }
         u.type("wqiy")
+        assertTrue(u.reads(' '))
         time = 1001
-        assertFalse(u.reads(' '))
-        assertFalse(u.apply(Key(' ')).handled)
+        val late = u.apply(Key(' '))
+        assertFalse(late.handled)
+        assertEquals("", late.commit)
+        // and through the keyboard, which reads the key then applies it: the app's, typed
+        time = 0
+        val keyboard = Keyboard(session { time }, nineKeys = false)
+        "wqiy".forEach { keyboard.onEvent(EngineEvent.CHAR, it.code) }
+        time = 5000
+        assertFalse(keyboard.onEvent(EngineEvent.CHAR, ' '.code).handled)
     }
 
     @Test

@@ -91,6 +91,10 @@ class TableSession(
         return c == ' ' && now() - at <= SPACE_TAKEN_MS
     }
 
+    // read: [apply] alone asks the clock, once for the key; one later than a second it hands on to
+    // the app as any key no code starts. Asked here too, the two could fall either side of the second
+    private fun mayTakeSpace(c: Char) = c == ' ' && committedItselfAt != null
+
     private fun dispatch(action: Action): Snapshot = if (lookingUp) lookUp(action) else when (action) {
         is Action.Key -> type(action.char)
         Action.Backspace -> backspace()
@@ -127,7 +131,7 @@ class TableSession(
         else -> emptySet()
     }
 
-    override fun reads(c: Char): Boolean = if (takesSpace(c)) {
+    override fun reads(c: Char): Boolean = if (mayTakeSpace(c)) {
         true
     } else if (lookingUp) {
         c in 'a'..'z' || c == '\''
