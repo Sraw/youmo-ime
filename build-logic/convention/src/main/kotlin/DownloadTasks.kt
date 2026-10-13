@@ -7,6 +7,7 @@ import com.android.build.gradle.tasks.ExternalNativeBuildJsonTask
 import org.gradle.api.DefaultTask
 import org.gradle.api.file.DirectoryProperty
 import org.gradle.api.file.RegularFileProperty
+import org.gradle.api.provider.ListProperty
 import org.gradle.api.provider.Property
 import org.gradle.api.tasks.Input
 import org.gradle.api.tasks.InputFile
@@ -86,6 +87,10 @@ abstract class ExtractTask @Inject constructor(private val exec: ExecOperations)
     @get:PathSensitive(PathSensitivity.NAME_ONLY)
     abstract val archive: RegularFileProperty
 
+    /** The archive's paths to unpack, as `cmake -E tar` matches them; none for all of it. */
+    @get:Input
+    abstract val members: ListProperty<String>
+
     @get:Internal
     abstract val cmake: RegularFileProperty
 
@@ -100,6 +105,7 @@ abstract class ExtractTask @Inject constructor(private val exec: ExecOperations)
         // configuring the native build installs a CMake the SDK lacks
         mustRunAfter(project.tasks.withType<ExternalNativeBuildJsonTask>())
         cmakeFromLocalProperties.convention(project.localCmake.map { true }.orElse(false))
+        members.convention(emptyList())
     }
 
     @TaskAction
@@ -111,7 +117,7 @@ abstract class ExtractTask @Inject constructor(private val exec: ExecOperations)
         dir.deleteRecursively()
         dir.mkdirs()
         exec.exec {
-            commandLine(cmake.path, "-E", "tar", "xf", archive.get().asFile.path)
+            commandLine(listOf(cmake.path, "-E", "tar", "xf", archive.get().asFile.path) + members.get())
             workingDir = dir
         }
     }

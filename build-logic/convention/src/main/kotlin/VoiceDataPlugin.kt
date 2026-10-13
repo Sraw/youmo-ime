@@ -67,10 +67,14 @@ class VoiceDataPlugin : Plugin<Project> {
 
         /** the archive's files the assets take as they are; its bpe.model is read for bpe.vocab */
         internal val MODEL_FILES = listOf("tokens.txt")
+        internal const val BPE_MODEL = "bpe.model"
 
         // the archive's encoder, decoder and joiner converted by onnxruntime 1.28's
         // convert_onnx_models_to_ort, the version the recognizer is built with
         private const val ORT_RELEASE = "voice-models-20261012"
+
+        // the archive ORT_RELEASE was converted from: another archive's tokens would go with these weights
+        private const val ORT_MODEL = "sherpa-onnx-x-asr-zipformer-transducer-zh-en-punct-int8-2026-06-03"
         private const val ORT_URL = "https://github.com/Sraw/youmo-ime/releases/download/$ORT_RELEASE/x-asr-ort.tar.zst"
         private const val ORT_SHA256 = "ab0d8bdc6076c5fb48e725fafd2066ea59a1a605a05d3ea8e84a79e885b53929"
         internal const val ORT_DIR = "x-asr-ort"
@@ -80,6 +84,10 @@ class VoiceDataPlugin : Plugin<Project> {
     }
 
     override fun apply(target: Project) {
+        // tokens of one model with another's weights decode to nonsense, and nothing else would fail
+        check(ORT_MODEL == MODEL_NAME) {
+            "$ORT_RELEASE is $ORT_MODEL converted, not $MODEL_NAME: publish $MODEL_NAME's as a new voice-models release and pin it"
+        }
         // its downloadEngineWords and its tool make the hotwords, whichever plugin the build script names first
         target.pluginManager.apply(EngineDataPlugin::class.java)
         val downloadsDir = target.rootProject.layout.projectDirectory.dir(".gradle/engine-downloads/voice")
@@ -92,6 +100,8 @@ class VoiceDataPlugin : Plugin<Project> {
         }
         val modelDir = target.tasks.register<ExtractTask>("extractVoiceModel") {
             archive.set(modelArchive.flatMap { it.outputFile })
+            // the weights come converted from ORT_RELEASE: of the archive's 176 MB, the 0.2 MB the assets read
+            members.set((MODEL_FILES + BPE_MODEL).map { "$MODEL_NAME/$it" })
             cmake.set(target.sdkCmake)
             outputDir.set(target.layout.buildDirectory.dir("voice-sources"))
         }
@@ -200,7 +210,7 @@ class VoiceDataPlugin : Plugin<Project> {
             for (name in MODEL_FILES) link(dir.resolve(name), out.resolve(name))
             for (name in ORT_FILES) link(ort.get().asFile.resolve(ORT_DIR).resolve(name), out.resolve(name))
             vad.get().asFile.copyTo(out.resolve("silero_vad.onnx"))
-            out.resolve("bpe.vocab").writeText(vocabulary(dir.resolve("bpe.model").readBytes()))
+            out.resolve("bpe.vocab").writeText(vocabulary(dir.resolve(BPE_MODEL).readBytes()))
             hotwords.get().asFile.copyTo(out.resolve("hotwords.txt"))
         }
 

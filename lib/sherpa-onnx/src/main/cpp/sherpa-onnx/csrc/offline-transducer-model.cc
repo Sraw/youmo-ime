@@ -101,17 +101,17 @@ class OfflineTransducerModel::Impl {
     encoder_sess_ = std::make_unique<Ort::Session>(
         env_, SHERPA_ONNX_TO_ORT_PATH(config.transducer.encoder_filename),
         sess_opts_);
-    InitEncoder(nullptr, 0);
+    InitEncoder(nullptr, 0, sess_opts_);
 
     decoder_sess_ = std::make_unique<Ort::Session>(
         env_, SHERPA_ONNX_TO_ORT_PATH(config.transducer.decoder_filename),
         sess_opts_);
-    InitDecoder(nullptr, 0);
+    InitDecoder(nullptr, 0, sess_opts_);
 
     joiner_sess_ = std::make_unique<Ort::Session>(
         env_, SHERPA_ONNX_TO_ORT_PATH(config.transducer.joiner_filename),
         sess_opts_);
-    InitJoiner(nullptr, 0);
+    InitJoiner(nullptr, 0, sess_opts_);
   }
 
   template <typename Manager>
@@ -215,11 +215,13 @@ class OfflineTransducerModel::Impl {
   }
 
  private:
+  // youmo: the session options passed on, for the mapped models' own (see below)
+  using Init = void (Impl::*)(void *, size_t, const Ort::SessionOptions &);
+
   template <typename Manager>
-  void Load(Manager *mgr, const std::string &filename,
-            void (Impl::*init)(void *, size_t)) {
+  void Load(Manager *mgr, const std::string &filename, Init init) {
     auto buf = ReadFile(mgr, filename);
-    (this->*init)(buf.data(), buf.size());
+    (this->*init)(buf.data(), buf.size(), sess_opts_);
   }
 
 #if __ANDROID_API__ >= 9
@@ -228,9 +230,10 @@ class OfflineTransducerModel::Impl {
   // the APK: pages the system can drop and read again, where a copy on the
   // heap, onnxruntime's tensors made of it and their prepacked weights took
   // some 250 MB of the encoder's 155. Prepacking copies the weights, so it is
-  // off; on the int8 encoder it saved nothing measurable.
-  void Load(AAssetManager *mgr, const std::string &filename,
-            void (Impl::*init)(void *, size_t)) {
+  // off; on the int8 encoder it saved nothing measurable. These options are a
+  // copy of sess_opts_, which a model read onto the heap keeps: its buffer is
+  // freed once its session is made, and must not be used in place.
+  void Load(AAssetManager *mgr, const std::string &filename, Init init) {
     if (!EndsWith(filename, ".ort")) {
       Load<AAssetManager>(mgr, filename, init);
       return;
@@ -247,22 +250,24 @@ class OfflineTransducerModel::Impl {
       SHERPA_ONNX_LOGE("'%s' is compressed, so not mapped", filename.c_str());
     }
     if (assets_.empty()) {
-      sess_opts_.AddConfigEntry("session.use_ort_model_bytes_directly", "1");
-      sess_opts_.AddConfigEntry("session.use_ort_model_bytes_for_initializers",
-                                "1");
-      sess_opts_.AddConfigEntry("session.disable_prepacking", "1");
+      mapped_opts_ = sess_opts_.Clone();
+      mapped_opts_.AddConfigEntry("session.use_ort_model_bytes_directly", "1");
+      mapped_opts_.AddConfigEntry(
+          "session.use_ort_model_bytes_for_initializers", "1");
+      mapped_opts_.AddConfigEntry("session.disable_prepacking", "1");
     }
     size_t length = AAsset_getLength(asset.get());
     // kept before the session is made on it, so that it outlives the session
     assets_.push_back(std::move(asset));
-    (this->*init)(const_cast<void *>(data), length);
+    (this->*init)(const_cast<void *>(data), length, mapped_opts_);
   }
 #endif
 
-  void InitEncoder(void *model_data, size_t model_data_length) {
+  void InitEncoder(void *model_data, size_t model_data_length,
+                   const Ort::SessionOptions &opts) {
     if (model_data) {
       encoder_sess_ = std::make_unique<Ort::Session>(
-          env_, model_data, model_data_length, sess_opts_);
+          env_, model_data, model_data_length, opts);
     } else if (!encoder_sess_) {
       SHERPA_ONNX_LOGE(
           "Please pass model data or initialize the encoder session outside of "
@@ -300,10 +305,11 @@ class OfflineTransducerModel::Impl {
     }
   }
 
-  void InitDecoder(void *model_data, size_t model_data_length) {
+  void InitDecoder(void *model_data, size_t model_data_length,
+                   const Ort::SessionOptions &opts) {
     if (model_data) {
       decoder_sess_ = std::make_unique<Ort::Session>(
-          env_, model_data, model_data_length, sess_opts_);
+          env_, model_data, model_data_length, opts);
     } else if (!decoder_sess_) {
       SHERPA_ONNX_LOGE(
           "Please pass model data or initialize the decoder session outside of "
@@ -337,10 +343,11 @@ class OfflineTransducerModel::Impl {
     SHERPA_ONNX_READ_META_DATA(context_size_, "context_size");
   }
 
-  void InitJoiner(void *model_data, size_t model_data_length) {
+  void InitJoiner(void *model_data, size_t model_data_length,
+                  const Ort::SessionOptions &opts) {
     if (model_data) {
       joiner_sess_ = std::make_unique<Ort::Session>(
-          env_, model_data, model_data_length, sess_opts_);
+          env_, model_data, model_data_length, opts);
     } else if (!joiner_sess_) {
       SHERPA_ONNX_LOGE(
           "Please pass model data or initialize the joiner session outside of "
@@ -371,6 +378,8 @@ class OfflineTransducerModel::Impl {
   Ort::AllocatorWithDefaultOptions allocator_;
 
 #if __ANDROID_API__ >= 9
+  // youmo: sess_opts_ with the bytes used in place, for the mapped models alone
+  Ort::SessionOptions mapped_opts_{nullptr};
   // youmo: the mapped models, declared before the sessions that read them so
   // that they are closed after them
   using Asset = std::unique_ptr<AAsset, decltype(&AAsset_close)>;
