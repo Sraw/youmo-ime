@@ -8,8 +8,8 @@ import android.os.Bundle
 import android.view.View
 import android.widget.Button
 import androidx.activity.addCallback
-import androidx.annotation.VisibleForTesting
 import androidx.activity.enableEdgeToEdge
+import androidx.annotation.VisibleForTesting
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
