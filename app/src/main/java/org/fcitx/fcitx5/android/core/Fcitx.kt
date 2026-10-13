@@ -74,8 +74,9 @@ class Fcitx(private val context: Context) : FcitxAPI, FcitxLifecycleOwner {
     override suspend fun forgetEnglishWords(texts: List<String>) = withFcitxContext { EngineBridge.engines.forgetEnglishWords(texts) }
     override suspend fun importUserWords(lines: Sequence<String>) = withFcitxContext { EngineBridge.engines.importWords(lines) }
     override suspend fun exportUserWords() = withFcitxContext { EngineBridge.engines.exportWords() }
+    override suspend fun tableKeys(im: String) = withFcitxContext { EngineBridge.tableKeys(im) }
 
-    override suspend fun engineContext(before: String) = withFcitxContext { EngineBridge.context(before) }
+    override suspend fun engineContext(before: String, learning: Boolean) = withFcitxContext { EngineBridge.context(before, learning) }
 
     override suspend fun sendKey(
         key: String,

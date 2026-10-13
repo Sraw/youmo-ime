@@ -87,11 +87,15 @@ interface FcitxAPI {
     /** The user's words as [importUserWords] reads them: see [Engines.exportWords]. */
     suspend fun exportUserWords(): List<String>
 
+    /** The keys no letter the table input method [im] reads now, as its session has them: see [Engines.tableKeys]. */
+    suspend fun tableKeys(im: String): Set<Char>
+
     /**
      * Tells the engine [before], the text before the cursor, where the user put the cursor other
-     * than by typing (a field focused, a tap): what they type next follows it.
+     * than by typing (a field focused, a tap): what they type next follows it. [learning] off in a
+     * field that asks not to be learned from, told "" (not known) there.
      */
-    suspend fun engineContext(before: String)
+    suspend fun engineContext(before: String, learning: Boolean = true)
 
     suspend fun sendKey(key: String, states: UInt = 0u, code: Int = 0, up: Boolean = false, timestamp: Int = -1)
 

@@ -125,8 +125,13 @@ class FakeFcitxAPI : FcitxAPI {
         if (it.kind == Engines.UserWord.Kind.BLOCKED) "!$line" else line
     }
 
-    override suspend fun engineContext(before: String) {
-        calls += "engineContext($before)"
+    /** What [tableKeys] answers, by table input method: none for any other, as the engine. */
+    val tableKeys = HashMap<String, Set<Char>>()
+
+    override suspend fun tableKeys(im: String): Set<Char> = tableKeys[im].orEmpty()
+
+    override suspend fun engineContext(before: String, learning: Boolean) {
+        calls += "engineContext($before, $learning)"
     }
 
     override suspend fun sendKey(key: String, states: UInt, code: Int, up: Boolean, timestamp: Int) {

@@ -8,11 +8,14 @@ import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.data.pinyin.CustomPhraseManager
 import org.fcitx.fcitx5.android.data.pinyin.ImportedDictionaries
 import org.fcitx.fcitx5.android.data.pinyin.customphrase.PinyinCustomPhrase
+import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.replaceDirectory
 import org.fcitx.fcitx5.android.engine.data.DataFormatException
 import org.fcitx.fcitx5.android.engine.host.EngineEvent
 import org.fcitx.fcitx5.android.engine.host.Engines
 import org.fcitx.fcitx5.android.engine.phrase.CustomPhrases
+import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
+import org.fcitx.fcitx5.android.engine.pinyin.ShuangpinScheme
 import org.fcitx.fcitx5.android.engine.session.Choice
 import org.fcitx.fcitx5.android.engine.session.Offer
 import org.fcitx.fcitx5.android.engine.session.Snapshot
@@ -44,7 +47,9 @@ import java.nio.file.Files
  * read them, nor over a file it could not read. And an input method whose data cannot load, and
  * only that: not called again till the engine is reloaded. And the engine's files a user-data
  * import killed midway left aside: put back before it opens them, or left there. And what the
- * engine is handed of the user's dictionaries, and what it hands the addon.
+ * engine is handed of the user's dictionaries, and what it hands the addon. And the nine keys'
+ * letters the user set, which the engine reads as it is configured and again as it is reloaded,
+ * and the 双拼 scheme configured, which the keyboard reads.
  */
 class EngineBridgeTest {
 
@@ -342,6 +347,60 @@ class EngineBridgeTest {
             assertTrue("mine" in EngineBridge.unloadable)
             EngineBridge.close()
             assertFalse("mine" in EngineBridge.unloadable)
+        }
+
+        // the keyboard draws the user's letters: the engine must read the keys by them
+        @Test
+        fun theEngineTakesTheNineKeysLettersOnConfigureAndAgainOnReload() {
+            val pref = AppPrefs.getInstance().keyboard.t9Letters
+            val moved = NineKeyLetters.of(listOf("abc", "def", "ghi", "jkl", "mno", "pqrs", "tuv", "wxyzl"))
+            val again = NineKeyLetters.of(listOf("abc", "def", "gi", "jkl", "mnoh", "pqrs", "tuv", "wxyz"))
+            try {
+                pref.setValue(moved.serialize())
+                EngineBridge.configure("")
+                assertEquals(moved, EngineBridge.engines.settings.nineKeys)
+                // changed on the settings page, then fcitx reloads the engine, its config as it was
+                pref.setValue(again.serialize())
+                EngineBridge.reload()
+                assertEquals(again, EngineBridge.engines.settings.nineKeys)
+            } finally {
+                pref.setValue("")
+                EngineBridge.close()
+            }
+        }
+
+        // the keyboard reads it to tell 微软双拼's ; from text (CommonKeyActionListener.typedAsIs)
+        @Test
+        fun theShuangpinSchemeIsTheOneConfigured() {
+            try {
+                EngineBridge.configure("ShuangpinProfile=MS")
+                assertEquals(ShuangpinScheme.MICROSOFT, EngineBridge.shuangpinScheme)
+                // the default again once the config no longer names one, not the last set
+                EngineBridge.configure("")
+                assertEquals(ShuangpinScheme.ZIRANMA, EngineBridge.shuangpinScheme)
+            } finally {
+                EngineBridge.close()
+            }
+        }
+
+        // the keyboard waits on it (CommonKeyActionListener.typeAsIsOrSend): no table has a session yet, nor is the engine made to answer
+        @Test
+        fun noTableHasKeysWhileTheEngineIsNotMade() {
+            EngineBridge.close()
+            val dir = File(appContext.filesDir, "engine").apply { deleteRecursively() }
+            val aside = File(dir.path + ".old")
+            File(aside.apply { mkdirs() }, "log").writeText("learned")
+            try {
+                assertEquals(emptySet<Char>(), EngineBridge.tableKeys("engine-erbi"))
+                // made, it would have put engine.old back
+                assertTrue(aside.exists())
+                assertFalse(dir.exists())
+            } finally {
+                // made after all, it is not left to the tests after
+                EngineBridge.close()
+                dir.deleteRecursively()
+                aside.deleteRecursively()
+            }
         }
     }
 }

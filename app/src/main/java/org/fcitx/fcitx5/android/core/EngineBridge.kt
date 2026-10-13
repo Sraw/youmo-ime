@@ -23,6 +23,7 @@ import org.fcitx.fcitx5.android.engine.host.Engines
 import org.fcitx.fcitx5.android.engine.libime.LibimeFiles
 import org.fcitx.fcitx5.android.engine.phrase.CustomPhrases
 import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
+import org.fcitx.fcitx5.android.engine.pinyin.ShuangpinScheme
 import org.fcitx.fcitx5.android.engine.session.Choice
 import org.fcitx.fcitx5.android.engine.session.Offer
 import org.fcitx.fcitx5.android.engine.session.Snapshot
@@ -78,6 +79,11 @@ object EngineBridge {
 
     private val t9State = MutableStateFlow(T9State())
     val t9: StateFlow<T9State> = t9State
+
+    /** The 双拼 scheme the user set, for the keyboard to tell its keys from text (Engines.readsAsKey): set on the fcitx thread, read on the main one. */
+    @Volatile
+    var shuangpinScheme: ShuangpinScheme = ShuangpinScheme.ZIRANMA
+        private set
 
     private var made: Engines? = null
 
@@ -358,6 +364,7 @@ object EngineBridge {
     @JvmStatic
     fun configure(settings: String) {
         engines.settings = EngineSettings.parse(settings).copy(nineKeys = nineKeys())
+        shuangpinScheme = engines.settings.scheme
     }
 
     private fun nineKeys() = NineKeyLetters.parse(AppPrefs.getInstance().keyboard.t9Letters.getValue())
@@ -375,9 +382,12 @@ object EngineBridge {
 
     /** See [Engines.context]; nothing to tell while the engine is not made. */
     @JvmStatic
-    fun context(before: String) {
-        made?.context(before)
+    fun context(before: String, learning: Boolean) {
+        made?.context(before, learning)
     }
+
+    /** See [Engines.tableKeys]; none while the engine is not made, no session yet, nor is it made to answer: the keyboard waits. */
+    fun tableKeys(im: String): Set<Char> = made?.tableKeys(im).orEmpty()
 
     /** Text and hint of each candidate in [from, from + count), one after the other. */
     @JvmStatic
