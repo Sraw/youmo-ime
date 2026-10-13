@@ -3,6 +3,7 @@
  * SPDX-FileCopyrightText: Copyright 2026 Fcitx5 for Android Contributors
  */
 #include <algorithm>
+#include <cstring>
 #include <memory>
 #include <stdexcept>
 #include <utility>
@@ -226,8 +227,11 @@ private:
     mutable const EngineCandidateWord *asked_ = nullptr;
 };
 
-/** Shows [text] as what is typed. */
-// [cursor]: in characters, -1 at the end
+/**
+ * Shows [text] as what is typed, the cursor [cursor] code points into it; -1, or past its end, at
+ * its end. ime-core's Snapshot.cursor counts UTF-16 units: the same while English, the one session
+ * with a cursor of its own, types letters of the BMP alone.
+ */
 void showPreedit(InputContext *ic, const std::string &text, int cursor = -1) {
     auto &panel = ic->inputPanel();
     // in the app where it can show it, as libime's pinyin does by default (ComposingPinyin)
@@ -315,27 +319,31 @@ bool endPunctuation(InputContext *ic, bool take) {
 
 using TableOption = Option<EngineTableConfig> AndroidEngineConfig::*;
 
+// the page of an input method's own options: one of config_'s keys, or its table's (Method::table)
+enum class Page { Pinyin, Shuangpin, English, Table };
+
 constexpr char EnglishName[] = "keyboard-us";
 
 // the input methods, named as ime-core's Engines knows them
 struct Method {
     const char *name, *label, *text, *icon, *language;
+    Page page;
     // a table's options, in AndroidEngineConfig; null for pinyin, shuangpin and T9, whose options
     // are config_'s own keys
     TableOption table;
 };
 
 const Method methods[] = {
-        {"engine-pinyin", "拼", "拼音", "fcitx-pinyin", "zh_CN", nullptr},
-        {"engine-shuangpin", "双", "双拼", "fcitx-shuangpin", "zh_CN", nullptr},
-        {"engine-t9", "九", "九键拼音", "fcitx-pinyin", "zh_CN", nullptr},
-        {"engine-wubi", "五", "五笔", "fcitx-wubi", "zh_CN", &AndroidEngineConfig::wubi},
-        {"engine-cangjie", "倉", "仓颉", "fcitx-cangjie", "zh_CN", &AndroidEngineConfig::cangjie},
-        {"engine-ziranma", "自", "自然码", "fcitx-ziranma", "zh_CN", &AndroidEngineConfig::ziranma},
-        {"engine-erbi", "二", "二笔", "fcitx-erbi", "zh_CN", &AndroidEngineConfig::erbi},
-        {"engine-wubipinyin", "五", "五笔拼音", "fcitx-wubi", "zh_CN", &AndroidEngineConfig::wubiPinyin},
+        {"engine-pinyin", "拼", "拼音", "fcitx-pinyin", "zh_CN", Page::Pinyin, nullptr},
+        {"engine-shuangpin", "双", "双拼", "fcitx-shuangpin", "zh_CN", Page::Shuangpin, nullptr},
+        {"engine-t9", "九", "九键拼音", "fcitx-pinyin", "zh_CN", Page::Pinyin, nullptr},
+        {"engine-wubi", "五", "五笔", "fcitx-wubi", "zh_CN", Page::Table, &AndroidEngineConfig::wubi},
+        {"engine-cangjie", "倉", "仓颉", "fcitx-cangjie", "zh_CN", Page::Table, &AndroidEngineConfig::cangjie},
+        {"engine-ziranma", "自", "自然码", "fcitx-ziranma", "zh_CN", Page::Table, &AndroidEngineConfig::ziranma},
+        {"engine-erbi", "二", "二笔", "fcitx-erbi", "zh_CN", Page::Table, &AndroidEngineConfig::erbi},
+        {"engine-wubipinyin", "五", "五笔拼音", "fcitx-wubi", "zh_CN", Page::Table, &AndroidEngineConfig::wubiPinyin},
         // fcitx's own name for English, which it falls back to: a user's lists keep it
-        {EnglishName, "En", "English", "input-keyboard", "en", nullptr},
+        {EnglishName, "En", "English", "input-keyboard", "en", Page::English, nullptr},
 };
 
 // the one of methods named [im]; null for any other
@@ -344,6 +352,13 @@ const Method *listed(const std::string &im) {
         if (im == m.name) return &m;
     }
     return nullptr;
+}
+
+// whether [im] types Chinese: Chinese marks for its punctuation keys, and the toggles of its text
+// (traditional, Chinese marks, full width) in the status area; English types the keys' own
+bool typesChinese(const std::string &im) {
+    const auto *m = listed(im);
+    return m && std::strcmp(m->language, "zh_CN") == 0;
 }
 
 // where AndroidEngineConfig keeps [im]'s options if it is one of the tables listed; else null
@@ -387,14 +402,15 @@ const Configuration *AndroidEngine::getConfigForInputMethod(const InputMethodEnt
     if (const auto option = tableOf(im)) {
         return &(config_.*option).value();
     }
-    if (!listed(im)) return nullptr;
+    const auto *m = listed(im);
+    if (!m) return nullptr;
     RawConfig raw;
     config_.save(raw);
-    if (im == "engine-shuangpin") {
+    if (m->page == Page::Shuangpin) {
         shuangpinPage_.load(raw, true);
         return &shuangpinPage_;
     }
-    if (im == EnglishName) {
+    if (m->page == Page::English) {
         englishPage_.load(raw, true);
         return &englishPage_;
     }
@@ -439,15 +455,18 @@ void AndroidEngine::pushSettings() const {
 }
 
 void AndroidEngine::activate(const InputMethodEntry &entry, InputContextEvent &event) {
-    // loaded now, so their toggles are there to add
-    punctuation();
-    fullwidth();
-    chttrans();
     // in the status area, these addons act on this input context: full-width punctuation and
-    // letters, traditional characters
-    for (const auto *name: {"chttrans", "punctuation", "fullwidth"}) {
-        if (auto *action = instance_->userInterfaceManager().lookupAction(name)) {
-            event.inputContext()->statusArea().addAction(StatusGroup::InputMethod, action);
+    // letters, traditional characters. Chinese's alone: a 全角 left on in pinyin, which they share,
+    // would make English's words and the keys it passes on (a password's too) full width
+    if (typesChinese(entry.uniqueName())) {
+        // loaded now, so their toggles are there to add
+        punctuation();
+        fullwidth();
+        chttrans();
+        for (const auto *name: {"chttrans", "punctuation", "fullwidth"}) {
+            if (auto *action = instance_->userInterfaceManager().lookupAction(name)) {
+                event.inputContext()->statusArea().addAction(StatusGroup::InputMethod, action);
+            }
         }
     }
     // starts the session afresh, and loads its data now rather than on the first key
@@ -516,10 +535,12 @@ void AndroidEngine::keyEvent(const InputMethodEntry &entry, KeyEvent &event) {
         return;
     }
     endPunctuation(event.inputContext(), true);
+    const auto &im = entry.uniqueName();
+    const bool chinese = typesChinese(im);
     // English where it suggests nothing: the keys type themselves, what was typed going in first,
     // as typed (Enter commits it, and has the session forget the space after a word)
-    if (entry.uniqueName() == EnglishName && !suggestsEnglish(event.inputContext(), event.isVirtual())) {
-        send(event.inputContext(), entry.uniqueName(), EngineEvent::Enter);
+    if (!chinese && !suggestsEnglish(event.inputContext(), event.isVirtual())) {
+        send(event.inputContext(), im, EngineEvent::Enter);
         return;
     }
     EngineEvent what;
@@ -546,8 +567,8 @@ void AndroidEngine::keyEvent(const InputMethodEntry &entry, KeyEvent &event) {
         }
     }
     // English's punctuation is the key's own, not a Chinese mark
-    if (send(event.inputContext(), entry.uniqueName(), what, arg) ||
-        (what == EngineEvent::Char && entry.uniqueName() != EnglishName && pushPunctuation(event.inputContext(), key))) {
+    if (send(event.inputContext(), im, what, arg) ||
+        (what == EngineEvent::Char && chinese && pushPunctuation(event.inputContext(), key))) {
         event.filterAndAccept();
     }
 }
@@ -591,6 +612,12 @@ void AndroidEngine::refineLater(InputContext *ic, const std::string &im, uint64_
 }
 
 void AndroidEngine::show(InputContext *ic, std::string im, const EngineSnapshot &snapshot) {
+    // a key passed on with nothing on show before or after it, as each of English's where it
+    // suggests nothing: no panel to reset, nor the app's to update
+    if (!snapshot.handled && snapshot.deleteBefore <= 0 && snapshot.commit.empty() && snapshot.preedit.empty() &&
+        snapshot.candidates.empty() && ic->inputPanel().empty()) {
+        return;
+    }
     // English's space after a word, put behind the punctuation typed next
     if (snapshot.deleteBefore > 0) ic->deleteSurroundingText(-snapshot.deleteBefore, snapshot.deleteBefore);
     if (!snapshot.commit.empty()) ic->commitString(snapshot.commit);

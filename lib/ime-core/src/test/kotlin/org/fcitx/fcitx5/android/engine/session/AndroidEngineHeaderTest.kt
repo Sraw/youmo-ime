@@ -7,6 +7,7 @@ package org.fcitx.fcitx5.android.engine.session
 import org.fcitx.fcitx5.android.engine.host.EngineEvent
 import org.fcitx.fcitx5.android.engine.host.EngineSettings
 import org.fcitx.fcitx5.android.engine.host.Engines
+import org.fcitx.fcitx5.android.engine.host.ModelLevel
 import org.fcitx.fcitx5.android.engine.host.TableSettings
 import org.fcitx.fcitx5.android.engine.pinyin.Fuzzy
 import org.junit.Assert.assertEquals
@@ -56,6 +57,14 @@ class AndroidEngineHeaderTest {
             .associate { it.groupValues[2] to it.groupValues[1].substringBefore(',').trim() }
     }
 
+    /** The names the C++ enum [name] is saved by, as its FCITX_CONFIG_ENUM_NAME_WITH_I18N lists them. */
+    private fun enumNames(name: String): List<String> {
+        val found = checkNotNull(Regex("""FCITX_CONFIG_ENUM_NAME_WITH_I18N\(\s*$name,(.*?)\)\s*\n""", RegexOption.DOT_MATCHES_ALL).find(config)) {
+            "the names of $name not found in androidengine.h"
+        }
+        return Regex("""N_\("([^"]*)"\)""").findAll(found.groupValues[1]).map { it.groupValues[1] }.toList()
+    }
+
     @Test
     fun eachEventIsNumberedAsTheAddonNumbersIt() {
         val addon = entries("EngineEvent").map { (name, value) ->
@@ -93,5 +102,11 @@ class AndroidEngineHeaderTest {
             val shown = options(page)
             assertEquals(page, shown, engine.filterKeys(shown::containsKey))
         }
+    }
+
+    // a level saved by another name is read as HIGH (EngineSettings.parse): 低档 would save no memory
+    @Test
+    fun eachModelLevelIsNamedAsTheAddonSavesIt() {
+        assertEquals(enumNames("EngineModelLevel"), ModelLevel.entries.map { it.key })
     }
 }

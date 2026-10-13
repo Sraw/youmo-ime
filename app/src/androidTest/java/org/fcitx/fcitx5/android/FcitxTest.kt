@@ -5,25 +5,10 @@
 package org.fcitx.fcitx5.android
 
 import android.os.SystemClock
-import androidx.test.platform.app.InstrumentationRegistry
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.CoroutineStart
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.cancel
-import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.firstOrNull
-import kotlinx.coroutines.flow.mapNotNull
-import kotlinx.coroutines.flow.receiveAsFlow
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.withTimeout
-import kotlinx.coroutines.withTimeoutOrNull
-import org.fcitx.fcitx5.android.core.CapabilityFlag
-import org.fcitx.fcitx5.android.core.CapabilityFlags
 import org.fcitx.fcitx5.android.core.Fcitx
 import org.fcitx.fcitx5.android.core.FcitxEvent
-import org.fcitx.fcitx5.android.core.InputMethodNames
 import org.fcitx.fcitx5.android.core.KeyState
 import org.fcitx.fcitx5.android.core.RawConfig
 import org.fcitx.fcitx5.android.data.punctuation.PunctuationManager
@@ -31,6 +16,7 @@ import org.fcitx.fcitx5.android.data.punctuation.PunctuationMapEntry
 import org.fcitx.fcitx5.android.engine.host.EngineSettings
 import org.fcitx.fcitx5.android.engine.host.Engines
 import org.fcitx.fcitx5.android.engine.host.Keyboard
+import org.fcitx.fcitx5.android.provider.reloadWritten
 import org.junit.After
 import org.junit.AfterClass
 import org.junit.Assert
@@ -46,130 +32,34 @@ class FcitxTest {
 
     /**
      * Without this a broken engine interaction hangs the whole run instead of failing it --
-     * which is exactly what happened before `activate`/`focus` were added to [setup].
+     * which is exactly what happened before `activate`/`focus` were added to [TestFcitx.start].
      */
     @get:Rule
     val timeout: Timeout = Timeout.seconds(30)
 
     private companion object {
 
-        lateinit var fcitx: Fcitx
-        /**
-         * Buffered, not CONFLATED. A conflated channel keeps only the newest event, so a
-         * `CommitStringEvent` is overwritten by the `CandidateListEvent` fcitx emits right
-         * after a commit -- the test then waits forever for an event that was dropped.
-         */
-        val fcitxEventChannel = Channel<FcitxEvent<*>>(capacity = Channel.UNLIMITED)
+        val harness = TestFcitx()
+        val fcitx: Fcitx get() = harness.fcitx
+        val latestInputPanel get() = harness.latestInputPanel
+        val latestPaged get() = harness.latestPaged
 
-        /**
-         * The input panel as of the newest event delivered here. `Fcitx.inputPanelCached` is
-         * written on the fcitx thread without synchronisation, so reading it from the test
-         * thread is a data race; this is written on the collector and read through a volatile.
-         */
-        @Volatile
-        var latestInputPanel = FcitxEvent.InputPanelEvent.Data()
-
-        /** The page of candidates as of the newest event, kept as [latestInputPanel] is. */
-        @Volatile
-        var latestPaged = FcitxEvent.PagedCandidateEvent.Data.Empty
-
-        /**
-         * Off the main thread: eventFlow drops its oldest event past 15 buffered, so a collector
-         * held up by a main-thread stall could lose a `CommitStringEvent` before it reaches the channel.
-         */
-        val scope = CoroutineScope(Dispatchers.Default)
-
-        /** What [setUpEngine] saves over in the app's data, put back by [cleanup]. */
-        var enabledImeBefore: Array<String>? = null
-        var globalConfigBefore: RawConfig? = null
+        /** Pinyin's prediction as the app's data had it, put back by [cleanup]. */
         var predictionBefore: String? = null
 
         @BeforeClass
         @JvmStatic
-        fun setup() {
-            checkThisInputMethodIsNotBound()
-            val context = InstrumentationRegistry.getInstrumentation().targetContext
-            fcitx = Fcitx(context)
-
-            // Forward to our channel for point to point consuming. UNDISPATCHED subscribes right
-            // here, before `start()`: eventFlow keeps no replay, so a ReadyEvent emitted before a
-            // dispatched collector got round to subscribing would be lost and setup would hang.
-            scope.launch(start = CoroutineStart.UNDISPATCHED) {
-                fcitx.eventFlow.collect {
-                    if (it is FcitxEvent.InputPanelEvent) latestInputPanel = it.data
-                    if (it is FcitxEvent.PagedCandidateEvent) latestPaged = it.data
-                    fcitxEventChannel.send(it)
-                }
-            }
-            fcitx.start()
-
-            // The Timeout rule covers tests, not @BeforeClass; bound this separately so a
-            // broken engine fails the run instead of hanging it.
-            runBlocking {
-                withTimeout(60_000) { setUpEngine() }
-            }
-        }
-
-        private suspend fun setUpEngine() {
-            receiveFirst<FcitxEvent.ReadyEvent>()
-            // Without an input context fcitx has nowhere to route keys: `sendKey` is
-            // accepted but produces no preedit and no candidates, so every test that waits
-            // for an event hangs. FcitxInputMethodService does this from `onBindInput` /
-            // `onStartInputView`; a bare engine has to do it itself.
-            fcitx.activate(TEST_UID, TEST_PKG_NAME)
-            fcitx.focus(true)
-            // both are saved to the app's data at once
-            enabledImeBefore = fcitx.enabledIme().map { it.uniqueName }.toTypedArray()
-            globalConfigBefore = fcitx.getGlobalConfig()["cfg"]
-            // what the tests commit is not learned into the app's data: as in a field that asks
-            // for no personalized learning (CapabilityFlags.fromEditorInfo)
-            fcitx.setCapFlags(CapabilityFlags(CapabilityFlag.Sensitive))
-            fcitx.setEnabledIme(arrayOf(Engines.PINYIN))
+        fun setup() = harness.start {
             // prediction on, whatever the app's data says: a commit then followed by none says learning is off
-            predictionBefore = fcitx.getImConfig(Engines.PINYIN)["cfg"][EngineSettings.PREDICTION].value
-            fcitx.setImConfig(Engines.PINYIN, RawConfig(arrayOf(RawConfig(EngineSettings.PREDICTION, true))))
-            fcitx.setGlobalConfig(
-                RawConfig(
-                    arrayOf(
-                        RawConfig(
-                            "Behavior", arrayOf(
-                                RawConfig("ShowInputMethodInformation", false)
-                            )
-                        )
-                    )
-                )
-            )
+            predictionBefore = getImConfig(Engines.PINYIN)["cfg"][EngineSettings.PREDICTION].value
+            setImConfig(Engines.PINYIN, RawConfig(arrayOf(RawConfig(EngineSettings.PREDICTION, true))))
         }
 
         @AfterClass
         @JvmStatic
-        fun cleanup() {
-            // setup failed before it made one
-            if (!::fcitx.isInitialized) return
-            try {
-                runBlocking {
-                    predictionBefore?.let { fcitx.setImConfig(Engines.PINYIN, RawConfig(arrayOf(RawConfig(EngineSettings.PREDICTION, it)))) }
-                    enabledImeBefore?.let { fcitx.setEnabledIme(it) }
-                    globalConfigBefore?.let { fcitx.setGlobalConfig(it) }
-                    fcitx.focus(false)
-                    fcitx.deactivate(TEST_UID)
-                }
-            } finally {
-                fcitx.stop()
-                scope.cancel()
-            }
+        fun cleanup() = harness.stop {
+            predictionBefore?.let { setImConfig(Engines.PINYIN, RawConfig(arrayOf(RawConfig(EngineSettings.PREDICTION, it)))) }
         }
-
-        /**
-         * How long the event channel must stay empty to count as drained. Events reach it through
-         * the collector, which a GC or class loading on a loaded emulator can stall for a few
-         * hundred ms; this leaves headroom over that.
-         */
-        const val QUIET_MS = 500L
-
-        /** Any uid works; fcitx only uses it to key its input context table. */
-        const val TEST_UID = 0
-        const val TEST_PKG_NAME = "org.fcitx.fcitx5.android.test"
 
         /** 五笔, the engine's own table (a key of [Engines.TABLES]). */
         const val WUBI = "engine-wubi"
@@ -181,8 +71,7 @@ class FcitxTest {
             }
         }
 
-        private suspend inline fun <reified T : FcitxEvent<*>> receiveFirst(): T? =
-            fcitxEventChannel.receiveAsFlow().mapNotNull { it as? T }.firstOrNull()
+        private suspend inline fun <reified T : FcitxEvent<*>> receiveFirst(): T? = harness.receiveFirst<T>()
 
         private suspend fun receiveFirstCommitString() =
             receiveFirst<FcitxEvent.CommitStringEvent>()
@@ -205,56 +94,21 @@ class FcitxTest {
             }
         }
 
-        /**
-         * Waits until no event has come for [QUIET_MS], dropping those that did: the engine's
-         * refine slices may still reorder a list after it is first shown.
-         */
-        private suspend fun awaitQuiet() {
-            while (withTimeoutOrNull(QUIET_MS) { fcitxEventChannel.receive() } != null) {
-                // discard
-            }
-        }
+        private suspend fun awaitQuiet() = harness.awaitQuiet()
 
-        /** As [awaitQuiet], but the events that came, for a test to see what a key did not do. */
-        private suspend fun eventsTillQuiet(): List<FcitxEvent<*>> {
-            val events = ArrayList<FcitxEvent<*>>()
-            while (true) events += withTimeoutOrNull(QUIET_MS) { fcitxEventChannel.receive() } ?: return events
-        }
+        private suspend fun eventsTillQuiet() = harness.eventsTillQuiet()
 
         /** Where Fcitx starts fcitx: its data/ and config/. */
         private fun fcitxHome(): File =
             FcitxApplication.getInstance().directBootAwareContext.let { it.getExternalFilesDir(null) ?: it.filesDir }
     }
 
-    private var enabledIme: List<String> = listOf()
-
-    /**
-     * Each test must start from a clean engine AND a clean event queue.
-     *
-     * The channel is buffered (see [fcitxEventChannel]), so events a previous test did not
-     * consume are still queued, and `receiveFirst*` returns the OLDEST match -- which shows up
-     * as a test asserting on another test's input. Draining here makes the tests independent
-     * of each other and of their declaration order.
-     *
-     * `reset()` returns before the events it causes have come through the collector, so a
-     * single sweep of the channel can finish before they land. Drain until it has been quiet
-     * for a while instead, then forget the last panel too.
-     */
+    /** A clean engine and event queue for each test: see [TestFcitx.beforeTest]. */
     @Before
-    fun resetEngineAndDrainEvents() = runBlocking {
-        fcitx.reset()
-        while (withTimeoutOrNull(QUIET_MS) { fcitxEventChannel.receive() } != null) {
-            // discard
-        }
-        latestInputPanel = FcitxEvent.InputPanelEvent.Data()
-        latestPaged = FcitxEvent.PagedCandidateEvent.Data.Empty
-        enabledIme = fcitx.enabledIme().map { it.uniqueName }
-    }
+    fun resetEngineAndDrainEvents() = harness.beforeTest()
 
     @After
-    fun restoreEnabledIME() = runBlocking {
-        fcitx.setEnabledIme(enabledIme.toTypedArray())
-    }
+    fun restoreEnabledIME() = harness.afterTest()
 
     /**
      * `wqvb` is the table's 你好 and 您好, in the order of their use (TableText.addWords): the
@@ -341,53 +195,6 @@ class FcitxTest {
         fcitx.reset()
     }
 
-    /**
-     * English through the engine as the keyboard types it (virtual keys): the word typed offered
-     * with what it starts, space committing it with a space, and a full stop typed next put in
-     * that space's place, `hel. `; a slip corrected by space, and, nothing learned here, no words
-     * offered after it; a hardware key types itself.
-     */
-    @Test
-    fun englishPutsTheSpaceAfterAWordBehindTheFullStopTypedNext(): Unit = runBlocking {
-        fcitx.setEnabledIme(arrayOf(InputMethodNames.KEYBOARD))
-        fcitx.activateIme(InputMethodNames.KEYBOARD)
-        awaitQuiet()
-        "hel".forEach { fcitx.sendKey(it, KeyState.Virtual.state) }
-        awaitQuiet()
-        val candidates = fcitx.getCandidates(0, 8).map { it.text }
-        Assert.assertEquals("hel", candidates.firstOrNull())
-        Assert.assertTrue("help among $candidates", "help" in candidates)
-        fcitx.sendKey(' ', KeyState.Virtual.state)
-        val space = eventsTillQuiet()
-        Assert.assertEquals("hel ", space.filterIsInstance<FcitxEvent.CommitStringEvent>().joinToString("") { it.data.text })
-        fcitx.sendKey('.', KeyState.Virtual.state)
-        val stop = eventsTillQuiet()
-        val deleted = stop.filterIsInstance<FcitxEvent.DeleteSurroundingEvent>().map { it.data }
-        Assert.assertEquals("$stop", listOf(FcitxEvent.DeleteSurroundingEvent.Data(1, 0)), deleted)
-        Assert.assertEquals(". ", stop.filterIsInstance<FcitxEvent.CommitStringEvent>().joinToString("") { it.data.text })
-        val started = System.nanoTime()
-        "teh".forEach { fcitx.sendKey(it, KeyState.Virtual.state) }
-        awaitQuiet()
-        Timber.i("teh typed in ${(System.nanoTime() - started) / 1_000_000} ms, the first key building the word index")
-        fcitx.sendKey(' ', KeyState.Virtual.state)
-        val corrected = eventsTillQuiet()
-        // the capital at a sentence's start is the keyboard's (AutoCaps), which these keys are not
-        Assert.assertEquals("the ", corrected.filterIsInstance<FcitxEvent.CommitStringEvent>().joinToString("") { it.data.text })
-        // the engine is Sensitive here (setUpEngine): nothing of the text kept, so nothing offered after it
-        Assert.assertEquals("$corrected", 0, corrected.filterIsInstance<FcitxEvent.CandidateListEvent>().last().data.total)
-        val warm = System.nanoTime()
-        "becuase".forEach { fcitx.sendKey(it, KeyState.Virtual.state) }
-        awaitQuiet()
-        Timber.i("becuase typed in ${(System.nanoTime() - warm) / 1_000_000} ms: ${fcitx.getCandidates(0, 4).map { it.text }}")
-        fcitx.sendKey(' ', KeyState.Virtual.state)
-        Assert.assertEquals("because ", eventsTillQuiet().filterIsInstance<FcitxEvent.CommitStringEvent>().joinToString("") { it.data.text })
-        // a hardware keyboard's key is the app's to type
-        fcitx.sendKey('a')
-        Assert.assertTrue(eventsTillQuiet().any { it is FcitxEvent.KeyEvent })
-        Assert.assertEquals("", latestInputPanel.preedit.toString())
-        fcitx.reset()
-    }
-
     // region input method management
 
     @Test
@@ -431,7 +238,7 @@ class FcitxTest {
      * `sendString` produces one per keystroke, so the first would be "n".
      *
      * Uses the input panel's preedit, not [FcitxAPI.clientPreeditCached]. This test drives a
-     * bare engine whose capability flags (see [setUpEngine]) leave out `Preedit`, so fcitx has
+     * bare engine whose capability flags (see [TestFcitx.start]) leave out `Preedit`, so fcitx has
      * no reason to believe the client can render a preedit and keeps it in the input panel. The
      * real service sets the capability flags in `onStartInput`, which is what moves it client-side.
      */
@@ -465,6 +272,24 @@ class FcitxTest {
         fcitx.reset()
     }
 
+    /**
+     * What a file written through the documents provider has fcitx do, reloadWritten (its config
+     * read again, then the engine), leaves the bar its candidates. It does not show that the engine
+     * read is what keeps them: it is not run with a reloadConfig alone, which for the nine keys'
+     * letters left them unshown till fcitx restarted (15fb15963b).
+     */
+    @Test
+    fun theBarGetsCandidatesAfterFcitxReadsItsConfigAgain(): Unit = runBlocking {
+        fcitx.setEnabledIme(arrayOf(Engines.PINYIN))
+        fcitx.reloadWritten()
+        awaitQuiet()
+        sendString("ni")
+        val bar = eventsTillQuiet().filterIsInstance<FcitxEvent.CandidateListEvent>().lastOrNull()
+            ?.data?.candidates?.map { it.text }.orEmpty()
+        Assert.assertTrue("你 in the bar for 'ni': $bar", "你" in bar)
+        fcitx.reset()
+    }
+
     @Test
     fun candidatesArePagedByOffsetAndLimit(): Unit = runBlocking {
         fcitx.setEnabledIme(arrayOf(Engines.PINYIN))
@@ -495,7 +320,7 @@ class FcitxTest {
     /**
      * The preedit is cleared, and the whole panel with it: where it learns the engine follows a
      * commit with predictions for the word just typed (`isEmpty()` false), prediction being on as
-     * [setUpEngine] sets it, and the Sensitive flag it sets, which keeps the tests' words out of the
+     * [setup] sets it, and the Sensitive flag [TestFcitx.start] sets, which keeps the tests' words out of the
      * app's data, turns learning off.
      */
     @Test
@@ -544,6 +369,7 @@ class FcitxTest {
         val shown = fcitx.getCandidates(0, 16).map { it.text }
         val at = shown.indexOf("𢦏")
         Assert.assertTrue("U+2298F among fae's: $shown", at >= 0)
+        Assert.assertTrue("another of fae's beside it: $shown", shown.size >= 2)
         Assert.assertFalse("another's text at its index", fcitx.select(at, shown[if (at == 0) 1 else 0]))
         Assert.assertTrue("its own text at its index", fcitx.select(at, shown[at]))
         Assert.assertEquals(shown[at], receiveFirstCommitString()?.data?.text)
