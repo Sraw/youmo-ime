@@ -15,16 +15,18 @@ object Const {
     // upstream's pages describe upstream's app
     const val privacyPolicyUrl = "$githubRepo/blob/HEAD/PRIVACY.md"
     // the user's manual, in the repository so it changes with the app: a release's as it shipped
-    val helpUrl = manualUrl(githubRepo, BuildConfig.VERSION_NAME)
+    val helpUrl = manualUrl(githubRepo, BuildConfig.VERSION_NAME, BuildConfig.FLAVOR)
     const val releasesUrl = "$githubRepo/releases"
 }
 
 /**
  * [repo]'s manual for the app named [versionName]: a release's (bare, as at its tag: 0.2.0) at that
  * tag, whose manual is of what it has; any other build's (0.1.0-5-gabc1234, 0.1.0-untagged) at HEAD.
+ * A [flavor] other than the default names itself after the version (0.2.0-voice, app/build.gradle.kts).
  */
-internal fun manualUrl(repo: String, versionName: String): String {
-    val ref = if (versionName.matches(RELEASE_NAME)) "v$versionName" else "HEAD"
+internal fun manualUrl(repo: String, versionName: String, flavor: String): String {
+    val version = versionName.removeSuffix("-$flavor")
+    val ref = if (version.matches(RELEASE_NAME)) "v$version" else "HEAD"
     return "$repo/blob/$ref/docs/README.md"
 }
 

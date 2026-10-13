@@ -69,7 +69,8 @@ android {
         }
         create(VoiceDataPlugin.FLAVOR) {
             dimension = VoiceDataPlugin.DIMENSION
-            versionNameSuffix = "-voice"
+            // the help reads a release's version less this (Const.manualUrl)
+            versionNameSuffix = "-${VoiceDataPlugin.FLAVOR}"
             buildConfigField("boolean", "VOICE", "true")
         }
     }
