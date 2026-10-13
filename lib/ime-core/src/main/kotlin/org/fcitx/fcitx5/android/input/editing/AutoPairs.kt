@@ -19,11 +19,12 @@ import org.fcitx.fcitx5.android.input.UnicodePunctuation
  *
  * The closing ones put in are remembered, the innermost last, till the cursor goes anywhere this
  * did not put it ([EditingSession.onCursorUpdate] calls [forget]) or text is deleted other than by
- * Backspace: only those step over or go with their opening one, so a closing bracket typed
- * before one the user wrote is typed. [EditingSession.pairs] is the one of an editor.
+ * Backspace or before the cursor inside the innermost pair ([deletedBefore]): only those step over
+ * or go with their opening one, so a closing bracket typed before one the user wrote is typed.
+ * [EditingSession.pairs] is the one of an editor.
  *
  * fcitx's punctuation turns `"` into “ or ” by the quotes it saw open, so either of them typed
- * at a ” put in steps over it: fcitx reset (the screen turned) may have taken the ” for an “.
+ * alone at a ” put in steps over it: fcitx reset (the screen turned) may have taken the ” for an “.
  * It then counts that “ open, so [quoteOpen] holds till the next cursor report, for the service
  * to reset fcitx there as when a pair is left.
  */
@@ -49,11 +50,13 @@ class AutoPairs internal constructor(
 
     /**
      * [text] typed, a character the user means to insert: true if it was handled here, as a
-     * pair or a step over a closing one; false if the caller commits it as usual.
+     * pair or a step over a closing one (of more than one character, over its first, the rest
+     * committed after it); false if the caller commits it as usual.
      */
     fun type(text: String): Boolean {
         checkThread()
-        if (text.length != 1 || !plainCursor()) return false
+        if (text.isEmpty() || !plainCursor()) return false
+        if (text.length > 1) return stepsOverFirst(text)
         val c = text[0]
         val top = pairs.lastOrNull()?.closer
         val closer = PAIRS[c]
@@ -75,6 +78,19 @@ class AutoPairs internal constructor(
         val at = session.selection.latest.start
         session.commitText("$c$closer", 1)
         pairs += OpenPair(closer, at + 1)
+        return true
+    }
+
+    // [text], its first a closing one put in right after the cursor, and more (English's `) `, the
+    // space it puts after it): the closing one stepped over, the rest committed after it. That one
+    // itself, not “ for ”: what starts with “ (a phrase, a candidate) is no quote key fcitx turned
+    private fun stepsOverFirst(text: String): Boolean {
+        val top = pairs.lastOrNull()?.closer ?: return false
+        if (text[0] != top) return false
+        if (editor.textAfterCursor(1)?.firstOrNull() != top) return false
+        pairs.removeAt(pairs.lastIndex)
+        session.applySelectionOffset(1, 1)
+        session.commitText(text.substring(1))
         return true
     }
 
@@ -108,6 +124,16 @@ class AutoPairs internal constructor(
     fun forget() {
         checkThread()
         pairs.clear()
+    }
+
+    /**
+     * [units] deleted right before the cursor at [cursor], none after it: the pairs stay where all
+     * of it is inside the innermost one (English's space taken back before a `)`); else forgotten.
+     */
+    internal fun deletedBefore(cursor: Int, units: Int) {
+        checkThread()
+        val top = pairs.lastOrNull() ?: return
+        if (cursor - units < top.opened) pairs.clear()
     }
 
     /**

@@ -83,6 +83,27 @@ class AutoPairsTest {
         assertEquals("（《书》）|", n.shown)
     }
 
+    // English takes back the space it put after a word, the bracket typed in its place with one
+    // after it: the closing one put in is stepped over, not typed again
+    @Test
+    fun aClosingOneCommittedWithMoreAfterItStepsOverTheOnePutIn() {
+        val t = Typing("")
+        t.type("(")
+        t.session.commitText("see ")
+        t.report()
+        t.session.deleteSurrounding(1, 0, inCodePoints = true)
+        t.report()
+        assertTrue(t.pairs.type(") "))
+        assertEquals("(see) |", t.shown)
+        t.assertInStep()
+        // a deletion reaching past the opening one leaves nothing to step over
+        val past = Typing("")
+        past.type("(")
+        past.session.deleteSurrounding(1, 0, inCodePoints = true)
+        past.report()
+        assertFalse(past.pairs.type(") "))
+    }
+
     @Test
     fun aClosingOneTheUserWroteIsNotSteppedOver() {
         val t = Typing("）", cursor = 0)
@@ -191,7 +212,7 @@ class AutoPairsTest {
         c.session.setComposingText(FormattedText(arrayOf("ni"), intArrayOf(0), -1))
         c.session.composing.update(0, 2)
         assertFalse(c.pairs.type("("))
-        // more than one character is not typed by a key
+        // more than one character opens no pair, and with none open steps over nothing: the caller's
         assertFalse(Typing("").pairs.type("()"))
         assertTrue(Typing("").pairs.type("("))
     }
@@ -213,6 +234,16 @@ class AutoPairsTest {
         val s = Typing("")
         s.type("“好”")
         assertFalse(s.pairs.quoteOpen)
+    }
+
+    /** A commit starting with “, a phrase or a candidate, is no quote key fcitx turned: the ” put in stays. */
+    @Test
+    fun aCommitStartingWithAnOpeningQuoteDoesNotStepOver() {
+        val t = Typing("")
+        t.type("“")
+        assertFalse(t.pairs.type("“引用”"))
+        assertEquals("“|”", t.shown)
+        assertTrue(t.pairs.quoteOpen)
     }
 
     @Test

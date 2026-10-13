@@ -339,13 +339,15 @@ class EditingSession(
      * deletions rarely, so this path can afford it (Backspace pays the same round trip, but only
      * for editors that opted in to direct deletion).
      *
-     * The service always passes `inCodePoints = true`, as fcitx counts characters; the unit
-     * variant is kept because it is the editor's own contract and the tests hold the fake to it.
+     * The service passes `inCodePoints = true`, as fcitx counts characters, but for text it put in
+     * itself, whose units it knows, where the field is not to be read (九键's 1 pressed again in a
+     * password); the unit variant is the editor's own contract too, and the tests hold the fake to it.
      */
     fun deleteSurrounding(before: Int, after: Int, inCodePoints: Boolean) {
         checkThread()
         if (!editor.isAvailable) return
-        pairs.forget()
+        // after the cursor, or around what is composed, a closing one put in may go too
+        if (after > 0 || composing.isNotEmpty()) pairs.forget()
         val (overhangBefore, overhangAfter) = composingOverhang()
         if (before > 0) {
             // null: malformed text, which the editor refuses to delete at all
@@ -354,6 +356,8 @@ class EditingSession(
             } else {
                 before.coerceAtMost(selection.latest.start - overhangBefore)
             }
+            // before the cursor alone: the pairs stay if it is all inside the innermost
+            pairs.deletedBefore(selection.latest.start, units)
             if (units > 0) {
                 selection.predictOffset(-units)
                 // the deletion is before the composition too, so it moves along

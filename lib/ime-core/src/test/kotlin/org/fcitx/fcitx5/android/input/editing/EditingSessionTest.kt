@@ -478,6 +478,49 @@ class EditingSessionTest {
         assertTrue(s.selection.consume(e.selectionStart, e.selectionEnd))
     }
 
+    /** Typed as the service types it: the pairs first, else committed. */
+    private fun EditingSession.type(text: String) {
+        for (c in text) if (!pairs.type(c.toString())) commitText(c.toString())
+    }
+
+    /**
+     * After the cursor, the closing one put in may be what went: the pairs are forgotten, even
+     * when what went before the cursor stayed inside the pair, and a `)` typed before one the
+     * user wrote is typed, not stepped over.
+     */
+    @Test
+    fun aDeletionAfterTheCursorForgetsThePairs() {
+        val (s, e) = session(")", cursor = 0)
+        s.type("(")
+        s.deleteSurrounding(before = 0, after = 1, inCodePoints = true)
+        s.type(")")
+        assertEquals("())", e.text)
+        assertEquals(2, e.selectionStart)
+        val (t, f) = session(")", cursor = 0)
+        t.type("(a")
+        t.deleteSurrounding(before = 1, after = 1, inCodePoints = true)
+        t.type(")")
+        assertEquals("())", f.text)
+        assertEquals(2, f.selectionStart)
+    }
+
+    /**
+     * Composing, the editor deletes before the composition, not before the cursor: the opening
+     * one can go, wherever the cursor is, so the pairs are forgotten.
+     */
+    @Test
+    fun aDeletionWhileComposingForgetsThePairs() {
+        val (s, e) = session()
+        s.type("(")
+        s.updateComposingText(formatted("ni"))
+        s.deleteSurrounding(before = 1, after = 0, inCodePoints = true)
+        assertEquals("ni)", e.text)
+        s.commitText("你")
+        s.type(")")
+        assertEquals("你))", e.text)
+        assertEquals(2, e.selectionStart)
+    }
+
     // endregion
 
     // region backspace
@@ -654,6 +697,7 @@ class EditingSessionTest {
             put("backspace") { backspace() }
             put("forget") { forget() }
             put("cursorReported") { cursorReported() }
+            put("deletedBefore") { deletedBefore(cursor = 3, units = 1) }
         }
         // a new public method must be added above, with a call, or to queries if it changes nothing; this names one in neither
         val queries = emptySet<String>()
