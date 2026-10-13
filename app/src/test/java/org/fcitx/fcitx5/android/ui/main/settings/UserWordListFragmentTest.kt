@@ -36,4 +36,14 @@ class UserWordListFragmentTest {
         assertEquals(listOf("你好", "你好吗", "我你好", "说你好"), found(words, "你好"))
         assertEquals(listOf("WiFi密码"), found(listOf(word("WiFi密码", "wifi mi ma")), "WIFI密"))
     }
+
+    // the query loses its `'`, so the word must too: don't typed in whole found nothing
+    @Test
+    fun anEnglishWordIsFoundWithItsApostropheOrWithout() {
+        val words = listOf("don't", "I'm", "done").map { UserWord(it, "", UserWord.Kind.LEARNED) }
+        assertEquals(listOf("don't"), found(words, "don't"))
+        assertEquals(listOf("don't"), found(words, "DONT"))
+        assertEquals(listOf("don't", "done"), found(words, "don"))
+        assertEquals(listOf("I'm"), found(words, "i'm"))
+    }
 }

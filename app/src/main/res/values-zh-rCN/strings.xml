@@ -307,12 +307,13 @@
     <string name="forget_word">忘掉</string>
     <string name="unblock_word">恢复显示</string>
     <string name="english_words">英文词库</string>
-    <string name="english_words_summary">打过或添加的英文词：不会被改错，打的时候会给出</string>
+    <string name="english_words_summary">打过或添加的英文词，打的时候会给出；添加的和打过两次的不会被改错</string>
     <string name="search_english_words_hint">搜索单词</string>
     <string name="english_word_invalid">只能是字母，中间可以有撇号或连字符</string>
     <plurals name="english_word_typed_times">
         <item quantity="other">打过 %d 次</item>
     </plurals>
+    <string name="english_word_learned">不会被改错</string>
     <string name="im_section_words">词库</string>
     <string name="search_words_hint">搜索词或拼音</string>
     <string name="search_settings">搜索设置</string>

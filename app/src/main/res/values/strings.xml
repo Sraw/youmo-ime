@@ -312,13 +312,14 @@
     <string name="forget_word">Forget</string>
     <string name="unblock_word">Show again</string>
     <string name="english_words">English words</string>
-    <string name="english_words_summary">Words you typed or added: never corrected, offered as you type them</string>
+    <string name="english_words_summary">Words you typed or added, offered as you type them; those added or typed twice are never corrected</string>
     <string name="search_english_words_hint">Search a word</string>
     <string name="english_word_invalid">Letters only, an apostrophe or a hyphen within</string>
     <plurals name="english_word_typed_times">
         <item quantity="one">typed once</item>
         <item quantity="other">typed %d times</item>
     </plurals>
+    <string name="english_word_learned">Never corrected</string>
     <string name="im_section_words">Words</string>
     <string name="search_words_hint">Search a word or its pinyin</string>
     <string name="search_settings">Search settings</string>

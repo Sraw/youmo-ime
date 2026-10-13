@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.ui.main.settings
 
+import android.content.res.Resources
 import android.os.Bundle
 import android.text.InputType
 import android.view.LayoutInflater
@@ -16,6 +17,8 @@ import android.view.inputmethod.EditorInfo
 import android.widget.CheckBox
 import android.widget.TextView
 import androidx.activity.OnBackPressedCallback
+import androidx.annotation.PluralsRes
+import androidx.annotation.StringRes
 import androidx.appcompat.app.AlertDialog
 import androidx.core.view.MenuProvider
 import androidx.core.view.ViewCompat
@@ -39,6 +42,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.core.FcitxAPI
+import org.fcitx.fcitx5.android.engine.english.EnglishUser
 import org.fcitx.fcitx5.android.engine.host.Engines.UserWord
 import org.fcitx.fcitx5.android.engine.user.WordLists
 import org.fcitx.fcitx5.android.ui.common.withLoadingDialog
@@ -78,14 +82,16 @@ import kotlin.math.roundToInt
  *
  * With [SettingsRoute.UserWordList.english], the English words the user typed instead (the
  * English page's list): no pinyin, a word added as typed twice, forgotten as a learned one is.
+ * What differs between the lists is the [WordSource] the route picks, once.
  */
 class UserWordListFragment : Fragment() {
 
     private val viewModel: MainViewModel by activityViewModels()
 
     private val args by lazyRoute<SettingsRoute.UserWordList>()
-    private val kind by lazy { UserWord.Kind.valueOf(args.kind) }
-    private val english by lazy { args.english }
+    private val source: WordSource by lazy {
+        if (args.english) EnglishWords else PinyinWords(UserWord.Kind.valueOf(args.kind))
+    }
 
     private var all = emptyList<UserWord>()
     private var shown = emptyList<UserWord>()
@@ -107,7 +113,7 @@ class UserWordListFragment : Fragment() {
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
         val ctx = requireContext()
         val (searchLayout, searchField) = ctx.materialTextInput {
-            hint = getString(if (english) R.string.search_english_words_hint else R.string.search_words_hint)
+            hint = getString(source.searchHint)
         }
         searchLayout.endIconMode = TextInputLayout.END_ICON_CLEAR_TEXT
         searchField.apply {
@@ -128,11 +134,13 @@ class UserWordListFragment : Fragment() {
             addItemDecoration(DividerItemDecoration(ctx, DividerItemDecoration.VERTICAL))
             clipToPadding = false
         }
-        val fab = if (kind == UserWord.Kind.LEARNED && !english) null else FloatingActionButton(ctx).apply {
-            this@UserWordListFragment.fab = this
-            imageDrawable = ctx.getDrawable(R.drawable.ic_baseline_plus_24)
-            contentDescription = getString(if (kind == UserWord.Kind.BLOCKED) R.string.block_word else R.string.add_word)
-            setOnClickListener { add() }
+        val fab = source.addLabel?.let { label ->
+            FloatingActionButton(ctx).apply {
+                this@UserWordListFragment.fab = this
+                imageDrawable = ctx.getDrawable(R.drawable.ic_baseline_plus_24)
+                contentDescription = getString(label)
+                setOnClickListener { addWord(label) }
+            }
         }
         val root = ctx.coordinatorLayout {
             backgroundColor = ctx.styledColor(android.R.attr.colorBackground)
@@ -186,14 +194,14 @@ class UserWordListFragment : Fragment() {
 
     private fun setTitle() {
         viewModel.setToolbarTitle(
-            if (selected.isEmpty()) getString(if (english) R.string.english_words else UserWordsFragment.title(kind))
+            if (selected.isEmpty()) getString(source.title)
             else getString(R.string.selected_count, selected.size)
         )
     }
 
     private fun load() {
         lifecycleScope.launch {
-            all = words()
+            all = onFcitx("Reading user words failed") { source.words(this) }.getOrElse { return@launch }
             // by word and reading: a learned word's count may have changed since it was picked
             val picked = selected.mapTo(HashSet()) { it.text to it.pinyin }
             selected.clear()
@@ -237,22 +245,11 @@ class UserWordListFragment : Fragment() {
         selectionChanged()
     }
 
-    private fun removeLabel() = when (kind) {
-        UserWord.Kind.ADDED -> R.string.delete
-        UserWord.Kind.LEARNED -> R.string.forget_word
-        UserWord.Kind.BLOCKED -> R.string.unblock_word
-    }
-
     private fun confirmRemove(words: List<UserWord>) {
         if (words.isEmpty()) return
-        val message = when (kind) {
-            UserWord.Kind.ADDED -> R.plurals.confirm_delete_words
-            UserWord.Kind.LEARNED -> R.plurals.confirm_forget_words
-            UserWord.Kind.BLOCKED -> R.plurals.confirm_unblock_words
-        }
         AlertDialog.Builder(requireContext())
-            .setMessage(resources.getQuantityString(message, words.size, words.size))
-            .setPositiveButton(removeLabel()) { _, _ -> remove(words) }
+            .setMessage(resources.getQuantityString(source.confirmRemove, words.size, words.size))
+            .setPositiveButton(source.removeLabel) { _, _ -> remove(words) }
             .setNegativeButton(android.R.string.cancel, null)
             .show()
     }
@@ -262,9 +259,7 @@ class UserWordListFragment : Fragment() {
         // thousands at once take a moment: the added words' model is made again without them
         lifecycleScope.withLoadingDialog(ctx) {
             try {
-                viewModel.fcitx.runOnReady {
-                    if (english) forgetEnglishWords(words.map { it.text }) else removeUserWords(words)
-                }
+                viewModel.fcitx.runOnReady { source.remove(this, words) }
                 selected.removeAll(words.toSet())
                 all = words()
                 filter(immediately = true)
@@ -279,13 +274,32 @@ class UserWordListFragment : Fragment() {
         }
     }
 
-    private suspend fun words() = viewModel.fcitx.runOnReady { if (english) englishWords() else userWords(kind) }
+    private suspend fun words() = viewModel.fcitx.runOnReady { source.words(this) }
 
-    /** What can be done to [word]: edited (not a blocked one, nor an English one), taken off its list. */
+    /**
+     * [block] on fcitx. Where it failed (a word list that could not be read or written, fcitx
+     * stopping), [failed] is logged and the error shown, where uncaught it would close the app, as
+     * [remove] shows it. A [Result], not null for a failure: what [block] gives may itself be null
+     * (a word of no known pinyin).
+     */
+    private suspend fun <T> onFcitx(failed: String, block: suspend FcitxAPI.() -> T): Result<T> {
+        val ctx = requireContext()
+        return try {
+            Result.success(viewModel.fcitx.runOnReady(block))
+        } catch (e: CancellationException) {
+            throw e
+        } catch (@Suppress("TooGenericExceptionCaught") e: Exception) {
+            Timber.w(e, failed)
+            ctx.toast(e)
+            Result.failure(e)
+        }
+    }
+
+    /** What can be done to [word]: edited where its list lets it be, taken off its list. */
     private fun act(word: UserWord) {
         val actions = buildList {
-            if (kind != UserWord.Kind.BLOCKED && !english) add(R.string.edit)
-            add(removeLabel())
+            if (source.editable) add(R.string.edit)
+            add(source.removeLabel)
         }
         AlertDialog.Builder(requireContext())
             .setTitle("${word.text}  ${word.pinyin}".trim())
@@ -302,16 +316,13 @@ class UserWordListFragment : Fragment() {
             .show()
     }
 
-    private fun add() = if (english) {
-        addEnglish()
-    } else if (kind == UserWord.Kind.BLOCKED) {
-        edit(R.string.block_word, null) { text, pinyin -> blockUserWord(text, pinyin) }
-    } else {
-        edit(R.string.add_word, null) { text, pinyin -> addUserWord(text, pinyin) }
+    private fun addWord(@StringRes title: Int) = when (val list = source) {
+        EnglishWords -> addEnglish(title)
+        is PinyinWords -> edit(title, null) { text, pinyin -> list.add(this, text, pinyin) }
     }
 
     /** Asks for an English word, kept open with an error under it while it is none. */
-    private fun addEnglish() {
+    private fun addEnglish(@StringRes title: Int) {
         val ctx = requireContext()
         val (layout, field) = ctx.materialTextInput { hint = getString(R.string.word_text) }
         field.apply {
@@ -323,15 +334,17 @@ class UserWordListFragment : Fragment() {
             add(layout, lParams(matchParent))
         }
         AlertDialog.Builder(ctx)
-            .setTitle(R.string.add_word)
+            .setTitle(title)
             .setView(padded)
             .setPositiveButton(android.R.string.ok, null)
             .setNegativeButton(android.R.string.cancel, null)
             .show()
             .onPositiveButtonClick onClick@{
                 val dialog = this
+                val text = field.str.trim()
                 lifecycleScope.launch {
-                    if (viewModel.fcitx.runOnReady { addEnglishWord(field.str.trim()) }) {
+                    val added = onFcitx(SAVING_FAILED) { addEnglishWord(text) }.getOrElse { return@launch }
+                    if (added) {
                         dialog.dismiss()
                         load()
                     } else {
@@ -385,7 +398,7 @@ class UserWordListFragment : Fragment() {
                 if (pinyin.isBlank()) {
                     // read as the dictionary reads it, shown for the user to check before saving
                     lifecycleScope.launch {
-                        val guessed = viewModel.fcitx.runOnReady { pinyinOf(text) }
+                        val guessed = onFcitx("Reading a word's pinyin failed") { pinyinOf(text) }.getOrElse { return@launch }
                         if (guessed == null) {
                             pinyinField.error = getString(R.string.word_pinyin_unknown)
                         } else {
@@ -402,7 +415,8 @@ class UserWordListFragment : Fragment() {
                 // unchanged: nothing to do
                 if (word != null && WordLists.entry(word.text, word.pinyin) == entry) return@onClick true
                 lifecycleScope.launch {
-                    if (viewModel.fcitx.runOnReady { save(text, pinyin) }) {
+                    val saved = onFcitx(SAVING_FAILED) { save(text, pinyin) }.getOrElse { return@launch }
+                    if (saved) {
                         dialog.dismiss()
                         load()
                     } else {
@@ -445,15 +459,7 @@ class UserWordListFragment : Fragment() {
         override fun onBindViewHolder(holder: WordHolder, position: Int) {
             val word = shown[position]
             holder.text.text = word.text
-            holder.detail.text = if (english) {
-                val times = word.count.roundToInt().coerceAtLeast(1)
-                resources.getQuantityString(R.plurals.english_word_typed_times, times, times)
-            } else if (word.kind == UserWord.Kind.LEARNED) {
-                val times = word.count.roundToInt().coerceAtLeast(1)
-                resources.getQuantityString(R.plurals.word_typed_times, times, word.pinyin, times)
-            } else {
-                word.pinyin
-            }
+            holder.detail.text = source.detail(resources, word)
             holder.check.visibility = if (selected.isEmpty()) View.GONE else View.VISIBLE
             holder.check.isChecked = word in selected
             holder.root.setOnClickListener { if (selected.isEmpty()) act(word) else toggle(word) }
@@ -466,7 +472,85 @@ class UserWordListFragment : Fragment() {
 
     companion object {
         private const val SEARCH_DELAY = 150L
+        private const val SAVING_FAILED = "Saving a user word failed"
     }
+}
+
+/**
+ * What differs between the lists [UserWordListFragment] shows: its title and labels, where its
+ * words come from and go, and what a row says of one. [addLabel] is null for a list nothing is
+ * added to by hand; [editable], whether a word's text and pinyin may be edited.
+ */
+private sealed class WordSource(
+    @StringRes val title: Int,
+    @StringRes val searchHint: Int,
+    @StringRes val addLabel: Int?,
+    @StringRes val removeLabel: Int,
+    @PluralsRes val confirmRemove: Int,
+    val editable: Boolean,
+) {
+    abstract suspend fun words(fcitx: FcitxAPI): List<UserWord>
+
+    abstract suspend fun remove(fcitx: FcitxAPI, words: List<UserWord>)
+
+    abstract fun detail(res: Resources, word: UserWord): String
+}
+
+/** One list of pinyin's user dictionary: the words learned come from typing alone, a blocked one is unblocked, not edited. */
+private class PinyinWords(private val kind: UserWord.Kind) : WordSource(
+    title = UserWordsFragment.title(kind),
+    searchHint = R.string.search_words_hint,
+    addLabel = when (kind) {
+        UserWord.Kind.ADDED -> R.string.add_word
+        UserWord.Kind.LEARNED -> null
+        UserWord.Kind.BLOCKED -> R.string.block_word
+    },
+    removeLabel = when (kind) {
+        UserWord.Kind.ADDED -> R.string.delete
+        UserWord.Kind.LEARNED -> R.string.forget_word
+        UserWord.Kind.BLOCKED -> R.string.unblock_word
+    },
+    confirmRemove = when (kind) {
+        UserWord.Kind.ADDED -> R.plurals.confirm_delete_words
+        UserWord.Kind.LEARNED -> R.plurals.confirm_forget_words
+        UserWord.Kind.BLOCKED -> R.plurals.confirm_unblock_words
+    },
+    editable = kind != UserWord.Kind.BLOCKED,
+) {
+    override suspend fun words(fcitx: FcitxAPI) = fcitx.userWords(kind)
+
+    override suspend fun remove(fcitx: FcitxAPI, words: List<UserWord>) = fcitx.removeUserWords(words)
+
+    /** A word typed in, put on this list: added, or blocked. */
+    suspend fun add(fcitx: FcitxAPI, text: String, pinyin: String) =
+        if (kind == UserWord.Kind.BLOCKED) fcitx.blockUserWord(text, pinyin) else fcitx.addUserWord(text, pinyin)
+
+    override fun detail(res: Resources, word: UserWord): String = if (word.kind == UserWord.Kind.LEARNED) {
+        val times = word.count.roundToInt().coerceAtLeast(1)
+        res.getQuantityString(R.plurals.word_typed_times, times, word.pinyin, times)
+    } else {
+        word.pinyin
+    }
+}
+
+/** The English words the user typed or added: no pinyin to edit, forgotten as a learned word is. */
+private object EnglishWords : WordSource(
+    title = R.string.english_words,
+    searchHint = R.string.search_english_words_hint,
+    addLabel = R.string.add_word,
+    removeLabel = R.string.forget_word,
+    confirmRemove = R.plurals.confirm_forget_words,
+    editable = false,
+) {
+    override suspend fun words(fcitx: FcitxAPI) = fcitx.englishWords()
+
+    override suspend fun remove(fcitx: FcitxAPI, words: List<UserWord>) = fcitx.forgetEnglishWords(words.map { it.text })
+
+    // whether it is still corrected, not a count: an added word was never typed, and below LEARNED,
+    // where it is corrected, a count halved from more may round up to 2
+    override fun detail(res: Resources, word: UserWord): String =
+        if (word.count >= EnglishUser.LEARNED) res.getString(R.string.english_word_learned)
+        else res.getQuantityString(R.plurals.english_word_typed_times, 1, 1)
 }
 
 // spaces and the `'` that parts syllables: a pinyin is found however the user spaces it
@@ -476,14 +560,14 @@ private val SEARCH_IGNORED = Regex("[\\s']")
 internal fun searchKey(query: String): String = query.trim().lowercase().replace(SEARCH_IGNORED, "")
 
 /**
- * The [words] with [key] (a [searchKey]) in the word or in its pinyin, spaces aside, in any case:
- * those that start with it first, as typing a word's start should find it at the top, each part in
- * the order of [words].
+ * The [words] with [key] (a [searchKey]) in the word or in its pinyin, each read as a key is
+ * (an English don't as dont, a pinyin however spaced): those that start with it first, as typing a
+ * word's start should find it at the top, each part in the order of [words].
  */
 internal fun searchWords(words: List<UserWord>, key: String): List<UserWord> {
     val (starting, within) = words.mapNotNull { word ->
-        val text = word.text.lowercase()
-        val pinyin = word.pinyin.replace(" ", "").lowercase()
+        val text = searchKey(word.text)
+        val pinyin = searchKey(word.pinyin)
         when {
             text.startsWith(key) || pinyin.startsWith(key) -> word to true
             key in text || key in pinyin -> word to false
