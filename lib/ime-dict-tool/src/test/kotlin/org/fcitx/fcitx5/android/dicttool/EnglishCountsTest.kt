@@ -87,13 +87,28 @@ class EnglishCountsTest {
 
     @Test
     fun aSpellingWithAnApostropheIsHeldToAHundredthOfItsGroupsCommonestToo() {
-        // th'e once beside the's 300 and i's twice beside is: none; user's a fiftieth of users: a word
-        val words = vocabulary("the" to 300, "th'e" to 1, "is" to 300, "i's" to 2, "users" to 300, "user's" to 6).words(100)
-        assertFalse(words.list.toString(), "th'e" in words.list || "i's" in words.list)
-        assertEquals(words.id("the", first = false), words.id("th'e", first = false))
-        assertEquals(words.id("is", first = false), words.id("i's", first = false))
-        assertTrue(words.list.toString(), "user's" in words.list)
-        assertEquals(1, words.exempted)
+        // we'l'l alone beside well's 300: the commonest with an apostrophe itself, yet a slip, none
+        val slip = vocabulary("well" to 300, "we'l'l" to 2).words(100)
+        assertFalse(slip.list.toString(), "we'l'l" in slip.list)
+        assertEquals(slip.id("well", first = false), slip.id("we'l'l", first = false))
+        // th'e once beside the's 300: none in any group
+        val the = vocabulary("the" to 300, "th'e" to 1).words(100)
+        assertFalse(the.list.toString(), "th'e" in the.list)
+        assertEquals(0, slip.exempted + the.exempted)
+    }
+
+    /** A possessive has a plural's letters, no word's: it is held to the plural as any spelling to its group's commonest. */
+    @Test
+    fun aPossessiveIsAWordOnlyAsCommonAsAnyOtherSpelling() {
+        // user's a fiftieth of users: counted as users, where it would take a word's place in the list
+        val rare = vocabulary("users" to 300, "user's" to 6).words(100)
+        assertFalse(rare.list.toString(), "user's" in rare.list)
+        assertEquals(rare.id("users", first = false), rare.id("user's", first = false))
+        assertEquals(0, rare.exempted)
+        // a fifth: a word of its own
+        val common = vocabulary("users" to 300, "user's" to 60).words(100)
+        assertTrue(common.list.toString(), "user's" in common.list)
+        assertNotEquals(common.id("users", first = false), common.id("user's", first = false))
     }
 
     @Test

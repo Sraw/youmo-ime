@@ -14,12 +14,13 @@ import org.fcitx.fcitx5.android.engine.english.EnglishText
  * apostrophes; spellings of the same letters (the, The, THE; don't, dont; us, US) are one group, and
  * a spelling seen less than [KEEP_SHARE] as often as its group's commonest is none of its own:
  * text with it is counted as the commonest (dont as don't, i as I), as the user typing it means.
- * A spelling with an apostrophe is held to the group's commonest with one, not to a spelling
- * without, and to [CONTRACTION_SHARE] of the group's commonest: we'll is a word beside well a
- * fifteenth as common, th'e seen once beside the's 300 is none, and We'll is counted as we'll. A
- * real word with a contraction's letters ([EnglishDecoder.LIKE_CONTRACTIONS]) is held to its
- * group's commonest without one alike: wed is a word beside we'd, and WED is counted as wed; dont,
- * a slip, as don't.
+ * Where a contraction has a real word's letters ([EnglishDecoder.LIKE_CONTRACTIONS]: well and
+ * we'll, wed and we'd), each is held to its own kind instead: a spelling with an apostrophe to the
+ * group's commonest with one, one without to the commonest without, and either to
+ * [CONTRACTION_SHARE] of the group's commonest. So we'll is a word beside well a fifteenth as common
+ * and We'll is counted as we'll; wed is a word beside we'd and WED is counted as wed. Any other group
+ * holds every spelling to its commonest: year's is no word beside years unless a tenth as common,
+ * dont a slip of don't, th'e seen once beside the's 300 none.
  *
  * A sentence's first word is capitalised whatever it is: seen there, it is counted as the
  * spellings it may be (The as the, Apple as Apple or apple) in the shares they have elsewhere.
@@ -97,14 +98,15 @@ class EnglishVocabulary {
     private fun cut(group: List<String>, total: Map<String, Double>, kept: MutableList<String>): Triple<String, String?, String?> {
         val order = compareBy<String> { total.getValue(it) }.thenByDescending { it }
         val top = group.maxWith(order)
-        // well's share would leave we'll out, and the keyboard could never offer it
         val contraction = if ('\'' in top) top else group.filter { '\'' in it }.maxWithOrNull(order)
-        // and we'd's would leave wed out
-        val plain = if ('\'' in top && key(top) in EnglishDecoder.LIKE_CONTRACTIONS) group.filter { '\'' !in it }.maxWithOrNull(order) else null
-        // the top's hundredth all the same, or a group with no contraction keeps its commonest slip: th'e, i's
+        // well's share would leave we'll out, and the keyboard could never offer it; we'd's, wed. A
+        // possessive is no such word (year's beside years): held to the group's commonest as any other
+        val alike = key(top) in EnglishDecoder.LIKE_CONTRACTIONS
+        val plain = if ('\'' in top && alike) group.filter { '\'' !in it }.maxWithOrNull(order) else null
+        // and in such a group a slip held to its own kind is under the top's hundredth all the same: we'l'l
         val least = CONTRACTION_SHARE * total.getValue(top)
         group.filterTo(kept) { word ->
-            val of = (if ('\'' in word) contraction else plain) ?: top
+            val of = if (!alike) top else (if ('\'' in word) contraction else plain) ?: top
             total.getValue(word) >= maxOf(KEEP_SHARE * total.getValue(of), least) && total.getValue(word) > 0
         }
         return Triple(top, contraction?.takeIf { it != top }, plain)

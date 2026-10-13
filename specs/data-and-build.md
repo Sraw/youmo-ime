@@ -68,8 +68,10 @@ publishing one, run `english-lm` on the same shards with the dict tool as at the
 now; compare the two `pass one` lines (words, slips, and how many are under a tenth of their group's
 commonest, held to another spelling) and the two models' words (their 1-grams); and run ime-eval's
 `english` set on both compiled models. `EnglishVocabulary.CONTRACTION_SHARE` (1%), the least share of
-its group's commonest that a spelling held to another must have (we'll beside well, wed beside we'd),
-is not tuned on FineWeb: it should drop slips such as th'e and keep words such as we'll and user's.
+its group's commonest that a spelling held to another must have (we'll beside well, wed beside we'd:
+only where a contraction has a real word's letters, `EnglishDecoder.LIKE_CONTRACTIONS`), is not tuned
+on FineWeb: it should drop slips such as we'l'l and keep words such as we'll. A possessive (user's) is
+held to its group's commonest, as any other spelling.
 
 ### Licences of what ships
 
