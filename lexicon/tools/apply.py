@@ -12,7 +12,7 @@ import common
 
 HERE = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..')
 TAKE = {'word', 'name', 'slang', 'term'}
-LEAVE = {'fragment', 'phrase', 'typo', 'junk', 'obscure'}
+LEAVE = {'fragment', 'phrase', 'typo', 'junk', 'obscure', 'case'}
 SYLLABLES = common.syllables()
 
 

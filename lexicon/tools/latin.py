@@ -6,11 +6,11 @@
 From latin_counts.py's counts: a word of letters only (digits and C++ cannot be typed as letter
 syllables), seen MIN_COUNT times or more on MIN_PAGES pages or more; not one lexicon/reject.tsv
 rejects (spam, adult and gambling sites, HTML left in text, what nobody types inside Chinese), in
-any spelling, or but the spelling rejected as `case` (WIFI, where WiFi is kept). One whose letters are all pinyin
-(shi, china, ai; not counting 呣, 嗯 and 儿, so NBA is not n'ba) is scored PINYIN_PENALTY lower:
-the same letters type Chinese, which should come first unless the text around says otherwise.
-Each spelling of a word written in a tenth or more of its uses is a word of its own: app, APP
-and App.
+any spelling, or, rejected as `case`, in that spelling alone (WIFI, where WiFi is kept). One whose
+letters are all pinyin (shi, china, ai; not counting 呣, 嗯 and 儿, so NBA is not n'ba) is scored
+PINYIN_PENALTY lower: the same letters type Chinese, which should come first unless the text
+around says otherwise. Each spelling of a word written in a tenth or more of its uses is a word
+of its own: app, APP and App.
 
 Scored on the model's unigram scale: its count's log10, moved by how far the Latin words libime's
 model already has (QQ, USB, iPad ...) sit from their own counts, the median of them.

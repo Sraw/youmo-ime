@@ -4,6 +4,7 @@ import contextlib
 import datetime
 import io
 import os
+import re
 import tempfile
 import unittest
 from unittest import mock
@@ -86,3 +87,16 @@ class ApplyTest(unittest.TestCase):
         self.assertIn('batch-001.out.tsv:3: 内卷: decided twice (', err)
         self.assertIn("1 words of the batch not decided, ['作为一']", err)
         self.assertNothingWritten()
+
+    def test_the_kinds_are_the_readmes(self):
+        """A kind the README gives (`case`, of the Latin words) is one a batch's decision may give too."""
+        readme = os.path.join(os.path.dirname(os.path.abspath(apply.__file__)), '..', 'README.md')
+        with open(readme, encoding='utf-8') as f:
+            text = f.read()
+
+        def kinds(label):
+            paragraph = text.split(label, 1)[1].split('\n\n', 1)[0]
+            return set(re.findall(r'`(\w+)` \(', paragraph))
+
+        self.assertEqual(apply.TAKE, kinds('Taken:'))
+        self.assertEqual(apply.LEAVE, kinds('Left out:'))
