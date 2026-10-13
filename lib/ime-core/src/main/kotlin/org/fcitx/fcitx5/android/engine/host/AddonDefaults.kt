@@ -15,7 +15,8 @@ object AddonDefaults {
     /**
      * punctuation.conf as [text] with Chinese punctuation after a letter or digit too, null where
      * it is so already: the addon's default turned `,` after `a` or `1` into English, and the
-     * user had to delete it and type it again.
+     * user had to delete it and type it again. The one option covers `.` as well, so the letter
+     * keyboard's `3.14` reads `3。14`; the number keyboard's `.`, a keypad key, is never converted.
      */
     fun punctuation(text: String): String? = withKey(text, "HalfWidthPuncAfterLetterOrNumber", "False")
 

@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.engine.host
 
+import org.fcitx.fcitx5.android.engine.host.EngineSettings.Companion.ENGLISH_SUGGEST
 import org.fcitx.fcitx5.android.engine.host.EngineSettings.Companion.FUZZY
 import org.fcitx.fcitx5.android.engine.host.EngineSettings.Companion.PAGE_SIZE
 import org.fcitx.fcitx5.android.engine.host.EngineSettings.Companion.PREDICTION
@@ -125,6 +126,24 @@ object LibimeMigration {
         if (missing.isEmpty()) return null
         val base = config.trimEnd()
         return (if (base.isEmpty()) "" else base + "\n\n") + write(missing)
+    }
+
+    /** androidkeyboard's switch for its word hints: fcitx's English, which English's session replaced. */
+    private const val WORD_HINT = "EnableWordHint"
+
+    /**
+     * [config], the androidengine addon's ("" for none yet), with English's suggestions off where
+     * [keyboardConfig], the androidkeyboard addon's, had its word hints off; null where it had them
+     * on, or [config] says already (once the user saved the English page).
+     */
+    fun englishSuggest(config: String, keyboardConfig: String): String? {
+        val hint = sections(keyboardConfig).first().let { value(it, WORD_HINT) }
+        if (!hint.equals("False", ignoreCase = true)) return null
+        val sections = sections(config)
+        val top = sections.first()
+        if (line(top, ENGLISH_SUGGEST) != null) return null
+        top.lines += "$ENGLISH_SUGGEST=False"
+        return write(sections)
     }
 
     // each group's from the first of TABLE_CONFIGS that set any of it

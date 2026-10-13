@@ -4,9 +4,12 @@
  */
 package org.fcitx.fcitx5.android
 
+import android.app.NotificationChannel
+import android.app.NotificationManager
 import android.content.Context
 import androidx.core.content.edit
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -17,7 +20,10 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 
-/** The start after an import of the user's data puts the settings without a UI back, once. */
+/**
+ * The start after an import of the user's data puts the settings without a UI back, once; the
+ * first start deletes the notification channels an older version made, once.
+ */
 @RunWith(RobolectricTestRunner::class)
 class FcitxApplicationTest {
 
@@ -60,5 +66,17 @@ class FcitxApplicationTest {
         FcitxApplication.resetHiddenSettings(prefs, directBoot = true) { marker }
         assertTrue(prefs.advanced.ignoreSystemCursor.getValue())
         assertTrue(marker.exists())
+    }
+
+    // the starts after need not ask the system for the channels: the first left none
+    @Test
+    fun theNotificationChannelsAnOlderVersionMadeGoAtTheFirstStartAlone() {
+        val manager = RuntimeEnvironment.getApplication().getSystemService(NotificationManager::class.java)
+        manager.createNotificationChannel(NotificationChannel("setup", "setup", NotificationManager.IMPORTANCE_LOW))
+        FcitxApplication.deleteNotificationChannels(manager, sp)
+        assertTrue(manager.notificationChannels.isEmpty())
+        manager.createNotificationChannel(NotificationChannel("later", "later", NotificationManager.IMPORTANCE_LOW))
+        FcitxApplication.deleteNotificationChannels(manager, sp)
+        assertEquals(listOf("later"), manager.notificationChannels.map { it.id })
     }
 }

@@ -200,4 +200,17 @@ class LibimeMigrationTest {
         val settings = LibimeMigration.settings("ShuangpinProfile=\"GB Standard\"\n")
         assertEquals("ShuangpinProfile=\"GB Standard\"\n", settings)
     }
+
+    @Test
+    fun wordHintsTurnedOffInAndroidKeyboardTurnEnglishSuggestionsOffOnce() {
+        assertEquals("EnglishSuggest=False\n", LibimeMigration.englishSuggest("", "EnableWordHint=False\n"))
+        assertEquals(
+            "PageSize=5\nEnglishSuggest=False\n\n[Fuzzy]\nV_U=True\n",
+            LibimeMigration.englishSuggest("PageSize=5\n[Fuzzy]\nV_U=True\n", "EnableWordHint=False\n"),
+        )
+        assertNull(LibimeMigration.englishSuggest("", "EnableWordHint=True\n"))
+        assertNull(LibimeMigration.englishSuggest("", ""))
+        // the English page saved since: the user's choice stands
+        assertNull(LibimeMigration.englishSuggest("EnglishSuggest=True\n", "EnableWordHint=False\n"))
+    }
 }

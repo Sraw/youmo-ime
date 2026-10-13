@@ -5,13 +5,16 @@
 package org.fcitx.fcitx5.android
 
 import android.app.Application
+import android.app.NotificationManager
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.content.SharedPreferences
 import android.content.res.Configuration
 import android.os.Build
 import android.os.Process
+import androidx.annotation.RequiresApi
 import androidx.core.content.ContextCompat
 import androidx.core.content.edit
 import androidx.preference.PreferenceManager
@@ -145,9 +148,7 @@ class FcitxApplication : Application() {
         Locales.onLocaleChange(resources.configuration)
         registerReceiver(shutdownReceiver, IntentFilter(Intent.ACTION_SHUTDOWN))
         // the app posts no notifications (and asks for no permission to): an older version's channels go
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            notificationManager.notificationChannels.forEach { notificationManager.deleteNotificationChannel(it.id) }
-        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) deleteNotificationChannels(notificationManager, sharedPrefs)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N && !isDirectBootMode) {
             AppPrefs.getInstance().syncToDeviceEncryptedStorage()
             ThemeManager.syncToDeviceEncryptedStorage()
@@ -186,6 +187,20 @@ class FcitxApplication : Application() {
             prefs.resetHiddenSettings(again = imported != null)
             imported?.delete()
         }
+
+        /**
+         * The notification channels an older version made deleted, once, [prefs] noting it: after
+         * that the list is empty, and asking the system for it is a call on the main thread at every
+         * start, the keyboard's too.
+         */
+        @RequiresApi(Build.VERSION_CODES.O)
+        internal fun deleteNotificationChannels(manager: NotificationManager, prefs: SharedPreferences) {
+            if (prefs.getBoolean(NOTIFICATION_CHANNELS_DELETED, false)) return
+            manager.notificationChannels.forEach { manager.deleteNotificationChannel(it.id) }
+            prefs.edit { putBoolean(NOTIFICATION_CHANNELS_DELETED, true) }
+        }
+
+        private const val NOTIFICATION_CHANNELS_DELETED = "notification_channels_deleted"
 
         private const val MAX_STACKTRACE_SIZE = 128000
 

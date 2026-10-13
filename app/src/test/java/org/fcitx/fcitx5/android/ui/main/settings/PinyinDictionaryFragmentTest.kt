@@ -27,9 +27,10 @@ import kotlin.coroutines.EmptyCoroutineContext
 
 /**
  * A file is imported into the layer asked. The dictionaries the migration put aside unread are
- * told of: they left the list without a word. A file refused is not read; a dictionary's words are counted again only once its file changed. The changes to the files
- * are made in turn, and the engine reads them again once the last is made: on the page's scope,
- * one still waiting as the page was left was cancelled, and the engine read them without it.
+ * told of: they left the list without a word. A file refused is not read; a dictionary's words
+ * are counted again only once its file changed. The changes to the files are made in turn, and
+ * the engine reads them again once the last is made: on the page's scope, one still waiting as
+ * the page was left was cancelled, and the engine read them without it.
  * A page made anew (a rotation) lists them once the changes of the one it replaced are made:
  * those were listed again on the page gone, the new one left showing what was before them.
  */

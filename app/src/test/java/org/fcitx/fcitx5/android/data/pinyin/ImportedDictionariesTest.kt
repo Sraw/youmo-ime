@@ -8,7 +8,6 @@ import org.fcitx.fcitx5.android.data.pinyin.ImportedDictionaries.Unread
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertThrows
-import org.junit.Assert.fail
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
@@ -54,6 +53,22 @@ class ImportedDictionariesTest {
         File(dir, "mine.txt").writeText("搭子 da'zi 0\n")
         ImportedDictionaries.migrate(dir)
         assertEquals(listOf("mine.txt"), names())
+    }
+
+    @Test
+    fun aWordPackGoneIsNoLongerMergedIntoTheNewWords() {
+        File(dir, "a.words").writeText("# youmo words 1\n搭子 da'zi -5.6\n")
+        File(dir, "b.words.disable").writeText("# youmo words 1\n")
+        File(dir, "mine.words").writeText("# youmo words 1\n")
+        File(dir, "mine.txt").writeText("搭子 da'zi 0\n")
+        // gone: a pack an older migration deleted, its name left listed
+        listOf("a", "b", "mine", "gone").forEach { ImportedDictionaries.setIntoNew(dir, it, true) }
+        // libime's of a pack's name, turned into text as the pack goes: merged into the base
+        File(dir, "b.dict").writeBytes(extra)
+        ImportedDictionaries.migrate(dir)
+        // a dictionary of a pack's name still there keeps its entry
+        assertEquals(setOf("mine"), ImportedDictionaries.intoNew(dir))
+        assertEquals(listOf(".libime", ImportedDictionaries.INTO_NEW, "b.txt", "mine.txt"), names())
     }
 
     @Test

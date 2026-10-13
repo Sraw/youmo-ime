@@ -6,7 +6,6 @@ package org.fcitx.fcitx5.android.data.pinyin
 
 import kotlinx.coroutines.runBlocking
 import org.fcitx.fcitx5.android.FcitxApplication
-import org.fcitx.fcitx5.android.data.pinyin.dict.PinyinDictionary
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertThrows

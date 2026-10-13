@@ -58,23 +58,48 @@ object ImportedDictionaries {
      * older one put aside without noting them, if they still cannot be read. Each is read by
      * [read], libime's reader but in a test. Both the settings and the engine call it, on their
      * own threads.
+     *
+     * The word packs an older build imported (`.words`, and `.words.disable` if turned off) are
+     * deleted first: their words are built in now. Then each name [INTO_NEW] lists that no
+     * dictionary has, a pack's among them, is taken off it.
      */
     @Synchronized
     fun migrate(dir: File, read: (ByteArray) -> List<String> = LibimeFiles::pinyinDictionary) {
         // before any is put aside: one put aside under a taken name is noted by the name it had
         noteOlder(dir, read)
-        for (file in dir.listFiles().orEmpty()) {
-            // a word pack an older build imported: its words are built in now
-            if (file.name.endsWith(".words") || file.name.endsWith(".words.${TextDictionary.DISABLE}")) {
-                file.delete()
-                continue
-            }
+        val files = dir.listFiles().orEmpty()
+        files.filter { isWordPack(it.name) }.forEach { deleteWordPack(it) }
+        // before libime's are turned into text: one under a name still listed would join the new words
+        forgetIntoNewOfNone(dir)
+        for (file in files) {
             val enabled = when {
                 file.name.endsWith(".dict") -> true
                 file.name.endsWith(".dict.${TextDictionary.DISABLE}") -> false
                 else -> null
             }
             if (enabled != null) migrate(file, enabled, read)
+        }
+    }
+
+    private fun isWordPack(fileName: String) =
+        fileName.endsWith(".words") || fileName.endsWith(".words.${TextDictionary.DISABLE}")
+
+    private fun deleteWordPack(file: File) {
+        if (file.delete()) {
+            Timber.i("word pack %s: deleted, its words are built in", file.name)
+        } else {
+            // tried again at the next migration
+            Timber.w("word pack %s: cannot delete it", file.name)
+        }
+    }
+
+    // a name listed that no dictionary has (a pack's an older build deleted, one whose delete
+    // stopped half way) would merge the next of that name, from libime or a backup, into the new words
+    private fun forgetIntoNewOfNone(dir: File) {
+        try {
+            readIntoNew(dir).filter { !hasDictionary(dir, it) }.forEach { setIntoNew(dir, it, false) }
+        } catch (e: IOException) {
+            Timber.w(e, "dictionaries merged into the new words: cannot forget those gone")
         }
     }
 
