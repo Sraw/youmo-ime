@@ -4,8 +4,8 @@
  */
 package org.fcitx.fcitx5.android.eval
 
-import org.fcitx.fcitx5.android.engine.pinyin.Syllables
 import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
+import org.fcitx.fcitx5.android.engine.pinyin.Syllables
 
 /**
  * Types the full-pinyin samples of an evaluation set on the nine keys (九键), as [ShuangpinSet]

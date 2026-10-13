@@ -41,4 +41,15 @@ class CharRanksTest {
         val report = StringBuilder().also { CharRanks.report(ranks, it) }.toString()
         assertTrue(report, report.lines()[0].endsWith(": ${ji.size + 2}"))
     }
+
+    // a character not listed has no score of the decoder's: they were shown in the order of a hash map
+    @Test
+    fun theMissingShownAreTheCommonestByTheModel() {
+        // commonest itself, not through measure: decoding every word a reading starts with
+        // (words = Int.MAX_VALUE), the decoder leaves no character of data like this out
+        val charRanks = CharRanks(data)
+        // 鑫 the model lacks: its unknown word's score, the last
+        assertEquals(listOf("奥", ji[5], "觉", "鑫"), charRanks.commonest(listOf("觉", "鑫", ji[5], "奥")))
+        assertEquals(ji.take(CharRanks.MISSED_SHOWN), charRanks.commonest(ji.reversed()))
+    }
 }

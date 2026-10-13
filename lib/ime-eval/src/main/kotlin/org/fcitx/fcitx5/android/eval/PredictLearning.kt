@@ -5,6 +5,7 @@
 package org.fcitx.fcitx5.android.eval
 
 import org.fcitx.fcitx5.android.engine.data.PinyinData
+import org.fcitx.fcitx5.android.engine.lattice.CoarseWords
 import org.fcitx.fcitx5.android.engine.lattice.Predictor
 import org.fcitx.fcitx5.android.engine.lattice.TextWords
 import org.fcitx.fcitx5.android.engine.pinyin.PinyinSegmenter
@@ -25,7 +26,8 @@ class PredictLearning(private val data: PinyinData, private val weight: Float) {
         val tune = Halves.select(samples, Halves.TUNE)
         val heldOut = Halves.select(samples, Halves.HELD_OUT)
         val user = UserModel(data.dictionary, data.vocabulary)
-        val predictor = Predictor(data.model, data.vocabulary, data.dictionary, user, weight)
+        // as the app's session has it
+        val predictor = Predictor(data.model, data.vocabulary, data.dictionary, user, weight, coarse = CoarseWords.of({ data.wordIndex.find(it) }))
         val rows = mutableListOf("tune, nothing learned" to score(tune, predictor), "held-out, nothing learned" to score(heldOut, predictor))
         val typist = KeystrokeRun(PinyinSession(data, PinyinSegmenter(), user = user, prediction = false))
         tune.forEach { typist.type(it) }

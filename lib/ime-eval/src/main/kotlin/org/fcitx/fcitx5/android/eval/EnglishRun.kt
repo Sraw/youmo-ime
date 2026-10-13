@@ -11,6 +11,7 @@ import org.fcitx.fcitx5.android.engine.english.TypingCosts
 import org.fcitx.fcitx5.android.engine.pinyin.KeyNeighbours
 import org.fcitx.fcitx5.android.engine.session.Action
 import org.fcitx.fcitx5.android.engine.session.Snapshot
+import java.util.Locale
 import kotlin.random.Random
 
 /**
@@ -19,7 +20,11 @@ import kotlin.random.Random
  * session is to put back; not its for it's), then space, or the punctuation after the word, which
  * the session follows with a space. With [noise], each key may slip ([slip]). What space commits is measured against the word meant, as are the candidates the
  * word typed shows and the words offered before it ([Snapshot.predicting]). A word committed
- * wrong is put right before the next, as the user would, so the next word follows the text meant.
+ * wrong is put right before the next, as the user would: a backspace, then the text meant, so the
+ * next word follows the text meant. As in the app, the backspace takes back only a correction space
+ * made, and the word typed, a slip too, is then the user's for the rest of the sentence; after a
+ * correction punctuation made, or a word committed as typed, it takes nothing back, and what was
+ * counted of the word stays counted.
  */
 internal class EnglishRun(
     private val data: EnglishData,
@@ -48,8 +53,9 @@ internal class EnglishRun(
         }
 
         fun row(name: String): String {
-            fun pct(n: Int, of: Int) = if (of == 0) "-" else "%.1f%%".format(n * 100.0 / of)
-            return "%-6s %6d %7s %7s %9s %6d %7s %7s".format(
+            fun pct(n: Int, of: Int) = if (of == 0) "-" else String.format(Locale.ROOT, "%.1f%%", n * 100.0 / of)
+            return String.format(
+                Locale.ROOT, "%-6s %6d %7s %7s %9s %6d %7s %7s",
                 name, words, pct(right, words), pct(top3, words), pct(predicted, words),
                 slipped, pct(fixed, slipped), pct(broken, words - slipped),
             )
@@ -98,7 +104,10 @@ internal class EnglishRun(
             meant.append(token).append(' ')
             offered = if (after.predicting) after.candidates else emptyList()
             if (committed != word) {
-                session.apply(Action.Context(meant.toString()))
+                // a backspace first, as the user's: right after a correction it takes it back, and
+                // what was counted of it with it; then the text meant, as much as the host reads of it
+                session.apply(Action.Backspace)
+                session.apply(Action.Context(meant.takeLast(Action.Context.HOST_CHARS).toString()))
                 offered = emptyList()
             }
         }

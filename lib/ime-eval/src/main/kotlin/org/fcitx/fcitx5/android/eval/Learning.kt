@@ -101,5 +101,4 @@ class Learning(
         p.words.forEach { user.list(it.entry, it.score, layer, data.model.vocabularySize) }
         return user
     }
-
 }

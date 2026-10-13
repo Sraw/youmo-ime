@@ -19,6 +19,10 @@ import java.util.Locale
  * 2026-10-10 the words were ranked by score alone and cut at [PinyinDecoder.DEFAULT_WORDS]: a
  * character rare under its reading whose reading starts with common ones (觉 jiao, after 几 家 加 of
  * ji and jia) was not listed at all, 39408 of 50974 so. Run on an older :lib:ime-core to compare.
+ *
+ * The decoder has no coarse words ([org.fcitx.fcitx5.android.engine.lattice.CoarseWords], which an
+ * older core lacks): a character of their list (屄) ranks here as if the app did not put it past
+ * its first page.
  */
 class CharRanks(private val data: PinyinData) {
 
@@ -38,32 +42,33 @@ class CharRanks(private val data: PinyinData) {
             for (r in readings.distinct()) byReading.getOrPut(r) { ArrayList() } += String(Character.toChars(char))
         }
         for ((reading, chars) in byReading) {
-            val decoding = decoder.decode(segmenter.segment(Syllables.spelling(reading).replace('ü', 'v')), words = Int.MAX_VALUE)
+            val decoding = decoder.decode(segmenter.segment(Syllables.spelling(reading)), words = Int.MAX_VALUE)
             val listed = (decoding.sentences.take(PinyinDecoder.DEFAULT_SENTENCES) + decoding.words).map { it.text }.distinct()
-            val score = decoding.words.associate { it.text to it.score }
-            for (char in chars) counter.count(char, listed.indexOf(char), score[char] ?: Float.NEGATIVE_INFINITY)
+            for (char in chars) counter.count(char, listed.indexOf(char))
         }
-        return counter.ranks()
+        return Ranks(counter.within, counter.past, counter.missed.size, commonest(counter.missed))
     }
+
+    /**
+     * The [MISSED_SHOWN] commonest of [chars], by the model's score of each alone: a character not
+     * listed has no score of the decoder's to go by.
+     */
+    internal fun commonest(chars: Collection<String>): List<String> =
+        chars.sortedByDescending { data.model.score(data.wordIndex.find(it)) }.take(MISSED_SHOWN)
 
     private class Counter {
         val within = IntArray(BOUNDS.size)
         var past = 0
-        var missing = 0
-        val missed = ArrayList<Pair<String, Float>>()
+        val missed = ArrayList<String>()
 
-        fun count(char: String, rank: Int, score: Float) {
+        fun count(char: String, rank: Int) {
             if (rank < 0) {
-                missing++
-                missed += char to score
+                missed += char
                 return
             }
             val bound = BOUNDS.indexOfFirst { rank < it }
             if (bound < 0) past++ else for (b in bound until BOUNDS.size) within[b]++
         }
-
-        // the commonest first, as the decoder scores them
-        fun ranks() = Ranks(within, past, missing, missed.sortedByDescending { it.second }.take(MISSED_SHOWN).map { it.first })
     }
 
     companion object {

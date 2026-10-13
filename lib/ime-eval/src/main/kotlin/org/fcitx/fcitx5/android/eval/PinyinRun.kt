@@ -5,6 +5,8 @@
 package org.fcitx.fcitx5.android.eval
 
 import org.fcitx.fcitx5.android.engine.data.PinyinData
+import org.fcitx.fcitx5.android.engine.host.EngineSettings
+import org.fcitx.fcitx5.android.engine.lattice.Candidate
 import org.fcitx.fcitx5.android.engine.lattice.CoarseWords
 import org.fcitx.fcitx5.android.engine.lattice.Decoding
 import org.fcitx.fcitx5.android.engine.lattice.LayerPrior
@@ -15,8 +17,10 @@ import org.fcitx.fcitx5.android.engine.lattice.WordScorer
 import org.fcitx.fcitx5.android.engine.pinyin.PinyinSegmenter
 import org.fcitx.fcitx5.android.engine.pinyin.Segmenter
 import org.fcitx.fcitx5.android.engine.pinyin.SyllableGraph
+import org.fcitx.fcitx5.android.engine.pinyin.T9Segmenter
 import org.fcitx.fcitx5.android.engine.rerank.SentencePicker
 import org.fcitx.fcitx5.android.engine.rerank.SentenceRefiner
+import org.fcitx.fcitx5.android.engine.session.CoarseCandidates
 import org.fcitx.fcitx5.android.engine.session.PinyinSession
 import org.fcitx.fcitx5.android.engine.user.UserModel
 import org.fcitx.fcitx5.android.engine.user.UserScorer
@@ -56,14 +60,19 @@ class PinyinRun(
         val layer = prior?.layer(p.layer) ?: 1
         UserModel(data.dictionary, data.vocabulary).also { u -> p.words.forEach { u.list(it.entry, it.score, layer, data.model.vocabularySize) } }
     }
+    // as the app's session has them
+    private val coarse = CoarseWords.of({ data.wordIndex.find(it) })
     private val decoder = PinyinDecoder(
         data.dictionary, data.vocabulary,
         (if (user == null) WordScorer.of(data.model) else UserScorer(data.model, user)).let { if (prior == null) it else prior.scorer(it) },
         penalties, beam, user = user, wholeFirst = segmenter.typesLetters,
-        // as the app's session has them
-        coarse = CoarseWords.of({ data.wordIndex.find(it) }),
+        coarse = coarse,
+        // text kept as typed reaches the rerankers as the session's does: on the nine keys, as digits
+        asTyped = { if (segmenter is T9Segmenter) T9Segmenter.asTyped(it) else it },
     )
     private val textWords = TextWords(data.model, data.wordIndex)
+    // where the session lists the candidates with one, by the same code
+    private val coarseCandidates = CoarseCandidates(coarse, data, user)
 
     fun run(samples: List<Sample>): List<RunResult> {
         // the JIT compiles the hot loops during the first rounds, for all threads alike: a few
@@ -108,9 +117,10 @@ class PinyinRun(
         // of the input read last: what the rerankers read before it, the decoder's readings in its
         // order, its words, the picker's pick, and whether a pause weighs the readings again
         private var before = ""
+        private var sentences: List<Candidate> = emptyList()
         private var readings: List<String> = emptyList()
         private var scores: List<Float> = emptyList()
-        private var words: List<String> = emptyList()
+        private var words: List<Candidate> = emptyList()
         private var picked = 0
         private var refines = false
 
@@ -121,9 +131,10 @@ class PinyinRun(
             before = if (contextWords.isEmpty()) "" else context
             val graph = segmenter.segment(input)
             val decoding = decode(graph, contextWords)
-            readings = decoding.sentences.map { it.text }
-            scores = decoding.sentences.map { it.score }
-            words = decoding.words.map { it.text }
+            sentences = decoding.sentences
+            readings = sentences.map { it.text }
+            scores = sentences.map { it.score }
+            words = decoding.words
             picked = picker?.pick(before, readings, scores) ?: 0
             refines = refine != null && readings.size > 1 && PinyinSession.endsOnSyllable(graph)
             return shown(picked)
@@ -144,9 +155,12 @@ class PinyinRun(
         }
 
         private fun shown(first: Int): List<String> {
-            val sentences = if (first == 0) readings else listOf(readings[first]) + readings.filterIndexed { i, _ -> i != first }
+            val ordered = if (first == 0) sentences else listOf(sentences[first]) + sentences.filterIndexed { i, _ -> i != first }
             // those past the decoder's usual few are there to be weighed, not shown
-            return (sentences.take(PinyinDecoder.DEFAULT_SENTENCES) + words).distinct().take(CANDIDATES)
+            val listed = (ordered.take(PinyinDecoder.DEFAULT_SENTENCES) + words).distinctBy { it.text }
+            // as the app lists them, on a page of its default size: those with a coarse word the
+            // user never typed that the first page would show wait past it
+            return coarseCandidates.order(listed, EngineSettings.DEFAULT_PAGE_SIZE).take(CANDIDATES).map { it.text }
         }
     }
 

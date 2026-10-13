@@ -5,6 +5,7 @@
 package org.fcitx.fcitx5.android.eval
 
 import org.fcitx.fcitx5.android.engine.data.PinyinData
+import org.fcitx.fcitx5.android.engine.lattice.CoarseWords
 import org.fcitx.fcitx5.android.engine.lattice.Predictor
 import org.fcitx.fcitx5.android.engine.lattice.TextWords
 import org.fcitx.fcitx5.android.engine.rerank.SentenceModel
@@ -25,7 +26,8 @@ data class Continuation(val context: String, val next: String)
 class PredictRun(data: PinyinData, model: SentenceModel? = null, private val weight: Float = 0f) {
     private val scorer = model?.Scorer()
 
-    private val predictor = Predictor(data.model, data.vocabulary, data.dictionary)
+    // as the app's session has it
+    private val predictor = Predictor(data.model, data.vocabulary, data.dictionary, coarse = CoarseWords.of({ data.wordIndex.find(it) }))
     private val textWords = TextWords(data.model, data.wordIndex)
 
     fun offers(context: String): List<String> {

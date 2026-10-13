@@ -8,12 +8,16 @@ import org.fcitx.fcitx5.android.engine.data.PinyinData
 import org.fcitx.fcitx5.android.engine.data.PinyinDataBuilder
 import org.fcitx.fcitx5.android.engine.data.SourceException
 import org.fcitx.fcitx5.android.engine.data.WordLayers
+import org.fcitx.fcitx5.android.engine.host.EngineSettings
+import org.fcitx.fcitx5.android.engine.lattice.CoarseWords
 import org.fcitx.fcitx5.android.engine.pinyin.PinyinSegmenter
 import org.fcitx.fcitx5.android.engine.pinyin.Syllables
 import org.fcitx.fcitx5.android.engine.rerank.SentencePicker
 import org.fcitx.fcitx5.android.engine.rerank.SentenceRefiner
 import org.fcitx.fcitx5.android.engine.session.Action
 import org.fcitx.fcitx5.android.engine.session.PinyinSession
+import org.fcitx.fcitx5.android.engine.user.UserModel
+import org.fcitx.fcitx5.android.engine.user.WordPack
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
@@ -237,6 +241,77 @@ class PinyinRunTest {
         assertEquals(sessionWeighs, runWeighs)
         // both answers among them, or the two could agree by never weighing at all
         assertTrue(true in sessionWeighs && false in sessionWeighs)
+    }
+
+    @Test
+    fun aCandidateWithACoarseWordIsHeldPastTheFirstPageAsInTheSession() {
+        // CoarseCandidatesTest's: 小穴 likelier than 小学 even lowered, and 小 then 穴 spell it too
+        val syl = { s: String -> s.split(' ').map { Syllables.id(it) }.toIntArray() }
+        val data = PinyinData.load(
+            ByteBuffer.wrap(
+                PinyinDataBuilder()
+                    .unigram("<unk>", -7f, 0f)
+                    .unigram("小穴", -1f, 0f)
+                    .unigram("小学", -3f, 0f)
+                    .unigram("小雪", -3.5f, 0f)
+                    .unigram("小", -2f, 0f)
+                    .unigram("学", -3f, 0f)
+                    .unigram("穴", -1f, 0f)
+                    .entry("小穴", syl("xiao xue"))
+                    .entry("小学", syl("xiao xue"))
+                    .entry("小雪", syl("xiao xue"))
+                    .entry("小", syl("xiao"))
+                    .entry("学", syl("xue"))
+                    .entry("穴", syl("xue"))
+                    .build().toByteArray(),
+            ),
+        )
+        val session = PinyinSession(data, PinyinSegmenter(), prediction = false)
+        val page = "xiaoxue".map { session.apply(Action.Key(it)) }.last().candidates
+        val shown = PinyinRun(data).candidates("xiaoxue")
+        assertEquals(page, shown.take(page.size))
+        // held, not left out
+        assertTrue(shown.toString(), "小穴" in shown && shown.first() != "小穴")
+    }
+
+    /**
+     * Only those the first page would show wait past it, as in the session: one further down keeps
+     * its place, where moving every one after the first page would put 骚穴 right after 小穴. With
+     * the user's words too: a coarse word of a pack, which the data lacks, waits as well.
+     */
+    @Test
+    fun aCandidateWithACoarseWordFurtherDownKeepsItsPlaceAsInTheSession() {
+        // ten words of xiao xue a quarter apart from a point a step above the penalty, so that, lowered
+        // by it, 小穴 falls among the first page's and 骚穴 past it, the penalty retuned or not
+        val reading = intArrayOf(Syllables.id("xiao"), Syllables.id("xue"))
+        val words = List(10) { (0x4E00 + it).toChar().toString().repeat(2) }
+        val data = PinyinData.load(
+            ByteBuffer.wrap(
+                PinyinDataBuilder().unigram("<unk>", -7f, 0f)
+                    .apply { words.forEachIndexed { i, w -> unigram(w, CoarseWords.PENALTY + 1f - i / 4f, 0f).entry(w, reading) } }
+                    .unigram("小穴", -0.1f, 0f).entry("小穴", reading)
+                    .unigram("骚穴", -0.85f, 0f).entry("骚穴", reading)
+                    .build().toByteArray(),
+            ),
+        )
+        val page = EngineSettings.DEFAULT_PAGE_SIZE
+        fun sessionShows(user: UserModel?, count: Int): List<String> {
+            val session = PinyinSession(data, PinyinSegmenter(), pageSize = page, user = user, prediction = false)
+            "xiaoxue".forEach { session.apply(Action.Key(it)) }
+            return session.candidates(0, count).map { it.text }
+        }
+        val shown = PinyinRun(data).candidates("xiaoxue")
+        assertEquals(sessionShows(null, shown.size), shown)
+        assertEquals(page, shown.indexOf("小穴"))
+        // a word of the second page still before it
+        assertEquals(page + 2, shown.indexOf("骚穴"))
+
+        val pack = WordPack("test", listOf(WordPack.Word(UserModel.Entry("嫩穴", reading), -0.2f)))
+        // as PinyinRun lists a pack given no layers
+        val user = UserModel(data.dictionary, data.vocabulary).also { u -> pack.words.forEach { u.list(it.entry, it.score, 1, data.model.vocabularySize) } }
+        val packed = PinyinRun(data, pack = pack).candidates("xiaoxue")
+        assertEquals(sessionShows(user, packed.size), packed)
+        assertEquals(listOf("小穴", "嫩穴"), packed.subList(page, page + 2))
     }
 
     @Test
