@@ -205,6 +205,31 @@ class PinyinDataTest {
         assertEquals(emptyList<String>(), after(NO_WORD, data.id("妳好")))
     }
 
+    // found once a context, as the decoder scores every word after one: the same scores
+    @Test
+    fun aContextsTrigramsLookedUpOnceServeEveryWordAfterIt() {
+        val data = load(builder().bigram("好", "你", -1.3f, 0f).trigram("你", "好", "拟", -0.6f))
+        val m = data.model
+        val nihao = m.context(data.id("你"), data.id("好"))
+        val trigrams = m.trigrams(nihao)
+        assertEquals(-0.2f, m.scoreAfter(nihao, trigrams, data.id("吗")), 0f)
+        assertEquals(-0.6f, m.scoreAfter(nihao, trigrams, data.id("拟")), 0f)
+        // none after both: bo(你 好) + P(你 | 好)
+        assertEquals(-0.1f + -1.3f, m.scoreAfter(nihao, trigrams, data.id("你")), 1e-6f)
+        // no bigram 拟 好: no trigrams to look up
+        val none = m.context(data.id("拟"), data.id("好"))
+        assertEquals(-1.1f, m.scoreAfter(none, m.trigrams(none), data.id("吗")), 1e-6f)
+    }
+
+    // kept by its bits, as the decoder keeps one a context in a LongArray: the same run back, its ends apart
+    @Test
+    fun aRunOfTrigramsKeptByItsBitsIsTheSameRun() {
+        val run = NgramModel.Trigrams(Int.MAX_VALUE / 2, Int.MAX_VALUE - 1)
+        assertEquals(run, NgramModel.Trigrams(run.bits))
+        assertEquals(Int.MAX_VALUE / 2, run.start)
+        assertEquals(Int.MAX_VALUE - 1, run.end)
+    }
+
     /** The words forEachAfter hands on are looked up in the vocabulary: one past the model loads, and is not handed on. */
     @Test
     fun anNgramWordPastTheModelIsNotHandedOn() {

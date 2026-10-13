@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.engine.lattice
 
+import org.fcitx.fcitx5.android.engine.data.NgramModel
 import org.fcitx.fcitx5.android.engine.data.WordLayers
 
 /**
@@ -76,6 +77,8 @@ class LayerPrior(
         override fun score(prev2: Int, prev: Int, word: Int) = minOf(0f, inner.score(prev2, prev, word) + of(word))
         override fun context(prev2: Int, prev: Int) = inner.context(prev2, prev)
         override fun scoreAfter(context: Long, word: Int) = minOf(0f, inner.scoreAfter(context, word) + of(word))
+        override fun trigrams(context: Long) = inner.trigrams(context)
+        override fun scoreAfter(context: Long, trigrams: NgramModel.Trigrams, word: Int) = minOf(0f, inner.scoreAfter(context, trigrams, word) + of(word))
     }
 
     /**

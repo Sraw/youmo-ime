@@ -27,12 +27,24 @@ fun interface WordScorer {
     /** [score] of [word] after a [context] this scorer made. */
     fun scoreAfter(context: Long, word: Int): Float = score((context shr Int.SIZE_BITS).toInt(), context.toInt(), word)
 
+    /**
+     * What [scoreAfter] looks up of [context] for each word (the n-gram model: where the trigrams
+     * after it are), looked up once a context, as [context] is; [NgramModel.Trigrams.NONE] for a
+     * scorer that looks up nothing.
+     */
+    fun trigrams(context: Long): NgramModel.Trigrams = NgramModel.Trigrams.NONE
+
+    /** [scoreAfter], with [trigrams] this scorer's [trigrams] of [context]. */
+    fun scoreAfter(context: Long, trigrams: NgramModel.Trigrams, word: Int): Float = scoreAfter(context, word)
+
     companion object {
         /** [model], held to 0: a backoff sum from quantised values could come out a hair above it. */
         fun of(model: NgramModel): WordScorer = object : WordScorer {
             override fun score(prev2: Int, prev: Int, word: Int) = minOf(0f, model.score(prev2, prev, word))
             override fun context(prev2: Int, prev: Int) = model.context(prev2, prev)
             override fun scoreAfter(context: Long, word: Int) = minOf(0f, model.scoreAfter(context, word))
+            override fun trigrams(context: Long) = model.trigrams(context)
+            override fun scoreAfter(context: Long, trigrams: NgramModel.Trigrams, word: Int) = minOf(0f, model.scoreAfter(context, trigrams, word))
         }
     }
 }

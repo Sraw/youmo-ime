@@ -26,8 +26,12 @@ class UserScorer(
 
     override fun context(prev2: Int, prev: Int) = model.context(prev2, prev)
 
-    override fun scoreAfter(context: Long, word: Int): Float {
-        var base = model.scoreAfter(context, word)
+    override fun trigrams(context: Long) = model.trigrams(context)
+
+    override fun scoreAfter(context: Long, word: Int) = scoreAfter(context, model.trigrams(context), word)
+
+    override fun scoreAfter(context: Long, trigrams: NgramModel.Trigrams, word: Int): Float {
+        var base = model.scoreAfter(context, trigrams, word)
         if (word >= model.vocabularySize) {
             val packed = user.score(word)
             if (!packed.isNaN()) base += packed - model.unknownScore

@@ -10,9 +10,9 @@ import java.nio.ByteOrder
 /**
  * A read-only non-decreasing array of non-negative ints in Elias-Fano form: where each bigram's run of
  * trigrams starts in the language model. [BitPacked] stored those in 25 bits each, 43 MB of the pinyin
- * model and 31 MB of English's; here they take some 3 bits, and the files 38 and 27 MB less. A lookup
- * costs more than [BitPacked]'s, so the unigrams' run starts, looked up for every bigram and only 1 MB,
- * stay [BitPacked]: in Elias-Fano they cost the decoder 70% at the 95th percentile of a key.
+ * model; here they take some 3 bits, and its file 38 MB less. A lookup costs more than [BitPacked]'s,
+ * so the unigrams' run starts, looked up for every bigram and only 1 MB, stay [BitPacked]: in
+ * Elias-Fano they cost the decoder 70% at the 95th percentile of a key.
  *
  * Each value is split into its [lowWidth] low bits, packed as [BitPacked] packs them, and the rest,
  * written in unary into the upper bit array: value i sets bit `(value ushr lowWidth) + i`. Value i's
@@ -44,7 +44,7 @@ class EliasFano(buffer: ByteBuffer) {
         require(lowWidth in 0..BitPacked.MAX_WIDTH) { "bad low width $lowWidth" }
         require(size >= 0) { "bad size $size" }
         // bit positions are ints: more upper words than that and a lookup would wrap onto another word
-        require(upperWords in 0..Int.MAX_VALUE / 64 && sampleCount == samplesFor(size)) { "bad upper bits or samples" }
+        require(upperWords in 0..MAX_UPPER_WORDS && sampleCount == samplesFor(size)) { "bad upper bits or samples" }
         // in longs: a damaged count would overflow an int past the check
         val upperAt = HEADER_BYTES + lowWords(lowWidth, size) * 8L
         val samplesAt = upperAt + upperWords * 8L
@@ -59,11 +59,21 @@ class EliasFano(buffer: ByteBuffer) {
         return value(index, select(index))
     }
 
-    /** Values [index] and [index] + 1 together, as `first shl 32 or second`: a run's start and end. */
-    fun run(index: Int): Long {
+    /** Values [index] and [index] + 1 together: a run's start and end. */
+    fun run(index: Int): Run {
         if (index < 0 || index >= size - 1) throw IndexOutOfBoundsException("$index and the next of $size")
         val bit = select(index)
-        return (value(index, bit).toLong() shl Int.SIZE_BITS) or value(index + 1, nextSet(bit + 1)).toLong()
+        return Run(value(index, bit), value(index + 1, nextSet(bit + 1)))
+    }
+
+    /** A run's [start] and [end], held in one long: the decoder looks one up for each word it scores, and none is an object. */
+    @JvmInline
+    value class Run private constructor(private val bits: Long) {
+
+        constructor(start: Int, end: Int) : this((start.toLong() shl Int.SIZE_BITS) or (end.toLong() and 0xffffffffL))
+
+        val start: Int get() = (bits ushr Int.SIZE_BITS).toInt()
+        val end: Int get() = bits.toInt()
     }
 
     /**
@@ -153,6 +163,9 @@ class EliasFano(buffer: ByteBuffer) {
         const val SAMPLE = 64
         private const val HEADER_BYTES = 16
 
+        // the reader's bound, which encode keeps to: a table it builds is one a reader takes
+        private const val MAX_UPPER_WORDS = Int.MAX_VALUE / 64
+
         private fun lowWords(width: Int, size: Int): Long = (size.toLong() * width + 63) / 64
 
         private fun samplesFor(size: Int): Int = ((size.toLong() + SAMPLE - 1) / SAMPLE).toInt()
@@ -168,7 +181,7 @@ class EliasFano(buffer: ByteBuffer) {
             // the low width that makes the whole smallest: about log2 of the mean gap
             val lowWidth = if (size == 0) 0 else (63 - java.lang.Long.numberOfLeadingZeros(maxOf(1L, (max.toLong() + 1) / size)))
             val upperBits = size.toLong() + (max.toLong() ushr lowWidth) + 1
-            require(upperBits <= Int.MAX_VALUE) { "$size values up to $max: bit positions past an int" }
+            require(upperBits <= MAX_UPPER_WORDS * 64L) { "$size values up to $max: bit positions past an int" }
             val upperWords = ((upperBits + 63) / 64).toInt()
             val low = LongArray(lowWords(lowWidth, size).toInt())
             val upper = LongArray(upperWords)

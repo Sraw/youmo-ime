@@ -17,9 +17,7 @@ import org.fcitx.fcitx5.android.engine.pinyin.Syllables
  */
 class PinyinDataBuilder {
 
-    private val ids = HashMap<String, Int>()
-    private val words = ArrayList<String>()
-    private val tables = NgramTables { words[it] }
+    private val model = NgramWords()
     private val entries = ArrayList<Entry>()
     private var layerNames = listOf(WordLayers.BASE)
 
@@ -31,25 +29,14 @@ class PinyinDataBuilder {
         layerNames = names
     }
 
-    fun unigram(word: String, prob: Float, backoff: Float) = apply {
-        finite(prob, backoff) { word }
-        require(ids.put(word, words.size) == null) { "unigram \"$word\" added twice" }
-        words += word
-        tables.unigram(prob, backoff)
-    }
+    fun unigram(word: String, prob: Float, backoff: Float) = apply { model.unigram(word, prob, backoff) }
 
     /** [word]'s unigram probability, or null if it was not added as one. */
-    fun unigramOf(word: String): Float? = ids[word]?.let { tables.unigramProb(it) }
+    fun unigramOf(word: String): Float? = model[word]?.let { model.tables.unigramProb(it) }
 
-    fun bigram(prev: String, word: String, prob: Float, backoff: Float) = apply {
-        finite(prob, backoff) { "$prev $word" }
-        tables.bigram(lmId(prev), lmId(word), prob, backoff)
-    }
+    fun bigram(prev: String, word: String, prob: Float, backoff: Float) = apply { model.bigram(prev, word, prob, backoff) }
 
-    fun trigram(prev2: String, prev: String, word: String, prob: Float) = apply {
-        finite(prob, 0f) { "$prev2 $prev $word" }
-        tables.trigram(lmId(prev2), lmId(prev), lmId(word), prob)
-    }
+    fun trigram(prev2: String, prev: String, word: String, prob: Float) = apply { model.trigram(prev2, prev, word, prob) }
 
     /**
      * [word] is spelt [syllables] (ids from [Syllables]). [weight] is a log10 adjustment for
@@ -64,22 +51,16 @@ class PinyinDataBuilder {
         entries += Entry(syllables, word, weight, layer)
     }
 
-    // a NaN would poison the quantiser: it equals nothing, so it breaks every bin it lands in
-    private inline fun finite(prob: Float, backoff: Float, ngram: () -> String) =
-        require(prob.isFinite() && backoff.isFinite()) { "\"${ngram()}\": $prob $backoff" }
-
-    private fun lmId(word: String) = requireNotNull(ids[word]) { "\"$word\" is not a unigram" }
-
     private var built = false
 
     /** Once only: building appends the dictionary's own words to the vocabulary. */
     fun build(meta: Map<String, String> = emptyMap()): DataFile.Writer {
         check(!built) { "already built" }
-        val lmSize = words.size
-        val unknown = requireNotNull(ids[UNKNOWN]) { "the model has no $UNKNOWN" }
+        val lmSize = model.words.size
+        val unknown = requireNotNull(model[UNKNOWN]) { "the model has no $UNKNOWN" }
         built = true
         // dictionary words the model lacks get ids after the model's own
-        entries.forEach { e -> ids.getOrPut(e.word) { words.size.also { words += e.word } } }
+        entries.forEach { e -> model.add(e.word) }
         val out = DataFile.Writer(DataFile.KIND_PINYIN, PinyinData.VERSION)
         out.addMeta(
             Section.META,
@@ -92,25 +73,26 @@ class PinyinDataBuilder {
             )
         )
         writeVocabulary(out)
-        writeDictionary(out) { id -> tables.unigramProb(if (id < lmSize) id else unknown) }
+        writeDictionary(out) { id -> model.tables.unigramProb(if (id < lmSize) id else unknown) }
         writeLayers(out)
-        tables.write(out, lmSize)
+        model.tables.write(out, lmSize)
         return out
     }
 
-    private fun writeVocabulary(out: DataFile.Writer) = StringTable.write(out, Section.VOCAB_OFFSETS, Section.VOCAB_CHARS, words)
+    private fun writeVocabulary(out: DataFile.Writer) = StringTable.write(out, Section.VOCAB_OFFSETS, Section.VOCAB_CHARS, model.words)
 
     private class Entry(val syllables: IntArray, val word: String, val weight: Float, val layer: Int)
 
     /** A word's layer is the first it has an entry in; a model word with no entry is of the base. */
     private fun writeLayers(out: DataFile.Writer) {
         if (layerNames.size == 1) return
-        val layer = IntArray(words.size) { -1 }
+        val size = model.words.size
+        val layer = IntArray(size) { -1 }
         entries.forEach { e ->
-            val id = ids.getValue(e.word)
+            val id = model.id(e.word)
             layer[id] = if (layer[id] < 0) e.layer else minOf(layer[id], e.layer)
         }
-        out.add(Section.WORD_LAYER, BitPacked.encode(words.size) { maxOf(layer[it], 0) })
+        out.add(Section.WORD_LAYER, BitPacked.encode(size) { maxOf(layer[it], 0) })
     }
 
     private class Node(val syllable: Int) {
@@ -125,7 +107,7 @@ class PinyinDataBuilder {
         entries.forEach { e ->
             val node = e.syllables.fold(root) { node, s -> node.children.getOrPut(s) { Node(s) } }
             // the same reading listed twice (say, in two source files) keeps its likelier weight
-            val id = ids.getValue(e.word)
+            val id = model.id(e.word)
             node.words[id] = maxOf(e.weight, node.words[id] ?: e.weight)
         }
         // breadth-first, so that each node's children get consecutive ids

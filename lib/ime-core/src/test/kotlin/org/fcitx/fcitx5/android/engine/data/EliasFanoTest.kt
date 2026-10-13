@@ -35,8 +35,8 @@ class EliasFanoTest {
                 for (i in values.indices) assertEquals("run $meanRun, owners $owners, at $i", values[i], packed[i])
                 for (i in 0 until values.size - 1) {
                     val run = packed.run(i)
-                    assertEquals(values[i], (run ushr Int.SIZE_BITS).toInt())
-                    assertEquals(values[i + 1], run.toInt())
+                    assertEquals(values[i], run.start)
+                    assertEquals(values[i + 1], run.end)
                 }
                 packed.checkRuns("t", 0, values.last())
             }
@@ -48,6 +48,10 @@ class EliasFanoTest {
         val values = intArrayOf(0, 0, 0, 1, Int.MAX_VALUE / 2, Int.MAX_VALUE / 2, Int.MAX_VALUE - 1)
         val packed = read(EliasFano.encode(values))
         for (i in values.indices) assertEquals(values[i], packed[i])
+        // a run's two halves apart, an end as large as a value may be
+        val last = packed.run(values.size - 2)
+        assertEquals(Int.MAX_VALUE / 2, last.start)
+        assertEquals(Int.MAX_VALUE - 1, last.end)
         val zeros = IntArray(300)
         read(EliasFano.encode(zeros)).also { z -> for (i in zeros.indices) assertEquals(0, z[i]) }
     }

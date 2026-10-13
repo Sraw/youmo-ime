@@ -276,14 +276,45 @@ class NgramModel internal constructor(file: DataFile, val vocabularySize: Int, p
     fun prevOf(context: Long): Int = (context shr Int.SIZE_BITS).toInt()
 
     /** log10 P(word | [context]), a value from [context] */
-    fun scoreAfter(context: Long, word: Int): Float {
+    fun scoreAfter(context: Long, word: Int): Float = scoreAfter(context, trigrams(context), word)
+
+    /**
+     * Where the trigrams after [context] are, a value for [scoreAfter]: an Elias-Fano lookup, which
+     * scoring every word after one context would repeat. Looked up once a context, as [context] is.
+     */
+    fun trigrams(context: Long): Trigrams {
+        val bigram = context.toInt()
+        if (bigram < 0) return Trigrams.NONE
+        val run = biTrigramStart.run(bigram)
+        return Trigrams(run.start, run.end)
+    }
+
+    /**
+     * The run of trigrams after a context, from [trigrams] for [scoreAfter]: typed, so that no other
+     * long is taken for one. Held in one long, [bits], which a decoder keeps in a [LongArray].
+     */
+    @JvmInline
+    value class Trigrams internal constructor(internal val bits: Long) {
+
+        internal constructor(start: Int, end: Int) : this((start.toLong() shl Int.SIZE_BITS) or (end.toLong() and 0xffffffffL))
+
+        internal val start: Int get() = (bits ushr Int.SIZE_BITS).toInt()
+        internal val end: Int get() = bits.toInt()
+
+        companion object {
+            /** Of a context without its bigram, and of a scorer that looks nothing up. */
+            val NONE = Trigrams(0, 0)
+        }
+    }
+
+    /** [scoreAfter], with [trigrams] this model's [trigrams] of [context]. */
+    fun scoreAfter(context: Long, trigrams: Trigrams, word: Int): Float {
         val prev = prevOf(context)
         val bigram = context.toInt()
         if (bigram < 0) return score(prev, word)
         val w = known(word)
-        val run = biTrigramStart.run(bigram)
-        val from = (run ushr Int.SIZE_BITS).toInt()
-        val to = run.toInt()
+        val from = trigrams.start
+        val to = trigrams.end
         val at = triWord.lowerBound(from, to, w)
         if (at < to && triWord[at] == w) return triProbTable[triProb.get(at).toInt() and 0xff]
         return biBackoffTable[biBackoff.get(bigram).toInt() and 0xff] + score(prev, word)
@@ -301,9 +332,9 @@ class NgramModel internal constructor(file: DataFile, val vocabularySize: Int, p
         val bigram = context.toInt()
         var b = uniBigramStart[p]
         val bEnd = uniBigramStart[p + 1]
-        val trigrams = if (bigram < 0) 0L else biTrigramStart.run(bigram)
-        var t = (trigrams ushr Int.SIZE_BITS).toInt()
-        val tEnd = trigrams.toInt()
+        val trigrams = trigrams(context)
+        var t = trigrams.start
+        val tEnd = trigrams.end
         val backoff = if (bigram < 0) 0f else biBackoffTable[biBackoff.get(bigram).toInt() and 0xff]
         // both runs are sorted by word: merge them
         while (b < bEnd || t < tEnd) {
