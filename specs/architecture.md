@@ -46,7 +46,8 @@ One process. Inside it:
   thread puts in place.
 - **`engine-warm-up`** (`Engines`): a daemon thread for each warm-up, once for each `Engines` (made
   anew as fcitx starts again after it exited, `EngineBridge.close()`): pinyin's data and word index
-  as the first field starts, English's keys and word index as its session is first made. A session
+  as the first field starts in one of the pinyins (全拼, 双拼, 九键; not in English or a table),
+  English's keys and word index as its session is first made. A session
   made meanwhile waits for them: `EngineAssets.pinyinData` and the word indexes are synchronized
   lazies.
 - **Voice** (voice build): the microphone reader, the VAD and the recognizer on threads of their own

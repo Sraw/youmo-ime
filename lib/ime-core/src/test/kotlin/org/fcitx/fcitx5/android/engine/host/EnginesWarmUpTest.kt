@@ -27,15 +27,26 @@ class EnginesWarmUpTest : EnginesFixture() {
     @Test
     fun pinyinsDataIsReadOffTheFcitxThreadOnceAsTheFirstFieldStarts() {
         val engines = Engines(::load, null, warmUps = warmUps)
-        engines.context("")
-        // nothing read on the fcitx thread: one who types only English waits on none of it
+        engines.context(Engines.T9, "")
+        // nothing read on the fcitx thread
         assertEquals(emptyList<String>(), loaded)
         assertEquals(1, later.size)
-        engines.context("你")
+        engines.context(Engines.PINYIN, "你")
         assertEquals(1, later.size)
         later.single().run()
         assertEquals(listOf(Engines.PINYIN_DATA), loaded)
         assertEquals(listOf("你", "拟"), engines.type(Engines.PINYIN, "ni").candidates)
+    }
+
+    /** One who types only English or a table neither waits for pinyin's data nor holds its word index. */
+    @Test
+    fun aFieldStartedInEnglishOrATableReadsNoPinyin() {
+        val engines = Engines(::load, null, warmUps = warmUps)
+        engines.context(Engines.ENGLISH, "")
+        engines.context(Engines.WUBI, "")
+        assertEquals(emptyList<Runnable>(), later)
+        engines.context(Engines.SHUANGPIN, "")
+        assertEquals(1, later.size)
     }
 
     @Test
@@ -70,7 +81,7 @@ class EnginesWarmUpTest : EnginesFixture() {
     // is handed over: what it cannot read must not escape its thread, which on Android ends the app
     private fun fieldStarted(assets: (String) -> ByteBuffer): Engines {
         val engines = Engines(assets, null, warmUps = inPlace)
-        engines.context("")
+        engines.context(Engines.PINYIN, "")
         engines.type(Engines.ENGLISH, "youmo")
         assertEquals("youmo ", engines.onEvent(Engines.ENGLISH, EngineEvent.CHAR, ' '.code).commit)
         return engines

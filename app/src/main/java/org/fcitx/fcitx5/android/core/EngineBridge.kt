@@ -382,8 +382,8 @@ object EngineBridge {
 
     /** See [Engines.context]; nothing to tell while the engine is not made. */
     @JvmStatic
-    fun context(before: String, learning: Boolean) {
-        made?.context(before, learning)
+    fun context(before: String, learning: Boolean, im: String) {
+        made?.context(im, before, learning)
     }
 
     /** See [Engines.tableKeys]; none while the engine is not made, no session yet, nor is it made to answer: the keyboard waits. */

@@ -76,7 +76,7 @@ class Fcitx(private val context: Context) : FcitxAPI, FcitxLifecycleOwner {
     override suspend fun exportUserWords() = withFcitxContext { EngineBridge.engines.exportWords() }
     override suspend fun tableKeys(im: String) = withFcitxContext { EngineBridge.tableKeys(im) }
 
-    override suspend fun engineContext(before: String, learning: Boolean) = withFcitxContext { EngineBridge.context(before, learning) }
+    override suspend fun engineContext(before: String, learning: Boolean) = withFcitxContext { EngineBridge.context(before, learning, inputMethodEntryCached.uniqueName) }
 
     override suspend fun sendKey(
         key: String,

@@ -113,9 +113,9 @@ class EnginesTest : EnginesFixture() {
     fun theTextBeforeTheCursorIsTheContextOfWhatIsTypedNext() {
         val engines = Engines(::load, null, warmUps = inPlace)
         // no keyboard yet: nothing to tell
-        engines.context("好")
+        engines.context(Engines.PINYIN, "好")
         engines.onEvent(Engines.PINYIN, EngineEvent.RESET, 0)
-        engines.context("好")
+        engines.context(Engines.PINYIN, "好")
         assertEquals(listOf("拟", "你"), engines.type(Engines.PINYIN, "ni").candidates)
     }
 
@@ -529,7 +529,7 @@ class EnginesTest : EnginesFixture() {
         // the decoder's reading alone
         engines.settings = EngineSettings(modelLevel = ModelLevel.LOW)
         engines.onEvent(Engines.PINYIN, EngineEvent.RESET, 0)
-        engines.context("你")
+        engines.context(Engines.PINYIN, "你")
         engines.type(Engines.PINYIN, "uz")
         assertEquals("好", engines.onEvent(Engines.PINYIN, EngineEvent.CHAR, ' '.code).commit)
         assertEquals("你", engines.type(Engines.PINYIN, "ni").candidates.first())

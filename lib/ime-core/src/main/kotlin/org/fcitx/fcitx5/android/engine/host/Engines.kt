@@ -213,16 +213,17 @@ class Engines(
     /**
      * [before] is the text before the cursor, put where the engines did not: see
      * [Keyboard.context]; [learning] off in a sensitive field, told "" (not known), so each
-     * learns as its [onEvent] would.
+     * learns as its [onEvent] would. [im] is the input method the field starts with.
      */
-    fun context(before: String, learning: Boolean = true) {
-        if (!pinyinWarmedUp) warmUpPinyin()
+    fun context(im: String, before: String, learning: Boolean = true) {
+        if (!pinyinWarmedUp && im in PINYINS) warmUpPinyin()
         keyboards.values.forEach { it.context(before, learning) }
     }
 
-    // told as a field starts, before its first key: pinyin's data read and its 270 thousand words
-    // indexed meanwhile, off the fcitx thread, so one who types only English does not wait for them; a
-    // pinyin key that comes sooner waits for them, as it would anyway. Whatever reading them throws is
+    // told as a field starts in one of the pinyins, before its first key: pinyin's data read and its
+    // 270 thousand words indexed meanwhile, off the fcitx thread; one who types only English or a
+    // table neither waits for them nor holds them. A pinyin key that comes sooner waits for them, and
+    // a switch to pinyin reads them on the fcitx thread as it makes the session (activate's Reset). Whatever reading them throws is
     // dropped, the lazies left unset: pinyin's session reads them again as it is made, on the fcitx
     // thread, which hands it to the addon (EngineBridge.Unloadable); thrown out of this thread, it
     // would end the app. Memory run out is no Exception, and is not caught
@@ -353,6 +354,9 @@ class Engines(
         const val T9 = "engine-t9"
 
         const val WUBI = "engine-wubi"
+
+        /** The input methods whose sessions read pinyin's data (a table's lookup reads it only once asked). */
+        private val PINYINS = setOf(PINYIN, SHUANGPIN, T9)
 
         /** Offered first to be added: the most asked for after pinyin, which is there already. */
         private val ADDED_FIRST = listOf(T9, WUBI)
