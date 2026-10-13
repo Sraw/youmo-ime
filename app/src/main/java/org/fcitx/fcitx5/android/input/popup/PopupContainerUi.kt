@@ -10,6 +10,7 @@ import android.view.View
 import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.input.keyboard.KeyAction
 import splitties.views.dsl.core.Ui
+import kotlin.math.abs
 import kotlin.math.roundToInt
 
 abstract class PopupContainerUi(
@@ -35,19 +36,31 @@ abstract class PopupContainerUi(
      */
     abstract val offsetY: Int
 
+    /**
+     * The column of the key in focus at first, the one centred over the trigger: the one nearest the
+     * middle that leaves every column inside [outerBounds], else the one past them least. Keys wider
+     * than the trigger may leave none that fits (nine keys' 9, a long word over Q):
+     * [PopupKeyboardUi] moves itself in by the rest. Bounds not laid out yet, empty, have nothing
+     * to fit in: the middle one.
+     */
     fun calcInitialFocusedColumn(
         columnCount: Int,
         columnWidth: Int,
         outerBounds: Rect,
         triggerBounds: Rect
     ): Int {
-        // assume trigger bounds inside outer bounds
-        val leftSpace = triggerBounds.left - outerBounds.left
-        val rightSpace = outerBounds.right - triggerBounds.right
-        var col = (columnCount - 1) / 2
-        while (columnWidth * col > leftSpace) col--
-        while (columnWidth * (columnCount - col - 1) > rightSpace) col++
-        return col.coerceIn(0, columnCount - 1)
+        val middle = (columnCount - 1) / 2
+        // every column is past empty bounds, and the search took one at the right: the popup opened left of the key
+        if (outerBounds.isEmpty) return middle
+        // the key in focus as offsetX centres it: wider than the trigger, it overhangs it both sides
+        val keyLeft = triggerBounds.left + (triggerBounds.width() - columnWidth) / 2
+        val leftSpace = keyLeft - outerBounds.left
+        val rightSpace = outerBounds.right - (keyLeft + columnWidth)
+        // not a column at a time: that loop never ended for keys of no width
+        return (0 until columnCount).minWith(
+            compareBy<Int> { maxOf(columnWidth * it - leftSpace, columnWidth * (columnCount - it - 1) - rightSpace, 0) }
+                .thenBy { abs(it - middle) }
+        )
     }
 
     /**

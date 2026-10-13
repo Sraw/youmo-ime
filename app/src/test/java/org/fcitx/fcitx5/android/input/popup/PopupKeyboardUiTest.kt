@@ -16,6 +16,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
+import kotlin.math.ceil
 
 /**
  * A key of the long-press popup is typed where it is drawn. With more columns than a short top
@@ -33,14 +34,14 @@ class PopupKeyboardUiTest {
     private fun popup(count: Int, trigger: Rect): PopupKeyboardUi =
         popup(Array(count) { ('a' + it).toString() }, trigger)
 
-    private fun popup(keys: Array<String>, trigger: Rect, outerBounds: Rect = outer): PopupKeyboardUi {
+    private fun popup(keys: Array<String>, trigger: Rect, outerBounds: Rect = outer, minKeyWidth: Int = keyWidth): PopupKeyboardUi {
         return PopupKeyboardUi(
             ctx = RuntimeEnvironment.getApplication(),
             theme = ThemePreset.PixelDark,
             outerBounds = outerBounds,
             triggerBounds = trigger,
             radius = 4f,
-            minKeyWidth = keyWidth,
+            minKeyWidth = minKeyWidth,
             keyHeight = keyHeight,
             popupHeight = 100,
             keys = keys,
@@ -143,6 +144,55 @@ class PopupKeyboardUiTest {
         // wide enough for the widest, so none is made smaller
         assertTrue(labels.all { it.paint.measureText(it.text.toString()) < ui.keyWidth })
         assertTrue(ui.keyWidth >= keyWidth)
+    }
+
+    /**
+     * AutoScaleTextView draws a label too wide for its view smaller, its text size unchanged: one
+     * text size held for the old keys too, `.com` too wide for its 38 dp. Under a bubble narrower
+     * than any label, every label fits its key with its padding (6 dp a side, at 1 dp = 1 px) and is
+     * measured as wide as its text: none is drawn smaller.
+     */
+    @Test
+    fun everyLabelFitsItsKeySoNoneIsDrawnSmaller() {
+        val domains = arrayOf(".com", ".cn", ".net", ".org")
+        val ui = popup(domains, Rect(480, 500, 520, 550), minKeyWidth = 1)
+        val unspecified = View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED)
+        ui.root.measure(unspecified, unspecified)
+        for (label in ui.labels()) {
+            val text = label.paint.measureText(label.text.toString())
+            assertTrue("${label.text}: $text in ${ui.keyWidth}", text + 12 <= ui.keyWidth)
+            assertEquals("${label.text}", ceil(text).toInt(), label.measuredWidth)
+        }
+    }
+
+    /** Where the popup starts and ends across, as PopupComponent places it over [trigger]. */
+    private fun PopupKeyboardUi.across(trigger: Rect, columns: Int) =
+        (trigger.left + offsetX).let { it to it + columns * keyWidth }
+
+    // keys as wide as the bubble may be wider than the key pressed: at an edge no column centred over it fits
+    @Test
+    fun aPopupOfKeysWiderThanItsTriggerStaysOnScreen() {
+        // nine keys' 9: five keys of a fifth of the width, over a key a little wider
+        val nine = Rect(600, 500, 820, 550)
+        val ui = popup(Array(5) { ('a' + it).toString() }, nine, minKeyWidth = 220)
+        assertEquals(200, ui.keyWidth)
+        assertEquals(0 to 1000, ui.across(nine, 5))
+        // moved in by 10: the first key starts at the trigger's left, not 10 right of it, and is still under the finger
+        assertEquals(0, ui.focusedKeyLeft)
+        ui.changeFocus(nine.width() / 2f, nine.height() / 2f)
+        assertEquals(KeyAction.FcitxKeyAction("a"), ui.onTrigger())
+        // a long word over Q, the key at either edge
+        for (q in listOf(Rect(0, 500, 40, 550), Rect(960, 500, 1000, 550))) {
+            val (left, right) = popup(arrayOf("q", "hello"), q, minKeyWidth = 80).across(q, 2)
+            assertTrue("$q: $left to $right", left >= 0 && right <= 1000)
+        }
+    }
+
+    // pressed before the popups' root is laid out, its bounds still empty: keys of no width hung the column search
+    @Test
+    fun boundsNotYetLaidOutLeaveTheKeysTheirWidth() {
+        val ui = popup(arrayOf("a", "b", "c"), Rect(480, 500, 520, 550), Rect())
+        assertEquals(keyWidth, ui.keyWidth)
     }
 
     @Test

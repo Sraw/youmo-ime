@@ -112,7 +112,9 @@ class PopupKeyboardUi(
         val padding = ctx.dp(KEY_PADDING)
         val widest = keyUis.maxOfOrNull { it.textView.paint.measureText(it.text) } ?: 0f
         val fitting = ceil(widest).toInt() + 2 * padding
-        keyWidth = min(max(minKeyWidth, fitting), outerBounds.width() / columnCount)
+        val wanted = max(minKeyWidth, fitting)
+        // bounds not laid out yet are empty: nothing to fit in, rather than keys of no width
+        keyWidth = if (outerBounds.isEmpty) wanted else min(wanted, outerBounds.width() / columnCount)
         if (fitting > keyWidth) {
             // its padding too, so never below nothing however narrow
             val size = TEXT_SIZE * keyWidth / fitting
@@ -151,9 +153,23 @@ class PopupKeyboardUi(
      *
      * Applying only `1.` parts of both X and Y offset, the origin should transform from `o` to `p`.
      * `2.` parts of both offset transform it from `p` to `c`.
+     *
+     * Where no column centred over the trigger leaves the popup inside [outerBounds] (keys wider than
+     * the trigger, at an edge), it is moved in by the rest, every key on screen.
      */
-    override val offsetX = ((triggerBounds.width() - keyWidth) / 2) - (keyWidth * focusColumn)
+    override val offsetX = run {
+        val centred = ((triggerBounds.width() - keyWidth) / 2) - (keyWidth * focusColumn)
+        if (outerBounds.isEmpty) return@run centred
+        val left = (triggerBounds.left + centred).coerceIn(outerBounds.left, outerBounds.right - columnCount * keyWidth)
+        left - triggerBounds.left
+    }
     override val offsetY = (triggerBounds.height() - popupHeight) - (keyHeight * (rowCount - 1))
+
+    /**
+     * Where the key in focus at first starts across, from the trigger's left: centred over it, unless
+     * the popup was moved in. The bubble under it belongs there, as one shape with it.
+     */
+    val focusedKeyLeft: Int get() = offsetX + keyWidth * focusColumn
 
     private val columnOrder = createColumnOrder(columnCount, focusColumn)
 
@@ -241,7 +257,7 @@ class PopupKeyboardUi(
         private const val TEXT_SIZE = 23f
 
         /** Space each side of the widest label, in dp. */
-        private const val KEY_PADDING = 6
+        private const val KEY_PADDING = PopupComponent.TEXT_PADDING
 
         /** What picking [key] types: from the long press, and from a letter's swipe (its first). */
         fun keyAction(key: String): KeyAction =

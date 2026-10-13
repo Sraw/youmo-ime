@@ -49,11 +49,11 @@ class PopupComponent :
     private val keyBottomMargin by lazy {
         context.dp(ThemeManager.prefs.keyVerticalMargin.getValue())
     }
-    private val popupWidth by lazy {
+    private val minPopupWidth by lazy {
         context.dp(38)
     }
     private val popupPadding by lazy {
-        context.dp(6)
+        context.dp(TEXT_PADDING)
     }
     private val popupHeight by lazy {
         context.dp(116)
@@ -114,7 +114,11 @@ class PopupComponent :
     }
 
     private fun updatePopup(viewId: Int, content: String) {
+        // under a long press's keys it stays as showKeyboard left it, empty and as wide as they are:
+        // a letter's preview, wrapped by its long press, still sends this on every move
+        if (viewId in showingContainerUi) return
         showingEntryUi[viewId]?.apply {
+            if (textView.text.contentEquals(content)) return
             setText(content)
             place(this, trigger)
         }
@@ -122,21 +126,33 @@ class PopupComponent :
 
     /**
      * Over the key [bounds], [width] wide, by default as wide as the key's face (the bounds across)
-     * and its text, never narrower than [popupWidth]: a fixed width over a wider key
+     * and its text, never narrower than [minPopupWidth]: a fixed width over a wider key
      * (九键's, `.com`, any in landscape) left the key's pressed colour showing at both sides.
+     * From [left], by default centred over the key.
      */
-    private fun place(popup: PopupEntryUi, bounds: Rect, width: Int = entryWidth(popup, bounds)) {
+    private fun place(
+        popup: PopupEntryUi,
+        bounds: Rect,
+        width: Int = entryWidth(popup, bounds),
+        left: Int = (bounds.left + bounds.right - width) / 2,
+    ) {
         popup.trigger.set(bounds)
+        // align popup bottom with key border bottom [^1]
+        val top = bounds.bottom - popupHeight - keyBottomMargin
+        // new ones lay the whole input view out again: not for a move or a press that changes nothing
+        if ((popup.root.layoutParams as? FrameLayout.LayoutParams)?.isAt(width, left, top) == true) return
         popup.root.layoutParams = FrameLayout.LayoutParams(width, popupHeight).apply {
-            // align popup bottom with key border bottom [^1]
-            topMargin = bounds.bottom - popupHeight - keyBottomMargin
-            leftMargin = (bounds.left + bounds.right - width) / 2
+            topMargin = top
+            leftMargin = left
         }
     }
 
+    private fun FrameLayout.LayoutParams.isAt(width: Int, left: Int, top: Int) =
+        this.width == width && leftMargin == left && topMargin == top
+
     private fun entryWidth(popup: PopupEntryUi, bounds: Rect): Int {
         val text = ceil(popup.textWidth(popup.textView.text.toString())).toInt() + 2 * popupPadding
-        return maxOf(popupWidth, bounds.width(), text)
+        return maxOf(minPopupWidth, bounds.width(), text)
     }
 
     private fun showKeyboard(viewId: Int, keyboard: KeyDef.Popup.Keyboard, bounds: Rect) {
@@ -165,15 +181,15 @@ class PopupComponent :
             bounds,
             { dismissPopup(viewId) },
             popupRadius,
-            max(entry.root.layoutParams.width, popupWidth),
+            max(entry.root.layoutParams.width, minPopupWidth),
             popupKeyHeight,
             // position popup keyboard higher, because of [^1]
             popupHeight + keyBottomMargin,
             keys,
             labels
         )
-        // the bubble under the key in focus as wide as it, as one shape
-        place(entry, bounds, keyboardUi.keyWidth)
+        // the bubble under the key in focus, its width and place (moved in at an edge): one shape
+        place(entry, bounds, keyboardUi.keyWidth, bounds.left + keyboardUi.focusedKeyLeft)
         showPopupContainer(viewId, keyboardUi)
     }
 
@@ -270,5 +286,13 @@ class PopupComponent :
                 is PopupAction.TriggerAction -> outAction = triggerFocused(viewId)
             }
         }
+    }
+
+    companion object {
+        /**
+         * Space each side of the bubble's text, in dp; a long press's keys leave as much each side
+         * of their widest label, so the bubble and the key over it come out one width.
+         */
+        internal const val TEXT_PADDING = 6
     }
 }
