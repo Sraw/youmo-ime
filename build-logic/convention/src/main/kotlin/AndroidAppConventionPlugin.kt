@@ -17,12 +17,15 @@ import org.gradle.api.file.RegularFileProperty
 import org.gradle.api.internal.provider.AbstractProperty
 import org.gradle.api.internal.provider.Providers
 import org.gradle.api.plugins.BasePluginExtension
+import org.gradle.api.provider.SetProperty
+import org.gradle.api.tasks.Input
 import org.gradle.api.tasks.InputFile
 import org.gradle.api.tasks.OutputFile
 import org.gradle.api.tasks.PathSensitive
 import org.gradle.api.tasks.PathSensitivity
 import org.gradle.api.tasks.TaskAction
 import org.gradle.kotlin.dsl.configure
+import org.gradle.kotlin.dsl.register
 import org.gradle.kotlin.dsl.withType
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 import org.w3c.dom.Element
@@ -48,7 +51,7 @@ class AndroidAppConventionPlugin : AndroidBaseConventionPlugin() {
             defaultConfig {
                 targetSdk = Versions.targetSdk
                 versionCode = Versions.calculateVersionCode()
-                versionName = target.buildVersionName
+                versionName = Versions.checkedVersionName(target.buildVersionName)
             }
             buildTypes {
                 release {
@@ -140,9 +143,10 @@ class AndroidAppConventionPlugin : AndroidBaseConventionPlugin() {
             }
             // Check the merged manifest in its own path, so no APK or bundle is built without it
             onVariants { v ->
-                val permissionCheck = target.tasks.register(
-                    "checkPermissions${v.name.capitalized()}", PermissionCheckTask::class.java
-                )
+                val permitted = PermissionCheckTask.allowedFor(v.productFlavors)
+                val permissionCheck = target.tasks.register<PermissionCheckTask>("checkPermissions${v.name.capitalized()}") {
+                    allowed.set(permitted)
+                }
                 v.artifacts.use(permissionCheck)
                     .wiredWithFiles(PermissionCheckTask::mergedManifest, PermissionCheckTask::checkedManifest)
                     .toTransform(SingleArtifact.MERGED_MANIFEST)
@@ -185,7 +189,7 @@ class AndroidAppConventionPlugin : AndroidBaseConventionPlugin() {
     }
 
     /**
-     * Fails the build if the merged manifest asks for a permission not in [ALLOWED], and otherwise
+     * Fails the build if the merged manifest asks for a permission not in [allowed], and otherwise
      * passes it on unchanged. The app asks for what it needs and no more, no network above all
      * (README, PRIVACY.md), and a dependency's manifest would merge one in without a line of this
      * repository changing.
@@ -195,6 +199,10 @@ class AndroidAppConventionPlugin : AndroidBaseConventionPlugin() {
         @get:PathSensitive(PathSensitivity.NONE)
         abstract val mergedManifest: RegularFileProperty
 
+        /** What the variant may ask for: [allowedFor] its flavors. */
+        @get:Input
+        abstract val allowed: SetProperty<String>
+
         @get:OutputFile
         abstract val checkedManifest: RegularFileProperty
 
@@ -203,12 +211,13 @@ class AndroidAppConventionPlugin : AndroidBaseConventionPlugin() {
             val manifest = mergedManifest.get().asFile
             val root = DocumentBuilderFactory.newInstance().apply { isNamespaceAware = true }
                 .newDocumentBuilder().parse(manifest).documentElement
+            val permitted = allowed.get()
             val found = PERMISSION_TAGS.flatMap { tag ->
                 val nodes = root.getElementsByTagName(tag)
                 (0 until nodes.length).map { (nodes.item(it) as Element).getAttributeNS(ANDROID_NS, "name") }
-            }.filter { it !in ALLOWED }
+            }.filter { it !in permitted }
             check(found.isEmpty()) {
-                "The merged manifest asks for ${found.joinToString()}, which the app does not ask for (PRIVACY.md): " +
+                "The merged manifest asks for ${found.joinToString()}, which this build does not ask for (PRIVACY.md): " +
                     "build/outputs/logs/manifest-merger-*-report.txt names the dependency that adds it"
             }
             manifest.copyTo(checkedManifest.get().asFile, overwrite = true)
@@ -217,8 +226,17 @@ class AndroidAppConventionPlugin : AndroidBaseConventionPlugin() {
         companion object {
             private const val ANDROID_NS = "http://schemas.android.com/apk/res/android"
             private val PERMISSION_TAGS = listOf("uses-permission", "uses-permission-sdk-23")
-            // key feedback, and the microphone of the voice build's voice input
-            private val ALLOWED = setOf("android.permission.VIBRATE", "android.permission.RECORD_AUDIO")
+
+            /**
+             * Key feedback for every build; the microphone for the voice build's voice input alone:
+             * the text build must not gain it from a dependency either (PRIVACY.md).
+             */
+            fun allowedFor(flavors: List<Pair<String, String>>): Set<String> =
+                if ((VoiceDataPlugin.DIMENSION to VoiceDataPlugin.FLAVOR) in flavors) {
+                    setOf("android.permission.VIBRATE", "android.permission.RECORD_AUDIO")
+                } else {
+                    setOf("android.permission.VIBRATE")
+                }
         }
     }
 

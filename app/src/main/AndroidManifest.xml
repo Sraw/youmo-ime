@@ -11,7 +11,8 @@
         android:name="${applicationId}.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION"
         tools:node="remove" />
 
-    <!-- no network permission: one merged in from a dependency fails the build (AndroidAppConventionPlugin) -->
+    <!-- no permission but this one and the voice build's RECORD_AUDIO, none for the network above
+         all: any other merged in from a dependency fails the build (AndroidAppConventionPlugin) -->
     <uses-permission android:name="android.permission.VIBRATE" />
 
     <!-- Don't strip the Cropper library's queries with tools:node="removeAll": under AGP 9 it also
