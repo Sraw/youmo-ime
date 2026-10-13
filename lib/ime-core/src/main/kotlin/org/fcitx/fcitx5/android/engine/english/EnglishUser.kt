@@ -21,7 +21,8 @@ import kotlin.math.pow
  * A word counted [LEARNED] times is the user's: never corrected, as a correction taken back makes
  * the word typed at once. Words the data lacks are offered by their keys from the first count.
  * Halved, a word's count may fall below [LEARNED] again, as in pinyin: a word not typed for long
- * is corrected again.
+ * is corrected again. A word added by hand ([add]) is not: it stays the user's until forgotten, as
+ * pinyin's added words do.
  */
 class EnglishUser(private val limit: Float = DEFAULT_LIMIT) {
 
@@ -29,12 +30,17 @@ class EnglishUser(private val limit: Float = DEFAULT_LIMIT) {
     interface Journal {
         fun learned(prev: String?, word: String, count: Float)
         fun forgot(word: String)
+        fun added(word: String) {}
     }
 
     var journal: Journal? = null
 
     private val counts = HashMap<String, Float>()
     private val pairs = HashMap<String, HashMap<String, Float>>()
+    private val added = HashSet<String>()
+
+    /** The words added by hand ([add]). */
+    val addedWords: Set<String> get() = added
 
     /** The sum of the words' counts. */
     var total = 0f
@@ -61,23 +67,42 @@ class EnglishUser(private val limit: Float = DEFAULT_LIMIT) {
             after.merge(word, count, Float::plus)
             if ((after[word] ?: 0f) <= 0f) after.remove(word)
         }
-        if (count(word) <= 0f) dropWord(word)
+        if (count(word) <= 0f) dropWords(setOf(word))
         if (total > limit) halve()
         // after halving, as a compaction it makes due writes the counts as they are
         journal?.learned(prev, word, count)
     }
 
-    /** Forgets [word], its count and every pair it is in: a long press on it. */
-    fun forget(word: String) {
-        if (word !in counts) return
-        dropWord(word)
-        journal?.forgot(word)
+    /**
+     * Makes [word] the user's for good, as added on the English page: counted [LEARNED] times at
+     * least, and kept so however often halved, until forgotten.
+     */
+    fun add(word: String) {
+        // first, so a halving the count makes due keeps it
+        added += word
+        val missing = LEARNED - count(word)
+        if (missing > 0f) learn(null, word, missing)
+        journal?.added(word)
     }
 
-    private fun dropWord(word: String) {
-        counts.remove(word)
-        pairs.remove(word)
-        pairs.values.forEach { it.remove(word) }
+    /** Forgets [word], its count and every pair it is in: a long press on it. */
+    fun forget(word: String) = forgetAll(listOf(word))
+
+    /** Forgets each of [words] as [forget] does, in one pass over the pairs: several removed on the English page. */
+    fun forgetAll(words: Collection<String>) {
+        val gone = words.filterTo(HashSet()) { it in counts }
+        if (gone.isEmpty()) return
+        dropWords(gone)
+        gone.forEach { journal?.forgot(it) }
+    }
+
+    private fun dropWords(gone: Set<String>) {
+        for (word in gone) {
+            counts.remove(word)
+            pairs.remove(word)
+            added.remove(word)
+        }
+        pairs.values.forEach { it.keys.removeAll(gone) }
         total = counts.values.sum()
         changes++
     }
@@ -125,7 +150,8 @@ class EnglishUser(private val limit: Float = DEFAULT_LIMIT) {
     }
 
     private fun halve() {
-        counts.replaceAll { _, c -> c * HALF }
+        // an added word kept at LEARNED, so never dropped below
+        counts.replaceAll { w, c -> if (w in added) maxOf(c * HALF, LEARNED) else c * HALF }
         counts.values.removeIf { it < MIN_COUNT }
         pairs.values.forEach { after ->
             after.replaceAll { _, c -> c * HALF }
@@ -153,26 +179,35 @@ class EnglishUser(private val limit: Float = DEFAULT_LIMIT) {
 
 /**
  * Keeps an [EnglishUser] in [file], a log a [RecordStore] keeps: [open] replays it, then each word
- * learned or forgotten is one write, compacted to the counts now and then.
+ * learned, added or forgotten is one write, compacted to the counts now and then (past [compactAt] bytes).
  */
 class EnglishUserStore(
     file: File,
     private val user: EnglishUser,
     onError: (IOException) -> Unit = {},
     background: Executor? = null,
+    compactAt: Long = RecordStore.DEFAULT_COMPACT_AT,
 ) : Closeable {
-    private val store = RecordStore(file, FORMAT, onError = onError, background = background)
+    private val store = RecordStore(file, FORMAT, compactAt = compactAt, onError = onError, background = background)
 
     fun open() {
         store.open(
             replay = ::replay,
-            counts = { write -> user.forEachCount { prev, word, count -> write(countRecord(prev, word, count)) } },
+            counts = { write ->
+                user.forEachCount { prev, word, count -> write(record(COUNT, prev, word, count)) }
+                // after the counts: replayed, each finds its word at LEARNED already and adds none
+                user.addedWords.forEach { write(addedRecord(it)) }
+            },
         )
         user.journal = object : EnglishUser.Journal {
-            override fun learned(prev: String?, word: String, count: Float) = store.append(learnedRecord(prev, word, count))
+            override fun learned(prev: String?, word: String, count: Float) = store.append(record(LEARNED, prev, word, count))
             override fun forgot(word: String) = store.append(FORMAT.record(FORGOT) { writeUTF(word) })
+            override fun added(word: String) = store.append(addedRecord(word))
         }
     }
+
+    /** Rewrites the log as the counts. */
+    internal fun compact() = store.compact()
 
     override fun close() {
         user.journal = null
@@ -190,6 +225,7 @@ class EnglishUserStore(
                 user.addCount(prev, input.readUTF(), input.readFloat())
             }
             FORGOT -> user.forget(input.readUTF())
+            ADDED -> user.add(input.readUTF())
             // a type from a later version: what it held is lost, the rest still reads
             else -> Unit
         }
@@ -202,15 +238,13 @@ class EnglishUserStore(
         private const val LEARNED: Byte = 1
         private const val COUNT: Byte = 2
         private const val FORGOT: Byte = 3
+        // a version without it skips it, as a later version's type
+        private const val ADDED: Byte = 4
 
-        private fun learnedRecord(prev: String?, word: String, count: Float) = FORMAT.record(LEARNED) {
-            writeBoolean(prev != null)
-            if (prev != null) writeUTF(prev)
-            writeUTF(word)
-            writeFloat(count)
-        }
+        private fun addedRecord(word: String) = FORMAT.record(ADDED) { writeUTF(word) }
 
-        private fun countRecord(prev: String?, word: String, count: Float) = FORMAT.record(COUNT) {
+        // a count of [word], after [prev] if given: LEARNED as learned, COUNT as compacted
+        private fun record(type: Byte, prev: String?, word: String, count: Float) = FORMAT.record(type) {
             writeBoolean(prev != null)
             if (prev != null) writeUTF(prev)
             writeUTF(word)
