@@ -19,6 +19,12 @@ interface Session {
     fun reads(c: Char): Boolean
 
     /**
+     * Whether it takes every character itself, as English does: space ends a word and digits are
+     * typed, neither picks; an arrow commits what is typed; a key gone to the app resets it.
+     */
+    val takesEveryCharacter: Boolean get() = false
+
+    /**
      * Whether what the user picks is learned. The host turns it off where the app asks it not to
      * (a password, an incognito tab), before the actions typed there.
      */
@@ -131,7 +137,17 @@ sealed class Action {
      * the input to come follows: what the host read off the editor, where the engine committed
      * nothing yet (a field focused, the cursor put somewhere).
      */
-    data class Context(val before: String) : Action()
+    data class Context(val before: String) : Action() {
+        companion object {
+            /**
+             * As much of the text before the cursor as the host reads into a context, and keeps of
+             * what it wrote where the field has none (the service's ContextChars, ContextMemory.KEEP):
+             * the last two words, and what the pinyin reranker has room for. A context as long may
+             * be the end of more text, no field's start.
+             */
+            const val HOST_CHARS = 64
+        }
+    }
 }
 
 /**

@@ -124,6 +124,9 @@ internal class UserLexicon(
         UserWord.Kind.BLOCKED to lists.blockedWords.size,
     )
 
+    /** The texts of the words added by hand, which no session holds back as coarse: listed, they have no count to say they are the user's. */
+    fun addedTexts(): Set<String> = lists.addedWords.mapTo(HashSet()) { it.text }
+
     fun addWord(text: String, pinyin: String): Boolean {
         val entry = WordLists.entry(text, pinyin) ?: return false
         add(listOf(entry))

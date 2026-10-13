@@ -11,6 +11,7 @@ import org.fcitx.fcitx5.android.engine.session.Choice
 import org.fcitx.fcitx5.android.engine.session.Offer
 import org.fcitx.fcitx5.android.engine.session.Session
 import org.fcitx.fcitx5.android.engine.session.Snapshot
+import java.util.BitSet
 
 /**
  * English typed a word at a time, as Gboard has it. The candidates are the word typed and the
@@ -23,7 +24,8 @@ import org.fcitx.fcitx5.android.engine.session.Snapshot
  *
  * A word committed by space or picked is followed by a space and by the words that may come next
  * ([Snapshot.predicting]); punctuation typed right after puts that space behind it (`word .` as
- * `word. `), and space typed again turns it into a full stop (`word  ` as `word. `). A lone i is
+ * `word. `), as a closing bracket does and a quote where one is open (`word.)` as `word.) `);
+ * space typed again turns it into a full stop (`word  ` as `word. `). A lone i is
  * I. Enter commits the word as typed and is the app's all the same: a search runs at once. A tap
  * in the word puts the cursor there, where letters go in and backspace deletes.
  *
@@ -55,14 +57,26 @@ class EnglishSession(
 
     private val decoder = data?.let { d -> EnglishDecoder(d, costs) { context, word -> scored(d, context, word) } }
 
-    // never offered, completed or corrected to; typed, they are kept as typed
-    private val coarse = data?.let { d -> CoarseWords.of({ d.id(it) }, coarseWords) } ?: CoarseWords.NONE
+    // never offered, completed or corrected to; typed, they are kept as typed. Looked up at the first
+    // key, not here: the session is made on the thread that types, and the lookups would build the
+    // data's word index there rather than leave it to the warm-up
+    private val coarse by lazy { data?.let { d -> CoarseWords.of({ d.id(it) }, coarseWords) } ?: CoarseWords.NONE }
 
-    // the model's words that are misspellings: no more offered than coarse ones
-    private val misspelt = data?.let { d -> CoarseWords.of({ d.id(it) }, misspellings.keys.toList()) } ?: CoarseWords.NONE
+    // the model's words that are misspellings, by id, looked up as late
+    private val misspelt by lazy {
+        val ids = BitSet()
+        data?.let { d -> for (word in misspellings.keys) d.id(word).takeIf { it != NgramModel.NO_WORD }?.let { ids.set(it) } }
+        ids
+    }
 
-    // a coarse word the user typed is theirs to be offered
-    private fun offered(word: Int) = !(coarse.has(word) && user.count(checkNotNull(data).word(word)) <= 0f) && !misspelt.has(word)
+    // a coarse word the user typed is theirs to be offered; a misspelling once it is theirs, never
+    // corrected (see read)
+    private fun offered(word: Int): Boolean {
+        val misspelling = misspelt[word]
+        if (!misspelling && !coarse.has(word)) return true
+        val text = checkNotNull(data).word(word)
+        return if (misspelling) user.learned(text) else user.count(text) > 0f
+    }
 
     private val input = StringBuilder()
     private var cursor = 0 // in input
@@ -73,7 +87,7 @@ class EnglishSession(
     private var correction: String? = null
 
     // the word typed and what space committed for it, while backspace may take the correction back
-    private var corrected: Pair<String, String>? = null
+    private var corrected: Corrected? = null
 
     // shown again by backspace: committed as typed
     private var keepTyped = false
@@ -83,9 +97,10 @@ class EnglishSession(
     private var last = ""
 
     // the end of the text before the cursor, as far as the session knows it: if [known], from the
-    // app's (Action.Context) on; else what it committed alone
+    // app's (Action.Context) on, [cut] where the text goes on before it; else what it committed alone
     private var recent = ""
     private var known = false
+    private var cut = false
 
     override var learning = true
         set(value) {
@@ -97,6 +112,8 @@ class EnglishSession(
         }
 
     override fun reads(c: Char): Boolean = c in 'a'..'z' || c in 'A'..'Z' || (c == '\'' || c == '-') && input.isNotEmpty()
+
+    override val takesEveryCharacter: Boolean get() = true
 
     override fun apply(action: Action): Snapshot = when (action) {
         is Action.Key -> key(action.char)
@@ -118,6 +135,7 @@ class EnglishSession(
             if (learning) {
                 recent = action.before.takeLast(EnglishText.CONTEXT_CHARS)
                 known = true
+                cut = action.before.length >= Action.Context.HOST_CHARS
             }
             snapshot()
         }
@@ -148,18 +166,15 @@ class EnglishSession(
 
     private fun key(c: Char): Snapshot {
         corrected = null
-        val join = input.isEmpty() && joins(c)
-        if (join) {
-            last = ""
-            recent = recent.dropLast(1)
-        }
         if (reads(c)) {
             if (input.isEmpty()) candidates = emptyList()
             input.insert(cursor++, c)
             read()
-            return snapshot(deleteBefore = if (join) 1 else 0)
+            return snapshot()
         }
-        if (join) {
+        if (input.isEmpty() && joins(c)) {
+            last = ""
+            recent = recent.dropLast(1)
             wrote(c.toString())
             candidates = emptyList()
             return snapshot(commit = c.toString(), deleteBefore = 1)
@@ -170,7 +185,7 @@ class EnglishSession(
             val word = if (c == ' ' || c in SWAPPED) correction ?: typed else typed
             // space ends the word with a space of the session's own, and punctuation with itself
             // and one; anything else is the app's
-            if (c == ' ') return commit(word, space = true).also { if (word != typed) corrected = typed to last }
+            if (c == ' ') return commit(word, space = true).also { if (word != typed) corrected = Corrected(typed, last) }
             if (c in SWAPPED) {
                 learn(word, 1f)
                 clear()
@@ -192,20 +207,22 @@ class EnglishSession(
     private fun afterOwnSpace(c: Char): Snapshot {
         // before the session's own space, if the cursor is still after it
         val before = if (last.length >= 2 && last.last() == ' ') last[last.length - 2] else null
-        val word = before != null && before.isLetterOrDigit()
+        val word = before != null && endsWord(before)
+        val mark = before != null && before in MARKS && !word
+        // after punctuation, or a bracket or quote closed, the space is there already
+        if (c == ' ' && mark) {
+            last = ""
+            return snapshot()
+        }
         val made = when {
             before == null -> null
             // twice after a word: a full stop
             c == ' ' && word -> ". "
-            // after punctuation the space is there already
-            c == ' ' && before in SWAPPED -> " "
             // in place of the space, and one after it: "word, " then "?" is "word? ", "?! " after "? "
-            c in SWAPPED && (word || before in SWAPPED) -> "$c "
+            c in SWAPPED && (word || mark) -> "$c "
+            // a bracket closed, likewise ("(see above.) ", "hello:) "), and a quote where one is open
+            c in CLOSING || c in QUOTES && quoteOpen(c) -> "$c "
             else -> null
-        }
-        if (made == " ") {
-            last = ""
-            return snapshot()
         }
         if (made == null) {
             clear()
@@ -216,6 +233,29 @@ class EnglishSession(
         recent = recent.dropLast(1)
         return spaced(made, deleteBefore = 1)
     }
+
+    // whether [c], before the session's own space, ends a word: an apostrophe too (dogs') is the
+    // word's, but one put in as a quote, all [last] has but its space
+    private fun endsWord(c: Char): Boolean = c.isLetterOrDigit() || c == '\'' && last.length > 2
+
+    // whether a quote [q] is open in the text before the cursor, as far as the session knows it: the
+    // last of them not in a word (don't, 90's) opens one after a space, a bracket or the field's
+    // start, and closes one after a word or punctuation (dogs', "Stop."), so one whose opening one is
+    // out of what the session knows is no opening one, nor one first of a text cut short or unknown
+    // (after a Reset), which may close one. An opening one is the app's to type
+    private fun quoteOpen(q: Char): Boolean {
+        var open = false
+        for (i in recent.indices) {
+            if (recent[i] != q || inWord(i)) continue
+            val prev = recent.getOrNull(i - 1)
+            open = if (prev == null) known && !cut else prev.isWhitespace() || prev in OPENING
+        }
+        return open
+    }
+
+    // whether the char at [i] of [recent] has a letter or digit on both sides, as the quote in don't
+    private fun inWord(i: Int): Boolean =
+        recent.getOrNull(i - 1)?.isLetterOrDigit() == true && recent.getOrNull(i + 1)?.isLetterOrDigit() == true
 
     // [made], ending with a space of the session's own, in place of the [deleteBefore] before it
     private fun spaced(made: String, deleteBefore: Int): Snapshot {
@@ -230,7 +270,7 @@ class EnglishSession(
         val undo = corrected
         corrected = null
         if (input.isEmpty()) {
-            if (undo != null && undo.second == last) return takeBack(undo.first, undo.second)
+            if (undo != null && undo.committed == last) return takeBack(undo.typed, undo.committed)
             last = ""
             candidates = emptyList()
             recent = recent.dropLast(1)
@@ -296,24 +336,36 @@ class EnglishSession(
         last = ""
         recent = ""
         known = false
+        cut = false
         corrected = null
     }
 
-    // [word] committed: counted [count] times after the word before it, while learning
-    private fun learn(word: String, count: Float) {
-        if (count != 0f && learning && word.any { it.isLetter() }) user.learn(previous(), inSentence(word), count)
+    /**
+     * [text] committed: each word of it (two for alot as a lot) counted [count] times after the
+     * word before it, while learning. What is no word (a run of letters past [EnglishText.MAX_WORD])
+     * is not counted, and breaks the run, as in the pages.
+     */
+    private fun learn(text: String, count: Float) {
+        if (count == 0f || !learning) return
+        val before = before()
+        var prev = previous(before)
+        var first = before.lastOrNull() == EnglishText.START
+        for (part in text.split(' ')) {
+            val word = if (EnglishText.isWord(part)) inSentence(part, first) else null
+            if (word != null) user.learn(prev, word, count)
+            prev = word
+            first = false
+        }
     }
-
-    // the word before the cursor, if one is known
-    private fun previous(): String? = before().lastOrNull()?.takeIf { it != EnglishText.START }
 
     /**
      * [word] as written inside a sentence, as the data has its words: a capital a sentence's start
-     * accounts for is not the word's (Hello as hello), unless the word is written so anyway, as the
-     * data has it (London, I) or the user typed it inside a sentence; a word in capitals as it is.
+     * accounts for, where it is the sentence's [first], is not the word's (Hello as hello), unless
+     * the word is written so anyway, as the data has it (London, I) or the user typed it inside a
+     * sentence; a word in capitals as it is.
      */
-    private fun inSentence(word: String): String {
-        if (before().lastOrNull() != EnglishText.START || word.drop(1).any { it.isUpperCase() }) return word
+    private fun inSentence(word: String, first: Boolean): String {
+        if (!first || word.drop(1).any { it.isUpperCase() }) return word
         val lower = word.replaceFirstChar(Char::lowercaseChar)
         val data = data
         val capital = data != null && data.id(word) != NgramModel.NO_WORD && data.id(lower) == NgramModel.NO_WORD ||
@@ -321,8 +373,9 @@ class EnglishSession(
         return if (capital) word else lower
     }
 
-    // the user's words the data has, by id, and those it lacks, as of the user's [EnglishUser.changes]
-    private var userIds: Set<Int> = emptySet()
+    // the user's words the data has, by id (sorted, so a key's search boxes no id it scores), and
+    // those it lacks, as of the user's [EnglishUser.changes]
+    private var userIds = IntArray(0)
     private var userOnly: List<String> = emptyList()
     private var userSeen = -1
 
@@ -335,29 +388,36 @@ class EnglishSession(
             val id = data.id(word)
             if (id != NgramModel.NO_WORD) ids += id else if (data.id(word.replaceFirstChar(Char::lowercaseChar)) == NgramModel.NO_WORD) only += word
         }
-        userIds = ids
+        userIds = ids.toIntArray().apply { sort() }
         userOnly = only
     }
 
-    // the word before, as of the last context scored: the same for every word a key's search scores
-    private var scoredContext: Long? = null
+    // the word before, as the user's pairs have it: the same for every word a key's search scores (see read)
     private var scoredPrev: String? = null
+
+    // the trigrams after the context last scored, looked up once for the thousands of words a key or
+    // two's search scores after it, as PinyinDecoder does; at first of a context no model makes
+    private var trigramsOf = Long.MIN_VALUE
+    private var trigrams = NgramModel.Trigrams.NONE
 
     // [word]'s score after [context], with the user's chance of it added
     private fun scored(data: EnglishData, context: Long, word: Int): Float {
-        val base = data.model.scoreAfter(context, word)
-        refreshUser(data)
-        if (word !in userIds) return base
-        if (context != scoredContext) {
-            scoredContext = context
-            scoredPrev = data.model.prevOf(context).takeIf { it != NgramModel.NO_WORD }?.let(data::word)
+        if (context != trigramsOf) {
+            trigramsOf = context
+            trigrams = data.model.trigrams(context)
         }
+        val base = data.model.scoreAfter(context, trigrams, word)
+        refreshUser(data)
+        if (userIds.binarySearch(word) < 0) return base
         return user.score(base, scoredPrev, data.word(word))
     }
 
     // [text] went in before the cursor
     private fun wrote(text: String) {
-        if (learning) recent = (recent + text).takeLast(EnglishText.CONTEXT_CHARS)
+        if (!learning) return
+        val all = recent + text
+        cut = cut || all.length > EnglishText.CONTEXT_CHARS
+        recent = all.takeLast(EnglishText.CONTEXT_CHARS)
     }
 
     // the word typed, then what it may be, in its case; the correction first, if any
@@ -373,7 +433,8 @@ class EnglishSession(
         val before = before()
         // no decoder, no correction: the context is not looked at
         val context = decoder?.context(before) ?: 0L
-        val found = decoder?.suggest(keys, context, SUGGESTED + 1).orEmpty().filter { offered(it.word) }
+        scoredPrev = previous(before)
+        val found = decoder?.let { d -> offeredOf(SUGGESTED + 1) { d.suggest(keys, context, it) } }.orEmpty()
         // a capital the sentence's start does not account for is the user's: a name, not a slip
         val upper = typed.count { it.isUpperCase() }
         val name = upper > 1 || upper == 1 && !(typed[0].isUpperCase() && before.lastOrNull().let { it == null || it == EnglishText.START })
@@ -390,7 +451,7 @@ class EnglishSession(
     // the words the user committed that the data lacks, which [keys] spell or start, scored by the user's counts alone
     private fun ownWords(data: EnglishData, keys: String, before: List<String>): List<Pair<String, Float>> {
         refreshUser(data)
-        val prev = before.lastOrNull()?.takeIf { it != EnglishText.START }
+        val prev = previous(before)
         return userOnly.mapNotNull { word ->
             val key = EnglishData.key(word)
             val spelt = key == keys || keys.length >= costs.completeFrom && key.startsWith(keys)
@@ -455,7 +516,7 @@ class EnglishSession(
         return best.cost == 0f || EnglishData.key(data.word(best.word)).length > keys.length + 1
     }
 
-    // the words that may come next, a sentence's first capitalised
+    // the words that may come next, a sentence's first capitalised but for one with a capital of its own (iPhone)
     private fun predictions(): List<String> {
         val decoder = decoder ?: return emptyList()
         val data = checkNotNull(data)
@@ -464,8 +525,8 @@ class EnglishSession(
         if (before.isEmpty()) return emptyList()
         val start = before.lastOrNull() == EnglishText.START
         val context = decoder.context(before)
-        val prev = before.last().takeIf { !start }
-        val model = decoder.predict(context, SUGGESTED + 1).filter { offered(it.word) }
+        val prev = previous(before)
+        val model = offeredOf(SUGGESTED + 1) { decoder.predict(context, it) }
             .map { data.word(it.word) to user.score(it.lm, prev, data.word(it.word)) }
         // what the user typed after the word before: theirs to type again
         val theirs = prev?.let(user::followers).orEmpty().map { word ->
@@ -475,14 +536,33 @@ class EnglishSession(
         return (model + theirs).sortedByDescending { it.second }
             .map { it.first }
             .filter { it.first().isLetter() }
-            .map { if (start) it.replaceFirstChar(Char::uppercaseChar) else it }
+            .map { if (start && it.drop(1).none { c -> c.isUpperCase() }) it.replaceFirstChar(Char::uppercaseChar) else it }
             .distinct()
             .take(SUGGESTED + 1)
     }
 
+    // the [limit] best that [find] finds, asked for how many, that are offered: more asked for where
+    // some are not, so those left out leave no gap
+    private fun offeredOf(limit: Int, find: (Int) -> List<EnglishDecoder.Suggestion>): List<EnglishDecoder.Suggestion> {
+        var asked = limit
+        while (true) {
+            val found = find(asked)
+            val kept = found.filter { offered(it.word) }
+            if (kept.size >= limit || found.size < asked) return kept.take(limit)
+            asked *= 2
+        }
+    }
+
     // the words before the cursor, as EnglishText reads them: what the session committed, if that
     // is all it knows, starting no sentence that is known
-    private fun before(): List<String> = EnglishText.context(recent, start = known)
+    private fun before(): List<String> = EnglishText.context(recent, start = known && !cut)
+
+    // the word last in [before], if one is known, as it was learned: a sentence's first as written
+    // inside one (Hello as hello), which the user's pairs after it are counted under
+    private fun previous(before: List<String>): String? {
+        val word = before.lastOrNull()?.takeIf { it != EnglishText.START } ?: return null
+        return inSentence(word, first = before.size == 2 && before[0] == EnglishText.START)
+    }
 
     /** What was typed, as committed: i alone, and i before an apostrophe (i'm), as I. */
     private fun typed(): String {
@@ -517,6 +597,9 @@ class EnglishSession(
         )
     }
 
+    // a correction space committed: the word [typed], and what it put in ([committed], its space too)
+    private class Corrected(val typed: String, val committed: String)
+
     companion object {
         const val DEFAULT_PAGE_SIZE = 5
 
@@ -537,5 +620,15 @@ class EnglishSession(
 
         /** Punctuation that takes the place of the space after a word, a space after it. */
         private const val SWAPPED = ".,!?;:"
+
+        // brackets that close, and quotes that may: in the place of the session's space, a space after them
+        private const val CLOSING = ")]}"
+        private const val QUOTES = "\"'"
+
+        // brackets a quote after opens one: ("hi")
+        private const val OPENING = "([{"
+
+        // what the session's own space may follow besides a word: a space typed after it is that one
+        private const val MARKS = SWAPPED + CLOSING + QUOTES
     }
 }

@@ -4,6 +4,8 @@
  */
 package org.fcitx.fcitx5.android.input.editing
 
+import org.fcitx.fcitx5.android.engine.session.Action
+
 /**
  * The end of what was written in each field, for the engine's context where the field has none: a
  * chat clears its box once a message is sent, and the reply typed next follows it more than it
@@ -92,8 +94,11 @@ class ContextMemory(
     }
 
     companion object {
-        /** As much as the service reads before the cursor. */
-        const val KEEP = 64
+        /**
+         * As much as the service reads before the cursor: kept full, the context is as long as
+         * the field's own read whole, and English takes it as the end of more, no field's start.
+         */
+        const val KEEP = Action.Context.HOST_CHARS
 
         /** A message answered within half an hour is still the conversation. */
         const val FRESH_MILLIS = 30 * 60 * 1000L

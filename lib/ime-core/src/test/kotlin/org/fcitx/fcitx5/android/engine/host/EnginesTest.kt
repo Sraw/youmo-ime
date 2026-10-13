@@ -82,7 +82,7 @@ class EnginesTest : EnginesFixture() {
         engines.onEvent(Engines.ENGLISH, EngineEvent.CHAR, ' '.code)
         engines.forgetEnglishWords(listOf("Youmo"))
         engines.close()
-        assertEquals(listOf("the", "you"), Engines(::load, folder.root).englishWords().map { it.text })
+        assertEquals(listOf("the", "you"), Engines(::load, folder.root).use { again -> again.englishWords().map { it.text } })
     }
 
     @Test
@@ -111,7 +111,7 @@ class EnginesTest : EnginesFixture() {
 
     @Test
     fun theTextBeforeTheCursorIsTheContextOfWhatIsTypedNext() {
-        val engines = Engines(::load, null)
+        val engines = Engines(::load, null, warmUps = inPlace)
         // no keyboard yet: nothing to tell
         engines.context("好")
         engines.onEvent(Engines.PINYIN, EngineEvent.RESET, 0)
@@ -525,7 +525,7 @@ class EnginesTest : EnginesFixture() {
             .entry("好", syl("hao"))
             .build()
             .toByteArray()
-        val engines = Engines({ if (it == Engines.PINYIN_DATA) ByteBuffer.wrap(data) else load(it) }, null)
+        val engines = Engines({ if (it == Engines.PINYIN_DATA) ByteBuffer.wrap(data) else load(it) }, null, warmUps = inPlace)
         // the decoder's reading alone
         engines.settings = EngineSettings(modelLevel = ModelLevel.LOW)
         engines.onEvent(Engines.PINYIN, EngineEvent.RESET, 0)
@@ -548,6 +548,28 @@ class EnginesTest : EnginesFixture() {
         Engines(::load, dir).use { engines ->
             assertEquals("拟", engines.type(Engines.PINYIN, "ni").candidates.first())
         }
+    }
+
+    /** A coarse word (小穴) the user added waited past the first page: listed, it has no count to say it is theirs. */
+    @Test
+    fun aCoarseWordTheUserAddsComesOnTheFirstPage() {
+        val data = PinyinDataBuilder()
+            .unigram("<unk>", -7f, 0f)
+            .unigram("小穴", -1f, 0f)
+            .unigram("小学", -3f, 0f)
+            .unigram("小雪", -3.5f, 0f)
+            .entry("小穴", syl("xiao", "xue"))
+            .entry("小学", syl("xiao", "xue"))
+            .entry("小雪", syl("xiao", "xue"))
+            .build()
+            .toByteArray()
+        val engines = Engines({ if (it == Engines.PINYIN_DATA) ByteBuffer.wrap(data) else load(it) }, null)
+        // the decoder's reading alone, on a page of two
+        engines.settings = EngineSettings(pageSize = 2, modelLevel = ModelLevel.LOW, typos = false)
+        assertFalse("小穴" in engines.type(Engines.PINYIN, "xiaoxue").candidates)
+        assertTrue(engines.addWord("小穴", "xiao xue"))
+        // the session made again knows it the user's
+        assertTrue("小穴" in engines.type(Engines.PINYIN, "xiaoxue").candidates)
     }
 
     @Test
@@ -575,17 +597,28 @@ class EnginesTest : EnginesFixture() {
     @Test
     fun aCandidateForgottenInAnyPinyinIsForgottenInTheTablesToo() {
         val wubi = "engine-wubi"
+        val log = TableLog.FORMAT.header() + TableLog.saved("abcd", "拟")
+        // the log forgets nothing by itself: 拟 is 五笔's by abcd
+        val kept = folder.newFolder("kept")
+        kept.resolve(Engines.userTable(wubi)).writeBytes(log)
+        Engines(::load, kept).use {
+            it.settings = wubiShown
+            assertEquals(listOf("拟"), it.type(wubi, "abcd").candidates)
+        }
         for ((im, keys) in listOf(Engines.PINYIN to "ni", Engines.T9 to "64", Engines.SHUANGPIN to "ni")) {
             val dir = folder.newFolder(im)
             // a phrase 五笔 saved, its table not loaded: loaded to forget it
-            dir.resolve(Engines.userTable(wubi)).writeBytes(TableLog.FORMAT.header() + TableLog.saved("abcd", "拟"))
+            dir.resolve(Engines.userTable(wubi)).writeBytes(log)
             Engines(::load, dir).use { engines ->
                 engines.type(im, keys)
                 val at = engines.candidates(im, 0, 20).indexOfFirst { it.text == "拟" }
                 assertTrue(im, Offer.FORGET in engines.offers(im, at))
                 engines.onEvent(im, EngineEvent.FORGET, at)
             }
-            Engines(::load, dir).use { assertFalse(im, "拟" in it.type(wubi, "abcd").candidates) }
+            Engines(::load, dir).use {
+                it.settings = wubiShown
+                assertFalse(im, "拟" in it.type(wubi, "abcd").candidates)
+            }
         }
     }
 
@@ -610,11 +643,6 @@ class EnginesTest : EnginesFixture() {
         assertTrue(Engines(::load, null).onEvent(Engines.T9, EngineEvent.ESCAPE, 0).handled)
     }
 
-    private companion object {
-        const val MAX_PICKS = 10
-        const val MAX_SLICES = 10_000
-    }
-
     @Test
     fun nineKeysAndWubiAreOfferedFirstToBeAdded() {
         val offered = listOf("engine-erbi", "engine-cangjie", Engines.WUBI, Engines.T9, "engine-ziranma", Engines.SHUANGPIN)
@@ -622,5 +650,30 @@ class EnginesTest : EnginesFixture() {
             listOf(Engines.T9, Engines.WUBI, "engine-erbi", "engine-cangjie", "engine-ziranma", Engines.SHUANGPIN),
             Engines.addOrder(offered) { it },
         )
+    }
+
+    /**
+     * In an address field a character goes in as it is unless the input method reads it as a key
+     * ([Engines.readsAsKey], told whether something is typed): the pinyins' `'` only while
+     * something is, as their sessions read it. Taken as text, it put xi'an in as xi' and an.
+     */
+    @Test
+    fun aPinyinsSeparatorIsAKeyWhereItsSessionReadsIt() {
+        val separator = '\''.code
+        val scheme = EngineSettings().scheme
+        for ((im, keys) in listOf(Engines.PINYIN to "ni", Engines.T9 to "64", Engines.SHUANGPIN to "ni")) {
+            Engines(::load, null).use { engines ->
+                assertFalse(im, engines.onEvent(im, EngineEvent.CHAR, separator).handled)
+                assertFalse(im, Engines.readsAsKey(im, scheme, separator, composing = false))
+                assertTrue(im, engines.type(im, keys).preedit.isNotEmpty())
+                assertTrue(im, engines.onEvent(im, EngineEvent.CHAR, separator).handled)
+                assertTrue(im, Engines.readsAsKey(im, scheme, separator, composing = true))
+            }
+        }
+    }
+
+    private companion object {
+        const val MAX_PICKS = 10
+        const val MAX_SLICES = 10_000
     }
 }

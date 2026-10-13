@@ -5,14 +5,13 @@
 package org.fcitx.fcitx5.android.engine.host
 
 import org.fcitx.fcitx5.android.engine.english.EnglishSession
-import org.fcitx.fcitx5.android.engine.english.EnglishText
-import org.fcitx.fcitx5.android.engine.english.EnglishUser
-import org.fcitx.fcitx5.android.engine.english.EnglishUserStore
 import org.fcitx.fcitx5.android.engine.phrase.CustomPhrases
 import org.fcitx.fcitx5.android.engine.phrase.PhraseBook
 import org.fcitx.fcitx5.android.engine.pinyin.PinyinSegmenter
 import org.fcitx.fcitx5.android.engine.pinyin.Segmenter
+import org.fcitx.fcitx5.android.engine.pinyin.ShuangpinScheme
 import org.fcitx.fcitx5.android.engine.pinyin.ShuangpinSegmenter
+import org.fcitx.fcitx5.android.engine.pinyin.SyllableGraph
 import org.fcitx.fcitx5.android.engine.pinyin.T9Segmenter
 import org.fcitx.fcitx5.android.engine.rerank.MatrixKernel
 import org.fcitx.fcitx5.android.engine.rerank.Reranker
@@ -37,16 +36,20 @@ import java.util.concurrent.Executor
 /**
  * The input methods the androidengine addon lists, by name, each with its session made on first
  * use. [load] gives a data file by its path in the app's assets; what the user picks, in pinyin
- * and in each table, is kept under [userDir] (in memory only if null). When pinyin's log is made
- * afresh, what libime's pinyin learned ([legacy], if the user had it) is read into it first. What the user added to
+ * and in each table, and the English words they commit, are kept under [userDir] (in memory only
+ * if null). When pinyin's log is made afresh, what libime's pinyin learned ([legacy], if the user
+ * had it) is read into it first. What the user added to
  * pinyin ([additions]) is read at first need, and again on [reload]. The sentence models'
- * int8 weights are multiplied by [kernel], if given (in C++, say); if not, by Kotlin.
+ * int8 weights are multiplied by [kernel], if given (in C++, say); if not, by Kotlin. What the
+ * first keys of pinyin and of English want is read ahead of them on [warmUps], a thread each
+ * unless given.
  *
  * A facade over its collaborators, which it makes and wires: [EngineAssets] (the data read from
- * the assets), [UserLexicon] (the user's words) and [TableRegistry] (the table input methods);
- * here are the sessions, made from them, and the settings they are made with.
+ * the assets), [UserLexicon] (the user's words), [EnglishLexicon] (the English words the user
+ * committed) and [TableRegistry] (the table input methods); here are the sessions, made from
+ * them, and the settings they are made with.
  *
- * Everything here runs on one thread, the one fcitx runs on.
+ * Everything here runs on one thread, the one fcitx runs on, but what is handed to [warmUps].
  */
 class Engines(
     private val load: (String) -> ByteBuffer,
@@ -55,6 +58,7 @@ class Engines(
     private val legacy: () -> LibimeImport.Legacy? = { null },
     private val additions: () -> Additions? = { null },
     private val kernel: MatrixKernel? = null,
+    private val warmUps: Executor = Executor { Thread(it, "engine-warm-up").apply { isDaemon = true }.start() },
 ) : Closeable {
 
     /**
@@ -87,6 +91,8 @@ class Engines(
     )
 
     private val tables = TableRegistry(load, userDir, onError, compactions, assets, lexicon)
+
+    private val english = EnglishLexicon(userDir, onError, compactions)
 
     /** A word of the user's, as the settings list them; [pinyin] its syllables apart by spaces. */
     data class UserWord(val text: String, val pinyin: String, val kind: Kind, val count: Float = 0f) {
@@ -145,26 +151,17 @@ class Engines(
     fun removeWords(words: Collection<UserWord>) = lexicon.removeWords(words)
 
     /** The English words the user committed, as written, the most typed first: [UserWord.Kind.LEARNED], no pinyin. */
-    fun englishWords(): List<UserWord> {
-        val user = englishUser()
-        return user.words.map { UserWord(it, "", UserWord.Kind.LEARNED, user.count(it)) }
-            .sortedWith(compareByDescending<UserWord> { it.count }.thenBy { it.text })
-    }
+    fun englishWords(): List<UserWord> = english.words()
 
     /**
-     * Makes [text] an English word of the user's, as typed twice: offered by its keys, never
-     * corrected. False for what is no word English types (letters, an apostrophe or a hyphen within).
+     * Makes [text] an English word of the user's, added: offered by its keys, never corrected, and
+     * kept however its count would fade. False for what is no word English types (letters, an
+     * apostrophe or a hyphen within).
      */
-    fun addEnglishWord(text: String): Boolean {
-        if (!EnglishText.isWord(text)) return false
-        val user = englishUser()
-        val missing = EnglishUser.LEARNED - user.count(text)
-        if (missing > 0f) user.learn(null, text, missing)
-        return true
-    }
+    fun addEnglishWord(text: String): Boolean = english.add(text)
 
     /** Forgets each of the English words [texts]: their counts and the pairs they are in. */
-    fun forgetEnglishWords(texts: Collection<String>) = englishUser().let { user -> texts.forEach(user::forget) }
+    fun forgetEnglishWords(texts: Collection<String>) = english.forget(texts)
 
     /** What [importWords] made of the lines: words added and blocked that were not already, lines it could not read. */
     data class Imported(val added: Int, val blocked: Int, val unread: Int)
@@ -183,6 +180,12 @@ class Engines(
 
     private val keyboards = HashMap<String, Keyboard>()
     private val sessions = HashMap<String, Session>()
+
+    // English's data is read once and kept: warmed up once, however often its session is made
+    private var englishWarmedUp = false
+
+    // pinyin's data and word index, which each pinyin session reads as it is made: read once, in the background
+    private var pinyinWarmedUp = false
 
     private fun dropSessions() {
         keyboards.clear()
@@ -203,16 +206,50 @@ class Engines(
 
     /** [event] of [im]'s keyboard; nothing picked is learned unless [learning]. */
     fun onEvent(im: String, event: Int, arg: Int, learning: Boolean = true): Snapshot {
-        val keyboard = keyboards[im] ?: Keyboard(session(im), nineKeys = im == T9, english = im == ENGLISH).also { keyboards[im] = it }
+        val keyboard = keyboards[im] ?: Keyboard(session(im), nineKeys = im == T9).also { keyboards[im] = it }
         return keyboard.onEvent(event, arg, learning)
     }
 
     /**
      * [before] is the text before the cursor, put where the engines did not: see
-     * [Keyboard.context]. The host passes it only where the user learns, so each learns as its
-     * [onEvent] would.
+     * [Keyboard.context]; [learning] off in a sensitive field, told "" (not known), so each
+     * learns as its [onEvent] would.
      */
-    fun context(before: String) = keyboards.values.forEach { it.context(before) }
+    fun context(before: String, learning: Boolean = true) {
+        if (!pinyinWarmedUp) warmUpPinyin()
+        keyboards.values.forEach { it.context(before, learning) }
+    }
+
+    // told as a field starts, before its first key: pinyin's data read and its 270 thousand words
+    // indexed meanwhile, off the fcitx thread, so one who types only English does not wait for them; a
+    // pinyin key that comes sooner waits for them, as it would anyway. Whatever reading them throws is
+    // dropped, the lazies left unset: pinyin's session reads them again as it is made, on the fcitx
+    // thread, which hands it to the addon (EngineBridge.Unloadable); thrown out of this thread, it
+    // would end the app. Memory run out is no Exception, and is not caught
+    private fun warmUpPinyin() {
+        pinyinWarmedUp = true
+        warmUps.execute {
+            try {
+                assets.pinyinData.wordIndex
+            } catch (_: Exception) {
+                null
+            }
+        }
+    }
+
+    /**
+     * The keys no letter [im], a table input method, reads now, as its session has them, for
+     * [readsAsKey]: 二笔's `;',./` of its codes, 仓颉's `*` for any key, 二笔's `[` that starts a
+     * pinyin lookup, the lookup's `'`. None for another input method, nor a table with no session
+     * yet, whose table is not read to answer: the keyboard waits.
+     */
+    fun tableKeys(im: String): Set<Char> {
+        val options = TABLES[im]?.options ?: return emptySet()
+        val session = sessions[im] ?: return emptySet()
+        // made with its session: read already
+        val keys = tables.table(im).dictionary.keys + listOfNotNull(options.matchingKey, options.pinyinKey, SyllableGraph.SEPARATOR) + options.selectionKeys.asIterable()
+        return keys.filterTo(HashSet()) { !it.isLetter() && session.reads(it) }
+    }
 
     /** Candidates of [im]'s input, from the [from]th, at most [count]; none if it has no session yet. */
     fun candidates(im: String, from: Int, count: Int): List<Choice> = sessions[im]?.candidates(from, count).orEmpty()
@@ -232,8 +269,11 @@ class Engines(
                 val data = assets.englishData
                 // its keys and word index, some hundreds of milliseconds on a phone, built before the
                 // first key wants them; a key that comes sooner waits for them, as it would anyway
-                if (data != null) Thread(data::warmUp, "english-warm-up").apply { isDaemon = true }.start()
-                EnglishSession(data, pageSize = s.pageSize, user = englishUser())
+                if (data != null && !englishWarmedUp) {
+                    englishWarmedUp = true
+                    warmUps.execute(data::warmUp)
+                }
+                EnglishSession(data, pageSize = s.pageSize, user = english.user())
             }
             // 简拼 only where the digits read nothing else: as common on the evaluation set, and faster
             T9 -> ForgetsInTables(pinyinSession(T9Segmenter(s.fuzzy, abbreviations = false, letters = s.nineKeys), spell = true))
@@ -258,7 +298,7 @@ class Engines(
             assets.pinyinData, segmenter, spell = spell,
             pageSize = s.pageSize, user = lexicon.user(), prediction = s.prediction, prior = lexicon.prior(), phraseBook = lexicon.phrases(),
             reranker = reranker(), refiner = refiner(), block = lexicon::block,
-            charReadings = assets::charSyllables, extensions = assets::decoderExtensions,
+            charReadings = assets::charSyllables, extensions = assets::decoderExtensions, addedWords = lexicon.addedTexts(),
         )
     }
 
@@ -291,31 +331,12 @@ class Engines(
         lexicon.reloadDictionaries(before)
     }
 
-    private var englishUser: EnglishUser? = null
-    private var englishStore: EnglishUserStore? = null
-
-    // the English words learned, kept in their own log beside pinyin's; read once, as English is first typed
-    private fun englishUser(): EnglishUser = englishUser ?: EnglishUser().also { user ->
-        englishUser = user
-        if (userDir != null) {
-            userDir.mkdirs()
-            // a log that cannot be read or moved aside: learn in memory rather than not type
-            englishStore = try {
-                EnglishUserStore(File(userDir, USER_ENGLISH), user, onError, compactions).apply { open() }
-            } catch (e: IOException) {
-                onError(e)
-                null
-            }
-        }
-    }
-
     override fun close() {
         // each on its own: one that fails to close must not leave the others open
-        (listOfNotNull(lexicon.store, englishStore) + tables.stores()).forEach { closeQuietly(it, onError) }
-        englishStore = null
-        englishUser = null
+        (listOfNotNull(lexicon.store, english.store) + tables.stores()).forEach { closeQuietly(it, onError) }
         // used after all the same: each reads its log again, and appends to it
         lexicon.closed()
+        english.closed()
         tables.closed()
         dropSessions()
     }
@@ -340,10 +361,36 @@ class Engines(
         fun <T> addOrder(methods: Collection<T>, name: (T) -> String): List<T> =
             methods.sortedBy { ADDED_FIRST.indexOf(name(it)).takeIf { i -> i >= 0 } ?: ADDED_FIRST.size }
 
+        /**
+         * Whether [im] types with [c], no letter, as with a letter: the nine keys' digits, a 双拼
+         * [scheme]'s own keys (`;` is ing in 微软 and 紫光), and the pinyins' syllable separator `'`
+         * while something is typed ([composing]), as PinyinSession.reads has them; and a table's
+         * keys while something is typed, as its session reads them ([tableKeys], [Engines.tableKeys] as
+         * read on fcitx's thread: asked only then). Any other an address
+         * field takes as it is (PendingInputPolicy.typesAsIs); 微软's `;` taken so cut the syllable
+         * being typed, `'` put `xi'an` in as `xi'` and `an`, and 二笔's `;` cut its code.
+         */
+        fun readsAsKey(
+            im: String,
+            scheme: ShuangpinScheme,
+            c: Int,
+            composing: Boolean = false,
+            tableKeys: () -> Set<Char> = { emptySet() },
+        ): Boolean = when (im) {
+            T9 -> Character.isDigit(c) || separates(c, composing)
+            SHUANGPIN -> c <= Char.MAX_VALUE.code && scheme.types(c.toChar()) || separates(c, composing)
+            PINYIN -> separates(c, composing)
+            // with nothing typed a table's is text, as ' is: through the table 二笔's / alone would be 、
+            else -> composing && c <= Char.MAX_VALUE.code && c.toChar() in tableKeys()
+        }
+
+        // with nothing typed ' is the app's: through the engine it would be a mark, ‘
+        private fun separates(c: Int, composing: Boolean) = composing && c == SyllableGraph.SEPARATOR.code
+
         /** English: fcitx's own name for it, which fcitx falls back to, so a user's lists keep it. */
         const val ENGLISH = "keyboard-us"
 
-        /** Its words, until a list of our own: fcitx's spell dictionary, in the app's assets. */
+        /** Its words as written and a trigram model over them, counted from FineWeb's English pages, in the app's assets. */
         const val ENGLISH_DATA = "engine/english.data"
 
         const val PINYIN_DATA = "engine/pinyin.data"
@@ -363,6 +410,9 @@ class Engines(
 
         /** Where what the user taught the table input method [im] is kept: `wubi.user` and so on. */
         fun userTable(im: String) = im.removePrefix("engine-") + ".user"
+
+        /** Whether [im] is a table input method, the only kind [tableKeys] has keys for. */
+        fun hasTableKeys(im: String) = im in TABLES
 
         /** Each table input method. */
         val TABLES: Map<String, TableMethod> = mapOf(

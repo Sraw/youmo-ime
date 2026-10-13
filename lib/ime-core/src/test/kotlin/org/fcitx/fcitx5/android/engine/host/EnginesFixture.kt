@@ -13,6 +13,7 @@ import org.fcitx.fcitx5.android.engine.rerank.TinyModel
 import org.fcitx.fcitx5.android.engine.stroke.Strokes
 import java.io.FileNotFoundException
 import java.nio.ByteBuffer
+import java.util.concurrent.Executor
 
 /** What [EnginesTest] and the like type with: the data, served as the app's assets serve it ([load]). */
 open class EnginesFixture {
@@ -55,6 +56,13 @@ open class EnginesFixture {
         .build().toByteArray()
 
     protected val loaded = ArrayList<String>()
+
+    // Engines' warm-ups run as they are handed over, on the test's thread: what they load is in
+    // [loaded] before a test looks, and no thread is left appending to it after the test
+    protected val inPlace = Executor { it.run() }
+
+    // 五笔 shown, not a code's one candidate committing itself and leaving none to look at
+    protected val wubiShown = EngineSettings(tables = mapOf("Wubi" to TableSettings(autoSelect = false)))
 
     protected fun load(path: String): ByteBuffer {
         loaded += path

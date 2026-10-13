@@ -66,14 +66,13 @@ object EngineEvent {
  * as [SYLLABLES]. The host says so: a table whose codes are digits reads 2 as well, and its
  * Escape and characters are the app's.
  *
- * [english]: the session is English's, which takes every character itself: space ends a word
- * there and digits are typed, neither picks.
- *
  * [learning] is passed to the session: off where the app asks that nothing be learned.
  */
-class Keyboard(private val session: Session, private val nineKeys: Boolean, private val english: Boolean = false) {
+class Keyboard(private val session: Session, private val nineKeys: Boolean) {
 
     private var shown: Snapshot = IDLE
+
+    private val english get() = session.takesEveryCharacter
 
     // something typed, not a prediction
     private val composing get() = shown.preedit.isNotEmpty() && !shown.predicting
@@ -141,26 +140,31 @@ class Keyboard(private val session: Session, private val nineKeys: Boolean, priv
     private fun whileComposing(event: Int, arg: Int): Snapshot = when {
         // an arrow, Tab: English commits its word and the key moves on from it; another session
         // keeps the key, its input as it was
-        composing && event == EngineEvent.OTHER -> if (english) session.apply(Action.CommitRaw) else shown.copy(commit = "", handled = true)
+        composing && event == EngineEvent.OTHER -> if (english) session.apply(Action.CommitRaw) else again(handled = true)
         composing -> session.apply(
             when (event) {
                 EngineEvent.ENTER -> Action.CommitRaw
                 EngineEvent.PAGE_UP -> Action.PreviousPage
                 EngineEvent.PAGE_DOWN -> Action.NextPage
-                else -> Action.Cursor(arg)
+                EngineEvent.CURSOR -> Action.Cursor(arg)
+                else -> error("event $event is not one taken while composing")
             },
         )
         // a tap in the app's text: the panel as it was
-        event == EngineEvent.CURSOR -> shown.copy(commit = "", handled = false).also { session.passedOn() }
+        event == EngineEvent.CURSOR -> again(handled = false).also { session.passedOn() }
         else -> passOn()
     }
 
     private fun refine(): Snapshot {
-        val last = shown.copy(commit = "", handled = true)
+        val last = again(handled = true)
         if (!last.refines) return last.copy(handled = false)
         val next = session.apply(Action.Refine)
         return if (next.copy(refines = false) == last.copy(refines = false)) next.copy(handled = false) else next
     }
+
+    // the last snapshot shown again, what it committed and deleted done: androidengine deletes
+    // before the cursor for any snapshot it shows, handled or not
+    private fun again(handled: Boolean) = shown.copy(commit = "", deleteBefore = 0, handled = handled)
 
     /**
      * The key is the app's; an offer of what may follow goes away with it, and so does what English

@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.input.editing
 
+import org.fcitx.fcitx5.android.engine.session.Action
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
 import org.junit.Test
@@ -91,6 +92,13 @@ class ContextMemoryTest {
         assertEquals("abcdef", small.context("abcdef", now = 4) { "" })
         small.committed("g", now = 5)
         assertEquals("defg", small.context("", now = 6) { "" })
+    }
+
+    /** Kept full, the context is as long as a field read whole: English takes it as the end of more. */
+    @Test
+    fun keptFullTheContextIsAsLongAsTheServiceReads() {
+        memory.committed("a".repeat(Action.Context.HOST_CHARS + 1), now = 0)
+        assertEquals(Action.Context.HOST_CHARS, memory.context("", now = 1) { "" }.length)
     }
 
     @Test

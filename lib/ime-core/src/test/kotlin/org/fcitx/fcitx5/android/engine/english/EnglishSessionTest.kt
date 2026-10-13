@@ -6,12 +6,14 @@ package org.fcitx.fcitx5.android.engine.english
 
 import org.fcitx.fcitx5.android.engine.host.EngineEvent
 import org.fcitx.fcitx5.android.engine.host.Keyboard
+import org.fcitx.fcitx5.android.engine.lattice.CoarseWords
 import org.fcitx.fcitx5.android.engine.session.Action
 import org.fcitx.fcitx5.android.engine.session.Snapshot
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.nio.ByteBuffer
 
 class EnglishSessionTest {
 
@@ -20,6 +22,11 @@ class EnglishSessionTest {
     private fun session() = EnglishSession(data)
 
     private fun EnglishSession.type(text: String): Snapshot = text.map { apply(Action.Key(it)) }.last()
+
+    private fun EnglishSession.commit(word: String): String {
+        type(word)
+        return apply(Action.Key(' ')).commit
+    }
 
     @Test
     fun theWordTypedComesFirstThenWhatItMayBe() {
@@ -361,7 +368,7 @@ class EnglishSessionTest {
     // the host hands it space and digits: they pick nothing here
     @Test
     fun theKeyboardHandsEnglishEveryKey() {
-        val keyboard = Keyboard(session(), nineKeys = false, english = true)
+        val keyboard = Keyboard(session(), nineKeys = false)
         "hel".forEach { keyboard.onEvent(EngineEvent.CHAR, it.code) }
         assertEquals("hel ", keyboard.onEvent(EngineEvent.CHAR, ' '.code).commit)
         "he".forEach { keyboard.onEvent(EngineEvent.CHAR, it.code) }
@@ -373,7 +380,7 @@ class EnglishSessionTest {
     // an arrow while a word is typed: the word as typed, and the key the app's
     @Test
     fun anArrowCommitsTheWordAndIsTheApps() {
-        val keyboard = Keyboard(session(), nineKeys = false, english = true)
+        val keyboard = Keyboard(session(), nineKeys = false)
         "hel".forEach { keyboard.onEvent(EngineEvent.CHAR, it.code) }
         val arrow = keyboard.onEvent(EngineEvent.OTHER, 0)
         assertEquals("hel", arrow.commit)
@@ -386,7 +393,7 @@ class EnglishSessionTest {
     @Test
     fun aKeyThatIsTheAppsForgetsTheSpaceAfterAWord() {
         for (event in listOf(EngineEvent.ENTER, EngineEvent.OTHER, EngineEvent.ESCAPE)) {
-            val keyboard = Keyboard(session(), nineKeys = false, english = true)
+            val keyboard = Keyboard(session(), nineKeys = false)
             "hello ".forEach { keyboard.onEvent(EngineEvent.CHAR, it.code) }
             assertFalse(keyboard.onEvent(event, 0).handled)
             val stop = keyboard.onEvent(EngineEvent.CHAR, '.'.code)
@@ -412,5 +419,290 @@ class EnglishSessionTest {
         assertFalse("hell" in EnglishSession(data, misspellings = list).type("hel").candidates)
         // the shipped list: no word twice, each to a word
         assertTrue(Misspellings.MAP.getValue("recieve") == "receive" && Misspellings.MAP.values.none { it.isBlank() || it in Misspellings.MAP })
+        // as the lines are, which the map, keeping the last of a word twice, cannot show; each lower
+        // case, as it is looked up
+        val misspelt = CoarseWords.listLines(Misspellings::class.java, "misspellings.txt").map { it.substringBefore(' ') }
+        assertEquals(misspelt.distinct(), misspelt)
+        assertTrue(misspelt.all { it == it.lowercase() })
+    }
+
+    // taught, a misspelling is the user's: no longer corrected, and offered as any word
+    @Test
+    fun aMisspellingTheUserMadeTheirsIsOffered() {
+        val session = EnglishSession(data, user = EnglishUser(), misspellings = mapOf("hell" to "hello"))
+        session.type("hel")
+        assertFalse("hell" in session.candidates(0, 10).map { it.text })
+        session.apply(Action.Reset)
+        session.type("hell")
+        assertEquals("hello ", session.apply(Action.Key(' ')).commit)
+        session.apply(Action.Backspace)
+        assertEquals("hell ", session.apply(Action.Key(' ')).commit)
+        session.type("hel")
+        assertTrue("hell" in session.candidates(0, 10).map { it.text })
+    }
+
+    // typed once, a coarse word is the user's: offered and predicted as any other
+    @Test
+    fun aCoarseWordTheUserTypedIsOfferedAndPredicted() {
+        val session = EnglishSession(data, user = EnglishUser(), coarseWords = listOf("cat"))
+        fun offeredAfterThe(): List<String> {
+            session.apply(Action.Context("I fed "))
+            session.commit("the")
+            return session.candidates(0, 10).map { it.text }
+        }
+        assertFalse("cat" in offeredAfterThe())
+        // typed after no word: what follows "the" is the model's alone
+        session.apply(Action.Context(""))
+        session.commit("cat")
+        assertTrue("cat" in offeredAfterThe())
+        session.apply(Action.Context("I fed the "))
+        session.type("cit")
+        assertTrue("cat" in session.candidates(0, 10).map { it.text })
+    }
+
+    // made on the thread that types, before the warm-up built the word index the lookups need
+    @Test
+    fun theListsAreLookedUpAtTheFirstKeyNotWhenTheSessionIsMade() {
+        var asked = 0
+        val coarse = object : AbstractList<String>() {
+            override val size: Int get() = 1.also { asked++ }
+            override fun get(index: Int): String = "hell"
+        }
+        var spelt = 0
+        val misspellings = object : AbstractMap<String, String>() {
+            override val entries: Set<Map.Entry<String, String>> get() = mapOf("teh" to "the").entries.also { spelt++ }
+        }
+        val session = EnglishSession(data, coarseWords = coarse, misspellings = misspellings)
+        assertEquals(0, asked)
+        assertEquals(0, spelt)
+        assertFalse("hell" in session.type("hel").candidates)
+        assertTrue(asked > 0)
+        assertTrue(spelt > 0)
+    }
+
+    // learned as hello, a sentence's first is the word the next is counted and offered after
+    @Test
+    fun theWordAfterASentencesCapitalisedFirstIsLearnedAfterIt() {
+        val user = EnglishUser()
+        val session = EnglishSession(data, user = user)
+        session.apply(Action.Context(""))
+        session.commit("Hello")
+        session.commit("youmo")
+        assertEquals(setOf("youmo"), user.followers("hello"))
+        session.apply(Action.Context("Fine. "))
+        session.commit("Hello")
+        assertTrue("youmo" in session.candidates(0, 10).map { it.text })
+    }
+
+    // typed after Hello, cat is scored up after it: cit is cat, not cut
+    @Test
+    fun aWordTypedAfterASentencesCapitalisedFirstIsScoredUpAfterIt() {
+        val session = EnglishSession(data, user = EnglishUser())
+        repeat(3) {
+            session.apply(Action.Context(""))
+            session.commit("Hello")
+            session.commit("cat")
+        }
+        session.apply(Action.Context(""))
+        session.commit("Hello")
+        assertEquals("cat", session.type("cit").candidates.first())
+    }
+
+    // a correction of two words is each, the next word after its last; a run of letters too long for a word, none
+    @Test
+    fun whatIsNoWordIsNotLearned() {
+        val user = EnglishUser()
+        val session = EnglishSession(data, user = user, misspellings = mapOf("alot" to "a lot"))
+        session.apply(Action.Context("I like "))
+        assertEquals("a lot ", session.commit("alot"))
+        session.commit("x".repeat(EnglishText.MAX_WORD + 1))
+        assertEquals(setOf("a", "lot"), user.words)
+        assertEquals(setOf("lot"), user.followers("a"))
+        // taken back, both go
+        val back = EnglishUser()
+        val undone = EnglishSession(data, user = back, misspellings = mapOf("alot" to "a lot"))
+        undone.commit("alot")
+        undone.apply(Action.Backspace)
+        assertEquals(setOf("alot"), back.words)
+    }
+
+    // the text before the cursor cut short is no field's start: a capital there is the user's. The host
+    // reads no more than Action.Context.HOST_CHARS, so a context as long may be the end of more
+    @Test
+    fun aContextCutShortStartsNoSentence() {
+        val cut = EnglishUser()
+        val longer = EnglishSession(data, user = cut)
+        longer.apply(Action.Context(" ".repeat(Action.Context.HOST_CHARS)))
+        longer.commit("Hello")
+        assertEquals(setOf("Hello"), cut.words)
+        val whole = EnglishUser()
+        val within = EnglishSession(data, user = whole)
+        within.apply(Action.Context(" ".repeat(Action.Context.HOST_CHARS - 1)))
+        within.commit("Hello")
+        assertEquals(setOf("hello"), whole.words)
+    }
+
+    // so is a field's start that what was typed since pushed out of what the session keeps
+    @Test
+    fun whatWasTypedPastWhatIsKeptStartsNoSentence() {
+        fun learnedAfterSpaces(spaces: Int): Set<String> {
+            val user = EnglishUser()
+            val session = EnglishSession(data, user = user)
+            session.apply(Action.Context(""))
+            // each the app's, with nothing typed: what the session knows of the text grows by one
+            repeat(spaces) { assertFalse(session.apply(Action.Key(' ')).handled) }
+            session.commit("Hello")
+            return user.words
+        }
+        assertEquals(setOf("Hello"), learnedAfterSpaces(EnglishText.CONTEXT_CHARS + 1))
+        assertEquals(setOf("hello"), learnedAfterSpaces(EnglishText.CONTEXT_CHARS))
+    }
+
+    // as written past their first letter: iPhone, not IPhone
+    @Test
+    fun aSentencesFirstOfferedHasACapitalUnlessItHasOneOfItsOwn() {
+        val b = EnglishDataBuilder()
+            .unigram("<unk>", -7f, 0f)
+            .unigram(EnglishText.START, -9f, -0.5f)
+            .unigram("hello", -2f, 0f)
+            .unigram("iPhone", -3f, 0f)
+            .unigram("the", -1.5f, 0f)
+            .bigram(EnglishText.START, "iPhone", -1f, 0f)
+            .bigram(EnglishText.START, "the", -1.5f, 0f)
+        val session = EnglishSession(EnglishData.load(ByteBuffer.wrap(b.build().toByteArray())))
+        session.commit("hello")
+        assertEquals(listOf("iPhone", "The"), session.apply(Action.Key(' ')).candidates)
+    }
+
+    // in the session's place as punctuation is, with a space after: a bracket closed, a quote where one is open
+    @Test
+    fun aClosingBracketOrQuoteTakesThePlaceOfTheSpace() {
+        val bracket = session()
+        bracket.type("above")
+        bracket.apply(Action.Key('.'))
+        val closed = bracket.apply(Action.Key(')'))
+        assertEquals(") ", closed.commit)
+        assertEquals(1, closed.deleteBefore)
+        // a space typed after that is that one, taken here, not the app's to add
+        val after = bracket.apply(Action.Key(' '))
+        assertEquals("", after.commit)
+        assertTrue(after.handled)
+        // after the colon's: hello:)
+        val smile = session()
+        smile.type("hello")
+        smile.apply(Action.Key(':'))
+        assertEquals(") ", smile.apply(Action.Key(')')).commit)
+        // a quote opened after the space is the app's; then one closes it
+        val quote = session()
+        quote.commit("said")
+        assertFalse(quote.apply(Action.Key('"')).handled)
+        quote.type("stop")
+        quote.apply(Action.Key('.'))
+        val shut = quote.apply(Action.Key('"'))
+        assertEquals("\" ", shut.commit)
+        assertEquals(1, shut.deleteBefore)
+        assertTrue(quote.apply(Action.Key(' ')).handled)
+    }
+
+    // the single quote likewise; an apostrophe in a word (don't) or ending one (dogs') opens none
+    @Test
+    fun anApostropheIsNoQuote() {
+        fun EnglishSession.quoteAfterStop(before: String): Snapshot {
+            apply(Action.Context(before))
+            type("stop")
+            apply(Action.Key('.'))
+            return apply(Action.Key('\''))
+        }
+        assertFalse(session().quoteAfterStop("I don't ").handled)
+        assertFalse(session().quoteAfterStop("the dogs' ").handled)
+        val quoted = session()
+        val shut = quoted.quoteAfterStop("she said '")
+        assertEquals("' ", shut.commit)
+        assertEquals(1, shut.deleteBefore)
+        // the quote the session put in ends no word: a space after it is that one, no full stop
+        val after = quoted.apply(Action.Key(' '))
+        assertTrue(after.handled)
+        assertEquals("", after.commit)
+        // one after an opening bracket opens one too: ('stop.'
+        assertEquals("' ", session().quoteAfterStop("she said ('").commit)
+        // a word's own apostrophe before the session's space: a space after it is a full stop, as after any word
+        val dogs = session()
+        dogs.commit("dogs'")
+        assertEquals(". ", dogs.apply(Action.Key(' ')).commit)
+        // and a quote typed there is an opening one, the app's
+        val possessive = session()
+        possessive.commit("dogs'")
+        assertFalse(possessive.apply(Action.Key('\'')).handled)
+    }
+
+    // a quote is read by what is before it, not counted: one closing a quote opened out of what the
+    // session knows is none open, and the one typed next opens one, the space before it kept
+    @Test
+    fun aQuoteWhoseOpeningOneIsOutOfSightIsNoneOpen() {
+        val session = session()
+        session.apply(Action.Context("it ended.\" "))
+        session.commit("said")
+        assertFalse(session.apply(Action.Key('"')).handled)
+    }
+
+    // a quote first of what the session knows opens one only at the field's start: first of a context
+    // as long as the host reads, or of what was typed since a Reset, it may close one
+    @Test
+    fun aQuoteFirstOfTextCutShortOrUnknownIsNoneOpen() {
+        fun EnglishSession.quoteAfterSaid(): Snapshot {
+            commit("said")
+            return apply(Action.Key('"'))
+        }
+        val spaces = " ".repeat(Action.Context.HOST_CHARS - 2)
+        val start = session()
+        start.apply(Action.Context("\"$spaces"))
+        assertEquals("\" ", start.quoteAfterSaid().commit)
+        val cut = session()
+        cut.apply(Action.Context("\"$spaces "))
+        assertFalse(cut.quoteAfterSaid().handled)
+        val reset = session()
+        reset.apply(Action.Reset)
+        assertFalse(reset.apply(Action.Key('"')).handled)
+        assertFalse(reset.quoteAfterSaid().handled)
+    }
+
+    // the likeliest words a key's search finds coarse: more are asked for, and as many offered as ever
+    @Test
+    fun wordsLeftOutLeaveNoGapInWhatIsOffered() {
+        val b = EnglishDataBuilder()
+            .unigram("<unk>", -7f, 0f)
+            .unigram(EnglishText.START, -9f, 0f)
+        val words = ('a'..'t').map { "pre$it" }
+        words.forEachIndexed { i, word -> b.unigram(word, -2f - i * 0.1f, 0f) }
+        val pre = EnglishData.load(ByteBuffer.wrap(b.build().toByteArray()))
+        // the five likeliest of the ten first asked for
+        val session = EnglishSession(pre, coarseWords = words.take(5))
+        assertEquals(EnglishSession.SUGGESTED + 1, session.type("pre").total)
+        assertEquals(listOf("pre") + words.subList(5, 5 + EnglishSession.SUGGESTED), session.candidates(0, 20).map { it.text })
+    }
+
+    // the trigrams of each context, looked up once for the words its search scores, are its own:
+    // rud is red after "I the", rod after "saw the", in the one session
+    @Test
+    fun eachContextIsScoredWithItsOwnTrigrams() {
+        val b = EnglishDataBuilder()
+            .unigram("<unk>", -7f, 0f)
+            .unigram(EnglishText.START, -9f, 0f)
+            .unigram("I", -1f, -0.5f)
+            .unigram("the", -1.2f, -0.5f)
+            .unigram("saw", -2f, -0.5f)
+            .unigram("red", -3f, 0f)
+            .unigram("rod", -3f, 0f)
+            .bigram("I", "the", -1f, -0.5f)
+            .bigram("saw", "the", -1f, -0.5f)
+            .bigram("the", "red", -2f, 0f)
+            .bigram("the", "rod", -2f, 0f)
+            .trigram("I", "the", "red", -0.2f)
+            .trigram("saw", "the", "rod", -0.2f)
+        val session = EnglishSession(EnglishData.load(ByteBuffer.wrap(b.build().toByteArray())))
+        session.apply(Action.Context("I the "))
+        assertEquals("red ", session.commit("rud"))
+        session.apply(Action.Context("saw the "))
+        assertEquals("rod ", session.commit("rud"))
     }
 }

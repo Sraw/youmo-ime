@@ -221,6 +221,27 @@ class KeyboardTest {
         assertEquals(Action.Key('b'), session.actions.last())
     }
 
+    // androidengine deletes before the cursor for any snapshot it shows, handled or not
+    @Test
+    fun theLastSnapshotShownAgainDeletesNothingAgain() {
+        // a session that deletes before the cursor with each key, as English its space after a word
+        var preedit = "a"
+        val deleting = object : Session {
+            override var learning = true
+            override fun reads(c: Char) = true
+            override fun candidates(from: Int, count: Int) = emptyList<Choice>()
+            override fun offers(index: Int) = emptySet<Offer>()
+            override fun apply(action: Action) = Snapshot(",", preedit, emptyList(), 0, false, false, true, false, deleteBefore = 1)
+        }
+        val keyboard = Keyboard(deleting, nineKeys = false)
+        assertEquals(1, keyboard.onEvent(EngineEvent.CHAR, ','.code).deleteBefore)
+        assertEquals(0, keyboard.onEvent(EngineEvent.OTHER, 0).deleteBefore)
+        // nothing typed: a tap in the app's text
+        preedit = ""
+        keyboard.onEvent(EngineEvent.CHAR, ','.code)
+        assertEquals(0, keyboard.onEvent(EngineEvent.CURSOR, 0).deleteBefore)
+    }
+
     @Test
     fun whetherToLearnReachesTheSessionWithEachEvent() {
         keyboard.onEvent(EngineEvent.CHAR, 'a'.code, learning = false)
@@ -326,6 +347,13 @@ class KeyboardTest {
         assertEquals(Action.NextPage, session.actions.last())
         keyboard.onEvent(EngineEvent.PAGE_UP, 0)
         assertEquals(Action.PreviousPage, session.actions.last())
+    }
+
+    @Test
+    fun aTapInWhatIsTypedGoesToTheSession() {
+        type("ab")
+        keyboard.onEvent(EngineEvent.CURSOR, 1)
+        assertEquals(Action.Cursor(1), session.actions.last())
     }
 
     @Test

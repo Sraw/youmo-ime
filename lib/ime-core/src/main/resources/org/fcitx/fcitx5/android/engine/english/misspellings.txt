@@ -1,7 +1,8 @@
 # Misspellings the web has so often that the English model knows them as words (recieve,
 # definately, untill), so they were never corrected: a word here is no word, and is corrected to
-# the one after it. Only spellings that are no English word; a real word misused (loose for lose,
-# its for it's) is not here, as it may be meant.
+# the one after it. Only spellings that are no English word, or one so rare that it is all but
+# never meant (calender, florescent, professer, supercede, wether), taken back by backspace as any
+# correction; a word that may be meant (loose for lose, its for it's) is not here.
 # misspelling, a space, the word meant (which may be two: alot is a lot).
 abscence absence
 accomodate accommodate
