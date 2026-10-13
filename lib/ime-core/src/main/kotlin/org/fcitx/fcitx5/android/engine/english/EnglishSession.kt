@@ -234,9 +234,10 @@ class EnglishSession(
         return spaced(made, deleteBefore = 1)
     }
 
-    // whether [c], before the session's own space, ends a word: an apostrophe too (dogs') is the
-    // word's, but one put in as a quote, all [last] has but its space
-    private fun endsWord(c: Char): Boolean = c.isLetterOrDigit() || c == '\'' && last.length > 2
+    // whether [c], before the session's own space, ends a word: an apostrophe too where it follows
+    // a letter (dogs'), as quoteOpen reads one in a word; one put in after anything else is a quote
+    private fun endsWord(c: Char): Boolean =
+        c.isLetterOrDigit() || c == '\'' && last.getOrNull(last.length - 3)?.isLetterOrDigit() == true
 
     // whether a quote [q] is open in the text before the cursor, as far as the session knows it: the
     // last of them not in a word (don't, 90's) opens one after a space, a bracket or the field's
