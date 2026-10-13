@@ -846,22 +846,17 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     }
 
     override fun onStartInput(attribute: EditorInfo, restarting: Boolean) {
-        // the editor's selection as followed till now, before the start's own takes its place
-        val start = InputStart(
-            again = restarting && attribute === startedWith,
-            followedSelected = selection.latest.isNotEmpty(),
-            editorComposing = editorComposing,
-            initialSelStart = attribute.initialSelStart,
-            initialSelEnd = attribute.initialSelEnd,
-        )
+        // the screen turned (resetStateForNewConfiguration): input restarts with the EditorInfo the
+        // field first started with, its initial selection and text that start's (CursorTracker.startInput)
+        val again = restarting && attribute === startedWith
         // update selection as soon as possible
         // sometimes when restarting input, onUpdateSelection happens before onStartInput, and
         // initialSel{Start,End} is outdated. but it's the client app's responsibility to send
         // right cursor position, try to workaround this would simply introduce more bugs.
-        selection.resetTo(attribute.initialSelStart, attribute.initialSelEnd)
+        selection.startInput(again, attribute.initialSelStart, attribute.initialSelEnd)
         val flags = CapabilityFlags.fromEditorInfo(attribute)
         val sensitive = flags.hasAny(CapabilityFlag.PasswordOrSensitive)
-        val put = currentInputConnection?.let { takeOutPreedit(it, attribute, restarting, start, sensitive) } ?: 0
+        val put = currentInputConnection?.let { takeOutPreedit(it, attribute, restarting, again, sensitive) } ?: 0
         startedWith = attribute
         // what commitOverEngine put in last, a paste into a password maybe, is not kept: the reset above
         // keeps it from being taken back anyway
@@ -905,7 +900,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
             // an editor that gives no initial text may still answer the connection. The initial
             // text is the field's as it started: the preedit put back, taken out above, is in it;
             // and after a turn it is the first start's, so the editor is asked
-            val initial = Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && start.initialTextIsNow
+            val initial = Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && !again
             tellContext(
                 before = {
                     (if (initial) attribute.getInitialTextBeforeCursor(ContextChars + put, 0)?.dropLast(put) else null)
@@ -1196,7 +1191,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         ic: InputConnection,
         attribute: EditorInfo,
         restarting: Boolean,
-        inputStart: InputStart,
+        again: Boolean,
         sensitive: Boolean,
     ): Int {
         val now = SystemClock.elapsedRealtime()
@@ -1206,9 +1201,9 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
             // the screen turned (resetStateForNewConfiguration) restarts input with no
             // onFinishInputView: the engine's input goes below, the editor's preedit with it. It
             // restarts with the EditorInfo the field started with, a select-all's selection still
-            // in it: the one followed since is the editor's. Not over a selection otherwise: an app
-            // that set new text and restarted has no preedit (InputStart)
-            dropPreedit(ic, inputStart.selected, inputStart.editorComposes)?.let { leftPreedit.dropped(it, field, now) }
+            // in it: the one followed since is the editor's, kept in onStartInput. An app that set
+            // new text and restarted has no preedit: its editor's last report is of the text before
+            dropPreedit(ic, selection.latest.isNotEmpty(), again && editorComposing)?.let { leftPreedit.dropped(it, field, now) }
             return 0
         }
         // not even read in a password or a field that asks not to be learned from, nor where the

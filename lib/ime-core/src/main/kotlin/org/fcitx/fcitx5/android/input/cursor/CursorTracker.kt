@@ -34,6 +34,16 @@ class CursorTracker {
         current.update(start, end)
     }
 
+    /**
+     * Input started in the field at [initialStart, initialEnd], its EditorInfo's. [again], input
+     * restarts with the EditorInfo it last started with, as when the screen turned
+     * (resetStateForNewConfiguration): its initial selection is that first start's, a select-all's
+     * maybe, and the editor reports nothing new, so the selection followed since is kept.
+     */
+    fun startInput(again: Boolean, initialStart: Int, initialEnd: Int) {
+        if (again) resetTo(latest.start, latest.end) else resetTo(initialStart, initialEnd)
+    }
+
     fun predict(new: CursorRange) {
         // queued as a copy: the caller's range wraps an array it may still change
         predict(new.start, new.end)

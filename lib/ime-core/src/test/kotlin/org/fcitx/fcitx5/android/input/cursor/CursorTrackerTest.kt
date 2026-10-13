@@ -54,6 +54,20 @@ class CursorTrackerTest {
         assertFalse(t.consume(2))
     }
 
+    // a select-all-on-focus field (an address bar) typed in, then the screen turned: input restarts
+    // with the EditorInfo of the field's first start, the whole text selected in it (seen on redroid)
+    @Test
+    fun inputStartedAgainKeepsTheSelectionFollowedNotTheFirstStarts() {
+        val t = tracker(0)
+        t.predict(6)
+        t.startInput(again = true, initialStart = 0, initialEnd = 11)
+        assertTrue(t.latest.rangeEquals(6, 6))
+        assertTrue(t.settled)
+        // an app restarting input with an EditorInfo of its own: its selection is the editor's now
+        t.startInput(again = false, initialStart = 0, initialEnd = 5)
+        assertTrue(t.latest.rangeEquals(0, 5))
+    }
+
     // endregion
 
     // region predict
