@@ -39,14 +39,4 @@ internal object IniText {
 
     /** The value of [line], one with a [key]: unquoted and unescaped. */
     fun value(line: String): String = unescapeValue(line.substringAfter('=').trim())
-
-    /** The keys of the sections named [name] in [text], with their values. */
-    fun section(text: String, name: String): Map<String, String> {
-        val out = HashMap<String, String>()
-        for ((section, lines) in sections(text)) {
-            if (section != name) continue
-            for (line in lines) key(line)?.let { out[it] = value(line) }
-        }
-        return out
-    }
 }

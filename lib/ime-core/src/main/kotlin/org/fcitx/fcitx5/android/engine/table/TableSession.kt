@@ -21,9 +21,10 @@ import org.fcitx.fcitx5.android.engine.session.Snapshot
  * one candidate, its code whole, commits it; a key past the longest code, or one that leads to no
  * entry, commits the first candidate on the page shown and starts a new code, or goes to the app
  * when no code starts with it (a table's punctuation). A code with no candidate is dropped by the
- * key that ends it, as 五笔 users expect of 空码. A space right after a code committed itself is
- * taken, not typed: whether a code is the only one is not shown (the shared words have codes too),
- * and the space a user types to commit it either way made a gap only after the lone ones.
+ * key that ends it, as 五笔 users expect of 空码. A space right after a code committed itself, within
+ * a second of it, is taken, not typed: whether a code is the only one is not shown (the shared words
+ * have codes too), and the space a user types to commit it either way made a gap only after the
+ * lone ones. One that comes later is typed: a pause to read, then a space meant as one.
  *
  * [TableOptions.pinyinKey] starting a code hands the keys after it to [pinyin], and its
  * candidates show their code here: the way to type a character whose code one does not know.
@@ -46,6 +47,8 @@ class TableSession(
     private val pinyin: Session? = null,
     private val user: TableUser = TableUser(table),
     private val shared: SharedWords = SharedWords.NONE,
+    /** Milliseconds on a clock that does not jump: how soon after a code committed itself a space comes. */
+    private val now: () -> Long = { System.nanoTime() / 1_000_000 },
 ) : Session {
 
     /**
@@ -68,18 +71,24 @@ class TableSession(
     private val recent = ArrayList<String>()
     private val autoPhraseLength = if (options.autoPhraseLength < 0) table.maxLength else options.autoPhraseLength
 
-    // a code just committed itself: the next key, if a space, is taken (see the class)
-    private var committedItself = false
+    // when a code just committed itself ([now]): the next key, if a space soon enough, is taken (see the class)
+    private var committedItselfAt: Long? = null
 
     // Enter between: the space is on a new line, typed
     override fun passedOn() {
-        committedItself = false
+        committedItselfAt = null
     }
 
     override fun apply(action: Action): Snapshot {
-        val takesSpace = committedItself && action is Action.Key && action.char == ' '
-        committedItself = false
-        return if (takesSpace) snapshot() else dispatch(action)
+        val taken = action is Action.Key && takesSpace(action.char)
+        committedItselfAt = null
+        return if (taken) snapshot() else dispatch(action)
+    }
+
+    /** Whether [c] is the space right after a code committed itself, soon enough to be the one typed to commit it. */
+    private fun takesSpace(c: Char): Boolean {
+        val at = committedItselfAt ?: return false
+        return c == ' ' && now() - at <= SPACE_TAKEN_MS
     }
 
     private fun dispatch(action: Action): Snapshot = if (lookingUp) lookUp(action) else when (action) {
@@ -118,7 +127,7 @@ class TableSession(
         else -> emptySet()
     }
 
-    override fun reads(c: Char): Boolean = if (committedItself && c == ' ') {
+    override fun reads(c: Char): Boolean = if (takesSpace(c)) {
         true
     } else if (lookingUp) {
         c in 'a'..'z' || c == '\''
@@ -168,7 +177,7 @@ class TableSession(
         val only = ranking.only()
         if (only != null && commitsItself(only)) {
             commit += take(only)
-            committedItself = true
+            committedItselfAt = now()
         }
         return snapshot(commit = commit)
     }
@@ -496,6 +505,8 @@ class TableSession(
             }
             // not offered (see offers): the lookup's pinyin has no phrases of the table's own
             is Action.Pin, is Action.Unpin, is Action.Block -> lookedUp ?: snapshot()
+            // a tap in the preedit is fcitx's, as outside a lookup: it commits the preedit and resets
+            is Action.Cursor -> (lookedUp ?: snapshot()).copy(handled = false)
             // the pinyin key alone: nothing to pick, and space drops it
             is Action.Select -> if (input.length > 1) fromPinyin(pinyin.apply(action)) else {
                 endLookUp()
@@ -543,5 +554,8 @@ class TableSession(
         private const val MAX_LENGTH = 0xFF
         private const val MAX_PICKS = 0x3FFFFF
         private const val POSITION_MASK = 0xFFFFFFFFL
+
+        // a space later than this after a code committed itself was typed on purpose, after a pause
+        private const val SPACE_TAKEN_MS = 1000L
     }
 }

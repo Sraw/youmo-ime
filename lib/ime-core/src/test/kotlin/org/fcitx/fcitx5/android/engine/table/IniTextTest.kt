@@ -32,12 +32,4 @@ class IniTextTest {
         assertNull(IniText.key("Name"))
         assertEquals("a \"b\"", IniText.value("Name=\"a \\\"b\\\"\""))
     }
-
-    @Test
-    fun aSectionIsReadByTheNameAsWrittenEachOfItsParts() {
-        assertEquals(mapOf("Name" to "Default"), IniText.section(profile, "Groups/0"))
-        // as fcitx names it, spaces and all
-        assertEquals(emptyMap<String, String>(), IniText.section(profile, "Groups/1"))
-        assertEquals(mapOf("A" to "1", "B" to "2"), IniText.section("[S]\nA=1\n[T]\nB=0\n[S]\nB=2\n", "S"))
-    }
 }

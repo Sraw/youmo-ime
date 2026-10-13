@@ -4,13 +4,25 @@
  */
 package org.fcitx.fcitx5.android.engine.host
 
+import org.fcitx.fcitx5.android.engine.session.Offer
+import org.fcitx.fcitx5.android.engine.table.TableUser.TableLog
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
+import org.junit.Rule
 import org.junit.Test
+import org.junit.rules.TemporaryFolder
+import java.io.File
 import java.util.concurrent.Executor
 
-/** The user's words as [TableRegistry] codes them for a table, below what a session makes of them. */
+/**
+ * The user's words as [TableRegistry] codes them for a table, below what a session makes of them,
+ * and what a table forgets of what is forgotten elsewhere ([TableRegistry.forgetInTables]).
+ */
 class TableRegistryTest : EnginesFixture() {
+
+    @get:Rule
+    val folder = TemporaryFolder()
 
     @Test
     fun aWordAddedInAnotherReadingOfOneListedIsNotCodedTwice() {
@@ -28,5 +40,85 @@ class TableRegistryTest : EnginesFixture() {
         // once is the registry's own doing, nothing the user sees: a session shows a text once however often
         // it is offered (EnginesTest's ...OfferedOnce). Twice would be the word coded again and ranked twice on each key
         assertEquals(listOf("wqvb" to "你好"), shared.words("wqvb"))
+    }
+
+    @Test
+    fun aTableHasTheModelsWordsIndexedInTheBackgroundAsItOpens() {
+        // what learnSaved looks a saved phrase up in: not made on the input thread at the first save
+        val later = ArrayList<Runnable>()
+        val background = Executor { later += it }
+        val assets = EngineAssets(::load, {}, null)
+        val lexicon = UserLexicon(null, {}, { null }, { null }, assets, background, forgetInTables = {}, dropSessions = {})
+        val registry = TableRegistry(::load, null, {}, background, assets, lexicon)
+        val table = registry.table(WUBI)
+        assertEquals(0, later.size)
+        registry.shared(table, WUBI)
+        assertEquals(1, later.size)
+        // once, as the table opens
+        registry.shared(table, WUBI)
+        assertEquals(1, later.size)
+        later.single().run()
+    }
+
+    /** A start whose 五笔 has 你好 saved at wqvb; pinyin learns it as 五笔 opens ([TableRegistry.shared]). */
+    private fun savedNihao(): File = folder.newFolder("engine").apply {
+        resolve(Engines.userTable(WUBI)).writeBytes(TableLog.FORMAT.header() + TableLog.saved("wqvb", "你好"))
+    }
+
+    private fun Engines.wubi(keys: String): List<String> {
+        settings = wubiShown
+        return type(WUBI, keys).candidates
+    }
+
+    @Test
+    fun aPhraseForgottenElsewhereIsForgottenByATableNotTypedWithSinceTheStart() {
+        val dir = savedNihao()
+        Engines(::load, dir).use { assertTrue("你好" in it.wubi("wqvb")) }
+        Engines(::load, dir).use { engines ->
+            val learned = engines.userWords().filter { it.text == "你好" }
+            assertEquals(1, learned.size)
+            engines.removeWords(learned)
+        }
+        Engines(::load, dir).use { engines ->
+            assertFalse("你好" in engines.wubi("wqvb"))
+            assertTrue(engines.userWords().none { it.text == "你好" })
+        }
+    }
+
+    @Test
+    fun aPhraseATableSavedForgottenInPinyinIsForgottenByTheTableToo() {
+        val dir = savedNihao()
+        Engines(::load, dir).use { engines ->
+            assertTrue("你好" in engines.wubi("wqvb"))
+            engines.type(Engines.PINYIN, "nihao")
+            val at = engines.candidates(Engines.PINYIN, 0, 20).indexOfFirst { it.text == "你好" }
+            assertTrue(Offer.FORGET in engines.offers(Engines.PINYIN, at))
+            engines.onEvent(Engines.PINYIN, EngineEvent.FORGET, at)
+        }
+        // pinyin's words gone, the table offers only what it saved itself
+        assertTrue(dir.resolve(Engines.USER_PINYIN).delete())
+        Engines(::load, dir).use { assertFalse("你好" in it.wubi("wqvb")) }
+    }
+
+    @Test
+    fun aWordAddedPickedInATableAndRemovedIsNotBackThereAtTheNextStart() {
+        val dir = folder.newFolder("engine")
+        Engines(::load, dir).use { engines ->
+            assertTrue(engines.addWord("你好", "ni hao"))
+            // the user's word, coded by the table's rule: its pick is the table's, read back as a phrase saved
+            val offered = engines.wubi("wqvb")
+            assertTrue("你好" in offered)
+            assertEquals("你好", engines.onEvent(WUBI, EngineEvent.PICK, offered.indexOf("你好")).commit)
+            engines.onEvent(WUBI, EngineEvent.RESET, 0)
+            engines.removeWord(Engines.UserWord("你好", "ni hao", Engines.UserWord.Kind.ADDED))
+        }
+        Engines(::load, dir).use { engines ->
+            assertFalse("你好" in engines.wubi("wqvb"))
+            assertEquals(emptyList<Engines.UserWord>(), engines.userWords())
+        }
+    }
+
+    private companion object {
+        const val WUBI = "engine-wubi"
     }
 }

@@ -272,6 +272,20 @@ class StrokesTest {
         assertFalse(pinyin.learning)
     }
 
+    // fcitx commits the preedit and resets: the lookup has no cursor
+    @Test
+    fun aTapInALookupIsLeftToFcitxAsItWas() {
+        val pinyin = Pinyin()
+        val l = lookup(pinyin)
+        l.apply(Action.Key('u'))
+        val typed = l.apply(Action.Key('h'))
+        assertEquals("u一", typed.preedit)
+        assertEquals(typed.copy(handled = false), l.apply(Action.Cursor(1)))
+        assertTrue("the pinyin is not told", pinyin.actions.none { it is Action.Cursor })
+        // still looking up: the next stroke goes on from it
+        assertEquals("u一丨", l.apply(Action.Key('s')).preedit)
+    }
+
     @Test
     fun theCharactersFoundAreMadeAsAskedForTheTotalKnownOnceAllAre() {
         val l = lookup()

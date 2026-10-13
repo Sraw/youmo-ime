@@ -19,7 +19,8 @@ class TableLoneCodeTest {
 
     private val wubi = dictionary("a 工", "a 戈", "sie 梢", "sieg 梢", "w 人", "wqiy 你", "wun 们", "wqvb 你好")
 
-    private fun session() = TableSession(wubi, TableOptions.WUBI)
+    // a clock that stands still unless a test moves it: a space comes as soon as the test types it
+    private fun session(now: () -> Long = { 0L }) = TableSession(wubi, TableOptions.WUBI, now = now)
 
     @Test
     fun aLoneCandidateOfTheWholeCodeCommitsItself() {
@@ -59,6 +60,24 @@ class TableLoneCodeTest {
         assertFalse(v.reads(' '))
     }
 
+    /** A pause, to read or scroll, then a space: that one was meant, not the one that commits the code. */
+    @Test
+    fun theSpaceIsTakenOnlyWithinASecondOfTheCode() {
+        var time = 0L
+        val t = session { time }
+        assertEquals("你", t.type("wqiy").first)
+        time = 1000
+        assertTrue(t.reads(' '))
+        assertTrue(t.apply(Key(' ')).handled)
+        // past the second: typed
+        time = 0
+        val u = session { time }
+        u.type("wqiy")
+        time = 1001
+        assertFalse(u.reads(' '))
+        assertFalse(u.apply(Key(' ')).handled)
+    }
+
     @Test
     fun throughTheKeyboardTheSpaceAfterALoneCodeIsNotTyped() {
         val keyboard = Keyboard(session(), nineKeys = false)
@@ -75,6 +94,15 @@ class TableLoneCodeTest {
         "wqiy".forEach { keyboard.onEvent(EngineEvent.CHAR, it.code) }
         // nothing typed: Enter is the app's, a new line
         assertFalse(keyboard.onEvent(EngineEvent.ENTER, 0).handled)
+        assertFalse(keyboard.onEvent(EngineEvent.CHAR, ' '.code).handled)
+    }
+
+    @Test
+    fun aTapInTheAppsTextBetweenLetsTheSpaceThrough() {
+        val keyboard = Keyboard(session(), nineKeys = false)
+        "wqiy".forEach { keyboard.onEvent(EngineEvent.CHAR, it.code) }
+        // nothing typed: the tap moves the app's cursor, and the space goes where it now is
+        assertFalse(keyboard.onEvent(EngineEvent.CURSOR, 0).handled)
         assertFalse(keyboard.onEvent(EngineEvent.CHAR, ' '.code).handled)
     }
 }
