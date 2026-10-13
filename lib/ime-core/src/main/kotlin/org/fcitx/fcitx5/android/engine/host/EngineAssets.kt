@@ -31,9 +31,11 @@ import java.nio.ByteBuffer
  * What [Engines] reads from the app's assets ([load]), each when first asked for and kept: the
  * pinyin data and what every session over it shares (the Latin words, the characters' syllables
  * and readings, the decoder's extensions, the model's words for [TextWords]), the two sentence
- * models and the refiner over the larger, the strokes, and how the dictionary reads a text
- * ([pinyinsOf]). What cannot be read is reported to [onError]; the sentence models' int8 weights
- * are multiplied by [kernel], if given, else by Kotlin. Run on the fcitx thread, as [Engines] is.
+ * models and the refiner over the larger, the strokes, English's words and their trigram model,
+ * and how the dictionary reads a text ([pinyinsOf]). What cannot be read is reported to
+ * [onError]; the sentence models' int8 weights are multiplied by [kernel], if given, else by
+ * Kotlin. Run on the fcitx thread, as [Engines] is, but for [pinyinData], which Engines' warm-up
+ * reads ahead off it.
  */
 internal class EngineAssets(
     private val load: (String) -> ByteBuffer,
@@ -42,18 +44,22 @@ internal class EngineAssets(
 ) {
 
     // the files are signed with the app: no need to read them through for their checksums
-    val pinyinData by lazy(LazyThreadSafetyMode.NONE) { PinyinData.load(load(PINYIN_DATA), verify = false) }
+    // read by Engines' warm-up off the fcitx thread too: synchronized, so a session made meanwhile waits for it
+    val pinyinData by lazy { PinyinData.load(load(PINYIN_DATA), verify = false) }
 
     // the Latin words full pinyin reads as typed in lower case (iphone for iPhone)
     val latinWords by lazy(LazyThreadSafetyMode.NONE) { LatinWords.of(pinyinData.dictionary) }
 
-    // English's words and model; none if the app has not got them, English then suggesting nothing
+    // English's words and model; none if the app has not got them or cannot read them (a stale
+    // VERSION, say), English then suggesting nothing, and [onError] told why
     val englishData: EnglishData? by lazy(LazyThreadSafetyMode.NONE) {
         try {
-            EnglishData.load(load(ENGLISH_DATA), verify = false)
-        } catch (_: IOException) {
+            EnglishData.load(load(ENGLISH_DATA), verify = false) { onError(IOException("$ENGLISH_DATA: $NO_ENGLISH", it)) }
+        } catch (e: IOException) {
+            onError(IOException("cannot read $ENGLISH_DATA: $NO_ENGLISH", e))
             null
-        } catch (_: DataFormatException) {
+        } catch (e: DataFormatException) {
+            onError(IOException("cannot read $ENGLISH_DATA: $NO_ENGLISH", e))
             null
         }
     }
@@ -273,5 +279,7 @@ internal class EngineAssets(
         const val MAX_WORD_CHARS = 8
 
         const val MAX_READINGS = 3
+
+        const val NO_ENGLISH = "English suggests nothing"
     }
 }

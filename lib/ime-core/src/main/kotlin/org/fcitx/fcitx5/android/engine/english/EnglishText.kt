@@ -11,7 +11,9 @@ package org.fcitx.fcitx5.android.engine.english
  * letter past ASCII), which breaks the run. Commas, quotes, brackets and dashes keep it going.
  *
  * The data is counted as this splits the pages (lib/ime-dict-tool), and the engine takes its
- * context from the text before the cursor as this splits it: the two must agree.
+ * context from the text before the cursor as this splits it: the two must agree. A change here
+ * reaches the shipped model only at the next `english-data` release; until then the engine reads its
+ * context by the new split from a model counted by the old, so a change must do no harm with either.
  */
 object EnglishText {
 
@@ -21,8 +23,9 @@ object EnglishText {
     /** The longest word: anything longer is no word (a hash, a run of letters typed for fun). */
     const val MAX_WORD = 24
 
-    // a full stop after these ends no sentence: Mr. Smith, Dr. Who, vs. them
-    private val ABBREVIATIONS = setOf("mr", "mrs", "ms", "dr", "st", "jr", "sr", "vs", "etc", "prof", "inc", "ltd", "co", "no", "vol", "fig")
+    // a full stop after these ends no sentence: Mr. Smith, Dr. Who, vs. them. Not no or etc, which end
+    // one more often than not (I said no.), and No. 5 breaks the run at its number all the same
+    private val ABBREVIATIONS = setOf("mr", "mrs", "ms", "dr", "st", "jr", "sr", "vs", "prof", "inc", "ltd", "co", "vol", "fig")
 
     private const val ENDS = "!?…\n\r"
     private const val SEPARATORS = " \t,;:\"“”()[]-–— /*"
@@ -93,11 +96,13 @@ object EnglishText {
             when {
                 // e.g, example.com, U.S: no word the keyboard types whole
                 next != null && (next.isAsciiLetter() || next.isDigit()) -> spoiled = true
-                // an initial (J. Smith) or an abbreviation: the sentence goes on
-                !spoiled && (word.length == 1 || word.toString().lowercase() in ABBREVIATIONS) -> endWord()
+                // an initial (J. Smith; not I, as in So do I.) or an abbreviation: the sentence goes on
+                !spoiled && abbreviated() -> endWord()
                 else -> breakRun(sentence = true)
             }
         }
+
+        private fun abbreviated() = word.length == 1 && word[0] != 'I' || word.toString().lowercase() in ABBREVIATIONS
 
         fun endWord() {
             if (spoiled || word.length > MAX_WORD) {

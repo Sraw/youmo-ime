@@ -92,6 +92,76 @@ class EnglishDecoderTest {
         assertEquals(none, decoder.context(listOf("zzzz")))
     }
 
+    // the dict tool counted a sentence's first word as the commoner of it and its lower case, and a
+    // spelling it has none of as its letters' commonest: the words before the cursor are read the same
+    @Test
+    fun theWordsBeforeAreReadAsTheyWereCounted() {
+        // The, which the data lacks, after a sentence's start: the, and cat follows it
+        val afterThe = decoder.context(listOf(EnglishText.START, "The"))
+        assertEquals(decoder.context(listOf(EnglishText.START, "the")), afterThe)
+        assertEquals(listOf("cat"), decoder.predict(afterThe, 1).map { data.word(it.word) })
+        assertEquals("cat", words("cit", afterThe).first())
+        assertEquals(decoder.context(listOf("don't")), decoder.context(listOf("dont")))
+        // its key between a commoner one that starts it (he) and a commoner one it starts (hello): its own
+        assertEquals(decoder.context(listOf("hell")), decoder.context(listOf("HELL")))
+        // both written: the commoner at a sentence's start, as written elsewhere (a title)
+        val both = EnglishDataBuilder()
+            .unigram("<unk>", -7f, 0f)
+            .unigram(EnglishText.START, -9f, 0f)
+            .unigram("the", -1.3f, 0f)
+            .unigram("The", -3.0f, 0f)
+            .unigram("cat", -4.0f, 0f)
+            .unigram("End", -5.0f, 0f)
+            .bigram(EnglishText.START, "the", -1.0f, 0f)
+            .bigram("the", "cat", -1.0f, 0f)
+            .bigram("The", "End", -1.0f, 0f)
+        val titled = EnglishData.load(ByteBuffer.wrap(both.build().toByteArray()))
+        val titledDecoder = EnglishDecoder(titled)
+        fun next(words: List<String>) = titledDecoder.predict(titledDecoder.context(words), 1).map { titled.word(it.word) }
+        assertEquals(listOf("cat"), next(listOf(EnglishText.START, "The")))
+        assertEquals(listOf("End"), next(listOf("The")))
+    }
+
+    @Test
+    fun noWordsAskedForAreNone() {
+        val start = decoder.context(listOf(EnglishText.START))
+        assertTrue(decoder.predict(start, 0).isEmpty())
+        assertTrue(decoder.suggest("hel", none, 0).isEmpty())
+    }
+
+    // a key or two start thousands of words: only those below FREQUENT are scored, as the dict tool
+    // numbers the words commonest first, and the likeliest of them are offered
+    @Test
+    fun aLongRunOfCompletionsIsScoredForItsCommonerWordsAlone() {
+        val count = EnglishDecoder.FREQUENT + 100
+        // ids 2 on: the rare word's is FREQUENT, the first past the commoner, and the last of them just before it
+        val rare = EnglishDecoder.FREQUENT - 2
+        val last = rare - 1
+        val b = EnglishDataBuilder()
+            .unigram("<unk>", -7f, 0f)
+            .unigram(EnglishText.START, -9f, 0f)
+        // q and four letters each, the lower the id the likelier; but the rare word the likeliest of all, the last next
+        for (i in 0 until count) b.unigram(spelt(i), if (i == rare) -1f else if (i == last) -1.5f else -2f - i * 1e-4f, 0f)
+        val many = EnglishData.load(ByteBuffer.wrap(b.build().toByteArray()))
+        val manyDecoder = EnglishDecoder(many)
+        val start = many.model.context(NgramModel.NO_WORD, NgramModel.NO_WORD)
+        assertTrue(count > EnglishDecoder.MAX_SCAN)
+        // the rare word is not looked at, likeliest as it is; the last of the commoner is, and offered first
+        assertEquals(listOf(last + 2, 2, 3), manyDecoder.suggest("q", start, 3).map { it.word })
+        // a short run, all of it: the keys of the rare word's first four start it and one other, it first
+        assertEquals(rare + 2, manyDecoder.suggest(spelt(rare).dropLast(1), start, 3).first().word)
+    }
+
+    private fun spelt(i: Int): String {
+        val b = StringBuilder("q")
+        var n = i
+        repeat(4) {
+            b.append('a' + n % 26)
+            n /= 26
+        }
+        return b.toString()
+    }
+
     @Test
     fun anotherKindOfDataIsRefused() {
         val bytes = PinyinDataBuilder().unigram("<unk>", -1f, 0f).build().toByteArray()

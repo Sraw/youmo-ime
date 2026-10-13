@@ -52,6 +52,15 @@ class EnglishTextTest {
         assertEquals(listOf("^Mr Smith met J Doe", "^Then"), runs("Mr. Smith met J. Doe. Then"))
     }
 
+    // the word after them was read inside a sentence: its capital a name's, corrected only for a key beside
+    @Test
+    fun noEtcAndIEndASentence() {
+        assertEquals(listOf("^I said no", "^Then so do I", "^Pens etc", "^Last"), runs("I said no. Then so do I. Pens etc. Last"))
+        assertEquals(listOf(START), EnglishText.context("So do I. "))
+        // a number after No. breaks the run as it did
+        assertEquals(listOf("^No", "is here"), runs("No. 5 is here"))
+    }
+
     // e.g, example.com: no word the keyboard types whole
     @Test
     fun aFullStopInsideAWordSpoilsIt() {

@@ -10,10 +10,13 @@ import org.fcitx.fcitx5.android.engine.session.Snapshot
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNotSame
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertSame
 import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.io.FileNotFoundException
+import java.io.IOException
 import java.nio.ByteBuffer
 
 /** What [EngineAssets] keeps for the pinyins' sessions to share, and when it makes it anew. */
@@ -117,6 +120,20 @@ class EngineAssetsTest : EnginesFixture() {
         assertEquals(setOf("解x", "了解x"), assets.strayPieces(offsets, found))
         // each read whole: no walk again
         assertEquals(emptySet<String>(), assets.strayPieces(offsets - "了解x", found))
+    }
+
+    /** English data that cannot be read (a stale VERSION, say) or is not there is reported: English then offers what is typed alone. */
+    @Test
+    fun englishDataThatCannotBeReadIsReported() {
+        val errors = ArrayList<IOException>()
+        val stale: (String) -> ByteBuffer = { if (it == Engines.ENGLISH_DATA) ByteBuffer.wrap(byteArrayOf(1, 2, 3)) else load(it) }
+        assertNull(EngineAssets(stale, { errors += it }, null).englishData)
+        val missing: (String) -> ByteBuffer = { if (it == Engines.ENGLISH_DATA) throw FileNotFoundException(it) else load(it) }
+        assertNull(EngineAssets(missing, { errors += it }, null).englishData)
+        assertEquals(2, errors.count { Engines.ENGLISH_DATA in it.message.orEmpty() })
+        val engines = Engines(stale, null, onError = { errors += it })
+        assertEquals(listOf("th"), engines.type(Engines.ENGLISH, "th").candidates)
+        assertEquals(3, errors.count { Engines.ENGLISH_DATA in it.message.orEmpty() })
     }
 
     @Test

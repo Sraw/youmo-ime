@@ -55,24 +55,77 @@ class EnglishDecoder(
         val score: Float get() = lm - cost
     }
 
-    /** The context of the next word after [words] (the nearest last): ids of the last two, a word the data lacks as none. */
+    /**
+     * The context of the next word after [words] (the nearest last): ids of the last two, each as the
+     * dict tool counted it ([wordId]), a word the data lacks as none.
+     */
     fun context(words: List<String>): Long {
-        val ids = words.takeLast(2).map { data.id(it) }
+        val from = maxOf(0, words.size - 2)
+        val ids = (from until words.size).map { wordId(words[it], first = it > 0 && words[it - 1] == EnglishText.START) }
         val prev = ids.lastOrNull() ?: NgramModel.NO_WORD
         // a word the data lacks starts afresh, as such a word broke the pages' runs
         val prev2 = if (ids.size == 2 && prev != NgramModel.NO_WORD) ids[0] else NgramModel.NO_WORD
         return data.model.context(prev2, prev)
     }
 
+    // [word] as EnglishVocabulary.Words.id counted it: a sentence's [first] as the commoner (the lower id)
+    // of it and its lower-case form, The as the; a spelling the data lacks as its letters' commonest,
+    // dont as don't, but one with an apostrophe as their commonest with one (WE'LL as we'll, not well)
+    // and one without of [LIKE_CONTRACTIONS] as their commonest without (WED as wed). Looked up as
+    // written, a sentence's first word was mostly none, and nothing followed it. A slip the pages had
+    // is none (teh, which the dict tool counted as the): the data does not say which they were. The
+    // rules for an apostrophe and for [LIKE_CONTRACTIONS] reach the shipped model only at the next
+    // `english-data` release: it counted WE'LL and WED as their letters' commonest (well, we'd), not as read here
+    private fun wordId(word: String, first: Boolean): Int {
+        val exact = data.id(word)
+        if (first) {
+            val lower = data.id(word.replaceFirstChar { it.lowercaseChar() })
+            if (lower != NgramModel.NO_WORD) return if (exact == NgramModel.NO_WORD) lower else minOf(exact, lower)
+        }
+        if (exact != NgramModel.NO_WORD) return exact
+        val key = EnglishData.key(word)
+        val apostrophe = '\'' in word
+        val held = if (apostrophe || key in LIKE_CONTRACTIONS) commonestOf(key, apostrophe) else NgramModel.NO_WORD
+        return if (held != NgramModel.NO_WORD) held else commonestOf(key, apostrophe = null)
+    }
+
+    // the lowest id of the words typed with [key] (their run in key order) with an [apostrophe] or
+    // without, either for null; none for no such word. The keys are read in place, as the search reads them
+    private fun commonestOf(key: String, apostrophe: Boolean?): Int {
+        var at = 0
+        var hi = data.keyed
+        while (at < hi) {
+            val mid = (at + hi) ushr 1
+            if (compareKey(mid, key) < 0) at = mid + 1 else hi = mid
+        }
+        var best = Int.MAX_VALUE
+        while (at < data.keyed && compareKey(at, key) == 0) {
+            val word = data.keyedWord(at++)
+            if (apostrophe == null || ('\'' in data.word(word)) == apostrophe) best = minOf(best, word)
+        }
+        return if (best == Int.MAX_VALUE) NgramModel.NO_WORD else best
+    }
+
+    // the key at [rank] in key order against [key], as String.compareTo compares them
+    private fun compareKey(rank: Int, key: String): Int {
+        val length = data.keyLength(rank)
+        for (i in 0 until minOf(length, key.length)) {
+            val d = data.keyChar(rank, i).compareTo(key[i])
+            if (d != 0) return d
+        }
+        return length.compareTo(key.length)
+    }
+
     /** The [limit] best words for [keys] (letters, lower case: [EnglishData.key]) after [context], best first. */
     fun suggest(keys: String, context: Long, limit: Int): List<Suggestion> {
-        if (keys.isEmpty() || keys.length > MAX_KEYS) return emptyList()
-        val found = Search(keys, context).run()
+        if (limit <= 0 || keys.isEmpty() || keys.length > MAX_KEYS) return emptyList()
+        val found = Search(keys, context, limit).run()
         return found.values.sortedWith(compareByDescending<Suggestion> { it.score }.thenBy { it.word }).take(limit)
     }
 
     /** The [limit] likeliest words after [context], best first: what may come next. */
     fun predict(context: Long, limit: Int): List<Suggestion> {
+        if (limit <= 0) return emptyList()
         val best = ArrayList<Suggestion>()
         data.model.forEachAfter(context) { word, score ->
             if (word == data.start || word == data.unknown) return@forEachAfter
@@ -85,7 +138,7 @@ class EnglishDecoder(
         return best
     }
 
-    private inner class Search(private val keys: String, private val context: Long) {
+    private inner class Search(private val keys: String, private val context: Long, private val limit: Int) {
         private val n = keys.length
         private val rows = Array(MAX_KEYS + n + 2) { FloatArray(n + 1) }
         private val path = CharArray(MAX_KEYS + n + 2)
@@ -104,7 +157,7 @@ class EnglishDecoder(
             val row = rows[depth]
             var pos = from
             // the words whose keys end here come first in the run
-            while (pos < to && data.keyAt(pos).length == depth) {
+            while (pos < to && data.keyLength(pos) == depth) {
                 if (row[n] <= costs.limit) add(data.keyedWord(pos), row[n], completes = false)
                 pos++
             }
@@ -114,7 +167,7 @@ class EnglishDecoder(
             }
             if (depth >= path.size - 1) return
             while (pos < to) {
-                val c = data.keyAt(pos)[depth]
+                val c = data.keyChar(pos, depth)
                 val end = runEnd(pos, to, depth, c)
                 if (step(depth, c)) visit(depth + 1, pos, end)
                 pos = end
@@ -160,12 +213,30 @@ class EnglishDecoder(
         private fun complete(from: Int, to: Int, cost: Float) {
             // a long run (a key or two typed): its commoner words alone, as ids are by frequency
             val frequentOnly = to - from > MAX_SCAN
+            // all cost the same here: only the run's [limit] likeliest can be offered, of thousands for a key or two
+            val best = ArrayList<Suggestion>(limit + 1)
             for (pos in from until to) {
                 val word = data.keyedWord(pos)
                 if (frequentOnly && word >= FREQUENT) continue
-                add(word, cost, completes = true)
+                keepIfAmongBest(best, word, cost)
             }
+            for (s in best) found[s.word] = s
         }
+
+        // [word] completed at [cost] into [best], the run's [limit] likeliest in the order offered, unless
+        // it is found as cheaply already or ranks past them
+        private fun keepIfAmongBest(best: MutableList<Suggestion>, word: Int, cost: Float) {
+            val old = found[word]
+            if (old != null && old.cost <= cost) return
+            val lm = score(context, word)
+            if (best.size == limit && !outranks(lm, word, best.last())) return
+            val at = best.binarySearch { b -> if (outranks(lm, word, b)) 1 else -1 }.let { -(it + 1) }
+            best.add(at, Suggestion(word, lm, cost, completes = true))
+            if (best.size > limit) best.removeAt(best.size - 1)
+        }
+
+        // [word] scored [lm] before [s] as they are offered: likelier, or as likely and the lower id
+        private fun outranks(lm: Float, word: Int, s: Suggestion) = lm > s.lm || lm == s.lm && word < s.word
 
         private fun add(word: Int, cost: Float, completes: Boolean) {
             val old = found[word]
@@ -179,7 +250,7 @@ class EnglishDecoder(
             var hi = to
             while (lo < hi) {
                 val mid = (lo + hi) ushr 1
-                if (data.keyAt(mid)[depth] <= c) lo = mid + 1 else hi = mid
+                if (data.keyChar(mid, depth) <= c) lo = mid + 1 else hi = mid
             }
             return lo
         }
@@ -190,9 +261,16 @@ class EnglishDecoder(
         const val MAX_KEYS = EnglishText.MAX_WORD
 
         // a run of completions longer than this is scored for its commoner words alone
-        private const val MAX_SCAN = 4000
+        internal const val MAX_SCAN = 4000
 
         // the words below this id: the commonest, as EnglishVocabulary numbers them
-        private const val FREQUENT = 30_000
+        internal const val FREQUENT = 30_000
+
+        /**
+         * Real words with a contraction's letters (wed beside we'd), by key: a spelling of them without
+         * an apostrophe is counted as their commonest without one, as EnglishVocabulary counts the pages,
+         * and read so before the cursor. Not cant or wont, typed for can't and won't far more often than meant.
+         */
+        val LIKE_CONTRACTIONS: Set<String> = setOf("hell", "id", "ill", "its", "lets", "shed", "shell", "wed", "well", "were")
     }
 }
