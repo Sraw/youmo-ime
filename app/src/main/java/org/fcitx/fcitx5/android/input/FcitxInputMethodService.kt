@@ -71,6 +71,7 @@ import org.fcitx.fcitx5.android.data.prefs.ManagedPreference
 import org.fcitx.fcitx5.android.data.prefs.ManagedPreferenceProvider
 import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
+import org.fcitx.fcitx5.android.engine.session.Action
 import org.fcitx.fcitx5.android.input.cursor.CursorRange
 import org.fcitx.fcitx5.android.input.editing.ArrowKeys
 import org.fcitx.fcitx5.android.input.editing.CodePoints
@@ -132,6 +133,13 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     /** nothing said out loud goes into a password, its characters shown or not */
     val inPasswordField get() = fieldPolicy.password
 
+    /**
+     * A URL's or an email's field, where what is typed is what is meant ([PendingInputPolicy]). Read
+     * on the main thread as a key is pressed: by the time fcitx gets to it, another field may have started.
+     */
+    val inAddressField: Boolean
+        get() = currentInputEditorInfo?.let { AddressKeys.of(it.toEditorTraits()) != AddressKeys.NONE } == true
+
     private val editingSession = EditingSession(
         InputConnectionEditor { currentInputConnection },
         checkThread = if (BuildConfig.DEBUG) ({
@@ -146,6 +154,19 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     private val selection get() = editingSession.selection
 
     private val leftPreedit = LeftPreedit()
+
+    // the EditorInfo input last started with, null between fields: the screen turned, input restarts
+    // with it again, its selection the one the field started with (resetStateForNewConfiguration).
+    // Set on the main thread, read on fcitx's too (commitOverEngine)
+    @Volatile
+    private var startedWith: EditorInfo? = null
+
+    // what commitOverEngine put in last ([PostedCommit.committed]), forgotten with its field: the next may take its place
+    private val lastPosted = LastPosted()
+
+    // whether the editor's last cursor report held a composing text: WebView's ends as the user
+    // selects, and an empty composing text then takes the selection's place (dropPreedit)
+    private var editorComposing = false
 
     val currentInputSelection: CursorRange
         get() = selection.latest
@@ -315,7 +336,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
                     val subtype = SubtypeManager.subtypeOf(im) ?: return
                     val had = inputMethodManager.currentInputMethodSubtype?.let(SubtypeManager::inputMethodOf)
                     // [^1]: notify system that input method subtype has changed
-                    if (subtypeEchoes.shouldTell(im, had)) switchInputMethod(InputMethodUtil.componentName, subtype)
+                    if (subtypeEchoes.shouldTell(im, had)) tellSubtype(im, subtype)
                 }
                 if (inputDeviceMgr.evaluateOnInputMethodActivate()) {
                     showStatusIcon(StatusIconMapping.fromEntry(event.data))
@@ -437,25 +458,66 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
      * before the cursor (English would put its space behind punctuation typed next, in [text]).
      * With [replacing], [text] takes its place before the cursor: what the app put in just before
      * (九键's 1 pressed again, 。 for ，), if it is still there; the field may have refused it, or
-     * the cursor moved.
+     * the cursor moved. A password or a field that asks not to be learned from is not read to
+     * know: there it is known as what the app put in last, the editor having reported all it did
+     * and nothing else since ([PostedCommit.takeBack]). Not reported yet when [text] goes in,
+     * [replacing] stays: 1 pressed again before the editor reported the first types both, ，。.
+     * Posted, it waits for fcitx (starting, or reloading for the nine keys' letters): by then
+     * another field may have the focus, or none, and nothing goes in ([PostedCommit]).
      */
-    fun commitOverEngine(text: String, replacing: String = "") = postFcitxJob {
-        commitAndReset()
-        lifecycleScope.launch {
-            if (replacing.isNotEmpty() && currentInputConnection?.getTextBeforeCursor(replacing.length, 0)?.toString() == replacing) {
-                handleDeleteSurrounding(replacing.codePointCount(0, replacing.length), 0)
+    fun commitOverEngine(text: String, replacing: String = ""): Job {
+        val address = inAddressField
+        val asked = PostedCommit(startedWith, replacing, text)
+        return postFcitxJob {
+            if (!stillIn(asked, text)) return@postFcitxJob
+            commitAndReset(address)
+            lifecycleScope.launch {
+                if (!stillIn(asked, text)) return@launch
+                lastPosted.putIn(asked, postedField, selection)
             }
-            commitText(text)
         }
     }
 
-    /** What is typed put in as the input method would (its first candidate, or as composed), then fcitx reset. */
+    // whether input is in the field [text] was asked to go in ([PostedCommit.lands]): else it is dropped
+    private fun stillIn(asked: PostedCommit, text: String): Boolean {
+        if (asked.lands(startedWith)) return true
+        // its length alone: the debug log can be exported, and the text may be what the user typed
+        Timber.d("commitOverEngine: the field changed or finished, ${text.length} chars dropped")
+        return false
+    }
+
+    /**
+     * The field as commitOverEngine puts text in it ([LastPosted.putIn]): what the app put in just
+     * before is read to know, or, where the field is not to be read, as the editor's cursor report
+     * tells, its units deleted unread.
+     */
+    private val postedField = object : LastPosted.Field {
+        override val sensitive: Boolean get() = fieldPolicy.sensitive
+        override val composing: Boolean get() = editingSession.composing.isNotEmpty()
+
+        override fun textBefore(length: Int): CharSequence? = currentInputConnection?.getTextBeforeCursor(length, 0)
+
+        override fun delete(deletion: PostedCommit.Deletion) {
+            if (deletion.inCodePoints) {
+                handleDeleteSurrounding(deletion.count, 0)
+            } else {
+                editingSession.deleteSurrounding(deletion.count, 0, inCodePoints = false)
+            }
+        }
+
+        override fun commit(text: String) = commitText(text)
+    }
+
+    /**
+     * What is typed put in as the input method would (its first candidate, or as composed), then
+     * fcitx reset. [address]: the field is one ([inAddressField]), as read when the key was pressed.
+     */
     // there should be a new fcitx API for this
-    suspend fun FcitxAPI.commitAndReset() {
+    suspend fun FcitxAPI.commitAndReset(address: Boolean) {
         val resolution = PendingInputPolicy.resolve(
             inputMethodEntryCached.languageCode,
             hasPreedit = clientPreeditCached.isNotEmpty() || inputPanelCached.preedit.isNotEmpty(),
-            address = currentInputEditorInfo?.let { AddressKeys.of(it.toEditorTraits()) != AddressKeys.NONE } == true
+            address = address
         )
         when (resolution) {
             PendingInputPolicy.Resolution.SelectFirstCandidate -> select(0)
@@ -750,6 +812,24 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
      */
     private val subtypeEchoes = SubtypeEchoes()
 
+    /**
+     * Tells the system the subtype fcitx is on. fcitx events come at any time, also after the
+     * system disabled this keyboard (in its settings, or a test restoring the device's), and the
+     * system refuses the switch then: not to throw on the main looper, the refusal is logged and
+     * the echo awaited for it forgotten.
+     */
+    @RequiresApi(Build.VERSION_CODES.UPSIDE_DOWN_CAKE)
+    private fun tellSubtype(im: String, subtype: InputMethodSubtype) {
+        try {
+            switchInputMethod(InputMethodUtil.componentName, subtype)
+        } catch (expected: RuntimeException) {
+            // the system's refusal comes back as a plain RuntimeException, a dead system as one too;
+            // named `expected` as detekt's TooGenericExceptionCaught allows a caught one so named
+            Timber.w(expected, "IMChangeEvent: the system refused the switch to im=$im")
+            subtypeEchoes.refused(im)
+        }
+    }
+
     override fun onCurrentInputMethodSubtypeChanged(newSubtype: InputMethodSubtype) {
         super.onCurrentInputMethodSubtypeChanged(newSubtype)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
@@ -766,32 +846,28 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     }
 
     override fun onStartInput(attribute: EditorInfo, restarting: Boolean) {
+        // the editor's selection as followed till now, before the start's own takes its place
+        val start = InputStart(
+            again = restarting && attribute === startedWith,
+            followedSelected = selection.latest.isNotEmpty(),
+            editorComposing = editorComposing,
+            initialSelStart = attribute.initialSelStart,
+            initialSelEnd = attribute.initialSelEnd,
+        )
         // update selection as soon as possible
         // sometimes when restarting input, onUpdateSelection happens before onStartInput, and
         // initialSel{Start,End} is outdated. but it's the client app's responsibility to send
         // right cursor position, try to workaround this would simply introduce more bugs.
         selection.resetTo(attribute.initialSelStart, attribute.initialSelEnd)
-        currentInputConnection?.let { ic ->
-            val now = SystemClock.elapsedRealtime()
-            val field = "${attribute.packageName}/${attribute.fieldId}"
-            if (restarting) {
-                // the screen turned (resetStateForNewConfiguration) restarts input with no
-                // onFinishInputView: the engine's input goes below, the editor's preedit with it.
-                // Not over a selection: an app that set new text and restarted has no preedit
-                if (attribute.initialSelStart == attribute.initialSelEnd) {
-                    dropPreedit(ic)?.let { leftPreedit.dropped(it, field, now) }
-                }
-            } else {
-                val (start, end) = attribute.initialSelStart to attribute.initialSelEnd
-                val put = leftPreedit.putBack(field, { ic.getTextBeforeCursor(it, 0) }, start, end, now)
-                if (put > 0) {
-                    ic.deleteSurroundingText(put, 0)
-                    selection.resetTo(start - put, end - put)
-                }
-            }
-        }
-        resetComposingState()
         val flags = CapabilityFlags.fromEditorInfo(attribute)
+        val sensitive = flags.hasAny(CapabilityFlag.PasswordOrSensitive)
+        val put = currentInputConnection?.let { takeOutPreedit(it, attribute, restarting, start, sensitive) } ?: 0
+        startedWith = attribute
+        // what commitOverEngine put in last, a paste into a password maybe, is not kept: the reset above
+        // keeps it from being taken back anyway
+        lastPosted.forget()
+        editorComposing = false
+        resetComposingState()
         capabilityFlags = flags
         editingSession.pairs.forget()
         arrowKeys.forget()
@@ -802,7 +878,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
                 attribute.packageName, attribute.fieldId, attribute.inputType, attribute.fieldName, attribute.hintText
             ),
             password = CapabilityFlags.isPassword(attribute),
-            sensitive = flags.hasAny(CapabilityFlag.PasswordOrSensitive),
+            sensitive = sensitive,
         )
         // EditorInfo may change between onStartInput and onStartInputView
         inputDeviceMgr.notifyOnStartInput(attribute)
@@ -826,11 +902,13 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         }
         contextDropped = false
         if (!isNullType) {
-            // an editor that gives no initial text may still answer the connection
-            val initial = Build.VERSION.SDK_INT >= Build.VERSION_CODES.R
+            // an editor that gives no initial text may still answer the connection. The initial
+            // text is the field's as it started: the preedit put back, taken out above, is in it;
+            // and after a turn it is the first start's, so the editor is asked
+            val initial = Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && start.initialTextIsNow
             tellContext(
                 before = {
-                    (if (initial) attribute.getInitialTextBeforeCursor(ContextChars, 0) else null)
+                    (if (initial) attribute.getInitialTextBeforeCursor(ContextChars + put, 0)?.dropLast(put) else null)
                         ?: currentInputConnection?.getTextBeforeCursor(ContextChars, 0)
                 },
                 after = {
@@ -884,6 +962,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         candidatesEnd: Int
     ) {
         Timber.d("onUpdateSelection: old=[$oldSelStart,$oldSelEnd] new=[$newSelStart,$newSelEnd] cand=[$candidatesStart,$candidatesEnd]")
+        editorComposing = candidatesStart != -1 || candidatesEnd != -1
         val update = editingSession.onCursorUpdate(
             newSelStart, newSelEnd, candidatesStart, candidatesEnd, ignoreSystemCursor
         )
@@ -895,6 +974,8 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         val quoteReset = editingSession.quoteLeftOpen
         if (quoteReset) postFcitxJob { reset() }
         handleCursorUpdate(update)
+        // a report not predicted, so not this service's own commit
+        if (update != EditingSession.CursorUpdate.None) inputView?.cursorMoved()
         if (quoteReset && update == EditingSession.CursorUpdate.None) tellContextLater()
         inputView?.updateSelection(newSelStart, newSelEnd)
     }
@@ -998,7 +1079,8 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     ) {
         contextReads.ask()
         val context = fieldPolicy.context(SystemClock.elapsedRealtime(), before, after) ?: return
-        postFcitxJob { engineContext(context) }
+        val learning = !fieldPolicy.sensitive
+        postFcitxJob { engineContext(context, learning) }
     }
 
     /**
@@ -1009,11 +1091,12 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     private fun tellContextLater() {
         val read = contextReads.ask()
         postFcitxJob {
-            val context = withContext(Dispatchers.Main) {
+            val told = withContext(Dispatchers.Main) {
                 if (!contextReads.isLatest(read)) null
                 else fieldPolicy.context(SystemClock.elapsedRealtime(), textBeforeCursor, textAfterCursor)
+                    ?.let { it to !fieldPolicy.sensitive }
             }
-            if (context != null) engineContext(context)
+            if (told != null) engineContext(told.first, told.second)
         }
     }
 
@@ -1090,17 +1173,54 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         return inputView?.handleInlineSuggestions(response) == true
     }
 
-    /** Takes a Chinese preedit out of the editor, as the engine drops its input: see [PendingInputPolicy.keepsPreeditOnLeaving]. */
-    private fun dropPreedit(ic: InputConnection): String? {
-        // only a preedit: with none, an empty composing text takes the selection's place
-        if (editingSession.composing.isEmpty() ||
-            PendingInputPolicy.keepsPreeditOnLeaving(fcitx.runImmediately { inputMethodEntryCached.languageCode })
-        ) {
+    /**
+     * Takes a Chinese preedit out of the editor, as the engine drops its input: see
+     * [PendingInputPolicy.takesPreeditOut]. [selected]: the editor's selection as last known.
+     */
+    private fun dropPreedit(ic: InputConnection, selected: Boolean, editorComposes: Boolean): String? {
+        val language = fcitx.runImmediately { inputMethodEntryCached.languageCode }
+        if (!PendingInputPolicy.takesPreeditOut(language, editingSession.composing.isNotEmpty(), selected, editorComposes)) {
             return null
         }
         val text = editingSession.composingText.toString()
         ic.setComposingText("", 1)
         return text
+    }
+
+    /**
+     * The preedit as input starts: on a restart (the screen turned) taken out of the editor; in a
+     * new field, the one the app put back taken out ([LeftPreedit]). How many characters went from
+     * before the cursor, the selection moved back over them.
+     */
+    private fun takeOutPreedit(
+        ic: InputConnection,
+        attribute: EditorInfo,
+        restarting: Boolean,
+        inputStart: InputStart,
+        sensitive: Boolean,
+    ): Int {
+        val now = SystemClock.elapsedRealtime()
+        val field = "${attribute.packageName}/${attribute.fieldId}"
+        val (start, end) = attribute.initialSelStart to attribute.initialSelEnd
+        if (restarting) {
+            // the screen turned (resetStateForNewConfiguration) restarts input with no
+            // onFinishInputView: the engine's input goes below, the editor's preedit with it. It
+            // restarts with the EditorInfo the field started with, a select-all's selection still
+            // in it: the one followed since is the editor's. Not over a selection otherwise: an app
+            // that set new text and restarted has no preedit (InputStart)
+            dropPreedit(ic, inputStart.selected, inputStart.editorComposes)?.let { leftPreedit.dropped(it, field, now) }
+            return 0
+        }
+        // not even read in a password or a field that asks not to be learned from, nor where the
+        // editor tells no cursor: the pinyin stays there
+        val put = leftPreedit.putBack(field, { if (sensitive || start < 0) null else ic.getTextBeforeCursor(it, 0) }, start, end, now)
+        if (put > 0) {
+            // how many alone: the debug log can be exported, and the preedit is what the user typed
+            Timber.d("onStartInput: took out $put chars of the preedit put back")
+            ic.deleteSurroundingText(put, 0)
+            selection.resetTo(start - put, end - put)
+        }
+        return put
     }
 
     override fun onFinishInputView(finishingInput: Boolean) {
@@ -1109,10 +1229,11 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         inputDeviceMgr.onFinishInputView()
         inputView?.finishInput()
         currentInputConnection?.apply {
-            dropPreedit(this)
+            dropPreedit(this, selection.latest.isNotEmpty(), editorComposing)
             finishComposingText()
             monitorCursorAnchor(false)
         }
+        editorComposing = false
         resetComposingState()
         postFcitxJob {
             focusOutIn()
@@ -1128,6 +1249,8 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
             focus(false)
         }
         capabilityFlags = CapabilityFlags.DefaultFlags
+        startedWith = null
+        lastPosted.forget()
         // a read queued in the field, a password's maybe, is not made once the policy forgot it
         contextReads.forget()
         fieldPolicy.finish()
@@ -1180,6 +1303,6 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         const val DefaultHighlightColor = 0x008577  // material_deep_teal_500
         // what the engine reads of the text before the cursor: its last two words, and what the
         // reranker has room for
-        const val ContextChars = 64
+        const val ContextChars = Action.Context.HOST_CHARS
     }
 }

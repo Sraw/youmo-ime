@@ -97,6 +97,27 @@ class SubtypeEchoesTest {
         assertTrue(echoes.shouldTell(PINYIN, had = ENGLISH))
     }
 
+    /** As for a switch fcitx made after the keyboard was disabled: the system throws instead of switching. */
+    @Test
+    fun aSwitchTheSystemRefusedAwaitsNoEchoWhileTheOnesToldBeforeItStillDo() {
+        echoes.shouldTell(PINYIN, had = ENGLISH)
+        echoes.shouldTell(ENGLISH, had = PINYIN)
+        echoes.shouldTell(PINYIN, had = ENGLISH)
+        echoes.refused(PINYIN)
+
+        assertTrue(echoes.isEcho(PINYIN))
+        assertTrue(echoes.isEcho(ENGLISH))
+        // the user's pick: the refused switch's echo is not awaited
+        assertFalse(echoes.isEcho(PINYIN))
+    }
+
+    /** Refused with nothing told, as no caller does: nothing is awaited, and nothing throws. */
+    @Test
+    fun aRefusalWithNoSwitchToldForgetsNothing() {
+        echoes.refused(PINYIN)
+        assertFalse(echoes.isEcho(PINYIN))
+    }
+
     @Test
     fun anEchoNotBackWithinTenSecondsIsForgotten() {
         echoes.shouldTell(PINYIN, had = ENGLISH)

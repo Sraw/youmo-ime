@@ -67,6 +67,18 @@ class SubtypeEchoes(private val now: () -> Long = SystemClock::uptimeMillis) {
         return true
     }
 
+    /**
+     * The system refused the switch to [inputMethod] that [shouldTell] just let through, as it does
+     * for a keyboard no longer enabled: no echo comes, and awaited, it would take a later pick of
+     * the user's for itself. The newest switch to it is forgotten; any told before stay awaited.
+     */
+    fun refused(inputMethod: String) {
+        val at = pending.indexOfLast { it.inputMethod == inputMethod }
+        if (at < 0) return
+        val told = pending.removeAt(at)
+        Timber.d("SubtypeEchoes: forgot im=${told.inputMethod}, told ${now() - told.at} ms ago: refused")
+    }
+
     private fun forgetOverdue(time: Long) {
         while (pending.firstOrNull()?.let { time - it.at > ECHO_WITHIN_MS } == true) forgetOldest(time, "overdue")
     }

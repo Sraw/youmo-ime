@@ -6,6 +6,7 @@ package org.fcitx.fcitx5.android.input
 
 import android.content.ComponentName
 import android.content.Intent
+import android.graphics.Rect
 import android.os.Build
 import android.os.SystemClock
 import android.view.InputDevice
@@ -35,6 +36,7 @@ import org.fcitx.fcitx5.android.core.SubtypeManager
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.daemon.FcitxDaemon
 import org.fcitx.fcitx5.android.engine.host.Engines
+import org.fcitx.fcitx5.android.input.keyboard.T9MultiTap
 import org.fcitx.fcitx5.android.utils.inputMethodManager
 import org.junit.After
 import org.junit.AfterClass
@@ -162,35 +164,90 @@ class SoftKeyboardTest {
     // nothing typed, 1 is ，。？！: pressed again soon, the next in place of the last; while typing, 分词
     @Test
     fun nineKeysOneIsPunctuationTillSomethingIsTyped() {
-        launch(inputMethod = Engines.T9)
-        val one = key(onKeyboard().text("，。？！")).visibleBounds
-        // within the multi-tap timeout: injected, as a click waits for the screen to settle
+        // 连按 at its default, 0.6 s, whatever this device has: off, 1 cycles at it too; Fast's 0.4 s is less room
+        val multiTap = AppPrefs.getInstance().keyboard.t9MultiTap
+        val before = multiTap.getValue()
+        multiTap.setValue(T9MultiTap.Medium)
+        try {
+            launch(inputMethod = Engines.T9)
+            pressOneTwiceSoon()
+            assertFieldBecomes("。")
+            key(onKeyboard().text("ABC")).click()
+            key(onKeyboard().text("分词"))
+            tap(R.string.a11y_key_backspace)
+            key(onKeyboard().text("，。？！"))
+        } finally {
+            multiTap.setValue(before)
+        }
+    }
+
+    // a field that asks not to be learned from is not read: the cursor the editor reported after ， tells it is there
+    @Test
+    fun nineKeysOnePressedAgainInAFieldNotLearnedFromTakesThePlaceOfTheLast() {
+        val multiTap = AppPrefs.getInstance().keyboard.t9MultiTap
+        val before = multiTap.getValue()
+        // at its slowest, 0.9 s: the most room for the editor's report of ， before the second press
+        multiTap.setValue(T9MultiTap.Slow)
+        try {
+            launch(action = EditorInfo.IME_ACTION_DONE or EditorInfo.IME_FLAG_NO_PERSONALIZED_LEARNING, inputMethod = Engines.T9)
+            val one = oneKey()
+            val first = press(one)
+            // again once the editor's report of ， is handled, as at a person's pace (before it, ，。 goes in:
+            // commitOverEngine), and still within 连按's 0.9 s: a device slower to report skips the test, saying how slow
+            assertFieldBecomes("，")
+            instrumentation.waitForIdleSync()
+            val reported = SystemClock.uptimeMillis() - first
+            assumeTrue(
+                "the editor reported ， $reported ms after the press: too late for 连按's ${T9MultiTap.Slow.timeout} ms",
+                reported < T9MultiTap.Slow.timeout - PRESS_LATENCY,
+            )
+            press(one)
+            assertFieldBecomes("。")
+        } finally {
+            multiTap.setValue(before)
+        }
+    }
+
+    /** 九键's 1 pressed twice, 0.1 s apart, within the multi-tap timeout. */
+    private fun pressOneTwiceSoon() {
+        val one = oneKey()
         repeat(2) {
-            val down = SystemClock.uptimeMillis()
-            for (action in listOf(MotionEvent.ACTION_DOWN, MotionEvent.ACTION_UP)) {
-                val event = MotionEvent.obtain(down, SystemClock.uptimeMillis(), action, one.exactCenterX(), one.exactCenterY(), 0)
-                event.source = InputDevice.SOURCE_TOUCHSCREEN
-                assertTrue("injected", instrumentation.uiAutomation.injectInputEvent(event, true))
-                event.recycle()
-            }
+            press(one)
             SystemClock.sleep(100)
         }
-        assertFieldBecomes("。")
-        key(onKeyboard().text("ABC")).click()
-        key(onKeyboard().text("分词"))
-        tap(R.string.a11y_key_backspace)
-        key(onKeyboard().text("，。？！"))
+    }
+
+    // found once: a search for the key takes time out of 连按's window
+    private fun oneKey(): Rect = key(onKeyboard().text("，。？！")).visibleBounds
+
+    /** A press at the centre of [bounds], injected, as a click waits for the screen to settle; when it went down. */
+    private fun press(bounds: Rect): Long {
+        val down = SystemClock.uptimeMillis()
+        for (action in listOf(MotionEvent.ACTION_DOWN, MotionEvent.ACTION_UP)) {
+            val event = MotionEvent.obtain(down, SystemClock.uptimeMillis(), action, bounds.exactCenterX(), bounds.exactCenterY(), 0)
+            event.source = InputDevice.SOURCE_TOUCHSCREEN
+            assertTrue("injected", instrumentation.uiAutomation.injectInputEvent(event, true))
+            event.recycle()
+        }
+        return down
     }
 
     // a real field, learning: the word the data lacks typed once is offered by its keys
     @Test
     fun englishOffersAWordOnceTyped() {
-        launch(inputMethod = ENGLISH)
-        tapLetters("qwzx")
-        tapSpace()
-        assertFieldBecomes("qwzx ")
-        tapLetters("qwz")
-        key(candidate("qwzx"))
+        // typed once: not left learned by a run before, nor kept on the device after this one
+        fun forget() = withFcitx { forgetEnglishWords(listOf("qwzx")) }
+        forget()
+        try {
+            launch(inputMethod = ENGLISH)
+            tapLetters("qwzx")
+            tapSpace()
+            assertFieldBecomes("qwzx ")
+            tapLetters("qwz")
+            key(candidate("qwzx"))
+        } finally {
+            forget()
+        }
     }
 
     @Test
@@ -453,6 +510,9 @@ class SoftKeyboardTest {
         const val SHUANGPIN = Engines.SHUANGPIN
         const val ENGLISH = "keyboard-us"
 
+        // allowed for an injected press's way to the keyboard, which counts 连按 from when it gets there
+        const val PRESS_LATENCY = 100L
+
         val instrumentation = InstrumentationRegistry.getInstrumentation()!!
         val context = instrumentation.targetContext!!
         val device: UiDevice = UiDevice.getInstance(instrumentation)
@@ -463,6 +523,8 @@ class SoftKeyboardTest {
         var originalDeviceIme: String? = null
         var wasEnabled = false
         var spellChecker: String? = null
+        // whether rememberDeviceIme got as far as turning it off: JUnit runs @AfterClass after a failed @BeforeClass too
+        var spellCheckerOff = false
         var originalIms: Array<String>? = null
 
         fun shell(command: String): String = device.executeShellCommand(command).trim()
@@ -483,7 +545,8 @@ class SoftKeyboardTest {
                 .any { ComponentName.unflattenFromString(it.substringBefore(';')) == self }
             // the system's spell checker (on in AOSP images, as redroid) underlines "ab", and a tap
             // on it opens its suggestions over the field, which takes the next tap on a key
-            spellChecker = shell("settings get secure spell_checker_enabled")
+            spellChecker = shell("settings get secure spell_checker_enabled").takeIf { it.isNotEmpty() && it != "null" }
+            spellCheckerOff = true
             shell("settings put secure spell_checker_enabled 0")
         }
 
@@ -498,39 +561,46 @@ class SoftKeyboardTest {
         @AfterClass
         @JvmStatic
         fun restoreDeviceIme() {
-            // the device's input method is put back even if fcitx's list could not be; the
-            // subtypes with it, as the input method list's settings page does on a change
-            val restoreIms = runCatching {
-                originalIms?.let { ims ->
-                    withFcitx {
-                        setEnabledIme(ims)
-                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) SubtypeManager.syncWith(enabledIme())
+            try {
+                // the device's input method is put back even if fcitx's list could not be; the
+                // subtypes with it, as the input method list's settings page does on a change
+                val restoreIms = runCatching {
+                    originalIms?.let { ims ->
+                        withFcitx {
+                            setEnabledIme(ims)
+                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) SubtypeManager.syncWith(enabledIme())
+                        }
                     }
                 }
-            }
-            val original = originalDeviceIme
-            when {
-                original == null -> shell("ime reset")
-                ComponentName.unflattenFromString(original) == ComponentName.unflattenFromString(imeId) -> {
-                    restoreIms.getOrThrow()
-                    return
+                val original = originalDeviceIme
+                when {
+                    original == null -> shell("ime reset")
+                    ComponentName.unflattenFromString(original) == ComponentName.unflattenFromString(imeId) -> {
+                        restoreIms.getOrThrow()
+                        return
+                    }
+                    else -> shell("ime set $original")
                 }
-                else -> shell("ime set $original")
+                if (!wasEnabled) shell("ime disable $imeId")
+                // The system unbinds the service asynchronously; its onDestroy stops the engine
+                // (FcitxDaemon.disconnect -> Fcitx.stop, which blocks until stopped).
+                val deadline = SystemClock.uptimeMillis() + 10_000
+                while (FcitxInputMethodService::class.java.name in shell("dumpsys activity services $imePkg") &&
+                    SystemClock.uptimeMillis() < deadline
+                ) SystemClock.sleep(100)
+                check(FcitxInputMethodService::class.java.name !in shell("dumpsys activity services $imePkg")) {
+                    "the input method service is still bound; the next class's engine would collide with it"
+                }
+                restoreIms.getOrThrow()
+                // the record goes before onDestroy has run on this process's main thread
+                instrumentation.waitForIdleSync()
+            } finally {
+                // also where this app is the device's input method (returned above) or a restore failed
+                if (spellCheckerOff) {
+                    if (spellChecker == null) shell("settings delete secure spell_checker_enabled")
+                    else shell("settings put secure spell_checker_enabled $spellChecker")
+                }
             }
-            if (!wasEnabled) shell("ime disable $imeId")
-            spellChecker.let { if (it == null || it == "null") shell("settings delete secure spell_checker_enabled") else shell("settings put secure spell_checker_enabled $it") }
-            // The system unbinds the service asynchronously; its onDestroy stops the engine
-            // (FcitxDaemon.disconnect -> Fcitx.stop, which blocks until stopped).
-            val deadline = SystemClock.uptimeMillis() + 10_000
-            while (FcitxInputMethodService::class.java.name in shell("dumpsys activity services $imePkg") &&
-                SystemClock.uptimeMillis() < deadline
-            ) SystemClock.sleep(100)
-            check(FcitxInputMethodService::class.java.name !in shell("dumpsys activity services $imePkg")) {
-                "the input method service is still bound; the next class's engine would collide with it"
-            }
-            restoreIms.getOrThrow()
-            // the record goes before onDestroy has run on this process's main thread
-            instrumentation.waitForIdleSync()
         }
     }
 }
