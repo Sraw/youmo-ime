@@ -8,13 +8,14 @@ import org.fcitx.fcitx5.android.input.editing.EditorTraits
 
 /**
  * What the letters' bottom row has either side of the space: the comma and the full stop, or in
- * an address field what addresses are made of, [first] in place of the comma, and after the full
- * stop [DOMAINS]' first, its long press the rest. The input method stays as it is.
+ * an address field what addresses are made of, a URL's `/` or an email address's `@` in place of
+ * the comma, and after the full stop [DOMAINS]' first, its long press the rest. The input method
+ * stays as it is.
  */
-enum class AddressKeys(val first: String?) {
-    NONE(null),
-    URL("/"),
-    EMAIL("@"),
+enum class AddressKeys {
+    NONE,
+    URL,
+    EMAIL,
     ;
 
     companion object {

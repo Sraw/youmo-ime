@@ -13,9 +13,7 @@ class AddressKeysTest {
     @Test
     fun anAddressFieldOffersWhatAddressesAreMadeOf() {
         assertEquals(AddressKeys.URL, AddressKeys.of(EditorTraits(isUri = true)))
-        assertEquals("/", AddressKeys.URL.first)
         assertEquals(AddressKeys.EMAIL, AddressKeys.of(EditorTraits(isEmail = true)))
-        assertEquals("@", AddressKeys.EMAIL.first)
         assertEquals(AddressKeys.NONE, AddressKeys.of(EditorTraits()))
         assertEquals(".com", AddressKeys.DOMAINS.first())
     }
