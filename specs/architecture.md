@@ -92,17 +92,16 @@ that asks not to be learned from) and sends it as `Action.Context`, so the langu
 sentence models score what follows it. `ContextMemory` keeps the end of what was written in a chat
 box that clears itself, for the reply typed next.
 
-The preedit goes into the app's text as composing text where the field takes it
-(`CapabilityFlag.Preedit`). A Chinese one is pinyin, not text, so a field that outlives the
-keyboard must not keep it: as the keyboard goes it is taken out
-(`PendingInputPolicy.keepsPreeditOnLeaving`; handwriting's is its characters, kept:
-`Engines.preeditIsText`), and `LeftPreedit` takes out what an app that made its
-activity anew saved with the field's text (see
-[pitfalls.md](pitfalls.md#rotation-with-chinese-half-typed)). Shown only on the keyboard's bar,
-the preedit would never reach the app's text, ending that kind of bug at the cost of seeing the
-pinyin where it goes; it is kept inline. A case `LeftPreedit` misses is a reason to weigh the
-bar-only preedit, not to widen its guards (same app and field id, the text just before the
-cursor, no selection, 3 seconds).
+Where the preedit shows is the input method's (`composesText` in `androidengine.cpp`, set as the
+input context's `setEnablePreedit` on activation, so quick phrase and Unicode follow it): English's
+word and handwriting's characters are the text itself and go into the app's text as composing
+text, where the field takes it (`CapabilityFlag.Preedit`), kept there as the keyboard goes. A code
+(pinyin, the nine keys', a table's) is not text, and is shown above the candidates (the bar's
+`PreeditComponent`, the floating window's `PreeditUi`) as 搜狗 and 百度 show theirs: in the app,
+a tap on another field or app had the app finish it as text before the input method heard of it
+(`InputMethodManager`), leaving `ni` in the field, and an app that made its activity anew on a
+turn saved it with the field's text. Dropped with the engine's input as the keyboard goes, a code
+never reaches the app's text, so nothing has to be taken out of it afterwards.
 
 ## The engine host
 

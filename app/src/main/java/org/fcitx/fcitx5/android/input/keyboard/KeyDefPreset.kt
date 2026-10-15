@@ -58,6 +58,9 @@ class AddressKey(text: String, viewId: Int, percentWidth: Float = 0.1f, more: Li
     if (more.isEmpty()) arrayOf(Popup.Preview(text)) else arrayOf(Popup.Preview(text), Popup.Keyboard.Explicit(more.toTypedArray())),
 )
 
+/** Room between a split keyboard's halves ([SplitKeyboard]), and at its edges: no key, nothing drawn. */
+object GapKey : KeyDef(Appearance.Text("", 0f, percentWidth = 0f, border = Border.Off, margin = false), emptySet())
+
 class AlphabetKey(
     val character: String,
     val punctuation: String,

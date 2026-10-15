@@ -454,10 +454,10 @@ class Engines(
         const val HANDWRITING = "engine-handwriting"
 
         /**
-         * Whether input method [name]'s preedit is the text itself, as handwriting's characters, not
-         * what is typed to find it (pinyin): kept in the field as the keyboard goes.
+         * Whether input method [name] is typed with a keyboard's keys: all but those made for a
+         * touch screen, the nine keys and handwriting. A hardware keyboard types with one that is.
          */
-        fun preeditIsText(name: String): Boolean = name == HANDWRITING
+        fun takesKeyboard(name: String): Boolean = name != T9 && name != HANDWRITING
 
         /** English: fcitx's own name for it, which fcitx falls back to, so a user's lists keep it. */
         const val ENGLISH = "keyboard-us"

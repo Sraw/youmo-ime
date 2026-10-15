@@ -4,12 +4,15 @@
  */
 package org.fcitx.fcitx5.android.ui.main.settings.theme
 
+import android.content.Context
+import android.content.res.Configuration
 import android.os.Build
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.view.ViewOutlineProvider
+import android.widget.FrameLayout
 import androidx.annotation.Keep
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
@@ -27,15 +30,18 @@ import org.fcitx.fcitx5.android.ui.main.settings.search.SearchHighlight
 import org.fcitx.fcitx5.android.utils.styledColor
 import splitties.dimensions.dp
 import splitties.views.backgroundColor
+import splitties.views.dsl.constraintlayout.after
 import splitties.views.dsl.constraintlayout.below
 import splitties.views.dsl.constraintlayout.bottomOfParent
 import splitties.views.dsl.constraintlayout.centerHorizontally
 import splitties.views.dsl.constraintlayout.constraintLayout
 import splitties.views.dsl.constraintlayout.endOfParent
 import splitties.views.dsl.constraintlayout.lParams
+import splitties.views.dsl.constraintlayout.matchConstraints
 import splitties.views.dsl.constraintlayout.startOfParent
 import splitties.views.dsl.constraintlayout.topOfParent
 import splitties.views.dsl.core.add
+import splitties.views.dsl.core.lParams
 import splitties.views.dsl.core.matchParent
 import splitties.views.dsl.core.wrapContent
 
@@ -70,8 +76,6 @@ class ThemeFragment : Fragment() {
         ThemeManager.addOnChangedListener(onThemeChangeListener)
         AppPrefs.getInstance().keyboard.registerOnChangeListener(onSizeChangeListener)
         val preview = previewUi.root.apply {
-            scaleX = 0.5f
-            scaleY = 0.5f
             outlineProvider = ViewOutlineProvider.BOUNDS
             elevation = dp(4f)
         }
@@ -100,31 +104,78 @@ class ThemeFragment : Fragment() {
             )
         }.attach()
 
-        val previewWrapper = constraintLayout {
-            add(preview, lParams(wrapContent, wrapContent) {
-                topOfParent(dp(-52))
-                startOfParent()
-                endOfParent()
-            })
-            add(tabLayout, lParams(matchParent, wrapContent) {
-                centerHorizontally()
-                bottomOfParent()
-            })
-            backgroundColor = styledColor(MaterialR.attr.colorSurface)
+        val box = HalfSizeBox(this).apply { add(preview, lParams(wrapContent, wrapContent)) }
+        val gap = dp(16)
+        if (resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE) {
+            // side by side: the preview, half the keyboard's width, takes half the screen's; the
+            // settings get its whole height, which above the preview left them a line of it
+            constraintLayout {
+                add(box, lParams(wrapContent, wrapContent) {
+                    topOfParent(gap)
+                    startOfParent()
+                    bottomOfParent(gap)
+                    verticalBias = 0f
+                })
+                add(tabLayout, lParams(matchConstraints, wrapContent) {
+                    topOfParent()
+                    after(box)
+                    endOfParent()
+                })
+                add(viewPager, lParams(matchConstraints, matchConstraints) {
+                    below(tabLayout)
+                    after(box)
+                    endOfParent()
+                    bottomOfParent()
+                })
+                backgroundColor = styledColor(MaterialR.attr.colorSurface)
+            }
+        } else {
+            val previewWrapper = constraintLayout {
+                add(box, lParams(wrapContent, wrapContent) {
+                    topOfParent(gap)
+                    centerHorizontally()
+                })
+                add(tabLayout, lParams(matchParent, wrapContent) {
+                    below(box, gap)
+                    centerHorizontally()
+                    bottomOfParent()
+                })
+                backgroundColor = styledColor(MaterialR.attr.colorSurface)
+            }
+            constraintLayout {
+                add(previewWrapper, lParams(height = wrapContent) {
+                    topOfParent()
+                    startOfParent()
+                    endOfParent()
+                })
+                add(viewPager, lParams {
+                    below(previewWrapper)
+                    startOfParent()
+                    endOfParent()
+                    bottomOfParent()
+                })
+            }
+        }
+    }
+
+    /**
+     * The keyboard preview at half its size, taking half its size: a view scaled still takes its
+     * whole size, which left the space a preview at full size would.
+     */
+    private class HalfSizeBox(context: Context) : FrameLayout(context) {
+        override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
+            val child = getChildAt(0)
+            child.measure(MeasureSpec.UNSPECIFIED, MeasureSpec.UNSPECIFIED)
+            setMeasuredDimension(child.measuredWidth / 2, child.measuredHeight / 2)
         }
 
-        constraintLayout {
-            add(previewWrapper, lParams(height = wrapContent) {
-                topOfParent()
-                startOfParent()
-                endOfParent()
-            })
-            add(viewPager, lParams {
-                below(previewWrapper)
-                startOfParent()
-                endOfParent()
-                bottomOfParent()
-            })
+        override fun onLayout(changed: Boolean, left: Int, top: Int, right: Int, bottom: Int) {
+            val child = getChildAt(0)
+            child.pivotX = 0f
+            child.pivotY = 0f
+            child.scaleX = 0.5f
+            child.scaleY = 0.5f
+            child.layout(0, 0, child.measuredWidth, child.measuredHeight)
         }
     }
 

@@ -555,4 +555,14 @@
     <string name="picker_short_ascii">英文</string>
     <string name="picker_short_math">数学</string>
     <string name="engine_unloadable">输入法数据无法加载，请重新安装应用；如果是导入的码表，请重新导入。</string>
+    <string name="split_keyboard">分体键盘</string>
+    <string name="split_keyboard_auto">横屏且屏幕够宽时</string>
+    <string name="split_keyboard_always">总是</string>
+    <string name="split_keyboard_off">关</string>
+    <string name="split_dock">分体时其他面板</string>
+    <string name="split_dock_right">靠右</string>
+    <string name="split_dock_left">靠左</string>
+    <string name="split_dock_full">铺满</string>
+    <string name="split_dock_move">移到另一边</string>
+    <string name="show_touch_keyboard">显示屏幕键盘</string>
 </resources>

@@ -8,6 +8,17 @@ package org.fcitx.fcitx5.android.input
 import android.annotation.SuppressLint
 import android.content.res.Configuration
 import android.graphics.Point
+import android.graphics.PorterDuff
+import android.graphics.PorterDuffColorFilter
+import android.view.Gravity
+import android.widget.FrameLayout
+import org.fcitx.fcitx5.android.R
+import org.fcitx.fcitx5.android.input.keyboard.SplitDock
+import org.fcitx.fcitx5.android.input.keyboard.SplitKeyboard
+import org.fcitx.fcitx5.android.input.keyboard.TextKeyboard
+import org.fcitx.fcitx5.android.utils.borderlessRippleDrawable
+import splitties.views.dsl.core.frameLayout
+import splitties.views.imageResource
 import android.os.Build
 import android.view.View
 import android.view.WindowInsets
@@ -28,6 +39,7 @@ import org.fcitx.fcitx5.android.core.FcitxEvent
 import org.fcitx.fcitx5.android.daemon.FcitxConnection
 import org.fcitx.fcitx5.android.daemon.launchOnReady
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
+import org.fcitx.fcitx5.android.data.prefs.ManagedPreference
 import org.fcitx.fcitx5.android.data.prefs.ManagedPreferenceProvider
 import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
@@ -88,12 +100,28 @@ class InputView(
 
     private val placeholderOnClickListener = OnClickListener { }
 
-    // use clickable view as padding, so MotionEvent can be split to padding view and keyboard view
-    private val leftPaddingSpace = view(::View) {
-        setOnClickListener(placeholderOnClickListener)
+    // the empty side of a board put at the other (SplitKeyboard.Dock): a button moves it across
+    private fun moveButton(to: SplitDock, icon: Int) = imageView {
+        imageResource = icon
+        colorFilter = PorterDuffColorFilter(theme.altKeyTextColor, PorterDuff.Mode.SRC_IN)
+        background = borderlessRippleDrawable(theme.keyPressHighlightColor)
+        scaleType = ImageView.ScaleType.CENTER
+        contentDescription = context.getString(R.string.split_dock_move)
+        visibility = GONE
+        setOnClickListener { ThemeManager.prefs.splitDock.setValue(to) }
     }
-    private val rightPaddingSpace = view(::View) {
+
+    private val moveLeft = moveButton(SplitDock.Left, R.drawable.ic_baseline_arrow_back_24)
+    private val moveRight = moveButton(SplitDock.Right, R.drawable.ic_baseline_arrow_forward_24)
+
+    // use clickable view as padding, so MotionEvent can be split to padding view and keyboard view
+    private val leftPaddingSpace = frameLayout {
         setOnClickListener(placeholderOnClickListener)
+        add(moveLeft, FrameLayout.LayoutParams(dp(56), dp(56), Gravity.CENTER))
+    }
+    private val rightPaddingSpace = frameLayout {
+        setOnClickListener(placeholderOnClickListener)
+        add(moveRight, FrameLayout.LayoutParams(dp(56), dp(56), Gravity.CENTER))
     }
     private val bottomPaddingSpace = view(::View) {
         // height as keyboardBottomPadding
@@ -218,6 +246,11 @@ class InputView(
         }
     }
 
+    @Keep
+    private val onSplitDockChangeListener = ManagedPreference.OnChangeListener<SplitDock> { _, _ ->
+        updateKeyboardSize()
+    }
+
     val keyboardView: View
 
     init {
@@ -250,9 +283,9 @@ class InputView(
                 centerVertically()
                 centerHorizontally()
             })
-            add(kawaiiBar.view, lParams(matchParent, dp(KawaiiBarComponent.HEIGHT)) {
+            add(kawaiiBar.view, lParams(0, dp(KawaiiBarComponent.HEIGHT)) {
                 topOfParent()
-                centerHorizontally()
+                // start and end set in updateKeyboardSize
             })
             add(leftPaddingSpace, lParams {
                 below(kawaiiBar.view)
@@ -279,6 +312,9 @@ class InputView(
         }
 
         updateKeyboardSize()
+        // the board at a side or across, as it changes, while the letters split: once laid out
+        windowManager.onAttached = { updateKeyboardSize() }
+        keyboardWindow.onLayoutShown = { updateKeyboardSize() }
 
         add(preedit.ui.root, lParams(matchParent, wrapContent) {
             above(keyboardView)
@@ -295,6 +331,7 @@ class InputView(
 
         keyboardPrefs.registerOnChangeListener(onKeyboardSizeChangeListener)
         advancedPrefs.registerOnChangeListener(onKeyboardSizeChangeListener)
+        ThemeManager.prefs.splitDock.registerOnChangeListener(onSplitDockChangeListener)
     }
 
     private fun updateKeyboardSize() {
@@ -305,34 +342,74 @@ class InputView(
             height = keyboardBottomPaddingPx
         }
         val sidePadding = keyboardSidePaddingPx
-        if (sidePadding == 0) {
-            // hide side padding space views when unnecessary
-            leftPaddingSpace.visibility = GONE
-            rightPaddingSpace.visibility = GONE
-            windowManager.view.updateLayoutParams<LayoutParams> {
+        val side = dockSide()
+        placeBoard(side, sidePadding)
+        preedit.ui.root.setPadding(sidePadding, 0, sidePadding, 0)
+        placeBar(side, sidePadding)
+    }
+
+    /** The windows across between the side paddings, or [side]'s width at it, the rest left empty. */
+    private fun placeBoard(side: SplitKeyboard.Dock?, sidePadding: Int) {
+        moveLeft.visibility = if (side == SplitKeyboard.Dock.RIGHT) VISIBLE else GONE
+        moveRight.visibility = if (side == SplitKeyboard.Dock.LEFT) VISIBLE else GONE
+        // the space at the board's side: the side padding, if any; at the other, all the rest
+        val near = if (side == SplitKeyboard.Dock.LEFT) leftPaddingSpace else rightPaddingSpace
+        val far = if (side == SplitKeyboard.Dock.LEFT) rightPaddingSpace else leftPaddingSpace
+        listOf(leftPaddingSpace, rightPaddingSpace).forEach {
+            it.visibility = if (sidePadding == 0 && (side == null || it === near)) GONE else VISIBLE
+            it.updateLayoutParams<LayoutParams> {
+                width = sidePadding
                 startToEnd = unset
                 endToStart = unset
-                startOfParent()
-                endOfParent()
-            }
-        } else {
-            leftPaddingSpace.visibility = VISIBLE
-            rightPaddingSpace.visibility = VISIBLE
-            leftPaddingSpace.updateLayoutParams {
-                width = sidePadding
-            }
-            rightPaddingSpace.updateLayoutParams {
-                width = sidePadding
-            }
-            windowManager.view.updateLayoutParams<LayoutParams> {
-                startToStart = unset
-                endToEnd = unset
-                startToEndOf(leftPaddingSpace)
-                endToStartOf(rightPaddingSpace)
             }
         }
-        preedit.ui.root.setPadding(sidePadding, 0, sidePadding, 0)
-        kawaiiBar.view.setPadding(sidePadding, 0, sidePadding, 0)
+        windowManager.view.updateLayoutParams<LayoutParams> {
+            startToEnd = unset
+            endToStart = unset
+            startToStart = unset
+            endToEnd = unset
+            width = if (side == null) 0 else dp(SplitKeyboard.dockWidth(TextKeyboard.widthDp(context)))
+            when {
+                side == null && sidePadding == 0 -> {
+                    startOfParent()
+                    endOfParent()
+                }
+                side == null -> {
+                    startToEndOf(leftPaddingSpace)
+                    endToStartOf(rightPaddingSpace)
+                }
+                side == SplitKeyboard.Dock.RIGHT -> if (sidePadding == 0) endOfParent() else endToStartOf(near)
+                else -> if (sidePadding == 0) startOfParent() else startToEndOf(near)
+            }
+        }
+        if (side != null) far.updateLayoutParams<LayoutParams> {
+            width = 0
+            if (side == SplitKeyboard.Dock.RIGHT) endToStartOf(windowManager.view) else startToEndOf(windowManager.view)
+        }
+    }
+
+    // the bar over the board goes with it: a picker's tabs, the toolbar, under the same thumb
+    private fun placeBar(side: SplitKeyboard.Dock?, sidePadding: Int) {
+        kawaiiBar.view.updateLayoutParams<LayoutParams> {
+            startToStart = unset
+            endToEnd = unset
+            width = 0
+            if (side == null) {
+                startOfParent()
+                endOfParent()
+            } else {
+                startToStart = windowManager.view.id
+                endToEnd = windowManager.view.id
+            }
+        }
+        val padding = if (side == null) sidePadding else 0
+        kawaiiBar.view.setPadding(padding, 0, padding, 0)
+    }
+
+    /** The side the board shown goes to, while the letters split, or null for the whole width. */
+    private fun dockSide(): SplitKeyboard.Dock? {
+        val lettersShown = windowManager.isAttached(keyboardWindow) && keyboardWindow.lettersShown
+        return SplitKeyboard.side(ThemeManager.prefs.splitDock.getValue().dock, TextKeyboard.splits(context), lettersShown)
     }
 
     override fun onApplyWindowInsets(insets: WindowInsets): WindowInsets {
@@ -417,6 +494,7 @@ class InputView(
     override fun onDetachedFromWindow() {
         advancedPrefs.unregisterOnChangeListener(onKeyboardSizeChangeListener)
         keyboardPrefs.unregisterOnChangeListener(onKeyboardSizeChangeListener)
+        ThemeManager.prefs.splitDock.unregisterOnChangeListener(onSplitDockChangeListener)
         // replaced (a rotation, a theme) its windows are never detached: what they had going,
         // the microphone above all, stops here
         broadcaster.onFinishInput()

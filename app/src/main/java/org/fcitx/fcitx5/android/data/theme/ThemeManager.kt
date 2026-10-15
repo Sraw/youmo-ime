@@ -125,6 +125,8 @@ object ThemeManager {
     private val onThemePrefsChange = ManagedPreferenceProvider.OnChangeListener { key ->
         if (prefs.dayNightModePrefNames.contains(key)) {
             activeTheme = evaluateActiveTheme()
+        } else if (key == prefs.splitDock.key) {
+            // InputView moves the board itself: made anew, the symbols shown would go back to the letters
         } else {
             fireChange()
         }

@@ -1,0 +1,91 @@
+/*
+ * SPDX-License-Identifier: LGPL-2.1-or-later
+ * SPDX-FileCopyrightText: Copyright 2026 Fcitx5 for Android Contributors
+ */
+package org.fcitx.fcitx5.android.input.hardware
+
+/**
+ * The hardware keyboard's shortcuts for the input method, as a computer's Chinese input methods
+ * have them and Sogou and Baidu on a phone: Shift pressed and let go by itself switches between
+ * Chinese and English, as Ctrl+Space does (fcitx's); Ctrl and Shift together, let go, go on to the
+ * next input method (Windows'). Told each key as it goes down and up; says what to do, and whether
+ * the key is the shortcut's alone, kept from the app and the engine.
+ *
+ * A modifier's tap counts only quickly done, within [tapMs], and with no other key between: Shift
+ * held for a capital, or Ctrl+Shift+Z, is no tap. A key held down repeats its press, which neither
+ * starts nor spoils one.
+ */
+class HardwareShortcuts(private val tapMs: Long = TAP_MS) {
+
+    enum class Key { SHIFT, CTRL, SPACE, OTHER }
+
+    enum class Action { TOGGLE, NEXT }
+
+    /** What to do, if anything, and whether the key goes no further. */
+    data class Decision(val action: Action?, val consumed: Boolean)
+
+    private enum class Pending { NONE, SHIFT, CTRL, CTRL_SHIFT }
+
+    private var pending = Pending.NONE
+    private var since = 0L
+
+    // Ctrl+Space was the shortcut: its Space's release goes no further either
+    private var spaceTaken = false
+
+    /**
+     * [key] goes down, with [ctrl] and [shift] held (before it) and [others], Alt or Meta, held or not;
+     * [repeat] for a held key's repeated press.
+     */
+    fun down(key: Key, ctrl: Boolean, shift: Boolean, others: Boolean, repeat: Boolean, timeMs: Long): Decision {
+        if (repeat) return if (key == Key.SPACE && spaceTaken) TAKEN else NONE
+        pending = when (key) {
+            Key.SHIFT -> when {
+                others -> Pending.NONE
+                ctrl -> if (pending == Pending.CTRL) Pending.CTRL_SHIFT else Pending.NONE
+                else -> Pending.SHIFT
+            }
+            Key.CTRL -> when {
+                others -> Pending.NONE
+                shift -> if (pending == Pending.SHIFT) Pending.CTRL_SHIFT else Pending.NONE
+                else -> Pending.CTRL
+            }
+            Key.SPACE -> {
+                // a fresh press: a taken Space whose release never came (focus moved) is let go
+                spaceTaken = false
+                if (ctrl && !shift && !others) {
+                    pending = Pending.NONE
+                    spaceTaken = true
+                    return Decision(Action.TOGGLE, consumed = true)
+                }
+                Pending.NONE
+            }
+            Key.OTHER -> Pending.NONE
+        }
+        since = timeMs
+        return NONE
+    }
+
+    /** [key] comes up. */
+    fun up(key: Key, timeMs: Long): Decision {
+        if (key == Key.SPACE && spaceTaken) {
+            spaceTaken = false
+            return TAKEN
+        }
+        val was = pending
+        pending = Pending.NONE
+        if (timeMs - since > tapMs) return NONE
+        return when {
+            key == Key.SHIFT && was == Pending.SHIFT -> Decision(Action.TOGGLE, consumed = false)
+            key != Key.SPACE && key != Key.OTHER && was == Pending.CTRL_SHIFT -> Decision(Action.NEXT, consumed = false)
+            else -> NONE
+        }
+    }
+
+    companion object {
+        /** fcitx's own limit for a modifier-only shortcut (ModifierOnlyKeyTimeout). */
+        const val TAP_MS = 250L
+
+        private val NONE = Decision(null, consumed = false)
+        private val TAKEN = Decision(null, consumed = true)
+    }
+}

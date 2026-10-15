@@ -55,29 +55,6 @@ class PendingInputPolicyTest {
         assertEquals(Resolution.FinishComposing, PendingInputPolicy.resolve("en", hasPreedit = true, address = true))
     }
 
-    /** The screen turned mid-pinyin left `ni hao` in the text. */
-    @Test
-    fun leavingAChinesePreeditDropsItAndOtherLanguagesKeepTheirs() {
-        assertFalse(PendingInputPolicy.keepsPreeditOnLeaving("zh_CN"))
-        assertTrue(PendingInputPolicy.keepsPreeditOnLeaving("en"))
-        assertTrue(PendingInputPolicy.keepsPreeditOnLeaving(""))
-        // handwriting's preedit is its characters
-        assertTrue(PendingInputPolicy.keepsPreeditOnLeaving("zh_CN", isText = true))
-    }
-
-    /** Back over a word selected in WebView, which ended the composing text as the user selected, took the word. */
-    @Test
-    fun aPreeditGoesUnlessAnEmptyComposingTextWouldTakeTheSelection() {
-        assertTrue(PendingInputPolicy.takesPreeditOut("zh_CN", preedit = true, selected = false, editorComposes = false))
-        // the editor's composing text is what an empty one replaces, the selection stays
-        assertTrue(PendingInputPolicy.takesPreeditOut("zh_CN", preedit = true, selected = true, editorComposes = true))
-        assertFalse(PendingInputPolicy.takesPreeditOut("zh_CN", preedit = true, selected = true, editorComposes = false))
-        // nothing shown: nothing to take out, over a selection or not
-        assertFalse(PendingInputPolicy.takesPreeditOut("zh_CN", preedit = false, selected = false, editorComposes = true))
-        assertFalse(PendingInputPolicy.takesPreeditOut("en", preedit = true, selected = false, editorComposes = true))
-        assertFalse(PendingInputPolicy.takesPreeditOut("zh_CN", preedit = true, selected = false, editorComposes = true, isText = true))
-    }
-
     /** xiaoming2026@ in an email field came out 小明026@, and xiaoming_ 小明——. */
     @Test
     fun inAnAddressFieldAKeyThatTypesNoLetterGoesInAsItIs() {

@@ -43,6 +43,62 @@ characters come from `PopupPreset` (built in) overridden by the user's `PopupOve
 of them is also what swiping the key types and the small label in its corner: one concept, one
 setting.
 
+On a wide screen held sideways the letters split in two (`TextKeyboard.Split`, sized by
+`SplitKeyboard` in ime-core, the setting `ThemePrefs.splitKeyboard`: auto / always / off): Gboard's,
+five keys a half, G and V on both (`QWERT|YUIOP`, `ASDFG|GHJKL`, `⇧ZXCV|VBNM⌫`), each half a grid
+from the edge to the room between them; that room what ten letters 48 dp wide leave of the keyboard
+(the screen less its side padding), 12–40% of it; the space spans it, the rest of the bottom row as
+wide in letters as before. `GapKey`
+is the room, a plain view that takes no touch. Decided as the keyboard is made: a turn of the screen
+makes the input view anew (the theme editor's preview too, `KeyboardPreviewUi`). A first try with
+the halves against the gap and T, G, B on both left the edges ragged and empty (2026-10-14).
+
+While the letters split, every other board (number pad, nine keys, handwriting, the pickers, the
+clipboard: anything but the letters, `SplitKeyboard.side`) goes to one side one thumb wide, the bar
+over it too, as Gboard's one-handed mode: across a 850 dp screen the number pad's middle was out of
+either thumb's reach. `SplitKeyboard.dockWidth`: 42% of the keyboard, 320–420 dp (about a phone
+upright). `InputView.placeBoard` gives the window that width at the side and the far padding space the
+rest, with an arrow that moves it across (`ThemePrefs.splitDock`: right / left / full, read live —
+`ThemeManager` does not make the input view anew for it, which would drop the board shown). It follows
+the window attached (`InputWindowManager.onAttached`) and the keyboard window's layout
+(`KeyboardWindow.onLayoutShown`).
+
+### Hardware keyboard
+
+A key pressed on one hides the touch keyboard and shows candidates by the cursor; a tap on the field
+brings the touch keyboard back (`InputDeviceManager`, upstream's). Chrome's web fields tell no input
+method of a tap (no `onViewClicked`, no `onUpdateEditorToolType`), so the floating window
+(`CandidatesView`) always shows, a keyboard button at its end — alone when nothing is typed, after the
+cursor on its line where it fits, else under it (under it always, it covered a note's next line; in a
+corner, an app's send button; before the cursor, what was just typed) — that brings the touch keyboard back (`showTouchKeyboard`), as Gboard's floating button. The
+keyboard last typed on going away (`InputManager.InputDeviceListener.onInputDeviceRemoved`, the
+device id of the last key) brings it back too, hidden or shown: the configuration's `keyboard` cannot
+tell, a device with one built in (the emulator's `qwerty2`) reports QWERTY throughout.
+
+`KeyStates.fromKeyEvent` gives fcitx a modifier key's state as X11 does, before the key: Android
+sets Shift in its own press and clears it in its release, so a lone Shift never matched itself.
+
+The shortcuts are the app's, not fcitx's (`HardwareShortcuts`, `InputMethodSwitch` in ime-core,
+applied in `FcitxInputMethodService.onKeyDown/onKeyUp`): a lone Shift tap (≤250 ms, fcitx's
+ModifierOnlyKeyTimeout, nothing pressed between) and Ctrl+Space switch between the Chinese input
+method and English, back to the Chinese one left; Ctrl+Shift (either order) goes to the next enabled
+one. fcitx's own toggle goes to the group's first, which here is pinyin (`Fcitx.onFirstRun` puts it
+first so a field starts in it), so from wubi it went to pinyin; its AltTrigger Shift is turned off and
+saved at startup (`native-lib` `disableAltTrigger`) so the two do not both switch. Ctrl+Space is
+consumed: unconsumed, Android goes to the next system input method (seen with Sogou and Gboard).
+The input method's name flashes by the cursor (fcitx's ShowInputMethodInformation).
+
+With the hardware keyboard, handwriting and the nine keys are skipped by Ctrl+Shift
+(`Engines.takesKeyboard`), and a character key pressed in one is typed by the first enabled Chinese
+input method that takes a keyboard (else English), as Sogou and Baidu type pinyin whatever their touch
+layout; the touch one comes back with the touch keyboard (`touchInputMethod`, the fcitx thread's).
+`-`/`=` page the candidates while composing (`androidengine.cpp`, physical keys only).
+
+Testing one (`uat/tools/emu-keyboard.sh`, the cases in `uat/17-hardware-keyboard.md`): the emulator, never redroid (redroid shares the host kernel, and a uinput keyboard there
+is the host's too). The emulator's own `qwerty2` is an ALPHA keyboard (sticky Shift, `unicodeChar` 0
+in the IME): register a USB keyboard with `/system/bin/uinput` (JSON `register`, vid/pid unknown so it
+reads `Generic.kl`/`Generic.kcm`) and `sendevent` to its `/dev/input/eventN` as root.
+
 Address fields swap the comma and the full stop for `/` or `@` and `.com` (`AddressKeys`); a key's
 digit or symbol goes in there as it is, what is typed committed as typed
 (`PendingInputPolicy.typesAsIs`, in `CommonKeyActionListener`), but for a key the input method
@@ -93,6 +149,10 @@ Rules for settings, all decided:
 - **Searchable.** `SettingsIndex` builds the search from the same declarations (managed categories
   are walked, input method pages read from `InputMethodSettings`); a page drawn by hand must add
   its entries there, with a test in `SettingsIndexTest`.
+- **Listeners see a snapshot.** `ManagedPreference.fireChange` and
+  `ManagedPreferenceProvider.fireChange` walk a copy of their listeners: a listener may make views
+  anew that unregister and register others in the same set (a theme change makes the input view
+  anew, and `InputView` listens to `splitDock`), which threw ConcurrentModificationException.
 - **Direct boot.** Preferences the keyboard needs before the first unlock (in a password prompt)
   are copied to device-protected storage (`AppPrefs.syncToDeviceEncryptedStorage`); a new
   keyboard-facing category belongs in that list.

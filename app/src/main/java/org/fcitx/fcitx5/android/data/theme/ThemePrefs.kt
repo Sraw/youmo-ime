@@ -16,6 +16,8 @@ import org.fcitx.fcitx5.android.data.prefs.ManagedPreference
 import org.fcitx.fcitx5.android.data.prefs.ManagedPreferenceCategory
 import org.fcitx.fcitx5.android.data.prefs.ManagedPreferenceEnum
 import org.fcitx.fcitx5.android.data.prefs.ManagedPreferenceUi.Levels.Level
+import org.fcitx.fcitx5.android.input.keyboard.SplitDock
+import org.fcitx.fcitx5.android.input.keyboard.SplitKeyboardMode
 
 class ThemePrefs(sharedPreferences: SharedPreferences) :
     ManagedPreferenceCategory(R.string.theme, sharedPreferences) {
@@ -72,6 +74,17 @@ class ThemePrefs(sharedPreferences: SharedPreferences) :
                 Level(R.string.level_more, 20, 12),
             )
         )
+    }
+
+    // the letters in two halves, for the thumbs, on a phone on its side (TextKeyboard.splits)
+    val splitKeyboard = enumList(R.string.split_keyboard, "split_keyboard", SplitKeyboardMode.Auto)
+
+    // the other boards at a side while it splits; read by the input view as it changes, not made anew
+    val splitDock = enumList(R.string.split_dock, "split_dock", SplitDock.Right) {
+        splitKeyboard.getValue() != SplitKeyboardMode.Off
+    }
+
+    init {
         section(R.string.section_keys)
     }
 

@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="zh-CN" translate="no">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="google" content="notranslate">
+<title>UAT 输入框</title>
+<style>
+  body { font: 16px/1.4 sans-serif; margin: 12px; }
+  label { display: block; margin: 14px 0 4px; font-weight: bold; }
+  input, textarea { width: 100%; box-sizing: border-box; font-size: 18px; padding: 8px; }
+  textarea { height: 90px; }
+  #log { white-space: pre-wrap; border: 1px solid #ccc; min-height: 3em; padding: 6px; }
+  button { font-size: 16px; padding: 6px 14px; margin-top: 6px; }
+</style>
+</head>
+<body>
+<!-- UAT 用的输入框。打开方法见 uat/README.md「测试页」。
+     地址后加 #<id>（如 fields.html#chat）只显示那一个框，放在最上面，好找也好点。 -->
+<label for="text">普通文本（text，不自动大写）</label>
+<input id="text" type="text" autocapitalize="off">
+
+<label for="sentence">句子（自动大写，textarea，autocapitalize=sentences）</label>
+<textarea id="sentence" autocapitalize="sentences"></textarea>
+
+<label for="chat">聊天（回车或点“发送”后清空，像聊天应用）</label>
+<textarea id="chat" enterkeyhint="send"></textarea>
+<button id="send" type="button">发送</button>
+<div id="log"></div>
+
+<label for="password">密码（password）</label>
+<input id="password" type="password">
+
+<label for="url">网址（url）</label>
+<input id="url" type="url">
+
+<label for="email">邮箱（email）</label>
+<input id="email" type="email">
+
+<label for="number">数字（number）</label>
+<input id="number" type="number">
+
+<label for="tel">电话（tel）</label>
+<input id="tel" type="tel">
+
+<label for="search">搜索（search，回车键显示“搜索”）</label>
+<input id="search" type="search" enterkeyhint="search">
+
+<label for="next">下一项（回车键显示“下一项”）</label>
+<input id="next" type="text" enterkeyhint="next">
+
+<label for="nosuggest">不要提示（autocorrect=off spellcheck=false）</label>
+<input id="nosuggest" type="text" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+
+<label for="long">长文本（用来测光标移动、选择，预先填好）</label>
+<textarea id="long">今天天气很好，我们一起去公园散步吧。The quick brown fox jumps over the lazy dog.</textarea>
+
+<script>
+  // fields.html#<id>: that field alone, at the top (the chat's send button and log with it)
+  const only = location.hash.slice(1);
+  if (only && document.getElementById(only)) {
+    for (const el of document.body.children) {
+      if (el.tagName === 'SCRIPT') continue;
+      const keep = el.id === only || el.htmlFor === only ||
+        (only === 'chat' && (el.id === 'send' || el.id === 'log'));
+      if (!keep) el.style.display = 'none';
+    }
+  }
+  const chat = document.getElementById('chat');
+  const log = document.getElementById('log');
+  function send() {
+    if (!chat.value) return;
+    log.textContent += chat.value + '\n';
+    chat.value = '';
+  }
+  document.getElementById('send').addEventListener('click', () => { send(); chat.focus(); });
+  chat.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); } });
+</script>
+</body>
+</html>

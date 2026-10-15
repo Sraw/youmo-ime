@@ -1,0 +1,80 @@
+/*
+ * SPDX-License-Identifier: LGPL-2.1-or-later
+ * SPDX-FileCopyrightText: Copyright 2026 Fcitx5 for Android Contributors
+ */
+package org.fcitx.fcitx5.android.input.keyboard
+
+import org.fcitx.fcitx5.android.input.keyboard.SplitKeyboard.Mode
+import org.fcitx.fcitx5.android.input.keyboard.SplitKeyboard.Sizes
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
+import org.junit.Test
+
+class SplitKeyboardTest {
+
+    @Test
+    fun autoSplitsAWideScreenHeldSidewaysOnly() {
+        assertTrue(SplitKeyboard.splits(Mode.AUTO, landscape = true, widthDp = 800))
+        // a small phone on its side is still wide enough; a tablet upright is not split
+        assertFalse(SplitKeyboard.splits(Mode.AUTO, landscape = true, widthDp = 560))
+        assertFalse(SplitKeyboard.splits(Mode.AUTO, landscape = false, widthDp = 800))
+        assertTrue(SplitKeyboard.splits(Mode.ALWAYS, landscape = false, widthDp = 360))
+        assertFalse(SplitKeyboard.splits(Mode.OFF, landscape = true, widthDp = 1280))
+    }
+
+    @Test
+    fun eachHalfIsAFullGridAgainstTheRoomInTheMiddle() {
+        val sizes = Sizes(800)
+        val row = sizes.row(listOf("q", "w", "e", "r", "t"), listOf("y", "u", "i", "o", "p"), "_")
+        assertEquals(listOf("q", "w", "e", "r", "t", "_", "y", "u", "i", "o", "p"), row.map { it.first })
+        assertEquals(1f, row.sumOf { it.second.toDouble() }.toFloat(), 1e-5f)
+        // nothing at the edges: the gap in the middle, the letters as wide as each other
+        assertEquals(sizes.gap, row[5].second)
+        assertEquals(1, row.map { it.second }.filterIndexed { i, _ -> i != 5 }.distinct().size)
+    }
+
+    @Test
+    fun theRoomBetweenIsWhatTenLettersAtTheirWidestLeave() {
+        // a small phone on its side: 480 of 640 dp in letters
+        assertEquals(0.25f, Sizes(640).gap, 1e-5f)
+        assertEquals(640 * Sizes(640).letter, SplitKeyboard.KEY_DP.toFloat(), 1e-3f)
+        // a tablet: no wider than MAX_GAP, the letters wider then
+        assertEquals(SplitKeyboard.MAX_GAP, Sizes(1280).gap)
+        // a phone upright, split all the same: letters narrower than their widest, some room kept
+        assertEquals(SplitKeyboard.MIN_GAP, Sizes(360).gap)
+    }
+
+    @Test
+    fun theBottomRowKeepsItsKeysAsWideInLettersAndTheSpaceFills() {
+        val sizes = Sizes(800)
+        assertEquals(sizes.letter * 1.5f, sizes.width(0.15f), 1e-6f)
+        assertEquals(0f, sizes.width(0f))
+    }
+
+    @Test
+    fun theOtherBoardsGoToASideOnlyWhileTheLettersSplit() {
+        val dock = SplitKeyboard.Dock.RIGHT
+        assertEquals(dock, SplitKeyboard.side(dock, splitting = true, lettersShown = false))
+        assertEquals(SplitKeyboard.Dock.LEFT, SplitKeyboard.side(SplitKeyboard.Dock.LEFT, splitting = true, lettersShown = false))
+        assertEquals(null, SplitKeyboard.side(dock, splitting = true, lettersShown = true))
+        assertEquals(null, SplitKeyboard.side(dock, splitting = false, lettersShown = false))
+        assertEquals(null, SplitKeyboard.side(SplitKeyboard.Dock.FULL, splitting = true, lettersShown = false))
+    }
+
+    @Test
+    fun aBoardAtASideIsOneThumbsWide() {
+        // a phone on its side: about a phone's width upright
+        assertEquals(357, SplitKeyboard.dockWidth(851))
+        // a small one, and a tablet: within the bounds
+        assertEquals(SplitKeyboard.DOCK_MIN_DP, SplitKeyboard.dockWidth(640))
+        assertEquals(SplitKeyboard.DOCK_MAX_DP, SplitKeyboard.dockWidth(1280))
+        // never wider than the keyboard
+        assertEquals(300, SplitKeyboard.dockWidth(300))
+    }
+
+    @Test(expected = IllegalArgumentException::class)
+    fun aHalfOfOtherThanFiveKeysIsAMistake() {
+        Sizes(800).row(List(6) { it }, List(5) { it }, -1)
+    }
+}

@@ -156,7 +156,11 @@ class InputWindowManager : UniqueViewComponent<InputWindowManager, FrameLayout>(
         currentWindow = window
         // broadcast the new window was added to layout
         broadcaster.onWindowAttached(window)
+        onAttached?.invoke(window)
     }
+
+    /** Told each window attached: InputView, which puts the board at a side while the letters split. */
+    var onAttached: ((InputWindow) -> Unit)? = null
 
     override val view: FrameLayout by lazy { context.frameLayout(R.id.input_window) }
 

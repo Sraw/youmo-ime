@@ -5,6 +5,7 @@
 
 package org.fcitx.fcitx5.android.input
 
+import android.view.KeyCharacterMap
 import android.view.KeyEvent
 import android.view.MotionEvent
 import android.view.View
@@ -91,6 +92,7 @@ class InputDeviceManager(private val onChange: (Boolean) -> Unit) {
         if (startedInputView) {
             // filter out back/home/volume buttons and combination keys
             if (e.unicodeChar != 0) {
+                typingDevice = e.deviceId
                 // evaluate virtual keyboard visibility when pressing physical keyboard while InputView visible
                 evaluateOnKeyDownInner(service)
             }
@@ -101,6 +103,7 @@ class InputDeviceManager(private val onChange: (Boolean) -> Unit) {
             // and pressing any digit/letter/punctuation key on physical keyboard
             val showInputView = !isNullInputType && e.unicodeChar != 0
             if (showInputView) {
+                typingDevice = e.deviceId
                 evaluateOnKeyDownInner(service)
             }
             return showInputView
@@ -132,6 +135,22 @@ class InputDeviceManager(private val onChange: (Boolean) -> Unit) {
                 if (toolType == MotionEvent.TOOL_TYPE_FINGER || toolType == MotionEvent.TOOL_TYPE_STYLUS) true else isVirtualKeyboard
             FloatingCandidatesMode.Disabled -> true
         }
+    }
+
+    /** The keyboard last typed on, which taken away brings the touch keyboard back. */
+    private var typingDevice = KeyCharacterMap.VIRTUAL_KEYBOARD
+
+    fun onDeviceRemoved(deviceId: Int) {
+        if (deviceId != typingDevice) return
+        typingDevice = KeyCharacterMap.VIRTUAL_KEYBOARD
+        // hidden or not: shown next, it is the touch keyboard (made visible in a hidden window, harmless)
+        isVirtualKeyboard = true
+    }
+
+    /** The touch keyboard asked for (the floating window's button): until a hardware key is typed again. */
+    fun showTouchKeyboard() {
+        if (!startedInputView) return
+        isVirtualKeyboard = true
     }
 
     /**

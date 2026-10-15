@@ -114,6 +114,8 @@ class KeyboardPreviewUi(override val ctx: Context, val theme: Theme) : Ui {
 
         override fun onConfigurationChanged(newConfig: Configuration?) {
             recalculateSize()
+            // the letters split or not as the screen turned (TextKeyboard.Split): made anew, as the input view is
+            makeKeyboard()
         }
 
         override fun onDetachedFromWindow() {
@@ -181,11 +183,20 @@ class KeyboardPreviewUi(override val ctx: Context, val theme: Theme) : Ui {
 
     fun setTheme(theme: Theme, background: Drawable? = null) {
         setBackground(background ?: theme.backgroundDrawable(keyBorder))
+        fakeKawaiiBar.backgroundColor = if (keyBorder) Color.TRANSPARENT else theme.barColor
+        shownTheme = theme
+        makeKeyboard()
+    }
+
+    // what setTheme was last given: lateinit, as the init block above sets it
+    private lateinit var shownTheme: Theme
+
+    private fun makeKeyboard() {
+        if (!this::shownTheme.isInitialized) return
         if (this::fakeKeyboardWindow.isInitialized) {
             fakeInputView.removeView(fakeKeyboardWindow)
         }
-        fakeKawaiiBar.backgroundColor = if (keyBorder) Color.TRANSPARENT else theme.barColor
-        fakeKeyboardWindow = TextKeyboard(ctx, theme).also {
+        fakeKeyboardWindow = TextKeyboard(ctx, shownTheme).also {
             it.onAttach()
         }
         fakeInputView.apply {

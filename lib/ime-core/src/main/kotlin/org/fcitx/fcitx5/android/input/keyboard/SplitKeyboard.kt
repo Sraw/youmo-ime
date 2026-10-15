@@ -1,0 +1,90 @@
+/*
+ * SPDX-License-Identifier: LGPL-2.1-or-later
+ * SPDX-FileCopyrightText: Copyright 2026 Fcitx5 for Android Contributors
+ */
+package org.fcitx.fcitx5.android.input.keyboard
+
+/**
+ * The letters keyboard split in two for the thumbs, as Gboard splits it on a wide screen: when it
+ * splits, and how wide its keys and the room between the halves are.
+ *
+ * Widths are shares of the keyboard's width, as the app's key definitions have them: a letter is
+ * 0.1 unsplit, and 0 is the key that fills what is left (the space, which spans the room between
+ * the halves).
+ */
+object SplitKeyboard {
+
+    /** The setting: split where the screen is wide, always, or never. */
+    enum class Mode { AUTO, ALWAYS, OFF }
+
+    /**
+     * Narrowest screen [Mode.AUTO] splits on, in dp, and only held sideways: a phone on its side
+     * (some 700 to 930 dp), a tablet's landscape; not a tablet upright, typed on as a phone is.
+     */
+    const val AUTO_MIN_WIDTH_DP = 600
+
+    /** Keys a half has, each row: Gboard's five, G and V on both halves to make the rows so. */
+    const val HALF_KEYS = 5
+
+    /** A letter's widest, in dp: what the screen has past ten of them is the room between the halves. */
+    const val KEY_DP = 48
+
+    /** The room between the halves at least (a narrow screen split all the same) and at most. */
+    const val MIN_GAP = 0.12f
+    const val MAX_GAP = 0.4f
+
+    // a letter's width unsplit
+    private const val LETTER = 0.1f
+
+    fun splits(mode: Mode, landscape: Boolean, widthDp: Int): Boolean = when (mode) {
+        Mode.ALWAYS -> true
+        Mode.OFF -> false
+        Mode.AUTO -> landscape && widthDp >= AUTO_MIN_WIDTH_DP
+    }
+
+    /**
+     * Where the boards other than the letters go while they are split: the number pad, the nine
+     * keys, handwriting, the symbols and emoji, the clipboard. Across the whole of a wide screen the
+     * keys at its middle are out of either thumb's reach; one thumb's width at a side, as Gboard's
+     * one-handed mode has its keyboard, they are under it.
+     */
+    enum class Dock { RIGHT, LEFT, FULL }
+
+    /** One thumb's board: a share of the keyboard's width, about a phone's upright, within these. */
+    const val DOCK_SHARE = 0.42f
+    const val DOCK_MIN_DP = 320
+    const val DOCK_MAX_DP = 420
+
+    /** How wide, in dp, a board at a side is of a keyboard [widthDp] wide. */
+    fun dockWidth(widthDp: Int): Int =
+        (widthDp * DOCK_SHARE).toInt().coerceIn(DOCK_MIN_DP, DOCK_MAX_DP).coerceAtMost(widthDp)
+
+    /**
+     * The side the board shown goes to, as [dock] says, or null for the whole width: the letters
+     * themselves ([lettersShown]) take it, split, as everything does when they are not ([splitting]).
+     */
+    fun side(dock: Dock, splitting: Boolean, lettersShown: Boolean): Dock? =
+        dock.takeIf { splitting && !lettersShown && it != Dock.FULL }
+
+    /** How the keyboard splits on a screen [widthDp] wide. */
+    class Sizes(widthDp: Int) {
+        /** The room between the halves: letters at their widest, within [MIN_GAP] and [MAX_GAP]. */
+        val gap: Float = (1 - 2f * HALF_KEYS * KEY_DP / widthDp.coerceAtLeast(1)).coerceIn(MIN_GAP, MAX_GAP)
+
+        /** A letter's width split. */
+        val letter: Float = (1 - gap) / 2 / HALF_KEYS
+
+        /** A key [width] wide unsplit, split: as wide in letters as it was; 0, the filling key, stays 0. */
+        fun width(width: Float): Float = width / LETTER * letter
+
+        /**
+         * A row in two halves of [HALF_KEYS] keys each, [left] and [right], as wide as each other
+         * so a half is a grid filling its side from the edge to the room between them, [gap] in
+         * that room: the keys and widths from left to right, adding up to 1.
+         */
+        fun <K> row(left: List<K>, right: List<K>, gap: K): List<Pair<K, Float>> {
+            require(left.size == HALF_KEYS && right.size == HALF_KEYS) { "a half of other than $HALF_KEYS keys" }
+            return left.map { it to letter } + (gap to this.gap) + right.map { it to letter }
+        }
+    }
+}

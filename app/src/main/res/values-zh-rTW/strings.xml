@@ -555,4 +555,14 @@
     <string name="picker_short_ascii">英文</string>
     <string name="picker_short_math">數學</string>
     <string name="engine_unloadable">輸入法資料無法載入，請重新安裝應用程式；如果是匯入的碼表，請重新匯入。</string>
+    <string name="split_keyboard">分體鍵盤</string>
+    <string name="split_keyboard_auto">橫屏且螢幕夠寬時</string>
+    <string name="split_keyboard_always">總是</string>
+    <string name="split_keyboard_off">關</string>
+    <string name="split_dock">分體時其他面板</string>
+    <string name="split_dock_right">靠右</string>
+    <string name="split_dock_left">靠左</string>
+    <string name="split_dock_full">鋪滿</string>
+    <string name="split_dock_move">移到另一邊</string>
+    <string name="show_touch_keyboard">顯示螢幕鍵盤</string>
 </resources>

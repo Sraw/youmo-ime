@@ -8,6 +8,7 @@ import android.content.Context
 import android.graphics.Rect
 import android.view.InputDevice
 import android.view.MotionEvent
+import android.view.View
 import androidx.annotation.CallSuper
 import androidx.annotation.Keep
 import androidx.constraintlayout.widget.ConstraintLayout
@@ -51,7 +52,9 @@ import splitties.views.dsl.core.add
 abstract class BaseKeyboard(
     context: Context,
     protected val theme: Theme,
-    private val keyLayout: List<List<KeyDef>>
+    private val keyLayout: List<List<KeyDef>>,
+    /** Each key's width in place of its own ([KeyDef.Appearance.percentWidth]): a split layout's. */
+    private val keyWidths: List<List<Float>>? = null,
 ) : ConstraintLayout(context) {
 
     var keyActionListener: KeyActionListener? = null
@@ -102,8 +105,11 @@ abstract class BaseKeyboard(
 
     init {
         isMotionEventSplittingEnabled = true
-        keyRows = keyLayout.map { row ->
-            val keyViews = row.map(::createKeyView)
+        keyRows = keyLayout.mapIndexed { r, row ->
+            // room between a split keyboard's halves: nothing to touch (a plain view takes no touch, and
+            // findTouchTarget, vivo's, finds key views only)
+            val keyViews = row.map { if (it === GapKey) View(context) else createKeyView(it) }
+            val widths = keyWidths?.get(r) ?: row.map { it.appearance.percentWidth }
             constraintLayout Row@{
                 isMotionEventSplittingEnabled = true
                 var totalWidth = 0f
@@ -123,27 +129,27 @@ abstract class BaseKeyboard(
                         } else {
                             rightToLeftOf(keyViews[index + 1])
                         }
-                        val def = row[index]
-                        matchConstraintPercentWidth = def.appearance.percentWidth
+                        matchConstraintPercentWidth = widths[index]
                     })
-                    row[index].appearance.percentWidth.let {
+                    widths[index].let {
                         // 0f means fill remaining space, thus does not need expanding
                         totalWidth += if (it != 0f) it else 1f
                     }
                 }
-                if (expandKeypressArea && totalWidth < 1f) {
+                // a split row fills the keyboard by itself (SplitKeyboard.row)
+                if (expandKeypressArea && keyWidths == null && totalWidth < 1f) {
                     val free = (1f - totalWidth) / 2f
-                    keyViews.first().apply {
+                    (keyViews.first() as KeyView).apply {
                         updateLayoutParams<LayoutParams> {
                             matchConstraintPercentWidth += free
                         }
-                        layoutMarginLeft = free / (row.first().appearance.percentWidth + free)
+                        layoutMarginLeft = free / (widths.first() + free)
                     }
-                    keyViews.last().apply {
+                    (keyViews.last() as KeyView).apply {
                         updateLayoutParams<LayoutParams> {
                             matchConstraintPercentWidth += free
                         }
-                        layoutMarginRight = free / (row.last().appearance.percentWidth + free)
+                        layoutMarginRight = free / (widths.last() + free)
                     }
                 }
             }

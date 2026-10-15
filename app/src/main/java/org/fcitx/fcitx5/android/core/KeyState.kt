@@ -121,7 +121,31 @@ value class KeyStates(val states: UInt) {
 //                if (isSymPressed);
 //                if (isSystem);
             }
+            // fcitx reads a key's state as X11 has it, as it was before the key: a modifier key's
+            // own bit off as it goes down, on as it comes up. Android has it the other way round,
+            // and a lone Shift's release never matched its press: no modifier-only hotkey could fire
+            // (the other side's key of the pair held down keeps the bit on, as in X11)
+            ownModifier(event.keyCode)?.let { (state, otherSide) ->
+                states = when {
+                    event.action == KeyEvent.ACTION_UP -> states + state
+                    event.metaState and otherSide != 0 -> states
+                    else -> states - state
+                }
+            }
             return KeyStates(states)
+        }
+
+        /** A modifier key's own state, and the meta flag of the other side's key of its pair. */
+        private fun ownModifier(keyCode: Int): Pair<KeyState, Int>? = when (keyCode) {
+            KeyEvent.KEYCODE_SHIFT_LEFT -> KeyState.Shift to KeyEvent.META_SHIFT_RIGHT_ON
+            KeyEvent.KEYCODE_SHIFT_RIGHT -> KeyState.Shift to KeyEvent.META_SHIFT_LEFT_ON
+            KeyEvent.KEYCODE_CTRL_LEFT -> KeyState.Ctrl to KeyEvent.META_CTRL_RIGHT_ON
+            KeyEvent.KEYCODE_CTRL_RIGHT -> KeyState.Ctrl to KeyEvent.META_CTRL_LEFT_ON
+            KeyEvent.KEYCODE_ALT_LEFT -> KeyState.Alt to KeyEvent.META_ALT_RIGHT_ON
+            KeyEvent.KEYCODE_ALT_RIGHT -> KeyState.Alt to KeyEvent.META_ALT_LEFT_ON
+            KeyEvent.KEYCODE_META_LEFT -> KeyState.Meta to KeyEvent.META_META_RIGHT_ON
+            KeyEvent.KEYCODE_META_RIGHT -> KeyState.Meta to KeyEvent.META_META_LEFT_ON
+            else -> null
         }
 
         fun mergeStates(arr: Array<out KeyState>): UInt =

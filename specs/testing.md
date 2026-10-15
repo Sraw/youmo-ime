@@ -81,7 +81,10 @@ a settings page, rotation, a field type, an upgrade) is tried on a device before
   with `adb shell input tap/swipe` at measured key coordinates, read the field back, screenshot the
   bar. The project's local scripts for this live outside the repository (`dev/redroid/`, not
   committed). Root via `docker exec`.
-- **An emulator** only for what redroid cannot do (another Android version, real telephony).
+- **An emulator** for what redroid cannot do: another Android version, real telephony, a browser
+  (redroid has none, and the UAT's test page needs Chrome), a hardware keyboard (a uinput one in
+  redroid is the host's too). Close it before `assembleTextRelease`: R8 and a running emulator
+  (qemu ~6 GB resident) together make earlyoom kill the emulator.
 - A real phone (arm64) for performance and voice.
 
 Worth checking by hand for keyboard changes: portrait and landscape; a password field (nothing
@@ -91,4 +94,15 @@ the last release (`adb install -r`), not only a clean install.
 
 Observing the keyboard: `uiautomator dump` does not see the keys or popups (the IME window is not in
 its tree), and icon-only controls have no text; tap by coordinates and judge by screenshots and by
-reading the field's text back.
+reading the field's text back. In Chrome, read a field through DevTools (`adb forward tcp:9222
+localabstract:chrome_devtools_remote`, then `Runtime.evaluate` over the page's websocket): exact,
+composing text included. A web field's `autocomplete="off"` reaches the input method as
+`TYPE_TEXT_FLAG_NO_SUGGESTIONS` (English then shows no candidates).
+
+## User acceptance tests (`uat/`)
+
+What a user does and sees, case by case, each on its own from a stated baseline (B0: reset, pinyin and
+English, the test page `uat/fixtures/fields.html` open), run on a device by hand or by script, never in
+place of the unit tests. A change in behaviour changes its cases in the same change; when a case and
+`docs/` disagree, find which is wrong. A run is written down in `uat/runs/<date>-<device>-<version>.md`;
+the case files hold no results. `uat/README.md` has the format, the baselines and the reset.

@@ -40,7 +40,9 @@ abstract class ManagedPreferenceProvider {
 
     fun fireChange(key: String) {
         val preference = _managedPreferences[key] ?: return
-        onChangeListeners.forEach { it.onChange(key) }
+        // a copy: a listener may add or remove one (a theme change makes the input view anew, whose
+        // listeners go and come), and the set must not change while it is gone through
+        onChangeListeners.toList().forEach { it.onChange(key) }
         preference.fireChange()
     }
 

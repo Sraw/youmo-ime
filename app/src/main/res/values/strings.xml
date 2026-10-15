@@ -570,4 +570,14 @@
     <string name="picker_short_ascii">ASCII</string>
     <string name="picker_short_math">Math</string>
     <string name="engine_unloadable">Input method data could not be loaded. Reinstall the app; for an imported table, import it again.</string>
+    <string name="split_keyboard">Split keyboard</string>
+    <string name="split_keyboard_auto">On a wide screen held sideways</string>
+    <string name="split_keyboard_always">Always</string>
+    <string name="split_keyboard_off">Off</string>
+    <string name="split_dock">Other panels when split</string>
+    <string name="split_dock_right">Right side</string>
+    <string name="split_dock_left">Left side</string>
+    <string name="split_dock_full">Full width</string>
+    <string name="split_dock_move">Move to the other side</string>
+    <string name="show_touch_keyboard">Show the on-screen keyboard</string>
 </resources>

@@ -173,7 +173,8 @@ A sentence picked other than the first is learned, its words as the
 decoder found them (`Decoding.words`: a dictionary word read as its syllable path, a character alone
 as its first reading): the user chose it over the ink's best. The first is not, however put in: the
 readings are often wrong, and a misread word not noticed, learned, would come back.
-The sentence is kept in the field as the keyboard goes (`Engines.preeditIsText`), as English's is.
+The sentence is shown in the field and kept there as the keyboard goes (`composesText` in
+`androidengine.cpp`), as English's word is; pinyin's and a table's codes show above the candidates.
 The pad (`InkPad`, ime-core's
 `input/handwriting`) decides when to read (each stroke ended), when a piece is done (the pen up
 `InkPad.FINISH_MILLIS`: its ink wiped, its reading kept), and that backspace takes back a

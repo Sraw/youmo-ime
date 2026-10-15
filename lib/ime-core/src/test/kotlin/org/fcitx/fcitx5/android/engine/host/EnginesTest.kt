@@ -691,12 +691,6 @@ class EnginesTest : EnginesFixture() {
         assertEquals(0, engines.inkEnded)
     }
 
-    @Test
-    fun handwritingsPreeditIsTheText() {
-        assertTrue(Engines.preeditIsText(Engines.HANDWRITING))
-        assertFalse(Engines.preeditIsText(Engines.PINYIN))
-    }
-
     // a second character joins the first, nothing put in till one is picked
     @Test
     fun handwritingReadsTheCharactersWrittenTogether() {

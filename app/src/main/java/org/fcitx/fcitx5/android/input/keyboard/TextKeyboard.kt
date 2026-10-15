@@ -6,6 +6,7 @@ package org.fcitx.fcitx5.android.input.keyboard
 
 import android.annotation.SuppressLint
 import android.content.Context
+import android.content.res.Configuration
 import android.view.View
 import androidx.annotation.Keep
 import androidx.core.view.ViewCompat
@@ -18,6 +19,7 @@ import org.fcitx.fcitx5.android.core.KeyStates
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.prefs.ManagedPreference
 import org.fcitx.fcitx5.android.data.theme.Theme
+import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.input.broadcast.ReturnKeyAppearance
 import org.fcitx.fcitx5.android.input.picker.PickerWindow
 import org.fcitx.fcitx5.android.input.popup.PopupAction
@@ -27,15 +29,34 @@ import org.fcitx.fcitx5.android.input.popup.PopupPreset
 import splitties.views.imageResource
 
 @SuppressLint("ViewConstructor")
-class TextKeyboard(
+class TextKeyboard private constructor(
     context: Context,
-    theme: Theme
-) : BaseKeyboard(context, theme, Layout) {
+    theme: Theme,
+    split: Split?,
+) : BaseKeyboard(context, theme, split?.keys ?: Layout, split?.widths) {
+
+    constructor(context: Context, theme: Theme) : this(context, theme, Split.of(context))
 
     enum class CapsState { None, Once, Lock }
 
     companion object {
         const val Name = "Text"
+
+        /** Whether the letters are split here: as the setting is, the screen as wide as it is now. */
+        fun splits(context: Context): Boolean {
+            val config = context.resources.configuration
+            val landscape = config.orientation == Configuration.ORIENTATION_LANDSCAPE
+            return SplitKeyboard.splits(ThemeManager.prefs.splitKeyboard.getValue().mode, landscape, config.screenWidthDp)
+        }
+
+        /** The keyboard's width, dp: the screen's less its side padding (InputView's). */
+        fun widthDp(context: Context): Int {
+            val config = context.resources.configuration
+            val keyboard = AppPrefs.getInstance().keyboard
+            val landscape = config.orientation == Configuration.ORIENTATION_LANDSCAPE
+            val padding = (if (landscape) keyboard.keyboardSidePaddingLandscape else keyboard.keyboardSidePadding).getValue()
+            return config.screenWidthDp - 2 * padding
+        }
 
         val Layout: List<List<KeyDef>> = listOf(
             listOf(
@@ -91,6 +112,40 @@ class TextKeyboard(
                 ReturnKey()
             )
         )
+    }
+
+    /**
+     * [Layout] in two halves of five keys (SplitKeyboard), Gboard's: G and V on both, which also
+     * puts the keys of the middle under either thumb; Shift and backspace as wide as a letter. The
+     * space spans the room between the halves, the bottom row's other keys as wide in letters as
+     * they were.
+     */
+    private class Split(sizes: SplitKeyboard.Sizes) {
+        val keys: List<List<KeyDef>>
+        val widths: List<List<Float>>
+
+        init {
+            val rows = listOf(
+                sizes.row(Layout[0].take(5), Layout[0].drop(5), GapKey),
+                sizes.row(Layout[1].take(5), Layout[1].drop(4), GapKey),
+                // Shift Z X C V, V B N M backspace
+                sizes.row(Layout[2].take(5), Layout[2].drop(4), GapKey),
+                Layout[3].map { it to sizes.width(it.appearance.percentWidth) },
+            )
+            keys = rows.map { row -> row.map { it.first } }
+            widths = rows.map { row -> row.map { it.second } }
+        }
+
+        companion object {
+            /**
+             * The letters in two halves here, or null: as the setting is, the screen as wide as it is
+             * now; sized by the keyboard's width, the screen's less its side padding (InputView's).
+             */
+            fun of(context: Context): Split? {
+                if (!splits(context)) return null
+                return Split(SplitKeyboard.Sizes(widthDp(context)))
+            }
+        }
     }
 
     val caps: ImageKeyView by lazy { findViewById(R.id.button_caps) }

@@ -41,12 +41,14 @@ next edit from the last report: `EditingSession` keeps the IME's own prediction 
 (`CursorTracker`); arrow-key runs step from where the presses put the cursor (`ArrowKeys`).
 Deletions are asked in code points so one press removes a whole emoji (`CodePoints`).
 
-### Rotation with Chinese half-typed
+### Composing text in the app outlives the keyboard
 
-Most apps recreate their activity on rotation and save the field's text, preedit included, before
-the input method hears of it; the new field starts with `ni hao` as plain text. `LeftPreedit` takes
-it out again, only in the same app and field, within a short window. Changes to input start/finish
-must keep that working.
+Most apps recreate their activity on rotation and save the field's text, composing text included,
+before the input method hears of it; a tap on another field or app has the app finish it as plain
+text first too. So only what is the text itself (English's word, handwriting's characters) goes
+into the app as composing text; pinyin and a table's code show above the candidates
+([architecture.md](architecture.md#a-key-from-the-finger-to-the-editor)). An input method whose preedit is a code must
+not be added to `composesText`.
 
 ### `EditorInfo` decides a lot
 

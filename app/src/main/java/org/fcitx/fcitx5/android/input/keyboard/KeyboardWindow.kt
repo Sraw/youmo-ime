@@ -166,9 +166,16 @@ class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), Essentia
         }
     }
 
+    /** Whether the letters are the layout shown, which take the whole width, split. */
+    val lettersShown get() = currentKeyboardName == TextKeyboard.Name
+
+    /** Told each layout shown: InputView, which puts the others at a side while the letters split. */
+    var onLayoutShown: (() -> Unit)? = null
+
     private fun showLayout(target: String) {
         detachCurrentLayout()
         attachLayout(target)
+        onLayoutShown?.invoke()
         // the letters back from the symbols, Shift off as they attach: at a sentence start, on again
         updateAutoCaps()
         if (windowManager.isAttached(this)) {

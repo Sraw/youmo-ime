@@ -229,12 +229,12 @@ private:
 
 /**
  * Shows [text] as what is typed, the cursor [cursor] code points into it; -1, or past its end, at
- * its end. ime-core's Snapshot.cursor counts UTF-16 units: the same while English, the one session
- * with a cursor of its own, types letters of the BMP alone.
+ * its end: in the app, underlined, where it may go (composesText); else above the candidates.
+ * ime-core's Snapshot.cursor counts UTF-16 units: the same while English, the one session with a
+ * cursor of its own, types letters of the BMP alone.
  */
 void showPreedit(InputContext *ic, const std::string &text, int cursor = -1) {
     auto &panel = ic->inputPanel();
-    // in the app where it can show it, as libime's pinyin does by default (ComposingPinyin)
     const bool client = ic->capabilityFlags().test(CapabilityFlag::Preedit);
     Text preedit(text, client ? TextFormatFlag::Underline : TextFormatFlag::NoFlag);
     const auto chars = utf8::length(text);
@@ -362,6 +362,16 @@ bool typesChinese(const std::string &im) {
     return m && std::strcmp(m->language, "zh_CN") == 0;
 }
 
+// whether what [im] has typed is the text itself (English's word, handwriting's characters), shown
+// in the app; a code (pinyin, a table's, quick phrase's and Unicode's in them) is shown above the
+// candidates instead. In the app, a code left there when the user taps another field or app is
+// made text by the app before we hear of it (InputMethodManager finishes the composing text): the
+// field kept "ni" (uat LC-03)
+bool composesText(const std::string &im) {
+    const auto *m = listed(im);
+    return m && (m->page == Page::English || m->page == Page::Handwriting);
+}
+
 // where AndroidEngineConfig keeps [im]'s options if it is one of the tables listed; else null
 TableOption tableOf(const std::string &im) {
     const auto *m = listed(im);
@@ -468,6 +478,9 @@ void AndroidEngine::pushSettings() const {
 }
 
 void AndroidEngine::activate(const InputMethodEntry &entry, InputContextEvent &event) {
+    // the input context's flags then tell every module (quick phrase, Unicode too) where to show
+    // its preedit; run again each time the field gains focus
+    event.inputContext()->setEnablePreedit(composesText(entry.uniqueName()));
     // in the status area, these addons act on this input context: full-width punctuation and
     // letters, traditional characters. Chinese's alone: a 全角 left on in pinyin, which they share,
     // would make English's words and the keys it passes on (a password's too) full width
@@ -554,6 +567,17 @@ void AndroidEngine::keyEvent(const InputMethodEntry &entry, KeyEvent &event) {
     // as typed (Enter commits it, and has the session forget the space after a word)
     if (!chinese && !suggestsEnglish(event.inputContext(), event.isVirtual())) {
         send(event.inputContext(), im, EngineEvent::Enter);
+        return;
+    }
+    // a hardware keyboard's - and = turn the pages while something is typed, as on a PC (libime's
+    // pinyin did); with nothing typed, and from the screen's keys (f's and g's swipe), they are the
+    // marks they are
+    const bool pageKey = key.sym() == FcitxKey_minus || key.sym() == FcitxKey_equal;
+    const auto &shown = event.inputContext()->inputPanel();
+    const bool typing = !shown.clientPreedit().empty() || !shown.preedit().empty();
+    if (chinese && pageKey && typing && !event.isVirtual() &&
+        send(event.inputContext(), im, key.sym() == FcitxKey_minus ? EngineEvent::PageUp : EngineEvent::PageDown)) {
+        event.filterAndAccept();
         return;
     }
     EngineEvent what;

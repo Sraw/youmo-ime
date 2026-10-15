@@ -92,6 +92,18 @@ public:
         p_clipboard = addonMgr.addon("clipboard", true);
         p_engine = addonMgr.addon("androidengine", true);
         setupCallback(p_frontend, p_engine);
+        disableAltTrigger();
+    }
+
+    // a hardware keyboard's lone Shift is the app's (HardwareShortcuts, which knows English from
+    // Chinese): fcitx's own switched as well, to the group's first, pinyin. Saved, so a reload keeps it
+    void disableAltTrigger() {
+        auto &config = p_instance->globalConfig();
+        if (config.altTriggerKeys().empty()) return;
+        fcitx::RawConfig raw;
+        raw.setValueByPath("Hotkey/AltTriggerKeys", "");
+        config.load(raw, true);
+        config.safeSave();
     }
 
     void reloadConfig() {

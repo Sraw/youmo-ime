@@ -59,7 +59,8 @@ abstract class ManagedPreference<T : Any>(
     fun fireChange() {
         if (!::listeners.isInitialized || listeners.isEmpty()) return
         val newValue = getValue()
-        listeners.forEach { it.onChange(key, newValue) }
+        // a copy, as ManagedPreferenceProvider.fireChange goes through its listeners
+        listeners.toList().forEach { it.onChange(key, newValue) }
     }
 
     class PBool(sharedPreferences: SharedPreferences, key: String, defaultValue: Boolean) :
