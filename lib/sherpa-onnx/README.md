@@ -41,7 +41,8 @@ upstream's AAR, so that it is ours to change.
 Each change is marked `youmo` in the source. Their C++ unit tests run on this machine with
 `lib/sherpa-onnx/host-test.sh`; the app's `VoiceEngineTest` covers them through the JNI.
 `lib/sherpa-onnx/host-eval.sh` builds `sherpa-onnx-offline` for this machine, to evaluate the
-recognizer on the app's code without a phone.
+recognizer on the app's code without a phone, on the app's onnxruntime version
+(`cmake/onnxruntime-linux-x86_64.cmake`, kept with the Android files).
 
 ## Updating upstream
 
