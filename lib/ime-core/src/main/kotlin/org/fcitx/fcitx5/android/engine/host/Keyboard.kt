@@ -115,6 +115,7 @@ class Keyboard(private val session: Session, private val nineKeys: Boolean) {
     }
 
     private fun char(codePoint: Int): Snapshot {
+        if (codePoint == INK) return session.apply(Action.Ink)
         if (codePoint in LETTERS && nineKeys) {
             val n = codePoint - LETTERS.first
             return session.apply(Action.Letter('a' + n % ALPHABET, again = n >= ALPHABET))
@@ -205,6 +206,12 @@ class Keyboard(private val session: Session, private val nineKeys: Boolean) {
             require(letter in 'a'..'z') { "letter $letter" }
             return LETTERS.first + (if (again) ALPHABET else 0) + (letter - 'a')
         }
+
+        /**
+         * The character the handwriting pad sends to have what it read shown ([Action.Ink]): of the
+         * supplementary private use area, past [LETTERS]. No keyboard types it otherwise.
+         */
+        const val INK = 0xF0100
 
         private val IDLE = Snapshot(
             commit = "",

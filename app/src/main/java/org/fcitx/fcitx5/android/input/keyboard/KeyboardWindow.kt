@@ -13,10 +13,14 @@ import androidx.core.content.ContextCompat
 import androidx.transition.Slide
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.core.CapabilityFlags
+import org.fcitx.fcitx5.android.core.EngineBridge
 import org.fcitx.fcitx5.android.core.InputMethodEntry
 import org.fcitx.fcitx5.android.core.InputMethodNames
+import org.fcitx.fcitx5.android.core.KeyStates
+import org.fcitx.fcitx5.android.core.KeySym
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.engine.host.Engines
+import org.fcitx.fcitx5.android.engine.host.Keyboard
 import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
 import org.fcitx.fcitx5.android.input.bar.KawaiiBarComponent
 import org.fcitx.fcitx5.android.input.broadcast.InputBroadcastReceiver
@@ -72,6 +76,17 @@ class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), Essentia
         TextKeyboard.Name to { TextKeyboard(context, theme) },
         T9Keyboard.Name to { T9Keyboard(context, theme, NineKeyLetters.parse(AppPrefs.getInstance().keyboard.t9Letters.getValue())) },
         NumberKeyboard.Name to { NumberKeyboard(context, theme) },
+        HandwritingKeyboard.Name to {
+            HandwritingKeyboard(context, theme) { reading, piece ->
+                // the keyboard hidden while it was read: the input it was for is over
+                if (!service.isInputViewShown) return@HandwritingKeyboard
+                // the reading, then its key, in one job: the key shows what was offered just before it
+                service.postFcitxJob {
+                    EngineBridge.offerInk(reading, piece)
+                    sendKey(KeySym(UNICODE + Keyboard.INK), KeyStates.Virtual)
+                }
+            }
+        },
     )
     private val keyboards = hashMapOf<String, BaseKeyboard>()
     private var currentKeyboardName = ""
@@ -173,6 +188,7 @@ class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), Essentia
     private var address = AddressKeys.NONE
 
     override fun onStartInput(info: EditorInfo, capFlags: CapabilityFlags) {
+        (keyboards[HandwritingKeyboard.Name] as? HandwritingKeyboard)?.restart()
         // the layout may stay as it is, so the one shown is told now
         currentKeyboard?.inPasswordField = service.inPasswordField
         address = AddressKeys.of(info.toEditorTraits())
@@ -207,7 +223,11 @@ class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), Essentia
 
     override fun onImeUpdate(ime: InputMethodEntry) {
         spaceKeys.current = ime
-        val letters = if (ime.uniqueName == Engines.T9) T9Keyboard.Name else TextKeyboard.Name
+        val letters = when (ime.uniqueName) {
+            Engines.T9 -> T9Keyboard.Name
+            Engines.HANDWRITING -> HandwritingKeyboard.Name
+            else -> TextKeyboard.Name
+        }
         val shown = lettersLayout.inputMethodChanged(letters, currentKeyboardName)
         // a layout shown anew is told the input method as it is attached
         if (shown != null) showLayout(shown) else currentKeyboard?.let(spaceKeys::show)

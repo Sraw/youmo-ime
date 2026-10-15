@@ -17,6 +17,8 @@ import org.fcitx.fcitx5.android.data.pinyin.dict.PinyinDictionary
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.restoreDirectory
 import org.fcitx.fcitx5.android.engine.data.DataFormatException
+import org.fcitx.fcitx5.android.engine.handwriting.HandwritingSession
+import org.fcitx.fcitx5.android.engine.handwriting.InkReading
 import org.fcitx.fcitx5.android.engine.host.EngineEvent
 import org.fcitx.fcitx5.android.engine.host.EngineSettings
 import org.fcitx.fcitx5.android.engine.host.Engines
@@ -79,6 +81,17 @@ object EngineBridge {
 
     private val t9State = MutableStateFlow(T9State())
     val t9: StateFlow<T9State> = t9State
+
+    private val inkEnded = MutableStateFlow(HandwritingSession.NO_PIECE)
+
+    /**
+     * The latest piece of handwriting the engine ended (Engines.inkEnded): the pad wipes the piece
+     * it is writing once it is among them. Set on the fcitx thread, read on the main one.
+     */
+    val handwritingEnded: StateFlow<Int> = inkEnded
+
+    /** What the handwriting pad read of its [piece], for the key sent next to show: Engines.offerInk. On the fcitx thread. */
+    fun offerInk(reading: InkReading, piece: Int) = engines.offerInk(reading, piece)
 
     /** The 双拼 scheme the user set, for the keyboard to tell its keys from text (Engines.readsAsKey): set on the fcitx thread, read on the main one. */
     @Volatile
@@ -325,6 +338,7 @@ object EngineBridge {
         val answered = try {
             val s = unloadable.call(im, call)
             if (im == Engines.T9 && (event != EngineEvent.REFINE || s.handled)) t9State.value = T9State(s.preedit.isNotEmpty(), s.syllables, s.syllablesId)
+            if (im == Engines.HANDWRITING) inkEnded.value = engines.inkEnded
             result(event, s, fetch)
         } catch (@Suppress("TooGenericExceptionCaught") e: Throwable) {
             // the addon refines no more after a failure (native-lib's engineFailed)
@@ -384,6 +398,7 @@ object EngineBridge {
     @JvmStatic
     fun context(before: String, learning: Boolean, im: String) {
         made?.context(im, before, learning)
+        if (im == Engines.HANDWRITING) made?.let { inkEnded.value = it.inkEnded }
     }
 
     /** See [Engines.tableKeys]; none while the engine is not made, no session yet, nor is it made to answer: the keyboard waits. */

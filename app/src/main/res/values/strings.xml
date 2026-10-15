@@ -412,6 +412,8 @@
     <string name="im_erbi">Erbi</string>
     <string name="im_wubipinyin">Wubi + Pinyin</string>
     <string name="im_english">English</string>
+    <string name="im_handwriting">Handwriting</string>
+    <string name="a11y_handwriting_pad">Handwriting pad</string>
     <string name="im_section_scheme">Scheme</string>
     <string name="im_shuangpin_scheme">Shuangpin scheme</string>
     <string name="shuangpin_ziranma">Ziranma</string>
@@ -450,7 +452,8 @@
     <string name="im_latin_words">Type English words</string>
     <string name="im_latin_words_summary">In pinyin, as iphone for iPhone or app for APP</string>
     <string name="engine_data_libime">Pinyin dictionary and language model: libime</string>
-    <string name="engine_data_fineweb">Web text the language model and the English words are counted from: FineWeb-2</string>
+    <string name="engine_data_fineweb">Web text the language model, the English words and handwriting\'s character frequencies are counted from: FineWeb-2</string>
+    <string name="engine_data_handwriting">Handwriting recognizers: trained by this project on Make Me a Hanzi\'s strokes (from Arphic\'s fonts) and open handwriting fonts</string>
     <string name="im_auto_select">Commit a lone candidate at once</string>
     <string name="im_auto_select_summary">And the first one once the code is full</string>
     <string name="im_hint">Show the keys left</string>

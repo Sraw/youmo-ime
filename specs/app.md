@@ -34,7 +34,7 @@ on the service's scope.
 
 ### Keys
 
-A layout is a list of rows of `KeyDef`s (`TextKeyboard.Layout`, `T9Keyboard`, `NumberKeyboard`):
+A layout is a list of rows of `KeyDef`s (`TextKeyboard.Layout`, `T9Keyboard`, `NumberKeyboard`, `HandwritingKeyboard`):
 an appearance (text, image, width, variant) and behaviours (`Press`, `LongPress`, `Repeat`,
 `Swipe`, `DoubleTap`), each a `KeyAction` (`FcitxKeyAction`, `SymAction`, `CommitAction`,
 `LayoutSwitchAction`, `QuickPhraseAction`, `UnicodeAction`, `LangSwitchAction`,
@@ -49,6 +49,15 @@ digit or symbol goes in there as it is, what is typed committed as typed
 types with (`Engines.readsAsKey`: the nine keys' digits, 微软双拼's `;`, the pinyins' `'` and a
 table's keys, 二笔's `;`, while something is typed, the table's from `Engines.tableKeys`); the nine
 keys' column, separator and multi-tap are in `T9Keyboard` with decisions in `MultiTap`, `NineKeys`.
+
+Handwriting's keyboard (`HandwritingKeyboard`, the letters layout of `Engines.HANDWRITING`) is a pad
+(`HandwritingPadView` over `InkPad`) and a column of backspace and marks. Each read goes to
+`HandwritingRecognition` (input/handwriting), its reading back to the engine through
+`EngineBridge.offerInk` and the key `Keyboard.INK`, with the piece it is of; the pad wipes the piece
+it writes once the engine has ended it (`EngineBridge.handwritingEnded`, the latest piece ended, so
+a value missed while detached is still seen), and ends it itself when detached and at each new
+input (`restart`, which also drops what was still being read). The
+recognizer skips a read only for a newer one of the same piece: a piece's last read is what it shows.
 
 ## Settings
 

@@ -71,6 +71,7 @@ import org.fcitx.fcitx5.android.data.prefs.ManagedPreference
 import org.fcitx.fcitx5.android.data.prefs.ManagedPreferenceProvider
 import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
+import org.fcitx.fcitx5.android.engine.host.Engines
 import org.fcitx.fcitx5.android.engine.session.Action
 import org.fcitx.fcitx5.android.input.cursor.CursorRange
 import org.fcitx.fcitx5.android.input.editing.ArrowKeys
@@ -1173,8 +1174,9 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
      * [PendingInputPolicy.takesPreeditOut]. [selected]: the editor's selection as last known.
      */
     private fun dropPreedit(ic: InputConnection, selected: Boolean, editorComposes: Boolean): String? {
-        val language = fcitx.runImmediately { inputMethodEntryCached.languageCode }
-        if (!PendingInputPolicy.takesPreeditOut(language, editingSession.composing.isNotEmpty(), selected, editorComposes)) {
+        val entry = fcitx.runImmediately { inputMethodEntryCached }
+        val isText = Engines.preeditIsText(entry.uniqueName)
+        if (!PendingInputPolicy.takesPreeditOut(entry.languageCode, editingSession.composing.isNotEmpty(), selected, editorComposes, isText)) {
             return null
         }
         val text = editingSession.composingText.toString()
@@ -1203,7 +1205,10 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
             // restarts with the EditorInfo the field started with, a select-all's selection still
             // in it: the one followed since is the editor's, kept in onStartInput. An app that set
             // new text and restarted has no preedit: its editor's last report is of the text before
-            dropPreedit(ic, selection.latest.isNotEmpty(), again && editorComposing)?.let { leftPreedit.dropped(it, field, now) }
+            val dropped = dropPreedit(ic, selection.latest.isNotEmpty(), again && editorComposing)
+            // one kept (English's, handwriting's) is text from now on: the engine's input went, and
+            // the next preedit would take the composing region's place
+            if (dropped != null) leftPreedit.dropped(dropped, field, now) else ic.finishComposingText()
             return 0
         }
         // not even read in a password or a field that asks not to be learned from, nor where the

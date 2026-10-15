@@ -320,7 +320,7 @@ bool endPunctuation(InputContext *ic, bool take) {
 using TableOption = Option<EngineTableConfig> AndroidEngineConfig::*;
 
 // the page of an input method's own options: one of config_'s keys, or its table's (Method::table)
-enum class Page { Pinyin, Shuangpin, English, Table };
+enum class Page { Pinyin, Shuangpin, English, Table, Handwriting };
 
 constexpr char EnglishName[] = "keyboard-us";
 
@@ -342,6 +342,7 @@ const Method methods[] = {
         {"engine-ziranma", "自", "自然码", "fcitx-ziranma", "zh_CN", Page::Table, &AndroidEngineConfig::ziranma},
         {"engine-erbi", "二", "二笔", "fcitx-erbi", "zh_CN", Page::Table, &AndroidEngineConfig::erbi},
         {"engine-wubipinyin", "五", "五笔拼音", "fcitx-wubi", "zh_CN", Page::Table, &AndroidEngineConfig::wubiPinyin},
+        {"engine-handwriting", "手", "手写", "draw-freehand", "zh_CN", Page::Handwriting, nullptr},
         // fcitx's own name for English, which it falls back to: a user's lists keep it
         {EnglishName, "En", "English", "input-keyboard", "en", Page::English, nullptr},
 };
@@ -413,6 +414,10 @@ const Configuration *AndroidEngine::getConfigForInputMethod(const InputMethodEnt
     if (m->page == Page::English) {
         englishPage_.load(raw, true);
         return &englishPage_;
+    }
+    if (m->page == Page::Handwriting) {
+        handwritingPage_.load(raw, true);
+        return &handwritingPage_;
     }
     pinyinPage_.load(raw, true);
     return &pinyinPage_;

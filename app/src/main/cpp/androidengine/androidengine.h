@@ -152,6 +152,11 @@ FCITX_CONFIGURATION(
         EngineEnglishPage,
         ENGINE_ENGLISH_SUGGEST)
 
+// how the pad is written on is the app's own setting, the keyboard's
+FCITX_CONFIGURATION(
+        EngineHandwritingPage,
+        ENGINE_PAGE_SIZE)
+
 #undef ENGINE_ENGLISH_SUGGEST
 #undef ENGINE_SHUANGPIN_PROFILE
 #undef ENGINE_PAGE_SIZE
@@ -262,6 +267,7 @@ private:
     mutable EnginePinyinPage pinyinPage_;
     mutable EngineShuangpinPage shuangpinPage_;
     mutable EngineEnglishPage englishPage_;
+    mutable EngineHandwritingPage handwritingPage_;
     // the pause a snapshot that refines waits for; any event ends it
     std::unique_ptr<EventSourceTime> refine_;
 

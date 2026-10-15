@@ -16,6 +16,7 @@ measurement that decided it.
 | `table` | Code tables (五笔, 仓颉, 自然码, 二笔, 五笔拼音): `TableDictionary`, `TableSession`, `TableOptions`, `PhraseRules` (组词规则), `TableUser`, `SharedWords` |
 | `english` | `EnglishData`, `EnglishDecoder` (keys → words with slips), `EnglishSession` (Gboard-like word-at-a-time typing, autocorrect), `EnglishUser`, `EnglishText`, `Misspellings` |
 | `stroke` | `Strokes`, `StrokeLookup` (`u` then `h s p n z` inside pinyin) |
+| `handwriting` | `HandwritingSession` (the input method), `HandwritingDecoder` (the characters written read as a sentence with the pinyin model and the user's words), `InkRecognizer` (the character's two recognizers run as their training code runs them, over `InkNet`s the app supplies), `InkFeatures` (what each recognizer reads of the strokes, equal to the training code's) |
 | `phrase` | `CustomPhrases` (libime's `customphrase` format, with date/time variables), `PhraseBook` |
 | `data` | File formats: `DataFile` (the container), `PinyinData`, `CodeTable`, `NgramTables`, `BitPacked`, `EliasFano` (the trigram runs' starts; a lookup costs more, so not for the unigrams'), `Quantizer`, `StringTable`, `WordIndex`, `PinyinDataBuilder`, readers of text sources, `Misreadings`, `DataAge` |
 | `store` | `RecordFormat` / `RecordStore`: append-only logs with CRC'd records, compacted by rename |
@@ -93,6 +94,52 @@ again. Space after a word adds a space and predicts; punctuation moves that spac
 double space is a full stop. `EnglishUser` learns committed words; a word counted twice is the
 user's, never corrected. `Misspellings` corrects common misspellings the web taught the model as
 words. Auto-capitalisation is the keyboard's (`AutoCaps`), not the engine's.
+
+## Handwriting
+
+One character at a time: two recognizers, trained outside this repository on synthetic ink only
+(fonts and Make Me a Hanzi's strokes; CASIA for evaluation alone) and shipped in the release
+`handwriting-models-*` (`HandwritingDataPlugin`, its `manifest.txt`), read the character by its
+image (9 × 64 × 64 planes) and by its pen path, weighed 0.7 to 0.3 with 0.2 × its log frequency.
+`InkFeatures` is held to the training code by golden data (`ink-golden.json.gz`, the training
+sources' `gen_golden.py`). Lines and characters written over each other are not read: their
+recognizers (CTC, in the first release, `handwriting-models-20261014`) read real handwriting far
+worse (CASIA, characters wrong: a line 44%, an overlay 32%, against 9% for characters one at a time
+read as a sentence).
+
+`HandwritingSession` reads the characters written as a sentence, as pinyin reads syllables: each
+one written joins those before it, uncommitted, and `HandwritingDecoder` finds the likeliest words
+through their readings, by the pinyin dictionary's syllable trie (each reading followed by its
+characters' syllables, `Predictor.charReadingsOf`) and the user's new words, scored by the pinyin
+session's scorer (the model, the user's counts, the layer prior) plus `INK_WEIGHT` × the
+recognizer's log-probabilities; after the words before the cursor. The best sentence is the
+preedit; the candidates are the last character's readings, each as the best sentence ending with
+it has it, and a pick commits that sentence. Measured with `ime-eval handwriting` (rows from the
+training sources' `lmdata.py`: CASIA's test lines, each character that writer's isolated sample;
+the weight set on synthetic ink made as hard as real, `HARD=2.2`, where 1.0 was best, and 12
+readings of a position for words): on 67,599 characters of the 51 CASIA writers never used to pick a
+checkpoint (`HELD=1`), 74.7% first right by the ink alone, 91.4% once the sentence is written,
+85.1% as each character is, the last in the first ten 95.7% (the first release: 72.5%, 89.2%,
+82.5%, 94.3%). The words from each position are kept while its readings and the
+next seven are the same (`HandwritingDecoder.arcs`), so a stroke costs the last characters' words,
+not the whole sentence's. A sentence picked other than the first is learned, its words as the
+decoder found them (`Decoding.words`: a dictionary word read as its syllable path, a character alone
+as its first reading): the user chose it over the ink's best. The first is not, however put in: the
+readings are often wrong, and a misread word not noticed, learned, would come back.
+The sentence is kept in the field as the keyboard goes (`Engines.preeditIsText`), as English's is.
+The pad (`InkPad`, ime-core's
+`input/handwriting`) decides when to read (each stroke ended), when a piece is done (the pen up
+`InkPad.FINISH_MILLIS`: its ink wiped, its reading kept), and that backspace takes back a
+stroke. The session cannot be handed a reading through fcitx, which carries keys: the app offers it
+(`Engines.offerInk`) and sends `Keyboard.INK`, which the keyboard turns into `Action.Ink`.
+
+Pieces are numbered, later higher, and every reading carries its piece: what a reading does is
+decided in the session, on the fcitx thread, in order with the keys. A reading of a piece written
+reads it again (none takes it out); a later piece's adds a character, unless read as nothing (a
+first dot); one of a piece already ended (committed, taken back, the cursor moved) or taken out
+comes too late. The session's `ended` goes back to the pad, which wipes the piece it is writing once it is
+among them. One rule instead of the pad guessing: a slow first read (the models opened), a key
+pressed while a stroke is read, and a reading of nothing all come out right.
 
 ## Data files and compatibility
 

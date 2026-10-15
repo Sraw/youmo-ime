@@ -9,6 +9,7 @@ import org.fcitx.fcitx5.android.engine.data.DataFormatException
 import org.fcitx.fcitx5.android.engine.data.PinyinData
 import org.fcitx.fcitx5.android.engine.english.EnglishData
 import org.fcitx.fcitx5.android.engine.english.EnglishSession
+import org.fcitx.fcitx5.android.engine.handwriting.HandwritingDecoder
 import org.fcitx.fcitx5.android.engine.lattice.Penalties
 import org.fcitx.fcitx5.android.engine.lattice.PinyinDecoder
 import org.fcitx.fcitx5.android.engine.lattice.Predictor
@@ -137,6 +138,19 @@ internal val COMMANDS = listOf(
     },
     Command("chars", "<pinyin.data>", 1..1) { args, out, _ ->
         CharRanks.report(CharRanks(loadData(args.operands[0])).measure(), out)
+        0
+    },
+    Command(
+        "handwriting", "<pinyin.data> <rows.tsv> [--weights <ink weight>,...] [--alternatives <n>] [--limit <rows>]",
+        2..2, "weights", "alternatives", "limit",
+    ) { args, out, _ ->
+        val (dataPath, rowsPath) = args.operands
+        val run = HandwritingRun(loadData(dataPath))
+        val rows = HandwritingRun.read(rowsPath).let { r -> args.options["limit"]?.toIntOrNull()?.let { r.take(it) } ?: r }
+        val alternatives = args.options["alternatives"]?.toIntOrNull() ?: HandwritingDecoder.ALTERNATIVES
+        out.appendLine("ink alone            ${run.ink(rows)}")
+        val weights = args.options["weights"]?.split(',')?.map { it.toDouble() } ?: listOf(HandwritingDecoder.INK_WEIGHT)
+        for (w in weights) out.appendLine(String.format(Locale.ROOT, "sentence, ink %-5s %s", w, run.sentences(rows, run.decoder(w, alternatives))))
         0
     },
     Command("table", "<table.data> <set.tsv> [--preset <preset>]", 2..2, "preset") { args, out, _ ->

@@ -9,6 +9,8 @@ import org.fcitx.fcitx5.android.engine.data.DataFormatException
 import org.fcitx.fcitx5.android.engine.data.PinyinData
 import org.fcitx.fcitx5.android.engine.data.PinyinDataBuilder
 import org.fcitx.fcitx5.android.engine.data.WordLayers
+import org.fcitx.fcitx5.android.engine.handwriting.HandwritingSession
+import org.fcitx.fcitx5.android.engine.handwriting.InkReading
 import org.fcitx.fcitx5.android.engine.lattice.LayerPrior
 import org.fcitx.fcitx5.android.engine.pinyin.Fuzzy
 import org.fcitx.fcitx5.android.engine.session.Choice
@@ -670,6 +672,44 @@ class EnginesTest : EnginesFixture() {
                 assertTrue(im, Engines.readsAsKey(im, scheme, separator, composing = true))
             }
         }
+    }
+
+    // the pad's reading offered, then its key: shown, read with the pinyin model after the text before
+    @Test
+    fun handwritingShowsWhatThePadOffered() {
+        val engines = Engines(::load, null)
+        // a field's text is told the keyboards there are: the input method switched to first
+        engines.onEvent(Engines.HANDWRITING, EngineEvent.RESET, 0)
+        engines.context(Engines.HANDWRITING, "好")
+        engines.offerInk(InkReading(listOf("你", "拟"), doubleArrayOf(0.0, 0.0)), 0)
+        val shown = engines.onEvent(Engines.HANDWRITING, EngineEvent.CHAR, Keyboard.INK)
+        // 好 then 拟: the model's bigram
+        assertEquals("拟", shown.preedit)
+        assertEquals(listOf("拟", "你"), engines.candidates(Engines.HANDWRITING, 0, 5).map { it.text })
+        assertEquals("你", engines.onEvent(Engines.HANDWRITING, EngineEvent.PICK, 1).commit)
+        assertTrue(Engines.PINYIN_DATA in loaded)
+        assertEquals(0, engines.inkEnded)
+    }
+
+    @Test
+    fun handwritingsPreeditIsTheText() {
+        assertTrue(Engines.preeditIsText(Engines.HANDWRITING))
+        assertFalse(Engines.preeditIsText(Engines.PINYIN))
+    }
+
+    // a second character joins the first, nothing put in till one is picked
+    @Test
+    fun handwritingReadsTheCharactersWrittenTogether() {
+        val engines = Engines(::load, null)
+        engines.offerInk(InkReading(listOf("好"), doubleArrayOf(0.0)), 0)
+        engines.onEvent(Engines.HANDWRITING, EngineEvent.CHAR, Keyboard.INK)
+        engines.offerInk(InkReading(listOf("你", "拟"), doubleArrayOf(0.0, 0.0)), 1)
+        val two = engines.onEvent(Engines.HANDWRITING, EngineEvent.CHAR, Keyboard.INK)
+        assertEquals("", two.commit)
+        assertEquals("好拟", two.preedit)
+        assertEquals(HandwritingSession.NO_PIECE, engines.inkEnded)
+        assertEquals("好拟", engines.onEvent(Engines.HANDWRITING, EngineEvent.CHAR, ' '.code).commit)
+        assertEquals(1, engines.inkEnded)
     }
 
     private companion object {

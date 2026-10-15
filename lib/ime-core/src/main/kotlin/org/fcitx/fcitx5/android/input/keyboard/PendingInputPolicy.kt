@@ -66,9 +66,10 @@ object PendingInputPolicy {
      * Whether the editor keeps the preedit when the keyboard goes (hidden, the screen turned, another
      * app): other languages' is their text; a Chinese one is pinyin, and kept it left `ni hao` in
      * the text. Its first candidate cannot take its place: it comes from fcitx's thread, after the
-     * field may have gone, into another app's field even. So it goes, as typed into nothing.
+     * field may have gone, into another app's field even. So it goes, as typed into nothing; unless
+     * the input method's preedit [isText] (handwriting's characters, `Engines.preeditIsText`).
      */
-    fun keepsPreeditOnLeaving(languageCode: String): Boolean = !languageCode.startsWith("zh")
+    fun keepsPreeditOnLeaving(languageCode: String, isText: Boolean = false): Boolean = isText || !languageCode.startsWith("zh")
 
     /**
      * Whether the [preedit] the input method shows in the editor is taken out as it leaves
@@ -77,8 +78,8 @@ object PendingInputPolicy {
      * held no composing text ([editorComposes]): WebView's ends as the user selects, and Back then
      * took the word selected.
      */
-    fun takesPreeditOut(languageCode: String, preedit: Boolean, selected: Boolean, editorComposes: Boolean): Boolean = when {
-        !preedit || keepsPreeditOnLeaving(languageCode) -> false
+    fun takesPreeditOut(languageCode: String, preedit: Boolean, selected: Boolean, editorComposes: Boolean, isText: Boolean = false): Boolean = when {
+        !preedit || keepsPreeditOnLeaving(languageCode, isText) -> false
         else -> !selected || editorComposes
     }
 }

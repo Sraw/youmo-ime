@@ -11,6 +11,7 @@
 | `lib/ime-dict-tool` | JVM CLI | Compiles text sources into the engine's data files (pinyin, tables, strokes, English), mixes models, packs word packs, finds new words. Runs on the build host only. |
 | `lib/fcitx5`, `lib/fcitx5-chinese-addons` | native (CMake) | Fcitx5 (with its quickphrase, unicode, clipboard, imselector and spell modules) and, of chinese-addons, only punctuation, chttrans (简繁), fullwidth and scel2org5 (reading 搜狗 `.scel`), as submodules built for Android. Its pinyin and table engines are not built: the input methods are `ime-core`'s. |
 | `lib/sherpa-onnx` | native | The speech recognizer, vendored and built from source; voice build only. |
+| `lib/handwriting` | Android library, native | The handwriting recognizers' runtime: onnxruntime (the very file sherpa-onnx links, so a voice build packs one) and a small JNI to it, `OrtModel`, which runs an ORT-format model mapped from the APK. Both builds. |
 | `codegen` | annotation processing | Generates the app's key and scancode mapping tables. |
 | `build-logic` | included build | Gradle convention plugins: Android/native conventions, data download and compile, voice data, permission check, version from tags, detekt. |
 | `lexicon/` | data | The curated new words, removed and corrected readings, misreadings, Latin words: decisions kept in the repository. |
@@ -52,6 +53,10 @@ One process. Inside it:
   lazies.
 - **Voice** (voice build): the microphone reader, the VAD and the recognizer on threads of their own
   (`VoiceListener`).
+- **`handwriting`** (`HandwritingRecognition`): the handwriting recognizers, one read at a time; a
+  read made stale by a newer stroke is skipped. Its reading goes to the engine as a fcitx job: the
+  reading offered (`EngineBridge.offerInk`), then a key (`Keyboard.INK`) that shows it, in order
+  with the keys and taps around it.
 
 Access to fcitx from outside the service goes through `FcitxDaemon` → `FcitxConnection`
 (`runOnReady`, `runIfReady`, `runImmediately` for cached reads and `eventFlow` only). Never
@@ -90,7 +95,8 @@ box that clears itself, for the reply typed next.
 The preedit goes into the app's text as composing text where the field takes it
 (`CapabilityFlag.Preedit`). A Chinese one is pinyin, not text, so a field that outlives the
 keyboard must not keep it: as the keyboard goes it is taken out
-(`PendingInputPolicy.keepsPreeditOnLeaving`), and `LeftPreedit` takes out what an app that made its
+(`PendingInputPolicy.keepsPreeditOnLeaving`; handwriting's is its characters, kept:
+`Engines.preeditIsText`), and `LeftPreedit` takes out what an app that made its
 activity anew saved with the field's text (see
 [pitfalls.md](pitfalls.md#rotation-with-chinese-half-typed)). Shown only on the keyboard's bar,
 the preedit would never reach the app's text, ending that kind of bug at the cost of seeing the

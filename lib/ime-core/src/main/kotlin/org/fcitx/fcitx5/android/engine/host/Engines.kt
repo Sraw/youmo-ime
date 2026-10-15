@@ -5,6 +5,11 @@
 package org.fcitx.fcitx5.android.engine.host
 
 import org.fcitx.fcitx5.android.engine.english.EnglishSession
+import org.fcitx.fcitx5.android.engine.handwriting.HandwritingDecoder
+import org.fcitx.fcitx5.android.engine.handwriting.HandwritingSession
+import org.fcitx.fcitx5.android.engine.handwriting.InkReading
+import org.fcitx.fcitx5.android.engine.lattice.CoarseWords
+import org.fcitx.fcitx5.android.engine.lattice.TextWords
 import org.fcitx.fcitx5.android.engine.phrase.CustomPhrases
 import org.fcitx.fcitx5.android.engine.phrase.PhraseBook
 import org.fcitx.fcitx5.android.engine.pinyin.PinyinSegmenter
@@ -26,6 +31,7 @@ import org.fcitx.fcitx5.android.engine.stroke.StrokeLookup
 import org.fcitx.fcitx5.android.engine.table.TableOptions
 import org.fcitx.fcitx5.android.engine.table.TableSession
 import org.fcitx.fcitx5.android.engine.user.LibimeImport
+import org.fcitx.fcitx5.android.engine.user.UserScorer
 import org.fcitx.fcitx5.android.engine.user.WordLists
 import java.io.Closeable
 import java.io.File
@@ -252,6 +258,17 @@ class Engines(
         return keys.filterTo(HashSet()) { !it.isLetter() && session.reads(it) }
     }
 
+    /**
+     * What the handwriting pad read, for its session to show at its next [Keyboard.INK]:
+     * [HandwritingSession.offer]. Called on the fcitx thread, just before that key is sent.
+     */
+    fun offerInk(reading: InkReading, piece: Int) {
+        (session(HANDWRITING) as HandwritingSession).offer(reading, piece)
+    }
+
+    /** The latest piece of handwriting ended ([HandwritingSession.ended]), for the pad to wipe; on the fcitx thread. */
+    val inkEnded: Int get() = (sessions[HANDWRITING] as? HandwritingSession)?.ended ?: HandwritingSession.NO_PIECE
+
     /** Candidates of [im]'s input, from the [from]th, at most [count]; none if it has no session yet. */
     fun candidates(im: String, from: Int, count: Int): List<Choice> = sessions[im]?.candidates(from, count).orEmpty()
 
@@ -275,6 +292,16 @@ class Engines(
                     warmUps.execute(data::warmUp)
                 }
                 EnglishSession(data, pageSize = s.pageSize, user = english.user())
+            }
+            HANDWRITING -> {
+                // read as pinyin reads a sentence: its words, the user's among them, and their counts
+                val data = assets.pinyinData
+                val user = lexicon.user()
+                val decoder = HandwritingDecoder(
+                    data.dictionary, data.vocabulary, data.wordIndex, lexicon.prior().scorer(UserScorer(data.model, user)),
+                    assets::charSyllables, user, CoarseWords.of({ data.wordIndex.find(it) }, CoarseWords.LIST - lexicon.addedTexts()),
+                )
+                HandwritingSession(decoder, TextWords(data.model, data.wordIndex), s.pageSize, user)
             }
             // 简拼 only where the digits read nothing else: as common on the evaluation set, and faster
             T9 -> ForgetsInTables(pinyinSession(T9Segmenter(s.fuzzy, abbreviations = false, letters = s.nineKeys), spell = true))
@@ -356,7 +383,8 @@ class Engines(
         const val WUBI = "engine-wubi"
 
         /** The input methods whose sessions read pinyin's data (a table's lookup reads it only once asked). */
-        private val PINYINS = setOf(PINYIN, SHUANGPIN, T9)
+        // those that read the pinyin data: handwriting reads its sentences with it
+        private val PINYINS = setOf(PINYIN, SHUANGPIN, T9, HANDWRITING)
 
         /** Offered first to be added: the most asked for after pinyin, which is there already. */
         private val ADDED_FIRST = listOf(T9, WUBI)
@@ -390,6 +418,15 @@ class Engines(
 
         // with nothing typed ' is the app's: through the engine it would be a mark, ‘
         private fun separates(c: Int, composing: Boolean) = composing && c == SyllableGraph.SEPARATOR.code
+
+        /** Handwriting: characters written one at a time on a pad, read as a sentence. */
+        const val HANDWRITING = "engine-handwriting"
+
+        /**
+         * Whether input method [name]'s preedit is the text itself, as handwriting's characters, not
+         * what is typed to find it (pinyin): kept in the field as the keyboard goes.
+         */
+        fun preeditIsText(name: String): Boolean = name == HANDWRITING
 
         /** English: fcitx's own name for it, which fcitx falls back to, so a user's lists keep it. */
         const val ENGLISH = "keyboard-us"

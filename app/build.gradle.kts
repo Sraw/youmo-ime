@@ -6,6 +6,7 @@ plugins {
     id("org.fcitx.fcitx5.android.fcitx-component")
     id("org.fcitx.fcitx5.android.engine-data")
     id("org.fcitx.fcitx5.android.voice-data")
+    id("org.fcitx.fcitx5.android.handwriting-data")
     alias(libs.plugins.kotlin.parcelize)
     alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.ksp)

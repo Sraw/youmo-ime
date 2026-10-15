@@ -435,4 +435,4 @@ class T9Keyboard(
 }
 
 /** fcitx's key for a Unicode character: this plus its code point. */
-private const val UNICODE = 0x01000000
+internal const val UNICODE = 0x01000000

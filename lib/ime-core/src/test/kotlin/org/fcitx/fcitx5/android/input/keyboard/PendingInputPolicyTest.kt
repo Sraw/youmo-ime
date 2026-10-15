@@ -61,6 +61,8 @@ class PendingInputPolicyTest {
         assertFalse(PendingInputPolicy.keepsPreeditOnLeaving("zh_CN"))
         assertTrue(PendingInputPolicy.keepsPreeditOnLeaving("en"))
         assertTrue(PendingInputPolicy.keepsPreeditOnLeaving(""))
+        // handwriting's preedit is its characters
+        assertTrue(PendingInputPolicy.keepsPreeditOnLeaving("zh_CN", isText = true))
     }
 
     /** Back over a word selected in WebView, which ended the composing text as the user selected, took the word. */
@@ -73,6 +75,7 @@ class PendingInputPolicyTest {
         // nothing shown: nothing to take out, over a selection or not
         assertFalse(PendingInputPolicy.takesPreeditOut("zh_CN", preedit = false, selected = false, editorComposes = true))
         assertFalse(PendingInputPolicy.takesPreeditOut("en", preedit = true, selected = false, editorComposes = true))
+        assertFalse(PendingInputPolicy.takesPreeditOut("zh_CN", preedit = true, selected = false, editorComposes = true, isText = true))
     }
 
     /** xiaoming2026@ in an email field came out 小明026@, and xiaoming_ 小明——. */

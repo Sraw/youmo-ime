@@ -111,7 +111,7 @@ class TableSession(
             snapshot(commit = text, handled = text.isNotEmpty())
         }
         // nothing to weigh again: a table's order is its own; a table has no custom phrases
-        Action.Refine, is Action.Pin, is Action.Unpin, is Action.Syllable, is Action.Letter -> snapshot()
+        Action.Refine, Action.Ink, is Action.Pin, is Action.Unpin, is Action.Syllable, is Action.Letter -> snapshot()
         is Action.Cursor -> snapshot(handled = false)
         // auto phrases are made of what was committed here, not of what the editor had: kept
         // only while the text still ends with it (the cursor did not go anywhere)

@@ -32,6 +32,7 @@ BUILDING.md's 5 GB counts the Gradle daemon beside it) and three table compiles 
 | `DataDescriptorPlugin` | `descriptor.json`: the SHA-256 of every file under `src/main/assets`, so `DataManager` syncs only what changed |
 | `EngineDataPlugin` | downloads (SHA-256 pinned) and compiles the engine's data into generated assets, stored uncompressed (see below) |
 | `VoiceDataPlugin` | voice build only: the recognizer's models, VAD, hotword list |
+| `HandwritingDataPlugin` | both builds: `:lib:handwriting` (onnxruntime, `pickFirst` with sherpa-onnx's identical copy) and the handwriting models |
 | `BuildMetadataPlugin` | build time and git hash into `BuildConfig` (the data release names are `EngineDataPlugin`'s fields) |
 | `DetektConventionPlugin` | detekt on every Kotlin module, one config, a baseline per module |
 | `ToolFingerprint` | hashes the classes the dict tool's `main` reaches, so the data task re-runs only when code that makes data changes, not on every ime-core edit |
@@ -52,6 +53,7 @@ GitHub release of this repository, and pinned in `EngineDataPlugin` by tag and S
 | English words and trigram model (FineWeb sample-10BT) | `english-data-*` (`ENGLISH_RELEASE`) | `ime-dict-tool english-lm`, then `prune --threshold 3e-8` (relative entropy: 117 → 44 MB compiled, slips fixed 73.8 → 72.7%) | `engine/english.data` |
 | Sentence models 4M and 25M (own training, Apache-2.0) | `sentence-models-*` (`MODELS_RELEASE`) | the training pipeline (not in this repo) | `engine/sentence-model*.safetensors` |
 | Voice recognizer (X-ASR zh-en, sherpa-onnx's int8 export) in onnxruntime's ORT format | `voice-models-*` (`ORT_RELEASE` in `VoiceDataPlugin`) | onnxruntime 1.28's `convert_onnx_models_to_ort --optimization_style Fixed --target_platform arm` (its `manifest.txt`) | `voice/encoder.ort`, `decoder.ort`, `joiner.ort`, mapped in place (lib/sherpa-onnx README) |
+| Handwriting recognizers (own training on synthetic ink), their characters and frequencies | `handwriting-models-*` (`RELEASE` in `HandwritingDataPlugin`) | the recognizers' training sources (not in this repo): `export.py` to ONNX, onnxruntime 1.28's `convert_onnx_models_to_ort --optimization_style Fixed --target_platform arm` (its `manifest.txt`) | `handwriting/*.ort` mapped in place (`OrtModel`), `chars.txt`, `prior.data` |
 | Code tables, strokes, dictionary | libime's and rime-stroke's sources, pinned archives | compiled in the build | `engine/table/*.data`, `engine/stroke.data` |
 
 Downloads go to `.gradle/engine-downloads` at the root (survives `clean`). The build also applies

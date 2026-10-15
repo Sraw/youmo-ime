@@ -144,7 +144,7 @@ class EnglishSession(
             snapshot()
         }
         is Action.Forget -> forget(action.index)
-        Action.Refine, is Action.Pin, is Action.Unpin, is Action.Block, is Action.Syllable, is Action.Letter -> snapshot()
+        Action.Refine, Action.Ink, is Action.Pin, is Action.Unpin, is Action.Block, is Action.Syllable, is Action.Letter -> snapshot()
     }
 
     override fun candidates(from: Int, count: Int): List<Choice> =

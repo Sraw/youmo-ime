@@ -398,6 +398,8 @@
     <string name="im_erbi">二筆</string>
     <string name="im_wubipinyin">五筆拼音</string>
     <string name="im_english">英文</string>
+    <string name="im_handwriting">手寫</string>
+    <string name="a11y_handwriting_pad">手寫板</string>
     <string name="im_section_scheme">方案</string>
     <string name="im_shuangpin_scheme">雙拼方案</string>
     <string name="shuangpin_ziranma">自然碼</string>
@@ -436,7 +438,8 @@
     <string name="im_latin_words">中英混輸</string>
     <string name="im_latin_words_summary">拼音裡直接打英文單詞，比如 iphone 出 iPhone</string>
     <string name="engine_data_libime">拼音詞典和語言模型：libime</string>
-    <string name="engine_data_fineweb">語言模型和英文詞表統計用的網頁文本：FineWeb-2</string>
+    <string name="engine_data_fineweb">語言模型、英文詞表和手寫的字頻統計用的網頁文本：FineWeb-2</string>
+    <string name="engine_data_handwriting">手寫辨識模型：本專案用 Make Me a Hanzi 的筆畫（來自文鼎字型）和開源手寫字型訓練</string>
     <string name="im_auto_select">只有一個候選時直接上屏</string>
     <string name="im_auto_select_summary">編碼打滿時也直接上屏第一個</string>
     <string name="im_hint">顯示編碼提示</string>

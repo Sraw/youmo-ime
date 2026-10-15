@@ -44,6 +44,10 @@ gradlePlugin {
             id = "org.fcitx.fcitx5.android.voice-data"
             implementationClass = "VoiceDataPlugin"
         }
+        register("handwritingData") {
+            id = "org.fcitx.fcitx5.android.handwriting-data"
+            implementationClass = "HandwritingDataPlugin"
+        }
         register("engineData") {
             id = "org.fcitx.fcitx5.android.engine-data"
             implementationClass = "EngineDataPlugin"

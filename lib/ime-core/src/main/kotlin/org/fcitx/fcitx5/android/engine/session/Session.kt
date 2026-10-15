@@ -117,6 +117,12 @@ sealed class Action {
     object CommitRaw : Action()
 
     /**
+     * Handwriting: shows what the pad last read (HandwritingSession.offer). Sent as a key, so that
+     * it comes in order with the keys and taps around it; nothing to any other session.
+     */
+    object Ink : Action()
+
+    /**
      * Puts the cursor [at] that character of the preedit (a tap in the composed text, where the
      * app shows it): what is typed next goes there. Only English keeps a cursor in its input;
      * elsewhere the snapshot is not [handled][Snapshot.handled].

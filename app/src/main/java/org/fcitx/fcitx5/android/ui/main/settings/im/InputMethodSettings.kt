@@ -269,6 +269,15 @@ object InputMethodSettings {
         ),
     )
 
+    // androidengine's handwriting page (EngineHandwritingPage)
+    private val handwriting = listOf(
+        Section(
+            R.string.im_section_typing, listOf(
+                Choice(EngineSettings.PAGE_SIZE, R.string.im_page_size, PAGE_SIZES, label = { _, v -> v }, nearest = numbers(EngineSettings.PAGE_SIZES)),
+            )
+        ),
+    )
+
     /** The English page's word list: its key. */
     const val ENGLISH_WORDS = "english_words"
 
@@ -276,13 +285,14 @@ object InputMethodSettings {
     const val T9_LETTERS = "t9_letters"
 
     /** The app's own input methods, each with a page in [of]. */
-    val BUILT_IN: List<String> = listOf(Engines.PINYIN, Engines.T9, Engines.SHUANGPIN) + Engines.TABLES.keys + InputMethodNames.KEYBOARD
+    val BUILT_IN: List<String> = listOf(Engines.PINYIN, Engines.T9, Engines.SHUANGPIN) + Engines.TABLES.keys + Engines.HANDWRITING + InputMethodNames.KEYBOARD
 
     /** The page of [uniqueName], or null for an input method the app does not know. */
     fun of(uniqueName: String): List<Item>? = when (uniqueName) {
         Engines.PINYIN -> pinyin(shuangpin = false)
         Engines.T9 -> pinyin(shuangpin = false, nineKeys = true)
         Engines.SHUANGPIN -> pinyin(shuangpin = true)
+        Engines.HANDWRITING -> handwriting
         InputMethodNames.KEYBOARD -> english
         else -> if (uniqueName.startsWith("engine-")) table else null
     }
