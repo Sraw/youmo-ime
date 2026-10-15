@@ -48,9 +48,17 @@ class HandwritingDecoder(
      * What [positions] read as after the words [prev2] and [prev]: for each reading of the last
      * position, the best sentence ending with it, best first ([text] the first); none for no
      * positions. [words] has each sentence's words as the user model learns them, null where a
-     * character has no reading.
+     * character has no reading. [best] are the best sentences whatever they end with, [bestScores]
+     * theirs (the model's log10 plus the ink's weighed log-probabilities), for a sentence model to
+     * weigh again, and [bestWords] their words as [words] has them: [best]'s first is [text].
      */
-    class Decoding(val sentences: List<String>, val words: List<List<Entry>?> = sentences.map { null }) {
+    class Decoding(
+        val sentences: List<String>,
+        val words: List<List<Entry>?> = sentences.map { null },
+        val best: List<String> = sentences.take(1),
+        val bestScores: List<Float> = best.map { 0f },
+        val bestWords: List<List<Entry>?> = best.map { null },
+    ) {
         val text: String get() = sentences.firstOrNull().orEmpty()
     }
 
@@ -76,8 +84,17 @@ class HandwritingDecoder(
             beams[end] = if (end == n) next else distinct(next)
         }
         val ends = HashSet<String>()
-        val kept = beams[n].orEmpty().filter { ends.add(lastCharacter(it.text)) }
-        return Decoding(kept.map(::textOf), kept.map(::wordsOf))
+        val all = beams[n].orEmpty()
+        val kept = all.filter { ends.add(lastCharacter(it.text)) }
+        val best = LinkedHashMap<String, State>()
+        for (s in all) {
+            if (best.size == BEST) break
+            best.putIfAbsent(textOf(s), s)
+        }
+        return Decoding(
+            kept.map(::textOf), kept.map(::wordsOf),
+            best.keys.toList(), best.values.map { it.score.toFloat() }, best.values.map(::wordsOf),
+        )
     }
 
     // the best [beam] sentences, one a pair of last words (a character the model lacks told by its text):
@@ -223,6 +240,9 @@ class HandwritingDecoder(
         const val ALTERNATIVES = 12
 
         const val BEAM = 16
+
+        /** The best sentences a [Decoding] has, whatever they end with: as many as a refiner weighs. */
+        const val BEST = 5
 
         // the longest word looked for, as TextWords
         private const val MAX_WORD = 8

@@ -8,7 +8,7 @@ import java.util.concurrent.atomic.AtomicInteger
 
 /**
  * The handwriting pad's strokes and when they are read: each stroke ended asks for the character
- * being written (a piece) to be read ([Read]); the pen up for [FINISH_MILLIS] ends the piece
+ * being written (a piece) to be read ([Read]); the pen up for [finishMillis] ends the piece
  * ([finish]), its ink wiped while its reading stays on show; the next stroke starts a new piece. Backspace takes the last stroke back ([undo]). Times in milliseconds, points in any one
  * unit.
  *
@@ -26,6 +26,13 @@ class InkPad {
     private var current: Points? = null
     private var lastUp = 0L
     private var reads = 0
+
+    /** How long the pen stays up before the piece counts as done: the user's to set, the hand's pace. */
+    var finishMillis = FINISH_MILLIS
+        set(value) {
+            require(value > 0) { "finish after $value ms" }
+            field = value
+        }
 
     /** The piece being written. */
     var piece = pieces.getAndIncrement()
@@ -65,7 +72,7 @@ class InkPad {
      * stroke. Its ink is then wiped, its reading left on show, and the next stroke starts another.
      */
     fun finish(time: Long): Boolean {
-        if (done.isEmpty() || current != null || time - lastUp < FINISH_MILLIS) return false
+        if (done.isEmpty() || current != null || time - lastUp < finishMillis) return false
         next()
         return true
     }
@@ -110,7 +117,7 @@ class InkPad {
     }
 
     companion object {
-        /** How long the pen stays up before the character written counts as done. */
+        /** How long the pen stays up before the character written counts as done, unless set: [finishMillis]. */
         const val FINISH_MILLIS = 700L
 
         private const val INITIAL = 64

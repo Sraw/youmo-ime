@@ -6,7 +6,10 @@ package org.fcitx.fcitx5.android.engine.handwriting
 
 import org.fcitx.fcitx5.android.engine.host.EngineEvent
 import org.fcitx.fcitx5.android.engine.host.Keyboard
+import org.fcitx.fcitx5.android.engine.lattice.Predictor
 import org.fcitx.fcitx5.android.engine.lattice.TextWords
+import org.fcitx.fcitx5.android.engine.rerank.SentencePicker
+import org.fcitx.fcitx5.android.engine.rerank.SentenceRefiner
 import org.fcitx.fcitx5.android.engine.session.Action
 import org.fcitx.fcitx5.android.engine.session.Choice
 import org.fcitx.fcitx5.android.engine.user.UserModel
@@ -134,13 +137,6 @@ class HandwritingSessionTest {
         assertFalse(s.apply(Action.CommitRaw).handled)
     }
 
-    // what [this] counted: each word and pair, as the user model has them
-    private fun UserModel.learned(): Set<String> {
-        val out = HashSet<String>()
-        forEachCount({ e, _ -> out += "$e" }, { a, b, _ -> out += "$a $b" })
-        return out
-    }
-
     @Test
     fun `a sentence picked other than the first is learned, its words as read, the first not`() {
         val user = UserModel(handwritingData.dictionary, handwritingData.vocabulary)
@@ -171,6 +167,96 @@ class HandwritingSessionTest {
         s.show(read("天", "山"))
         assertEquals("山", s.apply(Action.Pick(1)).commit)
         assertFalse(user.learned().any { it.startsWith("山") })
+    }
+
+    @Test
+    fun `once a sentence is put in, what may follow is offered, picked, learned and offered on`() {
+        val d = handwritingData
+        val user = UserModel(d.dictionary, d.vocabulary)
+        val s = HandwritingSession(handwritingDecoder(user), TextWords(d.model, d.wordIndex), user = user, predictor = Predictor(d.model, d.vocabulary, d.dictionary, user))
+        s.show(read("高"))
+        val put = s.apply(Action.Pick(0))
+        assertEquals("高", put.commit)
+        assertTrue(put.predicting)
+        assertEquals("", put.preedit)
+        assertEquals("山", put.candidates.first())
+        // a pick puts it in, the user's choice learned after the word before it
+        assertEquals("山", s.apply(Action.Pick(0)).commit)
+        assertEquals(setOf("山(shan)", "高(gao) 山(shan)"), user.learned())
+        // enter puts in what is written, as pinyin's, nothing offered after it
+        s.show(read("高"))
+        assertFalse(s.apply(Action.CommitRaw).predicting)
+        // a stroke takes the offer away
+        s.show(read("高"))
+        s.apply(Action.Pick(0))
+        val written = s.show(read("人", "天"))
+        assertFalse(written.predicting)
+        assertEquals("人", written.preedit)
+        assertEquals(listOf("人", "天"), written.candidates)
+        // so do backspace and a key, both the app's
+        s.apply(Action.Pick(0))
+        s.show(read("高"))
+        s.apply(Action.Pick(0))
+        val back = s.apply(Action.Backspace)
+        assertFalse(back.handled)
+        assertTrue(back.candidates.isEmpty())
+        s.show(read("高"))
+        s.apply(Action.Pick(0))
+        val key = s.apply(Action.Key('，'))
+        assertFalse(key.handled)
+        assertTrue(key.candidates.isEmpty())
+        // where nothing is learned (a password), nothing offered
+        s.learning = false
+        s.show(read("高"))
+        assertFalse(s.apply(Action.Pick(0)).predicting)
+    }
+
+    @Test
+    fun `a sentence model puts the sentence it reads best first, the refiner once the character is finished`() {
+        val d = handwritingData
+        // each prefers 淡话 to the decoder's 谈话, after the text before
+        val seen = ArrayList<String>()
+        val picker = SentencePicker { context, readings, _ -> seen += context; readings.indexOf("淡话").coerceAtLeast(0) }
+        val refiner = SentenceRefiner { _, readings, _, _ -> readings.indexOf("淡话").takeIf { it >= 0 } ?: SentenceRefiner.NONE }
+        val written = listOf(read("淡", "谈", step = 0.3), read("话"))
+        val words = TextWords(d.model, d.wordIndex)
+
+        val medium = HandwritingSession(handwritingDecoder(), words, reranker = picker)
+        medium.apply(Action.Context("我说"))
+        written.forEach { medium.show(it) }
+        val shown = medium.apply(Action.Ink)
+        assertEquals("淡话", shown.preedit)
+        assertEquals("我说", seen.last())
+        assertFalse(shown.refines)
+        // the sentence ending as it does gives way, the rest stay
+        assertEquals(1, shown.candidates.count { it == "话" })
+
+        val high = HandwritingSession(handwritingDecoder(), words, refiner = refiner)
+        written.forEach { high.show(it) }
+        // a character still being written is not weighed
+        val before = high.apply(Action.Ink)
+        assertEquals("谈话", before.preedit)
+        assertFalse(before.refines)
+        // nor one finished that is not the last
+        high.finished(pieces - 2)
+        assertFalse(high.apply(Action.Ink).refines)
+        high.finished(pieces - 1)
+        assertTrue(high.apply(Action.Ink).refines)
+        val after = high.apply(Action.Refine)
+        assertEquals("淡话", after.preedit)
+        assertFalse(after.refines)
+        // nothing more to weigh
+        assertEquals(after, high.apply(Action.Refine))
+        // the first, put in, is the sentence shown
+        assertEquals("淡话", high.apply(Action.Pick(0)).commit)
+        // a page turned while it weighs: the order shown stays, the weighing dropped
+        val paged = HandwritingSession(handwritingDecoder(), words, pageSize = 1, refiner = refiner)
+        written.forEach { paged.show(it) }
+        paged.finished(pieces - 1)
+        assertTrue(paged.apply(Action.Ink).refines)
+        val turned = paged.apply(Action.NextPage)
+        assertFalse(turned.refines)
+        assertEquals(turned, paged.apply(Action.Refine))
     }
 
     @Test

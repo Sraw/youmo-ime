@@ -420,6 +420,13 @@
     <string name="t9_multi_tap_fast">快（0.4 秒）</string>
     <string name="t9_multi_tap_medium">中（0.6 秒）</string>
     <string name="t9_multi_tap_slow">慢（0.9 秒）</string>
+    <string name="handwriting_pause">停筆多久算寫完一個字</string>
+    <string name="handwriting_pause_summary">停筆超過這個時間，就算寫完一個字、開始寫下一個：寫得快可以調短；寫一個字中間常停頓的，調長</string>
+    <string name="handwriting_pause_fastest">很短（0.3 秒）</string>
+    <string name="handwriting_pause_fast">短（0.5 秒）</string>
+    <string name="handwriting_pause_medium">中（0.7 秒）</string>
+    <string name="handwriting_pause_slow">長（1 秒）</string>
+    <string name="handwriting_pause_slowest">很長（1.5 秒）</string>
     <string name="t9_letters">按鍵字母</string>
     <string name="t9_letters_summary">自訂每個數字鍵打出哪些字母，每鍵最多五個，可以重複</string>
     <string name="t9_letters_hint">點一個鍵，設定它打出的字母，最多五個。同一個字母可以放在多個鍵上；不在任何鍵上的字母，含它的拼音就打不出來。</string>

@@ -58,6 +58,11 @@ it writes once the engine has ended it (`EngineBridge.handwritingEnded`, the lat
 a value missed while detached is still seen), and ends it itself when detached and at each new
 input (`restart`, which also drops what was still being read). The
 recognizer skips a read only for a newer one of the same piece: a piece's last read is what it shows.
+How long the pen stays up before a piece is done (`InkPad.finishMillis`) is the app's setting
+`AppPrefs.keyboard.handwritingPause` (`HandwritingPause`, 0.3–1.5 s), on the handwriting page,
+read at each pen up. A piece so done is told to the engine (`EngineBridge.inkFinished` and an Ink
+key, after the piece's readings: `HandwritingRecognition.afterReads`), for the large sentence model
+to weigh the finished character's sentence.
 
 ## Settings
 

@@ -400,12 +400,18 @@ Option<EngineTableConfig> *AndroidEngine::table(const std::string &im) {
 
 const Configuration *AndroidEngine::getConfigForInputMethod(const InputMethodEntry &entry) const {
     const auto &im = entry.uniqueName();
+    RawConfig raw;
     if (const auto option = tableOf(im)) {
-        return &(config_.*option).value();
+        // the shared options, then the table's own over them
+        config_.save(raw);
+        tablePage_.load(raw, true);
+        RawConfig own;
+        (config_.*option).value().save(own);
+        tablePage_.load(own, true);
+        return &tablePage_;
     }
     const auto *m = listed(im);
     if (!m) return nullptr;
-    RawConfig raw;
     config_.save(raw);
     if (m->page == Page::Shuangpin) {
         shuangpinPage_.load(raw, true);
@@ -426,9 +432,11 @@ const Configuration *AndroidEngine::getConfigForInputMethod(const InputMethodEnt
 void AndroidEngine::setConfigForInputMethod(const InputMethodEntry &entry, const RawConfig &config) {
     const auto &im = entry.uniqueName();
     if (auto *option = table(im)) {
+        // the table's own keys into its group, the shared ones into config_ (each ignores the other's)
         EngineTableConfig value = option->value();
         value.load(config, true);
         option->setValue(value);
+        config_.load(config, true);
     } else if (listed(im)) {
         // the page's keys are config_'s own
         config_.load(config, true);

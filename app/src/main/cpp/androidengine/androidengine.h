@@ -68,18 +68,21 @@ enum class EngineOrderPolicy { No, Freq, Fast };
 FCITX_CONFIG_ENUM_NAME_WITH_I18N(EngineOrderPolicy, N_("No"), N_("Freq"), N_("Fast"))
 
 // libime table's keys and texts; the engine orders by use alike for Freq and Fast
+#define ENGINE_TABLE_OPTIONS \
+        Option<bool> autoSelect{this, "AutoSelect", _("Auto select candidate"), true}; \
+        Option<bool> hint{this, "Hint", _("Display Hint for word"), true}; \
+        OptionWithAnnotation<EngineOrderPolicy, EngineOrderPolicyI18NAnnotation> orderPolicy{ \
+                this, "OrderPolicy", _("Order policy"), EngineOrderPolicy::No}; \
+        /* -1 as libime has it: the longest code; never by count, only once picked */ \
+        Option<int, IntConstrain> autoPhraseLength{this, "AutoPhraseLength", _("Auto phrase length"), 0, \
+                                                   IntConstrain(-1, 8)}; \
+        Option<int, IntConstrain> saveAutoPhraseAfter{ \
+                this, "SaveAutoPhraseAfter", _("Save auto phrase after being typed for ... times"), 0, \
+                IntConstrain(-1, 10)};
+
 FCITX_CONFIGURATION(
         EngineTableConfig,
-        Option<bool> autoSelect{this, "AutoSelect", _("Auto select candidate"), true};
-        Option<bool> hint{this, "Hint", _("Display Hint for word"), true};
-        OptionWithAnnotation<EngineOrderPolicy, EngineOrderPolicyI18NAnnotation> orderPolicy{
-                this, "OrderPolicy", _("Order policy"), EngineOrderPolicy::No};
-        // -1 as libime has it: the longest code; never by count, only once picked
-        Option<int, IntConstrain> autoPhraseLength{this, "AutoPhraseLength", _("Auto phrase length"), 0,
-                                                   IntConstrain(-1, 8)};
-        Option<int, IntConstrain> saveAutoPhraseAfter{
-                this, "SaveAutoPhraseAfter", _("Save auto phrase after being typed for ... times"), 0,
-                IntConstrain(-1, 10)};)
+        ENGINE_TABLE_OPTIONS)
 
 // each table's own defaults, those of ime-core's TableOptions presets (fcitx's .conf files); a
 // value read that is out of range falls back to EngineTableConfig's, not to these
@@ -152,11 +155,24 @@ FCITX_CONFIGURATION(
         EngineEnglishPage,
         ENGINE_ENGLISH_SUGGEST)
 
-// how the pad is written on is the app's own setting, the keyboard's
+// how the pad is written on is the app's own setting, the keyboard's; prediction and the
+// performance level are pinyin's, the same options
 FCITX_CONFIGURATION(
         EngineHandwritingPage,
-        ENGINE_PAGE_SIZE)
+        ENGINE_PAGE_SIZE
+        ENGINE_PREDICTION
+        ENGINE_MODEL_LEVEL)
 
+// a table's page: its own options, under its group, and pinyin's page size, prediction and
+// performance level, the same options (every Chinese input method has them)
+FCITX_CONFIGURATION(
+        EngineTablePage,
+        ENGINE_PAGE_SIZE
+        ENGINE_PREDICTION
+        ENGINE_MODEL_LEVEL
+        ENGINE_TABLE_OPTIONS)
+
+#undef ENGINE_TABLE_OPTIONS
 #undef ENGINE_ENGLISH_SUGGEST
 #undef ENGINE_SHUANGPIN_PROFILE
 #undef ENGINE_PAGE_SIZE
@@ -268,6 +284,7 @@ private:
     mutable EngineShuangpinPage shuangpinPage_;
     mutable EngineEnglishPage englishPage_;
     mutable EngineHandwritingPage handwritingPage_;
+    mutable EngineTablePage tablePage_;
     // the pause a snapshot that refines waits for; any event ends it
     std::unique_ptr<EventSourceTime> refine_;
 

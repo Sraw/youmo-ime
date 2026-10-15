@@ -11,6 +11,7 @@ import org.fcitx.fcitx5.android.engine.lattice.Predictor
 import org.fcitx.fcitx5.android.engine.lattice.UserWords
 import org.fcitx.fcitx5.android.engine.lattice.WordScorer
 import org.fcitx.fcitx5.android.engine.pinyin.Syllables
+import org.fcitx.fcitx5.android.engine.user.UserModel
 import java.nio.ByteBuffer
 
 private fun syl(vararg s: String) = s.map { Syllables.id(it) }.toIntArray()
@@ -58,3 +59,10 @@ internal fun handwritingDecoder(
 
 /** A position's readings, best first, each [step] less likely than the one before. */
 internal fun read(vararg texts: String, step: Double = 1.0) = InkReading(texts.toList(), DoubleArray(texts.size) { -step * it })
+
+/** What [this] counted: each word and pair, as the user model has them. */
+internal fun UserModel.learned(): Set<String> {
+    val out = HashSet<String>()
+    forEachCount({ e, _ -> out += "$e" }, { a, b, _ -> out += "$a $b" })
+    return out
+}

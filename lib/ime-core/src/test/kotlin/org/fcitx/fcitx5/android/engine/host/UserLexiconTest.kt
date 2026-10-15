@@ -134,7 +134,7 @@ class UserLexiconTest : EnginesFixture() {
         val additions = Engines.Additions("", "d") { sequenceOf("你好 ni'hao 0") }
         withTable(dir, additions).use { engines ->
             assertTrue(engines.addWord("你好", "ni hao"))
-            // the table's own entry, then the dictionary's word, coded by the table's rule
+            // the table's own entry, then the dictionary's word, coded by the table's rule: first once picked here
             assertEquals(listOf("妤", "你好"), engines.type(WUBI, "abcd").candidates)
             engines.onEvent(WUBI, EngineEvent.RESET, 0)
             engines.pickInTable("你好")

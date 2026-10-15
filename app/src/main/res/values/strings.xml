@@ -434,6 +434,13 @@
     <string name="t9_multi_tap_fast">Fast (0.4 s)</string>
     <string name="t9_multi_tap_medium">Medium (0.6 s)</string>
     <string name="t9_multi_tap_slow">Slow (0.9 s)</string>
+    <string name="handwriting_pause">Pause that ends a character</string>
+    <string name="handwriting_pause_summary">How long the pen stays up before what is written counts as one character and the next begins: shorter for a fast hand, longer if you pause between strokes</string>
+    <string name="handwriting_pause_fastest">Very short (0.3 s)</string>
+    <string name="handwriting_pause_fast">Short (0.5 s)</string>
+    <string name="handwriting_pause_medium">Medium (0.7 s)</string>
+    <string name="handwriting_pause_slow">Long (1 s)</string>
+    <string name="handwriting_pause_slowest">Very long (1.5 s)</string>
     <string name="t9_letters">Letters on the keys</string>
     <string name="t9_letters_summary">Which letters each key types: up to five, a letter may be on more than one key</string>
     <string name="t9_letters_hint">Tap a key to set the letters it types, up to five. A letter may be on more than one key; pinyin with a letter on no key cannot be typed.</string>

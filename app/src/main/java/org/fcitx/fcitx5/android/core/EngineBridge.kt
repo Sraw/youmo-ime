@@ -93,6 +93,9 @@ object EngineBridge {
     /** What the handwriting pad read of its [piece], for the key sent next to show: Engines.offerInk. On the fcitx thread. */
     fun offerInk(reading: InkReading, piece: Int) = engines.offerInk(reading, piece)
 
+    /** The handwriting pad's [piece] finished, for the key sent next to tell: Engines.inkFinished. On the fcitx thread. */
+    fun inkFinished(piece: Int) = engines.inkFinished(piece)
+
     /** The 双拼 scheme the user set, for the keyboard to tell its keys from text (Engines.readsAsKey): set on the fcitx thread, read on the main one. */
     @Volatile
     var shuangpinScheme: ShuangpinScheme = ShuangpinScheme.ZIRANMA

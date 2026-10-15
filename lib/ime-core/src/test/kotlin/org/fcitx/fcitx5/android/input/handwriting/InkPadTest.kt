@@ -8,6 +8,7 @@ import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -67,6 +68,16 @@ class InkPadTest {
         assertTrue(InkPad().piece > b.piece)
         pad.down(2f, 2f)
         assertFalse(pad.finish(1_000_000))
+    }
+
+    @Test
+    fun `the pause that ends a piece is the user's to set`() {
+        val pad = InkPad()
+        pad.finishMillis = 300
+        pad.stroke(1000, 0f, 0f, 1f, 1f)
+        assertFalse(pad.finish(1299))
+        assertTrue(pad.finish(1300))
+        assertThrows(IllegalArgumentException::class.java) { pad.finishMillis = 0 }
     }
 
     @Test

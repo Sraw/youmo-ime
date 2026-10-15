@@ -40,11 +40,13 @@ class EnginesWarmUpTest : EnginesFixture() {
 
     /** One who types only English or a table neither waits for pinyin's data nor holds its word index. */
     @Test
-    fun aFieldStartedInEnglishOrATableReadsNoPinyin() {
+    fun aFieldStartedInEnglishReadsNoPinyinATableDoes() {
         val engines = Engines(::load, null, warmUps = warmUps)
         engines.context(Engines.ENGLISH, "")
-        engines.context(Engines.WUBI, "")
         assertEquals(emptyList<Runnable>(), later)
+        // a table ranks and learns by pinyin's words too (TableLanguage)
+        engines.context(Engines.WUBI, "")
+        assertEquals(1, later.size)
         engines.context(Engines.SHUANGPIN, "")
         assertEquals(1, later.size)
     }

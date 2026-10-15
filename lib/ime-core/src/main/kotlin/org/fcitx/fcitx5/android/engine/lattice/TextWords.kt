@@ -11,9 +11,14 @@ import org.fcitx.fcitx5.android.engine.data.WordIndex
 /**
  * The model's words that text the engine did not commit ends with, such as what the editor has
  * before the cursor: its last chars split as the model finds them likeliest, word by word (the
- * sum of their unigram scores), a char no word of the model's covers counting as `<unk>`.
+ * sum of their unigram scores), a char no word of the model's covers counting as `<unk>`. [scorer]
+ * weighs a text for [logProb]: the model, or the model with the user's words mixed in.
  */
-class TextWords(private val model: NgramModel, private val index: WordIndex) {
+class TextWords(
+    private val model: NgramModel,
+    private val index: WordIndex,
+    private val scorer: WordScorer = WordScorer { prev2, prev, word -> model.score(prev2, prev, word) },
+) {
 
     /**
      * The last two words [text] ends with, the last one last: fewer when it has fewer, none when
@@ -51,15 +56,19 @@ class TextWords(private val model: NgramModel, private val index: WordIndex) {
     }
 
     /**
-     * log10 P of [text] as the model has it, split into words as makes it likeliest, each word
-     * after the two before it: a char no word covers is `<unk>`. For ranking texts heard alike.
+     * log10 P of [text] as [scorer] has it, after the words [before] ends with ([lastTwo]), split
+     * into words as makes it likeliest, each word after the two before it: a char no word covers
+     * is `<unk>`. For ranking texts heard alike, or a code's 重码.
      */
-    fun logProb(text: CharSequence): Float {
+    fun logProb(text: CharSequence, before: CharSequence = ""): Float = previous(lastTwo(before)).let { (prev2, prev) -> logProb(text, prev2, prev) }
+
+    /** As [logProb] after [prev2] and [prev] (as [previous] gives them): for many texts after the same. */
+    fun logProb(text: CharSequence, prev2: Int, prev: Int): Float {
         val n = text.length
         if (n == 0) return 0f
         // at each offset, the words a split can end on there: the best score to it and the word before
         val at = Array(n + 1) { HashMap<Int, Best>() }
-        at[0][NO_WORD] = Best(0f, NO_WORD)
+        at[0][prev] = Best(0f, prev2)
         for (begin in 0 until n) {
             val from = at[begin]
             if (from.isEmpty()) continue
@@ -67,10 +76,10 @@ class TextWords(private val model: NgramModel, private val index: WordIndex) {
                 val id = index.find(text, begin, begin + length)
                 if (id == NO_WORD && length > 1) continue
                 val to = at[begin + length]
-                for ((prev, best) in from) {
-                    val score = best.score + model.score(best.prev, prev, id)
+                for ((last, best) in from) {
+                    val score = best.score + scorer.score(best.prev, last, id)
                     val there = to[id]
-                    if (there == null || score > there.score) to[id] = Best(score, prev)
+                    if (there == null || score > there.score) to[id] = Best(score, last)
                 }
             }
         }

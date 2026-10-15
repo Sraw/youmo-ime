@@ -56,15 +56,20 @@ internal class HandwritingRun(private val data: PinyinData) {
         coarse = coarse, inkWeight = weight, alternatives = alternatives,
     )
 
-    fun sentences(rows: List<Row>, decoder: HandwritingDecoder): Tally = Tally().also { t ->
+    /**
+     * [pick], given the text before and a decoding, says which of its [HandwritingDecoder.Decoding.best]
+     * to put first, as a sentence model does (the 性能档位): none keeps the decoder's.
+     */
+    fun sentences(rows: List<Row>, decoder: HandwritingDecoder, pick: ((String, HandwritingDecoder.Decoding) -> Int)? = null): Tally = Tally().also { t ->
+        fun text(before: String, d: HandwritingDecoder.Decoding) = if (pick == null) d.text else d.best.getOrElse(pick(before, d)) { d.text }
         for (r in rows) {
             val (prev2, prev) = TextWords.previous(textWords.lastTwo(r.before))
             for (i in r.positions.indices) {
                 val d = decoder.decode(r.positions.subList(0, i + 1), prev2, prev)
-                if (d.text.lastOrNull() == r.text[i]) t.asWritten++
+                if (text(r.before, d).lastOrNull() == r.text[i]) t.asWritten++
                 if (d.sentences.take(TEN).any { it.last() == r.text[i] }) t.inTen++
             }
-            val final = decoder.decode(r.positions, prev2, prev).text
+            val final = text(r.before, decoder.decode(r.positions, prev2, prev))
             t.chars += r.text.length
             t.final += r.text.indices.count { final.getOrNull(it) == r.text[it] }
         }

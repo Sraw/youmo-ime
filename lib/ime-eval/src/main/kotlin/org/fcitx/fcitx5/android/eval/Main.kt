@@ -13,6 +13,7 @@ import org.fcitx.fcitx5.android.engine.handwriting.HandwritingDecoder
 import org.fcitx.fcitx5.android.engine.lattice.Penalties
 import org.fcitx.fcitx5.android.engine.lattice.PinyinDecoder
 import org.fcitx.fcitx5.android.engine.lattice.Predictor
+import org.fcitx.fcitx5.android.engine.lattice.TextWords
 import org.fcitx.fcitx5.android.engine.libime.LibimeFiles
 import org.fcitx.fcitx5.android.engine.pinyin.Fuzzy
 import org.fcitx.fcitx5.android.engine.pinyin.LatinWords
@@ -26,6 +27,7 @@ import org.fcitx.fcitx5.android.engine.rerank.SentencePicker
 import org.fcitx.fcitx5.android.engine.rerank.SentenceRefiner
 import org.fcitx.fcitx5.android.engine.session.Action
 import org.fcitx.fcitx5.android.engine.session.PinyinSession
+import org.fcitx.fcitx5.android.engine.table.TableLanguage
 import org.fcitx.fcitx5.android.engine.user.WordPack
 import java.io.File
 import java.io.IOException
@@ -141,8 +143,9 @@ internal val COMMANDS = listOf(
         0
     },
     Command(
-        "handwriting", "<pinyin.data> <rows.tsv> [--weights <ink weight>,...] [--alternatives <n>] [--limit <rows>]",
-        2..2, "weights", "alternatives", "limit",
+        "handwriting",
+        "<pinyin.data> <rows.tsv> [--weights <ink weight>,...] [--alternatives <n>] [--limit <rows>] [--rerank <small model.safetensors> [--refine <large model.safetensors>]] [--model-weights <w>,...]",
+        2..2, "weights", "alternatives", "limit", "rerank", "refine", "model-weights",
     ) { args, out, _ ->
         val (dataPath, rowsPath) = args.operands
         val run = HandwritingRun(loadData(dataPath))
@@ -151,11 +154,40 @@ internal val COMMANDS = listOf(
         out.appendLine("ink alone            ${run.ink(rows)}")
         val weights = args.options["weights"]?.split(',')?.map { it.toDouble() } ?: listOf(HandwritingDecoder.INK_WEIGHT)
         for (w in weights) out.appendLine(String.format(Locale.ROOT, "sentence, ink %-5s %s", w, run.sentences(rows, run.decoder(w, alternatives))))
+        // the sentence models weighing the best sentences again, as the 性能档位 has them in the app:
+        // medium, the small one at each character within its budget; high, then the large one in
+        // the slices a pause gives it (SentenceRefiner.SLICES of PinyinSession's budget, 1)
+        val small = args.options["rerank"]?.let { SentenceModel.load(mapFile(it), unpack = true) }
+        val large = args.options["refine"]?.let { SentenceModel.load(mapFile(it), unpack = true) }
+        val modelWeights = args.options["model-weights"]?.split(',')?.map { it.toFloat() } ?: listOf(Reranker.WEIGHT)
+        if (small != null) {
+            for (mw in modelWeights) {
+                val reranker = Reranker(small, mw)
+                val refiner = large?.let { Reranker(it, mw, limit = Reranker.REFINE_LIMIT) }
+                val medium = { before: String, d: HandwritingDecoder.Decoding -> reranker.pick(before, d.best, d.bestScores) }
+                val high = { before: String, d: HandwritingDecoder.Decoding ->
+                    val first = medium(before, d)
+                    var picked: Int? = null
+                    var slices = 0
+                    while (picked == null && refiner != null && slices++ < SentenceRefiner.SLICES) picked = refiner.refine(before, d.best, d.bestScores, 1)
+                    picked?.takeIf { it != SentenceRefiner.NONE } ?: first
+                }
+                val decoder = run.decoder(weights.first(), alternatives)
+                out.appendLine(String.format(Locale.ROOT, "medium %-5s     %s", mw, run.sentences(rows, decoder, medium)))
+                if (refiner != null) out.appendLine(String.format(Locale.ROOT, "high %-5s       %s", mw, run.sentences(rows, decoder, high)))
+            }
+        }
         0
     },
-    Command("table", "<table.data> <set.tsv> [--preset <preset>]", 2..2, "preset") { args, out, _ ->
+    Command(
+        "table", "<table.data> <set.tsv> [--preset <preset>] [--pinyin <pinyin.data> [--rerank <small.safetensors> [--refine <large.safetensors>]]]",
+        2..2, "preset", "pinyin", "rerank", "refine",
+    ) { args, out, _ ->
         val (dataPath, setPath) = args.operands
         table(dataPath, setPath, args.options["preset"] ?: "plain", out)
+        // the 重码 after the text before, as the app ranks them (TableLanguage)
+        args.options["pinyin"]?.let { tableHomographs(dataPath, setPath, args.options["preset"] ?: "plain", it, args.options["rerank"], args.options["refine"], out) }
+        0
     },
     Command("libime", "pinyin|history|table <file>", 2..2) { args, out, err ->
         val (kind, path) = args.operands
@@ -538,6 +570,30 @@ private fun table(dataPath: String, setPath: String, preset: String, out: Append
     val total = texts.fold(TableRun.Outcome.ZERO) { sum, text -> sum + run.type(text) }
     out.appendLine(TableRun.report(total, run.entries(ENTRY_STEP)))
     return 0
+}
+
+private fun tableHomographs(dataPath: String, setPath: String, preset: String, pinyinPath: String, rerank: String?, refine: String?, out: Appendable) {
+    val run = TableRun(CodeTable.load(mapFile(dataPath)), TableRun.PRESETS.getValue(preset))
+    val d = loadData(pinyinPath)
+    val words = TextWords(d.model, d.wordIndex)
+    val small = rerank?.let { Reranker(SentenceModel.load(mapFile(it), unpack = true), Reranker.WEIGHT) }
+    val large = refine?.let { Reranker(SentenceModel.load(mapFile(it), unpack = true), Reranker.WEIGHT, limit = Reranker.REFINE_LIMIT) }
+    val languages = listOfNotNull(
+        "table's order" to null,
+        "word model (low)" to TableLanguage(words),
+        small?.let { "+ small model (medium)" to TableLanguage(words, reranker = it) },
+        large?.let { "+ large model (high)" to TableLanguage(words, reranker = small, refiner = it) },
+    )
+    val texts = readSet(setPath).map { it.expected }.distinct()
+    var n = 0
+    val first = IntArray(languages.size)
+    for (text in texts) {
+        val (k, f) = run.homographs(text, languages.map { it.second })
+        n += k
+        f.indices.forEach { first[it] += f[it] }
+    }
+    out.appendLine("重码 words: $n")
+    languages.forEachIndexed { i, (label, _) -> out.appendLine(String.format(Locale.ROOT, "  %-24s first %.1f%%", label, 100.0 * first[i] / maxOf(n, 1))) }
 }
 
 /** A libime file as the text libime's own tools write of it, to check the readers against them. */

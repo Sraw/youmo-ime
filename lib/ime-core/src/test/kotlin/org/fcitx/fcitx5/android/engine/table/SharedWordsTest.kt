@@ -53,13 +53,14 @@ class SharedWordsTest {
     }
 
     @Test
-    fun forgottenASharedWordIsForgottenByAllATablesOwnOnlyHere() {
+    fun forgottenAWordIsForgottenByAllTheTablesOwnToo() {
+        // what a table puts in, every input method learned (the one user model): forgotten by all
         val shared = Fake(wubi, listOf("你门"))
         val session = TableSession(wubi, TableOptions.WUBI, user = TableUser(wubi), shared = shared)
         session.type("wqwu")
         session.apply(Forget(0))
-        assertEquals(emptyList<String>(), shared.forgotten)
+        assertEquals(listOf("你们"), shared.forgotten)
         assertEquals(listOf("你们"), session.apply(Forget(1)).candidates)
-        assertEquals(listOf("你门"), shared.forgotten)
+        assertEquals(listOf("你们", "你门"), shared.forgotten)
     }
 }

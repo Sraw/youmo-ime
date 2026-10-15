@@ -48,6 +48,8 @@ class HandwritingKeyboard(
     context: Context,
     theme: Theme,
     private val deliver: (InkReading, piece: Int) -> Unit,
+    /** The pad's piece finished (the pen up long enough), told after its readings are delivered. */
+    private val finished: (piece: Int) -> Unit = {},
 ) : BaseKeyboard(context, theme, Layout) {
 
     companion object {
@@ -95,7 +97,7 @@ class HandwritingKeyboard(
         lang.isVisible = v
     }
 
-    private val padView = HandwritingPadView(context, theme, ::read).apply {
+    private val padView = HandwritingPadView(context, theme, ::read, { AppPrefs.getInstance().keyboard.handwritingPause.getValue().millis }, ::finish).apply {
         val prefs = ThemeManager.prefs
         val h = dp(prefs.keyHorizontalMargin.getValue())
         val v = dp(prefs.keyVerticalMargin.getValue())
@@ -153,6 +155,11 @@ class HandwritingKeyboard(
         HandwritingRecognition.read(read) { reading ->
             if (read.piece >= since) deliver(reading, read.piece)
         }
+    }
+
+    // after the piece's readings, as the engine must have them first
+    private fun finish(piece: Int) {
+        HandwritingRecognition.afterReads { if (piece >= since) finished(piece) }
     }
 
     private val padHit = Rect()

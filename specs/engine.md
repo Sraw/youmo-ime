@@ -4,6 +4,23 @@ The input methods are this project's own, in Kotlin, replacing libime and fcitx5
 engines. Read the class KDoc before changing a class: most say why they are as they are, with the
 measurement that decided it.
 
+## What every Chinese input method has
+
+Each Chinese input method the app ships (全拼, 双拼, 九键, the code tables, handwriting, and any added
+later) has the same five, decided 2026-10-14; a new one is not done without them:
+
+1. **The word model** (the pinyin data's n-gram) in ranking, after the text before the cursor.
+2. **The sentence models** as the 性能档位 has them: none (low), the small one at each key (medium),
+   the large one at a pause too (high). One setting, shared, shown on each input method's page.
+3. **Prediction** (联想) after a commit: one setting, shared; a prediction picked is learned.
+4. **Learning** into the one user model (`UserLexicon.user()`), what the user picks; not while
+   `learning` is off (a password).
+5. **The user's lexicon**: their words, added and blocked (`WordLists`), found and ranked as the
+   dictionary's are; a blocked word never offered.
+
+All have them: the pinyins, handwriting (2026-10-14) and the code tables (2026-10-14, `TableLanguage`;
+see Tables for where a table's order may move).
+
 ## Packages
 
 | Package | Holds |
@@ -83,7 +100,28 @@ key. `pinyinKey` (五笔 `z`, 二笔 `[`) looks a character up by pinyin, showin
 `matchingKey` is the wildcard (五笔 `z`, 仓颉 and 二笔 `*`). Characters typed one by one become
 phrases by the table's 组词规则 (`autoPhraseLength`), saved after `saveAutoPhraseAfter` uses.
 `SharedWords` gives every table the user's words from the other input methods, coded by its rules.
-Options per table are in `androidengine.h` (`engineTable(...)`) and `TableOptions`.
+Options per table are in `androidengine.h` (`engineTable(...)`) and `TableOptions`; a table's page
+shows pinyin's page size, prediction and 性能档位 too (`EngineTablePage`), the same settings.
+
+Every table's words follow one rule, set at build time (`table --words --pinyin`, decided on 五笔
+86 and kept for all, `lexicon/README.md` "Words in the code tables"): the table keeps every entry
+it ships, only reordered, under each full code the commonest first; words added from pinyin.data go
+when under a tenth as common as their code's commonest; new words (the pack's) never go and count
+ten times; characters never go; 简码 (codes shorter than the longest) stay as they are.
+
+At typing time a table has the five every Chinese input method has (`TableLanguage`, made in
+`Engines.tableLanguage`). Where it orders by use (常用的字词排前面, on for all but 仓颉), a code's
+重码 — the candidates whose code is all that was typed, longer than `noSortInputLength` (五笔's 一二级
+简码 stay put; 自然码 and 二笔 keep none) — are placed: the user's words first (one of the other input methods' once picked here: decided so,
+not to move a blind typist's first for a word typed once in pinyin), then the table's
+entries by the word model after the text before (`TextWords.logProb` over the user's scorer), each
+of the table's picks adding (log10(1 + picks): the user model's counts alone moved a pick forward too
+slowly for a table that orders by use); a blocked entry is left out of the weighing. The small sentence model weighs them again at each key (medium), the large one at a
+pause (high). Off, the table's order stands for those who type by position. Whatever the order,
+what is put in is learned by the one user model (each word by its reading, after the one before),
+forgetting a candidate forgets it everywhere, and 联想 follows a commit until the next key.
+`ime-eval table <t.data> <set> --preset <p> --pinyin <pinyin.data> [--rerank --refine]` measures
+the 重码 typed first after the text before.
 
 ## English
 
@@ -122,7 +160,16 @@ checkpoint (`HELD=1`), 74.7% first right by the ink alone, 91.4% once the senten
 85.1% as each character is, the last in the first ten 95.7% (the first release: 72.5%, 89.2%,
 82.5%, 94.3%). The words from each position are kept while its readings and the
 next seven are the same (`HandwritingDecoder.arcs`), so a stroke costs the last characters' words,
-not the whole sentence's. A sentence picked other than the first is learned, its words as the
+not the whole sentence's. The 性能档位 is pinyin's: the decoder's best sentences (`Decoding.best`,
+five, whatever they end with) weighed again by the small sentence model as each stroke is read
+(medium) and by the large one once the character is finished (high: the pad tells the engine when
+the pen was up long enough, `Engines.inkFinished`, then `Action.Refine` slices), after the text before
+(128 chars, none where nothing is learned); on 11,197 held-out CASIA characters, final 90.5% → 90.8%
+→ 91.3%, as written 83.9% → 84.5% → 85.3% (low, medium, high; `ime-eval handwriting --rerank/--refine`,
+run within the app's budgets, at pinyin's `Reranker.WEIGHT`, 0.4; 0.8 gave half a point more as
+written, not worth a weight of its own). Once a sentence is put in, what may
+follow is offered as pinyin offers it (`Predictor`, the prediction setting), a word picked learned.
+A sentence picked other than the first is learned, its words as the
 decoder found them (`Decoding.words`: a dictionary word read as its syllable path, a character alone
 as its first reading): the user chose it over the ink's best. The first is not, however put in: the
 readings are often wrong, and a misread word not noticed, learned, would come back.

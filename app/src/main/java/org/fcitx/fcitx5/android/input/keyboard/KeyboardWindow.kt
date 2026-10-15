@@ -77,15 +77,26 @@ class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), Essentia
         T9Keyboard.Name to { T9Keyboard(context, theme, NineKeyLetters.parse(AppPrefs.getInstance().keyboard.t9Letters.getValue())) },
         NumberKeyboard.Name to { NumberKeyboard(context, theme) },
         HandwritingKeyboard.Name to {
-            HandwritingKeyboard(context, theme) { reading, piece ->
-                // the keyboard hidden while it was read: the input it was for is over
-                if (!service.isInputViewShown) return@HandwritingKeyboard
-                // the reading, then its key, in one job: the key shows what was offered just before it
-                service.postFcitxJob {
-                    EngineBridge.offerInk(reading, piece)
-                    sendKey(KeySym(UNICODE + Keyboard.INK), KeyStates.Virtual)
-                }
-            }
+            HandwritingKeyboard(
+                context, theme,
+                deliver = { reading, piece ->
+                    // the keyboard hidden while it was read: the input it was for is over
+                    if (!service.isInputViewShown) return@HandwritingKeyboard
+                    // the reading, then its key, in one job: the key shows what was offered just before it
+                    service.postFcitxJob {
+                        EngineBridge.offerInk(reading, piece)
+                        sendKey(KeySym(UNICODE + Keyboard.INK), KeyStates.Virtual)
+                    }
+                },
+                finished = { piece ->
+                    if (!service.isInputViewShown) return@HandwritingKeyboard
+                    // likewise: the character done, for the engine to weigh its sentence again (性能档位 high)
+                    service.postFcitxJob {
+                        EngineBridge.inkFinished(piece)
+                        sendKey(KeySym(UNICODE + Keyboard.INK), KeyStates.Virtual)
+                    }
+                },
+            )
         },
     )
     private val keyboards = hashMapOf<String, BaseKeyboard>()

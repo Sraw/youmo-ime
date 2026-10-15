@@ -18,6 +18,7 @@ import org.fcitx.fcitx5.android.input.candidates.expanded.ExpandedCandidateStyle
 import org.fcitx.fcitx5.android.input.candidates.floating.FloatingCandidatesMode
 import org.fcitx.fcitx5.android.input.candidates.floating.FloatingCandidatesOrientation
 import org.fcitx.fcitx5.android.input.candidates.horizontal.HorizontalCandidateMode
+import org.fcitx.fcitx5.android.input.handwriting.HandwritingPause
 import org.fcitx.fcitx5.android.input.keyboard.KeyboardHeightPercentBase
 import org.fcitx.fcitx5.android.input.keyboard.LangSwitchBehavior
 import org.fcitx.fcitx5.android.input.keyboard.SpaceLongPressBehavior
@@ -154,6 +155,11 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
 
         /** Shown on the English page (InputMethodSettings), not here: English's alone. */
         val englishAutoCaps = bool(ENGLISH_AUTO_CAPS, true)
+
+        /** Shown on the handwriting page (InputMethodSettings): how long the pen stays up before a character is done. */
+        val handwritingPause = stringLike(HANDWRITING_PAUSE, object : ManagedPreference.StringLikeCodec<HandwritingPause> {
+            override fun decode(raw: String) = HandwritingPause.entries.firstOrNull { it.name == raw }
+        }, HandwritingPause.Medium)
         val showLangSwitchKey =
             switch(R.string.show_lang_switch_key, "show_lang_switch_key", true)
         val langSwitchKeyBehavior = hidden {
@@ -589,6 +595,7 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
         // keys an input method's page names its rows by (InputMethodSettings); the others are only this file's
         const val T9_MULTI_TAP = "t9_multi_tap"
         const val ENGLISH_AUTO_CAPS = "english_auto_caps"
+        const val HANDWRITING_PAUSE = "handwriting_pause"
 
         /**
          * MUST call before use

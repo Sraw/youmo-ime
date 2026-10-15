@@ -4,11 +4,13 @@
  */
 package org.fcitx.fcitx5.android.engine.host
 
+import org.fcitx.fcitx5.android.engine.data.NgramModel.Companion.NO_WORD
 import org.fcitx.fcitx5.android.engine.english.EnglishSession
 import org.fcitx.fcitx5.android.engine.handwriting.HandwritingDecoder
 import org.fcitx.fcitx5.android.engine.handwriting.HandwritingSession
 import org.fcitx.fcitx5.android.engine.handwriting.InkReading
 import org.fcitx.fcitx5.android.engine.lattice.CoarseWords
+import org.fcitx.fcitx5.android.engine.lattice.Predictor
 import org.fcitx.fcitx5.android.engine.lattice.TextWords
 import org.fcitx.fcitx5.android.engine.phrase.CustomPhrases
 import org.fcitx.fcitx5.android.engine.phrase.PhraseBook
@@ -28,6 +30,7 @@ import org.fcitx.fcitx5.android.engine.session.PinyinSession
 import org.fcitx.fcitx5.android.engine.session.Session
 import org.fcitx.fcitx5.android.engine.session.Snapshot
 import org.fcitx.fcitx5.android.engine.stroke.StrokeLookup
+import org.fcitx.fcitx5.android.engine.table.TableLanguage
 import org.fcitx.fcitx5.android.engine.table.TableOptions
 import org.fcitx.fcitx5.android.engine.table.TableSession
 import org.fcitx.fcitx5.android.engine.user.LibimeImport
@@ -222,13 +225,13 @@ class Engines(
      * learns as its [onEvent] would. [im] is the input method the field starts with.
      */
     fun context(im: String, before: String, learning: Boolean = true) {
-        if (!pinyinWarmedUp && im in PINYINS) warmUpPinyin()
+        if (!pinyinWarmedUp && (im in PINYINS || im in TABLES)) warmUpPinyin()
         keyboards.values.forEach { it.context(before, learning) }
     }
 
     // told as a field starts in one of the pinyins, before its first key: pinyin's data read and its
-    // 270 thousand words indexed meanwhile, off the fcitx thread; one who types only English or a
-    // table neither waits for them nor holds them. A pinyin key that comes sooner waits for them, and
+    // 270 thousand words indexed meanwhile, off the fcitx thread (a table ranks and learns by them too,
+    // TableLanguage); one who types only English neither waits for them nor holds them. A pinyin key that comes sooner waits for them, and
     // a switch to pinyin reads them on the fcitx thread as it makes the session (activate's Reset). Whatever reading them throws is
     // dropped, the lazies left unset: pinyin's session reads them again as it is made, on the fcitx
     // thread, which hands it to the addon (EngineBridge.Unloadable); thrown out of this thread, it
@@ -266,6 +269,11 @@ class Engines(
         (session(HANDWRITING) as HandwritingSession).offer(reading, piece)
     }
 
+    /** The handwriting pad's [piece] finished, after its readings: [HandwritingSession.finished]. On the fcitx thread, before an Ink key. */
+    fun inkFinished(piece: Int) {
+        (session(HANDWRITING) as HandwritingSession).finished(piece)
+    }
+
     /** The latest piece of handwriting ended ([HandwritingSession.ended]), for the pad to wipe; on the fcitx thread. */
     val inkEnded: Int get() = (sessions[HANDWRITING] as? HandwritingSession)?.ended ?: HandwritingSession.NO_PIECE
 
@@ -297,11 +305,14 @@ class Engines(
                 // read as pinyin reads a sentence: its words, the user's among them, and their counts
                 val data = assets.pinyinData
                 val user = lexicon.user()
+                val coarse = CoarseWords.of({ data.wordIndex.find(it) }, CoarseWords.LIST - lexicon.addedTexts())
                 val decoder = HandwritingDecoder(
                     data.dictionary, data.vocabulary, data.wordIndex, lexicon.prior().scorer(UserScorer(data.model, user)),
-                    assets::charSyllables, user, CoarseWords.of({ data.wordIndex.find(it) }, CoarseWords.LIST - lexicon.addedTexts()),
+                    assets::charSyllables, user, coarse,
                 )
-                HandwritingSession(decoder, TextWords(data.model, data.wordIndex), s.pageSize, user)
+                // what may follow, as pinyin offers it: the same setting
+                val predictor = if (s.prediction) Predictor(data.model, data.vocabulary, data.dictionary, user, coarse = coarse, charReadings = assets::charSyllables) else null
+                HandwritingSession(decoder, TextWords(data.model, data.wordIndex), s.pageSize, user, predictor, reranker(), refiner())
             }
             // 简拼 only where the digits read nothing else: as common on the evaluation set, and faster
             T9 -> ForgetsInTables(pinyinSession(T9Segmenter(s.fuzzy, abbreviations = false, letters = s.nineKeys), spell = true))
@@ -314,9 +325,29 @@ class Engines(
                 val options = (s.tables[method.group]?.applyTo(method.options) ?: method.options).copy(pageSize = s.pageSize)
                 // looking a character up by pinyin learns nothing: it is not how the user writes
                 val lookUp = if (options.pinyinKey == null) null else PinyinSession(assets.pinyinData, PinyinSegmenter(), prediction = false)
-                TableSession(table.dictionary, options, lookUp, table.user, tables.shared(table, im))
+                TableSession(table.dictionary, options, lookUp, table.user, tables.shared(table, im), tableLanguage())
             }
         }
+    }
+
+    /**
+     * What a table shares with the other Chinese input methods: the word model with the user's words,
+     * the one user model, 联想 as the setting has it, the sentence models of the 性能档位.
+     */
+    private fun tableLanguage(): TableLanguage {
+        val data = assets.pinyinData
+        val user = lexicon.user()
+        val coarse = CoarseWords.of({ data.wordIndex.find(it) }, CoarseWords.LIST - lexicon.addedTexts())
+        // a word's reading as it is learned: as the user typed it, else the dictionary's likeliest
+        val readings = Predictor(data.model, data.vocabulary, data.dictionary, user, charReadings = assets::charSyllables)
+        return TableLanguage(
+            TextWords(data.model, data.wordIndex, lexicon.prior().scorer(UserScorer(data.model, user))),
+            user,
+            reading = { text -> data.wordIndex.find(text).takeIf { it != NO_WORD }?.let(readings::reading) },
+            predictor = if (settings.prediction) Predictor(data.model, data.vocabulary, data.dictionary, user, coarse = coarse, charReadings = assets::charSyllables) else null,
+            reranker = reranker(),
+            refiner = refiner(),
+        )
     }
 
     /** A session of one of the pinyins, alike but for how [segmenter] reads the keys. */

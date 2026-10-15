@@ -18,14 +18,17 @@ import splitties.dimensions.dp
 
 /**
  * The pad written on: draws [pad]'s strokes and feeds it the first finger's moves, [onRead] told
- * of each read a stroke ended asks for. The piece is checked for done [InkPad.FINISH_MILLIS]
- * after the pen goes up.
+ * of each read a stroke ended asks for. The piece is checked for done [pause] after the pen goes
+ * up, read each time: the setting may change while the keyboard is up; [onFinish] is told of a
+ * piece done so.
  */
 @SuppressLint("ViewConstructor")
 class HandwritingPadView(
     context: Context,
     theme: Theme,
     private val onRead: (InkPad.Read) -> Unit,
+    private val pause: () -> Long = { InkPad.FINISH_MILLIS },
+    private val onFinish: (piece: Int) -> Unit = {},
 ) : View(context) {
 
     val pad = InkPad()
@@ -40,7 +43,11 @@ class HandwritingPadView(
     private val path = Path()
 
     private val finishCheck = Runnable {
-        if (pad.finish(SystemClock.uptimeMillis())) invalidate()
+        val piece = pad.piece
+        if (pad.finish(SystemClock.uptimeMillis())) {
+            invalidate()
+            onFinish(piece)
+        }
     }
 
     init {
@@ -95,13 +102,14 @@ class HandwritingPadView(
                 pad.move(event.getX(i), event.getY(i))
                 pointer = MotionEvent.INVALID_POINTER_ID
                 pad.up(SystemClock.uptimeMillis())?.let(onRead)
-                postDelayed(finishCheck, InkPad.FINISH_MILLIS)
+                pad.finishMillis = pause()
+                postDelayed(finishCheck, pad.finishMillis)
             }
             MotionEvent.ACTION_CANCEL -> {
                 pointer = MotionEvent.INVALID_POINTER_ID
                 pad.cancel()
                 // the strokes before still end their piece
-                postDelayed(finishCheck, InkPad.FINISH_MILLIS)
+                postDelayed(finishCheck, pad.finishMillis)
             }
             else -> return true
         }
