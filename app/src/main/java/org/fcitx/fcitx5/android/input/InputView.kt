@@ -7,6 +7,7 @@ package org.fcitx.fcitx5.android.input
 
 import android.annotation.SuppressLint
 import android.content.res.Configuration
+import android.graphics.Color
 import android.graphics.Point
 import android.graphics.PorterDuff
 import android.graphics.PorterDuffColorFilter
@@ -68,6 +69,7 @@ import splitties.dimensions.dp
 import splitties.views.dsl.constraintlayout.above
 import splitties.views.dsl.constraintlayout.below
 import splitties.views.dsl.constraintlayout.bottomOfParent
+import splitties.views.dsl.constraintlayout.bottomToBottomOf
 import splitties.views.dsl.constraintlayout.centerHorizontally
 import splitties.views.dsl.constraintlayout.centerVertically
 import splitties.views.dsl.constraintlayout.constraintLayout
@@ -80,6 +82,7 @@ import splitties.views.dsl.constraintlayout.topOfParent
 import splitties.views.dsl.core.add
 import splitties.views.dsl.core.imageView
 import splitties.views.dsl.core.matchParent
+import splitties.views.backgroundColor
 import splitties.views.dsl.core.view
 import splitties.views.dsl.core.wrapContent
 import splitties.views.imageDrawable
@@ -96,6 +99,11 @@ class InputView(
 
     private val customBackground = imageView {
         scaleType = ImageView.ScaleType.CENTER_CROP
+    }
+
+    // the bar's colour, under the bar and the row above it for the code being typed: one taller bar
+    private val barBackground = view(::View) {
+        backgroundColor = if (keyBorder) Color.TRANSPARENT else theme.barColor
     }
 
     private val placeholderOnClickListener = OnClickListener { }
@@ -283,8 +291,17 @@ class InputView(
                 centerVertically()
                 centerHorizontally()
             })
-            add(kawaiiBar.view, lParams(0, dp(KawaiiBarComponent.HEIGHT)) {
+            add(barBackground, lParams(0, 0) {
                 topOfParent()
+                bottomToBottomOf(kawaiiBar.view)
+                // start and end set in updateKeyboardSize, as the bar's
+            })
+            add(preedit.ui.root, lParams(0, dp(KawaiiBarComponent.PREEDIT_HEIGHT)) {
+                topOfParent()
+                // start and end set in updateKeyboardSize, as the bar's
+            })
+            add(kawaiiBar.view, lParams(0, dp(KawaiiBarComponent.HEIGHT)) {
+                below(preedit.ui.root)
                 // start and end set in updateKeyboardSize
             })
             add(leftPaddingSpace, lParams {
@@ -316,10 +333,6 @@ class InputView(
         windowManager.onAttached = { updateKeyboardSize() }
         keyboardWindow.onLayoutShown = { updateKeyboardSize() }
 
-        add(preedit.ui.root, lParams(matchParent, wrapContent) {
-            above(keyboardView)
-            centerHorizontally()
-        })
         add(keyboardView, lParams(matchParent, wrapContent) {
             centerHorizontally()
             bottomOfParent()
@@ -344,7 +357,6 @@ class InputView(
         val sidePadding = keyboardSidePaddingPx
         val side = dockSide()
         placeBoard(side, sidePadding)
-        preedit.ui.root.setPadding(sidePadding, 0, sidePadding, 0)
         placeBar(side, sidePadding)
     }
 
@@ -390,20 +402,23 @@ class InputView(
 
     // the bar over the board goes with it: a picker's tabs, the toolbar, under the same thumb
     private fun placeBar(side: SplitKeyboard.Dock?, sidePadding: Int) {
-        kawaiiBar.view.updateLayoutParams<LayoutParams> {
-            startToStart = unset
-            endToEnd = unset
-            width = 0
-            if (side == null) {
-                startOfParent()
-                endOfParent()
-            } else {
-                startToStart = windowManager.view.id
-                endToEnd = windowManager.view.id
-            }
-        }
         val padding = if (side == null) sidePadding else 0
-        kawaiiBar.view.setPadding(padding, 0, padding, 0)
+        // the row of the code being typed goes with the bar under it
+        for (bar in listOf(barBackground, preedit.ui.root, kawaiiBar.view)) {
+            bar.updateLayoutParams<LayoutParams> {
+                startToStart = unset
+                endToEnd = unset
+                width = 0
+                if (side == null) {
+                    startOfParent()
+                    endOfParent()
+                } else {
+                    startToStart = windowManager.view.id
+                    endToEnd = windowManager.view.id
+                }
+            }
+            bar.setPadding(padding, 0, padding, 0)
+        }
     }
 
     /** The side the board shown goes to, while the letters split, or null for the whole width. */

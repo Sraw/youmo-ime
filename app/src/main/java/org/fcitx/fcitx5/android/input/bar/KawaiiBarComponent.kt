@@ -4,7 +4,6 @@
  */
 package org.fcitx.fcitx5.android.input.bar
 
-import android.graphics.Color
 import android.os.Build
 import android.util.Size
 import android.view.KeyEvent
@@ -33,7 +32,6 @@ import org.fcitx.fcitx5.android.data.clipboard.ClipboardManager
 import org.fcitx.fcitx5.android.data.clipboard.db.ClipboardEntry
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.prefs.ManagedPreference
-import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.input.bar.ExpandButtonStateMachine.State.ClickToAttachWindow
 import org.fcitx.fcitx5.android.input.bar.ExpandButtonStateMachine.State.ClickToDetachWindow
 import org.fcitx.fcitx5.android.input.bar.ExpandButtonStateMachine.State.Hidden
@@ -63,6 +61,7 @@ import org.fcitx.fcitx5.android.input.keyboard.CommonKeyActionListener
 import org.fcitx.fcitx5.android.input.keyboard.CustomGestureView
 import org.fcitx.fcitx5.android.input.keyboard.KeyboardWindow
 import org.fcitx.fcitx5.android.input.popup.PopupComponent
+import org.fcitx.fcitx5.android.input.preedit.PreeditComponent
 import org.fcitx.fcitx5.android.input.status.StatusAreaWindow
 import org.fcitx.fcitx5.android.input.voice.VoiceFeature
 import org.fcitx.fcitx5.android.input.wm.InputWindow
@@ -72,7 +71,6 @@ import org.mechdancer.dependency.DynamicScope
 import org.mechdancer.dependency.manager.must
 import splitties.bitflags.hasFlag
 import splitties.dimensions.dp
-import splitties.views.backgroundColor
 import splitties.views.dsl.core.add
 import splitties.views.dsl.core.lParams
 import splitties.views.dsl.core.matchParent
@@ -401,10 +399,8 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
     }
 
     override val view by lazy {
+        // its colour is InputView's barBackground's, under the row above it too
         ViewAnimator(context).apply {
-            backgroundColor =
-                if (ThemeManager.prefs.keyBorder.getValue()) Color.TRANSPARENT
-                else theme.barColor
             add(idleUi.root, lParams(matchParent, matchParent))
             add(candidateUi.root, lParams(matchParent, matchParent))
             add(titleUi.root, lParams(matchParent, matchParent))
@@ -530,6 +526,13 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
 
     companion object {
         const val HEIGHT = 40
+
+        /**
+         * The row above the bar where the code being typed shows ([PreeditComponent]), in dp: the
+         * keyboard's own, as 搜狗's, so it covers nothing of the app; there whether or not one is
+         * typed, so the keyboard keeps its height and the app does not jump.
+         */
+        const val PREEDIT_HEIGHT = 18
     }
 
     fun onKeyboardLayoutSwitched(isNumber: Boolean) {

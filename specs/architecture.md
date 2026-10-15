@@ -96,8 +96,10 @@ Where the preedit shows is the input method's (`composesText` in `androidengine.
 input context's `setEnablePreedit` on activation, so quick phrase and Unicode follow it): English's
 word and handwriting's characters are the text itself and go into the app's text as composing
 text, where the field takes it (`CapabilityFlag.Preedit`), kept there as the keyboard goes. A code
-(pinyin, the nine keys', a table's) is not text, and is shown above the candidates (the bar's
-`PreeditComponent`, the floating window's `PreeditUi`) as 搜狗 and 百度 show theirs: in the app,
+(pinyin, the nine keys', a table's) is not text, and is shown in the keyboard's own row above the
+candidates (`PreeditComponent`, `KawaiiBarComponent.PREEDIT_HEIGHT`, there whether or not a code is
+typed so the keyboard keeps its height; the floating window's `PreeditUi`), as 搜狗 shows its own,
+covering nothing of the app: in the app,
 a tap on another field or app had the app finish it as text before the input method heard of it
 (`InputMethodManager`), leaving `ni` in the field, and an app that made its activity anew on a
 turn saved it with the field's text. Dropped with the engine's input as the keyboard goes, a code

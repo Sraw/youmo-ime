@@ -28,7 +28,9 @@ import splitties.views.dsl.core.verticalLayout
 open class PreeditUi(
     override val ctx: Context,
     private val theme: Theme,
-    private val setupTextView: (TextView.() -> Unit)? = null
+    private val setupTextView: (TextView.() -> Unit)? = null,
+    // the line below put after the one above, for a row of one line's height
+    private val oneLine: Boolean = false,
 ) : Ui {
 
     class CursorSpan(ctx: Context, @ColorInt color: Int, metrics: Paint.FontMetricsInt) :
@@ -85,8 +87,10 @@ open class PreeditUi(
                 else inputPanel.auxUp.length + it
             }
         }
-        val downString = inputPanel.auxDown.toSpannedString(activeBkg)
-        val hasUp = upString.isNotEmpty()
+        val below = inputPanel.auxDown.toSpannedString(activeBkg)
+        val downString = if (oneLine) SpannedString("") else below
+        val upLine = if (oneLine && below.isNotEmpty()) buildSpannedString { append(upString); append("  "); append(below) } else upString
+        val hasUp = upLine.isNotEmpty()
         val hasDown = downString.isNotEmpty()
         visible = hasUp || hasDown
         if (!visible) {
@@ -94,13 +98,13 @@ open class PreeditUi(
             updateTextView(downView, "", false)
             return
         }
-        val upStringWithCursor = if (upCursor < 0 || upCursor == upString.length) {
-            upString
+        val upStringWithCursor = if (upCursor < 0 || upCursor == upLine.length) {
+            upLine
         } else buildSpannedString {
-            if (upCursor > 0) append(upString, 0, upCursor)
+            if (upCursor > 0) append(upLine, 0, upCursor)
             append('|')
             setSpan(cursorSpan, upCursor, upCursor + 1, Spanned.SPAN_INCLUSIVE_EXCLUSIVE)
-            append(upString, upCursor, upString.length)
+            append(upLine, upCursor, upLine.length)
         }
         updateTextView(upView, upStringWithCursor, hasUp)
         updateTextView(downView, downString, hasDown)
