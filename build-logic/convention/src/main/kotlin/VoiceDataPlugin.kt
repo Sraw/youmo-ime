@@ -69,14 +69,14 @@ class VoiceDataPlugin : Plugin<Project> {
         internal val MODEL_FILES = listOf("tokens.txt")
         internal const val BPE_MODEL = "bpe.model"
 
-        // the archive's encoder, decoder and joiner converted by onnxruntime 1.28's
+        // the archive's encoder, decoder and joiner converted by onnxruntime 1.30's
         // convert_onnx_models_to_ort, the version the recognizer is built with
-        private const val ORT_RELEASE = "voice-models-20261012"
+        private const val ORT_RELEASE = "voice-models-20261015"
 
         // the archive ORT_RELEASE was converted from: another archive's tokens would go with these weights
         private const val ORT_MODEL = "sherpa-onnx-x-asr-zipformer-transducer-zh-en-punct-int8-2026-06-03"
         private const val ORT_URL = "https://github.com/Sraw/youmo-ime/releases/download/$ORT_RELEASE/x-asr-ort.tar.zst"
-        private const val ORT_SHA256 = "ab0d8bdc6076c5fb48e725fafd2066ea59a1a605a05d3ea8e84a79e885b53929"
+        private const val ORT_SHA256 = "b9df3663360fadb0bdd22e51732a32b194b9b2a41a3b0e389c97fd89cd800d8a"
         internal const val ORT_DIR = "x-asr-ort"
         internal val ORT_FILES = listOf("encoder.ort", "decoder.ort", "joiner.ort")
         private const val VAD_URL = "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/silero_vad.onnx"

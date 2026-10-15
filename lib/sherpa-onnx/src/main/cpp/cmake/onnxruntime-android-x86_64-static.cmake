@@ -14,18 +14,18 @@ if(BUILD_SHARED_LIBS)
   message(FATAL_ERROR "This file is for building static libraries. BUILD_SHARED_LIBS: ${BUILD_SHARED_LIBS}")
 endif()
 
-set(onnxruntime_URL  "https://github.com/csukuangfj/onnxruntime-libs/releases/download/v1.28.2/onnxruntime-android-x86_64-static_lib-1.28.2.zip")
-set(onnxruntime_HASH "SHA256=f49dbf456ffe71dd417afb2123ef15202f8f57a4b2a05f12af1cf71f55448137")
+set(onnxruntime_URL  "https://github.com/csukuangfj/onnxruntime-libs/releases/download/v1.30.0/onnxruntime-android-x86_64-static_lib-1.30.0.zip")
+set(onnxruntime_HASH "SHA256=085fd2739a6237b9c089d210191e551cf682f0993ebfb452b50a00f08d42f83b")
 
 # If you don't have access to the Internet,
 # please download onnxruntime to one of the following locations.
 # You can add more if you want.
 set(possible_file_locations
-  $ENV{HOME}/Downloads/onnxruntime-android-x86_64-static_lib-1.28.2.zip
-  ${CMAKE_SOURCE_DIR}/onnxruntime-android-x86_64-static_lib-1.28.2.zip
-  ${CMAKE_BINARY_DIR}/onnxruntime-android-x86_64-static_lib-1.28.2.zip
-  /tmp/onnxruntime-android-x86_64-static_lib-1.28.2.zip
-  /star-fj/fangjun/download/github/onnxruntime-android-x86_64-static_lib-1.28.2.zip
+  $ENV{HOME}/Downloads/onnxruntime-android-x86_64-static_lib-1.30.0.zip
+  ${CMAKE_SOURCE_DIR}/onnxruntime-android-x86_64-static_lib-1.30.0.zip
+  ${CMAKE_BINARY_DIR}/onnxruntime-android-x86_64-static_lib-1.30.0.zip
+  /tmp/onnxruntime-android-x86_64-static_lib-1.30.0.zip
+  /star-fj/fangjun/download/github/onnxruntime-android-x86_64-static_lib-1.30.0.zip
 )
 
 foreach(f IN LISTS possible_file_locations)

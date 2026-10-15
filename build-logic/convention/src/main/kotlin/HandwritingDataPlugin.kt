@@ -23,9 +23,9 @@ import org.gradle.kotlin.dsl.register
 class HandwritingDataPlugin : Plugin<Project> {
 
     companion object {
-        private const val RELEASE = "handwriting-models-20261015"
+        private const val RELEASE = "handwriting-models-20261015b"
         private const val URL = "https://github.com/Sraw/youmo-ime/releases/download/$RELEASE/handwriting-models.tar.zst"
-        private const val SHA256 = "8e2c7d4afc9be4c834a0d912dda0af0b8a1034abc88b184ce967decc14d756ca"
+        private const val SHA256 = "940e746a2a68822b87aa683e3832541f38e7c36202602dd8445b4b72d26689b9"
         private val FILES = listOf("char_image.ort", "char_path.ort", "chars.txt", "prior.data")
     }
 

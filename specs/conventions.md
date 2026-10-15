@@ -31,6 +31,8 @@
   ime-core, no `runBlocking` on the main thread.
 - **Allocation-free hot paths.** The decode path runs on every key: primitive collections
   (`Counts`, `IndexCounts`), reused buffers, no boxing; measure before and after.
+- **Models** are int8, mapped from the APK where they lie (never read into the heap), and made and
+  run by one onnxruntime version: see [data-and-build.md](data-and-build.md#models-int8-mapped-in-place-one-onnxruntime).
 - **Untrusted files** (imports, models, backups) are bounds-checked before allocating and fail with a
   message saying what did not fit.
 - **File header** on new source files:

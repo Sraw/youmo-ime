@@ -28,11 +28,11 @@ class LicensesFragment : PaddingPreferenceFragment() {
             VoiceFeature.Credit(getString(R.string.engine_data_fineweb), "ODC-By-1.0", "https://huggingface.co/datasets/HuggingFaceFW/fineweb-2"),
             VoiceFeature.Credit(getString(R.string.engine_data_handwriting), "Arphic Public License", "https://github.com/skishore/makemeahanzi"),
             // what runs the handwriting recognizers (lib/handwriting), and in a voice build the speech one
-            VoiceFeature.Credit("onnxruntime:1.28.2", "MIT", "https://github.com/microsoft/onnxruntime/blob/main/LICENSE"),
+            VoiceFeature.Credit("onnxruntime:1.30.0", "MIT", "https://github.com/microsoft/onnxruntime/blob/main/LICENSE"),
             // others' code built into libonnxruntime.so: the notices of the release it is built from
             VoiceFeature.Credit(
-                "onnxruntime third-party notices:1.28.2", "Apache-2.0, BSD-3-Clause, MIT and others",
-                "https://github.com/microsoft/onnxruntime/blob/v1.28.2/ThirdPartyNotices.txt",
+                "onnxruntime third-party notices:1.30.0", "Apache-2.0, BSD-3-Clause, MIT and others",
+                "https://github.com/microsoft/onnxruntime/blob/v1.30.0/ThirdPartyNotices.txt",
             ),
         )
         lifecycleScope.launch {

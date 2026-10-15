@@ -8,15 +8,15 @@ import com.android.build.gradle.tasks.ExternalNativeBuildJsonTask
 /*
  * The handwriting recognizers' runtime: onnxruntime (MIT) and a small JNI to it (OrtModel). The
  * onnxruntime is the build sherpa-onnx links in the voice builds, the same file (csukuangfj's
- * onnxruntime-libs v1.28.2, SHA-256 checked), so a voice build packs one copy of it
+ * onnxruntime-libs v1.30.0, SHA-256 checked), so a voice build packs one copy of it
  * (pickFirst in the app). Its ORT-format models are mapped from the APK, not read onto the heap.
  */
 plugins {
     id("org.fcitx.fcitx5.android.lib-convention")
 }
 
-val ortVersion = "1.28.2"
-val ortSha256 = "01518867f78241138b6aa25925802e843a4fa9085af8d303d49e35bbb52aff4d"
+val ortVersion = "1.30.0"
+val ortSha256 = "150d1fd3356220e7539e17cb4ec81a7f6649218e5d2bab5afbeef6e23daf9641"
 
 // sherpa-onnx's CMake pins the archive on its own; the app keeps whichever copy comes first, so the
 // two pins are held equal here: one bumped alone would ship a library the other was not built for

@@ -52,8 +52,8 @@ GitHub release of this repository, and pinned in `EngineDataPlugin` by tag and S
 | New words (curated `lexicon/add.tsv`, packed for that model) | `words-*` (`WORDS_RELEASE`) | `ime-dict-tool pack --lexicon lexicon/add.tsv` | the `new` layer of `pinyin.data` |
 | English words and trigram model (FineWeb sample-10BT) | `english-data-*` (`ENGLISH_RELEASE`) | `ime-dict-tool english-lm`, then `prune --threshold 3e-8` (relative entropy: 117 → 44 MB compiled, slips fixed 73.8 → 72.7%) | `engine/english.data` |
 | Sentence models 4M and 25M (own training, Apache-2.0) | `sentence-models-*` (`MODELS_RELEASE`) | the training pipeline (not in this repo) | `engine/sentence-model*.safetensors` |
-| Voice recognizer (X-ASR zh-en, sherpa-onnx's int8 export) in onnxruntime's ORT format | `voice-models-*` (`ORT_RELEASE` in `VoiceDataPlugin`) | onnxruntime 1.28's `convert_onnx_models_to_ort --optimization_style Fixed --target_platform arm` (its `manifest.txt`) | `voice/encoder.ort`, `decoder.ort`, `joiner.ort`, mapped in place (lib/sherpa-onnx README) |
-| Handwriting recognizers (own training on synthetic ink), their characters and frequencies | `handwriting-models-*` (`RELEASE` in `HandwritingDataPlugin`) | the recognizers' training sources (not in this repo): `export.py` to ONNX; the dense and LSTM weights int8 by onnxruntime's `quantize_dynamic` (the release's `quantize.py`, from the float release's ORT files); onnxruntime 1.28's `convert_onnx_models_to_ort --optimization_style Fixed --target_platform arm` (its `manifest.txt`) | `handwriting/*.ort` mapped in place (`OrtModel`), `chars.txt`, `prior.data` |
+| Voice recognizer (X-ASR zh-en, sherpa-onnx's int8 export, its decoder int8 by us) in onnxruntime's ORT format | `voice-models-*` (`ORT_RELEASE` in `VoiceDataPlugin`) | onnxruntime 1.30's `convert_onnx_models_to_ort --optimization_style Fixed --target_platform arm` (its `manifest.txt`) | `voice/encoder.ort`, `decoder.ort`, `joiner.ort`, mapped in place (lib/sherpa-onnx README) |
+| Handwriting recognizers (own training on synthetic ink), their characters and frequencies | `handwriting-models-*` (`RELEASE` in `HandwritingDataPlugin`) | the recognizers' training sources (not in this repo): `export.py` to ONNX; the dense and LSTM weights int8 by onnxruntime's `quantize_dynamic` (the release's `quantize.py`, from the float release's ORT files); onnxruntime 1.30's `convert_onnx_models_to_ort --optimization_style Fixed --target_platform arm` (its `manifest.txt`) | `handwriting/*.ort` mapped in place (`OrtModel`), `chars.txt`, `prior.data` |
 | Code tables, strokes, dictionary | libime's and rime-stroke's sources, pinned archives | compiled in the build | `engine/table/*.data`, `engine/stroke.data` |
 
 Downloads go to `.gradle/engine-downloads` at the root (survives `clean`). The build also applies
@@ -74,6 +74,47 @@ its group's commonest that a spelling held to another must have (we'll beside we
 only where a contraction has a real word's letters, `EnglishDecoder.LIKE_CONTRACTIONS`), is not tuned
 on FineWeb: it should drop slips such as we'l'l and keep words such as we'll. A possessive (user's) is
 held to its group's commonest, as any other spelling.
+
+### Models: int8, mapped in place, one onnxruntime
+
+Decided by the owner (2026-10-15), for every model the app ships, the ones to come too:
+
+- **int8 weights, dynamic, convolutions float.** A model ships with its weights in int8, quantized
+  dynamically: onnxruntime's `quantize_dynamic`, per channel, `op_types_to_quantize` the matrix
+  multiplications (Gemm written as MatMul), LSTM/GRU and embeddings (Gather), the activations
+  quantized as each layer runs. The voice recognizer is sherpa-onnx's int8 export, made so (its
+  encoder's 344 MatMulInteger, its 82 Conv float), with its decoder quantized the same way by us;
+  the handwriting recognizers by the release's `quantize.py`; the sentence models are int8
+  safetensors (a scale per output row, `MatrixKernel`).
+  - **Convolutions are never quantized.** Measured: the handwriting image model with its
+    convolutions int8 too ran 15.6 → 44.3 ms a character (onnxruntime's ConvInteger is a slow
+    generic kernel that converts the activations to int8 and back at every layer, where the float
+    convolution is its tuned one), to save 12 MB; the voice decoder's one Conv1d int8 made each
+    step 0.111 → 0.129 ms where float convolution and int8 elsewhere made it 0.077 ms. Conv
+    weights are a small part of a model; the matrices are its size and their time.
+  - **Not static** (activation ranges calibrated beforehand, QLinearConv/QLinearMatMul): it needs
+    calibration data that is like the real input, risks accuracy where it is not, and what it buys
+    is speed on convolutions, measured nowhere yet. Worth trying only for a convolutional model, on
+    a phone with int8 dot-product instructions, judged by that phone's numbers.
+  - Before a release the int8 model is measured against its float one on its evaluation set, and
+    the release's `manifest.txt` gives both: int8 cost nothing measurable so far (handwriting on
+    CASIA: 91.44% → 91.43%, the models 121 → 43 MB). Another layer than a convolution stays float
+    only where int8 of it was measured to cost accuracy or time, and the manifest says so.
+- **Mapped from the file, never loaded.** A model or data file is stored uncompressed in the APK
+  (`noCompress`) and memory-mapped where it lies, so its weights are clean file pages the system can
+  drop and read again, not the app's heap. ORT models: the asset opened `AASSET_MODE_BUFFER`, the
+  session made from those bytes with `session.use_ort_model_bytes_directly` and
+  `session.use_ort_model_bytes_for_initializers`, and `session.disable_prepacking`, as prepacking
+  copies weights to the heap (`OrtModel`, lib/sherpa-onnx's README); `.data` and `.safetensors`
+  through `EngineBridge.asset`. Never read a model into a byte array. Checked with `dumpsys meminfo`:
+  the model's size shows under `.apk mmap`, not in the private columns.
+- **One onnxruntime version** for the runtime the app links (`ortVersion` in
+  `lib/handwriting/build.gradle.kts` and lib/sherpa-onnx's `cmake/onnxruntime-android-*.cmake`,
+  onnxruntime-libs' prebuilt archives), the converter that makes the ORT files
+  (`convert_onnx_models_to_ort --optimization_style Fixed --target_platform arm`) and the quantizer.
+  An ORT file loads only in a runtime at least as new as the one that wrote it. To move to another
+  version: change the runtime's pins, convert every ORT model again with it, publish them as new
+  releases, and measure each against the last on its set.
 
 ### Licences of what ships
 
