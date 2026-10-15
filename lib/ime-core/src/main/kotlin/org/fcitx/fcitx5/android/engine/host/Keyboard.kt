@@ -45,7 +45,7 @@ object EngineEvent {
     /** "Never show this word" on a candidate; the argument is its index among all of them. */
     const val BLOCK = 13
 
-    /** A tap in the composed text; the argument is the character it puts the cursor before. */
+    /** A tap in the composed text; the argument is the character it puts the cursor before, in code points. */
     const val CURSOR = 14
 }
 
@@ -58,6 +58,7 @@ object EngineEvent {
  * app, so `nihao,` gives 你好， (the comma turned full-width by fcitx's punctuation addon, which
  * androidengine asks for every key handed back). Keys that are no characters (arrows, Home) are
  * swallowed while something is typed: the app must not move its cursor about the input shown.
+ * Left, Right, Home and End move the session's cursor in its input, where it keeps one ([Action.Step]).
  *
  * While words that may follow are offered, any key the session does not read goes to the app and
  * the offer goes away: space after a word is a space, not the first prediction.
@@ -140,20 +141,34 @@ class Keyboard(private val session: Session, private val nineKeys: Boolean) {
     // keys the session takes while something is typed, the app's otherwise
     private fun whileComposing(event: Int, arg: Int): Snapshot = when {
         // an arrow, Tab: English commits its word and the key moves on from it; another session
-        // keeps the key, its input as it was
-        composing && event == EngineEvent.OTHER -> if (english) session.apply(Action.CommitRaw) else again(handled = true)
+        // moves its cursor by an arrow, Home or End, and keeps any other key, its input as it was
+        composing && event == EngineEvent.OTHER -> when {
+            english -> session.apply(Action.CommitRaw)
+            else -> step(arg)?.let { session.apply(it).takeIf(Snapshot::handled) } ?: again(handled = true)
+        }
         composing -> session.apply(
             when (event) {
                 EngineEvent.ENTER -> Action.CommitRaw
                 EngineEvent.PAGE_UP -> Action.PreviousPage
                 EngineEvent.PAGE_DOWN -> Action.NextPage
-                EngineEvent.CURSOR -> Action.Cursor(arg)
+                // the session counts UTF-16 units: a piece picked may be past the BMP
+                EngineEvent.CURSOR -> Action.Cursor(shown.preedit.let { it.offsetByCodePoints(0, arg.coerceIn(0, it.codePointCount(0, it.length))) })
                 else -> error("event $event is not one taken while composing")
             },
         )
         // a tap in the app's text: the panel as it was
         event == EngineEvent.CURSOR -> again(handled = false).also { session.passedOn() }
         else -> passOn()
+    }
+
+    // an arrow, Home or End as a move of the cursor in the input
+    private fun step(keySym: Int) = when (keySym) {
+        // the keypad's too, Num Lock off
+        KEY_LEFT, KEY_KP_LEFT -> Action.Step(-1)
+        KEY_RIGHT, KEY_KP_RIGHT -> Action.Step(1)
+        KEY_HOME, KEY_KP_HOME -> Action.Step.START
+        KEY_END, KEY_KP_END -> Action.Step.END
+        else -> null
     }
 
     private fun refine(): Snapshot {
@@ -180,6 +195,16 @@ class Keyboard(private val session: Session, private val nineKeys: Boolean) {
         private const val DIGITS = 10
         private const val ALPHABET = 26
         private const val REPLACEMENT = '\uFFFD'
+
+        // X keysyms, as androidengine passes a key that is no character (EngineEvent.OTHER)
+        private const val KEY_HOME = 0xff50
+        private const val KEY_LEFT = 0xff51
+        private const val KEY_RIGHT = 0xff53
+        private const val KEY_END = 0xff57
+        private const val KEY_KP_HOME = 0xff95
+        private const val KEY_KP_LEFT = 0xff96
+        private const val KEY_KP_RIGHT = 0xff98
+        private const val KEY_KP_END = 0xff9c
 
         /**
          * Characters of the private use area the nine-key keyboard sends for a syllable it offers

@@ -41,6 +41,13 @@ import java.util.Calendar
  * Backspace deletes the last key typed; when that leaves nothing after the last piece picked, the
  * piece is dropped, so its keys are read again.
  *
+ * The input keeps a cursor, at its end till moved ([Action.Cursor], a tap on the preedit;
+ * [Action.Step], an arrow): keys go in there and backspace deletes before it, the input read
+ * again whole, as if typed so. A piece picked whose keys that changes is dropped, as backspace
+ * drops one; the cursor goes no further back than the pieces' end. On the nine keys a syllable
+ * taken puts the cursor past it if it was in or after its digits, and is given back by backspace
+ * at the end alone.
+ *
  * The words committed stay the context of what is typed next, as they would be read together,
  * until [Action.Reset] or text committed as typed; [Action.Context] makes the words the app's text
  * ends with the context, as if committed (see [TextWords]).
@@ -137,6 +144,7 @@ class PinyinSession(
         val placed: Map<String, Phrase> = emptyMap(), // the phrases among the candidates, by text
         val preedit: String = "",
         val restShown: String = "", // the end of the preedit: what is left of the input, as shown
+        val places: PreeditPlaces = PreeditPlaces.NONE,
         val unsettled: Boolean = false, // a coarse candidate waits past a first page the list does not fill yet
     ) {
         val moreWords get() = decoded?.more == true
@@ -161,6 +169,8 @@ class PinyinSession(
     private val textWords by lazy { TextWords(data.model, data.wordIndex) }
 
     private val input = StringBuilder()
+    private var cursor = 0 // where in the input the next key goes
+    private var cursorMoved = false // by the last action, a tap or an arrow
     private val pieces = ArrayList<Piece>()
     private var context = IntArray(0) // the words committed last, at most two
     private var lastEntry: Entry? = null // the last of them, if known how it reads
@@ -177,9 +187,13 @@ class PinyinSession(
     override var learning = true
 
     override fun apply(action: Action): Snapshot {
-        // what the refiner weighs is the input as last read, on the first page
-        if (action != Action.Refine) unrefined = null
-        return act(action)
+        val moves = action is Action.Cursor || action is Action.Step
+        // what the refiner weighs is the input as last read, on the first page; a cursor moved reads nothing
+        if (action != Action.Refine && !moves) unrefined = null
+        // the keyboard counts presses of a key again unaware of a tap on the preedit: the next is a press of its own
+        val afterMove = cursorMoved
+        cursorMoved = moves || (afterMove && action == Action.Refine)
+        return if (afterMove && action is Action.Letter) act(action.copy(again = false)) else act(action)
     }
 
     private fun act(action: Action): Snapshot = when (action) {
@@ -202,7 +216,8 @@ class PinyinSession(
             snapshot()
         }
         is Action.Context -> takeContext(action.before)
-        is Action.Cursor -> snapshot(handled = false)
+        is Action.Cursor -> moved { lastRead.places.inputAt(action.at, readFrom()) }
+        is Action.Step -> moved { (cursor.toLong() + action.by).coerceIn(0, input.length.toLong()).toInt() }
     }
 
     /**
@@ -221,7 +236,7 @@ class PinyinSession(
             return keys.fold(snapshot()) { before, c -> apply(Action.Key(c)).let { it.copy(commit = before.commit + it.commit) } }
         }
         unrefined = null
-        input.append(keys)
+        insert(keys)
         read()
         return snapshot()
     }
@@ -257,13 +272,26 @@ class PinyinSession(
     private fun type(c: Char): Snapshot {
         if (!reads(c)) return leave()
         // on the nine keys 1 is 分词
-        input.append(if (c == NINE_KEYS_SEPARATOR && nineKeys != null) SyllableGraph.SEPARATOR else c)
+        insert((if (c == NINE_KEYS_SEPARATOR && nineKeys != null) SyllableGraph.SEPARATOR else c).toString())
         read()
         return snapshot()
     }
 
+    // [keys] typed at the cursor, never before the pieces' end (read and moved keep it there)
+    private fun insert(keys: String) {
+        input.insert(cursor, keys)
+        cursor += keys.length
+    }
+
+    /** The cursor put where [to] says, if the input keeps one; nothing read again. */
+    private fun moved(to: () -> Int): Snapshot {
+        if (input.isEmpty() || predicting) return snapshot(handled = false)
+        cursor = to().coerceIn(readFrom(), input.length)
+        return snapshot()
+    }
+
     /** See [Action.Letter]: on the nine keys alone, the others type letters as they are. */
-    private fun letter(c: Char, again: Boolean): Snapshot = edited(nineKeys?.letter(input, c, again, readFrom()) == true)
+    private fun letter(c: Char, again: Boolean): Snapshot = cursorAfter(nineKeys?.letter(input, c, again, readFrom(), cursor) ?: -1)
 
     private fun backspace(): Snapshot {
         if (input.isEmpty()) {
@@ -271,24 +299,31 @@ class PinyinSession(
             clear()
             return snapshot(handled = false)
         }
-        // the syllable taken last, given back as its digits
-        val given = nineKeys?.giveBack(input) ?: -1
+        // the syllable taken last, given back as its digits; the cursor in the middle deletes a key
+        val given = if (cursor == input.length) nineKeys?.giveBack(input) ?: -1 else -1
         if (given >= 0) {
             while (pieces.isNotEmpty() && pieces.last().end > given) pieces.removeAt(pieces.size - 1)
+            cursor = input.length
         } else {
-            input.setLength(input.length - 1)
-            while (pieces.isNotEmpty() && pieces.last().end >= input.length) pieces.removeAt(pieces.size - 1)
+            // at the start of the input: nothing before it is the session's to delete
+            if (cursor == 0) return snapshot()
+            input.deleteCharAt(--cursor)
+            while (pieces.isNotEmpty() && (pieces.last().end > cursor || pieces.last().end >= input.length)) pieces.removeAt(pieces.size - 1)
         }
         read()
         return snapshot()
     }
 
     /** Takes the syllable at [index] of those offered: see the class. */
-    private fun takeSyllable(index: Int, of: Int): Snapshot = edited(!predicting && nineKeys?.take(input, index, of) == true)
+    private fun takeSyllable(index: Int, of: Int): Snapshot =
+        cursorAfter(if (predicting) -1 else nineKeys?.take(input, index, of, cursor) ?: -1)
 
-    // the input read again if [changed] it
-    private fun edited(changed: Boolean): Snapshot {
-        if (changed) read()
+    // the input read again, the cursor at [at], if the edit made one; else -1
+    private fun cursorAfter(at: Int): Snapshot {
+        if (at >= 0) {
+            cursor = at
+            read()
+        }
         return snapshot()
     }
 
@@ -607,6 +642,7 @@ class PinyinSession(
 
     private fun clear() {
         input.setLength(0)
+        cursor = 0
         lastRead = Read()
         // the next input decodes afresh: what another input method learned or forgot since, with
         // the user's words they share, would not reach the scores the decoder keeps from key to key
@@ -623,6 +659,7 @@ class PinyinSession(
     private fun read() {
         predicting = false
         page = 0
+        cursor = cursor.coerceIn(readFrom(), input.length)
         if (input.isEmpty()) {
             lastRead = Read()
             nineKeys?.clear()
@@ -669,14 +706,16 @@ class PinyinSession(
         // sentence held, that is the candidate shown first, the rest of the input as typed after it
         val best = decoded.sentences.firstOrNull { it !in held }
             ?: ordered.firstOrNull()?.takeIf { decoded.sentences.isNotEmpty() }?.let { throughEnd(it, decoded.graph.end) }
-        val restShown = if (best == null) asTyped(decoded.graph.input) else preedit(decoded.graph, best)
+        val shown = if (best == null) PreeditPlaces.Builder().add(asTyped(decoded.graph.input), readFrom(), input.length) else preedit(decoded.graph, best)
+        val picked = pieces.joinToString("") { it.text }
         lastRead = Read(
             candidates = ordered,
             decoded = decoded,
             time = time,
             placed = placed,
-            preedit = pieces.joinToString("") { it.text } + restShown,
-            restShown = restShown,
+            preedit = picked + shown.rest,
+            restShown = shown.rest,
+            places = shown.places(picked.length, input.length),
             unsettled = held.isNotEmpty() && listed.size - held.size < pageSize,
         )
     }
@@ -732,6 +771,7 @@ class PinyinSession(
             refines = unrefined != null,
             syllables = nineKeys?.offered.orEmpty(),
             syllablesId = nineKeys?.id ?: 0,
+            cursor = if (cursor >= input.length) -1 else lastRead.places.preeditAt(cursor),
         )
     }
 
@@ -739,7 +779,7 @@ class PinyinSession(
      * [best] as the syllables it reads, a space between them, or `'` where one was typed: `ni hao`,
      * `xi'an`; text kept as typed shows as typed.
      */
-    private fun preedit(graph: SyllableGraph, best: Candidate): String {
+    private fun preedit(graph: SyllableGraph, best: Candidate): PreeditPlaces.Builder {
         val parts = ArrayList<String>()
         val ends = ArrayList<Int>()
         var from = graph.start
@@ -769,12 +809,19 @@ class PinyinSession(
             }
             from = to
         }
-        val out = StringBuilder(graph.input.substring(0, graph.start))
+        val base = readFrom()
+        val out = PreeditPlaces.Builder().add(graph.input.substring(0, graph.start), base, base + graph.start)
         for (k in parts.indices) {
-            if (k > 0) out.append(if (graph.input[ends[k - 1] - 1] == SyllableGraph.SEPARATOR) SyllableGraph.SEPARATOR else ' ')
-            out.append(parts[k])
+            val start = if (k == 0) graph.start else ends[k - 1]
+            // a separator typed shows as itself, a space between keys
+            if (k > 0 && graph.input[start - 1] == SyllableGraph.SEPARATOR) {
+                out.add(SyllableGraph.SEPARATOR.toString(), base + start - 1, base + start)
+            } else if (k > 0) out.add(" ", base + start, base + start)
+            // a separator ending the part shows as the next joiner, or, last, not at all
+            val end = if (graph.input[ends[k] - 1] == SyllableGraph.SEPARATOR) ends[k] - 1 else ends[k]
+            out.add(parts[k], base + start, base + end)
         }
-        return out.toString()
+        return out
     }
 
     /** How [word] reads from [from] to [to] of [graph]: what each syllable shows, where it ends, and its id. */

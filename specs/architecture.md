@@ -103,7 +103,10 @@ covering nothing of the app: in the app,
 a tap on another field or app had the app finish it as text before the input method heard of it
 (`InputMethodManager`), leaving `ni` in the field, and an app that made its activity anew on a
 turn saved it with the field's text. Dropped with the engine's input as the keyboard goes, a code
-never reaches the app's text, so nothing has to be taken out of it afterwards.
+never reaches the app's text, so nothing has to be taken out of it afterwards. The row scrolls to
+keep the cursor in sight, and a tap on it puts the cursor there (`FcitxAPI.moveCursor`, the
+engine's `EngineEvent.CURSOR` with the place in the preedit), for a key missed in the middle of a
+long code to be typed or deleted there; arrows and the swipe on space move it too (`Action.Step`).
 
 ## The engine host
 

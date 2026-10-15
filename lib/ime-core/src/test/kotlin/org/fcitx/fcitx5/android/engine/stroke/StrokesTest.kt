@@ -272,18 +272,32 @@ class StrokesTest {
         assertFalse(pinyin.learning)
     }
 
-    // fcitx commits the preedit and resets: the lookup has no cursor
     @Test
-    fun aTapInALookupIsLeftToFcitxAsItWas() {
+    fun theStrokesKeepACursorAsPinyinDoes() {
         val pinyin = Pinyin()
         val l = lookup(pinyin)
         l.apply(Action.Key('u'))
-        val typed = l.apply(Action.Key('h'))
-        assertEquals("u一", typed.preedit)
-        assertEquals(typed.copy(handled = false), l.apply(Action.Cursor(1)))
-        assertTrue("the pinyin is not told", pinyin.actions.none { it is Action.Cursor })
-        // still looking up: the next stroke goes on from it
+        l.apply(Action.Key('h'))
         assertEquals("u一丨", l.apply(Action.Key('s')).preedit)
+        // a tap after the u: before the first stroke
+        val tapped = l.apply(Action.Cursor(1))
+        assertTrue(tapped.handled)
+        assertEquals(1, tapped.cursor)
+        assertTrue("the pinyin is not told", pinyin.actions.none { it is Action.Cursor })
+        // nothing before it to delete: the u stays
+        assertEquals("u一丨", l.apply(Action.Backspace).preedit)
+        val mended = l.apply(Action.Key('h'))
+        assertEquals("u一一丨", mended.preedit)
+        assertEquals(2, mended.cursor)
+        // at the end again: backspace deletes the last stroke
+        assertEquals(-1, l.apply(Action.Step.END).cursor)
+        assertEquals("u一一", l.apply(Action.Backspace).preedit)
+        // a letter ends the lookup where the cursor is: u, then the a, then the strokes
+        l.apply(Action.Step.START)
+        l.apply(Action.Key('a'))
+        assertEquals("uahh", pinyin.typed.toString())
+        // and the pinyin's cursor after the a
+        assertEquals(Action.Step(-2), pinyin.actions.last())
     }
 
     @Test

@@ -117,49 +117,56 @@ internal class NineKeys(private val data: PinyinData, private val letters: NineK
     }
 
     /**
-     * Puts the syllable at [index] of [offered] into [input] for its digits; false if there is
-     * none, or the pick was [of] another list (see [Action.Syllable]).
+     * Puts the syllable at [index] of [offered] into [input] for its digits: where the [cursor] is
+     * after it, past the syllable if it was in or after its digits; -1 if there is none, or the pick
+     * was [of] another list (see [Action.Syllable]).
      */
-    fun take(input: StringBuilder, index: Int, of: Int): Boolean {
-        if (of != Action.Syllable.ANY && of != id) return false
-        val spelling = offered.getOrNull(index) ?: return false
+    fun take(input: StringBuilder, index: Int, of: Int, cursor: Int): Int {
+        if (of != Action.Syllable.ANY && of != id) return -1
+        val spelling = offered.getOrNull(index) ?: return -1
         val at = offeredAt
         val was = input.substring(at, at + offeredPresses[index])
+        val length = input.length
         input.replace(at, at + was.length, spelling)
         // the presses may have been more than its letters: a run of a key pressed again one
         val end = at + spelling.length
         val added = end == input.length || input[end] != SyllableGraph.SEPARATOR
         if (added) input.insert(end, SyllableGraph.SEPARATOR)
         taken += Taken(at, was, spelling.length, added, input.toString())
-        return true
+        return if (cursor < at) cursor else maxOf(cursor, at + was.length) + input.length - length
     }
 
     /**
-     * Puts [c] into [input] as a letter typed as itself ([Action.Letter]), upper case, after the
-     * last key; but [again] after the same key's digit after [picked], what is picked already, a
+     * Puts [c] into [input] as a letter typed as itself ([Action.Letter]), upper case, at [cursor],
+     * the key before it the last; where the cursor is after it, or -1 for what is no letter. But
+     * [again] after the same key's digit after [picked], what is picked already, a
      * press of its own ([T9Segmenter.again]: the decoder reads the run as keys or as the letter it
      * came to), and after the same letter typed as itself, in its place. Again with no such key (a candidate
      * picked in between, which the keyboard did not see) it is its key, any of its letters, as a
      * press after a pause; so too after such a key while [c], the letter the keyboard counted the
-     * presses to, is not the one the run comes to. False for what is no letter.
+     * presses to, is not the one the run comes to.
      */
-    fun letter(input: StringBuilder, c: Char, again: Boolean, picked: Int): Boolean {
-        if (c !in 'a'..'z') return false
-        val last = input.length - 1
+    fun letter(input: StringBuilder, c: Char, again: Boolean, picked: Int, cursor: Int): Int {
+        if (c !in 'a'..'z') return -1
+        val last = cursor - 1
         val same = last >= picked && T9Segmenter.isKey(input[last]) && letters.sameKey(T9Segmenter.digitOf(input[last]), c)
         // the keyboard counted no press the input lacks: 2, a pick it did not see, then 2 2 came as b
         // and c, which as a run of the 2 typed after the pick would read b
         val counted = same && input[last] !in T9Segmenter.FIXED && c == nextLetter(input, last, picked)
-        when {
+        val key = when {
             // a press of its own, the decoder to read the run as keys or as the letter it came to
-            again && counted -> input.append(T9Segmenter.again(T9Segmenter.digitOf(input[last])))
-            again && same && input[last] in T9Segmenter.FIXED -> input.setCharAt(last, c.uppercaseChar())
-            again && same -> input.append(T9Segmenter.digitOf(input[last]))
+            again && counted -> T9Segmenter.again(T9Segmenter.digitOf(input[last]))
+            again && same && input[last] in T9Segmenter.FIXED -> {
+                input.setCharAt(last, c.uppercaseChar())
+                return cursor
+            }
+            again && same -> T9Segmenter.digitOf(input[last])
             // which of its keys was pressed is not told: the letter itself where it is on more than one
-            again -> input.append(if (letters.keysOf(c).length == 1) letters.key(c) else c.uppercaseChar())
-            else -> input.append(c.uppercaseChar())
+            again -> if (letters.keysOf(c).length == 1) letters.key(c) else c.uppercaseChar()
+            else -> c.uppercaseChar()
         }
-        return true
+        input.insert(cursor, key)
+        return cursor + 1
     }
 
     // the letter a press more of the key whose run ends at [last] comes to, the run as the segmenter

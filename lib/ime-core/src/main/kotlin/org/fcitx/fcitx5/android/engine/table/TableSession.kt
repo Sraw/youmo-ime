@@ -39,6 +39,11 @@ import kotlin.math.log10
  * spells are sorted with the codes past those that come first, after a code as long and never
  * first, showing their code. One left alone waits to be picked.
  *
+ * The code keeps a cursor, at its end till moved ([Action.Cursor], [Action.Step]): keys go in
+ * there and backspace deletes before it. A code key typed before the end never commits what is
+ * typed (the code is being mended), nor goes into a full code; the code whole still commits
+ * itself when it is the only one. In a lookup the cursor is the pinyin's.
+ *
  * A key of [TableOptions.endKeys] ends a code: the next key commits it. A key of
  * [TableOptions.selectionKeys] picks while there are candidates, a code key too, as in fcitx.
  *
@@ -75,6 +80,7 @@ class TableSession(
     private class Item(val code: String, val text: String, val auto: Boolean, val index: Int = -1, val pinyin: Boolean = false)
 
     private val input = StringBuilder()
+    private var cursor = 0 // where in the code the next key goes; in a lookup unused, the pinyin's
     private var ranking = Ranking.NONE
     private var page = 0
 
@@ -115,7 +121,7 @@ class TableSession(
         val taken = action is Action.Key && takesSpace(action.char)
         committedItselfAt = null
         // the order shown is the one to weigh: anything but a slice of the weighing changes it, or the page
-        if (action != Action.Refine) unrefined = null
+        if (action != Action.Refine && action !is Action.Cursor && action !is Action.Step) unrefined = null
         if (taken) return snapshot()
         if (predictions.isNotEmpty()) {
             when (action) {
@@ -160,7 +166,8 @@ class TableSession(
         Action.Refine -> refine()
         // a table has no custom phrases
         Action.Ink, is Action.Pin, is Action.Unpin, is Action.Syllable, is Action.Letter -> snapshot()
-        is Action.Cursor -> snapshot(handled = false)
+        is Action.Cursor -> moveCursor(action.at.toLong())
+        is Action.Step -> moveCursor(cursor.toLong() + action.by)
         // auto phrases are made of what was committed here, not of what the editor had: kept
         // only while the text still ends with it (the cursor did not go anywhere)
         Action.Reset, is Action.Context -> {
@@ -214,11 +221,12 @@ class TableSession(
             return snapshot(commit = text, handled = false)
         }
         var commit = ""
-        if (options.autoSelect && input.isNotEmpty() && endsCode(c)) commit = autoCommit()
+        if (options.autoSelect && typingAtEnd() && endsCode(c)) commit = autoCommit()
         // after a code just committed too: 叫 by kkkk, then z looks the next one up
         if (startsLookUp && input.isEmpty()) {
             lookingUp = true
             input.append(c)
+            cursor = input.length
             return snapshot(commit = commit)
         }
         // a key no code starts is the app's, as fcitx hands it on: a table's , and . may be its
@@ -228,7 +236,15 @@ class TableSession(
             wrote(c.toString(), null)
             return snapshot(commit = commit, handled = false)
         }
-        input.append(c)
+        return typeInto(c, commit)
+    }
+
+    // [c] put in the code at the cursor, after [committed]
+    private fun typeInto(c: Char, committed: String): Snapshot {
+        var commit = committed
+        // a full code mended: the key has nowhere to go, the code shortened first
+        if (table.pinyinMarker == null && input.length >= table.maxLength && !typingAtEnd()) return snapshot(commit = commit)
+        input.insert(cursor++, c)
         update()
         val only = ranking.only()
         if (only != null && commitsItself(only)) {
@@ -238,6 +254,9 @@ class TableSession(
         }
         return snapshot(commit = commit)
     }
+
+    // a code typed, the cursor at its end: not one being mended
+    private fun typingAtEnd() = input.isNotEmpty() && cursor == input.length
 
     /**
      * Whether [c] cannot go on the code typed: it is full (pinyin has no length limit), ends
@@ -273,8 +292,17 @@ class TableSession(
             lastEntry = null
             return snapshot(handled = false)
         }
-        input.setLength(input.length - 1)
+        // at the start of the code: nothing before it is the session's to delete
+        if (cursor == 0) return snapshot()
+        input.deleteCharAt(--cursor)
         update()
+        return snapshot()
+    }
+
+    /** The cursor put where [to] says while a code is typed; nothing read again. */
+    private fun moveCursor(to: Long): Snapshot {
+        if (input.isEmpty()) return snapshot(handled = false)
+        cursor = to.coerceIn(0, input.length.toLong()).toInt()
         return snapshot()
     }
 
@@ -431,6 +459,7 @@ class TableSession(
 
     private fun clear() {
         input.setLength(0)
+        cursor = 0
         ranking = Ranking.NONE
         homographs = null
         page = 0
@@ -646,6 +675,7 @@ class TableSession(
         return Snapshot(
             commit = commit,
             preedit = input.toString(),
+            cursor = if (cursor < input.length) cursor else -1,
             candidates = shown.map { it.text },
             page = page,
             hasPreviousPage = page > 0,
@@ -713,13 +743,7 @@ class TableSession(
                 wrote(text + action.char, null)
                 snapshot(commit = text, handled = false)
             }
-            Action.Backspace -> if (input.length > 1) {
-                input.setLength(input.length - 1)
-                fromPinyin(pinyin.apply(action))
-            } else {
-                endLookUp()
-                snapshot()
-            }
+            Action.Backspace -> backspaceInLookUp(pinyin)
             Action.CommitRaw -> {
                 val text = typedInLookUp(pinyin)
                 endLookUp()
@@ -733,8 +757,8 @@ class TableSession(
             }
             // not offered (see offers): the lookup's pinyin has no phrases of the table's own
             is Action.Pin, is Action.Unpin, is Action.Block -> lookedUp ?: snapshot()
-            // a tap in the preedit is fcitx's, as outside a lookup: it commits the preedit and resets
-            is Action.Cursor -> (lookedUp ?: snapshot()).copy(handled = false)
+            // the preedit shown is the pinyin's, and so is the cursor in it
+            is Action.Cursor, is Action.Step -> if (input.length > 1) fromPinyin(pinyin.apply(action)) else snapshot()
             // the pinyin key alone: nothing to pick, and space drops it
             is Action.Select -> if (input.length > 1) fromPinyin(pinyin.apply(action)) else {
                 endLookUp()
@@ -744,10 +768,28 @@ class TableSession(
         }
     }
 
-    /** What was typed in a lookup, as typed: the pinyin key too, unless a word was picked from the start of it. */
+    private fun backspaceInLookUp(pinyin: Session): Snapshot = when {
+        input.length <= 1 -> {
+            endLookUp()
+            snapshot()
+        }
+        // the pinyin's cursor at its start: it deletes nothing
+        lookedUp?.cursor == 0 -> lookedUp ?: snapshot()
+        else -> {
+            input.setLength(input.length - 1)
+            fromPinyin(pinyin.apply(Action.Backspace))
+        }
+    }
+
+    /**
+     * What was typed in a lookup, as typed: the pinyin key too, unless a word was picked from the
+     * start of it. The keys here are as many as the pinyin's but, mended at its cursor, maybe not
+     * in its order: as it has them, keys alone, nothing was picked.
+     */
     private fun typedInLookUp(pinyin: Session): String {
         val raw = if (input.length > 1) pinyin.apply(Action.CommitRaw).commit else ""
-        return if (raw == input.substring(1)) input.toString() else raw
+        val keysAlone = raw.length == input.length - 1 && raw.all { it in 'a'..'z' || it == '\'' }
+        return if (keysAlone) input[0] + raw else raw
     }
 
     private fun fromPinyin(s: Snapshot): Snapshot {

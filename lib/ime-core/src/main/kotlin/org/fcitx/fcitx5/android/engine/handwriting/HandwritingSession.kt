@@ -145,7 +145,7 @@ class HandwritingSession(
             lastEntry = null
             reset()
         }
-        is Action.Cursor -> snapshot(handled = false)
+        is Action.Cursor, is Action.Step -> snapshot(handled = false)
         Action.Refine -> refine()
         is Action.Forget, is Action.Pin, is Action.Unpin, is Action.Block, is Action.Syllable, is Action.Letter -> snapshot()
     }

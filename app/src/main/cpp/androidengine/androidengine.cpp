@@ -230,8 +230,7 @@ private:
 /**
  * Shows [text] as what is typed, the cursor [cursor] code points into it; -1, or past its end, at
  * its end: in the app, underlined, where it may go (composesText); else above the candidates.
- * ime-core's Snapshot.cursor counts UTF-16 units: the same while English, the one session with a
- * cursor of its own, types letters of the BMP alone.
+ * (EngineBridge.result turns ime-core's UTF-16 units into code points.)
  */
 void showPreedit(InputContext *ic, const std::string &text, int cursor = -1) {
     auto &panel = ic->inputPanel();
@@ -667,11 +666,17 @@ void AndroidEngine::show(InputContext *ic, std::string im, const EngineSnapshot 
 }
 
 void AndroidEngine::invokeActionImpl(const InputMethodEntry &entry, InvokeActionEvent &event) {
-    // a tap in the composed text: a session keeping a cursor in its input (English) puts it there
-    if (event.action() == InvokeActionEvent::Action::LeftClick && event.cursor() >= 0 &&
-        send(event.inputContext(), entry.uniqueName(), EngineEvent::Cursor, event.cursor())) {
-        event.filter();
-        return;
+    // a tap in the composed text: a session keeping a cursor in its input (English, pinyin, a table, the stroke lookup) puts it there
+    if (event.action() == InvokeActionEvent::Action::LeftClick && event.cursor() >= 0) {
+        auto *ic = event.inputContext();
+        const bool client = ic->capabilityFlags().test(CapabilityFlag::Preedit);
+        // a tap on the code above the candidates that the session does not take (handwriting's, words
+        // offered): nothing.
+        // fcitx's own would commit the app's composing text, there none, then reset, the code lost
+        if (send(ic, entry.uniqueName(), EngineEvent::Cursor, event.cursor()) || !client) {
+            event.filter();
+            return;
+        }
     }
     InputMethodEngineV3::invokeActionImpl(entry, event);
 }

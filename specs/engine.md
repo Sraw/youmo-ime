@@ -60,7 +60,13 @@ see Tables for where a table's order may move).
    measured choice (replacing lost 2.2 points).
 4. **Present.** `PinyinSession` lists the readings of all the input, then words the start may be;
    picking a partial one keeps it and reads the rest after it. Committed text becomes the context
-   of what follows; `Predictor` offers next words (联想) until a key is typed.
+   of what follows; `Predictor` offers next words (联想) until a key is typed. The input keeps a
+   cursor (`Action.Cursor` from a tap on the preedit, `Action.Step` from an arrow): keys go in
+   and backspace deletes there, and the input is read again whole, as if typed so (the decoder
+   searches again from the first syllable that changed). A piece picked whose keys that changes is
+   dropped; `PreeditPlaces` says where each place of the preedit is in the input, syllables
+   spaced or spelt out (双拼). On the nine keys a syllable taken puts the cursor past it if it was in
+   or after its digits, and backspace gives the last one back at the end alone.
 5. **Learn.** Committed words are counted (`UserModel`); a sentence the user assembled from pieces,
    or a reading other than the first, is learned as one new word. Counts halve past a limit.
 
@@ -79,7 +85,8 @@ see Tables for where a table's order may move).
 - **Misreadings** (`lexicon/misreadings.tsv`): a word is also under its common misreading, a tenth
   as likely, and its candidate then shows the right reading with tones.
 - **Strokes.** `u` with nothing typed starts `StrokeLookup` (`h s p n z` = 横竖撇捺折); any other
-  letter turns it back into pinyin (`usb`, or `uan` as a slip for `yan`).
+  letter turns it back into pinyin (`usb`, or `uan` as a slip for `yan`), typed at the strokes'
+  cursor, which they keep as pinyin keeps its own.
 - **Latin words** in pinyin (`iphone` → iPhone) come from the `latin` layer, spelt in letter
   syllables; full pinyin only.
 
@@ -96,7 +103,10 @@ are offered where nothing is learned (a password field, `Session.learning` false
 `TableSession` ranks entries whose code starts with the input as libime does (codes up to
 `noSortInputLength` in table order, then shorter codes first, then by use). Auto-select commits a
 lone full code, or the first candidate when the next key leads nowhere; 空码 is dropped by the next
-key. `pinyinKey` (五笔 `z`, 二笔 `[`) looks a character up by pinyin, showing its code;
+key. The code keeps a cursor as pinyin's input does; a key typed before its end is put in there and
+never commits by the next-key rule (the code is being mended, not full), a lone full code still
+commits. `pinyinKey` (五笔 `z`, 二笔 `[`) looks a character up by pinyin, showing its code (the
+cursor then the pinyin's);
 `matchingKey` is the wildcard (五笔 `z`, 仓颉 and 二笔 `*`). Characters typed one by one become
 phrases by the table's 组词规则 (`autoPhraseLength`), saved after `saveAutoPhraseAfter` uses.
 `SharedWords` gives every table the user's words from the other input methods, coded by its rules.

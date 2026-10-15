@@ -124,10 +124,23 @@ sealed class Action {
 
     /**
      * Puts the cursor [at] that character of the preedit (a tap in the composed text, where the
-     * app shows it): what is typed next goes there. Only English keeps a cursor in its input;
-     * elsewhere the snapshot is not [handled][Snapshot.handled].
+     * app shows it): what is typed next goes there, and backspace deletes before it. English,
+     * pinyin (the nine keys too), the tables and the stroke lookup keep a cursor in their input;
+     * elsewhere (handwriting, words offered) the snapshot is not [handled][Snapshot.handled].
      */
     data class Cursor(val at: Int) : Action()
+
+    /**
+     * Moves the cursor in the input [by] keys, back where negative (an arrow, a swipe on space);
+     * [Int.MIN_VALUE] and [Int.MAX_VALUE] to its start and end (Home, End). Where no cursor is
+     * kept, as for [Cursor].
+     */
+    data class Step(val by: Int) : Action() {
+        companion object {
+            val START = Step(Int.MIN_VALUE)
+            val END = Step(Int.MAX_VALUE)
+        }
+    }
 
     /**
      * The user pauses: some of the work that may put a better reading first, where the

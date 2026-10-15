@@ -19,6 +19,10 @@ import org.fcitx.fcitx5.android.engine.session.Snapshot
  * other key commits the first candidate, or with none what was typed, and is the app's, as in
  * pinyin: what is typed next does not run on from it, as after Enter.
  *
+ * The strokes keep a cursor, at their end till moved ([Action.Cursor], [Action.Step]), as pinyin
+ * keeps one: strokes go in there, backspace deletes before it, and the letter that ends the lookup
+ * is typed there too.
+ *
  * [strokes] is asked for at the first lookup: null, there are none, and [KEY] is [pinyin]'s. A
  * character the user [blocked] is not found. A character picked is handed to [follow], for the
  * pinyin to go on after: by default as the app's text ([Action.Context]); a PinyinSession's
@@ -40,6 +44,7 @@ class StrokeLookup(
 
     private var looking = false
     private val input = StringBuilder()
+    private var cursor = 0 // where in the strokes the next goes
     private var found = Found.none()
     private var page = 0
 
@@ -63,9 +68,18 @@ class StrokeLookup(
             }
             return pinyin.apply(action).also { idle = it.preedit.isEmpty() }
         }
-        return when (action) {
+        return whileLooking(action)
+    }
+
+    private fun whileLooking(action: Action): Snapshot =
+        when (action) {
             is Action.Key -> type(action.char)
-            Action.Backspace -> if (input.isEmpty()) end() else lookUp { input.setLength(input.length - 1) }
+            Action.Backspace -> when {
+                input.isEmpty() -> end()
+                // before the first stroke: the key that started the lookup stays
+                cursor == 0 -> snapshot()
+                else -> lookUp { input.deleteCharAt(--cursor) }
+            }
             is Action.Select -> if (action.index in 0 until pageSize) pick(page * pageSize + action.index) else snapshot()
             is Action.Pick -> pick(action.index)
             Action.NextPage -> turn(page + 1)
@@ -75,12 +89,12 @@ class StrokeLookup(
                 end()
                 pinyin.apply(action).also { idle = it.preedit.isEmpty() }
             }
-            // no cursor in the input: the tap is the app's
-            is Action.Cursor -> snapshot().copy(handled = false)
+            // the preedit is the key, then a stroke a character
+            is Action.Cursor -> moved(action.at.toLong() - 1)
+            is Action.Step -> moved(cursor.toLong() + action.by)
             // nothing learned, nothing to offer: as it was
             else -> snapshot()
         }
-    }
 
     override fun candidates(from: Int, count: Int): List<Choice> =
         if (!looking) pinyin.candidates(from, count)
@@ -89,7 +103,7 @@ class StrokeLookup(
     override fun offers(index: Int): Set<Offer> = if (looking) emptySet() else pinyin.offers(index)
 
     private fun type(c: Char): Snapshot = when {
-        c in Strokes.KEYS -> lookUp { input.append(c) }
+        c in Strokes.KEYS -> lookUp { input.insert(cursor++, c) }
         c in 'a'..'z' -> toPinyin(c)
         // a key not read: the first candidate, or what was typed as Enter has it; then the key is the app's
         else -> leave(found[0] ?: "$KEY$input", handled = false)
@@ -97,9 +111,13 @@ class StrokeLookup(
 
     /** Ends the lookup, [KEY], the strokes and [c] typed into [pinyin] instead. */
     private fun toPinyin(c: Char): Snapshot {
-        val keys = "$KEY$input$c"
+        val after = input.length - cursor
+        val keys = "$KEY" + input.insert(cursor, c)
         end()
-        return retype(keys).also { idle = it.preedit.isEmpty() }
+        val typed = retype(keys)
+        // the pinyin's cursor where the letter went in, the strokes after it after it
+        val s = if (after > 0 && typed.preedit.isNotEmpty()) pinyin.apply(Action.Step(-after)).copy(commit = typed.commit) else typed
+        return s.also { idle = it.preedit.isEmpty() }
     }
 
     private inline fun lookUp(change: () -> Unit = {}): Snapshot {
@@ -126,6 +144,12 @@ class StrokeLookup(
         return end(commit = text, handled = handled)
     }
 
+    private fun moved(to: Long): Snapshot {
+        if (input.isEmpty()) return snapshot()
+        cursor = to.coerceIn(0, input.length.toLong()).toInt()
+        return snapshot()
+    }
+
     private fun turn(to: Int): Snapshot {
         if (to >= 0 && found[to * pageSize] != null) page = to
         return snapshot()
@@ -134,6 +158,7 @@ class StrokeLookup(
     private fun end(commit: String = "", handled: Boolean = true): Snapshot {
         looking = false
         input.setLength(0)
+        cursor = 0
         found = Found.none()
         page = 0
         return Snapshot(commit, "", emptyList(), 0, hasPreviousPage = false, hasNextPage = false, handled = handled, predicting = false)
@@ -145,6 +170,7 @@ class StrokeLookup(
         return Snapshot(
             commit = "",
             preedit = "$KEY" + Strokes.shown(input),
+            cursor = if (cursor < input.length) cursor + 1 else -1,
             candidates = shown,
             page = page,
             hasPreviousPage = page > 0,

@@ -130,6 +130,8 @@ class EnglishSession(
             cursor = action.at.coerceIn(0, input.length)
             snapshot()
         }
+        // the keyboard commits the word on an arrow (Keyboard.whileComposing): none comes here
+        is Action.Step -> snapshot(handled = false)
         is Action.Context -> {
             forgetText()
             if (learning) {

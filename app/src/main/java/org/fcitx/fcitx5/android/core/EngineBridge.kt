@@ -362,7 +362,9 @@ object EngineBridge {
         return Result(
             s.handled, s.commit, s.preedit,
             all.map { it.text }.toTypedArray(), all.map { it.hint }.toTypedArray(),
-            s.first, s.candidates.size, s.total, s.actionable, s.labels, s.refines, s.deleteBefore, s.cursor,
+            s.first, s.candidates.size, s.total, s.actionable, s.labels, s.refines, s.deleteBefore,
+            // the addon counts code points: a character past the BMP in the pieces picked is one
+            if (s.cursor < 0) -1 else s.preedit.codePointCount(0, minOf(s.cursor, s.preedit.length)),
         )
     }
 

@@ -4,13 +4,13 @@
  */
 package org.fcitx.fcitx5.android.input.preedit
 
-import android.text.TextUtils
 import android.util.TypedValue
 import android.view.Gravity
-import android.widget.LinearLayout
 import org.fcitx.fcitx5.android.core.FcitxEvent
+import org.fcitx.fcitx5.android.daemon.launchOnReady
 import org.fcitx.fcitx5.android.input.broadcast.InputBroadcastReceiver
 import org.fcitx.fcitx5.android.input.dependency.context
+import org.fcitx.fcitx5.android.input.dependency.fcitx
 import org.fcitx.fcitx5.android.input.dependency.theme
 import org.mechdancer.dependency.Dependent
 import org.mechdancer.dependency.UniqueComponent
@@ -24,6 +24,7 @@ class PreeditComponent : UniqueComponent<PreeditComponent>(), Dependent, InputBr
 
     private val context by manager.context()
     private val theme by manager.theme()
+    private val fcitx by manager.fcitx()
 
     val ui by lazy {
         PreeditUi(context, theme, oneLine = true, setupTextView = {
@@ -32,11 +33,11 @@ class PreeditComponent : UniqueComponent<PreeditComponent>(), Dependent, InputBr
             horizontalPadding = dp(8)
             isSingleLine = true
             includeFontPadding = false
-            // a long code keeps its end, where the typing is, in sight
-            ellipsize = TextUtils.TruncateAt.START
+            gravity = Gravity.CENTER_VERTICAL
         }).apply {
-            // on InputView's barBackground, with the bar: one taller bar
-            (root as LinearLayout).gravity = Gravity.CENTER_VERTICAL
+            // on InputView's barBackground, with the bar: one taller bar. A tap puts the cursor in
+            // the code, for a key missed in the middle of it to be typed or deleted there
+            onTap = { at -> fcitx.launchOnReady { it.moveCursor(at) } }
         }
     }
 

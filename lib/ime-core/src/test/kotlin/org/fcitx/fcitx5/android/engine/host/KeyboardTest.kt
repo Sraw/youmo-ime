@@ -100,7 +100,7 @@ class KeyboardTest {
                     input = ""
                     predicting = false
                 }
-                Action.NextPage, Action.PreviousPage, is Action.Forget, is Action.Pin, is Action.Unpin, is Action.Block, Action.Refine, Action.Ink, is Action.Syllable, is Action.Letter, is Action.Cursor -> {}
+                Action.NextPage, Action.PreviousPage, is Action.Forget, is Action.Pin, is Action.Unpin, is Action.Block, Action.Refine, Action.Ink, is Action.Syllable, is Action.Letter, is Action.Cursor, is Action.Step -> {}
             }
             val shown = all()
             return Snapshot(commit, input, shown, 0, false, false, handled, predicting, refines = slices > 0)
