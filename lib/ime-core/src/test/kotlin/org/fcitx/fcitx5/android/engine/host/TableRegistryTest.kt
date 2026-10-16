@@ -118,6 +118,21 @@ class TableRegistryTest : EnginesFixture() {
         }
     }
 
+    @Test
+    fun aCharacterForgottenElsewhereOpensNoTableWithALogNotOpenYet() {
+        // a table saves and shares no single character: forgetting one has nothing to replay a log for
+        val dir = savedNihao()
+        val opened = ArrayList<String>()
+        val now = Executor { it.run() }
+        val assets = EngineAssets(::load, {}, null)
+        val lexicon = UserLexicon(null, {}, { null }, { null }, assets, now, forgetInTables = {}, dropSessions = {})
+        val registry = TableRegistry({ opened += it; load(it) }, dir, {}, now, assets, lexicon)
+        registry.forgetInTables(setOf("好"))
+        assertEquals(emptyList<String>(), opened.filter { it.startsWith(Engines.TABLE_DIR) })
+        registry.forgetInTables(setOf("你好"))
+        assertEquals(1, opened.count { it.startsWith(Engines.TABLE_DIR) })
+    }
+
     private companion object {
         const val WUBI = "engine-wubi"
     }

@@ -17,10 +17,11 @@ import org.fcitx.fcitx5.android.data.theme.Theme
 import splitties.dimensions.dp
 
 /**
- * The pad written on: draws [pad]'s strokes and feeds it the first finger's moves, [onRead] told
- * of each read a stroke ended asks for. The piece is checked for done [pause] after the pen goes
- * up, read each time: the setting may change while the keyboard is up; [onFinish] is told of a
- * piece done so.
+ * The pad written on: draws [pad]'s strokes and feeds it the moves of one finger, the first down
+ * while none writes (another resting on the pad, a palm or a thumb, does not stop the strokes after
+ * it), [onRead] told of each read a stroke ended asks for. The piece is checked for done [pause]
+ * after the pen goes up or backspace takes a stroke back, read each time: the setting may change
+ * while the keyboard is up; [onFinish] is told of a piece done so.
  */
 @SuppressLint("ViewConstructor")
 class HandwritingPadView(
@@ -41,6 +42,13 @@ class HandwritingPadView(
         strokeJoin = Paint.Join.ROUND
     }
     private val path = Path()
+
+    // the finished strokes, traced again only when they change (InkPad.edits)
+    private val finishedInk = Path()
+    private var traced = -1
+
+    // made once: a lambda written in onDraw, holding the view, would be allocated at every frame
+    private val traceUnderPen: (FloatArray, Int) -> Unit = { xy, n -> trace(path, xy, n) }
 
     private val finishCheck = Runnable {
         val piece = pad.piece
@@ -75,21 +83,37 @@ class HandwritingPadView(
 
     /** Backspace: the last stroke taken back, true; false with none to take back. */
     fun undo(): Boolean {
-        val read = pad.undo() ?: return false
+        val read = pad.undo(SystemClock.uptimeMillis()) ?: return false
+        // timed again from here, else the strokes left end the piece before the one taken back is rewritten
+        if (read.strokes.isEmpty()) removeCallbacks(finishCheck) else checkLater()
         invalidate()
         onRead(read)
         return true
+    }
+
+    // the piece checked for done once the pen has stayed up the pause, read now
+    private fun checkLater() {
+        removeCallbacks(finishCheck)
+        pad.finishMillis = pause()
+        postDelayed(finishCheck, pad.finishMillis)
+    }
+
+    private fun penDown(event: MotionEvent, index: Int) {
+        parent?.requestDisallowInterceptTouchEvent(true)
+        removeCallbacks(finishCheck)
+        pointer = event.getPointerId(index)
+        pad.down(event.getX(index), event.getY(index))
     }
 
     @SuppressLint("ClickableViewAccessibility")
     override fun onTouchEvent(event: MotionEvent): Boolean {
         val i = if (pointer == MotionEvent.INVALID_POINTER_ID) -1 else event.findPointerIndex(pointer)
         when (event.actionMasked) {
-            MotionEvent.ACTION_DOWN -> {
-                parent?.requestDisallowInterceptTouchEvent(true)
-                removeCallbacks(finishCheck)
-                pointer = event.getPointerId(0)
-                pad.down(event.x, event.y)
+            MotionEvent.ACTION_DOWN -> penDown(event, 0)
+            // with a finger resting on the pad, the writing one comes down as another pointer
+            MotionEvent.ACTION_POINTER_DOWN -> {
+                if (pointer != MotionEvent.INVALID_POINTER_ID) return true
+                penDown(event, event.actionIndex)
             }
             MotionEvent.ACTION_MOVE -> {
                 if (i < 0) return true
@@ -102,8 +126,7 @@ class HandwritingPadView(
                 pad.move(event.getX(i), event.getY(i))
                 pointer = MotionEvent.INVALID_POINTER_ID
                 pad.up(SystemClock.uptimeMillis())?.let(onRead)
-                pad.finishMillis = pause()
-                postDelayed(finishCheck, pad.finishMillis)
+                checkLater()
             }
             MotionEvent.ACTION_CANCEL -> {
                 pointer = MotionEvent.INVALID_POINTER_ID
@@ -123,14 +146,23 @@ class HandwritingPadView(
     }
 
     override fun onDraw(canvas: Canvas) {
-        for (s in pad.strokes) {
-            path.rewind()
-            path.moveTo(s[0], s[1])
-            // a tap: a dot
-            if (s.size == 2) path.lineTo(s[0] + DOT, s[1])
-            for (j in 2 until s.size step 2) path.lineTo(s[j], s[j + 1])
-            canvas.drawPath(path, ink)
+        if (traced != pad.edits) {
+            traced = pad.edits
+            finishedInk.rewind()
+            for (s in pad.finished) trace(finishedInk, s, s.size)
         }
+        canvas.drawPath(finishedInk, ink)
+        path.rewind()
+        pad.underPen(traceUnderPen)
+        canvas.drawPath(path, ink)
+    }
+
+    /** A stroke's first [n] values of [xy], x, y pairs, traced into [into]. */
+    private fun trace(into: Path, xy: FloatArray, n: Int) {
+        into.moveTo(xy[0], xy[1])
+        // a tap: a dot
+        if (n == 2) into.lineTo(xy[0] + DOT, xy[1])
+        for (j in 2 until n step 2) into.lineTo(xy[j], xy[j + 1])
     }
 
     private companion object {

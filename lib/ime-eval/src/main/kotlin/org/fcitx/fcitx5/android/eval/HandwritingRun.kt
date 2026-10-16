@@ -11,6 +11,8 @@ import org.fcitx.fcitx5.android.engine.lattice.CoarseWords
 import org.fcitx.fcitx5.android.engine.lattice.Predictor
 import org.fcitx.fcitx5.android.engine.lattice.TextWords
 import org.fcitx.fcitx5.android.engine.lattice.WordScorer
+import org.fcitx.fcitx5.android.engine.rerank.SentenceRefiner
+import org.fcitx.fcitx5.android.engine.session.RefineSlices
 import java.io.File
 import java.util.Locale
 
@@ -23,7 +25,10 @@ import java.util.Locale
  */
 internal class HandwritingRun(private val data: PinyinData) {
 
-    class Row(val before: String, val text: String, val positions: List<InkReading>)
+    class Row(val before: String, val text: String, val positions: List<InkReading>) {
+        /** [text]'s characters, a position each: one past the BMP whole, as a reading has it. */
+        val characters: List<String> = charactersOf(text)
+    }
 
     private val textWords = TextWords(data.model, data.wordIndex)
     private val readings by lazy { Predictor.charReadingsOf(data.dictionary, data.vocabulary) }
@@ -44,10 +49,10 @@ internal class HandwritingRun(private val data: PinyinData) {
 
     fun ink(rows: List<Row>): Tally = Tally().also { t ->
         for (r in rows) for ((i, p) in r.positions.withIndex()) {
-            val right = p.texts.firstOrNull() == r.text[i].toString()
+            val right = p.texts.firstOrNull() == r.characters[i]
             t.chars++
             if (right) { t.final++; t.asWritten++ }
-            if (r.text[i].toString() in p.texts.take(TEN)) t.inTen++
+            if (r.characters[i] in p.texts.take(FIRST_OFFERED)) t.inTen++
         }
     }
 
@@ -66,27 +71,43 @@ internal class HandwritingRun(private val data: PinyinData) {
             val (prev2, prev) = TextWords.previous(textWords.lastTwo(r.before))
             for (i in r.positions.indices) {
                 val d = decoder.decode(r.positions.subList(0, i + 1), prev2, prev)
-                if (text(r.before, d).lastOrNull() == r.text[i]) t.asWritten++
-                if (d.sentences.take(TEN).any { it.last() == r.text[i] }) t.inTen++
+                if (text(r.before, d).endsWith(r.characters[i])) t.asWritten++
+                if (d.sentences.take(FIRST_OFFERED).any { it.endsWith(r.characters[i]) }) t.inTen++
             }
-            val final = text(r.before, decoder.decode(r.positions, prev2, prev))
-            t.chars += r.text.length
-            t.final += r.text.indices.count { final.getOrNull(it) == r.text[it] }
+            val final = charactersOf(text(r.before, decoder.decode(r.positions, prev2, prev)))
+            t.chars += r.characters.size
+            t.final += r.characters.indices.count { final.getOrNull(it) == r.characters[it] }
         }
     }
 
     companion object {
-        private const val TEN = 10
+        /** How many of the last character's candidates count as offered ("last in ten"). */
+        private const val FIRST_OFFERED = 10
+
+        /**
+         * The 性能档位's high, as [HandwritingSession][org.fcitx.fcitx5.android.engine.handwriting.HandwritingSession]
+         * has it: [first]'s pick, unless [refiner] picks another in the slices a pause gives it.
+         * By [RefineSlices], the session's own rule, rather than a copy of it to drift.
+         */
+        fun refined(refiner: SentenceRefiner, first: (String, HandwritingDecoder.Decoding) -> Int): (String, HandwritingDecoder.Decoding) -> Int =
+            { before, d ->
+                var picked = first(before, d)
+                val slices = RefineSlices<HandwritingDecoder.Decoding>(refiner)
+                slices.start(d, d.best.size)
+                while (slices.refines) slices.slice(before, { it.best }, { it.bestScores }) { _, at -> picked = at }
+                picked
+            }
 
         fun read(path: String): List<Row> = File(path).readLines().mapNotNull { line ->
             val f = line.split('\t')
             if (f.size < 4) return@mapNotNull null
-            val text = f[2]
             val positions = f.drop(3).map { cell ->
                 val pairs = cell.split(' ').filter { it.isNotEmpty() }.map { it.substringBeforeLast(':') to it.substringAfterLast(':').toDouble() }
                 InkReading(pairs.map { it.first }, pairs.map { it.second }.toDoubleArray())
             }
-            if (positions.size != text.length) null else Row(f[1], text, positions)
+            Row(f[1], f[2], positions).takeIf { it.characters.size == positions.size }
         }
     }
 }
+
+private fun charactersOf(text: String): List<String> = text.codePoints().toArray().map { String(Character.toChars(it)) }

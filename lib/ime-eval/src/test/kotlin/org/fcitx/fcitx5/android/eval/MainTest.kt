@@ -165,6 +165,18 @@ class MainTest {
             arrayOf("ksc"),
             arrayOf("table", "d", "s", "--preset", "dvorak"),
             arrayOf("table", "d", "s", "--half", "tune"),
+            // a preset in the table's order ranks no 重码 by the text before: every row would be the same
+            arrayOf("table", "d", "s", "--pinyin", "p"),
+            arrayOf("table", "d", "s", "--preset", "cangjie", "--pinyin", "p"),
+            // the large model without the small, which the 性能档位's high never has
+            arrayOf("table", "d", "s", "--preset", "wubi", "--pinyin", "p", "--refine", "m"),
+            arrayOf("handwriting", "d", "r", "--refine", "m"),
+            // a model option without what reads it: the 重码 are weighed only with --pinyin, model weights only with a model
+            arrayOf("table", "d", "s", "--preset", "wubi", "--rerank", "m"),
+            arrayOf("table", "d", "s", "--preset", "wubi", "--rerank", "m", "--refine", "m"),
+            arrayOf("handwriting", "d", "r", "--model-weights", "1"),
+            // the models read the sentences at one ink weight
+            arrayOf("handwriting", "d", "r", "--rerank", "m", "--weights", "1,2"),
             arrayOf("libime", "user", "f"),
             arrayOf("libime", "table", "f", "--preset", "plain"),
             arrayOf(),

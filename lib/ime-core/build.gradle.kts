@@ -9,7 +9,7 @@
 plugins {
     `java-library`
     // FakeEditor lives in testFixtures so :app's contract test can hold it against the real
-    // BaseInputConnection
+    // BaseInputConnection; the handwriting test data so :lib:ime-eval's tests read the same words
     `java-test-fixtures`
     alias(libs.plugins.kotlin.jvm)
     alias(libs.plugins.animalsniffer)

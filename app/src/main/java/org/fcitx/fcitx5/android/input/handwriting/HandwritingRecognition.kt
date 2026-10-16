@@ -6,52 +6,64 @@ package org.fcitx.fcitx5.android.input.handwriting
 
 import android.os.Handler
 import android.os.Looper
+import android.widget.Toast
+import androidx.core.content.ContextCompat
+import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.core.EngineBridge
 import org.fcitx.fcitx5.android.engine.handwriting.InkNet
 import org.fcitx.fcitx5.android.engine.handwriting.InkReading
 import org.fcitx.fcitx5.android.engine.handwriting.InkRecognizer
 import org.fcitx.fcitx5.android.handwriting.OrtModel
 import org.fcitx.fcitx5.android.utils.appContext
+import org.fcitx.fcitx5.android.utils.toast
 import timber.log.Timber
-import java.io.IOException
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.Executor
 import java.util.concurrent.Executors
 
 /**
- * The handwriting recognizer, run on a thread of their own: its two models (the character's image
- * and its path) are opened, mapped from the APK, when a read first needs them, and kept. Of a piece's reads, a newer one makes those still waiting stale: they are skipped. An
- * earlier piece's last read is not: it is what that piece shows, and commits.
+ * The handwriting recognizer, run on a thread of its own ([worker]), its readings handed on on
+ * the main thread ([main]). [shared] is the app's: its two models (the character's image and its
+ * path), mapped from the APK, are opened as the keyboard is first shown ([warmUp]), and kept. Of a
+ * piece's reads, a newer one makes those still waiting stale: they are skipped. An earlier piece's
+ * last read is not: it is what that piece shows, and commits. A read of a piece the engine ended
+ * ([ended], the latest) is dropped.
  */
-object HandwritingRecognition {
+class HandwritingRecognition internal constructor(
+    private val worker: Executor,
+    private val main: Executor,
+    private val ended: () -> Int,
+    private val reader: Reader,
+) {
 
-    private val worker = Executors.newSingleThreadExecutor { Thread(it, "handwriting").apply { isDaemon = true } }
+    /** What reads the strokes, on the worker. */
+    internal interface Reader {
+        /** False once it could not be loaded, for good: nothing is asked of it then. Read on the main thread. */
+        val loadable: Boolean
+
+        /** Loaded, if it is not yet. */
+        fun load()
+
+        /** [strokes] read, loaded first if need be; null if they cannot be. */
+        fun read(strokes: List<FloatArray>): InkReading?
+    }
 
     // each piece's newest read asked for: an older one of the piece still waiting is not run
     private val newest = ConcurrentHashMap<Int, Int>()
-
-    // on the worker only
-    private val models = HashMap<String, OrtModel>()
-    private var recognizer: InkRecognizer? = null
-
-    // the recognizer could not be loaded (its library, its files): not tried again at every stroke
-    @Volatile
-    private var broken = false
-
-    private val main = Handler(Looper.getMainLooper())
 
     // on the main thread: reads asked for whose reading is not handed on yet, and actions held behind them
     private var pending = 0
     private var held = 0
 
     /**
-     * Reads [read] on the worker and hands the reading to [done] on the main thread; no strokes are read as nothing. A read no longer its
-     * piece's newest when its turn comes is dropped, as is one of a piece the engine ended, and one
-     * that fails. Asked on the main thread.
+     * Reads [read] on the worker and hands the reading to [done] on the main thread; no strokes are
+     * read as nothing. A read no longer its piece's newest when its turn comes is dropped, as is
+     * one of a piece the engine ended, and one that fails. Asked on the main thread.
      */
     fun read(read: InkPad.Read, done: (InkReading) -> Unit) {
-        if (broken) return
+        if (!reader.loadable) return
         newest[read.piece] = read.id
         pending++
         worker.execute {
@@ -61,7 +73,7 @@ object HandwritingRecognition {
             } finally {
                 // handed on, or not, but counted off whatever was thrown: else keys would wait on it for good
                 val r = reading
-                main.post {
+                main.execute {
                     r?.let(done)
                     pending--
                 }
@@ -76,7 +88,7 @@ object HandwritingRecognition {
     fun afterReads(action: () -> Unit) {
         held++
         worker.execute {
-            main.post {
+            main.execute {
                 try {
                     action()
                 } finally {
@@ -86,35 +98,112 @@ object HandwritingRecognition {
         }
     }
 
+    /** The recognizer loaded before a read needs it (the keyboard shown); no read, it holds no key behind it. */
+    fun warmUp() {
+        if (reader.loadable) worker.execute { reader.load() }
+    }
+
     private fun recognize(read: InkPad.Read): InkReading? {
         // its piece's newest: run, and forgotten unless a newer came meanwhile
-        if (!newest.remove(read.piece, read.id) || read.piece <= EngineBridge.handwritingEnded.value) return null
-        val strokes = read.strokes
+        if (!newest.remove(read.piece, read.id) || read.piece <= ended()) return null
+        return if (read.strokes.isEmpty()) InkReading.NONE else reader.read(read.strokes)
+    }
+
+    companion object {
+        /** The app's, reading with the recognizer of the app's assets. */
+        val shared: HandwritingRecognition by lazy {
+            val main = Handler(Looper.getMainLooper())
+            HandwritingRecognition(
+                Executors.newSingleThreadExecutor { Thread(it, "handwriting").apply { isDaemon = true } },
+                Executor { main.post(it) },
+                { EngineBridge.handwritingEnded.value },
+                LoadingReader(AssetRecognizer::open, AssetRecognizer::told),
+            )
+        }
+    }
+}
+
+/**
+ * The recognizer [open] makes, on the worker only: loaded at its first load, and kept. What cannot be
+ * loaded (its library, its files) is not tried again at every stroke: the pad draws on with nothing
+ * read, and the user is [told] once. [open] adds what it opens to the list it is given, closed if
+ * the recognizer is of no use.
+ */
+internal class LoadingReader(
+    private val open: (opened: MutableList<AutoCloseable>) -> InkRecognizer,
+    private val told: () -> Unit,
+) : HandwritingRecognition.Reader {
+
+    private val models = ArrayList<AutoCloseable>()
+    private var recognizer: InkRecognizer? = null
+
+    @Volatile
+    private var broken = false
+
+    override val loadable: Boolean get() = !broken
+
+    override fun load() {
+        loaded()
+    }
+
+    override fun read(strokes: List<FloatArray>): InkReading? {
+        val recognizer = loaded() ?: return null
         return try {
-            if (strokes.isEmpty()) InkReading.NONE else recognizer().character(strokes)
-        } catch (e: IOException) {
-            Timber.w(e, "handwriting models")
-            null
+            recognizer.character(strokes)
         } catch (@Suppress("TooGenericExceptionCaught") e: RuntimeException) {
-            // onnxruntime's failures come as IllegalStateException
+            // onnxruntime's failures come as IllegalStateException: this read's alone, the next one run
             Timber.w(e, "handwriting recognition")
             null
         } catch (e: LinkageError) {
-            // the native library not loaded (ExceptionInInitializerError is one too): the IME lives on without handwriting
-            Timber.e(e, "handwriting library")
-            broken = true
-            null
+            cannotLoad(e)
         }
     }
 
-    private fun recognizer(): InkRecognizer = recognizer ?: InkRecognizer(
-        net("char_image"), net("char_path"),
+    private fun loaded(): InkRecognizer? {
+        if (broken) return null
+        recognizer?.let { return it }
+        return try {
+            open(models).also { recognizer = it }
+        } catch (@Suppress("TooGenericExceptionCaught") e: Exception) {
+            // a file missing (IOException) or not the recognizer's (IllegalArgumentException), a model this
+            // onnxruntime refuses (IllegalStateException: one a newer one wrote); one opened before is of no use
+            cannotLoad(e)
+        } catch (e: LinkageError) {
+            // the native library not loaded (ExceptionInInitializerError is one too): the IME lives on without handwriting
+            cannotLoad(e)
+        }
+    }
+
+    private fun cannotLoad(e: Throwable): Nothing? {
+        Timber.e(e, "handwriting cannot load: not tried again till the app restarts")
+        broken = true
+        // of no use from now on, whether it failed loading or reading (a LinkageError): not held open for the process
+        recognizer = null
+        // closing is native too, and may throw after a LinkageError: the rest closed and the user told all the same
+        models.forEach { model -> runCatching { model.close() }.onFailure { Timber.w(it, "handwriting model close") } }
+        models.clear()
+        told()
+        return null
+    }
+}
+
+/** The recognizer of the app's assets: its models opened and its files read as it loads. */
+private object AssetRecognizer {
+
+    fun open(opened: MutableList<AutoCloseable>): InkRecognizer = InkRecognizer(
+        net("char_image", opened), net("char_path", opened),
         chars = appContext.assets.open("$DIR/chars.txt").use { it.readBytes().toString(Charsets.UTF_8) },
         prior = prior(),
-    ).also { recognizer = it }
+    )
 
-    private fun net(name: String) = InkNet { x, shape ->
-        models.getOrPut(name) { OrtModel.open(appContext.assets, "$DIR/$name.ort", THREADS) }.run(x, shape).values
+    fun told() {
+        ContextCompat.getMainExecutor(appContext).execute { appContext.toast(R.string.engine_unloadable, Toast.LENGTH_LONG) }
+    }
+
+    // opened at once, not at its first run: one onnxruntime refuses is found as the recognizer loads
+    private fun net(name: String, opened: MutableList<AutoCloseable>): InkNet {
+        val model = OrtModel.open(appContext.assets, "$DIR/$name.ort", THREADS).also(opened::add)
+        return InkNet { x, shape -> model.run(x, shape).values }
     }
 
     // each character's log frequency, float32 little-endian

@@ -20,6 +20,9 @@ later) has the same five, decided 2026-10-14; a new one is not done without them
 
 All have them: the pinyins, handwriting (2026-10-14) and the code tables (2026-10-14, `TableLanguage`;
 see Tables for where a table's order may move).
+Handwriting and the tables share their prediction and the text before the cursor
+(`session/Predictions`) and the large model's slices at a pause (`session/RefineSlices`); pinyin
+keeps its own, the model they follow.
 
 ## Packages
 
@@ -50,7 +53,12 @@ see Tables for where a table's order may move).
    pressed again soon is read both as keys and as its next letter, `MultiTap`).
 2. **Decode.** `PinyinDecoder` puts every dictionary word along every path into a lattice and beam
    searches it, scoring each step by `WordScorer` (the n-gram model, through `UserScorer` with the
-   user's counts added) plus the `Penalties` of how the input was read. It keeps whole sequences
+   user's counts added; a word of the user's whose text the model has, added by hand or typed at a
+   reading of the user's, is that model word to it (one only imported, from a dictionary or a pack,
+   is the model's unknown word, plus its pack score, till picked), scored and as context, in every input
+   method: `UserModel.modelWord`; one test, `UserModel.chosen`, says whether a word is the user's, for
+   its score, its layer's prior, the context of 联想 and the words 联想 offers after it, and the
+   reading handwriting takes it at) plus the `Penalties` of how the input was read. It keeps whole sequences
    (a real N-best, not trigram-merged), and reuses the beams of the unchanged prefix so a key costs
    only its last syllables.
 3. **Rank.** At `ModelLevel.MEDIUM` and up, `Reranker` adds the 4M sentence model's score of the
@@ -122,16 +130,23 @@ ten times; characters never go; 简码 (codes shorter than the longest) stay as 
 At typing time a table has the five every Chinese input method has (`TableLanguage`, made in
 `Engines.tableLanguage`). Where it orders by use (常用的字词排前面, on for all but 仓颉), a code's
 重码 — the candidates whose code is all that was typed, longer than `noSortInputLength` (五笔's 一二级
-简码 stay put; 自然码 and 二笔 keep none) — are placed: the user's words first (one of the other input methods' once picked here: decided so,
-not to move a blind typist's first for a word typed once in pinyin), then the table's
+简码 stay put; 自然码 and 二笔 keep none) — are placed: the user's words once picked here first (one of the other input methods', or a phrase saved as typed
+character by character: decided so, not to move a blind typist's first for a word never picked here; till
+then it goes where its picks put it, after a pick of the table's), then the table's
 entries by the word model after the text before (`TextWords.logProb` over the user's scorer), each
 of the table's picks adding (log10(1 + picks): the user model's counts alone moved a pick forward too
 slowly for a table that orders by use); a blocked entry is left out of the weighing. The small sentence model weighs them again at each key (medium), the large one at a
 pause (high). Off, the table's order stands for those who type by position. Whatever the order,
 what is put in is learned by the one user model (each word by its reading, after the one before),
-forgetting a candidate forgets it everywhere, and 联想 follows a commit until the next key.
+forgetting a candidate forgets it everywhere, and 联想 follows a commit until the next key. A long press on a
+联想 offers Predictions' forget and block (block only where the table could block the text as a candidate, `SharedWords.blockable`: never a single character, since `UserLexicon` blocks a text in every reading and a character blocked would go from pinyin and strokes too), as handwriting's does: forgetting one forgets that entry's
+reading and the tables' copy of it, blocking leaves it out of 联想 from then on.
 `ime-eval table <t.data> <set> --preset <p> --pinyin <pinyin.data> [--rerank --refine]` measures
-the 重码 typed first after the text before.
+the 重码 typed first after the text before, codes too short to be sorted left out. The preset must
+order by use (wubi, ziranma, erbi, wubipinyin): a table in its own order is not weighed by the text
+before, so 仓颉 and plain, which 常用的字词排前面 can turn on in the app, are not measured.
+On pinyin.tsv (2026-10-16), the table's order → the word model (low): 五笔 76.4% → 93.3%, 二笔
+63.0% → 91.9%, 自然码 75.1% → 93.1%, 五笔拼音 79.9% → 95.0%.
 
 ## English
 
@@ -174,8 +189,9 @@ readings of a position for words): on 67,599 characters of the 51 CASIA writers 
 checkpoint (`HELD=1`), 74.7% first right by the ink alone, 91.4% once the sentence is written,
 85.1% as each character is, the last in the first ten 95.7% (the first release: 72.5%, 89.2%,
 82.5%, 94.3%). The words from each position are kept while its readings and the
-next seven are the same (`HandwritingDecoder.arcs`), so a stroke costs the last characters' words,
-not the whole sentence's. The 性能档位 is pinyin's: the decoder's best sentences (`Decoding.best`,
+next seven are the same (`HandwritingDecoder.arcs`), and the beams of the unchanged prefix with their
+scores (`HandwritingDecoder.keep`), so a stroke costs the last characters' words, not the whole
+sentence's; what is learned while a sentence is written counts from the next one. The 性能档位 is pinyin's: the decoder's best sentences (`Decoding.best`,
 five, whatever they end with) weighed again by the small sentence model as each stroke is read
 (medium) and by the large one once the character is finished (high: the pad tells the engine when
 the pen was up long enough, `Engines.inkFinished`, then `Action.Refine` slices), after the text before
@@ -185,14 +201,24 @@ run within the app's budgets, at pinyin's `Reranker.WEIGHT`, 0.4; 0.8 gave half 
 written, not worth a weight of its own). Once a sentence is put in, what may
 follow is offered as pinyin offers it (`Predictor`, the prediction setting), a word picked learned.
 A sentence picked other than the first is learned, its words as the
-decoder found them (`Decoding.words`: a dictionary word read as its syllable path, a character alone
-as its first reading): the user chose it over the ink's best. The first is not, however put in: the
+decoder found them (`Sentence.words` of `Decoding.endings`/`top`: a word or a character alone at the
+reading the user has it at, whichever reading the search finds first; else a
+word at the dictionary reading of highest weight found, a character at its likeliest,
+`HandwritingDecoder.alone`): the user chose it over the ink's best. A dictionary word has one entry in
+the user model, so of its dictionary readings the user's is the last typed; a reading of the user's
+the dictionary lacks wins over the dictionary's, and of it and a dictionary reading typed too, the more
+typed. The user has a reading while it is
+their choice, counted or added by hand (`UserModel.chosen`, `UserModel.reading`); one only imported
+has none till picked (its reading the dictionary lacks weighs -inf), and a word forgotten falls back to the dictionary's
+everywhere, here, in handwriting's and pinyin's 联想 and in the tables (`Predictor.reading`), so it is not learned
+back at the reading forgotten. The first is not, however put in: the
 readings are often wrong, and a misread word not noticed, learned, would come back.
 The sentence is shown in the field and kept there as the keyboard goes (`composesText` in
 `androidengine.cpp`), as English's word is; pinyin's and a table's codes show above the candidates.
 The pad (`InkPad`, ime-core's
 `input/handwriting`) decides when to read (each stroke ended), when a piece is done (the pen up
-`InkPad.FINISH_MILLIS`: its ink wiped, its reading kept), and that backspace takes back a
+`InkPad.finishMillis`, the app's `handwritingPause` setting, `FINISH_MILLIS` its default: its ink
+wiped, its reading kept), and that backspace takes back a
 stroke. The session cannot be handed a reading through fcitx, which carries keys: the app offers it
 (`Engines.offerInk`) and sends `Keyboard.INK`, which the keyboard turns into `Action.Ink`.
 

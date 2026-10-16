@@ -9,13 +9,15 @@ import org.fcitx.fcitx5.android.engine.lattice.TextWords
 import org.fcitx.fcitx5.android.engine.rerank.SentencePicker
 import org.fcitx.fcitx5.android.engine.rerank.SentenceRefiner
 import org.fcitx.fcitx5.android.engine.user.UserModel
+import org.fcitx.fcitx5.android.engine.user.UserModel.Entry
 
 /**
  * What a table shares with the other Chinese input methods (specs/engine.md, "What every Chinese
  * input method has"): [words], the word model with the user's words mixed in, ranks a code's 重码
- * after the text before; [user], the one user model, learns each word put in by its [reading] (the
- * syllables a word of the model's is read by, as the user typed it if they did); [predictor] offers
- * what may follow (联想); [reranker] and [refiner] are the 性能档位's sentence models.
+ * after the text before; [user], the one user model, learns each word put in as [entryOf] has it
+ * (by its [reading], the syllables a word of the model's is read by, as the user typed it if they
+ * did); [predictor] offers what may follow (联想); [reranker] and [refiner] are the 性能档位's
+ * sentence models.
  */
 class TableLanguage(
     val words: TextWords,
@@ -24,4 +26,19 @@ class TableLanguage(
     val predictor: Predictor? = null,
     val reranker: SentencePicker? = null,
     val refiner: SentenceRefiner? = null,
-)
+    /** Keeps a prediction the user blocked, blocked in [user] too; none offered without. */
+    val block: ((Entry) -> Unit)? = null,
+    /**
+     * Told the text of a prediction forgotten, for the tables' copy of it to go too: what [user]
+     * learned of it goes by its reading alone, as handwriting's, not every reading of the text.
+     */
+    val forgotten: (String) -> Unit = {},
+) {
+    /**
+     * The word [text] is learned as: by its [reading], or for one of the user's words ([theirs]: a
+     * phrase saved here, a word of the other input methods) one they made, which the word model
+     * lacks, as [user] has it, the reading they typed most. Null for none: nothing learned of it.
+     */
+    fun entryOf(text: String, theirs: Boolean = false): Entry? =
+        reading(text)?.let { Entry(text, it) } ?: user?.takeIf { theirs }?.newEntryOf(text)
+}

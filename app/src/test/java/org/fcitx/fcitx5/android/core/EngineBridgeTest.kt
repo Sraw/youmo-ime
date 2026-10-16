@@ -282,6 +282,25 @@ class EngineBridgeTest {
     }
 
     @Test
+    fun theCursorGoesToTheAddonInCodePointsNotUtf16Units() {
+        fun cursor(preedit: String, at: Int) = EngineBridge.result(
+            EngineEvent.CHAR,
+            Snapshot(
+                commit = "", preedit = preedit, candidates = emptyList(), page = 0, hasPreviousPage = false,
+                hasNextPage = false, handled = true, predicting = false, cursor = at,
+            ),
+        ) { _, _ -> emptyList() }.cursor
+        // 𠀀 (U+20000) is two UTF-16 units, one code point to the addon
+        assertEquals(2, cursor("𠀀ab", 3))
+        assertEquals(3, cursor("😀😀c", 5))
+        // none past the BMP: as it was
+        assertEquals(1, cursor("ab", 1))
+        // no cursor stays none; past the end, at the end
+        assertEquals(-1, cursor("𠀀a", -1))
+        assertEquals(2, cursor("𠀀a", 10))
+    }
+
+    @Test
     fun aRefineReadsAsRefiningWhileEachOfItsSlicesRuns() {
         fun refines(refines: Boolean) = Snapshot(
             commit = "", preedit = "n", candidates = listOf("你"), page = 0, hasPreviousPage = false,
@@ -319,6 +338,55 @@ class EngineBridgeTest {
     @RunWith(RobolectricTestRunner::class)
     @Config(application = FcitxApplication::class)
     class Made {
+        /** Taken, it says so: an Ink key goes out for what is shown. */
+        @Test
+        fun handwritingThatLoadsTakesTheInk() {
+            EngineBridge.unloadable.clear()
+            var calls = 0
+            try {
+                assertTrue(EngineBridge.ink(Engines.HANDWRITING) { calls++ })
+                assertEquals(1, calls)
+                assertFalse(Engines.HANDWRITING in EngineBridge.unloadable)
+            } finally {
+                EngineBridge.unloadable.clear()
+            }
+        }
+
+        /** A piece finished as the pad leaves for English: the engine is told, but no Ink key goes into keyboard-us. */
+        @Test
+        fun inkUnderAnotherInputMethodReachesTheEngineButIsNotTaken() {
+            EngineBridge.unloadable.clear()
+            var calls = 0
+            try {
+                assertFalse(EngineBridge.ink(Engines.ENGLISH) { calls++ })
+                assertEquals(1, calls)
+                assertFalse(Engines.HANDWRITING in EngineBridge.unloadable)
+            } finally {
+                EngineBridge.unloadable.clear()
+            }
+        }
+
+        @Test
+        fun handwritingWhosePinyinDataCannotLoadIsTriedOnceThenSkippedThrowingNothing() {
+            EngineBridge.unloadable.clear()
+            var calls = 0
+            try {
+                // each a character written: offerInk, inkFinished; none taken, so no Ink key is sent for it
+                repeat(3) {
+                    assertFalse(
+                        EngineBridge.ink(Engines.HANDWRITING) {
+                            calls++
+                            throw FileNotFoundException("pinyin")
+                        }
+                    )
+                }
+                assertEquals(1, calls)
+                assertTrue(Engines.HANDWRITING in EngineBridge.unloadable)
+            } finally {
+                EngineBridge.unloadable.clear()
+            }
+        }
+
         @Test
         fun whatAnImportKilledBetweenItsRenamesLeftAsideIsPutBackBeforeTheEngineOpensIt() {
             // made here, whichever test of this sandbox made it before

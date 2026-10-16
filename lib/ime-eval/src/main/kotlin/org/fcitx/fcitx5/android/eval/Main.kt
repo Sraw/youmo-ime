@@ -144,50 +144,32 @@ internal val COMMANDS = listOf(
     },
     Command(
         "handwriting",
-        "<pinyin.data> <rows.tsv> [--weights <ink weight>,...] [--alternatives <n>] [--limit <rows>] [--rerank <small model.safetensors> [--refine <large model.safetensors>]] [--model-weights <w>,...]",
+        "<pinyin.data> <rows.tsv> [--weights <ink weight>,... (one with --rerank)] [--alternatives <n>] [--limit <rows>] [--rerank <small model.safetensors> [--refine <large model.safetensors>] [--model-weights <w>,...]]",
         2..2, "weights", "alternatives", "limit", "rerank", "refine", "model-weights",
     ) { args, out, _ ->
         val (dataPath, rowsPath) = args.operands
-        val run = HandwritingRun(loadData(dataPath))
-        val rows = HandwritingRun.read(rowsPath).let { r -> args.options["limit"]?.toIntOrNull()?.let { r.take(it) } ?: r }
-        val alternatives = args.options["alternatives"]?.toIntOrNull() ?: HandwritingDecoder.ALTERNATIVES
-        out.appendLine("ink alone            ${run.ink(rows)}")
-        val weights = args.options["weights"]?.split(',')?.map { it.toDouble() } ?: listOf(HandwritingDecoder.INK_WEIGHT)
-        for (w in weights) out.appendLine(String.format(Locale.ROOT, "sentence, ink %-5s %s", w, run.sentences(rows, run.decoder(w, alternatives))))
-        // the sentence models weighing the best sentences again, as the 性能档位 has them in the app:
-        // medium, the small one at each character within its budget; high, then the large one in
-        // the slices a pause gives it (SentenceRefiner.SLICES of PinyinSession's budget, 1)
-        val small = args.options["rerank"]?.let { SentenceModel.load(mapFile(it), unpack = true) }
-        val large = args.options["refine"]?.let { SentenceModel.load(mapFile(it), unpack = true) }
-        val modelWeights = args.options["model-weights"]?.split(',')?.map { it.toFloat() } ?: listOf(Reranker.WEIGHT)
-        if (small != null) {
-            for (mw in modelWeights) {
-                val reranker = Reranker(small, mw)
-                val refiner = large?.let { Reranker(it, mw, limit = Reranker.REFINE_LIMIT) }
-                val medium = { before: String, d: HandwritingDecoder.Decoding -> reranker.pick(before, d.best, d.bestScores) }
-                val high = { before: String, d: HandwritingDecoder.Decoding ->
-                    val first = medium(before, d)
-                    var picked: Int? = null
-                    var slices = 0
-                    while (picked == null && refiner != null && slices++ < SentenceRefiner.SLICES) picked = refiner.refine(before, d.best, d.bestScores, 1)
-                    picked?.takeIf { it != SentenceRefiner.NONE } ?: first
-                }
-                val decoder = run.decoder(weights.first(), alternatives)
-                out.appendLine(String.format(Locale.ROOT, "medium %-5s     %s", mw, run.sentences(rows, decoder, medium)))
-                if (refiner != null) out.appendLine(String.format(Locale.ROOT, "high %-5s       %s", mw, run.sentences(rows, decoder, high)))
-            }
+        // the models read the sentences at one ink weight: more would be measured at the first alone
+        val inkWeights = args.options["weights"]?.split(',')?.size ?: 1
+        if (modelsAlone(args.options, "model-weights" to "rerank") || ("rerank" in args.options && inkWeights > 1)) {
+            null
+        } else {
+            handwriting(dataPath, rowsPath, args.options, out)
         }
-        0
     },
     Command(
-        "table", "<table.data> <set.tsv> [--preset <preset>] [--pinyin <pinyin.data> [--rerank <small.safetensors> [--refine <large.safetensors>]]]",
+        "table", "<table.data> <set.tsv> [--preset <preset> [--pinyin <pinyin.data> [--rerank <small.safetensors> [--refine <large.safetensors>]]]]",
         2..2, "preset", "pinyin", "rerank", "refine",
     ) { args, out, _ ->
         val (dataPath, setPath) = args.operands
-        table(dataPath, setPath, args.options["preset"] ?: "plain", out)
-        // the 重码 after the text before, as the app ranks them (TableLanguage)
-        args.options["pinyin"]?.let { tableHomographs(dataPath, setPath, args.options["preset"] ?: "plain", it, args.options["rerank"], args.options["refine"], out) }
-        0
+        val preset = args.options["preset"] ?: DEFAULT_PRESET
+        if (modelsAlone(args.options, "rerank" to "pinyin")) {
+            null
+        } else {
+            table(dataPath, setPath, preset, out)
+            // the 重码 after the text before, as the app ranks them (TableLanguage)
+            args.options["pinyin"]?.let { tableHomographs(dataPath, setPath, preset, it, args.options["rerank"], args.options["refine"], out) }
+            0
+        }
     },
     Command("libime", "pinyin|history|table <file>", 2..2) { args, out, err ->
         val (kind, path) = args.operands
@@ -199,7 +181,8 @@ val USAGE = "usage: " + COMMANDS.joinToString("\n       ") { "${it.name} ${it.us
 schemes: ${(ShuangpinSet.SCHEMES.keys + T9Set.SCHEMES + NO_LATIN).joinToString(" ")}
 pairs: ${Fuzzy.entries.joinToString(" ") { it.name.lowercase() }}
 halves: ${Halves.NAMES.joinToString(" ")}
-presets: ${TableRun.PRESETS.keys.joinToString(" ")}"""
+presets: ${TableRun.PRESETS.keys.joinToString(" ")}
+presets for --pinyin, which order by use (the app's 常用的字词排前面): ${TableRun.PRESETS.filterValues { it.orderByUse }.keys.joinToString(" ")}"""
 
 fun main(args: Array<String>) {
     exitProcess(runCli(args, System.out, System.err))
@@ -261,6 +244,9 @@ private const val ENGLISH_SEED = 20261011L
 /** Full pinyin without the Latin words. */
 private const val NO_LATIN = "no-latin"
 
+/** `table`'s preset unless given one: [TableRun.PRESETS]' plain, the options' defaults. */
+private const val DEFAULT_PRESET = "plain"
+
 private fun optionsValid(options: Map<String, String>): Boolean {
     fun valid(name: String, test: (String) -> Boolean) = options[name]?.let(test) ?: true
     val scheme = options["scheme"]
@@ -269,6 +255,8 @@ private fun optionsValid(options: Map<String, String>): Boolean {
         valid("scheme") { it == NO_LATIN || it in ShuangpinSet.SCHEMES || it in T9Set.SCHEMES },
         valid("fuzzy") { fuzzyPairs(it) != null },
         valid("preset") { it in TableRun.PRESETS },
+        // a table that does not order by use keeps its order whatever the text before: each row the same
+        valid("pinyin") { TableRun.PRESETS[options["preset"] ?: DEFAULT_PRESET]?.orderByUse == true },
         valid("weight") { weights(it) != null },
         valid("limit") { limits(it) != null },
         valid("user-weight") { weight(it) != null },
@@ -561,6 +549,41 @@ private fun learn(dataPath: String, setPath: String, options: RunOptions, models
     out.appendLine(KeystrokeRun.HEADER)
     // null for a note (where the prior ended up): a half with no samples is still a row, of none
     rows.forEach { (label, outcomes) -> out.appendLine(if (outcomes == null) label else KeystrokeRun.row(label, outcomes)) }
+    return 0
+}
+
+/**
+ * Whether [options] give a model option without what it is read with, which would be ignored: the
+ * large sentence model without the small (`handwriting` and `table` weigh as the 性能档位 does,
+ * whose high has both), or [need]'s first without its second.
+ */
+private fun modelsAlone(options: Map<String, String>, need: Pair<String, String>) =
+    ("refine" in options && "rerank" !in options) || (need.first in options && need.second !in options)
+
+/**
+ * The rows read by the ink alone, then as a sentence at each ink weight, then with the sentence
+ * models weighing the best sentences again, as the 性能档位 has them in the app: medium, the small
+ * one at each character within its budget; high, then the large one in the slices a pause gives it.
+ */
+private fun handwriting(dataPath: String, rowsPath: String, options: Map<String, String>, out: Appendable): Int {
+    val run = HandwritingRun(loadData(dataPath))
+    val rows = HandwritingRun.read(rowsPath).let { r -> options["limit"]?.toIntOrNull()?.let { r.take(it) } ?: r }
+    val alternatives = options["alternatives"]?.toIntOrNull() ?: HandwritingDecoder.ALTERNATIVES
+    out.appendLine("ink alone            ${run.ink(rows)}")
+    val weights = options["weights"]?.split(',')?.map { it.toDouble() } ?: listOf(HandwritingDecoder.INK_WEIGHT)
+    for (w in weights) out.appendLine(String.format(Locale.ROOT, "sentence, ink %-5s %s", w, run.sentences(rows, run.decoder(w, alternatives))))
+    val small = options["rerank"]?.let { SentenceModel.load(mapFile(it), unpack = true) } ?: return 0
+    val large = options["refine"]?.let { SentenceModel.load(mapFile(it), unpack = true) }
+    val modelWeights = options["model-weights"]?.split(',')?.map { it.toFloat() } ?: listOf(Reranker.WEIGHT)
+    for (mw in modelWeights) {
+        val reranker = Reranker(small, mw)
+        val medium = { before: String, d: HandwritingDecoder.Decoding -> reranker.pick(before, d.best, d.bestScores) }
+        val decoder = run.decoder(weights.first(), alternatives)
+        out.appendLine(String.format(Locale.ROOT, "medium %-5s     %s", mw, run.sentences(rows, decoder, medium)))
+        val refiner = large?.let { Reranker(it, mw, limit = Reranker.REFINE_LIMIT) } ?: continue
+        val high = HandwritingRun.refined(refiner, medium)
+        out.appendLine(String.format(Locale.ROOT, "high %-5s       %s", mw, run.sentences(rows, decoder, high)))
+    }
     return 0
 }
 

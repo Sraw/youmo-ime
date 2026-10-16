@@ -5,7 +5,6 @@
 package org.fcitx.fcitx5.android.eval
 
 import org.fcitx.fcitx5.android.engine.data.CodeTable
-import org.fcitx.fcitx5.android.engine.rerank.SentenceRefiner
 import org.fcitx.fcitx5.android.engine.session.Action
 import org.fcitx.fcitx5.android.engine.table.TableDictionary
 import org.fcitx.fcitx5.android.engine.table.TableLanguage
@@ -191,10 +190,13 @@ class TableRun(private val table: CodeTable, private val options: TableOptions) 
         typed.second.first && !typed.second.auto && commitsOnTo(typed.first, word, next)
 
     /**
-     * The words of [text], cut as [type] cuts it, whose cheapest code shows more than one candidate
-     * (a 重码 to pick from), each typed into a fresh session after the text before it: how many there
-     * are, and how often the word comes first with each of [languages] (null: the table's order).
-     * A language with a refiner is given the slices a pause gives it.
+     * The words of [text], cut as [type] cuts it, whose cheapest code is more than one entry's (a
+     * 重码 to pick from: the longer codes it leads to are none) and longer than the options'
+     * [TableOptions.noSortInputLength] (a code no longer stays in the table's order whatever ranks
+     * it, first in every row: 五笔's 一、二级简码), each typed into a fresh session
+     * after the text before it: how many there are, and how often the word comes first with each of
+     * [languages] (null: the table's order). A language with a refiner is given the slices a pause
+     * gives it.
      */
     fun homographs(text: String, languages: List<TableLanguage?>): Pair<Int, IntArray> {
         val cut = cut(text)
@@ -202,8 +204,12 @@ class TableRun(private val table: CodeTable, private val options: TableOptions) 
         var n = 0
         val first = IntArray(languages.size)
         for (k in 1 until path.size) {
-            // a word the table lacks, or one its code commits by itself: nothing to pick
-            val (code, _) = cut.step[path[k]]?.takeUnless { it.second.auto } ?: continue
+            // a word the table lacks, or one its code commits by itself: nothing to pick; one entry of the
+            // code's length, the rest longer codes it leads to: first in every row, no 重码
+            // and a code too short to be sorted: the table's order, whatever the language
+            val (code, _) = cut.step[path[k]]?.takeUnless {
+                it.second.auto || table.exactRange(it.first).count() < 2 || it.first.length <= options.noSortInputLength
+            } ?: continue
             val word = text.substring(cut.at[path[k - 1]], cut.at[path[k]])
             val before = text.substring(0, cut.at[path[k - 1]])
             val shown = languages.map { language ->
@@ -211,14 +217,13 @@ class TableRun(private val table: CodeTable, private val options: TableOptions) 
                 session.apply(Action.Context(before))
                 var s = session.apply(Action.Key(code[0]))
                 for (c in code.substring(1)) s = session.apply(Action.Key(c))
+                val pause = language?.refiner?.slices ?: 0
                 var slices = 0
-                while (s.refines && slices++ <= SentenceRefiner.SLICES) s = session.apply(Action.Refine)
+                while (s.refines && slices++ < pause) s = session.apply(Action.Refine)
                 s.candidates
             }
-            if (shown.first().size >= 2) {
-                n++
-                shown.forEachIndexed { i, c -> if (c.firstOrNull() == word) first[i]++ }
-            }
+            n++
+            shown.forEachIndexed { i, c -> if (c.firstOrNull() == word) first[i]++ }
         }
         return n to first
     }

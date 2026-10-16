@@ -60,6 +60,24 @@ class TableCursorTest {
     }
 
     @Test
+    fun aCodeOfATableWithPinyinIsMendedPastItsLength() {
+        // 五笔拼音: a code has no length limit, so none is full and turned away
+        val wubiPinyin = dictionary("a 工", "aa 式", "@zhong 中", "@zhongguo 中国", header = mapOf("拼音" to "@", "键码" to "a"))
+        val t = TableSession(wubiPinyin, TableOptions.WUBI_PINYIN)
+        t.type("zhongguo")
+        // the second g taken out before the cursor, then put back
+        t.apply(Action.Cursor(5))
+        val out = t.apply(Backspace)
+        assertEquals("zhonguo", out.preedit)
+        assertEquals(4, out.cursor)
+        val typed = t.apply(Key('g'))
+        assertEquals("", typed.commit)
+        assertEquals("zhongguo", typed.preedit)
+        assertEquals(5, typed.cursor)
+        assertEquals(listOf("中国"), typed.candidates)
+    }
+
+    @Test
     fun nothingTypedTheTapAndTheArrowAreTheApps() {
         val t = TableSession(wubi, TableOptions.WUBI)
         assertFalse(t.apply(Action.Cursor(0)).handled)

@@ -7,6 +7,9 @@ package org.fcitx.fcitx5.android.core
 import android.view.KeyCharacterMap
 import android.view.KeyEvent
 
+/** fcitx's key for a Unicode character: this plus its code point. */
+const val UNICODE = 0x01000000
+
 @JvmInline
 value class KeySym(val sym: Int) {
 

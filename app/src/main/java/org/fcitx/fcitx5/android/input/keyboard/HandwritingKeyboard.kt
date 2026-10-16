@@ -37,11 +37,12 @@ import splitties.views.dsl.core.add
 import splitties.views.existingOrNewId
 
 /**
- * Handwriting: a pad over most of the keyboard, written on a character at a time; backspace (taking the pad's last stroke back while it has
- * one), ，(its long press more marks) and 。 on the right; symbols, numbers, space, the language
- * switch and return below. What the pad reads is handed to [deliver] with the piece it is of; the
- * engine shows it as candidates. The pad wipes the piece it is writing once the engine ends it
- * (EngineBridge.handwritingEnded), and ends it itself when hidden.
+ * Handwriting: a pad over most of the keyboard, written on a character at a time; backspace (taking
+ * the pad's last stroke back while it has one), ，(its long press more marks) and 。 on the right;
+ * symbols, numbers, space, the language switch and return below. What the pad reads is handed to
+ * [deliver] with the piece it is of; the engine shows it as candidates. The pad wipes the piece it
+ * is writing once the engine ends it (EngineBridge.handwritingEnded), and ends it itself when
+ * hidden.
  */
 @SuppressLint("ViewConstructor")
 class HandwritingKeyboard(
@@ -50,6 +51,7 @@ class HandwritingKeyboard(
     private val deliver: (InkReading, piece: Int) -> Unit,
     /** The pad's piece finished (the pen up long enough), told after its readings are delivered. */
     private val finished: (piece: Int) -> Unit = {},
+    private val recognition: HandwritingRecognition = HandwritingRecognition.shared,
 ) : BaseKeyboard(context, theme, Layout) {
 
     companion object {
@@ -97,7 +99,12 @@ class HandwritingKeyboard(
         lang.isVisible = v
     }
 
-    private val padView = HandwritingPadView(context, theme, ::read, { AppPrefs.getInstance().keyboard.handwritingPause.getValue().millis }, ::finish).apply {
+    private val padView = HandwritingPadView(
+        context, theme,
+        onRead = ::read,
+        pause = { AppPrefs.getInstance().keyboard.handwritingPause.getValue().millis },
+        onFinish = ::finish,
+    ).apply {
         val prefs = ThemeManager.prefs
         val h = dp(prefs.keyHorizontalMargin.getValue())
         val v = dp(prefs.keyVerticalMargin.getValue())
@@ -131,12 +138,15 @@ class HandwritingKeyboard(
         scope = CoroutineScope(Dispatchers.Main.immediate + Job()).also { s ->
             s.launch { EngineBridge.handwritingEnded.collect(padView::ended) }
         }
+        recognition.warmUp()
     }
 
     override fun onDetachedFromWindow() {
         scope?.cancel()
         scope = null
-        // hidden, or the numbers shown: what was written is done, a key typed there commits it
+        // hidden, or the numbers shown: what was written is done, a key typed there commits it, so
+        // finished as a pause would have (weighed again first); hidden, KeyboardWindow drops it
+        if (padView.pad.finished.isNotEmpty()) finish(padView.pad.piece)
         padView.next()
         super.onDetachedFromWindow()
     }
@@ -152,14 +162,14 @@ class HandwritingKeyboard(
 
     private fun read(read: InkPad.Read) {
         // delivered while the numbers or symbols are shown too: a key typed there commits it
-        HandwritingRecognition.read(read) { reading ->
+        recognition.read(read) { reading ->
             if (read.piece >= since) deliver(reading, read.piece)
         }
     }
 
     // after the piece's readings, as the engine must have them first
     private fun finish(piece: Int) {
-        HandwritingRecognition.afterReads { if (piece >= since) finished(piece) }
+        recognition.afterReads { if (piece >= since) finished(piece) }
     }
 
     private val padHit = Rect()
@@ -172,14 +182,24 @@ class HandwritingKeyboard(
     }
 
     override fun onAction(action: KeyAction, source: KeyActionListener.Source) {
-        // backspace takes the pad's last stroke back while it has one; else it is the engine's
-        if (action is KeyAction.SymAction && action.sym.sym == FcitxKeyMapping.FcitxKey_BackSpace && padView.undo()) return
-        // pressed while a stroke is read: in after its reading, as written before it
-        if (HandwritingRecognition.busy) {
-            HandwritingRecognition.afterReads { if (isAttachedToWindow) super.onAction(action, source) }
+        // pressed while a stroke is read: in after its reading, as written before it; dropped if
+        // another input started meanwhile (restart), it was not typed for that one
+        if (recognition.busy) {
+            val at = since
+            recognition.afterReads { if (isAttachedToWindow && at == since) act(action, source) }
         } else {
-            super.onAction(action, source)
+            act(action, source)
         }
+    }
+
+    private fun act(action: KeyAction, source: KeyActionListener.Source) {
+        // backspace takes the pad's last stroke back while it has one; else it is the engine's. Decided
+        // in its turn: behind a held key, the strokes it would take back are of the piece that key commits
+        if (action is KeyAction.SymAction && action.sym.sym == FcitxKeyMapping.FcitxKey_BackSpace && padView.undo()) return
+        // a key for the engine commits the piece: its strokes wiped now, not once the engine's end of it
+        // comes back, else a backspace right behind (held with it) takes back a stroke of what is committed
+        if ((action is KeyAction.SymAction || action is KeyAction.FcitxKeyAction) && padView.pad.finished.isNotEmpty()) padView.next()
+        super.onAction(action, source)
     }
 
     override fun onReturnDrawableUpdate(appearance: ReturnKeyAppearance) {

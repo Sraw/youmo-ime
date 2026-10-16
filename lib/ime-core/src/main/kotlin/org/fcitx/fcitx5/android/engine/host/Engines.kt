@@ -193,12 +193,23 @@ class Engines(
     // English's data is read once and kept: warmed up once, however often its session is made
     private var englishWarmedUp = false
 
-    // pinyin's data and word index, which each pinyin session reads as it is made: read once, in the background
+    // pinyin's data and word index, which the sessions of READS_PINYIN_DATA and the tables read as they
+    // are made: read once, in the background
     private var pinyinWarmedUp = false
 
+    // the coarse words of pinyin's vocabulary but those the user added, one for handwriting and every
+    // table: made again once the sessions are dropped, as every change to the added words drops them
+    private var coarseWords: CoarseWords? = null
+
+    // the latest piece of handwriting ended by a session dropped: a reading late for it is not let in
+    // by the session made in its place ([HandwritingSession.latestPiece])
+    private var inkEndedBefore = HandwritingSession.NO_PIECE
+
     private fun dropSessions() {
+        (sessions[HANDWRITING] as? HandwritingSession)?.let { inkEndedBefore = maxOf(inkEndedBefore, it.latestPiece) }
         keyboards.clear()
         sessions.clear()
+        coarseWords = null
         assets.dropDecoderExtensions()
     }
 
@@ -225,17 +236,18 @@ class Engines(
      * learns as its [onEvent] would. [im] is the input method the field starts with.
      */
     fun context(im: String, before: String, learning: Boolean = true) {
-        if (!pinyinWarmedUp && (im in PINYINS || im in TABLES)) warmUpPinyin()
+        if (!pinyinWarmedUp && (im in READS_PINYIN_DATA || im in TABLES)) warmUpPinyin()
         keyboards.values.forEach { it.context(before, learning) }
     }
 
-    // told as a field starts in one of the pinyins, before its first key: pinyin's data read and its
-    // 270 thousand words indexed meanwhile, off the fcitx thread (a table ranks and learns by them too,
-    // TableLanguage); one who types only English neither waits for them nor holds them. A pinyin key that comes sooner waits for them, and
-    // a switch to pinyin reads them on the fcitx thread as it makes the session (activate's Reset). Whatever reading them throws is
-    // dropped, the lazies left unset: pinyin's session reads them again as it is made, on the fcitx
-    // thread, which hands it to the addon (EngineBridge.Unloadable); thrown out of this thread, it
-    // would end the app. Memory run out is no Exception, and is not caught
+    // told as a field starts in an input method that reads pinyin's data (READS_PINYIN_DATA, a table,
+    // which ranks and learns by them: TableLanguage), before its first key: the data read and its 270
+    // thousand words indexed meanwhile, off the fcitx thread; one who types only English neither waits
+    // for them nor holds them. A key that comes sooner waits for them, and a switch from English to one
+    // of those reads them on the fcitx thread as it makes the session (activate's Reset). Whatever
+    // reading them throws is dropped, the lazies left unset: the session reads them again as it is
+    // made, on the fcitx thread, which hands it to the addon (EngineBridge.Unloadable); thrown out of
+    // this thread, it would end the app. Memory run out is no Exception, and is not caught
     private fun warmUpPinyin() {
         pinyinWarmedUp = true
         warmUps.execute {
@@ -275,7 +287,7 @@ class Engines(
     }
 
     /** The latest piece of handwriting ended ([HandwritingSession.ended]), for the pad to wipe; on the fcitx thread. */
-    val inkEnded: Int get() = (sessions[HANDWRITING] as? HandwritingSession)?.ended ?: HandwritingSession.NO_PIECE
+    val inkEnded: Int get() = (sessions[HANDWRITING] as? HandwritingSession)?.ended ?: inkEndedBefore
 
     /** Candidates of [im]'s input, from the [from]th, at most [count]; none if it has no session yet. */
     fun candidates(im: String, from: Int, count: Int): List<Choice> = sessions[im]?.candidates(from, count).orEmpty()
@@ -303,16 +315,16 @@ class Engines(
             }
             HANDWRITING -> {
                 // read as pinyin reads a sentence: its words, the user's among them, and their counts
-                val data = assets.pinyinData
-                val user = lexicon.user()
-                val coarse = CoarseWords.of({ data.wordIndex.find(it) }, CoarseWords.LIST - lexicon.addedTexts())
+                val language = ChineseLanguage()
+                val data = language.data
                 val decoder = HandwritingDecoder(
-                    data.dictionary, data.vocabulary, data.wordIndex, lexicon.prior().scorer(UserScorer(data.model, user)),
-                    assets::charSyllables, user, coarse,
+                    data.dictionary, data.vocabulary, data.wordIndex, language.scorer,
+                    assets::charSyllables, language.user, language.coarse,
                 )
-                // what may follow, as pinyin offers it: the same setting
-                val predictor = if (s.prediction) Predictor(data.model, data.vocabulary, data.dictionary, user, coarse = coarse, charReadings = assets::charSyllables) else null
-                HandwritingSession(decoder, TextWords(data.model, data.wordIndex), s.pageSize, user, predictor, reranker(), refiner())
+                HandwritingSession(
+                    decoder, TextWords(data.model, data.wordIndex), s.pageSize, language.user, language.predictor, reranker(), refiner(),
+                    block = lexicon::block, forgotten = { tables.forgetInTables(listOf(it)) }, ended = inkEndedBefore,
+                )
             }
             // 简拼 only where the digits read nothing else: as common on the evaluation set, and faster
             T9 -> ForgetsInTables(pinyinSession(T9Segmenter(s.fuzzy, abbreviations = false, letters = s.nineKeys), spell = true))
@@ -335,19 +347,37 @@ class Engines(
      * the one user model, 联想 as the setting has it, the sentence models of the 性能档位.
      */
     private fun tableLanguage(): TableLanguage {
-        val data = assets.pinyinData
-        val user = lexicon.user()
-        val coarse = CoarseWords.of({ data.wordIndex.find(it) }, CoarseWords.LIST - lexicon.addedTexts())
-        // a word's reading as it is learned: as the user typed it, else the dictionary's likeliest
-        val readings = Predictor(data.model, data.vocabulary, data.dictionary, user, charReadings = assets::charSyllables)
+        val language = ChineseLanguage()
+        val data = language.data
         return TableLanguage(
-            TextWords(data.model, data.wordIndex, lexicon.prior().scorer(UserScorer(data.model, user))),
-            user,
-            reading = { text -> data.wordIndex.find(text).takeIf { it != NO_WORD }?.let(readings::reading) },
-            predictor = if (settings.prediction) Predictor(data.model, data.vocabulary, data.dictionary, user, coarse = coarse, charReadings = assets::charSyllables) else null,
+            TextWords(data.model, data.wordIndex, language.scorer),
+            language.user,
+            reading = { text -> data.wordIndex.find(text).takeIf { it != NO_WORD }?.let(language.readings::reading) },
+            predictor = language.predictor,
             reranker = reranker(),
             refiner = refiner(),
+            block = lexicon::block,
+            forgotten = { tables.forgetInTables(listOf(it)) },
         )
+    }
+
+    /**
+     * What handwriting and a table read by, as pinyin does (specs/engine.md), made with each of their
+     * sessions: pinyin's [data], the one [user] model, the word model with the user's words
+     * ([scorer]), the coarse words held back ([coarse], one for them all), and 联想 ([predictor]).
+     */
+    private inner class ChineseLanguage {
+        val data = assets.pinyinData
+        val user = lexicon.user()
+        val scorer = lexicon.prior().scorer(UserScorer(data.model, user))
+        val coarse = coarseWords ?: CoarseWords.of({ data.wordIndex.find(it) }, CoarseWords.LIST - lexicon.addedTexts()).also { coarseWords = it }
+
+        // a word's reading as it is learned: as the user typed it, else the dictionary's likeliest. The
+        // coarse words hold back only what is predicted, not a reading: one predictor for both
+        val readings = Predictor(data.model, data.vocabulary, data.dictionary, user, coarse = coarse, charReadings = assets::charSyllables)
+
+        // what may follow, as pinyin offers it: the same setting
+        val predictor = readings.takeIf { settings.prediction }
     }
 
     /** A session of one of the pinyins, alike but for how [segmenter] reads the keys. */
@@ -413,9 +443,14 @@ class Engines(
 
         const val WUBI = "engine-wubi"
 
-        /** The input methods whose sessions read pinyin's data (a table's lookup reads it only once asked). */
-        // those that read the pinyin data: handwriting reads its sentences with it
-        private val PINYINS = setOf(PINYIN, SHUANGPIN, T9, HANDWRITING)
+        /** Handwriting: characters written one at a time on a pad, read as a sentence. */
+        const val HANDWRITING = "engine-handwriting"
+
+        /**
+         * The input methods but the tables ([TABLES], which read it too) whose sessions read pinyin's
+         * data and word index as they are made: the pinyins, and handwriting, which reads its sentences by them.
+         */
+        private val READS_PINYIN_DATA = setOf(PINYIN, SHUANGPIN, T9, HANDWRITING)
 
         /** Offered first to be added: the most asked for after pinyin, which is there already. */
         private val ADDED_FIRST = listOf(T9, WUBI)
@@ -449,9 +484,6 @@ class Engines(
 
         // with nothing typed ' is the app's: through the engine it would be a mark, ‘
         private fun separates(c: Int, composing: Boolean) = composing && c == SyllableGraph.SEPARATOR.code
-
-        /** Handwriting: characters written one at a time on a pad, read as a sentence. */
-        const val HANDWRITING = "engine-handwriting"
 
         /**
          * Whether input method [name] is typed with a keyboard's keys: all but those made for a

@@ -17,7 +17,9 @@ import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.core.data.DataManager
 import org.fcitx.fcitx5.android.data.clipboard.ClipboardManager
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
+import org.fcitx.fcitx5.android.engine.handwriting.InkReading
 import org.fcitx.fcitx5.android.engine.host.Engines
+import org.fcitx.fcitx5.android.engine.host.Keyboard
 import org.fcitx.fcitx5.android.utils.Locales
 import org.fcitx.fcitx5.android.utils.appContext
 import org.fcitx.fcitx5.android.utils.toast
@@ -77,6 +79,14 @@ class Fcitx(private val context: Context) : FcitxAPI, FcitxLifecycleOwner {
     override suspend fun tableKeys(im: String) = withFcitxContext { EngineBridge.tableKeys(im) }
 
     override suspend fun engineContext(before: String, learning: Boolean) = withFcitxContext { EngineBridge.context(before, learning, inputMethodEntryCached.uniqueName) }
+    override suspend fun offerInk(reading: InkReading, piece: Int) = withFcitxContext { EngineBridge.offerInk(reading, piece, inputMethodEntryCached.uniqueName).also(::ink) }
+    override suspend fun inkFinished(piece: Int) = withFcitxContext { EngineBridge.inkFinished(piece, inputMethodEntryCached.uniqueName).also(::ink) }
+
+    // in the same turn of the fcitx thread as what it shows: nothing the thread starts itself (a REFINE) comes between;
+    // handwriting's only, which EngineBridge.ink tells
+    private fun ink(taken: Boolean) {
+        if (taken) sendKeySymToFcitx(UNICODE + Keyboard.INK, KeyStates.Virtual.toInt(), 0, false, -1)
+    }
 
     override suspend fun sendKey(
         key: String,

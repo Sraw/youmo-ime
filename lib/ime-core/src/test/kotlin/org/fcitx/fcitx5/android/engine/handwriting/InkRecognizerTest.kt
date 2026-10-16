@@ -12,6 +12,7 @@ import org.junit.Test
 import kotlin.math.abs
 import kotlin.math.exp
 import kotlin.math.ln
+import kotlin.random.Random
 
 class InkRecognizerTest {
 
@@ -62,6 +63,30 @@ class InkRecognizerTest {
         val short = Fake { floatArrayOf(0f, 1f) }
         assertThrows(IllegalArgumentException::class.java) { recognizer(short, short).character(stroke) }
         assertThrows(IllegalArgumentException::class.java) { InkReading(listOf("天"), DoubleArray(0)) }
+    }
+
+    @Test
+    fun `a class is a code point, one beyond the BMP too, and a line break ending the list none`() {
+        // 𠀀 (U+20000, Extension B) is two Chars and the line break one more: counted in Chars, five classes for three frequencies
+        val image = Fake { floatArrayOf(0f, 3f, 0f) }
+        val path = Fake { floatArrayOf(0f, 3f, 0f) }
+        val read = InkRecognizer(image, path, "天\uD840\uDC00人\n", FloatArray(3)).character(stroke, count = 1)
+        assertEquals(listOf("\uD840\uDC00"), read.texts)
+        assertEquals(listOf("天", "地", "人"), InkRecognizer.classesOf("天地人\r\n"))
+    }
+
+    @Test
+    fun `the likeliest are a stable sort's first, equal ones in class order`() {
+        val random = Random(7)
+        repeat(50) {
+            // few values: many ties
+            val s = DoubleArray(1 + random.nextInt(60)) { random.nextInt(8).toDouble() }
+            if (it % 10 == 0) s[random.nextInt(s.size)] = Double.NaN
+            for (count in listOf(0, 1, 5, 20, 100)) {
+                assertEquals(s.indices.sortedByDescending { i -> s[i] }.take(count), InkRecognizer.top(s, count).toList())
+            }
+        }
+        assertThrows(IllegalArgumentException::class.java) { InkRecognizer.top(DoubleArray(3), -1) }
     }
 
     @Test

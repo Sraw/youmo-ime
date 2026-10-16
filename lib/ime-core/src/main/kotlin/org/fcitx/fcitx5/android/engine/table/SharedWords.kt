@@ -21,7 +21,11 @@ interface SharedWords {
     /** Whether the user blocked [text], a word: no input method offers it. */
     fun blocked(text: String): Boolean
 
-    /** Whether [text] is a word [block] can block: one pinyin can read. */
+    /**
+     * Whether [text] is a word [block] can block: one pinyin can read, of two characters or more,
+     * as a block reaches every reading of it: a single character blocked would go from pinyin and
+     * strokes too.
+     */
     fun blockable(text: String): Boolean
 
     /** Blocks [text] for every input method, however read; whether it could be. */

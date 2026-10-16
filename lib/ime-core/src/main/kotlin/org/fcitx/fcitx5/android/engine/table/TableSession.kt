@@ -4,16 +4,14 @@
  */
 package org.fcitx.fcitx5.android.engine.table
 
-import org.fcitx.fcitx5.android.engine.lattice.Candidate
 import org.fcitx.fcitx5.android.engine.lattice.TextWords
-import org.fcitx.fcitx5.android.engine.rerank.SentenceRefiner
 import org.fcitx.fcitx5.android.engine.session.Action
 import org.fcitx.fcitx5.android.engine.session.Choice
 import org.fcitx.fcitx5.android.engine.session.Offer
-import org.fcitx.fcitx5.android.engine.session.PinyinSession
+import org.fcitx.fcitx5.android.engine.session.Predictions
+import org.fcitx.fcitx5.android.engine.session.RefineSlices
 import org.fcitx.fcitx5.android.engine.session.Session
 import org.fcitx.fcitx5.android.engine.session.Snapshot
-import org.fcitx.fcitx5.android.engine.user.UserModel.Entry
 import kotlin.math.log10
 
 /**
@@ -56,11 +54,15 @@ import kotlin.math.log10
  * 重码, the candidates whose code is all that was typed, longer than [TableOptions.noSortInputLength]
  * (五笔's 一二级简码 stay as they are), are placed where the table orders by use
  * ([TableOptions.orderByUse]: off, the table's order is kept for those who type by position): the
- * user's words first (a word of the other input methods once picked here), then the table's entries by the word model after the text before, each pick
- * here adding to it (log10 of 1 + picks); the small
- * sentence model weighs them again (性能档位 medium), the large one while the user pauses (high,
- * [Action.Refine]). What is put in is learned by the one user model as well, after the word before
- * it, and what may follow is offered (联想) until the next key.
+ * user's words once picked here first (a phrase saved as typed character by character, or a word of
+ * the other input methods, stays where its picks put it till then: a pick of the table's goes
+ * before it), then the table's entries by the word model after the text before, each pick here
+ * adding to it (log10 of 1 + picks); the small sentence model weighs them again (性能档位 medium), the
+ * large one while the user pauses (high, [Action.Refine]). What is put in is learned by the one
+ * user model as well, after the word before it, a pinyin entry too; not what [pinyin] looks up,
+ * which learns nothing (not how the user writes). What may follow is offered (联想) until the next
+ * key; a long press on it forgets or blocks it, as handwriting's (Predictions): blocks only what
+ * [SharedWords.blockable] allows, as for the table's own candidates.
  */
 class TableSession(
     private val table: TableDictionary,
@@ -97,41 +99,42 @@ class TableSession(
     // when a code just committed itself ([now]): the next key, if a space soon enough, is taken (see the class)
     private var committedItselfAt: Long? = null
 
-    // the text before the cursor, for the word and sentence models; the last word put in, as the
-    // user model has it, for what is learned after it
-    private var before = ""
-    private var lastEntry: Entry? = null
+    // what may follow what was put in, offered while nothing is typed; the text before the cursor,
+    // for the word and sentence models, and the last word put in, for what is learned after it
+    private val predictions = Predictions(
+        language?.predictor, language?.words, language?.user, language?.block, language?.forgotten ?: {}, shared::blockable,
+    ) { learning }
 
-    // what may follow what was put in, offered while nothing is typed
-    private var predictions: List<Candidate> = emptyList()
-
-    // the code's 重码 as placed ([rank]); those the refiner is still to weigh, and the slices it took
+    // the code's 重码 as placed ([rank]); those the refiner is still to weigh
     private var homographs: Homographs? = null
-    private var unrefined: Homographs? = null
-    private var refined = 0
+    private val unrefined = RefineSlices<Homographs>(language?.refiner)
 
     // Enter between: the space is on a new line, typed
     override fun passedOn() {
         committedItselfAt = null
-        before = ""
-        lastEntry = null
+        predictions.forgetBefore()
     }
 
     override fun apply(action: Action): Snapshot {
         val taken = action is Action.Key && takesSpace(action.char)
         committedItselfAt = null
         // the order shown is the one to weigh: anything but a slice of the weighing changes it, or the page
-        if (action != Action.Refine && action !is Action.Cursor && action !is Action.Step) unrefined = null
+        if (action != Action.Refine && action !is Action.Cursor && action !is Action.Step) unrefined.drop()
         if (taken) return snapshot()
-        if (predictions.isNotEmpty()) {
+        if (predictions.offered.isNotEmpty()) {
             when (action) {
                 is Action.Pick -> return pickPrediction(action.index)
                 is Action.Select -> return if (action.index in 0 until options.pageSize) pickPrediction(page * options.pageSize + action.index) else snapshot()
                 Action.NextPage -> return turnPredictions(page + 1)
                 Action.PreviousPage -> return turnPredictions(page - 1)
                 Action.Refine, Action.Ink -> return snapshot()
-                // anything else ends the offer, and goes on as it would without one
-                else -> unoffer()
+                is Action.Forget -> return pressed(action.index, Offer.FORGET)
+                is Action.Block -> return pressed(action.index, Offer.BLOCK)
+                // anything else ends the offer, and goes on as it would without one: its page too
+                else -> {
+                    predictions.unoffer()
+                    page = 0
+                }
             }
         }
         return dispatch(action)
@@ -160,14 +163,15 @@ class TableSession(
             val text = input.toString()
             recent.clear()
             clear()
-            wrote(text, null)
+            // nothing typed: Enter is the app's, and what is before goes when it is passed on (passedOn), as handwriting's
+            if (text.isNotEmpty()) predictions.wrote(text, null)
             snapshot(commit = text, handled = text.isNotEmpty())
         }
         Action.Refine -> refine()
         // a table has no custom phrases
         Action.Ink, is Action.Pin, is Action.Unpin, is Action.Syllable, is Action.Letter -> snapshot()
-        is Action.Cursor -> moveCursor(action.at.toLong())
-        is Action.Step -> moveCursor(cursor.toLong() + action.by)
+        is Action.Cursor -> moveCursor(action.at)
+        is Action.Step -> moveCursor(action.applyTo(cursor, input.length))
         // auto phrases are made of what was committed here, not of what the editor had: kept
         // only while the text still ends with it (the cursor did not go anywhere)
         Action.Reset, is Action.Context -> {
@@ -181,7 +185,8 @@ class TableSession(
     // a lookup's pinyin has no phrases of the table's own to pin to
     override fun offers(index: Int): Set<Offer> = when {
         // not where nothing is to be kept (a password): forgetting and blocking record the word
-        !learning || predictions.isNotEmpty() -> emptySet()
+        !learning -> emptySet()
+        predictions.offered.isNotEmpty() -> predictions.offers(index)
         lookingUp -> pinyin!!.offers(index).intersect(setOf(Offer.FORGET))
         ranking[index] != null -> if (shared.blockable(ranking[index]!!.text)) setOf(Offer.FORGET, Offer.BLOCK) else setOf(Offer.FORGET)
         else -> emptySet()
@@ -201,7 +206,7 @@ class TableSession(
 
     override fun candidates(from: Int, count: Int): List<Choice> {
         if (lookingUp) return pinyin!!.candidates(from, count).map { Choice(it.text, table.codeOf(it.text).orEmpty()) }
-        if (predictions.isNotEmpty()) return predictions.drop(from).take(count).map { Choice(it.text) }
+        if (predictions.offered.isNotEmpty()) return predictions.offered.drop(from).take(count).map { Choice(it.text) }
         val wild = wild()
         return ranking.page(from, count).map { Choice(it.text, if (options.hint) hint(it, wild) else "") }
     }
@@ -217,7 +222,7 @@ class TableSession(
             // not a code key: what was typed is committed, then the key is the app's
             val text = if (input.isEmpty()) "" else autoCommit()
             recent.clear()
-            wrote(c.toString(), null)
+            predictions.wrote(c.toString(), null)
             return snapshot(commit = text, handled = false)
         }
         var commit = ""
@@ -233,7 +238,7 @@ class TableSession(
         // punctuation, typed after a code as well as alone
         if (input.isEmpty() && !leadsAnywhere(c.toString())) {
             recent.clear()
-            wrote(c.toString(), null)
+            predictions.wrote(c.toString(), null)
             return snapshot(commit = commit, handled = false)
         }
         return typeInto(c, commit)
@@ -288,8 +293,7 @@ class TableSession(
         if (input.isEmpty()) {
             recent.clear()
             // the app's: what was before goes with it
-            before = before.dropLast(if (before.length >= 2 && Character.isLowSurrogate(before.last())) 2 else 1)
-            lastEntry = null
+            predictions.deleted()
             return snapshot(handled = false)
         }
         // at the start of the code: nothing before it is the session's to delete
@@ -300,16 +304,16 @@ class TableSession(
     }
 
     /** The cursor put where [to] says while a code is typed; nothing read again. */
-    private fun moveCursor(to: Long): Snapshot {
+    private fun moveCursor(to: Int): Snapshot {
         if (input.isEmpty()) return snapshot(handled = false)
-        cursor = to.coerceIn(0, input.length.toLong()).toInt()
+        cursor = to.coerceIn(0, input.length)
         return snapshot()
     }
 
     private fun select(index: Int): Snapshot {
         if (input.isEmpty()) {
             recent.clear()
-            lastEntry = null
+            predictions.lastEntry = null
             return snapshot(handled = false)
         }
         // space on a code with no candidate drops it
@@ -331,48 +335,36 @@ class TableSession(
         return snapshot(commit = text)
     }
 
+    // nothing typed: every caller has just cleared the code
     private fun predict() {
-        val p = language?.predictor
         page = 0
-        predictions = if (p == null || !learning || input.isNotEmpty()) emptyList() else TextWords.previous(language.words.lastTwo(before)).let { (prev2, prev) -> p.predict(prev2, prev) }
+        predictions.predict()
     }
 
-    private fun unoffer() {
-        predictions = emptyList()
-        page = 0
-    }
-
+    // none there: kept while predicting, as pinyin keeps a pick past its candidates
     private fun pickPrediction(index: Int): Snapshot {
-        val c = predictions.getOrNull(index) ?: return snapshot()
-        // learned after the word before it, as pinyin learns a prediction: it comes up after that word again
-        val entry = c.words.singleOrNull()?.let { w -> language?.predictor?.reading(w)?.let { Entry(c.text, it) } }
-        if (learning && entry != null) language?.user?.learn(lastEntry, listOf(entry))
-        wrote(c.text, entry)
+        val text = predictions.pick(index) ?: return snapshot()
         recent.clear()
-        return offering(c.text)
+        page = 0
+        return snapshot(commit = text)
     }
 
-    private fun turnPredictions(to: Int): Snapshot {
-        if (to >= 0 && to * options.pageSize < predictions.size) page = to
+    // the prediction at [index] forgotten or blocked, as the long press offered: what may follow offered again
+    private fun pressed(index: Int, offer: Offer): Snapshot {
+        if (predictions.press(index, offer)) page = 0
         return snapshot()
     }
 
-    /** [text] went into the editor, [entry] its word as learned (or none): the text before goes on from it. */
-    private fun wrote(text: String, entry: Entry?) {
-        before = kept(before + text)
-        lastEntry = entry
+    private fun turnPredictions(to: Int): Snapshot {
+        if (predictions.hasPage(to, options.pageSize)) page = to
+        return snapshot()
     }
 
     /** The text before the cursor is [to] (none: reset): the last word put in is still the one before it only if it ends so. */
     private fun moved(to: String?) {
-        if (to == null || lastEntry?.let { to.endsWith(it.text) } != true) lastEntry = null
-        before = if (to == null) "" else kept(to)
-    }
-
-    // the text before the cursor as kept: as much as a sentence model reads (not from the middle of
-    // a pair), only the last words where nothing is learned
-    private fun kept(text: String) = if (learning) PinyinSession.tail(text) else text.takeLast(WORDS_KEPT).let {
-        if (it.isNotEmpty() && Character.isLowSurrogate(it[0])) it.substring(1) else it
+        val last = predictions.lastEntry
+        if (to == null) predictions.forgetBefore() else predictions.goOnFrom(to)
+        predictions.lastEntry = last?.takeIf { to != null && to.endsWith(it.text) }
     }
 
     /** Forgets what was learned of the candidate at [index], ranking the code again on the page shown. */
@@ -388,7 +380,7 @@ class TableSession(
         update()
         if (ranking[shown * options.pageSize] != null) page = shown
         // weighed again only on the first page, as pinyin: not to move what is shown
-        if (page != 0) unrefined = null
+        if (page != 0) unrefined.drop()
         return snapshot()
     }
 
@@ -401,7 +393,7 @@ class TableSession(
         update()
         if (ranking[shown * options.pageSize] != null) page = shown
         // weighed again only on the first page, as pinyin: not to move what is shown
-        if (page != 0) unrefined = null
+        if (page != 0) unrefined.drop()
         return snapshot()
     }
 
@@ -419,16 +411,21 @@ class TableSession(
             recent.clear()
             return ""
         }
-        // what pinyin found is neither counted nor built into phrases: libime counts it in its
-        // history, but builds phrases from it with the pinyin as the code, which is a bug
-        if (!learning || item.pinyin) {
+        if (!learning) {
             recent.clear()
-            wrote(item.text, null)
+            predictions.wrote(item.text, null)
             return item.text
         }
-        val entry = language?.reading?.invoke(item.text)?.let { Entry(item.text, it) }
-        if (entry != null) language.user?.learn(lastEntry, listOf(entry))
-        wrote(item.text, entry)
+        // a word of the user's (a saved phrase, one of the other input methods') the word model lacks: as the user model has it
+        val entry = language?.entryOf(item.text, theirs = item.index < 0 && !item.auto)
+        if (entry != null) language.user?.learn(predictions.lastEntry, listOf(entry))
+        predictions.wrote(item.text, entry)
+        // what pinyin found is neither counted here nor built into phrases: libime counts it in its
+        // history, but builds phrases from it with the pinyin as the code, which is a bug
+        if (item.pinyin) {
+            recent.clear()
+            return item.text
+        }
         user.picked(item.code, item.text)
         // picked once, an auto phrase is the user's
         if (item.auto) user.save(item.code, item.text)
@@ -462,6 +459,8 @@ class TableSession(
         cursor = 0
         ranking = Ranking.NONE
         homographs = null
+        // nothing left to weigh: a code that commits itself may have set it (a row twice in the table, shown once)
+        unrefined.drop()
         page = 0
     }
 
@@ -473,8 +472,7 @@ class TableSession(
         page = 0
         homographs = null
         ranking = if (input.isEmpty()) Ranking.NONE else rank(input.toString())
-        refined = 0
-        unrefined = homographs?.takeIf { language?.refiner != null && it.texts.size > 1 }
+        unrefined.start(homographs, homographs?.texts?.size ?: 0)
     }
 
     /**
@@ -490,63 +488,82 @@ class TableSession(
         val learned = user.saved(code).map { (c, text) -> Item(c, text, false) }
         val others = shared.words(code).filterNot { (c, text) -> user.isSaved(c, text) }.map { (c, text) -> Item(c, text, false) }
         val noSort = minOf(code.length, options.noSortInputLength)
-        val sharedFrom = learned.size + entries.size
+        val found = Found(learned, entries, coded.size, others)
+        // one sortable number per candidate: its group, length, picks, then where it was
+        val keys = LongArray(found.size) { at ->
+            val extra = found.item(at)
+            if (extra != null) key(at, extra.code.length, noSort, false) { user.picks(extra.code, extra.text) }
+            else found.entry(at).let { e -> key(at, table.codeLength(e) - (if (found.spelt(at)) 1 else 0), noSort, found.spelt(at)) { user.picks(e) } }
+        }
+        keys.sort()
+        val order = IntArray(keys.size) { (keys[it] and POSITION_MASK).toInt() }
+        ownFirst(order, found::spelt)
+        // the most recently seen first
+        val auto = user.seen(code).map { (c, text) -> Item(c, text, true) }
+        val made = { placed: IntArray ->
+            Ranking(shared::blocked) { at ->
+                when {
+                    at < placed.size -> placed[at].let { found.item(it) ?: entryItem(found.entry(it)) }
+                    else -> auto.getOrNull(at - placed.size)
+                }
+            }
+        }
+        // the 重码: the candidates (at [order]'s positions) of the whole code typed, past those kept in order
+        if (code.length <= noSort) return made(order)
+        // sorted by length, none comes after the first longer code (what ownFirst moves forward past
+        // pinyin entries is none either): the rest is not looked at
+        val longer = keys.indexOfFirst { ((it shr LENGTH_SHIFT) and MAX_LENGTH.toLong()) > code.length }
+        return weighed(code, order, if (longer < 0) order.size else longer, { k -> kind(code, found, order[k]) }, made)
+    }
+
+    /**
+     * What candidate [at] of [found] is among the 重码 of [code]: a table entry of the code whole,
+     * [USERS] for a word of the user's once picked here (one of the other input methods', or a phrase
+     * saved as typed character by character, goes where its picks put it till then), else [OTHER].
+     */
+    private fun kind(code: String, found: Found, at: Int): Int {
+        val extra = found.item(at)
+        return when {
+            found.spelt(at) -> OTHER
+            extra != null -> if (extra.code.length == code.length && user.picks(extra.code, extra.text) > 0) USERS else OTHER
+            else -> found.entry(at).let { e -> if (table.codeLength(e) == code.length) e else OTHER }
+        }
+    }
+
+    /**
+     * A code's candidates at [rank]'s positions: the user's [learned] phrases, the table's [entries]
+     * (the first [coded] by code, the rest by pinyin), then the other input methods' words ([others]).
+     */
+    private class Found(val learned: List<Item>, val entries: IntArray, val coded: Int, val others: List<Item>) {
+        private val sharedFrom = learned.size + entries.size
+        val size get() = sharedFrom + others.size
+
         fun item(at: Int): Item? = when {
             at < learned.size -> learned[at]
             at >= sharedFrom -> others[at - sharedFrom]
             else -> null
         }
-        val pinyinFrom = learned.size + coded.size
-        fun spelt(at: Int) = at in pinyinFrom until sharedFrom
-        // one sortable number per candidate: its group, length, picks, then where it was
-        val keys = LongArray(sharedFrom + others.size) { at ->
-            val extra = item(at)
-            if (extra != null) key(at, extra.code.length, noSort, false) { user.picks(extra.code, extra.text) }
-            else entries[at - learned.size].let { e -> key(at, table.codeLength(e) - (if (spelt(at)) 1 else 0), noSort, spelt(at)) { user.picks(e) } }
-        }
-        keys.sort()
-        val order = IntArray(keys.size) { (keys[it] and POSITION_MASK).toInt() }
-        ownFirst(order, ::spelt)
-        // the most recently seen first
-        val auto = user.seen(code).map { (c, text) -> Item(c, text, true) }
-        val made = {
-            Ranking(shared::blocked) { at ->
-                when {
-                    at < order.size -> order[at].let { item(it) ?: entryItem(entries[it - learned.size]) }
-                    else -> auto.getOrNull(at - order.size)
-                }
-            }
-        }
-        // the 重码: the candidates (at [order]'s positions) of the whole code typed, past those kept in order
-        if (code.length <= noSort) return made()
-        return weighed(code, order, { k -> kindOf(order[k], code.length, item(order[k]), order[k] >= sharedFrom, spelt(order[k])) { entries[it - learned.size] } }, made)
+
+        fun spelt(at: Int) = at in learned.size + coded until sharedFrom
+
+        fun entry(at: Int) = entries[at - learned.size]
     }
 
     /**
-     * What candidate [i] of a code [length] long is among its 重码: [extra] the user's (one of the
-     * other input methods' if [fromShared]: theirs here once picked here, as the user chose), else
-     * table entry [entry] of it.
+     * [made] with the 重码 of [code] in [order] placed ([kind] of each of its first [reach] positions,
+     * past which there are none: a table entry, [USERS] for the user's words, or [OTHER]): the user's
+     * first, as they were, then the table's by the word and sentence models, a blocked one left where
+     * it is (it is not shown). In the table's order where it does not order by use (one setting:
+     * 常用的字词排前面), or a wildcard was typed.
      */
-    private fun kindOf(i: Int, length: Int, extra: Item?, fromShared: Boolean, spelt: Boolean, entry: (Int) -> Int): Int = when {
-        spelt -> OTHER
-        extra != null -> if (extra.code.length == length && (!fromShared || user.picks(extra.code, extra.text) > 0)) USERS else OTHER
-        else -> entry(i).let { e -> if (table.codeLength(e) == length) e else OTHER }
-    }
-
-    /**
-     * [made] with the 重码 of [code] in [order] placed ([kind] of each position: a table entry, [USERS]
-     * for the user's words, or [OTHER]): the user's first, as they were, then the table's by the word
-     * and sentence models, a blocked one left where it is (it is not shown). In the table's order
-     * where it does not order by use (one setting: 常用的字词排前面), or a wildcard was typed.
-     */
-    private fun weighed(code: String, order: IntArray, kind: (Int) -> Int, made: () -> Ranking): Ranking {
-        val language = language?.takeIf { options.orderByUse } ?: return made()
-        if (options.matchingKey != null && code.contains(options.matchingKey)) return made()
-        val kinds = IntArray(order.size, kind)
-        val users = order.indices.filter { kinds[it] == USERS }
-        val ranked = order.indices.filter { kinds[it] >= 0 && !shared.blocked(table.text(kinds[it])) }
-        if (ranked.size < 2 && users.isEmpty()) return made()
-        val (prev2, prev) = TextWords.previous(language.words.lastTwo(before))
+    private fun weighed(code: String, order: IntArray, reach: Int, kind: (Int) -> Int, made: (IntArray) -> Ranking): Ranking {
+        val language = language?.takeIf { options.orderByUse } ?: return made(order)
+        if (options.matchingKey != null && code.contains(options.matchingKey)) return made(order)
+        val kinds = IntArray(reach, kind)
+        val users = kinds.indices.filter { kinds[it] == USERS }
+        val ranked = kinds.indices.filter { kinds[it] >= 0 && !shared.blocked(table.text(kinds[it])) }
+        if (ranked.size < 2 && users.isEmpty()) return made(order)
+        val (prev2, prev) = TextWords.previous(language.words.lastTwo(predictions.before))
         val texts = ranked.map { table.text(kinds[it]) }
         // each pick here counting as use, as the table ordered by use before: the user model's counts
         // alone move a pick too slowly for those who expect it forward next time
@@ -558,13 +575,14 @@ class TableSession(
             byScore.map { order[ranked[it]] }.toIntArray(), byScore.map { texts[it] }, byScore.map { scores[it] }, made,
         )
         homographs = h
-        return h.place(if (texts.size > 1) language.reranker?.pick(context(), h.texts, h.scores) ?: 0 else 0)
+        return h.place(if (texts.size > 1) language.reranker?.pick(predictions.context, h.texts, h.scores) ?: 0 else 0)
     }
 
     /**
      * A code's 重码 in [order]: at the positions [at], the user's words [users] (order's values) first,
      * then [entries] by the word model, their [texts] and [scores] so; [place] puts one of the
-     * entries first among them, the rest as ranked.
+     * entries first among them, the rest as ranked, in a copy of [order]: a Ranking reads its
+     * order as it is asked, and one made before goes on as it was.
      */
     private class Homographs(
         private val order: IntArray,
@@ -573,30 +591,20 @@ class TableSession(
         private val entries: IntArray,
         val texts: List<String>,
         val scores: List<Float>,
-        private val made: () -> Ranking,
+        private val made: (IntArray) -> Ranking,
     ) {
         fun place(first: Int): Ranking {
+            val placed = order.copyOf()
             var k = 0
-            for (u in users) order[at[k++]] = u
-            if (entries.isNotEmpty()) order[at[k++]] = entries[first]
-            for (j in entries.indices) if (j != first) order[at[k++]] = entries[j]
-            return made()
+            for (u in users) placed[at[k++]] = u
+            if (entries.isNotEmpty()) placed[at[k++]] = entries[first]
+            for (j in entries.indices) if (j != first) placed[at[k++]] = entries[j]
+            return made(placed)
         }
     }
 
-    // what the sentence models read on from: none where nothing is learned (a password)
-    private fun context() = if (learning) before else ""
-
     private fun refine(): Snapshot {
-        val h = unrefined ?: return snapshot()
-        val refiner = language?.refiner
-        if (refiner == null || refined++ >= refiner.slices) {
-            unrefined = null
-            return snapshot()
-        }
-        val picked = refiner.refine(context(), h.texts, h.scores, REFINE_BUDGET) ?: return snapshot()
-        unrefined = null
-        if (picked != SentenceRefiner.NONE) ranking = h.place(picked)
+        unrefined.slice(predictions.context, { it.texts }, { it.scores }) { h, picked -> ranking = h.place(picked) }
         return snapshot()
     }
 
@@ -668,7 +676,7 @@ class TableSession(
     }
 
     private fun snapshot(commit: String = "", handled: Boolean = true): Snapshot {
-        if (predictions.isNotEmpty() && input.isEmpty() && !lookingUp) return predicted(commit, handled)
+        if (predictions.offered.isNotEmpty() && input.isEmpty() && !lookingUp) return predicted(commit, handled)
         val from = page * options.pageSize
         val shown = ranking.page(from, options.pageSize)
         val wild = wild()
@@ -687,7 +695,7 @@ class TableSession(
             first = from,
             actionable = shown.isNotEmpty(),
             labels = options.selectionKeys,
-            refines = unrefined != null,
+            refines = unrefined.refines,
         )
     }
 
@@ -696,13 +704,15 @@ class TableSession(
         return Snapshot(
             commit = commit,
             preedit = "",
-            candidates = predictions.drop(from).take(options.pageSize).map { it.text },
+            candidates = predictions.offered.drop(from).take(options.pageSize).map { it.text },
             page = page,
             hasPreviousPage = page > 0,
-            hasNextPage = from + options.pageSize < predictions.size,
+            hasNextPage = from + options.pageSize < predictions.offered.size,
             handled = handled,
             predicting = true,
-            total = predictions.size,
+            // a prediction may be forgotten or blocked: see offers
+            actionable = true,
+            total = predictions.offered.size,
             first = from,
         )
     }
@@ -740,14 +750,14 @@ class TableSession(
                 if (text.isEmpty()) text = typedInLookUp(pinyin)
                 endLookUp()
                 // then the key, the app's
-                wrote(text + action.char, null)
+                predictions.wrote(text + action.char, null)
                 snapshot(commit = text, handled = false)
             }
             Action.Backspace -> backspaceInLookUp(pinyin)
             Action.CommitRaw -> {
                 val text = typedInLookUp(pinyin)
                 endLookUp()
-                wrote(text, null)
+                predictions.wrote(text, null)
                 snapshot(commit = text)
             }
             Action.Reset, is Action.Context -> {
@@ -795,7 +805,7 @@ class TableSession(
     private fun fromPinyin(s: Snapshot): Snapshot {
         if (s.commit.isNotEmpty()) {
             endLookUp()
-            wrote(s.commit, null)
+            predictions.wrote(s.commit, null)
             return snapshot(commit = s.commit)
         }
         return s.copy(
@@ -832,12 +842,5 @@ class TableSession(
 
         // a space later than this after a code committed itself was typed on purpose, after a pause
         private const val SPACE_TAKEN_MS = 1000L
-
-        // the text before the cursor kept where nothing is learned: the last words alone (else
-        // as much as a sentence model reads, PinyinSession.tail)
-        private const val WORDS_KEPT = 3 * TextWords.MAX_WORD
-
-        // the refiner's work per Action.Refine: as pinyin's (PinyinSession.REFINE_BUDGET)
-        private const val REFINE_BUDGET = 1
     }
 }

@@ -149,8 +149,12 @@ object InkFeatures {
         System.arraycopy(blur, 0, full[0], 0, blur.size)
         val turn = (2 * PI).toFloat()
         for (i in 0 until size * size) {
-            val mag = hypot(gx[i], gy[i])
-            var angle = atan2(gy[i], gx[i]) % turn
+            val x = gx[i]
+            val y = gy[i]
+            // no gradient adds nothing: most of the square is blank
+            if (x == 0f && y == 0f) continue
+            val mag = sqrt(x * x + y * y)
+            var angle = atan2(y, x) % turn
             if (angle < 0) angle += turn
             val a = angle / turn * DIRS
             val lo = a.toInt() % DIRS
@@ -161,25 +165,29 @@ object InkFeatures {
         val res = FloatArray((1 + DIRS) * out * out)
         for (p in 0..DIRS) shrink(full[p], size, out, res, p * out * out)
         val plane = out * out
-        val inkMax = max(1e-6f, (0 until plane).maxOf { res[it] })
+        val inkMax = max(1e-6f, peak(res, 0, plane))
         for (i in 0 until plane) res[i] /= inkMax
-        val dirMax = max(1e-6f, (plane until res.size).maxOf { res[it] })
+        val dirMax = max(1e-6f, peak(res, plane, res.size))
         for (i in plane until res.size) res[i] /= dirMax
         return res
+    }
+
+    // a loop, not maxOf over a range: that boxes each index
+    private fun peak(v: FloatArray, from: Int, to: Int): Float {
+        var m = v[from]
+        for (i in from + 1 until to) m = max(m, v[i])
+        return m
     }
 
     /** Each pixel on where any of its 3 x 3 neighbourhood is (OpenCV's `dilate`, the border blank). */
     private fun widen(sk: BooleanArray, size: Int): FloatArray {
         val out = FloatArray(size * size)
-        for (y in 0 until size) for (x in 0 until size) {
-            val near = (-1..1).any { dy ->
-                (-1..1).any { dx ->
-                    val yy = y + dy
-                    val xx = x + dx
-                    yy in 0 until size && xx in 0 until size && sk[yy * size + xx]
-                }
-            }
-            if (near) out[y * size + x] = 1f
+        // each skeleton pixel lights its neighbourhood: the same, without a look around every blank one
+        for (i in sk.indices) {
+            if (!sk[i]) continue
+            val x = i % size
+            val y = i / size
+            for (yy in max(0, y - 1)..min(size - 1, y + 1)) for (xx in max(0, x - 1)..min(size - 1, x + 1)) out[yy * size + xx] = 1f
         }
         return out
     }

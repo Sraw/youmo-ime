@@ -90,11 +90,29 @@ object EngineBridge {
      */
     val handwritingEnded: StateFlow<Int> = inkEnded
 
-    /** What the handwriting pad read of its [piece], for the key sent next to show: Engines.offerInk. On the fcitx thread. */
-    fun offerInk(reading: InkReading, piece: Int) = engines.offerInk(reading, piece)
+    /** What the handwriting pad read of its [piece], for the key sent next to show: Engines.offerInk. On the fcitx thread, [current] its input method. */
+    fun offerInk(reading: InkReading, piece: Int, current: String) = ink(current) { engines.offerInk(reading, piece) }
 
-    /** The handwriting pad's [piece] finished, for the key sent next to tell: Engines.inkFinished. On the fcitx thread. */
-    fun inkFinished(piece: Int) = engines.inkFinished(piece)
+    /** The handwriting pad's [piece] finished, for the key sent next to tell: Engines.inkFinished. On the fcitx thread, [current] its input method. */
+    fun inkFinished(piece: Int, current: String) = ink(current) { engines.inkFinished(piece) }
+
+    // these make the handwriting session, whose pinyin data may not load: as its keys, latched once
+    // and skipped after, the pad drawing on with nothing taken (not a load tried at every character).
+    // Whether it was taken: not, no Ink key is sent, which unanswered would be typed as its character.
+    // Handwriting's only: a piece finished as the pad leaves for English ([current]) is told the engine,
+    // but is not a key typed into keyboard-us
+    internal fun ink(current: String, call: () -> Unit): Boolean {
+        if (Engines.HANDWRITING in unloadable) return false
+        try {
+            unloadable.call(Engines.HANDWRITING, call)
+            return current == Engines.HANDWRITING
+        } catch (e: IOException) {
+            Timber.w(e, "handwriting engine")
+        } catch (e: DataFormatException) {
+            Timber.w(e, "handwriting engine")
+        }
+        return false
+    }
 
     /** The 双拼 scheme the user set, for the keyboard to tell its keys from text (Engines.readsAsKey): set on the fcitx thread, read on the main one. */
     @Volatile
@@ -341,7 +359,7 @@ object EngineBridge {
         val answered = try {
             val s = unloadable.call(im, call)
             if (im == Engines.T9 && (event != EngineEvent.REFINE || s.handled)) t9State.value = T9State(s.preedit.isNotEmpty(), s.syllables, s.syllablesId)
-            if (im == Engines.HANDWRITING) inkEnded.value = engines.inkEnded
+            followed(im) { engines }
             result(event, s, fetch)
         } catch (@Suppress("TooGenericExceptionCaught") e: Throwable) {
             // the addon refines no more after a failure (native-lib's engineFailed)
@@ -402,8 +420,16 @@ object EngineBridge {
     /** See [Engines.context]; nothing to tell while the engine is not made. */
     @JvmStatic
     fun context(before: String, learning: Boolean, im: String) {
-        made?.context(im, before, learning)
-        if (im == Engines.HANDWRITING) made?.let { inkEnded.value = it.inkEnded }
+        made?.let {
+            it.context(im, before, learning)
+            followed(im) { it }
+        }
+    }
+
+    // what the app keeps of an input method's session, after any call of it: one place as input methods come.
+    // [engines] asked only for one followed: a call answered elsewhere (a test's) makes none
+    private inline fun followed(im: String, engines: () -> Engines) {
+        if (im == Engines.HANDWRITING) inkEnded.value = engines().inkEnded
     }
 
     /** See [Engines.tableKeys]; none while the engine is not made, no session yet, nor is it made to answer: the keyboard waits. */

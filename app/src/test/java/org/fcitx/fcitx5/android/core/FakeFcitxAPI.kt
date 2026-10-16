@@ -10,6 +10,7 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import org.fcitx.fcitx5.android.daemon.FcitxConnection
+import org.fcitx.fcitx5.android.engine.handwriting.InkReading
 import org.fcitx.fcitx5.android.engine.host.Engines
 
 /**
@@ -132,6 +133,16 @@ class FakeFcitxAPI : FcitxAPI {
 
     override suspend fun engineContext(before: String, learning: Boolean) {
         calls += "engineContext($before, $learning)"
+    }
+
+    override suspend fun offerInk(reading: InkReading, piece: Int): Boolean {
+        calls += "offerInk($piece)"
+        return true
+    }
+
+    override suspend fun inkFinished(piece: Int): Boolean {
+        calls += "inkFinished($piece)"
+        return true
     }
 
     override suspend fun sendKey(key: String, states: UInt, code: Int, up: Boolean, timestamp: Int) {

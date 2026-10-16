@@ -5,6 +5,11 @@
 package org.fcitx.fcitx5.android.eval
 
 import org.fcitx.fcitx5.android.engine.data.CodeTable
+import org.fcitx.fcitx5.android.engine.data.PinyinData
+import org.fcitx.fcitx5.android.engine.handwriting.handwritingDataBytes
+import org.fcitx.fcitx5.android.engine.lattice.TextWords
+import org.fcitx.fcitx5.android.engine.rerank.SentenceRefiner
+import org.fcitx.fcitx5.android.engine.table.TableLanguage
 import org.fcitx.fcitx5.android.engine.table.TableOptions
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -128,5 +133,60 @@ class TableRunTest {
         assertEquals(0, runCli(arrayOf("table", data.path, set.path, "--preset", "wubi"), out, StringBuilder()))
         // the text once, however many samples share it
         assertTrue(out.toString(), out.startsWith("text: 2 characters, 0 not in the table, 1 words"))
+    }
+
+    // 人 and 山 share abcd, a 重码; 高 commits itself; 天's abc is its one entry, abcd longer
+    private val homographEntries = CodeTable.Builder()
+        .header("键码", "abcdefghijklmnopqrstuvwxy")
+        .header("码长", "4")
+        .entry("g", "高").entry("abcd", "人").entry("abcd", "山").entry("abc", "天")
+        .build().toByteArray()
+
+    // the engine's handwriting test words: 人 likelier alone, 山 after 高
+    private val pinyin = handwritingDataBytes
+
+    /** Picks [word] on the last of its [slices], before then not done: a large model taking more than the default's pause. */
+    private class Late(override val slices: Int, private val word: String) : SentenceRefiner {
+        var calls = 0
+
+        override fun refine(context: String, readings: List<String>, scores: List<Float>, budget: Int): Int? =
+            if (++calls < slices) null else readings.indexOf(word)
+    }
+
+    @Test
+    fun aWordIsCountedWhereItsCodeHasAnotherEntryAsLong() {
+        val run = TableRun(CodeTable.load(ByteBuffer.wrap(homographEntries)), TableOptions.WUBI)
+        val words = PinyinData.load(ByteBuffer.wrap(pinyin)).let { TextWords(it.model, it.wordIndex) }
+        val late = Late(SentenceRefiner.SLICES + 8, "人")
+        val (n, first) = run.homographs("高人天", listOf(null, TableLanguage(words), TableLanguage(words, refiner = late)))
+        // 人 alone: 高 commits itself, and 天 comes first before the longer abcd's in every row
+        assertEquals(1, n)
+        // the table's order, 山 by the word model after 高, 人 again once the refiner is given its slices
+        assertEquals(listOf(1, 0, 1), first.toList())
+        // given at least its slices: how often the session asks past them is the session's business
+        assertTrue(late.calls >= late.slices)
+    }
+
+    @Test
+    fun aCodeKeptInTheTablesOrderIsNoHomograph() {
+        // 上 and 下 share e, a 简码 no longer than 五笔's noSortInputLength: no ranking reorders them
+        val table = CodeTable.Builder().header("键码", "abcdefghijklmnopqrstuvwxy").header("码长", "4")
+            .entry("e", "上").entry("e", "下").build().toByteArray().let { CodeTable.load(ByteBuffer.wrap(it)) }
+        assertEquals(0, TableRun(table, TableOptions.WUBI).homographs("上", listOf(null)).first)
+        // where codes of any length are ranked, it is one
+        assertEquals(1, TableRun(table, TableOptions()).homographs("上", listOf(null)).first)
+    }
+
+    @Test
+    fun theCommandReportsHowOftenEachRankingPutsTheWordFirst() {
+        val data = File(tmp.root, "t.data").also { it.writeBytes(homographEntries) }
+        val words = File(tmp.root, "pinyin.data").also { it.writeBytes(pinyin) }
+        val set = File(tmp.root, "s.tsv").also { it.writeText("gaorentian\t高人天\tx\n") }
+        val out = StringBuilder()
+        assertEquals(0, runCli(arrayOf("table", data.path, set.path, "--preset", "wubi", "--pinyin", words.path), out, StringBuilder()))
+        val lines = out.lines()
+        assertTrue(out.toString(), "重码 words: 1" in lines)
+        assertTrue(out.toString(), lines.any { it.startsWith("  table's order") && it.endsWith("first 100.0%") })
+        assertTrue(out.toString(), lines.any { it.startsWith("  word model (low)") && it.endsWith("first 0.0%") })
     }
 }

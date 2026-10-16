@@ -136,6 +136,9 @@ sealed class Action {
      * kept, as for [Cursor].
      */
     data class Step(val by: Int) : Action() {
+        /** Where a cursor at [cursor] in an input [length] keys long goes: no further than its ends, [START] and [END] too. */
+        fun applyTo(cursor: Int, length: Int): Int = (cursor.toLong() + by).coerceIn(0, length.toLong()).toInt()
+
         companion object {
             val START = Step(Int.MIN_VALUE)
             val END = Step(Int.MAX_VALUE)

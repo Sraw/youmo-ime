@@ -9,8 +9,6 @@ import org.fcitx.fcitx5.android.engine.data.DataFormatException
 import org.fcitx.fcitx5.android.engine.data.PinyinData
 import org.fcitx.fcitx5.android.engine.data.PinyinDataBuilder
 import org.fcitx.fcitx5.android.engine.data.WordLayers
-import org.fcitx.fcitx5.android.engine.handwriting.HandwritingSession
-import org.fcitx.fcitx5.android.engine.handwriting.InkReading
 import org.fcitx.fcitx5.android.engine.lattice.LayerPrior
 import org.fcitx.fcitx5.android.engine.pinyin.Fuzzy
 import org.fcitx.fcitx5.android.engine.session.Choice
@@ -599,27 +597,33 @@ class EnginesTest : EnginesFixture() {
     @Test
     fun aCandidateForgottenInAnyPinyinIsForgottenInTheTablesToo() {
         val wubi = "engine-wubi"
-        val log = TableLog.FORMAT.header() + TableLog.saved("abcd", "拟")
-        // the log forgets nothing by itself: 拟 is 五笔's by abcd
+        // a phrase, as a table saves no single character (TableRegistry.forgetInTables loads none for one)
+        val log = TableLog.FORMAT.header() + TableLog.saved("abcd", "你好")
+        // the log forgets nothing by itself: 你好 is 五笔's by abcd
         val kept = folder.newFolder("kept")
         kept.resolve(Engines.userTable(wubi)).writeBytes(log)
         Engines(::load, kept).use {
             it.settings = wubiShown
-            assertEquals(listOf("拟"), it.type(wubi, "abcd").candidates)
+            assertEquals(listOf("你好"), it.type(wubi, "abcd").candidates)
         }
-        for ((im, keys) in listOf(Engines.PINYIN to "ni", Engines.T9 to "64", Engines.SHUANGPIN to "ni")) {
+        for ((im, keys) in listOf(Engines.PINYIN to "nihao", Engines.T9 to "64426", Engines.SHUANGPIN to "nihk")) {
             val dir = folder.newFolder(im)
             // a phrase 五笔 saved, its table not loaded: loaded to forget it
             dir.resolve(Engines.userTable(wubi)).writeBytes(log)
             Engines(::load, dir).use { engines ->
+                // learned here first, to be forgotten
                 engines.type(im, keys)
-                val at = engines.candidates(im, 0, 20).indexOfFirst { it.text == "拟" }
+                val picked = engines.candidates(im, 0, 20).indexOfFirst { it.text == "你好" }
+                assertEquals(im, "你好", engines.onEvent(im, EngineEvent.PICK, picked).commit)
+                engines.onEvent(im, EngineEvent.RESET, 0)
+                engines.type(im, keys)
+                val at = engines.candidates(im, 0, 20).indexOfFirst { it.text == "你好" }
                 assertTrue(im, Offer.FORGET in engines.offers(im, at))
                 engines.onEvent(im, EngineEvent.FORGET, at)
             }
             Engines(::load, dir).use {
                 it.settings = wubiShown
-                assertFalse(im, "拟" in it.type(wubi, "abcd").candidates)
+                assertFalse(im, "你好" in it.type(wubi, "abcd").candidates)
             }
         }
     }
@@ -672,38 +676,6 @@ class EnginesTest : EnginesFixture() {
                 assertTrue(im, Engines.readsAsKey(im, scheme, separator, composing = true))
             }
         }
-    }
-
-    // the pad's reading offered, then its key: shown, read with the pinyin model after the text before
-    @Test
-    fun handwritingShowsWhatThePadOffered() {
-        val engines = Engines(::load, null)
-        // a field's text is told the keyboards there are: the input method switched to first
-        engines.onEvent(Engines.HANDWRITING, EngineEvent.RESET, 0)
-        engines.context(Engines.HANDWRITING, "好")
-        engines.offerInk(InkReading(listOf("你", "拟"), doubleArrayOf(0.0, 0.0)), 0)
-        val shown = engines.onEvent(Engines.HANDWRITING, EngineEvent.CHAR, Keyboard.INK)
-        // 好 then 拟: the model's bigram
-        assertEquals("拟", shown.preedit)
-        assertEquals(listOf("拟", "你"), engines.candidates(Engines.HANDWRITING, 0, 5).map { it.text })
-        assertEquals("你", engines.onEvent(Engines.HANDWRITING, EngineEvent.PICK, 1).commit)
-        assertTrue(Engines.PINYIN_DATA in loaded)
-        assertEquals(0, engines.inkEnded)
-    }
-
-    // a second character joins the first, nothing put in till one is picked
-    @Test
-    fun handwritingReadsTheCharactersWrittenTogether() {
-        val engines = Engines(::load, null)
-        engines.offerInk(InkReading(listOf("好"), doubleArrayOf(0.0)), 0)
-        engines.onEvent(Engines.HANDWRITING, EngineEvent.CHAR, Keyboard.INK)
-        engines.offerInk(InkReading(listOf("你", "拟"), doubleArrayOf(0.0, 0.0)), 1)
-        val two = engines.onEvent(Engines.HANDWRITING, EngineEvent.CHAR, Keyboard.INK)
-        assertEquals("", two.commit)
-        assertEquals("好拟", two.preedit)
-        assertEquals(HandwritingSession.NO_PIECE, engines.inkEnded)
-        assertEquals("好拟", engines.onEvent(Engines.HANDWRITING, EngineEvent.CHAR, ' '.code).commit)
-        assertEquals(1, engines.inkEnded)
     }
 
     private companion object {

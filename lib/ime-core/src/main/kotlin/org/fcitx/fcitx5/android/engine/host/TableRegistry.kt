@@ -134,7 +134,9 @@ internal class TableRegistry(
     // the tables loaded, and those with a log on disk: a phrase saved there would be shared again
     fun forgetInTables(texts: Collection<String>) {
         val forgotten = texts.toSet()
-        val logged = TABLES.keys.filter { im -> im in tables || userDir?.let { File(it, userTable(im)).exists() } == true }
+        // a table saves and shares no single character: none to load for one
+        val phrases = forgotten.any { it.codePointCount(0, it.length) >= 2 }
+        val logged = TABLES.keys.filter { im -> im in tables || (phrases && userDir?.let { File(it, userTable(im)).exists() } == true) }
         for (im in logged) table(im).user.forgetTexts(forgotten)
     }
 

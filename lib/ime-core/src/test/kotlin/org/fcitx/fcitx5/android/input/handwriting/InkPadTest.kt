@@ -85,15 +85,57 @@ class InkPadTest {
         val pad = InkPad()
         pad.stroke(0, 0f, 0f, 1f, 1f)
         val two = pad.stroke(10, 2f, 2f, 3f, 3f)
-        val one = pad.undo()!!
+        val one = pad.undo(20)!!
         assertEquals(1, one.strokes.size)
         assertEquals(two.piece, one.piece)
         assertTrue(one.id > two.id)
-        assertTrue(pad.undo()!!.strokes.isEmpty())
-        assertNull(pad.undo())
+        assertTrue(pad.undo(30)!!.strokes.isEmpty())
+        assertNull(pad.undo(40))
         // not while a stroke is drawn
         pad.down(0f, 0f)
-        assertNull(pad.undo())
+        assertNull(pad.undo(50))
+    }
+
+    @Test
+    fun `the pause after backspace counts from it, the stroke taken back written again in the same piece`() {
+        val pad = InkPad()
+        pad.stroke(1000, 0f, 0f, 1f, 1f)
+        pad.stroke(1500, 2f, 2f, 3f, 3f)
+        pad.undo(2000)
+        // the pen up long enough since the stroke left went up, not yet since the backspace
+        assertFalse(pad.finish(1500 + InkPad.FINISH_MILLIS))
+        assertFalse(pad.finish(2000 + InkPad.FINISH_MILLIS - 1))
+        assertTrue(pad.finish(2000 + InkPad.FINISH_MILLIS))
+    }
+
+    @Test
+    fun `drawing reads the strokes where they are, the finished ones counted as they change`() {
+        val pad = InkPad()
+        var seen = pad.edits
+        fun changed() = (pad.edits != seen).also { seen = pad.edits }
+        pad.stroke(0, 0f, 0f, 1f, 1f)
+        assertTrue(changed())
+        pad.down(2f, 2f)
+        repeat(100) { pad.move(it.toFloat(), 0f) }
+        // the stroke under the pen is none of the finished ones
+        assertFalse(changed())
+        assertEquals(1, pad.finished.size)
+        assertArrayEquals(pad.strokes[0], pad.finished[0], 0f)
+        var drawn = FloatArray(0)
+        pad.underPen { xy, n -> drawn = xy.copyOf(n) }
+        assertArrayEquals(pad.strokes[1], drawn, 0f)
+        pad.cancel()
+        assertFalse(changed())
+        var called = false
+        pad.underPen { _, _ -> called = true }
+        assertFalse(called)
+        pad.stroke(10, 3f, 3f, 4f, 4f)
+        assertTrue(changed())
+        pad.undo(20)
+        assertTrue(changed())
+        pad.next()
+        assertTrue(changed())
+        assertTrue(pad.finished.isEmpty())
     }
 
     @Test

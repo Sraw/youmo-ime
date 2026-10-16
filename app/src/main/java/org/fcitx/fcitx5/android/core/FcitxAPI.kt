@@ -5,6 +5,7 @@
 package org.fcitx.fcitx5.android.core
 
 import kotlinx.coroutines.flow.SharedFlow
+import org.fcitx.fcitx5.android.engine.handwriting.InkReading
 import org.fcitx.fcitx5.android.engine.host.Engines
 
 /**
@@ -96,6 +97,16 @@ interface FcitxAPI {
      * field that asks not to be learned from, told "" (not known) there.
      */
     suspend fun engineContext(before: String, learning: Boolean = true)
+
+    /**
+     * What the handwriting pad read of its [piece], shown by the Ink key sent with it in the same
+     * fcitx-thread turn: see [Engines.offerInk]. Whether the Ink key was sent: not where handwriting
+     * cannot load or is not the current input method (the engine told all the same).
+     */
+    suspend fun offerInk(reading: InkReading, piece: Int): Boolean
+
+    /** The handwriting pad's [piece] finished, told by the Ink key sent with it: see [Engines.inkFinished]; taken as [offerInk]. */
+    suspend fun inkFinished(piece: Int): Boolean
 
     suspend fun sendKey(key: String, states: UInt = 0u, code: Int = 0, up: Boolean = false, timestamp: Int = -1)
 

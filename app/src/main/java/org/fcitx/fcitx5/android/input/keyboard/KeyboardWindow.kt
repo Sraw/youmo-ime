@@ -13,14 +13,11 @@ import androidx.core.content.ContextCompat
 import androidx.transition.Slide
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.core.CapabilityFlags
-import org.fcitx.fcitx5.android.core.EngineBridge
+import org.fcitx.fcitx5.android.core.FcitxAPI
 import org.fcitx.fcitx5.android.core.InputMethodEntry
 import org.fcitx.fcitx5.android.core.InputMethodNames
-import org.fcitx.fcitx5.android.core.KeyStates
-import org.fcitx.fcitx5.android.core.KeySym
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.engine.host.Engines
-import org.fcitx.fcitx5.android.engine.host.Keyboard
 import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
 import org.fcitx.fcitx5.android.input.bar.KawaiiBarComponent
 import org.fcitx.fcitx5.android.input.broadcast.InputBroadcastReceiver
@@ -79,26 +76,20 @@ class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), Essentia
         HandwritingKeyboard.Name to {
             HandwritingKeyboard(
                 context, theme,
-                deliver = { reading, piece ->
-                    // the keyboard hidden while it was read: the input it was for is over
-                    if (!service.isInputViewShown) return@HandwritingKeyboard
-                    // the reading, then its key, in one job: the key shows what was offered just before it
-                    service.postFcitxJob {
-                        EngineBridge.offerInk(reading, piece)
-                        sendKey(KeySym(UNICODE + Keyboard.INK), KeyStates.Virtual)
-                    }
-                },
-                finished = { piece ->
-                    if (!service.isInputViewShown) return@HandwritingKeyboard
-                    // likewise: the character done, for the engine to weigh its sentence again (性能档位 high)
-                    service.postFcitxJob {
-                        EngineBridge.inkFinished(piece)
-                        sendKey(KeySym(UNICODE + Keyboard.INK), KeyStates.Virtual)
-                    }
-                },
+                deliver = { reading, piece -> ink { offerInk(reading, piece) } },
+                // the character done, for the engine to weigh its sentence again (性能档位 high)
+                finished = { piece -> ink { inkFinished(piece) } },
             )
         },
     )
+
+    // [tell] the engine of the pad, in order with the keys; the call sends the Ink key itself (Fcitx.offerInk)
+    private fun ink(tell: suspend FcitxAPI.() -> Unit) {
+        // the keyboard hidden while it was read: the input it was for is over
+        if (!service.isInputViewShown) return
+        service.postFcitxJob { tell() }
+    }
+
     private val keyboards = hashMapOf<String, BaseKeyboard>()
     private var currentKeyboardName = ""
     private var lastSymbolType: String by AppPrefs.getInstance().internal.lastSymbolLayout

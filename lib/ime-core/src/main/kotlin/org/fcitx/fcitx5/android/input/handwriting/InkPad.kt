@@ -9,8 +9,8 @@ import java.util.concurrent.atomic.AtomicInteger
 /**
  * The handwriting pad's strokes and when they are read: each stroke ended asks for the character
  * being written (a piece) to be read ([Read]); the pen up for [finishMillis] ends the piece
- * ([finish]), its ink wiped while its reading stays on show; the next stroke starts a new piece. Backspace takes the last stroke back ([undo]). Times in milliseconds, points in any one
- * unit.
+ * ([finish]), its ink wiped while its reading stays on show; the next stroke starts a new piece.
+ * Backspace takes the last stroke back ([undo]). Times in milliseconds, points in any one unit.
  *
  * Pieces are numbered, later ones higher, across pads: what a reading does to what is shown is
  * the engine's to decide, in order with the keys (HandwritingSession). The engine says which
@@ -41,8 +41,23 @@ class InkPad {
     /** The strokes of the piece being written, the one under the pen last. */
     val strokes: List<FloatArray> get() = done + listOfNotNull(current?.toArray())
 
+    /** The finished ones of [strokes], for drawing: not copied, so not to be kept. */
+    val finished: List<FloatArray> get() = done
+
+    /** Counts the changes to [finished]: what was drawn of them holds while this is the same. */
+    var edits = 0
+        private set
+
     /** Whether a stroke is being drawn. */
     val drawing: Boolean get() = current != null
+
+    /**
+     * The stroke under the pen, for drawing each frame: [each] given its x, y pairs as the first n
+     * values of xy, not copied, so not to be kept; not called where none is drawn.
+     */
+    fun underPen(each: (xy: FloatArray, n: Int) -> Unit) {
+        current?.let { each(it.xy, it.n) }
+    }
 
     /** The pen down at [x], [y]: a stroke starts. */
     fun down(x: Float, y: Float) {
@@ -58,6 +73,7 @@ class InkPad {
         val stroke = current ?: return null
         current = null
         done.add(stroke.toArray())
+        edits++
         lastUp = time
         return read()
     }
@@ -69,7 +85,8 @@ class InkPad {
 
     /**
      * At [time], whether the piece written is now done: the pen up long enough since the last
-     * stroke. Its ink is then wiped, its reading left on show, and the next stroke starts another.
+     * stroke, or since one was taken back ([undo]). Its ink is then wiped, its reading left on
+     * show, and the next stroke starts another.
      */
     fun finish(time: Long): Boolean {
         if (done.isEmpty() || current != null || time - lastUp < finishMillis) return false
@@ -80,6 +97,7 @@ class InkPad {
     /** The piece ended as it is (the pad hidden): wiped, the next stroke another's. */
     fun next() {
         done.clear()
+        edits++
         current = null
         piece = pieces.getAndIncrement()
     }
@@ -92,20 +110,25 @@ class InkPad {
     }
 
     /**
-     * Backspace: the last stroke taken back and what is left read, nothing left read as nothing;
-     * null where the pad has no stroke to take back, backspace then the engine's.
+     * Backspace at [time]: the last stroke taken back and what is left read, nothing left read as
+     * nothing; null where the pad has no stroke to take back, backspace then the engine's. The
+     * pause that ends the piece counts from [time]: the stroke taken back is often written again.
      */
-    fun undo(): Read? {
+    fun undo(time: Long): Read? {
         if (current != null || done.isEmpty()) return null
         done.removeAt(done.size - 1)
+        edits++
+        lastUp = time
         return read()
     }
 
     private fun read(): Read = Read(done.toList(), piece, ++reads)
 
     private class Points {
-        private var xy = FloatArray(INITIAL)
-        private var n = 0
+        var xy = FloatArray(INITIAL)
+            private set
+        var n = 0
+            private set
 
         fun add(x: Float, y: Float) {
             if (n + 2 > xy.size) xy = xy.copyOf(xy.size * 2)

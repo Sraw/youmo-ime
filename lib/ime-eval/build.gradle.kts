@@ -44,6 +44,8 @@ tasks.named<JavaExec>("run") {
 dependencies {
     implementation(project(":lib:ime-core"))
     testImplementation(libs.junit)
+    // the engine's handwriting test data, rather than a copy of it to drift
+    testImplementation(testFixtures(project(":lib:ime-core")))
 }
 
 tasks.withType<Test>().configureEach {
