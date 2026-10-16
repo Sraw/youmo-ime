@@ -16,7 +16,7 @@ class SplitKeyboardTest {
     @Test
     fun autoSplitsAWideScreenHeldSidewaysOnly() {
         assertTrue(SplitKeyboard.splits(Mode.AUTO, landscape = true, widthDp = 800))
-        // a small phone on its side is still wide enough; a tablet upright is not split
+        // a screen narrower on its side than a phone's is not split, nor a tablet upright
         assertFalse(SplitKeyboard.splits(Mode.AUTO, landscape = true, widthDp = 560))
         assertFalse(SplitKeyboard.splits(Mode.AUTO, landscape = false, widthDp = 800))
         assertTrue(SplitKeyboard.splits(Mode.ALWAYS, landscape = false, widthDp = 360))
@@ -55,11 +55,38 @@ class SplitKeyboardTest {
     @Test
     fun theOtherBoardsGoToASideOnlyWhileTheLettersSplit() {
         val dock = SplitKeyboard.Dock.RIGHT
-        assertEquals(dock, SplitKeyboard.side(dock, splitting = true, lettersShown = false))
-        assertEquals(SplitKeyboard.Dock.LEFT, SplitKeyboard.side(SplitKeyboard.Dock.LEFT, splitting = true, lettersShown = false))
-        assertEquals(null, SplitKeyboard.side(dock, splitting = true, lettersShown = true))
-        assertEquals(null, SplitKeyboard.side(dock, splitting = false, lettersShown = false))
-        assertEquals(null, SplitKeyboard.side(SplitKeyboard.Dock.FULL, splitting = true, lettersShown = false))
+        assertEquals(dock, SplitKeyboard.side(dock, splitting = true, lettersShown = false, widthDp = 851))
+        assertEquals(SplitKeyboard.Dock.LEFT, SplitKeyboard.side(SplitKeyboard.Dock.LEFT, splitting = true, lettersShown = false, widthDp = 851))
+        assertEquals(null, SplitKeyboard.side(dock, splitting = true, lettersShown = true, widthDp = 851))
+        assertEquals(null, SplitKeyboard.side(dock, splitting = false, lettersShown = false, widthDp = 851))
+        assertEquals(null, SplitKeyboard.side(SplitKeyboard.Dock.FULL, splitting = true, lettersShown = false, widthDp = 851))
+    }
+
+    @Test
+    fun theLayoutsPickersAndClipboardDockAndVoiceEditingAndTheLettersDoNot() {
+        for (letters in listOf(true, false)) {
+            assertTrue(SplitKeyboard.docks(SplitKeyboard.Window.OTHER_LAYOUT, lettersLast = letters))
+            assertTrue(SplitKeyboard.docks(SplitKeyboard.Window.PICKER, lettersLast = letters))
+            assertTrue(SplitKeyboard.docks(SplitKeyboard.Window.CLIPBOARD, lettersLast = letters))
+            assertFalse(SplitKeyboard.docks(SplitKeyboard.Window.LETTERS, lettersLast = letters))
+            // voice, editing, the status area
+            assertFalse(SplitKeyboard.docks(SplitKeyboard.Window.OTHER, lettersLast = letters))
+        }
+    }
+
+    @Test
+    fun theExpandedCandidatesGoAsTheBoardTheyAreOpenedFrom() {
+        assertFalse(SplitKeyboard.docks(SplitKeyboard.Window.EXPANDED_CANDIDATES, lettersLast = true))
+        assertTrue(SplitKeyboard.docks(SplitKeyboard.Window.EXPANDED_CANDIDATES, lettersLast = false))
+    }
+
+    @Test
+    fun aBoardGoesToASideOnlyWithRoomBesideIt() {
+        val dock = SplitKeyboard.Dock.RIGHT
+        // a phone upright split all the same: 320 of 360 dp at a side would leave a strip of nothing
+        assertEquals(null, SplitKeyboard.side(dock, splitting = true, lettersShown = false, widthDp = 360))
+        assertEquals(null, SplitKeyboard.side(dock, splitting = true, lettersShown = false, widthDp = 439))
+        assertEquals(dock, SplitKeyboard.side(dock, splitting = true, lettersShown = false, widthDp = 440))
     }
 
     @Test

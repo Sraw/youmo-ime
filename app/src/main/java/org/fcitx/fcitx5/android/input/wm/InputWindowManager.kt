@@ -34,7 +34,9 @@ class InputWindowManager : UniqueViewComponent<InputWindowManager, FrameLayout>(
 
     private val essentialWindows = mutableMapOf<EssentialWindow.Key, Pair<InputWindow, View?>>()
 
-    private var currentWindow: InputWindow? = null
+    /** The window shown: InputView puts the boards SplitKeyboard.Dock lists at a side while the letters split. */
+    var currentWindow: InputWindow? = null
+        private set
     private var currentView: View? = null
 
     private val disableAnimation by AppPrefs.getInstance().advanced.disableAnimation
@@ -156,11 +158,7 @@ class InputWindowManager : UniqueViewComponent<InputWindowManager, FrameLayout>(
         currentWindow = window
         // broadcast the new window was added to layout
         broadcaster.onWindowAttached(window)
-        onAttached?.invoke(window)
     }
-
-    /** Told each window attached: InputView, which puts the board at a side while the letters split. */
-    var onAttached: ((InputWindow) -> Unit)? = null
 
     override val view: FrameLayout by lazy { context.frameLayout(R.id.input_window) }
 

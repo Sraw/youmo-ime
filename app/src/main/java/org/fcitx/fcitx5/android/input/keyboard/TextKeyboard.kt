@@ -126,10 +126,10 @@ class TextKeyboard private constructor(
 
         init {
             val rows = listOf(
-                sizes.row(Layout[0].take(5), Layout[0].drop(5), GapKey),
-                sizes.row(Layout[1].take(5), Layout[1].drop(4), GapKey),
+                sizes.row(Layout[0].take(SplitKeyboard.HALF_KEYS), Layout[0].takeLast(SplitKeyboard.HALF_KEYS), GapKey),
+                sizes.row(Layout[1].take(SplitKeyboard.HALF_KEYS), Layout[1].takeLast(SplitKeyboard.HALF_KEYS), GapKey),
                 // Shift Z X C V, V B N M backspace
-                sizes.row(Layout[2].take(5), Layout[2].drop(4), GapKey),
+                sizes.row(Layout[2].take(SplitKeyboard.HALF_KEYS), Layout[2].takeLast(SplitKeyboard.HALF_KEYS), GapKey),
                 Layout[3].map { it to sizes.width(it.appearance.percentWidth) },
             )
             keys = rows.map { row -> row.map { it.first } }

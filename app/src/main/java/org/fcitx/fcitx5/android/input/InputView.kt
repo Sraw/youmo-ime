@@ -11,20 +11,13 @@ import android.graphics.Color
 import android.graphics.Point
 import android.graphics.PorterDuff
 import android.graphics.PorterDuffColorFilter
-import android.view.Gravity
-import android.widget.FrameLayout
-import org.fcitx.fcitx5.android.R
-import org.fcitx.fcitx5.android.input.keyboard.SplitDock
-import org.fcitx.fcitx5.android.input.keyboard.SplitKeyboard
-import org.fcitx.fcitx5.android.input.keyboard.TextKeyboard
-import org.fcitx.fcitx5.android.utils.borderlessRippleDrawable
-import splitties.views.dsl.core.frameLayout
-import splitties.views.imageResource
 import android.os.Build
+import android.view.Gravity
 import android.view.View
 import android.view.WindowInsets
 import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InlineSuggestionsResponse
+import android.widget.FrameLayout
 import android.widget.ImageView
 import androidx.annotation.Keep
 import androidx.annotation.RequiresApi
@@ -35,6 +28,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.isActive
+import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.core.CapabilityFlags
 import org.fcitx.fcitx5.android.core.FcitxEvent
 import org.fcitx.fcitx5.android.daemon.FcitxConnection
@@ -45,27 +39,38 @@ import org.fcitx.fcitx5.android.data.prefs.ManagedPreferenceProvider
 import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.input.bar.KawaiiBarComponent
+import org.fcitx.fcitx5.android.input.broadcast.InputBroadcastReceiver
 import org.fcitx.fcitx5.android.input.broadcast.InputBroadcaster
 import org.fcitx.fcitx5.android.input.broadcast.PreeditEmptyStateComponent
 import org.fcitx.fcitx5.android.input.broadcast.PunctuationComponent
 import org.fcitx.fcitx5.android.input.broadcast.ReturnKeyDrawableComponent
+import org.fcitx.fcitx5.android.input.candidates.expanded.window.BaseExpandedCandidateWindow
 import org.fcitx.fcitx5.android.input.candidates.horizontal.HorizontalCandidateComponent
+import org.fcitx.fcitx5.android.input.clipboard.ClipboardWindow
 import org.fcitx.fcitx5.android.input.keyboard.CommonKeyActionListener
 import org.fcitx.fcitx5.android.input.keyboard.KeyboardHeightPercentBase.DisplayMetrics
 import org.fcitx.fcitx5.android.input.keyboard.KeyboardHeightPercentBase.RealSize
 import org.fcitx.fcitx5.android.input.keyboard.KeyboardWindow
+import org.fcitx.fcitx5.android.input.keyboard.SplitDock
+import org.fcitx.fcitx5.android.input.keyboard.SplitKeyboard
+import org.fcitx.fcitx5.android.input.keyboard.TextKeyboard
+import org.fcitx.fcitx5.android.input.picker.PickerWindow
 import org.fcitx.fcitx5.android.input.picker.emojiPicker
 import org.fcitx.fcitx5.android.input.picker.emoticonPicker
 import org.fcitx.fcitx5.android.input.picker.symbolPicker
 import org.fcitx.fcitx5.android.input.popup.PopupComponent
 import org.fcitx.fcitx5.android.input.preedit.PreeditComponent
+import org.fcitx.fcitx5.android.input.wm.InputWindow
 import org.fcitx.fcitx5.android.input.wm.InputWindowManager
+import org.fcitx.fcitx5.android.utils.borderlessRippleDrawable
 import org.fcitx.fcitx5.android.utils.unset
 import org.fcitx.fcitx5.android.utils.windowManager
 import org.mechdancer.dependency.DynamicScope
+import org.mechdancer.dependency.UniqueComponent
 import org.mechdancer.dependency.manager.wrapToUniqueComponent
 import org.mechdancer.dependency.plusAssign
 import splitties.dimensions.dp
+import splitties.views.backgroundColor
 import splitties.views.dsl.constraintlayout.above
 import splitties.views.dsl.constraintlayout.below
 import splitties.views.dsl.constraintlayout.bottomOfParent
@@ -73,19 +78,17 @@ import splitties.views.dsl.constraintlayout.bottomToBottomOf
 import splitties.views.dsl.constraintlayout.centerHorizontally
 import splitties.views.dsl.constraintlayout.centerVertically
 import splitties.views.dsl.constraintlayout.constraintLayout
-import splitties.views.dsl.constraintlayout.endOfParent
-import splitties.views.dsl.constraintlayout.endToStartOf
 import splitties.views.dsl.constraintlayout.lParams
-import splitties.views.dsl.constraintlayout.startOfParent
-import splitties.views.dsl.constraintlayout.startToEndOf
 import splitties.views.dsl.constraintlayout.topOfParent
 import splitties.views.dsl.core.add
+import splitties.views.dsl.core.frameLayout
 import splitties.views.dsl.core.imageView
 import splitties.views.dsl.core.matchParent
-import splitties.views.backgroundColor
 import splitties.views.dsl.core.view
 import splitties.views.dsl.core.wrapContent
+import splitties.views.existingOrNewId
 import splitties.views.imageDrawable
+import splitties.views.imageResource
 import timber.log.Timber
 
 @SuppressLint("ViewConstructor")
@@ -109,18 +112,18 @@ class InputView(
     private val placeholderOnClickListener = OnClickListener { }
 
     // the empty side of a board put at the other (SplitKeyboard.Dock): a button moves it across
-    private fun moveButton(to: SplitDock, icon: Int) = imageView {
+    private fun moveButton(to: SplitDock, icon: Int, description: Int) = imageView {
         imageResource = icon
         colorFilter = PorterDuffColorFilter(theme.altKeyTextColor, PorterDuff.Mode.SRC_IN)
         background = borderlessRippleDrawable(theme.keyPressHighlightColor)
         scaleType = ImageView.ScaleType.CENTER
-        contentDescription = context.getString(R.string.split_dock_move)
+        contentDescription = context.getString(description)
         visibility = GONE
         setOnClickListener { ThemeManager.prefs.splitDock.setValue(to) }
     }
 
-    private val moveLeft = moveButton(SplitDock.Left, R.drawable.ic_baseline_arrow_back_24)
-    private val moveRight = moveButton(SplitDock.Right, R.drawable.ic_baseline_arrow_forward_24)
+    private val moveLeft = moveButton(SplitDock.Left, R.drawable.ic_baseline_arrow_back_24, R.string.split_dock_move_left)
+    private val moveRight = moveButton(SplitDock.Right, R.drawable.ic_baseline_arrow_forward_24, R.string.split_dock_move_right)
 
     // use clickable view as padding, so MotionEvent can be split to padding view and keyboard view
     private val leftPaddingSpace = frameLayout {
@@ -304,14 +307,15 @@ class InputView(
                 below(preedit.ui.root)
                 // start and end set in updateKeyboardSize
             })
+            // left and right, not start and end: a board docked right is on the right in any locale
             add(leftPaddingSpace, lParams {
                 below(kawaiiBar.view)
-                startOfParent()
+                leftToLeft = LayoutParams.PARENT_ID
                 bottomOfParent()
             })
             add(rightPaddingSpace, lParams {
                 below(kawaiiBar.view)
-                endOfParent()
+                rightToRight = LayoutParams.PARENT_ID
                 bottomOfParent()
             })
             add(windowManager.view, lParams {
@@ -322,15 +326,15 @@ class InputView(
                  */
             })
             add(bottomPaddingSpace, lParams {
-                startToEndOf(leftPaddingSpace)
-                endToStartOf(rightPaddingSpace)
+                leftToRight = leftPaddingSpace.existingOrNewId
+                rightToLeft = rightPaddingSpace.existingOrNewId
                 bottomOfParent()
             })
         }
 
         updateKeyboardSize()
         // the board at a side or across, as it changes, while the letters split: once laid out
-        windowManager.onAttached = { updateKeyboardSize() }
+        scope += DockFollower()
         keyboardWindow.onLayoutShown = { updateKeyboardSize() }
 
         add(keyboardView, lParams(matchParent, wrapContent) {
@@ -347,15 +351,32 @@ class InputView(
         ThemeManager.prefs.splitDock.registerOnChangeListener(onSplitDockChangeListener)
     }
 
+    // told each window attached, by the broadcaster: added once the views it places are laid out
+    private inner class DockFollower : UniqueComponent<DockFollower>(), InputBroadcastReceiver {
+        override fun onWindowAttached(window: InputWindow) = updateKeyboardSize()
+    }
+
+    // what updateKeyboardSize placed the views for last: each change of window or layout asks again
+    private var placed: List<Int?>? = null
+
     private fun updateKeyboardSize() {
+        val sidePadding = keyboardSidePaddingPx
+        val side = dockSide()
+        val placing = listOf(
+            keyboardHeightPx,
+            keyboardBottomPaddingPx,
+            sidePadding,
+            side?.ordinal,
+            dp(SplitKeyboard.dockWidth(TextKeyboard.widthDp(context))),
+        )
+        if (placing == placed) return
+        placed = placing
         windowManager.view.updateLayoutParams {
             height = keyboardHeightPx
         }
         bottomPaddingSpace.updateLayoutParams {
             height = keyboardBottomPaddingPx
         }
-        val sidePadding = keyboardSidePaddingPx
-        val side = dockSide()
         placeBoard(side, sidePadding)
         placeBar(side, sidePadding)
     }
@@ -371,32 +392,33 @@ class InputView(
             it.visibility = if (sidePadding == 0 && (side == null || it === near)) GONE else VISIBLE
             it.updateLayoutParams<LayoutParams> {
                 width = sidePadding
-                startToEnd = unset
-                endToStart = unset
+                leftToRight = unset
+                rightToLeft = unset
             }
         }
         windowManager.view.updateLayoutParams<LayoutParams> {
-            startToEnd = unset
-            endToStart = unset
-            startToStart = unset
-            endToEnd = unset
+            leftToRight = unset
+            rightToLeft = unset
+            leftToLeft = unset
+            rightToRight = unset
             width = if (side == null) 0 else dp(SplitKeyboard.dockWidth(TextKeyboard.widthDp(context)))
             when {
                 side == null && sidePadding == 0 -> {
-                    startOfParent()
-                    endOfParent()
+                    leftToLeft = LayoutParams.PARENT_ID
+                    rightToRight = LayoutParams.PARENT_ID
                 }
                 side == null -> {
-                    startToEndOf(leftPaddingSpace)
-                    endToStartOf(rightPaddingSpace)
+                    leftToRight = leftPaddingSpace.existingOrNewId
+                    rightToLeft = rightPaddingSpace.existingOrNewId
                 }
-                side == SplitKeyboard.Dock.RIGHT -> if (sidePadding == 0) endOfParent() else endToStartOf(near)
-                else -> if (sidePadding == 0) startOfParent() else startToEndOf(near)
+                side == SplitKeyboard.Dock.RIGHT ->
+                    if (sidePadding == 0) rightToRight = LayoutParams.PARENT_ID else rightToLeft = near.existingOrNewId
+                else -> if (sidePadding == 0) leftToLeft = LayoutParams.PARENT_ID else leftToRight = near.existingOrNewId
             }
         }
         if (side != null) far.updateLayoutParams<LayoutParams> {
             width = 0
-            if (side == SplitKeyboard.Dock.RIGHT) endToStartOf(windowManager.view) else startToEndOf(windowManager.view)
+            if (side == SplitKeyboard.Dock.RIGHT) rightToLeft = windowManager.view.id else leftToRight = windowManager.view.id
         }
     }
 
@@ -406,15 +428,15 @@ class InputView(
         // the row of the code being typed goes with the bar under it
         for (bar in listOf(barBackground, preedit.ui.root, kawaiiBar.view)) {
             bar.updateLayoutParams<LayoutParams> {
-                startToStart = unset
-                endToEnd = unset
+                leftToLeft = unset
+                rightToRight = unset
                 width = 0
                 if (side == null) {
-                    startOfParent()
-                    endOfParent()
+                    leftToLeft = LayoutParams.PARENT_ID
+                    rightToRight = LayoutParams.PARENT_ID
                 } else {
-                    startToStart = windowManager.view.id
-                    endToEnd = windowManager.view.id
+                    leftToLeft = windowManager.view.id
+                    rightToRight = windowManager.view.id
                 }
             }
             bar.setPadding(padding, 0, padding, 0)
@@ -423,8 +445,17 @@ class InputView(
 
     /** The side the board shown goes to, while the letters split, or null for the whole width. */
     private fun dockSide(): SplitKeyboard.Dock? {
-        val lettersShown = windowManager.isAttached(keyboardWindow) && keyboardWindow.lettersShown
-        return SplitKeyboard.side(ThemeManager.prefs.splitDock.getValue().dock, TextKeyboard.splits(context), lettersShown)
+        val letters = keyboardWindow.lettersShown
+        val kind = when (windowManager.currentWindow) {
+            keyboardWindow -> if (letters) SplitKeyboard.Window.LETTERS else SplitKeyboard.Window.OTHER_LAYOUT
+            is PickerWindow -> SplitKeyboard.Window.PICKER
+            is ClipboardWindow -> SplitKeyboard.Window.CLIPBOARD
+            is BaseExpandedCandidateWindow<*> -> SplitKeyboard.Window.EXPANDED_CANDIDATES
+            else -> SplitKeyboard.Window.OTHER
+        }
+        val docks = SplitKeyboard.docks(kind, lettersLast = letters)
+        val dock = ThemeManager.prefs.splitDock.getValue().dock
+        return SplitKeyboard.side(dock, TextKeyboard.splits(context), lettersShown = !docks, TextKeyboard.widthDp(context))
     }
 
     override fun onApplyWindowInsets(insets: WindowInsets): WindowInsets {

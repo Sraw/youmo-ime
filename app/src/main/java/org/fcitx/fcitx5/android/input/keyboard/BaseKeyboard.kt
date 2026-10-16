@@ -105,11 +105,11 @@ abstract class BaseKeyboard(
 
     init {
         isMotionEventSplittingEnabled = true
-        keyRows = keyLayout.mapIndexed { r, row ->
+        keyRows = keyLayout.mapIndexed { rowIndex, row ->
             // room between a split keyboard's halves: nothing to touch (a plain view takes no touch, and
             // findTouchTarget, vivo's, finds key views only)
             val keyViews = row.map { if (it === GapKey) View(context) else createKeyView(it) }
-            val widths = keyWidths?.get(r) ?: row.map { it.appearance.percentWidth }
+            val widths = keyWidths?.get(rowIndex) ?: row.map { it.appearance.percentWidth }
             constraintLayout Row@{
                 isMotionEventSplittingEnabled = true
                 var totalWidth = 0f
@@ -139,13 +139,14 @@ abstract class BaseKeyboard(
                 // a split row fills the keyboard by itself (SplitKeyboard.row)
                 if (expandKeypressArea && keyWidths == null && totalWidth < 1f) {
                     val free = (1f - totalWidth) / 2f
-                    (keyViews.first() as KeyView).apply {
+                    // a gap at an edge is no key to widen
+                    (keyViews.first() as? KeyView)?.apply {
                         updateLayoutParams<LayoutParams> {
                             matchConstraintPercentWidth += free
                         }
                         layoutMarginLeft = free / (widths.first() + free)
                     }
-                    (keyViews.last() as KeyView).apply {
+                    (keyViews.last() as? KeyView)?.apply {
                         updateLayoutParams<LayoutParams> {
                             matchConstraintPercentWidth += free
                         }

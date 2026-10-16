@@ -563,6 +563,9 @@
     <string name="split_dock_right">靠右</string>
     <string name="split_dock_left">靠左</string>
     <string name="split_dock_full">铺满</string>
-    <string name="split_dock_move">移到另一边</string>
+    <string name="split_dock_move_left">移到左边</string>
+    <string name="split_dock_move_right">移到右边</string>
     <string name="show_touch_keyboard">显示屏幕键盘</string>
+    <string name="hardware_switch_shortcuts">实体键盘快捷键</string>
+    <string name="hardware_switch_shortcuts_summary">单按 Shift 或 Ctrl+空格切换中英，Ctrl+Shift 轮流切换输入法</string>
 </resources>

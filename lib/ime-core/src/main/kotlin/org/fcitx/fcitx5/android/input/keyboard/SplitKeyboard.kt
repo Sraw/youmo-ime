@@ -59,12 +59,34 @@ object SplitKeyboard {
     fun dockWidth(widthDp: Int): Int =
         (widthDp * DOCK_SHARE).toInt().coerceIn(DOCK_MIN_DP, DOCK_MAX_DP).coerceAtMost(widthDp)
 
+    /** The room a board at a side leaves beside it at least, in dp, the arrow moving it across in it. */
+    const val DOCK_MIN_FREE_DP = 120
+
     /**
      * The side the board shown goes to, as [dock] says, or null for the whole width: the letters
-     * themselves ([lettersShown]) take it, split, as everything does when they are not ([splitting]).
+     * themselves ([lettersShown]) take it, split, as everything does when they are not ([splitting]),
+     * and on a keyboard [widthDp] wide that a board at a side would all but fill (a phone upright
+     * split all the same, [Mode.ALWAYS]: 320 of 360 dp, a strip of nothing beside it).
      */
-    fun side(dock: Dock, splitting: Boolean, lettersShown: Boolean): Dock? =
-        dock.takeIf { splitting && !lettersShown && it != Dock.FULL }
+    fun side(dock: Dock, splitting: Boolean, lettersShown: Boolean, widthDp: Int): Dock? {
+        if (!splitting || lettersShown || dock == Dock.FULL) return null
+        return dock.takeIf { widthDp - dockWidth(widthDp) >= DOCK_MIN_FREE_DP }
+    }
+
+    /** The kinds of window the keyboard shows, as far as where they go while the letters split. */
+    enum class Window { LETTERS, OTHER_LAYOUT, PICKER, CLIPBOARD, EXPANDED_CANDIDATES, OTHER }
+
+    /**
+     * Whether [window] goes to a side while the letters split: the other layouts, the pickers and
+     * the clipboard do; the expanded candidates go as the board they are opened from, docked when it
+     * was not the letters ([lettersLast]), so they neither widen nor narrow it; voice, editing and
+     * the status area ([Window.OTHER]) take the whole width, as the letters they are opened from.
+     */
+    fun docks(window: Window, lettersLast: Boolean): Boolean = when (window) {
+        Window.OTHER_LAYOUT, Window.PICKER, Window.CLIPBOARD -> true
+        Window.EXPANDED_CANDIDATES -> !lettersLast
+        Window.LETTERS, Window.OTHER -> false
+    }
 
     /** How the keyboard splits on a screen [widthDp] wide. */
     class Sizes(widthDp: Int) {

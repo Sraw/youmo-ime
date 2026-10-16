@@ -163,6 +163,18 @@ class ThemeFragment : Fragment() {
      * whole size, which left the space a preview at full size would.
      */
     private class HalfSizeBox(context: Context) : FrameLayout(context) {
+        init {
+            // exactly the scaled preview's size: clipped to it, the preview's elevation shadow was cut off
+            clipChildren = false
+        }
+
+        override fun onAttachedToWindow() {
+            super.onAttachedToWindow()
+            // the shadow is drawn in this box's own display list, which its parent clips to the box's
+            // bounds: the gap around it is in the parent, so the parent must not clip either
+            (parent as? ViewGroup)?.clipChildren = false
+        }
+
         override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
             val child = getChildAt(0)
             child.measure(MeasureSpec.UNSPECIFIED, MeasureSpec.UNSPECIFIED)
