@@ -60,7 +60,8 @@ measuring only), `pinyin-new` (new words), `pinyin-collide` (a common word that 
 one), `pinyin-context`, `pinyin-slips`, `pinyin-mixed`, `shuangpin-xiaohe`, `predict/`,
 `english.txt`. Other commands: `predict` (联想), `english`, `learn` (what learning brings back and
 costs), `ksc` (keystrokes), `t9` (a set turned into digits, then read with `pinyin --scheme
-t9-strict`, as the app types it), `tune` (penalties), `score` (compare a result with a baseline);
+t9-strict`, as the app types it; `--presses fast` presses a key again as 连按 hands it on, `letters`
+spells each letter by 连按: the sets `Penalties.tapped` is measured on), `tune` (penalties), `score` (compare a result with a baseline);
 run `ime-eval` with no arguments for the full usage.
 
 Report top-1 (and the change in samples won and lost) on at least the main, web, chat and new sets,

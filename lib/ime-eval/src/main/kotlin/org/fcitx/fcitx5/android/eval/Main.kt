@@ -110,9 +110,9 @@ internal val COMMANDS = listOf(
         val (scheme, setPath, outPath) = args.operands
         if (scheme in ShuangpinSet.SCHEMES) writeShuangpinSet(scheme, setPath, outPath, out) else null
     },
-    Command("t9", "<set.tsv> <t9-set.tsv>", 2..2) { args, out, _ ->
+    Command("t9", "<set.tsv> <t9-set.tsv> [--presses once|fast|letters]", 2..2, "presses") { args, out, _ ->
         val (setPath, outPath) = args.operands
-        writeT9Set(setPath, outPath, out)
+        writeT9Set(setPath, outPath, T9Set.Presses.of(args.options["presses"] ?: "once")!!, out)
     },
     Command("slips", "<set.tsv> <slip-set.tsv>", 2..2) { args, out, _ ->
         val (setPath, outPath) = args.operands
@@ -252,6 +252,7 @@ private fun optionsValid(options: Map<String, String>): Boolean {
     val scheme = options["scheme"]
     return listOf(
         valid("half") { it in Halves.NAMES },
+        valid("presses") { T9Set.Presses.of(it) != null },
         valid("scheme") { it == NO_LATIN || it in ShuangpinSet.SCHEMES || it in T9Set.SCHEMES },
         valid("fuzzy") { fuzzyPairs(it) != null },
         valid("preset") { it in TableRun.PRESETS },
@@ -425,10 +426,10 @@ private fun writeSet(outPath: String, header: String, samples: List<Sample>) {
     }
 }
 
-private fun writeT9Set(setPath: String, outPath: String, out: Appendable): Int {
+private fun writeT9Set(setPath: String, outPath: String, presses: T9Set.Presses, out: Appendable): Int {
     val samples = readSet(setPath)
-    val converted = T9Set.convert(samples)
-    writeSet(outPath, "$setPath typed on the nine keys by `t9`; samples without one exact reading left out", converted)
+    val converted = T9Set.convert(samples, presses)
+    writeSet(outPath, "$setPath typed on the nine keys by `t9`, keys pressed ${presses.option}; samples without one exact reading left out", converted)
     out.appendLine("${converted.size} of ${samples.size} samples typed on the nine keys")
     return 0
 }
