@@ -55,7 +55,7 @@ class WordLists(private val dir: File?, private val onError: (IOException) -> Un
 
     /** Lists the added words in [model], and blocks the blocked ones there. */
     fun applyTo(model: UserModel) {
-        added.forEach { model.list(it) }
+        added.forEach { model.listByHand(it) }
         blocked.forEach { model.block(it) }
     }
 

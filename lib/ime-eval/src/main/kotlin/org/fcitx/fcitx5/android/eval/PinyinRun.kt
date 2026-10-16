@@ -55,10 +55,17 @@ class PinyinRun(
     private val refiner: (() -> SentenceRefiner)? = null,
 ) {
     // the user model is read only when scoring, by then made
-    private val prior: LayerPrior? = layers?.let { spec -> LayerPrior.parse(data.layers, spec, listOfNotNull(pack?.layer)) { id -> user?.layerOf(id) ?: -1 } }
+    private val prior: LayerPrior? = layers?.let { spec ->
+        // as UserLexicon's: both through the user model, its words mapped to the model's as it scores them
+        val extra = object : LayerPrior.PackLayers {
+            override fun layerOf(word: Int) = user?.layerOf(word) ?: -1
+            override fun modelWord(word: Int) = user?.modelWord(word) ?: word
+        }
+        LayerPrior.parse(data.layers, spec, listOfNotNull(pack?.layer), extra)
+    }
     private val user: UserModel? = pack?.let { p ->
         val layer = prior?.layer(p.layer) ?: 1
-        UserModel(data.dictionary, data.vocabulary).also { u -> p.words.forEach { u.list(it.entry, it.score, layer, data.model.vocabularySize) } }
+        UserModel(data.dictionary, data.vocabulary, index = data.wordIndex).also { u -> p.words.forEach { u.list(it.entry, it.score, layer, data.model.vocabularySize) } }
     }
     // as the app's session has them
     private val coarse = CoarseWords.of({ data.wordIndex.find(it) })

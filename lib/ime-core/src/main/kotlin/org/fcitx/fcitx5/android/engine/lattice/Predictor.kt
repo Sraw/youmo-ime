@@ -53,8 +53,10 @@ class Predictor(
         val typed = HashMap<Int, Float>()
         user?.forEachAfter(prev) { word -> typed[word] = userWeight * user.probability(prev, word) }
         val best = Best(limit)
-        // a word the model lacks (the user's own, say) would get the followers of <unk>
-        var context = if (prev < model.vocabularySize) model.context(prev2, prev) else NO_CONTEXT
+        // the words as the model has them (UserScorer's rule); typed above keeps the user's prev. A
+        // word the model lacks (the user's own, say) would get the followers of <unk>
+        val modelPrev = user?.modelWord(prev) ?: prev
+        var context = if (modelPrev < model.vocabularySize) model.context(user?.modelWord(prev2) ?: prev2, modelPrev) else NO_CONTEXT
         if (context != NO_CONTEXT && !offerFollowers(context, typed, best)) context = NO_CONTEXT
         if (context == NO_CONTEXT) {
             val end = tail()
@@ -63,10 +65,12 @@ class Predictor(
                 offerFollowers(context, typed, best)
             }
         }
-        // typed after prev, and not among the model's words after it
+        // typed after prev, and not among the model's words after it: one of the user's the model has
+        // the text of (UserScorer's rule) gains the model's probability of it, as the context does
         for ((word, p) in typed) {
             if (p <= 0f || !offered(word)) continue
-            val base = if (context != NO_CONTEXT && word < model.vocabularySize) 10f.pow(model.scoreAfter(context, word)) else 0f
+            val modelWord = user?.modelWord(word) ?: word
+            val base = if (context != NO_CONTEXT && modelWord < model.vocabularySize) 10f.pow(model.scoreAfter(context, modelWord)) else 0f
             best.offer(word, minOf(0f, log10(base + p)))
         }
         return best.candidates()
@@ -90,29 +94,44 @@ class Predictor(
         return any
     }
 
-    /** The [limit] best words offered, best first. */
+    /** The [limit] best words offered, best first, a text once. */
     private inner class Best(private val limit: Int) {
         private val words = IntArray(limit)
+        private val texts = arrayOfNulls<String>(limit)
         private val scores = FloatArray(limit)
         private var size = 0
 
         fun takes(score: Float) = size < limit || score > scores[size - 1]
 
+        // a word of the user's may be written as one of the dictionary's, read otherwise (银行 as yin
+        // xing, 再 typed as ce): one text takes one place, at the higher score, so limit words are offered
         fun offer(word: Int, score: Float) {
             if (!takes(score)) return
+            val text = textOf(word)
+            val same = (0 until size).firstOrNull { texts[it] == text }
+            if (same != null) {
+                if (scores[same] >= score) return
+                for (j in same until size - 1) {
+                    words[j] = words[j + 1]
+                    texts[j] = texts[j + 1]
+                    scores[j] = scores[j + 1]
+                }
+                size--
+            }
             var k = minOf(size, limit - 1)
             while (k > 0 && scores[k - 1] < score) {
                 words[k] = words[k - 1]
+                texts[k] = texts[k - 1]
                 scores[k] = scores[k - 1]
                 k--
             }
             words[k] = word
+            texts[k] = text
             scores[k] = score
             if (size < limit) size++
         }
 
-        // a word of the user's may be written as one of the dictionary's, read otherwise (银行 as yin xing)
-        fun candidates() = List(size) { Candidate(textOf(words[it]), 0, scores[it], intArrayOf(words[it]), intArrayOf(0)) }.distinctBy { it.text }
+        fun candidates() = List(size) { Candidate(texts[it]!!, 0, scores[it], intArrayOf(words[it]), intArrayOf(0)) }
     }
 
     /**
@@ -138,7 +157,7 @@ class Predictor(
 
     /**
      * The syllables [word] is likeliest read as, to learn, forget or block it as a prediction:
-     * as the user typed it if they did, which is how it was learned, else the dictionary's
+     * as the user typed it if they still have it, which is how it was learned, else the dictionary's
      * reading of highest weight; null for a word neither reads.
      */
     fun reading(word: Int): IntArray? {

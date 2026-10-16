@@ -82,11 +82,18 @@ internal class UserLexicon(
     private var layerPrior: LayerPrior? = null
 
     /** Learned with the user model, and kept in its log; one for the life of the engine. */
-    fun prior(): LayerPrior = layerPrior ?: LayerPrior(pinyinData.layers, extra = { id -> userModel?.layerOf(id) ?: -1 }).also { layerPrior = it }
+    fun prior(): LayerPrior = layerPrior ?: LayerPrior(pinyinData.layers, extra = packLayers).also { layerPrior = it }
 
-    // the dictionaries' words go in as words the user added, uncounted: scored as the model's
-    // unknown word until picked, and not kept in the log unless picked
-    fun user(): UserModel = userModel ?: UserModel(pinyinData.dictionary, pinyinData.vocabulary).also { model ->
+    // the model of the moment's, as the prior outlives it
+    private val packLayers = object : LayerPrior.PackLayers {
+        override fun layerOf(word: Int) = userModel?.layerOf(word) ?: -1
+        override fun modelWord(word: Int) = userModel?.modelWord(word) ?: word
+    }
+
+    // the dictionaries' words go in listed, uncounted: scored as the model's unknown word until
+    // picked, and not kept in the log unless picked. The words added by hand are the user's choice:
+    // scored as the model's word of their text from the start (UserModel.modelWord)
+    fun user(): UserModel = userModel ?: UserModel(pinyinData.dictionary, pinyinData.vocabulary, index = pinyinData.wordIndex).also { model ->
         userModel = model
         newlyListed.clear()
         if (userDir != null) {
@@ -142,7 +149,7 @@ internal class UserLexicon(
         for (entry in newlyAdded) {
             val model = userModel ?: break
             val listings = model.listings
-            model.list(entry)
+            model.listByHand(entry)
             // listed now: the tables code it alone (see shared)
             if (model.listings > listings) newlyListed += entry.text
         }
@@ -204,6 +211,8 @@ internal class UserLexicon(
         val listedThem = userModel != null
         val removed = lists.removeAll(entries)
         if (removed.isEmpty()) return
+        // with no log the model is kept: no longer scored as the model's word
+        removed.forEach { userModel?.unlistByHand(it) }
         selfMade(removed)?.let { (back, texts) ->
             // and a table's pick of one is read back as its saved phrase
             if (texts.isNotEmpty()) forgetInTables(texts)

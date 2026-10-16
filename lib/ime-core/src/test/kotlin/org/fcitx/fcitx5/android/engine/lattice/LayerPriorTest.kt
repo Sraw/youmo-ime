@@ -7,6 +7,7 @@ package org.fcitx.fcitx5.android.engine.lattice
 import org.fcitx.fcitx5.android.engine.data.PinyinData
 import org.fcitx.fcitx5.android.engine.data.PinyinDataBuilder
 import org.fcitx.fcitx5.android.engine.pinyin.Syllables
+import org.fcitx.fcitx5.android.engine.user.UserModel
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertThrows
@@ -111,6 +112,58 @@ class LayerPriorTest {
         assertFalse(prior.restore("base", 1f))
         // a pack that puts a word of the dictionary's places in the base: the base's, as the pack scores it
         assertEquals(0f, LayerPrior.parse(data.layers, "places=2.5", extra = { if (it == daziPal) 0 else -1 }).of(daziPal), 0f)
+    }
+
+    @Test
+    fun aWordOfTheUsersMappedToTheModelsTakesThatWordsLayer() {
+        // 搭子 a word of the model's here, in places
+        val d = PinyinData.load(
+            ByteBuffer.wrap(
+                PinyinDataBuilder()
+                    .layers(listOf("base", "places"))
+                    .unigram("<unk>", -7f, 0f)
+                    .unigram("搭子", -3f, 0f)
+                    .entry("搭子", intArrayOf(Syllables.id("da"), Syllables.id("zi")), layer = 1)
+                    .build().toByteArray()
+            )
+        )
+        val user = UserModel(d.dictionary, d.vocabulary, index = d.wordIndex)
+        val prior = LayerPrior.parse(d.layers, "places=2.5", extra = user)
+        // added by hand at a reading the dictionary lacks: scored as the model's 搭子, so of its layer
+        val byHand = user.listByHand(UserModel.Entry("搭子", intArrayOf(Syllables.id("da"), Syllables.id("zhi"))))
+        assertTrue(byHand >= d.vocabulary.size)
+        assertEquals(2.5f, prior.of(byHand), 0f)
+        // only imported: the unknown word, of the base
+        val imported = user.list(UserModel.Entry("搭子", intArrayOf(Syllables.id("ta"), Syllables.id("zi"))))
+        assertEquals(0f, prior.of(imported), 0f)
+        // picked over a word of the base: places goes up
+        val learning = LayerPrior(d.layers, step = 0.25f, bound = 1f, extra = user)
+        assertTrue(learning.learn(intArrayOf(byHand), intArrayOf(imported)))
+        assertEquals(0.25f, learning[1], 0f)
+    }
+
+    @Test
+    fun aPacksWordTheUserChoseAtANewReadingTakesTheModelWordsLayer() {
+        val d = PinyinData.load(
+            ByteBuffer.wrap(
+                PinyinDataBuilder()
+                    .layers(listOf("base", "places"))
+                    .unigram("<unk>", -7f, 0f)
+                    .unigram("搭子", -3f, 0f)
+                    .entry("搭子", intArrayOf(Syllables.id("da"), Syllables.id("zi")), layer = 1)
+                    .build().toByteArray()
+            )
+        )
+        val user = UserModel(d.dictionary, d.vocabulary, index = d.wordIndex)
+        val prior = LayerPrior.parse(d.layers, "places=2.5,new=1", listOf("new"), extra = user)
+        val new = prior.layer("new")
+        val entry = UserModel.Entry("搭子", intArrayOf(Syllables.id("da"), Syllables.id("zhi")))
+        val packed = user.list(entry, -5f, new, d.model.vocabularySize)
+        // only listed by the pack: the pack's layer
+        assertEquals(1f, prior.of(packed), 0f)
+        // picked: scored as the model's 搭子, so of its layer
+        user.learn(null, listOf(entry))
+        assertEquals(2.5f, prior.of(packed), 0f)
     }
 
     @Test

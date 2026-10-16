@@ -43,6 +43,9 @@ class LayerPrior(
     /** Gives [extra]'s answer: an interface of its own, as an (Int) -> Int boxes the id of every word scored. */
     fun interface PackLayers {
         fun layerOf(word: Int): Int
+
+        /** The model's word [word] is scored as: a word of the user's mapped so takes that word's layer. */
+        fun modelWord(word: Int): Int = word
     }
 
     var journal: Journal? = null
@@ -57,8 +60,11 @@ class LayerPrior(
     fun of(word: Int): Float = values[layerOf(word)]
 
     private fun layerOf(word: Int): Int {
-        // a pack's word is the pack's layer even when the dictionary has it in a layer of its own,
-        // as it is the pack that scores it then
+        // a word the user chose, scored as the model's of its text, is that word's layer, a pack's
+        // word too; else a pack's word is the pack's layer even when the dictionary has it in a
+        // layer of its own, as it is the pack that scores it then
+        val model = extra.modelWord(word)
+        if (model != word) return layers.layer(model)
         val packed = extra.layerOf(word)
         return if (packed >= 0) packed else layers.layer(word)
     }

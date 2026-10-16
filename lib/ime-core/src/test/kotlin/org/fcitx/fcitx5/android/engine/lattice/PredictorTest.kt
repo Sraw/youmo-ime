@@ -14,6 +14,8 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.nio.ByteBuffer
+import kotlin.math.log10
+import kotlin.math.pow
 
 class PredictorTest {
 
@@ -167,6 +169,35 @@ class PredictorTest {
     }
 
     @Test
+    fun aWordOfTheUsersChosenAtAReadingOfTheirOwnIsTheModelsWordAsContext() {
+        val user = UserModel(data.dictionary, data.vocabulary, index = data.wordIndex)
+        val predicting = Predictor(data.model, data.vocabulary, data.dictionary, user)
+        // added by hand at readings the dictionary lacks: what follows 你, and 我 再 as the context of 见
+        val nin = user.listByHand(Entry("你", syl("nin")))
+        val o = user.listByHand(Entry("我", syl("o")))
+        assertTrue(nin >= data.vocabulary.size && o >= data.vocabulary.size)
+        assertEquals(texts(predictor.predict(NO_WORD, id("你"))), texts(predicting.predict(NO_WORD, nin)))
+        val trigram = predictor.predict(id("我"), id("再"))
+        assertEquals(trigram.map { it.text to it.score }, predicting.predict(o, id("再")).map { it.text to it.score })
+        // only imported, never picked: not the model's 你 yet, so nothing follows it
+        val nian = user.list(Entry("你", syl("nian")))
+        assertEquals(emptyList<String>(), texts(predicting.predict(NO_WORD, nian)))
+    }
+
+    @Test
+    fun aWordForgottenIsReadAsTheDictionaryReadsItNotAsItWasLearned() {
+        val user = UserModel(data.dictionary, data.vocabulary)
+        val predicting = Predictor(data.model, data.vocabulary, data.dictionary, user)
+        val xian = Entry("见", syl("xian"))
+        user.learn(null, listOf(xian))
+        assertEquals(syl("xian").toList(), predicting.reading(id("见"))?.toList())
+        // picked from 联想 after, it is learned at the dictionary's reading, not the one forgotten
+        user.forget(listOf(xian))
+        assertEquals(predictor.reading(id("见"))?.toList(), predicting.reading(id("见"))?.toList())
+        assertEquals(syl("jian").toList(), predicting.reading(id("见"))?.toList())
+    }
+
+    @Test
     fun aWordIsReadAsTheDictionaryReadsItBest() {
         assertEquals(syl("zai", "jian").toList(), predictor.reading(id("再见"))?.toList())
         assertEquals(syl("ni").toList(), predictor.reading(id("你"))?.toList())
@@ -174,7 +205,7 @@ class PredictorTest {
         assertEquals(null, predictor.reading(id("吗")))
         assertEquals(null, Predictor(data.model, data.vocabulary).reading(id("你")))
         val user = UserModel(data.dictionary, data.vocabulary)
-        val own = user.id(Entry("见你", syl("jian", "ni")))
+        val own = user.learn(null, listOf(Entry("见你", syl("jian", "ni")))).single()
         val predicting = Predictor(data.model, data.vocabulary, data.dictionary, user)
         assertEquals(syl("jian", "ni").toList(), predicting.reading(own)?.toList())
         // one the user typed is read as they typed it, 见 as xian
@@ -210,11 +241,46 @@ class PredictorTest {
     }
 
     @Test
+    fun whatTheUserTypedOfAModelsWordAtAReadingOfTheirOwnAddsToTheModelsProbability() {
+        val user = UserModel(data.dictionary, data.vocabulary, index = data.wordIndex)
+        val predicting = Predictor(data.model, data.vocabulary, data.dictionary, user, userWeight = 0.01f)
+        // 再 typed after 我 at a reading the dictionary lacks: the model's 再, its -0.5 there and the user's share summed
+        val ce = user.learn(null, listOf(Entry("我", syl("wo")), Entry("再", syl("ce"))))[1]
+        assertTrue(ce >= data.vocabulary.size)
+        val model = predictor.predict(NO_WORD, id("我")).first { it.text == "再" }.score
+        val expected = log10(10f.pow(model) + 0.01f * user.probability(id("我"), ce))
+        assertEquals(expected, predicting.predict(NO_WORD, id("我")).first { it.text == "再" }.score, 1e-6f)
+    }
+
+    @Test
     fun aTextIsOfferedOnceThoughTheUserReadItOtherwise() {
         val user = UserModel(data.dictionary, data.vocabulary)
         val predicting = Predictor(data.model, data.vocabulary, data.dictionary, user)
         user.learn(null, listOf(Entry("我", syl("wo")), Entry("再", syl("ce"))))
         assertEquals(listOf("再"), texts(predicting.predict(NO_WORD, id("我"))))
+    }
+
+    @Test
+    fun aTextTheUserTypedAtAReadingOfTheirOwnTakesOnePlace() {
+        val user = UserModel(data.dictionary, data.vocabulary, index = data.wordIndex)
+        val predicting = Predictor(data.model, data.vocabulary, data.dictionary, user)
+        // 好 typed after 你 at a reading the dictionary lacks: the model's 好 too, yet one place of two
+        val hao = user.learn(null, listOf(Entry("你", syl("ni")), Entry("好", syl("hao"))))[1]
+        assertTrue(hao >= data.vocabulary.size)
+        assertEquals(listOf("好", "吗"), texts(predicting.predict(NO_WORD, id("你"), limit = 2)))
+    }
+
+    // typed at two readings of the user's, one text takes one place, as the more typed of them,
+    // whichever is offered first (the other then drops, or is replaced)
+    @Test
+    fun aTextTypedAtTwoReadingsTakesOnePlaceAsTheMoreTyped() {
+        val user = UserModel(data.dictionary, data.vocabulary, index = data.wordIndex)
+        val predicting = Predictor(data.model, data.vocabulary, data.dictionary, user)
+        val hao = (1..2).map { user.learn(null, listOf(Entry("你", syl("ni")), Entry("好", syl("hao"))))[1] }.last()
+        user.learn(null, listOf(Entry("你", syl("ni")), Entry("好", syl("hai"))))
+        val offered = predicting.predict(NO_WORD, id("你"), limit = 2)
+        assertEquals(listOf("好", "吗"), texts(offered))
+        assertEquals(hao, offered[0].words.single())
     }
 
     /** 小穴 was predicted after 妈妈的. */

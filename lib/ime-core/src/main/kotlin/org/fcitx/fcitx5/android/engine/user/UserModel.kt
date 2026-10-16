@@ -7,6 +7,8 @@ package org.fcitx.fcitx5.android.engine.user
 import org.fcitx.fcitx5.android.engine.data.NgramModel.Companion.NO_WORD
 import org.fcitx.fcitx5.android.engine.data.PinyinDictionary
 import org.fcitx.fcitx5.android.engine.data.Vocabulary
+import org.fcitx.fcitx5.android.engine.data.WordIndex
+import org.fcitx.fcitx5.android.engine.lattice.LayerPrior
 import org.fcitx.fcitx5.android.engine.lattice.UserWords
 import org.fcitx.fcitx5.android.engine.pinyin.Syllables
 
@@ -23,12 +25,18 @@ import org.fcitx.fcitx5.android.engine.pinyin.Syllables
  * made keeps a quarter, though, for it is theirs to type however seldom they do. A new word
  * whose count is gone, forgotten in a longer candidate, stays in the trie, scored as the model's
  * unknown word, until the next start: few enough not to be worth rebuilding the trie for.
+ *
+ * [index], the model's words by text, gives each of the user's words the model's word of its text
+ * if it has one ([modelWord]): a word of the dictionary's typed, or added by hand ([listByHand]), at a
+ * reading of the user's. One only listed from the user's dictionaries does not, till typed: it is
+ * not [chosen], so neither its reading nor its score is the user's yet.
  */
 class UserModel(
     private val dictionary: PinyinDictionary,
     private val vocabulary: Vocabulary,
     private val limit: Float = DEFAULT_LIMIT,
-) : UserWords {
+    private val index: WordIndex? = null,
+) : UserWords, LayerPrior.PackLayers {
     init {
         require(limit > 0f) { "limit $limit" }
     }
@@ -57,11 +65,18 @@ class UserModel(
 
     // words the dictionary lacks, by id from vocabulary.size up
     private val newWords = ArrayList<Entry>()
+    // their ids by text, for newEntryOf: not to go through every id on a commit (ids holds the user's dictionaries too)
+    private val newByText = HashMap<String, ArrayList<Int>>()
+    // the model's word of each one's text, NO_WORD for none: looked up once, as the id is made, not on every score
+    private var sameText = IntArray(INITIAL_WORDS)
     private val ids = HashMap<Entry, Int>()
     // the entry each word was learned as, to write it out again: one of the dictionary's as last typed
     private val entries = HashMap<Int, Entry>()
     // those of them from the user's dictionaries: see list
     private val listed = HashSet<Int>()
+    // those of them the user added by hand (listByHand), by id from vocabulary.size up as sameText: in
+    // memory only, listed again from their list on a start; an array, as modelWord asks on every score
+    private var byHand = BooleanArray(INITIAL_WORDS)
     // from a word pack: the score of a word the model lacks, and the layer (exact as a float), by id
     private val packScores = Counts()
     private val packLayers = Counts()
@@ -236,6 +251,12 @@ class UserModel(
         if (id == NO_WORD) {
             id = vocabulary.size + newWords.size
             newWords += entry
+            newByText.getOrPut(entry.text) { ArrayList(1) } += id
+            if (newWords.size > sameText.size) {
+                sameText = sameText.copyOf(sameText.size * 2)
+                byHand = byHand.copyOf(sameText.size)
+            }
+            sameText[newWords.size - 1] = index?.find(entry.text) ?: NO_WORD
             changes++
             trie.add(entry.syllables, id)
             entries[id] = entry
@@ -254,6 +275,17 @@ class UserModel(
      */
     fun list(entry: Entry): Int = id(entry).also { if (it >= vocabulary.size && listed.add(it)) listings++ }
 
+    /** [list]s [entry] as a word the user added by hand: scored as the model's of its text ([modelWord]). */
+    fun listByHand(entry: Entry): Int = list(entry).also { if (it >= vocabulary.size) byHand[it - vocabulary.size] = true }
+
+    /**
+     * [entry] no longer added by hand: listed still, till the next start, but scored as the model's
+     * unknown word, unless the user typed it ([chosen]).
+     */
+    fun unlistByHand(entry: Entry) {
+        ids[entry]?.let { if (it >= vocabulary.size) byHand[it - vocabulary.size] = false }
+    }
+
     /**
      * [list]s a word of a [WordPack], of [layer] (an index [org.fcitx.fcitx5.android.engine.lattice.LayerPrior]
      * gave its name) and scored [score] if the model lacks it: see [score] and [layerOf]. A word
@@ -270,11 +302,30 @@ class UserModel(
         return id
     }
 
+    /**
+     * The model's word for [word]: the model's of the same text for one of the user's whose text the
+     * model has, added by hand or typed, so it scores as that word and as the context of those after
+     * it ([UserScorer]); else [word] itself. A word only imported, from a dictionary or a pack, is
+     * not the user's choice yet: the model's unknown word (with its pack score) till picked.
+     */
+    override fun modelWord(word: Int): Int {
+        if (word < vocabulary.size) return word
+        val same = sameText[word - vocabulary.size]
+        return if (same == NO_WORD || !chosen(word)) word else same
+    }
+
+    /**
+     * Whether [word] is the user's choice: typed (counted), or added by hand. The one test of
+     * whether a word's reading ([reading]) and score ([modelWord]) are the user's: one only
+     * imported, from a dictionary or a pack, is not, till picked.
+     */
+    fun chosen(word: Int): Boolean = (word >= vocabulary.size && byHand[word - vocabulary.size]) || count(word) > 0f
+
     /** The log10 probability a pack gave word [id], or NaN: [UserScorer] uses it where the model has no word. */
     fun score(id: Int): Float = packScores.getOrDefault(id.toLong(), Float.NaN)
 
     /** The layer a pack put word [id] in, -1 if none did. */
-    fun layerOf(id: Int): Int = packLayers.getOrDefault(id.toLong(), -1f).toInt()
+    override fun layerOf(id: Int): Int = packLayers.getOrDefault(id.toLong(), -1f).toInt()
 
     // a word the user made, not the dictionary's nor one of their dictionaries'
     private fun isOwn(id: Int) = id >= vocabulary.size && id !in listed
@@ -360,6 +411,16 @@ class UserModel(
     /** Every reading of [text] the model has an id for: those typed, made, listed. */
     fun entriesOf(text: String): List<Entry> = ids.keys.filter { it.text == text }
 
+    /**
+     * The reading of [text] the user typed most of the words made that the dictionary lacks, still
+     * known (a word made is gone once forgotten; one of the user's dictionaries stays, its count
+     * none); null for none.
+     */
+    fun newEntryOf(text: String): Entry? = newByText[text]
+        ?.map { newWords[it - vocabulary.size] }
+        ?.filter { it in ids }
+        ?.maxByOrNull { counts[key(NO_WORD, ids.getValue(it))] }
+
     /** Whether the user typed [text] as a word with an id here, however read. */
     fun typed(text: String): Boolean = text in typedTexts
 
@@ -385,8 +446,15 @@ class UserModel(
 
     override fun text(word: Int) = newWords[word - vocabulary.size].text
 
-    // as learned: a word of the dictionary's too, read as the user typed it (行 as hang)
-    override fun reading(word: Int) = entries[word]?.syllables ?: newWords.getOrNull(word - vocabulary.size)?.syllables
+    // as learned: a word of the dictionary's too, read as the user typed it (行 as hang); only while
+    // it is their choice (chosen): forgetting a word of the dictionary's keeps its entry, and a reading
+    // kept so would learn the word back at the reading forgotten; one only imported, its reading
+    // perhaps wrong, would take the decoder's arc from the dictionary's reading of the word (行人)
+    override fun reading(word: Int) = if (chosen(word)) {
+        entries[word]?.syllables ?: newWords.getOrNull(word - vocabulary.size)?.syllables
+    } else {
+        null
+    }
 
     private fun add(first: Int, second: Int, count: Float) {
         if (first == NO_WORD && counts[key(first, second)] == 0f) changes++
@@ -401,6 +469,7 @@ class UserModel(
 
     companion object {
         const val DEFAULT_LIMIT = 50_000f
+        private const val INITIAL_WORDS = 16
         private const val HALF = 0.5f
         private const val MIN_COUNT = 0.25f
         // counts the model pretends were spent on words not yet typed: one word typed once is

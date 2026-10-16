@@ -25,7 +25,7 @@ class PredictLearning(private val data: PinyinData, private val weight: Float) {
     fun measure(samples: List<Sample>): List<Pair<String, PredictRun.Score>> {
         val tune = Halves.select(samples, Halves.TUNE)
         val heldOut = Halves.select(samples, Halves.HELD_OUT)
-        val user = UserModel(data.dictionary, data.vocabulary)
+        val user = UserModel(data.dictionary, data.vocabulary, index = data.wordIndex)
         // as the app's session has it
         val predictor = Predictor(data.model, data.vocabulary, data.dictionary, user, weight, coarse = CoarseWords.of({ data.wordIndex.find(it) }))
         val rows = mutableListOf("tune, nothing learned" to score(tune, predictor), "held-out, nothing learned" to score(heldOut, predictor))

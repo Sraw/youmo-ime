@@ -37,8 +37,18 @@ interface UserWords {
     /** Each word the user typed after [prev]: what they may type there again (联想). */
     fun forEachAfter(prev: Int, visit: (Int) -> Unit) {}
 
-    /** The syllables of [word] as the user typed it, of this trie's or the dictionary's; null if never. */
+    /**
+     * The syllables of [word] as the user typed it, of this trie's or the dictionary's, while they
+     * still have it as their choice (typed, or added by hand); null if never, only imported, or
+     * forgotten since.
+     */
     fun reading(word: Int): IntArray? = null
+
+    /**
+     * The model's word [word] is to the model, as context and scored: the model's of the same text
+     * for one of the user's they chose at a reading of their own; else [word] itself.
+     */
+    fun modelWord(word: Int): Int = word
 
     /** How many times the user committed [word]: 0 for a word never typed. */
     fun count(word: Int): Float = 0f

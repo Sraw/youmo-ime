@@ -385,6 +385,30 @@ class UserModelTest {
     }
 
     @Test
+    fun aWordIsReadAsTheUserHasItOnlyWhileTheyHaveIt() {
+        val m = UserModel(polyphones.dictionary, polyphones.vocabulary)
+        val hang = entry("行", "hang")
+        val id = m.learn(null, listOf(hang)).single()
+        // forgotten, the dictionary's word keeps the entry it was learned as, but not as a reading
+        m.forget(listOf(hang))
+        assertEquals(null, m.reading(id))
+        // one of their dictionaries', never typed, is not theirs yet (its reading may be wrong); one
+        // added by hand is, and one imported once typed
+        val listed = m.list(entry("行行", "hang", "hang"))
+        assertEquals(null, m.reading(listed))
+        val byHand = m.listByHand(entry("行行", "hang", "xing"))
+        assertEquals(entry("行行", "hang", "xing").syllables.toList(), m.reading(byHand)?.toList())
+        m.learn(null, listOf(entry("行行", "hang", "hang")))
+        assertEquals(entry("行行", "hang", "hang").syllables.toList(), m.reading(listed)?.toList())
+        m.forget(listOf(entry("行行", "hang", "hang")))
+        // their own, forgotten in a longer candidate: still in the trie, no longer theirs
+        val own = entry("行行", "xing", "xing")
+        val made = m.learn(null, listOf(own)).single()
+        m.forget(listOf(own, hang))
+        assertEquals(null, m.reading(made))
+    }
+
+    @Test
     fun theTextsSharedAreTheUsersTheirDictionariesApartAndChangesSay() {
         val m = model()
         val before = m.changes
@@ -402,6 +426,24 @@ class UserModelTest {
         m.block(entry("好吗", "hao", "ma"))
         assertEquals(setOf("你好"), m.ownTexts().toSet())
         assertTrue(m.changes > learned)
+    }
+
+    @Test
+    fun aWordMadeIsFoundByItsTextAtTheReadingTypedMost() {
+        val m = model()
+        m.learn(null, listOf(entry("好吗", "hao", "a")))
+        m.learn(null, listOf(entry("好吗", "hao", "ma")))
+        m.learn(null, listOf(entry("好吗", "hao", "ma")))
+        assertEquals("好吗(hao ma)", m.newEntryOf("好吗").toString())
+        // none made
+        assertEquals(null, m.newEntryOf("吗好"))
+        m.forget(listOf(entry("好吗", "hao", "ma")))
+        assertEquals("好吗(hao a)", m.newEntryOf("好吗").toString())
+        m.forgetText("好吗")
+        assertEquals(null, m.newEntryOf("好吗"))
+        // learned again: a second id for the text, the one found
+        m.learn(null, listOf(entry("好吗", "hao", "ma")))
+        assertEquals("好吗(hao ma)", m.newEntryOf("好吗").toString())
     }
 
     @Test

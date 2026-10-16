@@ -65,8 +65,8 @@ class Learning(
 
     /** An engine learning all along, as the app's: the user's words and, if [learnsPrior], the prior per layer. */
     private inner class Learner(learnsPrior: Boolean = false) {
-        private val user = UserModel(data.dictionary, data.vocabulary)
-        val prior = if (learnsPrior) LayerPrior(data.layers, extra = { id -> user.layerOf(id) }) else null
+        private val user = UserModel(data.dictionary, data.vocabulary, index = data.wordIndex)
+        val prior = if (learnsPrior) LayerPrior(data.layers, extra = user) else null
         private val keystrokes = KeystrokeRun(
             session(listed(user, prior), prior, reranker?.invoke(), refiner?.invoke()),
         )
@@ -79,7 +79,7 @@ class Learning(
         private val learned = HashSet<UserModel.Entry>()
         // the pack listed once, not again for every sample: what the session commits, the model
         // learns, and forgets after the sample
-        private val user = pack?.let { listed(UserModel(data.dictionary, data.vocabulary), null) }?.apply {
+        private val user = pack?.let { listed(UserModel(data.dictionary, data.vocabulary, index = data.wordIndex), null) }?.apply {
             journal = UserModel.Journal { _, sentence -> learned += sentence }
         }
         private val keystrokes = KeystrokeRun(session(user, null, reranker?.invoke(), refiner?.invoke()))

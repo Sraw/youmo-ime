@@ -15,7 +15,9 @@ import kotlin.math.pow
  * learning moves only what was learned; the sum is held to 0, as a score must be.
  *
  * A word the model lacks that a word pack scored ([UserModel.score]) takes that score in place
- * of the unknown word's, under the same backoff from the context.
+ * of the unknown word's, under the same backoff from the context. One of the user's whose text the
+ * model has (a word of the dictionary's at a reading of the user's) is that word to the model
+ * ([UserModel.modelWord]), scored and as context: one rule for every input method.
  */
 class UserScorer(
     private val model: NgramModel,
@@ -24,20 +26,27 @@ class UserScorer(
 ) : WordScorer {
     override fun score(prev2: Int, prev: Int, word: Int) = scoreAfter(context(prev2, prev), word)
 
-    override fun context(prev2: Int, prev: Int) = model.context(prev2, prev)
+    // the model's context of the words as it has them, with prev as the user has it, for its counts
+    override fun context(prev2: Int, prev: Int): Long {
+        val bigram = model.context(user.modelWord(prev2), user.modelWord(prev))
+        return (prev.toLong() shl Int.SIZE_BITS) or (bigram and 0xffffffffL)
+    }
 
     override fun trigrams(context: Long) = model.trigrams(context)
 
     override fun scoreAfter(context: Long, word: Int) = scoreAfter(context, model.trigrams(context), word)
 
     override fun scoreAfter(context: Long, trigrams: NgramModel.Trigrams, word: Int): Float {
-        var base = model.scoreAfter(context, trigrams, word)
-        if (word >= model.vocabularySize) {
+        val prev = model.prevOf(context)
+        val modelContext = (user.modelWord(prev).toLong() shl Int.SIZE_BITS) or (context and 0xffffffffL)
+        val same = user.modelWord(word)
+        var base = model.scoreAfter(modelContext, trigrams, same)
+        if (same >= model.vocabularySize) {
             val packed = user.score(word)
             if (!packed.isNaN()) base += packed - model.unknownScore
         }
         base = minOf(0f, base)
-        val p = user.probability(model.prevOf(context), word)
+        val p = user.probability(prev, word)
         if (p == 0f) return base
         return minOf(0f, log10(10f.pow(base) + weight * p))
     }
