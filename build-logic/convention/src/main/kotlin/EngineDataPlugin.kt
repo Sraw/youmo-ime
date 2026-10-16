@@ -130,10 +130,10 @@ class EngineDataPlugin : Plugin<Project> {
         // FineWeb's English pages, counted by lib/ime-dict-tool's english-lm and pruned by its prune
         // at 3e-8 (its manifest.txt in the release says from what and how): the arpa the tool
         // compiles, in a tar CMake unpacks
-        private const val ENGLISH_RELEASE = "english-data-20261012"
+        private const val ENGLISH_RELEASE = "english-data-20261015"
         private val ENGLISH = Download(
             "$RELEASES_URL$ENGLISH_RELEASE/english.tar.zst",
-            "ffef6cc2460d05fbfc2c2c8c7b844281f70fef6cd2da74da5da6e941ec0ebee0",
+            "e582610acbc45bf9b70667c893fd80dd605c7484aa1e64577ef7c6e7ae32b4d0",
             "engine-data/$ENGLISH_RELEASE-english.tar.zst",
         )
         private const val ENGLISH_FILE = "english.arpa"
