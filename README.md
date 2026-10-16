@@ -4,6 +4,8 @@
 
 <p align="center"><a href="#幽默输入法">中文</a> · <a href="#youmo-ime">English</a> · <a href="docs/README.md">使用说明</a> · <a href="CHANGELOG.md">版本日志</a> · <a href="https://github.com/Sraw/youmo-ime/releases">下载</a></p>
 
+<p align="center"><a href="https://t.me/+smgndImIg7EzNjYx"><img src="https://img.shields.io/badge/Telegram-%E4%BA%A4%E6%B5%81%E7%BE%A4-26A5E4?logo=telegram&logoColor=white" alt="Telegram 交流群"></a></p>
+
 ---
 
 ## 幽默输入法
