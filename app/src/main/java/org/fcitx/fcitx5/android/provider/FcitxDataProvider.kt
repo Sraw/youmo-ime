@@ -26,6 +26,7 @@ import timber.log.Timber
 import java.io.File
 import java.io.FileNotFoundException
 import java.io.IOException
+import java.util.concurrent.atomic.AtomicBoolean
 
 class FcitxDataProvider : DocumentsProvider() {
 
@@ -166,6 +167,9 @@ class FcitxDataProvider : DocumentsProvider() {
     // a test's fake instead, to see what a reload asks of fcitx
     internal var connection: () -> FcitxConnection? = { FcitxDaemon.getFirstConnectionOrNull() }
 
+    // a reload waiting for fcitx to be ready reads every file written meanwhile: one is enough
+    private val reloadQueued = AtomicBoolean(false)
+
     // fcitx that is not running reads the files when it starts
     private fun reloadFcitx(written: File) {
         val fcitx = connection()
@@ -173,17 +177,29 @@ class FcitxDataProvider : DocumentsProvider() {
             Timber.d("Not reloading fcitx for %s: it is not running", written.name)
             return
         }
+        if (!reloadQueued.compareAndSet(false, true)) {
+            Timber.d("Not reloading fcitx again for %s: the reload on its way reads it", written.name)
+            return
+        }
         // once ready: fcitx still starting may have read the file before it was written, and
         // runIfReady would drop the reload
         Timber.d("Reloading fcitx for %s once it is ready", written.name)
+        var ran = false
         fcitx.lifecycleScope.launch { fcitx.runOnReady {
+            // before the files are read: one written from here on has a reload of its own
+            ran = true
+            reloadQueued.set(false)
             reloadConfig()
             // what the removed status-area entry did: config/profile holds the enabled input methods
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
                 SubtypeManager.syncWith(enabledIme())
             }
             Timber.d("Reloaded fcitx for %s", written.name)
-        } }
+        } }.invokeOnCompletion {
+            // cancelled as fcitx stops, before it ran even: the next write is not left waiting on it.
+            // Not once it ran: the flag may be a newer reload's by now
+            if (!ran) reloadQueued.set(false)
+        }
     }
 
     @Throws(FileNotFoundException::class)

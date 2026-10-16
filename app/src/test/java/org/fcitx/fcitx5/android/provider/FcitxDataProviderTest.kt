@@ -9,12 +9,20 @@ import android.content.pm.ProviderInfo
 import android.os.Looper
 import android.os.ParcelFileDescriptor
 import android.provider.DocumentsContract.Document
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.fcitx.fcitx5.android.core.FakeFcitxAPI
 import org.fcitx.fcitx5.android.core.FakeFcitxConnection
+import org.fcitx.fcitx5.android.core.FcitxAPI
+import org.fcitx.fcitx5.android.daemon.FcitxConnection
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -274,5 +282,110 @@ class FcitxDataProviderTest {
         shadowOf(Looper.getMainLooper()).idle()
         advanceUntilIdle()
         assertEquals(listOf("reloadConfig()"), fcitx.api.calls)
+    }
+
+    /** Files written while fcitx starts are all read by the one reload that waits for it, not one reload each. */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    @Config(sdk = [23])
+    fun writesWhileFcitxStartsShareOneReload() = runTest {
+        val fake = FakeFcitxConnection(this)
+        val ready = CompletableDeferred<Unit>()
+        // the fake's runOnReady runs at once: this one waits, as the real one does for fcitx
+        val fcitx = object : FcitxConnection by fake {
+            override suspend fun <T> runOnReady(block: suspend FcitxAPI.() -> T): T {
+                ready.await()
+                return block(fake.api)
+            }
+        }
+        provider.connection = { fcitx }
+        File(root, "config").mkdirs()
+        fun write(name: String) {
+            File(root, "config/$name").writeText("a")
+            provider.openDocument("$rootId/config/$name", "wt", null).use { pfd ->
+                FileOutputStream(pfd.fileDescriptor).use { it.write("b".toByteArray()) }
+            }
+            shadowOf(Looper.getMainLooper()).idle()
+            advanceUntilIdle()
+        }
+        write("config")
+        write("profile")
+        assertEquals(emptyList<String>(), fake.api.calls)
+        ready.complete(Unit)
+        advanceUntilIdle()
+        assertEquals(listOf("reloadConfig()"), fake.api.calls)
+        // fcitx ready: a write after it has a reload of its own
+        write("config")
+        assertEquals(listOf("reloadConfig()", "reloadConfig()"), fake.api.calls)
+    }
+
+    private fun TestScope.writeConfig(name: String) {
+        File(root, "config").mkdirs()
+        File(root, "config/$name").writeText("a")
+        provider.openDocument("$rootId/config/$name", "wt", null).use { pfd ->
+            FileOutputStream(pfd.fileDescriptor).use { it.write("b".toByteArray()) }
+        }
+        shadowOf(Looper.getMainLooper()).idle()
+        advanceUntilIdle()
+    }
+
+    /** A reload cancelled before fcitx was ready (fcitx stopped) leaves the next write a reload of its own. */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    @Config(sdk = [23])
+    fun aReloadCancelledBeforeFcitxIsReadyLeavesTheNextWriteItsOwn() = runTest {
+        val stopping = CoroutineScope(StandardTestDispatcher(testScheduler) + Job())
+        val never = CompletableDeferred<Unit>()
+        val first = FakeFcitxConnection(stopping)
+        provider.connection = {
+            object : FcitxConnection by first {
+                override suspend fun <T> runOnReady(block: suspend FcitxAPI.() -> T): T {
+                    never.await()
+                    return block(first.api)
+                }
+            }
+        }
+        writeConfig("config")
+        stopping.cancel()
+        advanceUntilIdle()
+        val restarted = FakeFcitxConnection(this)
+        provider.connection = { restarted }
+        writeConfig("config")
+        assertEquals(emptyList<String>(), first.api.calls)
+        assertEquals(listOf("reloadConfig()"), restarted.api.calls)
+    }
+
+    /** A reload that has read the files and then finishes leaves a newer one, queued meanwhile, waiting alone. */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    @Config(sdk = [23])
+    fun aFinishedReloadDoesNotClearTheOneQueuedAfterIt() = runTest {
+        val fake = FakeFcitxConnection(this)
+        val before = mutableListOf<CompletableDeferred<Unit>>()
+        val after = mutableListOf<CompletableDeferred<Unit>>()
+        provider.connection = {
+            object : FcitxConnection by fake {
+                override suspend fun <T> runOnReady(block: suspend FcitxAPI.() -> T): T {
+                    val go = CompletableDeferred<Unit>().also { before += it }
+                    val done = CompletableDeferred<Unit>().also { after += it }
+                    go.await()
+                    return block(fake.api).also { done.await() }
+                }
+            }
+        }
+        writeConfig("config")
+        // the first reads the files, and is still finishing as another file is written
+        before[0].complete(Unit)
+        advanceUntilIdle()
+        writeConfig("profile")
+        after[0].complete(Unit)
+        advanceUntilIdle()
+        // the second, still waiting, reads this one too
+        writeConfig("config")
+        assertEquals(2, before.size)
+        before[1].complete(Unit)
+        after[1].complete(Unit)
+        advanceUntilIdle()
+        assertEquals(listOf("reloadConfig()", "reloadConfig()"), fake.api.calls)
     }
 }

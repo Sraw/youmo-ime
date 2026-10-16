@@ -91,10 +91,19 @@ class EnglishCountsTest {
         val slip = vocabulary("well" to 300, "we'l'l" to 2).words(100)
         assertFalse(slip.list.toString(), "we'l'l" in slip.list)
         assertEquals(slip.id("well", first = false), slip.id("we'l'l", first = false))
-        // th'e once beside the's 300: none in any group
-        val the = vocabulary("the" to 300, "th'e" to 1).words(100)
-        assertFalse(the.list.toString(), "th'e" in the.list)
-        assertEquals(0, slip.exempted + the.exempted)
+        assertEquals(0, slip.exempted)
+    }
+
+    @Test
+    fun aSpellingWithAnApostropheOfAnyOtherGroupIsHeldToATenthOfItsCommonest() {
+        // th'e beside the's 300: a thirtieth as common, over a hundredth yet under a tenth, is none, as
+        // the tenth would have it and a hundredth would not; once is none too
+        for (times in listOf(1, 10)) {
+            val the = vocabulary("the" to 300, "th'e" to times).words(100)
+            assertFalse(the.list.toString(), "th'e" in the.list)
+            assertEquals(the.id("the", first = false), the.id("th'e", first = false))
+            assertEquals(0, the.exempted)
+        }
     }
 
     /** A possessive has a plural's letters, no word's: it is held to the plural as any spelling to its group's commonest. */

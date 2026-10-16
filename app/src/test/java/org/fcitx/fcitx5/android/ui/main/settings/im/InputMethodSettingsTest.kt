@@ -5,6 +5,7 @@
 package org.fcitx.fcitx5.android.ui.main.settings.im
 
 import org.fcitx.fcitx5.android.R
+import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.engine.host.EngineSettings
 import org.fcitx.fcitx5.android.engine.host.Engines
 import org.fcitx.fcitx5.android.engine.host.TableSettings
@@ -21,8 +22,8 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** Every input method of the engine's (nine keys too) and English: those the app has a page of. */
-internal val appInputMethods = listOf(Engines.PINYIN, Engines.SHUANGPIN, Engines.T9) + Engines.TABLES.keys + "keyboard-us"
+/** The app's own input methods, each of which has a page: handwriting too, which a list of them by hand left out. */
+internal val appInputMethods = InputMethodSettings.BUILT_IN
 
 internal fun List<Item>.flat(): List<Item> = flatMap { if (it is Section) it.items.flat() else listOf(it) }
 
@@ -37,6 +38,18 @@ class InputMethodSettingsTest {
     fun everyInputMethodOfTheAppHasAPageAndOthersNone() {
         appInputMethods.forEach { assertNotNull(it, InputMethodSettings.of(it)) }
         assertNull(InputMethodSettings.of("keyboard-de"))
+    }
+
+    // appInputMethods is BUILT_IN itself: held here to the names androidengine.cpp registers (and
+    // English), by hand, so that one BUILT_IN leaves out is not skipped by every check above
+    @Test
+    fun builtInIsEveryInputMethodTheEngineRegisters() {
+        val registered = setOf(
+            "engine-pinyin", "engine-shuangpin", "engine-t9", "engine-wubi", "engine-cangjie",
+            "engine-ziranma", "engine-erbi", "engine-wubipinyin", "engine-handwriting", "keyboard-us"
+        )
+        assertEquals(registered, InputMethodSettings.BUILT_IN.toSet())
+        assertEquals(registered.size, InputMethodSettings.BUILT_IN.size)
     }
 
     // a ListPreference shows nothing for a value not among its own: whatever fcitx stored (out of
@@ -109,5 +122,21 @@ class InputMethodSettingsTest {
         // the table's own, and those every Chinese input method shares with pinyin (EngineTablePage)
         val shared = listOf(EngineSettings.PAGE_SIZE, EngineSettings.PREDICTION, EngineSettings.MODEL_LEVEL)
         assertEquals((TableSettings.KEYS + shared).sorted(), table.sorted())
+    }
+
+    // its name starts as a table's does ("engine-"): without a page of its own it would get a table's
+    @Test
+    fun handwritingHasItsOwnPageWithTheOptionsEveryChineseInputMethodShares() {
+        val keys = InputMethodSettings.of(Engines.HANDWRITING)!!.flat().map {
+            when (it) {
+                is Toggle -> it.key
+                is InputMethodSettings.Titled -> it.key
+                else -> error("$it")
+            }
+        }
+        assertEquals(
+            listOf(AppPrefs.HANDWRITING_PAUSE, EngineSettings.PAGE_SIZE, EngineSettings.PREDICTION, EngineSettings.MODEL_LEVEL).sorted(),
+            keys.sorted(),
+        )
     }
 }

@@ -159,6 +159,10 @@ object InputMethodSettings {
         nearest = { v -> ModelLevel.entries.firstOrNull { it.key == v }?.key ?: ModelLevel.HIGH.key },
     )
 
+    private val pageSize = Choice(EngineSettings.PAGE_SIZE, R.string.im_page_size, PAGE_SIZES, label = { _, v -> v }, nearest = numbers(EngineSettings.PAGE_SIZES))
+
+    private val prediction = Toggle(EngineSettings.PREDICTION, text(R.string.im_prediction), R.string.im_prediction_summary)
+
     // keyed by Fuzzy's names, as the engine reads them (EngineSettings.parse)
     private val FUZZY = listOf(
         Fuzzy.V_U to "u ↔ v", Fuzzy.AN_ANG to "an ↔ ang", Fuzzy.EN_ENG to "en ↔ eng", Fuzzy.IAN_IANG to "ian ↔ iang",
@@ -189,8 +193,8 @@ object InputMethodSettings {
                         AppPrefs.getInstance().keyboard.t9MultiTap
                     }.takeIf { nineKeys },
                     Page(T9_LETTERS, R.string.t9_letters, R.string.t9_letters_summary, SettingsRoute.T9Letters).takeIf { nineKeys },
-                    Choice(EngineSettings.PAGE_SIZE, R.string.im_page_size, PAGE_SIZES, label = { _, v -> v }, nearest = numbers(EngineSettings.PAGE_SIZES)),
-                    Toggle(EngineSettings.PREDICTION, text(R.string.im_prediction), R.string.im_prediction_summary),
+                    pageSize,
+                    prediction,
                     modelLevel,
                     Toggle("${EngineSettings.FUZZY}/${EngineSettings.TYPOS}", text(R.string.im_typos), R.string.im_typos_summary, unused = if (nineKeys) R.string.im_not_for_t9 else 0),
                     // full pinyin's alone: 双拼 types its letters otherwise, the nine keys digits
@@ -216,8 +220,8 @@ object InputMethodSettings {
                 // Freq and Fast alike order by use
                 Toggle(TableSettings.ORDER_POLICY, text(R.string.im_order_by_use), read = { it != "No" }, write = { if (it) "Freq" else "No" }),
                 // pinyin's, the same settings: every Chinese input method has them
-                Choice(EngineSettings.PAGE_SIZE, R.string.im_page_size, PAGE_SIZES, label = { _, v -> v }, nearest = numbers(EngineSettings.PAGE_SIZES)),
-                Toggle(EngineSettings.PREDICTION, text(R.string.im_prediction), R.string.im_prediction_summary),
+                pageSize,
+                prediction,
                 modelLevel,
             )
         ),
@@ -284,9 +288,9 @@ object InputMethodSettings {
                 AppChoice(AppPrefs.HANDWRITING_PAUSE, R.string.handwriting_pause, R.string.handwriting_pause_summary, HandwritingPause.entries) {
                     AppPrefs.getInstance().keyboard.handwritingPause
                 },
-                Choice(EngineSettings.PAGE_SIZE, R.string.im_page_size, PAGE_SIZES, label = { _, v -> v }, nearest = numbers(EngineSettings.PAGE_SIZES)),
+                pageSize,
                 // the pinyins' options, the same values: one setting for one idea
-                Toggle(EngineSettings.PREDICTION, text(R.string.im_prediction), R.string.im_prediction_summary),
+                prediction,
                 modelLevel,
             )
         ),

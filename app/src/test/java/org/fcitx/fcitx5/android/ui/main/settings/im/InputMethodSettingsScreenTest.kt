@@ -20,6 +20,7 @@ import org.fcitx.fcitx5.android.engine.host.EngineSettings
 import org.fcitx.fcitx5.android.engine.host.Engines
 import org.fcitx.fcitx5.android.engine.host.TableSettings
 import org.fcitx.fcitx5.android.engine.pinyin.Fuzzy
+import org.fcitx.fcitx5.android.input.handwriting.HandwritingPause
 import org.fcitx.fcitx5.android.input.keyboard.T9MultiTap
 import org.fcitx.fcitx5.android.ui.main.modified.hasDefault
 import org.fcitx.fcitx5.android.ui.main.settings.PlaceholderStrings
@@ -111,6 +112,23 @@ class InputMethodSettingsScreenTest {
         assertTrue(AppPrefs.T9_MULTI_TAP !in cfg.flattened())
         assertNull(screen(Engines.PINYIN).findPreference<ListPreference>(AppPrefs.T9_MULTI_TAP))
         pref.setValue(T9MultiTap.Medium)
+    }
+
+    // as multi-tap: the pad's own, nothing of it in fcitx's config
+    @Test
+    fun thePauseOnTheHandwritingPageIsTheAppsPreference() {
+        val pref = AppPrefs.getInstance().keyboard.handwritingPause
+        pref.setValue(HandwritingPause.Medium)
+        val cfg = RawConfig()
+        var saved = 0
+        val list = screen(Engines.HANDWRITING, cfg) { saved++ }.findPreference<ListPreference>(AppPrefs.HANDWRITING_PAUSE)!!
+        assertEquals(HandwritingPause.Medium.name, list.value)
+        assertTrue(list.callChangeListener(HandwritingPause.Slow.name))
+        assertEquals(HandwritingPause.Slow, pref.getValue())
+        assertEquals(0, saved)
+        assertTrue(AppPrefs.HANDWRITING_PAUSE !in cfg.flattened())
+        assertNull(screen(Engines.PINYIN).findPreference<ListPreference>(AppPrefs.HANDWRITING_PAUSE))
+        pref.setValue(HandwritingPause.Medium)
     }
 
     // as multi-tap: the keyboard's own, nothing of it in fcitx's config
