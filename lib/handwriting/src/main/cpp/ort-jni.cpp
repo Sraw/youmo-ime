@@ -13,6 +13,7 @@
 #include <jni.h>
 
 #include <memory>
+#include <stdexcept>
 #include <string>
 #include <vector>
 
@@ -39,6 +40,12 @@ struct Model {
         Ort::AllocatorWithDefaultOptions alloc;
         input = session.GetInputNameAllocated(0, alloc).get();
         output = session.GetOutputNameAllocated(0, alloc).get();
+        // nativeRun reads the output as floats, another type's bytes wrongly (a narrower one's past
+        // its end): refused as the model opens, the recognizer then not loaded, rather than at each read
+        if (session.GetOutputTypeInfo(0).GetTensorTypeAndShapeInfo().GetElementType() !=
+            ONNX_TENSOR_ELEMENT_DATA_TYPE_FLOAT) {
+            throw std::invalid_argument("output not of floats");
+        }
     }
 };
 
@@ -72,7 +79,8 @@ Java_org_fcitx_fcitx5_android_handwriting_OrtModel_nativeOpen(
         opts.SetInterOpNumThreads(1);
         // a read a stroke: threads left spinning between them would only burn the battery
         opts.AddConfigEntry("session.intra_op.allow_spinning", "0");
-        // the arena would keep the widest line's activations for good, on the native heap
+        // the arena would keep the most a read ever needed (the longest pen path's activations) for
+        // good, on the native heap
         opts.DisableCpuMemArena();
         opts.AddConfigEntry("session.use_ort_model_bytes_directly", "1");
         opts.AddConfigEntry("session.use_ort_model_bytes_for_initializers", "1");

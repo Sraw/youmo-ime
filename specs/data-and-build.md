@@ -109,8 +109,9 @@ Decided by the owner (2026-10-15), for every model the app ships, the ones to co
   through `EngineBridge.asset`. Never read a model into a byte array. Checked with `dumpsys meminfo`:
   the model's size shows under `.apk mmap`, not in the private columns.
 - **One onnxruntime version** for the runtime the app links (`ortVersion` in
-  `lib/handwriting/build.gradle.kts` and lib/sherpa-onnx's `cmake/onnxruntime-android-*.cmake`,
-  onnxruntime-libs' prebuilt archives), the converter that makes the ORT files
+  `lib/handwriting/build.gradle.kts` and `lib/sherpa-onnx/src/main/cpp/cmake/onnxruntime-android-*.cmake`,
+  which that build script checks pin the same archive: onnxruntime-libs' prebuilt), the converter
+  that makes the ORT files
   (`convert_onnx_models_to_ort --optimization_style Fixed --target_platform arm`) and the quantizer.
   An ORT file loads only in a runtime at least as new as the one that wrote it. To move to another
   version: change the runtime's pins, convert every ORT model again with it, publish them as new

@@ -5,6 +5,9 @@
 package org.fcitx.fcitx5.android.handwriting
 
 import android.content.res.AssetManager
+import java.util.concurrent.locks.ReentrantReadWriteLock
+import kotlin.concurrent.read
+import kotlin.concurrent.write
 
 /**
  * One onnxruntime model of one float input and one float output, an ORT-format asset stored
@@ -16,28 +19,20 @@ class OrtModel private constructor(private var handle: Long) : AutoCloseable {
     /** An output: [values] row-major, its [shape]. */
     class Output(val values: FloatArray, val shape: LongArray)
 
-    private val lock = java.util.concurrent.locks.ReentrantReadWriteLock()
+    private val lock = ReentrantReadWriteLock()
 
     /** The model run on [x], of [shape]. */
-    fun run(x: FloatArray, shape: LongArray): Output {
-        lock.readLock().lock()
-        try {
-            check(handle != 0L) { "closed" }
-            val dims = LongArray(MAX_RANK)
-            val values = nativeRun(handle, x, shape, dims)
-            return Output(values, dims.filter { it >= 0 }.toLongArray())
-        } finally {
-            lock.readLock().unlock()
-        }
+    fun run(x: FloatArray, shape: LongArray): Output = lock.read {
+        check(handle != 0L) { "closed" }
+        val dims = LongArray(MAX_RANK)
+        val values = nativeRun(handle, x, shape, dims)
+        Output(values, dims.filter { it >= 0 }.toLongArray())
     }
 
     override fun close() {
-        lock.writeLock().lock()
-        try {
+        lock.write {
             if (handle != 0L) nativeClose(handle)
             handle = 0L
-        } finally {
-            lock.writeLock().unlock()
         }
     }
 

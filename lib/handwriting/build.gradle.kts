@@ -45,7 +45,13 @@ android {
     namespace = "org.fcitx.fcitx5.android.handwriting"
     ndkVersion = project.ndkVersion
 
+    buildFeatures {
+        buildConfig = true
+    }
+
     defaultConfig {
+        // the version the app's licences page names (LicensesFragment): the pin itself, not a copy of it
+        buildConfigField("String", "ORT_VERSION", "\"$ortVersion\"")
         ndk {
             abiFilters += project.buildAbiOverride?.split(",") ?: Versions.supportedABIs
         }

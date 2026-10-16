@@ -6,7 +6,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # unpacked by the module's unpackOnnxruntime task
 if(NOT EXISTS "${ORT_DIR}/jni/${ANDROID_ABI}/libonnxruntime.so")
-  message(FATAL_ERROR "no onnxruntime for ${ANDROID_ABI} in ${ORT_DIR}")
+  message(FATAL_ERROR "no onnxruntime for ${ANDROID_ABI} in ${ORT_DIR}: run ./gradlew :lib:handwriting:unpackOnnxruntime first (a Gradle build runs it before this configure; an IDE's own configure may not)")
 endif()
 
 add_library(onnxruntime SHARED IMPORTED)

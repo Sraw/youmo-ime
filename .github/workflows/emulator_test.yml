@@ -77,7 +77,17 @@ jobs:
           path: |
             .gradle/engine-downloads
             !.gradle/engine-downloads/voice
+            !.gradle/engine-downloads/handwriting
+            !.gradle/engine-downloads/onnxruntime-android-*.zip
           key: engine-downloads-${{ hashFiles('build-logic/convention/src/main/kotlin/EngineDataPlugin.kt') }}
+
+      - name: Cache handwriting downloads
+        uses: actions/cache@v6
+        with:
+          path: |
+            .gradle/engine-downloads/handwriting
+            .gradle/engine-downloads/onnxruntime-android-*.zip
+          key: handwriting-downloads-${{ hashFiles('build-logic/convention/src/main/kotlin/HandwritingDataPlugin.kt', 'lib/handwriting/build.gradle.kts') }}
 
       - name: Cache voice model downloads
         if: matrix.flavor == 'Voice'

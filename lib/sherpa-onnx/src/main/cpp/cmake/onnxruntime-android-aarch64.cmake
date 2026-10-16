@@ -26,6 +26,8 @@ set(possible_file_locations
   ${CMAKE_BINARY_DIR}/onnxruntime-android-1.30.0.zip
   /tmp/onnxruntime-android-1.30.0.zip
   /star-fj/fangjun/download/github/onnxruntime-android-1.30.0.zip
+  # youmo: lib/handwriting's download of this archive (its build holds the two pins equal), not fetched twice
+  ${CMAKE_CURRENT_LIST_DIR}/../../../../../../.gradle/engine-downloads/onnxruntime-android-1.30.0.zip
 )
 
 foreach(f IN LISTS possible_file_locations)

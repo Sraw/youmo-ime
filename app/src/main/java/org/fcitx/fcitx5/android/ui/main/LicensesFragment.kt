@@ -13,6 +13,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.fcitx.fcitx5.android.R
+import org.fcitx.fcitx5.android.handwriting.BuildConfig as HandwritingBuildConfig
 import org.fcitx.fcitx5.android.input.voice.VoiceFeature
 import org.fcitx.fcitx5.android.ui.common.PaddingPreferenceFragment
 import org.fcitx.fcitx5.android.utils.addPreference
@@ -22,17 +23,18 @@ class LicensesFragment : PaddingPreferenceFragment() {
 
     override fun onCreatePreferences(savedInstanceState: Bundle?, rootKey: String?) {
         val res = resources
+        val ort = HandwritingBuildConfig.ORT_VERSION
         // the engine's data: whose text its words and model are counted from
         val engineData = listOf(
             VoiceFeature.Credit(getString(R.string.engine_data_libime), "LGPL-2.1-or-later", "https://github.com/fcitx/libime"),
             VoiceFeature.Credit(getString(R.string.engine_data_fineweb), "ODC-By-1.0", "https://huggingface.co/datasets/HuggingFaceFW/fineweb-2"),
             VoiceFeature.Credit(getString(R.string.engine_data_handwriting), "Arphic Public License", "https://github.com/skishore/makemeahanzi"),
             // what runs the handwriting recognizers (lib/handwriting), and in a voice build the speech one
-            VoiceFeature.Credit("onnxruntime:1.30.0", "MIT", "https://github.com/microsoft/onnxruntime/blob/main/LICENSE"),
+            VoiceFeature.Credit("onnxruntime:$ort", "MIT", "https://github.com/microsoft/onnxruntime/blob/main/LICENSE"),
             // others' code built into libonnxruntime.so: the notices of the release it is built from
             VoiceFeature.Credit(
-                "onnxruntime third-party notices:1.30.0", "Apache-2.0, BSD-3-Clause, MIT and others",
-                "https://github.com/microsoft/onnxruntime/blob/v1.30.0/ThirdPartyNotices.txt",
+                "onnxruntime third-party notices:$ort", "Apache-2.0, BSD-3-Clause, MIT and others",
+                "https://github.com/microsoft/onnxruntime/blob/v$ort/ThirdPartyNotices.txt",
             ),
         )
         lifecycleScope.launch {

@@ -58,7 +58,19 @@ jobs:
           path: |
             .gradle/engine-downloads
             !.gradle/engine-downloads/voice
+            !.gradle/engine-downloads/handwriting
+            !.gradle/engine-downloads/onnxruntime-android-*.zip
           key: engine-downloads-${{ hashFiles('build-logic/convention/src/main/kotlin/EngineDataPlugin.kt') }}
+
+      # the handwriting models and onnxruntime, both builds': keyed on the two files that name them
+      # and their SHA-256, saved on main by engine_downloads.yml as the engine data is
+      - name: Cache handwriting downloads
+        uses: actions/cache@v6
+        with:
+          path: |
+            .gradle/engine-downloads/handwriting
+            .gradle/engine-downloads/onnxruntime-android-*.zip
+          key: handwriting-downloads-${{ hashFiles('build-logic/convention/src/main/kotlin/HandwritingDataPlugin.kt', 'lib/handwriting/build.gradle.kts') }}
 
       - name: Build Release APK
         run: ./gradlew --build-cache :app:assembleTextRelease
@@ -110,7 +122,17 @@ jobs:
           path: |
             .gradle/engine-downloads
             !.gradle/engine-downloads/voice
+            !.gradle/engine-downloads/handwriting
+            !.gradle/engine-downloads/onnxruntime-android-*.zip
           key: engine-downloads-${{ hashFiles('build-logic/convention/src/main/kotlin/EngineDataPlugin.kt') }}
+
+      - name: Cache handwriting downloads
+        uses: actions/cache@v6
+        with:
+          path: |
+            .gradle/engine-downloads/handwriting
+            .gradle/engine-downloads/onnxruntime-android-*.zip
+          key: handwriting-downloads-${{ hashFiles('build-logic/convention/src/main/kotlin/HandwritingDataPlugin.kt', 'lib/handwriting/build.gradle.kts') }}
 
       # the recognizer's model and the VAD, keyed on VoiceDataPlugin, which names them
       - name: Cache voice model downloads
