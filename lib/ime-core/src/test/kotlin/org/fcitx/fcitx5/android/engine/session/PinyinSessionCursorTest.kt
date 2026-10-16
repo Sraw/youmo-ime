@@ -237,6 +237,26 @@ class PinyinSessionCursorTest {
     }
 
     @Test
+    fun aSyllableTakenOnTheNineKeysKeepsACursorAfterItsDigitsOnItsKeyAndOneBeforeThemWhereItWas() {
+        // after the digits: before the 6 still, past the separator added
+        val after = nineKeys()
+        after.type("64426")
+        after.apply(Step(-1))
+        val taken = after.apply(Action.Syllable(0))
+        assertEquals("ni'hao", taken.preedit)
+        assertEquals(5, taken.cursor)
+        // before them, in a syllable taken before: where it was
+        val before = nineKeys()
+        before.type("64426")
+        val ni = before.apply(Action.Syllable(0))
+        before.apply(Step.START)
+        before.apply(Step(1))
+        val both = before.apply(Action.Syllable(ni.syllables.indexOf("hao")))
+        assertEquals("ni'hao", both.preedit)
+        assertEquals(1, both.cursor)
+    }
+
+    @Test
     fun aPressAgainAfterTheCursorMovedIsAPressOfItsOwn() {
         val moved = nineKeys()
         moved.apply(Action.Letter('a'))
@@ -244,14 +264,17 @@ class PinyinSessionCursorTest {
         moved.apply(Step(-1))
         // a slice of refining meanwhile is no key
         moved.apply(Action.Refine)
-        // after the A: again would have made it B, in its place
+        // after the A: again would have made it B, in its place; the keyboard's b is no letter typed as
+        // itself either, but a press of the 2, any of its letters
         val s = moved.apply(Action.Letter('b', again = true))
         val typed = nineKeys()
         typed.apply(Action.Letter('a'))
         typed.type("6")
         typed.apply(Step(-1))
         typed.apply(Step(0))
-        assertEquals(typed.apply(Action.Letter('b')).preedit, s.preedit)
+        val key = typed.apply(Key('2'))
+        assertEquals(key.preedit, s.preedit)
+        assertEquals(key.cursor, s.cursor)
     }
 
     @Test

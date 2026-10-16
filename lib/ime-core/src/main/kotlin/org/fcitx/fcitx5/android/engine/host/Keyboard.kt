@@ -152,7 +152,7 @@ class Keyboard(private val session: Session, private val nineKeys: Boolean) {
                 EngineEvent.PAGE_UP -> Action.PreviousPage
                 EngineEvent.PAGE_DOWN -> Action.NextPage
                 // the session counts UTF-16 units: a piece picked may be past the BMP
-                EngineEvent.CURSOR -> Action.Cursor(shown.preedit.let { it.offsetByCodePoints(0, arg.coerceIn(0, it.codePointCount(0, it.length))) })
+                EngineEvent.CURSOR -> Action.Cursor(utf16Offset(shown.preedit, arg))
                 else -> error("event $event is not one taken while composing")
             },
         )
@@ -170,6 +170,10 @@ class Keyboard(private val session: Session, private val nineKeys: Boolean) {
         KEY_END, KEY_KP_END -> Action.Step.END
         else -> null
     }
+
+    // [codePoints] into [text] in UTF-16 units, no further than its end: the host's tap counts code points (PreeditUi.preeditAt)
+    private fun utf16Offset(text: String, codePoints: Int) =
+        text.offsetByCodePoints(0, codePoints.coerceIn(0, text.codePointCount(0, text.length)))
 
     private fun refine(): Snapshot {
         val last = again(handled = true)

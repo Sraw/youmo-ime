@@ -90,8 +90,8 @@ class StrokeLookup(
                 pinyin.apply(action).also { idle = it.preedit.isEmpty() }
             }
             // the preedit is the key, then a stroke a character
-            is Action.Cursor -> moved(action.at.toLong() - 1)
-            is Action.Step -> moved(cursor.toLong() + action.by)
+            is Action.Cursor -> moved(action.at.coerceAtLeast(1) - 1)
+            is Action.Step -> moved(action.applyTo(cursor, input.length))
             // nothing learned, nothing to offer: as it was
             else -> snapshot()
         }
@@ -112,10 +112,10 @@ class StrokeLookup(
     /** Ends the lookup, [KEY], the strokes and [c] typed into [pinyin] instead. */
     private fun toPinyin(c: Char): Snapshot {
         val after = input.length - cursor
-        val keys = "$KEY" + input.insert(cursor, c)
+        val keys = "$KEY${input.substring(0, cursor)}$c${input.substring(cursor)}"
         end()
         val typed = retype(keys)
-        // the pinyin's cursor where the letter went in, the strokes after it after it
+        // the pinyin's cursor right after the letter, before the strokes that were after the lookup's
         val s = if (after > 0 && typed.preedit.isNotEmpty()) pinyin.apply(Action.Step(-after)).copy(commit = typed.commit) else typed
         return s.also { idle = it.preedit.isEmpty() }
     }
@@ -144,9 +144,9 @@ class StrokeLookup(
         return end(commit = text, handled = handled)
     }
 
-    private fun moved(to: Long): Snapshot {
+    private fun moved(to: Int): Snapshot {
         if (input.isEmpty()) return snapshot()
-        cursor = to.coerceIn(0, input.length.toLong()).toInt()
+        cursor = to.coerceIn(0, input.length)
         return snapshot()
     }
 

@@ -28,6 +28,8 @@ class TextWordsTest {
                 .unigram("中", -2.5f, 0f)
                 .unigram("国人", -3f, 0f)
                 .unigram("人", -2f, 0f)
+                // a pair, for a text scored after the words before it
+                .bigram("，", "你", -0.5f, 0f)
                 .entry("你", intArrayOf(Syllables.id("ni")))
                 .build().toByteArray(),
         ),
@@ -106,5 +108,20 @@ class TextWordsTest {
         assertEquals(-7f - 3f, words.logProb("x你好"), 1e-4f)
         assertEquals(0f, words.logProb(""), 0f)
         assertTrue(words.logProb("你好吗") > words.logProb("吗你好吗"))
+    }
+
+    @Test
+    fun aTextIsScoredAfterTheWordsBeforeItEachWordAfterTheTwoBeforeIt() {
+        val (comma, ni, hao) = listOf("，", "你", "好").map(::id)
+        val ma = id("吗")
+        val model = data.model
+        assertEquals(model.score(NO_WORD, comma, ni), words.logProb("你", "，"), 1e-6f)
+        assertTrue(words.logProb("你", "，") > words.logProb("你"))
+        // 吗 after ， 你, a pair the model has
+        assertEquals(model.score(NO_WORD, comma, ni) + model.score(comma, ni, ma), words.logProb("你吗", "，"), 1e-6f)
+        // the likelier of 你好 and 你 好, each after what came before it
+        val whole = model.score(NO_WORD, comma, id("你好"))
+        val split = model.score(NO_WORD, comma, ni) + model.score(comma, ni, hao)
+        assertEquals(maxOf(whole, split), words.logProb("你好", "，"), 1e-6f)
     }
 }

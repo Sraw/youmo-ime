@@ -38,17 +38,30 @@ class EnginesWarmUpTest : EnginesFixture() {
         assertEquals(listOf("你", "拟"), engines.type(Engines.PINYIN, "ni").candidates)
     }
 
-    /** One who types only English or a table neither waits for pinyin's data nor holds its word index. */
+    /** One who types only English neither waits for pinyin's data nor holds its word index; a table reads by them. */
     @Test
     fun aFieldStartedInEnglishReadsNoPinyinATableDoes() {
         val engines = Engines(::load, null, warmUps = warmUps)
         engines.context(Engines.ENGLISH, "")
         assertEquals(emptyList<Runnable>(), later)
+        // nor read on the fcitx thread instead
+        assertEquals(emptyList<String>(), loaded)
         // a table ranks and learns by pinyin's words too (TableLanguage)
         engines.context(Engines.WUBI, "")
         assertEquals(1, later.size)
         engines.context(Engines.SHUANGPIN, "")
         assertEquals(1, later.size)
+    }
+
+    /** Handwriting reads its sentences by pinyin's words: warmed up for as a pinyin is, off the fcitx thread. */
+    @Test
+    fun aFieldStartedInHandwritingWarmsPinyinUp() {
+        val engines = Engines(::load, null, warmUps = warmUps)
+        engines.context(Engines.HANDWRITING, "")
+        assertEquals(emptyList<String>(), loaded)
+        assertEquals(1, later.size)
+        later.single().run()
+        assertEquals(listOf(Engines.PINYIN_DATA), loaded)
     }
 
     @Test

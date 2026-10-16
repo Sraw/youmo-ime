@@ -81,20 +81,28 @@ class StrokesTest {
         assertEquals(3, e.line)
     }
 
-    /** Pinyin as far as the lookup sees it: shows what it is typed, records the rest. */
+    /** Pinyin as far as the lookup sees it: shows what it is typed, keys going in at a cursor an arrow moves; records the rest. */
     private class Pinyin : Session {
         val actions = ArrayList<Action>()
         val typed = StringBuilder()
+        var cursor = 0
         override var learning = true
         override fun reads(c: Char) = c in 'a'..'z'
         override fun apply(action: Action): Snapshot {
             actions += action
             when (action) {
-                is Action.Key -> typed.append(action.char)
-                is Action.Select, Action.Reset, is Action.Context -> typed.setLength(0)
+                is Action.Key -> typed.insert(cursor++, action.char)
+                is Action.Step -> cursor = action.applyTo(cursor, typed.length)
+                is Action.Select, Action.Reset, is Action.Context -> {
+                    typed.setLength(0)
+                    cursor = 0
+                }
                 else -> {}
             }
-            return Snapshot("", typed.toString(), emptyList(), 0, hasPreviousPage = false, hasNextPage = false, handled = true, predicting = false)
+            return Snapshot(
+                "", typed.toString(), emptyList(), 0, hasPreviousPage = false, hasNextPage = false, handled = true, predicting = false,
+                cursor = if (cursor < typed.length) cursor else -1,
+            )
         }
         override fun candidates(from: Int, count: Int) = listOf(Choice("拼"))
         override fun offers(index: Int) = setOf(Offer.FORGET)
@@ -294,10 +302,44 @@ class StrokesTest {
         assertEquals("u一一", l.apply(Action.Backspace).preedit)
         // a letter ends the lookup where the cursor is: u, then the a, then the strokes
         l.apply(Action.Step.START)
-        l.apply(Action.Key('a'))
+        val a = l.apply(Action.Key('a'))
         assertEquals("uahh", pinyin.typed.toString())
-        // and the pinyin's cursor after the a
-        assertEquals(Action.Step(-2), pinyin.actions.last())
+        // and the pinyin's cursor after the a: the next key goes there
+        assertEquals(2, a.cursor)
+        l.apply(Action.Key('n'))
+        assertEquals("uanhh", pinyin.typed.toString())
+    }
+
+    @Test
+    fun anArrowMovesTheCursorAStrokeAtATimeAndBackspaceThereDeletesTheStrokeBeforeIt() {
+        val l = lookup()
+        "uhsp".forEach { l.apply(Action.Key(it)) }
+        // between 丨 and 丿
+        assertEquals(3, l.apply(Action.Step(-1)).cursor)
+        val deleted = l.apply(Action.Backspace)
+        assertEquals("u一丿", deleted.preedit)
+        assertEquals(2, deleted.cursor)
+        assertEquals(-1, l.apply(Action.Step(1)).cursor)
+    }
+
+    @Test
+    fun aLetterEndingTheLookupBeforeStrokesLeavesThePinyinSessionsCursorAfterIt() {
+        val data = sessionTestData()
+        // typed into the pinyin a key at a time, and handed over at once, as Engines has it
+        for (handedOver in listOf(false, true)) {
+            val pinyin = PinyinSession(data, PinyinSegmenter())
+            val l = if (handedOver) StrokeLookup(pinyin, { strokes() }, retype = pinyin::typeAll) else StrokeLookup(pinyin, { strokes() })
+            "uhh".forEach { l.apply(Action.Key(it)) }
+            l.apply(Action.Step.START)
+            l.apply(Action.Key('a'))
+            val fixed = l.apply(Action.Key('n'))
+            // as if typed so, the cursor after the n
+            val typed = PinyinSession(data, PinyinSegmenter())
+            "uanhh".forEach { typed.apply(Action.Key(it)) }
+            val expected = typed.apply(Action.Step(-2))
+            assertEquals("$handedOver", expected.preedit, fixed.preedit)
+            assertEquals("$handedOver", expected.cursor, fixed.cursor)
+        }
     }
 
     @Test

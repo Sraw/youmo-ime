@@ -66,27 +66,41 @@ class TextWords(
     fun logProb(text: CharSequence, prev2: Int, prev: Int): Float {
         val n = text.length
         if (n == 0) return 0f
-        // at each offset, the words a split can end on there: the best score to it and the word before
-        val at = Array(n + 1) { HashMap<Int, Best>() }
-        at[0][prev] = Best(0f, prev2)
+        // at each offset, the words a split can end on there, by their length (0: the word before the
+        // text, at 0 alone), with the best score to it and the word before it: flat, as the decoder
+        // keeps its lattice, for this runs for each of a table's 重码 at each key
+        val score = FloatArray((n + 1) * STATES) { Float.NEGATIVE_INFINITY }
+        val last = IntArray(score.size)
+        val before = IntArray(score.size)
+        score[0] = 0f
+        last[0] = prev
+        before[0] = prev2
+        val ids = IntArray(MAX_WORD + 1)
         for (begin in 0 until n) {
-            val from = at[begin]
-            if (from.isEmpty()) continue
-            for (length in 1..minOf(MAX_WORD, n - begin)) {
-                val id = index.find(text, begin, begin + length)
-                if (id == NO_WORD && length > 1) continue
-                val to = at[begin + length]
-                for ((last, best) in from) {
-                    val score = best.score + scorer.score(best.prev, last, id)
-                    val there = to[id]
-                    if (there == null || score > there.score) to[id] = Best(score, last)
+            val longest = minOf(MAX_WORD, n - begin)
+            for (length in 1..longest) ids[length] = index.find(text, begin, begin + length)
+            for (s in begin * STATES until (begin + 1) * STATES) {
+                if (score[s] == Float.NEGATIVE_INFINITY) continue
+                // looked up once for every word that may follow it, as the decoder does
+                val context = scorer.context(before[s], last[s])
+                val trigrams = scorer.trigrams(context)
+                for (length in 1..longest) {
+                    val id = ids[length]
+                    if (id == NO_WORD && length > 1) continue
+                    val to = (begin + length) * STATES + length
+                    val next = score[s] + scorer.scoreAfter(context, trigrams, id)
+                    if (next > score[to]) {
+                        score[to] = next
+                        last[to] = id
+                        before[to] = last[s]
+                    }
                 }
             }
         }
-        return at[n].values.maxOf { it.score }
+        var best = Float.NEGATIVE_INFINITY
+        for (s in n * STATES until (n + 1) * STATES) best = maxOf(best, score[s])
+        return best
     }
-
-    private class Best(val score: Float, val prev: Int)
 
     // the likeliest split of text from [from] on, word by word: the word ending at each offset
     // (relative to from) and where it starts
@@ -122,6 +136,9 @@ class TextWords(
         // the longest word looked for: the model's are shorter, but for a few names
         const val MAX_WORD = 8
         private const val WINDOW = 3 * MAX_WORD
+
+        // the states of logProb at an offset: a word ending there of each length, or the word before
+        private const val STATES = MAX_WORD + 1
 
         /**
          * The last two of [words] (as [lastTwo] gives them) as the decoder takes them, the one

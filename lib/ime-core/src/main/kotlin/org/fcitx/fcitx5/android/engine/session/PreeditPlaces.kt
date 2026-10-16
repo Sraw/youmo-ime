@@ -18,9 +18,9 @@ internal class PreeditPlaces private constructor(
 
     /** Where in the preedit the place [place] of the input is: before a space between syllables, not after. */
     fun preeditAt(place: Int): Int {
-        var g = 0
-        while (g < inInput.size - 1 && inInput[g] < place) g++
-        return restAt + g
+        // a place past them all: the end
+        val first = inInput.indexOfFirst { it >= place }
+        return restAt + if (first < 0) inInput.size - 1 else first
     }
 
     /** The rest of a preedit, put together a piece of the input at a time. */

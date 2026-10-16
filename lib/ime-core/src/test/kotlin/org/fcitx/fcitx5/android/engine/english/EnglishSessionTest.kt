@@ -633,6 +633,12 @@ class EnglishSessionTest {
         val possessive = session()
         possessive.commit("dogs'")
         assertFalse(possessive.apply(Action.Key('\'')).handled)
+        // one after no letter, though of the word typed (a-'), is a quote: a space after it is that one
+        val dashed = session()
+        assertEquals("a-' ", dashed.commit("a-'"))
+        val space = dashed.apply(Action.Key(' '))
+        assertTrue(space.handled)
+        assertEquals("", space.commit)
     }
 
     // a quote is read by what is before it, not counted: one closing a quote opened out of what the

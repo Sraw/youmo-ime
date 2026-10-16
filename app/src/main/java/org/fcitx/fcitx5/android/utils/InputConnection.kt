@@ -13,15 +13,17 @@ fun InputConnection.monitorCursorAnchor(enable: Boolean = true): Boolean {
         requestCursorUpdates(0)
         return false
     }
+    // and at once: a field that reports nothing till its cursor moves would keep the last field's
+    val mode = InputConnection.CURSOR_UPDATE_MONITOR or InputConnection.CURSOR_UPDATE_IMMEDIATE
     var scheduled = false
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
         scheduled = requestCursorUpdates(
-            InputConnection.CURSOR_UPDATE_MONITOR,
+            mode,
             InputConnection.CURSOR_UPDATE_FILTER_CHARACTER_BOUNDS or InputConnection.CURSOR_UPDATE_FILTER_INSERTION_MARKER
         )
     }
     if (!scheduled) {
-        scheduled = requestCursorUpdates(InputConnection.CURSOR_UPDATE_MONITOR)
+        scheduled = requestCursorUpdates(mode)
     }
     return scheduled
 }
