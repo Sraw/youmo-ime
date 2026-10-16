@@ -29,7 +29,6 @@ import android.view.inputmethod.CursorAnchorInfo
 import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InlineSuggestionsRequest
 import android.view.inputmethod.InlineSuggestionsResponse
-import android.view.inputmethod.InputConnection
 import android.view.inputmethod.InputMethodSubtype
 import android.widget.FrameLayout
 import android.widget.inline.InlinePresentationSpec
@@ -72,7 +71,6 @@ import org.fcitx.fcitx5.android.data.prefs.ManagedPreference
 import org.fcitx.fcitx5.android.data.prefs.ManagedPreferenceProvider
 import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
-import org.fcitx.fcitx5.android.engine.host.Engines
 import org.fcitx.fcitx5.android.engine.session.Action
 import org.fcitx.fcitx5.android.input.cursor.CursorRange
 import org.fcitx.fcitx5.android.input.editing.ArrowKeys
@@ -83,8 +81,6 @@ import org.fcitx.fcitx5.android.input.editing.EditorKeyPolicy
 import org.fcitx.fcitx5.android.input.editing.ForwardedKeys
 import org.fcitx.fcitx5.android.input.editing.InputConnectionEditor
 import org.fcitx.fcitx5.android.input.editing.KeyEventRelay
-import org.fcitx.fcitx5.android.input.hardware.HardwareShortcuts
-import org.fcitx.fcitx5.android.input.hardware.InputMethodSwitch
 import org.fcitx.fcitx5.android.input.editing.toEditorTraits
 import org.fcitx.fcitx5.android.input.keyboard.AddressKeys
 import org.fcitx.fcitx5.android.input.keyboard.PendingInputPolicy
@@ -122,13 +118,22 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     private val inputDeviceListener = object : InputManager.InputDeviceListener {
         override fun onInputDeviceAdded(deviceId: Int) = Unit
         override fun onInputDeviceChanged(deviceId: Int) = Unit
-        override fun onInputDeviceRemoved(deviceId: Int) = inputDeviceMgr.onDeviceRemoved(deviceId)
+        override fun onInputDeviceRemoved(deviceId: Int) {
+            Timber.d("onInputDeviceRemoved: deviceId=$deviceId")
+            inputDeviceMgr.onDeviceRemoved(deviceId)
+        }
     }
-    private val inputDeviceMgr = InputDeviceManager { isVirtualKeyboard ->
+    private val inputDeviceMgr: InputDeviceManager = InputDeviceManager { isVirtualKeyboard ->
         postFcitxJob {
             setCandidatePagingMode(if (isVirtualKeyboard) 0 else 1)
         }
-        currentInputConnection?.monitorCursorAnchor(!isVirtualKeyboard)
+        // typed on in a field the touch keyboard was up in: not the cursor of the last field typed on;
+        // the same field's (the touch keyboard called up there and put away) keeps its drag (F1793)
+        if (!isVirtualKeyboard && cursorField !== startedWith) forgetCursor()
+        val monitoring = currentInputConnection?.monitorCursorAnchor(!isVirtualKeyboard) == true
+        // typed on in a field the touch keyboard was up in: one that tells no cursor has the corner,
+        // as onStartInputView gives it, not the anchor of a field before
+        if (!isVirtualKeyboard && !monitoring) anchorToCorner()
         if (isVirtualKeyboard) {
             hideStatusIcon()
         } else {
@@ -137,23 +142,24 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         window.window?.let {
             navbarMgr.evaluate(it, isVirtualKeyboard)
         }
-        // the touch keyboard back: the input method a hardware key was typed away from, as it was
-        if (isVirtualKeyboard) postFcitxJob {
-            val im = touchInputMethod ?: return@postFcitxJob
-            touchInputMethod = null
-            if (enabledIme().any { it.uniqueName == im }) activateIme(im)
+        if (isVirtualKeyboard) {
+            // back in a field started on the hardware keyboard (its button, a tap, the keyboard
+            // unplugged): its layout, Enter and password the field's, not the field's it was last up in
+            if (inputViewStarted) currentInputEditorInfo?.let { inputView?.startInput(it, capabilityFlags) }
+            hardwareKeyboard.touchKeyboardBack()
         }
     }
 
-    // the hardware keyboard's own shortcuts: Shift and Ctrl+Space, Ctrl+Shift
-    private val shortcuts = HardwareShortcuts()
+    private val hardwareKeyboard = HardwareKeyboard(
+        post = { postFcitxJob(it) },
+        typingOnTouch = { inputDeviceMgr.isVirtualKeyboard },
+        inTextField = { currentInputEditorInfo?.isTypeNull() == false },
+        shortcutsOn = { switchShortcuts },
+    )
 
-    // these two are the fcitx thread's, touched in its jobs only:
-    // the Chinese input method last in use, for Shift or Ctrl+Space to come back to from English
-    private var leftForEnglish: String? = null
-
-    // one made for the touch screen (handwriting, the nine keys) a hardware key was typed away from
-    private var touchInputMethod: String? = null
+    // onStartInputView's evaluation done, till onFinishInputView: the touch keyboard brought back
+    // since is started above, where onStartInputView does not start it itself
+    private var inputViewStarted = false
 
     private var capabilityFlags = CapabilityFlags.DefaultFlags
 
@@ -180,12 +186,14 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     /** The IME's view of the cursor; owned by [editingSession]. */
     private val selection get() = editingSession.selection
 
-
     // the EditorInfo input last started with, null between fields: the screen turned, input restarts
     // with it again, its selection the one the field started with (resetStateForNewConfiguration).
     // Set on the main thread, read on fcitx's too (commitOverEngine)
     @Volatile
     private var startedWith: EditorInfo? = null
+
+    // the field the floating window's cursor and drag are of, last typed on with the hardware keyboard
+    private var cursorField: EditorInfo? = null
 
     // what commitOverEngine put in last ([PostedCommit.committed]), forgotten with its field: the next may take its place
     private val lastPosted = LastPosted()
@@ -204,6 +212,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     private val inlineSuggestions by prefs.keyboard.inlineSuggestions
     private val ignoreSystemCursor by prefs.advanced.ignoreSystemCursor
     private val autoPairs by prefs.keyboard.autoPairs
+    private val switchShortcuts by prefs.candidates.switchShortcuts
 
     /** What was written in each app, the engine's context where a field has none of its own. */
     private val contextMemory = ContextMemory(keep = ContextChars)
@@ -335,9 +344,9 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
                         is ForwardedKeys.Action.SendKey -> {
                             val eventTime = SystemClock.uptimeMillis()
                             if (action.up) {
-                                sendUpKeyEvent(eventTime, action.keyCode, it.states.metaState)
+                                sendUpKeyEvent(eventTime, action.keyCode, it.states.metaStateOf(action.keyCode, up = true))
                             } else {
-                                sendDownKeyEvent(eventTime, action.keyCode, it.states.metaState)
+                                sendDownKeyEvent(eventTime, action.keyCode, it.states.metaStateOf(action.keyCode, up = false))
                             }
                         }
                         is ForwardedKeys.Action.CommitChar -> commitText(action.text)
@@ -354,11 +363,9 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
                 handleDeleteSurrounding(before, after)
             }
             is FcitxEvent.IMChangeEvent -> {
-                // the Chinese one Shift comes back to from English: the last in use, however gone to
-                val active = event.data.uniqueName
-                if (active != Engines.ENGLISH) postFcitxJob { leftForEnglish = active }
+                val im = event.data.uniqueName
+                hardwareKeyboard.inputMethodChanged(im)
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-                    val im = event.data.uniqueName
                     // (one not synced yet has no subtype: the status icon below is still updated)
                     val subtype = SubtypeManager.subtypeOf(im)
                     val had = inputMethodManager.currentInputMethodSubtype?.let(SubtypeManager::inputMethodOf)
@@ -761,13 +768,15 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
 
     override fun onEvaluateFullscreenMode() = false
 
-    private fun forwardKeyEvent(event: KeyEvent): Boolean {
+    /** [handOff]: the key may be typed by another input method ([HardwareKeyboard.mayHandOff]). */
+    private fun forwardKeyEvent(event: KeyEvent, handOff: Boolean = false): Boolean {
         val sym = KeySym.fromKeyEvent(event)
         if (sym != null) {
             val timestamp = keyEventRelay.remember(event)
             val states = KeyStates.fromKeyEvent(event)
             val up = event.action == KeyEvent.ACTION_UP
             postFcitxJob {
+                if (handOff) hardwareKeyboard.handOff(this)
                 sendKey(sym, states, event.scanCode, up, timestamp)
             }
             return true
@@ -777,11 +786,11 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     }
 
     override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {
-        val shortcut = shortcuts.down(
-            shortcutKey(keyCode), event.isCtrlPressed, event.isShiftPressed,
-            others = event.isAltPressed || event.isMetaPressed, repeat = event.repeatCount > 0, event.eventTime
+        val taken = hardwareKeyboard.down(
+            keyCode, event.isCtrlPressed, event.isShiftPressed, others = event.isAltPressed || event.isMetaPressed,
+            repeat = event.repeatCount > 0, timeMs = event.eventTime
         )
-        if (applyShortcut(shortcut)) return true
+        if (taken) return true
         // request to show floating CandidatesView when pressing physical keyboard
         if (inputDeviceMgr.evaluateOnKeyDown(event, this)) {
             postFcitxJob {
@@ -789,69 +798,14 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
             }
             forceShowSelf()
         }
-        typeWithKeyboard(event)
-        return forwardKeyEvent(event) || super.onKeyDown(keyCode, event)
+        val modified = event.isCtrlPressed || event.isAltPressed || event.isMetaPressed
+        val handOff = hardwareKeyboard.mayHandOff(event.unicodeChar, modified)
+        return forwardKeyEvent(event, handOff) || super.onKeyDown(keyCode, event)
     }
 
     override fun onKeyUp(keyCode: Int, event: KeyEvent): Boolean {
-        if (applyShortcut(shortcuts.up(shortcutKey(keyCode), event.eventTime))) return true
+        if (hardwareKeyboard.up(keyCode, event.eventTime)) return true
         return forwardKeyEvent(event) || super.onKeyUp(keyCode, event)
-    }
-
-    private fun shortcutKey(keyCode: Int) = when (keyCode) {
-        KeyEvent.KEYCODE_SHIFT_LEFT, KeyEvent.KEYCODE_SHIFT_RIGHT -> HardwareShortcuts.Key.SHIFT
-        KeyEvent.KEYCODE_CTRL_LEFT, KeyEvent.KEYCODE_CTRL_RIGHT -> HardwareShortcuts.Key.CTRL
-        KeyEvent.KEYCODE_SPACE -> HardwareShortcuts.Key.SPACE
-        else -> HardwareShortcuts.Key.OTHER
-    }
-
-    /** Does what [decision] says; whether the key goes no further. */
-    private fun applyShortcut(decision: HardwareShortcuts.Decision): Boolean {
-        // while the hardware keyboard is typed on, only what it can type is gone to
-        val usable: (String) -> Boolean = if (inputDeviceMgr.isVirtualKeyboard) { _ -> true } else Engines::takesKeyboard
-        when (decision.action) {
-            HardwareShortcuts.Action.TOGGLE -> switchInputMethod { current, enabled ->
-                InputMethodSwitch.toggle(current, enabled, leftForEnglish, Engines.ENGLISH, usable)
-            }
-            HardwareShortcuts.Action.NEXT -> switchInputMethod { current, enabled ->
-                InputMethodSwitch.next(current, enabled, usable)
-            }
-            null -> {}
-        }
-        return decision.consumed
-    }
-
-    private fun switchInputMethod(target: (current: String, enabled: List<String>) -> String?) = postFcitxJob {
-        val to = target(inputMethodEntryCached.uniqueName, enabledIme().map { it.uniqueName }) ?: return@postFcitxJob
-        // chosen: the touch keyboard comes back to this one
-        touchInputMethod = null
-        activateIme(to)
-    }
-
-    /**
-     * A character key of the hardware keyboard pressed in an input method made for the touch
-     * screen (handwriting, the nine keys): typed, as Sogou and Baidu type it whatever their touch
-     * keyboard is, by one that takes a keyboard, until the touch keyboard is back. Before the key,
-     * whose job comes after.
-     */
-    private fun typeWithKeyboard(event: KeyEvent) {
-        // the touch keyboard still up (its candidates window off, or the system told to keep it):
-        // what is on it stays what is typed with
-        if (inputDeviceMgr.isVirtualKeyboard) return
-        // a character only: Space, Enter and Tab are the touch input method's own (Enter commits
-        // what was written, and would send a message from pinyin with nothing typed)
-        val char = event.unicodeChar
-        if (char <= ' '.code || char == 0x7f) return
-        if (event.isCtrlPressed || event.isAltPressed || event.isMetaPressed) return
-        postFcitxJob {
-            val current = inputMethodEntryCached.uniqueName
-            if (Engines.takesKeyboard(current)) return@postFcitxJob
-            val to = InputMethodSwitch.forKeyboard(
-                current, enabledIme().map { it.uniqueName }, Engines.ENGLISH, Engines::takesKeyboard
-            ) ?: return@postFcitxJob
-            touchInputMethod = current
-            activateIme(to)
-        }
     }
 
     // Added in API level 14, deprecated in 29
@@ -948,10 +902,12 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         selection.startInput(again, attribute.initialSelStart, attribute.initialSelEnd)
         val flags = CapabilityFlags.fromEditorInfo(attribute)
         val sensitive = flags.hasAny(CapabilityFlag.PasswordOrSensitive)
-        // the screen turned (resetStateForNewConfiguration): input restarts with no
-        // onFinishInputView and the engine's input goes below; the editor's preedit (English's word,
-        // handwriting's characters, the text itself) is text from now on
+        // input restarting (the screen turned, resetStateForNewConfiguration, or the app's own
+        // restartInput) has no onFinishInputView, and the focus out below drops the engine's input: the
+        // editor's preedit (English's word, handwriting's characters, the text itself) is text from now on
         if (restarting) currentInputConnection?.finishComposingText()
+        // restarted, the same field: what it had of the floating window stays its
+        if (restarting && cursorField === startedWith) cursorField = attribute
         startedWith = attribute
         // what commitOverEngine put in last, a paste into a password maybe, is not kept: the reset above
         // keeps it from being taken back anyway
@@ -973,6 +929,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         inputDeviceMgr.notifyOnStartInput(attribute)
         Timber.d("onStartInput: initialSel=${selection.current}, restarting=$restarting")
         val isNullType = attribute.isTypeNull()
+        if (!isNullType) hardwareKeyboard.fieldStarted()
         // wait until InputContext created/activated
         postFcitxJob {
             if (restarting) {
@@ -1007,6 +964,11 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         }
     }
 
+    private fun forgetCursor() {
+        cursorField = startedWith
+        candidatesView?.forgetCursor()
+    }
+
     override fun onStartInputView(info: EditorInfo, restarting: Boolean) {
         Timber.d("onStartInputView: restarting=$restarting")
         // the app's language picked anew in its settings: shown in it from now on
@@ -1019,19 +981,18 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         postFcitxJob {
             focus(true)
         }
-        if (inputDeviceMgr.evaluateOnStartInputView(info, this)) {
+        // the touch keyboard coming up as this evaluates is started below, not in inputDeviceMgr's onChange
+        inputViewStarted = false
+        val virtual = inputDeviceMgr.evaluateOnStartInputView(info, this)
+        inputViewStarted = true
+        if (virtual) {
             // because onStartInputView will always be called after onStartInput,
             // editorInfo and capFlags should be up-to-date
             inputView?.startInput(info, capabilityFlags, restarting)
         } else {
-            if (currentInputConnection?.monitorCursorAnchor() != true) {
-                if (!decorLocationUpdated) {
-                    updateDecorLocation()
-                }
-                // anchor CandidatesView to bottom-left corner in case InputConnection does not
-                // support monitoring CursorAnchorInfo
-                candidatesView?.updateCursorAnchor(contentSize)
-            }
+            // the same field restarted (a WebView after an edit) keeps its cursor and its drag
+            if (!restarting) forgetCursor()
+            if (currentInputConnection?.monitorCursorAnchor() != true) anchorToCorner()
             showStatusIcon(StatusIconMapping.fromEntry(fcitx.runImmediately { inputMethodEntryCached }))
         }
         // shown again in the field it was hidden in, no onStartInput between to tell it anew
@@ -1083,6 +1044,15 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         if (contentSize[0] > 0 && contentSize[1] > 0) {
             decorLocationUpdated = true
         }
+    }
+
+    // anchor CandidatesView to bottom-left corner in case InputConnection does not
+    // support monitoring CursorAnchorInfo
+    private fun anchorToCorner() {
+        if (!decorLocationUpdated) {
+            updateDecorLocation()
+        }
+        candidatesView?.updateCursorAnchor(contentSize)
     }
 
     private val anchorPosition = floatArrayOf(0f, 0f, 0f, 0f)
@@ -1263,6 +1233,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     override fun onFinishInputView(finishingInput: Boolean) {
         Timber.d("onFinishInputView: finishingInput=$finishingInput")
         decorLocationUpdated = false
+        inputViewStarted = false
         inputDeviceMgr.onFinishInputView()
         inputView?.finishInput()
         currentInputConnection?.apply {
@@ -1285,6 +1256,8 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         }
         capabilityFlags = CapabilityFlags.DefaultFlags
         startedWith = null
+        // not the finished field's EditorInfo kept; the same field's touch keyboard put away finishes no input (F1793)
+        cursorField = null
         lastPosted.forget()
         // a read queued in the field, a password's maybe, is not made once the policy forgot it
         contextReads.forget()

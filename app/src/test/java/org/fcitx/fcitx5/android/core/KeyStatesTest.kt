@@ -51,4 +51,23 @@ class KeyStatesTest {
         val ctrls = KeyEvent.META_CTRL_ON or KeyEvent.META_CTRL_LEFT_ON or KeyEvent.META_CTRL_RIGHT_ON
         assertEquals(KeyStates(KeyState.Ctrl), states(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_CTRL_RIGHT, ctrls))
     }
+
+    /** A key fcitx hands back with no event left to replay is made up from its states: Android's meta state again. */
+    @Test
+    fun aModifierMadeUpFromItsStatesHasItsOwnBitAsAndroidHasIt() {
+        val shift = KeyEvent.META_SHIFT_ON or KeyEvent.META_SHIFT_LEFT_ON
+        val ctrl = KeyEvent.META_CTRL_ON or KeyEvent.META_CTRL_LEFT_ON
+        // a lone Shift: on in its press, off in its release, as it came
+        assertEquals(shift, states(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_SHIFT_LEFT, shift).metaStateOf(KeyEvent.KEYCODE_SHIFT_LEFT, up = false))
+        assertEquals(0, states(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_SHIFT_LEFT, 0).metaStateOf(KeyEvent.KEYCODE_SHIFT_LEFT, up = true))
+        // Ctrl held throughout stays on
+        assertEquals(ctrl, KeyStates(KeyState.Ctrl, KeyState.Shift).metaStateOf(KeyEvent.KEYCODE_SHIFT_LEFT, up = true))
+        assertEquals(ctrl or shift, KeyStates(KeyState.Ctrl).metaStateOf(KeyEvent.KEYCODE_SHIFT_LEFT, up = false))
+        // any other key's as its states have it
+        assertEquals(ctrl, KeyStates(KeyState.Ctrl).metaStateOf(KeyEvent.KEYCODE_A, up = true))
+        // no sides: right Shift's press has the left's flag, and left Shift's release with right
+        // Shift still held has the bit off
+        assertEquals(shift, KeyStates.Empty.metaStateOf(KeyEvent.KEYCODE_SHIFT_RIGHT, up = false))
+        assertEquals(0, KeyStates(KeyState.Shift).metaStateOf(KeyEvent.KEYCODE_SHIFT_LEFT, up = true))
+    }
 }

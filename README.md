@@ -57,11 +57,11 @@
 
 | 版本 | 内容 | 大小 |
 |---|---|---|
-| `text` 文字版 | 只有打字，只申请振动权限 | 约 260 MB |
-| `voice` 语音版 | 多了离线语音输入，多申请录音权限 | 约 440 MB |
+| `text` 文字版 | 只有打字，只申请振动权限 | 约 330 MB |
+| `voice` 语音版 | 多了离线语音输入，多申请录音权限 | 约 490 MB |
 
 - 需要 Android 6.0 以上的 64 位 ARM 手机（arm64-v8a），近几年的手机都是。
-- 安装包大，是因为语言模型、句子模型和词库都在包里，离线就能用；准确率优先于体积。
+- 安装包大，是因为语言模型、句子模型、词库和手写识别模型都在包里，离线就能用；准确率优先于体积。
 - 包名 `io.github.sraw.youmo`，可以和上游的 Fcitx5 同时安装；两个版本可以互相覆盖安装，设置和学到的词都会保留。
 - 下载后可以用 `SHA256SUMS.txt` 核对文件。
 
@@ -161,11 +161,11 @@ Builds are on [Releases](https://github.com/Sraw/youmo-ime/releases), two per re
 
 | Build | What | Size |
 |---|---|---|
-| `text` | Typing only; asks only for vibration | about 260 MB |
-| `voice` | Adds offline voice input; asks for the microphone too | about 440 MB |
+| `text` | Typing only; asks only for vibration | about 330 MB |
+| `voice` | Adds offline voice input; asks for the microphone too | about 490 MB |
 
 - Needs a 64-bit ARM phone (arm64-v8a) on Android 6.0 or later, as phones of the last several years are.
-- The APKs are large because the language models, sentence models and dictionary are inside, to work offline; accuracy comes before size.
+- The APKs are large because the language models, sentence models, dictionary and handwriting recognizers are inside, to work offline; accuracy comes before size.
 - The package name is `io.github.sraw.youmo`, so it installs alongside upstream Fcitx5; either build installs over the other, keeping settings and learnt words.
 - `SHA256SUMS.txt` checks the files.
 

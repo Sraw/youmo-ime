@@ -333,6 +333,19 @@ AndroidFrontend::AndroidFrontend(Instance *instance)
                 imChangeCallback(makeInputMethodStatus(activeIC_));
             }
     ));
+    // the enabled list set anew (native-lib's setEnabledInputMethods) with the input method kept: told as
+    // a change too, the app reading the list again on one (what Ctrl+Space can go to). On a focused
+    // context fcitx's Instance re-activates the input method on the manager's CurrentGroupChanged signal,
+    // just before it posts the InputMethodGroupChanged watched here (instance.cpp), and the watcher above
+    // tells that; only an unfocused one is left (split screen: settings in front, the field unfocused)
+    eventHandlers_.emplace_back(instance_->watchEvent(
+            EventType::InputMethodGroupChanged,
+            EventWatcherPhase::Default,
+            [this](Event &) {
+                if (!activeIC_ || activeIC_->hasFocus()) return;
+                imChangeCallback(makeInputMethodStatus(activeIC_));
+            }
+    ));
     eventHandlers_.emplace_back(instance_->watchEvent(
             EventType::InputContextSwitchInputMethod,
             EventWatcherPhase::Default,

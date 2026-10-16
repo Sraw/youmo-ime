@@ -15,8 +15,10 @@ class HardwareShortcutsTest {
     private val s = HardwareShortcuts()
     private val none = Decision(null, consumed = false)
 
-    private fun down(key: Key, t: Long, ctrl: Boolean = false, shift: Boolean = false, others: Boolean = false, repeat: Boolean = false) =
-        s.down(key, ctrl, shift, others, repeat, t)
+    private fun down(
+        key: Key, t: Long, ctrl: Boolean = false, shift: Boolean = false, others: Boolean = false, repeat: Boolean = false,
+        canToggle: Boolean = true,
+    ) = s.down(key, ctrl, shift, others, repeat, t) { canToggle }
 
     @Test
     fun shiftTappedAloneSwitchesChineseAndEnglish() {
@@ -69,6 +71,62 @@ class HardwareShortcutsTest {
     }
 
     @Test
+    fun oneHeldTheOtherTappedAgainGoesOnEachTime() {
+        // Ctrl held, Shift tapped three times: three on, as on Windows
+        down(Key.CTRL, 0)
+        down(Key.SHIFT, 60, ctrl = true)
+        assertEquals(Action.NEXT, s.up(Key.SHIFT, 120).action)
+        down(Key.SHIFT, 500, ctrl = true)
+        assertEquals(Action.NEXT, s.up(Key.SHIFT, 560).action)
+        down(Key.SHIFT, 900, ctrl = true)
+        assertEquals(Action.NEXT, s.up(Key.SHIFT, 960).action)
+        assertEquals(none, s.up(Key.CTRL, 1000))
+        // Shift held, Ctrl tapped again; Shift let go after is no lone Shift's tap
+        down(Key.SHIFT, 2000)
+        down(Key.CTRL, 2050, shift = true)
+        assertEquals(Action.NEXT, s.up(Key.CTRL, 2100).action)
+        down(Key.CTRL, 2400, shift = true)
+        assertEquals(Action.NEXT, s.up(Key.CTRL, 2450).action)
+        assertEquals(none, s.up(Key.SHIFT, 2470))
+        // nothing held: a Shift tap is the toggle again
+        down(Key.SHIFT, 3000)
+        assertEquals(Action.TOGGLE, s.up(Key.SHIFT, 3050).action)
+    }
+
+    @Test
+    fun oneSlowTapWithTheOtherHeldDoesNotEndTheCycle() {
+        down(Key.CTRL, 0)
+        down(Key.SHIFT, 60, ctrl = true)
+        assertEquals(Action.NEXT, s.up(Key.SHIFT, 120).action)
+        // a Shift held too long goes nowhere
+        down(Key.SHIFT, 500, ctrl = true)
+        assertEquals(none, s.up(Key.SHIFT, 500 + HardwareShortcuts.TAP_MS + 1))
+        // Ctrl still held: the next tap goes on again
+        down(Key.SHIFT, 1000, ctrl = true)
+        assertEquals(Action.NEXT, s.up(Key.SHIFT, 1060).action)
+        // and a first press of the two together held long is no NEXT, but the tap after it is
+        s.up(Key.CTRL, 1100)
+        down(Key.CTRL, 2000)
+        down(Key.SHIFT, 2050, ctrl = true)
+        assertEquals(none, s.up(Key.SHIFT, 2050 + HardwareShortcuts.TAP_MS + 1))
+        down(Key.SHIFT, 3000, ctrl = true)
+        assertEquals(Action.NEXT, s.up(Key.SHIFT, 3050).action)
+    }
+
+    @Test
+    fun oneSlowCtrlTapWithShiftHeldDoesNotEndTheCycle() {
+        down(Key.SHIFT, 0)
+        down(Key.CTRL, 60, shift = true)
+        assertEquals(Action.NEXT, s.up(Key.CTRL, 120).action)
+        // a Ctrl held too long goes nowhere
+        down(Key.CTRL, 500, shift = true)
+        assertEquals(none, s.up(Key.CTRL, 500 + HardwareShortcuts.TAP_MS + 1))
+        // Shift still held: the next tap goes on again
+        down(Key.CTRL, 1000, shift = true)
+        assertEquals(Action.NEXT, s.up(Key.CTRL, 1060).action)
+    }
+
+    @Test
     fun ctrlShiftWithAKeyIsTheAppsShortcut() {
         down(Key.CTRL, 0)
         down(Key.SHIFT, 30, ctrl = true)
@@ -92,6 +150,16 @@ class HardwareShortcutsTest {
     }
 
     @Test
+    fun ctrlSpaceWithNowhereToGoIsTheApps() {
+        // one input method, or no English: the app's, its completion say, or the system's
+        down(Key.CTRL, 0)
+        assertEquals(none, down(Key.SPACE, 50, ctrl = true, canToggle = false))
+        assertEquals(none, down(Key.SPACE, 600, ctrl = true, repeat = true, canToggle = false))
+        assertEquals(none, s.up(Key.SPACE, 700))
+        assertEquals(none, s.up(Key.CTRL, 720))
+    }
+
+    @Test
     fun ctrlTappedAloneDoesNothing() {
         down(Key.CTRL, 0)
         assertEquals(none, s.up(Key.CTRL, 50))
@@ -106,5 +174,19 @@ class HardwareShortcutsTest {
         // an ordinary Space later: both its press and its release go on
         assertEquals(none, down(Key.SPACE, 1000))
         assertEquals(none, s.up(Key.SPACE, 1050))
+    }
+
+    @Test
+    fun aSpacePassedWhereTheShortcutsDoNotApplyLetsATakenOneGo() {
+        down(Key.CTRL, 0)
+        assertEquals(Action.TOGGLE, down(Key.SPACE, 50, ctrl = true).action)
+        s.up(Key.CTRL, 100)
+        // pressed in a terminal, or with the shortcuts off: its release goes on with it
+        s.passed(Key.SPACE)
+        assertEquals(none, s.up(Key.SPACE, 1050))
+        // nor does a Shift tap go on across a key passed
+        down(Key.SHIFT, 2000)
+        s.passed(Key.OTHER)
+        assertEquals(none, s.up(Key.SHIFT, 2050))
     }
 }

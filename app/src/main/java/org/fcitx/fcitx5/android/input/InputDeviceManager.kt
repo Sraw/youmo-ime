@@ -13,6 +13,7 @@ import android.view.inputmethod.EditorInfo
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.input.candidates.floating.FloatingCandidatesMode
 import org.fcitx.fcitx5.android.utils.isTypeNull
+import timber.log.Timber
 
 class InputDeviceManager(private val onChange: (Boolean) -> Unit) {
 
@@ -78,7 +79,7 @@ class InputDeviceManager(private val onChange: (Boolean) -> Unit) {
         startedInputView = true
         isNullInputType = info.isTypeNull()
         isVirtualKeyboard = when (candidatesViewMode) {
-            FloatingCandidatesMode.SystemDefault -> service.superEvaluateInputViewShown()
+            FloatingCandidatesMode.SystemDefault -> systemShowsTouchKeyboard(service)
             FloatingCandidatesMode.InputDevice -> isVirtualKeyboard
             FloatingCandidatesMode.Disabled -> true
         }
@@ -111,6 +112,7 @@ class InputDeviceManager(private val onChange: (Boolean) -> Unit) {
     }
 
     private fun evaluateOnKeyDownInner(service: FcitxInputMethodService) {
+        touchKeyboardAsked = false
         isVirtualKeyboard = when (candidatesViewMode) {
             FloatingCandidatesMode.SystemDefault -> service.superEvaluateInputViewShown()
             FloatingCandidatesMode.InputDevice -> false
@@ -121,7 +123,7 @@ class InputDeviceManager(private val onChange: (Boolean) -> Unit) {
     fun evaluateOnViewClicked(service: FcitxInputMethodService) {
         if (!startedInputView) return
         isVirtualKeyboard = when (candidatesViewMode) {
-            FloatingCandidatesMode.SystemDefault -> service.superEvaluateInputViewShown()
+            FloatingCandidatesMode.SystemDefault -> systemShowsTouchKeyboard(service)
             else -> true
         }
     }
@@ -129,7 +131,7 @@ class InputDeviceManager(private val onChange: (Boolean) -> Unit) {
     fun evaluateOnUpdateEditorToolType(toolType: Int, service: FcitxInputMethodService) {
         if (!startedInputView) return
         isVirtualKeyboard = when (candidatesViewMode) {
-            FloatingCandidatesMode.SystemDefault -> service.superEvaluateInputViewShown()
+            FloatingCandidatesMode.SystemDefault -> systemShowsTouchKeyboard(service)
             FloatingCandidatesMode.InputDevice ->
                 // switch to virtual keyboard on touch screen events, otherwise preserve current mode
                 if (toolType == MotionEvent.TOOL_TYPE_FINGER || toolType == MotionEvent.TOOL_TYPE_STYLUS) true else isVirtualKeyboard
@@ -143,6 +145,9 @@ class InputDeviceManager(private val onChange: (Boolean) -> Unit) {
     fun onDeviceRemoved(deviceId: Int) {
         if (deviceId != typingDevice) return
         typingDevice = KeyCharacterMap.VIRTUAL_KEYBOARD
+        // a Bluetooth keyboard gone to sleep is removed as an unplugged one is: logged, for a touch
+        // keyboard that came up by itself
+        Timber.d("Keyboard %d gone: the touch keyboard back", deviceId)
         // hidden or not: shown next, it is the touch keyboard (made visible in a hidden window, harmless)
         isVirtualKeyboard = true
     }
@@ -150,8 +155,16 @@ class InputDeviceManager(private val onChange: (Boolean) -> Unit) {
     /** The touch keyboard asked for (the floating window's button): until a hardware key is typed again. */
     fun showTouchKeyboard() {
         if (!startedInputView) return
+        touchKeyboardAsked = true
         isVirtualKeyboard = true
     }
+
+    // the button's ask, which the system's say (a keyboard attached: no touch keyboard) does not
+    // undo at the next tap or field: a hardware key typed does
+    private var touchKeyboardAsked = false
+
+    private fun systemShowsTouchKeyboard(service: FcitxInputMethodService) =
+        touchKeyboardAsked || service.superEvaluateInputViewShown()
 
     /**
      * Should be called when input method switched **by user**

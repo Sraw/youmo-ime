@@ -201,7 +201,11 @@ public:
 
     void setConfig(const RawConfig &config) override;
 
-    /** Only [entry]'s own options: pinyin's, shuangpin's or its table's. */
+    /**
+     * What [entry]'s page shows of config_: pinyin's, shuangpin's, English's or handwriting's
+     * options, or a table's own with the page size, prediction and performance level every Chinese
+     * input method shares.
+     */
     const Configuration *getConfigForInputMethod(const InputMethodEntry &entry) const override;
 
     void setConfigForInputMethod(const InputMethodEntry &entry, const RawConfig &config) override;

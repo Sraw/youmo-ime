@@ -92,22 +92,30 @@ public:
         p_clipboard = addonMgr.addon("clipboard", true);
         p_engine = addonMgr.addon("androidengine", true);
         setupCallback(p_frontend, p_engine);
-        disableAltTrigger();
+        clearFcitxHotkeys();
     }
 
-    // a hardware keyboard's lone Shift is the app's (HardwareShortcuts, which knows English from
-    // Chinese): fcitx's own switched as well, to the group's first, pinyin. Saved, so a reload keeps it
-    void disableAltTrigger() {
+    // a hardware keyboard's lone Shift and Ctrl+Space are the app's (HardwareShortcuts, which knows
+    // English from Chinese, and its setting turns them off for the app to have them): fcitx's own
+    // switched as well, to the group's first, pinyin, and with the setting off Ctrl+Space still did.
+    // Where the preedit shows is the input method's (androidengine's composesText), which Ctrl+Alt+P
+    // turned over. TriggerKeys' defaults are Ctrl+Space, Zenkaku_Hankaku and Hangul: all three go to the
+    // app, which has no shortcut for the last two. Saved, and cleared again after each read of the config: one written through the
+    // documents provider without them (a backup from before) has fcitx's defaults back
+    void clearFcitxHotkeys() {
         auto &config = p_instance->globalConfig();
-        if (config.altTriggerKeys().empty()) return;
+        if (config.triggerKeys().empty() && config.altTriggerKeys().empty() && config.togglePreeditKeys().empty()) return;
         fcitx::RawConfig raw;
+        raw.setValueByPath("Hotkey/TriggerKeys", "");
         raw.setValueByPath("Hotkey/AltTriggerKeys", "");
+        raw.setValueByPath("Hotkey/TogglePreedit", "");
         config.load(raw, true);
         config.safeSave();
     }
 
     void reloadConfig() {
         p_instance->reloadConfig();
+        clearFcitxHotkeys();
         p_instance->refresh();
         auto &addonManager = p_instance->addonManager();
         for (const auto category: {fcitx::AddonCategory::InputMethod,
@@ -217,6 +225,7 @@ public:
         if (p_instance->globalConfig().safeSave()) {
             p_instance->reloadConfig();
         }
+        clearFcitxHotkeys();
     }
 
     fcitx::AddonInstance *getAddonInstance(const std::string &addon) {
@@ -279,6 +288,9 @@ public:
         if (!p_quickphrase) return;
         auto *ic = p_frontend->call<fcitx::IAndroidFrontend::activeInputContext>();
         if (!ic) return;
+        // its code above the candidates, as every code is, in English and handwriting too (whose
+        // text is the app's): the engine's next event sets the flag back
+        ic->setEnablePreedit(false);
         p_quickphrase->call<fcitx::IQuickPhrase::trigger>(
                 ic, "", "", "", "", fcitx::Key{FcitxKey_None}
         );

@@ -32,12 +32,26 @@ device() {
 
 ev() { echo "sendevent $DEV 1 $1 $2; sendevent $DEV 0 0 0;"; }
 
+prop() { adb shell getprop "$1" | tr -d '\r'; }
+
+# The emulator's board (ranchu, goldfish before it), marked qemu: ro.boot.qemu on newer images,
+# ro.kernel.qemu on older ones. redroid is no such board, and on this machine its kernel's boot_id
+# is this machine's: refused, as anything else is, since a keyboard made there could be the host's
+emulator() {
+  [[ "$(prop ro.boot.qemu)" == 1 || "$(prop ro.kernel.qemu)" == 1 ]] || return 1
+  [[ "$(prop ro.hardware)" == ranchu || "$(prop ro.hardware)" == goldfish ]] || return 1
+  local here there
+  there=$(adb shell cat /proc/sys/kernel/random/boot_id | tr -d '\r')
+  here=$(cat /proc/sys/kernel/random/boot_id 2>/dev/null || true)
+  [[ -z "$here" || "$there" != "$here" ]]
+}
+
 # fails here rather than in the $(ev ...) subshell, where exit would only end the subshell
 check() { for k in "$@"; do [[ -n "${C[$k]:-}" ]] || { echo "unknown key: $k (names are in the table above)" >&2; exit 1; }; done; }
 
 case "${1:-}" in
 up)
-  [[ "$(adb shell getprop ro.kernel.qemu)" == 1 ]] || { echo "not an emulator: refusing" >&2; exit 1; }
+  emulator || { echo "not an emulator: refusing" >&2; exit 1; }
   adb root >/dev/null; adb wait-for-device
   keys=$(seq -s, 1 255)
   adb shell "echo '{\"id\":1,\"command\":\"register\",\"name\":\"Test USB Keyboard\",\"vid\":4660,\"pid\":22136,\"bus\":\"usb\",\"configuration\":[{\"type\":100,\"data\":[1]},{\"type\":101,\"data\":[$keys]}]}' > /data/local/tmp/kbfifo.log"
@@ -74,5 +88,5 @@ type|key|combo)
   adb shell "$s"
   ;;
 *)
-  sed -n '2,17p' "$0"; exit 1 ;;
+  sed -n '2,16p' "$0"; exit 1 ;;
 esac

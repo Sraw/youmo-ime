@@ -49,6 +49,24 @@ class InputMethodSwitchTest {
     }
 
     @Test
+    fun nextFromOneNotInTheListReachesTheLastToo() {
+        // fcitx fallen back to an English the user removed, or its input method not read yet
+        assertEquals(Engines.PINYIN, InputMethodSwitch.next(en, listOf(Engines.PINYIN), any))
+        assertEquals(Engines.PINYIN, InputMethodSwitch.next(en, listOf(Engines.T9, Engines.HANDWRITING, Engines.PINYIN), keyboard))
+    }
+
+    @Test
+    fun aToggleCanGoOnlyWithEnglishAndAChineseOneToGoTo() {
+        assertTrue(InputMethodSwitch.canToggle(Engines.WUBI, list, en, keyboard))
+        assertTrue(InputMethodSwitch.canToggle(en, list, en, keyboard))
+        assertFalse(InputMethodSwitch.canToggle(Engines.PINYIN, listOf(Engines.PINYIN), en, any))
+        assertFalse(InputMethodSwitch.canToggle(Engines.PINYIN, list - en, en, any))
+        assertFalse(InputMethodSwitch.canToggle(en, listOf(en), en, any))
+        // on the hardware keyboard, English and only the touch screen's
+        assertFalse(InputMethodSwitch.canToggle(en, listOf(en, Engines.T9, Engines.HANDWRITING), en, keyboard))
+    }
+
+    @Test
     fun aTouchInputMethodHandsAKeyboardToTheFirstThatTakesOne() {
         assertNull(InputMethodSwitch.forKeyboard(Engines.WUBI, list, en, keyboard))
         assertNull(InputMethodSwitch.forKeyboard(en, list, en, keyboard))
@@ -57,6 +75,17 @@ class InputMethodSwitchTest {
         // no Chinese one that does: English
         assertEquals(en, InputMethodSwitch.forKeyboard(Engines.T9, listOf(Engines.T9, en), en, keyboard))
         assertNull(InputMethodSwitch.forKeyboard(Engines.T9, listOf(Engines.T9, Engines.HANDWRITING), en, keyboard))
+    }
+
+    @Test
+    fun aTouchInputMethodHandsAKeyboardToPinyinFirst() {
+        // as Sogou and Baidu, pinyin though a table comes before it
+        assertEquals(Engines.PINYIN, InputMethodSwitch.forKeyboard(Engines.T9, listOf(Engines.T9, Engines.WUBI, en, Engines.PINYIN), en, keyboard))
+        // 全拼 or 双拼, whichever the list has first
+        assertEquals(
+            Engines.SHUANGPIN,
+            InputMethodSwitch.forKeyboard(Engines.HANDWRITING, listOf(Engines.HANDWRITING, Engines.WUBI, Engines.SHUANGPIN, Engines.PINYIN), en, keyboard)
+        )
     }
 
     @Test

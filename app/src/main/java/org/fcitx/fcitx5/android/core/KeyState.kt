@@ -87,6 +87,17 @@ value class KeyStates(val states: UInt) {
         return metaState
     }
 
+    /**
+     * [metaState] for an event of [keyCode] made up from these states, fcitx's ([fromKeyEvent]): a
+     * modifier key's own bit back on as it goes down and off as it comes up ([up]), as Android has it,
+     * so that an editor's sticky meta state follows. The states have no sides: the bit goes off with
+     * either key of a pair while the other may still be held, and is always the left key's.
+     */
+    fun metaStateOf(keyCode: Int, up: Boolean): Int {
+        val own = ownModifier(keyCode)?.first ?: return metaState
+        return KeyStates(if (up) states - own else states + own).metaState
+    }
+
     fun toInt() = states.toInt()
 
     companion object {

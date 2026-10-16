@@ -47,7 +47,8 @@ One process. Inside it:
   thread puts in place.
 - **`engine-warm-up`** (`Engines`): a daemon thread for each warm-up, once for each `Engines` (made
   anew as fcitx starts again after it exited, `EngineBridge.close()`): pinyin's data and word index
-  as the first field starts in one of the pinyins (全拼, 双拼, 九键; not in English or a table),
+  as the first field starts in a Chinese input method (全拼, 双拼, 九键, handwriting, a table; not in
+  English: a switch from English to one reads them on the fcitx thread as its session is made),
   English's keys and word index as its session is first made. A session
   made meanwhile waits for them: `EngineAssets.pinyinData` and the word indexes are synchronized
   lazies.
@@ -93,7 +94,8 @@ sentence models score what follows it. `ContextMemory` keeps the end of what was
 box that clears itself, for the reply typed next.
 
 Where the preedit shows is the input method's (`composesText` in `androidengine.cpp`, set as the
-input context's `setEnablePreedit` on activation, so quick phrase and Unicode follow it): English's
+input context's `setEnablePreedit` on activation and again at each event the engine sends; turned off as
+quick phrase or Unicode starts, so their code shows above the candidates in English and handwriting too): English's
 word and handwriting's characters are the text itself and go into the app's text as composing
 text, where the field takes it (`CapabilityFlag.Preedit`), kept there as the keyboard goes. A code
 (pinyin, the nine keys', a table's) is not text, and is shown in the keyboard's own row above the

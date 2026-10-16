@@ -54,6 +54,13 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
 
         /** Whether [resetHiddenSettings] ran: on the first start of a version with it, and so once. */
         val hiddenSettingsReset = bool("hidden_settings_reset", false)
+
+        /**
+         * Where the lone floating keyboard button was dragged in an editor that tells no cursor, as
+         * fractions of its window (so a rotation still finds it); negative for none, the top end then.
+         */
+        val keyboardButtonX = float("keyboard_button_x", -1f)
+        val keyboardButtonY = float("keyboard_button_y", -1f)
     }
 
     inner class Advanced : ManagedPreferenceCategory(R.string.advanced, sharedPreferences) {
@@ -404,6 +411,11 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
             R.string.show_candidates_window,
             "show_candidates_window",
             FloatingCandidatesMode.InputDevice
+        )
+
+        // the hardware keyboard's other settings are here: this is its page
+        val switchShortcuts = switch(
+            R.string.hardware_switch_shortcuts, "hardware_switch_shortcuts", true, R.string.hardware_switch_shortcuts_summary
         )
 
         val orientation = enumList(

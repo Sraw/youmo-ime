@@ -16,6 +16,7 @@ import org.fcitx.fcitx5.android.data.punctuation.PunctuationMapEntry
 import org.fcitx.fcitx5.android.engine.host.EngineSettings
 import org.fcitx.fcitx5.android.engine.host.Engines
 import org.fcitx.fcitx5.android.engine.host.Keyboard
+import org.fcitx.fcitx5.android.engine.host.TableSettings
 import org.junit.After
 import org.junit.AfterClass
 import org.junit.Assert
@@ -213,6 +214,28 @@ class FcitxTest {
         Assert.assertEquals(WUBI, fcitx.currentIme().uniqueName)
         fcitx.enumerateIme(forward = true)
         Assert.assertEquals("cycles back round", Engines.PINYIN, fcitx.currentIme().uniqueName)
+    }
+
+    /**
+     * The list set anew with the input method kept is told as one IMChangeEvent, the app reading the
+     * list again on it (HardwareKeyboard's Ctrl+Space). The harness's context is focused, where the
+     * re-activation tells it; unfocused (split screen, settings in front) androidfrontend's
+     * InputMethodGroupChanged watcher does. Both paths, each told once.
+     */
+    @Test
+    fun aListSetAnewWithTheInputMethodKeptIsToldOnce(): Unit = runBlocking {
+        fcitx.setEnabledIme(arrayOf(Engines.PINYIN))
+        awaitQuiet()
+        fcitx.setEnabledIme(arrayOf(Engines.PINYIN, WUBI))
+        Assert.assertEquals("focused", 1, eventsTillQuiet().count { it is FcitxEvent.IMChangeEvent })
+        fcitx.focus(false)
+        try {
+            awaitQuiet()
+            fcitx.setEnabledIme(arrayOf(Engines.PINYIN))
+            Assert.assertEquals("unfocused", 1, eventsTillQuiet().count { it is FcitxEvent.IMChangeEvent })
+        } finally {
+            fcitx.focus(true)
+        }
     }
 
     @Test
@@ -445,6 +468,74 @@ class FcitxTest {
         }
     }
 
+    /**
+     * A hardware keyboard's = and - turn the page while something is typed, as PageDown and PageUp
+     * do, nothing of them going to the app; with nothing typed - is the key it is.
+     */
+    @Test
+    fun equalsAndMinusTurnThePageWhileSomethingIsTyped(): Unit = runBlocking {
+        fcitx.setEnabledIme(arrayOf(Engines.PINYIN))
+        fcitx.setCandidatePagingMode(1)
+        try {
+            sendString("ni")
+            Assert.assertEquals("ni", awaitPanelPreedit("ni"))
+            awaitQuiet()
+            val first = latestPaged.candidates.map { it.text }
+            fcitx.sendKey('=')
+            val turned = eventsTillQuiet()
+            Assert.assertTrue("$turned", turned.none { it is FcitxEvent.KeyEvent || it is FcitxEvent.CommitStringEvent })
+            val second = latestPaged.candidates.map { it.text }
+            Assert.assertTrue("a page to go back to", latestPaged.hasPrev)
+            Assert.assertTrue("another page: $first, $second", second.none { it in first })
+            fcitx.sendKey('-')
+            awaitQuiet()
+            Assert.assertEquals("the first page again", first, latestPaged.candidates.map { it.text })
+            Assert.assertEquals("still typed", "ni", latestInputPanel.preedit.toString())
+            fcitx.reset()
+            awaitQuiet()
+            fcitx.sendKey('-')
+            val typed = eventsTillQuiet()
+            Assert.assertTrue("- typed or offered: $typed",
+                typed.any { it is FcitxEvent.KeyEvent || it is FcitxEvent.CommitStringEvent } || !fcitx.isEmpty())
+        } finally {
+            fcitx.setCandidatePagingMode(0)
+            fcitx.reset()
+        }
+    }
+
+    /**
+     * A tap on the code above the candidates puts the cursor there, a key missed typed in its place;
+     * one no session takes (on marks offered) leaves the panel as it was, nothing put in: fcitx's
+     * own would put in the app's composing text, here none, and drop the marks.
+     */
+    @Test
+    fun aTapOnTheCodeMovesItsCursorAndOneNotTakenChangesNothing(): Unit = runBlocking {
+        fcitx.setEnabledIme(arrayOf(Engines.PINYIN))
+        sendString("nhao")
+        awaitQuiet()
+        // after the n
+        fcitx.moveCursor(1)
+        sendString("i")
+        Assert.assertEquals("ni hao", awaitPanelPreedit("ni hao"))
+        awaitQuiet()
+        val candidates = fcitx.getCandidates(0, 16).map { it.text }
+        Assert.assertTrue("你好 among $candidates", "你好" in candidates)
+        fcitx.reset()
+
+        sendString("[")
+        Assert.assertEquals("【", awaitPanelPreedit("【"))
+        awaitQuiet()
+        val marks = fcitx.getCandidates(0, 16).map { it.text }
+        fcitx.moveCursor(0)
+        val tapped = eventsTillQuiet()
+        Assert.assertTrue("$tapped", tapped.none { it is FcitxEvent.CommitStringEvent })
+        Assert.assertEquals("the marks still on offer", marks, fcitx.getCandidates(0, 16).map { it.text })
+        Assert.assertEquals("【", latestInputPanel.preedit.toString())
+        fcitx.sendKey("BackSpace")
+        Assert.assertEquals("", awaitPanelPreedit(""))
+        fcitx.reset()
+    }
+
     // endregion
 
     // region code table input
@@ -470,6 +561,26 @@ class FcitxTest {
         Assert.assertEquals("工业", receiveFirstCommitString()?.data?.text)
         Assert.assertEquals("", awaitPanelPreedit(""))
         fcitx.reset()
+    }
+
+    /**
+     * A table's page shows the page size, prediction and performance level every Chinese input
+     * method shares beside its own options: a page size saved there is pinyin's too, the table's
+     * own options as they were.
+     */
+    @Test
+    fun aTablesPageSharesThePageSizeWithPinyinAndKeepsItsOwnOptions(): Unit = runBlocking {
+        val pageSize = fcitx.getImConfig(Engines.PINYIN)["cfg"][EngineSettings.PAGE_SIZE].value
+        val autoSelect = fcitx.getImConfig(WUBI)["cfg"][TableSettings.AUTO_SELECT].value
+        val changed = if (pageSize == "4") "5" else "4"
+        try {
+            fcitx.setImConfig(WUBI, RawConfig(arrayOf(RawConfig(EngineSettings.PAGE_SIZE, changed))))
+            Assert.assertEquals("pinyin's", changed, fcitx.getImConfig(Engines.PINYIN)["cfg"][EngineSettings.PAGE_SIZE].value)
+            Assert.assertEquals("the table's", changed, fcitx.getImConfig(WUBI)["cfg"][EngineSettings.PAGE_SIZE].value)
+            Assert.assertEquals("its own option", autoSelect, fcitx.getImConfig(WUBI)["cfg"][TableSettings.AUTO_SELECT].value)
+        } finally {
+            fcitx.setImConfig(Engines.PINYIN, RawConfig(arrayOf(RawConfig(EngineSettings.PAGE_SIZE, pageSize))))
+        }
     }
 
     // endregion

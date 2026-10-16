@@ -362,10 +362,10 @@ bool typesChinese(const std::string &im) {
 }
 
 // whether what [im] has typed is the text itself (English's word, handwriting's characters), shown
-// in the app; a code (pinyin, a table's, quick phrase's and Unicode's in them) is shown above the
-// candidates instead. In the app, a code left there when the user taps another field or app is
-// made text by the app before we hear of it (InputMethodManager finishes the composing text): the
-// field kept "ni" (uat LC-03)
+// in the app; a code (pinyin's, a table's, and quick phrase's and Unicode's in any input method,
+// for which the flag is turned off as they start) is shown above the candidates instead. In the
+// app, a code left there when the user taps another field or app is made text by the app before
+// we hear of it (InputMethodManager finishes the composing text): the field kept "ni" (uat LC-03)
 bool composesText(const std::string &im) {
     const auto *m = listed(im);
     return m && (m->page == Page::English || m->page == Page::Handwriting);
@@ -477,8 +477,8 @@ void AndroidEngine::pushSettings() const {
 }
 
 void AndroidEngine::activate(const InputMethodEntry &entry, InputContextEvent &event) {
-    // the input context's flags then tell every module (quick phrase, Unicode too) where to show
-    // its preedit; run again each time the field gains focus
+    // the input context's flags then tell where the preedit shows; run again each time the field
+    // gains focus, and at each event sent (send)
     event.inputContext()->setEnablePreedit(composesText(entry.uniqueName()));
     // in the status area, these addons act on this input context: full-width punctuation and
     // letters, traditional characters. Chinese's alone: a 全角 left on in pinyin, which they share,
@@ -544,6 +544,10 @@ void AndroidEngine::keyEvent(const InputMethodEntry &entry, KeyEvent &event) {
     // what the app does (a paste) comes after it
     if (key.states().testAny(KeyStates{KeyState::Ctrl, KeyState::Alt, KeyState::Super, KeyState::Hyper})) {
         endPunctuation(event.inputContext(), true);
+        // one may start quick phrase's or Unicode's (Ctrl+Shift+U) code, shown above the candidates
+        // in English too; the next event sent sets the flag back. Not with English's word in the
+        // app: the flag off, it would stay there as composing text, never updated
+        if (event.inputContext()->inputPanel().clientPreedit().empty()) event.inputContext()->setEnablePreedit(false);
         return;
     }
     // a punctuation key's marks on offer: Backspace takes the key back, any other key takes the
@@ -620,6 +624,10 @@ bool AndroidEngine::suggestsEnglish(InputContext *ic, bool virtualKey) const {
 bool AndroidEngine::send(InputContext *ic, std::string im, EngineEvent event, int arg) {
     if (!eventCallback_) return false;
     refine_.reset();
+    // where what is typed shows is the input method's, whatever turned it since activate: a
+    // shortcut or quick phrase, fcitx reading its config again (PreeditEnabledByDefault, set for
+    // every input context)
+    ic->setEnablePreedit(composesText(im));
     const bool learning = !ic->capabilityFlags().testAny(CapabilityFlag::PasswordOrSensitive);
     const auto snapshot = eventCallback_(im, event, arg, learning);
     // a key may be on its way: the pause starts a little after it, the next slice at once
@@ -669,11 +677,12 @@ void AndroidEngine::invokeActionImpl(const InputMethodEntry &entry, InvokeAction
     // a tap in the composed text: a session keeping a cursor in its input (English, pinyin, a table, the stroke lookup) puts it there
     if (event.action() == InvokeActionEvent::Action::LeftClick && event.cursor() >= 0) {
         auto *ic = event.inputContext();
-        const bool client = ic->capabilityFlags().test(CapabilityFlag::Preedit);
-        // a tap on the code above the candidates that the session does not take (handwriting's, words
-        // offered): nothing.
-        // fcitx's own would commit the app's composing text, there none, then reset, the code lost
-        if (send(ic, entry.uniqueName(), EngineEvent::Cursor, event.cursor()) || !client) {
+        const bool taken = send(ic, entry.uniqueName(), EngineEvent::Cursor, event.cursor());
+        // a tap on the code above the candidates that the session does not take (a mark or words
+        // offered, handwriting's where the field shows no composing text): nothing.
+        // fcitx's own would commit the app's composing text, there none, then reset, the code lost;
+        // in the app (handwriting's) it commits the text as shown. Read after send, which sets it
+        if (taken || !ic->capabilityFlags().test(CapabilityFlag::Preedit)) {
             event.filter();
             return;
         }

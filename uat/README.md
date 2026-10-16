@@ -85,17 +85,20 @@ adb shell ime set io.github.sraw.youmo/org.fcitx.fcitx5.android.input.FcitxInput
 [`fixtures/fields.html`](fixtures/fields.html) 有测试用的各种输入框，用例里用「」里的名字指它们：
 「普通文本」「句子」「聊天」「密码」「网址」「邮箱」「数字」「电话」「搜索」「下一项」「不要提示」「长文本」。
 它们的 id 依次是 `text` `sentence` `chat` `password` `url` `email` `number` `tel` `search` `next` `nosuggest` `long`；
-地址后加 `#<id>`（例如 `fields.html#chat`）只显示那一个框，放在页面最上面。
+地址后加 `#<id>`（例如 `fields.html#chat`）只显示那一个框，放在页面最上面（「聊天」框在最下面，见下）；在已经打开测试页的标签里改 `#<id>` 也马上生效。
 
 在电脑上起一个本地网页服务，转发到手机，用手机的 Chrome 打开：
 
 ```sh
-python3 -m http.server 8000 -d uat/fixtures &
+python3 -m http.server 8000 --bind 127.0.0.1 -d uat/fixtures &
 adb reverse tcp:8000 tcp:8000
 adb shell am start -a android.intent.action.VIEW -d http://127.0.0.1:8000/fields.html
 ```
 
-「聊天」框按回车或点"发送"后会把内容记到下面并清空，像聊天应用发出一条消息。
+网页服务只在本机的 127.0.0.1 上（`adb reverse` 用的就是它），局域网里别的机器访问不到；测完在同一个终端里用 `kill %1` 停掉它（`jobs` 能看到它的编号）。
+
+「聊天」框按回车或点"发送"后会把内容记进它的记录并清空，像聊天应用发出一条消息；`fields.html#chat` 时它和"发送"按钮贴在页面底部，键盘弹出后紧贴键盘上沿，像聊天应用的输入栏。
+「搜索」框按回车会执行搜索：搜的词写在框下面，框失去焦点，键盘收起。
 无痕模式的测试在 Chrome 的无痕标签页里打开同一个地址。
 
 ## 设备

@@ -60,7 +60,8 @@ either thumb's reach. `SplitKeyboard.dockWidth`: 42% of the keyboard, 320–420 
 upright). `InputView.placeBoard` gives the window that width at the side and the far padding space the
 rest, with an arrow that moves it across (`ThemePrefs.splitDock`: right / left / full, read live —
 `ThemeManager` does not make the input view anew for it, which would drop the board shown). It follows
-the window attached (`InputWindowManager.onAttached`) and the keyboard window's layout
+the window attached (`InputBroadcastReceiver.onWindowAttached`, its `DockFollower`, reading
+`InputWindowManager.currentWindow`) and the keyboard window's layout
 (`KeyboardWindow.onLayoutShown`).
 
 ### Hardware keyboard
@@ -70,7 +71,14 @@ brings the touch keyboard back (`InputDeviceManager`, upstream's). Chrome's web 
 method of a tap (no `onViewClicked`, no `onUpdateEditorToolType`), so the floating window
 (`CandidatesView`) always shows, a keyboard button at its end — alone when nothing is typed, after the
 cursor on its line where it fits, else under it (under it always, it covered a note's next line; in a
-corner, an app's send button; before the cursor, what was just typed) — that brings the touch keyboard back (`showTouchKeyboard`), as Gboard's floating button. The
+corner, an app's send button; before the cursor, what was just typed) — that brings the touch keyboard back (`showTouchKeyboard`), as Gboard's floating button. Where the editor tells no
+cursor (no CursorAnchorInfo or a NaN marker: the bottom-left fallback, `CandidatesView.cursorKnown`) the lone
+button stands at the top right (in RTL too), and it can be dragged: dropped with no cursor, its place is kept as fractions
+of the window (`internal.keyboardButtonX/Y`), with a cursor only as an offset for the field
+(`FloatingButtonPlacement` in ime-core); its
+touch window follows the lone button once the cursor rests (150 ms), not at every report. The touch
+keyboard brought back mid-field is started for that field (`InputView.startInput` from the
+`InputDeviceManager` callback). The
 keyboard last typed on going away (`InputManager.InputDeviceListener.onInputDeviceRemoved`, the
 device id of the last key) brings it back too, hidden or shown: the configuration's `keyboard` cannot
 tell, a device with one built in (the emulator's `qwerty2`) reports QWERTY throughout.
@@ -79,19 +87,26 @@ tell, a device with one built in (the emulator's `qwerty2`) reports QWERTY throu
 sets Shift in its own press and clears it in its release, so a lone Shift never matched itself.
 
 The shortcuts are the app's, not fcitx's (`HardwareShortcuts`, `InputMethodSwitch` in ime-core,
-applied in `FcitxInputMethodService.onKeyDown/onKeyUp`): a lone Shift tap (≤250 ms, fcitx's
+applied by `HardwareKeyboard` (app, `input/`) from `FcitxInputMethodService.onKeyDown/onKeyUp`, only in
+a text field: not `EditorInfo.isTypeNull`, where fcitx has no focus and every key is the app's): a lone Shift tap (≤250 ms, fcitx's
 ModifierOnlyKeyTimeout, nothing pressed between) and Ctrl+Space switch between the Chinese input
 method and English, back to the Chinese one left; Ctrl+Shift (either order) goes to the next enabled
 one. fcitx's own toggle goes to the group's first, which here is pinyin (`Fcitx.onFirstRun` puts it
-first so a field starts in it), so from wubi it went to pinyin; its AltTrigger Shift is turned off and
-saved at startup (`native-lib` `disableAltTrigger`) so the two do not both switch. Ctrl+Space is
-consumed: unconsumed, Android goes to the next system input method (seen with Sogou and Gboard).
+first so a field starts in it), so from wubi it went to pinyin; its TriggerKeys (Ctrl+Space, Zenkaku_Hankaku, Hangul) and
+AltTrigger Shift are turned off and saved at startup and again after each read of fcitx's config
+(`native-lib` `clearFcitxHotkeys`, which clears fcitx's Ctrl+Alt+P TogglePreedit too) so the two do
+not both switch, and the setting below leaves the keys to the app alone. Ctrl+Space is
+consumed where it switches: unconsumed, Android goes to the next system input method (seen with Sogou
+and Gboard). Where it has nowhere to go (one input method, or English not enabled) it is no shortcut
+and goes on, through fcitx (none of its hotkeys left), to the app (an editor's completion). The setting `AppPrefs.candidates.switchShortcuts` (实体键盘快捷键, on) turns all three off:
+the keys then go to fcitx and the app as any other.
 The input method's name flashes by the cursor (fcitx's ShowInputMethodInformation).
 
 With the hardware keyboard, handwriting and the nine keys are skipped by Ctrl+Shift
-(`Engines.takesKeyboard`), and a character key pressed in one is typed by the first enabled Chinese
-input method that takes a keyboard (else English), as Sogou and Baidu type pinyin whatever their touch
-layout; the touch one comes back with the touch keyboard (`touchInputMethod`, the fcitx thread's).
+(`Engines.takesKeyboard`), and a character key pressed in one is typed by pinyin (全拼 or 双拼,
+whichever is listed first), else the first enabled Chinese input method that takes a keyboard, else
+English (`InputMethodSwitch.forKeyboard`), as Sogou and Baidu type pinyin whatever their touch
+layout; the touch one comes back with the touch keyboard (`HardwareKeyboard.touchInputMethod`, the fcitx thread's; the hand-off runs in the key's own fcitx job).
 `-`/`=` page the candidates while composing (`androidengine.cpp`, physical keys only).
 
 Testing one (`uat/tools/emu-keyboard.sh`, the cases in `uat/17-hardware-keyboard.md`): the emulator, never redroid (redroid shares the host kernel, and a uinput keyboard there
