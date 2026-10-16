@@ -43,6 +43,7 @@ x86_64 的模拟器或 redroid 加 `-PbuildABI=x86_64`。
 | `sentence-models-*` | 两个句子模型（4M 和 25M 参数） | `engine/sentence-model*.safetensors` |
 | `english-data-*` | 英文词表和语言模型 | `engine/english.data` |
 | `voice-models-*` | 转成 ORT 格式的语音识别模型（只用于 `voice`） | `voice/*.ort` |
+| `handwriting-models-*` | 手写识别模型（ORT 格式）、字表和字频 | `handwriting/*` |
 
 第一次构建，文字版约下载 500 MB，语音版再多约 260 MB（拼音语言模型解开后占 1 GB 磁盘）。编译拼音数据大约要 2 分钟、5 GB 内存。
 
@@ -126,6 +127,7 @@ The build downloads its data and checks the SHA-256 of each file:
 | `sentence-models-*` | The two sentence models (4M and 25M parameters) | `engine/sentence-model*.safetensors` |
 | `english-data-*` | English words and language model | `engine/english.data` |
 | `voice-models-*` | The speech recognizer in ORT format (`voice` only) | `voice/*.ort` |
+| `handwriting-models-*` | The handwriting recognizers in ORT format, their characters and frequencies | `handwriting/*` |
 
 The first build downloads about 500 MB for `text` and some 260 MB more for `voice` (the pinyin model takes 1 GB of disk unpacked). Compiling the pinyin data takes about 2 minutes and 5 GB of memory.
 

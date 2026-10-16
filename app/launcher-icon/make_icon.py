@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """幽默输入法's launcher icon: a monkey in sunglasses, grinning. The shapes are listed once, as
 path data, and written out twice: as the adaptive icon's vector drawables (background, foreground,
-monochrome) and, through cairosvg, as the PNGs that launchers before Android 8 take. Run it after
+monochrome) and, through cairosvg, as the PNGs that launchers before Android 8 take, and the README's
+logo (docs/images/logo.png). Run it after
 changing a shape; it writes into app/src/main/res. Needs cairosvg and Pillow.
 
 The canvas is the adaptive icon's 108 dp; launchers show at least the circle of radius 33 round its
@@ -147,7 +148,22 @@ def main():
         ImageDraw.Draw(mask).ellipse((0, 0, 199, 199), fill=255)
         sheet.paste(art, (20 + i * 220, 20), mask)
     sheet.save(preview)
-    print('written; preview at', preview)
+
+    # the README's logo: the release icon, round, at a size a page shows sharp on a dense screen
+    logo = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', 'docs', 'images', 'logo.png')
+    os.makedirs(os.path.dirname(logo), exist_ok=True)
+    size = 256
+    full = round(size * 108 / 72)
+    art = Image.open(io.BytesIO(cairosvg.svg2png(bytestring=svg(FOREGROUND, BACKGROUNDS['']).encode(),
+                                                 output_width=full, output_height=full))).convert('RGBA')
+    margin = (full - size) // 2
+    art = art.crop((margin, margin, margin + size, margin + size))
+    mask = Image.new('L', (size * 4, size * 4), 0)
+    ImageDraw.Draw(mask).ellipse((0, 0, size * 4 - 1, size * 4 - 1), fill=255)
+    icon = Image.new('RGBA', (size, size), (0, 0, 0, 0))
+    icon.paste(art, (0, 0), mask.resize((size, size), Image.LANCZOS))
+    icon.save(logo, optimize=True)
+    print('written; preview at', preview, 'logo at', logo)
 
 
 if __name__ == '__main__':

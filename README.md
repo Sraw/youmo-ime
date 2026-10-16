@@ -1,12 +1,14 @@
-# 幽默输入法 · Youmo IME
+<p align="center"><img src="docs/images/logo.png" width="128" height="128" alt="幽默输入法"></p>
 
-[中文](#幽默输入法) · [English](#youmo-ime) · [使用说明](docs/README.md) · [下载](https://github.com/Sraw/youmo-ime/releases)
+<h1 align="center">幽默输入法 · Youmo IME</h1>
+
+<p align="center"><a href="#幽默输入法">中文</a> · <a href="#youmo-ime">English</a> · <a href="docs/README.md">使用说明</a> · <a href="CHANGELOG.md">版本日志</a> · <a href="https://github.com/Sraw/youmo-ime/releases">下载</a></p>
 
 ---
 
 ## 幽默输入法
 
-一个**完全离线**的 Android 中文输入法：拼音、九键、双拼、五笔，英文，还能离线语音输入。不申请网络权限，你打的字、说的话都不会离开手机。
+一个**完全离线**的 Android 中文输入法：拼音、九键、双拼、五笔、手写，英文，还能离线语音输入。不申请网络权限，你打的字、说的话都不会离开手机。
 
 > 本项目从 [fcitx5-android](https://github.com/fcitx5-android/fcitx5-android) 分出，保留 [Fcitx5](https://github.com/fcitx/fcitx5) 作为输入法框架，
 > 但拼音引擎、语言模型、句子模型都是自己做的。它与 Fcitx5 和 fcitx5-android 官方无关，也不会合并回上游；问题请在[本仓库](https://github.com/Sraw/youmo-ime/issues)反馈。
@@ -15,8 +17,14 @@
 
 - **九键拼音**：按整句判断，直接按 `64426` 就是"你好"；左边的拼音选择栏可以把某一段定成某个音节；简拼也能用。
   快速连按同一个键也能表示它的第几个字母，输入法同时按两种读法判断，正常快打不受影响。每个键上的字母可以自定义。
+- **手写**：一次写一个字，写好的字像拼音一样按整句来读，后面写的字能把前面认错的改过来（单写"淡"，接着写"话"就是"谈话"）；
+  用你的用户词库，上屏后给联想。识别模型是本项目自己训练的。
 - **五笔**（86 版）：码满唯一自动上屏，空码自动丢弃，`z` 键是万能键，也能先按 `z` 再打拼音反查五笔编码；
   候选旁可以显示编码提示，方便学编码；一个字一个字打出来的词会自动造成词。另有五笔拼音混打，以及仓颉、二笔、码表式自然码。
+  码表和拼音一样：重码按前文排（一、二级简码的顺序不动），上屏后给联想，和拼音共用一个用户词库；打错的编码可以点一下改中间的键。
+- **横屏分体键盘**：横屏且屏幕够宽时，字母键分成左右两半，方便两个拇指打字；其他面板缩成单手宽，可以放左边或右边。
+- **实体键盘**：接上蓝牙或 USB 键盘，候选显示在光标旁的小窗里；单按 Shift 或 Ctrl+空格切中英，Ctrl+Shift 换输入法；
+  点小窗上的键盘图标叫回屏幕键盘，图标可以拖开。
 - **自己训练的语言模型**：
   - **拼音 n-gram 模型**：本项目自己从网页里统计训练。在 libime 模型的基础上，混入从 FineWeb-2 和一次 Common Crawl 抓取的中文聊天类网页里统计出的 n-gram，日常聊天打得更准。
   - **英文 n-gram 模型**：本项目自己从 FineWeb 的英文网页统计训练。
@@ -25,7 +33,7 @@
 - **全拼与双拼**：整句输入，8 种双拼方案；简拼、半截输入、按到相邻键的自动纠正；按前文给出联想。
 - **英文键盘**：自动纠错（`teh` → the）、补全、下一个词的预测，会记住你打的词；拼音里也能直接打出 iPhone、APP 这类英文词。
 - **越用越顺手**：记住你的用词和习惯；可以导入词库（.txt、Fcitx 5 的 .dict、搜狗 .scel）、自定义短语；长按候选可以让它忘掉学到的、置顶或屏蔽。
-- **其他**：Material 3 界面、主题（可以用自己的图片）、可自定义的长按字符、剪贴板（复制链接时自动去掉跟踪参数）、表情与符号、实体键盘下的悬浮候选栏。
+- **其他**：Material 3 界面、主题（可以用自己的图片）、可自定义的长按字符、剪贴板（复制链接时自动去掉跟踪参数）、表情与符号。
 
 ### 语音输入（语音版）
 
@@ -43,13 +51,13 @@
 | 测试集 | 解码器 | + 句子模型 |
 |---|---|---|
 | 主集（日常与书面句子，548 句） | 88.3 | 90.9 |
-| 网页（近期网页，模型没读过，3642 句） | 72.9 | 76.5 |
+| 网页（近期网页，模型没读过，3642 句） | 72.7 | 76.2 |
 | 聊天（留出的一半，1064 句） | 68.7 | 72.7 |
 | 对话（590 句） | 67.6 | 71.2 |
 | 新词（405 句） | 79.5 | 80.0 |
 
-2026-10-12 测，和 App 默认一样开着相邻键纠错。九键打主集，加句子模型后首选 88.8%。
-英文：正常打字 99.6% 按原意上屏；每 25 个键按错一个时，打错的词 72.7% 能被自动改对。
+2026-10-16 测，和 App 默认一样开着相邻键纠错。九键打主集，加句子模型后首选 88.8%。
+英文：正常打字 99.6% 按原意上屏；每 25 个键按错一个时，打错的词 73.8% 能被自动改对。
 
 ### 下载
 
@@ -57,8 +65,8 @@
 
 | 版本 | 内容 | 大小 |
 |---|---|---|
-| `text` 文字版 | 只有打字，只申请振动权限 | 约 330 MB |
-| `voice` 语音版 | 多了离线语音输入，多申请录音权限 | 约 490 MB |
+| `text` 文字版 | 只有打字，只申请振动权限 | 约 310 MB |
+| `voice` 语音版 | 多了离线语音输入，多申请录音权限 | 约 480 MB |
 
 - 需要 Android 6.0 以上的 64 位 ARM 手机（arm64-v8a），近几年的手机都是。
 - 安装包大，是因为语言模型、句子模型、词库和手写识别模型都在包里，离线就能用；准确率优先于体积。
@@ -75,8 +83,7 @@
 
 ### 下一步计划
 
-- **手写输入**。
-- **优化语音输入**：提高识别准确率，并支持方言。
+- **优化语音输入**：提高识别准确率；先改进带口音的普通话的识别，再进一步支持粤语等地方方言。
 
 ### 数据与许可
 
@@ -88,6 +95,8 @@
   - 句子模型（Apache-2.0）：先在 FineWeb-2 中文网页上训练，再用 Qwen3.5-9B-Base（Apache-2.0）给候选打分做蒸馏；
   - 新词库：从 Common Crawl 中文网页里找出，逐个校对（`lexicon/`）。
 - 笔画表：[rime-stroke](https://github.com/rime/rime-stroke)（LGPL-3.0-only）。
+- 手写识别模型：本项目自己训练，只用合成的笔迹——开源手写字体，以及 [Make Me a Hanzi](https://github.com/skishore/makemeahanzi) 的笔画（Arphic Public License）；
+  由 [onnxruntime](https://github.com/microsoft/onnxruntime)（MIT）运行。评测用的 CASIA 笔迹（仅限科研）只用来评测。
 - 语音识别：[X-ASR](https://github.com/Gilgamesh-J/X-ASR)（Apache-2.0），由 [sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx)（Apache-2.0）和 [silero VAD](https://github.com/snakers4/silero-vad)（MIT）运行。
 - 安装包里的模型和词库都没有用仅限科研用途的数据训练。评测用的聊天、对话测试集取自 [LCCC](https://github.com/thu-coai/CDial-GPT)（仅限科研），只用来评测和调参。
 - [隐私政策](PRIVACY.md)。
@@ -99,7 +108,7 @@
 ### 致谢
 
 [fcitx5-android](https://github.com/fcitx5-android/fcitx5-android)、[Fcitx5](https://github.com/fcitx/fcitx5)、[libime](https://github.com/fcitx/libime)、
-[fcitx5-chinese-addons](https://github.com/fcitx/fcitx5-chinese-addons)、[FineWeb](https://huggingface.co/datasets/HuggingFaceFW/fineweb)、[FineWeb-2](https://huggingface.co/datasets/HuggingFaceFW/fineweb-2)、[Common Crawl](https://commoncrawl.org)、[Qwen](https://github.com/QwenLM)、[X-ASR](https://github.com/Gilgamesh-J/X-ASR)、[sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx)。
+[fcitx5-chinese-addons](https://github.com/fcitx/fcitx5-chinese-addons)、[FineWeb](https://huggingface.co/datasets/HuggingFaceFW/fineweb)、[FineWeb-2](https://huggingface.co/datasets/HuggingFaceFW/fineweb-2)、[Common Crawl](https://commoncrawl.org)、[Qwen](https://github.com/QwenLM)、[X-ASR](https://github.com/Gilgamesh-J/X-ASR)、[sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx)、[Make Me a Hanzi](https://github.com/skishore/makemeahanzi)、[onnxruntime](https://github.com/microsoft/onnxruntime)。
 
 ---
 
@@ -107,7 +116,7 @@
 
 *幽默 (yōumò) means humor.*
 
-An Android Chinese input method that runs **entirely offline**: pinyin, nine keys, shuangpin, Wubi, English, and offline voice input.
+An Android Chinese input method that runs **entirely offline**: pinyin, nine keys, shuangpin, Wubi, handwriting, English, and offline voice input.
 It asks for no network permission; what you type and say never leaves the phone.
 
 > It branched off [fcitx5-android](https://github.com/fcitx5-android/fcitx5-android) and keeps [Fcitx5](https://github.com/fcitx/fcitx5) as the
@@ -120,7 +129,13 @@ It asks for no network permission; what you type and say never leaves the phone.
   A key pressed again quickly can also mean its next letter: both readings are decoded, so fast typing is not disturbed. Each key's letters can be changed.
 - **Wubi** (86): a full unique code commits itself, a code with no character is dropped, `z` stands for any key and, followed by pinyin,
   looks up a character's Wubi code; codes can be shown beside candidates to learn them; words typed character by character become words.
-  Also Wubi-Pinyin mixed, Cangjie, Erbi and table-style Ziranma.
+  Also Wubi-Pinyin mixed, Cangjie, Erbi and table-style Ziranma. The tables do what pinyin does: candidates of one code ordered by
+  the text before (Wubi's short codes keep their places), next-word suggestions, one user dictionary with pinyin; tap the code to fix a key in it.
+- **Handwriting**: one character at a time, read as a sentence the way pinyin is, so a later character can put an earlier misread right
+  (淡 alone, then 话, reads 谈话); your user dictionary counts, and next words are suggested. The recognizers are this project's own.
+- **Split keyboard in landscape**: on a wide enough screen the letters split in two halves for two thumbs; the other boards shrink to one hand's width, at either side.
+- **Physical keyboards**: with a Bluetooth or USB keyboard the candidates show in a small window by the cursor; Shift alone or Ctrl+Space
+  switches Chinese and English, Ctrl+Shift the input method; the keyboard icon on the window brings the touch keyboard back, and can be dragged away.
 - **Language models of its own**:
   - **Pinyin n-gram model**: counted and trained by this project. libime's model is the base, mixed with n-grams this project counted from chat-like Chinese pages of FineWeb-2 and a Common Crawl crawl, for everyday chat.
   - **English n-gram model**: counted by this project from FineWeb's English pages.
@@ -129,7 +144,7 @@ It asks for no network permission; what you type and say never leaves the phone.
 - **Full pinyin and shuangpin**: whole sentences, 8 shuangpin schemes; abbreviations, half-typed syllables, slipped neighbouring keys corrected; next-word suggestions.
 - **English keyboard**: autocorrection (`teh` → the), completions, next-word predictions, learning your words; Latin words such as iPhone and APP type straight from pinyin.
 - **Learns as you type**: your words and habits; imported dictionaries (.txt, Fcitx 5 .dict, Sogou .scel), custom phrases; long-press a candidate to forget what was learnt of it, pin it or block it.
-- **More**: Material 3 interface, themes (your own picture too), configurable long-press characters, clipboard (tracking parameters stripped from copied links), emoji and symbols, a floating candidate bar with a physical keyboard.
+- **More**: Material 3 interface, themes (your own picture too), configurable long-press characters, clipboard (tracking parameters stripped from copied links), emoji and symbols.
 
 ### Voice input (the voice build)
 
@@ -147,13 +162,13 @@ Pinyin top-1 accuracy (%). "Decoder" is the n-gram model alone; "+ sentence mode
 | Set | Decoder | + sentence models |
 |---|---|---|
 | Main (everyday and written sentences, 548) | 88.3 | 90.9 |
-| Web (recent pages the models never read, 3,642) | 72.9 | 76.5 |
+| Web (recent pages the models never read, 3,642) | 72.7 | 76.2 |
 | Chat (the held-out half, 1,064) | 68.7 | 72.7 |
 | Dialog (590) | 67.6 | 71.2 |
 | New words (405) | 79.5 | 80.0 |
 
-Measured on 2026-10-12, with neighbouring-key correction on as in the app by default. On nine keys the main set is 88.8% first with the sentence models.
-English: clean typing is committed as meant 99.6% of the time; with one key in 25 slipping, 72.7% of the slipped words are corrected.
+Measured on 2026-10-16, with neighbouring-key correction on as in the app by default. On nine keys the main set is 88.8% first with the sentence models.
+English: clean typing is committed as meant 99.6% of the time; with one key in 25 slipping, 73.8% of the slipped words are corrected.
 
 ### Download
 
@@ -161,8 +176,8 @@ Builds are on [Releases](https://github.com/Sraw/youmo-ime/releases), two per re
 
 | Build | What | Size |
 |---|---|---|
-| `text` | Typing only; asks only for vibration | about 330 MB |
-| `voice` | Adds offline voice input; asks for the microphone too | about 490 MB |
+| `text` | Typing only; asks only for vibration | about 310 MB |
+| `voice` | Adds offline voice input; asks for the microphone too | about 480 MB |
 
 - Needs a 64-bit ARM phone (arm64-v8a) on Android 6.0 or later, as phones of the last several years are.
 - The APKs are large because the language models, sentence models, dictionary and handwriting recognizers are inside, to work offline; accuracy comes before size.
@@ -179,8 +194,7 @@ The user's manual, in Chinese, is in [docs/](docs/README.md): setting it up, eve
 
 ### Next
 
-- **Handwriting input.**
-- **Better voice input**: more accurate recognition, and dialects.
+- **Better voice input**: more accurate recognition; first Mandarin spoken with a regional accent, then regional dialects such as Cantonese.
 
 ### Data and licences
 
@@ -192,6 +206,8 @@ The user's manual, in Chinese, is in [docs/](docs/README.md): setting it up, eve
   - the sentence models (Apache-2.0): trained on FineWeb-2's Chinese pages, then distilled from Qwen3.5-9B-Base's (Apache-2.0) scores of candidates;
   - the new words: found in Common Crawl's Chinese pages and curated one by one (`lexicon/`).
 - Stroke table: [rime-stroke](https://github.com/rime/rime-stroke) (LGPL-3.0-only).
+- Handwriting recognizers: trained by this project on synthetic ink only, open handwriting fonts and [Make Me a Hanzi](https://github.com/skishore/makemeahanzi)'s
+  strokes (Arphic Public License); run by [onnxruntime](https://github.com/microsoft/onnxruntime) (MIT). CASIA's handwriting (research use only) is used only to evaluate.
 - Speech recognition: [X-ASR](https://github.com/Gilgamesh-J/X-ASR) (Apache-2.0), run with [sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx) (Apache-2.0) and [silero VAD](https://github.com/snakers4/silero-vad) (MIT).
 - No model or dictionary in the app is trained on research-only data. The chat and dialog test sets come from [LCCC](https://github.com/thu-coai/CDial-GPT) (research use only) and are used only to evaluate and tune.
 - [Privacy policy](PRIVACY.md).
@@ -203,4 +219,4 @@ See [BUILDING.md](BUILDING.md).
 ### Thanks
 
 [fcitx5-android](https://github.com/fcitx5-android/fcitx5-android), [Fcitx5](https://github.com/fcitx/fcitx5), [libime](https://github.com/fcitx/libime),
-[fcitx5-chinese-addons](https://github.com/fcitx/fcitx5-chinese-addons), [FineWeb](https://huggingface.co/datasets/HuggingFaceFW/fineweb), [FineWeb-2](https://huggingface.co/datasets/HuggingFaceFW/fineweb-2), [Common Crawl](https://commoncrawl.org), [Qwen](https://github.com/QwenLM), [X-ASR](https://github.com/Gilgamesh-J/X-ASR), [sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx).
+[fcitx5-chinese-addons](https://github.com/fcitx/fcitx5-chinese-addons), [FineWeb](https://huggingface.co/datasets/HuggingFaceFW/fineweb), [FineWeb-2](https://huggingface.co/datasets/HuggingFaceFW/fineweb-2), [Common Crawl](https://commoncrawl.org), [Qwen](https://github.com/QwenLM), [X-ASR](https://github.com/Gilgamesh-J/X-ASR), [sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx), [Make Me a Hanzi](https://github.com/skishore/makemeahanzi), [onnxruntime](https://github.com/microsoft/onnxruntime).
