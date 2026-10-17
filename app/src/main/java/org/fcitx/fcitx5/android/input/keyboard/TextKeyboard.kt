@@ -4,6 +4,10 @@
  */
 package org.fcitx.fcitx5.android.input.keyboard
 
+import org.fcitx.fcitx5.android.core.InputMethodNames
+import org.fcitx.fcitx5.android.engine.english.EnglishSession
+import android.view.MotionEvent
+import android.graphics.Canvas
 import android.annotation.SuppressLint
 import android.content.Context
 import android.content.res.Configuration
@@ -203,6 +207,37 @@ class TextKeyboard private constructor(
 
     private var capsState: CapsState = CapsState.None
 
+    private val glideTyping = AppPrefs.getInstance().keyboard.glideTyping
+    private val longPressDelay by AppPrefs.getInstance().keyboard.longPressDelay
+
+    // the input method is English, whose session reads a glide
+    private var english = false
+
+    private val letterKeys: List<Pair<Char, TextKeyView>> by lazy {
+        textKeys.mapNotNull { v ->
+            (v.def as? KeyDef.Appearance.Text)?.displayText?.singleOrNull()?.lowercaseChar()?.takeIf { it in 'a'..'z' }?.let { it to v }
+        }
+    }
+
+    // glide typing (滑行输入), English's: a field where words are typed, not a password's or an address's
+    private val glide = GlideInput(
+        this, theme,
+        enabled = { english && glideTyping.getValue() && !inPasswordField && address == AddressKeys.NONE },
+        letters = { letterKeys },
+        longPressMillis = { longPressDelay.toLong() },
+    ) { path, layout ->
+        onAction(KeyAction.GlideAction(EnglishSession.Glide(path, layout, shift = capsState == CapsState.Once, capsLock = capsState == CapsState.Lock)))
+        // as a letter typed: Shift-once used up
+        if (capsState == CapsState.Once) switchCapsState()
+    }
+
+    override fun dispatchTouchEvent(ev: MotionEvent): Boolean = glide.dispatch(ev) { super.dispatchTouchEvent(it) }
+
+    override fun dispatchDraw(canvas: Canvas) {
+        super.dispatchDraw(canvas)
+        glide.draw(canvas)
+    }
+
     private val autoCaps = AutoCaps()
 
     /** Caps lock on: no sentence start changes Shift. */
@@ -294,6 +329,7 @@ class TextKeyboard private constructor(
 
     override fun onInputMethodUpdate(ime: InputMethodEntry) {
         showInputMethodName(space, ime)
+        english = ime.uniqueName == InputMethodNames.KEYBOARD
         if (capsState != CapsState.None) {
             switchCapsState()
         }

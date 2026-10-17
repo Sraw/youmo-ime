@@ -34,7 +34,7 @@ keeps its own, the model they follow.
 | `rerank` | The sentence models: `SentenceModel` (char-level transformer, int8 safetensors), `Reranker` (`SentencePicker` / `SentenceRefiner`), `MatrixKernel` (the hot loop; the app runs it in C++, `NativeMatrixKernel`), `Safetensors`, `Json` |
 | `user` | Learning: `UserModel` (counts of words and pairs, words made from pieces), `UserScorer` (mixes them into the model), `UserLog`/`UserStore` (the log on disk), `WordLists` (added and blocked by hand), `WordPack`, `LibimeImport` |
 | `table` | Code tables (五笔, 仓颉, 自然码, 二笔, 五笔拼音): `TableDictionary`, `TableSession`, `TableOptions`, `PhraseRules` (组词规则), `TableUser`, `SharedWords` |
-| `english` | `EnglishData`, `EnglishDecoder` (keys → words with slips), `EnglishSession` (Gboard-like word-at-a-time typing, autocorrect), `EnglishUser`, `EnglishText`, `Misspellings` |
+| `english` | `EnglishData`, `EnglishDecoder` (keys → words with slips), `GlideDecoder` (a glide's path → words), `EnglishSession` (Gboard-like word-at-a-time typing, autocorrect, glides), `EnglishUser`, `EnglishText`, `Misspellings` |
 | `stroke` | `Strokes`, `StrokeLookup` (`u` then `h s p n z` inside pinyin) |
 | `handwriting` | `HandwritingSession` (the input method), `HandwritingDecoder` (the characters written read as a sentence with the pinyin model and the user's words), `InkRecognizer` (the character's two recognizers run as their training code runs them, over `InkNet`s the app supplies), `InkFeatures` (what each recognizer reads of the strokes, equal to the training code's) |
 | `phrase` | `CustomPhrases` (libime's `customphrase` format, with date/time variables), `PhraseBook`; `EmojiData` (`engine/emoji.data`: the emoji panel's groups and the words emoji stand for) and `EmojiCandidates` (a word's emoji after the first two candidates, pinyin's and a table's alike: setting `Emoji`, those the phone cannot draw left out by `Engines.emojiShows`); `Chaizi` (`engine/chaizi.data`: characters by the pinyin of their parts, full pinyin's after `u`, setting `Chaizi`, those the phone's font lacks left out by `Engines.textShows`) and `AsideCandidates` (where pinyin puts both: the emoji after the first two, the characters first) |
@@ -157,6 +157,18 @@ again. Space after a word adds a space and predicts; punctuation moves that spac
 double space is a full stop. `EnglishUser` learns committed words; a word counted twice is the
 user's, never corrected. `Misspellings` corrects common misspellings the web taught the model as
 words. Auto-capitalisation is the keyboard's (`AutoCaps`), not the engine's.
+
+Glide typing: the keyboard (`GlideInput`, `GlideGesture` in ime-core deciding when a finger glides
+rather than taps, swipes or holds) hands the path, in key widths across and rows down over where
+its letter keys are (`engine/glide/GlideLayout`, a letter on two keys on the split keyboard), to
+`Engines.offerGlide`, then sends `Keyboard.GLIDE`, as handwriting sends `INK`; `Action.Glide`
+commits the best word with the session's own space and offers the others: a pick replaces it, a
+backspace deletes it. `GlideDecoder` walks the words' key trie with `engine/glide/GlidePath`: a
+letter goes on only where the path passes near its key in order (first and last near its ends), and
+a word is scored by the model less SHARK²'s location channel (the mean distance between the path
+and the word's keys joined, each resampled) and how near its keys come. `ime-eval english-glide`
+measures it on simulated paths (key centres off by a Gaussian of 0.3 key widths, a touch point
+every 0.05): 94.0% first, 97.5% in the first three, 0.7 ms a word on one desktop core.
 
 ## Handwriting
 

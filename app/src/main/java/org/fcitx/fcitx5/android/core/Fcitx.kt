@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.core
 
+import org.fcitx.fcitx5.android.engine.english.EnglishSession
 import android.content.Context
 import android.os.Build
 import androidx.annotation.Keep
@@ -81,6 +82,12 @@ class Fcitx(private val context: Context) : FcitxAPI, FcitxLifecycleOwner {
     override suspend fun engineContext(before: String, learning: Boolean) = withFcitxContext { EngineBridge.context(before, learning, inputMethodEntryCached.uniqueName) }
     override suspend fun offerInk(reading: InkReading, piece: Int) = withFcitxContext { EngineBridge.offerInk(reading, piece, inputMethodEntryCached.uniqueName).also(::ink) }
     override suspend fun inkFinished(piece: Int) = withFcitxContext { EngineBridge.inkFinished(piece, inputMethodEntryCached.uniqueName).also(::ink) }
+
+    override suspend fun offerGlide(glide: EnglishSession.Glide) = withFcitxContext {
+        EngineBridge.offerGlide(glide, inputMethodEntryCached.uniqueName).also { taken ->
+            if (taken) sendKeySymToFcitx(UNICODE + Keyboard.GLIDE, KeyStates.Virtual.toInt(), 0, false, -1)
+        }
+    }
 
     // in the same turn of the fcitx thread as what it shows: nothing the thread starts itself (a REFINE) comes between;
     // handwriting's only, which EngineBridge.ink tells

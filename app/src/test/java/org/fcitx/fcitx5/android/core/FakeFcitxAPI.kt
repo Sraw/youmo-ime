@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.core
 
+import org.fcitx.fcitx5.android.engine.english.EnglishSession
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -137,6 +138,11 @@ class FakeFcitxAPI : FcitxAPI {
 
     override suspend fun offerInk(reading: InkReading, piece: Int): Boolean {
         calls += "offerInk($piece)"
+        return true
+    }
+
+    override suspend fun offerGlide(glide: EnglishSession.Glide): Boolean {
+        calls += "offerGlide"
         return true
     }
 

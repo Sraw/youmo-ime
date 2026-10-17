@@ -40,6 +40,7 @@ any change to behaviour or settings.
 | English's words and model into app assets (part of every app build; the arpa of this fork's release `english-data-*`, SHA-256 checked, compiled) | `./gradlew :app:compileEnglishData` |
 | A new `english-data` release's arpa (FineWeb sample-10BT shards, ~3 min, 7 GB resident; its manifest says which), then pruned (~1 min, 3.3 GB) | `JAVA_OPTS=-Xmx9g ime-dict-tool english-lm -o full.arpa --known en_dict.fscd --tokens 300000000 <shard.parquet>...`; `JAVA_OPTS=-Xmx6g ime-dict-tool prune -o english.arpa --lm full.arpa --threshold 3e-8` |
 | English typing measured: committed as meant, wrongly corrected, slips fixed, words offered before a key | `ime-eval english <english.data> lib/ime-eval/data/english.txt [--misses <out.tsv>]` |
+| English glide typing measured on simulated paths: first, first three, time a word | `ime-eval english-glide <english.data> lib/ime-eval/data/english.txt [--wobble 0.3] [--misses <out.tsv>]` |
 
 Unit tests need no submodules, NDK or CMake. Instrumented tests (`FcitxTest`, `SoftKeyboardTest`)
 need the native build and an emulator; CI runs them weekly / on PRs labelled `emulator`.

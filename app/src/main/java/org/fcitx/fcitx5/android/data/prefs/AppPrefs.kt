@@ -168,6 +168,9 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
         /** Shown on the English page (InputMethodSettings), not here: English's alone. */
         val englishAutoCaps = bool(ENGLISH_AUTO_CAPS, true)
 
+        /** Shown on the English page too: a word by gliding across its letters (GlideInput). */
+        val glideTyping = bool(GLIDE_TYPING, true)
+
         /** Shown on the handwriting page (InputMethodSettings): how long the pen stays up before a character is done. */
         val handwritingPause = stringLike(HANDWRITING_PAUSE, object : ManagedPreference.StringLikeCodec<HandwritingPause> {
             override fun decode(raw: String) = HandwritingPause.entries.firstOrNull { it.name == raw }
@@ -612,6 +615,7 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
         // keys an input method's page names its rows by (InputMethodSettings); the others are only this file's
         const val T9_MULTI_TAP = "t9_multi_tap"
         const val ENGLISH_AUTO_CAPS = "english_auto_caps"
+        const val GLIDE_TYPING = "glide_typing"
         const val HANDWRITING_PAUSE = "handwriting_pause"
 
         /**

@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.eval
 
+import org.fcitx.fcitx5.android.engine.glide.GlidePath
 import org.fcitx.fcitx5.android.engine.data.CodeTable
 import org.fcitx.fcitx5.android.engine.data.DataFormatException
 import org.fcitx.fcitx5.android.engine.data.PinyinData
@@ -78,6 +79,25 @@ internal val COMMANDS = listOf(
         args.options["misses"]?.let { path ->
             File(path).printWriter().use { w -> (clean.misses.map { "clean\t$it" } + slips.misses.map { "slips\t$it" }).forEach(w::println) }
         }
+        0
+    },
+    Command(
+        "english-glide", "<english.data> <sentences.txt> [--wobble <key widths>] [--shape <w>] [--proximity <w>] [--near <r>] [--ends <r>] [--misses <out.tsv>] [--threads <n>]",
+        2..2, "wobble", "shape", "proximity", "near", "ends", "misses", "threads",
+    ) { args, out, _ ->
+        val (dataPath, setPath) = args.operands
+        val sentences = File(setPath).readLines().filter { it.isNotBlank() && !it.startsWith("#") }
+        val o = args.options
+        val d = GlidePath.Weights()
+        val weights = GlidePath.Weights(
+            near = o["near"]?.toFloat() ?: d.near, ends = o["ends"]?.toFloat() ?: d.ends,
+            shape = o["shape"]?.toFloat() ?: d.shape, proximity = o["proximity"]?.toFloat() ?: d.proximity,
+        )
+        val run = GlideRun(EnglishData.load(mapFile(dataPath)), weights)
+        out.appendLine(GlideRun.Result.HEADER)
+        val r = run.run(sentences, o["wobble"]?.toFloat() ?: GLIDE_WOBBLE, ENGLISH_SEED, RunOptions(o).threads)
+        out.appendLine(r.row("wobble"))
+        o["misses"]?.let { path -> File(path).printWriter().use { w -> r.misses.forEach(w::println) } }
         0
     },
     Command("predict-learn", "<pinyin.data> <set.tsv> [--user-weight <w>]", 2..2, "user-weight") { args, out, _ ->
@@ -240,6 +260,9 @@ fun runCli(args: Array<String>, out: Appendable, err: Appendable): Int {
 /** How often a key slips in `english`'s second run, and the slips' seed: the same each run. */
 private const val ENGLISH_NOISE = 0.04
 private const val ENGLISH_SEED = 20261011L
+
+// how far a finger misses each key it glides through, key widths
+private const val GLIDE_WOBBLE = 0.3f
 
 /** Full pinyin without the Latin words. */
 private const val NO_LATIN = "no-latin"

@@ -468,6 +468,8 @@
     <string name="im_word_hint_summary">顯示以已打字母開頭的單詞，以及拼錯時的改正；關閉後按鍵直接上屏</string>
     <string name="im_auto_caps">句首自動大寫</string>
     <string name="im_auto_caps_summary">在句子開頭自動開啟 Shift（應用的輸入框要求時）</string>
+    <string name="im_glide">滑行輸入</string>
+    <string name="im_glide_summary">手指不離開鍵盤，依序劃過一個詞的字母即可輸入這個詞</string>
     <string name="status_punctuation_chinese">中文標點</string>
     <string name="status_punctuation_english">英文標點</string>
     <string name="status_full_width">全形</string>

@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.core
 
+import org.fcitx.fcitx5.android.engine.english.EnglishSession
 import android.text.TextPaint
 import android.widget.Toast
 import androidx.core.content.ContextCompat
@@ -97,6 +98,21 @@ object EngineBridge {
 
     /** The handwriting pad's [piece] finished, for the key sent next to tell: Engines.inkFinished. On the fcitx thread, [current] its input method. */
     fun inkFinished(piece: Int, current: String) = ink(current) { engines.inkFinished(piece) }
+
+    /** A glide across the letters, for the key sent next to commit its word: Engines.offerGlide. On the fcitx thread, [current] its input method. */
+    fun offerGlide(glide: EnglishSession.Glide, current: String): Boolean {
+        if (current != Engines.ENGLISH || Engines.ENGLISH in unloadable) return false
+        return try {
+            unloadable.call(Engines.ENGLISH) { engines.offerGlide(glide) }
+            true
+        } catch (e: IOException) {
+            Timber.w(e, "English engine")
+            false
+        } catch (e: DataFormatException) {
+            Timber.w(e, "English engine")
+            false
+        }
+    }
 
     // these make the handwriting session, whose pinyin data may not load: as its keys, latched once
     // and skipped after, the pad drawing on with nothing taken (not a load tried at every character).

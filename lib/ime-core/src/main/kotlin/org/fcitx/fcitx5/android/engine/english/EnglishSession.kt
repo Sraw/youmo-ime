@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.engine.english
 
+import org.fcitx.fcitx5.android.engine.glide.GlideLayout
 import org.fcitx.fcitx5.android.engine.data.NgramModel
 import org.fcitx.fcitx5.android.engine.lattice.CoarseWords
 import org.fcitx.fcitx5.android.engine.session.Action
@@ -56,6 +57,8 @@ class EnglishSession(
     private val user = user ?: EnglishUser()
 
     private val decoder = data?.let { d -> EnglishDecoder(d, costs) { context, word -> scored(d, context, word) } }
+
+    private val glider = data?.let { d -> GlideDecoder(d, score = { context, word -> scored(d, context, word) }) }
 
     // never offered, completed or corrected to; typed, they are kept as typed. Looked up at the first
     // key, not here: the session is made on the thread that types, and the lookups would build the
@@ -115,8 +118,51 @@ class EnglishSession(
 
     override val takesEveryCharacter: Boolean get() = true
 
-    override fun apply(action: Action): Snapshot = when (action) {
+    /**
+     * A glide across the letters ([GlideDecoder]): its [path] in key widths over [layout], and
+     * whether the shift was on ([shift], the word's first letter a capital) or locked ([capsLock]).
+     */
+    class Glide(val path: FloatArray, val layout: GlideLayout, val shift: Boolean = false, val capsLock: Boolean = false)
+
+    // the word a glide committed and the others it may have been, while the cursor stays after it
+    private class Glided(val committed: String, val words: List<String>)
+
+    // the keyboard's last glide, read at the Glide key sent after it
+    private var pendingGlide: Glide? = null
+    private var glided: Glided? = null
+
+    /** The keyboard's [glide], for the [Action.Glide] sent after it to read. */
+    fun offerGlide(glide: Glide) {
+        pendingGlide = glide
+    }
+
+    override fun apply(action: Action): Snapshot {
+        val g = glided?.takeIf { input.isEmpty() && it.committed == last }
+        // what goes on from the word glided: a pick, a backspace, a page; anything else leaves it
+        if (!keepsGlided(action)) glided = null
+        return when {
+            g == null -> act(action)
+            // the glide's own space is there already: not a full stop; its others are no longer offered
+            action == Action.Key(' ') -> {
+                candidates = predictions()
+                page = 0
+                snapshot()
+            }
+            action == Action.Backspace -> unglide(g, null)
+            action is Action.Pick -> g.words.getOrNull(action.index)?.let { unglide(g, it) } ?: snapshot()
+            action is Action.Select && action.index in 0 until pageSize -> g.words.getOrNull(page * pageSize + action.index)?.let { unglide(g, it) } ?: snapshot()
+            else -> act(action)
+        }
+    }
+
+    private fun keepsGlided(action: Action) = when (action) {
+        is Action.Pick, is Action.Select, Action.Backspace, Action.NextPage, Action.PreviousPage -> true
+        else -> false
+    }
+
+    private fun act(action: Action): Snapshot = when (action) {
         is Action.Key -> key(action.char)
+        Action.Glide -> glide()
         Action.Backspace -> backspace()
         is Action.Select -> if (action.index in 0 until pageSize) pick(page * pageSize + action.index) else snapshot(handled = candidates.isNotEmpty())
         is Action.Pick -> pick(action.index)
@@ -158,6 +204,54 @@ class EnglishSession(
     // the candidate [text] as the user committed it, if they did: as shown, or as at a sentence's start
     private fun learnedAs(text: String): String? =
         text.takeIf { user.count(it) > 0f } ?: text.replaceFirstChar(Char::lowercaseChar).takeIf { user.count(it) > 0f }
+
+    // the pending glide's word committed, a word typed before it ended as space ends it
+    private fun glide(): Snapshot {
+        val glide = pendingGlide ?: return snapshot()
+        pendingGlide = null
+        val glider = glider ?: return snapshot()
+        val data = checkNotNull(data)
+        val ended = if (input.isNotEmpty()) key(' ').commit else ""
+        // a correction space made is no longer the last thing before the cursor
+        corrected = null
+        // right after a word or punctuation not the session's (the cursor put there): a space between them
+        val space = if (ended.isEmpty() && recent.lastOrNull()?.let { it.isLetterOrDigit() || it in SPACED_AFTER } == true) " " else ""
+        val before = EnglishText.context(recent + space, start = known && !cut)
+        val context = checkNotNull(decoder).context(before)
+        scoredPrev = previous(before)
+        val words = glider.decode(glide.path, glide.layout, context, GLIDE_SEARCHED)
+            .filter { offered(it.word) }
+            .map { data.word(it.word).let { w -> if (glide.capsLock) w.uppercase() else if (glide.shift) w.replaceFirstChar(Char::uppercaseChar) else w } }
+            .distinct()
+            .take(SUGGESTED + 1)
+        val word = words.firstOrNull() ?: return snapshot(commit = ended)
+        wrote(space)
+        learn(word, 1f)
+        val made = "$word "
+        last = made
+        wrote(made)
+        glided = Glided(made, words)
+        candidates = words
+        page = 0
+        return snapshot(commit = ended + space + made)
+    }
+
+    // the word [g] glided taken back: deleted (a backspace), or another it may have been in its place
+    private fun unglide(g: Glided, other: String?): Snapshot {
+        recent = recent.dropLast(g.committed.length)
+        learn(g.committed.trimEnd(' '), -1f)
+        if (other == null) {
+            last = ""
+            candidates = emptyList()
+            return snapshot(deleteBefore = g.committed.length)
+        }
+        learn(other, 1f)
+        val made = "$other "
+        last = made
+        wrote(made)
+        glided = Glided(made, g.words)
+        return snapshot(commit = made, deleteBefore = g.committed.length)
+    }
 
     private fun forget(index: Int): Snapshot {
         val word = candidates.getOrNull(index)?.let(::learnedAs) ?: return snapshot()
@@ -608,6 +702,12 @@ class EnglishSession(
 
         /** How many words are suggested besides the one typed. */
         const val SUGGESTED = 9
+
+        // after these, not the session's, a glide's word has a space before it
+        private const val SPACED_AFTER = ".,!?;:"
+
+        // words a glide's search keeps, before those never offered are left out
+        private const val GLIDE_SEARCHED = 30
 
         /** The most a slip may cost ([TypingCosts]) for space to correct it: a key far from the one meant. */
         const val MAX_CORRECTION = 3.0f

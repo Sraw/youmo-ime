@@ -123,6 +123,12 @@ sealed class Action {
     object Ink : Action()
 
     /**
+     * Glide typing: the word the keyboard's last glide was, committed, the others it may have been
+     * offered (EnglishSession.offerGlide). Sent as a key, as [Ink]; nothing to any other session.
+     */
+    object Glide : Action()
+
+    /**
      * Puts the cursor [at] that character of the preedit (a tap in the composed text, where the
      * app shows it): what is typed next goes there, and backspace deletes before it. English,
      * pinyin (the nine keys too), the tables and the stroke lookup keep a cursor in their input;

@@ -137,7 +137,7 @@ class TableSession(
                 is Action.Select -> return if (action.index in 0 until options.pageSize) pickPrediction(page * options.pageSize + action.index) else snapshot()
                 Action.NextPage -> return turnPredictions(page + 1)
                 Action.PreviousPage -> return turnPredictions(page - 1)
-                Action.Refine, Action.Ink -> return snapshot()
+                Action.Refine, Action.Ink, Action.Glide -> return snapshot()
                 is Action.Forget -> return pressed(action.index, Offer.FORGET)
                 is Action.Block -> return pressed(action.index, Offer.BLOCK)
                 // anything else ends the offer, and goes on as it would without one: its page too
@@ -179,7 +179,7 @@ class TableSession(
         }
         Action.Refine -> refine()
         // a table has no custom phrases
-        Action.Ink, is Action.Pin, is Action.Unpin, is Action.Syllable, is Action.Letter -> snapshot()
+        Action.Ink, Action.Glide, is Action.Pin, is Action.Unpin, is Action.Syllable, is Action.Letter -> snapshot()
         is Action.Cursor -> moveCursor(action.at)
         is Action.Step -> moveCursor(action.applyTo(cursor, input.length))
         // auto phrases are made of what was committed here, not of what the editor had: kept

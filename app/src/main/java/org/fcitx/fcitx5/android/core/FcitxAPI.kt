@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.core
 
+import org.fcitx.fcitx5.android.engine.english.EnglishSession
 import kotlinx.coroutines.flow.SharedFlow
 import org.fcitx.fcitx5.android.engine.handwriting.InkReading
 import org.fcitx.fcitx5.android.engine.host.Engines
@@ -104,6 +105,13 @@ interface FcitxAPI {
      * cannot load or is not the current input method (the engine told all the same).
      */
     suspend fun offerInk(reading: InkReading, piece: Int): Boolean
+
+    /**
+     * A glide across the letters, read by English's session at the Glide key sent with it in the same
+     * fcitx-thread turn: see [Engines.offerGlide]. Whether the key was sent: not where English is not
+     * the current input method or cannot load.
+     */
+    suspend fun offerGlide(glide: EnglishSession.Glide): Boolean
 
     /** The handwriting pad's [piece] finished, told by the Ink key sent with it: see [Engines.inkFinished]; taken as [offerInk]. */
     suspend fun inkFinished(piece: Int): Boolean

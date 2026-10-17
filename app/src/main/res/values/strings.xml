@@ -482,6 +482,8 @@
     <string name="im_word_hint_summary">Words that start with what is typed, and fixes of a misspelling. Off, the keys type themselves</string>
     <string name="im_auto_caps">Capitalize sentences</string>
     <string name="im_auto_caps_summary">Shift at the start of a sentence, where the app asks for it</string>
+    <string name="im_glide">Glide typing</string>
+    <string name="im_glide_summary">Slide across the letters of a word without lifting your finger</string>
     <string name="status_punctuation_chinese">Chinese punctuation</string>
     <string name="status_punctuation_english">English punctuation</string>
     <string name="status_full_width">Full-width</string>

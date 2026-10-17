@@ -28,6 +28,7 @@ import org.fcitx.fcitx5.android.input.keyboard.KeyAction.BeginSelectionSwipeActi
 import org.fcitx.fcitx5.android.input.keyboard.KeyAction.CommitAction
 import org.fcitx.fcitx5.android.input.keyboard.KeyAction.DeleteSelectionAction
 import org.fcitx.fcitx5.android.input.keyboard.KeyAction.FcitxKeyAction
+import org.fcitx.fcitx5.android.input.keyboard.KeyAction.GlideAction
 import org.fcitx.fcitx5.android.input.keyboard.KeyAction.LangSwitchAction
 import org.fcitx.fcitx5.android.input.keyboard.KeyAction.MoveSelectionAction
 import org.fcitx.fcitx5.android.input.keyboard.KeyAction.PickerSwitchAction
@@ -108,6 +109,8 @@ class CommonKeyActionListener :
                     }
                 }
                 is CommitAction -> service.commitOverEngine(action.text, action.replacing)
+                // the engine sends the key that commits its word itself (Fcitx.offerGlide)
+                is GlideAction -> service.postFcitxJob { offerGlide(action.glide) }
                 is QuickPhraseAction -> afterPendingInput { triggerQuickPhrase() }
                 is UnicodeAction -> afterPendingInput { triggerUnicode() }
                 is LangSwitchAction -> {

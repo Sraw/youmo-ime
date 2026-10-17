@@ -1,0 +1,62 @@
+/*
+ * SPDX-License-Identifier: LGPL-2.1-or-later
+ * SPDX-FileCopyrightText: Copyright 2026 Fcitx5 for Android Contributors
+ */
+package org.fcitx.fcitx5.android.engine.glide
+
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
+import org.junit.Test
+
+class GlidePathTest {
+
+    private fun path(keys: String, layout: GlideLayout = GlideLayout.QWERTY) =
+        keys.flatMap { layout.centre(it).toList() }.toFloatArray()
+
+    // the cost of [word] for a path through [keys], null where it is none
+    private fun cost(keys: String, word: String, layout: GlideLayout = GlideLayout.QWERTY, path: FloatArray = path(keys)): Float? {
+        val g = GlidePath(path, layout, GlidePath.Weights(), 30)
+        for ((i, c) in word.withIndex()) if (!g.step(i, c)) return null
+        return g.cost(word.length)
+    }
+
+    @Test
+    fun aWordsOwnPathCostsLeast() {
+        val own = cost("the", "the")!!
+        assertTrue(own < 0.01f)
+        assertTrue(own < cost("thre", "the")!!)
+        assertNull(cost("the", "they"))
+        // a letter doubled passed once, and no dearer for it
+        assertEquals(cost("helo", "helo")!!, cost("helo", "hello")!!, 1e-4f)
+    }
+
+    @Test
+    fun aLetterOnTwoKeysIsNearEither() {
+        // the split keyboard: g and v on both halves, the right one far off
+        val split = GlideLayout(GlideLayout.rows().let { qwerty -> "abcdefghijklmnopqrstuvwxyz".map { it to qwerty.centre(it) } } + listOf('g' to (12f to 2.1f), 'v' to (14f to 3.5f)))
+        val viaLeft = path("give", GlideLayout.QWERTY)
+        assertTrue(cost("give", "give", split, viaLeft)!! < 0.01f)
+    }
+
+    @Test
+    fun aPathOfOnePointIsNone() {
+        val g = GlidePath(floatArrayOf(1f, 1f), GlideLayout.QWERTY, GlidePath.Weights(), 30)
+        assertEquals(0, g.n)
+        assertEquals(false, g.step(0, 'q'))
+        // a letter the layout lacks
+        assertNull(cost("the", "the", GlideLayout(mapOf('t' to (4.5f to 0.7f), 'e' to (2.5f to 0.7f)))))
+    }
+
+    @Test
+    fun resampledEvenlyAlongItsLength() {
+        val line = GlidePath.resample(floatArrayOf(0f, 0f, 2f, 0f, 2f, 2f), 3, 5, FloatArray(10))
+        assertEquals(listOf(0f, 0f, 1f, 0f, 2f, 0f, 2f, 1f, 2f, 2f), line.toList())
+        assertEquals(listOf(1f, 1f, 1f, 1f), GlidePath.resample(floatArrayOf(1f, 1f), 1, 2, FloatArray(4)).toList())
+        // no two points further apart than a quarter key, none nearer than an eighth but the last
+        val dense = GlidePath.dense(floatArrayOf(0f, 0f, 1f, 0f))
+        assertTrue(dense.size / 2 >= 5)
+        assertEquals(1f, dense[dense.size - 2])
+        assertEquals(listOf(0f, 0f, 0.5f, 0f, 0.55f, 0f), GlidePath.thin(floatArrayOf(0f, 0f, 0.01f, 0f, 0.5f, 0f, 0.52f, 0f, 0.55f, 0f)).toList())
+    }
+}

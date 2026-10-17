@@ -117,6 +117,7 @@ class Keyboard(private val session: Session, private val nineKeys: Boolean) {
 
     private fun char(codePoint: Int): Snapshot {
         if (codePoint == INK) return session.apply(Action.Ink)
+        if (codePoint == GLIDE) return session.apply(Action.Glide)
         if (codePoint in LETTERS && nineKeys) {
             val n = codePoint - LETTERS.first
             return session.apply(Action.Letter('a' + n % ALPHABET, again = n >= ALPHABET))
@@ -241,6 +242,9 @@ class Keyboard(private val session: Session, private val nineKeys: Boolean) {
          * supplementary private use area, past [LETTERS]. No keyboard types it otherwise.
          */
         const val INK = 0xF0100
+
+        /** The character the keyboard sends after a glide, to have its word committed ([Action.Glide]); as [INK]. */
+        const val GLIDE = 0xF0101
 
         private val IDLE = Snapshot(
             commit = "",

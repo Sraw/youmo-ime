@@ -276,6 +276,10 @@ object InputMethodSettings {
                 AppToggle(AppPrefs.ENGLISH_AUTO_CAPS, R.string.im_auto_caps, R.string.im_auto_caps_summary) {
                     AppPrefs.getInstance().keyboard.englishAutoCaps
                 },
+                // the keyboard's: a word by gliding across its letters
+                AppToggle(AppPrefs.GLIDE_TYPING, R.string.im_glide, R.string.im_glide_summary) {
+                    AppPrefs.getInstance().keyboard.glideTyping
+                },
             )
         ),
         Section(

@@ -288,6 +288,14 @@ class Engines(
         (session(HANDWRITING) as HandwritingSession).offer(reading, piece)
     }
 
+    /**
+     * The keyboard's glide across the letters, for English's session to read at its next
+     * [Keyboard.GLIDE]: [EnglishSession.offerGlide]. On the fcitx thread, just before that key.
+     */
+    fun offerGlide(glide: EnglishSession.Glide) {
+        (session(ENGLISH) as? EnglishSession)?.offerGlide(glide)
+    }
+
     /** The handwriting pad's [piece] finished, after its readings: [HandwritingSession.finished]. On the fcitx thread, before an Ink key. */
     fun inkFinished(piece: Int) {
         (session(HANDWRITING) as HandwritingSession).finished(piece)
