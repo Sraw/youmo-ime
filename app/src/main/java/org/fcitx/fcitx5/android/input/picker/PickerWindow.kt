@@ -6,11 +6,13 @@ package org.fcitx.fcitx5.android.input.picker
 
 import android.view.inputmethod.EditorInfo
 import androidx.core.content.ContextCompat
+import androidx.core.view.isVisible
 import androidx.transition.Transition
 import androidx.recyclerview.widget.RecyclerView
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.core.CapabilityFlag
 import org.fcitx.fcitx5.android.core.CapabilityFlags
+import org.fcitx.fcitx5.android.core.KeyState
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.input.broadcast.InputBroadcastReceiver
@@ -37,7 +39,9 @@ class PickerWindow(
     private val switchKey: KeyDef,
     private val popupPreview: Boolean = true,
     private val followKeyBorder: Boolean = true,
-    private val policy: PickerPolicy = DefaultPickerPolicy()
+    private val policy: PickerPolicy = DefaultPickerPolicy(),
+    /** A key that finds emoji by the pinyin of their words ([EmojiSearchUi]). */
+    private val search: Boolean = false,
 ) : InputWindow.ExtendedInputWindow<PickerWindow>(), EssentialWindow, InputBroadcastReceiver {
 
     enum class Key : EssentialWindow.Key {
@@ -71,6 +75,9 @@ class PickerWindow(
     // what is picked in a password, or in a field that asks not to be learned from, is not kept as recent
     private var keepsNoRecent = false
 
+    /** The pinyin typed in the search, while it is open. */
+    private val query = StringBuilder()
+
     override fun onStartInput(info: EditorInfo, capFlags: CapabilityFlags) {
         keepsNoRecent = capFlags.hasAny(CapabilityFlag.PasswordOrSensitive)
         // the space's badge asks what the hold to talk asks (CommonKeyActionListener), a shown password too
@@ -102,6 +109,8 @@ class PickerWindow(
 
             KeyAction.PanelBackAction -> backToKeyboard()
 
+            is KeyAction.EmojiSearchAction -> search(it.on)
+
             KeyAction.PanelLockAction -> {
                 locked = !locked
                 pickerLayout.embeddedKeyboard.showLocked(locked)
@@ -120,6 +129,32 @@ class PickerWindow(
 
             else -> commonKeyActionListener.listener.onKeyAction(it, source)
         }
+    }
+
+    // the search's letters build the query; a backspace with none typed deletes in the field, as
+    // elsewhere, but not one held on from the query's letters
+    private val searchKeyActionListener = KeyActionListener { it, source ->
+        when {
+            it is KeyAction.FcitxKeyAction -> searchFor(query.append(it.act))
+            it is KeyAction.SymAction && it.sym == EmojiSearchUi.BACKSPACE && query.isNotEmpty() ->
+                searchFor(query.deleteCharAt(query.length - 1))
+            it is KeyAction.SymAction && it.sym == EmojiSearchUi.BACKSPACE && it.states.has(KeyState.Repeat) -> {}
+            else -> keyActionListener.onKeyAction(it, source)
+        }
+    }
+
+    /** The search shown ([on]) from no query, or the emoji again. */
+    private fun search(on: Boolean) {
+        val ui = pickerLayout.search ?: return
+        query.clear()
+        if (on) searchFor(query)
+        ui.isVisible = on
+    }
+
+    private fun searchFor(typed: CharSequence) {
+        // in the skin tone a tap puts in
+        val found = PickerData.EmojiWords.search(typed.toString()).filter(policy::filter).map(policy::transform)
+        pickerLayout.search?.show(typed.toString(), found)
     }
 
     /** The panel's side lists the recently used once there are any; the emoji have no side. */
@@ -151,7 +186,7 @@ class PickerWindow(
         }
     }
 
-    override fun onCreateView() = PickerLayout(context, theme, switchKey, density, panel).apply {
+    override fun onCreateView() = PickerLayout(context, theme, switchKey, density, panel, if (search) SearchKey else null).apply {
         pickerLayout = this
         val bordered = followKeyBorder && keyBorder
         adapter = PickerGridAdapter(grid, keyActionListener, popupActionListener, data, key.name, bordered, policy)
@@ -160,10 +195,17 @@ class PickerWindow(
             setCategories(adapter.categories.map { context.getString(if (it.short != 0) it.short else it.name) })
             onPick = ::select
         }
+        search?.apply {
+            keyboard.popupActionListener = popup.listener
+            onPick = { keyActionListener.onKeyAction(KeyAction.CommitAction(it), KeyActionListener.Source.Keyboard) }
+        }
         if (panel) return@apply
         tabsUi.apply {
             setTabs(adapter.categories)
-            setOnTabClickListener { i -> show(i) }
+            setOnTabClickListener { i ->
+                search(false)
+                show(i)
+            }
         }
         grid.addOnScrollListener(object : RecyclerView.OnScrollListener() {
             override fun onScrollStateChanged(recyclerView: RecyclerView, newState: Int) {
@@ -213,6 +255,7 @@ class PickerWindow(
             select(sidePanel.selected)
             pickerLayout.embeddedKeyboard.showLocked(locked)
         } else {
+            search(false)
             // opens on the first category (the common symbols), not on what was recently used
             adapter.rebuild()
             show(FirstCategory)
@@ -222,11 +265,13 @@ class PickerWindow(
             it.keyActionListener = keyActionListener
             it.inPasswordField = service.inPasswordField
         }
+        pickerLayout.search?.keyboard?.keyActionListener = searchKeyActionListener
     }
 
     override fun onDetached() {
         popup.dismissAll()
         pickerLayout.embeddedKeyboard.keyActionListener = null
+        pickerLayout.search?.keyboard?.keyActionListener = null
     }
 
     override val showTitle get() = panel
@@ -234,5 +279,14 @@ class PickerWindow(
     companion object {
         /** the common symbols (or the first emoji), not the recently used before them */
         private const val FirstCategory = 1
+
+        private val SearchKey = KeyDef(
+            KeyDef.Appearance.Image(
+                src = R.drawable.ic_baseline_search_24,
+                variant = KeyDef.Appearance.Variant.Alternative,
+                contentDescription = R.string.emoji_search
+            ),
+            setOf(KeyDef.Behavior.Press(KeyAction.EmojiSearchAction(true)))
+        )
     }
 }

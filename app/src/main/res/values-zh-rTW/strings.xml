@@ -550,6 +550,8 @@
     <string name="dict_unread_import_again">可以重新匯入（例如換一個較新的版本）。</string>
     <string name="picker_back">返回</string>
     <string name="picker_lock">選完符號後停留</string>
+    <string name="emoji_search">按拼音搜尋表情</string>
+    <string name="emoji_search_hint">打拼音找表情</string>
     <string name="picker_unlock">選完符號後返回</string>
     <string name="picker_title">符號</string>
     <string name="picker_chinese">中文標點</string>

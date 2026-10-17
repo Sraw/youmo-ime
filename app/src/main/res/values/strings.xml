@@ -565,6 +565,8 @@
     <string name="dict_unread_import_again">You can import a dictionary again (a newer version, for example).</string>
     <string name="picker_back">Back</string>
     <string name="picker_lock">Stay after a symbol is picked</string>
+    <string name="emoji_search">Search emoji by pinyin</string>
+    <string name="emoji_search_hint">Type pinyin</string>
     <string name="picker_unlock">Go back after a symbol is picked</string>
     <string name="picker_title">Symbols</string>
     <string name="picker_chinese">Chinese punctuation</string>

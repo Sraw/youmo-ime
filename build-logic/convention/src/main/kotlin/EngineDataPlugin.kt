@@ -237,6 +237,7 @@ class EngineDataPlugin : Plugin<Project> {
             test.set(emojiTest.flatMap { it.outputFile })
             annotations.set(emojiWords.flatMap { it.outputFile })
             edits.set(target.rootProject.layout.projectDirectory.dir("lexicon").file("emoji.tsv"))
+            pinyin.set(compile.flatMap { it.outputDir.file("engine/pinyin.data") })
             outputDir.set(target.layout.buildDirectory.dir("generated/engine-emoji"))
         }
         val tableRuns = target.gradle.sharedServices.registerIfAbsent("engineTableRuns", TableRuns::class.java)
@@ -439,6 +440,11 @@ class EngineDataPlugin : Plugin<Project> {
         @get:PathSensitive(PathSensitivity.NONE)
         abstract val edits: RegularFileProperty
 
+        /** The compiled pinyin data: each word's pinyin, for the panel's search, and how common it is. */
+        @get:InputFile
+        @get:PathSensitive(PathSensitivity.NONE)
+        abstract val pinyin: RegularFileProperty
+
         @get:OutputDirectory
         abstract val outputDir: DirectoryProperty
 
@@ -448,8 +454,12 @@ class EngineDataPlugin : Plugin<Project> {
             output.parentFile.mkdirs()
             exec.javaexec {
                 configureTool(
-                    this@CompileEmojiData.classpath, "256m",
-                    listOf("emoji", "-o", output.path, "--test", test.get().asFile.path, "--lexicon", edits.get().asFile.path, annotations.get().asFile.path),
+                    // the pinyin data mapped, its 800k words indexed
+                    this@CompileEmojiData.classpath, "1g",
+                    listOf(
+                        "emoji", "-o", output.path, "--test", test.get().asFile.path, "--lexicon", edits.get().asFile.path,
+                        "--pinyin", pinyin.get().asFile.path, annotations.get().asFile.path,
+                    ),
                 )
             }
         }

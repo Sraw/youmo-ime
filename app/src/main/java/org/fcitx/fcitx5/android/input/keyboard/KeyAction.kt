@@ -52,4 +52,7 @@ sealed class KeyAction {
 
     /** The symbol panel's lock: it stays after a symbol is picked, for a run of them. */
     data object PanelLockAction : KeyAction()
+
+    /** The emoji panel's search by pinyin, begun ([on]) or left. */
+    data class EmojiSearchAction(val on: Boolean) : KeyAction()
 }

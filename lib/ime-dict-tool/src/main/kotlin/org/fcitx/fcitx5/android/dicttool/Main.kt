@@ -16,13 +16,15 @@ import org.fcitx.fcitx5.android.engine.data.WordLayers
 import org.fcitx.fcitx5.android.engine.data.forEachNumberedLine
 import org.fcitx.fcitx5.android.engine.english.EnglishDataBuilder
 import org.fcitx.fcitx5.android.engine.english.EnglishText
-import org.fcitx.fcitx5.android.engine.pinyin.Syllables
+import org.fcitx.fcitx5.android.engine.host.Engines
 import org.fcitx.fcitx5.android.engine.phrase.EmojiData
+import org.fcitx.fcitx5.android.engine.pinyin.Syllables
 import org.fcitx.fcitx5.android.engine.stroke.Strokes
 import org.fcitx.fcitx5.android.engine.table.TableText
 import org.fcitx.fcitx5.android.engine.user.WordPack
 import org.fcitx.fcitx5.android.input.voice.HotwordSpelling
 import java.io.File
+import java.io.FileNotFoundException
 import java.io.IOException
 import java.io.RandomAccessFile
 import java.nio.ByteBuffer
@@ -72,12 +74,13 @@ private val COMMANDS = listOf(
         strokes(options.output!!, options.inputs.single(), out)
     },
     Command(
-        "emoji -o <out> --test <emoji-test.txt> [--lexicon <emoji.tsv>] <annotations/zh.xml>",
+        "emoji -o <out> --test <emoji-test.txt> [--lexicon <emoji.tsv>] [--pinyin <pinyin.data>] <annotations/zh.xml>",
         """
             the emoji panel's groups and the Chinese
             words emoji stand for, from Unicode's
             emoji-test.txt, CLDR's annotations and
-            lexicon/emoji.tsv's edits (EmojiAnnotations)
+            lexicon/emoji.tsv's edits (EmojiAnnotations),
+            each word's pinyin as the data reads it
         """,
         inputs = 1..1,
     ) { options, out -> emoji(options, out) },
@@ -253,7 +256,7 @@ private class Options(
     val misreadings: String?,
     /** `table`: a word pack whose words go in, coded by the table's rules. */
     val words: String?,
-    /** `table`: compiled pinyin data whose words go in too. */
+    /** `table`: compiled pinyin data whose words go in too; `emoji`: that reads the words. */
     val pinyin: String?,
     /** `emoji`: Unicode's emoji-test.txt. */
     val test: String?,
@@ -926,8 +929,16 @@ private fun emoji(options: Options, out: Appendable) {
     val emoji = EmojiAnnotations.emoji(File(options.test!!).readText())
     val annotations = EmojiAnnotations.read(File(input).readText(), emoji)
     val words = EmojiAnnotations.words(annotations, options.lexicon?.let { File(it).readLines() }.orEmpty(), emoji)
+    // read as the settings read a word the user adds (Engines.pinyinOf), for the panel's search by pinyin
+    val engines = options.pinyin?.let { data -> Engines({ path -> if (path == Engines.PINYIN_DATA) map(data) else throw FileNotFoundException(path) }, null) }
+    val pinyin = engines?.pinyinsOf(words.keys).orEmpty()
+    // the commoner word first, as the panel's search lists words alike (笑 before 孝); by word without the data
+    val sorted = words.keys.sorted()
+    val order = engines?.logProbs(sorted)?.let { p -> sorted.indices.sortedByDescending { p[it] }.map(sorted::get) } ?: sorted
     val output = File(options.output!!)
-    output.writeText(EmojiData.format(emoji.groups, words, EMOJI_HEADER))
+    output.writeText(EmojiData.format(emoji.groups, order.associateWith(words::getValue), EMOJI_HEADER, pinyin))
+    val unread = words.keys.count { pinyin[it] == null }
+    if (options.pinyin != null && unread > 0) out.appendLine("emoji: $unread words the pinyin data does not read: not found by search")
     out.appendLine("emoji: ${emoji.groups.sumOf { it.second.size }} in the panel, ${annotations.size} annotated, ${words.size} words")
     out.appendLine("wrote $output: ${output.length()} bytes")
 }

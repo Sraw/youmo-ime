@@ -28,7 +28,8 @@ fun emojiPicker(): PickerWindow = PickerWindow(
     switchKey = TextPickerSwitchKey(":-)", PickerWindow.Key.Emoticon),
     popupPreview = false,
     followKeyBorder = false,
-    policy = EmojiPickerPolicy()
+    policy = EmojiPickerPolicy(),
+    search = true,
 )
 
 fun emoticonPicker(): PickerWindow = PickerWindow(

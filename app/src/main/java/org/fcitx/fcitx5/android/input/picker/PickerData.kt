@@ -142,13 +142,17 @@ object PickerData {
      * build, not a list written out here. None if the app has not got it.
      */
     val Emoji: List<Pair<Category, Array<String>>> by lazy {
-        val data = try {
+        EmojiWords.groups.mapNotNull { (id, emoji) -> EmojiCategories[id]?.let { it to emoji.toTypedArray() } }
+    }
+
+    /** That data, its words too: what the panel's search finds emoji by. */
+    val EmojiWords: EmojiData by lazy {
+        try {
             appContext.assets.open(Engines.EMOJI_DATA).use { EmojiData.read(it.reader().readText()) }
         } catch (e: IOException) {
             Timber.w(e, "no emoji panel")
             EmojiData.EMPTY
         }
-        data.groups.mapNotNull { (id, emoji) -> EmojiCategories[id]?.let { it to emoji.toTypedArray() } }
     }
 
     val Emoticon: List<Pair<Category, Array<String>>> = listOf(

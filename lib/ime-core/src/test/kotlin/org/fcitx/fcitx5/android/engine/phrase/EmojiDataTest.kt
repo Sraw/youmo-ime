@@ -36,4 +36,39 @@ class EmojiDataTest {
         assertEquals(emptyList<Pair<String, List<String>>>(), data.groups)
         assertEquals(0, EmojiData.EMPTY.size)
     }
+
+    private val searched = EmojiData.read(
+        EmojiData.format(
+            emptyList(),
+            // in the order of their use, as the tool writes them
+            linkedMapOf("笑" to listOf("😄"), "笑脸" to listOf("😃", "😄"), "笑哭" to listOf("😂"), "点赞" to listOf("👍"), "小" to listOf("🤏"), "无读音" to listOf("❓")),
+            pinyin = mapOf("笑" to "xiao", "笑脸" to "xiao lian", "笑哭" to "xiao ku", "点赞" to "dian zan", "小" to "xiao", "无读音" to null),
+        ),
+    )
+
+    @Test
+    fun aSearchFindsWordsTypedInFullThenTheirStartThenEachSyllablesStart() {
+        // in full first, fewer syllables first, then as written; then the words xiao starts, each emoji once
+        assertEquals(listOf("😄", "🤏", "😃", "😂"), searched.search("xiao"))
+        // the last syllable in part: the start of 笑脸
+        assertEquals(listOf("😃", "😄"), searched.search("xiaol"))
+        assertEquals(listOf("😃", "😄"), searched.search("XiaoLian"))
+        // each syllable by its start
+        assertEquals(listOf("👍"), searched.search("dz"))
+        assertEquals(listOf("👍"), searched.search("d'zan"))
+        assertEquals(listOf("👍"), searched.search("dianz"))
+        assertEquals(listOf("😄", "🤏"), searched.search("xiao", limit = 2))
+        // past a word, or no letter: none
+        assertEquals(emptyList<String>(), searched.search("dianzana"))
+        assertEquals(emptyList<String>(), searched.search("zan"))
+        assertEquals(emptyList<String>(), searched.search("12"))
+        assertEquals(emptyList<String>(), EmojiData.EMPTY.search("xiao"))
+    }
+
+    @Test
+    fun aWordsPinyinIsKeptAsWrittenAndReadBack() {
+        val text = EmojiData.format(emptyList(), mapOf("点赞" to listOf("👍")), pinyin = mapOf("点赞" to "dian zan"))
+        assertEquals("点赞\t👍\tdian zan\n", text)
+        assertEquals(listOf("👍"), EmojiData.read(text).of("点赞"))
+    }
 }

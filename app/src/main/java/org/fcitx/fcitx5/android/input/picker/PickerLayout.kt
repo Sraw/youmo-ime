@@ -18,7 +18,9 @@ import splitties.views.dsl.constraintlayout.below
 import splitties.views.dsl.constraintlayout.bottomOfParent
 import splitties.views.dsl.constraintlayout.centerHorizontally
 import splitties.views.dsl.constraintlayout.endOfParent
+import splitties.views.dsl.constraintlayout.centerInParent
 import splitties.views.dsl.constraintlayout.lParams
+import splitties.views.dsl.constraintlayout.matchConstraints
 import splitties.views.dsl.constraintlayout.startOfParent
 import splitties.views.dsl.constraintlayout.topOfParent
 import splitties.views.dsl.core.add
@@ -28,7 +30,7 @@ import splitties.views.dsl.core.add
  * the categories at the side, the one picked beside them, and a lock in the row of keys.
  */
 @SuppressLint("ViewConstructor")
-class PickerLayout(context: Context, theme: Theme, switchKey: KeyDef, density: PickerGridView.Density, panel: Boolean) :
+class PickerLayout(context: Context, theme: Theme, switchKey: KeyDef, density: PickerGridView.Density, panel: Boolean, searchKey: KeyDef? = null) :
     ConstraintLayout(context) {
 
     class Keyboard(context: Context, theme: Theme, keys: List<KeyDef>) : BaseKeyboard(context, theme, listOf(keys)) {
@@ -63,13 +65,16 @@ class PickerLayout(context: Context, theme: Theme, switchKey: KeyDef, density: P
         }
     }
 
-    val embeddedKeyboard = Keyboard(context, theme, if (panel) panelKeys(context, switchKey) else listKeys(switchKey))
+    val embeddedKeyboard = Keyboard(context, theme, if (panel) panelKeys(context, switchKey) else listKeys(switchKey, searchKey))
 
     val grid = PickerGridView(context, theme, density)
 
     val tabsUi by lazy { PickerTabsUi(context, theme) }
 
     val side: PickerSideUi? = if (panel) PickerSideUi(context, theme) else null
+
+    /** The emoji's search ([searchKey]), over the rest while shown. */
+    val search: EmojiSearchUi? = searchKey?.let { EmojiSearchUi(context, theme).apply { visibility = GONE } }
 
     init {
         if (side != null) {
@@ -96,14 +101,16 @@ class PickerLayout(context: Context, theme: Theme, switchKey: KeyDef, density: P
             bottomOfParent()
             matchConstraintPercentHeight = 0.25f
         })
+        if (search != null) add(search, lParams(matchConstraints, matchConstraints) { centerInParent() })
     }
 
     companion object {
         private const val SIDE_WIDTH = 0.18f
 
-        private fun listKeys(switchKey: KeyDef) = listOf(
+        // the emoji's search in place of the comma, which the letters have a step away
+        private fun listKeys(switchKey: KeyDef, searchKey: KeyDef?) = listOf(
             LayoutSwitchKey("ABC", TextKeyboard.Name),
-            Keyboard.PunctuationKey(","),
+            searchKey ?: Keyboard.PunctuationKey(","),
             switchKey,
             SpaceKey(),
             Keyboard.PunctuationKey("."),
