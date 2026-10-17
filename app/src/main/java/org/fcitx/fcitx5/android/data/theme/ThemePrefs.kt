@@ -16,6 +16,7 @@ import org.fcitx.fcitx5.android.data.prefs.ManagedPreference
 import org.fcitx.fcitx5.android.data.prefs.ManagedPreferenceCategory
 import org.fcitx.fcitx5.android.data.prefs.ManagedPreferenceEnum
 import org.fcitx.fcitx5.android.data.prefs.ManagedPreferenceUi.Levels.Level
+import org.fcitx.fcitx5.android.input.keyboard.OneHanded
 import org.fcitx.fcitx5.android.input.keyboard.SplitDock
 import org.fcitx.fcitx5.android.input.keyboard.SplitKeyboardMode
 
@@ -83,6 +84,10 @@ class ThemePrefs(sharedPreferences: SharedPreferences) :
     val splitDock = enumList(R.string.split_dock, "split_dock", SplitDock.Right) {
         splitKeyboard.getValue() != SplitKeyboardMode.Off
     }
+
+    // the whole keyboard at a side for one thumb while it does not split; also from the status area,
+    // and read by the input view as it changes, as the dock is
+    val oneHanded = enumList(R.string.one_handed, "one_handed", OneHanded.Off)
 
     init {
         section(R.string.section_keys)

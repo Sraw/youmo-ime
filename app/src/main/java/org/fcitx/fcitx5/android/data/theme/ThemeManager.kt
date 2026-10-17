@@ -126,7 +126,7 @@ object ThemeManager {
         when (key) {
             in prefs.dayNightModePrefNames -> activeTheme = evaluateActiveTheme()
             // InputView moves the board itself: made anew, the symbols shown would go back to the letters
-            prefs.splitDock.key -> Unit
+            prefs.splitDock.key, prefs.oneHanded.key -> Unit
             else -> fireChange()
         }
     }

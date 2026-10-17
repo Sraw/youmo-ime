@@ -587,6 +587,9 @@
     <string name="split_dock_full">Full width</string>
     <string name="split_dock_move_left">Move to the left</string>
     <string name="split_dock_move_right">Move to the right</string>
+    <string name="one_handed">One-handed mode</string>
+    <string name="one_handed_off">Off</string>
+    <string name="one_handed_exit">Full width</string>
     <string name="show_touch_keyboard">Show the on-screen keyboard</string>
     <string name="hardware_switch_shortcuts">Hardware keyboard shortcuts</string>
     <string name="hardware_switch_shortcuts_summary">Shift alone or Ctrl+Space switches between Chinese and English, Ctrl+Shift goes to the next input method</string>

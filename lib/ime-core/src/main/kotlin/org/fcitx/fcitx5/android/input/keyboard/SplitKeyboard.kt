@@ -73,6 +73,27 @@ object SplitKeyboard {
         return dock.takeIf { widthDp - dockWidth(widthDp) >= DOCK_MIN_FREE_DP }
     }
 
+    /**
+     * One thumb's keyboard while the letters do not split, Gboard's one-handed mode: everything
+     * the keyboard shows at a side, [ONE_HANDED_SHARE] of the width, the room beside it for the
+     * buttons that move it across or back to the whole width.
+     */
+    const val ONE_HANDED_SHARE = 0.8f
+
+    /** Where the board shown goes ([Placement.side]) and how wide it is there, in dp. */
+    data class Placement(val side: Dock, val widthDp: Int)
+
+    /**
+     * Where the board shown goes on a keyboard [widthDp] wide, or null for the whole width: split,
+     * as [side] has it by [dock]; else one-handed at [oneHanded]'s side ([Dock.FULL] is off), a
+     * phone's width at most on a tablet upright, whatever the board is.
+     */
+    fun placement(oneHanded: Dock, dock: Dock, splitting: Boolean, lettersShown: Boolean, widthDp: Int): Placement? = when {
+        splitting -> side(dock, true, lettersShown, widthDp)?.let { Placement(it, dockWidth(widthDp)) }
+        oneHanded == Dock.FULL -> null
+        else -> Placement(oneHanded, (widthDp * ONE_HANDED_SHARE).toInt().coerceAtMost(DOCK_MAX_DP))
+    }
+
     /** The kinds of window the keyboard shows, as far as where they go while the letters split. */
     enum class Window { LETTERS, OTHER_LAYOUT, PICKER, CLIPBOARD, EXPANDED_CANDIDATES, OTHER }
 

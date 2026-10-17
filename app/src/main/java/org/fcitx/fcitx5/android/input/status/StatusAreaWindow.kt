@@ -17,6 +17,8 @@ import org.fcitx.fcitx5.android.daemon.FcitxConnection
 import org.fcitx.fcitx5.android.daemon.launchOnReady
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
+import org.fcitx.fcitx5.android.input.keyboard.KeyboardWindow
+import org.fcitx.fcitx5.android.input.keyboard.OneHanded as OneHandedMode
 import org.fcitx.fcitx5.android.input.bar.ui.ToolButton
 import org.fcitx.fcitx5.android.input.broadcast.InputBroadcastReceiver
 import org.fcitx.fcitx5.android.input.dependency.fcitx
@@ -25,6 +27,7 @@ import org.fcitx.fcitx5.android.input.dependency.theme
 import org.fcitx.fcitx5.android.input.editorinfo.EditorInfoWindow
 import org.fcitx.fcitx5.android.input.status.StatusAreaEntry.Android.Type.InputMethod
 import org.fcitx.fcitx5.android.input.status.StatusAreaEntry.Android.Type.Keyboard
+import org.fcitx.fcitx5.android.input.status.StatusAreaEntry.Android.Type.OneHanded
 import org.fcitx.fcitx5.android.input.status.StatusAreaEntry.Android.Type.ThemeList
 import org.fcitx.fcitx5.android.input.wm.InputWindow
 import org.fcitx.fcitx5.android.input.wm.InputWindowManager
@@ -134,6 +137,12 @@ class StatusAreaWindow : InputWindow.ExtendedInputWindow<StatusAreaWindow>(),
                         }
                         Keyboard -> AppUtil.launchMainToKeyboard(context)
                         ThemeList -> AppUtil.launchMainToThemeList(context)
+                        // on or off, then the keyboard as it now goes: the side the arrow beside it last chose is not kept
+                        OneHanded -> {
+                            val oneHanded = ThemeManager.prefs.oneHanded
+                            oneHanded.setValue(if (oneHanded.getValue() == OneHandedMode.Off) OneHandedMode.Right else OneHandedMode.Off)
+                            windowManager.attachWindow(KeyboardWindow)
+                        }
                     }
                 }
             }
@@ -157,6 +166,12 @@ class StatusAreaWindow : InputWindow.ExtendedInputWindow<StatusAreaWindow>(),
     override fun onStatusAreaUpdate(actions: Array<Action>) {
         adapter.entries = arrayOf(
             *staticEntries,
+            StatusAreaEntry.Android(
+                context.getString(R.string.one_handed),
+                R.drawable.ic_baseline_pan_tool_24,
+                OneHanded,
+                active = ThemeManager.prefs.oneHanded.getValue() != OneHandedMode.Off
+            ),
             *Array(actions.size) { StatusAreaEntry.fromAction(context, actions[it]) }
         )
     }

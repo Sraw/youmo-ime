@@ -65,6 +65,12 @@ the window attached (`InputBroadcastReceiver.onWindowAttached`, its `DockFollowe
 `InputWindowManager.currentWindow`) and the keyboard window's layout
 (`KeyboardWindow.onLayoutShown`).
 
+One-handed (`ThemePrefs.oneHanded`: off / right / left, read live the same way; the status area's
+单手模式 turns it on at the right or off): while the letters do not split, every board, the letters
+too, goes to that side, 80% of the width, a phone's 420 dp at most (`SplitKeyboard.placement`, which
+decides both). The room beside it has the arrow, which then sets `oneHanded` rather than
+`splitDock`, and a button back to the whole width.
+
 ### Hardware keyboard
 
 A key pressed on one hides the touch keyboard and shows candidates by the cursor; a tap on the field

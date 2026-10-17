@@ -7,6 +7,7 @@ package org.fcitx.fcitx5.android.input.keyboard
 import org.fcitx.fcitx5.android.input.keyboard.SplitKeyboard.Mode
 import org.fcitx.fcitx5.android.input.keyboard.SplitKeyboard.Sizes
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -98,6 +99,23 @@ class SplitKeyboardTest {
         assertEquals(SplitKeyboard.DOCK_MAX_DP, SplitKeyboard.dockWidth(1280))
         // never wider than the keyboard
         assertEquals(300, SplitKeyboard.dockWidth(300))
+    }
+
+    @Test
+    fun oneHandedEveryBoardGoesToItsSideTillTheLettersSplit() {
+        val right = SplitKeyboard.Dock.RIGHT
+        val left = SplitKeyboard.Dock.LEFT
+        val full = SplitKeyboard.Dock.FULL
+        // a phone upright: four fifths of it, the letters too
+        assertEquals(SplitKeyboard.Placement(right, 288), SplitKeyboard.placement(right, left, splitting = false, lettersShown = true, widthDp = 360))
+        assertEquals(SplitKeyboard.Placement(left, 288), SplitKeyboard.placement(left, right, splitting = false, lettersShown = false, widthDp = 360))
+        // a tablet upright: a phone's width
+        assertEquals(SplitKeyboard.Placement(left, SplitKeyboard.DOCK_MAX_DP), SplitKeyboard.placement(left, full, false, true, 800))
+        assertNull(SplitKeyboard.placement(full, right, splitting = false, lettersShown = false, widthDp = 360))
+        // split, the letters take the width, the other boards go as the split's setting says
+        assertNull(SplitKeyboard.placement(left, right, splitting = true, lettersShown = true, widthDp = 800))
+        assertEquals(SplitKeyboard.Placement(right, SplitKeyboard.dockWidth(800)), SplitKeyboard.placement(left, right, true, false, 800))
+        assertNull(SplitKeyboard.placement(left, full, splitting = true, lettersShown = false, widthDp = 800))
     }
 
     @Test(expected = IllegalArgumentException::class)

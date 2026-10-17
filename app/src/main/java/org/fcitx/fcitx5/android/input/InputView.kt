@@ -21,6 +21,7 @@ import android.widget.FrameLayout
 import android.widget.ImageView
 import androidx.annotation.Keep
 import androidx.annotation.RequiresApi
+import androidx.core.view.isVisible
 import androidx.core.view.updateLayoutParams
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.CoroutineScope
@@ -52,6 +53,7 @@ import org.fcitx.fcitx5.android.input.keyboard.CommonKeyActionListener
 import org.fcitx.fcitx5.android.input.keyboard.KeyboardHeightPercentBase.DisplayMetrics
 import org.fcitx.fcitx5.android.input.keyboard.KeyboardHeightPercentBase.RealSize
 import org.fcitx.fcitx5.android.input.keyboard.KeyboardWindow
+import org.fcitx.fcitx5.android.input.keyboard.OneHanded
 import org.fcitx.fcitx5.android.input.keyboard.SplitDock
 import org.fcitx.fcitx5.android.input.keyboard.SplitKeyboard
 import org.fcitx.fcitx5.android.input.keyboard.TextKeyboard
@@ -92,6 +94,9 @@ import splitties.views.imageDrawable
 import splitties.views.imageResource
 import timber.log.Timber
 
+// a button in the room beside a board at a side, square
+private const val SIDE_BUTTON_DP = 56
+
 @SuppressLint("ViewConstructor")
 class InputView(
     service: FcitxInputMethodService,
@@ -112,28 +117,46 @@ class InputView(
 
     private val placeholderOnClickListener = OnClickListener { }
 
-    // the empty side of a board put at the other (SplitKeyboard.Dock): a button moves it across
-    private fun moveButton(to: SplitDock, icon: Int, description: Int) = imageView {
+    private fun sideButton(icon: Int, description: Int, onClick: () -> Unit) = imageView {
         imageResource = icon
         colorFilter = PorterDuffColorFilter(theme.altKeyTextColor, PorterDuff.Mode.SRC_IN)
         background = borderlessRippleDrawable(theme.keyPressHighlightColor)
         scaleType = ImageView.ScaleType.CENTER
         contentDescription = context.getString(description)
         visibility = GONE
-        setOnClickListener { ThemeManager.prefs.splitDock.setValue(to) }
+        setOnClickListener { onClick() }
     }
 
-    private val moveLeft = moveButton(SplitDock.Left, R.drawable.ic_baseline_arrow_back_24, R.string.split_dock_move_left)
-    private val moveRight = moveButton(SplitDock.Right, R.drawable.ic_baseline_arrow_forward_24, R.string.split_dock_move_right)
+    // whether the board is at a side one-handed (not split): what the buttons beside it change
+    private var oneHandedPlaced = false
+
+    // the empty side of a board put at the other (SplitKeyboard.Dock): a button moves it across
+    private fun moveButton(to: SplitKeyboard.Dock, icon: Int, description: Int) = sideButton(icon, description) {
+        if (oneHandedPlaced) ThemeManager.prefs.oneHanded.setValue(OneHanded.entries.first { it.dock == to })
+        else ThemeManager.prefs.splitDock.setValue(SplitDock.entries.first { it.dock == to })
+    }
+
+    private val moveLeft = moveButton(SplitKeyboard.Dock.LEFT, R.drawable.ic_baseline_arrow_back_24, R.string.split_dock_move_left)
+    private val moveRight = moveButton(SplitKeyboard.Dock.RIGHT, R.drawable.ic_baseline_arrow_forward_24, R.string.split_dock_move_right)
+
+    // one-handed, the other button there: the whole width again, at either side
+    private fun fullWidthButton() = sideButton(R.drawable.ic_baseline_open_in_full_24, R.string.one_handed_exit) {
+        ThemeManager.prefs.oneHanded.setValue(OneHanded.Off)
+    }
+
+    private val fullWidthLeft = fullWidthButton()
+    private val fullWidthRight = fullWidthButton()
 
     // use clickable view as padding, so MotionEvent can be split to padding view and keyboard view
     private val leftPaddingSpace = frameLayout {
         setOnClickListener(placeholderOnClickListener)
-        add(moveLeft, FrameLayout.LayoutParams(dp(56), dp(56), Gravity.CENTER))
+        add(moveLeft, FrameLayout.LayoutParams(dp(SIDE_BUTTON_DP), dp(SIDE_BUTTON_DP), Gravity.CENTER))
+        add(fullWidthLeft, FrameLayout.LayoutParams(dp(SIDE_BUTTON_DP), dp(SIDE_BUTTON_DP), Gravity.CENTER))
     }
     private val rightPaddingSpace = frameLayout {
         setOnClickListener(placeholderOnClickListener)
-        add(moveRight, FrameLayout.LayoutParams(dp(56), dp(56), Gravity.CENTER))
+        add(moveRight, FrameLayout.LayoutParams(dp(SIDE_BUTTON_DP), dp(SIDE_BUTTON_DP), Gravity.CENTER))
+        add(fullWidthRight, FrameLayout.LayoutParams(dp(SIDE_BUTTON_DP), dp(SIDE_BUTTON_DP), Gravity.CENTER))
     }
     private val bottomPaddingSpace = view(::View) {
         // height as keyboardBottomPadding
@@ -263,6 +286,11 @@ class InputView(
         updateKeyboardSize()
     }
 
+    @Keep
+    private val onOneHandedChangeListener = ManagedPreference.OnChangeListener<OneHanded> { _, _ ->
+        updateKeyboardSize()
+    }
+
     val keyboardView: View
 
     init {
@@ -350,6 +378,7 @@ class InputView(
         keyboardPrefs.registerOnChangeListener(onKeyboardSizeChangeListener)
         advancedPrefs.registerOnChangeListener(onKeyboardSizeChangeListener)
         ThemeManager.prefs.splitDock.registerOnChangeListener(onSplitDockChangeListener)
+        ThemeManager.prefs.oneHanded.registerOnChangeListener(onOneHandedChangeListener)
     }
 
     // told each window attached, by the broadcaster: added once the views it places are laid out
@@ -362,14 +391,9 @@ class InputView(
 
     private fun updateKeyboardSize() {
         val sidePadding = keyboardSidePaddingPx
-        val side = dockSide()
-        val placing = listOf(
-            keyboardHeightPx,
-            keyboardBottomPaddingPx,
-            sidePadding,
-            side?.ordinal,
-            dp(SplitKeyboard.dockWidth(TextKeyboard.widthDp(context))),
-        )
+        val placement = placement()
+        oneHandedPlaced = placement != null && !TextKeyboard.splits(context)
+        val placing = listOf(keyboardHeightPx, keyboardBottomPaddingPx, sidePadding, placement?.side?.ordinal, placement?.widthDp, if (oneHandedPlaced) 1 else 0)
         if (placing == placed) return
         placed = placing
         windowManager.view.updateLayoutParams {
@@ -378,14 +402,14 @@ class InputView(
         bottomPaddingSpace.updateLayoutParams {
             height = keyboardBottomPaddingPx
         }
-        placeBoard(side, sidePadding)
-        placeBar(side, sidePadding)
+        placeBoard(placement, sidePadding)
+        placeBar(placement?.side, sidePadding)
     }
 
-    /** The windows across between the side paddings, or [side]'s width at it, the rest left empty. */
-    private fun placeBoard(side: SplitKeyboard.Dock?, sidePadding: Int) {
-        moveLeft.visibility = if (side == SplitKeyboard.Dock.RIGHT) VISIBLE else GONE
-        moveRight.visibility = if (side == SplitKeyboard.Dock.LEFT) VISIBLE else GONE
+    /** The windows across between the side paddings, or [placement]'s width at its side, the rest left empty. */
+    private fun placeBoard(placement: SplitKeyboard.Placement?, sidePadding: Int) {
+        val side = placement?.side
+        showSideButtons(side)
         // the space at the board's side: the side padding, if any; at the other, all the rest
         val near = if (side == SplitKeyboard.Dock.LEFT) leftPaddingSpace else rightPaddingSpace
         val far = if (side == SplitKeyboard.Dock.LEFT) rightPaddingSpace else leftPaddingSpace
@@ -402,7 +426,7 @@ class InputView(
             rightToLeft = unset
             leftToLeft = unset
             rightToRight = unset
-            width = if (side == null) 0 else dp(SplitKeyboard.dockWidth(TextKeyboard.widthDp(context)))
+            width = if (placement == null) 0 else dp(placement.widthDp)
             when {
                 side == null && sidePadding == 0 -> {
                     leftToLeft = LayoutParams.PARENT_ID
@@ -421,6 +445,20 @@ class InputView(
             width = 0
             if (side == SplitKeyboard.Dock.RIGHT) rightToLeft = windowManager.view.id else leftToRight = windowManager.view.id
         }
+    }
+
+    // in the room beside a board at [side]: the arrow across, and one-handed the way back to the whole width
+    private fun showSideButtons(side: SplitKeyboard.Dock?) {
+        moveLeft.isVisible = side == SplitKeyboard.Dock.RIGHT
+        moveRight.isVisible = side == SplitKeyboard.Dock.LEFT
+        fullWidthLeft.isVisible = oneHandedPlaced && side == SplitKeyboard.Dock.RIGHT
+        fullWidthRight.isVisible = oneHandedPlaced && side == SplitKeyboard.Dock.LEFT
+        // one-handed, the two one above the other about the middle; the arrow alone in it
+        val apart = if (oneHandedPlaced) dp(SIDE_BUTTON_DP / 2 + 4).toFloat() else 0f
+        moveLeft.translationY = -apart
+        moveRight.translationY = -apart
+        fullWidthLeft.translationY = apart
+        fullWidthRight.translationY = apart
     }
 
     // the bar over the board goes with it: a picker's tabs, the toolbar, under the same thumb
@@ -444,8 +482,8 @@ class InputView(
         }
     }
 
-    /** The side the board shown goes to, while the letters split, or null for the whole width. */
-    private fun dockSide(): SplitKeyboard.Dock? {
+    /** Where the board shown goes, while the letters split or one-handed, or null for the whole width. */
+    private fun placement(): SplitKeyboard.Placement? {
         val letters = keyboardWindow.lettersShown
         val kind = when (windowManager.currentWindow) {
             keyboardWindow -> if (letters) SplitKeyboard.Window.LETTERS else SplitKeyboard.Window.OTHER_LAYOUT
@@ -456,7 +494,8 @@ class InputView(
         }
         val docks = SplitKeyboard.docks(kind, lettersLast = letters)
         val dock = ThemeManager.prefs.splitDock.getValue().dock
-        return SplitKeyboard.side(dock, TextKeyboard.splits(context), lettersShown = !docks, TextKeyboard.widthDp(context))
+        val oneHanded = ThemeManager.prefs.oneHanded.getValue().dock
+        return SplitKeyboard.placement(oneHanded, dock, TextKeyboard.splits(context), lettersShown = !docks, TextKeyboard.widthDp(context))
     }
 
     override fun onApplyWindowInsets(insets: WindowInsets): WindowInsets {
@@ -545,6 +584,7 @@ class InputView(
         advancedPrefs.unregisterOnChangeListener(onKeyboardSizeChangeListener)
         keyboardPrefs.unregisterOnChangeListener(onKeyboardSizeChangeListener)
         ThemeManager.prefs.splitDock.unregisterOnChangeListener(onSplitDockChangeListener)
+        ThemeManager.prefs.oneHanded.unregisterOnChangeListener(onOneHandedChangeListener)
         // replaced (a rotation, a theme) its windows are never detached: what they had going,
         // the microphone above all, stops here
         broadcaster.onFinishInput()

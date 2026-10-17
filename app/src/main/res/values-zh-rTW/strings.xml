@@ -572,6 +572,9 @@
     <string name="split_dock_full">鋪滿</string>
     <string name="split_dock_move_left">移到左邊</string>
     <string name="split_dock_move_right">移到右邊</string>
+    <string name="one_handed">單手模式</string>
+    <string name="one_handed_off">關</string>
+    <string name="one_handed_exit">恢復全寬</string>
     <string name="show_touch_keyboard">顯示螢幕鍵盤</string>
     <string name="hardware_switch_shortcuts">實體鍵盤快速鍵</string>
     <string name="hardware_switch_shortcuts_summary">單按 Shift 或 Ctrl+空格切換中英，Ctrl+Shift 輪流切換輸入法</string>
