@@ -8,6 +8,7 @@ import org.fcitx.fcitx5.android.engine.data.CodeTable
 import org.fcitx.fcitx5.android.engine.data.DataFormatException
 import org.fcitx.fcitx5.android.engine.data.PinyinData
 import org.fcitx.fcitx5.android.engine.english.EnglishData
+import org.fcitx.fcitx5.android.engine.host.Engines.Companion.EMOJI_DATA
 import org.fcitx.fcitx5.android.engine.host.Engines.Companion.ENGLISH_DATA
 import org.fcitx.fcitx5.android.engine.host.Engines.Companion.PINYIN_DATA
 import org.fcitx.fcitx5.android.engine.host.Engines.Companion.REFINING_MODEL
@@ -15,6 +16,7 @@ import org.fcitx.fcitx5.android.engine.host.Engines.Companion.SENTENCE_MODEL
 import org.fcitx.fcitx5.android.engine.host.Engines.Companion.STROKE_DATA
 import org.fcitx.fcitx5.android.engine.lattice.Predictor
 import org.fcitx.fcitx5.android.engine.lattice.TextWords
+import org.fcitx.fcitx5.android.engine.phrase.EmojiData
 import org.fcitx.fcitx5.android.engine.pinyin.LatinWords
 import org.fcitx.fcitx5.android.engine.pinyin.Syllables
 import org.fcitx.fcitx5.android.engine.rerank.MatrixKernel
@@ -32,7 +34,7 @@ import java.nio.ByteBuffer
  * pinyin data and what every session over it shares (the Latin words, the characters' syllables
  * and readings, the decoder's extensions, the model's words for [TextWords]), the two sentence
  * models and the refiner over the larger, the strokes, English's words and their trigram model,
- * and how the dictionary reads a text ([pinyinsOf]). What cannot be read is reported to
+ * the emoji ([emojiOf]), and how the dictionary reads a text ([pinyinsOf]). What cannot be read is reported to
  * [onError]; the sentence models' int8 weights are multiplied by [kernel], if given, else by
  * Kotlin. Run on the fcitx thread, as [Engines] is, but for [pinyinData], which Engines' warm-up
  * reads ahead off it.
@@ -41,6 +43,7 @@ internal class EngineAssets(
     private val load: (String) -> ByteBuffer,
     private val onError: (IOException) -> Unit,
     private val kernel: MatrixKernel?,
+    private val emojiShows: (String) -> Boolean = { true },
 ) {
 
     // the files are signed with the app: no need to read them through for their checksums
@@ -208,6 +211,22 @@ internal class EngineAssets(
     fun wordBoundaries(texts: Collection<String>): Map<String, IntArray> = texts.associateWith { textWords.boundaries(it) }
 
     fun logProbs(texts: List<String>): FloatArray = FloatArray(texts.size) { textWords.logProb(texts[it]) }
+
+    // the words emoji stand for; none if the app has not got them
+    private val emoji: EmojiData by lazy(LazyThreadSafetyMode.NONE) {
+        try {
+            EmojiData.read(Charsets.UTF_8.decode(load(EMOJI_DATA)))
+        } catch (e: IOException) {
+            onError(IOException("cannot read $EMOJI_DATA: no emoji candidates", e))
+            EmojiData.EMPTY
+        }
+    }
+
+    // asked of each emoji once it is to be offered: some 40k of them in all, each a font lookup
+    private val shown = HashMap<String, Boolean>()
+
+    /** The emoji [word] stands for (EmojiCandidates), but those the phone cannot draw. */
+    fun emojiOf(word: String): List<String> = emoji.of(word).filter { shown.getOrPut(it) { emojiShows(it) } }
 
     // null till asked for; an app without the data has no lookup
     private var strokeTable: Strokes? = null

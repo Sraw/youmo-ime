@@ -137,6 +137,20 @@ class EngineDataPlugin : Plugin<Project> {
             "engine-data/$ENGLISH_RELEASE-english.tar.zst",
         )
         private const val ENGLISH_FILE = "english.arpa"
+        const val EMOJI_TASK = "compileEmojiData"
+        // the emoji there are and the panel's groups, Unicode's emoji-test.txt; their Chinese words,
+        // CLDR's annotations (both Unicode-3.0), as lexicon/emoji.tsv corrects them
+        private val EMOJI_TEST = Download(
+            "https://www.unicode.org/Public/17.0.0/emoji/emoji-test.txt",
+            "1d8a944f88d7952f7ef7c5167fef3c67995bcae24543949710231b03a201acda",
+            "engine-data/emoji-test-17.0.0.txt",
+        )
+        private const val CLDR_RELEASE = "release-48-2"
+        private val EMOJI_WORDS = Download(
+            "https://raw.githubusercontent.com/unicode-org/cldr/$CLDR_RELEASE/common/annotations/zh.xml",
+            "92389f71659998736530c72d4dcc86e453fe0be170cde5c5ad27094cab2a2de8",
+            "engine-data/cldr-$CLDR_RELEASE-annotations-zh.xml",
+        )
 
         const val MODEL_TASK = "copySentenceModels"
         // a tag of its own, not "latest": what is downloaded is what was measured
@@ -178,6 +192,8 @@ class EngineDataPlugin : Plugin<Project> {
         val strokes = registerDownload(target, "downloadStrokes", STROKES, downloadsDir)
         val englishDownload = registerDownload(target, "downloadEnglishModel", ENGLISH, downloadsDir)
         val englishLm = registerExtract(target, "extractEnglishModel", englishDownload, sourcesDir.map { it.dir("english") })
+        val emojiTest = registerDownload(target, "downloadEmojiTest", EMOJI_TEST, downloadsDir)
+        val emojiWords = registerDownload(target, "downloadEmojiWords", EMOJI_WORDS, downloadsDir)
 
         val tool = target.configurations.create(TOOL_CONFIGURATION) {
             isCanBeConsumed = false
@@ -215,6 +231,14 @@ class EngineDataPlugin : Plugin<Project> {
             this.lm.set(englishLm.flatMap { it.outputDir.file(ENGLISH_FILE) })
             outputDir.set(target.layout.buildDirectory.dir("generated/engine-english"))
         }
+        val emoji = target.tasks.register<CompileEmojiData>(EMOJI_TASK) {
+            classpath.from(tool)
+            toolCode.set(fingerprint.flatMap { it.outputFile })
+            test.set(emojiTest.flatMap { it.outputFile })
+            annotations.set(emojiWords.flatMap { it.outputFile })
+            edits.set(target.rootProject.layout.projectDirectory.dir("lexicon").file("emoji.tsv"))
+            outputDir.set(target.layout.buildDirectory.dir("generated/engine-emoji"))
+        }
         val tableRuns = target.gradle.sharedServices.registerIfAbsent("engineTableRuns", TableRuns::class.java)
         val tables = target.tasks.register<CompileTables>(TABLES_TASK) {
             classpath.from(tool)
@@ -249,6 +273,7 @@ class EngineDataPlugin : Plugin<Project> {
         components.onVariants { variant ->
             variant.sources.assets?.addGeneratedSourceDirectory(compile, CompileEngineData::outputDir)
             variant.sources.assets?.addGeneratedSourceDirectory(english, CompileEnglishData::outputDir)
+            variant.sources.assets?.addGeneratedSourceDirectory(emoji, CompileEmojiData::outputDir)
             variant.sources.assets?.addGeneratedSourceDirectory(tables, CompileTables::outputDir)
             variant.sources.assets?.addGeneratedSourceDirectory(model, CopyModels::outputDir)
         }
@@ -383,6 +408,49 @@ class EngineDataPlugin : Plugin<Project> {
             exec.javaexec {
                 // the model is held in memory while it is sorted: 2.1 GB resident, as measured
                 configureTool(this@CompileEnglishData.classpath, "2g", listOf("english", "-o", output.path, "--lm", lm.get().asFile.path))
+            }
+        }
+    }
+
+    /** The emoji panel's groups and the Chinese words emoji stand for as `engine/emoji.data` (EmojiData). */
+    @CacheableTask
+    abstract class CompileEmojiData @Inject constructor(private val exec: ExecOperations) : DefaultTask() {
+        // built before this runs, but keyed on by toolCode only
+        @get:Internal
+        abstract val classpath: ConfigurableFileCollection
+
+        @get:InputFile
+        @get:PathSensitive(PathSensitivity.NONE)
+        abstract val toolCode: RegularFileProperty
+
+        init {
+            dependsOn(classpath)
+        }
+
+        @get:InputFile
+        @get:PathSensitive(PathSensitivity.NAME_ONLY)
+        abstract val test: RegularFileProperty
+
+        @get:InputFile
+        @get:PathSensitive(PathSensitivity.NAME_ONLY)
+        abstract val annotations: RegularFileProperty
+
+        @get:InputFile
+        @get:PathSensitive(PathSensitivity.NONE)
+        abstract val edits: RegularFileProperty
+
+        @get:OutputDirectory
+        abstract val outputDir: DirectoryProperty
+
+        @TaskAction
+        fun compile() {
+            val output = outputDir.get().asFile.resolve("engine/emoji.data")
+            output.parentFile.mkdirs()
+            exec.javaexec {
+                configureTool(
+                    this@CompileEmojiData.classpath, "256m",
+                    listOf("emoji", "-o", output.path, "--test", test.get().asFile.path, "--lexicon", edits.get().asFile.path, annotations.get().asFile.path),
+                )
             }
         }
     }

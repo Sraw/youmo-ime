@@ -51,5 +51,8 @@ msgstr "提示英文單字"
 msgid "Type English words in pinyin"
 msgstr "中英混輸"
 
+msgid "Emoji candidates"
+msgstr "表情候選"
+
 msgid "Never show this word"
 msgstr "不再顯示這個詞"

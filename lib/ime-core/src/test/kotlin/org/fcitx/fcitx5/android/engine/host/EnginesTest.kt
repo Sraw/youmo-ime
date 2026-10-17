@@ -99,8 +99,8 @@ class EnginesTest : EnginesFixture() {
     fun aTableIsLoadedOnlyWhenItsInputMethodIsUsed() {
         val engines = Engines(::load, null)
         engines.type(Engines.PINYIN, "ni")
-        // the larger model only once the user pauses
-        assertEquals(listOf(Engines.PINYIN_DATA, Engines.SENTENCE_MODEL), loaded)
+        // the larger model only once the user pauses; the emoji as the first candidates are listed
+        assertEquals(listOf(Engines.PINYIN_DATA, Engines.SENTENCE_MODEL, Engines.EMOJI_DATA), loaded)
         loaded.clear()
         val s = engines.type("engine-wubi", "vbg")
         assertEquals(listOf("好", "妤"), s.candidates)

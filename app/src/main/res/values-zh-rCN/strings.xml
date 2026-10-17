@@ -415,6 +415,8 @@
     <string name="im_page_size">每页候选数</string>
     <string name="im_prediction">联想下一个词</string>
     <string name="im_prediction_summary">打完一个词，接着给出可能要打的下一个词</string>
+    <string name="im_emoji">表情候选</string>
+    <string name="im_emoji_summary">打的词有对应的表情时，一并给出：哈哈 😄、点赞 👍</string>
     <string name="t9_multi_tap">连按选字母</string>
     <string name="t9_multi_tap_summary">快速连按同一个键也可以是它的第几个字母（按两下是第二个），输入法按上下文判断；快打照常</string>
     <string name="t9_multi_tap_off">关</string>

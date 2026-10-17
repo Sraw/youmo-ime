@@ -5,6 +5,7 @@
 package org.fcitx.fcitx5.android.engine.table
 
 import org.fcitx.fcitx5.android.engine.lattice.TextWords
+import org.fcitx.fcitx5.android.engine.phrase.EmojiCandidates
 import org.fcitx.fcitx5.android.engine.session.Action
 import org.fcitx.fcitx5.android.engine.session.Choice
 import org.fcitx.fcitx5.android.engine.session.Offer
@@ -76,10 +77,17 @@ class TableSession(
 ) : Session {
 
     /**
-     * A candidate: a table entry (its [index]), or a phrase learned here ([index] -1). A [pinyin]
-     * entry's [code] is its pinyin, without the marker.
+     * A candidate: a table entry (its [index]), a phrase learned here ([index] -1), or an [emoji]
+     * the first stands for. A [pinyin] entry's [code] is its pinyin, without the marker.
      */
-    private class Item(val code: String, val text: String, val auto: Boolean, val index: Int = -1, val pinyin: Boolean = false)
+    private class Item(
+        val code: String,
+        val text: String,
+        val auto: Boolean,
+        val index: Int = -1,
+        val pinyin: Boolean = false,
+        val emoji: Boolean = false,
+    )
 
     private val input = StringBuilder()
     private var cursor = 0 // where in the code the next key goes; in a lookup unused, the pinyin's
@@ -104,6 +112,8 @@ class TableSession(
     private val predictions = Predictions(
         language?.predictor, language?.words, language?.user, language?.block, language?.forgotten ?: {}, shared::blockable,
     ) { learning }
+
+    private val emojiOf: (String) -> List<String> = language?.emoji ?: { emptyList() }
 
     // the code's 重码 as placed ([rank]); those the refiner is still to weigh
     private var homographs: Homographs? = null
@@ -188,6 +198,8 @@ class TableSession(
         !learning -> emptySet()
         predictions.offered.isNotEmpty() -> predictions.offers(index)
         lookingUp -> pinyin!!.offers(index).intersect(setOf(Offer.FORGET))
+        // an emoji is no word: nothing learned of it to forget, nor to block
+        ranking[index]?.emoji == true -> emptySet()
         ranking[index] != null -> if (shared.blockable(ranking[index]!!.text)) setOf(Offer.FORGET, Offer.BLOCK) else setOf(Offer.FORGET)
         else -> emptySet()
     }
@@ -285,7 +297,8 @@ class TableSession(
 
     /** Commits the first candidate on the page shown, unless it is an auto phrase: then, as with no candidate, the code is dropped. */
     private fun autoCommit(): String {
-        val first = ranking[page * options.pageSize] ?: ranking[0]
+        // an emoji first on a page (past the first) is no reading of the code: the first that is
+        val first = ranking[page * options.pageSize]?.takeUnless { it.emoji } ?: ranking[0]
         return take(first?.takeUnless { it.auto })
     }
 
@@ -372,6 +385,7 @@ class TableSession(
         // as offered: nothing recorded where nothing is to be kept
         if (!learning) return snapshot()
         val item = ranking[index] ?: return snapshot(handled = input.isNotEmpty())
+        if (item.emoji) return snapshot()
         user.forget(item.code, item.text)
         // forgotten by every input method: a phrase saved here or a word of theirs would be back
         // as theirs, and what was put in here they learned too (the one user model)
@@ -388,7 +402,7 @@ class TableSession(
     private fun block(index: Int): Snapshot {
         if (!learning) return snapshot()
         val item = ranking[index] ?: return snapshot(handled = input.isNotEmpty())
-        if (!shared.block(item.text)) return snapshot()
+        if (item.emoji || !shared.block(item.text)) return snapshot()
         val shown = page
         update()
         if (ranking[shown * options.pageSize] != null) page = shown
@@ -411,7 +425,8 @@ class TableSession(
             recent.clear()
             return ""
         }
-        if (!learning) {
+        // an emoji is text, no word: nothing to learn, nor to build a phrase of
+        if (!learning || item.emoji) {
             recent.clear()
             predictions.wrote(item.text, null)
             return item.text
@@ -501,7 +516,7 @@ class TableSession(
         // the most recently seen first
         val auto = user.seen(code).map { (c, text) -> Item(c, text, true) }
         val made = { placed: IntArray ->
-            Ranking(shared::blocked) { at ->
+            Ranking(shared::blocked, emojiOf) { at ->
                 when {
                     at < placed.size -> placed[at].let { found.item(it) ?: entryItem(found.entry(it)) }
                     else -> auto.getOrNull(at - placed.size)
@@ -649,21 +664,58 @@ class TableSession(
      * code when codes are sorted by length. Unsorted, the first stays (libime would show the
      * shorter code in its place); no preset turns sorting off.
      */
-    private class Ranking(private val blocked: (String) -> Boolean = { false }, private val source: (Int) -> Item?) {
+    /**
+     * The candidates [source] makes, as far as asked for, but those [blocked] and the same text
+     * twice; the first's [emoji] after the first [EmojiCandidates.AFTER] of them.
+     */
+    private class Ranking(
+        private val blocked: (String) -> Boolean = { false },
+        private val emoji: (String) -> List<String> = { emptyList() },
+        private val source: (Int) -> Item?,
+    ) {
         private val items = ArrayList<Item>()
         private val seen = HashSet<String>()
         private var next = 0
         private var done = false
+        private var emojiPlaced = false
 
         operator fun get(i: Int): Item? {
             while (items.size <= i && !done) {
+                if (!emojiPlaced && items.size == EmojiCandidates.AFTER) {
+                    placeEmoji()
+                    continue
+                }
                 val item = source(next++)
                 if (item == null) done = true else if (!blocked(item.text) && seen.add(item.text)) items += item
             }
+            // fewer than AFTER: after them all
+            if (done && !emojiPlaced) placeEmoji()
             return items.getOrNull(i)
         }
 
-        fun only(): Item? = if (get(1) == null) get(0) else null
+        private fun placeEmoji() {
+            emojiPlaced = true
+            val first = items.firstOrNull() ?: return
+            // as EmojiCandidates.place: none a candidate already
+            // seen too: an entry of the same text later is not listed again
+            emoji(first.text).take(EmojiCandidates.MAX + EmojiCandidates.AFTER).filter { it !in seen }.take(EmojiCandidates.MAX)
+                .forEach {
+                    seen += it
+                    items += Item("", it, auto = false, emoji = true)
+                }
+        }
+
+        /** The one candidate of the code, the emoji aside: none if it has more. */
+        fun only(): Item? {
+            var found: Item? = null
+            var i = 0
+            while (true) {
+                val item = get(i++) ?: return found
+                if (item.emoji) continue
+                if (found != null) return null
+                found = item
+            }
+        }
 
         /** How many there are, -1 until all were made: a key's range may hold thousands. */
         val size: Int get() = if (done) items.size else -1
@@ -724,6 +776,7 @@ class TableSession(
      * for a pinyin entry the table code it could have been typed by.
      */
     private fun hint(item: Item, wild: Boolean) = when {
+        item.emoji -> ""
         item.pinyin -> table.codeOf(item.text).orEmpty()
         wild -> item.code
         else -> item.code.substring(input.length)

@@ -42,6 +42,8 @@ class EnginesModelTest {
             Engines.PINYIN_DATA -> pinyin
             Engines.SENTENCE_MODEL -> model
             Engines.REFINING_MODEL -> refining
+            // none of a word
+            Engines.EMOJI_DATA -> ByteArray(0)
             else -> null
         }
         // as the app's assets do of a file it has not got

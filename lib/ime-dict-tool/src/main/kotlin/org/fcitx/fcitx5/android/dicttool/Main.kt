@@ -17,6 +17,7 @@ import org.fcitx.fcitx5.android.engine.data.forEachNumberedLine
 import org.fcitx.fcitx5.android.engine.english.EnglishDataBuilder
 import org.fcitx.fcitx5.android.engine.english.EnglishText
 import org.fcitx.fcitx5.android.engine.pinyin.Syllables
+import org.fcitx.fcitx5.android.engine.phrase.EmojiData
 import org.fcitx.fcitx5.android.engine.stroke.Strokes
 import org.fcitx.fcitx5.android.engine.table.TableText
 import org.fcitx.fcitx5.android.engine.user.WordPack
@@ -70,6 +71,16 @@ private val COMMANDS = listOf(
     Command("strokes -o <out> <stroke.dict.yaml>", "compile rime-stroke's characters by their strokes", 1..1) { options, out ->
         strokes(options.output!!, options.inputs.single(), out)
     },
+    Command(
+        "emoji -o <out> --test <emoji-test.txt> [--lexicon <emoji.tsv>] <annotations/zh.xml>",
+        """
+            the emoji panel's groups and the Chinese
+            words emoji stand for, from Unicode's
+            emoji-test.txt, CLDR's annotations and
+            lexicon/emoji.tsv's edits (EmojiAnnotations)
+        """,
+        inputs = 1..1,
+    ) { options, out -> emoji(options, out) },
     Command(
         "hotwords -o <out> <pack.words>",
         """
@@ -228,7 +239,7 @@ private class Options(
     val only: String?,
     /** `examples`: sentences a word. */
     val perWord: Int,
-    /** `pack`: a curated list, `word<TAB>reading...` (lexicon/add.tsv): its words and no other, as it reads them. */
+    /** `pack`: a curated list, `word<TAB>reading...` (lexicon/add.tsv): its words and no other, as it reads them; `emoji`: lexicon/emoji.tsv, the edits. */
     val lexicon: String?,
     /**
      * `clean`: the line sketch's width, so twice the lines collide no more than one crawl's did;
@@ -244,6 +255,8 @@ private class Options(
     val words: String?,
     /** `table`: compiled pinyin data whose words go in too. */
     val pinyin: String?,
+    /** `emoji`: Unicode's emoji-test.txt. */
+    val test: String?,
     /** `english-lm`: how many words, and at most how many of the pages' words to read. */
     val vocabulary: Int,
     val tokens: Long,
@@ -359,6 +372,7 @@ private class Options(
                 misreadings = values["--misreadings"],
                 words = values["--words"],
                 pinyin = values["--pinyin"],
+                test = values["--test"],
                 // the start's id must fit an n-gram key too (EnglishCounts)
                 vocabulary = values.count("--vocabulary", VOCABULARY, 1 until NgramKey.MAX_WORDS - 2) ?: return null,
                 tokens = values.read("--tokens", Long.MAX_VALUE) { it.toLongOrNull()?.takeIf { n -> n >= 1 } } ?: return null,
@@ -906,6 +920,22 @@ internal fun wordsByUse(pack: List<Pair<String, Float>>, data: PinyinData?): Lis
     }
     return score.entries.sortedByDescending { it.value }.map { it.key } + unscored.filter { it !in score }
 }
+
+private fun emoji(options: Options, out: Appendable) {
+    val input = options.inputs.single()
+    val emoji = EmojiAnnotations.emoji(File(options.test!!).readText())
+    val annotations = EmojiAnnotations.read(File(input).readText(), emoji)
+    val words = EmojiAnnotations.words(annotations, options.lexicon?.let { File(it).readLines() }.orEmpty(), emoji)
+    val output = File(options.output!!)
+    output.writeText(EmojiData.format(emoji.groups, words, EMOJI_HEADER))
+    out.appendLine("emoji: ${emoji.groups.sumOf { it.second.size }} in the panel, ${annotations.size} annotated, ${words.size} words")
+    out.appendLine("wrote $output: ${output.length()} bytes")
+}
+
+private val EMOJI_HEADER = """
+    emoji.data, ime-dict-tool's emoji: the panel's groups (@), then the Chinese words emoji stand for
+    from Unicode's emoji-test.txt and CLDR's annotations (Unicode-3.0, https://www.unicode.org/license.txt)
+""".trimIndent()
 
 private fun strokes(output: String, input: String, out: Appendable) {
     val builder = File(input).bufferedReader().use { Strokes.read(it, input) }

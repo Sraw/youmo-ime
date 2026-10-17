@@ -21,6 +21,8 @@ data class EngineSettings(
     val typos: Boolean = true,
     /** Whether words that may follow are offered after a commit. */
     val prediction: Boolean = true,
+    /** Whether a word's emoji are offered among its candidates (EmojiCandidates). */
+    val emoji: Boolean = true,
     val pageSize: Int = DEFAULT_PAGE_SIZE,
     /** How much the sentence models weigh pinyin's readings again: the 性能档位. */
     val modelLevel: ModelLevel = ModelLevel.HIGH,
@@ -37,6 +39,7 @@ data class EngineSettings(
         const val SHUANGPIN_PROFILE = "ShuangpinProfile"
         const val PAGE_SIZE = "PageSize"
         const val PREDICTION = "Prediction"
+        const val EMOJI = "Emoji"
         const val FUZZY = "Fuzzy"
         const val MODEL_LEVEL = "ModelLevel"
         const val LATIN_WORDS = "LatinWords"
@@ -100,6 +103,7 @@ data class EngineSettings(
                 fuzzy = Fuzzy.entries.filterTo(HashSet()) { flag("$FUZZY/${it.name}") == true },
                 typos = flag("$FUZZY/$TYPOS") ?: default.typos,
                 prediction = flag(PREDICTION) ?: default.prediction,
+                emoji = flag(EMOJI) ?: default.emoji,
                 pageSize = values[PAGE_SIZE]?.toIntOrNull()?.takeIf { it in PAGE_SIZES } ?: default.pageSize,
                 modelLevel = ModelLevel.entries.firstOrNull { it.key == values[MODEL_LEVEL] } ?: default.modelLevel,
                 latinWords = flag(LATIN_WORDS) ?: default.latinWords,

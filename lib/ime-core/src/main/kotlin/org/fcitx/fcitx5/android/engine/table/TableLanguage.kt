@@ -33,6 +33,8 @@ class TableLanguage(
      * learned of it goes by its reading alone, as handwriting's, not every reading of the text.
      */
     val forgotten: (String) -> Unit = {},
+    /** The emoji a word stands for, offered after its first 重码 (EmojiCandidates); none, the setting off. */
+    val emoji: (String) -> List<String> = { emptyList() },
 ) {
     /**
      * The word [text] is learned as: by its [reading], or for one of the user's words ([theirs]: a

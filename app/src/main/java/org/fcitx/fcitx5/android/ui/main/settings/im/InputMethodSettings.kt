@@ -163,6 +163,8 @@ object InputMethodSettings {
 
     private val prediction = Toggle(EngineSettings.PREDICTION, text(R.string.im_prediction), R.string.im_prediction_summary)
 
+    private val emoji = Toggle(EngineSettings.EMOJI, text(R.string.im_emoji), R.string.im_emoji_summary)
+
     // keyed by Fuzzy's names, as the engine reads them (EngineSettings.parse)
     private val FUZZY = listOf(
         Fuzzy.V_U to "u ↔ v", Fuzzy.AN_ANG to "an ↔ ang", Fuzzy.EN_ENG to "en ↔ eng", Fuzzy.IAN_IANG to "ian ↔ iang",
@@ -195,6 +197,7 @@ object InputMethodSettings {
                     Page(T9_LETTERS, R.string.t9_letters, R.string.t9_letters_summary, SettingsRoute.T9Letters).takeIf { nineKeys },
                     pageSize,
                     prediction,
+                    emoji,
                     modelLevel,
                     Toggle("${EngineSettings.FUZZY}/${EngineSettings.TYPOS}", text(R.string.im_typos), R.string.im_typos_summary, unused = if (nineKeys) R.string.im_not_for_t9 else 0),
                     // full pinyin's alone: 双拼 types its letters otherwise, the nine keys digits
@@ -222,6 +225,7 @@ object InputMethodSettings {
                 // pinyin's, the same settings: every Chinese input method has them
                 pageSize,
                 prediction,
+                emoji,
                 modelLevel,
             )
         ),

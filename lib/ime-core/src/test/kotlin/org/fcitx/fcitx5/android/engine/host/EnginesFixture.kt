@@ -8,6 +8,7 @@ import org.fcitx.fcitx5.android.engine.data.CodeTable
 import org.fcitx.fcitx5.android.engine.data.PinyinDataBuilder
 import org.fcitx.fcitx5.android.engine.english.EnglishDataBuilder
 import org.fcitx.fcitx5.android.engine.english.EnglishText
+import org.fcitx.fcitx5.android.engine.phrase.EmojiData
 import org.fcitx.fcitx5.android.engine.pinyin.Syllables
 import org.fcitx.fcitx5.android.engine.rerank.TinyModel
 import org.fcitx.fcitx5.android.engine.stroke.Strokes
@@ -55,6 +56,9 @@ open class EnginesFixture {
     protected var strokes: ByteArray? = Strokes.read("...\n你\tpsnpzsn\n好\tzphzsh\n".reader().buffered(), "stroke")
         .build().toByteArray()
 
+    // none of a word: a test of them puts its own
+    protected var emoji: ByteArray? = EmojiData.format(emptyList(), emptyMap()).toByteArray()
+
     protected val loaded = ArrayList<String>()
 
     // Engines' warm-ups run as they are handed over, on the test's thread: what they load is in
@@ -73,6 +77,7 @@ open class EnginesFixture {
             Engines.REFINING_MODEL -> refining
             Engines.STROKE_DATA -> strokes
             Engines.ENGLISH_DATA -> english
+            Engines.EMOJI_DATA -> emoji
             else -> throw IllegalArgumentException(path)
         }
         // as the app's assets do of a file it has not got

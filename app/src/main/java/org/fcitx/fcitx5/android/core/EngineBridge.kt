@@ -22,6 +22,7 @@ import org.fcitx.fcitx5.android.engine.handwriting.InkReading
 import org.fcitx.fcitx5.android.engine.host.EngineEvent
 import org.fcitx.fcitx5.android.engine.host.EngineSettings
 import org.fcitx.fcitx5.android.engine.host.Engines
+import org.fcitx.fcitx5.android.input.popup.EmojiModifier
 import org.fcitx.fcitx5.android.engine.libime.LibimeFiles
 import org.fcitx.fcitx5.android.engine.phrase.CustomPhrases
 import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
@@ -130,6 +131,7 @@ object EngineBridge {
             legacy = ::legacy,
             additions = { additions(pinyinDir()) },
             kernel = NativeMatrixKernel,
+            emojiShows = EmojiModifier.validator(),
         ).also { made = it }
 
     // credential-encrypted, unlike fcitx's home: what the user typed is not kept where it can be read

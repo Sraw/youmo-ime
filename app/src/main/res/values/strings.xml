@@ -429,6 +429,8 @@
     <string name="im_page_size">Candidates per page</string>
     <string name="im_prediction">Suggest the next word</string>
     <string name="im_prediction_summary">After a word is typed, offer the words likely to follow it</string>
+    <string name="im_emoji">Emoji among the candidates</string>
+    <string name="im_emoji_summary">A word that stands for an emoji offers it too: haha 😄, dianzan 👍</string>
     <string name="t9_multi_tap">Multi-tap letters</string>
     <string name="t9_multi_tap_summary">A key pressed again quickly may also be its next letter (twice, the second); the context decides, so typing fast works as ever</string>
     <string name="t9_multi_tap_off">Off</string>

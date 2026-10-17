@@ -68,6 +68,8 @@ class Engines(
     private val additions: () -> Additions? = { null },
     private val kernel: MatrixKernel? = null,
     private val warmUps: Executor = Executor { Thread(it, "engine-warm-up").apply { isDaemon = true }.start() },
+    /** Whether the phone can draw an emoji: those it cannot are no candidates. */
+    private val emojiShows: (String) -> Boolean = { true },
 ) : Closeable {
 
     /**
@@ -88,7 +90,7 @@ class Engines(
         val dictionary: () -> Sequence<String>,
     )
 
-    private val assets = EngineAssets(load, onError, kernel)
+    private val assets = EngineAssets(load, onError, kernel, emojiShows)
 
     // a thread for each compaction an append makes due, so a key does not wait on the disk: none
     // kept, so the logs opened again after close() still have one
@@ -358,6 +360,7 @@ class Engines(
             refiner = refiner(),
             block = lexicon::block,
             forgotten = { tables.forgetInTables(listOf(it)) },
+            emoji = emoji(),
         )
     }
 
@@ -386,7 +389,7 @@ class Engines(
         return PinyinSession(
             assets.pinyinData, segmenter, spell = spell,
             pageSize = s.pageSize, user = lexicon.user(), prediction = s.prediction, prior = lexicon.prior(), phraseBook = lexicon.phrases(),
-            reranker = reranker(), refiner = refiner(), block = lexicon::block,
+            reranker = reranker(), refiner = refiner(), block = lexicon::block, emoji = emoji(),
             charReadings = assets::charSyllables, extensions = assets::decoderExtensions, addedWords = lexicon.addedTexts(),
         )
     }
@@ -398,6 +401,9 @@ class Engines(
             return pinyin.apply(action).also { if (forgotten != null) tables.forgetInTables(listOf(forgotten.text)) }
         }
     }
+
+    /** The emoji a word stands for, as the Chinese input methods offer them: none, the setting off. */
+    private fun emoji(): (String) -> List<String> = if (settings.emoji) assets::emojiOf else { _ -> emptyList() }
 
     /**
      * The one reranker over the model, for every session: they all run on the fcitx thread, one
@@ -501,6 +507,9 @@ class Engines(
 
         /** Characters by their strokes (rime-stroke), for pinyin's `u` lookup; read if the app has it. */
         const val STROKE_DATA = "engine/stroke.data"
+
+        /** The emoji panel's groups and the words emoji stand for (EmojiData); read if the app has it. */
+        const val EMOJI_DATA = "engine/emoji.data"
         /** Read if the app has one; without it the engine types by the decoder alone. */
         const val SENTENCE_MODEL = "engine/sentence-model.safetensors"
         /** Six times the work of [SENTENCE_MODEL], and right more often: see [PinyinSession]'s refiner. */

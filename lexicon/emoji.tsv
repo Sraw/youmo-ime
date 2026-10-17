@@ -1,0 +1,48 @@
+# word	emoji...	# note
+# The emoji candidates (engine/emoji.data, ime-dict-tool's emoji) as this project corrects CLDR's
+# Chinese annotations. `word<TAB>emoji...` puts those emoji first under the word (a new word too);
+# `-word<TAB>emoji...` takes them out of it; `-word` alone takes the word out. Emoji apart by spaces,
+# U+FE0F as you like: the tool writes each as emoji-test.txt has it.
+#
+# the internet's words, which CLDR has not
+点赞	👍
+赞	👍
+狗头	🐶
+吃瓜	🍉
+么么哒	😘
+比心	🫰 🫶
+偷笑	🤭
+哈哈哈	🤣 😂
+笑死	🤣 😂
+裂开	💔 🫠
+流泪	😢 😭
+厉害	👍 💪
+牛	🐮 👍
+牛逼	👍 🐮
+绝了	👍
+摸鱼	🐟
+躺平	🛌
+加班	💻 😩
+拜拜	👋
+早安	☀️ 🌞
+早上好	☀️ 🌞
+新年快乐	🧧 🎉
+春节	🧧 🧨
+发财	🧧 💰
+爱你	❤️ 😘
+喜欢	😍 ❤️
+心	❤️
+爱心	❤️
+笑	😄
+火	🔥
+火了	🔥
+冲	💪 🚀
+奥利给	💪
+# CLDR's, as a user would not mean them
+加油	💪
+-加油	⛽
+-生气	🥹
+-微笑	😈
+-庆祝	🎃
+-啤酒	🫚
+灯笼	🏮

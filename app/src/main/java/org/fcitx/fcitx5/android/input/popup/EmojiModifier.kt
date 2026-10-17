@@ -96,12 +96,20 @@ object EmojiModifier {
         UnicodeSet("[:RGI_Emoji:]").freeze()
     }
 
-    fun isValidEmoji(emoji: String): Boolean {
+    fun isValidEmoji(emoji: String): Boolean = isValidEmoji(emoji, DefaultTextPaint)
+
+    private fun isValidEmoji(emoji: String, paint: TextPaint): Boolean {
         // UProperty.RGI_EMOJI is available on 34+
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
             if (!RGIEmojiSet.contains(emoji)) return false
         }
-        return DefaultTextPaint.hasGlyph(emoji)
+        return paint.hasGlyph(emoji)
+    }
+
+    /** [isValidEmoji] with a paint of its own, for another thread than the main one's (the engine's): a paint is not shared safely. */
+    fun validator(): (String) -> Boolean {
+        val paint = TextPaint()
+        return { isValidEmoji(it, paint) }
     }
 
     fun getPreferredTone(emoji: String, tone: SkinTone): String {

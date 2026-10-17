@@ -103,6 +103,7 @@ inline EngineTableConfig engineTable(bool hint, EngineOrderPolicy order, int aut
 #define ENGINE_PAGE_SIZE \
     Option<int, IntConstrain> pageSize{this, "PageSize", _("Candidates Per Page"), 7, IntConstrain(3, 10)};
 #define ENGINE_PREDICTION Option<bool> prediction{this, "Prediction", _("Enable Prediction"), true};
+#define ENGINE_EMOJI Option<bool> emoji{this, "Emoji", D_("fcitx5-android", "Emoji candidates"), true};
 #define ENGINE_MODEL_LEVEL \
     OptionWithAnnotation<EngineModelLevel, EngineModelLevelI18NAnnotation> modelLevel{ \
             this, "ModelLevel", D_("fcitx5-android", "Performance level"), EngineModelLevel::High};
@@ -117,6 +118,7 @@ FCITX_CONFIGURATION(
         ENGINE_SHUANGPIN_PROFILE
         ENGINE_PAGE_SIZE
         ENGINE_PREDICTION
+        ENGINE_EMOJI
         ENGINE_MODEL_LEVEL
         ENGINE_LATIN_WORDS
         ENGINE_FUZZY
@@ -139,6 +141,7 @@ FCITX_CONFIGURATION(
         EnginePinyinPage,
         ENGINE_PAGE_SIZE
         ENGINE_PREDICTION
+        ENGINE_EMOJI
         ENGINE_MODEL_LEVEL
         ENGINE_LATIN_WORDS
         ENGINE_FUZZY)
@@ -148,6 +151,7 @@ FCITX_CONFIGURATION(
         ENGINE_SHUANGPIN_PROFILE
         ENGINE_PAGE_SIZE
         ENGINE_PREDICTION
+        ENGINE_EMOJI
         ENGINE_MODEL_LEVEL
         ENGINE_FUZZY)
 
@@ -163,12 +167,13 @@ FCITX_CONFIGURATION(
         ENGINE_PREDICTION
         ENGINE_MODEL_LEVEL)
 
-// a table's page: its own options, under its group, and pinyin's page size, prediction and
+// a table's page: its own options, under its group, and pinyin's page size, prediction, emoji and
 // performance level, the same options (every Chinese input method has them)
 FCITX_CONFIGURATION(
         EngineTablePage,
         ENGINE_PAGE_SIZE
         ENGINE_PREDICTION
+        ENGINE_EMOJI
         ENGINE_MODEL_LEVEL
         ENGINE_TABLE_OPTIONS)
 
@@ -177,6 +182,7 @@ FCITX_CONFIGURATION(
 #undef ENGINE_SHUANGPIN_PROFILE
 #undef ENGINE_PAGE_SIZE
 #undef ENGINE_PREDICTION
+#undef ENGINE_EMOJI
 #undef ENGINE_MODEL_LEVEL
 #undef ENGINE_LATIN_WORDS
 #undef ENGINE_FUZZY
