@@ -415,6 +415,8 @@
     <string name="im_page_size">每頁候選數</string>
     <string name="im_prediction">聯想下一個詞</string>
     <string name="im_prediction_summary">打完一個詞，接著給出可能要打的下一個詞</string>
+    <string name="im_chaizi">拆字</string>
+    <string name="im_chaizi_summary">不會讀的字，先按 u 再打各部分的拼音：uniuniuniu 犇、ushuishuishui 淼</string>
     <string name="im_emoji">表情候選</string>
     <string name="im_emoji_summary">打的詞有對應的表情時，一併給出：哈哈 😄、點讚 👍</string>
     <string name="t9_multi_tap">連按選字母</string>

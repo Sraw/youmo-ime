@@ -8,6 +8,7 @@ import org.fcitx.fcitx5.android.engine.data.CodeTable
 import org.fcitx.fcitx5.android.engine.data.PinyinDataBuilder
 import org.fcitx.fcitx5.android.engine.english.EnglishDataBuilder
 import org.fcitx.fcitx5.android.engine.english.EnglishText
+import org.fcitx.fcitx5.android.engine.phrase.Chaizi
 import org.fcitx.fcitx5.android.engine.phrase.EmojiData
 import org.fcitx.fcitx5.android.engine.pinyin.Syllables
 import org.fcitx.fcitx5.android.engine.rerank.TinyModel
@@ -58,6 +59,7 @@ open class EnginesFixture {
 
     // none of a word: a test of them puts its own
     protected var emoji: ByteArray? = EmojiData.format(emptyList(), emptyMap()).toByteArray()
+    protected var chaizi: ByteArray? = Chaizi.format(emptyMap()).toByteArray()
 
     protected val loaded = ArrayList<String>()
 
@@ -78,6 +80,7 @@ open class EnginesFixture {
             Engines.STROKE_DATA -> strokes
             Engines.ENGLISH_DATA -> english
             Engines.EMOJI_DATA -> emoji
+            Engines.CHAIZI_DATA -> chaizi
             else -> throw IllegalArgumentException(path)
         }
         // as the app's assets do of a file it has not got

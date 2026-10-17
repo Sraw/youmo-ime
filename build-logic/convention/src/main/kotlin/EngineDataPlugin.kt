@@ -152,6 +152,15 @@ class EngineDataPlugin : Plugin<Project> {
             "engine-data/cldr-$CLDR_RELEASE-annotations-zh.xml",
         )
 
+        const val CHAIZI_TASK = "compileChaiziData"
+        // characters by their parts, the open 汉语拆字字典 (CC BY 3.0), at a commit of its
+        private const val CHAIZI_COMMIT = "e177ab54ce4edf255315a60593ffecbd8167e96b"
+        private val CHAIZI = Download(
+            "https://raw.githubusercontent.com/kfcd/chaizi/$CHAIZI_COMMIT/chaizi-jt.txt",
+            "c341a99fc6a4a4f3169279c451ca55057a22603a5d7a520094378f65e817ad26",
+            "engine-data/chaizi-${CHAIZI_COMMIT.take(8)}-jt.txt",
+        )
+
         const val MODEL_TASK = "copySentenceModels"
         // a tag of its own, not "latest": what is downloaded is what was measured
         private const val MODELS_RELEASE = "sentence-models-20261001"
@@ -194,6 +203,7 @@ class EngineDataPlugin : Plugin<Project> {
         val englishLm = registerExtract(target, "extractEnglishModel", englishDownload, sourcesDir.map { it.dir("english") })
         val emojiTest = registerDownload(target, "downloadEmojiTest", EMOJI_TEST, downloadsDir)
         val emojiWords = registerDownload(target, "downloadEmojiWords", EMOJI_WORDS, downloadsDir)
+        val chaiziDownload = registerDownload(target, "downloadChaizi", CHAIZI, downloadsDir)
 
         val tool = target.configurations.create(TOOL_CONFIGURATION) {
             isCanBeConsumed = false
@@ -240,6 +250,13 @@ class EngineDataPlugin : Plugin<Project> {
             pinyin.set(compile.flatMap { it.outputDir.file("engine/pinyin.data") })
             outputDir.set(target.layout.buildDirectory.dir("generated/engine-emoji"))
         }
+        val chaizi = target.tasks.register<CompileChaiziData>(CHAIZI_TASK) {
+            classpath.from(tool)
+            toolCode.set(fingerprint.flatMap { it.outputFile })
+            source.set(chaiziDownload.flatMap { it.outputFile })
+            pinyin.set(compile.flatMap { it.outputDir.file("engine/pinyin.data") })
+            outputDir.set(target.layout.buildDirectory.dir("generated/engine-chaizi"))
+        }
         val tableRuns = target.gradle.sharedServices.registerIfAbsent("engineTableRuns", TableRuns::class.java)
         val tables = target.tasks.register<CompileTables>(TABLES_TASK) {
             classpath.from(tool)
@@ -275,6 +292,7 @@ class EngineDataPlugin : Plugin<Project> {
             variant.sources.assets?.addGeneratedSourceDirectory(compile, CompileEngineData::outputDir)
             variant.sources.assets?.addGeneratedSourceDirectory(english, CompileEnglishData::outputDir)
             variant.sources.assets?.addGeneratedSourceDirectory(emoji, CompileEmojiData::outputDir)
+            variant.sources.assets?.addGeneratedSourceDirectory(chaizi, CompileChaiziData::outputDir)
             variant.sources.assets?.addGeneratedSourceDirectory(tables, CompileTables::outputDir)
             variant.sources.assets?.addGeneratedSourceDirectory(model, CopyModels::outputDir)
         }
@@ -460,6 +478,47 @@ class EngineDataPlugin : Plugin<Project> {
                         "emoji", "-o", output.path, "--test", test.get().asFile.path, "--lexicon", edits.get().asFile.path,
                         "--pinyin", pinyin.get().asFile.path, annotations.get().asFile.path,
                     ),
+                )
+            }
+        }
+    }
+
+    /** `engine/chaizi.data`: ime-dict-tool's `chaizi` of the 汉语拆字字典, its parts read by the pinyin data. */
+    @CacheableTask
+    abstract class CompileChaiziData @Inject constructor(private val exec: ExecOperations) : DefaultTask() {
+        // built before this runs, but keyed on by toolCode only
+        @get:Internal
+        abstract val classpath: ConfigurableFileCollection
+
+        @get:InputFile
+        @get:PathSensitive(PathSensitivity.NONE)
+        abstract val toolCode: RegularFileProperty
+
+        init {
+            dependsOn(classpath)
+        }
+
+        @get:InputFile
+        @get:PathSensitive(PathSensitivity.NAME_ONLY)
+        abstract val source: RegularFileProperty
+
+        /** The compiled pinyin data: how each part reads, and how common each character is. */
+        @get:InputFile
+        @get:PathSensitive(PathSensitivity.NONE)
+        abstract val pinyin: RegularFileProperty
+
+        @get:OutputDirectory
+        abstract val outputDir: DirectoryProperty
+
+        @TaskAction
+        fun compile() {
+            val output = outputDir.get().asFile.resolve("engine/chaizi.data")
+            output.parentFile.mkdirs()
+            exec.javaexec {
+                configureTool(
+                    // the pinyin data mapped, as for the emoji
+                    this@CompileChaiziData.classpath, "1g",
+                    listOf("chaizi", "-o", output.path, "--pinyin", pinyin.get().asFile.path, source.get().asFile.path),
                 )
             }
         }

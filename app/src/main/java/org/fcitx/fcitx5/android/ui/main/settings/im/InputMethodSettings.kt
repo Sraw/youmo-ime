@@ -165,6 +165,8 @@ object InputMethodSettings {
 
     private val emoji = Toggle(EngineSettings.EMOJI, text(R.string.im_emoji), R.string.im_emoji_summary)
 
+    private val chaizi = Toggle(EngineSettings.CHAIZI, text(R.string.im_chaizi), R.string.im_chaizi_summary)
+
     // keyed by Fuzzy's names, as the engine reads them (EngineSettings.parse)
     private val FUZZY = listOf(
         Fuzzy.V_U to "u ↔ v", Fuzzy.AN_ANG to "an ↔ ang", Fuzzy.EN_ENG to "en ↔ eng", Fuzzy.IAN_IANG to "ian ↔ iang",
@@ -198,6 +200,8 @@ object InputMethodSettings {
                     pageSize,
                     prediction,
                     emoji,
+                    // full pinyin's: 双拼's u is a key of its own, 九键's no letter
+                    chaizi.takeIf { !shuangpin && !nineKeys },
                     modelLevel,
                     Toggle("${EngineSettings.FUZZY}/${EngineSettings.TYPOS}", text(R.string.im_typos), R.string.im_typos_summary, unused = if (nineKeys) R.string.im_not_for_t9 else 0),
                     // full pinyin's alone: 双拼 types its letters otherwise, the nine keys digits

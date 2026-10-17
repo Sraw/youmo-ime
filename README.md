@@ -55,6 +55,7 @@
 - 代码：LGPL-2.1-or-later。构建方法见 [BUILDING.md](BUILDING.md)；[隐私政策](PRIVACY.md)。
 - 词典、码表和拼音模型的基础来自 [libime](https://github.com/fcitx/libime)（LGPL-2.1-or-later），笔画表来自 [rime-stroke](https://github.com/rime/rime-stroke)（LGPL-3.0-only）。
 - 表情列表来自 Unicode 的 [emoji-test.txt](https://www.unicode.org/Public/17.0.0/emoji/emoji-test.txt)，表情的中文关键词来自 [CLDR](https://github.com/unicode-org/cldr)（均为 Unicode-3.0）。
+- 拆字数据来自开放词典《汉语拆字字典》[kfcd/chaizi](https://github.com/kfcd/chaizi)（[CC BY 3.0](https://creativecommons.org/licenses/by/3.0/)），按本项目的拼音数据给部件注音，未改动拆分。
 - 自己统计和训练的部分：n-gram 和新词来自 [FineWeb](https://huggingface.co/datasets/HuggingFaceFW/fineweb)、[FineWeb-2](https://huggingface.co/datasets/HuggingFaceFW/fineweb-2)（ODC-By 1.0）和 [Common Crawl](https://commoncrawl.org) 的网页；
   句子模型（Apache-2.0）用 Qwen3.5-9B-Base（Apache-2.0）蒸馏；手写模型只用合成笔迹训练（开源手写字体，以及 [Make Me a Hanzi](https://github.com/skishore/makemeahanzi) 的笔画，Arphic Public License），
   由 [onnxruntime](https://github.com/microsoft/onnxruntime)（MIT）运行。
@@ -113,6 +114,7 @@ Needs an arm64 phone on Android 6.0 or later. The models and dictionary are insi
 - Code: LGPL-2.1-or-later. Building: [BUILDING.md](BUILDING.md); [privacy policy](PRIVACY.md).
 - Dictionary, code tables and the base of the pinyin model: [libime](https://github.com/fcitx/libime) (LGPL-2.1-or-later); stroke table: [rime-stroke](https://github.com/rime/rime-stroke) (LGPL-3.0-only).
 - Emoji list: Unicode's [emoji-test.txt](https://www.unicode.org/Public/17.0.0/emoji/emoji-test.txt); their Chinese keywords: [CLDR](https://github.com/unicode-org/cldr) (both Unicode-3.0).
+- Characters by their parts (拆字): the open 汉语拆字字典 [kfcd/chaizi](https://github.com/kfcd/chaizi) ([CC BY 3.0](https://creativecommons.org/licenses/by/3.0/)), its parts read by this project's pinyin data, the splits unchanged.
 - Counted and trained by this project: n-grams and new words from web pages of [FineWeb](https://huggingface.co/datasets/HuggingFaceFW/fineweb), [FineWeb-2](https://huggingface.co/datasets/HuggingFaceFW/fineweb-2) (ODC-By 1.0) and [Common Crawl](https://commoncrawl.org);
   sentence models (Apache-2.0) distilled from Qwen3.5-9B-Base (Apache-2.0); handwriting recognizers trained on synthetic ink only (open handwriting fonts and
   [Make Me a Hanzi](https://github.com/skishore/makemeahanzi)'s strokes, Arphic Public License), run by [onnxruntime](https://github.com/microsoft/onnxruntime) (MIT).

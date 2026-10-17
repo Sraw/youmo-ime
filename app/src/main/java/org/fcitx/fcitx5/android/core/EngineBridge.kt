@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.core
 
+import android.text.TextPaint
 import android.widget.Toast
 import androidx.core.content.ContextCompat
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -132,6 +133,8 @@ object EngineBridge {
             additions = { additions(pinyinDir()) },
             kernel = NativeMatrixKernel,
             emojiShows = EmojiModifier.validator(),
+            // a paint of its own: this is the fcitx thread's, not the main one's
+            textShows = TextPaint().let { paint -> paint::hasGlyph },
         ).also { made = it }
 
     // credential-encrypted, unlike fcitx's home: what the user typed is not kept where it can be read

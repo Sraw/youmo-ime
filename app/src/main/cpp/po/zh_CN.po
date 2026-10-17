@@ -51,6 +51,9 @@ msgstr "提示英文单词"
 msgid "Type English words in pinyin"
 msgstr "中英混输"
 
+msgid "Characters by their parts"
+msgstr "拆字"
+
 msgid "Emoji candidates"
 msgstr "表情候选"
 

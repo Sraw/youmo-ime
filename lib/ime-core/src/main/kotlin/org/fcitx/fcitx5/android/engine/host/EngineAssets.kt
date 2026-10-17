@@ -8,6 +8,7 @@ import org.fcitx.fcitx5.android.engine.data.CodeTable
 import org.fcitx.fcitx5.android.engine.data.DataFormatException
 import org.fcitx.fcitx5.android.engine.data.PinyinData
 import org.fcitx.fcitx5.android.engine.english.EnglishData
+import org.fcitx.fcitx5.android.engine.host.Engines.Companion.CHAIZI_DATA
 import org.fcitx.fcitx5.android.engine.host.Engines.Companion.EMOJI_DATA
 import org.fcitx.fcitx5.android.engine.host.Engines.Companion.ENGLISH_DATA
 import org.fcitx.fcitx5.android.engine.host.Engines.Companion.PINYIN_DATA
@@ -16,6 +17,7 @@ import org.fcitx.fcitx5.android.engine.host.Engines.Companion.SENTENCE_MODEL
 import org.fcitx.fcitx5.android.engine.host.Engines.Companion.STROKE_DATA
 import org.fcitx.fcitx5.android.engine.lattice.Predictor
 import org.fcitx.fcitx5.android.engine.lattice.TextWords
+import org.fcitx.fcitx5.android.engine.phrase.Chaizi
 import org.fcitx.fcitx5.android.engine.phrase.EmojiData
 import org.fcitx.fcitx5.android.engine.pinyin.LatinWords
 import org.fcitx.fcitx5.android.engine.pinyin.Syllables
@@ -44,6 +46,7 @@ internal class EngineAssets(
     private val onError: (IOException) -> Unit,
     private val kernel: MatrixKernel?,
     private val emojiShows: (String) -> Boolean = { true },
+    private val textShows: (String) -> Boolean = { true },
 ) {
 
     // the files are signed with the app: no need to read them through for their checksums
@@ -227,6 +230,23 @@ internal class EngineAssets(
 
     /** The emoji [word] stands for (EmojiCandidates), but those the phone cannot draw. */
     fun emojiOf(word: String): List<String> = emoji.of(word).filter { shown.getOrPut(it) { emojiShows(it) } }
+
+    // characters by their parts' pinyin; none if the app has not got them
+    private val chaizi: Chaizi by lazy(LazyThreadSafetyMode.NONE) {
+        try {
+            Chaizi.read(Charsets.UTF_8.decode(load(CHAIZI_DATA)))
+        } catch (e: IOException) {
+            onError(IOException("cannot read $CHAIZI_DATA: no characters by their parts", e))
+            Chaizi.EMPTY
+        }
+    }
+
+    // asked of each character by its parts once found: a rare one may be past the phone's font
+    private val drawn = HashMap<String, Boolean>()
+
+    /** The characters whose parts [letters] spells (Chaizi), each with its reading, but those the phone cannot draw. */
+    fun chaiziOf(letters: String): List<Pair<String, String>> =
+        chaizi.of(letters).filter { drawn.getOrPut(it) { textShows(it) } }.map { it to charReading(it) }
 
     // null till asked for; an app without the data has no lookup
     private var strokeTable: Strokes? = null

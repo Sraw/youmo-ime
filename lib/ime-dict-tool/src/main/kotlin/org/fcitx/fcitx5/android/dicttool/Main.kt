@@ -17,6 +17,7 @@ import org.fcitx.fcitx5.android.engine.data.forEachNumberedLine
 import org.fcitx.fcitx5.android.engine.english.EnglishDataBuilder
 import org.fcitx.fcitx5.android.engine.english.EnglishText
 import org.fcitx.fcitx5.android.engine.host.Engines
+import org.fcitx.fcitx5.android.engine.phrase.Chaizi
 import org.fcitx.fcitx5.android.engine.phrase.EmojiData
 import org.fcitx.fcitx5.android.engine.pinyin.Syllables
 import org.fcitx.fcitx5.android.engine.stroke.Strokes
@@ -84,6 +85,14 @@ private val COMMANDS = listOf(
         """,
         inputs = 1..1,
     ) { options, out -> emoji(options, out) },
+    Command(
+        "chaizi -o <out> --pinyin <pinyin.data> <chaizi-jt.txt>",
+        """
+            characters by the pinyin of their parts,
+            from the open 汉语拆字字典 (kfcd/chaizi)
+        """,
+        inputs = 1..1,
+    ) { options, out -> chaizi(options, out) },
     Command(
         "hotwords -o <out> <pack.words>",
         """
@@ -946,6 +955,27 @@ private fun emoji(options: Options, out: Appendable) {
 private val EMOJI_HEADER = """
     emoji.data, ime-dict-tool's emoji: the panel's groups (@), then the Chinese words emoji stand for
     from Unicode's emoji-test.txt and CLDR's annotations (Unicode-3.0, https://www.unicode.org/license.txt)
+""".trimIndent()
+
+private fun chaizi(options: Options, out: Appendable) {
+    val data = options.pinyin!!
+    val engines = Engines({ path -> if (path == Engines.PINYIN_DATA) map(data) else throw FileNotFoundException(path) }, null)
+    val lines = File(options.inputs.single()).readLines()
+    val chars = lines.map { it.substringBefore('\t').trim() }.filter { it.codePointCount(0, it.length) == 1 }.distinct()
+    val p = engines.logProbs(chars)
+    // the commoner character first, as the lookup lists those of a spelling
+    val order = chars.indices.sortedByDescending { p[it] }.map(chars::get)
+    val spellings = ChaiziTable.spellings(lines.asSequence(), engines::charReading)
+    val found = ChaiziTable.bySpelling(spellings, order)
+    val output = File(options.output!!)
+    output.writeText(Chaizi.format(found, CHAIZI_HEADER))
+    out.appendLine("chaizi: ${chars.size} characters, ${spellings.size} of them by their parts, ${found.size} spellings")
+    out.appendLine("wrote $output: ${output.length()} bytes")
+}
+
+private val CHAIZI_HEADER = """
+    chaizi.data, ime-dict-tool's chaizi: characters by the pinyin of their parts, from the open
+    汉语拆字字典 (https://github.com/kfcd/chaizi, CC BY 3.0, https://creativecommons.org/licenses/by/3.0/)
 """.trimIndent()
 
 private fun strokes(output: String, input: String, out: Appendable) {

@@ -104,6 +104,7 @@ inline EngineTableConfig engineTable(bool hint, EngineOrderPolicy order, int aut
     Option<int, IntConstrain> pageSize{this, "PageSize", _("Candidates Per Page"), 7, IntConstrain(3, 10)};
 #define ENGINE_PREDICTION Option<bool> prediction{this, "Prediction", _("Enable Prediction"), true};
 #define ENGINE_EMOJI Option<bool> emoji{this, "Emoji", D_("fcitx5-android", "Emoji candidates"), true};
+#define ENGINE_CHAIZI Option<bool> chaizi{this, "Chaizi", D_("fcitx5-android", "Characters by their parts"), true};
 #define ENGINE_MODEL_LEVEL \
     OptionWithAnnotation<EngineModelLevel, EngineModelLevelI18NAnnotation> modelLevel{ \
             this, "ModelLevel", D_("fcitx5-android", "Performance level"), EngineModelLevel::High};
@@ -119,6 +120,7 @@ FCITX_CONFIGURATION(
         ENGINE_PAGE_SIZE
         ENGINE_PREDICTION
         ENGINE_EMOJI
+        ENGINE_CHAIZI
         ENGINE_MODEL_LEVEL
         ENGINE_LATIN_WORDS
         ENGINE_FUZZY
@@ -142,6 +144,7 @@ FCITX_CONFIGURATION(
         ENGINE_PAGE_SIZE
         ENGINE_PREDICTION
         ENGINE_EMOJI
+        ENGINE_CHAIZI
         ENGINE_MODEL_LEVEL
         ENGINE_LATIN_WORDS
         ENGINE_FUZZY)
@@ -183,6 +186,7 @@ FCITX_CONFIGURATION(
 #undef ENGINE_PAGE_SIZE
 #undef ENGINE_PREDICTION
 #undef ENGINE_EMOJI
+#undef ENGINE_CHAIZI
 #undef ENGINE_MODEL_LEVEL
 #undef ENGINE_LATIN_WORDS
 #undef ENGINE_FUZZY

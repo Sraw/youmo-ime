@@ -23,6 +23,8 @@ data class EngineSettings(
     val prediction: Boolean = true,
     /** Whether a word's emoji are offered among its candidates (EmojiCandidates). */
     val emoji: Boolean = true,
+    /** Whether full pinyin offers a character by the pinyin of its parts (Chaizi): niuniuniu 犇. */
+    val chaizi: Boolean = true,
     val pageSize: Int = DEFAULT_PAGE_SIZE,
     /** How much the sentence models weigh pinyin's readings again: the 性能档位. */
     val modelLevel: ModelLevel = ModelLevel.HIGH,
@@ -40,6 +42,7 @@ data class EngineSettings(
         const val PAGE_SIZE = "PageSize"
         const val PREDICTION = "Prediction"
         const val EMOJI = "Emoji"
+        const val CHAIZI = "Chaizi"
         const val FUZZY = "Fuzzy"
         const val MODEL_LEVEL = "ModelLevel"
         const val LATIN_WORDS = "LatinWords"
@@ -104,6 +107,7 @@ data class EngineSettings(
                 typos = flag("$FUZZY/$TYPOS") ?: default.typos,
                 prediction = flag(PREDICTION) ?: default.prediction,
                 emoji = flag(EMOJI) ?: default.emoji,
+                chaizi = flag(CHAIZI) ?: default.chaizi,
                 pageSize = values[PAGE_SIZE]?.toIntOrNull()?.takeIf { it in PAGE_SIZES } ?: default.pageSize,
                 modelLevel = ModelLevel.entries.firstOrNull { it.key == values[MODEL_LEVEL] } ?: default.modelLevel,
                 latinWords = flag(LATIN_WORDS) ?: default.latinWords,

@@ -44,6 +44,9 @@ msgstr ""
 msgid "Type English words in pinyin"
 msgstr ""
 
+msgid "Characters by their parts"
+msgstr ""
+
 msgid "Emoji candidates"
 msgstr ""
 

@@ -70,6 +70,8 @@ class Engines(
     private val warmUps: Executor = Executor { Thread(it, "engine-warm-up").apply { isDaemon = true }.start() },
     /** Whether the phone can draw an emoji: those it cannot are no candidates. */
     private val emojiShows: (String) -> Boolean = { true },
+    /** Whether the phone can draw a text: a rare character it cannot is no candidate. */
+    private val textShows: (String) -> Boolean = { true },
 ) : Closeable {
 
     /**
@@ -90,7 +92,7 @@ class Engines(
         val dictionary: () -> Sequence<String>,
     )
 
-    private val assets = EngineAssets(load, onError, kernel, emojiShows)
+    private val assets = EngineAssets(load, onError, kernel, emojiShows, textShows)
 
     // a thread for each compaction an append makes due, so a key does not wait on the disk: none
     // kept, so the logs opened again after close() still have one
@@ -148,6 +150,9 @@ class Engines(
 
     /** log10 P of each of [texts] under the pinyin model (TextWords.logProb): for ranking what voice input heard. */
     fun logProbs(texts: List<String>): FloatArray = assets.logProbs(texts)
+
+    /** A character's readings as the dictionary has them, the likeliest first: `zhang/chang`; empty for none. */
+    fun charReading(c: String): String = assets.charReading(c)
 
     /** Adds [text] read as [pinyin] (see [WordLists.entry]); false if it does not read so. */
     fun addWord(text: String, pinyin: String): Boolean = lexicon.addWord(text, pinyin)
@@ -302,7 +307,7 @@ class Engines(
         when (im) {
             PINYIN -> {
                 val segmenter = PinyinSegmenter(s.fuzzy, s.typos, neighbours = s.typos, latin = if (s.latinWords) assets.latinWords else null)
-                val pinyin = pinyinSession(segmenter, spell = false)
+                val pinyin = pinyinSession(segmenter, spell = false, chaizi = chaizi())
                 ForgetsInTables(StrokeLookup(pinyin, assets::strokes, assets::charReading, s.pageSize, blocked = lexicon::isBlocked, follow = pinyin::follow, retype = pinyin::typeAll))
             }
             ENGLISH -> {
@@ -384,12 +389,12 @@ class Engines(
     }
 
     /** A session of one of the pinyins, alike but for how [segmenter] reads the keys. */
-    private fun pinyinSession(segmenter: Segmenter, spell: Boolean): PinyinSession {
+    private fun pinyinSession(segmenter: Segmenter, spell: Boolean, chaizi: (String) -> List<Pair<String, String>> = { emptyList() }): PinyinSession {
         val s = settings
         return PinyinSession(
             assets.pinyinData, segmenter, spell = spell,
             pageSize = s.pageSize, user = lexicon.user(), prediction = s.prediction, prior = lexicon.prior(), phraseBook = lexicon.phrases(),
-            reranker = reranker(), refiner = refiner(), block = lexicon::block, emoji = emoji(),
+            reranker = reranker(), refiner = refiner(), block = lexicon::block, emoji = emoji(), chaizi = chaizi,
             charReadings = assets::charSyllables, extensions = assets::decoderExtensions, addedWords = lexicon.addedTexts(),
         )
     }
@@ -404,6 +409,10 @@ class Engines(
 
     /** The emoji a word stands for, as the Chinese input methods offer them: none, the setting off. */
     private fun emoji(): (String) -> List<String> = if (settings.emoji) assets::emojiOf else { _ -> emptyList() }
+
+    /** The characters by their parts' pinyin, as full pinyin offers them, but those blocked: none, the setting off. */
+    private fun chaizi(): (String) -> List<Pair<String, String>> =
+        if (settings.chaizi) { letters -> assets.chaiziOf(letters).filterNot { lexicon.isBlocked(it.first) } } else { _ -> emptyList() }
 
     /**
      * The one reranker over the model, for every session: they all run on the fcitx thread, one
@@ -510,6 +519,9 @@ class Engines(
 
         /** The emoji panel's groups and the words emoji stand for (EmojiData); read if the app has it. */
         const val EMOJI_DATA = "engine/emoji.data"
+
+        /** Characters by the pinyin of their parts (Chaizi), for full pinyin; read if the app has it. */
+        const val CHAIZI_DATA = "engine/chaizi.data"
         /** Read if the app has one; without it the engine types by the decoder alone. */
         const val SENTENCE_MODEL = "engine/sentence-model.safetensors"
         /** Six times the work of [SENTENCE_MODEL], and right more often: see [PinyinSession]'s refiner. */

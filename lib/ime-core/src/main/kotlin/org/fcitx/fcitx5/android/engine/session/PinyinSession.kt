@@ -17,7 +17,8 @@ import org.fcitx.fcitx5.android.engine.lattice.TextWords
 import org.fcitx.fcitx5.android.engine.lattice.WordScorer
 import org.fcitx.fcitx5.android.engine.phrase.CustomPhrases
 import org.fcitx.fcitx5.android.engine.phrase.CustomPhrases.Phrase
-import org.fcitx.fcitx5.android.engine.phrase.EmojiCandidates
+import org.fcitx.fcitx5.android.engine.phrase.Chaizi
+import org.fcitx.fcitx5.android.engine.phrase.AsideCandidates
 import org.fcitx.fcitx5.android.engine.phrase.PhraseBook
 import org.fcitx.fcitx5.android.engine.pinyin.LatinWords
 import org.fcitx.fcitx5.android.engine.pinyin.Segmenter
@@ -93,6 +94,11 @@ class PinyinSession(
     private val phraseBook: PhraseBook = PhraseBook(),
     /** The emoji a word stands for ([EmojiCandidates]); none, the setting off. */
     private val emoji: (String) -> List<String> = { emptyList() },
+    /**
+     * The characters whose parts' pinyin [Chaizi.KEY] and then the whole input is (Chaizi), each
+     * with its reading; none for most. No pinyin starts with u, the stroke lookup's key too.
+     */
+    private val chaizi: (String) -> List<Pair<String, String>> = { emptyList() },
     /** The time a dynamic phrase is filled in with. */
     private val now: () -> Calendar = { Calendar.getInstance() },
     private val refiner: SentenceRefiner? = null,
@@ -149,7 +155,9 @@ class PinyinSession(
         val restShown: String = "", // the end of the preedit: what is left of the input, as shown
         val places: PreeditPlaces = PreeditPlaces.NONE,
         val unsettled: Boolean = false, // a coarse candidate waits past a first page the list does not fill yet
-        val emoji: Set<String> = emptySet(), // the emoji among the candidates (EmojiCandidates), by text
+        // the emoji (EmojiCandidates) and the characters by their parts (Chaizi) among the candidates,
+        // by text, each with its hint: text, no word, and no reading of the first candidate's
+        val aside: Map<String, String> = emptyMap(),
     ) {
         val moreWords get() = decoded?.more == true
     }
@@ -364,6 +372,7 @@ class PinyinSession(
      */
     private fun hint(c: Candidate): String {
         if (spell || predicting) return ""
+        lastRead.aside[c.text]?.let { return it }
         val word = data.misreadings[c.text] ?: return ""
         val from = readFrom()
         val typed = input.substring(from, minOf(input.length, from + c.end)).filter { it != SyllableGraph.SEPARATOR }
@@ -378,7 +387,7 @@ class PinyinSession(
         }
         pieces += Piece(c.text, c.words, readFrom() + c.end, if (user == null) null else entries(c), c !== lastRead.decoded?.first)
         // an emoji says nothing of whether the first candidate's words were right
-        if (c.text !in lastRead.emoji) learnPrior(c)
+        if (c.text !in lastRead.aside) learnPrior(c)
         if (pieces.last().end < input.length) {
             read()
             return snapshot()
@@ -435,7 +444,7 @@ class PinyinSession(
      * upper case), which no other input method types.
      */
     private fun pinnable(c: Candidate) =
-        learning && c.text !in lastRead.emoji && c.end == input.length - readFrom() && input.substring(readFrom()).let { CustomPhrases.isKey(it) && it.none(Char::isUpperCase) }
+        learning && c.text !in lastRead.aside && c.end == input.length - readFrom() && input.substring(readFrom()).let { CustomPhrases.isKey(it) && it.none(Char::isUpperCase) }
 
     /**
      * Makes the candidate at [index] the first phrase of what is left of the input, as
@@ -702,12 +711,12 @@ class PinyinSession(
         // the time asked once, for what is shown and what is kept of it to agree
         val time = time ?: if (key in phrases) now() else null
         val placed: Map<String, Phrase> = if (time == null) emptyMap() else phrases.offered(key, time).associate { it.text to it.phrase }
-        // a phrase is text, no word: nothing to learn, and what follows it reads after nothing; so is
-        // an emoji, of the decoder's first reading, placed before the phrases so each is where its order says
+        // a phrase is text, no word: nothing to learn, and what follows it reads after nothing; so are
+        // the emoji and the characters by their parts, placed before the phrases so each is where its order says
         val asText = { text: String -> Candidate(text, rest, 0f, intArrayOf(NO_WORD), intArrayOf(rest)) }
         val read = (decoded.sentences + decoded.words).distinctBy { it.text }
-        val withEmoji = EmojiCandidates.place(read, emoji, { it.text }, { it.end == rest }, asText)
-        val listed = phrases.place(key, { checkNotNull(time) }, withEmoji, text = { it.text }, all = { it.end == rest }) { asText(it) }
+        val withAside = AsideCandidates.place(read, key, emoji, chaizi.takeUnless { spell }, { it.text }, { it.end == rest }, asText)
+        val listed = phrases.place(key, { checkNotNull(time) }, withAside.candidates, text = { it.text }, all = { it.end == rest }) { asText(it) }
         val held = coarseCandidates.held(listed, pageSize)
         val ordered = coarseCandidates.order(listed, pageSize, held)
         // the first reading shown: the preedit, the syllables offered and Enter's text go by it. Every
@@ -726,8 +735,7 @@ class PinyinSession(
             restShown = restShown,
             places = shown.places(picked.length, input.length),
             unsettled = held.isNotEmpty() && listed.size - held.size < pageSize,
-            // placed after the first AFTER of what was read
-            emoji = minOf(EmojiCandidates.AFTER, read.size).let { at -> withEmoji.subList(at, at + withEmoji.size - read.size) }.mapTo(HashSet()) { it.text },
+            aside = withAside.aside,
         )
     }
 
