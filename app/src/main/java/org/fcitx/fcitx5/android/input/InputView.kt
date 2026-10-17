@@ -11,6 +11,7 @@ import android.graphics.Color
 import android.graphics.Point
 import android.graphics.PorterDuff
 import android.graphics.PorterDuffColorFilter
+import android.graphics.Rect
 import android.os.Build
 import android.view.Gravity
 import android.view.View
@@ -53,6 +54,9 @@ import org.fcitx.fcitx5.android.input.keyboard.CommonKeyActionListener
 import org.fcitx.fcitx5.android.input.keyboard.KeyboardHeightPercentBase.DisplayMetrics
 import org.fcitx.fcitx5.android.input.keyboard.KeyboardHeightPercentBase.RealSize
 import org.fcitx.fcitx5.android.input.keyboard.KeyboardWindow
+import org.fcitx.fcitx5.android.input.floating.FloatingHandle
+import org.fcitx.fcitx5.android.input.floating.FloatingKeyboard
+import org.fcitx.fcitx5.android.input.floating.FloatingPlacer
 import org.fcitx.fcitx5.android.input.keyboard.OneHanded
 import org.fcitx.fcitx5.android.input.keyboard.SplitDock
 import org.fcitx.fcitx5.android.input.keyboard.SplitKeyboard
@@ -293,6 +297,18 @@ class InputView(
 
     val keyboardView: View
 
+    // read once: the view is made anew as it changes (ThemeManager), the letters splitting or not
+    private val floating = ThemeManager.prefs.floatingKeyboard.getValue()
+
+    private var floatingPlacer: FloatingPlacer? = null
+
+    private val floatingHandle = if (!floating) null else FloatingHandle(
+        context, theme,
+        onDrag = { dx, dy -> floatingPlacer?.drag(dx, dy) },
+        onDrop = { floatingPlacer?.drop() },
+        onDock = { ThemeManager.prefs.floatingKeyboard.setValue(false) },
+    )
+
     init {
         // MUST call before any operation
         setupScope()
@@ -328,8 +344,15 @@ class InputView(
                 bottomToBottomOf(kawaiiBar.view)
                 // start and end set in updateKeyboardSize, as the bar's
             })
+            floatingHandle?.let {
+                add(it, lParams(0, dp(FloatingHandle.HEIGHT_DP)) {
+                    topOfParent()
+                    leftToLeft = LayoutParams.PARENT_ID
+                    rightToRight = LayoutParams.PARENT_ID
+                })
+            }
             add(preedit.ui.root, lParams(0, dp(KawaiiBarComponent.PREEDIT_HEIGHT)) {
-                topOfParent()
+                if (floatingHandle != null) below(floatingHandle) else topOfParent()
                 // start and end set in updateKeyboardSize, as the bar's
             })
             add(kawaiiBar.view, lParams(0, dp(KawaiiBarComponent.HEIGHT)) {
@@ -366,10 +389,12 @@ class InputView(
         scope += DockFollower()
         keyboardWindow.onLayoutShown = { updateKeyboardSize() }
 
-        add(keyboardView, lParams(matchParent, wrapContent) {
+        add(keyboardView, lParams(if (floating) dp(TextKeyboard.widthDp(context)) else matchParent, wrapContent) {
             centerHorizontally()
             bottomOfParent()
         })
+        floatingPlacer = if (floating) FloatingPlacer(this, keyboardView) else null
+        floatingPlacer?.let { placer -> keyboardView.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ -> placer.place() } }
         add(popup.root, lParams(matchParent, matchParent) {
             centerVertically()
             centerHorizontally()
@@ -390,17 +415,24 @@ class InputView(
     private var placed: List<Int?>? = null
 
     private fun updateKeyboardSize() {
-        val sidePadding = keyboardSidePaddingPx
-        val placement = placement()
+        // floating: no padding, no side, keys as much shorter as the keyboard is narrower
+        val sidePadding = if (floating) 0 else keyboardSidePaddingPx
+        val placement = if (floating) null else placement()
+        val boardHeight = if (floating) {
+            FloatingKeyboard.height(keyboardHeightPx, TextKeyboard.widthDp(context), resources.configuration.screenWidthDp)
+        } else {
+            keyboardHeightPx
+        }
+        val bottomPadding = if (floating) 0 else keyboardBottomPaddingPx
         oneHandedPlaced = placement != null && !TextKeyboard.splits(context)
-        val placing = listOf(keyboardHeightPx, keyboardBottomPaddingPx, sidePadding, placement?.side?.ordinal, placement?.widthDp, if (oneHandedPlaced) 1 else 0)
+        val placing = listOf(boardHeight, bottomPadding, sidePadding, placement?.side?.ordinal, placement?.widthDp, if (oneHandedPlaced) 1 else 0)
         if (placing == placed) return
         placed = placing
         windowManager.view.updateLayoutParams {
-            height = keyboardHeightPx
+            height = boardHeight
         }
         bottomPaddingSpace.updateLayoutParams {
-            height = keyboardBottomPaddingPx
+            height = bottomPadding
         }
         placeBoard(placement, sidePadding)
         placeBar(placement?.side, sidePadding)
@@ -499,10 +531,22 @@ class InputView(
     }
 
     override fun onApplyWindowInsets(insets: WindowInsets): WindowInsets {
+        val navBar = getNavBarBottomInset(insets)
+        // floating, it is kept above the bar rather than drawn over it
+        floatingPlacer?.bottomInset = navBar
         bottomPaddingSpace.updateLayoutParams<LayoutParams> {
-            bottomMargin = getNavBarBottomInset(insets)
+            bottomMargin = if (floating) 0 else navBar
         }
         return insets
+    }
+
+    /**
+     * Floating ([FloatingKeyboard]), where the keyboard is in the window, all of it that takes
+     * touches (the service gives the rest to the app under it); false docked.
+     */
+    fun floatingRegion(out: Rect): Boolean {
+        floatingPlacer?.region(out) ?: return false
+        return true
     }
 
     /**

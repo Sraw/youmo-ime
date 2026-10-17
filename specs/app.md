@@ -71,6 +71,14 @@ too, goes to that side, 80% of the width, a phone's 420 dp at most (`SplitKeyboa
 decides both). The room beside it has the arrow, which then sets `oneHanded` rather than
 `splitDock`, and a button back to the whole width.
 
+Floating (`ThemePrefs.floatingKeyboard`, the status area's 悬浮键盘; the input view is made anew for
+it): `keyboardView` is `FloatingKeyboard.widthDp` wide (70% of the screen, 300–420 dp), its boards as
+much shorter (85% at least), with `FloatingHandle` on top, and is moved by translation
+(`FloatingPlacer`) to a spot kept as shares of the room it moves in (`AppPrefs.internal.floatingKeyboardX/Y`),
+so a turn keeps its corner. `FcitxInputMethodService.onComputeInsets` then gives the app the whole
+height (it is not laid out again) and only `InputView.floatingRegion` takes touches
+(`TOUCHABLE_INSETS_REGION`). Floating, the letters never split (`TextKeyboard.splits`, `widthDp`).
+
 ### Hardware keyboard
 
 A key pressed on one hides the touch keyboard and shows candidates by the cursor; a tap on the field

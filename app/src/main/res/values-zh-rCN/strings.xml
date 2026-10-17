@@ -575,6 +575,8 @@
     <string name="one_handed">单手模式</string>
     <string name="one_handed_off">关</string>
     <string name="one_handed_exit">恢复全宽</string>
+    <string name="floating_keyboard">悬浮键盘</string>
+    <string name="floating_keyboard_dock">键盘放回底部</string>
     <string name="show_touch_keyboard">显示屏幕键盘</string>
     <string name="hardware_switch_shortcuts">实体键盘快捷键</string>
     <string name="hardware_switch_shortcuts_summary">单按 Shift 或 Ctrl+空格切换中英，Ctrl+Shift 轮流切换输入法</string>

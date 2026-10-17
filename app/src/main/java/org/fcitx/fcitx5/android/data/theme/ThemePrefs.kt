@@ -89,6 +89,10 @@ class ThemePrefs(sharedPreferences: SharedPreferences) :
     // and read by the input view as it changes, as the dock is
     val oneHanded = enumList(R.string.one_handed, "one_handed", OneHanded.Off)
 
+    // the keyboard over the app, smaller, dragged anywhere (FloatingKeyboard); also from the status
+    // area. The view is made anew for it: the letters do not split floating
+    val floatingKeyboard = switch(R.string.floating_keyboard, "floating_keyboard", false)
+
     init {
         section(R.string.section_keys)
     }

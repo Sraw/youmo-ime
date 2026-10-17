@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.data.prefs
 
+import org.fcitx.fcitx5.android.input.floating.FloatingKeyboard
 import android.content.SharedPreferences
 import android.os.Build
 import androidx.annotation.Keep
@@ -61,6 +62,9 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
          */
         val keyboardButtonX = float("keyboard_button_x", -1f)
         val keyboardButtonY = float("keyboard_button_y", -1f)
+        // where the floating keyboard was dragged to: FloatingKeyboard.Spot, its middle at the bottom first
+        val floatingKeyboardX = float("floating_keyboard_x", FloatingKeyboard.DEFAULT.x)
+        val floatingKeyboardY = float("floating_keyboard_y", FloatingKeyboard.DEFAULT.y)
     }
 
     inner class Advanced : ManagedPreferenceCategory(R.string.advanced, sharedPreferences) {

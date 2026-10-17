@@ -48,7 +48,9 @@ class NavigationBarManager {
     }
 
     private fun evaluateWithVirtualKeyboard(window: Window) {
-        when (navbarBackground) {
+        // floating, the app is under the bar, not the keyboard: the system's, as with None
+        val background = if (ThemeManager.prefs.floatingKeyboard.getValue()) NavbarBackground.None else navbarBackground
+        when (background) {
             NavbarBackground.None -> {
                 shouldUpdateNavbarForeground = false
                 shouldUpdateNavbarBackground = false

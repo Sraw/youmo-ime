@@ -26,6 +26,7 @@ import org.fcitx.fcitx5.android.input.dependency.imeScope
 import org.fcitx.fcitx5.android.input.dependency.theme
 import org.fcitx.fcitx5.android.input.editorinfo.EditorInfoWindow
 import org.fcitx.fcitx5.android.input.status.StatusAreaEntry.Android.Type.InputMethod
+import org.fcitx.fcitx5.android.input.status.StatusAreaEntry.Android.Type.Floating
 import org.fcitx.fcitx5.android.input.status.StatusAreaEntry.Android.Type.Keyboard
 import org.fcitx.fcitx5.android.input.status.StatusAreaEntry.Android.Type.OneHanded
 import org.fcitx.fcitx5.android.input.status.StatusAreaEntry.Android.Type.ThemeList
@@ -143,6 +144,8 @@ class StatusAreaWindow : InputWindow.ExtendedInputWindow<StatusAreaWindow>(),
                             oneHanded.setValue(if (oneHanded.getValue() == OneHandedMode.Off) OneHandedMode.Right else OneHandedMode.Off)
                             windowManager.attachWindow(KeyboardWindow)
                         }
+                        // the input view is made anew for it, on the letters
+                        Floating -> ThemeManager.prefs.floatingKeyboard.run { setValue(!getValue()) }
                     }
                 }
             }
@@ -164,13 +167,24 @@ class StatusAreaWindow : InputWindow.ExtendedInputWindow<StatusAreaWindow>(),
     }
 
     override fun onStatusAreaUpdate(actions: Array<Action>) {
-        adapter.entries = arrayOf(
-            *staticEntries,
+        val floating = ThemeManager.prefs.floatingKeyboard.getValue()
+        // floating, one-handed mode is of no use: not offered
+        val oneHanded = if (floating) emptyArray() else arrayOf(
             StatusAreaEntry.Android(
                 context.getString(R.string.one_handed),
                 R.drawable.ic_baseline_pan_tool_24,
                 OneHanded,
                 active = ThemeManager.prefs.oneHanded.getValue() != OneHandedMode.Off
+            )
+        )
+        adapter.entries = arrayOf(
+            *staticEntries,
+            *oneHanded,
+            StatusAreaEntry.Android(
+                context.getString(R.string.floating_keyboard),
+                R.drawable.ic_baseline_open_with_24,
+                Floating,
+                active = floating
             ),
             *Array(actions.size) { StatusAreaEntry.fromAction(context, actions[it]) }
         )

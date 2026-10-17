@@ -20,6 +20,7 @@ import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.prefs.ManagedPreference
 import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
+import org.fcitx.fcitx5.android.input.floating.FloatingKeyboard
 import org.fcitx.fcitx5.android.input.broadcast.ReturnKeyAppearance
 import org.fcitx.fcitx5.android.input.picker.PickerWindow
 import org.fcitx.fcitx5.android.input.popup.PopupAction
@@ -42,16 +43,18 @@ class TextKeyboard private constructor(
     companion object {
         const val Name = "Text"
 
-        /** Whether the letters are split here: as the setting is, the screen as wide as it is now. */
+        /** Whether the letters are split here: as the setting is, the screen as wide as it is now; floating, never. */
         fun splits(context: Context): Boolean {
+            if (ThemeManager.prefs.floatingKeyboard.getValue()) return false
             val config = context.resources.configuration
             val landscape = config.orientation == Configuration.ORIENTATION_LANDSCAPE
             return SplitKeyboard.splits(ThemeManager.prefs.splitKeyboard.getValue().mode, landscape, config.screenWidthDp)
         }
 
-        /** The keyboard's width, dp: the screen's less its side padding (InputView's). */
+        /** The keyboard's width, dp: the screen's less its side padding (InputView's), or floating its own. */
         fun widthDp(context: Context): Int {
             val config = context.resources.configuration
+            if (ThemeManager.prefs.floatingKeyboard.getValue()) return FloatingKeyboard.widthDp(config.screenWidthDp)
             val keyboard = AppPrefs.getInstance().keyboard
             val landscape = config.orientation == Configuration.ORIENTATION_LANDSCAPE
             val padding = (if (landscape) keyboard.keyboardSidePaddingLandscape else keyboard.keyboardSidePadding).getValue()

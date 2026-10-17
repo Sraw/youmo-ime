@@ -753,8 +753,19 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
 
     private var inputViewLocation = intArrayOf(0, 0)
 
+    private val floatingRegion = android.graphics.Rect()
+
     override fun onComputeInsets(outInsets: Insets) {
-        if (inputDeviceMgr.isVirtualKeyboard) {
+        if (inputDeviceMgr.isVirtualKeyboard && inputView?.floatingRegion(floatingRegion) == true) {
+            // the app laid out as if there were no keyboard, only the keyboard's own place taking touches
+            val h = decorView.height
+            outInsets.apply {
+                contentTopInsets = h
+                visibleTopInsets = h
+                touchableInsets = Insets.TOUCHABLE_INSETS_REGION
+                touchableRegion.set(floatingRegion)
+            }
+        } else if (inputDeviceMgr.isVirtualKeyboard) {
             inputView?.keyboardView?.getLocationInWindow(inputViewLocation)
             outInsets.apply {
                 contentTopInsets = inputViewLocation[1]
