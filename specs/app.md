@@ -24,8 +24,9 @@ an ime-core class with a test.
 `UniqueViewComponent` injection) under one `InputWindowManager`, which shows one window at a time
 in the keyboard area: `KeyboardWindow` (the layouts), `PickerWindow` (symbols / emoji),
 `ClipboardWindow`, `TextEditingWindow`, `StatusAreaWindow`, and in the voice build `VoiceWindow`.
-The bar above is `KawaiiBarComponent`: idle (toolbar, number row, clipboard suggestion, inline
-autofill, decided by `IdleUiPolicy`) or candidates (`KawaiiBarStateMachine`,
+The bar above is `KawaiiBarComponent`: idle (toolbar, number row, the result of a sum just written, clipboard suggestion, inline
+autofill, decided by `IdleUiPolicy`; the sum is read off the field when what the service commits
+ends with `=`, worked out by `Calculation` in ime-core, and dropped as the cursor leaves the `=`) or candidates (`KawaiiBarStateMachine`,
 `ExpandButtonStateMachine` in ime-core).
 
 Work tied to the view runs in the view's scope (`dependency/Functions.kt`): a theme or layout

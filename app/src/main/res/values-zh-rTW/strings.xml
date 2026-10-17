@@ -199,6 +199,7 @@
     <string name="clipboard_clear_urls">移除連結中的追蹤參數</string>
     <string name="clipboard_clear_urls_summary">複製的連結存入剪貼簿紀錄前，依 ClearURLs 規則清理。不變更系統剪貼簿。</string>
     <string name="auto_pairs">括號和引號成對輸入，游標停在中間</string>
+    <string name="calculation_replaces_sum">點算式結果時取代整個算式</string>
     <string name="space_swipe_move_cursor">滑動空格以移動游標</string>
     <string name="please_wait">請稍候……</string>
     <string name="rotate">旋轉</string>

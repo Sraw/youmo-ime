@@ -138,6 +138,7 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
         val spaceSwipeMoveCursor =
             switch(R.string.space_swipe_move_cursor, "space_swipe_move_cursor", true)
         val autoPairs = switch(R.string.auto_pairs, "auto_pairs", true)
+        val calculationReplacesSum = switch(R.string.calculation_replaces_sum, "calculation_replaces_sum", false)
 
         // set on an input method's page, with no UI here: not hidden { }, which would put them back to their defaults
         private fun bool(key: String, defaultValue: Boolean) =

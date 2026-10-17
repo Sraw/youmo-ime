@@ -105,4 +105,14 @@ class IdleUiPolicyTest {
             decide { copy(isPasswordField = true, isNumberLayout = true, expandToolbarByDefault = true) }
         )
     }
+
+    @Test
+    fun aSumsResultComesBeforeTheClipboardButNotBeforeANumberRowAskedFor() {
+        assertEquals(Display.Calculation, decide { copy(isCalculationPresent = true, isClipboardFresh = true) })
+        assertEquals(Display.Calculation, decide { copy(isCalculationPresent = true, isPasswordField = true) })
+        assertEquals(
+            Display.NumberRow,
+            decide { copy(isCalculationPresent = true, numberRowMode = NumberRowMode.ForceShow) }
+        )
+    }
 }

@@ -21,6 +21,7 @@ import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.input.bar.IdleUiPolicy.Display
 import org.fcitx.fcitx5.android.input.bar.KawaiiBarComponent
 import org.fcitx.fcitx5.android.input.bar.ui.idle.ButtonsBarUi
+import org.fcitx.fcitx5.android.input.bar.ui.idle.CalculationUi
 import org.fcitx.fcitx5.android.input.bar.ui.idle.ClipboardSuggestionUi
 import org.fcitx.fcitx5.android.input.bar.ui.idle.InlineSuggestionsUi
 import org.fcitx.fcitx5.android.input.bar.ui.idle.NumberRow
@@ -107,6 +108,8 @@ class IdleUi(
 
     val clipboardUi = ClipboardSuggestionUi(ctx, theme)
 
+    val calculationUi = CalculationUi(ctx, theme)
+
     val numberRow = NumberRow(ctx, theme).apply {
         visibility = View.GONE
     }
@@ -118,6 +121,7 @@ class IdleUi(
         add(buttonsUi.root, lParams(matchParent, matchParent))
         add(clipboardUi.root, lParams(matchParent, matchParent))
         add(inlineSuggestionsBar.root, lParams(matchParent, matchParent))
+        add(calculationUi.root, lParams(matchParent, matchParent))
     }
 
     private val inAnimation by lazy {
@@ -244,6 +248,7 @@ class IdleUi(
             Display.Clipboard -> animator.displayedChild = 2
             Display.NumberRow -> {}
             Display.InlineSuggestion -> animator.displayedChild = 3
+            Display.Calculation -> animator.displayedChild = 4
         }
         if (state == Display.NumberRow) {
             numberRow.keyActionListener = commonKeyActionListener.listener

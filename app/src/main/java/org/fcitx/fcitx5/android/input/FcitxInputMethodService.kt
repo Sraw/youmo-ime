@@ -72,6 +72,7 @@ import org.fcitx.fcitx5.android.data.prefs.ManagedPreferenceProvider
 import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.engine.session.Action
+import org.fcitx.fcitx5.android.input.bar.Calculation
 import org.fcitx.fcitx5.android.input.cursor.CursorRange
 import org.fcitx.fcitx5.android.input.editing.ArrowKeys
 import org.fcitx.fcitx5.android.input.editing.CodePoints
@@ -484,6 +485,19 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     fun commitText(text: String, cursor: Int = -1) {
         editingSession.commitText(text, cursor)
         contextMemory.committed(text, cursor, SystemClock.elapsedRealtime())
+        if (cursor == -1 && (text.endsWith('=') || text.endsWith('＝'))) offerCalculation()
+    }
+
+    /**
+     * The result of the sum the `=` just put in ends ([Calculation]), for the bar: read off the
+     * field, however its digits got there. Not in a field that may not be read; the editor has the
+     * commit by the time it answers, its commands taken in order.
+     */
+    private fun offerCalculation() {
+        if (fieldPolicy.sensitive || currentInputEditorInfo.isTypeNull()) return
+        val before = currentInputConnection?.getTextBeforeCursor(CALCULATION_CHARS, 0) ?: return
+        val worked = Calculation.of(before) ?: return
+        inputView?.offerCalculation(worked, selection.latest.start)
     }
 
     /**
@@ -1313,5 +1327,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         // what the engine reads of the text before the cursor: its last two words, and what the
         // reranker has room for
         const val ContextChars = Action.Context.HOST_CHARS
+        // a sum the bar works out: longer than any typed on a phone, short to read
+        const val CALCULATION_CHARS = 128
     }
 }

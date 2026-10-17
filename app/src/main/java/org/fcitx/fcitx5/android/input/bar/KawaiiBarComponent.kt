@@ -102,12 +102,19 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
     private val expandedCandidateStyle by prefs.keyboard.expandedCandidateStyle
     private val expandToolbarByDefault by prefs.keyboard.expandToolbarByDefault
     private val toolbarNumRowOnPassword by prefs.keyboard.toolbarNumRowOnPassword
+    private val calculationReplacesSum by prefs.keyboard.calculationReplacesSum
 
     private var clipboardTimeoutJob: Job? = null
 
     private var inlineSuggestionsJob: Job? = null
 
     private var isClipboardFresh: Boolean = false
+
+    // the sum just written, its result offered while the cursor stays at its end
+    private var calculation: Calculation.Worked? = null
+    private var calculationAt = -1
+    // the editor reported the cursor at the `=`: reports of the keys before it may still come after the offer
+    private var calculationReached = false
     private var isInlineSuggestionPresent: Boolean = false
     private var isCapabilityFlagsPassword: Boolean = false
     private var isKeyboardLayoutNumber: Boolean = false
@@ -181,6 +188,7 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
                 isNumberLayout = isKeyboardLayoutNumber,
                 expandToolbarByDefault = expandToolbarByDefault,
                 isToolbarManuallyToggled = isToolbarManuallyToggled,
+                isCalculationPresent = calculation != null,
             )
         )
         if (newState == idleUi.currentState) return
@@ -315,6 +323,14 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
                     true
                 }
             }
+            calculationUi.suggestionView.setOnClickListener {
+                calculation?.let {
+                    // replacing what is still there before the cursor: the editor may have moved on
+                    if (calculationReplacesSum) service.commitOverEngine(it.result, replacing = it.sum)
+                    else service.commitOverEngine(it.result)
+                }
+                dropCalculation()
+            }
             numberRow.apply {
                 onCollapseListener = {
                     numberRowMode = IdleUiPolicy.NumberRowMode.ForceHide
@@ -427,6 +443,7 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
         }
         isCapabilityFlagsPassword = toolbarNumRowOnPassword && capFlags.has(CapabilityFlag.Password)
         isInlineSuggestionPresent = false
+        calculation = null
         numberRowMode = IdleUiPolicy.NumberRowMode.Auto
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             inlineSuggestionsJob?.cancel()
@@ -435,6 +452,31 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
         // nothing said out loud goes into a password
         idleUi.voiceButton.isVisible = VoiceFeature.AVAILABLE && !service.inPasswordField
         evalIdleUiState()
+    }
+
+    /** [worked]'s result offered till the cursor leaves [at], the end of the sum's `=`. */
+    fun offerCalculation(worked: Calculation.Worked, at: Int) {
+        calculation = worked
+        calculationAt = at
+        calculationReached = false
+        idleUi.calculationUi.text.text = "= ${worked.result}"
+        evalIdleUiState()
+    }
+
+    private fun dropCalculation() {
+        if (calculation == null) return
+        calculation = null
+        evalIdleUiState()
+    }
+
+    override fun onSelectionUpdate(start: Int, end: Int) {
+        if (calculation == null) return
+        when {
+            start == calculationAt && end == start -> calculationReached = true
+            // a late report of a key typed before the `=`
+            !calculationReached && end == start && start < calculationAt -> {}
+            else -> dropCalculation()
+        }
     }
 
     override fun onPreeditEmptyStateUpdate(empty: Boolean) {

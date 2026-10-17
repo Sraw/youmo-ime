@@ -6,12 +6,12 @@ package org.fcitx.fcitx5.android.input.bar
 
 /**
  * What the candidate bar shows while there is no input in progress ("idle"): a number row,
- * a clipboard suggestion, an inline (autofill) suggestion, the toolbar, or nothing.
+ * the result of a sum just written ([Calculation]), a clipboard suggestion, an inline (autofill) suggestion, the toolbar, or nothing.
  * Several of these can be wanted at once; [decide] is the priority order between them.
  */
 object IdleUiPolicy {
 
-    enum class Display { Empty, Toolbar, Clipboard, NumberRow, InlineSuggestion }
+    enum class Display { Empty, Toolbar, Clipboard, NumberRow, InlineSuggestion, Calculation }
 
     /** The number row can be pinned either way by the user; otherwise it follows the editor. */
     enum class NumberRowMode { Auto, ForceShow, ForceHide }
@@ -28,10 +28,13 @@ object IdleUiPolicy {
         val expandToolbarByDefault: Boolean,
         /** the user has flipped the toolbar away from its default this session */
         val isToolbarManuallyToggled: Boolean,
+        /** a sum was just written, its result offered till the cursor moves */
+        val isCalculationPresent: Boolean = false,
     )
 
     /**
-     * In priority order: a number row the user asked for, a fresh clipboard entry, an inline
+     * In priority order: a number row the user asked for, a sum's result (asked for by the `=` just
+     * typed, gone once the cursor moves), a fresh clipboard entry, an inline
      * suggestion, the number row for a password field (unless the layout is numeric already, or
      * the user hid it), then the toolbar or nothing.
      *
@@ -40,6 +43,7 @@ object IdleUiPolicy {
      */
     fun decide(inputs: Inputs): Display = when {
         inputs.numberRowMode == NumberRowMode.ForceShow -> Display.NumberRow
+        inputs.isCalculationPresent -> Display.Calculation
         inputs.isClipboardFresh -> Display.Clipboard
         inputs.isInlineSuggestionPresent -> Display.InlineSuggestion
         inputs.isPasswordField && !inputs.isNumberLayout && inputs.numberRowMode != NumberRowMode.ForceHide ->

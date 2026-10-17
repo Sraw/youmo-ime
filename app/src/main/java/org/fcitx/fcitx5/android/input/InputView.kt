@@ -38,6 +38,7 @@ import org.fcitx.fcitx5.android.data.prefs.ManagedPreference
 import org.fcitx.fcitx5.android.data.prefs.ManagedPreferenceProvider
 import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
+import org.fcitx.fcitx5.android.input.bar.Calculation
 import org.fcitx.fcitx5.android.input.bar.KawaiiBarComponent
 import org.fcitx.fcitx5.android.input.broadcast.InputBroadcastReceiver
 import org.fcitx.fcitx5.android.input.broadcast.InputBroadcaster
@@ -525,6 +526,9 @@ class InputView(
     }
 
     fun cursorMoved() = keyboardWindow.cursorMoved()
+
+    /** The sum just written, [worked] out, for the bar to offer while the cursor stays [at] its end. */
+    fun offerCalculation(worked: Calculation.Worked, at: Int) = kawaiiBar.offerCalculation(worked, at)
 
     @RequiresApi(Build.VERSION_CODES.R)
     fun handleInlineSuggestions(response: InlineSuggestionsResponse): Boolean {
