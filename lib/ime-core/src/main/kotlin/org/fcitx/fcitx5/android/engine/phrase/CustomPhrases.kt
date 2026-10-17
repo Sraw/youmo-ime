@@ -71,6 +71,25 @@ class CustomPhrases private constructor(private val phrases: Map<String, List<Ph
         return CustomPhrases(LinkedHashMap(phrases).apply { put(key, list.sortedBy { it.order }) })
     }
 
+    /** These phrases, and [builtIn]'s under each key they have none of, as offered. */
+    fun over(builtIn: CustomPhrases): CustomPhrases =
+        if (builtIn.isEmpty) this else CustomPhrases(LinkedHashMap(builtIn.phrases.filterKeys { it !in phrases } + phrases))
+
+    /** These phrases with [builtIn]'s under [key] made theirs, where they have none under it. */
+    fun adopting(key: String, builtIn: CustomPhrases): CustomPhrases {
+        val adopted = builtIn.phrases[key]
+        if (key in phrases || adopted == null) return this
+        return CustomPhrases(LinkedHashMap(phrases).apply { put(key, adopted) })
+    }
+
+    /** These phrases with [value] under [key] turned off: kept, as the settings can turn it on again. */
+    fun turnedOff(key: String, value: String): CustomPhrases {
+        val list = phrases[key] ?: return this
+        return CustomPhrases(LinkedHashMap(phrases).apply {
+            put(key, list.map { if (it.value == value && it.enabled) Phrase(key, -it.order, value) else it })
+        })
+    }
+
     /** These phrases without [value] under [key]. */
     fun without(key: String, value: String): CustomPhrases {
         val left = phrases[key]?.filter { it.value != value } ?: return this
@@ -109,6 +128,24 @@ class CustomPhrases private constructor(private val phrases: Map<String, List<Ph
 
     companion object {
         val EMPTY = CustomPhrases(emptyMap())
+
+        /**
+         * The date, the time and the weekday under 日期, 时间 and 星期's initials, as Sogou has them:
+         * after the first candidate, so `rq` and space still type 日期. Offered where the user has
+         * no phrase of that key ([over]); one of them deleted from the keyboard is kept turned off
+         * in the user's file, the others with it ([PhraseBook.remove]), so it does not come back.
+         */
+        val BUILT_IN: CustomPhrases = parse(
+            """
+            rq,2=#${'$'}year年${'$'}month月${'$'}day日
+            rq,3=#${'$'}year-${'$'}month_mm-${'$'}day_dd
+            rq,4=#${'$'}year_cn年${'$'}month_cn月${'$'}day_cn日
+            sj,2=#${'$'}fullhour:${'$'}minute
+            sj,3=#${'$'}fullhour时${'$'}minute分
+            xq,2=#星期${'$'}weekday_cn
+            xq,3=#周${'$'}weekday_cn
+            """.trimIndent()
+        )
 
         fun parse(text: String): CustomPhrases {
             val phrases = LinkedHashMap<String, MutableList<Phrase>>()

@@ -66,7 +66,7 @@ internal class UserLexicon(
 
     private var phrases: PhraseBook? = null
 
-    fun phrases(): PhraseBook = phrases ?: PhraseBook(CustomPhrases.parse(added()?.phrases.orEmpty())) {
+    fun phrases(): PhraseBook = phrases ?: PhraseBook(CustomPhrases.parse(added()?.phrases.orEmpty()), CustomPhrases.BUILT_IN) {
         try {
             userAdditions?.savePhrases?.invoke(it)
         } catch (e: IOException) {
