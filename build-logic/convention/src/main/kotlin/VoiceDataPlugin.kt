@@ -42,7 +42,9 @@ import javax.inject.Inject
  *   trained on some million hours, Mandarin and English with punctuation. Of the models sherpa-onnx
  *   runs, the most accurate on the voice evaluation sets (AISHELL-1, FLEURS, ASCEND mixed speech)
  *   but for those five to fifteen times slower, the fastest, and the smallest; and, a transducer,
- *   it takes hotwords. Numbers it writes in characters: VoiceText puts them in digits.
+ *   it takes hotwords. Numbers it writes in characters: VoiceText puts them in digits. Its encoder
+ *   is fine-tuned by us for accented Mandarin (KeSpeech's dialect speech 17.1% -> 14.6% wrong,
+ *   standard sets unchanged), on synthesized dialect speech held to the original by anchor batches.
  * - silero VAD (MIT): where a stretch of speech ends.
  * - Hotwords: the new-word pack (EngineDataPlugin's `downloadEngineWords`), each word's characters
  *   apart by spaces as the dict tool's `hotwords` writes them (HotwordSpelling.spelled), and the
@@ -69,14 +71,15 @@ class VoiceDataPlugin : Plugin<Project> {
         internal val MODEL_FILES = listOf("tokens.txt")
         internal const val BPE_MODEL = "bpe.model"
 
-        // the archive's encoder, decoder and joiner converted by onnxruntime 1.30's
-        // convert_onnx_models_to_ort, the version the recognizer is built with
-        private const val ORT_RELEASE = "voice-models-20261015"
+        // the archive's decoder and joiner, and its encoder fine-tuned for accented Mandarin (the
+        // release's manifest.txt), converted by onnxruntime 1.30's convert_onnx_models_to_ort, the
+        // version the recognizer is built with
+        private const val ORT_RELEASE = "voice-models-20261017"
 
         // the archive ORT_RELEASE was converted from: another archive's tokens would go with these weights
         private const val ORT_MODEL = "sherpa-onnx-x-asr-zipformer-transducer-zh-en-punct-int8-2026-06-03"
         private const val ORT_URL = "https://github.com/Sraw/youmo-ime/releases/download/$ORT_RELEASE/x-asr-ort.tar.zst"
-        private const val ORT_SHA256 = "b9df3663360fadb0bdd22e51732a32b194b9b2a41a3b0e389c97fd89cd800d8a"
+        private const val ORT_SHA256 = "89416b38b51238674c19df4eb6c9d2356917e77e5276a028ce87b13234f785bf"
         internal const val ORT_DIR = "x-asr-ort"
         internal val ORT_FILES = listOf("encoder.ort", "decoder.ort", "joiner.ort")
         private const val VAD_URL = "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/silero_vad.onnx"
