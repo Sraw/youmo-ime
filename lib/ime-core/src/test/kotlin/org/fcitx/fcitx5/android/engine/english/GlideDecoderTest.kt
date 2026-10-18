@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.engine.english
 
+import org.fcitx.fcitx5.android.engine.glide.Glide
 import org.fcitx.fcitx5.android.engine.glide.GlideLayout
 import org.fcitx.fcitx5.android.engine.session.Action
 import org.junit.Assert.assertEquals
@@ -66,7 +67,7 @@ class GlideDecoderTest {
         fun path(keys: String): FloatArray =
             keys.flatMap { GlideLayout.QWERTY.centre(it).toList() }.toFloatArray()
 
-        fun glide(keys: String, shift: Boolean = false) = EnglishSession.Glide(path(keys), GlideLayout.QWERTY, shift)
+        fun glide(keys: String, shift: Boolean = false) = Glide(path(keys), GlideLayout.QWERTY, shift)
 
         fun EnglishSession.glided(keys: String, shift: Boolean = false) = run {
             offerGlide(glide(keys, shift))

@@ -4,7 +4,7 @@
  */
 package org.fcitx.fcitx5.android.core
 
-import org.fcitx.fcitx5.android.engine.english.EnglishSession
+import org.fcitx.fcitx5.android.engine.glide.Glide
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -141,7 +141,7 @@ class FakeFcitxAPI : FcitxAPI {
         return true
     }
 
-    override suspend fun offerGlide(glide: EnglishSession.Glide): Boolean {
+    override suspend fun offerGlide(glide: Glide): Boolean {
         calls += "offerGlide"
         return true
     }

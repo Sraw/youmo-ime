@@ -4,8 +4,11 @@
  */
 package org.fcitx.fcitx5.android.engine.host
 
+import org.fcitx.fcitx5.android.engine.glide.PinyinGlide
+import org.fcitx.fcitx5.android.engine.glide.PinyinGlideSession
 import org.fcitx.fcitx5.android.engine.data.NgramModel.Companion.NO_WORD
 import org.fcitx.fcitx5.android.engine.english.EnglishSession
+import org.fcitx.fcitx5.android.engine.glide.Glide
 import org.fcitx.fcitx5.android.engine.handwriting.HandwritingDecoder
 import org.fcitx.fcitx5.android.engine.handwriting.HandwritingSession
 import org.fcitx.fcitx5.android.engine.handwriting.InkReading
@@ -288,12 +291,21 @@ class Engines(
         (session(HANDWRITING) as HandwritingSession).offer(reading, piece)
     }
 
+    // read when first glided: most never glide pinyin
+    private val pinyinGlide by lazy { PinyinGlide(assets.pinyinData) }
+
     /**
-     * The keyboard's glide across the letters, for English's session to read at its next
-     * [Keyboard.GLIDE]: [EnglishSession.offerGlide]. On the fcitx thread, just before that key.
+     * The keyboard's glide across the letters, for [im] to read at its next [Keyboard.GLIDE]:
+     * English's session its words ([EnglishSession.offerGlide]), full pinyin's its readings
+     * ([PinyinGlideSession]). False for any other input method. On the fcitx thread, just before that key.
      */
-    fun offerGlide(glide: EnglishSession.Glide) {
-        (session(ENGLISH) as? EnglishSession)?.offerGlide(glide)
+    fun offerGlide(im: String, glide: Glide): Boolean {
+        when (im) {
+            ENGLISH -> (session(ENGLISH) as? EnglishSession)?.offerGlide(glide)
+            PINYIN -> (session(PINYIN) as? PinyinGlideSession)?.offer(glide)
+            else -> return false
+        }
+        return true
     }
 
     /** The handwriting pad's [piece] finished, after its readings: [HandwritingSession.finished]. On the fcitx thread, before an Ink key. */
@@ -316,7 +328,8 @@ class Engines(
             PINYIN -> {
                 val segmenter = PinyinSegmenter(s.fuzzy, s.typos, neighbours = s.typos, latin = if (s.latinWords) assets.latinWords else null)
                 val pinyin = pinyinSession(segmenter, spell = false, chaizi = chaizi())
-                ForgetsInTables(StrokeLookup(pinyin, assets::strokes, assets::charReading, s.pageSize, blocked = lexicon::isBlocked, follow = pinyin::follow, retype = pinyin::typeAll))
+                val looked = ForgetsInTables(StrokeLookup(pinyin, assets::strokes, assets::charReading, s.pageSize, blocked = lexicon::isBlocked, follow = pinyin::follow, retype = pinyin::typeAll))
+                PinyinGlideSession(looked, blocked = lexicon::isBlocked) { pinyinGlide }
             }
             ENGLISH -> {
                 val data = assets.englishData

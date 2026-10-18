@@ -4,8 +4,9 @@
  */
 package org.fcitx.fcitx5.android.input.keyboard
 
+import org.fcitx.fcitx5.android.engine.host.Engines
 import org.fcitx.fcitx5.android.core.InputMethodNames
-import org.fcitx.fcitx5.android.engine.english.EnglishSession
+import org.fcitx.fcitx5.android.engine.glide.Glide
 import android.view.MotionEvent
 import android.graphics.Canvas
 import android.annotation.SuppressLint
@@ -210,7 +211,8 @@ class TextKeyboard private constructor(
     private val glideTyping = AppPrefs.getInstance().keyboard.glideTyping
     private val longPressDelay by AppPrefs.getInstance().keyboard.longPressDelay
 
-    // the input method is English, whose session reads a glide
+    // the input method is English or full pinyin, which read a glide; English, whose glide a Shift capitalises
+    private var glides = false
     private var english = false
 
     private val letterKeys: List<Pair<Char, TextKeyView>> by lazy {
@@ -219,16 +221,16 @@ class TextKeyboard private constructor(
         }
     }
 
-    // glide typing (滑行输入), English's: a field where words are typed, not a password's or an address's
+    // glide typing (滑行输入), English's and full pinyin's: a field where words are typed, not a password's or an address's
     private val glide = GlideInput(
         this, theme,
-        enabled = { english && glideTyping.getValue() && !inPasswordField && address == AddressKeys.NONE },
+        enabled = { glides && glideTyping.getValue() && !inPasswordField && address == AddressKeys.NONE },
         letters = { letterKeys },
         longPressMillis = { longPressDelay.toLong() },
     ) { path, layout ->
-        onAction(KeyAction.GlideAction(EnglishSession.Glide(path, layout, shift = capsState == CapsState.Once, capsLock = capsState == CapsState.Lock)))
-        // as a letter typed: Shift-once used up
-        if (capsState == CapsState.Once) switchCapsState()
+        onAction(KeyAction.GlideAction(Glide(path, layout, shift = capsState == CapsState.Once, capsLock = capsState == CapsState.Lock)))
+        // as a letter typed: Shift-once used up, where it capitalises (English's; pinyin has no capitals)
+        if (capsState == CapsState.Once && english) switchCapsState()
     }
 
     override fun dispatchTouchEvent(ev: MotionEvent): Boolean = glide.dispatch(ev) { super.dispatchTouchEvent(it) }
@@ -330,6 +332,7 @@ class TextKeyboard private constructor(
     override fun onInputMethodUpdate(ime: InputMethodEntry) {
         showInputMethodName(space, ime)
         english = ime.uniqueName == InputMethodNames.KEYBOARD
+        glides = english || ime.uniqueName == Engines.PINYIN
         if (capsState != CapsState.None) {
             switchCapsState()
         }

@@ -4,7 +4,7 @@
  */
 package org.fcitx.fcitx5.android.core
 
-import org.fcitx.fcitx5.android.engine.english.EnglishSession
+import org.fcitx.fcitx5.android.engine.glide.Glide
 import android.text.TextPaint
 import android.widget.Toast
 import androidx.core.content.ContextCompat
@@ -100,16 +100,15 @@ object EngineBridge {
     fun inkFinished(piece: Int, current: String) = ink(current) { engines.inkFinished(piece) }
 
     /** A glide across the letters, for the key sent next to commit its word: Engines.offerGlide. On the fcitx thread, [current] its input method. */
-    fun offerGlide(glide: EnglishSession.Glide, current: String): Boolean {
-        if (current != Engines.ENGLISH || Engines.ENGLISH in unloadable) return false
+    fun offerGlide(glide: Glide, current: String): Boolean {
+        if (current in unloadable) return false
         return try {
-            unloadable.call(Engines.ENGLISH) { engines.offerGlide(glide) }
-            true
+            unloadable.call(current) { engines.offerGlide(current, glide) }
         } catch (e: IOException) {
-            Timber.w(e, "English engine")
+            Timber.w(e, "glide in $current")
             false
         } catch (e: DataFormatException) {
-            Timber.w(e, "English engine")
+            Timber.w(e, "glide in $current")
             false
         }
     }

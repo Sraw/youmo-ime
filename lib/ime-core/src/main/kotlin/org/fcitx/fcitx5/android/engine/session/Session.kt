@@ -123,8 +123,9 @@ sealed class Action {
     object Ink : Action()
 
     /**
-     * Glide typing: the word the keyboard's last glide was, committed, the others it may have been
-     * offered (EnglishSession.offerGlide). Sent as a key, as [Ink]; nothing to any other session.
+     * Glide typing: the keyboard's last glide read, as offered to the session (EnglishSession.offerGlide
+     * commits its word, PinyinGlideSession types its reading). Sent as a key, as [Ink]; nothing to any
+     * other session.
      */
     object Glide : Action()
 

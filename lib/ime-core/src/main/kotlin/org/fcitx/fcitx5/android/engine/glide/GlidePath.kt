@@ -21,14 +21,21 @@ class GlidePath(path: FloatArray, private val layout: GlideLayout, private val w
 
     /**
      * How a word's keys are held to the path: [near], how close (key widths) the path comes to each
-     * key; [ends], to the first and last; [shape] and [proximity] weigh the shape's mean distance
-     * and the keys' mean distance from the path against a model's log10 score.
+     * key; [ends], to the first and last; [shape], [proximity] and [edges] weigh the shape's mean
+     * distance, the keys' mean distance from the path and the first and last keys' from where it
+     * starts and ends against a model's log10 score: a finger starts and lifts on a word's ends far
+     * more surely than it turns on its keys between. [corner] is what a turn of the path costs, by
+     * how far it turns (1 - its cosine), that no key of the word is at: a finger turns on a key it
+     * means (ni-h-ao is no niao); [turn] is the cosine below which a bend is a turn, not a wobble.
      */
     data class Weights(
         val near: Float = 1.0f,
         val ends: Float = 1.2f,
         val shape: Float = 4f,
         val proximity: Float = 5f,
+        val edges: Float = 2f,
+        val corner: Float = 2f,
+        val turn: Float = 0.8f,
     )
 
     private val p = dense(thin(path))
@@ -40,6 +47,9 @@ class GlidePath(path: FloatArray, private val layout: GlideLayout, private val w
     private val distances = FloatArray(n * GlideLayout.LETTERS) { layout.distance('a' + it % GlideLayout.LETTERS, p[2 * (it / GlideLayout.LETTERS)], p[2 * (it / GlideLayout.LETTERS) + 1]) }
 
     private val sampled = resample(p, p.size / 2, SAMPLES, FloatArray(SAMPLES * 2))
+
+    // the points the path turns sharply at, in order
+    private val corners = Corners(p, n, weights.turn)
     private val at = IntArray(maxKeys + 1)
     private val cost = FloatArray(maxKeys + 1)
     private val distinct = IntArray(maxKeys + 1)
@@ -95,7 +105,63 @@ class GlidePath(path: FloatArray, private val layout: GlideLayout, private val w
         if (length > 1 && at[length - 1] == 0) return null
         val near = (cost[length - 1] + end) / (distinct[length - 1] + 1)
         val shape = shapeDistance(length)
-        return weights.shape * shape * shape + weights.proximity * near
+        return weights.shape * shape * shape + weights.proximity * near + weights.edges * (cost[0] + end) + weights.corner * unexplained(length)
+    }
+
+    // the path's sharp turns none of the first [length] keys was passed at
+    private fun unexplained(length: Int): Float {
+        var sum = 0f
+        var i = 0
+        for (c in corners.at.indices) {
+            val k = corners.at[c]
+            // the keys in order, as the corners: the first not before this corner's reach
+            while (i < length && at[i] < k - CORNER_REACH) i++
+            if (i >= length || at[i] > k + CORNER_REACH) sum += corners.turn[c]
+        }
+        return sum
+    }
+
+    /** Where [p]'s first [n] points turn by more than [cutoff] (a cosine): each the sharpest of its run, and by how much (1 - its cosine). */
+    internal class Corners(p: FloatArray, n: Int, cutoff: Float) {
+        val at: IntArray
+        val turn: FloatArray
+
+        init {
+            val ats = ArrayList<Int>()
+            val turns = ArrayList<Float>()
+            var best = -1
+            var bestCos = 1f
+            for (k in ARM until n - ARM) {
+                val cos = cosine(p, k)
+                if (cos < cutoff) {
+                    if (cos < bestCos) {
+                        best = k
+                        bestCos = cos
+                    }
+                } else if (best >= 0) {
+                    ats += best
+                    turns += 1 - bestCos
+                    best = -1
+                    bestCos = 1f
+                }
+            }
+            if (best >= 0) {
+                ats += best
+                turns += 1 - bestCos
+            }
+            at = ats.toIntArray()
+            turn = turns.toFloatArray()
+        }
+
+        // the cosine of the turn at [k], between the [ARM] points before and after
+        private fun cosine(p: FloatArray, k: Int): Float {
+            val ax = p[2 * k] - p[2 * (k - ARM)]
+            val ay = p[2 * k + 1] - p[2 * (k - ARM) + 1]
+            val bx = p[2 * (k + ARM)] - p[2 * k]
+            val by = p[2 * (k + ARM) + 1] - p[2 * k + 1]
+            val norm = sqrt((ax * ax + ay * ay) * (bx * bx + by * by))
+            return if (norm == 0f) 1f else (ax * bx + ay * by) / norm
+        }
     }
 
     // the mean distance between the path and the word's keys joined up (each at its key nearest where
@@ -124,6 +190,12 @@ class GlidePath(path: FloatArray, private val layout: GlideLayout, private val w
         // about this far apart (key widths), the path's points: none too far for a key passed to
         // be missed, none so close that a finger's many touch points slow the search
         private const val STEP = 0.25f
+
+        // how many points (of [STEP]) a key may be passed from a corner it explains
+        private const val CORNER_REACH = 3
+
+        // points (of [STEP]) either side of one that its turn is measured over
+        private const val ARM = 2
 
         /** [path] without the points nearer than half a [STEP] to the one kept before them; its last kept. */
         internal fun thin(path: FloatArray): FloatArray {

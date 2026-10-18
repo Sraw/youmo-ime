@@ -4,7 +4,7 @@
  */
 package org.fcitx.fcitx5.android.input.keyboard
 
-import org.fcitx.fcitx5.android.engine.english.EnglishSession
+import org.fcitx.fcitx5.android.engine.glide.Glide
 import android.view.MotionEvent
 import org.fcitx.fcitx5.android.core.KeyStates
 import org.fcitx.fcitx5.android.core.KeySym
@@ -57,6 +57,6 @@ sealed class KeyAction {
     /** The emoji panel's search by pinyin, begun ([on]) or left. */
     data class EmojiSearchAction(val on: Boolean) : KeyAction()
 
-    /** A glide across the letters, for English to read (GlideInput): its word committed. */
-    class GlideAction(val glide: EnglishSession.Glide) : KeyAction()
+    /** A glide across the letters, for English or full pinyin to read (GlideInput). */
+    class GlideAction(val glide: Glide) : KeyAction()
 }

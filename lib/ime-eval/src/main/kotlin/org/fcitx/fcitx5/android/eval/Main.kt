@@ -4,6 +4,8 @@
  */
 package org.fcitx.fcitx5.android.eval
 
+import org.fcitx.fcitx5.android.engine.glide.GlideLayout
+import org.fcitx.fcitx5.android.engine.glide.PinyinGlide
 import org.fcitx.fcitx5.android.engine.glide.GlidePath
 import org.fcitx.fcitx5.android.engine.data.CodeTable
 import org.fcitx.fcitx5.android.engine.data.DataFormatException
@@ -82,20 +84,35 @@ internal val COMMANDS = listOf(
         0
     },
     Command(
-        "english-glide", "<english.data> <sentences.txt> [--wobble <key widths>] [--shape <w>] [--proximity <w>] [--near <r>] [--ends <r>] [--misses <out.tsv>] [--threads <n>]",
-        2..2, "wobble", "shape", "proximity", "near", "ends", "misses", "threads",
+        "english-glide", "<english.data> <sentences.txt> [--wobble <key widths>] [--shape <w>] [--proximity <w>] [--edges <w>] [--corner <w>] [--turn <cos>] [--near <r>] [--ends <r>] [--misses <out.tsv>] [--threads <n>]",
+        2..2, "wobble", "shape", "proximity", "edges", "corner", "turn", "near", "ends", "misses", "threads",
     ) { args, out, _ ->
         val (dataPath, setPath) = args.operands
         val sentences = File(setPath).readLines().filter { it.isNotBlank() && !it.startsWith("#") }
         val o = args.options
-        val d = GlidePath.Weights()
-        val weights = GlidePath.Weights(
-            near = o["near"]?.toFloat() ?: d.near, ends = o["ends"]?.toFloat() ?: d.ends,
-            shape = o["shape"]?.toFloat() ?: d.shape, proximity = o["proximity"]?.toFloat() ?: d.proximity,
-        )
-        val run = GlideRun(EnglishData.load(mapFile(dataPath)), weights)
+        val run = GlideRun(EnglishData.load(mapFile(dataPath)), glideWeights(o))
         out.appendLine(GlideRun.Result.HEADER)
         val r = run.run(sentences, o["wobble"]?.toFloat() ?: GLIDE_WOBBLE, ENGLISH_SEED, RunOptions(o).threads)
+        out.appendLine(r.row("wobble"))
+        o["misses"]?.let { path -> File(path).printWriter().use { w -> r.misses.forEach(w::println) } }
+        0
+    },
+    Command(
+        "pinyin-glide", "<pinyin.data> <set.tsv> [--syllables <n; 0, the words>] [--word <letters>] [--wobble <key widths>] [--shape <w>] [--proximity <w>] [--edges <w>] [--corner <w>] [--turn <cos>] [--near <r>] [--ends <r>] [--misses <out.tsv>]",
+        2..2, "syllables", "wobble", "shape", "proximity", "edges", "corner", "turn", "near", "ends", "misses", "word",
+    ) { args, out, _ ->
+        val (dataPath, setPath) = args.operands
+        val o = args.options
+        // one word's clean path: its readings, scored
+        o["word"]?.let { word ->
+            val path = word.flatMap { GlideLayout.QWERTY.centre(it).toList() }.toFloatArray()
+            PinyinGlide(loadData(dataPath), glideWeights(o, PinyinGlide.WEIGHTS)).decode(path, GlideLayout.QWERTY, 10)
+                .forEach { out.appendLine(String.format(java.util.Locale.ROOT, "%-16s %-8s %7.2f", it.pinyin, it.word, it.score)) }
+            return@Command 0
+        }
+        val samples = readSet(setPath).map { it.input to it.expected }
+        val r = PinyinGlideRun(loadData(dataPath), glideWeights(o, PinyinGlide.WEIGHTS)).run(samples, o["syllables"]?.toInt() ?: 0, o["wobble"]?.toFloat() ?: GLIDE_WOBBLE, ENGLISH_SEED)
+        out.appendLine(GlideRun.Result.HEADER)
         out.appendLine(r.row("wobble"))
         o["misses"]?.let { path -> File(path).printWriter().use { w -> r.misses.forEach(w::println) } }
         0
@@ -302,6 +319,16 @@ private fun fuzzyPairs(names: String): Set<Fuzzy>? {
     if (names == "all") return Fuzzy.entries.toSet()
     val byName = Fuzzy.entries.associateBy { it.name.lowercase() }
     return names.split(',').map { byName[it] ?: return null }.toSet()
+}
+
+// [d] (GlidePath's), the options' where given
+private fun glideWeights(o: Map<String, String>, d: GlidePath.Weights = GlidePath.Weights()): GlidePath.Weights {
+    return GlidePath.Weights(
+        near = o["near"]?.toFloat() ?: d.near, ends = o["ends"]?.toFloat() ?: d.ends,
+        shape = o["shape"]?.toFloat() ?: d.shape, proximity = o["proximity"]?.toFloat() ?: d.proximity,
+        edges = o["edges"]?.toFloat() ?: d.edges,
+        corner = o["corner"]?.toFloat() ?: d.corner, turn = o["turn"]?.toFloat() ?: d.turn,
+    )
 }
 
 private fun readSet(path: String) = File(path).useLines { EvalSet.parse(it) }

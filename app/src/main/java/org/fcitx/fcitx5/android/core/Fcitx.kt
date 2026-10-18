@@ -4,7 +4,7 @@
  */
 package org.fcitx.fcitx5.android.core
 
-import org.fcitx.fcitx5.android.engine.english.EnglishSession
+import org.fcitx.fcitx5.android.engine.glide.Glide
 import android.content.Context
 import android.os.Build
 import androidx.annotation.Keep
@@ -83,7 +83,7 @@ class Fcitx(private val context: Context) : FcitxAPI, FcitxLifecycleOwner {
     override suspend fun offerInk(reading: InkReading, piece: Int) = withFcitxContext { EngineBridge.offerInk(reading, piece, inputMethodEntryCached.uniqueName).also(::ink) }
     override suspend fun inkFinished(piece: Int) = withFcitxContext { EngineBridge.inkFinished(piece, inputMethodEntryCached.uniqueName).also(::ink) }
 
-    override suspend fun offerGlide(glide: EnglishSession.Glide) = withFcitxContext {
+    override suspend fun offerGlide(glide: Glide) = withFcitxContext {
         EngineBridge.offerGlide(glide, inputMethodEntryCached.uniqueName).also { taken ->
             if (taken) sendKeySymToFcitx(UNICODE + Keyboard.GLIDE, KeyStates.Virtual.toInt(), 0, false, -1)
         }

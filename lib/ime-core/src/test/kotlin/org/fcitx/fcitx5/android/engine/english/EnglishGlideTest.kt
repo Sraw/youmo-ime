@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.engine.english
 
+import org.fcitx.fcitx5.android.engine.glide.Glide
 import org.fcitx.fcitx5.android.engine.english.GlideDecoderTest.Companion.glided
 import org.fcitx.fcitx5.android.engine.session.Action
 import org.junit.Assert.assertEquals
@@ -98,7 +99,7 @@ class EnglishGlideTest {
         val t = EnglishSession(EnglishDecoderTest.data())
         t.apply(Action.Context("say"))
         // a path no word fits: nothing, not a lone space
-        t.offerGlide(EnglishSession.Glide(floatArrayOf(0.5f, 0.7f, 0.6f, 0.7f, 0.5f, 3.5f), GlideDecoderTest.glide("the").layout))
+        t.offerGlide(Glide(floatArrayOf(0.5f, 0.7f, 0.6f, 0.7f, 0.5f, 3.5f), GlideDecoderTest.glide("the").layout))
         assertEquals("", t.apply(Action.Glide).commit)
     }
 

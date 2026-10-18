@@ -168,7 +168,20 @@ letter goes on only where the path passes near its key in order (first and last 
 a word is scored by the model less SHARK²'s location channel (the mean distance between the path
 and the word's keys joined, each resampled) and how near its keys come. `ime-eval english-glide`
 measures it on simulated paths (key centres off by a Gaussian of 0.3 key widths, a touch point
-every 0.05): 94.0% first, 97.5% in the first three, 0.7 ms a word on one desktop core.
+every 0.05): 94.6% first, 97.6% in the first three, 0.7 ms a word on one desktop core. Besides
+the shape and the keys, `GlidePath` costs where the path starts and lifts away from a word's ends,
+and each turn of the path (by how far it turns) that none of the word's keys is at: a finger turns
+on the keys it means.
+
+Full pinyin glides too (`engine/glide/PinyinGlide`): the dictionary's syllable trie is walked as
+English's key trie, each reading with a word scored by its likeliest word (the unigram, or its
+characters one after another where likelier, as the decoder's best path takes 你好) less the path's
+cost; one word a glide (chained, the readings ran to thousands). `PinyinGlideSession` wraps full
+pinyin's session: `Action.Glide` types the best reading's letters as keys (after a `'` where
+something is typed already, so glides chain into a sentence), and a glide that starts the input
+puts the next two readings' words after the first candidate, a pick of one typing its reading and
+picking it there, so it is learned and followed as any word. `ime-eval pinyin-glide` measures it
+per dictionary word of a pinyin set: pinyin-chat 85.3% first, 96.5% in the first three, 0.4 ms.
 
 ## Handwriting
 

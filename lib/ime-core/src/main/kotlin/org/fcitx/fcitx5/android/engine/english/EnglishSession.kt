@@ -4,7 +4,7 @@
  */
 package org.fcitx.fcitx5.android.engine.english
 
-import org.fcitx.fcitx5.android.engine.glide.GlideLayout
+import org.fcitx.fcitx5.android.engine.glide.Glide
 import org.fcitx.fcitx5.android.engine.data.NgramModel
 import org.fcitx.fcitx5.android.engine.lattice.CoarseWords
 import org.fcitx.fcitx5.android.engine.session.Action
@@ -117,12 +117,6 @@ class EnglishSession(
     override fun reads(c: Char): Boolean = c in 'a'..'z' || c in 'A'..'Z' || (c == '\'' || c == '-') && input.isNotEmpty()
 
     override val takesEveryCharacter: Boolean get() = true
-
-    /**
-     * A glide across the letters ([GlideDecoder]): its [path] in key widths over [layout], and
-     * whether the shift was on ([shift], the word's first letter a capital) or locked ([capsLock]).
-     */
-    class Glide(val path: FloatArray, val layout: GlideLayout, val shift: Boolean = false, val capsLock: Boolean = false)
 
     // the word a glide committed and the others it may have been, while the cursor stays after it
     private class Glided(val committed: String, val words: List<String>)
