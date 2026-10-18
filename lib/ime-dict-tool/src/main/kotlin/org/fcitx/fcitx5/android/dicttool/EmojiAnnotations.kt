@@ -80,13 +80,14 @@ internal object EmojiAnnotations {
      * The words of [annotations] and [edits] (lexicon/emoji.tsv's lines), the edits' emoji written
      * in full as [emoji] has them: `word<TAB>emoji...` puts those first under the word,
      * `-word<TAB>emoji...` takes them out of it, `-word` alone takes the word out. `#` starts a comment.
+     * A taking out that finds nothing to take (CLDR has dropped the word or the emoji) goes to [stale].
      */
-    fun words(annotations: List<Annotation>, edits: List<String>, emoji: Emoji): Map<String, List<String>> {
+    fun words(annotations: List<Annotation>, edits: List<String>, emoji: Emoji, stale: (String) -> Unit = {}): Map<String, List<String>> {
         val named = LinkedHashMap<String, MutableList<String>>()
         val keyed = LinkedHashMap<String, MutableList<String>>()
         for (a in annotations) {
             a.name?.takeIf(::isWord)?.let { named.getOrPut(it) { ArrayList() } += a.emoji }
-            for (k in a.keywords) if (isWord(k) && k.length > 1) keyed.getOrPut(k) { ArrayList() } += a.emoji
+            for (k in a.keywords) if (isWord(k) && k.codePointCount(0, k.length) > 1) keyed.getOrPut(k) { ArrayList() } += a.emoji
         }
         val words = LinkedHashMap<String, MutableList<String>>()
         for ((w, e) in named) words.getOrPut(w) { ArrayList() } += e
@@ -98,8 +99,8 @@ internal object EmojiAnnotations {
             val listed = text.substringAfter('\t', "").split(' ').map { it.trim() }.filter { it.isNotEmpty() }
             val full = listed.map { requireNotNull(emoji.full[bare(it)]) { "not an emoji: $it, in $line" } }
             when {
-                word.startsWith('-') && full.isEmpty() -> words.remove(word.substring(1))
-                word.startsWith('-') -> words[word.substring(1)]?.removeAll { it in full }
+                word.startsWith('-') && full.isEmpty() -> if (words.remove(word.substring(1)) == null) stale(line)
+                word.startsWith('-') -> if (words[word.substring(1)]?.removeAll { it in full } != true) stale(line)
                 else -> {
                     require(isWord(word) && full.isNotEmpty()) { "not a word and its emoji: $line" }
                     words[word] = (full + words[word].orEmpty()).toMutableList()
@@ -109,12 +110,15 @@ internal object EmojiAnnotations {
         return words.mapValues { (_, e) -> e.distinct().take(EmojiData.MAX_EMOJI) }.filterValues { it.isNotEmpty() }
     }
 
-    /** A word pinyin can give: Han characters only, as long as a keyword is. */
+    /**
+     * A word pinyin can give: Han characters only, by code point (扩展B's are two chars), as long as
+     * a keyword is in chars, as EmojiData's reader counts it.
+     */
     private fun isWord(w: String) =
-        w.length in 1..EmojiData.MAX_WORD && w.all { Character.UnicodeScript.of(it.code) == Character.UnicodeScript.HAN }
+        w.length in 1..EmojiData.MAX_WORD && w.codePoints().allMatch { Character.UnicodeScript.of(it) == Character.UnicodeScript.HAN }
 
     // an emoji as CLDR and a user write it, U+FE0F left out
-    private fun bare(emoji: String) = emoji.replace("️", "")
+    private fun bare(emoji: String) = emoji.replace("\uFE0F", "")
 
     private fun unescape(s: String) = s.replace("&lt;", "<").replace("&gt;", ">").replace("&quot;", "\"")
         .replace("&apos;", "'").replace("&amp;", "&")

@@ -466,6 +466,9 @@
     <string name="engine_data_libime">Pinyin dictionary and language model: libime</string>
     <string name="engine_data_fineweb">Web text the language model, the English words and handwriting\'s character frequencies are counted from: FineWeb-2</string>
     <string name="engine_data_handwriting">Handwriting recognizers: trained by this project on Make Me a Hanzi\'s strokes (from Arphic\'s fonts) and open handwriting fonts</string>
+    <string name="engine_data_stroke">Stroke table: rime-stroke</string>
+    <string name="engine_data_emoji">Emoji list and keywords: Unicode\'s emoji-test.txt and CLDR</string>
+    <string name="engine_data_chaizi">Character decompositions: the open dictionary kfcd/chaizi, its components given readings by this project</string>
     <string name="im_auto_select">Commit a lone candidate at once</string>
     <string name="im_auto_select_summary">And the first one once the code is full</string>
     <string name="im_hint">Show the keys left</string>

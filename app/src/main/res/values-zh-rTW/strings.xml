@@ -452,6 +452,9 @@
     <string name="engine_data_libime">拼音詞典和語言模型：libime</string>
     <string name="engine_data_fineweb">語言模型、英文詞表和手寫的字頻統計用的網頁文本：FineWeb-2</string>
     <string name="engine_data_handwriting">手寫辨識模型：本專案用 Make Me a Hanzi 的筆畫（來自文鼎字型）和開源手寫字型訓練</string>
+    <string name="engine_data_stroke">筆畫表：rime-stroke</string>
+    <string name="engine_data_emoji">表情列表和關鍵詞：Unicode 的 emoji-test.txt 和 CLDR</string>
+    <string name="engine_data_chaizi">拆字資料：開放詞典 kfcd/chaizi，部件讀音由本專案標注</string>
     <string name="im_auto_select">只有一個候選時直接上屏</string>
     <string name="im_auto_select_summary">編碼打滿時也直接上屏第一個</string>
     <string name="im_hint">顯示編碼提示</string>

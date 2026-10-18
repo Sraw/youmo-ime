@@ -91,12 +91,24 @@ class EmojiAnnotationsTest {
     }
 
     @Test
+    fun aWordsCharactersAreCountedByCodePoint() {
+        // 𠮷 is one character in two chars: alone it is no keyword, beside another it is a word
+        val annotations = EmojiAnnotations.read("""<annotation cp="🐈">𠮷 | 𠮷猫</annotation>""", emoji)
+        val words = EmojiAnnotations.words(annotations, emptyList(), emoji)
+        assertFalse("𠮷" in words)
+        assertEquals(listOf("🐈"), words["𠮷猫"])
+    }
+
+    @Test
     fun theEditsGoFirstTakeOutAndAddWords() {
         val annotations = EmojiAnnotations.read(xml, emoji)
         val edits = listOf(
             "# a comment", "", "加油\t💪", "-加油\t⛽", "-加油站", "点赞\t👍  # the internet's", "哈哈\t☺ 😄", "-大笑\t😃 😄",
         )
-        val words = EmojiAnnotations.words(annotations, edits, emoji)
+        val stale = ArrayList<String>()
+        val words = EmojiAnnotations.words(annotations, edits + listOf("-加油站", "-猫\t⛽"), emoji, stale::add)
+        // taken out already, and an emoji the word has not: each told of
+        assertEquals(listOf("-加油站", "-猫\t⛽"), stale)
         assertEquals(listOf("💪"), words["加油"])
         assertFalse("加油站" in words)
         assertEquals(listOf("👍"), words["点赞"])

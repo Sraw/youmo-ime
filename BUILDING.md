@@ -33,6 +33,7 @@ x86_64 的模拟器或 redroid 加 `-PbuildABI=x86_64`。
 构建会自动下载数据，并按 SHA-256 校验：
 
 - libime 发布的词典和码表文本源，rime-stroke 的笔画表；
+- Unicode 的 `emoji-test.txt`、CLDR 的 `annotations/zh.xml`（表情），kfcd/chaizi 的 `chaizi-jt.txt`（拆字）；
 - `voice` 还有 X-ASR 原版模型包（取其中的词表）和 silero VAD；
 - 本仓库 release 里的数据，每类一个，版本写在 `build-logic` 里：
 
@@ -117,6 +118,7 @@ permission and a ~180 MB speech model. `./gradlew :app:assembleRelease` makes bo
 The build downloads its data and checks the SHA-256 of each file:
 
 - the dictionary and code table text sources published by libime, and rime-stroke's stroke table;
+- Unicode's `emoji-test.txt` and CLDR's `annotations/zh.xml` (emoji), kfcd/chaizi's `chaizi-jt.txt` (拆字);
 - for `voice`, X-ASR's original model archive (for its token list) and silero VAD;
 - this repository's data releases, one of each kind, their versions pinned in `build-logic`:
 

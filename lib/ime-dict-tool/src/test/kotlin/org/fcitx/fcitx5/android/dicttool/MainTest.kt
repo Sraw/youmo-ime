@@ -314,6 +314,46 @@ class MainTest {
     }
 
     @Test
+    fun emojiWordsAreCompiledTheCommonerFirstWithTheirPinyin() {
+        val groups = listOf(
+            "Smileys & Emotion" to "1F603", "People & Body" to "1F44D", "Animals & Nature" to "1F408", "Food & Drink" to "1F34E",
+            "Travel & Places" to "26FD", "Activities" to "1F389", "Objects" to "1F4A1", "Symbols" to "1F197", "Flags" to "1F3C1",
+        )
+        val test = file("emoji-test.txt", groups.joinToString("\n") { (group, cp) -> "# group: $group\n$cp ; fully-qualified # x" })
+        val xml = file("zh.xml", """
+            <annotation cp="😃">哈哈 | 笑脸</annotation>
+            <annotation cp="😃" type="tts">大笑</annotation>
+            <annotation cp="🐈">宠物</annotation>
+            <annotation cp="🐈" type="tts">猫</annotation>
+        """)
+        val lexicon = file("emoji.tsv", "-加油\t⛽\n-猫\t😃\n")
+        val lm = file("lm.arpa", ReadersTest.TINY_ARPA.replace("ngram 1=3", "ngram 1=5").replace("-1.5\t好", "-1.5\t好\n-0.5\t猫\n-6.0\t大笑"))
+        val pinyin = tmp.root.resolve("pinyin.data").path
+        assertEquals(0, run("pinyin", "-o", pinyin, "--lm", lm, file("dict.txt", "你 ni\n好 hao\n猫 mao\n大笑 da'xiao\n")).first)
+        val output = tmp.root.resolve("emoji.data")
+        val (code, out, err) = run("emoji", "-o", output.path, "--test", test, "--lexicon", lexicon, "--pinyin", pinyin, xml)
+        assertEquals(err, 0, code)
+        assertTrue(out, out.contains("emoji: 2 of the edits take out what is not there"))
+        assertTrue(out, out.contains("words the pinyin data does not read"))
+        val lines = output.readLines().filter { !it.startsWith('#') && !it.startsWith('@') }
+        // the model has 猫 far commoner than 大笑
+        assertTrue(lines.toString(), lines.indexOfFirst { it.startsWith("猫\t") } < lines.indexOfFirst { it.startsWith("大笑\t") })
+        assertTrue(lines.toString(), lines.any { it.startsWith("猫\t🐈\t") && it.endsWith("mao") })
+    }
+
+    @Test
+    fun chaiziSpellsACharacterByItsPartsRadicalsAsTheirCharacters() {
+        val pinyin = tmp.root.resolve("pinyin.data").path
+        val dict = file("dict.txt", "你\tni\t0\n好\thao\t0\n草\tcao\t0\n巴\tba\t0\n芭\tba\t0\n艹\tao\t0.1\n艹\tcao\t0\n")
+        assertEquals(0, run("pinyin", "-o", pinyin, "--lm", file("lm.arpa", ReadersTest.TINY_ARPA), dict).first)
+        val output = tmp.root.resolve("chaizi.data")
+        val (code, out, err) = run("chaizi", "-o", output.path, "--pinyin", pinyin, file("chaizi-jt.txt", "芭\t草 巴\t艹 巴\n"))
+        assertEquals(err, 0, code)
+        assertTrue(out, out.contains("chaizi: 1 characters, 1 of them by their parts, 1 spellings"))
+        assertEquals(listOf("caoba\t芭"), output.readLines().filter { !it.startsWith('#') })
+    }
+
+    @Test
     fun strokesAreCompiled() {
         val dict = file("stroke.dict.yaml", "# Rime dictionary: stroke\n---\nname: stroke\n...\n\n一\th\n十\ths\n")
         val output = tmp.root.resolve("stroke.data").path

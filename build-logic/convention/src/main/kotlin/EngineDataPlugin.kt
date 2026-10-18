@@ -398,9 +398,12 @@ class EngineDataPlugin : Plugin<Project> {
         }
     }
 
-    /** English's words and model as `engine/english.data`, compiled from the arpa of the release. */
-    @CacheableTask
-    abstract class CompileEnglishData @Inject constructor(private val exec: ExecOperations) : DefaultTask() {
+    /** A data file under `engine/` compiled by a run of the tool, its classpath keyed on by toolCode only. */
+    @DisableCachingByDefault(because = "an abstract base; each compile says whether it is kept")
+    abstract class ToolDataTask : DefaultTask() {
+        @get:Inject
+        abstract val exec: ExecOperations
+
         // built before this runs, but keyed on by toolCode only
         @get:Internal
         abstract val classpath: ConfigurableFileCollection
@@ -413,39 +416,34 @@ class EngineDataPlugin : Plugin<Project> {
             dependsOn(classpath)
         }
 
+        @get:OutputDirectory
+        abstract val outputDir: DirectoryProperty
+
+        /** `engine/[name]` written by the tool's [command] of it, in a JVM of [heap]. */
+        protected fun runTool(name: String, heap: String, command: (output: String) -> List<String>) {
+            val output = outputDir.get().asFile.resolve("engine/$name")
+            output.parentFile.mkdirs()
+            exec.javaexec { configureTool(this@ToolDataTask.classpath, heap, command(output.path)) }
+        }
+    }
+
+    /** English's words and model as `engine/english.data`, compiled from the arpa of the release. */
+    @CacheableTask
+    abstract class CompileEnglishData : ToolDataTask() {
         @get:InputFiles
         @get:PathSensitive(PathSensitivity.NAME_ONLY)
         abstract val lm: RegularFileProperty
 
-        @get:OutputDirectory
-        abstract val outputDir: DirectoryProperty
-
         @TaskAction
         fun compile() {
-            val output = outputDir.get().asFile.resolve("engine/english.data")
-            output.parentFile.mkdirs()
-            exec.javaexec {
-                // the model is held in memory while it is sorted: 2.1 GB resident, as measured
-                configureTool(this@CompileEnglishData.classpath, "2g", listOf("english", "-o", output.path, "--lm", lm.get().asFile.path))
-            }
+            // the model is held in memory while it is sorted: 2.1 GB resident, as measured
+            runTool("english.data", "2g") { listOf("english", "-o", it, "--lm", lm.get().asFile.path) }
         }
     }
 
     /** The emoji panel's groups and the Chinese words emoji stand for as `engine/emoji.data` (EmojiData). */
     @CacheableTask
-    abstract class CompileEmojiData @Inject constructor(private val exec: ExecOperations) : DefaultTask() {
-        // built before this runs, but keyed on by toolCode only
-        @get:Internal
-        abstract val classpath: ConfigurableFileCollection
-
-        @get:InputFile
-        @get:PathSensitive(PathSensitivity.NONE)
-        abstract val toolCode: RegularFileProperty
-
-        init {
-            dependsOn(classpath)
-        }
-
+    abstract class CompileEmojiData : ToolDataTask() {
         @get:InputFile
         @get:PathSensitive(PathSensitivity.NAME_ONLY)
         abstract val test: RegularFileProperty
@@ -463,21 +461,13 @@ class EngineDataPlugin : Plugin<Project> {
         @get:PathSensitive(PathSensitivity.NONE)
         abstract val pinyin: RegularFileProperty
 
-        @get:OutputDirectory
-        abstract val outputDir: DirectoryProperty
-
         @TaskAction
         fun compile() {
-            val output = outputDir.get().asFile.resolve("engine/emoji.data")
-            output.parentFile.mkdirs()
-            exec.javaexec {
-                configureTool(
-                    // the pinyin data mapped, its 800k words indexed
-                    this@CompileEmojiData.classpath, "1g",
-                    listOf(
-                        "emoji", "-o", output.path, "--test", test.get().asFile.path, "--lexicon", edits.get().asFile.path,
-                        "--pinyin", pinyin.get().asFile.path, annotations.get().asFile.path,
-                    ),
+            // the pinyin data mapped, its 800k words indexed
+            runTool("emoji.data", "1g") {
+                listOf(
+                    "emoji", "-o", it, "--test", test.get().asFile.path, "--lexicon", edits.get().asFile.path,
+                    "--pinyin", pinyin.get().asFile.path, annotations.get().asFile.path,
                 )
             }
         }
@@ -485,19 +475,7 @@ class EngineDataPlugin : Plugin<Project> {
 
     /** `engine/chaizi.data`: ime-dict-tool's `chaizi` of the 汉语拆字字典, its parts read by the pinyin data. */
     @CacheableTask
-    abstract class CompileChaiziData @Inject constructor(private val exec: ExecOperations) : DefaultTask() {
-        // built before this runs, but keyed on by toolCode only
-        @get:Internal
-        abstract val classpath: ConfigurableFileCollection
-
-        @get:InputFile
-        @get:PathSensitive(PathSensitivity.NONE)
-        abstract val toolCode: RegularFileProperty
-
-        init {
-            dependsOn(classpath)
-        }
-
+    abstract class CompileChaiziData : ToolDataTask() {
         @get:InputFile
         @get:PathSensitive(PathSensitivity.NAME_ONLY)
         abstract val source: RegularFileProperty
@@ -507,20 +485,10 @@ class EngineDataPlugin : Plugin<Project> {
         @get:PathSensitive(PathSensitivity.NONE)
         abstract val pinyin: RegularFileProperty
 
-        @get:OutputDirectory
-        abstract val outputDir: DirectoryProperty
-
         @TaskAction
         fun compile() {
-            val output = outputDir.get().asFile.resolve("engine/chaizi.data")
-            output.parentFile.mkdirs()
-            exec.javaexec {
-                configureTool(
-                    // the pinyin data mapped, as for the emoji
-                    this@CompileChaiziData.classpath, "1g",
-                    listOf("chaizi", "-o", output.path, "--pinyin", pinyin.get().asFile.path, source.get().asFile.path),
-                )
-            }
+            // the pinyin data mapped, as for the emoji
+            runTool("chaizi.data", "1g") { listOf("chaizi", "-o", it, "--pinyin", pinyin.get().asFile.path, source.get().asFile.path) }
         }
     }
 

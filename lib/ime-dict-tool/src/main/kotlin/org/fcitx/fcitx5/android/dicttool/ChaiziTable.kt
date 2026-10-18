@@ -35,12 +35,17 @@ internal object ChaiziTable {
         return chars
     }
 
+    // a radical read as the character it stands for, where the pinyin data's likeliest reading is
+    // another (dict_sc.txt: 艹 ao, 氵 san, 亻 dan, 扌 ti, 犭 fan, 刂 li, 灬 biao), which spelt 芭 aoba
+    // beside 草巴's caoba; 忄 xin, 讠 yan, 钅 jin, 纟 si and the like read as their characters already
+    private val RADICALS = mapOf("艹" to "草", "氵" to "水", "亻" to "人", "扌" to "手", "犭" to "犬", "刂" to "刀", "灬" to "火")
+
     // a way [parts] of [c] read, each part by its likeliest reading: a rare one (广 as ān) would
     // spell the character as no one says it (anmu for 床); none for a way that is no split of it,
     // or has a part not read
     private fun spelt(c: String, parts: List<String>, reading: (String) -> String): String? {
         if (parts.size !in 2..MAX_PARTS || c in parts) return null
-        val readings = parts.map { reading(it).substringBefore('/') }
+        val readings = parts.map { reading(RADICALS[it] ?: it).substringBefore('/') }
         return if (readings.any { it.isEmpty() }) null else readings.joinToString("")
     }
 

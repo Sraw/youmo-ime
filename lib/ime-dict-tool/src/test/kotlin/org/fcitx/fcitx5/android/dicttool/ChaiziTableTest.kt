@@ -43,6 +43,28 @@ class ChaiziTableTest {
     }
 
     @Test
+    fun aRadicalIsReadAsTheCharacterItStandsFor() {
+        // the pinyin data reads 艹 likeliest as ao: 芭 is caoba, not aoba too
+        val spellings = ChaiziTable.spellings(sequenceOf("芭\t草 巴\t艹 巴"), { mapOf("艹" to "ao/cao", "草" to "cao", "巴" to "ba")[it].orEmpty() })
+        assertEquals(setOf("caoba"), spellings["芭"])
+    }
+
+    @Test
+    fun theSideRadicalsWhoseLikeliestReadingIsAnotherAreReadAsTheirCharacters() {
+        // dict_sc.txt's likeliest: 氵 san, 亻 dan, 扌 ti, 犭 fan, 刂 li, 灬 biao
+        val read = mapOf(
+            "氵" to "san/shui", "亻" to "dan/ren", "扌" to "ti/shou", "犭" to "fan/quan", "刂" to "li/dao", "灬" to "biao/huo",
+            "水" to "shui", "人" to "ren", "手" to "shou", "犬" to "quan", "刀" to "dao", "火" to "huo", "可" to "ke",
+        )
+        val lines = sequenceOf("河\t氵 可", "何\t亻 可", "抲\t扌 可", "犄\t犭 可", "剞\t可 刂", "炣\t可 灬")
+        val spellings = ChaiziTable.spellings(lines, { read[it].orEmpty() })
+        assertEquals(
+            mapOf("河" to setOf("shuike"), "何" to setOf("renke"), "抲" to setOf("shouke"), "犄" to setOf("quanke"), "剞" to setOf("kedao"), "炣" to setOf("kehuo")),
+            spellings,
+        )
+    }
+
+    @Test
     fun bySpellingTheCommonestFirstAtMostMax() {
         val found = ChaiziTable.bySpelling(mapOf("吅" to setOf("koukou"), "吕" to setOf("koukou"), "犇" to setOf("niuniuniu")), listOf("吕", "犇"))
         assertEquals(listOf("吕", "吅"), found["koukou"])

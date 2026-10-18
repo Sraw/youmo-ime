@@ -46,3 +46,13 @@
 -庆祝	🎃
 -啤酒	🫚
 灯笼	🏮
+# CLDR's single characters that are mostly function words, verbs or other senses: 啊 (a) would put
+# 😦 third on one of the commonest keys, 派 is a pie only as a loan word
+-啊
+-加
+-减
+-乘
+-除
+-线
+-结
+-派

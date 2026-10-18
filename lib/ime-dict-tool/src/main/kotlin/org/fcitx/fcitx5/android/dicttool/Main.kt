@@ -937,9 +937,10 @@ private fun emoji(options: Options, out: Appendable) {
     val input = options.inputs.single()
     val emoji = EmojiAnnotations.emoji(File(options.test!!).readText())
     val annotations = EmojiAnnotations.read(File(input).readText(), emoji)
-    val words = EmojiAnnotations.words(annotations, options.lexicon?.let { File(it).readLines() }.orEmpty(), emoji)
+    var stale = 0
+    val words = EmojiAnnotations.words(annotations, options.lexicon?.let { File(it).readLines() }.orEmpty(), emoji) { stale++ }
     // read as the settings read a word the user adds (Engines.pinyinOf), for the panel's search by pinyin
-    val engines = options.pinyin?.let { data -> Engines({ path -> if (path == Engines.PINYIN_DATA) map(data) else throw FileNotFoundException(path) }, null) }
+    val engines = options.pinyin?.let(::pinyinEngines)
     val pinyin = engines?.pinyinsOf(words.keys).orEmpty()
     // the commoner word first, as the panel's search lists words alike (笑 before 孝); by word without the data
     val sorted = words.keys.sorted()
@@ -948,9 +949,14 @@ private fun emoji(options: Options, out: Appendable) {
     output.writeText(EmojiData.format(emoji.groups, order.associateWith(words::getValue), EMOJI_HEADER, pinyin))
     val unread = words.keys.count { pinyin[it] == null }
     if (options.pinyin != null && unread > 0) out.appendLine("emoji: $unread words the pinyin data does not read: not found by search")
+    if (stale > 0) out.appendLine("emoji: $stale of the edits take out what is not there: CLDR has changed under them")
     out.appendLine("emoji: ${emoji.groups.sumOf { it.second.size }} in the panel, ${annotations.size} annotated, ${words.size} words")
     out.appendLine("wrote $output: ${output.length()} bytes")
 }
+
+/** The engines of compiled pinyin [data] alone. */
+private fun pinyinEngines(data: String) =
+    Engines({ path -> if (path == Engines.PINYIN_DATA) map(data) else throw FileNotFoundException(path) }, null)
 
 private val EMOJI_HEADER = """
     emoji.data, ime-dict-tool's emoji: the panel's groups (@), then the Chinese words emoji stand for
@@ -958,8 +964,7 @@ private val EMOJI_HEADER = """
 """.trimIndent()
 
 private fun chaizi(options: Options, out: Appendable) {
-    val data = options.pinyin!!
-    val engines = Engines({ path -> if (path == Engines.PINYIN_DATA) map(data) else throw FileNotFoundException(path) }, null)
+    val engines = pinyinEngines(options.pinyin!!)
     val lines = File(options.inputs.single()).readLines()
     val chars = lines.map { it.substringBefore('\t').trim() }.filter { it.codePointCount(0, it.length) == 1 }.distinct()
     val p = engines.logProbs(chars)
