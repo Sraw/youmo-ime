@@ -12,4 +12,10 @@ enum class OneHanded(override val stringRes: Int, val dock: SplitKeyboard.Dock) 
     Off(R.string.one_handed_off, SplitKeyboard.Dock.FULL),
     Right(R.string.split_dock_right, SplitKeyboard.Dock.RIGHT),
     Left(R.string.split_dock_left, SplitKeyboard.Dock.LEFT),
+    ;
+
+    companion object {
+        /** The side to keep for the status area's toggle: any side put, from wherever; [Off] keeps the last one. */
+        fun sideToRemember(value: OneHanded): OneHanded? = value.takeIf { it != Off }
+    }
 }

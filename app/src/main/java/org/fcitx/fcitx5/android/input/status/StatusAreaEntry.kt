@@ -21,8 +21,8 @@ sealed class StatusAreaEntry(
             InputMethod,
             Keyboard,
             ThemeList,
-            OneHanded,
-            Floating
+            OneHandedToggle,
+            FloatingToggle
         }
     }
 

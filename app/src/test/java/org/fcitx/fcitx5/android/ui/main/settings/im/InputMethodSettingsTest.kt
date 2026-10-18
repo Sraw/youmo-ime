@@ -27,6 +27,16 @@ internal val appInputMethods = InputMethodSettings.BUILT_IN
 
 internal fun List<Item>.flat(): List<Item> = flatMap { if (it is Section) it.items.flat() else listOf(it) }
 
+/** Every row's key on [page], whatever its kind: a kind added later is not skipped. */
+internal fun keys(page: String): List<String> = InputMethodSettings.of(page)!!.flat().map {
+    when (it) {
+        is Toggle -> it.key
+        is Flags -> it.path
+        is InputMethodSettings.Titled -> it.key
+        is Section -> error("$it")
+    }
+}
+
 internal fun item(page: String, key: String) = InputMethodSettings.of(page)!!.flat().first {
     (it is Choice && it.key == key) || (it is Toggle && it.key == key)
 }
@@ -118,10 +128,27 @@ class InputMethodSettingsTest {
         val fuzzy = InputMethodSettings.of(Engines.PINYIN)!!.flat().filterIsInstance<Flags>().single()
         assertEquals(EngineSettings.FUZZY, fuzzy.path)
         assertEquals(Fuzzy.entries.map { it.name }.sorted(), fuzzy.flags.map { it.first }.sorted())
-        val table = InputMethodSettings.of("engine-wubi")!!.flat().filter { it is Toggle || it is Choice }.map { if (it is Toggle) it.key else (it as Choice).key }
-        // the table's own, and those every Chinese input method shares with pinyin (EngineTablePage)
-        val shared = listOf(EngineSettings.PAGE_SIZE, EngineSettings.PREDICTION, EngineSettings.EMOJI, EngineSettings.MODEL_LEVEL)
+        val table = keys("engine-wubi")
+        // the table's own, and those every Chinese input method shares with pinyin (EngineTablePage),
+        // and the keyboard's glide typing
+        val shared = listOf(EngineSettings.PAGE_SIZE, EngineSettings.PREDICTION, EngineSettings.EMOJI, EngineSettings.MODEL_LEVEL, AppPrefs.GLIDE_TYPING)
         assertEquals((TableSettings.KEYS + shared).sorted(), table.sorted())
+    }
+
+    // one setting, on the page of every input method the keyboard glides on, and on no other
+    @Test
+    fun everyPageThatGlidesHasTheGlideRowAndNoOtherDoes() {
+        appInputMethods.forEach { page ->
+            assertEquals(page, Engines.glides(page), AppPrefs.GLIDE_TYPING in keys(page))
+        }
+    }
+
+    // full pinyin's alone: 双拼's u is a key of its own, 九键's no letter
+    @Test
+    fun onlyFullPinyinHasTheChaiziRow() {
+        appInputMethods.forEach { page ->
+            assertEquals(page, page == Engines.PINYIN, EngineSettings.CHAIZI in keys(page))
+        }
     }
 
     // its name starts as a table's does ("engine-"): without a page of its own it would get a table's

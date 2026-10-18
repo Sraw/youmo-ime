@@ -86,8 +86,14 @@ class ThemePrefs(sharedPreferences: SharedPreferences) :
     }
 
     // the whole keyboard at a side for one thumb while it does not split; also from the status area,
-    // and read by the input view as it changes, as the dock is
-    val oneHanded = enumList(R.string.one_handed, "one_handed", OneHanded.Off)
+    // and read by the input view as it changes, as the dock is; floating, it does nothing
+    val oneHanded = enumList(R.string.one_handed, "one_handed", OneHanded.Off) {
+        !floatingKeyboard.getValue()
+    }
+
+    // the side 单手模式 was last at, which turning it on from the status area goes back to: a
+    // left-handed user would otherwise move it across every time
+    val oneHandedSide = hidden { enumList(R.string.one_handed, "one_handed_side", OneHanded.Right) }
 
     // the keyboard over the app, smaller, dragged anywhere (FloatingKeyboard); also from the status
     // area. The view is made anew for it: the letters do not split floating

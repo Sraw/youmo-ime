@@ -79,11 +79,10 @@ abstract class KeyView(ctx: Context, val theme: Theme, val def: KeyDef.Appearanc
 
     private val cachedLocation = intArrayOf(0, 0)
     private val cachedBounds = Rect()
-    private var boundsValid = false
+    // where it is now, asked each time: the floating keyboard moves by translation, which lays
+    // nothing out again (FloatingPlacer), so a rect kept from the last layout would be stale
     val bounds: Rect
-        get() = cachedBounds.also {
-            if (!boundsValid) updateBounds()
-        }
+        get() = cachedBounds.also { updateBounds() }
 
     /**
      * KeyView content left margin, in percentage of parent width
@@ -195,11 +194,9 @@ abstract class KeyView(ctx: Context, val theme: Theme, val def: KeyDef.Appearanc
         // across, the face drawn (less hMargin, none on keys without margins): popups are as wide as
         // it; down, to the margin's foot, which popups align their bottoms with
         cachedBounds.set(x + hMargin, y, x + appearanceView.width - hMargin, y + appearanceView.height)
-        boundsValid = true
     }
 
     override fun onLayout(changed: Boolean, left: Int, top: Int, right: Int, bottom: Int) {
-        boundsValid = false
         if (layoutMarginLeft != 0f || layoutMarginRight != 0f) {
             val w = right - left
             val h = bottom - top

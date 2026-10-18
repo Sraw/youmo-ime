@@ -13,6 +13,7 @@ import androidx.preference.PreferenceManager
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.prefs.ManagedPreferenceProvider
 import org.fcitx.fcitx5.android.data.theme.ThemeManager.activeTheme
+import org.fcitx.fcitx5.android.input.keyboard.OneHanded
 import org.fcitx.fcitx5.android.utils.WeakHashSet
 import org.fcitx.fcitx5.android.utils.appContext
 import org.fcitx.fcitx5.android.utils.isDarkMode
@@ -125,8 +126,11 @@ object ThemeManager {
     private val onThemePrefsChange = ManagedPreferenceProvider.OnChangeListener { key ->
         when (key) {
             in prefs.dayNightModePrefNames -> activeTheme = evaluateActiveTheme()
-            // InputView moves the board itself: made anew, the symbols shown would go back to the letters
-            prefs.splitDock.key, prefs.oneHanded.key -> Unit
+            // InputView moves the board itself: made anew, the symbols shown would go back to the letters.
+            // The side one-handed mode is put at, from wherever (status area, arrows, settings page), is
+            // where the status area's toggle opens it again; remembered, it changes nothing shown
+            prefs.oneHanded.key -> OneHanded.sideToRemember(prefs.oneHanded.getValue())?.let(prefs.oneHandedSide::setValue)
+            prefs.splitDock.key, prefs.oneHandedSide.key -> Unit
             else -> fireChange()
         }
     }

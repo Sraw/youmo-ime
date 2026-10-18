@@ -80,18 +80,24 @@ object SplitKeyboard {
      */
     const val ONE_HANDED_SHARE = 0.8f
 
+    /** The room one thumb's keyboard leaves beside it at least, in dp: a side button's width. */
+    const val ONE_HANDED_MIN_FREE_DP = 56
+
     /** Where the board shown goes ([Placement.side]) and how wide it is there, in dp. */
     data class Placement(val side: Dock, val widthDp: Int)
 
     /**
      * Where the board shown goes on a keyboard [widthDp] wide, or null for the whole width: split,
      * as [side] has it by [dock]; else one-handed at [oneHanded]'s side ([Dock.FULL] is off), a
-     * phone's width at most on a tablet upright, whatever the board is.
+     * phone's width at most on a tablet upright, whatever the board is, and null when the room beside
+     * it is under [ONE_HANDED_MIN_FREE_DP].
      */
     fun placement(oneHanded: Dock, dock: Dock, splitting: Boolean, lettersShown: Boolean, widthDp: Int): Placement? = when {
         splitting -> side(dock, true, lettersShown, widthDp)?.let { Placement(it, dockWidth(widthDp)) }
         oneHanded == Dock.FULL -> null
-        else -> Placement(oneHanded, (widthDp * ONE_HANDED_SHARE).toInt().coerceAtMost(DOCK_MAX_DP))
+        else -> (widthDp * ONE_HANDED_SHARE).toInt().coerceAtMost(DOCK_MAX_DP)
+            // too narrow for the buttons beside it: the whole width, as a board at a side is
+            .takeIf { widthDp - it >= ONE_HANDED_MIN_FREE_DP }?.let { Placement(oneHanded, it) }
     }
 
     /** The kinds of window the keyboard shows, as far as where they go while the letters split. */

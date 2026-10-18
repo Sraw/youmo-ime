@@ -17,18 +17,19 @@ import org.fcitx.fcitx5.android.daemon.FcitxConnection
 import org.fcitx.fcitx5.android.daemon.launchOnReady
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
-import org.fcitx.fcitx5.android.input.keyboard.KeyboardWindow
-import org.fcitx.fcitx5.android.input.keyboard.OneHanded as OneHandedMode
 import org.fcitx.fcitx5.android.input.bar.ui.ToolButton
 import org.fcitx.fcitx5.android.input.broadcast.InputBroadcastReceiver
 import org.fcitx.fcitx5.android.input.dependency.fcitx
 import org.fcitx.fcitx5.android.input.dependency.imeScope
 import org.fcitx.fcitx5.android.input.dependency.theme
 import org.fcitx.fcitx5.android.input.editorinfo.EditorInfoWindow
+import org.fcitx.fcitx5.android.input.keyboard.KeyboardWindow
+import org.fcitx.fcitx5.android.input.keyboard.OneHanded
+import org.fcitx.fcitx5.android.input.keyboard.TextKeyboard
+import org.fcitx.fcitx5.android.input.status.StatusAreaEntry.Android.Type.FloatingToggle
 import org.fcitx.fcitx5.android.input.status.StatusAreaEntry.Android.Type.InputMethod
-import org.fcitx.fcitx5.android.input.status.StatusAreaEntry.Android.Type.Floating
 import org.fcitx.fcitx5.android.input.status.StatusAreaEntry.Android.Type.Keyboard
-import org.fcitx.fcitx5.android.input.status.StatusAreaEntry.Android.Type.OneHanded
+import org.fcitx.fcitx5.android.input.status.StatusAreaEntry.Android.Type.OneHandedToggle
 import org.fcitx.fcitx5.android.input.status.StatusAreaEntry.Android.Type.ThemeList
 import org.fcitx.fcitx5.android.input.wm.InputWindow
 import org.fcitx.fcitx5.android.input.wm.InputWindowManager
@@ -138,14 +139,16 @@ class StatusAreaWindow : InputWindow.ExtendedInputWindow<StatusAreaWindow>(),
                         }
                         Keyboard -> AppUtil.launchMainToKeyboard(context)
                         ThemeList -> AppUtil.launchMainToThemeList(context)
-                        // on or off, then the keyboard as it now goes: the side the arrow beside it last chose is not kept
-                        OneHanded -> {
+                        // on, at the side it was last at, or off; then the keyboard as it now goes
+                        OneHandedToggle -> {
                             val oneHanded = ThemeManager.prefs.oneHanded
-                            oneHanded.setValue(if (oneHanded.getValue() == OneHandedMode.Off) OneHandedMode.Right else OneHandedMode.Off)
+                            val side = ThemeManager.prefs.oneHandedSide
+                            val was = oneHanded.getValue()
+                            oneHanded.setValue(if (was == OneHanded.Off) side.getValue() else OneHanded.Off)
                             windowManager.attachWindow(KeyboardWindow)
                         }
                         // the input view is made anew for it, on the letters
-                        Floating -> ThemeManager.prefs.floatingKeyboard.run { setValue(!getValue()) }
+                        FloatingToggle -> ThemeManager.prefs.floatingKeyboard.run { setValue(!getValue()) }
                     }
                 }
             }
@@ -168,13 +171,13 @@ class StatusAreaWindow : InputWindow.ExtendedInputWindow<StatusAreaWindow>(),
 
     override fun onStatusAreaUpdate(actions: Array<Action>) {
         val floating = ThemeManager.prefs.floatingKeyboard.getValue()
-        // floating, one-handed mode is of no use: not offered
-        val oneHanded = if (floating) emptyArray() else arrayOf(
+        // floating or the letters split, one-handed mode is of no use: not offered
+        val oneHanded = if (floating || TextKeyboard.splits(context)) emptyArray() else arrayOf(
             StatusAreaEntry.Android(
                 context.getString(R.string.one_handed),
                 R.drawable.ic_baseline_pan_tool_24,
-                OneHanded,
-                active = ThemeManager.prefs.oneHanded.getValue() != OneHandedMode.Off
+                OneHandedToggle,
+                active = ThemeManager.prefs.oneHanded.getValue() != OneHanded.Off
             )
         )
         adapter.entries = arrayOf(
@@ -183,7 +186,7 @@ class StatusAreaWindow : InputWindow.ExtendedInputWindow<StatusAreaWindow>(),
             StatusAreaEntry.Android(
                 context.getString(R.string.floating_keyboard),
                 R.drawable.ic_baseline_open_with_24,
-                Floating,
+                FloatingToggle,
                 active = floating
             ),
             *Array(actions.size) { StatusAreaEntry.fromAction(context, actions[it]) }

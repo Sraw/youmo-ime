@@ -7,8 +7,8 @@ package org.fcitx.fcitx5.android.input.keyboard
 import org.fcitx.fcitx5.android.input.keyboard.SplitKeyboard.Mode
 import org.fcitx.fcitx5.android.input.keyboard.SplitKeyboard.Sizes
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNull
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -112,6 +112,9 @@ class SplitKeyboardTest {
         // a tablet upright: a phone's width
         assertEquals(SplitKeyboard.Placement(left, SplitKeyboard.DOCK_MAX_DP), SplitKeyboard.placement(left, full, false, true, 800))
         assertNull(SplitKeyboard.placement(full, right, splitting = false, lettersShown = false, widthDp = 360))
+        // 20% of 250 dp is 50, under a side button: the whole width; 280 leaves 56, just enough
+        assertNull(SplitKeyboard.placement(right, full, splitting = false, lettersShown = true, widthDp = 250))
+        assertEquals(SplitKeyboard.Placement(right, 224), SplitKeyboard.placement(right, full, false, true, 280))
         // split, the letters take the width, the other boards go as the split's setting says
         assertNull(SplitKeyboard.placement(left, right, splitting = true, lettersShown = true, widthDp = 800))
         assertEquals(SplitKeyboard.Placement(right, SplitKeyboard.dockWidth(800)), SplitKeyboard.placement(left, right, true, false, 800))

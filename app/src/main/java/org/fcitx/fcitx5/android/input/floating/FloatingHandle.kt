@@ -44,7 +44,7 @@ class FloatingHandle(
             colorFilter = PorterDuffColorFilter(theme.altKeyTextColor, PorterDuff.Mode.SRC_IN)
             // the handle's whole strip drags, this only shows that it does
             isClickable = false
-        }, LayoutParams(dp(HEIGHT_DP), dp(HEIGHT_DP), Gravity.CENTER))
+        }, LayoutParams(dp(24), dp(24), Gravity.CENTER))
         addView(ImageView(context).apply {
             setImageResource(R.drawable.ic_baseline_open_in_full_24)
             colorFilter = PorterDuffColorFilter(theme.altKeyTextColor, PorterDuff.Mode.SRC_IN)
@@ -53,7 +53,7 @@ class FloatingHandle(
             contentDescription = context.getString(R.string.floating_keyboard_dock)
             setPadding(dp(4), dp(4), dp(4), dp(4))
             setOnClickListener { onDock() }
-        }, LayoutParams(dp(HEIGHT_DP + 16), dp(HEIGHT_DP), Gravity.END or Gravity.CENTER_VERTICAL))
+        }, LayoutParams(dp(48), dp(HEIGHT_DP), Gravity.END or Gravity.CENTER_VERTICAL))
     }
 
     // raw (screen) places: the handle moves with the keyboard under the finger
@@ -79,6 +79,8 @@ class FloatingHandle(
     }
 
     companion object {
-        const val HEIGHT_DP = 24
+        // the strip's and so the dock button's height, 48 dp wide: a 48 dp touch target. A TouchDelegate
+        // can't make it taller: above the strip is outside the view, below it the bar's own buttons
+        const val HEIGHT_DP = 48
     }
 }

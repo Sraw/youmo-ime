@@ -22,14 +22,17 @@ import android.widget.FrameLayout
 import android.widget.ImageView
 import androidx.annotation.Keep
 import androidx.annotation.RequiresApi
+import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.isVisible
 import androidx.core.view.updateLayoutParams
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.core.CapabilityFlags
 import org.fcitx.fcitx5.android.core.FcitxEvent
@@ -50,17 +53,18 @@ import org.fcitx.fcitx5.android.input.broadcast.ReturnKeyDrawableComponent
 import org.fcitx.fcitx5.android.input.candidates.expanded.window.BaseExpandedCandidateWindow
 import org.fcitx.fcitx5.android.input.candidates.horizontal.HorizontalCandidateComponent
 import org.fcitx.fcitx5.android.input.clipboard.ClipboardWindow
+import org.fcitx.fcitx5.android.input.floating.FloatingHandle
+import org.fcitx.fcitx5.android.input.floating.FloatingKeyboard
+import org.fcitx.fcitx5.android.input.floating.FloatingPlacer
 import org.fcitx.fcitx5.android.input.keyboard.CommonKeyActionListener
 import org.fcitx.fcitx5.android.input.keyboard.KeyboardHeightPercentBase.DisplayMetrics
 import org.fcitx.fcitx5.android.input.keyboard.KeyboardHeightPercentBase.RealSize
 import org.fcitx.fcitx5.android.input.keyboard.KeyboardWindow
-import org.fcitx.fcitx5.android.input.floating.FloatingHandle
-import org.fcitx.fcitx5.android.input.floating.FloatingKeyboard
-import org.fcitx.fcitx5.android.input.floating.FloatingPlacer
 import org.fcitx.fcitx5.android.input.keyboard.OneHanded
 import org.fcitx.fcitx5.android.input.keyboard.SplitDock
 import org.fcitx.fcitx5.android.input.keyboard.SplitKeyboard
 import org.fcitx.fcitx5.android.input.keyboard.TextKeyboard
+import org.fcitx.fcitx5.android.input.picker.PickerData
 import org.fcitx.fcitx5.android.input.picker.PickerWindow
 import org.fcitx.fcitx5.android.input.picker.emojiPicker
 import org.fcitx.fcitx5.android.input.picker.emoticonPicker
@@ -99,7 +103,7 @@ import splitties.views.imageResource
 import timber.log.Timber
 
 // a button in the room beside a board at a side, square
-private const val SIDE_BUTTON_DP = 56
+private const val SIDE_BUTTON_DP = SplitKeyboard.ONE_HANDED_MIN_FREE_DP
 
 @SuppressLint("ViewConstructor")
 class InputView(
@@ -323,6 +327,9 @@ class InputView(
         windowManager.addEssentialWindow(symbolPicker)
         windowManager.addEssentialWindow(emojiPicker)
         windowManager.addEssentialWindow(emoticonPicker)
+        // emoji.data read and parsed off the main thread before the panel first opens; the lazy
+        // holds the panel back if it opens before this is done
+        viewScope.launch(Dispatchers.IO) { PickerData.Emoji }
         // show KeyboardWindow by default
         windowManager.attachWindow(KeyboardWindow)
 
@@ -534,6 +541,8 @@ class InputView(
         val navBar = getNavBarBottomInset(insets)
         // floating, it is kept above the bar rather than drawn over it
         floatingPlacer?.bottomInset = navBar
+        floatingPlacer?.topInset = WindowInsetsCompat.toWindowInsetsCompat(insets)
+            .getInsets(WindowInsetsCompat.Type.statusBars() or WindowInsetsCompat.Type.displayCutout()).top
         bottomPaddingSpace.updateLayoutParams<LayoutParams> {
             bottomMargin = if (floating) 0 else navBar
         }

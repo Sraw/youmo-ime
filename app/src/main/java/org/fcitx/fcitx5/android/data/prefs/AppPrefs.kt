@@ -4,7 +4,6 @@
  */
 package org.fcitx.fcitx5.android.data.prefs
 
-import org.fcitx.fcitx5.android.input.floating.FloatingKeyboard
 import android.content.SharedPreferences
 import android.os.Build
 import androidx.annotation.Keep
@@ -19,6 +18,7 @@ import org.fcitx.fcitx5.android.input.candidates.expanded.ExpandedCandidateStyle
 import org.fcitx.fcitx5.android.input.candidates.floating.FloatingCandidatesMode
 import org.fcitx.fcitx5.android.input.candidates.floating.FloatingCandidatesOrientation
 import org.fcitx.fcitx5.android.input.candidates.horizontal.HorizontalCandidateMode
+import org.fcitx.fcitx5.android.input.floating.FloatingKeyboard
 import org.fcitx.fcitx5.android.input.handwriting.HandwritingPause
 import org.fcitx.fcitx5.android.input.keyboard.KeyboardHeightPercentBase
 import org.fcitx.fcitx5.android.input.keyboard.LangSwitchBehavior
