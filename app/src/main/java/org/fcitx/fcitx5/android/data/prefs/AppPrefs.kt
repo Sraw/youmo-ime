@@ -168,8 +168,11 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
         /** Shown on the English page (InputMethodSettings), not here: English's alone. */
         val englishAutoCaps = bool(ENGLISH_AUTO_CAPS, true)
 
-        /** Shown on the English page too: a word by gliding across its letters (GlideInput). */
-        val glideTyping = bool(GLIDE_TYPING, true)
+        /**
+         * Shown on each input method's page that glides (Engines.glides), one setting for all: a
+         * word by gliding across its keys (GlideInput). Off till turned on: a fast tap may glide.
+         */
+        val glideTyping = bool(GLIDE_TYPING, false)
 
         /** Shown on the handwriting page (InputMethodSettings): how long the pen stays up before a character is done. */
         val handwritingPause = stringLike(HANDWRITING_PAUSE, object : ManagedPreference.StringLikeCodec<HandwritingPause> {

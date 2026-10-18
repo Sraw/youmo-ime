@@ -75,8 +75,8 @@ class GlidePath(path: FloatArray, private val layout: GlideLayout, private val w
             return true
         }
         val from = at[depth - 1]
-        // a letter doubled, or the same key again: where the path was
-        if (c == keys[depth - 1]) {
+        // a letter doubled, or another on the same key (the nine keys'): where the path was
+        if (c == keys[depth - 1] || layout.sameKey(c, keys[depth - 1])) {
             at[depth] = from
             cost[depth] = cost[depth - 1]
             distinct[depth] = distinct[depth - 1]

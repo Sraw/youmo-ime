@@ -9,11 +9,17 @@ import kotlin.math.abs
 /**
  * When a finger on the letters glides (滑行输入) rather than taps, swipes or holds a key: it went
  * down on a letter, alone, and before its long press came up moved [ACROSS] of a key's width
- * sideways or [DOWN] of its height up or down. A letter's swipe is up or down and shorter (the
- * keys' swipe threshold); its long press, once up, is the popup's, the finger choosing in it.
- * [keyWidth] and [keyHeight] in the units of the places given, [longPressMillis] the keys'.
+ * sideways or [down] of its height up or down ([DOWN]; the nine keys', a row away from the next, [NINE_KEYS_DOWN]).
+ * A letter's swipe is up or down and shorter (the keys' swipe threshold); its long press, once up,
+ * is the popup's, the finger choosing in it. [keyWidth] and [keyHeight] in the units of the places
+ * given, [longPressMillis] the keys'.
  */
-class GlideGesture(private val keyWidth: Float, private val keyHeight: Float, private val longPressMillis: Long) {
+class GlideGesture(
+    private val keyWidth: Float,
+    private val keyHeight: Float,
+    private val longPressMillis: Long,
+    private val down: Float = DOWN,
+) {
 
     private var x0 = 0f
     private var y0 = 0f
@@ -45,7 +51,7 @@ class GlideGesture(private val keyWidth: Float, private val keyHeight: Float, pr
             possible = false
             return false
         }
-        gliding = abs(x - x0) >= ACROSS * keyWidth || abs(y - y0) >= DOWN * keyHeight
+        gliding = abs(x - x0) >= ACROSS * keyWidth || abs(y - y0) >= down * keyHeight
         return gliding
     }
 
@@ -58,5 +64,8 @@ class GlideGesture(private val keyWidth: Float, private val keyHeight: Float, pr
     companion object {
         const val ACROSS = 0.8f
         const val DOWN = 1.6f
+
+        /** The nine keys' up or down: their keys as tall as the next row is far, a digit key's swipe shorter still. */
+        const val NINE_KEYS_DOWN = 0.8f
     }
 }

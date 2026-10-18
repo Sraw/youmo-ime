@@ -85,16 +85,17 @@ internal class GlideRun(private val data: EnglishData, private val weights: Glid
 
     companion object {
         /**
-         * [keys]' centres, each moved by a Gaussian of sigma [wobble], a letter doubled once, joined
-         * as a finger's touch points are: one every [TOUCH] key widths, each a little off the line.
+         * [keys]' centres on [layout], each moved by a Gaussian of sigma [wobble], a key again
+         * (a letter doubled, the nine keys' next on the same) once, joined as a finger's touch points
+         * are: one every [TOUCH] key widths, each a little off the line.
          */
-        fun path(keys: String, wobble: Float, random: Random): FloatArray {
+        fun path(keys: String, wobble: Float, random: Random, layout: GlideLayout = GlideLayout.QWERTY): FloatArray {
             val corners = ArrayList<Pair<Float, Float>>()
             var last = ' '
             for (c in keys) {
-                if (c == last) continue
+                if (c == last || layout.sameKey(c, last)) continue
                 last = c
-                val (x, y) = GlideLayout.QWERTY.centre(c)
+                val (x, y) = layout.centre(c)
                 corners += x + gauss(random) * wobble to y + gauss(random) * wobble
             }
             val out = arrayListOf(corners[0].first, corners[0].second)

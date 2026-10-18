@@ -22,10 +22,13 @@ import splitties.dimensions.dp
 class GlideInput(
     private val keyboard: ViewGroup,
     theme: Theme,
-    // whether a glide is taken now: English, its setting on, a field where words are typed
+    // whether a glide is taken now: an input method that reads one, the setting on, a field where words are typed
     private val enabled: () -> Boolean,
+    // each letter and its key: the nine keys' several on one
     private val letters: () -> List<Pair<Char, TextKeyView>>,
     private val longPressMillis: () -> Long,
+    // how far up or down a glide starts, in key heights (GlideGesture)
+    private val down: Float = GlideGesture.DOWN,
     private val glided: (path: FloatArray, layout: GlideLayout) -> Unit,
 ) {
     private var gesture: GlideGesture? = null
@@ -83,7 +86,7 @@ class GlideInput(
         val key = keys.firstOrNull { (_, v) -> bounds(v).contains(event.x.toInt(), event.y.toInt()) }
         val size = bounds(keys.firstOrNull()?.second ?: return)
         pointer = event.getPointerId(0)
-        gesture = GlideGesture(size.width().toFloat(), size.height().toFloat(), longPressMillis()).apply {
+        gesture = GlideGesture(size.width().toFloat(), size.height().toFloat(), longPressMillis(), down).apply {
             down(event.x, event.y, event.eventTime, onLetter = key != null)
         }
         add(event.x, event.y)

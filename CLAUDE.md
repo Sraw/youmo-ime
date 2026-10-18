@@ -41,7 +41,7 @@ any change to behaviour or settings.
 | A new `english-data` release's arpa (FineWeb sample-10BT shards, ~3 min, 7 GB resident; its manifest says which), then pruned (~1 min, 3.3 GB) | `JAVA_OPTS=-Xmx9g ime-dict-tool english-lm -o full.arpa --known en_dict.fscd --tokens 300000000 <shard.parquet>...`; `JAVA_OPTS=-Xmx6g ime-dict-tool prune -o english.arpa --lm full.arpa --threshold 3e-8` |
 | English typing measured: committed as meant, wrongly corrected, slips fixed, words offered before a key | `ime-eval english <english.data> lib/ime-eval/data/english.txt [--misses <out.tsv>]` |
 | English glide typing measured on simulated paths: first, first three, time a word | `ime-eval english-glide <english.data> lib/ime-eval/data/english.txt [--wobble 0.3] [--misses <out.tsv>]` |
-| Pinyin glide typing measured the same way, a dictionary word at a time (`--word nihao`: one clean path's readings) | `ime-eval pinyin-glide <pinyin.data> lib/ime-eval/data/pinyin-chat.tsv [--misses <out.tsv>]` |
+| Pinyin glide typing measured the same way, a dictionary word at a time (`--word nihao`: one clean path's readings; 双拼, the nine keys, a table's codes instead) | `ime-eval pinyin-glide <pinyin.data> lib/ime-eval/data/pinyin-chat.tsv [--shuangpin Ziranma \| --keys nine \| --table <wbx.data>] [--misses <out.tsv>]` |
 
 Unit tests need no submodules, NDK or CMake. Instrumented tests (`FcitxTest`, `SoftKeyboardTest`)
 need the native build and an emulator; CI runs them weekly / on PRs labelled `emulator`.

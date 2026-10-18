@@ -118,7 +118,7 @@ class InputMethodSettingsTest {
         val fuzzy = InputMethodSettings.of(Engines.PINYIN)!!.flat().filterIsInstance<Flags>().single()
         assertEquals(EngineSettings.FUZZY, fuzzy.path)
         assertEquals(Fuzzy.entries.map { it.name }.sorted(), fuzzy.flags.map { it.first }.sorted())
-        val table = InputMethodSettings.of("engine-wubi")!!.flat().map { if (it is Toggle) it.key else (it as Choice).key }
+        val table = InputMethodSettings.of("engine-wubi")!!.flat().filter { it is Toggle || it is Choice }.map { if (it is Toggle) it.key else (it as Choice).key }
         // the table's own, and those every Chinese input method shares with pinyin (EngineTablePage)
         val shared = listOf(EngineSettings.PAGE_SIZE, EngineSettings.PREDICTION, EngineSettings.EMOJI, EngineSettings.MODEL_LEVEL)
         assertEquals((TableSettings.KEYS + shared).sorted(), table.sorted())

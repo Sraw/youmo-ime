@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.engine.glide
 
+import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
 import kotlin.math.sqrt
 
 /**
@@ -27,6 +28,12 @@ class GlideLayout(keys: List<Pair<Char, Pair<Float, Float>>>) {
             y[i] += at.second
         }
     }
+
+    // each letter's keys as one id, letters on the same keys alike: the nine keys' a, b and c all on 2
+    private val key = IntArray(LETTERS) { i -> (0..i).first { j -> x[j].contentEquals(x[i]) && y[j].contentEquals(y[i]) } }
+
+    /** Whether [a] and [b] are on the same keys, as the nine keys' letters are: a glide goes from one to the other without moving. */
+    fun sameKey(a: Char, b: Char): Boolean = a in this && b in this && key[index(a)] == key[index(b)]
 
     /** [c]'s first key's centre: its only one but on a split keyboard. */
     fun centre(c: Char): Pair<Float, Float> = x[index(c)][0] to y[index(c)][0]
@@ -82,5 +89,13 @@ class GlideLayout(keys: List<Pair<Char, Pair<Float, Float>>>) {
 
         /** QWERTY's on a phone upright. */
         val QWERTY = rows()
+
+        /** The nine keys' (九键): each digit key's [letters] on it, three keys a row from 1. */
+        fun nineKeys(letters: NineKeyLetters = NineKeyLetters.STANDARD): GlideLayout = GlideLayout(
+            ('2'..'9').flatMap { d ->
+                val k = d - '1'
+                letters.letters(d).map { it to (k % 3 + 0.5f to ROW_HEIGHT * (k / 3 + 0.5f)) }
+            }
+        )
     }
 }

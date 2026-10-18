@@ -176,12 +176,20 @@ on the keys it means.
 Full pinyin glides too (`engine/glide/PinyinGlide`): the dictionary's syllable trie is walked as
 English's key trie, each reading with a word scored by its likeliest word (the unigram, or its
 characters one after another where likelier, as the decoder's best path takes 你好) less the path's
-cost; one word a glide (chained, the readings ran to thousands). `PinyinGlideSession` wraps full
-pinyin's session: `Action.Glide` types the best reading's letters as keys (after a `'` where
-something is typed already, so glides chain into a sentence), and a glide that starts the input
-puts the next two readings' words after the first candidate, a pick of one typing its reading and
-picking it there, so it is learned and followed as any word. `ime-eval pinyin-glide` measures it
-per dictionary word of a pinyin set: pinyin-chat 85.3% first, 96.5% in the first three, 0.4 ms.
+cost; one word a glide (chained, the readings ran to thousands). Each pinyin glides its own keys
+(`PinyinGlide.Spelling`): full pinyin the letters, 双拼 its scheme's two a syllable, the nine keys
+the letters too, on their digits' keys (`GlideLayout.sameKey`: letters on one key follow without
+the path moving). A table glides its codes (`engine/glide/TableGlide`): its entries walked in code
+order as a trie, a code scored by its likeliest entry under the word model. `GlideSession` wraps
+each of their sessions (`Engines.glides`: all but handwriting, English its own): `Action.Glide`
+types the best reading's keys (the nine keys' as `Action.Letter`, so 426 is not read as gan), after
+`between` where something is typed already (pinyin's `'`, so glides chain into a sentence; a
+table's first candidate picked), and a glide that starts the input puts the next two readings'
+words after the first candidate, a pick of one typing its reading and picking it there, so it is
+learned and followed as any word. `ime-eval pinyin-glide` measures it per dictionary word of a
+pinyin set (`--shuangpin`, `--keys nine`, `--table`): on pinyin-chat full pinyin 85.3% first,
+96.5% in the first three, 0.4 ms; 双拼 (自然码, 小鹤, 微软) 82–83% / 94%; the nine keys 53.5% / 76.7% (a key three or four letters, the path reads far more; the weights moved it under a point); 五笔 70.6% / 90.0%,
+仓颉 94.5% / 99.3% (the characters it has). The setting is off by default: a sloppy fast tap may glide.
 
 ## Handwriting
 

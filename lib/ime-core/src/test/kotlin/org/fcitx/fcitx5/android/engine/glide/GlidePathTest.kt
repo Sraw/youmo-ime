@@ -5,6 +5,7 @@
 package org.fcitx.fcitx5.android.engine.glide
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -54,6 +55,19 @@ class GlidePathTest {
         assertNull(cost("the", "they"))
         // a letter doubled passed once, and no dearer for it
         assertEquals(cost("helo", "helo")!!, cost("helo", "hello")!!, 1e-4f)
+    }
+
+    @Test
+    fun lettersOnOneKeyAreWhereThePathWas() {
+        val nine = GlideLayout.nineKeys()
+        assertTrue(nine.sameKey('t', 'u'))
+        assertFalse(nine.sameKey('t', 'o'))
+        assertFalse(GlideLayout.QWERTY.sameKey('a', 's'))
+        // t and u both on 8: tuo is the path from 8 to 6, as to is
+        val to = path("to", nine)
+        assertEquals(cost("to", "to", nine, to)!!, cost("to", "tuo", nine, to)!!, 1e-4f)
+        // all on one key: a tap
+        assertNull(cost("ta", "ta", nine, path = path("ta", nine) + path("u", nine)))
     }
 
     @Test

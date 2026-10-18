@@ -6,6 +6,7 @@ package org.fcitx.fcitx5.android.input.keyboard
 
 import android.annotation.SuppressLint
 import android.content.Context
+import android.graphics.Canvas
 import android.graphics.Rect
 import android.graphics.drawable.ColorDrawable
 import android.graphics.drawable.StateListDrawable
@@ -37,6 +38,7 @@ import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.prefs.ManagedPreference
 import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
+import org.fcitx.fcitx5.android.engine.glide.Glide
 import org.fcitx.fcitx5.android.engine.host.Keyboard
 import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
 import org.fcitx.fcitx5.android.input.broadcast.ReturnKeyAppearance
@@ -63,6 +65,9 @@ import splitties.views.existingOrNewId
  * sets), sent as a character of [Keyboard.LETTERS] ([Keyboard.letterKey]), which the engine reads
  * as a press of its own, the run as keys or as that letter; its preview shows the letter. Its long press offers the digit and its letters, a letter chosen
  * typed as itself after what is typed.
+ *
+ * A glide across the digit keys ([GlideInput], the setting on) is read as full pinyin's, each
+ * key's letters on it: the engine types the reading's letters as themselves.
  */
 @SuppressLint("ViewConstructor")
 class T9Keyboard(
@@ -235,6 +240,34 @@ class T9Keyboard(
     private val one: AltTextKeyView = digitKeys.getValue('1')
     private val `return`: ImageKeyView by lazy { findViewById(R.id.button_return) }
     private val lang: ImageKeyView by lazy { findViewById(R.id.button_lang) }
+
+    private val glideTyping = AppPrefs.getInstance().keyboard.glideTyping
+    private val longPressDelay by AppPrefs.getInstance().keyboard.longPressDelay
+
+    // each digit key's letters on it, as the engine reads the digits
+    private val letterKeys: List<Pair<Char, TextKeyView>> = ('2'..'9').flatMap { d ->
+        letters.letters(d).map { it.lowercaseChar() to digitKeys.getValue(d) }
+    }
+
+    // glide typing (滑行输入) over the digit keys, read as full pinyin's letters: not in a password's field
+    private val glide = GlideInput(
+        this, theme,
+        enabled = { glideTyping.getValue() && !inPasswordField },
+        letters = { letterKeys },
+        longPressMillis = { longPressDelay.toLong() },
+        down = GlideGesture.NINE_KEYS_DOWN,
+    ) { path, layout ->
+        // a glide ends a run of presses: a key pressed soon after it is a press of its own, not 连按's next letter
+        multiTap.reset()
+        onAction(KeyAction.GlideAction(Glide(path, layout)))
+    }
+
+    override fun dispatchTouchEvent(ev: MotionEvent): Boolean = glide.dispatch(ev) { super.dispatchTouchEvent(it) }
+
+    override fun dispatchDraw(canvas: Canvas) {
+        super.dispatchDraw(canvas)
+        glide.draw(canvas)
+    }
 
     private val showLangSwitchKey = AppPrefs.getInstance().keyboard.showLangSwitchKey
 

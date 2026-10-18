@@ -211,7 +211,7 @@ class TextKeyboard private constructor(
     private val glideTyping = AppPrefs.getInstance().keyboard.glideTyping
     private val longPressDelay by AppPrefs.getInstance().keyboard.longPressDelay
 
-    // the input method is English or full pinyin, which read a glide; English, whose glide a Shift capitalises
+    // the input method reads a glide (Engines.glides); English, whose glide a Shift capitalises
     private var glides = false
     private var english = false
 
@@ -221,7 +221,7 @@ class TextKeyboard private constructor(
         }
     }
 
-    // glide typing (滑行输入), English's and full pinyin's: a field where words are typed, not a password's or an address's
+    // glide typing (滑行输入): a field where words are typed, not a password's or an address's
     private val glide = GlideInput(
         this, theme,
         enabled = { glides && glideTyping.getValue() && !inPasswordField && address == AddressKeys.NONE },
@@ -332,7 +332,7 @@ class TextKeyboard private constructor(
     override fun onInputMethodUpdate(ime: InputMethodEntry) {
         showInputMethodName(space, ime)
         english = ime.uniqueName == InputMethodNames.KEYBOARD
-        glides = english || ime.uniqueName == Engines.PINYIN
+        glides = Engines.glides(ime.uniqueName)
         if (capsState != CapsState.None) {
             switchCapsState()
         }

@@ -107,9 +107,9 @@ interface FcitxAPI {
     suspend fun offerInk(reading: InkReading, piece: Int): Boolean
 
     /**
-     * A glide across the letters, read by English's or full pinyin's session at the Glide key sent with
-     * it in the same fcitx-thread turn: see [Engines.offerGlide]. Whether the key was sent: not where
-     * the current input method is neither or cannot load.
+     * A glide across the letters, read by the current input method's session at the Glide key sent
+     * with it in the same fcitx-thread turn: see [Engines.offerGlide]. Whether the key was sent: not
+     * where the input method does not glide (Engines.glides) or cannot load.
      */
     suspend fun offerGlide(glide: Glide): Boolean
 

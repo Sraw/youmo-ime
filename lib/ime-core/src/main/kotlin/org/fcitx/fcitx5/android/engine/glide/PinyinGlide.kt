@@ -6,6 +6,7 @@ package org.fcitx.fcitx5.android.engine.glide
 
 import org.fcitx.fcitx5.android.engine.data.PinyinData
 import org.fcitx.fcitx5.android.engine.data.NgramModel.Companion.NO_WORD
+import org.fcitx.fcitx5.android.engine.pinyin.ShuangpinScheme
 import org.fcitx.fcitx5.android.engine.pinyin.Syllables
 
 /**
@@ -15,11 +16,29 @@ import org.fcitx.fcitx5.android.engine.pinyin.Syllables
  * likeliest word (the model's unigram, or its characters' where the model lacks it; a rarer
  * reading's weight added) less what fitting the path
  * cost. A word a glide: chained in one, the words' readings ran to thousands and the search to seconds.
+ * Each pinyin input method glides its own keys ([Spelling]): full pinyin's and the nine keys' the
+ * letters, 双拼's its scheme's two a syllable.
  */
 class PinyinGlide(private val data: PinyinData, private val weights: GlidePath.Weights = WEIGHTS) {
 
-    /** A reading of the path: its syllables apart by [SEPARATOR], its likeliest [word] and the score. */
-    class Reading(val pinyin: String, val word: String, val score: Float)
+    /**
+     * How an input method types a syllable, the keys a glide passes for it: full pinyin's letters
+     * ([FULL]), the nine keys' too (on their digits' keys, GlideLayout.sameKey), 双拼's
+     * [shuangpin] two. [separated]: a reading's syllables typed apart by [SEPARATOR], as full
+     * pinyin's must be (xi'an); 双拼's are two keys each.
+     */
+    class Spelling(val separated: Boolean, spell: (Int) -> String?) {
+        private val spelt = Array(Syllables.count, spell)
+
+        /** [syllable]'s keys; null for none: the scheme cannot type it. */
+        fun of(syllable: Int): String? = spelt[syllable]
+
+        companion object {
+            val FULL = Spelling(true, Syllables::spelling)
+
+            fun shuangpin(scheme: ShuangpinScheme) = Spelling(false, scheme::encode)
+        }
+    }
 
     // each node's likeliest word and its score, as first asked (NaN till then): a node's words are in no such order
     private val likeliest = FloatArray(data.dictionary.nodeCount) { Float.NaN }
@@ -59,29 +78,29 @@ class PinyinGlide(private val data: PinyinData, private val weights: GlidePath.W
         return maxOf(own, chars)
     }
 
-    /** The [limit] likeliest readings of [path] over [layout], best first, each once. */
-    fun decode(path: FloatArray, layout: GlideLayout, limit: Int): List<Reading> {
+    /** The [limit] likeliest readings of [path] over [layout] as [spelling] types them, best first, each once. */
+    fun decode(path: FloatArray, layout: GlideLayout, limit: Int, spelling: Spelling = Spelling.FULL): List<GlideReading> {
         if (limit <= 0) return emptyList()
         val glide = GlidePath(path, layout, weights, MAX_LETTERS)
         if (glide.n == 0) return emptyList()
-        return Search(glide, limit).run()
+        return Search(glide, spelling, limit).run()
     }
 
-    private inner class Search(private val glide: GlidePath, private val limit: Int) {
+    private inner class Search(private val glide: GlidePath, private val spelling: Spelling, private val limit: Int) {
         private val dictionary = data.dictionary
         private val syllables = IntArray(MAX_LETTERS)
 
         // each reading with a word: the trie spells each once
-        private val found = ArrayList<Reading>()
+        private val found = ArrayList<GlideReading>()
 
-        fun run(): List<Reading> = found.sortedByDescending { it.score }.take(limit)
+        fun run(): List<GlideReading> = found.sortedByDescending { it.score }.take(limit)
 
         // the children of [node], [depth] letters and [count] syllables in
         private fun visit(node: Int, depth: Int, count: Int) {
             val first = dictionary.firstChild(node)
             for (child in first until first + dictionary.childCount(node)) {
                 val s = dictionary.syllable(child)
-                val d = stepped(Syllables.spelling(s), depth) ?: continue
+                val d = stepped(spelling.of(s), depth) ?: continue
                 syllables[count] = s
                 if (dictionary.wordCount(child) > 0) glide.cost(d)?.let { found += reading(child, count + 1, likeliest(child) - it) }
                 if (d < MAX_LETTERS) visit(child, d, count + 1)
@@ -92,8 +111,9 @@ class PinyinGlide(private val data: PinyinData, private val weights: GlidePath.W
             visit(dictionary.root, 0, 0)
         }
 
-        // the letters of [spelling] stepped from [depth]: where they end, or null where the path does not pass them
-        private fun stepped(spelling: String, depth: Int): Int? {
+        // the keys of [spelling] stepped from [depth]: where they end, or null where the path does not pass them or there are none
+        private fun stepped(spelling: String?, depth: Int): Int? {
+            if (spelling == null) return null
             var d = depth
             for (ch in spelling) {
                 if (d >= MAX_LETTERS || !glide.step(d, ch)) return null
@@ -102,8 +122,8 @@ class PinyinGlide(private val data: PinyinData, private val weights: GlidePath.W
             return d
         }
 
-        private fun reading(node: Int, count: Int, score: Float) = Reading(
-            (0 until count).joinToString(SEPARATOR.toString()) { Syllables.spelling(syllables[it]) },
+        private fun reading(node: Int, count: Int, score: Float) = GlideReading(
+            (0 until count).joinToString(if (spelling.separated) SEPARATOR.toString() else "") { spelling.of(syllables[it]).orEmpty() },
             data.vocabulary.word(likeliestWord[node]),
             score,
         )

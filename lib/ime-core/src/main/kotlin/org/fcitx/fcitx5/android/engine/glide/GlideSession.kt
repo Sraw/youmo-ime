@@ -10,54 +10,62 @@ import org.fcitx.fcitx5.android.engine.session.Offer
 import org.fcitx.fcitx5.android.engine.session.Session
 import org.fcitx.fcitx5.android.engine.session.Snapshot
 
-/**
- * Full pinyin's [pinyin] session, glided on ([PinyinGlide]): an [Action.Glide] types the likeliest
- * reading of the glide [offer]ed as keys, after a syllable boundary where something is typed
- * already. A glide that starts the input has the next readings' words offered too, after the
- * first candidate: a path fits more than one reading (ni-h-ao and niao differ by a bend), and the
- * one typed may be the wrong one. Picking such a word types its reading instead and picks it there,
- * so it is learned and followed (联想) as any word picked. None [blocked] is offered.
- */
-class PinyinGlideSession(
-    private val pinyin: Session,
-    private val blocked: (String) -> Boolean = { false },
-    private val glide: () -> PinyinGlide,
-) : Session by pinyin {
+/** A reading of a glide: the [keys] it types, as its input method reads them, its likeliest [word] and the score. */
+class GlideReading(val keys: String, val word: String, val score: Float)
 
-    private var offered: List<PinyinGlide.Reading> = emptyList()
+/**
+ * A Chinese input method's [session] session, glided on: an [Action.Glide] types the likeliest
+ * reading of the glide [offer]ed ([read]: [PinyinGlide]'s for the pinyins, [TableGlide]'s for a
+ * table), each key as [typed] has it, after [between] where something is typed already (pinyin's
+ * syllable boundary, a table's first candidate picked). A glide that starts the input has the next
+ * readings' words offered too, after the first candidate: a path fits more than one reading
+ * (ni-h-ao and niao differ by a bend), and the one typed may be the wrong one. Picking such a word
+ * types its reading instead and picks it there, so it is learned and followed (联想) as any word
+ * picked. None [blocked] is offered; [readings] in all, the one typed among them.
+ */
+class GlideSession(
+    private val session: Session,
+    private val blocked: (String) -> Boolean = { false },
+    private val between: Action = Action.Key(PinyinGlide.SEPARATOR),
+    private val typed: (Char) -> Action = Action::Key,
+    private val readings: Int = READINGS,
+    private val read: (Glide, limit: Int) -> List<GlideReading>,
+) : Session by session {
+
+    private var offered: List<GlideReading> = emptyList()
 
     // the other readings' words, shown after the first candidate while the input is what the glide typed
-    private var others: List<PinyinGlide.Reading> = emptyList()
+    private var others: List<GlideReading> = emptyList()
 
     // the input the glide typed: once it changes (a key, a candidate picked of part of it), the others are no longer its
     private var glided = ""
 
-    // what [pinyin] last showed, before the others were put in
+    // what [session] last showed, before the others were put in
     private var last: Snapshot? = null
 
     private val composing get() = last?.let(::typing) == true
 
     /** The glide that the next [Action.Glide] types: [Glide.path] read now, on the thread the session is used on. */
     fun offer(g: Glide) {
-        offered = glide().decode(g.path, g.layout, READINGS)
+        offered = read(g, readings)
     }
 
     override fun apply(action: Action): Snapshot {
         val s = when (action) {
             Action.Glide -> glided()
-            is Action.Pick -> others(action.index)?.let(::pickOther) ?: pinyin.apply(action.copy(index = inner(action.index)))
+            is Action.Pick -> others(action.index)?.let(::pickOther) ?: session.apply(action.copy(index = inner(action.index)))
             // of the page shown: the others are on the first
-            is Action.Select -> if (last?.first != 0) pinyin.apply(action) else others(action.index)?.let(::pickOther) ?: pinyin.apply(action.copy(index = inner(action.index)))
-            is Action.Forget -> if (others(action.index) != null) unchanged() else pinyin.apply(action.copy(index = inner(action.index)))
-            is Action.Pin -> if (others(action.index) != null) unchanged() else pinyin.apply(action.copy(index = inner(action.index)))
-            is Action.Unpin -> if (others(action.index) != null) unchanged() else pinyin.apply(action.copy(index = inner(action.index)))
-            is Action.Block -> if (others(action.index) != null) unchanged() else pinyin.apply(action.copy(index = inner(action.index)))
-            else -> pinyin.apply(action)
+            is Action.Select -> if (last?.first != 0) session.apply(action) else others(action.index)?.let(::pickOther) ?: session.apply(action.copy(index = inner(action.index)))
+            is Action.Forget -> if (others(action.index) != null) unchanged() else session.apply(action.copy(index = inner(action.index)))
+            is Action.Pin -> if (others(action.index) != null) unchanged() else session.apply(action.copy(index = inner(action.index)))
+            is Action.Unpin -> if (others(action.index) != null) unchanged() else session.apply(action.copy(index = inner(action.index)))
+            is Action.Block -> if (others(action.index) != null) unchanged() else session.apply(action.copy(index = inner(action.index)))
+            else -> session.apply(action)
         }
         return shown(settled(s))
     }
 
-    // [s] as [pinyin] shows it, the others kept only while it shows the input the glide typed
+    // [s] as [session] shows it, the others kept only while it shows the input the glide typed
     private fun settled(s: Snapshot): Snapshot {
         last = s
         if (s.preedit != glided || s.predicting || s.candidates.isEmpty()) others = emptyList()
@@ -70,14 +78,14 @@ class PinyinGlideSession(
         val readings = offered
         offered = emptyList()
         others = emptyList()
-        val best = readings.firstOrNull() ?: return pinyin.apply(Action.Glide)
+        val best = readings.firstOrNull() ?: return session.apply(Action.Glide)
         var commit = ""
         // after what is typed, a boundary; that may end it (笔画查字 leaves, its character committed)
-        val before = if (composing) pinyin.apply(Action.Key(PinyinGlide.SEPARATOR)).also { commit += it.commit } else null
+        val before = if (composing) session.apply(between).also { commit += it.commit } else null
         val fresh = before == null || before.preedit.isEmpty() || before.predicting
         var s = before
-        for (c in best.pinyin) s = pinyin.apply(Action.Key(c)).also { commit += it.commit }
-        val shown = (s ?: return pinyin.apply(Action.Glide)).copy(commit = commit, handled = true)
+        for (c in best.keys) s = session.apply(typed(c)).also { commit += it.commit }
+        val shown = (s ?: return session.apply(Action.Glide)).copy(commit = commit, handled = true)
         if (fresh) {
             glided = shown.preedit
             others = readings.drop(1).filter { !blocked(it.word) }.distinctBy { it.word }
@@ -88,33 +96,33 @@ class PinyinGlideSession(
     // the reading whose word is at [index] (of all), if one is
     private fun others(index: Int) = others.getOrNull(index - 1)?.takeIf { index >= 1 }
 
-    // [index] of all as [pinyin] has it: after the first, the others' places are not its
+    // [index] of all as [session] has it: after the first, the others' places are not its
     private fun inner(index: Int) = if (index > others.size) index - others.size else index
 
-    private fun pickOther(reading: PinyinGlide.Reading): Snapshot {
+    private fun pickOther(reading: GlideReading): Snapshot {
         others = emptyList()
         // the input taken back, not Reset: that drops what was committed before too, which the word follows
         takenBack(last)
         var s: Snapshot? = null
-        for (c in reading.pinyin) s = pinyin.apply(Action.Key(c))
-        val at = pinyin.candidates(0, SEARCHED).indexOfFirst { it.text == reading.word }
-        if (at >= 0) return pinyin.apply(Action.Pick(at))
+        for (c in reading.keys) s = session.apply(typed(c))
+        val at = session.candidates(0, SEARCHED).indexOfFirst { it.text == reading.word }
+        if (at >= 0) return session.apply(Action.Pick(at))
         // not among its candidates (the session holds it back): the word as shown, the input taken back
-        return (takenBack(s) ?: pinyin.apply(Action.Refine)).copy(commit = reading.word, handled = true)
+        return (takenBack(s) ?: session.apply(Action.Refine)).copy(commit = reading.word, handled = true)
     }
 
     // [s]'s input deleted, a backspace a character: what the session shows then
     private fun takenBack(s: Snapshot?): Snapshot? {
         var shown = s
         var left = MAX_BACKSPACES
-        while (shown != null && typing(shown) && left-- > 0) shown = pinyin.apply(Action.Backspace)
+        while (shown != null && typing(shown) && left-- > 0) shown = session.apply(Action.Backspace)
         return shown
     }
 
     private fun typing(s: Snapshot) = s.preedit.isNotEmpty() && !s.predicting
 
     // nothing to forget or pin of another reading's word: the input as it was
-    private fun unchanged() = last?.copy(commit = "", deleteBefore = 0, handled = true) ?: pinyin.apply(Action.Refine)
+    private fun unchanged() = last?.copy(commit = "", deleteBefore = 0, handled = true) ?: session.apply(Action.Refine)
 
     // [s] with the others after its first candidate, on the first page
     private fun shown(s: Snapshot): Snapshot {
@@ -131,22 +139,28 @@ class PinyinGlideSession(
     }
 
     override fun candidates(from: Int, count: Int): List<Choice> {
-        if (others.isEmpty()) return pinyin.candidates(from, count)
+        if (others.isEmpty()) return session.candidates(from, count)
         val all = ArrayList<Choice>()
         val k = others.size
-        // what is asked of the first and others together, then the rest from where [pinyin] has them
-        if (from == 0 && count > 0) all += pinyin.candidates(0, 1)
+        // what is asked of the first and others together, then the rest from where [session] has them
+        if (from == 0 && count > 0) all += session.candidates(0, 1)
         for (i in maxOf(from, 1) until minOf(from + count, k + 1)) all += Choice(others[i - 1].word)
         val rest = maxOf(from, k + 1)
-        if (from + count > rest) all += pinyin.candidates(rest - k, from + count - rest)
+        if (from + count > rest) all += session.candidates(rest - k, from + count - rest)
         return all
     }
 
-    override fun offers(index: Int): Set<Offer> = if (others(index) != null) emptySet() else pinyin.offers(inner(index))
+    override fun offers(index: Int): Set<Offer> = if (others(index) != null) emptySet() else session.offers(inner(index))
 
     companion object {
         /** Readings a glide offers: the one typed and the others. */
         const val READINGS = 3
+
+        /**
+         * The nine keys': a key three or four letters, and a key pressed again not on the path
+         * (ni-h-ao and nian both 6-4-2-6), a path reads far more; 你好 sixth of that one.
+         */
+        const val NINE_KEYS_READINGS = 7
 
         // how far down its candidates another reading's word is looked for, once typed
         private const val SEARCHED = 50

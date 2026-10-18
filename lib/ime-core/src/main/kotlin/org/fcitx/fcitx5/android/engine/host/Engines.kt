@@ -5,7 +5,8 @@
 package org.fcitx.fcitx5.android.engine.host
 
 import org.fcitx.fcitx5.android.engine.glide.PinyinGlide
-import org.fcitx.fcitx5.android.engine.glide.PinyinGlideSession
+import org.fcitx.fcitx5.android.engine.glide.GlideSession
+import org.fcitx.fcitx5.android.engine.glide.TableGlide
 import org.fcitx.fcitx5.android.engine.data.NgramModel.Companion.NO_WORD
 import org.fcitx.fcitx5.android.engine.english.EnglishSession
 import org.fcitx.fcitx5.android.engine.glide.Glide
@@ -296,13 +297,15 @@ class Engines(
 
     /**
      * The keyboard's glide across the letters, for [im] to read at its next [Keyboard.GLIDE]:
-     * English's session its words ([EnglishSession.offerGlide]), full pinyin's its readings
-     * ([PinyinGlideSession]). False for any other input method. On the fcitx thread, just before that key.
+     * English's session its words ([EnglishSession.offerGlide]), a pinyin's or a table's its
+     * readings ([GlideSession]). False for one that does not glide ([glides]). On the fcitx thread,
+     * just before that key.
      */
     fun offerGlide(im: String, glide: Glide): Boolean {
-        when (im) {
-            ENGLISH -> (session(ENGLISH) as? EnglishSession)?.offerGlide(glide)
-            PINYIN -> (session(PINYIN) as? PinyinGlideSession)?.offer(glide)
+        if (!glides(im)) return false
+        when (val s = session(im)) {
+            is EnglishSession -> s.offerGlide(glide)
+            is GlideSession -> s.offer(glide)
             else -> return false
         }
         return true
@@ -329,7 +332,7 @@ class Engines(
                 val segmenter = PinyinSegmenter(s.fuzzy, s.typos, neighbours = s.typos, latin = if (s.latinWords) assets.latinWords else null)
                 val pinyin = pinyinSession(segmenter, spell = false, chaizi = chaizi())
                 val looked = ForgetsInTables(StrokeLookup(pinyin, assets::strokes, assets::charReading, s.pageSize, blocked = lexicon::isBlocked, follow = pinyin::follow, retype = pinyin::typeAll))
-                PinyinGlideSession(looked, blocked = lexicon::isBlocked) { pinyinGlide }
+                GlideSession(looked, blocked = lexicon::isBlocked) { g, n -> pinyinGlide.decode(g.path, g.layout, n) }
             }
             ENGLISH -> {
                 val data = assets.englishData
@@ -355,17 +358,34 @@ class Engines(
                 )
             }
             // 简拼 only where the digits read nothing else: as common on the evaluation set, and faster
-            T9 -> ForgetsInTables(pinyinSession(T9Segmenter(s.fuzzy, abbreviations = false, letters = s.nineKeys), spell = true))
-            SHUANGPIN -> ForgetsInTables(
-                pinyinSession(ShuangpinSegmenter(s.scheme, s.fuzzy, s.typos), spell = true),
-            )
+            // glided as full pinyin, over the digits' keys: each letter typed as itself, as one chosen from a key's long press
+            T9 -> GlideSession(
+                ForgetsInTables(pinyinSession(T9Segmenter(s.fuzzy, abbreviations = false, letters = s.nineKeys), spell = true)),
+                blocked = lexicon::isBlocked,
+                typed = { c -> if (c == PinyinGlide.SEPARATOR) Action.Key(c) else Action.Letter(c) },
+                readings = GlideSession.NINE_KEYS_READINGS,
+            ) { g, n -> pinyinGlide.decode(g.path, g.layout, n) }
+            SHUANGPIN -> {
+                val spelling = PinyinGlide.Spelling.shuangpin(s.scheme)
+                GlideSession(
+                    ForgetsInTables(pinyinSession(ShuangpinSegmenter(s.scheme, s.fuzzy, s.typos), spell = true)),
+                    blocked = lexicon::isBlocked,
+                ) { g, n -> pinyinGlide.decode(g.path, g.layout, n, spelling) }
+            }
             else -> {
                 val method = TABLES[im] ?: throw IllegalArgumentException("no input method $im")
                 val table = tables.table(im)
                 val options = (s.tables[method.group]?.applyTo(method.options) ?: method.options).copy(pageSize = s.pageSize)
                 // looking a character up by pinyin learns nothing: it is not how the user writes
                 val lookUp = if (options.pinyinKey == null) null else PinyinSession(assets.pinyinData, PinyinSegmenter(), prediction = false)
-                TableSession(table.dictionary, options, lookUp, table.user, tables.shared(table, im), tableLanguage())
+                val language = tableLanguage()
+                val glide = TableGlide(table.dictionary, { text -> language.words.logProb(text) })
+                // a glide after a code typed picks its first candidate: the next code is the glide's
+                GlideSession(
+                    TableSession(table.dictionary, options, lookUp, table.user, tables.shared(table, im), language),
+                    blocked = lexicon::isBlocked,
+                    between = Action.Pick(0),
+                ) { g, n -> glide.decode(g.path, g.layout, n) }
             }
         }
     }
@@ -526,6 +546,9 @@ class Engines(
          * touch screen, the nine keys and handwriting. A hardware keyboard types with one that is.
          */
         fun takesKeyboard(name: String): Boolean = name != T9 && name != HANDWRITING
+
+        /** Whether input method [name] reads a glide across its keys (滑行输入): English, the pinyins and the tables, not handwriting. */
+        fun glides(name: String): Boolean = name == ENGLISH || name == PINYIN || name == SHUANGPIN || name == T9 || name in TABLES
 
         /** English: fcitx's own name for it, which fcitx falls back to, so a user's lists keep it. */
         const val ENGLISH = "keyboard-us"

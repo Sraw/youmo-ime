@@ -167,7 +167,7 @@ object InputMethodSettings {
 
     private val chaizi = Toggle(EngineSettings.CHAIZI, text(R.string.im_chaizi), R.string.im_chaizi_summary)
 
-    // the keyboard's: a word by gliding across its letters, English's and full pinyin's alike
+    // the keyboard's: a word by gliding across its keys, every input method's but handwriting's alike
     private val glide = AppToggle(AppPrefs.GLIDE_TYPING, R.string.im_glide, R.string.im_glide_summary) {
         AppPrefs.getInstance().keyboard.glideTyping
     }
@@ -207,8 +207,8 @@ object InputMethodSettings {
                     emoji,
                     // full pinyin's: 双拼's u is a key of its own, 九键's no letter
                     chaizi.takeIf { !shuangpin && !nineKeys },
-                    // the keyboard's, English's too: one setting
-                    glide.takeIf { !shuangpin && !nineKeys },
+                    // the keyboard's, English's and the tables' too: one setting
+                    glide,
                     modelLevel,
                     Toggle("${EngineSettings.FUZZY}/${EngineSettings.TYPOS}", text(R.string.im_typos), R.string.im_typos_summary, unused = if (nineKeys) R.string.im_not_for_t9 else 0),
                     // full pinyin's alone: 双拼 types its letters otherwise, the nine keys digits
@@ -237,6 +237,7 @@ object InputMethodSettings {
                 pageSize,
                 prediction,
                 emoji,
+                glide,
                 modelLevel,
             )
         ),

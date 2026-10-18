@@ -57,6 +57,6 @@ sealed class KeyAction {
     /** The emoji panel's search by pinyin, begun ([on]) or left. */
     data class EmojiSearchAction(val on: Boolean) : KeyAction()
 
-    /** A glide across the letters, for English or full pinyin to read (GlideInput). */
+    /** A glide across the letters, for the input method to read (GlideInput, Engines.glides). */
     class GlideAction(val glide: Glide) : KeyAction()
 }

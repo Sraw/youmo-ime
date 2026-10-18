@@ -17,7 +17,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.nio.ByteBuffer
 
-class PinyinGlideSessionTest {
+class GlideSessionTest {
 
     private fun syl(vararg s: String) = s.map { Syllables.id(it) }.toIntArray()
 
@@ -48,7 +48,7 @@ class PinyinGlideSessionTest {
         override fun apply(action: Action) = inner.apply(action).also { told += action }
     }
 
-    private var session = PinyinGlideSession(recorded(PinyinSession(data, PinyinSegmenter(), prediction = false))) { decoder }
+    private var session = GlideSession(recorded(PinyinSession(data, PinyinSegmenter(), prediction = false))) { g, n -> decoder.decode(g.path, g.layout, n) }
 
     private fun path(keys: String) = keys.flatMap { GlideLayout.QWERTY.centre(it).toList() }.toFloatArray()
 
@@ -67,6 +67,14 @@ class PinyinGlideSessionTest {
         val all = session.candidates(0, 100).map { it.text }
         assertEquals(all.size, s.total)
         assertEquals(1, all.count { it == "你好" })
+    }
+
+    @Test
+    fun asManyReadingsAsItIsMadeFor() {
+        session = GlideSession(PinyinSession(data, PinyinSegmenter(), prediction = false), readings = 1) { g, n -> decoder.decode(g.path, g.layout, n) }
+        val s = glide("nihao")
+        assertEquals("鸟", s.candidates[0])
+        assertEquals("尿", s.candidates[1])
     }
 
     @Test
@@ -100,13 +108,13 @@ class PinyinGlideSessionTest {
 
     @Test
     fun noneBlockedOffered() {
-        session = PinyinGlideSession(PinyinSession(data, PinyinSegmenter(), prediction = false), blocked = { it == "你好" }) { decoder }
+        session = GlideSession(PinyinSession(data, PinyinSegmenter(), prediction = false), blocked = { it == "你好" }) { g, n -> decoder.decode(g.path, g.layout, n) }
         assertTrue("你好" !in glide("nihao").candidates)
     }
 
     @Test
     fun pagesPastTheFirstAreTheSessionsOwnAfterTheOthers() {
-        session = PinyinGlideSession(PinyinSession(data, PinyinSegmenter(), prediction = false, pageSize = 2)) { decoder }
+        session = GlideSession(PinyinSession(data, PinyinSegmenter(), prediction = false, pageSize = 2)) { g, n -> decoder.decode(g.path, g.layout, n) }
         val first = glide("nihao")
         assertEquals("你好", first.candidates[1])
         val next = session.apply(Action.NextPage)

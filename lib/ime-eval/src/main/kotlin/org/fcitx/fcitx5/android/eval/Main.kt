@@ -5,6 +5,9 @@
 package org.fcitx.fcitx5.android.eval
 
 import org.fcitx.fcitx5.android.engine.glide.GlideLayout
+import org.fcitx.fcitx5.android.engine.glide.TableGlide
+import org.fcitx.fcitx5.android.engine.host.EngineSettings
+import org.fcitx.fcitx5.android.engine.table.TableDictionary
 import org.fcitx.fcitx5.android.engine.glide.PinyinGlide
 import org.fcitx.fcitx5.android.engine.glide.GlidePath
 import org.fcitx.fcitx5.android.engine.data.CodeTable
@@ -98,20 +101,32 @@ internal val COMMANDS = listOf(
         0
     },
     Command(
-        "pinyin-glide", "<pinyin.data> <set.tsv> [--syllables <n; 0, the words>] [--word <letters>] [--wobble <key widths>] [--shape <w>] [--proximity <w>] [--edges <w>] [--corner <w>] [--turn <cos>] [--near <r>] [--ends <r>] [--misses <out.tsv>]",
-        2..2, "syllables", "wobble", "shape", "proximity", "edges", "corner", "turn", "near", "ends", "misses", "word",
+        "pinyin-glide", "<pinyin.data> <set.tsv> [--syllables <n; 0, the words>] [--word <letters>] [--shuangpin <scheme, as EngineSettings names it>] [--keys nine] [--table <x.data>] [--wobble <key widths>] [--shape <w>] [--proximity <w>] [--edges <w>] [--corner <w>] [--turn <cos>] [--near <r>] [--ends <r>] [--misses <out.tsv>]",
+        2..2, "syllables", "wobble", "shape", "proximity", "edges", "corner", "turn", "near", "ends", "misses", "word", "shuangpin", "keys", "table",
     ) { args, out, _ ->
         val (dataPath, setPath) = args.operands
         val o = args.options
         // one word's clean path: its readings, scored
         o["word"]?.let { word ->
-            val path = word.flatMap { GlideLayout.QWERTY.centre(it).toList() }.toFloatArray()
-            PinyinGlide(loadData(dataPath), glideWeights(o, PinyinGlide.WEIGHTS)).decode(path, GlideLayout.QWERTY, 10)
-                .forEach { out.appendLine(String.format(java.util.Locale.ROOT, "%-16s %-8s %7.2f", it.pinyin, it.word, it.score)) }
+            val layout = if (o["keys"] == "nine") GlideLayout.nineKeys() else GlideLayout.QWERTY
+            val path = word.flatMap { layout.centre(it).toList() }.toFloatArray()
+            PinyinGlide(loadData(dataPath), glideWeights(o, PinyinGlide.WEIGHTS)).decode(path, layout, 10)
+                .forEach { out.appendLine(String.format(java.util.Locale.ROOT, "%-16s %-8s %7.2f", it.keys, it.word, it.score)) }
             return@Command 0
         }
         val samples = readSet(setPath).map { it.input to it.expected }
-        val r = PinyinGlideRun(loadData(dataPath), glideWeights(o, PinyinGlide.WEIGHTS)).run(samples, o["syllables"]?.toInt() ?: 0, o["wobble"]?.toFloat() ?: GLIDE_WOBBLE, ENGLISH_SEED)
+        val data = loadData(dataPath)
+        val weights = glideWeights(o, PinyinGlide.WEIGHTS)
+        val spelling = o["shuangpin"]?.let { PinyinGlide.Spelling.shuangpin(EngineSettings.SCHEMES[it] ?: throw IllegalArgumentException("no scheme $it")) }
+        val layout = if (o["keys"] == "nine") GlideLayout.nineKeys() else GlideLayout.QWERTY
+        val table = o["table"]?.let { path ->
+            val words = TextWords(data.model, data.wordIndex)
+            TableDictionary(CodeTable.load(mapFile(path))).let { it to TableGlide(it, { text -> words.logProb(text) }, weights) }
+        }
+        val r = PinyinGlideRun(data, weights).run(
+            samples, o["syllables"]?.toInt() ?: 0, o["wobble"]?.toFloat() ?: GLIDE_WOBBLE, ENGLISH_SEED,
+            spelling ?: PinyinGlide.Spelling.FULL, layout, table,
+        )
         out.appendLine(GlideRun.Result.HEADER)
         out.appendLine(r.row("wobble"))
         o["misses"]?.let { path -> File(path).printWriter().use { w -> r.misses.forEach(w::println) } }

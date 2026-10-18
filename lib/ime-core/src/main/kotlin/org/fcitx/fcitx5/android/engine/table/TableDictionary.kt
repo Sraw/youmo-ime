@@ -62,6 +62,12 @@ class TableDictionary(private val table: CodeTable) {
 
     fun codeLength(index: Int): Int = table.codeLength(index)
 
+    /** [index]'s code's key at [at]: the entries in their codes' order, a glide walks them as a trie (TableGlide). */
+    fun codeKey(index: Int, at: Int): Char = table.codeKey(index, at)
+
+    /** How many entries the table has. */
+    val size: Int get() = table.size
+
     /**
      * The entries [pattern] leads to, in table order: those whose code starts with it, or with
      * [wildcard] in it (standing for any one key), those whose code it spells whole, as libime
