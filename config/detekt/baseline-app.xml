@@ -32,7 +32,6 @@
     <ID>NestedBlockDepth:FcitxInputMethodService.kt:FcitxInputMethodService$private fun handleFcitxEvent</ID>
     <ID>NestedBlockDepth:StatusAreaWindow.kt:StatusAreaWindow.&lt;no name provided&gt;$override fun onItemClick</ID>
     <ID>NestedBlockDepth:TextKeyboard.kt:TextKeyboard$private fun updatePunctuationKeys</ID>
-    <ID>PrintStackTrace:AdvancedSettingsFragment.kt:AdvancedSettingsFragment$e</ID>
     <ID>SwallowedException:DeviceUtil.kt:DeviceUtil$e: Exception</ID>
     <ID>SwallowedException:FcitxDataProvider.kt:FcitxDataProvider$e: Exception</ID>
     <ID>SwallowedException:FcitxDataProvider.kt:FcitxDataProvider$e: IOException</ID>
@@ -43,7 +42,6 @@
     <ID>SwallowedException:ManagedPreference.kt:ManagedPreference.PStringLike$e: Exception</ID>
     <ID>SwallowedException:NavigationBarHeight.kt:e: Resources.NotFoundException</ID>
     <ID>SwallowedException:SystemProperty.kt:e: Exception</ID>
-    <ID>TooGenericExceptionCaught:AdvancedSettingsFragment.kt:AdvancedSettingsFragment$e: Exception</ID>
     <ID>TooGenericExceptionCaught:ClipboardManager.kt:ClipboardManager$exception: Exception</ID>
     <ID>TooGenericExceptionCaught:CropImageActivity.kt:CropImageActivity$e: Exception</ID>
     <ID>TooGenericExceptionCaught:DeveloperFragment.kt:DeveloperFragment$e: Exception</ID>

@@ -442,6 +442,8 @@ const Configuration *AndroidEngine::getConfigForInputMethod(const InputMethodEnt
 }
 
 void AndroidEngine::setConfigForInputMethod(const InputMethodEntry &entry, const RawConfig &config) {
+    // every load here is partial (load(config, true)): the app's pages save only what they show
+    // (InputMethodSettings.only), and a full load would reset each option a page does not show
     const auto &im = entry.uniqueName();
     if (auto *option = table(im)) {
         // the table's own keys into its group, the shared ones into config_ (each ignores the other's)

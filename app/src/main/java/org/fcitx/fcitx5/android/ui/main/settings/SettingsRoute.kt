@@ -21,13 +21,14 @@ import org.fcitx.fcitx5.android.ui.main.AboutFragment
 import org.fcitx.fcitx5.android.ui.main.DeveloperFragment
 import org.fcitx.fcitx5.android.ui.main.LicensesFragment
 import org.fcitx.fcitx5.android.ui.main.MainFragment
-import org.fcitx.fcitx5.android.ui.main.settings.behavior.AdvancedSettingsFragment
-import org.fcitx.fcitx5.android.ui.main.settings.behavior.CandidatesSettingsFragment
+import org.fcitx.fcitx5.android.ui.main.settings.behavior.BackupFragment
+import org.fcitx.fcitx5.android.ui.main.settings.behavior.HardwareKeyboardFragment
 import org.fcitx.fcitx5.android.ui.main.settings.behavior.ClipboardSettingsFragment
-import org.fcitx.fcitx5.android.ui.main.settings.behavior.KeyboardSettingsFragment
-import org.fcitx.fcitx5.android.ui.main.settings.behavior.SymbolSettingsFragment
+import org.fcitx.fcitx5.android.ui.main.settings.behavior.KeysSettingsFragment
+import org.fcitx.fcitx5.android.ui.main.settings.behavior.SoundSettingsFragment
 import org.fcitx.fcitx5.android.ui.main.settings.im.InputMethodConfigFragment
 import org.fcitx.fcitx5.android.ui.main.settings.im.InputMethodListFragment
+import org.fcitx.fcitx5.android.ui.main.settings.im.SharedInputFragment
 import org.fcitx.fcitx5.android.ui.main.settings.search.SettingsSearchFragment
 import org.fcitx.fcitx5.android.ui.main.settings.theme.ThemeFragment
 import org.fcitx.fcitx5.android.utils.config.ConfigDescriptor
@@ -50,25 +51,33 @@ sealed class SettingsRoute : Parcelable {
     @Serializable
     data class InputMethodConfig(val name: String, val uniqueName: String) : SettingsRoute()
 
+    /** What every input method shares (InputMethodSettings.SHARED). */
+    @Serializable
+    data object SharedInput : SettingsRoute()
+
     /* ========== Android ========== */
 
     @Serializable
     data object Theme : SettingsRoute()
 
+    /** The keys (按键), one of the two pages of AppPrefs.Keyboard. */
     @Serializable
-    data object VirtualKeyboard : SettingsRoute()
+    data object Keys : SettingsRoute()
 
+    /** The sound and vibration, the other. */
     @Serializable
-    data object CandidatesWindow : SettingsRoute()
+    data object SoundAndVibration : SettingsRoute()
 
+    /** The physical keyboard's page: its candidate window, its shortcuts. */
+    @Serializable
+    data object HardwareKeyboard : SettingsRoute()
+
+    /** The clipboard and the emoji. */
     @Serializable
     data object Clipboard : SettingsRoute()
 
     @Serializable
-    data object Symbol : SettingsRoute()
-
-    @Serializable
-    data object Advanced : SettingsRoute()
+    data object Backup : SettingsRoute()
 
     @Serializable
     data object Developer : SettingsRoute()
@@ -123,8 +132,9 @@ sealed class SettingsRoute : Parcelable {
         constructor(uri: Uri) : this(uri.toString())
     }
 
+    /** The punctuation editor, titled [title] (the app's own name for it when null). */
     @Serializable
-    data class Punctuation(val title: String, val lang: String? = null) : SettingsRoute()
+    data class Punctuation(val title: String? = null, val lang: String? = null) : SettingsRoute()
 
     @Serializable
     data object PinyinCustomPhrase : SettingsRoute()
@@ -161,26 +171,28 @@ sealed class SettingsRoute : Parcelable {
                 label = ctx.getString(R.string.input_methods)
             }
             fragment<InputMethodConfigFragment, InputMethodConfig>()
+            fragment<SharedInputFragment, SharedInput>()
 
             /* ========== Android ========== */
 
             fragment<ThemeFragment, Theme> {
                 label = ctx.getString(R.string.theme_and_size)
             }
-            fragment<KeyboardSettingsFragment, VirtualKeyboard> {
+            // titled as the home page's rows that open them (MainFragment.HOME)
+            fragment<KeysSettingsFragment, Keys> {
                 label = ctx.getString(R.string.virtual_keyboard)
             }
-            fragment<CandidatesSettingsFragment, CandidatesWindow> {
-                label = ctx.getString(R.string.candidates_window)
+            fragment<SoundSettingsFragment, SoundAndVibration> {
+                label = ctx.getString(R.string.section_sound_and_vibration)
+            }
+            fragment<HardwareKeyboardFragment, HardwareKeyboard> {
+                label = ctx.getString(R.string.hardware_keyboard)
             }
             fragment<ClipboardSettingsFragment, Clipboard> {
-                label = ctx.getString(R.string.clipboard)
+                label = ctx.getString(R.string.clipboard_and_emoji)
             }
-            fragment<SymbolSettingsFragment, Symbol> {
-                label = ctx.getString(R.string.emoji_and_symbols)
-            }
-            fragment<AdvancedSettingsFragment, Advanced> {
-                label = ctx.getString(R.string.advanced)
+            fragment<BackupFragment, Backup> {
+                label = ctx.getString(R.string.user_data)
             }
             fragment<DeveloperFragment, Developer> {
                 label = ctx.getString(R.string.developer)

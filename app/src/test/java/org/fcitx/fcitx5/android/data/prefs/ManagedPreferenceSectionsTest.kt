@@ -86,6 +86,44 @@ class ManagedPreferenceSectionsTest {
         assertEquals(listOf("loose", "first", "second", "third"), screen.allKeys())
     }
 
+    // every preference after a section: what a category shown a section a page must be
+    private class Sectioned(sp: SharedPreferences) : ManagedPreferenceCategory(R.string.advanced, sp) {
+        init {
+            section(R.string.section_keys)
+        }
+
+        val first = switch(R.string.popup_on_key_press, "first", true)
+        val second = switch(R.string.expand_keypress_area, "second", false)
+
+        init {
+            section(R.string.section_candidates)
+        }
+
+        val third = switch(R.string.show_lang_switch_key, "third", true)
+    }
+
+    // one category over two pages (the keys, the sound and vibration): each its section alone, untitled
+    @Test
+    fun aSectionAloneIsItsPreferencesWithoutItsTitle() {
+        val keys = newScreen()
+        Sectioned(sp).createUi(keys, R.string.section_keys)
+        assertEquals(listOf("first", "second"), keys.children().map { it.key })
+        val rest = newScreen()
+        Sectioned(sp).createUi(rest, R.string.section_candidates)
+        assertEquals(listOf("third"), rest.children().map { it.key })
+    }
+
+    // one before the first section would be on neither page: grouping never drops a preference
+    @Test(expected = IllegalArgumentException::class)
+    fun aSectionAloneOfACategoryWithPreferencesBeforeItsFirstIsRejected() {
+        Sample(sp).createUi(newScreen(), R.string.section_keys)
+    }
+
+    @Test(expected = IllegalArgumentException::class)
+    fun aSectionTheCategoryHasNotIsRejected() {
+        Sectioned(sp).createUi(newScreen(), R.string.section_sound_and_vibration)
+    }
+
     private class EmptySection(sp: SharedPreferences) : ManagedPreferenceCategory(R.string.advanced, sp) {
         init {
             section(R.string.section_keys)

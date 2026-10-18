@@ -1,6 +1,6 @@
 /*
  * SPDX-License-Identifier: LGPL-2.1-or-later
- * SPDX-FileCopyrightText: Copyright 2021-2025 Fcitx5 for Android Contributors
+ * SPDX-FileCopyrightText: Copyright 2021-2026 Fcitx5 for Android Contributors
  */
 package org.fcitx.fcitx5.android.ui.main.settings.im
 
@@ -18,10 +18,12 @@ import org.fcitx.fcitx5.android.utils.navigateWithAnim
 class InputMethodConfigFragment : FcitxPreferenceFragment() {
     val args by lazyRoute<SettingsRoute.InputMethodConfig>()
 
+    private val items by lazy { InputMethodSettings.of(args.uniqueName) }
+
     override fun getPageTitle(): String = InputMethodNames.of(requireContext(), args.uniqueName, args.name)
 
     override fun createScreen(raw: RawConfig, save: () -> Unit): PreferenceScreen =
-        InputMethodSettings.of(args.uniqueName)?.let { InputMethodSettings.create(preferenceManager, it, raw["cfg"], save) { route -> navigateWithAnim(route) } }
+        items?.let { InputMethodSettings.create(preferenceManager, it, raw["cfg"], save) { route -> navigateWithAnim(route) } }
             ?: super.createScreen(raw, save)
 
     override suspend fun obtainConfig(fcitx: FcitxAPI): RawConfig {
@@ -29,7 +31,8 @@ class InputMethodConfigFragment : FcitxPreferenceFragment() {
     }
 
     override suspend fun saveConfig(fcitx: FcitxAPI, newConfig: RawConfig) {
-        fcitx.setImConfig(args.uniqueName, newConfig)
+        // what the page shows alone: the shared options it read may have been changed on the shared page since
+        fcitx.setImConfig(args.uniqueName, items?.let { InputMethodSettings.only(it, newConfig) } ?: newConfig)
     }
 
     override fun onStop() {

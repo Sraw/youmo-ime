@@ -90,9 +90,7 @@ class Engines(
         val phrases: String,
         val dictionaries: String,
         val savePhrases: (CustomPhrases) -> Unit = {},
-        /** The lines of the dictionaries turned on that are merged into the new words dictionary. */
-        val newDictionary: () -> Sequence<String> = { emptySequence() },
-        /** The lines of the dictionaries turned on that are merged into the base dictionary. */
+        /** The lines of the dictionaries turned on, merged into the base dictionary. */
         val dictionary: () -> Sequence<String>,
     )
 
@@ -529,10 +527,6 @@ class Engines(
     }
 
     companion object {
-        // the median score of the new words dictionary's 78 thousand words (words-202610): what a
-        // word of a dictionary merged into it, which has no score, is taken to be
-        const val NEW_WORD_SCORE = -6.2f
-
         const val PINYIN = "engine-pinyin"
         const val SHUANGPIN = "engine-shuangpin"
 

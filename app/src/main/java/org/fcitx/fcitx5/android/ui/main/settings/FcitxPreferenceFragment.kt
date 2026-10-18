@@ -43,10 +43,13 @@ abstract class FcitxPreferenceFragment : PaddingPreferenceFragment() {
 
     private fun save() {
         if (!configLoaded) return
+        // a copy taken here, on the main thread: the page goes on changing raw while the fcitx
+        // thread reads it into JNI, with nothing between the two
+        val cfg = raw["cfg"].deepCopy()
         // launch "saveConfig" job under supervisorJob scope
         scope.launch {
             fcitx.runOnReady {
-                saveConfig(this, raw["cfg"])
+                saveConfig(this, cfg)
             }
         }
     }

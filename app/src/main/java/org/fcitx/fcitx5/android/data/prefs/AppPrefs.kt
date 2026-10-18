@@ -141,10 +141,7 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
         )
         val spaceSwipeMoveCursor =
             switch(R.string.space_swipe_move_cursor, "space_swipe_move_cursor", true)
-        val autoPairs = switch(R.string.auto_pairs, "auto_pairs", true)
-        val calculationReplacesSum = switch(R.string.calculation_replaces_sum, "calculation_replaces_sum", false)
-
-        // set on an input method's page, with no UI here: not hidden { }, which would put them back to their defaults
+        // set on an input method's page or the shared one, with no UI here: not hidden { }, which would put them back to their defaults
         private fun bool(key: String, defaultValue: Boolean) =
             ManagedPreference.PBool(sharedPreferences, key, defaultValue).apply { register() }
 
@@ -169,10 +166,17 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
         val englishAutoCaps = bool(ENGLISH_AUTO_CAPS, true)
 
         /**
-         * Shown on each input method's page that glides (Engines.glides), one setting for all: a
-         * word by gliding across its keys (GlideInput). Off till turned on: a fast tap may glide.
+         * Shown on the page of what every input method shares (InputMethodSettings.SHARED), one
+         * setting for all that glide (Engines.glides): a word by gliding across its keys
+         * (GlideInput). Off till turned on: a fast tap may glide.
          */
         val glideTyping = bool(GLIDE_TYPING, false)
+
+        /** Shown on the shared page too: every input method types a bracket or a quote. */
+        val autoPairs = bool(AUTO_PAIRS, true)
+
+        /** Shown on the shared page too: a sum is typed in any input method. */
+        val calculationReplacesSum = bool(CALCULATION_REPLACES_SUM, false)
 
         /** Shown on the handwriting page (InputMethodSettings): how long the pen stays up before a character is done. */
         val handwritingPause = stringLike(HANDWRITING_PAUSE, object : ManagedPreference.StringLikeCodec<HandwritingPause> {
@@ -619,6 +623,8 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
         const val T9_MULTI_TAP = "t9_multi_tap"
         const val ENGLISH_AUTO_CAPS = "english_auto_caps"
         const val GLIDE_TYPING = "glide_typing"
+        const val AUTO_PAIRS = "auto_pairs"
+        const val CALCULATION_REPLACES_SUM = "calculation_replaces_sum"
         const val HANDWRITING_PAUSE = "handwriting_pause"
 
         /**

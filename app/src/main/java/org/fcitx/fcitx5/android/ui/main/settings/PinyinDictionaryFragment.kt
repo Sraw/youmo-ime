@@ -32,6 +32,9 @@ import org.fcitx.fcitx5.android.data.pinyin.ImportedDictionaries.Unread
 import org.fcitx.fcitx5.android.data.pinyin.PinyinDictManager
 import org.fcitx.fcitx5.android.data.pinyin.dict.PinyinDictionary
 import org.fcitx.fcitx5.android.data.pinyin.dict.TextDictionary
+import org.fcitx.fcitx5.android.engine.host.Engines
+import org.fcitx.fcitx5.android.engine.user.WordListFiles
+import org.fcitx.fcitx5.android.engine.user.WordLists
 import org.fcitx.fcitx5.android.ui.common.PaddingPreferenceFragment
 import org.fcitx.fcitx5.android.ui.common.withLoadingDialog
 import org.fcitx.fcitx5.android.ui.main.MainViewModel
@@ -50,9 +53,12 @@ import java.io.InputStream
 import kotlin.coroutines.CoroutineContext
 
 /**
- * The three layers of the dictionary, as they rank: the user dictionary, the new words, the
- * base. A dictionary the user imports is merged into one of them, as asked when it is imported;
- * those merged into a layer rank alike, and can be turned off, moved or deleted.
+ * The words and phrases (词库与短语): the user dictionary, then the base one, as they rank, and
+ * the custom phrases. The user sees two dictionaries: the engine's built-in new words, which in
+ * pinyin start level with the base, are shown as part of it, and every imported dictionary is
+ * merged into the base (ImportedDictionaries.migrate moves those an older build merged into the
+ * new words). A file imported goes into the base or, read word by word, the user dictionary, as
+ * asked; one merged can be turned off or deleted.
  */
 class PinyinDictionaryFragment : PaddingPreferenceFragment() {
 
@@ -68,17 +74,16 @@ class PinyinDictionaryFragment : PaddingPreferenceFragment() {
     /** whether this view told of the dictionaries put aside unread: the list is built again after each change */
     private var toldUnread = false
 
-    private class Listed(val dictionary: TextDictionary, val intoNew: Boolean, val words: Int)
+    private class Listed(val dictionary: TextDictionary, val words: Int)
 
-    private enum class Layer(@StringRes val title: Int, @StringRes val hint: Int) {
+    private enum class Target(@StringRes val title: Int, @StringRes val hint: Int) {
+        BASE(R.string.layer_base_recommended, R.string.import_into_base),
         USER(R.string.layer_user, R.string.import_into_user),
-        NEW(R.string.layer_new, R.string.import_into_new),
-        BASE(R.string.layer_base, R.string.import_into_base),
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        launcher = registerForActivityResult(ActivityResultContracts.GetContent()) { it?.let(::askLayer) }
+        launcher = registerForActivityResult(ActivityResultContracts.GetContent()) { it?.let(::askTarget) }
     }
 
     override fun onCreatePreferences(savedInstanceState: Bundle?, rootKey: String?) {
@@ -91,7 +96,7 @@ class PinyinDictionaryFragment : PaddingPreferenceFragment() {
         toldUnread = false
         rebuild()
         // a file opened with the app, once (the home page passes none, as "")
-        if (savedInstanceState == null && !asked) args.uri?.takeIf { it.isNotEmpty() }?.let { askLayer(Uri.parse(it)) }
+        if (savedInstanceState == null && !asked) args.uri?.takeIf { it.isNotEmpty() }?.let { askTarget(Uri.parse(it)) }
         asked = true
     }
 
@@ -107,10 +112,7 @@ class PinyinDictionaryFragment : PaddingPreferenceFragment() {
             changes.awaitMade()
             val listed = withContext(Dispatchers.IO) {
                 val dictionaries = PinyinDictManager.listDictionaries()
-                val intoNew = PinyinDictManager.intoNew()
-                dictionaries.zip(wordCounts.of(dictionaries)) { dictionary, words ->
-                    Listed(dictionary, dictionary.name in intoNew, words)
-                }
+                dictionaries.zip(wordCounts.of(dictionaries)) { dictionary, words -> Listed(dictionary, words) }
             }
             // read after the list: listing it runs the migration when the engine has not yet
             val unread = if (tell) withContext(Dispatchers.IO) { PinyinDictManager.unread() } else emptyList()
@@ -148,23 +150,27 @@ class PinyinDictionaryFragment : PaddingPreferenceFragment() {
     private fun show(listed: List<Listed>) {
         val ctx = context ?: return
         val screen = preferenceScreen.apply { removeAll() }
+        screen.addPreference(hint(ctx, R.string.word_packs_hint))
         val user = category(R.string.layer_user)
         user.addPreference(R.string.my_words, R.string.layer_user_summary) {
             navigateWithAnim(SettingsRoute.UserWords)
         }
-        val new = category(R.string.layer_new)
-        new.addPreference(builtIn(R.string.builtin_new_title, R.string.builtin_new_summary))
-        listed.filter { it.intoNew }.forEach { new.addPreference(row(it)) }
         val base = category(R.string.layer_base)
         base.addPreference(builtIn(R.string.builtin_base_title, R.string.builtin_base_summary))
-        listed.filter { !it.intoNew }.forEach { base.addPreference(row(it)) }
+        listed.forEach { base.addPreference(row(it)) }
         val files = category(R.string.import_section)
         files.addPreference(R.string.import_dict, R.string.import_dict_summary) { launcher.launch("*/*") }
-        screen.addPreference(Preference(ctx).apply {
-            setSummary(R.string.words_page_hint)
-            isSelectable = false
-            isIconSpaceReserved = false
-        })
+        val phrases = category(R.string.section_phrases)
+        phrases.addPreference(R.string.custom_phrases, R.string.custom_phrases_summary) {
+            navigateWithAnim(SettingsRoute.PinyinCustomPhrase)
+        }
+        screen.addPreference(hint(ctx, R.string.words_page_hint))
+    }
+
+    private fun hint(ctx: Context, @StringRes text: Int) = Preference(ctx).apply {
+        setSummary(text)
+        isSelectable = false
+        isIconSpaceReserved = false
     }
 
     private fun category(title: Int) = PreferenceCategory(requireContext()).apply {
@@ -197,9 +203,6 @@ class PinyinDictionaryFragment : PaddingPreferenceFragment() {
                     runCatching { check(if (dictionary.isEnabled) dictionary.disable() else dictionary.enable()) { "cannot rename ${dictionary.file.name}" } }
                 }
             },
-            (if (item.intoNew) R.string.dict_move_to_base else R.string.dict_move_to_new) to {
-                change { PinyinDictManager.setIntoNew(dictionary.name, !item.intoNew) }
-            },
             R.string.delete to { confirmDelete(dictionary) },
         )
         AlertDialog.Builder(requireContext())
@@ -225,13 +228,16 @@ class PinyinDictionaryFragment : PaddingPreferenceFragment() {
             .show()
     }
 
-    /** Which layer a file is merged into: the base unless asked otherwise, the safest of the three. */
-    private fun askLayer(uri: Uri) {
+    /**
+     * Which dictionary a file is merged into: the base unless asked otherwise, the safer of the
+     * two, or the user dictionary for a file that is its export.
+     */
+    private fun askTarget(uri: Uri) {
         val ctx = requireContext()
         lifecycleScope.withLoadingDialog(ctx) {
             try {
                 val incoming = inspect(ctx, uri) ?: return@withLoadingDialog
-                showLayers(ctx, uri, incoming)
+                showTargets(ctx, uri, incoming)
             } catch (e: CancellationException) {
                 // the page left: nothing to show the error on
                 throw e
@@ -243,49 +249,57 @@ class PinyinDictionaryFragment : PaddingPreferenceFragment() {
         }
     }
 
-    /** The file at [uri] to import; null for one without a name, or not a dictionary, which is told. */
+    /**
+     * The file at [uri] to import; null for one without a name. Its type is not checked here: the
+     * user dictionary takes any text, only the base wants a dictionary's extension.
+     */
     private suspend fun inspect(ctx: Context, uri: Uri): Incoming? {
         val cr = ctx.contentResolver
         val fileName = withContext(Dispatchers.IO) { cr.queryFileName(uri) } ?: return null
-        val type = PinyinDictionary.Type.fromFileName(withLowercaseExtension(fileName))
-        if (type == null) {
-            ctx.importErrorDialog(R.string.invalid_dict)
-            return null
+        val export = readAsWordList(fileName) && withContext(Dispatchers.IO) {
+            WordListFiles.isUserExport(cr.openInputStreamOrThrow(uri).use { it.readAtMost(EXPORT_PEEK) })
         }
-        return Incoming(fileName)
+        return Incoming(fileName, export)
     }
 
-    /** Asks which layer [incoming] goes into, the base picked to begin with, and imports it there. */
-    private fun showLayers(ctx: Context, uri: Uri, incoming: Incoming) {
-        val layers = listOf(Layer.BASE, Layer.NEW, Layer.USER)
-        val items = layers.map { layer ->
+    /**
+     * Asks which dictionary [incoming] goes into, the user dictionary picked to begin with if
+     * [startsInUser], else the base, and imports it there.
+     */
+    private fun showTargets(ctx: Context, uri: Uri, incoming: Incoming) {
+        val targets = Target.entries
+        val items = targets.map { target ->
             SpannableStringBuilder()
-                .inSpans(StyleSpan(Typeface.BOLD)) { append(getString(layer.title)) }
+                .inSpans(StyleSpan(Typeface.BOLD)) { append(getString(target.title)) }
                 .append("\n")
-                .inSpans(RelativeSizeSpan(SMALL)) { append(getString(layer.hint)) }
-                // a gap under each: three of two lines each read as one block without
+                .inSpans(RelativeSizeSpan(SMALL)) { append(getString(target.hint)) }
+                // a gap under each: two of a few lines each read as one block without
                 .inSpans(RelativeSizeSpan(GAP)) { append("\n") }
         }.toTypedArray<CharSequence>()
-        var picked = layers.indexOf(Layer.BASE)
+        var picked = targets.indexOf(if (startsInUser(incoming)) Target.USER else Target.BASE)
         AlertDialog.Builder(ctx)
             .setTitle(R.string.import_into_title)
             .setSingleChoiceItems(items, picked) { _, which -> picked = which }
-            .setPositiveButton(R.string.import_dict) { _, _ -> import(uri, incoming, layers[picked]) }
+            .setPositiveButton(R.string.import_dict) { _, _ -> import(uri, incoming, targets[picked]) }
             .setNegativeButton(android.R.string.cancel, null)
             .show()
     }
 
-    private fun import(uri: Uri, incoming: Incoming, layer: Layer) {
+    private fun import(uri: Uri, incoming: Incoming, target: Target) {
         val ctx = requireContext()
         val cr = ctx.contentResolver
         lifecycleScope.withLoadingDialog(ctx, R.string.importing) {
             try {
-                if (layer == Layer.USER) {
+                if (target == Target.USER) {
                     importIntoUser(uri, incoming.fileName)
                     return@withLoadingDialog
                 }
+                if (PinyinDictionary.Type.fromFileName(withLowercaseExtension(incoming.fileName)) == null) {
+                    ctx.importErrorDialog(R.string.invalid_dict)
+                    return@withLoadingDialog
+                }
                 val imported = withContext(Dispatchers.IO) {
-                    ManagedDictionaries.importFile(incoming, layer == Layer.NEW) { cr.openInputStreamOrThrow(uri) }
+                    ManagedDictionaries.importFile(incoming) { cr.openInputStreamOrThrow(uri) }
                 }
                 if (!imported) {
                     ctx.importErrorDialog(R.string.dict_already_exists)
@@ -305,11 +319,9 @@ class PinyinDictionaryFragment : PaddingPreferenceFragment() {
     private suspend fun importIntoUser(uri: Uri, fileName: String) {
         val ctx = requireContext()
         val fcitx = viewModel.fcitx
-        // the lines go to the engine as they are read, not held all at once as a list first
-        val imported = withContext(Dispatchers.IO) {
-            PinyinDictManager.readWords(ctx.contentResolver.openInputStreamOrThrow(uri), fileName) { lines ->
-                fcitx.runOnReady { importUserWords(lines) }
-            }
+        val cr = ctx.contentResolver
+        val imported = importWordsFrom(fileName, { cr.openInputStreamOrThrow(uri) }) { lines ->
+            fcitx.runOnReady { importUserWords(lines) }
         }
         AlertDialog.Builder(ctx)
             .setTitle(R.string.import_dict)
@@ -331,6 +343,9 @@ class PinyinDictionaryFragment : PaddingPreferenceFragment() {
         private const val SMALL = 0.85f
         private const val GAP = 0.6f
 
+        // the export's header is its first line, and a blocked word's `!` is soon there if it has one
+        private const val EXPORT_PEEK = 64 shl 10
+
         // the process's: a page made anew reads again only the dictionaries that changed
         private val wordCounts = WordCounts { PinyinDictManager.wordCount(it) }
 
@@ -343,8 +358,45 @@ class PinyinDictionaryFragment : PaddingPreferenceFragment() {
     }
 }
 
-/** A file to import, named [fileName]. */
-internal class Incoming(val fileName: String) {
+/**
+ * Whether a file named [fileName], imported into the user dictionary, is read as a word list
+ * (WordLists.decode): any but a binary dictionary (.dict, .scel), as the user dictionary's own
+ * import read any text file, whatever its name; those two are converted as dictionaries.
+ */
+internal fun readAsWordList(fileName: String) =
+    PinyinDictionary.Type.fromFileName(withLowercaseExtension(fileName)).let {
+        it != PinyinDictionary.Type.LibIME && it != PinyinDictionary.Type.Sougou
+    }
+
+/**
+ * Whether the user dictionary, not the base, is picked to begin with for [incoming]: for its own
+ * export, and for a file of no dictionary's type, which only it takes.
+ */
+internal fun startsInUser(incoming: Incoming) =
+    incoming.userExport || PinyinDictionary.Type.fromFileName(withLowercaseExtension(incoming.fileName)) == null
+
+/**
+ * The words of the file named [fileName], as [open] reads it, imported into the user dictionary
+ * by [import], the engine's.
+ */
+internal suspend fun importWordsFrom(
+    fileName: String,
+    open: () -> InputStream,
+    import: suspend (Sequence<String>) -> Engines.Imported,
+): Engines.Imported =
+    // two ways, as the encodings differ: a word list is read whole (at most readImported's cap,
+    // as the user dictionary's own import read it) to be decoded from UTF-16 or GB18030; a .dict
+    // or .scel is converted as the base's are, to UTF-8 text read a line at a time, the text
+    // never held whole, only the words the engine reads from it
+    if (readAsWordList(fileName)) {
+        val lines = withContext(Dispatchers.IO) { WordLists.decode(open().use { it.readImported() }).lineSequence() }
+        import(lines)
+    } else {
+        withContext(Dispatchers.IO) { PinyinDictManager.readWords(open(), fileName, import) }
+    }
+
+/** A file to import, named [fileName]; [userExport] if it is the user dictionary's export. */
+internal class Incoming(val fileName: String, val userExport: Boolean = false) {
     /** what it is kept as */
     val name = PinyinDictionary.nameOf(fileName)
 }
@@ -354,24 +406,24 @@ internal interface ImportTarget {
     /** The type of the dictionary of [name] there, if there is one. */
     fun typeOf(name: String): PinyinDictionary.Type?
 
-    fun import(stream: InputStream, fileName: String, intoNew: Boolean)
+    fun import(stream: InputStream, fileName: String)
 }
 
 /**
- * Imports [incoming], as [open] reads it, into the new words ([intoNew]) or the base; false, with
- * nothing read or changed, where one of its name is there.
+ * Imports [incoming], as [open] reads it, into the base dictionary; false, with nothing read or
+ * changed, where one of its name is there.
  */
-internal fun ImportTarget.importFile(incoming: Incoming, intoNew: Boolean, open: () -> InputStream): Boolean {
+internal fun ImportTarget.importFile(incoming: Incoming, open: () -> InputStream): Boolean {
     if (typeOf(incoming.name) != null) return false
-    open().use { import(it, incoming.fileName, intoNew) }
+    open().use { import(it, incoming.fileName) }
     return true
 }
 
 private object ManagedDictionaries : ImportTarget {
     override fun typeOf(name: String) = PinyinDictManager.listDictionaries().firstOrNull { it.name == name }?.type
 
-    override fun import(stream: InputStream, fileName: String, intoNew: Boolean) {
-        PinyinDictManager.importFromInputStream(stream, fileName, intoNew).getOrThrow()
+    override fun import(stream: InputStream, fileName: String) {
+        PinyinDictManager.importFromInputStream(stream, fileName).getOrThrow()
     }
 }
 
@@ -411,7 +463,7 @@ internal class DictionaryChanges(
     private val io: CoroutineContext = Dispatchers.IO,
     private val onFailure: (Throwable) -> Unit,
 ) {
-    // a dictionary turned on or off, moved or deleted: the engine reads them again on leaving
+    // a dictionary turned on or off or deleted: the engine reads them again on leaving
     private var changed = false
 
     // the last: the next waits for it, and so do the engine reading them again and a page listing them

@@ -7,6 +7,7 @@ package org.fcitx.fcitx5.android.data.pinyin
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.data.pinyin.dict.PinyinDictionary
 import org.fcitx.fcitx5.android.data.pinyin.dict.TextDictionary
+import org.fcitx.fcitx5.android.engine.user.WordListFiles
 import org.fcitx.fcitx5.android.utils.appContext
 import org.fcitx.fcitx5.android.utils.errorArg
 import org.fcitx.fcitx5.android.utils.withLowercaseExtension
@@ -41,45 +42,40 @@ object PinyinDictManager {
     /** Forgets [told], the dictionaries put aside unread the user was told of. */
     fun forgetUnread(told: List<ImportedDictionaries.Unread>) = runCatching { ImportedDictionaries.forgetUnread(pinyinDicDir, told) }
 
-    /** The names of the dictionaries merged into the new words dictionary, the rest into the base one. */
-    fun intoNew(): Set<String> = ImportedDictionaries.intoNew(pinyinDicDir)
-
-    /** Merges dictionary [name] into the new words dictionary ([into]) or the base one. */
-    fun setIntoNew(name: String, into: Boolean) = runCatching { ImportedDictionaries.setIntoNew(pinyinDicDir, name, into) }
-
-    /** Deletes [dictionary], and what was kept of where it was merged; whether both went. */
-    fun delete(dictionary: TextDictionary): Boolean =
-        dictionary.file.delete() && setIntoNew(dictionary.name, false).isSuccess
+    /** Deletes [dictionary]; whether it went. */
+    fun delete(dictionary: TextDictionary): Boolean = dictionary.file.delete()
 
     /**
      * Imports [file], of any [PinyinDictionary.Type], as text the engine reads, named as it is,
-     * merged into the new words dictionary ([intoNew]) or the base one.
+     * merged into the base dictionary. A text file is read as the user dictionary's import reads
+     * one (see [WordListFiles.baseLine]). One imported into the user dictionary is read word by
+     * word by the settings page, not kept as a file.
      */
-    fun importFromFile(file: File, intoNew: Boolean = false): Result<TextDictionary> = runCatching {
+    fun importFromFile(file: File): Result<TextDictionary> = runCatching {
         val raw =
             PinyinDictionary.new(file) ?: errorArg(R.string.exception_dict_filename, file.path)
         val text = File.createTempFile("import", ".${PinyinDictionary.Type.Text.ext}", appContext.cacheDir)
         try {
-            raw.toTextDictionary(text)
             val dest = File(pinyinDicDir, TextDictionary.fileName(raw.name, true))
             // one of that name, on or off, is the user's: the list may not have shown it yet
             if (ImportedDictionaries.hasDictionary(pinyinDicDir, raw.name)) errorArg(R.string.dict_already_exists)
-            val words = text.useLines { ImportedDictionaries.write(it, dest) }
-            if (words == 0) errorArg(R.string.exception_dict_no_words, file.name)
-            // not kept, a failed import, but for the file: one tried again would be "already there"
-            try {
-                ImportedDictionaries.setIntoNew(pinyinDicDir, raw.name, intoNew)
-            } catch (e: IOException) {
-                dest.delete()
-                throw e
+            val words = if (raw is TextDictionary) {
+                // read where it is, not copied as UTF-8 first: Sogou's export is UTF-16, older lists GB18030
+                raw.file.useLines(WordListFiles.charset { raw.file.inputStream() }) { lines ->
+                    ImportedDictionaries.write(lines.mapNotNull(WordListFiles::baseLine), dest)
+                }
+            } else {
+                raw.toTextDictionary(text)
+                text.useLines { ImportedDictionaries.write(it, dest) }
             }
+            if (words == 0) errorArg(R.string.exception_dict_no_words, file.name)
             TextDictionary(dest).also { Timber.d("Imported $raw as $it") }
         } finally {
             text.delete()
         }
     }
 
-    fun importFromInputStream(stream: InputStream, name: String, intoNew: Boolean = false): Result<TextDictionary> {
+    fun importFromInputStream(stream: InputStream, name: String): Result<TextDictionary> {
         // the name a provider gives is no path to trust: its last part alone, which names the dictionary
         val fileName = withLowercaseExtension(File(name).name)
         // one that is no dictionary's is refused unread: "." or ".." would be the cache or what holds it
@@ -90,7 +86,7 @@ object PinyinDictManager {
         val tempFile = File(appContext.cacheDir, fileName)
         return try {
             stream.use { input -> tempFile.outputStream().use { input.copyTo(it) } }
-            importFromFile(tempFile, intoNew)
+            importFromFile(tempFile)
         } finally {
             tempFile.delete()
         }

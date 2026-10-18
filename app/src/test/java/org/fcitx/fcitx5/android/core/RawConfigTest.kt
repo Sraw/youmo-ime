@@ -192,5 +192,13 @@ class RawConfigTest {
         assertEquals("changed", root.findByName("a")?.value)
     }
 
+    @Test
+    fun aDeepCopyKeepsANestedValueChangedAfterIt() {
+        val root = RawConfig(arrayOf(RawConfig("g", arrayOf(RawConfig("k", "old")))))
+        val copy = root.deepCopy()
+        root["g"]["k"].value = "new"
+        assertEquals("old", copy["g"]["k"].value)
+    }
+
     // endregion
 }

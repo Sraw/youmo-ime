@@ -53,7 +53,7 @@
     <string name="delete">刪除</string>
     <string name="clipboard">剪貼簿</string>
     <string name="keyboard_height">鍵盤高度</string>
-    <string name="virtual_keyboard">按鍵與振動</string>
+    <string name="virtual_keyboard">按鍵</string>
     <string name="clipboard_suggestion_timeout">剪貼簿項目逾時</string>
     <string name="version">版本</string>
     <string name="build_time">提交時間</string>
@@ -282,8 +282,6 @@
     <string name="section_keys">按鍵</string>
     <string name="section_candidates">候選欄</string>
     <string name="section_sound_and_vibration">聲音與振動</string>
-    <string name="home_section_input">輸入</string>
-    <string name="home_section_other">其他</string>
     <string name="long_press_characters_summary">自訂每個鍵長按彈出的字元；第一個也是滑動輸入的字元，也就是鍵上的小字</string>
     <string name="long_press_of">長按「%1$s」</string>
     <string name="long_press_editor_hint">帶框的第一個是長按後直接放開得到的字元，也是滑動這個鍵輸入的字元，也就是鍵上的小字。點一個字元選取它，再用下面的按鈕調整。</string>
@@ -320,12 +318,8 @@
     <string name="search_settings">搜尋設定</string>
     <string name="search_settings_hint">搜尋設定</string>
     <string name="search_settings_none">沒有找到相關的設定</string>
-    <string name="home_section_words">詞語</string>
-    <string name="home_section_keyboard_look">鍵盤與外觀</string>
-    <string name="home_section_clipboard_emoji">剪貼簿與表情</string>
     <string name="custom_phrases">自訂短語</string>
-    <string name="word_packs">詞庫</string>
-    <string name="more_settings">更多設定</string>
+    <string name="word_packs">詞庫與短語</string>
     <string name="word_pinyin_unknown">找不到讀音，請填寫拼音</string>
     <string name="punctuation_map">中文標點</string>
     <string name="word_list_empty">還沒有詞</string>
@@ -333,10 +327,8 @@
         <item quantity="other">共 %1$d 個 · 長按可多選</item>
     </plurals>
     <string name="word_list_found">找到 %1$d 個，共 %2$d 個</string>
-    <string name="import_words">匯入詞表</string>
-    <string name="import_words_summary">文字檔，一行一個詞，可以帶拼音（幽默 you\'mo），也可以只寫詞。搜狗、QQ 等匯出的詞庫文字也能讀</string>
     <string name="export_words">匯出</string>
-    <string name="export_words_summary">整個使用者詞庫存成一個文字檔，可在別的手機上匯入</string>
+    <string name="export_words_summary">整個使用者詞庫存成一個文字檔；要匯回或在別的手機上用，在「詞庫與短語 → 匯入詞庫」裡選「使用者詞庫」。</string>
     <string name="import_words_done">匯入完成：新增 %1$d 個詞，封鎖 %2$d 個，%3$d 行沒能讀懂</string>
     <string name="export_words_header"># 幽默輸入法使用者詞庫：一行一個詞，詞後面是拼音；! 開頭的是封鎖的詞</string>
     <string name="select_all">全選</string>
@@ -352,7 +344,7 @@
         <item quantity="other">恢復顯示這 %1$d 個詞？</item>
     </plurals>
     <string name="words_section_manage">詞</string>
-    <string name="words_section_files">匯入與匯出</string>
+    <string name="words_section_files">檔案</string>
     <plurals name="word_count">
         <item quantity="other">%1$d 個詞</item>
     </plurals>
@@ -381,8 +373,8 @@
     <string name="level_strong">強</string>
     <string name="level_quiet">小</string>
     <string name="level_loud">大</string>
-    <string name="theme_and_size">主題與大小</string>
-    <string name="configure_look">大小與按鍵</string>
+    <string name="theme_and_size">外觀</string>
+    <string name="configure_look">大小與樣式</string>
     <string name="export_user_data_summary">設定、學到和新增的詞、自訂短語、主題和剪貼簿紀錄（複製過的密碼也在內），存成一個檔案</string>
     <string name="app_language">介面語言</string>
     <string name="language_follow_system">跟隨系統</string>
@@ -392,7 +384,6 @@
     <string name="im_pinyin">拼音</string>
     <string name="im_shuangpin">雙拼</string>
     <string name="im_t9">九鍵拼音</string>
-    <string name="im_not_for_t9">九鍵不適用</string>
     <string name="im_wubi">五筆</string>
     <string name="im_cangjie">倉頡</string>
     <string name="im_ziranma">自然碼</string>
@@ -523,13 +514,10 @@
     <string name="long_press_move_left">左移</string>
     <string name="long_press_move_right">右移</string>
     <string name="layer_user">使用者詞庫</string>
-    <string name="layer_new">新詞庫</string>
     <string name="layer_base">基礎詞庫</string>
-    <string name="layer_user_summary">你新增的、學到的和封鎖的詞，總是排在最前</string>
-    <string name="builtin_new_title">內建新詞</string>
-    <string name="builtin_new_summary">近幾年的新詞，隨應用更新 · 唯讀</string>
-    <string name="builtin_base_title">內建基礎詞庫</string>
-    <string name="builtin_base_summary">常用詞和詞頻，隨應用更新 · 唯讀</string>
+    <string name="layer_user_summary">你新增的和輸入法學到的詞，排得靠前，選得越多越靠前；封鎖的詞不再出現。</string>
+    <string name="builtin_base_title">內建詞庫</string>
+    <string name="builtin_base_summary">常用詞和近幾年的新詞，隨應用更新 · 唯讀</string>
     <string name="import_section">匯入</string>
     <string name="import_dict">匯入詞庫</string>
     <string name="import_dict_summary">支援 .txt、.dict 和搜狗 .scel 檔案</string>
@@ -538,13 +526,10 @@
     <string name="dict_summary">%1$s · %2$s</string>
     <string name="dict_turn_on">開啟</string>
     <string name="dict_turn_off">關閉</string>
-    <string name="dict_move_to_new">改為併入新詞庫</string>
-    <string name="dict_move_to_base">改為併入基礎詞庫</string>
     <string name="dict_delete_confirm">刪除詞庫「%s」？</string>
     <string name="import_into_title">併入哪個詞庫？</string>
-    <string name="import_into_base">適合大而雜的詞庫，例如從搜狗、QQ 匯出的專業詞庫：詞能打出來，不會擠掉常用詞</string>
-    <string name="import_into_new">只適合確定都是新詞的小清單：和內建新詞一起，依你的選擇調整權重</string>
-    <string name="import_into_user">當成你自己加的詞，排在最前；適合幾千個以內你常用的詞</string>
+    <string name="import_into_base">適合大而雜的詞庫，例如專業詞庫：詞能打出來，依常用程度排，不會擠掉常用詞。</string>
+    <string name="import_into_user">適合幾千個以內你常用的詞：排得靠前，選過就更靠前，可以編輯、匯出。使用者詞庫匯出的檔案也從這裡匯回。</string>
     <string name="words_page_hint">不想看到某個詞，可以在「使用者詞庫」裡封鎖，或在鍵盤上長按它</string>
     <string name="dict_change_failed">修改失敗</string>
     <string name="dict_unread_title">有詞庫沒能讀入</string>
@@ -585,4 +570,32 @@
     <string name="show_touch_keyboard">顯示螢幕鍵盤</string>
     <string name="hardware_switch_shortcuts">實體鍵盤快速鍵</string>
     <string name="hardware_switch_shortcuts_summary">單按 Shift 或 Ctrl+空格切換中英，Ctrl+Shift 輪流切換輸入法</string>
+    <string name="shared_input">通用輸入</string>
+    <string name="shared_input_link">通用輸入設定</string>
+    <string name="shared_input_link_summary">各輸入法共用的設定</string>
+    <string name="shared_section_all">所有輸入法</string>
+    <string name="shared_section_chinese">中文輸入法</string>
+    <string name="shared_section_pinyin">拼音（全拼、雙拼、九鍵）</string>
+    <string name="im_not_for">不適用：%s。</string>
+    <string name="im_not_for_separator">、</string>
+    <string name="clipboard_and_emoji">剪貼簿與表情</string>
+    <string name="hardware_keyboard">實體鍵盤</string>
+    <string name="section_emoji">表情</string>
+    <string name="section_animation">動畫</string>
+    <string name="section_key_style">按鍵樣式</string>
+    <string name="section_phrases">短語</string>
+    <string name="punctuation_map_summary">中文輸入時每個標點打成什麼，例如 , 打成 ，</string>
+    <string name="custom_phrases_summary">打一個縮寫出一段話，例如 dz 出你的地址</string>
+    <string name="im_page_size_summary">只用於實體鍵盤的候選窗，所有輸入法都用，包括英文</string>
+    <string name="home_input_methods_summary">新增、排序，每種輸入法自己的選項</string>
+    <string name="home_shared_input_summary">各輸入法共用：聯想、表情、滑行、模糊音、標點</string>
+    <string name="home_words_summary">你的詞、匯入的詞庫、自訂短語</string>
+    <string name="home_look_summary">主題、鍵盤大小，單手 / 分體 / 懸浮</string>
+    <string name="home_keys_summary">長按、劃動、空白鍵、鍵上的字元</string>
+    <string name="home_sound_summary">按鍵音、振動</string>
+    <string name="home_clipboard_summary">剪貼簿歷史、表情膚色</string>
+    <string name="home_hardware_summary">候選窗、快捷鍵、每頁候選數</string>
+    <string name="home_backup_summary">設定、詞、主題和剪貼簿存成一個檔案</string>
+    <string name="word_packs_hint">使用者詞庫的詞排得靠前，選得越多越靠前；還沒選過的，可能排在很常用的同音詞後面。拼音和碼表都用這些詞，英文詞庫在英文的設定裡。</string>
+    <string name="layer_base_recommended">基礎詞庫（推薦）</string>
 </resources>

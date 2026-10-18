@@ -15,7 +15,7 @@ class AppUtilTest {
     @Test
     fun keyboardsOwnRoutesAreLaunchRoutes() {
         listOf(
-            SettingsRoute.VirtualKeyboard,
+            SettingsRoute.Keys,
             SettingsRoute.InputMethodList,
             SettingsRoute.Theme,
             SettingsRoute.InputMethodConfig("Pinyin", "pinyin"),

@@ -5,13 +5,41 @@
 package org.fcitx.fcitx5.android.ui.main
 
 import org.fcitx.fcitx5.android.BuildConfig
+import org.fcitx.fcitx5.android.R
+import org.fcitx.fcitx5.android.ui.main.settings.SettingsRoute
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** The data is as old as the day its release was made: an old tree built today is warned of too. */
+/**
+ * The home page is one flat list in the order decided (2026-10-18), each row opening its page.
+ * The data is as old as the day its release was made: an old tree built today is warned of too.
+ */
 class MainFragmentTest {
+
+    @Test
+    fun theHomePageListsThePagesInTheirOrder() {
+        assertEquals(
+            listOf(
+                R.string.input_methods, R.string.shared_input, R.string.word_packs, R.string.theme_and_size,
+                R.string.virtual_keyboard, R.string.section_sound_and_vibration, R.string.clipboard_and_emoji,
+                R.string.hardware_keyboard, R.string.user_data,
+            ),
+            MainFragment.HOME.map { it.title },
+        )
+        assertEquals(
+            listOf(
+                SettingsRoute.InputMethodList, SettingsRoute.SharedInput, SettingsRoute.PinyinDict(""), SettingsRoute.Theme,
+                SettingsRoute.Keys, SettingsRoute.SoundAndVibration, SettingsRoute.Clipboard,
+                SettingsRoute.HardwareKeyboard, SettingsRoute.Backup,
+            ),
+            MainFragment.HOME.map { it.route },
+        )
+        // each says what is behind it
+        MainFragment.HOME.forEach { assertTrue(it.summary != 0) }
+    }
 
     @Test
     fun theDayIsReadFromTheReleasesTag() {

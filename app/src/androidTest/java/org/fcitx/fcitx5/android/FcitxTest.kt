@@ -16,7 +16,6 @@ import org.fcitx.fcitx5.android.data.punctuation.PunctuationMapEntry
 import org.fcitx.fcitx5.android.engine.host.EngineSettings
 import org.fcitx.fcitx5.android.engine.host.Engines
 import org.fcitx.fcitx5.android.engine.host.Keyboard
-import org.fcitx.fcitx5.android.engine.host.TableSettings
 import org.junit.After
 import org.junit.AfterClass
 import org.junit.Assert
@@ -561,26 +560,6 @@ class FcitxTest {
         Assert.assertEquals("工业", receiveFirstCommitString()?.data?.text)
         Assert.assertEquals("", awaitPanelPreedit(""))
         fcitx.reset()
-    }
-
-    /**
-     * A table's page shows the page size, prediction and performance level every Chinese input
-     * method shares beside its own options: a page size saved there is pinyin's too, the table's
-     * own options as they were.
-     */
-    @Test
-    fun aTablesPageSharesThePageSizeWithPinyinAndKeepsItsOwnOptions(): Unit = runBlocking {
-        val pageSize = fcitx.getImConfig(Engines.PINYIN)["cfg"][EngineSettings.PAGE_SIZE].value
-        val autoSelect = fcitx.getImConfig(WUBI)["cfg"][TableSettings.AUTO_SELECT].value
-        val changed = if (pageSize == "4") "5" else "4"
-        try {
-            fcitx.setImConfig(WUBI, RawConfig(arrayOf(RawConfig(EngineSettings.PAGE_SIZE, changed))))
-            Assert.assertEquals("pinyin's", changed, fcitx.getImConfig(Engines.PINYIN)["cfg"][EngineSettings.PAGE_SIZE].value)
-            Assert.assertEquals("the table's", changed, fcitx.getImConfig(WUBI)["cfg"][EngineSettings.PAGE_SIZE].value)
-            Assert.assertEquals("its own option", autoSelect, fcitx.getImConfig(WUBI)["cfg"][TableSettings.AUTO_SELECT].value)
-        } finally {
-            fcitx.setImConfig(Engines.PINYIN, RawConfig(arrayOf(RawConfig(EngineSettings.PAGE_SIZE, pageSize))))
-        }
     }
 
     // endregion

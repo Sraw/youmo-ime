@@ -186,21 +186,30 @@ abstract class ManagedPreferenceCategory(
         return primary to secondary
     }
 
-    override fun createUi(screen: PreferenceScreen) {
+    override fun createUi(screen: PreferenceScreen) = createUi(screen, ALL)
+
+    /**
+     * The preferences of [section] alone, put straight into [group] without its title: one category
+     * shown over two pages, each page a section of it (the keys, the sound and vibration). With
+     * [ALL], every preference, each section under its title.
+     */
+    fun createUi(group: PreferenceGroup, @StringRes section: Int) {
         // a section with nothing after it would silently drop its title
         require(managedPreferencesUi.size !in sections) { "empty section at the end" }
-        val ctx = screen.context
-        var group: PreferenceGroup = screen
+        require(section == ALL || section in sections.values) { "no section $section" }
+        // one before the first section would be on no page made of a section
+        require(section == ALL || managedPreferencesUi.isEmpty() || 0 in sections) { "preferences before the first section" }
+        val ctx = group.context
+        var into: PreferenceGroup? = if (section == ALL) group else null
         managedPreferencesUi.forEachIndexed { index, it ->
             sections[index]?.let { title ->
-                group = PreferenceCategory(ctx).apply {
-                    key = sectionKey(title)
-                    setTitle(title)
-                    isIconSpaceReserved = false
+                into = when (section) {
+                    ALL -> addSection(group, title)
+                    title -> group
+                    else -> null
                 }
-                screen.addPreference(group)
             }
-            group.addPreference(it.createUi(ctx).apply {
+            into?.addPreference(it.createUi(ctx).apply {
                 isEnabled = it.isEnabled()
             })
         }
@@ -209,5 +218,16 @@ abstract class ManagedPreferenceCategory(
     companion object {
         /** Key of the [PreferenceCategory] created for [section], for fragments that append to it. */
         fun sectionKey(@StringRes title: Int) = "section_$title"
+
+        /** A category titled [title] added to [group], keyed and laid out as [createUi] makes a section's. */
+        fun addSection(group: PreferenceGroup, @StringRes title: Int): PreferenceCategory =
+            PreferenceCategory(group.context).apply {
+                key = sectionKey(title)
+                setTitle(title)
+                isIconSpaceReserved = false
+            }.also(group::addPreference)
+
+        /** For [createUi]: every section, not one. */
+        const val ALL = 0
     }
 }

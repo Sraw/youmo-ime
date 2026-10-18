@@ -39,7 +39,7 @@ class MainActivityTest {
             .putExtra(NavController.KEY_DEEP_LINK_IDS, intArrayOf(GRAPH, PAGE))
             .putParcelableArrayListExtra(NavController.KEY_DEEP_LINK_ARGS, arrayListOf(Bundle(), Bundle()))
             .putExtra(NavController.KEY_DEEP_LINK_EXTRAS, Bundle())
-            .putExtra(MainActivity.EXTRA_SETTINGS_ROUTE, SettingsRoute.VirtualKeyboard)
+            .putExtra(MainActivity.EXTRA_SETTINGS_ROUTE, SettingsRoute.Keys)
         intent.dropDeepLinks()
         assertFalse(intent.hasExtra(NavController.KEY_DEEP_LINK_IDS))
         assertFalse(intent.hasExtra(NavController.KEY_DEEP_LINK_ARGS))

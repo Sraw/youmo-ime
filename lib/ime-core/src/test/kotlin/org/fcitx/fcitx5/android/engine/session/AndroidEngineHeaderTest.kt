@@ -104,6 +104,18 @@ class AndroidEngineHeaderTest {
         }
     }
 
+    // the app's page of what every input method shares reads and writes pinyin's page
+    // (InputMethodSettings.SHARED, SharedInputFragment): each of them must be on it, and be the
+    // addon's own option, not a table's, which every session reads (EngineSettings, one for all)
+    @Test
+    fun theSharedOptionsAreOnPinyinsPageAndTheAddonsOwn() {
+        val shared = with(EngineSettings) { setOf(PREDICTION, EMOJI, MODEL_LEVEL, FUZZY, PAGE_SIZE) }
+        val pinyin = options("EnginePinyinPage")
+        assertEquals(shared, shared intersect pinyin.keys)
+        val engine = options("AndroidEngineConfig")
+        shared.forEach { assertEquals(it, engine[it], pinyin[it]) }
+    }
+
     // a level saved by another name is read as HIGH (EngineSettings.parse): 低档 would save no memory
     @Test
     fun eachModelLevelIsNamedAsTheAddonSavesIt() {

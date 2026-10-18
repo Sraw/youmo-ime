@@ -15,7 +15,7 @@ import org.junit.Test
 import timber.log.Timber
 
 @OptIn(ExperimentalCoroutinesApi::class)
-class AdvancedSettingsFragmentTest {
+class BackupFragmentTest {
 
     // a reopen that still throws, its count failing on the full disk say (SQLiteFullException, a stub off the device)
     @Test

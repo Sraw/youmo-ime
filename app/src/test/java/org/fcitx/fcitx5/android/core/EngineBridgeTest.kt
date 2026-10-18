@@ -217,19 +217,19 @@ class EngineBridgeTest {
         assertEquals(listOf(phone, email), CustomPhraseManager.load(file))
     }
 
+    // one an older build merged into the new words is read into the base, its list gone
     @Test
-    fun aDictionaryMovedToTheNewWordsIsReadThereAndIsAChange() {
+    fun aDictionaryOnceMergedIntoTheNewWordsIsReadIntoTheBase() {
         val dictionaries = File(folder.root, "dictionaries").apply { mkdirs() }
         File(dictionaries, "mine.txt").writeText("你好 ni'hao 0.0\n")
-        val base = EngineBridge.additions(folder.root)
-        assertEquals(listOf("你好 ni'hao 0.0"), base.dictionary().toList())
-        assertEquals(emptyList<String>(), base.newDictionary().toList())
-        ImportedDictionaries.setIntoNew(dictionaries, "mine", true)
-        val moved = EngineBridge.additions(folder.root)
-        assertEquals(emptyList<String>(), moved.dictionary().toList())
-        assertEquals(listOf("你好 ni'hao 0.0"), moved.newDictionary().toList())
-        // the same file, size and time: read again on reload all the same
-        assertNotEquals(base.dictionaries, moved.dictionaries)
+        File(dictionaries, "theirs.txt").writeText("搭子 da'zi 0.0\n")
+        val list = File(dictionaries, ImportedDictionaries.INTO_NEW).apply { writeText("mine\n") }
+        val added = EngineBridge.additions(folder.root)
+        assertEquals(listOf("你好 ni'hao 0.0", "搭子 da'zi 0.0"), added.dictionary().toList())
+        assertFalse(list.exists())
+        // a change of a dictionary is told apart, as the engine reads them again for it
+        File(dictionaries, "theirs.txt").writeText("搭子 da'zi 0.0\n妮 ni 0.0\n")
+        assertNotEquals(added.dictionaries, EngineBridge.additions(folder.root).dictionaries)
     }
 
     @Test

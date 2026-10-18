@@ -18,6 +18,7 @@ import org.fcitx.fcitx5.android.core.RawConfig
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.engine.host.EngineSettings
 import org.fcitx.fcitx5.android.engine.host.Engines
+import org.fcitx.fcitx5.android.engine.host.ModelLevel
 import org.fcitx.fcitx5.android.engine.host.TableSettings
 import org.fcitx.fcitx5.android.engine.pinyin.Fuzzy
 import org.fcitx.fcitx5.android.input.handwriting.HandwritingPause
@@ -169,22 +170,74 @@ class InputMethodSettingsScreenTest {
     @Test
     fun aChoiceHasNoDefaultToGoBackTo() {
         appInputMethods.forEach { page -> screen(page).lists().forEach { assertFalse("$page ${it.key}", it.hasDefault()) } }
-        val given = screen(Engines.PINYIN).lists().first().apply { setDefaultValue("5") }
+        val given = create(InputMethodSettings.SHARED).lists().first().apply { setDefaultValue("5") }
         assertTrue(given.hasDefault())
     }
 
-    // a key the engine does not read is a switch that does nothing
+    // a key the engine does not read is a switch that does nothing; the shared page and the physical
+    // keyboard's save into pinyin's config, whose shared keys are the addon's own, read by every
+    // session (EngineSettings, one for all: pinyin's, a table's, handwriting's)
     @Test
     fun aChangeIsSavedWhereTheEngineReadsIt() {
         val cfg = RawConfig()
         var saves = 0
-        val page = screen(Engines.PINYIN, cfg) { saves++ }
+        val page = create(InputMethodSettings.SHARED, cfg) { saves++ }
         page.titled(R.string.im_prediction).callChangeListener(false)
         page.titled(R.string.im_typos).callChangeListener(false)
-        page.findPreference<ListPreference>(EngineSettings.PAGE_SIZE)!!.callChangeListener("5")
-        assertEquals(3, saves)
+        page.findPreference<ListPreference>(EngineSettings.MODEL_LEVEL)!!.callChangeListener("Low")
+        create(InputMethodSettings.HARDWARE_KEYBOARD, cfg) { saves++ }.findPreference<ListPreference>(EngineSettings.PAGE_SIZE)!!.callChangeListener("5")
+        assertEquals(4, saves)
         assertEquals("False", cfg[EngineSettings.FUZZY][EngineSettings.TYPOS].value)
-        assertEquals(EngineSettings(prediction = false, typos = false, pageSize = 5), EngineSettings.parse(cfg.flattened()))
+        assertEquals(EngineSettings(prediction = false, typos = false, pageSize = 5, modelLevel = ModelLevel.LOW), EngineSettings.parse(cfg.flattened()))
+    }
+
+    // a page saves what it shows alone: the addon keeps the rest (a partial load), so a table's page
+    // opened before the shared one does not write back the prediction it read then
+    @Test
+    fun aPageSavesOnlyWhatItShows() {
+        val cfg = RawConfig().apply {
+            getOrCreate(EngineSettings.PREDICTION).value = "True"
+            getOrCreate(TableSettings.HINT).value = "True"
+        }
+        screen("engine-wubi", cfg).titled(R.string.im_hint).callChangeListener(false)
+        val saved = InputMethodSettings.only(InputMethodSettings.of("engine-wubi")!!, cfg).flattened()
+        assertTrue(saved, "${TableSettings.HINT}=False\n" in saved)
+        assertFalse(saved, EngineSettings.PREDICTION in saved)
+        val shared = RawConfig().apply {
+            getOrCreate(EngineSettings.CHAIZI).value = "False"
+            getOrCreate(EngineSettings.FUZZY).getOrCreate(Fuzzy.L_N.name).value = "True"
+            getOrCreate(EngineSettings.EMOJI).value = "False"
+        }
+        // pinyin's own (拆字) stays on its page; a pair of the fuzzy ones, not the group's name alone
+        assertEquals("${EngineSettings.EMOJI}=False\n${EngineSettings.FUZZY}/${Fuzzy.L_N.name}=True\n", InputMethodSettings.only(InputMethodSettings.SHARED, shared).flattened())
+    }
+
+    // the shared page says under each what it is no use to; an input method's page, its own alone, says nothing of the kind
+    @Test
+    fun aSharedOptionSaysUnderItWhatItIsNoUseTo() {
+        val shared = create(InputMethodSettings.SHARED)
+        // in the Chinese input methods' section, whose title says English: only the exception within it
+        assertEquals(placeholder(R.string.im_prediction_summary), shared.titled(R.string.im_prediction).summary?.toString())
+        assertEquals("${placeholder(R.string.im_emoji_summary)}\n${placeholder(R.string.im_not_for)}", shared.titled(R.string.im_emoji).summary?.toString())
+        assertNull(shared.titled(R.string.auto_pairs).summary)
+        assertEquals("${placeholder(R.string.im_glide_summary)}\n${placeholder(R.string.im_not_for)}", shared.titled(R.string.im_glide).summary?.toString())
+        val level = shared.findPreference<ListPreference>(EngineSettings.MODEL_LEVEL)!!
+        assertEquals("${level.entry}\n${placeholder(R.string.im_model_level_summary)}", level.summary?.toString())
+        assertEquals(placeholder(R.string.im_chaizi_summary), screen(Engines.PINYIN).titled(R.string.im_chaizi).summary?.toString())
+    }
+
+    // every input method's page opens the shared one from its first row
+    @Test
+    fun eachPageOpensTheSharedOneFromItsFirstRow() {
+        val ctx = PlaceholderStrings(RuntimeEnvironment.getApplication())
+        appInputMethods.forEach { page ->
+            val opened = ArrayList<SettingsRoute>()
+            val screen = InputMethodSettings.create(PreferenceManager(ctx), InputMethodSettings.of(page)!!, RawConfig(), {}) { opened += it }
+            val link = screen.getPreference(0)
+            assertEquals(page, InputMethodSettings.SHARED_LINK, link.key)
+            link.performClick()
+            assertEquals(page, listOf<SettingsRoute>(SettingsRoute.SharedInput), opened)
+        }
     }
 
     @Test
@@ -208,7 +261,7 @@ class InputMethodSettingsScreenTest {
     @Test
     fun theFuzzyPairsStoredShowOnTheirRow() {
         val cfg = RawConfig().apply { getOrCreate(EngineSettings.FUZZY).getOrCreate(Fuzzy.L_N.name).value = "True" }
-        assertEquals("l ↔ n", screen(Engines.PINYIN, cfg).titled(R.string.im_fuzzy).summary?.toString())
+        assertEquals("l ↔ n", create(InputMethodSettings.SHARED, cfg).titled(R.string.im_fuzzy).summary?.toString())
     }
 
     @Test

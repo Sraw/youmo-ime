@@ -24,6 +24,9 @@ abstract class ManagedPreferenceFragment(private val preferenceProvider: Managed
         }
     }
 
+    /** The page's preferences put on [screen]: those of the provider, unless the page shows others too or only some. */
+    open fun createUi(screen: PreferenceScreen) = preferenceProvider.createUi(screen)
+
     open fun onPreferenceUiCreated(screen: PreferenceScreen) {}
 
     @CallSuper
@@ -31,7 +34,7 @@ abstract class ManagedPreferenceFragment(private val preferenceProvider: Managed
         evaluator.evaluateVisibility()
         preferenceScreen =
             preferenceManager.createPreferenceScreen(preferenceManager.context).also { screen ->
-                preferenceProvider.createUi(screen)
+                createUi(screen)
                 onPreferenceUiCreated(screen)
             }
     }

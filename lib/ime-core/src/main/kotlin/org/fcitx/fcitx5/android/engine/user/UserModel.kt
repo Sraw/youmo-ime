@@ -77,7 +77,9 @@ class UserModel(
     // those of them the user added by hand (listByHand), by id from vocabulary.size up as sameText: in
     // memory only, listed again from their list on a start; an array, as modelWord asks on every score
     private var byHand = BooleanArray(INITIAL_WORDS)
-    // from a word pack: the score of a word the model lacks, and the layer (exact as a float), by id
+    // from a word pack: the score of a word the model lacks, and the layer (exact as a float), by id.
+    // Only ime-eval lists scored words (a candidate pack evaluated); the app no longer does, and for
+    // it these cost one map miss per word the model lacks
     private val packScores = Counts()
     private val packLayers = Counts()
 
@@ -296,6 +298,9 @@ class UserModel(
      * gave its name) and scored [score] if the model lacks it: see [score] and [layerOf]. A word
      * of the model's (an id below [modelWords]) keeps the model's score and the dictionary's
      * layer. Listed twice, the later holds: a pack read again replaces what it said before.
+     *
+     * Only ime-eval calls it, to evaluate a candidate pack (lib/ime-dict-tool/engine-data.sh): the
+     * app no longer lists scored words, its built-in new words being a layer of the dictionary.
      */
     fun list(entry: Entry, score: Float, layer: Int, modelWords: Int = 0): Int {
         require(score <= 0f && score.isFinite()) { "score $score" }
@@ -326,10 +331,13 @@ class UserModel(
      */
     fun chosen(word: Int): Boolean = (word >= vocabulary.size && byHand[word - vocabulary.size]) || count(word) > 0f
 
-    /** The log10 probability a pack gave word [id], or NaN: [UserScorer] uses it where the model has no word. */
+    /**
+     * The log10 probability a pack gave word [id], or NaN: [UserScorer] uses it where the model has
+     * no word. Always NaN in the app, which lists no scored words (only ime-eval does).
+     */
     fun score(id: Int): Float = packScores.getOrDefault(id.toLong(), Float.NaN)
 
-    /** The layer a pack put word [id] in, -1 if none did. */
+    /** The layer a pack put word [id] in, -1 if none did (always, in the app: see [score]). */
     override fun layerOf(id: Int): Int = packLayers.getOrDefault(id.toLong(), -1f).toInt()
 
     // a word the user made, not the dictionary's nor one of their dictionaries'

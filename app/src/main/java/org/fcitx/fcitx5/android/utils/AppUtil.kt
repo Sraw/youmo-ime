@@ -32,13 +32,13 @@ object AppUtil {
      * intent: it is exported, and a route such as the pinyin dictionaries' names any file it likes.
      */
     fun isLaunchRoute(route: SettingsRoute) = when (route) {
-        SettingsRoute.VirtualKeyboard, SettingsRoute.InputMethodList, SettingsRoute.Theme,
+        SettingsRoute.Keys, SettingsRoute.InputMethodList, SettingsRoute.Theme,
         is SettingsRoute.InputMethodConfig -> true
         else -> false
     }
 
     fun launchMainToKeyboard(context: Context) =
-        launchMainToDest(context, SettingsRoute.VirtualKeyboard)
+        launchMainToDest(context, SettingsRoute.Keys)
 
     fun launchMainToInputMethodList(context: Context) =
         launchMainToDest(context, SettingsRoute.InputMethodList)

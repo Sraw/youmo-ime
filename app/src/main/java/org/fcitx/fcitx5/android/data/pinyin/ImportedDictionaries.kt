@@ -60,8 +60,8 @@ object ImportedDictionaries {
      * own threads.
      *
      * The word packs an older build imported (`.words`, and `.words.disable` if turned off) are
-     * deleted first: their words are built in now. Then each name [INTO_NEW] lists that no
-     * dictionary has, a pack's among them, is taken off it.
+     * deleted first: their words are built in now. So is [INTO_NEW], the list of those an older
+     * build merged into the new words dictionary: every one is merged into the base now.
      */
     @Synchronized
     fun migrate(dir: File, read: (ByteArray) -> List<String> = LibimeFiles::pinyinDictionary) {
@@ -69,8 +69,7 @@ object ImportedDictionaries {
         noteOlder(dir, read)
         val files = dir.listFiles().orEmpty()
         files.filter { isWordPack(it.name) }.forEach { deleteWordPack(it) }
-        // before libime's are turned into text: one under a name still listed would join the new words
-        forgetIntoNewOfNone(dir)
+        forgetIntoNew(dir)
         for (file in files) {
             val enabled = when {
                 file.name.endsWith(".dict") -> true
@@ -93,13 +92,12 @@ object ImportedDictionaries {
         }
     }
 
-    // a name listed that no dictionary has (a pack's an older build deleted, one whose delete
-    // stopped half way) would merge the next of that name, from libime or a backup, into the new words
-    private fun forgetIntoNewOfNone(dir: File) {
-        try {
-            readIntoNew(dir).filter { !hasDictionary(dir, it) }.forEach { setIntoNew(dir, it, false) }
-        } catch (e: IOException) {
-            Timber.w(e, "dictionaries merged into the new words: cannot forget those gone")
+    // the user is shown two dictionaries, theirs and the base, with the built-in new words in the base:
+    // one merged into the new words, apart from the base, was a third to explain; a restored backup
+    // brings the list back, gone again at the next migration
+    private fun forgetIntoNew(dir: File) {
+        for (file in listOf(File(dir, INTO_NEW), File(dir, "$INTO_NEW.tmp"))) {
+            if (file.exists() && !file.delete()) Timber.w("%s: cannot delete it", file.name)
         }
     }
 
@@ -272,46 +270,8 @@ object ImportedDictionaries {
     private const val OLDER_NOTED = ".unread-older"
 
     /**
-     * The names of the dictionaries merged into the new words dictionary, one a line;
-     * the rest are merged into the base dictionary. A dot file: no dictionary to list.
+     * Where an older build listed the dictionaries merged into the new words dictionary, one a line;
+     * [migrate] deletes it, all of them merged into the base.
      */
     const val INTO_NEW = ".new-words"
-
-    /** The names [INTO_NEW] in [dir] lists; none if it cannot be read, all then in the base. */
-    fun intoNew(dir: File): Set<String> = try {
-        readIntoNew(dir)
-    } catch (e: IOException) {
-        Timber.w(e, "dictionaries merged into the new words")
-        emptySet()
-    }
-
-    private fun readIntoNew(dir: File): Set<String> {
-        val file = File(dir, INTO_NEW)
-        if (!file.isFile) return emptySet()
-        // as setIntoNew wrote them: a name may begin or end with a space
-        return file.readLines().filter { it.isNotEmpty() }.toSet()
-    }
-
-    /**
-     * Merges dictionary [name] into the new words dictionary ([into]) or the base one. The
-     * settings write it, from any thread.
-     *
-     * @throws IOException if it could not be written, or [name] cannot be listed: empty, or with
-     *   a line break in it
-     */
-    @Synchronized
-    fun setIntoNew(dir: File, name: String, into: Boolean) {
-        // a name a line: one that is not would read back as others, or as none
-        if (into && !isOneLine(name)) throw IOException("cannot list \"$name\" in $INTO_NEW")
-        // a list that does not read is not written over with one name: the rest would be lost
-        val names = readIntoNew(dir)
-        val now = if (into) names + name else names - name
-        val file = File(dir, INTO_NEW)
-        if (now == names && file.isFile) return
-        replaceFile(file, File(dir, "$INTO_NEW.tmp")) { temp ->
-            temp.writeText(now.sorted().joinToString("") { "$it\n" })
-        }
-    }
-
-    private fun isOneLine(name: String) = name.isNotEmpty() && '\n' !in name && '\r' !in name
 }

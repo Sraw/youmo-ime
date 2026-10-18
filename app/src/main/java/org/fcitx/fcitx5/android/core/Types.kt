@@ -94,6 +94,9 @@ data class RawConfig(
         return subItems?.find { it.name == name }
     }
 
+    /** A copy no later change to this one reaches, however deep. */
+    fun deepCopy(): RawConfig = copy(subItems = subItems?.map { it.deepCopy() }?.toTypedArray())
+
     fun getOrCreate(name: String): RawConfig {
         val items = subItems
         return if (items == null) {

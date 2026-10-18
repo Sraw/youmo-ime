@@ -4,9 +4,7 @@
  */
 package org.fcitx.fcitx5.android.engine.host
 
-import org.fcitx.fcitx5.android.engine.data.WordLayers
 import org.fcitx.fcitx5.android.engine.host.Engines.Additions
-import org.fcitx.fcitx5.android.engine.host.Engines.Companion.NEW_WORD_SCORE
 import org.fcitx.fcitx5.android.engine.host.Engines.Companion.USER_PINYIN
 import org.fcitx.fcitx5.android.engine.host.Engines.Imported
 import org.fcitx.fcitx5.android.engine.host.Engines.UserWord
@@ -246,13 +244,9 @@ internal class UserLexicon(
                 unread = true
                 onError(it)
             },
-            plain = {
-                left -= it
-                texts -= it.text
-            },
-        ) { entry, _, _ ->
-            left -= entry
-            texts -= entry.text
+        ) {
+            left -= it
+            texts -= it.text
         }
         if (unread || addedFailed) return null
         return removed.filter { it in left } to texts
@@ -310,29 +304,17 @@ internal class UserLexicon(
     }
 
     private fun addDictionaries(model: UserModel) {
-        val modelWords = pinyinData.model.vocabularySize
-        forEachDictionaryWord(onError, { model.list(it) }) { entry, score, layer -> model.list(entry, score, layer, modelWords) }
+        forEachDictionaryWord(onError) { model.list(it) }
     }
 
     /**
-     * Each word of the user's dictionaries as it is read: [plain] one of a dictionary
-     * merged into the base one, [scored] any other, with the score and the layer it goes in.
+     * Each word of the user's dictionaries, all merged into the base one, as it is read, to [each].
      * [failed] hears of each that does not read.
      */
-    private fun forEachDictionaryWord(failed: (IOException) -> Unit, plain: (Entry) -> Unit, scored: (Entry, Float, Int) -> Unit) {
+    private fun forEachDictionaryWord(failed: (IOException) -> Unit, each: (Entry) -> Unit) {
         // as they are read: one dictionary in the heap at a time, not all their lines at once
         try {
-            added()?.dictionary?.invoke()?.forEach { line -> LibimeImport.dictionaryEntry(line)?.let(plain) }
-        } catch (e: IOException) {
-            failed(e)
-        }
-        val newLayer = prior().layer(WordLayers.NEW)
-        // a dictionary has no scores of its own: its words the model lacks are scored as the new
-        // words dictionary's typical one, and weighed with it
-        try {
-            added()?.newDictionary?.invoke()?.forEach { line ->
-                LibimeImport.dictionaryEntry(line)?.let { scored(it, NEW_WORD_SCORE, newLayer) }
-            }
+            added()?.dictionary?.invoke()?.forEach { line -> LibimeImport.dictionaryEntry(line)?.let(each) }
         } catch (e: IOException) {
             failed(e)
         }

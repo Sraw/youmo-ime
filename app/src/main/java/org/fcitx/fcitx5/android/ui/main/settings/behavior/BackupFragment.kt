@@ -12,8 +12,6 @@ import androidx.appcompat.app.AlertDialog
 import androidx.fragment.app.activityViewModels
 import androidx.lifecycle.lifecycleScope
 import androidx.preference.Preference
-import androidx.preference.PreferenceCategory
-import androidx.preference.PreferenceScreen
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.currentCoroutineContext
@@ -25,14 +23,10 @@ import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.daemon.FcitxDaemon
 import org.fcitx.fcitx5.android.data.UserDataManager
 import org.fcitx.fcitx5.android.data.clipboard.ClipboardManager
-import org.fcitx.fcitx5.android.data.prefs.AppPrefs
-import org.fcitx.fcitx5.android.data.prefs.ManagedPreferenceFragment
+import org.fcitx.fcitx5.android.ui.common.PaddingPreferenceFragment
 import org.fcitx.fcitx5.android.ui.common.withLoadingDialog
 import org.fcitx.fcitx5.android.ui.main.MainViewModel
-import org.fcitx.fcitx5.android.ui.main.settings.SettingsRoute
 import org.fcitx.fcitx5.android.utils.AppUtil
-import org.fcitx.fcitx5.android.utils.addPreference
-import org.fcitx.fcitx5.android.utils.navigateWithAnim
 import org.fcitx.fcitx5.android.utils.formatDateTime
 import org.fcitx.fcitx5.android.utils.importErrorDialog
 import org.fcitx.fcitx5.android.utils.iso8601UTCDateTime
@@ -41,7 +35,11 @@ import org.fcitx.fcitx5.android.utils.setup
 import org.fcitx.fcitx5.android.utils.toast
 import timber.log.Timber
 
-class AdvancedSettingsFragment : ManagedPreferenceFragment(AppPrefs.getInstance().advanced) {
+/**
+ * The whole of the user's data in and out, as one file: where it lies on the phone is no business
+ * of theirs (fcitx's global options and its data folder are not shown either).
+ */
+class BackupFragment : PaddingPreferenceFragment() {
 
     private val viewModel: MainViewModel by activityViewModels()
 
@@ -81,8 +79,8 @@ class AdvancedSettingsFragment : ManagedPreferenceFragment(AppPrefs.getInstance(
                             delay(400L)
                             AppUtil.restart(ctx.applicationContext)
                             null
-                        } catch (e: Exception) {
-                            // reopen the clipboard and restart fcitx in case importing failed
+                        } catch (@Suppress("TooGenericExceptionCaught") e: Exception) {
+                            // whatever the provider or the zip threw: shown, after the clipboard is reopened and fcitx restarted
                             restartAfterFailedImport({ ClipboardManager.reopenDatabase() }) { FcitxDaemon.startFcitx() }
                             e
                         }
@@ -100,35 +98,20 @@ class AdvancedSettingsFragment : ManagedPreferenceFragment(AppPrefs.getInstance(
                             val outputStream = ctx.contentResolver.openOutputStream(uri)!!
                             UserDataManager.export(outputStream, exportTimestamp).getOrThrow()
                         }
-                    } catch (e: Exception) {
-                        e.printStackTrace()
+                    } catch (@Suppress("TooGenericExceptionCaught") e: Exception) {
+                        // whatever the provider threw: told, the page left as it was
+                        Timber.w(e, "Failed to export the user's data")
                         ctx.toast(e)
                     }
                 }
             }
     }
 
-    override fun onPreferenceUiCreated(screen: PreferenceScreen) {
+    override fun onCreatePreferences(savedInstanceState: Bundle?, rootKey: String?) {
         val ctx = requireContext()
-        // what a phone's user seldom needs, kept off the main page
-        val more = PreferenceCategory(ctx).apply {
-            setTitle(R.string.more_settings)
-            isIconSpaceReserved = false
-        }
-        screen.addPreference(more)
-        more.addPreference(R.string.candidates_window) { navigateWithAnim(SettingsRoute.CandidatesWindow) }
-        // the punctuation addon's own page went with the list of addons
-        more.addPreference(R.string.punctuation_map) {
-            navigateWithAnim(SettingsRoute.Punctuation(getString(R.string.punctuation_map)))
-        }
-        // the whole of the user's data in and out, as one file: where it lies on the phone is no
-        // business of theirs (fcitx's global options and its data folder are not shown either)
-        val userData = PreferenceCategory(ctx).apply {
-            setTitle(R.string.user_data)
-            isIconSpaceReserved = false
-        }
-        screen.addPreference(userData)
-        userData.addPreference(Preference(ctx).apply {
+        val screen = preferenceManager.createPreferenceScreen(ctx)
+        preferenceScreen = screen
+        screen.addPreference(Preference(ctx).apply {
             key = EXPORT_USER_DATA_KEY
             setup(ctx.getString(EXPORT_USER_DATA), ctx.getString(EXPORT_USER_DATA_SUMMARY)) {
                 lifecycleScope.withLoadingDialog(ctx) {
@@ -140,7 +123,7 @@ class AdvancedSettingsFragment : ManagedPreferenceFragment(AppPrefs.getInstance(
                 }
             }
         })
-        userData.addPreference(Preference(ctx).apply {
+        screen.addPreference(Preference(ctx).apply {
             key = IMPORT_USER_DATA_KEY
             setup(ctx.getString(IMPORT_USER_DATA)) {
                 AlertDialog.Builder(ctx)

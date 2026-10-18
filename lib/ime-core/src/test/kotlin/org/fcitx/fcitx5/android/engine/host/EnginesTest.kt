@@ -194,26 +194,57 @@ class EnginesTest : EnginesFixture() {
     }
 
     @Test
-    fun aDictionaryMergedIntoTheNewWordsIsScoredAsOneOfThem() {
-        // no scores in a dictionary: 泥, merged into the new words, at their typical score; 妮,
-        // merged into the base, at the unknown word's until picked
-        val additions = Engines.Additions("", "d", newDictionary = { sequenceOf("泥 ni 0") }) { sequenceOf("妮 ni 0") }
+    fun aDictionaryWordIsMergedIntoTheBase() {
+        // no scores in a dictionary: 妮 and 泥, merged into the base, at the unknown word's until picked
+        val additions = Engines.Additions("", "d") { sequenceOf("妮 ni 0", "泥 ni 0") }
         Engines(::load, folder.newFolder("engine"), { throw it }, additions = { additions }).use { engines ->
-            assertEquals(listOf("你", "拟", "泥", "妮"), engines.type(Engines.PINYIN, "ni").candidates)
+            val candidates = engines.type(Engines.PINYIN, "ni").candidates
+            assertEquals(listOf("你", "拟"), candidates.take(2))
+            assertEquals(setOf("妮", "泥"), candidates.drop(2).toSet())
         }
     }
 
+    // an imported dictionary is the base's: a word of it picked teaches the new words' layer nothing
+    // (the built-in new words' is learned: theNewWordsLayerIsLearnedAndKept)
     @Test
-    fun theNewWordsLayerIsLearnedAndKept() {
-        val additions = Engines.Additions("", "d", newDictionary = { sequenceOf("泥 ni 0") }) { emptySequence() }
+    fun aDictionaryWordPickedLeavesTheNewWordsLayerAsItWas() {
+        val additions = Engines.Additions("", "d") { sequenceOf("泥 ni 0") }
         val dir = folder.newFolder("engine")
         Engines(::load, dir, { throw it }, additions = { additions }).use { engines ->
             val at = engines.type(Engines.PINYIN, "ni").candidates.indexOf("泥")
             assertTrue(at > 0)
             engines.onEvent(Engines.PINYIN, EngineEvent.PICK, at)
         }
+        priorsKept(dir).let { assertEquals(0f, it[it.layer(WordLayers.NEW)], 0f) }
+    }
+
+    // the built-in new words are a layer of the data: one of them picked moves that layer, kept in the log
+    @Test
+    fun theNewWordsLayerIsLearnedAndKept() {
+        val ni = syl("ni")
+        val data = PinyinDataBuilder()
+            .layers(listOf(WordLayers.BASE, WordLayers.NEW))
+            .unigram("<unk>", -7f, 0f)
+            .unigram("你", -2f, 0f)
+            .unigram("拟", -3f, 0f)
+            .entry("你", ni)
+            .entry("拟", ni)
+            .entry("泥", ni, layer = 1)
+            .build()
+            .toByteArray()
+        val withNew = { path: String -> if (path == Engines.PINYIN_DATA) ByteBuffer.wrap(data) else load(path) }
+        val dir = folder.newFolder("engine")
+        Engines(withNew, dir, { throw it }).use { engines ->
+            val at = engines.type(Engines.PINYIN, "ni").candidates.indexOf("泥")
+            assertTrue(at > 0)
+            engines.onEvent(Engines.PINYIN, EngineEvent.PICK, at)
+        }
         // 泥 picked over 你: its layer a step up, in the log
-        priorsKept(dir).let { assertEquals(LayerPrior.STEP, it[it.layer(WordLayers.NEW)], 0f) }
+        val loaded = PinyinData.load(ByteBuffer.wrap(data))
+        val kept = LayerPrior(loaded.layers).also {
+            UserLog.read(dir.resolve(Engines.USER_PINYIN).readBytes(), UserModel(loaded.dictionary, loaded.vocabulary), it)
+        }
+        assertEquals(LayerPrior.STEP, kept[kept.layer(WordLayers.NEW)], 0f)
     }
 
     @Test

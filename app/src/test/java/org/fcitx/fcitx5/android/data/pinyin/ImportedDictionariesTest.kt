@@ -56,19 +56,30 @@ class ImportedDictionariesTest {
     }
 
     @Test
-    fun aWordPackGoneIsNoLongerMergedIntoTheNewWords() {
+    fun aWordPackGoesAndLibimesOfItsNameIsTurnedIntoText() {
         File(dir, "a.words").writeText("# youmo words 1\n搭子 da'zi -5.6\n")
         File(dir, "b.words.disable").writeText("# youmo words 1\n")
         File(dir, "mine.words").writeText("# youmo words 1\n")
         File(dir, "mine.txt").writeText("搭子 da'zi 0\n")
-        // gone: a pack an older migration deleted, its name left listed
-        listOf("a", "b", "mine", "gone").forEach { ImportedDictionaries.setIntoNew(dir, it, true) }
-        // libime's of a pack's name, turned into text as the pack goes: merged into the base
         File(dir, "b.dict").writeBytes(extra)
         ImportedDictionaries.migrate(dir)
-        // a dictionary of a pack's name still there keeps its entry
-        assertEquals(setOf("mine"), ImportedDictionaries.intoNew(dir))
-        assertEquals(listOf(".libime", ImportedDictionaries.INTO_NEW, "b.txt", "mine.txt"), names())
+        assertEquals(listOf(".libime", "b.txt", "mine.txt"), names())
+    }
+
+    // two dictionaries shown, the user's and the base: one an older build merged into the new words
+    // (listed in INTO_NEW, or half written as its .tmp) is merged into the base, the list gone, as
+    // it is again after a restore brings it back
+    @Test
+    fun dictionariesOnceMergedIntoTheNewWordsAreMergedIntoTheBase() {
+        File(dir, "mine.txt").writeText("搭子 da'zi 0\n")
+        File(dir, "theirs.txt.disable").writeText("搭子 da'zi 0\n")
+        File(dir, ImportedDictionaries.INTO_NEW).writeText("mine\ntheirs\ngone\n")
+        File(dir, "${ImportedDictionaries.INTO_NEW}.tmp").writeText("mine\n")
+        ImportedDictionaries.migrate(dir)
+        assertEquals(listOf("mine.txt", "theirs.txt.disable"), names())
+        File(dir, ImportedDictionaries.INTO_NEW).writeText("mine\n")
+        ImportedDictionaries.migrate(dir)
+        assertEquals(listOf("mine.txt", "theirs.txt.disable"), names())
     }
 
     @Test
@@ -283,17 +294,4 @@ class ImportedDictionariesTest {
         assertEquals(listOf("a.txt"), names())
     }
 
-    @Test
-    fun aNameIsListedInTheNewWordsAsItIsOrNotAtAll() {
-        ImportedDictionaries.setIntoNew(dir, "新词 ", true)
-        assertEquals(setOf("新词 "), ImportedDictionaries.intoNew(dir))
-        // a name a line: one with a line break would read back as two
-        assertThrows(IOException::class.java) { ImportedDictionaries.setIntoNew(dir, "a\nb", true) }
-        assertEquals(setOf("新词 "), ImportedDictionaries.intoNew(dir))
-        // one not listed is kept from the new words all the same
-        ImportedDictionaries.setIntoNew(dir, "a\nb", false)
-        ImportedDictionaries.setIntoNew(dir, "新词 ", false)
-        assertEquals(emptySet<String>(), ImportedDictionaries.intoNew(dir))
-        assertEquals(listOf(ImportedDictionaries.INTO_NEW), names())
-    }
 }

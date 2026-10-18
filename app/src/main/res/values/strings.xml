@@ -53,7 +53,7 @@
     <string name="delete">Delete</string>
     <string name="clipboard">Clipboard</string>
     <string name="keyboard_height">Keyboard height</string>
-    <string name="virtual_keyboard">Keys and feedback</string>
+    <string name="virtual_keyboard">Keys</string>
     <string name="clipboard_suggestion_timeout">Clipboard suggestion timeout</string>
     <string name="version">Version</string>
     <string name="build_time">Commit time</string>
@@ -286,8 +286,6 @@
     <string name="section_keys">Keys</string>
     <string name="section_candidates">Candidate bar</string>
     <string name="section_sound_and_vibration">Sound &amp; vibration</string>
-    <string name="home_section_input">Input</string>
-    <string name="home_section_other">Other</string>
     <string name="long_press_characters_summary">Choose what each key offers when you hold it; the first is also what swiping it types, and the small character on the key</string>
     <string name="long_press_of">Long press on “%1$s”</string>
     <string name="long_press_editor_hint">The outlined one is what you get by holding the key and letting go, and by swiping it, and the small character on the key. Tap a character to select it, then use the buttons below.</string>
@@ -326,12 +324,8 @@
     <string name="search_settings">Search settings</string>
     <string name="search_settings_hint">Search settings</string>
     <string name="search_settings_none">No matching settings</string>
-    <string name="home_section_words">Words</string>
-    <string name="home_section_keyboard_look">Keyboard &amp; look</string>
-    <string name="home_section_clipboard_emoji">Clipboard &amp; emoji</string>
     <string name="custom_phrases">Custom phrases</string>
-    <string name="word_packs">Dictionaries</string>
-    <string name="more_settings">More settings</string>
+    <string name="word_packs">Words and phrases</string>
     <string name="word_pinyin_unknown">No reading found: please type the pinyin</string>
     <string name="punctuation_map">Chinese punctuation</string>
     <string name="word_list_empty">No words yet</string>
@@ -340,10 +334,8 @@
         <item quantity="other">%1$d words · long-press to select several</item>
     </plurals>
     <string name="word_list_found">%1$d of %2$d words</string>
-    <string name="import_words">Import a word list</string>
-    <string name="import_words_summary">A text file, a word a line, its pinyin after it or not: 幽默 you\'mo. Lists other input methods export read too</string>
     <string name="export_words">Export</string>
-    <string name="export_words_summary">All of the user dictionary as a text file, to import on another phone</string>
+    <string name="export_words_summary">All of the user dictionary as a text file; to bring it back or use it on another phone, pick User dictionary in Words and phrases → Import a dictionary.</string>
     <string name="import_words_done">Imported. Words added: %1$d, blocked: %2$d; lines not understood: %3$d</string>
     <string name="export_words_header"># Youmo IME user dictionary: a word a line, its pinyin after it; a ! before a word blocks it</string>
     <string name="select_all">Select all</string>
@@ -362,7 +354,7 @@
         <item quantity="other">Show %1$d words again?</item>
     </plurals>
     <string name="words_section_manage">Words</string>
-    <string name="words_section_files">Import and export</string>
+    <string name="words_section_files">File</string>
     <plurals name="word_count">
         <item quantity="one">%1$d word</item>
         <item quantity="other">%1$d words</item>
@@ -392,8 +384,8 @@
     <string name="level_strong">Strong</string>
     <string name="level_quiet">Quiet</string>
     <string name="level_loud">Loud</string>
-    <string name="theme_and_size">Theme and size</string>
-    <string name="configure_look">Size and keys</string>
+    <string name="theme_and_size">Look</string>
+    <string name="configure_look">Size and style</string>
     <string name="export_user_data_summary">Settings, words learned and added, custom phrases, themes and the clipboard history (copied passwords too), in one file</string>
     <string name="app_language">App language</string>
     <string name="language_follow_system">Same as the phone</string>
@@ -406,7 +398,6 @@
     <string name="im_pinyin">Pinyin</string>
     <string name="im_shuangpin">Shuangpin</string>
     <string name="im_t9">Pinyin (9 keys)</string>
-    <string name="im_not_for_t9">Not used on 9 keys</string>
     <string name="im_wubi">Wubi</string>
     <string name="im_cangjie">Cangjie</string>
     <string name="im_ziranma">Ziranma</string>
@@ -538,13 +529,10 @@
     <string name="long_press_move_left">Move left</string>
     <string name="long_press_move_right">Move right</string>
     <string name="layer_user">User dictionary</string>
-    <string name="layer_new">New words dictionary</string>
     <string name="layer_base">Base dictionary</string>
-    <string name="layer_user_summary">The words you added, learned and blocked: always ranked first</string>
-    <string name="builtin_new_title">Built-in new words</string>
-    <string name="builtin_new_summary">Words of the last few years, updated with the app · read only</string>
-    <string name="builtin_base_title">Built-in base dictionary</string>
-    <string name="builtin_base_summary">Everyday words and how common they are, updated with the app · read only</string>
+    <string name="layer_user_summary">Words you added and the keyboard learned, ranked high, higher the more you pick them; blocked words no longer show.</string>
+    <string name="builtin_base_title">Built-in dictionary</string>
+    <string name="builtin_base_summary">Everyday words and those of the last few years, updated with the app · read only</string>
     <string name="import_section">Import</string>
     <string name="import_dict">Import a dictionary</string>
     <string name="import_dict_summary">.txt, .dict and Sogou .scel files</string>
@@ -553,13 +541,10 @@
     <string name="dict_summary">%1$s · %2$s</string>
     <string name="dict_turn_on">Turn on</string>
     <string name="dict_turn_off">Turn off</string>
-    <string name="dict_move_to_new">Merge into the new words dictionary instead</string>
-    <string name="dict_move_to_base">Merge into the base dictionary instead</string>
     <string name="dict_delete_confirm">Delete the dictionary “%s”?</string>
     <string name="import_into_title">Merge it into which dictionary?</string>
-    <string name="import_into_base">For big, mixed dictionaries, such as a specialist one exported from Sogou or QQ: its words can be typed without pushing everyday ones aside</string>
-    <string name="import_into_new">Only for a short list you know is all new words: weighed with the built-in new words, as your picks show</string>
-    <string name="import_into_user">Taken as words you added yourself, ranked first: for a few thousand words you use at most</string>
+    <string name="import_into_base">For big, mixed dictionaries, such as a specialist one: its words can be typed, ranked by how common they are, without pushing everyday ones aside.</string>
+    <string name="import_into_user">For up to a few thousand words you use: ranked high, higher once picked, and can be edited and exported. A file the user dictionary exported comes back in here too.</string>
     <string name="words_page_hint">To stop a word showing, block it in User dictionary, or long-press it on the keyboard</string>
     <string name="dict_change_failed">Could not change it</string>
     <string name="dict_unread_title">Some dictionaries could not be read</string>
@@ -600,4 +585,32 @@
     <string name="show_touch_keyboard">Show the on-screen keyboard</string>
     <string name="hardware_switch_shortcuts">Hardware keyboard shortcuts</string>
     <string name="hardware_switch_shortcuts_summary">Shift alone or Ctrl+Space switches between Chinese and English, Ctrl+Shift goes to the next input method</string>
+    <string name="shared_input">Shared typing</string>
+    <string name="shared_input_link">Shared typing settings</string>
+    <string name="shared_input_link_summary">Options every input method shares</string>
+    <string name="shared_section_all">Every input method</string>
+    <string name="shared_section_chinese">Chinese input methods</string>
+    <string name="shared_section_pinyin">Pinyin (full, shuangpin, 9 keys)</string>
+    <string name="im_not_for">Not for %s.</string>
+    <string name="im_not_for_separator">", "</string>
+    <string name="clipboard_and_emoji">Clipboard and emoji</string>
+    <string name="hardware_keyboard">Physical keyboard</string>
+    <string name="section_emoji">Emoji</string>
+    <string name="section_animation">Animation</string>
+    <string name="section_key_style">Key style</string>
+    <string name="section_phrases">Phrases</string>
+    <string name="punctuation_map_summary">What each punctuation key types in Chinese, such as ， for ,</string>
+    <string name="custom_phrases_summary">A short code for a longer text, such as dz for your address</string>
+    <string name="im_page_size_summary">Only in the physical keyboard\'s candidate window; every input method\'s, English too</string>
+    <string name="home_input_methods_summary">Add and order them, and each one\'s own options</string>
+    <string name="home_shared_input_summary">Shared by every input method: prediction, emoji, glide typing, fuzzy pinyin, punctuation</string>
+    <string name="home_words_summary">Your words, imported dictionaries, custom phrases</string>
+    <string name="home_look_summary">Theme, keyboard size, one-handed / split / floating</string>
+    <string name="home_keys_summary">Long press, swipes, the space key, the characters on the keys</string>
+    <string name="home_sound_summary">Key sound, vibration</string>
+    <string name="home_clipboard_summary">Clipboard history, emoji skin tone</string>
+    <string name="home_hardware_summary">Candidate window, shortcuts, candidates per page</string>
+    <string name="home_backup_summary">Settings, words, themes and clipboard history in one file</string>
+    <string name="word_packs_hint">The user dictionary\'s words rank high, higher the more you pick them; one not yet picked may come after a very common word that sounds the same. Pinyin and the tables use these words; the English words are in English\'s settings.</string>
+    <string name="layer_base_recommended">Base dictionary (recommended)</string>
 </resources>

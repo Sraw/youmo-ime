@@ -12,12 +12,18 @@ import androidx.preference.PreferenceScreen
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.core.RawConfig
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
+import org.fcitx.fcitx5.android.engine.host.EngineSettings
 import org.fcitx.fcitx5.android.engine.host.Engines
+import org.fcitx.fcitx5.android.ui.main.MainFragment
 import org.fcitx.fcitx5.android.ui.main.settings.PlaceholderStrings
 import org.fcitx.fcitx5.android.ui.main.settings.SettingsRoute
+import org.fcitx.fcitx5.android.ui.main.settings.behavior.KeysSettingsFragment
+import org.fcitx.fcitx5.android.ui.main.settings.behavior.SoundSettingsFragment
 import org.fcitx.fcitx5.android.ui.main.settings.im.InputMethodSettings
+import org.fcitx.fcitx5.android.ui.main.settings.im.flat
 import org.fcitx.fcitx5.android.ui.search.SettingsSearch.Entry
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -65,6 +71,37 @@ class SettingsIndexTest {
         }
     }
 
+    // moved off the input methods' pages: found where they are now, each by the key its row has there
+    @Test
+    fun everySharedOptionFoundOpensTheSharedPageThatHasIt() {
+        val ctx = context()
+        val found = buildList<Entry<SettingsIndex.Target>> { SettingsIndex.sharedInput(ctx, this) }
+        val screen = InputMethodSettings.create(PreferenceManager(ctx), InputMethodSettings.SHARED, RawConfig(), save = {}, open = {})
+        val options = found.filter { it.target.key != null }
+        // each row of the shared page, sections aside, once
+        assertEquals(InputMethodSettings.SHARED.flat().size, options.size)
+        for (entry in options) {
+            assertEquals("$entry", SettingsRoute.SharedInput, entry.target.route)
+            assertEquals("$entry", entry.title, screen.findPreference<Preference>(entry.target.key!!)?.title?.toString())
+        }
+    }
+
+    // each page the home page opens can be searched for, and the settings moved there with it
+    @Test
+    fun everyPageOfTheHomePageIsFoundAndWhatMovedOnIt() {
+        val all = SettingsIndex.build(context())
+        val pages = all.filter { it.target.key == null }.map { it.target.route }.toSet()
+        MainFragment.HOME.forEach { assertTrue("${it.route}", it.route in pages) }
+        fun on(route: SettingsRoute) = all.filter { it.target.route == route }.mapNotNull { it.target.key }.toSet()
+        assertTrue(EngineSettings.PAGE_SIZE in on(SettingsRoute.HardwareKeyboard))
+        assertTrue(AppPrefs.getInstance().advanced.disableAnimation.key in on(SettingsRoute.Theme))
+        assertTrue(AppPrefs.getInstance().symbols.defaultEmojiSkinTone.key in on(SettingsRoute.Clipboard))
+        assertTrue(AppPrefs.getInstance().keyboard.soundOnKeyPress.key in on(SettingsRoute.SoundAndVibration))
+        assertFalse(AppPrefs.getInstance().keyboard.soundOnKeyPress.key in on(SettingsRoute.Keys))
+        assertTrue(AppPrefs.getInstance().keyboard.popupOnKeyPress.key in on(SettingsRoute.Keys))
+        assertFalse(AppPrefs.AUTO_PAIRS in on(SettingsRoute.Keys))
+    }
+
     @Test
     fun everyBuiltInTableHasItsOwnPageAndOptionsFound() {
         val ctx = context()
@@ -73,7 +110,7 @@ class SettingsIndexTest {
         for (table in Engines.TABLES.keys) {
             val on = all.filter { (it.target.route as? SettingsRoute.InputMethodConfig)?.uniqueName == table }
             assertEquals(table, 1, on.count { it.target.key == null })
-            assertEquals(table, keysOn(ctx, table), on.mapNotNull { it.target.key }.toSet())
+            assertEquals(table, keysOn(ctx, table) - InputMethodSettings.SHARED_LINK, on.mapNotNull { it.target.key }.toSet())
         }
     }
 
@@ -89,6 +126,34 @@ class SettingsIndexTest {
             val keys = on.mapNotNull { it.target.key }
             assertEquals("$route: $keys", keys.size, keys.toSet().size)
         }
+    }
+
+    /**
+     * The row on every input method's page that opens the shared page is not a result of each: a
+     * search for the shared page, or what its summary names, found it once and some ten times over.
+     */
+    @Test
+    fun noTwoResultsOpenTheSamePageUnderTheSameTitle() {
+        val all = SettingsIndex.build(context())
+        assertTrue(all.none { it.target.key == InputMethodSettings.SHARED_LINK })
+        val twice = all.groupBy { it.target.route to it.title }.filterValues { it.size > 1 }
+        assertTrue("$twice", twice.isEmpty())
+    }
+
+    // the keyboard's category over two pages, one section each: none of it on neither, none on both
+    @Test
+    fun theKeysAndTheSoundPagesTogetherHaveTheWholeKeyboardCategory() {
+        val ctx = context()
+        fun keysOf(build: (PreferenceScreen) -> Unit): List<String> {
+            fun PreferenceGroup.keys(): List<String> = (0 until preferenceCount).flatMap {
+                val pref = getPreference(it)
+                if (pref is PreferenceGroup) pref.keys() else listOfNotNull(pref.key)
+            }
+            return PreferenceManager(ctx).createPreferenceScreen(ctx).also(build).keys()
+        }
+        val whole = keysOf { AppPrefs.getInstance().keyboard.createUi(it) }
+        val pages = keysOf { KeysSettingsFragment.build(it) } + keysOf { SoundSettingsFragment.build(it) }
+        assertEquals(whole.sorted(), pages.sorted())
     }
 
     /**

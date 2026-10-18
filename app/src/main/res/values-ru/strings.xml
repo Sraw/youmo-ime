@@ -52,7 +52,6 @@
     <string name="delete">Удалить</string>
     <string name="clipboard">Буфер обмена</string>
     <string name="keyboard_height">Высота клавиатуры</string>
-    <string name="virtual_keyboard">Клавиши и отклик</string>
     <string name="clipboard_suggestion_timeout">Тайм-аут предложения буфера обмена</string>
     <string name="version">Версия</string>
     <string name="build_time">Время коммита</string>

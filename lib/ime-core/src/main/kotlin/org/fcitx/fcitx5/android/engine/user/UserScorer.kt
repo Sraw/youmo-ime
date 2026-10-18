@@ -15,7 +15,9 @@ import kotlin.math.pow
  * learning moves only what was learned; the sum is held to 0, as a score must be.
  *
  * A word the model lacks that a word pack scored ([UserModel.score]) takes that score in place
- * of the unknown word's, under the same backoff from the context. One of the user's whose text the
+ * of the unknown word's, under the same backoff from the context: only under ime-eval, evaluating
+ * a candidate pack, as the app lists no scored words; for it the look-up is one map miss for a
+ * word the model lacks. One of the user's whose text the
  * model has (a word of the dictionary's at a reading of the user's) is that word to the model
  * ([UserModel.modelWord]), scored and as context: one rule for every input method.
  */

@@ -5,21 +5,20 @@
 package org.fcitx.fcitx5.android.ui.main.settings.behavior
 
 import androidx.preference.Preference
-import androidx.preference.PreferenceCategory
 import androidx.preference.PreferenceScreen
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
-import org.fcitx.fcitx5.android.data.prefs.ManagedPreferenceCategory
 import org.fcitx.fcitx5.android.data.prefs.ManagedPreferenceFragment
 import org.fcitx.fcitx5.android.ui.main.settings.SettingsRoute
 import org.fcitx.fcitx5.android.utils.navigateWithAnim
 
-class KeyboardSettingsFragment : ManagedPreferenceFragment(AppPrefs.getInstance().keyboard) {
+/** The keys (按键): the first section of AppPrefs.Keyboard, the sound and vibration [SoundSettingsFragment]'s. */
+class KeysSettingsFragment : ManagedPreferenceFragment(AppPrefs.getInstance().keyboard) {
+
+    override fun createUi(screen: PreferenceScreen) = build(screen)
+
     override fun onPreferenceUiCreated(screen: PreferenceScreen) {
-        val keys = screen.findPreference<PreferenceCategory>(
-            ManagedPreferenceCategory.sectionKey(R.string.section_keys)
-        ) ?: screen
-        keys.addPreference(Preference(requireContext()).apply {
+        screen.addPreference(Preference(requireContext()).apply {
             // managed preferences don't reserve an icon slot; match them or the title sits indented
             isIconSpaceReserved = false
             isSingleLineTitle = false
@@ -30,5 +29,10 @@ class KeyboardSettingsFragment : ManagedPreferenceFragment(AppPrefs.getInstance(
                 true
             }
         })
+    }
+
+    companion object {
+        /** The page's managed preferences, as SettingsIndex reads them too. */
+        fun build(screen: PreferenceScreen) = AppPrefs.getInstance().keyboard.createUi(screen, R.string.section_keys)
     }
 }

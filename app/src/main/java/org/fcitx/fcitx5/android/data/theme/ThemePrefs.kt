@@ -100,7 +100,7 @@ class ThemePrefs(sharedPreferences: SharedPreferences) :
     val floatingKeyboard = switch(R.string.floating_keyboard, "floating_keyboard", false)
 
     init {
-        section(R.string.section_keys)
+        section(R.string.section_key_style)
     }
 
     // keys drawn apart: borderless, one letter was hard to tell from the next

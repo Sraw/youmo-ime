@@ -14,7 +14,6 @@ import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.data.pinyin.CustomPhraseManager
 import org.fcitx.fcitx5.android.data.pinyin.ImportedDictionaries
-import org.fcitx.fcitx5.android.data.pinyin.dict.PinyinDictionary
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.restoreDirectory
 import org.fcitx.fcitx5.android.engine.data.DataFormatException
@@ -277,17 +276,14 @@ object EngineBridge {
         val dictionaryDir = File(dir, "dictionaries")
         ImportedDictionaries.migrate(dictionaryDir)
         val dictionaries = dictionaryDir.listFiles { f -> f.name.endsWith(".txt") }.orEmpty().sortedBy { it.name }
-        val intoNew = ImportedDictionaries.intoNew(dictionaryDir)
-        fun File.intoNew() = PinyinDictionary.nameOf(name) in intoNew
-        // a dictionary moved to another layer is a change too
-        val seen = dictionaries.joinToString("\n") { "${it.name} ${it.length()} ${it.lastModified()} ${it.intoNew()}" }
+        val seen = dictionaries.joinToString("\n") { "${it.name} ${it.length()} ${it.lastModified()}" }
         val save = PhraseFile(phraseFile, phrases, read, phraseSaves)::save
         // one that cannot be read is left out, the rest still read; then the first failure is
         // thrown, for the engine to know a dictionary is missing: removing a word it may list
         // forgets nothing then (UserLexicon.selfMade)
-        fun read(files: List<File>) = sequence {
+        fun read() = sequence {
             var failure: IOException? = null
-            for (file in files) {
+            for (file in dictionaries) {
                 val lines = try {
                     file.readLines()
                 } catch (e: IOException) {
@@ -299,13 +295,11 @@ object EngineBridge {
             }
             failure?.let { throw it }
         }
-        val (newDictionaries, baseDictionaries) = dictionaries.partition { it.intoNew() }
         return Engines.Additions(
             phrases = phrases,
             dictionaries = seen,
             savePhrases = save,
-            newDictionary = { read(newDictionaries) },
-            dictionary = { read(baseDictionaries) },
+            dictionary = { read() },
         )
     }
 

@@ -297,7 +297,7 @@ class PunctuationEditorFragment : ProgressFragment() {
 
     override fun onStart() {
         super.onStart()
-        viewModel.setToolbarTitle(args.title)
+        viewModel.setToolbarTitle(args.title ?: getString(R.string.punctuation_map))
     }
 
     override fun onDestroyView() {

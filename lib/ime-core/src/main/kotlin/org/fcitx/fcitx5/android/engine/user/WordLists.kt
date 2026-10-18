@@ -13,6 +13,7 @@ import java.io.IOException
 import java.nio.ByteBuffer
 import java.nio.charset.CharacterCodingException
 import java.nio.charset.Charset
+import java.nio.charset.CharsetDecoder
 import java.nio.charset.CodingErrorAction
 
 /**
@@ -118,20 +119,33 @@ class WordLists(private val dir: File?, private val onError: (IOException) -> Un
          * mark (Sogou's export), or else GB18030 (older Windows ones).
          */
         fun decode(bytes: ByteArray): String {
-            fun bom(vararg b: Int) = bytes.size >= b.size && b.indices.all { bytes[it] == b[it].toByte() }
+            val marked = bomCharset(bytes, bytes.size)
             return when {
-                bom(0xFF, 0xFE) -> String(bytes, 2, bytes.size - 2, Charsets.UTF_16LE)
-                bom(0xFE, 0xFF) -> String(bytes, 2, bytes.size - 2, Charsets.UTF_16BE)
+                marked != null -> String(bytes, 2, bytes.size - 2, marked)
                 else -> try {
-                    Charsets.UTF_8.newDecoder()
-                        .onMalformedInput(CodingErrorAction.REPORT)
-                        .onUnmappableCharacter(CodingErrorAction.REPORT)
-                        .decode(ByteBuffer.wrap(bytes)).toString()
+                    strictUtf8().decode(ByteBuffer.wrap(bytes)).toString()
                 } catch (_: CharacterCodingException) {
-                    String(bytes, Charset.forName("GB18030"))
+                    String(bytes, GB18030)
                 }
             }
         }
+
+        /** UTF-16LE or BE by the byte order mark in the first [size] bytes of [head]; null for none. */
+        internal fun bomCharset(head: ByteArray, size: Int): Charset? {
+            fun bom(a: Int, b: Int) = size >= 2 && head[0] == a.toByte() && head[1] == b.toByte()
+            return when {
+                bom(0xFF, 0xFE) -> Charsets.UTF_16LE
+                bom(0xFE, 0xFF) -> Charsets.UTF_16BE
+                else -> null
+            }
+        }
+
+        /** A UTF-8 decoder that fails on bytes UTF-8 has not: the list is then GB18030's. */
+        internal fun strictUtf8(): CharsetDecoder = Charsets.UTF_8.newDecoder()
+            .onMalformedInput(CodingErrorAction.REPORT)
+            .onUnmappableCharacter(CodingErrorAction.REPORT)
+
+        internal val GB18030: Charset = Charset.forName("GB18030")
 
         /** [line] as a word to import; null for a blank line or a `#` comment, [Line.UNREAD] for one with no word in it. */
         fun line(line: String): Line? {

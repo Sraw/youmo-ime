@@ -8,7 +8,6 @@ import android.net.Uri
 import android.os.Bundle
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.appcompat.app.AlertDialog
 import androidx.fragment.app.activityViewModels
 import androidx.lifecycle.lifecycleScope
 import androidx.preference.Preference
@@ -18,7 +17,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.engine.host.Engines.UserWord
-import org.fcitx.fcitx5.android.engine.user.WordLists
+import org.fcitx.fcitx5.android.engine.user.WordListFiles
 import org.fcitx.fcitx5.android.ui.common.PaddingPreferenceFragment
 import org.fcitx.fcitx5.android.ui.common.withLoadingDialog
 import org.fcitx.fcitx5.android.ui.main.MainViewModel
@@ -32,7 +31,8 @@ import java.util.Locale
 /**
  * The user dictionary at a glance: how many words each of its lists holds, a page of its own
  * for each (see [UserWordListFragment]: a list may run to thousands), and the whole of it
- * imported or exported as a text file.
+ * exported as a text file; it is imported back where every dictionary is imported, the
+ * dictionaries' page asking into which ([PinyinDictionaryFragment]).
  */
 class UserWordsFragment : PaddingPreferenceFragment() {
 
@@ -40,12 +40,10 @@ class UserWordsFragment : PaddingPreferenceFragment() {
 
     private val lists = mutableMapOf<UserWord.Kind, Preference>()
 
-    private lateinit var importLauncher: ActivityResultLauncher<String>
     private lateinit var exportLauncher: ActivityResultLauncher<String>
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        importLauncher = registerForActivityResult(ActivityResultContracts.GetContent()) { it?.let(::import) }
         exportLauncher = registerForActivityResult(ActivityResultContracts.CreateDocument("text/plain")) { it?.let(::export) }
     }
 
@@ -66,9 +64,6 @@ class UserWordsFragment : PaddingPreferenceFragment() {
             }
         }
         val files = category(R.string.words_section_files)
-        files.addPreference(R.string.import_words, R.string.import_words_summary) {
-            importLauncher.launch("text/*")
-        }
         files.addPreference(R.string.export_words, R.string.export_words_summary) {
             exportLauncher.launch("youmo-words-${SimpleDateFormat("yyyyMMdd", Locale.ROOT).format(Date())}.txt")
         }
@@ -95,25 +90,6 @@ class UserWordsFragment : PaddingPreferenceFragment() {
 
     private fun count(n: Int) = resources.getQuantityString(R.plurals.word_count, n, n)
 
-    private fun import(uri: Uri) {
-        val ctx = requireContext()
-        lifecycleScope.withLoadingDialog(ctx) {
-            ctx.showingFileErrors("user words import") {
-                val lines = withContext(Dispatchers.IO) {
-                    val bytes = ctx.contentResolver.openInputStreamOrThrow(uri).use { it.readImported() }
-                    WordLists.decode(bytes).lineSequence()
-                }
-                val imported = viewModel.fcitx.runOnReady { importUserWords(lines) }
-                AlertDialog.Builder(ctx)
-                    .setTitle(R.string.import_words)
-                    .setMessage(getString(R.string.import_words_done, imported.added, imported.blocked, imported.unread))
-                    .setPositiveButton(android.R.string.ok, null)
-                    .show()
-                refreshCounts()
-            }
-        }
-    }
-
     private fun export(uri: Uri) {
         val ctx = requireContext()
         lifecycleScope.withLoadingDialog(ctx) {
@@ -121,8 +97,7 @@ class UserWordsFragment : PaddingPreferenceFragment() {
                 val lines = viewModel.fcitx.runOnReady { exportUserWords() }
                 withContext(Dispatchers.IO) {
                     ctx.contentResolver.openOutputStreamOrThrow(uri).bufferedWriter().use { out ->
-                        out.write(getString(R.string.export_words_header))
-                        out.write("\n")
+                        out.write(WordListFiles.exportHead(getString(R.string.export_words_header)))
                         lines.forEach { out.write(it); out.write("\n") }
                     }
                 }

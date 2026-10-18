@@ -4,12 +4,12 @@
  */
 package org.fcitx.fcitx5.android.ui.main.settings.im
 
-import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.engine.host.EngineSettings
 import org.fcitx.fcitx5.android.engine.host.Engines
 import org.fcitx.fcitx5.android.engine.host.TableSettings
 import org.fcitx.fcitx5.android.engine.pinyin.Fuzzy
+import org.fcitx.fcitx5.android.ui.main.settings.SettingsRoute
 import org.fcitx.fcitx5.android.ui.main.settings.im.InputMethodSettings.Choice
 import org.fcitx.fcitx5.android.ui.main.settings.im.InputMethodSettings.Flags
 import org.fcitx.fcitx5.android.ui.main.settings.im.InputMethodSettings.Item
@@ -68,7 +68,7 @@ class InputMethodSettingsTest {
     fun anyValueStoredShowsAsOneOfTheChoices() {
         val stored = listOf("", "x", "-5", "-1", "0", "1", "4", "7", "100", "Fast", "Ziranma", "Alt")
         appInputMethods.forEach { page ->
-            InputMethodSettings.of(page)!!.flat().filterIsInstance<Choice>().forEach { choice ->
+            (InputMethodSettings.of(page)!! + InputMethodSettings.SHARED + InputMethodSettings.HARDWARE_KEYBOARD).flat().filterIsInstance<Choice>().forEach { choice ->
                 stored.forEach { v ->
                     assertTrue("$page ${choice.key} $v", choice.nearest(v) in choice.values)
                 }
@@ -101,69 +101,94 @@ class InputMethodSettingsTest {
         assertEquals("3", after.nearest("3"))
     }
 
-    // 九键 greys the options it has no use for, and only on its own page: the others share them
+    /** Every row's key on the shared page, as [keys] for an input method's. */
+    private fun sharedKeys(): List<String> = InputMethodSettings.SHARED.flat().map {
+        when (it) {
+            is Toggle -> it.key
+            is Flags -> it.path
+            is InputMethodSettings.Titled -> it.key
+            is Section -> error("$it")
+        }
+    }
+
+    // what every input method shares is on its own page, and on no input method's
     @Test
-    fun nineKeysGreyOnlyWhatTheyHaveNoUseFor() {
-        fun unused(page: String) = InputMethodSettings.of(page)!!.flat().flatMap {
-            when (it) {
-                is Toggle -> if (it.unused != 0) listOf(it.key) else emptyList<String>()
-                is Flags -> it.unused.map { key -> "${it.path}/$key" }
-                else -> emptyList<String>()
+    fun theSharedOptionsAreOnTheSharedPageAlone() {
+        val shared = listOf(
+            AppPrefs.GLIDE_TYPING, AppPrefs.AUTO_PAIRS, AppPrefs.CALCULATION_REPLACES_SUM,
+            EngineSettings.PREDICTION, EngineSettings.EMOJI, EngineSettings.MODEL_LEVEL, InputMethodSettings.PUNCTUATION,
+            "${EngineSettings.FUZZY}/${EngineSettings.TYPOS}", EngineSettings.FUZZY,
+        )
+        assertEquals(shared, sharedKeys())
+        appInputMethods.forEach { page ->
+            assertEquals(page, emptySet<String>(), keys(page).toSet() intersect shared.toSet())
+            // nor the page size, the physical keyboard's
+            assertFalse(page, EngineSettings.PAGE_SIZE in keys(page))
+        }
+        assertEquals(listOf(EngineSettings.PAGE_SIZE), InputMethodSettings.HARDWARE_KEYBOARD.flat().map { (it as Choice).key })
+    }
+
+    // each page's own, and first a way to the shared page
+    @Test
+    fun eachPageHasItsOwnOptionsAfterTheWayToTheSharedOnes() {
+        val own = mapOf(
+            Engines.PINYIN to listOf(EngineSettings.CHAIZI, EngineSettings.LATIN_WORDS),
+            Engines.SHUANGPIN to listOf(EngineSettings.SHUANGPIN_PROFILE),
+            Engines.T9 to listOf(AppPrefs.T9_MULTI_TAP, InputMethodSettings.T9_LETTERS),
+            Engines.HANDWRITING to listOf(AppPrefs.HANDWRITING_PAUSE),
+            Engines.ENGLISH to listOf(EngineSettings.ENGLISH_SUGGEST, AppPrefs.ENGLISH_AUTO_CAPS, InputMethodSettings.ENGLISH_WORDS),
+        ) + Engines.TABLES.keys.associateWith { TableSettings.KEYS.toList() }
+        assertEquals(appInputMethods.toSet(), own.keys)
+        appInputMethods.forEach { page ->
+            val keys = keys(page)
+            assertEquals(page, InputMethodSettings.SHARED_LINK, keys.first())
+            assertEquals(page, own.getValue(page).sorted(), keys.drop(1).sorted())
+            val link = InputMethodSettings.of(page)!!.first() as InputMethodSettings.Page
+            assertEquals(SettingsRoute.SharedInput, link.route)
+        }
+    }
+
+    // said under each: the input methods it is no use to, as the engine has them
+    @Test
+    fun eachSharedOptionSaysWhichInputMethodsItIsNoUseTo() {
+        val rows = InputMethodSettings.SHARED.flat()
+        fun notFor(key: String): List<String> = when (val row = rows.single { (it is Toggle && it.key == key) || (it is InputMethodSettings.Titled && it.key == key) || (it is Flags && it.path == key) }) {
+            is Toggle -> row.notFor
+            is InputMethodSettings.Titled -> row.notFor
+            else -> error("$row")
+        }
+        // the keyboard's glide: every input method's that reads one
+        assertEquals(appInputMethods.filterNot { Engines.glides(it) }, notFor(AppPrefs.GLIDE_TYPING))
+        assertEquals(emptyList<String>(), notFor(AppPrefs.AUTO_PAIRS))
+        assertEquals(emptyList<String>(), notFor(AppPrefs.CALCULATION_REPLACES_SUM))
+        // the Chinese input methods' section says English for all of it: under a row, only an exception within it
+        assertEquals(emptyList<String>(), notFor(EngineSettings.PREDICTION))
+        assertEquals(listOf(Engines.HANDWRITING), notFor(EngineSettings.EMOJI))
+        assertEquals(emptyList<String>(), notFor(EngineSettings.MODEL_LEVEL))
+        assertEquals(emptyList<String>(), notFor(InputMethodSettings.PUNCTUATION))
+        assertEquals(listOf(Engines.T9), notFor("${EngineSettings.FUZZY}/${EngineSettings.TYPOS}"))
+        // u and v are both on 8: the pair alone is said to be no use to the nine keys, the others are
+        val fuzzy = rows.filterIsInstance<Flags>().single()
+        assertEquals(mapOf(Fuzzy.V_U.name to listOf(Engines.T9)), fuzzy.notFor)
+        // each a name the app has: one it does not know would be said by its id
+        val named = appInputMethods.toSet()
+        rows.forEach { row ->
+            val all = when (row) {
+                is Toggle -> row.notFor
+                is InputMethodSettings.Titled -> row.notFor
+                is Flags -> row.notFor.values.flatten()
+                else -> emptyList()
             }
-        }.toSet()
-        val fuzzy = EngineSettings.FUZZY
-        assertEquals(setOf("$fuzzy/${EngineSettings.TYPOS}", EngineSettings.LATIN_WORDS, "$fuzzy/${Fuzzy.V_U.name}"), unused(Engines.T9))
-        assertEquals(emptySet<String>(), unused(Engines.PINYIN))
-        assertEquals(emptySet<String>(), unused(Engines.SHUANGPIN))
-        // its reason under each pair greyed, as under each switch
-        val pairs = InputMethodSettings.of(Engines.T9)!!.flat().filterIsInstance<Flags>().single()
-        assertEquals(R.string.im_not_for_t9, pairs.unusedNote)
-        // 双拼 types its letters as its scheme has them: no Latin words to read in them
-        assertTrue(InputMethodSettings.of(Engines.SHUANGPIN)!!.flat().none { it is Toggle && it.key == EngineSettings.LATIN_WORDS })
+            assertTrue("$all", named.containsAll(all))
+        }
     }
 
     // the labels are the app's, the pairs and a table's options the engine's: one it adds gets a row
     @Test
     fun everyFuzzyPairAndTableOptionOfTheEngineHasARow() {
-        val fuzzy = InputMethodSettings.of(Engines.PINYIN)!!.flat().filterIsInstance<Flags>().single()
+        val fuzzy = InputMethodSettings.SHARED.flat().filterIsInstance<Flags>().single()
         assertEquals(EngineSettings.FUZZY, fuzzy.path)
         assertEquals(Fuzzy.entries.map { it.name }.sorted(), fuzzy.flags.map { it.first }.sorted())
-        val table = keys("engine-wubi")
-        // the table's own, and those every Chinese input method shares with pinyin (EngineTablePage),
-        // and the keyboard's glide typing
-        val shared = listOf(EngineSettings.PAGE_SIZE, EngineSettings.PREDICTION, EngineSettings.EMOJI, EngineSettings.MODEL_LEVEL, AppPrefs.GLIDE_TYPING)
-        assertEquals((TableSettings.KEYS + shared).sorted(), table.sorted())
-    }
-
-    // one setting, on the page of every input method the keyboard glides on, and on no other
-    @Test
-    fun everyPageThatGlidesHasTheGlideRowAndNoOtherDoes() {
-        appInputMethods.forEach { page ->
-            assertEquals(page, Engines.glides(page), AppPrefs.GLIDE_TYPING in keys(page))
-        }
-    }
-
-    // full pinyin's alone: 双拼's u is a key of its own, 九键's no letter
-    @Test
-    fun onlyFullPinyinHasTheChaiziRow() {
-        appInputMethods.forEach { page ->
-            assertEquals(page, page == Engines.PINYIN, EngineSettings.CHAIZI in keys(page))
-        }
-    }
-
-    // its name starts as a table's does ("engine-"): without a page of its own it would get a table's
-    @Test
-    fun handwritingHasItsOwnPageWithTheOptionsEveryChineseInputMethodShares() {
-        val keys = InputMethodSettings.of(Engines.HANDWRITING)!!.flat().map {
-            when (it) {
-                is Toggle -> it.key
-                is InputMethodSettings.Titled -> it.key
-                else -> error("$it")
-            }
-        }
-        assertEquals(
-            listOf(AppPrefs.HANDWRITING_PAUSE, EngineSettings.PAGE_SIZE, EngineSettings.PREDICTION, EngineSettings.MODEL_LEVEL).sorted(),
-            keys.sorted(),
-        )
+        assertEquals(TableSettings.KEYS.sorted(), keys("engine-wubi").filter { it != InputMethodSettings.SHARED_LINK }.sorted())
     }
 }

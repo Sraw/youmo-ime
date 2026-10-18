@@ -53,7 +53,7 @@
     <string name="delete">删除</string>
     <string name="clipboard">剪贴板</string>
     <string name="keyboard_height">键盘高度</string>
-    <string name="virtual_keyboard">按键与振动</string>
+    <string name="virtual_keyboard">按键</string>
     <string name="clipboard_suggestion_timeout">剪贴板提示超时</string>
     <string name="version">版本</string>
     <string name="build_time">提交时间</string>
@@ -282,8 +282,6 @@
     <string name="section_keys">按键</string>
     <string name="section_candidates">候选栏</string>
     <string name="section_sound_and_vibration">声音与振动</string>
-    <string name="home_section_input">输入</string>
-    <string name="home_section_other">其他</string>
     <string name="long_press_characters_summary">自定义每个键长按弹出的字符；第一个也是滑动输入的字符，也就是键上的小字</string>
     <string name="long_press_of">长按“%1$s”</string>
     <string name="long_press_editor_hint">带框的第一个是长按后直接松手得到的字符，也是滑动这个键输入的字符，也就是键上的小字。点一个字符选中它，再用下面的按钮调整。</string>
@@ -320,12 +318,8 @@
     <string name="search_settings">搜索设置</string>
     <string name="search_settings_hint">搜索设置项</string>
     <string name="search_settings_none">没有找到相关的设置</string>
-    <string name="home_section_words">词语</string>
-    <string name="home_section_keyboard_look">键盘与外观</string>
-    <string name="home_section_clipboard_emoji">剪贴板与表情</string>
     <string name="custom_phrases">自定义短语</string>
-    <string name="word_packs">词库</string>
-    <string name="more_settings">更多设置</string>
+    <string name="word_packs">词库与短语</string>
     <string name="word_pinyin_unknown">找不到读音，请填写拼音</string>
     <string name="punctuation_map">中文标点</string>
     <string name="word_list_empty">还没有词</string>
@@ -333,10 +327,8 @@
         <item quantity="other">共 %1$d 个 · 长按可多选</item>
     </plurals>
     <string name="word_list_found">找到 %1$d 个，共 %2$d 个</string>
-    <string name="import_words">导入词表</string>
-    <string name="import_words_summary">文本文件，一行一个词，可以带拼音（幽默 you\'mo），也可以只写词。搜狗、QQ 等导出的词库文本也能读</string>
     <string name="export_words">导出</string>
-    <string name="export_words_summary">整个用户词库存成一个文本文件，可在别的手机上导入</string>
+    <string name="export_words_summary">整个用户词库存成一个文本文件；要导回或在别的手机上用，在「词库与短语 → 导入词库」里选「用户词库」。</string>
     <string name="import_words_done">导入完成：添加 %1$d 个词，屏蔽 %2$d 个，%3$d 行没能读懂</string>
     <string name="export_words_header"># 幽默输入法用户词库：一行一个词，词后面是拼音；! 开头的是屏蔽的词</string>
     <string name="select_all">全选</string>
@@ -352,7 +344,7 @@
         <item quantity="other">恢复显示这 %1$d 个词？</item>
     </plurals>
     <string name="words_section_manage">词</string>
-    <string name="words_section_files">导入与导出</string>
+    <string name="words_section_files">文件</string>
     <plurals name="word_count">
         <item quantity="other">%1$d 个词</item>
     </plurals>
@@ -381,8 +373,8 @@
     <string name="level_strong">强</string>
     <string name="level_quiet">小</string>
     <string name="level_loud">大</string>
-    <string name="theme_and_size">主题与大小</string>
-    <string name="configure_look">大小与按键</string>
+    <string name="theme_and_size">外观</string>
+    <string name="configure_look">大小与样式</string>
     <string name="export_user_data_summary">设置、学到和添加的词、自定义短语、主题和剪贴板记录（复制过的密码也在内），存成一个文件</string>
     <string name="app_language">界面语言</string>
     <string name="language_follow_system">跟随系统</string>
@@ -392,7 +384,6 @@
     <string name="im_pinyin">拼音</string>
     <string name="im_shuangpin">双拼</string>
     <string name="im_t9">九键拼音</string>
-    <string name="im_not_for_t9">九键不适用</string>
     <string name="im_wubi">五笔</string>
     <string name="im_cangjie">仓颉</string>
     <string name="im_ziranma">自然码</string>
@@ -523,13 +514,10 @@
     <string name="long_press_move_left">左移</string>
     <string name="long_press_move_right">右移</string>
     <string name="layer_user">用户词库</string>
-    <string name="layer_new">新词库</string>
     <string name="layer_base">基础词库</string>
-    <string name="layer_user_summary">你添加的、学到的和屏蔽的词，总是排在最前</string>
-    <string name="builtin_new_title">内置新词</string>
-    <string name="builtin_new_summary">近几年的新词，随应用更新 · 只读</string>
-    <string name="builtin_base_title">内置基础词库</string>
-    <string name="builtin_base_summary">常用词和词频，随应用更新 · 只读</string>
+    <string name="layer_user_summary">你添加的和输入法学到的词，排得靠前，选得越多越靠前；屏蔽的词不再出现。</string>
+    <string name="builtin_base_title">内置词库</string>
+    <string name="builtin_base_summary">常用词和近几年的新词，随应用更新 · 只读</string>
     <string name="import_section">导入</string>
     <string name="import_dict">导入词库</string>
     <string name="import_dict_summary">支持 .txt、.dict 和搜狗 .scel 文件</string>
@@ -538,13 +526,10 @@
     <string name="dict_summary">%1$s · %2$s</string>
     <string name="dict_turn_on">开启</string>
     <string name="dict_turn_off">关闭</string>
-    <string name="dict_move_to_new">改为并入新词库</string>
-    <string name="dict_move_to_base">改为并入基础词库</string>
     <string name="dict_delete_confirm">删除词库「%s」？</string>
     <string name="import_into_title">并入哪个词库？</string>
-    <string name="import_into_base">适合大而杂的词库，比如从搜狗、QQ 导出的专业词库：词能打出来，不会挤掉常用词</string>
-    <string name="import_into_new">只适合确定都是新词的小清单：和内置新词一起，按你的选择调整权重</string>
-    <string name="import_into_user">当成你自己加的词，排在最前；适合几千个以内你常用的词</string>
+    <string name="import_into_base">适合大而杂的词库，比如专业词库：词能打出来，按常用程度排，不会挤掉常用词。</string>
+    <string name="import_into_user">适合几千个以内你常用的词：排得靠前，选过就更靠前，可以编辑、导出。用户词库导出的文件也从这里导回。</string>
     <string name="words_page_hint">不想看到某个词，可以在「用户词库」里屏蔽，或在键盘上长按它</string>
     <string name="dict_change_failed">修改失败</string>
     <string name="dict_unread_title">有词库没能读入</string>
@@ -585,4 +570,32 @@
     <string name="show_touch_keyboard">显示屏幕键盘</string>
     <string name="hardware_switch_shortcuts">实体键盘快捷键</string>
     <string name="hardware_switch_shortcuts_summary">单按 Shift 或 Ctrl+空格切换中英，Ctrl+Shift 轮流切换输入法</string>
+    <string name="shared_input">通用输入</string>
+    <string name="shared_input_link">通用输入设置</string>
+    <string name="shared_input_link_summary">各输入法共用的设置</string>
+    <string name="shared_section_all">所有输入法</string>
+    <string name="shared_section_chinese">中文输入法</string>
+    <string name="shared_section_pinyin">拼音（全拼、双拼、九键）</string>
+    <string name="im_not_for">不适用：%s。</string>
+    <string name="im_not_for_separator">、</string>
+    <string name="clipboard_and_emoji">剪贴板与表情</string>
+    <string name="hardware_keyboard">实体键盘</string>
+    <string name="section_emoji">表情</string>
+    <string name="section_animation">动画</string>
+    <string name="section_key_style">按键样式</string>
+    <string name="section_phrases">短语</string>
+    <string name="punctuation_map_summary">中文输入时每个标点打成什么，比如 , 打成 ，</string>
+    <string name="custom_phrases_summary">打一个缩写出一段话，比如 dz 出你的地址</string>
+    <string name="im_page_size_summary">只用于实体键盘的候选窗，所有输入法都用，包括英文</string>
+    <string name="home_input_methods_summary">添加、排序，每种输入法自己的选项</string>
+    <string name="home_shared_input_summary">各输入法共用：联想、表情、滑行、模糊音、标点</string>
+    <string name="home_words_summary">你的词、导入的词库、自定义短语</string>
+    <string name="home_look_summary">主题、键盘大小，单手 / 分体 / 悬浮</string>
+    <string name="home_keys_summary">长按、划动、空格键、键上的字符</string>
+    <string name="home_sound_summary">按键音、振动</string>
+    <string name="home_clipboard_summary">剪贴板历史、表情肤色</string>
+    <string name="home_hardware_summary">候选窗、快捷键、每页候选数</string>
+    <string name="home_backup_summary">设置、词、主题和剪贴板存成一个文件</string>
+    <string name="word_packs_hint">用户词库的词排得靠前，选得越多越靠前；还没选过的，可能排在很常用的同音词后面。拼音和码表都用这些词，英文词库在英文的设置里。</string>
+    <string name="layer_base_recommended">基础词库（推荐）</string>
 </resources>

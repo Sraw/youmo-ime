@@ -51,7 +51,6 @@
     <string name="delete">削除</string>
     <string name="clipboard">クリップボード</string>
     <string name="keyboard_height">キーボードの高さ</string>
-    <string name="virtual_keyboard">キーとフィードバック</string>
     <string name="clipboard_suggestion_timeout">クリップボード候補のタイムアウト</string>
     <string name="version">バージョン</string>
     <string name="build_time">コミット日時</string>

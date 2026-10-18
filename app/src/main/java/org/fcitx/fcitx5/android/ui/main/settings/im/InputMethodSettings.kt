@@ -5,8 +5,6 @@
 package org.fcitx.fcitx5.android.ui.main.settings.im
 
 import android.content.Context
-import android.view.View
-import android.view.ViewGroup
 import android.widget.ArrayAdapter
 import android.widget.ListView
 import androidx.annotation.StringRes
@@ -14,6 +12,7 @@ import androidx.appcompat.app.AlertDialog
 import androidx.preference.ListPreference
 import androidx.preference.Preference
 import androidx.preference.PreferenceCategory
+import androidx.preference.PreferenceGroup
 import androidx.preference.PreferenceManager
 import androidx.preference.PreferenceScreen
 import androidx.preference.SwitchPreferenceCompat
@@ -40,6 +39,12 @@ import kotlin.math.abs
  * are androidengine's options), while what an option is called, which of
  * them a user sees and how they are grouped is decided here. fcitx's own descriptions came in
  * fcitx's language, not the app's, and named every knob the engine has.
+ *
+ * What every input method shares is on a page of its own, [SHARED], over pinyin's config: the
+ * addon keeps one value of each for all (androidengine's config_), and pinyin's page has them
+ * all. On each input method's page they were shown again and again, "the same as pinyin's"; each
+ * page now has only its own and a way to the shared one. A page saves only what it shows
+ * ([only]), so one left open behind another does not write back an older value of what the other changed.
  */
 object InputMethodSettings {
 
@@ -50,20 +55,18 @@ object InputMethodSettings {
         val key: String
         @get:StringRes val title: Int
         @get:StringRes val summary: Int
+        /** The input methods (unique names) it is no use to, said under it: on the shared page, which says it for all. */
+        val notFor: List<String>
     }
 
-    /**
-     * [key] (a/b for b under a) is "True" or "False", unless [read] and [write] say otherwise.
-     * With [unused], shown greyed with that as its summary: an option of the engine this input
-     * method has no use for, kept for the others that share it.
-     */
+    /** [key] (a/b for b under a) is "True" or "False", unless [read] and [write] say otherwise; [notFor] as [Titled.notFor]. */
     class Toggle(
         val key: String,
         val title: (Context) -> String,
         @StringRes val summary: Int = 0,
         val read: (String) -> Boolean = { it == "True" },
         val write: (Boolean) -> String = { if (it) "True" else "False" },
-        @StringRes val unused: Int = 0,
+        val notFor: List<String> = emptyList(),
     ) : Item
 
     /** One of [values]; a value stored that is not one of them shows as the one [nearest] to it. */
@@ -74,20 +77,19 @@ object InputMethodSettings {
         @StringRes override val summary: Int = 0,
         val label: (Context, String) -> String,
         val nearest: (String) -> String = { it },
+        override val notFor: List<String> = emptyList(),
     ) : Titled
 
     /**
      * Switches of the same kind, picked together in one dialog: [flags] of key and label, under
-     * [path]; those [unused] by this input method greyed there, as [Toggle.unused], with
-     * [unusedNote] under each.
+     * [path]; [notFor] says under a flag the input methods it is no use to, as [Titled.notFor].
      */
     class Flags(
         val path: String,
         @StringRes val title: Int,
         @StringRes val none: Int,
         val flags: List<Pair<String, String>>,
-        val unused: Set<String> = emptySet(),
-        @StringRes val unusedNote: Int = 0,
+        val notFor: Map<String, List<String>> = emptyMap(),
     ) : Item
 
     /**
@@ -100,13 +102,16 @@ object InputMethodSettings {
         @StringRes override val summary: Int,
         val values: List<T>,
         val pref: () -> ManagedPreference.PStringLike<T>,
-    ) : Titled where T : Enum<T>, T : ManagedPreferenceEnum
+    ) : Titled where T : Enum<T>, T : ManagedPreferenceEnum {
+        override val notFor: List<String> get() = emptyList()
+    }
 
     /** A switch over the app's own preference [pref], as [AppChoice] is a list. */
     class AppToggle(
         override val key: String,
         @StringRes override val title: Int,
         @StringRes override val summary: Int,
+        override val notFor: List<String> = emptyList(),
         val pref: () -> ManagedPreference<Boolean>,
     ) : Titled
 
@@ -116,6 +121,7 @@ object InputMethodSettings {
         @StringRes override val title: Int,
         @StringRes override val summary: Int,
         val route: SettingsRoute,
+        override val notFor: List<String> = emptyList(),
     ) : Titled
 
     class Section(@StringRes val title: Int, val items: List<Item>) : Item
@@ -152,26 +158,6 @@ object InputMethodSettings {
         ModelLevel.HIGH to R.string.im_model_level_high,
     )
 
-    private val modelLevel = Choice(
-        EngineSettings.MODEL_LEVEL, R.string.im_model_level, ModelLevel.entries.map { it.key }, R.string.im_model_level_summary,
-        label = { ctx, v -> ctx.getString(MODEL_LEVELS.getValue(ModelLevel.entries.first { it.key == v })) },
-        // what the engine reads as the default (EngineSettings.parse)
-        nearest = { v -> ModelLevel.entries.firstOrNull { it.key == v }?.key ?: ModelLevel.HIGH.key },
-    )
-
-    private val pageSize = Choice(EngineSettings.PAGE_SIZE, R.string.im_page_size, PAGE_SIZES, label = { _, v -> v }, nearest = numbers(EngineSettings.PAGE_SIZES))
-
-    private val prediction = Toggle(EngineSettings.PREDICTION, text(R.string.im_prediction), R.string.im_prediction_summary)
-
-    private val emoji = Toggle(EngineSettings.EMOJI, text(R.string.im_emoji), R.string.im_emoji_summary)
-
-    private val chaizi = Toggle(EngineSettings.CHAIZI, text(R.string.im_chaizi), R.string.im_chaizi_summary)
-
-    // the keyboard's: a word by gliding across its keys, every input method's but handwriting's alike
-    private val glide = AppToggle(AppPrefs.GLIDE_TYPING, R.string.im_glide, R.string.im_glide_summary) {
-        AppPrefs.getInstance().keyboard.glideTyping
-    }
-
     // keyed by Fuzzy's names, as the engine reads them (EngineSettings.parse)
     private val FUZZY = listOf(
         Fuzzy.V_U to "u ↔ v", Fuzzy.AN_ANG to "an ↔ ang", Fuzzy.EN_ENG to "en ↔ eng", Fuzzy.IAN_IANG to "ian ↔ iang",
@@ -179,66 +165,112 @@ object InputMethodSettings {
         Fuzzy.F_H to "f ↔ h", Fuzzy.L_N to "l ↔ n", Fuzzy.L_R to "l ↔ r", Fuzzy.S_SH to "s ↔ sh", Fuzzy.Z_ZH to "z ↔ zh",
     ).map { (fuzzy, label) -> fuzzy.name to label }
 
-    /** [nineKeys]: the options 九键 has no use for greyed: slips onto a neighbouring key, u ↔ v (both on 8). */
-    private fun pinyin(shuangpin: Boolean, nineKeys: Boolean = false) = buildList {
-        if (shuangpin) {
-            add(
-                Section(
-                    R.string.im_section_scheme, listOf(
-                        Choice(
-                            EngineSettings.SHUANGPIN_PROFILE, R.string.im_shuangpin_scheme, EngineSettings.SCHEMES.keys.toList(),
-                            label = { ctx, v -> ctx.getString(SHUANGPIN.getValue(EngineSettings.SCHEMES.getValue(v))) },
-                            nearest = { v -> if (v in EngineSettings.SCHEMES) v else EngineSettings.ZIRANMA },
-                        )
-                    )
+    /** What every input method shares: its page's key, the one row on each input method's page that opens it. */
+    const val SHARED_LINK = "shared_input"
+
+    /** The shared page's row of the Chinese punctuation: its key. */
+    const val PUNCTUATION = "punctuation"
+
+    /** What every input method shares, each with those it is no use to (Engines has which reads what). */
+    val SHARED: List<Item> = listOf(
+        Section(
+            R.string.shared_section_all, listOf(
+                // the keyboard's: a word by gliding across its keys, every input method's but handwriting's (Engines.glides)
+                AppToggle(AppPrefs.GLIDE_TYPING, R.string.im_glide, R.string.im_glide_summary, notFor = listOf(Engines.HANDWRITING)) {
+                    AppPrefs.getInstance().keyboard.glideTyping
+                },
+                AppToggle(AppPrefs.AUTO_PAIRS, R.string.auto_pairs, 0) { AppPrefs.getInstance().keyboard.autoPairs },
+                AppToggle(AppPrefs.CALCULATION_REPLACES_SUM, R.string.calculation_replaces_sum, 0) {
+                    AppPrefs.getInstance().keyboard.calculationReplacesSum
+                },
+            )
+        ),
+        // the section's title says English reads none of these: only an exception within it is said under a row
+        Section(
+            R.string.shared_section_chinese, listOf(
+                Toggle(EngineSettings.PREDICTION, text(R.string.im_prediction), R.string.im_prediction_summary),
+                // handwriting writes no word an emoji stands for
+                Toggle(EngineSettings.EMOJI, text(R.string.im_emoji), R.string.im_emoji_summary, notFor = listOf(Engines.HANDWRITING)),
+                Choice(
+                    EngineSettings.MODEL_LEVEL, R.string.im_model_level, ModelLevel.entries.map { it.key }, R.string.im_model_level_summary,
+                    label = { ctx, v -> ctx.getString(MODEL_LEVELS.getValue(ModelLevel.entries.first { it.key == v })) },
+                    // what the engine reads as the default (EngineSettings.parse)
+                    nearest = { v -> ModelLevel.entries.firstOrNull { it.key == v }?.key ?: ModelLevel.HIGH.key },
+                ),
+                // the punctuation addon's own page went with the list of addons
+                Page(PUNCTUATION, R.string.punctuation_map, R.string.punctuation_map_summary, SettingsRoute.Punctuation()),
+            )
+        ),
+        Section(
+            R.string.shared_section_pinyin, listOf(
+                // the nine keys type digits: no letter slips onto its neighbour
+                Toggle("${EngineSettings.FUZZY}/${EngineSettings.TYPOS}", text(R.string.im_typos), R.string.im_typos_summary, notFor = listOf(Engines.T9)),
+                // u and v are both on 8
+                Flags(EngineSettings.FUZZY, R.string.im_fuzzy, R.string.im_fuzzy_none, FUZZY, notFor = mapOf(Fuzzy.V_U.name to listOf(Engines.T9))),
+            )
+        ),
+    )
+
+    /**
+     * The physical keyboard's page's own of fcitx's options: how many candidates its window shows,
+     * which no touch keyboard's bar has (it shows as many as fit), every input method's alike.
+     */
+    val HARDWARE_KEYBOARD: List<Item> = listOf(
+        Choice(EngineSettings.PAGE_SIZE, R.string.im_page_size, PAGE_SIZES, R.string.im_page_size_summary, label = { _, v -> v }, nearest = numbers(EngineSettings.PAGE_SIZES)),
+    )
+
+    private val sharedLink = Page(SHARED_LINK, R.string.shared_input_link, R.string.shared_input_link_summary, SettingsRoute.SharedInput)
+
+    private val pinyin = listOf(
+        sharedLink,
+        Section(
+            R.string.im_section_typing, listOf(
+                // full pinyin's alone: 双拼's u is a key of its own, 九键's no letter
+                Toggle(EngineSettings.CHAIZI, text(R.string.im_chaizi), R.string.im_chaizi_summary),
+                // full pinyin's alone: 双拼 types its letters otherwise, the nine keys digits
+                Toggle(EngineSettings.LATIN_WORDS, text(R.string.im_latin_words), R.string.im_latin_words_summary),
+            )
+        ),
+    )
+
+    private val shuangpin = listOf(
+        sharedLink,
+        Section(
+            R.string.im_section_scheme, listOf(
+                Choice(
+                    EngineSettings.SHUANGPIN_PROFILE, R.string.im_shuangpin_scheme, EngineSettings.SCHEMES.keys.toList(),
+                    label = { ctx, v -> ctx.getString(SHUANGPIN.getValue(EngineSettings.SCHEMES.getValue(v))) },
+                    nearest = { v -> if (v in EngineSettings.SCHEMES) v else EngineSettings.ZIRANMA },
                 )
             )
-        }
-        add(
-            Section(
-                R.string.im_section_typing, listOfNotNull(
-                    // the keyboard's: how it sends a key pressed again
-                    AppChoice(AppPrefs.T9_MULTI_TAP, R.string.t9_multi_tap, R.string.t9_multi_tap_summary, T9MultiTap.entries) {
-                        AppPrefs.getInstance().keyboard.t9MultiTap
-                    }.takeIf { nineKeys },
-                    Page(T9_LETTERS, R.string.t9_letters, R.string.t9_letters_summary, SettingsRoute.T9Letters).takeIf { nineKeys },
-                    pageSize,
-                    prediction,
-                    emoji,
-                    // full pinyin's: 双拼's u is a key of its own, 九键's no letter
-                    chaizi.takeIf { !shuangpin && !nineKeys },
-                    // the keyboard's, English's and the tables' too: one setting
-                    glide,
-                    modelLevel,
-                    Toggle("${EngineSettings.FUZZY}/${EngineSettings.TYPOS}", text(R.string.im_typos), R.string.im_typos_summary, unused = if (nineKeys) R.string.im_not_for_t9 else 0),
-                    // full pinyin's alone: 双拼 types its letters otherwise, the nine keys digits
-                    Toggle(EngineSettings.LATIN_WORDS, text(R.string.im_latin_words), R.string.im_latin_words_summary, unused = if (nineKeys) R.string.im_not_for_t9 else 0)
-                        .takeUnless { shuangpin },
-                    Flags(
-                        EngineSettings.FUZZY, R.string.im_fuzzy, R.string.im_fuzzy_none, FUZZY,
-                        unused = if (nineKeys) setOf(Fuzzy.V_U.name) else emptySet(), unusedNote = R.string.im_not_for_t9,
-                    ),
-                )
+        ),
+    )
+
+    private val nineKeys = listOf(
+        sharedLink,
+        Section(
+            R.string.im_section_typing, listOf(
+                // the keyboard's: how it sends a key pressed again
+                AppChoice(AppPrefs.T9_MULTI_TAP, R.string.t9_multi_tap, R.string.t9_multi_tap_summary, T9MultiTap.entries) {
+                    AppPrefs.getInstance().keyboard.t9MultiTap
+                },
+                Page(T9_LETTERS, R.string.t9_letters, R.string.t9_letters_summary, SettingsRoute.T9Letters),
             )
-        )
-    }
+        ),
+    )
 
     private val PHRASE_LENGTHS = listOf("0", "2", "3", "4", "6", "-1")
     private val SAVE_AFTER = listOf("0", "1", "2", "3", "5", "10")
 
+    // each table's own, under its group of the addon's config
     private val table = listOf(
+        sharedLink,
         Section(
             R.string.im_section_typing, listOf(
                 Toggle(TableSettings.AUTO_SELECT, text(R.string.im_auto_select), R.string.im_auto_select_summary),
                 Toggle(TableSettings.HINT, text(R.string.im_hint), R.string.im_hint_summary),
                 // Freq and Fast alike order by use
                 Toggle(TableSettings.ORDER_POLICY, text(R.string.im_order_by_use), read = { it != "No" }, write = { if (it) "Freq" else "No" }),
-                // pinyin's, the same settings: every Chinese input method has them
-                pageSize,
-                prediction,
-                emoji,
-                glide,
-                modelLevel,
             )
         ),
         Section(
@@ -277,6 +309,7 @@ object InputMethodSettings {
 
     // androidengine's English page (EngineEnglishPage)
     private val english = listOf(
+        sharedLink,
         Section(
             R.string.im_section_typing, listOf(
                 Toggle(EngineSettings.ENGLISH_SUGGEST, text(R.string.im_word_hint), R.string.im_word_hint_summary),
@@ -284,7 +317,6 @@ object InputMethodSettings {
                 AppToggle(AppPrefs.ENGLISH_AUTO_CAPS, R.string.im_auto_caps, R.string.im_auto_caps_summary) {
                     AppPrefs.getInstance().keyboard.englishAutoCaps
                 },
-                glide,
             )
         ),
         Section(
@@ -297,18 +329,14 @@ object InputMethodSettings {
         ),
     )
 
-    // androidengine's handwriting page (EngineHandwritingPage)
     private val handwriting = listOf(
+        sharedLink,
         Section(
             R.string.im_section_typing, listOf(
                 // the pad's: how soon the pen up ends a character
                 AppChoice(AppPrefs.HANDWRITING_PAUSE, R.string.handwriting_pause, R.string.handwriting_pause_summary, HandwritingPause.entries) {
                     AppPrefs.getInstance().keyboard.handwritingPause
                 },
-                pageSize,
-                // the pinyins' options, the same values: one setting for one idea
-                prediction,
-                modelLevel,
             )
         ),
     )
@@ -324,13 +352,53 @@ object InputMethodSettings {
 
     /** The page of [uniqueName], or null for an input method the app does not know. */
     fun of(uniqueName: String): List<Item>? = when (uniqueName) {
-        Engines.PINYIN -> pinyin(shuangpin = false)
-        Engines.T9 -> pinyin(shuangpin = false, nineKeys = true)
-        Engines.SHUANGPIN -> pinyin(shuangpin = true)
+        Engines.PINYIN -> pinyin
+        Engines.T9 -> nineKeys
+        Engines.SHUANGPIN -> shuangpin
         Engines.HANDWRITING -> handwriting
         InputMethodNames.KEYBOARD -> english
         else -> if (uniqueName.startsWith("engine-")) table else null
     }
+
+    /**
+     * What [items] show of [cfg], as a config of its own to save: the addon takes what it is given
+     * and keeps the rest (a partial load), so a page left open behind the shared one, which read
+     * the shared options before they were changed there, does not write them back as they were.
+     */
+    fun only(items: List<Item>, cfg: RawConfig): RawConfig {
+        val shown = RawConfig()
+        fun copy(path: String) {
+            val from = cfg.find(path) ?: return
+            shown.at(path).value = from.value
+        }
+        fun walk(item: Item) {
+            when (item) {
+                is Section -> item.items.forEach(::walk)
+                is Toggle -> copy(item.key)
+                is Choice -> copy(item.key)
+                is Flags -> item.flags.forEach { copy("${item.path}/${it.first}") }
+                is AppChoice<*>, is AppToggle, is Page -> Unit
+            }
+        }
+        items.forEach(::walk)
+        return shown
+    }
+
+    // an item's path, a/b for b under a: where it is, made if it is not there
+    private fun RawConfig.at(path: String): RawConfig = path.split('/').fold(this) { at, name -> at.getOrCreate(name) }
+
+    // an item's path: where it is, or null if it is not there
+    private fun RawConfig.find(path: String): RawConfig? = path.split('/').fold<String, RawConfig?>(this) { at, name -> at?.findByName(name) }
+
+    /** [summary] (0 for none), and on a line of its own the input methods [notFor] it is no use to; null for neither. */
+    internal fun summaryOf(context: Context, @StringRes summary: Int, notFor: List<String>): String? =
+        listOfNotNull(if (summary == 0) null else context.getString(summary), notForText(context, notFor))
+            .joinToString("\n").ifEmpty { null }
+
+    // "不适用：英文、手写。": the input methods by the names the app gives them
+    private fun notForText(context: Context, notFor: List<String>): String? =
+        if (notFor.isEmpty()) null
+        else context.getString(R.string.im_not_for, notFor.joinToString(context.getString(R.string.im_not_for_separator)) { InputMethodNames.of(context, it, it) })
 
     private fun page(context: Context, item: Page, open: (SettingsRoute) -> Unit) = Preference(context).apply {
         key = item.key
@@ -338,7 +406,7 @@ object InputMethodSettings {
         isIconSpaceReserved = false
         isSingleLineTitle = false
         setTitle(item.title)
-        setSummary(item.summary)
+        summary = summaryOf(context, item.summary, item.notFor)
         setOnPreferenceClickListener {
             open(item.route)
             true
@@ -352,10 +420,18 @@ object InputMethodSettings {
         cfg: RawConfig,
         save: () -> Unit,
         open: (SettingsRoute) -> Unit,
-    ): PreferenceScreen {
-        val context = manager.context
-        val screen = manager.createPreferenceScreen(context)
-        fun raw(path: String) = path.split('/').fold(cfg) { at, name -> at.getOrCreate(name) }
+    ): PreferenceScreen = manager.createPreferenceScreen(manager.context).also { addTo(it, items, cfg, save, open) }
+
+    /** [items] added to [group], as [create] makes them: a page of the app's own preferences may show some of fcitx's too. */
+    fun addTo(
+        group: PreferenceGroup,
+        items: List<Item>,
+        cfg: RawConfig,
+        save: () -> Unit,
+        open: (SettingsRoute) -> Unit,
+    ) {
+        val context = group.context
+        fun raw(path: String) = cfg.at(path)
         fun add(item: Item, into: (Preference) -> Unit) {
             when (item) {
                 is Section -> {
@@ -375,11 +451,7 @@ object InputMethodSettings {
                         isIconSpaceReserved = false
                         isSingleLineTitle = false
                         title = item.title(context)
-                        if (item.summary != 0) setSummary(item.summary)
-                        if (item.unused != 0) {
-                            isEnabled = false
-                            setSummary(item.unused)
-                        }
+                        summary = summaryOf(context, item.summary, item.notFor)
                         isChecked = item.read(raw.value)
                         setOnPreferenceChangeListener { _, value ->
                             raw.value = item.write(value as Boolean)
@@ -416,8 +488,7 @@ object InputMethodSettings {
                 is AppToggle -> into(appToggle(context, item))
             }
         }
-        items.forEach { add(it, screen::addPreference) }
-        return screen
+        items.forEach { add(it, group::addPreference) }
     }
 
     /** [item] as one preference over [raws], one for each of its flags, picked in a dialog; [save] called after each change. */
@@ -478,7 +549,7 @@ object InputMethodSettings {
         isIconSpaceReserved = false
         isSingleLineTitle = false
         setTitle(item.title)
-        setSummary(item.summary)
+        summary = summaryOf(context, item.summary, item.notFor)
         isChecked = pref.getValue()
         setOnPreferenceChangeListener { _, value ->
             pref.setValue(value as Boolean)
@@ -488,31 +559,18 @@ object InputMethodSettings {
 
     private fun choiceSummary(context: Context, item: Choice): Preference.SummaryProvider<ListPreference> {
         val simple = ListPreference.SimpleSummaryProvider.getInstance()
-        return if (item.summary == 0) {
-            simple
-        } else {
-            val summary = context.getString(item.summary)
-            // the value as the simple provider words it: "Not set", not "null", for one not among the entries
-            Preference.SummaryProvider<ListPreference> { "${simple.provideSummary(it)}\n$summary" }
-        }
+        val summary = summaryOf(context, item.summary, item.notFor) ?: return simple
+        // the value as the simple provider words it: "Not set", not "null", for one not among the entries
+        return Preference.SummaryProvider<ListPreference> { "${simple.provideSummary(it)}\n$summary" }
     }
 
-    /**
-     * [item]'s flags as a list of check boxes over [checked], those it has no use for greyed and
-     * marked so: a dialog's own multi-choice list cannot grey one.
-     */
+    /** [item]'s flags as a list of check boxes over [checked], each with the input methods it is no use to under it. */
     private fun flagList(context: Context, item: Flags, checked: BooleanArray): ListView {
-        val note = if (item.unusedNote == 0) null else context.getString(item.unusedNote)
         // the note under the label: brackets around it would be one language's
-        val labels = item.flags.map { (key, label) -> if (key in item.unused && note != null) "$label\n$note" else label }
+        val labels = item.flags.map { (key, label) -> summaryOf(context, 0, item.notFor[key].orEmpty())?.let { "$label\n$it" } ?: label }
         val list = ListView(context)
         list.choiceMode = ListView.CHOICE_MODE_MULTIPLE
-        list.adapter = object : ArrayAdapter<String>(context, android.R.layout.simple_list_item_multiple_choice, labels) {
-            override fun isEnabled(position: Int) = item.flags[position].first !in item.unused
-            override fun areAllItemsEnabled() = item.unused.isEmpty()
-            override fun getView(position: Int, convertView: View?, parent: ViewGroup): View =
-                super.getView(position, convertView, parent).also { it.isEnabled = isEnabled(position) }
-        }
+        list.adapter = ArrayAdapter(context, android.R.layout.simple_list_item_multiple_choice, labels)
         checked.forEachIndexed { i, on -> list.setItemChecked(i, on) }
         list.setOnItemClickListener { _, _, position, _ -> checked[position] = list.isItemChecked(position) }
         return list

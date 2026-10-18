@@ -29,7 +29,7 @@ class PinyinDictManagerTest {
     // the manager's own, made once for the class: each test's application has another external dir
     private val dir get() = PinyinDictManager.pinyinDicDir
 
-    // the dictionaries, not the dot files kept among them (.new-words, .libime)
+    // the dictionaries, not the dot files kept among them (.libime)
     private fun names() = dir.list()!!.filter { !it.startsWith(".") }.sorted()
 
     @Before
@@ -115,16 +115,30 @@ class PinyinDictManagerTest {
         PinyinDictManager.runConverter(listOf("/bin/sh", "-c", "exit 0"), lib)
     }
 
+    // a word list as other input methods export them, read as the user dictionary's import reads one
     @Test
-    fun aDictionaryIsMergedWhereAskedAndForgottenWhenDeleted() {
+    fun aTextFileIsReadAsAWordListInTheBase() {
+        PinyinDictManager.importFromInputStream("you mo 幽默 12\n搭子 da'zi -5.5\n!尬 ga\n".byteInputStream(), "pinyin-first.txt").getOrThrow()
+        assertEquals(listOf("幽默 you'mo 0.0", "搭子 da'zi -5.5"), File(dir, "pinyin-first.txt").readLines())
+        val sogou = byteArrayOf(0xFF.toByte(), 0xFE.toByte()) + "幽默 you'mo\r\n'da'zi 搭子 3\r\n".toByteArray(Charsets.UTF_16LE)
+        PinyinDictManager.importFromInputStream(sogou.inputStream(), "sogou.txt").getOrThrow()
+        assertEquals(listOf("幽默 you'mo 0.0", "搭子 da'zi 0.0"), File(dir, "sogou.txt").readLines())
+        val gb = "幽默 you'mo 0\n".toByteArray(charset("GB18030"))
+        PinyinDictManager.importFromInputStream(gb.inputStream(), "gb.txt").getOrThrow()
+        assertEquals(listOf("幽默 you'mo 0.0"), File(dir, "gb.txt").readLines())
+    }
+
+    // the list of those an older build merged into the new words goes as the dictionaries are listed
+    @Test
+    fun aDictionaryIsImportedAndDeleted() {
         val file = File(RuntimeEnvironment.getApplication().cacheDir, "mine.txt").apply { writeText("搭子 da'zi 0\n") }
         val base = PinyinDictManager.importFromFile(file).getOrThrow()
-        assertEquals(emptySet<String>(), ImportedDictionaries.intoNew(dir))
         file.renameTo(File(file.parentFile, "theirs.txt"))
-        val new = PinyinDictManager.importFromFile(File(file.parentFile, "theirs.txt"), intoNew = true).getOrThrow()
-        assertEquals(setOf("theirs"), ImportedDictionaries.intoNew(dir))
+        val new = PinyinDictManager.importFromFile(File(file.parentFile, "theirs.txt")).getOrThrow()
+        File(dir, ImportedDictionaries.INTO_NEW).writeText("theirs\n")
         assertTrue(PinyinDictManager.delete(new))
-        assertEquals(emptySet<String>(), ImportedDictionaries.intoNew(dir))
+        assertEquals(listOf("mine"), PinyinDictManager.listDictionaries().map { it.name })
+        assertFalse(File(dir, ImportedDictionaries.INTO_NEW).exists())
         assertEquals(listOf("mine.txt"), names())
         assertEquals(1, PinyinDictManager.wordCount(base))
     }

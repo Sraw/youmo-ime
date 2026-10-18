@@ -99,16 +99,15 @@ class EnginesUserWordsTest {
 
     @Test
     fun aWordAddedByHandAtANewReadingIsTheModelsWordAndOneImportedIsNot() {
-        // at nin, which the dictionary lacks: 拟 added by hand, the model's 拟 (-3); 泥, merged into
-        // the new words, at their typical score; 你, merged into the base, the unknown word's (-7)
-        // till picked, though the model's 你 (-2) would come first
-        val additions = Engines.Additions("", "d", newDictionary = { sequenceOf("泥 nin 0") }) { sequenceOf("你 nin 0") }
-        // 拟 is offered too, as ni with n begun, after them; sentences of ni n may come first
-        val order = listOf("拟", "泥", "你")
+        // at nin, which the dictionary lacks: 拟 added by hand, the model's 拟 (-3); 你, merged into
+        // the base, the unknown word's (-7) till picked, though the model's 你 (-2) would come first
+        val additions = Engines.Additions("", "d") { sequenceOf("你 nin 0") }
+        // 拟 is offered too, as ni with n begun, after it; sentences of ni n may come first
+        val order = listOf("拟", "你")
         fun Engines.atNin() = type(Engines.PINYIN, "nin").candidates.filter { it in order }.also { onEvent(Engines.PINYIN, EngineEvent.RESET, 0) }
         val dir = folder.newFolder()
         Engines(::load, dir, additions = { additions }).use { engines ->
-            assertEquals(listOf("泥", "你", "拟"), engines.atNin())
+            assertEquals(listOf("你", "拟"), engines.atNin())
             assertTrue(engines.addWord("拟", "nin"))
             assertEquals(order, engines.atNin())
         }
@@ -116,11 +115,11 @@ class EnginesUserWordsTest {
         Engines(::load, dir, additions = { additions }).use { assertEquals(order, it.atNin()) }
         // removed with no log to make the model again from: still typed till the next start, but the unknown word's
         Engines(::load, null, additions = { additions }).use { engines ->
-            assertEquals(listOf("泥", "你", "拟"), engines.atNin())
+            assertEquals(listOf("你", "拟"), engines.atNin())
             assertTrue(engines.addWord("拟", "nin"))
             assertEquals(order, engines.atNin())
             engines.removeWord(Engines.UserWord("拟", "nin", Engines.UserWord.Kind.ADDED))
-            assertEquals("泥", engines.atNin().first())
+            assertEquals("你", engines.atNin().first())
         }
     }
 
