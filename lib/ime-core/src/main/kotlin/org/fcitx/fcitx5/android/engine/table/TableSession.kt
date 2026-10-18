@@ -295,7 +295,10 @@ class TableSession(
     /** Whether what is typed is long enough for a length [limit] of [TableOptions]. */
     private fun reaches(limit: Int) = limit != 0 && (limit < 0 || input.length >= limit)
 
-    /** Commits the first candidate on the page shown, unless it is an auto phrase: then, as with no candidate, the code is dropped. */
+    /**
+     * Commits the first candidate on the page shown, or the first of all where that is an emoji,
+     * unless it is an auto phrase: then, as with no candidate, the code is dropped.
+     */
     private fun autoCommit(): String {
         // an emoji first on a page (past the first) is no reading of the code: the first that is
         val first = ranking[page * options.pageSize]?.takeUnless { it.emoji } ?: ranking[0]
@@ -696,9 +699,8 @@ class TableSession(
         private fun placeEmoji() {
             emojiPlaced = true
             val first = items.firstOrNull() ?: return
-            // as EmojiCandidates.place: none a candidate already
             // seen too: an entry of the same text later is not listed again
-            emoji(first.text).take(EmojiCandidates.MAX + EmojiCandidates.AFTER).filter { it !in seen }.take(EmojiCandidates.MAX)
+            EmojiCandidates.pick(first.text, emoji) { it in seen }
                 .forEach {
                     seen += it
                     items += Item("", it, auto = false, emoji = true)

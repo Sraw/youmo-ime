@@ -47,7 +47,7 @@ msgstr ""
 msgid "Characters by their parts"
 msgstr ""
 
-msgid "Emoji candidates"
+msgid "Emoji among the candidates"
 msgstr ""
 
 msgid "Never show this word"

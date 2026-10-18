@@ -4,10 +4,10 @@
  */
 package org.fcitx.fcitx5.android.engine.table
 
+import org.fcitx.fcitx5.android.engine.handwriting.handwritingData
 import org.fcitx.fcitx5.android.engine.lattice.TextWords
 import org.fcitx.fcitx5.android.engine.session.Action.NextPage
 import org.fcitx.fcitx5.android.engine.session.Action.Select
-import org.fcitx.fcitx5.android.engine.handwriting.handwritingData
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Test

@@ -60,4 +60,53 @@ class PhraseBookTest {
         assertEquals(listOf("0:时间", "1:09:05", "2:09时05分"), book.offered("sj"))
         assertEquals("sj,1=时间 sj,2=#\$fullhour:\$minute sj,3=#\$fullhour时\$minute分", saved.single())
     }
+
+    @Test
+    fun theBuiltInOnesAreNotOfferedWhereTheyAreOff() {
+        val book = PhraseBook(CustomPhrases.parse("yx,1=邮箱"), CustomPhrases.BUILT_IN)
+        assertEquals(listOf("yx"), book.offered(builtIns = false).all.map { it.key })
+        // pinned there, the built-in ones are kept for full pinyin, not offered here
+        book.pin("sj", "三家")
+        assertEquals(listOf("0:三家"), book.offered(builtIns = false).offered("sj", saturday).map { "${it.index}:${it.text}" })
+        assertEquals(listOf("0:三家", "1:09:05", "2:09时05分"), book.offered("sj"))
+    }
+
+    @Test
+    fun theBuiltInOnesAChangeInFullPinyinMadeTheUsersAreNotOfferedElsewhere() {
+        val book = PhraseBook(builtIn = CustomPhrases.BUILT_IN)
+        book.pin("sj", "时间")
+        book.remove("xq", "#周\$weekday_cn")
+        val elsewhere = book.offered(builtIns = false)
+        assertEquals(listOf("0:时间"), elsewhere.offered("sj", saturday).map { "${it.index}:${it.text}" })
+        assertEquals(emptyList<CustomPhrases.Offered>(), elsewhere.offered("xq", saturday))
+    }
+
+    @Test
+    fun builtInOnesDeletedAfterAPinStayGoneWithThePin() {
+        val book = PhraseBook(builtIn = CustomPhrases.BUILT_IN)
+        book.pin("sj", "时间")
+        book.remove("sj", "#\$fullhour:\$minute")
+        book.remove("sj", "#\$fullhour时\$minute分")
+        book.remove("sj", "时间")
+        assertEquals(emptyList<String>(), book.offered("sj"))
+        // kept turned off, for the settings to turn on again
+        assertEquals(listOf(false, false), book.phrases.all.filter { it.key == "sj" }.map { it.enabled })
+    }
+
+    @Test
+    fun theUsersOwnPhraseReadingAsABuiltInOneIsDeleted() {
+        val saved = ArrayList<String>()
+        val book = PhraseBook(CustomPhrases.parse("rq,1=日期\nrq,2=#\$year年\$month月\$day日"), CustomPhrases.BUILT_IN) { saved += it.all.joinToString(" ") }
+        book.remove("rq", "#\$year年\$month月\$day日")
+        // turned off, not deleted: once adopted, a built-in one reads the same, and must stay gone
+        assertEquals(listOf("rq,1=日期 rq,-2=#\$year年\$month月\$day日"), saved)
+        assertEquals(listOf("0:日期"), book.offered("rq"))
+    }
+
+    @Test
+    fun theUsersOwnLastPhraseDeletedGivesTheKeyBackToTheBuiltInOnes() {
+        val book = PhraseBook(CustomPhrases.parse("sj,1=三家"), CustomPhrases.BUILT_IN)
+        book.remove("sj", "三家")
+        assertEquals(listOf("1:09:05", "2:09时05分"), book.offered("sj"))
+    }
 }

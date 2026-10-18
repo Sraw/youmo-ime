@@ -111,10 +111,7 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
     private var isClipboardFresh: Boolean = false
 
     // the sum just written, its result offered while the cursor stays at its end
-    private var calculation: Calculation.Worked? = null
-    private var calculationAt = -1
-    // the editor reported the cursor at the `=`: reports of the keys before it may still come after the offer
-    private var calculationReached = false
+    private var calculation: CalculationOffer? = null
     private var isInlineSuggestionPresent: Boolean = false
     private var isCapabilityFlagsPassword: Boolean = false
     private var isKeyboardLayoutNumber: Boolean = false
@@ -324,7 +321,9 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
                 }
             }
             calculationUi.suggestionView.setOnClickListener {
-                calculation?.let {
+                calculation?.takeIf {
+                    it.stillThere(service.currentInputConnection?.getTextBeforeCursor(it.worked.sum.length, 0))
+                }?.worked?.let {
                     // replacing what is still there before the cursor: the editor may have moved on
                     if (calculationReplacesSum) service.commitOverEngine(it.result, replacing = it.sum)
                     else service.commitOverEngine(it.result)
@@ -456,9 +455,7 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
 
     /** [worked]'s result offered till the cursor leaves [at], the end of the sum's `=`. */
     fun offerCalculation(worked: Calculation.Worked, at: Int) {
-        calculation = worked
-        calculationAt = at
-        calculationReached = false
+        calculation = CalculationOffer(worked, at)
         idleUi.calculationUi.text.text = "= ${worked.result}"
         evalIdleUiState()
     }
@@ -470,13 +467,7 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
     }
 
     override fun onSelectionUpdate(start: Int, end: Int) {
-        if (calculation == null) return
-        when {
-            start == calculationAt && end == start -> calculationReached = true
-            // a late report of a key typed before the `=`
-            !calculationReached && end == start && start < calculationAt -> {}
-            else -> dropCalculation()
-        }
+        if (calculation?.keeps(start, end) == false) dropCalculation()
     }
 
     override fun onPreeditEmptyStateUpdate(empty: Boolean) {

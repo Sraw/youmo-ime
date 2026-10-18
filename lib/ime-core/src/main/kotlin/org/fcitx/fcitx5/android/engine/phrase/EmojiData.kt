@@ -28,32 +28,32 @@ class EmojiData private constructor(
      * order, a word of fewer syllables first, then as the file has them. Letters only count; none for none.
      */
     fun search(query: String, limit: Int = SEARCH_LIMIT): List<String> {
-        val q = query.lowercase().filter { it in 'a'..'z' }
-        if (q.isEmpty()) return emptyList()
+        val typed = query.lowercase().filter { it in 'a'..'z' }
+        if (typed.isEmpty()) return emptyList()
         val found = pinyin.mapNotNull { (word, syllables) ->
-            match(q, syllables, 0, 0, partly = false)?.let { Triple(it, syllables.size, word) }
+            match(typed, syllables, 0, 0, partly = false)?.let { Triple(it, syllables.size, word) }
         }.sortedWith(compareBy({ it.first }, { it.second }))
         return found.asSequence().flatMap { of(it.third) }.distinct().take(limit).toList()
     }
 
     /**
-     * How [q] from [at] spells [syllables] from [from]: [EXACT], [START] or [SHORT] ([search]'s
+     * How [typed] from [at] spells [syllables] from [from]: [EXACT], [START] or [SHORT] ([search]'s
      * order), the best of the ways; null for none. [partly]: a syllable before was typed in part.
      */
-    private fun match(q: String, syllables: List<String>, from: Int, at: Int, partly: Boolean): Int? {
+    private fun match(typed: String, syllables: List<String>, from: Int, at: Int, partly: Boolean): Int? {
         if (from == syllables.size) return null
-        val s = syllables[from]
+        val syllable = syllables[from]
         var best: Int? = null
-        for (k in minOf(s.length, q.length - at) downTo 1) {
-            val m = when {
-                !q.regionMatches(at, s, 0, k) -> null
-                at + k < q.length -> match(q, syllables, from + 1, at + k, partly || k < s.length)
+        for (taken in minOf(syllable.length, typed.length - at) downTo 1) {
+            val rank = when {
+                !typed.regionMatches(at, syllable, 0, taken) -> null
+                at + taken < typed.length -> match(typed, syllables, from + 1, at + taken, partly || taken < syllable.length)
                 partly -> SHORT
-                k == s.length && from + 1 == syllables.size -> EXACT
+                taken == syllable.length && from + 1 == syllables.size -> EXACT
                 // the last typed in part, or the word goes on
                 else -> START
             }
-            if (m != null && (best == null || m < best)) best = m
+            if (rank != null && (best == null || rank < best)) best = rank
         }
         return best
     }

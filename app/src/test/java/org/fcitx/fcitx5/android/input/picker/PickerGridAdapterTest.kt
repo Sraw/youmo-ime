@@ -74,6 +74,21 @@ class PickerGridAdapterTest {
         assertEquals(2, policy.transforms)
     }
 
+    // F1969: emoji.data missing, the emoji picker has the recently used alone and opened past it
+    @Test
+    fun aPickerWithNoDataOpensOnTheRecentlyUsed() {
+        val adapter = adapter(CountingPolicy())
+        val first = PickerWindow.firstShown(adapter.categories.size)
+        assertEquals(0, first)
+        assertEquals(0, adapter.categoryAt(adapter.startOf(first)))
+    }
+
+    @Test
+    fun aPickerWithDataOpensOnItsFirstCategory() {
+        val adapter = adapter(CountingPolicy(), PickerData.Category("a") to arrayOf("x"))
+        assertEquals(1, PickerWindow.firstShown(adapter.categories.size))
+    }
+
     companion object {
         private const val HIDDEN = "hidden"
     }

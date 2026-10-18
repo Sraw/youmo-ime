@@ -7,6 +7,8 @@ package org.fcitx.fcitx5.android.engine.session
 import org.fcitx.fcitx5.android.engine.phrase.CustomPhrases
 import org.fcitx.fcitx5.android.engine.phrase.PhraseBook
 import org.fcitx.fcitx5.android.engine.pinyin.PinyinSegmenter
+import org.fcitx.fcitx5.android.engine.pinyin.ShuangpinScheme
+import org.fcitx.fcitx5.android.engine.pinyin.ShuangpinSegmenter
 import org.fcitx.fcitx5.android.engine.session.Action.Key
 import org.fcitx.fcitx5.android.engine.session.Action.Pin
 import org.fcitx.fcitx5.android.engine.session.Action.Select
@@ -146,5 +148,19 @@ class PinyinSessionPhraseTest {
         assertEquals("拟", session.type("ni").candidates.first())
         session.apply(Select(0))
         assertEquals(1f, user.total)
+    }
+
+    @Test
+    fun theBuiltInPhrasesAreFullPinyinsAndNotShuangpins() {
+        val book = { PhraseBook(builtIn = CustomPhrases.BUILT_IN) }
+        val now = { GregorianCalendar(2026, Calendar.OCTOBER, 17, 9, 5) }
+        assertTrue("09:05" in PinyinSession(data, PinyinSegmenter(), pageSize = 20, phraseBook = book(), now = now).type("sj").candidates)
+        // sj is san in 自然码
+        val shuangpin = PinyinSession(data, ShuangpinSegmenter(ShuangpinScheme.ZIRANMA), spell = true, pageSize = 20, phraseBook = book(), now = now)
+        assertFalse("09:05" in shuangpin.type("sj").candidates)
+        // the user's own are offered there still
+        val own = PhraseBook(CustomPhrases.parse("sj,1=三家"), CustomPhrases.BUILT_IN)
+        val mine = PinyinSession(data, ShuangpinSegmenter(ShuangpinScheme.ZIRANMA), spell = true, pageSize = 20, phraseBook = own, now = now)
+        assertEquals("三家", mine.type("sj").candidates[0])
     }
 }

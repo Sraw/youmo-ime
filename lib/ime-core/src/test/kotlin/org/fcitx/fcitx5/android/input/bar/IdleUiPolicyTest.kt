@@ -20,6 +20,7 @@ class IdleUiPolicyTest {
         isNumberLayout = false,
         expandToolbarByDefault = false,
         isToolbarManuallyToggled = false,
+        isCalculationPresent = false,
     )
 
     private fun decide(change: Inputs.() -> Inputs) = IdleUiPolicy.decide(quiet.change())

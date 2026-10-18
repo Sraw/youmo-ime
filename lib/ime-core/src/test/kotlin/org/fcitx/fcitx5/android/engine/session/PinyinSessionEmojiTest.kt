@@ -51,4 +51,16 @@ class PinyinSessionEmojiTest {
         val s = PinyinSession(data, PinyinSegmenter(), pageSize = 20).type("nihao")
         assertFalse("👋" in s.candidates)
     }
+
+    @Test
+    fun theEmojiAreThoseOfTheCandidateShownFirst() {
+        // a phrase pinned ahead of 你好: its emoji, not 你好's
+        val book = PhraseBook(CustomPhrases.parse("nihao,1=嗨"))
+        val more = emoji + ("嗨" to listOf("🙌"))
+        val s = PinyinSession(data, PinyinSegmenter(), pageSize = 20, phraseBook = book, emoji = { more[it].orEmpty() }).type("nihao")
+        assertEquals("嗨", s.candidates[0])
+        // after the first two read, the phrase ahead of them
+        assertEquals("🙌", s.candidates[3])
+        assertFalse("👋" in s.candidates)
+    }
 }

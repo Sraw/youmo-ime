@@ -20,6 +20,8 @@ object AsideCandidates {
     /**
      * [read] (the readings of [key], the input) with the emoji and the characters by their parts
      * among them, made by [make]; [chaizi] null where the keys are no pinyin to spell parts by (双拼).
+     * The emoji are those of [first], the reading shown first, asked only for them.
+     * Nothing placed, the candidates are [read] itself (see [EmojiCandidates.placed]), as PinyinSession.place relies on.
      */
     fun <T> place(
         read: List<T>,
@@ -29,13 +31,12 @@ object AsideCandidates {
         text: (T) -> String,
         whole: (T) -> Boolean,
         make: (String) -> T,
+        first: () -> T? = { read.firstOrNull() },
     ): Placed<T> {
         val parts = if (chaizi == null || key.firstOrNull() != Chaizi.KEY) emptyList() else chaizi(key.substring(1).filter { it in 'a'..'z' })
         if (parts.isEmpty()) {
-            val withEmoji = EmojiCandidates.place(read, emoji, text, whole, make)
-            // placed after the first AFTER of what was read
-            val at = minOf(EmojiCandidates.AFTER, read.size)
-            return Placed(withEmoji, withEmoji.subList(at, at + withEmoji.size - read.size).associate { text(it) to "" })
+            val (withEmoji, added) = EmojiCandidates.placed(read, first(), emoji, text, whole, make)
+            return Placed(withEmoji, added.associateWith { "" })
         }
         // no emoji of a reading of u…, the readings being slips; but u then a vowel may be a slip for
         // y (uao for yao): the reading first, then the characters

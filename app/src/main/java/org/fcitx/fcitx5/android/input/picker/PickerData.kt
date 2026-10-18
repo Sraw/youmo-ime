@@ -123,8 +123,8 @@ object PickerData {
         )
     )
 
-    // the panel's tabs, by the ids of Unicode's groups (EmojiData.GROUPS)
-    private val EmojiCategories = mapOf(
+    // the panel's tabs, by the ids of Unicode's groups (EmojiData.GROUPS; PickerDataTest holds them to it)
+    internal val EmojiCategories = mapOf(
         "smileys" to Category("🙂", R.drawable.ic_baseline_tag_faces_24, R.string.picker_smileys),
         "people" to Category("🧑", R.drawable.ic_baseline_emoji_people_24, R.string.picker_people),
         "nature" to Category("🌸", R.drawable.ic_baseline_flower_24, R.string.picker_nature),

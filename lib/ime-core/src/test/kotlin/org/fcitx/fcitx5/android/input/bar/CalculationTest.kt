@@ -97,6 +97,56 @@ class CalculationTest {
     }
 
     @Test
+    fun theLongestSumDecidesEvenWhereItCannotBeWorkedOut() {
+        assertNull(of("1/0+5="))
+        assertNull(of("2^1000+1="))
+        assertNull(of("2(3+4)="))
+        assertNull(of("1.5.2+1="))
+        assertNull(of("1.2.3+1="))
+        assertNull(of("50%2+1="))
+    }
+
+    @Test
+    fun aNumberMayStartWithItsPoint() {
+        assertEquals("1.5", of(".5+1="))
+        assertEquals(Calculation.Worked("1.5", ".5+1="), Calculation.of("价格.5+1="))
+    }
+
+    @Test
+    fun stepsAreNotRoundedToWhatIsShown() {
+        assertEquals("1", of("1/3*3="))
+        assertEquals("10", of("10/3*3="))
+    }
+
+    @Test
+    fun zeroIsWrittenPlain() {
+        assertEquals("0", of("0.5-0.5="))
+        assertEquals("0", of("1.50*0="))
+    }
+
+    @Test
+    fun aTinyResultIsWrittenWithItsExponent() {
+        assertEquals("1E-999", of("10^-999="))
+        assertEquals("0.000001", of("10^-6="))
+        assertEquals("1E-7", of("10^-7="))
+        assertEquals("0.03333333333333333", of("1/30="))
+        // a power of a power is bounded by its result, not only by its exponent
+        assertNull(of("(10^-999)^999="))
+        assertNull(of("((10^-999)^999)^999="))
+    }
+
+    @Test
+    fun aWindowThatMayHaveCutTheFirstNumberOffersNoSumAtItsStart() {
+        assertNull(Calculation.of("23+1=", cut = true))
+        // the window opening on an operator, a thousands comma or a space: still maybe mid-number
+        assertNull(Calculation.of("+23+1=", cut = true))
+        assertNull(Calculation.of(",345+1=", cut = true))
+        assertNull(Calculation.of(" 23+1=", cut = true))
+        assertEquals(Calculation.Worked("2", "1+1="), Calculation.of("年1+1=", cut = true))
+        assertEquals(Calculation.Worked("24", "23+1="), Calculation.of("23+1="))
+    }
+
+    @Test
     fun theSumIsKnownAsWrittenForTheResultToTakeItsPlace() {
         assertEquals(Calculation.Worked("5", "1+2*2="), Calculation.of("价格1+2*2="))
         assertEquals(Calculation.Worked("3", "1 + 2 ＝"), Calculation.of("好 1 + 2 ＝"))

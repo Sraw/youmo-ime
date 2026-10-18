@@ -29,7 +29,7 @@ object IdleUiPolicy {
         /** the user has flipped the toolbar away from its default this session */
         val isToolbarManuallyToggled: Boolean,
         /** a sum was just written, its result offered till the cursor moves */
-        val isCalculationPresent: Boolean = false,
+        val isCalculationPresent: Boolean,
     )
 
     /**

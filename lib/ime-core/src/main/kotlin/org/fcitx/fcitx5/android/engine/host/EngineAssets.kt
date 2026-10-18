@@ -216,7 +216,7 @@ internal class EngineAssets(
     fun logProbs(texts: List<String>): FloatArray = FloatArray(texts.size) { textWords.logProb(texts[it]) }
 
     // the words emoji stand for; none if the app has not got them
-    private val emoji: EmojiData by lazy(LazyThreadSafetyMode.NONE) {
+    private val emoji: EmojiData by lazy {
         try {
             EmojiData.read(Charsets.UTF_8.decode(load(EMOJI_DATA)))
         } catch (e: IOException) {
@@ -225,14 +225,14 @@ internal class EngineAssets(
         }
     }
 
-    // asked of each emoji once it is to be offered: some 40k of them in all, each a font lookup
+    // asked of each emoji once it is to be offered, each a font lookup: a few thousand emoji in all
     private val shown = HashMap<String, Boolean>()
 
     /** The emoji [word] stands for (EmojiCandidates), but those the phone cannot draw. */
     fun emojiOf(word: String): List<String> = emoji.of(word).filter { shown.getOrPut(it) { emojiShows(it) } }
 
     // characters by their parts' pinyin; none if the app has not got them
-    private val chaizi: Chaizi by lazy(LazyThreadSafetyMode.NONE) {
+    private val chaizi: Chaizi by lazy {
         try {
             Chaizi.read(Charsets.UTF_8.decode(load(CHAIZI_DATA)))
         } catch (e: IOException) {
@@ -277,7 +277,7 @@ internal class EngineAssets(
     }
 
     // a character to its readings, the likeliest first, for the stroke lookup to show
-    private val charReadings: Map<String, String> by lazy(LazyThreadSafetyMode.NONE) {
+    private val charReadings: Map<String, String> by lazy {
         val dictionary = pinyinData.dictionary
         val vocabulary = pinyinData.vocabulary
         val readings = HashMap<String, MutableList<Pair<Float, String>>>()
@@ -296,6 +296,18 @@ internal class EngineAssets(
     }
 
     fun charReading(c: String): String = charReadings[c].orEmpty()
+
+    /**
+     * What the candidates beside a pinyin key's own come from (emoji, characters by their parts, their
+     * readings), read on the warm-up's thread rather than at the first key on the fcitx thread:
+     * their lazies are the synchronized kind for it. Only those asked for: what the input method
+     * shows, each read once and held from then on.
+     */
+    fun warmUpAside(emoji: Boolean, chaizi: Boolean, charReadings: Boolean) {
+        if (emoji) this.emoji
+        if (chaizi) this.chaizi
+        if (charReadings) this.charReadings
+    }
 
     val lateRefiner: SentenceRefiner = LateRefiner()
 

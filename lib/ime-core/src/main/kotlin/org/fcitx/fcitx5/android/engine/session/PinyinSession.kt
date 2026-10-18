@@ -454,21 +454,20 @@ class PinyinSession(
     private fun pin(index: Int): Snapshot {
         val c = candidates.getOrNull(index)
         if (c == null || predicting || !pinnable(c)) return snapshot()
-        // read again whatever saving it does: the phrases changed all the same
-        try {
-            phraseBook.pin(input.substring(readFrom()), lastRead.placed[c.text]?.value ?: c.text)
-        } finally {
-            read()
-        }
-        return snapshot()
+        return readAgainAfter { phraseBook.pin(input.substring(readFrom()), lastRead.placed[c.text]?.value ?: c.text) }
     }
 
     /** Deletes the phrase the candidate at [index] is, then reads the input again. */
     private fun unpin(index: Int): Snapshot {
         val phrase = candidates.getOrNull(index)?.let { lastRead.placed[it.text] }
         if (phrase == null || predicting) return snapshot()
+        return readAgainAfter { phraseBook.remove(phrase.key, phrase.value) }
+    }
+
+    // read again whatever saving does: the phrases changed all the same
+    private inline fun readAgainAfter(change: () -> Unit): Snapshot {
         try {
-            phraseBook.remove(phrase.key, phrase.value)
+            change()
         } finally {
             read()
         }
@@ -707,7 +706,8 @@ class PinyinSession(
     private fun place(decoded: Decoded, time: Calendar? = null) {
         val rest = input.length - readFrom()
         val key = input.substring(readFrom())
-        val phrases = phraseBook.phrases
+        // the built-in ones for full pinyin only: 双拼's sj, xq spell syllables
+        val phrases = phraseBook.offered(builtIns = !spell)
         // the time asked once, for what is shown and what is kept of it to agree
         val time = time ?: if (key in phrases) now() else null
         val placed: Map<String, Phrase> = if (time == null) emptyMap() else phrases.offered(key, time).associate { it.text to it.phrase }
@@ -715,9 +715,14 @@ class PinyinSession(
         // the emoji and the characters by their parts, placed before the phrases so each is where its order says
         val asText = { text: String -> Candidate(text, rest, 0f, intArrayOf(NO_WORD), intArrayOf(rest)) }
         val read = (decoded.sentences + decoded.words).distinctBy { it.text }
-        val withAside = AsideCandidates.place(read, key, emoji, chaizi.takeUnless { spell }, { it.text }, { it.end == rest }, asText)
-        val listed = phrases.place(key, { checkNotNull(time) }, withAside.candidates, text = { it.text }, all = { it.end == rest }) { asText(it) }
-        val held = coarseCandidates.held(listed, pageSize)
+        val withPhrases = { list: List<Candidate> -> phrases.place(key, { checkNotNull(time) }, list, text = { it.text }, all = { it.end == rest }) { asText(it) } }
+        val readPlaced by lazy { withPhrases(read) }
+        val readHeld by lazy { coarseCandidates.held(readPlaced, pageSize) }
+        // the emoji go with the reading shown first: not one held past the first page, nor one a pinned phrase put second
+        val withAside = AsideCandidates.place(read, key, emoji, chaizi.takeUnless { spell }, { it.text }, { it.end == rest }, asText) { coarseCandidates.order(readPlaced, pageSize, readHeld).firstOrNull() }
+        // nothing set aside: the list worked out for that is the one listed
+        val listed = if (withAside.candidates === read) readPlaced else withPhrases(withAside.candidates)
+        val held = if (withAside.candidates === read) readHeld else coarseCandidates.held(listed, pageSize)
         val ordered = coarseCandidates.order(listed, pageSize, held)
         // the first reading shown: the preedit, the syllables offered and Enter's text go by it. Every
         // sentence held, that is the candidate shown first, the rest of the input as typed after it

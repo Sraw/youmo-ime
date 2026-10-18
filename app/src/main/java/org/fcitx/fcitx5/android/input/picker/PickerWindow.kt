@@ -34,7 +34,8 @@ import org.mechdancer.dependency.manager.must
 
 class PickerWindow(
     override val key: Key,
-    private val data: List<Pair<PickerData.Category, Array<String>>>,
+    // asked for when the view is made, as the picker first opens: the emoji are read from their data
+    private val data: () -> List<Pair<PickerData.Category, Array<String>>>,
     private val density: PickerGridView.Density,
     private val switchKey: KeyDef,
     private val popupPreview: Boolean = true,
@@ -76,7 +77,7 @@ class PickerWindow(
     private var keepsNoRecent = false
 
     /** The pinyin typed in the search, while it is open. */
-    private val query = StringBuilder()
+    private val query = EmojiSearchQuery()
 
     override fun onStartInput(info: EditorInfo, capFlags: CapabilityFlags) {
         keepsNoRecent = capFlags.hasAny(CapabilityFlag.PasswordOrSensitive)
@@ -131,30 +132,39 @@ class PickerWindow(
         }
     }
 
-    // the search's letters build the query; a backspace with none typed deletes in the field, as
-    // elsewhere, but not one held on from the query's letters
+    // where the search's keys go: EmojiSearchQuery
     private val searchKeyActionListener = KeyActionListener { it, source ->
-        when {
-            it is KeyAction.FcitxKeyAction -> searchFor(query.append(it.act))
-            it is KeyAction.SymAction && it.sym == EmojiSearchUi.BACKSPACE && query.isNotEmpty() ->
-                searchFor(query.deleteCharAt(query.length - 1))
-            it is KeyAction.SymAction && it.sym == EmojiSearchUi.BACKSPACE && it.states.has(KeyState.Repeat) -> {}
-            else -> keyActionListener.onKeyAction(it, source)
+        val outcome = when {
+            it is KeyAction.FcitxKeyAction -> query.type(it.act)
+            it is KeyAction.SymAction && it.sym == EmojiSearchUi.BACKSPACE -> query.backspace(it.states.has(KeyState.Repeat))
+            else -> EmojiSearchQuery.Outcome.PASSED
+        }
+        when (outcome) {
+            EmojiSearchQuery.Outcome.CHANGED -> searchFor(query.text)
+            EmojiSearchQuery.Outcome.PASSED -> keyActionListener.onKeyAction(it, source)
+            EmojiSearchQuery.Outcome.SWALLOWED -> Unit
         }
     }
 
     /** The search shown ([on]) from no query, or the emoji again. */
     private fun search(on: Boolean) {
-        val ui = pickerLayout.search ?: return
+        // made the first time it opens, not with the panel
+        val ui = (if (on) pickerLayout.openSearch(::setUpSearch) else pickerLayout.search) ?: return
         query.clear()
-        if (on) searchFor(query)
+        if (on) searchFor(query.text)
         ui.isVisible = on
     }
 
-    private fun searchFor(typed: CharSequence) {
+    private fun setUpSearch(ui: EmojiSearchUi) {
+        ui.keyboard.popupActionListener = popup.listener
+        ui.keyboard.keyActionListener = searchKeyActionListener
+        ui.onPick = { keyActionListener.onKeyAction(KeyAction.CommitAction(it), KeyActionListener.Source.Keyboard) }
+    }
+
+    private fun searchFor(typed: String) {
         // in the skin tone a tap puts in
-        val found = PickerData.EmojiWords.search(typed.toString()).filter(policy::filter).map(policy::transform)
-        pickerLayout.search?.show(typed.toString(), found)
+        val found = PickerData.EmojiWords.search(typed).filter(policy::filter).map(policy::transform)
+        pickerLayout.search?.show(typed, found)
     }
 
     /** The panel's side lists the recently used once there are any; the emoji have no side. */
@@ -189,15 +199,11 @@ class PickerWindow(
     override fun onCreateView() = PickerLayout(context, theme, switchKey, density, panel, if (search) SearchKey else null).apply {
         pickerLayout = this
         val bordered = followKeyBorder && keyBorder
-        adapter = PickerGridAdapter(grid, keyActionListener, popupActionListener, data, key.name, bordered, policy)
+        adapter = PickerGridAdapter(grid, keyActionListener, popupActionListener, data(), key.name, bordered, policy)
         grid.adapter = adapter
         side?.apply {
             setCategories(adapter.categories.map { context.getString(if (it.short != 0) it.short else it.name) })
             onPick = ::select
-        }
-        search?.apply {
-            keyboard.popupActionListener = popup.listener
-            onPick = { keyActionListener.onKeyAction(KeyAction.CommitAction(it), KeyActionListener.Source.Keyboard) }
         }
         if (panel) return@apply
         tabsUi.apply {
@@ -258,7 +264,7 @@ class PickerWindow(
             search(false)
             // opens on the first category (the common symbols), not on what was recently used
             adapter.rebuild()
-            show(FirstCategory)
+            show(firstShown(adapter.categories.size))
         }
         pickerLayout.embeddedKeyboard.also {
             it.onReturnDrawableUpdate(returnKeyDrawable.appearance)
@@ -279,6 +285,9 @@ class PickerWindow(
     companion object {
         /** the common symbols (or the first emoji), not the recently used before them */
         private const val FirstCategory = 1
+
+        /** The category a picker of [count] opens on: no emoji (the app without their data), the recently used, the only one there is. */
+        internal fun firstShown(count: Int) = minOf(FirstCategory, count - 1)
 
         private val SearchKey = KeyDef(
             KeyDef.Appearance.Image(

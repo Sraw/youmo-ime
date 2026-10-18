@@ -54,7 +54,7 @@ msgstr "中英混輸"
 msgid "Characters by their parts"
 msgstr "拆字"
 
-msgid "Emoji candidates"
+msgid "Emoji among the candidates"
 msgstr "表情候選"
 
 msgid "Never show this word"

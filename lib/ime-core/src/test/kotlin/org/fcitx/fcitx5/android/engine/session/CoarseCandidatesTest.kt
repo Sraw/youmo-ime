@@ -55,6 +55,15 @@ class CoarseCandidatesTest {
     }
 
     @Test
+    fun theEmojiAreNotThoseOfAReadingHeldPastTheFirstPage() {
+        val emoji = mapOf("小穴" to listOf("🍑"), "小学" to listOf("🏫"))
+        val s = PinyinSession(data, PinyinSegmenter(), pageSize = 2, prediction = false, emoji = { emoji[it].orEmpty() })
+        val listed = s.type("xiaoxue").candidates + s.apply(Action.NextPage).candidates
+        assertTrue("🏫" in listed)
+        assertTrue("🍑" !in listed)
+    }
+
+    @Test
     fun soDoesOneSpeltByWordsInTurn() {
         // 小 then 穴, each likelier than the word: as many characters, the same text
         val s = session().type("xiaoxue")

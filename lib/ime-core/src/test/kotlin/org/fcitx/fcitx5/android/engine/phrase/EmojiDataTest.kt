@@ -66,6 +66,22 @@ class EmojiDataTest {
     }
 
     @Test
+    fun theStartOfAWordComesBeforeEachSyllableByItsStart() {
+        val data = EmojiData.read(
+            EmojiData.format(
+                emptyList(),
+                // the one spelt by each syllable's start first in the file: not the order that puts it after
+                linkedMapOf("夏欧丽" to listOf("🌞"), "笑脸" to listOf("😃")),
+                pinyin = mapOf("夏欧丽" to "xia ou li", "笑脸" to "xiao lian"),
+            ),
+        )
+        // xiao in full and the start of lian, against xia, the start of ou and of li
+        assertEquals(listOf("😃", "🌞"), data.search("xiaol"))
+        // half a syllable, then a whole one: each by its start
+        assertEquals(listOf("😃"), data.search("xlian"))
+    }
+
+    @Test
     fun aWordsPinyinIsKeptAsWrittenAndReadBack() {
         val text = EmojiData.format(emptyList(), mapOf("点赞" to listOf("👍")), pinyin = mapOf("点赞" to "dian zan"))
         assertEquals("点赞\t👍\tdian zan\n", text)

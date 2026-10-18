@@ -17,8 +17,8 @@ import splitties.views.dsl.constraintlayout.after
 import splitties.views.dsl.constraintlayout.below
 import splitties.views.dsl.constraintlayout.bottomOfParent
 import splitties.views.dsl.constraintlayout.centerHorizontally
-import splitties.views.dsl.constraintlayout.endOfParent
 import splitties.views.dsl.constraintlayout.centerInParent
+import splitties.views.dsl.constraintlayout.endOfParent
 import splitties.views.dsl.constraintlayout.lParams
 import splitties.views.dsl.constraintlayout.matchConstraints
 import splitties.views.dsl.constraintlayout.startOfParent
@@ -30,7 +30,7 @@ import splitties.views.dsl.core.add
  * the categories at the side, the one picked beside them, and a lock in the row of keys.
  */
 @SuppressLint("ViewConstructor")
-class PickerLayout(context: Context, theme: Theme, switchKey: KeyDef, density: PickerGridView.Density, panel: Boolean, searchKey: KeyDef? = null) :
+class PickerLayout(context: Context, private val theme: Theme, switchKey: KeyDef, density: PickerGridView.Density, panel: Boolean, searchKey: KeyDef? = null) :
     ConstraintLayout(context) {
 
     class Keyboard(context: Context, theme: Theme, keys: List<KeyDef>) : BaseKeyboard(context, theme, listOf(keys)) {
@@ -73,8 +73,11 @@ class PickerLayout(context: Context, theme: Theme, switchKey: KeyDef, density: P
 
     val side: PickerSideUi? = if (panel) PickerSideUi(context, theme) else null
 
-    /** The emoji's search ([searchKey]), over the rest while shown. */
-    val search: EmojiSearchUi? = searchKey?.let { EmojiSearchUi(context, theme).apply { visibility = GONE } }
+    private val searches = searchKey != null
+
+    /** The emoji's search ([searchKey]), over the rest while shown; none till first opened ([openSearch]). */
+    var search: EmojiSearchUi? = null
+        private set
 
     init {
         if (side != null) {
@@ -101,7 +104,17 @@ class PickerLayout(context: Context, theme: Theme, switchKey: KeyDef, density: P
             bottomOfParent()
             matchConstraintPercentHeight = 0.25f
         })
-        if (search != null) add(search, lParams(matchConstraints, matchConstraints) { centerInParent() })
+    }
+
+    /** [search], made and laid over the rest the first time, [onMade] then; none without a [searchKey]. */
+    fun openSearch(onMade: (EmojiSearchUi) -> Unit): EmojiSearchUi? {
+        if (search == null && searches) {
+            val ui = EmojiSearchUi(context, theme).apply { visibility = GONE }
+            add(ui, lParams(matchConstraints, matchConstraints) { centerInParent() })
+            search = ui
+            onMade(ui)
+        }
+        return search
     }
 
     companion object {
