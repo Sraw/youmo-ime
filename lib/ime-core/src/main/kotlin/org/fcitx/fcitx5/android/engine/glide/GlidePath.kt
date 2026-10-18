@@ -38,24 +38,31 @@ class GlidePath(path: FloatArray, private val layout: GlideLayout, private val w
         val turn: Float = 0.8f,
     )
 
-    private val p = dense(thin(path))
+    private val resampled = dense(thin(path))
 
     /** Points of the path as searched: none for a path of one point, no glide. */
-    val n = if (path.size < 4) 0 else p.size / 2
+    val points = if (path.size < 4) 0 else resampled.size / 2
 
     // each point's distance from each letter's nearest key, worked out once for the thousands of prefixes
-    private val distances = FloatArray(n * GlideLayout.LETTERS) { layout.distance('a' + it % GlideLayout.LETTERS, p[2 * (it / GlideLayout.LETTERS)], p[2 * (it / GlideLayout.LETTERS) + 1]) }
+    private val distances = FloatArray(points * GlideLayout.LETTERS) { layout.distance('a' + it % GlideLayout.LETTERS, resampled[2 * (it / GlideLayout.LETTERS)], resampled[2 * (it / GlideLayout.LETTERS) + 1]) }
 
-    private val sampled = resample(p, p.size / 2, SAMPLES, FloatArray(SAMPLES * 2))
+    private val sampled = resample(resampled, resampled.size / 2, SAMPLES, FloatArray(SAMPLES * 2))
 
     // the points the path turns sharply at, in order
-    private val corners = Corners(p, n, weights.turn)
+    private val corners = Corners(resampled, points, weights.turn)
     private val at = IntArray(maxKeys + 1)
     private val cost = FloatArray(maxKeys + 1)
     private val distinct = IntArray(maxKeys + 1)
     private val keys = CharArray(maxKeys + 1)
     private val line = FloatArray((maxKeys + 1) * 2)
     private val ideal = FloatArray(SAMPLES * 2)
+
+    /**
+     * Keys stepped so far: a long scribble fits so many prefixes that the search, on the fcitx
+     * thread, would hold the keyboard for seconds; past [MAX_STEPS] none goes on, the best found kept.
+     */
+    var steps = 0
+        private set
 
     private fun distance(i: Int, c: Char) = distances[i * GlideLayout.LETTERS + (c - 'a')]
 
@@ -64,7 +71,9 @@ class GlidePath(path: FloatArray, private val layout: GlideLayout, private val w
      * of those that follow; false where it does not pass near it.
      */
     fun step(depth: Int, c: Char): Boolean {
-        if (n == 0 || c !in layout) return false
+        // a lowercase letter only: the layout finds 'A' too, but a dictionary's capitals (A股) are no keys
+        if (c !in 'a'..'z' || c !in layout) return false
+        if (points == 0 || ++steps > MAX_STEPS) return false
         keys[depth] = c
         if (depth == 0) {
             val d = distance(0, c)
@@ -83,14 +92,14 @@ class GlidePath(path: FloatArray, private val layout: GlideLayout, private val w
             return true
         }
         var j = from + 1
-        while (j < n && distance(j, c) > weights.near) j++
-        if (j >= n) {
+        while (j < points && distance(j, c) > weights.near) j++
+        if (j >= points) {
             // not passed near: the word's last letter may still be where the path ends, as its first
             // where it starts, a finger lifted short of a key more often than it turns short of one
-            if (from == n - 1 || distance(n - 1, c) > weights.ends) return false
-            j = n - 1
+            if (from == points - 1 || distance(points - 1, c) > weights.ends) return false
+            j = points - 1
         }
-        while (j + 1 < n && distance(j + 1, c) <= distance(j, c)) j++
+        while (j + 1 < points && distance(j + 1, c) <= distance(j, c)) j++
         at[depth] = j
         cost[depth] = cost[depth - 1] + distance(j, c)
         distinct[depth] = distinct[depth - 1] + 1
@@ -99,7 +108,7 @@ class GlidePath(path: FloatArray, private val layout: GlideLayout, private val w
 
     /** What a word of the first [length] keys stepped costs to be the path; null if the path does not end near it. */
     fun cost(length: Int): Float? {
-        val end = distance(n - 1, keys[length - 1])
+        val end = distance(points - 1, keys[length - 1])
         if (end > weights.ends) return null
         // the keys after the first all on the path's first point: a tap, not a glide
         if (length > 1 && at[length - 1] == 0) return null
@@ -170,7 +179,7 @@ class GlidePath(path: FloatArray, private val layout: GlideLayout, private val w
         var k = 0
         for (i in 0 until length) {
             if (i > 0 && keys[i] == keys[i - 1]) continue
-            layout.nearest(keys[i], p[2 * at[i]], p[2 * at[i] + 1], line, k)
+            layout.nearest(keys[i], resampled[2 * at[i]], resampled[2 * at[i] + 1], line, k)
             k += 2
         }
         resample(line, k / 2, SAMPLES, ideal)
@@ -186,6 +195,14 @@ class GlidePath(path: FloatArray, private val layout: GlideLayout, private val w
     companion object {
         /** Points the path and a word's line are each taken at to compare their shapes. */
         const val SAMPLES = 32
+
+        /**
+         * Keys a glide's search steps at most, each a walk along the path's points: a bound on a
+         * scribble's time, not a word's. A clean path steps far fewer, a key going on only where the
+         * path passes it: ime-eval's test sets (2026-10-17) took at most 36k (English), 122k (full
+         * pinyin), 319k (the nine keys, the most) and 16k (五笔) a word, 99% of them under 136k.
+         */
+        const val MAX_STEPS = 1_000_000
 
         // about this far apart (key widths), the path's points: none too far for a key passed to
         // be missed, none so close that a finger's many touch points slow the search

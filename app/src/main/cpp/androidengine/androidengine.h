@@ -103,7 +103,7 @@ inline EngineTableConfig engineTable(bool hint, EngineOrderPolicy order, int aut
 #define ENGINE_PAGE_SIZE \
     Option<int, IntConstrain> pageSize{this, "PageSize", _("Candidates Per Page"), 7, IntConstrain(3, 10)};
 #define ENGINE_PREDICTION Option<bool> prediction{this, "Prediction", _("Enable Prediction"), true};
-#define ENGINE_EMOJI Option<bool> emoji{this, "Emoji", D_("fcitx5-android", "Emoji candidates"), true};
+#define ENGINE_EMOJI Option<bool> emoji{this, "Emoji", D_("fcitx5-android", "Emoji among the candidates"), true};
 #define ENGINE_CHAIZI Option<bool> chaizi{this, "Chaizi", D_("fcitx5-android", "Characters by their parts"), true};
 #define ENGINE_MODEL_LEVEL \
     OptionWithAnnotation<EngineModelLevel, EngineModelLevelI18NAnnotation> modelLevel{ \
@@ -301,6 +301,9 @@ private:
     mutable EngineTablePage tablePage_;
     // the pause a snapshot that refines waits for; any event ends it
     std::unique_ptr<EventSourceTime> refine_;
+    // English where it suggests nothing: the last key was a glide the session took, its word held;
+    // cleared by any other key, a reset (the cursor moved, focus lost) and activate
+    bool glidedAsIs_ = false;
 
     FCITX_ADDON_EXPORT_FUNCTION(AndroidEngine, setEventCallback);
     FCITX_ADDON_EXPORT_FUNCTION(AndroidEngine, setCandidatesCallback);

@@ -35,7 +35,7 @@ class GlideGestureTest {
 
     @Test
     fun theNineKeysGlideARowUpOrDown() {
-        val g = GlideGesture(keyWidth = 100f, keyHeight = 150f, longPressMillis = 300, down = GlideGesture.NINE_KEYS_DOWN)
+        val g = GlideGesture(keyWidth = 100f, keyHeight = 150f, longPressMillis = 300, downKeys = GlideGesture.NINE_KEYS_DOWN)
         g.down(50f, 75f, 0, onLetter = true)
         assertFalse(g.move(50f, 150f, 50))
         assertTrue(g.move(50f, 200f, 60))

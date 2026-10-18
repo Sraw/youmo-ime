@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.input
 
+import org.fcitx.fcitx5.android.engine.session.Action
 import org.fcitx.fcitx5.android.input.editing.ContextMemory
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -59,6 +60,20 @@ class FieldPolicyTest {
         assertEquals(listOf("before", "after"), reads)
         // text after the cursor: the start of a field, not an empty one
         assertEquals("", context(4, "", after = "好"))
+    }
+
+    @Test
+    fun whatWasWrittenInAFieldNowEmptyIsToldClearedWhatIsThereIsNot() {
+        policy.focus("chat", password = false, sensitive = false)
+        memory.committed("ok!", now = 0)
+        assertEquals(Action.Context("ok!", cleared = true), policy.told(1, { "" }, { "" }))
+        assertEquals(Action.Context("ok! hi"), policy.told(2, { "ok! hi" }, { "" }))
+        // not said: not known, nothing cleared
+        assertEquals(Action.Context(""), policy.told(3, { null }, { "" }))
+        policy.focus("incognito", password = false, sensitive = true)
+        assertEquals(Action.Context(""), policy.told(4, { "x" }, { "" }))
+        policy.finish()
+        assertNull(policy.told(5, { "" }, { "" }))
     }
 
     @Test

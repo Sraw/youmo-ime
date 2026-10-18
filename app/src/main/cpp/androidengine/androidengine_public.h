@@ -54,6 +54,7 @@ enum class EngineEvent : int {
     Unpin = 12,     // "Delete from custom phrase" on a candidate; arg: the index among all
     Block = 13,     // "Never show this word" on a candidate; arg: the index among all
     Cursor = 14,    // a tap in the composed text; arg: the character it puts the cursor before
+    Typed = 15,     // a screen key the app types itself where English suggests nothing; arg: its code point, '\b' for Backspace, 0 for none (the offer put away)
 };
 
 // What a long press on a candidate offers, as bits of what EngineOffersCallback returns: ime-core's

@@ -4,11 +4,6 @@
  */
 package org.fcitx.fcitx5.android.input.keyboard
 
-import org.fcitx.fcitx5.android.engine.host.Engines
-import org.fcitx.fcitx5.android.core.InputMethodNames
-import org.fcitx.fcitx5.android.engine.glide.Glide
-import android.view.MotionEvent
-import android.graphics.Canvas
 import android.annotation.SuppressLint
 import android.content.Context
 import android.content.res.Configuration
@@ -25,8 +20,10 @@ import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.prefs.ManagedPreference
 import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
-import org.fcitx.fcitx5.android.input.floating.FloatingKeyboard
+import org.fcitx.fcitx5.android.engine.glide.Glide
+import org.fcitx.fcitx5.android.engine.host.Engines
 import org.fcitx.fcitx5.android.input.broadcast.ReturnKeyAppearance
+import org.fcitx.fcitx5.android.input.floating.FloatingKeyboard
 import org.fcitx.fcitx5.android.input.picker.PickerWindow
 import org.fcitx.fcitx5.android.input.popup.PopupAction
 import org.fcitx.fcitx5.android.input.popup.PopupOverrides
@@ -163,7 +160,7 @@ class TextKeyboard private constructor(
     val `return`: ImageKeyView by lazy { findViewById(R.id.button_return) }
 
     /** What the bottom row has either side of the space, as the field is: see [AddressKeys]. */
-    var address: AddressKeys = AddressKeys.NONE
+    override var address: AddressKeys = AddressKeys.NONE
         set(value) {
             field = value
             showAddressKeys()
@@ -208,12 +205,8 @@ class TextKeyboard private constructor(
 
     private var capsState: CapsState = CapsState.None
 
-    private val glideTyping = AppPrefs.getInstance().keyboard.glideTyping
-    private val longPressDelay by AppPrefs.getInstance().keyboard.longPressDelay
-
-    // the input method reads a glide (Engines.glides); English, whose glide a Shift capitalises
+    // the input method reads a glide (Engines.glides)
     private var glides = false
-    private var english = false
 
     private val letterKeys: List<Pair<Char, TextKeyView>> by lazy {
         textKeys.mapNotNull { v ->
@@ -221,23 +214,11 @@ class TextKeyboard private constructor(
         }
     }
 
-    // glide typing (滑行输入): a field where words are typed, not a password's or an address's
-    private val glide = GlideInput(
-        this, theme,
-        enabled = { glides && glideTyping.getValue() && !inPasswordField && address == AddressKeys.NONE },
-        letters = { letterKeys },
-        longPressMillis = { longPressDelay.toLong() },
-    ) { path, layout ->
+    // glide typing (滑行输入) where the input method reads one
+    override val glide = glideInput(letters = { letterKeys }, enabled = { glides }) { path, layout ->
         onAction(KeyAction.GlideAction(Glide(path, layout, shift = capsState == CapsState.Once, capsLock = capsState == CapsState.Lock)))
-        // as a letter typed: Shift-once used up, where it capitalises (English's; pinyin has no capitals)
-        if (capsState == CapsState.Once && english) switchCapsState()
-    }
-
-    override fun dispatchTouchEvent(ev: MotionEvent): Boolean = glide.dispatch(ev) { super.dispatchTouchEvent(it) }
-
-    override fun dispatchDraw(canvas: Canvas) {
-        super.dispatchDraw(canvas)
-        glide.draw(canvas)
+        // as a letter typed: Shift-once used up in any input method, as a tap uses it up (only English reads it)
+        if (capsState == CapsState.Once) switchCapsState()
     }
 
     private val autoCaps = AutoCaps()
@@ -331,7 +312,6 @@ class TextKeyboard private constructor(
 
     override fun onInputMethodUpdate(ime: InputMethodEntry) {
         showInputMethodName(space, ime)
-        english = ime.uniqueName == InputMethodNames.KEYBOARD
         glides = Engines.glides(ime.uniqueName)
         if (capsState != CapsState.None) {
             switchCapsState()

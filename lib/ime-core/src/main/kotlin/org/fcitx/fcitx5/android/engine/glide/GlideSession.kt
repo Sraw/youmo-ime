@@ -17,16 +17,18 @@ class GlideReading(val keys: String, val word: String, val score: Float)
  * A Chinese input method's [session] session, glided on: an [Action.Glide] types the likeliest
  * reading of the glide [offer]ed ([read]: [PinyinGlide]'s for the pinyins, [TableGlide]'s for a
  * table), each key as [typed] has it, after [between] where something is typed already (pinyin's
- * syllable boundary, a table's first candidate picked). A glide that starts the input has the next
+ * syllable boundary, a table's first candidate picked); what is typed and shows no candidates (a
+ * table's 空码, a lone u of 笔画查字 or its parts that match nothing) is taken back instead. A glide that starts the input has the next
  * readings' words offered too, after the first candidate: a path fits more than one reading
  * (ni-h-ao and niao differ by a bend), and the one typed may be the wrong one. Picking such a word
  * types its reading instead and picks it there, so it is learned and followed (联想) as any word
- * picked. None [blocked] is offered; [readings] in all, the one typed among them.
+ * picked. None [blocked] is offered; [readings] in all, the one typed among them. Such a word is
+ * looked for on the first page only: one the session lists on a later page shows there again.
  */
 class GlideSession(
     private val session: Session,
+    private val between: Action,
     private val blocked: (String) -> Boolean = { false },
-    private val between: Action = Action.Key(PinyinGlide.SEPARATOR),
     private val typed: (Char) -> Action = Action::Key,
     private val readings: Int = READINGS,
     private val read: (Glide, limit: Int) -> List<GlideReading>,
@@ -43,6 +45,9 @@ class GlideSession(
     // what [session] last showed, before the others were put in
     private var last: Snapshot? = null
 
+    // the text committed through this, as far as a context goes: what a word committed here as told follows
+    private var written = ""
+
     private val composing get() = last?.let(::typing) == true
 
     /** The glide that the next [Action.Glide] types: [Glide.path] read now, on the thread the session is used on. */
@@ -53,17 +58,33 @@ class GlideSession(
     override fun apply(action: Action): Snapshot {
         val s = when (action) {
             Action.Glide -> glided()
-            is Action.Pick -> others(action.index)?.let(::pickOther) ?: session.apply(action.copy(index = inner(action.index)))
+            is Action.Pick -> picked(action.index) { action.copy(index = it) }
             // of the page shown: the others are on the first
-            is Action.Select -> if (last?.first != 0) session.apply(action) else others(action.index)?.let(::pickOther) ?: session.apply(action.copy(index = inner(action.index)))
-            is Action.Forget -> if (others(action.index) != null) unchanged() else session.apply(action.copy(index = inner(action.index)))
-            is Action.Pin -> if (others(action.index) != null) unchanged() else session.apply(action.copy(index = inner(action.index)))
-            is Action.Unpin -> if (others(action.index) != null) unchanged() else session.apply(action.copy(index = inner(action.index)))
-            is Action.Block -> if (others(action.index) != null) unchanged() else session.apply(action.copy(index = inner(action.index)))
+            is Action.Select -> if (last?.first != 0) session.apply(action) else picked(action.index) { action.copy(index = it) }
+            is Action.Forget -> pressed(action.index) { action.copy(index = it) }
+            is Action.Pin -> pressed(action.index) { action.copy(index = it) }
+            is Action.Unpin -> pressed(action.index) { action.copy(index = it) }
+            is Action.Block -> pressed(action.index) { action.copy(index = it) }
             else -> session.apply(action)
         }
+        wrote(action, s)
         return shown(settled(s))
     }
+
+    private fun wrote(action: Action, s: Snapshot) {
+        val before = when (action) {
+            Action.Reset -> ""
+            is Action.Context -> action.before
+            else -> written.dropLast(s.deleteBefore)
+        }
+        written = (before + s.commit).takeLast(Action.Context.HOST_CHARS)
+    }
+
+    // another reading's word at [index] typed and picked, else [at] its index as [session] has it
+    private inline fun picked(index: Int, at: (Int) -> Action) = others(index)?.let(::pickOther) ?: session.apply(at(inner(index)))
+
+    // a long press's offer: nothing to do of another reading's word, else [at] its index as [session] has it
+    private inline fun pressed(index: Int, at: (Int) -> Action) = if (others(index) != null) unchanged() else session.apply(at(inner(index)))
 
     // [s] as [session] shows it, the others kept only while it shows the input the glide typed
     private fun settled(s: Snapshot): Snapshot {
@@ -80,8 +101,14 @@ class GlideSession(
         others = emptyList()
         val best = readings.firstOrNull() ?: return session.apply(Action.Glide)
         var commit = ""
-        // after what is typed, a boundary; that may end it (笔画查字 leaves, its character committed)
-        val before = if (composing) session.apply(between).also { commit += it.commit } else null
+        // after what is typed, a boundary; that may end it (笔画查字 leaves, its character committed).
+        // What shows no candidates is taken back: a table's 空码 would run on into the glide's code, a
+        // lone u of 笔画查字 or its parts that match nothing be committed as typed
+        val before = when {
+            !composing -> null
+            last?.candidates.isNullOrEmpty() -> takenBack(last)
+            else -> session.apply(between).also { commit += it.commit }
+        }
         val fresh = before == null || before.preedit.isEmpty() || before.predicting
         var s = before
         for (c in best.keys) s = session.apply(typed(c)).also { commit += it.commit }
@@ -103,12 +130,13 @@ class GlideSession(
         others = emptyList()
         // the input taken back, not Reset: that drops what was committed before too, which the word follows
         takenBack(last)
-        var s: Snapshot? = null
-        for (c in reading.keys) s = session.apply(typed(c))
+        for (c in reading.keys) session.apply(typed(c))
         val at = session.candidates(0, SEARCHED).indexOfFirst { it.text == reading.word }
         if (at >= 0) return session.apply(Action.Pick(at))
-        // not among its candidates (the session holds it back): the word as shown, the input taken back
-        return (takenBack(s) ?: session.apply(Action.Refine)).copy(commit = reading.word, handled = true)
+        // not among its candidates (the session holds it back): the word as shown, the input dropped
+        // and the word told the session as what the next input follows, after what was committed before,
+        // as if committed there; not learned
+        return session.apply(Action.Context(written + reading.word)).copy(commit = reading.word, handled = true)
     }
 
     // [s]'s input deleted, a backspace a character: what the session shows then
@@ -135,6 +163,8 @@ class GlideSession(
             candidates = s.candidates.take(1) + words + s.candidates.drop(1),
             hints = if (s.hints.isEmpty()) s.hints else s.hints.take(1) + words.map { "" } + s.hints.drop(1),
             total = total,
+            // a table's selection keys pick of [session]'s own: none on the others, each still on its candidate
+            labels = if (s.labels.isEmpty()) s.labels else s.labels.take(1) + " ".repeat(k) + s.labels.drop(1),
         )
     }
 

@@ -27,7 +27,7 @@ object EnglishText {
     // one more often than not (I said no.), and No. 5 breaks the run at its number all the same
     private val ABBREVIATIONS = setOf("mr", "mrs", "ms", "dr", "st", "jr", "sr", "vs", "prof", "inc", "ltd", "co", "vol", "fig")
 
-    private const val ENDS = "!?…\n\r"
+    private const val ENDS = "!?…\n\r\u000B\u000C\u2028\u2029\u0085"
     private const val SEPARATORS = " \t,;:\"“”()[]-–— /*"
 
     /**
@@ -59,6 +59,19 @@ object EnglishText {
         return words.takeLast(2)
     }
 
+    /**
+     * Whether [text] ends a sentence as [context] reads it: a full stop that ends one (no initial's
+     * or abbreviation's), a question or exclamation mark, an ellipsis or a line break last, spaces
+     * after it or not (any Unicode space, U+00A0 too, as [context] separates words by); what
+     * starts [text] starts no sentence of its own.
+     */
+    fun endsSentence(text: CharSequence): Boolean {
+        val splitter = Splitter(sentence = false) { _, _ -> }
+        for (i in text.indices) splitter.char(text, i)
+        splitter.endWord()
+        return splitter.sentence && splitter.current.isEmpty()
+    }
+
     /** Whether [text] is a word as English types it: letters, an apostrophe or a hyphen between them, at most [MAX_WORD]. */
     fun isWord(text: String): Boolean =
         text.length in 1..MAX_WORD && text.first().isAsciiLetter() && text.all { it.isAsciiLetter() || it == '\'' || it == '-' }
@@ -87,6 +100,8 @@ object EnglishText {
                 c == '.' -> fullStop(text, i)
                 c in ENDS -> breakRun(sentence = true)
                 c in SEPARATORS || c == '\'' || c == '\u2019' || c == '\u2018' -> endWord()
+                // any other Unicode space separates too (U+00A0 after a full stop), the line breaks being ENDS
+                c.isWhitespace() -> endWord()
                 else -> spoiled = true
             }
         }

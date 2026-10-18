@@ -41,6 +41,26 @@ interface Session {
 
     /** A key went to the app, not here (Enter, an arrow with nothing typed), or the cursor moved: what came before it is past. */
     fun passedOn() {}
+
+    /**
+     * The app typed [text] itself, right after what is before the cursor (a key where English
+     * suggests nothing; empty for none, [ERASED] for a Backspace): any offer goes, what was before
+     * stays. The host passes it on first ([passedOn]).
+     */
+    fun typed(text: String) {}
+
+    companion object {
+        /**
+         * What the app [typed] for a Backspace it did itself: what the editor's Backspace takes
+         * before the cursor gone (in an opted-in editor one code point; else a key event, what the
+         * editor decides, perhaps an emoji sequence or a flag whole), or what was selected.
+         * English takes one code point off what it knows and forgets all of it where the code
+         * point taken or the char left may belong to a cluster (a CR taken or left: perhaps a
+         * "\r\n"'s half) (EnglishSession.erased); for a selection the service reads the context
+         * right after (handleBackspaceKey).
+         */
+        const val ERASED = "\b"
+    }
 }
 
 /**
@@ -164,9 +184,11 @@ sealed class Action {
     /**
      * Drops everything as [Reset] does, then takes [before], the text before the cursor, as what
      * the input to come follows: what the host read off the editor, where the engine committed
-     * nothing yet (a field focused, the cursor put somewhere).
+     * nothing yet (a field focused, the cursor put somewhere). [cleared]: [before] is what was
+     * written last in a field that has since cleared itself (a chat's box once a message is sent),
+     * which what is typed next follows, but the field is empty: nothing is before the cursor.
      */
-    data class Context(val before: String) : Action() {
+    data class Context(val before: String, val cleared: Boolean = false) : Action() {
         companion object {
             /**
              * As much of the text before the cursor as the host reads into a context, and keeps of

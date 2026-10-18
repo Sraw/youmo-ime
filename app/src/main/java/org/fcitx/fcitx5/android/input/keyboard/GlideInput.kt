@@ -28,15 +28,11 @@ class GlideInput(
     private val letters: () -> List<Pair<Char, TextKeyView>>,
     private val longPressMillis: () -> Long,
     // how far up or down a glide starts, in key heights (GlideGesture)
-    private val down: Float = GlideGesture.DOWN,
+    down: Float = GlideGesture.DOWN,
     private val glided: (path: FloatArray, layout: GlideLayout) -> Unit,
 ) {
-    private var gesture: GlideGesture? = null
-
-    // the finger that may glide; once it does, the others are none of the keys' till all lift
-    private var pointer = MotionEvent.INVALID_POINTER_ID
-    private var swallowing = false
-    private val points = ArrayList<Float>()
+    // which finger may glide, which events are the keys', the path in the decoder's units
+    private val touch = GlideTouch(down)
     private val trail = Path()
     private val rect = Rect()
 
@@ -54,112 +50,78 @@ class GlideInput(
      * the keyboard does otherwise (its dispatch), told a cancel as a glide starts.
      */
     fun dispatch(event: MotionEvent, toKeys: (MotionEvent) -> Boolean): Boolean {
-        val action = event.actionMasked
-        if (action == MotionEvent.ACTION_DOWN) swallowing = false
-        if (swallowing) {
-            // the glide ended with another finger still down: its touch was the glide's, as all lift
-            if (action == MotionEvent.ACTION_UP || action == MotionEvent.ACTION_CANCEL) swallowing = false
-            return true
-        }
-        val gliding = gesture?.gliding == true
-        when (action) {
+        val masked = event.actionMasked
+        val last = masked == MotionEvent.ACTION_UP || masked == MotionEvent.ACTION_CANCEL
+        if (touch.swallows(first = masked == MotionEvent.ACTION_DOWN, last = last)) return true
+        val i = event.actionIndex
+        val route = when (masked) {
             MotionEvent.ACTION_DOWN -> down(event)
-            MotionEvent.ACTION_POINTER_DOWN -> if (gliding) return true else gesture?.otherDown()
-            MotionEvent.ACTION_MOVE -> if (move(event, toKeys)) return true
-            MotionEvent.ACTION_POINTER_UP -> if (gliding) {
-                // the gliding finger lifted, another still down: the glide ends; the other is swallowed
-                if (event.getPointerId(event.actionIndex) == pointer) {
-                    lift(event, event.actionIndex, up = true)
-                    swallowing = true
-                }
-                return true
-            }
-            MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> if (lift(event, event.actionIndex, up = action == MotionEvent.ACTION_UP)) return true
+            MotionEvent.ACTION_POINTER_DOWN -> touch.otherDown()
+            MotionEvent.ACTION_MOVE -> move(event)
+            MotionEvent.ACTION_POINTER_UP -> touch.pointerUp(event.getPointerId(i), event.getX(i), event.getY(i))
+            MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> touch.up(event.getX(i), event.getY(i), cancelled = masked == MotionEvent.ACTION_CANCEL)
+            else -> GlideTouch.Route.KEYS
         }
-        return toKeys(event)
-    }
-
-    private fun down(event: MotionEvent) {
-        reset()
-        if (!enabled()) return
-        val keys = letters()
-        val key = keys.firstOrNull { (_, v) -> bounds(v).contains(event.x.toInt(), event.y.toInt()) }
-        val size = bounds(keys.firstOrNull()?.second ?: return)
-        pointer = event.getPointerId(0)
-        gesture = GlideGesture(size.width().toFloat(), size.height().toFloat(), longPressMillis(), down).apply {
-            down(event.x, event.y, event.eventTime, onLetter = key != null)
-        }
-        add(event.x, event.y)
-    }
-
-    // whether the finger glides, the keys cancelled as it starts
-    private fun move(event: MotionEvent, toKeys: (MotionEvent) -> Boolean): Boolean {
-        val g = gesture ?: return false
-        val i = event.findPointerIndex(pointer).takeIf { it >= 0 } ?: return g.gliding
-        val was = g.gliding
-        for (h in 0 until event.historySize) add(event.getHistoricalX(i, h), event.getHistoricalY(i, h))
-        val x = event.getX(i)
-        val y = event.getY(i)
-        add(x, y)
-        if (!g.move(x, y, event.eventTime)) return false
-        if (!was) {
+        touch.takeGlided()?.let { send(it) }
+        if (route == GlideTouch.Route.KEYS) return toKeys(event)
+        if (route == GlideTouch.Route.CANCEL_KEYS) {
             val cancel = MotionEvent.obtain(event).apply { action = MotionEvent.ACTION_CANCEL }
             toKeys(cancel)
             cancel.recycle()
         }
+        // the trail drawn anew, or gone as the glide ends
         keyboard.invalidate()
         return true
     }
 
-    // whether the glide ended: the path given in key widths over the letters
-    private fun lift(event: MotionEvent, index: Int, up: Boolean): Boolean {
-        val g = gesture ?: return false
-        val was = g.gliding
-        if (was && up) {
-            add(event.getX(index), event.getY(index))
-            send()
-        }
-        reset()
-        return was
+    private fun down(event: MotionEvent): GlideTouch.Route {
+        val keys = if (enabled()) letters() else emptyList()
+        val x = event.x.toInt()
+        val y = event.y.toInt()
+        val onLetter = keys.any { (_, v) -> bounds(v).contains(x, y) }
+        // the keys' size from any letter: all the same; nothing measured on a tap off the letters
+        if (onLetter) bounds(keys.first().second)
+        touch.down(
+            event.getPointerId(0), event.x, event.y, event.eventTime, onLetter,
+            rect.width().toFloat(), rect.height().toFloat(), longPressMillis(),
+        )
+        return GlideTouch.Route.KEYS
     }
 
-    private fun send() {
+    private fun move(event: MotionEvent): GlideTouch.Route {
+        val i = event.findPointerIndex(touch.pointer).takeIf { it >= 0 } ?: return touch.missing()
+        for (h in 0 until event.historySize) touch.add(event.getHistoricalX(i, h), event.getHistoricalY(i, h))
+        return touch.move(event.getX(i), event.getY(i), event.eventTime)
+    }
+
+    // [path] in key widths over where the letters are
+    private fun send(path: FloatArray) {
         val keys = letters()
-        val size = keys.firstOrNull()?.let { bounds(it.second) }?.takeIf { it.width() > 0 && it.height() > 0 } ?: return
-        // across in key widths, down in rows of the height the decoder's radii are for, whatever
-        // the keys' shape (wide and short in landscape)
-        val unitX = size.width().toFloat()
-        val unitY = size.height() / GlideLayout.ROW_HEIGHT
+        if (keys.isEmpty()) return
+        bounds(keys.first().second)
+        val unitX = rect.width().toFloat()
+        val unitY = GlideTouch.unitY(rect.height().toFloat())
+        if (unitX <= 0f || unitY <= 0f) return
         // every key a letter has: the split keyboard's G and V are on both halves
         val centres = keys.map { (c, v) -> bounds(v).let { b -> c to (b.exactCenterX() / unitX to b.exactCenterY() / unitY) } }
-        val path = FloatArray(points.size) { if (it % 2 == 0) points[it] / unitX else points[it] / unitY }
         glided(path, GlideLayout(centres))
     }
 
-    private fun add(x: Float, y: Float) {
-        if (points.isEmpty()) trail.moveTo(x, y) else trail.lineTo(x, y)
-        points += x
-        points += y
-    }
-
-    private fun reset() {
-        gesture?.up()
-        gesture = null
-        if (!trail.isEmpty) keyboard.invalidate()
-        points.clear()
-        trail.rewind()
-    }
-
-    // where [view] is in the keyboard
+    // where [view] is in the keyboard, in the one rect kept for it
     private fun bounds(view: TextKeyView): Rect {
         rect.set(0, 0, view.width, view.height)
         keyboard.offsetDescendantRectToMyCoords(view, rect)
-        return Rect(rect)
+        return rect
     }
 
     /** The path so far, over the keys. */
     fun draw(canvas: Canvas) {
-        if (gesture?.gliding == true) canvas.drawPath(trail, paint)
+        if (!touch.gliding) return
+        val p = touch.points
+        trail.rewind()
+        trail.moveTo(p[0], p[1])
+        for (k in 2 until touch.count step 2) trail.lineTo(p[k], p[k + 1])
+        canvas.drawPath(trail, paint)
     }
 
     companion object {

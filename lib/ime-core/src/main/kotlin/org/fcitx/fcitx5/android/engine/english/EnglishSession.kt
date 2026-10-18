@@ -4,8 +4,9 @@
  */
 package org.fcitx.fcitx5.android.engine.english
 
-import org.fcitx.fcitx5.android.engine.glide.Glide
 import org.fcitx.fcitx5.android.engine.data.NgramModel
+import org.fcitx.fcitx5.android.engine.glide.Glide
+import org.fcitx.fcitx5.android.engine.glide.GlidePath
 import org.fcitx.fcitx5.android.engine.lattice.CoarseWords
 import org.fcitx.fcitx5.android.engine.session.Action
 import org.fcitx.fcitx5.android.engine.session.Choice
@@ -105,11 +106,24 @@ class EnglishSession(
     private var known = false
     private var cut = false
 
+    // where the field's own text starts in [recent], -1 if not there: before it, what was written
+    // in a field that has cleared itself (Action.Context.cleared), a space put after it as a word's
+    // end for scoring. At the mark nothing is before the cursor: no glide's space, and a Backspace
+    // takes nothing
+    private var clearedAt = -1
+
+    // the end of the text before the cursor, known while learning or not: its last few chars not
+    // spaces (a few, for the app's Backspaces to take back one by one) and the spaces after it,
+    // empty if unknown. A glide's space before its word, and its
+    // case after a full stop, need it where [recent] is kept empty. It is never learned or scored
+    private var edge = ""
+
     override var learning = true
         set(value) {
             field = value
             if (!value) {
                 recent = ""
+                clearedAt = -1
                 known = false
             }
         }
@@ -118,8 +132,10 @@ class EnglishSession(
 
     override val takesEveryCharacter: Boolean get() = true
 
-    // the word a glide committed and the others it may have been, while the cursor stays after it
-    private class Glided(val committed: String, val words: List<String>)
+    // the word a glide committed, the space it put before it ([lead]) and the others it may have
+    // been, while the cursor stays after it; [edge], the end of the text before them, for a glide after the
+    // word is taken back
+    private class Glided(val committed: String, val words: List<String>, val lead: String = "", val edge: String = "")
 
     // the keyboard's last glide, read at the Glide key sent after it
     private var pendingGlide: Glide? = null
@@ -172,15 +188,7 @@ class EnglishSession(
         }
         // the keyboard commits the word on an arrow (Keyboard.whileComposing): none comes here
         is Action.Step -> snapshot(handled = false)
-        is Action.Context -> {
-            forgetText()
-            if (learning) {
-                recent = action.before.takeLast(EnglishText.CONTEXT_CHARS)
-                known = true
-                cut = action.before.length >= Action.Context.HOST_CHARS
-            }
-            snapshot()
-        }
+        is Action.Context -> context(action)
         Action.Reset -> {
             forgetText()
             snapshot()
@@ -199,52 +207,108 @@ class EnglishSession(
     private fun learnedAs(text: String): String? =
         text.takeIf { user.count(it) > 0f } ?: text.replaceFirstChar(Char::lowercaseChar).takeIf { user.count(it) > 0f }
 
-    // the pending glide's word committed, a word typed before it ended as space ends it
+    // the pending glide's word committed, a word typed before it ended as space ends it; a glide no
+    // word fits leaves that word as it is, so it is decoded after the word as space would end it
     private fun glide(): Snapshot {
         val glide = pendingGlide ?: return snapshot()
         pendingGlide = null
-        val glider = glider ?: return snapshot()
-        val data = checkNotNull(data)
-        val ended = if (input.isNotEmpty()) key(' ').commit else ""
+        if (glider == null) return snapshot()
+        // what key(' ') below commits: the two must stay in step. It is not called first, as a glide
+        // no word fits leaves the word typed
+        val ending = if (input.isNotEmpty()) "${correction ?: typed()} " else ""
+        // right after a word or punctuation not the session's (the cursor put there): a space between them
+        val lastChar = if (recent.length == clearedAt) null else recent.lastOrNull() ?: edge.lastOrNull()
+        val space = if (ending.isEmpty() && lastChar?.let { it.isLetterOrDigit() || it in SPACED_AFTER } == true) " " else ""
+        // what is before the cursor once the word is ended, as wrote would keep it
+        val ahead = if (learning) recent + ending + space else recent
+        val context = EnglishText.context(ahead, start = known && !cut)
+        // inside a sentence, the data's capital of a sentence's start is not the word's ("abc Hello" as
+        // "abc hello"; a word unknown before it backs off to the unigram, Hello likelier): words
+        // before it known, or nothing known but a char that ends no sentence, past the spaces after
+        // it (a field not learned from); after "Hi. ", "Wait… " or a line break the capital stays
+        val inside = context != listOf(EnglishText.START) &&
+            (context.isNotEmpty() || recent.ifEmpty { edge }.let { it.isNotBlank() && !EnglishText.endsSentence(it) })
+        val words = glideWords(glide, context, inside)
+        val word = words.firstOrNull() ?: return snapshot()
+        val ended = if (ending.isNotEmpty()) key(' ').commit else ""
+        val before = edge
         // a correction space made is no longer the last thing before the cursor
         corrected = null
-        // right after a word or punctuation not the session's (the cursor put there): a space between them
-        val space = if (ended.isEmpty() && recent.lastOrNull()?.let { it.isLetterOrDigit() || it in SPACED_AFTER } == true) " " else ""
-        val before = EnglishText.context(recent + space, start = known && !cut)
-        val context = checkNotNull(decoder).context(before)
-        scoredPrev = previous(before)
-        val words = glider.decode(glide.path, glide.layout, context, GLIDE_SEARCHED)
-            .filter { offered(it.word) }
-            .map { data.word(it.word).let { w -> if (glide.capsLock) w.uppercase() else if (glide.shift) w.replaceFirstChar(Char::uppercaseChar) else w } }
-            .distinct()
-            .take(SUGGESTED + 1)
-        val word = words.firstOrNull() ?: return snapshot(commit = ended)
         wrote(space)
         learn(word, 1f)
         val made = "$word "
         last = made
         wrote(made)
-        glided = Glided(made, words)
+        glided = Glided(made, words, space, before)
         candidates = words
         page = 0
         return snapshot(commit = ended + space + made)
     }
 
-    // the word [g] glided taken back: deleted (a backspace), or another it may have been in its place
+    // the words [glide] may be after [before], best first, in the keyboard's case: the data's and the user's own
+    private fun glideWords(glide: Glide, before: List<String>, inside: Boolean = false): List<String> {
+        val data = checkNotNull(data)
+        val context = checkNotNull(decoder).context(before)
+        scoredPrev = previous(before)
+        val found = checkNotNull(glider).decode(glide.path, glide.layout, context, GLIDE_SEARCHED)
+            .filter { offered(it.word) }
+            .map { data.word(it.word) to it.score }
+        return (found + ownGlided(data, glide, scoredPrev))
+            .sortedByDescending { it.second }
+            .map { (w, _) -> if (inside) inSentence(w, first = true) else w }
+            .map { w -> if (glide.capsLock) w.uppercase() else if (glide.shift) w.replaceFirstChar(Char::uppercaseChar) else w }
+            .distinct()
+            .take(SUGGESTED + 1)
+    }
+
+    // the words the user committed that the data lacks, which the trie the glide searches has not:
+    // each held to the path as the decoder holds its words, scored by the user's counts alone
+    private fun ownGlided(data: EnglishData, glide: Glide, prev: String?): List<Pair<String, Float>> {
+        refreshUser(data)
+        if (userOnly.isEmpty()) return emptyList()
+        val path = GlidePath(glide.path, glide.layout, GlidePath.Weights(), EnglishDecoder.MAX_KEYS)
+        if (path.points == 0) return emptyList()
+        return userOnly.mapNotNull { word ->
+            val key = EnglishData.key(word)
+            val fits = key.length in 1..EnglishDecoder.MAX_KEYS && key.indices.all { path.step(it, key[it]) }
+            val cost = if (fits) path.cost(key.length) else null
+            cost?.let { word to user.score(Float.NEGATIVE_INFINITY, prev, word) - it }
+        }
+    }
+
+    // the word [g] glided taken back: deleted (a backspace), the space it put before it too, or
+    // another it may have been in its place
     private fun unglide(g: Glided, other: String?): Snapshot {
         recent = recent.dropLast(g.committed.length)
         learn(g.committed.trimEnd(' '), -1f)
         if (other == null) {
+            recent = recent.dropLast(g.lead.length)
+            edge = g.edge
             last = ""
             candidates = emptyList()
-            return snapshot(deleteBefore = g.committed.length)
+            return snapshot(deleteBefore = g.committed.length + g.lead.length)
         }
         learn(other, 1f)
         val made = "$other "
         last = made
         wrote(made)
-        glided = Glided(made, g.words)
+        glided = Glided(made, g.words, g.lead, g.edge)
         return snapshot(commit = made, deleteBefore = g.committed.length)
+    }
+
+    private fun context(action: Action.Context): Snapshot {
+        forgetText()
+        if (!action.cleared) edge = endOf(action.before)
+        if (learning) {
+            recent = action.before.takeLast(EnglishText.CONTEXT_CHARS)
+            known = true
+            cut = action.before.length >= Action.Context.HOST_CHARS
+            if (action.cleared) {
+                if (recent.isNotEmpty() && !recent.last().isWhitespace()) recent += " "
+                clearedAt = recent.length
+            }
+        }
+        return snapshot()
     }
 
     private fun forget(index: Int): Snapshot {
@@ -364,7 +428,7 @@ class EnglishSession(
             if (undo != null && undo.committed == last) return takeBack(undo.typed, undo.committed)
             last = ""
             candidates = emptyList()
-            recent = recent.dropLast(1)
+            erased()
             return snapshot(handled = false)
         }
         last = ""
@@ -379,6 +443,7 @@ class EnglishSession(
     private fun takeBack(typed: String, committed: String): Snapshot {
         last = ""
         recent = recent.dropLast(committed.length)
+        edge = ""
         // what was counted of the correction taken back, and the word typed the user's at once
         learn(committed.trimEnd(' '), -1f)
         learn(typed, EnglishUser.LEARNED)
@@ -426,8 +491,10 @@ class EnglishSession(
         clear()
         last = ""
         recent = ""
+        edge = ""
         known = false
         cut = false
+        clearedAt = -1
         corrected = null
     }
 
@@ -505,10 +572,43 @@ class EnglishSession(
 
     // [text] went in before the cursor
     private fun wrote(text: String) {
+        edge = endOf(edge + text)
         if (!learning) return
         val all = recent + text
         cut = cut || all.length > EnglishText.CONTEXT_CHARS
         recent = all.takeLast(EnglishText.CONTEXT_CHARS)
+        // the mark goes with the text it is in, and once out of it is no longer in reach
+        if (clearedAt >= 0) clearedAt = (clearedAt - (all.length - recent.length)).takeIf { it > 0 } ?: -1
+    }
+
+    // the app typed [text] itself (a key where English suggests nothing): kept after what is known
+    // of the text before the cursor, as what the session wrote; with nothing known, a word's tail
+    // perhaps, it is no word to score, only the edge. A Backspace is [erased]
+    override fun typed(text: String) {
+        glided = null
+        pendingGlide = null
+        clear()
+        last = ""
+        corrected = null
+        when {
+            text == Session.ERASED -> erased()
+            known || recent.isNotEmpty() -> wrote(text)
+            else -> edge = endOf(edge + text)
+        }
+    }
+
+    // the app's Backspace, the session's input empty: the last code point off what is known, and
+    // off the edge, which may know more where the field's text is not. An editor may take more (an
+    // emoji sequence, a flag, a "\r\n") or less; where the code point taken or the char now
+    // last may belong to such a cluster, nothing is known rather than guessed (a glide right after
+    // may then add no space)
+    private fun erased() {
+        // the field empty, nothing taken
+        if (known && recent.length <= clearedAt) return
+        val end = if (known) recent else edge
+        recent = withoutLast(recent)
+        edge = if (known) endOf(recent) else endOf(withoutLast(edge))
+        if (endsInCluster(end) || endsInCluster(if (known) recent else edge)) forgetText()
     }
 
     // the word typed, then what it may be, in its case; the correction first, if any
@@ -699,6 +799,39 @@ class EnglishSession(
 
         // after these, not the session's, a glide's word has a space before it
         private const val SPACED_AFTER = ".,!?;:"
+
+        // [text]'s end as [edge] keeps it: its last [EDGE_CHARS] chars up to its last not a space,
+        // and the spaces after them, as many as fit after those
+        private fun endOf(text: String): String {
+            val end = text.trimEnd().length
+            val kept = text.substring(maxOf(0, end - EDGE_CHARS), end)
+            return kept + text.substring(end).take(EnglishText.CONTEXT_CHARS - kept.length)
+        }
+
+        // the chars [edge] keeps before the spaces at its end: where nothing is known of the text
+        // before the cursor (forgotten at a Reset, an Enter or an arrow, a hardware key, the field
+        // left, and no Context read since), the app's Backspaces after keys typed take back a
+        // word's worth before nothing is known
+        private const val EDGE_CHARS = 32
+
+        // [text] less its last code point
+        private fun withoutLast(text: String): String =
+            if (text.isEmpty()) text else text.substring(0, text.offsetByCodePoints(text.length, -1))
+
+        // whether [text]'s last code point may belong to a cluster an editor's Backspace takes
+        // otherwise than by code point: a mark (an accent, a variation selector, a keycap), a
+        // ZWJ, anything outside the BMP (an emoji, a skin tone, a regional indicator, a tag), or
+        // a CR, taken or left, perhaps a "\r\n"'s half (a key event takes both, an opted-in editor
+        // the "\n")
+        private fun endsInCluster(text: String): Boolean {
+            if (text.isEmpty()) return false
+            val c = text.codePointBefore(text.length)
+            return c > 0xFFFF || c == 0x200D || c == '\r'.code || when (Character.getType(c).toByte()) {
+                Character.NON_SPACING_MARK, Character.ENCLOSING_MARK,
+                Character.COMBINING_SPACING_MARK -> true
+                else -> false
+            }
+        }
 
         // words a glide's search keeps, before those never offered are left out
         private const val GLIDE_SEARCHED = 30

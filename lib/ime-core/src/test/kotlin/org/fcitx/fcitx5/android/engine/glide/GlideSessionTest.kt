@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.engine.glide
 
+import org.fcitx.fcitx5.android.engine.data.CodeTable
 import org.fcitx.fcitx5.android.engine.data.PinyinData
 import org.fcitx.fcitx5.android.engine.data.PinyinDataBuilder
 import org.fcitx.fcitx5.android.engine.pinyin.PinyinSegmenter
@@ -12,6 +13,13 @@ import org.fcitx.fcitx5.android.engine.session.Action
 import org.fcitx.fcitx5.android.engine.session.Offer
 import org.fcitx.fcitx5.android.engine.session.PinyinSession
 import org.fcitx.fcitx5.android.engine.session.Session
+import org.fcitx.fcitx5.android.engine.session.Snapshot
+import org.fcitx.fcitx5.android.engine.stroke.StrokeLookup
+import org.fcitx.fcitx5.android.engine.stroke.Strokes
+import org.fcitx.fcitx5.android.engine.table.SharedWords
+import org.fcitx.fcitx5.android.engine.table.TableOptions
+import org.fcitx.fcitx5.android.engine.table.TableSession
+import org.fcitx.fcitx5.android.engine.table.dictionary
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -42,13 +50,33 @@ class GlideSessionTest {
 
     private val decoder = PinyinGlide(data, GlidePath.Weights(corner = 0f))
 
-    // what the session was told, to see that a pick of another reading takes the input back, not the context
-    private val told = ArrayList<Action>()
-    private fun recorded(inner: Session) = object : Session by inner {
-        override fun apply(action: Action) = inner.apply(action).also { told += action }
+    private val boundary = Action.Key(PinyinGlide.SEPARATOR)
+
+    // the text before the cursor as the app has it: what was committed, deleted, or told as a field's
+    private var text = ""
+    private fun written(inner: Session) = object : Session by inner {
+        override fun apply(action: Action) = inner.apply(action).also {
+            text = when (action) {
+                Action.Reset -> ""
+                is Action.Context -> action.before
+                else -> text.dropLast(it.deleteBefore)
+            } + it.commit
+        }
     }
 
-    private var session = GlideSession(recorded(PinyinSession(data, PinyinSegmenter(), prediction = false))) { g, n -> decoder.decode(g.path, g.layout, n) }
+    // what the session follows, as the next input's context: the app's text, as far as it was told
+    private var followed = ""
+    private fun following(inner: Session) = object : Session by inner {
+        override fun apply(action: Action) = inner.apply(action).also {
+            followed = when (action) {
+                Action.Reset -> ""
+                is Action.Context -> action.before
+                else -> followed + it.commit
+            }
+        }
+    }
+
+    private var session = GlideSession(written(PinyinSession(data, PinyinSegmenter(), prediction = false)), boundary) { g, n -> decoder.decode(g.path, g.layout, n) }
 
     private fun path(keys: String) = keys.flatMap { GlideLayout.QWERTY.centre(it).toList() }.toFloatArray()
 
@@ -71,7 +99,7 @@ class GlideSessionTest {
 
     @Test
     fun asManyReadingsAsItIsMadeFor() {
-        session = GlideSession(PinyinSession(data, PinyinSegmenter(), prediction = false), readings = 1) { g, n -> decoder.decode(g.path, g.layout, n) }
+        session = GlideSession(PinyinSession(data, PinyinSegmenter(), prediction = false), boundary, readings = 1) { g, n -> decoder.decode(g.path, g.layout, n) }
         val s = glide("nihao")
         assertEquals("鸟", s.candidates[0])
         assertEquals("尿", s.candidates[1])
@@ -90,10 +118,12 @@ class GlideSessionTest {
 
     @Test
     fun aPickOfAnotherReadingKeepsWhatWasCommittedBefore() {
+        glide("hao")
+        session.apply(Action.Pick(0))
         glide("nihao")
-        told.clear()
-        session.apply(Action.Pick(1))
-        assertTrue(Action.Reset !in told)
+        val s = session.apply(Action.Pick(1))
+        assertEquals("你好", s.commit)
+        assertEquals("好你好", text)
     }
 
     @Test
@@ -108,13 +138,13 @@ class GlideSessionTest {
 
     @Test
     fun noneBlockedOffered() {
-        session = GlideSession(PinyinSession(data, PinyinSegmenter(), prediction = false), blocked = { it == "你好" }) { g, n -> decoder.decode(g.path, g.layout, n) }
+        session = GlideSession(PinyinSession(data, PinyinSegmenter(), prediction = false), boundary, blocked = { it == "你好" }) { g, n -> decoder.decode(g.path, g.layout, n) }
         assertTrue("你好" !in glide("nihao").candidates)
     }
 
     @Test
     fun pagesPastTheFirstAreTheSessionsOwnAfterTheOthers() {
-        session = GlideSession(PinyinSession(data, PinyinSegmenter(), prediction = false, pageSize = 2)) { g, n -> decoder.decode(g.path, g.layout, n) }
+        session = GlideSession(PinyinSession(data, PinyinSegmenter(), prediction = false, pageSize = 2), boundary) { g, n -> decoder.decode(g.path, g.layout, n) }
         val first = glide("nihao")
         assertEquals("你好", first.candidates[1])
         val next = session.apply(Action.NextPage)
@@ -153,5 +183,85 @@ class GlideSessionTest {
     fun noReadingIsTheSessionsGlide() {
         session.offer(Glide(floatArrayOf(0f, 0f), GlideLayout.QWERTY))
         assertEquals("", session.apply(Action.Glide).preedit)
+    }
+
+    // a table's: hints and selection labels, a 空码, a word it has not, an offer past the others
+    private val table = dictionary("wqiy 你", "vbg 好", "vbgf 妤", "vbgg 姓")
+    private val blocks = HashSet<String>()
+    private val shared = object : SharedWords by SharedWords.NONE {
+        override fun blocked(text: String) = text in blocks
+        override fun blockable(text: String) = true
+        override fun block(text: String) = blocks.add(text)
+    }
+    private val tableSession = following(TableSession(table, TableOptions(autoSelect = false, selectionKeys = "123"), shared = shared))
+
+    // one session over the table for every glide of a test, as the app has it
+    private var tableReadings = emptyList<GlideReading>()
+    private val tableGlide by lazy { GlideSession(tableSession, Action.Pick(0)) { _, _ -> tableReadings } }
+
+    private fun tableGlided(vararg readings: GlideReading): Snapshot {
+        tableReadings = readings.toList()
+        session = tableGlide
+        session.offer(Glide(floatArrayOf(0f, 0f), GlideLayout.QWERTY))
+        return session.apply(Action.Glide)
+    }
+
+    @Test
+    fun aTablesHintsAndLabelsStayOnTheirCandidates() {
+        val s = tableGlided(GlideReading("vbg", "好", 0f), GlideReading("wqiy", "你", -1f))
+        assertEquals(listOf("好", "你", "妤", "姓"), s.candidates)
+        assertEquals(s.candidates.size, s.hints.size)
+        assertEquals("", s.hints[1])
+        assertEquals(listOf("f", "g"), s.hints.drop(2))
+        // the key for the session's second, 2, on it, none on the other
+        assertEquals("1 23", s.labels)
+    }
+
+    @Test
+    fun anOfferPastTheOthersIsOfTheSessionsWord() {
+        tableGlided(GlideReading("vbg", "好", 0f), GlideReading("wqiy", "你", -1f))
+        session.apply(Action.Block(2))
+        // 妤, the session's second, blocked: not the other reading's 你, nor 姓 after it; the code
+        // still typed goes as its first, the glide's after it
+        val again = tableGlided(GlideReading("vbg", "好", 0f), GlideReading("wqiy", "你", -1f))
+        assertEquals(listOf("好", "你", "姓"), again.candidates)
+    }
+
+    @Test
+    fun aWordTheSessionHasNotIsCommittedAndFollowed() {
+        tableGlided(GlideReading("vbg", "好", 0f))
+        session.apply(Action.Pick(0))
+        tableGlided(GlideReading("wqiy", "你", 0f), GlideReading("vbg", "奻", -1f))
+        val s = session.apply(Action.Pick(1))
+        assertEquals("奻", s.commit)
+        assertEquals("", s.preedit)
+        // what follows goes on after the word, and after what was committed before it
+        assertEquals("好奻", followed)
+    }
+
+    @Test
+    fun aGlideAfterACodeThatReadsNothingTakesItBack() {
+        session = GlideSession(tableSession, Action.Pick(0)) { _, _ -> listOf(GlideReading("vbg", "好", 0f)) }
+        session.apply(Action.Key('v'))
+        assertTrue(session.apply(Action.Key('x')).candidates.isEmpty())
+        session.offer(Glide(floatArrayOf(0f, 0f), GlideLayout.QWERTY))
+        val s = session.apply(Action.Glide)
+        assertEquals("", s.commit)
+        assertEquals("vbg", s.preedit)
+        assertEquals("好", s.candidates.first())
+    }
+
+    @Test
+    fun aGlideAfterALookupThatMatchesNothingTakesItBack() {
+        val pinyin = PinyinSession(data, PinyinSegmenter(), prediction = false)
+        val table = CodeTable.load(ByteBuffer.wrap(Strokes.read("...\n你\tpsnpzsn\n".reader().buffered(), "stroke").build().toByteArray()))
+        val looked = StrokeLookup(pinyin, { Strokes(table) { 0f } }, follow = pinyin::follow)
+        session = GlideSession(looked, boundary) { g, n -> decoder.decode(g.path, g.layout, n) }
+        session.apply(Action.Key(StrokeLookup.KEY))
+        // strokes no character starts with
+        assertTrue(session.apply(Action.Key('h')).candidates.isEmpty())
+        val s = glide("hao")
+        assertEquals("", s.commit)
+        assertEquals("好", s.candidates.first())
     }
 }

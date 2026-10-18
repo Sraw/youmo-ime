@@ -36,7 +36,10 @@ class GlideLayout(keys: List<Pair<Char, Pair<Float, Float>>>) {
     fun sameKey(a: Char, b: Char): Boolean = a in this && b in this && key[index(a)] == key[index(b)]
 
     /** [c]'s first key's centre: its only one but on a split keyboard. */
-    fun centre(c: Char): Pair<Float, Float> = x[index(c)][0] to y[index(c)][0]
+    fun centre(c: Char): Pair<Float, Float> {
+        require(c in this) { "no key for '$c' in the layout" }
+        return x[index(c)][0] to y[index(c)][0]
+    }
 
     operator fun contains(c: Char): Boolean = index(c) >= 0 && x[index(c)].isNotEmpty()
 
@@ -69,7 +72,7 @@ class GlideLayout(keys: List<Pair<Char, Pair<Float, Float>>>) {
         }
     }
 
-    private fun index(c: Char) = (c - 'a').takeIf { it in 0 until LETTERS } ?: -1
+    private fun index(c: Char) = (c.lowercaseChar() - 'a').takeIf { it in 0 until LETTERS } ?: -1
 
     companion object {
         const val LETTERS = 26

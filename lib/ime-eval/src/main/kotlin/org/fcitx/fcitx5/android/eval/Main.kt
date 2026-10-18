@@ -4,18 +4,17 @@
  */
 package org.fcitx.fcitx5.android.eval
 
-import org.fcitx.fcitx5.android.engine.glide.GlideLayout
-import org.fcitx.fcitx5.android.engine.glide.TableGlide
-import org.fcitx.fcitx5.android.engine.host.EngineSettings
-import org.fcitx.fcitx5.android.engine.table.TableDictionary
-import org.fcitx.fcitx5.android.engine.glide.PinyinGlide
-import org.fcitx.fcitx5.android.engine.glide.GlidePath
 import org.fcitx.fcitx5.android.engine.data.CodeTable
 import org.fcitx.fcitx5.android.engine.data.DataFormatException
 import org.fcitx.fcitx5.android.engine.data.PinyinData
 import org.fcitx.fcitx5.android.engine.english.EnglishData
 import org.fcitx.fcitx5.android.engine.english.EnglishSession
+import org.fcitx.fcitx5.android.engine.glide.GlideLayout
+import org.fcitx.fcitx5.android.engine.glide.GlidePath
+import org.fcitx.fcitx5.android.engine.glide.PinyinGlide
+import org.fcitx.fcitx5.android.engine.glide.TableGlide
 import org.fcitx.fcitx5.android.engine.handwriting.HandwritingDecoder
+import org.fcitx.fcitx5.android.engine.host.EngineSettings
 import org.fcitx.fcitx5.android.engine.lattice.Penalties
 import org.fcitx.fcitx5.android.engine.lattice.PinyinDecoder
 import org.fcitx.fcitx5.android.engine.lattice.Predictor
@@ -33,6 +32,7 @@ import org.fcitx.fcitx5.android.engine.rerank.SentencePicker
 import org.fcitx.fcitx5.android.engine.rerank.SentenceRefiner
 import org.fcitx.fcitx5.android.engine.session.Action
 import org.fcitx.fcitx5.android.engine.session.PinyinSession
+import org.fcitx.fcitx5.android.engine.table.TableDictionary
 import org.fcitx.fcitx5.android.engine.table.TableLanguage
 import org.fcitx.fcitx5.android.engine.user.WordPack
 import java.io.File
@@ -97,6 +97,8 @@ internal val COMMANDS = listOf(
         out.appendLine(GlideRun.Result.HEADER)
         val r = run.run(sentences, o["wobble"]?.toFloat() ?: GLIDE_WOBBLE, ENGLISH_SEED, RunOptions(o).threads)
         out.appendLine(r.row("wobble"))
+        if (r.skipped > 0) out.appendLine("${r.skipped} words left out: a key the layout lacks, or all on one key")
+        out.appendLine(r.stepsRow())
         o["misses"]?.let { path -> File(path).printWriter().use { w -> r.misses.forEach(w::println) } }
         0
     },
@@ -111,7 +113,7 @@ internal val COMMANDS = listOf(
             val layout = if (o["keys"] == "nine") GlideLayout.nineKeys() else GlideLayout.QWERTY
             val path = word.flatMap { layout.centre(it).toList() }.toFloatArray()
             PinyinGlide(loadData(dataPath), glideWeights(o, PinyinGlide.WEIGHTS)).decode(path, layout, 10)
-                .forEach { out.appendLine(String.format(java.util.Locale.ROOT, "%-16s %-8s %7.2f", it.keys, it.word, it.score)) }
+                .forEach { out.appendLine(String.format(Locale.ROOT, "%-16s %-8s %7.2f", it.keys, it.word, it.score)) }
             return@Command 0
         }
         val samples = readSet(setPath).map { it.input to it.expected }
@@ -129,6 +131,9 @@ internal val COMMANDS = listOf(
         )
         out.appendLine(GlideRun.Result.HEADER)
         out.appendLine(r.row("wobble"))
+        if (r.skipped > 0) out.appendLine("${r.skipped} words left out: a key the layout lacks, or all on one key")
+        if (r.samplesSkipped > 0) out.appendLine("${r.samplesSkipped} samples left out: their syllables are not one a character")
+        out.appendLine(r.stepsRow())
         o["misses"]?.let { path -> File(path).printWriter().use { w -> r.misses.forEach(w::println) } }
         0
     },

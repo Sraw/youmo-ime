@@ -31,10 +31,14 @@ class EnginesWarmUpTest : EnginesFixture() {
         // nothing read on the fcitx thread
         assertEquals(emptyList<String>(), loaded)
         assertEquals(1, later.size)
+        // and what is placed beside its candidates, not at the first key: the nine keys' emoji, and
+        // full pinyin's characters by their parts once a field starts there, the data not read again
         engines.context(Engines.PINYIN, "你")
-        assertEquals(1, later.size)
-        later.single().run()
-        assertEquals(listOf(Engines.PINYIN_DATA), loaded)
+        assertEquals(2, later.size)
+        engines.context(Engines.PINYIN, "")
+        assertEquals(2, later.size)
+        later.forEach { it.run() }
+        assertEquals(listOf(Engines.PINYIN_DATA, Engines.EMOJI_DATA, Engines.CHAIZI_DATA), loaded)
         assertEquals(listOf("你", "拟"), engines.type(Engines.PINYIN, "ni").candidates)
     }
 
@@ -53,13 +57,22 @@ class EnginesWarmUpTest : EnginesFixture() {
         assertEquals(1, later.size)
     }
 
-    /** Handwriting reads its sentences by pinyin's words: warmed up for as a pinyin is, off the fcitx thread. */
+    /** Handwriting reads its sentences by pinyin's words: warmed up for as a pinyin is, off the fcitx thread; it shows no emoji, nor characters by their parts. */
     @Test
     fun aFieldStartedInHandwritingWarmsPinyinUp() {
         val engines = Engines(::load, null, warmUps = warmUps)
         engines.context(Engines.HANDWRITING, "")
         assertEquals(emptyList<String>(), loaded)
         assertEquals(1, later.size)
+        later.single().run()
+        assertEquals(listOf(Engines.PINYIN_DATA), loaded)
+    }
+
+    /** What the settings turned off is not shown, so not read either. */
+    @Test
+    fun emojiAndCharactersByTheirPartsTurnedOffAreNotWarmedUp() {
+        val engines = Engines(::load, null, warmUps = warmUps).apply { settings = EngineSettings(emoji = false, chaizi = false) }
+        engines.context(Engines.PINYIN, "")
         later.single().run()
         assertEquals(listOf(Engines.PINYIN_DATA), loaded)
     }

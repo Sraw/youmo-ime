@@ -203,6 +203,11 @@ class UserModel(
     /** Adds [count] to [second] after [first]. */
     fun addCount(first: Entry, second: Entry, count: Float) = add(idAsTyped(first), idAsTyped(second), count)
 
+    /** Calls [word] with every word counted, its count above 0. */
+    fun forEachWordCount(word: (Entry, Float) -> Unit) {
+        counts.forEach { key, count -> if (first(key) == NO_WORD && count > 0f) word(entries.getValue(second(key)), count) }
+    }
+
     /** Calls [word] with every word counted, then [pair] with every pair. */
     fun forEachCount(word: (Entry, Float) -> Unit, pair: (Entry, Entry, Float) -> Unit) {
         // twice through the counts, words then pairs: no copy of every pair held while compacting

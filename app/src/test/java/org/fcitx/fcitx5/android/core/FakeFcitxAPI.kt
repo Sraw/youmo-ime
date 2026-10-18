@@ -4,13 +4,13 @@
  */
 package org.fcitx.fcitx5.android.core
 
-import org.fcitx.fcitx5.android.engine.glide.Glide
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import org.fcitx.fcitx5.android.daemon.FcitxConnection
+import org.fcitx.fcitx5.android.engine.glide.Glide
 import org.fcitx.fcitx5.android.engine.handwriting.InkReading
 import org.fcitx.fcitx5.android.engine.host.Engines
 
@@ -132,8 +132,8 @@ class FakeFcitxAPI : FcitxAPI {
 
     override suspend fun tableKeys(im: String): Set<Char> = tableKeys[im].orEmpty()
 
-    override suspend fun engineContext(before: String, learning: Boolean) {
-        calls += "engineContext($before, $learning)"
+    override suspend fun engineContext(before: String, learning: Boolean, cleared: Boolean) {
+        calls += "engineContext($before, $learning" + (if (cleared) ", cleared)" else ")")
     }
 
     override suspend fun offerInk(reading: InkReading, piece: Int): Boolean {

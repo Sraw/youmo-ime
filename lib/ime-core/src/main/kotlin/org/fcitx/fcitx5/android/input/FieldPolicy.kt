@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.input
 
+import org.fcitx.fcitx5.android.engine.session.Action
 import org.fcitx.fcitx5.android.input.editing.ContextMemory
 
 /**
@@ -60,5 +61,12 @@ class FieldPolicy(private val memory: ContextMemory) {
         if (sensitive) return ""
         val text = before()?.toString() ?: return ""
         return memory.context(text, now, after)
+    }
+
+    /** [context] as the engine is told it: cleared where the field is empty and what was written in it is told ([Action.Context.cleared]). */
+    fun told(now: Long, before: () -> CharSequence?, after: () -> CharSequence?): Action.Context? {
+        var read: CharSequence? = null
+        val context = context(now, { before().also { read = it } }, after) ?: return null
+        return Action.Context(context, cleared = context.isNotEmpty() && read?.isEmpty() == true)
     }
 }

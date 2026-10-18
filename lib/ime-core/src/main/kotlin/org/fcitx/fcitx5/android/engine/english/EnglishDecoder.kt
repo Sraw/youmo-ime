@@ -5,6 +5,7 @@
 package org.fcitx.fcitx5.android.engine.english
 
 import org.fcitx.fcitx5.android.engine.data.NgramModel
+import org.fcitx.fcitx5.android.engine.data.runEnd
 import org.fcitx.fcitx5.android.engine.pinyin.KeyNeighbours
 
 /**
@@ -168,7 +169,7 @@ class EnglishDecoder(
             if (depth >= path.size - 1) return
             while (pos < to) {
                 val c = data.keyChar(pos, depth)
-                val end = runEnd(pos, to, depth, c)
+                val end = runEnd(pos, to, c) { data.keyChar(it, depth) }
                 if (step(depth, c)) visit(depth + 1, pos, end)
                 pos = end
             }
@@ -242,17 +243,6 @@ class EnglishDecoder(
             val old = found[word]
             if (old != null && old.cost <= cost) return
             found[word] = Suggestion(word, score(context, word), cost, completes)
-        }
-
-        // the end of the run from [from] whose keys have [c] at [depth]: the run is sorted, and every key in it is longer than depth
-        private fun runEnd(from: Int, to: Int, depth: Int, c: Char): Int {
-            var lo = from
-            var hi = to
-            while (lo < hi) {
-                val mid = (lo + hi) ushr 1
-                if (data.keyChar(mid, depth) <= c) lo = mid + 1 else hi = mid
-            }
-            return lo
         }
     }
 

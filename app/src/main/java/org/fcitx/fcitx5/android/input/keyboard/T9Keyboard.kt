@@ -6,7 +6,6 @@ package org.fcitx.fcitx5.android.input.keyboard
 
 import android.annotation.SuppressLint
 import android.content.Context
-import android.graphics.Canvas
 import android.graphics.Rect
 import android.graphics.drawable.ColorDrawable
 import android.graphics.drawable.StateListDrawable
@@ -241,32 +240,16 @@ class T9Keyboard(
     private val `return`: ImageKeyView by lazy { findViewById(R.id.button_return) }
     private val lang: ImageKeyView by lazy { findViewById(R.id.button_lang) }
 
-    private val glideTyping = AppPrefs.getInstance().keyboard.glideTyping
-    private val longPressDelay by AppPrefs.getInstance().keyboard.longPressDelay
-
     // each digit key's letters on it, as the engine reads the digits
     private val letterKeys: List<Pair<Char, TextKeyView>> = ('2'..'9').flatMap { d ->
         letters.letters(d).map { it.lowercaseChar() to digitKeys.getValue(d) }
     }
 
-    // glide typing (滑行输入) over the digit keys, read as full pinyin's letters: not in a password's field
-    private val glide = GlideInput(
-        this, theme,
-        enabled = { glideTyping.getValue() && !inPasswordField },
-        letters = { letterKeys },
-        longPressMillis = { longPressDelay.toLong() },
-        down = GlideGesture.NINE_KEYS_DOWN,
-    ) { path, layout ->
+    // glide typing (滑行输入) over the digit keys, read as full pinyin's letters
+    override val glide = glideInput(letters = { letterKeys }, down = GlideGesture.NINE_KEYS_DOWN) { path, layout ->
         // a glide ends a run of presses: a key pressed soon after it is a press of its own, not 连按's next letter
         multiTap.reset()
         onAction(KeyAction.GlideAction(Glide(path, layout)))
-    }
-
-    override fun dispatchTouchEvent(ev: MotionEvent): Boolean = glide.dispatch(ev) { super.dispatchTouchEvent(it) }
-
-    override fun dispatchDraw(canvas: Canvas) {
-        super.dispatchDraw(canvas)
-        glide.draw(canvas)
     }
 
     private val showLangSwitchKey = AppPrefs.getInstance().keyboard.showLangSwitchKey

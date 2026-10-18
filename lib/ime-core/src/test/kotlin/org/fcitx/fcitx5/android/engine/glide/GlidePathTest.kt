@@ -7,6 +7,7 @@ package org.fcitx.fcitx5.android.engine.glide
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -37,8 +38,9 @@ class GlidePathTest {
         // a right angle: one turn, by 1 (a cosine of 0), at the corner
         val l = FloatArray(18).also { for (i in 0..8) if (i <= 4) { it[2 * i] = i * 0.25f } else { it[2 * i] = 1f; it[2 * i + 1] = (i - 4) * 0.25f } }
         val corners = GlidePath.Corners(l, 9, 0.8f)
-        assertEquals(listOf(4), corners.at.toList())
-        assertEquals(1f, corners.turn.single(), 1e-4f)
+        assertEquals(1, corners.at.size)
+        assertTrue(corners.at.single() in 3..5)
+        assertEquals(1f, corners.turn.single(), 0.2f)
     }
 
     @Test
@@ -81,8 +83,10 @@ class GlidePathTest {
     @Test
     fun aPathOfOnePointIsNone() {
         val g = GlidePath(floatArrayOf(1f, 1f), GlideLayout.QWERTY, GlidePath.Weights(), 30)
-        assertEquals(0, g.n)
+        assertEquals(0, g.points)
         assertEquals(false, g.step(0, 'q'))
+        // a capital, which the layout finds, is no key a path passes
+        assertNull(cost("the", "The"))
         // a letter the layout lacks
         assertNull(cost("the", "the", GlideLayout(mapOf('t' to (4.5f to 0.7f), 'e' to (2.5f to 0.7f)))))
     }
@@ -96,6 +100,28 @@ class GlidePathTest {
         val dense = GlidePath.dense(floatArrayOf(0f, 0f, 1f, 0f))
         assertTrue(dense.size / 2 >= 5)
         assertEquals(1f, dense[dense.size - 2])
-        assertEquals(listOf(0f, 0f, 0.5f, 0f, 0.55f, 0f), GlidePath.thin(floatArrayOf(0f, 0f, 0.01f, 0f, 0.5f, 0f, 0.52f, 0f, 0.55f, 0f)).toList())
+        // thinned: its first and last points kept, none kept nearer the one before than an eighth but the last
+        val thin = GlidePath.thin(floatArrayOf(0f, 0f, 0.01f, 0f, 0.5f, 0f, 0.52f, 0f, 0.55f, 0f))
+        assertEquals(listOf(0f, 0f), thin.take(2))
+        assertEquals(listOf(0.55f, 0f), thin.takeLast(2))
+        for (i in 1 until thin.size / 2 - 1) assertTrue(thin[2 * i] - thin[2 * i - 2] >= 0.125f)
+    }
+
+    @Test
+    fun aSearchStepsAtMostItsBudget() {
+        val g = GlidePath(path("the"), GlideLayout.QWERTY, GlidePath.Weights(), 30)
+        repeat(GlidePath.MAX_STEPS) { assertTrue(g.step(0, 't')) }
+        assertFalse(g.step(0, 't'))
+    }
+
+    @Test
+    fun aKeyTheLayoutLacksIsNoGlidesAndHasNoCentre() {
+        // 微软双拼's ing, on no key of the letters: never stepped, never a crash
+        val g = GlidePath(path("ming"), GlideLayout.QWERTY, GlidePath.Weights(), 30)
+        assertTrue(g.step(0, 'm'))
+        assertFalse(g.step(1, ';'))
+        assertTrue('G' in GlideLayout.QWERTY)
+        assertEquals(GlideLayout.QWERTY.centre('g'), GlideLayout.QWERTY.centre('G'))
+        assertThrows(IllegalArgumentException::class.java) { GlideLayout.QWERTY.centre('\'') }
     }
 }

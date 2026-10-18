@@ -148,7 +148,7 @@ class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), Essentia
             it.keyActionListener = keyActionListener
             it.popupActionListener = popupActionListener
             it.inPasswordField = service.inPasswordField
-            (it as? TextKeyboard)?.address = address
+            it.address = address
             spaceKeys.attach(it) {
                 keyboardView.apply { add(it, lParams(matchParent, matchParent)) }
                 it.onAttach()
@@ -193,7 +193,7 @@ class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), Essentia
         }
     }
 
-    // the field's, for the letters to show what an address is made of: told each layout as it attaches
+    // the field's, for the letters to show what an address is made of and no layout to glide there: told each layout as it attaches
     private var address = AddressKeys.NONE
 
     override fun onStartInput(info: EditorInfo, capFlags: CapabilityFlags) {
@@ -201,7 +201,7 @@ class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), Essentia
         // the layout may stay as it is, so the one shown is told now
         currentKeyboard?.inPasswordField = service.inPasswordField
         address = AddressKeys.of(info.toEditorTraits())
-        (currentKeyboard as? TextKeyboard)?.address = address
+        currentKeyboard?.address = address
         val targetLayout = when (info.inputType and InputType.TYPE_MASK_CLASS) {
             InputType.TYPE_CLASS_NUMBER -> NumberKeyboard.Name
             InputType.TYPE_CLASS_PHONE -> NumberKeyboard.Name

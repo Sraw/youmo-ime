@@ -4,6 +4,9 @@
  */
 package org.fcitx.fcitx5.android.engine.host
 
+import org.fcitx.fcitx5.android.engine.english.EnglishDecoderTest
+import org.fcitx.fcitx5.android.engine.english.EnglishSession
+import org.fcitx.fcitx5.android.engine.english.GlideDecoderTest
 import org.fcitx.fcitx5.android.engine.session.Action
 import org.fcitx.fcitx5.android.engine.session.Choice
 import org.fcitx.fcitx5.android.engine.session.Offer
@@ -391,5 +394,282 @@ class KeyboardTest {
         assertEquals(Action.Reset, session.actions.last())
         assertFalse(keyboard.onEvent(EngineEvent.BACKSPACE, 0).handled)
         assertFalse(keyboard.onEvent(99, 0).handled)
+    }
+
+    /** Where English suggests nothing the app types the screen's keys, each told the session: a glide after one knows whether to space. */
+    @Test
+    fun aGlideAfterWhatTheAppTypedWhereEnglishSuggestsNothing() {
+        val english = EnglishSession(EnglishDecoderTest.data())
+        val keyboard = Keyboard(english, nineKeys = false)
+        fun glided(): String? {
+            english.offerGlide(GlideDecoderTest.glide("hello"))
+            return keyboard.onEvent(EngineEvent.CHAR, Keyboard.GLIDE).commit
+        }
+        assertFalse(keyboard.onEvent(EngineEvent.TYPED, 'c'.code).handled)
+        assertEquals(" hello ", glided())
+        // a key that is no char: nothing known before the cursor
+        keyboard.onEvent(EngineEvent.ENTER, 0)
+        assertEquals("hello ", glided())
+        // nor is Enter's arg a char typed (a hardware key's, which androidengine sends as Enter)
+        keyboard.onEvent(EngineEvent.ENTER, 'c'.code)
+        assertEquals("hello ", glided())
+    }
+
+    /** The offer androidengine puts away where English suggests nothing (TYPED 0): the app's next read of the text is taken, not dropped as if still on show. */
+    @Test
+    fun theOfferPutAwayWhereEnglishSuggestsNothingLetsTheTextBeRead() {
+        val english = EnglishSession(EnglishDecoderTest.data())
+        val keyboard = Keyboard(english, nineKeys = false)
+        english.offerGlide(GlideDecoderTest.glide("hello"))
+        assertTrue(keyboard.onEvent(EngineEvent.CHAR, Keyboard.GLIDE).candidates.isNotEmpty())
+        val away = keyboard.onEvent(EngineEvent.TYPED, 0)
+        assertFalse(away.handled)
+        assertTrue(away.candidates.isEmpty())
+        keyboard.context("abc")
+        english.offerGlide(GlideDecoderTest.glide("hello"))
+        assertEquals(" hello ", keyboard.onEvent(EngineEvent.CHAR, Keyboard.GLIDE).commit)
+    }
+
+    /** TYPED past the BMP (an emoji) or to a session not English's: the key passed on, the session not told of it. */
+    @Test
+    fun whatTheAppTypedIsPassedOnPastTheBmpOrNotEnglish() {
+        val fake = FakeSession()
+        assertFalse(Keyboard(fake, nineKeys = false).onEvent(EngineEvent.TYPED, 'c'.code).handled)
+        assertTrue(fake.actions.isEmpty())
+        val english = EnglishSession(EnglishDecoderTest.data())
+        val keyboard = Keyboard(english, nineKeys = false)
+        keyboard.onEvent(EngineEvent.TYPED, 'c'.code)
+        // the emoji forgets the c before it: no space before the glide
+        assertFalse(keyboard.onEvent(EngineEvent.TYPED, 0x1F600).handled)
+        english.offerGlide(GlideDecoderTest.glide("hello"))
+        assertEquals("hello ", keyboard.onEvent(EngineEvent.CHAR, Keyboard.GLIDE).commit)
+    }
+
+    /** Only spaces before the cursor: they are the glide's space, none added. */
+    @Test
+    fun aGlideAfterOnlySpacesAddsNone() {
+        val english = EnglishSession(EnglishDecoderTest.data())
+        val keyboard = Keyboard(english, nineKeys = false)
+        keyboard.context("   ")
+        english.offerGlide(GlideDecoderTest.glide("hello"))
+        val commit = keyboard.onEvent(EngineEvent.CHAR, Keyboard.GLIDE).commit
+        assertFalse(commit.startsWith(" "))
+        assertTrue(commit.endsWith(" "))
+    }
+
+    /** TYPED while a word is typed (the field's flags changed under it): the word committed as an Enter would, not dropped, and the char still known after it. */
+    @Test
+    fun whatTheAppTypedWhileAWordIsTypedCommitsIt() {
+        val english = EnglishSession(EnglishDecoderTest.data())
+        val keyboard = Keyboard(english, nineKeys = false)
+        keyboard.onEvent(EngineEvent.CHAR, 'h'.code)
+        keyboard.onEvent(EngineEvent.CHAR, 'e'.code)
+        val typed = keyboard.onEvent(EngineEvent.TYPED, ' '.code)
+        assertEquals("he", typed.commit)
+        assertEquals("", typed.preedit)
+        // the space typed is before the cursor: none added before the glide
+        english.offerGlide(GlideDecoderTest.glide("hello"))
+        assertEquals("hello ", keyboard.onEvent(EngineEvent.CHAR, Keyboard.GLIDE).commit)
+    }
+
+    /** TYPED of a letter or a Backspace while a word is typed: the word committed, the letter after it or its last char taken back. */
+    @Test
+    fun aLetterOrABackspaceTheAppTypedWhileAWordIsTypedCommitsIt() {
+        val english = EnglishSession(EnglishDecoderTest.data())
+        val keyboard = Keyboard(english, nineKeys = false)
+        keyboard.onEvent(EngineEvent.CHAR, 'h'.code)
+        keyboard.onEvent(EngineEvent.CHAR, 'e'.code)
+        assertEquals("he", keyboard.onEvent(EngineEvent.TYPED, 'c'.code).commit)
+        english.offerGlide(GlideDecoderTest.glide("hello"))
+        assertEquals(" hello ", keyboard.onEvent(EngineEvent.CHAR, Keyboard.GLIDE).commit)
+        keyboard.onEvent(EngineEvent.TYPED, 0)
+        keyboard.context("ab ")
+        keyboard.onEvent(EngineEvent.CHAR, 'h'.code)
+        assertEquals("h", keyboard.onEvent(EngineEvent.TYPED, BACKSPACE).commit)
+        // the h taken back: the space before it last again
+        english.offerGlide(GlideDecoderTest.glide("hello"))
+        assertEquals("hello ", keyboard.onEvent(EngineEvent.CHAR, Keyboard.GLIDE).commit)
+    }
+
+    /** TYPED past the BMP while a word is typed: the word committed, then passed on as a key the session knows nothing of. */
+    @Test
+    fun anEmojiTheAppTypedWhileAWordIsTypedCommitsItAndForgets() {
+        val english = EnglishSession(EnglishDecoderTest.data())
+        val keyboard = Keyboard(english, nineKeys = false)
+        keyboard.context("")
+        keyboard.onEvent(EngineEvent.CHAR, 'h'.code)
+        keyboard.onEvent(EngineEvent.CHAR, 'e'.code)
+        val typed = keyboard.onEvent(EngineEvent.TYPED, 0x1F600)
+        assertEquals("he", typed.commit)
+        assertEquals("", typed.preedit)
+        assertFalse(typed.handled)
+        // the emoji after the word: nothing known before the cursor, no space before the glide
+        english.offerGlide(GlideDecoderTest.glide("hello"))
+        assertEquals("hello ", keyboard.onEvent(EngineEvent.CHAR, Keyboard.GLIDE).commit)
+    }
+
+    /** No text read (no context sent), the app's own Backspace takes the last char typed off what the session keeps, not all it knows. */
+    @Test
+    fun aBackspaceTheAppDidWithNothingReadKeepsTheCharBefore() {
+        val english = EnglishSession(EnglishDecoderTest.data())
+        val keyboard = Keyboard(english, nineKeys = false)
+        "abc".forEach { keyboard.onEvent(EngineEvent.TYPED, it.code) }
+        keyboard.onEvent(EngineEvent.TYPED, BACKSPACE)
+        english.offerGlide(GlideDecoderTest.glide("hello"))
+        assertEquals(" hello ", keyboard.onEvent(EngineEvent.CHAR, Keyboard.GLIDE).commit)
+    }
+
+    /** The app's own Backspace where English suggests nothing (TYPED of Session.ERASED): the last char known taken off, not all of it forgotten. */
+    @Test
+    fun aBackspaceTheAppDidTakesOffTheLastCharKnown() {
+        val english = EnglishSession(EnglishDecoderTest.data())
+        val keyboard = Keyboard(english, nineKeys = false)
+        keyboard.context("")
+        "abc".forEach { keyboard.onEvent(EngineEvent.TYPED, it.code) }
+        assertFalse(keyboard.onEvent(EngineEvent.TYPED, BACKSPACE).handled)
+        english.offerGlide(GlideDecoderTest.glide("hello"))
+        assertEquals(" hello ", keyboard.onEvent(EngineEvent.CHAR, Keyboard.GLIDE).commit)
+        // a space taken back: the b before it again
+        keyboard.onEvent(EngineEvent.TYPED, 0)
+        keyboard.context("ab ")
+        keyboard.onEvent(EngineEvent.TYPED, BACKSPACE)
+        english.offerGlide(GlideDecoderTest.glide("hello"))
+        assertEquals(" hello ", keyboard.onEvent(EngineEvent.CHAR, Keyboard.GLIDE).commit)
+        // only the edge known (no Context): its char gone, nothing is known, no space added
+        keyboard.onEvent(EngineEvent.ENTER, 0)
+        keyboard.onEvent(EngineEvent.TYPED, 'c'.code)
+        keyboard.onEvent(EngineEvent.TYPED, BACKSPACE)
+        english.offerGlide(GlideDecoderTest.glide("hello"))
+        assertEquals("hello ", keyboard.onEvent(EngineEvent.CHAR, Keyboard.GLIDE).commit)
+    }
+
+    /** The app's Backspaces with only the edge known (no Context): a char at a time, across a space, up to its last 32 chars before the spaces after them. */
+    @Test
+    fun theAppsBackspacesTakeTheEdgeACharAtATime() {
+        fun glidedAfter(typed: String, backspaces: Int): String {
+            val english = EnglishSession(EnglishDecoderTest.data())
+            val keyboard = Keyboard(english, nineKeys = false)
+            typed.forEach { keyboard.onEvent(EngineEvent.TYPED, it.code) }
+            repeat(backspaces) { keyboard.onEvent(EngineEvent.TYPED, BACKSPACE) }
+            english.offerGlide(GlideDecoderTest.glide("hello"))
+            return keyboard.onEvent(EngineEvent.CHAR, Keyboard.GLIDE).commit
+        }
+        assertEquals(" hello ", glidedAfter("ab c", 2))
+        assertEquals(" hello ", glidedAfter("ab c", 3))
+        assertEquals("hello ", glidedAfter("ab c", 4))
+        // 33 typed, the edge keeps 32, and the spaces after them
+        val long = "a".repeat(33) + "  "
+        assertEquals(" hello ", glidedAfter(long, 2 + 31))
+        assertEquals("hello ", glidedAfter(long, 2 + 32))
+    }
+
+    /** The app's Backspace: a code point taken that may belong to a cluster (outside the BMP, a mark), or one left last, has the session forget; a plain char or a lone "\n", it is taken off; a "\r\n", forgotten. */
+    @Test
+    fun theAppsBackspaceForgetsWhatACodePointOfAClusterMayLeave() {
+        val english = EnglishSession(EnglishDecoderTest.data())
+        val keyboard = Keyboard(english, nineKeys = false)
+        fun glidedAfter(before: String): String {
+            keyboard.onEvent(EngineEvent.TYPED, 0)
+            keyboard.context(before)
+            keyboard.onEvent(EngineEvent.TYPED, BACKSPACE)
+            english.offerGlide(GlideDecoderTest.glide("hello"))
+            return keyboard.onEvent(EngineEvent.CHAR, Keyboard.GLIDE).commit
+        }
+        assertEquals(" hello ", glidedAfter("abcd"))
+        assertEquals("hello ", glidedAfter("abc\uD83D\uDE00"))
+        assertFalse(glidedAfter("").startsWith(" "))
+        // a family's last person gone, a ZWJ left; a skin tone, a flag's half apart
+        assertEquals("hello ", glidedAfter("ab\uD83D\uDC68\u200D\uD83D\uDC69"))
+        assertEquals("hello ", glidedAfter("ab\uD83D\uDC4D\uD83C\uDFFD"))
+        assertEquals("hello ", glidedAfter("ab\uD83C\uDDEF\uD83C\uDDF5"))
+        // an accent: the editor may take it alone or with its letter, so nothing is known
+        assertEquals("hello ", glidedAfter("abe\u0301"))
+        // a variation selector left at the end: forgotten (EnglishGlideTest
+        // .theAppsBackspaceForgetsTheTextWhereAClusterMayBeCut tells forgetting by the case)
+        assertEquals("hello ", glidedAfter("ab\u2764\uFE0Fc"))
+        // a keycap's mark (Me), a vowel sign (Mc), a ZWJ taken: forgotten
+        assertEquals("hello ", glidedAfter("ab1\u20E3"))
+        assertEquals("hello ", glidedAfter("ab\u0915\u093F"))
+        assertEquals("hello ", glidedAfter("ab\u200D"))
+        // a lone "\n" taken off; a CR taken (else "ab" known, a space added): forgotten
+        assertEquals(" hello ", glidedAfter("ab\n"))
+        assertEquals("hello ", glidedAfter("ab\r"))
+        // a "\r\n" last, taken whole or in part by the editor: forgotten, so a second Backspace
+        // leaves nothing known (the CR left is checked as the FE0F and ZWJ left above are)
+        keyboard.onEvent(EngineEvent.TYPED, 0)
+        keyboard.context("ab\r\n")
+        repeat(2) { keyboard.onEvent(EngineEvent.TYPED, BACKSPACE) }
+        english.offerGlide(GlideDecoderTest.glide("hello"))
+        assertEquals("hello ", keyboard.onEvent(EngineEvent.CHAR, Keyboard.GLIDE).commit)
+    }
+
+    /** What was written in a chat's box now empty: the reply follows it, but nothing is before the cursor. */
+    @Test
+    fun aGlideInAFieldClearedSinceItWasWrittenHasNoSpaceBefore() {
+        val english = EnglishSession(EnglishDecoderTest.data())
+        val keyboard = Keyboard(english, nineKeys = false)
+        fun glided(): String {
+            english.offerGlide(GlideDecoderTest.glide("hello"))
+            return keyboard.onEvent(EngineEvent.CHAR, Keyboard.GLIDE).commit
+        }
+        // not learning, the service tells no such context (FieldPolicy.told): the edge kept empty all the same
+        for (learning in listOf(true, false)) {
+            keyboard.onEvent(EngineEvent.TYPED, 0)
+            keyboard.context("ok", learning, cleared = true)
+            assertFalse(glided().startsWith(" "))
+            // a Backspace takes nothing of it (else "ok" would be before the cursor)
+            keyboard.onEvent(EngineEvent.TYPED, 0)
+            keyboard.context("ok", learning, cleared = true)
+            keyboard.onEvent(EngineEvent.TYPED, BACKSPACE)
+            assertFalse(glided().startsWith(" "))
+            // a glide's word taken back leaves the field empty again
+            keyboard.onEvent(EngineEvent.TYPED, 0)
+            keyboard.context("ok", learning, cleared = true)
+            glided()
+            keyboard.onEvent(EngineEvent.BACKSPACE, 0)
+            keyboard.onEvent(EngineEvent.TYPED, BACKSPACE)
+            assertFalse(glided().startsWith(" "))
+            // a char typed is before the cursor
+            keyboard.onEvent(EngineEvent.TYPED, 0)
+            keyboard.context("ok", learning, cleared = true)
+            keyboard.onEvent(EngineEvent.TYPED, 'a'.code)
+            assertEquals(" hello ", glided())
+            // typed and taken back to the field's start, nothing before the cursor again
+            keyboard.onEvent(EngineEvent.TYPED, 0)
+            keyboard.context("ok", learning, cleared = true)
+            "hi ".forEach { keyboard.onEvent(EngineEvent.TYPED, it.code) }
+            repeat(4) { keyboard.onEvent(EngineEvent.TYPED, BACKSPACE) }
+            assertFalse(glided().startsWith(" "))
+        }
+        // not cleared: after "ok", a space
+        keyboard.onEvent(EngineEvent.TYPED, 0)
+        keyboard.context("ok")
+        assertEquals(" hello ", glided())
+    }
+
+    /** Only the edge known (no Context): an accent typed after a letter, the app's Backspace has the edge forgotten, the editor's unit unknown. */
+    @Test
+    fun theAppsBackspaceOnTheEdgeForgetsAfterAnAccent() {
+        val english = EnglishSession(EnglishDecoderTest.data())
+        val keyboard = Keyboard(english, nineKeys = false)
+        "ab\u0301".forEach { keyboard.onEvent(EngineEvent.TYPED, it.code) }
+        keyboard.onEvent(EngineEvent.TYPED, BACKSPACE)
+        english.offerGlide(GlideDecoderTest.glide("hello"))
+        assertEquals("hello ", keyboard.onEvent(EngineEvent.CHAR, Keyboard.GLIDE).commit)
+    }
+
+    /** TYPED to a session not English's while a word is typed: the word committed, the panel gone with the key. */
+    @Test
+    fun whatTheAppTypedWhileAWordIsTypedInAnotherSessionCommitsIt() {
+        type("ab")
+        val typed = keyboard.onEvent(EngineEvent.TYPED, 'c'.code)
+        assertEquals("ab", typed.commit)
+        assertEquals("", typed.preedit)
+        assertTrue(typed.candidates.isEmpty())
+        assertFalse(typed.handled)
+    }
+
+    private companion object {
+        val BACKSPACE = Session.ERASED.single().code
     }
 }

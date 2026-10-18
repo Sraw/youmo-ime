@@ -25,8 +25,9 @@ data class EditorTraits(
     val isSensitive: Boolean = false,
     /**
      * The editor opted in, through `privateImeOptions`, to having Backspace done as an edit
-     * rather than a key event. Almost nothing does: our own key-binding preference is the one
-     * known user.
+     * rather than a key event: the selection, or else one code point before the cursor (an
+     * unpaired surrogate still goes as a key event). Almost nothing does: our own key-binding
+     * preference, whose text is key names, is the one known user.
      */
     val acceptsDeleteSurrounding: Boolean = false,
     /** `IME_FLAG_NO_ENTER_ACTION`: Return must stay a plain Enter. */

@@ -5,6 +5,7 @@
 package org.fcitx.fcitx5.android.input.keyboard
 
 import android.content.Context
+import android.graphics.Canvas
 import android.graphics.Rect
 import android.view.InputDevice
 import android.view.MotionEvent
@@ -27,6 +28,7 @@ import org.fcitx.fcitx5.android.data.InputFeedbacks
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.prefs.ManagedPreference
 import org.fcitx.fcitx5.android.data.theme.Theme
+import org.fcitx.fcitx5.android.engine.glide.GlideLayout
 import org.fcitx.fcitx5.android.input.broadcast.ReturnKeyAppearance
 import org.fcitx.fcitx5.android.input.keyboard.CustomGestureView.GestureType
 import org.fcitx.fcitx5.android.input.keyboard.CustomGestureView.OnGestureListener
@@ -88,6 +90,43 @@ abstract class BaseKeyboard(
             field = value
             updateSpaceBadges(spaceLongPress.getValue())
         }
+
+    /** Set per field ([KeyboardWindow]): an address's has no glide typing, as no word is typed there. */
+    open var address: AddressKeys = AddressKeys.NONE
+
+    private val glideTyping = prefs.keyboard.glideTyping
+    private val longPressDelay by prefs.keyboard.longPressDelay
+
+    /** The layout's glide typing (滑行输入), if it has one: see [glideInput]. */
+    protected open val glide: GlideInput? = null
+
+    /**
+     * Glide typing over [letters], taken where [enabled] says and the setting is on, in a field
+     * where words are typed: not a password's or an address's.
+     */
+    protected fun glideInput(
+        letters: () -> List<Pair<Char, TextKeyView>>,
+        down: Float = GlideGesture.DOWN,
+        enabled: () -> Boolean = { true },
+        glided: (path: FloatArray, layout: GlideLayout) -> Unit,
+    ) = GlideInput(
+        this, theme,
+        enabled = { glideTyping.getValue() && wordField() && enabled() },
+        letters = letters,
+        longPressMillis = { longPressDelay.toLong() },
+        down = down,
+        glided = glided,
+    )
+
+    private fun wordField() = !inPasswordField && address == AddressKeys.NONE
+
+    override fun dispatchTouchEvent(ev: MotionEvent): Boolean =
+        glide?.dispatch(ev) { super.dispatchTouchEvent(it) } ?: super.dispatchTouchEvent(ev)
+
+    override fun dispatchDraw(canvas: Canvas) {
+        super.dispatchDraw(canvas)
+        glide?.draw(canvas)
+    }
 
     private val vivoKeypressWorkaround by prefs.advanced.vivoKeypressWorkaround
 

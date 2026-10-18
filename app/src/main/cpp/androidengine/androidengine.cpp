@@ -27,6 +27,9 @@ namespace {
 // come first, short against the time a user takes to reach for a candidate
 constexpr uint64_t PauseBeforeRefine = 30000;
 
+// the character the keyboard sends after a glide (Keyboard.GLIDE): never text
+constexpr uint32_t GlideChar = 0xF0101;
+
 class EngineCandidateWord : public CandidateWord {
 public:
     EngineCandidateWord(AndroidEngine *engine, std::string im, int index, const std::string &text, const std::string &hint)
@@ -480,6 +483,7 @@ void AndroidEngine::activate(const InputMethodEntry &entry, InputContextEvent &e
     // the input context's flags then tell where the preedit shows; run again each time the field
     // gains focus, and at each event sent (send)
     event.inputContext()->setEnablePreedit(composesText(entry.uniqueName()));
+    glidedAsIs_ = false;
     // in the status area, these addons act on this input context: full-width punctuation and
     // letters, traditional characters. Chinese's alone: a 全角 left on in pinyin, which they share,
     // would make English's words and the keys it passes on (a password's too) full width
@@ -569,7 +573,46 @@ void AndroidEngine::keyEvent(const InputMethodEntry &entry, KeyEvent &event) {
     // English where it suggests nothing: the keys type themselves, what was typed going in first,
     // as typed (Enter commits it, and has the session forget the space after a word)
     if (!chinese && !suggestsEnglish(event.inputContext(), event.isVirtual())) {
-        send(event.inputContext(), im, EngineEvent::Enter);
+        const auto unicode = Key::keySymToUnicode(key.sym());
+        // a glide's key goes to the session as where it suggests, which commits the word glided
+        // (the keyboard offers glide in such fields too); swallowed whatever it does, as let
+        // through the app would type its private-use character. No Enter first: it would have the
+        // session forget the char before the cursor, which the space before the word depends on
+        if (unicode == GlideChar) {
+            glidedAsIs_ = send(event.inputContext(), im, EngineEvent::Char, static_cast<int>(GlideChar));
+            event.filterAndAccept();
+            return;
+        }
+        // the key right after a glide: Backspace and any other char (a space, a digit, punctuation,
+        // a letter not ASCII's) are the session's, as where it suggests (the word taken back, the
+        // space moved behind the mark); an ASCII letter types itself
+        const bool afterGlide = std::exchange(glidedAsIs_, false);
+        const bool letter = (unicode >= 'a' && unicode <= 'z') || (unicode >= 'A' && unicode <= 'Z');
+        const bool mark = unicode >= 0x20 && unicode != 0x7f && !letter;
+        if (!afterGlide || (key.sym() != FcitxKey_BackSpace && !mark)) {
+            // the char the screen's key has the app type, or take back (Backspace, as '\b'), for
+            // the session to know what is before the cursor; none from a password or sensitive
+            // field, which is not read (a password shown is Sensitive, not Password), nor from a
+            // hardware key, which types where English suggests too (its keys are not the screen's)
+            const bool erases = key.sym() == FcitxKey_BackSpace;
+            const bool told = (mark || letter || erases) && event.isVirtual() &&
+                              !event.inputContext()->capabilityFlags().testAny(CapabilityFlag::PasswordOrSensitive);
+            if (told) {
+                send(event.inputContext(), im, EngineEvent::Typed, erases ? '\b' : static_cast<int>(unicode));
+            } else {
+                send(event.inputContext(), im, EngineEvent::Enter);
+            }
+            return;
+        }
+        if (send(event.inputContext(), im, key.sym() == FcitxKey_BackSpace ? EngineEvent::Backspace : EngineEvent::Char,
+                 static_cast<int>(unicode))) {
+            event.filterAndAccept();
+        }
+        // the words that may follow are not offered here: put away through the session, so that
+        // its keyboard knows the panel empty and takes the app's next read of the text
+        if (dynamic_cast<EngineCandidateList *>(event.inputContext()->inputPanel().candidateList().get())) {
+            send(event.inputContext(), im, EngineEvent::Typed, 0);
+        }
         return;
     }
     // a hardware keyboard's - and = turn the pages while something is typed, as on a PC (libime's
@@ -691,6 +734,8 @@ void AndroidEngine::invokeActionImpl(const InputMethodEntry &entry, InvokeAction
 }
 
 void AndroidEngine::reset(const InputMethodEntry &entry, InputContextEvent &event) {
+    // a glide's word held belongs to the field and cursor it was glided at
+    glidedAsIs_ = false;
     send(event.inputContext(), entry.uniqueName(), EngineEvent::Reset);
 }
 

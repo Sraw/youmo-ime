@@ -47,6 +47,13 @@ object EngineEvent {
 
     /** A tap in the composed text; the argument is the character it puts the cursor before, in code points. */
     const val CURSOR = 14
+
+    /**
+     * A key of the screen's that the app types itself, where English suggests nothing; the argument
+     * is the char it types ([Session.ERASED]'s for Backspace), or 0 for none: the offer on show
+     * put away, the text before the cursor as it was.
+     */
+    const val TYPED = 15
 }
 
 /**
@@ -90,6 +97,7 @@ class Keyboard(private val session: Session, private val nineKeys: Boolean) {
             EngineEvent.FORGET, EngineEvent.PIN, EngineEvent.UNPIN, EngineEvent.BLOCK -> session.apply(pressed(event, arg))
             EngineEvent.RESET -> session.apply(Action.Reset).copy(handled = false)
             EngineEvent.REFINE -> refine()
+            EngineEvent.TYPED -> typed(arg)
             else -> passOn()
         }
         return shown
@@ -100,11 +108,12 @@ class Keyboard(private val session: Session, private val nineKeys: Boolean) {
      * (a field focused, a tap): what is typed next follows it. Nothing on show is dropped, as the
      * host would not know: the service resets fcitx first where there is something. [learning]
      * is as for [onEvent], set before: this comes before any key typed in a field just focused.
+     * [cleared] as [Action.Context.cleared].
      */
-    fun context(before: String, learning: Boolean = true) {
+    fun context(before: String, learning: Boolean = true, cleared: Boolean = false) {
         if (shown.preedit.isNotEmpty() || shown.candidates.isNotEmpty()) return
         session.learning = learning
-        shown = session.apply(Action.Context(before))
+        shown = session.apply(Action.Context(before, cleared))
     }
 
     /** What a long press on the candidate at [index] offered, and the user chose. */
@@ -160,6 +169,22 @@ class Keyboard(private val session: Session, private val nineKeys: Boolean) {
         // a tap in the app's text: the panel as it was
         event == EngineEvent.CURSOR -> again(handled = false).also { session.passedOn() }
         else -> passOn()
+    }
+
+    // what the app typed itself where English suggests nothing: after the text before the cursor,
+    // for a glide after it to know whether a space goes first. Past the BMP (an emoji) it is passed
+    // on as a key the session knows nothing of. While a word is typed it is committed as an Enter
+    // would, not dropped by the session forgetting its input, and the char still goes after it
+    private fun typed(codePoint: Int): Snapshot {
+        val committed = if (composing) whileComposing(EngineEvent.ENTER, 0) else null
+        if (!english || codePoint !in 0..Char.MAX_VALUE.code) {
+            // the word committed goes in all the same, the panel the key leaves
+            val passed = passOn()
+            return committed?.let { passed.copy(commit = it.commit, deleteBefore = it.deleteBefore) } ?: passed
+        }
+        session.passedOn()
+        session.typed(if (codePoint == 0) "" else codePoint.toChar().toString())
+        return committed ?: IDLE
     }
 
     // an arrow, Home or End as a move of the cursor in the input

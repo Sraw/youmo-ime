@@ -4,7 +4,6 @@
  */
 package org.fcitx.fcitx5.android.core
 
-import org.fcitx.fcitx5.android.engine.glide.Glide
 import android.content.Context
 import android.os.Build
 import androidx.annotation.Keep
@@ -18,6 +17,7 @@ import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.core.data.DataManager
 import org.fcitx.fcitx5.android.data.clipboard.ClipboardManager
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
+import org.fcitx.fcitx5.android.engine.glide.Glide
 import org.fcitx.fcitx5.android.engine.handwriting.InkReading
 import org.fcitx.fcitx5.android.engine.host.Engines
 import org.fcitx.fcitx5.android.engine.host.Keyboard
@@ -79,7 +79,7 @@ class Fcitx(private val context: Context) : FcitxAPI, FcitxLifecycleOwner {
     override suspend fun exportUserWords() = withFcitxContext { EngineBridge.engines.exportWords() }
     override suspend fun tableKeys(im: String) = withFcitxContext { EngineBridge.tableKeys(im) }
 
-    override suspend fun engineContext(before: String, learning: Boolean) = withFcitxContext { EngineBridge.context(before, learning, inputMethodEntryCached.uniqueName) }
+    override suspend fun engineContext(before: String, learning: Boolean, cleared: Boolean) = withFcitxContext { EngineBridge.context(before, learning, inputMethodEntryCached.uniqueName, cleared) }
     override suspend fun offerInk(reading: InkReading, piece: Int) = withFcitxContext { EngineBridge.offerInk(reading, piece, inputMethodEntryCached.uniqueName).also(::ink) }
     override suspend fun inkFinished(piece: Int) = withFcitxContext { EngineBridge.inkFinished(piece, inputMethodEntryCached.uniqueName).also(::ink) }
 

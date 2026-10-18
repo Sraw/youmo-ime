@@ -557,6 +557,14 @@ class EditingSessionTest {
         assertTrue(s.backspace(optedIn))
         assertEquals("a", e.text)
         assertTrue("exactly where the editor will report", s.selection.latest.rangeEquals(1))
+        // a "\r\n" or a flag: one code point too, the "\n", half the flag
+        val (s2, e2) = session("a\r\n", cursor = 3)
+        assertTrue(s2.backspace(optedIn))
+        assertEquals("a\r", e2.text)
+        val flag = String(Character.toChars(0x1F1EF)) + String(Character.toChars(0x1F1F5))
+        val (s3, e3) = session("a$flag", cursor = 5)
+        assertTrue(s3.backspace(optedIn))
+        assertEquals("a" + String(Character.toChars(0x1F1EF)), e3.text)
     }
 
     @Test

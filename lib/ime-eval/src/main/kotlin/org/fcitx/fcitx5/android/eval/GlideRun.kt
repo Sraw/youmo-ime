@@ -4,13 +4,17 @@
  */
 package org.fcitx.fcitx5.android.eval
 
-import org.fcitx.fcitx5.android.engine.glide.GlidePath
 import org.fcitx.fcitx5.android.engine.english.EnglishData
 import org.fcitx.fcitx5.android.engine.english.EnglishDecoder
 import org.fcitx.fcitx5.android.engine.english.EnglishText
 import org.fcitx.fcitx5.android.engine.english.GlideDecoder
 import org.fcitx.fcitx5.android.engine.glide.GlideLayout
+import org.fcitx.fcitx5.android.engine.glide.GlidePath
 import java.util.Locale
+import kotlin.math.cos
+import kotlin.math.hypot
+import kotlin.math.ln
+import kotlin.math.sqrt
 import kotlin.random.Random
 
 /**
@@ -25,6 +29,12 @@ internal class GlideRun(private val data: EnglishData, private val weights: Glid
         var right = 0
         var top3 = 0
         var nanos = 0L
+        /** Words left out: a key the layout lacks (微软's ; for ing), or all on one key. */
+        var skipped = 0
+        /** Samples left out whole: their syllables are not one a character (pinyin-glide). */
+        var samplesSkipped = 0
+        /** The search steps (GlidePath.steps) each glided word took: what GlidePath.MAX_STEPS is set by. */
+        val steps = ArrayList<Int>()
         val misses = ArrayList<String>()
 
         fun add(other: Result) {
@@ -32,7 +42,17 @@ internal class GlideRun(private val data: EnglishData, private val weights: Glid
             right += other.right
             top3 += other.top3
             nanos += other.nanos
+            skipped += other.skipped
+            samplesSkipped += other.samplesSkipped
+            steps += other.steps
             misses += other.misses
+        }
+
+        /** The most steps one word took, and the 99th percentile's. */
+        fun stepsRow(): String {
+            val sorted = steps.sorted()
+            val p99 = sorted.getOrElse(((sorted.size - 1) * P99).toInt()) { 0 }
+            return "steps: most ${sorted.lastOrNull() ?: 0}, 99th percentile $p99"
         }
 
         fun row(name: String): String = String.format(
@@ -42,6 +62,7 @@ internal class GlideRun(private val data: EnglishData, private val weights: Glid
 
         companion object {
             const val HEADER = "glide     words   right    top3   ms/word"
+            private const val P99 = 0.99
         }
     }
 
@@ -66,6 +87,7 @@ internal class GlideRun(private val data: EnglishData, private val weights: Glid
                 val got = decoder.decode(p, GlideLayout.QWERTY, context.context(before), 3)
                     .map { data.word(it.word) }
                 result.nanos += System.nanoTime() - t
+                result.steps += decoder.lastSteps
                 result.words++
                 if (got.firstOrNull().equals(word, ignoreCase = true)) {
                     result.right++
@@ -77,6 +99,8 @@ internal class GlideRun(private val data: EnglishData, private val weights: Glid
                     result.misses += "$word\t${got.joinToString(" ")}\t${if (rank < 0) "missing" else "rank $rank"}\t$pts"
                 }
                 if (got.any { it.equals(word, ignoreCase = true) }) result.top3++
+            } else if (word.isNotEmpty()) {
+                result.skipped++
             }
             before += word
             if (token != word) before += EnglishText.START
@@ -100,7 +124,7 @@ internal class GlideRun(private val data: EnglishData, private val weights: Glid
             }
             val out = arrayListOf(corners[0].first, corners[0].second)
             for ((a, b) in corners.zipWithNext()) {
-                val steps = maxOf(1, (kotlin.math.hypot(b.first - a.first, b.second - a.second) / TOUCH).toInt())
+                val steps = maxOf(1, (hypot(b.first - a.first, b.second - a.second) / TOUCH).toInt())
                 for (k in 1..steps) {
                     val jitter = if (k == steps) 0f else TOUCH_JITTER
                     out += a.first + (b.first - a.first) * k / steps + gauss(random) * jitter
@@ -116,7 +140,7 @@ internal class GlideRun(private val data: EnglishData, private val weights: Glid
         private fun gauss(random: Random): Float {
             val u = random.nextDouble().coerceAtLeast(1e-12)
             val v = random.nextDouble()
-            return (kotlin.math.sqrt(-2 * kotlin.math.ln(u)) * kotlin.math.cos(2 * Math.PI * v)).toFloat()
+            return (sqrt(-2 * ln(u)) * cos(2 * Math.PI * v)).toFloat()
         }
     }
 }

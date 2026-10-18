@@ -4,8 +4,8 @@
  */
 package org.fcitx.fcitx5.android.core
 
-import org.fcitx.fcitx5.android.engine.glide.Glide
 import kotlinx.coroutines.flow.SharedFlow
+import org.fcitx.fcitx5.android.engine.glide.Glide
 import org.fcitx.fcitx5.android.engine.handwriting.InkReading
 import org.fcitx.fcitx5.android.engine.host.Engines
 
@@ -95,9 +95,10 @@ interface FcitxAPI {
     /**
      * Tells the engine [before], the text before the cursor, where the user put the cursor other
      * than by typing (a field focused, a tap): what they type next follows it. [learning] off in a
-     * field that asks not to be learned from, told "" (not known) there.
+     * field that asks not to be learned from, told "" (not known) there. [cleared]: [before] is
+     * what was written in a field now empty (Action.Context.cleared).
      */
-    suspend fun engineContext(before: String, learning: Boolean = true)
+    suspend fun engineContext(before: String, learning: Boolean = true, cleared: Boolean = false)
 
     /**
      * What the handwriting pad read of its [piece], shown by the Ink key sent with it in the same

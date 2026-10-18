@@ -9,8 +9,8 @@ import org.fcitx.fcitx5.android.engine.glide.GlideLayout
 import org.fcitx.fcitx5.android.engine.glide.GlidePath
 import org.fcitx.fcitx5.android.engine.glide.PinyinGlide
 import org.fcitx.fcitx5.android.engine.glide.TableGlide
-import org.fcitx.fcitx5.android.engine.table.TableDictionary
 import org.fcitx.fcitx5.android.engine.pinyin.Syllables
+import org.fcitx.fcitx5.android.engine.table.TableDictionary
 import kotlin.random.Random
 
 /**
@@ -37,30 +37,45 @@ internal class PinyinGlideRun(private val data: PinyinData, private val weights:
         for ((i, sample) in samples.withIndex()) {
             val (input, expected) = sample
             val random = Random(seed + i)
-            val split = split(input).orEmpty()
+            // a syllable a character, or the text looked up for a chunk is another's
+            val split = split(input)?.takeIf { it.size == expected.length }
+            if (split == null) {
+                result.samplesSkipped++
+                continue
+            }
             val chunks = if (syllables > 0) split.chunked(syllables) else words(split, expected).orEmpty()
             var at = 0
             for (chunk in chunks) {
                 val text = expected.substring(minOf(at, expected.length), minOf(at + chunk.size, expected.length))
                 at += chunk.size
-                val keys = if (table != null) {
+                // the reading as decoded: its syllables apart where the spelling types them so (xi'an is not xian)
+                val reading = if (table != null) {
                     table.first.codeOf(text)?.takeIf { table.first.indexOf(it, text) >= 0 }
                 } else {
-                    chunk.map { spelling.of(Syllables.id(it)) }.takeIf { null !in it }?.joinToString("")
+                    chunk.map { spelling.of(Syllables.id(it)) }.takeIf { null !in it }
+                        ?.joinToString(if (spelling.separated) PinyinGlide.SEPARATOR.toString() else "")
                 }
-                if (keys == null || keys.any { it !in layout } || keys.map { layout.centre(it) }.toSet().size < 2) continue
+                // a table's code is its keys as they are: 二笔's ' is a key, not a syllable mark
+                val keys = if (table != null) reading else reading?.replace(PinyinGlide.SEPARATOR.toString(), "")
+                val glidable = keys != null && glidable(keys, layout)
+                if (keys != null && !glidable) result.skipped++
+                if (reading == null || keys == null || !glidable) continue
                 val path = GlideRun.path(keys, wobble, random, layout)
                 val t = System.nanoTime()
                 val got = table?.second?.decode(path, layout, 3) ?: glide.decode(path, layout, 3, spelling)
                 result.nanos += System.nanoTime() - t
+                result.steps += table?.second?.lastSteps ?: glide.lastSteps
                 result.words++
-                val typed = got.map { it.keys.replace("'", "") }
-                if (typed.firstOrNull() == keys) result.right++ else result.misses += "$keys\t$text\t${got.joinToString(" ") { "${it.keys}:${it.word}" }}"
-                if (keys in typed) result.top3++
+                val typed = got.map { it.keys }
+                if (typed.firstOrNull() == reading) result.right++ else result.misses += "$reading\t$text\t${got.joinToString(" ") { "${it.keys}:${it.word}" }}"
+                if (reading in typed) result.top3++
             }
         }
         return result
     }
+
+    // a key the layout lacks (微软's ; for ing) or all on one key: no glide types it
+    private fun glidable(keys: String, layout: GlideLayout) = keys.all { it in layout } && keys.map { layout.centre(it) }.toSet().size >= 2
 
     // [split] cut into the dictionary's words that [text] is, the longest first; null where its
     // syllables are not one a character, or a character's is no word

@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.engine.english
 
+import org.fcitx.fcitx5.android.engine.data.runEnd
 import org.fcitx.fcitx5.android.engine.glide.GlideLayout
 import org.fcitx.fcitx5.android.engine.glide.GlidePath
 
@@ -24,6 +25,10 @@ class GlideDecoder(
         val score: Float get() = lm - cost
     }
 
+    /** The search steps ([GlidePath.steps]) the last decode took: for ime-eval to measure. */
+    var lastSteps = 0
+        private set
+
     /**
      * The [limit] likeliest words for [path] (x, y pairs over [layout], the order the finger went)
      * after [context], best first; none for a path of less than two points.
@@ -31,8 +36,8 @@ class GlideDecoder(
     fun decode(path: FloatArray, layout: GlideLayout, context: Long, limit: Int): List<Suggestion> {
         if (limit <= 0) return emptyList()
         val glide = GlidePath(path, layout, weights, EnglishDecoder.MAX_KEYS)
-        if (glide.n == 0) return emptyList()
-        return Search(glide, context, limit).run()
+        if (glide.points == 0) return emptyList()
+        return Search(glide, context, limit).run().also { lastSteps = glide.steps }
     }
 
     private inner class Search(private val glide: GlidePath, private val context: Long, private val limit: Int) {
@@ -53,7 +58,7 @@ class GlideDecoder(
             if (depth >= EnglishDecoder.MAX_KEYS) return
             while (pos < to) {
                 val c = data.keyChar(pos, depth)
-                val end = runEnd(pos, to, depth, c)
+                val end = runEnd(pos, to, c) { data.keyChar(it, depth) }
                 if (glide.step(depth, c)) visit(depth + 1, pos, end)
                 pos = end
             }
@@ -69,15 +74,5 @@ class GlideDecoder(
 
         // [s] before [b] as they are offered: likelier, or as likely and the lower id
         private fun outranks(s: Suggestion, b: Suggestion) = s.score > b.score || s.score == b.score && s.word < b.word
-
-        private fun runEnd(from: Int, to: Int, depth: Int, c: Char): Int {
-            var lo = from
-            var hi = to
-            while (lo < hi) {
-                val mid = (lo + hi) ushr 1
-                if (data.keyChar(mid, depth) <= c) lo = mid + 1 else hi = mid
-            }
-            return lo
-        }
     }
 }

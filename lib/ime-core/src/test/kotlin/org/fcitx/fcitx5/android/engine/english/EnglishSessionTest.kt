@@ -150,6 +150,10 @@ class EnglishSessionTest {
         val after = session()
         after.apply(Action.Context("I fed the "))
         assertEquals("cat", after.type("cit").candidates.first())
+        // what was written in a field now empty: a word's end after it, not run into what is typed
+        val cleared = session()
+        cleared.apply(Action.Context("I fed the", cleared = true))
+        assertEquals("cat", cleared.type("cit").candidates.first())
         // committed here too
         val typed = session()
         typed.type("the")

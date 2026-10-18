@@ -6,6 +6,8 @@ package org.fcitx.fcitx5.android.engine.english
 
 import org.fcitx.fcitx5.android.engine.english.EnglishText.START
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class EnglishTextTest {
@@ -29,6 +31,16 @@ class EnglishTextTest {
     @Test
     fun sentencesAreRunsThatStartOne() {
         assertEquals(listOf("^Hello there", "^How are you", "^Fine"), runs("Hello there. How are you?\nFine"))
+    }
+
+    // any Unicode space separates words; U+2028, U+2029 and U+0085 break lines as \n does
+    @Test
+    fun unicodeSpacesSeparateAndUnicodeLineBreaksEndASentence() {
+        assertEquals(listOf("^Hi there", "^Fine", "^Ok", "^Yes"), runs("Hi\u00A0there.\u2003Fine\u2028Ok\u2029Yes"))
+        // a vertical tab and a form feed are line breaks too
+        assertEquals(listOf("^Hi", "^Yes", "^Ok"), runs("Hi\u000BYes\u000COk"))
+        assertEquals(listOf(START), EnglishText.context("Hi.\u00A0"))
+        assertEquals(listOf(START), EnglishText.context("Hi\u0085"))
     }
 
     @Test
@@ -82,6 +94,17 @@ class EnglishTextTest {
         assertEquals(emptyList<String>(), EnglishText.context("I have 3 "))
         // the next key goes on with the word
         assertEquals(emptyList<String>(), EnglishText.context("Hello"))
+    }
+
+    // as the context reads it: an initial's or an abbreviation's full stop ends none
+    @Test
+    fun aSentenceEndsAsTheContextReadsIt() {
+        listOf("Hi. ", "Hi.", "So do I.", "Wait… ", "Why? ", "Hi\n", "Hi \r\n ", "Hi.\u00A0", "Hi.\u2003", "Hi\u2028", "Hi\u2029 ", "Hi\u0085", "Hi\u000B", "Hi\u000C").forEach {
+            assertTrue(it, EnglishText.endsSentence(it))
+        }
+        listOf("", "abc ", "abc", "J. ", "Mr. ", "J.\u00A0", "Mr.\u00A0", "Hi. Hello", "I have 3 ", "c   ", "c\u00A0").forEach {
+            assertFalse(it, EnglishText.endsSentence(it))
+        }
     }
 
     // only the end is looked at: where it is cut, no sentence is known to start

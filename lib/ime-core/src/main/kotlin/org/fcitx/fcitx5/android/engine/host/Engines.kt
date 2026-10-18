@@ -4,12 +4,12 @@
  */
 package org.fcitx.fcitx5.android.engine.host
 
-import org.fcitx.fcitx5.android.engine.glide.PinyinGlide
-import org.fcitx.fcitx5.android.engine.glide.GlideSession
-import org.fcitx.fcitx5.android.engine.glide.TableGlide
 import org.fcitx.fcitx5.android.engine.data.NgramModel.Companion.NO_WORD
 import org.fcitx.fcitx5.android.engine.english.EnglishSession
 import org.fcitx.fcitx5.android.engine.glide.Glide
+import org.fcitx.fcitx5.android.engine.glide.GlideSession
+import org.fcitx.fcitx5.android.engine.glide.PinyinGlide
+import org.fcitx.fcitx5.android.engine.glide.TableGlide
 import org.fcitx.fcitx5.android.engine.handwriting.HandwritingDecoder
 import org.fcitx.fcitx5.android.engine.handwriting.HandwritingSession
 import org.fcitx.fcitx5.android.engine.handwriting.InkReading
@@ -208,6 +208,9 @@ class Engines(
     // are made: read once, in the background
     private var pinyinWarmedUp = false
 
+    // of what is placed beside the candidates (EMOJI_DATA, CHAIZI_DATA, CHAR_READINGS), what was warmed up
+    private val asideWarmedUp = HashSet<String>()
+
     // the coarse words of pinyin's vocabulary but those the user added, one for handwriting and every
     // table: made again once the sessions are dropped, as every change to the added words drops them
     private var coarseWords: CoarseWords? = null
@@ -244,11 +247,12 @@ class Engines(
     /**
      * [before] is the text before the cursor, put where the engines did not: see
      * [Keyboard.context]; [learning] off in a sensitive field, told "" (not known), so each
-     * learns as its [onEvent] would. [im] is the input method the field starts with.
+     * learns as its [onEvent] would. [im] is the input method the field starts with. [cleared] as
+     * [Action.Context.cleared].
      */
-    fun context(im: String, before: String, learning: Boolean = true) {
-        if (!pinyinWarmedUp && (im in READS_PINYIN_DATA || im in TABLES)) warmUpPinyin()
-        keyboards.values.forEach { it.context(before, learning) }
+    fun context(im: String, before: String, learning: Boolean = true, cleared: Boolean = false) {
+        if (im in READS_PINYIN_DATA || im in TABLES) warmUpPinyin(im)
+        keyboards.values.forEach { it.context(before, learning, cleared) }
     }
 
     // told as a field starts in an input method that reads pinyin's data (READS_PINYIN_DATA, a table,
@@ -258,12 +262,22 @@ class Engines(
     // of those reads them on the fcitx thread as it makes the session (activate's Reset). Whatever
     // reading them throws is dropped, the lazies left unset: the session reads them again as it is
     // made, on the fcitx thread, which hands it to the addon (EngineBridge.Unloadable); thrown out of
-    // this thread, it would end the app. Memory run out is no Exception, and is not caught
-    private fun warmUpPinyin() {
+    // this thread, it would end the app. Memory run out is no Exception, and is not caught.
+    // Beside it only what [im] shows as the settings have it, held from then on: no emoji in handwriting,
+    // characters by their parts and their readings (笔画查字's) only in full pinyin
+    private fun warmUpPinyin(im: String) {
+        val aside = HashSet<String>()
+        if (settings.emoji && im != HANDWRITING) aside += EMOJI_DATA
+        if (im == PINYIN && settings.chaizi) aside += CHAIZI_DATA
+        if (im == PINYIN) aside += CHAR_READINGS
+        aside -= asideWarmedUp
+        if (pinyinWarmedUp && aside.isEmpty()) return
         pinyinWarmedUp = true
+        asideWarmedUp += aside
         warmUps.execute {
             try {
                 assets.pinyinData.wordIndex
+                assets.warmUpAside(EMOJI_DATA in aside, CHAIZI_DATA in aside, CHAR_READINGS in aside)
             } catch (_: Exception) {
                 null
             }
@@ -293,7 +307,18 @@ class Engines(
     }
 
     // read when first glided: most never glide pinyin
-    private val pinyinGlide by lazy { PinyinGlide(assets.pinyinData) }
+    private val pinyinGlide by lazy { PinyinGlide(assets.pinyinData, user = ::glideUser) }
+
+    // the user's words in a glide's readings, as the sessions score them: added, learned, blocked
+    private fun glideUser(): PinyinGlide.User {
+        val user = lexicon.user()
+        val scorer = lexicon.prior().scorer(UserScorer(assets.pinyinData.model, user))
+        val context = scorer.context(NO_WORD, NO_WORD)
+        return PinyinGlide.User(user to user.changes, { word -> scorer.scoreAfter(context, word) }, user, { word -> user.count(word) > 0f }, user::blocked)
+    }
+
+    // what a pinyin's glide after something typed goes on after
+    private val syllableBoundary = Action.Key(PinyinGlide.SEPARATOR)
 
     /**
      * The keyboard's glide across the letters, for [im] to read at its next [Keyboard.GLIDE]:
@@ -325,6 +350,7 @@ class Engines(
     /** What a long press on the [index]th of [im]'s candidates offers; nothing if it has no session yet. */
     fun offers(im: String, index: Int): Set<Offer> = sessions[im]?.offers(index).orEmpty()
 
+    // each of [glides] made a GlideSession or an EnglishSession, which offerGlide hands the glide to
     private fun session(im: String): Session = sessions.getOrPut(im) {
         val s = settings
         when (im) {
@@ -332,7 +358,7 @@ class Engines(
                 val segmenter = PinyinSegmenter(s.fuzzy, s.typos, neighbours = s.typos, latin = if (s.latinWords) assets.latinWords else null)
                 val pinyin = pinyinSession(segmenter, spell = false, chaizi = chaizi())
                 val looked = ForgetsInTables(StrokeLookup(pinyin, assets::strokes, assets::charReading, s.pageSize, blocked = lexicon::isBlocked, follow = pinyin::follow, retype = pinyin::typeAll))
-                GlideSession(looked, blocked = lexicon::isBlocked) { g, n -> pinyinGlide.decode(g.path, g.layout, n) }
+                GlideSession(looked, syllableBoundary, blocked = glideHeldBack()) { g, n -> pinyinGlide.decode(g.path, g.layout, n) }
             }
             ENGLISH -> {
                 val data = assets.englishData
@@ -361,7 +387,8 @@ class Engines(
             // glided as full pinyin, over the digits' keys: each letter typed as itself, as one chosen from a key's long press
             T9 -> GlideSession(
                 ForgetsInTables(pinyinSession(T9Segmenter(s.fuzzy, abbreviations = false, letters = s.nineKeys), spell = true)),
-                blocked = lexicon::isBlocked,
+                syllableBoundary,
+                blocked = glideHeldBack(),
                 typed = { c -> if (c == PinyinGlide.SEPARATOR) Action.Key(c) else Action.Letter(c) },
                 readings = GlideSession.NINE_KEYS_READINGS,
             ) { g, n -> pinyinGlide.decode(g.path, g.layout, n) }
@@ -369,7 +396,8 @@ class Engines(
                 val spelling = PinyinGlide.Spelling.shuangpin(s.scheme)
                 GlideSession(
                     ForgetsInTables(pinyinSession(ShuangpinSegmenter(s.scheme, s.fuzzy, s.typos), spell = true)),
-                    blocked = lexicon::isBlocked,
+                    syllableBoundary,
+                    blocked = glideHeldBack(),
                 ) { g, n -> pinyinGlide.decode(g.path, g.layout, n, spelling) }
             }
             else -> {
@@ -379,15 +407,29 @@ class Engines(
                 // looking a character up by pinyin learns nothing: it is not how the user writes
                 val lookUp = if (options.pinyinKey == null) null else PinyinSession(assets.pinyinData, PinyinSegmenter(), prediction = false)
                 val language = tableLanguage()
-                val glide = TableGlide(table.dictionary, { text -> language.words.logProb(text) })
+                val glide = TableGlide(
+                    table.dictionary, { text -> language.words.logProb(text) }, PinyinGlide.WEIGHTS,
+                    version = { language.user?.let { it to it.changes } },
+                    // the words counted, scored anew a glide: their scores move with every word learned
+                    learned = { text -> language.user?.typed(text) == true },
+                    // as the table's session blocks: not a character blocked under one pinyin reading
+                    blocked = lexicon::isBlockedWord,
+                )
                 // a glide after a code typed picks its first candidate: the next code is the glide's
                 GlideSession(
                     TableSession(table.dictionary, options, lookUp, table.user, tables.shared(table, im), language),
-                    blocked = lexicon::isBlocked,
                     between = Action.Pick(0),
+                    blocked = glideHeldBack(lexicon::isBlockedWord),
                 ) { g, n -> glide.decode(g.path, g.layout, n) }
             }
         }
+    }
+
+    // what a glide's other readings leave out: the words blocked, and the coarse ones but those the
+    // user added, as the decoders hold them back (CoarseWords); [blocked] as the session blocks
+    private fun glideHeldBack(blocked: (String) -> Boolean = lexicon::isBlocked): (String) -> Boolean {
+        val coarse = (CoarseWords.LIST - lexicon.addedTexts()).toHashSet()
+        return { blocked(it) || it in coarse }
     }
 
     /**
@@ -508,6 +550,9 @@ class Engines(
          */
         private val READS_PINYIN_DATA = setOf(PINYIN, SHUANGPIN, T9, HANDWRITING)
 
+        // what charReading reads off pinyin's dictionary, warmed up as the data files are
+        private const val CHAR_READINGS = "char readings"
+
         /** Offered first to be added: the most asked for after pinyin, which is there already. */
         private val ADDED_FIRST = listOf(T9, WUBI)
 
@@ -547,7 +592,11 @@ class Engines(
          */
         fun takesKeyboard(name: String): Boolean = name != T9 && name != HANDWRITING
 
-        /** Whether input method [name] reads a glide across its keys (滑行输入): English, the pinyins and the tables, not handwriting. */
+        /**
+         * Whether input method [name] reads a glide across its keys (滑行输入): English, the pinyins and
+         * the tables, not handwriting. Each is made a session that reads one (Engines.session): one
+         * added here is added there.
+         */
         fun glides(name: String): Boolean = name == ENGLISH || name == PINYIN || name == SHUANGPIN || name == T9 || name in TABLES
 
         /** English: fcitx's own name for it, which fcitx falls back to, so a user's lists keep it. */

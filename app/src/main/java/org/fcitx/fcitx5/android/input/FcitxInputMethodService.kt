@@ -12,6 +12,7 @@ import android.content.res.ColorStateList
 import android.content.res.Configuration
 import android.content.res.Resources
 import android.graphics.Color
+import android.graphics.Rect
 import android.graphics.drawable.Icon
 import android.hardware.input.InputManager
 import android.os.Build
@@ -73,6 +74,7 @@ import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.engine.session.Action
 import org.fcitx.fcitx5.android.input.bar.Calculation
+import org.fcitx.fcitx5.android.input.bar.CalculationOffer
 import org.fcitx.fcitx5.android.input.cursor.CursorRange
 import org.fcitx.fcitx5.android.input.editing.ArrowKeys
 import org.fcitx.fcitx5.android.input.editing.CodePoints
@@ -231,11 +233,17 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         prefs.advanced.ignoreSystemWindowInsets,
     )
 
-    private fun replaceInputView(theme: Theme): InputView {
+    private fun replaceInputView(theme: Theme, start: Boolean = false): InputView {
         val newInputView = InputView(this, fcitx, theme)
         setInputView(newInputView)
         inputDeviceMgr.setInputView(newInputView)
         inputView = newInputView
+        // rebuilt in a field already started (floating toggled from the keyboard): its editor info,
+        // as onStartInputView would give it. Not when onStartInputView follows (onCreateInputView, a
+        // language picked anew): it starts the view itself, and twice would start input twice
+        if (start && inputViewStarted && inputDeviceMgr.isVirtualKeyboard) {
+            currentInputEditorInfo?.let { newInputView.startInput(it, capabilityFlags) }
+        }
         return newInputView
     }
 
@@ -250,15 +258,15 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         return newCandidatesView
     }
 
-    private fun replaceInputViews(theme: Theme) {
+    private fun replaceInputViews(theme: Theme, start: Boolean = false) {
         navbarMgr.evaluate(window.window!!, inputDeviceMgr.isVirtualKeyboard)
-        replaceInputView(theme)
+        replaceInputView(theme, start)
         replaceCandidateView(theme)
     }
 
     @Keep
     private val recreateInputViewListener = ManagedPreference.OnChangeListener<Any> { _, _ ->
-        replaceInputView(ThemeManager.activeTheme)
+        replaceInputView(ThemeManager.activeTheme, start = true)
     }
 
     @Keep
@@ -268,7 +276,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
 
     @Keep
     private val onThemeChangeListener = ThemeManager.OnThemeChangeListener {
-        replaceInputViews(it)
+        replaceInputViews(it, start = true)
     }
 
     /**
@@ -400,6 +408,11 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     private fun handleBackspaceKey() {
         val deleting = selection.latest
         contextMemory.backspace(deleting.start, deleting.end)
+        // a selection deleted, where a session takes one code point off what it knows (the app's
+        // Session.ERASED, or English's own Backspace) and the cursor report, predicted, tells it
+        // nothing: read now, for every input method, the selection still there, the text before
+        // it is what will be before the cursor
+        if (deleting.isNotEmpty()) tellContext()
         if (pairing) backspacePair()
         if (!editingSession.backspace(currentInputEditorInfo.toEditorTraits())) {
             sendDownUpKeyEvents(KeyEvent.KEYCODE_DEL)
@@ -494,9 +507,11 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
      * commit by the time it answers, its commands taken in order.
      */
     private fun offerCalculation() {
-        if (fieldPolicy.sensitive || currentInputEditorInfo.isTypeNull()) return
-        val before = currentInputConnection?.getTextBeforeCursor(CALCULATION_CHARS, 0) ?: return
-        val worked = Calculation.of(before) ?: return
+        val worked = CalculationOffer.read(
+            fieldPolicy.sensitive,
+            currentInputEditorInfo.isTypeNull(),
+            CALCULATION_CHARS,
+        ) { currentInputConnection?.getTextBeforeCursor(it, 0) } ?: return
         inputView?.offerCalculation(worked, selection.latest.start)
     }
 
@@ -753,7 +768,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
 
     private var inputViewLocation = intArrayOf(0, 0)
 
-    private val floatingRegion = android.graphics.Rect()
+    private val floatingRegion = Rect()
 
     override fun onComputeInsets(outInsets: Insets) {
         if (inputDeviceMgr.isVirtualKeyboard && inputView?.floatingRegion(floatingRegion) == true) {
@@ -1160,9 +1175,9 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         after: () -> CharSequence? = textAfterCursor,
     ) {
         contextReads.ask()
-        val context = fieldPolicy.context(SystemClock.elapsedRealtime(), before, after) ?: return
+        val context = fieldPolicy.told(SystemClock.elapsedRealtime(), before, after) ?: return
         val learning = !fieldPolicy.sensitive
-        postFcitxJob { engineContext(context, learning) }
+        postFcitxJob { engineContext(context.before, learning, context.cleared) }
     }
 
     /**
@@ -1175,10 +1190,10 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         postFcitxJob {
             val told = withContext(Dispatchers.Main) {
                 if (!contextReads.isLatest(read)) null
-                else fieldPolicy.context(SystemClock.elapsedRealtime(), textBeforeCursor, textAfterCursor)
+                else fieldPolicy.told(SystemClock.elapsedRealtime(), textBeforeCursor, textAfterCursor)
                     ?.let { it to !fieldPolicy.sensitive }
             }
-            if (told != null) engineContext(told.first, told.second)
+            if (told != null) engineContext(told.first.before, told.second, told.first.cleared)
         }
     }
 

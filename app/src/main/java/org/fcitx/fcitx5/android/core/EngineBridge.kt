@@ -4,7 +4,6 @@
  */
 package org.fcitx.fcitx5.android.core
 
-import org.fcitx.fcitx5.android.engine.glide.Glide
 import android.text.TextPaint
 import android.widget.Toast
 import androidx.core.content.ContextCompat
@@ -19,12 +18,12 @@ import org.fcitx.fcitx5.android.data.pinyin.dict.PinyinDictionary
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.restoreDirectory
 import org.fcitx.fcitx5.android.engine.data.DataFormatException
+import org.fcitx.fcitx5.android.engine.glide.Glide
 import org.fcitx.fcitx5.android.engine.handwriting.HandwritingSession
 import org.fcitx.fcitx5.android.engine.handwriting.InkReading
 import org.fcitx.fcitx5.android.engine.host.EngineEvent
 import org.fcitx.fcitx5.android.engine.host.EngineSettings
 import org.fcitx.fcitx5.android.engine.host.Engines
-import org.fcitx.fcitx5.android.input.popup.EmojiModifier
 import org.fcitx.fcitx5.android.engine.libime.LibimeFiles
 import org.fcitx.fcitx5.android.engine.phrase.CustomPhrases
 import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
@@ -33,6 +32,7 @@ import org.fcitx.fcitx5.android.engine.session.Choice
 import org.fcitx.fcitx5.android.engine.session.Offer
 import org.fcitx.fcitx5.android.engine.session.Snapshot
 import org.fcitx.fcitx5.android.engine.user.LibimeImport
+import org.fcitx.fcitx5.android.input.popup.EmojiModifier
 import org.fcitx.fcitx5.android.utils.appContext
 import org.fcitx.fcitx5.android.utils.toast
 import timber.log.Timber
@@ -109,6 +109,10 @@ object EngineBridge {
             false
         } catch (e: DataFormatException) {
             Timber.w(e, "glide in $current")
+            false
+        } catch (@Suppress("TooGenericExceptionCaught") e: RuntimeException) {
+            // the decoders read any path drawn: a slip of theirs loses the glide, not the keyboard
+            Timber.e(e, "glide in $current")
             false
         }
     }
@@ -439,9 +443,9 @@ object EngineBridge {
 
     /** See [Engines.context]; nothing to tell while the engine is not made. */
     @JvmStatic
-    fun context(before: String, learning: Boolean, im: String) {
+    fun context(before: String, learning: Boolean, im: String, cleared: Boolean = false) {
         made?.let {
-            it.context(im, before, learning)
+            it.context(im, before, learning, cleared)
             followed(im) { it }
         }
     }
