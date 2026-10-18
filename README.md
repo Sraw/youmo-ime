@@ -48,7 +48,7 @@
 
 ### 下一步计划
 
-- **改进语音识别**：先改进带口音的普通话，再支持粤语等方言。
+- **改进语音识别**：用真实的口音录音继续改进带口音的普通话，再支持粤语等方言。
 
 ### 许可与数据
 
@@ -59,7 +59,7 @@
 - 自己统计和训练的部分：n-gram 和新词来自 [FineWeb](https://huggingface.co/datasets/HuggingFaceFW/fineweb)、[FineWeb-2](https://huggingface.co/datasets/HuggingFaceFW/fineweb-2)（ODC-By 1.0）和 [Common Crawl](https://commoncrawl.org) 的网页；
   句子模型（Apache-2.0）用 Qwen3.5-9B-Base（Apache-2.0）蒸馏；手写模型只用合成笔迹训练（开源手写字体，以及 [Make Me a Hanzi](https://github.com/skishore/makemeahanzi) 的笔画，Arphic Public License），
   由 [onnxruntime](https://github.com/microsoft/onnxruntime)（MIT）运行。
-- 语音识别：[X-ASR](https://github.com/Gilgamesh-J/X-ASR)（Apache-2.0），由 [sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx)（Apache-2.0）和 [silero VAD](https://github.com/snakers4/silero-vad)（MIT）运行。
+- 语音识别：[X-ASR](https://github.com/Gilgamesh-J/X-ASR)（Apache-2.0），编码器由本项目为带口音的普通话微调：训练语音用 [CosyVoice3](https://github.com/FunAudioLLM/CosyVoice)（Apache-2.0）合成并加上 [Common Voice](https://commonvoice.mozilla.org)（CC0），以 [AISHELL-1](https://www.openslr.org/33/)（Apache-2.0）和 [LibriSpeech](https://www.openslr.org/12/)（CC BY 4.0）防止原有能力退化；由 [sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx)（Apache-2.0）和 [silero VAD](https://github.com/snakers4/silero-vad)（MIT）运行。
 - 安装包里的模型和词库都没有用仅限科研的数据训练；[LCCC](https://github.com/thu-coai/CDial-GPT) 和 CASIA 只用来评测。
 - 致谢：上面这些项目，以及 [fcitx5-chinese-addons](https://github.com/fcitx/fcitx5-chinese-addons)、[Qwen](https://github.com/QwenLM)。
 
@@ -107,7 +107,7 @@ Needs an arm64 phone on Android 6.0 or later. The models and dictionary are insi
 
 ### Next
 
-- **Better voice recognition**: first for Mandarin with a regional accent, then dialects such as Cantonese.
+- **Better voice recognition**: Mandarin with a regional accent further, from real accented speech, then dialects such as Cantonese.
 
 ### Licences and data
 
@@ -118,6 +118,6 @@ Needs an arm64 phone on Android 6.0 or later. The models and dictionary are insi
 - Counted and trained by this project: n-grams and new words from web pages of [FineWeb](https://huggingface.co/datasets/HuggingFaceFW/fineweb), [FineWeb-2](https://huggingface.co/datasets/HuggingFaceFW/fineweb-2) (ODC-By 1.0) and [Common Crawl](https://commoncrawl.org);
   sentence models (Apache-2.0) distilled from Qwen3.5-9B-Base (Apache-2.0); handwriting recognizers trained on synthetic ink only (open handwriting fonts and
   [Make Me a Hanzi](https://github.com/skishore/makemeahanzi)'s strokes, Arphic Public License), run by [onnxruntime](https://github.com/microsoft/onnxruntime) (MIT).
-- Speech recognition: [X-ASR](https://github.com/Gilgamesh-J/X-ASR) (Apache-2.0), run with [sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx) (Apache-2.0) and [silero VAD](https://github.com/snakers4/silero-vad) (MIT).
+- Speech recognition: [X-ASR](https://github.com/Gilgamesh-J/X-ASR) (Apache-2.0), its encoder fine-tuned by this project for accented Mandarin on speech synthesized by [CosyVoice3](https://github.com/FunAudioLLM/CosyVoice) (Apache-2.0) and [Common Voice](https://commonvoice.mozilla.org) (CC0), held to the original by [AISHELL-1](https://www.openslr.org/33/) (Apache-2.0) and [LibriSpeech](https://www.openslr.org/12/) (CC BY 4.0); run with [sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx) (Apache-2.0) and [silero VAD](https://github.com/snakers4/silero-vad) (MIT).
 - No model or dictionary in the app is trained on research-only data; [LCCC](https://github.com/thu-coai/CDial-GPT) and CASIA are used only to evaluate.
 - Thanks to the projects above, and to [fcitx5-chinese-addons](https://github.com/fcitx/fcitx5-chinese-addons) and [Qwen](https://github.com/QwenLM).

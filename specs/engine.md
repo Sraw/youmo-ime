@@ -37,7 +37,7 @@ keeps its own, the model they follow.
 | `english` | `EnglishData`, `EnglishDecoder` (keys → words with slips), `GlideDecoder` (a glide's path → words), `EnglishSession` (Gboard-like word-at-a-time typing, autocorrect, glides), `EnglishUser`, `EnglishText`, `Misspellings` |
 | `stroke` | `Strokes`, `StrokeLookup` (`u` then `h s p n z` inside pinyin) |
 | `handwriting` | `HandwritingSession` (the input method), `HandwritingDecoder` (the characters written read as a sentence with the pinyin model and the user's words), `InkRecognizer` (the character's two recognizers run as their training code runs them, over `InkNet`s the app supplies), `InkFeatures` (what each recognizer reads of the strokes, equal to the training code's) |
-| `phrase` | `CustomPhrases` (libime's `customphrase` format, with date/time variables), `PhraseBook`; `EmojiData` (`engine/emoji.data`: the emoji panel's groups and the words emoji stand for) and `EmojiCandidates` (a word's emoji after the first two candidates, pinyin's and a table's alike: setting `Emoji`, those the phone cannot draw left out by `Engines.emojiShows`); `Chaizi` (`engine/chaizi.data`: characters by the pinyin of their parts, full pinyin's after `u`, setting `Chaizi`, those the phone's font lacks left out by `Engines.textShows`) and `AsideCandidates` (where pinyin puts both: the emoji after the first two, the characters first) |
+| `phrase` | `CustomPhrases` (libime's `customphrase` format, with date/time variables; `CustomPhrases.BUILT_IN`: the date, time and weekday under `rq`, `sj`, `xq`, offered in full pinyin only, under a key the user file has none of: in 双拼 `sj` and `xq` spell syllables), `PhraseBook` (a pin or delete from the keyboard under such a key first copies that key's built-in phrases into the user file, so a pin keeps the date and a deleted one stays off); `EmojiData` (`engine/emoji.data`: the emoji panel's groups and the words emoji stand for) and `EmojiCandidates` (a word's emoji after the first two candidates, pinyin's and a table's alike: setting `Emoji`, those the phone cannot draw left out by `Engines.emojiShows`); `Chaizi` (`engine/chaizi.data`: characters by the pinyin of their parts, full pinyin's after `u`, setting `Chaizi`, those the phone's font lacks left out by `Engines.textShows`) and `AsideCandidates` (where pinyin puts both: the emoji after the first two, the characters first) |
 | `data` | File formats: `DataFile` (the container), `PinyinData`, `CodeTable`, `NgramTables`, `BitPacked`, `EliasFano` (the trigram runs' starts; a lookup costs more, so not for the unigrams'), `Quantizer`, `StringTable`, `WordIndex`, `PinyinDataBuilder`, readers of text sources, `Misreadings`, `DataAge` |
 | `store` | `RecordFormat` / `RecordStore`: append-only logs with CRC'd records, compacted by rename |
 | `libime` | Reading libime's binary files without libime (its `DATrie`, zstd): for users coming from upstream and for importing `.dict` |
@@ -171,13 +171,53 @@ measures it on simulated paths (key centres off by a Gaussian of 0.3 key widths,
 every 0.05): 94.6% first, 97.6% in the first three, 0.7 ms a word on one desktop core. Besides
 the shape and the keys, `GlidePath` costs where the path starts and lifts away from a word's ends,
 and each turn of the path (by how far it turns) that none of the word's keys is at: a finger turns
-on the keys it means.
+on the keys it means. Words the user committed that the data lacks glide too: `EnglishSession` holds each to the same `GlidePath` and scores it by the user's counts less the cost. Whether a glided word needs a space before it is read off the
+field's char before the cursor, as the host tells it (`Action.Context`), or what the session
+put in itself; what was written in a field now empty (`Action.Context.cleared`) is scored after
+but is not before the cursor: no space after it, and no Backspace takes any of it (`clearedAt`); a field not learned from tells nothing (user decision F2074: such a field's text is
+not read at all), nor does what the keyboard typed there (`androidengine` sends no `TYPED` from a
+PasswordOrSensitive field: a password shown is Sensitive, not Password, and so looks like an
+incognito field), so there only the session's own glide counts; after typed text, a Backspace or
+an arrow nothing before the cursor is known, and a glide gets no space before it (part of the
+F2074 limit). A glided word that starts no sentence takes its in-sentence form (`inSentence`):
+whenever its context is not just the sentence's start, so with known words before it, or with
+nothing known but a char that ends no sentence (looked at past the spaces after it, by
+`EnglishText.endsSentence` as the context reads it: `.` not an initial's or an abbreviation's,
+`!`, `?`, `…` and a line break among those spaces end one): "abc hello", but "Hi. Hello"; Shift still
+capitalises it. Where English suggests nothing (`androidengine`'s
+`suggestsEnglish`: NoSpellCheck, an address, a password, suggestions off) the keys type themselves.
+Each char a screen key types there is sent as `EngineEvent.TYPED` (`Keyboard` passes it on, then
+`Session.typed`: the session's edge, and its known text if it knows the text before it). The
+screen's Backspace there goes the same way as `Session.ERASED`, as does the session's own
+Backspace with nothing typed: the last code point of what is known taken off, of the edge where
+nothing is known; a CR taken or left last has it forget, a "\r\n" being taken differently by
+editors (a key event both, an opted-in editor the "\n"). An opted-in editor has one code point
+deleted directly (a surrogate pair as one; an unpaired surrogate goes as a key event, which
+removes it); any other editor gets a key event, and what it takes is the editor's to decide (an
+emoji sequence or a flag whole, perhaps). So where the code point taken or the char left may
+belong to such a cluster (a combining mark, a ZWJ, a variation selector, a keycap, or any char
+outside the BMP: an emoji, a skin tone, a regional indicator, a tag), all that is known is
+forgotten rather than guessed; a glide right after may then add no space. So "abc",
+Backspace, a glide gives "ab hello ". The edge keeps the last 32 chars before its trailing spaces
+for Backspaces with nothing known: where the session forgot the text (a Reset: an Enter, an arrow,
+a hardware key, the field left) and no Context was read since, even in a field learned from
+(measured on redroid in the test page's 不要提示 field: a 1-char edge gave "abhello "). A
+Backspace over a selection is one `ERASED` too, so the service reads the context then
+(`handleBackspaceKey`; the cursor report, predicted, tells none). None from a password field, nor from a hardware key, which comes this way in fields that suggest too:
+those, and keys no char, go as an Enter. The Glide char goes in with no Enter before it, and the
+one key right after it, if Backspace or a char other than an ASCII letter, is the session's as
+where it suggests (the word taken back, the space moved); the words that would follow are put away
+by a `TYPED` of 0, so `Keyboard` knows the panel empty. Learning there is as anywhere: glided words
+are counted outside password and sensitive fields (they are the user's words), while typed ones
+never reach the session as words.
 
 Full pinyin glides too (`engine/glide/PinyinGlide`): the dictionary's syllable trie is walked as
 English's key trie, each reading with a word scored by its likeliest word (the unigram, or its
 characters one after another where likelier, as the decoder's best path takes 你好) less the path's
-cost; one word a glide (chained, the readings ran to thousands). Each pinyin glides its own keys
-(`PinyinGlide.Spelling`): full pinyin the letters, 双拼 its scheme's two a syllable, the nine keys
+cost; one word a glide (chained, the readings ran to thousands). The user's own words glide
+too: their trie (`UserWords`) is walked alongside the dictionary's, a reading in both one reading. Each pinyin glides its own keys
+(`PinyinGlide.Spelling`): full pinyin the letters, 双拼 its scheme's two a syllable (微软's and
+紫光's -ing is on `;`, which the letter keyboard lacks, so those syllables cannot glide), the nine keys
 the letters too, on their digits' keys (`GlideLayout.sameKey`: letters on one key follow without
 the path moving). A table glides its codes (`engine/glide/TableGlide`): its entries walked in code
 order as a trie, a code scored by its likeliest entry under the word model. `GlideSession` wraps
@@ -187,9 +227,9 @@ types the best reading's keys (the nine keys' as `Action.Letter`, so 426 is not 
 table's first candidate picked), and a glide that starts the input puts the next two readings'
 words after the first candidate, a pick of one typing its reading and picking it there, so it is
 learned and followed as any word. `ime-eval pinyin-glide` measures it per dictionary word of a
-pinyin set (`--shuangpin`, `--keys nine`, `--table`): on pinyin-chat full pinyin 85.3% first,
-96.5% in the first three, 0.4 ms; 双拼 (自然码, 小鹤, 微软) 82–83% / 94%; the nine keys 53.5% / 76.7% (a key three or four letters, the path reads far more; the weights moved it under a point); 五笔 70.6% / 90.0%,
-仓颉 94.5% / 99.3% (the characters it has). The setting is off by default: a sloppy fast tap may glide.
+pinyin set (`--shuangpin`, `--keys nine`, `--table`): on pinyin-chat (readings compared with their separators, xi'an ≠ xian) full pinyin 85.3% first,
+96.5% in the first three, 0.4 ms; 双拼 (自然码) 82.1% / 94.2%; the nine keys 53.5% / 76.7% (a key three or four letters, the path reads far more; the weights moved it under a point); 五笔 70.6% / 90.0%,
+仓颉 94.5% / 99.3% (the characters it has). These times are with no user model: with one, a glide works out again only the words the user has counts of, at the nodes (pinyin) or entries (a table) it reaches, the rest kept till a word gets its first count, is forgotten or blocked; unmeasured. A table entry with no count of its own keeps its score meanwhile, though a counted word is in its likeliest split (你们 as 你 + 们). The setting is off by default: a sloppy fast tap may glide.
 
 ## Handwriting
 

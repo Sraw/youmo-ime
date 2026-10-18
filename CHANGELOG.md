@@ -52,18 +52,19 @@ Each release lists its **main changes** (new features, large improvements) and i
   the input method; the window's keyboard icon brings the touch keyboard back and can be dragged away.
 - **Code tables** (Wubi, Cangjie, Ziranma, Erbi, Wubi-Pinyin) do what pinyin does: candidates ordered by the text before, next-word
   suggestions, performance levels, one user dictionary shared with pinyin and handwriting.
-- **Code row**: the code being typed has its own row above the candidates; tap it to put the cursor inside and edit there, in every input method.
+- **Code row**: the code being typed has its own row above the candidates; tap it to put the cursor inside and edit there, in pinyin, shuangpin, nine keys, strokes and the code tables.
 
 ### Smaller changes
 
 - Words added by hand (an imported word list too) rank as the common word of the same characters from the start.
 - A next-word suggestion appears once; Wubi's lone-code space is taken only within a second; nine keys' 1 key with 连按 off types one
-  mark a press; digits and symbols in URL and email fields go in as typed.
+  mark a press, and with custom letters two keys of the same letters no longer confuse the popup; digits and symbols in URL and email fields go in as typed.
 - English: brackets and quotes take the space added after a word; auto-paired brackets no longer double; words after a capitalised
-  sentence start are predicted; words added by hand are kept; the Chinese toggles (full width among them) no longer reach English.
-- The cursor is kept after a screen turn; an edge key's long-press popup stays on screen; settings changed before the first unlock apply at once.
+  sentence start are predicted; words added by hand are kept; the English word list no longer marks a word typed once as never corrected; the Chinese toggles (full width among them) no longer reach English.
+- The cursor is kept after a screen turn; an edge key's long-press popup stays on screen; settings changed before the first unlock apply at once;
+  the welcome pages come back each time the app opens until set up or skipped.
 - Pinyin's data is not loaded for a user who types only English or a table; English data counted again by the current rules;
-  the voice decoder in int8; the text build asks only for vibration.
+  the voice build's help opens its own manual, its decoder in int8; the text build asks only for vibration.
 
 ---
 

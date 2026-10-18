@@ -79,6 +79,12 @@ so a turn keeps its corner. `FcitxInputMethodService.onComputeInsets` then gives
 height (it is not laid out again) and only `InputView.floatingRegion` takes touches
 (`TOUCHABLE_INSETS_REGION`). Floating, the letters never split (`TextKeyboard.splits`, `widthDp`).
 
+Glide typing (`keyboard/GlideInput`, held by `TextKeyboard` and `T9Keyboard`): it sees every touch
+before the keys (`dispatch`), `GlideGesture` deciding when a finger glides; as a glide starts the keys
+are cancelled (their preview and swipe with them), other fingers are swallowed until all lift, and on
+the lift the path, in key widths over the letters, goes out as `KeyAction.GlideAction`, which
+`CommonKeyActionListener` hands to `FcitxAPI.offerGlide` (the engine's side: specs/engine.md).
+
 ### Hardware keyboard
 
 A key pressed on one hides the touch keyboard and shows candidates by the cursor; a tap on the field

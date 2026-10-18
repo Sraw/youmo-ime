@@ -91,7 +91,9 @@ The engine also reads the editor: on a field focused or the cursor moved, the se
 text before the cursor (`ContextReads`, gated by `FieldPolicy`: nothing from a password or a field
 that asks not to be learned from) and sends it as `Action.Context`, so the language model and the
 sentence models score what follows it. `ContextMemory` keeps the end of what was written in a chat
-box that clears itself, for the reply typed next.
+box that clears itself, for the reply typed next; told as `Action.Context.cleared` (`FieldPolicy.told`),
+as the field is empty: English scores after it but puts no glide's space after it, nor has a
+Backspace take any of it.
 
 Where the preedit shows is the input method's (`composesText` in `androidengine.cpp`, set as the
 input context's `setEnablePreedit` on activation and again at each event the engine sends; turned off as

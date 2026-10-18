@@ -61,7 +61,10 @@ one), `pinyin-context`, `pinyin-slips`, `pinyin-mixed`, `shuangpin-xiaohe`, `pre
 `english.txt`. Other commands: `predict` (联想), `english`, `learn` (what learning brings back and
 costs), `ksc` (keystrokes), `t9` (a set turned into digits, then read with `pinyin --scheme
 t9-strict`, as the app types it; `--presses fast` presses a key again as 连按 hands it on, `letters`
-spells each letter by 连按: the sets `Penalties.tapped` is measured on), `tune` (penalties), `score` (compare a result with a baseline);
+spells each letter by 连按: the sets `Penalties.tapped` is measured on), `english-glide` (glide
+typing on simulated paths, `--wobble` the key-width noise), `pinyin-glide` (the same per dictionary word
+of a pinyin set; `--shuangpin <scheme>`, `--keys nine`, `--table <table.data>`, `--word <pinyin>` one
+clean path's readings), `tune` (penalties), `score` (compare a result with a baseline);
 run `ime-eval` with no arguments for the full usage.
 
 Report top-1 (and the change in samples won and lost) on at least the main, web, chat and new sets,

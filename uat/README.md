@@ -12,11 +12,11 @@
 | 文件 | 范围 |
 |---|---|
 | [01-setup.md](01-setup.md) | 安装、向导、添加和排列输入法、切换输入法 |
-| [02-keyboard.md](02-keyboard.md) | 全键盘的每个键、长按、滑动、网址邮箱框、括号成对 |
+| [02-keyboard.md](02-keyboard.md) | 全键盘的每个键、长按、滑动、网址邮箱框、括号成对、滑行输入 |
 | [03-t9.md](03-t9.md) | 九键键盘和九键拼音 |
-| [04-panels.md](04-panels.md) | 数字键盘、符号面板、表情面板 |
-| [05-toolbar.md](05-toolbar.md) | 工具栏、文本编辑、剪贴板、状态面板 |
-| [06-pinyin.md](06-pinyin.md) | 全拼：整句、简拼、纠错、模糊音、中英混输、笔画、联想、长按候选、学词 |
+| [04-panels.md](04-panels.md) | 数字键盘、符号面板、表情面板、表情拼音搜索 |
+| [05-toolbar.md](05-toolbar.md) | 工具栏、文本编辑、剪贴板、状态面板、单手模式、悬浮键盘、计算结果 |
+| [06-pinyin.md](06-pinyin.md) | 全拼：整句、简拼、纠错、模糊音、中英混输、笔画、联想、长按候选、学词、拆字、表情候选、自带日期时间、滑行 |
 | [07-shuangpin.md](07-shuangpin.md) | 双拼 |
 | [08-english.md](08-english.md) | 英文 |
 | [09-handwriting.md](09-handwriting.md) | 手写 |
