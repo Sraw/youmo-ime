@@ -85,7 +85,9 @@ keeps its own, the model they follow.
   blocking undoes it, halving fades it. This is the one general rule for "my word should win";
   do not add per-case boosts or global penalties for it (both were tried and lost on the sets).
 - **Layers.** The dictionary has layers (`WordLayers`: the base from libime, `new` from
-  `lexicon/add.tsv` via the word pack, `latin`, imported dictionaries as base or new). `LayerPrior`
+  `lexicon/add.tsv` via the word pack, `latin`). Imported dictionaries are merged into the base only
+  (`ImportedDictionaries.migrate` moves those an older build listed in `.new-words` there and
+  deletes the list); the settings show the built-in new words as part of 基础词库. `LayerPrior`
   adds one learned log10 value per layer, moved by the user's picks within a bound.
 - **Coarse words** (`CoarseWords`, list `coarse.txt` beside it): never predicted, `PENALTY` lower in
   the decoder, a candidate with one goes past the first page, English never corrects to one. Once

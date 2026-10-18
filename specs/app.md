@@ -164,18 +164,27 @@ Two stores, deliberately:
    `data/prefs`: a `ManagedPreferenceCategory` (`AppPrefs.Keyboard`, `Candidates`, `Clipboard`,
    `Symbols`, `Advanced`; `ThemePrefs`) declares each preference with its UI in one line
    (`switch`, `int`, `enumList`, `twinInt`, `levels`). A page is a `ManagedPreferenceFragment` over
-   a category. These are what the keyboard reads.
+   a category, or one section of it (`createUi(group, section)`: 按键 and 声音与振动 are two
+   sections of `Keyboard`). These are what the keyboard reads.
 2. **fcitx config** of the input methods: the `androidengine` addon's options (C++,
    `androidengine.h`), read by the engine (`EngineSettings`). The pages for the app's own input
    methods are built by `InputMethodSettings` from a list of `Item`s (`Toggle`, `Choice`, `Flags`,
    `Page`, and `AppChoice`/`AppToggle` for the few app preferences that belong to one input method,
-   such as 九键's multi-tap or English's auto-caps), over `FcitxAPI.getImConfig`/`setImConfig`.
+   such as 九键's multi-tap or English's auto-caps, or to all of them on the shared page, such as
+   glide typing, paired brackets and replacing a sum), over `FcitxAPI.getImConfig`/`setImConfig`.
+   The options every input method shares are one `config_` in the addon, so they are on one page,
+   通用输入 (`InputMethodSettings.SHARED`, `SharedInputFragment`, saved through pinyin's config),
+   each saying which input methods it is no use to (`notFor`); 每页候选数 is on 实体键盘
+   (`HARDWARE_KEYBOARD`). A page saves only the paths it shows (`InputMethodSettings.only`), so one
+   left open behind another cannot write back the shared options it read before.
 
 Rules for settings, all decided:
 
-- **Few settings.** The home page is grouped by what the user wants to adjust (输入 / 词语 / 键盘与外观
-  / 剪贴板与表情 / 其他), each input method has its own page, fcitx's global options and addon list
-  are not shown. Before adding a setting, ask whether a good default would do.
+- **Few settings.** The home page is one flat list without headers, each row a title and a line of
+  what is in it (`MainFragment.HOME`: 输入法 / 通用输入 / 词库与短语 / 外观 / 按键 / 声音与振动 /
+  剪贴板与表情 / 实体键盘 / 备份与恢复 / 界面语言), each page's toolbar title is its row's; each
+  input method's page has only its own options under a first row to 通用输入; fcitx's global
+  options and addon list are not shown. Before adding a setting, ask whether a good default would do.
 - **One concept, one setting.** Do not split what the user sees as one thing into two knobs (the
   long-press character is the swipe character is the corner label).
 - **Levels over numbers.** Sizes, delays, vibration and volume are shown as a few named levels
