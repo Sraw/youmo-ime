@@ -61,11 +61,14 @@
 <div id="searched"></div>
 </form>
 
+<!-- one form: Chrome moves the focus on the input method's "next" only within a form -->
+<form id="nextform">
 <label for="next">下一项（回车键显示“下一项”）</label>
 <input id="next" type="text" enterkeyhint="next">
 
 <label for="nosuggest">不要提示（autocorrect=off spellcheck=false）</label>
 <input id="nosuggest" type="text" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+</form>
 
 <label for="long">长文本（用来测光标移动、选择，预先填好）</label>
 <textarea id="long">今天天气很好，我们一起去公园散步吧。The quick brown fox jumps over the lazy dog.</textarea>
@@ -77,10 +80,16 @@
     const only = location.hash.slice(1);
     const field = only && document.getElementById(only);
     document.body.classList.toggle('chat', only === 'chat');
+    // #next keeps the field after it, where its next action goes
+    const after = only === 'next' ? document.getElementById('nosuggest') : null;
+    const keeps = el => !field || el.contains(field) || el.htmlFor === only ||
+      (only === 'chat' && el.id === 'log') || (after && (el.contains(after) || el.htmlFor === 'nosuggest'));
     for (const el of document.body.children) {
       if (el.tagName === 'SCRIPT') continue;
-      const keep = !field || el.contains(field) || el.htmlFor === only || (only === 'chat' && el.id === 'log');
-      el.style.display = keep ? '' : 'none';
+      el.style.display = keeps(el) ? '' : 'none';
+    }
+    for (const el of document.getElementById('nextform').children) {
+      el.style.display = keeps(el) ? '' : 'none';
     }
   }
   filter();

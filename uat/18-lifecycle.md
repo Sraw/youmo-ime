@@ -54,7 +54,7 @@
 
 ### LC-11 [P1] 应用被系统杀掉后
 - **前提**：B0。
-- **操作**：`adb shell am force-stop io.github.sraw.youmo`；点「普通文本」框；打 n i h a o 空格。
+- **操作**：以 root 杀掉输入法进程（debug 包的进程名是 `io.github.sraw.youmo.debug`，发布包是 `io.github.sraw.youmo`；root 过的手机用 `adb shell su 0 sh -c 'kill -9 $(pidof io.github.sraw.youmo.debug)'`（Magisk 的 su 也接受 `su -c '…'`），redroid 用 `docker exec <容器> sh -c …`；手机没有 root 就记为 **阻塞**；系统回收内存时就是这样杀的。不要用 `am force-stop`：AOSP 在当前输入法被强行停止时会改用另一个已启用的输入法）；点「普通文本」框；打 n i h a o 空格。
 - **预期**：键盘重新弹出，能打出「你好」；设置和学到的词都还在。
 
 ### LC-12 [P1] 分屏（真机或平板）

@@ -73,9 +73,9 @@
 把应用恢复成刚装好的样子（不用卸载重装）：
 
 ```sh
-adb shell pm clear io.github.sraw.youmo
-adb shell ime enable io.github.sraw.youmo/org.fcitx.fcitx5.android.input.FcitxInputMethodService
-adb shell ime set io.github.sraw.youmo/org.fcitx.fcitx5.android.input.FcitxInputMethodService
+adb shell pm clear io.github.sraw.youmo.debug   # 测发布包时去掉 .debug，下同
+adb shell ime enable io.github.sraw.youmo.debug/org.fcitx.fcitx5.android.input.FcitxInputMethodService
+adb shell ime set io.github.sraw.youmo.debug/org.fcitx.fcitx5.android.input.FcitxInputMethodService
 ```
 
 `pm clear` 删掉应用的全部数据（设置、词、剪贴板、主题）。之后第一次弹出键盘时引擎要准备数据，
@@ -112,7 +112,64 @@ adb shell am start -a android.intent.action.VIEW -d http://127.0.0.1:8000/fields
 | 语音（12） | 真机，有麦克风，装语音版 |
 | 振动、按键音 | 真机 |
 
-redroid 没有浏览器，跑不了要测试页的测试；只适合不用测试页的少数几条（设置页面等）。
+redroid 里有浏览器"WebView Browser Tester"（`org.chromium.webview_shell`），测试页在它里面打开（`am start -a android.intent.action.VIEW -d <地址> -n org.chromium.webview_shell/.WebViewBrowserActivity`）。
+
+## 自动跑（redroid）
+
+`uat/tools/uat.py` 在 redroid 上照用例操作、读回结果；用例脚本在 `uat/scripts/<文件名>.py`，一个 .md 一个，
+**.md 仍是准绳**：脚本照前提/操作/预期做，做不到就记"阻塞"并写原因，不放宽预期。每个 .md 都有脚本；
+12（语音）、17（实体键盘）在 redroid 上整份记"跳过"（用例的 `needs="emu:…"`，不先重置；语音版才有的用例在文字版上
+也记"跳过"，`needs="voice:…"`），它们在模拟器上跑（见下面"自动跑（模拟器）"）；其余各份里 redroid 做不到的几条也是（分屏、无痕标签页、
+密码管理器、振动和按键音、语音版安装、发版升级）。横屏是把屏幕改成 2340×1080（851 dp，`Device.rotate`），
+redroid 的显示不会真的转。手写用 `scripts/hw_strokes.py` 里的笔画在书写板上画字。装包时比较设备上的 APK
+和 `app/build/outputs` 里最新的那个（同一个版本号会重新构建），不同就重装。
+
+```sh
+BUILD_ABI=x86_64 ./gradlew :app:assembleTextDebug   # 没有 debug 包时（运行器只要 x86_64）
+uat/tools/uat.py up                         # 第二台 youmo-redroid2（127.0.0.1:5557）；第一台是 youmo-redroid（5556）
+uat/tools/uat.py run [--areas 14,06] [--ids PY-01,ST-02] [--devices 5556,5557]
+uat/tools/uat.py mark <run> <编号> 通过|失败 [看到了什么]     # 看过拼图后
+uat/tools/uat.py down                       # 用完关掉第二台
+```
+
+## 自动跑（模拟器）
+
+实体键盘（17）和语音（12）在模拟器上跑：`uat.py emu-up` 起无界面模拟器（端口 5554，Xvfb；语音要宿主机
+PulseAudio 的虚拟音源，语音片段先用 `uat/tools/voice-clips.py` 合成），跑完 `uat.py emu-down`。模拟器单独跑，
+不和 redroid 同一次（`run` 会拒绝）。`--flavor` 要和装的包一致：运行器把它传给用例，文字版上语音用例记"跳过"。
+
+```sh
+BUILD_ABI=x86_64 ./gradlew :app:assembleVoiceDebug   # 语音版
+uat/tools/uat.py emu-up
+uat/tools/uat.py run --devices 5554 --areas 17                  # 实体键盘，文字版
+uat/tools/uat.py run --devices 5554 --flavor voice --areas 12   # 语音
+uat/tools/uat.py emu-down
+```
+
+- **分组**：同一基线（和同一页面）的用例是一组，基线只到一次。组里先跑不改状态的，再跑只因上屏而学词的，
+  最后跑改设置、改词的；改过状态的用例之后、下一条之前才重置（`pm clear` 再到基线）。要"没学过词"的用例
+  （`clean=True`）前面若有上屏过的，也先重置。
+- **机器判断**：框里的字、候选、拼音行（光标画成 `|`）、设置页的文字和开关、弹出的字符、键的位置大小、
+  键盘亮度，都从界面树（每台设备上常驻的 `Dumper.java`，一次约 0.1 s）和截图像素读回来判断。
+- **拼图**：只有预期要靠眼睛看的用例（`visual=True`）截图，裁到相关区域、缩小，每组拼成一张
+  `dev/uat-out/<run>/sheet-<组>.png`，每格写编号和预期原文。这些用例记为"待看图"，看过后用 `mark` 改。
+- **两台并行**：两台设备各取一组；没组可取的设备把别组末尾要重置的用例分走一半。结果自动写进
+  `uat/runs/<日期>-redroid-<版本>.md`。
+- 设备上只用 `adb shell input`、uiautomator 接口、am/pm/ime/settings；**不造 uinput 设备**。
+
+### 用代理看拼图
+
+要让代理看拼图时，为了让各代理共用提示缓存：每个代理的**启动提示一字不差**，共同的说明放在一个文件里先读
+（[`tools/sheet-review.md`](tools/sheet-review.md)），只有最后一行写各自的拼图路径；同一批用同一种代理。
+例如：
+
+```
+读 uat/tools/sheet-review.md 并照做。
+拼图：dev/uat-out/<run>/sheet-B0-text.png
+```
+
+`uat.py` 自己的输出也只给数量和路径（每条一行 `<标记> <编号> <结果>`，最后两行汇总），不打印界面树，
+免得调用它的代理每一轮都重读一大段。
 
 ## 记录结果
 
