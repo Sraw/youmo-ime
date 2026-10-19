@@ -154,6 +154,51 @@ class KeyboardTest {
     }
 
     @Test
+    fun aKeypadDigitIsNeverANineKeysKeyWithNothingTypedItIsTheApps() {
+        // the number keyboard's 2 on the nine keys: the digit typed, not abc
+        val nine = FakeSession(nineKeys = true)
+        val keyboard = Keyboard(nine, nineKeys = true)
+        for (c in "2390") assertFalse(keyboard.onEvent(EngineEvent.KEYPAD, c.code).handled)
+        assertTrue(nine.actions.none { it is Action.Key || it is Action.Select })
+    }
+
+    @Test
+    fun aKeypadDigitPicksWhileComposingAsPinyinsDigitDoes() {
+        val nine = FakeSession(nineKeys = true)
+        val keyboard = Keyboard(nine, nineKeys = true)
+        keyboard.onEvent(EngineEvent.CHAR, '6'.code)
+        keyboard.onEvent(EngineEvent.CHAR, '4'.code)
+        val s = keyboard.onEvent(EngineEvent.KEYPAD, '2'.code)
+        assertTrue(s.handled)
+        assertEquals("6!", s.commit)
+        assertEquals(listOf(Action.Key('6'), Action.Key('4'), Action.Select(1)), nine.actions)
+        // and a table whose codes are digits: KP_2 is no code either
+        val digits = FakeSession(nineKeys = true)
+        val table = Keyboard(digits, nineKeys = false)
+        table.onEvent(EngineEvent.CHAR, '2'.code)
+        table.onEvent(EngineEvent.KEYPAD, '1'.code)
+        assertEquals(listOf(Action.Key('2'), Action.Select(0)), digits.actions)
+    }
+
+    @Test
+    fun aKeypadDigitEndsAnOfferOfWhatMayFollowAndIsTheApps() {
+        val nine = FakeSession(nineKeys = true)
+        val keyboard = Keyboard(nine, nineKeys = true)
+        keyboard.onEvent(EngineEvent.CHAR, '6'.code)
+        assertTrue(keyboard.onEvent(EngineEvent.CHAR, ' '.code).predicting)
+        val s = keyboard.onEvent(EngineEvent.KEYPAD, '5'.code)
+        assertFalse(s.handled)
+        assertFalse(s.predicting)
+    }
+
+    @Test
+    fun aKeypadMarkGoesAsTheKeyboardsOwn() {
+        val s = keyboard.onEvent(EngineEvent.KEYPAD, '.'.code)
+        assertFalse(s.handled)
+        assertEquals(listOf<Action>(Action.Key('.')), session.actions)
+    }
+
+    @Test
     fun lettersTheSessionReadsAreTyped() {
         type("ni")
         val s = char('h')

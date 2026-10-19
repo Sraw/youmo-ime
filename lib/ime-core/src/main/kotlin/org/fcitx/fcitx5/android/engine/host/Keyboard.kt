@@ -54,6 +54,13 @@ object EngineEvent {
      * put away, the text before the cursor as it was.
      */
     const val TYPED = 15
+
+    /**
+     * A keypad's character (KP_2, KP_Decimal): the number keyboard's keys, a digit swiped or
+     * long-pressed off a letter. The argument is its code point. Never a key the session types
+     * with: on the nine keys 2 is abc, KP_2 is 2.
+     */
+    const val KEYPAD = 16
 }
 
 /**
@@ -89,6 +96,7 @@ class Keyboard(private val session: Session, private val nineKeys: Boolean) {
         session.learning = learning
         shown = when (event) {
             EngineEvent.CHAR -> char(arg)
+            EngineEvent.KEYPAD -> keypad(arg)
             EngineEvent.BACKSPACE -> session.apply(Action.Backspace)
             EngineEvent.ENTER, EngineEvent.PAGE_UP, EngineEvent.PAGE_DOWN, EngineEvent.CURSOR, EngineEvent.OTHER -> whileComposing(event, arg)
             // the nine keys' 重输 is Escape: with nothing typed, nothing to start over, not the app's
@@ -146,6 +154,16 @@ class Keyboard(private val session: Session, private val nineKeys: Boolean) {
             composing && digit != null -> session.apply(Action.Select((digit + DIGITS - 1) % DIGITS))
             else -> session.apply(Action.Key(c)).copy(handled = false)
         }
+    }
+
+    // a keypad's digit is never a key the session types with (the nine keys' 2, a table's code):
+    // as pinyin has any digit, it picks the candidate it numbers while something is typed, and is
+    // the app's otherwise. English reads it as it reads any digit; the keypad's other characters
+    // (. + =) go as the keyboard's own do
+    private fun keypad(codePoint: Int): Snapshot {
+        val digit = codePoint - '0'.code
+        if (english || digit !in 0 until DIGITS) return char(codePoint)
+        return if (composing) session.apply(Action.Select((digit + DIGITS - 1) % DIGITS)) else passOn()
     }
 
     // keys the session takes while something is typed, the app's otherwise

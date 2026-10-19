@@ -53,16 +53,17 @@ import splitties.views.existingOrNewId
  * Pinyin on nine keys (九键), laid out as 搜狗 does: a column on the left offering what the first
  * digits not yet taken may be (the engine's [EngineBridge.t9] syllables), or punctuation while
  * nothing is typed; 1 is the separator (分词) while something is typed, else punctuation
- * (，。？！, pressed again soon the next in place of the last, as a digit key's letters; its long
+ * (，。？！, with 连按 on pressed again soon the next in place of the last, as a digit key's letters; its long
  * press more); backspace, start over (重输) and 0 on the right; symbols, numbers, space, the
- * language switch and return below. Swiping a digit key, 1 too, types the digit itself.
+ * language switch and return below. Swiping a digit key, 1 too, types the digit itself (picks its
+ * candidate while typing, as the number keyboard's digits do).
  *
  * A syllable is sent to the engine as a character of [Keyboard.SYLLABLES], saying which of
  * which list it is ([Keyboard.syllableKey]).
  *
- * A digit key pressed again soon may be its next letter ([MultiTap], as [AppPrefs.Keyboard.t9MultiTap]
- * sets), sent as a character of [Keyboard.LETTERS] ([Keyboard.letterKey]), which the engine reads
- * as a press of its own, the run as keys or as that letter; its preview shows the letter. Its long press offers the digit and its letters, a letter chosen
+ * A digit key pressed again soon is its next letter ([MultiTap], as [AppPrefs.Keyboard.t9MultiTap]
+ * sets; off by default), sent as a character of [Keyboard.LETTERS] ([Keyboard.letterKey]), which
+ * the engine puts in as that letter typed as itself and nothing else; its preview shows the letter. Its long press offers the digit and its letters, a letter chosen
  * typed as itself after what is typed.
  *
  * A glide across the digit keys ([GlideInput], the setting on) is read as full pinyin's, each
@@ -115,11 +116,14 @@ class T9Keyboard(
                 KeyAction.CommitAction(PUNCTUATION[i])
             }
 
+        /** A digit as a keypad's, as the number keyboard's: typed, or its candidate picked while typing (EngineEvent.KEYPAD). */
+        private fun keypad(digit: Char) = KeyAction.SymAction(KeySym(FcitxKeyMapping.FcitxKey_KP_0 + (digit - '0')), KeyStates.Virtual)
+
         private fun digitKey(digit: Char, letters: String) = KeyDef(
             KeyDef.Appearance.AltText(displayText = letters, altText = digit.toString(), textSize = 20f, percentWidth = DIGIT),
             setOf(
                 KeyDef.Behavior.Press(KeyAction.FcitxKeyAction(digit.toString())),
-                KeyDef.Behavior.Swipe(KeyAction.CommitAction(digit.toString())),
+                KeyDef.Behavior.Swipe(keypad(digit)),
             ),
             arrayOf(
                 KeyDef.Popup.AltPreview(letters, digit.toString()),
@@ -148,6 +152,12 @@ class T9Keyboard(
                 val last = ONE[(ONE.indexOf(next) + ONE.length - 1) % ONE.length]
                 return KeyAction.CommitAction(next.toString(), replacing = last.toString())
             }
+            if (source == KeyActionListener.Source.Popup && key != null && key in '0'..'9') {
+                tap.reset()
+                // the digit itself, a keypad's as the number keyboard's: never read as a key, typed
+                // with nothing typed, while typing it picks its candidate (EngineEvent.KEYPAD)
+                return keypad(key)
+            }
             if (source == KeyActionListener.Source.Popup && key != null && key.toString() in ONE_MORE) {
                 tap.reset()
                 // as it is: through the engine . would be 。
@@ -159,8 +169,7 @@ class T9Keyboard(
             }
             if (source == KeyActionListener.Source.Popup) {
                 tap.reset()
-                // the digit itself, as the swipe types it, not a key
-                return if (key in '2'..'9') KeyAction.CommitAction(key.toString()) else letter(key, again = false)
+                return letter(key, again = false)
             }
             if (key !in '2'..'9') return action
             val letter = tap.press(key, letters.letters(key), time) ?: return action
@@ -187,7 +196,7 @@ class T9Keyboard(
                     KeyDef.Appearance.AltText(displayText = ONE, altText = "1", textSize = 16f, percentWidth = DIGIT),
                     setOf(
                         KeyDef.Behavior.Press(KeyAction.FcitxKeyAction("1")),
-                        KeyDef.Behavior.Swipe(KeyAction.CommitAction("1")),
+                        KeyDef.Behavior.Swipe(keypad('1')),
                     ),
                     arrayOf(KeyDef.Popup.Keyboard.Explicit(ONE_MORE.toTypedArray())),
                 ),

@@ -15,6 +15,7 @@ import androidx.lifecycle.LifecycleRegistry
 import androidx.lifecycle.setViewTreeLifecycleOwner
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.core.EngineBridge
+import org.fcitx.fcitx5.android.core.FcitxKeyMapping
 import org.fcitx.fcitx5.android.core.KeyStates
 import org.fcitx.fcitx5.android.core.KeySym
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
@@ -24,6 +25,7 @@ import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
 import org.fcitx.fcitx5.android.input.popup.PopupAction
 import org.fcitx.fcitx5.android.input.popup.PopupActionListener
 import org.fcitx.fcitx5.android.ui.main.settings.PlaceholderStrings
+import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -98,7 +100,9 @@ class T9KeyboardTest {
         val tap = MultiTap(600)
         val popup = KeyActionListener.Source.Popup
         assertEquals(letter('g', again = false), T9Keyboard.resolve(KeyAction.FcitxKeyAction("g"), popup, tap, 0))
-        assertEquals(KeyAction.CommitAction("4"), T9Keyboard.resolve(KeyAction.FcitxKeyAction("4"), popup, tap, 10))
+        // the digit a keypad's: typed as it is, or its candidate picked while typing, never the GHI key
+        assertEquals(keypad(4), T9Keyboard.resolve(KeyAction.FcitxKeyAction("4"), popup, tap, 10))
+        assertEquals(keypad(1), T9Keyboard.resolve(KeyAction.FcitxKeyAction("1"), popup, tap, 15, composing = true))
         // and the next press is a key of its own
         assertEquals(KeyAction.FcitxKeyAction("4"), T9Keyboard.resolve(KeyAction.FcitxKeyAction("4"), KeyActionListener.Source.Keyboard, tap, 20))
     }
@@ -129,6 +133,19 @@ class T9KeyboardTest {
         }
         assertEquals(listOf("…", "：", "；", "~", ".", "-", "@", "、", "“", "”"), T9Keyboard.ONE_MORE)
     }
+
+    @Test
+    fun swipingADigitKeySendsItsKeypadDigit() {
+        // a keypad's, as the number keyboard's: its candidate picked while typing, not committed after it
+        fun swipe(row: Int, digit: String) = T9Keyboard.layout(NineKeyLetters.STANDARD)[row]
+            .first { (it.appearance as? KeyDef.Appearance.AltText)?.altText == digit }
+            .behaviors.filterIsInstance<KeyDef.Behavior.Swipe>().single().action
+        assertEquals(keypad(1), swipe(0, "1"))
+        assertEquals(keypad(2), swipe(0, "2"))
+        assertEquals(keypad(9), swipe(2, "9"))
+    }
+
+    private fun keypad(d: Int) = KeyAction.SymAction(KeySym(FcitxKeyMapping.FcitxKey_KP_0 + d), KeyStates.Virtual)
 
     private fun letter(c: Char, again: Boolean) =
         KeyAction.SymAction(KeySym(0x01000000 + Keyboard.letterKey(c, again)), KeyStates.Virtual)
@@ -192,18 +209,28 @@ class T9KeyboardTest {
         override val lifecycle = LifecycleRegistry(this)
     }
 
+    // 连按 is off by default; [keyboard] sets it on for the tests of it
+    @After
+    fun multiTapAtItsDefault() {
+        AppPrefs.getInstance().keyboard.t9MultiTap.let { it.setValue(it.defaultValue) }
+    }
+
     /**
-     * A keyboard of [letters] out of a window, what it sends put in [sent] and what it previews in
-     * [previews]. The clock stands still here: every press is within the multi-tap timeout of the last.
+     * A keyboard of [letters] out of a window, 连按 at [multiTap], what it sends put in [sent] and what
+     * it previews in [previews]. The clock stands still here: every press is within the multi-tap timeout of the last.
      */
     private fun keyboard(
         sent: MutableList<KeyAction>,
         previews: MutableList<PopupAction> = ArrayList(),
         letters: NineKeyLetters = NineKeyLetters.STANDARD,
-    ) = T9Keyboard(PlaceholderStrings(RuntimeEnvironment.getApplication()), ThemePreset.PixelDark, letters).apply {
-        setViewTreeLifecycleOwner(Owner())
-        keyActionListener = KeyActionListener { action, _ -> sent += action }
-        popupActionListener = PopupActionListener { previews += it }
+        multiTap: T9MultiTap = T9MultiTap.Medium,
+    ): T9Keyboard {
+        AppPrefs.getInstance().keyboard.t9MultiTap.setValue(multiTap)
+        return T9Keyboard(PlaceholderStrings(RuntimeEnvironment.getApplication()), ThemePreset.PixelDark, letters).apply {
+            setViewTreeLifecycleOwner(Owner())
+            keyActionListener = KeyActionListener { action, _ -> sent += action }
+            popupActionListener = PopupActionListener { previews += it }
+        }
     }
 
     /** The key of [digit], as drawn in its corner. */
@@ -285,24 +312,19 @@ class T9KeyboardTest {
 
     @Test
     @Config(application = FcitxApplication::class)
-    fun withMultiTapOffADigitAndOneAreAKeyEachPress() {
-        val multiTap = AppPrefs.getInstance().keyboard.t9MultiTap
-        val was = multiTap.getValue()
-        multiTap.setValue(T9MultiTap.Off)
-        try {
-            val sent = ArrayList<KeyAction>()
-            val previews = ArrayList<PopupAction>()
-            val keyboard = keyboard(sent, previews)
-            keyboard.key('1').performClick()
-            keyboard.key('1').performClick()
-            tap(keyboard.key('4'))
-            tap(keyboard.key('4'))
-            val four = KeyAction.FcitxKeyAction("4")
-            // 1's punctuation too: two quick presses are two ，, the rest picked from the column
-            assertEquals(listOf(KeyAction.CommitAction("，"), KeyAction.CommitAction("，"), four, four), sent)
-            assertEquals(listOf("GHI", "GHI"), previews.filterIsInstance<PopupAction.PreviewAction>().map { it.content })
-        } finally {
-            multiTap.setValue(was)
-        }
+    fun withMultiTapOffTheDefaultADigitAndOneAreAKeyEachPress() {
+        // off by default (2026-10-19): a quick 4 4 is two keys, gg/gh/hh… for the model to weigh
+        assertEquals(T9MultiTap.Off, AppPrefs.getInstance().keyboard.t9MultiTap.defaultValue)
+        val sent = ArrayList<KeyAction>()
+        val previews = ArrayList<PopupAction>()
+        val keyboard = keyboard(sent, previews, multiTap = T9MultiTap.Off)
+        keyboard.key('1').performClick()
+        keyboard.key('1').performClick()
+        tap(keyboard.key('4'))
+        tap(keyboard.key('4'))
+        val four = KeyAction.FcitxKeyAction("4")
+        // 1's punctuation too: two quick presses are two ，, the rest picked from the column
+        assertEquals(listOf(KeyAction.CommitAction("，"), KeyAction.CommitAction("，"), four, four), sent)
+        assertEquals(listOf("GHI", "GHI"), previews.filterIsInstance<PopupAction.PreviewAction>().map { it.content })
     }
 }

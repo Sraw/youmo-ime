@@ -642,7 +642,8 @@ void AndroidEngine::keyEvent(const InputMethodEntry &entry, KeyEvent &event) {
             // a control character (Tab, a line feed, Delete) is a key like an arrow: the session
             // keeps it while composing, the app gets it otherwise
             if (unicode >= 0x20 && unicode != 0x7f) {
-                what = EngineEvent::Char;
+                // a keypad's is told apart: the nine keys read 2 as abc, which KP_2 is not
+                what = key.isKeyPad() ? EngineEvent::Keypad : EngineEvent::Char;
                 arg = static_cast<int>(unicode);
             } else {
                 what = EngineEvent::Other;
