@@ -78,6 +78,14 @@ class HandwritingDecoder(
     // best first, as sortByDescending had them, without boxing each score compared
     private val byScore = Comparator<State> { a, b -> b.score.compareTo(a.score) }
 
+    /**
+     * Whether [word], as [decode] read it, has the only reading it could: a word of several
+     * characters, read as the dictionary or the user has it, or a character of one reading. A
+     * character of several (行) is read as the likeliest, a guess.
+     */
+    fun sure(word: Entry): Boolean =
+        word.text.codePointCount(0, word.text.length) > 1 || readings()[word.text.codePointAt(0)]?.size == 1
+
     fun decode(positions: List<InkReading>, prev2: Int = NO_WORD, prev: Int = NO_WORD): Decoding {
         val n = positions.size
         if (n == 0) return Decoding(emptyList())

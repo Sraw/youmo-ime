@@ -39,9 +39,10 @@ import org.fcitx.fcitx5.android.engine.user.UserModel.Entry
  * The sentence goes on from the text before the cursor ([Action.Context]) and what was put in
  * since, read as words by [words].
  *
- * A sentence picked other than the first, while [learning], is learned by [user], its words as the
- * decoder read them, after the word put in before it: the user chose it over what the ink read
- * best. The first, put in by space, enter or a tap alike, is not: the readings are often wrong,
+ * A sentence picked other than the first, while [learning], is learned by [user], after the word
+ * put in before it: the user chose it over what the ink read best. Of several words, at most
+ * [UserModel.MAX_PHRASE] characters, it is one phrase, as pinyin learns a pick it corrected, where
+ * each word's reading is sure ([HandwritingDecoder.sure]); else its words as the decoder read them. The first, put in by space, enter or a tap alike, is not: the readings are often wrong,
  * and one not noticed, learned, would come back. Nor is the layer prior (LayerPrior.learn), as
  * pinyin's picks teach it: a pick here puts the ink right, it says nothing of a word's layer.
  * The word before is the one put in, learned or not (a first sentence's last): the pick after
@@ -299,9 +300,16 @@ class HandwritingSession(
     private fun pick(index: Int, offer: Boolean = true): Snapshot {
         if (written.isEmpty()) return pickPrediction(index)
         val sentence = sentences.getOrNull(index) ?: return snapshot(handled = true)
-        // after the word put in before it, as pinyin learns what is picked: it comes up after that word again
-        if (index > 0 && learning) sentence.words?.let { user?.learn(predictions.lastEntry, it) }
-        predictions.wrote(sentence.text, sentence.words?.lastOrNull())
+        // after the word put in before it, as pinyin learns what is picked: it comes up after that word
+        // again; words of several, short enough, as one phrase (the user corrected the reading to get it),
+        // if each word's reading is sure: a character of several readings (行, 长) read as the decoder
+        // guessed would make a word pinyin offers at the wrong reading and lacks at the right one
+        val words = sentence.words?.let { w ->
+            val sure = index > 0 && w.size > 1 && w.all { decoder?.sure(it) == true }
+            (if (sure) UserModel.phrase(sentence.text, w)?.let(::listOf) else null) ?: w
+        }
+        if (index > 0 && learning) words?.let { user?.learn(predictions.lastEntry, it) }
+        predictions.wrote(sentence.text, words?.lastOrNull())
         ended = maxOf(ended, written.last().piece)
         written.clear()
         sentences = emptyList()

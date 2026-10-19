@@ -226,9 +226,12 @@ class EnglishGlideTest {
         assertEquals("", EnglishSession(null).glided("the").commit)
     }
 
-    /** Nothing before known but a letter (a field not learned from): the data's sentence-start capital is not the word's. */
+    /**
+     * A glide gets a capital only where Shift gives one, as a word tapped: the data's sentence-start
+     * "Hello" is "hello" wherever the cursor is (a field that asks for capitals has Shift on there).
+     */
     @Test
-    fun aGlideAfterALetterInAFieldNotLearnedHasNoSentencesCapital() {
+    fun aGlideHasACapitalOnlyWhereShiftGivesOne() {
         val b = EnglishDataBuilder().unigram("<unk>", -7f, 0f).unigram(EnglishText.START, -9f, -0.5f)
         // as the web's text has it: Hello at a sentence's start more often than hello inside one
         b.unigram("Hello", -2.5f, 0f).unigram("hello", -3.0f, 0f).unigram("help", -3.4f, 0f)
@@ -236,15 +239,15 @@ class EnglishGlideTest {
         s.learning = false
         s.apply(Action.Context("c"))
         assertEquals(" hello ", s.glided("hello").commit)
-        // a sentence ended before it: as the data has it
+        // a sentence ended before it: still Shift's to give
         s.apply(Action.Context("."))
-        assertEquals(" Hello ", s.glided("hello").commit)
+        assertEquals(" hello ", s.glided("hello").commit)
         // Shift's capital still the user's
         s.apply(Action.Context("c"))
         assertEquals(" Hello ", s.glided("hello", shift = true).commit)
         // the spaces after the char looked past: a full stop's, then a letter's
         s.apply(Action.Context(". "))
-        assertEquals("Hello ", s.glided("hello").commit)
+        assertEquals("hello ", s.glided("hello").commit)
         s.apply(Action.Context("c "))
         assertEquals("hello ", s.glided("hello").commit)
         // more spaces than the context holds: the char before them still kept
@@ -252,37 +255,61 @@ class EnglishGlideTest {
         assertEquals("hello ", s.glided("hello").commit)
         // an ellipsis and a line break end a sentence as a full stop does
         s.apply(Action.Context("Wait… "))
-        assertEquals("Hello ", s.glided("hello").commit)
+        assertEquals("hello ", s.glided("hello").commit)
         s.apply(Action.Context("Hi\n"))
-        assertEquals("Hello ", s.glided("hello").commit)
+        assertEquals("hello ", s.glided("hello").commit)
         s.apply(Action.Context("Hi \r\n "))
-        assertEquals("Hello ", s.glided("hello").commit)
+        assertEquals("hello ", s.glided("hello").commit)
         // a no-break space after a full stop is a space too; an abbreviation's stop ends no sentence
         s.apply(Action.Context("Hi.\u00A0"))
-        assertEquals("Hello ", s.glided("hello").commit)
+        assertEquals("hello ", s.glided("hello").commit)
         s.apply(Action.Context("Mr. "))
         assertEquals("hello ", s.glided("hello").commit)
+        // the field's capital at a sentence's start comes as Shift
+        s.apply(Action.Context(". "))
+        assertEquals("Hello ", s.glided("hello", shift = true).commit)
     }
 
-    /** Learning, the decoder reads a sentence's start after a no-break space as endsSentence does: Hello only after <s>. */
+    /** A word whose own form has a capital (a name the data has only so, iPhone) keeps it, wherever glided. */
     @Test
-    fun aGlideAfterANoBreakSpaceInALearnedFieldStartsASentence() {
+    fun aGlidedNameKeepsItsOwnCapital() {
         val b = EnglishDataBuilder().unigram("<unk>", -7f, 0f).unigram(EnglishText.START, -9f, -0.5f)
-        b.unigram("hello", -2.5f, 0f).unigram("Hello", -3.0f, 0f).unigram("help", -3.4f, 0f)
-        b.bigram(EnglishText.START, "Hello", -0.5f, 0f)
+        b.unigram("London", -2.5f, 0f).unigram("iPhone", -2.5f, 0f).unigram("help", -3.4f, 0f)
         val s = EnglishSession(EnglishData.load(ByteBuffer.wrap(b.build().toByteArray())))
-        s.apply(Action.Context("Hi.\u00A0"))
-        assertEquals("Hello ", s.glided("hello").commit)
-        s.apply(Action.Context("Mr.\u00A0"))
-        assertEquals("hello ", s.glided("hello").commit)
+        s.learning = false
+        s.apply(Action.Context(""))
+        assertEquals("London ", s.glided("london").commit)
+        s.apply(Action.Context("abc "))
+        assertEquals("London ", s.glided("london").commit)
+        assertEquals("iPhone ", s.glided("iphone").commit)
+    }
+
+    /** A glided i and i'm are I and I'm, as tapped ones commit, though the data has them lower-case too. */
+    @Test
+    fun aGlidedIIsACapitalAsTapped() {
+        val b = EnglishDataBuilder().unigram("<unk>", -7f, 0f).unigram(EnglishText.START, -9f, -0.5f)
+        b.unigram("i", -1.5f, 0f).unigram("I", -2.0f, 0f).unigram("i'm", -2.5f, 0f).unigram("I'm", -3.0f, 0f).unigram("in", -3.5f, 0f)
+        val s = EnglishSession(EnglishData.load(ByteBuffer.wrap(b.build().toByteArray())))
+        s.learning = false
+        s.apply(Action.Context("so "))
+        val shown = s.glided("im")
+        assertEquals("I'm ", shown.commit)
+        assertFalse(shown.candidates.any { it == "i'm" || it == "i" })
+        // only i and i'...: in, mid-sentence, stays lower-case (F2472)
+        val inWord = s.glided("in")
+        assertTrue("in" in inWord.candidates + inWord.commit.orEmpty().trim())
+        assertFalse(inWord.candidates.any { it == "In" })
+        assertFalse("committed ${inWord.commit}", inWord.commit == "In ")
     }
 
     /**
      * The app's Backspace keeps what is known where the code point taken and the char left are
      * plain; where either may belong to a cluster an editor takes otherwise, nothing is known.
+     * Either way a glide after it has no space before (a space is left) and no capital Shift did
+     * not give: what this holds is that no cut cluster makes the session space or case otherwise.
      */
     @Test
-    fun theAppsBackspaceForgetsTheTextWhereAClusterMayBeCut() {
+    fun aGlideAfterTheAppsBackspaceIsSpacedAndCasedAlike() {
         val b = EnglishDataBuilder().unigram("<unk>", -7f, 0f).unigram(EnglishText.START, -9f, -0.5f)
         b.unigram("Hello", -2.5f, 0f).unigram("hello", -3.0f, 0f).unigram("help", -3.4f, 0f)
         val data = EnglishData.load(ByteBuffer.wrap(b.build().toByteArray()))
@@ -296,12 +323,12 @@ class EnglishGlideTest {
         assertEquals("hello ", glidedAfter("ab c d"))
         assertEquals("hello ", glidedAfter("ab ce\u0301 d"))
         // an accent taken, a variation selector left, an emoji taken, a flag left, a ZWJ left:
-        // nothing known, the data's sentence-start capital
-        assertEquals("Hello ", glidedAfter("ab c e\u0301"))
-        assertEquals("Hello ", glidedAfter("ab c \u2764\uFE0Fd"))
-        assertEquals("Hello ", glidedAfter("ab c \uD83D\uDC4B"))
-        assertEquals("Hello ", glidedAfter("ab c \uD83C\uDDEF\uD83C\uDDF5d"))
-        assertEquals("Hello ", glidedAfter("ab \uD83D\uDC68\u200D\uD83D\uDC69"))
+        // nothing known, still no capital Shift did not give
+        assertEquals("hello ", glidedAfter("ab c e\u0301"))
+        assertEquals("hello ", glidedAfter("ab c \u2764\uFE0Fd"))
+        assertEquals("hello ", glidedAfter("ab c \uD83D\uDC4B"))
+        assertEquals("hello ", glidedAfter("ab c \uD83C\uDDEF\uD83C\uDDF5d"))
+        assertEquals("hello ", glidedAfter("ab \uD83D\uDC68\u200D\uD83D\uDC69"))
     }
 
     /** What the app typed itself (a key where English suggests nothing) is the end of the text before the cursor, to space and case a glide after it by. */
@@ -314,11 +341,11 @@ class EnglishGlideTest {
         // nothing known before: a word's tail perhaps, so only the char counts
         s.typed("c")
         assertEquals(" hello ", s.glided("hello").commit)
-        // anew: the hello just glided is learned, and would outrank the data's Hello
+        // anew: the hello just glided is learned
         s = EnglishSession(data)
         s.typed(".")
         s.typed(" ")
-        assertEquals("Hello ", s.glided("hello").commit)
+        assertEquals("hello ", s.glided("hello").commit)
         // a field not learned from: the same, from the edge alone (anew, the Hello above learned)
         s = EnglishSession(data)
         s.learning = false
@@ -337,8 +364,8 @@ class EnglishGlideTest {
         s.apply(Action.Context("Hi"))
         s.typed(".")
         s.typed(" ")
-        assertEquals("Hello ", s.glided("hello").commit)
-        // anew, the hello learned above not to outrank the data's Hello
+        assertEquals("hello ", s.glided("hello").commit)
+        // anew, nothing learned above
         s = EnglishSession(data)
         s.apply(Action.Context("abc"))
         s.typed(" ")

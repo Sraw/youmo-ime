@@ -222,13 +222,7 @@ class EnglishSession(
         // what is before the cursor once the word is ended, as wrote would keep it
         val ahead = if (learning) recent + ending + space else recent
         val context = EnglishText.context(ahead, start = known && !cut)
-        // inside a sentence, the data's capital of a sentence's start is not the word's ("abc Hello" as
-        // "abc hello"; a word unknown before it backs off to the unigram, Hello likelier): words
-        // before it known, or nothing known but a char that ends no sentence, past the spaces after
-        // it (a field not learned from); after "Hi. ", "Wait… " or a line break the capital stays
-        val inside = context != listOf(EnglishText.START) &&
-            (context.isNotEmpty() || recent.ifEmpty { edge }.let { it.isNotBlank() && !EnglishText.endsSentence(it) })
-        val words = glideWords(glide, context, inside)
+        val words = glideWords(glide, context)
         val word = words.firstOrNull() ?: return snapshot()
         val ended = if (ending.isNotEmpty()) key(' ').commit else ""
         val before = edge
@@ -246,7 +240,7 @@ class EnglishSession(
     }
 
     // the words [glide] may be after [before], best first, in the keyboard's case: the data's and the user's own
-    private fun glideWords(glide: Glide, before: List<String>, inside: Boolean = false): List<String> {
+    private fun glideWords(glide: Glide, before: List<String>): List<String> {
         val data = checkNotNull(data)
         val context = checkNotNull(decoder).context(before)
         scoredPrev = previous(before)
@@ -255,7 +249,11 @@ class EnglishSession(
             .map { data.word(it.word) to it.score }
         return (found + ownGlided(data, glide, scoredPrev))
             .sortedByDescending { it.second }
-            .map { (w, _) -> if (inside) inSentence(w, first = true) else w }
+            // a capital only where Shift gives one, as typing: the data's sentence-start "Hello" is
+            // "hello" (a field that asks for capitals has Shift on there); a name or iPhone keeps its own
+            .map { (w, _) -> inSentence(w, first = true) }
+            // i and i'm as tapping commits them ([typed]), whichever case the data has them in
+            .map(::capitalI)
             .map { w -> if (glide.capsLock) w.uppercase() else if (glide.shift) w.replaceFirstChar(Char::uppercaseChar) else w }
             .distinct()
             .take(SUGGESTED + 1)
@@ -757,9 +755,11 @@ class EnglishSession(
 
     /** What was typed, as committed: i alone, and i before an apostrophe (i'm), as I. */
     private fun typed(): String {
-        val s = input.toString()
-        return if (s == "i" || s.startsWith("i'")) "I" + s.substring(1) else s
+        return capitalI(input.toString())
     }
+
+    // i alone, and i before an apostrophe (i'm), as I; tapping and gliding alike
+    private fun capitalI(s: String): String = if (s == "i" || s.startsWith("i'")) "I" + s.substring(1) else s
 
     // [word], as written, as the input has its case: Hello for he, HELLO for HE; I' at a
     // sentence's start is I'm's, not I'M's

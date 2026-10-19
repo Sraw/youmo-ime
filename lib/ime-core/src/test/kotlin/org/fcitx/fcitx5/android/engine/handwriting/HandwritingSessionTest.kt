@@ -139,7 +139,7 @@ class HandwritingSessionTest {
     }
 
     @Test
-    fun `a sentence picked other than the first is learned, its words as read, the first not`() {
+    fun `a sentence picked other than the first is learned, a word or several as one phrase, the first not`() {
         val user = UserModel(handwritingData.dictionary, handwritingData.vocabulary)
         val s = HandwritingSession(handwritingDecoder(user), TextWords(handwritingData.model, handwritingData.wordIndex), user = user)
         // the first, however it is put in
@@ -162,8 +162,8 @@ class HandwritingSessionTest {
         s.show(read("淡", "谈", step = 0.3))
         s.show(read("话", "天", "人"))
         assertEquals("淡人", s.apply(Action.Pick(2)).commit)
-        // after the word put in before it, as pinyin learns a pick
-        assertEquals(setOf("谈话(tan hua)", "淡(dan)", "人(ren)", "淡(dan) 人(ren)", "谈话(tan hua) 淡(dan)"), user.learned())
+        // words of two or more as one phrase, as pinyin learns a pick it corrected, after the word put in before it
+        assertEquals(setOf("谈话(tan hua)", "淡人(dan ren)", "谈话(tan hua) 淡人(dan ren)"), user.learned())
         // where nothing is learned (a password), not even that
         s.learning = false
         s.show(read("天", "山"))
@@ -358,6 +358,30 @@ class HandwritingSessionTest {
         assertEquals("行", s.apply(Action.Pick(1)).commit)
         // not hang, the first of its syllables by id
         assertEquals(setOf("行(xing)"), user.learned())
+    }
+
+    @Test
+    fun `a pick with a character of several readings is learned word by word, not as a phrase read as guessed`() {
+        val d = polyphoneData
+        val user = UserModel(d.dictionary, d.vocabulary)
+        val s = HandwritingSession(polyphoneDecoder(user), TextWords(d.model, d.wordIndex), user = user)
+        s.show(read("人"))
+        val shown = s.show(read("人", "行"))
+        assertEquals("人行", s.apply(Action.Pick(shown.candidates.indexOf("行"))).commit)
+        assertEquals(setOf("人(ren)", "行(xing)", "人(ren) 行(xing)"), user.learned())
+    }
+
+    @Test
+    fun `a pick longer than a phrase is learned word by word`() {
+        val user = UserModel(handwritingData.dictionary, handwritingData.vocabulary)
+        val s = HandwritingSession(handwritingDecoder(user), TextWords(handwritingData.model, handwritingData.wordIndex), user = user)
+        repeat(UserModel.MAX_PHRASE) { s.show(read("人", "山")) }
+        val shown = s.show(read("人", "山"))
+        val text = "人".repeat(UserModel.MAX_PHRASE) + "山"
+        assertEquals(text, s.apply(Action.Pick(shown.candidates.indexOf("山"))).commit)
+        val learned = user.learned()
+        assertTrue(learned.toString(), "人(ren)" in learned && "山(shan)" in learned)
+        assertFalse(learned.any { it.startsWith(text) })
     }
 
     @Test

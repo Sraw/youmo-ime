@@ -6,7 +6,6 @@ package org.fcitx.fcitx5.android.engine.english
 
 import org.fcitx.fcitx5.android.engine.english.EnglishText.START
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -96,14 +95,14 @@ class EnglishTextTest {
         assertEquals(emptyList<String>(), EnglishText.context("Hello"))
     }
 
-    // as the context reads it: an initial's or an abbreviation's full stop ends none
+    // a piece of text ending a sentence, as the context reads it: an initial's or an abbreviation's full stop ends none
     @Test
     fun aSentenceEndsAsTheContextReadsIt() {
         listOf("Hi. ", "Hi.", "So do I.", "Wait… ", "Why? ", "Hi\n", "Hi \r\n ", "Hi.\u00A0", "Hi.\u2003", "Hi\u2028", "Hi\u2029 ", "Hi\u0085", "Hi\u000B", "Hi\u000C").forEach {
-            assertTrue(it, EnglishText.endsSentence(it))
+            assertEquals(it, listOf(START), EnglishText.context(it, start = false))
         }
         listOf("", "abc ", "abc", "J. ", "Mr. ", "J.\u00A0", "Mr.\u00A0", "Hi. Hello", "I have 3 ", "c   ", "c\u00A0").forEach {
-            assertFalse(it, EnglishText.endsSentence(it))
+            assertTrue(it, EnglishText.context(it, start = false).firstOrNull() != START)
         }
     }
 
