@@ -31,6 +31,7 @@ import org.fcitx.fcitx5.android.ui.main.settings.im.InputMethodSettings.Item
 import org.fcitx.fcitx5.android.ui.main.settings.im.InputMethodSettings.Section
 import org.fcitx.fcitx5.android.ui.main.settings.im.InputMethodSettings.Toggle
 import org.fcitx.fcitx5.android.ui.main.settings.placeholder
+import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
@@ -48,6 +49,17 @@ import org.robolectric.annotation.Config
 // the real application, which initialises the AppPrefs the nine keys' page reads
 @Config(application = FcitxApplication::class)
 class InputMethodSettingsScreenTest {
+    // the app's own preferences the tests set: back to their defaults whether a test passed or not,
+    // or a failure leaks its value into the tests after it in this JVM
+    @After
+    fun restorePrefs() {
+        AppPrefs.getInstance().keyboard.run {
+            t9MultiTap.setValue(t9MultiTap.defaultValue)
+            handwritingPause.setValue(handwritingPause.defaultValue)
+            englishAutoCaps.setValue(englishAutoCaps.defaultValue)
+        }
+    }
+
 
     private fun create(items: List<Item>, cfg: RawConfig = RawConfig(), save: () -> Unit = {}): PreferenceScreen {
         val ctx = PlaceholderStrings(RuntimeEnvironment.getApplication())
@@ -112,7 +124,6 @@ class InputMethodSettingsScreenTest {
         assertEquals(0, saved)
         assertTrue(AppPrefs.T9_MULTI_TAP !in cfg.flattened())
         assertNull(screen(Engines.PINYIN).findPreference<ListPreference>(AppPrefs.T9_MULTI_TAP))
-        pref.setValue(T9MultiTap.Medium)
     }
 
     // as multi-tap: the pad's own, nothing of it in fcitx's config
@@ -129,7 +140,6 @@ class InputMethodSettingsScreenTest {
         assertEquals(0, saved)
         assertTrue(AppPrefs.HANDWRITING_PAUSE !in cfg.flattened())
         assertNull(screen(Engines.PINYIN).findPreference<ListPreference>(AppPrefs.HANDWRITING_PAUSE))
-        pref.setValue(HandwritingPause.Medium)
     }
 
     // as multi-tap: the keyboard's own, nothing of it in fcitx's config
@@ -145,7 +155,6 @@ class InputMethodSettingsScreenTest {
         assertFalse(pref.getValue())
         assertEquals(0, saved)
         assertTrue(AppPrefs.ENGLISH_AUTO_CAPS !in cfg.flattened())
-        pref.setValue(true)
     }
 
     // a dialog message would leave the list's dialog with no choices in it

@@ -154,7 +154,7 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
         /** Shown on the 九键 page (InputMethodSettings), not here: one input method's alone. */
         val t9MultiTap = stringLike(T9_MULTI_TAP, object : ManagedPreference.StringLikeCodec<T9MultiTap> {
             override fun decode(raw: String) = T9MultiTap.entries.firstOrNull { it.name == raw }
-        }, T9MultiTap.Medium)
+        }, T9MultiTap.Off)
 
         /**
          * What each of 九键's digit keys types ([NineKeyLetters.serialize], empty as on a phone):
@@ -503,11 +503,9 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
                 "s"
             ) { clipboardListening.getValue() && clipboardSuggestion.getValue() }
         }
-        val clipboardReturnAfterPaste = hidden {
-            switch(
-                R.string.clipboard_return_after_paste, "clipboard_return_after_paste", false
-            ) { clipboardListening.getValue() }
-        }
+        val clipboardReturnAfterPaste = switch(
+            R.string.clipboard_return_after_paste, "clipboard_return_after_paste", true
+        ) { clipboardListening.getValue() }
         val clipboardMaskSensitive = switch(
             R.string.clipboard_mask_sensitive, "clipboard_mask_sensitive", true
         ) { clipboardListening.getValue() }

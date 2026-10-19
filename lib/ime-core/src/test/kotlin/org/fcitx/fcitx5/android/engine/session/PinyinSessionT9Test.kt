@@ -66,7 +66,7 @@ class PinyinSessionT9Test {
 
     private fun Session.type(keys: String): Snapshot = keys.map { apply(Key(it)) }.last()
 
-    // [digit] pressed [times] fast, as the keyboard sends it: the key, then each press again its next letter
+    // [digit] pressed [times] fast (连按 on), as the keyboard sends it: the key, then each press again its next letter
     private fun Session.press(digit: Char, times: Int, keys: NineKeyLetters = NineKeyLetters.STANDARD): Snapshot {
         var s = apply(Key(digit))
         for (n in 1 until times) s = apply(Action.Letter(keys.letters(digit)[n % keys.letters(digit).length], again = true))
@@ -119,19 +119,52 @@ class PinyinSessionT9Test {
     }
 
     @Test
-    fun aRunOfAKeyPressedAgainIsReadAsKeysAndAsTheLetterItCameTo() {
-        // 6 four times fast: m, as no four keys read
+    fun aKeyPressedAgainIsTheLetterItCameToAndNothingElse() {
+        // 6 four times fast: round to m
         val session = session()
         val m = session.press('6', 4)
+        assertEquals("m", m.preedit)
         assertTrue("m" in m.syllables)
         val s = session.type("4426")
         assertEquals("米糕", s.candidates[0])
         assertEquals("mi gao", s.preedit)
-        // 2 four times fast at a pace of keys, not letters: baba, which was 'a' (B, 2026-10-10)
-        val baba = session().press('2', 4)
-        assertEquals("爸爸", baba.candidates[0])
-        assertEquals("ba ba", baba.preedit)
-        assertTrue(baba.preedit.all { it in 'a'..'z' || it == ' ' })
+        // 2 four times fast is a, as the key's preview showed: not baba (2026-10-19, strict)
+        val a = session().press('2', 4)
+        assertEquals("a", a.preedit)
+        assertTrue("爸爸" !in a.candidates)
+    }
+
+    /** Read as keys too (the 2026-10-12 hybrid), a learned 广告 overrode the h the key's preview showed. */
+    @Test
+    fun fourFourFastIsHEvenWithGuangGaoLearned() {
+        val data = dataOf(Triple("广告", -2f, "guang gao"), Triple("哈哈", -2f, "ha ha"), Triple("和", -3f, "he"), Triple("会", -3f, "hui"))
+        val user = UserModel(data.dictionary, data.vocabulary)
+        fun session() = PinyinSession(data, T9Segmenter(abbreviations = false), spell = true, user = user, prediction = false)
+        // 4 4 slowly: two keys, 广告 picked and learned
+        val slow = session()
+        val keys = slow.type("44")
+        assertTrue("广告" in keys.candidates)
+        slow.apply(Action.Pick(keys.candidates.indexOf("广告")))
+        // 4 4 fast: h, its words alone
+        val h = session().press('4', 2)
+        assertEquals("h", h.preedit)
+        assertTrue(h.candidates.containsAll(listOf("和", "会")))
+        assertTrue("广告" !in h.candidates && "哈哈" !in h.candidates)
+    }
+
+    @Test
+    fun sevenThenFourFourFastIsSAndH() {
+        val data = dataOf(Triple("是", -2f, "shi"), Triple("啥", -3f, "sha"), Triple("撕", -1f, "si"), Triple("皮", -1f, "pi"))
+        val session = sessionOf(data)
+        session.type("7")
+        val sh = session.press('4', 2)
+        assertEquals("是", sh.candidates[0])
+        assertTrue("啥" in sh.candidates)
+        // not 744 as keys, which is shi typed whole: two letters on the way to shi, sha
+        assertEquals("sh", sh.preedit)
+        assertEquals("shi", sessionOf(data).type("744").preedit)
+        // backspace deletes the H whole, both its presses
+        assertEquals(sessionOf(data).type("7").preedit, session.apply(Backspace).preedit)
     }
 
     @Test
@@ -204,7 +237,7 @@ class PinyinSessionT9Test {
         keyboard.onEvent(EngineEvent.CHAR, '6'.code)
         val n = keyboard.onEvent(EngineEvent.CHAR, Keyboard.letterKey('n', again = true))
         assertTrue(n.handled)
-        // 6 pressed again: the run read as n too
+        // 6 pressed again: n, in place of the 6
         assertTrue("n" in n.syllables)
         assertTrue(Keyboard.letterKey('z', again = true) in Keyboard.LETTERS && Keyboard.letterKey('a', again = false) == Keyboard.LETTERS.first)
         // a keyboard of letters has no use for them
@@ -352,7 +385,7 @@ class PinyinSessionT9Test {
         assertEquals("你好", s.candidates[0])
         // 6's letters offered as initials, h with them
         assertTrue(s.syllables.containsAll(listOf("m", "n", "h")))
-        // pressed again soon, a letter of the same key goes in place of the last
+        // pressed again soon, a letter of the same key goes in place of the last: round to h
         val h = session().press('6', 4, keys)
         assertEquals("h", h.preedit)
     }
@@ -369,16 +402,14 @@ class PinyinSessionT9Test {
         assertTrue(one.apply(Key('4')).candidates.isNotEmpty())
     }
 
-    /** A key pressed again that no reading takes was the private character it stands as in the input. */
+    /** A key pressed again that no reading takes is kept as the letter it came to. */
     @Test
-    fun aKeyPressedAgainKeptAsTypedIsItsDigit() {
+    fun aKeyPressedAgainKeptAsTypedIsItsLetter() {
         val session = session()
         // no word of w, x, y or z here
-        val s = session.press('9', 8)
-        assertEquals("99999999", s.candidates[0])
-        val commit = session.apply(Action.CommitRaw).commit
-        assertEquals("99999999", commit)
-        assertTrue(commit.none { it in T9Segmenter.AGAIN })
+        val s = session.press('9', 2)
+        assertEquals("x", s.candidates[0])
+        assertEquals("x", session.apply(Action.CommitRaw).commit)
     }
 
     /** 屄 held past the first page still gave the preedit, the column and Enter its bi, 爱 first. */
@@ -405,31 +436,37 @@ class PinyinSessionT9Test {
         assertEquals("a4", session.apply(Action.CommitRaw).commit)
     }
 
-    /** 3 3 fast read as 鹅点, e of one press: taking e took both, and 鹅好 was read of the rest. */
+    /** 3 3 fast is E, one char of the input: taking e takes it alone, not the 4 after it. */
     @Test
-    fun theBestReadingsSyllableTakenStandsForThePressesItRead() {
+    fun aLetterOfAKeyPressedAgainTakenStandsForItsOneChar() {
         val session = sessionOf(dataOf(Triple("鹅", -2f, "e"), Triple("点", -2f, "dian"), Triple("的", -5f, "de"), Triple("好", -5f, "hao")))
         session.press('3', 2)
         val s = session.type("426")
-        assertEquals("鹅点", s.candidates[0])
+        assertEquals("鹅好", s.candidates[0])
         assertEquals("e", s.syllables[0])
         val taken = session.apply(Action.Syllable(0))
-        assertEquals("e'dian", taken.preedit)
-        assertEquals("鹅点", taken.candidates[0])
+        assertEquals("e'hao", taken.preedit)
+        assertEquals("e", session.apply(Backspace).syllables[0])
     }
 
-    /** 2, a pick the keyboard did not see, then 2 2 fast: the keyboard showed c, the run read b. */
+    /**
+     * 2, a pick the keyboard did not see, then 2 2 fast: the keyboard showed c. What the preview
+     * showed wins: the 2 typed after the pick, then C in its place (2026-10-19).
+     */
     @Test
-    fun aPressAgainNotCountedFromTheKeyBeforeIsAKeyOfItsOwn() {
-        val data = dataOf(Triple("不", -2f, "bu"), Triple("啊", -4f, "a"))
+    fun aPressAgainAfterAPickTheKeyboardDidNotSeeIsTheLetterItShowed() {
+        val data = dataOf(Triple("不", -2f, "bu"), Triple("啊", -4f, "a"), Triple("出", -3f, "chu"))
         val session = sessionOf(data)
         // nothing typed: the keyboard counted the 2 before the pick
         session.apply(Action.Letter('b', again = true))
         session.apply(Action.Letter('c', again = true))
         val s = session.type("8")
-        // 2 2 8 as keys, no B to read 不 of
-        val keys = sessionOf(data).type("228")
-        assertEquals(keys.candidates, s.candidates)
-        assertEquals(keys.preedit, s.preedit)
+        val c = sessionOf(data)
+        c.apply(Action.Letter('c'))
+        val shown = c.type("8")
+        assertEquals(shown.candidates, s.candidates)
+        assertEquals(shown.preedit, s.preedit)
+        assertTrue("不" !in s.candidates)
     }
+
 }

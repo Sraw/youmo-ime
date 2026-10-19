@@ -5,14 +5,19 @@
 package org.fcitx.fcitx5.android.eval
 
 import org.fcitx.fcitx5.android.engine.data.PinyinDataBuilder
+import org.fcitx.fcitx5.android.engine.data.PinyinData
+import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
 import org.fcitx.fcitx5.android.engine.pinyin.Syllables
 import org.fcitx.fcitx5.android.engine.pinyin.T9Segmenter
+import org.fcitx.fcitx5.android.engine.session.Action
+import org.fcitx.fcitx5.android.engine.session.PinyinSession
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
+import java.nio.ByteBuffer
 
 class T9SetTest {
 
@@ -21,8 +26,6 @@ class T9SetTest {
 
     private fun typed(input: String, expected: String, presses: T9Set.Presses = T9Set.Presses.ONCE) =
         T9Set.convert(listOf(Sample(input, expected, "daily")), presses).map { it.input }
-
-    private fun again(digit: Char) = T9Segmenter.again(digit)
 
     @Test
     fun eachSyllableIsTypedInDigits() {
@@ -35,20 +38,45 @@ class T9SetTest {
     }
 
     @Test
-    fun withMultiTapOnAPressOfTheKeyJustPressedIsOneAgain() {
-        // shi: 7, 4, then 4 again
-        assertEquals(listOf("74${again('4')}"), typed("shi", "是", T9Set.Presses.FAST))
-        // across syllables too: hao ends on 6, and nan's n is on 6
-        assertEquals(listOf("426${again('6')}26"), typed("haonan", "好男", T9Set.Presses.FAST))
+    fun withMultiTapEachLetterPastTheFirstOnItsKeyIsTheLetterTypedAsItself() {
+        // s, h and i are each past the first on their key; a is 2's first
+        assertEquals(listOf("SHI"), typed("shi", "是", T9Set.Presses.LETTERS))
+        assertEquals(listOf("H2O"), typed("hao", "好", T9Set.Presses.LETTERS))
+        assertEquals(listOf("NIH2O"), typed("nihao", "你好", T9Set.Presses.LETTERS))
+        // ü as v
+        assertEquals(listOf("LV"), typed("lv", "绿", T9Set.Presses.LETTERS))
     }
 
+    /** What the set writes for LETTERS is what the session makes of those presses, as the keyboard sends them. */
     @Test
-    fun withMultiTapEachLetterIsItsPlaceOnTheKeyAndALetterOnTheSameKeyComesAfterAPause() {
-        // s is 7777, h 44, i 444 after a pause: 4 and twice 4 again
-        val s = "7${again('7')}${again('7')}${again('7')}"
-        assertEquals(listOf(s + "4${again('4')}" + "4${again('4')}${again('4')}"), typed("shi", "是", T9Set.Presses.LETTERS))
-        // ü as v: 888
-        assertEquals(listOf("5${again('5')}${again('5')}8${again('8')}${again('8')}"), typed("lv", "绿", T9Set.Presses.LETTERS))
+    fun lettersAreTheInputTheSessionMakesOfThePresses() {
+        val data = PinyinData.load(
+            ByteBuffer.wrap(
+                PinyinDataBuilder().unigram("<unk>", -7f, 0f)
+                    .unigram("你好", -2.5f, 0f).entry("你好", intArrayOf(Syllables.id("ni"), Syllables.id("hao")))
+                    .unigram("是", -2f, 0f).entry("是", intArrayOf(Syllables.id("shi")))
+                    .build().toByteArray(),
+            ),
+        )
+        fun session() = PinyinSession(data, T9Segmenter(), spell = true, prediction = false)
+        val keys = NineKeyLetters.STANDARD
+        for ((letters, word) in listOf("nihao" to "你好", "shi" to "是", "lv" to "绿", "haonan" to "好男")) {
+            // pressed: a pause before each letter, then its key quickly again till it comes to it
+            val pressed = session()
+            var byPresses = pressed.apply(Action.Key(keys.keysOf(letters[0]).first()))
+            letters.forEachIndexed { n, c ->
+                val key = keys.keysOf(c).first()
+                if (n > 0) byPresses = pressed.apply(Action.Key(key))
+                for (p in 1..keys.letters(key).indexOf(c)) byPresses = pressed.apply(Action.Letter(keys.letters(key)[p], again = true))
+            }
+            // the set's input: a digit a key, a capital a letter typed as itself
+            val written = session()
+            val input = typed(letters, word, T9Set.Presses.LETTERS).single()
+            val bySet = input.map { if (it in T9Segmenter.FIXED) written.apply(Action.Letter(it.lowercaseChar())) else written.apply(Action.Key(it)) }.last()
+            assertEquals(letters, bySet.preedit, byPresses.preedit)
+            assertEquals(letters, bySet.cursor, byPresses.cursor)
+            assertEquals(letters, bySet.candidates, byPresses.candidates)
+        }
     }
 
     @Test
@@ -69,8 +97,10 @@ class T9SetTest {
         assertEquals(listOf(Sample("64426", "你好", "daily", "Ah，")), converted.useLines { EvalSet.parse(it) })
         assertEquals(2, runCli(arrayOf("t9", set.path), StringBuilder(), StringBuilder()))
         assertEquals(2, runCli(arrayOf("t9", set.path, converted.path, "--presses", "twice"), StringBuilder(), StringBuilder()))
-        assertEquals(0, runCli(arrayOf("t9", set.path, converted.path, "--presses", "fast"), StringBuilder(), StringBuilder()))
-        assertEquals("64${again('4')}26", converted.useLines { EvalSet.parse(it) }.single().input)
+        // fast modelled the hybrid 连按 gone 2026-10-19
+        assertEquals(2, runCli(arrayOf("t9", set.path, converted.path, "--presses", "fast"), StringBuilder(), StringBuilder()))
+        assertEquals(0, runCli(arrayOf("t9", set.path, converted.path, "--presses", "letters"), StringBuilder(), StringBuilder()))
+        assertEquals("NIH2O", converted.useLines { EvalSet.parse(it) }.single().input)
     }
 
     @Test

@@ -164,7 +164,7 @@ class SoftKeyboardTest {
     // nothing typed, 1 is ，。？！: pressed again soon, the next in place of the last; while typing, 分词
     @Test
     fun nineKeysOneIsPunctuationTillSomethingIsTyped() {
-        // 连按 at its default, 0.6 s, whatever this device has: off, 1 cycles at it too; Fast's 0.4 s is less room
+        // 连按 on at 中, 0.6 s, whatever this device has: off (the default), 1 does not cycle; Fast's 0.4 s is less room
         val multiTap = AppPrefs.getInstance().keyboard.t9MultiTap
         val before = multiTap.getValue()
         multiTap.setValue(T9MultiTap.Medium)

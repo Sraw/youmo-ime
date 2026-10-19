@@ -6,11 +6,11 @@ package org.fcitx.fcitx5.android.input.keyboard
 
 /**
  * 连按 on the nine keys: a key pressed once is any of its letters, for the engine to guess; the
- * same key pressed again within [timeout] ms of the last press may be its second letter, then its
- * third, round to the first again (`4` 4 is h, 4 4 4 is i, a fourth g). The engine reads such a
- * run as that many keys too and lets the context pick ([org.fcitx.fcitx5.android.engine.pinyin.T9Segmenter]):
- * 是 typed 7 4 4 fast is still shi, where only the letters (h) made 八点开会 at a key's pace 备案拉回.
- * A [timeout] of 0 is off: every press is a key of its own.
+ * same key pressed again within [timeout] ms of the last press is its second letter, then its
+ * third, round to the first again (`4` 4 is h, 4 4 4 is i, a fourth g), and nothing else: the
+ * engine takes it as a letter typed as itself, what the key's preview showed (2026-10-19; read as
+ * keys too, a learned 广告 overrode the h). A [timeout] of 0 is off, the default: every press is a
+ * key of its own.
  *
  * Times are the presses' own (the touch's), not when they reach the engine, which may be busy
  * reading the last.

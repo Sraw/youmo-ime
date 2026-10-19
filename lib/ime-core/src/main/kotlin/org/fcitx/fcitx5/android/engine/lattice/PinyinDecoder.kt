@@ -297,7 +297,6 @@ class PinyinDecoder(
         if (flags and SyllableMatches.FUZZY != 0) p += penalties.fuzzy
         if (flags and SyllableMatches.TYPO != 0) p += penalties.typo
         if (flags and SyllableMatches.NEIGHBOUR != 0) p += penalties.neighbour
-        if (flags and SyllableMatches.TAPPED != 0) p += penalties.tapped
         return p
     }
 

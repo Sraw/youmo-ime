@@ -34,8 +34,8 @@ internal class NineKeys(private val data: PinyinData, private val letters: NineK
     var id = 0
         private set
 
-    // where in the input the best reading has a syllable start: which, and where it ends
-    private var best: Map<Int, Pair<Int, Int>> = emptyMap()
+    // where in the input the best reading has a syllable start: which
+    private var best: Map<Int, Int> = emptyMap()
 
     fun clear() {
         taken.clear()
@@ -59,7 +59,7 @@ internal class NineKeys(private val data: PinyinData, private val letters: NineK
     /** Syllables of the best reading: [syllables] from input position [from] on, the [k]th ending at [ends] [k]. */
     fun note(from: Int, ends: List<Int>, syllables: IntArray) {
         val noted = HashMap(best)
-        for (k in syllables.indices) noted[if (k == 0) from else ends[k - 1]] = syllables[k] to ends[k]
+        for (k in syllables.indices) noted[if (k == 0) from else ends[k - 1]] = syllables[k]
         best = noted
     }
 
@@ -75,45 +75,36 @@ internal class NineKeys(private val data: PinyinData, private val letters: NineK
             show(emptyList(), -1)
             return
         }
-        val (first, firstEnd) = best[at] ?: (-1 to -1)
-        val (found, firstPresses) = syllablesAt(graph, from, at, first, firstEnd)
+        val first = best[at] ?: -1
+        val found = syllablesAt(graph, from, at)
         val order = found.keys.sortedWith(
             compareByDescending<Int> { it == first }.thenByDescending { found.getValue(it) }.thenByDescending { weights[it] },
         )
         // a letter typed as itself offers itself alone
-        val digit = T9Segmenter.digitOf(input[at])
-        val keys = if (input[at] in T9Segmenter.FIXED) input[at].lowercase() else letters.letters(digit)
+        val keys = if (input[at] in T9Segmenter.FIXED) input[at].lowercase() else letters.letters(input[at])
         val initials = keys.filter { it in INITIAL_LETTERS }.map { it.toString() }
-        // a key pressed again: the letter it came to stands for all its presses, the others for the first
-        var run = 1
-        while (at + run < input.length && input[at + run] == T9Segmenter.again(digit)) run++
-        val cameTo = if (run > 1 && keys.isNotEmpty()) keys[(run - 1) % keys.length].toString() else null
         val presses = HashMap<String, Int>()
-        for ((s, length) in found) presses[Syllables.spelling(s)] = if (s == first && firstPresses > 0) firstPresses else length
+        for ((s, length) in found) presses[Syllables.spelling(s)] = length
         val shown = (order.map { Syllables.spelling(it) } + initials).take(Action.Syllable.MAX)
-        show(shown, at, shown.map { s -> presses[s] ?: if (s == cameTo) run else 1 })
+        show(shown, at, shown.map { s -> presses[s] ?: 1 })
     }
 
     // the syllables [graph] (of the input from [from]) reads at input position [at], each to its most
-    // presses, in the order read; and the presses of [first], the best reading's syllable ending at [firstEnd]
-    private fun syllablesAt(graph: SyllableGraph, from: Int, at: Int, first: Int, firstEnd: Int): Pair<Map<Int, Int>, Int> {
+    // presses, in the order read
+    private fun syllablesAt(graph: SyllableGraph, from: Int, at: Int): Map<Int, Int> {
         val found = LinkedHashMap<Int, Int>() // syllable to its length
-        var firstPresses = 0 // of the best reading's syllable as it read them: maybe fewer than its longest
         for (e in graph.edges(at - from)) {
             if (graph.kind(e) != Kind.SYLLABLE) continue
             val m = graph.matches(e)
             val length = graph.text(e).length
-            // 嗯 as m, n, ng: the letters stand for those, as initials; read with a run of a key
-            // pressed again as keys and as a letter, the more presses
+            // 嗯 as m, n, ng: the letters stand for those, as initials
             for (i in 0 until m.size) {
                 val s = m.syllable(i)
-                if (m.flags(i) and SyllableMatches.TAPPED.inv() != 0 || Syllables.split(Syllables.spelling(s)) == null) continue
+                if (m.flags(i) != 0 || Syllables.split(Syllables.spelling(s)) == null) continue
                 found.merge(s, length, ::maxOf)
-                // 3 3 fast read as e then d…: e stands for its one press there, not for both
-                if (s == first && from + graph.to(e) == firstEnd) firstPresses = length
             }
         }
-        return found to firstPresses
+        return found
     }
 
     /**
@@ -128,7 +119,6 @@ internal class NineKeys(private val data: PinyinData, private val letters: NineK
         val was = input.substring(at, at + offeredPresses[index])
         val lengthBefore = input.length
         input.replace(at, at + was.length, spelling)
-        // the presses may have been more than its letters: a run of a key pressed again one
         val end = at + spelling.length
         val added = end == input.length || input[end] != SyllableGraph.SEPARATOR
         if (added) input.insert(end, SyllableGraph.SEPARATOR)
@@ -139,44 +129,28 @@ internal class NineKeys(private val data: PinyinData, private val letters: NineK
     /**
      * Puts [c] into [input] as a letter typed as itself ([Action.Letter]), upper case, at [cursor],
      * the key before it the last; where the cursor is after it, or -1 for what is no letter. But
-     * [again] after the same key's digit after [picked], what is picked already, a
-     * press of its own ([T9Segmenter.again]: the decoder reads the run as keys or as the letter it
-     * came to), and after the same letter typed as itself, in its place. Again with no such key (a candidate
-     * picked in between, or the cursor moved, [picked] then the cursor itself: what the keyboard did not see)
-     * it is its key, any of its letters, as a press after a pause; so too after such a key while [c], the
-     * letter the keyboard counted the presses to, is not the one the run comes to.
+     * [again] (连按) after the same key, a digit or a letter typed as itself after [picked], what is
+     * picked already, in its place: the key's next letter, what its preview showed, and nothing
+     * else, so 4 4 fast is `H`. The letter shown wins where the keyboard counted a press the input
+     * lacks (a pick it did not see). Again with no such key (a candidate picked in between, or the
+     * cursor moved, [picked] then the cursor itself: what the keyboard did not see) it is its key,
+     * any of its letters, as a press after a pause.
      */
     fun letter(input: StringBuilder, c: Char, again: Boolean, picked: Int, cursor: Int): Int {
         if (c !in 'a'..'z') return -1
         val last = cursor - 1
-        val same = last >= picked && T9Segmenter.isKey(input[last]) && letters.sameKey(T9Segmenter.digitOf(input[last]), c)
-        if (again && same && input[last] in T9Segmenter.FIXED) {
+        val same = last >= picked && T9Segmenter.isKey(input[last]) && letters.sameKey(input[last], c)
+        if (again && same) {
             input.setCharAt(last, c.uppercaseChar())
             return cursor
         }
-        // the keyboard counted no press the input lacks: 2, a pick it did not see, then 2 2 came as b
-        // and c, which as a run of the 2 typed after the pick would read b
-        val counted = same && input[last] !in T9Segmenter.FIXED && c == nextLetter(input, last, picked)
         val key = when {
-            // a press of its own, the decoder to read the run as keys or as the letter it came to
-            again && counted -> T9Segmenter.again(T9Segmenter.digitOf(input[last]))
-            again && same -> T9Segmenter.digitOf(input[last])
             // which of its keys was pressed is not told: the letter itself where it is on more than one
             again -> if (letters.keysOf(c).length == 1) letters.key(c) else c.uppercaseChar()
             else -> c.uppercaseChar()
         }
         input.insert(cursor, key)
         return cursor + 1
-    }
-
-    // the letter a press more of the key whose run ends at [last] comes to, the run as the segmenter
-    // reads it: not past what is picked, [picked], nor past a separator
-    private fun nextLetter(input: CharSequence, last: Int, picked: Int): Char {
-        val digit = T9Segmenter.digitOf(input[last])
-        var start = last
-        while (start > picked && input[start] == T9Segmenter.again(digit) && T9Segmenter.digitOf(input[start - 1]) == digit) start--
-        val keyLetters = letters.letters(digit)
-        return keyLetters[(last - start + 1) % keyLetters.length]
     }
 
     /**

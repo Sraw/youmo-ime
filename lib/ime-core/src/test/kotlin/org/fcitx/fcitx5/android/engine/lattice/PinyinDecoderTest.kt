@@ -493,14 +493,13 @@ class PinyinDecoderTest {
         assertTrue(calls > 0)
     }
 
-    /** Text kept as typed is the segmenter's to show: a key pressed again on the nine keys as its digit. */
+    /** Text kept as typed is the segmenter's to show: a letter typed as itself on the nine keys lower case. */
     @Test
     fun textKeptAsTypedShowsAsAskedOrAsTyped() {
-        val a8 = T9Segmenter.again('8')
         // no word starts with t, u or v here
-        val graph = T9Segmenter().segment("8$a8")
+        val graph = T9Segmenter().segment("8U")
         val nineKeys = PinyinDecoder(data.dictionary, data.vocabulary, WordScorer.of(data.model), asTyped = { T9Segmenter.asTyped(it) })
-        assertEquals("88", nineKeys.decode(graph).sentences.first().text)
-        assertEquals("8$a8", decoder().decode(graph).sentences.first().text)
+        assertEquals("8u", nineKeys.decode(graph).sentences.first().text)
+        assertEquals("8U", decoder().decode(graph).sentences.first().text)
     }
 }

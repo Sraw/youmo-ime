@@ -6,14 +6,12 @@ package org.fcitx.fcitx5.android.eval
 
 import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
 import org.fcitx.fcitx5.android.engine.pinyin.Syllables
-import org.fcitx.fcitx5.android.engine.pinyin.T9Segmenter
 
 /**
  * Types the full-pinyin samples of an evaluation set on the nine keys (九键), as [ShuangpinSet]
  * does in 双拼: the [ExactReading] spelt in digits, no separators, as a phone's user types it.
  * Samples with a Latin letter are left out: the nine keys type it in another mode. How a key is
- * pressed is [Presses]': once a letter, or with 连按 on, as the app hands the engine a press of the
- * same key again within its timeout ([T9Segmenter.again]).
+ * pressed is [Presses]': once a letter (连按 off, the default), or each letter spelt by 连按.
  */
 object T9Set {
 
@@ -28,10 +26,12 @@ object T9Set {
         /** Once, 连按 off or a pause before each press: 744 for shi. */
         ONCE("once"),
 
-        /** Once, quickly: a press of the key just pressed is one again, 74 and 4 again. */
-        FAST("fast"),
-
-        /** As 连按 spells a letter, its key as many times as its place on it, quickly: s is 7777. */
+        /**
+         * As 连按 spells a letter, its key as many times as its place on it, quickly: as the session
+         * has it, the key's digit for its first letter, else the letter typed as itself (s is `S`,
+         * shi `SHI`, hao `H2O`). A fast same-key pair with 连按 on is a letter, so typing once a
+         * letter quickly models nobody: it is no option.
+         */
         LETTERS("letters");
 
         companion object {
@@ -51,13 +51,8 @@ object T9Set {
         val out = StringBuilder()
         for (c in letters) {
             val key = keys.keysOf(c).firstOrNull() ?: return null
-            val times = if (presses == Presses.LETTERS) keys.letters(key).indexOf(c) + 1 else 1
-            repeat(times) { n ->
-                // a letter's first press on the key the last letter ended on comes after a pause: not again
-                val again = presses == Presses.LETTERS && n > 0 ||
-                    presses == Presses.FAST && out.isNotEmpty() && T9Segmenter.digitOf(out.last()) == key
-                out.append(if (again) T9Segmenter.again(key) else key)
-            }
+            // a letter's first press on the key the last letter ended on comes after a pause: a key again
+            out.append(if (presses == Presses.LETTERS && keys.letters(key).indexOf(c) > 0) c.uppercaseChar() else key)
         }
         return out.toString()
     }

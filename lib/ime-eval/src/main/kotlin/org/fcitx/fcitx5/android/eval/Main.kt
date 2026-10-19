@@ -167,7 +167,7 @@ internal val COMMANDS = listOf(
         val (scheme, setPath, outPath) = args.operands
         if (scheme in ShuangpinSet.SCHEMES) writeShuangpinSet(scheme, setPath, outPath, out) else null
     },
-    Command("t9", "<set.tsv> <t9-set.tsv> [--presses once|fast|letters]", 2..2, "presses") { args, out, _ ->
+    Command("t9", "<set.tsv> <t9-set.tsv> [--presses once|letters]", 2..2, "presses") { args, out, _ ->
         val (setPath, outPath) = args.operands
         writeT9Set(setPath, outPath, T9Set.Presses.of(args.options["presses"] ?: "once")!!, out)
     },
