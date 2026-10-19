@@ -55,6 +55,33 @@ class PinyinDictionaryFragmentTest {
     }
 
     @Test
+    fun aBigListPickedIntoTheUserDictionaryGetsTheBaseSuggested() = runTest {
+        assertFalse(suggestsBase(USER_IMPORT_HINT_WORDS))
+        assertTrue(suggestsBase(USER_IMPORT_HINT_WORDS + 1))
+        // blank lines are not words
+        val text = (1..1001).joinToString("\n\n") { "词$it" }
+        val words = countWords("big.txt") { text.byteInputStream() }
+        assertEquals(1001, words)
+        assertTrue(suggestsBase(words))
+        assertFalse(suggestsBase(countWords("small.txt") { "鲸园\n\n量子\n".byteInputStream() }))
+        // only what the import adds: duplicates, blocked words, comments and a `~` line outside an
+        // export are not counted; one word with two pinyins is two
+        assertEquals(3, countWords("mixed.txt") {
+            "鲸园\n鲸园\n量子\n!时间\n# note\n!量子\n~学到 xue'dao 3\n长大 chang da\n长大 zhang da\n长大 zhang da\n"
+                .byteInputStream()
+        })
+    }
+
+    @Test
+    fun onlyTheExportsHeaderSkipsTheCount() {
+        // which file is the export: WordListFilesTest.anExportIsToldByItsFirstNonBlankLine
+        val thirdParty = Incoming("big.txt", userExport = true, ownExport = false)
+        assertTrue(needsCount(true, thirdParty))
+        assertFalse(needsCount(true, Incoming("export.txt", userExport = true, ownExport = true)))
+        assertFalse(needsCount(false, thirdParty))
+    }
+
+    @Test
     fun aFileOfANewNameIsImported() {
         val text = Recorded(null)
         assertTrue(text.importFile(Incoming("mine.txt")) { "words".byteInputStream() })

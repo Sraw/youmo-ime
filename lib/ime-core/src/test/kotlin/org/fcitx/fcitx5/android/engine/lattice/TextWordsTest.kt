@@ -28,6 +28,21 @@ class TextWordsTest {
                 .unigram("中", -2.5f, 0f)
                 .unigram("国人", -3f, 0f)
                 .unigram("人", -2f, 0f)
+                // a phrase the model has as a word, and its words
+                .unigram("今天天气", -4f, 0f)
+                .unigram("今天", -3f, 0f)
+                .unigram("天气", -3f, 0f)
+                .unigram("今", -3f, 0f)
+                .unigram("天", -2.5f, 0f)
+                .unigram("气", -2.5f, 0f)
+                // a word of three, and a phrase with it in it
+                .unigram("去开饭店", -4f, 0f)
+                .unigram("开饭店", -4f, 0f)
+                .unigram("开饭", -3.5f, 0f)
+                .unigram("饭店", -3f, 0f)
+                .unigram("开", -3f, 0f)
+                .unigram("店", -3f, 0f)
+                .unigram("去", -2f, 0f)
                 // a pair, for a text scored after the words before it
                 .bigram("，", "你", -0.5f, 0f)
                 .entry("你", intArrayOf(Syllables.id("ni")))
@@ -96,6 +111,27 @@ class TextWordsTest {
         // longer than the window lastTwo looks at
         val long = "你好吗".repeat(10)
         assertEquals((0..30).filter { it % 3 != 1 }, words.boundaries(long).toList())
+    }
+
+    @Test
+    fun aWordOfThreeOrMoreIsSplitAgainIntoItsWords() {
+        // 今天天气 whole (-4) is likeliest, and within it 今天 天气 (-6) over 今天 天 气 (-8):
+        // a blocked 天气 stands as a word in it (VoiceBlocking, VO-10)
+        assertEquals(listOf(0, 2, 4, 5), words.boundaries("今天天气吗", splitLong = true).toList())
+        // no word of three: as before, 今天 气 (-5.5) over 今 天气 (-6)
+        assertEquals(listOf(0, 2, 3), words.boundaries("今天气", splitLong = true).toList())
+        // a word of three: 开 饭店 (-6) over 开饭 店 (-6.5)
+        assertEquals(listOf(0, 1, 3), words.boundaries("开饭店", splitLong = true).toList())
+        // nested: 去开饭店 is 去 开饭店 (-6) without itself, and 开饭店 split again
+        assertEquals(listOf(0, 1, 2, 4), words.boundaries("去开饭店", splitLong = true).toList())
+    }
+
+    @Test
+    fun withoutSplitLongTheModelsWordsStandWhole() {
+        // as ime-eval measures 联想 after each word
+        assertEquals(listOf(0, 4, 5), words.boundaries("今天天气吗").toList())
+        assertEquals(listOf(0, 3), words.boundaries("开饭店").toList())
+        assertEquals(listOf(0, 4), words.boundaries("去开饭店").toList())
     }
 
     @Test

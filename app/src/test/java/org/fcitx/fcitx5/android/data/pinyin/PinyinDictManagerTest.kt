@@ -128,6 +128,20 @@ class PinyinDictManagerTest {
         assertEquals(listOf("幽默 you'mo 0.0"), File(dir, "gb.txt").readLines())
     }
 
+    // the user's export put into the base: its learned words (`~`) are words there too, read only
+    // after the export's mark (WordListFiles.baseLines, not baseLine line by line)
+    @Test
+    fun anExportsLearnedWordsAreReadIntoTheBase() {
+        val export = "\n# youmo-words 1\n# header\n幽默 you'mo\n~ 这个誓言很难 zhe'ge'shi'yan'hen'nan 3.0\n~搭子 da'zi 2\n!尬 ga\n"
+        PinyinDictManager.importFromInputStream(export.byteInputStream(), "export.txt").getOrThrow()
+        assertEquals(
+            listOf("幽默 you'mo 0.0", "这个誓言很难 zhe'ge'shi'yan'hen'nan 0.0", "搭子 da'zi 0.0"),
+            File(dir, "export.txt").readLines(),
+        )
+        PinyinDictManager.importFromInputStream("幽默 you'mo\n~ 搭子 da'zi 2\n".byteInputStream(), "list.txt").getOrThrow()
+        assertEquals(listOf("幽默 you'mo 0.0"), File(dir, "list.txt").readLines())
+    }
+
     // the list of those an older build merged into the new words goes as the dictionaries are listed
     @Test
     fun aDictionaryIsImportedAndDeleted() {

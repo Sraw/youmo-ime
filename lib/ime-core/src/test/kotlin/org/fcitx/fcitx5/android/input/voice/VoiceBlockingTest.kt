@@ -27,9 +27,24 @@ class VoiceBlockingTest {
 
     @Test
     fun withinALongerWordOrAcrossTwoItIsNot() {
-        // 开饭店 one word; 打开 饭盒 two, the blocked word across them
-        assertEquals(0, VoiceBlocking.pick(listOf("开饭店"), blocked, mapOf("开饭店" to intArrayOf(0, 3))))
+        // 开 饭店 (as TextWords splits a word of three again); 打开 饭盒 two, the blocked word across them
+        assertEquals(0, VoiceBlocking.pick(listOf("开饭店"), blocked, mapOf("开饭店" to intArrayOf(0, 1, 3))))
         assertEquals(0, VoiceBlocking.pick(listOf("打开饭盒"), blocked, mapOf("打开饭盒" to intArrayOf(0, 2, 4))))
+    }
+
+    @Test
+    fun belowTheFirstOnlyOneWithoutTheWordAtAll() {
+        // 打开饭盒 below the first: 开饭 across two words, still shown, so not taken
+        val split = mapOf("开饭了" to intArrayOf(0, 2, 3), "打开饭盒" to intArrayOf(0, 2, 4))
+        assertNull(VoiceBlocking.pick(listOf("开饭了", "打开饭盒"), blocked, split))
+        assertEquals(2, VoiceBlocking.pick(listOf("开饭了", "打开饭盒", "开放了"), blocked, split))
+    }
+
+    @Test
+    fun inTheLastSearchOneBelowWithoutItStandingIsTaken() {
+        val split = mapOf("开饭啦" to intArrayOf(0, 2, 3), "打开饭盒" to intArrayOf(0, 2, 4))
+        assertEquals(1, VoiceBlocking.pick(listOf("开饭啦", "打开饭盒"), blocked, split, last = true))
+        assertNull(VoiceBlocking.pick(listOf("开饭啦", "开饭了"), blocked, split + ("开饭了" to intArrayOf(0, 2, 3)), last = true))
     }
 
     @Test

@@ -91,6 +91,19 @@ class VoiceChoiceTest {
     }
 
     @Test
+    fun theSearchAgainsLowerWithoutItStandingBeatsItsBestWithIt() {
+        // the search has nothing after it: 打开饭盒 (开饭 across two words) over 开饭啦 typed with it
+        val split = words + ("打开饭盒" to intArrayOf(0, 2, 4))
+        assertEquals("打开饭盒", choose(heard("开饭了"), blocked, FakeLanguage(split)) { heard("开饭啦", "打开饭盒") })
+    }
+
+    @Test
+    fun beforeTheSearchAgainOneBelowWithTheWordAtAllIsPassedOver() {
+        // 开饭啦 below the first, though not split: passed over for 开放了
+        assertEquals("开放了", choose(heard("开饭了", "开饭啦", "开放了"), blocked, FakeLanguage(mapOf("开饭了" to intArrayOf(0, 2, 3)))))
+    }
+
+    @Test
     fun theSearchAgainStillWithItInEachTypesItsBest() {
         val again = VoiceChoice.Heard(listOf("开饭啦", "开饭了"), FloatArray(0), "开饭啦")
         assertEquals("开饭啦", choose(heard("开饭了"), blocked, FakeLanguage(words)) { again })

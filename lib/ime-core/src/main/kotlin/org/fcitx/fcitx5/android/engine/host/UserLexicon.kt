@@ -16,6 +16,7 @@ import org.fcitx.fcitx5.android.engine.user.LibimeImport
 import org.fcitx.fcitx5.android.engine.user.UserModel
 import org.fcitx.fcitx5.android.engine.user.UserModel.Entry
 import org.fcitx.fcitx5.android.engine.user.UserStore
+import org.fcitx.fcitx5.android.engine.user.WordListFiles
 import org.fcitx.fcitx5.android.engine.user.WordLists
 import java.io.File
 import java.io.IOException
@@ -258,8 +259,25 @@ internal class UserLexicon(
     fun importWords(lines: Sequence<String>): Imported {
         val add = LinkedHashSet<Entry>()
         val block = LinkedHashSet<Entry>()
+        val learn = LinkedHashMap<Entry, Float>()
         var unread = 0
-        val read = lines.mapNotNull { WordLists.line(it) }.toList()
+        // `~`, a learned word, only in the user's own export (its first line the mark): another
+        // list's line never becomes a learned word unseen, it is not read (counted unread). One
+        // pass, no line kept but as read
+        var export: Boolean? = null
+        val read = ArrayList<WordLists.Line>()
+        for (raw in lines) {
+            val line = raw.trimStart().removePrefix("\uFEFF")
+            if (export == null) export = WordListFiles.exportMark(raw)
+            if (!line.startsWith(WordListFiles.LEARNED_MARK)) {
+                WordLists.line(raw)?.let(read::add)
+                continue
+            }
+            val rest = line.removePrefix(WordListFiles.LEARNED_MARK)
+            val word = WordLists.line(rest)
+            val entry = word?.pinyin?.let { WordLists.entry(word.text, it) }
+            if (export != true || entry == null || word.blocked) unread++ else learn[entry] = learnedCount(rest)
+        }
         val guessed = assets.pinyinsOf(read.filter { it.pinyin == null && it.text.isNotEmpty() }.map { it.text }, strayFirst = true)
         for (line in read) {
             val pinyin = line.pinyin ?: guessed[line.text]
@@ -278,12 +296,42 @@ internal class UserLexicon(
             blocked = blockAll(block.toList())
             dropSessions()
         }
-        return Imported(added, blocked, unread)
+        return Imported(added, blocked, unread, learnAll(learn))
+    }
+
+    /**
+     * Learns each of [words] with its count, as a phone move brings them back: not one added,
+     * blocked or already learned (no count twice). Kept as compaction writes counts. How many.
+     */
+    private fun learnAll(words: Map<Entry, Float>): Int {
+        if (words.isEmpty()) return 0
+        val added = lists.addedWords.toHashSet()
+        val blocked = lists.blockedWords.toHashSet()
+        val model = user()
+        var learned = 0
+        for ((entry, count) in words) {
+            if (entry in added || entry in blocked || model.hasLearned(listOf(entry))) continue
+            model.learn(null, listOf(entry))
+            // as it was, under one too (halved over time)
+            if (count != 1f) model.addCount(entry, count - 1f)
+            learned++
+        }
+        if (learned > 0) {
+            // the counts past the one learned are in no journal record: written out whole
+            compactUser()
+            dropSessions()
+        }
+        return learned
     }
 
     fun exportWords(): List<String> = userWords().map {
         val line = "${it.text} ${it.pinyin.replace(' ', '\'')}"
-        if (it.kind == UserWord.Kind.BLOCKED) "!$line" else line
+        when (it.kind) {
+            UserWord.Kind.BLOCKED -> "!$line"
+            // its count after it, for its place: read back only from an export (importWords)
+            UserWord.Kind.LEARNED -> "${WordListFiles.LEARNED_MARK} $line ${it.count}"
+            UserWord.Kind.ADDED -> line
+        }
     }
 
     /**
@@ -439,3 +487,7 @@ internal class UserLexicon(
         userModel = null
     }
 }
+
+
+// a learned line's count, its last field; 1 for none
+private fun learnedCount(line: String) = line.trim().split(' ').last().toFloatOrNull()?.takeIf { it > 0f } ?: 1f

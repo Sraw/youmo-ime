@@ -19,6 +19,12 @@ class CoarseWordsTest {
         assertEquals(list.distinct(), list)
     }
 
+    // PY-37: `cao` put 肏 on the first page
+    @Test
+    fun theVulgarCaoIsListed() {
+        assertTrue(listOf("肏", "肏你妈", "操逼").all { it in CoarseWords.LIST })
+    }
+
     /** The words coarse.txt's header keeps out, typed on purpose or as common in another sense: ranked lower, they would get in the way. */
     @Test
     fun wordsTheHeaderKeepsOutAreNotListed() {

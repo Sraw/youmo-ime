@@ -61,6 +61,8 @@ class UserLexiconTest : EnginesFixture() {
             }
         },
         dir,
+        // the user's words coded for the table at once, not in the background
+        warmUps = { it.run() },
         additions = { additions },
         // a pick, not a code's one candidate committing itself
     ).apply { settings = settings.copy(tables = mapOf("Wubi" to TableSettings(autoSelect = false, saveAutoPhraseAfter = saveAfter))) }

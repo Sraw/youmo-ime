@@ -62,7 +62,7 @@ object PinyinDictManager {
             val words = if (raw is TextDictionary) {
                 // read where it is, not copied as UTF-8 first: Sogou's export is UTF-16, older lists GB18030
                 raw.file.useLines(WordListFiles.charset { raw.file.inputStream() }) { lines ->
-                    ImportedDictionaries.write(lines.mapNotNull(WordListFiles::baseLine), dest)
+                    ImportedDictionaries.write(WordListFiles.baseLines(lines), dest)
                 }
             } else {
                 raw.toTextDictionary(text)

@@ -70,8 +70,10 @@ internal class EngineAssets(
         }
     }
 
-    // built once for the pinyins' sessions, which read the same data and score alike
-    val charSyllables by lazy(LazyThreadSafetyMode.NONE) { Predictor.charReadingsOf(pinyinData.dictionary, pinyinData.vocabulary) }
+    // built once for the pinyins' sessions, which read the same data and score alike; 联想 reads it at
+    // a table's first commit, half a second on a phone: built on Engines' warm-up thread meanwhile
+    // (UAT TBL-04/19 read the field before that commit landed), so made under a lock
+    val charSyllables by lazy { Predictor.charReadingsOf(pinyinData.dictionary, pinyinData.vocabulary) }
 
     private var extensions: Array<IntArray?>? = null
 
@@ -211,7 +213,7 @@ internal class EngineAssets(
 
     private val textWords by lazy(LazyThreadSafetyMode.NONE) { TextWords(pinyinData.model, pinyinData.wordIndex) }
 
-    fun wordBoundaries(texts: Collection<String>): Map<String, IntArray> = texts.associateWith { textWords.boundaries(it) }
+    fun wordBoundaries(texts: Collection<String>): Map<String, IntArray> = texts.associateWith { textWords.boundaries(it, splitLong = true) }
 
     fun logProbs(texts: List<String>): FloatArray = FloatArray(texts.size) { textWords.logProb(texts[it]) }
 

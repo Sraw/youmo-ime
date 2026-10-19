@@ -256,10 +256,10 @@ class PinyinDictionaryFragment : PaddingPreferenceFragment() {
     private suspend fun inspect(ctx: Context, uri: Uri): Incoming? {
         val cr = ctx.contentResolver
         val fileName = withContext(Dispatchers.IO) { cr.queryFileName(uri) } ?: return null
-        val export = readAsWordList(fileName) && withContext(Dispatchers.IO) {
-            WordListFiles.isUserExport(cr.openInputStreamOrThrow(uri).use { it.readAtMost(EXPORT_PEEK) })
+        val head = if (!readAsWordList(fileName)) null else withContext(Dispatchers.IO) {
+            cr.openInputStreamOrThrow(uri).use { it.readAtMost(EXPORT_PEEK) }
         }
-        return Incoming(fileName, export)
+        return Incoming(fileName, head?.let(WordListFiles::isUserExport) == true, head?.let(WordListFiles::isOwnExport) == true)
     }
 
     /**
@@ -280,9 +280,40 @@ class PinyinDictionaryFragment : PaddingPreferenceFragment() {
         AlertDialog.Builder(ctx)
             .setTitle(R.string.import_into_title)
             .setSingleChoiceItems(items, picked) { _, which -> picked = which }
-            .setPositiveButton(R.string.import_dict) { _, _ -> import(uri, incoming, targets[picked]) }
+            .setPositiveButton(R.string.import_dict) { _, _ -> checkTarget(ctx, uri, incoming, targets[picked]) }
             .setNegativeButton(android.R.string.cancel, null)
             .show()
+    }
+
+    /**
+     * Imports [incoming] into [target], first suggesting the base for a big list picked into the
+     * user dictionary: each of its words is favoured (ranking, a voice hotword each), which a
+     * long list dilutes.
+     */
+    private fun checkTarget(ctx: Context, uri: Uri, incoming: Incoming, target: Target) {
+        if (!needsCount(target == Target.USER, incoming)) return import(uri, incoming, target)
+        lifecycleScope.withLoadingDialog(ctx) {
+            val words = try {
+                countWords(incoming.fileName) { ctx.contentResolver.openInputStreamOrThrow(uri) }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (@Suppress("TooGenericExceptionCaught") e: Exception) {
+                // a provider's error comes back as any kind: shown, as import() does
+                ctx.importErrorDialog(e)
+                return@withLoadingDialog
+            }
+            if (!suggestsBase(words)) return@withLoadingDialog import(uri, incoming, target)
+            val builder = AlertDialog.Builder(ctx)
+                .setTitle(R.string.import_big_into_user_title)
+                .setMessage(getString(R.string.import_big_into_user, words))
+                .setNegativeButton(R.string.import_big_into_user_keep) { _, _ -> import(uri, incoming, Target.USER) }
+                .setNeutralButton(android.R.string.cancel, null)
+            // the base takes only a dictionary's file type
+            if (PinyinDictionary.Type.fromFileName(withLowercaseExtension(incoming.fileName)) != null) {
+                builder.setPositiveButton(R.string.import_big_into_user_base) { _, _ -> import(uri, incoming, Target.BASE) }
+            }
+            builder.show()
+        }
     }
 
     private fun import(uri: Uri, incoming: Incoming, target: Target) {
@@ -325,7 +356,7 @@ class PinyinDictionaryFragment : PaddingPreferenceFragment() {
         }
         AlertDialog.Builder(ctx)
             .setTitle(R.string.import_dict)
-            .setMessage(getString(R.string.import_words_done, imported.added, imported.blocked, imported.unread))
+            .setMessage(getString(R.string.import_words_done, imported.added + imported.learned, imported.blocked, imported.unread))
             .setPositiveButton(android.R.string.ok, null)
             .show()
     }
@@ -395,8 +426,50 @@ internal suspend fun importWordsFrom(
         withContext(Dispatchers.IO) { PinyinDictManager.readWords(open(), fileName, import) }
     }
 
-/** A file to import, named [fileName]; [userExport] if it is the user dictionary's export. */
-internal class Incoming(val fileName: String, val userExport: Boolean = false) {
+/** More words than this, picked into the user dictionary, and the base is suggested instead. */
+internal const val USER_IMPORT_HINT_WORDS = 1000
+
+/** Whether a file of [words] words, picked into the user dictionary, gets the hint to use the base. */
+internal fun suggestsBase(words: Int) = words > USER_IMPORT_HINT_WORDS
+
+/**
+ * Whether [incoming], picked into the user dictionary ([intoUser]), is counted for the big-list
+ * hint: not the user dictionary's own export, which comes back where it was however big. Only
+ * the export's header tells it: a third-party list with a `!` line ([Incoming.userExport]) is
+ * counted like any other.
+ */
+internal fun needsCount(intoUser: Boolean, incoming: Incoming) = intoUser && !incoming.ownExport
+
+/**
+ * About the words the user dictionary's import would add from the file named [fileName], for the
+ * big-list hint: each different word, a blocked one, a learned one's line (only an export's, never
+ * counted) and an unreadable line left out. A line with pinyin is keyed by its word and pinyin, as
+ * the import keys it; one without by its text alone, its pinyin not guessed here. So it can only
+ * over-count: a word without pinyin that the engine cannot guess, or one listed both with and
+ * without pinyin, counts once more, which matters only near the threshold. The file is read again
+ * for the import: a .dict/.scel is converted a line at a time, never held whole.
+ */
+internal suspend fun countWords(fileName: String, open: () -> InputStream): Int =
+    importWordsFrom(fileName, open) { lines ->
+        // as the import keys them: a word with its pinyin (WordLists.entry), one without by its
+        // text, its pinyin guessed alike; `~` (a learned word, WordListFiles.LEARNED_MARK) is only
+        // the export's, which is not counted, so here it is an unread line
+        val blocked = HashSet<Any>()
+        val added = HashSet<Any>()
+        lines.filterNot { it.trimStart().removePrefix("\uFEFF").startsWith(WordListFiles.LEARNED_MARK) }
+            .mapNotNull { raw -> WordLists.line(raw)?.takeIf { it.text.isNotEmpty() } }
+            .forEach { line ->
+                val key: Any? = line.pinyin.let { if (it == null) line.text else WordLists.entry(line.text, it) }
+                if (key != null) if (line.blocked) blocked += key else added += key
+            }
+        Engines.Imported((added - blocked).size, 0, 0)
+    }.added
+
+/**
+ * A file to import, named [fileName]; [userExport] if it looks like the user dictionary's export
+ * (WordListFiles.isUserExport: its header, or a `!` line), [ownExport] only if it has the header.
+ */
+internal class Incoming(val fileName: String, val userExport: Boolean = false, val ownExport: Boolean = userExport) {
     /** what it is kept as */
     val name = PinyinDictionary.nameOf(fileName)
 }

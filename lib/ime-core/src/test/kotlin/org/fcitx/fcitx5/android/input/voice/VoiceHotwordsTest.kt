@@ -41,7 +41,7 @@ class VoiceHotwordsTest {
             UserWord("内卷", "nei juan", Kind.BLOCKED),
             UserWord("X", "", Kind.BLOCKED),
         )
-        assertEquals(VoiceHotwords.Words("幽 默/佛 系", "尬 聊/内 卷"), VoiceHotwords.ofUser(words))
+        assertEquals(VoiceHotwords.Words("幽 默 :5.0/佛 系", "尬 聊/内 卷"), VoiceHotwords.ofUser(words))
         assertEquals(VoiceHotwords.Words.NONE, VoiceHotwords.ofUser(emptyList()))
     }
 
@@ -49,5 +49,47 @@ class VoiceHotwordsTest {
     fun atMostSoMany() {
         val words = (0 until VoiceHotwords.MAX_USER + 10).map { UserWord("词" + ('一' + it), "", Kind.LEARNED) }
         assertEquals(VoiceHotwords.MAX_USER, VoiceHotwords.ofUser(words).hotwords.split('/').size)
+    }
+
+    @Test
+    fun aListenerTheReadCameTooLateForUsesTheLastReadAndTheLateOneIsKeptForTheNext() {
+        // VO-10/VO-14 (F2458, F2467): an engine too busy to answer in time leaves the words last read in use, never none
+        val remembered = VoiceHotwords.Remembered()
+        val first = VoiceHotwords.Words("澜 境", "天 气")
+        assertEquals(first, remembered.inTime(remembered.read(remembered.start(), first)))
+        // the next read comes late: this listener has the first words
+        val late = remembered.start()
+        assertEquals(first, remembered.inTime(null))
+        val added = VoiceHotwords.Words("澜 境 花 园", "天 气")
+        remembered.read(late, added)
+        // the next listener, the late read's
+        assertEquals(added, remembered.inTime(null))
+    }
+
+    @Test
+    fun aReadStartedEarlierButDoneLaterDoesNotReplaceANewerOne() {
+        val remembered = VoiceHotwords.Remembered()
+        val older = remembered.start()
+        val newer = remembered.start()
+        val fresh = VoiceHotwords.Words("花 园", "")
+        remembered.read(newer, fresh)
+        remembered.read(older, VoiceHotwords.Words.NONE)
+        assertEquals(fresh, remembered.last)
+    }
+
+    @Test
+    fun aReadStillUnderWayIsSharedAndOneDoneGivesWayToANewOne() {
+        // F2498: holds while a slow read runs wait on it; once it is done the next hold reads again
+        val remembered = VoiceHotwords.Remembered()
+        val launched = mutableListOf<Long>()
+        var running = true
+        val read = { remembered.shared<Long>({ running }) { ticket -> ticket.also { launched += it } } }
+        assertEquals(1L, read())
+        assertEquals(1L, read())
+        assertEquals(1L, read())
+        assertEquals(listOf(1L), launched)
+        running = false
+        assertEquals(2L, read())
+        assertEquals(listOf(1L, 2L), launched)
     }
 }

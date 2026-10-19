@@ -24,12 +24,16 @@ object VoiceBlocking {
     /**
      * The first of [nbest] in which none of [blocked] stands as words, given [boundaries] of the
      * [suspects] (offsets between words, as TextWords.boundaries); null if none is. A suspect
-     * with no boundaries (the engine could not split it) is taken to have one.
+     * with no boundaries (the engine could not split it) is taken to have one. Below the first,
+     * only one without them at all: 今天气很好 for 今天天气很好 with 天气 blocked (今天 气) is a
+     * worse hearing that still shows it (VO-10); the search again with it blocked does better.
+     * That search, with nothing after it, takes any [last]: one below its first without them
+     * standing beats its first with them standing.
      */
-    fun pick(nbest: List<String>, blocked: List<String>, boundaries: Map<String, IntArray>): Int? =
+    fun pick(nbest: List<String>, blocked: List<String>, boundaries: Map<String, IntArray>, last: Boolean = false): Int? =
         nbest.indices.firstOrNull { i ->
             val text = typed(nbest[i])
-            blocked.none { word -> word in text && stands(text, word, boundaries[text]) }
+            blocked.none { word -> word in text && ((i > 0 && !last) || stands(text, word, boundaries[text])) }
         }
 
     // as far as a blocked word goes, what is typed: VoiceText takes out the spaces X-ASR puts by

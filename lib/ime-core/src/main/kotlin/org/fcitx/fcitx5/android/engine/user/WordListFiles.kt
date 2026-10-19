@@ -19,6 +19,13 @@ object WordListFiles {
      */
     const val EXPORT_MARK = "# youmo-words 1"
 
+    /**
+     * Before a learned word in the export, apart from it (`~ 拟好 ni'hao 3.0`), as `!` before a
+     * blocked one: no other input method's list starts a line so, and apart, an older version
+     * reads the line as two words, so not at all (not a word `~拟好`).
+     */
+    const val LEARNED_MARK = "~"
+
     /** The first lines of an export: [EXPORT_MARK], then [header], the translated one. */
     fun exportHead(header: String) = "$EXPORT_MARK\n$header\n"
 
@@ -54,33 +61,73 @@ object WordListFiles {
      * is one already (its cost kept), else read as the user dictionary reads a word list
      * ([WordLists.line]: `you mo 幽默`, a Sogou export's `'you'mo 幽默 1`) and written so. Null for
      * a line neither reads, a word with no pinyin (the base has nothing to guess it from) or a
-     * blocked one: the base cannot block.
+     * blocked one: the base cannot block. A learned word ([LEARNED_MARK]) is read only in the
+     * user's [export], as the user dictionary's import reads it; in another list, none.
      */
-    fun baseLine(line: String): String? {
+    fun baseLine(line: String, export: Boolean = false): String? {
         // the byte order mark, read as a character in UTF-8 and UTF-16 alike
-        val plain = line.removePrefix("\uFEFF")
-        if (LibimeImport.dictionaryEntry(plain) != null) return plain
+        val bare = line.removePrefix("\uFEFF")
+        // a learned word of the user's export: the word, its count no cost
+        val learned = bare.trimStart().startsWith(LEARNED_MARK)
+        if (learned && !export) return null
+        val plain = if (learned) bare.trimStart().removePrefix(LEARNED_MARK) else bare
+        if (!learned && LibimeImport.dictionaryEntry(plain) != null) return plain
         val read = WordLists.line(plain) ?: return null
         if (read.blocked) return null
         val entry = WordLists.entry(read.text, read.pinyin ?: return null) ?: return null
         return "${escapeValue(entry.text)} ${WordLists.code(entry.syllables)} 0"
     }
 
+    /** [lines], a text file, as [baseLine] reads them: an export ([EXPORT_MARK] its first line not blank) with its learned words. */
+    fun baseLines(lines: Sequence<String>): Sequence<String> {
+        var export: Boolean? = null
+        return lines.mapNotNull { line ->
+            if (export == null) export = exportMark(line)
+            baseLine(line, export == true)
+        }
+    }
+
     /**
-     * Whether [head], the start of a file, is the user dictionary's export: its first line is
-     * [EXPORT_MARK] (or an older export's header, in any language shipped), or it has a blocked
-     * word (`!`), which no other list has and which the base, should it be imported there, would drop.
+     * The lines of [head], the start of a file, decoded up to its last whole line: a character cut
+     * in two would read UTF-8 as GB18030 and garble the rest; UTF-16 (by its byte order mark) to a
+     * whole code unit, its newline being two bytes.
      */
-    fun isUserExport(head: ByteArray): Boolean {
-        // up to the last whole line: a character cut in two would read the UTF-8 as GB18030; UTF-16
-        // (by its byte order mark) to a whole code unit, its newline being two bytes
+    private fun headLines(head: ByteArray): Sequence<String> {
         val utf16 = WordLists.bomCharset(head, head.size) != null
         val end = if (utf16) head.size and 1.inv() else head.lastIndexOf('\n'.code.toByte()) + 1
-        val lines = WordLists.decode(if (end > 0) head.copyOf(end) else head).lineSequence()
-        return lines.withIndex().any { (i, line) ->
-            (i == 0 && line.removePrefix("\uFEFF").trim().let { it == EXPORT_MARK || it in OLD_HEADERS }) ||
-                line.trimStart().startsWith("!")
-        }
+        return WordLists.decode(if (end > 0) head.copyOf(end) else head).lineSequence()
+    }
+
+    /** [line] without a byte order mark and the spaces around it; null for one with nothing else. */
+    private fun header(line: String) = line.removePrefix("\uFEFF").trim().takeIf { it.isNotEmpty() }
+
+    /**
+     * Whether a file is an export, told line by line from its start: null for [line] with nothing
+     * but a byte order mark or spaces (the answer comes from a later one), else whether it is
+     * [EXPORT_MARK] (or, [old], also an older export's header). The one rule [baseLines], the user
+     * dictionary's import and [isOwnExport] tell an export by: its first non-blank line.
+     */
+    internal fun exportMark(line: String, old: Boolean = false): Boolean? =
+        header(line)?.let { it == EXPORT_MARK || (old && it in OLD_HEADERS) }
+
+    /**
+     * Whether [head], a file's start, begins with an export's header: its first non-blank line (as
+     * [baseLines] and the user dictionary's import tell an export) is [EXPORT_MARK] or an older
+     * export's header. A `!` line tells nothing here.
+     */
+    fun isOwnExport(head: ByteArray): Boolean = isOwnExport(headLines(head))
+
+    private fun isOwnExport(lines: Sequence<String>) = lines.firstNotNullOfOrNull { exportMark(it, old = true) } == true
+
+    /**
+     * Whether [head], the start of a file, is the user dictionary's export: [isOwnExport], or it has
+     * a blocked word (`!`), which no other list has and which the base, should it be imported there,
+     * would drop.
+     */
+    fun isUserExport(head: ByteArray): Boolean {
+        // decoded once: both questions read the same lines
+        val lines = headLines(head).toList().asSequence()
+        return isOwnExport(lines) || lines.any { it.removePrefix("\uFEFF").trimStart().startsWith("!") }
     }
 
     private const val BUFFER = 8192

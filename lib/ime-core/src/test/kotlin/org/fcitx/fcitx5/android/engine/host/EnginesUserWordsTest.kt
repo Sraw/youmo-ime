@@ -10,6 +10,7 @@ import org.fcitx.fcitx5.android.engine.session.Offer
 import org.fcitx.fcitx5.android.engine.user.LibimeImport
 import org.fcitx.fcitx5.android.engine.user.UserLog
 import org.fcitx.fcitx5.android.engine.user.UserModel
+import org.fcitx.fcitx5.android.engine.user.WordListFiles
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -43,6 +44,8 @@ class EnginesUserWordsTest {
         .entry("行", syl("hang"))
         .entry("航", syl("hang"))
         .entry("星", syl("xing"))
+        // a phrase as one word: voice blocking splits it again
+        .unigram("你好拟", -3f, 0f)
         .build()
         .toByteArray()
 
@@ -234,6 +237,13 @@ class EnginesUserWordsTest {
     }
 
     @Test
+    fun voiceBlockingsBoundariesSplitAPhraseIntoItsWords() {
+        Engines(::load, folder.newFolder()).use { engines ->
+            assertEquals(listOf(0, 1, 2, 3), engines.wordBoundaries(listOf("你好拟")).getValue("你好拟").toList())
+        }
+    }
+
+    @Test
     fun aListImportedIsAddedAndBlockedAndExportsAsItWasImported() {
         Engines(::load, folder.newFolder()).use { engines ->
             val imported = engines.importWords(
@@ -263,6 +273,120 @@ class EnginesUserWordsTest {
             // read back: nothing new
             assertEquals(Engines.Imported(added = 0, blocked = 0, unread = 0), engines.importWords(engines.exportWords().asSequence()))
             assertEquals(5, engines.userWords().size)
+        }
+    }
+
+    // 拟 then 好, over the decoder's 你好: learned as the user's word 拟好
+    private fun Engines.learnNiHao() {
+        type(Engines.PINYIN, "nihao")
+        onEvent(Engines.PINYIN, EngineEvent.PICK, candidates(Engines.PINYIN, 0, 20).indexOfFirst { it.text == "拟" })
+        onEvent(Engines.PINYIN, EngineEvent.PICK, 0)
+        onEvent(Engines.PINYIN, EngineEvent.RESET, 0)
+    }
+
+    private fun exported(lines: List<String>) = (listOf(WordListFiles.EXPORT_MARK, "# header") + lines).asSequence()
+
+    @Test
+    fun anExportBringsLearnedWordsBackLearnedWithTheirCounts() {
+        val (export, count) = Engines(::load, folder.newFolder()).use { engines ->
+            engines.learnNiHao()
+            engines.learnNiHao()
+            engines.addWord("妮浩", "nihao")
+            engines.blockWord("航", "hang")
+            val count = engines.userWords(Engines.UserWord.Kind.LEARNED).single().count
+            assertTrue(count > 1f)
+            engines.exportWords() to count
+        }
+        assertEquals(listOf("妮浩 ni'hao", "~ 拟好 ni'hao $count", "!航 hang"), export)
+        val dir = folder.newFolder()
+        Engines(::load, dir).use { engines ->
+            assertEquals(Engines.Imported(added = 1, blocked = 1, unread = 0, learned = 1), engines.importWords(exported(export)))
+            assertEquals(listOf("妮浩"), engines.userWords(Engines.UserWord.Kind.ADDED).map { it.text })
+            assertEquals(listOf("航"), engines.userWords(Engines.UserWord.Kind.BLOCKED).map { it.text })
+        }
+        // kept across a start, and not counted twice
+        Engines(::load, dir).use { engines ->
+            assertEquals(listOf("拟好" to count), engines.userWords(Engines.UserWord.Kind.LEARNED).map { it.text to it.count })
+            assertEquals(Engines.Imported(added = 0, blocked = 0, unread = 0, learned = 0), engines.importWords(exported(export)))
+            assertEquals(listOf("拟好" to count), engines.userWords(Engines.UserWord.Kind.LEARNED).map { it.text to it.count })
+        }
+    }
+
+    // an export is told by its first non-blank line, as the base's reading and the import hint tell it:
+    // a byte order mark alone, then a blank line, before the mark
+    @Test
+    fun anExportStartingWithBlankLinesStillBringsLearnedWordsBack() {
+        Engines(::load, folder.newFolder()).use { engines ->
+            val lines = sequenceOf("\uFEFF", "", WordListFiles.EXPORT_MARK, "~ 拟好 ni'hao 2.0")
+            assertEquals(1, engines.importWords(lines).learned)
+            assertEquals(listOf("拟好" to Engines.UserWord.Kind.LEARNED), engines.userWords().map { it.text to it.kind })
+        }
+    }
+
+    @Test
+    fun anAddedWordMarkedLearnedStaysAdded() {
+        Engines(::load, folder.newFolder()).use { engines ->
+            engines.addWord("拟好", "ni hao")
+            assertEquals(0, engines.importWords(exported(listOf("~ 拟好 ni'hao 2.0"))).learned)
+            assertEquals(listOf("拟好" to Engines.UserWord.Kind.ADDED), engines.userWords().map { it.text to it.kind })
+        }
+    }
+
+    @Test
+    fun aBlockedWordMarkedLearnedStaysBlocked() {
+        Engines(::load, folder.newFolder()).use { engines ->
+            engines.blockWord("拟好", "ni hao")
+            assertEquals(0, engines.importWords(exported(listOf("~ 拟好 ni'hao 2.0"))).learned)
+            assertEquals(listOf("拟好" to Engines.UserWord.Kind.BLOCKED), engines.userWords().map { it.text to it.kind })
+        }
+    }
+
+    @Test
+    fun aLearnedCountUnderOneComesBackAsItWas() {
+        val dir = folder.newFolder()
+        Engines(::load, dir).use { engines ->
+            engines.importWords(exported(listOf("~ 拟好 ni'hao 0.5")))
+            assertEquals(listOf("拟好" to 0.5f), engines.userWords(Engines.UserWord.Kind.LEARNED).map { it.text to it.count })
+        }
+        // and so after a start
+        Engines(::load, dir).use { engines ->
+            assertEquals(listOf("拟好" to 0.5f), engines.userWords(Engines.UserWord.Kind.LEARNED).map { it.text to it.count })
+        }
+    }
+
+    @Test
+    fun aLearnedLineWithNoCountIsOnceAndOneWithNoWordIsUnread() {
+        Engines(::load, folder.newFolder()).use { engines ->
+            val lines = listOf(
+                // no count: once
+                "~ 拟好 ni'hao",
+                // blocked too, no pinyin, a pinyin it does not read as
+                "~ !航 hang",
+                "~ 航星",
+                "~ 航星 zz",
+                // the mark against the word, as well
+                "~好拟 hao'ni 2.0",
+            )
+            assertEquals(Engines.Imported(added = 0, blocked = 0, unread = 3, learned = 2), engines.importWords(exported(lines)))
+            assertEquals(listOf("好拟" to 2f, "拟好" to 1f), engines.userWords(Engines.UserWord.Kind.LEARNED).map { it.text to it.count })
+        }
+    }
+
+    @Test
+    fun anOlderExportComesBackAdded() {
+        Engines(::load, folder.newFolder()).use { engines ->
+            // the header of an export from before EXPORT_MARK
+            val old = sequenceOf("# 幽默输入法用户词库：一行一个词，词后面是拼音；! 开头的是屏蔽的词", "拟好 ni'hao")
+            assertEquals(Engines.Imported(added = 1, blocked = 0, unread = 0), engines.importWords(old))
+            assertEquals(listOf("拟好" to Engines.UserWord.Kind.ADDED), engines.userWords().map { it.text to it.kind })
+        }
+    }
+
+    @Test
+    fun aLearnedMarkOutsideAnExportIsNotRead() {
+        Engines(::load, folder.newFolder()).use { engines ->
+            assertEquals(Engines.Imported(added = 0, blocked = 0, unread = 1), engines.importWords(sequenceOf("~拟好 ni'hao 3")))
+            assertEquals(emptyList<Engines.UserWord>(), engines.userWords())
         }
     }
 

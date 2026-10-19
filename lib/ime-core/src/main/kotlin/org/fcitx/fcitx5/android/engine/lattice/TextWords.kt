@@ -41,18 +41,35 @@ class TextWords(
     /**
      * Where [text] splits into words, split whole as [lastTwo] splits its end: the offsets
      * between them, 0 and the length included, ascending. A char no word covers is one of its own.
+     * With [splitLong] (voice blocking), a word of three chars or more is split again, as likeliest
+     * without itself, down to words of two: the model has phrases as words, and 今天天气 is 今天
+     * 天气 (a voice result with a blocked 天气 in it is not typed, VO-10), 开饭店 开 饭店. Without
+     * it, the model's words as they are (ime-eval's 联想 after each word, comparable with earlier runs).
      */
-    fun boundaries(text: CharSequence): IntArray {
-        if (text.isEmpty()) return intArrayOf(0)
-        val split = split(text, 0)
+    fun boundaries(text: CharSequence, splitLong: Boolean = false): IntArray {
         val ends = ArrayList<Int>()
-        var end = text.length
-        while (end > 0) {
-            ends += end
-            end = split.start[end]
-        }
         ends += 0
-        return ends.asReversed().toIntArray()
+        within(text, 0, text.length, MAX_WORD, ends, splitLong)
+        return ends.toIntArray()
+    }
+
+    // the ends of the words [begin, end) of text splits into, with [longest] chars at most, each
+    // of three chars or more split again with [splitLong]
+    private fun within(text: CharSequence, begin: Int, end: Int, longest: Int, ends: MutableList<Int>, splitLong: Boolean) {
+        if (end == begin) return
+        val split = split(text, begin, end, longest)
+        val starts = ArrayList<Int>()
+        var at = end - begin
+        while (at > 0) {
+            starts += at
+            at = split.start[at]
+        }
+        var from = begin
+        for (wordEnd in starts.asReversed()) {
+            val to = begin + wordEnd
+            if (splitLong && to - from >= MIN_SPLIT) within(text, from, to, to - from - 1, ends, true) else ends += to
+            from = to
+        }
     }
 
     /**
@@ -106,15 +123,15 @@ class TextWords(
     // (relative to from) and where it starts
     private class Split(val word: IntArray, val start: IntArray)
 
-    private fun split(text: CharSequence, from: Int): Split {
-        val n = text.length - from
+    private fun split(text: CharSequence, from: Int, until: Int = text.length, longest: Int = MAX_WORD): Split {
+        val n = until - from
         val best = FloatArray(n + 1) { Float.NEGATIVE_INFINITY }
         val word = IntArray(n + 1) { NO_WORD }
         val start = IntArray(n + 1)
         best[0] = 0f
         val unknown = model.score(NO_WORD)
         for (end in 1..n) {
-            for (length in 1..minOf(MAX_WORD, end)) {
+            for (length in 1..minOf(longest, end)) {
                 val begin = end - length
                 val id = index.find(text, from + begin, from + end)
                 val score = when {
@@ -135,6 +152,9 @@ class TextWords(
     companion object {
         // the longest word looked for: the model's are shorter, but for a few names
         const val MAX_WORD = 8
+
+        // a word as long as this is split again for boundaries: one of two holds no other of two
+        private const val MIN_SPLIT = 3
         private const val WINDOW = 3 * MAX_WORD
 
         // the states of logProb at an offset: a word ending there of each length, or the word before

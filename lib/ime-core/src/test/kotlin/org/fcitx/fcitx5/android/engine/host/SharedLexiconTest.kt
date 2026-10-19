@@ -158,4 +158,85 @@ class SharedLexiconTest {
             assertFalse("好你" in engines.type("engine-wubi", "vbw").candidates)
         }
     }
+
+    // 你好 a word of pinyin's dictionary, not the table's (a table keeps only the commoner of the
+    // dictionary's words at a code): its code wqvb has the table's own word only, which would
+    // commit itself. A word the user adds or imports is typable there all the same (UAT TBL-12;
+    // the owner, 2026-10-19: 码表也需要导入词库)
+    private fun knownToPinyin(): (String) -> ByteBuffer {
+        val known = PinyinDataBuilder()
+            .unigram("<unk>", -7f, 0f).unigram("你", -2f, 0f).unigram("好", -2.5f, 0f).unigram("你好", -3f, 0f)
+            .entry("你", syl("ni")).entry("好", syl("hao")).entry("你好", syl("ni", "hao"))
+            .build().toByteArray()
+        val table = CodeTable.Builder()
+            .header("键码", "abcdefghijklmnopqrstuvwxy").header("码长", "4").rule("e2", "p11+p12+p21+p22")
+            .entry("wqiy", "你").entry("vbg", "好").entry("wqvb", "仰泳")
+            .build().toByteArray()
+        return { path: String ->
+            ByteBuffer.wrap(
+                when (path) {
+                    Engines.PINYIN_DATA -> known
+                    "${Engines.TABLE_DIR}/wbx.data" -> table
+                    else -> throw FileNotFoundException(path)
+                },
+            )
+        }
+    }
+
+    @Test
+    fun aDictionaryWordAddedByHandIsTypedInTheTables() {
+        val load = knownToPinyin()
+        Engines(load, folder.newFolder("engine")).use { engines ->
+            engines.type("engine-wubi", "vbg")
+            engines.onEvent("engine-wubi", EngineEvent.RESET, 0)
+            assertTrue(engines.addWord("你好", "ni hao"))
+            val typed = engines.type("engine-wubi", "wqvb")
+            assertEquals("", typed.commit)
+            assertTrue("你好" in typed.candidates)
+        }
+    }
+
+    @Test
+    fun aWordOfAnImportedDictionaryIsTypedInTheTablesThoughPinyinsDictionaryHasIt() {
+        val additions = Engines.Additions("", "d") { sequenceOf("你好 ni'hao 0") }
+        Engines(knownToPinyin(), folder.newFolder("engine"), warmUps = { it.run() }, additions = { additions }).use { engines ->
+            val typed = engines.type("engine-wubi", "wqvb")
+            assertEquals("", typed.commit)
+            // after the table's own
+            assertEquals(listOf("仰泳", "你好"), typed.candidates)
+        }
+    }
+
+    // F2442: what the real SharedWords.learned lets a table offer to forget, as the owner decided
+    @Test
+    fun aSharedWordIsForgettableInATableOnlyOnceTypedOrMade() {
+        val additions = Engines.Additions("", "d") { sequenceOf("你好 ni'hao 0") }
+        Engines(knownToPinyin(), folder.newFolder("engine"), warmUps = { it.run() }, additions = { additions }).use { engines ->
+            fun forgettable(code: String = "wqvb", text: String = "你好"): Boolean {
+                val i = engines.type("engine-wubi", code).candidates.indexOf(text)
+                assertTrue(i >= 0)
+                val offered = Offer.FORGET in engines.offers("engine-wubi", i)
+                engines.onEvent("engine-wubi", EngineEvent.RESET, 0)
+                return offered
+            }
+            // imported, never typed: nothing learned to forget
+            assertFalse(forgettable())
+            // typed once in pinyin: learned
+            engines.type(Engines.PINYIN, "nihao")
+            engines.onEvent(Engines.PINYIN, EngineEvent.PICK, engines.candidates(Engines.PINYIN, 0, 9).indexOfFirst { it.text == "你好" })
+            engines.onEvent(Engines.PINYIN, EngineEvent.RESET, 0)
+            assertTrue(forgettable())
+            // forgotten there: no longer
+            val i = engines.type("engine-wubi", "wqvb").candidates.indexOf("你好")
+            engines.onEvent("engine-wubi", EngineEvent.FORGET, i)
+            engines.onEvent("engine-wubi", EngineEvent.RESET, 0)
+            assertFalse(forgettable())
+            // added by hand, never typed: as pinyin offers it (PY-33, something learned to forget)
+            assertTrue(engines.addWord("好你", "hao ni"))
+            val inPinyin = engines.type(Engines.PINYIN, "haoni").candidates.indexOf("好你").also { assertTrue(it >= 0) }
+                .let { Offer.FORGET in engines.offers(Engines.PINYIN, it) }
+            engines.onEvent(Engines.PINYIN, EngineEvent.RESET, 0)
+            assertEquals(inPinyin, forgettable("vbw", "好你"))
+        }
+    }
 }

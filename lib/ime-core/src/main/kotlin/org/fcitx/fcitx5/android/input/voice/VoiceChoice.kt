@@ -7,9 +7,10 @@ package org.fcitx.fcitx5.android.input.voice
 /**
  * What of a stretch the recognizer heard is typed (VoiceEngine.recognize): the best of its
  * hypotheses by the pinyin engine's model too ([VoiceRerank]); of them, that first, the first with
- * none of the words the user blocked standing as a word in it ([VoiceBlocking]); if each has one,
- * the stretch searched again with them blocked, and of that search's hypotheses again the first
- * with none, its best if each still has one.
+ * none of the words the user blocked standing as a word in it, below it none with them at all
+ * ([VoiceBlocking]); if each has one,
+ * the stretch searched again with them blocked, and of that search's hypotheses the first with
+ * none standing, below its first too, its best if each still has one.
  */
 object VoiceChoice {
 
@@ -49,14 +50,16 @@ object VoiceChoice {
         val again = searchBlocked()
         // the search blocks a word as the model spells it: written in other tokens it can still win;
         // its best, when typed, as it writes it ([Heard.text]), as with it in each
-        return firstUnblocked(again.nbest.ifEmpty { listOf(again.text) }, blocked, language, first = again.text) ?: again.text
+        return firstUnblocked(again.nbest.ifEmpty { listOf(again.text) }, blocked, language, first = again.text, last = true) ?: again.text
     }
 
-    // the first of nbest with no blocked word standing in it, only those with one at all split;
-    // the first of all as [first], null if each has one standing
-    private suspend fun firstUnblocked(nbest: List<String>, blocked: List<String>, language: Language, first: String = nbest[0]): String? {
-        val suspects = VoiceBlocking.suspects(nbest, blocked)
-        if (suspects.isEmpty()) return first
-        return VoiceBlocking.pick(nbest, blocked, language.boundaries(suspects))?.let { if (it == 0) first else nbest[it] }
+    // the first of nbest with no blocked word standing in it (VoiceBlocking.pick, [last] as there),
+    // only the splits it reads asked for; the first of all as [first], null if none is
+    private suspend fun firstUnblocked(nbest: List<String>, blocked: List<String>, language: Language, first: String = nbest[0], last: Boolean = false): String? {
+        if (VoiceBlocking.suspects(nbest, blocked).isEmpty()) return first
+        // below the first, short of the last search, one with a blocked word at all is not taken: its split unread
+        val split = VoiceBlocking.suspects(if (last) nbest else nbest.take(1), blocked)
+        val boundaries = if (split.isEmpty()) emptyMap() else language.boundaries(split)
+        return VoiceBlocking.pick(nbest, blocked, boundaries, last)?.let { if (it == 0) first else nbest[it] }
     }
 }

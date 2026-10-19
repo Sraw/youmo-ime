@@ -39,6 +39,8 @@ open class EnginesFixture {
         .entry("wqiy", "你")
         .entry("vbg", "好")
         .entry("vbgf", "妤")
+        // a word of the built-in phrases (PhraseBook.WORD_KEYS)
+        .entry("jjad", "日期")
         .apply { "一二三四五六七".forEachIndexed { i, c -> entry("va" + ('a' + i) + "a", c.toString()) } }
         .build()
         .toByteArray()

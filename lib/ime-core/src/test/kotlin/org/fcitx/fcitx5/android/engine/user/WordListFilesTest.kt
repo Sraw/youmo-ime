@@ -8,6 +8,7 @@ import org.fcitx.fcitx5.android.engine.user.WordListFiles.EXPORT_MARK
 import org.fcitx.fcitx5.android.engine.user.WordListFiles.baseLine
 import org.fcitx.fcitx5.android.engine.user.WordListFiles.charset
 import org.fcitx.fcitx5.android.engine.user.WordListFiles.exportHead
+import org.fcitx.fcitx5.android.engine.user.WordListFiles.isOwnExport
 import org.fcitx.fcitx5.android.engine.user.WordListFiles.isUserExport
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -44,9 +45,27 @@ class WordListFilesTest {
         assertEquals("搭子 da'zi -5.5", baseLine("搭子 da'zi -5.5"))
         // the base can neither block nor guess a pinyin
         assertNull(baseLine("!尬 ga"))
+        // a learned word of the user's export: the word, its count not taken for a cost
+        assertEquals("拟好 ni'hao 0", baseLine("~ 拟好 ni'hao 3.0", export = true))
+        assertEquals("拟好 ni'hao 0", baseLine("~拟好 ni'hao 3.0", export = true))
+        // in another list: none, as the user dictionary's import reads it
+        assertNull(baseLine("~拟好 ni'hao 3.0"))
         assertNull(baseLine("幽默"))
         assertNull(baseLine("# a comment"))
         assertNull(baseLine(""))
+    }
+
+    @Test
+    fun aFileIsReadForTheBaseWithItsLearnedWordsOnlyIfAnExport() {
+        val lines = listOf("~ 拟好 ni'hao 3.0", "幽默 you'mo")
+        assertEquals(listOf("拟好 ni'hao 0", "幽默 you'mo"), WordListFiles.baseLines((listOf(EXPORT_MARK) + lines).asSequence()).toList())
+        assertEquals(listOf("幽默 you'mo"), WordListFiles.baseLines(lines.asSequence()).toList())
+    }
+
+    @Test
+    fun aLearnedLineIsNoWordToTheWordListParserOlderVersionsHave() {
+        // WordLists.line is as v0.2.0 has it: the mark apart is a second word, the line not read
+        assertEquals(WordLists.Line.UNREAD, WordLists.line("~ 拟好 ni'hao 3.0"))
     }
 
     // into the base its blocked words would be dropped and the rest lose the user dictionary's place
@@ -58,6 +77,8 @@ class WordListFilesTest {
         assertTrue(isUserExport("\uFEFF$EXPORT_MARK\r\n".toByteArray()))
         assertTrue(isUserExport(utf16le("$EXPORT_MARK\n")))
         assertTrue(isUserExport(utf16be("$EXPORT_MARK\n")))
+        // a blocked word on a first line that still carries the UTF-8 byte order mark
+        assertTrue(isUserExport("\uFEFF!幽默 you mo\n".toByteArray()))
         // a list with a blocked word, whatever its first line
         assertTrue(isUserExport("# other\n幽默 you mo\n!尬 ga\n".toByteArray()))
         assertFalse(isUserExport("幽默 you'mo 0\n$EXPORT_MARK\n".toByteArray()))
@@ -74,5 +95,37 @@ class WordListFilesTest {
             "# 幽默输入法用户词库：一行一个词，词后面是拼音；! 开头的是屏蔽的词",
             "# 幽默輸入法使用者詞庫：一行一個詞，詞後面是拼音；! 開頭的是封鎖的詞",
         ).forEach { assertTrue(it, isUserExport("$it\n幽默 you mo\n".toByteArray())) }
+    }
+
+    @Test
+    fun anExportIsToldByItsFirstNonBlankLine() {
+        val head = { text: String -> text.toByteArray() }
+        assertTrue(isOwnExport(head("# youmo-words 1\n# header\n幽默 you'mo\n")))
+        assertTrue("a blank line first", isOwnExport(head("\n  \n# youmo-words 1\n幽默 you'mo\n")))
+        // a byte order mark alone on the first line, then a blank one: told alike by the base's reading
+        val bomFirst = "\uFEFF\n\n# youmo-words 1\n~ 拟好 ni'hao 2.0\n"
+        assertTrue(isOwnExport(head(bomFirst)))
+        assertEquals(listOf("拟好 ni'hao 0"), WordListFiles.baseLines(bomFirst.lineSequence()).toList())
+        assertFalse("a list with a ! line", isOwnExport(head("鲸园\n!时间\n")))
+        assertTrue("…which is still a user export", isUserExport(head("鲸园\n!时间\n")))
+        assertFalse(isOwnExport(head("!时间\n鲸园\n")))
+        assertFalse(isOwnExport(head("# my list\n鲸园\n")))
+        val bom = byteArrayOf(0xEF.toByte(), 0xBB.toByte(), 0xBF.toByte())
+        // a big older export, the peek cut inside a character: its header still read as UTF-8
+        listOf(
+            "# Youmo IME user dictionary: a word a line, its pinyin after it; a ! before a word blocks it",
+            "# 幽默输入法用户词库：一行一个词，词后面是拼音；! 开头的是屏蔽的词",
+            "# 幽默輸入法使用者詞庫：一行一個詞，詞後面是拼音；! 開頭的是封鎖的詞",
+        ).forEach { header ->
+            val bytes = (header + "\n" + "鲸园 jing'yuan\n".repeat(6000)).toByteArray()
+            val cut = generateSequence(64 shl 10) { it - 1 }.first { (bytes[it].toInt() and 0xC0) == 0x80 }
+            assertTrue(header, isOwnExport(bytes.copyOf(cut)))
+            assertTrue("$header with a BOM", isOwnExport(bom + bytes.copyOf(cut)))
+            val text = "\n$header\n鲸园\n"
+            val le = byteArrayOf(0xFF.toByte(), 0xFE.toByte()) + text.toByteArray(Charsets.UTF_16LE)
+            val be = byteArrayOf(0xFE.toByte(), 0xFF.toByte()) + text.toByteArray(Charsets.UTF_16BE)
+            assertTrue("$header in UTF-16LE, cut mid-unit", isOwnExport(le.copyOf(le.size - 1)))
+            assertTrue("$header in UTF-16BE, cut mid-unit", isOwnExport(be.copyOf(be.size - 1)))
+        }
     }
 }

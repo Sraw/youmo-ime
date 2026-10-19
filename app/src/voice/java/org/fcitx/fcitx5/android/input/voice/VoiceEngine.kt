@@ -17,10 +17,15 @@ import com.k2fsa.sherpa.onnx.OfflineTransducerModelConfig
 import com.k2fsa.sherpa.onnx.SileroVadModelConfig
 import com.k2fsa.sherpa.onnx.Vad
 import com.k2fsa.sherpa.onnx.VadModelConfig
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.asExecutor
+import kotlinx.coroutines.async
 import kotlinx.coroutines.withTimeoutOrNull
 import org.fcitx.fcitx5.android.daemon.FcitxConnection
+import timber.log.Timber
 
 /**
  * The recognizer (X-ASR, VoiceDataPlugin): read in once, which takes a second or two and some
@@ -129,11 +134,24 @@ object VoiceEngine {
         VoiceChoice.Heard(result.nbest.toList(), result.nbestScores, result.text)
 
     /** the words the user added and made (VoiceHotwords.ofUser), read again for each listener */
-    suspend fun userHotwords(fcitx: FcitxConnection): VoiceHotwords.Words =
-        withTimeoutOrNull(USER_WORDS_MS) { VoiceHotwords.ofUser(fcitx.runOnReady { userWords() }) } ?: VoiceHotwords.Words.NONE
+    suspend fun userHotwords(fcitx: FcitxConnection): VoiceHotwords.Words {
+        // not cancelled with the wait: a read that comes late is still remembered for the next listener
+        // one read at a time: a hold while one is still waiting on a busy engine waits on it too
+        val read = remembered.shared<Deferred<VoiceHotwords.Words>>({ it.isActive }) { ticket ->
+            reading.async { remembered.read(ticket, VoiceHotwords.ofUser(fcitx.runOnReady { userWords() })) }
+        }
+        val inTime = withTimeoutOrNull(USER_WORDS_MS) { read.await() }
+        // a timeout was silent: the user's words were dropped and nothing said so
+        if (inTime == null) Timber.w("voice hotwords: no answer in %d ms, the last read used", USER_WORDS_MS)
+        // how many, not which: they are the user's
+        return remembered.inTime(inTime).also { Timber.d("voice hotwords: %d listened for, %d blocked", it.hotwords.split('/').count { w -> w.isNotEmpty() }, it.blockedWords.size) }
+    }
 
-    // the engine still starting: voice input without the user's words, not a wait
+    // the engine still starting or busy: voice input with the words last read, not a wait
     private const val USER_WORDS_MS = 2000L
+    private val remembered = VoiceHotwords.Remembered()
+    // a failed read is the awaiting listener's to log (its Deferred), not this scope's
+    private val reading = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     /**
      * The pinyin engine's [VoiceChoice.Language], each answer in time or none: no boundaries
