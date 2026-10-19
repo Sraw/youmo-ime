@@ -109,4 +109,16 @@ class PhraseBookTest {
         book.remove("sj", "三家")
         assertEquals(listOf("1:09:05", "2:09时05分"), book.offered("sj"))
     }
+
+    @Test
+    fun aWordOfBuiltInPhrasesHasTheirTextsButThoseDeleted() {
+        val now = java.util.GregorianCalendar(2026, java.util.Calendar.OCTOBER, 17, 9, 5)
+        val book = PhraseBook(builtIn = CustomPhrases.BUILT_IN)
+        assertEquals(listOf("星期六", "周六"), book.builtInsOf("星期") { now })
+        assertEquals(emptyList<String>(), book.builtInsOf("时候") { now })
+        book.remove("xq", "#周\$weekday_cn")
+        assertEquals(listOf("星期六"), book.builtInsOf("星期") { now })
+        // the user's own under the key are no built-in ones
+        assertEquals(emptyList<String>(), PhraseBook(CustomPhrases.parse("rq,1=日前")).builtInsOf("日期") { now })
+    }
 }

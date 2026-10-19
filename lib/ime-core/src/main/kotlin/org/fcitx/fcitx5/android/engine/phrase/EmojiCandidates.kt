@@ -19,7 +19,7 @@ object EmojiCandidates {
      * first is not [whole] (a word of the start of the input only) or [candidates] has them all.
      */
     fun <T> place(candidates: List<T>, emoji: (String) -> List<String>, text: (T) -> String, whole: (T) -> Boolean = { true }, make: (String) -> T): List<T> =
-        placed(candidates, candidates.firstOrNull(), emoji, text, whole, make).first
+        placed(candidates, candidates.firstOrNull(), emoji, text, whole, make = make).first
 
     /**
      * [candidates] with the emoji of [of] (the candidate shown first, [whole]) after the first
@@ -33,16 +33,21 @@ object EmojiCandidates {
         emoji: (String) -> List<String>,
         text: (T) -> String,
         whole: (T) -> Boolean,
+        phrases: (String) -> List<String> = { emptyList() },
         make: (String) -> T,
     ): Pair<List<T>, List<String>> {
         val first = of?.takeIf(whole) ?: return candidates to emptyList()
-        val added = pick(text(first), emoji) { e -> candidates.any { text(it) == e } }
+        val added = pick(text(first), emoji, phrases) { e -> candidates.any { text(it) == e } }
         if (added.isEmpty()) return candidates to added
         val at = minOf(AFTER, candidates.size)
         return candidates.subList(0, at) + added.map(make) + candidates.subList(at, candidates.size) to added
     }
 
-    /** The emoji of [word] to list, at most [MAX], none [listed] already: pinyin's and the tables' rule. */
-    fun pick(word: String, emoji: (String) -> List<String>, listed: (String) -> Boolean): List<String> =
-        emoji(word).take(MAX + AFTER).filterNot(listed).take(MAX)
+    /**
+     * The emoji of [word] to list, at most [MAX], none [listed] already: pinyin's and the tables' rule.
+     * Before them the texts of the built-in phrases [word] stands for ([PhraseBook.builtInsOf]: 日期's
+     * dates), all of them: placed as the emoji are, so the input methods with no `rq` have them too.
+     */
+    fun pick(word: String, emoji: (String) -> List<String>, phrases: (String) -> List<String> = { emptyList() }, listed: (String) -> Boolean): List<String> =
+        phrases(word).filterNot(listed) + emoji(word).take(MAX + AFTER).filterNot(listed).take(MAX)
 }

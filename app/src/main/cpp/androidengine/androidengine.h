@@ -105,6 +105,8 @@ inline EngineTableConfig engineTable(bool hint, EngineOrderPolicy order, int aut
 #define ENGINE_PREDICTION Option<bool> prediction{this, "Prediction", _("Enable Prediction"), true};
 #define ENGINE_EMOJI Option<bool> emoji{this, "Emoji", D_("fcitx5-android", "Emoji among the candidates"), true};
 #define ENGINE_CHAIZI Option<bool> chaizi{this, "Chaizi", D_("fcitx5-android", "Characters by their parts"), true};
+#define ENGINE_BUILT_IN_PHRASES \
+    Option<bool> builtInPhrases{this, "BuiltInPhrases", D_("fcitx5-android", "Built-in date and time"), true};
 #define ENGINE_MODEL_LEVEL \
     OptionWithAnnotation<EngineModelLevel, EngineModelLevelI18NAnnotation> modelLevel{ \
             this, "ModelLevel", D_("fcitx5-android", "Performance level"), EngineModelLevel::High};
@@ -121,6 +123,7 @@ FCITX_CONFIGURATION(
         ENGINE_PREDICTION
         ENGINE_EMOJI
         ENGINE_CHAIZI
+        ENGINE_BUILT_IN_PHRASES
         ENGINE_MODEL_LEVEL
         ENGINE_LATIN_WORDS
         ENGINE_FUZZY
@@ -145,6 +148,7 @@ FCITX_CONFIGURATION(
         ENGINE_PREDICTION
         ENGINE_EMOJI
         ENGINE_CHAIZI
+        ENGINE_BUILT_IN_PHRASES
         ENGINE_MODEL_LEVEL
         ENGINE_LATIN_WORDS
         ENGINE_FUZZY)
@@ -187,6 +191,7 @@ FCITX_CONFIGURATION(
 #undef ENGINE_PREDICTION
 #undef ENGINE_EMOJI
 #undef ENGINE_CHAIZI
+#undef ENGINE_BUILT_IN_PHRASES
 #undef ENGINE_MODEL_LEVEL
 #undef ENGINE_LATIN_WORDS
 #undef ENGINE_FUZZY

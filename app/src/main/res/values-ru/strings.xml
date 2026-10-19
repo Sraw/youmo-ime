@@ -171,7 +171,9 @@
     <string name="following_system_settings">Следовать системным настройкам</string>
     <string name="button_sound">Звуковой эффект при нажатии клавиш</string>
     <string name="button_sound_volume">Громкость звукового эффекта при нажатии клавиш</string>
-    <string name="clipboard_return_after_paste">Возврат в буфер обмена после вставки</string>
+    <string name="clipboard_return_after_paste">Возвращаться к клавиатуре после вставки</string>
+    <string name="text_copied">Скопировано</string>
+    <string name="text_cut">Вырезано</string>
     <string name="theme_message_follow_system_day_night_mode_enabled">Невозможно вручную переключить тему, пока включен режим «Следовать системному дневному/ночному режиму».</string>
     <string name="disable_it">Отключить это</string>
     <string name="reset_keyboard_on_focus_change">Переключиться обратно на клавиатуру при изменении фокуса</string>
@@ -283,4 +285,8 @@
         <item quantity="many">After typed %d times</item>
         <item quantity="other">After typed %d times</item>
     </plurals>
-    </resources>
+        <string name="import_big_into_user_title">Большой список в словарь пользователя?</string>
+    <string name="import_big_into_user">В этом файле %1$d слов.\n\nСловарь пользователя — для слов, которыми вы пользуетесь: они стоят высоко среди кандидатов, голосовой ввод в первую очередь слушает их, табличные методы ввода их подхватывают. Если их слишком много:\n• верх списка кандидатов забит, и то, что вы пишете чаще всего, может уйти вниз;\n• голосовой ввод выделяет не больше 3000 слов, остальным ничего не достаётся, а речь чаще распознаётся как слова из списка;\n• в таблицах больше совпадающих кодов, и реже код вводит слово сам;\n• ваши собственные слова теряются среди импортированных.\n\nБазовый словарь ранжирует слова по частоте и контексту: любое слово можно набрать, частые не вытесняются, а весь список можно в любой момент отключить или удалить. Большим спискам место там.</string>
+    <string name="import_big_into_user_base">В базовый</string>
+    <string name="import_big_into_user_keep">Оставить в пользовательском</string>
+</resources>

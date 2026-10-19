@@ -191,6 +191,8 @@ object InputMethodSettings {
                 Toggle(EngineSettings.PREDICTION, text(R.string.im_prediction), R.string.im_prediction_summary),
                 // handwriting writes no word an emoji stands for
                 Toggle(EngineSettings.EMOJI, text(R.string.im_emoji), R.string.im_emoji_summary, notFor = listOf(Engines.HANDWRITING)),
+                // 全拼's rq, sj, xq, and in each the words 日期, 时间, 星期 (PhraseBook.WORD_KEYS); handwriting writes none of them
+                Toggle(EngineSettings.BUILT_IN_PHRASES, text(R.string.im_built_in_phrases), R.string.im_built_in_phrases_summary, notFor = listOf(Engines.HANDWRITING)),
                 Choice(
                     EngineSettings.MODEL_LEVEL, R.string.im_model_level, ModelLevel.entries.map { it.key }, R.string.im_model_level_summary,
                     label = { ctx, v -> ctx.getString(MODEL_LEVELS.getValue(ModelLevel.entries.first { it.key == v })) },

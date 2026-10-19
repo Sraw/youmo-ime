@@ -31,11 +31,12 @@ object AsideCandidates {
         text: (T) -> String,
         whole: (T) -> Boolean,
         make: (String) -> T,
+        phrases: (String) -> List<String> = { emptyList() },
         first: () -> T? = { read.firstOrNull() },
     ): Placed<T> {
         val parts = if (chaizi == null || key.firstOrNull() != Chaizi.KEY) emptyList() else chaizi(key.substring(1).filter { it in 'a'..'z' })
         if (parts.isEmpty()) {
-            val (withEmoji, added) = EmojiCandidates.placed(read, first(), emoji, text, whole, make)
+            val (withEmoji, added) = EmojiCandidates.placed(read, first(), emoji, text, whole, phrases, make)
             return Placed(withEmoji, added.associateWith { "" })
         }
         // no emoji of a reading of u…, the readings being slips; but u then a vowel may be a slip for

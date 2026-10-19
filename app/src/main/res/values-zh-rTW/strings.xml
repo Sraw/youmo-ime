@@ -178,7 +178,9 @@
     <string name="following_system_settings">跟隨系統設定</string>
     <string name="button_sound">按鍵音</string>
     <string name="button_sound_volume">按鍵音音量</string>
-    <string name="clipboard_return_after_paste">貼上後返回</string>
+    <string name="clipboard_return_after_paste">貼上後回到鍵盤</string>
+    <string name="text_copied">已複製</string>
+    <string name="text_cut">已剪下</string>
     <string name="theme_message_follow_system_day_night_mode_enabled">已設定「依據系統設定主題色調」，無法手動切換主題。</string>
     <string name="disable_it">停用此項</string>
     <string name="reset_keyboard_on_focus_change">焦點改變時切換回鍵盤</string>
@@ -330,7 +332,7 @@
     <string name="export_words">匯出</string>
     <string name="export_words_summary">整個使用者詞庫存成一個文字檔；要匯回或在別的手機上用，在「詞庫與短語 → 匯入詞庫」裡選「使用者詞庫」。</string>
     <string name="import_words_done">匯入完成：新增 %1$d 個詞，封鎖 %2$d 個，%3$d 行沒能讀懂</string>
-    <string name="export_words_header"># 幽默輸入法使用者詞庫：一行一個詞，詞後面是拼音；! 開頭的是封鎖的詞</string>
+    <string name="export_words_header"># 幽默輸入法使用者詞庫：一行一個詞，詞後面是拼音；! 開頭的是封鎖的詞，~ 開頭的是學到的詞</string>
     <string name="select_all">全選</string>
     <string name="delete_selected">刪除</string>
     <string name="selected_count">已選 %1$d 個</string>
@@ -408,10 +410,12 @@
     <string name="im_prediction_summary">打完一個詞，接著給出可能要打的下一個詞</string>
     <string name="im_chaizi">拆字</string>
     <string name="im_chaizi_summary">不會讀的字，先按 u 再打各部分的拼音：uniuniuniu 犇、ushuishuishui 淼</string>
+    <string name="im_built_in_phrases">內建的日期時間</string>
+    <string name="im_built_in_phrases_summary">日期、時間、星期這幾個詞後面給出今天的日期、現在的時間、星期幾；全拼裡打 rq、sj、xq 也行</string>
     <string name="im_emoji">表情候選</string>
     <string name="im_emoji_summary">打的詞有對應的表情時，一併給出：哈哈 😄、點讚 👍</string>
     <string name="t9_multi_tap">連按選字母</string>
-    <string name="t9_multi_tap_summary">快速連按同一個鍵也可以是它的第幾個字母（按兩下是第二個），輸入法按上下文判斷；快打照常</string>
+    <string name="t9_multi_tap_summary">快速連按同一個鍵就是它的第幾個字母（按兩下是第二個），只有這一種讀法；按一下仍由輸入法判斷；關著時每按一次都是一個鍵</string>
     <string name="t9_multi_tap_off">關</string>
     <string name="t9_multi_tap_fast">快（0.4 秒）</string>
     <string name="t9_multi_tap_medium">中（0.6 秒）</string>
@@ -598,4 +602,8 @@
     <string name="home_backup_summary">設定、詞、主題和剪貼簿存成一個檔案</string>
     <string name="word_packs_hint">使用者詞庫的詞排得靠前，選得越多越靠前；還沒選過的，可能排在很常用的同音詞後面。拼音和碼表都用這些詞，英文詞庫在英文的設定裡。</string>
     <string name="layer_base_recommended">基礎詞庫（推薦）</string>
+    <string name="import_big_into_user_title">詞很多，放進使用者詞庫？</string>
+    <string name="import_big_into_user">這個檔案有 %1$d 個詞。\n\n使用者詞庫放你自己常用的詞：候選裡排得靠前，語音輸入會優先往這些詞上聽，碼表也會收進這些詞。放得太多會：\n• 讓候選裡多出很多排得靠前的詞，常打的詞可能被擠到後面；\n• 語音最多照顧 3000 個詞，多出來的照顧不到，說話也更容易被聽成清單裡的詞；\n• 讓碼表重碼變多，四碼唯一自動上屏變少；\n• 和你自己加的詞混在「手動新增的詞」裡，不好找也不好刪。\n\n基礎詞庫按常用程度和前後文排詞：詞都能打出來，但不擠掉常用詞，整個詞庫還能隨時停用或刪除。大的詞表建議放進基礎詞庫。</string>
+    <string name="import_big_into_user_base">改放基礎詞庫</string>
+    <string name="import_big_into_user_keep">仍放使用者詞庫</string>
 </resources>

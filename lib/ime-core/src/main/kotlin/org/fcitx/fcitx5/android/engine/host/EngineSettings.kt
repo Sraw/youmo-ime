@@ -25,6 +25,8 @@ data class EngineSettings(
     val emoji: Boolean = true,
     /** Whether full pinyin offers a character by the pinyin of its parts (Chaizi): niuniuniu 犇. */
     val chaizi: Boolean = true,
+    /** Whether full pinyin offers the date, the time and the weekday under rq, sj and xq (CustomPhrases.BUILT_IN). */
+    val builtInPhrases: Boolean = true,
     val pageSize: Int = DEFAULT_PAGE_SIZE,
     /** How much the sentence models weigh pinyin's readings again: the 性能档位. */
     val modelLevel: ModelLevel = ModelLevel.HIGH,
@@ -43,6 +45,7 @@ data class EngineSettings(
         const val PREDICTION = "Prediction"
         const val EMOJI = "Emoji"
         const val CHAIZI = "Chaizi"
+        const val BUILT_IN_PHRASES = "BuiltInPhrases"
         const val FUZZY = "Fuzzy"
         const val MODEL_LEVEL = "ModelLevel"
         const val LATIN_WORDS = "LatinWords"
@@ -108,6 +111,7 @@ data class EngineSettings(
                 prediction = flag(PREDICTION) ?: default.prediction,
                 emoji = flag(EMOJI) ?: default.emoji,
                 chaizi = flag(CHAIZI) ?: default.chaizi,
+                builtInPhrases = flag(BUILT_IN_PHRASES) ?: default.builtInPhrases,
                 pageSize = values[PAGE_SIZE]?.toIntOrNull()?.takeIf { it in PAGE_SIZES } ?: default.pageSize,
                 modelLevel = ModelLevel.entries.firstOrNull { it.key == values[MODEL_LEVEL] } ?: default.modelLevel,
                 latinWords = flag(LATIN_WORDS) ?: default.latinWords,

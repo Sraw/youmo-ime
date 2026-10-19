@@ -116,7 +116,7 @@ class InputMethodSettingsTest {
     fun theSharedOptionsAreOnTheSharedPageAlone() {
         val shared = listOf(
             AppPrefs.GLIDE_TYPING, AppPrefs.AUTO_PAIRS, AppPrefs.CALCULATION_REPLACES_SUM,
-            EngineSettings.PREDICTION, EngineSettings.EMOJI, EngineSettings.MODEL_LEVEL, InputMethodSettings.PUNCTUATION,
+            EngineSettings.PREDICTION, EngineSettings.EMOJI, EngineSettings.BUILT_IN_PHRASES, EngineSettings.MODEL_LEVEL, InputMethodSettings.PUNCTUATION,
             "${EngineSettings.FUZZY}/${EngineSettings.TYPOS}", EngineSettings.FUZZY,
         )
         assertEquals(shared, sharedKeys())
@@ -164,6 +164,7 @@ class InputMethodSettingsTest {
         // the Chinese input methods' section says English for all of it: under a row, only an exception within it
         assertEquals(emptyList<String>(), notFor(EngineSettings.PREDICTION))
         assertEquals(listOf(Engines.HANDWRITING), notFor(EngineSettings.EMOJI))
+        assertEquals(listOf(Engines.HANDWRITING), notFor(EngineSettings.BUILT_IN_PHRASES))
         assertEquals(emptyList<String>(), notFor(EngineSettings.MODEL_LEVEL))
         assertEquals(emptyList<String>(), notFor(InputMethodSettings.PUNCTUATION))
         assertEquals(listOf(Engines.T9), notFor("${EngineSettings.FUZZY}/${EngineSettings.TYPOS}"))

@@ -178,7 +178,9 @@
     <string name="following_system_settings">Follow system settings</string>
     <string name="button_sound">Sound on keypress</string>
     <string name="button_sound_volume">Keypress sound volume</string>
-    <string name="clipboard_return_after_paste">Return after pasting</string>
+    <string name="clipboard_return_after_paste">Back to the keyboard after pasting</string>
+    <string name="text_copied">Copied</string>
+    <string name="text_cut">Cut</string>
     <string name="theme_message_follow_system_day_night_mode_enabled">Cannot switch theme manually while \"Follow system day/night mode\" is enabled.</string>
     <string name="disable_it">Disable it</string>
     <string name="reset_keyboard_on_focus_change">Switch back to keyboard when the focus changes</string>
@@ -337,7 +339,7 @@
     <string name="export_words">Export</string>
     <string name="export_words_summary">All of the user dictionary as a text file; to bring it back or use it on another phone, pick User dictionary in Words and phrases → Import a dictionary.</string>
     <string name="import_words_done">Imported. Words added: %1$d, blocked: %2$d; lines not understood: %3$d</string>
-    <string name="export_words_header"># Youmo IME user dictionary: a word a line, its pinyin after it; a ! before a word blocks it</string>
+    <string name="export_words_header"># Youmo IME user dictionary: a word a line, its pinyin after it; a ! before a word blocks it, a ~ before one marks it learned</string>
     <string name="select_all">Select all</string>
     <string name="delete_selected">Delete</string>
     <string name="selected_count">%1$d selected</string>
@@ -422,10 +424,12 @@
     <string name="im_prediction_summary">After a word is typed, offer the words likely to follow it</string>
     <string name="im_chaizi">Characters by their parts</string>
     <string name="im_chaizi_summary">u, then the pinyin of a character\'s parts: uniuniuniu 犇, ushuishuishui 淼</string>
+    <string name="im_built_in_phrases">Built-in date and time</string>
+    <string name="im_built_in_phrases_summary">Today\'s date, the time now and the weekday after the words 日期, 时间, 星期; rq, sj, xq in full pinyin too</string>
     <string name="im_emoji">Emoji among the candidates</string>
     <string name="im_emoji_summary">A word that stands for an emoji offers it too: haha 😄, dianzan 👍</string>
     <string name="t9_multi_tap">Multi-tap letters</string>
-    <string name="t9_multi_tap_summary">A key pressed again quickly may also be its next letter (twice, the second); the context decides, so typing fast works as ever</string>
+    <string name="t9_multi_tap_summary">A key pressed again quickly is its next letter (twice, the second), and nothing else; once, the input method still guesses which; off, every press is a key</string>
     <string name="t9_multi_tap_off">Off</string>
     <string name="t9_multi_tap_fast">Fast (0.4 s)</string>
     <string name="t9_multi_tap_medium">Medium (0.6 s)</string>
@@ -613,4 +617,8 @@
     <string name="home_backup_summary">Settings, words, themes and clipboard history in one file</string>
     <string name="word_packs_hint">The user dictionary\'s words rank high, higher the more you pick them; one not yet picked may come after a very common word that sounds the same. Pinyin and the tables use these words; the English words are in English\'s settings.</string>
     <string name="layer_base_recommended">Base dictionary (recommended)</string>
+    <string name="import_big_into_user_title">A big list for the user dictionary</string>
+    <string name="import_big_into_user">This file has %1$d words.\n\nThe user dictionary is for the words you use: they rank high among candidates, voice input listens for them first, and table input methods take them in. Too many of them:\n• crowd the top of the candidates, so the words you type most may move down;\n• dilute voice input: it favours at most 3000 words, the rest get nothing, and speech is pulled towards words of the list;\n• add duplicate codes to tables, so fewer codes commit on their own;\n• bury the words you added yourself under Words you added.\n\nThe base dictionary ranks words by how common they are and by context: every word can be typed, none pushes common words aside, and the whole list can be turned off or removed at any time. Big lists belong there.</string>
+    <string name="import_big_into_user_base">Use the base</string>
+    <string name="import_big_into_user_keep">Keep the user one</string>
 </resources>

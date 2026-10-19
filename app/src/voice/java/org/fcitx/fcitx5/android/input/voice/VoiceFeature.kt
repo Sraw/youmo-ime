@@ -37,6 +37,8 @@ object VoiceFeature {
     /** on the licences page */
     fun credits(context: Context) = listOf(
         Credit(context.getString(R.string.voice_model_credit), "Apache-2.0", "https://github.com/Gilgamesh-J/X-ASR"),
+        // the encoder's fine-tuning kept its English with LibriSpeech, whose licence asks for the notice
+        Credit("LibriSpeech", "CC-BY-4.0", "https://www.openslr.org/12/"),
         Credit("sherpa-onnx:1.13.8", "Apache-2.0", "https://github.com/k2-fsa/sherpa-onnx/blob/master/LICENSE"),
         Credit("silero-vad", "MIT", "https://github.com/snakers4/silero-vad/blob/master/LICENSE"),
         // what sherpa-onnx is built with (lib/sherpa-onnx/README.md), in its library in the APK; its

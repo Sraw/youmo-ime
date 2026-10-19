@@ -4,6 +4,8 @@
  */
 package org.fcitx.fcitx5.android.engine.phrase
 
+import java.util.Calendar
+
 /**
  * The custom phrases the pinyin sessions share, and the user's changes to them from the keyboard
  * (a candidate pinned, a phrase deleted), each handed to [save] as the whole list, as the file
@@ -47,6 +49,15 @@ class PhraseBook(
         change(if (builtInOne) mine.turnedOff(key, value) else mine.without(key, value))
     }
 
+    /**
+     * The texts at [now] of the built-in phrases [word] stands for ([WORD_KEYS]: 日期's under `rq`),
+     * those still offered under their key: one the user deleted stays off here too.
+     */
+    fun builtInsOf(word: String, now: () -> Calendar): List<String> {
+        val key = WORD_KEYS[word] ?: return emptyList()
+        return phrases.offered(key, now()).filter { o -> builtIn.all.any { it.key == key && it.value == o.phrase.value } }.map { it.text }
+    }
+
     private fun withoutBuiltIns(phrases: CustomPhrases) =
         builtIn.all.fold(phrases) { p, b -> p.without(b.key, b.value) }
 
@@ -55,5 +66,10 @@ class PhraseBook(
         phrases = to.over(builtIn)
         own = withoutBuiltIns(to)
         save(to)
+    }
+
+    companion object {
+        /** The words whose built-in phrases every Chinese input method offers beside them, by their key. */
+        val WORD_KEYS = mapOf("日期" to "rq", "时间" to "sj", "星期" to "xq")
     }
 }

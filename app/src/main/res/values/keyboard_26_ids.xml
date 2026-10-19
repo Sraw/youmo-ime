@@ -13,4 +13,5 @@
     <item name="button_at" type="id"/>
     <item name="button_dot" type="id"/>
     <item name="button_domain" type="id"/>
+    <item name="button_semicolon" type="id"/>
 </resources>

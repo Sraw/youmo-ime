@@ -47,6 +47,9 @@ msgstr ""
 msgid "Characters by their parts"
 msgstr ""
 
+msgid "Built-in date and time"
+msgstr ""
+
 msgid "Emoji among the candidates"
 msgstr ""
 
