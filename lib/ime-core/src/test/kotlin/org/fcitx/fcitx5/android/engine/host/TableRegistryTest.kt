@@ -30,7 +30,7 @@ class TableRegistryTest : EnginesFixture() {
         val now = Executor { it.run() }
         val assets = EngineAssets(::load, {}, null)
         val lexicon = UserLexicon(null, {}, { null }, { additions }, assets, now, forgetInTables = {}, dropSessions = {})
-        val registry = TableRegistry(::load, null, {}, now, assets, lexicon)
+        val registry = TableRegistry(::load, null, {}, now, now, assets, lexicon)
         val wubi = "engine-wubi"
         val shared = registry.shared(registry.table(wubi), wubi)
         assertEquals(listOf("wqvb" to "你好"), shared.words("wqvb"))
@@ -43,13 +43,53 @@ class TableRegistryTest : EnginesFixture() {
     }
 
     @Test
+    fun theListedWordsAreCodedInTheBackgroundAndTillThenATableHasAddedOnesOnly() {
+        // F2443: the pending state, on a queued executor rather than in place
+        val additions = Engines.Additions("", "d") { sequenceOf("你好 ni'hao 0") }
+        val now = Executor { it.run() }
+        val queued = ArrayList<Runnable>()
+        val assets = EngineAssets(::load, {}, null)
+        val lexicon = UserLexicon(null, {}, { null }, { additions }, assets, now, forgetInTables = {}, dropSessions = {})
+        val registry = TableRegistry(::load, null, {}, now, { queued += it }, assets, lexicon)
+        val shared = registry.shared(registry.table(WUBI), WUBI)
+        assertEquals(emptyList<Pair<String, String>>(), shared.words("wqvb"))
+        assertTrue(lexicon.addWord("好你", "hao ni"))
+        assertEquals(listOf("vbwq" to "好你"), shared.words("vbwq"))
+        assertEquals(1, queued.size)
+        queued.removeAt(0).run()
+        assertEquals(listOf("wqvb" to "你好"), shared.words("wqvb"))
+        assertEquals(listOf("vbwq" to "好你"), shared.words("vbwq"))
+        assertTrue(queued.isEmpty())
+    }
+
+    @Test
+    fun theListedWordsStartCodingAsATableComesUpNotAtItsFirstKey() {
+        // UAT TBL-12a: coded at the first key, an imported word came too late for the first code
+        val additions = Engines.Additions("", "d") { sequenceOf("你好 ni'hao 0") }
+        val now = Executor { it.run() }
+        val queued = ArrayList<Runnable>()
+        val assets = EngineAssets(::load, {}, null)
+        val lexicon = UserLexicon(null, {}, { null }, { additions }, assets, now, forgetInTables = {}, dropSessions = {})
+        val registry = TableRegistry(::load, null, {}, now, { queued += it }, assets, lexicon)
+        registry.prepare(WUBI)   // no session yet: nothing loaded, nothing coded
+        assertTrue(queued.isEmpty())
+        val shared = registry.shared(registry.table(WUBI), WUBI)
+        registry.prepare(WUBI)
+        assertEquals(1, queued.size)
+        queued.removeAt(0).run()
+        // the first key finds them coded
+        assertEquals(listOf("wqvb" to "你好"), shared.words("wqvb"))
+        assertTrue(queued.isEmpty())
+    }
+
+    @Test
     fun aTableHasTheModelsWordsIndexedInTheBackgroundAsItOpens() {
         // what learnSaved looks a saved phrase up in: not made on the input thread at the first save
         val later = ArrayList<Runnable>()
         val background = Executor { later += it }
         val assets = EngineAssets(::load, {}, null)
         val lexicon = UserLexicon(null, {}, { null }, { null }, assets, background, forgetInTables = {}, dropSessions = {})
-        val registry = TableRegistry(::load, null, {}, background, assets, lexicon)
+        val registry = TableRegistry(::load, null, {}, background, Executor { it.run() }, assets, lexicon)
         val table = registry.table(WUBI)
         assertEquals(0, later.size)
         registry.shared(table, WUBI)
@@ -126,7 +166,7 @@ class TableRegistryTest : EnginesFixture() {
         val now = Executor { it.run() }
         val assets = EngineAssets(::load, {}, null)
         val lexicon = UserLexicon(null, {}, { null }, { null }, assets, now, forgetInTables = {}, dropSessions = {})
-        val registry = TableRegistry({ opened += it; load(it) }, dir, {}, now, assets, lexicon)
+        val registry = TableRegistry({ opened += it; load(it) }, dir, {}, now, now, assets, lexicon)
         registry.forgetInTables(setOf("好"))
         assertEquals(emptyList<String>(), opened.filter { it.startsWith(Engines.TABLE_DIR) })
         registry.forgetInTables(setOf("你好"))
@@ -135,5 +175,29 @@ class TableRegistryTest : EnginesFixture() {
 
     private companion object {
         const val WUBI = "engine-wubi"
+    }
+
+    @Test
+    fun aFieldStartingInATableStartsCodingTheWordsListedSinceBeforeItsFirstKey() {
+        // Engines.context → TableRegistry.prepare, end to end: dictionaries changed by a reload are
+        // coded as the next field starts in 五笔, not at its first key
+        var lines = sequenceOf<String>()
+        var name = "a"
+        val queued = ArrayList<Runnable>()
+        fun runAll() { while (queued.isNotEmpty()) queued.removeAt(0).run() }
+        Engines(::load, null, additions = { Engines.Additions("", name) { lines } }, warmUps = { queued += it }).use { engines ->
+            engines.settings = wubiShown
+            engines.type(WUBI, "w")
+            runAll()
+            engines.context(WUBI, "", cleared = true)
+            lines = sequenceOf("你好 ni'hao 0")
+            name = "b"
+            engines.reload()
+            runAll()
+            engines.context(WUBI, "")
+            assertTrue(queued.isNotEmpty())
+            runAll()
+            assertTrue("你好" in engines.type(WUBI, "wqvb").candidates)
+        }
     }
 }

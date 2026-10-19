@@ -37,8 +37,8 @@ class TableDictionary(private val table: CodeTable) {
 
     // Built on first use: a pass over the whole table, keeping characters alone (a phrase's code
     // comes from the rules), as libime does. With rules, that is a session's first key once the
-    // user has words: CodedWords codes them.
-    private val reverse by lazy(LazyThreadSafetyMode.NONE) {
+    // user has words: CodedWords codes them, in the background (TableRegistry), so it may be two threads'.
+    private val reverse by lazy(LazyThreadSafetyMode.SYNCHRONIZED) {
         val codes = HashMap<String, String>()
         val constructCodes = HashMap<String, String>()
         for (i in 0 until table.size) {

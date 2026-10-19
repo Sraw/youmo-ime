@@ -307,7 +307,7 @@ class EnginesTest : EnginesFixture() {
             .build()
             .toByteArray()
         var additions = added("", "a", "你好 ni'hao 0")
-        val engines = Engines({ if (it == "${Engines.TABLE_DIR}/wbx.data") ByteBuffer.wrap(wubi) else load(it) }, null, additions = { additions })
+        val engines = Engines({ if (it == "${Engines.TABLE_DIR}/wbx.data") ByteBuffer.wrap(wubi) else load(it) }, null, warmUps = inPlace, additions = { additions })
         assertEquals(listOf("你好"), engines.type("engine-wubi", "wqv").candidates)
         // listed into the same user model, not by add(): 五笔, loaded still, codes them all again
         additions = added("", "b", "你好 ni'hao 0", "好你 hao'ni 0")
@@ -351,12 +351,12 @@ class EnginesTest : EnginesFixture() {
         assertEquals(emptySet<Offer>(), engines.offers(Engines.PINYIN, 0))
         val shown = engines.type(Engines.PINYIN, "ni")
         assertTrue(shown.actionable)
-        assertEquals(setOf(Offer.FORGET, Offer.PIN, Offer.BLOCK), engines.offers(Engines.PINYIN, 1))
+        assertEquals(setOf(Offer.PIN, Offer.BLOCK), engines.offers(Engines.PINYIN, 1))
         assertEquals(listOf("拟", "你"), engines.onEvent(Engines.PINYIN, EngineEvent.PIN, 1).candidates)
         assertEquals(listOf("ni,1=拟"), saved)
         assertEquals(listOf("拟", "你"), engines.type(Engines.SHUANGPIN, "ni").candidates)
-        // the decoder's 拟 moved first: still a word to forget
-        assertEquals(setOf(Offer.FORGET, Offer.UNPIN), engines.offers(Engines.SHUANGPIN, 0))
+        // the decoder's 拟 moved first, pinned but never typed: nothing learned to forget
+        assertEquals(setOf(Offer.UNPIN), engines.offers(Engines.SHUANGPIN, 0))
         // not saved: kept till the next start all the same
         fail = true
         assertEquals(listOf("你", "拟"), engines.onEvent(Engines.SHUANGPIN, EngineEvent.UNPIN, 0).candidates)

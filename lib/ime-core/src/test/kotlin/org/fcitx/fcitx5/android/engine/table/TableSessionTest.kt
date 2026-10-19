@@ -294,6 +294,8 @@ class TableSessionTest {
         assertEquals(listOf("恭恭敬敬", "工"), learned.candidates)
         assertTrue(learned.actionable)
         assertEquals(setOf(Offer.FORGET), t.offers(0))
+        // 工 never picked: nothing to forget (PY-33, as pinyin)
+        assertEquals(emptySet<Offer>(), t.offers(1))
         assertEquals(emptySet<Offer>(), t.offers(2))
         // no phrases to pin to
         assertEquals(learned.copy(commit = ""), t.apply(Pin(0)).copy(commit = ""))
@@ -357,6 +359,7 @@ class TableSessionTest {
             override fun forget(text: String) {
                 forgotten += text
             }
+            override fun learned(text: String) = true
         }
         val t = TableSession(wubi, TableOptions.WUBI, user = user, shared = shared)
         t.type("aaaa")

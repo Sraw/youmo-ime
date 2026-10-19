@@ -240,6 +240,32 @@ class GlideSessionTest {
     }
 
     @Test
+    fun anEmojiInPlaceOfAWordPastTheBmpTakesItsCodePointsFromWhatIsFollowed() {
+        // as TableSession does for an emoji picked in place of a word it committed itself: the
+        // word's code points deleted (Snapshot.deleteBefore), 𠀾 two UTF-16 units of one
+        var swap = false
+        val inner = object : Session by tableSession {
+            override fun apply(action: Action) = tableSession.apply(action).let {
+                if (swap && action == Action.Refine) it.copy(commit = "📢", deleteBefore = 2) else it
+            }
+        }
+        tableReadings = listOf(GlideReading("wqiy", "你", 0f), GlideReading("vbg", "𠀾𠀾", -1f))
+        session = GlideSession(inner, Action.Pick(0)) { _, _ -> tableReadings }
+        session.offer(Glide(floatArrayOf(0f, 0f), GlideLayout.QWERTY))
+        session.apply(Action.Glide)
+        assertEquals("𠀾𠀾", session.apply(Action.Pick(1)).commit)
+        swap = true
+        session.apply(Action.Refine)
+        swap = false
+        tableReadings = listOf(GlideReading("wqiy", "你", 0f), GlideReading("vbg", "奻", -1f))
+        session.offer(Glide(floatArrayOf(0f, 0f), GlideLayout.QWERTY))
+        session.apply(Action.Glide)
+        session.apply(Action.Pick(1))
+        // what follows is after the emoji, none of the word left
+        assertEquals("📢奻", followed)
+    }
+
+    @Test
     fun aGlideAfterACodeThatReadsNothingTakesItBack() {
         session = GlideSession(tableSession, Action.Pick(0)) { _, _ -> listOf(GlideReading("vbg", "好", 0f)) }
         session.apply(Action.Key('v'))

@@ -75,7 +75,8 @@ class GlideSession(
         val before = when (action) {
             Action.Reset -> ""
             is Action.Context -> action.before
-            else -> written.dropLast(s.deleteBefore)
+            // in code points, as Snapshot.deleteBefore is (an emoji in place of a word past the BMP)
+            else -> written.substring(0, written.offsetByCodePoints(written.length, -minOf(s.deleteBefore, written.codePointCount(0, written.length))))
         }
         written = (before + s.commit).takeLast(Action.Context.HOST_CHARS)
     }

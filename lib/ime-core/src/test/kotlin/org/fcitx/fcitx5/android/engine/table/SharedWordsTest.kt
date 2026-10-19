@@ -15,7 +15,7 @@ class SharedWordsTest {
     private val wubi = dictionary("wqiy 你", "vbg 好", "wqvb 你好", "trnt 我", "wu 们", "wuyy 门", "wqwu 你们")
 
     /** The other input methods as a test sees them: [words] shared, what was blocked and forgotten recorded. */
-    private class Fake(table: TableDictionary, words: List<String>) : SharedWords {
+    private class Fake(table: TableDictionary, private val words: List<String>) : SharedWords {
         val coded = CodedWords(table, words)
         val blocked = HashSet<String>()
         val forgotten = ArrayList<String>()
@@ -27,6 +27,8 @@ class SharedWordsTest {
         override fun forget(text: String) {
             forgotten += text
         }
+        // the user's words: learned, till forgotten
+        override fun learned(text: String) = text in words && text !in forgotten
     }
 
     @Test
@@ -62,5 +64,17 @@ class SharedWordsTest {
         assertEquals(listOf("你们"), shared.forgotten)
         assertEquals(listOf("你们"), session.apply(Forget(1)).candidates)
         assertEquals(listOf("你们", "你门"), shared.forgotten)
+    }
+
+    @Test
+    fun codingStopsAtACheckOnceNoLongerWanted() {
+        // the word past the first STOP_CHECK texts: coded only while still wanted at that check
+        val texts = List(CodedWords.STOP_CHECK) { "x你" } + "我们"
+        assertEquals(1, CodedWords(wubi, texts).size)
+        assertEquals(1, CodedWords(wubi, texts) { true }.size)
+        // wanted at the first check, not at the one before the word
+        var checks = 0
+        assertEquals(0, CodedWords(wubi, texts) { checks++ == 0 }.size)
+        assertEquals(0, CodedWords(wubi, listOf("我们")) { false }.size)
     }
 }

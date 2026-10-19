@@ -44,6 +44,7 @@ import java.io.Closeable
 import java.io.File
 import java.io.IOException
 import java.nio.ByteBuffer
+import java.util.Calendar
 import java.util.concurrent.Executor
 
 /**
@@ -105,7 +106,7 @@ class Engines(
         forgetInTables = { tables.forgetInTables(it) }, dropSessions = ::dropSessions,
     )
 
-    private val tables = TableRegistry(load, userDir, onError, compactions, assets, lexicon)
+    private val tables = TableRegistry(load, userDir, onError, compactions, warmUps, assets, lexicon)
 
     private val english = EnglishLexicon(userDir, onError, compactions)
 
@@ -181,18 +182,20 @@ class Engines(
     /** Forgets each of the English words [texts]: their counts and the pairs they are in. */
     fun forgetEnglishWords(texts: Collection<String>) = english.forget(texts)
 
-    /** What [importWords] made of the lines: words added and blocked that were not already, lines it could not read. */
-    data class Imported(val added: Int, val blocked: Int, val unread: Int)
+    /** What [importWords] made of the lines: words added, blocked and learned that were not already, lines it could not read. */
+    data class Imported(val added: Int, val blocked: Int, val unread: Int, val learned: Int = 0)
 
     /**
      * The words of a list the user imports, a word a line (see [WordLists.line]): added, or
-     * blocked where marked so; one with no pinyin read as the dictionary reads it ([pinyinOf]).
+     * blocked where marked so; one with no pinyin read as the dictionary reads it ([pinyinOf]);
+     * in the user's own export ([exportWords]), one marked learned learned again with its count.
      */
     fun importWords(lines: Sequence<String>): Imported = lexicon.importWords(lines)
 
     /**
-     * The user's words as [importWords] reads them back: the added and the learned (most typed
-     * first) as `幽默 you'mo`, the blocked with a `!` before them.
+     * The user's words as [importWords] reads them back: the added as `幽默 you'mo`, the learned
+     * (most typed first) with a `~` apart before them and their count after (`~ 幽默 you'mo 3.0`, learned
+     * again only from a file headed by the export's mark), the blocked with a `!` before them.
      */
     fun exportWords(): List<String> = lexicon.exportWords()
 
@@ -250,6 +253,8 @@ class Engines(
      */
     fun context(im: String, before: String, learning: Boolean = true, cleared: Boolean = false) {
         if (im in READS_PINYIN_DATA || im in TABLES) warmUpPinyin(im)
+        // the user's words coded for the table before its first key, which would otherwise start it
+        if (im in TABLES) tables.prepare(im)
         keyboards.values.forEach { it.context(before, learning, cleared) }
     }
 
@@ -275,6 +280,7 @@ class Engines(
         warmUps.execute {
             try {
                 assets.pinyinData.wordIndex
+                assets.charSyllables
                 assets.warmUpAside(EMOJI_DATA in aside, CHAIZI_DATA in aside, CHAR_READINGS in aside)
             } catch (_: Exception) {
                 null
@@ -415,7 +421,7 @@ class Engines(
                 )
                 // a glide after a code typed picks its first candidate: the next code is the glide's
                 GlideSession(
-                    TableSession(table.dictionary, options, lookUp, table.user, tables.shared(table, im), language),
+                    TableSession(table.dictionary, options, lookUp, table.user, tables.shared(table, im).also { it.prepare() }, language),
                     between = Action.Pick(0),
                     blocked = glideHeldBack(lexicon::isBlockedWord),
                 ) { g, n -> glide.decode(g.path, g.layout, n) }
@@ -447,6 +453,7 @@ class Engines(
             block = lexicon::block,
             forgotten = { tables.forgetInTables(listOf(it)) },
             emoji = emoji(),
+            phrases = wordPhrases(),
         )
     }
 
@@ -469,18 +476,22 @@ class Engines(
         val predictor = readings.takeIf { settings.prediction }
     }
 
-    /** A session of one of the pinyins, alike but for how [segmenter] reads the keys. */
+    /** A session of one of the pinyins, alike but for how [segmenter] reads the keys; the built-in phrases as set, kept from [spell] by the session. */
     private fun pinyinSession(segmenter: Segmenter, spell: Boolean, chaizi: (String) -> List<Pair<String, String>> = { emptyList() }): PinyinSession {
         val s = settings
         return PinyinSession(
             assets.pinyinData, segmenter, spell = spell,
-            pageSize = s.pageSize, user = lexicon.user(), prediction = s.prediction, prior = lexicon.prior(), phraseBook = lexicon.phrases(),
+            pageSize = s.pageSize, user = lexicon.user(), prediction = s.prediction, prior = lexicon.prior(), phraseBook = lexicon.phrases(), builtInPhrases = s.builtInPhrases,
             reranker = reranker(), refiner = refiner(), block = lexicon::block, emoji = emoji(), chaizi = chaizi,
             charReadings = assets::charSyllables, extensions = assets::decoderExtensions, addedWords = lexicon.addedTexts(),
         )
     }
 
-    /** [pinyin], what a long press forgets there forgotten in every table too, as [TableRegistry.shared] has it. */
+    /**
+     * [pinyin], what a long press forgets there forgotten in every table too, as [TableRegistry.shared] has it.
+     * Offered only where pinyin learned something of it (PY-33): a character only a table learned
+     * (picked there, not a phrase it saved) is forgotten from that table's own long press, not here.
+     */
     private inner class ForgetsInTables(private val pinyin: Session) : Session by pinyin {
         override fun apply(action: Action): Snapshot {
             val forgotten = if (action is Action.Forget && Offer.FORGET in pinyin.offers(action.index)) pinyin.candidates(action.index, 1).firstOrNull() else null
@@ -490,6 +501,10 @@ class Engines(
 
     /** The emoji a word stands for, as the Chinese input methods offer them: none, the setting off. */
     private fun emoji(): (String) -> List<String> = if (settings.emoji) assets::emojiOf else { _ -> emptyList() }
+
+    /** The built-in phrases' texts a word stands for, as the tables offer them: none, the setting off. */
+    private fun wordPhrases(): (String) -> List<String> =
+        if (settings.builtInPhrases) { word -> lexicon.phrases().builtInsOf(word, Calendar::getInstance) } else { _ -> emptyList() }
 
     /** The characters by their parts' pinyin, as full pinyin offers them, but those blocked: none, the setting off. */
     private fun chaizi(): (String) -> List<Pair<String, String>> =

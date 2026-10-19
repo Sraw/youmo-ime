@@ -31,6 +31,8 @@ internal class TableRegistry(
     private val userDir: File?,
     private val onError: (IOException) -> Unit,
     private val compactions: Executor,
+    // where the user's words are coded for a table, off the input thread
+    private val coding: Executor,
     private val assets: EngineAssets,
     private val lexicon: UserLexicon,
 ) {
@@ -47,6 +49,8 @@ internal class TableRegistry(
         // model, with those add() listed since apart ([later], from [listedFrom] in listedSince);
         // and those they made or typed, as of its changes then
         var listed: CodedWords? = null
+        // the dictionaries' words, 300k and more, coded off the input thread: a second, more on a phone
+        var coding: InBackground<Listed>? = null
         var later: CodedWords? = null
         var own: CodedWords? = null
         var codedFor: UserModel? = null
@@ -70,6 +74,10 @@ internal class TableRegistry(
         override fun blockable(text: String) = text.codePointCount(0, text.length) >= 2 && assets.pinyinOf(text) != null
         override fun block(text: String) = lexicon.blockText(text)
         override fun forget(text: String) = lexicon.forgetEverywhere(text)
+        override fun learned(text: String) = lexicon.user().let { m -> m.entriesOf(text).any { m.hasLearned(listOf(it)) } }
+        override fun prepare() {
+            coded()
+        }
 
         private fun coded(): List<CodedWords> {
             val model = lexicon.user()
@@ -78,14 +86,11 @@ internal class TableRegistry(
                 table.own = null
                 table.codedFor = model
             }
-            // all coded again only once words were listed other than by add() (a reload's dictionaries)
+            // all coded again only once words were listed other than by add() (a reload's dictionaries),
+            // in the background: till then the table offers its own words and those below, not these
             val listed = table.listed?.takeIf { model.listings - table.listedAt == listedSince.size - table.listedFrom }
-                ?: CodedWords(table.dictionary, model.listedTexts()).also {
-                    table.listed = it
-                    table.listedAt = model.listings
-                    table.listedFrom = listedSince.size
-                    table.later = null
-                }
+                ?: coded(table, model)?.also { table.listed = it }
+                ?: CodedWords(table.dictionary, emptyList())
             val later = table.later?.takeIf { table.laterTo == listedSince.size }
                 ?: listedLater(table, listed).also {
                     table.later = it
@@ -106,6 +111,33 @@ internal class TableRegistry(
         table.user.onSaved = { lexicon.learnSaved(listOf(it), again = true) }
         tellPinyinOnce(table, im)
     }
+
+    /** [im]'s shared words, if its session made them, started coding for the user model as it now is. */
+    fun prepare(im: String) {
+        tables[im]?.shared?.prepare()
+    }
+
+    // [table]'s listed words for [model] as it now lists them, once coded on [coding]; null till then.
+    // Asked for by the listings not add()'s (a reload's dictionaries): one add() made is coded apart (later)
+    private fun coded(table: Table, model: UserModel): CodedWords? {
+        val coding = table.coding ?: InBackground<Listed>(coding) { onError(IOException("coding the user's words for a table", it)) }.also { table.coding = it }
+        val dictionary = table.dictionary
+        val made = coding.get(model to model.listings - listedSince.size) {
+            val texts = model.listedTexts()
+            val at = model.listings
+            val from = listedSince.size
+            { stillAsked -> Listed(CodedWords(dictionary, texts, stillAsked), at, from) }
+        } ?: return null
+        if (table.listedAt != made.at || table.listedFrom != made.from) {
+            table.listedAt = made.at
+            table.listedFrom = made.from
+            table.later = null
+        }
+        return made.words
+    }
+
+    // the listed words coded, and the listings and add()s they were read at
+    internal class Listed(val words: CodedWords, val at: Int, val from: Int)
 
     /** What add() listed since [table]'s [listed] were coded, coded alone; a text listed before in another reading left out, coded already. */
     private fun listedLater(table: Table, listed: CodedWords): CodedWords {

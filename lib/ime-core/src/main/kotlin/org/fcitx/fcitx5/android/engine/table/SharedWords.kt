@@ -34,6 +34,16 @@ interface SharedWords {
     /** Forgets what every input method learned of [text], a phrase a table saved or a word it shares. */
     fun forget(text: String)
 
+    /** Whether [forget] has anything of [text] to forget: what an input method learned of it, or a word the user made. */
+    fun learned(text: String): Boolean = false
+
+    /**
+     * Starts whatever [words] needs made in the background, as the table comes up rather than at
+     * its first key: coded at the first key, the dictionaries' words came too late for the first
+     * code typed, which committed the table's only candidate instead (UAT TBL-12a).
+     */
+    fun prepare() = Unit
+
     companion object {
         val NONE = object : SharedWords {
             override fun words(prefix: String) = emptyList<Pair<String, String>>()
@@ -51,12 +61,14 @@ interface SharedWords {
  * Unlike the words [TableText.addWords] builds in, under any code: a key after which the table's
  * codes led nowhere, and so committed (顶屏), may lead on to one.
  */
-class CodedWords(private val table: TableDictionary, texts: Collection<String>) {
+class CodedWords(private val table: TableDictionary, texts: Collection<String>, wanted: () -> Boolean = { true }) {
     private val byCode = TreeMap<String, MutableList<String>>()
 
     init {
         if (!table.rules.isEmpty) {
-            for (text in texts) {
+            // coded in the background for 300k+ texts: stop once superseded, the result is dropped
+            val going = texts.asSequence().withIndex().takeWhile { (i, _) -> i % STOP_CHECK != 0 || wanted() }
+            for ((_, text) in going) {
                 val code = text.takeIf { it.codePointCount(0, it.length) >= 2 }?.let(table::encode)
                     ?.takeUnless { table.contains(it, text) } ?: continue
                 val list = byCode.getOrPut(code) { ArrayList(1) }
@@ -71,6 +83,10 @@ class CodedWords(private val table: TableDictionary, texts: Collection<String>) 
     fun leadsAnywhere(prefix: String) = range(prefix).isNotEmpty()
 
     val size: Int get() = byCode.values.sumOf { it.size }
+
+    internal companion object {
+        const val STOP_CHECK = 4096
+    }
 
     private fun range(prefix: String) = if (prefix.isEmpty()) emptyMap() else byCode.subMap(prefix, true, prefix + Char.MAX_VALUE, false)
 }

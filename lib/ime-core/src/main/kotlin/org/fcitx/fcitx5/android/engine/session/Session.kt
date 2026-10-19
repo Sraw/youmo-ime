@@ -225,7 +225,7 @@ sealed class Action {
  * @property syllablesId which list [syllables] is: another for each change of it, below
  *   [Action.Syllable.IDS]
  * @property cursor where in [preedit] the cursor is, in characters; -1 at its end
- * @property deleteBefore how many characters before the cursor go first, before [commit]: English
+ * @property deleteBefore how many code points before the cursor go first (the app deletes in code points), before [commit]: English
  *   puts a space it added after a word behind the punctuation typed next (`word .` as `word. `)
  */
 data class Snapshot(

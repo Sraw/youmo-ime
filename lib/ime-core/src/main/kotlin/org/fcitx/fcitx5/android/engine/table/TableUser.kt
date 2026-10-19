@@ -54,6 +54,13 @@ class TableUser(private val table: TableDictionary) {
 
     fun isSaved(code: String, text: String): Boolean = saved[code]?.contains(text) == true
 
+    /** Whether [forget] has anything of [text] under [code] to forget: a pick, or the phrase saved or seen. */
+    fun hasLearned(code: String, text: String): Boolean {
+        val phrase = Phrase(code, text)
+        val index = table.indexOf(code, text)
+        return (index >= 0 && picks[index] > 0) || phrase in savedPicks || phrase in autoPhrases || isSaved(code, text)
+    }
+
     /** The saved phrases whose code starts with [prefix], as code and text, in code order. */
     fun saved(prefix: String): List<Pair<String, String>> =
         savedUnder(prefix).flatMap { (code, texts) -> texts.map { code to it } }

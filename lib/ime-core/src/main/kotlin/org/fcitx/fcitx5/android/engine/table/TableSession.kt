@@ -114,6 +114,7 @@ class TableSession(
     ) { learning }
 
     private val emojiOf: (String) -> List<String> = language?.emoji ?: { emptyList() }
+    private val phrasesOf: (String) -> List<String> = language?.phrases ?: { emptyList() }
 
     // the code's 重码 as placed ([rank]); those the refiner is still to weigh
     private var homographs: Homographs? = null
@@ -122,7 +123,47 @@ class TableSession(
     // Enter between: the space is on a new line, typed
     override fun passedOn() {
         committedItselfAt = null
+        selfEmoji = emptyList()
         predictions.forgetBefore()
+    }
+
+    // a word that committed itself (no candidates were shown with its emoji) has them offered first
+    // among what may follow (EmojiCandidates.pick); one picked takes the word's place: [selfCommitted]
+    // deleted before it. Anything else but a page or a long press ends the offer, as it does 联想
+    private var selfEmoji: List<String> = emptyList()
+    private var selfCommitted = ""
+
+    private fun offerEmojiOf(word: String) {
+        selfEmoji = EmojiCandidates.pick(word, emojiOf, phrasesOf) { false }
+        selfCommitted = word
+    }
+
+    private fun offering() = selfEmoji.isNotEmpty() || predictions.offered.isNotEmpty()
+
+    private fun offeredTexts() = selfEmoji + predictions.offered.map { it.text }
+
+    // the offer at [index] of all: an emoji in place of the word, or what may follow
+    private fun pickOffered(index: Int): Snapshot {
+        val n = selfEmoji.size
+        // a prediction picked: the text no longer ends with the word, the offer is over
+        if (index >= n) {
+            // none there: nothing picked, the offer goes on
+            val text = predictions.pick(index - n) ?: return snapshot()
+            selfEmoji = emptyList()
+            recent.clear()
+            page = 0
+            return snapshot(commit = text)
+        }
+        val emoji = selfEmoji[index]
+        // the app deletes code points (FcitxInputMethodService.handleDeleteSurrounding)
+        val replaced = selfCommitted.codePointCount(0, selfCommitted.length)
+        selfEmoji = emptyList()
+        // the word is gone from the text: no auto phrase of it, nothing to follow it
+        recent.clear()
+        predictions.unoffer()
+        predictions.forgetBefore()
+        page = 0
+        return snapshot(commit = emoji).copy(deleteBefore = replaced)
     }
 
     override fun apply(action: Action): Snapshot {
@@ -131,18 +172,21 @@ class TableSession(
         // the order shown is the one to weigh: anything but a slice of the weighing changes it, or the page
         if (action != Action.Refine && action !is Action.Cursor && action !is Action.Step) unrefined.drop()
         if (taken) return snapshot()
-        if (predictions.offered.isNotEmpty()) {
+        if (offering()) {
+            val n = selfEmoji.size
             when (action) {
-                is Action.Pick -> return pickPrediction(action.index)
-                is Action.Select -> return if (action.index in 0 until options.pageSize) pickPrediction(page * options.pageSize + action.index) else snapshot()
+                is Action.Pick -> return pickOffered(action.index)
+                is Action.Select -> return if (action.index in 0 until options.pageSize) pickOffered(page * options.pageSize + action.index) else snapshot()
                 Action.NextPage -> return turnPredictions(page + 1)
                 Action.PreviousPage -> return turnPredictions(page - 1)
                 Action.Refine, Action.Ink, Action.Glide -> return snapshot()
-                is Action.Forget -> return pressed(action.index, Offer.FORGET)
-                is Action.Block -> return pressed(action.index, Offer.BLOCK)
+                // an emoji is no word: nothing to forget or block
+                is Action.Forget -> return if (action.index < n) snapshot() else pressed(action.index - n, Offer.FORGET)
+                is Action.Block -> return if (action.index < n) snapshot() else pressed(action.index - n, Offer.BLOCK)
                 // anything else ends the offer, and goes on as it would without one: its page too
                 else -> {
                     predictions.unoffer()
+                    selfEmoji = emptyList()
                     page = 0
                 }
             }
@@ -196,11 +240,16 @@ class TableSession(
     override fun offers(index: Int): Set<Offer> = when {
         // not where nothing is to be kept (a password): forgetting and blocking record the word
         !learning -> emptySet()
-        predictions.offered.isNotEmpty() -> predictions.offers(index)
+        offering() -> if (index < selfEmoji.size) emptySet() else predictions.offers(index - selfEmoji.size)
         lookingUp -> pinyin!!.offers(index).intersect(setOf(Offer.FORGET))
         // an emoji is no word: nothing learned of it to forget, nor to block
         ranking[index]?.emoji == true -> emptySet()
-        ranking[index] != null -> if (shared.blockable(ranking[index]!!.text)) setOf(Offer.FORGET, Offer.BLOCK) else setOf(Offer.FORGET)
+        ranking[index] != null -> {
+            val item = ranking[index]!!
+            // forgetting only where something was learned of it, as pinyin offers it (PY-33)
+            val learned = user.hasLearned(item.code, item.text) || (!item.pinyin && !item.auto && shared.learned(item.text))
+            setOfNotNull(Offer.FORGET.takeIf { learned }, Offer.BLOCK.takeIf { shared.blockable(item.text) })
+        }
         else -> emptySet()
     }
 
@@ -218,7 +267,7 @@ class TableSession(
 
     override fun candidates(from: Int, count: Int): List<Choice> {
         if (lookingUp) return pinyin!!.candidates(from, count).map { Choice(it.text, table.codeOf(it.text).orEmpty()) }
-        if (predictions.offered.isNotEmpty()) return predictions.offered.drop(from).take(count).map { Choice(it.text) }
+        if (offering()) return offeredTexts().drop(from).take(count).map { Choice(it) }
         val wild = wild()
         return ranking.page(from, count).map { Choice(it.text, if (options.hint) hint(it, wild) else "") }
     }
@@ -266,6 +315,7 @@ class TableSession(
         val only = ranking.only()
         if (only != null && commitsItself(only)) {
             commit += take(only)
+            offerEmojiOf(only.text)
             committedItselfAt = now()
             predict()
         }
@@ -357,14 +407,6 @@ class TableSession(
         predictions.predict()
     }
 
-    // none there: kept while predicting, as pinyin keeps a pick past its candidates
-    private fun pickPrediction(index: Int): Snapshot {
-        val text = predictions.pick(index) ?: return snapshot()
-        recent.clear()
-        page = 0
-        return snapshot(commit = text)
-    }
-
     // the prediction at [index] forgotten or blocked, as the long press offered: what may follow offered again
     private fun pressed(index: Int, offer: Offer): Snapshot {
         if (predictions.press(index, offer)) page = 0
@@ -372,7 +414,7 @@ class TableSession(
     }
 
     private fun turnPredictions(to: Int): Snapshot {
-        if (predictions.hasPage(to, options.pageSize)) page = to
+        if (to >= 0 && to * options.pageSize < offeredTexts().size) page = to
         return snapshot()
     }
 
@@ -519,7 +561,7 @@ class TableSession(
         // the most recently seen first
         val auto = user.seen(code).map { (c, text) -> Item(c, text, true) }
         val made = { placed: IntArray ->
-            Ranking(shared::blocked, emojiOf) { at ->
+            Ranking(shared::blocked, emojiOf, phrasesOf) { at ->
                 when {
                     at < placed.size -> placed[at].let { found.item(it) ?: entryItem(found.entry(it)) }
                     else -> auto.getOrNull(at - placed.size)
@@ -674,6 +716,7 @@ class TableSession(
     private class Ranking(
         private val blocked: (String) -> Boolean = { false },
         private val emoji: (String) -> List<String> = { emptyList() },
+        private val phrases: (String) -> List<String> = { emptyList() },
         private val source: (Int) -> Item?,
     ) {
         private val items = ArrayList<Item>()
@@ -700,7 +743,7 @@ class TableSession(
             emojiPlaced = true
             val first = items.firstOrNull() ?: return
             // seen too: an entry of the same text later is not listed again
-            EmojiCandidates.pick(first.text, emoji) { it in seen }
+            EmojiCandidates.pick(first.text, emoji, phrases) { it in seen }
                 .forEach {
                     seen += it
                     items += Item("", it, auto = false, emoji = true)
@@ -730,7 +773,7 @@ class TableSession(
     }
 
     private fun snapshot(commit: String = "", handled: Boolean = true): Snapshot {
-        if (predictions.offered.isNotEmpty() && input.isEmpty() && !lookingUp) return predicted(commit, handled)
+        if (offering() && input.isEmpty() && !lookingUp) return predicted(commit, handled)
         val from = page * options.pageSize
         val shown = ranking.page(from, options.pageSize)
         val wild = wild()
@@ -755,18 +798,19 @@ class TableSession(
 
     private fun predicted(commit: String, handled: Boolean): Snapshot {
         val from = page * options.pageSize
+        val offered = offeredTexts()
         return Snapshot(
             commit = commit,
             preedit = "",
-            candidates = predictions.offered.drop(from).take(options.pageSize).map { it.text },
+            candidates = offered.drop(from).take(options.pageSize),
             page = page,
             hasPreviousPage = page > 0,
-            hasNextPage = from + options.pageSize < predictions.offered.size,
+            hasNextPage = from + options.pageSize < offered.size,
             handled = handled,
             predicting = true,
             // a prediction may be forgotten or blocked: see offers
             actionable = true,
-            total = predictions.offered.size,
+            total = offered.size,
             first = from,
         )
     }
