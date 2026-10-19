@@ -197,7 +197,10 @@ abstract class KeyView(ctx: Context, val theme: Theme, val def: KeyDef.Appearanc
     }
 
     override fun onLayout(changed: Boolean, left: Int, top: Int, right: Int, bottom: Int) {
-        if (layoutMarginLeft != 0f || layoutMarginRight != 0f) {
+        // margins set back to 0 (a row fitted again, BaseKeyboard.fitRow) must reach the face too
+        val face = appearanceView.layoutParams as LayoutParams
+        val faceHasMargins = face.leftMargin != 0 || face.rightMargin != 0
+        if (layoutMarginLeft != 0f || layoutMarginRight != 0f || faceHasMargins) {
             val w = right - left
             val h = bottom - top
             val layoutWidth = (w * (1f - layoutMarginLeft - layoutMarginRight)).roundToInt()

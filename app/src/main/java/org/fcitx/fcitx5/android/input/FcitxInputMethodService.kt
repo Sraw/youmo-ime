@@ -63,6 +63,7 @@ import org.fcitx.fcitx5.android.core.KeyStates
 import org.fcitx.fcitx5.android.core.KeySym
 import org.fcitx.fcitx5.android.core.ScancodeMapping
 import org.fcitx.fcitx5.android.core.SubtypeManager
+import org.fcitx.fcitx5.android.core.plus
 import org.fcitx.fcitx5.android.core.toSpannedString
 import org.fcitx.fcitx5.android.daemon.FcitxConnection
 import org.fcitx.fcitx5.android.daemon.FcitxDaemon
@@ -414,7 +415,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         // it is what will be before the cursor
         if (deleting.isNotEmpty()) tellContext()
         if (pairing) backspacePair()
-        if (!editingSession.backspace(currentInputEditorInfo.toEditorTraits())) {
+        if (!editingSession.backspace(currentInputEditorInfo.toEditorTraits(packageName))) {
             sendDownUpKeyEvents(KeyEvent.KEYCODE_DEL)
         }
     }
@@ -471,7 +472,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     }
 
     private fun handleReturnKey() {
-        when (val action = EditorKeyPolicy.onReturn(currentInputEditorInfo.toEditorTraits())) {
+        when (val action = EditorKeyPolicy.onReturn(currentInputEditorInfo.toEditorTraits(packageName))) {
             EditorKeyPolicy.ReturnAction.SendEnter -> sendDownUpKeyEvents(KeyEvent.KEYCODE_ENTER)
             is EditorKeyPolicy.ReturnAction.PerformEditorAction ->
                 currentInputConnection.performEditorAction(action.actionId)
@@ -484,7 +485,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
             EditorKeyPolicy.Direction.Right -> KeyEvent.KEYCODE_DPAD_RIGHT
         }
         val action = arrowKeys.onArrow(
-            currentInputEditorInfo.toEditorTraits(), direction,
+            currentInputEditorInfo.toEditorTraits(packageName), direction,
             textBefore = { currentInputConnection?.getTextBeforeCursor(it, 0) },
             textAfter = { currentInputConnection?.getTextAfterCursor(it, 0) },
         )
@@ -940,7 +941,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         // initialSel{Start,End} is outdated. but it's the client app's responsibility to send
         // right cursor position, try to workaround this would simply introduce more bugs.
         selection.startInput(again, attribute.initialSelStart, attribute.initialSelEnd)
-        val flags = CapabilityFlags.fromEditorInfo(attribute)
+        val flags = CapabilityFlags.forField(attribute, packageName)
         val sensitive = flags.hasAny(CapabilityFlag.PasswordOrSensitive)
         // input restarting (the screen turned, resetStateForNewConfiguration, or the app's own
         // restartInput) has no onFinishInputView, and the focus out below drops the engine's input: the

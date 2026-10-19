@@ -69,4 +69,14 @@ class FieldPolicy(private val memory: ContextMemory) {
         val context = context(now, { before().also { read = it } }, after) ?: return null
         return Action.Context(context, cleared = context.isNotEmpty() && read?.isEmpty() == true)
     }
+
+    companion object {
+        /**
+         * A field of this app itself ([fieldPackage] is [ownPackage]): the add/edit word and custom
+         * phrase dialogs, settings search. It is [sensitive], as a field that asks not to be learned
+         * from: typing a word out to add it would otherwise count its pieces and the pairs between
+         * them, which deleting the word later cannot take back (UAT WD-03).
+         */
+        fun ownApp(fieldPackage: String?, ownPackage: String): Boolean = fieldPackage == ownPackage
+    }
 }

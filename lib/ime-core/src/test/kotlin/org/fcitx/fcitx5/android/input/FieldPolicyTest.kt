@@ -131,4 +131,12 @@ class FieldPolicyTest {
         policy.focus("login", password = false, sensitive = false)
         assertEquals("", context(2, ""))
     }
+
+    @Test
+    fun aFieldOfThisAppItselfIsTakenAsOneThatAsksNotToBeLearnedFrom() {
+        assertTrue(FieldPolicy.ownApp("io.github.sraw.youmo", "io.github.sraw.youmo"))
+        assertTrue(FieldPolicy.ownApp("io.github.sraw.youmo.debug", "io.github.sraw.youmo.debug"))
+        assertFalse(FieldPolicy.ownApp("com.tencent.mm", "io.github.sraw.youmo"))
+        assertFalse(FieldPolicy.ownApp(null, "io.github.sraw.youmo"))
+    }
 }

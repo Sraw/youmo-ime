@@ -24,6 +24,15 @@ class EditorInfoTraitsTest {
     private fun info(block: EditorInfo.() -> Unit) = EditorInfo().apply(block).toEditorTraits()
 
     @Test
+    fun aFieldOfThisAppIsSensitiveWhenThePackageIsGiven() {
+        // F2330/F2420: the arrow policy reads the same flags the service tells fcitx
+        val own = EditorInfo().apply { inputType = InputType.TYPE_CLASS_TEXT; packageName = "io.github.sraw.youmo" }
+        assertTrue(own.toEditorTraits("io.github.sraw.youmo").isSensitive)
+        assertFalse(own.toEditorTraits("other.app").isSensitive)
+        assertFalse(own.toEditorTraits().isSensitive)
+    }
+
+    @Test
     fun aPlainTextFieldHasNoSpecialTraits() {
         assertEquals(EditorTraits(), info { inputType = InputType.TYPE_CLASS_TEXT })
     }

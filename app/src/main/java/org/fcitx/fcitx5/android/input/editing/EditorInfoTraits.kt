@@ -19,8 +19,11 @@ const val DeleteSurroundingFlag = "org.fcitx.fcitx5.android.DELETE_SURROUNDING"
 
 private val EMAIL_VARIATIONS = setOf(InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS, InputType.TYPE_TEXT_VARIATION_WEB_EMAIL_ADDRESS)
 
-/** Decodes the bits of [EditorInfo] that [EditorKeyPolicy] and [EditingSession] act on. */
-fun EditorInfo.toEditorTraits(): EditorTraits {
+/**
+ * Decodes the bits of [EditorInfo] that [EditorKeyPolicy] and [EditingSession] act on. [ownPackage]
+ * given, a field of this app is sensitive as the service tells fcitx ([CapabilityFlags.forField]).
+ */
+fun EditorInfo.toEditorTraits(ownPackage: String? = null): EditorTraits {
     val type = inputType and InputType.TYPE_MASK_CLASS
     val variation = inputType and InputType.TYPE_MASK_VARIATION
     val action = imeOptions and EditorInfo.IME_MASK_ACTION
@@ -28,7 +31,8 @@ fun EditorInfo.toEditorTraits(): EditorTraits {
         isRawKeyInput = type == InputType.TYPE_NULL,
         isUri = type == InputType.TYPE_CLASS_TEXT && variation == InputType.TYPE_TEXT_VARIATION_URI,
         isEmail = type == InputType.TYPE_CLASS_TEXT && variation in EMAIL_VARIATIONS,
-        isSensitive = CapabilityFlags.fromEditorInfo(this).hasAny(CapabilityFlag.PasswordOrSensitive),
+        isSensitive = (if (ownPackage != null) CapabilityFlags.forField(this, ownPackage) else CapabilityFlags.fromEditorInfo(this))
+            .hasAny(CapabilityFlag.PasswordOrSensitive),
         acceptsDeleteSurrounding =
             privateImeOptions?.split(',')?.any { it.trim() == DeleteSurroundingFlag } == true,
         noEnterAction = (imeOptions and EditorInfo.IME_FLAG_NO_ENTER_ACTION) != 0,

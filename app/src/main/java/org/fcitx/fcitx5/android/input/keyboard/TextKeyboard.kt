@@ -13,6 +13,7 @@ import androidx.core.view.ViewCompat
 import androidx.core.view.allViews
 import androidx.core.view.isVisible
 import org.fcitx.fcitx5.android.R
+import org.fcitx.fcitx5.android.core.EngineBridge
 import org.fcitx.fcitx5.android.core.InputMethodEntry
 import org.fcitx.fcitx5.android.core.KeyState
 import org.fcitx.fcitx5.android.core.KeyStates
@@ -85,7 +86,9 @@ class TextKeyboard private constructor(
                 AlphabetKey("H", "/"),
                 AlphabetKey("J", "#"),
                 AlphabetKey("K", "("),
-                AlphabetKey("L", ")")
+                AlphabetKey("L", ")"),
+                // where a physical keyboard has it: 微软 and 紫光 双拼 type ing on it, hidden else (semicolonKey)
+                SymbolKey(";", 0.1f, viewId = R.id.button_semicolon)
             ),
             listOf(
                 CapsKey(),
@@ -132,7 +135,8 @@ class TextKeyboard private constructor(
         init {
             val rows = listOf(
                 sizes.row(Layout[0].take(SplitKeyboard.HALF_KEYS), Layout[0].takeLast(SplitKeyboard.HALF_KEYS), GapKey),
-                sizes.row(Layout[1].take(SplitKeyboard.HALF_KEYS), Layout[1].takeLast(SplitKeyboard.HALF_KEYS), GapKey),
+                // without the 双拼 `;`: each half is five keys
+                Layout[1].dropLast(1).let { sizes.row(it.take(SplitKeyboard.HALF_KEYS), it.takeLast(SplitKeyboard.HALF_KEYS), GapKey) },
                 // Shift Z X C V, V B N M backspace
                 sizes.row(Layout[2].take(SplitKeyboard.HALF_KEYS), Layout[2].takeLast(SplitKeyboard.HALF_KEYS), GapKey),
                 Layout[3].map { it to sizes.width(it.appearance.percentWidth) },
@@ -192,7 +196,13 @@ class TextKeyboard private constructor(
         updatePunctuationKeys()
     }
 
+    // the input method last reported, for the `;` key again when the 双拼 scheme changed meanwhile
+    private var imeName = ""
+
     init {
+        // hidden until an input method says it types on it: shown, every one's A row had an 11th key
+        // at a cold start, before fcitx reported the first
+        showSemicolonKey()
         showAddressKeys()
         updateLangSwitchKey(showLangSwitchKey.getValue())
         showLangSwitchKey.registerOnChangeListener(showLangSwitchKeyListener)
@@ -207,6 +217,11 @@ class TextKeyboard private constructor(
 
     // the input method reads a glide (Engines.glides)
     private var glides = false
+
+    private fun showSemicolonKey() {
+        // split, the halves have no room for it: absent there
+        findViewById<View>(R.id.button_semicolon)?.let { showKey(it, semicolonKey(imeName, EngineBridge.shuangpinScheme)) }
+    }
 
     private val letterKeys: List<Pair<Char, TextKeyView>> by lazy {
         textKeys.mapNotNull { v ->
@@ -299,6 +314,8 @@ class TextKeyboard private constructor(
         updateCapsButtonIcon()
         updateAlphabetKeys()
         updatePunctuationKeys()
+        // the scheme may have changed in the settings with 双拼 kept, which reports no input method
+        showSemicolonKey()
     }
 
     override fun onReturnDrawableUpdate(appearance: ReturnKeyAppearance) {
@@ -312,6 +329,8 @@ class TextKeyboard private constructor(
 
     override fun onInputMethodUpdate(ime: InputMethodEntry) {
         showInputMethodName(space, ime)
+        imeName = ime.uniqueName
+        showSemicolonKey()
         glides = Engines.glides(ime.uniqueName)
         if (capsState != CapsState.None) {
             switchCapsState()
@@ -432,8 +451,10 @@ class TextKeyboard private constructor(
 /** What [label]'s long press offers: the user's list, else the built-in one; null where it is off. */
 internal fun PopupOverrides.longPressOf(label: String): Array<String>? = resolve(label, PopupPreset[label])
 
-// here, not in the companion: previewOf's JVM test would otherwise load TextKeyboard, a View
-private val ADDRESS_KEYS = setOf(R.id.button_slash, R.id.button_at, R.id.button_dot, R.id.button_domain)
+// here, not in the companion: previewOf's JVM test would otherwise load TextKeyboard, a View;
+// the 双拼 `;` is a key of the scheme, shown as it is too (; not ；)
+private val ADDRESS_KEYS = setOf(R.id.button_slash, R.id.button_at, R.id.button_dot, R.id.button_domain, R.id.button_semicolon)
+
 
 /**
  * What the preview bubble of the key [viewId] shows for [content]: a letter as Shift has it

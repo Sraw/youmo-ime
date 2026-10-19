@@ -71,9 +71,9 @@ class PopupKeyboardUiTest {
         return keys
     }
 
-    // the inverse of onChangeFocus's mapping, to the middle of a cell
+    // the middle of a cell as drawn: rows of keyHeight from the container's top, row 0 the bottom one
     private fun PopupKeyboardUi.select(row: Int, column: Int, rows: Int): KeyAction? {
-        onChangeFocus((column + 0.5f) * keyWidth, (rows - row + 0.2f) * keyHeight)
+        onChangeFocus((column + 0.5f) * keyWidth, (rows - 1 - row + 0.5f) * keyHeight)
         return onTrigger()
     }
 
@@ -207,5 +207,27 @@ class PopupKeyboardUiTest {
         val sizes = ui.labels().map { it.textSize }.toSet()
         assertEquals(1, sizes.size)
         assertTrue(sizes.single() < roomy.labels().first().textSize)
+    }
+
+    // KB-16: releasing on the bottom row of a two-row popup typed the key above it
+    @Test
+    fun theBottomRowOfTwoIsTypedWhereDrawnAndOnTheTriggerToo() {
+        val ui = popup(10, Rect(480, 500, 520, 550))
+        val cells = drawn(ui)
+        val rows = ui.root.childCount
+        assertEquals(2, rows)
+        val bottom = cells.filterValues { it.first == 0 }
+        assertTrue(bottom.isNotEmpty())
+        bottom.forEach { (label, cell) ->
+            // anywhere in the cell, its top edge to its bottom
+            for (f in listOf(0.05f, 0.5f, 0.95f)) {
+                ui.onChangeFocus((cell.second + 0.5f) * keyWidth, (rows - 1 + f) * keyHeight)
+                assertEquals(label, KeyAction.FcitxKeyAction(label), ui.onTrigger())
+            }
+        }
+        // the finger still on its key, below the popup: the bottom row
+        val first = cells.entries.first { it.value.first == 0 }
+        ui.onChangeFocus((first.value.second + 0.5f) * keyWidth, rows * keyHeight + 30f)
+        assertEquals(KeyAction.FcitxKeyAction(first.key), ui.onTrigger())
     }
 }

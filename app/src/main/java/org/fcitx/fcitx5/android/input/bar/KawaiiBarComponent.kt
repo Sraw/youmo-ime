@@ -345,6 +345,12 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
                 swipeEnabled = true
                 swipeThresholdY = dp(HEIGHT.toFloat())
                 onGestureListener = swipeDownExpandCallback
+                // with candidates or predictions shown the bar has no ⌄ of its own: this one hides
+                // the keyboard when held, as the swipe down does
+                setOnLongClickListener {
+                    service.requestHideSelf(0)
+                    true
+                }
             }
         }
     }

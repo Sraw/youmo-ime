@@ -4,6 +4,8 @@
  */
 package org.fcitx.fcitx5.android.input.keyboard
 
+import kotlin.math.abs
+
 /**
  * The bookkeeping behind a key's touch gestures, with no Android types involved.
  *
@@ -135,6 +137,11 @@ class KeyGestureRecognizer {
     val swipeTotalY: Int get() = swipeY.total
 
     private var maybeDoubleTap = false
+
+    // where the touch went down and where it is now, for a drag past the slop on a key whose
+    // swipe repeats
+    private var downX = 0f
+    private var lastX = 0f
     private var lastClickTime = 0L
 
     // endregion
@@ -146,6 +153,8 @@ class KeyGestureRecognizer {
 
     fun onDown(x: Float, y: Float) {
         frozen = live()
+        downX = x
+        lastX = x
         if (settings.swipe) {
             swipeX.last = x
             swipeY.last = y
@@ -160,6 +169,16 @@ class KeyGestureRecognizer {
         gestureConsumed = true
     }
 
+    private fun draggedPastSlop(x: Float) =
+        settings.swipe && settings.swipeRepeat && abs(x - downX) > touchSlop
+
+    /**
+     * Whether the long press timer, now due, may fire: not when the finger has already dragged
+     * sideways past the slop on a key whose swipe repeats. Asked at the timer as well as on each
+     * move, so the outcome does not hang on which comes first, the timer or the next sample.
+     */
+    fun longPressMayFire(): Boolean = !draggedPastSlop(lastX)
+
     fun onMove(x: Float, y: Float, longPressTriggered: Boolean, repeatStarted: Boolean): MoveOutcome {
         val settings = settings
         var movedOutsideNow = false
@@ -173,6 +192,17 @@ class KeyGestureRecognizer {
             if (settings.longPress) cancelLongPress = true
             if (settings.repeat) cancelRepeat = true
             if (repeatStarted || !settings.swipe) releasePressed = true
+        }
+
+        // A drag sideways past the slop on a key whose swipe repeats (the space's cursor, the
+        // backspace's selection) is that swipe, though its first step is not reached yet: a slow
+        // one took longer than the long press to reach it, and the long press then took the touch
+        // (PY-41: 330 px in 4 s moved no cursor, where 300 px in 2.5 s did). Only the long
+        // press: a pending repeat (holding the backspace) is cancelled by a real swipe step, as
+        // before, so a finger that drifts a little still deletes on.
+        lastX = x
+        if (!longPressTriggered && !repeatStarted && draggedPastSlop(x)) {
+            cancelLongPress = settings.longPress
         }
 
         // once a long press or repeat has fired, the gesture belongs to them

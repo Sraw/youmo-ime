@@ -30,7 +30,7 @@ val PopupPreset: Map<String, Array<String>> = hashMapOf(
     "h" to arrayOf("/", "H"),
     "j" to arrayOf("#", "J"),
     "k" to arrayOf("(", "K", "[", "{"),
-    "l" to arrayOf(")", "L", "]", "}", "ł"),
+    "l" to arrayOf(")", "L", "]", "}", "ł", ";"),
     "z" to arrayOf("'", "Z", "`", "ž", "ź", "ż"),
     "x" to arrayOf(":", "X", "×"),
     "c" to arrayOf("\"", "C", "ç", "ć", "č"),
@@ -132,6 +132,10 @@ val PopupPreset: Map<String, Array<String>> = hashMapOf(
     // Punctuation
     //
     "." to arrayOf(",", "?", "!", ":", ";", "_", "%", "$", "^", "&"),
+    // the bottom row's comma: its own long press was missing, so it offered only itself;
+    // ASCII, so a Chinese input method shows and commits them as its punctuation; the first ones
+    // sit nearest the finger, the full stop and the marks that end a sentence first
+    "," to arrayOf(".", "?", "!", ":", ";", "\"", "'", "(", ")", "~"),
     "-" to arrayOf("—", "–", "·"),
     "?" to arrayOf("¿", "‽"),
     "'" to arrayOf("‘", "’", "‚", "›", "‹"),

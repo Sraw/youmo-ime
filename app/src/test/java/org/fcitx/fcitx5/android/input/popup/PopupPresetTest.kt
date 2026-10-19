@@ -4,9 +4,11 @@
  */
 package org.fcitx.fcitx5.android.input.popup
 
+import org.fcitx.fcitx5.android.input.keyboard.KeyAction
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
@@ -37,5 +39,12 @@ class PopupPresetTest {
         assertArrayEquals(arrayOf("\u05D7\u05F3", "\u05F1"), PopupPreset["\u05D7"])
         // tsadi offers tsadi with geresh, as gimel, zayin, het and tav do
         assertArrayEquals(arrayOf("\u05E6\u05F3"), PopupPreset["\u05E6"])
+    }
+
+    @Test
+    fun lOffersTheSemicolonThatTwoShuangpinSchemesTypeAsAKey() {
+        // 微软 and 紫光 read ';' as ing; one character picked goes through fcitx as a key
+        assertTrue(";" in PopupPreset["l"]!!)
+        assertTrue(PopupKeyboardUi.keyAction(";") is KeyAction.FcitxKeyAction)
     }
 }

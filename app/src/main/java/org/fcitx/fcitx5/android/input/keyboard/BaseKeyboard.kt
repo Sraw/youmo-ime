@@ -12,8 +12,10 @@ import android.view.MotionEvent
 import android.view.View
 import androidx.annotation.CallSuper
 import androidx.annotation.Keep
+import androidx.annotation.VisibleForTesting
 import androidx.constraintlayout.widget.ConstraintLayout
 import androidx.core.view.children
+import androidx.core.view.isVisible
 import androidx.core.view.updateLayoutParams
 import kotlin.math.absoluteValue
 import kotlin.math.roundToInt
@@ -142,6 +144,51 @@ abstract class BaseKeyboard(
 
     protected val keyRows: List<ConstraintLayout>
 
+    /** A row's views and their own widths, for [fitRow] again once a key is shown or hidden. */
+    private class Row(val keys: List<View>, val widths: List<Float>)
+
+    private val rowKeys = mutableListOf<Row>()
+
+    /**
+     * A row narrower than the keyboard: its outermost keys shown take the room left at the edges,
+     * their labels where they were. Only keys shown count, so a key hidden (the 双拼 `;`) leaves
+     * the row's ends widened again.
+     */
+    private fun fitRow(keyViews: List<View>, widths: List<Float>) {
+        val shown = keyViews.indices.filter { keyViews[it].visibility != View.GONE }.ifEmpty { return }
+        // back to their own widths first: fitted before, they may no longer be at an end
+        keyViews.forEachIndexed { i, view ->
+            if (view !is KeyView) return@forEachIndexed
+            view.updateLayoutParams<ConstraintLayout.LayoutParams> { matchConstraintPercentWidth = widths[i] }
+            view.layoutMarginLeft = 0f
+            view.layoutMarginRight = 0f
+        }
+        // 0f means fill remaining space, thus does not need expanding
+        val totalWidth = shown.sumOf { (widths[it].takeIf { w -> w != 0f } ?: 1f).toDouble() }.toFloat()
+        // a split row fills the keyboard by itself (SplitKeyboard.row)
+        if (!expandKeypressArea || keyWidths != null || totalWidth >= 1f) return
+        val free = (1f - totalWidth) / 2f
+        val first = shown.first()
+        val last = shown.last()
+        // a gap at an edge is no key to widen
+        (keyViews[first] as? KeyView)?.apply {
+            updateLayoutParams<ConstraintLayout.LayoutParams> { matchConstraintPercentWidth += free }
+            layoutMarginLeft = free / (widths[first] + free)
+        }
+        (keyViews[last] as? KeyView)?.apply {
+            updateLayoutParams<ConstraintLayout.LayoutParams> { matchConstraintPercentWidth += free }
+            layoutMarginRight = free / (widths[last] + free)
+        }
+    }
+
+    /** [view] shown or not, its row fitted again ([fitRow]). */
+    @VisibleForTesting(otherwise = VisibleForTesting.PROTECTED)
+    internal fun showKey(view: View, shown: Boolean) {
+        if (view.isVisible == shown) return
+        view.isVisible = shown
+        rowKeys.firstOrNull { view in it.keys }?.let { fitRow(it.keys, it.widths) }
+    }
+
     init {
         isMotionEventSplittingEnabled = true
         keyRows = keyLayout.mapIndexed { rowIndex, row ->
@@ -149,9 +196,9 @@ abstract class BaseKeyboard(
             // findTouchTarget, vivo's, finds key views only)
             val keyViews = row.map { if (it === GapKey) View(context) else createKeyView(it) }
             val widths = keyWidths?.get(rowIndex) ?: row.map { it.appearance.percentWidth }
+            rowKeys += Row(keyViews, widths)
             constraintLayout Row@{
                 isMotionEventSplittingEnabled = true
-                var totalWidth = 0f
                 keyViews.forEachIndexed { index, view ->
                     add(view, lParams {
                         centerVertically()
@@ -170,28 +217,8 @@ abstract class BaseKeyboard(
                         }
                         matchConstraintPercentWidth = widths[index]
                     })
-                    widths[index].let {
-                        // 0f means fill remaining space, thus does not need expanding
-                        totalWidth += if (it != 0f) it else 1f
-                    }
                 }
-                // a split row fills the keyboard by itself (SplitKeyboard.row)
-                if (expandKeypressArea && keyWidths == null && totalWidth < 1f) {
-                    val free = (1f - totalWidth) / 2f
-                    // a gap at an edge is no key to widen
-                    (keyViews.first() as? KeyView)?.apply {
-                        updateLayoutParams<LayoutParams> {
-                            matchConstraintPercentWidth += free
-                        }
-                        layoutMarginLeft = free / (widths.first() + free)
-                    }
-                    (keyViews.last() as? KeyView)?.apply {
-                        updateLayoutParams<LayoutParams> {
-                            matchConstraintPercentWidth += free
-                        }
-                        layoutMarginRight = free / (widths.last() + free)
-                    }
-                }
+                fitRow(keyViews, widths)
             }
         }
         keyRows.forEachIndexed { index, row ->
@@ -212,7 +239,12 @@ abstract class BaseKeyboard(
     private fun updateSpaceBadges(behavior: SpaceLongPressBehavior) {
         val voice = behavior.talks(VoiceFeature.AVAILABLE, inPasswordField)
         val icon = if (voice) R.drawable.ic_baseline_keyboard_voice_24 else null
-        spaceKeys.forEach { (it as? TextKeyView)?.showBadge(icon) }
+        // a long press that does nothing here buzzes for nothing either
+        val takes = spaceLongPressTakesTouch(behavior, VoiceFeature.AVAILABLE, inPasswordField)
+        spaceKeys.forEach {
+            (it as? TextKeyView)?.showBadge(icon)
+            it.longPressFeedbackEnabled = takes
+        }
     }
 
     /** What swiping a key types: its own swipe, nothing, or what the user chose ([swipeText]). */
@@ -267,7 +299,8 @@ abstract class BaseKeyboard(
                 is ReturnKey -> InputFeedbacks.SoundEffect.Return
                 else -> InputFeedbacks.SoundEffect.Standard
             }
-            if (def is SpaceKey) {
+            // the number pad's space moves the cursor too (TB-27): it had the press only
+            if (def is SpaceKey || def is MiniSpaceKey) {
                 spaceKeys.add(this)
                 swipeEnabled = spaceSwipeMoveCursor.getValue()
                 swipeRepeatEnabled = true
@@ -331,8 +364,13 @@ abstract class BaseKeyboard(
                         // hold to talk follows the finger that holds the space
                         setOnLongClickListener { view ->
                             val action = it.action
-                            onAction(if (action is KeyAction.SpaceLongPressAction) action.copy(pointer = (view as CustomGestureView).touchPointer) else action)
-                            true
+                            if (action is KeyAction.SpaceLongPressAction && !spaceLongPressTakesTouch(spaceLongPress.getValue(), VoiceFeature.AVAILABLE, inPasswordField)) {
+                                // nothing to do: not taken, or a slow drag on the space, its first step past the delay, moved no cursor (PY-41)
+                                false
+                            } else {
+                                onAction(if (action is KeyAction.SpaceLongPressAction) action.copy(pointer = (view as CustomGestureView).touchPointer) else action)
+                                true
+                            }
                         }
                     }
                     is KeyDef.Behavior.Repeat -> {
@@ -349,14 +387,18 @@ abstract class BaseKeyboard(
                         val oldOnGestureListener = onGestureListener ?: OnGestureListener.Empty
                         onGestureListener = OnGestureListener { view, event ->
                             when (event.type) {
-                                GestureType.Up -> {
-                                    if (event.isSwipe(swipeSymbolDirection)) {
+                                GestureType.Up -> when (event.symbolSwipe(swipeSymbolDirection)) {
+                                    SymbolSwipe.Outcome.Symbol -> {
                                         swipeText(view as KeyView).typed(it.action)?.let { (action, source) -> onAction(action, source) }
                                         // consumed when it types nothing too, or a swipe that stayed on the key would type it as a tap
                                         true
-                                    } else {
-                                        false
                                     }
+                                    SymbolSwipe.Outcome.Tap -> {
+                                        // the key's click, here: one that left the key is no click to the view; consumed, so one on it clicks once
+                                        view.performClick()
+                                        true
+                                    }
+                                    SymbolSwipe.Outcome.None -> false
                                 }
                                 else -> false
                             } || oldOnGestureListener.onGesture(view, event)
@@ -427,7 +469,7 @@ abstract class BaseKeyboard(
                                         PopupAction.PreviewAction(view.id, popup.content, view.bounds)
                                     )
                                     GestureType.Move -> {
-                                        val triggered = swipeSymbolDirection.checkY(event.totalY)
+                                        val triggered = SymbolSwipe.typesSymbol(swipeSymbolDirection.direction, event.totalY)
                                         val text = if (triggered) swipeText(view).preview(popup.alternative) else popup.content
                                         onPopupAction(
                                             PopupAction.PreviewUpdateAction(view.id, text)
@@ -689,9 +731,19 @@ private object KeyPointer {
     val coords = arrayOf(MotionEvent.PointerCoords())
 }
 
-/** Whether this Up ends a swipe [direction] types on: not one taken already (by a long press, say), nor cancelled. */
-internal fun CustomGestureView.Event.isSwipe(direction: SwipeSymbolDirection) =
-    !consumed && !cancelled && direction.checkY(totalY)
+/**
+ * Whether the space's long press, set to [behavior], takes the touch from its swipe: not when it does
+ * nothing, as None does, and Voice where it does not talk ([SpaceLongPressBehavior.talks]).
+ */
+internal fun spaceLongPressTakesTouch(behavior: SpaceLongPressBehavior, voiceAvailable: Boolean, inPasswordField: Boolean) = when (behavior) {
+    SpaceLongPressBehavior.None -> false
+    SpaceLongPressBehavior.Voice -> behavior.talks(voiceAvailable, inPasswordField)
+    else -> true
+}
+
+/** What this Up types on a key that swipes for its symbol [direction]: see [SymbolSwipe]. */
+internal fun CustomGestureView.Event.symbolSwipe(direction: SwipeSymbolDirection) =
+    SymbolSwipe.onUp(direction.direction, totalY, consumed, cancelled)
 
 /** What the Space key shows of an input method: its [name], and [subMode]'s label (or else its name) in brackets. */
 internal fun spaceLabel(name: String, subMode: InputMethodSubMode): String {

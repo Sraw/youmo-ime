@@ -26,7 +26,6 @@ import kotlin.math.ceil
 import kotlin.math.floor
 import kotlin.math.max
 import kotlin.math.min
-import kotlin.math.roundToInt
 
 /**
  * @param ctx [Context]
@@ -228,8 +227,9 @@ class PopupKeyboardUi(
     }
 
     override fun onChangeFocus(x: Float, y: Float): Boolean {
-        // move to next row when gesture moves above 30% from bottom of current row
-        var newRow = rowCount - (y / keyHeight - 0.2).roundToInt()
+        // the row drawn under the finger, row 0 at the bottom; below it (still on the key) is row 0.
+        // Rounded with a 30% lead, a finger on the bottom row's upper 70% picked the row above (KB-16)
+        var newRow = rowCount - 1 - floor(y / keyHeight).toInt()
         // move to next column when gesture moves out of current column
         var newColumn = floor(x / keyWidth).toInt()
         // retain focus when gesture moves between ±2 rows/columns of range

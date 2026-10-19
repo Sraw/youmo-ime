@@ -22,6 +22,7 @@ import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.data.theme.ThemePrefs.NavbarBackground
 import org.fcitx.fcitx5.android.input.bar.KawaiiBarComponent
+import org.fcitx.fcitx5.android.input.keyboard.KeyboardHeightCap
 import org.fcitx.fcitx5.android.input.keyboard.TextKeyboard
 import org.fcitx.fcitx5.android.utils.navbarFrameHeight
 import splitties.dimensions.dp
@@ -137,7 +138,8 @@ class KeyboardPreviewUi(override val ctx: Context, val theme: Theme) : Ui {
             Configuration.ORIENTATION_LANDSCAPE -> keyboardHeightPercentLandscape
             else -> keyboardHeightPercent
         }
-        return w to (h * hPercent / 100)
+        // capped as the real keyboard is (InputView), or a landscape 很高 preview stands taller than it
+        return w to KeyboardHeightCap.keysHeight(h * hPercent / 100, h, barHeight, keyboardBottomPaddingPx)
     }
 
     init {

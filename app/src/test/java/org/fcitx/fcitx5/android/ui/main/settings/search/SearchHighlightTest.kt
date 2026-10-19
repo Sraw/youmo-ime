@@ -6,6 +6,7 @@ package org.fcitx.fcitx5.android.ui.main.settings.search
 
 import android.content.Context
 import android.os.Bundle
+import android.os.Looper
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -23,6 +24,7 @@ import androidx.preference.Preference
 import androidx.preference.PreferenceFragmentCompat
 import androidx.preference.PreferenceManager
 import androidx.preference.PreferenceScreen
+import androidx.recyclerview.widget.RecyclerView
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -33,7 +35,9 @@ import org.junit.runner.RunWith
 import org.robolectric.Robolectric
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
+import org.robolectric.Shadows.shadowOf
 import org.robolectric.shadows.ShadowSystemClock
+import java.time.Duration
 import java.util.concurrent.TimeUnit
 
 /**
@@ -181,5 +185,25 @@ class SearchHighlightTest {
         const val SEARCH = 2
         const val RESULT = 3
         const val OTHER = 4
+    }
+
+    // a page opened from a search stayed at its top: its list had no adapter yet when it was scrolled
+    @Test
+    fun aListIsScrolledOnlyOnceItHasItsAdapter() {
+        val list = RecyclerView(ctx)
+        var scrolled = 0
+        SearchHighlight.whenListed(list) { scrolled++ }
+        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(200))
+        assertEquals(0, scrolled)
+        list.adapter = object : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
+            override fun onCreateViewHolder(parent: ViewGroup, viewType: Int) = object : RecyclerView.ViewHolder(View(ctx)) {}
+            override fun onBindViewHolder(holder: RecyclerView.ViewHolder, position: Int) = Unit
+            override fun getItemCount() = 0
+        }
+        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(100))
+        assertEquals(1, scrolled)
+        // one with no list yet goes at once (scrollToPreference waits for the list itself)
+        SearchHighlight.whenListed(null) { scrolled++ }
+        assertEquals(2, scrolled)
     }
 }

@@ -122,6 +122,11 @@ class PinyinCustomPhraseFragment : Fragment(), OnItemChangedListener<PinyinCusto
                 }
             }
 
+            override fun onBindViewHolder(holder: ViewHolder, position: Int) {
+                super.onBindViewHolder(holder, position)
+                tapRowToEdit(holder.nameText, holder.editButton, multiselect)
+            }
+
             override fun showEditDialog(
                 title: String,
                 entry: PinyinCustomPhrase?,
@@ -173,6 +178,12 @@ class PinyinCustomPhraseFragment : Fragment(), OnItemChangedListener<PinyinCusto
                     .setView(layout)
                     .setPositiveButton(android.R.string.ok, null)
                     .setNegativeButton(android.R.string.cancel, null)
+                    .apply {
+                        // editing one (a tap on its row or its pen): it can be deleted here too (WD-18)
+                        if (entry != null) setNeutralButton(R.string.delete) { _, _ ->
+                            ui.indexItem(entry).takeIf { it >= 0 }?.let { ui.removeItem(it) }
+                        }
+                    }
                     .show()
                     .onPositiveButtonClick onClick@{
                         val key = keyField.str
@@ -339,4 +350,13 @@ class PinyinCustomPhraseFragment : Fragment(), OnItemChangedListener<PinyinCusto
         super.onDestroy()
     }
 
+}
+
+/**
+ * A tap on a phrase's row edits it, as its pen does (WD-18: docs/words.md says 点一条可以编辑或删除);
+ * the list's own tap only ticked the row's box, hidden outside multi-select. In multi-select the
+ * tap still ticks it, as the list set.
+ */
+internal fun tapRowToEdit(row: View, pen: View, multiselect: Boolean) {
+    if (!multiselect) row.setOnClickListener { pen.performClick() }
 }

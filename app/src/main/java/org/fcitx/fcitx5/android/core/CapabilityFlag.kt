@@ -6,6 +6,7 @@ package org.fcitx.fcitx5.android.core
 
 import android.text.InputType
 import android.view.inputmethod.EditorInfo
+import org.fcitx.fcitx5.android.input.FieldPolicy
 import splitties.bitflags.hasFlag
 
 /**
@@ -93,6 +94,15 @@ value class CapabilityFlags constructor(val flags: ULong) {
             CapabilityFlag.ClientUnfocusCommit,
             CapabilityFlag.CommitStringWithCursor
         )
+
+        /**
+         * What the service tells fcitx of [info]: [fromEditorInfo], and a field of this app's own
+         * package ([ownPackage]) is Sensitive, so it learns nothing, as a 无痕 field: the engine,
+         * the context memory and the recently used emoji and symbols alike.
+         */
+        fun forField(info: EditorInfo, ownPackage: String): CapabilityFlags = fromEditorInfo(info).let {
+            if (FieldPolicy.ownApp(info.packageName, ownPackage)) CapabilityFlags(it.flags + CapabilityFlag.Sensitive) else it
+        }
 
         fun fromEditorInfo(info: EditorInfo): CapabilityFlags {
             var flags = DefaultFlags.flags

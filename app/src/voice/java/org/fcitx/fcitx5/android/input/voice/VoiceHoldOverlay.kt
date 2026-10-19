@@ -175,6 +175,9 @@ class VoiceHoldOverlay(
         if (inputView.hold === this) inputView.hold = null
         if (gone) return
         gone = true
+        // still shown a moment (the message, the fade), but no longer the held finger's: clickable,
+        // it took the next press on the space under it and the long press never fired (VO-16)
+        card.isClickable = false
         message?.let { status.setText(it) }
         main.postDelayed({
             card.animate().alpha(0f).setDuration(VoiceStyle.ANIMATE_MS).withEndAction { overlay.removeView(card) }.start()

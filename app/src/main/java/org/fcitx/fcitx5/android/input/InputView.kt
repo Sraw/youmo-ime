@@ -57,6 +57,7 @@ import org.fcitx.fcitx5.android.input.floating.FloatingHandle
 import org.fcitx.fcitx5.android.input.floating.FloatingKeyboard
 import org.fcitx.fcitx5.android.input.floating.FloatingPlacer
 import org.fcitx.fcitx5.android.input.keyboard.CommonKeyActionListener
+import org.fcitx.fcitx5.android.input.keyboard.KeyboardHeightCap
 import org.fcitx.fcitx5.android.input.keyboard.KeyboardHeightPercentBase.DisplayMetrics
 import org.fcitx.fcitx5.android.input.keyboard.KeyboardHeightPercentBase.RealSize
 import org.fcitx.fcitx5.android.input.keyboard.KeyboardWindow
@@ -428,7 +429,13 @@ class InputView(
         val boardHeight = if (floating) {
             FloatingKeyboard.height(keyboardHeightPx, TextKeyboard.widthDp(context), resources.configuration.screenWidthDp)
         } else {
-            keyboardHeightPx
+            // the whole docked area stays under ~70% of the screen, so the field shows in landscape
+            KeyboardHeightCap.keysHeight(
+                keyboardHeightPx,
+                resources.displayMetrics.heightPixels,
+                dp(KawaiiBarComponent.HEIGHT + KawaiiBarComponent.PREEDIT_HEIGHT),
+                keyboardBottomPaddingPx,
+            )
         }
         val bottomPadding = if (floating) 0 else keyboardBottomPaddingPx
         oneHandedPlaced = placement != null && !TextKeyboard.splits(context)

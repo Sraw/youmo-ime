@@ -12,6 +12,10 @@ enum class SwipeSymbolDirection(override val stringRes: Int): ManagedPreferenceE
     Down(R.string.swipe_down),
     Disabled(R.string.disabled);
 
-    fun checkY(totalY: Int): Boolean =
-        (this != Disabled) && (totalY != 0) && ((totalY > 0) == (this == Down))
+    /** Which way its swipe types the symbol, as [SymbolSwipe] takes it. */
+    val direction: SymbolSwipe.Direction get() = when (this) {
+        Up -> SymbolSwipe.Direction.Up
+        Down -> SymbolSwipe.Direction.Down
+        Disabled -> SymbolSwipe.Direction.Off
+    }
 }

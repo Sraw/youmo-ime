@@ -24,6 +24,15 @@ class CapabilityFlagsTest {
     }
 
     @Test
+    fun aFieldOfThisAppLearnsNothing() {
+        // F2330: the emoji picker's recents read these flags, not fromEditorInfo
+        val info = EditorInfo().apply { inputType = InputType.TYPE_CLASS_TEXT; packageName = "own" }
+        assertTrue(CapabilityFlags.forField(info, "own").has(CapabilityFlag.Sensitive))
+        assertFalse(CapabilityFlags.forField(info, "other").has(CapabilityFlag.Sensitive))
+        assertFalse(CapabilityFlags.fromEditorInfo(info).has(CapabilityFlag.Sensitive))
+    }
+
+    @Test
     fun aPinIsAPassword() {
         fun flags(type: Int) = CapabilityFlags.fromEditorInfo(EditorInfo().apply { inputType = type })
         val pin = flags(InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_VARIATION_PASSWORD)

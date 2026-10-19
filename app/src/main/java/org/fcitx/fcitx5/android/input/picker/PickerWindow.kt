@@ -253,7 +253,7 @@ class PickerWindow(
     override fun onAttached() {
         // a view made anew mid-field (a dark-mode switch replaces it) is told of no start: the field is asked
         service.currentInputEditorInfo?.let {
-            keepsNoRecent = CapabilityFlags.fromEditorInfo(it).hasAny(CapabilityFlag.PasswordOrSensitive)
+            keepsNoRecent = CapabilityFlags.forField(it, service.packageName).hasAny(CapabilityFlag.PasswordOrSensitive)
         }
         if (panel) {
             sidePanel.open(adapter.recentEmpty)
