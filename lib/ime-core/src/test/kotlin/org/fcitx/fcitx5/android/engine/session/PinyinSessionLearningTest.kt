@@ -87,11 +87,11 @@ class PinyinSessionLearningTest {
     @Test
     fun aLongRunOfPiecesIsLearnedAsItsWords() {
         val (session, user) = learning()
-        var s = session.type("ni".repeat(PinyinSession.MAX_PHRASE + 1))
-        repeat(PinyinSession.MAX_PHRASE + 1) { s = session.apply(Select(s.candidates.indexOf("拟"))) }
-        assertEquals("拟".repeat(PinyinSession.MAX_PHRASE + 1), s.commit)
+        var s = session.type("ni".repeat(UserModel.MAX_PHRASE + 1))
+        repeat(UserModel.MAX_PHRASE + 1) { s = session.apply(Select(s.candidates.indexOf("拟"))) }
+        assertEquals("拟".repeat(UserModel.MAX_PHRASE + 1), s.commit)
         assertEquals(0, user.size)
-        assertEquals(PinyinSession.MAX_PHRASE + 1f, user.total)
+        assertEquals(UserModel.MAX_PHRASE + 1f, user.total)
     }
 
     @Test
@@ -127,6 +127,19 @@ class PinyinSessionLearningTest {
         val next = session.apply(Select(0))
         assertEquals("你", next.commit)
         assertEquals("好", next.candidates.first())
+    }
+
+    // PY-33: a long press on a word never chosen offered to forget what was never learned
+    @Test
+    fun onlyAWordLearnedOffersToBeForgotten() {
+        val (session, _) = learning()
+        session.type("ni")
+        val never = session.candidates(0, 20).indexOfFirst { it.text == "拟" }
+        assertFalse(Offer.FORGET in session.offers(never))
+        session.apply(Pick(never))
+        session.apply(Reset)
+        session.type("ni")
+        assertTrue(Offer.FORGET in session.offers(session.candidates(0, 20).indexOfFirst { it.text == "拟" }))
     }
 
     @Test

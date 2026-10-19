@@ -163,4 +163,45 @@ class PinyinSessionPhraseTest {
         val mine = PinyinSession(data, ShuangpinSegmenter(ShuangpinScheme.ZIRANMA), spell = true, pageSize = 20, phraseBook = own, now = now)
         assertEquals("三家", mine.type("sj").candidates[0])
     }
+
+    @Test
+    fun theBuiltInPhrasesTurnedOffAreNotOfferedButTheUsersAre() {
+        val now = { GregorianCalendar(2026, Calendar.OCTOBER, 17, 9, 5) }
+        val book = PhraseBook(CustomPhrases.parse("rq,1=日前"), CustomPhrases.BUILT_IN)
+        fun session(on: Boolean) = PinyinSession(data, PinyinSegmenter(), pageSize = 20, phraseBook = book, builtInPhrases = on, now = now)
+        assertTrue("09:05" in session(true).type("sj").candidates)
+        assertFalse("09:05" in session(false).type("sj").candidates)
+        assertTrue("星期六" in session(true).type("xq").candidates)
+        assertFalse("星期六" in session(false).type("xq").candidates)
+        // the user's own stays
+        assertEquals("日前", session(false).type("rq").candidates[0])
+    }
+
+    @Test
+    fun theWordsOfTheBuiltInPhrasesBringThemInEveryPinyinOnceAndAsTheSwitchHasIt() {
+        val now = { GregorianCalendar(2026, Calendar.OCTOBER, 17, 9, 5) }
+        fun session(spell: Boolean, on: Boolean = true, book: PhraseBook = PhraseBook(builtIn = CustomPhrases.BUILT_IN)) = PinyinSession(
+            data, if (spell) ShuangpinSegmenter(ShuangpinScheme.ZIRANMA) else PinyinSegmenter(), spell = spell, pageSize = 20,
+            phraseBook = book, builtInPhrases = on, now = now,
+        )
+        val dates = listOf("2026年10月17日", "2026-10-17", "二〇二六年十月十七日")
+        // 日期 read first, the whole input: its dates after the first two, as its emoji would be
+        val sp = session(spell = true).type("riqi").candidates
+        assertEquals("日期", sp[0])
+        assertEquals(dates, sp.filter { it in dates })
+        assertEquals(minOf(2, sp.size - dates.size), sp.indexOf(dates[0]))
+        val full = session(spell = false).type("riqi").candidates
+        assertEquals("日期", full[0])
+        assertEquals(dates, full.filter { it in dates })
+        assertEquals(minOf(2, full.size - dates.size), full.indexOf(dates[0]))
+        // rq in full pinyin: its own, not twice
+        assertEquals(1, session(spell = false).type("rq").candidates.count { it == "2026-10-17" })
+        // the switch off, or the one deleted: none
+        assertFalse("2026-10-17" in session(spell = true, on = false).type("riqi").candidates)
+        val book = PhraseBook(builtIn = CustomPhrases.BUILT_IN)
+        book.remove("rq", "#\$year-\$month_mm-\$day_dd")
+        val left = session(spell = true, book = book).type("riqi").candidates
+        assertFalse("2026-10-17" in left)
+        assertTrue("2026年10月17日" in left)
+    }
 }

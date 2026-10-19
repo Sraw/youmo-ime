@@ -17,6 +17,8 @@ import org.fcitx.fcitx5.android.engine.user.UserModel.Entry
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -557,5 +559,61 @@ class UserModelTest {
                     .build().toByteArray(),
             ),
         )
+    }
+
+    @Test
+    fun hasLearnedWhatForgetWouldDrop() {
+        val m = model()
+        val ni = entry("你", "ni")
+        val hao = entry("好", "hao")
+        val ma = entry("吗", "ma")
+        // nothing of it: never typed, or only listed (a hand-added word not typed, which the settings remove)
+        assertFalse(m.hasLearned(listOf(ni)))
+        m.list(entry("你好", "ni", "hao"))
+        m.listByHand(entry("拟好", "ni", "hao"))
+        assertFalse(m.hasLearned(listOf(entry("你好", "ni", "hao"))))
+        assertFalse(m.hasLearned(listOf(entry("拟好", "ni", "hao"))))
+        // typed after a word of the dictionary's never typed itself: the word before is in a pair only
+        m.learn(ni, listOf(hao))
+        assertTrue(m.hasLearned(listOf(hao)))
+        assertTrue(m.hasLearned(listOf(ni)))
+        // a candidate of several: any of its words learned
+        assertTrue(m.hasLearned(listOf(ma, hao)))
+        assertFalse(m.hasLearned(listOf(ma, entry("你好", "ni", "hao"))))
+        // a word the user made, alone
+        val made = entry("拟吗", "ni", "ma")
+        m.learn(null, listOf(made))
+        assertTrue(m.hasLearned(listOf(made)))
+        // forgotten, nothing left
+        m.forget(listOf(hao))
+        assertFalse(m.hasLearned(listOf(hao)))
+        assertFalse(m.hasLearned(listOf(ni)))
+    }
+
+    @Test
+    fun aWordOfTheUsersDictionariesTypedIsTheirsAsATypedWordOfTheDictionarysIs() {
+        val m = model()
+        val imported = entry("拟好", "ni", "hao")
+        m.list(imported)
+        assertFalse("拟好" in m.ownTexts())
+        m.learn(null, listOf(imported))
+        assertTrue("拟好" in m.ownTexts())
+        // forgotten, no longer
+        m.forget(listOf(imported))
+        assertFalse("拟好" in m.ownTexts())
+        // typed again then blocked: no longer either (F2433)
+        m.learn(null, listOf(imported))
+        assertTrue("拟好" in m.ownTexts())
+        m.block(imported)
+        assertFalse("拟好" in m.ownTexts())
+    }
+
+    @Test
+    fun aPhraseIsAtMostMaxPhraseCharactersCountedByCodePoint() {
+        // F2460: the bound exactly, and an Ext-B character (two UTF-16 units) counts once
+        val nihao = listOf(entry("你好", "ni", "hao"))
+        assertNotNull(UserModel.phrase("你".repeat(UserModel.MAX_PHRASE), nihao))
+        assertNull(UserModel.phrase("你".repeat(UserModel.MAX_PHRASE + 1), nihao))
+        assertNotNull(UserModel.phrase("\uD840\uDC00".repeat(UserModel.MAX_PHRASE), nihao))
     }
 }

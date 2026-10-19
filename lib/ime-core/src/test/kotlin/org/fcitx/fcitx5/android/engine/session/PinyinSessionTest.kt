@@ -260,6 +260,86 @@ class PinyinSessionTest {
     }
 
     @Test
+    fun aKeyTheAppTookEndsTheContextCommitted() {
+        val session = session()
+        session.type("wo")
+        session.apply(Select(0))
+        // an arrow the app took: 在 again, as with no context
+        session.passedOn()
+        assertEquals("在", session.type("zai").candidates.first())
+    }
+
+    @Test
+    fun whatTheAppsBackspaceErasedIsNoContext() {
+        val session = session()
+        session.type("wo")
+        session.apply(Select(0))
+        // the app's Backspace erases 我 (the session's input empty): 在, as in an empty field
+        assertFalse(session.apply(Action.Backspace).handled)
+        assertEquals("在", session.type("zai").candidates.first())
+    }
+
+    @Test
+    fun whatTheAppsBackspaceErasedIsNoContextWhileLearningIsOff() {
+        val session = session()
+        session.learning = false
+        session.type("wo")
+        session.apply(Select(0))
+        // the premise: not learning, what was committed is context all the same (我 then 再)
+        val kept = session()
+        kept.learning = false
+        kept.type("wo")
+        kept.apply(Select(0))
+        assertEquals("再", kept.type("zai").candidates.first())
+        assertFalse(session.apply(Action.Backspace).handled)
+        assertEquals("在", session.type("zai").candidates.first())
+    }
+
+    @Test
+    fun whatTheAppsBackspaceLeftIsTheContext() {
+        val session = session()
+        session.type("wo")
+        session.apply(Select(0))
+        session.type("zai")
+        session.apply(Select(0))
+        // 在 erased, 我 left: as if the app's text were 我
+        session.apply(Action.Backspace)
+        val fresh = session().apply { apply(Action.Context("我")) }
+        assertEquals(fresh.type("zai").candidates, session.type("zai").candidates)
+    }
+
+    @Test
+    fun aCharacterPastTheBmpIsErasedWhole() {
+        // 𠀀 (Ext-B) a word of the model's, so that what is committed after 我 ends with a surrogate pair
+        val wide = PinyinData.load(
+            ByteBuffer.wrap(
+                PinyinDataBuilder()
+                    .unigram("<unk>", -7f, 0f)
+                    .unigram("我", -2f, 0f)
+                    .unigram("𠀀", -2f, 0f)
+                    .unigram("在", -2f, 0f)
+                    .unigram("再", -2.5f, 0f)
+                    .bigram("我", "再", -0.5f, 0f)
+                    .entry("我", syl("wo"))
+                    .entry("𠀀", syl("ke"))
+                    .entry("在", syl("zai"))
+                    .entry("再", syl("zai"))
+                    .build().toByteArray(),
+            ),
+        )
+        val session = PinyinSession(wide, PinyinSegmenter())
+        session.type("wo")
+        session.apply(Select(0))
+        assertEquals("𠀀", session.type("ke").let { session.apply(Select(0)) }.commit)
+        // one Backspace takes both halves: 我 is left, no lone surrogate after it to end the context
+        session.apply(Action.Backspace)
+        val fresh = PinyinSession(wide, PinyinSegmenter()).apply { apply(Action.Context("我")) }
+        val after = session.type("zai").candidates
+        assertEquals("再", after.first())
+        assertEquals(fresh.type("zai").candidates, after)
+    }
+
+    @Test
     fun theTextTheAppHasIsTheContextOfWhatIsTypedNext() {
         val session = session()
         val context = session.apply(Action.Context("他说我"))
@@ -442,6 +522,34 @@ class PinyinSessionTest {
     }
 
     @Test
+    fun 双拼SemicolonIsAFinalAfterAnInitialAndPunctuationElsewhere() {
+        for (scheme in listOf(ShuangpinScheme.MICROSOFT, ShuangpinScheme.ZIGUANG)) {
+            val session = PinyinSession(data, ShuangpinSegmenter(scheme), spell = true)
+            // nothing typed: the app's punctuation key
+            val empty = session.apply(Key(';'))
+            assertFalse(empty.handled)
+            assertEquals("", empty.preedit)
+            // after a whole syllable: the first candidate, then the app's ；
+            val ni = session.type("ni")
+            val after = session.apply(Key(';'))
+            assertFalse(after.handled)
+            assertEquals(ni.candidates.first(), after.commit)
+            assertEquals("", after.preedit)
+            // after an initial: ing, read into the input (no 星 in the data: shown as typed)
+            val xing = session.type("x;")
+            assertTrue(xing.handled)
+            assertEquals("x;", xing.preedit)
+            val segmenter = ShuangpinSegmenter(scheme)
+            assertTrue(segmenter.readsAfter("x", ';'))
+            assertTrue(segmenter.readsAfter("nix", ';'))
+            assertFalse(segmenter.readsAfter("", ';'))
+            assertFalse(segmenter.readsAfter("ni", ';'))
+            assertFalse(segmenter.readsAfter("x;", ';'))
+            session.apply(Reset)
+        }
+    }
+
+    @Test
     fun enterCommitsWhatWasTyped() {
         val session = session()
         val s = session.type("nihao")
@@ -572,10 +680,21 @@ class PinyinSessionTest {
     @Test
     fun aWordForgottenPastTheFirstWordsStaysOnThePageShown() {
         val many = many()
-        val session = PinyinSession(many, PinyinSegmenter(), pageSize = 10, user = UserModel(many.dictionary, many.vocabulary))
+        val user = UserModel(many.dictionary, many.vocabulary)
+        val session = PinyinSession(many, PinyinSegmenter(), pageSize = 10, user = user)
         session.type("shi")
         repeat(7) { session.apply(NextPage) }
+        // never learned, so not offered (PY-33)
+        assertFalse(Offer.FORGET in session.offers(72))
+        // learned only as the word before another: something to forget, its place not moved
+        val word = session.candidates(72, 1).single().text
+        user.learn(UserModel.Entry(word, syl("shi")), listOf(UserModel.Entry(chars[0], syl("shi"))))
+        session.apply(Reset)
+        session.type("shi")
+        repeat(7) { session.apply(NextPage) }
+        assertEquals(word, session.candidates(72, 1).single().text)
         assertTrue(Offer.FORGET in session.offers(72))
         assertEquals(7, session.apply(Action.Forget(72)).page)
+        assertFalse(user.hasLearned(listOf(UserModel.Entry(word, syl("shi")))))
     }
 }

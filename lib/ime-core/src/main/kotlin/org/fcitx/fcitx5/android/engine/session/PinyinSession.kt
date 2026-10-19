@@ -92,6 +92,8 @@ class PinyinSession(
      * pinned ([Action.Pin]) or deleted ([Action.Unpin]) changes them.
      */
     private val phraseBook: PhraseBook = PhraseBook(),
+    /** Whether [phraseBook]'s built-in phrases (the date, the time, the weekday) are offered, the setting; never where [spell]. */
+    private val builtInPhrases: Boolean = true,
     /** The emoji a word stands for ([EmojiCandidates]); none, the setting off. */
     private val emoji: (String) -> List<String> = { emptyList() },
     /**
@@ -243,9 +245,10 @@ class PinyinSession(
      * [keys] typed as [Action.Key]s one after another would be, the input read once: keys a
      * session over this one hands it together (a stroke lookup a letter ended). On the nine keys
      * a key at a time: each key read may change the syllables offered, each change their next id.
+     * Keys other than letters a key at a time too: whether 双拼's `;` is read depends on the keys before it.
      */
     fun typeAll(keys: String): Snapshot {
-        if (keys.isEmpty() || nineKeys != null || !keys.all(segmenter::reads)) {
+        if (keys.isEmpty() || nineKeys != null || !keys.all { it in 'a'..'z' }) {
             return keys.fold(snapshot()) { before, c -> apply(Action.Key(c)).let { it.copy(commit = before.commit + it.commit) } }
         }
         unrefined = null
@@ -283,7 +286,7 @@ class PinyinSession(
     }
 
     private fun type(c: Char): Snapshot {
-        if (!reads(c)) return leave()
+        if (!reads(c) || !segmenter.readsAfter(input.substring(readFrom(), cursor), c)) return leave()
         // on the nine keys 1 is 分词
         insert((if (c == NINE_KEYS_SEPARATOR && nineKeys != null) SyllableGraph.SEPARATOR else c).toString())
         read()
@@ -309,8 +312,10 @@ class PinyinSession(
 
     private fun backspace(): Snapshot {
         if (input.isEmpty()) {
-            // the app deletes; a prediction shown goes away
-            clear()
+            // the app deletes, a prediction shown goes away, and what was committed here is context
+            // only as far as it is left: 你 committed and erased kept 你脾气 before 日期 for 7474
+            // recent is empty where nothing is learned, but commit set the context all the same
+            if (recent.isEmpty()) { dropContext(); clear() } else takeText(recent.substring(0, recent.offsetByCodePoints(recent.length, -1)))
             return snapshot(handled = false)
         }
         // the syllable taken last, given back as its digits; the cursor in the middle deletes a key
@@ -421,9 +426,9 @@ class PinyinSession(
         }
     }
 
-    // text kept as typed and phrases hold no words to forget. Not where nothing is to be kept (a
-    // password): forgetting records the word
-    private fun forgettable(c: Candidate) = learning && user != null && entries(c) != null
+    // text kept as typed and phrases hold no words to forget, nor a word never learned (PY-33). Not
+    // where nothing is to be kept (a password): forgetting records the word
+    private fun forgettable(c: Candidate) = learning && user != null && entries(c)?.let(user::hasLearned) == true
 
     // a prediction the user taught is forgotten, as are the words learned; any may be blocked
     private fun predictionOffers(c: Candidate): Set<Offer> {
@@ -561,11 +566,7 @@ class PinyinSession(
         if (user == null || !learning) return null
         val entries = pieces.map { it.entries ?: return null }
         val corrected = pieces.size > 1 || (pieces[0].corrected && pieces[0].words.size > 1)
-        val sentence = if (corrected && text.codePointCount(0, text.length) <= MAX_PHRASE) {
-            listOf(Entry(text, entries.flatten().flatMap { it.syllables.asList() }.toIntArray()))
-        } else {
-            entries.flatten()
-        }
+        val sentence = (if (corrected) UserModel.phrase(text, entries.flatten()) else null)?.let(::listOf) ?: entries.flatten()
         val words = user.learn(lastEntry, sentence)
         lastEntry = sentence.last()
         // the scores the decoder kept are stale
@@ -649,6 +650,11 @@ class PinyinSession(
         return predictor.predict(prev2, prev) { predictor.tail(last.text, last.syllables) }
     }
 
+    // a key the app took (an arrow, Enter, Escape) moved the cursor or changed the text before it,
+    // and no Context follows where the service expected that: what was committed here is context
+    // no more
+    override fun passedOn() = dropContext()
+
     private fun dropContext() {
         context = IntArray(0)
         lastEntry = null
@@ -707,7 +713,7 @@ class PinyinSession(
         val rest = input.length - readFrom()
         val key = input.substring(readFrom())
         // the built-in ones for full pinyin only: 双拼's sj, xq spell syllables
-        val phrases = phraseBook.offered(builtIns = !spell)
+        val phrases = phraseBook.offered(builtIns = !spell && builtInPhrases)
         // the time asked once, for what is shown and what is kept of it to agree
         val time = time ?: if (key in phrases) now() else null
         val placed: Map<String, Phrase> = if (time == null) emptyMap() else phrases.offered(key, time).associate { it.text to it.phrase }
@@ -719,7 +725,9 @@ class PinyinSession(
         val readPlaced by lazy { withPhrases(read) }
         val readHeld by lazy { coarseCandidates.held(readPlaced, pageSize) }
         // the emoji go with the reading shown first: not one held past the first page, nor one a pinned phrase put second
-        val withAside = AsideCandidates.place(read, key, emoji, chaizi.takeUnless { spell }, { it.text }, { it.end == rest }, asText) { coarseCandidates.order(readPlaced, pageSize, readHeld).firstOrNull() }
+        // the dates 日期 stands for and so on, where the input is no key of them (双拼's sj is a syllable): never twice
+        val wordPhrases = { word: String -> if (builtInPhrases && placed.isEmpty()) phraseBook.builtInsOf(word) { time ?: now() } else emptyList() }
+        val withAside = AsideCandidates.place(read, key, emoji, chaizi.takeUnless { spell }, { it.text }, { it.end == rest }, asText, wordPhrases) { coarseCandidates.order(readPlaced, pageSize, readHeld).firstOrNull() }
         // nothing set aside: the list worked out for that is the one listed
         val listed = if (withAside.candidates === read) readPlaced else withPhrases(withAside.candidates)
         val held = if (withAside.candidates === read) readHeld else coarseCandidates.held(listed, pageSize)
@@ -843,9 +851,9 @@ class PinyinSession(
     /** How [edge] of [graph] shows, read as [syllable]: as typed, spelt for 双拼, letters for digits. */
     private fun shown(graph: SyllableGraph, edge: Int, syllable: Int): String = when {
         // digits say nothing: the syllable read, a fuzzy one too (9664 as zhong with z for zh), and
-        // of one still being typed as many letters as were typed, a run of a key pressed again maybe one
+        // of one still being typed as many letters as were typed
         segmenter is T9Segmenter -> Syllables.spelling(syllable).let {
-            if (graph.kind(edge) == Kind.SYLLABLE) it else it.take(segmenter.lettersOf(graph.text(edge), syllable))
+            if (graph.kind(edge) == Kind.SYLLABLE) it else it.take(graph.text(edge).length)
         }
         spell && graph.kind(edge) == Kind.SYLLABLE -> Syllables.spelling(syllable)
         else -> graph.text(edge)
@@ -911,9 +919,6 @@ class PinyinSession(
          * the large model, a few milliseconds on a phone. A key pressed meanwhile waits for it.
          */
         const val REFINE_BUDGET = 1
-        // the longest text put together from pieces that is learned as a word: past this, it is
-        // a sentence, which would crowd the dictionary with things never typed again
-        const val MAX_PHRASE = 8
         // the text committed that the reranker reads before the input: well over what it has room
         // for (39 tokens), so a commit drops only text it no longer reads, and it goes on from what
         // it read rather than read it all again

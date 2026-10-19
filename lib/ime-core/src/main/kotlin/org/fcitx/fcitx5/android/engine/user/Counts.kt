@@ -54,6 +54,12 @@ internal class Counts {
         return i
     }
 
+    /** Whether a key [test] says so has a count, going no further than the first. */
+    fun any(test: (Long) -> Boolean): Boolean {
+        for (k in keys) if (k != EMPTY && test(k)) return true
+        return false
+    }
+
     fun forEach(visit: (Long, Float) -> Unit) {
         for (i in keys.indices) if (keys[i] != EMPTY) visit(keys[i], values[i])
     }

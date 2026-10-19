@@ -79,6 +79,15 @@ class ShuangpinSegmenter(private val scheme: ShuangpinScheme, fuzzy: Set<Fuzzy> 
 
     override fun reads(c: Char) = scheme.types(c)
 
+    // 微软 and 紫光 type ing on `;`: a final, so read only as a syllable's second key; at a
+    // syllable's start it is the punctuation key, as in Microsoft Pinyin (`ni;` is 你；)
+    override fun readsAfter(before: String, c: Char): Boolean {
+        if (!scheme.types(c) || c in 'a'..'z' || scheme.typesInitial(c)) return true
+        // the graph walks only positions reached: an edge there ending on c is a syllable it ends
+        val graph = segment(before + c)
+        return graph.end >= 2 && graph.edges(graph.end - 2).any { graph.to(it) == graph.end && graph.kind(it) == Kind.SYLLABLE }
+    }
+
     override fun segment(input: String): SyllableGraph = GraphEdges.build(input) { at, edges -> walk(input, at, edges) }
 
     private fun walk(input: String, at: Int, edges: GraphEdges) {

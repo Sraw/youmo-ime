@@ -167,6 +167,19 @@ class UserModel(
     }
 
     /**
+     * Whether [forget] has anything of [words] to forget: a count, a pair one of them is in, or,
+     * alone, a word the user made. A word of the dictionary's never typed has none, so a long
+     * press on it offers no forgetting.
+     */
+    fun hasLearned(words: List<Entry>): Boolean {
+        val known = words.mapNotNull { ids[it] }.toSet()
+        if (known.isEmpty()) return false
+        if (words.size == 1 && isOwn(known.first())) return true
+        // a word's own count first; a pair's first word may never have been counted (the word before, read from the editor)
+        return known.any { count(it) > 0f } || counts.any { key -> first(key) in known || second(key) in known }
+    }
+
+    /**
      * [forget]s each of [words] alone, as the settings take words off their list: each of the
      * user's own is gone from the trie, the counts gone through once for them all, and each is
      * journaled alone, so it reads back so.
@@ -279,8 +292,11 @@ class UserModel(
     /**
      * [id] of a word from the user's dictionaries: one they did not make, so forgetting it drops
      * what was learned of it but leaves it to type, as libime leaves its extra dictionaries be.
+     * One the dictionary has is listed too: no word of the user's, but the tables offer it
+     * ([listedTexts]), a word added by hand being typable there whether pinyin knew it or not
+     * (UAT TBL-12, 鲸园).
      */
-    fun list(entry: Entry): Int = id(entry).also { if (it >= vocabulary.size && listed.add(it)) listings++ }
+    fun list(entry: Entry): Int = id(entry).also { if (listed.add(it)) listings++ }
 
     /** [list]s [entry] as a word the user added by hand: scored as the model's of its text ([modelWord]). */
     fun listByHand(entry: Entry): Int = list(entry).also { if (it >= vocabulary.size) byHand[it - vocabulary.size] = true }
@@ -404,10 +420,11 @@ class UserModel(
      * the other input methods to offer too, blocked ones as well: those ask what is blocked as
      * they offer. See [listings].
      */
-    fun listedTexts(): List<String> = listed.mapNotNullTo(LinkedHashSet()) { id -> entries[id]?.text }.toList()
+    fun listedTexts(): List<String> =
+        listed.mapNotNullTo(LinkedHashSet()) { id -> entries[id]?.text ?: if (id < vocabulary.size) vocabulary.word(id) else null }.toList()
 
     /**
-     * The texts of the words the user made, and of the dictionary's they typed, for the other
+     * The texts of the words the user made, and of the dictionary's and their dictionaries' they typed, for the other
      * input methods to offer too; not those blocked or forgotten. See [changes].
      */
     fun ownTexts(): List<String> {
@@ -417,6 +434,8 @@ class UserModel(
             val id = second(key)
             val typed = first(key) == NO_WORD && count > 0f
             if (typed && id < vocabulary.size && !blockedAnyhow(id)) texts += vocabulary.word(id)
+            // a word of the user's dictionaries typed is theirs as a typed word of the dictionary's is (owner, 2026-10-19)
+            if (typed && id >= vocabulary.size && id in listed) entries[id]?.takeIf { it !in blockedEntries && !blockedAnyhow(id) }?.let { texts += it.text }
         }
         return texts.toList()
     }
@@ -481,6 +500,16 @@ class UserModel(
     private fun second(key: Long) = key.toInt()
 
     companion object {
+        /** The longest a pick of several words is learned as one phrase ([phrase]), in characters: past it, word by word. */
+        const val MAX_PHRASE = 8
+
+        /**
+         * [words], committed as [text], as one phrase to learn: the user corrected the reading to
+         * get them (pinyin's pieces, handwriting's pick); null past [MAX_PHRASE] characters.
+         */
+        fun phrase(text: String, words: List<Entry>): Entry? =
+            if (text.codePointCount(0, text.length) > MAX_PHRASE) null else Entry(text, words.flatMap { it.syllables.asList() }.toIntArray())
+
         const val DEFAULT_LIMIT = 50_000f
         private const val INITIAL_WORDS = 16
         private const val HALF = 0.5f

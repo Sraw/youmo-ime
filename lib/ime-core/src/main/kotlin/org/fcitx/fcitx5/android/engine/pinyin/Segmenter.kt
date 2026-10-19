@@ -12,6 +12,13 @@ fun interface Segmenter {
     fun reads(c: Char): Boolean = c in 'a'..'z'
 
     /**
+     * Whether [c], a key this [reads], is read after [before] (the input not yet taken, up to the
+     * cursor): false where it can only be punctuation there (双拼's `;`, a final, with no initial
+     * before it).
+     */
+    fun readsAfter(before: String, c: Char): Boolean = true
+
+    /**
      * Whether the keys are the letters of the pinyin, as typed; false for the nine keys, whose
      * input is digits, the syllables shown spelt and taken one by one ([T9Segmenter]).
      */
