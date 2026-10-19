@@ -36,6 +36,8 @@ BUILDING.md's 5 GB counts the Gradle daemon beside it) and three table compiles 
 | `BuildMetadataPlugin` | build time and git hash into `BuildConfig` (the data release names are `EngineDataPlugin`'s fields) |
 | `DetektConventionPlugin` | detekt on every Kotlin module, one config, a baseline per module |
 | `ToolFingerprint` | hashes the classes the dict tool's `main` reaches, so the data task re-runs only when code that makes data changes, not on every ime-core edit |
+| `DownloadTasks`, `Hashes` | downloads pinned by SHA-256, and the hashing they and the fingerprints use |
+| `Utils`, `Versions` | shared helpers; SDK and tool versions |
 | `ProjectExtensions` | version name from `git describe --tags --long --match v[0-9]*` |
 
 Any edit to build-logic changes the data task's implementation, so the next build compiles the
@@ -169,7 +171,7 @@ trap in [pitfalls.md](pitfalls.md#kotlin-ic-and-interface-delegation) before bui
 
 | Workflow | When | Runs |
 |---|---|---|
-| `unit_test.yml` | push, PR | `:lib:ime-core:check`, dict-tool and eval tests, build-logic tests, `:app:testTextDebugUnitTest`, voice test compile, native host tests |
+| `unit_test.yml` | push, PR | `:lib:ime-core:check`, dict-tool and eval tests, build-logic tests, `:app:testTextDebugUnitTest`, voice test compile, native host tests, Python tool tests (`lexicon/tools`, `lib/ime-eval/tools`), detekt, Kover reports, test failures annotated |
 | `pull_request.yml` | PR | `assembleTextRelease` and `assembleVoiceRelease` on Ubuntu (unsigned) |
-| `engine_downloads.yml` | push to main changing `EngineDataPlugin.kt`, on demand | the engine data's download tasks alone, saving the `engine-downloads-*` cache a new pull request's build reads |
+| `engine_downloads.yml` | push to main changing `EngineDataPlugin.kt`, `HandwritingDataPlugin.kt`, `lib/handwriting/build.gradle.kts` or the workflow; Mon/Thu 04:41; on demand | the engine data's download tasks alone (the handwriting models and onnxruntime too, a cache of their own), saving the `engine-downloads-*` cache a new pull request's build reads |
 | `emulator_test.yml` | weekly, and PRs labelled `emulator` | instrumented tests (`FcitxTest`, `SoftKeyboardTest` …) for Text and Voice on an API 35 emulator |

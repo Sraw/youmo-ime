@@ -10,8 +10,9 @@ an ime-core class with a test.
 |---|---|
 | `core/` | The JNI side of fcitx: `Fcitx` (native lifecycle, the fcitx thread), `FcitxAPI` (suspend calls into fcitx), `FcitxEvent` (events out of it), `EngineBridge` (where the native `androidengine` addon reaches ime-core's `Engines`), `EngineMigration`, `SubtypeManager`, `InputMethodNames`, `NativeMatrixKernel` |
 | `daemon/` | `FcitxDaemon`: the one fcitx instance, shared by connections (`FcitxConnection`) |
-| `input/` | The `InputMethodService` (`FcitxInputMethodService`), `InputView`, and what the keyboard shows: `bar/` (the candidate bar / toolbar, `KawaiiBarComponent`), `candidates/` (horizontal bar, expanded grid, floating window for physical keyboards), `keyboard/` (`TextKeyboard`, `T9Keyboard`, `NumberKeyboard`, `KeyDef`/`KeyDefPreset`, `KeyView`, `CommonKeyActionListener`), `picker/` (symbols, emoji), `popup/` (key previews, long-press keyboards), `clipboard/`, `editing/` (text editing panel, `InputConnectionEditor`), `status/` (the "more" panel), `preedit/`, `broadcast/`, `wm/` (`InputWindowManager`) |
-| `data/` | File-backed managers: `prefs/` (`AppPrefs`, the managed preference framework), `theme/`, `clipboard/` (Room), `pinyin/` (imported dictionaries, custom phrases), `punctuation/`, `UserDataManager` (backup/restore), `DataManager` (syncs `assets/usr`) |
+| `input/` | The `InputMethodService` (`FcitxInputMethodService`), `InputView`, and what the keyboard shows: `bar/` (the candidate bar / toolbar, `KawaiiBarComponent`), `candidates/` (horizontal bar, expanded grid, floating window for physical keyboards), `keyboard/` (`TextKeyboard`, `T9Keyboard`, `NumberKeyboard`, `KeyDef`/`KeyDefPreset`, `KeyView`, `CommonKeyActionListener`), `picker/` (symbols, emoji), `popup/` (key previews, long-press keyboards), `clipboard/`, `editing/` (text editing panel, `InputConnectionEditor`), `status/` (the "more" panel), `preedit/`, `broadcast/`, `wm/` (`InputWindowManager`), `handwriting/`, `floating/` (the floating keyboard), `dialog/`, `editorinfo/` (the `EditorInfo` inspector) |
+| `provider/` | `FcitxDataProvider` |
+| `data/` | File-backed managers: `prefs/` (`AppPrefs`, the managed preference framework), `theme/`, `clipboard/` (Room), `pinyin/` (imported dictionaries, custom phrases), `punctuation/`, `UserDataManager` (backup/restore); `DataManager` (syncs `assets/usr`) is in `core/data/` |
 | `ui/` | Settings: `main/` (`MainActivity`, `MainFragment` = the home page, `settings/` pages and `SettingsRoute`, `settings/search/`), `setup/` (the first-run wizard), `common/` |
 | `utils/` | Small helpers (`AppUtil`, `Const`, extensions) |
 | `src/main/cpp/` | `native-lib.cpp` (JNI), `androidfrontend` (fcitx frontend for the service), `androidengine` (the addon in front of ime-core's input methods), `androidaddonloader`, `androidnotification` (fcitx tips as toasts), `matrix-kernel.cpp` |
@@ -23,7 +24,7 @@ an ime-core class with a test.
 `InputView` per configuration. `InputView` is a tree of components (`dependency/`, a small
 `UniqueViewComponent` injection) under one `InputWindowManager`, which shows one window at a time
 in the keyboard area: `KeyboardWindow` (the layouts), `PickerWindow` (symbols / emoji),
-`ClipboardWindow`, `TextEditingWindow`, `StatusAreaWindow`, and in the voice build `VoiceWindow`.
+`ClipboardWindow`, `TextEditingWindow`, `StatusAreaWindow`, `EditorInfoWindow` (debug, `internal.editorInfoInspector`), and in the voice build `VoiceWindow`.
 The bar above is `KawaiiBarComponent`: idle (toolbar, number row, the result of a sum just written, clipboard suggestion, inline
 autofill, decided by `IdleUiPolicy`; the sum is read off the field when what the service commits
 ends with `=`, worked out by `Calculation` in ime-core, and dropped as the cursor leaves the `=`) or candidates (`KawaiiBarStateMachine`,
@@ -42,7 +43,12 @@ an appearance (text, image, width, variant) and behaviours (`Press`, `LongPress`
 `SpaceLongPressAction` …). `CommonKeyActionListener` performs them. A key's long-press
 characters come from `PopupPreset` (built in) overridden by the user's `PopupOverrides`; the first
 of them is also what swiping the key types and the small label in its corner: one concept, one
-setting.
+setting. Which way a vertical swipe types it is `SymbolSwipe` (ime-core): the chosen way the corner
+character, the other way the letter as a tap, swiping off nothing (a slide off the key takes the
+press back). 微软 and 紫光 双拼 get a `;` key right of L (`semicolonKey(ime, scheme)` in ime-core's
+`input/keyboard/SemicolonKey.kt`, which `TextKeyboard.showSemicolonKey` asks); the split halves have none, the row's other keys widen to fill (`fitRow`/`showKey`),
+and `;` comes from l's long press. The keyboard area never passes 70% of the screen's height
+(`KeyboardHeightCap`), so 很高 in landscape leaves the field room.
 
 On a wide screen held sideways the letters split in two (`TextKeyboard.Split`, sized by
 `SplitKeyboard` in ime-core, the setting `ThemePrefs.splitKeyboard`: auto / always / off): Gboard's,
@@ -66,7 +72,7 @@ the window attached (`InputBroadcastReceiver.onWindowAttached`, its `DockFollowe
 (`KeyboardWindow.onLayoutShown`).
 
 One-handed (`ThemePrefs.oneHanded`: off / right / left, read live the same way; the status area's
-单手模式 turns it on at the right or off): while the letters do not split, every board, the letters
+单手模式 turns it on at the side last used, hidden `ThemePrefs.oneHandedSide`, right at first, or off): while the letters do not split, every board, the letters
 too, goes to that side, 80% of the width, a phone's 420 dp at most (`SplitKeyboard.placement`, which
 decides both). The room beside it has the arrow, which then sets `oneHanded` rather than
 `splitDock`, and a button back to the whole width.
@@ -84,6 +90,11 @@ before the keys (`dispatch`), `GlideGesture` deciding when a finger glides; as a
 are cancelled (their preview and swipe with them), other fingers are swallowed until all lift, and on
 the lift the path, in key widths over the letters, goes out as `KeyAction.GlideAction`, which
 `CommonKeyActionListener` hands to `FcitxAPI.offerGlide` (the engine's side: specs/engine.md).
+Glide is off in password, address (URL) and email fields (`BaseKeyboard.wordField`): a rule the
+owner set (2026-10-19), not a gap. A glide can only be read as a word of the lexicon and their text
+is no word (a domain, a user name, a password); a wrong guess in a password is not even seen, and a
+password is neither read nor learned; the space a glide puts before its word would break an address.
+Keys there are typed as they are, and a finger sliding across them never starts a glide.
 
 ### Hardware keyboard
 
@@ -138,7 +149,7 @@ reads `Generic.kl`/`Generic.kcm`) and `sendevent` to its `/dev/input/eventN` as 
 Address fields swap the comma and the full stop for `/` or `@` and `.com` (`AddressKeys`); a key's
 digit or symbol goes in there as it is, what is typed committed as typed
 (`PendingInputPolicy.typesAsIs`, in `CommonKeyActionListener`), but for a key the input method
-types with (`Engines.readsAsKey`: the nine keys' digits, 微软双拼's `;`, the pinyins' `'` and a
+types with (`Engines.readsAsKey`: the nine keys' digits, the `;` of every 双拼 scheme whose layout types it (微软, 紫光), the pinyins' `'` and a
 table's keys, 二笔's `;`, while something is typed, the table's from `Engines.tableKeys`); the nine
 keys' column, separator and multi-tap are in `T9Keyboard` with decisions in `MultiTap`, `NineKeys`.
 
@@ -235,7 +246,9 @@ permission, ever: no cloud features, no analytics, no crash upload. No notificat
 
 `FieldPolicy` decides what may be done with a field: a password or a field that asks not to be
 learned from is *sensitive* (its text is never read for context, nothing is learned or kept in
-`ContextMemory`, voice never types into a password). Any new feature reading the editor or
+`ContextMemory`, voice never types into a password). A field of this app itself (its settings, the dictionary
+editors: `FieldPolicy.ownApp`, applied in `CapabilityFlags.forField`) is sensitive too, so what is
+typed there is never learned. Any new feature reading the editor or
 remembering text goes through it.
 
 ## The two flavors

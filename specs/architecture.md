@@ -4,12 +4,12 @@
 
 | Module | Kind | What it holds |
 |---|---|---|
-| `lib/ime-core` | plain JVM (`java-library`), no Android on the classpath | The engine (`engine/`: pinyin, tables, English, strokes, phrases, learning, ranking, data formats, the host that lists the input methods) and the keyboard's decisions (`input/`: cursor and composing tracking, key and gesture policies, bar state machines, voice decisions, field policy). Tested in milliseconds. |
+| `lib/ime-core` | plain JVM (`java-library`), no Android on the classpath | The engine (`engine/`: pinyin, tables, English, strokes, phrases, learning, ranking, data formats, the host that lists the input methods), the keyboard's decisions (`input/`: cursor and composing tracking, key and gesture policies, bar state machines, voice decisions, field policy), `core/` (`CoreLog`, `FcitxUtils`, `FormattedText`), `ui/search/SettingsSearch` and `utils/EventStateMachine`. Tested in milliseconds. |
 | `app` | Android application | The `InputMethodService`, the keyboard's views and windows, the settings UI, file-backed managers (clipboard, themes, dictionaries, backups), the JNI side of fcitx (`core/`), native code (`src/main/cpp`). |
 | `app/src/text`, `app/src/voice` | flavor source sets (`speech` dimension) | Each defines `VoiceFeature` with the same signatures; only `voice` has voice input, sherpa-onnx and `RECORD_AUDIO`. |
 | `lib/ime-eval` | JVM CLI | Typing simulated over test sets; top-1 accuracy, predictions, English, learning. Never shipped. |
 | `lib/ime-dict-tool` | JVM CLI | Compiles text sources into the engine's data files (pinyin, tables, strokes, English), mixes models, packs word packs, finds new words. Runs on the build host only. |
-| `lib/fcitx5`, `lib/fcitx5-chinese-addons` | native (CMake) | Fcitx5 (with its quickphrase, unicode, clipboard, imselector and spell modules) and, of chinese-addons, only punctuation, chttrans (简繁), fullwidth and scel2org5 (reading 搜狗 `.scel`), as submodules built for Android. Its pinyin and table engines are not built: the input methods are `ime-core`'s. |
+| `lib/fcitx5`, `lib/fcitx5-chinese-addons` | native (CMake) | Fcitx5 (with its quickphrase, unicode, clipboard, imselector, notifications and spell modules) and, of chinese-addons, only punctuation, chttrans (简繁), fullwidth and scel2org5 (reading 搜狗 `.scel`), as submodules built for Android. Its pinyin and table engines are not built: the input methods are `ime-core`'s. |
 | `lib/sherpa-onnx` | native | The speech recognizer, vendored and built from source; voice build only. |
 | `lib/handwriting` | Android library, native | The handwriting recognizers' runtime: onnxruntime (the very file sherpa-onnx links, so a voice build packs one) and a small JNI to it, `OrtModel`, which runs an ORT-format model mapped from the APK. Both builds. |
 | `codegen` | annotation processing | Generates the app's key and scancode mapping tables. |
@@ -40,7 +40,9 @@ One process. Inside it:
   The engine's sessions run here too: the native `androidengine` addon calls `EngineBridge` through
   JNI on this thread, so the sessions are this thread's alone and nothing in them locks.
 - **IO / Default dispatchers**: file work (imports, backups, the clipboard database), and the
-  engine's own background saves (the custom phrases file).
+  engine's own background saves.
+- **`engine-phrases`** (`EngineBridge`): one thread saving the custom phrases file, one save at a
+  time, in order.
 - **`record-compaction`** (`Engines`): a daemon thread for each compaction of a user log
   (`RecordStore`), at most every few thousand records. The fcitx thread, which learns, reads the
   counts; this thread writes and syncs them to a new file, which the next append on the fcitx
@@ -49,7 +51,8 @@ One process. Inside it:
   anew as fcitx starts again after it exited, `EngineBridge.close()`): pinyin's data and word index
   as the first field starts in a Chinese input method (全拼, 双拼, 九键, handwriting, a table; not in
   English: a switch from English to one reads them on the fcitx thread as its session is made),
-  English's keys and word index as its session is first made. A session
+  English's keys and word index as its session is first made, and the tables' shared words, coded
+  for the tables (`TableRegistry`). A session
   made meanwhile waits for them: `EngineAssets.pinyinData` and the word indexes are synchronized
   lazies.
 - **Voice** (voice build): the microphone reader, the VAD and the recognizer on threads of their own
@@ -115,9 +118,9 @@ long code to be typed or deleted there; arrows and the swipe on space move it to
 ## The engine host
 
 `Engines` (`engine/host`) lists the input methods by name (`Engines.PINYIN`, `T9`, `SHUANGPIN`,
-`TABLES`, the English keyboard) and makes each session at first use. `EngineAssets` loads the data
+`TABLES`, `HANDWRITING`, `ENGLISH` = `keyboard-us`) and makes each session at first use. `EngineAssets` loads the data
 from the APK's assets: `engine/pinyin.data`, `engine/table/<name>.data`, `engine/english.data`,
-`engine/stroke.data` and the two `.safetensors` models. They are stored uncompressed in the APK
+`engine/stroke.data`, `engine/emoji.data`, `engine/chaizi.data` and the two `.safetensors` models. They are stored uncompressed in the APK
 (`noCompress`) and memory-mapped in place (`EngineBridge.asset`), so the language model (about
 156 MB of `pinyin.data`) costs no heap. `TableRegistry` loads tables on demand; `UserLexicon`
 owns the user's words (learned, added, blocked, imported dictionaries, custom phrases) shared
@@ -133,7 +136,7 @@ Settings for the engine live in fcitx's config of the `androidengine` addon (its
 
 | What | Where | Written by |
 |---|---|---|
-| Engine data (read-only) | APK assets, memory-mapped | build (`EngineDataPlugin`, `VoiceDataPlugin`) |
+| Engine data (read-only) | APK assets, memory-mapped | build (`EngineDataPlugin`, `VoiceDataPlugin`, `HandwritingDataPlugin`: the handwriting models, `.ort`/`.data` uncompressed, both builds) |
 | fcitx's own data (punctuation tables, addon configs, locale) | `assets/usr` synced into the app's data dir at start (`DataManager`, keyed by `descriptor.json`) | build |
 | What the engine learned | `files/engine/` (`EngineBridge.userDir`): pinyin's user log, each table's and English's, the word lists (added, blocked) | engine: append-only logs (`RecordStore`), lists written whole |
 | fcitx config and data home | the external files dir (`Android/data/<package>/files`, `HOME` / `FCITX_CONFIG_HOME` / `FCITX_DATA_HOME` set in `native-lib.cpp`): `config/` (the profile, `conf/*.conf` incl. the input methods' options), `data/pinyin/customphrase`, `data/pinyin/dictionaries/` (imported dictionaries, as text), `data/data/quickphrase.d`, `theme/` | fcitx, the app's managers |

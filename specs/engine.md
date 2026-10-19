@@ -11,7 +11,7 @@ later) has the same five, decided 2026-10-14; a new one is not done without them
 
 1. **The word model** (the pinyin data's n-gram) in ranking, after the text before the cursor.
 2. **The sentence models** as the 性能档位 has them: none (low), the small one at each key (medium),
-   the large one at a pause too (high). One setting, shared, shown on each input method's page.
+   the large one at a pause too (high). One setting, shared, on the 通用输入 page (`InputMethodSettings.SHARED`); each input method's page has its own options and a link there.
 3. **Prediction** (联想) after a commit: one setting, shared; a prediction picked is learned.
 4. **Learning** into the one user model (`UserLexicon.user()`), what the user picks; not while
    `learning` is off (a password).
@@ -28,20 +28,30 @@ keeps its own, the model they follow.
 
 | Package | Holds |
 |---|---|
-| `session` | `Session` (the host's view: `apply(Action): Snapshot`, `offers`, `candidates`), `PinyinSession` (全拼, 双拼, 九键), `NineKeys` |
+| `session` | `Session` (the host's view: `apply(Action): Snapshot`, `offers`, `candidates`), `PinyinSession` (全拼, 双拼, 九键), `NineKeys`, `CoarseCandidates` (the candidates' coarse first pass) |
 | `pinyin` | Turning keys into syllables: `Syllables` (every syllable, append-only ids), `SpellingIndex`, `PinyinSegmenter` / `ShuangpinSegmenter` / `T9Segmenter` → `SyllableGraph`; `Fuzzy`, `Typo`, `KeyNeighbours`, `ShuangpinScheme`, `NineKeyLetters`, `LatinWords` |
 | `lattice` | Turning syllables into text: `PinyinDecoder` (word lattice + beam search), `Penalties`, `WordScorer`, `UserWords`, `LayerPrior`, `Predictor` (联想), `TextWords` (the model's words in text the engine did not commit), `CoarseWords` |
 | `rerank` | The sentence models: `SentenceModel` (char-level transformer, int8 safetensors), `Reranker` (`SentencePicker` / `SentenceRefiner`), `MatrixKernel` (the hot loop; the app runs it in C++, `NativeMatrixKernel`), `Safetensors`, `Json` |
-| `user` | Learning: `UserModel` (counts of words and pairs, words made from pieces), `UserScorer` (mixes them into the model), `UserLog`/`UserStore` (the log on disk), `WordLists` (added and blocked by hand), `WordPack`, `LibimeImport` |
-| `table` | Code tables (五笔, 仓颉, 自然码, 二笔, 五笔拼音): `TableDictionary`, `TableSession`, `TableOptions`, `PhraseRules` (组词规则), `TableUser`, `SharedWords` |
-| `english` | `EnglishData`, `EnglishDecoder` (keys → words with slips), `GlideDecoder` (a glide's path → words), `EnglishSession` (Gboard-like word-at-a-time typing, autocorrect, glides), `EnglishUser`, `EnglishText`, `Misspellings` |
+| `user` | Learning: `UserModel` (counts of words and pairs, words made from pieces), `UserScorer` (mixes them into the model), `SyllableTrie` (the learned words by syllables), `Counts`, `UserLog`/`UserStore` (the log on disk), `WordLists` (added and blocked by hand; the export, `UserLexicon.exportWords`, writes added words as `词 pin'yin`, blocked ones with a `!` before them, learned ones with a `~` apart before them and their count after them (`~ 词 pin'yin 3.0`: apart, an older version's parser reads the line as two words and skips it, rather than adding a word `~词`; picked into the base, `WordListFiles.baseLines` takes the word without the count, and only from an export: `baseLine` alone drops a `~` line); both imports read `~` only after `WordListFiles.EXPORT_MARK`, the file's first non-blank line (byte order mark and spaces aside), as `WordListFiles.exportMark` tells it for `baseLines`, the user dictionary's import and `isOwnExport` alike; `isOwnExport` also takes an older export's header, and it is what the big-list hint asks (`Incoming.ownExport`/`needsCount`); the default target dictionary asks `isUserExport` (`isOwnExport`, or a `!` line); the user dictionary's import learns those words once each, restoring the exported count (`~ 词 pin'yin 3.0` comes back at 3), skipping any that are added, blocked or already learned; an older export has no `~`, so its learned words come back as added), `WordPack`, `LibimeImport` |
+| `table` | Code tables (五笔, 仓颉, 自然码, 二笔, 五笔拼音): `TableDictionary`, `TableSession`, `TableOptions`, `PhraseRules` (组词规则), `TableUser`, `SharedWords`, `TableLanguage` (the five a table shares with pinyin), `TableText` / `IniText` (reading a table's sources), `IndexCounts` |
+| `glide` | Glide typing over Chinese keys: `Glide`, `GlideLayout` (the keys' places), `GlidePath`, `GlideSession`, `PinyinGlide` (a path → pinyin readings, full, 双拼, nine keys), `TableGlide` (→ a table's codes), `GlideReading` |
+| `english` | `EnglishData`, `EnglishDecoder` (keys → words with slips), `GlideDecoder` (a glide's path → words), `EnglishSession` (Gboard-like word-at-a-time typing, autocorrect, glides), `EnglishUser`, `EnglishUserStore` (its log), `EnglishText`, `Misspellings`, `EnglishDataBuilder` (compiles `english.data`) |
 | `stroke` | `Strokes`, `StrokeLookup` (`u` then `h s p n z` inside pinyin) |
 | `handwriting` | `HandwritingSession` (the input method), `HandwritingDecoder` (the characters written read as a sentence with the pinyin model and the user's words), `InkRecognizer` (the character's two recognizers run as their training code runs them, over `InkNet`s the app supplies), `InkFeatures` (what each recognizer reads of the strokes, equal to the training code's) |
-| `phrase` | `CustomPhrases` (libime's `customphrase` format, with date/time variables; `CustomPhrases.BUILT_IN`: the date, time and weekday under `rq`, `sj`, `xq`, offered in full pinyin only, under a key the user file has none of: in 双拼 `sj` and `xq` spell syllables), `PhraseBook` (a pin or delete from the keyboard under such a key first copies that key's built-in phrases into the user file, so a pin keeps the date and a deleted one stays off); `EmojiData` (`engine/emoji.data`: the emoji panel's groups and the words emoji stand for) and `EmojiCandidates` (a word's emoji after the first two candidates, pinyin's and a table's alike: setting `Emoji`, those the phone cannot draw left out by `Engines.emojiShows`); `Chaizi` (`engine/chaizi.data`: characters by the pinyin of their parts, full pinyin's after `u`, setting `Chaizi`, those the phone's font lacks left out by `Engines.textShows`) and `AsideCandidates` (where pinyin puts both: the emoji after the first two, the characters first) |
-| `data` | File formats: `DataFile` (the container), `PinyinData`, `CodeTable`, `NgramTables`, `BitPacked`, `EliasFano` (the trigram runs' starts; a lookup costs more, so not for the unigrams'), `Quantizer`, `StringTable`, `WordIndex`, `PinyinDataBuilder`, readers of text sources, `Misreadings`, `DataAge` |
-| `store` | `RecordFormat` / `RecordStore`: append-only logs with CRC'd records, compacted by rename |
+| `phrase` | `CustomPhrases` (libime's `customphrase` format, with date/time variables; `CustomPhrases.BUILT_IN`: the date, time and weekday under `rq`, `sj`, `xq`, as keys in full pinyin only, under a key the user file has none of (in 双拼 `sj` and `xq` spell syllables); setting `BuiltInPhrases`, on 通用输入, off: none of them, the user's own as before), `PhraseBook` (a pin or delete from the keyboard under such a key first copies that key's built-in phrases into the user file, so a pin keeps the date and a deleted one stays off; `builtInsOf`: the words 日期, 时间, 星期 (`WORD_KEYS`) bring the built-in ones still on in every Chinese input method, placed by `EmojiCandidates` before the word's emoji, never twice where the input is the key itself); `EmojiData` (`engine/emoji.data`: the emoji panel's groups and the words emoji stand for) and `EmojiCandidates` (a word's emoji after the first two candidates, pinyin's and a table's alike; a table's word alone on its code commits itself as ever, and its emoji and built-in phrases come first in the 联想 after it, `TableSession.pickOffered` replacing the word (`Snapshot.deleteBefore`, in code points) — the offer ends with any other key or pick: setting `Emoji`, those the phone cannot draw left out by `Engines.emojiShows`); `Chaizi` (`engine/chaizi.data`: characters by the pinyin of their parts, full pinyin's after `u`, setting `Chaizi`, those the phone's font lacks left out by `Engines.textShows`) and `AsideCandidates` (where pinyin puts both: the emoji after the first two, the characters first) |
+| `data` | File formats: `DataFile` (the container), `PinyinData`, `CodeTable`, `NgramTables`, `BitPacked`, `EliasFano` (the trigram runs' starts; a lookup costs more, so not for the unigrams'), `Quantizer`, `StringTable`, `WordIndex`, `PinyinDataBuilder`, `CodeTableReader`, `NgramWords`, `SortedKeys`, readers of text sources, `Misreadings`, `DataAge` |
+| `store` | `RecordFormat` / `RecordStore`: append-only logs with CRC'd records, compacted by rename; `ReplaceFile` (a file written whole, put in place by rename) |
 | `libime` | Reading libime's binary files without libime (its `DATrie`, zstd): for users coming from upstream and for importing `.dict` |
-| `host` | `Engines` (the input methods by name, sessions made on first use), `EngineAssets`, `EngineSettings` (+ `ModelLevel`), `TableRegistry`, `UserLexicon`, `EnglishLexicon` (the English words the user committed, kept in `english.user`), `Keyboard` (the addon's event numbers), `LibimeMigration`, `AddonDefaults` |
+| `host` | `Engines` (the input methods by name, sessions made on first use), `EngineAssets`, `EngineSettings` (+ `ModelLevel`), `TableRegistry`, `InBackground` (work handed to `warmUps`, waited on by who needs it), `UserLexicon`, `EnglishLexicon` (the English words the user committed, kept in `english.user`), `Keyboard` (the addon's event numbers), `LibimeMigration`, `AddonDefaults` |
+
+## What voice input gets from the engine
+
+- **Hotwords**: the user's added and learned words (`VoiceHotwords.ofUser`: added at 5, learned at
+  1.5, blocked none, 3000 at most) bias the recognizer.
+- **Blocking**: a blocked word is kept out of a result (`VoiceBlocking`), found by the model's word
+  boundaries (`Engines.wordBoundaries`, `TextWords.boundaries` with `splitLong`).
+- **Reranking**: the recognizer's hypotheses are rescored by the word model (`Engines.logProbs`,
+  `VoiceRerank`).
 
 ## Pinyin, from keys to candidates
 
@@ -49,8 +59,11 @@ keeps its own, the model they follow.
    carries every syllable that stretch may stand for, with `SyllableMatches` flags saying how it
    strays (fuzzy, typo, slipped onto a neighbouring key, initial only = 简拼, partial = still being
    typed, a Latin letter, raw). Unlike libime, every cut is kept and the language model chooses.
-   `PinyinSegmenter` (全拼), `ShuangpinSegmenter` (双拼, same graph), `T9Segmenter` (digits; a key
-   pressed again soon is read both as keys and as its next letter, `MultiTap`).
+   `PinyinSegmenter` (全拼), `ShuangpinSegmenter` (双拼, same graph), `T9Segmenter` (digits; with 连按
+   on, off by default, a key pressed again soon is its next letter and nothing else, `MultiTap`: the
+   session puts it in as a letter typed as itself, upper case, in place of the digit, so `4 4` fast
+   is `H`. The 2026-10-12 hybrid, read as keys too with a `Penalties.tapped`, went 2026-10-19: a
+   learned 广告 overrode the h the key's preview showed).
 2. **Decode.** `PinyinDecoder` puts every dictionary word along every path into a lattice and beam
    searches it, scoring each step by `WordScorer` (the n-gram model, through `UserScorer` with the
    user's counts added; a word of the user's whose text the model has, added by hand or typed at a
@@ -91,14 +104,17 @@ keeps its own, the model they follow.
   adds one learned log10 value per layer, moved by the user's picks within a bound.
 - **Coarse words** (`CoarseWords`, list `coarse.txt` beside it): never predicted, `PENALTY` lower in
   the decoder, a candidate with one goes past the first page, English never corrects to one. Once
-  the user typed one it is theirs and none of this applies.
+  the user typed one (committed it once) it is theirs and none of this applies: it is ranked and
+  predicted as any word. What goes on the list, and what stays off (words typed on purpose, plain
+  anatomy, words common in another sense), is the file's header; single characters are on it too (a vulgar
+  character the web made common, such as 肏 for `cao`).
 - **Misreadings** (`lexicon/misreadings.tsv`): a word is also under its common misreading, a tenth
   as likely, and its candidate then shows the right reading with tones.
 - **Strokes.** `u` with nothing typed starts `StrokeLookup` (`h s p n z` = 横竖撇捺折); any other
   letter turns it back into pinyin (`usb`, or `uan` as a slip for `yan`), typed at the strokes'
   cursor, which they keep as pinyin keeps its own.
 - **Latin words** in pinyin (`iphone` → iPhone) come from the `latin` layer, spelt in letter
-  syllables; full pinyin only.
+  syllables; full pinyin only, setting `EngineSettings.LATIN_WORDS` (a toggle on full pinyin's page).
 
 ### Long press on a candidate
 
@@ -119,9 +135,15 @@ commits. `pinyinKey` (五笔 `z`, 二笔 `[`) looks a character up by pinyin, sh
 cursor then the pinyin's);
 `matchingKey` is the wildcard (五笔 `z`, 仓颉 and 二笔 `*`). Characters typed one by one become
 phrases by the table's 组词规则 (`autoPhraseLength`), saved after `saveAutoPhraseAfter` uses.
-`SharedWords` gives every table the user's words from the other input methods, coded by its rules.
-Options per table are in `androidengine.h` (`engineTable(...)`) and `TableOptions`; a table's page
-shows pinyin's page size, prediction and 性能档位 too (`EngineTablePage`), the same settings.
+`SharedWords` gives every table the user's words from the other input methods, coded by its rules:
+those made, added, typed, and every word of an imported dictionary (owner, 2026-10-19), ranked after
+the table's own. A big import turns some unique codes into choices, so they no longer commit
+themselves (measured for F2328: 搜狗标准 393k takes 五笔's auto-commit on eval text from 22% to 9%).
+The dictionaries' words are coded in the background (`InBackground`, on `warmUps`) at the first key
+after a user model is made or reloaded; till then a table offers the rest.
+Options per table are in `androidengine.h` (`engineTable(...)`) and `TableOptions`; prediction and 性能档位
+are the shared settings on the 通用输入 page (`InputMethodSettings.SHARED`, `SharedInputFragment`), page size
+on the hardware keyboard page (`HARDWARE_KEYBOARD`); the addon's `EngineTablePage` config still carries them.
 
 Every table's words follow one rule, set at build time (`table --words --pinyin`, decided on 五笔
 86 and kept for all, `lexicon/README.md` "Words in the code tables"): the table keeps every entry
@@ -181,12 +203,10 @@ not read at all), nor does what the keyboard typed there (`androidengine` sends 
 PasswordOrSensitive field: a password shown is Sensitive, not Password, and so looks like an
 incognito field), so there only the session's own glide counts; after typed text, a Backspace or
 an arrow nothing before the cursor is known, and a glide gets no space before it (part of the
-F2074 limit). A glided word that starts no sentence takes its in-sentence form (`inSentence`):
-whenever its context is not just the sentence's start, so with known words before it, or with
-nothing known but a char that ends no sentence (looked at past the spaces after it, by
-`EnglishText.endsSentence` as the context reads it: `.` not an initial's or an abbreviation's,
-`!`, `?`, `…` and a line break among those spaces end one): "abc hello", but "Hi. Hello"; Shift still
-capitalises it. Where English suggests nothing (`androidengine`'s
+F2074 limit). A glided word always takes its in-sentence form (`inSentence`): the data's
+sentence-start "Hello" is "hello" anywhere, a word the data or the user has only capitalised (London,
+iPhone) keeps it; a capital comes only from Shift, as for a word tapped (`AutoCaps` turns Shift on
+where the field asks for sentence capitals), Caps Lock all capitals. Where English suggests nothing (`androidengine`'s
 `suggestsEnglish`: NoSpellCheck, an address, a password, suggestions off) the keys type themselves.
 Each char a screen key types there is sent as `EngineEvent.TYPED` (`Keyboard` passes it on, then
 `Session.typed`: the session's edge, and its known text if it knows the text before it). The
@@ -219,7 +239,8 @@ characters one after another where likelier, as the decoder's best path takes �
 cost; one word a glide (chained, the readings ran to thousands). The user's own words glide
 too: their trie (`UserWords`) is walked alongside the dictionary's, a reading in both one reading. Each pinyin glides its own keys
 (`PinyinGlide.Spelling`): full pinyin the letters, 双拼 its scheme's two a syllable (微软's and
-紫光's -ing is on `;`, which the letter keyboard lacks, so those syllables cannot glide), the nine keys
+紫光's -ing is on `;`, which a glide path cannot carry: `GlidePath` takes only a..z, so those syllables
+cannot glide, though the unsplit letter keyboard has a `;` key for them), the nine keys
 the letters too, on their digits' keys (`GlideLayout.sameKey`: letters on one key follow without
 the path moving). A table glides its codes (`engine/glide/TableGlide`): its entries walked in code
 order as a trie, a code scored by its likeliest entry under the word model. `GlideSession` wraps
@@ -275,7 +296,9 @@ the pen was up long enough, `Engines.inkFinished`, then `Action.Refine` slices),
 run within the app's budgets, at pinyin's `Reranker.WEIGHT`, 0.4; 0.8 gave half a point more as
 written, not worth a weight of its own). Once a sentence is put in, what may
 follow is offered as pinyin offers it (`Predictor`, the prediction setting), a word picked learned.
-A sentence picked other than the first is learned, its words as the
+A sentence picked other than the first is learned: one of two or more words at most
+`UserModel.MAX_PHRASE` (8) characters as one phrase, its readings the words' joined (as pinyin learns
+a pick it corrected), else its words as the
 decoder found them (`Sentence.words` of `Decoding.endings`/`top`: a word or a character alone at the
 reading the user has it at, whichever reading the search finds first; else a
 word at the dictionary reading of highest weight found, a character at its likeliest,
@@ -307,7 +330,7 @@ pressed while a stroke is read, and a reading of nothing all come out right.
 
 ## Data files and compatibility
 
-Every compiled file is a `DataFile`: `"FCITXIME"`, container version, kind, kind version, then
+Every compiled file is a `DataFile` (`emoji.data` and `chaizi.data` aside: plain UTF-8 text): `"FCITXIME"`, container version, kind, kind version, then
 numbered sections with CRC32s, little-endian and 8-byte aligned so it can be read memory-mapped in
 place. Rules that keep old files and old users working:
 

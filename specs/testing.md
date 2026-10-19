@@ -11,9 +11,10 @@ compiled is not done.
 | ime-core unit tests | `lib/ime-core/src/test` | `./gradlew :lib:ime-core:check` (tests + animal-sniffer + Kover floors) | every decision and the whole engine; milliseconds each |
 | App JVM tests | `app/src/test` | `./gradlew :app:testTextDebugUnitTest` | glue that needs Android types: Robolectric where the framework is reached |
 | Tools | `lib/ime-dict-tool/src/test`, `lib/ime-eval/src/test`, `build-logic/convention/src/test` | `:lib:ime-dict-tool:test`, `:lib:ime-eval:test`, `./gradlew -p build-logic test` | data compilation, the evaluation, build tasks |
+| Python tools | `lexicon/tools`, `lib/ime-eval/tools` | `python3 -m unittest discover -s lexicon/tools` (and `-s lib/ime-eval/tools`) | the lexicon and evaluation scripts |
 | Static | all Kotlin modules | `./gradlew detekt` | syntax rules (type resolution does not work here); findings frozen in `config/detekt/baseline-*.xml` |
 | Native host tests | `app/src/test/cpp/host-test.sh`, `lib/sherpa-onnx/host-test.sh` | the scripts | C++ helpers, compiled for the host |
-| Instrumented | `app/src/androidTest` | CI (`emulator` label / weekly); locally `connectedTextDebugAndroidTest` | the real native engine and keyboard: `FcitxTest`, `SoftKeyboardTest`, `TypingHostActivityTest`, `NativeMatrixKernelTest` |
+| Instrumented | `app/src/androidTest` | CI (`emulator` label / weekly); locally `connectedTextDebugAndroidTest` | the real native engine and keyboard: `FcitxTest`, `SoftKeyboardTest`, `TypingHostActivityTest`, `NativeMatrixKernelTest`, `FcitxConfigTest`, `FcitxEnglishTest`, `FcitxPreeditTest`, `SetupActivityDeviceTest`, `FileUtilTest`; `EngineEvalRunner` is the device runner behind `run-on-device.sh` |
 | Evaluation | `lib/ime-eval` | see below | ranking: whether the first candidate is the sentence meant |
 | On a device | redroid or a phone | by hand / scripts | what a user sees: layout, gestures, rotation, upgrade |
 
@@ -60,11 +61,11 @@ measuring only), `pinyin-new` (new words), `pinyin-collide` (a common word that 
 one), `pinyin-context`, `pinyin-slips`, `pinyin-mixed`, `shuangpin-xiaohe`, `predict/`,
 `english.txt`. Other commands: `predict` (联想), `english`, `learn` (what learning brings back and
 costs), `ksc` (keystrokes), `t9` (a set turned into digits, then read with `pinyin --scheme
-t9-strict`, as the app types it; `--presses fast` presses a key again as 连按 hands it on, `letters`
-spells each letter by 连按: the sets `Penalties.tapped` is measured on), `english-glide` (glide
+t9-strict`, as the app types it; `--presses once`, 连按 off, the default, or `letters`, each letter
+spelt by 连按, a letter past its key's first as the letter typed as itself, as the session has it), `english-glide` (glide
 typing on simulated paths, `--wobble` the key-width noise), `pinyin-glide` (the same per dictionary word
 of a pinyin set; `--shuangpin <scheme>`, `--keys nine`, `--table <table.data>`, `--word <pinyin>` one
-clean path's readings), `tune` (penalties), `score` (compare a result with a baseline);
+clean path's readings), `tune` (penalties), `score` (compare a result with a baseline), `handwriting` (handwriting's sentence reading), `table` (a table's codes, optionally with pinyin and the models), `sentences` (each sample's sentences written out), `predict-learn` (联想 after learning), `predict-set` (a 联想 set made from a set), `shuangpin` (a set turned into a 双拼 scheme's keys), `slips` (a set with slips put in), `chars` (the data's characters), `lm` (a sentence model's scores of texts), `libime` (reading libime's pinyin, history or table files);
 run `ime-eval` with no arguments for the full usage.
 
 Report top-1 (and the change in samples won and lost) on at least the main, web, chat and new sets,
@@ -83,13 +84,15 @@ a settings page, rotation, a field type, an upgrade) is tried on a device before
 - **redroid** is the default: Android 14 in a Docker container on the host kernel, ~10 s to boot,
   ~1.3 GB. Build `-PbuildABI=x86_64`, install, `ime enable` / `ime set` the service, drive it
   with `adb shell input tap/swipe` at measured key coordinates, read the field back, screenshot the
-  bar. The project's local scripts for this live outside the repository (`dev/redroid/`, not
-  committed). Root via `docker exec`.
+  bar. Scripted, that is `uat/tools/uat.py` (below); `dev/redroid/` is only an uncommitted
+  workbench. Root via `docker exec`.
 - **An emulator** for what redroid cannot do: another Android version, real telephony, a browser
   (redroid has none, and the UAT's test page needs Chrome), a hardware keyboard (a uinput one in
   redroid is the host's too). Close it before `assembleTextRelease`: R8 and a running emulator
-  (qemu ~6 GB resident) together make earlyoom kill the emulator.
-- A real phone (arm64) for performance and voice.
+  (qemu ~6 GB resident) together make earlyoom kill the emulator. Voice (UAT 12) and the hardware
+  keyboard (17) run on a headless one, `uat.py emu-up` (port 5554, Xvfb; voice from a host PulseAudio
+  virtual source playing clips made by `uat/tools/voice-clips.py`).
+- A real phone (arm64) for performance, voice latency and a real microphone.
 
 Worth checking by hand for keyboard changes: portrait and landscape; a password field (nothing
 learned, no hold-to-talk); a URL and an email field (address keys); a search field (Enter acts);
@@ -110,3 +113,9 @@ English, the test page `uat/fixtures/fields.html` open), run on a device by hand
 place of the unit tests. A change in behaviour changes its cases in the same change; when a case and
 `docs/` disagree, find which is wrong. A run is written down in `uat/runs/<date>-<device>-<version>.md`;
 the case files hold no results. `uat/README.md` has the format, the baselines and the reset.
+
+The runner, `uat/tools/uat.py`: `up` / `down` (two redroids, `youmo-redroid` on 5556 and
+`youmo-redroid2` on 5557), `run [--areas] [--ids] [--devices]`, `mark` (a visual case after its sheet
+is seen), `emu-up` / `emu-down`. One script per case file (`uat/scripts/<file>.py`; handwriting's
+strokes in `hw_strokes.py`); the UI read back by a resident `Dumper.java`; visual cases go on contact
+sheets, reviewed per `uat/tools/sheet-review.md`. Details in `uat/README.md`.

@@ -467,7 +467,7 @@
     <string name="im_auto_caps">句首自动大写</string>
     <string name="im_auto_caps_summary">在句子开头自动打开 Shift（应用的输入框要求时）</string>
     <string name="im_glide">滑行输入</string>
-    <string name="im_glide_summary">手指不离开键盘，依次划过一个词的键即可输入：拼音划字母，九键划字母所在的数字键，码表划编码</string>
+    <string name="im_glide_summary">手指不离开键盘，依次划过一个词的键即可输入：拼音划字母，九键划字母所在的数字键，码表划编码。网址、邮箱、密码框里不能滑</string>
     <string name="status_punctuation_chinese">中文标点</string>
     <string name="status_punctuation_english">英文标点</string>
     <string name="status_full_width">全角</string>
