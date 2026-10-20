@@ -41,7 +41,7 @@ class FloatingKeyboardTest {
         // the default theme: keys 4 dp round, 3 dp from the sides, 7 dp from the bottom
         assertEquals(7, FloatingKeyboard.cornerDp(keyRadius = 4, hMargin = 3, vMargin = 7))
         // square keys, a corner as near square; round keys, as round
-        assertEquals(3, FloatingKeyboard.cornerDp(0, 3, 7))
+        assertEquals(0, FloatingKeyboard.cornerDp(0, 3, 7))
         assertEquals(15, FloatingKeyboard.cornerDp(10, 5, 9))
         // keys with no margin: the keys' radius alone; keys drawn square (no border): the margin alone
         assertEquals(4, FloatingKeyboard.cornerDp(4, 0, 0))

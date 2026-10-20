@@ -275,10 +275,9 @@ class InputView(
             return dp(value)
         }
 
-    // the keys' radius and margins as KeyView draws them; square where the user turned corners off
+    // the keys' radius and margins as KeyView draws them; square where the keys are (按键圆角 直角)
     private fun floatingCornerPx(): Float {
         val prefs = ThemeManager.prefs
-        if (!prefs.floatingKeyboardRound.getValue()) return 0f
         val landscape = resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
         val h = (if (landscape) prefs.keyHorizontalMarginLandscape else prefs.keyHorizontalMargin).getValue()
         val v = (if (landscape) prefs.keyVerticalMarginLandscape else prefs.keyVerticalMargin).getValue()

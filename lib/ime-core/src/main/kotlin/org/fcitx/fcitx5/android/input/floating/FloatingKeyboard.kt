@@ -45,14 +45,15 @@ object FloatingKeyboard {
         Spot(share(left, parentW - w), share(top, parentH - h))
 
     /**
-     * Its corners' radius, in dp, rounded as a user asked: the keys' own [keyRadius] and the least
-     * of their margins to its edge ([hMargin] at the sides, [vMargin] at the bottom), so its curve
-     * runs alongside the corner keys' (nested round them) and clips none of them; square keys, a
-     * corner as near square. Keys not [bordered] are drawn square whatever their radius: the
-     * margin alone, or a big radius would clip a corner key's face.
+     * Its corners' radius, in dp, as round as the keys (按键圆角): the keys' own [keyRadius] and
+     * the least of their margins to its edge ([hMargin] at the sides, [vMargin] at the bottom), so
+     * its curve runs alongside the corner keys' (nested round them) and clips none of them. Square
+     * keys ([keyRadius] 0, 直角), square corners: the user's one setting for corners. Keys not
+     * [bordered] are drawn square whatever their radius: the margin alone, or a big radius would
+     * clip a corner key's face.
      */
     fun cornerDp(keyRadius: Int, hMargin: Int, vMargin: Int, bordered: Boolean = true): Int =
-        (if (bordered) keyRadius else 0) + minOf(hMargin, vMargin)
+        if (keyRadius == 0) 0 else (if (bordered) keyRadius else 0) + minOf(hMargin, vMargin)
 
     /** How much of the keys' text colour the drag handle's strip has over the bar's. */
     const val HANDLE_INK = 0.1f

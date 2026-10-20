@@ -99,12 +99,6 @@ class ThemePrefs(sharedPreferences: SharedPreferences) :
     // area. The view is made anew for it: the letters do not split floating
     val floatingKeyboard = switch(R.string.floating_keyboard, "floating_keyboard", false)
 
-    // its corners as round as the keys' (FloatingKeyboard.cornerDp); off, square, as before
-    val floatingKeyboardRound = switch(
-        R.string.floating_keyboard_round, "floating_keyboard_round", true,
-        summary = R.string.floating_keyboard_round_summary
-    )
-
     init {
         section(R.string.section_key_style)
     }
