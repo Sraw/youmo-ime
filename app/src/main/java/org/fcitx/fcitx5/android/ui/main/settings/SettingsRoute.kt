@@ -153,6 +153,9 @@ sealed class SettingsRoute : Parcelable {
     data object T9Letters : SettingsRoute()
 
     @Serializable
+    data object T9Symbols : SettingsRoute()
+
+    @Serializable
     data object Search : SettingsRoute()
 
     companion object {
@@ -225,6 +228,9 @@ sealed class SettingsRoute : Parcelable {
             }
             fragment<NineKeyLettersFragment, T9Letters> {
                 label = ctx.getString(R.string.t9_letters)
+            }
+            fragment<NineKeySymbolsFragment, T9Symbols> {
+                label = ctx.getString(R.string.t9_symbols)
             }
             fragment<SettingsSearchFragment, Search> {
                 label = ctx.getString(R.string.search_settings)

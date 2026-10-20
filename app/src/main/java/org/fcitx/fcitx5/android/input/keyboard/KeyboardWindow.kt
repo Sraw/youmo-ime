@@ -71,7 +71,10 @@ class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), Essentia
     // each made when first shown: every new input view made 九键 too, which most never use
     private val makers: Map<String, () -> BaseKeyboard> = mapOf(
         TextKeyboard.Name to { TextKeyboard(context, theme) },
-        T9Keyboard.Name to { T9Keyboard(context, theme, NineKeyLetters.parse(AppPrefs.getInstance().keyboard.t9Letters.getValue())) },
+        T9Keyboard.Name to {
+            val keyboard = AppPrefs.getInstance().keyboard
+            T9Keyboard(context, theme, NineKeyLetters.parse(keyboard.t9Letters.getValue()), NineKeySymbols.parse(keyboard.t9Symbols.getValue()))
+        },
         NumberKeyboard.Name to { NumberKeyboard(context, theme) },
         HandwritingKeyboard.Name to {
             HandwritingKeyboard(

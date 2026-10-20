@@ -24,6 +24,7 @@ import org.fcitx.fcitx5.android.engine.host.Keyboard
 import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
 import org.fcitx.fcitx5.android.input.popup.PopupAction
 import org.fcitx.fcitx5.android.input.popup.PopupActionListener
+import org.fcitx.fcitx5.android.input.popup.PopupKeyboardUi
 import org.fcitx.fcitx5.android.ui.main.settings.PlaceholderStrings
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -123,15 +124,38 @@ class T9KeyboardTest {
         assertEquals(one, T9Keyboard.resolve(one, keys, tap, 2100, composing = true))
     }
 
-    // as it is, not through the engine, where . would be 。
+    // 2 to 9's to the engine, as the full keyboard's (the candidate, then the mark); 1's committed
+    // as they are already, not through the engine, where . would be 。
     @Test
-    fun oneLongPressedCommitsItsSymbolsAsTheyAre() {
+    fun aLongPressedSymbolGoesOnAsThePopupGivesIt() {
         val tap = MultiTap(600)
         val popup = KeyActionListener.Source.Popup
-        for (symbol in T9Keyboard.ONE_MORE) {
-            assertEquals(KeyAction.CommitAction(symbol), T9Keyboard.resolve(KeyAction.FcitxKeyAction(symbol), popup, tap, 0, composing = true))
+        for (symbol in ('2'..'9').flatMap { NineKeySymbols.STANDARD.symbols(it) } + listOf("😀", "^_^")) {
+            val picked = PopupKeyboardUi.keyAction(symbol)
+            assertEquals(symbol, picked, T9Keyboard.resolve(picked, popup, tap, 0, composing = true))
         }
-        assertEquals(listOf("…", "：", "；", "~", ".", "-", "@", "、", "“", "”"), T9Keyboard.ONE_MORE)
+        for (symbol in NineKeySymbols.STANDARD.symbols('1')) {
+            val picked = KeyAction.CommitAction(symbol)
+            assertEquals(symbol, picked, T9Keyboard.resolve(picked, popup, tap, 0, composing = true))
+        }
+    }
+
+    @Test
+    fun eachKeysSymbolsAreSetApartAfterItsDigitAndLetters() {
+        val symbols = NineKeySymbols.STANDARD.with('5', listOf("【", "】")).with('1', emptyList())
+        val keys = T9Keyboard.layout(NineKeyLetters.STANDARD, symbols).flatten()
+        fun popup(digit: String) = keys.single { (it.appearance as? KeyDef.Appearance.AltText)?.altText == digit }
+            .popup?.filterIsInstance<KeyDef.Popup.Keyboard.Explicit>()?.singleOrNull()
+        val two = popup("2")!!
+        assertEquals(listOf("2", "a", "b", "c", "@", "!", "\""), two.items.toList())
+        assertEquals(4, two.symbolsFrom)
+        assertEquals(false, two.asTyped)
+        val one = T9Keyboard.layout(NineKeyLetters.STANDARD).flatten()
+            .single { (it.appearance as? KeyDef.Appearance.AltText)?.altText == "1" }.popup!!.single() as KeyDef.Popup.Keyboard.Explicit
+        assertEquals(true, one.asTyped)
+        assertEquals(listOf("5", "j", "k", "l", "【", "】"), popup("5")!!.items.toList())
+        // 1 with none: no long press
+        assertEquals(null, popup("1"))
     }
 
     @Test

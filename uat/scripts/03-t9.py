@@ -464,3 +464,75 @@ def t926(d):
     # Backspace takes the multi-tap letter whole, back to 7 alone
     check(got == want, f"连按 `{mid}` 退格后 {got}，只点 7 时 {want}")
     return f"`{mid}` → ⌫ → `{got[0]}` {got[1][:3]}"
+
+
+def symbol_rows(items, digit):
+    """the popup's items above its digit's row, and those on it"""
+    row = next((n for n in items if n.text == digit), None)
+    if not row:
+        return [], []
+    above = [n.text for n in items if n.c[1] < row.b[1]]
+    on = [n.text.lower() for n in items if row.b[1] <= n.c[1] <= row.b[3]]
+    return above, on
+
+
+@case("T9-27", base="B0-九键", mutates="learn")
+def t927(d):
+    items, xy = popup(d, "2")
+    d.touch(("up", xy[0], xy[1] + 400))   # off the popup: nothing picked
+    time.sleep(0.4)
+    above, on = symbol_rows(items, "2")
+    check({"2", "a", "b", "c"} <= set(on), f"长按 2 下面一行 {on}")
+    check("@" in above and ("！" in above or "!" in above), f"长按 2 上面一行 {above}")
+    d.clear()
+    t9(d, "64")
+    items, xy = popup(d, "2")
+    tgt = next((n for n in items if n.text in ("！", "!")), None)
+    if not tgt:
+        d.touch(("up", *xy))
+        raise Blocked(f"长按 2 弹出 {[n.text for n in items]}")
+    popup_slide(d, xy, tgt)
+    t, p = d.field_text(), d.preedit()
+    check(t == "你！" and not p, f"框里「{t}」，拼音行 `{p}`")
+    return f"上面一行 {above}，下面 {on}；选「{tgt.text}」后「{t}」"
+
+
+@case("T9-28", base="B0-设置", mutates=True)
+def t928(d):
+    def page():
+        gear(d, "九键拼音")
+        d.tap_text("按键长按", after=1.2)
+
+    def long_press_5():
+        d.open_page("text")
+        d.switch_im("九键")
+        items, xy = popup(d, "5")
+        d.touch(("up", xy[0], xy[1] + 400))
+        time.sleep(0.4)
+        return symbol_rows(items, "5")
+
+    add_im(d, "九键拼音")
+    page()
+    d.tap_text("# ( ), 5", where="all", after=1.2)
+    s = d.screen()
+    f = next((n for n in s.nodes if n.cls == "EditText"), None)
+    if not f:
+        raise Blocked("5 键的长按符号对话框没有输入框")
+    d.tap((f.b[2] - 20, f.c[1]), 1.0)
+    d.bksp(8)
+    d.hide_keyboard()
+    f = next((n for n in d.screen().nodes if n.cls == "EditText"), None)
+    if f and f.text:
+        raise Blocked(f"输入框没清空：「{f.text}」")
+    d.tap_text("确定", where="all", scroll=False, after=1.0)
+    # emptied, the key shows its digit alone
+    shown = d.screen().find(desc="5", where="app")
+    cleared = long_press_5()
+    page()
+    d.tap(shown.c if shown else d.screen().find(desc="5", where="app").c, 1.2)
+    d.tap_text("重置", where="all", scroll=False, after=1.0)
+    back = long_press_5()
+    check(shown, "清空后页面上 5 键不是空的")
+    check(not cleared[0] and {"5", "j", "k", "l"} <= set(cleared[1]), f"清空后长按 5：上面 {cleared[0]}，下面 {cleared[1]}")
+    check({"#", "（", "）"} <= set(back[0]) or {"#", "(", ")"} <= set(back[0]), f"重置后长按 5 上面一行 {back[0]}")
+    return f"清空后长按 5 {cleared}；重置后 {back}"

@@ -435,6 +435,13 @@
     <string name="t9_letters_field_hint">預設：%s</string>
     <string name="t9_letters_editor_hint">填 a 到 z 的字母，每個一次；順序就是鍵上顯示和連按選字母的順序</string>
     <string name="t9_letters_reset_all_message">把所有鍵恢復成預設的字母？</string>
+    <string name="t9_symbols">按鍵長按</string>
+    <string name="t9_symbols_summary">長按數字鍵時，除了數字和字母還能選的符號</string>
+    <string name="t9_symbols_hint">點一個鍵，設定長按它時多出的符號，它們排在數字和字母上面，隔一條細線。開著中文標點時，2–9 的符號按中文標點打出（! 打出 ！），1 的符號原樣打出。</string>
+    <string name="t9_symbols_of">%1$s 鍵的長按符號</string>
+    <string name="t9_symbols_field_hint">預設：%1$s</string>
+    <string name="t9_symbols_editor_hint">用空格分開，最多 %1$d 個。單個的數字和字母不能填：長按選它們是當按鍵用的（選候選、打拼音），打不出它們本身。清空就是這個鍵不加符號。</string>
+    <string name="t9_symbols_reset_all_message">把所有鍵的長按符號恢復成預設？</string>
     <string name="im_model_level">效能檔位</string>
     <string name="im_model_level_summary">檔位越高越準，也越耗電</string>
     <string name="im_model_level_low">低檔：只按詞頻和搭配，最省電</string>

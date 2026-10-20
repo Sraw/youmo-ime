@@ -6,7 +6,10 @@ package org.fcitx.fcitx5.android.input.popup
 
 import android.content.Context
 import android.graphics.Rect
+import android.graphics.drawable.ColorDrawable
 import android.graphics.drawable.GradientDrawable
+import android.graphics.drawable.LayerDrawable
+import android.view.Gravity
 import android.view.ViewOutlineProvider
 import android.widget.Space
 import org.fcitx.fcitx5.android.data.theme.Theme
@@ -41,6 +44,9 @@ import kotlin.math.min
  * trigger view to popup keyboard view. See [offsetX] and [offsetY].
  * @param keys character to commit when triggered
  * @param labels symbols to show on keys
+ * @param split where the keys set apart start: drawn in rows of their own above the others, a
+ * line between; none past the last key
+ * @param asTyped every key committed as it is, never typed as a key ([keyAction])
  */
 class PopupKeyboardUi(
     override val ctx: Context,
@@ -53,7 +59,9 @@ class PopupKeyboardUi(
     private val keyHeight: Int,
     private val popupHeight: Int,
     private val keys: Array<String>,
-    private val labels: Array<String>
+    private val labels: Array<String>,
+    split: Int = keys.size,
+    private val asTyped: Boolean = false,
 ) : PopupContainerUi(ctx, theme, outerBounds, triggerBounds, onDismissSelf) {
 
     class PopupKeyUi(override val ctx: Context, val theme: Theme, val text: String) : Ui {
@@ -86,6 +94,12 @@ class PopupKeyboardUi(
     private val rowCount: Int
     private val columnCount: Int
 
+    // the keys before the split, then those from it (if any): each group's first index and size,
+    // and how many rows it takes, from the bottom
+    private val groups: List<IntRange> = listOf(0 until split.coerceIn(0, keys.size), split.coerceIn(0, keys.size) until keys.size)
+        .filter { !it.isEmpty() }.ifEmpty { listOf(keys.indices) }
+    private val groupRows: List<Int>
+
     // those 2 variables meas initial focus row/column during initialization
     private val focusRow: Int
     private val focusColumn: Int
@@ -103,10 +117,14 @@ class PopupKeyboardUi(
     val keyWidth: Int
 
     init {
-        val keyCount: Float = keys.size.toFloat()
-        rowCount = ceil(keyCount / 5).toInt()
+        // as wide as the widest group wants: up to 5 a row, its rows as even as may be.
         // round() left fewer slots than entries for 13, 17, 21 ... entries and hid the last ones
-        columnCount = ceil(keyCount / rowCount).toInt()
+        columnCount = groups.maxOf { group ->
+            val count = group.count().toFloat()
+            ceil(count / ceil(count / 5)).toInt()
+        }
+        groupRows = groups.map { ceil(it.count().toFloat() / columnCount).toInt() }
+        rowCount = groupRows.sum()
 
         val padding = ctx.dp(KEY_PADDING)
         val widest = keyUis.maxOfOrNull { it.textView.paint.measureText(it.text) } ?: 0f
@@ -185,9 +203,15 @@ class PopupKeyboardUi(
      * ```
      * in which `0` indicates default focus
      */
-    private val keyOrders = Array(rowCount) { row ->
-        IntArray(columnCount) { col -> row * columnCount + columnOrder[col] }
-    }
+    private val keyOrders = groups.flatMapIndexed { g, group ->
+        List(groupRows[g]) { r ->
+            // a slot past its group's keys is empty: -1
+            IntArray(columnCount) { col -> (group.first + r * columnCount + columnOrder[col]).takeIf { it <= group.last } ?: -1 }
+        }
+    }.toTypedArray()
+
+    // the first row of the keys set apart, if any: a line drawn under it
+    private val apartFrom = if (groups.size > 1) groupRows[0] else -1
 
     private var focusedIndex = keyOrders[focusRow][focusColumn]
 
@@ -203,6 +227,7 @@ class PopupKeyboardUi(
         for (i in rowCount - 1 downTo 0) {
             val order = keyOrders[i]
             add(horizontalLayout row@{
+                if (i == apartFrom) background = lineUnder()
                 for (j in 0 until columnCount) {
                     // an empty slot keeps its column, so each key is drawn where onChangeFocus selects it
                     val slot = keyUis.getOrNull(order[j])?.root ?: Space(ctx)
@@ -210,6 +235,14 @@ class PopupKeyboardUi(
                 }
             }, lParams(width = matchParent))
         }
+    }
+
+    private fun lineUnder() = LayerDrawable(arrayOf(ColorDrawable(theme.dividerColor))).apply {
+        setLayerGravity(0, Gravity.BOTTOM or Gravity.FILL_HORIZONTAL)
+        setLayerHeight(0, ctx.dp(1))
+        val inset = ctx.dp(LINE_INSET)
+        setLayerInsetLeft(0, inset)
+        setLayerInsetRight(0, inset)
     }
 
     private fun markFocus(index: Int) {
@@ -240,7 +273,7 @@ class PopupKeyboardUi(
         newRow = limitIndex(newRow, rowCount)
         newColumn = limitIndex(newColumn, columnCount)
         val newFocus = keyOrders[newRow][newColumn]
-        if (newFocus < keyUis.size) {
+        if (newFocus in keyUis.indices) {
             markInactive(focusedIndex)
             markFocus(newFocus)
             focusedIndex = newFocus
@@ -250,11 +283,14 @@ class PopupKeyboardUi(
 
     override fun onTrigger(): KeyAction? {
         val key = keys.getOrNull(focusedIndex) ?: return null
-        return keyAction(key)
+        return if (asTyped) KeyAction.CommitAction(key) else keyAction(key)
     }
 
     companion object {
         private const val TEXT_SIZE = 23f
+
+        // how far in from the popup's sides the line over the keys set apart starts, in dp
+        private const val LINE_INSET = 8
 
         /** Space each side of the widest label, in dp. */
         private const val KEY_PADDING = PopupComponent.TEXT_PADDING

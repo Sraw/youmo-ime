@@ -22,6 +22,7 @@ import org.fcitx.fcitx5.android.input.floating.FloatingKeyboard
 import org.fcitx.fcitx5.android.input.handwriting.HandwritingPause
 import org.fcitx.fcitx5.android.input.keyboard.KeyboardHeightPercentBase
 import org.fcitx.fcitx5.android.input.keyboard.LangSwitchBehavior
+import org.fcitx.fcitx5.android.input.keyboard.NineKeySymbols
 import org.fcitx.fcitx5.android.input.keyboard.SpaceLongPressBehavior
 import org.fcitx.fcitx5.android.input.keyboard.SwipeSymbolDirection
 import org.fcitx.fcitx5.android.input.keyboard.T9MultiTap
@@ -161,6 +162,12 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
          * set on its own page from the 九键 page, read by the keyboard and the engine alike.
          */
         val t9Letters = string("t9_letters", "")
+
+        /**
+         * What each of 九键's keys 1 to 9 offers on a long press besides its digit and letters
+         * ([NineKeySymbols.serialize], empty as by default): set on its own page from the 九键 page.
+         */
+        val t9Symbols = string("t9_symbols", "")
 
         /** Shown on the English page (InputMethodSettings), not here: English's alone. */
         val englishAutoCaps = bool(ENGLISH_AUTO_CAPS, true)

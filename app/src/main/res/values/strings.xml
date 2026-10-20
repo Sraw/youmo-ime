@@ -449,6 +449,13 @@
     <string name="t9_letters_field_hint">As on a phone: %s</string>
     <string name="t9_letters_editor_hint">Letters a to z, each once, in the order the key shows them and multi-tap goes through them</string>
     <string name="t9_letters_reset_all_message">Put every key back to its letters as on a phone?</string>
+    <string name="t9_symbols">Long-press symbols</string>
+    <string name="t9_symbols_summary">What a long press on a key offers besides its digit and letters</string>
+    <string name="t9_symbols_hint">Tap a key to set the symbols its long press offers too, above its digit and letters, a line between. With Chinese punctuation on, those of 2 to 9 type as Chinese punctuation (! types ！); those of 1 type as they are.</string>
+    <string name="t9_symbols_of">Long press of %1$s</string>
+    <string name="t9_symbols_field_hint">Default: %1$s</string>
+    <string name="t9_symbols_editor_hint">Apart by spaces, up to %1$d. A digit or a letter alone is not kept: a long press types those as keys, not as themselves. Emptied, the key offers none.</string>
+    <string name="t9_symbols_reset_all_message">Put every key back to its default symbols?</string>
     <string name="im_model_level">Performance level</string>
     <string name="im_model_level_summary">Higher picks better and uses more battery</string>
     <string name="im_model_level_low">Low: by how common words and pairs are, least battery</string>

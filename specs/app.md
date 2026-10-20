@@ -157,6 +157,17 @@ digit or symbol goes in there as it is, what is typed committed as typed
 types with (`Engines.readsAsKey`: the nine keys' digits, the `;` of every 双拼 scheme whose layout types it (微软, 紫光), the pinyins' `'` and a
 table's keys, 二笔's `;`, while something is typed, the table's from `Engines.tableKeys`); the nine
 keys' column, separator and multi-tap are in `T9Keyboard` with decisions in `MultiTap`, `NineKeys`.
+A nine key's long press shows its digit and letters, then in rows of their own above, a line
+between, its symbols (`NineKeySymbols` in ime-core, the pref `t9Symbols`, set on 九键拼音's page
+按键长按, `NineKeySymbolsFragment`; separate from 按键字符, owner 2026-10-19): by default 2–9's are
+the full keyboard's corner characters of their letters (`PopupPresetTest` holds them to it), 1's
+the rest of 搜狗's column. `KeyDef.Popup.Keyboard.Explicit.symbolsFrom` sets 2–9's apart: shown
+as Chinese punctuation maps them and typed as keys to the engine, as the full keyboard's long
+press is (the first candidate, then the mark: quotes in turn, brackets paired; `'` while
+typing is the syllable separator, as there). 1's are
+`asTyped`, committed as they are (`.` not `。`). A digit or a lone letter is never a symbol: the
+long press types those as the key's own. (A probe with `adb shell input text` showed the nine
+keys committing the pinyin as typed before a mark: that is a hardware key's path, not the screen's.)
 
 Handwriting's keyboard (`HandwritingKeyboard`, the letters layout of `Engines.HANDWRITING`) is a pad
 (`HandwritingPadView` over `InkPad`) and a column of backspace and marks. Each read goes to

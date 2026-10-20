@@ -144,7 +144,13 @@ open class KeyDef(
             data class Preset(val label: String, val transformPunctuation: Boolean = true) :
                 Keyboard()
 
-            class Explicit(val items: Array<String>) : Keyboard()
+            /**
+             * [items], typed as keys (one character) or committed (longer); those from [symbolsFrom]
+             * are symbols set apart: rows of their own above the rest, a line between, each shown as
+             * Chinese punctuation maps it, typed as a key the engine maps. [asTyped]: every item is
+             * committed as it is, never a key.
+             */
+            class Explicit(val items: Array<String>, val symbolsFrom: Int = items.size, val asTyped: Boolean = false) : Keyboard()
         }
 
         class Menu(val items: Array<Item>) : Popup() {

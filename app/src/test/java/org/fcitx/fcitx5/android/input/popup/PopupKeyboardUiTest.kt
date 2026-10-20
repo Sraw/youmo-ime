@@ -34,7 +34,10 @@ class PopupKeyboardUiTest {
     private fun popup(count: Int, trigger: Rect): PopupKeyboardUi =
         popup(Array(count) { ('a' + it).toString() }, trigger)
 
-    private fun popup(keys: Array<String>, trigger: Rect, outerBounds: Rect = outer, minKeyWidth: Int = keyWidth): PopupKeyboardUi {
+    private fun popup(
+        keys: Array<String>, trigger: Rect, outerBounds: Rect = outer, minKeyWidth: Int = keyWidth, split: Int = keys.size,
+        asTyped: Boolean = false,
+    ): PopupKeyboardUi {
         return PopupKeyboardUi(
             ctx = RuntimeEnvironment.getApplication(),
             theme = ThemePreset.PixelDark,
@@ -45,7 +48,9 @@ class PopupKeyboardUiTest {
             keyHeight = keyHeight,
             popupHeight = 100,
             keys = keys,
-            labels = keys
+            labels = keys,
+            split = split,
+            asTyped = asTyped,
         )
     }
 
@@ -96,6 +101,61 @@ class PopupKeyboardUiTest {
         val centre = Rect(480, 500, 520, 550)
         // the user's own list (PopupOverrides) can be any length
         for (count in 1..30) assertTypedWhereDrawn(count, centre)
+    }
+
+    @Test
+    fun theKeysSetApartAreRowsOfTheirOwnAboveTheOthers() {
+        // 九键's 7: its digit and letters under the finger as before, its symbols above
+        val keys = arrayOf("7", "p", "q", "r", "s", "*", "%", "&", "^", "$", "#", "!")
+        val ui = popup(keys, Rect(480, 500, 520, 550), split = 5)
+        val drawn = drawn(ui)
+        assertEquals(keys.size, drawn.size)
+        assertEquals(keys.take(5).toSet(), drawn.filterValues { it.first == 0 }.keys)
+        assertTrue("7 symbols in rows 1 and 2", drawn.filterKeys { it in keys.drop(5) }.values.all { it.first in 1..2 })
+        // the first symbol right above the digit, the key under the finger
+        assertEquals(drawn["7"]!!.second, drawn["*"]!!.second)
+        val rows = ui.root.childCount
+        drawn.forEach { (label, cell) -> assertEquals(KeyAction.FcitxKeyAction(label), ui.select(cell.first, cell.second, rows)) }
+        // a line under the first row of symbols alone
+        val backgrounds = (0 until rows).map { ui.root.getChildAt(rows - 1 - it).background }
+        assertEquals(listOf(false, true, false), backgrounds.map { it != null })
+    }
+
+    @Test
+    fun withNoneSetApartAPopupIsAsBefore() {
+        // as PopupComponent passes it for a popup with none; 7 keys: 4 columns, the 2nd in focus
+        // (centre, right, left, right), the top row's last slot empty
+        val keys = Array(7) { ('a' + it).toString() }
+        val expected = mapOf(
+            "a" to (0 to 1), "b" to (0 to 2), "c" to (0 to 0), "d" to (0 to 3),
+            "e" to (1 to 1), "f" to (1 to 2), "g" to (1 to 0),
+        )
+        assertEquals(expected, drawn(popup(keys, Rect(480, 500, 520, 550), split = Int.MAX_VALUE)))
+        assertEquals(expected, drawn(popup(keys, Rect(480, 500, 520, 550), split = 0)))
+    }
+
+    // 九键's 1: . committed as it is, not a key the engine would make 。
+    @Test
+    fun asTypedEveryKeyIsCommittedAsItIs() {
+        val ui = popup(arrayOf(".", "-"), Rect(480, 500, 520, 550), asTyped = true)
+        assertEquals(KeyAction.CommitAction("."), ui.onTrigger())
+        assertEquals(KeyAction.FcitxKeyAction("."), popup(arrayOf(".", "-"), Rect(480, 500, 520, 550)).onTrigger())
+    }
+
+    @Test
+    fun atAnEdgeTheFirstSymbolIsStillAboveTheDigit() {
+        // 九键's 2 with ten symbols: a short bottom row, two of symbols above
+        val keys = arrayOf("2", "a", "b", "c") + Array(10) { "#$it" }
+        for (trigger in listOf(Rect(0, 500, 40, 550), Rect(960, 500, 1000, 550))) {
+            val ui = popup(keys, trigger, split = 4)
+            val drawn = drawn(ui)
+            assertEquals(keys.size, drawn.size)
+            assertEquals(setOf("2", "a", "b", "c"), drawn.filterValues { it.first == 0 }.keys)
+            assertEquals(drawn["2"]!!.second, drawn["#0"]!!.second)
+            assertEquals(1, drawn["#0"]!!.first)
+            val rows = ui.root.childCount
+            drawn.forEach { (label, cell) -> assertEquals(PopupKeyboardUi.keyAction(label), ui.select(cell.first, cell.second, rows)) }
+        }
     }
 
     @Test

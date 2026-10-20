@@ -121,4 +121,14 @@ class PopupComponentTest {
     private companion object {
         const val ID = 1
     }
+
+    // 九键's: the digit and letters as they are, the symbols shown as Chinese punctuation maps them
+    @Test
+    fun onlyTheKeysSetApartAreShownMapped() {
+        val nineKey = KeyDef.Popup.Keyboard.Explicit(arrayOf("2", "a", "!", "@"), symbolsFrom = 2)
+        val map = mapOf("!" to "！", "a" to "A", "2" to "二")
+        assertEquals(listOf("2", "a", "！", "@"), PopupComponent.explicitLabels(nineKey) { map[it] ?: it }.toList())
+        // none set apart (1's, everyone else's): none mapped
+        assertEquals(listOf("1", "2", "3", "4", "5"), PopupComponent.explicitLabels(five) { "x" }.toList())
+    }
 }

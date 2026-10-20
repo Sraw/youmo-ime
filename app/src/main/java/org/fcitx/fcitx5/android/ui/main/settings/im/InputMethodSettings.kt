@@ -257,6 +257,7 @@ object InputMethodSettings {
                     AppPrefs.getInstance().keyboard.t9MultiTap
                 },
                 Page(T9_LETTERS, R.string.t9_letters, R.string.t9_letters_summary, SettingsRoute.T9Letters),
+                Page(T9_SYMBOLS, R.string.t9_symbols, R.string.t9_symbols_summary, SettingsRoute.T9Symbols),
             )
         ),
     )
@@ -348,6 +349,9 @@ object InputMethodSettings {
 
     /** 九键's page of its keys' letters: its key. */
     const val T9_LETTERS = "t9_letters"
+
+    /** 九键's page of its keys' long-press symbols: its key. */
+    const val T9_SYMBOLS = "t9_symbols"
 
     /** The app's own input methods, each with a page in [of]. */
     val BUILT_IN: List<String> = listOf(Engines.PINYIN, Engines.T9, Engines.SHUANGPIN) + Engines.TABLES.keys + Engines.HANDWRITING + InputMethodNames.KEYBOARD

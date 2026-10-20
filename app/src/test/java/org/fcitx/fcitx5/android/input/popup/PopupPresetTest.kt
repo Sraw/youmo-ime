@@ -4,7 +4,9 @@
  */
 package org.fcitx.fcitx5.android.input.popup
 
+import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
 import org.fcitx.fcitx5.android.input.keyboard.KeyAction
+import org.fcitx.fcitx5.android.input.keyboard.NineKeySymbols
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -46,5 +48,15 @@ class PopupPresetTest {
         // 微软 and 紫光 read ';' as ing; one character picked goes through fcitx as a key
         assertTrue(";" in PopupPreset["l"]!!)
         assertTrue(PopupKeyboardUi.keyAction(";") is KeyAction.FcitxKeyAction)
+    }
+
+    // 九键's long press offers by default the full keyboard's corner characters of each key's letters
+    @Test
+    fun nineKeysDefaultSymbolsAreTheirLettersCornerCharacters() {
+        for (digit in '2'..'9') {
+            val corners = NineKeyLetters.STANDARD.letters(digit).map { PopupPreset.getValue(it.toString()).first() }
+                .filter { it.length != 1 || it[0] !in '0'..'9' }
+            assertEquals("$digit", corners, NineKeySymbols.DEFAULTS.getValue(digit))
+        }
     }
 }

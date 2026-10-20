@@ -158,6 +158,8 @@ class PopupComponent :
     private fun showKeyboard(viewId: Int, keyboard: KeyDef.Popup.Keyboard, bounds: Rect) {
         var keys: Array<String>
         var labels: Array<String>
+        var split = Int.MAX_VALUE
+        var asTyped = false
         when (keyboard) {
             is KeyDef.Popup.Keyboard.Preset -> {
                 val preset = PopupOverridesCache.user.current.longPressOf(keyboard.label) ?: return
@@ -167,8 +169,10 @@ class PopupComponent :
                 } else keys
             }
             is KeyDef.Popup.Keyboard.Explicit -> {
+                split = keyboard.symbolsFrom
+                asTyped = keyboard.asTyped
                 keys = keyboard.items
-                labels = keyboard.items
+                labels = explicitLabels(keyboard) { if (punctuation.enabled) punctuation.transform(it) else it }
             }
         }
         // clear popup preview text         OR create empty popup preview
@@ -186,7 +190,9 @@ class PopupComponent :
             // position popup keyboard higher, because of [^1]
             popupHeight + keyBottomMargin,
             keys,
-            labels
+            labels,
+            split,
+            asTyped,
         )
         // the bubble under the key in focus, its width and place (moved in at an edge): one shape
         place(entry, bounds, keyboardUi.keyWidth, bounds.left + keyboardUi.focusedKeyLeft)
@@ -289,6 +295,13 @@ class PopupComponent :
     }
 
     companion object {
+        /**
+         * [keyboard]'s labels, those set apart ([KeyDef.Popup.Keyboard.Explicit.symbolsFrom]) as
+         * [mapped]: shown as the engine will type them, as a Preset's are.
+         */
+        internal fun explicitLabels(keyboard: KeyDef.Popup.Keyboard.Explicit, mapped: (String) -> String): Array<String> =
+            Array(keyboard.items.size) { if (it >= keyboard.symbolsFrom) mapped(keyboard.items[it]) else keyboard.items[it] }
+
         /**
          * Space each side of the bubble's text, in dp; a long press's keys leave as much each side
          * of their widest label, so the bubble and the key over it come out one width.

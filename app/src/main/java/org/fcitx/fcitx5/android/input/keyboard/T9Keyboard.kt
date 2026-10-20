@@ -64,7 +64,8 @@ import splitties.views.existingOrNewId
  * A digit key pressed again soon is its next letter ([MultiTap], as [AppPrefs.Keyboard.t9MultiTap]
  * sets; off by default), sent as a character of [Keyboard.LETTERS] ([Keyboard.letterKey]), which
  * the engine puts in as that letter typed as itself and nothing else; its preview shows the letter. Its long press offers the digit and its letters, a letter chosen
- * typed as itself after what is typed.
+ * typed as itself after what is typed, and in rows above its symbols ([NineKeySymbols]), typed
+ * as the full keyboard's long press types them (1's as they are).
  *
  * A glide across the digit keys ([GlideInput], the setting on) is read as full pinyin's, each
  * key's letters on it: the engine types the reading's letters as themselves.
@@ -75,7 +76,9 @@ class T9Keyboard(
     theme: Theme,
     /** What each digit key types, as the user set it: the engine reads the digits by the same. */
     private val letters: NineKeyLetters = NineKeyLetters.STANDARD,
-) : BaseKeyboard(context, theme, layout(letters)) {
+    /** What each key's long press offers besides its digit and letters, as the user set it. */
+    symbols: NineKeySymbols = NineKeySymbols.STANDARD,
+) : BaseKeyboard(context, theme, layout(letters, symbols)) {
 
     companion object {
         const val Name = "T9"
@@ -90,9 +93,6 @@ class T9Keyboard(
 
         /** What 1 types while nothing is typed: the first, pressed again soon the next in its place. */
         internal const val ONE = "，。？！"
-
-        /** 1's long press: the rest of 搜狗's column, committed as they are. */
-        internal val ONE_MORE = listOf("…", "：", "；", "~", ".", "-", "@", "、", "“", "”")
 
         // 1's label while something is typed
         private const val SEPARATOR = "分词"
@@ -119,7 +119,7 @@ class T9Keyboard(
         /** A digit as a keypad's, as the number keyboard's: typed, or its candidate picked while typing (EngineEvent.KEYPAD). */
         private fun keypad(digit: Char) = KeyAction.SymAction(KeySym(FcitxKeyMapping.FcitxKey_KP_0 + (digit - '0')), KeyStates.Virtual)
 
-        private fun digitKey(digit: Char, letters: String) = KeyDef(
+        private fun digitKey(digit: Char, letters: String, symbols: List<String>) = KeyDef(
             KeyDef.Appearance.AltText(displayText = letters, altText = digit.toString(), textSize = 20f, percentWidth = DIGIT),
             setOf(
                 KeyDef.Behavior.Press(KeyAction.FcitxKeyAction(digit.toString())),
@@ -127,15 +127,20 @@ class T9Keyboard(
             ),
             arrayOf(
                 KeyDef.Popup.AltPreview(letters, digit.toString()),
-                KeyDef.Popup.Keyboard.Explicit(arrayOf(digit.toString()) + letters.lowercase().map { it.toString() }),
+                KeyDef.Popup.Keyboard.Explicit(
+                    arrayOf(digit.toString()) + letters.lowercase().map { it.toString() } + symbols,
+                    symbolsFrom = 1 + letters.length,
+                ),
             ),
         )
 
         /**
          * What [action] from [source] types: a digit key's press [MultiTap] reads at [time]
          * through [letters], a letter or digit of its long press; 1, while nothing is [composing],
-         * punctuation ([ONE]), a symbol of its long press as it is; anything else resets [tap] and
-         * types as it is.
+         * punctuation ([ONE]); anything else resets [tap] and types as it is: a symbol of 2 to 9's
+         * long press goes to the engine as the full keyboard's do (the first candidate, then the
+         * mark Chinese punctuation maps it to, quotes in turn, brackets paired), 1's come
+         * committed as they are already.
          */
         internal fun resolve(
             action: KeyAction,
@@ -157,11 +162,6 @@ class T9Keyboard(
                 // the digit itself, a keypad's as the number keyboard's: never read as a key, typed
                 // with nothing typed, while typing it picks its candidate (EngineEvent.KEYPAD)
                 return keypad(key)
-            }
-            if (source == KeyActionListener.Source.Popup && key != null && key.toString() in ONE_MORE) {
-                tap.reset()
-                // as it is: through the engine . would be 。
-                return KeyAction.CommitAction(key.toString())
             }
             if (key == null || key !in '2'..'9' && key !in 'a'..'z') {
                 tap.reset()
@@ -189,7 +189,7 @@ class T9Keyboard(
         )
 
         /** The keys, each digit key with [letters]' letters on it. */
-        internal fun layout(letters: NineKeyLetters): List<List<KeyDef>> = listOf(
+        internal fun layout(letters: NineKeyLetters, symbols: NineKeySymbols = NineKeySymbols.STANDARD): List<List<KeyDef>> = listOf(
             listOf(
                 spacer(),
                 KeyDef(
@@ -198,17 +198,21 @@ class T9Keyboard(
                         KeyDef.Behavior.Press(KeyAction.FcitxKeyAction("1")),
                         KeyDef.Behavior.Swipe(keypad('1')),
                     ),
-                    arrayOf(KeyDef.Popup.Keyboard.Explicit(ONE_MORE.toTypedArray())),
+                    // its symbols alone, none set apart: it has no letters; typed as they are, not
+                    // through the engine, where . would be 。
+                    symbols.symbols('1').takeIf { it.isNotEmpty() }?.let {
+                        arrayOf(KeyDef.Popup.Keyboard.Explicit(it.toTypedArray(), asTyped = true))
+                    },
                 ),
-                digitKey('2', letters.letters('2').uppercase()),
-                digitKey('3', letters.letters('3').uppercase()),
+                digitKey('2', letters.letters('2').uppercase(), symbols.symbols('2')),
+                digitKey('3', letters.letters('3').uppercase(), symbols.symbols('3')),
                 BackspaceKey(RIGHT),
             ),
             listOf(
                 spacer(),
-                digitKey('4', letters.letters('4').uppercase()),
-                digitKey('5', letters.letters('5').uppercase()),
-                digitKey('6', letters.letters('6').uppercase()),
+                digitKey('4', letters.letters('4').uppercase(), symbols.symbols('4')),
+                digitKey('5', letters.letters('5').uppercase(), symbols.symbols('5')),
+                digitKey('6', letters.letters('6').uppercase(), symbols.symbols('6')),
                 KeyDef(
                     KeyDef.Appearance.Text("重输", 16f, percentWidth = RIGHT, variant = KeyDef.Appearance.Variant.Alternative),
                     setOf(KeyDef.Behavior.Press(KeyAction.SymAction(KeySym(FcitxKeyMapping.FcitxKey_Escape)))),
@@ -216,9 +220,9 @@ class T9Keyboard(
             ),
             listOf(
                 spacer(),
-                digitKey('7', letters.letters('7').uppercase()),
-                digitKey('8', letters.letters('8').uppercase()),
-                digitKey('9', letters.letters('9').uppercase()),
+                digitKey('7', letters.letters('7').uppercase(), symbols.symbols('7')),
+                digitKey('8', letters.letters('8').uppercase(), symbols.symbols('8')),
+                digitKey('9', letters.letters('9').uppercase(), symbols.symbols('9')),
                 KeyDef(
                     KeyDef.Appearance.Text("0", 20f, percentWidth = RIGHT, variant = KeyDef.Appearance.Variant.Alternative),
                     setOf(KeyDef.Behavior.Press(KeyAction.FcitxKeyAction("0"))),
