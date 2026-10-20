@@ -6,6 +6,8 @@ package org.fcitx.fcitx5.android.core
 
 import android.text.InputType
 import android.view.inputmethod.EditorInfo
+import org.fcitx.fcitx5.android.BuildConfig
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -30,6 +32,9 @@ class CapabilityFlagsTest {
         assertTrue(CapabilityFlags.forField(info, "own").has(CapabilityFlag.Sensitive))
         assertFalse(CapabilityFlags.forField(info, "other").has(CapabilityFlag.Sensitive))
         assertFalse(CapabilityFlags.fromEditorInfo(info).has(CapabilityFlag.Sensitive))
+        // the debug build's test host: typed into as another app's field; a release build has none
+        info.privateImeOptions = CapabilityFlags.TEST_HOST_FIELD
+        assertEquals(!BuildConfig.DEBUG, CapabilityFlags.forField(info, "own").has(CapabilityFlag.Sensitive))
     }
 
     @Test

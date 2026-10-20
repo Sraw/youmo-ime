@@ -6,6 +6,7 @@ package org.fcitx.fcitx5.android.core
 
 import android.text.InputType
 import android.view.inputmethod.EditorInfo
+import org.fcitx.fcitx5.android.BuildConfig
 import org.fcitx.fcitx5.android.input.FieldPolicy
 import splitties.bitflags.hasFlag
 
@@ -101,8 +102,16 @@ value class CapabilityFlags constructor(val flags: ULong) {
          * the context memory and the recently used emoji and symbols alike.
          */
         fun forField(info: EditorInfo, ownPackage: String): CapabilityFlags = fromEditorInfo(info).let {
-            if (FieldPolicy.ownApp(info.packageName, ownPackage)) CapabilityFlags(it.flags + CapabilityFlag.Sensitive) else it
+            val own = FieldPolicy.ownApp(info.packageName, ownPackage) &&
+                !(BuildConfig.DEBUG && info.privateImeOptions == TEST_HOST_FIELD)
+            if (own) CapabilityFlags(it.flags + CapabilityFlag.Sensitive) else it
         }
+
+        /**
+         * The debug build's TypingHostActivity marks its field so: the instrumented tests type there
+         * as in another app's field (learning, predictions), though it lives in this package.
+         */
+        const val TEST_HOST_FIELD = "io.github.sraw.youmo.testHostField"
 
         fun fromEditorInfo(info: EditorInfo): CapabilityFlags {
             var flags = DefaultFlags.flags

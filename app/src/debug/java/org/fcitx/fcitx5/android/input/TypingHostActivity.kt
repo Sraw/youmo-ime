@@ -8,6 +8,7 @@ import android.app.Activity
 import android.os.Bundle
 import android.widget.EditText
 import android.widget.FrameLayout
+import org.fcitx.fcitx5.android.core.CapabilityFlags
 import java.util.concurrent.CopyOnWriteArrayList
 
 /**
@@ -27,6 +28,8 @@ class TypingHostActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         field = EditText(this).apply {
+            // typed into as another app's field, not as this app's own (which learns nothing)
+            privateImeOptions = CapabilityFlags.TEST_HOST_FIELD
             intent.getIntExtra(EXTRA_ACTION, -1).takeIf { it >= 0 }?.let {
                 isSingleLine = true
                 imeOptions = it
