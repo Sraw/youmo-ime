@@ -10,8 +10,9 @@ import android.view.ViewOutlineProvider
 
 /**
  * The floating keyboard's frame, as users asked: [view] and all it holds, the theme's picture too,
- * clipped to a rectangle with corners [radius] pixels round (read at each layout: a turn of the
- * screen changes the keys' margins it follows, [FloatingKeyboard.cornerDp]), and a shadow
+ * clipped to a rectangle with corners [radius] pixels round (read as the outline is made again, as the
+ * view's size changes: a turn of the screen changes the keys' margins it follows,
+ * [FloatingKeyboard.cornerDp]), and a shadow
  * [elevation] deep, so it stands apart from the app under it.
  */
 object FloatingCorners {
@@ -26,5 +27,14 @@ object FloatingCorners {
         }
         view.clipToOutline = true
         view.elevation = elevation
+    }
+
+    /**
+     * [layer] (the popups: a key's bubble, a long press's keys) drawn over [view], the keyboard
+     * [frame]d: once a child has a Z its parent draws its children by Z, and the keyboard lifted
+     * covered the popups added after it.
+     */
+    fun keepAbove(layer: View, view: View) {
+        layer.translationZ = view.elevation + 1f
     }
 }

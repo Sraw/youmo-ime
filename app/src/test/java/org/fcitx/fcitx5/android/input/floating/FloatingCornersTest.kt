@@ -7,6 +7,7 @@ package org.fcitx.fcitx5.android.input.floating
 import android.graphics.Outline
 import android.graphics.Rect
 import android.view.View
+import android.widget.FrameLayout
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -37,5 +38,20 @@ class FloatingCornersTest {
         assertEquals(0f, outline(view).radius, 0f)
         assertTrue(outline(view).getRect(bounds))
         assertEquals(Rect(0, 0, 400, 600), bounds)
+    }
+
+    @Test
+    fun thePopupsStayOverTheKeyboardLifted() {
+        val context = RuntimeEnvironment.getApplication()
+        val keyboard = View(context)
+        val popups = FrameLayout(context)
+        FrameLayout(context).apply {
+            addView(keyboard)
+            addView(popups)
+        }
+        FloatingCorners.frame(keyboard, { 0f }, 12f)
+        assertTrue("under the keyboard", popups.z < keyboard.z)
+        FloatingCorners.keepAbove(popups, keyboard)
+        assertTrue(popups.z > keyboard.z)
     }
 }

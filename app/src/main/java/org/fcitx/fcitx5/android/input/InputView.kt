@@ -419,6 +419,7 @@ class InputView(
             centerVertically()
             centerHorizontally()
         })
+        if (floating) FloatingCorners.keepAbove(popup.root, keyboardView)
 
         keyboardPrefs.registerOnChangeListener(onKeyboardSizeChangeListener)
         advancedPrefs.registerOnChangeListener(onKeyboardSizeChangeListener)

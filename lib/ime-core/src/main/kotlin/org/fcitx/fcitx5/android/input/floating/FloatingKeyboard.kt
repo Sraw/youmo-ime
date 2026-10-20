@@ -4,6 +4,8 @@
  */
 package org.fcitx.fcitx5.android.input.floating
 
+import kotlin.math.roundToInt
+
 /**
  * The keyboard floating over the app, as Gboard's and Sogou's on a tablet: smaller than docked,
  * the app laid out under it as if there were no keyboard, dragged by its handle anywhere on the
@@ -64,7 +66,7 @@ object FloatingKeyboard {
         fun mix(shift: Int): Int {
             val b = base ushr shift and 0xFF
             val i = ink ushr shift and 0xFF
-            return Math.round(b + (i - b) * HANDLE_INK) shl shift
+            return (b + (i - b) * HANDLE_INK).roundToInt() shl shift
         }
         return (base and 0xFF000000.toInt()) or mix(16) or mix(8) or mix(0)
     }
