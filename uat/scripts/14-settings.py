@@ -216,6 +216,19 @@ def dark(lum):
     return lum < 90
 
 
+def darkest_theme(d, s=None, top=None, pool=None):
+    """the darkest theme in view (of [pool], the app's nodes by default), below [top] (the
+    preview's bottom by default): built-in themes are told apart by their look, not by a name"""
+    s = s or d.screen()
+    top = preview_box(d, s)[3] + 100 if top is None else top
+    items = [n for n in (pool if pool is not None else s.app()) if n.cls == "ViewGroup" and "新增主题" not in n.texts() and
+             n.b[2] - n.b[0] > 250 and 200 < n.b[3] - n.b[1] < 300 and top < n.b[1] and n.b[3] < 2200]
+    if not items:
+        raise Blocked("主题列表里找不到主题")
+    im = d.png()
+    return min(items, key=lambda n: d.lum(n.b, im))
+
+
 @case("ST-05", base="B0-设置", mutates=True)
 def st05(d):
     appearance_tab(d, "大小与样式")
@@ -223,16 +236,7 @@ def st05(d):
     appearance_tab(d, "主题")
     s = d.screen()
     before = d.lum(preview_box(d, s))
-    # the second row's left theme: the dark one with the sparkles (the first row is 新增主题 and
-    # the light default); picked by its look: the darkest item
-    items = [n for n in s.app() if n.cls == "ViewGroup" and "新增主题" not in n.texts() and
-             n.b[2] - n.b[0] > 250 and 200 < n.b[3] - n.b[1] < 300 and n.b[1] > preview_box(d, s)[3] + 100]
-    im = d.png()
-    items = [n for n in items if n.b[3] < 2200]
-    if not items:
-        raise Blocked("主题列表里找不到主题")
-    darkest = min(items, key=lambda n: d.lum(n.b, im))
-    d.tap(darkest.c, 1.2)
+    d.tap(darkest_theme(d, s).c, 1.2)
     after = d.lum(preview_box(d))
     check(dark(after), f"预览亮度 {before:.0f} → {after:.0f}，没变深")
     d.open_page("text")
@@ -420,6 +424,57 @@ def st09(d):
     o, b = kb_picture(d)
     check(o > 40 and b > 40, f"选用导入的主题后键盘背景不是那张图（橙 {o} 蓝 {b} / 1800）")
     return f"导入后列表里有它；选用后键盘是那张图（橙 {o} 蓝 {b}）"
+
+
+@case("ST-35", base="B0-设置", mutates=True)
+def st35(d):
+    appearance_tab(d, "大小与样式")
+    d.switch("跟随系统夜间模式", False)
+    appearance_tab(d, "主题")
+    check(not custom_item(d), "开始前列表里就有自己的主题")
+    d.tap_text("新增主题", after=1.2)
+    d.tap_text("复制内置主题…", contains=True, scroll=False, after=1.5)
+    s = d.screen()
+    title = d.visible("复制内置主题", s, where="all")
+    if not title:
+        raise Blocked(f"没出内置主题列表：{s.texts(where='all')[:8]}")
+    # the dialog's own items, not the theme list behind it
+    root = title
+    while root.parent is not None:
+        root = root.parent
+    d.tap(darkest_theme(d, s, top=title.b[3], pool=list(root.walk())).c, 1.5)
+    appearance_tab(d, "主题")
+    item = custom_item(d)
+    check(item, "复制后列表里没有可编辑的主题")
+    d.tap(item.c, 1.5)
+    d.open_page("text")
+    kl = d.lum(kb_box(d))
+    check(dark(kl), f"选用复制的深色主题后键盘亮度 {kl:.0f}")
+    return f"复制出可编辑的主题；选用后键盘亮度 {kl:.0f}"
+
+
+@case("ST-36", base="B0-设置", mutates=True)
+def st36(d):
+    appearance_tab(d, "主题")
+    s = d.screen()
+    item = darkest_theme(d, s)
+    d.tap(item.c, 1.2)
+    s = d.screen()
+    msg = d.visible("不能手动更换主题", s, where="all", contains=True)
+    check(msg, f"点主题没出提示：{s.texts(where='all')[:8]}")
+    d.tap_text("确定", where="all", scroll=False, after=1.0)
+    d.open_page("text")
+    k1 = d.lum(kb_box(d))
+    check(not dark(k1), f"点「确定」后主题换了（键盘亮度 {k1:.0f}）")
+    appearance_tab(d, "主题")
+    d.tap(darkest_theme(d).c, 1.2)
+    d.tap_text("禁用它", where="all", scroll=False, after=1.5)
+    d.open_page("text")
+    k2 = d.lum(kb_box(d))
+    check(dark(k2), f"点「禁用它」后没换成深色主题（键盘亮度 {k2:.0f}）")
+    appearance_tab(d, "大小与样式")
+    check(not d.switch("跟随系统夜间模式", False), "点「禁用它」后跟随系统夜间模式还开着")
+    return f"确定：主题不变（{k1:.0f}）；禁用它：跟随关了，换成深色（{k2:.0f}）"
 
 
 @case("ST-10", base="B0-设置", mutates=True)

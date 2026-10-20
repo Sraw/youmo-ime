@@ -2,7 +2,7 @@
 import re
 import time
 
-from uat import BAR_BOTTOM, Blocked, case, check, home, menu_tap, open_url, sym_char
+from uat import BAR_BOTTOM, Blocked, Fail, case, check, home, menu_tap, open_url, sym_char
 
 LONG = "今天天气很好，我们一起去公园散步吧。"
 
@@ -359,6 +359,55 @@ def tb12(d):
     texts = [n.text for n in clip_items(d) if not n.text.startswith(("已删除", "撤销"))]
     check("公园" in texts and "散步" not in texts, f"清空前 {before}，清空后 {texts}")
     return f"清空后 {texts}"
+
+
+def trash(d, prompt):
+    """the panel's bin, then 确定 on its prompt; returns the prompt's text"""
+    s = d.screen()
+    t = next((n for n in s.ime() if n.desc and ("删除" in n.desc or "清空" in n.desc)), None)
+    if not t:
+        raise Blocked(f"剪贴板面板没有垃圾桶：{[n.desc for n in s.ime() if n.desc]}")
+    d.tap(t.c, 0.8)
+    s = d.screen()
+    asked = next((n.text for n in s.nodes if prompt in n.text), None)
+    ok = next((n for n in s.nodes if n.text == "确定"), None)
+    if not asked or not ok:
+        raise Fail(f"点垃圾桶后没问「{prompt}」：{s.texts(where='all')[:8]}")
+    d.tap(ok.c, 0.8)
+    return asked
+
+
+@case("TB-33", mutates=True)
+def tb33(d):
+    copy_word(d, "公园")
+    d.open_page("text")
+    clip_panel(d)
+    pin(d, "公园")
+    back_to_keys(d)
+    copy_word(d, "散步")
+    d.open_page("text")
+    clip_panel(d)
+    trash(d, "未置顶")
+    s = d.screen()
+    undo = next((n for n in s.nodes if n.text == "撤销"), None)
+    gone = next((n.text for n in s.nodes if n.text.startswith("已删除")), None)
+    check(undo and gone == "已删除 1 项", f"删除后的提示：{s.texts(where='all')[:8]}")
+    t0 = [n.text for n in clip_items(d) if not n.text.startswith(("已删除", "撤销"))]
+    check(t0 == ["公园"], f"删除后撤销前面板 {t0}")
+    d.tap(undo.c, 1.0)
+    t1 = [n.text for n in clip_items(d) if not n.text.startswith(("已删除", "撤销"))]
+    check("散步" in t1 and "公园" in t1, f"撤销后面板 {t1}")
+    trash(d, "未置顶")
+    time.sleep(0.5)
+    t2 = [n.text for n in clip_items(d) if not n.text.startswith(("已删除", "撤销"))]
+    check(t2 == ["公园"], f"再删一次后面板 {t2}")
+    asked = trash(d, "置顶")
+    check("未置顶" not in asked, f"只剩置顶的时候问的是「{asked}」")
+    time.sleep(0.5)
+    t3 = [n.text for n in clip_items(d) if not n.text.startswith(("已删除", "撤销"))]
+    empty = d.screen().find(text="试着复制些东西", where="ime")
+    check(not t3 and empty, f"删除置顶条目后面板 {t3}，{'有' if empty else '没有'}空面板的提示")
+    return f"「{gone}」撤销后 {t1}；再删 {t2}；只剩置顶时问「{asked}」，删后 {t3}"
 
 
 @case("TB-13", mutates=True)
