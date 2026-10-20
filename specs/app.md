@@ -79,7 +79,12 @@ decides both). The room beside it has the arrow, which then sets `oneHanded` rat
 
 Floating (`ThemePrefs.floatingKeyboard`, the status area's 悬浮键盘; the input view is made anew for
 it): `keyboardView` is `FloatingKeyboard.widthDp` wide (70% of the screen, 300–420 dp), its boards as
-much shorter (85% at least), with `FloatingHandle` on top, and is moved by translation
+much shorter (85% at least), with `FloatingHandle` on top, clipped to rounded corners
+with a shadow (`FloatingCorners`; users asked for both). The radius is the keys' radius plus their
+least margin to the edge (`FloatingKeyboard.cornerDp`, the nested-corner rule: the curve runs
+alongside the corner keys' and clips none), square with `ThemePrefs.floatingKeyboardRound` off; the
+handle is a shade of the bar towards the key text (`FloatingKeyboard.handleColor`), as some themes'
+bar is the keyboard's colour. It is moved by translation
 (`FloatingPlacer`) to a spot kept as shares of the room it moves in (`AppPrefs.internal.floatingKeyboardX/Y`),
 so a turn keeps its corner. `FcitxInputMethodService.onComputeInsets` then gives the app the whole
 height (it is not laid out again) and only `InputView.floatingRegion` takes touches

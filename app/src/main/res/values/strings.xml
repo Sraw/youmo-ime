@@ -586,6 +586,8 @@
     <string name="one_handed_exit">Full width</string>
     <string name="floating_keyboard">Floating keyboard</string>
     <string name="floating_keyboard_dock">Dock the keyboard</string>
+    <string name="floating_keyboard_round">Rounded floating keyboard</string>
+    <string name="floating_keyboard_round_summary">Floating, the keyboard\'s corners are as round as its keys\'</string>
     <string name="show_touch_keyboard">Show the on-screen keyboard</string>
     <string name="hardware_switch_shortcuts">Hardware keyboard shortcuts</string>
     <string name="hardware_switch_shortcuts_summary">Shift alone or Ctrl+Space switches between Chinese and English, Ctrl+Shift goes to the next input method</string>

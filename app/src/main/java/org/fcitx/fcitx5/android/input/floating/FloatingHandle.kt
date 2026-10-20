@@ -38,7 +38,8 @@ class FloatingHandle(
     private var dragging = false
 
     init {
-        setBackgroundColor(theme.barColor)
+        // a shade of the bar: in a theme whose bar is the keyboard's colour it was not told apart
+        setBackgroundColor(FloatingKeyboard.handleColor(theme.barColor, theme.keyTextColor))
         addView(ImageView(context).apply {
             setImageResource(R.drawable.ic_baseline_drag_handle_24)
             colorFilter = PorterDuffColorFilter(theme.altKeyTextColor, PorterDuff.Mode.SRC_IN)

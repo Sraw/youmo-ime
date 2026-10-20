@@ -837,3 +837,27 @@ def tb31(d):
     t2 = d.field_text()
     check(t2 == "公园公园", f"第二次点后框里「{t2}」")
     return f"点一次「{t1}」，面板仍在；再点「{t2}」"
+
+
+@case("TB-32", base="B0-设置", mutates=True)
+def tb32(d):
+    def corner_is_handle():
+        """whether the keyboard's very corner is the handle's colour (square) or what is under it (round)"""
+        s = d.screen()
+        h, dock = handle(d, s)
+        kb = kbox(d, s)
+        im = d.png()
+        # the handle's strip is the keyboard's top: the dock button's top, the keys' left
+        inside, corner = im.getpixel((h[0] - 150, h[1])), im.getpixel((kb[0] + 1, dock.b[1] + 1))
+        return max(abs(a - b) for a, b in zip(inside, corner)) < 12, inside, corner
+    d.open_page("text")
+    floating(d)
+    rounded = corner_is_handle()
+    home(d, "外观")
+    d.tap_text("大小与样式", scroll=False, after=1.0)
+    d.switch("悬浮键盘圆角", False)
+    d.open_page("text")
+    square = corner_is_handle()
+    check(not rounded[0], f"开着时角上是横条的颜色 {rounded[2]}（横条 {rounded[1]}）")
+    check(square[0], f"关掉后角上不是横条的颜色 {square[2]}（横条 {square[1]}）")
+    return f"开：角 {rounded[2]}，横条 {rounded[1]}；关：角 {square[2]}"

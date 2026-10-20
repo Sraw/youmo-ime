@@ -42,6 +42,33 @@ object FloatingKeyboard {
     fun spot(left: Float, top: Float, w: Float, h: Float, parentW: Float, parentH: Float): Spot =
         Spot(share(left, parentW - w), share(top, parentH - h))
 
+    /**
+     * Its corners' radius, in dp, rounded as a user asked: the keys' own [keyRadius] and the least
+     * of their margins to its edge ([hMargin] at the sides, [vMargin] at the bottom), so its curve
+     * runs alongside the corner keys' (nested round them) and clips none of them; square keys, a
+     * corner as near square. Keys not [bordered] are drawn square whatever their radius: the
+     * margin alone, or a big radius would clip a corner key's face.
+     */
+    fun cornerDp(keyRadius: Int, hMargin: Int, vMargin: Int, bordered: Boolean = true): Int =
+        (if (bordered) keyRadius else 0) + minOf(hMargin, vMargin)
+
+    /** How much of the keys' text colour the drag handle's strip has over the bar's. */
+    const val HANDLE_INK = 0.1f
+
+    /**
+     * The drag handle's colour: [base], the bar's, with [ink], the keys' text colour, laid over by
+     * [HANDLE_INK]. In a theme whose bar is the keyboard's colour the strip was not told apart from
+     * the bar under it; the text's colour makes it a shade darker on a light theme, lighter on a dark.
+     */
+    fun handleColor(base: Int, ink: Int): Int {
+        fun mix(shift: Int): Int {
+            val b = base ushr shift and 0xFF
+            val i = ink ushr shift and 0xFF
+            return Math.round(b + (i - b) * HANDLE_INK) shl shift
+        }
+        return (base and 0xFF000000.toInt()) or mix(16) or mix(8) or mix(0)
+    }
+
     // where in a room [room] wide [at] is; no room, the far edge, which is where it is all the same
     private fun share(at: Float, room: Float) = if (room <= 0f) 1f else (at / room).coerceIn(0f, 1f)
 }

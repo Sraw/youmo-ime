@@ -53,6 +53,7 @@ import org.fcitx.fcitx5.android.input.broadcast.ReturnKeyDrawableComponent
 import org.fcitx.fcitx5.android.input.candidates.expanded.window.BaseExpandedCandidateWindow
 import org.fcitx.fcitx5.android.input.candidates.horizontal.HorizontalCandidateComponent
 import org.fcitx.fcitx5.android.input.clipboard.ClipboardWindow
+import org.fcitx.fcitx5.android.input.floating.FloatingCorners
 import org.fcitx.fcitx5.android.input.floating.FloatingHandle
 import org.fcitx.fcitx5.android.input.floating.FloatingKeyboard
 import org.fcitx.fcitx5.android.input.floating.FloatingPlacer
@@ -274,6 +275,16 @@ class InputView(
             return dp(value)
         }
 
+    // the keys' radius and margins as KeyView draws them; square where the user turned corners off
+    private fun floatingCornerPx(): Float {
+        val prefs = ThemeManager.prefs
+        if (!prefs.floatingKeyboardRound.getValue()) return 0f
+        val landscape = resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
+        val h = (if (landscape) prefs.keyHorizontalMarginLandscape else prefs.keyHorizontalMargin).getValue()
+        val v = (if (landscape) prefs.keyVerticalMarginLandscape else prefs.keyVerticalMargin).getValue()
+        return dp(FloatingKeyboard.cornerDp(prefs.keyRadius.getValue(), h, v, prefs.keyBorder.getValue())).toFloat()
+    }
+
     private val keyboardBottomPaddingPx: Int
         get() {
             val value = when (resources.configuration.orientation) {
@@ -402,6 +413,7 @@ class InputView(
             bottomOfParent()
         })
         floatingPlacer = if (floating) FloatingPlacer(this, keyboardView) else null
+        if (floating) FloatingCorners.frame(keyboardView, ::floatingCornerPx, dp(FloatingCorners.ELEVATION_DP).toFloat())
         floatingPlacer?.let { placer -> keyboardView.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ -> placer.place() } }
         add(popup.root, lParams(matchParent, matchParent) {
             centerVertically()

@@ -571,6 +571,8 @@
     <string name="one_handed_exit">恢復全寬</string>
     <string name="floating_keyboard">懸浮鍵盤</string>
     <string name="floating_keyboard_dock">鍵盤放回底部</string>
+    <string name="floating_keyboard_round">懸浮鍵盤圓角</string>
+    <string name="floating_keyboard_round_summary">懸浮時鍵盤四角跟按鍵一樣圓</string>
     <string name="show_touch_keyboard">顯示螢幕鍵盤</string>
     <string name="hardware_switch_shortcuts">實體鍵盤快速鍵</string>
     <string name="hardware_switch_shortcuts_summary">單按 Shift 或 Ctrl+空格切換中英，Ctrl+Shift 輪流切換輸入法</string>
