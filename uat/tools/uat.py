@@ -38,6 +38,8 @@ UAT = os.path.join(REPO, "uat")
 OUT = os.path.join(REPO, "dev", "uat-out")
 # UAT_BUILD=release runs the cases on the x86_64 release APK (a release's gate: R8's code, its own package)
 BUILD = os.environ.get("UAT_BUILD", "debug")
+if BUILD not in ("debug", "release"):
+    sys.exit(f"UAT_BUILD={BUILD}: debug or release")
 PKG = "io.github.sraw.youmo" + (".debug" if BUILD == "debug" else "")
 IME = f"{PKG}/org.fcitx.fcitx5.android.input.FcitxInputMethodService"
 MAIN = f"{PKG}/org.fcitx.fcitx5.android.ui.main.MainActivity"
@@ -1302,7 +1304,7 @@ def key_texts(d, label, s=None):
 
 def popup(d, key):
     """long-press a key and keep the finger down: (the popup's texts above the key, the key's centre).
-    Finish with popup_slide or d.touch(("up", x, y))"""
+    Finish with popup_slide (a pick) or popup_away (none): a lift in place types the key in focus"""
     k = d.key_node(key)
     if not k:
         raise Blocked(f"键盘上没有 {key} 键")
@@ -1331,12 +1333,19 @@ def popup_slide(d, xy, tgt):
     time.sleep(0.5)
 
 
+def popup_away(d, xy):
+    """let a long press's popup go with nothing picked: a lift with no move types the key in focus,
+    a move far off first closes it"""
+    x, y = xy
+    d.touch(("move", x, y + 400), ("sleep", 0.1), ("up", x, y + 400))
+
+
 def popup_pick(d, key, char):
     """long-press a key, slide to char in its popup, let go; returns the popup's texts"""
     items, xy = popup(d, key)
     tgt = next((n for n in items if n.text == char), None)
     if not tgt:
-        d.touch(("up", *xy))
+        popup_away(d, xy)
         raise Blocked(f"长按 {key} 的弹出里没有「{char}」：{[n.text for n in items]}")
     popup_slide(d, xy, tgt)
     return [n.text for n in items]
@@ -1709,10 +1718,12 @@ def up(port="5557"):
 
 def install(d, flavor="text"):
     apks = sorted((os.path.join(dp, f) for dp in [os.path.join(REPO, f"app/build/outputs/apk/{flavor}/{BUILD}")]
-                   if os.path.isdir(dp) for f in os.listdir(dp) if "x86_64" in f and f.endswith(".apk")),
+                   if os.path.isdir(dp) for f in os.listdir(dp) if "x86_64" in f and f.endswith(".apk") and not f.endswith("-unsigned.apk")),
                   key=os.path.getmtime)
     if not apks:
         msg = f"no {flavor} {BUILD} x86_64 APK: BUILD_ABI=x86_64 ./gradlew :app:assemble{flavor.capitalize()}{BUILD.capitalize()}"
+        if BUILD == "release":
+            msg += " (signed: the release key's environment set; an -unsigned.apk does not install)"
         if d.case:   # inside a case (SET-01): that case is blocked, the run goes on
             raise Blocked(msg)
         sys.exit(msg)

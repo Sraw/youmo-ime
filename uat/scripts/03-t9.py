@@ -3,7 +3,7 @@
 import time
 
 from uat import (Blocked, add_im, case, check, first, flick, gear, glide_on, glide_shot, has, popup,
-                 popup_pick, popup_slide)
+                 popup_away, popup_pick, popup_slide)
 
 
 def t9(d, digits, gap=0.35, after=0.6):
@@ -237,8 +237,8 @@ def t914(d):
     add_im(d, "九键拼音")
     gear(d, "九键拼音")
     t = d.all_texts()
-    titles = [x for x in ("通用输入设置", "连按选字母", "按键字母") if x in t]
-    check(titles == ["通用输入设置", "连按选字母", "按键字母"], f"九键页 {t[:12]}")
+    titles = [x for x in ("通用输入设置", "连按选字母", "按键字母", "按键长按") if x in t]
+    check(titles == ["通用输入设置", "连按选字母", "按键字母", "按键长按"], f"九键页 {t[:12]}")
     check(any("只有这一种读法" in x for x in t), f"连按选字母的说明 {t[:12]}")
     d.scroll_top()
     d.tap_text("通用输入设置", after=1.2)
@@ -259,7 +259,7 @@ def t914(d):
     check(uv is not None and any("不适用：九键拼音" in x for x in texts[uv:uv + 3]), f"模糊音 {texts[:20]}")
     box = [n for n in s.nodes if n.cls in ("CheckBox", "CheckedTextView") and n.enabled]
     check(box, "模糊音里的勾选框不能勾")
-    return "九键页三项；纠正错拼和 u↔v 都写着不适用：九键拼音"
+    return "九键页四项；纠正错拼和 u↔v 都写着不适用：九键拼音"
 
 
 @case("T9-15", base="B0-九键", mutates="learn")
@@ -479,8 +479,10 @@ def symbol_rows(items, digit):
 @case("T9-27", base="B0-九键", mutates="learn")
 def t927(d):
     items, xy = popup(d, "2")
-    d.touch(("up", xy[0], xy[1] + 400))   # off the popup: nothing picked
+    popup_away(d, xy)
     time.sleep(0.4)
+    t, p = d.field_text(), d.preedit()
+    check(not t and not p, f"松手不选，框里却有「{t}」，拼音行 `{p}`")
     above, on = symbol_rows(items, "2")
     check({"2", "a", "b", "c"} <= set(on), f"长按 2 下面一行 {on}")
     check("@" in above and ("！" in above or "!" in above), f"长按 2 上面一行 {above}")
@@ -507,7 +509,7 @@ def t928(d):
         d.open_page("text")
         d.switch_im("九键")
         items, xy = popup(d, "5")
-        d.touch(("up", xy[0], xy[1] + 400))
+        popup_away(d, xy)
         time.sleep(0.4)
         return symbol_rows(items, "5")
 
@@ -527,12 +529,69 @@ def t928(d):
     d.tap_text("确定", where="all", scroll=False, after=1.0)
     # emptied, the key shows its digit alone
     shown = d.screen().find(desc="5", where="app")
+    check(shown, "清空后页面上 5 键不是空的")
     cleared = long_press_5()
+    check(not cleared[0] and {"5", "j", "k", "l"} <= set(cleared[1]), f"清空后长按 5：上面 {cleared[0]}，下面 {cleared[1]}")
     page()
-    d.tap(shown.c if shown else d.screen().find(desc="5", where="app").c, 1.2)
+    d.tap(shown.c, 1.2)
     d.tap_text("重置", where="all", scroll=False, after=1.0)
     back = long_press_5()
-    check(shown, "清空后页面上 5 键不是空的")
-    check(not cleared[0] and {"5", "j", "k", "l"} <= set(cleared[1]), f"清空后长按 5：上面 {cleared[0]}，下面 {cleared[1]}")
     check({"#", "（", "）"} <= set(back[0]) or {"#", "(", ")"} <= set(back[0]), f"重置后长按 5 上面一行 {back[0]}")
     return f"清空后长按 5 {cleared}；重置后 {back}"
+
+
+@case("T9-29", base="B0-设置", mutates=True)
+def t929(d):
+    def page():
+        gear(d, "九键拼音")
+        d.tap_text("按键长按", after=1.2)
+
+    def set_one(typed):
+        d.tap_text(", 1", where="all", contains=True, after=1.2)
+        f = next((n for n in d.screen().nodes if n.cls == "EditText"), None)
+        if not f:
+            raise Blocked("1 键的长按符号对话框没有输入框")
+        d.tap((f.b[2] - 20, f.c[1]), 1.0)
+        d.bksp(40)
+        # 全拼 by its own name: switch_im("拼音") stops at 九键拼音 too
+        for _ in range(6):
+            label = d.im_label()
+            if "拼音" in label and "九键" not in label:
+                break
+            d.press("globe", after=0.8)
+        for i, part in enumerate(typed.split(" ")):
+            if i:
+                d.type(" ")
+            d.type(part)
+            if part.isalpha():
+                d.enter()   # the letters as they are, not their pinyin
+        f = next((n for n in d.screen().nodes if n.cls == "EditText"), None)
+        want = typed.replace(",", "，").replace(".", "。")
+        if not f or f.text != want:
+            raise Blocked(f"输入框里是「{f.text if f else None}」，要的是「{want}」")
+        d.hide_keyboard()
+        d.tap_text("确定", where="all", scroll=False, after=0.3)
+        # the toast, while it shows: not in the UI dump, a window of its own whose text dumpsys does
+        # not give, so only that one showed; the key's label, checked after, says it was this one
+        return [l.strip() for l in d.sh("dumpsys window windows").splitlines() if "Toast" in l][:2]
+
+    add_im(d, "九键拼音")
+    d.open_page("text")
+    d.switch_im("九键")
+    popup_pick(d, "1", ".")
+    t = d.field_text()
+    check(t == ".", f"长按 1 选 . 后框里「{t}」")
+    page()
+    toast = set_one("a")
+    check(toast, "只填 a 后没有提示")
+    # the key's description: its symbols as drawn, then its digit
+    label = next((n.desc for n in d.screen().app() if n.desc.endswith(", 1")), "")
+    check("…" in label, f"只填 a 后 1 键成了「{label}」")
+    set_one(", .")
+    d.open_page("text")
+    d.switch_im("九键")
+    items, xy = popup(d, "1")
+    popup_away(d, xy)
+    texts = sorted(n.text for n in items)
+    check(texts == sorted(["，", "。"]), f"改后长按 1 弹出 {texts}")
+    return f"「{t}」；只填 a 后提示 {toast[:1]}，1 键「{label}」；改后 {texts}"
