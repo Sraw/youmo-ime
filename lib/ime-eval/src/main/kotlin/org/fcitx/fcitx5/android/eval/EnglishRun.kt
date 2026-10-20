@@ -9,6 +9,7 @@ import org.fcitx.fcitx5.android.engine.english.EnglishData
 import org.fcitx.fcitx5.android.engine.english.EnglishSession
 import org.fcitx.fcitx5.android.engine.english.TypingCosts
 import org.fcitx.fcitx5.android.engine.pinyin.KeyNeighbours
+import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
 import org.fcitx.fcitx5.android.engine.session.Action
 import org.fcitx.fcitx5.android.engine.session.Snapshot
 import java.util.Locale
@@ -30,6 +31,8 @@ internal class EnglishRun(
     private val data: EnglishData,
     private val costs: TypingCosts = TypingCosts(),
     private val maxCorrection: Float = EnglishSession.MAX_CORRECTION,
+    // typed on the nine keys (Action.NineKey), each word's letters as their keys, Shift where a letter is a capital
+    private val nineKeys: Boolean = false,
 ) {
     class Result {
         var words = 0
@@ -39,6 +42,7 @@ internal class EnglishRun(
         var slipped = 0 // typed with a slip
         var fixed = 0 // of those, committed as meant
         var broken = 0 // typed without a slip, committed otherwise
+        var absent = 0 // on the nine keys, not among the candidates at all: its letters pinned by long press needed
         val misses = ArrayList<String>() // meant, typed, committed: each word committed otherwise
 
         fun add(other: Result) {
@@ -49,6 +53,7 @@ internal class EnglishRun(
             slipped += other.slipped
             fixed += other.fixed
             broken += other.broken
+            absent += other.absent
             misses += other.misses
         }
 
@@ -61,8 +66,15 @@ internal class EnglishRun(
             )
         }
 
+        /** On the nine keys: committed as meant (the first), among the first three, not offered at all. */
+        fun nineRow(): String {
+            fun pct(n: Int) = if (words == 0) "-" else String.format(Locale.ROOT, "%.1f%%", n * 100.0 / words)
+            return String.format(Locale.ROOT, "%-6s %6d %7s %7s %9s %8s", "nine", words, pct(right), pct(top3), pct(predicted), pct(absent))
+        }
+
         companion object {
             const val HEADER = "typing  words   right    top3  predicted  slips   fixed  broken"
+            const val NINE_HEADER = "typing  words   first    top3  predicted  absent"
         }
     }
 
@@ -70,7 +82,8 @@ internal class EnglishRun(
     fun run(sentences: List<String>, noise: Double, seed: Long, threads: Int): Result {
         data.warmUp()
         val each = dealt(sentences.withIndex().toList(), threads, {}) { hand ->
-            hand.map { (i, sentence) -> Result().also { type(sentence, noise, Random(seed + i), it) } }
+            // the nine keys are pressed as meant: no slip of a neighbour's letter
+            hand.map { (i, sentence) -> Result().also { type(sentence, if (nineKeys) 0.0 else noise, Random(seed + i), it) } }
         }
         return Result().apply { each.forEach(::add) }
     }
@@ -84,13 +97,12 @@ internal class EnglishRun(
             val word = token.trimEnd(*PUNCTUATION)
             val punctuation = token.substring(word.length)
             if (word in offered.take(3)) result.predicted++
-            // an apostrophe left out where that is no word too (dont), not where it is (its, were)
-            val bare = word.replace("'", "")
-            val keys = if (bare != word && data.id(bare) == NgramModel.NO_WORD && data.id(bare.lowercase()) == NgramModel.NO_WORD) bare else word
+            val keys = keysOf(word)
             val typed = if (noise > 0) slip(keys, noise, random) else keys
             var shown: Snapshot? = null
-            for (c in typed) shown = session.apply(Action.Key(c))
+            for (c in typed) shown = session.apply(if (nineKeys) nineKey(c) else Action.Key(c))
             if (shown != null && word in shown.candidates.take(3)) result.top3++
+            if (nineKeys && shown != null && word !in offeredBy(session)) result.absent++
             val after = session.apply(Action.Key(punctuation.firstOrNull() ?: ' '))
             val committed = after.commit.trimEnd(' ').removeSuffix(punctuation.take(1))
             result.words++
@@ -111,6 +123,21 @@ internal class EnglishRun(
                 offered = emptyList()
             }
         }
+    }
+
+    // an apostrophe left out where that is no word too (dont), not where it is (its, were); the nine keys type it
+    private fun keysOf(word: String): String {
+        val bare = word.replace("'", "")
+        if (nineKeys || bare == word) return word
+        return if (data.id(bare) == NgramModel.NO_WORD && data.id(bare.lowercase()) == NgramModel.NO_WORD) bare else word
+    }
+
+    private fun offeredBy(session: EnglishSession) = session.candidates(0, EnglishSession.SUGGESTED + 1).map { it.text }
+
+    // [c] as the nine keys type it: a letter its key, Shift on for a capital; anything else as itself (1's apostrophe)
+    private fun nineKey(c: Char): Action {
+        val digit = ('2'..'9').firstOrNull { c.lowercaseChar() in NineKeyLetters.STANDARD.letters(it) }
+        return if (digit == null) Action.Key(c) else Action.NineKey(digit, c.isUpperCase())
     }
 
     companion object {

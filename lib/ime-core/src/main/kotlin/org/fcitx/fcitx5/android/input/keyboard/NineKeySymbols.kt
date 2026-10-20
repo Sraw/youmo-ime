@@ -83,8 +83,8 @@ class NineKeySymbols private constructor(private val edited: Map<Char, List<Stri
             typed.map { if (it.isWhitespace()) ' ' else it }.joinToString("").split(' ').filter(::allowed).distinct().take(MAX)
 
         /**
-         * Not a digit or a letter alone: a long press types those as a key's own (a candidate
-         * picked, a letter typed into the pinyin), not as themselves. Nothing blank or spaced.
+         * Not a digit or a letter alone: a long press offers those of the key already, in the row
+         * under its symbols, and any other is no symbol. Nothing blank or spaced.
          */
         fun allowed(symbol: String): Boolean {
             if (symbol.isEmpty() || symbol.any { it.isWhitespace() }) return false

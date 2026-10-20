@@ -36,6 +36,8 @@ data class EngineSettings(
     val tables: Map<String, TableSettings> = emptyMap(),
     /** The nine keys' letters: the app's, set on the keyboard's side, not in the addon's config. */
     val nineKeys: NineKeyLetters = NineKeyLetters.STANDARD,
+    /** Whether English suggests words ([ENGLISH_SUGGEST]): the keyboard's to know, the engine's is the addon's. */
+    val englishSuggest: Boolean = true,
 ) {
     val scheme: ShuangpinScheme get() = SCHEMES[shuangpin] ?: ShuangpinScheme.ZIRANMA
 
@@ -49,7 +51,10 @@ data class EngineSettings(
         const val FUZZY = "Fuzzy"
         const val MODEL_LEVEL = "ModelLevel"
         const val LATIN_WORDS = "LatinWords"
-        /** Read by the addon itself: off, English hands the session no key, and they type themselves. */
+        /**
+         * Read by the addon itself: off, English hands the session no key, and they type themselves.
+         * The nine keys read it too: there they type English a letter at a time (连按).
+         */
         const val ENGLISH_SUGGEST = "EnglishSuggest"
 
         /** libime's key for its common misspellings (gn for ng); here it turns slips on too. */
@@ -77,18 +82,10 @@ data class EngineSettings(
          * (`Fuzzy/L_N=True`), as the addon flattens its config. What is missing or unreadable
          * stays as by default.
          */
-        fun parse(config: String): EngineSettings {
-            val values = config.lineSequence().mapNotNull { line ->
-                val eq = line.indexOf('=')
-                if (eq > 0) line.substring(0, eq).trim() to line.substring(eq + 1).trim() else null
-            }.toMap()
-            fun flag(key: String) = when {
-                values[key].equals("True", ignoreCase = true) -> true
-                values[key].equals("False", ignoreCase = true) -> false
-                else -> null
-            }
+        // each table's settings in [values], by its group: those of a group with any of [TableSettings.KEYS]
+        private fun tables(values: Map<String, String>, flag: (String) -> Boolean?): Map<String, TableSettings> {
             fun count(key: String, range: IntRange) = values[key]?.toIntOrNull()?.takeIf { it in range }
-            val tables = values.keys.mapNotNullTo(LinkedHashSet()) { key ->
+            return values.keys.mapNotNullTo(LinkedHashSet()) { key ->
                 key.substringBefore('/', "").takeIf { it.isNotEmpty() && key.substringAfter('/') in TableSettings.KEYS }
             }.associateWith { group ->
                 TableSettings(
@@ -103,6 +100,18 @@ data class EngineSettings(
                     saveAutoPhraseAfter = count("$group/${TableSettings.SAVE_AUTO_PHRASE_AFTER}", TableSettings.SAVES_AFTER),
                 )
             }
+        }
+
+        fun parse(config: String): EngineSettings {
+            val values = config.lineSequence().mapNotNull { line ->
+                val eq = line.indexOf('=')
+                if (eq > 0) line.substring(0, eq).trim() to line.substring(eq + 1).trim() else null
+            }.toMap()
+            fun flag(key: String) = when {
+                values[key].equals("True", ignoreCase = true) -> true
+                values[key].equals("False", ignoreCase = true) -> false
+                else -> null
+            }
             val default = EngineSettings()
             return EngineSettings(
                 shuangpin = values[SHUANGPIN_PROFILE]?.takeIf { it in SCHEMES } ?: default.shuangpin,
@@ -115,7 +124,8 @@ data class EngineSettings(
                 pageSize = values[PAGE_SIZE]?.toIntOrNull()?.takeIf { it in PAGE_SIZES } ?: default.pageSize,
                 modelLevel = ModelLevel.entries.firstOrNull { it.key == values[MODEL_LEVEL] } ?: default.modelLevel,
                 latinWords = flag(LATIN_WORDS) ?: default.latinWords,
-                tables = tables,
+                tables = tables(values, ::flag),
+                englishSuggest = flag(ENGLISH_SUGGEST) ?: default.englishSuggest,
             )
         }
     }

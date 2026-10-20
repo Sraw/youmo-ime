@@ -67,16 +67,25 @@ internal val COMMANDS = listOf(
         predict(dataPath, setPath, RunOptions(args.options).threads, args.options["offers"], args.options["rerank"], weight, out)
     },
     Command(
-        "english", "<english.data> <sentences.txt> [--noise <rate>] [--max-correction <cost>] [--misses <out.tsv>] [--threads <n>]",
-        2..2, "noise", "max-correction", "misses", "threads",
+        "english", "<english.data> <sentences.txt> [--keys nine] [--noise <rate>] [--max-correction <cost>] [--misses <out.tsv>] [--threads <n>]",
+        2..2, "keys", "noise", "max-correction", "misses", "threads",
     ) { args, out, _ ->
         val (dataPath, setPath) = args.operands
         val sentences = File(setPath).readLines().filter { it.isNotBlank() && !it.startsWith("#") }
         // checked already: see optionsValid
-        val run = EnglishRun(EnglishData.load(mapFile(dataPath)), maxCorrection = args.options["max-correction"]?.toFloat() ?: EnglishSession.MAX_CORRECTION)
+        val nine = args.options["keys"] == "nine"
+        val run = EnglishRun(EnglishData.load(mapFile(dataPath)), maxCorrection = args.options["max-correction"]?.toFloat() ?: EnglishSession.MAX_CORRECTION, nineKeys = nine)
         val noise = args.options["noise"]?.toDouble() ?: ENGLISH_NOISE
-        out.appendLine(EnglishRun.Result.HEADER)
         val threads = RunOptions(args.options).threads
+        if (nine) {
+            // each key meant: no slip to measure; a word not offered at all is spelled by its letters, pinned by long press
+            val r = run.run(sentences, 0.0, ENGLISH_SEED, threads)
+            out.appendLine(EnglishRun.Result.NINE_HEADER)
+            out.appendLine(r.nineRow())
+            args.options["misses"]?.let { path -> File(path).printWriter().use { w -> r.misses.forEach(w::println) } }
+            return@Command 0
+        }
+        out.appendLine(EnglishRun.Result.HEADER)
         val clean = run.run(sentences, 0.0, ENGLISH_SEED, threads)
         val slips = run.run(sentences, noise, ENGLISH_SEED, threads)
         out.appendLine(clean.row("clean"))
@@ -323,6 +332,7 @@ private fun optionsValid(options: Map<String, String>): Boolean {
         valid("user-weight") { weight(it) != null },
         valid("max-correction") { weight(it) != null },
         valid("noise") { n -> n.toDoubleOrNull()?.let { it in 0.0..1.0 } == true },
+        valid("keys") { it == "nine" },
         listOf("threads", "beam", "sentences").all { name -> valid(name) { (it.toIntOrNull() ?: 0) > 0 } },
         // only full pinyin reads slips: 双拼 and the nine keys read none
         valid("neighbours") { it in ON_OFF && (scheme == null || scheme == NO_LATIN) },

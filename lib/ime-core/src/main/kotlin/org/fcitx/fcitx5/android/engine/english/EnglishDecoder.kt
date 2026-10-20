@@ -44,6 +44,8 @@ data class TypingCosts(
 class EnglishDecoder(
     private val data: EnglishData,
     private val costs: TypingCosts = TypingCosts(),
+    // what a key typed costs for the letter meant: by default a key beside it [TypingCosts.near], any other far
+    private val keyCost: ((meant: Char, typed: Char) -> Float)? = null,
     // a word's score after a context: the model's, or with what the user typed added
     private val score: (context: Long, word: Int) -> Float = data.model::scoreAfter,
 ) {
@@ -117,11 +119,17 @@ class EnglishDecoder(
         return length.compareTo(key.length)
     }
 
-    /** The [limit] best words for [keys] (letters, lower case: [EnglishData.key]) after [context], best first. */
-    fun suggest(keys: String, context: Long, limit: Int): List<Suggestion> {
+    /**
+     * The [limit] best words for [keys] (letters, lower case: [EnglishData.key]) after [context], best
+     * first; [exactFirst], those as long as the keys before any longer (the nine keys', whose words
+     * all cost nothing).
+     */
+    fun suggest(keys: String, context: Long, limit: Int, exactFirst: Boolean = false): List<Suggestion> {
         if (limit <= 0 || keys.isEmpty() || keys.length > MAX_KEYS) return emptyList()
         val found = Search(keys, context, limit).run()
-        return found.values.sortedWith(compareByDescending<Suggestion> { it.score }.thenBy { it.word }).take(limit)
+        val best = compareByDescending<Suggestion> { it.score }.thenBy { it.word }
+        val order = if (exactFirst) compareBy<Suggestion> { it.completes }.then(best) else best
+        return found.values.sortedWith(order).take(limit)
     }
 
     /** The [limit] likeliest words after [context], best first: what may come next. */
@@ -206,6 +214,7 @@ class EnglishDecoder(
             depth >= 1 && j >= 2 && c == keys[j - 2] && path[depth - 1] == keys[j - 1]
 
         private fun substitution(meant: Char, typed: Char): Float = when {
+            keyCost != null -> keyCost(meant, typed)
             meant == typed -> 0f
             typed in KeyNeighbours.of(meant) -> costs.near
             else -> costs.far
@@ -247,6 +256,25 @@ class EnglishDecoder(
     }
 
     companion object {
+        // a cost past any limit: what cannot be
+        private const val NEVER = 1000f
+
+        /**
+         * Typing on the nine keys: a word's letters each on the key typed, or the letter typed itself
+         * (a hardware key's among the screen's); no key missed, extra or swapped, as each press is
+         * meant. A word longer than the keys is offered from the first key.
+         */
+        val NINE_KEY_COSTS = TypingCosts(
+            near = NEVER, far = NEVER, missed = NEVER, extra = NEVER, swapped = NEVER, repeated = NEVER,
+            limit = 0f, complete = 0f, completeLimit = 0f, completeFrom = 1,
+        )
+
+        /** [NINE_KEY_COSTS]' key cost: a digit typed (2 to 9) is any of its [letters], a letter only itself. */
+        fun nineKeyCost(letters: (Char) -> String): (Char, Char) -> Float = { meant, typed ->
+            val fits = if (typed in '2'..'9') meant in letters(typed) else meant == typed
+            if (fits) 0f else NEVER
+        }
+
         /** Keys past this are no word the data has: nothing is searched for them. */
         const val MAX_KEYS = EnglishText.MAX_WORD
 

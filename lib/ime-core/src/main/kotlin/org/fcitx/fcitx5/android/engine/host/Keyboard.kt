@@ -135,6 +135,14 @@ class Keyboard(private val session: Session, private val nineKeys: Boolean) {
     private fun char(codePoint: Int): Snapshot {
         if (codePoint == INK) return session.apply(Action.Ink)
         if (codePoint == GLIDE) return session.apply(Action.Glide)
+        if (codePoint in NINE_DIGITS) {
+            val n = codePoint - NINE_DIGITS.first
+            return session.apply(Action.NineKey('0' + n % DIGITS, upper = n >= DIGITS))
+        }
+        if (codePoint in NINE_LETTERS) {
+            val n = codePoint - NINE_LETTERS.first
+            return session.apply(Action.NineKey((if (n >= ALPHABET) 'A' else 'a') + n % ALPHABET))
+        }
         if (codePoint in LETTERS && nineKeys) {
             val n = codePoint - LETTERS.first
             return session.apply(Action.Letter('a' + n % ALPHABET, again = n >= ALPHABET))
@@ -158,11 +166,12 @@ class Keyboard(private val session: Session, private val nineKeys: Boolean) {
 
     // a keypad's digit is never a key the session types with (the nine keys' 2, a table's code):
     // as pinyin has any digit, it picks the candidate it numbers while something is typed, and is
-    // the app's otherwise. English reads it as it reads any digit; the keypad's other characters
-    // (. + =) go as the keyboard's own do
+    // the app's otherwise. English reads it as it reads any digit, but where its keys are the nine
+    // keys' (Session.picksByDigit); the keypad's other characters (. + =) go as the keyboard's own do
     private fun keypad(codePoint: Int): Snapshot {
         val digit = codePoint - '0'.code
-        if (english || digit !in 0 until DIGITS) return char(codePoint)
+        val picks = !english || composing && session.picksByDigit
+        if (!picks || digit !in 0 until DIGITS) return char(codePoint)
         return if (composing) session.apply(Action.Select((digit + DIGITS - 1) % DIGITS)) else passOn()
     }
 
@@ -288,6 +297,32 @@ class Keyboard(private val session: Session, private val nineKeys: Boolean) {
 
         /** The character the keyboard sends after a glide, to have its word committed ([Action.Glide]); as [INK]. */
         const val GLIDE = 0xF0101
+
+        /**
+         * Characters of the supplementary private use area the nine keys send for English
+         * ([Action.NineKey]): [nineKey]. Past [LETTERS], short of [INK]; a digit typed otherwise
+         * (a hardware key, the number pad) stays a digit.
+         */
+        val NINE_DIGITS = 0xF0040 until 0xF0040 + 2 * DIGITS
+
+        /** The character for the nine keys' [digit] typed for English, [upper] with Shift on. */
+        fun nineKey(digit: Char, upper: Boolean): Int {
+            require(digit in '2'..'9') { "nine key $digit" }
+            return NINE_DIGITS.first + (if (upper) DIGITS else 0) + (digit - '0')
+        }
+
+        /**
+         * Characters for a letter a nine key's long press pins into the word English spells
+         * ([Action.NineKey] with the letter): [nineLetter]. After [NINE_DIGITS], short of [INK].
+         */
+        val NINE_LETTERS = 0xF0060 until 0xF0060 + 2 * ALPHABET
+
+        /** The character for [letter] (a to z, either case) pinned into the word on the nine keys. */
+        fun nineLetter(letter: Char): Int = when (letter) {
+            in 'a'..'z' -> NINE_LETTERS.first + (letter - 'a')
+            in 'A'..'Z' -> NINE_LETTERS.first + ALPHABET + (letter - 'A')
+            else -> throw IllegalArgumentException("nine key letter $letter")
+        }
 
         private val IDLE = Snapshot(
             commit = "",

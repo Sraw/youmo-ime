@@ -103,7 +103,7 @@ class KeyboardTest {
                     input = ""
                     predicting = false
                 }
-                Action.NextPage, Action.PreviousPage, is Action.Forget, is Action.Pin, is Action.Unpin, is Action.Block, Action.Refine, Action.Ink, Action.Glide, is Action.Syllable, is Action.Letter, is Action.Cursor, is Action.Step -> {}
+                Action.NextPage, Action.PreviousPage, is Action.Forget, is Action.Pin, is Action.Unpin, is Action.Block, Action.Refine, Action.Ink, Action.Glide, is Action.Syllable, is Action.Letter, is Action.NineKey, is Action.Cursor, is Action.Step -> {}
             }
             val shown = all()
             return Snapshot(commit, input, shown, 0, false, false, handled, predicting, refines = slices > 0)
@@ -716,5 +716,38 @@ class KeyboardTest {
 
     private companion object {
         val BACKSPACE = Session.ERASED.single().code
+    }
+
+    /** English on the nine keys: their digits spell, a keypad's digit picks while they do, any other digit is typed. */
+    @Test
+    fun englishOnTheNineKeys() {
+        val keyboard = Keyboard(EnglishSession(EnglishDecoderTest.data()), nineKeys = false)
+        fun nine(d: Char, upper: Boolean = false) = keyboard.onEvent(EngineEvent.CHAR, Keyboard.nineKey(d, upper))
+        nine('4', upper = true)
+        assertEquals("He", nine('3').preedit)
+        assertEquals("Hello ", keyboard.onEvent(EngineEvent.KEYPAD, '2'.code).commit)
+        // idle, a keypad's digit is typed
+        keyboard.onEvent(EngineEvent.RESET, 0)
+        assertFalse(keyboard.onEvent(EngineEvent.KEYPAD, '2'.code).handled)
+        // a digit not the nine keys' (a hardware key) ends the word shown and is the app's
+        nine('4')
+        nine('3')
+        val digit = keyboard.onEvent(EngineEvent.CHAR, '4'.code)
+        assertEquals("he", digit.commit)
+        assertFalse(digit.handled)
+        // Enter commits the word shown
+        nine('4')
+        nine('3')
+        assertEquals("he", keyboard.onEvent(EngineEvent.ENTER, 0).commit)
+        // a letter a long press pinned, either case: itself among the keys
+        keyboard.onEvent(EngineEvent.CHAR, Keyboard.nineKey('4', upper = false))
+        assertEquals("hE", keyboard.onEvent(EngineEvent.CHAR, Keyboard.nineLetter('E')).preedit)
+        keyboard.onEvent(EngineEvent.RESET, 0)
+        // a word typed by its letters (the full keyboard): a keypad's digit is no pick, as before
+        keyboard.onEvent(EngineEvent.CHAR, 'h'.code)
+        keyboard.onEvent(EngineEvent.CHAR, 'e'.code)
+        val keypad = keyboard.onEvent(EngineEvent.KEYPAD, '2'.code)
+        assertEquals("he", keypad.commit)
+        assertFalse(keypad.handled)
     }
 }

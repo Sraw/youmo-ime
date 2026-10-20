@@ -372,7 +372,7 @@ class Engines(
                     englishWarmedUp = true
                     warmUps.execute(data::warmUp)
                 }
-                EnglishSession(data, pageSize = s.pageSize, user = english.user())
+                EnglishSession(data, pageSize = s.pageSize, user = english.user(), nineKeys = s.nineKeys)
             }
             HANDWRITING -> {
                 // read as pinyin reads a sentence: its words, the user's among them, and their counts

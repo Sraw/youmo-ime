@@ -30,6 +30,12 @@ constexpr uint64_t PauseBeforeRefine = 30000;
 // the character the keyboard sends after a glide (Keyboard.GLIDE): never text
 constexpr uint32_t GlideChar = 0xF0101;
 
+// the characters 九键英文 sends where English spells words, its keys and the letters a long press
+// pins into the word (Keyboard.NINE_DIGITS to NINE_LETTERS): never text either
+constexpr uint32_t NineKeysFirst = 0xF0040;
+constexpr uint32_t NineLettersFirst = 0xF0060;
+constexpr uint32_t NineKeysEnd = NineLettersFirst + 52;
+
 class EngineCandidateWord : public CandidateWord {
 public:
     EngineCandidateWord(AndroidEngine *engine, std::string im, int index, const std::string &text, const std::string &hint)
@@ -582,6 +588,17 @@ void AndroidEngine::keyEvent(const InputMethodEntry &entry, KeyEvent &event) {
         // session forget the char before the cursor, which the space before the word depends on
         if (unicode == GlideChar) {
             glidedAsIs_ = send(event.inputContext(), im, EngineEvent::Char, static_cast<int>(GlideChar));
+            event.filterAndAccept();
+            return;
+        }
+        // a nine key's, here only if the keyboard took a field for one English spells in (the two
+        // decide apart): never let through, the app would type its private-use character. A letter
+        // a long press pinned is the one the user chose: typed, in its case; a key is no letter yet
+        if (unicode >= NineKeysFirst && unicode < NineKeysEnd) {
+            if (unicode >= NineLettersFirst) {
+                const auto n = unicode - NineLettersFirst;
+                event.inputContext()->commitString(std::string(1, static_cast<char>((n >= 26 ? 'A' : 'a') + n % 26)));
+            }
             event.filterAndAccept();
             return;
         }

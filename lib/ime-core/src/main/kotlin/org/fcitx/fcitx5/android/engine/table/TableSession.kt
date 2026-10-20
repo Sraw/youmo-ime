@@ -223,7 +223,7 @@ class TableSession(
         }
         Action.Refine -> refine()
         // a table has no custom phrases
-        Action.Ink, Action.Glide, is Action.Pin, is Action.Unpin, is Action.Syllable, is Action.Letter -> snapshot()
+        Action.Ink, Action.Glide, is Action.Pin, is Action.Unpin, is Action.Syllable, is Action.Letter, is Action.NineKey -> snapshot()
         is Action.Cursor -> moveCursor(action.at)
         is Action.Step -> moveCursor(action.applyTo(cursor, input.length))
         // auto phrases are made of what was committed here, not of what the editor had: kept

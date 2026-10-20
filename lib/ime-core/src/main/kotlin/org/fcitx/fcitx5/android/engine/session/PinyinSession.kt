@@ -213,7 +213,7 @@ class PinyinSession(
 
     private fun act(action: Action): Snapshot = when (action) {
         Action.Refine -> refine()
-        Action.Ink, Action.Glide -> snapshot()
+        Action.Ink, Action.Glide, is Action.NineKey -> snapshot()
         is Action.Key -> type(action.char)
         is Action.Letter -> letter(action.letter, action.again)
         Action.Backspace -> backspace()

@@ -7,6 +7,7 @@ package org.fcitx.fcitx5.android.engine.session
 import org.fcitx.fcitx5.android.engine.host.EngineEvent
 import org.fcitx.fcitx5.android.engine.host.EngineSettings
 import org.fcitx.fcitx5.android.engine.host.Engines
+import org.fcitx.fcitx5.android.engine.host.Keyboard
 import org.fcitx.fcitx5.android.engine.host.ModelLevel
 import org.fcitx.fcitx5.android.engine.host.TableSettings
 import org.fcitx.fcitx5.android.engine.pinyin.Fuzzy
@@ -27,6 +28,7 @@ class AndroidEngineHeaderTest {
 
     private val header = read("androidengine_public.h")
     private val config = read("androidengine.h")
+    private val addon = read("androidengine.cpp")
 
     /** The entries of the C++ enum [name], each name to what it is set to. */
     private fun entries(name: String): Map<String, String> {
@@ -63,6 +65,24 @@ class AndroidEngineHeaderTest {
             "the names of $name not found in androidengine.h"
         }
         return Regex("""N_\("([^"]*)"\)""").findAll(found.groupValues[1]).map { it.groupValues[1] }.toList()
+    }
+
+    // the keyboard's private-use characters the addon swallows, never text: the same numbers
+    @Test
+    fun theCharactersNeverTypedAreTheKeyboards() {
+        fun constant(name: String): Int = checkNotNull(Regex("""constexpr uint32_t $name = ([^;]+);""").find(addon)) { "$name not in androidengine.cpp" }
+            .groupValues[1].split('+').sumOf { part ->
+                val p = part.trim()
+                when {
+                    p.startsWith("0x") -> p.removePrefix("0x").toInt(16)
+                    p.first().isDigit() -> p.toInt()
+                    else -> constant(p)
+                }
+            }
+        assertEquals(Keyboard.GLIDE, constant("GlideChar"))
+        assertEquals(Keyboard.NINE_DIGITS.first, constant("NineKeysFirst"))
+        assertEquals(Keyboard.NINE_LETTERS.first, constant("NineLettersFirst"))
+        assertEquals(Keyboard.NINE_LETTERS.last + 1, constant("NineKeysEnd"))
     }
 
     @Test

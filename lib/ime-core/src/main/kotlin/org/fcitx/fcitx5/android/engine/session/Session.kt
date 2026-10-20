@@ -25,6 +25,12 @@ interface Session {
     val takesEveryCharacter: Boolean get() = false
 
     /**
+     * Whether a keypad's digit picks the candidate it numbers now, though the session
+     * [takesEveryCharacter]: English typed on the nine keys, whose digits are no text of it.
+     */
+    val picksByDigit: Boolean get() = false
+
+    /**
      * Whether what the user picks is learned. The host turns it off where the app asks it not to
      * (a password, an incognito tab), before the actions typed there.
      */
@@ -132,6 +138,13 @@ sealed class Action {
      * as the letter, the context to pick (see [org.fcitx.fcitx5.android.engine.pinyin.T9Segmenter]).
      */
     data class Letter(val letter: Char, val again: Boolean = false) : Action()
+
+    /**
+     * A key of the nine keys typed for English: [digit] (2 to 9), any of its letters, the session
+     * spelling the word ([upper]: that letter a capital, Shift on as it was pressed); or a letter
+     * a long press pinned there, itself, the word still the nine keys' (never corrected).
+     */
+    data class NineKey(val digit: Char, val upper: Boolean = false) : Action()
 
     /** Commits what was typed, as typed (enter). */
     object CommitRaw : Action()

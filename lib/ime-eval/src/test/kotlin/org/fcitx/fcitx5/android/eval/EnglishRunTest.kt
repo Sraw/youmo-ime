@@ -36,6 +36,18 @@ class EnglishRunTest {
 
     private fun run(vararg sentences: String) = EnglishRun(data).run(sentences.toList(), noise = 0.0, seed = 1, threads = 1)
 
+    // on the nine keys: each word's keys, its capital by Shift, don't's apostrophe by 1; a word no
+    // key run spells counted as never offered
+    @Test
+    fun theNineKeysSpellEachWordByItsKeys() {
+        val result = EnglishRun(data, nineKeys = true).run(listOf("The cat and don't zzz."), noise = 0.0, seed = 1, threads = 1)
+        assertEquals(5, result.words)
+        assertEquals(4, result.right)
+        assertEquals(1, result.absent)
+        assertEquals(0, result.slipped)
+        assertEquals("zzz", result.misses.single().substringBefore('\t'))
+    }
+
     @Test
     fun cleanWordsAreCommittedAsMeantThoughPunctuationEndsThem() {
         // dont typed for don't, put back by the session; the comma and the full stop are no part of the word

@@ -66,7 +66,7 @@ tasks.withType<Test>().configureEach {
     // MisreadingsTest checks the list the app build compiles: an edit to it alone runs it again
     inputs.file(rootProject.file("lexicon/misreadings.tsv")).withPathSensitivity(PathSensitivity.RELATIVE)
     jvmArgumentProviders.add(objects.newInstance<AndroidEngineHeaders>().apply {
-        headers.from(rootProject.files("app/src/main/cpp/androidengine/androidengine.h", "app/src/main/cpp/androidengine/androidengine_public.h"))
+        headers.from(rootProject.files("app/src/main/cpp/androidengine/androidengine.h", "app/src/main/cpp/androidengine/androidengine_public.h", "app/src/main/cpp/androidengine/androidengine.cpp"))
     })
     testLogging {
         events("failed")

@@ -7,6 +7,7 @@ package org.fcitx.fcitx5.android.engine.english
 import org.fcitx.fcitx5.android.engine.data.DataFormatException
 import org.fcitx.fcitx5.android.engine.data.NgramModel
 import org.fcitx.fcitx5.android.engine.data.PinyinDataBuilder
+import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertThrows
@@ -160,6 +161,31 @@ class EnglishDecoderTest {
             n /= 26
         }
         return b.toString()
+    }
+
+    private val nine = EnglishDecoder(data, EnglishDecoder.NINE_KEY_COSTS, EnglishDecoder.nineKeyCost(NineKeyLetters.STANDARD::letters))
+
+    private fun nineWords(keys: String) = nine.suggest(keys, none, 10, exactFirst = true).map { data.word(it.word) }
+
+    @Test
+    fun onTheNineKeysAKeyIsAnyOfItsLettersTheWordsAsLongAsTheKeysFirst() {
+        // 4355: hell, and hello it starts; help's 7 is not a 5
+        assertEquals(listOf("hell", "hello"), nineWords("4355"))
+        // he, then what it starts, likeliest first
+        assertEquals(listOf("he", "hello", "help", "hell"), nineWords("43"))
+        // an apostrophe is no key
+        assertEquals(listOf("don't"), nineWords("3668"))
+        // a letter typed is itself alone
+        assertEquals(listOf("hell", "hello"), nineWords("4e55"))
+        assertEquals(emptyList<String>(), nineWords("4f55"))
+    }
+
+    @Test
+    fun onTheNineKeysNoKeyIsASlip() {
+        // hlel, swapped; hel, one missed; helll, one extra: none of them the nine keys' hell
+        assertEquals(emptyList<String>(), nineWords("4535"))
+        assertEquals(listOf("hello"), nineWords("43556"))
+        assertEquals(emptyList<String>(), nineWords("435556"))
     }
 
     @Test

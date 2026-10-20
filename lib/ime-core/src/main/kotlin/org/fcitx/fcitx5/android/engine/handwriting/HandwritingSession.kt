@@ -145,7 +145,7 @@ class HandwritingSession(
     // what changes neither the sentences shown nor the page: an Ink (see apply), the cursor, which
     // handwriting keeps none of, a prediction forgotten or blocked, what no handwriting does
     private fun keepsOrder(action: Action) = when (action) {
-        Action.Refine, Action.Ink, Action.Glide, is Action.Cursor, is Action.Step, is Action.Forget, is Action.Block, is Action.Pin, is Action.Unpin, is Action.Syllable, is Action.Letter -> true
+        Action.Refine, Action.Ink, Action.Glide, is Action.Cursor, is Action.Step, is Action.Forget, is Action.Block, is Action.Pin, is Action.Unpin, is Action.Syllable, is Action.Letter, is Action.NineKey -> true
         else -> false
     }
 
@@ -173,7 +173,7 @@ class HandwritingSession(
         Action.Refine -> refine()
         is Action.Forget -> pressed(action.index, Offer.FORGET)
         is Action.Block -> pressed(action.index, Offer.BLOCK)
-        Action.Glide, is Action.Pin, is Action.Unpin, is Action.Syllable, is Action.Letter -> snapshot()
+        Action.Glide, is Action.Pin, is Action.Unpin, is Action.Syllable, is Action.Letter, is Action.NineKey -> snapshot()
     }
 
     override fun candidates(from: Int, count: Int): List<Choice> {
