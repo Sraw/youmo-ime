@@ -268,6 +268,7 @@
     <string name="a11y_key_space_with_ime">空格鍵，%1$s</string>
     <string name="a11y_key_quick_phrase">快速片語</string>
     <string name="a11y_key_switch_language">切換語言</string>
+    <string name="a11y_key_nine_language">中/英切換</string>
     <string name="a11y_key_number_pad">數字鍵盤</string>
     <string name="a11y_key_emoji">表情</string>
     <string name="voice_input">語音輸入</string>
@@ -420,6 +421,10 @@
     <string name="t9_multi_tap_fast">快（0.4 秒）</string>
     <string name="t9_multi_tap_medium">中（0.6 秒）</string>
     <string name="t9_multi_tap_slow">慢（0.9 秒）</string>
+    <string name="t9_english_typing">九鍵英文打法</string>
+    <string name="t9_english_typing_summary">預測：每個鍵可以是它的任一個字母，由輸入法猜出整個詞（4663 是 good、home、gone）；連按：快速再按同一個鍵是它的下一個字母。網址、郵箱和不要聯想的輸入框總是連按</string>
+    <string name="t9_english_predictive">預測</string>
+    <string name="t9_english_multi_tap">連按</string>
     <string name="handwriting_pause">停筆多久算寫完一個字</string>
     <string name="handwriting_pause_summary">停筆超過這個時間，就算寫完一個字、開始寫下一個：寫得快可以調短；寫一個字中間常停頓的，調長</string>
     <string name="handwriting_pause_fastest">很短（0.3 秒）</string>
@@ -579,8 +584,6 @@
     <string name="one_handed_exit">恢復全寬</string>
     <string name="floating_keyboard">懸浮鍵盤</string>
     <string name="floating_keyboard_dock">鍵盤放回底部</string>
-    <string name="floating_keyboard_round">懸浮鍵盤圓角</string>
-    <string name="floating_keyboard_round_summary">懸浮時鍵盤四角跟按鍵一樣圓</string>
     <string name="show_touch_keyboard">顯示螢幕鍵盤</string>
     <string name="hardware_switch_shortcuts">實體鍵盤快速鍵</string>
     <string name="hardware_switch_shortcuts_summary">單按 Shift 或 Ctrl+空格切換中英，Ctrl+Shift 輪流切換輸入法</string>

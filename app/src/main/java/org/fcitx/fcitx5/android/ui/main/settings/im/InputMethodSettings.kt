@@ -30,6 +30,7 @@ import org.fcitx.fcitx5.android.engine.host.TableSettings
 import org.fcitx.fcitx5.android.engine.pinyin.Fuzzy
 import org.fcitx.fcitx5.android.engine.pinyin.ShuangpinScheme
 import org.fcitx.fcitx5.android.input.handwriting.HandwritingPause
+import org.fcitx.fcitx5.android.input.keyboard.T9EnglishTyping
 import org.fcitx.fcitx5.android.input.keyboard.T9MultiTap
 import org.fcitx.fcitx5.android.ui.main.settings.SettingsRoute
 import kotlin.math.abs
@@ -255,6 +256,10 @@ object InputMethodSettings {
                 // the keyboard's: how it sends a key pressed again
                 AppChoice(AppPrefs.T9_MULTI_TAP, R.string.t9_multi_tap, R.string.t9_multi_tap_summary, T9MultiTap.entries) {
                     AppPrefs.getInstance().keyboard.t9MultiTap
+                },
+                // how 九键英文 (the 中/英 key's English) types
+                AppChoice(AppPrefs.T9_ENGLISH_TYPING, R.string.t9_english_typing, R.string.t9_english_typing_summary, T9EnglishTyping.entries) {
+                    AppPrefs.getInstance().keyboard.t9EnglishTyping
                 },
                 Page(T9_LETTERS, R.string.t9_letters, R.string.t9_letters_summary, SettingsRoute.T9Letters),
                 Page(T9_SYMBOLS, R.string.t9_symbols, R.string.t9_symbols_summary, SettingsRoute.T9Symbols),

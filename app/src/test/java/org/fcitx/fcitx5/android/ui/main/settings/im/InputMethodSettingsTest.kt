@@ -134,7 +134,7 @@ class InputMethodSettingsTest {
         val own = mapOf(
             Engines.PINYIN to listOf(EngineSettings.CHAIZI, EngineSettings.LATIN_WORDS),
             Engines.SHUANGPIN to listOf(EngineSettings.SHUANGPIN_PROFILE),
-            Engines.T9 to listOf(AppPrefs.T9_MULTI_TAP, InputMethodSettings.T9_LETTERS, InputMethodSettings.T9_SYMBOLS),
+            Engines.T9 to listOf(AppPrefs.T9_MULTI_TAP, AppPrefs.T9_ENGLISH_TYPING, InputMethodSettings.T9_LETTERS, InputMethodSettings.T9_SYMBOLS),
             Engines.HANDWRITING to listOf(AppPrefs.HANDWRITING_PAUSE),
             Engines.ENGLISH to listOf(EngineSettings.ENGLISH_SUGGEST, AppPrefs.ENGLISH_AUTO_CAPS, InputMethodSettings.ENGLISH_WORDS),
         ) + Engines.TABLES.keys.associateWith { TableSettings.KEYS.toList() }

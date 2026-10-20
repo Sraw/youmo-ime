@@ -25,6 +25,7 @@ import org.fcitx.fcitx5.android.input.keyboard.LangSwitchBehavior
 import org.fcitx.fcitx5.android.input.keyboard.NineKeySymbols
 import org.fcitx.fcitx5.android.input.keyboard.SpaceLongPressBehavior
 import org.fcitx.fcitx5.android.input.keyboard.SwipeSymbolDirection
+import org.fcitx.fcitx5.android.input.keyboard.T9EnglishTyping
 import org.fcitx.fcitx5.android.input.keyboard.T9MultiTap
 import org.fcitx.fcitx5.android.input.picker.PickerWindow
 import org.fcitx.fcitx5.android.input.popup.EmojiModifier
@@ -41,6 +42,9 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
         val lastSymbolLayout = string("last_symbol_layout", PickerWindow.Key.Symbol.name)
         val lastPickerType = string("last_picker_type", PickerWindow.Key.Emoji.name)
         val symbolPanelLocked = bool("symbol_panel_locked", false)
+
+        /** Whether English is on the nine keys, 九键's 中/英 having brought it (EnglishLayoutPolicy): kept for the input view made anew. */
+        val englishOnNineKeys = bool("english_on_nine_keys", false)
         val verboseLog = bool("verbose_log", false)
         val pid = int("pid", 0)
         val editorInfoInspector = bool("editor_info_inspector", false)
@@ -156,6 +160,11 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
         val t9MultiTap = stringLike(T9_MULTI_TAP, object : ManagedPreference.StringLikeCodec<T9MultiTap> {
             override fun decode(raw: String) = T9MultiTap.entries.firstOrNull { it.name == raw }
         }, T9MultiTap.Off)
+
+        /** Shown on the 九键 page: how the nine keys type English. */
+        val t9EnglishTyping = stringLike(T9_ENGLISH_TYPING, object : ManagedPreference.StringLikeCodec<T9EnglishTyping> {
+            override fun decode(raw: String) = T9EnglishTyping.entries.firstOrNull { it.name == raw }
+        }, T9EnglishTyping.Predictive)
 
         /**
          * What each of 九键's digit keys types ([NineKeyLetters.serialize], empty as on a phone):
@@ -626,6 +635,7 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
 
         // keys an input method's page names its rows by (InputMethodSettings); the others are only this file's
         const val T9_MULTI_TAP = "t9_multi_tap"
+        const val T9_ENGLISH_TYPING = "t9_english_typing"
         const val ENGLISH_AUTO_CAPS = "english_auto_caps"
         const val GLIDE_TYPING = "glide_typing"
         const val AUTO_PAIRS = "auto_pairs"

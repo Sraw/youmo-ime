@@ -14,4 +14,5 @@
     <item name="button_dot" type="id"/>
     <item name="button_domain" type="id"/>
     <item name="button_semicolon" type="id"/>
+    <item name="button_nine_language" type="id"/>
 </resources>

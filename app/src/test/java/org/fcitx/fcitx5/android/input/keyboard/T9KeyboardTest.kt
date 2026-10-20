@@ -6,14 +6,18 @@ package org.fcitx.fcitx5.android.input.keyboard
 
 import android.app.Activity
 import android.os.Looper
+import android.text.Spanned
+import android.text.style.RelativeSizeSpan
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
 import android.widget.ScrollView
+import androidx.core.view.isVisible
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.LifecycleRegistry
 import androidx.lifecycle.setViewTreeLifecycleOwner
 import org.fcitx.fcitx5.android.FcitxApplication
+import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.core.EngineBridge
 import org.fcitx.fcitx5.android.core.FcitxKeyMapping
 import org.fcitx.fcitx5.android.core.KeyStates
@@ -28,6 +32,7 @@ import org.fcitx.fcitx5.android.input.popup.PopupKeyboardUi
 import org.fcitx.fcitx5.android.ui.main.settings.PlaceholderStrings
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -97,13 +102,14 @@ class T9KeyboardTest {
     }
 
     @Test
-    fun theLongPressTypesALetterAsItselfAfterTheLastOrCommitsTheDigit() {
+    fun theLongPressCommitsTheLetterOrDigitChosenAsItIs() {
         val tap = MultiTap(600)
         val popup = KeyActionListener.Source.Popup
-        assertEquals(letter('g', again = false), T9Keyboard.resolve(KeyAction.FcitxKeyAction("g"), popup, tap, 0))
-        // the digit a keypad's: typed as it is, or its candidate picked while typing, never the GHI key
-        assertEquals(keypad(4), T9Keyboard.resolve(KeyAction.FcitxKeyAction("4"), popup, tap, 10))
-        assertEquals(keypad(1), T9Keyboard.resolve(KeyAction.FcitxKeyAction("1"), popup, tap, 15, composing = true))
+        assertEquals(KeyAction.CommitAction("g"), T9Keyboard.resolve(KeyAction.FcitxKeyAction("g"), popup, tap, 0))
+        assertEquals(KeyAction.CommitAction("G"), T9Keyboard.resolve(KeyAction.FcitxKeyAction("G"), popup, tap, 5, composing = true))
+        // the digit too, while typing as well: never the GHI key, nor a candidate picked
+        assertEquals(KeyAction.CommitAction("4"), T9Keyboard.resolve(KeyAction.FcitxKeyAction("4"), popup, tap, 10))
+        assertEquals(KeyAction.CommitAction("1"), T9Keyboard.resolve(KeyAction.FcitxKeyAction("1"), popup, tap, 15, composing = true))
         // and the next press is a key of its own
         assertEquals(KeyAction.FcitxKeyAction("4"), T9Keyboard.resolve(KeyAction.FcitxKeyAction("4"), KeyActionListener.Source.Keyboard, tap, 20))
     }
@@ -153,13 +159,14 @@ class T9KeyboardTest {
         fun popup(digit: String) = keys.single { (it.appearance as? KeyDef.Appearance.AltText)?.altText == digit }
             .popup?.filterIsInstance<KeyDef.Popup.Keyboard.Explicit>()?.singleOrNull()
         val two = popup("2")!!
-        assertEquals(listOf("2", "a", "b", "c", "@", "!", "\""), two.items.toList())
-        assertEquals(4, two.symbolsFrom)
+        assertEquals(listOf("A", "B", "C", "2", "a", "b", "c", "@", "!", "\""), two.items.toList())
+        assertEquals(7, two.symbolsFrom)
+        assertEquals(3, two.inRow)
         assertEquals(false, two.asIs)
         val one = T9Keyboard.layout(NineKeyLetters.STANDARD).flatten()
             .single { (it.appearance as? KeyDef.Appearance.AltText)?.altText == "1" }.popup!!.single() as KeyDef.Popup.Keyboard.Explicit
         assertEquals(true, one.asIs)
-        assertEquals(listOf("5", "j", "k", "l", "【", "】"), popup("5")!!.items.toList())
+        assertEquals(listOf("J", "K", "L", "5", "j", "k", "l", "【", "】"), popup("5")!!.items.toList())
         // 1 with none: no long press
         assertEquals(null, popup("1"))
     }
@@ -356,5 +363,146 @@ class T9KeyboardTest {
         // 1's punctuation too: two quick presses are two ，, the rest picked from the column
         assertEquals(listOf(KeyAction.CommitAction("，"), KeyAction.CommitAction("，"), four, four), sent)
         assertEquals(listOf("GHI", "GHI"), previews.filterIsInstance<PopupAction.PreviewAction>().map { it.content })
+    }
+
+    private fun nineKey(d: Char, upper: Boolean = false) =
+        KeyAction.SymAction(KeySym(0x01000000 + Keyboard.nineKey(d, upper)), KeyStates.Virtual)
+
+    @Test
+    @Config(application = FcitxApplication::class)
+    fun englishSpellsWithTheKeysTheLongPressPinsItsLetterInTheWord() {
+        val tap = MultiTap(600)
+        val keys = KeyActionListener.Source.Keyboard
+        val popup = KeyActionListener.Source.Popup
+        val four = KeyAction.FcitxKeyAction("4")
+        fun spell(action: KeyAction, source: KeyActionListener.Source = keys, composing: Boolean = false, upper: Boolean = false) =
+            T9Keyboard.resolveEnglish(action, source, tap, 0, composing, spells = true, upper = upper)
+        assertEquals(nineKey('4'), spell(four))
+        assertEquals(nineKey('4', upper = true), spell(four, upper = true))
+        // pressed again soon, a key all the same
+        assertEquals(nineKey('4'), spell(four))
+        // a long press's letter pinned into the word as chosen, Shift or not; its digit committed
+        fun pinned(c: Char) = KeyAction.SymAction(KeySym(0x01000000 + Keyboard.nineLetter(c)), KeyStates.Virtual)
+        assertEquals(pinned('x'), spell(KeyAction.FcitxKeyAction("x"), popup, composing = true, upper = true))
+        assertEquals(pinned('X'), spell(KeyAction.FcitxKeyAction("X"), popup))
+        assertTrue(T9Keyboard.startsLetter(pinned('x')))
+        assertEquals(KeyAction.CommitAction("4"), spell(four, popup, composing = true))
+        // 连按 (no word spelled): the letter committed as it is
+        assertEquals(KeyAction.CommitAction("x"), T9Keyboard.resolveEnglish(KeyAction.FcitxKeyAction("x"), popup, tap, 0, false, spells = false, upper = false))
+        // 1 in a word an apostrophe (366 1 8, don't); 0 English's own key
+        assertEquals(KeyAction.FcitxKeyAction("'"), spell(KeyAction.FcitxKeyAction("1"), composing = true))
+        assertEquals(KeyAction.FcitxKeyAction("0"), spell(KeyAction.FcitxKeyAction("0"), composing = true))
+        assertTrue(T9Keyboard.startsLetter(nineKey('4')))
+        assertFalse(T9Keyboard.startsLetter(keypad(4)))
+    }
+
+    @Test
+    @Config(application = FcitxApplication::class)
+    fun englishOneWithNothingTypedIsItsMarksInTurn() {
+        val tap = MultiTap(600)
+        val one = KeyAction.FcitxKeyAction("1")
+        fun press(time: Long) = T9Keyboard.resolveEnglish(one, KeyActionListener.Source.Keyboard, tap, time, composing = false, spells = true, upper = false)
+        assertEquals(KeyAction.CommitAction("."), press(0))
+        assertEquals(KeyAction.CommitAction(",", replacing = "."), press(100))
+        assertEquals(KeyAction.CommitAction("?", replacing = ","), press(200))
+        assertEquals(KeyAction.CommitAction("."), press(2000))
+    }
+
+    @Test
+    @Config(application = FcitxApplication::class)
+    fun englishALetterAtATimeTheCaseTheRunStartedIn() {
+        val tap = MultiTap(600)
+        val four = KeyAction.FcitxKeyAction("4")
+        fun press(time: Long, upper: Boolean, runUpper: Boolean = upper) =
+            T9Keyboard.resolveEnglish(four, KeyActionListener.Source.Keyboard, tap, time, composing = false, spells = false, upper = upper, runUpper = runUpper)
+        assertEquals(KeyAction.CommitAction("G"), press(0, upper = true))
+        // Shift used up by the G: the run keeps its case
+        assertEquals(KeyAction.CommitAction("H", replacing = "G"), press(100, upper = false, runUpper = true))
+        assertEquals(KeyAction.CommitAction("I", replacing = "H"), press(200, upper = false, runUpper = true))
+        assertEquals(KeyAction.CommitAction("g"), press(2000, upper = false))
+        assertTrue(T9Keyboard.startsLetter(KeyAction.CommitAction("g")))
+        assertFalse(T9Keyboard.startsLetter(KeyAction.CommitAction("h", replacing = "g")))
+    }
+
+    @Test
+    @Config(application = FcitxApplication::class)
+    fun englishsKeysAreLowerCaseWithShiftForStartingOverAndItsOwnMarks() {
+        val english = T9Keyboard.layout(NineKeyLetters.STANDARD, english = true)
+        assertTrue(english[1].any { (it.appearance as? KeyDef.Appearance.AltText)?.displayText == "ghi" })
+        assertTrue(english[1].any { it is CapsKey })
+        assertFalse(english.flatten().any { (it.appearance as? KeyDef.Appearance.Text)?.displayText == "重输" })
+        assertEquals(listOf(",", ".", "?", "!", "'"), T9Keyboard.labels(EngineBridge.T9State(composing = true), english = true).take(5))
+        assertEquals(KeyAction.FcitxKeyAction(","), T9Keyboard.pick(EngineBridge.T9State(composing = true), 0, english = true))
+    }
+
+    @Test
+    @Config(application = FcitxApplication::class)
+    fun englishShiftCapitalisesTheNextKeyAndAPasswordTypesALetterAtATime() {
+        val sent = ArrayList<KeyAction>()
+        val keyboard = T9Keyboard(PlaceholderStrings(RuntimeEnvironment.getApplication()), ThemePreset.PixelDark, english = true).apply {
+            setViewTreeLifecycleOwner(Owner())
+            keyActionListener = KeyActionListener { action, _ -> sent += action }
+        }
+        keyboard.findViewById<View>(R.id.button_caps).performClick()
+        keyboard.key('4').performClick()
+        keyboard.key('4').performClick()
+        assertEquals(listOf(nineKey('4', upper = true), nineKey('4')), sent.filterIsInstance<KeyAction.SymAction>())
+        // never glides, whatever 滑行输入 says
+        val glide = BaseKeyboard::class.java.getDeclaredMethod("getGlide").apply { isAccessible = true }
+        assertEquals(null, glide.invoke(keyboard))
+        sent.clear()
+        keyboard.inPasswordField = true
+        keyboard.key('4').performClick()
+        assertEquals(listOf(KeyAction.CommitAction("g")), sent)
+        // Shift ends the run: 4 again soon is a capital G of its own, not h in g's place
+        sent.clear()
+        keyboard.findViewById<View>(R.id.button_caps).performClick()
+        keyboard.key('4').performClick()
+        assertEquals(listOf(KeyAction.CommitAction("G")), sent.filterIsInstance<KeyAction.CommitAction>())
+        // 1's long press: English's marks, none full width
+        val one = T9Keyboard.layout(NineKeyLetters.STANDARD, english = true).flatten()
+            .single { (it.appearance as? KeyDef.Appearance.AltText)?.altText == "1" }.popup!!.single() as KeyDef.Popup.Keyboard.Explicit
+        assertTrue(one.items.all { s -> s.all { it.code < 0x80 } })
+    }
+
+    // as the full keyboard's: a URL's / or an email address's @ before the space, . and .com after it
+    @Test
+    @Config(application = FcitxApplication::class)
+    fun anAddressFieldsKeysShowOnlyThere() {
+        val keyboard = T9Keyboard(PlaceholderStrings(RuntimeEnvironment.getApplication()), ThemePreset.PixelDark)
+        fun shown() = listOf(R.id.button_slash, R.id.button_at, R.id.button_dot, R.id.button_domain).map { keyboard.findViewById<View>(it).isVisible }
+        assertEquals(listOf(false, false, false, false), shown())
+        keyboard.address = AddressKeys.URL
+        assertEquals(listOf(true, false, true, true), shown())
+        keyboard.address = AddressKeys.EMAIL
+        assertEquals(listOf(false, true, true, true), shown())
+        keyboard.address = AddressKeys.NONE
+        assertEquals(listOf(false, false, false, false), shown())
+    }
+
+    // 中/英 beside the space on both; the language key given up to an address's keys
+    @Test
+    @Config(application = FcitxApplication::class)
+    fun bothHaveTheLanguageKeyAndAnAddressHidesTheGlobe() {
+        val app = RuntimeEnvironment.getApplication()
+        for (english in listOf(false, true)) {
+            val keyboard = T9Keyboard(PlaceholderStrings(app), ThemePreset.PixelDark, english = english)
+            val language = keyboard.findViewById<TextKeyView>(R.id.button_nine_language)
+            // the language typed in full, the other with the slash smaller
+            val label = language.mainText.text as Spanned
+            val smaller = label.getSpans(0, label.length, RelativeSizeSpan::class.java).single()
+            assertEquals(if (english) "中/" else "/英", label.substring(label.getSpanStart(smaller), label.getSpanEnd(smaller)))
+            val sent = mutableListOf<KeyAction>()
+            keyboard.keyActionListener = KeyActionListener { action, _ -> sent += action }
+            language.performClick()
+            assertEquals(listOf(KeyAction.NineKeyLanguageAction), sent)
+            val globe = keyboard.findViewById<View>(R.id.button_lang)
+            assertTrue(globe.isVisible)
+            keyboard.address = AddressKeys.EMAIL
+            assertFalse(globe.isVisible)
+            assertTrue(keyboard.findViewById<View>(R.id.button_nine_language).isVisible)
+            keyboard.address = AddressKeys.NONE
+            assertTrue(globe.isVisible)
+        }
     }
 }

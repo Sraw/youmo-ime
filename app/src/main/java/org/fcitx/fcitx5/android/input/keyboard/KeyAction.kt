@@ -34,6 +34,9 @@ sealed class KeyAction {
 
     data object ShowInputMethodPickerAction : KeyAction()
 
+    /** 九键's 中/英: 九键拼音 and English on the nine keys, one to the other (EnglishLayoutPolicy). */
+    data object NineKeyLanguageAction : KeyAction()
+
     data class LayoutSwitchAction(val act: String = "") : KeyAction()
 
     data class MoveSelectionAction(val start: Int = 0, val end: Int = 0) : KeyAction()

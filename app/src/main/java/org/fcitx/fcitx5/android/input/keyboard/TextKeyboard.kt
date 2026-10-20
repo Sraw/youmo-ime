@@ -37,7 +37,7 @@ class TextKeyboard private constructor(
     context: Context,
     theme: Theme,
     split: Split?,
-) : BaseKeyboard(context, theme, split?.keys ?: Layout, split?.widths) {
+) : BaseKeyboard(context, theme, split?.keys ?: Layout, split?.widths), AutoCapsKeys {
 
     constructor(context: Context, theme: Theme) : this(context, theme, Split.of(context))
 
@@ -238,11 +238,9 @@ class TextKeyboard private constructor(
 
     private val autoCaps = AutoCaps()
 
-    /** Caps lock on: no sentence start changes Shift. */
-    val capsLocked: Boolean get() = capsState == CapsState.Lock
+    override val capsLocked: Boolean get() = capsState == CapsState.Lock
 
-    /** Shift on by itself where the editor [wants] a capital next, as [AutoCaps] decides. */
-    fun applyAutoCaps(wants: Boolean) {
+    override fun applyAutoCaps(wants: Boolean) {
         val current = when (capsState) {
             CapsState.None -> AutoCaps.Caps.NONE
             CapsState.Once -> AutoCaps.Caps.ONCE

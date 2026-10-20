@@ -273,6 +273,7 @@
     <string name="a11y_key_space_with_ime">空格，%1$s</string>
     <string name="a11y_key_quick_phrase">快速输入</string>
     <string name="a11y_key_switch_language">切换语言</string>
+    <string name="a11y_key_nine_language">中/英切换</string>
     <string name="a11y_key_number_pad">数字键盘</string>
     <string name="a11y_key_emoji">表情</string>
     <string name="voice_input">语音输入</string>
@@ -420,6 +421,10 @@
     <string name="t9_multi_tap_fast">快（0.4 秒）</string>
     <string name="t9_multi_tap_medium">中（0.6 秒）</string>
     <string name="t9_multi_tap_slow">慢（0.9 秒）</string>
+    <string name="t9_english_typing">九键英文打法</string>
+    <string name="t9_english_typing_summary">预测：每个键可以是它的任一个字母，由输入法猜出整个词（4663 是 good、home、gone）；连按：快速再按同一个键是它的下一个字母。网址、邮箱和不要联想的输入框总是连按</string>
+    <string name="t9_english_predictive">预测</string>
+    <string name="t9_english_multi_tap">连按</string>
     <string name="handwriting_pause">停笔多久算写完一个字</string>
     <string name="handwriting_pause_summary">停笔超过这个时间，就算写完一个字、开始写下一个：写得快可以调短；写一个字中间常停顿的，调长</string>
     <string name="handwriting_pause_fastest">很短（0.3 秒）</string>
@@ -579,8 +584,6 @@
     <string name="one_handed_exit">恢复全宽</string>
     <string name="floating_keyboard">悬浮键盘</string>
     <string name="floating_keyboard_dock">键盘放回底部</string>
-    <string name="floating_keyboard_round">悬浮键盘圆角</string>
-    <string name="floating_keyboard_round_summary">悬浮时键盘四角跟按键一样圆</string>
     <string name="show_touch_keyboard">显示屏幕键盘</string>
     <string name="hardware_switch_shortcuts">实体键盘快捷键</string>
     <string name="hardware_switch_shortcuts_summary">单按 Shift 或 Ctrl+空格切换中英，Ctrl+Shift 轮流切换输入法</string>

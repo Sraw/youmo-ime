@@ -115,11 +115,11 @@ class AlphabetDigitKey(
     )
 }
 
-class CapsKey : KeyDef(
+class CapsKey(percentWidth: Float = 0.15f) : KeyDef(
     Appearance.Image(
         src = R.drawable.ic_capslock_none,
         viewId = R.id.button_caps,
-        percentWidth = 0.15f,
+        percentWidth = percentWidth,
         variant = Variant.Alternative,
         // updated to the state-specific label by TextKeyboard.updateCapsButtonIcon
         contentDescription = R.string.a11y_key_shift
@@ -193,6 +193,19 @@ class LanguageKey : KeyDef(
         Behavior.Press(KeyAction.LangSwitchAction),
         Behavior.LongPress(KeyAction.ShowInputMethodPickerAction)
     )
+)
+
+/** 九键's 中/英, beside the space as 搜狗's: [KeyAction.NineKeyLanguageAction]; its label T9Keyboard.languageLabel. */
+class NineKeyLanguageKey(percentWidth: Float) : KeyDef(
+    Appearance.Text(
+        displayText = "中/英",
+        textSize = 16f,
+        percentWidth = percentWidth,
+        variant = Variant.Alternative,
+        viewId = R.id.button_nine_language,
+        contentDescription = R.string.a11y_key_nine_language,
+    ),
+    setOf(Behavior.Press(KeyAction.NineKeyLanguageAction)),
 )
 
 class SpaceKey : KeyDef(

@@ -12,6 +12,7 @@ import android.widget.FrameLayout
 import androidx.core.content.ContextCompat
 import androidx.transition.Slide
 import org.fcitx.fcitx5.android.R
+import org.fcitx.fcitx5.android.core.CapabilityFlag
 import org.fcitx.fcitx5.android.core.CapabilityFlags
 import org.fcitx.fcitx5.android.core.FcitxAPI
 import org.fcitx.fcitx5.android.core.InputMethodEntry
@@ -23,6 +24,7 @@ import org.fcitx.fcitx5.android.input.bar.KawaiiBarComponent
 import org.fcitx.fcitx5.android.input.broadcast.InputBroadcastReceiver
 import org.fcitx.fcitx5.android.input.broadcast.ReturnKeyAppearance
 import org.fcitx.fcitx5.android.input.broadcast.ReturnKeyDrawableComponent
+import org.fcitx.fcitx5.android.input.dependency.fcitx
 import org.fcitx.fcitx5.android.input.dependency.inputMethodService
 import org.fcitx.fcitx5.android.input.dependency.theme
 import org.fcitx.fcitx5.android.input.editing.toEditorTraits
@@ -71,10 +73,8 @@ class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), Essentia
     // each made when first shown: every new input view made 九键 too, which most never use
     private val makers: Map<String, () -> BaseKeyboard> = mapOf(
         TextKeyboard.Name to { TextKeyboard(context, theme) },
-        T9Keyboard.Name to {
-            val keyboard = AppPrefs.getInstance().keyboard
-            T9Keyboard(context, theme, NineKeyLetters.parse(keyboard.t9Letters.getValue()), NineKeySymbols.parse(keyboard.t9Symbols.getValue()))
-        },
+        T9Keyboard.Name to { nineKeys(english = false) },
+        T9Keyboard.EnglishName to { nineKeys(english = true) },
         NumberKeyboard.Name to { NumberKeyboard(context, theme) },
         HandwritingKeyboard.Name to {
             HandwritingKeyboard(
@@ -85,6 +85,11 @@ class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), Essentia
             )
         },
     )
+
+    private fun nineKeys(english: Boolean): T9Keyboard {
+        val keyboard = AppPrefs.getInstance().keyboard
+        return T9Keyboard(context, theme, NineKeyLetters.parse(keyboard.t9Letters.getValue()), NineKeySymbols.parse(keyboard.t9Symbols.getValue()), english)
+    }
 
     // [tell] the engine of the pad, in order with the keys; the call sends the Ink key itself (Fcitx.offerInk)
     private fun ink(tell: suspend FcitxAPI.() -> Unit) {
@@ -99,6 +104,7 @@ class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), Essentia
 
     // the space's badge asks what the hold to talk asks (CommonKeyActionListener), a shown password too
     private val service by manager.inputMethodService()
+    private val fcitx by manager.fcitx()
 
     private val autoCapsPref = AppPrefs.getInstance().keyboard.englishAutoCaps
 
@@ -151,6 +157,7 @@ class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), Essentia
             it.keyActionListener = keyActionListener
             it.popupActionListener = popupActionListener
             it.inPasswordField = service.inPasswordField
+            (it as? T9Keyboard)?.noSuggestions = noSuggestions
             it.address = address
             spaceKeys.attach(it) {
                 keyboardView.apply { add(it, lParams(matchParent, matchParent)) }
@@ -199,8 +206,13 @@ class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), Essentia
     // the field's, for the letters to show what an address is made of and no layout to glide there: told each layout as it attaches
     private var address = AddressKeys.NONE
 
+    // the field asks for no suggestions (CapabilityFlag.NoSpellCheck), where English spells no word on the nine keys
+    private var noSuggestions = false
+
     override fun onStartInput(info: EditorInfo, capFlags: CapabilityFlags) {
         (keyboards[HandwritingKeyboard.Name] as? HandwritingKeyboard)?.restart()
+        noSuggestions = capFlags.has(CapabilityFlag.NoSpellCheck)
+        (keyboards[T9Keyboard.EnglishName] as? T9Keyboard)?.noSuggestions = noSuggestions
         // the layout may stay as it is, so the one shown is told now
         currentKeyboard?.inPasswordField = service.inPasswordField
         address = AddressKeys.of(info.toEditorTraits())
@@ -224,7 +236,7 @@ class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), Essentia
 
     // what the field's caps flags make of the text before the cursor: a capital where a sentence starts
     private fun updateAutoCaps() {
-        val keyboard = currentKeyboard as? TextKeyboard ?: return
+        val keyboard = currentKeyboard as? AutoCapsKeys ?: return
         if (composing || keyboard.capsLocked) return
         // null after the input is bound and before it first starts
         val inputType = service.currentInputEditorInfo?.inputType
@@ -233,11 +245,25 @@ class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), Essentia
         keyboard.applyAutoCaps(wants)
     }
 
+    // English on the nine keys, as 九键's 中/英 brought it (EnglishLayoutPolicy): kept while English stays
+    private val englishOnNineKeys = AppPrefs.getInstance().internal.englishOnNineKeys
+
+    // the language key's round from 九键英文 can end on English itself (after 九键拼音 in the list),
+    // and fcitx tells of no change then: shown anew, the flag dropped, the full keyboard. Not on
+    // the flag's every change: dropped before 九键拼音 or another comes, it would show the full
+    // keyboard for a moment
+    private val showAnew: () -> Unit = { spaceKeys.current?.let(::onImeUpdate) }
+
     override fun onImeUpdate(ime: InputMethodEntry) {
         spaceKeys.current = ime
+        val nine = EnglishLayoutPolicy.nineKeys(ime.uniqueName, englishOnNineKeys.getValue())
+        if (englishOnNineKeys.getValue() && EnglishLayoutPolicy.endsNineKeys(ime.uniqueName, fcitx.runImmediately { inputMethodEntryCached }.uniqueName)) {
+            englishOnNineKeys.setValue(false)
+        }
         val letters = when (ime.uniqueName) {
             Engines.T9 -> T9Keyboard.Name
             Engines.HANDWRITING -> HandwritingKeyboard.Name
+            Engines.ENGLISH -> if (nine) T9Keyboard.EnglishName else TextKeyboard.Name
             else -> TextKeyboard.Name
         }
         val shown = lettersLayout.inputMethodChanged(letters, currentKeyboardName)
@@ -256,6 +282,9 @@ class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), Essentia
     }
 
     override fun onAttached() {
+        // kept when detached: a round run from the picker's space lands here too, and the two share
+        // the input view's lifetime
+        commonKeyActionListener.englishShownAnew = showAnew
         currentKeyboard?.let {
             it.keyActionListener = keyActionListener
             it.popupActionListener = popupActionListener

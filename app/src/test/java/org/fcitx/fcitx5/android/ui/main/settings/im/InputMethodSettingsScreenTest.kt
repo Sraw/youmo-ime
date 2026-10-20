@@ -22,6 +22,7 @@ import org.fcitx.fcitx5.android.engine.host.ModelLevel
 import org.fcitx.fcitx5.android.engine.host.TableSettings
 import org.fcitx.fcitx5.android.engine.pinyin.Fuzzy
 import org.fcitx.fcitx5.android.input.handwriting.HandwritingPause
+import org.fcitx.fcitx5.android.input.keyboard.T9EnglishTyping
 import org.fcitx.fcitx5.android.input.keyboard.T9MultiTap
 import org.fcitx.fcitx5.android.ui.main.modified.hasDefault
 import org.fcitx.fcitx5.android.ui.main.settings.PlaceholderStrings
@@ -124,6 +125,17 @@ class InputMethodSettingsScreenTest {
         assertEquals(0, saved)
         assertTrue(AppPrefs.T9_MULTI_TAP !in cfg.flattened())
         assertNull(screen(Engines.PINYIN).findPreference<ListPreference>(AppPrefs.T9_MULTI_TAP))
+    }
+
+    // how 九键英文 types: the app's preference, as multi-tap
+    @Test
+    fun nineKeyEnglishTypingIsTheAppsPreference() {
+        val keyboard = AppPrefs.getInstance().keyboard
+        val typing = screen(Engines.T9, RawConfig()).findPreference<ListPreference>(AppPrefs.T9_ENGLISH_TYPING)!!
+        assertEquals(T9EnglishTyping.Predictive.name, typing.value)
+        assertTrue(typing.callChangeListener(T9EnglishTyping.MultiTap.name))
+        assertEquals(T9EnglishTyping.MultiTap, keyboard.t9EnglishTyping.getValue())
+        keyboard.t9EnglishTyping.setValue(T9EnglishTyping.Predictive)
     }
 
     // as multi-tap: the pad's own, nothing of it in fcitx's config

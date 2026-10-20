@@ -31,6 +31,7 @@ import org.fcitx.fcitx5.android.input.keyboard.KeyAction.FcitxKeyAction
 import org.fcitx.fcitx5.android.input.keyboard.KeyAction.GlideAction
 import org.fcitx.fcitx5.android.input.keyboard.KeyAction.LangSwitchAction
 import org.fcitx.fcitx5.android.input.keyboard.KeyAction.MoveSelectionAction
+import org.fcitx.fcitx5.android.input.keyboard.KeyAction.NineKeyLanguageAction
 import org.fcitx.fcitx5.android.input.keyboard.KeyAction.PickerSwitchAction
 import org.fcitx.fcitx5.android.input.keyboard.KeyAction.QuickPhraseAction
 import org.fcitx.fcitx5.android.input.keyboard.KeyAction.ShowInputMethodPickerAction
@@ -66,6 +67,34 @@ class CommonKeyActionListener :
     private val langSwitchKeyBehavior by kbdPrefs.langSwitchKeyBehavior
 
     private val backspaceSwipe = BackspaceSwipeBehavior()
+
+    // English on the nine keys, brought by 中/英 (EnglishLayoutPolicy)
+    private val englishOnNineKeys = AppPrefs.getInstance().internal.englishOnNineKeys
+
+    // the next input method, from 九键英文 the one after 九键拼音: the two are one to the user
+    private suspend fun FcitxAPI.nextInputMethod() {
+        val current = currentIme().uniqueName
+        val next = if (EnglishLayoutPolicy.nineKeys(current, englishOnNineKeys.getValue())) {
+            EnglishLayoutPolicy.nextFromNineKeys(enabledIme().map { it.uniqueName })
+        } else {
+            null
+        }
+        // dropped first, from wherever: English next is its own input method, the full keyboard
+        englishOnNineKeys.setValue(false)
+        when (next) {
+            null -> enumerateIme()
+            // the input method shown stays (English, after 九键拼音 in the list): fcitx tells of no
+            // change, so the keyboard is told
+            current -> service.lifecycleScope.launch { englishShownAnew?.invoke() }
+            else -> activateIme(next)
+        }
+    }
+
+    /**
+     * KeyboardWindow's, from its first attach: English's letters shown anew, as the flag now has them, where
+     * the language key's round from 九键英文 lands on English itself.
+     */
+    var englishShownAnew: (() -> Unit)? = null
 
     /**
      * What is typed put in first ([FcitxInputMethodService.commitAndReset]), then [then]: whether
@@ -122,7 +151,7 @@ class CommonKeyActionListener :
                                         service.showDialog(AddMoreInputMethodsPrompt.build(context))
                                     }
                                 } else {
-                                    enumerateIme()
+                                    nextInputMethod()
                                 }
                             }
                         }
@@ -137,6 +166,13 @@ class CommonKeyActionListener :
                     }
                 }
                 is ShowInputMethodPickerAction -> showInputMethodPicker()
+                // what is typed kept as a switch of input method keeps it (androidengine's deactivate)
+                is NineKeyLanguageAction -> service.postFcitxJob {
+                    val to = EnglishLayoutPolicy.toggled(currentIme().uniqueName, enabledIme().map { it.uniqueName })
+                        ?: return@postFcitxJob
+                    englishOnNineKeys.setValue(to == Engines.ENGLISH)
+                    activateIme(to)
+                }
                 is BeginSelectionSwipeAction -> backspaceSwipe.onTouchDown()
                 is MoveSelectionAction -> {
                     // something typed: candidates with nothing typed are the words that may come
@@ -174,7 +210,7 @@ class CommonKeyActionListener :
                     when (val behavior = spaceKeyLongPressBehavior) {
                         SpaceLongPressBehavior.None -> {}
                         SpaceLongPressBehavior.Enumerate -> service.postFcitxJob {
-                            enumerateIme()
+                            nextInputMethod()
                         }
                         SpaceLongPressBehavior.ToggleActivate -> service.postFcitxJob {
                             toggleIme()

@@ -277,6 +277,7 @@
     <string name="a11y_key_space_with_ime">Space, %1$s</string>
     <string name="a11y_key_quick_phrase">Quick phrase</string>
     <string name="a11y_key_switch_language">Switch language</string>
+    <string name="a11y_key_nine_language">Chinese / English</string>
     <string name="a11y_key_number_pad">Number pad</string>
     <string name="a11y_key_emoji">Emoji</string>
     <string name="voice_input">Voice input</string>
@@ -434,6 +435,10 @@
     <string name="t9_multi_tap_fast">Fast (0.4 s)</string>
     <string name="t9_multi_tap_medium">Medium (0.6 s)</string>
     <string name="t9_multi_tap_slow">Slow (0.9 s)</string>
+    <string name="t9_english_typing">Nine-key English typing</string>
+    <string name="t9_english_typing_summary">Predictive: each key is any of its letters and the word is guessed (4663 for good, home, gone); multi-tap: a key pressed again quickly is its next letter. Address fields and fields that ask for no suggestions are always multi-tap</string>
+    <string name="t9_english_predictive">Predictive</string>
+    <string name="t9_english_multi_tap">Multi-tap</string>
     <string name="handwriting_pause">Pause that ends a character</string>
     <string name="handwriting_pause_summary">How long the pen stays up before what is written counts as one character and the next begins: shorter for a fast hand, longer if you pause between strokes</string>
     <string name="handwriting_pause_fastest">Very short (0.3 s)</string>
@@ -594,8 +599,6 @@
     <string name="one_handed_exit">Full width</string>
     <string name="floating_keyboard">Floating keyboard</string>
     <string name="floating_keyboard_dock">Dock the keyboard</string>
-    <string name="floating_keyboard_round">Rounded floating keyboard</string>
-    <string name="floating_keyboard_round_summary">Floating, the keyboard\'s corners are as round as its keys\'</string>
     <string name="show_touch_keyboard">Show the on-screen keyboard</string>
     <string name="hardware_switch_shortcuts">Hardware keyboard shortcuts</string>
     <string name="hardware_switch_shortcuts_summary">Shift alone or Ctrl+Space switches between Chinese and English, Ctrl+Shift goes to the next input method</string>

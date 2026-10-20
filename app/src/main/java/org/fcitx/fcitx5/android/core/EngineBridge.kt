@@ -84,6 +84,19 @@ object EngineBridge {
     private val t9State = MutableStateFlow(T9State())
     val t9: StateFlow<T9State> = t9State
 
+    private val englishTypingState = MutableStateFlow(false)
+
+    /**
+     * Whether English has a word typed (not a prediction offered), as its last event left it: on
+     * the nine keys, 1 is then an apostrophe in the word. Set on the fcitx thread, read on the main one.
+     */
+    val englishTyping: StateFlow<Boolean> = englishTypingState
+
+    /** Whether English suggests words, as the addon's config last said ([EngineSettings.englishSuggest]). */
+    @Volatile
+    var englishSuggests = true
+        private set
+
     private val inkEnded = MutableStateFlow(HandwritingSession.NO_PIECE)
 
     /**
@@ -377,11 +390,14 @@ object EngineBridge {
         val answered = try {
             val s = unloadable.call(im, call)
             if (im == Engines.T9 && (event != EngineEvent.REFINE || s.handled)) t9State.value = T9State(s.preedit.isNotEmpty(), s.syllables, s.syllablesId)
+            if (im == Engines.ENGLISH) englishTypingState.value = s.preedit.isNotEmpty() && !s.predicting
             followed(im) { engines }
             result(event, s, fetch)
         } catch (@Suppress("TooGenericExceptionCaught") e: Throwable) {
             // the addon refines no more after a failure (native-lib's engineFailed)
             refining = false
+            // nor is a word being spelled: 1 left an apostrophe with nothing typed
+            if (im == Engines.ENGLISH) englishTypingState.value = false
             throw e
         }
         refining = answered.refines
@@ -420,6 +436,7 @@ object EngineBridge {
     fun configure(settings: String) {
         engines.settings = EngineSettings.parse(settings).copy(nineKeys = nineKeys())
         shuangpinScheme = engines.settings.scheme
+        englishSuggests = engines.settings.englishSuggest
     }
 
     private fun nineKeys() = NineKeyLetters.parse(AppPrefs.getInstance().keyboard.t9Letters.getValue())
