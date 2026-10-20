@@ -143,7 +143,9 @@ class TableRegistryTest : EnginesFixture() {
     @Test
     fun aWordAddedPickedInATableAndRemovedIsNotBackThereAtTheNextStart() {
         val dir = folder.newFolder("engine")
-        Engines(::load, dir).use { engines ->
+        // the listed words coded at once: added before pinyin's model was made, the word is one of
+        // them, and in the background a slow machine typed before they were coded
+        Engines(::load, dir, warmUps = { it.run() }).use { engines ->
             assertTrue(engines.addWord("你好", "ni hao"))
             // the user's word, coded by the table's rule: its pick is the table's, read back as a phrase saved
             val offered = engines.wubi("wqvb")

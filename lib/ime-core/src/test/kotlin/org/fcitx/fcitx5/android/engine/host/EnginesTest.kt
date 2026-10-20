@@ -663,7 +663,8 @@ class EnginesTest : EnginesFixture() {
     fun aWordAddedAfterATableCodedTheListedOnesIsCodedThereAloneAndOfferedOnce() {
         val additions = Engines.Additions("", "d") { sequenceOf("你好 ni'hao 0") }
         val wubi = "engine-wubi"
-        Engines(::load, null, additions = { additions }).use { engines ->
+        // the listed words coded at once: in the background, a slow machine typed before they were
+        Engines(::load, null, additions = { additions }, warmUps = { it.run() }).use { engines ->
             // a dictionary's word, coded by the table's rule: its code's one candidate, it commits itself
             assertEquals("你好", engines.type(wubi, "wqvb").commit)
             assertTrue(engines.addWord("好你", "hao ni"))
