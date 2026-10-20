@@ -36,7 +36,9 @@ warnings.filterwarnings("ignore", category=DeprecationWarning)
 REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 UAT = os.path.join(REPO, "uat")
 OUT = os.path.join(REPO, "dev", "uat-out")
-PKG = "io.github.sraw.youmo.debug"
+# UAT_BUILD=release runs the cases on the x86_64 release APK (a release's gate: R8's code, its own package)
+BUILD = os.environ.get("UAT_BUILD", "debug")
+PKG = "io.github.sraw.youmo" + (".debug" if BUILD == "debug" else "")
 IME = f"{PKG}/org.fcitx.fcitx5.android.input.FcitxInputMethodService"
 MAIN = f"{PKG}/org.fcitx.fcitx5.android.ui.main.MainActivity"
 BROWSER = "org.chromium.webview_shell/.WebViewBrowserActivity"
@@ -1636,7 +1638,7 @@ def write_results(run, cases, version, ports, wall, sheets, flavor="text"):
     else:
         dev = f"- 设备：redroid 14 x86_64，1080×2340，440 dpi，简体中文；{len(ports)} 台（{', '.join('127.0.0.1:' + p for p in ports)}）"
     lines = [f"# {run.name}", "", dev,
-             f"- 包：{'语音版' if flavor == 'voice' else '文字版'} x86_64 debug（{PKG}）{version}",
+             f"- 包：{'语音版' if flavor == 'voice' else '文字版'} x86_64 {BUILD}（{PKG}）{version}",
              # the ids of a short rerun say which rows are new; a whole run is just its count
              f"- 跑法：`uat/tools/uat.py run`（最近一次跑 {len(run.ids)} 条"
              f"{'：' + ', '.join(run.ids) if len(run.ids) <= 12 else ''}，用时 {wall:.0f} s）；"
@@ -1706,11 +1708,11 @@ def up(port="5557"):
 
 
 def install(d, flavor="text"):
-    apks = sorted((os.path.join(dp, f) for dp in [os.path.join(REPO, f"app/build/outputs/apk/{flavor}/debug")]
+    apks = sorted((os.path.join(dp, f) for dp in [os.path.join(REPO, f"app/build/outputs/apk/{flavor}/{BUILD}")]
                    if os.path.isdir(dp) for f in os.listdir(dp) if "x86_64" in f and f.endswith(".apk")),
                   key=os.path.getmtime)
     if not apks:
-        msg = f"no {flavor} debug x86_64 APK: BUILD_ABI=x86_64 ./gradlew :app:assemble{flavor.capitalize()}Debug"
+        msg = f"no {flavor} {BUILD} x86_64 APK: BUILD_ABI=x86_64 ./gradlew :app:assemble{flavor.capitalize()}{BUILD.capitalize()}"
         if d.case:   # inside a case (SET-01): that case is blocked, the run goes on
             raise Blocked(msg)
         sys.exit(msg)
@@ -1720,6 +1722,11 @@ def install(d, flavor="text"):
     with open(apks[-1], "rb") as f:
         for chunk in iter(lambda: f.read(1 << 20), b""):
             h.update(chunk)
+    # one 幽默输入法 on the device: with the debug and the release build both there, the system's
+    # picker lists two and the setup wizard (SET-01) can take the other one
+    other = "io.github.sraw.youmo" if BUILD == "debug" else "io.github.sraw.youmo.debug"
+    if d.sh(f"pm path {other}").strip():
+        d.sh(f"pm uninstall {other}")
     path = d.sh(f"pm path {PKG}").strip().split(":", 1)[-1]
     on_device = d.sh(f"sha1sum {path}").split()[:1] if path else []
     if on_device != [h.hexdigest()]:

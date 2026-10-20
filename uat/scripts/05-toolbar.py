@@ -609,7 +609,8 @@ def tb22(d):
         check(d.field() and d.field().b == free[1].b, "点键盘外的框焦点没过去")
     a = d.key_node("a")
     x, y = a.c
-    d.sh(f"input motionevent DOWN {x} {y}; screencap -p /sdcard/uat-p.png; input motionevent UP {x} {y}")
+    # a moment for the bubble to be drawn: the release build's frame can come after an immediate screencap
+    d.sh(f"input motionevent DOWN {x} {y}; sleep 0.1; screencap -p /sdcard/uat-p.png; input motionevent UP {x} {y}")
     png = d.adb("exec-out", "cat", "/sdcard/uat-p.png", binary=True)
     d.shot((max(0, x - 300), max(0, a.b[1] - 330), min(1080, x + 300), a.b[3] + 20), "按住 a", png=png)
     return f"悬浮 {b1} → 拖到 {b2}；页面不动"

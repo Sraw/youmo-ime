@@ -130,8 +130,8 @@ def st32(d):
     home(d, "实体键盘")
     choose(d, "每页候选数", "5")
     home(d, "通用输入")
-    s = d.screen()
-    perf = d.summary("性能档位", s) or ""
+    # read off the whole page: a longer summary above (滑行输入) can push it below the fold
+    perf = next((sm for t, sm, _ in d.pref_rows() if t == "性能档位"), None) or ""
     d.tap_text("模糊音", after=1.0)
     s = d.screen()
     z = next((n for n in s.app() if n.text.startswith("z ↔ zh")), None)
@@ -328,9 +328,10 @@ def custom_item(d, s=None):
     return None
 
 
-def kb_picture(d):
-    """how much of the keyboard is the picture's orange and blue"""
-    im = d.png().crop(kb_box(d)).convert("RGB").resize((60, 30))
+def kb_picture(d, rows=1.0):
+    """how much of the keyboard (its top [rows] part) is the picture's orange and blue"""
+    x0, y0, x1, y1 = kb_box(d)
+    im = d.png().crop((x0, y0, x1, y0 + int((y1 - y0) * rows))).convert("RGB").resize((60, 30))
     px = list(im.getdata())
     return (sum(1 for r, g, b in px if r > g + 40 and r > b + 60), sum(1 for r, g, b in px if b > r + 80 and b > g + 80))
 
@@ -387,7 +388,8 @@ def st08(d):
     appearance_tab(d, "主题")
     check(not custom_item(d), "删除后列表里还有它")
     d.open_page("text")
-    o, b = kb_picture(d)
+    # above the bottom row: the release build's default (Pixel) has a blue return key there
+    o, b = kb_picture(d, rows=0.75)
     lum = d.lum(kb_box(d))
     check(o < 10 and b < 10 and lum > 150, f"键盘不是默认主题（图的橙 {o} 蓝 {b}，亮度 {lum:.0f}）")
     return f"导出 {files[0]}；删除后列表里没有它，键盘回到默认（亮度 {lum:.0f}）"

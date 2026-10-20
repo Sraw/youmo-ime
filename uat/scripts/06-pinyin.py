@@ -874,8 +874,9 @@ def _words13():
 def py52(d):
     import re
     w = _words13()
-    today = datetime.date.today()
-    zhou, xingqi = "周" + "一二三四五六日"[today.weekday()], "星期" + "一二三四五六日"[today.weekday()]
+    # the device's day, not the host's: redroid keeps UTC, a day ahead of a Pacific evening
+    wd = int(d.sh("date +%u").strip()) - 1
+    zhou, xingqi = "周" + "一二三四五六日"[wd], "星期" + "一二三四五六日"[wd]
     w.PIECES.setdefault("三家", [("sanjia", "三家")])
     w.add_phrase(d, "sj", [("cn", "三家")])
 

@@ -173,7 +173,8 @@ def import_file(d, name, target=None):
     d.tap_text("导入词库", after=2.5)
     if "documentsui" not in d.top_activity():
         raise Blocked(f"没出文件选择：{d.top_activity()}")
-    for _ in range(4):
+    # the exports of earlier runs pile up in 下载 (a grid of two columns): enough scrolls to pass them
+    for _ in range(12):
         n = d.screen().find(text=name)
         if n:
             break
