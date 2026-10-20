@@ -82,7 +82,7 @@ it): `keyboardView` is `FloatingKeyboard.widthDp` wide (70% of the screen, 300�
 much shorter (85% at least), with `FloatingHandle` on top, clipped to rounded corners
 with a shadow (`FloatingCorners`; users asked for both). The radius is the keys' radius plus their
 least margin to the edge (`FloatingKeyboard.cornerDp`, the nested-corner rule: the curve runs
-alongside the corner keys' and clips none), square with `ThemePrefs.floatingKeyboardRound` off; the
+alongside the corner keys' and clips none), square where the keys are (按键圆角 直角, the owner's one setting for corners); the
 handle is a shade of the bar towards the key text (`FloatingKeyboard.handleColor`), as some themes'
 bar is the keyboard's colour. It is moved by translation
 (`FloatingPlacer`) to a spot kept as shares of the room it moves in (`AppPrefs.internal.floatingKeyboardX/Y`),
@@ -157,8 +157,10 @@ digit or symbol goes in there as it is, what is typed committed as typed
 types with (`Engines.readsAsKey`: the nine keys' digits, the `;` of every 双拼 scheme whose layout types it (微软, 紫光), the pinyins' `'` and a
 table's keys, 二笔's `;`, while something is typed, the table's from `Engines.tableKeys`); the nine
 keys' column, separator and multi-tap are in `T9Keyboard` with decisions in `MultiTap`, `NineKeys`.
-A nine key's long press shows its digit and letters, then in rows of their own above, a line
-between, its symbols (`NineKeySymbols` in ime-core, the pref `t9Symbols`, set on 九键拼音's page
+A nine key's long press shows one row, its letters in capitals, its digit, its letters (A B C 2 a
+b c, `Explicit.inRow` the digit's place: in that order, the digit under the finger, narrower keys
+when they don't fit; owner 2026-10-20), each committed as it is (`CommitAction`, after the first
+candidate), then in rows of their own above, no line between, its symbols (`NineKeySymbols` in ime-core, the pref `t9Symbols`, set on 九键拼音's page
 按键长按, `NineKeySymbolsFragment`; separate from 按键字符, owner 2026-10-19): by default 2–9's are
 the full keyboard's corner characters of their letters (`PopupPresetTest` holds them to it), 1's
 the rest of 搜狗's column. `KeyDef.Popup.Keyboard.Explicit.symbolsFrom` sets 2–9's apart: shown
@@ -166,8 +168,34 @@ as Chinese punctuation maps them and typed as keys to the engine, as the full ke
 press is (the first candidate, then the mark: quotes in turn, brackets paired; `'` while
 typing is the syllable separator, as there). 1's are
 `asIs`, committed as they are (`.` not `。`). A digit or a lone letter is never a symbol: the
-long press types those as the key's own. (A probe with `adb shell input text` showed the nine
+long press has those already. In an address field the bottom row gets the full keyboard's
+address keys (`AddressKeys`: `/` or `@`, `.`, `.com`), shown by the same `address` both boards
+take from `KeyboardWindow`. (A probe with `adb shell input text` showed the nine
 keys committing the pinyin as typed before a mark: that is a hardware key's path, not the screen's.)
+
+九键英文 (`T9Keyboard.EnglishName`, a second `T9Keyboard` built with `english = true`) is fcitx's
+English shown on the nine keys, reached only by 九键's 中/英 key (`NineKeyLanguageKey`, beside the
+space as 搜狗's; owner 2026-10-20, replacing a 「英文键盘」 setting and English following
+九键拼音 however switched to; its label `T9Keyboard.languageLabel`, the language in use full size, the other smaller and fainter, drawn because `AutoScaleTextView` lays a spanned text out with `StaticLayout`). `CommonKeyActionListener` sets `internal.englishOnNineKeys` and
+activates English, or 九键拼音 back (`EnglishLayoutPolicy.toggled`); `KeyboardWindow.onImeUpdate`
+shows the nine keys for English while the pref holds (`EnglishLayoutPolicy.nineKeys`), dropping it
+as anything but English shows, unless fcitx's cached IM is English again by then (`endsNineKeys`: an
+update queued behind 中/英 pressed again), and on the language key's round; a round that lands on English itself changes no IM, so
+`CommonKeyActionListener.englishShownAnew` (KeyboardWindow's from its first attach, kept when detached: the picker's space runs the round too) shows it anew. Not a
+listener on the pref: dropped before another IM comes, it would flash the full keyboard. So English come to any other way is the full keyboard and the input view
+made anew (a turn, a setting) shows it as it was. The language key's round (and the space's long press set to it) goes on
+from 九键拼音 when in 九键英文: straight to the one after it in the enabled list
+(`EnglishLayoutPolicy.nextFromNineKeys`), the pref dropped first, not through 九键拼音's keyboard.
+中/英 does nothing where the other is not enabled (`toggled(current, enabled)`: fcitx would switch to none, quietly). In an address field the nine keys hide the
+language key for the address keys' room. Its keys send `Keyboard.nineKey(digit, upper)` (predictive,
+the engine's `Action.NineKey`) where `EnglishLayoutPolicy.spellsWords` says English suggests
+(`t9EnglishTyping` Predictive, not a password, an address or NoSpellCheck, English's suggestions
+on, read from `EngineBridge.englishSuggests`), a long press's letter then pinned into the word
+(`Keyboard.nineLetter`, owner 2026-10-20), else commit letters by `MultiTap` themselves
+(`CommitAction` replacing the last of a run), a long press's as it is. Whether a word is being spelled, for 1 (an
+apostrophe then, else `. , ? ! ' -` in turn) and the column, comes from
+`EngineBridge.englishTyping`. ⇧ stands where 重输 is, its state `NineKeyShift` (ime-core), lit by
+auto-caps through `AutoCapsKeys`, which both boards implement. No glide on it.
 
 Handwriting's keyboard (`HandwritingKeyboard`, the letters layout of `Engines.HANDWRITING`) is a pad
 (`HandwritingPadView` over `InkPad`) and a column of backspace and marks. Each read goes to

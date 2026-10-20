@@ -208,6 +208,23 @@ sentence-start "Hello" is "hello" anywhere, a word the data or the user has only
 iPhone) keeps it; a capital comes only from Shift, as for a word tapped (`AutoCaps` turns Shift on
 where the field asks for sentence capitals), Caps Lock all capitals. Where English suggests nothing (`androidengine`'s
 `suggestsEnglish`: NoSpellCheck, an address, a password, suggestions off) the keys type themselves.
+
+On the nine keys English takes `Action.NineKey(digit, upper)` (the host `Keyboard`'s
+`NINE_DIGITS`, 0xF0040 up, past `LETTERS`, clear of INK and GLIDE). The input is then digits
+(`'` from 1, kept in place) and `NineKeyWords` reads it: an `EnglishDecoder` whose substitution is
+`nineKeyCost` (a digit fits any of its `NineKeyLetters`, the same 按键字母 as 九键拼音; a letter only
+itself) and whose every edit costs `NINE_KEY_COSTS`' `NEVER`, the user's own words matched the same
+way, then words as long as the keys first, completions after, each by score, in the case Shift gave
+each key. A letter a long press pinned (`Action.NineKey` with the letter, `Keyboard.NINE_LETTERS`
+from 0xF0060; where English does not suggest the addon swallows the digits and types the letter) is
+itself among the keys, and marks the word the nine keys' (`pinned`) though no digit is left: never
+corrected, first among the candidates when every letter is pinned (a prefix of longer words too), and
+a word so spelled the data lacks is learned and offered by its keys after (owner 2026-10-20). The
+preedit and `typed()` are the first candidate, else each key's first letter
+(`NineKeyWords.firstLetters`, a guess not learned), so space, punctuation, Enter and the
+arrows commit a word, never the digits; the cursor stays at the end; `keypad()` picks the nth
+candidate (`picksByDigit`). `ime-eval english --keys nine` measures it (2026-10-20, english.txt:
+95.9% first, 98.4% in the first three).
 Each char a screen key types there is sent as `EngineEvent.TYPED` (`Keyboard` passes it on, then
 `Session.typed`: the session's edge, and its known text if it knows the text before it). The
 screen's Backspace there goes the same way as `Session.ERASED`, as does the session's own
