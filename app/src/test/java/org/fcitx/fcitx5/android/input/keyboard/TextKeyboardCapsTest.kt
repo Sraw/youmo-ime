@@ -58,4 +58,16 @@ class TextKeyboardCapsTest {
         assertEquals("Q", type("Q"))
         assertEquals("Q", type("Q"))
     }
+
+    // every row's letters, the bottom one too: the 双拼 `;` key after L once ended the pass there
+    private fun letters() = keyboard.allViews.filterIsInstance<AltTextKeyView>()
+        .map { it.mainText.text.toString() }.filter { it.length == 1 && it[0].isLetter() }.joinToString("")
+
+    @Test
+    fun everyLetterFollowsShift() {
+        keyboard.caps.performClick()
+        assertEquals("QWERTYUIOPASDFGHJKLZXCVBNM", letters())
+        keyboard.caps.performClick()
+        assertEquals("qwertyuiopasdfghjklzxcvbnm", letters())
+    }
 }

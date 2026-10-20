@@ -615,3 +615,28 @@ def kb38(d):
     check(t == "ab ", f"按住空格 1 秒松开后框里「{t}」")
     check(not pop, f"弹出了 {pop}")
     return f"「{t}」，没弹出东西"
+
+
+def letter_labels(d):
+    """the letters the keys show, row by row as the screen has them"""
+    kb = d.screen().find(rid="keyboard_view", where="ime")
+    out = []
+    for n in kb.walk() if kb else []:
+        if n.clickable:
+            t = [m.text for m in n.walk() if m.text]
+            if t and len(t[0]) == 1 and t[0].isascii() and t[0].isalpha():
+                out.append(t[0])
+    return "".join(out)
+
+
+@case("KB-39")
+def kb39(d):
+    low = letter_labels(d)
+    d.press("shift")
+    up = letter_labels(d)
+    d.press("shift")
+    back = letter_labels(d)
+    check(sorted(low) == list("abcdefghijklmnopqrstuvwxyz"), f"没开 Shift 时 {low}")
+    check(sorted(up) == list("ABCDEFGHIJKLMNOPQRSTUVWXYZ"), f"开了 Shift 时 {up}")
+    check(back == low, f"再点 Shift 后 {back}")
+    return f"小写 {low}，大写 {up}"
