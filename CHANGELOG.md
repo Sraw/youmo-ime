@@ -1,10 +1,105 @@
 # 版本日志 · Changelog
 
-每个版本分两部分：**主要变化**是新功能和大的改进，**小改动**是用户能感觉到的修复和细节。
+每个版本分两部分：**主要变化**是新功能和大的改进，**小改动**是用户能感觉到的细节，**修复**是改掉的问题（0.3.0 起单列）。
 只记用户看得到、用得到的变化；内部重构、测试、构建的改动不列。
 
-Each release lists its **main changes** (new features, large improvements) and its **smaller changes**
-(fixes and details a user notices). Internal refactoring, tests and build changes are left out.
+Each release lists its **main changes** (new features, large improvements) its **smaller changes**
+(details a user notices) and, from 0.3.0, its **fixes**. Internal refactoring, tests and build changes are left out.
+
+---
+
+## 0.3.0（2026-10-19）
+
+### 主要变化
+
+- **滑行输入**：手指在字母上划过一个词，抬起就出候选。英文、全拼、双拼、九键和码表都能滑（手写除外），自己加的词也能滑出来，
+  屏蔽的词不会出现。网址、邮箱和密码框里不能滑：这些内容不是词，滑行只会猜出错的词，密码框里也看不见滑错了什么。默认关，在「通用输入」里打开。
+- **表情候选**：打出的字词有对应表情时，候选里从第三个起给出至多两个，全拼、双拼、九键、码表都有；码表编码打满直接上屏时，表情改在联想栏最前面，点了替换刚上屏的词。
+  表情面板可以按拼音搜索（`xiao` 找笑、`dz` 找点赞）。
+- **拆字**：不会读的字按部件打：先按 u，再打各部分的全拼，`uniuniuniu` 出「犇」，`ushuishuishui` 出「淼」。只有全拼有，可以关掉。
+- **算式结果**：打完算式再打 =，候选栏上给出结果（0.1+0.2 是 0.3）；除以零、太大的数这类算不了的不给。
+- **自带的日期时间**：打出「日期」「时间」「星期」时，第三个候选起给出今天的日期、现在的时间、星期几，全拼、双拼、九键、码表都有；全拼里 rq、sj、xq 也行。
+  删掉的自带短语不再出现，开关在「通用输入」。
+- **单手模式和悬浮键盘**：键盘可以缩到一边单手打，再打开时回到上次的那一边；悬浮键盘缩成小窗浮在应用上面，按住顶上的横条拖到哪里就停在哪里，下次打开还在。
+- **设置重新整理**：首页铺平成 10 项；各输入法共用的选项（联想、表情、滑行、模糊音、标点、性能档位）都放在「通用输入」，
+  每个输入法的页面只留自己的选项。词库分成「用户词库」和「基础词库」，导入只有一个入口，导入时问放进哪一个。
+- **语音识别更懂口音**：识别模型为带口音的普通话做了微调。
+
+### 小改动
+
+- 往用户词库导入超过 1000 个词时，提示建议改放基础词库，并说明两者的区别（导入自己导出的文件不提示）。
+- 导出用户词库时标出学到的词，再导入时仍算学到的词；旧的导出文件导回来算手动加的词。
+- 导入的词全部进码表；导入的词在拼音里打过一次，就算你自己的词。
+- 语音：手动加的词和导入的词优先识别，学到的词照顾得轻一些，屏蔽的词不照顾。
+- 九键：打字时在数字键上滑或长按，直接选对应序号的候选。
+- 九键「连按选字母」改成严格：打开时快速连按就是第几个字母（44 是 h），关着时每按一下都是一个键；1 键连按换标点也跟着这个设置。
+  **默认改为关**，没改过这个设置的用户升级后是关。
+- 剪贴板里点一条粘贴后回到键盘（「剪贴板与表情」里的「粘贴后回到键盘」，默认开）。
+- 有候选或联想时，长按 ⌄ 收起键盘（点一下仍是展开）。
+- 文本编辑面板复制、剪切后提示「已复制」「已剪切」，复制后退出选择；隐藏的密码框里复制不提示。
+- 本应用自己的输入框什么都不学。
+- 手写连写多个字后选词，整段记成一个词（和拼音一样）。
+- 滑行出的英文词跟点击一样大写：输入框要求才大写，专有名词保持原样；在词或标点后面滑会自动补空格，撤回滑出的词连空格一起删。
+- 微软双拼、紫光双拼在 L 右边加了 ; 键。
+- 语音版的许可页补上 LibriSpeech 的署名。
+- 帮助文档补全。
+- 粗俗的词等第一页之后才出，多收了一些这类词。
+- 「忘记词汇」只在有东西可忘的候选上出现。
+- 点自定义短语打开编辑框，里面可以删除。
+
+### 修复
+
+- 九键切到数字键盘后，点数字键打出的是字母（ABC），现在打的是数字。
+- 九键打字时在数字键上滑，数字接在拼音后面（「你2」），现在是选对应的候选。
+- 微软双拼、紫光双拼的 ; 被当成标点打出来，现在是键。
+- 横屏把键盘高度调到「很高」时会挡住输入框，现在键盘最高约占屏幕 70%。
+- 拼音：上屏的字被退格删掉后，下一个词的排序还按删掉的字算（删了「你」再打 riqi，「脾气」排在「日期」前面）。
+- 设置搜索：点搜索结果打开的页面不会滚到那一项。
+- 有滑动符号的键，往别的方向滑时打出了不该打的字符，现在打出键本身。
+- 空格长按设为「无」时，慢慢拖空格不能移动光标；会连发的键横着拖时还会触发长按。
+- 逗号的长按列表不对；两行的长按弹出框里，下面一行选不到。
+- 文本编辑面板的 |< >| 现在跳到输入框的开头、结尾。
+- 数字键盘的空格可以左右拖动光标。
+- 手动加的词如果基础词库里已经有，码表里打不出来。
+
+### Main changes
+
+- **Glide typing**: slide across a word's letters and lift; in English, full pinyin, shuangpin, nine keys and the code tables
+  (not handwriting). Your own words glide, blocked words never come out, not in address, email or password fields, whose text is no word (a glide could only guess a wrong one, unseen in a password). Off by default; turn it on in 通用输入.
+- **Emoji among the candidates**: up to two from the third candidate on, in every pinyin layout and the code tables (after a code that commits itself, first in the next-word bar, a tap replaces the word); the emoji panel searches by pinyin.
+- **拆字**: in full pinyin, u then the pinyin of each part types a character you cannot read (`uniuniuniu` gives 犇).
+- **Sums**: type a sum and = and the result is offered on the bar (0.1+0.2 is 0.3); nothing for what cannot be worked out.
+- **Built-in date and time**: typing 日期, 时间 or 星期 offers today's date, the time or the weekday from the third candidate on, in every pinyin layout and the code tables; rq, sj, xq in full pinyin too. A deleted one stays gone; the switch is in 通用输入.
+- **One-handed and floating keyboard**: one-handed comes back at the side last used; the floating keyboard is a small window over the app that stays where you drag it.
+- **Settings rearranged**: a flat home of 10 entries; options all input methods share on one 通用输入 page; two dictionaries,
+  用户词库 and 基础词库, with one import entry that asks which one a file goes into.
+- **Voice**: the recognizer fine-tuned for accented Mandarin.
+
+### Smaller changes
+
+- Importing more than 1000 words into the user dictionary suggests the base dictionary and explains the difference; an export marks learned words and restores them as learned.
+- Imported words reach the code tables, and count as your own once typed in pinyin; voice favours words you added or imported, learned words less, blocked words not at all.
+- Nine keys: slide or long-press a digit key while typing to pick that candidate; 连按选字母 is strict
+  (on: quick presses pick the nth letter, 44 is h; off: each press is a key, the 1 key's marks too) and **now off by default**, also for users who never set it.
+- A clipboard item tapped goes back to the keyboard (粘贴后回到键盘, on by default); long-press ⌄ hides the keyboard while candidates show;
+  copy and cut say so and end the selection (not in hidden password fields).
+- The app's own fields learn nothing; several handwritten characters picked together are learned as a word.
+- Glided English words are capitalised as tapped ones are, with a space before them after a word or punctuation; 微软 and 紫光 shuangpin gain a ; key;
+  the voice build credits LibriSpeech; the manual is complete.
+- Coarse words wait past the first page; 忘记词汇 shows only where there is something to forget; tapping a custom phrase opens it for editing, with 删除.
+
+### Fixes
+
+- Nine keys: on the number board the digit keys typed letters (ABC); they type digits. A digit key slid while typing added the digit to the pinyin (你2); it picks that candidate.
+- 微软 and 紫光 shuangpin typed ; as a punctuation mark instead of a key.
+- In landscape, keyboard height 很高 covered the field; the docked keyboard now takes at most about 70% of the screen.
+- Pinyin: a character committed and then deleted with Backspace still steered the next word (你 deleted, riqi gave 脾气 before 日期).
+- Settings search opened a result's page without scrolling to it.
+- A key with a swipe symbol typed the wrong character when swiped another way; it types the key.
+- With the space's long press set to 无, a slow drag on the space did not move the cursor; a sideways drag on a repeating key still fired its long press.
+- The comma's long-press list; in a two-row popup the bottom row could not be picked.
+- The edit panel's |< >| go to the start and end of the field; the number board's space drags the cursor.
+- A word added by hand that the base dictionary already had could not be typed in the code tables.
 
 ---
 

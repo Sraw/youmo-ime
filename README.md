@@ -24,7 +24,9 @@
 - **手写**：一次写一个字，按整句理解，后写的字能改正前面认错的。
 - **码表**：五笔、仓颉、二笔、自然码、五笔拼音；重码按前文排，上屏后有联想。
 - **英文键盘**：自动纠错、补全、预测下一个词。
-- **横屏分体键盘、实体键盘**：横屏时字母键分成左右两半；接实体键盘时候选显示在光标旁。
+- **滑行输入**：英文、拼音、九键、码表都能一笔划出一个词（默认关）。
+- **表情和小工具**：候选里给出对应的表情，表情面板按拼音搜索；u 开头按部件拆字，算式后打 = 出结果，rq/sj/xq 出日期时间。
+- **横屏分体、单手、悬浮键盘，实体键盘**：横屏时字母键分成左右两半；键盘可以缩到一边单手打，或变成能拖动的小窗；接实体键盘时候选显示在光标旁。
 - **离线语音**（语音版）：按住空格说话，可以中英混说，自动加标点；目前只支持普通话和英语。
 - **越用越顺手**：记住你的用词；可以导入搜狗等词库；长按候选可以忘掉、置顶或屏蔽。
 
@@ -32,7 +34,7 @@
 
 ### 效果
 
-拼音首选正确率（%），2026-10-16 测，开着相邻键纠错（App 默认如此）：
+拼音首选正确率（%），2026-10-19 测，开着相邻键纠错（App 默认如此）：
 
 | | 主集 | 近期网页 | 聊天 | 对话 | 新词 |
 |---|---|---|---|---|---|
@@ -43,7 +45,7 @@
 
 ### 下载
 
-到 [Releases](https://github.com/Sraw/youmo-ime/releases) 下载：文字版约 310 MB，语音版约 480 MB（多申请录音权限）。
+到 [Releases](https://github.com/Sraw/youmo-ime/releases) 下载：文字版约 310 MB，语音版约 470 MB（多申请录音权限）。
 需要 Android 6.0 以上的 arm64 手机。模型和词库都在安装包里，所以包比较大。每月发一版，主要更新词库。
 
 ### 下一步计划
@@ -83,7 +85,9 @@ English, and offline voice input in the voice build. It asks for no network perm
 - **Handwriting**: one character at a time, read as a sentence, so a later character puts an earlier misread right.
 - **Code tables**: Wubi, Cangjie, Erbi, Ziranma, Wubi-Pinyin; candidates ordered by the text before, next-word suggestions.
 - **English keyboard**: autocorrection, completions, next-word predictions.
-- **Split keyboard in landscape, physical keyboards**: the letters split in two halves; with a keyboard, candidates show by the cursor.
+- **Glide typing**: one stroke for a word in English, pinyin, nine keys and the code tables (off by default).
+- **Emoji and small tools**: emoji among the candidates, the emoji panel searched by pinyin; characters typed by their parts (u…), sums worked out after =, the date and time from rq/sj/xq.
+- **Split, one-handed and floating keyboards, physical keyboards**: in landscape the letters split in two halves; the keyboard shrinks to one side or floats as a small window you drag; with a physical keyboard, candidates show by the cursor.
 - **Offline voice** (voice build): hold the space bar to talk, Mandarin and English mixed, punctuation added.
 - **Learns as you type**: your words; imported dictionaries (Sogou and others); long-press a candidate to forget, pin or block it.
 
@@ -91,7 +95,7 @@ The [user's manual](docs/README.md) (in Chinese) covers every feature and settin
 
 ### Accuracy
 
-Pinyin top-1 (%), measured 2026-10-16 with neighbouring-key correction on (the app's default):
+Pinyin top-1 (%), measured 2026-10-19 with neighbouring-key correction on (the app's default):
 
 | | Main | Recent web | Chat | Dialog | New words |
 |---|---|---|---|---|---|
@@ -102,7 +106,7 @@ Nine keys, main set: 88.8%. English with one key in 25 slipping: 73.8% of slippe
 
 ### Download
 
-From [Releases](https://github.com/Sraw/youmo-ime/releases): text build about 310 MB, voice build about 480 MB (asks for the microphone too).
+From [Releases](https://github.com/Sraw/youmo-ime/releases): text build about 310 MB, voice build about 470 MB (asks for the microphone too).
 Needs an arm64 phone on Android 6.0 or later. The models and dictionary are inside the APK, hence its size. A release a month, mostly for new words.
 
 ### Next
