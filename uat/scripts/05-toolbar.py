@@ -904,9 +904,9 @@ def tb32(d):
     rounded = corner_is_handle()
     home(d, "外观")
     d.tap_text("大小与样式", scroll=False, after=1.0)
-    d.switch("悬浮键盘圆角", False)
+    d.choose("按键圆角", "直角")
     d.open_page("text")
     square = corner_is_handle()
-    check(not rounded[0], f"开着时角上是横条的颜色 {rounded[2]}（横条 {rounded[1]}）")
-    check(square[0], f"关掉后角上不是横条的颜色 {square[2]}（横条 {square[1]}）")
-    return f"开：角 {rounded[2]}，横条 {rounded[1]}；关：角 {square[2]}"
+    check(not rounded[0], f"按键圆角是「圆角」时角上是横条的颜色 {rounded[2]}（横条 {rounded[1]}）")
+    check(square[0], f"按键圆角选「直角」后角上不是横条的颜色 {square[2]}（横条 {square[1]}）")
+    return f"圆角：角 {rounded[2]}，横条 {rounded[1]}；直角：角 {square[2]}"
