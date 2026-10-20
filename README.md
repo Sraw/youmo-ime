@@ -27,7 +27,7 @@
 - **滑行输入**：英文、拼音、九键、码表都能一笔划出一个词（默认关）。
 - **表情和小工具**：候选里给出对应的表情，表情面板按拼音搜索；u 开头按部件拆字，算式后打 = 出结果，rq/sj/xq 出日期时间。
 - **横屏分体、单手、悬浮键盘，实体键盘**：横屏时字母键分成左右两半；键盘可以缩到一边单手打，或变成能拖动的小窗；接实体键盘时候选显示在光标旁。
-- **离线语音**（语音版）：按住空格说话，可以中英混说，自动加标点；目前只支持普通话和英语。
+- **离线语音**（语音版）：按住空格说话，可以中英混说，自动加标点；带口音的普通话也能识别。目前只支持普通话和英语，还不支持方言。
 - **越用越顺手**：记住你的用词；可以导入搜狗等词库；长按候选可以忘掉、置顶或屏蔽。
 
 每项功能和设置的详细说明见[使用说明](docs/README.md)。
@@ -88,7 +88,7 @@ English, and offline voice input in the voice build. It asks for no network perm
 - **Glide typing**: one stroke for a word in English, pinyin, nine keys and the code tables (off by default).
 - **Emoji and small tools**: emoji among the candidates, the emoji panel searched by pinyin; characters typed by their parts (u…), sums worked out after =, the date and time from rq/sj/xq.
 - **Split, one-handed and floating keyboards, physical keyboards**: in landscape the letters split in two halves; the keyboard shrinks to one side or floats as a small window you drag; with a physical keyboard, candidates show by the cursor.
-- **Offline voice** (voice build): hold the space bar to talk, Mandarin and English mixed, punctuation added.
+- **Offline voice** (voice build): hold the space bar to talk, Mandarin and English mixed, punctuation added; accented Mandarin understood too. No dialects yet.
 - **Learns as you type**: your words; imported dictionaries (Sogou and others); long-press a candidate to forget, pin or block it.
 
 The [user's manual](docs/README.md) (in Chinese) covers every feature and setting.
