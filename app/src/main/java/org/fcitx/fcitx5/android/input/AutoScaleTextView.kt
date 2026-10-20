@@ -9,6 +9,9 @@ import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.Rect
+import android.text.Layout
+import android.text.Spanned
+import android.text.StaticLayout
 import android.util.AttributeSet
 import android.view.Gravity
 import android.widget.TextView
@@ -54,8 +57,12 @@ class AutoScaleTextView @JvmOverloads constructor(
     private var textScaleX = 1.0f
     private var textScaleY = 1.0f
 
+    // a text with spans (one part smaller or fainter: 九键's 中/英) laid out by the platform, which
+    // draws them; drawn as a plain string they were lost
+    private var styled: Layout? = null
+
     override fun setText(charSequence: CharSequence?, bufferType: BufferType) {
-        if (charSequence == null || !text.contentEquals(charSequence)) {
+        if (charSequence == null || changes(charSequence)) {
             needsMeasureText = true
             needsCalculateTransform = true
             super.setText(charSequence, bufferType)
@@ -63,6 +70,9 @@ class AutoScaleTextView @JvmOverloads constructor(
             invalidate()
         }
     }
+
+    // the same characters styled otherwise are a change too
+    private fun changes(to: CharSequence) = !text.contentEquals(to) || to is Spanned || text is Spanned
 
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
         val widthMode = MeasureSpec.getMode(widthMeasureSpec)
@@ -90,7 +100,13 @@ class AutoScaleTextView @JvmOverloads constructor(
             val paint = paint
             paint.getFontMetrics(fontMetrics)
             val codePointCount = Character.codePointCount(text, 0, text.length)
-            if (codePointCount == 1) {
+            val spanned = text as? Spanned
+            styled = null
+            if (spanned != null) {
+                val width = ceil(Layout.getDesiredWidth(spanned, paint)).toInt()
+                styled = StaticLayout.Builder.obtain(spanned, 0, spanned.length, paint, max(width, 1)).setIncludePad(false).build()
+                textBounds.set(0, floor(fontMetrics.top).toInt(), width, ceil(fontMetrics.bottom).toInt())
+            } else if (codePointCount == 1) {
                 // use actual text bounds when there is only one "character",
                 // e.g. full-width punctuation
                 paint.getTextBounds(text.toString(), 0, text.length, textBounds)
@@ -194,7 +210,14 @@ class AutoScaleTextView @JvmOverloads constructor(
             translate(scrollX.toFloat(), scrollY.toFloat())
             translate(baselineX, baselineY)
             scale(textScaleX, textScaleY)
-            drawText(text.toString(), 0.0f, 0.0f, paint)
+            val layout = styled
+            if (layout != null) {
+                // its first line's baseline where the plain text's is
+                translate(0.0f, -layout.getLineBaseline(0).toFloat())
+                layout.draw(this)
+            } else {
+                drawText(text.toString(), 0.0f, 0.0f, paint)
+            }
         }
     }
 

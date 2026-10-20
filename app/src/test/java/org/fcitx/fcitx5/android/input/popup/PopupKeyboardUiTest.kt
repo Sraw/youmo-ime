@@ -5,15 +5,13 @@
 package org.fcitx.fcitx5.android.input.popup
 
 import android.graphics.Rect
-import android.graphics.drawable.ColorDrawable
-import android.graphics.drawable.LayerDrawable
-import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
 import android.widget.TextView
 import org.fcitx.fcitx5.android.data.theme.ThemePreset
 import org.fcitx.fcitx5.android.input.keyboard.KeyAction
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -39,7 +37,7 @@ class PopupKeyboardUiTest {
 
     private fun popup(
         keys: Array<String>, trigger: Rect, outerBounds: Rect = outer, minKeyWidth: Int = keyWidth, split: Int = keys.size,
-        asIs: Boolean = false,
+        asIs: Boolean = false, inRow: Int = -1,
     ): PopupKeyboardUi {
         return PopupKeyboardUi(
             ctx = RuntimeEnvironment.getApplication(),
@@ -54,6 +52,7 @@ class PopupKeyboardUiTest {
             labels = keys,
             split = split,
             asIs = asIs,
+            inRow = inRow,
         )
     }
 
@@ -119,12 +118,27 @@ class PopupKeyboardUiTest {
         assertEquals(drawn["7"]!!.second, drawn["*"]!!.second)
         val rows = ui.root.childCount
         drawn.forEach { (label, cell) -> assertEquals(KeyAction.FcitxKeyAction(label), ui.select(cell.first, cell.second, rows)) }
-        // a line under the first row of symbols alone
-        val backgrounds = (0 until rows).map { ui.root.getChildAt(rows - 1 - it).background }
-        assertEquals(listOf(false, true, false), backgrounds.map { it != null })
-        val line = (backgrounds[1] as LayerDrawable).getDrawable(0) as ColorDrawable
-        assertEquals(ThemePreset.PixelDark.dividerColor, line.color)
-        assertEquals(Gravity.BOTTOM or Gravity.FILL_HORIZONTAL, (backgrounds[1] as LayerDrawable).getLayerGravity(0))
+        // no line between them
+        assertTrue((0 until rows).all { ui.root.getChildAt(it).background == null })
+    }
+
+    @Test
+    fun aRowInOrderIsDrawnSoTheKeyGivenUnderTheFinger() {
+        // 九键's 2: A B C 2 a b c in one row, the digit under the finger, its symbols above round it
+        val keys = arrayOf("A", "B", "C", "2", "a", "b", "c", "@", "!", "\"")
+        val trigger = Rect(480, 500, 520, 550)
+        val ui = popup(keys, trigger, split = 7, inRow = 3)
+        val drawn = drawn(ui)
+        assertEquals((0 until 7).map { 0 to it }, keys.take(7).map { drawn[it] })
+        assertEquals(KeyAction.FcitxKeyAction("2"), ui.onTrigger())
+        assertEquals(drawn["2"]!!.second, drawn["@"]!!.second)
+        assertTrue(keys.drop(7).all { drawn[it]!!.first == 1 })
+        // the digit centred over the key, room enough either side
+        assertEquals(trigger.left + (trigger.width() - ui.keyWidth) / 2, trigger.left + ui.focusedKeyLeft)
+        // too many to fit across at full width: narrower, all in the one row still
+        val narrow = popup(keys, trigger, outerBounds = Rect(0, 0, 7 * keyWidth / 2, 2000), split = 7, inRow = 3)
+        assertEquals(keyWidth / 2, narrow.keyWidth)
+        assertEquals(KeyAction.FcitxKeyAction("2"), narrow.onTrigger())
     }
 
     @Test
@@ -138,8 +152,6 @@ class PopupKeyboardUiTest {
         assertTrue(drawn.filterKeys { it in keys.drop(7) }.values.all { it.first == 2 })
         val rows = ui.root.childCount
         assertEquals(3, rows)
-        val backgrounds = (0 until rows).map { ui.root.getChildAt(rows - 1 - it).background }
-        assertEquals(listOf(false, false, true), backgrounds.map { it != null })
     }
 
     @Test
@@ -311,5 +323,33 @@ class PopupKeyboardUiTest {
         val first = cells.entries.first { it.value.first == 0 }
         ui.onChangeFocus((first.value.second + 0.5f) * keyWidth, rows * keyHeight + 30f)
         assertEquals(KeyAction.FcitxKeyAction(first.key), ui.onTrigger())
+    }
+
+    @Test
+    fun atAnEdgeTheDigitKeepsTheFocusTillTheFingerLeavesTheKey() {
+        // 九键's 2 at the left: seven keys fit across only narrower, so the row fills the screen and
+        // its digit is in the middle, not over the key
+        val keys = arrayOf("A", "B", "C", "2", "a", "b", "c")
+        val ui = popup(keys, Rect(0, 500, 40, 550), outerBounds = Rect(0, 0, 7 * keyWidth / 2, 2000), split = 7, inRow = 3)
+        // a jitter on the key: B is drawn under it, the digit stays
+        assertFalse(ui.changeFocus(25f, 20f))
+        assertEquals(KeyAction.FcitxKeyAction("2"), ui.onTrigger())
+        // off the key, up over the row: what is drawn there
+        ui.changeFocus(5f, -30f)
+        assertEquals(KeyAction.FcitxKeyAction("A"), ui.onTrigger())
+        // and back down on the key, what is under the finger still
+        ui.changeFocus(25f, 20f)
+        assertEquals(KeyAction.FcitxKeyAction("B"), ui.onTrigger())
+    }
+
+    @Test
+    fun aKeyOfNoLettersStillHasItsSymbolsFiveARow() {
+        // a 1 the user left with its digit alone: its ten symbols two rows of five, not ten of one
+        val keys = arrayOf("1") + Array(10) { "#$it" }
+        val ui = popup(keys, Rect(480, 500, 520, 550), split = 1, inRow = 0)
+        val drawn = drawn(ui)
+        assertEquals(3, ui.root.childCount)
+        assertEquals(0 to 0, drawn["1"])
+        assertEquals(KeyAction.FcitxKeyAction("1"), ui.onTrigger())
     }
 }

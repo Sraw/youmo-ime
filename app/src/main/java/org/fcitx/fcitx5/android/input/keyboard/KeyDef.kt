@@ -146,13 +146,21 @@ open class KeyDef(
 
             /**
              * [items], typed as keys (one character) or committed (longer); those from [symbolsFrom]
-             * are symbols set apart: rows of their own above the rest, a line between, each shown as
-             * Chinese punctuation maps it, typed as a key the engine maps. [asIs]: every item is
-             * committed as it is, never a key (none set apart then: nothing would map them).
+             * are symbols set apart: rows of their own above the rest, each shown as Chinese
+             * punctuation maps it, typed as a key the engine maps. [asIs]: every item is committed as
+             * it is, never a key (none set apart then: nothing would map them). [inRow]: the items
+             * before the symbols in one row, in their order (A B C 2 a b c), the one at [inRow] under
+             * the finger first; -1, round it, the first under the finger.
              */
-            class Explicit(val items: Array<String>, val symbolsFrom: Int = items.size, val asIs: Boolean = false) : Keyboard() {
+            class Explicit(
+                val items: Array<String>,
+                val symbolsFrom: Int = items.size,
+                val asIs: Boolean = false,
+                val inRow: Int = -1,
+            ) : Keyboard() {
                 init {
                     require(!asIs || symbolsFrom >= items.size) { "symbols committed as they are are not mapped" }
+                    require(inRow < minOf(symbolsFrom, items.size)) { "the key first under the finger is one of the row" }
                 }
             }
         }

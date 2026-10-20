@@ -160,6 +160,7 @@ class PopupComponent :
         var labels: Array<String>
         val split: Int
         var asIs = false
+        var inRow = -1
         when (keyboard) {
             is KeyDef.Popup.Keyboard.Preset -> {
                 val preset = PopupOverridesCache.user.current.longPressOf(keyboard.label) ?: return
@@ -172,6 +173,7 @@ class PopupComponent :
             is KeyDef.Popup.Keyboard.Explicit -> {
                 split = keyboard.symbolsFrom
                 asIs = keyboard.asIs
+                inRow = keyboard.inRow
                 keys = keyboard.items
                 labels = explicitLabels(keyboard) { if (punctuation.enabled) punctuation.transform(it) else it }
             }
@@ -194,6 +196,7 @@ class PopupComponent :
             labels,
             split,
             asIs,
+            inRow,
         )
         // the bubble under the key in focus, its width and place (moved in at an edge): one shape
         place(entry, bounds, keyboardUi.keyWidth, bounds.left + keyboardUi.focusedKeyLeft)
