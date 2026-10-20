@@ -158,8 +158,8 @@ class PopupComponent :
     private fun showKeyboard(viewId: Int, keyboard: KeyDef.Popup.Keyboard, bounds: Rect) {
         var keys: Array<String>
         var labels: Array<String>
-        var split = Int.MAX_VALUE
-        var asTyped = false
+        val split: Int
+        var asIs = false
         when (keyboard) {
             is KeyDef.Popup.Keyboard.Preset -> {
                 val preset = PopupOverridesCache.user.current.longPressOf(keyboard.label) ?: return
@@ -167,10 +167,11 @@ class PopupComponent :
                 labels = if (keyboard.transformPunctuation && punctuation.enabled) {
                     Array(keys.size) { punctuation.transform(keys[it]) }
                 } else keys
+                split = keys.size
             }
             is KeyDef.Popup.Keyboard.Explicit -> {
                 split = keyboard.symbolsFrom
-                asTyped = keyboard.asTyped
+                asIs = keyboard.asIs
                 keys = keyboard.items
                 labels = explicitLabels(keyboard) { if (punctuation.enabled) punctuation.transform(it) else it }
             }
@@ -192,7 +193,7 @@ class PopupComponent :
             keys,
             labels,
             split,
-            asTyped,
+            asIs,
         )
         // the bubble under the key in focus, its width and place (moved in at an edge): one shape
         place(entry, bounds, keyboardUi.keyWidth, bounds.left + keyboardUi.focusedKeyLeft)

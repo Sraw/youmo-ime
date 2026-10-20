@@ -5,6 +5,9 @@
 package org.fcitx.fcitx5.android.input.popup
 
 import android.graphics.Rect
+import android.graphics.drawable.ColorDrawable
+import android.graphics.drawable.LayerDrawable
+import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
 import android.widget.TextView
@@ -36,7 +39,7 @@ class PopupKeyboardUiTest {
 
     private fun popup(
         keys: Array<String>, trigger: Rect, outerBounds: Rect = outer, minKeyWidth: Int = keyWidth, split: Int = keys.size,
-        asTyped: Boolean = false,
+        asIs: Boolean = false,
     ): PopupKeyboardUi {
         return PopupKeyboardUi(
             ctx = RuntimeEnvironment.getApplication(),
@@ -50,7 +53,7 @@ class PopupKeyboardUiTest {
             keys = keys,
             labels = keys,
             split = split,
-            asTyped = asTyped,
+            asIs = asIs,
         )
     }
 
@@ -119,11 +122,29 @@ class PopupKeyboardUiTest {
         // a line under the first row of symbols alone
         val backgrounds = (0 until rows).map { ui.root.getChildAt(rows - 1 - it).background }
         assertEquals(listOf(false, true, false), backgrounds.map { it != null })
+        val line = (backgrounds[1] as LayerDrawable).getDrawable(0) as ColorDrawable
+        assertEquals(ThemePreset.PixelDark.dividerColor, line.color)
+        assertEquals(Gravity.BOTTOM or Gravity.FILL_HORIZONTAL, (backgrounds[1] as LayerDrawable).getLayerGravity(0))
+    }
+
+    @Test
+    fun underTwoRowsOfLettersTheSymbolsStillHaveRowsOfTheirOwn() {
+        // a 9 the user gave 6 letters: its digit and letters take 2 rows, the symbols the 3rd
+        val keys = arrayOf("9", "w", "x", "y", "z", "ä", "ö", ":", "'", "~")
+        val ui = popup(keys, Rect(480, 500, 520, 550), split = 7)
+        val drawn = drawn(ui)
+        assertEquals(keys.size, drawn.size)
+        assertTrue(drawn.filterKeys { it in keys.take(7) }.values.all { it.first in 0..1 })
+        assertTrue(drawn.filterKeys { it in keys.drop(7) }.values.all { it.first == 2 })
+        val rows = ui.root.childCount
+        assertEquals(3, rows)
+        val backgrounds = (0 until rows).map { ui.root.getChildAt(rows - 1 - it).background }
+        assertEquals(listOf(false, false, true), backgrounds.map { it != null })
     }
 
     @Test
     fun withNoneSetApartAPopupIsAsBefore() {
-        // as PopupComponent passes it for a popup with none; 7 keys: 4 columns, the 2nd in focus
+        // none set apart, the split at either end (PopupComponent passes the key count); 7 keys: 4 columns, the 2nd in focus
         // (centre, right, left, right), the top row's last slot empty
         val keys = Array(7) { ('a' + it).toString() }
         val expected = mapOf(
@@ -132,12 +153,13 @@ class PopupKeyboardUiTest {
         )
         assertEquals(expected, drawn(popup(keys, Rect(480, 500, 520, 550), split = Int.MAX_VALUE)))
         assertEquals(expected, drawn(popup(keys, Rect(480, 500, 520, 550), split = 0)))
+        assertEquals(expected, drawn(popup(keys, Rect(480, 500, 520, 550), split = keys.size)))
     }
 
     // 九键's 1: . committed as it is, not a key the engine would make 。
     @Test
-    fun asTypedEveryKeyIsCommittedAsItIs() {
-        val ui = popup(arrayOf(".", "-"), Rect(480, 500, 520, 550), asTyped = true)
+    fun asIsEveryKeyIsCommittedAsItIs() {
+        val ui = popup(arrayOf(".", "-"), Rect(480, 500, 520, 550), asIs = true)
         assertEquals(KeyAction.CommitAction("."), ui.onTrigger())
         assertEquals(KeyAction.FcitxKeyAction("."), popup(arrayOf(".", "-"), Rect(480, 500, 520, 550)).onTrigger())
     }

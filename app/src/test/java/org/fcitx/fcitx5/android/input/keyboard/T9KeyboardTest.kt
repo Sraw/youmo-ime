@@ -138,6 +138,12 @@ class T9KeyboardTest {
             val picked = KeyAction.CommitAction(symbol)
             assertEquals(symbol, picked, T9Keyboard.resolve(picked, popup, tap, 0, composing = true))
         }
+        // and a 2 pressed again soon after one is a 2 anew, not the next letter
+        val two = KeyAction.FcitxKeyAction("2")
+        val keys = KeyActionListener.Source.Keyboard
+        assertEquals(two, T9Keyboard.resolve(two, keys, tap, 1000))
+        T9Keyboard.resolve(PopupKeyboardUi.keyAction("!"), popup, tap, 1100, composing = true)
+        assertEquals(two, T9Keyboard.resolve(two, keys, tap, 1200))
     }
 
     @Test
@@ -149,10 +155,10 @@ class T9KeyboardTest {
         val two = popup("2")!!
         assertEquals(listOf("2", "a", "b", "c", "@", "!", "\""), two.items.toList())
         assertEquals(4, two.symbolsFrom)
-        assertEquals(false, two.asTyped)
+        assertEquals(false, two.asIs)
         val one = T9Keyboard.layout(NineKeyLetters.STANDARD).flatten()
             .single { (it.appearance as? KeyDef.Appearance.AltText)?.altText == "1" }.popup!!.single() as KeyDef.Popup.Keyboard.Explicit
-        assertEquals(true, one.asTyped)
+        assertEquals(true, one.asIs)
         assertEquals(listOf("5", "j", "k", "l", "【", "】"), popup("5")!!.items.toList())
         // 1 with none: no long press
         assertEquals(null, popup("1"))

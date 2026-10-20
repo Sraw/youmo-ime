@@ -442,6 +442,7 @@
     <string name="t9_symbols_field_hint">預設：%1$s</string>
     <string name="t9_symbols_editor_hint">用空格分開，最多 %1$d 個。單個的數字和字母不能填：長按選它們是當按鍵用的（選候選、打拼音），打不出它們本身。清空就是這個鍵不加符號。</string>
     <string name="t9_symbols_reset_all_message">把所有鍵的長按符號恢復成預設？</string>
+    <string name="t9_symbols_none_kept">填的都是單個的數字或字母，不能做符號，這個鍵沒有改。</string>
     <string name="im_model_level">效能檔位</string>
     <string name="im_model_level_summary">檔位越高越準，也越耗電</string>
     <string name="im_model_level_low">低檔：只按詞頻和搭配，最省電</string>

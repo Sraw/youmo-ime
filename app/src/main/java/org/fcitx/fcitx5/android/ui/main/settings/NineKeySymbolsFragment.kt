@@ -24,6 +24,7 @@ import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.input.keyboard.NineKeySymbols
 import org.fcitx.fcitx5.android.utils.styledColor
+import org.fcitx.fcitx5.android.utils.toast
 import splitties.dimensions.dp
 import splitties.views.dsl.core.add
 import splitties.views.dsl.core.horizontalLayout
@@ -131,7 +132,12 @@ class NineKeySymbolsFragment : Fragment() {
             .setView(box)
             .setPositiveButton(android.R.string.ok) { _, _ ->
                 // emptied, the key offers none: its defaults are the reset button's
-                save(current.with(digit, NineKeySymbols.split(field.text.toString())))
+                val kept = NineKeySymbols.edited(field.text.toString())
+                if (kept == null) {
+                    ctx.toast(R.string.t9_symbols_none_kept)
+                    return@setPositiveButton
+                }
+                save(current.with(digit, kept))
                 rebuild()
             }
             .setNegativeButton(android.R.string.cancel, null)

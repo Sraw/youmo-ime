@@ -456,6 +456,7 @@
     <string name="t9_symbols_field_hint">Default: %1$s</string>
     <string name="t9_symbols_editor_hint">Apart by spaces, up to %1$d. A digit or a letter alone is not kept: a long press types those as keys, not as themselves. Emptied, the key offers none.</string>
     <string name="t9_symbols_reset_all_message">Put every key back to its default symbols?</string>
+    <string name="t9_symbols_none_kept">None of those can be a symbol (a digit or a letter alone): the key is left as it was.</string>
     <string name="im_model_level">Performance level</string>
     <string name="im_model_level_summary">Higher picks better and uses more battery</string>
     <string name="im_model_level_low">Low: by how common words and pairs are, least battery</string>

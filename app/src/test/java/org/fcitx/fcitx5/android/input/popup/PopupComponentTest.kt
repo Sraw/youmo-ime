@@ -7,14 +7,18 @@ package org.fcitx.fcitx5.android.input.popup
 import android.graphics.Rect
 import android.view.ContextThemeWrapper
 import android.view.View
+import android.view.ViewGroup
 import android.widget.FrameLayout
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.data.theme.ThemePreset
+import org.fcitx.fcitx5.android.input.broadcast.PunctuationComponent
+import org.fcitx.fcitx5.android.input.keyboard.KeyAction
 import org.fcitx.fcitx5.android.input.keyboard.KeyDef
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
+import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -53,6 +57,8 @@ class PopupComponentTest {
         val theme: Theme = ThemePreset.PixelDark
         scope += context.wrapToUniqueComponent()
         scope += theme.wrapToUniqueComponent()
+        // off (no engine here): a symbol shown as it is
+        scope += PunctuationComponent()
         scope += popup
         layOut()
     }
@@ -130,5 +136,27 @@ class PopupComponentTest {
         assertEquals(listOf("2", "a", "！", "@"), PopupComponent.explicitLabels(nineKey) { map[it] ?: it }.toList())
         // none set apart (1's, everyone else's): none mapped
         assertEquals(listOf("1", "2", "3", "4", "5"), PopupComponent.explicitLabels(five) { "x" }.toList())
+    }
+
+    // what a key's popup is made with goes on to the keys shown: 1's committed as they are, 九键's
+    // symbols in rows of their own
+    @Test
+    fun aKeyboardsWayOfTypingAndItsSymbolsReachTheKeysShown() {
+        var id = ID
+        // each on a key of its own (a dismissal runs in the IME's scope, not here)
+        fun shown(keyboard: KeyDef.Popup.Keyboard.Explicit): Pair<KeyAction?, Int> {
+            send(PopupAction.ShowKeyboardAction(++id, keyboard, key))
+            layOut()
+            // the long press's keys, added last: a row a child
+            val rows = (popup.root.getChildAt(popup.root.childCount - 1) as ViewGroup).childCount
+            return PopupAction.TriggerAction(id).also { send(it) }.outAction to rows
+        }
+        assertEquals(KeyAction.CommitAction(".") to 1, shown(KeyDef.Popup.Keyboard.Explicit(arrayOf(".", "-"), asIs = true)))
+        assertEquals(KeyAction.FcitxKeyAction(".") to 1, shown(KeyDef.Popup.Keyboard.Explicit(arrayOf(".", "-"))))
+        assertEquals(2, shown(KeyDef.Popup.Keyboard.Explicit(arrayOf("2", "a", "!"), symbolsFrom = 2)).second)
+        // committed as they are, none can be set apart to be mapped
+        assertThrows(IllegalArgumentException::class.java) {
+            KeyDef.Popup.Keyboard.Explicit(arrayOf("a", "!"), symbolsFrom = 1, asIs = true)
+        }
     }
 }

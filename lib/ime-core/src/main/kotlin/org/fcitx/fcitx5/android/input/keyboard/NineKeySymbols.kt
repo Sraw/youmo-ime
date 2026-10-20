@@ -69,6 +69,13 @@ class NineKeySymbols private constructor(private val edited: Map<Char, List<Stri
         }
 
         /**
+         * What a key is set to from [typed]: its [split] symbols, none for nothing typed; null when
+         * something was typed and none of it kept (digits or letters alone), so the key is left as
+         * it was rather than emptied unasked.
+         */
+        fun edited(typed: String): List<String>? = split(typed).takeIf { it.isNotEmpty() || typed.isBlank() }
+
+        /**
          * [typed]'s symbols, apart by spaces (a full-width one too), as a key keeps them: [allowed]
          * ones, each once, [MAX] at most.
          */

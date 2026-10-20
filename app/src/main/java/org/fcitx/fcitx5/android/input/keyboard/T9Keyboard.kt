@@ -201,7 +201,7 @@ class T9Keyboard(
                     // its symbols alone, none set apart: it has no letters; typed as they are, not
                     // through the engine, where . would be 。
                     symbols.symbols('1').takeIf { it.isNotEmpty() }?.let {
-                        arrayOf(KeyDef.Popup.Keyboard.Explicit(it.toTypedArray(), asTyped = true))
+                        arrayOf(KeyDef.Popup.Keyboard.Explicit(it.toTypedArray(), asIs = true))
                     },
                 ),
                 digitKey('2', letters.letters('2').uppercase(), symbols.symbols('2')),

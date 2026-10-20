@@ -46,7 +46,7 @@ import kotlin.math.min
  * @param labels symbols to show on keys
  * @param split where the keys set apart start: drawn in rows of their own above the others, a
  * line between; none past the last key
- * @param asTyped every key committed as it is, never typed as a key ([keyAction])
+ * @param asIs every key committed as it is, never typed as a key ([keyAction])
  */
 class PopupKeyboardUi(
     override val ctx: Context,
@@ -61,7 +61,7 @@ class PopupKeyboardUi(
     private val keys: Array<String>,
     private val labels: Array<String>,
     split: Int = keys.size,
-    private val asTyped: Boolean = false,
+    private val asIs: Boolean = false,
 ) : PopupContainerUi(ctx, theme, outerBounds, triggerBounds, onDismissSelf) {
 
     class PopupKeyUi(override val ctx: Context, val theme: Theme, val text: String) : Ui {
@@ -96,8 +96,9 @@ class PopupKeyboardUi(
 
     // the keys before the split, then those from it (if any): each group's first index and size,
     // and how many rows it takes, from the bottom
-    private val groups: List<IntRange> = listOf(0 until split.coerceIn(0, keys.size), split.coerceIn(0, keys.size) until keys.size)
-        .filter { !it.isEmpty() }.ifEmpty { listOf(keys.indices) }
+    private val groups: List<IntRange> = split.coerceIn(0, keys.size).let { at ->
+        listOf(0 until at, at until keys.size).filter { !it.isEmpty() }.ifEmpty { listOf(keys.indices) }
+    }
     private val groupRows: List<Int>
 
     // those 2 variables meas initial focus row/column during initialization
@@ -206,7 +207,10 @@ class PopupKeyboardUi(
     private val keyOrders = groups.flatMapIndexed { g, group ->
         List(groupRows[g]) { r ->
             // a slot past its group's keys is empty: -1
-            IntArray(columnCount) { col -> (group.first + r * columnCount + columnOrder[col]).takeIf { it <= group.last } ?: -1 }
+            IntArray(columnCount) { col ->
+                val index = group.first + r * columnCount + columnOrder[col]
+                if (index <= group.last) index else -1
+            }
         }
     }.toTypedArray()
 
@@ -283,7 +287,7 @@ class PopupKeyboardUi(
 
     override fun onTrigger(): KeyAction? {
         val key = keys.getOrNull(focusedIndex) ?: return null
-        return if (asTyped) KeyAction.CommitAction(key) else keyAction(key)
+        return if (asIs) KeyAction.CommitAction(key) else keyAction(key)
     }
 
     companion object {

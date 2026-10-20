@@ -165,7 +165,7 @@ the rest of 搜狗's column. `KeyDef.Popup.Keyboard.Explicit.symbolsFrom` sets 2
 as Chinese punctuation maps them and typed as keys to the engine, as the full keyboard's long
 press is (the first candidate, then the mark: quotes in turn, brackets paired; `'` while
 typing is the syllable separator, as there). 1's are
-`asTyped`, committed as they are (`.` not `。`). A digit or a lone letter is never a symbol: the
+`asIs`, committed as they are (`.` not `。`). A digit or a lone letter is never a symbol: the
 long press types those as the key's own. (A probe with `adb shell input text` showed the nine
 keys committing the pinyin as typed before a mark: that is a hardware key's path, not the screen's.)
 

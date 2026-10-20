@@ -47,6 +47,15 @@ class NineKeySymbolsTest {
     }
 
     @Test
+    fun typedOnlyWhatIsRefusedTheKeyIsLeftAsItWas() {
+        assertEquals(null, NineKeySymbols.edited("a"))
+        assertEquals(null, NineKeySymbols.edited("1 2"))
+        assertEquals(emptyList<String>(), NineKeySymbols.edited(""))
+        assertEquals(emptyList<String>(), NineKeySymbols.edited("  "))
+        assertEquals(listOf("，"), NineKeySymbols.edited("a ，"))
+    }
+
+    @Test
     fun aFullWidthSpaceSeparatesToo() {
         assertEquals(listOf("【", "】", "·"), NineKeySymbols.split("【\u3000】\u00A0·"))
     }
