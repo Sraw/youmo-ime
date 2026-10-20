@@ -3,7 +3,7 @@
 每个版本分两部分：**主要变化**是新功能和大的改进，**小改动**是用户能感觉到的细节，**修复**是改掉的问题（0.3.0 起单列）。
 只记用户看得到、用得到的变化；内部重构、测试、构建的改动不列。
 
-Each release lists its **main changes** (new features, large improvements) its **smaller changes**
+Each release lists its **main changes** (new features, large improvements), its **smaller changes**
 (details a user notices) and, from 0.3.0, its **fixes**. Internal refactoring, tests and build changes are left out.
 
 ---
@@ -31,7 +31,7 @@ Each release lists its **main changes** (new features, large improvements) its *
 - 导出用户词库时标出学到的词，再导入时仍算学到的词；旧的导出文件导回来算手动加的词。
 - 导入的词全部进码表；导入的词在拼音里打过一次，就算你自己的词。
 - 语音：手动加的词和导入的词优先识别，学到的词照顾得轻一些，屏蔽的词不照顾。
-- 九键：打字时在数字键上滑或长按，直接选对应序号的候选。
+- 九键：打字时长按数字键，直接选对应序号的候选。
 - 九键「连按选字母」改成严格：打开时快速连按就是第几个字母（44 是 h），关着时每按一下都是一个键；1 键连按换标点也跟着这个设置。
   **默认改为关**，没改过这个设置的用户升级后是关。
 - 剪贴板里点一条粘贴后回到键盘（「剪贴板与表情」里的「粘贴后回到键盘」，默认开）。
@@ -40,7 +40,6 @@ Each release lists its **main changes** (new features, large improvements) its *
 - 本应用自己的输入框什么都不学。
 - 手写连写多个字后选词，整段记成一个词（和拼音一样）。
 - 滑行出的英文词跟点击一样大写：输入框要求才大写，专有名词保持原样；在词或标点后面滑会自动补空格，撤回滑出的词连空格一起删。
-- 微软双拼、紫光双拼在 L 右边加了 ; 键。
 - 语音版的许可页补上 LibriSpeech 的署名。
 - 帮助文档补全。
 - 粗俗的词等第一页之后才出，多收了一些这类词。
@@ -65,7 +64,7 @@ Each release lists its **main changes** (new features, large improvements) its *
 ### Main changes
 
 - **Glide typing**: slide across a word's letters and lift; in English, full pinyin, shuangpin, nine keys and the code tables
-  (not handwriting). Your own words glide, blocked words never come out, not in address, email or password fields, whose text is no word (a glide could only guess a wrong one, unseen in a password). Off by default; turn it on in 通用输入.
+  (not handwriting). Your own words glide and blocked words never come out. Glide typing is off in address, email and password fields: their text is no word (a glide could only guess a wrong one, unseen in a password). Off by default; turn it on in 通用输入.
 - **Emoji among the candidates**: up to two from the third candidate on, in every pinyin layout and the code tables (after a code that commits itself, first in the next-word bar, a tap replaces the word); the emoji panel searches by pinyin.
 - **拆字**: in full pinyin, u then the pinyin of each part types a character you cannot read (`uniuniuniu` gives 犇).
 - **Sums**: type a sum and = and the result is offered on the bar (0.1+0.2 is 0.3); nothing for what cannot be worked out.
@@ -79,12 +78,12 @@ Each release lists its **main changes** (new features, large improvements) its *
 
 - Importing more than 1000 words into the user dictionary suggests the base dictionary and explains the difference; an export marks learned words and restores them as learned.
 - Imported words reach the code tables, and count as your own once typed in pinyin; voice favours words you added or imported, learned words less, blocked words not at all.
-- Nine keys: slide or long-press a digit key while typing to pick that candidate; 连按选字母 is strict
+- Nine keys: long-press a digit key while typing to pick that candidate; 连按选字母 is strict
   (on: quick presses pick the nth letter, 44 is h; off: each press is a key, the 1 key's marks too) and **now off by default**, also for users who never set it.
 - A clipboard item tapped goes back to the keyboard (粘贴后回到键盘, on by default); long-press ⌄ hides the keyboard while candidates show;
   copy and cut say so and end the selection (not in hidden password fields).
 - The app's own fields learn nothing; several handwritten characters picked together are learned as a word.
-- Glided English words are capitalised as tapped ones are, with a space before them after a word or punctuation; 微软 and 紫光 shuangpin gain a ; key;
+- Glided English words are capitalised as tapped ones are, with a space before them after a word or punctuation;
   the voice build credits LibriSpeech; the manual is complete.
 - Coarse words wait past the first page; 忘记词汇 shows only where there is something to forget; tapping a custom phrase opens it for editing, with 删除.
 

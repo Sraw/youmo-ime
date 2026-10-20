@@ -115,7 +115,8 @@ place of the unit tests. A change in behaviour changes its cases in the same cha
 the case files hold no results. `uat/README.md` has the format, the baselines and the reset.
 
 The runner, `uat/tools/uat.py`: `up` / `down` (two redroids, `youmo-redroid` on 5556 and
-`youmo-redroid2` on 5557), `run [--areas] [--ids] [--devices]`, `mark` (a visual case after its sheet
+`youmo-redroid2` on 5557), `run [--areas] [--ids] [--devices]` (`UAT_BUILD=release`: on the signed x86_64
+release APK, the debug package uninstalled first), `mark` (a visual case after its sheet
 is seen), `emu-up` / `emu-down`. One script per case file (`uat/scripts/<file>.py`; handwriting's
 strokes in `hw_strokes.py`); the UI read back by a resident `Dumper.java`; visual cases go on contact
 sheets, reviewed per `uat/tools/sheet-review.md`. Details in `uat/README.md`.
