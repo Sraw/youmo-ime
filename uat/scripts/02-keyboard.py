@@ -3,7 +3,7 @@ import subprocess
 import time
 
 from uat import (Blocked, Skip, GRID_BOTTOM, GRID_TOP, case, check, emoji_tab_xy, first, flick, glide_on,
-                 glide_shot, has, home, key_texts, open_url, popup, popup_pick, popup_slide)
+                 glide_shot, has, home, key_texts, open_url, popup, popup_pick, popup_slide, script)
 
 
 def tap_key(d, label, after=0.5):
@@ -148,7 +148,9 @@ def kb10(d):
     if not tone:
         d.touch(("up", *thumb.c))
         raise Blocked(f"长按 👍 没有弹出 👍🏽：{[n.text for n in s.ime() if n.text.startswith('👍')]}")
-    popup_slide(d, thumb.c, tone)
+    # the popup's own keys (the tones in a row above 👍): its focus is read from them, not popup()'s
+    row = [n for n in s.ime() if n.text.startswith("👍") and n.b[3] <= thumb.b[1] + 10]
+    popup_slide(d, thumb.c, tone, items=row, key="👍")
     t = d.field_text()
     if t != "👍🏽":
         raise Blocked(f"前提没到：框里「{t}」")
@@ -640,3 +642,36 @@ def kb39(d):
     check(sorted(up) == list("ABCDEFGHIJKLMNOPQRSTUVWXYZ"), f"开了 Shift 时 {up}")
     check(back == low, f"再点 Shift 后 {back}")
     return f"小写 {low}，大写 {up}"
+
+
+@case("KB-40", mutates="learn")
+def kb40(d):
+    t9 = script("03-t9")
+    tq = t9.edge_out(d, "q")
+    tc = t9.edge_out(d, "，")
+    check(tq == "", f"q 从下沿往下刚滑出键：「{tq}」")
+    check(tc == "", f"， 从下沿往下刚滑出键：「{tc}」")
+    return f"q「{tq}」，「{tc}」"
+
+
+@case("KB-41", mutates="learn")
+def kb41(d):
+    d.clear()
+    k = d.key_node("q")
+    if not k:
+        raise Blocked("键盘上没有 q 键")
+    x, y = k.c
+    dpx = d.dpx()
+    below = k.b[3] + round(3 * dpx)   # 3 dp past the key's lower edge
+    # already past the edge when the popup opens: its first move must not count as leaving downward
+    d.touch(("down", x, y), ("sleep", 0.1), ("move", x, below), ("sleep", 0.8))
+    s = d.screen()
+    items = [n.text for n in s.ime() if n.text and n.b[3] <= k.b[1] + 10 and n.b[1] > k.b[1] - 700]
+    right = x + round(25 * dpx)
+    d.touch(("move", right, below), ("sleep", 0.15), ("up", right, below))
+    time.sleep(0.5)
+    t = d.field_text() or ""
+    d.clear()
+    check(t != "", f"弹出后右挪 25dp 什么也没打（弹出 {items[:6]}）")
+    check(t in items, f"打出「{t}」，弹出 {items[:6]}")
+    return f"弹出 {items[:5]}；打出「{t}」"

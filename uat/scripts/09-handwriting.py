@@ -7,7 +7,7 @@ import time
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from hw_strokes import STROKES  # noqa: E402
 
-from uat import Blocked, add_im, case, check, choose, gear, home, open_url  # noqa: E402
+from uat import Blocked, add_im, case, check, choose, gear, home, menu_tap, open_url  # noqa: E402
 
 
 def pad(d):
@@ -220,29 +220,64 @@ def hw10a(d):
     d.space()
     time.sleep(0.5)
     menu = d.long_pick(w)
-    has_forget = any("忘记词汇" in x for x in menu)
-    has_block = any("不再显示" in x for x in menu)
-    if has_forget:
-        n = next(n for n in d.screen().nodes if "忘记词汇" in n.text)
-        d.tap(n.c, 0.8)
-    d.clear()
-    write(d, "我")
-    d.space()
-    time.sleep(0.5)
-    c2 = d.candidates()
-    if w in [x.split(" ")[0] for x in c2]:
-        d.long_pick(w)
-        n = next((n for n in d.screen().nodes if "不再显示" in n.text), None)
-        if n:
-            d.tap(n.c, 0.8)
+    has_block = any(x == "屏蔽" for x in menu)
+    check("不再联想" in menu and has_block, f"长按菜单 {menu[:8]}")
+    n = next((n for n in d.screen().nodes if n.text == "不再联想"), None)
+    if n is None:
+        raise Blocked(f"菜单里找不到「不再联想」这一项：{menu[:8]}")
+    d.tap(n.c, 0.8)
     d.clear()
     write(d, "我")
     d.space()
     time.sleep(0.5)
     c3 = d.all_cands()
-    check(has_forget and has_block, f"长按菜单 {menu[:8]}")
-    check(w not in [x.split(" ")[0] for x in c3], f"不再显示后联想里还有「{w}」：{c3[:6]}")
-    return f"联想「{w}」；菜单有忘记、不再显示；之后 {c3[:4]}"
+    check(w not in [x.split(" ")[0] for x in c3], f"不再联想后联想里还有「{w}」：{c3[:6]}")
+    # B still typed in pinyin: 不再联想 is the pair's alone
+    try:
+        from pypinyin import lazy_pinyin
+    except ImportError:
+        raise Blocked("没有 pypinyin，拼不出 B 的拼音（pip install pypinyin）")
+    d.clear()
+    d.switch_im("拼音")
+    d.type("".join(lazy_pinyin(w)))
+    p = [x.split(" ")[0] for x in d.all_cands()]
+    check(w in p, f"拼音里打不出「{w}」：{p[:6]}")
+    return f"联想「{w}」；菜单有不再联想、屏蔽；之后 {c3[:4]}；拼音里照常有"
+
+
+@case("HW-19", base="B0-手写", mutates="learn")
+def hw19(d):
+    write(d, "人")
+    c = [x.split(" ")[0] for x in d.candidates()]
+    c0 = c
+    if "入" not in c:
+        raise Blocked(f"写「人」的候选里没有「入」：{c[:6]}")
+    d.pick("入")
+    d.clear()
+    write(d, "人")
+    menu = d.long_pick("入")
+    has_forget = any("忘掉学到的" in x for x in menu)
+    has_block = any(x == "屏蔽" for x in menu)
+    has_pin = any("置顶" in x or "固定" in x for x in menu)
+    check(has_forget and has_block and not has_pin, f"长按菜单 {menu[:8]}")
+    # and blocked: never written again
+    menu_tap(d, "屏蔽")
+    menu_tap(d, "确定屏蔽")
+    c2 = [x.split(" ")[0] for x in d.all_cands()]
+    # undone without writing again: the shown candidates read anew (F2738)
+    d.tap_text("撤销", where="all", scroll=False, after=0.8)
+    c3 = [x.split(" ")[0] for x in d.all_cands()]
+    d.long_pick("入")
+    menu_tap(d, "忘掉学到的")
+    c4 = [x.split(" ")[0] for x in d.candidates()]
+    d.clear()
+    write(d, "人")
+    c5 = [x.split(" ")[0] for x in d.candidates()]
+    d.clear()
+    check("入" not in c2, f"屏蔽后还有「入」：{c2[:6]}")
+    check("入" in c3, f"点撤销后（不重写）{c3[:6]}")
+    check(c4[:3] == c0[:3] and c5[:3] == c0[:3], f"忘掉后当场 {c4[:3]}、重写 {c5[:3]}，学之前 {c0[:3]}")
+    return f"长按「入」：{menu[:4]}；屏蔽后 {c2[:4]}；撤销后 {c3[:4]}；忘掉后 {c4[:3]}"
 
 
 @case("HW-11", base="B0-手写", page="sentence", mutates="learn")
@@ -290,11 +325,6 @@ def hw13(d):
     return f"一横后 1 秒墨迹 {mid}；「{t}」"
 
 
-POLYPHONIC = set("大行长重还了得地的着和乐好为都发觉传少种朝便调数会中只没参差更将处干看教空量难切答系分相"
-                 "要应当正间几假结给省藏曾沉称冲处传弹当倒的度恶分缝供冠喝荷横华会几济假间将降角觉卡看壳空乐"
-                 "累量率论落埋蔓模磨难宁片铺奇强切曲任散色扇少舍什识似属数宿说体帖调为相兴削血压咽要应载择扎"
-                 "粘涨折正挣只种转作")
-
 
 def learned(d):
     d.hide_keyboard()
@@ -304,40 +334,24 @@ def learned(d):
 
 @case("HW-14", base="B0-手写", mutates=True)
 def hw14(d):
-    write(d, "天")
-    write(d, "人")
-    t0 = d.field_text() or ""
-    if not t0.startswith("天"):
-        raise Blocked(f"「天」没认出来：框里「{t0}」")
-    c = [x.split(" ")[0] for x in d.candidates()]
-    # C: the last single character on the bar that has one reading (the rarest pairing with 天, so
-    # 天C is most likely not a dictionary word); a polyphonic C is learnt character by character
-    ok = [j for j in range(1, len(c)) if len(c[j]) == 1 and c[j] not in POLYPHONIC]
-    if not ok:
-        raise Blocked(f"候选里没有单读音的字：{c}")
-    i = ok[-1]
-    d.pick(i + 1)
-    t1 = d.field_text() or ""
-    tc = "天" + c[i]
-    if not t1.endswith(tc):
-        raise Blocked(f"点第 {i + 1} 个候选「{c[i]}」后框里「{t1}」")
-    d.clear()   # 普通文本 is one line: Enter would not start a new one
-    write(d, "天")
-    write(d, "人")
-    t2 = d.field_text() or ""
-    c2 = [x.split(" ")[0] for x in d.candidates()]
-    at2 = c2.index(c[i]) + 1 if c[i] in c2 else None
-    # learning moves C up (docs: 下次同样写会更靠前); the sentence itself need not become 天C
-    check(t2.endswith(tc) or (at2 is not None and at2 < i + 1),
-          f"第二次写「天」「人」，框里「{t2}」，「{c[i]}」没有更靠前（第 {i + 1} 个 → {at2}：{c2[:6]}）")
-    d.space()
-    rows = learned(d)
-    listed = any(tc in r for r in rows)
-    alone = any(r.split(" ")[0] == c[i] for r in rows)
-    check(listed or not alone, f"只学了单字「{c[i]}」，没学整个「{tc}」：{rows[:8]}")
-    if not listed:
-        raise Blocked(f"「{tc}」不在自动学到的词里，也没有单字「{c[i]}」：多半是词库原有的词，换一个 C 再做（{rows[:8]}）")
-    return f"C 选「{tc}」；第二次框里「{t2}」，「{c[i]}」第 {i + 1} → {at2} 个；「{tc}」在自动学到的词里"
+    # the .md's steps: 人, pick the second; again it is second; picked twice it is first
+    def cands():
+        write(d, "人")
+        time.sleep(0.5)
+        return [x.split(" ")[0] for x in d.candidates()]
+    c0 = cands()
+    if len(c0) < 2:
+        raise Blocked(f"候选 {c0}")
+    w = c0[1]
+    d.pick(2)
+    d.clear()
+    c1 = cands()
+    d.pick(w)
+    d.clear()
+    c2 = cands()
+    d.clear()
+    check(c1[:2] == [c0[0], w] and c2[:1] == [w], f"「{w}」：开始 {c0[:3]}，点一次后 {c1[:3]}，点两次后 {c2[:3]}")
+    return f"「{w}」：{c0[:3]} → {c1[:3]} → {c2[:3]}"
 
 
 @case("HW-15", base="B0-手写", mutates=True)
@@ -373,3 +387,94 @@ def hw17(d):
     bad = [x for x in ("每页候选数", "联想下一个词", "性能档位") if x in t]
     check(not bad, f"有 {bad}")
     return f"{t[:8]}"
+
+
+@case("HW-22", base="B0-手写", mutates="learn")
+def hw22(d):
+    # the same strokes each time (hw_strokes.py): the same three read, the same code (review F2655 NIT)
+    def cands():
+        write(d, "人")
+        time.sleep(0.5)
+        return [x.split(" ")[0] for x in d.candidates()]
+    c0 = cands()
+    if len(c0) < 2:
+        raise Blocked(f"候选 {c0}")
+    first, w = c0[0], "入"
+    if w not in c0:
+        raise Blocked(f"写「人」的候选里没有「入」：{c0[:6]}")
+    d.pick(w)
+    cands()
+    d.space()
+    d.bksp()
+    cands()
+    d.pick(w)
+    c = cands()
+    d.clear()
+    check(c[:1] == [w], f"「{first}」上屏又删掉以后，两次点「{w}」：候选 {c[:3]}")
+    return f"{c0[:3]} → {c[:3]}"
+
+
+@case("HW-23", base="B0-手写", mutates="learn")
+def hw23(d):
+    write(d, "人")
+    time.sleep(0.5)
+    c0 = [x.split(" ")[0] for x in d.candidates()]
+    if len(c0) < 3:
+        raise Blocked(f"候选 {c0}")
+    d.pick(3)
+    d.bksp()
+    write(d, "人")
+    time.sleep(0.5)
+    c1 = [x.split(" ")[0] for x in d.candidates()]
+    d.clear()
+    check(c1[:3] == c0[:3], f"点「{c0[2]}」又删掉：之前 {c0[:3]}，之后 {c1[:3]}")
+    return f"{c0[:3]} → {c1[:3]}"
+
+
+@case("HW-21", base="B0-手写", mutates=True)
+def hw21(d):
+    d.switch_im("拼音")
+    d.type("ru")
+    c0 = [x.split(" ")[0] for x in d.cands()]
+    d.clear()
+    d.switch_im("手写")
+    # HW-14's steps: 人's second picked twice, first after
+    for _ in range(2):
+        write(d, "人")
+        time.sleep(0.5)
+        c = [x.split(" ")[0] for x in d.candidates()]
+        if "入" not in c:
+            raise Blocked(f"写「人」的候选 {c[:5]}")
+        d.pick("入")
+        d.clear()
+    write(d, "人")
+    time.sleep(0.5)
+    c = [x.split(" ")[0] for x in d.candidates()]
+    d.clear()
+    if c[:1] != ["入"]:
+        raise Blocked(f"前提没到：写「人」{c[:3]}")
+    d.switch_im("拼音")
+    d.type("ru")
+    c1 = [x.split(" ")[0] for x in d.cands()]
+    d.clear()
+    check(c1[:1] == c0[:1], f"ru 学前 {c0[:3]}，学后 {c1[:3]}")
+    return f"ru {c0[:3]} → {c1[:3]}"
+
+
+@case("HW-24", base="B0-手写", mutates="learn")
+def hw24(d):
+    def wo():
+        write(d, "我")
+        d.space()
+        time.sleep(0.5)
+        return [x.split(" ")[0] for x in d.candidates()]
+    c0 = wo()
+    if len(c0) < 2:
+        raise Blocked(f"联想 {c0[:4]}")
+    d.pick(c0[1])
+    d.bksp(len(c0[1]))
+    d.clear()
+    c1 = wo()
+    d.clear()
+    check(c1[:4] == c0[:4], f"点联想「{c0[1]}」又删掉：之前 {c0[:4]}，之后 {c1[:4]}")
+    return f"{c0[:4]} → {c1[:4]}"

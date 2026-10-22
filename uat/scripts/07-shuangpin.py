@@ -1,8 +1,7 @@
 """uat/07-shuangpin.md (B0-双拼). The .md is the source of truth; each function follows its case's
 前提/操作/预期."""
-import time
 
-from uat import Blocked, Fail, add_im, case, check, choose, first, gear, glide_shot, has, home, key_texts
+from uat import Blocked, Fail, add_im, case, check, choose, first, gear, glide_shot, has, home, key_texts, script
 
 
 def scheme(d, name, add=True):
@@ -122,26 +121,17 @@ def sp06(d):
 
 @case("SP-07", base="B0-双拼", mutates=True)
 def sp07(d):
-    want = "这个誓言很难"
+    # PY-34's word (2–4 chars; a longer sentence is never learned, PY-62), made yours in 全拼
+    want = "汪小明"
     d.switch_im("拼音")
-    d.type("zhegeshiyanhennan")
-    c0 = d.cands()
-    if first(c0) == want:
-        raise Blocked(f"整句首选已经是「{want}」：{c0[:3]}")
     try:
-        for w in ("这个", "誓言", "很难"):
-            d.cands()
-            d.pick(w)
+        script("06-pinyin").learn_sentence(d)
     except Fail as e:
         raise Blocked(f"前提（PY-34 的步骤）没到：{e}")
-    time.sleep(0.5)
-    if d.field_text() != want:
-        raise Blocked(f"前提没到：框里「{d.field_text()}」")
-    d.clear()
     d.switch_im("双拼")
-    d.type("vegeuiyjhfnj")
+    d.type("whxcmy")
     c = d.cands()
-    check(first(c) == want, f"双拼打整串：{c[:4]}（拼音行 `{d.preedit()}`）")
+    check(first(c) == "王小明" and c[1:2] == [want], f"双拼 whxcmy：{c[:4]}（拼音行 `{d.preedit()}`）")
     return f"{c[:3]}"
 
 

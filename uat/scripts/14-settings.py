@@ -6,7 +6,7 @@ import subprocess
 import tempfile
 import time
 
-from uat import PKG, Blocked, Fail, case, check, choose, gear, has, home, popup_pick
+from uat import PKG, Blocked, Fail, case, check, choose, gear, has, home, popup_pick, script
 
 SWITCHES = ("Switch", "SwitchCompat", "SwitchMaterial", "CheckBox")
 
@@ -614,7 +614,7 @@ def st16(d):
     d.touch(("down", x, y), ("sleep", 0.6))
     s = d.screen()
     pop = [n.text for n in s.ime() if n.text and n.b[3] <= q.b[1] + 10 and n.b[1] > q.b[1] - 600]
-    d.touch(("move", x, y + 300), ("up", x, y + 300))
+    d.touch(("move", x + 1, y), ("sleep", 0.05), ("move", x, y + 300), ("up", x, y + 300))
     check(len(pop) >= 2, f"按 0.6 秒没弹出长按字符：{pop}")
     return f"0.3 秒打出 q；0.6 秒弹出 {pop[:6]}"
 
@@ -763,7 +763,7 @@ def st22(d):
         x, y = k.c
         d.touch(("down", x, y), ("sleep", 0.9))
         s = d.screen()
-        d.touch(("move", x, y + 300), ("up", x, y + 300))
+        d.touch(("move", x + 1, y), ("sleep", 0.05), ("move", x, y + 300), ("up", x, y + 300))
         return [n.text for n in s.ime() if n.text and n.b[3] <= k.b[1] + 10 and n.b[1] > k.b[1] - 700]
     p1 = popup()
     check("α" in p1 and "β" in p1, f"长按 a 弹出 {p1}")
@@ -1012,3 +1012,34 @@ def st31(d):
     libs = [n.text for n in s.app() if n.text and n.rid != "title" and len(n.text) > 3]
     check(len(libs) >= 5, f"许可证页 {libs[:6]}")
     return f"版本 {ver}；许可证页 {len(libs)} 行，如 {libs[1][:20]}"
+
+
+def switch_state(d, title):
+    r = d.row(title)
+    w = [n for n in r.walk() if n.cls in SWITCHES] if r else []
+    return w[0].checked if w else None
+
+
+@case("ST-37", base="B0-设置")
+def st37(d):
+    home(d, "词库与短语", "用户词库")
+    on = {t: switch_state(d, t) for t in ("用我的输入习惯", "自动备份")}
+    texts = d.all_texts()
+    check(on == {"用我的输入习惯": True, "自动备份": True}, f"页顶开关 {on}")
+    miss = [t for t in ("清空学到的", "学习备份", "英文词库", "导出") if t not in texts]
+    check(not miss, f"用户词库页缺 {miss}：{texts[:20]}")
+    d.tap_text("学习备份", after=1.2)
+    bk = d.all_texts()
+    miss = [t for t in ("从备份恢复", "另存一份到看得见的文件夹", "退回恢复前") if t not in bk]
+    check(not miss, f"学习备份里缺 {miss}：{bk[:8]}")
+    d.back()
+    d.tap_text("英文词库", after=1.2)
+    here = d.screen().texts()
+    script("08-english").en_settings(d)
+    d.tap_text("英文词库", after=1.2)
+    there = d.screen().texts()
+    check(here == there, f"两处英文词库不是同一页：{here[:5]} / {there[:5]}")
+    d.open_settings()
+    titles = [r[0] for r in d.pref_rows()]
+    check(titles == HOME, f"首页入口 {titles}")
+    return f"开关 {on}；学习备份 {bk[1:6:2]}；英文词库两处同页；首页 {len(titles)} 项"

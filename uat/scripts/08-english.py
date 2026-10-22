@@ -373,3 +373,49 @@ def en21(d):
     t3 = d.field_text() or ""
     check(t3 == "ok I'm ", f"不自动大写的框里划 i-m 后「{t3}」")
     return f"「{t}」；「{t2}」；「{t3}」"
+
+
+@case("EN-25", base="B0-英文", mutates="learn")
+def en25(d):
+    d.type("i")   # no 'I' key: the field's auto-capital makes it "I"
+    d.space()
+    d.type("said")
+    d.cands()
+    d.space()
+    d.type("hel")
+    c = [x.split(" ")[0] for x in d.cands(want="hello")]
+    if "hello" not in c:
+        raise Blocked(f"hel 的候选 {c[:5]}")
+    d.pick("hello")
+    t0 = d.field_text()
+    d.bksp()
+    t = d.field_text()
+    d.clear()
+    check(t.rstrip() == "I said hello", f"选「hello」后「{t0}」，⌫ 后「{t}」")
+    return f"「{t0}」→ ⌫「{t}」"
+
+
+@case("EN-26", base="B0-英文", mutates="learn", clean=True)
+def en26(d):
+    # docs/other-input-methods.md: picking the word as typed over its correction counts as taking it back
+    d.type("teh")
+    c = [x.split(" ")[0] for x in d.cands(want="teh")]
+    if "teh" not in c:
+        raise Blocked(f"teh 的候选里没有原样的 teh：{c[:5]}")
+    d.pick("teh")
+    if not d.field_text().endswith(" "):   # picking adds the space itself; a second one is ". "
+        d.space()
+    d.type("teh")
+    d.cands()
+    d.space()
+    t = d.field_text()
+    d.clear()
+    # the choice recorded where the user sees it (D11): 英文词库's 不再自动改的词
+    en_settings(d)
+    d.tap_text("英文词库", after=1.2)
+    # a word's row says 不再自动改 (english_word_learned) beside it
+    n = d.screen().find(text="teh")
+    row = n.row().texts() if n else []
+    check(t.endswith("teh teh "), f"点过一次原样的 teh 后，teh 空格：「{t}」")
+    check(any("不再自动改" in x for x in row), f"英文词库里 teh 那行 {row[:4]}")
+    return f"「{t}」；英文词库 {row[:3]}"

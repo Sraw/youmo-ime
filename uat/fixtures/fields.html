@@ -94,6 +94,21 @@
   }
   filter();
   window.addEventListener('hashchange', filter);
+  // A load is a fresh field to the input method. The app keeps the text last written in a field that
+  // cleared itself as the context (ContextMemory: a chat's box after a send), for an app, view, type and
+  // hint, which a reload of this page keeps the same: the next step was typed after the last's text (他点了
+  // before 他 turned dl's 带来 into 的脸). It forgets that text where the field has text after the cursor:
+  // so each field starts with an invisible character after it, gone once the input method has looked.
+  for (const el of document.querySelectorAll('input:not([type=password]), textarea')) {
+    let primed = false;
+    el.addEventListener('focus', () => {
+      if (primed || el.value) return;
+      primed = true;
+      el.value = '\u200b';
+      el.setSelectionRange(0, 0);
+      setTimeout(() => { if (el.value === '\u200b') el.value = ''; }, 400);
+    });
+  }
   const chat = document.getElementById('chat');
   const log = document.getElementById('log');
   function send() {

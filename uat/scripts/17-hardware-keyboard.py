@@ -743,3 +743,6 @@ def hk28(d):
     check(not k and "你" in c[:3], f"打字时屏幕键盘{'没收起' if k else '收起'}，小窗 {c[:4]}")
     check(split, "回来的不是分体键盘")
     return f"收起，小窗 {c[:3]}；回来的是分体键盘"
+
+
+case("HK-33", base="B0-实体", needs="skip:要一个输入框在屏幕最顶上的应用（候选窗贴屏幕顶）；测试页的框不够高，手动跑")(lambda d: None)

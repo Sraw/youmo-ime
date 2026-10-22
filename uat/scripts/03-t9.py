@@ -763,28 +763,24 @@ def t933(d):
 
 @case("T9-34", base="B0-九键", page="email", mutates="learn")
 def t934(d):
-    row = bottom_row(d)
+    row, col = bottom_row(d), column(d)
     globe = d.screen().find(rid="button_lang", where="ime")
     to_english(d)
-    row_en = bottom_row(d)
+    row_en, col_en = bottom_row(d), column(d)
     globe_en = d.screen().find(rid="button_lang", where="ime")
     k = d.keys(refresh=True)
     d.taps([k["4"]] * 2, gap=0.12, after=1.0)
     c = d.cands(timeout=1)
     for label in ("@", ".com"):
-        n = d.key_node(label)
-        if not n:
-            raise Blocked(f"键盘上没有「{label}」键：{row}")
-        d.tap(n.c, 0.5)
+        col_tap(d, label)
     t = d.field_text() or ""
-    check("@" in row and "." in row and ".com" in row and "中/英" in row and "/" not in row, f"底排 {row}")
-    check(globe is None, "邮箱框里还有地球键")
-    # the space bar names the IM (九键/英文): every other key the same
-    check([x for x in row_en if x != "英文"] == [x for x in row if x not in ("九键", "九键拼音")], f"切到九键英文后底排 {row_en}，九键拼音时 {row}")
-    check(globe_en is None, "切到九键英文后邮箱框里有地球键")
+    check(col[:4] == ["@", ".", ".com", "-"], f"左列 {col}")
+    check(col_en[:4] == ["@", ".", ".com", "-"], f"九键英文的左列 {col_en}")
+    check(not any(x in row for x in ("@", ".com")) and "中/英" in row, f"底排 {row}")
+    check(globe is not None and globe_en is not None, "邮箱框里没有地球键")
     check(not c, f"邮箱框里有候选 {c[:4]}")
     check(t == "h@.com", f"框里「{t}」")
-    return f"底排 {row}；「{t}」"
+    return f"左列 {col[:4]}；底排 {row}；「{t}」"
 
 
 @case("T9-35", base="B0-九键")
@@ -844,18 +840,22 @@ def t937(d):
 
 @case("T9-38", base="B0-九键", page="url")
 def t938(d):
-    row = bottom_row(d)
+    row, col = bottom_row(d), column(d)
     globe = d.screen().find(rid="button_lang", where="ime")
     for label in ("/", ".com"):
-        n = d.key_node(label)
-        if not n:
-            raise Blocked(f"键盘上没有「{label}」键：{row}")
-        d.tap(n.c, 0.5)
+        col_tap(d, label)
     t = d.field_text() or ""
-    check("/" in row and "." in row and ".com" in row and "中/英" in row and "@" not in row, f"底排 {row}")
-    check(globe is None, "网址框里还有地球键")
+    t9(d, "64")
+    typing = column(d)
+    d.press("space", after=0.8)
+    after = column(d)
+    check(col[:4] == ["/", ".", ".com", ":"], f"左列 {col}")
+    check(not any(x in row for x in ("/", ".com")) and "中/英" in row, f"底排 {row}")
+    check(globe is not None, "网址框里没有地球键")
     check(t == "/.com", f"框里「{t}」")
-    return f"底排 {row}；「{t}」"
+    check(typing and typing[0] not in ("/", ".com"), f"打 6、4 时左列 {typing}")
+    check(after[:4] == ["/", ".", ".com", ":"], f"上屏后左列 {after}")
+    return f"左列 {col[:4]}；底排 {row}；「{t}」；打字时 {typing[:3]}"
 
 
 def word(d):
@@ -1026,33 +1026,56 @@ def t947(d):
     return f"弹出 {texts}；「{t}」"
 
 
-@case("T9-48", base="B0-九键", mutates="learn")
+def edge_out(d, key):
+    """long-press a key at its lower edge, then just past it (10 dp, under half a key): what is typed.
+    The old rule cancelled a key's height from the press, so this short a move would have picked"""
+    d.clear()
+    k = d.key_node(key)
+    if not k:
+        raise Blocked(f"键盘上没有 {key} 键")
+    x, y = k.c[0], k.b[3] - round(3 * d.dpx())   # 3 dp in
+    out = k.b[3] + round(10 * d.dpx())
+    d.touch(("down", x, y), ("sleep", 0.9), ("move", x + 1, y), ("sleep", 0.05), ("move", x, out),
+            ("sleep", 0.15), ("up", x, out))
+    time.sleep(0.5)
+    return d.field_text() or ""
+
+
+@case("T9-48", base="B0-九键", mutates="learn", visual=True)
 def t948(d):
-    out = []
-    for key in ("9", "7"):
+    def lp(key, dx=0, dy=0):
         d.clear()
         items, (x, y) = popup(d, key)
-        row = [n for n in items if n.text.lower() in "pqrswxyz" + key]
-        order = [n.text for n in sorted(row, key=lambda n: n.c[0])]
-        d.touch(("move", x + 12, y - 8), ("sleep", 0.15), ("up", x + 12, y - 8))
+        if dx or dy:
+            d.touch(("move", x + 1, y), ("sleep", 0.05), ("move", x + dx, y + dy), ("sleep", 0.15), ("up", x + dx, y + dy))
+        else:
+            d.touch(("up", x, y))
         time.sleep(0.5)
-        t1 = d.field_text() or ""
-        d.clear()
-        items, (x, y) = popup(d, key)
-        on = next((n for n in items if n.text.lower() in "pqrswxyz" + key and n.b[0] <= x <= n.b[2]), None)
-        if not on:
-            popup_away(d, (x, y))
-            raise Blocked(f"长按 {key}：手指正上方没有弹出的字，弹出 {[n.text for n in items]}")
-        ty = on.c[1]
-        d.touch(("move", x, (y + ty) // 2), ("sleep", 0.05), ("move", x, ty), ("sleep", 0.15), ("up", x, ty))
-        time.sleep(0.5)
-        t2 = d.field_text() or ""
-        want = ["W", "X", "Y", "Z", "9", "w", "x", "y", "z"] if key == "9" else ["P", "Q", "R", "S", "7", "p", "q", "r", "s"]
-        check(order == want, f"长按 {key} 弹出一行 {order}")
-        check(t1 == key, f"长按 {key} 在键上挪一下松手：框里「{t1}」")
-        check(t2 == on.text, f"长按 {key} 笔直往上滑到「{on.text}」松手：框里「{t2}」")
-        out.append(f"{key}: 挪一下「{t1}」，上滑「{t2}」")
-    return "；".join(out)
+        return items, d.field_text() or ""
+    step = round(25 * d.dpx())   # 25 dp
+    k5 = d.key_node("5")
+    items, (x, y) = popup(d, "5")
+    d.shot((0, max(0, k5.b[1] - 500), 1080, k5.b[3] + 20), "长按 5")
+    d.touch(("up", x, y))
+    time.sleep(0.5)
+    # the popup's bottom row, not the column's punctuation beside it
+    over = [n for n in items if n.b[0] > 200]
+    row = sorted([n for n in over if abs(n.b[3] - max(m.b[3] for m in over)) < 10], key=lambda n: n.c[0])
+    widths = [n.b[2] - n.b[0] for n in row]
+    t0 = d.field_text() or ""
+    _, t1 = lp("5", dx=step)
+    _, t2 = lp("5", dx=-900)
+    t3 = edge_out(d, "5")
+    _, t4 = lp("9", dx=step)
+    check([n.text for n in row] == ["J", "K", "L", "5", "j", "k", "l"], f"长按 5 弹出一行 {[n.text for n in row]}")
+    check(row and max(widths) < (k5.b[2] - k5.b[0]) * 0.6, f"弹出的格宽 {widths}，5 键宽 {k5.b[2] - k5.b[0]}")
+    check(row and row[-1].b[3] <= k5.b[1] + 5, f"弹出框不在键上方：{row[-1].b if row else None}，键 {k5.b}")
+    check(t0 == "5", f"不挪松手：「{t0}」")
+    check(t1 == "j", f"往右挪 25dp：「{t1}」")
+    check(t2 == "J", f"往左挪很远：「{t2}」")
+    check(t3 == "", f"从下沿往下刚滑出键：「{t3}」")
+    check(t4 == "w", f"9 往右挪 25dp：「{t4}」")
+    return f"一行 {[n.text for n in row]}，格宽 {widths[:1]}；「{t0}」「{t1}」「{t2}」「{t3}」「{t4}」"
 
 
 @case("T9-49", base="B0-九键", page="nosuggest", mutates="learn")

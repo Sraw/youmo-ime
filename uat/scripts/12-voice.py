@@ -501,3 +501,127 @@ def vo17(d):
         out.append(f"「{t}」{tries_note(n, miss)}")
         d.clear()
     return "；".join(out)
+
+
+def _words():
+    return script("13-words")
+
+
+def heard_once(d, clip, want):
+    """one dictation (retried only on a drop-out: an empty or cut result), then the field emptied"""
+    _, t, n, miss = retried(d, clip, lambda t: len(plain(t)) >= len(want))
+    d.clear()
+    return t, tries_note(n, miss)
+
+
+@case("VO-18", base="B0-设置", mutates=True, needs=EV)
+def vo18(d):
+    emu_only(d)
+    w = _words()
+    w.push(d, "voice-import.txt")   # the .md's fixture, pushed
+    _, msgs = w.import_file(d, "voice-import.txt", "用户词库")
+    check(w.imported_count(msgs) == 1, f"导入结果 {msgs[:3]}")
+    d.open_page("text")
+    d.switch_im("拼音")
+    t1, n1 = heard_once(d, "lanjing", "我住在澜境花园")
+    check("澜境花园" not in t1, f"导入后、还不是你的词时，说「我住在澜境花园」就是「{t1}」{n1}")
+    for _ in range(2):
+        d.type("lanjinghuayuan")
+        d.cands(want="澜境花园")
+        d.pick("澜境花园")
+        d.press("。") if "。" in d.keys(refresh=True) else None
+        time.sleep(0.5)
+        d.clear()
+    _, t2, n, miss = retried(d, "lanjing", lambda t: "澜境花园" in t)
+    check("澜境花园" in t2, f"拼音上屏两次后说「我住在澜境花园」，框里「{t2}」{tries_note(n, miss)}")
+    return f"导入后「{t1}」{n1}；拼音上屏两次后「{t2}」{tries_note(n, miss)}"
+
+
+@case("VO-19", base="B0-语音", mutates=True, needs=EV, clean=True)
+def vo19(d):
+    d.switch_im("拼音")
+    d.type("wangxiaoming")
+    c0 = d.cands()[:5]
+    d.clear()
+    heard = []
+    for _ in range(2):
+        _, t, n, miss = retried(d, "wangxiaoming", lambda t: len(plain(t)) >= 3)
+        heard.append(t + tries_note(n, miss))
+        d.clear()
+    d.type("wangxiaoming")
+    c1 = d.cands()[:5]
+    d.clear()
+    check(c1 == c0, f"说两次后拼音候选 {c1}，说之前 {c0}（听成 {heard}）")
+    w = _words()
+    w.user_lexicon(d)
+    texts = d.all_texts()
+    for page in ("自动学到的词", "手动添加的词"):
+        if page in texts:
+            d.tap_text(page, after=1.0)
+            rows = w.list_texts(d)
+            check(not any("小明" in r for r in rows), f"「{page}」里有语音新增的 {[r for r in rows if '小明' in r]}")
+            d.back()
+    return f"听成 {heard}；候选前后都是 {c0[:3]}；用户词库没有「小明」"
+
+
+def vo20_steps(d):
+    t0, n0 = heard_once(d, "wangmingtian", "汪小明明天来")
+    if "汪小明" in t0:
+        raise Blocked(f"前提没到：没学之前就听成「{t0}」{n0}（合成语音太清楚，X-ASR 本身听得出汪小明）")
+    d.switch_im("拼音")
+    _words().learn_name(d)
+    _, t, n, miss = retried(d, "wangmingtian", lambda t: "汪小明" in t)
+    return t0, t, tries_note(n, miss)
+
+
+@case("VO-20", base="B0-语音", mutates=True, needs=EV, clean=True)
+def vo20(d):
+    t0, t, note = vo20_steps(d)
+    check("汪小明" in t, f"拼音打两次「汪小明」后说，框里「{t}」{note}（之前「{t0}」）")
+    return f"之前「{t0}」，打两次后「{t}」{note}"
+
+
+@case("VO-21", base="B0-语音", mutates=True, needs=EV, clean=True)
+def vo21(d):
+    t0, t, note = vo20_steps(d)
+    if "汪小明" not in t:
+        raise Blocked(f"前提（VO-20）没到：打两次后仍是「{t}」")
+    d.clear()
+    w = _words()
+    w.user_lexicon(d, "自动学到的词")
+    row = next((n for n in d.screen().app() if n.text.startswith("汪小明")), None)
+    if not row:
+        raise Blocked(f"自动学到的词里没有「汪小明」：{w.list_texts(d)[:6]}")
+    d.hold(row.c, 900)
+    time.sleep(0.6)
+    s = d.screen()
+    dl = s.find(desc="删除") or s.find(text="删除")
+    if not dl:
+        raise Blocked(f"长按「汪小明」后没有删除：{[x.desc or x.text for x in s.app() if x.desc or x.text][:10]}")
+    d.tap(dl.c, 1.0)
+    conf = next((n for n in d.screen().nodes if n.rid == "button1"), None)
+    if conf:
+        d.tap(conf.c, 1.0)
+    rows = w.list_texts(d)
+    check(not any(r.startswith("汪小明") for r in rows), f"删除后 {rows[:6]}")
+    d.open_page("text")
+    t2, n2 = heard_once(d, "wangmingtian", "汪小明明天来")
+    check("汪小明" not in t2, f"删掉「汪小明」后说，框里「{t2}」{n2}")
+    return f"学后「{t}」；删掉后「{t2}」{n2}"
+
+
+@case("VO-22", base="B0-语音", mutates=True, needs=EV, clean=True)
+def vo22(d):
+    t0, t, note = vo20_steps(d)
+    if "汪小明" not in t:
+        raise Blocked(f"前提（VO-20）没到：打两次后仍是「{t}」")
+    d.clear()
+    pr = script("15-privacy-backup")
+    pr.status_entry(d, "不用我的输入习惯")
+    t1, n1 = heard_once(d, "wangmingtian", "汪小明明天来")
+    pr.status_entry(d, "恢复我的输入习惯")
+    _, t2, n, miss = retried(d, "wangmingtian", lambda x: "汪小明" in x)
+    d.clear()
+    check("汪小明" not in t1, f"不用我的输入习惯时说，框里「{t1}」{n1}")
+    check("汪小明" in t2, f"恢复后说，框里「{t2}」{tries_note(n, miss)}")
+    return f"不用时「{t1}」{n1}；恢复后「{t2}」{tries_note(n, miss)}"

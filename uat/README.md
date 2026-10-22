@@ -23,9 +23,9 @@
 | [10-tables.md](10-tables.md) | 五笔、二笔、仓颉、自然码、五笔拼音 |
 | [11-quick-unicode.md](11-quick-unicode.md) | 快速输入、Unicode 输入 |
 | [12-voice.md](12-voice.md) | 语音输入（语音版） |
-| [13-words.md](13-words.md) | 词库页、用户词库、屏蔽词、导入导出、导入词库、自定义短语 |
+| [13-words.md](13-words.md) | 词库页、用户词库、屏蔽词、导入导出、导入词库、导入的词、清空学到的、自定义短语 |
 | [14-settings.md](14-settings.md) | 设置首页、通用输入、外观、按键、声音与振动、剪贴板与表情、实体键盘、界面语言、开发者、关于 |
-| [15-privacy-backup.md](15-privacy-backup.md) | 隐私与权限、密码框和无痕、备份与恢复 |
+| [15-privacy-backup.md](15-privacy-backup.md) | 隐私与权限、密码框和无痕、不用我的输入习惯、清掉最近、备份与恢复（含学到的合并、退回、自动备份） |
 | [16-landscape-split.md](16-landscape-split.md) | 横屏、分体键盘、分体时其他面板靠边 |
 | [17-hardware-keyboard.md](17-hardware-keyboard.md) | 实体键盘 |
 | [18-lifecycle.md](18-lifecycle.md) | 转屏、切换应用、换输入框、引擎重启这些时刻 |
@@ -121,7 +121,7 @@ redroid 里有浏览器"WebView Browser Tester"（`org.chromium.webview_shell`�
 12（语音）、17（实体键盘）在 redroid 上整份记"跳过"（用例的 `needs="emu:…"`，不先重置；语音版才有的用例在文字版上
 也记"跳过"，`needs="voice:…"`），它们在模拟器上跑（见下面"自动跑（模拟器）"）；其余各份里 redroid 做不到的几条也是（分屏、无痕标签页、
 密码管理器、振动和按键音、语音版安装、发版升级）。横屏是把屏幕改成 2340×1080（851 dp，`Device.rotate`），
-redroid 的显示不会真的转。手写用 `scripts/hw_strokes.py` 里的笔画在书写板上画字。装包时比较设备上的 APK
+redroid 的显示不会真的转。手写用 `scripts/hw_strokes.py` 里的笔画在书写板上画字；HW-10a 要电脑上有 pypinyin（`pip install --user pypinyin`），没有就记阻塞。装包时比较设备上的 APK
 和 `app/build/outputs` 里最新的那个（同一个版本号会重新构建），不同就重装。
 
 ```sh

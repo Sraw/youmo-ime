@@ -2,9 +2,10 @@
 前提/操作/预期. Files for the import cases are pushed from uat/fixtures to 下载 and picked in the
 system file picker."""
 import os
+import re
 import time
 
-from uat import Blocked, Fail, PKG, case, check, first, flick, home, reset, sym_char
+from uat import Blocked, Fail, PKG, add_im, case, check, first, flick, home, menu_tap, reset, script, sym_char
 
 FIXTURES = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "fixtures")
 DOWNLOAD = "/sdcard/Download"
@@ -19,7 +20,8 @@ PIECES = {"蓝鲸花园": [("lanjinghuayuan", "蓝鲸花园")], "幽默": [("you
           "天气": [("tianqi", "天气")],
           "北京市海淀区": [("beijingshi", "北京市"), ("haidianqu", "海淀区")], "张三": [("zhangsan", "张三")],
           "上海市": [("shanghaishi", "上海市")], "年": [("nian", "年")], "月": [("yue", "月")],
-          "日": [("ri", "日")]}
+          "日": [("ri", "日")], "鲸喵屿": [("jing", "鲸"), ("miao", "喵"), ("yu", "屿")],
+          "你好": [("nihao", "你好")], "您好呀": [("ninhao", "您好"), ("ya", "呀")]}
 
 
 def words(cs):
@@ -213,6 +215,14 @@ def dictionaries(d):
 
 # ---------------------------------------------------------------- user lexicon
 
+
+def learn_name(d):
+    """PY-34's steps (06-pinyin's, the one copy): 汪小明 picked piece by piece twice, so it becomes your word"""
+    try:
+        script("06-pinyin").learn_sentence(d)
+    except Fail as e:
+        raise Blocked(f"前提（PY-34 的步骤）没到：{e}")
+
 @case("WD-00", base="B0-设置")
 def wd00(d):
     home(d, "词库与短语")
@@ -363,10 +373,10 @@ def wd07(d):
     d.type("shijian")
     d.cands()
     menu = d.long_pick("时间")
-    n = next((n for n in d.screen().nodes if "不再显示" in n.text), None)
-    if not n:
-        raise Blocked(f"长按「时间」的菜单 {menu}")
-    d.tap(n.c, 1.0)
+    if "屏蔽" not in menu:
+        raise Blocked(f"长按「时间」的菜单 {menu[:8]}")
+    menu_tap(d, "屏蔽")
+    menu_tap(d, "确定屏蔽")
     d.clear()
     user_lexicon(d, "屏蔽的词")
     rows1 = list_texts(d)
@@ -382,89 +392,57 @@ def wd07(d):
 
 @case("WD-08", mutates=True)
 def wd08(d):
-    d.type("zhegeshiyanhennan")
-    c0 = d.cands()
-    try:
-        for w in ("这个", "誓言", "很难"):
-            d.cands()
-            d.pick(w)
-    except Exception as e:
-        raise Blocked(f"前提（PY-34 的步骤）没到：{e}")
-    time.sleep(0.5)
-    if d.field_text() != "这个誓言很难":
-        raise Blocked(f"前提没到：框里「{d.field_text()}」（开始 {c0[:3]}）")
-    d.clear()
+    learn_name(d)
     user_lexicon(d, "自动学到的词")
-    item_menu(d, "这个誓言很难", "忘掉")
+    item_menu(d, "汪小明", "删除")
     rows = list_texts(d)
-    c = page_cands(d, "zhegeshiyanhennan")
-    check(not any("这个誓言很难" in r for r in rows), f"列表 {rows[:5]}")
-    check(first(c) != "这个誓言很难", f"候选 {c[:3]}")
-    return f"候选 {c[:2]}"
+    c = page_cands(d, "wangxiaoming")
+    d.clear()
+    d.type("wxm")
+    j = d.cands()
+    check(not any("汪小明" in r for r in rows), f"列表 {rows[:5]}")
+    check(first(c) == "王小明" and "汪小明" not in words(c), f"候选 {c[:5]}")
+    check("汪小明" not in words(j), f"wxm 候选 {j[:5]}")
+    return f"候选 {c[:2]}；wxm {j[:2]}"
 
 
 @case("WD-09", base="B0-设置", mutates=True)
 def wd09(d):
     push(d, "userwords.txt")
     chosen, msgs = import_file(d, "userwords.txt", "用户词库")
-    user_lexicon(d, "手动添加的词")
-    added = list_texts(d)
-    d.back()
+    done = next((m for m in msgs if "导入完成" in m), None)
+    user_lexicon(d)
     d.tap_text("屏蔽的词", after=1.0)
     blocked = list_texts(d)
-    check(any("幽默测试" in r for r in added) and any("蓝鲸花园" in r for r in added), f"添加的词 {added[:6]}")
+    home(d, "词库与短语", "导入的词")
+    batches = d.screen().texts()
+    # 幽默测试 and 蓝鲸花园 imported: 蓝鲸花园 is no dictionary word, only typed as a sentence (U-101)
+    check(done and "导入 2 个词" in done and "屏蔽 1 个" in done, f"导入结果 {msgs[:3]}")
     check(any("马上就好" in r for r in blocked), f"屏蔽的词 {blocked[:5]}")
-    check(not any(BIG_HINT in m for m in msgs), f"3 个词也提示改放基础词库：{msgs[:3]}")
-    return f"添加 {len([r for r in added if '幽默测试' in r or '蓝鲸花园' in r])} 个，屏蔽有马上就好"
+    check(any("userwords.txt" in t for t in batches), f"导入的词 {batches[:6]}")
+    return f"「{done}」，屏蔽有马上就好，导入的词有这一批"
 
 
-BIG_HINT = "用户词库放你自己常用的词"
-
-
-@case("WD-09a", base="B0-设置", mutates=True)
-def wd09a(d):
-    push(d, "big-words.txt")
-    _, msgs = import_file(d, "big-words.txt", "用户词库")
-    hint = next((m for m in msgs if BIG_HINT in m), None)
-    check(hint and "1001" in hint, f"1001 个词并入用户词库没提示：{msgs[:3]}")
-    s = d.screen()
-    texts = [n.text for n in s.nodes if n.text]
-    check("词很多，放进用户词库？" in texts and "仍放用户词库" in texts and "取消" in texts, f"提示框 {texts[:8]}")
-    b = s.find(text="改放基础词库")
-    if not b:
-        raise Blocked(f"提示里没有「改放基础词库」：{texts[:8]}")
-    d.tap(b.c, 4.0)
-    rows = dictionaries(d)
-    check(any("big-words" in r for r in rows), f"改放后基础词库一节 {rows}")
-    user_lexicon(d, "手动添加的词")
-    added = list_texts(d)
-    check(not any("鲸喵屿" in r for r in added), f"手动添加的词里有「鲸喵屿」：{added[:4]}")
-    return f"提示「{hint[:20]}…」；基础词库 {[r for r in rows if 'big-words' in r]}"
+def imported_count(msgs):
+    """the words 导入完成 says were imported, or None"""
+    m = next((re.search(r"导入 (\d+) 个词", m) for m in msgs if "导入完成" in m), None)
+    return int(m.group(1)) if m else None
 
 
 @case("WD-09b", base="B0-设置", mutates=True)
 def wd09b(d):
-    push(d, "big-words.txt", "big-words.list")
-    _, msgs = import_file(d, "big-words.list", "用户词库")
-    texts = [n.text for n in d.screen().nodes if n.text]
-    check(any(BIG_HINT in m for m in msgs), f".list 1001 个词没提示：{msgs[:3]}")
-    check("改放基础词库" not in texts and "仍放用户词库" in texts, f".list 的提示按钮 {texts[:8]}")
-    cancel = d.screen().find(text="取消")
-    if not cancel:
-        raise Blocked(f".list 的提示里没有「取消」：{texts[:8]}")
-    d.tap(cancel.c, 1.0)
+    push(d, "big-words.txt")
     _, msgs = import_file(d, "big-words.txt", "用户词库")
-    b = d.screen().find(text="仍放用户词库")
-    if not b:
-        raise Blocked(f"提示里没有「仍放用户词库」：{msgs[:3]}")
-    d.tap(b.c, 6.0)
+    n = imported_count(msgs)
+    # no hint to use the base any more: imported words stay out of sentences and voice
+    check(n is not None and n >= 1000, f"导入结果 {msgs[:3]}")
     d.back()
     rows = dictionaries(d)
-    check(not any("big-words" in r for r in rows), f"仍放用户词库后基础词库一节 {rows}")
-    user_lexicon(d, "手动添加的词")
-    added = list_texts(d)
-    check(any("鲸喵屿" in r for r in added) and any("共 1001 个" in r for r in added), f"手动添加的词 {added[:4]}")
-    return f".list 无改放按钮；.txt 仍放后添加的词 {added[:2]}"
+    check(not any("big-words" in r for r in rows), f"基础词库一节 {rows}")
+    d.tap_text("导入的词", after=1.5)
+    texts = d.screen().texts()
+    check(any("big-words.txt" in t for t in texts), f"导入的词 {texts[:6]}")
+    return f"导入 {n} 个；导入的词里有 big-words.txt"
 
 
 @case("WD-10", base="B0-设置", mutates=True)
@@ -472,17 +450,7 @@ def wd10(d):
     # a learned word too (WD-08's): it comes back learned, not among the added
     d.open_page("text")
     d.switch_im("拼音")
-    d.type("zhegeshiyanhennan")
-    try:
-        for w in ("这个", "誓言", "很难"):
-            d.cands()
-            d.pick(w)
-    except Exception as e:
-        raise Blocked(f"前提（PY-34 的步骤）没到：{e}")
-    time.sleep(0.5)
-    if d.field_text() != "这个誓言很难":
-        raise Blocked(f"前提没到：框里「{d.field_text()}」")
-    d.clear()
+    learn_name(d)
     add_word(d, "蓝鲸花园", "lan jing hua yuan")
     block_word(d, "时间")
     user_lexicon(d)
@@ -490,18 +458,20 @@ def wd10(d):
     files = t[t.index("文件") + 1:] if "文件" in t else []
     before = set(d.sh(f"ls -1 {DOWNLOAD}").splitlines())
     d.tap_text("导出", after=2.5)
+    # the export warns first (learning_save_copy_warning): anyone with the phone can copy the file
+    if d.screen().find(text="确定", where="all"):
+        d.tap_text("确定", where="all", scroll=False, after=2.5)
     if "documentsui" not in d.top_activity():
         raise Blocked(f"导出没出保存界面：{d.top_activity()}")
     d.tap_text("保存", where="all", scroll=False, after=2.5)
     new = sorted(set(d.sh(f"ls -1 {DOWNLOAD}").splitlines()) - before)
     if not new:
         raise Blocked("导出后下载里没有新文件")
-    body = d.sh(f"cat '{DOWNLOAD}/{new[0]}'")
     reset(d, "B0-设置", "设置")
+    # a backup (WD-10): no 并入哪个词库, the restore's confirmation with its source and date
     chosen, s = import_file(d, new[0])
-    opt = next(o for o in s.nodes if o.cls == "CheckedTextView" and o.text.startswith("用户词库"))
-    d.tap(opt.c, 0.5)
-    d.tap(next(n for n in d.screen().nodes if n.text == "导入词库" and n.cls == "Button").c, 3.0)
+    confirm = [n.text for n in s.nodes if n.rid == "message"]
+    d.tap_text("确定", after=3.0)
     user_lexicon(d, "手动添加的词")
     added = list_texts(d)
     d.back()
@@ -511,80 +481,54 @@ def wd10(d):
     d.tap_text("自动学到的词", after=1.0)
     learned = list_texts(d)
     hint = [x for x in files if "导入词库" in x]
-    check(files[:1] == ["导出"] and hint, f"文件一节 {files[:3]}")
-    check("蓝鲸花园" in body and "!时间" in body, f"导出的文件 {body[:80]!r}")
-    check(chosen == "用户词库", f"对话框选的是「{chosen}」")
+    check("导出" in files, f"文件一节 {files[:3]}")
+    check(new[0].endswith(".fxlb"), f"导出的文件名 {new[0]}")
+    check(chosen is None and confirm, f"选文件后的对话框：选项「{chosen}」，说明 {confirm[:1]}")
     check(any("蓝鲸花园" in r for r in added) and any("时间" in r for r in blocked), f"添加 {added[:4]}，屏蔽 {blocked[:4]}")
-    check("~ 这个誓言很难" in body, f"导出的文件里学到的词没有 ~ 标记 {body[:120]!r}")
-    check(any("这个誓言很难" in r for r in learned) and not any("这个誓言很难" in r for r in added), f"学到的 {learned[:4]}，添加 {added[:4]}")
+    check(any("汪小明" in r for r in learned) and not any("汪小明" in r for r in added), f"学到的 {learned[:4]}，添加 {added[:4]}")
     # the learned word types as before (PY-34's second half)
-    c = words(page_cands(d, "zhegeshiyanhennan"))
-    check(c[:1] == ["这个誓言很难"], f"导回后 zhegeshiyanhennan 的候选 {c[:3]}")
+    c = words(page_cands(d, "wangxiaoming"))
+    check(c[:1] == ["汪小明"], f"导回后 wangxiaoming 的候选 {c[:3]}")
     return f"导出 {new[0]}；导回后添加的、学到的、屏蔽的词各在原处；整句首选「{c[0] if c else ''}」"
 
 
 @case("WD-10a", base="B0-设置", mutates=True)
 def wd10a(d):
     push(d, "big-words.txt")
-    import_file(d, "big-words.txt", "用户词库")
-    b = d.screen().find(text="仍放用户词库")
-    if not b:
-        raise Blocked("没出「仍放用户词库」")
-    d.tap(b.c, 6.0)
+    _, msgs = import_file(d, "big-words.txt", "用户词库")
+    if not imported_count(msgs):
+        raise Blocked(f"前提没到：{msgs[:3]}")
     d.back()
-    user_lexicon(d)
+    user_lexicon(d, "学习备份")
     before = set(d.sh(f"ls -1 {DOWNLOAD}").splitlines())
-    d.tap_text("导出", after=2.5)
+    d.tap_text("另存一份到看得见的文件夹", after=1.0)
+    d.tap_text("确定", after=2.5)
     if "documentsui" not in d.top_activity():
-        raise Blocked(f"导出没出保存界面：{d.top_activity()}")
+        raise Blocked(f"另存没出保存界面：{d.top_activity()}")
     d.tap_text("保存", where="all", scroll=False, after=2.5)
     new = sorted(set(d.sh(f"ls -1 {DOWNLOAD}").splitlines()) - before)
     if not new:
-        raise Blocked("导出后下载里没有新文件")
+        raise Blocked("另存后下载里没有新文件")
     reset(d, "B0-设置", "设置")
-    chosen, msgs = import_file(d, new[0], "用户词库")
-    check(not any(BIG_HINT in m for m in msgs), f"导回自己导出的 1001 个词也提示了：{msgs[:2]}")
-    check(any("导入完成" in m for m in msgs), f"导回后没出导入结果：{msgs[:3]}")
+    user_lexicon(d, "学习备份")
+    d.tap_text("从备份恢复", after=2.5)
+    if "documentsui" not in d.top_activity():
+        raise Blocked(f"没出文件选择：{d.top_activity()}")
+    for _ in range(12):
+        n = d.screen().find(text=new[0])
+        if n:
+            break
+        d.swipe((540, 1900), (540, 900), 400)
+    else:
+        raise Blocked(f"下载里没有 {new[0]}")
+    d.tap(n.c, 2.5)
+    d.tap_text("确定", after=3.0)
+    home(d, "词库与短语", "导入的词")
     texts = d.screen().texts()
-    check("词很多，放进用户词库？" not in texts and "仍放用户词库" not in texts, f"导回时的对话框 {texts[:6]}")
-    d.back()
-    user_lexicon(d, "手动添加的词")
-    t = list_texts(d)
-    check(any("共 1001 个" in x for x in t), f"手动添加的词 {t[:4]}")
-    return f"导回 {new[0]}（默认选「{chosen}」）没提示；{next((x for x in t if '共' in x), '')}"
-
-
-@case("WD-10b", base="B0-设置", mutates=True)
-def wd10b(d):
-    d.open_page("text")
-    d.switch_im("拼音")
-    d.type("zhegeshiyanhennan")
-    try:
-        for w in ("这个", "誓言", "很难"):
-            d.cands()
-            d.pick(w)
-    except Exception as e:
-        raise Blocked(f"前提（PY-34 的步骤）没到：{e}")
-    time.sleep(0.5)
-    if d.field_text() != "这个誓言很难":
-        raise Blocked(f"前提没到：框里「{d.field_text()}」")
-    d.clear()
-    d.hide_keyboard()
-    user_lexicon(d)
-    before = set(d.sh(f"ls -1 {DOWNLOAD}").splitlines())
-    d.tap_text("导出", after=2.5)
-    if "documentsui" not in d.top_activity():
-        raise Blocked(f"导出没出保存界面：{d.top_activity()}")
-    d.tap_text("保存", where="all", scroll=False, after=2.5)
-    new = sorted(set(d.sh(f"ls -1 {DOWNLOAD}").splitlines()) - before)
-    if not new:
-        raise Blocked("导出后下载里没有新文件")
-    reset(d, "B0-设置", "设置")
-    import_file(d, new[0], "基础词库")
-    rows = dictionaries(d)
-    c = words(page_cands(d, "zhegeshiyanhennan"))
-    check(c[:1] == ["这个誓言很难"], f"导出并入基础词库后 zhegeshiyanhennan 的候选 {c[:3]}（基础词库 {rows}）")
-    return f"基础词库 {rows[-1:]}；整句首选「{c[0]}」"
+    row = next((t for t in texts if "big-words.txt" in t), "")
+    check(row, f"恢复后导入的词里没有 big-words.txt：{texts[:6]}")
+    check("1001" in " ".join(texts), f"那一批不是 1001 个词：{texts[:6]}")
+    return f"另存 {new[0]}，重置后恢复；导入的词 {texts[:3]}"
 
 
 @case("WD-10c", base="B0-设置", mutates=True)
@@ -592,9 +536,8 @@ def wd10c(d):
     push(d, "old-export.txt")
     chosen, msgs = import_file(d, "old-export.txt", "用户词库")
     check(chosen == "用户词库", f"并入哪个词库默认选的是「{chosen}」")
-    check(not any(BIG_HINT in m for m in msgs), f"旧版本的导出也提示了：{msgs[:2]}")
     done = next((m for m in msgs if "导入完成" in m), None)
-    check(done and "添加 3000 个词" in done and "屏蔽 1 个" in done, f"导入结果 {msgs[:3]}")
+    check(done and "添加 3000 个" in done and "屏蔽 1 个" in done, f"导入结果 {msgs[:3]}")
     d.back()
     user_lexicon(d, "手动添加的词")
     t = list_texts(d)
@@ -719,8 +662,10 @@ def wd14b(d):
     push(d, "extra.dict")
     before = dictionaries(d)
     chosen, msgs = import_file(d, "extra.dict", "用户词库")
-    user_lexicon(d, "手动添加的词")
-    added = list_texts(d)
+    d.back()
+    home(d, "词库与短语", "导入的词")
+    batches = d.screen().texts()
+    d.back()
     after = dictionaries(d)
     d.open_page("text")
     d.switch_im("拼音")
@@ -730,12 +675,89 @@ def wd14b(d):
     d.clear()
     d.type("congjing")
     c2 = words(d.cands())
+    d.pick("琮璟")
+    d.clear()
+    d.type("congjing")
+    c3 = words(d.cands())
     check(chosen and chosen.startswith("基础词库"), f"一开始选的是「{chosen}」")
-    check(any("2" in m for m in msgs), f"提示 {msgs[:3]}")
-    check(any("骁骎" in r for r in added) and any("琮璟" in r for r in added), f"添加的词 {added[:5]}")
+    check(imported_count(msgs) == 2, f"提示 {msgs[:3]}")
+    check(any("extra.dict" in t for t in batches), f"导入的词 {batches[:5]}")
     check(after == before, f"基础词库 {before} → {after}")
-    check("琮璟" in c1 and c2[:1] == ["琮璟"], f"第一次 {c1[:4]}，第二次 {c2[:3]}")
-    return f"一开始「{chosen}」；{[m for m in msgs if '2' in m][:1]}；第二次 {c2[:2]}"
+    # behind the dictionary's own the first time, second after one pick (two make it first)
+    check(first(c1) != "琮璟" and c2[1:2] == ["琮璟"], f"第一次 {c1[:4]}，第二次 {c2[:3]}")
+    check(first(c3) == "琮璟", f"点过两次后 {c3[:3]}")
+    return f"一开始「{chosen}」；导入 {imported_count(msgs)} 个；第二次 {c2[:2]}；第三次 {c3[:2]}"
+
+
+@case("WD-14c", base="B0-设置", mutates=True)
+def wd14c(d):
+    push(d, "extra.scel")
+    _, msgs = import_file(d, "extra.scel", "用户词库")
+    d.back()
+    home(d, "词库与短语", "导入的词")
+    batches = d.screen().texts()
+    d.back()
+    d.open_page("text")
+    d.switch_im("拼音")
+    d.type("congjing")
+    c = words(d.all_cands())
+    d.clear()
+    check(imported_count(msgs) == 2, f"提示 {msgs[:3]}")
+    check(any("extra.scel" in t for t in batches), f"导入的词 {batches[:5]}")
+    check("琮璟" in c and c.index("琮璟") > 0, f"congjing 的候选 {c[:6]}")
+    return f"导入 {imported_count(msgs)} 个；congjing {c[:4]}"
+
+
+def drop_batch(d, name):
+    """导入的词 → the row of [name] → 撤掉这批: the dialog's text, then what the screen shows after (the Snackbar)."""
+    home(d, "词库与短语", "导入的词")
+    d.tap_text(name, contains=True, after=1.0)
+    asked = " ".join(d.screen().texts())
+    d.tap_text("撤掉这批", where="all", scroll=False, after=0.6)
+    return asked, d.screen().texts()
+
+
+@case("WD-23", base="B0-设置", mutates=True)
+def wd23(d):
+    push(d, "extra.dict")
+    _, msgs = import_file(d, "extra.dict", "用户词库")
+    if imported_count(msgs) != 2:
+        raise Blocked(f"前提没到：{msgs[:3]}")
+    d.back()
+    d.open_page("text")
+    d.switch_im("拼音")
+    for _ in range(2):
+        d.type("congjing")
+        d.cands(want="琮璟")
+        d.pick("琮璟")
+        d.clear()
+    asked, after = drop_batch(d, "extra.dict")
+    d.back()
+    d.open_page("text")
+    d.switch_im("拼音")
+    d.type("xiaoqin")
+    x = words(d.all_cands())
+    d.clear()
+    d.type("congjing")
+    c = words(d.all_cands())
+    d.clear()
+    check("还不是你的 1 个词" in asked and "extra.dict" in asked, f"确认框 {asked[:80]}")
+    check(any("撤掉了 1 个" in t for t in after), f"撤掉后 {after[:6]}")
+    check("骁骎" not in x and "琮璟" in c, f"xiaoqin {x[:5]}，congjing {c[:4]}")
+    # again, and 撤销 on the bar this time: the same list imports again (it was undone), and comes back
+    _, msgs = import_file(d, "extra.dict", "用户词库")
+    d.back()
+    _, after = drop_batch(d, "extra.dict")
+    d.tap_text("撤销", where="all", scroll=False, after=1.0)
+    d.back()
+    d.open_page("text")
+    d.switch_im("拼音")
+    d.type("xiaoqin")
+    x2 = words(d.all_cands())
+    d.clear()
+    check(imported_count(msgs) == 1, f"再导入一次 {msgs[:3]}")
+    check("骁骎" in x2, f"撤销后 xiaoqin {x2[:5]}")
+    return f"撤掉后 xiaoqin {x[:3]}、congjing {c[:2]}；撤销后 xiaoqin {x2[:3]}"
 
 
 # ---------------------------------------------------------------- phrases
@@ -881,3 +903,333 @@ def wd20(d):
     c = words(d.all_cands())
     check("北京市海淀区" in c, f"候选 {c[:6]}")
     return f"候选 {c[:4]}"
+
+
+# ---------------------------------------------------------------- the user lexicon's pages
+
+def marks(d):
+    """WD-21's 前提: PY-34 (汪小明 your word), PY-30 (the fifth of shi pinned), PY-29 (是 blocked);
+    returns the pinned word and shi's candidates before"""
+    py = script("06-pinyin")
+    learn_name(d)
+    c0, cc = py.pin_fifth(d)
+    d.type("shi")
+    d.cands()
+    d.long_pick("是")
+    menu_tap(d, "屏蔽")
+    menu_tap(d, "确定屏蔽")
+    d.clear()
+    return cc, c0
+
+
+def switch_on(d, title):
+    r = d.row(title)
+    w = [n for n in r.walk() if n.cls in ("Switch", "SwitchCompat", "SwitchMaterial", "CheckBox")] if r else []
+    return w[0].checked if w else None
+
+
+@case("WD-21", mutates=True)
+def wd21(d):
+    cc, _ = marks(d)
+    # a second word, made yours after 汪小明: the newest first is by the day it became yours (F2992)
+    for _ in range(2):
+        d.type("jingmiaoyu")
+        for w in "鲸喵屿":
+            d.cands(want=w)
+            d.pick(w)
+        time.sleep(0.5)
+        d.clear()
+    user_lexicon(d)
+    tops = {t: switch_on(d, t) for t in ("用我的输入习惯", "自动备份")}
+    t = d.all_texts()
+    pages = ["手动添加的词", "自动学到的词", "屏蔽的词", "不再联想的搭配", "固定的词"]
+    miss = [x for x in pages if x not in t]
+    d.tap_text("自动学到的词", after=1.2)
+    rows = list_texts(d)
+    today = d.sh("date +%Y年%-m月%-d日").strip()
+    row = next((r for r in rows if r.startswith("wang xiao ming")), "")
+    d.tap_text("更多选项", where="all", scroll=False, after=0.8)
+    d.tap_text("最近学到的在前", where="all", scroll=False, after=1.2)
+    words_now = [r for r in list_texts(d) if r in ("汪小明", "鲸喵屿") or r.startswith("共 ")]
+    d.back()
+    d.tap_text("固定的词", after=1.2)
+    pinned = list_texts(d)
+    d.back()
+    d.tap_text("屏蔽的词", after=1.2)
+    blocked = list_texts(d)
+    check(tops == {"用我的输入习惯": True, "自动备份": True}, f"页顶开关 {tops}")
+    check(not miss, f"用户词库缺 {miss}")
+    check("打过 2 次" in row and today in row and not re.search(r"\d+:\d+", row), f"汪小明那行「{row}」（今天 {today}）")
+    check(cc in pinned and "是" in blocked, f"固定的词 {pinned[:4]}；屏蔽的词 {blocked[:5]}")
+    check(words_now[1:3] == ["鲸喵屿", "汪小明"], f"最近学到的在前后 {words_now}")
+    return f"「{row}」；固定 {cc}；屏蔽 是；最近在前 {words_now}"
+
+
+@case("WD-22", mutates=True)
+def wd22(d):
+    c0, cc = script("06-pinyin").pin_fifth(d)
+    user_lexicon(d, "固定的词")
+    d.tap_text(cc, after=1.0)
+    s = d.screen()
+    btn = next((n for n in s.nodes if n.text == "取消固定"), None)
+    if not btn:
+        raise Blocked(f"点「{cc}」后没有取消固定：{[n.text for n in s.nodes if n.text][:10]}")
+    d.tap(btn.c, 1.2)
+    rows = list_texts(d)
+    c = page_cands(d, "shi")
+    check(cc not in rows, f"取消后固定的词 {rows[:4]}")
+    check(first(c) == first(c0), f"shi {c[:4]}（原来 {c0[:4]}）")
+    return f"「{cc}」不在列表；shi {c[:3]}"
+
+
+@case("WD-24", base="B0-设置", mutates=True)
+def wd24(d):
+    d.sh(f"echo \"汪小明 wang'xiao'ming\" > {DOWNLOAD}/name-import.txt")
+    _, msgs = import_file(d, "name-import.txt", "用户词库")
+    if not imported_count(msgs):
+        raise Blocked(f"前提没到：{msgs[:3]}")
+    d.back()
+    c1 = words(page_cands(d, "wangxiaoming"))
+    if "汪小明" not in c1:
+        c1 = words(d.all_cands())
+    for i in range(2):
+        if i:
+            d.type("wangxiaoming")
+        d.cands()
+        d.pick("汪小明")
+        d.press(".")
+        d.clear()
+    d.type("wangxiaoming")
+    c2 = words(d.cands())
+    d.clear()
+    user_lexicon(d)
+    t = d.all_texts()
+    d.tap_text("自动学到的词", after=1.2)
+    learned = list_texts(d)
+    check(first(c1) == "王小明" and "汪小明" in c1[1:], f"导入后 wangxiaoming {c1[:6]}")
+    check(c2[:1] == ["汪小明"], f"两次后 {c2[:4]}")
+    check("汪小明" in learned and "我的词" not in t, f"自动学到的词 {learned[:4]}；页 {t[:12]}")
+    return f"导入后 {c1[:4]}；两次后 {c2[:3]}；自动学到的词 {learned[1:3]}"
+
+
+@case("WD-28", base="B0-设置", mutates=True)
+def wd28(d):
+    dz(d)
+    c0 = words(page_cands(d, "dz"))
+    if c0[:1] != ["北京市海淀区"] or len(c0) < 2:
+        raise Blocked(f"前提没到：dz {c0[:4]}")
+    w = c0[1]
+    d.pick(w)
+    d.press(".")
+    d.type("dz")
+    d.cands()
+    d.pick(w)
+    d.press(".")
+    d.type("dz")
+    c = words(d.cands())
+    d.clear()
+    check(c[:2] == ["北京市海淀区", w], f"W=「{w}」，两次后 dz {c[:4]}")
+    return f"W=「{w}」；两次后 {c[:3]}"
+
+
+@case("WD-29", base="B0-设置", mutates=True)
+def wd29(d):
+    add_word(d, "鲸喵屿", "jing miao yu")
+    c = words(page_cands(d, "jingmiaoyu"))
+    d.clear()
+    d.type("wozhuzaijingmiaoyu")
+    c2 = words(d.cands())
+    d.clear()
+    check(c[:1] == ["鲸喵屿"], f"jingmiaoyu {c[:4]}")
+    check(c2[:1] == ["我住在鲸喵屿"], f"整句 {c2[:3]}")
+    return f"jingmiaoyu {c[:2]}；整句 {c2[:2]}"
+
+
+def export_lexicon(d):
+    """用户词库 → 导出 → 保存 in 下载 (WD-10's steps); returns the new file's name"""
+    user_lexicon(d)
+    before = set(d.sh(f"ls -1 {DOWNLOAD}").splitlines())
+    d.tap_text("导出", after=2.5)
+    if d.screen().find(text="确定", where="all"):
+        d.tap_text("确定", where="all", scroll=False, after=2.5)
+    if "documentsui" not in d.top_activity():
+        raise Blocked(f"导出没出保存界面：{d.top_activity()}")
+    d.tap_text("保存", where="all", scroll=False, after=2.5)
+    new = sorted(set(d.sh(f"ls -1 {DOWNLOAD}").splitlines()) - before)
+    if not new:
+        raise Blocked("导出后下载里没有新文件")
+    return new[0]
+
+
+def cut_exports(d, name):
+    """cut.fxlb (mid-record, 100 bytes) and cut2.fxlb (the export less its last 13 bytes: the END
+    record, so cut exactly at a record's boundary) made in 下载 from the export name; sizes from stat"""
+    d.sh(f"cd {DOWNLOAD}; rm -f cut.fxlb cut2.fxlb; n=$(stat -c %s '{name}'); "
+         f"head -c 100 '{name}' > cut.fxlb; head -c $((n-13)) '{name}' > cut2.fxlb")
+    return ["cut.fxlb", "cut2.fxlb"]
+
+
+def pick_refused(d, fname):
+    """in an open file picker, picks fname; returns (messages seen, choices shown, other dialog text).
+    A toast's text is in no UI dump (03-t9's note): the engine's refusal logged, then the toast it
+    brings (LearningRestore.from: !ok → learning_backup_failed, 不是本输入法的备份) posted by the app"""
+    if "documentsui" not in d.top_activity():
+        raise Blocked(f"没出文件选择：{d.top_activity()}")
+    for _ in range(12):
+        n = d.screen().find(text=fname)
+        if n:
+            break
+        d.swipe((540, 1900), (540, 900), 400)
+    else:
+        raise Blocked(f"下载里没有 {fname}")
+    d.sh("logcat -c")
+    d.tap(n.c, 0.3)
+    msgs, opts, dialog = [], [], []
+    for _ in range(12):
+        s = d.screen()
+        msgs += [x.text for x in s.nodes if x.text and "备份" in x.text]
+        opts += [x.text for x in s.nodes if x.cls == "CheckedTextView"]
+        dialog += [x.text for x in s.nodes if x.rid == "message" and "不是本输入法的备份" not in x.text]
+        time.sleep(0.3)
+    log = d.sh("logcat -d | grep -E 'learning restore:|Toast.*pkg='")
+    if "learning restore:" in log and f"pkg={PKG}" in log:
+        msgs.append("不是本输入法的备份（toast；" + log.split("learning restore:")[1].splitlines()[0].strip() + "）")
+    elif f"pkg={PKG}" in log and not dialog and not opts:
+        # a file that isn't one by its head or size (readPicked → null) toasts learning_backup_failed
+        # without the engine's log line: the app's toast is the evidence
+        msgs.append("不是本输入法的备份（toast，未经引擎：文件头或大小不符）")
+    return msgs, opts, dialog
+
+
+@case("WD-10d", base="B0-设置", mutates=True)
+def wd10d(d):
+    add_word(d, "蓝鲸花园", "lan jing hua yuan")
+    name = export_lexicon(d)
+    files = cut_exports(d, name)
+    user_lexicon(d, "手动添加的词")
+    before = list_texts(d)
+    d.back()
+    d.back()
+    seen = []
+    for f in files:
+        home(d, "词库与短语")
+        d.tap_text("导入词库", after=2.5)
+        msgs, opts, dialog = pick_refused(d, f)
+        d.open_settings()
+        user_lexicon(d, "手动添加的词")
+        after = list_texts(d)
+        d.back()
+        d.back()
+        check(any("不是本输入法的备份" in m for m in msgs), f"{f} 提示 {msgs[:3]}")
+        check(not opts and not dialog, f"{f} 出了选择 {opts[:3]} / 确认框 {dialog[:1]}")
+        check(after == before, f"{f} 用户词库 {before[:4]} → {after[:4]}")
+        seen.append(f"{f}「{next((m for m in msgs if '不是' in m), '')}」")
+    return "；".join(seen) + "；没有选择和确认框；用户词库不变"
+
+
+@case("WD-33", base="B0-设置", mutates=True)
+def wd33(d):
+    add_phrase(d, "nihao", [("cn", "你好")], order="2")
+    add_phrase(d, "nihao", [("cn", "您好呀")], order="3")
+    c = words(page_cands(d, "nihao"))
+    d.clear()
+    check(c.count("你好") == 1, f"nihao {c[:5]}：「你好」出现 {c.count('你好')} 次")
+    check(c[2:3] == ["您好呀"], f"nihao {c[:5]}：「您好呀」不是第三个")
+    return f"nihao {c[:4]}"
+
+
+case("WD-34", needs="skip:手工做不到（提示条离开导入的词页就没了）；由 ImportedWordsTest 的单元测试管")(lambda d: None)
+
+
+# ---------------------------------------------------------------- R11: 清空学到的 / 全部清空
+
+def _wd25_setup(d, cun=False):
+    """WD-25's 前提: 点了 after 他 twice, 汪小明 yours, C pinned under shi, 是 blocked (and 寸 under fghy)"""
+    py = script("06-pinyin")
+    d.open_page("text")
+    d.switch_im("拼音")
+    script("15-privacy-backup").ta_dl_twice(d)
+    py.learn_sentence(d)
+    c0, cc = py.pin_fifth(d)
+    d.type("shi")
+    d.cands()
+    d.long_pick("是")
+    menu_tap(d, "屏蔽")
+    menu_tap(d, "确定屏蔽")
+    d.clear()
+    if cun:
+        add_im(d, "五笔")
+        d.open_page("text")
+        d.switch_im("五笔")
+        script("10-tables").block_fghy_cun(d)
+        d.switch_im("拼音")
+    return cc
+
+
+def _clear_learned(d, everything):
+    user_lexicon(d)
+    d.tap_text("清空学到的", after=1.0)
+    s = d.screen()
+    if everything:
+        cb = next((n for n in s.nodes if n.cls == "CheckBox" or "全部清空" in (n.text or "")), None)
+        if not cb:
+            raise Blocked(f"确认框没有全部清空：{[n.text for n in s.nodes if n.text][:10]}")
+        d.tap(cb.c, 0.8)
+        s = d.screen()
+    msg = " ".join(n.text for n in s.nodes if n.text and n.rid not in ("button1", "button2"))
+    b = next((n for n in s.nodes if n.rid == "button1"), None)
+    if not b:
+        raise Blocked(f"没有确认：{msg[:80]}")
+    d.tap(b.c, 2.0)
+    return msg
+
+
+def _cands(d, code, want=None):
+    d.open_page("text")
+    d.switch_im("拼音")
+    d.type(code)
+    c = words(d.cands(want=want))
+    d.clear()
+    return c
+
+
+@case("WD-25", mutates=True)
+def wd25(d):
+    cc = _wd25_setup(d)
+    msg = _clear_learned(d, False)
+    d.open_page("text")
+    d.switch_im("拼音")
+    d.type("ta")
+    d.cands(want="他")
+    d.pick("他")
+    d.type("dl")
+    dl = words(d.cands())
+    d.clear()
+    x = _cands(d, "wxm")
+    d.type("shi")
+    s = words(d.all_cands())
+    d.clear()
+    check(all(k in msg for k in ("自定义短语", "退回恢复前")), f"确认框「{msg[:200]}」")
+    check(first(dl) == "带来", f"他 dl {dl[:3]}")
+    check("汪小明" in x, f"wxm {x[:5]}")
+    check(first(s) == cc and "是" not in s, f"shi {s[:5]}（C=「{cc}」）")
+    return f"他 dl {dl[:2]}；wxm {x[:3]}；shi {s[:3]}"
+
+
+@case("WD-26", mutates=True)
+def wd26(d):
+    cc = _wd25_setup(d, cun=True)
+    msg = _clear_learned(d, True)
+    w = _cands(d, "wangxiaoming")
+    d.type("shi")
+    s = words(d.all_cands())
+    d.clear()
+    d.switch_im("五笔")
+    d.type("fghy")
+    f = words(d.all_cands())
+    d.clear()
+    check("屏蔽的 2 个词会重新出现" in msg, f"确认框「{msg[:200]}」")
+    check(first(w) == "王小明" and "汪小明" not in w, f"wangxiaoming {w[:4]}")
+    check("是" in s and first(s) != cc, f"shi {s[:5]}（C=「{cc}」）")
+    check("寸" in f, f"fghy {f[:5]}")
+    return f"wangxiaoming {w[:2]}；shi {s[:3]}；fghy {f[:3]}"

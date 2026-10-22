@@ -1,8 +1,9 @@
 """uat/05-toolbar.md. The .md is the source of truth; each function follows its case's 前提/操作/预期."""
+import io
 import re
 import time
 
-from uat import BAR_BOTTOM, Blocked, Fail, case, check, home, menu_tap, open_url, sym_char
+from uat import BAR_BOTTOM, Blocked, Fail, case, check, has, home, menu_tap, open_url, script, sym_char
 
 LONG = "今天天气很好，我们一起去公园散步吧。"
 
@@ -465,6 +466,10 @@ def status_toggle(d, frm):
     status_panel(d)
     n = d.screen().find(text=frm, where="ime")
     if not n:
+        # the learning entries (U-88, U-93) push fcitx's toggles to a third row, under the fold
+        d.swipe((540, 2000), (540, 1650), 300, 0.8)
+        n = d.screen().find(text=frm, where="ime")
+    if not n:
         raise Blocked(f"状态面板没有「{frm}」")
     d.tap(n.c, 0.8)
     s = d.screen()
@@ -641,6 +646,16 @@ def tb22(d):
     s = d.screen()
     b1 = kbox(d, s)
     f1 = [n.b for n in s.app() if n.cls == "EditText" and n.rid != "url_field"]
+    # the toolbar's buttons as big as docked, not squeezed by the narrower bar
+    menu = s.find(desc="展开工具栏", where="ime")
+    if menu:
+        d.tap(menu.c, 0.8)
+    s = d.screen()
+    undo, more = s.find(desc="撤销", where="ime"), s.find(desc="状态区域", where="ime")
+    d.shot("kb", "悬浮的工具栏和字母")
+    # 28 dp at least, all in view (⋯, the way out of floating, too)
+    check(undo is not None and undo.b[2] - undo.b[0] >= 72, f"悬浮时工具栏按钮 {undo.b if undo else None}，窄于 28dp")
+    check(more is not None and b1 and more.b[2] <= b1[2], f"悬浮时工具栏的 ⋯ {more.b if more else None} 不在键盘里 {b1}")
     h, _ = handle(d, s)
     drag(d, h, (h[0], 500))
     s = d.screen()
@@ -663,6 +678,129 @@ def tb22(d):
     png = d.adb("exec-out", "cat", "/sdcard/uat-p.png", binary=True)
     d.shot((max(0, x - 300), max(0, a.b[1] - 330), min(1080, x + 300), a.b[3] + 20), "按住 a", png=png)
     return f"悬浮 {b1} → 拖到 {b2}；页面不动"
+
+
+@case("TB-34", page="sentence", mutates=True, visual=True)
+def tb34(d):
+    floating(d)
+    h, _ = handle(d)
+    drag(d, h, (h[0], 900))
+    h, _ = handle(d)
+    W = 1080
+    # down to the edge and on, held: the mark shows (not a view the dump names: its colour beside the keyboard)
+    far = (h[0], 2350)
+    steps = [("down", *h), ("sleep", 0.2)] + [("move", h[0], h[1] + (far[1] - h[1]) * i // 10) for i in range(1, 11)] + [("sleep", 0.4)]
+    d.touch(*steps)
+    time.sleep(0.6)
+    png = d.adb("exec-out", "screencap", "-p", binary=True)
+    d.shot("full", "拖进底边", png=png)
+    from PIL import Image
+    im = Image.open(io.BytesIO(png)).convert("RGB")
+    kb = kbox(d)
+    # back up out of it, let go: still floating
+    d.touch(("move", h[0], 1900), ("sleep", 0.4), ("up", h[0], 1900))
+    time.sleep(0.8)
+    im2 = d.png()
+    # the mark: across the bottom above the bar, beside the keyboard; where the two differ down its left
+    diff = [y for y in range(1500, 2300, 4)
+            if max(abs(a - b) for a, b in zip(im.getpixel((20, y))[:3], im2.getpixel((20, y))[:3])) >= 12]
+    in_zone = im.getpixel((20, diff[len(diff) // 2]))[:3] if diff else None
+    still = kbox(d)
+    check(still and (still[2] - still[0]) < W * 0.9, f"拖回去松手后不是悬浮键盘 {still}")
+    # once more, let go in it: docked
+    h, _ = handle(d)
+    drag(d, h, far)
+    docked = kbox(d)
+    check(len(diff) >= 10, f"拖进底边时左边没有落点框（不同的行 {diff[:3]}…，键盘 {kb}）")
+    # as Gboard's, the keyboard stops above the mark, never over it
+    check(kb and diff and kb[3] <= diff[0] + 4, f"键盘压在落点框上（键盘 {kb}，框从 {diff[:1]}）")
+    check(docked and docked[2] - docked[0] >= W - 5, f"在落点框里松手后键盘 {docked}，不是放回底部")
+    return f"落点框 {len(diff) * 4} px 高，颜色 {in_zone}；放回 {docked}"
+
+
+@case("TB-38", page="sentence", mutates=True, visual=True)
+def tb38(d):
+    floating(d)
+    h, _ = handle(d)
+    # low, out of the bottom zone (TB-34 lets go here and it floats)
+    drag(d, h, (h[0], 1900))
+    h, _ = handle(d)
+    b1 = kbox(d)
+    # sideways, the finger wobbling 3 px up and back as it goes
+    x2 = 200 if h[0] > 540 else 880
+    steps = [("down", *h), ("sleep", 0.2)]
+    for i in range(1, 11):
+        steps.append(("move", h[0] + (x2 - h[0]) * i // 10, h[1] - 3 * (i % 2)))
+    steps += [("sleep", 0.2), ("up", x2, h[1])]
+    d.touch(*steps)
+    time.sleep(0.8)
+    b2 = kbox(d)
+    d.shot("full", "最低处左右拖、上下抖后松手")
+    check(b2 and (b2[2] - b2[0]) < 1080 * 0.9, f"抖了一下就放回底部：{b2}")
+    check(b1 and b2 and abs(b2[0] - b1[0]) > 100 and abs(b2[1] - b1[1]) <= 8, f"拖前 {b1}，拖后 {b2}")
+    return f"{b1} → {b2}，仍悬浮（横屏那步手动看）"
+
+
+@case("TB-39", page="sentence", mutates=True, visual=True)
+def tb39(d):
+    py = script("06-pinyin")
+    floating(d)
+    h, _ = handle(d)
+    # up past the top edge: no room above the keyboard, the chip goes below it, off the candidates
+    drag(d, h, (h[0], 0))
+    b = kbox(d)
+    d._keys = None
+    s, chip = py._block_shi(d)
+    row = chip.row().b
+    d.shot("full", "拖到最顶后屏蔽「是」的提示")
+    undo = s.find(text="撤销", where="all")
+    check(row[1] >= 0 and row[3] <= d.screen_h(), f"提示 {row} 出了屏幕")
+    check(row[1] >= b[3], f"提示 {row} 不在键盘 {b} 下方")
+    check(undo is not None, "提示里没有撤销")
+    d.tap(undo.c, 0.8)
+    d.clear()
+    d.type("shi")
+    back = d.all_cands()
+    d.clear()
+    check(has(back, "是"), f"撤销后 shi {back[:6]}")
+    return f"键盘 {b}；提示 {row}；撤销后 {back[:3]}"
+
+
+@case("TB-37", base="B0-设置", mutates=True, visual=True)
+def tb37(d):
+    d.open_page("text")
+    floating(d)
+    home(d, "外观")
+    d.shot("full", "悬浮开着时外观页的预览")
+    d.open_page("text")
+    floating(d)
+    home(d, "外观")
+    d.shot("full", "悬浮关掉后外观页的预览")
+    return "比两张截图里预览的字母大小"
+
+
+@case("TB-35", base="B0-设置", mutates=True)
+def tb35(d):
+    d.open_page("text")
+    floating(d)
+    s = d.screen()
+    _, dock = handle(d, s)
+    kb = kbox(d, s)
+    bottom = dock.c[1] > (kb[1] + kb[3]) // 2
+    home(d, "外观")
+    d.tap_text("大小与样式", scroll=False, after=1.0)
+    d.choose("悬浮键盘拖动条", "上面")
+    d.open_page("text")
+    s = d.screen()
+    h, dock2 = handle(d, s)
+    kb2 = kbox(d, s)
+    top = dock2.c[1] < (kb2[1] + kb2[3]) // 2
+    drag(d, h, (h[0], h[1] - 300))
+    kb3 = kbox(d)
+    check(bottom, f"默认拖动条不在下面：{dock.b}，键盘 {kb}")
+    check(top, f"改成上面后拖动条 {dock2.b}，键盘 {kb2}")
+    check(kb3 and kb3[1] < kb2[1] - 200, f"拖顶上的拖动条：{kb2} → {kb3}")
+    return f"下面 {dock.b} → 上面 {dock2.b}；拖后 {kb3}"
 
 
 @case("TB-23", mutates=True, visual=True)
@@ -896,8 +1034,8 @@ def tb32(d):
         h, dock = handle(d, s)
         kb = kbox(d, s)
         im = d.png()
-        # the handle's strip is the keyboard's top: the dock button's top, the keys' left
-        inside, corner = im.getpixel((h[0] - 150, h[1])), im.getpixel((kb[0] + 1, dock.b[1] + 1))
+        # the handle's strip is the keyboard's bottom: the dock button's bottom, the keys' left
+        inside, corner = im.getpixel((h[0] - 150, h[1])), im.getpixel((kb[0] + 1, dock.b[3] - 2))
         return max(abs(a - b) for a, b in zip(inside, corner)) < 12, inside, corner
     d.open_page("text")
     floating(d)

@@ -193,7 +193,8 @@ class Node:
 
     def __init__(self, e, parent):
         # an empty field reports its hint as its text
-        self.text = "" if e.get("hint") == "true" else (e.get("text") or "")
+        # fields.html's placeholder is zero-width spaces, read as text where the hint is not told apart
+        self.text = "" if e.get("hint") == "true" else (e.get("text") or "").replace("\u200b", "")
         self.desc = e.get("content-desc") or ""
         self.rid = (e.get("resource-id") or "").split("/")[-1]
         self.cls = (e.get("class") or "").split(".")[-1]
@@ -332,6 +333,14 @@ class Device:
 
     def sh(self, cmd):
         return self.adb("shell", cmd)
+
+    def dpx(self):
+        """Pixels per dp, from the device's density."""
+        return int(self.sh("wm density").split()[-1]) / 160
+
+    def screen_h(self):
+        """The screen's height in pixels in its natural (portrait) orientation, from wm size (an override wins); not the rotated height."""
+        return int(self.sh("wm size").strip().splitlines()[-1].split()[-1].split("x")[1])
 
     def root(self, cmd):
         if self.emu:   # adbd runs as root there (emu-up)
@@ -817,10 +826,23 @@ class Device:
             p, t = self.preedit(s), self.field_text(s) or ""
             if not p and not t:
                 return
+            # committed text alone: reload the page instead of backspacing it, as a backspace
+            # right after a commit takes the commit back and unlearns it (PY-64)
+            on_page = self.page and "webview_shell" in self.top_activity()
+            if not p and on_page:
+                break
             if "|" in p:   # the cursor inside the composing row: backspace stops at its start
                 break
-            n = len(p) + len(t)
-            self.press("bksp", min(n + 1, 40), after=0.3)
+            if p and on_page:
+                # the composing text only, a key at a time until it is gone: what it shows is not
+                # the keys typed (双拼 or 九键 show full pinyin, longer), and a backspace past it
+                # takes the commit back (PY-64); the committed text is reloaded away above
+                for _ in range(40):
+                    self.press("bksp", 1, after=0.15)
+                    if not self.preedit():
+                        break
+                continue
+            self.press("bksp", min(len(p) + len(t) + 1, 40), after=0.3)
         if self.page:
             self.open_page(self.page)
             if not self.preedit() and not self.field_text():
@@ -1322,22 +1344,48 @@ def popup(d, key):
             a = a.parent
         return False
     top = max(150, k.b[1] - 700)   # not the status bar; landscape's keyboard starts higher up
-    return [n for n in s.ime() if n.text and n.b[3] <= k.b[1] + 10 and n.b[1] > top and not on_key(n)], (x, y)
+    items = [n for n in s.ime() if n.text and n.b[3] <= k.b[1] + 10 and n.b[1] > top and not on_key(n)]
+    d._popup = (items, key, x)
+    return items, (x, y)
 
 
-def popup_slide(d, xy, tgt):
+# a long press's keys pick by how far the finger moves, this much of a key a step (PopupKeyboardUi.STEP)
+POPUP_STEP = 0.6
+
+
+def popup_focus(items, key, x):
+    """the key in focus as a popup opens: a nine key's digit, else the bottom row's nearest the finger"""
+    if not items:
+        return None
+    bottom = max(n.b[3] for n in items)
+    row = [n for n in items if abs(n.b[3] - bottom) < 10]
+    return next((n for n in row if n.text == key), None) or min(row, key=lambda n: abs(n.c[0] - x))
+
+
+def popup_slide(d, xy, tgt, items=None, key=None):
+    """move from the key in focus to tgt as the popup reads it: so many keys across and up, each
+    POPUP_STEP of a key; the first move is where the finger starts. The popup's items and key are
+    popup()'s, or given for a long press made without it (an emoji's): used once, then dropped, so a
+    later case never reads another's popup"""
     x, y = xy
-    tx, ty = tgt.c
-    d.touch(("move", (x + tx) // 2, (y + ty) // 2), ("sleep", 0.05), ("move", tx, ty), ("sleep", 0.15),
-            ("up", tx, ty))
+    if items is None:
+        items, key, _ = d.__dict__.pop("_popup", ([], None, x))
+    else:
+        d.__dict__.pop("_popup", None)
+    focus = popup_focus(items, key, x) or tgt
+    tx = x + round((tgt.c[0] - focus.c[0]) * POPUP_STEP)
+    ty = y + round((tgt.c[1] - focus.c[1]) * POPUP_STEP)
+    d.touch(("move", x + 1, y), ("sleep", 0.05), ("move", (x + tx) // 2, (y + ty) // 2), ("sleep", 0.05),
+            ("move", tx, ty), ("sleep", 0.15), ("up", tx, ty))
     time.sleep(0.5)
 
 
 def popup_away(d, xy):
     """let a long press's popup go with nothing picked: a lift with no move types the key in focus,
-    a move far off first closes it"""
+    a move down off the key first closes it"""
     x, y = xy
-    d.touch(("move", x, y + 400), ("sleep", 0.1), ("up", x, y + 400))
+    # the first move is where the finger starts: then down off the key
+    d.touch(("move", x + 1, y), ("sleep", 0.05), ("move", x, y + 400), ("sleep", 0.1), ("up", x, y + 400))
 
 
 def popup_pick(d, key, char):

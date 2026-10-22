@@ -31,6 +31,9 @@ PHRASES = {   # name: (what Kokoro is given, what X-ASR alone should hear, None:
     "iphone": ("我想买一个 I phone", "我想买一个iphone"),
     # a user word the recognizer alone mishears (蓝镜花园): heard only as the user's hotword
     "lanjing": ("我住在澜境花园", None),
+    # VO-19..21: a name the recognizer alone hears as 王小明 or the like
+    "wangxiaoming": ("汪小明", None),
+    "wangmingtian": ("汪小明明天来", None),
 }
 
 
