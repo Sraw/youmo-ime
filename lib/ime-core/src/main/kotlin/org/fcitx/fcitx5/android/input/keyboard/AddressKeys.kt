@@ -22,6 +22,17 @@ enum class AddressKeys {
         /** The ends of addresses the full stop's place offers, the commonest first. */
         val DOMAINS = listOf(".com", ".cn", ".net", ".org")
 
+        /**
+         * The nine keys' column in an address field, in place of its punctuation, the commonest
+         * first (it shows four): its bottom row has no room for keys of their own beside the space,
+         * which they left an eighth of the width, its label pushed off it, and the globe hidden.
+         */
+        fun column(keys: AddressKeys): List<String> = when (keys) {
+            NONE -> emptyList()
+            URL -> listOf("/", ".", DOMAINS.first(), ":", "-", "_", "?", "=", "&", "#") + DOMAINS.drop(1)
+            EMAIL -> listOf("@", ".", DOMAINS.first(), "-", "_", "+") + DOMAINS.drop(1)
+        }
+
         fun of(traits: EditorTraits): AddressKeys = when {
             traits.isUri -> URL
             traits.isEmail -> EMAIL

@@ -6,6 +6,7 @@ package org.fcitx.fcitx5.android.input.keyboard
 
 import android.annotation.SuppressLint
 import android.content.Context
+import android.content.ContextWrapper
 import android.content.res.ColorStateList
 import android.content.res.Configuration
 import android.graphics.Color
@@ -16,6 +17,7 @@ import android.graphics.drawable.Drawable
 import android.graphics.drawable.InsetDrawable
 import android.graphics.drawable.RippleDrawable
 import android.graphics.drawable.StateListDrawable
+import android.inputmethodservice.InputMethodService
 import android.util.TypedValue
 import android.view.View
 import android.widget.ImageView
@@ -29,6 +31,7 @@ import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.data.theme.ThemePrefs.PunctuationPosition
 import org.fcitx.fcitx5.android.input.AutoScaleTextView
+import org.fcitx.fcitx5.android.input.floating.FloatingKeyboard
 import org.fcitx.fcitx5.android.input.keyboard.KeyDef.Appearance.Border
 import org.fcitx.fcitx5.android.input.keyboard.KeyDef.Appearance.Variant
 import org.fcitx.fcitx5.android.utils.styledFloat
@@ -257,6 +260,26 @@ abstract class KeyView(ctx: Context, val theme: Theme, val def: KeyDef.Appearanc
     }
 }
 
+/**
+ * The keys' text: floating ([FloatingKeyboard]), as much smaller as the keys are shorter, or a letter
+ * and the digit under it ran into each other.
+ */
+internal fun keyTextScale(context: Context): Float {
+    // a keyboard drawn elsewhere (the theme's preview in the settings) is not the floating one
+    if (!ThemeManager.prefs.floatingKeyboard.getValue() || !context.inInputMethod()) return 1f
+    val screen = context.resources.configuration.screenWidthDp
+    return FloatingKeyboard.textScale(FloatingKeyboard.widthDp(screen), screen)
+}
+
+private fun Context.inInputMethod(): Boolean {
+    var at: Context? = this
+    while (at is ContextWrapper) {
+        if (at is InputMethodService) return true
+        at = at.baseContext
+    }
+    return false
+}
+
 @SuppressLint("ViewConstructor")
 open class TextKeyView(ctx: Context, theme: Theme, def: KeyDef.Appearance.Text) :
     KeyView(ctx, theme, def) {
@@ -265,7 +288,7 @@ open class TextKeyView(ctx: Context, theme: Theme, def: KeyDef.Appearance.Text) 
         isFocusable = false
         background = null
         text = def.displayText
-        setTextSize(TypedValue.COMPLEX_UNIT_DIP, def.textSize)
+        setTextSize(TypedValue.COMPLEX_UNIT_DIP, def.textSize * keyTextScale(ctx))
         textDirection = View.TEXT_DIRECTION_FIRST_STRONG_LTR
         // keep original typeface, apply textStyle only
         setTypeface(typeface, def.textStyle)
@@ -332,7 +355,7 @@ class AltTextKeyView(ctx: Context, theme: Theme, def: KeyDef.Appearance.AltText)
         isClickable = false
         isFocusable = false
         // TODO hardcoded alt text size
-        setTextSize(TypedValue.COMPLEX_UNIT_DIP, 10.666667f)
+        setTextSize(TypedValue.COMPLEX_UNIT_DIP, 10.666667f * keyTextScale(ctx))
         setTypeface(typeface, Typeface.BOLD)
         text = def.altText
         textDirection = View.TEXT_DIRECTION_FIRST_STRONG_LTR

@@ -17,7 +17,6 @@ import org.fcitx.fcitx5.android.input.keyboard.KeyAction
 import org.fcitx.fcitx5.android.input.keyboard.KeyDef
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
-import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -32,10 +31,9 @@ import org.robolectric.annotation.Config
 
 /**
  * The bubble over a key pressed, as the finger moves on: a letter's preview sends an update on every
- * move, also once its long press's keys are up, which put the bubble back to its own width under
- * them; and each update laid the input view out again, whether or not anything had changed. At an
- * edge the long press's keys are moved in, and the bubble with the key in focus. Under the app,
- * whose theme preferences the popups read.
+ * move, also once its long press's keys are up, and each update laid the input view out again,
+ * whether or not anything had changed. A long press's keys float over the key on their own, the
+ * bubble gone. Under the app, whose theme preferences the popups read.
  */
 @RunWith(RobolectricTestRunner::class)
 @Config(application = FcitxApplication::class)
@@ -43,7 +41,7 @@ class PopupComponentTest {
 
     private val popup = PopupComponent()
 
-    // in a root 150 px across (1 dp = 1 px): a long press of five has keys 30 wide, narrower than it
+    // in a root 150 px across (1 dp = 1 px): a long press of five has keys 30 wide
     private val key = Rect(55, 500, 95, 550)
 
     // one row: five columns
@@ -76,33 +74,23 @@ class PopupComponentTest {
 
     private fun placedAt() = (bubble.layoutParams as FrameLayout.LayoutParams).run { listOf(width, leftMargin, topMargin) }
 
-    // the long press's keys, added after the bubble, as laid out: however they are arranged, its columns across
-    private fun longPressKeyWidth(): Int {
-        layOut()
-        return popup.root.getChildAt(1).measuredWidth / five.items.size
-    }
-
     @Test
-    fun underALongPressTheBubbleStaysAsWideAsItsKeysAsTheFingerMoves() {
-        send(PopupAction.PreviewAction(ID, "q", key))
-        send(PopupAction.ShowKeyboardAction(ID, five, key))
-        val keys = longPressKeyWidth()
-        assertNotEquals("keys of another width than the bubble's own", key.width(), keys)
-        assertEquals(keys, bubble.layoutParams.width)
-        // the preview's updates, back on the key and swiped
+    fun aLongPressesKeysFloatOverTheKeyAsSmallAsALetters() {
+        // a 九键 key, far wider than a letter's: its long press's keys as small as for a letter
+        val wide = Rect(10, 500, 140, 550)
+        send(PopupAction.PreviewAction(ID, "q", wide))
+        send(PopupAction.ShowKeyboardAction(ID, five, wide))
+        layOut()
+        // the bubble gone, the keys alone
+        assertEquals(1, popup.root.childCount)
+        val keys = popup.root.getChildAt(0)
+        assertTrue("${keys.width}", keys.width / five.items.size <= PopupComponent.LONG_PRESS_KEY_WIDTH)
+        // over the key, clear of it
+        assertEquals(wide.top - PopupComponent.LONG_PRESS_LIFT, keys.bottom)
+        // the preview's updates, back on the key and swiped, bring no bubble back
         send(PopupAction.PreviewUpdateAction(ID, "q"))
         send(PopupAction.PreviewUpdateAction(ID, "1"))
-        assertEquals(keys, bubble.layoutParams.width)
-    }
-
-    @Test
-    fun atAnEdgeTheBubbleIsMovedInUnderItsKey() {
-        // the five keys fill the root, so they start at its edge: centred over the key, the bubble was at 5
-        val edge = Rect(0, 500, 40, 550)
-        send(PopupAction.PreviewAction(ID, "q", edge))
-        send(PopupAction.ShowKeyboardAction(ID, five, edge))
-        layOut()
-        assertEquals(0, bubble.left)
+        assertEquals(1, popup.root.childCount)
     }
 
     @Test

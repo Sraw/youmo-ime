@@ -17,4 +17,17 @@ class AddressKeysTest {
         assertEquals(AddressKeys.NONE, AddressKeys.of(EditorTraits()))
         assertEquals(".com", AddressKeys.DOMAINS.first())
     }
+
+    @Test
+    fun theNineKeysColumnOffersAnAddresssMarksTheCommonestFirst() {
+        assertEquals(listOf("/", ".", ".com", ":"), AddressKeys.column(AddressKeys.URL).take(4))
+        assertEquals(listOf("@", ".", ".com", "-"), AddressKeys.column(AddressKeys.EMAIL).take(4))
+        assertEquals(emptyList<String>(), AddressKeys.column(AddressKeys.NONE))
+        // every domain, each once
+        for (keys in listOf(AddressKeys.URL, AddressKeys.EMAIL)) {
+            val column = AddressKeys.column(keys)
+            assertEquals(column.distinct(), column)
+            assertEquals(AddressKeys.DOMAINS.toSet(), column.filter { it.length > 1 }.toSet())
+        }
+    }
 }

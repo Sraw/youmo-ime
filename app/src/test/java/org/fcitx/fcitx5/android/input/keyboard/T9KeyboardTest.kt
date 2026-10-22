@@ -12,6 +12,7 @@ import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
 import android.widget.ScrollView
+import android.widget.TextView
 import androidx.core.view.isVisible
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.LifecycleRegistry
@@ -465,25 +466,42 @@ class T9KeyboardTest {
         assertTrue(one.items.all { s -> s.all { it.code < 0x80 } })
     }
 
-    // as the full keyboard's: a URL's / or an email address's @ before the space, . and .com after it
+    // an address's marks in the column, in place of its punctuation: the bottom row as it always is
     @Test
     @Config(application = FcitxApplication::class)
-    fun anAddressFieldsKeysShowOnlyThere() {
-        val keyboard = T9Keyboard(PlaceholderStrings(RuntimeEnvironment.getApplication()), ThemePreset.PixelDark)
-        fun shown() = listOf(R.id.button_slash, R.id.button_at, R.id.button_dot, R.id.button_domain).map { keyboard.findViewById<View>(it).isVisible }
-        assertEquals(listOf(false, false, false, false), shown())
-        keyboard.address = AddressKeys.URL
-        assertEquals(listOf(true, false, true, true), shown())
-        keyboard.address = AddressKeys.EMAIL
-        assertEquals(listOf(false, true, true, true), shown())
-        keyboard.address = AddressKeys.NONE
-        assertEquals(listOf(false, false, false, false), shown())
+    fun anAddressFieldsMarksAreInTheColumn() {
+        for (english in listOf(false, true)) {
+            val keyboard = T9Keyboard(PlaceholderStrings(RuntimeEnvironment.getApplication()), ThemePreset.PixelDark, english = english)
+            val sent = mutableListOf<KeyAction>()
+            keyboard.keyActionListener = KeyActionListener { action, _ -> sent += action }
+            // the column: the scrolling list left of the keys
+            val items = (0 until keyboard.childCount).map { keyboard.getChildAt(it) }.filterIsInstance<ScrollView>().single().getChildAt(0) as ViewGroup
+            fun column() = (0 until items.childCount).map { items.getChildAt(it) as TextView }.filter { it.isVisible }.map { it.text.toString() }
+            fun pickFirst() = items.getChildAt(0).performClick()
+            // no keys of their own beside the space
+            assertTrue(listOf(R.id.button_slash, R.id.button_at, R.id.button_dot, R.id.button_domain).all { keyboard.findViewById<View>(it) == null })
+            keyboard.address = AddressKeys.URL
+            assertEquals(AddressKeys.column(AddressKeys.URL), column())
+            pickFirst()
+            assertEquals(KeyAction.CommitAction("/"), sent.last())
+            keyboard.address = AddressKeys.EMAIL
+            assertEquals(AddressKeys.column(AddressKeys.EMAIL), column())
+            pickFirst()
+            assertEquals(KeyAction.CommitAction("@"), sent.last())
+            keyboard.address = AddressKeys.NONE
+            assertEquals(T9Keyboard.labels(EngineBridge.T9State(), english), column())
+        }
+        // pinyin typed in an address field: its syllables still
+        val typing = EngineBridge.T9State(composing = true, syllables = listOf("ni", "mi"))
+        assertEquals(listOf("ni", "mi"), T9Keyboard.labels(typing, address = AddressKeys.URL))
+        assertEquals(KeyAction.CommitAction(".com"), T9Keyboard.pick(EngineBridge.T9State(), 2, address = AddressKeys.URL))
+        assertEquals(KeyAction.CommitAction(".com"), T9Keyboard.pick(EngineBridge.T9State(composing = true), 2, english = true, address = AddressKeys.URL))
     }
 
-    // 中/英 beside the space on both; the language key given up to an address's keys
+    // 中/英 beside the space on both, and the globe, in an address field too
     @Test
     @Config(application = FcitxApplication::class)
-    fun bothHaveTheLanguageKeyAndAnAddressHidesTheGlobe() {
+    fun bothHaveTheLanguageKeyAndTheGlobeEvenInAnAddressField() {
         val app = RuntimeEnvironment.getApplication()
         for (english in listOf(false, true)) {
             val keyboard = T9Keyboard(PlaceholderStrings(app), ThemePreset.PixelDark, english = english)
@@ -499,7 +517,7 @@ class T9KeyboardTest {
             val globe = keyboard.findViewById<View>(R.id.button_lang)
             assertTrue(globe.isVisible)
             keyboard.address = AddressKeys.EMAIL
-            assertFalse(globe.isVisible)
+            assertTrue(globe.isVisible)
             assertTrue(keyboard.findViewById<View>(R.id.button_nine_language).isVisible)
             keyboard.address = AddressKeys.NONE
             assertTrue(globe.isVisible)

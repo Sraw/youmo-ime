@@ -9,6 +9,7 @@ import android.graphics.Rect
 import android.graphics.drawable.InsetDrawable
 import android.graphics.drawable.ShapeDrawable
 import android.graphics.drawable.shapes.OvalShape
+import android.view.View
 import android.widget.ImageView
 import androidx.core.graphics.ColorUtils
 import org.fcitx.fcitx5.android.data.theme.Theme
@@ -20,7 +21,6 @@ import splitties.views.dsl.core.horizontalLayout
 import splitties.views.dsl.core.imageView
 import splitties.views.dsl.core.lParams
 import splitties.views.imageDrawable
-import kotlin.math.floor
 
 class PopupMenuUi(
     override val ctx: Context,
@@ -28,7 +28,8 @@ class PopupMenuUi(
     outerBounds: Rect,
     triggerBounds: Rect,
     onDismissSelf: PopupContainerUi.() -> Unit = {},
-    private val items: Array<KeyDef.Popup.Menu.Item>
+    private val items: Array<KeyDef.Popup.Menu.Item>,
+    private val onFocusMoved: (View) -> Unit = {},
 ) : PopupContainerUi(ctx, theme, outerBounds, triggerBounds, onDismissSelf) {
 
     private val keySize = ctx.dp(48)
@@ -94,18 +95,29 @@ class PopupMenuUi(
         }
     }
 
+    // as a long press's keys pick ([PopupKeyboardUi]): by how far the finger moves, down off the key none
+    private val focus = PopupFocus(
+        rows = listOf(columnOrder.copyOf()),
+        startRow = 0,
+        startColumn = focusColumn,
+        stepX = keySize * PopupFocus.STEP,
+        stepY = keySize * PopupFocus.STEP,
+        cancelBelow = triggerBounds.height().toFloat(),
+        // the key's bottom edge, in onChangeFocus's coordinates (the popup's, offsetY up)
+        cancelAt = (triggerBounds.height() - offsetY).toFloat(),
+    )
+
     override fun onChangeFocus(x: Float, y: Float): Boolean {
-        var newColumn = floor(x / keySize).toInt()
-        if (newColumn < -2 || newColumn > columnCount + 1) {
+        val newFocus = focus.moveTo(x, y)
+        if (newFocus == PopupFocus.CANCELLED) {
             onDismissSelf(this)
             return true
         }
-        newColumn = limitIndex(newColumn, columnCount)
-        val newFocus = columnOrder[newColumn]
-        if (newFocus < keyViews.size) {
+        if (newFocus != focusedIndex) {
             markInactive(focusedIndex)
             markFocus(newFocus)
             focusedIndex = newFocus
+            onFocusMoved(root)
         }
         return false
     }

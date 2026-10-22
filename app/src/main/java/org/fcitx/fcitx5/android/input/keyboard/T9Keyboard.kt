@@ -105,11 +105,8 @@ class T9Keyboard(
         private const val SIDE = 0.16f
         private const val RIGHT = 0.18f
 
-        // 中/英's share; an address field's keys': the space keeps an eighth of the width beside them
+        // 中/英's share
         private const val LANGUAGE = 0.12f
-        private const val ADDRESS_KEY = 0.09f
-        private const val ADDRESS_DOT = 0.07f
-        private const val ADDRESS_DOMAIN = 0.11f
         private const val DIGIT = (1f - SIDE - RIGHT) / 3
 
         /** Shown in the column while nothing is typed, committed as they are. */
@@ -143,20 +140,30 @@ class T9Keyboard(
         // nothing typed, or nothing of it left to take: the column offers punctuation
         private fun EngineBridge.T9State.offersSyllables() = composing && syllables.isNotEmpty()
 
-        /** The column's items for [state]: its syllables while typing, else punctuation; [english]'s marks. */
-        internal fun labels(state: EngineBridge.T9State, english: Boolean = false): List<String> = when {
+        /**
+         * The column's items for [state]: its syllables while typing, else punctuation; [english]'s
+         * marks; in an address field ([address]) what addresses are made of ([AddressKeys.column]),
+         * pinyin's syllables still while typing.
+         */
+        internal fun labels(state: EngineBridge.T9State, english: Boolean = false, address: AddressKeys = AddressKeys.NONE): List<String> = when {
+            !english && state.offersSyllables() -> state.syllables
+            address != AddressKeys.NONE -> AddressKeys.column(address)
             english -> ENGLISH_PUNCTUATION
-            state.offersSyllables() -> state.syllables
             else -> PUNCTUATION
         }
 
-        /** What picking item [i] of [state]'s column types: for [english], the mark through English, the word typed ended by it. */
-        internal fun pick(state: EngineBridge.T9State, i: Int, english: Boolean = false): KeyAction =
-            if (english) {
-                KeyAction.FcitxKeyAction(ENGLISH_PUNCTUATION[i])
-            } else if (state.offersSyllables()) {
+        /**
+         * What picking item [i] of [state]'s column types: for [english], the mark through English, the
+         * word typed ended by it; an address's, committed as it is.
+         */
+        internal fun pick(state: EngineBridge.T9State, i: Int, english: Boolean = false, address: AddressKeys = AddressKeys.NONE): KeyAction =
+            if (!english && state.offersSyllables()) {
                 // with the list's id: shown before a key typed since replaced it, the pick is dropped
                 KeyAction.SymAction(KeySym(UNICODE + Keyboard.syllableKey(i, state.id).code), KeyStates.Virtual)
+            } else if (address != AddressKeys.NONE) {
+                KeyAction.CommitAction(AddressKeys.column(address)[i])
+            } else if (english) {
+                KeyAction.FcitxKeyAction(ENGLISH_PUNCTUATION[i])
             } else {
                 KeyAction.CommitAction(PUNCTUATION[i])
             }
@@ -377,13 +384,7 @@ class T9Keyboard(
             listOf(
                 LayoutSwitchKey("符", PickerWindow.Key.Symbol.name, SIDE),
                 LayoutSwitchKey("123", NumberKeyboard.Name, 0.14f),
-                // an address field's, as the full keyboard's (AddressKeys), hidden else; narrower,
-                // and the language key hidden for them, to leave the space room beside them
-                AddressKey("/", R.id.button_slash, ADDRESS_KEY),
-                AddressKey("@", R.id.button_at, ADDRESS_KEY),
                 SpaceKey(),
-                AddressKey(".", R.id.button_dot, ADDRESS_DOT),
-                AddressKey(AddressKeys.DOMAINS.first(), R.id.button_domain, ADDRESS_DOMAIN, AddressKeys.DOMAINS),
                 NineKeyLanguageKey(LANGUAGE),
                 LanguageKey(),
                 ReturnKey(RIGHT),
@@ -393,20 +394,13 @@ class T9Keyboard(
 
     private val space: TextKeyView by lazy { findViewById(R.id.button_space) }
 
-    /** What the bottom row has either side of the space, as the field is: see [AddressKeys], as the full keyboard's. */
+    /** The field's address: what the column offers in place of punctuation ([AddressKeys.column]). */
     override var address: AddressKeys = AddressKeys.NONE
         set(value) {
+            if (field == value) return
             field = value
-            showAddressKeys()
+            show(columnState)
         }
-
-    private fun showAddressKeys() {
-        showLanguageKey()
-        findViewById<View>(R.id.button_dot).isVisible = address != AddressKeys.NONE
-        findViewById<View>(R.id.button_slash).isVisible = address == AddressKeys.URL
-        findViewById<View>(R.id.button_at).isVisible = address == AddressKeys.EMAIL
-        findViewById<View>(R.id.button_domain).isVisible = address != AddressKeys.NONE
-    }
 
     // the keys 1 to 9 by their digits
     private val digitKeys: Map<Char, AltTextKeyView> = keyRows.flatMap { it.children.toList() }
@@ -470,9 +464,9 @@ class T9Keyboard(
         showLanguageKey()
     }
 
-    // the language key as the user has it, but for an address field's keys
+    // the language key as the user has it
     private fun showLanguageKey() {
-        lang.isVisible = showLangSwitchKey.getValue() && address == AddressKeys.NONE
+        lang.isVisible = showLangSwitchKey.getValue()
     }
 
     private val items = LinearLayout(context).apply { orientation = LinearLayout.VERTICAL }
@@ -526,7 +520,7 @@ class T9Keyboard(
                 importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
             }
         }
-        showAddressKeys()
+        showLanguageKey()
         findViewById<TextKeyView>(R.id.button_nine_language).mainText.text = languageLabel(english)
         showLangSwitchKey.registerOnChangeListener(showLangSwitchKeyListener)
         multiTapPref.registerOnChangeListener(multiTapListener)
@@ -579,7 +573,7 @@ class T9Keyboard(
         typing = state.composing
         // only when it changes: setText does not skip the same text, and may lay the row out again
         if (state.composing != was) one.mainText.text = oneLabel(state.composing)
-        val labels = labels(state, english)
+        val labels = labels(state, english, address)
         while (items.childCount < labels.size) items.addView(item(items.childCount))
         for (i in 0 until items.childCount) {
             val view = items.getChildAt(i) as TextView
@@ -605,7 +599,7 @@ class T9Keyboard(
         setOnClickListener {
             InputFeedbacks.hapticFeedback(this)
             InputFeedbacks.soundEffect(InputFeedbacks.SoundEffect.Standard)
-            onAction(pick(columnState, i, english))
+            onAction(pick(columnState, i, english, address))
         }
     }
 

@@ -7,6 +7,7 @@ package org.fcitx.fcitx5.android.input.popup
 import android.content.Context
 import android.graphics.Rect
 import android.graphics.drawable.GradientDrawable
+import android.view.View
 import android.view.ViewOutlineProvider
 import android.widget.Space
 import org.fcitx.fcitx5.android.data.theme.Theme
@@ -23,7 +24,6 @@ import splitties.views.dsl.core.verticalLayout
 import splitties.views.dsl.core.view
 import splitties.views.gravityCenter
 import kotlin.math.ceil
-import kotlin.math.floor
 import kotlin.math.max
 import kotlin.math.min
 
@@ -37,8 +37,7 @@ import kotlin.math.min
  * @param radius popup keyboard and key radius
  * @param minKeyWidth key width in popup keyboard, at least: see [keyWidth]
  * @param keyHeight key height in popup keyboard
- * @param popupHeight popup preview view height. Used to transform gesture coordinate from
- * trigger view to popup keyboard view. See [offsetX] and [offsetY].
+ * @param lift how far above the trigger's top the popup's bottom is. See [offsetY].
  * @param keys character to commit when triggered
  * @param labels symbols to show on keys
  * @param split where the keys set apart start: drawn in rows of their own above the others; none
@@ -46,6 +45,8 @@ import kotlin.math.min
  * @param asIs every key committed as it is, never typed as a key ([keyAction])
  * @param inRow the keys before [split] in one row, in their order, the one at [inRow] under the
  * finger first (KeyDef.Popup.Keyboard.Explicit.inRow); -1, the first under it and the others round it
+ * @param onFocusMoved told, with the popup's view, each time another key comes into focus: a buzz,
+ * as the finger is not over the key it picks ([PopupFocus])
  */
 class PopupKeyboardUi(
     override val ctx: Context,
@@ -56,12 +57,13 @@ class PopupKeyboardUi(
     private val radius: Float,
     minKeyWidth: Int,
     private val keyHeight: Int,
-    private val popupHeight: Int,
+    private val lift: Int,
     private val keys: Array<String>,
     private val labels: Array<String>,
     split: Int = keys.size,
     private val asIs: Boolean = false,
     inRow: Int = -1,
+    private val onFocusMoved: (View) -> Unit = {},
 ) : PopupContainerUi(ctx, theme, outerBounds, triggerBounds, onDismissSelf) {
 
     class PopupKeyUi(override val ctx: Context, val theme: Theme, val text: String) : Ui {
@@ -101,17 +103,17 @@ class PopupKeyboardUi(
     }
     private val groupRows: List<Int>
 
-    // those 2 variables meas initial focus row/column during initialization
+    // the row and column in focus at first; the column read by tests, to move from it
     private val focusRow: Int
-    private val focusColumn: Int
+    internal val focusColumn: Int
 
     private val keyUis = labels.map {
         PopupKeyUi(ctx, theme, it)
     }
 
     /**
-     * One for every key, wide enough for the widest label and no narrower than [minKeyWidth]
-     * (the bubble over the key pressed), and one text size: each label fitted to a fixed width by
+     * One for every key, wide enough for the widest label and no narrower than [minKeyWidth],
+     * and one text size: each label fitted to a fixed width by
      * itself came out at as many sizes (`.com` smaller than `.cn`). Where the keys so wide would
      * not fit across [outerBounds], narrower, all their labels made smaller alike.
      */
@@ -152,29 +154,19 @@ class PopupKeyboardUi(
      *  1. from trigger view bounds left to popup entry view left
      *  2. from left-most column to initial focused column
      *
-     * Offset on Y axis made up of 2 parts as well:
-     *  1. from trigger view top to popup entry view top
-     *  2. from top-most row to initial focused row (bottom row)
+     * On Y axis, the popup's bottom [lift] above the trigger's top, all its rows above that:
      *
      * ```
      *                    c───┬───┬───┐
      *                    │   │ 4 │ 5 │
-     *                 ┌─ ├───p───┼───┤ ─┐
-     *   popupKeyHeight│  │ 3 │ 1 │ 2 │  │
-     *                 └─ └───┼───┼───┘  │
-     *                        │   │      │popupHeight
-     *                 ┌───── │o─┐│      │
-     *  bounds.height()│      ││a││      │
-     *                 └───── └┴─┴┘ ─────┘
+     *                    ├───┼───┼───┤
+     *                    │ 3 │ 1 │ 2 │
+     *                    └───┴───┴───┘ ─┐lift
+     *                        o──┐      ─┘
+     *                        │a │
+     *                        └──┘
      * ```
-     * o: trigger view top-left origin
-     *
-     * p: popup preview ([PopupEntryUi]) top-left origin
-     *
-     * c: container view top-left origin
-     *
-     * Applying only `1.` parts of both X and Y offset, the origin should transform from `o` to `p`.
-     * `2.` parts of both offset transform it from `p` to `c`.
+     * o: trigger view top-left origin; c: container view top-left origin
      *
      * Where no column centred over the trigger leaves the popup inside [outerBounds] (keys wider than
      * the trigger, at an edge), it is moved in by the rest, every key on screen.
@@ -185,13 +177,13 @@ class PopupKeyboardUi(
         val left = (triggerBounds.left + centred).coerceIn(outerBounds.left, outerBounds.right - columnCount * keyWidth)
         left - triggerBounds.left
     }
-    override val offsetY = (triggerBounds.height() - popupHeight) - (keyHeight * (rowCount - 1))
+    override val offsetY = -lift - keyHeight * rowCount
 
     /**
      * Where the key in focus at first starts across, from the trigger's left: centred over it, unless
-     * the popup was moved in. The bubble under it belongs there, as one shape with it.
+     * the popup was moved in. Read by tests only, since the bubble no longer sits under that key.
      */
-    val focusedKeyLeft: Int get() = offsetX + keyWidth * focusColumn
+    internal val focusedKeyLeft: Int get() = offsetX + keyWidth * focusColumn
 
     private val columnOrder = createColumnOrder(columnCount, focusColumn)
 
@@ -257,34 +249,29 @@ class PopupKeyboardUi(
         }
     }
 
-    // one row in order fitted across the screen leaves the key in focus over the finger only for a
-    // key in the middle: it keeps the focus while the finger is still on the key pressed, as a
-    // finger's first jitter would move it to whatever is drawn under it; once off, what is under it
-    private var offTheKey = inRow < 0
+    // by how far the finger moves from where it was when the popup opened, not where it is
+    private val focus = PopupFocus(
+        rows = keyOrders.toList(),
+        startRow = focusRow,
+        startColumn = focusColumn,
+        stepX = keyWidth * PopupFocus.STEP,
+        stepY = keyHeight * PopupFocus.STEP,
+        cancelBelow = triggerBounds.height().toFloat(),
+        // the key's bottom edge, in onChangeFocus's coordinates (the popup's, offsetY up)
+        cancelAt = (triggerBounds.height() - offsetY).toFloat(),
+    )
 
     override fun onChangeFocus(x: Float, y: Float): Boolean {
-        if (!offTheKey) {
-            val onKey = x + offsetX in 0f..triggerBounds.width().toFloat() && y + offsetY in 0f..triggerBounds.height().toFloat()
-            if (onKey) return false
-            offTheKey = true
-        }
-        // the row drawn under the finger, row 0 at the bottom; below it (still on the key) is row 0.
-        // Rounded with a 30% lead, a finger on the bottom row's upper 70% picked the row above (KB-16)
-        var newRow = rowCount - 1 - floor(y / keyHeight).toInt()
-        // move to next column when gesture moves out of current column
-        var newColumn = floor(x / keyWidth).toInt()
-        // retain focus when gesture moves between ±2 rows/columns of range
-        if (newRow < -2 || newRow > rowCount + 1 || newColumn < -2 || newColumn > columnCount + 1) {
+        val newFocus = focus.moveTo(x, y)
+        if (newFocus == PopupFocus.CANCELLED) {
             onDismissSelf(this)
             return true
         }
-        newRow = limitIndex(newRow, rowCount)
-        newColumn = limitIndex(newColumn, columnCount)
-        val newFocus = keyOrders[newRow][newColumn]
-        if (newFocus in keyUis.indices) {
+        if (newFocus != focusedIndex) {
             markInactive(focusedIndex)
             markFocus(newFocus)
             focusedIndex = newFocus
+            onFocusMoved(root)
         }
         return false
     }
@@ -295,7 +282,7 @@ class PopupKeyboardUi(
     }
 
     companion object {
-        private const val TEXT_SIZE = 23f
+        private const val TEXT_SIZE = 20f
 
         /** Space each side of the widest label, in dp. */
         private const val KEY_PADDING = PopupComponent.TEXT_PADDING

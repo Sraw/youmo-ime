@@ -37,22 +37,24 @@ class PopupKeyboardUiTest {
 
     private fun popup(
         keys: Array<String>, trigger: Rect, outerBounds: Rect = outer, minKeyWidth: Int = keyWidth, split: Int = keys.size,
-        asIs: Boolean = false, inRow: Int = -1,
+        asIs: Boolean = false, inRow: Int = -1, onFocusMoved: (View) -> Unit = {}, onDismiss: () -> Unit = {},
     ): PopupKeyboardUi {
         return PopupKeyboardUi(
             ctx = RuntimeEnvironment.getApplication(),
             theme = ThemePreset.PixelDark,
             outerBounds = outerBounds,
             triggerBounds = trigger,
+            onDismissSelf = { onDismiss() },
             radius = 4f,
             minKeyWidth = minKeyWidth,
             keyHeight = keyHeight,
-            popupHeight = 100,
+            lift = 10,
             keys = keys,
             labels = keys,
             split = split,
             asIs = asIs,
             inRow = inRow,
+            onFocusMoved = onFocusMoved,
         )
     }
 
@@ -78,9 +80,13 @@ class PopupKeyboardUiTest {
         return keys
     }
 
-    // the middle of a cell as drawn: rows of keyHeight from the container's top, row 0 the bottom one
-    private fun PopupKeyboardUi.select(row: Int, column: Int, rows: Int): KeyAction? {
-        onChangeFocus((column + 0.5f) * keyWidth, (rows - 1 - row + 0.5f) * keyHeight)
+    private val started = mutableSetOf<PopupKeyboardUi>()
+
+    // the finger moved from where it was when the popup opened, a step a key ([PopupFocus.STEP]):
+    // the first move is where it starts, over the key in focus at first (row 0)
+    private fun PopupKeyboardUi.select(row: Int, column: Int): KeyAction? {
+        if (started.add(this)) onChangeFocus(0f, 0f)
+        onChangeFocus((column - focusColumn) * keyWidth * PopupFocus.STEP, -row * keyHeight * PopupFocus.STEP)
         return onTrigger()
     }
 
@@ -88,12 +94,11 @@ class PopupKeyboardUiTest {
         val ui = popup(count, trigger)
         val keys = drawn(ui)
         assertEquals("every key is drawn", count, keys.size)
-        val rows = ui.root.childCount
         keys.forEach { (label, cell) ->
             assertEquals(
                 "$count keys: the key drawn at $cell is the one typed there",
                 KeyAction.FcitxKeyAction(label),
-                ui.select(cell.first, cell.second, rows)
+                ui.select(cell.first, cell.second)
             )
         }
     }
@@ -117,7 +122,7 @@ class PopupKeyboardUiTest {
         // the first symbol right above the digit, the key under the finger
         assertEquals(drawn["7"]!!.second, drawn["*"]!!.second)
         val rows = ui.root.childCount
-        drawn.forEach { (label, cell) -> assertEquals(KeyAction.FcitxKeyAction(label), ui.select(cell.first, cell.second, rows)) }
+        drawn.forEach { (label, cell) -> assertEquals(KeyAction.FcitxKeyAction(label), ui.select(cell.first, cell.second)) }
         // no line between them
         assertTrue((0 until rows).all { ui.root.getChildAt(it).background == null })
     }
@@ -187,8 +192,7 @@ class PopupKeyboardUiTest {
             assertEquals(setOf("2", "a", "b", "c"), drawn.filterValues { it.first == 0 }.keys)
             assertEquals(drawn["2"]!!.second, drawn["#0"]!!.second)
             assertEquals(1, drawn["#0"]!!.first)
-            val rows = ui.root.childCount
-            drawn.forEach { (label, cell) -> assertEquals(PopupKeyboardUi.keyAction(label), ui.select(cell.first, cell.second, rows)) }
+            drawn.forEach { (label, cell) -> assertEquals(PopupKeyboardUi.keyAction(label), ui.select(cell.first, cell.second)) }
         }
     }
 
@@ -303,43 +307,86 @@ class PopupKeyboardUiTest {
         assertTrue(sizes.single() < roomy.labels().first().textSize)
     }
 
-    // KB-16: releasing on the bottom row of a two-row popup typed the key above it
     @Test
-    fun theBottomRowOfTwoIsTypedWhereDrawnAndOnTheTriggerToo() {
+    fun aSmallMoveIsAKeyAndOnTheKeyPressedTheBottomRow() {
         val ui = popup(10, Rect(480, 500, 520, 550))
-        val cells = drawn(ui)
-        val rows = ui.root.childCount
-        assertEquals(2, rows)
-        val bottom = cells.filterValues { it.first == 0 }
-        assertTrue(bottom.isNotEmpty())
-        bottom.forEach { (label, cell) ->
-            // anywhere in the cell, its top edge to its bottom
-            for (f in listOf(0.05f, 0.5f, 0.95f)) {
-                ui.onChangeFocus((cell.second + 0.5f) * keyWidth, (rows - 1 + f) * keyHeight)
-                assertEquals(label, KeyAction.FcitxKeyAction(label), ui.onTrigger())
-            }
-        }
-        // the finger still on its key, below the popup: the bottom row
-        val first = cells.entries.first { it.value.first == 0 }
-        ui.onChangeFocus((first.value.second + 0.5f) * keyWidth, rows * keyHeight + 30f)
-        assertEquals(KeyAction.FcitxKeyAction(first.key), ui.onTrigger())
+        val step = keyWidth * PopupFocus.STEP
+        ui.onChangeFocus(100f, 100f)
+        val first = ui.onTrigger()
+        // under half a step: the same key
+        ui.onChangeFocus(100f + step / 3, 100f)
+        assertEquals(first, ui.onTrigger())
+        // a step: the next key, a step back the first again
+        ui.onChangeFocus(100f + step, 100f)
+        val next = ui.onTrigger()
+        assertTrue(next != first)
+        ui.onChangeFocus(100f, 100f)
+        assertEquals(first, ui.onTrigger())
+        // down, still on the key pressed: the bottom row, nothing cancelled
+        assertFalse(ui.onChangeFocus(100f, 140f))
+        assertEquals(first, ui.onTrigger())
     }
 
     @Test
-    fun atAnEdgeTheDigitKeepsTheFocusTillTheFingerLeavesTheKey() {
-        // 九键's 2 at the left: seven keys fit across only narrower, so the row fills the screen and
-        // its digit is in the middle, not over the key
+    fun onlyDownOffTheKeyPressedPicksNothing() {
+        var dismissed = 0
+        val ui = popup(Array(7) { ('a' + it).toString() }, Rect(480, 500, 520, 550), onDismiss = { dismissed++ })
+        // the key's own coordinates, as BaseKeyboard passes them
+        ui.changeFocus(20f, 20f)
+        // far up, left, right: a key still
+        for ((x, y) in listOf(20f to -900f, -900f to 20f, 900f to 20f, 900f to -900f)) {
+            assertFalse(ui.changeFocus(x, y))
+            assertTrue(ui.onTrigger() != null)
+        }
+        assertEquals(0, dismissed)
+        // below the key's bottom edge (50)
+        assertTrue(ui.changeFocus(20f, 51f))
+        assertEquals(1, dismissed)
+    }
+
+    @Test
+    fun aPressNearTheKeysBottomCancelsJustBelowIt() {
+        var dismissed = 0
+        val ui = popup(Array(7) { ('a' + it).toString() }, Rect(480, 500, 520, 550), onDismiss = { dismissed++ })
+        ui.changeFocus(20f, 45f)
+        assertFalse(ui.changeFocus(20f, 49f))
+        assertEquals(0, dismissed)
+        // 7 down, not a whole key's height: off the key
+        assertTrue(ui.changeFocus(20f, 52f))
+        assertEquals(1, dismissed)
+    }
+
+    @Test
+    fun atAnEdgeTheDigitIsInFocusAndAStepPicksItsNeighbours() {
+        // 九键's 2 at the left: seven keys fit across only narrower, the row fills the screen and
+        // its digit is in the middle, not over the key; the finger steps from it all the same
         val keys = arrayOf("A", "B", "C", "2", "a", "b", "c")
         val ui = popup(keys, Rect(0, 500, 40, 550), outerBounds = Rect(0, 0, 7 * keyWidth / 2, 2000), split = 7, inRow = 3)
-        // a jitter on the key: B is drawn under it, the digit stays
+        val step = ui.keyWidth * PopupFocus.STEP
         assertFalse(ui.changeFocus(25f, 20f))
         assertEquals(KeyAction.FcitxKeyAction("2"), ui.onTrigger())
-        // off the key, up over the row: what is drawn there
-        ui.changeFocus(5f, -30f)
+        ui.changeFocus(25f - step, 20f)
+        assertEquals(KeyAction.FcitxKeyAction("C"), ui.onTrigger())
+        ui.changeFocus(25f - 3 * step, 20f)
         assertEquals(KeyAction.FcitxKeyAction("A"), ui.onTrigger())
-        // and back down on the key, what is under the finger still
-        ui.changeFocus(25f, 20f)
-        assertEquals(KeyAction.FcitxKeyAction("B"), ui.onTrigger())
+        ui.changeFocus(25f + 2 * step, 20f)
+        assertEquals(KeyAction.FcitxKeyAction("b"), ui.onTrigger())
+    }
+
+    @Test
+    fun eachKeyComingIntoFocusBuzzesOnce() {
+        var buzzes = 0
+        val keys = arrayOf("A", "B", "C", "2", "a", "b", "c")
+        val ui = popup(keys, Rect(480, 500, 520, 550), split = 7, inRow = 3, onFocusMoved = { buzzes++ })
+        val step = ui.keyWidth * PopupFocus.STEP
+        ui.onChangeFocus(0f, 0f)
+        ui.onChangeFocus(step / 4, 0f)
+        assertEquals(0, buzzes)
+        ui.onChangeFocus(step, 0f)
+        ui.onChangeFocus(step * 1.1f, 0f)
+        assertEquals(1, buzzes)
+        ui.onChangeFocus(step * 3, 0f)
+        assertEquals(2, buzzes)
     }
 
     @Test
