@@ -77,4 +77,13 @@ class FloatingKeyboardTest {
         // the bar's alpha kept, each channel on its own
         assertEquals(0x80F2ECE9.toInt(), FloatingKeyboard.handleColor(0x80FFFFFF.toInt(), 0x00804020))
     }
+
+    @Test
+    fun theKeysTextIsAsMuchSmallerAsTheKeysAreShorter() {
+        // a phone: 70% as wide, its keys 85% as tall, and their text
+        assertEquals(FloatingKeyboard.MIN_HEIGHT_SHARE, FloatingKeyboard.textScale(300, 411), 1e-6f)
+        assertEquals(850, FloatingKeyboard.height(1000, 300, 411))
+        // a wider share than that: the share itself
+        assertEquals(0.9f, FloatingKeyboard.textScale(450, 500), 1e-6f)
+    }
 }

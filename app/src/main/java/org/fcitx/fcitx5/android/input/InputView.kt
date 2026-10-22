@@ -12,16 +12,20 @@ import android.graphics.Point
 import android.graphics.PorterDuff
 import android.graphics.PorterDuffColorFilter
 import android.graphics.Rect
+import android.graphics.drawable.GradientDrawable
 import android.os.Build
 import android.view.Gravity
 import android.view.View
 import android.view.WindowInsets
+import android.view.animation.AccelerateInterpolator
+import android.view.animation.DecelerateInterpolator
 import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InlineSuggestionsResponse
 import android.widget.FrameLayout
 import android.widget.ImageView
 import androidx.annotation.Keep
 import androidx.annotation.RequiresApi
+import androidx.core.graphics.ColorUtils
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.isVisible
 import androidx.core.view.updateLayoutParams
@@ -38,6 +42,7 @@ import org.fcitx.fcitx5.android.core.CapabilityFlags
 import org.fcitx.fcitx5.android.core.FcitxEvent
 import org.fcitx.fcitx5.android.daemon.FcitxConnection
 import org.fcitx.fcitx5.android.daemon.launchOnReady
+import org.fcitx.fcitx5.android.data.InputFeedbacks
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.prefs.ManagedPreference
 import org.fcitx.fcitx5.android.data.prefs.ManagedPreferenceProvider
@@ -45,6 +50,7 @@ import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.input.bar.Calculation
 import org.fcitx.fcitx5.android.input.bar.KawaiiBarComponent
+import org.fcitx.fcitx5.android.input.bar.KawaiiBarStateMachine
 import org.fcitx.fcitx5.android.input.broadcast.InputBroadcastReceiver
 import org.fcitx.fcitx5.android.input.broadcast.InputBroadcaster
 import org.fcitx.fcitx5.android.input.broadcast.PreeditEmptyStateComponent
@@ -55,6 +61,7 @@ import org.fcitx.fcitx5.android.input.candidates.horizontal.HorizontalCandidateC
 import org.fcitx.fcitx5.android.input.clipboard.ClipboardWindow
 import org.fcitx.fcitx5.android.input.floating.FloatingCorners
 import org.fcitx.fcitx5.android.input.floating.FloatingHandle
+import org.fcitx.fcitx5.android.input.floating.FloatingHandleSide
 import org.fcitx.fcitx5.android.input.floating.FloatingKeyboard
 import org.fcitx.fcitx5.android.input.floating.FloatingPlacer
 import org.fcitx.fcitx5.android.input.keyboard.CommonKeyActionListener
@@ -184,6 +191,25 @@ class InputView(
     private val commonKeyActionListener = CommonKeyActionListener()
     private val windowManager = InputWindowManager()
     private val kawaiiBar = KawaiiBarComponent()
+
+    // over the candidates' bar: this view is as high as the window, its top the screen's (setInputView)
+    override val undoAnchor: View get() = kawaiiBar.view
+
+    // with candidates on the bar, above the whole keyboard (preedit row included): over the app, not a key
+    override val undoAbove: View get() = keyboardView
+    override val undoAnchorShowsCandidates: Boolean
+        get() = kawaiiBar.view.displayedChild == KawaiiBarStateMachine.State.Candidate.ordinal
+
+    // docked, below the keyboard is the screen's edge; floating, dragged to the top, there is room below (F3205)
+    override val undoBelowOk: Boolean get() = floating
+
+    // the same bottom FloatingPlacer keeps the keyboard above: this view's bottom less the inset
+    // dispatched to it, in window pixels. The decor may already fit the bar (API < 35, floating),
+    // so the raw root insets subtracted from the decor's height can count the bar twice or not at all
+    override val undoBottomLimit: Int
+        get() = floatingPlacer?.let { placer ->
+            IntArray(2).also { getLocationInWindow(it) }[1] + height - placer.bottomInset
+        } ?: super.undoBottomLimit
     private val horizontalCandidate = HorizontalCandidateComponent()
     private val keyboardWindow = KeyboardWindow()
     private val symbolPicker = symbolPicker()
@@ -317,12 +343,47 @@ class InputView(
 
     private var floatingPlacer: FloatingPlacer? = null
 
+    private val handleSide = ThemeManager.prefs.floatingHandle.getValue()
+    private val handleAtBottom = handleSide == FloatingHandleSide.Bottom
+
     private val floatingHandle = if (!floating) null else FloatingHandle(
-        context, theme,
+        context, theme, handleSide,
         onDrag = { dx, dy -> floatingPlacer?.drag(dx, dy) },
-        onDrop = { floatingPlacer?.drop() },
+        // let go in the zone at the bottom: docked, as Gboard's
+        onDrop = { lifted -> if (floatingPlacer?.drop(lifted) == true) ThemeManager.prefs.floatingKeyboard.setValue(false) },
         onDock = { ThemeManager.prefs.floatingKeyboard.setValue(false) },
     )
+
+    // across the bottom of the screen while a drag is in the docking zone: where it will go, let go
+    private val dockMark = if (!floating) null else View(context).apply {
+        background = GradientDrawable().apply {
+            cornerRadius = dp(4f)
+            setColor(ColorUtils.setAlphaComponent(theme.accentKeyBackgroundColor, DOCK_MARK_ALPHA))
+            setStroke(dp(FloatingPlacer.DOCK_MARK_STROKE_DP).toInt(), ColorUtils.setAlphaComponent(theme.accentKeyBackgroundColor, DOCK_MARK_STROKE_ALPHA))
+        }
+        alpha = 0f
+        isVisible = false
+        // it opens up from the bottom and folds back down: its pivot there, once laid out
+        addOnLayoutChangeListener { v, _, top, _, bottom, _, _, _, _ -> v.pivotY = (bottom - top).toFloat() }
+    }
+
+    private fun showDockMark(shown: Boolean) {
+        val mark = dockMark ?: return
+        mark.animate().cancel()
+        // opened up from the bottom as it fades in, folded back down as it goes, as Gboard's
+        if (shown) {
+            InputFeedbacks.hapticFeedback(keyboardView)
+            if (!mark.isVisible) {
+                mark.scaleY = 0f
+                mark.isVisible = true
+            }
+            mark.animate().alpha(1f).scaleY(1f).setInterpolator(DecelerateInterpolator())
+                .setDuration(DOCK_MARK_IN_MS).withEndAction(null).start()
+        } else {
+            mark.animate().alpha(0f).scaleY(0f).setInterpolator(AccelerateInterpolator())
+                .setDuration(DOCK_MARK_OUT_MS).withEndAction { mark.isVisible = false }.start()
+        }
+    }
 
     init {
         // MUST call before any operation
@@ -364,13 +425,13 @@ class InputView(
             })
             floatingHandle?.let {
                 add(it, lParams(0, dp(FloatingHandle.HEIGHT_DP)) {
-                    topOfParent()
+                    if (handleAtBottom) bottomOfParent() else topOfParent()
                     leftToLeft = LayoutParams.PARENT_ID
                     rightToRight = LayoutParams.PARENT_ID
                 })
             }
             add(preedit.ui.root, lParams(0, dp(KawaiiBarComponent.PREEDIT_HEIGHT)) {
-                if (floatingHandle != null) below(floatingHandle) else topOfParent()
+                if (floatingHandle != null && !handleAtBottom) below(floatingHandle) else topOfParent()
                 // start and end set in updateKeyboardSize, as the bar's
             })
             add(kawaiiBar.view, lParams(0, dp(KawaiiBarComponent.HEIGHT)) {
@@ -398,7 +459,7 @@ class InputView(
             add(bottomPaddingSpace, lParams {
                 leftToRight = leftPaddingSpace.existingOrNewId
                 rightToLeft = rightPaddingSpace.existingOrNewId
-                bottomOfParent()
+                if (floatingHandle != null && handleAtBottom) above(floatingHandle) else bottomOfParent()
             })
         }
 
@@ -407,11 +468,18 @@ class InputView(
         scope += DockFollower()
         keyboardWindow.onLayoutShown = { updateKeyboardSize() }
 
+        // under the keyboard, which is drawn over it at the bottom
+        dockMark?.let {
+            add(it, lParams(0, dp(FloatingPlacer.DOCK_MARK_DP)) {
+                centerHorizontally()
+                bottomOfParent()
+            })
+        }
         add(keyboardView, lParams(if (floating) dp(TextKeyboard.widthDp(context)) else matchParent, wrapContent) {
             centerHorizontally()
             bottomOfParent()
         })
-        floatingPlacer = if (floating) FloatingPlacer(this, keyboardView) else null
+        floatingPlacer = if (floating) FloatingPlacer(this, keyboardView).also { it.onZone = ::showDockMark } else null
         if (floating) FloatingCorners.frame(keyboardView, ::floatingCornerPx, dp(FloatingCorners.ELEVATION_DP).toFloat())
         floatingPlacer?.let { placer -> keyboardView.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ -> placer.place() } }
         add(popup.root, lParams(matchParent, matchParent) {
@@ -559,7 +627,11 @@ class InputView(
     override fun onApplyWindowInsets(insets: WindowInsets): WindowInsets {
         val navBar = getNavBarBottomInset(insets)
         // floating, it is kept above the bar rather than drawn over it
-        floatingPlacer?.bottomInset = navBar
+        if (floating) {
+            val bottom = floatingBottomInset(insets)
+            floatingPlacer?.bottomInset = bottom
+            dockMark?.updateLayoutParams<LayoutParams> { bottomMargin = bottom }
+        }
         floatingPlacer?.topInset = WindowInsetsCompat.toWindowInsetsCompat(insets)
             .getInsets(WindowInsetsCompat.Type.statusBars() or WindowInsetsCompat.Type.displayCutout()).top
         bottomPaddingSpace.updateLayoutParams<LayoutParams> {
@@ -667,3 +739,9 @@ class InputView(
     }
 
 }
+
+// the docking zone's mark: its fill's alpha over the accent colour, and how fast it comes and goes
+private const val DOCK_MARK_ALPHA = 0x33
+private const val DOCK_MARK_STROKE_ALPHA = 0x80
+private const val DOCK_MARK_IN_MS = 250L
+private const val DOCK_MARK_OUT_MS = 200L

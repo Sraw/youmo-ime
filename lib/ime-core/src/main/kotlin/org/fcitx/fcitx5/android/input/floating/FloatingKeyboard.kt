@@ -33,8 +33,16 @@ object FloatingKeyboard {
         (screenWidthDp * SHARE).toInt().coerceIn(MIN_DP, MAX_DP).coerceAtMost(screenWidthDp)
 
     /** The board's height, the docked one's [docked] as narrowed as its width is, but not past [MIN_HEIGHT_SHARE]. */
-    fun height(docked: Int, widthDp: Int, screenWidthDp: Int): Int =
-        (docked * (widthDp.toFloat() / screenWidthDp.coerceAtLeast(1)).coerceIn(MIN_HEIGHT_SHARE, 1f)).toInt()
+    fun height(docked: Int, widthDp: Int, screenWidthDp: Int): Int = (docked * share(widthDp, screenWidthDp)).toInt()
+
+    /**
+     * The keys' text, as much smaller as the keys are shorter: at the docked size a letter and the
+     * digit under it ran into each other (y's tail on its 6).
+     */
+    fun textScale(widthDp: Int, screenWidthDp: Int): Float = share(widthDp, screenWidthDp)
+
+    private fun share(widthDp: Int, screenWidthDp: Int) =
+        (widthDp.toFloat() / screenWidthDp.coerceAtLeast(1)).coerceIn(MIN_HEIGHT_SHARE, 1f)
 
     /** Its left and top, in pixels, at [spot] in a parent [parentW] by [parentH], it [w] by [h]. */
     fun place(spot: Spot, w: Float, h: Float, parentW: Float, parentH: Float): Pair<Float, Float> =

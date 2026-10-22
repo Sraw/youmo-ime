@@ -16,6 +16,7 @@ import org.fcitx.fcitx5.android.data.prefs.ManagedPreference
 import org.fcitx.fcitx5.android.data.prefs.ManagedPreferenceCategory
 import org.fcitx.fcitx5.android.data.prefs.ManagedPreferenceEnum
 import org.fcitx.fcitx5.android.data.prefs.ManagedPreferenceUi.Levels.Level
+import org.fcitx.fcitx5.android.input.floating.FloatingHandleSide
 import org.fcitx.fcitx5.android.input.keyboard.OneHanded
 import org.fcitx.fcitx5.android.input.keyboard.SplitDock
 import org.fcitx.fcitx5.android.input.keyboard.SplitKeyboardMode
@@ -98,6 +99,9 @@ class ThemePrefs(sharedPreferences: SharedPreferences) :
     // the keyboard over the app, smaller, dragged anywhere (FloatingKeyboard); also from the status
     // area. The view is made anew for it: the letters do not split floating
     val floatingKeyboard = switch(R.string.floating_keyboard, "floating_keyboard", false)
+
+    // where its drag handle is: made anew for it too. Set also while it does not float, for the next time
+    val floatingHandle = enumList(R.string.floating_handle, "floating_handle", FloatingHandleSide.Bottom)
 
     init {
         section(R.string.section_key_style)
