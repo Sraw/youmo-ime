@@ -41,6 +41,15 @@ next edit from the last report: `EditingSession` keeps the IME's own prediction 
 (`CursorTracker`); arrow-key runs step from where the presses put the cursor (`ArrowKeys`).
 Deletions are asked in code points so one press removes a whole emoji (`CodePoints`).
 
+### A selection looks like a cut
+
+With text selected, `getTextBeforeCursor` gives what is before the selection and
+`getTextAfterCursor` what is after it: the same as if the selection had been cut. Anything that
+reads a deletion from the text around the cursor (the commit journal, U-03) must be told a
+selection is there (`Action.Context.selected`), or it writes UNDOs for text still on screen.
+Likewise an empty text before the cursor may be an editor that would not say (`FieldPolicy`), and
+every keyboard is told every context, also of text another keyboard wrote.
+
 ### Composing text in the app outlives the keyboard
 
 Most apps recreate their activity on rotation and save the field's text, composing text included,
@@ -88,6 +97,9 @@ A new preference the keyboard needs at a lock screen must be in that copy.
 - A data format change without a version bump is read as garbage by an old reader, or crashes on a
   key press. Bump, and refuse what cannot be read.
 - User logs must stay readable by the next build and skippable by the previous one.
+- A downgrade to 0.3.0 while 0.3.1's first conversion is still owed (`learn.converting`) loses the
+  older build's counts: when 0.3.1 is installed again it finds a log that is not empty and has no
+  marker, takes only the words (`LegacyConversion.since`), and writes the marker. Rare, and accepted.
 - Data releases are pinned by SHA-256; a re-uploaded asset with the same name fails the build. Make
   a new release instead.
 

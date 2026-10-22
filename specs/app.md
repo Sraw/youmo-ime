@@ -10,7 +10,7 @@ an ime-core class with a test.
 |---|---|
 | `core/` | The JNI side of fcitx: `Fcitx` (native lifecycle, the fcitx thread), `FcitxAPI` (suspend calls into fcitx), `FcitxEvent` (events out of it), `EngineBridge` (where the native `androidengine` addon reaches ime-core's `Engines`), `EngineMigration`, `SubtypeManager`, `InputMethodNames`, `NativeMatrixKernel` |
 | `daemon/` | `FcitxDaemon`: the one fcitx instance, shared by connections (`FcitxConnection`) |
-| `input/` | The `InputMethodService` (`FcitxInputMethodService`), `InputView`, and what the keyboard shows: `bar/` (the candidate bar / toolbar, `KawaiiBarComponent`), `candidates/` (horizontal bar, expanded grid, floating window for physical keyboards), `keyboard/` (`TextKeyboard`, `T9Keyboard`, `NumberKeyboard`, `KeyDef`/`KeyDefPreset`, `KeyView`, `CommonKeyActionListener`), `picker/` (symbols, emoji), `popup/` (key previews, long-press keyboards), `clipboard/`, `editing/` (text editing panel, `InputConnectionEditor`), `status/` (the "more" panel), `preedit/`, `broadcast/`, `wm/` (`InputWindowManager`), `handwriting/`, `floating/` (the floating keyboard), `dialog/`, `editorinfo/` (the `EditorInfo` inspector) |
+| `input/` | The `InputMethodService` (`FcitxInputMethodService`), `InputView`, and what the keyboard shows: `bar/` (the candidate bar / toolbar, `KawaiiBarComponent`), `candidates/` (horizontal bar, expanded grid, floating window for physical keyboards), `keyboard/` (`TextKeyboard`, `T9Keyboard`, `NumberKeyboard`, `KeyDef`/`KeyDefPreset`, `KeyView`, `CommonKeyActionListener`), `picker/` (symbols, emoji), `popup/` (key previews, long-press keyboards), `clipboard/`, `editing/` (text editing panel, `InputConnectionEditor`), `status/` (the "more" panel), `preedit/`, `broadcast/`, `wm/` (`InputWindowManager`), `handwriting/`, `floating/` (the floating keyboard), `dialog/`, `editorinfo/` (the `EditorInfo` inspector), `learning/` (a candidate's long-press menu worded by the app from the engine's `LearningResult.Menu`, `CandidateLearningMenu`; the undo chip, `UndoChip`: above the whole keyboard while candidates show, below a window with no room above when it fits the window, over the bar otherwise, placed by ime-core's `UndoChipPlacement`) |
 | `provider/` | `FcitxDataProvider` |
 | `data/` | File-backed managers: `prefs/` (`AppPrefs`, the managed preference framework), `theme/`, `clipboard/` (Room), `pinyin/` (imported dictionaries, custom phrases), `punctuation/`, `UserDataManager` (backup/restore); `DataManager` (syncs `assets/usr`) is in `core/data/` |
 | `ui/` | Settings: `main/` (`MainActivity`, `MainFragment` = the home page, `settings/` pages and `SettingsRoute`, `settings/search/`), `setup/` (the first-run wizard), `common/` |
@@ -45,7 +45,12 @@ characters come from `PopupPreset` (built in) overridden by the user's `PopupOve
 of them is also what swiping the key types and the small label in its corner: one concept, one
 setting. Which way a vertical swipe types it is `SymbolSwipe` (ime-core): the chosen way the corner
 character, the other way the letter as a tap, swiping off nothing (a slide off the key takes the
-press back). 微软 and 紫光 双拼 get a `;` key right of L (`semicolonKey(ime, scheme)` in ime-core's
+press back). A long press's keys (`PopupKeyboardUi`, `PopupMenuUi`) are one small size whatever the
+key (`PopupComponent.LONG_PRESS_KEY_*`; as wide as the key pressed, 九键's 7 filled the screen),
+floating above it, the bubble gone; the finger picks by how far it moved since they opened, not
+where it is (`PopupFocus` in ime-core: 0.6 of a key a step, held past a row's ends, an empty slot's
+nearest key, a little hysteresis, only down off the key cancelling), each new key a buzz under 按键振动
+(`InputFeedbacks.hapticFeedback`). 微软 and 紫光 双拼 get a `;` key right of L (`semicolonKey(ime, scheme)` in ime-core's
 `input/keyboard/SemicolonKey.kt`, which `TextKeyboard.showSemicolonKey` asks); the split halves have none, the row's other keys widen to fill (`fitRow`/`showKey`),
 and `;` comes from l's long press. The keyboard area never passes 70% of the screen's height
 (`KeyboardHeightCap`), so 很高 in landscape leaves the field room.
@@ -79,12 +84,19 @@ decides both). The room beside it has the arrow, which then sets `oneHanded` rat
 
 Floating (`ThemePrefs.floatingKeyboard`, the status area's 悬浮键盘; the input view is made anew for
 it): `keyboardView` is `FloatingKeyboard.widthDp` wide (70% of the screen, 300–420 dp), its boards as
-much shorter (85% at least), with `FloatingHandle` on top, clipped to rounded corners
+much shorter (85% at least), with `FloatingHandle` at the bottom (24 dp: a short bar and the dock button;
+`ThemePrefs.floatingHandle` puts it on top, the view made anew). The dock button is 56×24 dp, a
+smaller touch target than 48 dp, traded for a thin handle (review R11). The view is clipped to rounded corners
 with a shadow (`FloatingCorners`; users asked for both). The radius is the keys' radius plus their
 least margin to the edge (`FloatingKeyboard.cornerDp`, the nested-corner rule: the curve runs
 alongside the corner keys' and clips none), square where the keys are (按键圆角 直角, the owner's one setting for corners); the
 handle is a shade of the bar towards the key text (`FloatingKeyboard.handleColor`), as some themes'
-bar is the keyboard's colour. It is moved by translation
+bar is the keyboard's colour (on top; at the bottom it is the keyboard's own). As Gboard's, it never
+goes into a strip of `FloatingPlacer.DOCK_MARK_DP` above the bottom (the IME's own nav bar, gesture
+navigation's switch/collapse row, counted by `BaseInputView.floatingBottomInset`); dragged down to that
+it is in the docking zone (`FloatingDrag` in ime-core; where a drag began at the bottom, it first
+floats there, only a push of `DOCK_SLOP_DP` on down): the strip shows the mark (accent, opening up from
+the bottom), a buzz under 按键振动, and let go there it docks: only a real lift docks (a cancel or a second finger never does), and docking keeps the last floating place. It is moved by translation
 (`FloatingPlacer`) to a spot kept as shares of the room it moves in (`AppPrefs.internal.floatingKeyboardX/Y`),
 so a turn keeps its corner. `FcitxInputMethodService.onComputeInsets` then gives the app the whole
 height (it is not laid out again) and only `InputView.floatingRegion` takes touches
@@ -168,9 +180,10 @@ as Chinese punctuation maps them and typed as keys to the engine, as the full ke
 press is (the first candidate, then the mark: quotes in turn, brackets paired; `'` while
 typing is the syllable separator, as there). 1's are
 `asIs`, committed as they are (`.` not `。`). A digit or a lone letter is never a symbol: the
-long press has those already. In an address field the bottom row gets the full keyboard's
-address keys (`AddressKeys`: `/` or `@`, `.`, `.com`), shown by the same `address` both boards
-take from `KeyboardWindow`. (A probe with `adb shell input text` showed the nine
+long press has those already. In an address field the column offers what addresses are made of
+(`AddressKeys.column`: `/` or `@`, `.`, `.com` …) in place of punctuation, pinyin's syllables still
+while typing, from the same `address` both boards take from `KeyboardWindow`; the bottom row is as
+always (keys of their own there left the space an eighth of the width, its label pushed off). (A probe with `adb shell input text` showed the nine
 keys committing the pinyin as typed before a mark: that is a hardware key's path, not the screen's.)
 
 九键英文 (`T9Keyboard.EnglishName`, a second `T9Keyboard` built with `english = true`) is fcitx's
@@ -186,8 +199,7 @@ listener on the pref: dropped before another IM comes, it would flash the full k
 made anew (a turn, a setting) shows it as it was. The language key's round (and the space's long press set to it) goes on
 from 九键拼音 when in 九键英文: straight to the one after it in the enabled list
 (`EnglishLayoutPolicy.nextFromNineKeys`), the pref dropped first, not through 九键拼音's keyboard.
-中/英 does nothing where the other is not enabled (`toggled(current, enabled)`: fcitx would switch to none, quietly). In an address field the nine keys hide the
-language key for the address keys' room. Its keys send `Keyboard.nineKey(digit, upper)` (predictive,
+中/英 does nothing where the other is not enabled (`toggled(current, enabled)`: fcitx would switch to none, quietly). Its keys send `Keyboard.nineKey(digit, upper)` (predictive,
 the engine's `Action.NineKey`) where `EnglishLayoutPolicy.spellsWords` says English suggests
 (`t9EnglishTyping` Predictive, not a password, an address or NoSpellCheck, English's suggestions
 on, read from `EngineBridge.englishSuggests`), a long press's letter then pinned into the word
@@ -224,7 +236,9 @@ Two stores, deliberately:
 2. **fcitx config** of the input methods: the `androidengine` addon's options (C++,
    `androidengine.h`), read by the engine (`EngineSettings`). The pages for the app's own input
    methods are built by `InputMethodSettings` from a list of `Item`s (`Toggle`, `Choice`, `Flags`,
-   `Page`, and `AppChoice`/`AppToggle` for the few app preferences that belong to one input method,
+   `Page`, `Action` (a confirmed button that runs on the fcitx thread, such as 恢复码表顺序: only
+   `InputMethodConfigFragment` passes the `act` that runs it; the default `act = {}` of `create`/`addTo`
+   ignores it, so an `Action` on another page does nothing), and `AppChoice`/`AppToggle` for the few app preferences that belong to one input method,
    such as 九键's multi-tap or English's auto-caps, or to all of them on the shared page, such as
    glide typing, paired brackets and replacing a sum), over `FcitxAPI.getImConfig`/`setImConfig`.
    The options every input method shares are one `config_` in the addon, so they are on one page,
@@ -279,6 +293,12 @@ process (`AppUtil.restart`); a failed restore reopens what it stopped (`restartA
 `ReplaceFile` replaces a directory in one rename so a kill leaves the old or the new, never half.
 New user data must be added to the export, and must survive a restore made by an older version
 (missing files mean defaults).
+The learning is merged, not replaced (U-100, `UserDataManager.importEngine`): the phone's
+`learn.log`, its word lists, its old `*.user` logs and its backups stay; what the backup has of
+learning (the zip's learning backup, or its record, or an older build's logs to convert, with its
+lists) is moved into a directory of its own under `RestoreStash.DIR`, and the engine merges it as it
+next starts (beside any stash not merged yet). A `learn.log.unreadable*` (a later build's log kept
+aside) stays.
 
 ## Permissions and privacy
 
@@ -309,6 +329,7 @@ in CI keeps the voice source set compiling.
 ## Strings and languages
 
 The app speaks 简体中文, 繁體中文 and English (`AppLanguage`, chosen in the settings, independent of
-the phone's language); de/es/ja/ko/ru are partial and fall back to English. fcitx's own texts
+the phone's language) and nothing else: `androidResources.localeFilters` drops libraries'
+other translations, and the native install keeps only the zh_CN/zh_TW gettext catalogs. fcitx's own texts
 (menus from the addon) are translated through gettext `.po` files in `src/main/cpp/po` (domain
 `fcitx5-android`) and chinese-addons' domain for texts reused from libime.

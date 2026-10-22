@@ -60,12 +60,17 @@ The sets (`lib/ime-eval/data/*.tsv`): `pinyin` (main, everyday and written sente
 measuring only), `pinyin-new` (new words), `pinyin-collide` (a common word that reads as a new
 one), `pinyin-context`, `pinyin-slips`, `pinyin-mixed`, `shuangpin-xiaohe`, `predict/`,
 `english.txt`. Other commands: `predict` (联想), `english`, `learn` (what learning brings back and
-costs), `ksc` (keystrokes), `t9` (a set turned into digits, then read with `pinyin --scheme
+costs, learning through the learning record as the app does, `EvalUser`; rows typed once, again and
+twice; `--user-counts none|multi|full` and `--short-guard off` change a channel of what is learned in
+the scores, `LearningUse`, to see what it is worth; `--misses <out.tsv>` writes what was not first), `learn-ux` (scripted user behaviour,
+`data/learn-ux/*.txt`: type, pick, a context, then the order the learning spec says, each
+expectation PASS, FAIL or PENDING where the engine cannot do it yet; `--seed <n>` commits n real
+samples first, `--gate` fails on a FAIL or when nothing was checked; a `space` with only 联想 shown stops the scenario), `ksc` (keystrokes), `t9` (a set turned into digits, then read with `pinyin --scheme
 t9-strict`, as the app types it; `--presses once`, 连按 off, the default, or `letters`, each letter
 spelt by 连按, a letter past its key's first as the letter typed as itself, as the session has it), `english-glide` (glide
 typing on simulated paths, `--wobble` the key-width noise), `pinyin-glide` (the same per dictionary word
 of a pinyin set; `--shuangpin <scheme>`, `--keys nine`, `--table <table.data>`, `--word <pinyin>` one
-clean path's readings), `tune` (penalties), `score` (compare a result with a baseline), `handwriting` (handwriting's sentence reading), `table` (a table's codes, optionally with pinyin and the models), `sentences` (each sample's sentences written out), `predict-learn` (联想 after learning), `predict-set` (a 联想 set made from a set), `shuangpin` (a set turned into a 双拼 scheme's keys), `slips` (a set with slips put in), `chars` (the data's characters), `lm` (a sentence model's scores of texts), `libime` (reading libime's pinyin, history or table files);
+clean path's readings), `tune` (penalties), `score` (compare a result with a baseline), `handwriting` (handwriting's sentence reading), `table` (a table's codes, optionally with pinyin and the models), `sentences` (each sample's sentences written out), `predict-learn` (联想 after learning), `learn-log-bench` (a heavy year's learning record opened, folded and opened again; `--legacy <pinyin.data>`: a heavy user's old logs converted at the first open, and caught up after an older build wrote them; `--counts <pinyin.data>`: what the ranking's counts cost on that record, attached, made anew and per key typed; not together with `--legacy`, which reuses `<dir>/legacy`), `predict-set` (a 联想 set made from a set), `shuangpin` (a set turned into a 双拼 scheme's keys), `slips` (a set with slips put in), `chars` (the data's characters), `lm` (a sentence model's scores of texts), `libime` (reading libime's pinyin, history or table files);
 run `ime-eval` with no arguments for the full usage.
 
 Report top-1 (and the change in samples won and lost) on at least the main, web, chat and new sets,
