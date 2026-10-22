@@ -81,6 +81,9 @@ android {
         // would offer every values-* directory, the partial translations too
         @Suppress("UnstableApiUsage")
         generateLocaleConfig = false
+        // Chinese and English only, library translations too; zh-HK/zh-MO still resolve to
+        // values-zh-rTW through Android's Hant script matching
+        localeFilters += listOf("en") + Versions.translations.map { it.replace("_", "-r") }
     }
 
     testOptions {

@@ -85,6 +85,10 @@ class FcitxComponentPlugin : Plugin<Project> {
             destDir.set(project.assetsDir)
             mustRunAfter(sourceProject.tasks.withType<ExternalNativeBuildJsonTask>())
             doLast {
+                // English is the msgid: only the catalogs of the app's translations are kept
+                project.assetsDir.resolve("usr/share/locale").listFiles()
+                    ?.filter { it.name !in Versions.translations }
+                    ?.forEach { it.deleteRecursively() }
                 val ext = project.extensions.getByName<FcitxComponentExtension>(EXTENSION)
                 ext.modifyFiles.forEach { (path, function) ->
                     val file = project.assetsDir.resolve(path)

@@ -12,12 +12,16 @@ object Versions {
     const val minSdk = 23
     const val targetSdk = 36
 
+    // the translations the app ships (gettext's names), English being the source: here once for
+    // the app's resources (localeFilters) and fcitx's catalogs (FcitxComponentPlugin)
+    val translations = listOf("zh_CN", "zh_TW")
+
     const val defaultCMake = "3.31.6"
     const val defaultNDK = "28.0.13004108"
     const val defaultBuildTools = "36.1.0"
 
     // NOTE: raise this for a release; the version code follows it (versionCodeOf)
-    const val baseVersionName = "0.3.0"
+    const val baseVersionName = "0.3.1"
     val baseVersionCode = versionCodeOf(baseVersionName)
 
     private val abiIds = mapOf("armeabi-v7a" to 1, "arm64-v8a" to 2, "x86" to 3, "x86_64" to 4)
