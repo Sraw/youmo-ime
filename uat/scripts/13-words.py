@@ -1234,6 +1234,9 @@ def wd26(d):
     f = words(d.all_cands())
     d.clear()
     check("屏蔽的 2 个词会重新出现" in msg, f"确认框「{msg[:200]}」")
+    # ticked, the message lists what goes; what stays is the custom phrases alone
+    kept = msg.split("留下：")[-1]
+    check("回到刚装好，清掉" in msg and "自定义短语" in kept and "固定" not in kept, f"勾上后的确认框「{msg[:200]}」")
     check(first(w) == "王小明" and "汪小明" not in w, f"wangxiaoming {w[:4]}")
     check("是" in s and first(s) != cc, f"shi {s[:5]}（C=「{cc}」）")
     check("寸" in f, f"fghy {f[:5]}")

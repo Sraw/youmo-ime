@@ -192,13 +192,15 @@ class UserWordsFragment : PaddingPreferenceFragment() {
             setPaddingDp(20, 8, 20, 0)
             add(all, lParams(matchParent))
         }
-        AlertDialog.Builder(ctx)
+        val dialog = AlertDialog.Builder(ctx)
             .setTitle(R.string.learning_clear_learned)
-            .setMessage(R.string.learning_clear_learned_message)
+            .setMessage(clearMessage(all = false))
             .setView(padded)
             .setPositiveButton(R.string.learning_clear_do) { _, _ -> clear(all.isChecked) }
             .setNegativeButton(android.R.string.cancel, null)
             .show()
+        // ticked, what stays is listed no more as kept: it goes too (the user, 2026-10-22)
+        all.setOnCheckedChangeListener { _, ticked -> dialog.setMessage(getString(clearMessage(ticked))) }
     }
 
     private fun clear(all: Boolean) {
@@ -229,6 +231,11 @@ class UserWordsFragment : PaddingPreferenceFragment() {
 /** The words 「全部清空」 unticked brings back (F2730): the blocked words, and the tables' blocks [tableBlocks] listed. */
 internal fun blockedThatReturn(counts: Map<UserWord.Kind, Int>, tableBlocks: LearningResult?): Int =
     (counts[UserWord.Kind.BLOCKED] ?: 0) + ((tableBlocks as? LearningResult.Listed)?.items?.size ?: 0)
+
+/** What 清空学到的 says it clears and keeps: [all] (全部清空 ticked) keeps the custom phrases alone. */
+@StringRes
+internal fun clearMessage(all: Boolean): Int =
+    if (all) R.string.learning_clear_all_message else R.string.learning_clear_learned_message
 
 /** What 清掉学到的 tells: works locked too (the record in memory then), what fails is the disk; anything else is not now. */
 @StringRes
