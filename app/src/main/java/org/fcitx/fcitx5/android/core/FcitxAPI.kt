@@ -8,6 +8,9 @@ import kotlinx.coroutines.flow.SharedFlow
 import org.fcitx.fcitx5.android.engine.glide.Glide
 import org.fcitx.fcitx5.android.engine.handwriting.InkReading
 import org.fcitx.fcitx5.android.engine.host.Engines
+import org.fcitx.fcitx5.android.engine.host.ImportLayer
+import org.fcitx.fcitx5.android.engine.learn.control.LearningOp
+import org.fcitx.fcitx5.android.engine.learn.control.LearningResult
 
 /**
  * API of fcitx that hides lifecycle stuffs from [Fcitx]
@@ -52,6 +55,9 @@ interface FcitxAPI {
     /** How many words of each kind the user has: see [Engines.userWordCounts]. */
     suspend fun userWordCounts(): Map<Engines.UserWord.Kind, Int>
 
+    /** The words of [texts] the tables among [ims] cannot take: see [Engines.sameCodes]. */
+    suspend fun sameCodes(texts: List<String>, ims: List<String>): Map<String, List<Pair<String, String>>>
+
     /** Where each of [texts] splits into words: see [Engines.wordBoundaries]. */
     suspend fun wordBoundaries(texts: List<String>): Map<String, IntArray>
 
@@ -80,25 +86,59 @@ interface FcitxAPI {
     suspend fun forgetEnglishWords(texts: List<String>)
 
     /**
-     * Adds and blocks the words of a list the user imports, a word a line: see [Engines.importWords].
+     * The words of a list the user imports, a word a line, from the file named [fileName]: the
+     * user's own export added back, another's imported as a batch: see [Engines.importWords].
      * [lines] are read as the engine takes them, on fcitx's thread: those of a local file, not of a
      * provider's stream, whose slowness would hold up the keyboard.
      */
-    suspend fun importUserWords(lines: Sequence<String>): Engines.Imported
+    suspend fun importUserWords(lines: Sequence<String>, fileName: String): Engines.Imported
 
-    /** The user's words as [importUserWords] reads them: see [Engines.exportWords]. */
-    suspend fun exportUserWords(): List<String>
+    /** The lists imported, oldest first: see [Engines.importBatches]. */
+    suspend fun importBatches(): List<ImportLayer.Batch>
+
+    /** The words only imported, of [batch] if given: see [Engines.importedWords]. */
+    suspend fun importedWords(batch: Int?): List<ImportLayer.Word>
+
+    /** Undoes the list imported as [batch]: see [Engines.dropImport]. */
+    suspend fun dropImport(batch: Int): Int?
+
+    /** Puts back the list [dropImport] took as [batch] (撤销): see [Engines.restoreImport]. */
+    suspend fun restoreImport(batch: Int): Boolean
 
     /** The keys no letter the table input method [im] reads now, as its session has them: see [Engines.tableKeys]. */
     suspend fun tableKeys(im: String): Set<Char>
 
     /**
+     * What the user asks of what was learned (PLAN §2.8, Engines.learning), of the input method in
+     * use. A long press's act goes as the menu's always did, the list it leaves shown; one that
+     * changes what is shown otherwise (taken back, cleared, habits on or off) has it shown anew.
+     */
+    suspend fun learning(op: LearningOp): LearningResult
+
+    /**
+     * Typing paused in the field: the keyboard shown or hidden, or ([idle]) a while gone since the
+     * last key (Engines.paused). Whether the older build's learning, made, still waits for a pause.
+     */
+    suspend fun enginePaused(idle: Boolean = false): Boolean
+
+    /**
      * Tells the engine [before], the text before the cursor, where the user put the cursor other
      * than by typing (a field focused, a tap): what they type next follows it. [learning] off in a
      * field that asks not to be learned from, told "" (not known) there. [cleared]: [before] is
-     * what was written in a field now empty (Action.Context.cleared).
+     * what was written in a field now empty (Action.Context.cleared). [started], [after] and
+     * [selected] as Action.Context has them: another field started, the text after the cursor
+     * where read, text selected; [said], the editor answered [before] itself (Action.Context.said).
      */
-    suspend fun engineContext(before: String, learning: Boolean = true, cleared: Boolean = false)
+    suspend fun engineContext(
+        before: String,
+        learning: Boolean = true,
+        cleared: Boolean = false,
+        learnFlags: Int = 0,
+        started: Boolean = false,
+        after: String? = null,
+        selected: Boolean = false,
+        said: Boolean = false,
+    )
 
     /**
      * What the handwriting pad read of its [piece], shown by the Ink key sent with it in the same

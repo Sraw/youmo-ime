@@ -17,17 +17,37 @@ import org.fcitx.fcitx5.android.engine.user.UserModel.Entry
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
-import org.junit.Assert.assertNotNull
-import org.junit.Assert.assertNull
 import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
-import java.io.ByteArrayOutputStream
 import java.nio.ByteBuffer
 
 class UserModelTest {
 
     private fun word(text: String) = (0 until data.vocabulary.size).first { data.vocabulary.word(it) == text }
+
+    // [text] forgotten at each reading, as an older build's log forgot a candidate: for the replay
+    // (LegacyConversion); what this build forgets by text, the learning record forgets (HabitCountsTest)
+    private fun forgetText(m: UserModel, text: String) = m.entriesOf(text).forEach { m.forget(listOf(it)) }
+
+    // review R11 F2932: the texts whose ids changed, the last ones; past what is kept, none to go by
+    @Test
+    fun theTextsWhoseIdsChangedAreTheLastOnesTillMoreThanAreKept() {
+        val m = model()
+        val at = m.idsChanged
+        m.id(entry("拟好", "ni", "hao"))
+        m.id(entry("好吗", "hao", "ma"))
+        assertEquals(listOf("拟好", "好吗"), m.textsChangedSince(at))
+        assertEquals(listOf("好吗"), m.textsChangedSince(at + 1))
+        assertEquals(emptyList<String>(), m.textsChangedSince(m.idsChanged))
+        // a reading a new word each time: 2 + CHANGED_KEPT changes, more than are kept
+        val syllables = listOf("ni", "hao", "ma")
+        for (i in 0 until UserModel.CHANGED_KEPT) m.id(entry("拟$i", *Array(1 + i % 3) { syllables[it] }))
+        assertEquals(null, m.textsChangedSince(at))
+        assertEquals(UserModel.CHANGED_KEPT, m.textsChangedSince(at + 2)?.size)
+        assertEquals(null, m.textsChangedSince(at + 1))
+        assertEquals(null, m.textsChangedSince(-1))
+    }
 
     @Test
     fun aWordTheDictionaryHasIsItsOwn() {
@@ -67,7 +87,6 @@ class UserModelTest {
         assertThrows(IllegalArgumentException::class.java) { Entry("你", IntArray(0)) }
         assertThrows(IllegalArgumentException::class.java) { Entry("你", intArrayOf(-1)) }
         assertThrows(IllegalArgumentException::class.java) { model().learn(null, emptyList()) }
-        assertThrows(IllegalArgumentException::class.java) { model(0f) }
         assertEquals(entry("你", "ni"), entry("你", "ni"))
         assertEquals(entry("你", "ni").hashCode(), entry("你", "ni").hashCode())
         assertNotEquals(entry("你", "ni"), entry("你", "nie"))
@@ -98,48 +117,6 @@ class UserModelTest {
     }
 
     @Test
-    fun countsHalvePastTheLimit() {
-        val m = model(limit = 2.5f)
-        fun counted(): Map<String, Float> {
-            val out = HashMap<String, Float>()
-            m.forEachCount({ e, c -> out[e.text] = c }, { a, b, c -> out[a.text + b.text] = c })
-            return out
-        }
-        m.learn(null, listOf(entry("你", "ni"), entry("好", "hao")))
-        m.learn(null, listOf(entry("你", "ni")))
-        // 3 > 2.5: 你 2, 好 1 and the pair 1 halve
-        assertEquals(mapOf("你" to 1f, "好" to 0.5f, "你好" to 0.5f), counted())
-        assertEquals(1.5f, m.total)
-        m.learn(null, listOf(entry("吗", "ma")))
-        m.learn(null, listOf(entry("吗", "ma")))
-        assertEquals(mapOf("你" to 0.5f, "好" to 0.25f, "你好" to 0.25f, "吗" to 1f), counted())
-        m.learn(null, listOf(entry("吗", "ma")))
-        // 好 and the pair fall below a quarter and go
-        assertEquals(mapOf("你" to 0.25f, "吗" to 1f), counted())
-        assertEquals(1.25f, m.total)
-    }
-
-    @Test
-    fun theUsersOwnWordKeepsAQuarterAsCountsHalveAndIsWrittenOutSo() {
-        val m = model(limit = 2.5f)
-        val niHao = entry("拟好", "ni", "hao")
-        m.learn(null, listOf(niHao))
-        m.learn(null, listOf(entry("好", "hao")))
-        // halved three times: 拟好 and 好, typed once, would fall below a quarter
-        repeat(4) { m.learn(null, listOf(entry("你", "ni"))) }
-        val counted = HashMap<String, Float>()
-        m.forEachCount({ e, c -> counted[e.text] = c }, { a, b, c -> counted[a.text + b.text] = c })
-        // the dictionary's 好 goes; the user's word keeps a quarter
-        assertEquals(mapOf("拟好" to 0.25f, "你" to 1.125f), counted)
-        assertEquals(1.375f, m.total)
-        // what a compaction writes, a start reads back: the word still there to type
-        val restored = model()
-        m.forEachCount({ e, c -> restored.addCount(e, c) }, { a, b, c -> restored.addCount(a, b, c) })
-        assertTrue(inTrie(restored, "拟好", "ni", "hao"))
-        assertEquals(listOf(niHao), restored.ownWords().map { it.first })
-    }
-
-    @Test
     fun countsWrittenOutRestoreTheSame() {
         val m = model()
         m.learn(null, listOf(entry("你", "ni"), entry("拟好", "ni", "hao"), entry("吗", "ma")))
@@ -165,38 +142,16 @@ class UserModelTest {
     }
 
     @Test
-    fun theJournalHearsEachSentence() {
-        val m = model()
-        val heard = ArrayList<String>()
-        m.journal = UserModel.Journal { prev, sentence -> heard += "$prev ${sentence.joinToString()}" }
-        m.learn(null, listOf(entry("你", "ni")))
-        m.learn(entry("你", "ni"), listOf(entry("好", "hao")))
-        m.addCount(entry("吗", "ma"), 1f)
-        assertEquals(listOf("null 你(ni)", "你(ni) 好(hao)"), heard)
-    }
-
-    @Test
-    fun theJournalHearsOfASentenceOnceItsCountsHalved() {
-        val m = model(limit = 2.5f)
-        val totals = ArrayList<Float>()
-        m.journal = UserModel.Journal { _, _ -> totals += m.total }
-        m.learn(null, listOf(entry("你", "ni"), entry("好", "hao")))
-        m.learn(null, listOf(entry("你", "ni")))
-        // what a compaction then writes out is what a restart restores
-        assertEquals(listOf(2f, 1.5f), totals)
-    }
-
-    @Test
-    fun countsGrowAndScale() {
+    fun countsGrowAndClear() {
         val c = Counts()
         for (k in 0L until 1000L) c.add(k * 7919, 1f)
         c.add(7919, 2f)
         assertEquals(1000, c.size)
         assertEquals(3f, c[7919])
         assertEquals(0f, c[-5])
-        c.scale(0.5f, 1f)
-        assertEquals(1, c.size)
-        assertEquals(1.5f, c[7919])
+        c.clear()
+        assertEquals(0, c.size)
+        assertEquals(0f, c[7919])
         assertThrows(IllegalArgumentException::class.java) { c.add(Long.MIN_VALUE, 1f) }
     }
 
@@ -217,26 +172,21 @@ class UserModelTest {
     @Test
     fun aWordForgottenLosesItsCountsAndPairs() {
         val m = model()
-        val heard = ArrayList<String>()
         m.learn(null, listOf(entry("你", "ni"), entry("好", "hao"), entry("吗", "ma")))
         m.learn(null, listOf(entry("你", "ni")))
-        m.journal = object : UserModel.Journal {
-            override fun record(prev: Entry?, sentence: List<Entry>) = Unit
-            override fun forgot(words: List<Entry>) {
-                heard += words.joinToString()
-            }
-        }
+        val before = m.changes
         m.forget(listOf(entry("好", "hao")))
-        assertEquals(listOf("好(hao)"), heard)
+        assertTrue(m.changes > before)
         assertEquals(0f, m.probability(NO_WORD, word("好")))
         assertEquals(3f, m.total)
         // the pairs it was in are gone, those without it stay
         val counted = HashMap<String, Float>()
         m.forEachCount({ e, c -> counted[e.toString()] = c }, { a, b, c -> counted["$a $b"] = c })
         assertEquals(mapOf("你(ni)" to 2f, "吗(ma)" to 1f), counted)
-        // nothing learned of it: nothing to forget, nothing heard
+        // nothing learned of it: nothing to forget, nothing changed
+        val after = m.changes
         m.forget(listOf(entry("拟", "ni")))
-        assertEquals(1, heard.size)
+        assertEquals(after, m.changes)
     }
 
     @Test
@@ -311,6 +261,25 @@ class UserModelTest {
         assertEquals(word("你"), m.list(entry("你", "ni")))
     }
 
+    // U-82: deleted from a long press, out of the trie at once; one the user owns stays theirs to type
+    @Test
+    fun aWordAddedByHandUnlistedIsGoneAtOnceUnlessTheUsersOwn() {
+        val m = model()
+        val niZai = entry("拟再", "ni", "zai")
+        m.listByHand(niZai)
+        assertTrue(inTrie(m, "拟再", "ni", "zai"))
+        m.unlist(niZai)
+        assertFalse(inTrie(m, "拟再", "ni", "zai"))
+        val haoZai = entry("好再", "hao", "zai")
+        m.listByHand(haoZai)
+        m.own(haoZai)
+        m.unlist(haoZai)
+        assertTrue(inTrie(m, "好再", "hao", "zai"))
+        // a word of the dictionary's stays the dictionary's
+        m.unlist(entry("你", "ni"))
+        assertTrue(m.knows(entry("你", "ni")))
+    }
+
     @Test
     fun aWordIsBlockedInTheReadingItWasBlockedIn() {
         val m = model()
@@ -331,11 +300,11 @@ class UserModelTest {
         val word = entry("拟好", "ni", "hao")
         // no such word yet: nothing to block now
         assertFalse(m.block(word))
-        val id = m.learn(null, listOf(word)).single()
+        val id = m.own(word)
         assertTrue(m.blocked(id, -1))
         assertEquals(emptyList<Pair<Entry, Float>>(), m.ownWords())
-        m.forget(listOf(word))
-        val again = m.learn(null, listOf(word)).single()
+        m.disown(word)
+        val again = m.own(word)
         assertTrue(m.blocked(again, -1))
         m.unblock(word)
         assertFalse(m.blocked(again, -1))
@@ -347,7 +316,7 @@ class UserModelTest {
         val m = UserModel(polyphones.dictionary, polyphones.vocabulary)
         val hang = entry("行", "hang")
         val xing = entry("行", "xing")
-        val id = m.learn(null, listOf(hang)).single()
+        val id = m.own(hang)
         val atHang = polyphones.dictionary.find(syl("hang"))
         val atXing = polyphones.dictionary.find(syl("xing"))
         m.block(hang)
@@ -369,20 +338,17 @@ class UserModelTest {
     }
 
     @Test
-    fun aPolyphoneIsReadAsTypedNotAsListedOrBlocked() {
+    fun aPolyphoneIsReadAsOwnedNotAsListedOrBlocked() {
         val m = UserModel(polyphones.dictionary, polyphones.vocabulary)
         val hang = entry("行", "hang")
         val xing = entry("行", "xing")
-        val id = m.learn(null, listOf(hang)).single()
+        val id = m.own(hang)
         m.list(xing)
         m.block(xing)
         m.unblock(xing)
         assertEquals(hang.syllables.toList(), m.reading(id)?.toList())
-        val counted = HashMap<String, Float>()
-        m.forEachCount({ e, c -> counted[e.toString()] = c }, { _, _, _ -> })
-        assertEquals(mapOf("行(hang)" to 1f), counted)
-        // typed the other way, it is read so
-        m.learn(null, listOf(xing))
+        // owned the other way, it is read so
+        m.own(xing)
         assertEquals(xing.syllables.toList(), m.reading(id)?.toList())
     }
 
@@ -390,24 +356,27 @@ class UserModelTest {
     fun aWordIsReadAsTheUserHasItOnlyWhileTheyHaveIt() {
         val m = UserModel(polyphones.dictionary, polyphones.vocabulary)
         val hang = entry("行", "hang")
-        val id = m.learn(null, listOf(hang)).single()
-        // forgotten, the dictionary's word keeps the entry it was learned as, but not as a reading
-        m.forget(listOf(hang))
+        val id = m.own(hang)
+        // no longer theirs, the dictionary's word keeps the entry it was owned as, but not as a reading
+        m.disown(hang)
         assertEquals(null, m.reading(id))
         // one of their dictionaries', never typed, is not theirs yet (its reading may be wrong); one
-        // added by hand is, and one imported once typed
+        // added by hand is, and one imported once theirs
         val listed = m.list(entry("行行", "hang", "hang"))
         assertEquals(null, m.reading(listed))
         val byHand = m.listByHand(entry("行行", "hang", "xing"))
         assertEquals(entry("行行", "hang", "xing").syllables.toList(), m.reading(byHand)?.toList())
-        m.learn(null, listOf(entry("行行", "hang", "hang")))
+        m.own(entry("行行", "hang", "hang"))
         assertEquals(entry("行行", "hang", "hang").syllables.toList(), m.reading(listed)?.toList())
-        m.forget(listOf(entry("行行", "hang", "hang")))
-        // their own, forgotten in a longer candidate: still in the trie, no longer theirs
+        m.disown(entry("行行", "hang", "hang"))
+        // their own no longer, listed: still in the trie, no longer theirs
         val own = entry("行行", "xing", "xing")
-        val made = m.learn(null, listOf(own)).single()
-        m.forget(listOf(own, hang))
+        m.list(own)
+        val made = m.own(own)
+        m.disown(own)
         assertEquals(null, m.reading(made))
+        assertTrue(inTrie(m, "行行", "xing", "xing"))
+        assertFalse(m.owns(made))
     }
 
     @Test
@@ -416,14 +385,14 @@ class UserModelTest {
         val before = m.changes
         m.list(entry("拟好", "ni", "hao"))
         assertEquals(listOf("拟好"), m.listedTexts())
-        // made from pieces, and the dictionary's typed: their own
-        m.learn(null, listOf(entry("好吗", "hao", "ma")))
-        m.learn(null, listOf(entry("你好", "ni", "hao")))
+        // made, and the dictionary's: their own
+        m.own(entry("好吗", "hao", "ma"))
+        m.own(entry("你好", "ni", "hao"))
         assertEquals(setOf("好吗", "你好"), m.ownTexts().toSet())
         val learned = m.changes
         assertTrue(learned > before)
-        // typed again, nothing new to share
-        m.learn(null, listOf(entry("你好", "ni", "hao")))
+        // owned again, nothing new to share
+        m.own(entry("你好", "ni", "hao"))
         assertEquals(learned, m.changes)
         m.block(entry("好吗", "hao", "ma"))
         assertEquals(setOf("你好"), m.ownTexts().toSet())
@@ -441,7 +410,7 @@ class UserModelTest {
         assertEquals(null, m.newEntryOf("吗好"))
         m.forget(listOf(entry("好吗", "hao", "ma")))
         assertEquals("好吗(hao a)", m.newEntryOf("好吗").toString())
-        m.forgetText("好吗")
+        forgetText(m, "好吗")
         assertEquals(null, m.newEntryOf("好吗"))
         // learned again: a second id for the text, the one found
         m.learn(null, listOf(entry("好吗", "hao", "ma")))
@@ -454,7 +423,7 @@ class UserModelTest {
         m.learn(null, listOf(entry("好吗", "hao", "ma")))
         m.learn(null, listOf(entry("好吗", "hao", "a"), entry("吗", "ma")))
         assertEquals(2, m.entriesOf("好吗").size)
-        m.forgetText("好吗")
+        forgetText(m, "好吗")
         // each reading: its counts, its pairs, its place in the trie
         assertEquals(emptyList<Entry>(), m.entriesOf("好吗"))
         val counted = HashMap<String, Float>()
@@ -476,7 +445,7 @@ class UserModelTest {
         assertTrue(m.hasText("好吗"))
         assertTrue(m.hasText("拟好"))
         assertFalse(m.hasText("好"))
-        m.forgetText("好吗")
+        forgetText(m, "好吗")
         assertFalse(m.hasText("好吗"))
     }
 
@@ -501,50 +470,6 @@ class UserModelTest {
         assertFalse(m.typed("好"))
         m.forget(listOf(niHao))
         assertFalse(m.typed("拟好"))
-    }
-
-    @Test
-    fun aTextWhoseCountHalvedAwayIsNoLongerTyped() {
-        val m = model(limit = 2.5f)
-        val niHao = entry("拟好", "ni", "hao")
-        m.list(niHao)
-        m.learn(null, listOf(entry("你", "ni"), niHao))
-        // 你 typed again: at a half as 拟好 goes at an eighth, not on the quarter below which a count goes
-        repeat(2) { m.learn(null, listOf(entry("你", "ni"))) }
-        repeat(3) { m.learn(null, listOf(entry("吗", "ma"))) }
-        // listed, not made by the user: no quarter is kept for it, and below a quarter it goes
-        assertFalse(m.typed("拟好"))
-        assertTrue(m.typed("你"))
-    }
-
-    @Test
-    fun wordsForgottenEachAloneAreAllGoneAndReadBackSo() {
-        val m = model()
-        val heard = ArrayList<String>()
-        val log = ByteArrayOutputStream().apply { write(UserLog.header()) }
-        m.journal = object : UserModel.Journal {
-            override fun record(prev: Entry?, sentence: List<Entry>) = log.write(UserLog.sentence(prev, sentence))
-            override fun forgot(words: List<Entry>) {
-                heard += words.joinToString()
-                log.write(UserLog.forgot(words))
-            }
-        }
-        val niHao = entry("拟好", "ni", "hao")
-        val haoMa = entry("好吗", "hao", "ma")
-        m.learn(null, listOf(niHao, haoMa, entry("你", "ni")))
-        // 拟 was never typed: nothing to forget
-        m.forgetEach(listOf(niHao, haoMa, entry("拟", "ni")))
-        assertEquals(listOf("拟好(ni hao)", "好吗(hao ma)"), heard)
-        assertFalse(inTrie(m, "拟好", "ni", "hao"))
-        assertFalse(inTrie(m, "好吗", "hao", "ma"))
-        assertEquals(emptyList<Pair<Entry, Float>>(), m.ownWords())
-        assertEquals(listOf("你"), m.ownTexts())
-        assertEquals(1f, m.total)
-        // each written as forgotten alone: read back, neither is a word of the user's any more
-        val again = model().also { UserLog.read(log.toByteArray(), it) }
-        assertEquals(emptyList<Pair<Entry, Float>>(), again.ownWords())
-        assertFalse(inTrie(again, "拟好", "ni", "hao"))
-        assertEquals(1f, again.total)
     }
 
     private companion object {
@@ -596,24 +521,15 @@ class UserModelTest {
         val imported = entry("拟好", "ni", "hao")
         m.list(imported)
         assertFalse("拟好" in m.ownTexts())
-        m.learn(null, listOf(imported))
+        m.own(imported)
         assertTrue("拟好" in m.ownTexts())
         // forgotten, no longer
-        m.forget(listOf(imported))
+        m.disown(imported)
         assertFalse("拟好" in m.ownTexts())
-        // typed again then blocked: no longer either (F2433)
-        m.learn(null, listOf(imported))
+        // theirs again then blocked: no longer either (F2433)
+        m.own(imported)
         assertTrue("拟好" in m.ownTexts())
         m.block(imported)
         assertFalse("拟好" in m.ownTexts())
-    }
-
-    @Test
-    fun aPhraseIsAtMostMaxPhraseCharactersCountedByCodePoint() {
-        // F2460: the bound exactly, and an Ext-B character (two UTF-16 units) counts once
-        val nihao = listOf(entry("你好", "ni", "hao"))
-        assertNotNull(UserModel.phrase("你".repeat(UserModel.MAX_PHRASE), nihao))
-        assertNull(UserModel.phrase("你".repeat(UserModel.MAX_PHRASE + 1), nihao))
-        assertNotNull(UserModel.phrase("\uD840\uDC00".repeat(UserModel.MAX_PHRASE), nihao))
     }
 }

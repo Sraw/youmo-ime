@@ -64,4 +64,19 @@
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toEndOf="@id/done_icon"
         app:layout_constraintTop_toTopOf="@id/done_icon" />
+
+    <!-- a line, not a dialog: who has no backup reads past it (U-100's onboarding) -->
+    <TextView
+        android:id="@+id/restore_text"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="32dp"
+        android:background="?attr/selectableItemBackground"
+        android:padding="12dp"
+        android:text="@string/learning_restore_onboarding"
+        android:textColor="?attr/colorPrimary"
+        android:visibility="gone"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent" />
 </androidx.constraintlayout.widget.ConstraintLayout>

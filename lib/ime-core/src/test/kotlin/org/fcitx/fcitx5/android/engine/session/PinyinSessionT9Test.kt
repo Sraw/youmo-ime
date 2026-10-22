@@ -8,8 +8,10 @@ import org.fcitx.fcitx5.android.engine.data.PinyinData
 import org.fcitx.fcitx5.android.engine.data.PinyinDataBuilder
 import org.fcitx.fcitx5.android.engine.host.EngineEvent
 import org.fcitx.fcitx5.android.engine.host.Keyboard
-import org.fcitx.fcitx5.android.engine.phrase.CustomPhrases
-import org.fcitx.fcitx5.android.engine.phrase.PhraseBook
+import org.fcitx.fcitx5.android.engine.learn.Kinds
+import org.fcitx.fcitx5.android.engine.learn.LearnTo
+import org.fcitx.fcitx5.android.engine.learn.Learner
+import org.fcitx.fcitx5.android.engine.learn.RecordingHabits
 import org.fcitx.fcitx5.android.engine.pinyin.Fuzzy
 import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
 import org.fcitx.fcitx5.android.engine.pinyin.PinyinSegmenter
@@ -50,8 +52,10 @@ class PinyinSessionT9Test {
         ),
     )
 
-    private fun session(user: UserModel? = null, refiner: SentenceRefiner? = null) =
-        PinyinSession(data, T9Segmenter(abbreviations = false), spell = true, user = user, prediction = false, refiner = refiner)
+    private fun session(user: UserModel? = null, learner: Learner? = null, refiner: SentenceRefiner? = null) = PinyinSession(
+        data, T9Segmenter(abbreviations = false), spell = true, user = learner?.model ?: user, prediction = false, refiner = refiner,
+        learnTo = learner?.learnTo() ?: LearnTo(),
+    )
 
     // a dictionary of [words], each with its score and its syllables apart by spaces
     private fun dataOf(vararg words: Triple<String, Float, String>) = PinyinData.load(
@@ -82,6 +86,25 @@ class PinyinSessionT9Test {
         assertEquals(listOf("ni", "mi", "o", "m", "n"), s.syllables)
     }
 
+    // design-1b §6, S1: the letters and the bar go by the ranked first, the readings in the places the decoder gave them
+    @Test
+    fun theLettersAndTheBarFollowTheRankedFirst() {
+        val learner = Learner(data)
+        val s = session(learner = learner)
+        val fresh = s.type("64426")
+        assertEquals("你好", fresh.candidates.first())
+        s.apply(Action.Reset)
+        repeat(2) {
+            s.apply(Action.Select(s.type("64426").candidates.indexOf("米糕")))
+            s.apply(Action.Reset)
+        }
+        val ranked = s.type("64426")
+        assertEquals("米糕", ranked.candidates.first())
+        assertEquals("mi gao", ranked.preedit)
+        assertEquals("mi", ranked.syllables.first())
+        assertEquals(fresh.candidates.toSet(), ranked.candidates.toSet())
+    }
+
     @Test
     fun keysHandedOverTogetherReadAsTypedOneByOne() {
         // the syllables offered with their id: a pick from the list shown names it
@@ -103,6 +126,32 @@ class PinyinSessionT9Test {
         assertEquals(listOf("ni", "mi", "o", "m", "n"), back.syllables)
         // then a digit goes
         assertEquals("ni ha", session.apply(Backspace).preedit)
+    }
+
+    // review F3116 (F2672): a syllable taken off the bar is several places of its digits; a pin after it is kept
+    @Test
+    fun aPinIsKeptAfterASyllableTakenOffTheBar() {
+        val session = session(learner = Learner(data))
+        val shown = session.type("64426").candidates
+        session.apply(Action.Pin(shown.indexOf("米糕")))
+        session.apply(Action.Reset)
+        // ni, two digits taken as one syllable
+        val typed = session.type("6464426")
+        val ni = session.apply(Action.Syllable(typed.syllables.indexOf("ni")))
+        assertTrue(ni.preedit, ni.preedit.startsWith("ni'"))
+        assertEquals("你米糕", ni.candidates.first())
+    }
+
+    // review F3182 (F2795): a glide's letter after the cursor moved is still glided: no key of the nine keys' code
+    @Test
+    fun aGlidedLetterAfterTheCursorMovedIsGlided() {
+        val habits = RecordingHabits()
+        val session = PinyinSession(data, T9Segmenter(abbreviations = false), spell = true, prediction = false, learnTo = LearnTo(habits))
+        session.apply(Action.Cursor(0))
+        val m = session.apply(Action.Letter('m', glided = true))
+        assertTrue(m.candidates.toString(), m.candidates.isNotEmpty())
+        session.apply(Action.Pin(0))
+        assertTrue(habits.pins.toString(), habits.pins.single().startsWith("${Kinds.FULL}:"))
     }
 
     @Test
@@ -202,19 +251,17 @@ class PinyinSessionT9Test {
     }
 
     @Test
-    fun noPhraseIsPinnedToAKeyWithALetterTypedAsItself() {
-        val book = PhraseBook(CustomPhrases.parse("")) {}
-        // m i, each typed as itself: letters, as a phrase key is, but no other input method's
-        val session = PinyinSession(data, T9Segmenter(abbreviations = false), spell = true, prediction = false, phraseBook = book)
+    fun aWordIsPinnedUnderTheNineKeysOwnCodeALetterTypedAsItselfToo() {
+        // m i, each typed as itself: pinned under the keys as pressed, no phrase key (impl/design-1b.md §3)
+        val habits = RecordingHabits()
+        val session = PinyinSession(data, T9Segmenter(abbreviations = false), spell = true, prediction = false, learnTo = LearnTo(habits))
         session.apply(Action.Letter('m'))
         val mi = session.apply(Action.Letter('i'))
         assertEquals("米", mi.candidates[0])
-        assertTrue(Offer.PIN !in session.offers(0))
-        // full pinyin's mi may be
-        val pinyin = PinyinSession(data, PinyinSegmenter(), prediction = false, phraseBook = book)
-        pinyin.apply(Key('m'))
-        pinyin.apply(Key('i'))
-        assertTrue(Offer.PIN in pinyin.offers(0))
+        assertTrue(Offer.PIN in session.offers(0))
+        session.apply(Action.Pin(0))
+        assertEquals(1, habits.pins.size)
+        assertTrue(habits.pins.single(), habits.pins.single().startsWith("${Kinds.nineKeys(NineKeyLetters.STANDARD.tag())}:"))
     }
 
     @Test
@@ -353,7 +400,9 @@ class PinyinSessionT9Test {
         assertEquals(emptyList<String>(), session.apply(Action.Syllable(0, typed.syllablesId)).syllables)
         // the same list again keeps its id: a word forgotten reads the input again, offering what
         // it did, and stales no pick (a pause reads nothing again: see the test after this one)
-        val again = session(UserModel(data.dictionary, data.vocabulary)) { _, _, _, _ -> 0 }
+        val again = session(learner = Learner(data), refiner = { _, _, _, _ -> 0 })
+        again.type("64")
+        again.apply(Action.Select(0))
         val first = again.type("64")
         val forgotten = again.apply(Action.Forget(0))
         // the input was read again: the refiner has its readings anew

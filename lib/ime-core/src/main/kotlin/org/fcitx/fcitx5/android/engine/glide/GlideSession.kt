@@ -4,14 +4,18 @@
  */
 package org.fcitx.fcitx5.android.engine.glide
 
+import org.fcitx.fcitx5.android.engine.learn.control.Why
 import org.fcitx.fcitx5.android.engine.session.Action
 import org.fcitx.fcitx5.android.engine.session.Choice
 import org.fcitx.fcitx5.android.engine.session.Offer
 import org.fcitx.fcitx5.android.engine.session.Session
 import org.fcitx.fcitx5.android.engine.session.Snapshot
 
-/** A reading of a glide: the [keys] it types, as its input method reads them, its likeliest [word] and the score. */
-class GlideReading(val keys: String, val word: String, val score: Float)
+/**
+ * A reading of a glide: the [keys] it types, as its input method reads them, its likeliest [word]
+ * and the score; [pinyin], the word's syllables apart by spaces, where a pinyin glide read it.
+ */
+class GlideReading(val keys: String, val word: String, val score: Float, val pinyin: String = "")
 
 /**
  * A Chinese input method's [session] session, glided on: an [Action.Glide] types the likeliest
@@ -29,8 +33,10 @@ class GlideSession(
     private val session: Session,
     private val between: Action,
     private val blocked: (String) -> Boolean = { false },
-    private val typed: (Char) -> Action = Action::Key,
+    private val typed: (Char) -> Action = { Action.Key(it, glided = true) },
     private val readings: Int = READINGS,
+    /** A word of the other readings committed though [session] holds it back, and the first it showed (asked only if wanted): for learning to record. */
+    private val heldBack: (GlideReading, first: () -> String) -> Unit = { _, _ -> },
     private val read: (Glide, limit: Int) -> List<GlideReading>,
 ) : Session by session {
 
@@ -136,7 +142,8 @@ class GlideSession(
         if (at >= 0) return session.apply(Action.Pick(at))
         // not among its candidates (the session holds it back): the word as shown, the input dropped
         // and the word told the session as what the next input follows, after what was committed before,
-        // as if committed there; not learned
+        // as if committed there; not learned by the user model, but recorded
+        heldBack(reading) { session.candidates(0, 1).firstOrNull()?.text.orEmpty() }
         return session.apply(Action.Context(written + reading.word)).copy(commit = reading.word, handled = true)
     }
 
@@ -182,6 +189,11 @@ class GlideSession(
     }
 
     override fun offers(index: Int): Set<Offer> = if (others(index) != null) emptySet() else session.offers(inner(index))
+
+    // the others are no candidates [session] ranked; its own a place on for each (review-int-runtime S2)
+    override fun why(index: Int): Why? = if (others(index) != null) null else session.why(inner(index))
+
+    override fun reread(): Snapshot? = session.reread()?.let { shown(settled(it)) }
 
     companion object {
         /** Readings a glide offers: the one typed and the others. */

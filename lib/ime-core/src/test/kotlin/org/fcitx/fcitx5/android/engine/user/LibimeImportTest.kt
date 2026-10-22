@@ -86,10 +86,8 @@ class LibimeImportTest {
     }
 
     @Test
-    fun historyIsLearnedOldestFirstThenTheDictionarysOtherWords() {
+    fun historyIsLearnedThenTheDictionarysWordsItLacks() {
         val m = model()
-        val order = ArrayList<String>()
-        m.journal = UserModel.Journal { _, sentence -> order += sentence.joinToString(" ") }
         val learned = LibimeImport.learn(
             m, data.dictionary, data.vocabulary,
             userDictionary = sequenceOf("你好 ni'hao 0", "拟 ni 0", "garbage"),
@@ -97,7 +95,6 @@ class LibimeImportTest {
             history = sequenceOf("你好\tni'hao 拟\tni", "你\tni"),
         )
         assertEquals(3, learned)
-        assertEquals(listOf("你(ni)", "你好(ni hao) 拟(ni)"), order)
         val c = counts(m)
         assertEquals(1f, c["你好(ni hao)"])
         assertEquals(1f, c["拟(ni)"])

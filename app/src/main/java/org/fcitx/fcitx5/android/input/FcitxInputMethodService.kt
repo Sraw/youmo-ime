@@ -86,6 +86,7 @@ import org.fcitx.fcitx5.android.input.editing.ForwardedKeys
 import org.fcitx.fcitx5.android.input.editing.InputConnectionEditor
 import org.fcitx.fcitx5.android.input.editing.KeyEventRelay
 import org.fcitx.fcitx5.android.input.editing.toEditorTraits
+import org.fcitx.fcitx5.android.input.hardware.TakenKey
 import org.fcitx.fcitx5.android.input.keyboard.AddressKeys
 import org.fcitx.fcitx5.android.input.keyboard.PendingInputPolicy
 import org.fcitx.fcitx5.android.utils.InputMethodUtil
@@ -169,6 +170,9 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
 
     /** nothing said out loud goes into a password, its characters shown or not */
     val inPasswordField get() = fieldPolicy.password
+
+    /** Whether nothing typed in the field focused is learned (U-87's 这里不学): a password, or a field that asks so. */
+    val learnsNothingHere get() = fieldPolicy.sensitive
 
     /**
      * A URL's or an email's field, where what is typed is what is meant ([PendingInputPolicy]). Read
@@ -376,6 +380,8 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
             is FcitxEvent.IMChangeEvent -> {
                 val im = event.data.uniqueName
                 hardwareKeyboard.inputMethodChanged(im)
+                // the session switched to knows nothing of the field yet: told it, after fcitx's reset of it (FieldPolicy)
+                if (fieldPolicy.inputMethodChanged(im)) tellContext(started = true)
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
                     // (one not synced yet has no subtype: the status icon below is still updated)
                     val subtype = SubtypeManager.subtypeOf(im)
@@ -414,7 +420,8 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         // Session.ERASED, or English's own Backspace) and the cursor report, predicted, tells it
         // nothing: read now, for every input method, the selection still there, the text before
         // it is what will be before the cursor
-        if (deleting.isNotEmpty()) tellContext()
+        // (told as no selection: what it reads is the field once the selection is gone, review-1c M2)
+        if (deleting.isNotEmpty()) tellContext(selected = false)
         if (pairing) backspacePair()
         if (!editingSession.backspace(currentInputEditorInfo.toEditorTraits(packageName))) {
             sendDownUpKeyEvents(KeyEvent.KEYCODE_DEL)
@@ -433,7 +440,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
             tellContext(before = {
                 currentInputConnection?.getTextBeforeCursor(ContextChars + 1, 0)
                     ?.let { it.dropLast(CodePoints.lengthOfLast(it, 1) ?: 1) }
-            })
+            }, selected = false)
         }
     }
 
@@ -628,7 +635,11 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         )
     }
 
-    fun deleteSelection() = editingSession.deleteSelection()
+    fun deleteSelection() {
+        editingSession.deleteSelection()
+        // the engine reset first: what is left is read, for what of its commits the selection took (U-03)
+        tellContext(selected = false)
+    }
 
     fun sendCombinationKeyEvents(
         keyEventCode: Int,
@@ -827,12 +838,23 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         return false
     }
 
+    // the key whose press was taken here, its repeats and release not to go to fcitx alone
+    private val keyTaken = TakenKey()
+
     override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {
+        // Shift+Delete on the candidate highlighted forgets it, as its long press does (U-82): taken
+        // while one is highlighted, the engine's answer too late for the key: with nothing to forget it
+        // does nothing, where Delete would have deleted beside a composition (review-E-ui N1)
+        val forgets = keyTaken.down(keyCode, repeat = event.repeatCount > 0) {
+            keyCode == KeyEvent.KEYCODE_FORWARD_DEL && event.isShiftPressed && candidatesView?.forgetHighlighted() == true
+        }
+        // told even when taken: the Delete ends a lone Shift tap, else letting go of Shift soon after
+        // the forget would switch 中/英 too
         val taken = hardwareKeyboard.down(
             keyCode, event.isCtrlPressed, event.isShiftPressed, others = event.isAltPressed || event.isMetaPressed,
             repeat = event.repeatCount > 0, timeMs = event.eventTime
         )
-        if (taken) return true
+        if (forgets || taken) return true
         // request to show floating CandidatesView when pressing physical keyboard
         if (inputDeviceMgr.evaluateOnKeyDown(event, this)) {
             postFcitxJob {
@@ -846,6 +868,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     }
 
     override fun onKeyUp(keyCode: Int, event: KeyEvent): Boolean {
+        if (keyTaken.up(keyCode)) return true
         if (hardwareKeyboard.up(keyCode, event.eventTime)) return true
         return forwardKeyEvent(event) || super.onKeyUp(keyCode, event)
     }
@@ -959,13 +982,15 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         editingSession.pairs.forget()
         arrowKeys.forget()
         contextReads.forget()
-        // nothing of a password or a field that asks not to be learned from is kept
-        fieldPolicy.focus(
+        // nothing of a password or a field that asks not to be learned from is kept. Another field:
+        // what was written before is no longer the engine's to take back (U-03)
+        val started = fieldPolicy.focusAnother(
             ContextMemory.field(
                 attribute.packageName, attribute.fieldId, attribute.inputType, attribute.fieldName, attribute.hintText
             ),
             password = CapabilityFlags.isPassword(attribute),
             sensitive = sensitive,
+            learnFlags = FieldPolicy.learnFlags(attribute.toEditorTraits()),
         )
         // EditorInfo may change between onStartInput and onStartInputView
         inputDeviceMgr.notifyOnStartInput(attribute)
@@ -999,9 +1024,10 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
                         ?: currentInputConnection?.getTextBeforeCursor(ContextChars, 0)
                 },
                 after = {
-                    (if (initial) attribute.getInitialTextAfterCursor(1, 0) else null)
-                        ?: currentInputConnection?.getTextAfterCursor(1, 0)
+                    (if (initial) attribute.getInitialTextAfterCursor(Action.Context.HOST_CHARS, 0) else null)
+                        ?: currentInputConnection?.getTextAfterCursor(Action.Context.HOST_CHARS, 0)
                 },
+                started = started,
             )
         }
     }
@@ -1022,6 +1048,8 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         }
         postFcitxJob {
             focus(true)
+            // the keyboard shown again in a field: typing paused, the older build's learning put in place if made (uat-0.3.1 recheck)
+            enginePaused()
         }
         // the touch keyboard coming up as this evaluates is started below, not in inputDeviceMgr's onChange
         inputViewStarted = false
@@ -1162,7 +1190,8 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     }
 
     private val textBeforeCursor = { currentInputConnection?.getTextBeforeCursor(ContextChars, 0) }
-    private val textAfterCursor = { currentInputConnection?.getTextAfterCursor(1, 0) }
+    // as much as a context holds: what the engine checks its commits by after the cursor (U-03), and whether anything follows it
+    private val textAfterCursor = { currentInputConnection?.getTextAfterCursor(Action.Context.HOST_CHARS, 0) }
 
     // context reads asked for: one still queued behind a newer, or from a field since left, is not made
     private val contextReads = ContextReads()
@@ -1175,11 +1204,26 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     private fun tellContext(
         before: () -> CharSequence? = textBeforeCursor,
         after: () -> CharSequence? = textAfterCursor,
+        started: Boolean = false,
+        selected: Boolean = selection.latest.isNotEmpty(),
     ) {
         contextReads.ask()
-        val context = fieldPolicy.told(SystemClock.elapsedRealtime(), before, after) ?: return
+        val context = fieldPolicy.told(SystemClock.elapsedRealtime(), before, readOnce(after), started, selected) ?: return
         val learning = !fieldPolicy.sensitive
-        postFcitxJob { engineContext(context.before, learning, context.cleared) }
+        postFcitxJob { tell(context, learning) }
+    }
+
+    // [read] asked of the editor once, however often its answer is wanted: each ask is a round trip
+    private fun readOnce(read: () -> CharSequence?): () -> CharSequence? {
+        var asked = false
+        var text: CharSequence? = null
+        return {
+            if (!asked) {
+                asked = true
+                text = read()
+            }
+            text
+        }
     }
 
     /**
@@ -1192,10 +1236,13 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         postFcitxJob {
             val told = withContext(Dispatchers.Main) {
                 if (!contextReads.isLatest(read)) null
-                else fieldPolicy.told(SystemClock.elapsedRealtime(), textBeforeCursor, textAfterCursor)
-                    ?.let { it to !fieldPolicy.sensitive }
+                else {
+                    val selected = selection.latest.isNotEmpty()
+                    fieldPolicy.told(SystemClock.elapsedRealtime(), textBeforeCursor, readOnce(textAfterCursor), selected = selected)
+                        ?.let { it to !fieldPolicy.sensitive }
+                }
             }
-            if (told != null) engineContext(told.first.before, told.second, told.first.cleared)
+            if (told != null) tell(told.first, told.second)
         }
     }
 
@@ -1285,6 +1332,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         resetComposingState()
         postFcitxJob {
             focusOutIn()
+            enginePaused()
         }
         contextDropped = true
         hideStatusIcon()
@@ -1359,3 +1407,10 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         const val CALCULATION_CHARS = 128
     }
 }
+
+// every flag of [c] passed on: each defaults to false at engineContext, so one left out is silently off (F3198)
+internal suspend fun FcitxAPI.tell(c: Action.Context, learning: Boolean) =
+    engineContext(
+        c.before, learning, cleared = c.cleared, learnFlags = c.learnFlags ?: 0, started = c.started,
+        after = c.after, selected = c.selected, said = c.said,
+    )

@@ -1,0 +1,30 @@
+# C31 原首选是单字时也不跨前文：在「去」「在」后面各选过「西安」，到「从 xian」：「先」仍第 1，「西安」是 xian 下用过的词，
+# 排第 2 起；在「从」后面连着选两次，那里才是「西安」。
+# The data has 西安 first after 去 already: 在 and 到 (线, 现 first) stand in for the picks, 我 (先 first, 西安 not on the first page) for 从.
+
+scenario xian
+ctx 我
+type xian
+expect first 先
+ctx 在
+type xian
+pick 西安
+ctx 到
+type xian
+pick 西安
+ctx 我
+type xian
+expect top2 先,西安
+ctx 我
+type xian
+pick 西安
+ctx 我
+type xian
+pick 西安
+ctx 我
+type xian
+expect first 西安
+# 别的前文仍是原首选
+ctx 首
+type xian
+expect first 先

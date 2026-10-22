@@ -12,14 +12,14 @@ import org.fcitx.fcitx5.android.engine.data.WordLayers
  * word pack's layer ([layer] gives a name an index; [extra] tells a pack word's): the words of
  * the last years, say, which the model scores as unknown or as rarer than they are now, lifted
  * as one. One value a layer, so it reaches words the user has never typed, where the user
- * model's counts cannot; and it is learned from the user's picks ([learn]), so one who writes
- * the new words gets them lifted and one who never does gets them lowered. The base layer, the
- * first, is what the others are measured against and stays at 0 (but for [parse], for measuring).
+ * model's counts cannot. The base layer, the first, is what the others are measured against and
+ * stays at 0 (but for [parse], for measuring).
  *
- * Values move by [step] a pick and stay within ±[bound]: slow, so one pick settles nothing, and
- * bounded, so a layer can never bury the rest of the dictionary. They are kept by name
- * ([UserStore][org.fcitx.fcitx5.android.engine.user.UserStore]); a name no build or pack uses
- * any more just sits in the log, a few bytes.
+ * The values are fixed now: the session no longer learns them from picks (learning-ux
+ * impl/design-1b.md §4), so nothing in the app calls [learn] or sets [journal]. They stay, with
+ * [step] and ±[bound], for measuring a learned prior again; [restore] still takes back what an
+ * older build kept by name (`pinyin.user`, UserLog), a name no build or pack uses any more just
+ * sitting in the log, a few bytes.
  */
 class LayerPrior(
     private val layers: WordLayers,

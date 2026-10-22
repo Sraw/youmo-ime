@@ -20,7 +20,7 @@ import java.nio.charset.CodingErrorAction
  * The words the user added by hand and the words they blocked, as they edit them in the settings
  * or block one from the keyboard. Each list is a file in [dir], a word a line as libime's text
  * dictionaries have it (`你好 ni'hao`), written whole on each change: they are lists a user keeps
- * by hand, short, and unlike the log ([UserStore]) not counts. With no [dir], kept in memory.
+ * by hand, short, and unlike the learning record not counts. With no [dir], kept in memory.
  */
 class WordLists(private val dir: File?, private val onError: (IOException) -> Unit = {}) {
     // the lists whose file did not read: what is in memory is not all of them, so not written over them
@@ -46,6 +46,18 @@ class WordLists(private val dir: File?, private val onError: (IOException) -> Un
     fun addAll(entries: Collection<Entry>): List<Entry> = change(ADDED, added, entries) { added.add(it) }
 
     fun removeAll(entries: Collection<Entry>): List<Entry> = change(ADDED, added, entries) { added.remove(it) }
+
+    /** Puts [entries] back on the added words, each at its index then (a delete taken back): those that were not there. */
+    fun putBack(entries: List<IndexedValue<Entry>>): List<Entry> {
+        val back = entries.filter { it.value !in added }.sortedBy { it.index }
+        if (back.isEmpty()) return emptyList()
+        val all = added.toMutableList()
+        for ((i, e) in back) all.add(i.coerceAtMost(all.size), e)
+        added.clear()
+        added.addAll(all)
+        write(ADDED, added)
+        return back.map { it.value }
+    }
 
     fun blockAll(entries: Collection<Entry>): List<Entry> = change(BLOCKED, blocked, entries) { blocked.add(it) }
 

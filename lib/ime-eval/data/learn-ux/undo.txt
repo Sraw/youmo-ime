@@ -1,0 +1,39 @@
+# U-03 选错马上删：从末尾连续退删，删掉几次上屏都行：删掉的都不算用过，也不算纠正。重打出的 X 前文和被删那次一样，
+# 又和那次的编码读音对得上，还算在那次的编码和前文下纠正选了 X 一次。
+# 例：dl 空格出「打了」，ma 空格出「吗」，退格 3 下，再用 dianlema 打出「点了吗」：「打了」不算用过；dl 下的「点了」算纠正一次。
+# The data puts 带来 first for dl after 他, 带领 second: 带领 stands in for the spec's 打了, which the data now puts first after 给
+# (UAT PY-64: a pick of the first is no correction, so nothing was there to take back). Backspace is driven;
+# what was learned is taken back (step 1c).
+
+scenario dl 带领 deleted, 点了吗 retyped
+ctx 他
+type dl
+pick 带领
+type ma
+space
+del 2
+type dianlema
+pick 点了吗
+ctx 他
+type dl
+expect before 点了 带领
+ctx 他
+type dl
+pick 点了
+# 那次纠正加这次：连着两次
+ctx 他
+type dl
+expect first 点了
+
+scenario dl 带领 deleted, dl 点了 typed again with the same keys
+# 同一编码重打：只算这一次（一次纠正），不另记一行
+ctx 他
+type dl
+pick 带领
+del 1
+type dl
+pick 点了
+ctx 他
+type dl
+expect before 点了 带领
+expect notfirst 点了

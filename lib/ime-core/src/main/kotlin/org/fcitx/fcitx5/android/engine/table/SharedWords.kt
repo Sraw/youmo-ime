@@ -9,7 +9,7 @@ import java.util.TreeMap
 /**
  * What one user lexicon shares with a table: the words the user made, added or typed with the
  * other input methods, coded by the table's rules ([CodedWords]), and the words blocked, offered
- * by none of them. A word the table saves goes the other way: see [TableUser.onSaved].
+ * by none of them. The phrases a table saved in an older build go the other way (TableRegistry).
  */
 interface SharedWords {
     /** The user's words under codes starting with [prefix], code and text; none the table has so. */
@@ -22,14 +22,11 @@ interface SharedWords {
     fun blocked(text: String): Boolean
 
     /**
-     * Whether [text] is a word [block] can block: one pinyin can read, of two characters or more,
-     * as a block reaches every reading of it: a single character blocked would go from pinyin and
-     * strokes too.
+     * Whether [text] is a word a block of what may follow (联想) can reach: one pinyin can read, of
+     * two characters or more, as a block reaches every reading of it: a single character blocked
+     * would go from pinyin and strokes too.
      */
     fun blockable(text: String): Boolean
-
-    /** Blocks [text] for every input method, however read; whether it could be. */
-    fun block(text: String): Boolean
 
     /** Forgets what every input method learned of [text], a phrase a table saved or a word it shares. */
     fun forget(text: String)
@@ -50,7 +47,6 @@ interface SharedWords {
             override fun leadsAnywhere(prefix: String) = false
             override fun blocked(text: String) = false
             override fun blockable(text: String) = false
-            override fun block(text: String) = false
             override fun forget(text: String) = Unit
         }
     }

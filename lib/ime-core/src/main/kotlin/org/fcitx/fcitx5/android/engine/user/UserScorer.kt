@@ -48,7 +48,9 @@ class UserScorer(
             if (!packed.isNaN()) base += packed - model.unknownScore
         }
         base = minOf(0f, base)
-        val p = user.probability(prev, word)
+        // weight 0: the model's score as it is, not through 10^x and back
+        if (weight == 0f) return base
+        val p = user.decoderProbability(prev, word)
         if (p == 0f) return base
         return minOf(0f, log10(10f.pow(base) + weight * p))
     }

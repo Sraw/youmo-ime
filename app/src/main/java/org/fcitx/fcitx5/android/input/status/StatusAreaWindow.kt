@@ -4,9 +4,11 @@
  */
 package org.fcitx.fcitx5.android.input.status
 
+import android.app.AlertDialog
 import android.os.Build
 import android.view.View
 import android.widget.PopupMenu
+import androidx.annotation.StringRes
 import androidx.core.text.buildSpannedString
 import androidx.core.text.color
 import kotlinx.coroutines.launch
@@ -17,16 +19,21 @@ import org.fcitx.fcitx5.android.daemon.FcitxConnection
 import org.fcitx.fcitx5.android.daemon.launchOnReady
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
+import org.fcitx.fcitx5.android.engine.learn.control.LearningOp
+import org.fcitx.fcitx5.android.engine.learn.control.LearningResult
 import org.fcitx.fcitx5.android.input.bar.ui.ToolButton
 import org.fcitx.fcitx5.android.input.broadcast.InputBroadcastReceiver
 import org.fcitx.fcitx5.android.input.dependency.fcitx
 import org.fcitx.fcitx5.android.input.dependency.imeScope
+import org.fcitx.fcitx5.android.input.dependency.inputMethodService
 import org.fcitx.fcitx5.android.input.dependency.theme
 import org.fcitx.fcitx5.android.input.editorinfo.EditorInfoWindow
 import org.fcitx.fcitx5.android.input.keyboard.KeyboardWindow
 import org.fcitx.fcitx5.android.input.keyboard.OneHanded
 import org.fcitx.fcitx5.android.input.keyboard.TextKeyboard
+import org.fcitx.fcitx5.android.input.status.StatusAreaEntry.Android.Type.ClearRecent
 import org.fcitx.fcitx5.android.input.status.StatusAreaEntry.Android.Type.FloatingToggle
+import org.fcitx.fcitx5.android.input.status.StatusAreaEntry.Android.Type.HabitsToggle
 import org.fcitx.fcitx5.android.input.status.StatusAreaEntry.Android.Type.InputMethod
 import org.fcitx.fcitx5.android.input.status.StatusAreaEntry.Android.Type.Keyboard
 import org.fcitx.fcitx5.android.input.status.StatusAreaEntry.Android.Type.OneHandedToggle
@@ -37,6 +44,7 @@ import org.fcitx.fcitx5.android.utils.AppUtil
 import org.fcitx.fcitx5.android.utils.DeviceUtil
 import org.fcitx.fcitx5.android.utils.alpha
 import org.fcitx.fcitx5.android.utils.styledColor
+import org.fcitx.fcitx5.android.utils.toast
 import org.mechdancer.dependency.manager.must
 import splitties.dimensions.dp
 import splitties.views.backgroundColor
@@ -55,6 +63,13 @@ class StatusAreaWindow : InputWindow.ExtendedInputWindow<StatusAreaWindow>(),
     private val windowManager: InputWindowManager by manager.must()
 
     private val editorInfoInspector by AppPrefs.getInstance().internal.editorInfoInspector
+
+    private val service by manager.inputMethodService()
+
+    private val useHabits = AppPrefs.getInstance().internal.useHabits
+
+    // what fcitx last offered, for the entries to be shown again as one of the app's changes
+    private var fcitxActions = emptyArray<Action>()
 
     private val staticEntries by lazy {
         arrayOf(
@@ -149,12 +164,61 @@ class StatusAreaWindow : InputWindow.ExtendedInputWindow<StatusAreaWindow>(),
                         }
                         // the input view is made anew for it, on the letters
                         FloatingToggle -> ThemeManager.prefs.floatingKeyboard.run { setValue(!getValue()) }
+                        // the app's preference (read when the engine is made), and the engine told now
+                        HabitsToggle -> {
+                            val on = !useHabits.getValue()
+                            useHabits.setValue(on)
+                            fcitx.launchOnReady { it.learning(LearningOp.UseHabits(on)) }
+                            onStatusAreaUpdate(fcitxActions)
+                        }
+                        ClearRecent -> clearRecent(view)
                     }
                 }
             }
 
             override val theme = this@StatusAreaWindow.theme
         }
+    }
+
+    /** U-88: how far back, then asked once more, saying what stays and what goes with it. */
+    private fun clearRecent(anchor: View) {
+        val popup = PopupMenu(context, anchor)
+        val spans = listOf(
+            LearningOp.Span.TEN_MINUTES to R.string.learning_span_ten_minutes,
+            LearningOp.Span.HOUR to R.string.learning_span_hour,
+            LearningOp.Span.TODAY to R.string.learning_span_today,
+        )
+        for ((span, label) in spans) {
+            popup.menu.add(label).setOnMenuItemClickListener {
+                confirmClear(span, label)
+                true
+            }
+        }
+        popupMenu?.dismiss()
+        popupMenu = popup
+        popup.show()
+    }
+
+    private fun confirmClear(span: LearningOp.Span, @StringRes label: Int) {
+        val dialog = AlertDialog.Builder(context)
+            .setTitle(context.getString(R.string.learning_clear_recent_title, context.getString(label)))
+            .setMessage(R.string.learning_clear_recent_message)
+            .setPositiveButton(R.string.learning_clear) { _, _ ->
+                imeScope.launch {
+                    val cleared = fcitx.runOnReady { learning(LearningOp.ClearRecent(span)) }
+                    // not on disk (the phone locked since it started) is not now; a disk that failed, again (review-E-ui S6)
+                    context.toast(
+                        when (cleared) {
+                            is LearningResult.Cleared -> R.string.learning_cleared
+                            LearningResult.Failed -> R.string.learning_clear_failed
+                            else -> R.string.learning_not_now
+                        }
+                    )
+                }
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .create()
+        service.showDialog(dialog)
     }
 
     private val keyBorder by ThemeManager.prefs.keyBorder
@@ -170,6 +234,7 @@ class StatusAreaWindow : InputWindow.ExtendedInputWindow<StatusAreaWindow>(),
     }
 
     override fun onStatusAreaUpdate(actions: Array<Action>) {
+        fcitxActions = actions
         val floating = ThemeManager.prefs.floatingKeyboard.getValue()
         // floating or the letters split, one-handed mode is of no use: not offered
         val oneHanded = if (floating || TextKeyboard.splits(context)) emptyArray() else arrayOf(
@@ -188,6 +253,18 @@ class StatusAreaWindow : InputWindow.ExtendedInputWindow<StatusAreaWindow>(),
                 R.drawable.ic_baseline_open_with_24,
                 FloatingToggle,
                 active = floating
+            ),
+            // off, shown lit: the keyboard is not as the user left it
+            StatusAreaEntry.Android(
+                context.getString(if (useHabits.getValue()) R.string.learning_habits_off else R.string.learning_habits_on),
+                R.drawable.ic_view_private,
+                HabitsToggle,
+                active = !useHabits.getValue()
+            ),
+            StatusAreaEntry.Android(
+                context.getString(R.string.learning_clear_recent),
+                R.drawable.ic_baseline_delete_sweep_24,
+                ClearRecent
             ),
             *Array(actions.size) { StatusAreaEntry.fromAction(context, actions[it]) }
         )

@@ -46,4 +46,22 @@ class LatinWordsTest {
         assertEquals(listOf(3), at("app'le", 0))
         assertEquals(emptyList<Int>(), at("Apple", 0))
     }
+
+    @Test
+    fun theUsersWordsAreSpeltFromTwoLettersTillALetterStops() {
+        val user = UserLatinWords()
+        user.set(setOf("a", "ab", "abc", "xyz"))
+        fun at(input: String, from: Int) = ArrayList<Int>().also { l -> user.forEachAt(input, from) { l += it } }
+        // one letter is no word; each word the input spells from there, shortest first
+        assertEquals(listOf(2, 3), at("abcd", 0))
+        assertEquals(listOf(3), at("qxyz", 1))
+        // a word ends where the letters do
+        assertEquals(listOf(2), at("ab'c", 0))
+        assertEquals(emptyList<Int>(), at("Abc", 0))
+        // a new set replaces the words before it
+        user.set(setOf("xy"))
+        assertEquals(setOf("xy"), user.words)
+        assertEquals(emptyList<Int>(), at("abc", 0))
+        assertEquals(listOf(2), at("xyz", 0))
+    }
 }

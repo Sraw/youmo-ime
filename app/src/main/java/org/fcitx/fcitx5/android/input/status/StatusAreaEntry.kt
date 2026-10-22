@@ -22,7 +22,13 @@ sealed class StatusAreaEntry(
             Keyboard,
             ThemeList,
             OneHandedToggle,
-            FloatingToggle
+            FloatingToggle,
+
+            /** U-93 「不用我的输入习惯」 / 「恢复我的输入习惯」 */
+            HabitsToggle,
+
+            /** U-88 「清掉最近」 */
+            ClearRecent
         }
     }
 

@@ -13,6 +13,7 @@ import org.fcitx.fcitx5.android.engine.rerank.SentencePicker
 import org.fcitx.fcitx5.android.engine.rerank.SentenceRefiner
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
+import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Assume.assumeTrue
 import org.junit.Rule
@@ -33,10 +34,10 @@ class MainTest {
 
     private fun syl(vararg s: String) = s.map { Syllables.id(it) }.toIntArray()
 
-    /** The words KeystrokeRunTest types; [layered], with 毫 in a layer of its own. */
-    private fun dataFile(layered: Boolean = false): File {
+    /** The words KeystrokeRunTest types. */
+    private fun dataFile(): File {
         val bytes = PinyinDataBuilder()
-            .layers(if (layered) listOf(WordLayers.BASE, "places") else listOf(WordLayers.BASE))
+            .layers(listOf(WordLayers.BASE))
             .unigram("<unk>", -7f, 0f)
             .unigram("你", -2f, 0f)
             .unigram("拟", -5f, 0f)
@@ -58,7 +59,7 @@ class MainTest {
             .entry("泥", syl("ni"))
             .entry("尼", syl("ni"))
             .entry("号", syl("hao"))
-            .entry("毫", syl("hao"), layer = if (layered) 1 else 0)
+            .entry("毫", syl("hao"))
             .build().toByteArray()
         return tmp.newFile("pinyin.data").apply { writeBytes(bytes) }
     }
@@ -225,14 +226,12 @@ class MainTest {
         assertEquals("0", cell(scores.toString(), "lost", Metrics.ALL))
         assertEquals(Flips(Metrics.ALL, 2, 1, 0).p, cell(scores.toString(), "p", Metrics.ALL)!!.toDouble(), 0.0)
 
-        // the user layer's rows, as the gate runs it; with layers, rows that start the same follow
+        // the user layer's rows, as the gate runs it
         val chat = tmp.newFile("chat.tsv").apply { writeText("nihao\t尼好\tdaily\nnihao\t你好\tdaily\n") }
         val learning = StringBuilder()
-        assertEquals(0, runCli(arrayOf("learn", dataFile(layered = true).path, chat.path, "--neighbours", "on"), learning, StringBuilder()))
-        assertTrue(learning.toString(), learning.lines().any { it.startsWith("held-out, tune learned, prior learned") })
-        // where the prior ended up is a note, not a row of zero counts
-        assertTrue(learning.toString(), learning.lines().single { it.startsWith("prior after tune: ") }.matches(Regex("prior after tune: \\S+; after held-out alone: \\S+")))
-        assertEquals("100.0%", cell(learning.toString(), "top1", "tune, typed again"))
+        assertEquals(0, runCli(arrayOf("learn", dataFile().path, chat.path, "--neighbours", "on"), learning, StringBuilder()))
+        // a correction made twice is first (U-02)
+        assertEquals("100.0%", cell(learning.toString(), "top1", "tune, typed a third time"))
         assertEquals("100.0%", cell(learning.toString(), "top1", "held-out, learning nothing"))
         assertEquals("0.0%", cell(learning.toString(), "top1", "held-out, tune learned"))
     }
@@ -256,9 +255,9 @@ class MainTest {
         val p = Flips(Metrics.ALL, inputs.size, 0, inputs.size).p.toString()
         assertTrue(p, 'E' in p)
         val typed = listOf(KeystrokeRun.Outcome(Sample("nihao", "你好", "daily"), 5, reached = true, first = true))
-        fun learning(typedAgain: List<KeystrokeRun.Outcome>) = listOf(
+        fun learning(typedTwice: List<KeystrokeRun.Outcome>) = listOf(
             KeystrokeRun.HEADER,
-            KeystrokeRun.row("tune, typed again", typedAgain),
+            KeystrokeRun.row("tune, typed a third time", typedTwice),
             KeystrokeRun.row("held-out, learning nothing", typed),
             KeystrokeRun.row("held-out, tune learned", typed),
         ).joinToString("\n", postfix = "\n")
@@ -301,7 +300,7 @@ class MainTest {
         // a half with no samples: no top1 to read
         val (unread, said) = releaseReport(launcher(scores.toString(), learning(emptyList())))
         assertEquals(said, 2, unread)
-        assertTrue(said, "learn typed again: no number in its output" in said)
+        assertTrue(said, "learn typed a third time: no number in its output" in said)
     }
 
     @Test
@@ -372,15 +371,14 @@ class MainTest {
     }
 
     @Test
-    fun aHalfWithNoSamplesIsARowOfNoneAndTheNoteStaysANote() {
+    fun aHalfWithNoSamplesIsARowOfNone() {
         // one sample: one half has none
         val set = tmp.newFile("set.tsv").apply { writeText("nihao\t你好\tdaily\n") }
         val out = StringBuilder()
-        assertEquals(0, runCli(arrayOf("learn", dataFile(layered = true).path, set.path), out, StringBuilder()))
+        assertEquals(0, runCli(arrayOf("learn", dataFile().path, set.path), out, StringBuilder()))
         val text = out.toString()
-        val sizes = listOf("tune, typed again", "held-out, tune learned, prior learned").map { cell(text, "n", it) }
+        val sizes = listOf("tune, typed a third time", "held-out, tune learned").map { cell(text, "n", it) }
         assertEquals(text, setOf("0", "1"), sizes.toSet())
-        assertTrue(text, text.lines().single { it.startsWith("prior after tune: ") }.matches(Regex("prior after tune: \\S+; after held-out alone: \\S+")))
     }
 
     @Test
@@ -406,5 +404,31 @@ class MainTest {
         assertEquals(1, runCli(arrayOf("libime", "pinyin", file.path), StringBuilder(), err))
         assertEquals(1, runCli(arrayOf("libime", "table", file.path + ".gone"), StringBuilder(), err))
         assertEquals(2, err.lines().count { it.startsWith(file.path) })
+    }
+
+    // its three modes' lines, not their times; a directory with another's files in it refused, its own reused
+    @Test
+    fun learnLogBenchRunsItsModes() {
+        val dir = tmp.newFolder("bench")
+        val data = dataFile()
+        fun bench(vararg options: String): List<String> {
+            val out = StringBuilder()
+            assertEquals(0, runCli(arrayOf("learn-log-bench", dir.path, "--commits", "60", "--days", "3", *options), out, StringBuilder()))
+            return out.lines().filter { it.isNotBlank() }
+        }
+        assertEquals(listOf("unfolded log", "fold at start", "folded log", "state"), bench().map { it.substringBefore("  ").trim() })
+        assertTrue(bench("--counts", data.path).first().startsWith("counts "))
+        assertTrue(bench("--legacy", data.path).first().startsWith("conversion "))
+        // again over what the last left
+        assertTrue(bench("--legacy", data.path)[1].startsWith("catch-up "))
+        assertEquals(4, bench().size)
+        assertThrows(IllegalArgumentException::class.java) { bench("--legacy", data.path, "--counts", data.path) }
+        File(dir, "notes.txt").writeText("mine")
+        assertThrows(IllegalArgumentException::class.java) { bench() }
+        // F2907: one commit forms no word, its cost NaN rather than a crash
+        val one = StringBuilder()
+        val args = arrayOf("learn-log-bench", tmp.newFolder("one").path, "--commits", "1", "--days", "1", "--counts", data.path)
+        assertEquals(0, runCli(args, one, StringBuilder()))
+        assertTrue(one.toString(), one.lines().any { it.startsWith("a word formed") && "NaN" in it })
     }
 }

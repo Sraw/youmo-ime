@@ -4,10 +4,13 @@
  */
 package org.fcitx.fcitx5.android.engine.session
 
+import org.fcitx.fcitx5.android.engine.data.NgramModel.Companion.NO_WORD
 import org.fcitx.fcitx5.android.engine.handwriting.handwritingData
 import org.fcitx.fcitx5.android.engine.handwriting.learned
 import org.fcitx.fcitx5.android.engine.lattice.Predictor
 import org.fcitx.fcitx5.android.engine.lattice.TextWords
+import org.fcitx.fcitx5.android.engine.learn.LearnRecord.Commit
+import org.fcitx.fcitx5.android.engine.learn.Learner
 import org.fcitx.fcitx5.android.engine.user.UserModel
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -19,9 +22,11 @@ import org.junit.Test
 class PredictionsTest {
 
     private val d = handwritingData
-    private val user = UserModel(d.dictionary, d.vocabulary)
+    private val learner = Learner(d)
+    private val user = learner.model
     private var learning = true
-    private val p = Predictions(Predictor(d.model, d.vocabulary, d.dictionary, user), TextWords(d.model, d.wordIndex), user) { learning }
+    private val predictor = Predictor(d.model, d.vocabulary, d.dictionary, user)
+    private val p = Predictions(predictor, TextWords(d.model, d.wordIndex), user, habits = learner.habits) { learning }
 
     @Test
     fun aPickIsLearnedAfterTheWordBeforeAndWhatFollowsItOffered() {
@@ -31,7 +36,74 @@ class PredictionsTest {
         assertEquals("山", p.pick(0))
         assertEquals("山", p.lastEntry?.text)
         assertEquals("高山", p.before)
-        assertEquals(setOf("山(shan)"), user.learned())
+        // after 高, by its text: 联想's alone, never the decoder's (review-C S1)
+        assertTrue(learner.used().containsAll(setOf("山", "高 山")))
+        assertEquals(emptySet<String>(), user.learned())
+    }
+
+    // review F3183: why is the offer's, after 高, though the predictor went on after another word since
+    @Test
+    fun whyIsTheOffersCodeNotThePredictorsLast() {
+        p.wrote("高", null)
+        p.predict()
+        predictor.predict(NO_WORD, d.wordIndex.find("山"))
+        assertEquals("山", predictor.after)
+        assertEquals(PredictionOrder.code("高"), p.why(0)?.code)
+    }
+
+    // USER-DECISIONS 2026-10-20: a message sent leaves no word before, though its text still scores
+    @Test
+    fun aClearedFieldHasNoWordBeforeUntilSomethingIsPutIn() {
+        p.learnFrom(Action.Context("高山", cleared = true))
+        p.goOnFrom("高山")
+        assertEquals("", p.wordBefore())
+        assertEquals("高山", p.before)
+        p.deleted()
+        assertEquals("高", p.before)
+        assertEquals("", p.wordBefore())
+        p.wrote("山", null)
+        assertTrue(p.wordBefore().isNotEmpty())
+        // a context not cleared: the field's text is a word before again
+        p.learnFrom(Action.Context("高", cleared = true))
+        p.learnFrom(Action.Context("高"))
+        p.goOnFrom("高")
+        assertEquals("高", p.wordBefore())
+    }
+
+    // review-1a-r2 S1: a context that says no flags (the engine's own) keeps the field's
+    @Test
+    fun aContextOfNoFlagsKeepsTheFieldsFlags() {
+        p.learnFrom(Action.Context("", learnFlags = Commit.NO_PREDICT))
+        p.learnFrom(Action.Context("高"))
+        assertEquals(Commit.NO_PREDICT, p.learnFlags)
+        p.learnFrom(Action.Context("高", learnFlags = 0))
+        assertEquals(0, p.learnFlags)
+    }
+
+    // U-70: filed under the word the predictions follow, though nothing learned says how it reads
+    // (handwriting's 高, put in by its text): what an elder writes on with, a character at a time
+    @Test
+    fun aPickIsFiledUnderTheWordItFollowsByItsText() {
+        p.wrote("高", null)
+        p.predict()
+        p.pick(0)
+        val state = learner.log.state
+        assertEquals(1, learner.habits.uses(PredictionOrder.code("高"), PredictionOrder.words("山")))
+        assertTrue(state.pairs.keys.any { it.prev == "高" && it.next == "山" && it.nextReading.isEmpty() })
+    }
+
+    // U-70, as pinyin's: picked once before those never picked, twice running first
+    @Test
+    fun whatIsOfferedIsInTheUsersOrder() {
+        // 人, picked after 高 once when it was offered
+        learner.habits.record(listOf(PredictionOrder.row("人", "高", "山")))
+        p.wrote("高", null)
+        p.predict()
+        assertEquals(listOf("山", "人"), p.offered.map { it.text })
+        assertEquals("人", p.pick(1))
+        p.wrote("高", null)
+        p.predict()
+        assertEquals(listOf("人", "山"), p.offered.map { it.text })
     }
 
     @Test
@@ -98,7 +170,11 @@ class PredictionsTest {
     fun aLongPressForgetsWhatWasLearnedOfAPredictionOrBlocksItNotWhereNothingIsLearned() {
         val blocked = ArrayList<UserModel.Entry>()
         val forgotten = ArrayList<String>()
-        val q = Predictions(Predictor(d.model, d.vocabulary, d.dictionary, user), TextWords(d.model, d.wordIndex), user, { blocked += it }, { forgotten += it }) { learning }
+        // the host forgets it in the learning record (Engines.forgottenEverywhere)
+        val q = Predictions(
+            Predictor(d.model, d.vocabulary, d.dictionary, user), TextWords(d.model, d.wordIndex), user, { blocked += it },
+            { forgotten += it; learner.habits.forget(it) }, habits = learner.habits,
+        ) { learning }
         q.wrote("高", null)
         q.predict()
         // never picked: nothing learned of it to forget

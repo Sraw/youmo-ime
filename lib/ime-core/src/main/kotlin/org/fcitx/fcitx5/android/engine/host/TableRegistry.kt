@@ -12,6 +12,7 @@ import org.fcitx.fcitx5.android.engine.host.Engines.Companion.userTable
 import org.fcitx.fcitx5.android.engine.table.CodedWords
 import org.fcitx.fcitx5.android.engine.table.SharedWords
 import org.fcitx.fcitx5.android.engine.table.TableDictionary
+import org.fcitx.fcitx5.android.engine.table.TableOptions
 import org.fcitx.fcitx5.android.engine.table.TableUser
 import org.fcitx.fcitx5.android.engine.user.UserModel
 import java.io.File
@@ -21,8 +22,8 @@ import java.util.concurrent.Executor
 
 /**
  * The table input methods of [Engines], each loaded at first need and kept, with what the user
- * taught it: those of [TABLES] from the app's assets ([load]), what the user taught each kept
- * under [userDir]. It shares the user's words ([lexicon]) with each table, coded by its rules ([shared]), tells
+ * taught it: those of [TABLES] from the app's assets ([load]), the phrases each saved in an older
+ * build kept under [userDir]. It shares the user's words ([lexicon]) with each table, coded by its rules ([shared]), tells
  * pinyin what a table saved, and forgets in every table, loaded or not, what is forgotten
  * anywhere ([forgetInTables]). Run on the fcitx thread, as [Engines] is.
  */
@@ -35,6 +36,13 @@ internal class TableRegistry(
     private val coding: Executor,
     private val assets: EngineAssets,
     private val lexicon: UserLexicon,
+    // whether the learning record has a text, used or pinned anywhere: something to forget (impl/design-1b.md §3)
+    private val knows: (String) -> Boolean = { false },
+    // whether the learning record is kept on disk: what pinyin is told of a table's phrases lasts only then (review-int-records N8)
+    private val recorded: () -> Boolean = { true },
+    // the learning record opened, before an older build's log is: its conversion reads that log's
+    // picks, which this build no longer keeps, and opening a large one compacts it (review C S5)
+    private val beforeOpen: () -> Unit = {},
 ) {
 
     /** A table and what the user taught it: both outlive the sessions made over them. */
@@ -64,17 +72,19 @@ internal class TableRegistry(
 
     /**
      * One user lexicon for every input method: [table] offers the words the user made, added or
-     * typed with pinyin, coded by its rules, as of now; the phrases it saves become pinyin's
-     * words (those saved before this, once); what is blocked or forgotten anywhere is so here.
+     * typed with pinyin, coded by its rules, as of now; the phrases it saved in an older build
+     * are pinyin's words (told once); what is blocked or forgotten anywhere is so here, but for
+     * the table's own entries, which a block from pinyin leaves (C12).
      */
     fun shared(table: Table, im: String): SharedWords = table.shared ?: object : SharedWords {
         override fun words(prefix: String) = coded().flatMap { it.words(prefix) }
         override fun leadsAnywhere(prefix: String) = coded().any { it.leadsAnywhere(prefix) }
         override fun blocked(text: String) = lexicon.isBlockedWord(text)
         override fun blockable(text: String) = text.codePointCount(0, text.length) >= 2 && assets.pinyinOf(text) != null
-        override fun block(text: String) = lexicon.blockText(text)
         override fun forget(text: String) = lexicon.forgetEverywhere(text)
-        override fun learned(text: String) = lexicon.user().let { m -> m.entriesOf(text).any { m.hasLearned(listOf(it)) } }
+        // as pinyin offers to forget: what the record has, or a word added by hand (PY-33)
+        override fun learned(text: String) =
+            knows(text) || lexicon.addedOf(text).isNotEmpty() || lexicon.user().let { m -> m.entriesOf(text).any { m.hasLearned(listOf(it)) } }
         override fun prepare() {
             coded()
         }
@@ -105,10 +115,6 @@ internal class TableRegistry(
         }
     }.also { shared ->
         table.shared = shared
-        // what learnSaved looks a saved phrase up in, made in the background rather than on the input thread at the first save
-        val data = assets.pinyinData
-        compactions.execute { data.wordIndex }
-        table.user.onSaved = { lexicon.learnSaved(listOf(it), again = true) }
         tellPinyinOnce(table, im)
     }
 
@@ -154,7 +160,9 @@ internal class TableRegistry(
     private fun tellPinyinOnce(table: Table, im: String) {
         val told = userDir?.let { File(it, userTable(im) + TOLD) }
         if (told?.exists() == true) return
-        lexicon.learnSaved(table.user.savedTexts(), again = false)
+        lexicon.learnSaved(table.user.savedTexts())
+        // learned in memory only: told again at the next start, when the record may open
+        if (!recorded()) return
         try {
             told?.createNewFile()
         } catch (_: IOException) {
@@ -172,11 +180,47 @@ internal class TableRegistry(
         for (im in logged) table(im).user.forgetTexts(forgotten)
     }
 
+    /** How many phrases the tables forgot (here, or a long press in one): no learning record has them, so no undo takes them back. */
+    val forgets get() = tables.values.sumOf { it.user.forgot }
+
+    /** 全部清空 (U-86): the phrases every table saved, loaded or kept on disk, forgotten, and an older build's picks with them. */
+    fun clearSaved() {
+        val logged = TABLES.keys.filter { im -> im in tables || userDir?.let { File(it, userTable(im)).exists() } == true }
+        for (im in logged) table(im).user.let {
+            it.forgetTexts(it.savedTexts())
+            it.forgetOlderPicks()
+        }
+    }
+
+    /**
+     * Of [texts], those [im] cannot take (D8, TBL-12), each with the table's word it gives way to:
+     * the word's code is one the table has a lone entry of, its code whole, that commits itself
+     * under [options], so a session never offers the word there (TableSession's rank).
+     */
+    fun sameCode(im: String, options: TableOptions, texts: Collection<String>): Map<String, String> {
+        if (!options.autoSelect || options.autoSelectLength == 0) return emptyMap()
+        val dictionary = table(im).dictionary
+        if (dictionary.rules.isEmpty) return emptyMap()
+        return texts.mapNotNull { text -> lone(dictionary, options, text)?.let { text to it } }.toMap()
+    }
+
+    // the table's word alone under [text]'s code, that code whole and committing itself; null if none
+    private fun lone(dictionary: TableDictionary, options: TableOptions, text: String): String? {
+        if (text.codePointCount(0, text.length) < 2) return null
+        val code = dictionary.encode(text) ?: return null
+        if (dictionary.contains(code, text)) return null
+        if (code.length > dictionary.maxLength || code.length < options.autoSelectLength) return null
+        if (dictionary.matchPinyin(code, prefix = true).isNotEmpty()) return null
+        val coded = dictionary.match(code, null)
+        return if (coded.any { dictionary.code(it) != code }) null else coded.map(dictionary::text).distinct().singleOrNull()
+    }
+
     private val tables = HashMap<String, Table>()
 
     fun table(im: String): Table = tables.getOrPut(im) {
         val dictionary = TableDictionary(CodeTable.load(load("$TABLE_DIR/${TABLES.getValue(im).file}"), verify = false))
         val user = TableUser(dictionary)
+        if (userDir != null) beforeOpen()
         Table(dictionary, user, userDir?.let { openStore(File(it, userTable(im)), user) })
     }
 

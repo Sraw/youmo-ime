@@ -183,6 +183,25 @@ class StrokesTest {
     }
 
     @Test
+    fun theFieldsFlagsReachThePinyinWhileLookingUpOrNot() {
+        val passed = ArrayList<Int>()
+        val real = PinyinSession(sessionTestData(), PinyinSegmenter())
+        val pinyin = object : Session by real {
+            override fun fieldFlags(flags: Int) {
+                passed += flags
+            }
+        }
+        val l = StrokeLookup(pinyin, { strokes("...\n再\th\n") })
+        l.fieldFlags(1)
+        l.apply(Action.Key('u'))
+        // looking up: the strokes' own, not the pinyin's to reread or tell why
+        l.fieldFlags(2)
+        assertEquals(null, l.reread())
+        assertFalse(l.rereads)
+        assertEquals(listOf(1, 2), passed)
+    }
+
+    @Test
     fun aCharacterPickedFollowsWhatThePinyinCommittedBefore() {
         val contexts = ArrayList<String>()
         val pinyin = PinyinSession(sessionTestData(), PinyinSegmenter()) { context, _, _ -> contexts += context; 0 }

@@ -49,9 +49,13 @@ class EngineAssetsTest : EnginesFixture() {
         assertTrue(fresh.all { it == null })
     }
 
-    /** The look-ahead's picks, by what the user learned, are kept while a session lives: the sessions made after a change to the user's words pick anew. */
+    /**
+     * The look-ahead's picks are the model's alone, whatever the user typed in full (D32: a short
+     * edge scores no counts, look-ahead arcs included), in the sessions made after a change to the
+     * user's words too.
+     */
     @Test
-    fun theSessionsMadeAfterTheUserWordsChangeLookAheadByWhatWasLearned() {
+    fun theLookAheadIsTheModelsThoughTheWordAheadWasTypedInFull() {
         // 拟 may go on to 拟好, under 拟 alone till learned
         val data = PinyinDataBuilder()
             .unigram("<unk>", -7f, 0f)
@@ -75,11 +79,10 @@ class EngineAssetsTest : EnginesFixture() {
             engines.onEvent(Engines.PINYIN, EngineEvent.PICK, engines.candidates(Engines.PINYIN, 0, 20).indexOfFirst { it.text == "拟好" })
         }
         engines.onEvent(Engines.PINYIN, EngineEvent.RESET, 0)
-        // the session's look-ahead, picked before
         assertEquals(listOf("你", "拟"), engines.type(Engines.PINYIN, "n").candidates.take(2))
         assertTrue(engines.addWord("号", "hao"))
-        // 拟 scored as 拟好, learned
-        assertEquals(listOf("拟", "你"), engines.type(Engines.PINYIN, "n").candidates.take(2))
+        // made again: 拟 as the model scores 拟好, not as learned
+        assertEquals(listOf("你", "拟"), engines.type(Engines.PINYIN, "n").candidates.take(2))
     }
 
     /**

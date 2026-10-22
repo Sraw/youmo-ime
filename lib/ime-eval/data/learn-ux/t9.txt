@@ -1,0 +1,51 @@
+# U-23 九键：原首选是单字时（43 的「和」），只按 U-02 第 2 条在一个个前文里换（C31）。
+# 次选键（不看屏幕按第 2 个）：第 2 位是首选以外用得最多的词，一样多不换 (C43).
+# The spec's 好的 is not read from 43 on the app's nine keys (abbreviations off: 43 is he/ge): 个 stands in.
+
+scenario 九键 43
+ctx 你
+type 43 kb=t9
+expect first 和
+show
+ctx 我
+type 43 kb=t9
+expect first 和
+show
+# 在「你」后面选两次「个」
+ctx 你
+type 43 kb=t9
+pick 个
+ctx 我
+type 43 kb=t9
+# 别处：首选不变，「个」是用过的词，第 2（盲按次选就是它）
+expect top2 和,个
+ctx 你
+type 43 kb=t9
+pick 个
+ctx 你
+type 43 kb=t9
+expect first 个
+ctx 我
+type 43 kb=t9
+expect top2 和,个
+# 一样多不换：喝 选一次，个 已两次，第 2 还是个
+ctx 他
+type 43 kb=t9
+pick 喝
+ctx 我
+type 43 kb=t9
+expect top2 和,个
+
+scenario 九键和全拼各学各的 (D32)
+ctx 你
+type 43 kb=t9
+pick 个
+ctx 你
+type 43 kb=t9
+pick 个
+ctx 你
+type ge
+show
+ctx 你
+type he
+expect first 和

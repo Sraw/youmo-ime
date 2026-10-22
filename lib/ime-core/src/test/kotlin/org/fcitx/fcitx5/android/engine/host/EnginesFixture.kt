@@ -8,11 +8,16 @@ import org.fcitx.fcitx5.android.engine.data.CodeTable
 import org.fcitx.fcitx5.android.engine.data.PinyinDataBuilder
 import org.fcitx.fcitx5.android.engine.english.EnglishDataBuilder
 import org.fcitx.fcitx5.android.engine.english.EnglishText
+import org.fcitx.fcitx5.android.engine.learn.LearnLog
+import org.fcitx.fcitx5.android.engine.learn.LearnRecord
+import org.fcitx.fcitx5.android.engine.learn.LearnRecords
 import org.fcitx.fcitx5.android.engine.phrase.Chaizi
 import org.fcitx.fcitx5.android.engine.phrase.EmojiData
 import org.fcitx.fcitx5.android.engine.pinyin.Syllables
 import org.fcitx.fcitx5.android.engine.rerank.TinyModel
 import org.fcitx.fcitx5.android.engine.stroke.Strokes
+import org.fcitx.fcitx5.android.engine.table.TableUser.TableLog
+import java.io.File
 import java.io.FileNotFoundException
 import java.nio.ByteBuffer
 import java.util.concurrent.Executor
@@ -41,15 +46,24 @@ open class EnginesFixture {
         .entry("vbgf", "妤")
         // a word of the built-in phrases (PhraseBook.WORD_KEYS)
         .entry("jjad", "日期")
+        // alone under the code any two of 一…七 make: a word of them the table cannot take (D8)
+        .entry("vava", "七上八下")
+        // two 重码 past the 简码 kept in order: what 调频 reorders (EnginesTest, F3033)
+        .entry("kkkk", "叫")
+        .entry("kkkk", "员")
         .apply { "一二三四五六七".forEachIndexed { i, c -> entry("va" + ('a' + i) + "a", c.toString()) } }
         .build()
         .toByteArray()
 
-    private val english = EnglishDataBuilder()
+    protected var english: ByteArray = englishWith()
+
+    // English's data of the two words, and [more]
+    protected fun englishWith(vararg more: String): ByteArray = EnglishDataBuilder()
         .unigram("<unk>", -7f, 0f)
         .unigram(EnglishText.START, -9f, -0.5f)
         .unigram("the", -1.3f, 0f)
         .unigram("you", -1.8f, 0f)
+        .apply { for (w in more) unigram(w, -3f, 0f) }
         .build()
         .toByteArray()
 
@@ -72,6 +86,13 @@ open class EnginesFixture {
     // 五笔 shown, not a code's one candidate committing itself and leaving none to look at
     protected val wubiShown = EngineSettings(tables = mapOf("Wubi" to TableSettings(autoSelect = false)))
 
+    // 调频 [on] for Wubi, what kkkk shows then
+    protected fun byUse(engines: Engines, on: Boolean): List<String> {
+        engines.onEvent("engine-wubi", EngineEvent.RESET, 0)
+        engines.settings = EngineSettings(pageSize = 3, tables = mapOf("Wubi" to TableSettings(orderByUse = on)))
+        return engines.type("engine-wubi", "kkkk").candidates.also { engines.onEvent("engine-wubi", EngineEvent.RESET, 0) }
+    }
+
     protected fun load(path: String): ByteBuffer {
         loaded += path
         val bytes = when (path) {
@@ -88,6 +109,21 @@ open class EnginesFixture {
         // as the app's assets do of a file it has not got
         return ByteBuffer.wrap(bytes ?: throw FileNotFoundException(path))
     }
+}
+
+// the phrases (code, text) an older build saved in 五笔 (自动造词 is gone), as its log under [dir] has them
+internal fun olderPhrases(dir: File, vararg phrases: Pair<String, String>) {
+    val file = dir.resolve(Engines.userTable("engine-wubi"))
+    file.parentFile.mkdirs()
+    file.writeBytes(phrases.fold(TableLog.FORMAT.header()) { bytes, (code, text) -> bytes + TableLog.saved(code, text) })
+}
+
+// the learning record under [dir], each record decoded
+internal fun records(dir: File): List<LearnRecord> {
+    val records = ArrayList<LearnRecord>()
+    val reader = LearnRecords.Reader()
+    LearnRecords.FORMAT.read(File(dir, LearnLog.FILE).readBytes()) { type, input -> reader.decode(type, input)?.let { records += it } }
+    return records
 }
 
 internal fun syl(vararg s: String) = s.map { Syllables.id(it) }.toIntArray()

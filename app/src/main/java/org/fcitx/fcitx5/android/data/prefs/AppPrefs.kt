@@ -45,6 +45,12 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
 
         /** Whether English is on the nine keys, 九键's 中/英 having brought it (EnglishLayoutPolicy): kept for the input view made anew. */
         val englishOnNineKeys = bool("english_on_nine_keys", false)
+
+        /**
+         * U-93 「用我的输入习惯」, from the ⋯ menu or the lexicon page: off, the engine as installed but
+         * for the blocks (Engines.useHabits), nothing learned, nothing shown of what was.
+         */
+        val useHabits = bool("learning.use_habits", true)
         val verboseLog = bool("verbose_log", false)
         val pid = int("pid", 0)
         val editorInfoInspector = bool("editor_info_inspector", false)
@@ -70,6 +76,9 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
         // where the floating keyboard was dragged to: FloatingKeyboard.Spot, its middle at the bottom first
         val floatingKeyboardX = float("floating_keyboard_x", FloatingKeyboard.DEFAULT.x)
         val floatingKeyboardY = float("floating_keyboard_y", FloatingKeyboard.DEFAULT.y)
+
+        /** U-106's switch, at the lexicon page's top beside 用我的输入习惯 (UserWordsFragment): a backup of the learning every few typing days. */
+        val learningAutoBackup = bool("learning.auto_backup", true)
     }
 
     inner class Advanced : ManagedPreferenceCategory(R.string.advanced, sharedPreferences) {

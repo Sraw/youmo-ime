@@ -7,6 +7,7 @@ package org.fcitx.fcitx5.android.engine.host
 import org.fcitx.fcitx5.android.engine.english.EnglishDecoderTest
 import org.fcitx.fcitx5.android.engine.english.EnglishSession
 import org.fcitx.fcitx5.android.engine.english.GlideDecoderTest
+import org.fcitx.fcitx5.android.engine.learn.LearnRecord.Commit
 import org.fcitx.fcitx5.android.engine.session.Action
 import org.fcitx.fcitx5.android.engine.session.Choice
 import org.fcitx.fcitx5.android.engine.session.Offer
@@ -28,12 +29,17 @@ class KeyboardTest {
     private class FakeSession(private val nineKeys: Boolean = false) : Session {
         val actions = ArrayList<Action>()
         val learned = ArrayList<Boolean>()
+        var flags = 0
         private var input = ""
         private var predicting = false
         private var slices = 0
         private var refined = false
 
         override var learning = true
+
+        override fun fieldFlags(flags: Int) {
+            this.flags = flags
+        }
 
         override fun reads(c: Char) = c in 'a'..'z' || nineKeys && c in '2'..'9'
 
@@ -349,7 +355,7 @@ class KeyboardTest {
     @Test
     fun theTextBeforeTheCursorGoesToTheSessionOnlyWithNothingShown() {
         keyboard.context("你好")
-        assertEquals(Action.Context("你好"), session.actions.last())
+        assertEquals(Action.Context("你好", learnFlags = 0), session.actions.last())
         type("ab")
         keyboard.context("x")
         assertEquals(Action.Key('b'), session.actions.last())
@@ -359,12 +365,29 @@ class KeyboardTest {
         assertEquals(Action.Select(0), session.actions.last())
         keyboard.onEvent(EngineEvent.RESET, 0)
         keyboard.context("x")
-        assertEquals(Action.Context("x"), session.actions.last())
+        assertEquals(Action.Context("x", learnFlags = 0), session.actions.last())
         // set for it as for a key: it comes first in a field just focused
         keyboard.context("y", learning = false)
         assertFalse(session.learning)
         keyboard.context("z")
         assertTrue(session.learning)
+    }
+
+    // review-int S5: a keyboard made after the field's context takes its flags alone, no context of a text it does not know
+    @Test
+    fun theFieldsFlagsAloneAreNoContext() {
+        keyboard.fieldFlags(Commit.NO_PREDICT)
+        assertEquals(Commit.NO_PREDICT, session.flags)
+        assertTrue(session.actions.none { it is Action.Context })
+    }
+
+    // a field started, the text after the cursor: as the host read them, for what it may take back (U-03)
+    @Test
+    fun aFieldStartedAndTheTextAfterGoToTheSession() {
+        keyboard.context("你好", started = true)
+        assertEquals(Action.Context("你好", learnFlags = 0, started = true), session.actions.last())
+        keyboard.context("你", after = "好")
+        assertEquals(Action.Context("你", learnFlags = 0, after = "好"), session.actions.last())
     }
 
     @Test

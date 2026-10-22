@@ -1,0 +1,34 @@
+# U-08 整句：以后的整句里，在同一个前文后面连着改两次换上的多字词（老师 → 指导）照用。
+# The data reads laoshizhidao as 老师指导 already: 我 → 指导 stands in (wozhidao is 我知道).
+
+scenario 我 指导 in a sentence
+clear
+type wozhidao
+expect first 我知道
+ctx 我
+type zhidao
+pick 指导
+ctx 我
+type zhidao
+pick 指导
+clear
+type wozhidao
+expect first 我指导
+# 照用的词被整句里更长的词盖住（laoshizhidaole 里的「知道了」盖住 zhidao）：由整句定
+clear
+type wozhidaole
+show
+
+scenario laoshizhidao after 老师 → 指导 twice
+ctx 老师
+type zhidao
+pick 指导
+ctx 老师
+type zhidao
+pick 指导
+clear
+type laoshizhidao
+expect first 老师指导
+clear
+type laoshizhidaole
+expect first 老师知道了

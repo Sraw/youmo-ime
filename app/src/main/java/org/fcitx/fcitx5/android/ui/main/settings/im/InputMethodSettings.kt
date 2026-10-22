@@ -7,6 +7,7 @@ package org.fcitx.fcitx5.android.ui.main.settings.im
 import android.content.Context
 import android.widget.ArrayAdapter
 import android.widget.ListView
+import android.widget.Toast
 import androidx.annotation.StringRes
 import androidx.appcompat.app.AlertDialog
 import androidx.preference.ListPreference
@@ -17,6 +18,7 @@ import androidx.preference.PreferenceManager
 import androidx.preference.PreferenceScreen
 import androidx.preference.SwitchPreferenceCompat
 import org.fcitx.fcitx5.android.R
+import org.fcitx.fcitx5.android.core.FcitxAPI
 import org.fcitx.fcitx5.android.core.InputMethodNames
 import org.fcitx.fcitx5.android.core.RawConfig
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
@@ -27,13 +29,22 @@ import org.fcitx.fcitx5.android.engine.host.Engines
 import org.fcitx.fcitx5.android.engine.host.Engines.UserWord
 import org.fcitx.fcitx5.android.engine.host.ModelLevel
 import org.fcitx.fcitx5.android.engine.host.TableSettings
+import org.fcitx.fcitx5.android.engine.learn.control.LearningOp
+import org.fcitx.fcitx5.android.engine.learn.control.LearningResult
 import org.fcitx.fcitx5.android.engine.pinyin.Fuzzy
 import org.fcitx.fcitx5.android.engine.pinyin.ShuangpinScheme
 import org.fcitx.fcitx5.android.input.handwriting.HandwritingPause
 import org.fcitx.fcitx5.android.input.keyboard.T9EnglishTyping
 import org.fcitx.fcitx5.android.input.keyboard.T9MultiTap
+import org.fcitx.fcitx5.android.ui.main.settings.LearningRestore
 import org.fcitx.fcitx5.android.ui.main.settings.SettingsRoute
 import kotlin.math.abs
+
+/** Does an [InputMethodSettings.Action], then tells whether it was done, on the main thread. */
+typealias ImAct = (InputMethodSettings.Action, done: (Boolean) -> Unit) -> Unit
+
+/** Asks the user to confirm an [InputMethodSettings.Action], `then` done on yes. */
+typealias ImConfirm = (Context, InputMethodSettings.Action, then: () -> Unit) -> Unit
 
 /**
  * The pages of the app's own input methods, in its own words: fcitx stores the values (the keys
@@ -123,6 +134,20 @@ object InputMethodSettings {
         @StringRes override val summary: Int,
         val route: SettingsRoute,
         override val notFor: List<String> = emptyList(),
+    ) : Titled
+
+    /**
+     * A button that does [run] to the page's input method, the user asked to [confirm] it first: no option of fcitx's.
+     * [run] says whether it was done: [done] is shown only then, a failure otherwise.
+     */
+    class Action(
+        override val key: String,
+        @StringRes override val title: Int,
+        @StringRes override val summary: Int,
+        @StringRes val confirm: Int,
+        @StringRes val done: Int,
+        override val notFor: List<String> = emptyList(),
+        val run: suspend FcitxAPI.(im: String) -> Boolean,
     ) : Titled
 
     class Section(@StringRes val title: Int, val items: List<Item>) : Item
@@ -267,9 +292,6 @@ object InputMethodSettings {
         ),
     )
 
-    private val PHRASE_LENGTHS = listOf("0", "2", "3", "4", "6", "-1")
-    private val SAVE_AFTER = listOf("0", "1", "2", "3", "5", "10")
-
     // each table's own, under its group of the addon's config
     private val table = listOf(
         sharedLink,
@@ -277,40 +299,18 @@ object InputMethodSettings {
             R.string.im_section_typing, listOf(
                 Toggle(TableSettings.AUTO_SELECT, text(R.string.im_auto_select), R.string.im_auto_select_summary),
                 Toggle(TableSettings.HINT, text(R.string.im_hint), R.string.im_hint_summary),
-                // Freq and Fast alike order by use
-                Toggle(TableSettings.ORDER_POLICY, text(R.string.im_order_by_use), read = { it != "No" }, write = { if (it) "Freq" else "No" }),
-            )
-        ),
-        Section(
-            R.string.im_section_phrases, listOf(
-                Choice(
-                    TableSettings.AUTO_PHRASE_LENGTH, R.string.im_auto_phrase_length, PHRASE_LENGTHS, R.string.im_auto_phrase_summary,
-                    label = { ctx, v ->
-                        when (v) {
-                            "0" -> ctx.getString(R.string.im_auto_phrase_off)
-                            "-1" -> ctx.getString(R.string.im_auto_phrase_longest)
-                            else -> ctx.getString(R.string.im_auto_phrase_up_to, v.toInt())
-                        }
-                    },
-                    nearest = { v ->
-                        val n = v.toIntOrNull()
-                        when {
-                            // 1 makes no phrase, a phrase being two characters at least (TableSession): off
-                            n == null || n in 0..1 -> "0"
-                            n < 0 -> "-1"
-                            else -> nearestOf(PHRASE_LENGTHS)(v)
-                        }
-                    },
+                // 调频: Freq and Fast alike order by use; off on a new install (U-28 D7)
+                Toggle(
+                    TableSettings.ORDER_POLICY, text(R.string.im_order_by_use), R.string.im_order_by_use_summary,
+                    read = { it != "No" }, write = { if (it) TableSettings.ORDER_BY_USE else "No" },
                 ),
-                Choice(
-                    TableSettings.SAVE_AUTO_PHRASE_AFTER, R.string.im_save_phrase_after, SAVE_AFTER,
-                    label = { ctx, v ->
-                        val n = v.toInt()
-                        if (n <= 0) ctx.getString(R.string.im_save_phrase_picked)
-                        else ctx.resources.getQuantityString(R.plurals.im_save_phrase_typed, n, n)
-                    },
-                    nearest = { v -> if ((v.toIntOrNull() ?: 0) <= 0) "0" else nearestOf(SAVE_AFTER)(v) },
-                ),
+                // what 调频 learned, which clearing what is learned keeps (U-28, U-86)
+                Action(
+                    RESET_TABLE_ORDER, R.string.im_reset_table_order, R.string.im_reset_table_order_summary, R.string.im_reset_table_order_confirm,
+                    R.string.im_reset_table_order_done,
+                ) {
+                    learning(LearningOp.ResetTableOrder(it)) is LearningResult.Done
+                },
             )
         ),
     )
@@ -358,6 +358,9 @@ object InputMethodSettings {
     /** 九键's page of its keys' long-press symbols: its key. */
     const val T9_SYMBOLS = "t9_symbols"
 
+    /** A table's 恢复码表顺序: its key. */
+    const val RESET_TABLE_ORDER = "reset_table_order"
+
     /** The app's own input methods, each with a page in [of]. */
     val BUILT_IN: List<String> = listOf(Engines.PINYIN, Engines.T9, Engines.SHUANGPIN) + Engines.TABLES.keys + Engines.HANDWRITING + InputMethodNames.KEYBOARD
 
@@ -388,7 +391,7 @@ object InputMethodSettings {
                 is Toggle -> copy(item.key)
                 is Choice -> copy(item.key)
                 is Flags -> item.flags.forEach { copy("${item.path}/${it.first}") }
-                is AppChoice<*>, is AppToggle, is Page -> Unit
+                is AppChoice<*>, is AppToggle, is Page, is Action -> Unit
             }
         }
         items.forEach(::walk)
@@ -424,14 +427,37 @@ object InputMethodSettings {
         }
     }
 
+    private fun action(context: Context, item: Action, act: ImAct, confirm: ImConfirm) = Preference(context).apply {
+        key = item.key
+        isPersistent = false
+        isIconSpaceReserved = false
+        isSingleLineTitle = false
+        setTitle(item.title)
+        summary = summaryOf(context, item.summary, item.notFor)
+        setOnPreferenceClickListener {
+            confirm(context, item) {
+                // told once it ran: a toast before it was "done" whether or not the engine did it
+                act(item) { ok -> Toast.makeText(context, if (ok) item.done else R.string.dict_change_failed, Toast.LENGTH_SHORT).show() }
+            }
+            true
+        }
+    }
+
+    /** The dialog [create] asks with unless told otherwise: the JVM tests (no app resources) cannot show it. */
+    private val askFirst: ImConfirm = { context, item, then ->
+        LearningRestore.confirmDialog(context, item.title, context.getString(item.confirm)) { then() }
+    }
+
     /** [items] as a screen over [cfg], [save] called after each change, [open] opening a [Page]'s route. */
     fun create(
         manager: PreferenceManager,
         items: List<Item>,
         cfg: RawConfig,
         save: () -> Unit,
+        act: ImAct = { _, _ -> },
+        confirm: ImConfirm = askFirst,
         open: (SettingsRoute) -> Unit,
-    ): PreferenceScreen = manager.createPreferenceScreen(manager.context).also { addTo(it, items, cfg, save, open) }
+    ): PreferenceScreen = manager.createPreferenceScreen(manager.context).also { addTo(it, items, cfg, save, act, confirm, open) }
 
     /** [items] added to [group], as [create] makes them: a page of the app's own preferences may show some of fcitx's too. */
     fun addTo(
@@ -439,6 +465,8 @@ object InputMethodSettings {
         items: List<Item>,
         cfg: RawConfig,
         save: () -> Unit,
+        act: ImAct = { _, _ -> },
+        confirm: ImConfirm = askFirst,
         open: (SettingsRoute) -> Unit,
     ) {
         val context = group.context
@@ -496,6 +524,7 @@ object InputMethodSettings {
                 is Flags -> into(flagsPreference(context, item, item.flags.map { raw("${item.path}/${it.first}") }, save))
                 is AppChoice<*> -> into(appChoice(context, item))
                 is Page -> into(page(context, item, open))
+                is Action -> into(action(context, item, act, confirm))
                 is AppToggle -> into(appToggle(context, item))
             }
         }

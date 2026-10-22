@@ -29,3 +29,15 @@ internal fun InputStream.readAtMost(max: Int): ByteArray {
  */
 internal fun InputStream.readImported(max: Int = MAX_IMPORTED): ByteArray =
     readAtMost(max + 1).also { if (it.size > max) throw IOException("larger than ${max shr 20} MB") }
+
+/**
+ * A file picked that may be anything (a video): null where its first [head] bytes are not what
+ * [accepts] takes, never read further, or where it is larger than [max]; else all of it.
+ */
+internal fun InputStream.readPicked(head: Int, max: Int, accepts: (ByteArray) -> Boolean): ByteArray? {
+    val start = readAtMost(head)
+    if (!accepts(start)) return null
+    // past [max] (the whole file's, head included) it is no backup either, told as one (F3199, F3239)
+    val rest = readAtMost(max - start.size + 1)
+    return if (start.size + rest.size > max) null else start + rest
+}

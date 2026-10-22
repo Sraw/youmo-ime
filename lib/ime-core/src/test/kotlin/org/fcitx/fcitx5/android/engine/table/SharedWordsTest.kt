@@ -4,10 +4,13 @@
  */
 package org.fcitx.fcitx5.android.engine.table
 
+import org.fcitx.fcitx5.android.engine.session.Action
 import org.fcitx.fcitx5.android.engine.session.Action.Block
 import org.fcitx.fcitx5.android.engine.session.Action.Forget
 import org.fcitx.fcitx5.android.engine.session.Offer
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class SharedWordsTest {
@@ -17,13 +20,11 @@ class SharedWordsTest {
     /** The other input methods as a test sees them: [words] shared, what was blocked and forgotten recorded. */
     private class Fake(table: TableDictionary, private val words: List<String>) : SharedWords {
         val coded = CodedWords(table, words)
-        val blocked = HashSet<String>()
         val forgotten = ArrayList<String>()
         override fun words(prefix: String) = coded.words(prefix).filterNot { it.second in forgotten }
         override fun leadsAnywhere(prefix: String) = coded.leadsAnywhere(prefix)
-        override fun blocked(text: String) = text in blocked
+        override fun blocked(text: String) = false
         override fun blockable(text: String) = text.length >= 2
-        override fun block(text: String) = blocked.add(text)
         override fun forget(text: String) {
             forgotten += text
         }
@@ -44,22 +45,36 @@ class SharedWordsTest {
     }
 
     @Test
-    fun sharedWordsComeAfterTheTablesOwnAndBlockedOnesNowhere() {
+    fun sharedWordsComeAfterTheTablesOwnAndBlockedOnesUnderTheCodeBlockedThere() {
         val shared = Fake(wubi, listOf("你门", "你们"))
-        val session = TableSession(wubi, TableOptions.WUBI, user = TableUser(wubi), shared = shared)
+        // nothing commits itself: wqwu's one entry would, and no word from outside the table takes its place (D8)
+        val session = TableSession(wubi, TableOptions.WUBI.copy(autoSelect = false), user = TableUser(wubi), shared = shared, language = learning())
         // 你门 is wqwu as 你们 is: the table's first
         assertEquals(listOf("你们", "你门"), session.type("wqwu").second.candidates)
-        assertEquals(setOf(Offer.FORGET, Offer.BLOCK), session.offers(1))
+        assertEquals(setOf(Offer.FORGET, Offer.PIN, Offer.BLOCK), session.offers(1))
         assertEquals(listOf("你们"), session.apply(Block(1)).candidates)
-        assertEquals(setOf("你门"), shared.blocked)
+        // under that code alone: still the other input methods' word, under the start of its code too
+        assertEquals(emptyList<String>(), shared.forgotten)
+        session.apply(Action.Backspace)
+        assertEquals(listOf("你们", "你门"), session.candidates(0, 2).map { it.text })
+        // kept in the learning record, not in the code typed then
+        session.apply(Action.Reset)
+        assertEquals(listOf("你们"), session.type("wqwu").second.candidates)
     }
 
     @Test
-    fun forgottenAWordIsForgottenByAllTheTablesOwnToo() {
-        // what a table puts in, every input method learned (the one user model): forgotten by all
+    fun forgottenAWordIsForgottenByAllTheTablesOwnOnceLearned() {
         val shared = Fake(wubi, listOf("你门"))
-        val session = TableSession(wubi, TableOptions.WUBI, user = TableUser(wubi), shared = shared)
+        val session = TableSession(wubi, TableOptions.WUBI.copy(autoSelect = false), user = TableUser(wubi), shared = shared, language = learning())
         session.type("wqwu")
+        // the table's own, nothing learned of it: nothing to forget (U-28)
+        assertFalse(Offer.FORGET in session.offers(0))
+        session.apply(Forget(0))
+        assertEquals(emptyList<String>(), shared.forgotten)
+        // picked, the table ordering by use: what every input method learned of it forgotten by all (U-84)
+        session.apply(Action.Select(0))
+        session.type("wqwu")
+        assertTrue(Offer.FORGET in session.offers(0))
         session.apply(Forget(0))
         assertEquals(listOf("你们"), shared.forgotten)
         assertEquals(listOf("你们"), session.apply(Forget(1)).candidates)

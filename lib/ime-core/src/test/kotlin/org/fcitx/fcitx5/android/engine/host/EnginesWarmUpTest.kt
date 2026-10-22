@@ -6,7 +6,9 @@ package org.fcitx.fcitx5.android.engine.host
 
 import org.fcitx.fcitx5.android.engine.data.DataFormatException
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertThrows
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.FileNotFoundException
 import java.io.IOException
@@ -87,6 +89,32 @@ class EnginesWarmUpTest : EnginesFixture() {
         engines.type(Engines.ENGLISH, "th")
         assertEquals(1, later.size)
         later.single().run()
+    }
+
+    // review R11 F2726/F3111: 中英混输 asks English's words of each English word learned at the first
+    // key: a field started in 全拼 reads English then, if there is one learned and habits are on
+    @Test
+    fun aFieldStartedInFullPinyinWarmsEnglishUpOnlyForAWordLearned() {
+        val none = Engines(::load, null, warmUps = warmUps)
+        none.context(Engines.PINYIN, "", started = true)
+        assertFalse(Engines.ENGLISH_DATA in loaded)
+        val off = Engines(::load, null, warmUps = warmUps)
+        assertTrue(off.addEnglishWord("youmo"))
+        off.useHabits = false
+        off.context(Engines.PINYIN, "", started = true)
+        assertFalse(Engines.ENGLISH_DATA in loaded)
+        later.clear()
+        val learned = Engines(::load, null, warmUps = warmUps)
+        assertTrue(learned.addEnglishWord("youmo"))
+        learned.context(Engines.PINYIN, "", started = true)
+        assertTrue(Engines.ENGLISH_DATA in loaded)
+        // its index made off the fcitx thread, with pinyin's: however many tasks that takes (F3227)
+        assertTrue(later.isNotEmpty())
+        later.forEach { it.run() }
+        // English typed after reads nothing more: its index was made there
+        val read = loaded.toList()
+        assertTrue(learned.type(Engines.ENGLISH, "you").candidates.isNotEmpty())
+        assertEquals(read, loaded)
     }
 
     /** Pinyin data that is not there, or that this build cannot read (a stale VERSION, say): a field starts all the same. */

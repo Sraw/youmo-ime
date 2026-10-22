@@ -71,6 +71,15 @@ class CandidatesView(
     private var inputPanel = FcitxEvent.InputPanelEvent.Data()
     private var paged = FcitxEvent.PagedCandidateEvent.Data.Empty
 
+    override val pagedCandidates = true
+
+    /** Shift+Delete with a candidate highlighted (U-82): deleted, or what it learned forgotten. Whether one was. */
+    fun forgetHighlighted(): Boolean {
+        val word = paged.candidates.getOrNull(paged.cursorIndex) ?: return false
+        forgetCandidate(paged.cursorIndex, word.text)
+        return true
+    }
+
     /**
      * horizontal, bottom, top
      */

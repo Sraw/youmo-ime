@@ -221,125 +221,48 @@ class TableSessionTest {
     }
 
     @Test
-    fun longerCodesPutWhatWasPickedMostFirst() {
-        val t = session()
-        t.type("aaaa")
-        assertEquals("恭恭敬敬", t.apply(Select(1)).commit)
-        assertEquals(listOf("恭恭敬敬", "工"), t.type("aaaa").second.candidates)
-        t.apply(Reset)
-        // short codes keep the table's order
-        t.type("a")
-        t.apply(Select(1))
-        assertEquals(listOf("工", "戈"), t.type("a").second.candidates.take(2))
-        // and without ordering by use, so do long ones
-        val plain = session(TableOptions.WUBI.copy(orderByUse = false))
-        plain.type("aaaa")
-        plain.apply(Select(1))
-        assertEquals(listOf("工", "恭恭敬敬"), plain.type("aaaa").second.candidates)
+    fun aPickMovesNothingByItself() {
+        // the order the user's habits make is TableSession.byHabit's, and theirs to make (TableHabitsTest)
+        for (orderByUse in listOf(true, false)) {
+            val t = session(TableOptions.WUBI.copy(orderByUse = orderByUse))
+            t.type("aaaa")
+            assertEquals("恭恭敬敬", t.apply(Select(1)).commit)
+            assertEquals(listOf("工", "恭恭敬敬"), t.type("aaaa").second.candidates)
+        }
     }
 
     @Test
-    fun theAppsTextKeepsWhatAPhraseIsMadeOfOnlyWhileItEndsWithIt() {
-        val stayed = session()
-        // its whole code, and nothing else has it: committed as typed
-        assertEquals("你", stayed.type("wqiy").first)
-        stayed.apply(Context("他说你"))
-        stayed.type("wun")
-        assertEquals(listOf("你们"), stayed.type("wqwu").second.candidates)
-        val moved = session()
-        moved.type("wqiy")
-        moved.apply(Context("你说"))
-        moved.type("wun")
-        assertFalse("你们" in moved.type("wqwu").second.candidates)
-    }
-
-    @Test
-    fun charactersTypedOneByOneBecomeAPhraseTheUsersOncePicked() {
-        val t = session()
-        t.type("wqiy")
-        t.type("wun")
-        // 你们 by e2: wq + wu, offered last and never committed by itself
-        val (commit, s) = t.type("wqwu")
-        assertEquals("", commit)
-        assertEquals(listOf("你们"), s.candidates)
-        assertEquals("你们", t.apply(Select(0)).commit)
-        // picked: now the table's own, so a lone candidate that commits itself
-        assertEquals("你们", t.type("wqwu").first)
-    }
-
-    @Test
-    fun asLibimeHasItAPhraseRunsToTheLongestCodeAndIsSavedOnlyOncePicked() {
-        val t = session(TableOptions.WUBI.copy(autoPhraseLength = -1, saveAutoPhraseAfter = -1))
-        repeat(4) {
+    fun charactersTypedOneByOneMakeNoPhrase() {
+        // 自动造词 is gone (U-28 C46): 你 then 们, again and again, make no 你们 under wqwu
+        val user = TableUser(wubi)
+        val t = TableSession(wubi, TableOptions.WUBI, user = user)
+        repeat(3) {
             t.type("wqiy")
             t.type("wun")
+            t.apply(Select(0))
         }
-        // -1: up to 码长 characters, so four: 你们你们 and 们你们你 by a4, the latest seen first
-        assertEquals(listOf("你们你们", "们你们你"), t.type("wwww").second.candidates)
-        t.apply(Reset)
-        // never saved by count: offered, but waits to be picked
-        val (commit, s) = t.type("wqwu")
-        assertEquals("", commit)
-        assertEquals(listOf("你们"), s.candidates)
-        assertEquals("你们", t.apply(Select(0)).commit)
-        assertEquals("你们", t.type("wqwu").first)
+        assertFalse("你们" in t.type("wqwu").second.candidates)
+        assertTrue(user.savedTexts().isEmpty())
     }
 
     @Test
-    fun whatIsForgottenIsRankedAsTheTableHasIt() {
-        val t = session(TableOptions.WUBI.copy(saveAutoPhraseAfter = -1))
-        t.type("aaaa")
-        assertEquals("恭恭敬敬", t.apply(Select(1)).commit)
-        val learned = t.type("aaaa").second
-        assertEquals(listOf("恭恭敬敬", "工"), learned.candidates)
-        assertTrue(learned.actionable)
-        assertEquals(setOf(Offer.FORGET), t.offers(0))
-        // 工 never picked: nothing to forget (PY-33, as pinyin)
-        assertEquals(emptySet<Offer>(), t.offers(1))
-        assertEquals(emptySet<Offer>(), t.offers(2))
-        // no phrases to pin to
-        assertEquals(learned.copy(commit = ""), t.apply(Pin(0)).copy(commit = ""))
-        val forgot = t.apply(Forget(0))
-        assertEquals(listOf("工", "恭恭敬敬"), forgot.candidates)
-        assertEquals("aaaa", forgot.preedit)
-        // a phrase saved, forgotten: offered no more
+    fun aPhraseSavedBeforeIsForgottenAndTheTablesOwnHaveNothingToForget() {
+        val user = wubi.savedBefore("wqwu" to "你们")
+        val t = TableSession(wubi, TableOptions.WUBI, user = user)
+        val shown = t.type("aaaa").second
+        assertEquals(listOf("工", "恭恭敬敬"), shown.candidates)
+        // nothing learned of the table's own here (PY-33, as pinyin); nothing to pin or block to without a learning record
+        assertEquals(emptySet<Offer>(), t.offers(0))
+        assertEquals(shown.copy(commit = ""), t.apply(Pin(0)).copy(commit = ""))
+        assertEquals(listOf("工", "恭恭敬敬"), t.apply(Forget(0)).candidates)
         t.apply(Reset)
-        t.type("wqiy")
-        t.type("wun")
-        t.type("wqwu")
-        assertEquals("你们", t.apply(Select(0)).commit)
         assertEquals(listOf("你们"), t.type("wqw").second.candidates)
+        assertEquals(setOf(Offer.FORGET), t.offers(0))
         assertTrue(t.apply(Forget(0)).candidates.isEmpty())
+        assertTrue(user.savedTexts().isEmpty())
         // nothing to forget: nothing typed
         t.apply(Reset)
         assertFalse(t.apply(Forget(0)).handled)
-    }
-
-    @Test
-    fun aKeyNotReadBreaksAPhrase() {
-        val t = session()
-        t.type("wqiy")
-        val comma = t.apply(Key(','))
-        assertFalse(comma.handled)
-        t.type("wun")
-        assertFalse("你们" in t.type("wqwu").second.candidates)
-    }
-
-    @Test
-    fun nothingIsLearnedWhileLearningIsOff() {
-        val t = session()
-        t.learning = false
-        t.type("wqiy")
-        t.type("wun")
-        assertFalse("你们" in t.type("wqwu").second.candidates)
-        // a pick moves what is picked up, unless learning is off
-        for (learning in listOf(true, false)) {
-            val u = session()
-            u.learning = learning
-            u.type("aaaa")
-            assertEquals("恭恭敬敬", u.apply(Select(1)).commit)
-            assertEquals(if (learning) "恭恭敬敬" else "工", u.type("aaaa").second.candidates.first())
-        }
     }
 
     @Test
@@ -347,7 +270,6 @@ class TableSessionTest {
         val user = TableUser(wubi)
         val records = ArrayList<ByteArray>()
         val forgotten = ArrayList<String>()
-        val blocks = ArrayList<String>()
         // 你们, wqwu by the rules: a word of the other input methods
         val shared = object : SharedWords {
             val coded = CodedWords(wubi, listOf("你们"))
@@ -355,86 +277,23 @@ class TableSessionTest {
             override fun leadsAnywhere(prefix: String) = coded.leadsAnywhere(prefix)
             override fun blocked(text: String) = false
             override fun blockable(text: String) = true
-            override fun block(text: String) = blocks.add(text)
             override fun forget(text: String) {
                 forgotten += text
             }
             override fun learned(text: String) = true
         }
         val t = TableSession(wubi, TableOptions.WUBI, user = user, shared = shared)
-        t.type("aaaa")
-        assertEquals("恭恭敬敬", t.apply(Select(1)).commit)
         t.learning = false
         user.journal = { records += it }
-        t.type("aaaa")
-        assertEquals(emptySet<Offer>(), t.offers(0))
-        // its pick kept: still first
-        assertEquals(listOf("恭恭敬敬", "工"), t.apply(Forget(0)).candidates)
-        t.apply(Reset)
         assertEquals(listOf("你们"), t.type("wqw").second.candidates)
         assertEquals(emptySet<Offer>(), t.offers(0))
         assertEquals(listOf("你们"), t.apply(Forget(0)).candidates)
         assertEquals(listOf("你们"), t.apply(Block(0)).candidates)
         assertEquals(0, records.size)
         assertEquals(emptyList<String>(), forgotten)
-        assertEquals(emptyList<String>(), blocks)
         // learning again: offered again
         t.learning = true
-        assertEquals(setOf(Offer.FORGET, Offer.BLOCK), t.offers(0))
-    }
-
-    @Test
-    fun orTypedCharacterByCharacterOftenEnough() {
-        val t = session()
-        repeat(2) {
-            t.type("wqiy")
-            t.type("wun")
-        }
-        assertEquals("", t.type("wqwu").first)
-        t.apply(Reset)
-        t.type("wqiy")
-        t.type("wun")
-        // seen three times
-        assertEquals("你们", t.type("wqwu").first)
-    }
-
-    @Test
-    fun aPhraseCommittedWholeStartsNoPhrase() {
-        val user = TableUser(wubi)
-        val t = TableSession(wubi, TableOptions.WUBI, user = user)
-        t.type("wqvb")
-        t.type("wun")
-        // wqw leads nowhere, so what wq offers first goes and wu is typed on
-        val (commit, s) = t.type("wqwu")
-        assertEquals("你好", commit)
-        assertEquals(listOf("们"), s.candidates)
-        t.apply(Reset)
-        // nor does it go on from what came before it: 你, 你好, 们 make no 你们
-        t.type("wqiy")
-        t.type("wqvb")
-        t.type("wun")
-        assertEquals(emptyList<Pair<String, String>>(), user.seen(""))
-    }
-
-    @Test
-    fun phrasesTheTableHasAreNotLearnedAgainAndResetForgetsWhatCameBefore() {
-        val user = TableUser(wubi)
-        val t = TableSession(wubi, TableOptions.WUBI, user = user)
-        t.type("wqiy")
-        t.type("vbg")
-        // 你好 is in the table already, as itself: not seen as a phrase too
-        assertEquals(emptyList<Pair<String, String>>(), user.seen(""))
-        assertEquals(listOf("你好"), t.type("wqv").second.candidates)
-        t.apply(Reset)
-        t.type("wqiy")
-        t.apply(Reset)
-        t.type("wun")
-        assertFalse("你们" in t.type("wqwu").second.candidates)
-        // not learned without the option
-        val none = session(TableOptions.CANGJIE.copy(autoPhraseLength = 0))
-        none.type("wqiy")
-        none.type("wun")
-        assertEquals(emptyList<String>(), none.type("wqwu").second.candidates)
+        assertEquals(setOf(Offer.FORGET), t.offers(0))
     }
 
     /** Reads keys as pinyin the dumb way: "ni" is 你, "wo" 我 then 窝; ' first it refuses. */
@@ -661,7 +520,6 @@ class TableSessionTest {
         val t = TableSession(wubiPinyin, TableOptions.WUBI_PINYIN, user = user)
         t.type("ai")
         assertEquals("哀", t.apply(Pick(2)).commit)
-        // 工 has a code, so two characters in a row could build a phrase
         t.type("gong")
         assertEquals("工", t.apply(Pick(1)).commit)
         var records = 0
@@ -682,10 +540,10 @@ class TableSessionTest {
     }
 
     // as 晚风's .conf had it: a code ends with one of its punctuation keys
-    private val ending = TableOptions(noMatchAutoSelectLength = 1, autoPhraseLength = -1, saveAutoPhraseAfter = -1, endKeys = ",;/.")
+    private val ending = TableOptions(noMatchAutoSelectLength = 1, endKeys = ",;/.")
 
     // as 电报码's: codes of digits, so letters pick
-    private val digits = TableOptions(orderByUse = true, autoPhraseLength = -1, saveAutoPhraseAfter = -1, selectionKeys = "qwertyuiop")
+    private val digits = TableOptions(orderByUse = true, selectionKeys = "qwertyuiop")
 
     @Test
     fun anEndKeyEndsTheCode() {

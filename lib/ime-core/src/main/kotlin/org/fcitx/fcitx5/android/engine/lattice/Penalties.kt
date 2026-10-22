@@ -53,4 +53,10 @@ data class Penalties(
      * model decides between them.
      */
     val nasal: Float = -2f,
+    /**
+     * A word only imported (U-101): the model's unknown word, and this below it, so it stays after
+     * the dictionary's words read the same, a rare or coarse one too, where the ranking does not
+     * place it (a glide, ends but the whole and the first word's; review-G S2).
+     */
+    val imported: Float = -2f,
 )

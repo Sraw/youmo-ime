@@ -8,7 +8,9 @@ import org.fcitx.fcitx5.android.engine.pinyin.Fuzzy
 import org.fcitx.fcitx5.android.engine.pinyin.ShuangpinScheme
 import org.fcitx.fcitx5.android.engine.table.TableOptions
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class LibimeMigrationTest {
@@ -136,24 +138,52 @@ class LibimeMigrationTest {
         val wbx = "[Table]\nAutoSelect=False\nOrderPolicy=Fast\nPageSize=5\nHint=True\n\n[Table/PrevPage]\n0=minus\n"
         val config = LibimeMigration.settings("", mapOf("wbx" to wbx, "cangjie" to "[Other]\nHint=True\n", "wbpy" to wbx))
         assertEquals("[Wubi]\nAutoSelect=False\nHint=True\nOrderPolicy=Fast\n\n[WubiPinyin]\nAutoSelect=False\nHint=True\nOrderPolicy=Fast\n", config)
+        // 自动造词's two, gone (U-28 C46): left in an older config, read as nothing
         val settings = EngineSettings.parse("Wubi/AutoSelect=False\nWubi/OrderPolicy=Fast\nWubi/Hint=x\nErbi/AutoPhraseLength=3\nErbi/SaveAutoPhraseAfter=99\nFuzzy/L_N=True")
-        assertEquals(
-            mapOf("Wubi" to TableSettings(autoSelect = false, orderByUse = true), "Erbi" to TableSettings(autoPhraseLength = 3)),
-            settings.tables,
-        )
+        assertEquals(mapOf("Wubi" to TableSettings(autoSelect = false, orderByUse = true)), settings.tables)
         // what is not set stays as the table has it
         assertEquals(
-            TableOptions.WUBI.copy(autoSelect = false, orderByUse = false, hint = false, autoPhraseLength = 2, saveAutoPhraseAfter = 1),
-            TableSettings(false, false, false, 2, 1).applyTo(TableOptions.WUBI),
+            TableOptions.WUBI.copy(autoSelect = false, orderByUse = false, hint = false),
+            TableSettings(false, false, false).applyTo(TableOptions.WUBI),
         )
         assertEquals(TableOptions.CANGJIE, TableSettings().applyTo(TableOptions.CANGJIE))
         assertEquals(false, EngineSettings.parse("Wubi/OrderPolicy=No").tables["Wubi"]?.orderByUse)
         assertEquals(TableSettings(), EngineSettings.parse("Wubi/OrderPolicy=Sometimes").tables["Wubi"])
-        // libime's -1: the longest code, and never saved by count
+    }
+
+    @Test
+    fun aTableTypedBeforeItsDefault调频CameOffKeepsItOn() {
+        val wubi = Engines.TABLES.entries.first { it.value.group == "Wubi" }.key
+        val cangjie = Engines.TABLES.entries.first { it.value.group == "Cangjie" }.key
+        // none set yet: on where the old default had it
+        assertEquals("[Wubi]\nOrderPolicy=Freq\n", LibimeMigration.keepOrderByUse("", listOf(wubi, cangjie)))
+        // what the user chose stays, the rest of the config too
+        val chosen = "[Wubi]\nOrderPolicy=No\nHint=True\n\n[Fuzzy]\nL_N=True\n"
+        assertEquals(null, LibimeMigration.keepOrderByUse(chosen, listOf(wubi)))
         assertEquals(
-            TableSettings(autoPhraseLength = -1, saveAutoPhraseAfter = -1),
-            EngineSettings.parse("Ziranma/AutoPhraseLength=-1\nZiranma/SaveAutoPhraseAfter=-1").tables["Ziranma"],
+            "[Wubi]\nAutoSelect=False\nOrderPolicy=Freq\n\n[Fuzzy]\nL_N=True\n",
+            LibimeMigration.keepOrderByUse("[Wubi]\nAutoSelect=False\n\n[Fuzzy]\nL_N=True\n", listOf(wubi)),
         )
+        // 仓颉's preset never ordered by use, and an input method no table is: nothing
+        assertEquals(null, LibimeMigration.keepOrderByUse("", listOf(cangjie, "pinyin")))
+        assertEquals(true, EngineSettings.parse("Wubi/OrderPolicy=Freq").tables["Wubi"]?.orderByUse)
+    }
+
+    @Test
+    fun whatTheConfigDidNotSayBeforeIsKeptOnOverADefaultWrittenSince() {
+        val wubi = "engine-wubi"
+        val zrm = Engines.TABLES.entries.first { it.value.group == "Ziranma" }.key
+        val before = "[Ziranma]\nOrderPolicy=No\n"
+        val unset = LibimeMigration.orderUnset(before)
+        assertTrue(wubi in unset)
+        assertFalse(zrm in unset)
+        assertEquals(Engines.TABLES.keys - zrm, unset)
+        val since = "[Ziranma]\nOrderPolicy=No\n\n[Wubi]\nOrderPolicy=No\nHint=True\n"
+        assertEquals(
+            "[Ziranma]\nOrderPolicy=No\n\n[Wubi]\nOrderPolicy=Freq\nHint=True\n",
+            LibimeMigration.keepOrderByUse(since, listOf(wubi, zrm), unset),
+        )
+        assertNull(LibimeMigration.keepOrderByUse("[Wubi]\nOrderPolicy=Freq\n", listOf(wubi), unset))
     }
 
     @Test

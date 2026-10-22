@@ -87,10 +87,13 @@ class Keyboard(private val session: Session, private val nineKeys: Boolean) {
 
     private var shown: Snapshot = IDLE
 
+    /** Where the page shown starts among all the candidates ([Snapshot.first]): a paged list's index counts from it. */
+    val first get() = shown.first
+
     private val english get() = session.takesEveryCharacter
 
-    // something typed, not a prediction
-    private val composing get() = shown.preedit.isNotEmpty() && !shown.predicting
+    /** Something typed, not a prediction. */
+    val composing get() = shown.preedit.isNotEmpty() && !shown.predicting
 
     fun onEvent(event: Int, arg: Int, learning: Boolean = true): Snapshot {
         session.learning = learning
@@ -111,17 +114,32 @@ class Keyboard(private val session: Session, private val nineKeys: Boolean) {
         return shown
     }
 
+    /** The field's [flags] alone, for a keyboard made after its context: see [Session.fieldFlags]. */
+    fun fieldFlags(flags: Int) = session.fieldFlags(flags)
+
     /**
      * [before] is the text before the cursor, which the user put somewhere the engine did not
      * (a field focused, a tap): what is typed next follows it. Nothing on show is dropped, as the
      * host would not know: the service resets fcitx first where there is something. [learning]
      * is as for [onEvent], set before: this comes before any key typed in a field just focused.
-     * [cleared] as [Action.Context.cleared].
+     * [cleared], [started], [after], [selected] and [offers] as [Action.Context]'s. Whether the session
+     * offers candidates now (English's word typed in place of its correction before the cursor), which a [RECALL] shows.
      */
-    fun context(before: String, learning: Boolean = true, cleared: Boolean = false) {
-        if (shown.preedit.isNotEmpty() || shown.candidates.isNotEmpty()) return
+    fun context(
+        before: String,
+        learning: Boolean = true,
+        cleared: Boolean = false,
+        learnFlags: Int = 0,
+        started: Boolean = false,
+        after: String? = null,
+        selected: Boolean = false,
+        offers: Boolean = true,
+        said: Boolean = false,
+    ): Boolean {
+        if (shown.preedit.isNotEmpty() || shown.candidates.isNotEmpty()) return false
         session.learning = learning
-        shown = session.apply(Action.Context(before, cleared))
+        shown = session.apply(Action.Context(before, cleared, learnFlags, started, after, selected, offers, said))
+        return shown.candidates.isNotEmpty()
     }
 
     /** What a long press on the candidate at [index] offered, and the user chose. */
@@ -132,9 +150,17 @@ class Keyboard(private val session: Session, private val nineKeys: Boolean) {
         else -> Action.Unpin(index)
     }
 
+    // the host's own characters, no key's: null for any other
+    private fun hostChar(codePoint: Int): Snapshot? = when (codePoint) {
+        INK -> session.apply(Action.Ink)
+        GLIDE -> session.apply(Action.Glide)
+        RECALL -> again(handled = true)
+        AGAIN -> session.reread() ?: again(handled = true)
+        else -> null
+    }
+
     private fun char(codePoint: Int): Snapshot {
-        if (codePoint == INK) return session.apply(Action.Ink)
-        if (codePoint == GLIDE) return session.apply(Action.Glide)
+        hostChar(codePoint)?.let { return it }
         if (codePoint in NINE_DIGITS) {
             val n = codePoint - NINE_DIGITS.first
             return session.apply(Action.NineKey('0' + n % DIGITS, upper = n >= DIGITS))
@@ -297,6 +323,19 @@ class Keyboard(private val session: Session, private val nineKeys: Boolean) {
 
         /** The character the keyboard sends after a glide, to have its word committed ([Action.Glide]); as [INK]. */
         const val GLIDE = 0xF0101
+
+        /**
+         * The character the host sends after a [context] the session offers candidates for (English's
+         * word typed, a tap after its correction): those shown, as no key asked for them; as [INK].
+         */
+        const val RECALL = 0xF0102
+
+        /**
+         * The character the app sends after what was learned changed under the input (a long press
+         * taken back, a clear: LearningOp), to have the candidates read anew and shown
+         * ([Session.reread]); as [INK].
+         */
+        const val AGAIN = 0xF0103
 
         /**
          * Characters of the supplementary private use area the nine keys send for English

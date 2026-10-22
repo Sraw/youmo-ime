@@ -15,6 +15,10 @@ import org.fcitx.fcitx5.android.data.pinyin.ImportedDictionaries.Unread
 import org.fcitx.fcitx5.android.data.pinyin.dict.PinyinDictionary
 import org.fcitx.fcitx5.android.data.pinyin.dict.TextDictionary
 import org.fcitx.fcitx5.android.engine.host.Engines
+import org.fcitx.fcitx5.android.engine.host.ImportLayer
+import org.fcitx.fcitx5.android.engine.learn.LearnState
+import org.fcitx.fcitx5.android.engine.learn.backup.BackupHead
+import org.fcitx.fcitx5.android.engine.learn.backup.LearnBackup
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -54,31 +58,32 @@ class PinyinDictionaryFragmentTest {
         }
     }
 
+    // another input method's .scel for the user dictionary: its words as lines with their counts, read
+    // in the engine's ime-core (ImportFiles.Scel), a list of no syllable table reading Sogou's own
     @Test
-    fun aBigListPickedIntoTheUserDictionaryGetsTheBaseSuggested() = runTest {
-        assertFalse(suggestsBase(USER_IMPORT_HINT_WORDS))
-        assertTrue(suggestsBase(USER_IMPORT_HINT_WORDS + 1))
-        // blank lines are not words
-        val text = (1..1001).joinToString("\n\n") { "词$it" }
-        val words = countWords("big.txt") { text.byteInputStream() }
-        assertEquals(1001, words)
-        assertTrue(suggestsBase(words))
-        assertFalse(suggestsBase(countWords("small.txt") { "鲸园\n\n量子\n".byteInputStream() }))
-        // only what the import adds: duplicates, blocked words, comments and a `~` line outside an
-        // export are not counted; one word with two pinyins is two
-        assertEquals(3, countWords("mixed.txt") {
-            "鲸园\n鲸园\n量子\n!时间\n# note\n!量子\n~学到 xue'dao 3\n长大 chang da\n长大 zhang da\n长大 zhang da\n"
-                .byteInputStream()
-        })
+    fun aCellDictionaryForTheUserDictionaryReachesTheEngineAsLines() = runTest {
+        val scel = ByteArray(0x1540).also {
+            byteArrayOf(0x40, 0x15, 0, 0, 0x44, 0x43, 0x53, 0x01, 0x01, 0, 0, 0).copyInto(it)
+            it[0x120] = 1
+        } + le(0, 0, 1, 4, 0, 1, 4) + le(0x9cb8, 0x56ed) + le(2, 120)
+        var got: List<String>? = null
+        importWordsFrom("鲸.scel", { scel.inputStream() }) { lines ->
+            got = lines.toList()
+            Engines.Imported(0, 0, 0, imported = 1)
+        }
+        // u32 0 syllables; 1 word of a's (0) and ai's (1) syllables, "鲸园", 2 bytes more: its count
+        assertEquals(listOf("鲸园 a'ai 120"), got)
     }
 
+    // 16-bit little-endian values, but the first two: a u32 0, the table's size
+    private fun le(vararg v: Int) = v.flatMap { listOf((it and 0xff).toByte(), (it shr 8).toByte()) }.toByteArray()
+
     @Test
-    fun onlyTheExportsHeaderSkipsTheCount() {
-        // which file is the export: WordListFilesTest.anExportIsToldByItsFirstNonBlankLine
-        val thirdParty = Incoming("big.txt", userExport = true, ownExport = false)
-        assertTrue(needsCount(true, thirdParty))
-        assertFalse(needsCount(true, Incoming("export.txt", userExport = true, ownExport = true)))
-        assertFalse(needsCount(false, thirdParty))
+    fun theListsImportedShowNewestFirstButThoseWithNothingLeftToUndo() {
+        val a = ImportLayer.Batch(1, "a.txt", 20000, 3, 3)
+        val b = ImportLayer.Batch(2, "b.scel", 20001, 5, 2)
+        val all = ImportLayer.Batch(3, "c.txt", 20002, 4, 0)
+        assertEquals(listOf(b, a), shownBatches(listOf(a, b, all)))
     }
 
     @Test
@@ -112,6 +117,27 @@ class PinyinDictionaryFragmentTest {
         assertFalse(startsInUser(Incoming("mine.TXT")))
         assertFalse(startsInUser(Incoming("mine.dict")))
         assertFalse(startsInUser(Incoming("mine.scel")))
+    }
+
+    // WD-10: the user dictionary's export is a learning backup, restored as one; an earlier build's text export is still words
+    @Test
+    fun theExportIsKnownAsABackupAndAnEarlierOneAsWords() {
+        assertTrue(readAsWordList("youmo-words-20261021${LearnBackup.EXTENSION}"))
+        val backup = LearnBackup.bytes(BackupHead(0, 1, 2L, BackupHead.SAVED), LearnState(), emptyList(), emptyList())
+        val exported = incoming("youmo-words-20261021${LearnBackup.EXTENSION}", backup)
+        assertTrue(exported.backup)
+        assertFalse(exported.userExport)
+        val earlier = incoming("youmo-words.txt", "# youmo-words 1\n幽默 you'mo\n".toByteArray())
+        assertTrue(earlier.userExport)
+        assertFalse(earlier.backup)
+        assertFalse(incoming("mine.dict", null).backup)
+        // renamed by a chat app: a backup still, and a dictionary's name is never words exported (review-uat-fixes N3)
+        assertTrue(incoming("youmo-words.dict", backup).backup)
+        assertFalse(incoming("youmo-words.dict", "# youmo-words 1\n幽默 you'mo\n".toByteArray()).userExport)
+        // named as one, and not one: cut short, it is never offered as words
+        assertFalse(exported.brokenBackup)
+        assertTrue(incoming("youmo-words-20261021${LearnBackup.EXTENSION.uppercase()}", backup.copyOf(3)).brokenBackup)
+        assertFalse(incoming("words.txt", "a".toByteArray()).brokenBackup)
     }
 
     @Test

@@ -8,19 +8,29 @@ import org.fcitx.fcitx5.android.engine.lattice.TextWords
 import org.fcitx.fcitx5.android.engine.phrase.EmojiCandidates
 import org.fcitx.fcitx5.android.engine.session.Action
 import org.fcitx.fcitx5.android.engine.session.Choice
+import org.fcitx.fcitx5.android.engine.session.FieldJournal
 import org.fcitx.fcitx5.android.engine.session.Offer
 import org.fcitx.fcitx5.android.engine.session.Predictions
 import org.fcitx.fcitx5.android.engine.session.RefineSlices
+import org.fcitx.fcitx5.android.engine.learn.Code
+import org.fcitx.fcitx5.android.engine.learn.HabitRanker
+import org.fcitx.fcitx5.android.engine.learn.Habits
+import org.fcitx.fcitx5.android.engine.learn.KeyedRows
+import org.fcitx.fcitx5.android.engine.learn.LearnRecord.Commit
+import org.fcitx.fcitx5.android.engine.learn.Word
+import org.fcitx.fcitx5.android.engine.learn.control.Why
 import org.fcitx.fcitx5.android.engine.session.Session
 import org.fcitx.fcitx5.android.engine.session.Snapshot
-import kotlin.math.log10
+import org.fcitx.fcitx5.android.engine.user.UserModel.Entry
 
 /**
  * A table input method (五笔, 仓颉 ...): the candidates are the entries whose code starts with
  * what was typed, ranked as libime ranks them. Codes no longer than [TableOptions.noSortInputLength]
  * (nor than what was typed) come first in the table's order; then the others, shorter codes
- * first ([TableOptions.sortByCodeLength]), and among codes as long what was picked most
- * ([TableOptions.orderByUse]). A text shows once, with its shortest code.
+ * first ([TableOptions.sortByCodeLength]); among codes as long, the table's own before the words
+ * from outside it (the user's: [shared], and [user]'s saved phrases; U-28). A text shows once, with
+ * its shortest code. A code the table alone has one entry for, which commits it by itself, takes no
+ * word from outside the table (D8): one who types it blind keeps it.
  *
  * With [TableOptions.autoSelect], typing commits by itself, as libime does: a code that leaves
  * one candidate, its code whole, commits it; a key past the longest code, or one that leads to no
@@ -46,24 +56,30 @@ import kotlin.math.log10
  * A key of [TableOptions.endKeys] ends a code: the next key commits it. A key of
  * [TableOptions.selectionKeys] picks while there are candidates, a code key too, as in fcitx.
  *
- * Characters committed one by one become phrases ([TableOptions.autoPhraseLength]) coded by the
- * table's 组词规则, offered last for their code. One picked, or typed character by character
- * [TableOptions.saveAutoPhraseAfter] times, joins the table's own. What is picked and learned goes
- * to [user], which may keep it, and forgets it when asked to ([Action.Forget]).
+ * Characters committed one by one make no phrase (U-28 C46: 自动造词 is gone); the phrases an
+ * older build made are [user]'s, words of the user's, forgotten when asked to ([Action.Forget]).
  *
  * With a [language], a table has what every Chinese input method has (specs/engine.md). A code's
  * 重码, the candidates whose code is all that was typed, longer than [TableOptions.noSortInputLength]
- * (五笔's 一二级简码 stay as they are), are placed where the table orders by use
- * ([TableOptions.orderByUse]: off, the table's order is kept for those who type by position): the
- * user's words once picked here first (a phrase saved as typed character by character, or a word of
- * the other input methods, stays where its picks put it till then: a pick of the table's goes
- * before it), then the table's entries by the word model after the text before, each pick here
- * adding to it (log10 of 1 + picks); the small sentence model weighs them again (性能档位 medium), the
- * large one while the user pauses (high, [Action.Refine]). What is put in is learned by the one
- * user model as well, after the word before it, a pinyin entry too; not what [pinyin] looks up,
- * which learns nothing (not how the user writes). What may follow is offered (联想) until the next
- * key; a long press on it forgets or blocks it, as handwriting's (Predictions): blocks only what
- * [SharedWords.blockable] allows, as for the table's own candidates.
+ * (五笔's 一二级简码 stay as they are), are placed where the table orders by use (调频,
+ * [TableOptions.orderByUse]: off, the table's order is kept for those who type by position): the
+ * table's entries by the word model after the text before; the small sentence model weighs them
+ * again (性能档位 medium), the large one while the user pauses (high, [Action.Refine]). That is the
+ * order the user's habits go on from ([byHabit]). What is put in is learned into the language's
+ * [Habits] ([KeyedRows]): under the keys typed alone, and the whole of it after the word before it,
+ * for 联想; never into pinyin's order (D28). What [pinyin] looks up is learned there, as full pinyin
+ * is, after the text before; the table's codes are not touched. What may follow is offered (联想)
+ * until the next key; a long press on it forgets or blocks it, as handwriting's (Predictions):
+ * blocks only what [SharedWords.blockable] allows.
+ *
+ * A long press on a candidate (U-28): forgets what was learned of it, for a word from outside the
+ * table, or one of the table's while it orders by use; pins it first under the code typed, ordered
+ * by use or not; blocks it under that code alone. A block from pinyin never hides the table's own
+ * entries (C12), only the words from outside it.
+ *
+ * What is put in and deleted at once is taken back, as pinyin's (U-03, [FieldJournal]): a code, a
+ * 联想 pick, a word looked up by pinyin. Typed again with the same keys it is a pick there, its own
+ * row the correction; with other keys it is new input, nothing more (形码看键, PLAN §2.5).
  */
 class TableSession(
     private val table: TableDictionary,
@@ -77,17 +93,20 @@ class TableSession(
 ) : Session {
 
     /**
-     * A candidate: a table entry (its [index]), a phrase learned here ([index] -1), or an [emoji]
-     * the first stands for. A [pinyin] entry's [code] is its pinyin, without the marker.
+     * A candidate: a table entry (its [index]), a word from outside the table ([index] -1: a phrase
+     * saved here, a word of the other input methods), or an [emoji] the first stands for. A
+     * [pinyin] entry's [code] is its pinyin, without the marker.
      */
     private class Item(
         val code: String,
         val text: String,
-        val auto: Boolean,
         val index: Int = -1,
         val pinyin: Boolean = false,
         val emoji: Boolean = false,
-    )
+    ) {
+        // the table's own entry, not a word from outside it (the user's, saved or shared)
+        val inTable get() = index >= 0
+    }
 
     private val input = StringBuilder()
     private var cursor = 0 // where in the code the next key goes; in a lookup unused, the pinyin's
@@ -98,11 +117,17 @@ class TableSession(
     private var lookingUp = false
     private var lookedUp: Snapshot? = null
 
+    // the lookup learns as full pinyin does, or nothing where nothing is learned here
     override var learning = true
+        set(value) {
+            field = value
+            pinyin?.learning = value
+        }
 
-    // what was committed last, one character at a time, for auto phrases
-    private val recent = ArrayList<String>()
-    private val autoPhraseLength = if (options.autoPhraseLength < 0) table.maxLength else options.autoPhraseLength
+    private val habits: Habits get() = language?.habits ?: Habits.OFF
+
+    // what a code typed is learned and kept under
+    private fun keyed(code: String) = Code(language?.kind.orEmpty(), code)
 
     // when a code just committed itself ([now]): the next key, if a space soon enough, is taken (see the class)
     private var committedItselfAt: Long? = null
@@ -111,17 +136,25 @@ class TableSession(
     // for the word and sentence models, and the last word put in, for what is learned after it
     private val predictions = Predictions(
         language?.predictor, language?.words, language?.user, language?.block, language?.forgotten ?: {}, shared::blockable,
+        language?.habits ?: Habits.OFF, language?.simplify ?: { it },
     ) { learning }
+
+    // the field as this session wrote it (U-03), compared as the record has its text (a traditional table's)
+    private val journal = FieldJournal({ habits }, language?.simplify ?: { it })
 
     private val emojiOf: (String) -> List<String> = language?.emoji ?: { emptyList() }
     private val phrasesOf: (String) -> List<String> = language?.phrases ?: { emptyList() }
 
     // the code's 重码 as placed ([rank]); those the refiner is still to weigh
     private var homographs: Homographs? = null
+
+    // how the habits ranked the 重码 of the code typed, by text: what 为什么排在这 says (U-81)
+    private var ranked: Map<String, HabitRanker.Ranked<Int>> = emptyMap()
     private val unrefined = RefineSlices<Homographs>(language?.refiner)
 
     // Enter between: the space is on a new line, typed
     override fun passedOn() {
+        journal.passedOn()
         committedItselfAt = null
         selfEmoji = emptyList()
         predictions.forgetBefore()
@@ -149,8 +182,9 @@ class TableSession(
         if (index >= n) {
             // none there: nothing picked, the offer goes on
             val text = predictions.pick(index - n) ?: return snapshot()
+            // deleted whole at once, the pick is taken back (U-03)
+            journal.committed(text, predictions.picked, learning)
             selfEmoji = emptyList()
-            recent.clear()
             page = 0
             return snapshot(commit = text)
         }
@@ -158,8 +192,9 @@ class TableSession(
         // the app deletes code points (FcitxInputMethodService.handleDeleteSurrounding)
         val replaced = selfCommitted.codePointCount(0, selfCommitted.length)
         selfEmoji = emptyList()
-        // the word is gone from the text: no auto phrase of it, nothing to follow it
-        recent.clear()
+        // the word replaced, by the app: the field is no longer as written (its record stands)
+        journal.unverify()
+        // the word is gone from the text: nothing to follow it
         predictions.unoffer()
         predictions.forgetBefore()
         page = 0
@@ -167,6 +202,7 @@ class TableSession(
     }
 
     override fun apply(action: Action): Snapshot {
+        journal.before(action, learning)
         val taken = action is Action.Key && takesSpace(action.char)
         committedItselfAt = null
         // the order shown is the one to weigh: anything but a slice of the weighing changes it, or the page
@@ -183,6 +219,8 @@ class TableSession(
                 // an emoji is no word: nothing to forget or block
                 is Action.Forget -> return if (action.index < n) snapshot() else pressed(action.index - n, Offer.FORGET)
                 is Action.Block -> return if (action.index < n) snapshot() else pressed(action.index - n, Offer.BLOCK)
+                // what may follow has nothing to pin
+                is Action.Pin, is Action.Unpin -> return snapshot()
                 // anything else ends the offer, and goes on as it would without one: its page too
                 else -> {
                     predictions.unoffer()
@@ -205,35 +243,65 @@ class TableSession(
     private fun mayTakeSpace(c: Char) = c == ' ' && committedItselfAt != null
 
     private fun dispatch(action: Action): Snapshot = if (lookingUp) lookUp(action) else when (action) {
-        is Action.Key -> type(action.char)
+        is Action.Key -> type(action.char, action.glided)
         Action.Backspace -> backspace()
         is Action.Select -> select(action.index)
         is Action.Pick -> pick(action.index)
         is Action.Forget -> forget(action.index)
         is Action.Block -> block(action.index)
+        is Action.Pin -> pin(action.index, on = true)
+        is Action.Unpin -> pin(action.index, on = false)
         Action.NextPage -> turn(page + 1)
         Action.PreviousPage -> turn(page - 1)
         Action.CommitRaw -> {
             val text = input.toString()
-            recent.clear()
             clear()
             // nothing typed: Enter is the app's, and what is before goes when it is passed on (passedOn), as handwriting's
-            if (text.isNotEmpty()) predictions.wrote(text, null)
+            // the code as typed: no pick to take back
+            if (text.isNotEmpty()) wrote(text, null)
             snapshot(commit = text, handled = text.isNotEmpty())
         }
         Action.Refine -> refine()
-        // a table has no custom phrases
-        Action.Ink, Action.Glide, is Action.Pin, is Action.Unpin, is Action.Syllable, is Action.Letter, is Action.NineKey -> snapshot()
+        Action.Ink, Action.Glide, is Action.Syllable, is Action.Letter, is Action.NineKey -> snapshot()
         is Action.Cursor -> moveCursor(action.at)
         is Action.Step -> moveCursor(action.applyTo(cursor, input.length))
-        // auto phrases are made of what was committed here, not of what the editor had: kept
-        // only while the text still ends with it (the cursor did not go anywhere)
         Action.Reset, is Action.Context -> {
-            if (action !is Action.Context || !action.before.endsWith(recent.joinToString(""))) recent.clear()
+            if (action is Action.Context) predictions.learnFrom(action)
             moved((action as? Action.Context)?.before)
             clear()
             snapshot()
         }
+    }
+
+    /** A glide's [word] the session held back, committed by the glide and told as context next: written here, nothing learned of it. */
+    fun heldBack(word: String) = if (learning) journal.own(word, null) else Unit
+
+    // [text] put in, [entry] its word as learned, [commit] its record: what follows goes on from it, and the journal has it (U-03)
+    private fun wrote(text: String, entry: Entry?, commit: Commit? = null) = predictions.wrote(text, entry).also { journal.committed(text, commit, learning) }
+
+    // what may follow says what it goes on from, for 不再联想 (U-72); a code's 重码 how the habits ranked them
+    override fun why(index: Int): Why? = when {
+        lookingUp -> pinyin!!.why(index)
+        offering() -> predictions.why(index - selfEmoji.size)
+        else -> ranking[index]?.let { TableHabitOrder.why(habits, keyed(input.toString()), it.text, ranked[it.text]) }
+    }
+
+    // what was learned read as it is now (an undo, a prediction turned off), the record's read live
+    override fun reread(): Snapshot? = when {
+        lookingUp -> pinyin!!.reread()
+        // what may follow, offered anew: one taken back may be all there is
+        input.isEmpty() -> {
+            page = predictions.reread(page, options.pageSize)
+            snapshot()
+        }
+        else -> rankedAgain()
+    }
+
+    override val rereads get() = !lookingUp || pinyin!!.rereads
+
+    override fun fieldFlags(flags: Int) {
+        predictions.learnFlags = flags
+        pinyin?.fieldFlags(flags)
     }
 
     // a lookup's pinyin has no phrases of the table's own to pin to
@@ -244,13 +312,26 @@ class TableSession(
         lookingUp -> pinyin!!.offers(index).intersect(setOf(Offer.FORGET))
         // an emoji is no word: nothing learned of it to forget, nor to block
         ranking[index]?.emoji == true -> emptySet()
-        ranking[index] != null -> {
-            val item = ranking[index]!!
-            // forgetting only where something was learned of it, as pinyin offers it (PY-33)
-            val learned = user.hasLearned(item.code, item.text) || (!item.pinyin && !item.auto && shared.learned(item.text))
-            setOfNotNull(Offer.FORGET.takeIf { learned }, Offer.BLOCK.takeIf { shared.blockable(item.text) })
-        }
+        ranking[index] != null -> offersOf(ranking[index]!!)
         else -> emptySet()
+    }
+
+    // U-28's long press. Forgetting only where something was learned of it, as pinyin offers it
+    // (PY-33): the table's own learn nothing while the table keeps its order. Pinned and blocked
+    // under the code typed, where the record keeps them; not under a wildcard, which is no code
+    private fun offersOf(item: Item): Set<Offer> {
+        val learned = when {
+            item.inTable -> options.orderByUse && habits.knows(item.text)
+            else -> user.isSaved(item.code, item.text) || shared.learned(item.text)
+        }
+        val keeps = habits.learns && !wild()
+        val pinned = keeps && habits.pinned(keyed(input.toString()))?.text == item.text
+        return setOfNotNull(
+            Offer.FORGET.takeIf { learned },
+            Offer.PIN.takeIf { keeps && !pinned },
+            Offer.UNPIN.takeIf { pinned },
+            Offer.BLOCK.takeIf { keeps },
+        )
     }
 
     override fun reads(c: Char): Boolean = if (mayTakeSpace(c)) {
@@ -272,7 +353,7 @@ class TableSession(
         return ranking.page(from, count).map { Choice(it.text, if (options.hint) hint(it, wild) else "") }
     }
 
-    private fun type(c: Char): Snapshot {
+    private fun type(c: Char, glided: Boolean = false): Snapshot {
         val startsLookUp = c == options.pinyinKey && pinyin != null
         // a selection key picks while there are candidates, a key of the codes too, as in fcitx;
         // with none it goes on as any other key
@@ -282,8 +363,9 @@ class TableSession(
         if (!isCode && !(startsLookUp && input.isEmpty())) {
             // not a code key: what was typed is committed, then the key is the app's
             val text = if (input.isEmpty()) "" else autoCommit()
-            recent.clear()
-            predictions.wrote(c.toString(), null)
+            // the key is in the field, not the journal's: a Backspace now deletes it, not a commit;
+            // not a glide's key, which the glide drops (GlideSession hands nothing on)
+            predictions.wrote(c.toString(), null).also { if (!glided) journal.unverify() }
             return snapshot(commit = text, handled = false)
         }
         var commit = ""
@@ -293,13 +375,14 @@ class TableSession(
             lookingUp = true
             input.append(c)
             cursor = input.length
+            // what is looked up is learned as full pinyin is, after the text before
+            pinyin?.apply(Action.Context(predictions.before, predictions.cleared, predictions.learnFlags))
             return snapshot(commit = commit)
         }
         // a key no code starts is the app's, as fcitx hands it on: a table's , and . may be its
         // punctuation, typed after a code as well as alone
         if (input.isEmpty() && !leadsAnywhere(c.toString())) {
-            recent.clear()
-            predictions.wrote(c.toString(), null)
+            predictions.wrote(c.toString(), null).also { if (!glided) journal.unverify() }
             return snapshot(commit = commit, handled = false)
         }
         return typeInto(c, commit)
@@ -336,29 +419,30 @@ class TableSession(
 
     /** Whether [item], the only candidate, is committed without asking. */
     private fun commitsItself(item: Item): Boolean {
-        // an auto phrase waits to be picked, and a pinyin entry, shown for the code to learn; so
-        // does a code found through the matching key
-        if (!options.autoSelect || item.auto || item.pinyin) return false
-        return item.code == input.toString() && input.length <= table.maxLength && reaches(options.autoSelectLength)
+        // a pinyin entry waits to be picked, shown for the code to learn; so does a code found
+        // through the matching key
+        if (item.pinyin) return false
+        return commitsWhole(item.code)
     }
+
+    // whether an entry of [code], all that was typed, commits itself once it is the only one
+    private fun commitsWhole(code: String) =
+        options.autoSelect && code == input.toString() && input.length <= table.maxLength && reaches(options.autoSelectLength)
 
     /** Whether what is typed is long enough for a length [limit] of [TableOptions]. */
     private fun reaches(limit: Int) = limit != 0 && (limit < 0 || input.length >= limit)
 
-    /**
-     * Commits the first candidate on the page shown, or the first of all where that is an emoji,
-     * unless it is an auto phrase: then, as with no candidate, the code is dropped.
-     */
+    /** Commits the first candidate on the page shown, or the first of all where that is an emoji. */
     private fun autoCommit(): String {
         // an emoji first on a page (past the first) is no reading of the code: the first that is
         val first = ranking[page * options.pageSize]?.takeUnless { it.emoji } ?: ranking[0]
-        return take(first?.takeUnless { it.auto })
+        return take(first)
     }
 
     private fun backspace(): Snapshot {
         if (input.isEmpty()) {
-            recent.clear()
             // the app's: what was before goes with it
+            journal.backspace()
             predictions.deleted()
             return snapshot(handled = false)
         }
@@ -378,7 +462,6 @@ class TableSession(
 
     private fun select(index: Int): Snapshot {
         if (input.isEmpty()) {
-            recent.clear()
             predictions.lastEntry = null
             return snapshot(handled = false)
         }
@@ -430,24 +513,40 @@ class TableSession(
         // as offered: nothing recorded where nothing is to be kept
         if (!learning) return snapshot()
         val item = ranking[index] ?: return snapshot(handled = input.isNotEmpty())
-        if (item.emoji) return snapshot()
+        if (item.emoji || Offer.FORGET !in offersOf(item)) return snapshot()
         user.forget(item.code, item.text)
-        // forgotten by every input method: a phrase saved here or a word of theirs would be back
-        // as theirs, and what was put in here they learned too (the one user model)
-        if (!item.pinyin && !item.auto) shared.forget(item.text)
-        val shown = page
-        update()
-        if (ranking[shown * options.pageSize] != null) page = shown
-        // weighed again only on the first page, as pinyin: not to move what is shown
-        if (page != 0) unrefined.drop()
-        return snapshot()
+        // forgotten by every input method (U-84): a phrase saved here or a word of theirs would be
+        // back as theirs, and what was learned of it here goes by its text too
+        shared.forget(item.text)
+        return rankedAgain()
     }
 
-    /** Blocks the candidate at [index] for every input method (see [SharedWords]), ranking the code again. */
+    /** Blocks the candidate at [index] under the code typed alone (U-28), ranking the code again. */
     private fun block(index: Int): Snapshot {
         if (!learning) return snapshot()
         val item = ranking[index] ?: return snapshot(handled = input.isNotEmpty())
-        if (item.emoji || !shared.block(item.text)) return snapshot()
+        if (item.emoji || Offer.BLOCK !in offersOf(item)) return snapshot()
+        val code = keyed(input.toString())
+        // the block wins: a pin of it would show it all the same
+        if (habits.pinned(code)?.text == item.text) habits.pin(code, item.text, "", on = false)
+        habits.blockUnder(code, item.text, on = true)
+        return rankedAgain()
+    }
+
+    /** Pins the candidate at [index] first under the code typed (U-28, 调频 on or off), or unpins it. */
+    private fun pin(index: Int, on: Boolean): Snapshot {
+        if (!learning) return snapshot()
+        val item = ranking[index] ?: return snapshot(handled = input.isNotEmpty())
+        if (item.emoji || (if (on) Offer.PIN else Offer.UNPIN) !in offersOf(item)) return snapshot()
+        habits.pin(keyed(input.toString()), item.text, "", on)
+        // back to the first page, unlike a block or a forget (rankedAgain): a pin is first there,
+        // and an unpin is pressed on the first candidate
+        update()
+        return snapshot()
+    }
+
+    // the code ranked again after what a long press changed, on the page shown if it still has one
+    private fun rankedAgain(): Snapshot {
         val shown = page
         update()
         if (ranking[shown * options.pageSize] != null) page = shown
@@ -465,53 +564,32 @@ class TableSession(
 
     /** Commits [item], learning from it, and clears the input; a code with none is dropped. */
     private fun take(item: Item?): String {
+        val typed = input.toString()
+        // a code with the matching key in it is no code to learn under (nor pin nor block there)
+        val wild = wild()
+        // what the user picked over: the code's first (never an emoji, which come after it)
+        val first = ranking[0]?.text.orEmpty()
+        val own = ranking.own
         clear()
-        if (item == null) {
-            recent.clear()
-            return ""
-        }
-        // an emoji is text, no word: nothing to learn, nor to build a phrase of
+        if (item == null) return ""
+        // an emoji is text, no word: nothing to learn
         if (!learning || item.emoji) {
-            recent.clear()
-            predictions.wrote(item.text, null)
+            wrote(item.text, null)
             return item.text
         }
         // a word of the user's (a saved phrase, one of the other input methods') the word model lacks: as the user model has it
-        val entry = language?.entryOf(item.text, theirs = item.index < 0 && !item.auto)
-        if (entry != null) language.user?.learn(predictions.lastEntry, listOf(entry))
-        predictions.wrote(item.text, entry)
-        // what pinyin found is neither counted here nor built into phrases: libime counts it in its
-        // history, but builds phrases from it with the pinyin as the code, which is a bug
-        if (item.pinyin) {
-            recent.clear()
-            return item.text
-        }
-        user.picked(item.code, item.text)
-        // picked once, an auto phrase is the user's
-        if (item.auto) user.save(item.code, item.text)
-        learnPhrases(item.text)
+        val entry = language?.entryOf(item.text, theirs = !item.inTable)
+        val h = habits
+        val commit = if (h.learns) {
+            val pick = KeyedRows.Pick(typed, item.text, if (item.text == first) 'A' else 'B', first, own = item.text == own)
+            val picks = if (wild) emptyList() else listOf(pick)
+            val word = Word(language?.simplify?.invoke(item.text) ?: item.text, "")
+            // a wildcard's too: its whole row, the use and the pair, taken back if deleted
+            h.record(KeyedRows.of(language?.kind.orEmpty(), picks, listOf(word), predictions.wordBefore()), flags = predictions.learnFlags)
+        } else null
+        // typed again with the same keys, its own row is the correction: no other (形码看键)
+        wrote(item.text, entry, commit)
         return item.text
-    }
-
-    /** Offers the last characters committed one by one, [text] ending them, as phrases. */
-    private fun learnPhrases(text: String) {
-        if (autoPhraseLength < 2 || table.rules.isEmpty) return
-        val chars = PhraseRules.codePoints(text)
-        // a phrase committed whole says nothing of what the user builds (fcitx's AutoPhraseWithPhrase)
-        if (chars.size != 1) {
-            recent.clear()
-            return
-        }
-        recent += chars[0]
-        while (recent.size > autoPhraseLength) recent.removeAt(0)
-        for (n in 2..recent.size) sighted(recent.subList(recent.size - n, recent.size).joinToString(""))
-    }
-
-    /** Counts [phrase] typed once more, saving it when seen often enough. */
-    private fun sighted(phrase: String) {
-        val code = table.encode(phrase) ?: return
-        if (table.contains(code, phrase)) return
-        user.sighted(code, phrase, options.saveAutoPhraseAfter)
     }
 
     private fun clear() {
@@ -524,7 +602,7 @@ class TableSession(
         page = 0
     }
 
-    /** Whether some entry, learned ones too, has a code [pattern] leads to. */
+    /** Whether some entry, a saved phrase or a word of the user's too, has a code [pattern] leads to. */
     private fun leadsAnywhere(pattern: String) =
         table.hasMatch(pattern, options.matchingKey) || user.leadsAnywhere(pattern) || shared.leadsAnywhere(pattern)
 
@@ -536,118 +614,138 @@ class TableSession(
     }
 
     /**
-     * The candidates of [code], ranked; decoded as they are asked for. The user's words of the
-     * other input methods ([shared]) after the table's own as long; none blocked.
+     * The candidates of [code], ranked; decoded as they are asked for. The words from outside the
+     * table after its own as long, none where the table's lone entry commits itself (D8); none
+     * blocked under the code, nor a word from outside blocked anywhere; the one pinned first.
      */
     private fun rank(code: String): Ranking {
         val coded = table.match(code, options.matchingKey)
         val spelt = table.matchPinyin(code, prefix = pinyinPrefix(code))
         // the pinyin entries last, so a code and its pinyin as long rank the code first
         val entries = if (spelt.isEmpty()) coded else coded + spelt
-        // learned phrases are found by their plain code; the matching key is for the table's
-        val learned = user.saved(code).map { (c, text) -> Item(c, text, false) }
-        val others = shared.words(code).filterNot { (c, text) -> user.isSaved(c, text) }.map { (c, text) -> Item(c, text, false) }
+        val here = keyed(code)
+        val blockedHere = language?.blockedUnder?.invoke(here).orEmpty()
+        val alone = spelt.isEmpty() && alone(coded, blockedHere)
+        // saved phrases are found by their plain code; the matching key is for the table's
+        val saved = if (alone) emptyList() else user.saved(code).map { (c, text) -> Item(c, text) }
+        val others = if (alone) emptyList() else shared.words(code).filterNot { (c, text) -> user.isSaved(c, text) }.map { (c, text) -> Item(c, text) }
         val noSort = minOf(code.length, options.noSortInputLength)
-        val found = Found(learned, entries, coded.size, others)
-        // one sortable number per candidate: its group, length, picks, then where it was
+        val found = Found(saved, entries, coded.size, others)
+        // one sortable number per candidate: its group, length, whether from outside the table, then where it was
         val keys = LongArray(found.size) { at ->
             val extra = found.item(at)
-            if (extra != null) key(at, extra.code.length, noSort, false) { user.picks(extra.code, extra.text) }
-            else found.entry(at).let { e -> key(at, table.codeLength(e) - (if (found.spelt(at)) 1 else 0), noSort, found.spelt(at)) { user.picks(e) } }
+            if (extra != null) {
+                key(at, extra.code.length, noSort, isPinyin = false, outside = true)
+            } else {
+                found.entry(at).let { e -> key(at, table.codeLength(e) - (if (found.spelt(at)) 1 else 0), noSort, found.spelt(at), outside = false) }
+            }
         }
         keys.sort()
         val order = IntArray(keys.size) { (keys[it] and POSITION_MASK).toInt() }
         ownFirst(order, found::spelt)
-        // the most recently seen first
-        val auto = user.seen(code).map { (c, text) -> Item(c, text, true) }
+        val pinned = habits.pinned(here)?.text
+        // the 重码: the candidates (at [order]'s positions) of the whole code typed, past those kept in
+        // order; sorted by length, none comes after the first longer code (what ownFirst moves forward
+        // past pinyin entries is none either): the rest is not looked at
+        val longer = keys.indexOfFirst { ((it shr LENGTH_SHIFT) and MAX_LENGTH.toLong()) > code.length }
+        val reach = if (code.length <= noSort) 0 else if (longer < 0) order.size else longer
+        val blocked = { item: Item -> item.text in blockedHere || (!item.inTable && shared.blocked(item.text)) }
+        // the table's own first, before 调频's models and the habits ranked it: picked over another shown first, a use of it (F2739)
+        val own = order.asSequence().map { found.item(it) ?: entryItem(found.entry(it)) }.firstOrNull { !blocked(it) }?.text.orEmpty()
         val made = { placed: IntArray ->
-            Ranking(shared::blocked, emojiOf, phrasesOf) { at ->
-                when {
-                    at < placed.size -> placed[at].let { found.item(it) ?: entryItem(found.entry(it)) }
-                    else -> auto.getOrNull(at - placed.size)
-                }
+            val shown = TableHabitOrder.pinnedFirst(byHabit(code, placed, reach, { found.item(it) == null && !found.spelt(it) }) { found.text(it, table) }, pinned) {
+                found.text(it, table)
+            }
+            Ranking(blocked, emojiOf, phrasesOf, own) { at ->
+                shown.getOrNull(at)?.let { found.item(it) ?: entryItem(found.entry(it)) }
             }
         }
-        // the 重码: the candidates (at [order]'s positions) of the whole code typed, past those kept in order
-        if (code.length <= noSort) return made(order)
-        // sorted by length, none comes after the first longer code (what ownFirst moves forward past
-        // pinyin entries is none either): the rest is not looked at
-        val longer = keys.indexOfFirst { ((it shr LENGTH_SHIFT) and MAX_LENGTH.toLong()) > code.length }
-        return weighed(code, order, if (longer < 0) order.size else longer, { k -> kind(code, found, order[k]) }, made)
+        if (reach == 0) return made(order)
+        return weighed(code, order, reach, { k -> kind(code, found, order[k]) }, blockedHere, made)
+    }
+
+    /**
+     * Whether the table's entries [coded] are one text, not [blocked], whose code commits itself
+     * (D8): a row the table has twice is one text, a blocked one none. Done at the second text.
+     */
+    private fun alone(coded: IntArray, blocked: Set<String>): Boolean {
+        var text: String? = null
+        for (e in coded) {
+            val t = table.text(e)
+            if (t in blocked || t == text) continue
+            if (text != null || !commitsWhole(table.code(e))) return false
+            text = t
+        }
+        return text != null
+    }
+
+    // [TableHabitOrder.order] under [code] typed alone, what it ranked kept for 为什么排在这
+    private fun byHabit(code: String, original: IntArray, reach: Int, own: (Int) -> Boolean, text: (Int) -> String): IntArray {
+        val ordered = if (reach == 0 || wild()) null else TableHabitOrder.order(habits, options.orderByUse, keyed(code), original, reach, own, text)
+        ranked = ordered?.second.orEmpty()
+        return ordered?.first ?: original
     }
 
     /**
      * What candidate [at] of [found] is among the 重码 of [code]: a table entry of the code whole,
-     * [USERS] for a word of the user's once picked here (one of the other input methods', or a phrase
-     * saved as typed character by character, goes where its picks put it till then), else [OTHER].
+     * else [OTHER] (a word from outside the table goes where its length put it).
      */
-    private fun kind(code: String, found: Found, at: Int): Int {
-        val extra = found.item(at)
-        return when {
-            found.spelt(at) -> OTHER
-            extra != null -> if (extra.code.length == code.length && user.picks(extra.code, extra.text) > 0) USERS else OTHER
-            else -> found.entry(at).let { e -> if (table.codeLength(e) == code.length) e else OTHER }
-        }
+    private fun kind(code: String, found: Found, at: Int): Int = when {
+        found.spelt(at) || found.item(at) != null -> OTHER
+        else -> found.entry(at).let { e -> if (table.codeLength(e) == code.length) e else OTHER }
     }
 
     /**
-     * A code's candidates at [rank]'s positions: the user's [learned] phrases, the table's [entries]
+     * A code's candidates at [rank]'s positions: the [saved] phrases, the table's [entries]
      * (the first [coded] by code, the rest by pinyin), then the other input methods' words ([others]).
      */
-    private class Found(val learned: List<Item>, val entries: IntArray, val coded: Int, val others: List<Item>) {
-        private val sharedFrom = learned.size + entries.size
+    private class Found(val saved: List<Item>, val entries: IntArray, val coded: Int, val others: List<Item>) {
+        private val sharedFrom = saved.size + entries.size
         val size get() = sharedFrom + others.size
 
         fun item(at: Int): Item? = when {
-            at < learned.size -> learned[at]
+            at < saved.size -> saved[at]
             at >= sharedFrom -> others[at - sharedFrom]
             else -> null
         }
 
-        fun spelt(at: Int) = at in learned.size + coded until sharedFrom
+        fun spelt(at: Int) = at in saved.size + coded until sharedFrom
 
-        fun entry(at: Int) = entries[at - learned.size]
+        fun entry(at: Int) = entries[at - saved.size]
+
+        fun text(at: Int, table: TableDictionary) = item(at)?.text ?: table.text(entry(at))
     }
 
     /**
      * [made] with the 重码 of [code] in [order] placed ([kind] of each of its first [reach] positions,
-     * past which there are none: a table entry, [USERS] for the user's words, or [OTHER]): the user's
-     * first, as they were, then the table's by the word and sentence models, a blocked one left where
-     * it is (it is not shown). In the table's order where it does not order by use (one setting:
-     * 常用的字词排前面), or a wildcard was typed.
+     * past which there are none: a table entry, or [OTHER]): the table's by the word and sentence
+     * models, one blocked under the code ([blockedHere]) left where it is (it is not shown). In the
+     * table's order where it does not order by use (调频), or a wildcard was typed.
      */
-    private fun weighed(code: String, order: IntArray, reach: Int, kind: (Int) -> Int, made: (IntArray) -> Ranking): Ranking {
+    private fun weighed(code: String, order: IntArray, reach: Int, kind: (Int) -> Int, blockedHere: Set<String>, made: (IntArray) -> Ranking): Ranking {
         val language = language?.takeIf { options.orderByUse } ?: return made(order)
         if (options.matchingKey != null && code.contains(options.matchingKey)) return made(order)
         val kinds = IntArray(reach, kind)
-        val users = kinds.indices.filter { kinds[it] == USERS }
-        val ranked = kinds.indices.filter { kinds[it] >= 0 && !shared.blocked(table.text(kinds[it])) }
-        if (ranked.size < 2 && users.isEmpty()) return made(order)
+        val rankable = kinds.indices.filter { kinds[it] >= 0 && table.text(kinds[it]) !in blockedHere }
+        if (rankable.size < 2) return made(order)
         val (prev2, prev) = TextWords.previous(language.words.lastTwo(predictions.before))
-        val texts = ranked.map { table.text(kinds[it]) }
-        // each pick here counting as use, as the table ordered by use before: the user model's counts
-        // alone move a pick too slowly for those who expect it forward next time
-        val scores = FloatArray(ranked.size) { k -> language.words.logProb(texts[k], prev2, prev) + log10(1f + user.picks(kinds[ranked[k]])) }
+        val texts = rankable.map { table.text(kinds[it]) }
+        val scores = FloatArray(rankable.size) { k -> language.words.logProb(texts[k], prev2, prev) }
         // by score, the table's order among equals
-        val byScore = ranked.indices.sortedByDescending { scores[it] }
-        val h = Homographs(
-            order, (users + ranked).sorted().toIntArray(), users.map { order[it] }.toIntArray(),
-            byScore.map { order[ranked[it]] }.toIntArray(), byScore.map { texts[it] }, byScore.map { scores[it] }, made,
-        )
+        val byScore = rankable.indices.sortedByDescending { scores[it] }
+        val h = Homographs(order, rankable.toIntArray(), byScore.map { order[rankable[it]] }.toIntArray(), byScore.map { texts[it] }, byScore.map { scores[it] }, made)
         homographs = h
-        return h.place(if (texts.size > 1) language.reranker?.pick(predictions.context, h.texts, h.scores) ?: 0 else 0)
+        return h.place(language.reranker?.pick(predictions.context, h.texts, h.scores) ?: 0)
     }
 
     /**
-     * A code's 重码 in [order]: at the positions [at], the user's words [users] (order's values) first,
-     * then [entries] by the word model, their [texts] and [scores] so; [place] puts one of the
-     * entries first among them, the rest as ranked, in a copy of [order]: a Ranking reads its
-     * order as it is asked, and one made before goes on as it was.
+     * A code's 重码 in [order]: at the positions [at], [entries] by the word model, their [texts]
+     * and [scores] so; [place] puts one of them first, the rest as ranked, in a copy of [order]: a
+     * Ranking reads its order as it is asked, and one made before goes on as it was.
      */
     private class Homographs(
         private val order: IntArray,
         private val at: IntArray,
-        private val users: IntArray,
         private val entries: IntArray,
         val texts: List<String>,
         val scores: List<Float>,
@@ -656,8 +754,7 @@ class TableSession(
         fun place(first: Int): Ranking {
             val placed = order.copyOf()
             var k = 0
-            for (u in users) placed[at[k++]] = u
-            if (entries.isNotEmpty()) placed[at[k++]] = entries[first]
+            placed[at[k++]] = entries[first]
             for (j in entries.indices) if (j != first) placed[at[k++]] = entries[j]
             return made(placed)
         }
@@ -668,31 +765,19 @@ class TableSession(
         return snapshot()
     }
 
-    /** A candidate's sortable number: its group, length, picks (asked for only when they count), then [at]. */
-    private fun key(at: Int, length: Int, noSort: Int, isPinyin: Boolean, picks: () -> Int): Long {
+    /** A candidate's sortable number: its group, length, whether it is from [outside] the table, then [at]. */
+    private fun key(at: Int, length: Int, noSort: Int, isPinyin: Boolean, outside: Boolean): Long {
         val sorted = length > noSort || isPinyin
-        val used = if (sorted && options.orderByUse) picks() else 0
         return (if (sorted) 1L shl GROUP_SHIFT else 0L) or
             ((if (sorted && options.sortByCodeLength) minOf(length, MAX_LENGTH) else 0).toLong() shl LENGTH_SHIFT) or
-            ((MAX_PICKS - minOf(used, MAX_PICKS)).toLong() shl PICKS_SHIFT) or
+            (if (outside) 1L shl OUTSIDE_SHIFT else 0L) or
             at.toLong()
     }
 
-    /** A code's own candidate first, if it has one (libime's rule): before what pinyin [spelt]. */
-    private fun ownFirst(order: IntArray, spelt: (Int) -> Boolean) {
-        if (order.isEmpty() || !spelt(order[0])) return
-        val own = order.indexOfFirst { !spelt(it) }
-        if (own > 0) {
-            val first = order[own]
-            System.arraycopy(order, 0, order, 1, own)
-            order[0] = first
-        }
-    }
-
     private fun entryItem(index: Int) = if (table.isPinyin(index)) {
-        Item(table.code(index).substring(1), table.text(index), false, index, pinyin = true)
+        Item(table.code(index).substring(1), table.text(index), index, pinyin = true)
     } else {
-        Item(table.code(index), table.text(index), false, index)
+        Item(table.code(index), table.text(index), index)
     }
 
     /**
@@ -714,9 +799,10 @@ class TableSession(
      * twice; the first's [emoji] after the first [EmojiCandidates.AFTER] of them.
      */
     private class Ranking(
-        private val blocked: (String) -> Boolean = { false },
+        private val blocked: (Item) -> Boolean = { false },
         private val emoji: (String) -> List<String> = { emptyList() },
         private val phrases: (String) -> List<String> = { emptyList() },
+        val own: String = "",
         private val source: (Int) -> Item?,
     ) {
         private val items = ArrayList<Item>()
@@ -732,7 +818,7 @@ class TableSession(
                     continue
                 }
                 val item = source(next++)
-                if (item == null) done = true else if (!blocked(item.text) && seen.add(item.text)) items += item
+                if (item == null) done = true else if (!blocked(item) && seen.add(item.text)) items += item
             }
             // fewer than AFTER: after them all
             if (done && !emojiPlaced) placeEmoji()
@@ -746,7 +832,7 @@ class TableSession(
             EmojiCandidates.pick(first.text, emoji, phrases) { it in seen }
                 .forEach {
                     seen += it
-                    items += Item("", it, auto = false, emoji = true)
+                    items += Item("", it, emoji = true)
                 }
         }
 
@@ -796,24 +882,7 @@ class TableSession(
         )
     }
 
-    private fun predicted(commit: String, handled: Boolean): Snapshot {
-        val from = page * options.pageSize
-        val offered = offeredTexts()
-        return Snapshot(
-            commit = commit,
-            preedit = "",
-            candidates = offered.drop(from).take(options.pageSize),
-            page = page,
-            hasPreviousPage = page > 0,
-            hasNextPage = from + options.pageSize < offered.size,
-            handled = handled,
-            predicting = true,
-            // a prediction may be forgotten or blocked: see offers
-            actionable = true,
-            total = offered.size,
-            first = from,
-        )
-    }
+    private fun predicted(commit: String, handled: Boolean) = predicted(offeredTexts(), page, options.pageSize, commit, handled)
 
     private fun wild() = options.matchingKey != null && input.contains(options.matchingKey)
 
@@ -846,7 +915,11 @@ class TableSession(
                 // what was looked up is committed, or else what was typed as Enter has it; then
                 // the key is the app's
                 var text = if (input.length > 1) pinyin.apply(Action.Select(0)).commit else ""
+                val commit = if (text.isEmpty()) null else pinyin.lastCommit
                 if (text.isEmpty()) text = typedInLookUp(pinyin)
+                journal.committed(text, commit, learning)
+                // then the key, not written here
+                journal.unverify()
                 endLookUp()
                 // then the key, the app's
                 predictions.wrote(text + action.char, null)
@@ -856,10 +929,11 @@ class TableSession(
             Action.CommitRaw -> {
                 val text = typedInLookUp(pinyin)
                 endLookUp()
-                predictions.wrote(text, null)
+                wrote(text, null)
                 snapshot(commit = text)
             }
             Action.Reset, is Action.Context -> {
+                if (action is Action.Context) predictions.learnFrom(action)
                 endLookUp()
                 moved((action as? Action.Context)?.before)
                 snapshot()
@@ -904,7 +978,8 @@ class TableSession(
     private fun fromPinyin(s: Snapshot): Snapshot {
         if (s.commit.isNotEmpty()) {
             endLookUp()
-            predictions.wrote(s.commit, null)
+            // looked up as full pinyin learns it (U-28), and taken back as it is (U-03)
+            wrote(s.commit, null, pinyin?.lastCommit)
             return snapshot(commit = s.commit)
         }
         return s.copy(
@@ -921,25 +996,51 @@ class TableSession(
         pinyin?.apply(Action.Reset)
         lookingUp = false
         lookedUp = null
-        // a looked-up character is not one typed by its code: no phrase from it
-        recent.clear()
         clear()
     }
 
     companion object {
-        // a ranking key: group, code length, picks (fewest last), position
+        // a ranking key: group, code length, from outside the table, position
         private const val GROUP_SHIFT = 62
         private const val LENGTH_SHIFT = 54
-        private const val PICKS_SHIFT = 32
+        private const val OUTSIDE_SHIFT = 32
         private const val MAX_LENGTH = 0xFF
-        private const val MAX_PICKS = 0x3FFFFF
         private const val POSITION_MASK = 0xFFFFFFFFL
 
-        // a position's kind in a code's 重码 that is no table entry: the user's word, or none of them
-        private const val USERS = -1
-        private const val OTHER = -2
+        // a position's kind in a code's 重码 that is no table entry
+        private const val OTHER = -1
 
         // a space later than this after a code committed itself was typed on purpose, after a pause
         private const val SPACE_TAKEN_MS = 1000L
+    }
+}
+
+// what may follow, shown: page [page] of [offered] (a session's own emoji, then the predictions)
+private fun predicted(offered: List<String>, page: Int, pageSize: Int, commit: String, handled: Boolean): Snapshot {
+    val from = page * pageSize
+    return Snapshot(
+        commit = commit,
+        preedit = "",
+        candidates = offered.drop(from).take(pageSize),
+        page = page,
+        hasPreviousPage = page > 0,
+        hasNextPage = from + pageSize < offered.size,
+        handled = handled,
+        predicting = true,
+        // a prediction may be forgotten or blocked: see offers
+        actionable = true,
+        total = offered.size,
+        first = from,
+    )
+}
+
+/** A code's own candidate first, if it has one (libime's rule): before what pinyin [spelt]. */
+private fun ownFirst(order: IntArray, spelt: (Int) -> Boolean) {
+    if (order.isEmpty() || !spelt(order[0])) return
+    val own = order.indexOfFirst { !spelt(it) }
+    if (own > 0) {
+        val first = order[own]
+        System.arraycopy(order, 0, order, 1, own)
+        order[0] = first
     }
 }

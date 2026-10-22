@@ -6,7 +6,8 @@ package org.fcitx.fcitx5.android.engine.session
 
 import org.fcitx.fcitx5.android.engine.data.PinyinData
 import org.fcitx.fcitx5.android.engine.data.PinyinDataBuilder
-import org.fcitx.fcitx5.android.engine.lattice.LayerPrior
+import org.fcitx.fcitx5.android.engine.learn.Learner
+import org.fcitx.fcitx5.android.engine.learn.row
 import org.fcitx.fcitx5.android.engine.phrase.CustomPhrases
 import org.fcitx.fcitx5.android.engine.phrase.PhraseBook
 import org.fcitx.fcitx5.android.engine.pinyin.Fuzzy
@@ -204,59 +205,30 @@ class PinyinSessionTest {
     }
 
     @Test
-    fun aPickPastTheFirstChoiceLiftsItsLayerUntilItComesFirst() {
-        // 拟 of another layer, scored 2.5 orders under 你; a step of 1 lifts it over in three picks
-        val layered = PinyinData.load(
-            ByteBuffer.wrap(
-                PinyinDataBuilder()
-                    .layers(listOf("base", "new"))
-                    .unigram("<unk>", -7f, 0f)
-                    .unigram("你", -2f, 0f)
-                    .unigram("拟", -4.5f, 0f)
-                    .entry("你", syl("ni"))
-                    .entry("拟", syl("ni"), layer = 1)
-                    .build().toByteArray(),
-            ),
-        )
-        val prior = LayerPrior(layered.layers, step = 1f, bound = 4f)
-        val session = PinyinSession(layered, PinyinSegmenter(), prior = prior, prediction = false)
-        assertEquals(listOf("你", "拟"), session.type("ni").candidates)
-        // the first choice taken: nothing learned
-        session.apply(Select(0))
-        assertEquals(0f, prior[1], 0f)
-        repeat(3) {
-            assertEquals("你", session.type("ni").candidates[0])
-            assertEquals("拟", session.apply(Select(1)).commit)
+    fun whatTheRerankerPutFirstIsUsedAsShownAndTwiceTheUsersWord() {
+        val learner = Learner(data)
+        val user = learner.model
+        // the reranker's choice, the same text each time once it is made
+        var chosen: String? = null
+        val session = PinyinSession(data, PinyinSegmenter(), pageSize = 20, user = user, learnTo = learner.learnTo()) { _, readings, _ ->
+            chosen?.let { readings.indexOf(it).takeIf { i -> i >= 0 } } ?: readings.lastIndex
         }
-        assertEquals(3f, prior[1], 0f)
-        // 拟 first now, and taking it there teaches nothing more
-        assertEquals(listOf("拟", "你"), session.type("ni").candidates)
-        session.apply(Select(0))
-        assertEquals(3f, prior[1], 0f)
-        // 你 picked over it: back down one
-        session.type("ni")
-        session.apply(Select(1))
-        assertEquals(2f, prior[1], 0f)
-        // not while learning is off
-        session.learning = false
-        session.type("ni")
-        session.apply(Select(1))
-        assertEquals(2f, prior[1], 0f)
-    }
-
-    @Test
-    fun whatTheRerankerPutFirstIsLearnedAsPickedOverTheDecoder() {
-        val user = UserModel(data.dictionary, data.vocabulary)
-        val session = PinyinSession(data, PinyinSegmenter(), pageSize = 20, user = user) { _, readings, _ -> readings.lastIndex }
         // the decoder's best, second now: nothing new
         assertEquals("你在", session.type("nizai").candidates[1])
         session.apply(Select(1))
         assertEquals(0, user.size)
-        // the reranker's: learned as one word, for the decoder to have it first without it
+        // the reranker's, put in as shown, twice: a text of none's, the user's word (U-06), used, not corrected to
         val picked = session.type("nizai").candidates[0]
-        assertEquals(picked, session.apply(Select(0)).commit)
+        chosen = picked
+        repeat(2) {
+            assertEquals(picked, session.apply(Select(0)).commit)
+            session.apply(Reset)
+            session.type("nizai")
+        }
         assertEquals(1, user.size)
-        assertEquals(picked, PinyinSession(data, PinyinSegmenter(), user = user).type("nizai").candidates.first())
+        // without the reranker the decoder's first stays first, whatever its words' counts made it: the text used there comes next (U-02)
+        val plain = PinyinSession(data, PinyinSegmenter(), user = user, learnTo = learner.learnTo()).type("nizai").candidates
+        assertEquals(picked, plain[1])
     }
 
     @Test
@@ -384,6 +356,53 @@ class PinyinSessionTest {
     }
 
     @Test
+    fun aPickAfterTheAppsTextLearnsThePairWithItsLastWord() {
+        // dl's 点了 picked after the field's 我 learned no pair with 我, and stayed behind 带来 there
+        val learner = Learner(data)
+        val session = PinyinSession(data, PinyinSegmenter(), user = learner.model, prediction = false, learnTo = learner.learnTo())
+        // as the learning record has them: the model holds a pair to the count of the word before
+        fun pairs() = learner.log.state.pairs.keys.map { it.prev + it.next }
+        session.apply(Action.Context("他说我"))
+        val shown = session.type("zai").candidates
+        assertEquals("再", shown.first())
+        assertEquals("在", session.apply(Pick(shown.indexOf("在"))).commit)
+        assertEquals(listOf("我在"), pairs())
+        // what follows goes on from what was committed here, as before
+        session.type("jian")
+        assertEquals("见", session.apply(Select(0)).commit)
+        assertEquals(setOf("我在", "在见"), pairs().toSet())
+    }
+
+    @Test
+    fun noPairIsLearnedAfterTheAppsTextEndingInNoWordOrClearedOrDeleted() {
+        val learner = Learner(data)
+        val session = PinyinSession(data, PinyinSegmenter(), user = learner.model, prediction = false, learnTo = learner.learnTo())
+        fun pairs() = learner.log.state.pairs.keys.map { it.prev + it.next }
+        fun pickZai() = assertEquals("在", session.type("zai").let { session.apply(Pick(it.candidates.indexOf("在"))) }.commit)
+        // ending in a mark or digits: no word before (a space is trimmed, letters are a word: LastWord, U-52)
+        for (text in listOf("我。", "我123")) {
+            session.apply(Action.Context(text))
+            pickZai()
+            assertTrue(text, pairs().none { it.startsWith("我") })
+        }
+        // a field that cleared itself (a message sent): its text scores, but is no word to pair with
+        session.apply(Action.Context("他说我", cleared = true))
+        pickZai()
+        assertEquals(emptyList<String>(), pairs())
+        // what follows goes on from what was picked here
+        session.type("jian")
+        assertEquals("见", session.apply(Select(0)).commit)
+        assertEquals(listOf("在见"), pairs())
+        // what was committed deleted to nothing: nothing before
+        session.apply(Reset)
+        session.type("wo")
+        assertEquals("我", session.apply(Select(0)).commit)
+        session.apply(Backspace)
+        pickZai()
+        assertEquals(listOf("在见"), pairs())
+    }
+
+    @Test
     fun whileLearningIsOffTheAppsTextIsNoContext() {
         val contexts = ArrayList<String>()
         val session = PinyinSession(data, PinyinSegmenter()) { context, _, _ -> contexts += context; 0 }
@@ -411,7 +430,7 @@ class PinyinSessionTest {
         assertEquals(committed.toString(), contexts.last())
         // cut where a pair of chars is not split
         val pairs = "\uD840\uDC00".repeat(100)
-        assertEquals(pairs.substring(74) + "b", PinyinSession.tail("a" + pairs + "b"))
+        assertEquals(pairs.substring(74) + "b", recentTail("a" + pairs + "b"))
     }
 
     @Test
@@ -680,21 +699,21 @@ class PinyinSessionTest {
     @Test
     fun aWordForgottenPastTheFirstWordsStaysOnThePageShown() {
         val many = many()
-        val user = UserModel(many.dictionary, many.vocabulary)
-        val session = PinyinSession(many, PinyinSegmenter(), pageSize = 10, user = user)
+        val learner = Learner(many)
+        val session = PinyinSession(many, PinyinSegmenter(), pageSize = 10, user = learner.model, learnTo = learner.learnTo())
         session.type("shi")
         repeat(7) { session.apply(NextPage) }
         // never learned, so not offered (PY-33)
         assertFalse(Offer.FORGET in session.offers(72))
         // learned only as the word before another: something to forget, its place not moved
         val word = session.candidates(72, 1).single().text
-        user.learn(UserModel.Entry(word, syl("shi")), listOf(UserModel.Entry(chars[0], syl("shi"))))
+        learner.habits.record(listOf(row("shi", chars[0], "shi", prev = word)))
         session.apply(Reset)
         session.type("shi")
         repeat(7) { session.apply(NextPage) }
         assertEquals(word, session.candidates(72, 1).single().text)
         assertTrue(Offer.FORGET in session.offers(72))
         assertEquals(7, session.apply(Action.Forget(72)).page)
-        assertFalse(user.hasLearned(listOf(UserModel.Entry(word, syl("shi")))))
+        assertFalse(learner.habits.knows(word))
     }
 }

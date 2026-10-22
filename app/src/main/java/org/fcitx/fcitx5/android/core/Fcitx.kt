@@ -21,6 +21,7 @@ import org.fcitx.fcitx5.android.engine.glide.Glide
 import org.fcitx.fcitx5.android.engine.handwriting.InkReading
 import org.fcitx.fcitx5.android.engine.host.Engines
 import org.fcitx.fcitx5.android.engine.host.Keyboard
+import org.fcitx.fcitx5.android.engine.learn.control.LearningOp
 import org.fcitx.fcitx5.android.utils.Locales
 import org.fcitx.fcitx5.android.utils.appContext
 import org.fcitx.fcitx5.android.utils.toast
@@ -66,6 +67,7 @@ class Fcitx(private val context: Context) : FcitxAPI, FcitxLifecycleOwner {
     override suspend fun userWords() = withFcitxContext { EngineBridge.engines.userWords() }
     override suspend fun userWords(kind: Engines.UserWord.Kind) = withFcitxContext { EngineBridge.engines.userWords(kind) }
     override suspend fun userWordCounts() = withFcitxContext { EngineBridge.engines.userWordCounts() }
+    override suspend fun sameCodes(texts: List<String>, ims: List<String>) = withFcitxContext { EngineBridge.engines.sameCodes(texts, ims) }
     override suspend fun pinyinOf(text: String) = withFcitxContext { EngineBridge.engines.pinyinOf(text) }
     override suspend fun wordBoundaries(texts: List<String>) = withFcitxContext { EngineBridge.engines.wordBoundaries(texts) }
     override suspend fun logProbs(texts: List<String>) = withFcitxContext { EngineBridge.engines.logProbs(texts) }
@@ -75,13 +77,51 @@ class Fcitx(private val context: Context) : FcitxAPI, FcitxLifecycleOwner {
     override suspend fun englishWords() = withFcitxContext { EngineBridge.engines.englishWords() }
     override suspend fun addEnglishWord(text: String) = withFcitxContext { EngineBridge.engines.addEnglishWord(text) }
     override suspend fun forgetEnglishWords(texts: List<String>) = withFcitxContext { EngineBridge.engines.forgetEnglishWords(texts) }
-    override suspend fun importUserWords(lines: Sequence<String>) = withFcitxContext { EngineBridge.engines.importWords(lines) }
-    override suspend fun exportUserWords() = withFcitxContext { EngineBridge.engines.exportWords() }
+    override suspend fun importUserWords(lines: Sequence<String>, fileName: String) = withFcitxContext { EngineBridge.engines.importWords(lines, fileName) }
+    override suspend fun importBatches() = withFcitxContext { EngineBridge.engines.importBatches() }
+    override suspend fun importedWords(batch: Int?) = withFcitxContext { EngineBridge.engines.importedWords(batch) }
+    override suspend fun dropImport(batch: Int) = withFcitxContext { EngineBridge.engines.dropImport(batch) }
+    override suspend fun restoreImport(batch: Int) = withFcitxContext { EngineBridge.engines.restoreImport(batch) }
     override suspend fun tableKeys(im: String) = withFcitxContext { EngineBridge.tableKeys(im) }
 
-    override suspend fun engineContext(before: String, learning: Boolean, cleared: Boolean) = withFcitxContext { EngineBridge.context(before, learning, inputMethodEntryCached.uniqueName, cleared) }
+    // English's word typed offered back where the cursor came to its correction (U-31): shown at once, as a glide's word is
+    override suspend fun engineContext(
+        before: String,
+        learning: Boolean,
+        cleared: Boolean,
+        learnFlags: Int,
+        started: Boolean,
+        after: String?,
+        selected: Boolean,
+        said: Boolean,
+    ) = withFcitxContext {
+        if (EngineBridge.context(
+                before, learning, inputMethodEntryCached.uniqueName, cleared = cleared, learnFlags = learnFlags,
+                started = started, after = after, selected = selected, said = said,
+            )) {
+            sendKeySymToFcitx(UNICODE + Keyboard.RECALL, KeyStates.Virtual.toInt(), 0, false, -1)
+        }
+    }
     override suspend fun offerInk(reading: InkReading, piece: Int) = withFcitxContext { EngineBridge.offerInk(reading, piece, inputMethodEntryCached.uniqueName).also(::ink) }
     override suspend fun inkFinished(piece: Int) = withFcitxContext { EngineBridge.inkFinished(piece, inputMethodEntryCached.uniqueName).also(::ink) }
+
+    override suspend fun enginePaused(idle: Boolean) = withFcitxContext { EngineBridge.paused(idle) }
+
+    override suspend fun learning(op: LearningOp) = withFcitxContext {
+        val candidate = (op as? LearningOp.OnPage)?.op ?: op as? LearningOp.OnCandidate
+        EngineBridge.learning(op, inputMethodEntryCached.uniqueName) act@{ event ->
+            // as the menu sends it: asked first (the addon acts only on the candidate it was asked of), at the index the list has
+            // whether it was: the engine says nothing done where the addon dropped it (review-E-engine S4)
+            if (candidate == null) return@act false
+            val offered = getFcitxCandidateActions(candidate.index)?.any { it.id == event } == true
+            if (!offered) return@act false
+            triggerFcitxCandidateAction(candidate.index, event, candidate.text)
+            true
+        }.also { (_, again) ->
+            // a private-use key the engine reads as "show it anew" (Keyboard.AGAIN), as INK and GLIDE
+            if (again) sendKeySymToFcitx(UNICODE + Keyboard.AGAIN, KeyStates.Virtual.toInt(), 0, false, -1)
+        }.first
+    }
 
     override suspend fun offerGlide(glide: Glide) = withFcitxContext {
         EngineBridge.offerGlide(glide, inputMethodEntryCached.uniqueName).also { taken ->

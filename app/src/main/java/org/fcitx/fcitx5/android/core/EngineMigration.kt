@@ -4,7 +4,9 @@
  */
 package org.fcitx.fcitx5.android.core
 
+import org.fcitx.fcitx5.android.data.restoreDirectory
 import org.fcitx.fcitx5.android.engine.host.AddonDefaults
+import org.fcitx.fcitx5.android.engine.host.Engines
 import org.fcitx.fcitx5.android.engine.host.LibimeMigration
 import org.fcitx.fcitx5.android.engine.store.replaceFile
 import timber.log.Timber
@@ -18,7 +20,8 @@ import java.io.IOException
  * English's suggestions). What the user learned is read in later, by the engine (EngineBridge).
  * Each file carried over is kept as it was before it is first rewritten ([keep]).
  * Before that, what a table imported in an older build left is deleted ([importedTablesGone]);
- * after it, punctuation.conf gets the app's default ([punctuationDefault]). Neither is kept to undo.
+ * after it, punctuation.conf gets the app's default ([punctuationDefault]), and the tables typed
+ * with before 调频 came off by default keep it on ([orderByUseKept]). None is kept to undo.
  */
 object EngineMigration {
 
@@ -33,6 +36,7 @@ object EngineMigration {
         // failing, fcitx starts with its defaults: the old input methods are just not there
         guarded("migrate libime's config") { libimeConfig(configHome) }
         guarded("set the punctuation default") { punctuationDefault(configHome) }
+        guarded("keep the tables ordering by use") { orderByUseKept(configHome, engineDir) }
     }
 
     private inline fun guarded(what: String, step: () -> Unit) {
@@ -76,6 +80,48 @@ object EngineMigration {
             punctuation.parentFile?.mkdirs()
             replaceFile(punctuation, File(punctuation.path + ".new")) { it.writeText(text) }
         }
+    }
+
+    /**
+     * 调频 is off on a new install (U-28 D7); a table typed with in an older build, which has its log
+     * in [engineDir], keeps it on where its settings do not say. Once, at the first start of this
+     * build ([ORDER_KEPT] says it ran): a table's log made since is a new install's. Decided only
+     * once the phone is unlocked, with [engineDir] to read. A start while locked notes which tables'
+     * settings did not say yet ([ORDER_UNSET], the first such start's): fcitx saves every value,
+     * its defaults too, at the next change of any setting, and a table's `No` written so before
+     * the unlocked start is the new default, not the user's.
+     */
+    private fun orderByUseKept(configHome: File, engineDir: File?) {
+        val settings = File(configHome, "conf/androidengine.conf")
+        val unset = File(configHome, ORDER_UNSET)
+        val config = if (settings.exists()) settings.readText() else ""
+        if (engineDir == null) {
+            if (!unset.exists()) replaceFile(unset, File(unset.path + ".new")) {
+                it.writeText(LibimeMigration.orderUnset(config).joinToString("\n"))
+            }
+            return
+        }
+        // a new install has no engine directory yet: made, or the marker could not be written and a
+        // table typed with from then on would be taken for an older build's (review C M1); an import
+        // killed between its renames left it as engine.old, put back first, as the engine would
+        try {
+            restoreDirectory(engineDir)
+        } catch (e: IOException) {
+            Timber.w(e, "engine data not put back: the tables' ordering decided at a later start")
+            return
+        }
+        if (!engineDir.isDirectory && !engineDir.mkdirs()) return
+        val done = File(engineDir, ORDER_KEPT)
+        if (!done.exists()) {
+            val typed = Engines.TABLES.keys.filter { File(engineDir, Engines.userTable(it)).exists() }
+            val before = if (unset.exists()) unset.readLines().filterTo(HashSet()) { it.isNotEmpty() } else emptySet()
+            LibimeMigration.keepOrderByUse(config, typed, before)?.let {
+                settings.parentFile?.mkdirs()
+                replace(configHome, settings, it)
+            }
+            done.createNewFile()
+        }
+        unset.delete()
     }
 
     /**
@@ -128,4 +174,10 @@ object EngineMigration {
 
     // at the top of each home: in no directory fcitx or the settings list
     private const val KEPT = ".libime"
+
+    // in the engine's user data, beside the tables' logs: the tables typed with before were looked at
+    internal const val ORDER_KEPT = "tables.order-kept"
+
+    // in the config home, readable while locked: see orderByUseKept
+    internal const val ORDER_UNSET = "tables.order-unset"
 }

@@ -98,10 +98,11 @@ class CustomPhrases private constructor(private val phrases: Map<String, List<Ph
 
     /**
      * [candidates] with the phrases under [key] put where they go, in the file's order among
-     * phrases of one order: a candidate of the same text that reads [all] the input moves there
-     * itself, as libime does, so what it learns is learned still; one that reads less is left out,
-     * as the phrase is what the user meant by the key; for the rest, [make] one. [now] is asked
-     * only when [key] has phrases.
+     * phrases of one order, each one [make]s: text, not learned (impl/PLAN.md §2.7, U-66). A
+     * candidate of the same text that reads [all] the input is not moved there: ranked before the
+     * phrase, it stays there, to be picked and learned, and the phrase is not listed again after
+     * it; ranked after, the phrase stands for it. No text is listed twice. One that reads less is
+     * left out, as the phrase is what the user meant by the key. [now] is asked only when [key] has phrases.
      */
     fun <T> place(
         key: String,
@@ -115,13 +116,21 @@ class CustomPhrases private constructor(private val phrases: Map<String, List<Ph
         val found = lookup(key, now())
         if (found.isEmpty()) return candidates
         val texts = found.mapTo(HashSet()) { it.second }
-        val out = candidates.filterTo(ArrayList()) { text(it) !in texts }
+        val out = candidates.filterTo(ArrayList()) { text(it) !in texts || all(it) }
         var last = -1
         for ((order, phrase) in found) {
-            val c = candidates.firstOrNull { text(it) == phrase && all(it) } ?: make(phrase)
             // found is in order: one of the same order goes after the one before it
-            last = minOf(maxOf(order, last + 1), out.size)
-            out.add(last, c)
+            val at = minOf(maxOf(order, last + 1), out.size)
+            // the same text before it stands for it, there; nothing is added, so no phrase after it
+            // moves up a place as when the copy was added and de-duplicated away later (F3000)
+            if ((0 until at).any { text(out[it]) == phrase }) {
+                last = at - 1
+                continue
+            }
+            out.add(at, make(phrase))
+            last = at
+            // and it stands for one of its text after it: gone now, before the next is placed
+            for (i in out.lastIndex downTo at + 1) if (text(out[i]) == phrase) out.removeAt(i)
         }
         return out
     }

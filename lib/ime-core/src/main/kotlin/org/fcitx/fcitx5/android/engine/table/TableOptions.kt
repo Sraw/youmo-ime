@@ -18,14 +18,12 @@ package org.fcitx.fcitx5.android.engine.table
  * @property noSortInputLength codes this long or shorter (and no longer than what was typed) come
  *   first, in the table's order
  * @property sortByCodeLength the other codes, shorter first
- * @property orderByUse and among codes as long, what was picked most first (fcitx's OrderPolicy)
+ * @property orderByUse 调频 (fcitx's OrderPolicy): a code's 重码 by the word and sentence models,
+ *   and by what the user picked (U-28); off, the table's order. The presets have fcitx's; the app's
+ *   is off on a new install (androidengine's config, D7)
  * @property matchingKey stands for any one key (五笔 z, 仓颉 *)
  * @property pinyinKey typed first, looks a character up by its pinyin, showing its code
  * @property hint show what is left of each candidate's code
- * @property autoPhraseLength the last characters committed one by one, up to this many (-1: the
- *   longest code), become phrases typed by their 组词规则 code; 0 turns them off
- * @property saveAutoPhraseAfter an auto phrase typed this many times, character by character, or
- *   picked once, joins the table's own entries; 0 or less: only once picked
  * @property endKeys keys that end a code (a `.conf`'s EndKey, punctuation such as `,./;`): the next
  *   key starts another, the first candidate committed (fcitx's EndKey)
  * @property selectionKeys keys that pick a candidate while something is typed, the first key the
@@ -42,8 +40,6 @@ data class TableOptions(
     val matchingKey: Char? = null,
     val pinyinKey: Char? = null,
     val hint: Boolean = true,
-    val autoPhraseLength: Int = 0,
-    val saveAutoPhraseAfter: Int = 0,
     val pageSize: Int = 5,
     val endKeys: String = "",
     val selectionKeys: String = "",
@@ -56,11 +52,13 @@ data class TableOptions(
         /** fcitx's wbx.conf: 五笔 86 */
         val WUBI = TableOptions(
             noSortInputLength = 2,
+            // orderByUse as fcitx's .conf has it, in each preset: what an older build ordered by,
+            // which LibimeMigration.keepOrderByUse keeps on for those who typed with it. A new
+            // install's 调频 is off (U-28 D7): the addon's setting, pushed to EngineSettings, says so
+            // over this; where its flattened config has no OrderPolicy, TableSettings.applyTo keeps this true
             orderByUse = true,
             matchingKey = 'z',
             pinyinKey = 'z',
-            autoPhraseLength = 4,
-            saveAutoPhraseAfter = 3,
         )
 
         /**
@@ -69,23 +67,15 @@ data class TableOptions(
          */
         val WUBI_PINYIN = WUBI.copy(pinyinKey = null)
 
-        /**
-         * fcitx's cangjie.conf. Auto phrases as libime has them unless set, though its table has
-         * no 组词规则 to code them by.
-         */
+        /** fcitx's cangjie.conf. */
         val CANGJIE = TableOptions(
             noMatchAutoSelectLength = 0,
             matchingKey = '*',
             hint = false,
-            autoPhraseLength = -1,
-            saveAutoPhraseAfter = -1,
         )
 
-        /**
-         * fcitx's zrm.conf: OrderPolicy=Fast, which orders by use as Freq does, and auto phrases
-         * as libime has them unless set.
-         */
-        val ZIRANMA = TableOptions(orderByUse = true, autoPhraseLength = -1, saveAutoPhraseAfter = -1)
+        /** fcitx's zrm.conf: OrderPolicy=Fast, which orders by use as Freq does. */
+        val ZIRANMA = TableOptions(orderByUse = true)
 
         /**
          * fcitx's erbi.conf. Its AutoSelectRegex is not needed: libime takes it or the length,
@@ -97,8 +87,6 @@ data class TableOptions(
             orderByUse = true,
             matchingKey = '*',
             pinyinKey = '[',
-            autoPhraseLength = 4,
-            saveAutoPhraseAfter = -1,
         )
     }
 }

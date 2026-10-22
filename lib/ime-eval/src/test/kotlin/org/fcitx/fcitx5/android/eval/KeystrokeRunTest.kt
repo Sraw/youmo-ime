@@ -15,6 +15,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
+import java.io.File
 import java.nio.ByteBuffer
 
 class KeystrokeRunTest {
@@ -127,16 +128,17 @@ class KeystrokeRunTest {
         // 尼好 is in the tune half, 你好 in the held-out one
         assertEquals(Halves.TUNE, Halves.of(sample))
         val rows = Learning(data, PinyinSegmenter()).measure(listOf(sample, Sample("nihao", "你好", "daily"))).toMap()
-        assertEquals(6, rows.size)
-        // picked over 你好, then learned as one word: first the next time
-        assertFalse(rows.getValue("tune, typed once")!!.single().first)
-        assertTrue(rows.getValue("tune, typed again")!!.single().first)
-        assertFalse(rows.getValue("tune, learning nothing")!!.single().first)
+        assertEquals(7, rows.size)
+        // picked over 你好 once, next to it the next time; twice, first (U-02)
+        assertFalse(rows.getValue("tune, typed once").single().first)
+        assertFalse(rows.getValue("tune, typed again").single().first)
+        assertTrue(rows.getValue("tune, typed a third time").single().first)
+        assertFalse(rows.getValue("tune, learning nothing").single().first)
         // the other sentence is still read right after it
-        assertTrue(rows.getValue("held-out, learning nothing")!!.single().first)
-        assertTrue(rows.getValue("held-out, learning")!!.single().first)
+        assertTrue(rows.getValue("held-out, learning nothing").single().first)
+        assertTrue(rows.getValue("held-out, learning").single().first)
         // after the tune half, nihao is 尼好: the same keys, and the user picked it twice
-        assertFalse(rows.getValue("held-out, tune learned")!!.single().first)
+        assertFalse(rows.getValue("held-out, tune learned").single().first)
     }
 
     @Test
@@ -148,7 +150,12 @@ class KeystrokeRunTest {
         assertEquals(listOf("daily", "1", "1", "0.0%", "3.000"), out.lines()[1].split(Regex(" +")))
         out.setLength(0)
         assertEquals(0, runCli(arrayOf("learn", dataFile.path, set.path, "--fuzzy", "all"), out, StringBuilder()))
-        assertEquals(7, out.lines().count { it.isNotBlank() })
-        assertTrue(out.lines()[3], out.lines()[3].startsWith("tune, typed again") && "100.0%" in out.lines()[3])
+        assertEquals(8, out.lines().count { it.isNotBlank() })
+        assertTrue(out.lines()[4], out.lines()[4].startsWith("tune, typed a third time") && "100.0%" in out.lines()[4])
+        // --misses: each row's samples not first, the row, the keys and what was meant
+        val misses = File(tmp.root, "misses.tsv")
+        assertEquals(0, runCli(arrayOf("learn", dataFile.path, set.path, "--misses", misses.path), StringBuilder(), StringBuilder()))
+        assertTrue(misses.readText(), "tune, typed once\tnihao\t尼好" in misses.readLines())
+        assertFalse(misses.readText(), misses.readLines().any { it.startsWith("tune, typed a third time\t") })
     }
 }

@@ -1,0 +1,26 @@
+# U-29 手写：识别出来的前 3 个候选是同样三个字（不论先后），就是同样的输入。点选了第 2 个以后的候选（纠正），
+# 下次写出同样的候选时，它排到前面；连着纠正 2 次，它第 1。中间超时自动上屏了当时的首选，就从头数（C29）。
+# Handwriting is not driven by this runner yet (step 2): `type <the recognizer's top 3> kb=hw` stands for a character written.
+
+scenario 手写 人入八
+pending step 2: handwriting (U-29)
+type 人入八 kb=hw
+expect first 人
+pick 入
+type 人入八 kb=hw
+expect top2 人,入
+pick 入
+type 人入八 kb=hw
+expect first 入
+
+scenario 手写, a timeout between
+pending step 2: handwriting (U-29)
+type 人入八 kb=hw
+pick 入
+type 人入八 kb=hw
+# 超时自动上屏了当时的首选
+space
+type 人入八 kb=hw
+pick 入
+type 人入八 kb=hw
+expect first 人

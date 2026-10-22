@@ -5,6 +5,7 @@
 package org.fcitx.fcitx5.android.engine.session
 
 import org.fcitx.fcitx5.android.engine.data.PinyinData
+import org.fcitx.fcitx5.android.engine.learn.Take
 import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
 import org.fcitx.fcitx5.android.engine.pinyin.SyllableGraph
 import org.fcitx.fcitx5.android.engine.pinyin.SyllableGraph.Kind
@@ -17,10 +18,22 @@ import org.fcitx.fcitx5.android.engine.pinyin.T9Segmenter
  * be ([offered]), and those taken, which stand in the input as their letters and a separator.
  * Taking one and giving it back edit the session's input; the session reads it again after.
  */
-internal class NineKeys(private val data: PinyinData, private val letters: NineKeyLetters) {
+internal class NineKeys(
+    private val data: PinyinData,
+    private val letters: NineKeyLetters,
+    /** The keys pressed, kept in step with the input as this edits it. */
+    private val pressed: PressedKeys = PressedKeys(),
+    /** How often each syllable was taken for some digits (the bar's habit, U-23): its order after the best reading's. */
+    private val bar: (digits: String) -> Map<String, Int> = { emptyMap() },
+) {
 
-    /** A syllable taken at [at] for the keys [was], [length] letters, a separator [added] after it; [then] the input after. */
-    private class Taken(val at: Int, val was: String, val length: Int, val added: Boolean, val then: String)
+    /**
+     * A syllable taken at [at] for the keys [was], [spelling] in their place, a separator [added]
+     * after it; [then] the input after; [runs], what [pressed] had for the keys.
+     */
+    private class Taken(val at: Int, val was: String, val spelling: String, val added: Boolean, val then: String, val runs: List<PressedKeys.Run>) {
+        val length get() = spelling.length
+    }
 
     private val taken = ArrayList<Taken>() // the last last
 
@@ -65,8 +78,8 @@ internal class NineKeys(private val data: PinyinData, private val letters: NineK
 
     /**
      * Offers what the first digits after [from] of [input] may be, as [graph] (of the input from
-     * [from]) reads them: the best reading's syllable first, then the longer, then the more
-     * common; then the letters of the first digit that are initials, for 简拼. Nothing where all
+     * [from]) reads them: the best reading's syllable first, then those taken most for their digits,
+     * then the longer, then the more common; then the letters of the first digit that are initials, for 简拼. Nothing where all
      * is taken.
      */
     fun offer(input: CharSequence, from: Int, graph: SyllableGraph) {
@@ -77,8 +90,11 @@ internal class NineKeys(private val data: PinyinData, private val letters: NineK
         }
         val first = best[at] ?: -1
         val found = syllablesAt(graph, from, at)
+        // a habit by the digits each syllable takes, as a take files it (impl/design-1b.md NIT 7)
+        val bars = HashMap<Int, Map<String, Int>>()
+        val taken = { s: Int -> bars.getOrPut(found.getValue(s)) { bar(pressed.keys(at, at + found.getValue(s))) }[Syllables.spelling(s)] ?: 0 }
         val order = found.keys.sortedWith(
-            compareByDescending<Int> { it == first }.thenByDescending { found.getValue(it) }.thenByDescending { weights[it] },
+            compareByDescending<Int> { it == first }.thenByDescending(taken).thenByDescending { found.getValue(it) }.thenByDescending { weights[it] },
         )
         // a letter typed as itself offers itself alone
         val keys = if (input[at] in T9Segmenter.FIXED) input[at].lowercase() else letters.letters(input[at])
@@ -118,11 +134,13 @@ internal class NineKeys(private val data: PinyinData, private val letters: NineK
         val at = offeredAt
         val was = input.substring(at, at + offeredPresses[index])
         val lengthBefore = input.length
+        val runs = pressed.runs(at, at + was.length)
         input.replace(at, at + was.length, spelling)
         val end = at + spelling.length
         val added = end == input.length || input[end] != SyllableGraph.SEPARATOR
         if (added) input.insert(end, SyllableGraph.SEPARATOR)
-        taken += Taken(at, was, spelling.length, added, input.toString())
+        pressed.replace(at, at + was.length, spelling.length, runs.joinToString("") { it.keys }, added = if (added) 1 else 0)
+        taken += Taken(at, was, spelling, added, input.toString(), runs)
         return if (cursor < at) cursor else maxOf(cursor, at + was.length) + input.length - lengthBefore
     }
 
@@ -136,12 +154,13 @@ internal class NineKeys(private val data: PinyinData, private val letters: NineK
      * cursor moved, [picked] then the cursor itself: what the keyboard did not see) it is its key,
      * any of its letters, as a press after a pause.
      */
-    fun letter(input: StringBuilder, c: Char, again: Boolean, picked: Int, cursor: Int): Int {
+    fun letter(input: StringBuilder, c: Char, again: Boolean, picked: Int, cursor: Int, glided: Boolean = false): Int {
         if (c !in 'a'..'z') return -1
         val last = cursor - 1
         val same = last >= picked && T9Segmenter.isKey(input[last]) && letters.sameKey(input[last], c)
         if (again && same) {
             input.setCharAt(last, c.uppercaseChar())
+            pressed.set(last, c.toString(), multiTap = true)
             return cursor
         }
         val key = when {
@@ -149,6 +168,8 @@ internal class NineKeys(private val data: PinyinData, private val letters: NineK
             again -> if (letters.keysOf(c).length == 1) letters.key(c) else c.uppercaseChar()
             else -> c.uppercaseChar()
         }
+        // pressed again after another key: a press after a pause, the key or the letter, not one 连按 chose
+        pressed.insert(cursor, key.toString(), glided, input = input, letters = letters)
         input.insert(cursor, key)
         return cursor + 1
     }
@@ -164,8 +185,15 @@ internal class NineKeys(private val data: PinyinData, private val letters: NineK
         taken.removeAt(taken.size - 1)
         input.replace(last.at, last.at + last.length, last.was)
         if (last.added) input.deleteCharAt(last.at + last.was.length)
+        pressed.putBack(last.at, last.at + last.length + if (last.added) 1 else 0, last.runs)
         return last.at
     }
+
+    /** The syllables taken and kept, for their digits: learned with the commit, the bar's (PLAN §2.2 state 6) under [layout]. */
+    fun takes(layout: String): List<Take> = taken.map { Take(layout, it.runs.joinToString("") { r -> r.keys }, it.spelling) }
+
+    /** Whether a syllable is taken: a pick then is 'H' (spec §1), learned against the first shown before it was. */
+    val anyTaken get() = taken.isNotEmpty()
 
     // how common each syllable is: its commonest character's score; for the order offered only
     private val weights: FloatArray by lazy {

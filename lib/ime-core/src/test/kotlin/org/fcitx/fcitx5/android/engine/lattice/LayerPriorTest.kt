@@ -161,8 +161,8 @@ class LayerPriorTest {
         val packed = user.list(entry, -5f, new, d.model.vocabularySize)
         // only listed by the pack: the pack's layer
         assertEquals(1f, prior.of(packed), 0f)
-        // picked: scored as the model's 搭子, so of its layer
-        user.learn(null, listOf(entry))
+        // the user's: scored as the model's 搭子, so of its layer
+        user.own(entry)
         assertEquals(2.5f, prior.of(packed), 0f)
     }
 

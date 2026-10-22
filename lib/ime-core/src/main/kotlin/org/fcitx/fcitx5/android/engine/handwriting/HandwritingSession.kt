@@ -7,15 +7,31 @@ package org.fcitx.fcitx5.android.engine.handwriting
 import org.fcitx.fcitx5.android.engine.data.NgramModel.Companion.NO_WORD
 import org.fcitx.fcitx5.android.engine.lattice.Predictor
 import org.fcitx.fcitx5.android.engine.lattice.TextWords
+import org.fcitx.fcitx5.android.engine.learn.Code
+import org.fcitx.fcitx5.android.engine.learn.HabitRanker
+import org.fcitx.fcitx5.android.engine.learn.Habits
+import org.fcitx.fcitx5.android.engine.learn.KeyedRows
+import org.fcitx.fcitx5.android.engine.learn.Kinds
+import org.fcitx.fcitx5.android.engine.learn.LearnRecord.Commit
+import org.fcitx.fcitx5.android.engine.learn.Row
+import org.fcitx.fcitx5.android.engine.learn.Word
+import org.fcitx.fcitx5.android.engine.learn.Words
+import org.fcitx.fcitx5.android.engine.learn.rankView
+import org.fcitx.fcitx5.android.engine.learn.control.Why
+import org.fcitx.fcitx5.android.engine.pinyin.Syllables
 import org.fcitx.fcitx5.android.engine.rerank.SentencePicker
 import org.fcitx.fcitx5.android.engine.rerank.SentenceRefiner
 import org.fcitx.fcitx5.android.engine.session.Action
 import org.fcitx.fcitx5.android.engine.session.Choice
+import org.fcitx.fcitx5.android.engine.session.CommitJournal
+import org.fcitx.fcitx5.android.engine.session.FieldJournal
 import org.fcitx.fcitx5.android.engine.session.Offer
 import org.fcitx.fcitx5.android.engine.session.Predictions
 import org.fcitx.fcitx5.android.engine.session.RefineSlices
+import org.fcitx.fcitx5.android.engine.session.Retype
 import org.fcitx.fcitx5.android.engine.session.Session
 import org.fcitx.fcitx5.android.engine.session.Snapshot
+import org.fcitx.fcitx5.android.engine.table.PhraseRules
 import org.fcitx.fcitx5.android.engine.user.UserModel
 import org.fcitx.fcitx5.android.engine.user.UserModel.Entry
 
@@ -39,21 +55,29 @@ import org.fcitx.fcitx5.android.engine.user.UserModel.Entry
  * The sentence goes on from the text before the cursor ([Action.Context]) and what was put in
  * since, read as words by [words].
  *
- * A sentence picked other than the first, while [learning], is learned by [user], after the word
- * put in before it: the user chose it over what the ink read best. Of several words, at most
- * [UserModel.MAX_PHRASE] characters, it is one phrase, as pinyin learns a pick it corrected, where
- * each word's reading is sure ([HandwritingDecoder.sure]); else its words as the decoder read them. The first, put in by space, enter or a tap alike, is not: the readings are often wrong,
- * and one not noticed, learned, would come back. Nor is the layer prior (LayerPrior.learn), as
- * pinyin's picks teach it: a pick here puts the ink right, it says nothing of a word's layer.
- * The word before is the one put in, learned or not (a first sentence's last): the pick after
- * it is the user's choice either way.
+ * A sentence put in, while [learning], is learned into [habits] (U-29, PLAN §2.7, [KeyedRows]):
+ * each character under what the ink of it was read as (the first three readings, in any order:
+ * the same input, as no two hands write alike), no word before it; the last as picked, corrected
+ * where the first shown was another, the ones before it used as they were read. The whole
+ * sentence, by its words' text, after the word put in before it: for 联想, never for pinyin's
+ * order (D28), never made a word. Not the layer prior (LayerPrior.learn), as pinyin's picks teach
+ * it: a pick here puts the ink right, it says nothing of a word's layer. The word before is the
+ * one put in, learned or not (a first sentence's last): the pick after it is the user's choice
+ * either way.
+ *
+ * A sentence deleted as soon as it was put in is taken back, as pinyin's (U-03, [FieldJournal]); one
+ * written again for it, a character in what the ink of the deleted one's was read as, is a pick
+ * there instead, its character's first after two such running ([Retype.matchKeyed]). A 联想 pick
+ * deleted is taken back too.
  *
  * With a [predictor], what may follow is offered once a sentence is put in, as pinyin offers it:
  * a word picked goes in and is learned (the user chose it), and what may follow it is offered in
  * turn; a stroke, backspace or any key takes the offer away. Not while nothing is [learning]. A
  * long press on a prediction forgets what was learned of it, or blocks it ([block]), as pinyin's;
- * one on a candidate offers nothing: it shows one character of the sentence a pick puts in, and
- * neither is what the menu would say it acts on.
+ * one on a candidate does so to the character it shows (U-29, U-82): what was learned of it
+ * forgotten everywhere ([forgotten]), or blocked in every reading, as the decoder leaves a blocked
+ * character out; never pinned (C18: no code a pin would hold, a slip would put the wrong
+ * character in on its own from then on).
  *
  * The 性能档位, as pinyin has it: a [reranker] weighs the decoder's best sentences again by how they
  * read after the text before, as each stroke is read; a [refiner], larger and slower, does so once
@@ -73,11 +97,15 @@ class HandwritingSession(
     private val reranker: SentencePicker? = null,
     private val refiner: SentenceRefiner? = null,
     /** Keeps a prediction the user blocked ([Action.Block]), blocked in [user] too; none offered without. */
-    block: ((Entry) -> Unit)? = null,
-    /** Told the text of a prediction forgotten here ([Action.Forget]), for the input methods that count their own (the tables) to forget it too. */
-    forgotten: (String) -> Unit = {},
+    private val block: ((Entry) -> Unit)? = null,
+    /** Told the text of a prediction or a candidate forgotten here ([Action.Forget]), to forget it everywhere. */
+    private val forgotten: (String) -> Unit = {},
     /** The latest piece ended already: of a session this one is made in place of, see [latestPiece]. */
     ended: Int = NO_PIECE,
+    /** The learning record what is put in is written to. */
+    private val habits: Habits = Habits.OFF,
+    /** Traditional text to simplified, as the field's text is compared with what was put in (the 繁体 output's). */
+    simplify: (String) -> String = { it },
 ) : Session {
 
     // a reading of a piece, or none: the piece finished (the pen up long enough)
@@ -94,15 +122,28 @@ class HandwritingSession(
     // what the characters written read as: the best sentence first, then the best for each other last character
     private var sentences: List<HandwritingDecoder.Sentence> = emptyList()
 
+    // how the habits ranked [sentences], each one's, under [rankedUnder]: what 为什么排在这 says (U-81)
+    private var ranks: List<HabitRanker.Ranked<HandwritingDecoder.Sentence>> = emptyList()
+    private var rankedUnder: Code? = null
+
     // what may follow the text put in, offered in place of [sentences] while nothing is written;
     // the text before the cursor it goes on from, and the last word put in
-    private val predictions = Predictions(predictor, words, user, block, forgotten) { learning }
+    private val predictions = Predictions(predictor, words, user, block, forgotten, habits = habits) { learning }
 
     // the last decoding; the one [refiner] is still to weigh
     private var decoding: HandwritingDecoder.Decoding? = null
     private val unrefined = RefineSlices<HandwritingDecoder.Decoding>(refiner)
 
     private var page = 0
+
+    // the field as this session wrote it (U-03); what each sentence of it was written as, a set of
+    // what the ink of each character read as, by its record (seqs are given again after an undo)
+    private val inked = ArrayList<Pair<Commit, List<Set<String>>>>()
+    private val journal = FieldJournal({ habits }, simplify) { inked.clear() }
+
+    // the deleted commit the last commit typed again in part, how many of its characters, and that
+    // commit: once it is deleted too, what it typed is to be typed again (review F3124)
+    private var retyped: Triple<Commit, Int, Commit>? = null
 
     // the latest piece offered
     private var latest = NO_PIECE
@@ -139,11 +180,14 @@ class HandwritingSession(
         // the order shown is the one to weigh: what may change it, or the page, drops the
         // weighing, as pinyin has it; an Ink drops it only if it reads something new (decode)
         if (!keepsOrder(action)) unrefined.drop()
+        // what a Backspace deleted whole taken back, now that what came next is not a context saying otherwise (U-03)
+        journal.before(action, learning)
         return act(action)
     }
 
     // what changes neither the sentences shown nor the page: an Ink (see apply), the cursor, which
-    // handwriting keeps none of, a prediction forgotten or blocked, what no handwriting does
+    // handwriting keeps none of, a prediction forgotten or blocked (a candidate's reads anew, see
+    // pressed), what no handwriting does
     private fun keepsOrder(action: Action) = when (action) {
         Action.Refine, Action.Ink, Action.Glide, is Action.Cursor, is Action.Step, is Action.Forget, is Action.Block, is Action.Pin, is Action.Unpin, is Action.Syllable, is Action.Letter, is Action.NineKey -> true
         else -> false
@@ -161,6 +205,7 @@ class HandwritingSession(
         Action.CommitRaw -> if (written.isEmpty()) unoffer(handled = false) else pick(0, offer = false)
         is Action.Key -> key(action.char)
         is Action.Context -> {
+            predictions.learnFrom(action)
             predictions.goOnFrom(action.before)
             predictions.lastEntry = null
             reset()
@@ -182,9 +227,41 @@ class HandwritingSession(
     }
 
     // while predicting, as pinyin's: see Predictions.offers
-    override fun offers(index: Int): Set<Offer> = if (written.isNotEmpty()) emptySet() else predictions.offers(index)
+    override fun offers(index: Int): Set<Offer> = if (written.isEmpty()) predictions.offers(index) else writtenOffers(index)
 
-    override fun passedOn() = predictions.forgetBefore()
+    // what may follow says what it goes on from, for 不再联想 (U-72); the characters written say nothing yet
+    override fun why(index: Int): Why? =
+        if (written.isEmpty()) predictions.why(index) else ranks.getOrNull(index)?.let { Why(it.tier, it.uses, rankedUnder) }
+
+    // what was written read anew, or what may follow offered anew (a prediction turned off back in
+    // it): the session, its pad and what is written on it kept after an undo (review-int S1)
+    override fun reread(): Snapshot? {
+        // the undo may have unblocked a character the cached search left out (as pressed forgets it)
+        decoder?.forgetSearch()
+        if (written.isNotEmpty()) decode() else predict()
+        return snapshot()
+    }
+
+    override val rereads get() = true
+
+    override fun fieldFlags(flags: Int) {
+        predictions.learnFlags = flags
+    }
+
+    // a candidate's, as the class says: forgotten where something is learned of it
+    private fun writtenOffers(index: Int): Set<Offer> {
+        val text = sentences.getOrNull(index)?.let { lastCharacter(it.text) }
+        if (text == null || !learning) return emptySet()
+        return buildSet {
+            if (habits.knows(text)) add(Offer.FORGET)
+            if (block != null && decoder?.alone(text) != null) add(Offer.BLOCK)
+        }
+    }
+
+    override fun passedOn() {
+        journal.passedOn()
+        predictions.forgetBefore()
+    }
 
     private fun show(): Snapshot {
         var changed = false
@@ -216,6 +293,7 @@ class HandwritingSession(
 
     // nothing written: the app deletes, and the offer goes; what it deletes is no longer before, as a table has it
     private fun deleted(): Snapshot {
+        journal.backspace()
         predictions.deleted()
         return unoffer(handled = false)
     }
@@ -224,6 +302,8 @@ class HandwritingSession(
     // from the key, not from the words before it, as a table's code does
     private fun key(c: Char): Snapshot {
         val put = if (written.isEmpty()) unoffer() else pick(0, offer = false)
+        // the key goes into the field, not written here (U-03), as pinyin's leave(); the host passes it on too (passedOn)
+        journal.unverify()
         predictions.wrote(c.toString(), null)
         return put.copy(handled = false)
     }
@@ -275,13 +355,29 @@ class HandwritingSession(
     // [decoded]'s sentences, its best at [first] put first in place of the one ending as it does
     private fun place(decoded: HandwritingDecoder.Decoding, first: Int) {
         if (first <= 0 || first >= decoded.top.size) {
-            sentences = decoded.endings
+            sentences = byHabit(decoded.endings)
             return
         }
         val top = decoded.top[first]
         val replaced = decoded.endings.indexOfFirst { lastCharacter(it.text) == lastCharacter(top.text) }
-        sentences = listOf(top) + decoded.endings.filterIndexed { i, _ -> i != replaced }
+        sentences = byHabit(listOf(top) + decoded.endings.filterIndexed { i, _ -> i != replaced })
     }
+
+    // [read] reordered by the habits under the character last written, no word before (U-29, PLAN
+    // §2.7): its first after two corrections running, then those used by uses, then as read. No pin
+    private fun byHabit(read: List<HandwritingDecoder.Sentence>): List<HandwritingDecoder.Sentence> {
+        ranks = emptyList()
+        rankedUnder = null
+        val h = habits
+        if (!h.learns || written.isEmpty() || read.isEmpty()) return read
+        val code = Code(Kinds.HANDWRITING, KeyedRows.handwriting(written.last().reading.texts))
+        ranks = HabitRanker.rank(read.map { HabitRanker.Item(it, Words.of(lastCharacter(it.text)), single = true) }, code, "", view(h))
+        rankedUnder = code
+        return ranks.map { it.value }
+    }
+
+    // characters, no word of the user's or imported a tier, nothing pinned
+    private fun view(h: Habits) = h.rankView(pins = false, mine = false, imports = false)
 
     // the last character finished: its sentence for the refiner to weigh while the user pauses
     private fun refineLast() {
@@ -300,15 +396,8 @@ class HandwritingSession(
     private fun pick(index: Int, offer: Boolean = true): Snapshot {
         if (written.isEmpty()) return pickPrediction(index)
         val sentence = sentences.getOrNull(index) ?: return snapshot(handled = true)
-        // after the word put in before it, as pinyin learns what is picked: it comes up after that word
-        // again; words of several, short enough, as one phrase (the user corrected the reading to get it),
-        // if each word's reading is sure: a character of several readings (行, 长) read as the decoder
-        // guessed would make a word pinyin offers at the wrong reading and lacks at the right one
-        val words = sentence.words?.let { w ->
-            val sure = index > 0 && w.size > 1 && w.all { decoder?.sure(it) == true }
-            (if (sure) UserModel.phrase(sentence.text, w)?.let(::listOf) else null) ?: w
-        }
-        if (index > 0 && learning) words?.let { user?.learn(predictions.lastEntry, it) }
+        val words = sentence.words
+        learn(sentence, index)
         predictions.wrote(sentence.text, words?.lastOrNull())
         ended = maxOf(ended, written.last().piece)
         written.clear()
@@ -319,16 +408,86 @@ class HandwritingSession(
         return snapshot(commit = sentence.text)
     }
 
+    // [sentence], at [index] of those shown, learned as the class says, and kept in the journal
+    private fun learn(sentence: HandwritingDecoder.Sentence, index: Int) {
+        if (!learning || !habits.learns) return journal.committed(sentence.text, null, learning)
+        val chars = PhraseRules.codePoints(sentence.text)
+        val first = sentences.firstOrNull()?.let { lastCharacter(it.text) }.orEmpty()
+        // a character for each one written, as the decoder reads them; else the last alone
+        val each = chars.size == written.size
+        val from = if (each) 0 else written.size - 1
+        val picks = (from until written.size).map { i ->
+            val keys = KeyedRows.handwriting(written[i].reading.texts)
+            val last = i == written.size - 1
+            val text = if (last) lastCharacter(sentence.text) else chars[i]
+            KeyedRows.Pick(keys, text, if (last && index > 0) Row.HOW_PICKED else Row.HOW_FIRST, if (last) first else text)
+        }
+        // its words as the decoder read them, the reading it gives each (the dictionary's likeliest,
+        // as 添加词 fills one in): a sentence that is no word, put in twice, is the user's word typed
+        // so (U-06, UAT HW-20). Counted by their text alone, never for pinyin's order (D28, LearnState.heard)
+        val read = sentence.words
+        val whole = read?.map { Word(it.text, it.syllables.joinToString(" ") { s -> Syllables.spelling(s) }) } ?: listOf(Word(sentence.text, ""))
+        val origin = read?.let { origin(sentence.text, it) } ?: Row.DICTIONARY
+        val rows = KeyedRows.of(Kinds.HANDWRITING, picks, whole, predictions.wordBefore(), origin)
+        // sentences deleted whole just before, written again by this one, a character for each written (U-03)
+        val deleted = journal.pending
+        val again = retype(deleted, each, chars, rows)
+        val commit = habits.record(rows + again?.match?.rows.orEmpty(), flags = predictions.learnFlags)
+        retyped = again?.takeIf { it.skip > 0 && commit != null }?.let { Triple(deleted[it.match.typedAgain], it.skip, commit!!) }
+        if (commit != null && each) {
+            inked += commit to written.map { it.reading.texts.toSet() }
+            while (inked.size > CommitJournal.KEPT) inked.removeAt(0)
+        }
+        journal.committed(sentence.text, commit, learning, again?.match)
+    }
+
+    // what of [deleted] [chars] typed again, a character for each written ([each]); none where nothing was deleted
+    private fun retype(deleted: List<Commit>, each: Boolean, chars: List<String>, rows: List<Row>): Retype.Keyed? = when {
+        deleted.isEmpty() -> null
+        !each -> Retype.Keyed(Retype.Match(emptyList(), 0, goesOn = false), 0)
+        else -> {
+            // what the last commit typed of the first deleted, unless it was deleted too (review F3124)
+            val skip = retyped?.takeIf { r -> r.first === deleted.first() && deleted.none { it === r.third } }?.second ?: 0
+            Retype.matchKeyed(deleted, skip, chars, rows, ::inCandidates, ::writtenBy)
+        }
+    }
+
+    // how many characters [deleted] wrote, as its ink has them
+    private fun writtenBy(deleted: Commit) = inked.firstOrNull { it.first === deleted }?.second?.size ?: 0
+
+    // whether [text] is among what the ink of [deleted]'s [k]th character was read as
+    private fun inCandidates(deleted: Commit, k: Int, text: String) = inked.firstOrNull { it.first === deleted }?.second?.getOrNull(k)?.contains(text) == true
+
+    // where [text] read as [read] comes from, as pinyin files it (CommitRecorder.origin): none's only if no word of the model nor the user's
+    private fun origin(text: String, read: List<Entry>): Int {
+        val entry = Entry(text, read.flatMap { it.syllables.asList() }.toIntArray())
+        val known = user?.origin(entry) ?: Row.NONE
+        return if (known == Row.NONE && words?.id(text)?.takeIf { it != NO_WORD } != null) Row.DICTIONARY else known
+    }
+
     // none there: kept while predicting, as pinyin keeps a pick past its candidates
     private fun pickPrediction(index: Int): Snapshot {
         val text = predictions.pick(index) ?: return snapshot(handled = predictions.offered.isNotEmpty())
+        // deleted whole at once, the pick is taken back (U-03); it types nothing deleted again
+        journal.committed(text, predictions.picked, learning)
         page = 0
         return snapshot(commit = text)
     }
 
-    // the prediction at [index] forgotten or blocked, as the long press offered: what may follow offered again
+    // the prediction at [index] forgotten or blocked, as the long press offered: what may follow
+    // offered again; or the candidate's character, what is written read again without it
     private fun pressed(index: Int, offer: Offer): Snapshot {
-        if (written.isEmpty() && predictions.press(index, offer)) page = 0
+        if (written.isEmpty()) {
+            if (predictions.press(index, offer)) page = 0
+            return snapshot()
+        }
+        if (offer !in writtenOffers(index)) return snapshot()
+        val text = lastCharacter(sentences[index].text)
+        if (offer == Offer.FORGET) forgotten(text) else decoder?.alone(text)?.let { block?.invoke(it) }
+        // the words the last search found are as they were before: scored as learned, or not blocked
+        decoder?.forgetSearch()
+        decode()
+        if (written.last().finished) refineLast()
         return snapshot()
     }
 
@@ -374,8 +533,7 @@ class HandwritingSession(
             hasNextPage = from + pageSize < all.size,
             handled = handled,
             predicting = predicting,
-            // a prediction alone: see offers
-            actionable = predicting,
+            actionable = predicting || written.isNotEmpty(),
             refines = unrefined.refines,
             total = all.size,
             first = from,

@@ -8,16 +8,18 @@ import org.fcitx.fcitx5.android.engine.data.PinyinData
 import org.fcitx.fcitx5.android.engine.lattice.CoarseWords
 import org.fcitx.fcitx5.android.engine.lattice.Predictor
 import org.fcitx.fcitx5.android.engine.lattice.TextWords
+import org.fcitx.fcitx5.android.engine.learn.Habits
 import org.fcitx.fcitx5.android.engine.pinyin.PinyinSegmenter
 import org.fcitx.fcitx5.android.engine.session.PinyinSession
-import org.fcitx.fcitx5.android.engine.user.UserModel
+import org.fcitx.fcitx5.android.engine.session.PredictionOrder
 
 /**
  * What learning gains 联想: the sentences of a set split into words, and after each word but the
- * last, whether what follows starts with what is offered, as [PredictRun] scores it. The
- * [Halves.TUNE] half before anything is learned and after it was typed once (a user's own
- * phrases, typed again), the [Halves.HELD_OUT] half after it (text not typed before, which
- * learning must not make worse), each with the user's pairs at [weight].
+ * last, whether what follows starts with what is offered, as [PredictRun] scores it, ranked by the
+ * user's habits as a session ranks them ([PredictionOrder]). The [Halves.TUNE] half before anything
+ * is learned, after it was typed once and after three times (a user's own phrases, typed again:
+ * a pair counts from its third time, U-71), the [Halves.HELD_OUT] half after that (text not typed
+ * before, which learning must not make worse), each with the user's pairs at [weight].
  */
 class PredictLearning(private val data: PinyinData, private val weight: Float) {
     private val textWords = TextWords(data.model, data.wordIndex)
@@ -25,23 +27,27 @@ class PredictLearning(private val data: PinyinData, private val weight: Float) {
     fun measure(samples: List<Sample>): List<Pair<String, PredictRun.Score>> {
         val tune = Halves.select(samples, Halves.TUNE)
         val heldOut = Halves.select(samples, Halves.HELD_OUT)
-        val user = UserModel(data.dictionary, data.vocabulary, index = data.wordIndex)
+        val user = EvalUser(data)
         // as the app's session has it
-        val predictor = Predictor(data.model, data.vocabulary, data.dictionary, user, weight, coarse = CoarseWords.of({ data.wordIndex.find(it) }))
-        val rows = mutableListOf("tune, nothing learned" to score(tune, predictor), "held-out, nothing learned" to score(heldOut, predictor))
-        val typist = KeystrokeRun(PinyinSession(data, PinyinSegmenter(), user = user, prediction = false))
+        val predictor = Predictor(data.model, data.vocabulary, data.dictionary, user.model, weight, coarse = CoarseWords.of({ data.wordIndex.find(it) }))
+        val order = PredictionOrder(predictor) { user.model.idsOfText(it).firstOrNull() ?: data.wordIndex.find(it) }
+        val score = { set: List<Sample> -> score(set, order, user.habits) }
+        val rows = mutableListOf("tune, nothing learned" to score(tune), "held-out, nothing learned" to score(heldOut))
+        val typist = KeystrokeRun(PinyinSession(data, PinyinSegmenter(), user = user.model, prediction = false, learnTo = user.learnTo()))
         tune.forEach { typist.type(it) }
-        rows += "tune, typed once" to score(tune, predictor)
-        rows += "held-out, tune learned" to score(heldOut, predictor)
+        rows += "tune, typed once" to score(tune)
+        repeat(2) { tune.forEach { typist.type(it) } }
+        rows += "tune, typed three times" to score(tune)
+        rows += "held-out, tune learned" to score(heldOut)
         return rows
     }
 
-    private fun score(samples: List<Sample>, predictor: Predictor): PredictRun.Score {
+    private fun score(samples: List<Sample>, order: PredictionOrder, habits: Habits): PredictRun.Score {
         val continuations = continuations(samples)
         val offers = continuations.map { c ->
             val words = textWords.lastTwo(c.context)
             val (prev2, prev) = TextWords.previous(words)
-            predictor.predict(prev2, prev).map { it.text }.distinct()
+            order.offer(habits, prev2, prev).candidates.map { it.text }.distinct()
         }
         return PredictRun.score(continuations, offers)
     }

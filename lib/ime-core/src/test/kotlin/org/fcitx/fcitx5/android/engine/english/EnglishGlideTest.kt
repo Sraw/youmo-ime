@@ -173,7 +173,7 @@ class EnglishGlideTest {
     @Test
     fun aWordTheUserAddedIsGlidedToo() {
         val user = EnglishUser()
-        user.learn(null, "kotlin")
+        user.commit(null, "kotlin")
         val s = EnglishSession(EnglishDecoderTest.data(), user = user).apply { apply(Action.Context("")) }
         assertTrue("kotlin" in s.glided("kotlin").candidates)
         // alone on its path it goes in, with the shift a capital

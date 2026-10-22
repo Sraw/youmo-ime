@@ -9,6 +9,7 @@ import android.os.Looper
 import androidx.annotation.StringRes
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.daemon.FcitxConnection
+import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.input.FcitxInputMethodService
 
 /**
@@ -78,7 +79,7 @@ class VoiceHoldSession(
         listener = VoiceListener(
             service.assets,
             events,
-            hotwords = { VoiceEngine.userHotwords(fcitx) },
+            hotwords = { VoiceEngine.userHotwords(fcitx, habits = AppPrefs.getInstance().internal.useHabits.getValue()) },
             language = VoiceEngine.language(fcitx),
         ).also {
             it.load()

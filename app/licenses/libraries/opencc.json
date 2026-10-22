@@ -1,7 +1,7 @@
 {
     "uniqueId": "BYVoid/OpenCC",
     "artifactVersion": "1.2.0",
-    "description": "opensource project for conversions between Traditional Chinese, Simplified Chinese and Japanese Kanji (Shinjitai).",
+    "description": "opensource project for conversions between Traditional Chinese, Simplified Chinese and Japanese Kanji (Shinjitai). Used natively by fcitx's chttrans, and its character tables TSCharacters.txt and STCharacters.txt (1.2.0, unchanged) ship in the app's assets under learn/, for learning to read traditional text as simplified.",
     "name": "BYVoid/OpenCC",
     "website": "https://opencc.byvoid.com/",
     "tag": "native",

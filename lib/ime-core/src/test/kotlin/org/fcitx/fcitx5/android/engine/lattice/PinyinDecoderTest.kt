@@ -7,6 +7,8 @@ package org.fcitx.fcitx5.android.engine.lattice
 import org.fcitx.fcitx5.android.engine.data.NgramModel.Companion.NO_WORD
 import org.fcitx.fcitx5.android.engine.data.PinyinData
 import org.fcitx.fcitx5.android.engine.data.PinyinDataBuilder
+import org.fcitx.fcitx5.android.engine.learn.ImportedWords
+import org.fcitx.fcitx5.android.engine.learn.import
 import org.fcitx.fcitx5.android.engine.pinyin.Fuzzy
 import org.fcitx.fcitx5.android.engine.pinyin.PinyinSegmenter
 import org.fcitx.fcitx5.android.engine.pinyin.Syllables
@@ -448,31 +450,54 @@ class PinyinDecoderTest {
     }
 
     /**
-     * A word the user committed twice costs no more typed short than typed whole, a whole syllable
-     * read as the start of a longer one too (ee for 嗯嗯): 方向 read from fangxian ties the exact
-     * 防线, where by what was typed it was [Penalties.extended] below.
+     * What is typed in full never moves what is typed short (D32): a word counted, read from a whole
+     * syllable as the start of a longer one (方向 from fangxian), is scored without its counts where
+     * an uncounted scorer is given; typed exactly it has them.
      */
     @Test
-    fun aLearnedWordReadOnFromAWholeSyllableTiesTheExactReading() {
-        val fang = PinyinData.load(
-            ByteBuffer.wrap(
-                PinyinDataBuilder()
-                    .unigram("<unk>", -7f, 0f)
-                    .unigram("方向", -3f, 0f)
-                    .unigram("防线", -3f, 0f)
-                    .entry("方向", syl("fang", "xiang"))
-                    .entry("防线", syl("fang", "xian"))
-                    .build().toByteArray(),
-            ),
-        )
+    fun aCountedWordReadOverAnExtendedSyllableIsScoredWithoutItsCounts() {
+        val fang = fang()
         val user = UserModel(fang.dictionary, fang.vocabulary)
-        fun score(input: String, text: String) = PinyinDecoder(fang.dictionary, fang.vocabulary, WordScorer.of(fang.model), user = user)
-            .decode(plain.segment(input)).sentences.first { it.text == text }.score
-        val whole = score("fangxiang", "方向")
-        assertEquals(whole + Penalties().extended, score("fangxian", "方向"), 1e-4f)
-        user.addCount(UserModel.Entry("方向", syl("fang", "xiang")), PinyinDecoder.LEARNED)
-        assertEquals(whole, score("fangxian", "方向"), 1e-4f)
-        assertEquals(score("fangxian", "防线"), score("fangxian", "方向"), 1e-4f)
+        val counted = UserScorer(fang.model, user)
+        fun score(input: String, text: String, guard: Boolean) =
+            PinyinDecoder(fang.dictionary, fang.vocabulary, counted, user = user, uncounted = if (guard) UserScorer(fang.model, user, 0f) else null)
+                .decode(plain.segment(input)).sentences.first { it.text == text }.score
+        val before = score("fangxian", "方向", guard = true)
+        val exact = score("fangxiang", "方向", guard = true)
+        user.addCount(UserModel.Entry("方向", syl("fang", "xiang")), 5f)
+        assertTrue(score("fangxiang", "方向", guard = true) > exact + 1e-3f)
+        assertEquals(before, score("fangxian", "方向", guard = true), 1e-4f)
+        assertTrue(score("fangxian", "方向", guard = false) > before + 1e-3f)
+    }
+
+    // 方向 and 防线 over fang, and 的 to go on with (F2938)
+    private fun fang() = PinyinData.load(
+        ByteBuffer.wrap(
+            PinyinDataBuilder()
+                .unigram("<unk>", -7f, 0f)
+                .unigram("方向", -3f, 0f)
+                .unigram("防线", -3f, 0f)
+                .unigram("的", -2f, 0f)
+                .entry("方向", syl("fang", "xiang"))
+                .entry("防线", syl("fang", "xian"))
+                .entry("的", syl("de"))
+                .build().toByteArray(),
+        ),
+    )
+
+    // review-1b S5: so is one of the first words that ends before the input does (level 2's, firstWords), over initials
+    @Test
+    fun aCountedFirstWordReadOverInitialsIsScoredWithoutItsCounts() {
+        val fang = fang()
+        val user = UserModel(fang.dictionary, fang.vocabulary)
+        val counted = UserScorer(fang.model, user)
+        fun score(input: String, guard: Boolean) =
+            PinyinDecoder(fang.dictionary, fang.vocabulary, counted, user = user, uncounted = if (guard) UserScorer(fang.model, user, 0f) else null)
+                .decode(plain.segment(input)).words.first { it.text == "方向" }.also { assertTrue(it.end < input.length) }.score
+        val before = score("fxde", guard = true)
+        user.addCount(UserModel.Entry("方向", syl("fang", "xiang")), 5f)
+        assertEquals(before, score("fxde", guard = true), 1e-4f)
+        assertTrue(score("fxde", guard = false) > before + 1e-3f)
     }
 
     /** A page turned past the first words read the whole lattice again, every time it doubled them. */
@@ -501,5 +526,57 @@ class PinyinDecoderTest {
         val nineKeys = PinyinDecoder(data.dictionary, data.vocabulary, WordScorer.of(data.model), asTyped = { T9Segmenter.asTyped(it) })
         assertEquals("8u", nineKeys.decode(graph).sentences.first().text)
         assertEquals("8U", decoder().decode(graph).sentences.first().text)
+    }
+
+    /**
+     * A word only imported (U-101, C19) is offered as a word the input starts with, never inside a
+     * sentence nor after another word: 妮好 imported, nihaonihao reads no 妮好 anywhere but its start.
+     */
+    @Test
+    fun anImportedWordIsOfferedOnlyFromTheStart() {
+        val user = UserModel(data.dictionary, data.vocabulary)
+        user.attachImports(ImportedWords().import("妮好" to "ni hao", "妮好妮" to "ni hao ni"))
+        val id = user.known(UserModel.Entry("妮好", syl("ni", "hao")))
+        val three = user.known(UserModel.Entry("妮好妮", syl("ni", "hao", "ni")))
+        val d = PinyinDecoder(data.dictionary, data.vocabulary, UserScorer(data.model, user), user = user)
+        val alone = d.decode(plain.segment("nihao"))
+        assertTrue(alone.words.any { it.words.toList() == listOf(id) })
+        assertTrue(alone.sentences.none { id in it.words })
+        // three syllables deep too, from the start
+        val twice = d.decode(plain.segment("nihaonihao"), sentences = 64, words = 256)
+        assertTrue(twice.words.any { it.words.toList() == listOf(id) && it.end == 5 })
+        assertTrue(twice.words.any { it.words.toList() == listOf(three) })
+        assertTrue(twice.sentences.none { id in it.words || three in it.words })
+        // after a word: never, not at the input's second word either
+        d.reset()
+        assertTrue(d.decode(plain.segment("hainihao"), sentences = 64, words = 256).let { r -> r.words.none { id in it.words } && r.sentences.none { id in it.words } })
+        // the user's own, it is a word like any other
+        user.own(UserModel.Entry("妮好", syl("ni", "hao")))
+        d.reset()
+        assertTrue(d.decode(plain.segment("nihaonihao"), sentences = 64).sentences.any { id in it.words })
+    }
+
+    // C19 with imports there, not only with none (review-G S7): the sentences are the same, word for word
+    @Test
+    fun importedWordsChangeNoSentence() {
+        val inputs = listOf("nihao", "nihaonihao", "nihaoma", "nhnh")
+        fun sentences(user: UserModel) = PinyinDecoder(data.dictionary, data.vocabulary, UserScorer(data.model, user), user = user).let { d ->
+            inputs.map { input -> d.reset(); d.decode(plain.segment(input), sentences = 16).sentences.map { it.words.toList() to it.score } }
+        }
+        val plainUser = UserModel(data.dictionary, data.vocabulary)
+        val imported = UserModel(data.dictionary, data.vocabulary)
+        imported.attachImports(ImportedWords().import("妮好" to "ni hao", "妮好妮" to "ni hao ni", "好妮" to "hao ni", "妮" to "ni"))
+        assertEquals(sentences(plainUser), sentences(imported))
+    }
+
+    // review-G S2: an import alone over the input's first syllable leaves the typed letters to go on from
+    @Test
+    fun aSyllableOnlyAnImportHasStillReadsAsTyped() {
+        val user = UserModel(data.dictionary, data.vocabulary)
+        user.attachImports(ImportedWords().import("妆" to "zhuang"))
+        val d = PinyinDecoder(data.dictionary, data.vocabulary, UserScorer(data.model, user), user = user)
+        val r = d.decode(plain.segment("zhuangnihao"), sentences = 8, words = 64)
+        assertTrue(r.sentences.isNotEmpty())
+        assertTrue(r.words.any { it.words.toList() == listOf(user.known(UserModel.Entry("妆", syl("zhuang")))) })
     }
 }

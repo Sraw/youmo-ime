@@ -52,3 +52,42 @@ class LatinWords private constructor(private val dictionary: PinyinDictionary, v
         }
     }
 }
+
+/**
+ * The user's Latin words, as [LatinWords] are the dictionary's, for [PinyinSegmenter]: English's
+ * learned words (U-31 §3), in lower case, which pinyin's model lists spelt by their letters.
+ * Small, and [set] anew as English learns; read on the thread that sets it.
+ */
+class UserLatinWords {
+    private class Node {
+        val next = HashMap<Char, Node>(2)
+        var word = false
+    }
+
+    private var root = Node()
+
+    /** The words, in lower case. */
+    var words: Set<String> = emptySet()
+        private set
+
+    fun set(spellings: Set<String>) {
+        words = spellings
+        root = Node().also { r ->
+            for (w in spellings) {
+                var n = r
+                for (c in w) n = n.next.getOrPut(c) { Node() }
+                n.word = true
+            }
+        }
+    }
+
+    /** The length of each word [input] spells from [at], two letters or more, as [LatinWords.forEachAt]. */
+    fun forEachAt(input: String, at: Int, visit: (length: Int) -> Unit) {
+        var node = root
+        var end = at
+        while (end < input.length && input[end] in 'a'..'z') {
+            node = node.next[input[end++]] ?: return
+            if (end - at >= 2 && node.word) visit(end - at)
+        }
+    }
+}

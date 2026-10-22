@@ -4,8 +4,10 @@
  */
 package org.fcitx.fcitx5.android.input
 
+import org.fcitx.fcitx5.android.engine.learn.LearnRecord.Commit
 import org.fcitx.fcitx5.android.engine.session.Action
 import org.fcitx.fcitx5.android.input.editing.ContextMemory
+import org.fcitx.fcitx5.android.input.editing.EditorTraits
 
 /**
  * What the keyboard may do with the focused field's text. A password, or a field that asks not to
@@ -23,20 +25,47 @@ class FieldPolicy(private val memory: ContextMemory) {
     var sensitive = false
         private set
 
+    /** What learning leaves out in the field focused ([Commit.NO_PAIRS], [Commit.NO_PREDICT]; see [learnFlags]). */
+    var learnFlags = 0
+        private set
+
     // no field between finish() and the next focus(): a read queued in the one before reads nothing
     private var focused = false
 
-    /** A field focused, named as [ContextMemory.field] names it; a [password] is [sensitive] whatever the rest says. */
-    fun focus(name: String, password: Boolean, sensitive: Boolean) {
+    // the name of the field focused last
+    private var field: String? = null
+
+    /**
+     * A field focused, named as [ContextMemory.field] names it; a [password] is [sensitive] whatever
+     * the rest says. Whether it is another field than the last ([Action.Context.started]): the same
+     * one again (restarted by a WebView, gone back to from another app) is checked by the context,
+     * not taken for a new one (review-1c S3).
+     */
+    fun focusAnother(name: String, password: Boolean, sensitive: Boolean, learnFlags: Int = 0): Boolean {
+        this.learnFlags = learnFlags
         this.password = password
         this.sensitive = sensitive || password
         focused = true
         memory.focus(name.takeUnless { this.sensitive })
+        return (name != field).also { field = name }
     }
 
-    /** The input finished: no field until the next [focus]. */
+    // the input method active when last asked (inputMethodChanged)
+    private var inputMethod: String? = null
+
+    /**
+     * [im] became the active input method: whether to tell it the field as one [Action.Context.started].
+     * fcitx resets the session it activates, which leaves its journal unverified (U-03), and nothing
+     * else tells it this field: in one empty no context would verify it again, so nothing deleted
+     * at once would be taken back (UAT HW-22/23, a switch to 手写). The field is new to that session;
+     * any text in it another input method's. Not the same one again, nor with no field focused.
+     */
+    fun inputMethodChanged(im: String): Boolean = (focused && im != inputMethod).also { inputMethod = im }
+
+    /** The input finished: no field until the next [focusAnother]. */
     fun finish() {
         focused = false
+        learnFlags = 0
         password = false
         sensitive = false
     }
@@ -63,11 +92,27 @@ class FieldPolicy(private val memory: ContextMemory) {
         return memory.context(text, now, after)
     }
 
-    /** [context] as the engine is told it: cleared where the field is empty and what was written in it is told ([Action.Context.cleared]). */
-    fun told(now: Long, before: () -> CharSequence?, after: () -> CharSequence?): Action.Context? {
+    /**
+     * [context] as the engine is told it: cleared where the field is empty and what was written in
+     * it is told ([Action.Context.cleared]); the text [after] the cursor where learning, for what was
+     * written to be checked (U-03), so asked on every report of a field not [sensitive], once even
+     * where [context] asked it too (a round trip each; accepted in review-design-1c); [started] and
+     * [selected] as [Action.Context] has them.
+     */
+    fun told(now: Long, before: () -> CharSequence?, after: () -> CharSequence?, started: Boolean = false, selected: Boolean = false): Action.Context? {
         var read: CharSequence? = null
-        val context = context(now, { before().also { read = it } }, after) ?: return null
-        return Action.Context(context, cleared = context.isNotEmpty() && read?.isEmpty() == true)
+        val afterOnce by lazy(LazyThreadSafetyMode.NONE) { after() }
+        val context = context(now, { before().also { read = it } }, { afterOnce }) ?: return null
+        val following = if (sensitive) null else afterOnce?.toString()
+        return Action.Context(
+            before = context,
+            cleared = context.isNotEmpty() && read?.isEmpty() == true,
+            learnFlags = learnFlags,
+            started = started,
+            after = following,
+            selected = selected,
+            said = !sensitive && read != null,
+        )
     }
 
     companion object {
@@ -78,5 +123,12 @@ class FieldPolicy(private val memory: ContextMemory) {
          * them, which deleting the word later cannot take back (UAT WD-03).
          */
         fun ownApp(fieldPackage: String?, ownPackage: String): Boolean = fieldPackage == ownPackage
+
+        /**
+         * What learning leaves out of what is typed in a field like [traits] (U-91): no pairs where
+         * an address or a number is typed, no 联想 from a search.
+         */
+        fun learnFlags(traits: EditorTraits): Int =
+            (if (traits.isUri || traits.isEmail || traits.isNumber) Commit.NO_PAIRS else 0) or (if (traits.isSearch) Commit.NO_PREDICT else 0)
     }
 }

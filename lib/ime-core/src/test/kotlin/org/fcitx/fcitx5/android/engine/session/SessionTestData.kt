@@ -11,6 +11,15 @@ import java.nio.ByteBuffer
 
 internal fun syl(vararg s: String) = s.map { Syllables.id(it) }.toIntArray()
 
+/** A dictionary and model of [words]: each its text, its syllables apart by spaces, and its score. */
+internal fun pinyinDataOf(vararg words: Triple<String, String, Float>) = PinyinData.load(
+    ByteBuffer.wrap(
+        PinyinDataBuilder().unigram("<unk>", -7f, 0f)
+            .apply { words.forEach { (w, reading, score) -> unigram(w, score, 0f).entry(w, reading.split(' ').map(Syllables::id).toIntArray()) } }
+            .build().toByteArray(),
+    ),
+)
+
 /** The dictionary and model the pinyin session tests read. */
 internal fun sessionTestData() = PinyinData.load(
     ByteBuffer.wrap(

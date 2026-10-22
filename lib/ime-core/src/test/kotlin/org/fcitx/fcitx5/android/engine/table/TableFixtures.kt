@@ -5,9 +5,18 @@
 package org.fcitx.fcitx5.android.engine.table
 
 import org.fcitx.fcitx5.android.engine.data.CodeTable
+import org.fcitx.fcitx5.android.engine.data.NgramModel.Companion.NO_WORD
+import org.fcitx.fcitx5.android.engine.handwriting.handwritingData
+import org.fcitx.fcitx5.android.engine.lattice.Predictor
+import org.fcitx.fcitx5.android.engine.lattice.TextWords
+import org.fcitx.fcitx5.android.engine.learn.Code
+import org.fcitx.fcitx5.android.engine.learn.Habits
+import org.fcitx.fcitx5.android.engine.learn.Kinds
+import org.fcitx.fcitx5.android.engine.learn.Learner
 import org.fcitx.fcitx5.android.engine.session.Action.Key
 import org.fcitx.fcitx5.android.engine.session.Session
 import org.fcitx.fcitx5.android.engine.session.Snapshot
+import org.fcitx.fcitx5.android.engine.user.UserScorer
 import java.nio.ByteBuffer
 
 /**
@@ -25,6 +34,34 @@ internal fun dictionary(vararg entries: String, header: Map<String, String> = em
     .build()
     .toByteArray()
     .let { TableDictionary(CodeTable.load(ByteBuffer.wrap(it))) }
+
+/**
+ * A language over the fixture's word model learning into [learner], as 五笔's: what pins and blocks
+ * under a code need. [habits] in place of the learner's (a test's that records or stands in), and
+ * [blockedUnder] as [TableLanguage] has it.
+ */
+internal fun learning(
+    learner: Learner = Learner(handwritingData),
+    habits: Habits = learner.habits,
+    blockedUnder: (Code) -> Set<String> = habits::blockedUnder,
+): TableLanguage {
+    val d = handwritingData
+    val readings = Predictor(d.model, d.vocabulary, d.dictionary, learner.model)
+    return TableLanguage(
+        TextWords(d.model, d.wordIndex, UserScorer(d.model, learner.model)),
+        learner.model,
+        reading = { text -> d.wordIndex.find(text).takeIf { it != NO_WORD }?.let(readings::reading) },
+        habits = habits,
+        kind = Kinds.table("wubi"),
+        blockedUnder = blockedUnder,
+    )
+}
+
+/** What an older build saved in this table: [phrases] as code and text (自动造词 is gone, U-28 C46). */
+internal fun TableDictionary.savedBefore(vararg phrases: Pair<String, String>): TableUser = TableUser(this).also { user ->
+    val log = phrases.fold(TableUser.TableLog.FORMAT.header()) { bytes, (code, text) -> bytes + TableUser.TableLog.saved(code, text) }
+    TableUser.TableLog.FORMAT.read(log) { type, input -> TableUser.TableLog.replay(type, input, user) }
+}
 
 /** Types [keys], returning every snapshot's commit joined and the last snapshot. */
 internal fun Session.type(keys: String): Pair<String, Snapshot> {

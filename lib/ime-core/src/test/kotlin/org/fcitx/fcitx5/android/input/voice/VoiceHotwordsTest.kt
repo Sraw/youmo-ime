@@ -43,6 +43,11 @@ class VoiceHotwordsTest {
         )
         assertEquals(VoiceHotwords.Words("幽 默 :5.0/佛 系", "尬 聊/内 卷"), VoiceHotwords.ofUser(words))
         assertEquals(VoiceHotwords.Words.NONE, VoiceHotwords.ofUser(emptyList()))
+        // U-93 off: nothing of theirs listened for, the blocked never heard all the same
+        assertEquals(VoiceHotwords.Words("", "尬 聊/内 卷"), VoiceHotwords.ofUser(words, habits = false))
+        // words read with the switch on, handed to a listener once it is off: theirs dropped all the same
+        assertEquals(VoiceHotwords.Words("", "尬 聊/内 卷"), VoiceHotwords.ofUser(words).withHabits(false))
+        assertEquals(VoiceHotwords.ofUser(words), VoiceHotwords.ofUser(words).withHabits(true))
     }
 
     @Test

@@ -1,0 +1,47 @@
+# U-42 回落：学到的东西很久（30 个打字日）不用就忘掉；还在用就一直有效。
+# U-41 习惯变化：连着两次选 X：X 第 1。之后 X、Y 都不打，不到 30 天：X 仍在 Y 前。
+# No typing days yet: every expectation after a `day` is pending.
+
+scenario dl back to 带来 after 30 days
+ctx 他
+type dl
+pick 点了
+ctx 他
+type dl
+pick 点了
+ctx 他
+type dl
+expect first 点了
+repeat 29 {
+day
+clear
+type nihao
+space
+}
+ctx 他
+type dl
+expect first 点了
+pick 带来
+repeat 31 {
+day
+clear
+type nihao
+space
+}
+# 31 个打字日没在 他 下打 dl：那里学到的作废
+ctx 他
+type dl
+expect first 带来
+
+scenario a month away keeps everything
+# 没打字的日子不计：一个月没用输入法，回来一切照旧
+ctx 他
+type dl
+pick 点了
+ctx 他
+type dl
+pick 点了
+day
+ctx 他
+type dl
+expect first 点了

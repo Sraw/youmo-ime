@@ -65,6 +65,7 @@ enum EngineOffer : int {
     OfferPin = 1 << 1,
     OfferUnpin = 1 << 2,
     OfferBlock = 1 << 3,
+    OfferDeletePhrase = 1 << 4,
 };
 
 // Hands an event to the session of input method [im]; called on the fcitx thread. [learning] is

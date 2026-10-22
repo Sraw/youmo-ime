@@ -49,6 +49,8 @@ class RecordStore internal constructor(
     private val openAppend: (File) -> OutputStream,
     // writes a compaction an append made due; null: the thread that learns does
     private val background: Executor? = null,
+    // compacts from the log's own bytes rather than the counts in memory: see [Fold]
+    private val fold: Fold? = null,
 ) : Closeable {
     constructor(
         file: File,
@@ -56,9 +58,36 @@ class RecordStore internal constructor(
         compactAt: Long = DEFAULT_COMPACT_AT,
         onError: (IOException) -> Unit = {},
         background: Executor? = null,
-    ) : this(file, format, compactAt, onError, { FileOutputStream(it, true) }, background)
+        fold: Fold? = null,
+    ) : this(file, format, compactAt, onError, { FileOutputStream(it, true) }, background, fold)
+
+    /**
+     * A log compacted from its own bytes: the file's first bytes as they were when the compaction
+     * was due ([log]; appends do not change them), written compacted to [to]; false if there is
+     * nothing to compact, the log then left as it is. Run on the [background] executor if there
+     * is one, so it reads nothing the thread that learns changes. The counts in memory still seed
+     * a log ([open]).
+     */
+    fun interface Fold {
+        @Throws(IOException::class)
+        fun fold(log: ByteArray, to: OutputStream): Boolean
+    }
 
     private var out: OutputStream? = null
+
+    /**
+     * A seam for a test (EnginesRecordFaultTest): the next write to the open log throws, as a full
+     * disk would, and the store recovers as from one. Not the stream itself, which nothing else in
+     * the module is to swap or drop (F3233).
+     */
+    internal fun refuseNextWrite() {
+        val real = out ?: return
+        out = object : OutputStream() {
+            override fun write(b: Int) = throw IOException("refused")
+            override fun write(b: ByteArray, off: Int, len: Int) = throw IOException("refused")
+            override fun close() = real.close()
+        }
+    }
     // out is null before open and once a failed write stopped the appends: only the first is not open
     private var opened = false
     private var closed = false
@@ -69,8 +98,11 @@ class RecordStore internal constructor(
     private var counts: ((ByteArray) -> Unit) -> Unit = {}
     private var pending: Pending? = null
 
-    /** A compaction being written by [background]: the counts it was given, and the records appended to the log since. */
-    private class Pending(val task: FutureTask<Unit>, val size: Long) {
+    /**
+     * A compaction being written by [background], as long as its task returns (-1: nothing to
+     * compact), and the records appended to the log since.
+     */
+    private class Pending(val task: FutureTask<Long>) {
         val since = ArrayList<ByteArray>()
     }
 
@@ -82,9 +114,10 @@ class RecordStore internal constructor(
      * another input method learned, and written as the counts it leaves, all or nothing: until
      * that is written whole, the log stays empty and the next open seeds again. A seed that
      * cannot be written fails the open. A log compacted to no counts is not empty: what the user
-     * had forgotten is not seeded back.
+     * had forgotten is not seeded back. A seed that says it seeded nothing (its source did not
+     * read) leaves the log empty, to be seeded at the next open.
      */
-    fun open(replay: (Byte, DataInputStream) -> Unit, counts: ((ByteArray) -> Unit) -> Unit, seed: (() -> Unit)? = null) {
+    fun open(replay: (Byte, DataInputStream) -> Unit, counts: ((ByteArray) -> Unit) -> Unit, seed: (() -> Boolean)? = null) {
         check(out == null && !closed) { "opened already" }
         this.counts = counts
         if (file.exists()) {
@@ -105,11 +138,8 @@ class RecordStore internal constructor(
                 else -> moveAside()
             }
         }
-        val seeding = seed != null && (!file.exists() || file.length() <= RecordFormat.HEADER_SIZE)
-        if (seeding) {
-            seed?.invoke()
-            writeCounts(seeding = true)
-        }
+        val seeding = seed != null && (!file.exists() || file.length() <= RecordFormat.HEADER_SIZE) && seed()
+        if (seeding) writeCounts(seeding = true)
         if (!file.exists()) file.writeBytes(format.header())
         end = file.length()
         // a seed already written as counts: no call to write them again yet
@@ -189,6 +219,40 @@ class RecordStore internal constructor(
         }
     }
 
+    /**
+     * Appends [records] as [append] does each, in one write: an import of many words is not a
+     * write per word (review R11 F3058). One that does not fit is left out and reported.
+     */
+    fun appendAll(records: List<ByteArray>) {
+        val stream = out ?: return
+        val kept = records.filter(::fits)
+        if (kept.isEmpty()) return
+        val all = ByteArray(kept.sumOf { it.size })
+        var at = 0
+        kept.forEach { it.copyInto(all, at); at += it.size }
+        try {
+            stream.write(all)
+            end += all.size
+        } catch (e: IOException) {
+            onError(e)
+            recover()
+            return
+        }
+        val compacting = pending
+        if (compacting != null) {
+            compacting.since += kept
+            if (compacting.task.isDone) finish(compacting)
+        } else if (tooLong()) {
+            compactDue()
+        }
+    }
+
+    /** Compacts the log soon, as though it had grown long enough: one already being compacted is not compacted again. */
+    fun compactSoon() {
+        if (!opened || closed) return
+        if (out != null && pending == null) compactDue()
+    }
+
     /** Compacts the log now due: only its counts are read here if there is a [background] to write them. */
     private fun compactDue() {
         if (background != null) compactInBackground(background) else compact()
@@ -231,6 +295,10 @@ class RecordStore internal constructor(
         if (out == null) return
         // one being written in the background goes first: both would write the same file
         pending?.let { finish(it) }
+        if (fold != null) {
+            finish(Pending(foldTask(fold)).also { it.task.run() })
+            return
+        }
         try {
             writeCounts()
         } catch (e: IOException) {
@@ -243,14 +311,67 @@ class RecordStore internal constructor(
     }
 
     /**
+     * Rewrites the log whole, as the user asked (U-88, U-86, a long press taken back): [transform]
+     * reads it (header and records) and writes what is kept to its stream, the header first; false
+     * leaves the log as it was. A compaction being written is put in place first, so the bytes read
+     * are the log as it is, and none is renamed over the rewrite after: this thread alone renames.
+     *
+     * @return the bytes written, null if nothing was (false, not open, or a header alone: [onError])
+     * @throws IOException if the disk failed: the log as it was
+     */
+    @Throws(IOException::class)
+    fun rewrite(transform: (ByteArray, OutputStream) -> Boolean): ByteArray? {
+        check(opened && !closed) { "not open" }
+        if (out == null) return null
+        pending?.let { finish(it) }
+        if (out == null) return null
+        val written = ByteArrayOutputStream()
+        if (!transform(file.readBytes(), written)) return null
+        // a header alone is a log a start seeds again (as a first one): never written for one emptied
+        if (written.size() <= RecordFormat.HEADER_SIZE) {
+            onError(IOException("a rewrite to a header alone declined"))
+            return null
+        }
+        // a failure the caller's to tell (a clear that did not clear): the file as it was, still open
+        replaceFile(file, File(file.path + COMPACTING)) { it.writeBytes(written.toByteArray()) }
+        reopen(compactedTo = file.length())
+        return written.toByteArray()
+    }
+
+    /** Folds the log's first [end] bytes into the next file, written and synced: its length, or -1 for nothing to fold. */
+    private fun foldTask(fold: Fold): FutureTask<Long> {
+        val length = end
+        val next = File(file.path + COMPACTING)
+        return FutureTask(
+            Callable {
+                val log = ByteArray(length.toInt())
+                RandomAccessFile(file, "r").use { it.readFully(log) }
+                var folded = false
+                writeSynced(next) { folded = fold.fold(log, it) }
+                if (folded) {
+                    next.length()
+                } else {
+                    next.delete()
+                    -1L
+                }
+            },
+        )
+    }
+
+    /**
      * As [compact], but only the counts are read here: [executor] writes and syncs them, and
      * [finish] puts them in place.
      */
     private fun compactInBackground(executor: Executor) {
-        // as long as the log, which open read whole, so seldom grown; handed on as it is, not copied
-        val bytes = ByteArrayOutputStream(end.coerceAtMost(Int.MAX_VALUE.toLong()).toInt()).also { countsTo(it, seeding = false) }
-        val next = File(file.path + COMPACTING)
-        val compacting = Pending(FutureTask(Callable { writeSynced(next) { bytes.writeTo(it) } }), bytes.size().toLong())
+        val task = if (fold != null) {
+            foldTask(fold)
+        } else {
+            // as long as the log, which open read whole, so seldom grown; handed on as it is, not copied
+            val bytes = ByteArrayOutputStream(end.coerceAtMost(Int.MAX_VALUE.toLong()).toInt()).also { countsTo(it, seeding = false) }
+            val next = File(file.path + COMPACTING)
+            FutureTask(Callable { writeSynced(next) { bytes.writeTo(it) }.let { bytes.size().toLong() } })
+        }
+        val compacting = Pending(task)
         pending = compacting
         try {
             executor.execute(compacting.task)
@@ -264,9 +385,15 @@ class RecordStore internal constructor(
     private fun finish(compacting: Pending) {
         pending = null
         val next = File(file.path + COMPACTING)
+        val size: Long
         try {
-            written(compacting.task)?.let { throw it }
-            appendSince(next, compacting)
+            size = written(compacting.task).getOrThrow()
+            // nothing to fold: the log stays, and is not due again till it has doubled
+            if (size < 0) {
+                compacted = end
+                return
+            }
+            appendSince(next, size, compacting)
             if (!next.renameTo(file)) throw IOException("cannot replace $file")
         } catch (e: IOException) {
             next.delete()
@@ -275,36 +402,39 @@ class RecordStore internal constructor(
             compacted = end
             return
         }
-        reopen(compactedTo = compacting.size)
+        reopen(compactedTo = size)
     }
 
-    /** Appends to the counts [compacting] wrote in [next] what was appended to the log since. */
-    private fun appendSince(next: File, compacting: Pending) {
+    /** Appends to the [size] bytes of counts [compacting] wrote in [next] what was appended to the log since, and syncs it. */
+    private fun appendSince(next: File, size: Long, compacting: Pending) {
         // one gone would be made anew, of no header nor counts, and renamed over the log
-        if (next.length() != compacting.size) throw IOException("$next is not the ${compacting.size} bytes of counts written")
-        FileOutputStream(next, true).use { stream -> compacting.since.forEach { stream.write(it) } }
+        if (next.length() != size) throw IOException("$next is not the $size bytes of counts written")
+        // synced before the rename: a power cut after it would otherwise lose what was appended meanwhile
+        FileOutputStream(next, true).use { stream ->
+            compacting.since.forEach { stream.write(it) }
+            stream.fd.sync()
+        }
     }
 
     /**
      * Waits for [task] to have written its file, running it here if no thread has started it.
      *
-     * @return why it failed, or null
+     * @return the length it wrote, -1 for nothing to compact; or why it failed, an [IOException]
      */
-    private fun written(task: FutureTask<Unit>): IOException? {
+    private fun written(task: FutureTask<Long>): Result<Long> {
         task.run()
         var interrupted = false
         try {
             while (true) {
                 try {
-                    task.get()
-                    return null
+                    return Result.success(task.get())
                 } catch (_: InterruptedException) {
                     // its file is still being written: not to be renamed or deleted under it
                     interrupted = true
                 }
             }
         } catch (e: ExecutionException) {
-            return e.cause as? IOException ?: IOException(e.cause)
+            return Result.failure(e.cause as? IOException ?: IOException(e.cause))
         } finally {
             if (interrupted) Thread.currentThread().interrupt()
         }

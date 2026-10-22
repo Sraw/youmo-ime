@@ -5,6 +5,12 @@
 package org.fcitx.fcitx5.android.engine.session
 
 import org.fcitx.fcitx5.android.engine.data.NgramModel.Companion.NO_WORD
+import org.fcitx.fcitx5.android.engine.lattice.Predictor
+import org.fcitx.fcitx5.android.engine.learn.KeyedRows
+import org.fcitx.fcitx5.android.engine.learn.Kinds
+import org.fcitx.fcitx5.android.engine.learn.LearnState
+import org.fcitx.fcitx5.android.engine.learn.Learner
+import org.fcitx.fcitx5.android.engine.learn.Word
 import org.fcitx.fcitx5.android.engine.pinyin.PinyinSegmenter
 import org.fcitx.fcitx5.android.engine.session.Action.Backspace
 import org.fcitx.fcitx5.android.engine.session.Action.CommitRaw
@@ -43,31 +49,42 @@ class PinyinSessionLearningTest {
         assertEquals(0, user.size)
     }
 
+    // the user, as Engines has one: what a session learns goes to the learning record, and from it to the model
+    private lateinit var learner: Learner
+
     private fun learning(pageSize: Int = 20): Pair<Session, UserModel> {
-        val user = UserModel(data.dictionary, data.vocabulary)
-        return PinyinSession(data, PinyinSegmenter(), pageSize = pageSize, user = user) to user
+        learner = Learner(data)
+        val user = learner.model
+        return PinyinSession(data, PinyinSegmenter(), pageSize = pageSize, user = user, learnTo = learner.learnTo()) to user
     }
 
     @Test
-    fun aWordPickedOftenComesFirst() {
+    fun aWordPickedOverTheFirstTwiceComesFirst() {
         val (session, user) = learning()
-        repeat(3) {
+        repeat(2) {
             val s = session.type("ni")
-            // 拟 is far less likely than 你 until picked three times
+            // 拟 is far less likely than 你 until corrected to twice in a row (U-02 rule 2)
             assertEquals("你", s.candidates.first())
             assertEquals("拟", session.apply(Select(s.candidates.indexOf("拟"))).commit)
             session.apply(Reset)
         }
         assertEquals("拟", session.type("ni").candidates.first())
-        assertEquals(3f, user.total)
+        assertEquals(2f, user.total)
     }
 
     @Test
-    fun piecesPutTogetherAreLearnedAsOneWord() {
+    fun piecesPutTogetherTwiceAreTheUsersWord() {
         val (session, user) = learning()
-        val s = session.type("nizai")
-        session.apply(Select(s.candidates.indexOf("拟")))
-        val committed = session.apply(Select(0))
+        fun pieces(): Snapshot {
+            val s = session.type("nizai")
+            session.apply(Select(s.candidates.indexOf("拟")))
+            return session.apply(Select(0))
+        }
+        assertEquals("拟再", pieces().commit)
+        // once: no word yet (U-06)
+        assertEquals(0, user.size)
+        session.apply(Reset)
+        val committed = pieces()
         assertEquals("拟再", committed.commit)
         assertEquals(1, user.size)
         // the model never saw the user's word: what follows is what follows its end, 再
@@ -78,20 +95,20 @@ class PinyinSessionLearningTest {
         val again = session.type("nizai")
         assertEquals("拟再", again.candidates.first())
         assertEquals("ni zai", again.preedit)
-        // and picked whole: learned again, not anew
+        // and picked whole: not made anew
         assertEquals("拟再", session.apply(Select(0)).commit)
         assertEquals(1, user.size)
-        assertEquals(2f, user.total)
+        assertTrue(inTrie(user, "拟再", "ni", "zai"))
     }
 
     @Test
     fun aLongRunOfPiecesIsLearnedAsItsWords() {
         val (session, user) = learning()
-        var s = session.type("ni".repeat(UserModel.MAX_PHRASE + 1))
-        repeat(UserModel.MAX_PHRASE + 1) { s = session.apply(Select(s.candidates.indexOf("拟"))) }
-        assertEquals("拟".repeat(UserModel.MAX_PHRASE + 1), s.commit)
+        var s = session.type("ni".repeat(LearnState.MAX_FORMED + 1))
+        repeat(LearnState.MAX_FORMED + 1) { s = session.apply(Select(s.candidates.indexOf("拟"))) }
+        assertEquals("拟".repeat(LearnState.MAX_FORMED + 1), s.commit)
         assertEquals(0, user.size)
-        assertEquals(UserModel.MAX_PHRASE + 1f, user.total)
+        assertEquals(LearnState.MAX_FORMED + 1f, user.total)
     }
 
     @Test
@@ -99,32 +116,87 @@ class PinyinSessionLearningTest {
         val (session, user) = learning()
         session.type("wo")
         session.apply(Select(0))
-        // 再, predicted after 我: learned as the dictionary reads it, after 我
+        // 再, predicted after 我: learned after 我 for 联想, by its text alone, no count of the decoder's (review-C S1)
         assertEquals("再", session.apply(Select(0)).commit)
-        assertEquals(2f, user.total)
-        assertTrue(user.probability(user.id(UserModel.Entry("我", syl("wo"))), user.id(UserModel.Entry("再", syl("zai")))) > 0.3f)
+        assertEquals(1f, user.total)
+        assertEquals(1f, predicted(user, word("我"), word("再")))
+        assertEquals(0f, user.probability(word("我"), word("再")))
         session.type("vvv")
         session.apply(CommitRaw)
         // a sentence with text kept as typed
         val s = session.type("nivvv")
         assertEquals("你vvv", session.apply(Select(s.candidates.indexOf("你vvv"))).commit)
-        assertEquals(2f, user.total)
+        assertEquals(1f, user.total)
+    }
+
+    // U-71: put in after a word 3 times in a table, it is offered after that word in pinyin too
+    @Test
+    fun whatATableOftenPutInAfterAWordIsPredictedAfterItInPinyin() {
+        val (session, _) = learning()
+        repeat(Predictor.PAIRS) { learner.habits.record(KeyedRows.of(Kinds.table("wubi"), emptyList(), listOf(Word("你", "")), "我")) }
+        session.type("wo")
+        assertEquals(listOf("再", "你"), session.apply(Select(0)).candidates.take(2))
+    }
+
+    // a 联想 picked is learned with no user model too: it is ranked by the record (H review S5)
+    @Test
+    fun aPredictionPickedIsLearnedWithNoUserModel() {
+        learner = Learner(data)
+        val session = PinyinSession(data, PinyinSegmenter(), user = null, learnTo = learner.learnTo())
+        session.type("wo")
+        val after = session.apply(Select(0))
+        assertEquals("再", after.candidates.first())
+        assertEquals("再", session.apply(Select(0)).commit)
+        assertEquals(1, learner.habits.uses(PredictionOrder.code("我"), PredictionOrder.words("再")))
+    }
+
+    // UAT PY-71 (好的谢谢): the pair is learned after the word the text ends with, 你好, though the
+    // decoder read it 你 好; 联想 after it looked under 好 and never found it
+    @Test
+    fun whatIsOftenTypedAfterAWordReadInPiecesIsPredictedAfterIt() {
+        val (session, _) = learning()
+        repeat(Predictor.PAIRS) {
+            assertEquals("你好", session.type("nihao").let { session.apply(Select(0)) }.commit)
+            assertEquals("再", session.type("zai").let { session.apply(Select(it.candidates.indexOf("再"))) }.commit)
+            session.apply(Reset)
+        }
+        assertTrue("再" in session.type("nihao").let { session.apply(Select(0)) }.candidates)
+    }
+
+    // review-uat-fixes S11: what is offered after a word read in pieces is filed under the word, 你好:
+    // 为什么 says so, and 不再联想 is asked of it, not of the 好 it ends with
+    @Test
+    fun whatIsOfferedAfterAWordReadInPiecesIsFiledUnderIt() {
+        val (session, user) = learning()
+        repeat(Predictor.PAIRS) {
+            session.type("nihao").let { session.apply(Select(0)) }
+            session.type("zai").let { session.apply(Select(it.candidates.indexOf("再"))) }
+            session.apply(Reset)
+        }
+        user.predictionsOff = { prev, next -> prev == "好" && next == "再" }
+        val offered = session.type("nihao").let { session.apply(Select(0)) }.candidates
+        assertEquals(PredictionOrder.code("你好"), session.why(offered.indexOf("再"))?.code)
+        session.apply(Reset)
+        user.predictionsOff = { prev, next -> prev == "你好" && next == "再" }
+        assertFalse("再" in session.type("nihao").let { session.apply(Select(0)) }.candidates)
     }
 
     @Test
     fun whatIsOftenTypedAfterAWordIsPredictedAfterIt() {
         val (session, _) = learning()
-        // 我 then 你好 (你 and 好, as the model splits it), as 用 then 中文: the model has 再 after 我
+        // 我 then 你好 (你 and 好, as the model splits it), as 用 then 中文: the model has 再 after 我;
+        // 你 after it from the third time (U-71)
         repeat(5) {
             session.type("wo")
-            assertEquals(if (it == 0) listOf("再") else listOf("再", "你"), session.apply(Select(0)).candidates.take(2))
+            assertEquals(if (it < Predictor.PAIRS) listOf("再") else listOf("再", "你"), session.apply(Select(0)).candidates.take(2))
             assertEquals("你好", session.type("nihao").let { session.apply(Select(0)) }.commit)
             session.apply(Reset)
         }
         session.type("wo")
-        assertEquals("你", session.apply(Select(0)).candidates.first())
+        val after = session.apply(Select(0)).candidates
+        assertEquals("你", after[1])
         // picked, what follows it is offered in turn
-        val next = session.apply(Select(0))
+        val next = session.apply(Select(1))
         assertEquals("你", next.commit)
         assertEquals("好", next.candidates.first())
     }
@@ -148,11 +220,13 @@ class PinyinSessionLearningTest {
         session.type("nizai")
         val fresh = session.candidates(0, 20)
         session.apply(Reset)
-        // 拟 then 再: learned as the user's word 拟再
-        session.type("nizai")
-        session.apply(Pick(session.candidates(0, 20).indexOfFirst { it.text == "拟" }))
-        session.apply(Select(0))
-        session.apply(Reset)
+        // 拟 then 再, twice: the user's word 拟再
+        repeat(2) {
+            session.type("nizai")
+            session.apply(Pick(session.candidates(0, 20).indexOfFirst { it.text == "拟" }))
+            session.apply(Select(0))
+            session.apply(Reset)
+        }
         val before = session.type("nizai")
         assertEquals(listOf("拟再"), before.candidates)
         assertTrue(before.actionable)
@@ -161,8 +235,10 @@ class PinyinSessionLearningTest {
         // forgotten from the second page, which stays shown
         session.apply(NextPage)
         val after = session.apply(Forget(session.candidates(0, 20).indexOfFirst { it.text == "拟再" }))
-        // read as before: 拟再 as the sentence 拟 再, not the user's word
-        assertEquals(fresh, session.candidates(0, 20))
+        // read as before: 拟再 as the sentence 拟 再, not the user's word; only 拟, picked as a piece under
+        // ni, is still used there, before 你 (the text forgotten is 拟再's alone)
+        assertEquals(fresh.take(4), session.candidates(0, 20).take(4))
+        assertEquals(listOf("拟", "你"), session.candidates(0, 20).drop(4).map { it.text })
         assertEquals(1, after.page)
         assertEquals("ni zai", after.preedit)
         assertEquals(0f, user.total)
@@ -179,22 +255,38 @@ class PinyinSessionLearningTest {
         session.type("nizai")
         session.apply(Pick(session.candidates(0, 20).indexOfFirst { it.text == "拟" }))
         session.apply(Select(0))
-        // deleted in the app, typed again and forgotten: the context is still 拟再's
+        // deleted in the app, typed again and forgotten: the context is the 拟 Backspace left
         session.apply(Backspace)
         session.type("nizai")
         session.apply(Forget(session.candidates(0, 20).indexOfFirst { it.text == "拟再" }))
         session.apply(Pick(session.candidates(0, 20).indexOfFirst { it.text == "你在" }))
-        assertFalse(inTrie(user, "拟再", "ni", "zai"))
         val counted = ArrayList<String>()
         user.forEachCount({ e, _ -> counted += e.toString() }, { a, b, _ -> counted += "$a $b" })
-        // 你 在 and their pair, none with 拟再
+        // 你 在 and their pair, none with 拟再; none of 你 after the 拟 Backspace left: a pair is held to
+        // the count of the word before it, and 拟 has none, but in the 拟再 forgotten
         assertEquals(listOf("你(ni)", "你(ni) 在(zai)", "在(zai)"), counted.sorted())
     }
 
     @Test
+    fun theAppsLastWordForgottenIsNotLearnedAgainAsTheWordBefore() {
+        val (session, user) = learning()
+        session.type("zai")
+        session.apply(Pick(session.candidates(0, 20).indexOfFirst { it.text == "在" }))
+        session.apply(Reset)
+        // the field ends in 在, nothing committed here: forgetting it drops it as the word before too
+        session.apply(Action.Context("我在"))
+        session.type("zai")
+        session.apply(Forget(session.candidates(0, 20).indexOfFirst { it.text == "在" }))
+        assertEquals("再", session.apply(Pick(session.candidates(0, 20).indexOfFirst { it.text == "再" })).commit)
+        val pairs = ArrayList<String>()
+        user.forEachCount({ _, _ -> }, { a, b, _ -> pairs += "$a $b" })
+        assertEquals(emptyList<String>(), pairs)
+    }
+
+    @Test
     fun onlyWhatAUserModelLearnedIsForgotten() {
-        // pinned as a phrase, but nothing learned to forget
-        assertEquals(setOf(Offer.PIN), session().also { it.type("ni") }.offers(0))
+        // no learning record: nothing to pin, nothing learned to forget
+        assertEquals(emptySet<Offer>(), session().also { it.type("ni") }.offers(0))
         assertEquals(session().type("ni"), session().also { it.type("ni") }.apply(Forget(0)))
         val (session, user) = learning()
         session.type("wo")
@@ -210,11 +302,19 @@ class PinyinSessionLearningTest {
 
     private fun word(text: String) = (0 until data.vocabulary.size).first { data.vocabulary.word(it) == text }
 
+    // how often [next] was put in after [prev], as 联想 counts it
+    private fun predicted(user: UserModel, prev: Int, next: Int): Float {
+        var count = 0f
+        user.forEachPredicted(prev) { w, c -> if (w == next) count = c }
+        return count
+    }
+
     @Test
     fun aPredictionLearnedMayBeForgottenAndAnyBlocked() {
-        val user = UserModel(data.dictionary, data.vocabulary)
+        val learner = Learner(data)
+        val user = learner.model
         val blocked = ArrayList<String>()
-        val session = PinyinSession(data, PinyinSegmenter(), user = user, block = { blocked += it.text; user.block(it) })
+        val session = PinyinSession(data, PinyinSegmenter(), user = user, block = { blocked += it.text; user.block(it) }, learnTo = learner.learnTo())
         session.type("wo")
         // the host asks what a long press offers only where the snapshot is actionable
         assertTrue(session.apply(Select(0)).actionable)
@@ -238,9 +338,10 @@ class PinyinSessionLearningTest {
 
     @Test
     fun whileLearningIsOffNothingIsForgottenOrBlocked() {
-        val user = UserModel(data.dictionary, data.vocabulary)
+        val learner = Learner(data)
+        val user = learner.model
         val blocked = ArrayList<String>()
-        val session = PinyinSession(data, PinyinSegmenter(), user = user, block = { blocked += it.text; user.block(it) })
+        val session = PinyinSession(data, PinyinSegmenter(), user = user, block = { blocked += it.text; user.block(it) }, learnTo = learner.learnTo())
         session.type("wo")
         session.apply(Select(0))
         session.apply(Reset)
@@ -264,7 +365,7 @@ class PinyinSessionLearningTest {
         session.type("zai")
         session.apply(Select(session.candidates(0, 20).indexOfFirst { it.text == "再" }))
         assertEquals("见", session.apply(Select(0)).commit)
-        assertTrue(user.probability(word("再"), word("见")) > 0.3f)
+        assertEquals(1f, predicted(user, word("再"), word("见")))
     }
 
     @Test
@@ -295,18 +396,22 @@ class PinyinSessionLearningTest {
     }
 
     @Test
-    fun aReadingPickedOverABetterOneIsLearnedAsOneWord() {
+    fun aReadingPickedOverABetterOneTwiceIsOneWord() {
         val (session, user) = learning()
         val s = session.type("nihaoma")
         assertEquals("你好吗", s.candidates.first())
         // the first reading, picked whole: its words are learned, and no new one
         session.apply(Select(0))
         assertEquals(0, user.size)
-        val other = session.type("nizai")
-        val index = other.candidates.indexOf("拟再")
-        assertTrue(index > 0)
-        assertEquals("拟再", session.apply(Select(index)).commit)
-        assertEquals(1, user.size)
+        repeat(2) {
+            val other = session.type("nizai")
+            val index = other.candidates.indexOf("拟再")
+            assertTrue(index > 0)
+            assertEquals("拟再", session.apply(Select(index)).commit)
+            assertEquals(it, user.size)
+            session.apply(Reset)
+        }
+        // corrected to twice, after two words before, and used more than 你在: first after any (U-02 rule 3)
         session.apply(Reset)
         assertEquals("拟再", session.type("nizai").candidates.first())
     }

@@ -24,17 +24,47 @@ class RecentlyUsedTest {
     @Test
     fun theOldestGoOnceThereAreMoreThanTheLimit() {
         val recent = RecentlyUsed("emoji", 3)
-        listOf("a", "b", "c", "d", "e").forEach(recent::insert)
-        assertEquals(listOf("e", "d", "c"), recent.items)
+        listOf("a", "b", "c", "d", "e").forEach { recent.insert(it, habits = true) }
+        assertEquals(listOf("e", "d", "c"), recent.items(habits = true))
         // picked again, it comes first and none goes
-        recent.insert("c")
-        assertEquals(listOf("c", "e", "d"), recent.items)
-        assertEquals(listOf("c", "e", "d"), RecentlyUsed("emoji", 3).items)
+        recent.insert("c", habits = true)
+        assertEquals(listOf("c", "e", "d"), recent.items(habits = true))
+        assertEquals(listOf("c", "e", "d"), RecentlyUsed("emoji", 3).items(habits = true))
     }
 
     @Test
     fun aListSavedLongerThanTheLimitIsReadAsItsNewest() {
         prefs.edit { putString("symbol", "[\"a\",\"b\",\"c\",\"d\"]") }
-        assertEquals(listOf("d", "c"), RecentlyUsed("symbol", 2).items)
+        assertEquals(listOf("d", "c"), RecentlyUsed("symbol", 2).items(habits = true))
+    }
+
+    // U-67: not while the habits are off; cleared with what was learned, every picker's, the one open too
+    @Test
+    fun noneWhileTheHabitsAreOffAndAllClearedWithWhatWasLearned() {
+        val emoji = RecentlyUsed("emoji", 5)
+        emoji.insert("a", habits = true)
+        emoji.insert("b", habits = false)
+        assertEquals(emptyList<String>(), emoji.items(habits = false))
+        assertEquals(listOf("a"), emoji.items(habits = true))
+        // kept by an older build, with no times: as of long ago
+        prefs.edit { putString("symbol", "[\"x\"]") }
+        val symbol = RecentlyUsed("symbol", 5)
+        RecentlyUsed.clear(System.currentTimeMillis() - 60_000)
+        assertEquals(emptyList<String>(), emoji.items(habits = true))
+        assertEquals(listOf("x"), symbol.items(habits = true))
+        RecentlyUsed.clear(0)
+        assertEquals(emptyList<String>(), RecentlyUsed("symbol", 5).items(habits = true))
+    }
+
+    // review-E-engine M1: a picker open while 清掉最近 ran saves what it last read, the cleared items with it, at its next pick
+    @Test
+    fun aPickAfterAClearKeepsOnlyItself() {
+        val open = RecentlyUsed("emoji", 5)
+        open.insert("a", habits = true)
+        open.insert("b", habits = true)
+        RecentlyUsed.clear(0)
+        open.insert("c", habits = true)
+        assertEquals(listOf("c"), open.items(habits = true))
+        assertEquals(listOf("c"), RecentlyUsed("emoji", 5).items(habits = true))
     }
 }

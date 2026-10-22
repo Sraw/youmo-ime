@@ -11,6 +11,8 @@ import org.fcitx.fcitx5.android.engine.lattice.CoarseWords
 import org.fcitx.fcitx5.android.engine.lattice.Predictor
 import org.fcitx.fcitx5.android.engine.lattice.UserWords
 import org.fcitx.fcitx5.android.engine.lattice.WordScorer
+import org.fcitx.fcitx5.android.engine.learn.ImportedWords
+import org.fcitx.fcitx5.android.engine.learn.import
 import org.fcitx.fcitx5.android.engine.pinyin.Syllables
 import org.fcitx.fcitx5.android.engine.user.UserModel
 import org.fcitx.fcitx5.android.engine.user.UserScorer
@@ -62,10 +64,10 @@ class HandwritingDecoderTest {
         assertEquals("[行(xing)]", polyphoneDecoder().decode(listOf(read("行"))).endings[0].words.toString())
         val d = polyphoneData
         val user = UserModel(d.dictionary, d.vocabulary)
-        user.learn(null, listOf(UserModel.Entry("行", intArrayOf(Syllables.id("hang")))))
+        user.own(UserModel.Entry("行", intArrayOf(Syllables.id("hang"))))
         assertEquals("[行(hang)]", polyphoneDecoder(user).decode(listOf(read("行"))).endings[0].words.toString())
         // forgotten, the reading it was learned at no longer wins
-        user.forgetText("行")
+        user.entriesOf("行").forEach(user::disown)
         assertEquals("[行(xing)]", polyphoneDecoder(user).decode(listOf(read("行"))).endings[0].words.toString())
     }
 
@@ -132,10 +134,10 @@ class HandwritingDecoderTest {
     fun `a word of the dictionary the user learned at a reading of its own has that one, as a character alone`() {
         val d = walkers("xing ren", "hang ren")
         val user = UserModel(d.dictionary, d.vocabulary, index = d.wordIndex)
-        user.learn(null, listOf(UserModel.Entry("行人", walk("hang ren"))))
+        user.own(UserModel.Entry("行人", walk("hang ren")))
         assertEquals("[行人(hang ren)]", walkersDecoder(d, user).decode(listOf(read("行"), read("人"))).endings[0].words.toString())
         // forgotten: the dictionary's likelier reading, not the one it was learned at
-        user.forgetText("行人")
+        user.entriesOf("行人").forEach(user::disown)
         assertEquals("[行人(xing ren)]", walkersDecoder(d, user).decode(listOf(read("行"), read("人"))).endings[0].words.toString())
     }
 
@@ -144,15 +146,15 @@ class HandwritingDecoderTest {
         // the user's hang ren, which the dictionary lacks, found first (hang before xing by id)
         val first = walkers("xing ren")
         val theirs = UserModel(first.dictionary, first.vocabulary, index = first.wordIndex)
-        theirs.learn(null, listOf(UserModel.Entry("行人", walk("hang ren"))))
+        theirs.own(UserModel.Entry("行人", walk("hang ren")))
         assertEquals("[行人(hang ren)]", walkersDecoder(first, theirs).decode(listOf(read("行"), read("人"))).endings[0].words.toString())
         // the dictionary's hang ren found first: the user's xing ren after it takes its place
         val later = walkers("hang ren")
         val after = UserModel(later.dictionary, later.vocabulary, index = later.wordIndex)
-        after.learn(null, listOf(UserModel.Entry("行人", walk("xing ren"))))
+        after.own(UserModel.Entry("行人", walk("xing ren")))
         assertEquals("[行人(xing ren)]", walkersDecoder(later, after).decode(listOf(read("行"), read("人"))).endings[0].words.toString())
         // forgotten, the dictionary's reading again
-        after.forgetText("行人")
+        after.entriesOf("行人").forEach(after::disown)
         assertEquals("[行人(hang ren)]", walkersDecoder(later, after).decode(listOf(read("行"), read("人"))).endings[0].words.toString())
     }
 
@@ -184,40 +186,45 @@ class HandwritingDecoderTest {
         user.list(UserModel.Entry("行人", walk("hang ren")))
         val best = walkersDecoder(d, user).decode(listOf(read("行"), read("人"))).endings[0]
         assertEquals("[行人(xing ren)]", best.words.toString())
-        // picked once, it is theirs
-        user.learn(null, listOf(UserModel.Entry("行人", walk("hang ren"))))
+        // made the user's own, it is theirs
+        user.own(UserModel.Entry("行人", walk("hang ren")))
         assertEquals("[行人(hang ren)]", walkersDecoder(d, user).decode(listOf(read("行"), read("人"))).endings[0].words.toString())
     }
 
     @Test
-    fun `a word of the user's forgotten in a longer candidate yields to the dictionary's reading`() {
+    fun `a word of the user's no longer theirs but listed yields to the dictionary's reading`() {
         // still in the trie, found first, but no longer theirs
         val d = walkers("xing ren")
         val user = UserModel(d.dictionary, d.vocabulary, index = d.wordIndex)
         val own = UserModel.Entry("行人", walk("hang ren"))
-        user.learn(null, listOf(own))
-        user.forget(listOf(own, UserModel.Entry("人", walk("ren"))))
+        user.list(own)
+        user.own(own)
+        user.disown(own)
         assertEquals("[行人(xing ren)]", walkersDecoder(d, user).decode(listOf(read("行"), read("人"))).endings[0].words.toString())
     }
 
     @Test
-    fun `of two readings the user has of a word the more typed wins, whichever is found first`() {
+    fun `of two readings the user owns of a word the more typed wins, whichever is found first`() {
         val d = walkers("xing ren")
         val hang = UserModel.Entry("行人", walk("hang ren"))
         val xing = UserModel.Entry("行人", walk("xing ren"))
         // hang ren, the user's own, is found first
         val more = UserModel(d.dictionary, d.vocabulary, index = d.wordIndex)
-        more.learn(null, listOf(hang))
-        repeat(2) { more.learn(null, listOf(xing)) }
+        more.own(hang)
+        more.own(xing)
+        more.addCount(hang, 1f)
+        more.addCount(xing, 2f)
         assertEquals("[行人(xing ren)]", walkersDecoder(d, more).decode(listOf(read("行"), read("人"))).endings[0].words.toString())
         val fewer = UserModel(d.dictionary, d.vocabulary, index = d.wordIndex)
-        repeat(2) { fewer.learn(null, listOf(hang)) }
-        fewer.learn(null, listOf(xing))
+        fewer.own(hang)
+        fewer.own(xing)
+        fewer.addCount(hang, 2f)
+        fewer.addCount(xing, 1f)
         assertEquals("[行人(hang ren)]", walkersDecoder(d, fewer).decode(listOf(read("行"), read("人"))).endings[0].words.toString())
-        // hang ren listed, never typed, against xing ren typed once
+        // hang ren listed, not theirs, against xing ren theirs
         val listed = UserModel(d.dictionary, d.vocabulary, index = d.wordIndex)
         listed.list(hang)
-        listed.learn(null, listOf(xing))
+        listed.own(xing)
         assertEquals("[行人(xing ren)]", walkersDecoder(d, listed).decode(listOf(read("行"), read("人"))).endings[0].words.toString())
     }
 
@@ -328,5 +335,26 @@ class HandwritingDecoderTest {
         assertThrows(IllegalArgumentException::class.java) {
             HandwritingDecoder(d.dictionary, d.vocabulary, d.wordIndex, WordScorer.of(d.model), { emptyMap() }, beam = 0)
         }
+    }
+
+    // review-G-design M2: a word only imported is no word of a handwritten sentence (C19); owned, it is
+    @Test
+    fun `a word only imported is no word of a sentence written`() {
+        val d = polyphoneData
+        val user = UserModel(d.dictionary, d.vocabulary)
+        user.attachImports(ImportedWords().import("人行" to "ren hang"))
+        val readings = Predictor.charReadingsOf(d.dictionary, d.vocabulary)
+        val decoder = HandwritingDecoder(d.dictionary, d.vocabulary, d.wordIndex, UserScorer(d.model, user), { readings }, user)
+        fun words() = decoder.decode(listOf(read("人"), read("行"))).endings.flatMap { it.words.orEmpty() }.map { it.text }
+        assertTrue("人行" !in words())
+        // typed once, still not the user's (U-101, review-int-runtime Q1): no word of a sentence yet
+        val renHang = UserModel.Entry("人行", intArrayOf(Syllables.id("ren"), Syllables.id("hang")))
+        user.learn(null, listOf(renHang))
+        assertTrue(user.startOnly(user.idsOfText("人行").first()))
+        assertTrue("人行" !in words())
+        // the user's, typed: a word of the sentence
+        user.own(renHang)
+        repeat(3) { user.learn(null, listOf(renHang)) }
+        assertTrue("人行" in words())
     }
 }

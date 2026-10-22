@@ -32,7 +32,7 @@ internal object UserFixtures {
         ),
     )
 
-    fun model(limit: Float = UserModel.DEFAULT_LIMIT) = UserModel(data.dictionary, data.vocabulary, limit)
+    fun model() = UserModel(data.dictionary, data.vocabulary)
 
     fun entry(text: String, vararg syllables: String) = Entry(text, syl(*syllables))
 

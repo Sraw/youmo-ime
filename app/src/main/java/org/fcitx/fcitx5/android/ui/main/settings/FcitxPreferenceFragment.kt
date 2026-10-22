@@ -54,6 +54,11 @@ abstract class FcitxPreferenceFragment : PaddingPreferenceFragment() {
         }
     }
 
+    /** [block] on the fcitx thread, as [save] is: what the page does, saved before the page goes back too. */
+    protected fun launchOnFcitx(block: suspend FcitxAPI.() -> Unit) {
+        scope.launch { fcitx.runOnReady { block() } }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         requireActivity().onBackPressedDispatcher

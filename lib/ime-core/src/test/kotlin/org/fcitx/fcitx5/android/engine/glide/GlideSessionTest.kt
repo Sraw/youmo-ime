@@ -7,6 +7,7 @@ package org.fcitx.fcitx5.android.engine.glide
 import org.fcitx.fcitx5.android.engine.data.CodeTable
 import org.fcitx.fcitx5.android.engine.data.PinyinData
 import org.fcitx.fcitx5.android.engine.data.PinyinDataBuilder
+import org.fcitx.fcitx5.android.engine.learn.control.Why
 import org.fcitx.fcitx5.android.engine.pinyin.PinyinSegmenter
 import org.fcitx.fcitx5.android.engine.pinyin.Syllables
 import org.fcitx.fcitx5.android.engine.session.Action
@@ -20,6 +21,7 @@ import org.fcitx.fcitx5.android.engine.table.SharedWords
 import org.fcitx.fcitx5.android.engine.table.TableOptions
 import org.fcitx.fcitx5.android.engine.table.TableSession
 import org.fcitx.fcitx5.android.engine.table.dictionary
+import org.fcitx.fcitx5.android.engine.table.learning
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -187,13 +189,10 @@ class GlideSessionTest {
 
     // a table's: hints and selection labels, a 空码, a word it has not, an offer past the others
     private val table = dictionary("wqiy 你", "vbg 好", "vbgf 妤", "vbgg 姓")
-    private val blocks = HashSet<String>()
     private val shared = object : SharedWords by SharedWords.NONE {
-        override fun blocked(text: String) = text in blocks
         override fun blockable(text: String) = true
-        override fun block(text: String) = blocks.add(text)
     }
-    private val tableSession = following(TableSession(table, TableOptions(autoSelect = false, selectionKeys = "123"), shared = shared))
+    private val tableSession = following(TableSession(table, TableOptions(autoSelect = false, selectionKeys = "123"), shared = shared, language = learning()))
 
     // one session over the table for every glide of a test, as the app has it
     private var tableReadings = emptyList<GlideReading>()
@@ -289,5 +288,21 @@ class GlideSessionTest {
         val s = glide("hao")
         assertEquals("", s.commit)
         assertEquals("好", s.candidates.first())
+    }
+
+    // review-int-runtime S2: the others' places are no candidates of the session's; what it says of
+    // its own, and its list read again, a place on past them
+    @Test
+    fun whyAndTheListReadAgainAreTheSessionsShiftedPastTheOthers() {
+        val inner = object : Session by tableSession {
+            override fun why(index: Int) = Why(null, uses = index)
+        }
+        tableReadings = listOf(GlideReading("vbg", "好", 0f), GlideReading("wqiy", "你", -1f))
+        session = GlideSession(inner, Action.Pick(0)) { _, _ -> tableReadings }
+        session.offer(Glide(floatArrayOf(0f, 0f), GlideLayout.QWERTY))
+        val s = session.apply(Action.Glide)
+        assertEquals(listOf("好", "你", "妤", "姓"), s.candidates)
+        assertEquals(listOf(0, null, 1, 2), s.candidates.indices.map { session.why(it)?.uses })
+        assertEquals(s.candidates, session.reread()!!.candidates)
     }
 }

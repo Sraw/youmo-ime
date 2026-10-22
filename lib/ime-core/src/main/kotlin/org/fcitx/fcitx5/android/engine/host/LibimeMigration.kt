@@ -146,6 +146,39 @@ object LibimeMigration {
         return write(sections)
     }
 
+    /**
+     * [config], the androidengine addon's ("" for none yet), with 调频 kept on for [ims], the
+     * tables someone typed with before it came off on a new install (U-28 D7): written where their
+     * group does not say, as the old default had it on, or where it did not say in [unset] ([orderUnset]
+     * of the config before: what was written since is fcitx's default, not the user's). Null where
+     * nothing changes; a table whose preset never ordered by use (仓颉) is left as it is.
+     */
+    fun keepOrderByUse(config: String, ims: Collection<String>, unset: Set<String> = emptySet()): String? {
+        val sections = sections(config).toMutableList()
+        var changed = false
+        for (im in ims) {
+            val group = Engines.TABLES[im]?.takeIf { it.options.orderByUse }?.group ?: continue
+            val section = sections.firstOrNull { it.name == group } ?: Section(group, ArrayList()).also { sections += it }
+            val found = value(section, TableSettings.ORDER_POLICY)
+            if (found == null) {
+                section.lines += "${TableSettings.ORDER_POLICY}=${TableSettings.ORDER_BY_USE}"
+                changed = true
+            } else if (im in unset && found != TableSettings.ORDER_BY_USE) {
+                set(section, TableSettings.ORDER_POLICY, TableSettings.ORDER_BY_USE)
+                changed = true
+            }
+        }
+        return if (changed) write(sections) else null
+    }
+
+    /** The tables whose group in [config], the androidengine addon's ("" for none yet), does not say whether to order by use. */
+    fun orderUnset(config: String): Set<String> {
+        val sections = sections(config)
+        return Engines.TABLES.filterValues { table ->
+            sections.firstOrNull { it.name == table.group }?.let { line(it, TableSettings.ORDER_POLICY) } == null
+        }.keys.toSet()
+    }
+
     // each group's from the first of TABLE_CONFIGS that set any of it
     private fun tableSections(tableConfigs: Map<String, String>): List<Section> {
         val out = LinkedHashMap<String, Section>()

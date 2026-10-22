@@ -31,6 +31,8 @@ fun EditorInfo.toEditorTraits(ownPackage: String? = null): EditorTraits {
         isRawKeyInput = type == InputType.TYPE_NULL,
         isUri = type == InputType.TYPE_CLASS_TEXT && variation == InputType.TYPE_TEXT_VARIATION_URI,
         isEmail = type == InputType.TYPE_CLASS_TEXT && variation in EMAIL_VARIATIONS,
+        isNumber = type == InputType.TYPE_CLASS_NUMBER || type == InputType.TYPE_CLASS_PHONE || type == InputType.TYPE_CLASS_DATETIME,
+        isSearch = action == EditorInfo.IME_ACTION_SEARCH,
         isSensitive = (if (ownPackage != null) CapabilityFlags.forField(this, ownPackage) else CapabilityFlags.fromEditorInfo(this))
             .hasAny(CapabilityFlag.PasswordOrSensitive),
         acceptsDeleteSurrounding =

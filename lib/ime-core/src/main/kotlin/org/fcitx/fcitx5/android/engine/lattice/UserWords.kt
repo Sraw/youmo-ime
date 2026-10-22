@@ -31,11 +31,34 @@ interface UserWords {
      */
     fun blocked(word: Int, node: Int): Boolean = false
 
+    /**
+     * Whether [word] is offered only as a word the input starts with, never inside a sentence nor
+     * after another word: one only imported (U-101, C19).
+     */
+    fun startOnly(word: Int): Boolean = false
+
+    /**
+     * The words only imported, by their syllables: walked from where the input starts alone, so
+     * none is inside a sentence nor after another word (U-101, C19), and apart from this trie, so
+     * nothing else walks them (handwriting's sentences). Null for none.
+     */
+    val startWords: StartWords? get() = null
+
     /** Whether [word] is blocked in some reading: not predicted, as a prediction has none. */
     fun blockedAnyhow(word: Int): Boolean = false
 
     /** Each word the user typed after [prev]: what they may type there again (联想). */
     fun forEachAfter(prev: Int, visit: (Int) -> Unit) {}
+
+    /** Whether the user said never to predict [next] after [prev] (U-72 不再联想), by their texts. */
+    fun notPredicted(prev: String, next: String): Boolean = false
+
+    /**
+     * Each word put in right after [prev], by any input method, and how often (U-71): what 联想
+     * offers after it once often enough ([Predictor.PAIRS]). Not the decoder's pairs, which leave
+     * out what was put in by its text alone (a table's, handwriting's, 联想's words).
+     */
+    fun forEachPredicted(prev: Int, visit: (word: Int, count: Float) -> Unit) {}
 
     /**
      * The syllables of [word] as the user typed it, of this trie's or the dictionary's, while they

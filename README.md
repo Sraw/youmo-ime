@@ -57,6 +57,7 @@
 - 代码：LGPL-2.1-or-later。构建方法见 [BUILDING.md](BUILDING.md)；[隐私政策](PRIVACY.md)。
 - 词典、码表和拼音模型的基础来自 [libime](https://github.com/fcitx/libime)（LGPL-2.1-or-later），笔画表来自 [rime-stroke](https://github.com/rime/rime-stroke)（LGPL-3.0-only）。
 - 表情列表来自 Unicode 的 [emoji-test.txt](https://www.unicode.org/Public/17.0.0/emoji/emoji-test.txt)，表情的中文关键词来自 [CLDR](https://github.com/unicode-org/cldr)（均为 Unicode-3.0）。
+- 繁简转换的字表来自 [OpenCC](https://github.com/BYVoid/OpenCC)（Apache-2.0，1.2.0 版的 `TSCharacters.txt`、`STCharacters.txt`，未改动），供学习把输入框里的繁体文字按简体读。
 - 拆字数据来自开放词典《汉语拆字字典》[kfcd/chaizi](https://github.com/kfcd/chaizi)（[CC BY 3.0](https://creativecommons.org/licenses/by/3.0/)），按本项目的拼音数据给部件注音，未改动拆分。
 - 自己统计和训练的部分：n-gram 和新词来自 [FineWeb](https://huggingface.co/datasets/HuggingFaceFW/fineweb)、[FineWeb-2](https://huggingface.co/datasets/HuggingFaceFW/fineweb-2)（ODC-By 1.0）和 [Common Crawl](https://commoncrawl.org) 的网页；
   句子模型（Apache-2.0）用 Qwen3.5-9B-Base（Apache-2.0）蒸馏，文件格式与结构沿用 [metasequoiaime/chinese-ime-lm](https://github.com/metasequoiaime/chinese-ime-lm)；手写模型只用合成笔迹训练（开源手写字体，以及 [Make Me a Hanzi](https://github.com/skishore/makemeahanzi) 的笔画，Arphic Public License），
@@ -118,6 +119,7 @@ Needs an arm64 phone on Android 6.0 or later. The models and dictionary are insi
 - Code: LGPL-2.1-or-later. Building: [BUILDING.md](BUILDING.md); [privacy policy](PRIVACY.md).
 - Dictionary, code tables and the base of the pinyin model: [libime](https://github.com/fcitx/libime) (LGPL-2.1-or-later); stroke table: [rime-stroke](https://github.com/rime/rime-stroke) (LGPL-3.0-only).
 - Emoji list: Unicode's [emoji-test.txt](https://www.unicode.org/Public/17.0.0/emoji/emoji-test.txt); their Chinese keywords: [CLDR](https://github.com/unicode-org/cldr) (both Unicode-3.0).
+- Traditional-to-simplified character tables: [OpenCC](https://github.com/BYVoid/OpenCC) (Apache-2.0; 1.2.0's `TSCharacters.txt` and `STCharacters.txt`, unchanged), for learning to read traditional text in the field as simplified.
 - Characters by their parts (拆字): the open 汉语拆字字典 [kfcd/chaizi](https://github.com/kfcd/chaizi) ([CC BY 3.0](https://creativecommons.org/licenses/by/3.0/)), its parts read by this project's pinyin data, the splits unchanged.
 - Counted and trained by this project: n-grams and new words from web pages of [FineWeb](https://huggingface.co/datasets/HuggingFaceFW/fineweb), [FineWeb-2](https://huggingface.co/datasets/HuggingFaceFW/fineweb-2) (ODC-By 1.0) and [Common Crawl](https://commoncrawl.org);
   sentence models (Apache-2.0) distilled from Qwen3.5-9B-Base (Apache-2.0), in the file format and architecture of [metasequoiaime/chinese-ime-lm](https://github.com/metasequoiaime/chinese-ime-lm); handwriting recognizers trained on synthetic ink only (open handwriting fonts and

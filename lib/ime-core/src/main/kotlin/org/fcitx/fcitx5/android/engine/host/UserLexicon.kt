@@ -9,27 +9,36 @@ import org.fcitx.fcitx5.android.engine.host.Engines.Companion.USER_PINYIN
 import org.fcitx.fcitx5.android.engine.host.Engines.Imported
 import org.fcitx.fcitx5.android.engine.host.Engines.UserWord
 import org.fcitx.fcitx5.android.engine.lattice.LayerPrior
+import org.fcitx.fcitx5.android.engine.learn.Han
+import org.fcitx.fcitx5.android.engine.learn.ImportedWords
+import org.fcitx.fcitx5.android.engine.learn.Row
 import org.fcitx.fcitx5.android.engine.phrase.CustomPhrases
 import org.fcitx.fcitx5.android.engine.phrase.PhraseBook
+import org.fcitx.fcitx5.android.engine.pinyin.LatinWords
 import org.fcitx.fcitx5.android.engine.pinyin.Syllables
+import org.fcitx.fcitx5.android.engine.user.HabitCounts
+import org.fcitx.fcitx5.android.engine.user.ImportFiles
 import org.fcitx.fcitx5.android.engine.user.LibimeImport
 import org.fcitx.fcitx5.android.engine.user.UserModel
+import org.fcitx.fcitx5.android.engine.user.UserLog
 import org.fcitx.fcitx5.android.engine.user.UserModel.Entry
-import org.fcitx.fcitx5.android.engine.user.UserStore
 import org.fcitx.fcitx5.android.engine.user.WordListFiles
 import org.fcitx.fcitx5.android.engine.user.WordLists
 import java.io.File
 import java.io.IOException
-import java.util.concurrent.Executor
 
 /**
  * The user's words, for [Engines]: what they added to pinyin ([additions]: custom phrases,
- * dictionaries), the model of what they typed with its log under [userDir] (made
- * afresh from libime's, [legacy]), its layer prior, and the words they added
- * and blocked by hand ([WordLists]). It lists, adds, blocks, imports, exports and forgets those
- * words for the settings, blocks and forgets them for a table's candidate, and learns what a
- * table saved. A word forgotten here is forgotten in the tables too ([forgetInTables]); a change
- * the sessions must see drops them ([dropSessions]). Run on the fcitx thread, as [Engines] is.
+ * dictionaries), the decoder's lexicon of them ([user]: their own words and counts as the learning
+ * record has them, put in by [attach]), its layer prior, and the words they added and blocked by
+ * hand ([WordLists]). It lists, adds, blocks, imports, exports and forgets those words for the
+ * settings, blocks and forgets them for a table's candidate, and owns what a table saved; another
+ * input method's list it imports goes to the learning record as a batch of imported words
+ * ([imports], U-101). A word
+ * forgotten here is forgotten in the tables too ([forgetInTables]) and in the learning record
+ * ([forgotten]); a change the sessions must see drops them ([dropSessions]). An older build's log
+ * under [userDir] (made afresh from libime's, [legacy]) is only read, to be converted
+ * ([legacyModel]). Run on the fcitx thread, as [Engines] is.
  */
 internal class UserLexicon(
     private val userDir: File?,
@@ -37,9 +46,20 @@ internal class UserLexicon(
     private val legacy: () -> LibimeImport.Legacy?,
     private val additions: () -> Additions?,
     private val assets: EngineAssets,
-    private val compactions: Executor,
     private val forgetInTables: (Collection<String>) -> Unit,
     private val dropSessions: () -> Unit,
+    // the texts the model forgot, whatever the tables do: for the learning record (review-1a-app S3)
+    private val forgotten: (Collection<String>) -> Unit = {},
+    // the user's own words and the counts put into a model made, as the learning record has them
+    private val attach: (UserModel) -> Unit = {},
+    // the texts blocked: unpinned wherever pinned, the block winning (impl/design-1b.md §3)
+    private val blocked: (Collection<String>) -> Unit = {},
+    // words made the user's own in the learning record, where they are not yet, each with the uses it
+    // comes with (an export's count): how many were not
+    private val owned: (Map<Entry, Float>) -> Int = { 0 },
+    // a list's words written as a batch of imported words (U-101), of the file named so, but those
+    // the predicate says are words already: how many were
+    private val imports: (String, List<ImportedWords.Incoming>, (String, String) -> Boolean) -> Int = { _, _, _ -> 0 },
 ) {
 
     private val pinyinData get() = assets.pinyinData
@@ -74,13 +94,10 @@ internal class UserLexicon(
         }
     }.also { phrases = it }
 
-    /** The user's log, while open; closed by [Engines.close] with the tables' logs. */
-    var store: UserStore? = null
-        private set
     private var userModel: UserModel? = null
     private var layerPrior: LayerPrior? = null
 
-    /** Learned with the user model, and kept in its log; one for the life of the engine. */
+    /** The prior per layer, one for the life of the engine: no longer learned, nor read from an older build's log (impl/design-1b.md §4). */
     fun prior(): LayerPrior = layerPrior ?: LayerPrior(pinyinData.layers, extra = packLayers).also { layerPrior = it }
 
     // the model of the moment's, as the prior outlives it
@@ -90,24 +107,41 @@ internal class UserLexicon(
     }
 
     // the dictionaries' words go in listed, uncounted: scored as the model's unknown word until
-    // picked, and not kept in the log unless picked. The words added by hand are the user's choice:
-    // scored as the model's word of their text from the start (UserModel.modelWord)
+    // the user owns them. The words added by hand are the user's choice: scored as the model's word
+    // of their text from the start (UserModel.modelWord)
     fun user(): UserModel = userModel ?: UserModel(pinyinData.dictionary, pinyinData.vocabulary, index = pinyinData.wordIndex).also { model ->
         userModel = model
         newlyListed.clear()
-        if (userDir != null) {
-            userDir.mkdirs()
-            val file = File(userDir, USER_PINYIN)
-            // a log that cannot be read or moved aside: learn in memory rather than not type
-            store = try {
-                UserStore(file, model, onError = onError, prior = prior(), background = compactions).apply { open(seed = ::importLegacy) }
-            } catch (e: IOException) {
-                onError(e)
-                null
-            }
-        }
         addDictionaries(model)
         lists.applyTo(model)
+        attach(model)
+    }
+
+    /**
+     * The model an older build kept in [USER_PINYIN] (libime's, if it has none or one with nothing
+     * learned in it, as that build's start filled it), read and never written, with the user's
+     * dictionaries and lists as [user] has them: what converting it makes the user's
+     * (LegacyConversion). Null with no user directory, or nothing to convert (the dictionaries not
+     * read for none).
+     *
+     * [file] another than the user's, an older build's in a settings backup restored, has none of
+     * libime's read in its place: that is the phone's.
+     *
+     * @throws IOException if libime's files cannot be read: the conversion is tried again next time
+     */
+    @Throws(IOException::class)
+    fun legacyModel(file: File? = null): UserModel? {
+        val dir = userDir ?: return null
+        val model = UserModel(pinyinData.dictionary, pinyinData.vocabulary, index = pinyinData.wordIndex)
+        val log = file ?: File(dir, USER_PINYIN)
+        // one cut short of its header (killed as 0.3.0 first wrote it, a full disk) is as none, as the
+        // tables' and English's logs are: not a failure owed to every start
+        val bytes = if (log.isFile) log.readBytes() else null
+        val read = if (bytes != null && UserLog.hasHeader(bytes)) UserLog.read(bytes, model) else 0
+        if (read <= UserLog.header().size && (file != null || !importLegacy(model))) return null
+        addDictionaries(model)
+        lists.applyTo(model)
+        return model
     }
 
     // in the user directory with the log, in memory without one
@@ -130,8 +164,11 @@ internal class UserLexicon(
         UserWord.Kind.BLOCKED to lists.blockedWords.size,
     )
 
-    /** The texts of the words added by hand, which no session holds back as coarse: listed, they have no count to say they are the user's. */
-    fun addedTexts(): Set<String> = lists.addedWords.mapTo(HashSet()) { it.text }
+    /**
+     * The texts of the words added by hand, in the list's order, which no session holds back as
+     * coarse (listed, they have no count to say they are the user's), ranked after the user's formed words.
+     */
+    fun addedTexts(): Set<String> = lists.addedWords.mapTo(LinkedHashSet()) { it.text }
 
     fun addWord(text: String, pinyin: String): Boolean {
         val entry = WordLists.entry(text, pinyin) ?: return false
@@ -142,8 +179,7 @@ internal class UserLexicon(
     /** Adds [entries]; how many were not there already. */
     private fun add(entries: List<Entry>): Int {
         // unblocked, as the user asks for them
-        blockedTexts = null
-        lists.unblockAll(entries).forEach { userModel?.unblock(it) }
+        unblock(entries)
         val newlyAdded = lists.addAll(entries)
         for (entry in newlyAdded) {
             val model = userModel ?: break
@@ -154,6 +190,15 @@ internal class UserLexicon(
         }
         dropSessions()
         return newlyAdded.size
+    }
+
+    /** [added] and [blocked] (text, pinyin) put on the lists at once, as a restore merges them: one write of each, the sessions dropped once. */
+    fun addListed(added: Collection<Pair<String, String>>, blocked: Collection<Pair<String, String>>) {
+        val add = added.mapNotNull { (text, pinyin) -> WordLists.entry(text, pinyin) }
+        val block = blocked.mapNotNull { (text, pinyin) -> WordLists.entry(text, pinyin) }
+        if (add.isNotEmpty()) add(add)
+        if (block.isNotEmpty()) blockAll(block)
+        dropSessions()
     }
 
     fun blockWord(text: String, pinyin: String): Boolean {
@@ -170,30 +215,24 @@ internal class UserLexicon(
     /** Blocks [entries]; how many were not already. */
     private fun blockAll(entries: List<Entry>): Int {
         blockedTexts = null
-        val blocked = lists.blockAll(entries)
+        val newlyBlocked = lists.blockAll(entries)
         val model = user()
         entries.forEach { model.block(it) }
-        return blocked.size
+        freshModel?.let { fresh -> entries.forEach { fresh.block(it) } }
+        blocked(entries.mapTo(LinkedHashSet()) { it.text })
+        return newlyBlocked.size
     }
 
     fun removeWords(words: Collection<UserWord>) {
         val byKind = words.groupBy({ it.kind }, { it.entry() })
         byKind[UserWord.Kind.ADDED]?.let { removeAdded(it.filterNotNull()) }
-        byKind[UserWord.Kind.LEARNED]?.let { learned ->
-            val entries = learned.filterNotNull()
-            val model = user()
-            // a FORGOT record a word forgotten, each a pass over all the counts as a start replays it:
-            // compacted so none is. knows holds for a dictionary's word forgetEach skips too, but no
-            // learned word is the dictionary's: at worst a stale one costs a compaction
-            val forgotten = entries.toSet().count(model::knows)
-            model.forgetEach(entries)
-            forgetInTables(entries.map { it.text })
-            if (forgotten > 1) compactUser()
+        // forgotten in the learning record, which takes each out of the model (impl/design-1b.md §3)
+        val learned = words.filter { it.kind == UserWord.Kind.LEARNED }.map { it.text }
+        if (learned.isNotEmpty()) {
+            forgetInTables(learned)
+            forgotten(learned)
         }
-        byKind[UserWord.Kind.BLOCKED]?.let { entries ->
-            blockedTexts = null
-            lists.unblockAll(entries.filterNotNull()).forEach { userModel?.unblock(it) }
-        }
+        byKind[UserWord.Kind.BLOCKED]?.let { unblock(it.filterNotNull()) }
         dropSessions()
     }
 
@@ -215,12 +254,22 @@ internal class UserLexicon(
         selfMade(removed)?.let { (back, texts) ->
             // and a table's pick of one is read back as its saved phrase
             if (texts.isNotEmpty()) forgetInTables(texts)
-            if (back.isNotEmpty()) {
-                user().forgetEach(back)
-                if (back.size > 1) compactUser()
-            }
+            // forgotten in the learning record as a text, so only one listed at no other reading: its
+            // forget takes every reading off the list (Engines.changed)
+            back.map { it.text }.filter { it in texts }.distinct().takeIf { it.isNotEmpty() }?.let(forgotten)
         }
         if (listedThem) dropUser()
+    }
+
+    /**
+     * Takes [text] off the added words as a long press deletes it (U-82): out of the model at once
+     * ([UserModel.unlist]), the sessions kept, as the one that asked goes on with its input.
+     */
+    fun unAdd(text: String) {
+        val entries = lists.addedWords.filter { it.text == text }
+        if (entries.isEmpty()) return
+        lists.removeAll(entries)
+        entries.forEach { userModel?.unlist(it) }
     }
 
     /**
@@ -256,36 +305,36 @@ internal class UserLexicon(
     // as listed: one syllable a space, so read back as it was, not split again
     private fun UserWord.entry() = LibimeImport.entry(text, pinyin.replace(' ', '\''))
 
-    fun importWords(lines: Sequence<String>): Imported {
+    /** [word] as its list keeps it: what a removal taken back puts back ([reAdd], [reBlock]). */
+    fun entryOf(word: UserWord): Entry? = word.entry()
+
+    /** [entries] blocked again, as an unblock taken back. */
+    fun reBlock(entries: List<Entry>) {
+        if (entries.isNotEmpty()) blockAll(entries)
+    }
+
+    /**
+     * The words of [lines], a list named [file]: the user's own export ([WordListFiles.EXPORT_MARK],
+     * or an older one's header) added, blocked and learned as it was; another input method's list
+     * blocked where marked so and imported as a batch (U-101), in the record, not on the hand list.
+     */
+    fun importWords(lines: Sequence<String>, file: String = ""): Imported {
+        val list = readList(lines)
         val add = LinkedHashSet<Entry>()
         val block = LinkedHashSet<Entry>()
-        val learn = LinkedHashMap<Entry, Float>()
-        var unread = 0
-        // `~`, a learned word, only in the user's own export (its first line the mark): another
-        // list's line never becomes a learned word unseen, it is not read (counted unread). One
-        // pass, no line kept but as read
-        var export: Boolean? = null
-        val read = ArrayList<WordLists.Line>()
-        for (raw in lines) {
-            val line = raw.trimStart().removePrefix("\uFEFF")
-            if (export == null) export = WordListFiles.exportMark(raw)
-            if (!line.startsWith(WordListFiles.LEARNED_MARK)) {
-                WordLists.line(raw)?.let(read::add)
-                continue
-            }
-            val rest = line.removePrefix(WordListFiles.LEARNED_MARK)
-            val word = WordLists.line(rest)
-            val entry = word?.pinyin?.let { WordLists.entry(word.text, it) }
-            if (export != true || entry == null || word.blocked) unread++ else learn[entry] = learnedCount(rest)
-        }
-        val guessed = assets.pinyinsOf(read.filter { it.pinyin == null && it.text.isNotEmpty() }.map { it.text }, strayFirst = true)
-        for (line in read) {
+        var unread = list.unread
+        val guessed = assets.pinyinsOf(list.read.filter { it.pinyin == null && it.text.isNotEmpty() }.map { it.text }, strayFirst = true)
+        val incoming = ArrayList<Pair<Entry, Double?>>()
+        for ((i, line) in list.read.withIndex()) {
             val pinyin = line.pinyin ?: guessed[line.text]
             val entry = pinyin?.let { WordLists.entry(line.text, it) }
             when {
                 entry == null -> unread++
                 line.blocked -> block += entry
-                else -> add += entry
+                list.own -> add += entry
+                // another list's line of no Chinese (a Latin word given a guessed pinyin) is no word to import
+                !Han.any(line.text) -> unread++
+                else -> incoming += entry to list.counts[i]
             }
         }
         // a word the file has both ways: blocked, the safer of the two
@@ -296,32 +345,86 @@ internal class UserLexicon(
             blocked = blockAll(block.toList())
             dropSessions()
         }
-        return Imported(added, blocked, unread, learnAll(learn))
+        val batch = incoming.filter { it.first !in block }.map { (e, count) -> ImportedWords.Incoming(e.text, reading(e), count) }
+        val imported = if (batch.isEmpty()) 0 else imports(file, batch, kept())
+        if (imported > 0) dropSessions()
+        return Imported(added, blocked, unread, learnAll(list.learn), imported)
     }
 
+    // a list's lines as read: the words ([read], each with its line's count), the learned of an export, whether it is the user's own
+    private class ListRead(val read: List<WordLists.Line>, val counts: List<Double?>, val learn: Map<Entry, Float>, val unread: Int, val own: Boolean)
+
+    private fun readList(lines: Sequence<String>): ListRead {
+        val learn = LinkedHashMap<Entry, Float>()
+        var unread = 0
+        // `~`, a learned word, only in the user's own export (its first line the mark): another
+        // list's line never becomes a learned word unseen, it is not read (counted unread). One
+        // pass, no line kept but as read
+        var export: Boolean? = null
+        var own = false
+        val read = ArrayList<WordLists.Line>()
+        val counts = ArrayList<Double?>()
+        for (raw in lines) {
+            val line = raw.trimStart().removePrefix("\uFEFF")
+            if (export == null) {
+                export = WordListFiles.exportMark(raw)
+                own = WordListFiles.exportMark(raw, old = true) == true
+            }
+            if (!line.startsWith(WordListFiles.LEARNED_MARK)) {
+                WordLists.line(raw)?.let {
+                    read += it
+                    counts += ImportFiles.frequency(raw)
+                }
+                continue
+            }
+            val rest = line.removePrefix(WordListFiles.LEARNED_MARK)
+            val word = WordLists.line(rest)
+            val entry = word?.pinyin?.let { WordLists.entry(word.text, it) }
+            if (export != true || entry == null || word.blocked) unread++ else learn[entry] = learnedCount(rest)
+        }
+        return ListRead(read, counts, learn, unread, own)
+    }
+
+    // the words an import leaves as they are (U-101): the dictionary's (in any reading: a list's misreading of
+    // one is no new word, review-G S4) or a user dictionary's, added, imported or blocked already
+    private fun kept(): (String, String) -> Boolean {
+        val model = user()
+        val blocked = lists.blockedWords.toHashSet()
+        return { text, reading ->
+            model.knowsText(text) || HabitCounts.entry(text, reading)?.let { model.origin(it) != Row.NONE || model.knows(it) || it in blocked } ?: true
+        }
+    }
+
+    private fun reading(entry: Entry) = entry.syllables.joinToString(" ") { Syllables.spelling(it) }
+
     /**
-     * Learns each of [words] with its count, as a phone move brings them back: not one added,
-     * blocked or already learned (no count twice). Kept as compaction writes counts. How many.
+     * Makes each of [words] the user's own, as a phone move brings them back: not one added, blocked
+     * or theirs already; an export's count of each comes back as its uses today ([owned]). How many.
      */
     private fun learnAll(words: Map<Entry, Float>): Int {
         if (words.isEmpty()) return 0
         val added = lists.addedWords.toHashSet()
         val blocked = lists.blockedWords.toHashSet()
+        return owned(words.filterKeys { it !in added && it !in blocked })
+    }
+
+    // English's learned words listed in the model of the moment, spelt by letters (U-31 §3): those it lacked
+    private var latin = emptySet<Entry>()
+    private var latinIn: UserModel? = null
+
+    /**
+     * [texts], the English words English learned, listed spelt by their letters for pinyin's 中英混输
+     * (U-31 §3: `youmo` typed offers youmo), as the dictionary's Latin words are; those listed before
+     * and not now unlisted. A model made anew lists them all again; one it knows already it keeps as it is.
+     */
+    fun listLatin(texts: Set<String>) {
         val model = user()
-        var learned = 0
-        for ((entry, count) in words) {
-            if (entry in added || entry in blocked || model.hasLearned(listOf(entry))) continue
-            model.learn(null, listOf(entry))
-            // as it was, under one too (halved over time)
-            if (count != 1f) model.addCount(entry, count - 1f)
-            learned++
-        }
-        if (learned > 0) {
-            // the counts past the one learned are in no journal record: written out whole
-            compactUser()
-            dropSessions()
-        }
-        return learned
+        val was = if (latinIn === model) latin else emptySet()
+        val entries = texts.mapTo(HashSet()) { t -> Entry(t, IntArray(t.length) { LatinWords.syllable(t[it].lowercaseChar()) }) }
+        for (e in was) if (e !in entries) model.unlist(e)
+        latin = entries.filterTo(HashSet()) { e -> e in was || !model.knows(e) }
+        for (e in latin) if (e !in was) model.listLatin(e)
+        latinIn = model
     }
 
     fun exportWords(): List<String> = userWords().map {
@@ -335,20 +438,12 @@ internal class UserLexicon(
     }
 
     /**
-     * Makes the user's words again from the log, the dictionaries and the lists: a word listed
-     * cannot be taken out of the model, only left out of the next one. With no log, the model
-     * is all there is of what was learned, so it is kept, the word typeable till the next start.
+     * Makes the user's words again from the learning record, the dictionaries and the lists, at
+     * next need: a word listed cannot be taken out of the model, only left out of the next one.
      */
     private fun dropUser() {
-        val log = store ?: return
-        closeQuietly(log, onError)
-        store = null
         userModel = null
-    }
-
-    /** Rewrites the user's log as the counts now are: a start then reads none of what was forgotten. */
-    private fun compactUser() {
-        store?.compact()
+        freshModel = null
     }
 
     private fun addDictionaries(model: UserModel) {
@@ -369,22 +464,21 @@ internal class UserLexicon(
     }
 
     /**
-     * What libime learned, into a log with nothing in it yet. Whatever fails is reported and
-     * pinyin goes on without it. Files that cannot be read leave the log empty, for the next
-     * start to try again; a failure while learning them keeps what was learned before it.
+     * What libime learned, into a log with nothing in it yet. A failure to read or learn them is
+     * thrown (as an [IOException]): the conversion that asked is owed to the next start.
      */
-    private fun importLegacy(model: UserModel) {
+    // whether libime had any
+    private fun importLegacy(model: UserModel): Boolean {
         try {
-            val old = legacy() ?: return
+            val old = legacy() ?: return false
             LibimeImport.learn(
                 model, pinyinData.dictionary, pinyinData.vocabulary,
                 old.dictionary.asSequence(), old.history.asSequence(), old.decode,
             )
-        } catch (e: IOException) {
-            onError(e)
+            return true
         } catch (@Suppress("TooGenericExceptionCaught") e: RuntimeException) {
             // old data, however it came to be: no failure reading it should stop typing
-            onError(IOException("cannot import libime's data", e))
+            throw IOException("cannot import libime's data", e)
         }
     }
 
@@ -396,45 +490,34 @@ internal class UserLexicon(
     val listedSince: List<String> get() = newlyListed
 
     /**
-     * Phrases a table saved, as pinyin's words: learned once more [again], else only those pinyin lacks.
+     * Phrases a table saved (in an older build: 自动造词 is gone), as pinyin's words: those pinyin lacks.
      * Read with no stray first (EngineAssets.pinyinsOf), a word may read as its pieces do (了解 le jie, a
-     * reading the log would keep and an export carry): that one is read again with a stray first, and
-     * learned as the dictionary then reads it (liao jie); if the dictionary has no reading of it, as its
-     * pieces read, the only one pinyin can offer it by. Told a table's history (not [again]), every text
-     * so read that pinyin lacks is read again, all in one walk; a phrase saved as it is typed, on the
-     * input thread, only if the model or the user's words (typed, made, listed) have its text: a
-     * dictionary word of neither is learned there as its pieces read. The walk reads the base dictionary
-     * alone: a word only the user's dictionaries have, so misread, is learned so either way.
+     * reading the log would keep and an export carry): every text so read that pinyin lacks is read
+     * again with a stray first, all in one walk, and learned as the dictionary then reads it (liao jie);
+     * if the dictionary has no reading of it, as its pieces read, the only one pinyin can offer it by.
+     * The walk reads the base dictionary alone: a word only the user's dictionaries have, so misread,
+     * is learned so either way.
      */
-    fun learnSaved(texts: Collection<String>, again: Boolean) {
+    fun learnSaved(texts: Collection<String>) {
         if (texts.isEmpty()) return
         val model = user()
         val read = assets.pinyinsOf(texts).mapNotNull { (text, reading) -> readAs(text, reading) }
         val unknown = read.filterNotTo(HashSet(), model::knows)
-        val misread = if (again) unknown.filter { mayBeWord(it.text, model) } else unknown
         // one walk with a stray first for them all, some hundred times the walk; none for no text
-        val stray = assets.pinyinsOf(misread.map { it.text }, strayFirst = true)
-        for (entry in read) {
-            val word = if (entry !in unknown) entry else readAs(entry.text, stray[entry.text])?.takeIf(model::knows)
-            when {
-                word == null -> model.learn(null, listOf(entry))
-                again -> model.learn(null, listOf(word))
-            }
-        }
+        val stray = assets.pinyinsOf(unknown.map { it.text }, strayFirst = true)
+        // a word pinyin lacks is the user's own, in the learning record (impl/design-1b.md §4); one it
+        // has was counted once more, which the record's counts, of commits, no longer do (step 2's)
+        val own = read.filter { entry -> entry in unknown && readAs(entry.text, stray[entry.text])?.takeIf(model::knows) == null }
+        if (own.isNotEmpty()) owned(own.associateWith { 0f })
     }
-
-    // a text the model or the user's words have in some reading, found without a walk: the model's
-    // by their index, the user's gone through once
-    private fun mayBeWord(text: String, model: UserModel): Boolean =
-        pinyinData.wordIndex.find(text) >= 0 || model.hasText(text)
 
     // as EngineAssets.pinyinsOf spells a reading: one syllable a space
     private fun readAs(text: String, reading: String?): Entry? = reading?.let { LibimeImport.entry(text, it.replace(' ', '\'')) }
 
     /** Forgets [text] in pinyin, however read, and in every table that saved it. */
     fun forgetEverywhere(text: String) {
-        user().forgetText(text)
         forgetInTables(listOf(text))
+        forgotten(listOf(text))
     }
 
     // the texts blocked, of any reading: a table has no readings to tell apart
@@ -451,15 +534,6 @@ internal class UserLexicon(
      */
     fun isBlockedWord(text: String): Boolean = text.codePointCount(0, text.length) >= 2 && text in blockedTexts()
 
-    /** Blocks [text] from a table's candidate, as the dictionary reads it and as the user typed it: false if it reads none. */
-    fun blockText(text: String): Boolean {
-        val read = assets.pinyinOf(text, strayFirst = true)?.let { LibimeImport.entry(text, it.replace(' ', '\'')) }
-        val entries = (listOfNotNull(read) + user().entriesOf(text)).distinct()
-        if (entries.isEmpty()) return false
-        blockAll(entries)
-        return true
-    }
-
     /** Forgets what was read of [additions], read again at next need: what their dictionaries were, for [reloadDictionaries]. */
     fun dropAdditions(): String {
         val before = userAdditions?.dictionaries.orEmpty()
@@ -470,22 +544,70 @@ internal class UserLexicon(
 
     /** The user's words read again if the dictionaries are no longer as they were [before]: see [Engines.reload]. */
     fun reloadDictionaries(before: String) {
-        val model = userModel ?: return
-        if (added()?.dictionaries.orEmpty() == before) return
-        if (store == null) {
-            addDictionaries(model)
-            lists.applyTo(model)
-        } else {
-            // read again from the log all the same: what did not reach it is lost either way
-            dropUser()
+        if (userModel == null && freshModel == null || added()?.dictionaries.orEmpty() == before) return
+        dropUser()
+    }
+
+    /** After the learning record was closed: [user] is made again from it. */
+    fun closed() {
+        userModel = null
+        freshModel = null
+    }
+
+    private var freshModel: UserModel? = null
+
+    /** The words added by hand of [text]: what a long press's delete takes off the list ([unAdd]), for its undo to put back. */
+    fun addedOf(text: String): List<Entry> = lists.addedWords.filter { it.text == text }
+
+    /** The words blocked of [text]. */
+    fun blockedOf(text: String): List<Entry> = lists.blockedWords.filter { it.text == text }
+
+    /** [entries] of the words added by hand, each with its place on the list now: what [reAdd] puts back there. */
+    fun addedPlaces(entries: List<Entry>): List<IndexedValue<Entry>> {
+        val all = lists.addedWords
+        return entries.mapNotNull { e -> all.indexOf(e).takeIf { it >= 0 }?.let { IndexedValue(it, e) } }
+    }
+
+    /**
+     * [entries] back on the words added by hand where they were ([addedPlaces]), as a delete taken
+     * back finds them, their order among 我的词 as before (review-int N3): the sessions kept, as [unAdd].
+     */
+    fun reAdd(entries: List<IndexedValue<Entry>>) {
+        lists.putBack(entries).forEach { userModel?.listByHand(it) }
+    }
+
+    /** [entries] blocked no more, as a block taken back: the sessions kept, as [block]. */
+    fun unblock(entries: List<Entry>) {
+        blockedTexts = null
+        lists.unblockAll(entries).forEach {
+            userModel?.unblock(it)
+            freshModel?.unblock(it)
         }
     }
 
-    /** After [store] was closed: [user] reads the log again, and appends to it. */
-    fun closed() {
-        store = null
-        userModel = null
+    /** U-86 「全部清空」: no word added by hand nor blocked any more; the model made anew at next need. */
+    fun clearLists() {
+        lists.removeAll(lists.addedWords)
+        lists.unblockAll(lists.blockedWords)
+        blockedTexts = null
+        dropUser()
+        dropSessions()
     }
+
+    /**
+     * U-93 「不用我的输入习惯」 on: the words as a fresh install has them but for the dictionaries the
+     * user turned on (a setting, not a habit) and the blocks, which hold whatever (C26): none of
+     * their own words, counts or pairs, none added by hand. [attach] is not told: nothing of the
+     * learning record is in it.
+     */
+    fun freshUser(): UserModel = freshModel ?: UserModel(pinyinData.dictionary, pinyinData.vocabulary, index = pinyinData.wordIndex).also { model ->
+        freshModel = model
+        addDictionaries(model)
+        lists.blockedWords.forEach { model.block(it) }
+    }
+
+    /** As [freshUser], the phrases: the built-in ones alone, as installed, the user's left out (U-93). */
+    fun freshPhrases(): PhraseBook = PhraseBook(CustomPhrases.parse(""), CustomPhrases.BUILT_IN) {}
 }
 
 

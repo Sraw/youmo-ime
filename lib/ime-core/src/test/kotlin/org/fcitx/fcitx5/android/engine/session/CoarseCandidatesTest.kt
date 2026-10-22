@@ -7,8 +7,13 @@ package org.fcitx.fcitx5.android.engine.session
 import org.fcitx.fcitx5.android.engine.data.PinyinData
 import org.fcitx.fcitx5.android.engine.data.PinyinDataBuilder
 import org.fcitx.fcitx5.android.engine.lattice.PinyinDecoder
+import org.fcitx.fcitx5.android.engine.learn.Code
+import org.fcitx.fcitx5.android.engine.learn.Kinds
+import org.fcitx.fcitx5.android.engine.learn.Learner
+import org.fcitx.fcitx5.android.engine.learn.Row
+import org.fcitx.fcitx5.android.engine.learn.corrected
+import org.fcitx.fcitx5.android.engine.learn.row
 import org.fcitx.fcitx5.android.engine.pinyin.PinyinSegmenter
-import org.fcitx.fcitx5.android.engine.pinyin.Syllables
 import org.fcitx.fcitx5.android.engine.session.Action.Key
 import org.fcitx.fcitx5.android.engine.user.UserModel
 import org.junit.Assert.assertEquals
@@ -18,8 +23,6 @@ import java.nio.ByteBuffer
 
 /** 小穴 came first for xiaoxue after 妈妈的, its fourth at a lower score still too high. */
 class CoarseCandidatesTest {
-
-    private fun syl(vararg s: String) = s.map { Syllables.id(it) }.toIntArray()
 
     private val data = PinyinData.load(
         ByteBuffer.wrap(
@@ -108,7 +111,7 @@ class CoarseCandidatesTest {
     @Test
     fun aWordTheUserAddedIsTheirs() {
         // added by hand, it is listed with no count: never typed, yet asked for
-        val s = PinyinSession(data, PinyinSegmenter(), pageSize = 2, prediction = false, addedWords = setOf("小穴"))
+        val s = PinyinSession(data, PinyinSegmenter(), pageSize = 2, prediction = false, addedWords = { setOf("小穴") })
         assertTrue("小穴" in s.type("xiaoxue").candidates)
     }
 
@@ -138,5 +141,29 @@ class CoarseCandidatesTest {
         assertTrue(all.take(10).none { it == "小穴" || it == "骚穴" })
         assertTrue(all.indexOf("小穴") > 10)
         assertTrue(all.indexOf("骚穴") >= PinyinDecoder.DEFAULT_WORDS)
+    }
+
+    // design-1b S7: a coarse word pinned is the user's choice, never held
+    @Test
+    fun aCoarseWordPinnedIsFirst() {
+        val learner = Learner(data)
+        learner.habits.pin(Code(Kinds.FULL, "xiaoxue"), "小穴", "xiao xue", on = true)
+        val s = PinyinSession(data, PinyinSegmenter(), pageSize = 2, user = learner.model, prediction = false, learnTo = learner.learnTo())
+        assertEquals("小穴", s.type("xiaoxue").candidates.first())
+    }
+
+    // review-1b N2: one of the user's own, unused for 30 typing days, is theirs still: not held
+    @Test
+    fun aCoarseWordOfTheirOwnUnusedIsNotHeld() {
+        val learner = Learner(data)
+        val s = PinyinSession(data, PinyinSegmenter(), pageSize = 2, user = learner.model, prediction = false, learnTo = learner.learnTo())
+        repeat(2) { learner.habits.record(listOf(corrected("xiaoxue", "小穴", "xiao xue", origin = Row.NONE))) }
+        assertTrue(learner.log.state.mine.containsKey("小穴"))
+        learner.clock.days(1)
+        repeat(31) {
+            learner.clock.days(1)
+            learner.habits.record(listOf(row("xiao", "小", "xiao")))
+        }
+        assertTrue("小穴" in s.type("xiaoxue").candidates)
     }
 }

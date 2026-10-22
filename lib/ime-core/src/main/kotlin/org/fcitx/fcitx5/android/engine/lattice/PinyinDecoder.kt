@@ -56,6 +56,18 @@ class PinyinDecoder(
     private val coarse: CoarseWords = CoarseWords.NONE,
     /** How text kept as typed shows: on the nine keys, [T9Segmenter.asTyped][org.fcitx.fcitx5.android.engine.pinyin.T9Segmenter.asTyped]. */
     private val asTyped: (String) -> String = { it },
+    /**
+     * The scores of a word reading all the input alone, where they differ from [scorer]'s: with the
+     * same contexts and trigrams (the user's counts left out, LearningUse.Counts.MULTI). Null: [scorer]'s.
+     */
+    private val whole: WordScorer? = null,
+    /**
+     * The scores of a word read over a syllable typed short (an initial, the start of one, a whole
+     * one read as the start of a longer: 简拼), where they differ from [scorer]'s: the user's
+     * counts left out, with the same contexts and trigrams, so what is typed in full never moves
+     * what is typed short (impl/design-1b.md D32, S4). Null: [scorer]'s.
+     */
+    private val uncounted: WordScorer? = null,
 ) {
     init {
         require(beam >= 1 && wordsPerReading >= 1) { "beam $beam, words per reading $wordsPerReading" }
@@ -130,7 +142,7 @@ class PinyinDecoder(
         lastStart = graph.start
         lastPrev2 = prev2
         lastPrev = prev
-        return Decoding(sentences(graph, sentences), firstWords(graph, prev2, prev, words, firstKept))
+        return Decoding(sentences(graph, sentences), firstWords(graph, prev2, prev, words, firstKept, last))
     }
 
     /** Forgets the last decode, so the next searches from scratch; needed when [scorer]'s scores change. */
@@ -154,11 +166,13 @@ class PinyinDecoder(
             arcs.start[at] = arcs.size
             if (graph.edges(at).isEmpty()) continue
             val limit = if (at == graph.start) Int.MAX_VALUE else wordsPerReading
-            collect(graph, at, dictionary.root, user?.root ?: -1, 0f, 0f, limit)
-            // nothing in the dictionary starts here: keep what was typed, so every path goes on
+            collect(graph, at, dictionary.root, user?.root ?: -1, 0f, false, limit)
+            // nothing in the dictionary starts here: keep what was typed, so every path goes on. Asked
+            // before the words only imported: no path goes on from those (review-G S2)
             if (arcs.size == arcs.start[at]) {
                 for (e in graph.edges(at)) arcs.add(graph.to(e), NO_WORD, penalties.raw)
             }
+            if (at == graph.start) user?.startWords?.let { collectStart(graph, at, it, it.root, 0f, false) }
             arcs.sortByEnd(arcs.start[at], n)
         }
         arcs.start[n + 1] = arcs.size
@@ -166,18 +180,17 @@ class PinyinDecoder(
 
     /**
      * Adds the words of every path from [node] in the dictionary, and [userNode] in the user's
-     * words, that the graph spells from [at]; -1 for a trie the path has left. [short] is the part
-     * of [cost] for syllables typed short (简拼, the start of one): a word the user has committed
-     * [LEARNED] times is spared it, so typed whole once, its 简拼 finds it too (嗯嗯 for ee).
+     * words, that the graph spells from [at]; -1 for a trie the path has left. [short]: a syllable
+     * of the path typed short (简拼, the start of one), whose words are scored by [uncounted].
      */
-    private fun collect(graph: SyllableGraph, at: Int, node: Int, userNode: Int, cost: Float, short: Float, limit: Int) {
+    private fun collect(graph: SyllableGraph, at: Int, node: Int, userNode: Int, cost: Float, short: Boolean, limit: Int) {
         for (e in graph.edges(at)) {
             val kind = graph.kind(e)
             if (kind == Kind.RAW) continue
             val to = graph.to(e)
             val matches = graph.matches(e)
             val edgeCost = cost + penalty(kind)
-            val edgeShort = short + shortPenalty(kind)
+            val edgeShort = short || isShort(kind)
             for (i in 0 until matches.size) {
                 val child = if (node < 0) -1 else dictionary.child(node, matches.syllable(i))
                 val userChild = if (userNode < 0 || user == null) -1 else user.child(userNode, matches.syllable(i))
@@ -188,7 +201,7 @@ class PinyinDecoder(
                     val words = minOf(dictionary.wordCount(child), limit)
                     addWords(to, child, words, c, edgeShort)
                     more = dictionary.childCount(child) > 0
-                    if (to == graph.end) lookAhead(kind, to, child, c, words)
+                    if (to == graph.end) lookAhead(kind, to, child, c, words, edgeShort)
                 }
                 if (userChild >= 0 && user != null) {
                     addUserWords(to, user, userChild, c, edgeShort)
@@ -199,32 +212,90 @@ class PinyinDecoder(
         }
     }
 
+    /**
+     * Adds the words only imported along every path from [node] of [starts] the graph spells from
+     * [at], the input's start alone, marked so the search never goes on from them: never inside a
+     * sentence nor after a word (U-101, C19). Those the user made theirs since are in the user's
+     * trie, whole words, and left out here; so are those blocked.
+     */
+    private fun collectStart(graph: SyllableGraph, at: Int, starts: StartWords, node: Int, cost: Float, short: Boolean) {
+        val user = user ?: return
+        for (e in graph.edges(at)) {
+            val kind = graph.kind(e)
+            if (kind == Kind.RAW) continue
+            val to = graph.to(e)
+            val matches = graph.matches(e)
+            val edgeShort = short || isShort(kind)
+            for (i in 0 until matches.size) {
+                val child = starts.child(node, matches.syllable(i))
+                if (child < 0) continue
+                val c = cost + penalty(kind) + penalty(matches.flags(i)) + nasal(kind, matches.syllable(i))
+                for (w in 0 until starts.wordCount(child)) {
+                    val word = starts.word(child, w)
+                    if (user.startOnly(word) && !user.blocked(word, -1)) arcs.add(to, word, c + penalties.imported, short = edgeShort, startOnly = true)
+                }
+                if (to < graph.end && starts.childCount(child) > 0) collectStart(graph, to, starts, child, c, edgeShort)
+            }
+        }
+    }
+
     // the first [words] of the dictionary's at [node], those the user blocked left out
-    private fun addWords(to: Int, node: Int, words: Int, cost: Float, short: Float) {
+    private fun addWords(to: Int, node: Int, words: Int, cost: Float, short: Boolean) {
         for (w in 0 until words) {
             val word = dictionary.word(node, w)
-            if (user?.blocked(word, node) != true) arcs.add(to, word, cost - spared(word, short) + dictionary.weight(node, w) + coarseness(word))
+            if (user?.blocked(word, node) != true) arcs.add(to, word, cost + dictionary.weight(node, w) + coarseness(word), short = short)
         }
     }
 
     private fun coarseness(word: Int) = if (coarse.unasked(word, user, vocabulary.size)) CoarseWords.PENALTY else 0f
 
-    // what a word of the user's is spared of typing it short; not a character, whose initial
-    // alone would cut every sentence into the characters the user types most (w for 我). A whole
-    // syllable read as the start of a longer one is spared too, as ee for 嗯嗯 needs: 方向 then ties
-    // the exact 防线 for fangxian, the user's word ahead by what they typed of it
-    private fun spared(word: Int, short: Float): Float {
-        if (short == 0f || user == null || user.count(word) < LEARNED) return 0f
-        val text = if (word < vocabulary.size) vocabulary.word(word) else user.text(word)
-        return if (text.codePointCount(0, text.length) > 1) short else 0f
-    }
-
     // one reading each, so no weight; and few enough to take them all
-    private fun addUserWords(to: Int, user: UserWords, node: Int, cost: Float, short: Float) {
+    private fun addUserWords(to: Int, user: UserWords, node: Int, cost: Float, short: Boolean) {
         for (w in 0 until user.wordCount(node)) {
             val word = user.word(node, w)
-            if (!user.blocked(word, -1)) arcs.add(to, word, cost - spared(word, short) + coarseness(word))
+            if (!user.blocked(word, -1)) arcs.add(to, word, cost + coarseness(word), short = short)
         }
+    }
+
+    /**
+     * The words of the last decode's arcs from the start of [graph] to [to] that [take] says, each
+     * once, as candidates scored by their arcs' costs alone: those a list may lack that the user
+     * has (impl/design-1b.md §1, injection). Every word from the start is an arc, with no limit.
+     */
+    fun startWords(graph: SyllableGraph, to: Int, take: (Int) -> Boolean): List<Candidate> {
+        if (lastEnd != graph.end || lastStart != graph.start) return emptyList()
+        val out = ArrayList<Candidate>()
+        val seen = HashSet<Int>()
+        for (a in arcs.start[graph.start] until arcs.start[graph.start + 1]) {
+            val word = arcs.word[a]
+            if (arcs.to[a] != to || word == NO_WORD) continue
+            if (take(word) && seen.add(word)) out += Candidate(text(word), to, arcs.cost[a], intArrayOf(word), intArrayOf(to))
+        }
+        return out
+    }
+
+    /**
+     * Up to [limit] of the last decode's sentences of [graph], each text once, as [decode] gives
+     * them: more than it gave, for words put in place of theirs to leave as many apart
+     * (review-design-1c S4). The beams' backtracking only, no search.
+     */
+    fun moreSentences(graph: SyllableGraph, limit: Int = beam): List<Candidate> =
+        if (lastEnd != graph.end || lastStart != graph.start) emptyList() else sentences(graph, limit)
+
+    /**
+     * The words of the last decode's arcs of [graph] from [from] to [to], each once, as [startWords]
+     * gives them: what a word added by hand is the only one of (impl/design-1c.md §1). Read off the
+     * lattice the decode built, no search.
+     */
+    fun arcsBetween(graph: SyllableGraph, from: Int, to: Int): List<Candidate> {
+        if (from !in graph.start until graph.end || lastEnd != graph.end || lastStart != graph.start) return emptyList()
+        val out = ArrayList<Candidate>()
+        val seen = HashSet<Int>()
+        for (a in arcs.start[from] until arcs.start[from + 1]) {
+            val word = arcs.word[a]
+            if (arcs.to[a] == to && word != NO_WORD && seen.add(word)) out += Candidate(text(word), to - from, arcs.cost[a], intArrayOf(word), intArrayOf(to))
+        }
+        return out
     }
 
     /**
@@ -232,14 +303,14 @@ class PinyinDecoder(
      * longer word each starts: `yibeik` is 一杯 and the start of 咖啡 more likely than 一杯可, though
      * 咖 alone is rare. The text stays what was typed; the beam keeps the better of the two scores.
      */
-    private fun lookAhead(kind: Kind, to: Int, node: Int, cost: Float, words: Int) {
+    private fun lookAhead(kind: Kind, to: Int, node: Int, cost: Float, words: Int, short: Boolean) {
         if (kind != Kind.INITIAL && kind != Kind.PARTIAL || dictionary.childCount(node) == 0) return
         val cache = extensions
         val longer = cache[node] ?: extensionsOf(node).also { cache[node] = it }
         for (w in 0 until minOf(words, longer.size)) {
             val word = dictionary.word(node, w)
             if (longer[w] != NO_WORD && user?.blocked(word, node) != true) {
-                arcs.add(to, word, cost + dictionary.weight(node, w) + penalties.lookAhead + coarseness(word), longer[w])
+                arcs.add(to, word, cost + dictionary.weight(node, w) + penalties.lookAhead + coarseness(word), longer[w], short)
             }
         }
     }
@@ -284,11 +355,8 @@ class PinyinDecoder(
         Kind.LETTER -> penalties.letter
     }
 
-    // of a syllable typed short: what a word the user knows is spared ([spared])
-    private fun shortPenalty(kind: Kind) = when (kind) {
-        Kind.INITIAL, Kind.PARTIAL, Kind.EXTENDED -> penalty(kind)
-        else -> 0f
-    }
+    // a syllable typed short: an initial, the start of one, one read as the start of a longer
+    private fun isShort(kind: Kind) = kind == Kind.INITIAL || kind == Kind.PARTIAL || kind == Kind.EXTENDED
 
     private fun nasal(kind: Kind, syllable: Int) = if (kind == Kind.SYLLABLE && syllable in NASALS) penalties.nasal else 0f
 
@@ -313,18 +381,21 @@ class PinyinDecoder(
         beamSize.fill(0, from, n + 1)
         if (from == graph.start) insert(graph.start, 0f, prev, prev2, -1)
         for (at in graph.start until n) {
-            if (beamSize[at] > 0) extend(at, from)
+            if (beamSize[at] > 0) extend(at, from, if (at == graph.start) n else -1)
         }
     }
 
-    /** Extends the sequences ending at [at] by the arcs from there, those ending at [from] or later. */
-    private fun extend(at: Int, from: Int) {
+    /**
+     * Extends the sequences ending at [at] by the arcs from there, those ending at [from] or later;
+     * one ending at [wholeEnd] reads all the input alone, scored by [whole] if given.
+     */
+    private fun extend(at: Int, from: Int, wholeEnd: Int) {
         val first = at * beam
         val size = beamSize[at]
         var looked = false
         for (a in arcs.start[at] until arcs.start[at + 1]) {
             val to = arcs.to[a]
-            if (to < from) continue // that beam is kept
+            if (to < from || arcs.flags[a] and START_ONLY != 0) continue // that beam is kept; a start-only word begins no sentence
             if (!looked) {
                 // once per state rather than per arc: most of what scoring a word takes. Arcs only
                 // go forward, so this beam does not change while it is extended
@@ -336,15 +407,23 @@ class PinyinDecoder(
             }
             val word = arcs.word[a]
             val scored = arcs.scored[a]
+            val scoring = scoring(a, to == wholeEnd)
             for (k in 0 until size) {
                 val s = first + k
                 val base = stateScore[s] + arcs.cost[a]
                 // scores only fall from here, and the states come best first
                 if (beamSize[to] == beam && base <= stateScore[to * beam + beam - 1]) break
-                val lm = if (word == NO_WORD) 0f else scorer.scoreAfter(contexts[k], Trigrams(runs[k]), scored)
+                val lm = if (word == NO_WORD) 0f else scoring.scoreAfter(contexts[k], Trigrams(runs[k]), scored)
                 insert(to, base + lm, word, stateWord[s], s)
             }
         }
+    }
+
+    // the scorer of arc [a]: without the user's counts over a syllable typed short, or (MULTI) reading all the input alone
+    private fun scoring(a: Int, wholeInput: Boolean): WordScorer = when {
+        arcs.flags[a] and SHORT != 0 -> uncounted ?: scorer
+        wholeInput -> whole ?: scorer
+        else -> scorer
     }
 
     /**
@@ -449,7 +528,7 @@ class PinyinDecoder(
      * as they began the last decode's, of the [kept] it scored, keep their scores: a key changes
      * the arcs ending near the end, and those come last.
      */
-    private fun firstWords(graph: SyllableGraph, prev2: Int, prev: Int, limit: Int, kept: Int): List<Candidate> {
+    private fun firstWords(graph: SyllableGraph, prev2: Int, prev: Int, limit: Int, kept: Int, last: Int): List<Candidate> {
         val from = arcs.start[graph.start]
         val until = arcs.start[graph.start + 1]
         val context = scorer.context(prev2, prev)
@@ -459,13 +538,16 @@ class PinyinDecoder(
         var same = 0
         if (kept > 0) {
             val lastFrom = lastArcs.start[graph.start]
-            while (same < minOf(kept, until - from) && lastArcs.same(lastFrom + same, arcs, from + same)) same++
+            // with [whole], an arc that read all of the input then, or does now, is scored anew
+            val sameUntil = if (whole == null) Int.MAX_VALUE else minOf(last, graph.end)
+            while (same < minOf(kept, until - from) && lastArcs.same(lastFrom + same, arcs, from + same) && arcs.to[from + same] < sameUntil) same++
         }
         // score, then arc, in one sortable long: best first, ties in arc order
         val order = LongArray(until - from) { i ->
             val a = from + i
             val word = arcs.word[a]
-            if (i >= same) scores[i] = if (word == NO_WORD) Float.NEGATIVE_INFINITY else arcs.cost[a] + scorer.scoreAfter(context, trigrams, arcs.scored[a])
+            val scoring = scoring(a, arcs.to[a] == graph.end)
+            if (i >= same) scores[i] = if (word == NO_WORD) Float.NEGATIVE_INFINITY else arcs.cost[a] + scoring.scoreAfter(context, trigrams, arcs.scored[a])
             (sortable(-scores[i]).toLong() shl Int.SIZE_BITS) or a.toLong()
         }
         firstScored = until - from
@@ -511,6 +593,7 @@ class PinyinDecoder(
         val word = IntList() // NO_WORD for input kept as typed
         val scored = IntList() // the word the model scores: word, or a longer one it starts
         val cost = FloatList()
+        val flags = IntList() // SHORT for an arc over a syllable typed short (scored without the user's counts), START_ONLY for a start-only word
         val size get() = to.size
 
         // for sorting
@@ -519,6 +602,7 @@ class PinyinDecoder(
         private val wordCopy = IntList()
         private val scoredCopy = IntList()
         private val costCopy = FloatList()
+        private val flagsCopy = IntList()
 
         fun clear(end: Int) {
             if (start.size < end + 2) {
@@ -529,6 +613,7 @@ class PinyinDecoder(
             word.clear()
             scored.clear()
             cost.clear()
+            flags.clear()
         }
 
         /** Orders the arcs from [first] on, none ending past [end], by where they end, keeping the order of those ending together. */
@@ -546,12 +631,14 @@ class PinyinDecoder(
             wordCopy.clear()
             scoredCopy.clear()
             costCopy.clear()
+            flagsCopy.clear()
             ends.fill(0, 0, end + 1)
             for (a in first until size) {
                 toCopy += to[a]
                 wordCopy += word[a]
                 scoredCopy += scored[a]
                 costCopy += cost[a]
+                flagsCopy += flags[a]
                 ends[to[a]]++
             }
             var next = first
@@ -562,29 +649,24 @@ class PinyinDecoder(
                 word[a] = wordCopy[i]
                 scored[a] = scoredCopy[i]
                 cost[a] = costCopy[i]
+                flags[a] = flagsCopy[i]
             }
         }
 
-        fun add(to: Int, word: Int, cost: Float, scored: Int = word) {
+        fun add(to: Int, word: Int, cost: Float, scored: Int = word, short: Boolean = false, startOnly: Boolean = false) {
             this.to += to
             this.word += word
             this.scored += scored
             this.cost += cost
+            this.flags += (if (short) SHORT else 0) or (if (startOnly) START_ONLY else 0)
         }
 
         fun same(arc: Int, other: Lattice, otherArc: Int) =
             to[arc] == other.to[otherArc] && word[arc] == other.word[otherArc] && scored[arc] == other.scored[otherArc] &&
-                cost[arc] == other.cost[otherArc]
+                cost[arc] == other.cost[otherArc] && flags[arc] == other.flags[otherArc]
     }
 
     companion object {
-        /**
-         * Committed this often, a word of two characters or more is the user's: typed short it
-         * costs no more than typed whole. Once may be a slip. The user model halves its counts
-         * as they grow, so a word not typed since goes back to costing what it did.
-         */
-        const val LEARNED = 2f
-
         /** The syllables of a nasal alone: see [Penalties.nasal]. */
         private val NASALS = setOf("m", "n", "ng").map { Syllables.id(it) }.toIntArray()
 
@@ -598,6 +680,10 @@ class PinyinDecoder(
         // on the evaluation set 1 to 16 of the latter read the same
         private const val LOOK_AHEAD_WORDS = 16
         private const val EXTENSIONS_PER_READING = 4
+
+        // the bits of Lattice.flags
+        private const val SHORT = 1
+        private const val START_ONLY = 2
     }
 }
 

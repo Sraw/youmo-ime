@@ -4,46 +4,54 @@
  */
 package org.fcitx.fcitx5.android.engine.host
 
-import org.fcitx.fcitx5.android.engine.english.EnglishUser
-import org.fcitx.fcitx5.android.engine.english.EnglishUserStore
-import org.junit.Assert.assertArrayEquals
+import org.fcitx.fcitx5.android.engine.host.Engines.UserWord
+import org.fcitx.fcitx5.android.engine.learn.LearnLog
+import org.fcitx.fcitx5.android.engine.learn.LearnRecord.EnCommit
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
-import org.junit.Rule
 import org.junit.Test
-import org.junit.rules.TemporaryFolder
-import java.io.File
-import java.io.IOException
-import java.util.concurrent.Executor
 
-/** Words removed together from the English page leave the log compacted, as pinyin's do (UserLexicon). */
+/** The English page's words, as the learning record has them (U-31). */
 class EnglishLexiconTest {
 
-    @get:Rule
-    val folder = TemporaryFolder()
+    private val log = LearnLog(null)
+    private val english = EnglishLexicon { log }
+
+    // typed lately or kept: a word whose correction was taken back is listed, never corrected, however long untyped
+    @Test
+    fun theWordsTypedAddedAndNeverCorrectedAreListed() {
+        val user = english.user()
+        user.commit(null, "the")
+        user.commit(null, "the")
+        user.commit(null, "teh", how = EnCommit.REVERTED)
+        assertTrue(english.add("Youmo"))
+        assertFalse(english.add("you mo"))
+        assertEquals(
+            listOf(
+                UserWord("Youmo", "", UserWord.Kind.ADDED, 2f, neverCorrected = true),
+                UserWord("the", "", UserWord.Kind.LEARNED, 2f),
+                UserWord("teh", "", UserWord.Kind.LEARNED, 1f, neverCorrected = true),
+            ),
+            english.words(),
+        )
+        // 恢复 gives a word back to correction, still listed with its count; 删除 forgets it
+        english.restoreCorrection(listOf("teh"))
+        assertEquals(UserWord("teh", "", UserWord.Kind.LEARNED, 1f), english.words().last())
+        english.forget(listOf("teh", "Youmo"))
+        assertEquals(listOf("the"), english.words().map { it.text })
+        assertFalse(english.user().neverCorrected("teh"))
+    }
 
     @Test
-    fun wordsForgottenTogetherLeaveAStartNothingToReplay() {
-        val dir = folder.newFolder()
-        val errors = ArrayList<IOException>()
-        val english = EnglishLexicon(dir, { errors += it }, Executor { it.run() })
-        assertTrue(english.add("hello"))
-        assertTrue(english.add("world"))
-        english.forget(listOf("hello", "world"))
-        checkNotNull(english.store).close()
-        english.closed()
-        assertEquals(emptyList<IOException>(), errors)
-        // the log itself is one compacted with no word in it: replay alone may not show it
-        val none = File(folder.newFolder(), Engines.USER_ENGLISH)
-        EnglishUserStore(none, EnglishUser()).use {
-            it.open()
-            it.compact()
-        }
-        assertArrayEquals(none.readBytes(), File(dir, Engines.USER_ENGLISH).readBytes())
-        // the log as appended would make both words again at a start, only to forget them
-        val replayed = EnglishUser()
-        EnglishUserStore(File(dir, Engines.USER_ENGLISH), replayed).use { it.open() }
-        assertEquals(0, replayed.changes)
-        assertEquals(emptySet<String>(), replayed.words)
+    fun aRecordClosedIsReadAgain() {
+        var record = LearnLog(null)
+        val lexicon = EnglishLexicon { record }
+        lexicon.user().commit(null, "the")
+        assertEquals(listOf("the"), lexicon.words().map { it.text })
+        // opened anew without the word: what the page lists is that record's, not the one closed
+        record = LearnLog(null)
+        lexicon.closed()
+        assertEquals(emptyList<String>(), lexicon.words().map { it.text })
     }
 }

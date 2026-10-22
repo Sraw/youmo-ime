@@ -4,12 +4,9 @@
  */
 package org.fcitx.fcitx5.android.engine.host
 
-import org.fcitx.fcitx5.android.engine.data.PinyinData
 import org.fcitx.fcitx5.android.engine.data.PinyinDataBuilder
 import org.fcitx.fcitx5.android.engine.session.Offer
 import org.fcitx.fcitx5.android.engine.user.LibimeImport
-import org.fcitx.fcitx5.android.engine.user.UserLog
-import org.fcitx.fcitx5.android.engine.user.UserModel
 import org.fcitx.fcitx5.android.engine.user.WordListFiles
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -17,7 +14,6 @@ import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
-import java.io.File
 import java.io.FileNotFoundException
 import java.nio.ByteBuffer
 
@@ -129,11 +125,14 @@ class EnginesUserWordsTest {
     @Test
     fun aWordTheUserPutTogetherIsListedTillRemoved() {
         Engines(::load, folder.newFolder()).use { engines ->
-            // 拟 then 好, over the decoder's 你好: learned as the user's word 拟好
+            // 拟 then 好, over the decoder's 你好, twice: the user's word 拟好 (U-06); once may be a slip
             engines.type(Engines.PINYIN, "nihao")
             val pieces = engines.onEvent(Engines.PINYIN, EngineEvent.PICK, engines.candidates(Engines.PINYIN, 0, 20).indexOfFirst { it.text == "拟" })
             assertEquals("拟", pieces.preedit.substringBefore("hao").trim())
             engines.onEvent(Engines.PINYIN, EngineEvent.PICK, 0)
+            engines.onEvent(Engines.PINYIN, EngineEvent.RESET, 0)
+            assertEquals(emptyList<Engines.UserWord>(), engines.userWords())
+            engines.learnNiHao()
             val learned = engines.userWords().single()
             assertEquals("拟好" to Engines.UserWord.Kind.LEARNED, learned.text to learned.kind)
             assertEquals("ni hao", learned.pinyin)
@@ -151,18 +150,16 @@ class EnginesUserWordsTest {
                 for (p in pieces) engines.onEvent(Engines.PINYIN, EngineEvent.PICK, engines.candidates(Engines.PINYIN, 0, 20).indexOfFirst { it.text == p })
                 engines.onEvent(Engines.PINYIN, EngineEvent.RESET, 0)
             }
-            putTogether("nihao", "拟", "好")
-            putTogether("haoxing", "好", "星")
+            repeat(2) {
+                putTogether("nihao", "拟", "好")
+                putTogether("haoxing", "好", "星")
+            }
             val learned = engines.userWords()
             assertEquals(setOf("拟好", "好星"), learned.map { it.text }.toSet())
             engines.removeWords(learned)
             assertEquals(emptyList<Engines.UserWord>(), engines.userWords())
         }
         assertEquals(emptyList<Engines.UserWord>(), Engines(::load, dir).use { it.userWords() })
-        // compacted: a start does not make them words again only to forget them
-        val replayed = PinyinData.load(ByteBuffer.wrap(pinyin)).let { UserModel(it.dictionary, it.vocabulary) }
-        UserLog.read(File(dir, Engines.USER_PINYIN).readBytes(), replayed)
-        assertEquals(0, replayed.size)
     }
 
     @Test
@@ -191,10 +188,8 @@ class EnginesUserWordsTest {
     @Test
     fun eachKindIsListedAndCountedAlone() {
         Engines(::load, folder.newFolder()).use { engines ->
-            // 拟 then 好, over the decoder's 你好: learned as the user's word 拟好
-            engines.type(Engines.PINYIN, "nihao")
-            engines.onEvent(Engines.PINYIN, EngineEvent.PICK, engines.candidates(Engines.PINYIN, 0, 20).indexOfFirst { it.text == "拟" })
-            engines.onEvent(Engines.PINYIN, EngineEvent.PICK, 0)
+            // 拟 then 好, over the decoder's 你好, twice: the user's word 拟好
+            repeat(2) { engines.learnNiHao() }
             // as many of each kind as no other: a count or list of the wrong kind tells
             assertTrue(engines.addWord("妮浩", "nihao"))
             assertTrue(engines.addWord("星航", "xing hang"))
@@ -244,7 +239,7 @@ class EnginesUserWordsTest {
     }
 
     @Test
-    fun aListImportedIsAddedAndBlockedAndExportsAsItWasImported() {
+    fun aListImportedIsBlockedAndImportedAndExportsOnlyWhatIsBlocked() {
         Engines(::load, folder.newFolder()).use { engines ->
             val imported = engines.importWords(
                 sequenceOf(
@@ -263,20 +258,26 @@ class EnginesUserWordsTest {
                     "!你好 ni'hao",
                     "",
                 ),
+                "list.txt",
             )
-            assertEquals(Engines.Imported(added = 3, blocked = 2, unread = 3), imported)
-            assertEquals(listOf("妮浩 ni'hao", "航星 hang'xing", "好你 hao'ni", "!拟 ni", "!你好 ni'hao"), engines.exportWords())
-            assertTrue("妮浩" in engines.type(Engines.PINYIN, "nihao").candidates)
+            // another input method's list: its words imported (U-101), none added by hand
+            assertEquals(Engines.Imported(added = 0, blocked = 2, unread = 3, imported = 3), imported)
+            assertEquals(listOf("航星 hang xing", "妮浩 ni hao", "好你 hao ni"), engines.importedWords().map { "${it.text} ${it.pinyin}" })
+            assertEquals(listOf("!拟 ni", "!你好 ni'hao"), engines.exportWords())
+            engines.type(Engines.PINYIN, "nihao")
+            assertTrue("妮浩" in engines.candidates(Engines.PINYIN, 0, 20).map { it.text })
             engines.onEvent(Engines.PINYIN, EngineEvent.RESET, 0)
             assertFalse("拟" in engines.type(Engines.PINYIN, "ni").candidates)
             engines.onEvent(Engines.PINYIN, EngineEvent.RESET, 0)
             // read back: nothing new
             assertEquals(Engines.Imported(added = 0, blocked = 0, unread = 0), engines.importWords(engines.exportWords().asSequence()))
-            assertEquals(5, engines.userWords().size)
+            // imported again: imported already
+            assertEquals(0, engines.importWords(sequenceOf("妮浩 ni'hao"), "again.txt").imported)
+            assertEquals(2, engines.userWords().size)
         }
     }
 
-    // 拟 then 好, over the decoder's 你好: learned as the user's word 拟好
+    // 拟 then 好, over the decoder's 你好: twice, the user's word 拟好
     private fun Engines.learnNiHao() {
         type(Engines.PINYIN, "nihao")
         onEvent(Engines.PINYIN, EngineEvent.PICK, candidates(Engines.PINYIN, 0, 20).indexOfFirst { it.text == "拟" })
@@ -342,15 +343,16 @@ class EnginesUserWordsTest {
     }
 
     @Test
-    fun aLearnedCountUnderOneComesBackAsItWas() {
+    fun aLearnedCountUnderOneComesBackAsOneUse() {
         val dir = folder.newFolder()
+        // the learning record counts commits: an older build's halved count is a use still
         Engines(::load, dir).use { engines ->
             engines.importWords(exported(listOf("~ 拟好 ni'hao 0.5")))
-            assertEquals(listOf("拟好" to 0.5f), engines.userWords(Engines.UserWord.Kind.LEARNED).map { it.text to it.count })
+            assertEquals(listOf("拟好" to 1f), engines.userWords(Engines.UserWord.Kind.LEARNED).map { it.text to it.count })
         }
         // and so after a start
         Engines(::load, dir).use { engines ->
-            assertEquals(listOf("拟好" to 0.5f), engines.userWords(Engines.UserWord.Kind.LEARNED).map { it.text to it.count })
+            assertEquals(listOf("拟好" to 1f), engines.userWords(Engines.UserWord.Kind.LEARNED).map { it.text to it.count })
         }
     }
 
@@ -398,7 +400,8 @@ class EnginesUserWordsTest {
             // every word of four of the characters: 1296, each its own
             val words = chars.flatMap { a -> chars.flatMap { b -> chars.flatMap { c -> chars.map { d -> listOf(a, b, c, d) } } } }
                 .map { w -> "${w.joinToString("") { it.first }} ${w.joinToString("'") { it.second }}" }
-            assertEquals(Engines.Imported(added = words.size, blocked = 0, unread = 0), engines.importWords(words.asSequence()))
+            // as the user's export brings them: added (another list's are imported, U-101)
+            assertEquals(Engines.Imported(added = words.size, blocked = 0, unread = 0), engines.importWords(exported(words)))
             val listed = engines.userWords()
             assertEquals(words.size, listed.size)
             engines.removeWords(listed.drop(1))

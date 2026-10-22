@@ -72,26 +72,19 @@ FCITX_CONFIG_ENUM_NAME_WITH_I18N(EngineOrderPolicy, N_("No"), N_("Freq"), N_("Fa
         Option<bool> autoSelect{this, "AutoSelect", _("Auto select candidate"), true}; \
         Option<bool> hint{this, "Hint", _("Display Hint for word"), true}; \
         OptionWithAnnotation<EngineOrderPolicy, EngineOrderPolicyI18NAnnotation> orderPolicy{ \
-                this, "OrderPolicy", _("Order policy"), EngineOrderPolicy::No}; \
-        /* -1 as libime has it: the longest code; never by count, only once picked */ \
-        Option<int, IntConstrain> autoPhraseLength{this, "AutoPhraseLength", _("Auto phrase length"), 0, \
-                                                   IntConstrain(-1, 8)}; \
-        Option<int, IntConstrain> saveAutoPhraseAfter{ \
-                this, "SaveAutoPhraseAfter", _("Save auto phrase after being typed for ... times"), 0, \
-                IntConstrain(-1, 10)};
+                this, "OrderPolicy", _("Order policy"), EngineOrderPolicy::No};
 
 FCITX_CONFIGURATION(
         EngineTableConfig,
         ENGINE_TABLE_OPTIONS)
 
-// each table's own defaults, those of ime-core's TableOptions presets (fcitx's .conf files); a
-// value read that is out of range falls back to EngineTableConfig's, not to these
-inline EngineTableConfig engineTable(bool hint, EngineOrderPolicy order, int autoPhraseLength, int saveAfter) {
+// each table's own defaults, those of ime-core's TableOptions presets (fcitx's .conf files) but
+// OrderPolicy (调频): off for every table on a new install (U-28 D7). Those who typed with a table
+// before keep it on: EngineMigration writes it into their config. A value read that is out of
+// range falls back to EngineTableConfig's, not to these
+inline EngineTableConfig engineTable(bool hint) {
     EngineTableConfig config;
     config.hint.setValue(hint);
-    config.orderPolicy.setValue(order);
-    config.autoPhraseLength.setValue(autoPhraseLength);
-    config.saveAutoPhraseAfter.setValue(saveAfter);
     return config;
 }
 
@@ -129,11 +122,11 @@ FCITX_CONFIGURATION(
         ENGINE_FUZZY
         ENGINE_ENGLISH_SUGGEST
         // named as the input methods are listed (androidengine.cpp)
-        Option<EngineTableConfig> wubi{this, "Wubi", "五笔", engineTable(true, EngineOrderPolicy::Freq, 4, 3)};
-        Option<EngineTableConfig> cangjie{this, "Cangjie", "仓颉", engineTable(false, EngineOrderPolicy::No, -1, -1)};
-        Option<EngineTableConfig> ziranma{this, "Ziranma", "自然码", engineTable(true, EngineOrderPolicy::Fast, -1, -1)};
-        Option<EngineTableConfig> erbi{this, "Erbi", "二笔", engineTable(false, EngineOrderPolicy::Freq, 4, -1)};
-        Option<EngineTableConfig> wubiPinyin{this, "WubiPinyin", "五笔拼音", engineTable(true, EngineOrderPolicy::Freq, 4, 3)};
+        Option<EngineTableConfig> wubi{this, "Wubi", "五笔", engineTable(true)};
+        Option<EngineTableConfig> cangjie{this, "Cangjie", "仓颉", engineTable(false)};
+        Option<EngineTableConfig> ziranma{this, "Ziranma", "自然码", engineTable(true)};
+        Option<EngineTableConfig> erbi{this, "Erbi", "二笔", engineTable(false)};
+        Option<EngineTableConfig> wubiPinyin{this, "WubiPinyin", "五笔拼音", engineTable(true)};
         // opened by name in the app (ConfigDescriptor), the uri only says whose they are
         ExternalOption dictmanager{this, "DictManager", _("Manage Dictionaries"),
                                    "fcitx://config/addon/androidengine/dictmanager"};

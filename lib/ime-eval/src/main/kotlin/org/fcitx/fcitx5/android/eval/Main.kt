@@ -34,13 +34,18 @@ import org.fcitx.fcitx5.android.engine.session.Action
 import org.fcitx.fcitx5.android.engine.session.PinyinSession
 import org.fcitx.fcitx5.android.engine.table.TableDictionary
 import org.fcitx.fcitx5.android.engine.table.TableLanguage
+import org.fcitx.fcitx5.android.engine.user.LearningUse
 import org.fcitx.fcitx5.android.engine.user.WordPack
 import java.io.File
 import java.io.IOException
 import java.io.RandomAccessFile
 import java.nio.channels.FileChannel
 import java.util.Locale
+import java.util.Random
 import kotlin.system.exitProcess
+
+/** The options of [learningUse]: before [COMMANDS], which take them. */
+private val USE_OPTIONS = arrayOf("user-counts", "short-guard")
 
 /** Every command, in the order [USAGE] lists them: it is made from them. */
 internal val COMMANDS = listOf(
@@ -153,6 +158,15 @@ internal val COMMANDS = listOf(
         rows.forEach { (label, score) -> out.appendLine("%-28s %s".format(label, score)) }
         0
     },
+    Command("learn-log-bench", "<dir> [--commits <n>] [--days <n>] [--legacy <pinyin.data>] [--counts <pinyin.data>]", 1..1, "commits", "days", "legacy", "counts") { args, out, _ ->
+        require("legacy" !in args.options || "counts" !in args.options) { "--legacy or --counts, not both" }
+        val dir = File(args.operands[0]).apply { mkdirs() }
+        val bench = LearnLogBench(args.options["commits"]?.toInt() ?: LEARN_LOG_COMMITS, args.options["days"]?.toInt() ?: LEARN_LOG_DAYS)
+        val lines = args.options["legacy"]?.let { bench.legacy(loadData(it), dir).lines() }
+            ?: args.options["counts"]?.let { bench.counts(loadData(it), dir).lines() } ?: bench.run(dir).lines()
+        lines.forEach(out::appendLine)
+        0
+    },
     Command("predict-set", "<pinyin.data> <set.tsv> <predict.tsv>", 3..3) { args, _, _ ->
         val (dataPath, setPath, outPath) = args.operands
         // after each word of a pinyin set's sentences, what follows: for `predict`
@@ -198,11 +212,19 @@ internal val COMMANDS = listOf(
     },
     Command(
         "learn",
-        "<pinyin.data> <set.tsv> [--scheme <scheme>] [--fuzzy all|<pair>,...] [--neighbours on|off] [--rerank <model.safetensors>] [--refine <model.safetensors>] [--weight <rerank>[,<refine>]] [--limit <rerank>[,<refine>]] [--pack <file.words>]",
-        2..2, "scheme", "fuzzy", "neighbours", "rerank", "refine", "weight", "limit", "pack",
+        "<pinyin.data> <set.tsv> [--scheme <scheme>] [--fuzzy all|<pair>,...] [--neighbours on|off] [--rerank <model.safetensors>] [--refine <model.safetensors>] [--weight <rerank>[,<refine>]] [--limit <rerank>[,<refine>]] [--pack <file.words>] [--misses <out.tsv>] $USE_USAGE",
+        2..2, "scheme", "fuzzy", "neighbours", "rerank", "refine", "weight", "limit", "pack", "misses", *USE_OPTIONS,
     ) { args, out, _ ->
         val (dataPath, setPath) = args.operands
-        learn(dataPath, setPath, RunOptions(args.options), Models(args.options), args.options["pack"], out)
+        learn(dataPath, setPath, RunOptions(args.options), Models(args.options), args.options["pack"], learningUse(args.options), args.options["misses"], out)
+    },
+    Command(
+        "learn-ux",
+        "<pinyin.data> <script.txt or a directory of them> [--seed <commits>] [--gate] [--rerank <model.safetensors>] [--refine <model.safetensors>] $USE_USAGE",
+        2..2, "seed", "gate", "rerank", "refine", *USE_OPTIONS,
+    ) { args, out, _ ->
+        val (dataPath, scriptPath) = args.operands
+        learnUx(dataPath, File(scriptPath), args.options, out)
     },
     Command("chars", "<pinyin.data>", 1..1) { args, out, _ ->
         CharRanks.report(CharRanks(loadData(args.operands[0])).measure(), out)
@@ -268,7 +290,10 @@ internal class Command(
     val options = options.toSet()
 }
 
-/** Arguments split into the positional ones and `--name value` options. */
+/** Options that take no value: `--gate`. */
+private val FLAGS = setOf("gate")
+
+/** Arguments split into the positional ones and `--name value` options, a [FLAGS] one with an empty value. */
 internal class Arguments(args: Array<String>) {
     val positional = ArrayList<String>()
     val options = HashMap<String, String>()
@@ -281,6 +306,8 @@ internal class Arguments(args: Array<String>) {
             val arg = args[i++]
             if (!arg.startsWith("--")) {
                 positional += arg
+            } else if (arg.removePrefix("--") in FLAGS) {
+                if (options.put(arg.removePrefix("--"), "") != null) valid = false
             } else if (i == args.size || options.put(arg.removePrefix("--"), args[i++]) != null) {
                 valid = false // no value, or given twice
             }
@@ -310,6 +337,10 @@ private const val ENGLISH_SEED = 20261011L
 // how far a finger misses each key it glides through, key widths
 private const val GLIDE_WOBBLE = 0.3f
 
+/** A heavy user's year (impl/design-1a.md §8): what learn-log-bench writes. */
+private const val LEARN_LOG_COMMITS = 200_000
+private const val LEARN_LOG_DAYS = 365
+
 /** Full pinyin without the Latin words. */
 private const val NO_LATIN = "no-latin"
 
@@ -333,6 +364,9 @@ private fun optionsValid(options: Map<String, String>): Boolean {
         valid("max-correction") { weight(it) != null },
         valid("noise") { n -> n.toDoubleOrNull()?.let { it in 0.0..1.0 } == true },
         valid("keys") { it == "nine" },
+        valid("user-counts") { it in setOf("full", "none", "multi") },
+        valid("short-guard") { it in ON_OFF },
+        valid("seed") { (it.toIntOrNull() ?: -1) >= 0 },
         listOf("threads", "beam", "sentences").all { name -> valid(name) { (it.toIntOrNull() ?: 0) > 0 } },
         // only full pinyin reads slips: 双拼 and the nine keys read none
         valid("neighbours") { it in ON_OFF && (scheme == null || scheme == NO_LATIN) },
@@ -623,15 +657,55 @@ internal class Typist(
     }
 }
 
-private fun learn(dataPath: String, setPath: String, options: RunOptions, models: Models, packPath: String?, out: Appendable): Int {
+private fun learn(dataPath: String, setPath: String, options: RunOptions, models: Models, packPath: String?, use: LearningUse, missesPath: String?, out: Appendable): Int {
     val data = loadData(dataPath)
     val pack = packPath?.let { path -> File(path).useLines { WordPack.parse(it, path) } }
-    val rows = Learning(data, options.segmenter(data), models.reranker, models.refiner, pack).measure(readSet(setPath))
+    val rows = Learning(data, options.segmenter(data), models.reranker, models.refiner, pack, use).measure(readSet(setPath))
     out.appendLine(KeystrokeRun.HEADER)
-    // null for a note (where the prior ended up): a half with no samples is still a row, of none
-    rows.forEach { (label, outcomes) -> out.appendLine(if (outcomes == null) label else KeystrokeRun.row(label, outcomes)) }
+    // a half with no samples is still a row, of none
+    rows.forEach { (label, outcomes) -> out.appendLine(KeystrokeRun.row(label, outcomes)) }
+    // each row's samples not first once typed: the row, the keys, what was meant
+    missesPath?.let { path ->
+        File(path).printWriter().use { w ->
+            for ((label, outcomes) in rows) outcomes.filterNot { it.first }.forEach { w.println("$label\t${it.sample.input}\t${it.sample.expected}") }
+        }
+    }
     return 0
 }
+
+/** `--user-counts` and `--short-guard`: how what is learned reaches the scores, the app's where not given (checked already: see optionsValid). */
+private fun learningUse(o: Map<String, String>) = LearningUse(
+    counts = o["user-counts"]?.let { LearningUse.Counts.valueOf(it.uppercase(Locale.ROOT)) } ?: LearningUse.DEFAULT.counts,
+    shortGuard = o["short-guard"] != "off",
+)
+
+/**
+ * The scripts at [scripts] (a file, or every .txt of a directory, by name) run by [LearnUx]: the
+ * report, and with `--gate` exit code 1 where an expectation failed. `--seed <n>` commits the
+ * first n samples of the sets beside the scripts' directory (as dev/design/user-recency.md's
+ * harness did: web, chat, dialog, mixed, collide, slips, shuffled) before each scenario.
+ */
+private fun learnUx(dataPath: String, scripts: File, o: Map<String, String>, out: Appendable): Int {
+    val files = if (scripts.isDirectory) scripts.listFiles { f -> f.name.endsWith(".txt") }.orEmpty().sortedBy { it.name } else listOf(scripts)
+    val scenarios = files.flatMap { LearnUxScript.parse(it.name, it.readLines()) }
+    val seed = o["seed"]?.toInt()?.let { n ->
+        val sets = (if (scripts.isDirectory) scripts else scripts.absoluteFile.parentFile).absoluteFile.parentFile
+        SEED_SETS.flatMap { readSet(File(sets, "$it.tsv").path) }.shuffled(Random(SEED_SHUFFLE)).take(n)
+    }.orEmpty()
+    val models = Models(o)
+    val results = LearnUx(loadData(dataPath), models.reranker, models.refiner, learningUse(o), seed).run(scenarios)
+    out.appendLine(LearnUx.report(results))
+    // a gate that checked nothing (no scripts, no expectations) is no pass
+    val checked = results.any { it.status != LearnUx.Status.NOTE }
+    if (!checked) out.appendLine("no expectation checked in $scripts")
+    return if ("gate" in o && (!checked || results.any { it.status == LearnUx.Status.FAIL })) 1 else 0
+}
+
+/** The sets `learn-ux --seed` commits from. */
+private val SEED_SETS = listOf("pinyin-web", "pinyin-chat", "pinyin-dialog", "pinyin-mixed", "pinyin-collide", "pinyin-slips")
+private const val SEED_SHUFFLE = 7L
+
+private const val USE_USAGE = "[--user-counts full|none|multi] [--short-guard on|off]"
 
 /**
  * Whether [options] give a model option without what it is read with, which would be ignored: the

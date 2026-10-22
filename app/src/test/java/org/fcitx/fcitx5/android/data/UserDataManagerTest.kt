@@ -8,9 +8,16 @@ import androidx.room.Room
 import kotlinx.coroutines.test.runTest
 import org.fcitx.fcitx5.android.BuildConfig
 import org.fcitx.fcitx5.android.FcitxApplication
+import org.fcitx.fcitx5.android.core.EngineMigration
 import org.fcitx.fcitx5.android.data.clipboard.db.ClipboardDatabase
 import org.fcitx.fcitx5.android.data.clipboard.db.ClipboardEntry
 import org.fcitx.fcitx5.android.data.clipboard.importedClipboardMarker
+import org.fcitx.fcitx5.android.engine.host.Engines
+import org.fcitx.fcitx5.android.engine.host.TableSettings
+import org.fcitx.fcitx5.android.engine.learn.LearnLog
+import org.fcitx.fcitx5.android.engine.learn.backup.Backups
+import org.fcitx.fcitx5.android.engine.learn.backup.RestoreStash
+import org.fcitx.fcitx5.android.engine.user.WordLists
 import org.fcitx.fcitx5.android.utils.appContext
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -256,5 +263,109 @@ class UserDataManagerTest {
         // where the backup has a file, its file
         assertEquals("a file", File(phone.engine, "lists").readText())
         assertEquals(listOf("engine"), File(folder.root, "phone").list()!!.filter { it.startsWith("engine") })
+    }
+
+    // U-100: the phone's learning is merged with the backup's, not replaced: the backup's left for the engine's next start
+    @Test
+    fun aBackupsLearningIsLeftToMergeThePhonesKept() {
+        val phone = install("phone")
+        File(phone.engine, Backups.DIR).mkdirs()
+        File(phone.engine, LearnLog.FILE).writeText("the phone's")
+        File(phone.engine, LearnLog.MARKER).writeText("the phone's")
+        File(phone.engine, WordLists.ADDED).writeText("the phone's")
+        File(phone.engine, "${Backups.DIR}/auto-1.fxlb").writeText("the phone's")
+        File(phone.engine, "wubi.user").writeText("the phone's")
+        val backup = zip(
+            BuildConfig.APPLICATION_ID,
+            RestoreStash.BACKUP to "the backup's learning",
+            "engine/${LearnLog.MARKER}" to "the backup's",
+            "engine/${WordLists.ADDED}" to "the backup's",
+            "engine/wubi.user" to "the backup's table",
+        )
+        UserDataManager.import(backup, phone).getOrThrow()
+        // review-DE-design D-M3: every old log the phone's, a changed one reading to the record as words removed
+        for (name in listOf(LearnLog.FILE, LearnLog.MARKER, WordLists.ADDED, "${Backups.DIR}/auto-1.fxlb", "wubi.user")) {
+            assertEquals(name, "the phone's", File(phone.engine, name).readText())
+        }
+        val stash = stashes(phone).single()
+        assertEquals("the backup's learning", File(stash, RestoreStash.BACKUP).readText())
+        assertEquals("the backup's", File(stash, WordLists.ADDED).readText())
+        assertEquals("the backup's table", File(stash, "wubi.user").readText())
+        // D-S5: a second import before the engine merged the first: both left, in the order made
+        UserDataManager.import(zip(BuildConfig.APPLICATION_ID, RestoreStash.BACKUP to "the second's"), phone).getOrThrow()
+        val both = stashes(phone)
+        assertEquals(2, both.size)
+        assertEquals(stash.name, both[0].name)
+        assertEquals("the second's", File(both[1], RestoreStash.BACKUP).readText())
+    }
+
+    // R11 F2745: a zip from before tables.order-kept keeps 调频 on for its tables typed with, as
+    // such a build's first start would; the phone's marker would otherwise skip it
+    @Test
+    fun aBackupFromBeforeTheOrderMarkerKeepsItsTypedTablesOrderingByUse() {
+        val im = Engines.TABLES.entries.first { it.value.options.orderByUse }.key
+        val phone = install("phone")
+        UserDataManager.import(zip(BuildConfig.APPLICATION_ID, "engine/${Engines.userTable(im)}" to "a log"), phone).getOrThrow()
+        val conf = File(phone.external, "config/conf/androidengine.conf").readText()
+        assertTrue(conf, "${TableSettings.ORDER_POLICY}=${TableSettings.ORDER_BY_USE}" in conf)
+        // a newer backup, with the marker: its settings as they are
+        val other = install("other")
+        val newer = zip(BuildConfig.APPLICATION_ID, "engine/${Engines.userTable(im)}" to "a log", "engine/${EngineMigration.ORDER_KEPT}" to "")
+        UserDataManager.import(newer, other).getOrThrow()
+        assertFalse(File(other.external, "config/conf/androidengine.conf").exists())
+    }
+
+    // R11 F3123: a zip without the addon's settings over a phone whose fcitx wrote them in full,
+    // 调频 off as its default: the backup's typed table orders by use again, one it did not type stays off
+    @Test
+    fun aBackupWithoutTheAddonsSettingsTurnsItsTypedTablesOrderingOnOverThePhones() {
+        val ordered = Engines.TABLES.entries.filter { it.value.options.orderByUse }
+        val (im, typed) = ordered[0]
+        val untyped = ordered.first { it.value.group != typed.group }.value
+        val phone = install("phone")
+        val settings = File(phone.external, "config/conf/androidengine.conf").apply { parentFile!!.mkdirs() }
+        settings.writeText("[${typed.group}]\n${TableSettings.ORDER_POLICY}=No\n\n[${untyped.group}]\n${TableSettings.ORDER_POLICY}=No\n")
+        UserDataManager.import(zip(BuildConfig.APPLICATION_ID, "engine/${Engines.userTable(im)}" to "a log"), phone).getOrThrow()
+        val conf = settings.readText()
+        assertTrue(conf, "[${typed.group}]\n${TableSettings.ORDER_POLICY}=${TableSettings.ORDER_BY_USE}" in conf)
+        assertTrue(conf, "[${untyped.group}]\n${TableSettings.ORDER_POLICY}=No" in conf)
+    }
+
+    private fun stashes(phone: UserDataManager.Dirs) =
+        File(phone.engine, RestoreStash.DIR).listFiles().orEmpty().sortedBy { it.name.toLong() }
+
+    // a zip of an earlier build: its learning record; older still, its pinyin log, to convert
+    @Test
+    fun anOlderBackupsLearningFilesAreLeftToMerge() {
+        val phone = install("phone")
+        phone.engine.mkdirs()
+        File(phone.engine, Engines.USER_PINYIN).writeText("the phone's")
+        UserDataManager.import(zip(BuildConfig.APPLICATION_ID, "engine/${LearnLog.FILE}" to "a record", "engine/${Engines.USER_PINYIN}" to "a log"), phone).getOrThrow()
+        val stash = stashes(phone).single()
+        assertEquals("a record", File(stash, LearnLog.FILE).readText())
+        assertEquals("a log", File(stash, Engines.USER_PINYIN).readText())
+        assertEquals("the phone's", File(phone.engine, Engines.USER_PINYIN).readText())
+        assertFalse(File(phone.engine, LearnLog.FILE).exists())
+        // a backup of no learning leaves nothing to merge
+        File(phone.engine, RestoreStash.DIR).deleteRecursively()
+        UserDataManager.import(zip(BuildConfig.APPLICATION_ID, "engine/notes" to "notes"), phone).getOrThrow()
+        assertFalse(File(phone.engine, RestoreStash.DIR).exists())
+    }
+
+    // the learning goes as a backup of it, not as the files it is made of, nor the phone's own backups
+    @Test
+    fun anExportCarriesTheLearningAsABackup() {
+        val phone = install("phone")
+        File(phone.engine, Backups.DIR).mkdirs()
+        File(phone.engine, LearnLog.FILE).writeText("record")
+        File(phone.engine, Engines.USER_PINYIN).writeText("old log")
+        File(phone.engine, WordLists.ADDED).writeText("words")
+        File(phone.engine, "${Backups.DIR}/auto-1.fxlb").writeText("backup")
+        val names = ByteArrayOutputStream().also { UserDataManager.export(it, 0L, phone, "learning".toByteArray()).getOrThrow() }.let { bytes ->
+            ZipInputStream(bytes.toByteArray().inputStream()).use { zip -> generateSequence { zip.nextEntry }.map { it.name }.toList() }
+        }
+        assertTrue(RestoreStash.BACKUP in names)
+        assertTrue("engine/${WordLists.ADDED}" in names)
+        for (gone in listOf("engine/${LearnLog.FILE}", "engine/${Engines.USER_PINYIN}", "engine/${Backups.DIR}/auto-1.fxlb")) assertFalse(gone, gone in names)
     }
 }

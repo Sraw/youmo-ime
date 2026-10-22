@@ -1,0 +1,23 @@
+# U-24 双拼：自然码 dl 读作 dai，原首选是单字「带」：在这里选「点了」，只在连着选过两次的前文第 1，
+# 别处排在没用过的词前面（C31）。换双拼方案后排序要重新学【D32】。
+# 点了 cannot be typed as dl in 自然码 (dl is dai alone, 点了 is dmle): 呆, fourth under dl, stands in.
+
+scenario 自然码 dl
+ctx 他
+type dl kb=sp:ziranma
+expect first 带
+pick 呆
+ctx 他
+type dl kb=sp:ziranma
+pick 呆
+ctx 他
+type dl kb=sp:ziranma
+expect first 呆
+ctx 你
+type dl kb=sp:ziranma
+expect first 带
+expect before 呆 戴
+# 全拼的 dl 不跟着变
+ctx 你
+type dl
+expect first 带来

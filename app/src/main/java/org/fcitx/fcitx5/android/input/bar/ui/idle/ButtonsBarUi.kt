@@ -29,15 +29,19 @@ class ButtonsBarUi(override val ctx: Context, private val theme: Theme) : Ui {
     }
 
     // spread out where the bar has room; where it has not (a narrow screen, side padding, the
-    // emoji and voice beside it), scrolled rather than squeezed below a button's 40dp
+    // emoji and voice beside it, the floating keyboard), squeezed to MIN_SIZE, then scrolled
     override val root = view(::HorizontalScrollView) {
         isFillViewport = true
+        isHorizontalScrollBarEnabled = false
         add(buttons, lParams(wrapContent, matchParent))
     }
 
+    // narrower where the bar is (the floating keyboard's), down to MIN_SIZE, then scrolled; the icon
+    // its size all the same: in the button's padding it shrank with it, tiny on the floating bar
     private fun toolButton(@DrawableRes icon: Int) = ToolButton(ctx, icon, theme).also {
-        val size = ctx.dp(40)
-        buttons.addView(it, FlexboxLayout.LayoutParams(size, size))
+        val size = ctx.dp(SIZE)
+        it.fixIconSize(ctx.dp(ICON))
+        buttons.addView(it, FlexboxLayout.LayoutParams(size, size).apply { minWidth = ctx.dp(MIN_SIZE) })
     }
 
     val undoButton = toolButton(R.drawable.ic_baseline_undo_24).apply {
@@ -60,4 +64,9 @@ class ButtonsBarUi(override val ctx: Context, private val theme: Theme) : Ui {
         contentDescription = ctx.getString(R.string.status_area)
     }
 
+    private companion object {
+        const val SIZE = 40
+        const val MIN_SIZE = 28
+        const val ICON = 20
+    }
 }

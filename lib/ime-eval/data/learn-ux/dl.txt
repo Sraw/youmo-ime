@@ -1,0 +1,197 @@
+# U-45 全拼的 dl（用户的例子）：以前在 20 个前文后面按空格出「带来」。现在改用「点了」。
+# The data puts 带来 first for dl after 你 他 会 能 给 可以 还 它 将 将会 必然 可能 一定 总是 and with no 前文:
+# those stand in for the spec's 20 前文 (some twice). 他 is the spec's 「一个前文」, 你 a 「没改过的前文」, 给 the one of 打了.
+
+scenario dl, editor context
+# 前文 = 输入框原有的字 (Action.Context): U-50 「和刚打的前文一样当语境」; bug C: a pick here learned no pair
+ctx 他
+type dl
+expect first 带来
+pick 带来
+ctx 你
+type dl
+pick 带来
+ctx 会
+type dl
+pick 带来
+ctx 能
+type dl
+pick 带来
+ctx 给
+type dl
+pick 带来
+ctx 可以
+type dl
+pick 带来
+ctx 还
+type dl
+pick 带来
+ctx 它
+type dl
+pick 带来
+ctx 将
+type dl
+pick 带来
+ctx 将会
+type dl
+pick 带来
+ctx 必然
+type dl
+pick 带来
+ctx 可能
+type dl
+pick 带来
+ctx 一定
+type dl
+pick 带来
+ctx 总是
+type dl
+pick 带来
+clear
+type dl
+pick 带来
+ctx 他
+type dl
+pick 带来
+ctx 你
+type dl
+pick 带来
+ctx 会
+type dl
+pick 带来
+ctx 能
+type dl
+pick 带来
+ctx 可以
+type dl
+pick 带来
+# 在一个前文后面连着选两次「点了」：那里是「点了、带来…」（带来用得多，第 2）
+ctx 他
+type dl
+pick 点了
+# 选一次：不是首选，排到没用过的词前面 (U-10)
+ctx 他
+type dl
+expect first 带来
+expect top2 带来,点了
+pick 点了
+ctx 他
+type dl
+expect top2 点了,带来
+# 别的没改过的前文：起初是「带来、点了…」（点了是 dl 下用过的词，排在没用过的前面）
+ctx 你
+type dl
+expect top2 带来,点了
+# 「点了」最近用得比「带来」多以后（每天改打「点了」、不再打「带来」时），都变成「点了、带来…」
+# (no typing days yet: the same uses within one day; 点了 at 22 > 带来 at 20)
+repeat 2 {
+ctx 会
+type dl
+pick 点了
+ctx 能
+type dl
+pick 点了
+ctx 可以
+type dl
+pick 点了
+ctx 还
+type dl
+pick 点了
+ctx 它
+type dl
+pick 点了
+ctx 将
+type dl
+pick 点了
+ctx 将会
+type dl
+pick 点了
+ctx 可能
+type dl
+pick 点了
+ctx 一定
+type dl
+pick 点了
+ctx 总是
+type dl
+pick 点了
+}
+ctx 必然
+type dl
+expect top2 点了,带来
+# 后来又在某个前文连着两次选「打了」：那里「打了」第 1，后面按最近用的次数，一般是「点了、带来」
+ctx 给
+type dl
+pick 打了
+ctx 给
+type dl
+pick 打了
+ctx 给
+type dl
+expect top3 打了,点了,带来
+# 别处仍是「点了」（打了改选两次，但用得比点了少）
+ctx 你
+type dl
+expect first 点了
+
+scenario dl, commit context
+# the same, the 前文 typed and committed by the input method in the same flow (a pair learned today too)
+clear
+type ta
+pick 他
+type dl
+expect first 带来
+pick 带来
+clear
+type ni
+pick 你
+type dl
+pick 带来
+clear
+type ta
+pick 他
+type dl
+pick 点了
+clear
+type ta
+pick 他
+type dl
+expect first 带来
+pick 点了
+clear
+type ta
+pick 他
+type dl
+expect top2 点了,带来
+clear
+type ni
+pick 你
+type dl
+expect top2 带来,点了
+
+scenario dl twice, d unchanged
+# PLAN §2.1: dl 下选第 2 条整句「点｜了」：显示的第 1「带来」在中间没有边界，所以只在 dl 下记，不会漏进 d、l
+clear
+type d
+expect first 的
+clear
+type l
+show
+clear
+type dl
+pick 点了
+clear
+type dl
+pick 点了
+clear
+type dl
+expect first 点了
+clear
+type d
+expect first 的
+clear
+type l
+show
+clear
+type dianle
+expect first 点了

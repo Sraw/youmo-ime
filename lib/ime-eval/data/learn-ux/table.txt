@@ -1,0 +1,25 @@
+# U-28 形码：调频关：码表原有的词位置不变；调频开：选一次排到没用过的词前面，连着选两次排第 1；
+# 只数形码里的选择，不进拼音。码表以外的词不进原本唯一、满码自动上屏的编码。
+# Tables are not driven by this runner yet (step 2): every expectation is pending.
+
+scenario 五笔 调频关
+pending step 2: tables (U-28)
+type fghy kb=wubi
+expect top3 雨,寸,圷
+pick 寸
+type fghy kb=wubi
+expect top3 雨,寸,圷
+
+scenario 五笔 调频开
+pending step 2: tables (U-28)
+todo the table's 调频 on
+type fghy kb=wubi
+pick 寸
+type fghy kb=wubi
+expect first 雨
+pick 寸
+type fghy kb=wubi
+expect first 寸
+# 形码里的选择不改拼音的顺序【D28】
+type cun
+expect first 存

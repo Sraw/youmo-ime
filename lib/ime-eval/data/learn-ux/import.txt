@@ -1,0 +1,34 @@
+# U-101 别的输入法的词库：都当导入的词，排在词库自带的同码词后面；我在本机用过才往前，上屏两次是我的词，
+# 在那以前整句和语音都不用它。U-102 能整批撤掉，我的词留下。
+
+scenario an imported word
+import 汪小明 wang'xiao'ming
+clear
+type wangxiaoming
+expect first 王小明
+expect before 王小明 汪小明
+# never in a sentence before it is the user's (C19)
+clear
+type wangxiaomingchifan
+expect notfirst 汪小明吃饭
+clear
+type wangxiaoming
+pick 汪小明
+clear
+type wangxiaoming
+pick 汪小明
+clear
+type wangxiaoming
+expect first 汪小明
+# the batch undone: the user's word stays
+unimport
+clear
+type wangxiaoming
+expect first 汪小明
+
+scenario an import undone before it is used
+import 汪小明 wang'xiao'ming
+unimport
+clear
+type wangxiaoming
+expect before 王小明 汪小明

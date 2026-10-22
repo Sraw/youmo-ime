@@ -60,7 +60,8 @@ class RecordStoreTest {
         compactAt: Long = RecordStore.DEFAULT_COMPACT_AT,
         background: Executor? = null,
         openAppend: (File) -> OutputStream = { FileOutputStream(it, true) },
-    ) = RecordStore(file, format, compactAt, { errors += it }, openAppend, background).apply {
+        fold: RecordStore.Fold? = null,
+    ) = RecordStore(file, format, compactAt, { errors += it }, openAppend, background, fold).apply {
         open(replay = { type, input -> replay(type, input, kept) }, counts = { write -> kept.forEach { (word, n) -> write(count(word, n)) } })
     }
 
@@ -102,6 +103,19 @@ class RecordStoreTest {
         assertEquals(1, errors.size)
         assertArrayEquals(format.header() + added("a"), file.readBytes())
         assertEquals(mapOf("a" to 1), read())
+    }
+
+    // an import's words in one write: the same bytes as one at a time, one that does not fit left out
+    @Test
+    fun recordsAppendedAllAtOnceAreTheLogOneAtATimeWouldBe() {
+        val errors = ArrayList<IOException>()
+        val kept = HashMap<String, Int>()
+        store(kept, errors).use { s ->
+            s.appendAll(listOf(added("a"), format.record(0) { writeUTF("x") }, added("b")))
+        }
+        assertEquals(1, errors.size)
+        assertArrayEquals(format.header() + added("a") + added("b"), file.readBytes())
+        assertEquals(mapOf("a" to 1, "b" to 1), read())
     }
 
     @Test
@@ -221,6 +235,59 @@ class RecordStoreTest {
         }
         assertEquals(8L + 5 * added("a").size, file.length())
         assertEquals(mapOf("a" to 5), read())
+    }
+
+    // a seed that seeded nothing (its source did not read) leaves a header alone, seeded again at the next open
+    @Test
+    fun aSeedThatSeededNothingIsTriedAgainAtTheNextOpen() {
+        val kept = LinkedHashMap<String, Int>()
+        val counts: ((ByteArray) -> Unit) -> Unit = { write -> kept.forEach { (word, n) -> write(count(word, n)) } }
+        var seeds = 0
+        RecordStore(file, format, RecordStore.DEFAULT_COMPACT_AT, {}).use {
+            it.open(replay = { type, input -> replay(type, input, kept) }, counts = counts, seed = { seeds++; false })
+        }
+        assertArrayEquals(format.header(), file.readBytes())
+        RecordStore(file, format, RecordStore.DEFAULT_COMPACT_AT, {}).use {
+            it.open(replay = { type, input -> replay(type, input, kept) }, counts = counts, seed = { seeds++; kept["a"] = 3; true })
+        }
+        assertEquals(2, seeds)
+        assertArrayEquals(format.header() + count("a", 3), file.readBytes())
+    }
+
+    @Test
+    fun aFoldWithNothingToFoldLeavesTheLogAsItWasAndIsNotDueAgainAtTheNextAppend() {
+        val later = Later()
+        val errors = ArrayList<IOException>()
+        val kept = LinkedHashMap<String, Int>()
+        store(kept, errors, compactAt = 40, background = later, fold = { _, _ -> false }).use { s ->
+            repeat(3) { s.learn(kept, "a") }
+            assertEquals(1, later.tasks.size)
+            later.run()
+            s.learn(kept, "a")
+            assertArrayEquals(format.header() + added("a") + added("a") + added("a") + added("a"), file.readBytes())
+            assertFalse(File(file.path + ".compacting").exists())
+            // compacted marked at the end: the next appends do not read the whole log again
+            s.learn(kept, "a")
+            assertEquals(1, later.tasks.size)
+        }
+        assertEquals(0, errors.size)
+        assertEquals(mapOf("a" to 5), read())
+    }
+
+    @Test
+    fun aRewriteToAHeaderAloneIsDeclinedAndSaidSo() {
+        val errors = ArrayList<IOException>()
+        val kept = LinkedHashMap<String, Int>()
+        store(kept, errors).use { s ->
+            s.learn(kept, "a")
+            val before = file.readBytes()
+            assertEquals(null, s.rewrite { _, out -> out.write(format.header()); true })
+            assertEquals(1, errors.size)
+            assertArrayEquals(before, file.readBytes())
+            // still open: what is learned next is appended
+            s.learn(kept, "b")
+        }
+        assertEquals(mapOf("a" to 1, "b" to 1), read())
     }
 
     @Test

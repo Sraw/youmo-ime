@@ -52,6 +52,15 @@ class ToolButton(context: Context) : CustomGestureView(context) {
 
     fun iconAnimate(): ViewPropertyAnimator = image.animate()
 
+    /** The icon [px] square whatever the button's size: a button made narrower keeps it as it was. */
+    fun fixIconSize(px: Int) {
+        image.padding = 0
+        image.layoutParams = image.layoutParams.apply {
+            width = px
+            height = px
+        }
+    }
+
     fun setIcon(@DrawableRes icon: Int) {
         image.imageResource = icon
     }

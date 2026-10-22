@@ -88,17 +88,11 @@ class InputMethodSettingsTest {
     }
 
     @Test
-    fun aPhraseLengthBelowZeroIsTheLongestAndAnyOtherTheNearest() {
-        val length = item("engine-wubi", "AutoPhraseLength") as Choice
-        assertEquals("-1", length.nearest("-1"))
-        assertEquals("6", length.nearest("8"))
-        assertEquals("0", length.nearest("0"))
-        // 1, as libime's settings may have it, makes no phrase here: off, not up to 2
-        assertEquals("0", length.nearest("1"))
-        assertEquals("2", length.nearest("2"))
-        val after = item("engine-wubi", "SaveAutoPhraseAfter") as Choice
-        assertEquals("0", after.nearest("-1"))
-        assertEquals("3", after.nearest("3"))
+    fun aTableHasNoAutoPhraseSettings() {
+        // 自动造词 is gone (U-28 C46): an older config's two keys are left, read by nothing
+        for (im in Engines.TABLES.keys) {
+            assertEquals(im, emptyList<String>(), keys(im).filter { it == "AutoPhraseLength" || it == "SaveAutoPhraseAfter" })
+        }
     }
 
     /** Every row's key on the shared page, as [keys] for an input method's. */
@@ -137,7 +131,7 @@ class InputMethodSettingsTest {
             Engines.T9 to listOf(AppPrefs.T9_MULTI_TAP, AppPrefs.T9_ENGLISH_TYPING, InputMethodSettings.T9_LETTERS, InputMethodSettings.T9_SYMBOLS),
             Engines.HANDWRITING to listOf(AppPrefs.HANDWRITING_PAUSE),
             Engines.ENGLISH to listOf(EngineSettings.ENGLISH_SUGGEST, AppPrefs.ENGLISH_AUTO_CAPS, InputMethodSettings.ENGLISH_WORDS),
-        ) + Engines.TABLES.keys.associateWith { TableSettings.KEYS.toList() }
+        ) + Engines.TABLES.keys.associateWith { TableSettings.KEYS.toList() + InputMethodSettings.RESET_TABLE_ORDER }
         assertEquals(appInputMethods.toSet(), own.keys)
         appInputMethods.forEach { page ->
             val keys = keys(page)
@@ -190,6 +184,6 @@ class InputMethodSettingsTest {
         val fuzzy = InputMethodSettings.SHARED.flat().filterIsInstance<Flags>().single()
         assertEquals(EngineSettings.FUZZY, fuzzy.path)
         assertEquals(Fuzzy.entries.map { it.name }.sorted(), fuzzy.flags.map { it.first }.sorted())
-        assertEquals(TableSettings.KEYS.sorted(), keys("engine-wubi").filter { it != InputMethodSettings.SHARED_LINK }.sorted())
+        assertEquals(TableSettings.KEYS.sorted(), keys("engine-wubi").filter { it != InputMethodSettings.SHARED_LINK && it != InputMethodSettings.RESET_TABLE_ORDER }.sorted())
     }
 }

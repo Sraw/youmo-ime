@@ -131,6 +131,95 @@ class EngineMigrationTest {
     }
 
     @Test
+    fun aTableTypedWithBeforeKeepsOrderingByUseOnce() {
+        val config = folder.newFolder("config")
+        val engine = folder.newFolder("engine")
+        // 五笔 typed with, its 调频 never set; 自然码 set off by the user; 仓颉 never typed
+        engine.put("wubi.user", "x")
+        engine.put("ziranma.user", "x")
+        config.put("conf/androidengine.conf", "PageSize=5\n\n[Ziranma]\nOrderPolicy=No\n")
+        // locked: nothing to read, looked at again at the next start
+        EngineMigration.run(config, null)
+        assertFalse(config.resolve("conf/androidengine.conf").readText().contains("Freq"))
+        EngineMigration.run(config, engine)
+        val once = "PageSize=5\n\n[Ziranma]\nOrderPolicy=No\n\n[Wubi]\nOrderPolicy=Freq\n"
+        assertEquals(once, config.resolve("conf/androidengine.conf").readText())
+        assertTrue(engine.resolve(EngineMigration.ORDER_KEPT).exists())
+        // once: set off since, it stays off; a table typed with first since is a new install's
+        config.put("conf/androidengine.conf", "[Wubi]\nOrderPolicy=No\n")
+        engine.put("cangjie.user", "x")
+        EngineMigration.run(config, engine)
+        assertEquals("[Wubi]\nOrderPolicy=No\n", config.resolve("conf/androidengine.conf").readText())
+    }
+
+    @Test
+    fun aLockedStartLeavesTheOrderingToTheFirstUnlockedOne() {
+        val config = folder.newFolder("config")
+        val engine = folder.newFolder("engine")
+        engine.put("wubi.user", "x")
+        config.put("conf/androidengine.conf", "[Ziranma]\nOrderPolicy=No\n")
+        EngineMigration.run(config, null)
+        assertEquals("[Ziranma]\nOrderPolicy=No\n", config.resolve("conf/androidengine.conf").readText())
+        // a setting changed while still locked: fcitx saves every value, its new default for 五笔 too
+        val saved = "[Ziranma]\nOrderPolicy=No\n\n[Wubi]\nOrderPolicy=No\n"
+        config.put("conf/androidengine.conf", saved)
+        // a second locked start keeps what the first saw
+        EngineMigration.run(config, null)
+        EngineMigration.run(config, engine)
+        assertEquals("[Ziranma]\nOrderPolicy=No\n\n[Wubi]\nOrderPolicy=Freq\n", config.resolve("conf/androidengine.conf").readText())
+        assertFalse(config.resolve(EngineMigration.ORDER_UNSET).exists())
+        // decided: a locked start after it changes nothing the user sets since
+        config.put("conf/androidengine.conf", "[Ziranma]\nOrderPolicy=No\n")
+        EngineMigration.run(config, null)
+        config.put("conf/androidengine.conf", saved)
+        EngineMigration.run(config, engine)
+        assertEquals(saved, config.resolve("conf/androidengine.conf").readText())
+    }
+
+    // review C M1: no engine directory at a new install's first start, a table typed with before the second
+    @Test
+    fun aNewInstallStaysOffPastItsFirstTableUse() {
+        val config = folder.newFolder("config")
+        val engine = File(folder.root, "engine")
+        EngineMigration.run(config, engine)
+        assertTrue(engine.resolve(EngineMigration.ORDER_KEPT).exists())
+        engine.put("wubi.user", "x")
+        EngineMigration.run(config, engine)
+        assertFalse(config.resolve("conf/androidengine.conf").exists())
+    }
+
+    // an import killed between its renames: the engine's files in engine.old, put back before deciding
+    @Test
+    fun anOlderBuildsTablesLeftAsideStillKeepOrderingByUse() {
+        val config = folder.newFolder("config")
+        val aside = folder.newFolder("engine.old")
+        aside.put("wubi.user", "x")
+        val engine = File(folder.root, "engine")
+        EngineMigration.run(config, engine)
+        assertEquals("[Wubi]\nOrderPolicy=Freq\n", config.resolve("conf/androidengine.conf").readText())
+        assertTrue(engine.resolve("wubi.user").exists())
+    }
+
+    @Test
+    fun aNewInstallStartedLockedOrdersNoTableByUse() {
+        val config = folder.newFolder("config")
+        val engine = folder.newFolder("engine")
+        EngineMigration.run(config, null)
+        config.put("conf/androidengine.conf", "[Wubi]\nOrderPolicy=No\n")
+        EngineMigration.run(config, engine)
+        assertEquals("[Wubi]\nOrderPolicy=No\n", config.resolve("conf/androidengine.conf").readText())
+    }
+
+    @Test
+    fun aNewInstallOrdersNoTableByUse() {
+        val config = folder.newFolder("config")
+        val engine = folder.newFolder("engine")
+        EngineMigration.run(config, engine)
+        assertFalse(config.resolve("conf/androidengine.conf").exists())
+        assertTrue(engine.resolve(EngineMigration.ORDER_KEPT).exists())
+    }
+
+    @Test
     fun thePunctuationDefaultIsSetWhereLibimesConfigCannotBeMigrated() {
         val config = folder.newFolder("config")
         config.put("profile", "[Groups/0]\nName=Default\nDefaultIM=pinyin\n\n[Groups/0/Items/0]\nName=pinyin\n")

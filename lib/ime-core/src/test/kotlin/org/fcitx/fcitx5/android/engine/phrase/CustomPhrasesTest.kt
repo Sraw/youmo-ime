@@ -101,15 +101,21 @@ class CustomPhrasesTest {
         assertEquals("a\$", CustomPhrases.evaluate("a\$", morning))
     }
 
-    // a candidate ending in … reads only part of the input
+    // a candidate ending in … reads only part of the input; one made for a phrase, of its text, shown +
     private fun CustomPhrases.place(key: String, candidates: List<String>) =
-        place(key, { now }, candidates, { it.removeSuffix("…") }, { !it.endsWith("…") }, { "+$it" })
+        place(key, { now }, candidates, { it.removeSuffix("…").removePrefix("+") }, { !it.endsWith("…") }, { "+$it" })
 
     @Test
-    fun phrasesGoWhereTheirOrderSaysAndACandidateOfTheSameTextMovesThere() {
+    fun phrasesGoWhereTheirOrderSaysEachACandidateOfItsOwn() {
         val phrases = CustomPhrases.parse("ab,1=甲\nab,3=乙\nab,9=丙\nab,2=丁\nab,1=戊\nab,2=己")
-        // of one order, in the file's order; one of the phrase's text that reads less is left out
-        assertEquals(listOf("+甲", "+戊", "+丁", "+己", "乙", "x", "y", "+丙"), phrases.place("ab", listOf("x", "乙", "y", "甲…")))
+        // of one order, in the file's order; a candidate of a phrase's text that reads all stays
+        // where it is (PLAN §2.7), one that reads less is left out
+        assertEquals(listOf("+甲", "+戊", "+丁", "+己", "+乙", "x", "y", "+丙"), phrases.place("ab", listOf("x", "乙", "y", "甲…")))
+        // the candidate ranked before its phrase: the text listed once, there
+        assertEquals(listOf("乙", "x"), CustomPhrases.parse("ab,3=乙").place("ab", listOf("乙", "x")))
+        // and the phrases after it keep their places (F3000)
+        assertEquals(listOf("x", "a", "+y"), CustomPhrases.parse("ab,2=x\nab,3=y").place("ab", listOf("x", "a")))
+        assertEquals(listOf("a", "+x", "b", "+y"), CustomPhrases.parse("ab,2=x\nab,4=y").place("ab", listOf("a", "x", "b")))
         assertEquals(listOf("x"), phrases.place("abc", listOf("x")))
         // the time is asked only for a key with phrases
         assertEquals(listOf("x"), phrases.place("abc", { error("asked") }, listOf("x"), { it }, { true }, { it }))

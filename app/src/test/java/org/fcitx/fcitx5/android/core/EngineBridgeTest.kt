@@ -13,6 +13,9 @@ import org.fcitx.fcitx5.android.data.replaceDirectory
 import org.fcitx.fcitx5.android.engine.data.DataFormatException
 import org.fcitx.fcitx5.android.engine.host.EngineEvent
 import org.fcitx.fcitx5.android.engine.host.Engines
+import org.fcitx.fcitx5.android.engine.learn.control.BackupOp
+import org.fcitx.fcitx5.android.engine.learn.control.LearningOp
+import org.fcitx.fcitx5.android.engine.learn.control.LearningResult
 import org.fcitx.fcitx5.android.engine.phrase.CustomPhrases
 import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
 import org.fcitx.fcitx5.android.engine.pinyin.ShuangpinScheme
@@ -470,5 +473,33 @@ class EngineBridgeTest {
                 aside.deleteRecursively()
             }
         }
+    }
+
+    @Test
+    fun whatAnActOnLearningShowsAnew() {
+        val pinyin = "engine-pinyin"
+        val done = LearningResult.Done()
+        // what changed what the list shows: shown anew, on a page too
+        for (op in listOf(LearningOp.Undo(1), LearningOp.UseHabits(false), LearningOp.ClearLearned(true),
+            LearningOp.NoPredict(0, "你"), LearningOp.OnPage(LearningOp.NoPredict(0, "你")), LearningOp.RemoveWords(emptyList()),
+            // a restore or 退回恢复前 changes what was learned (F2962)
+            BackupOp.Restore(ByteArray(0)), BackupOp.RestoreKept("a"), BackupOp.Revert)) {
+            assertTrue(op.toString(), EngineBridge.shownAnew(op, pinyin, done))
+        }
+        // what only reads, or the addon shows itself
+        for (op in listOf(LearningOp.Overview, LearningOp.Menu(0, "你"), LearningOp.Delete(0, "你"), LearningOp.ResetTableOrder("wbx"),
+            BackupOp.Kept, BackupOp.Copy, BackupOp.Peek(ByteArray(0)), BackupOp.Delete("a"), BackupOp.SetAuto(true))) {
+            assertFalse(op.toString(), EngineBridge.shownAnew(op, pinyin, done))
+        }
+        // nothing done, or an input method not the engine's: nothing shown anew
+        assertFalse(EngineBridge.shownAnew(LearningOp.Undo(1), pinyin, LearningResult.Unavailable))
+        assertFalse(EngineBridge.shownAnew(LearningOp.Undo(1), "rime", done))
+        assertTrue(EngineBridge.shownAnew(LearningOp.Undo(1), Engines.ENGLISH, done))
+    }
+
+    @Test
+    fun recentsAreClearedFromTheMinuteLearningWas() {
+        assertEquals(0L, EngineBridge.recentsSince(LearningResult.ALL))
+        assertEquals(30_000_000L * 60_000L, EngineBridge.recentsSince(30_000_000))
     }
 }

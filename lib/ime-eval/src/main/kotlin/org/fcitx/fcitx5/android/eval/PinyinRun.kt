@@ -22,6 +22,7 @@ import org.fcitx.fcitx5.android.engine.rerank.SentencePicker
 import org.fcitx.fcitx5.android.engine.rerank.SentenceRefiner
 import org.fcitx.fcitx5.android.engine.session.CoarseCandidates
 import org.fcitx.fcitx5.android.engine.session.PinyinSession
+import org.fcitx.fcitx5.android.engine.session.endsOnSyllable
 import org.fcitx.fcitx5.android.engine.user.UserModel
 import org.fcitx.fcitx5.android.engine.user.UserScorer
 import org.fcitx.fcitx5.android.engine.user.WordPack
@@ -143,7 +144,7 @@ class PinyinRun(
             scores = sentences.map { it.score }
             words = decoding.words
             picked = picker?.pick(before, readings, scores) ?: 0
-            refines = refine != null && readings.size > 1 && PinyinSession.endsOnSyllable(graph)
+            refines = refine != null && readings.size > 1 && endsOnSyllable(graph)
             return shown(picked)
         }
 

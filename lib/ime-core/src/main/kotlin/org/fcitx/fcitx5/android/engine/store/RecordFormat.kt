@@ -69,6 +69,24 @@ class RecordFormat(magic: String, val version: Int) {
         return at
     }
 
+    /**
+     * Hands [visit] where each record of [bytes] (which start with the header) is, from its length
+     * to its CRC, as [read] would read them: for a log rewritten in part, the rest copied as it is.
+     *
+     * @return the length of the records read whole
+     */
+    fun spans(bytes: ByteArray, visit: (start: Int, end: Int) -> Unit): Int {
+        require(hasHeader(bytes)) { "not a log of ${String(magic, Charsets.US_ASCII)} $version" }
+        var at = HEADER_SIZE
+        var length = wholeRecord(bytes, at)
+        while (length > 0) {
+            visit(at, at + 4 + length + 4)
+            at += 4 + length + 4
+            length = wholeRecord(bytes, at)
+        }
+        return at
+    }
+
     /** The length of the fields of the record at [at], or -1 if it is cut short or garbled. */
     private fun wholeRecord(bytes: ByteArray, at: Int): Int {
         if (bytes.size - at < 4) return -1

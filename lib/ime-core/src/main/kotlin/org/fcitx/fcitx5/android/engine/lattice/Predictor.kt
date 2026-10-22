@@ -24,10 +24,12 @@ import kotlin.math.pow
  * After a word the model has not seen (one the user put together, say) what may follow is what
  * follows its end: see [tail], which needs the [dictionary] to find it.
  *
- * What the [user] typed after the last word counts too, as the decoder counts it (see
- * [org.fcitx.fcitx5.android.engine.user.UserScorer]) but at [userWeight], higher: a word they
- * typed after this one a few times comes first, 中文 after 用 once they typed 用中文 again and
- * again. Their own words too, which the model has none of.
+ * What the [user] put in right after the last word counts too, by any input method, once they
+ * did [PAIRS] times (U-71): at [userWeight] times its share of what followed that word, so a word
+ * put in after it again and again comes first, 中文 after 用 once they typed 用中文 often. Their
+ * own words too, which the model has none of. A word they turned off after it (U-72) is never
+ * offered there. The order given is the original one the session ranks by their picks
+ * ([org.fcitx.fcitx5.android.engine.session.PredictionOrder]).
  */
 class Predictor(
     private val model: NgramModel,
@@ -46,12 +48,17 @@ class Predictor(
      * @param prev the last word committed; nothing is predicted without one
      * @param tail the model's word to go on from where it has nothing after [prev2] and [prev]:
      *   one of [prev]'s end ([tail]), or [NO_WORD]
+     * @param learnedAfter the word what the user put in after is counted after (U-71): [prev], or the
+     *   word of the model's the text ends with where the decoder read it in pieces (好的 as 好 的)
      * @return words with an [end][Candidate.end] of 0, as they read no input
      */
-    fun predict(prev2: Int, prev: Int, limit: Int = DEFAULT_LIMIT, tail: () -> Int = { NO_WORD }): List<Candidate> {
+    fun predict(prev2: Int, prev: Int, limit: Int = DEFAULT_LIMIT, learnedAfter: Int = prev, tail: () -> Int = { NO_WORD }): List<Candidate> {
         if (prev == NO_WORD || limit <= 0) return emptyList()
-        val typed = HashMap<Int, Float>()
-        user?.forEachAfter(prev) { word -> typed[word] = userWeight * user.probability(prev, word) }
+        // what 不再联想 is filed under: the word as put in, not the piece the decoder ended it with (review-uat-fixes S11)
+        // and what the user put in after is counted under the same word (F2996)
+        val key = if (learnedAfter == NO_WORD) prev else learnedAfter
+        after = textOf(key)
+        val typed = learned(key)
         val best = Best(limit)
         // the words as the model has them (UserScorer's rule); typed above keeps the user's prev. A
         // word the model lacks (the user's own, say) would get the followers of <unk>
@@ -68,12 +75,24 @@ class Predictor(
         // typed after prev, and not among the model's words after it: one of the user's the model has
         // the text of (UserScorer's rule) gains the model's probability of it, as the context does
         for ((word, p) in typed) {
-            if (p <= 0f || !offered(word)) continue
+            if (p <= 0f || !offered(word, after)) continue
             val modelWord = user?.modelWord(word) ?: word
             val base = if (context != NO_CONTEXT && modelWord < model.vocabularySize) 10f.pow(model.scoreAfter(context, modelWord)) else 0f
             best.offer(word, minOf(0f, log10(base + p)))
         }
         return best.candidates()
+    }
+
+    // what the user put in right after prev often enough (U-71), at userWeight times its share of all
+    // that followed prev, PRIOR more: one word put in 3 times after prev and nothing else is not certain
+    private fun learned(prev: Int): HashMap<Int, Float> {
+        val typed = HashMap<Int, Float>()
+        val user = user ?: return typed
+        var total = 0f
+        user.forEachPredicted(prev) { _, count -> total += count }
+        // a word only imported is not predicted till the user's (U-101: two commits), however often put in after prev
+        if (total > 0f) user.forEachPredicted(prev) { word, count -> if (count >= PAIRS && !user.startOnly(word)) typed[word] = userWeight * count / (total + PRIOR) }
+        return typed
     }
 
     // the model's words after context, each with what the user typed of it there: whether it has any to offer
@@ -87,7 +106,7 @@ class Predictor(
             val takes = best.takes(score)
             if (any && !takes) return@forEachAfter
             // what the model has after it may be only punctuation, or what the user blocked
-            val offerable = offered(word)
+            val offerable = offered(word, after)
             any = any || offerable
             if (takes && offerable) best.offer(word, score)
         }
@@ -202,11 +221,29 @@ class Predictor(
     // the syllables each character of the dictionary is read as: see charReadingsOf
     private val charReadings: Map<Int, IntArray> by lazy(LazyThreadSafetyMode.NONE, charReadings)
 
-    private fun textOf(word: Int) = if (word < vocabulary.size) vocabulary.word(word) else user?.text(word).orEmpty()
+    /** The text of [word], the model's or the user's. */
+    fun textOf(word: Int) = if (word < vocabulary.size) vocabulary.word(word) else user?.text(word).orEmpty()
 
-    private fun offered(word: Int): Boolean {
+    /**
+     * [word] as a prediction after [prev], though not among the best [predict] gave: one the user
+     * picked there before (U-70); null if it is not offered (blocked, coarse, not words, turned off
+     * after [prev]). Leaves [after] as [predict] set it: resetting it here filed 不再联想 under the
+     * decoder's piece rather than the word as put in (F2657).
+     */
+    fun candidate(prev: Int, word: Int): Candidate? {
+        if (prev == NO_WORD) return null
+        if (!offered(word, textOf(prev))) return null
+        return Candidate(textOf(word), 0, Float.NEGATIVE_INFINITY, intArrayOf(word), intArrayOf(0))
+    }
+
+    /** The text of the word [predict] last predicted after: what a prediction is turned off after (U-72). */
+    var after = ""
+        private set
+
+    private fun offered(word: Int, prevText: String): Boolean {
         if (user?.blockedAnyhow(word) == true || coarse.unasked(word, user, vocabulary.size)) return false
         val text = textOf(word)
+        if (user?.notPredicted(prevText, text) == true) return false
         var i = 0
         while (i < text.length) {
             val c = Character.codePointAt(text, i)
@@ -223,12 +260,19 @@ class Predictor(
 
     companion object {
         const val DEFAULT_LIMIT = 20
+
+        /** Put in after a word this often, by any input method, a word is offered after it (U-71). */
+        const val PAIRS = 3
         /**
-         * Under `ime-eval predict-learn` on the chat set, the half typed once then predicted
-         * again: top1 13.0% learning nothing, 19.6 / 30.9 / 34.1 / 36.4% at 0.1 / 0.3 / 0.5 / 1;
-         * the other half, never typed, 13.0% falling to 13.0 / 12.7 / 12.6 / 12.5%.
+         * Under `ime-eval predict-learn` on pinyin.tsv, the half typed three times then predicted
+         * again: top1 19.9% learning nothing, 58.9 / 65.4 / 66.1% at 0.25 / 0.5 / 1; the other half,
+         * never typed, 18.3% learning nothing, 20.4 / 19.9 / 19.4% (top5 40.9 / 39.6 / 39.2%): the
+         * most of the first that keeps the second up (impl/streams/H-report.md).
          */
-        const val USER_WEIGHT = 0.5f
+        const val USER_WEIGHT = 0.25f
+
+        // what follows a word counted as this many more than were put in after it (UserModel's PRIOR)
+        internal const val PRIOR = 2f
         private const val NO_CONTEXT = Long.MIN_VALUE
         // readings of a word tried at most: 7 characters of 3 readings each
         private const val MAX_READINGS = 2187

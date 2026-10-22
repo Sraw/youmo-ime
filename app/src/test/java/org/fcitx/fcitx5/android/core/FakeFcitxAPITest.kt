@@ -41,18 +41,4 @@ class FakeFcitxAPITest {
         fcitx.setEnabledIme(arrayOf("pinyin", "wubi"))
         assertEquals(wubi, fcitx.currentIme())
     }
-
-    @Test
-    fun theUserWordsAreExportedAsTheEngineWritesThem() = runTest {
-        val fcitx = FakeFcitxAPI()
-        val pinyin = PinyinDataBuilder().unigram("<unk>", -7f, 0f).unigram("你", -2f, 0f).entry("你", intArrayOf(Syllables.id("ni"))).build().toByteArray()
-        // the engine itself, in memory: pure Kotlin, where the rest of fcitx needs JNI
-        Engines({ ByteBuffer.wrap(pinyin) }, null).use { engines ->
-            fcitx.addUserWord("幽默", "you mo")
-            engines.addWord("幽默", "you mo")
-            fcitx.blockUserWord("尤莫", "you mo")
-            engines.blockWord("尤莫", "you mo")
-            assertEquals(engines.exportWords(), fcitx.exportUserWords())
-        }
-    }
 }

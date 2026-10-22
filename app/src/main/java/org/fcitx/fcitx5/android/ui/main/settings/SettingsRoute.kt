@@ -142,8 +142,16 @@ sealed class SettingsRoute : Parcelable {
     @Serializable
     data object UserWords : SettingsRoute()
 
+    /** The learning's backups (LearningBackupsFragment). */
+    @Serializable
+    data object LearningBackups : SettingsRoute()
+
     @Serializable
     data class UserWordList(val kind: String, val english: Boolean = false) : SettingsRoute()
+
+    /** The pins or the predictions turned off ([LearnedItemsFragment]), [what] a LearningOp.Listed's name. */
+    @Serializable
+    data class LearnedItems(val what: String) : SettingsRoute()
 
     @Serializable
     data object PopupOverrides : SettingsRoute()
@@ -219,6 +227,10 @@ sealed class SettingsRoute : Parcelable {
                 label = ctx.getString(R.string.my_words)
             }
             fragment<UserWordListFragment, UserWordList>()
+            fragment<LearnedItemsFragment, LearnedItems>()
+            fragment<LearningBackupsFragment, LearningBackups> {
+                label = ctx.getString(R.string.learning_backups)
+            }
             fragment<PunctuationEditorFragment, Punctuation>()
             fragment<PinyinCustomPhraseFragment, PinyinCustomPhrase> {
                 label = ctx.getString(R.string.custom_phrases)

@@ -7,8 +7,11 @@ package org.fcitx.fcitx5.android.engine.glide
 import org.fcitx.fcitx5.android.engine.data.PinyinData
 import org.fcitx.fcitx5.android.engine.data.PinyinDataBuilder
 import org.fcitx.fcitx5.android.engine.lattice.UserWords
+import org.fcitx.fcitx5.android.engine.learn.ImportedWords
+import org.fcitx.fcitx5.android.engine.learn.import
 import org.fcitx.fcitx5.android.engine.pinyin.ShuangpinScheme
 import org.fcitx.fcitx5.android.engine.pinyin.Syllables
+import org.fcitx.fcitx5.android.engine.user.UserModel
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -165,5 +168,24 @@ class PinyinGlideTest {
         assertEquals("我", user.decode(path("wo"), GlideLayout.QWERTY, 3).first().word)
         blocked = true
         assertTrue(user.decode(path("woai"), GlideLayout.QWERTY, 10).none { it.word == "我爱" })
+    }
+
+    // imported words glide (U-101), below the dictionary's of the same reading, never blocked ones, once owned once
+    @Test
+    fun anImportedWordGlidesBelowTheDictionarys() {
+        val model = UserModel(data.dictionary, data.vocabulary)
+        model.attachImports(ImportedWords().import("我爱" to "wo ai", "妮好" to "ni hao"))
+        var version = 0
+        val user = PinyinGlide(data, user = { PinyinGlide.User(version, null, model, null) { w, _ -> model.blocked(w, -1) } })
+        assertEquals(1, user.decode(path("woai"), GlideLayout.QWERTY, 10).count { it.keys == "wo'ai" && it.word == "我爱" })
+        assertEquals("你好", user.decode(path("nihao"), GlideLayout.QWERTY, 10).first { it.keys == "ni'hao" }.word)
+        val woai = UserModel.Entry("我爱", syl("wo", "ai"))
+        model.block(woai)
+        version++
+        assertTrue(user.decode(path("woai"), GlideLayout.QWERTY, 10).none { it.word == "我爱" })
+        model.unblock(woai)
+        model.own(woai)
+        version++
+        assertEquals(1, user.decode(path("woai"), GlideLayout.QWERTY, 10).count { it.word == "我爱" })
     }
 }

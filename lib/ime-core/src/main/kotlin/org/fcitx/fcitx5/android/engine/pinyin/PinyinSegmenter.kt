@@ -38,12 +38,14 @@ import org.fcitx.fcitx5.android.engine.pinyin.SyllableGraph.Kind
  * spelt, and the model weighs it against the pinyin the same letters read as. With hundreds of
  * two-letter words (OK, PC) that is most letters of most input, every position one to read
  * words from: measured, the first candidates stay as they were and a key costs ~0.2 ms more.
+ * [userLatin], the user's (English's learned words, U-31 §3), the same way: the user model has them.
  */
 class PinyinSegmenter(
     fuzzy: Set<Fuzzy> = emptySet(),
     typos: Boolean = true,
     neighbours: Boolean = false,
     private val latin: LatinWords? = null,
+    private val userLatin: UserLatinWords? = null,
 ) : Segmenter {
 
     private val index = SpellingIndex(fuzzy, typos, neighbours)
@@ -51,7 +53,7 @@ class PinyinSegmenter(
     override fun segment(input: String): SyllableGraph {
         // read as slips, 简拼 turns into anything: 我喜欢你 into 网讯
         val slips = input.any { it in VOWELS }
-        val letters = latin?.let { lettersOfWords(input, it) }
+        val letters = if (latin == null && userLatin == null) null else lettersOfWords(input)
         return GraphEdges.build(input) { at, edges ->
             walk(input, at, edges, slips)
             if (letters != null && letters[at]) edges.add(at, 1, Kind.LETTER, LETTERS[input[at] - 'a'])
@@ -59,13 +61,15 @@ class PinyinSegmenter(
     }
 
     // where a Latin word is typed, each of its letters: true
-    private fun lettersOfWords(input: String, latin: LatinWords): BooleanArray? {
+    private fun lettersOfWords(input: String): BooleanArray? {
         var marks: BooleanArray? = null
+        val mark = { at: Int, length: Int ->
+            val m = marks ?: BooleanArray(input.length).also { marks = it }
+            for (i in at until at + length) m[i] = true
+        }
         for (at in input.indices) {
-            latin.forEachAt(input, at) { length ->
-                val m = marks ?: BooleanArray(input.length).also { marks = it }
-                for (i in at until at + length) m[i] = true
-            }
+            latin?.forEachAt(input, at) { mark(at, it) }
+            userLatin?.forEachAt(input, at) { mark(at, it) }
         }
         return marks
     }

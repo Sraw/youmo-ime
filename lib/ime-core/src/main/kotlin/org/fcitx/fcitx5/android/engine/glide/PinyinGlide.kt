@@ -6,6 +6,7 @@ package org.fcitx.fcitx5.android.engine.glide
 
 import org.fcitx.fcitx5.android.engine.data.NgramModel.Companion.NO_WORD
 import org.fcitx.fcitx5.android.engine.data.PinyinData
+import org.fcitx.fcitx5.android.engine.lattice.Penalties
 import org.fcitx.fcitx5.android.engine.lattice.UserWords
 import org.fcitx.fcitx5.android.engine.pinyin.ShuangpinScheme
 import org.fcitx.fcitx5.android.engine.pinyin.Syllables
@@ -25,7 +26,13 @@ class PinyinGlide(
     private val data: PinyinData,
     private val weights: GlidePath.Weights = WEIGHTS,
     private val user: () -> User = { User.NONE },
+    /**
+     * The decoder's: a word only imported goes [Penalties.imported] below the dictionary's here as
+     * there. Every caller (Engines, ime-eval) takes the default; a seam for one tuned to pass its own.
+     */
+    penalties: Penalties = Penalties(),
 ) {
+    private val importedPenalty = penalties.imported
 
     /**
      * The user's part in a glide's words, asked once a glide: [unigram], a word's score with the
@@ -147,6 +154,8 @@ class PinyinGlide(
         private val dictionary = data.dictionary
         private val syllables = IntArray(MAX_LETTERS)
         private val words = scoredFor.words
+        // the words only imported: a glide is a word the input starts with, so these glide too (U-101)
+        private val starts = words?.startWords
         private val learned = scoredFor.learned
 
         // the word [pick] found
@@ -159,46 +168,62 @@ class PinyinGlide(
         private inner class Found(val word: Int, val syllables: IntArray, val score: Float)
 
         fun run(): List<GlideReading> {
-            visit(dictionary.root, words?.root ?: -1, 0, 0)
+            visit(dictionary.root, words?.root ?: -1, starts?.root ?: -1, 0, 0)
             return best.map { reading(it) }
         }
 
-        // the children of [node] and the user's [userNode] (-1 for none of either), [depth] letters
-        // and [count] syllables in: a reading of the dictionary's and the user's is one reading
-        private fun visit(node: Int, userNode: Int, depth: Int, count: Int) {
+        // the children of [node], the user's [userNode] and the imported [startNode] (-1 for none of
+        // each), [depth] letters and [count] syllables in: a reading of all three is one reading
+        private fun visit(node: Int, userNode: Int, startNode: Int, depth: Int, count: Int) {
             if (node >= 0) {
                 val first = dictionary.firstChild(node)
                 for (child in first until first + dictionary.childCount(node)) {
                     val s = dictionary.syllable(child)
-                    reach(child, if (userNode >= 0) checkNotNull(words).child(userNode, s) else -1, s, depth, count)
+                    reach(child, if (userNode >= 0) checkNotNull(words).child(userNode, s) else -1, startChild(startNode, s), s, depth, count)
                 }
             }
-            if (userNode >= 0 && checkNotNull(words).childCount(userNode) > 0) visitUsers(node, userNode, depth, count)
+            if (userNode >= 0 && checkNotNull(words).childCount(userNode) > 0) visitUsers(node, userNode, startNode, depth, count)
+            if (startNode >= 0) visitStarts(node, userNode, startNode, depth, count)
         }
+
+        private fun startChild(startNode: Int, s: Int) = if (startNode >= 0) checkNotNull(starts).child(startNode, s) else -1
 
         // the user's children of [userNode] the dictionary's [node] has not: the user's trie tells a
         // child by its syllable only, and it is small
-        private fun visitUsers(node: Int, userNode: Int, depth: Int, count: Int) {
+        private fun visitUsers(node: Int, userNode: Int, startNode: Int, depth: Int, count: Int) {
             val own = checkNotNull(words)
             for (s in 0 until Syllables.count) {
                 val userChild = own.child(userNode, s)
-                if (userChild >= 0 && (node < 0 || dictionary.child(node, s) < 0)) reach(-1, userChild, s, depth, count)
+                if (userChild >= 0 && (node < 0 || dictionary.child(node, s) < 0)) reach(-1, userChild, startChild(startNode, s), s, depth, count)
             }
         }
 
-        // [node] and [userNode] by [syllable], from [depth] letters and [count] syllables in
-        private fun reach(node: Int, userNode: Int, syllable: Int, depth: Int, count: Int) {
+        // the imported children of [startNode] neither the dictionary's [node] nor the user's [userNode] has
+        private fun visitStarts(node: Int, userNode: Int, startNode: Int, depth: Int, count: Int) {
+            val imported = checkNotNull(starts)
+            val first = imported.firstChild(startNode)
+            for (child in first until first + imported.childCount(startNode)) {
+                val s = imported.syllable(child)
+                val inDictionary = node >= 0 && dictionary.child(node, s) >= 0
+                val inUserTrie = userNode >= 0 && checkNotNull(words).child(userNode, s) >= 0
+                if (!inDictionary && !inUserTrie) reach(-1, -1, child, s, depth, count)
+            }
+        }
+
+        // [node], [userNode] and [startNode] by [syllable], from [depth] letters and [count] syllables in
+        private fun reach(node: Int, userNode: Int, startNode: Int, syllable: Int, depth: Int, count: Int) {
             val d = stepped(spelling.of(syllable), depth) ?: return
             syllables[count] = syllable
             val any = (node >= 0 && dictionary.wordCount(node) > 0) ||
-                (userNode >= 0 && checkNotNull(words).wordCount(userNode) > 0)
-            if (any) glide.cost(d)?.let { keep(count + 1, pick(node, userNode) - it) }
-            if (d < MAX_LETTERS) visit(node, userNode, d, count + 1)
+                (userNode >= 0 && checkNotNull(words).wordCount(userNode) > 0) ||
+                (startNode >= 0 && checkNotNull(starts).wordCount(startNode) > 0)
+            if (any) glide.cost(d)?.let { keep(count + 1, pick(node, userNode, startNode) - it) }
+            if (d < MAX_LETTERS) visit(node, userNode, startNode, d, count + 1)
         }
 
-        // the likeliest word not blocked of [node]'s and [userNode]'s, into [picked]: the dictionary's
+        // the likeliest word not blocked of [node]'s, [userNode]'s and [startNode]'s, into [picked]: the dictionary's
         // as worked out before but for those the user has counts of now, worked out again
-        private fun pick(node: Int, userNode: Int): Float {
+        private fun pick(node: Int, userNode: Int, startNode: Int): Float {
             var best = Float.NEGATIVE_INFINITY
             picked = NO_WORD
             if (node >= 0) {
@@ -212,6 +237,20 @@ class PinyinGlide(
                     val word = own.word(userNode, i)
                     if (scoredFor.blocked(word, -1)) continue
                     val score = score(word)
+                    if (score > best) {
+                        best = score
+                        picked = word
+                    }
+                }
+            }
+            if (startNode >= 0) {
+                val imported = checkNotNull(starts)
+                val own = checkNotNull(words)
+                for (i in 0 until imported.wordCount(startNode)) {
+                    val word = imported.word(startNode, i)
+                    // one the user made theirs is in their trie; below the dictionary's of the same reading (review-G S2)
+                    if (!own.startOnly(word) || scoredFor.blocked(word, -1)) continue
+                    val score = score(word) + importedPenalty
                     if (score > best) {
                         best = score
                         picked = word
@@ -261,6 +300,7 @@ class PinyinGlide(
             found.syllables.joinToString(if (spelling.separated) SEPARATOR.toString() else "") { spelling.of(it).orEmpty() },
             text(found.word),
             found.score,
+            found.syllables.joinToString(" ") { Syllables.spelling(it) },
         )
     }
 

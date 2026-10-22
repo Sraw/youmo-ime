@@ -9,6 +9,9 @@ import org.fcitx.fcitx5.android.engine.handwriting.handwritingData
 import org.fcitx.fcitx5.android.engine.handwriting.learned
 import org.fcitx.fcitx5.android.engine.lattice.Predictor
 import org.fcitx.fcitx5.android.engine.lattice.TextWords
+import org.fcitx.fcitx5.android.engine.learn.Habits
+import org.fcitx.fcitx5.android.engine.learn.Kinds
+import org.fcitx.fcitx5.android.engine.learn.Learner
 import org.fcitx.fcitx5.android.engine.pinyin.Syllables
 import org.fcitx.fcitx5.android.engine.rerank.SentencePicker
 import org.fcitx.fcitx5.android.engine.rerank.SentenceRefiner
@@ -36,6 +39,8 @@ class TableLanguageTest {
         refiner: SentenceRefiner? = null,
         block: ((Entry) -> Unit)? = null,
         forgotten: (String) -> Unit = {},
+        habits: Habits = Habits.OFF,
+        simplify: (String) -> String = { it },
     ): TableLanguage {
         val readings = Predictor(d.model, d.vocabulary, d.dictionary, user)
         return TableLanguage(
@@ -47,6 +52,9 @@ class TableLanguageTest {
             refiner = refiner,
             block = block,
             forgotten = forgotten,
+            habits = habits,
+            kind = Kinds.table("wubi"),
+            simplify = simplify,
         )
     }
 
@@ -80,30 +88,30 @@ class TableLanguageTest {
 
     @Test
     fun `what is put in is learned by the one user model, after the word before it`() {
-        val user = UserModel(d.dictionary, d.vocabulary)
-        val s = session(language(user))
+        val learner = Learner(d)
+        val user = learner.model
+        val s = session(language(user, habits = learner.habits))
         s.type("g")
         // 人 picked after 高, where 山 comes first
         assertEquals("人", s.apply(Action.Select(s.type("abcd").second.candidates.indexOf("人"))).commit)
-        assertEquals(setOf("高(gao)", "人(ren)", "高(gao) 人(ren)"), user.learned())
-        // and ranks by it: 山 picked comes first alone too
-        repeat(3) {
-            s.apply(Action.Reset)
-            s.apply(Action.Select(s.type("abcd").second.candidates.indexOf("山")))
-        }
-        s.apply(Action.Reset)
-        assertEquals("山", s.type("abcd").second.candidates.first())
+        assertEquals(setOf("高", "人", "高 人"), learner.used())
+        // under the code typed, no word before it (U-28), corrected where 山 was first; never for pinyin's order (D28)
+        val picked = learner.log.state.stats.keys.single { it.code.kind == Kinds.table("wubi") && it.code.keys.isNotEmpty() && it.text == "人" }
+        assertEquals("abcd", picked.code.keys)
+        assertEquals(0f, user.count(d.wordIndex.find("人")), 0f)
         // nothing where nothing is learned (a password)
-        val none = UserModel(d.dictionary, d.vocabulary)
-        val password = session(language(none)).apply { learning = false }
+        val noneLearner = Learner(d)
+        val none = noneLearner.model
+        val password = session(language(none, habits = noneLearner.habits)).apply { learning = false }
         password.type("g")
-        assertTrue(none.learned().isEmpty())
+        assertTrue(noneLearner.used().isEmpty())
     }
 
     @Test
     fun `what may follow is offered once something is put in, until the next key`() {
-        val user = UserModel(d.dictionary, d.vocabulary)
-        val s = session(language(user, predicts = true))
+        val learner = Learner(d)
+        val user = learner.model
+        val s = session(language(user, habits = learner.habits, predicts = true))
         val (commit, put) = s.type("g")
         assertEquals("高", commit)
         assertTrue(put.predicting)
@@ -112,7 +120,7 @@ class TableLanguageTest {
         // a pick puts it in, learned after the word before it, and offers on
         val picked = s.apply(Action.Pick(0))
         assertEquals("山", picked.commit)
-        assertTrue("高(gao) 山(shan)" in user.learned())
+        assertTrue("高 山" in learner.used())
         // a code key ends the offer and starts a code
         s.type("g")
         val typed = s.apply(Action.Key('a'))
@@ -134,6 +142,27 @@ class TableLanguageTest {
         // where nothing is learned, nothing offered
         s.learning = false
         assertFalse(s.type("g").second.predicting)
+    }
+
+    // PLAN §2.1, H review N9: a traditional table's words are learned simplified, as 联想 reads them,
+    // so what is put in after one 3 times is offered after it (髙 standing for a traditional 高 here)
+    @Test
+    fun `what a traditional table puts in after a word is offered after it`() {
+        val learner = Learner(d)
+        val s = TableSession(
+            dictionary("g 髙", "abcd 人", "abcd 山"), TableOptions.WUBI,
+            language = language(learner.model, habits = learner.habits, predicts = true, simplify = { it.replace("髙", "高") }),
+        )
+        repeat(Predictor.PAIRS) {
+            assertEquals("髙", s.type("g").first)
+            val code = s.type("abcd").second
+            assertEquals("人", s.apply(Action.Pick(code.candidates.indexOf("人"))).commit)
+            s.apply(Action.Reset)
+        }
+        assertTrue("高 人" in learner.used())
+        val after = s.type("g").second
+        assertTrue(after.predicting)
+        assertTrue("人" in after.candidates)
     }
 
     @Test
@@ -163,14 +192,15 @@ class TableLanguageTest {
 
     @Test
     fun `a key the app takes ends the text before, nothing ranked or learned across it`() {
-        val user = UserModel(d.dictionary, d.vocabulary)
-        val s = session(language(user))
+        val learner = Learner(d)
+        val user = learner.model
+        val s = session(language(user, habits = learner.habits))
         s.type("g")
         // the comma is the app's
         assertFalse(s.apply(Action.Key('，')).handled)
         assertEquals(listOf("人", "山"), s.type("abcd").second.candidates)
         s.apply(Action.Select(1))
-        assertFalse("高(gao) 山(shan)" in user.learned())
+        assertFalse("高 山" in learner.used())
         // a cursor that stays after the word keeps it; one that moves does not
         val stays = session(language())
         stays.type("g")
@@ -183,7 +213,7 @@ class TableLanguageTest {
     }
 
     @Test
-    fun `the user's words of the code come first once picked here, a blocked word is not weighed, a wildcard keeps the order`() {
+    fun `the user's words of the code come after the table's own, which a block in pinyin leaves, a wildcard keeps the order`() {
         val shared = object : SharedWords by SharedWords.NONE {
             override fun words(prefix: String) = if ("abcd".startsWith(prefix)) listOf("abcd" to "人山") else emptyList()
             override fun leadsAnywhere(prefix: String) = "abcd".startsWith(prefix)
@@ -191,11 +221,8 @@ class TableLanguageTest {
         }
         val s = TableSession(dictionary("g 高", "abcd 人", "abcd 山", "abcd 天"), TableOptions.WUBI, language = language(), shared = shared)
         s.apply(Action.Context("高"))
-        // a word of pinyin's, never picked here: after the table's own
-        assertEquals(listOf("山", "人", "人山"), s.type("abcd").second.candidates)
-        assertEquals("人山", s.apply(Action.Select(2)).commit)
-        s.apply(Action.Context("高"))
-        assertEquals(listOf("人山", "山", "人"), s.type("abcd").second.candidates)
+        // a word of pinyin's: after the table's own (U-28); 天, blocked in pinyin, the table's own still (C12)
+        assertEquals(listOf("山", "人", "天", "人山"), s.type("abcd").second.candidates)
         s.apply(Action.Reset)
         // 五笔's z stands for any key: the table's order
         s.apply(Action.Context("高"))
@@ -203,79 +230,85 @@ class TableLanguageTest {
     }
 
     @Test
-    fun `forgetting a table entry forgets it everywhere, as every input method learned it`() {
+    fun `forgetting a table entry forgets it everywhere, as every input method learned it, once learned while ordering by use`() {
         val forgotten = ArrayList<String>()
         val shared = object : SharedWords by SharedWords.NONE {
             override fun forget(text: String) {
                 forgotten += text
             }
         }
-        val s = session(language(), shared)
-        s.type("abcd")
-        s.apply(Action.Forget(1))
+        val learner = Learner(d)
+        val s = session(language(learner.model, habits = learner.habits), shared)
+        val at = s.type("abcd").second.candidates.indexOf("山")
+        // nothing learned of it yet (U-28)
+        assertFalse(Offer.FORGET in s.offers(at))
+        s.apply(Action.Forget(at))
+        assertEquals(emptyList<String>(), forgotten)
+        s.apply(Action.Select(at))
+        val again = s.type("abcd").second.candidates.indexOf("山")
+        assertTrue(Offer.FORGET in s.offers(again))
+        s.apply(Action.Forget(again))
         assertEquals(listOf("山"), forgotten)
+        // 调频 off: the table's order is all there is, nothing of its own to forget
+        val fixed = TableSession(table, TableOptions.WUBI.copy(orderByUse = false), language = language(learner.model, habits = learner.habits))
+        assertTrue(fixed.type("abcd").second.candidates.indices.none { Offer.FORGET in fixed.offers(it) })
     }
 
     @Test
-    fun `a phrase saved but never picked goes where its picks put it, after a pick of the table's`() {
-        val user = TableUser(table)
-        // as one typed character by character is saved
-        user.save("abcd", "人山")
-        val s = TableSession(table, TableOptions.WUBI, user = user, language = language())
-        assertEquals(listOf("人山", "人", "山"), s.type("abcd").second.candidates)
-        assertEquals("人", s.apply(Action.Select(1)).commit)
-        s.apply(Action.Reset)
-        assertEquals(listOf("人", "人山"), s.type("abcd").second.candidates.take(2))
-        // picked once, it is the user's: first
-        assertEquals("人山", s.apply(Action.Select(1)).commit)
-        s.apply(Action.Reset)
-        assertEquals("人山", s.type("abcd").second.candidates.first())
+    fun `a phrase an older build saved comes after the table's own of its code, which the word model places`() {
+        val s = TableSession(table, TableOptions.WUBI, user = table.savedBefore("abcd" to "人山"), language = language())
+        val shown = s.type("abcd").second.candidates
+        assertEquals("人山", shown.last())
+        assertEquals(setOf("人", "山"), shown.dropLast(1).toSet())
     }
 
     @Test
     fun `a phrase saved here is learned as the user made it in pinyin, a table entry the word model lacks is not`() {
-        val model = UserModel(d.dictionary, d.vocabulary)
+        val modelLearner = Learner(d)
+        val model = modelLearner.model
         // the word model lacks it: the user's own, read ren shan
-        model.learn(null, listOf(Entry("人山", intArrayOf(Syllables.id("ren"), Syllables.id("shan")))))
-        val user = TableUser(table)
-        user.save("abcd", "人山")
-        val s = TableSession(table, TableOptions.WUBI, user = user, language = language(model))
+        model.own(Entry("人山", intArrayOf(Syllables.id("ren"), Syllables.id("shan"))))
+        val s = TableSession(table, TableOptions.WUBI, user = table.savedBefore("abcd" to "人山"), language = language(model, habits = modelLearner.habits))
         assertEquals("人山", s.apply(Action.Select(s.type("abcd").second.candidates.indexOf("人山"))).commit)
         assertEquals("高", s.type("g").first)
-        assertTrue("人山(ren shan) 高(gao)" in model.learned())
-        // the table's own entry: not one of the user's words, nothing learned of it
-        val entry = TableSession(dictionary("g 高", "abcd 人山"), TableOptions.WUBI, language = language(model))
+        assertTrue("人山 高" in modelLearner.used())
+        // the table's own entry: learned by its text after the word before it (for 联想), never made a word of the user's
+        val entryLearner = Learner(d)
+        val entry = TableSession(dictionary("g 高", "abcd 人山"), TableOptions.WUBI, language = language(entryLearner.model, habits = entryLearner.habits))
         entry.type("g")
         assertEquals("人山", entry.type("abcd").first)
-        assertFalse("高(gao) 人山(ren shan)" in model.learned())
+        assertTrue("高 人山" in entryLearner.used())
+        assertFalse(entryLearner.habits.isWord("人山"))
     }
 
     @Test
     fun `a word the user made in pinyin, picked here, is learned as they made it, after the word before it`() {
-        val user = UserModel(d.dictionary, d.vocabulary)
+        val learner = Learner(d)
+        val user = learner.model
         // the word model lacks it: the user's own, read ren shan
         val made = Entry("人山", intArrayOf(Syllables.id("ren"), Syllables.id("shan")))
-        user.learn(null, listOf(made))
+        user.own(made)
         val shared = object : SharedWords by SharedWords.NONE {
             override fun words(prefix: String) = if ("abcd".startsWith(prefix)) listOf("abcd" to "人山") else emptyList()
             override fun leadsAnywhere(prefix: String) = "abcd".startsWith(prefix)
         }
-        val s = session(language(user), shared)
+        val s = session(language(user, habits = learner.habits), shared)
         assertEquals("人山", s.apply(Action.Select(s.type("abcd").second.candidates.indexOf("人山"))).commit)
         assertEquals("高", s.type("g").first)
-        assertTrue("人山(ren shan) 高(gao)" in user.learned())
+        assertTrue("人山 高" in learner.used())
     }
 
     @Test
     fun `a pinyin entry of the table's is learned too, after the word before it`() {
-        val user = UserModel(d.dictionary, d.vocabulary)
+        val learner = Learner(d)
+        val user = learner.model
         val wubiPinyin = dictionary("g 高", "@ren 人", "@shan 山", header = mapOf("拼音" to "@"))
-        val s = TableSession(wubiPinyin, TableOptions.WUBI_PINYIN, language = language(user))
+        val s = TableSession(wubiPinyin, TableOptions.WUBI_PINYIN, language = language(user, habits = learner.habits))
         assertEquals(listOf("人"), s.type("ren").second.candidates)
         assertEquals("人", s.apply(Action.Select(0)).commit)
-        assertTrue("人(ren)" in user.learned())
+        assertTrue("人" in learner.used())
         assertEquals("高", s.type("g").first)
-        assertTrue("人(ren) 高(gao)" in user.learned())
+        assertTrue("人 高" in learner.used())
     }
 
     @Test
@@ -290,24 +323,22 @@ class TableLanguageTest {
     }
 
     @Test
-    fun `the 重码 are placed with longer codes after them, sorted by length or by picks`() {
+    fun `the 重码 are placed with longer codes after them, sorted by length or not`() {
         val longer = dictionary("g 高", "abc 人", "abc 山", "abcd 天")
         val sorted = TableSession(longer, TableOptions.WUBI, language = language())
         sorted.apply(Action.Context("高"))
         assertEquals(listOf("山", "人", "天"), sorted.type("abc").second.candidates)
-        // not sorted by length, a longer code picked comes first: the 重码 after it are placed all the same
+        // not sorted by length: the 重码 are placed all the same
         val unsorted = TableSession(longer, TableOptions.WUBI.copy(sortByCodeLength = false), language = language())
         unsorted.apply(Action.Context("高"))
-        assertEquals("天", unsorted.apply(Action.Select(unsorted.type("abc").second.candidates.indexOf("天"))).commit)
-        unsorted.apply(Action.Context("高"))
-        assertEquals(listOf("天", "山", "人"), unsorted.type("abc").second.candidates)
+        assertEquals(listOf("山", "人", "天"), unsorted.type("abc").second.candidates)
     }
 
     @Test
     fun `a key that ends what may follow shows the first page again`() {
         // two may follow 高, one a page: 山 of the model, 人 learned after it
         val user = UserModel(d.dictionary, d.vocabulary)
-        user.learn(Entry("高", syl("gao")), listOf(Entry("人", syl("ren"))))
+        user.setPredicted(user.id(Entry("高", syl("gao"))), user.id(Entry("人", syl("ren"))), Predictor.PAIRS.toFloat())
         val s = TableSession(table, TableOptions.WUBI.copy(pageSize = 1), language = language(user, predicts = true))
         assertTrue(s.type("g").second.predicting)
         assertTrue(s.apply(Action.NextPage).hasPreviousPage)
@@ -319,7 +350,8 @@ class TableLanguageTest {
 
     @Test
     fun `a long press on what may follow forgets what was learned of it or blocks it, as handwriting's`() {
-        val user = UserModel(d.dictionary, d.vocabulary)
+        val learner = Learner(d)
+        val user = learner.model
         // a prediction forgotten goes at its reading and from the tables, not at every reading (shared.forget)
         val forgotten = ArrayList<String>()
         val everywhere = ArrayList<String>()
@@ -329,7 +361,7 @@ class TableLanguageTest {
                 everywhere += text
             }
         }
-        val s = session(language(user, predicts = true, block = { user.block(it) }, forgotten = { forgotten += it }), shared)
+        val s = session(language(user, habits = learner.habits, predicts = true, block = { user.block(it) }, forgotten = { forgotten += it; learner.habits.forget(it) }), shared)
         val offered = s.type("g").second
         assertTrue(offered.actionable)
         assertEquals("山", offered.candidates.first())
@@ -339,7 +371,7 @@ class TableLanguageTest {
         s.type("g")
         assertEquals(setOf(Offer.FORGET, Offer.BLOCK), s.offers(0))
         assertTrue(s.apply(Action.Forget(0)).predicting)
-        assertFalse(user.learned().any { "山" in it })
+        assertFalse(learner.used().any { "山" in it })
         assertEquals(listOf("山"), forgotten)
         assertEquals(emptyList<String>(), everywhere)
         assertFalse("山" in s.apply(Action.Block(0)).candidates)
@@ -360,22 +392,24 @@ class TableLanguageTest {
 
     @Test
     fun `Enter with nothing typed is the app's, what is before goes when it is passed on, as handwriting's`() {
-        val user = UserModel(d.dictionary, d.vocabulary)
-        val s = session(language(user))
+        val learner = Learner(d)
+        val user = learner.model
+        val s = session(language(user, habits = learner.habits))
         s.type("g")
         assertFalse(s.apply(Action.CommitRaw).handled)
         // the word before still the one a pick is learned after, as handwriting has it
         assertEquals(listOf("山", "人"), s.type("abcd").second.candidates)
         s.apply(Action.Select(0))
-        assertTrue("高(gao) 山(shan)" in user.learned())
+        assertTrue("高 山" in learner.used())
         // the app took the Enter: past
-        val passed = UserModel(d.dictionary, d.vocabulary)
-        val t = session(language(passed))
+        val passedLearner = Learner(d)
+        val passed = passedLearner.model
+        val t = session(language(passed, habits = passedLearner.habits))
         t.type("g")
         t.apply(Action.CommitRaw)
         t.passedOn()
         assertEquals(listOf("人", "山"), t.type("abcd").second.candidates)
         t.apply(Action.Select(1))
-        assertFalse("高(gao) 山(shan)" in passed.learned())
+        assertFalse("高 山" in passedLearner.used())
     }
 }

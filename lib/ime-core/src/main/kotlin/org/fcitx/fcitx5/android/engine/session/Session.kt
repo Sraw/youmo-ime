@@ -4,6 +4,11 @@
  */
 package org.fcitx.fcitx5.android.engine.session
 
+import org.fcitx.fcitx5.android.engine.host.Keyboard
+import org.fcitx.fcitx5.android.engine.learn.Kinds
+import org.fcitx.fcitx5.android.engine.learn.LearnRecord.Commit
+import org.fcitx.fcitx5.android.engine.learn.control.Why
+
 /**
  * An input method engine as its host sees it: actions in, what to show and commit out. The host
  * (the fcitx5 addon) turns key events into [Action]s and renders each [Snapshot]; the engine
@@ -45,8 +50,33 @@ interface Session {
     /** What a long press on the candidate at [index] of all offers, where [Snapshot.actionable]. */
     fun offers(index: Int): Set<Offer>
 
+    /**
+     * Why the candidate at [index] of all is where it is (U-81): its tier, its uses, the code it was
+     * ranked under (a prediction's: [Kinds.PREDICTION] after the word before). Null where the
+     * session does not say.
+     */
+    fun why(index: Int): Why? = null
+
+    /**
+     * What was learned changed under the input (a long press taken back, a clear): the candidates
+     * read anew, to be shown ([Keyboard.AGAIN]); null where nothing is on show to read again.
+     */
+    fun reread(): Snapshot? = null
+
+    /** Whether [reread] reads what was learned as it is now; a session that does not is made anew after an undo. */
+    val rereads: Boolean get() = false
+
+    /**
+     * What learning leaves out in the field ([Action.Context.learnFlags]), told a session made after
+     * the field's context: nothing else of the field, whose text it does not know (review-int S5).
+     */
+    fun fieldFlags(flags: Int) {}
+
     /** A key went to the app, not here (Enter, an arrow with nothing typed), or the cursor moved: what came before it is past. */
     fun passedOn() {}
+
+    /** The learning record of what was committed last, null for none: for a session over this one to take back (a table's lookup, U-03). */
+    val lastCommit: Commit? get() = null
 
     /**
      * The app typed [text] itself, right after what is before the cursor (a key where English
@@ -73,7 +103,12 @@ interface Session {
  * What a long press on a candidate may offer, each done by the [Action] of its name; [bit] is its
  * bit in the offers the androidengine addon reads (EngineOffer in androidengine_public.h).
  */
-enum class Offer(val bit: Int) { FORGET(1 shl 0), PIN(1 shl 1), UNPIN(1 shl 2), BLOCK(1 shl 3) }
+enum class Offer(val bit: Int) {
+    FORGET(1 shl 0), PIN(1 shl 1), UNPIN(1 shl 2), BLOCK(1 shl 3),
+
+    /** A custom phrase (a built-in date too) taken off the settings' list, by [Action.Unpin]: no word to unpin is one. */
+    DELETE_PHRASE(1 shl 4),
+}
 
 /** A candidate as a host lists it, with its [hint] (see [Snapshot.hints]). */
 data class Choice(val text: String, val hint: String = "")
@@ -84,8 +119,9 @@ sealed class Action {
      * A key typed. One the engine [reads][Session.reads] goes into the input; any other ends it,
      * committed as the engine would have it, and is the app's (the snapshot is not
      * [handled][Snapshot.handled]): what comes after it does not run on from what came before.
+     * [glided]: typed by a glide, no key pressed (learning files it by its pinyin).
      */
-    data class Key(val char: Char) : Action()
+    data class Key(val char: Char, val glided: Boolean = false) : Action()
 
     object Backspace : Action()
 
@@ -136,8 +172,9 @@ sealed class Action {
      * from a key's long press. [again]: the key pressed again soon (连按), [letter] the one the run
      * came to; after the same key not yet picked a press of its own, read as a key or with the run
      * as the letter, the context to pick (see [org.fcitx.fcitx5.android.engine.pinyin.T9Segmenter]).
+     * [glided] as for [Key].
      */
-    data class Letter(val letter: Char, val again: Boolean = false) : Action()
+    data class Letter(val letter: Char, val again: Boolean = false, val glided: Boolean = false) : Action()
 
     /**
      * A key of the nine keys typed for English: [digit] (2 to 9), any of its letters, the session
@@ -200,8 +237,27 @@ sealed class Action {
      * nothing yet (a field focused, the cursor put somewhere). [cleared]: [before] is what was
      * written last in a field that has since cleared itself (a chat's box once a message is sent),
      * which what is typed next follows, but the field is empty: nothing is before the cursor.
+     * [learnFlags]: what learning leaves out in the field (the host's, as told with it); null, as
+     * the engine's own contexts have it (a glide's word held back, a lookup committed), leaves them
+     * as they were (review-1a-r2 S1). [started]: the field was (re)started, its commits no longer
+     * this session's to take back (U-03); [after], the text after the cursor if the host read it,
+     * for an edit put back among them (design-1c §2). [selected]: text is selected, [before] what
+     * is before it and [after] what is after it, as if it were cut: nothing deleted yet (review-1c M2).
+     * [offers]: the session may offer candidates for [before] now (English's word typed in place of
+     * its correction); not where it is not the input method shown, which nothing would reset.
+     * [said]: the editor itself answered [before], so an empty one is a field really empty; false
+     * where it would not say (null) or nothing was read: an empty [before] then is not known (review-1c M1).
      */
-    data class Context(val before: String, val cleared: Boolean = false) : Action() {
+    data class Context(
+        val before: String,
+        val cleared: Boolean = false,
+        val learnFlags: Int? = null,
+        val started: Boolean = false,
+        val after: String? = null,
+        val selected: Boolean = false,
+        val offers: Boolean = true,
+        val said: Boolean = false,
+    ) : Action() {
         companion object {
             /**
              * As much of the text before the cursor as the host reads into a context, and keeps of

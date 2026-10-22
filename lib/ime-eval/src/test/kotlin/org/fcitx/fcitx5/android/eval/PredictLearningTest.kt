@@ -53,21 +53,25 @@ class PredictLearningTest {
         )
     }
 
+    // the word before's id falls back to the model's (data.wordIndex.find), as PinyinSession's does
+    // (F2696): these fixtures score the same either way, the fallback kept only by that likeness
     @Test
-    fun whatIsTypedOnceIsOfferedAfterItsFirstWord() {
+    fun whatIsTypedThreeTimesIsOfferedAfterItsFirstWord() {
         assertEquals(listOf(Halves.TUNE, Halves.HELD_OUT), samples.map { Halves.of(it) })
         assertEquals(
             listOf(
                 "tune, nothing learned" to PredictRun.Score(1, 0, 0, 0),
                 "held-out, nothing learned" to PredictRun.Score(1, 1, 1, 1),
-                "tune, typed once" to PredictRun.Score(1, 1, 1, 1),
+                // 们 after 我 once: not yet (U-71)
+                "tune, typed once" to PredictRun.Score(1, 0, 0, 0),
+                "tune, typed three times" to PredictRun.Score(1, 1, 1, 1),
                 // learning 我们 takes nothing from what the model offers after 你
                 "held-out, tune learned" to PredictRun.Score(1, 1, 1, 1),
             ),
             PredictLearning(data, Predictor.USER_WEIGHT).measure(samples),
         )
         // at no weight what the user typed counts for nothing
-        assertEquals(PredictRun.Score(1, 0, 0, 0), PredictLearning(data, 0f).measure(samples).toMap().getValue("tune, typed once"))
+        assertEquals(PredictRun.Score(1, 0, 0, 0), PredictLearning(data, 0f).measure(samples).toMap().getValue("tune, typed three times"))
     }
 
     @Test
@@ -77,11 +81,11 @@ class PredictLearningTest {
         val out = StringBuilder()
         assertEquals(0, runCli(arrayOf("predict-learn", dataFile.path, set.path), out, StringBuilder()))
         val rows = out.lines().filter { it.isNotBlank() }
-        assertEquals(4, rows.size)
-        assertTrue(rows[2], rows[2].startsWith("tune, typed once") && "top1 100.0%" in rows[2])
+        assertEquals(5, rows.size)
+        assertTrue(rows[3], rows[3].startsWith("tune, typed three times") && "top1 100.0%" in rows[3])
         out.setLength(0)
         assertEquals(0, runCli(arrayOf("predict-learn", dataFile.path, set.path, "--user-weight", "0"), out, StringBuilder()))
-        assertTrue(out.lines()[2], "top1 0.0%" in out.lines()[2])
+        assertTrue(out.lines()[3], "top1 0.0%" in out.lines()[3])
         assertEquals(2, runCli(arrayOf("predict-learn", dataFile.path, set.path, "--user-weight", "much"), StringBuilder(), StringBuilder()))
 
         // after each word of the set's sentences, what follows; `predict` measures it with nothing learned

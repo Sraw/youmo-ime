@@ -6,10 +6,11 @@ package org.fcitx.fcitx5.android.engine.host
 
 import org.fcitx.fcitx5.android.engine.data.CodeTable
 import org.fcitx.fcitx5.android.engine.data.DataFormatException
-import org.fcitx.fcitx5.android.engine.data.PinyinData
 import org.fcitx.fcitx5.android.engine.data.PinyinDataBuilder
-import org.fcitx.fcitx5.android.engine.data.WordLayers
-import org.fcitx.fcitx5.android.engine.lattice.LayerPrior
+import org.fcitx.fcitx5.android.engine.learn.LearnLog
+import org.fcitx.fcitx5.android.engine.learn.LearnState
+import org.fcitx.fcitx5.android.engine.learn.control.LearningOp
+import org.fcitx.fcitx5.android.engine.learn.control.LearningResult
 import org.fcitx.fcitx5.android.engine.pinyin.Fuzzy
 import org.fcitx.fcitx5.android.engine.session.Choice
 import org.fcitx.fcitx5.android.engine.session.Offer
@@ -17,7 +18,6 @@ import org.fcitx.fcitx5.android.engine.session.Snapshot
 import org.fcitx.fcitx5.android.engine.table.TableUser.TableLog
 import org.fcitx.fcitx5.android.engine.user.LibimeImport
 import org.fcitx.fcitx5.android.engine.user.UserLog
-import org.fcitx.fcitx5.android.engine.user.UserModel
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -54,14 +54,16 @@ class EnginesTest : EnginesFixture() {
         assertEquals("你", engines.onEvent(Engines.PINYIN, EngineEvent.CHAR, ' '.code).commit)
     }
 
-    // in its own log under the user directory, read again as English is next typed
+    // in the learning record under the user directory (PLAN §2.2), read again as English is next typed;
+    // the older builds' log no longer written
     @Test
     fun theEnglishWordsLearnedAreKeptAcrossAStart() {
         val first = Engines(::load, folder.root)
         first.type(Engines.ENGLISH, "youmo")
         assertEquals("youmo ", first.onEvent(Engines.ENGLISH, EngineEvent.CHAR, ' '.code).commit)
         first.close()
-        assertTrue(File(folder.root, Engines.USER_ENGLISH).length() > 0)
+        assertFalse(File(folder.root, Engines.USER_ENGLISH).exists())
+        assertTrue(File(folder.root, LearnLog.FILE).length() > 0)
         val again = Engines(::load, folder.root)
         assertTrue("youmo" in again.type(Engines.ENGLISH, "you").candidates)
         again.close()
@@ -76,7 +78,8 @@ class EnginesTest : EnginesFixture() {
         assertTrue(engines.addEnglishWord("Youmo"))
         assertFalse(engines.addEnglishWord("you mo"))
         assertFalse(engines.addEnglishWord("'em"))
-        assertEquals(listOf("Youmo" to 2f, "the" to 1f), engines.englishWords().map { it.text to it.count })
+        assertEquals(listOf("Youmo" to true, "the" to false), engines.englishWords().map { it.text to it.neverCorrected })
+        assertEquals(listOf(2f, 1f), engines.englishWords().map { it.count })
         // the user's: not corrected, offered by its keys
         assertTrue("Youmo" in engines.type(Engines.ENGLISH, "you").candidates)
         engines.onEvent(Engines.ENGLISH, EngineEvent.CHAR, ' '.code)
@@ -139,7 +142,7 @@ class EnginesTest : EnginesFixture() {
             // picked until it leads
             engines.pickUntilFirst("拟")
         }
-        assertTrue(dir.resolve(Engines.USER_PINYIN).length() > 0)
+        assertTrue(dir.resolve(LearnLog.FILE).length() > 0)
         // and read back: 拟 still comes first
         Engines(::load, dir).use { engines ->
             assertEquals("拟", engines.type(Engines.PINYIN, "ni").candidates.first())
@@ -167,8 +170,15 @@ class EnginesTest : EnginesFixture() {
             }
             assertEquals("你", engines.type(Engines.PINYIN, "ni").candidates.first())
         }
-        // nor on disk: the log as it was made, its header alone
-        assertEquals(UserLog.header().size.toLong(), dir.resolve(Engines.USER_PINYIN).length())
+        // nor in the learning record
+        val kept = logged(dir)
+        assertTrue(kept.wordUses.isEmpty() && kept.stats.isEmpty())
+    }
+
+    // the learning record under [dir], read back as a start reads it
+    private fun logged(dir: File): LearnState = LearnLog(dir.resolve(LearnLog.FILE)).run {
+        open()
+        state.also { close() }
     }
 
     private var dictionaryReads = 0
@@ -187,12 +197,6 @@ class EnginesTest : EnginesFixture() {
         onEvent(Engines.PINYIN, EngineEvent.RESET, 0)
     }
 
-    /** The layers' priors the log under [dir] keeps, read as a start reads them: a layer a pick moved is among them, back at 0 or not. */
-    private fun priorsKept(dir: File): LayerPrior {
-        val data = PinyinData.load(load(Engines.PINYIN_DATA))
-        return LayerPrior(data.layers).also { UserLog.read(dir.resolve(Engines.USER_PINYIN).readBytes(), UserModel(data.dictionary, data.vocabulary), it) }
-    }
-
     @Test
     fun aDictionaryWordIsMergedIntoTheBase() {
         // no scores in a dictionary: 妮 and 泥, merged into the base, at the unknown word's until picked
@@ -202,49 +206,6 @@ class EnginesTest : EnginesFixture() {
             assertEquals(listOf("你", "拟"), candidates.take(2))
             assertEquals(setOf("妮", "泥"), candidates.drop(2).toSet())
         }
-    }
-
-    // an imported dictionary is the base's: a word of it picked teaches the new words' layer nothing
-    // (the built-in new words' is learned: theNewWordsLayerIsLearnedAndKept)
-    @Test
-    fun aDictionaryWordPickedLeavesTheNewWordsLayerAsItWas() {
-        val additions = Engines.Additions("", "d") { sequenceOf("泥 ni 0") }
-        val dir = folder.newFolder("engine")
-        Engines(::load, dir, { throw it }, additions = { additions }).use { engines ->
-            val at = engines.type(Engines.PINYIN, "ni").candidates.indexOf("泥")
-            assertTrue(at > 0)
-            engines.onEvent(Engines.PINYIN, EngineEvent.PICK, at)
-        }
-        priorsKept(dir).let { assertEquals(0f, it[it.layer(WordLayers.NEW)], 0f) }
-    }
-
-    // the built-in new words are a layer of the data: one of them picked moves that layer, kept in the log
-    @Test
-    fun theNewWordsLayerIsLearnedAndKept() {
-        val ni = syl("ni")
-        val data = PinyinDataBuilder()
-            .layers(listOf(WordLayers.BASE, WordLayers.NEW))
-            .unigram("<unk>", -7f, 0f)
-            .unigram("你", -2f, 0f)
-            .unigram("拟", -3f, 0f)
-            .entry("你", ni)
-            .entry("拟", ni)
-            .entry("泥", ni, layer = 1)
-            .build()
-            .toByteArray()
-        val withNew = { path: String -> if (path == Engines.PINYIN_DATA) ByteBuffer.wrap(data) else load(path) }
-        val dir = folder.newFolder("engine")
-        Engines(withNew, dir, { throw it }).use { engines ->
-            val at = engines.type(Engines.PINYIN, "ni").candidates.indexOf("泥")
-            assertTrue(at > 0)
-            engines.onEvent(Engines.PINYIN, EngineEvent.PICK, at)
-        }
-        // 泥 picked over 你: its layer a step up, in the log
-        val loaded = PinyinData.load(ByteBuffer.wrap(data))
-        val kept = LayerPrior(loaded.layers).also {
-            UserLog.read(dir.resolve(Engines.USER_PINYIN).readBytes(), UserModel(loaded.dictionary, loaded.vocabulary), it)
-        }
-        assertEquals(LayerPrior.STEP, kept[kept.layer(WordLayers.NEW)], 0f)
     }
 
     @Test
@@ -285,7 +246,7 @@ class EnginesTest : EnginesFixture() {
     }
 
     @Test
-    fun withNoLogADictionaryChangeAddsToWhatIsInMemory() {
+    fun withNoLogADictionaryChangeKeepsWhatWasLearned() {
         var additions = added("", "a", "泥 ni 0")
         val engines = Engines(::load, null, additions = { additions })
         engines.pickUntilFirst("拟")
@@ -293,7 +254,8 @@ class EnginesTest : EnginesFixture() {
         engines.reload()
         val shown = engines.type(Engines.PINYIN, "ni").candidates
         assertEquals("拟", shown.first())
-        assertTrue("尼" in shown && "泥" in shown)
+        // the model made again of the dictionaries now
+        assertTrue("尼" in shown && "泥" !in shown)
     }
 
     @Test
@@ -316,12 +278,12 @@ class EnginesTest : EnginesFixture() {
     }
 
     /**
-     * What one pinyin learned reorders another's next input, though that one read the same keys in
-     * the same context before: past the sentences too, where the words the keys start are listed.
-     * Forgotten here, as a pick would rise into the sentences, scored afresh at every key.
+     * What one pinyin learned leaves another's short input as the model has it (D32: 全拼 does not
+     * change 双拼's order, 简拼's first is the model's), though that one read the same keys in the
+     * same context before; forgotten, each is as it was, past the sentences too.
      */
     @Test
-    fun aPickInOnePinyinReordersTheNextInputOfAnother() {
+    fun aPickInOnePinyinLeavesAnothersShortInputAndIsForgottenInBoth() {
         val chars = "你拟泥尼逆腻昵倪妮霓"
         val data = PinyinDataBuilder().unigram("<unk>", -7f, 0f)
             .apply { chars.forEachIndexed { i, c -> unigram(c.toString(), -2f - i * 0.4f, 0f).entry(c.toString(), syl("ni")) } }
@@ -329,8 +291,10 @@ class EnginesTest : EnginesFixture() {
         val load = { path: String -> if (path == Engines.PINYIN_DATA) ByteBuffer.wrap(data) else load(path) }
         Engines(load, null).use { engines ->
             engines.settings = EngineSettings(modelLevel = ModelLevel.LOW)
+            val fresh = engines.type(Engines.SHUANGPIN, "n").candidates
+            engines.onEvent(Engines.SHUANGPIN, EngineEvent.RESET, 0)
             engines.onEvent(Engines.PINYIN, EngineEvent.PICK, engines.type(Engines.PINYIN, "ni").candidates.indexOf("昵"))
-            assertEquals(listOf("你", "昵", "拟", "泥", "尼", "逆", "腻"), engines.type(Engines.SHUANGPIN, "n").candidates)
+            assertEquals(fresh, engines.type(Engines.SHUANGPIN, "n").candidates)
             engines.onEvent(Engines.SHUANGPIN, EngineEvent.RESET, 0)
             engines.onEvent(Engines.PINYIN, EngineEvent.FORGET, engines.type(Engines.PINYIN, "ni").candidates.indexOf("昵"))
             engines.onEvent(Engines.PINYIN, EngineEvent.RESET, 0)
@@ -342,27 +306,71 @@ class EnginesTest : EnginesFixture() {
     }
 
     @Test
-    fun aCandidatePinnedFromEitherPinyinIsSavedAndOfferedInBoth() {
+    fun aCandidatePinnedIsTheLearningRecordsUnderItsOwnCodeThePhrasesUntouched() {
         val saved = ArrayList<String>()
         val errors = ArrayList<IOException>()
-        var fail = false
-        val additions = Engines.Additions("", "", { if (fail) throw IOException("full") else saved += it.all.joinToString(" ") }) { emptySequence() }
+        val additions = Engines.Additions("", "", { saved += it.all.joinToString(" ") }) { emptySequence() }
         val engines = Engines(::load, null, { errors += it }, additions = { additions })
         assertEquals(emptySet<Offer>(), engines.offers(Engines.PINYIN, 0))
         val shown = engines.type(Engines.PINYIN, "ni")
         assertTrue(shown.actionable)
         assertEquals(setOf(Offer.PIN, Offer.BLOCK), engines.offers(Engines.PINYIN, 1))
         assertEquals(listOf("拟", "你"), engines.onEvent(Engines.PINYIN, EngineEvent.PIN, 1).candidates)
-        assertEquals(listOf("ni,1=拟"), saved)
-        assertEquals(listOf("拟", "你"), engines.type(Engines.SHUANGPIN, "ni").candidates)
-        // the decoder's 拟 moved first, pinned but never typed: nothing learned to forget
-        assertEquals(setOf(Offer.UNPIN), engines.offers(Engines.SHUANGPIN, 0))
-        // not saved: kept till the next start all the same
-        fail = true
-        assertEquals(listOf("你", "拟"), engines.onEvent(Engines.SHUANGPIN, EngineEvent.UNPIN, 0).candidates)
-        assertEquals(1, errors.size)
+        assertTrue(saved.isEmpty())
+        // 双拼 pins under its own codes (impl/design-1b.md §3)
+        assertEquals(listOf("你", "拟"), engines.type(Engines.SHUANGPIN, "ni").candidates)
+        engines.onEvent(Engines.SHUANGPIN, EngineEvent.RESET, 0)
         engines.onEvent(Engines.PINYIN, EngineEvent.RESET, 0)
-        assertEquals(listOf("你", "拟"), engines.type(Engines.PINYIN, "ni").candidates)
+        engines.type(Engines.PINYIN, "ni")
+        assertTrue(Offer.UNPIN in engines.offers(Engines.PINYIN, 0))
+        assertEquals(listOf("你", "拟"), engines.onEvent(Engines.PINYIN, EngineEvent.UNPIN, 0).candidates)
+        assertEquals(emptyList<IOException>(), errors)
+    }
+
+    // design-1a Open 3: a phrase a pin of full pinyin was converted from goes, once, where the pin shows its word
+    @Test
+    fun pinsConvertedFromPhrasesTakeThemOutOnce() {
+        val saved = ArrayList<String>()
+        val additions = { Engines.Additions("ni,1=拟\nhao,1=呢\n", "", { saved += it.all.joinToString(" ") }) { emptySequence() } }
+        val dir = folder.newFolder("engine")
+        Engines(::load, dir, additions = additions).use { engines ->
+            assertEquals("拟", engines.type(Engines.PINYIN, "ni").candidates.first())
+        }
+        // 拟 the learning record's pin now; 呢 no word of the model's, which a pin could not show
+        assertEquals(listOf("hao,1=呢"), saved)
+        assertTrue(dir.resolve(Engines.PINS_MOVED).exists())
+        // once: a phrase put back since is the user's
+        Engines(::load, dir, additions = additions).use { engines ->
+            assertEquals("拟", engines.type(Engines.PINYIN, "ni").candidates.first())
+        }
+        assertEquals(1, saved.size)
+    }
+
+    // review-1b M2: a pin the input reads though not as the likeliest spelling (你好 on 简拼) takes its phrase out too, shown once
+    @Test
+    fun aPinOfAnAbbreviationTakesItsPhraseOut() {
+        val saved = ArrayList<String>()
+        val additions = { Engines.Additions("nh,1=你好\n", "", { saved += it.all.joinToString(" ") }) { emptySequence() } }
+        Engines(::load, folder.newFolder("engine"), additions = additions).use { engines ->
+            val shown = engines.type(Engines.PINYIN, "nh").candidates
+            assertEquals("你好", shown.first())
+            assertEquals(1, shown.count { it == "你好" })
+        }
+        assertEquals(listOf(""), saved)
+    }
+
+    // review-1b M2: a phrase of the pin's text put back since (the move is done once) is shown once, the pin first
+    @Test
+    fun aPhraseOfThePinsTextIsShownOnce() {
+        val dir = folder.newFolder("engine")
+        val additions = { Engines.Additions("nh,1=你好\n", "", { }) { emptySequence() } }
+        Engines(::load, dir, additions = additions).use { it.type(Engines.PINYIN, "nh") }
+        // the phrase again, the pin kept: both of 你好
+        Engines(::load, dir, additions = additions).use { engines ->
+            val shown = engines.type(Engines.PINYIN, "nh").candidates
+            assertEquals("你好", shown.first())
+            assertEquals(1, shown.count { it == "你好" })
+        }
     }
 
     @Test
@@ -382,28 +390,42 @@ class EnginesTest : EnginesFixture() {
     fun aUserLogThatCannotBeReadLeavesPinyinWorking() {
         val dir = folder.newFolder("engine")
         // a directory where the log should be
-        dir.resolve(Engines.USER_PINYIN).mkdir()
+        dir.resolve(LearnLog.FILE).mkdir()
         val errors = ArrayList<IOException>()
         Engines(::load, dir, onError = { errors += it }).use { engines ->
             assertEquals(listOf("你", "拟"), engines.type(Engines.PINYIN, "ni").candidates)
+            assertTrue(errors.isNotEmpty())
+            // told once: the record left closed, not tried again on each key and commit
+            val told = errors.size
             assertEquals("拟", engines.onEvent(Engines.PINYIN, EngineEvent.PICK, 1).commit)
+            engines.type(Engines.PINYIN, "ni")
+            assertEquals(told, errors.size)
         }
-        assertEquals(1, errors.size)
     }
 
     @Test
     fun whatATableLearnsOutlivesASettingChangedAndARestart() {
         val dir = folder.newFolder("engine")
         Engines(::load, dir).use { engines ->
-            // codes longer than what is typed go by use
+            // pinned first under the code typed, ordered by use or not (U-28)
             engines.type("engine-wubi", "va")
-            assertEquals("二", engines.onEvent("engine-wubi", EngineEvent.PICK, 1).commit)
-            engines.settings = EngineSettings(pageSize = 3)
+            assertTrue(Offer.PIN in engines.offers("engine-wubi", 1))
+            assertEquals(listOf("二", "一", "三"), engines.onEvent("engine-wubi", EngineEvent.PIN, 1).candidates.take(3))
+            engines.onEvent("engine-wubi", EngineEvent.RESET, 0)
+            engines.settings = EngineSettings(pageSize = 3, tables = mapOf("Wubi" to TableSettings(orderByUse = false)))
             assertEquals(listOf("二", "一", "三"), engines.type("engine-wubi", "va").candidates)
+            // past the 简码 kept in order (TableHabitOrder's reach): 员 picked twice under 调频 is first there, kept with 调频 off
+            byUse(engines, true)
+            repeat(2) { engines.onEvent("engine-wubi", EngineEvent.PICK, engines.type("engine-wubi", "kkkk").candidates.indexOf("员")) }
+            assertEquals(listOf("叫", "员"), byUse(engines, false))
         }
-        assertTrue(dir.resolve(Engines.userTable("engine-wubi")).length() > 0)
         Engines(::load, dir).use { engines ->
+            assertEquals(listOf("员", "叫"), byUse(engines, true))
+            // 恢复码表顺序 forgets the order learned by use, not what was pinned
+            // the one entry the app has (U-28's 恢复码表顺序 in a table's settings)
+            assertEquals(LearningResult.Done(), engines.learning(null, LearningOp.ResetTableOrder("engine-wubi")))
             assertEquals("二", engines.type("engine-wubi", "va").candidates.first())
+            assertEquals(setOf(Offer.UNPIN, Offer.BLOCK), engines.offers("engine-wubi", 0))
         }
     }
 
@@ -413,9 +435,13 @@ class EnginesTest : EnginesFixture() {
             engines.settings = EngineSettings(pageSize = 3, tables = mapOf("Wubi" to TableSettings(orderByUse = false)))
             engines.type("engine-wubi", "va")
             assertEquals("二", engines.onEvent("engine-wubi", EngineEvent.PICK, 1).commit)
+            // 调频 off: the pick is kept but not used, so nothing offered to forget (U-28)
             assertEquals(listOf("一", "二", "三"), engines.type("engine-wubi", "va").candidates)
+            assertFalse(Offer.FORGET in engines.offers("engine-wubi", 1))
+            engines.onEvent("engine-wubi", EngineEvent.RESET, 0)
             engines.settings = EngineSettings(pageSize = 3, tables = mapOf("Cangjie" to TableSettings(orderByUse = false)))
-            assertEquals(listOf("二", "一", "三"), engines.type("engine-wubi", "va").candidates)
+            engines.type("engine-wubi", "va")
+            assertTrue(Offer.FORGET in engines.offers("engine-wubi", 1))
         }
     }
 
@@ -462,11 +488,10 @@ class EnginesTest : EnginesFixture() {
             asked++
             LibimeImport.Legacy(listOf("拟 ni 0"), List(MAX_PICKS) { "拟\tni" })
         }
-        Engines(::load, dir, legacy = legacy).use { engines ->
-            assertEquals("拟", engines.type(Engines.PINYIN, "ni").candidates.first())
-        }
-        Engines(::load, dir, legacy = legacy).use { engines ->
-            assertEquals("拟", engines.type(Engines.PINYIN, "ni").candidates.first())
+        // its counts the words' uses (impl/design-1b.md §4), what sentences go by (MULTI); its first under ni no habit
+        repeat(2) {
+            Engines(::load, dir, legacy = legacy).use { engines -> engines.type(Engines.PINYIN, "ni") }
+            assertTrue("拟" in logged(dir).wordUses)
         }
         assertEquals(1, asked)
     }
@@ -476,9 +501,9 @@ class EnginesTest : EnginesFixture() {
         val dir = folder.newFolder("engine")
         dir.resolve(Engines.USER_PINYIN).writeBytes(UserLog.header())
         val legacy = { LibimeImport.Legacy(emptyList(), List(MAX_PICKS) { "拟\tni" }) }
-        Engines(::load, dir, legacy = legacy).use { engines ->
-            assertEquals("拟", engines.type(Engines.PINYIN, "ni").candidates.first())
-        }
+        // converted on the warm-ups, merged in at the next key: run in place here, so by the next
+        Engines(::load, dir, legacy = legacy, warmUps = inPlace).use { engines -> engines.type(Engines.PINYIN, "ni") }
+        assertTrue("拟" in logged(dir).wordUses)
     }
 
     @Test
@@ -496,9 +521,8 @@ class EnginesTest : EnginesFixture() {
             }
         }
         assertEquals(listOf("unreadable", "corrupt"), errors.map { it.cause?.message ?: it.message })
-        Engines(::load, dir, legacy = legacy).use { engines ->
-            assertEquals("拟", engines.type(Engines.PINYIN, "ni").candidates.first())
-        }
+        Engines(::load, dir, legacy = legacy).use { engines -> engines.type(Engines.PINYIN, "ni") }
+        assertTrue("拟" in logged(dir).wordUses)
         // with none, nothing is asked of the log
         Engines(::load, folder.newFolder("other"), legacy = { null }).use { engines ->
             assertFalse(engines.type(Engines.PINYIN, "ni").candidates.isEmpty())
@@ -606,12 +630,15 @@ class EnginesTest : EnginesFixture() {
     @Test
     fun oneLearnedWordRemovedIsARecordAppendedNotTheLogRewritten() {
         val dir = folder.newFolder("engine")
-        val log = dir.resolve(Engines.USER_PINYIN)
+        val log = dir.resolve(LearnLog.FILE)
         Engines(::load, dir).use { engines ->
-            // 拟 then 好, over the decoder's 你好: the user's word 拟好
-            engines.type(Engines.PINYIN, "nihao")
-            engines.onEvent(Engines.PINYIN, EngineEvent.PICK, engines.candidates(Engines.PINYIN, 0, 20).indexOfFirst { it.text == "拟" })
-            engines.onEvent(Engines.PINYIN, EngineEvent.PICK, 0)
+            // 拟 then 好, over the decoder's 你好, twice: the user's word 拟好
+            repeat(2) {
+                engines.type(Engines.PINYIN, "nihao")
+                engines.onEvent(Engines.PINYIN, EngineEvent.PICK, engines.candidates(Engines.PINYIN, 0, 20).indexOfFirst { it.text == "拟" })
+                engines.onEvent(Engines.PINYIN, EngineEvent.PICK, 0)
+                engines.onEvent(Engines.PINYIN, EngineEvent.RESET, 0)
+            }
             val learned = engines.userWords().single()
             val before = log.readBytes()
             // and one whose pinyin does not read: one word forgotten all the same

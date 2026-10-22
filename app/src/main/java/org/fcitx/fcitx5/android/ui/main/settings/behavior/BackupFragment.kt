@@ -23,6 +23,8 @@ import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.daemon.FcitxDaemon
 import org.fcitx.fcitx5.android.data.UserDataManager
 import org.fcitx.fcitx5.android.data.clipboard.ClipboardManager
+import org.fcitx.fcitx5.android.engine.learn.control.BackupOp
+import org.fcitx.fcitx5.android.engine.learn.control.BackupResult
 import org.fcitx.fcitx5.android.ui.common.PaddingPreferenceFragment
 import org.fcitx.fcitx5.android.ui.common.withLoadingDialog
 import org.fcitx.fcitx5.android.ui.main.MainViewModel
@@ -94,9 +96,17 @@ class BackupFragment : PaddingPreferenceFragment() {
                 val ctx = requireContext()
                 lifecycleScope.withLoadingDialog(ctx) {
                     try {
+                        // the learning as a backup, merged, not laid over, when imported: taken once a
+                        // file is picked, not before the picker, so a page made anew while it was open
+                        // (rotation, the process killed) still writes it (review R11 F3094); held only
+                        // till written, the user's whole typing history
+                        val learning = viewModel.fcitx.runOnReady {
+                            save()
+                            (learning(BackupOp.Copy) as? BackupResult)?.bytes
+                        }
                         withContext(Dispatchers.IO) {
                             val outputStream = ctx.contentResolver.openOutputStream(uri)!!
-                            UserDataManager.export(outputStream, exportTimestamp).getOrThrow()
+                            UserDataManager.export(outputStream, exportTimestamp, learning).getOrThrow()
                         }
                     } catch (@Suppress("TooGenericExceptionCaught") e: Exception) {
                         // whatever the provider threw: told, the page left as it was
@@ -114,13 +124,8 @@ class BackupFragment : PaddingPreferenceFragment() {
         screen.addPreference(Preference(ctx).apply {
             key = EXPORT_USER_DATA_KEY
             setup(ctx.getString(EXPORT_USER_DATA), ctx.getString(EXPORT_USER_DATA_SUMMARY)) {
-                lifecycleScope.withLoadingDialog(ctx) {
-                    viewModel.fcitx.runOnReady {
-                        save()
-                    }
-                    exportTimestamp = System.currentTimeMillis()
-                    exportLauncher.launch("youmo_${iso8601UTCDateTime(exportTimestamp)}.zip")
-                }
+                exportTimestamp = System.currentTimeMillis()
+                exportLauncher.launch("youmo_${iso8601UTCDateTime(exportTimestamp)}.zip")
             }
         })
         screen.addPreference(Preference(ctx).apply {

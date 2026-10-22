@@ -4,6 +4,8 @@
  */
 package org.fcitx.fcitx5.android.engine.session
 
+import org.fcitx.fcitx5.android.engine.learn.LearnTo
+import org.fcitx.fcitx5.android.engine.learn.Learner
 import org.fcitx.fcitx5.android.engine.phrase.CustomPhrases
 import org.fcitx.fcitx5.android.engine.phrase.PhraseBook
 import org.fcitx.fcitx5.android.engine.pinyin.PinyinSegmenter
@@ -28,48 +30,48 @@ class PinyinSessionPhraseTest {
 
     private fun Session.type(keys: String): Snapshot = keys.map { apply(Key(it)) }.last()
 
-    private fun phrased(text: String, user: UserModel? = null, saved: MutableList<String> = ArrayList()) = PinyinSession(
-        data, PinyinSegmenter(), pageSize = 20, user = user,
+    private fun phrased(text: String, user: UserModel? = null, saved: MutableList<String> = ArrayList(), learner: Learner? = null) = PinyinSession(
+        data, PinyinSegmenter(), pageSize = 20, user = learner?.model ?: user,
         phraseBook = PhraseBook(CustomPhrases.parse(text)) { saved += it.all.joinToString(" ") },
         now = { GregorianCalendar(2026, Calendar.SEPTEMBER, 30) },
+        learnTo = learner?.learnTo() ?: LearnTo(),
     )
 
     @Test
-    fun aCandidatePinnedIsTheFirstPhraseOfTheInputTillDeleted() {
+    fun aCandidatePinnedGoesInFrontTillUnpinnedThePhrasesUntouched() {
         val saved = ArrayList<String>()
-        val session = phrased("nizai,2=你在哪儿", saved = saved)
+        val session = phrased("nizai,2=你在哪儿", saved = saved, learner = Learner(data))
         val s = session.type("nizai")
         val text = s.candidates[2]
         val pinned = session.apply(Pin(2))
-        assertEquals(text, pinned.candidates[0])
+        // in front, the rest as they were (impl/design-1b.md M4), the pin the learning record's
+        assertEquals(listOf(text) + s.candidates.filter { it != text }, pinned.candidates)
         assertEquals(s.preedit, pinned.preedit)
         assertEquals("", pinned.commit)
-        assertEquals(listOf("nizai,1=$text nizai,2=你在哪儿"), saved)
-        assertEquals(setOf(Offer.UNPIN), session.offers(0))
-        // a phrase not first yet: pinned again, or deleted
-        val second = pinned.candidates.indexOf("你在哪儿")
-        assertEquals(setOf(Offer.PIN, Offer.UNPIN), session.offers(second))
-        assertEquals(setOf(Offer.PIN), session.offers(pinned.candidates.indexOf(s.candidates[0])))
+        assertTrue(saved.isEmpty())
+        assertTrue(Offer.UNPIN in session.offers(0))
+        // a phrase is the settings': neither pinned nor unpinned here
+        val phrase = pinned.candidates.indexOf("你在哪儿")
+        assertFalse(Offer.PIN in session.offers(phrase) || Offer.UNPIN in session.offers(phrase))
+        assertTrue(Offer.PIN in session.offers(pinned.candidates.indexOf(s.candidates[0])))
         val unpinned = session.apply(Unpin(0))
         assertEquals(s.candidates, unpinned.candidates)
-        assertEquals("nizai,2=你在哪儿", saved.last())
-        // not a phrase, or past the candidates: nothing to do
+        // not pinned, or past the candidates: nothing to do
         assertEquals(unpinned, session.apply(Unpin(0)))
         assertEquals(unpinned, session.apply(Pin(99)))
-        assertEquals(2, saved.size)
+        assertTrue(saved.isEmpty())
     }
 
     @Test
-    fun aPhraseIsPinnedAsWrittenUnderWhatIsLeftOfTheInput() {
+    fun aPhraseIsNotPinnedHere() {
         val saved = ArrayList<String>()
-        val session = phrased("zai,1=再\nzai,2=#${'$'}{day}日", saved = saved)
+        val session = phrased("zai,1=再\nzai,2=#${'$'}{day}日", saved = saved, learner = Learner(data))
         val s = session.type("nizai")
         val rest = session.apply(Select(s.candidates.indexOf("拟")))
         assertEquals(listOf("再", "30日"), rest.candidates.take(2))
-        session.apply(Pin(1))
-        // filled in again each time it is offered, not the day it was pinned
-        assertEquals("zai,1=#${'$'}{day}日 zai,1=再", saved.single())
-        assertEquals("30日", session.candidates(0, 1).single().text)
+        assertFalse(Offer.PIN in session.offers(1))
+        assertEquals(rest.copy(commit = ""), session.apply(Pin(1)))
+        assertTrue(saved.isEmpty())
     }
 
     @Test
@@ -101,9 +103,9 @@ class PinyinSessionPhraseTest {
     @Test
     fun aPredictionIsNeitherPinnedNorDeleted() {
         val saved = ArrayList<String>()
-        val session = phrased("wo,1=我", saved = saved)
-        session.type("wo")
-        val predicted = session.apply(Select(0))
+        val session = phrased("", saved = saved)
+        val shown = session.type("wo").candidates
+        val predicted = session.apply(Select(shown.indexOf("我")))
         assertTrue(predicted.predicting)
         assertEquals(emptySet<Offer>(), session.offers(0))
         assertEquals(predicted.copy(commit = ""), session.apply(Pin(0)))
@@ -138,16 +140,46 @@ class PinyinSessionPhraseTest {
     }
 
     @Test
-    fun aPhraseIsNotLearnedButACandidateItMovedIs() {
-        val user = UserModel(data.dictionary, data.vocabulary)
-        val session = phrased("nizai,1=你在哪儿\nni,1=拟", user)
+    fun aPhraseIsNotLearnedThoughTheDecoderHasItsTextButTheWordAfterIs() {
+        val learner = Learner(data)
+        val session = phrased("nizai,1=你在哪儿\nni,1=拟", learner = learner)
         assertEquals("你在哪儿", session.type("nizai").candidates.first())
         session.apply(Select(0))
-        assertEquals(0f, user.total)
-        // 拟 moved first by a phrase is still the decoder's word, not its best
+        // 拟 put first by a phrase is the phrase's pick, no word picked (PLAN §2.7): the record has neither
         assertEquals("拟", session.type("ni").candidates.first())
         session.apply(Select(0))
-        assertEquals(1f, user.total)
+        assertEquals(emptySet<String>(), learner.used())
+        session.type("zai")
+        val after = session.apply(Select(0)).commit
+        // the word after learned, the phrase's 拟 no word of it
+        assertTrue(learner.used().toString(), after in learner.used())
+        assertFalse("拟" in learner.used())
+    }
+
+    // U-66, impl/PLAN.md §2.7: the phrase a candidate of its own, not learned, where its order says; the
+    // decoder's of the same text not moved there: ranked after it, the phrase stands for it; ranked
+    // before (learned elsewhere), it stays a word there, picked and learned, the phrase not listed again
+    @Test
+    fun aPhraseIsItsOwnCandidateAndNoTextIsListedTwice() {
+        val learner = Learner(data)
+        val session = phrased("ni,2=拟", learner = learner)
+        val shown = session.type("ni").candidates
+        assertEquals(listOf("你", "拟"), shown.take(2))
+        assertEquals(1, shown.count { it == "拟" })
+        assertFalse(Offer.PIN in session.offers(1))
+        session.apply(Action.Reset)
+        // 拟 picked twice where no phrase is: the user's first under ni
+        val plain = PinyinSession(data, PinyinSegmenter(), pageSize = 20, user = learner.model, learnTo = learner.learnTo())
+        repeat(2) {
+            plain.type("ni")
+            plain.apply(Select(plain.candidates(0, 20).indexOfFirst { it.text == "拟" }))
+            plain.apply(Action.Reset)
+        }
+        val learned = session.type("ni").candidates
+        assertEquals("拟", learned[0])
+        assertEquals(1, learned.count { it == "拟" })
+        // the word, not the phrase: pinned like any word
+        assertTrue(Offer.PIN in session.offers(0))
     }
 
     @Test
@@ -203,5 +235,37 @@ class PinyinSessionPhraseTest {
         val left = session(spell = true, book = book).type("riqi").candidates
         assertFalse("2026-10-17" in left)
         assertTrue("2026年10月17日" in left)
+    }
+
+    // UAT PY-49: v0.3.0's 从自定义词组中删除 on a built-in date, lost with the learning menu
+    @Test
+    fun aBuiltInDateIsDeletedFromTheCustomPhrasesByItsLongPress() {
+        val saved = ArrayList<String>()
+        val book = PhraseBook(builtIn = CustomPhrases.BUILT_IN) { saved += it.all.joinToString(" ") }
+        val session = PinyinSession(
+            data, PinyinSegmenter(), pageSize = 20, phraseBook = book,
+            now = { GregorianCalendar(2026, Calendar.OCTOBER, 17, 9, 5) },
+        )
+        val s = session.type("rq")
+        val date = s.candidates.indexOf("2026-10-17")
+        assertEquals(setOf(Offer.DELETE_PHRASE), session.offers(date))
+        assertFalse(Offer.DELETE_PHRASE in session.offers(0))
+        val left = session.apply(Unpin(date)).candidates
+        assertFalse("2026-10-17" in left)
+        assertTrue("2026年10月17日" in left)
+        assertEquals(1, saved.size)
+    }
+
+    // a phrase of the user's own deleted by its long press too, saved without it (no undo: the settings' list)
+    @Test
+    fun aPhraseOfTheUsersIsDeletedByItsLongPress() {
+        val saved = ArrayList<String>()
+        val session = phrased("nizai,2=你在哪儿", saved = saved)
+        val at = session.type("nizai").candidates.indexOf("你在哪儿")
+        assertTrue(at >= 0)
+        assertTrue(Offer.DELETE_PHRASE in session.offers(at))
+        assertFalse("你在哪儿" in session.apply(Unpin(at)).candidates)
+        assertEquals(1, saved.size)
+        assertFalse(saved.single(), "你在哪儿" in saved.single())
     }
 }

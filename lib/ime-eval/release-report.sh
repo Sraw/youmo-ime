@@ -25,7 +25,7 @@
 #   base layer, must not get worse   web (recent pages, held out), chat (held-out half), dialog, pinyin
 #   new-word layer, types its words  new
 #   new-word layer, stays out of the way  collide (a common word reading as a new word)
-#   user layer                       learn over chat: typed again, and what was not typed
+#   user layer                       learn over chat: typed a third time, and what was not typed
 # Reported only: context, small (when given), slips (mixed-up and slipped syllables), mixed
 # (Chinese with an English word: not yet typed at all), and chat (held-out half) and pinyin on the
 # nine keys (t9-chat, t9-pinyin).
@@ -126,20 +126,20 @@ done
 echo "$line" | awk '{ s = 0; w = 0; for (i = 1; i <= NF; i++) { split($i, a, /[=%:]/); s += a[2] * a[4]; w += a[4] }
   printf "%s weighted=%.1f%%\n", $0, s / w }' | sed -E 's/:0(\.[0-9]*)?//g' >> "$REPORT"
 
-# the user layer: chat typed once and again, and the held-out half before and after
+# the user layer: chat typed once and twice (a correction made twice is first, U-02), and the held-out half before and after
 "$EVAL" learn "$DATA" "$SETS/pinyin-chat.tsv" --neighbours on \
   --rerank "$MODELS/sentence-model.safetensors" --refine "$MODELS/sentence-model-large.safetensors" \
   ${PACK:+--pack "$PACK"} > "$OUT/learn.txt" 2> "$OUT/learn.err" || fail "learn: the run failed"
-again=$(cell top1 "tune, typed again" < "$OUT/learn.txt")
+twice=$(cell top1 "tune, typed a third time" < "$OUT/learn.txt")
 nothing=$(cell top1 "held-out, learning nothing" < "$OUT/learn.txt")
 learned=$(cell top1 "held-out, tune learned" < "$OUT/learn.txt")
-number "${again%\%}" "learn typed again"; number "${nothing%\%}" "learn nothing"; number "${learned%\%}" "learn learned"
+number "${twice%\%}" "learn typed a third time"; number "${nothing%\%}" "learn nothing"; number "${learned%\%}" "learn learned"
 verdict=""
 # a point on the held-out 1064 is about ten samples: a loss past that is learning's cost
-if awk "BEGIN { exit !(${again%\%} < 95 || ${learned%\%} < ${nothing%\%} - 1) }"; then
+if awk "BEGIN { exit !(${twice%\%} < 95 || ${learned%\%} < ${nothing%\%} - 1) }"; then
   verdict=" FAIL"
   failed=1
 fi
-echo "learn: typed again $again first; held-out $nothing learning nothing, $learned after the rest was learned$verdict" >> "$REPORT"
+echo "learn: typed a third time $twice first; held-out $nothing learning nothing, $learned after the rest was learned$verdict" >> "$REPORT"
 cat "$REPORT"
 [ $failed = 0 ] || exit 1

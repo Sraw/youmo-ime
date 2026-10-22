@@ -20,6 +20,9 @@ class TextWords(
     private val scorer: WordScorer = WordScorer { prev2, prev, word -> model.score(prev2, prev, word) },
 ) {
 
+    /** The model's word of [text] whole, [NO_WORD] for none. */
+    fun id(text: CharSequence): Int = index.find(text)
+
     /**
      * The last two words [text] ends with, the last one last: fewer when it has fewer, none when
      * it ends with a char the model has no word for (a space, a letter), as after text kept as

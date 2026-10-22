@@ -1,0 +1,63 @@
+# U-45 单字：在「跑」「飞」后面各选了一次「得」，到「猫」后面打 de：「的」第 1；「得」「地」是 de 下用过的词，
+# 谁最近用得多谁在前。在「跑」后面连着选两次「得」，「跑 de」才是「得」。
+
+scenario de after 跑 飞 猫
+ctx 跑
+type de
+expect first 的
+pick 得
+# 选一次不换首选
+ctx 跑
+type de
+expect first 的
+ctx 飞
+type de
+pick 得
+ctx 猫
+type de
+expect first 的
+expect before 得 地
+# 跑 下第二次（中间没在跑后面用的）：连着两次
+ctx 跑
+type de
+pick 得
+ctx 跑
+type de
+expect first 得
+# 单字不跨前文 (U-02 第 3 条)
+ctx 猫
+type de
+expect first 的
+ctx 飞
+type de
+expect first 的
+
+scenario 好 de, one stray pick (U-10)
+# 「好 de」天天出「好的」，某次正当地选了一次「好得多」：「得」排到前面；下一次又按空格出「好的」，「连着」从头数。
+repeat 3 {
+ctx 好
+type de
+space
+}
+ctx 好
+type de
+expect first 的
+pick 得
+ctx 好
+type de
+expect first 的
+expect top2 的,得
+# 又按空格出「的」
+space
+ctx 好
+type de
+pick 得
+# 「连着」从头数：只算一次
+ctx 好
+type de
+expect first 的
+pick 得
+# 这次连着两次
+ctx 好
+type de
+expect first 得

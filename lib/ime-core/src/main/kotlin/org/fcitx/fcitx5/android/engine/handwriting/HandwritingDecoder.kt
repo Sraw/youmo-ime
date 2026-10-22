@@ -86,6 +86,17 @@ class HandwritingDecoder(
     fun sure(word: Entry): Boolean =
         word.text.codePointCount(0, word.text.length) > 1 || readings()[word.text.codePointAt(0)]?.size == 1
 
+    /** Character [c] as a word of its own, read as [decode] reads it alone (see [alone]); null where it has no reading. */
+    fun alone(c: String): Entry? = alone(c, index.find(c), readings())?.let { Entry(c, it) }
+
+    /** What the last search found forgotten: the user blocked a character since, which a search kept would still find. */
+    fun forgetSearch() {
+        known = emptyList()
+        knownFrom = emptyList()
+        searchedBeams = emptyArray()
+        beamsOf = emptyList()
+    }
+
     fun decode(positions: List<InkReading>, prev2: Int = NO_WORD, prev: Int = NO_WORD): Decoding {
         val n = positions.size
         if (n == 0) return Decoding(emptyList())
@@ -337,7 +348,8 @@ class HandwritingDecoder(
         if (userNode < 0 || user == null) return
         for (k in 0 until user.wordCount(userNode)) {
             val id = user.word(userNode, k)
-            if (user.text(id) == t && !user.blockedAnyhow(id)) {
+            // a word only imported is none of a sentence till the user's, as the pinyin decoder holds it to the input's start (U-101, C19)
+            if (user.text(id) == t && !user.blockedAnyhow(id) && !user.startOnly(id)) {
                 // a reading the dictionary lacks: in place of the dictionary's found before it while the
                 // user's choice; forgotten, or only imported and never picked, only where nothing else
                 // reads the word

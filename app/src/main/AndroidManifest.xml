@@ -103,10 +103,16 @@
                 <data android:pathPattern=".*\\..*\\.txt" />
                 <data android:pathPattern=".*\\..*\\..*\\.txt" />
                 <data android:pathPattern=".*\\..*\\..*\\..*\\.txt" />
+                <!-- a learning backup, the user dictionary's export (review-uat-fixes N4) -->
+                <data android:pathPattern=".*\\.fxlb" />
+                <data android:pathPattern=".*\\..*\\.fxlb" />
+                <data android:pathPattern=".*\\..*\\..*\\.fxlb" />
+                <data android:pathPattern=".*\\..*\\..*\\..*\\.fxlb" />
                 <!-- pathSuffix works on API 31+ -->
                 <data android:pathSuffix=".dict" />
                 <data android:pathSuffix=".scel" />
                 <data android:pathSuffix=".txt" />
+                <data android:pathSuffix=".fxlb" />
             </intent-filter>
         </activity>
 

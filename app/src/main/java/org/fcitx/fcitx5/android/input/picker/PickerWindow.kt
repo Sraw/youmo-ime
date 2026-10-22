@@ -76,6 +76,10 @@ class PickerWindow(
     // what is picked in a password, or in a field that asks not to be learned from, is not kept as recent
     private var keepsNoRecent = false
 
+    // U-93's 「用我的输入习惯」, read at each opening: off, the recently used are neither shown nor kept
+    // (U-67). Read here, not pushed at the field's start: ⋯ switches it mid-field
+    private val habits = AppPrefs.getInstance().internal.useHabits
+
     /** The pinyin typed in the search, while it is open. */
     private val query = EmojiSearchQuery()
 
@@ -251,6 +255,7 @@ class PickerWindow(
     override val title: String get() = if (panel) context.getString(R.string.picker_title) else ""
 
     override fun onAttached() {
+        adapter.habits = habits.getValue()
         // a view made anew mid-field (a dark-mode switch replaces it) is told of no start: the field is asked
         service.currentInputEditorInfo?.let {
             keepsNoRecent = CapabilityFlags.forField(it, service.packageName).hasAny(CapabilityFlag.PasswordOrSensitive)

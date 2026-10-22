@@ -13,9 +13,18 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.encodeToStream
 import org.fcitx.fcitx5.android.BuildConfig
 import org.fcitx.fcitx5.android.R
+import org.fcitx.fcitx5.android.core.EngineMigration
 import org.fcitx.fcitx5.android.data.clipboard.CLIPBOARD_DATABASE
 import org.fcitx.fcitx5.android.data.clipboard.db.ClipboardEntry
 import org.fcitx.fcitx5.android.data.clipboard.importedClipboardMarker
+import org.fcitx.fcitx5.android.engine.host.Engines
+import org.fcitx.fcitx5.android.engine.host.LibimeMigration
+import org.fcitx.fcitx5.android.engine.learn.LearnLog
+import org.fcitx.fcitx5.android.engine.learn.backup.Backups
+import org.fcitx.fcitx5.android.engine.learn.backup.RestoreStash
+import org.fcitx.fcitx5.android.engine.store.RecordStore
+import org.fcitx.fcitx5.android.engine.store.replaceFile
+import org.fcitx.fcitx5.android.engine.user.WordLists
 import org.fcitx.fcitx5.android.utils.Const
 import org.fcitx.fcitx5.android.utils.appContext
 import org.fcitx.fcitx5.android.utils.errorRuntime
@@ -121,10 +130,16 @@ object UserDataManager {
         return copy
     }
 
-    fun export(dest: OutputStream, timestamp: Long = System.currentTimeMillis()) = export(dest, timestamp, appDirs)
+    /**
+     * The user's data as a zip, with [learning], the engine's learning as a backup (its
+     * BackupOp.Copy), in place of its own files; null if the engine could not give it, the files then
+     * going as they are.
+     */
+    fun export(dest: OutputStream, timestamp: Long = System.currentTimeMillis(), learning: ByteArray? = null) =
+        export(dest, timestamp, appDirs, learning)
 
     @OptIn(ExperimentalSerializationApi::class)
-    internal fun export(dest: OutputStream, timestamp: Long, dirs: Dirs) = runCatching {
+    internal fun export(dest: OutputStream, timestamp: Long, dirs: Dirs, learning: ByteArray? = null) = runCatching {
         ZipOutputStream(dest.buffered()).use { zipStream ->
             // shared_prefs
             writeFileTree(dirs.sharedPrefs, "shared_prefs", zipStream)
@@ -138,9 +153,19 @@ object UserDataManager {
             }
             // external
             writeFileTree(dirs.external, "external", zipStream)
-            // engine, but for a log being compacted (RecordStore): it holds nothing the log has not
+            // engine, but for a log being compacted (RecordStore): it holds nothing the log has not; the
+            // backups, which are the phone's own; and with the learning given, the files it is made of
+            // and the old logs it was converted from (PLAN §3)
             if (dirs.engine.isDirectory) {
-                writeFileTree(dirs.engine, "engine", zipStream) { it.name.endsWith(".compacting") }
+                writeFileTree(dirs.engine, "engine", zipStream) { f ->
+                    val path = f.relativeTo(dirs.engine).path
+                    f.name.endsWith(".compacting") || path.substringBefore(File.separatorChar) in OWN_DIRS ||
+                        (learning != null && path in LEARNED_FROM)
+                }
+            }
+            learning?.let {
+                zipStream.putNextEntry(ZipEntry(RestoreStash.BACKUP))
+                zipStream.write(it)
             }
             // recently_used moved to SharedPreference and shoud not be exported
             // metadata
@@ -214,7 +239,14 @@ object UserDataManager {
             // keep importing recently_used for backwords compatibility
             copyDir(File(tempDir, "recently_used"), dirs.recentlyUsed)
             // last: an import failing after it would start fcitx again on the logs it replaced
-            if (File(tempDir, "engine").exists()) importEngine(File(tempDir, "engine"), dirs.engine)
+            val learning = File(tempDir, RestoreStash.BACKUP).takeIf { it.isFile }
+            if (File(tempDir, "engine").exists() || learning != null) {
+                val source = File(tempDir, "engine")
+                source.mkdirs()
+                val broughtSettings = File(tempDir, "external/config/$ENGINE_SETTINGS").isFile
+                keepOrderOfOlderBuild(source, File(dirs.external, "config"), broughtSettings)
+                importEngine(source, dirs.engine, learning)
+            }
             metadata
         }
     }
@@ -222,8 +254,15 @@ object UserDataManager {
     /**
      * [source] laid over [engine], as [copyDir] would, but put in place in one rename: if the
      * import fails here, the engine's directory is whole as it was, for fcitx to start again on.
+     *
+     * The learning is merged, not laid over (U-100, PLAN §2.9): the phone's learning record, its
+     * lists of words, its old logs (every `*.user`: a changed one would read to the record as the
+     * phone's words removed) and its backups stay; what the backup has of learning ([learning], the
+     * zip's backup of it; or its record; or, older, its old logs to convert; with its lists) is left
+     * in a directory of its own in [RestoreStash.DIR] for the engine to merge as it next starts,
+     * beside any the engine has not merged yet.
      */
-    private fun importEngine(source: File, engine: File) {
+    private fun importEngine(source: File, engine: File, learning: File?) {
         if (!source.isDirectory) {
             Timber.w("Cannot import user data: path='${source.path}' is not a directory")
             return
@@ -231,15 +270,73 @@ object UserDataManager {
         replaceDirectory(engine, File(engine.path + ".import")) { staged ->
             // the backup moved, and only the engine's files it lacks copied: a full phone may have no room for two copies
             if (!source.renameTo(staged)) source.copyRecursively(staged)
+            stash(staged, learning, engine)
             engine.walkTopDown()
                 // a directory the backup has as a file: the backup's
                 .onEnter { !File(staged, it.toRelativeString(engine)).isFile }
+                // half written by a compaction stopped with fcitx: nothing the log has not
+                .filterNot { it.name.endsWith(".compacting") }
                 .forEach {
-                    val target = File(staged, it.toRelativeString(engine))
-                    if (it.isDirectory) target.mkdirs() else if (!target.exists()) it.copyTo(target)
+                    val path = it.toRelativeString(engine)
+                    val target = File(staged, path)
+                    val phonesOwn = path in PHONES || path.substringBefore(File.separatorChar) in OWN_DIRS || isOldLog(path)
+                    if (it.isDirectory) target.mkdirs() else if (phonesOwn || !target.exists()) it.copyTo(target, overwrite = true)
                 }
         }
     }
+
+    // a backup of a build before tables.order-kept: its tables typed with keep 调频 on in the
+    // settings it brings, as EngineMigration does at such a build's first start. The phone's own
+    // marker stays (importEngine), so that start never comes for the backup's logs (R11 F2745).
+    // A backup without the addon's settings leaves the phone's, which fcitx writes in full once any
+    // setting changes: their 调频 off is fcitx's default, not what the backup's build had (F3123)
+    private fun keepOrderOfOlderBuild(source: File, configHome: File, broughtSettings: Boolean) {
+        if (File(source, EngineMigration.ORDER_KEPT).exists()) return
+        val typed = Engines.TABLES.keys.filter { File(source, Engines.userTable(it)).exists() }
+        if (typed.isEmpty()) return
+        val settings = File(configHome, ENGINE_SETTINGS)
+        val config = if (settings.exists()) settings.readText() else ""
+        LibimeMigration.keepOrderByUse(config, typed, unset = if (broughtSettings) emptySet() else typed.toSet())?.let { text ->
+            settings.parentFile?.mkdirs()
+            replaceFile(settings, File(settings.path + ".new")) { it.writeText(text) }
+        }
+    }
+
+    // the backup's learning in [staged] (its engine directory) moved aside into a new directory of
+    // RestoreStash.DIR, named by the time (after any the phone has waiting), and the learning files that
+    // are the phone's alone dropped
+    private fun stash(staged: File, learning: File?, engine: File) {
+        OWN_DIRS.forEach { File(staged, it).deleteRecursively() }
+        val waiting = File(engine, RestoreStash.DIR).list().orEmpty().mapNotNull { it.toLongOrNull() }.maxOrNull() ?: 0L
+        val stash = File(staged, RestoreStash.DIR + File.separator + maxOf(System.currentTimeMillis(), waiting + 1))
+        stash.mkdirs()
+        learning?.copyTo(File(stash, RestoreStash.BACKUP))
+        val stashed = STASHED + staged.list().orEmpty().filter(::isOldLog)
+        for (name in stashed) File(staged, name).takeIf { it.isFile }?.let { it.copyTo(File(stash, name)); it.delete() }
+        PHONES.forEach { File(staged, it).deleteRecursively() }
+        if (stash.list().isNullOrEmpty()) stash.parentFile?.let { if (stash.delete()) it.delete() }
+    }
+
+    // an older build's log of learning (pinyin's, a table's, English's), at the engine directory's top
+    private fun isOldLog(path: String) = File.separatorChar !in path && path.endsWith(".user")
+
+    // the files of the phone's learning: kept over a backup's, as the backup's learning is merged into them
+    private val PHONES = setOf(
+        LearnLog.FILE, LearnLog.FILE + RecordStore.UNREADABLE, LearnLog.MARKER, LearnLog.MARKER + ".new",
+        Engines.PINS_MOVED, WordLists.ADDED, WordLists.BLOCKED, Engines.USER_PINYIN,
+    )
+
+    // of a backup's engine directory, what is its learning, with its old logs: merged by the engine at its next start
+    private val STASHED = listOf(LearnLog.FILE, WordLists.ADDED, WordLists.BLOCKED)
+
+    // the androidengine addon's settings, under fcitx's config home
+    private const val ENGINE_SETTINGS = "conf/androidengine.conf"
+
+    // the directories of the engine's that are the phone's alone, neither exported nor imported
+    private val OWN_DIRS = setOf(Backups.DIR, RestoreStash.DIR, RestoreStash.UNREADABLE)
+
+    // what the learning a zip carries as a backup is made of: not exported beside it
+    private val LEARNED_FROM = setOf(LearnLog.FILE, LearnLog.FILE + RecordStore.UNREADABLE, LearnLog.MARKER, Engines.PINS_MOVED, Engines.USER_PINYIN)
 }
 
 /**

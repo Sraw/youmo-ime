@@ -11,8 +11,10 @@ import androidx.preference.PreferenceGroup
 import androidx.preference.PreferenceManager
 import androidx.preference.PreferenceScreen
 import androidx.preference.SwitchPreferenceCompat
+import kotlinx.coroutines.runBlocking
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
+import org.fcitx.fcitx5.android.core.FakeFcitxAPI
 import org.fcitx.fcitx5.android.core.InputMethodNames
 import org.fcitx.fcitx5.android.core.RawConfig
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
@@ -20,6 +22,7 @@ import org.fcitx.fcitx5.android.engine.host.EngineSettings
 import org.fcitx.fcitx5.android.engine.host.Engines
 import org.fcitx.fcitx5.android.engine.host.ModelLevel
 import org.fcitx.fcitx5.android.engine.host.TableSettings
+import org.fcitx.fcitx5.android.engine.learn.control.LearningResult
 import org.fcitx.fcitx5.android.engine.pinyin.Fuzzy
 import org.fcitx.fcitx5.android.input.handwriting.HandwritingPause
 import org.fcitx.fcitx5.android.input.keyboard.T9EnglishTyping
@@ -44,6 +47,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
+import org.robolectric.shadows.ShadowToast
 
 /** The pages as the preferences [InputMethodSettings.create] makes of them, over fcitx's config. */
 @RunWith(RobolectricTestRunner::class)
@@ -95,6 +99,36 @@ class InputMethodSettingsScreenTest {
         assertSame(words, screen.findPreference<Preference>(InputMethodSettings.ENGLISH_WORDS))
         words.performClick()
         assertEquals(listOf<SettingsRoute>(SettingsRoute.UserWordList("LEARNED", english = true)), opened)
+    }
+
+    // 恢复码表顺序: asked first, then the page's input method's order reset on the fcitx thread
+    @Test
+    fun aTablesOrderIsResetOnceConfirmed() {
+        val acted = ArrayList<InputMethodSettings.Action>()
+        val told = ArrayList<(Boolean) -> Unit>()
+        val asked = ArrayList<() -> Unit>()
+        val confirm: ImConfirm = { _, item, then ->
+            assertEquals(R.string.im_reset_table_order_confirm, item.confirm)
+            asked += then
+        }
+        val wubi = "engine-wubi"
+        val ctx = PlaceholderStrings(RuntimeEnvironment.getApplication())
+        val screen = InputMethodSettings.create(
+            PreferenceManager(ctx), InputMethodSettings.of(wubi)!!, RawConfig(), {}, act = { item, done -> acted += item; told += done }, confirm = confirm,
+        ) {}
+        screen.findPreference<Preference>(InputMethodSettings.RESET_TABLE_ORDER)!!.performClick()
+        assertTrue(acted.isEmpty())
+        asked.single()()
+        val fcitx = FakeFcitxAPI()
+        assertTrue(runBlocking { acted.single().run(fcitx, wubi) })
+        assertEquals(listOf("learning(ResetTableOrder(im=$wubi))"), fcitx.calls)
+        // F2673: the engine not there, not done; what is shown says which
+        fcitx.learned = { LearningResult.Unavailable }
+        assertFalse(runBlocking { acted.single().run(fcitx, wubi) })
+        told.single()(true)
+        assertEquals(ctx.getText(R.string.im_reset_table_order_done), ShadowToast.getTextOfLatestToast())
+        told.single()(false)
+        assertEquals(ctx.getText(R.string.dict_change_failed), ShadowToast.getTextOfLatestToast())
     }
 
     // a list's dialog looks its preference up by key: one without a key crashed on a tap
@@ -173,16 +207,16 @@ class InputMethodSettingsScreenTest {
     @Test
     fun anExplanationIsUnderTheValueNotInTheDialog() {
         appInputMethods.forEach { page -> screen(page).lists().forEach { assertNull("$page ${it.key}", it.dialogMessage) } }
-        val length = item("engine-wubi", "AutoPhraseLength") as Choice
-        val pref = screen("engine-wubi").findPreference<ListPreference>(length.key)!!
+        val length = InputMethodSettings.SHARED.flat().first { it is Choice && it.key == EngineSettings.MODEL_LEVEL } as Choice
+        val pref = create(InputMethodSettings.SHARED).findPreference<ListPreference>(length.key)!!
         assertEquals("${pref.entry}\n${placeholder(length.summary)}", pref.summary?.toString())
     }
 
     // as a list without an explanation shows it, not as "null"
     @Test
     fun aValueNotAmongTheChoicesIsNotSetAboveTheExplanation() {
-        val length = item("engine-wubi", "AutoPhraseLength") as Choice
-        val pref = screen("engine-wubi").findPreference<ListPreference>(length.key)!!
+        val length = InputMethodSettings.SHARED.flat().first { it is Choice && it.key == EngineSettings.MODEL_LEVEL } as Choice
+        val pref = create(InputMethodSettings.SHARED).findPreference<ListPreference>(length.key)!!
         pref.value = "7"
         assertEquals("${placeholder(androidx.preference.R.string.not_set)}\n${placeholder(length.summary)}", pref.summary?.toString())
     }
@@ -270,11 +304,10 @@ class InputMethodSettingsScreenTest {
         val page = screen("engine-wubi", wubi)
         page.titled(R.string.im_auto_select).callChangeListener(false)
         page.titled(R.string.im_order_by_use).callChangeListener(false)
-        page.findPreference<ListPreference>(TableSettings.AUTO_PHRASE_LENGTH)!!.callChangeListener("2")
         // a table's page is its group of the addon's config
         val group = Engines.TABLES.getValue("engine-wubi").group
         assertEquals(
-            TableSettings(autoSelect = false, orderByUse = false, autoPhraseLength = 2),
+            TableSettings(autoSelect = false, orderByUse = false),
             EngineSettings.parse(wubi.flattened("$group/")).tables[group],
         )
     }
@@ -287,10 +320,10 @@ class InputMethodSettingsScreenTest {
 
     @Test
     fun aSectionInAnotherStaysInIt() {
-        val inner = Section(R.string.im_section_phrases, listOf(Toggle("Inner", { "inner" })))
+        val inner = Section(R.string.im_section_words, listOf(Toggle("Inner", { "inner" })))
         val screen = create(listOf(Section(R.string.im_section_typing, listOf(inner))))
         assertEquals(1, screen.preferenceCount)
         val outer = screen.getPreference(0) as PreferenceGroup
-        assertEquals(placeholder(R.string.im_section_phrases), outer.getPreference(0).title?.toString())
+        assertEquals(placeholder(R.string.im_section_words), outer.getPreference(0).title?.toString())
     }
 }

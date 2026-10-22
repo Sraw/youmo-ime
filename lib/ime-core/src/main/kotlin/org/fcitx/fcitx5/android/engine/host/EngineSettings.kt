@@ -84,7 +84,6 @@ data class EngineSettings(
          */
         // each table's settings in [values], by its group: those of a group with any of [TableSettings.KEYS]
         private fun tables(values: Map<String, String>, flag: (String) -> Boolean?): Map<String, TableSettings> {
-            fun count(key: String, range: IntRange) = values[key]?.toIntOrNull()?.takeIf { it in range }
             return values.keys.mapNotNullTo(LinkedHashSet()) { key ->
                 key.substringBefore('/', "").takeIf { it.isNotEmpty() && key.substringAfter('/') in TableSettings.KEYS }
             }.associateWith { group ->
@@ -96,8 +95,6 @@ data class EngineSettings(
                         "No" -> false
                         else -> null
                     },
-                    autoPhraseLength = count("$group/${TableSettings.AUTO_PHRASE_LENGTH}", TableSettings.AUTO_PHRASE_LENGTHS),
-                    saveAutoPhraseAfter = count("$group/${TableSettings.SAVE_AUTO_PHRASE_AFTER}", TableSettings.SAVES_AFTER),
                 )
             }
         }
@@ -154,27 +151,26 @@ data class TableSettings(
     val autoSelect: Boolean? = null,
     val hint: Boolean? = null,
     val orderByUse: Boolean? = null,
-    val autoPhraseLength: Int? = null,
-    val saveAutoPhraseAfter: Int? = null,
 ) {
     /** [options] with what was set here instead. */
     fun applyTo(options: TableOptions) = options.copy(
         autoSelect = autoSelect ?: options.autoSelect,
         hint = hint ?: options.hint,
         orderByUse = orderByUse ?: options.orderByUse,
-        autoPhraseLength = autoPhraseLength ?: options.autoPhraseLength,
-        saveAutoPhraseAfter = saveAutoPhraseAfter ?: options.saveAutoPhraseAfter,
     )
 
     companion object {
         const val AUTO_SELECT = "AutoSelect"
         const val HINT = "Hint"
         const val ORDER_POLICY = "OrderPolicy"
-        const val AUTO_PHRASE_LENGTH = "AutoPhraseLength"
-        const val SAVE_AUTO_PHRASE_AFTER = "SaveAutoPhraseAfter"
-        val KEYS = setOf(AUTO_SELECT, HINT, ORDER_POLICY, AUTO_PHRASE_LENGTH, SAVE_AUTO_PHRASE_AFTER)
 
-        val AUTO_PHRASE_LENGTHS = -1..8
-        val SAVES_AFTER = -1..10
+        /** What 调频 on is written as (Fast orders by use alike). */
+        const val ORDER_BY_USE = "Freq"
+
+        /**
+         * The keys a table's group has. 自动造词's two (AutoPhraseLength, SaveAutoPhraseAfter) are
+         * gone (U-28 C46): an older config's are read by nothing, and fcitx drops them at its next save.
+         */
+        val KEYS = setOf(AUTO_SELECT, HINT, ORDER_POLICY)
     }
 }

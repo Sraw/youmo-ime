@@ -19,6 +19,7 @@ import org.fcitx.fcitx5.android.core.EngineBridge
 import org.fcitx.fcitx5.android.core.Fcitx
 import org.fcitx.fcitx5.android.core.FcitxEvent
 import org.fcitx.fcitx5.android.engine.host.Engines
+import org.fcitx.fcitx5.android.engine.learn.LearnLog
 import org.fcitx.fcitx5.android.engine.store.RecordFormat
 import org.junit.Assert.assertEquals
 import org.junit.Assume.assumeTrue
@@ -161,12 +162,17 @@ class EngineEvalRunner {
             .joinToString("\t")
 
     /**
-     * The logs under [dir], the engine's user directory, with a record in them: pinyin's, which keeps
-     * the counts of every word typed (the dictionary's too) and the layer prior (UserStore), English's
-     * and each table's. One of a header alone learned nothing, as a first start leaves it.
+     * The logs under [dir], the engine's user directory, with a record in them: English's and each
+     * table's, and the learning record (LearnLog), which keeps pinyin's (an older build's pinyin.user,
+     * read once, is never written). One of a header alone learned nothing, as a first start leaves
+     * it; the learning record, a snapshot of nothing (review-1a-app S6).
      */
-    private fun learnedLogs(dir: File): List<File> =
-        dir.walkTopDown().filter { it.isFile && it.name.endsWith(LOG_SUFFIX) && it.length() > RecordFormat.HEADER_SIZE }.toList()
+    private fun learnedLogs(dir: File): List<File> = dir.walkTopDown().filter {
+        it.isFile && when {
+            it.name == LearnLog.FILE -> !LearnLog.replay(it.readBytes()).isEmpty()
+            else -> it.name.endsWith(LOG_SUFFIX) && it.length() > RecordFormat.HEADER_SIZE
+        }
+    }.toList()
 
     /** A line of an evaluation set as it is typed: [input] after [context], the text before the cursor ("" for none). */
     private data class Sample(val input: String, val context: String)

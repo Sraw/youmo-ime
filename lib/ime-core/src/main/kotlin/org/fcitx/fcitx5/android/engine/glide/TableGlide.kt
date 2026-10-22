@@ -17,7 +17,8 @@ import org.fcitx.fcitx5.android.engine.table.TableDictionary
  * asked as an entry is first scored for a [version]: its [score] is asked again each glide that
  * reaches it, as every word learned moves it. An approximation: an entry with no count whose
  * likeliest split has a counted word in it (你们 as 你 + 们) keeps its score till [version] changes.
- * A [blocked] entry is never a code's.
+ * A [blocked] entry (asked with its code, as a table blocks under a code) is never a code's;
+ * [version] includes what the blocks are, so a new block scores it anew.
  */
 class TableGlide(
     private val dictionary: TableDictionary,
@@ -25,7 +26,7 @@ class TableGlide(
     private val weights: GlidePath.Weights = PinyinGlide.WEIGHTS,
     private val version: () -> Any? = { null },
     private val learned: (String) -> Boolean = { false },
-    private val blocked: (String) -> Boolean = { false },
+    private val blocked: (code: String, text: String) -> Boolean = { _, _ -> false },
 ) {
 
     // each entry's [score] (-∞ blocked), as first asked (NaN till then): the same every glide till
@@ -100,7 +101,7 @@ class TableGlide(
             val s = scores[i]
             if (s.isNaN()) {
                 val text = dictionary.text(i)
-                val isBlocked = blocked(text)
+                val isBlocked = blocked(dictionary.code(i), text)
                 counted[i] = !isBlocked && learned(text)
                 return (if (isBlocked) Float.NEGATIVE_INFINITY else score(text)).also { scores[i] = it }
             }

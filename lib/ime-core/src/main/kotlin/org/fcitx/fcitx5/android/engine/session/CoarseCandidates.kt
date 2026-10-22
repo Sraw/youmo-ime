@@ -19,16 +19,16 @@ class CoarseCandidates(private val coarse: CoarseWords, private val data: Pinyin
 
     /**
      * The candidates of [listed] with a coarse word the user never typed that a first page of
-     * [pageSize] would show: they wait past it, those further down keep their place, so what more
-     * words read goes after all that was listed.
+     * [pageSize] would show, but those [kept] (the user's habit put them there): they wait past it,
+     * those further down keep their place, so what more words read goes after all that was listed.
      */
-    fun held(listed: List<Candidate>, pageSize: Int): List<Candidate> {
+    fun held(listed: List<Candidate>, pageSize: Int, kept: (Candidate) -> Boolean = { false }): List<Candidate> {
         val typedOnce = HashMap<String, Boolean>()
         val held = ArrayList<Candidate>()
         var shown = 0
         for (c in listed) {
             if (shown == pageSize) break
-            if (isCoarse(c, typedOnce)) held += c else shown++
+            if (!kept(c) && isCoarse(c, typedOnce)) held += c else shown++
         }
         return held
     }
@@ -59,7 +59,7 @@ class CoarseCandidates(private val coarse: CoarseWords, private val data: Pinyin
         return false
     }
 
-    private fun text(word: Int) = if (word < data.vocabulary.size || user == null) data.vocabulary.word(word) else user.text(word)
+    private fun text(word: Int) = wordText(data, user, word)
 
     // a word of the vocabulary or of the user's own
     private fun typed(text: String): Boolean {
@@ -68,3 +68,7 @@ class CoarseCandidates(private val coarse: CoarseWords, private val data: Pinyin
         return word >= 0 && user.count(word) > 0f || user.typed(text)
     }
 }
+
+/** The text of [word]: the model's, else the [user]'s own. */
+internal fun wordText(data: PinyinData, user: UserModel?, word: Int): String =
+    if (word < data.vocabulary.size || user == null) data.vocabulary.word(word) else user.text(word)

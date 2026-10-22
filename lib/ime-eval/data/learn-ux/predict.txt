@@ -1,0 +1,180 @@
+# §9 联想。
+# U-70 选了联想（方式 D）：联想照 U-02 排，前一个词就是它的编码，不另看前文：选一次（算用过）排到没用过的前面，连着选两次第 1。
+# U-71 自己打过的搭配也联想：后一个词紧跟在前一个后面，累计满 3 次（中间打别的不影响），写了前一个就联想出后一个。
+#      各种打法都算；语音原样上屏的不算；被删掉的不算；还没成词的不进联想。
+# U-72 不想要的联想：长按「不再联想」，这个前词后面不再联想它；当场能撤销。
+# The data offers 人 选择 时候 一 效果 after 好的, and 的 地 搞笑 风趣 是 after 幽默 (no 输入法 among them).
+
+scenario U-70 picked once: before those never picked
+clear
+type haode
+space
+expect first 人
+pick 效果
+clear
+type haode
+space
+expect top2 人,效果
+
+scenario U-70 picked twice running: first
+clear
+type haode
+space
+pick 效果
+clear
+type haode
+space
+pick 效果
+clear
+type haode
+space
+expect first 效果
+
+scenario U-70 the first picked between: the run starts again
+clear
+type haode
+space
+pick 效果
+clear
+type haode
+space
+pick 人
+clear
+type haode
+space
+pick 效果
+clear
+type haode
+space
+expect first 人
+expect before 效果 选择
+
+scenario U-70 no 前文 beyond the word before
+ctx 我们
+type haode
+space
+pick 效果
+ctx 他说
+type haode
+space
+pick 效果
+ctx 今天
+type haode
+space
+expect first 效果
+
+scenario U-70 after 30 typing days without it, gone
+clear
+type haode
+space
+pick 效果
+clear
+type haode
+space
+pick 效果
+repeat 30 {
+day
+clear
+type nihao
+space
+}
+clear
+type haode
+space
+expect first 人
+
+scenario U-71 a pair typed 3 times is offered, not before
+clear
+type youmo
+space
+expect lacks 输入法
+clear
+type youmo
+space
+type shurufa
+pick 输入法
+clear
+type youmo
+space
+type shurufa
+pick 输入法
+clear
+type youmo
+space
+expect lacks 输入法
+type shurufa
+pick 输入法
+clear
+type youmo
+space
+expect has 输入法
+
+scenario U-71 other words between do not reset the count
+clear
+type youmo
+space
+type shurufa
+pick 输入法
+type henhao
+space
+clear
+type youmo
+space
+type shurufa
+pick 输入法
+clear
+type nihao
+space
+type youmo
+space
+type shurufa
+pick 输入法
+clear
+type youmo
+space
+expect has 输入法
+
+scenario U-71 a pair deleted does not count
+pending 1c: Backspace takes a commit back (UNDO)
+clear
+type youmo
+space
+type shurufa
+pick 输入法
+clear
+type youmo
+space
+type shurufa
+pick 输入法
+clear
+type youmo
+space
+type shurufa
+pick 输入法
+del 1
+clear
+type youmo
+space
+expect lacks 输入法
+
+scenario U-72 不再联想
+clear
+type haode
+space
+expect first 人
+todo 不再联想 on 人 (stream E's long press)
+expect lacks 人
+
+scenario U-71 after a word the decoder reads in pieces (UAT PY-71)
+# 好的 is read 好 的 (the 人 选择 时候 offered are what follows that): what is put in after it is counted after 好的, the word its text ends with
+repeat 3 {
+clear
+type haode
+space
+type xiexie
+space
+}
+clear
+type haode
+space
+expect first 谢谢

@@ -70,12 +70,23 @@ class TableGlideTest {
 
     @Test
     fun aBlockedEntryIsNotItsCodes() {
-        val blocked = TableGlide(dictionary("wqiy 你", "vbg 好", "vbgf 妤", "vb 奻", "vb 女"), { scores.getValue(it) }, blocked = { it == "女" })
+        val blocked = TableGlide(dictionary("wqiy 你", "vbg 好", "vbgf 妤", "vb 奻", "vb 女"), { scores.getValue(it) }, blocked = { _, text -> text == "女" })
         val unblocked = TableGlide(dictionary("wqiy 你", "vbg 好", "vbgf 妤", "vb 奻", "vb 女"), { scores.getValue(it) })
         assertEquals("女", unblocked.decode(path("vb"), GlideLayout.QWERTY, 3).first { it.keys == "vb" }.word)
         // vb by its next entry, not dropped
         assertEquals("奻", blocked.decode(path("vb"), GlideLayout.QWERTY, 10).first { it.keys == "vb" }.word)
-        val none = TableGlide(dictionary("wqiy 你", "vb 女"), { scores.getValue(it) }, blocked = { it == "女" })
+        val none = TableGlide(dictionary("wqiy 你", "vb 女"), { scores.getValue(it) }, blocked = { _, text -> text == "女" })
         assertTrue(none.decode(path("vb"), GlideLayout.QWERTY, 3).none { it.keys == "vb" })
+    }
+
+    // a block is under a code (U-28): the same text under another code still reads there
+    @Test
+    fun aBlockUnderOneCodeLeavesTheTextUnderAnother() {
+        val glide = TableGlide(
+            dictionary("wqiy 你", "vbg 好", "vbgf 妤", "vb 女", "vb 奻", "wq 女", "wq 奻"), { scores.getValue(it) },
+            blocked = { code, text -> code == "vb" && text == "女" },
+        )
+        assertEquals("奻", glide.decode(path("vb"), GlideLayout.QWERTY, 10).first { it.keys == "vb" }.word)
+        assertEquals("女", glide.decode(path("wq"), GlideLayout.QWERTY, 10).first { it.keys == "wq" }.word)
     }
 }

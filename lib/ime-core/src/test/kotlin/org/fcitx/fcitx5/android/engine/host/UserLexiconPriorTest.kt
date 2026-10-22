@@ -8,6 +8,7 @@ import org.fcitx.fcitx5.android.engine.data.PinyinDataBuilder
 import org.fcitx.fcitx5.android.engine.pinyin.Syllables
 import org.fcitx.fcitx5.android.engine.user.UserModel
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.nio.ByteBuffer
@@ -27,7 +28,7 @@ class UserLexiconPriorTest {
     private fun lexicon() = UserLexicon(
         null, { throw it }, { null }, { null },
         EngineAssets({ ByteBuffer.wrap(pinyin) }, { throw it }, null),
-        Executor { it.run() }, forgetInTables = {}, dropSessions = {},
+        forgetInTables = {}, dropSessions = {},
     )
 
     @Test
@@ -41,5 +42,22 @@ class UserLexiconPriorTest {
         assertTrue(user.modelWord(byHand) != byHand)
         // through UserLexicon's delegate: scored as the model's 搭子, so of places
         assertEquals(0.5f, prior.of(byHand), 0f)
+    }
+
+    // review-uat-fixes S8: English's words pinyin spells are no word of the user's dictionaries for
+    // the tables, which recoded the whole list at each one learned
+    @Test
+    fun englishsWordsListedForPinyinLeaveTheTablesListAlone() {
+        val lexicon = lexicon()
+        val user = lexicon.user()
+        val listings = user.listings
+        lexicon.listLatin(setOf("GitHub"))
+        assertEquals(listings, user.listings)
+        assertFalse("GitHub" in user.listedTexts())
+        // listed all the same: pinyin's model has the word, and not once unlisted
+        assertTrue(user.knowsText("GitHub"))
+        lexicon.listLatin(emptySet())
+        assertEquals(listings, user.listings)
+        assertFalse(user.knowsText("GitHub"))
     }
 }

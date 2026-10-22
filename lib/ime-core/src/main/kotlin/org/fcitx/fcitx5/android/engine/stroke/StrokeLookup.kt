@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.engine.stroke
 
+import org.fcitx.fcitx5.android.engine.learn.control.Why
 import org.fcitx.fcitx5.android.engine.session.Action
 import org.fcitx.fcitx5.android.engine.session.Choice
 import org.fcitx.fcitx5.android.engine.session.Offer
@@ -101,6 +102,14 @@ class StrokeLookup(
         else found.page(from, count).map { Choice(it, reading(it)) }
 
     override fun offers(index: Int): Set<Offer> = if (looking) emptySet() else pinyin.offers(index)
+
+    override fun why(index: Int): Why? = if (looking) null else pinyin.why(index)
+
+    override fun reread(): Snapshot? = if (looking) null else pinyin.reread()
+
+    override val rereads get() = !looking && pinyin.rereads
+
+    override fun fieldFlags(flags: Int) = pinyin.fieldFlags(flags)
 
     private fun type(c: Char): Snapshot = when {
         c in Strokes.KEYS -> lookUp { input.insert(cursor++, c) }

@@ -1,0 +1,57 @@
+# U-60 人名：单独打出来（分段选），同样上屏 2 次就是我的词（U-06）。这两次都是改出来的：在没改过的前文后面，
+# 单独打它也排第 1（原首选「王小明」我没用过）。成了我的词：进简拼（首选以外排在没用过的词库词前面）。
+# U-62 只上屏过一次的：不会因此冒到简拼。
+
+scenario 汪小明 segmented twice
+clear
+type wangxiaoming
+expect first 王小明
+pick 汪
+pick 小明
+clear
+type wangxiaoming
+expect top2 王小明,汪小明
+clear
+type wxm
+expect before 危险吗 汪小明
+clear
+type wangxiaoming
+pick 汪
+pick 小明
+clear
+type wangxiaoming
+expect first 汪小明
+clear
+type wxm
+expect top2 我下面,汪小明
+
+scenario 汪 picked alone ranks before 往 (U-08 两级)
+# 分段选过的「汪」，在 wangxiaomingchifan 里也排在没用过的「往、忘」前面
+clear
+type wangxiaoming
+pick 汪
+pick 小明
+clear
+type wangxiaomingchifan
+expect before 汪 往
+
+scenario 汪小明 added by hand, 王小明 the dictionary's (U-65: U-02 and a pin, not kept in sentences)
+# U-65：有同码的词时，选它照 U-02，要首位可以固定。王小明 是词库里 wangxiaoming 的词，所以手动加的 汪小明
+# 排在首选之后、没用过的词库词前面，整句里不照用（design-1c 草案曾写 wangxiaoming 首位 汪小明，与规格不符）
+clear
+add 汪小明 wang xiao ming
+type wangxiaoming
+expect top2 王小明,汪小明
+clear
+type wangxiaomingchifan
+expect first 王小明吃饭
+
+scenario 芮小雯 added by hand, no word of the same keys (U-65, U-08)
+# U-65：没有别的同编码的词时，整句里照用（U-08），单独打它的编码也第 1（那也是整句，§1）
+clear
+add 芮小雯 rui xiao wen
+type ruixiaowen
+expect first 芮小雯
+clear
+type ruixiaowenchifan
+expect first 芮小雯吃饭

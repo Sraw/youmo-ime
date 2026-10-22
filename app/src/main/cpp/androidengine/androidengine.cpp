@@ -68,6 +68,8 @@ const OfferAction offerActions[] = {
         {OfferPin, EngineEvent::Pin, "Pin to top as custom phrase", "fcitx5-chinese-addons"},
         {OfferUnpin, EngineEvent::Unpin, "Delete from custom phrase", "fcitx5-chinese-addons"},
         {OfferBlock, EngineEvent::Block, N_("Never show this word"), "fcitx5-android"},
+        // a custom phrase (a built-in date too) goes by the unpin's event, as in v0.3.0 (UAT PY-49)
+        {OfferDeletePhrase, EngineEvent::Unpin, "Delete from custom phrase", "fcitx5-chinese-addons"},
 };
 
 /**
@@ -199,7 +201,7 @@ public:
         const auto event = static_cast<EngineEvent>(id);
         int offer = 0;
         for (const auto &offered: offerActions) {
-            if (offered.event == event) offer = offered.offer;
+            if (offered.event == event) offer |= offered.offer;
         }
         // asked again: only what the session still offers for the candidate at that index, and
         // only on the one this list offered it for: a menu of a list since replaced names another

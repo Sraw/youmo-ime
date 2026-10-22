@@ -1,0 +1,66 @@
+# U-45 跨前文。The data has 指导 first after 老师 and 多多 already: 你 请 stand in for the picks, 想 for 多多.
+
+scenario zhidao, two corrections elsewhere
+# 老师 zhidao、请 zhidao 各选一次「指导」，然后在从没打过 zhidao 的「多多」后面打：最近「指导」用得比「知道」多，「指导」第 1
+ctx 想
+type zhidao
+expect first 知道
+ctx 你
+type zhidao
+pick 指导
+ctx 请
+type zhidao
+pick 指导
+ctx 想
+type zhidao
+expect first 指导
+
+scenario zhidao, 我 types 知道 daily
+# 否则「知道」第 1、「指导」第 2
+repeat 5 {
+ctx 我
+type zhidao
+space
+}
+ctx 你
+type zhidao
+pick 指导
+ctx 请
+type zhidao
+pick 指导
+ctx 想
+type zhidao
+expect top2 知道,指导
+# 律师这个月「指导」改选过很多次、用得比「知道」还多：「我 zhidao」也出「指导」（C30）
+ctx 他
+type zhidao
+pick 指导
+ctx 不
+type zhidao
+pick 指导
+ctx 都
+type zhidao
+pick 指导
+ctx 也
+type zhidao
+pick 指导
+ctx 你
+type zhidao
+pick 指导
+ctx 请
+type zhidao
+pick 指导
+ctx 我
+type zhidao
+expect first 指导
+# 在「我」后面连着选两次「知道」，「我」就有了自己的首选「知道」，不再跟着别处变
+pick 知道
+ctx 我
+type zhidao
+pick 知道
+ctx 我
+type zhidao
+expect first 知道
+ctx 想
+type zhidao
+expect first 指导

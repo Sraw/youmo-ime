@@ -49,6 +49,25 @@ class WordListsTest {
         assertNull(WordLists.entry("西安", "xian"))
     }
 
+    // review R11 F2933: a delete taken back puts each word where it was, in order, past the end at the end
+    @Test
+    fun wordsPutBackGoWhereTheyWereAndAreKept() {
+        val dir = folder.newFolder()
+        val lists = WordLists(dir)
+        val a = entry("你", "ni")
+        val b = entry("好", "hao")
+        val c = entry("吗", "ma")
+        val d = entry("拟", "ni")
+        lists.addAll(listOf(a, b, c, d))
+        lists.removeAll(listOf(a, c, d))
+        // out of order, one there still, one past the end
+        val back = lists.putBack(listOf(IndexedValue(9, d), IndexedValue(2, c), IndexedValue(1, b), IndexedValue(0, a)))
+        assertEquals(listOf(a, c, d), back)
+        assertEquals(listOf(a, b, c, d), lists.addedWords)
+        assertEquals(listOf(a, b, c, d), WordLists(dir).addedWords)
+        assertEquals(emptyList<UserModel.Entry>(), lists.putBack(listOf(IndexedValue(0, b))))
+    }
+
     @Test
     fun theListsAreKeptInTheirFiles() {
         val dir = folder.newFolder()

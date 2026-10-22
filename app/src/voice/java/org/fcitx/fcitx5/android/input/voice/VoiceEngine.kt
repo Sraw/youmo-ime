@@ -133,10 +133,15 @@ object VoiceEngine {
     private fun heard(result: OfflineRecognizerResult) =
         VoiceChoice.Heard(result.nbest.toList(), result.nbestScores, result.text)
 
-    /** the words the user added and made (VoiceHotwords.ofUser), read again for each listener */
-    suspend fun userHotwords(fcitx: FcitxConnection): VoiceHotwords.Words {
+    /**
+     * the words the user added and made (VoiceHotwords.ofUser), read again for each listener; with
+     * [habits] off (U-93's 用我的输入习惯) none of theirs, the blocked still blocked
+     */
+    suspend fun userHotwords(fcitx: FcitxConnection, habits: Boolean = true): VoiceHotwords.Words {
         // not cancelled with the wait: a read that comes late is still remembered for the next listener
         // one read at a time: a hold while one is still waiting on a busy engine waits on it too
+        // read with habits on: shared and remembered, it serves later listeners whose switch may differ;
+        // each listener's own switch is applied below
         val read = remembered.shared<Deferred<VoiceHotwords.Words>>({ it.isActive }) { ticket ->
             reading.async { remembered.read(ticket, VoiceHotwords.ofUser(fcitx.runOnReady { userWords() })) }
         }
@@ -144,7 +149,7 @@ object VoiceEngine {
         // a timeout was silent: the user's words were dropped and nothing said so
         if (inTime == null) Timber.w("voice hotwords: no answer in %d ms, the last read used", USER_WORDS_MS)
         // how many, not which: they are the user's
-        return remembered.inTime(inTime).also { Timber.d("voice hotwords: %d listened for, %d blocked", it.hotwords.split('/').count { w -> w.isNotEmpty() }, it.blockedWords.size) }
+        return remembered.inTime(inTime).withHabits(habits).also { Timber.d("voice hotwords: %d listened for, %d blocked", it.hotwords.split('/').count { w -> w.isNotEmpty() }, it.blockedWords.size) }
     }
 
     // the engine still starting or busy: voice input with the words last read, not a wait

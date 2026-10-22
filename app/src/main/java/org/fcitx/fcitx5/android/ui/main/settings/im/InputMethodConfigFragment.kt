@@ -6,6 +6,8 @@ package org.fcitx.fcitx5.android.ui.main.settings.im
 
 import android.os.Build
 import androidx.preference.PreferenceScreen
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import org.fcitx.fcitx5.android.core.FcitxAPI
 import org.fcitx.fcitx5.android.core.InputMethodNames
 import org.fcitx.fcitx5.android.core.RawConfig
@@ -23,7 +25,16 @@ class InputMethodConfigFragment : FcitxPreferenceFragment() {
     override fun getPageTitle(): String = InputMethodNames.of(requireContext(), args.uniqueName, args.name)
 
     override fun createScreen(raw: RawConfig, save: () -> Unit): PreferenceScreen =
-        items?.let { InputMethodSettings.create(preferenceManager, it, raw["cfg"], save) { route -> navigateWithAnim(route) } }
+        items?.let {
+            InputMethodSettings.create(preferenceManager, it, raw["cfg"], save, act = { action, done ->
+                launchOnFcitx {
+                    val ok = action.run(this, args.uniqueName)
+                    withContext(Dispatchers.Main) { done(ok) }
+                }
+            }) { route ->
+                navigateWithAnim(route)
+            }
+        }
             ?: super.createScreen(raw, save)
 
     override suspend fun obtainConfig(fcitx: FcitxAPI): RawConfig {

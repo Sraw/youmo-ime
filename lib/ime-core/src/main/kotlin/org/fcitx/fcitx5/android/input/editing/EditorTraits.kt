@@ -21,6 +21,10 @@ data class EditorTraits(
     val isUri: Boolean = false,
     /** An email address field. */
     val isEmail: Boolean = false,
+    /** A number, phone or date field. */
+    val isNumber: Boolean = false,
+    /** A search field: its action is the search key. */
+    val isSearch: Boolean = false,
     /** A password, or a field that asks not to be learned from: its text is not read, not even to step over an emoji. */
     val isSensitive: Boolean = false,
     /**

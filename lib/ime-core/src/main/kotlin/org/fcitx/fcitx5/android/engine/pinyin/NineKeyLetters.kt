@@ -55,6 +55,9 @@ class NineKeyLetters private constructor(private val keys: List<String>) {
 
     override fun hashCode() = keys.hashCode()
 
+    /** The layout as the learning record files the nine keys' codes under it: every key's letters, the standard ones too. */
+    fun tag(): String = keys.joinToString(",")
+
     override fun toString() = keys.joinToString(",")
 
     companion object {

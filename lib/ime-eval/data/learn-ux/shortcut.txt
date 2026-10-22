@@ -1,0 +1,30 @@
+# U-20 简拼和全拼各学各的【D32】：dl 下的选择不改 dianle 下的顺序，反过来也一样。
+
+scenario full pinyin use does not move 简拼
+clear
+type dl
+expect first 带来
+repeat 3 {
+clear
+type dianle
+pick 点了
+}
+clear
+type dl
+expect first 带来
+
+scenario 全拼 picks do not move 简拼
+clear
+type sy
+expect first 所以
+repeat 2 {
+clear
+type shiyan
+pick 试验
+}
+clear
+type shiyan
+expect first 试验
+clear
+type sy
+expect first 所以

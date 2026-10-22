@@ -72,6 +72,31 @@ object UserLog {
     fun read(bytes: ByteArray, model: UserModel, prior: LayerPrior? = null): Int =
         FORMAT.read(bytes) { type, input -> replay(type, input, model, prior) }
 
+    /**
+     * The texts [bytes]' records (the header first) forget and do not learn again after: what an
+     * older build forgot, a candidate by its text, for the learning record to forget too.
+     */
+    fun forgotten(bytes: ByteArray): Set<String> {
+        val learned = LinkedHashMap<String, Boolean>()
+        FORMAT.read(bytes) { type, input ->
+            try {
+                when (type) {
+                    SENTENCE -> {
+                        if (input.readBoolean()) input.entry()
+                        val sentence = List(input.readShort().toInt()) { input.entry() }
+                        (sentence.map { it.text } + sentence.joinToString("") { it.text }).forEach { learned[it] = true }
+                    }
+                    WORD -> learned[input.entry().text] = true
+                    FORGOT -> learned[List(input.readShort().toInt()) { input.entry() }.joinToString("") { it.text }] = false
+                    else -> Unit
+                }
+            } catch (_: Unreadable) {
+                // of syllables this build does not have: no text of it typeable here
+            }
+        }
+        return learned.filterValues { !it }.keys
+    }
+
     internal fun replay(type: Byte, input: DataInputStream, model: UserModel, prior: LayerPrior?) {
         try {
             when (type) {

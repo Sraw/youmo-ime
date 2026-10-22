@@ -99,10 +99,10 @@ class AndroidEngineHeaderTest {
     fun eachOfferIsTheBitTheAddonReadsForIt() {
         val addon = entries("EngineOffer").map { (name, value) ->
             val (one, shift) = value.split("<<").map { it.trim().toInt() }
-            name.removePrefix("Offer").uppercase() to (one shl shift)
+            name.removePrefix("Offer").replace(Regex("(?<=.)([A-Z])"), "_$1").uppercase() to (one shl shift)
         }.toMap()
         assertEquals(addon, Offer.entries.associate { it.name to it.bit })
-        assertEquals(mapOf("FORGET" to 1, "PIN" to 2, "UNPIN" to 4, "BLOCK" to 8), addon)
+        assertEquals(mapOf("FORGET" to 1, "PIN" to 2, "UNPIN" to 4, "BLOCK" to 8, "DELETE_PHRASE" to 16), addon)
     }
 
     // the addon hands the engine its config as these options save it (AndroidEngine::pushSettings):

@@ -52,7 +52,10 @@ class PickerGridAdapter(
     /** the one category shown, from the next [rebuild]; null for all of them */
     var only: Int? = null
 
-    val recentEmpty get() = recentlyUsed.items.isEmpty()
+    /** U-93's 「用我的输入习惯」: off, the recently used are neither shown nor kept (U-67) */
+    var habits = true
+
+    val recentEmpty get() = recentlyUsed.items(habits).isEmpty()
 
     private val recentlyUsed = RecentlyUsed(recentlyUsedFileName, grid.density.recentLimit)
 
@@ -80,7 +83,7 @@ class PickerGridAdapter(
 
     fun insertRecent(text: String) {
         if (text.length == 1 && text[0].code.let { it in Digit || it in FullWidthDigit }) return
-        recentlyUsed.insert(text)
+        recentlyUsed.insert(text, habits)
     }
 
     /**
@@ -95,7 +98,7 @@ class PickerGridAdapter(
             filtered = rawData.map { (_, items) -> items.filter(policy::filter) }
             transforms.clear()
         }
-        sections = PickerSections(listOf(recentlyUsed.items) + filtered, only)
+        sections = PickerSections(listOf(recentlyUsed.items(habits)) + filtered, only)
         notifyDataSetChanged()
     }
 

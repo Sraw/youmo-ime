@@ -8,6 +8,11 @@ import org.fcitx.fcitx5.android.engine.host.EngineEvent
 import org.fcitx.fcitx5.android.engine.host.Keyboard
 import org.fcitx.fcitx5.android.engine.lattice.Predictor
 import org.fcitx.fcitx5.android.engine.lattice.TextWords
+import org.fcitx.fcitx5.android.engine.learn.Code
+import org.fcitx.fcitx5.android.engine.learn.HabitRanker
+import org.fcitx.fcitx5.android.engine.learn.KeyedRows
+import org.fcitx.fcitx5.android.engine.learn.Kinds
+import org.fcitx.fcitx5.android.engine.learn.Learner
 import org.fcitx.fcitx5.android.engine.rerank.SentencePicker
 import org.fcitx.fcitx5.android.engine.rerank.SentenceRefiner
 import org.fcitx.fcitx5.android.engine.session.Action
@@ -139,10 +144,11 @@ class HandwritingSessionTest {
     }
 
     @Test
-    fun `a sentence picked other than the first is learned, a word or several as one phrase, the first not`() {
-        val user = UserModel(handwritingData.dictionary, handwritingData.vocabulary)
-        val s = HandwritingSession(handwritingDecoder(user), TextWords(handwritingData.model, handwritingData.wordIndex), user = user)
-        // the first, however it is put in
+    fun `every sentence put in is learned by its words' text, after the word before it`() {
+        val learner = Learner(handwritingData)
+        val user = learner.model
+        val s = HandwritingSession(handwritingDecoder(user), TextWords(handwritingData.model, handwritingData.wordIndex), user = user, habits = learner.habits)
+        // the first too, however it is put in (U-29: 手写直接上屏的 counts for 联想)
         s.show(read("淡", "谈", step = 0.3))
         s.show(read("话"))
         assertEquals("谈话", s.apply(Action.Pick(0)).commit)
@@ -152,39 +158,51 @@ class HandwritingSessionTest {
         s.apply(Action.Select(0))
         s.show(read("天", "人"))
         s.apply(Action.Key('，'))
-        assertEquals(emptySet<String>(), user.learned())
-        // another: its words and their order, a word of two as the dictionary reads it
-        s.show(read("淡", "谈", step = 0.3))
-        val shown = s.show(read("天", "话", step = 3.0))
+        assertEquals(setOf("谈话", "天", "谈话 天", "天 天"), learner.used())
+        // never counted for pinyin's order (D28)
+        assertEquals(0f, user.count(handwritingData.wordIndex.find("谈话")), 0f)
+        val again = Learner(handwritingData)
+        val t = HandwritingSession(handwritingDecoder(again.model), TextWords(handwritingData.model, handwritingData.wordIndex), user = again.model, habits = again.habits)
+        // another than the first: its words and their order, a word of two as the dictionary reads it
+        t.show(read("淡", "谈", step = 0.3))
+        val shown = t.show(read("天", "话", step = 3.0))
         assertEquals("淡天", shown.preedit)
-        assertEquals("谈话", s.apply(Action.Pick(shown.candidates.indexOf("话"))).commit)
-        assertEquals(setOf("谈话(tan hua)"), user.learned())
-        s.show(read("淡", "谈", step = 0.3))
-        s.show(read("话", "天", "人"))
-        assertEquals("淡人", s.apply(Action.Pick(2)).commit)
-        // words of two or more as one phrase, as pinyin learns a pick it corrected, after the word put in before it
-        assertEquals(setOf("谈话(tan hua)", "淡人(dan ren)", "谈话(tan hua) 淡人(dan ren)"), user.learned())
+        assertEquals("谈话", t.apply(Action.Pick(shown.candidates.indexOf("话"))).commit)
+        assertEquals(setOf("谈话"), again.used())
+        // each character under what its ink was read as, no word before it: the one picked corrected,
+        // the one before it as it was read
+        val stats = again.log.state.stats.keys.filter { it.code.kind == Kinds.HANDWRITING && it.code.keys.isNotEmpty() }
+        assertEquals(setOf(KeyedRows.handwriting(listOf("淡", "谈")) to "谈", KeyedRows.handwriting(listOf("天", "话")) to "话"), stats.map { it.code.keys to it.text }.toSet())
+        t.show(read("淡", "谈", step = 0.3))
+        t.show(read("话", "天", "人"))
+        assertEquals("淡人", t.apply(Action.Pick(2)).commit)
+        // its words, never made one (impl/design-1b.md §4), after the word put in before it
+        assertEquals(setOf("谈话", "淡", "人", "谈话 淡", "淡 人"), again.used())
         // where nothing is learned (a password), not even that
-        s.learning = false
-        s.show(read("天", "山"))
-        assertEquals("山", s.apply(Action.Pick(1)).commit)
-        assertFalse(user.learned().any { it.startsWith("山") })
+        t.learning = false
+        t.show(read("天", "山"))
+        assertEquals("山", t.apply(Action.Pick(1)).commit)
+        assertFalse(again.used().any { it.startsWith("山") })
     }
 
     @Test
     fun `once a sentence is put in, what may follow is offered, picked, learned and offered on`() {
         val d = handwritingData
-        val user = UserModel(d.dictionary, d.vocabulary)
-        val s = HandwritingSession(handwritingDecoder(user), TextWords(d.model, d.wordIndex), user = user, predictor = Predictor(d.model, d.vocabulary, d.dictionary, user))
+        val learner = Learner(d)
+        val user = learner.model
+        val s = HandwritingSession(
+            handwritingDecoder(user), TextWords(d.model, d.wordIndex), user = user, predictor = Predictor(d.model, d.vocabulary, d.dictionary, user),
+            habits = learner.habits,
+        )
         s.show(read("高"))
         val put = s.apply(Action.Pick(0))
         assertEquals("高", put.commit)
         assertTrue(put.predicting)
         assertEquals("", put.preedit)
         assertEquals("山", put.candidates.first())
-        // a pick puts it in, the user's choice learned after the word before it
+        // a pick puts it in, the user's choice learned after the word before it: for 联想 alone, no use of the word (review-C S1)
         assertEquals("山", s.apply(Action.Pick(0)).commit)
-        assertEquals(setOf("山(shan)", "高(gao) 山(shan)"), user.learned())
+        assertEquals(setOf("高", "山", "高 山"), learner.used())
         // enter puts in what is written, as pinyin's, nothing offered after it
         s.show(read("高"))
         assertFalse(s.apply(Action.CommitRaw).predicting)
@@ -335,53 +353,34 @@ class HandwritingSessionTest {
             assertEquals(shown, s.apply(a))
         }
         assertFalse(s.apply(Action.Cursor(0)).handled)
+        // nothing learned, nothing to block it in: a candidate's long press offers nothing
         assertTrue(s.offers(0).isEmpty())
     }
 
     @Test
-    fun `a sentence picked is learned after the word put in before it, the first or not`() {
-        val user = UserModel(handwritingData.dictionary, handwritingData.vocabulary)
-        val s = HandwritingSession(handwritingDecoder(user), TextWords(handwritingData.model, handwritingData.wordIndex), user = user)
+    fun `a sentence picked is learned after the word put in before it, the first too`() {
+        val learner = Learner(handwritingData)
+        val user = learner.model
+        val s = HandwritingSession(handwritingDecoder(user), TextWords(handwritingData.model, handwritingData.wordIndex), user = user, habits = learner.habits)
         s.show(read("高"))
         s.apply(Action.Pick(0))
         s.show(read("天", "人"))
         assertEquals("人", s.apply(Action.Pick(1)).commit)
-        assertEquals(setOf("人(ren)", "高(gao) 人(ren)"), user.learned())
+        assertEquals(setOf("高", "人", "高 人"), learner.used())
     }
 
     @Test
-    fun `a character picked alone is learned as it is likeliest read`() {
+    fun `a pick with a character of several readings is learned by its words' text, no reading guessed`() {
         val d = polyphoneData
-        val user = UserModel(d.dictionary, d.vocabulary)
-        val s = HandwritingSession(polyphoneDecoder(user), TextWords(d.model, d.wordIndex), user = user)
-        assertEquals(listOf("人", "行"), s.show(read("人", "行")).candidates)
-        assertEquals("行", s.apply(Action.Pick(1)).commit)
-        // not hang, the first of its syllables by id
-        assertEquals(setOf("行(xing)"), user.learned())
-    }
-
-    @Test
-    fun `a pick with a character of several readings is learned word by word, not as a phrase read as guessed`() {
-        val d = polyphoneData
-        val user = UserModel(d.dictionary, d.vocabulary)
-        val s = HandwritingSession(polyphoneDecoder(user), TextWords(d.model, d.wordIndex), user = user)
+        val learner = Learner(d)
+        val user = learner.model
+        val s = HandwritingSession(polyphoneDecoder(user), TextWords(d.model, d.wordIndex), user = user, habits = learner.habits)
         s.show(read("人"))
         val shown = s.show(read("人", "行"))
         assertEquals("人行", s.apply(Action.Pick(shown.candidates.indexOf("行"))).commit)
-        assertEquals(setOf("人(ren)", "行(xing)", "人(ren) 行(xing)"), user.learned())
-    }
-
-    @Test
-    fun `a pick longer than a phrase is learned word by word`() {
-        val user = UserModel(handwritingData.dictionary, handwritingData.vocabulary)
-        val s = HandwritingSession(handwritingDecoder(user), TextWords(handwritingData.model, handwritingData.wordIndex), user = user)
-        repeat(UserModel.MAX_PHRASE) { s.show(read("人", "山")) }
-        val shown = s.show(read("人", "山"))
-        val text = "人".repeat(UserModel.MAX_PHRASE) + "山"
-        assertEquals(text, s.apply(Action.Pick(shown.candidates.indexOf("山"))).commit)
-        val learned = user.learned()
-        assertTrue(learned.toString(), "人(ren)" in learned && "山(shan)" in learned)
-        assertFalse(learned.any { it.startsWith(text) })
+        assertEquals(setOf("人", "行", "人 行"), learner.used())
+        // no reading guessed, and none counted for pinyin's order (D28)
+        assertEquals(0f, user.count(d.wordIndex.find("行")), 0f)
     }
 
     @Test
@@ -463,13 +462,15 @@ class HandwritingSessionTest {
     }
 
     @Test
-    fun `a long press on what may follow forgets what was learned of it or blocks it, on a candidate nothing`() {
+    fun `a long press on what may follow or on a candidate forgets what was learned of it or blocks it`() {
         val d = handwritingData
-        val user = UserModel(d.dictionary, d.vocabulary)
+        val learner = Learner(d)
+        val user = learner.model
         val forgotten = ArrayList<String>()
         val s = HandwritingSession(
             handwritingDecoder(user), TextWords(d.model, d.wordIndex), user = user, predictor = Predictor(d.model, d.vocabulary, d.dictionary, user),
-            block = { user.block(it) }, forgotten = { forgotten += it },
+            // the host forgets it in the learning record (Engines.forgottenEverywhere)
+            block = { user.block(it) }, forgotten = { forgotten += it; learner.habits.forget(it) }, habits = learner.habits,
         )
         s.show(read("高"))
         val offered = s.apply(Action.Pick(0))
@@ -481,26 +482,52 @@ class HandwritingSessionTest {
         s.show(read("高"))
         s.apply(Action.Pick(0))
         assertEquals(setOf(Offer.FORGET, Offer.BLOCK), s.offers(0))
+        // picked twice, by its text alone: pinyin's count of it moves not (review C S1)
+        assertEquals(0f, user.count(d.wordIndex.find("山")), 0f)
         assertEquals("山", s.apply(Action.Forget(0)).candidates.first())
-        assertFalse(user.learned().any { "山" in it })
+        assertFalse(learner.used().any { "山" in it })
         assertEquals(listOf("山"), forgotten)
         assertFalse("山" in s.apply(Action.Block(0)).candidates)
         // where nothing is to be kept (a password), nothing offered, the predictions shown or not
         s.learning = false
         assertTrue(s.offers(0).isEmpty())
         s.learning = true
-        // a candidate shows one character of the sentence a pick puts in: nothing to offer
-        assertFalse(s.show(read("天")).actionable)
-        assertTrue(s.offers(0).isEmpty())
+        // a candidate's character as a prediction (U-29): nothing learned of 天 yet; blocked in every
+        // reading, what is written read again without it
+        assertTrue(s.show(read("天", "人")).actionable)
+        assertEquals(setOf(Offer.BLOCK), s.offers(0))
+        assertEquals(listOf("人"), s.apply(Action.Block(0)).candidates)
+        assertEquals("人", s.apply(Action.Pick(0)).commit)
+        // one picked: what was learned of it forgotten everywhere; never pinned (C18)
+        s.show(read("人"))
+        assertEquals(setOf(Offer.FORGET, Offer.BLOCK), s.offers(0))
+        assertEquals(listOf("人"), s.apply(Action.Forget(0)).candidates)
+        assertEquals(listOf("山", "人"), forgotten)
+        assertFalse(learner.used().any { "人" in it })
+        assertEquals(listOf("人"), s.apply(Action.Pin(0)).candidates)
+    }
+
+    @Test
+    fun `a character blocked then unblocked comes back when what is written is read again`() {
+        val d = handwritingData
+        val user = Learner(d).model
+        val blocked = ArrayList<UserModel.Entry>()
+        val s = HandwritingSession(handwritingDecoder(user), TextWords(d.model, d.wordIndex), user = user, block = { blocked += it; user.block(it) })
+        s.show(read("天", "人"))
+        assertEquals(listOf("人"), s.apply(Action.Block(0)).candidates)
+        // the undo (Engines): unblocked, then read again, on no search kept from while it was blocked
+        user.unblock(blocked.single())
+        assertEquals("天", s.reread()?.candidates?.first())
     }
 
     @Test
     fun `backspace with nothing written takes the deleted text out of what goes before, enter keeps it`() {
         val d = handwritingData
-        val user = UserModel(d.dictionary, d.vocabulary)
+        val learner = Learner(d)
+        val user = learner.model
         val seen = ArrayList<String>()
         val picker = SentencePicker { context, _, _ -> seen += context; 0 }
-        val s = HandwritingSession(handwritingDecoder(user), TextWords(d.model, d.wordIndex), user = user, reranker = picker)
+        val s = HandwritingSession(handwritingDecoder(user), TextWords(d.model, d.wordIndex), user = user, reranker = picker, habits = learner.habits)
         s.show(read("高"))
         assertEquals("高", s.apply(Action.Pick(0)).commit)
         // enter with nothing written: the text before still ends with the word, learned after it
@@ -508,13 +535,36 @@ class HandwritingSessionTest {
         s.show(read("天", "人"))
         assertEquals("高", seen.last())
         assertEquals("人", s.apply(Action.Pick(1)).commit)
-        assertTrue("高(gao) 人(ren)" in user.learned())
+        assertTrue("高 人" in learner.used())
         // backspace with nothing written: the app deleted it, neither read after nor learned after
         assertFalse(s.apply(Action.Backspace).handled)
         s.show(read("山", "天"))
         assertEquals("高", seen.last())
         assertEquals("天", s.apply(Action.Pick(1)).commit)
-        assertTrue("天(tian)" in user.learned())
-        assertFalse("人(ren) 天(tian)" in user.learned())
+        assertTrue("天" in learner.used())
+        assertFalse("人 天" in learner.used())
+    }
+
+    // HW-14 (review-int-runtime M1): 人 picked over 天 twice running, first where the pad reads the same
+    @Test
+    fun `a character picked over the first twice running is first for what reads the same`() {
+        val learner = Learner(handwritingData)
+        val user = learner.model
+        val s = HandwritingSession(handwritingDecoder(user), TextWords(handwritingData.model, handwritingData.wordIndex), user = user, habits = learner.habits)
+        assertEquals("天", s.show(read("天", "人")).candidates.first())
+        assertEquals("人", s.apply(Action.Pick(1)).commit)
+        // once: before those not used, the first kept; what 为什么排在这 says, under what was read (U-29, U-81)
+        assertEquals(listOf("天", "人"), s.show(read("天", "人")).candidates.take(2))
+        val why = s.why(1)!!
+        assertEquals(HabitRanker.Tier.USED, why.tier)
+        assertEquals(1, why.uses)
+        assertEquals(Code(Kinds.HANDWRITING, KeyedRows.handwriting(listOf("天", "人"))), why.code)
+        assertEquals("人", s.apply(Action.Pick(1)).commit)
+        // twice running over the first: first
+        assertEquals("人", s.show(read("天", "人")).candidates.first())
+        assertEquals(HabitRanker.Tier.FIRST_HERE, s.why(0)!!.tier)
+        s.apply(Action.Reset)
+        // what reads otherwise is not ranked so
+        assertEquals("天", s.show(read("天", "大")).candidates.first())
     }
 }

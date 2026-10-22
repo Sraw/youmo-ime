@@ -64,8 +64,12 @@ internal class Counts {
         for (i in keys.indices) if (keys[i] != EMPTY) visit(keys[i], values[i])
     }
 
-    /** Multiplies every count by [factor], dropping those that fall below [min]. */
-    fun scale(factor: Float, min: Float) = rebuild { _, v -> (v * factor).takeIf { it >= min } }
+    /** Drops every count. */
+    fun clear() {
+        keys = LongArray(INITIAL) { EMPTY }
+        values = FloatArray(INITIAL)
+        size = 0
+    }
 
     /** Drops the counts whose key [drop] says; seldom done, so it is a rebuild. */
     fun removeIf(drop: (Long) -> Boolean) = rebuild { key, v -> v.takeUnless { drop(key) } }

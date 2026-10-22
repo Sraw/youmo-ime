@@ -98,6 +98,24 @@ class EditorInfoTraitsTest {
     }
 
     @Test
+    fun numberPhoneAndDateFieldsAreNumbers() {
+        // U-91: no word pairs learned in them
+        assertTrue(info { inputType = InputType.TYPE_CLASS_NUMBER }.isNumber)
+        assertTrue(info { inputType = InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_VARIATION_PASSWORD }.isNumber)
+        assertTrue(info { inputType = InputType.TYPE_CLASS_PHONE }.isNumber)
+        assertTrue(info { inputType = InputType.TYPE_CLASS_DATETIME or InputType.TYPE_DATETIME_VARIATION_DATE }.isNumber)
+        assertFalse(info { inputType = InputType.TYPE_CLASS_TEXT }.isNumber)
+    }
+
+    @Test
+    fun aSearchActionMakesASearchField() {
+        // U-91: no 联想 in it
+        assertTrue(info { imeOptions = EditorInfo.IME_ACTION_SEARCH or EditorInfo.IME_FLAG_NO_EXTRACT_UI }.isSearch)
+        assertFalse(info { imeOptions = EditorInfo.IME_ACTION_GO }.isSearch)
+        assertFalse(info { inputType = InputType.TYPE_CLASS_TEXT }.isSearch)
+    }
+
+    @Test
     fun theImeActionIsReadFromItsMaskAlone() {
         val t = info { imeOptions = EditorInfo.IME_ACTION_SEARCH or EditorInfo.IME_FLAG_NO_EXTRACT_UI }
         assertEquals(EditorInfo.IME_ACTION_SEARCH, t.imeAction)

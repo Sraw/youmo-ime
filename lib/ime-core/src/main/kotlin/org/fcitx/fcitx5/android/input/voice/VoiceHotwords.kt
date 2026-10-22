@@ -47,6 +47,13 @@ object VoiceHotwords {
         /** the blocked words as written, not [spelled] */
         val blockedWords: List<String> get() = blocked.split('/').filter { it.isNotEmpty() }.map { it.replace(" ", "") }
 
+        /**
+         * As listened for with U-93's [habits]: off, none of the user's words, the blocked still
+         * blocked. For words read before the switch went off (one shared, or the last read for a
+         * read too late), which [ofUser] made with it on.
+         */
+        fun withHabits(habits: Boolean): Words = if (habits) this else copy(hotwords = "")
+
         companion object {
             val NONE = Words("", "")
         }
@@ -103,9 +110,11 @@ object VoiceHotwords {
 
     /**
      * The user's words for one stream: as hotwords, those they added first, then those they made
-     * as they typed, most used first ([Engines.userWords]' order); blocked, those they blocked.
+     * as they typed, most used first ([Engines.userWords]' order): 我的词 alone (U-30, D29), no
+     * word of another kind, nor one the user only typed once; blocked, those they blocked. With
+     * [habits] off (U-93's 「用我的输入习惯」) no hotword of theirs, the blocked still blocked.
      */
-    fun ofUser(words: List<Engines.UserWord>): Words {
+    fun ofUser(words: List<Engines.UserWord>, habits: Boolean = true): Words {
         fun spell(kinds: (Engines.UserWord.Kind) -> Boolean) = words.asSequence()
             .filter { kinds(it.kind) }
             .mapNotNull { word -> spelled(word.text)?.let { it to word.kind } }
@@ -115,8 +124,11 @@ object VoiceHotwords {
             // sherpa-onnx's own bonus for one hotword, after its tokens; learned ones get [SCORE]
             .joinToString("/") { (spelling, kind) -> if (kind == Engines.UserWord.Kind.ADDED) "$spelling :$ADDED_SCORE" else spelling }
         return Words(
-            hotwords = spell { it != Engines.UserWord.Kind.BLOCKED },
+            hotwords = if (habits) spell { it in MINE } else "",
             blocked = spell { it == Engines.UserWord.Kind.BLOCKED },
         )
     }
+
+    // the kinds of [Engines.UserWord] that are the user's own words (稿子 §1 我的词)
+    private val MINE = setOf(Engines.UserWord.Kind.ADDED, Engines.UserWord.Kind.LEARNED)
 }

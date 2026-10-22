@@ -13,6 +13,9 @@ import org.fcitx.fcitx5.android.daemon.FcitxConnection
 import org.fcitx.fcitx5.android.engine.glide.Glide
 import org.fcitx.fcitx5.android.engine.handwriting.InkReading
 import org.fcitx.fcitx5.android.engine.host.Engines
+import org.fcitx.fcitx5.android.engine.host.ImportLayer
+import org.fcitx.fcitx5.android.engine.learn.control.LearningOp
+import org.fcitx.fcitx5.android.engine.learn.control.LearningResult
 
 /**
  * In-memory stand-in for the engine, so that code written against [FcitxAPI] runs on the JVM
@@ -73,6 +76,9 @@ class FakeFcitxAPI : FcitxAPI {
     override suspend fun userWordCounts(): Map<Engines.UserWord.Kind, Int> =
         Engines.UserWord.Kind.entries.associateWith { kind -> userWords.count { it.kind == kind } }
 
+    // no table to code them by
+    override suspend fun sameCodes(texts: List<String>, ims: List<String>): Map<String, List<Pair<String, String>>> = emptyMap()
+
     // no dictionary to read it by
     override suspend fun pinyinOf(text: String): String? = null
 
@@ -105,7 +111,7 @@ class FakeFcitxAPI : FcitxAPI {
 
     override suspend fun addEnglishWord(text: String): Boolean {
         calls += "addEnglishWord($text)"
-        englishWords += Engines.UserWord(text, "", Engines.UserWord.Kind.LEARNED, 2f)
+        englishWords += Engines.UserWord(text, "", Engines.UserWord.Kind.ADDED, 2f, neverCorrected = true)
         return true
     }
 
@@ -114,17 +120,31 @@ class FakeFcitxAPI : FcitxAPI {
         englishWords.removeAll { it.text in texts }
     }
 
-    override suspend fun importUserWords(lines: Sequence<String>): Engines.Imported {
+    override suspend fun importUserWords(lines: Sequence<String>, fileName: String): Engines.Imported {
         // once: a file's lines may be read only once
         val count = lines.count()
-        calls += "importUserWords($count)"
+        calls += "importUserWords($count, $fileName)"
         return Engines.Imported(0, 0, count)
     }
 
-    // as Engines.exportWords writes them, for importUserWords to read back
-    override suspend fun exportUserWords(): List<String> = userWords.map {
-        val line = "${it.text} ${it.pinyin.replace(' ', '\'')}"
-        if (it.kind == Engines.UserWord.Kind.BLOCKED) "!$line" else line
+    /** What [importBatches] answers, as set by a test: nothing is imported here. */
+    val importBatches = ArrayList<ImportLayer.Batch>()
+
+    override suspend fun importBatches(): List<ImportLayer.Batch> = importBatches.toList()
+
+    override suspend fun importedWords(batch: Int?): List<ImportLayer.Word> = emptyList()
+
+    // the batch's words left, taken out of [importBatches]; null for none such
+    override suspend fun dropImport(batch: Int): Int? {
+        calls += "dropImport($batch)"
+        val dropped = importBatches.firstOrNull { it.id == batch } ?: return null
+        importBatches.remove(dropped)
+        return dropped.left
+    }
+
+    override suspend fun restoreImport(batch: Int): Boolean {
+        calls += "restoreImport($batch)"
+        return false
     }
 
     /** What [tableKeys] answers, by table input method: none for any other, as the engine. */
@@ -132,13 +152,36 @@ class FakeFcitxAPI : FcitxAPI {
 
     override suspend fun tableKeys(im: String): Set<Char> = tableKeys[im].orEmpty()
 
-    override suspend fun engineContext(before: String, learning: Boolean, cleared: Boolean) {
-        calls += "engineContext($before, $learning" + (if (cleared) ", cleared)" else ")")
+    override suspend fun engineContext(
+        before: String,
+        learning: Boolean,
+        cleared: Boolean,
+        learnFlags: Int,
+        started: Boolean,
+        after: String?,
+        selected: Boolean,
+        said: Boolean,
+    ) {
+        calls += "engineContext($before, $learning" + (if (cleared) ", cleared" else "") + (if (learnFlags != 0) ", flags $learnFlags" else "") +
+            (if (started) ", started" else "") + (after?.let { ", after $it" } ?: "") + (if (selected) ", selected" else "") + (if (said) ", said)" else ")")
     }
 
     override suspend fun offerInk(reading: InkReading, piece: Int): Boolean {
         calls += "offerInk($piece)"
         return true
+    }
+
+    /** What [learning] answers: a test puts its own; Done by default. */
+    var learned: (LearningOp) -> LearningResult = { LearningResult.Done() }
+
+    override suspend fun learning(op: LearningOp): LearningResult {
+        calls += "learning($op)"
+        return learned(op)
+    }
+
+    override suspend fun enginePaused(idle: Boolean): Boolean {
+        calls += "enginePaused($idle)"
+        return false
     }
 
     override suspend fun offerGlide(glide: Glide): Boolean {

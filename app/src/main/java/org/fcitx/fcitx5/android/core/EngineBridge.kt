@@ -5,13 +5,17 @@
 package org.fcitx.fcitx5.android.core
 
 import android.text.TextPaint
+import android.util.Log
 import android.widget.Toast
 import androidx.core.content.ContextCompat
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import org.fcitx.fcitx5.android.BuildConfig
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
+import org.fcitx.fcitx5.android.daemon.FcitxDaemon
+import org.fcitx.fcitx5.android.data.RecentlyUsed
 import org.fcitx.fcitx5.android.data.pinyin.CustomPhraseManager
 import org.fcitx.fcitx5.android.data.pinyin.ImportedDictionaries
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
@@ -20,9 +24,14 @@ import org.fcitx.fcitx5.android.engine.data.DataFormatException
 import org.fcitx.fcitx5.android.engine.glide.Glide
 import org.fcitx.fcitx5.android.engine.handwriting.HandwritingSession
 import org.fcitx.fcitx5.android.engine.handwriting.InkReading
+import org.fcitx.fcitx5.android.engine.host.ConversionNote
 import org.fcitx.fcitx5.android.engine.host.EngineEvent
 import org.fcitx.fcitx5.android.engine.host.EngineSettings
 import org.fcitx.fcitx5.android.engine.host.Engines
+import org.fcitx.fcitx5.android.engine.learn.Simplifier
+import org.fcitx.fcitx5.android.engine.learn.control.BackupOp
+import org.fcitx.fcitx5.android.engine.learn.control.LearningOp
+import org.fcitx.fcitx5.android.engine.learn.control.LearningResult
 import org.fcitx.fcitx5.android.engine.libime.LibimeFiles
 import org.fcitx.fcitx5.android.engine.phrase.CustomPhrases
 import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
@@ -32,6 +41,7 @@ import org.fcitx.fcitx5.android.engine.session.Offer
 import org.fcitx.fcitx5.android.engine.session.Snapshot
 import org.fcitx.fcitx5.android.engine.user.LibimeImport
 import org.fcitx.fcitx5.android.input.popup.EmojiModifier
+import org.fcitx.fcitx5.android.utils.Const
 import org.fcitx.fcitx5.android.utils.appContext
 import org.fcitx.fcitx5.android.utils.toast
 import timber.log.Timber
@@ -42,6 +52,7 @@ import java.nio.ByteBuffer
 import java.nio.channels.FileChannel
 import java.util.concurrent.Executor
 import java.util.concurrent.Executors
+import java.util.concurrent.atomic.AtomicBoolean
 
 /**
  * Where the androidengine addon (native) reaches ime-core's input methods. Called only on the
@@ -154,6 +165,9 @@ object EngineBridge {
 
     private var made: Engines? = null
 
+    // what the field's last context said learning leaves out, kept for engines made after it
+    private var fieldFlags = 0
+
     /** Made when first used, and again after [close]; on the fcitx thread only, as the addon uses it there. */
     val engines: Engines
         get() = made ?: Engines(
@@ -166,7 +180,64 @@ object EngineBridge {
             emojiShows = EmojiModifier.validator(),
             // a paint of its own: this is the fcitx thread's, not the main one's
             textShows = TextPaint().let { paint -> paint::hasGlyph },
-        ).also { made = it }
+            simplifier = ::simplifier,
+            // where the app's files do not go with a phone moved: a copied backup is another install's
+            installFile = File(appContext.noBackupFilesDir, "learn.install"),
+            appVersion = Const.versionName,
+            // libime's own, which [legacy] reads: gone with what the clears clear (review-E-engine S3)
+            legacyFiles = listOf(File(pinyinDir(), LIBIME_DICTIONARY), File(pinyinDir(), LIBIME_HISTORY)),
+            onConversion = ::conversion,
+        ).also {
+            it.useHabits = AppPrefs.getInstance().internal.useHabits.getValue()
+            // made anew in a field (after a close): its flags as the field's context told them (review-int N1)
+            it.fieldFlags = fieldFlags
+            it.learning(null, BackupOp.SetAuto(AppPrefs.getInstance().internal.learningAutoBackup.getValue()))
+            made = it
+        }
+
+    /** See [Engines.paused]; nothing waits while the engine is not made. */
+    fun paused(idle: Boolean): Boolean = made?.paused(idle) == true
+
+    // the older builds' learning's conversion: logged, counts alone (a release's logcat reads it, the
+    // upgrade's device check); made, put in place once typing pauses a second (uat-0.3.1 recheck)
+    private fun conversion(note: ConversionNote) {
+        if (note != ConversionNote.Made) {
+            Log.i(LOG_TAG, note.toString())
+            return
+        }
+        // on the warm-up thread: the IME may disconnect after the connection was got, the
+        // conversion still made and put in place at the next start's pause
+        try {
+            FcitxDaemon.getFirstConnectionOrNull()?.runIfReady {
+                // a stale merge made again (up to three times) reports Made each time: one wait does for all
+                if (!puttingInPlace.compareAndSet(false, true)) return@runIfReady
+                do {
+                    try {
+                        do delay(Engines.IDLE_MILLIS) while (enginePaused(idle = true))
+                    } finally {
+                        puttingInPlace.set(false)
+                    }
+                    // a Made between the last pause and the flag's clearing found it set and left: asked
+                    // once more, and waited for again unless another Made took the wait (F3171)
+                } while (enginePaused(idle = true) && puttingInPlace.compareAndSet(false, true))
+            }
+        } catch (e: IllegalStateException) {
+            Timber.w(e, "learning converted: put in place once the engine pauses next")
+        }
+    }
+
+    private val puttingInPlace = AtomicBoolean(false)
+
+    // OpenCC's character tables, as the app ships them: the app's traditional text read simplified by
+    // learning. Read from the APK's assets, never from the data directory DataManager syncs: no
+    // copy there to go stale or missing
+    private fun simplifier(): Simplifier = try {
+        val assets = appContext.assets
+        Simplifier.read(assets.open(TRADITIONAL_TABLE).use { it.readBytes() }, assets.open(SIMPLIFIED_TABLE).use { it.readBytes() })
+    } catch (e: IOException) {
+        Timber.w(e, "no traditional-to-simplified table: text read as it is")
+        Simplifier.NONE
+    }
 
     // credential-encrypted, unlike fcitx's home: what the user typed is not kept where it can be read
     // before the phone is first unlocked. Till then the engine learns in memory; the app restarts at unlock.
@@ -258,8 +329,8 @@ object EngineBridge {
     /** What libime's pinyin learned, where fcitx kept it (FCITX_DATA_HOME), as text. */
     private fun legacy(): LibimeImport.Legacy? {
         val dir = pinyinDir()
-        val dictionary = File(dir, "user.dict")
-        val history = File(dir, "user.history")
+        val dictionary = File(dir, LIBIME_DICTIONARY)
+        val history = File(dir, LIBIME_HISTORY)
         if (!dictionary.exists() && !history.exists()) return null
         return LibimeImport.Legacy(
             libime(dictionary, LibimeFiles::pinyinDictionary),
@@ -439,6 +510,43 @@ object EngineBridge {
         englishSuggests = engines.settings.englishSuggest
     }
 
+    /**
+     * [Engines.learning] of [op] in [im], the input method in use, [act] sending a long press's
+     * event the way the menu does; on the fcitx thread. With whether what an engine's input method
+     * shows is to be shown anew: what was taken back, cleared or turned off may be on it.
+     */
+    fun learning(op: LearningOp, im: String, act: (event: Int) -> Boolean): Pair<LearningResult, Boolean> {
+        // the switch's preference is the app's to set, on the main thread: read when the engine is made
+        val result = engines.learning(im, op) { event, _ -> act(event) }
+        if (result is LearningResult.Cleared) RecentlyUsed.clear(recentsSince(result.fromMinute))
+        return result to shownAnew(op, im, result)
+    }
+
+    // the pickers' recents go with what was learned (U-67): from the same minute on, or all (0)
+    internal fun recentsSince(fromMinute: Int): Long =
+        if (fromMinute == LearningResult.ALL) 0L else fromMinute * MS_PER_MINUTE
+
+    // only an engine's input method that loaded shows its list anew, and only after an op that did something
+    internal fun shownAnew(op: LearningOp, im: String, result: LearningResult) =
+        isEngines(im) && im !in unloadable && result != LearningResult.Unavailable && showsAnew(op)
+
+    // the acts on a candidate the addon shows itself, as it shows a long press's; what only reads
+    // shows nothing new. Every op named: a new one must say whether it changes what is shown
+    private fun showsAnew(op: LearningOp): Boolean = when (op) {
+        is LearningOp.OnPage -> showsAnew(op.op)
+        is LearningOp.Undo, is LearningOp.UseHabits, is LearningOp.ClearRecent, is LearningOp.ClearLearned,
+        is LearningOp.NoPredict, is LearningOp.RemoveItems, is LearningOp.RemoveWords -> true
+        is LearningOp.Menu, is LearningOp.Delete, is LearningOp.Block, is LearningOp.Pin, is LearningOp.Unpin,
+        is LearningOp.Report, LearningOp.Overview, is LearningOp.ListItems, is LearningOp.RestoreCorrection,
+        is LearningOp.ResetTableOrder -> false
+        // a restore or 退回恢复前 changes what was learned; the rest only read or keep files
+        is BackupOp.Restore, is BackupOp.RestoreKept, BackupOp.Revert -> true
+        BackupOp.Kept, is BackupOp.Delete, is BackupOp.Peek, BackupOp.Copy, is BackupOp.SetAuto -> false
+    }
+
+    /** Whether [im] is one of the engine's input methods, whose long press the app words (U-82). */
+    fun isEngines(im: String) = im.startsWith(ENGINE) || im == Engines.ENGLISH
+
     private fun nineKeys() = NineKeyLetters.parse(AppPrefs.getInstance().keyboard.t9Letters.getValue())
 
     /**
@@ -452,13 +560,28 @@ object EngineBridge {
         made?.reload()
     }
 
-    /** See [Engines.context]; nothing to tell while the engine is not made. */
+    /** See [Engines.context]; nothing to tell while the engine is not made. True if [im] offers words now, for a RECALL key (Engines.context) to show. */
     @JvmStatic
-    fun context(before: String, learning: Boolean, im: String, cleared: Boolean = false) {
-        made?.let {
-            it.context(im, before, learning, cleared)
-            followed(im) { it }
-        }
+    fun context(
+        before: String,
+        learning: Boolean,
+        im: String,
+        cleared: Boolean = false,
+        learnFlags: Int = 0,
+        started: Boolean = false,
+        after: String? = null,
+        selected: Boolean = false,
+        said: Boolean = false,
+    ): Boolean {
+        fieldFlags = learnFlags
+        val engines = made ?: return false
+        val offers = engines.context(
+            // named: eight flags in a row, two swapped would still compile (review R11 F3080)
+            im, before, learning, cleared = cleared, learnFlags = learnFlags, started = started,
+            after = after, selected = selected, said = said,
+        )
+        followed(im) { engines }
+        return offers
     }
 
     // what the app keeps of an input method's session, after any call of it: one place as input methods come.
@@ -486,4 +609,14 @@ object EngineBridge {
     private val unhandled = Result(false, "", "", emptyArray(), emptyArray(), 0, 0, 0, false, "", false)
 
     internal const val CHUNK = 32
+
+    // the addon's input methods (androidengine), but English, which is keyboard-us's
+    private const val ENGINE = "engine-"
+    private const val LOG_TAG = "youmo-learn"
+    private const val MS_PER_MINUTE = 60_000L
+    private const val LIBIME_DICTIONARY = "user.dict"
+    private const val LIBIME_HISTORY = "user.history"
+    // OpenCC 1.2.0's character tables, in the APK's assets: see simplifier()
+    private const val TRADITIONAL_TABLE = "learn/TSCharacters.txt"
+    private const val SIMPLIFIED_TABLE = "learn/STCharacters.txt"
 }

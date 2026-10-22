@@ -87,12 +87,12 @@ class UserScorerTest {
         assertNotEquals(lm.score(NO_WORD, ni, hao), lm.score(NO_WORD, nin, hao))
         assertEquals(lm.score(NO_WORD, NO_WORD, nin), scorer.score(NO_WORD, NO_WORD, nin))
         assertEquals(lm.score(NO_WORD, nin, hao), scorer.score(NO_WORD, nin, hao))
-        // picked: the model's 你, scored and as context
-        m.learn(null, listOf(entry("你", "nin")))
+        // the user's: the model's 你, scored and as context
+        m.own(entry("你", "nin"))
         assertEquals(lm.score(NO_WORD, NO_WORD, ni), scorer.score(NO_WORD, NO_WORD, nin))
         assertEquals(lm.score(NO_WORD, ni, hao), scorer.score(NO_WORD, nin, hao))
-        // typed without being listed maps too
-        val nian = m.learn(null, listOf(entry("你", "nian")))[0]
+        // the user's without being listed maps too
+        val nian = m.own(entry("你", "nian"))
         assertEquals(lm.score(NO_WORD, ni, hao), scorer.score(NO_WORD, nian, hao))
         // added by hand then taken off, never typed, it no longer does
         val ning = m.listByHand(entry("你", "ning"))
@@ -101,9 +101,9 @@ class UserScorerTest {
         m.unlistByHand(entry("你", "ning"))
         assertEquals(lm.score(NO_WORD, NO_WORD, ning), scorer.score(NO_WORD, NO_WORD, ning))
         assertEquals(lm.score(NO_WORD, ning, hao), scorer.score(NO_WORD, ning, hao))
-        // added by hand and typed too, then taken off: typed, it still does
+        // added by hand and the user's too, then taken off: theirs, it still does
         val nie = m.listByHand(entry("你", "nie"))
-        m.learn(null, listOf(entry("你", "nie")))
+        m.own(entry("你", "nie"))
         m.unlistByHand(entry("你", "nie"))
         assertEquals(lm.score(NO_WORD, NO_WORD, ni), scorer.score(NO_WORD, NO_WORD, nie))
         assertEquals(lm.score(NO_WORD, ni, hao), scorer.score(NO_WORD, nie, hao))

@@ -66,22 +66,22 @@ class LearningTest {
         val sample = Sample("ni", "尼", "daily")
         assertFalse(firsts(Learning(data, PinyinSegmenter()), sample).getValue("learning nothing"))
         val packed = firsts(Learning(data, PinyinSegmenter(), pack = pack), sample)
-        assertEquals(3, packed.size)
+        assertEquals(4, packed.size)
         assertTrue(packed.toString(), packed.values.all { it })
     }
 
     @Test
     fun withAPackTheEngineLearningNothingLearnsNothingFromOneSampleForTheNext() {
         val pack = WordPack.parse(sequenceOf(WordPack.HEADER, "# layer: test", "尼\tni\t-1.5"))
-        // the same text twice, so in the same half: 泥好 picked once would come first the second time
+        // the same text three times, so in the same half: 泥好 picked twice would come first the third time (U-02)
         val sample = Sample("nihao", "泥好", "daily")
-        val rows = Learning(data, PinyinSegmenter(), pack = pack).measure(listOf(sample, sample))
+        val rows = Learning(data, PinyinSegmenter(), pack = pack).measure(listOf(sample, sample, sample))
         val alone = rows.single { (label, outcomes) -> label.endsWith("learning nothing") && !outcomes.isNullOrEmpty() }.second!!
-        assertEquals(2, alone.size)
+        assertEquals(3, alone.size)
         assertFalse(alone.toString(), alone.any { it.first })
-        // that premise, with the same pack: an engine that learns has 泥好 first the second time
+        // that premise, with the same pack: an engine that learns has 泥好 first the third time
         assertEquals(Halves.HELD_OUT, Halves.of(sample))
         val learning = rows.toMap().getValue("held-out, learning")!!
-        assertEquals(learning.toString(), listOf(false, true), learning.map { it.first })
+        assertEquals(learning.toString(), listOf(false, false, true), learning.map { it.first })
     }
 }

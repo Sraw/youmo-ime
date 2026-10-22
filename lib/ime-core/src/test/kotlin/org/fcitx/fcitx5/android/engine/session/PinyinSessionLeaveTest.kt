@@ -6,8 +6,6 @@ package org.fcitx.fcitx5.android.engine.session
 
 import org.fcitx.fcitx5.android.engine.data.PinyinData
 import org.fcitx.fcitx5.android.engine.data.PinyinDataBuilder
-import org.fcitx.fcitx5.android.engine.phrase.CustomPhrases
-import org.fcitx.fcitx5.android.engine.phrase.PhraseBook
 import org.fcitx.fcitx5.android.engine.pinyin.PinyinSegmenter
 import org.fcitx.fcitx5.android.engine.session.Action.Key
 import org.junit.Assert.assertEquals
@@ -35,11 +33,21 @@ class PinyinSessionLeaveTest {
 
     @Test
     fun aKeyNotReadKeepsWhatTheFirstCandidateLeavesAsTyped() {
-        // the one reading of it all put second by a phrase: the first, 你, reads only ni
-        val session = PinyinSession(data, PinyinSegmenter(), phraseBook = PhraseBook(CustomPhrases.parse("nihao,2=你好")))
-        assertEquals(listOf("你", "你好"), session.type("nihao").candidates)
+        // every reading of it all coarse, held past the first page: the first, 啊, reads only a
+        // (a phrase no longer moves the decoder's of its text: impl/PLAN.md §2.7). The five are words of
+        // lattice/coarse.txt (CoarseWords.LIST): one taken off that list puts its reading first here
+        val held = listOf("屄", "骚屄", "嫩屄", "肉棒", "鸡巴").mapIndexed { i, w -> Triple(w, -0.1f * (i + 1), "bi") }
+        val coarse = PinyinData.load(
+            ByteBuffer.wrap(
+                PinyinDataBuilder().unigram("<unk>", -7f, 0f)
+                    .apply { (held + Triple("啊", -2f, "a")).forEach { (w, score, reading) -> unigram(w, score, 0f).entry(w, syl(reading)) } }
+                    .build().toByteArray(),
+            ),
+        )
+        val session = PinyinSession(coarse, PinyinSegmenter())
+        assertEquals("啊", session.type("abi").candidates.first())
         val left = session.apply(Key(','))
-        assertEquals("你hao", left.commit)
+        assertEquals("啊bi", left.commit)
         assertFalse(left.handled)
         assertEquals("", left.preedit)
     }

@@ -6,6 +6,9 @@ package org.fcitx.fcitx5.android.engine.table
 
 import org.fcitx.fcitx5.android.engine.lattice.Predictor
 import org.fcitx.fcitx5.android.engine.lattice.TextWords
+import org.fcitx.fcitx5.android.engine.learn.Code
+import org.fcitx.fcitx5.android.engine.learn.Habits
+import org.fcitx.fcitx5.android.engine.learn.Simplifier
 import org.fcitx.fcitx5.android.engine.rerank.SentencePicker
 import org.fcitx.fcitx5.android.engine.rerank.SentenceRefiner
 import org.fcitx.fcitx5.android.engine.user.UserModel
@@ -37,6 +40,19 @@ class TableLanguage(
     val emoji: (String) -> List<String> = { emptyList() },
     /** The built-in phrases' texts a word stands for (PhraseBook.builtInsOf), placed as its emoji; none, the setting off. */
     val phrases: (String) -> List<String> = { emptyList() },
+    /** The learning record what is put in is written to, under [kind] (Kinds.table): its words, by their text (impl/design-1b.md §4). */
+    val habits: Habits = Habits.OFF,
+    val kind: String = "",
+    /**
+     * The texts a code shows no more ([Habits.blockedUnder]): the record's, read whatever [habits]
+     * are, as blocks stay with 「用我的输入习惯」 off, where the habits are none (U-93, C26).
+     */
+    val blockedUnder: (Code) -> Set<String> = habits::blockedUnder,
+    /**
+     * Traditional text to simplified ([Simplifier]): a traditional table's words are learned for 联想
+     * as the predictor reads them, simplified (PLAN §2.1); its codes keep the table's own.
+     */
+    val simplify: (String) -> String = { it },
 ) {
     /**
      * The word [text] is learned as: by its [reading], or for one of the user's words ([theirs]: a
