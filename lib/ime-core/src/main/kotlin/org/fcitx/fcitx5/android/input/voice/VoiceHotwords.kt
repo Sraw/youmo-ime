@@ -26,7 +26,8 @@ object VoiceHotwords {
     const val SCORE = 1.5f
 
     /**
-     * the bonus on each token of a word the user added (by hand or imported): at [SCORE], 澜境花园
+     * the bonus on each token of a word the user added by hand (an imported word stays apart until
+     * used twice, then is learned: [SCORE], the user's choice 2026-10-22): at [SCORE], 澜境花园
      * was heard 兰静花园 or 蓝镜花园 every time (VO-14). On five takes through the emulator's
      * microphone, 3 heard it in none, 4 in three, 5 in all five. Learned words keep [SCORE]: the
      * same 5 on 3000 of them (jieba's commonest) took aishell's CER from 3.9% to 9.9% and fleurs'

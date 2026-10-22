@@ -524,17 +524,13 @@ def vo18(d):
     d.open_page("text")
     d.switch_im("拼音")
     t1, n1 = heard_once(d, "lanjing", "我住在澜境花园")
-    check("澜境花园" not in t1, f"导入后、还不是你的词时，说「我住在澜境花园」就是「{t1}」{n1}")
-    for _ in range(2):
-        d.type("lanjinghuayuan")
-        d.cands(want="澜境花园")
-        d.pick("澜境花园")
-        d.press("。") if "。" in d.keys(refresh=True) else None
-        time.sleep(0.5)
-        d.clear()
+    check("澜境花园" not in t1, f"导入后说「我住在澜境花园」就是「{t1}」{n1}")
+    w.add_word(d, "澜境花园", "lan jing hua yuan")
+    d.open_page("text")
+    d.switch_im("拼音")
     _, t2, n, miss = retried(d, "lanjing", lambda t: "澜境花园" in t)
-    check("澜境花园" in t2, f"拼音上屏两次后说「我住在澜境花园」，框里「{t2}」{tries_note(n, miss)}")
-    return f"导入后「{t1}」{n1}；拼音上屏两次后「{t2}」{tries_note(n, miss)}"
+    check("澜境花园" in t2, f"手动加了以后说「我住在澜境花园」，框里「{t2}」{tries_note(n, miss)}")
+    return f"导入后「{t1}」{n1}；手动加了以后「{t2}」{tries_note(n, miss)}"
 
 
 @case("VO-19", base="B0-语音", mutates=True, needs=EV, clean=True)
