@@ -22,7 +22,6 @@ import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.engine.learn.control.LearningOp
 import org.fcitx.fcitx5.android.engine.learn.control.LearningResult
 import org.fcitx.fcitx5.android.input.UndoChipPlacement
-import org.fcitx.fcitx5.android.utils.toast
 import splitties.dimensions.dp
 import splitties.views.dsl.core.add
 import splitties.views.dsl.core.horizontalLayout
@@ -59,7 +58,8 @@ class UndoChip(
 
     private val dismiss = Runnable { dismiss() }
 
-    fun show(message: String, token: Long) {
+    /** [aboveKeys]: above the keyboard, off the bar, whether or not it shows candidates (what the keyboard says, [BaseInputView.say]). */
+    fun show(message: String, token: Long, aboveKeys: Boolean = false) {
         dismiss()
         if (!anchor.isAttachedToWindow) return
         val ctx = anchor.context
@@ -67,7 +67,8 @@ class UndoChip(
             text = message
             setTextColor(theme.popupTextColor)
             textSize = 14f
-            setPaddingDp(16, 10, 8, 10)
+            // the undo beside it pads its own side
+            setPaddingDp(16, 10, if (token == LearningResult.NO_UNDO) 16 else 8, 10)
         }
         val undo = ctx.textView {
             setText(R.string.learning_undo)
@@ -89,14 +90,19 @@ class UndoChip(
                 cornerRadius = dp(18).toFloat()
             }
             add(text, lParams(wrapContent, wrapContent))
-            if (token != LearningResult.NO_UNDO) add(undo, lParams(wrapContent, wrapContent) { marginEnd = dp(8) })
+            if (token != LearningResult.NO_UNDO) {
+                add(undo, lParams(wrapContent, wrapContent) { marginEnd = dp(8) })
+            } else {
+                // one that only says goes when tapped (the user, 2026-10-22)
+                setOnClickListener { dismiss() }
+            }
         }
         val bar = IntArray(2).also { anchor.getLocationInWindow(it) }
         val over = above()
         val aboveAt = IntArray(2).also { over.getLocationInWindow(it) }
         chip.measure(View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED), View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED))
         val y = UndoChipPlacement.top(
-            candidates = candidates(),
+            candidates = aboveKeys || candidates(),
             barTop = bar[1],
             aboveTop = aboveAt[1],
             chipHeight = chip.measuredHeight,
@@ -111,13 +117,14 @@ class UndoChip(
         }
         // said aloud as a pane that appears, the window no focus a screen reader follows; as long as its user needs
         ViewCompat.setAccessibilityPaneTitle(chip, message)
+        val shownMs = if (aboveKeys) SAID_MS else SHOWN_MS
         val shown = ctx.getSystemService(AccessibilityManager::class.java)?.let { a ->
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                a.getRecommendedTimeoutMillis(SHOWN_MS.toInt(), AccessibilityManager.FLAG_CONTENT_TEXT or AccessibilityManager.FLAG_CONTENT_CONTROLS).toLong()
+                a.getRecommendedTimeoutMillis(shownMs.toInt(), AccessibilityManager.FLAG_CONTENT_TEXT or AccessibilityManager.FLAG_CONTENT_CONTROLS).toLong()
             } else {
                 null
             }
-        } ?: SHOWN_MS
+        } ?: shownMs
         anchor.postDelayed(dismiss, shown)
     }
 
@@ -134,9 +141,9 @@ class UndoChip(
         scope.launch {
             val undone = fcitx.runOnReady { learning(LearningOp.Undo(token)) }
             when (undone) {
-                LearningResult.Unavailable -> anchor.context.toast(R.string.learning_undo_gone)
+                LearningResult.Unavailable -> show(anchor.context.getString(R.string.learning_undo_gone), LearningResult.NO_UNDO)
                 // a disk that failed: said, as 清掉最近 says it, not the chip just gone
-                LearningResult.Failed -> anchor.context.toast(R.string.learning_try_again)
+                LearningResult.Failed -> show(anchor.context.getString(R.string.learning_try_again), LearningResult.NO_UNDO)
                 else -> {}
             }
         }
@@ -151,6 +158,9 @@ class UndoChip(
     private companion object {
         // long enough to read a few words and reach for it, short enough not to sit over the candidates
         const val SHOWN_MS = 6000L
+
+        // a line said above the keys, with nothing to reach for (the user, 2026-10-22)
+        const val SAID_MS = 2000L
 
         // the smallest a target is to be touched surely (Material's accessibility guidance)
         const val MIN_TOUCH_DP = 48

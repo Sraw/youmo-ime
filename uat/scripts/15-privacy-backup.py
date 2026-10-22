@@ -99,7 +99,6 @@ def pr05(d):
     return f"数字行 {''.join(digits)}；框里 {len(t)} 个圆点"
 
 
-case("PR-06", needs="skip:要 Chrome 无痕标签页；redroid 上的 WebView 测试浏览器没有无痕模式")(lambda d: None)
 case("PR-07", needs="skip:要 Chrome 无痕标签页；redroid 上的 WebView 测试浏览器没有无痕模式")(lambda d: None)
 case("PR-08", needs="skip:要一个会把复制的密码标成敏感的密码管理器（用例：没有记阻塞）；redroid 上没有")(lambda d: None)
 
@@ -398,9 +397,21 @@ def pr17(d):
     d.switch_im("拼音")
     tap_emoji(d)
     d.clear()
-    status_entry(d, "不用我的输入习惯")
-    script("05-toolbar").back_to_keys(d)
-    marker = any("已不用我的输入习惯 · 在 ⋯ 里恢复" in t for t in d.screen().texts(where="ime"))
+    tb = script("05-toolbar")
+    tb.status_panel(d)
+    d.tap(d.screen().find(text="不用我的输入习惯", where="ime").c, 0.1)
+    # said once as it goes off (the chip above the keyboard, up 2 s), and nothing kept on the bar after
+    said = tb.said(d, "已不用我的输入习惯，在设置里恢复")
+    # a tap on it takes it away, and only it: the panel under it stays
+    chip = d.screen().find(contains="已不用我的输入习惯，在设置里恢复", where="all")
+    if chip:
+        d.tap(chip.c, 0.3)
+    s = d.screen()
+    tapped_away = chip is None or not s.find(contains="已不用我的输入习惯，在设置里恢复", where="all")
+    panel_kept = bool(s.find(text="恢复我的输入习惯", where="ime"))
+    tb.back_to_keys(d)
+    time.sleep(2)
+    kept = [t for t in d.screen().texts(where="ime") if "输入习惯" in t]
     d.type("wangxiaoming")
     w = d.cands()
     d.clear()
@@ -415,7 +426,9 @@ def pr17(d):
     status_entry(d, "恢复我的输入习惯")
     script("05-toolbar").back_to_keys(d)
     hdr2, rec2 = recent_emoji(d)
-    check(marker, "工具栏上没有「已不用我的输入习惯 · 在 ⋯ 里恢复」")
+    check(said, "关掉时没有提示「已不用我的输入习惯，在设置里恢复」")
+    check(not kept, f"键盘上留着 {kept}")
+    check(tapped_away and panel_kept, f"点提示：消失 {tapped_away}，⋯ 面板还在 {panel_kept}")
     check(first(w) == "王小明" and not has(w, "汪小明"), f"wangxiaoming {w[:4]}")
     # 是 is blocked (the blocks still apply), so "the first as before" is the first of c0 without 是
     was = first([x for x in c0 if first([x]) != "是"])
@@ -424,7 +437,7 @@ def pr17(d):
     check(hdr != "最近使用", f"表情面板第一页是「{hdr}」")
     check("恢复我的输入习惯" in ent, f"⋯ 里 {ent[:16]}")
     check(hdr2 == "最近使用" and any(x.startswith("😀") for x in rec2), f"恢复后表情第一页「{hdr2}」{rec2[:5]}")
-    return f"标记在；wangxiaoming {w[:2]}；shi {s1[:2]}；dz {z[:2]}；表情第一页「{hdr}」；恢复后「{hdr2}」{rec2[:2]}"
+    return f"弹出提示、不留标记；wangxiaoming {w[:2]}；shi {s1[:2]}；dz {z[:2]}；表情第一页「{hdr}」；恢复后「{hdr2}」{rec2[:2]}"
 
 
 @case("PR-21", mutates=True)

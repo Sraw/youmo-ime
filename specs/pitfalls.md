@@ -76,6 +76,11 @@ Before the first unlock there is no credential-protected storage: `EngineBridge.
 learning stays in memory, and the keyboard reads the preferences copied to device-protected storage.
 A new preference the keyboard needs at a lock screen must be in that copy.
 
+A toast from the keyboard is dropped while the app may not post notifications, Android 13's default
+(logcat: `Suppressing toast from package … by user request`): the input method is never the
+foreground app. What the keyboard says goes above it instead, `FcitxInputMethodService.say` (the
+long press's undo chip with nothing to undo). The settings' toasts are fine.
+
 ## Device testing
 
 - `adb shell input text` goes around the input method: useless for testing typing. Tap keys.

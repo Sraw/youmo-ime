@@ -12,7 +12,6 @@ import org.fcitx.fcitx5.android.input.dependency.inputMethodService
 import org.fcitx.fcitx5.android.input.dependency.theme
 import org.fcitx.fcitx5.android.input.wm.InputWindow
 import org.fcitx.fcitx5.android.utils.clipboardManager
-import org.fcitx.fcitx5.android.utils.toast
 import splitties.dimensions.dp
 import splitties.views.dsl.core.add
 import splitties.views.dsl.core.horizontalLayout
@@ -49,7 +48,7 @@ class EditorInfoWindow : InputWindow.ExtendedInputWindow<EditorInfoWindow>() {
             setOnClickListener {
                 val clipData = ClipData.newPlainText("", buildMarkdownString())
                 context.clipboardManager.setPrimaryClip(clipData)
-                context.toast(R.string.done)
+                service.say(R.string.done)
             }
         }
     }

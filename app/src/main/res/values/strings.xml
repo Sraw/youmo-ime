@@ -348,9 +348,7 @@
     <string name="learning_table_blocked_detail">Not shown under %1$s · %2$s</string>
     <string name="learning_table_blocks_entry">Blocked under a table code: %1$d ›</string>
     <string name="learning_not_now">Not now: unlock the phone first</string>
-    <string name="learning_not_here">Not learning here</string>
-    <string name="learning_not_here_explain">This field asked not to be learned from: nothing typed here is learned, and the order stays as it is.</string>
-    <string name="learning_habits_off_marker">Not using my habits · turn back on in ⋯</string>
+    <string name="learning_habits_off_said">Not using my habits now: turn them back on in Settings</string>
     <string name="learning_use_habits">Use my typing habits</string>
     <string name="learning_use_habits_summary">Off, the keyboard is as just installed: it learns nothing and uses nothing of yours but the blocks. For lending the phone; the same switch as in ⋯</string>
     <string name="my_words_pinned">Pinned words</string>

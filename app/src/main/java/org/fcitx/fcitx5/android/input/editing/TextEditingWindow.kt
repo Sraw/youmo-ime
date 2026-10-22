@@ -21,7 +21,6 @@ import org.fcitx.fcitx5.android.input.dependency.theme
 import org.fcitx.fcitx5.android.input.keyboard.CustomGestureView
 import org.fcitx.fcitx5.android.input.wm.InputWindow
 import org.fcitx.fcitx5.android.input.wm.InputWindowManager
-import org.fcitx.fcitx5.android.utils.toast
 import org.mechdancer.dependency.manager.must
 
 class TextEditingWindow : InputWindow.ExtendedInputWindow<TextEditingWindow>(),
@@ -90,7 +89,7 @@ class TextEditingWindow : InputWindow.ExtendedInputWindow<TextEditingWindow>(),
                 userSelection = false
                 val range = service.currentInputSelection
                 service.performContextMenuAction(android.R.id.cut)
-                if (range.start != range.end && copyIsSaid(service.currentInputEditorInfo)) context.toast(R.string.text_cut)
+                if (range.start != range.end && copyIsSaid(service.currentInputEditorInfo)) service.say(R.string.text_cut)
             }
             copyButton.setOnClickListener {
                 userSelection = false
@@ -101,10 +100,10 @@ class TextEditingWindow : InputWindow.ExtendedInputWindow<TextEditingWindow>(),
                 // tracked one may lag; 选择 on with nothing selected sends no selection update
                 val range = service.currentInputSelection
                 // the copy shows nowhere else (the bar's hint is behind this window): say so; not in a
-                // hidden password, whose editor copies nothing (a shown one copies, so it gets the toast)
+                // hidden password, whose editor copies nothing (a shown one copies, so it is said)
                 cursorAfterCopy(range.start, range.end)?.let {
                     ic.setSelection(it, it)
-                    if (copyIsSaid(service.currentInputEditorInfo)) context.toast(R.string.text_copied)
+                    if (copyIsSaid(service.currentInputEditorInfo)) service.say(R.string.text_copied)
                 }
                 updateSelection(hasSelection, false)
             }
@@ -152,7 +151,7 @@ class TextEditingWindow : InputWindow.ExtendedInputWindow<TextEditingWindow>(),
 internal fun fieldEdgeCtrl(rawKeyInput: Boolean): Boolean = !rawKeyInput
 
 /**
- * Whether a copy or cut gets its toast: not in a password whose characters are hidden, which
+ * Whether a copy or cut is said: not in a password whose characters are hidden, which
  * TextView refuses to copy; a shown (visible-password) one copies fine, though inPasswordField
  * counts it too.
  */

@@ -24,7 +24,6 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
-import org.robolectric.shadows.ShadowToast
 
 /** [CandidateLearningMenu]: the engine's menu worded, a block asked first, the reason shown, an act sent. */
 @RunWith(RobolectricTestRunner::class)
@@ -98,13 +97,15 @@ class CandidateLearningMenuTest {
     }
 
     @Test
-    fun nothingDoneIsNoChip() = runTest {
+    fun nothingDoneIsSaidWithNothingToUndo() = runTest {
         val connection = FakeFcitxConnection(this)
         connection.api.learned = { if (it is LearningOp.Menu) menu(WordKind.DICTIONARY) else LearningResult.Unavailable }
-        val menu = CandidateLearningMenu(context, connection, this) { _, _ -> error("nothing was done") }
+        val said = mutableListOf<Pair<String, Long>>()
+        val menu = CandidateLearningMenu(context, connection, this) { m, t -> said += m to t }
         menu.lines(2, "指导", paged = false)!![2].pick()
         testScheduler.advanceUntilIdle()
-        assertEquals(placeholder(R.string.learning_not_done), ShadowToast.getTextOfLatestToast())
+        // on the bar, not a toast: an input method's is dropped without the notification permission
+        assertEquals(listOf(placeholder(R.string.learning_not_done) to LearningResult.NO_UNDO), said)
     }
 
     @Test

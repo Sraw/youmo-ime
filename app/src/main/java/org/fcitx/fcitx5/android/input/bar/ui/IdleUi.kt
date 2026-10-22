@@ -5,9 +5,6 @@
 package org.fcitx.fcitx5.android.input.bar.ui
 
 import android.content.Context
-import android.graphics.drawable.GradientDrawable
-import android.graphics.drawable.InsetDrawable
-import android.text.TextUtils
 import android.transition.Slide
 import android.transition.TransitionManager
 import android.transition.TransitionSet
@@ -21,7 +18,6 @@ import android.widget.ViewAnimator
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.theme.Theme
-import org.fcitx.fcitx5.android.input.LearningMarker
 import org.fcitx.fcitx5.android.input.bar.IdleUiPolicy.Display
 import org.fcitx.fcitx5.android.input.bar.KawaiiBarComponent
 import org.fcitx.fcitx5.android.input.bar.ui.idle.ButtonsBarUi
@@ -33,7 +29,6 @@ import org.fcitx.fcitx5.android.input.keyboard.CommonKeyActionListener
 import org.fcitx.fcitx5.android.input.keyboard.KeyAction
 import org.fcitx.fcitx5.android.input.keyboard.KeyActionListener
 import org.fcitx.fcitx5.android.input.popup.PopupComponent
-import org.fcitx.fcitx5.android.utils.toast
 import splitties.dimensions.dp
 import splitties.views.dsl.constraintlayout.after
 import splitties.views.dsl.constraintlayout.before
@@ -45,16 +40,10 @@ import splitties.views.dsl.constraintlayout.matchConstraints
 import splitties.views.dsl.constraintlayout.startOfParent
 import splitties.views.dsl.core.Ui
 import splitties.views.dsl.core.add
-import splitties.views.dsl.core.frameLayout
-import splitties.views.dsl.core.horizontalLayout
 import splitties.views.dsl.core.lParams
+import splitties.views.dsl.core.frameLayout
 import splitties.views.dsl.core.matchParent
-import splitties.views.dsl.core.textView
-import splitties.views.dsl.core.wrapContent
-import splitties.views.gravityCenter
-import splitties.views.gravityCenterVertical
 import splitties.views.imageResource
-import splitties.views.setPaddingDp
 import timber.log.Timber
 
 class IdleUi(
@@ -112,64 +101,14 @@ class IdleUi(
 
     val emptyBar = Space(ctx)
 
-    /**
-     * 这里不学 or 已不用我的输入习惯 (U-87, U-93; [LearningMarker]) beside the menu button. Tapped,
-     * it says what it means and nothing more: whoever was lent the phone is not led to turn it back on.
-     */
-    private val learningMarker = markerView()
-
-    // the same mark before the number row, which a password field shows in the bar's place: there
-    // above all U-87 says 这里不学 (UAT PR-20)
-    private val rowMarker = markerView()
-
-    private fun markerView() = ctx.textView {
-        visibility = View.GONE
-        textSize = 12f
-        isSingleLine = true
-        ellipsize = TextUtils.TruncateAt.END
-        setTextColor(theme.altKeyTextColor)
-        gravity = gravityCenter
-        // the bar's height to touch, the tag drawn as small as it reads (review-E-ui S7); never so
-        // wide the toolbar's buttons are crushed: the tap says it whole (S9)
-        background = InsetDrawable(
-            GradientDrawable().apply {
-                setColor(theme.altKeyBackgroundColor)
-                cornerRadius = dp(10).toFloat()
-            },
-            0, dp(MARKER_INSET), 0, dp(MARKER_INSET),
-        )
-        minWidth = dp(MIN_TOUCH)
-        maxWidth = ctx.resources.displayMetrics.widthPixels * 2 / 5
-        setPaddingDp(8, 0, 8, 0)
-    }
-
-    fun learningMarker(marker: LearningMarker?) {
-        listOf(learningMarker, rowMarker).forEach { it.visibility = if (marker == null) View.GONE else View.VISIBLE }
-        // its label and what a tap says, together: a new marker names both here
-        val (label, said) = when (marker) {
-            null -> return
-            LearningMarker.NOT_HERE -> R.string.learning_not_here to R.string.learning_not_here_explain
-            LearningMarker.HABITS_OFF -> R.string.learning_habits_off_marker to R.string.learning_habits_off_marker
-        }
-        listOf(learningMarker, rowMarker).forEach {
-            it.setText(label)
-            it.contentDescription = ctx.getString(said)
-            it.setOnClickListener { ctx.toast(said) }
-        }
-    }
-
     val buttonsUi = ButtonsBarUi(ctx, theme)
 
     val clipboardUi = ClipboardSuggestionUi(ctx, theme)
 
     val calculationUi = CalculationUi(ctx, theme)
 
-    val numberRow = NumberRow(ctx, theme)
-
-    private val numberRowBox = ctx.horizontalLayout {
+    val numberRow = NumberRow(ctx, theme).apply {
         visibility = View.GONE
-        add(rowMarker, lParams(wrapContent, matchParent) { gravity = gravityCenterVertical })
-        add(numberRow, lParams(0, matchParent) { weight = 1f })
     }
 
     val inlineSuggestionsBar = InlineSuggestionsUi(ctx)
@@ -217,15 +156,8 @@ class IdleUi(
             before(voiceButton)
             centerVertically()
         })
-        add(learningMarker, lParams(wrapContent, matchParent) {
-            after(menuButton)
-            centerVertically()
-            before(emojiButton)
-            constrainedWidth = true
-            horizontalBias = 0f
-        })
         add(animator, lParams(matchConstraints, matchParent) {
-            after(learningMarker)
+            after(menuButton)
             before(emojiButton)
             centerVertically()
         })
@@ -233,7 +165,7 @@ class IdleUi(
 
     override val root = frameLayout {
         add(idleBody, lParams(matchParent, matchParent))
-        add(numberRowBox, lParams(matchParent, matchParent))
+        add(numberRow, lParams(matchParent, matchParent))
     }
 
     private fun updateMenuButtonContentDescription() {
@@ -303,16 +235,16 @@ class IdleUi(
             numberRow.keyActionListener = commonKeyActionListener.listener
             numberRow.popupActionListener = popup.listener
             if (fromUser && !disableAnimation) {
-                enableSlideTransition(numberRowBox, idleBody, Gravity.END, Gravity.START)
+                enableSlideTransition(numberRow, idleBody, Gravity.END, Gravity.START)
             }
-            numberRowBox.visibility = View.VISIBLE
+            numberRow.visibility = View.VISIBLE
             idleBody.visibility = View.GONE
         } else if (currentState == Display.NumberRow) {
             if (fromUser && !disableAnimation) {
-                enableSlideTransition(idleBody, numberRowBox, Gravity.START, Gravity.END)
+                enableSlideTransition(idleBody, numberRow, Gravity.START, Gravity.END)
             }
             idleBody.visibility = View.VISIBLE
-            numberRowBox.visibility = View.GONE
+            numberRow.visibility = View.GONE
             numberRow.keyActionListener = null
             numberRow.popupActionListener = null
             popup.dismissAll()
@@ -320,11 +252,5 @@ class IdleUi(
         currentState = state
         updateMenuButtonContentDescription()
         updateMenuButtonRotation(instant = !fromUser)
-    }
-
-    private companion object {
-        // the tag's margin within the bar's height, which all of it takes to be touched
-        const val MARKER_INSET = 8
-        const val MIN_TOUCH = 48
     }
 }

@@ -35,6 +35,7 @@ import android.widget.FrameLayout
 import android.widget.inline.InlinePresentationSpec
 import androidx.annotation.Keep
 import androidx.annotation.RequiresApi
+import androidx.annotation.StringRes
 import androidx.autofill.inline.UiVersions
 import androidx.autofill.inline.common.ImageViewStyle
 import androidx.autofill.inline.common.TextViewStyle
@@ -98,6 +99,7 @@ import org.fcitx.fcitx5.android.utils.isTypeNull
 import org.fcitx.fcitx5.android.utils.monitorCursorAnchor
 import org.fcitx.fcitx5.android.utils.styledColorOrDefault
 import org.fcitx.fcitx5.android.utils.styledFloat
+import org.fcitx.fcitx5.android.utils.toast
 import splitties.dimensions.dp
 import timber.log.Timber
 
@@ -168,11 +170,19 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
 
     private var capabilityFlags = CapabilityFlags.DefaultFlags
 
+    /**
+     * [id] said for a moment above the keyboard. Not a toast: one from an input method is dropped
+     * while its app may not post notifications, Android 13's default ("Suppressing toast … by user
+     * request"); one from no keyboard shown, as the settings' toasts are, still is.
+     */
+    fun say(@StringRes id: Int) {
+        // the view shown, not the one the device mode picks: a key typed with ⋯ open flips that mode
+        val view = inputView?.takeIf { it.isShown } ?: candidatesView?.takeIf { it.isShown }
+        if (view != null) view.say(getString(id)) else toast(id)
+    }
+
     /** nothing said out loud goes into a password, its characters shown or not */
     val inPasswordField get() = fieldPolicy.password
-
-    /** Whether nothing typed in the field focused is learned (U-87's 这里不学): a password, or a field that asks so. */
-    val learnsNothingHere get() = fieldPolicy.sensitive
 
     /**
      * A URL's or an email's field, where what is typed is what is meant ([PendingInputPolicy]). Read

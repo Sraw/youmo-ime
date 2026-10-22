@@ -344,9 +344,7 @@
     <string name="learning_table_blocked_detail">在 %1$s 下不显示 · %2$s</string>
     <string name="learning_table_blocks_entry">码表里按码屏蔽的：%1$d 个 ›</string>
     <string name="learning_not_now">现在还做不了：先解锁手机</string>
-    <string name="learning_not_here">这里不学</string>
-    <string name="learning_not_here_explain">这个输入框要求不记录：这里打的什么都不学，排序照旧。</string>
-    <string name="learning_habits_off_marker">已不用我的输入习惯 · 在 ⋯ 里恢复</string>
+    <string name="learning_habits_off_said">已不用我的输入习惯，在设置里恢复</string>
     <string name="learning_use_habits">用我的输入习惯</string>
     <string name="learning_use_habits_summary">关掉时键盘像刚装好：不学，也不用你的任何记录，只有屏蔽照常。借手机时用；和 ⋯ 里的是同一个开关</string>
     <string name="my_words_pinned">固定的词</string>

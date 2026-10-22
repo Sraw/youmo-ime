@@ -32,7 +32,6 @@ import org.fcitx.fcitx5.android.data.clipboard.ClipboardManager
 import org.fcitx.fcitx5.android.data.clipboard.db.ClipboardEntry
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.prefs.ManagedPreference
-import org.fcitx.fcitx5.android.input.LearningMarker
 import org.fcitx.fcitx5.android.input.bar.ExpandButtonStateMachine.State.ClickToAttachWindow
 import org.fcitx.fcitx5.android.input.bar.ExpandButtonStateMachine.State.ClickToDetachWindow
 import org.fcitx.fcitx5.android.input.bar.ExpandButtonStateMachine.State.Hidden
@@ -440,22 +439,9 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
         ClipboardManager.addOnUpdateListener(onClipboardUpdateListener)
         clipboardSuggestion.registerOnChangeListener(onClipboardSuggestionUpdateListener)
         clipboardItemTimeout.registerOnChangeListener(onClipboardTimeoutUpdateListener)
-        useHabits.registerOnChangeListener(onUseHabitsChangeListener)
-    }
-
-    private val useHabits = AppPrefs.getInstance().internal.useHabits
-
-    // turned off or on in ⋯ or the settings: the mark follows at once
-    private val onUseHabitsChangeListener = ManagedPreference.OnChangeListener<Boolean> { _, _ -> showLearningMarker() }
-
-    private fun showLearningMarker() {
-        idleUi.learningMarker(LearningMarker.of(learnsHere = !service.learnsNothingHere, habits = useHabits.getValue()))
     }
 
     override fun onStartInput(info: EditorInfo, capFlags: CapabilityFlags) {
-        // the one mark of a field that learns nothing (U-87), IME_FLAG_NO_PERSONALIZED_LEARNING's
-        // among them (FieldPolicy): the menu button no longer turns a private icon beside it
-        showLearningMarker()
         isCapabilityFlagsPassword = toolbarNumRowOnPassword && capFlags.has(CapabilityFlag.Password)
         isInlineSuggestionPresent = false
         calculation = null

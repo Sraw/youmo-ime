@@ -32,6 +32,7 @@ import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.data.theme.ThemePrefs
+import org.fcitx.fcitx5.android.engine.learn.control.LearningResult
 import org.fcitx.fcitx5.android.input.learning.CandidateLearningMenu
 import org.fcitx.fcitx5.android.input.learning.UndoChip
 import org.fcitx.fcitx5.android.utils.navbarFrameHeight
@@ -122,12 +123,18 @@ abstract class BaseInputView(
     /** The lowest window y the chip may reach when it goes below: the window's bottom less the navigation bar. */
     protected open val undoBottomLimit: Int get() = rootView.height - (rootWindowInsets?.let(::floatingBottomInset) ?: 0)
 
-    private val learningMenu by lazy {
-        CandidateLearningMenu(themedContext, fcitx, service.lifecycleScope) { message, token ->
-            chipTyping.chipShown()
-            (undoChip ?: UndoChip(undoAnchor, theme, service.lifecycleScope, fcitx, { undoAbove }, { undoAnchorShowsCandidates }, undoBelowOk, { undoBottomLimit }).also { undoChip = it }).show(message, token)
-        }
+    private val learningMenu by lazy { CandidateLearningMenu(themedContext, fcitx, service.lifecycleScope, ::chip) }
+
+    private fun chip(message: String, token: Long, aboveKeys: Boolean = false) {
+        chipTyping.chipShown()
+        (undoChip ?: UndoChip(undoAnchor, theme, service.lifecycleScope, fcitx, { undoAbove }, { undoAnchorShowsCandidates }, undoBelowOk, { undoBottomLimit }).also { undoChip = it }).show(message, token, aboveKeys)
     }
+
+    /**
+     * [message] said for a moment above the keyboard, in the chip a long press's act shows
+     * ([FcitxInputMethodService.say]); not over the bar, whose buttons it hid (the user, 2026-10-22).
+     */
+    fun say(message: String) = chip(message, LearningResult.NO_UNDO, aboveKeys = true)
 
     private val chipTyping = ChipTyping()
 

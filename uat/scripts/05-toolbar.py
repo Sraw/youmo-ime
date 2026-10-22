@@ -1005,6 +1005,36 @@ def tb29(d):
     return "有候选、有联想时长按 ⌄ 都收起键盘；联想时点一下展开表格"
 
 
+def said(d, text, wait=2.0):
+    """whether the chip above the keyboard says text within wait seconds (a window of its own, in the dump)"""
+    end = time.time() + wait
+    while True:
+        if any(text in t for t in d.screen().texts(where="all")):
+            return True
+        if time.time() > end:
+            return False
+
+
+@case("TB-30", page="long")
+def tb30(d):
+    edit_panel(d)
+    ime(d, desc="全选", after=0.3)
+    ime(d, desc="复制", after=0.2)
+    copied = said(d, "已复制")
+    ime(d, desc="全选", after=0.3)
+    ime(d, desc="剪切", after=0.2)
+    cut = said(d, "已剪切")
+    t = d.field_text() or ""
+    time.sleep(2.5)
+    ime(d, desc="复制", after=0.2)
+    again = said(d, "已复制", 1.5)
+    back_to_keys(d)
+    check(copied, "复制后没有「已复制」")
+    check(cut, "剪切后没有「已剪切」")
+    check(not t.strip(), f"剪切后框里还有「{t[:10]}」")
+    check(not again, "没选中时点复制也提示了")
+    return "复制「已复制」，剪切「已剪切」，空框复制不提示"
+
 @case("TB-31", base="B0-设置", mutates=True)
 def tb31(d):
     home(d, "剪贴板与表情")

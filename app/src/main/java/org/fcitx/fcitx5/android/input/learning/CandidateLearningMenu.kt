@@ -18,7 +18,6 @@ import org.fcitx.fcitx5.android.engine.learn.control.LearningOp
 import org.fcitx.fcitx5.android.engine.learn.control.LearningResult
 import org.fcitx.fcitx5.android.engine.learn.control.Why
 import org.fcitx.fcitx5.android.utils.clipboardManager
-import org.fcitx.fcitx5.android.utils.toast
 
 /**
  * A long press on a candidate of the engine's input methods (U-82): the menu the engine gives
@@ -110,7 +109,7 @@ class CandidateLearningMenu(
             when (val result = fcitx.runOnReady { learning(op) }) {
                 is LearningResult.Done -> done(said(row, text), result.undo)
                 // the list changed under the menu: nothing done, and said so (review-E-ui N7)
-                else -> context.toast(R.string.learning_not_done)
+                else -> done(context.getString(R.string.learning_not_done), LearningResult.NO_UNDO)
             }
         }
         return null
@@ -123,7 +122,7 @@ class CandidateLearningMenu(
                 val report = fcitx.runOnReady { learning(LearningMenu.onCandidate(LearningOp.Report(index, text), paged)) }
                 if (report is LearningResult.Text) {
                     context.clipboardManager.setPrimaryClip(ClipData.newPlainText(null, report.text))
-                    context.toast(R.string.learning_report_copied)
+                    done(context.getString(R.string.learning_report_copied), LearningResult.NO_UNDO)
                 }
             }
             null
