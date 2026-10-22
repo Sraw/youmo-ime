@@ -8,7 +8,7 @@ Each release lists its **main changes** (new features, large improvements), its 
 
 ---
 
-## 0.3.1（2026-10-21）
+## 0.3.1（2026-10-22）
 
 ### 主要变化
 
@@ -22,7 +22,7 @@ Each release lists its **main changes** (new features, large improvements), its 
   排在词库同音词后面，不进整句、不进语音、不出联想，上屏两次才成为你的词；五笔等码表也能打出它们，排在码表自己的词后面。
   词库与短语 → 导入的词 里按批列出，可以整批撤掉（马上能撤销）。导入大词表时不再提示改导基础词库。
 - **学习的控制**：工具栏 **⋯** 里有 **不用我的输入习惯**（借手机时键盘像刚装好，不学也不用你的记录）和 **清掉最近**（10 分钟、1 小时、今天）；
-  用户词库里的 **清空学到的** 逐项写明清什么、留什么，可以选全部清空。密码框、无痕模式等不记录的输入框里显示"这里不学"。
+  用户词库里的 **清空学到的** 逐项写明清什么、留什么，可以选全部清空。
 - **学习备份**：用户词库 → 学习备份。默认开着自动备份（第一个打字日一份，之后每 7 个打字日一份，留最近 2 份），能另存一份到看得见的文件夹；
   恢复（包括 **备份全部** 的恢复）改为和手机上的合并，恢复前自动存一份，可以 **退回恢复前**。用户词库的 **导出** 改存成 `.fxlb` 备份文件，不再导出纯文本。
 - **长按候选的菜单**：改为 **删除**（你的词、导入的词）、**忘掉学到的**（词库自带的词）、**固定首位**、**屏蔽**、**不再联想**；码表里屏蔽只对这串码生效。
@@ -42,6 +42,38 @@ Each release lists its **main changes** (new features, large improvements), its 
 ### 修复
 
 - 修复了一些学习前文（前面打的词）时的问题：输入框里原有文字后面选的词，现在也会记住和前面那个词的搭配。
+- 键盘里的提示（复制、剪切、清掉最近的结果等）改为显示在键盘上方。以前用的是系统提示，Android 13 起没开通知权限时不显示。
+
+### Main changes
+
+- **English on the nine keys**: the nine-key pinyin layout gains a **中/英** key for nine-key English. A word's keys offer candidates (`4663` gives good, home, gone),
+  space commits the first; 1 is an apostrophe inside a word, ⇧ sits where 重输 was. A letter picked by long press is fixed in the word, so a word the
+  dictionary lacks is typed and remembered that way. Multi-tap is an option, and always on in address and email fields. The English input method stays a full keyboard.
+- **Steadier, faster learning**: how the keyboard learns your words was rewritten. What it learned stays steady instead of shifting after one odd pick,
+  the words you use come up and become yours sooner, and pins are kept per input method. What an older version learned is carried over on first start.
+- **Imported words**: word lists and Sogou .scel files imported into the user dictionary become imported words, behind the dictionary's words of the same
+  reading until you use them, and yours after two commits. 词库与短语 → 导入的词 lists each import, which can be taken back as a whole.
+- **Learning controls**: the toolbar's **⋯** has **不用我的输入习惯** (a borrowed phone gets a fresh keyboard) and **清掉最近** (10 minutes, an hour, today);
+  **清空学到的** says what it clears.
+- **Learning backups**: automatic backups on by default, a copy saved where you can see it, and restores that merge with the phone, with **退回恢复前**.
+  The user dictionary's export is now such a backup file (`.fxlb`).
+- **Long press on a candidate**: **删除**, **忘掉学到的**, **固定首位**, **屏蔽** and **不再联想**, each with an undo. Handwriting and 联想 learn from your picks too.
+- **Code tables**: 自动造词 is gone; 常用字词排前面 is now **调频**, off on new installs (kept on for tables used before the upgrade).
+
+### Smaller changes
+
+- The app's interface is in Simplified Chinese, Traditional Chinese and English only.
+- English: a word only typed a few times is no longer spared autocorrection; one you reverted once or added yourself is.
+- Nine keys: a digit key's long press shows `A B C 2 a b c`; address and email fields put `/` or `@`, `.` and `.com` in the left column.
+- Long-press popups are smaller and float above the key; a small move changes the pick, with a light vibration; sliding down off the key picks nothing.
+- The floating keyboard follows 按键圆角, has a slimmer handle below it by default, and docks when dropped at the bottom.
+
+### Fixes
+
+- Several fixes to learning the word before: a word picked after text already in the field now learns its pairing with that text.
+- What the keyboard tells you (copied, cut, what 清掉最近 did) now shows above the keys. It used system toasts, which Android 13 and later hide while the app may not post notifications.
+
+---
 
 ## 0.3.0（2026-10-19）
 
