@@ -2,9 +2,23 @@
 
 <h1 align="center">幽默输入法 · Youmo IME</h1>
 
-<p align="center"><a href="#幽默输入法">中文</a> · <a href="#youmo-ime">English</a> · <a href="docs/README.md">使用说明</a> · <a href="CHANGELOG.md">版本日志</a> · <a href="https://github.com/Sraw/youmo-ime/releases">下载</a></p>
+<p align="center"><a href="#幽默输入法">中文</a> · <a href="#youmo-ime">English</a> · <a href="docs/README.md">使用说明</a> · <a href="CHANGELOG.md">版本日志</a> · <a href="https://github.com/Sraw/youmo-ime/releases/latest">下载</a></p>
 
-<p align="center"><a href="https://t.me/+smgndImIg7EzNjYx"><img src="https://img.shields.io/badge/Telegram-%E4%BA%A4%E6%B5%81%E7%BE%A4-26A5E4?logo=telegram&logoColor=white" alt="Telegram 交流群"></a></p>
+<p align="center">
+<a href="https://github.com/Sraw/youmo-ime/releases/latest"><img src="https://img.shields.io/github/v/release/Sraw/youmo-ime?label=release" alt="最新版本 / latest release"></a>
+<a href="https://github.com/Sraw/youmo-ime/releases/latest"><img src="https://img.shields.io/github/downloads/Sraw/youmo-ime/latest/total?label=downloads" alt="这一版的下载数 / downloads of this release"></a>
+<a href="https://github.com/Sraw/youmo-ime/actions/workflows/unit_test.yml"><img src="https://github.com/Sraw/youmo-ime/actions/workflows/unit_test.yml/badge.svg?branch=main" alt="Unit Tests"></a>
+<a href="LICENSE"><img src="https://img.shields.io/badge/license-LGPL--2.1--or--later-blue" alt="LGPL-2.1-or-later"></a>
+<img src="https://img.shields.io/badge/Android-6.0%2B%20arm64-3DDC84?logo=android&logoColor=white" alt="Android 6.0+ arm64">
+<a href="https://t.me/+smgndImIg7EzNjYx"><img src="https://img.shields.io/badge/Telegram-%E4%BA%A4%E6%B5%81%E7%BE%A4-26A5E4?logo=telegram&logoColor=white" alt="Telegram 交流群"></a></p>
+
+<p align="center">
+<img src="docs/images/screenshot-pinyin.png" width="19%" alt="整句拼音 / pinyin sentences">
+<img src="docs/images/screenshot-t9.png" width="19%" alt="九键 / nine keys">
+<img src="docs/images/screenshot-hw.png" width="19%" alt="手写 / handwriting">
+<img src="docs/images/screenshot-floating.png" width="19%" alt="悬浮键盘 / floating keyboard">
+<img src="docs/images/screenshot-dark.png" width="19%" alt="深色主题 / dark theme">
+</p>
 
 ---
 
@@ -46,8 +60,8 @@
 
 ### 下载
 
-到 [Releases](https://github.com/Sraw/youmo-ime/releases) 下载：文字版约 310 MB，语音版约 470 MB（多申请录音权限）。
-需要 Android 6.0 以上的 arm64 手机。模型和词库都在安装包里，所以包比较大。每月发一版，主要更新词库。
+到 [Releases](https://github.com/Sraw/youmo-ime/releases/latest) 下载最新版：文字版约 310 MB，语音版约 470 MB（多申请录音权限）。
+需要 Android 6.0 以上的 arm64 手机。模型和词库都在安装包里，所以包比较大。持续更新中，词库每月更新一次。
 
 ### 下一步计划
 
@@ -108,8 +122,8 @@ Nine keys, main set: 88.8%. English with one key in 25 slipping: 73.8% of slippe
 
 ### Download
 
-From [Releases](https://github.com/Sraw/youmo-ime/releases): text build about 310 MB, voice build about 470 MB (asks for the microphone too).
-Needs an arm64 phone on Android 6.0 or later. The models and dictionary are inside the APK, hence its size. A release a month, mostly for new words.
+The latest from [Releases](https://github.com/Sraw/youmo-ime/releases/latest): text build about 310 MB, voice build about 470 MB (asks for the microphone too).
+Needs an arm64 phone on Android 6.0 or later. The models and dictionary are inside the APK, hence its size. Actively updated; the dictionary gets new words every month.
 
 ### Next
 

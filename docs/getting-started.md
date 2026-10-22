@@ -2,7 +2,7 @@
 
 ## 选哪个版本
 
-安装包在 [GitHub Releases](https://github.com/Sraw/youmo-ime/releases)，每次发布有两个：
+安装包在 [GitHub Releases](https://github.com/Sraw/youmo-ime/releases/latest)（最新版），每次发布有两个：
 
 | 文件名含 | 版本 | 区别 |
 |---|---|---|
