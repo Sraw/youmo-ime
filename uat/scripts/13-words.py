@@ -175,6 +175,11 @@ def import_file(d, name, target=None):
     d.tap_text("导入词库", after=2.5)
     if "documentsui" not in d.top_activity():
         raise Blocked(f"没出文件选择：{d.top_activity()}")
+    # a package the picker has not served yet opens in 最近 (the release build after the debug one
+    # had used it): go to 下载 through the roots drawer
+    if d.screen().find(text="近期的文件"):
+        d.tap((77, 148), 1.0)
+        d.tap_text("下载", scroll=False, after=2.0)
     # the exports of earlier runs pile up in 下载 (a grid of two columns): enough scrolls to pass them
     for _ in range(12):
         n = d.screen().find(text=name)

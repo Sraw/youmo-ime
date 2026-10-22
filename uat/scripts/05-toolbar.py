@@ -1036,7 +1036,8 @@ def tb32(d):
         im = d.png()
         # the handle's strip is the keyboard's bottom: the dock button's bottom, the keys' left
         inside, corner = im.getpixel((h[0] - 150, h[1])), im.getpixel((kb[0] + 1, dock.b[3] - 2))
-        return max(abs(a - b) for a, b in zip(inside, corner)) < 12, inside, corner
+        # the release build's handle (238) and what a round corner shows (227) are 11 apart
+        return max(abs(a - b) for a, b in zip(inside, corner)) < 6, inside, corner
     d.open_page("text")
     floating(d)
     rounded = corner_is_handle()

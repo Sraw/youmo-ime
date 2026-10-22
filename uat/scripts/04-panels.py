@@ -341,6 +341,10 @@ def numpad_space_slide(d):
     """on the number keyboard: slide left on space, then type 1; returns (where the 1 landed, the
     text before, after)"""
     t0 = d.field_text() or ""
+    # the cursor at the end, as 前提 says: open_page's tap past the text left it at the start now
+    # and then, which read as a slide that moved it (Ctrl+End, a key the browser takes)
+    d.sh("input keycombination 113 123")
+    time.sleep(0.4)
     ime_tap(d, text="123", after=0.8)
     s = d.screen()
     sp = next((n for n in s.ime() if n.desc == "空格"), None)

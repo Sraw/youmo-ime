@@ -617,9 +617,13 @@ def vo22(d):
         raise Blocked(f"前提（VO-20）没到：打两次后仍是「{t}」")
     d.clear()
     pr = script("15-privacy-backup")
+    tb = script("05-toolbar")
+    # the ⋯ panel stays up after a switch in it: back to the keys, where the space is held
     pr.status_entry(d, "不用我的输入习惯")
+    tb.back_to_keys(d)
     t1, n1 = heard_once(d, "wangmingtian", "汪小明明天来")
     pr.status_entry(d, "恢复我的输入习惯")
+    tb.back_to_keys(d)
     _, t2, n, miss = retried(d, "wangmingtian", lambda x: "汪小明" in x)
     d.clear()
     check("汪小明" not in t1, f"不用我的输入习惯时说，框里「{t1}」{n1}")

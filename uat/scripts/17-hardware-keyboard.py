@@ -268,7 +268,8 @@ def search_box(d, e):
     t = next((n.text for n in s.app() if n.cls.endswith("EditText") and n.focused), "")
     check(not soft(s), "在设置的搜索框里按 n i 空格，屏幕键盘没收起")
     check(t == "你", f"设置的搜索框里是「{t}」")
-    key(d, "ESC")
+    # no Esc first: a search box offers no 联想 to close (docs/pinyin.md), so the app takes the Esc
+    # and the box loses its focus
     d.tap(e.c, 1.0)
     ok = False
     try:

@@ -1399,8 +1399,9 @@ def popup_pick(d, key, char):
     return [n.text for n in items]
 
 
-def flick(d, key, dy=130, ms=120):
-    """a short swipe on a key (dy > 0 down)"""
+def flick(d, key, dy=130, ms=200):
+    """a short swipe on a key (dy > 0 down). Not quicker: `input swipe` sends a move every frame or
+    so, and one of 120 ms read as a tap about once in six on redroid (the key saw too few moves)"""
     x, y = d.keys(refresh=True)[key]
     d.swipe((x, y), (x, y + dy), ms)
 
