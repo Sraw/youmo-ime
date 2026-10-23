@@ -40,5 +40,12 @@ class ChipTyping {
         return true
     }
 
+    /**
+     * A key the engine let through, [up] if its release: the chip goes, but not on a release. The
+     * shortcut that raised a tip (Ctrl+. and the like) comes back up unaccepted and would put the
+     * tip away the moment it came (F3554).
+     */
+    fun key(up: Boolean): Boolean = !up && typed()
+
     private fun changed() = atChip != editor to bar
 }

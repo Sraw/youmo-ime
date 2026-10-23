@@ -18,7 +18,6 @@ import android.widget.ProgressBar
 import android.widget.Space
 import android.widget.ViewAnimator
 import org.fcitx.fcitx5.android.R
-import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.input.bar.IdleUiPolicy.Display
 import org.fcitx.fcitx5.android.input.bar.KawaiiBarComponent
@@ -30,7 +29,10 @@ import org.fcitx.fcitx5.android.input.bar.ui.idle.NumberRow
 import org.fcitx.fcitx5.android.input.keyboard.CommonKeyActionListener
 import org.fcitx.fcitx5.android.input.keyboard.KeyAction
 import org.fcitx.fcitx5.android.input.keyboard.KeyActionListener
+import org.fcitx.fcitx5.android.input.motion.Motion
 import org.fcitx.fcitx5.android.input.popup.PopupComponent
+import org.fcitx.fcitx5.android.utils.interpolator
+import org.fcitx.fcitx5.android.utils.motionSettings
 import splitties.dimensions.dp
 import splitties.views.dsl.constraintlayout.after
 import splitties.views.dsl.constraintlayout.before
@@ -59,8 +61,6 @@ class IdleUi(
     var currentState = Display.Empty
         private set
 
-    private val disableAnimation by AppPrefs.getInstance().advanced.disableAnimation
-
     private val translateDirection by lazy {
         if (ctx.resources.configuration.layoutDirection == View.LAYOUT_DIRECTION_LTR) 1f else -1f
     }
@@ -73,6 +73,7 @@ class IdleUi(
 
     val menuButton = ToolButton(ctx, R.drawable.ic_baseline_expand_more_24, theme).apply {
         iconRotation = menuButtonRotation
+        fixIconSize(ctx.dp(KawaiiBarComponent.ICON_DP))
     }
 
     init {
@@ -83,6 +84,7 @@ class IdleUi(
 
     val hideKeyboardButton = ToolButton(ctx, R.drawable.ic_baseline_arrow_drop_down_24, theme).apply {
         contentDescription = ctx.getString(R.string.hide_keyboard)
+        fixIconSize(ctx.dp(KawaiiBarComponent.ICON_DP))
     }
 
     /**
@@ -91,6 +93,7 @@ class IdleUi(
      */
     val emojiButton = ToolButton(ctx, R.drawable.ic_baseline_tag_faces_24, theme).apply {
         contentDescription = ctx.getString(R.string.a11y_key_emoji)
+        fixIconSize(ctx.dp(KawaiiBarComponent.ICON_DP))
         setOnClickListener {
             commonKeyActionListener.listener.onKeyAction(KeyAction.PickerSwitchAction(), KeyActionListener.Source.Keyboard)
         }
@@ -99,6 +102,7 @@ class IdleUi(
     /** Voice input, in a voice build only (VoiceFeature): beside the emoji, as on Sogou's bar */
     val voiceButton = ToolButton(ctx, R.drawable.ic_baseline_keyboard_voice_24, theme).apply {
         contentDescription = ctx.getString(R.string.voice_input)
+        fixIconSize(ctx.dp(KawaiiBarComponent.ICON_DP))
         visibility = View.GONE
     }
 
@@ -166,9 +170,10 @@ class IdleUi(
         if (text != null) workText.text = text
     }
 
+    // their lengths set as each switch starts: animation may have been turned off or on since
     private val inAnimation by lazy {
         AnimationSet(true).apply {
-            duration = 200L
+            interpolator = Motion.Curve.Enter.interpolator
             addAnimation(AlphaAnimation(0f, 1f))
             // 2 stands for Animation.RELATIVE_TO_PARENT
             addAnimation(TranslateAnimation(2, -0.3f * translateDirection, 2, 0f, 0, 0f, 0, 0f))
@@ -177,27 +182,29 @@ class IdleUi(
 
     private val outAnimation by lazy {
         AnimationSet(true).apply {
-            duration = 200L
+            interpolator = Motion.Curve.Exit.interpolator
             addAnimation(AlphaAnimation(1f, 0f))
             addAnimation(TranslateAnimation(2, 0f, 2, -0.3f * translateDirection, 0, 0f, 0, 0f))
         }
     }
 
     private val idleBody = constraintLayout {
+        // as tall as the bar; at a small 候选字号 still 40 dp wide, a finger's target
         val size = dp(KawaiiBarComponent.HEIGHT)
-        add(menuButton, lParams(size, size) {
+        val buttonWidth = dp(maxOf(KawaiiBarComponent.HEIGHT, KawaiiBarComponent.MIN_TOUCH_DP))
+        add(menuButton, lParams(buttonWidth, size) {
             startOfParent()
             centerVertically()
         })
-        add(hideKeyboardButton, lParams(size, size) {
+        add(hideKeyboardButton, lParams(buttonWidth, size) {
             endOfParent()
             centerVertically()
         })
-        add(voiceButton, lParams(size, size) {
+        add(voiceButton, lParams(buttonWidth, size) {
             before(hideKeyboardButton)
             centerVertically()
         })
-        add(emojiButton, lParams(size, size) {
+        add(emojiButton, lParams(buttonWidth, size) {
             before(voiceButton)
             centerVertically()
         })
@@ -230,8 +237,9 @@ class IdleUi(
         menuButton.apply {
             if (targetRotation == iconRotation) return
             iconAnimate().cancel()
-            if (!instant && !disableAnimation) {
-                iconAnimate().setDuration(200L).rotation(targetRotation)
+            val ms = if (instant) 0L else Motion.Medium.enter(motionSettings())
+            if (ms > 0L) {
+                iconAnimate().setDuration(ms).setInterpolator(Motion.Curve.Move.interpolator).rotation(targetRotation)
             } else {
                 iconRotation = targetRotation
             }
@@ -243,14 +251,20 @@ class IdleUi(
         animator.outAnimation = null
     }
 
-    private fun setAnimation() {
-        animator.inAnimation = inAnimation
-        animator.outAnimation = outAnimation
+    private fun setAnimation(motion: Motion.Settings) {
+        animator.inAnimation = inAnimation.apply { duration = Motion.Medium.enter(motion) }
+        animator.outAnimation = outAnimation.apply { duration = Motion.Medium.exit(motion) }
     }
 
-    private fun enableSlideTransition(inTarget: View, outTarget: View, inGravity: Int, outGravity: Int) {
-        val slideIn = Slide(inGravity).apply { duration = 200L }
-        val slideOut = Slide(outGravity).apply { duration = 200L }
+    private fun enableSlideTransition(inTarget: View, outTarget: View, inGravity: Int, outGravity: Int, motion: Motion.Settings) {
+        val slideIn = Slide(inGravity).apply {
+            duration = Motion.Medium.enter(motion)
+            interpolator = Motion.Curve.Enter.interpolator
+        }
+        val slideOut = Slide(outGravity).apply {
+            duration = Motion.Medium.exit(motion)
+            interpolator = Motion.Curve.Exit.interpolator
+        }
         slideIn.addTarget(inTarget)
         slideOut.addTarget(outTarget)
         val set = TransitionSet().apply {
@@ -261,17 +275,18 @@ class IdleUi(
         TransitionManager.beginDelayedTransition(root, set)
     }
 
-    private fun skipsAnimation(state: Display, fromUser: Boolean) =
-        !fromUser || disableAnimation || state.isUnanimated() || currentState.isUnanimated()
+    private fun skipsAnimation(state: Display, fromUser: Boolean, motion: Motion.Settings) =
+        !fromUser || !motion.animates || state.isUnanimated() || currentState.isUnanimated()
 
     private fun Display.isUnanimated() = this == Display.InlineSuggestion || this == Display.NumberRow
 
     fun updateState(state: Display, fromUser: Boolean = false) {
         Timber.d("Switch idle ui to $state")
-        if (skipsAnimation(state, fromUser)) {
+        val motion = motionSettings()
+        if (skipsAnimation(state, fromUser, motion)) {
             clearAnimation()
         } else {
-            setAnimation()
+            setAnimation(motion)
         }
         when (state) {
             Display.Empty -> animator.displayedChild = 0
@@ -284,14 +299,14 @@ class IdleUi(
         if (state == Display.NumberRow) {
             numberRow.keyActionListener = commonKeyActionListener.listener
             numberRow.popupActionListener = popup.listener
-            if (fromUser && !disableAnimation) {
-                enableSlideTransition(numberRow, idleBody, Gravity.END, Gravity.START)
+            if (fromUser && motion.animates) {
+                enableSlideTransition(numberRow, idleBody, Gravity.END, Gravity.START, motion)
             }
             numberRow.visibility = View.VISIBLE
             idleBody.visibility = View.GONE
         } else if (currentState == Display.NumberRow) {
-            if (fromUser && !disableAnimation) {
-                enableSlideTransition(idleBody, numberRow, Gravity.START, Gravity.END)
+            if (fromUser && motion.animates) {
+                enableSlideTransition(idleBody, numberRow, Gravity.START, Gravity.END, motion)
             }
             idleBody.visibility = View.VISIBLE
             numberRow.visibility = View.GONE

@@ -339,17 +339,11 @@ class PinyinDataTest {
     }
 
     @Test
-    fun callerMetaIsKeptAlongsideTheBuildersOwn() {
-        val meta = load(meta = mapOf("source" to "test")).meta
+    fun callerMetaIsKeptButTheBuildersSyllableChecksumWins() {
+        val meta = load(meta = mapOf("source" to "test", PinyinData.META_SYLLABLE_CHECKSUM to "0")).meta
         assertEquals("test", meta["source"])
         assertEquals(Syllables.checksum().toString(), meta[PinyinData.META_SYLLABLE_CHECKSUM])
         assertEquals(Syllables.count.toString(), meta[PinyinData.META_SYLLABLE_COUNT])
-    }
-
-    @Test
-    fun theCallerCannotOverrideTheSyllableChecksum() {
-        val meta = load(meta = mapOf(PinyinData.META_SYLLABLE_CHECKSUM to "0")).meta
-        assertEquals(Syllables.checksum().toString(), meta[PinyinData.META_SYLLABLE_CHECKSUM])
     }
 
     @Test

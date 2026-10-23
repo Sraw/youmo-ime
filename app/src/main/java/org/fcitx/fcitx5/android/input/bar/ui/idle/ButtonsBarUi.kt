@@ -12,6 +12,7 @@ import com.google.android.flexbox.FlexboxLayout
 import com.google.android.flexbox.JustifyContent
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.data.theme.Theme
+import org.fcitx.fcitx5.android.input.bar.KawaiiBarComponent
 import org.fcitx.fcitx5.android.input.bar.ui.ToolButton
 import splitties.dimensions.dp
 import splitties.views.dsl.core.Ui
@@ -36,12 +37,15 @@ class ButtonsBarUi(override val ctx: Context, private val theme: Theme) : Ui {
         add(buttons, lParams(wrapContent, matchParent))
     }
 
-    // narrower where the bar is (the floating keyboard's), down to MIN_SIZE, then scrolled; the icon
-    // its size all the same: in the button's padding it shrank with it, tiny on the floating bar
+    // as tall as the bar (候选字号) and as wide as the other bar buttons; narrower where the bar is
+    // (the floating keyboard's), down to MIN_SIZE, then scrolled; the icon its size all the same
     private fun toolButton(@DrawableRes icon: Int) = ToolButton(ctx, icon, theme).also {
-        val size = ctx.dp(SIZE)
-        it.fixIconSize(ctx.dp(ICON))
-        buttons.addView(it, FlexboxLayout.LayoutParams(size, size).apply { minWidth = ctx.dp(MIN_SIZE) })
+        val width = ctx.dp(maxOf(KawaiiBarComponent.HEIGHT, KawaiiBarComponent.MIN_TOUCH_DP))
+        it.fixIconSize(ctx.dp(KawaiiBarComponent.ICON_DP))
+        buttons.addView(
+            it,
+            FlexboxLayout.LayoutParams(width, ctx.dp(KawaiiBarComponent.HEIGHT)).apply { minWidth = ctx.dp(MIN_SIZE) }
+        )
     }
 
     val undoButton = toolButton(R.drawable.ic_baseline_undo_24).apply {
@@ -65,8 +69,6 @@ class ButtonsBarUi(override val ctx: Context, private val theme: Theme) : Ui {
     }
 
     private companion object {
-        const val SIZE = 40
         const val MIN_SIZE = 28
-        const val ICON = 20
     }
 }

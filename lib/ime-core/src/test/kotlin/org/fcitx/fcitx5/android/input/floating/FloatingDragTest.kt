@@ -90,4 +90,25 @@ class FloatingDragTest {
     // the top, and whether the drag is in the zone after the move: its contract; FloatingPlacer
     // tells the move that takes it in (FloatingPlacerTest)
     private fun FloatingDrag.moved(top: Float, dy: Float, maxTop: Float): Pair<Float, Boolean> = move(top, dy, maxTop) to inZone
+
+    // 始终显示悬浮条, MN-11 on redroid: grabbed from the docked keyboard with the finger 150 below
+    // where the grip can go, the finger coming up takes that up first, then the grip is under it
+    @Test
+    fun grabbedBelowWhereItCanGoTheFingerCatchesUpWithTheGrip() {
+        val drag = FloatingDrag(slop = 20f)
+        drag.start(slack = 150f)
+        assertEquals(maxTop to false, drag.moved(maxTop, -100f, maxTop))
+        assertEquals(maxTop to false, drag.moved(maxTop, -40f, maxTop))
+        // 10 more of slack, then 290 up: the grip under the finger from here
+        assertEquals(710f to false, drag.moved(maxTop, -300f, maxTop))
+    }
+
+    @Test
+    fun grabbedTheSlackIsNoPushIntoTheZoneOnlyAPushPastWhereTheFingerBegan() {
+        val drag = FloatingDrag(slop = 20f)
+        drag.start(slack = 150f)
+        assertFalse("let go at once, it floats", drag.inZone)
+        assertEquals(maxTop to false, drag.moved(maxTop, 10f, maxTop))
+        assertEquals(maxTop to true, drag.moved(maxTop, 10f, maxTop))
+    }
 }

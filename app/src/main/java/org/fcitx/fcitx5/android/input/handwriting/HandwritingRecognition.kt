@@ -6,16 +6,14 @@ package org.fcitx.fcitx5.android.input.handwriting
 
 import android.os.Handler
 import android.os.Looper
-import android.widget.Toast
-import androidx.core.content.ContextCompat
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.core.EngineBridge
 import org.fcitx.fcitx5.android.engine.handwriting.InkNet
 import org.fcitx.fcitx5.android.engine.handwriting.InkReading
 import org.fcitx.fcitx5.android.engine.handwriting.InkRecognizer
 import org.fcitx.fcitx5.android.handwriting.OrtModel
+import org.fcitx.fcitx5.android.core.EngineNotices
 import org.fcitx.fcitx5.android.utils.appContext
-import org.fcitx.fcitx5.android.utils.toast
 import timber.log.Timber
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
@@ -197,7 +195,7 @@ private object AssetRecognizer {
     )
 
     fun told() {
-        ContextCompat.getMainExecutor(appContext).execute { appContext.toast(R.string.engine_unloadable, Toast.LENGTH_LONG) }
+        EngineNotices.failed(R.string.engine_unloadable)
     }
 
     // opened at once, not at its first run: one onnxruntime refuses is found as the recognizer loads

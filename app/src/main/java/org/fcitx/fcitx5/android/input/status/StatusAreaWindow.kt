@@ -167,8 +167,8 @@ class StatusAreaWindow : InputWindow.ExtendedInputWindow<StatusAreaWindow>(),
                             val on = !useHabits.getValue()
                             useHabits.setValue(on)
                             fcitx.launchOnReady { it.learning(LearningOp.UseHabits(on)) }
-                            // said once, as it goes off, with no mark kept on the bar after (the user, 2026-10-22)
-                            if (!on) service.say(R.string.learning_habits_off_said)
+                            // said as it goes off and as it comes back, nothing on the bar showing which (§3 rule 1)
+                            service.say(if (on) R.string.learning_habits_on_said else R.string.learning_habits_off_said)
                             onStatusAreaUpdate(fcitxActions)
                         }
                         ClearRecent -> clearRecent(view)

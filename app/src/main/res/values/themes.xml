@@ -37,5 +37,4 @@
 
     <style name="Theme.DialogTheme" parent="@android:style/Theme.DeviceDefault.Light.Dialog" />
 
-    <style name="InputViewSnackbarTheme" parent="Theme.MaterialComponents.Light.NoActionBar" />
 </resources>

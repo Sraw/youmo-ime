@@ -20,6 +20,7 @@ import org.fcitx.fcitx5.android.input.dependency.theme
 import org.fcitx.fcitx5.android.input.keyboard.KeyAction
 import org.fcitx.fcitx5.android.input.keyboard.KeyDef
 import org.fcitx.fcitx5.android.input.keyboard.longPressOf
+import org.fcitx.fcitx5.android.utils.popIn
 import org.mechdancer.dependency.Dependent
 import org.mechdancer.dependency.UniqueComponent
 import org.mechdancer.dependency.manager.ManagedHandler
@@ -242,6 +243,12 @@ class PopupComponent :
             })
         }
         showingContainerUi[viewId] = ui
+        // out of the key pressed (its middle, in the container's pixels); it goes at once, the
+        // character picked typed already. Focus follows the finger by position, not by its scale
+        ui.root.popIn(
+            (ui.triggerBounds.width() / 2 - ui.offsetX).toFloat(),
+            (ui.triggerBounds.height() / 2 - ui.offsetY).toFloat(),
+        )
     }
 
     private fun changeFocus(viewId: Int, x: Float, y: Float): Boolean {

@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.input.clipboard
 
+import org.fcitx.fcitx5.android.assertRows
 import org.fcitx.fcitx5.android.input.clipboard.ClipboardStateMachine.BooleanKey.ClipboardDbEmpty
 import org.fcitx.fcitx5.android.input.clipboard.ClipboardStateMachine.BooleanKey.ClipboardListeningEnabled
 import org.fcitx.fcitx5.android.input.clipboard.ClipboardStateMachine.State
@@ -49,11 +50,25 @@ class ClipboardStateMachineTest {
     }
 
     @Test
-    fun theCallerChoosesTheStartingState() {
-        for (state in State.entries) {
-            assertEquals(state, machine(state, empty = true, listening = true).currentState)
-        }
-    }
+    fun eachUpdateGoesWhereTheFlagsSay() = assertRows(
+        "an empty database prompts the user to copy something" to { assertTransition(Normal, ClipboardDbUpdated, empty = true, listening = true, expected = AddMore) },
+        "a non-empty database shows the list" to { assertTransition(AddMore, ClipboardDbUpdated, empty = false, listening = true, expected = Normal) },
+        "a database update that changes nothing is a no-op (list)" to { assertTransition(Normal, ClipboardDbUpdated, empty = false, listening = true, expected = Normal) },
+        "a database update that changes nothing is a no-op (prompt)" to { assertTransition(AddMore, ClipboardDbUpdated, empty = true, listening = true, expected = AddMore) },
+        "the database update ignores the listening flag (to the prompt)" to { assertTransition(Normal, ClipboardDbUpdated, empty = true, listening = false, expected = AddMore) },
+        "the database update ignores the listening flag (to the list)" to { assertTransition(AddMore, ClipboardDbUpdated, empty = false, listening = false, expected = Normal) },
+        "turning listening off prompts to enable it, from the list" to { assertTransition(Normal, ClipboardListeningUpdated, empty = false, listening = false, expected = EnableListening) },
+        "turning listening off prompts to enable it, from the copy prompt" to { assertTransition(AddMore, ClipboardListeningUpdated, empty = true, listening = false, expected = EnableListening) },
+        "turning listening on goes to the list when the database has entries" to { assertTransition(EnableListening, ClipboardListeningUpdated, empty = false, listening = true, expected = Normal) },
+        "turning listening on goes to the copy prompt when the database is empty" to { assertTransition(EnableListening, ClipboardListeningUpdated, empty = true, listening = true, expected = AddMore) },
+        "a listening update that changes nothing is a no-op (list)" to { assertTransition(Normal, ClipboardListeningUpdated, empty = false, listening = true, expected = Normal) },
+        "a listening update that changes nothing is a no-op (copy prompt)" to { assertTransition(AddMore, ClipboardListeningUpdated, empty = true, listening = true, expected = AddMore) },
+        "a listening update that changes nothing is a no-op (listening prompt)" to { assertTransition(EnableListening, ClipboardListeningUpdated, empty = true, listening = false, expected = EnableListening) },
+        // an asymmetry worth knowing: leaving Normal or AddMore for the listening prompt ignores
+        // the database flag, so listening off from Normal with an empty database skips AddMore
+        "leaving the list for the listening prompt ignores the database flag" to { assertTransition(Normal, ClipboardListeningUpdated, empty = true, listening = false, expected = EnableListening) },
+        "leaving the copy prompt for the listening prompt ignores the database flag" to { assertTransition(AddMore, ClipboardListeningUpdated, empty = false, listening = false, expected = EnableListening) },
+    )
 
     @Test
     fun theCallerSuppliesTheInitialFlags() {
@@ -63,22 +78,6 @@ class ClipboardStateMachineTest {
     }
 
     // region ClipboardDbUpdated
-
-    @Test
-    fun anEmptyDatabasePromptsTheUserToCopySomething() {
-        assertTransition(Normal, ClipboardDbUpdated, empty = true, listening = true, expected = AddMore)
-    }
-
-    @Test
-    fun aNonEmptyDatabaseShowsTheList() {
-        assertTransition(AddMore, ClipboardDbUpdated, empty = false, listening = true, expected = Normal)
-    }
-
-    @Test
-    fun aDatabaseUpdateThatChangesNothingIsANoOp() {
-        assertTransition(Normal, ClipboardDbUpdated, empty = false, listening = true, expected = Normal)
-        assertTransition(AddMore, ClipboardDbUpdated, empty = true, listening = true, expected = AddMore)
-    }
 
     /**
      * No rule leaves [EnableListening] on a database update: while listening is off the prompt
@@ -91,53 +90,6 @@ class ClipboardStateMachineTest {
                 assertTransition(EnableListening, ClipboardDbUpdated, empty, listening, expected = EnableListening)
             }
         }
-    }
-
-    @Test
-    fun theDatabaseUpdateIgnoresTheListeningFlag() {
-        assertTransition(Normal, ClipboardDbUpdated, empty = true, listening = false, expected = AddMore)
-        assertTransition(AddMore, ClipboardDbUpdated, empty = false, listening = false, expected = Normal)
-    }
-
-    // endregion
-
-    // region ClipboardListeningUpdated
-
-    @Test
-    fun turningListeningOffPromptsToEnableItFromEitherListState() {
-        assertTransition(Normal, ClipboardListeningUpdated, empty = false, listening = false, expected = EnableListening)
-        assertTransition(AddMore, ClipboardListeningUpdated, empty = true, listening = false, expected = EnableListening)
-    }
-
-    @Test
-    fun turningListeningOnGoesToTheListWhenTheDatabaseHasEntries() {
-        assertTransition(EnableListening, ClipboardListeningUpdated, empty = false, listening = true, expected = Normal)
-    }
-
-    @Test
-    fun turningListeningOnGoesToTheCopyPromptWhenTheDatabaseIsEmpty() {
-        assertTransition(EnableListening, ClipboardListeningUpdated, empty = true, listening = true, expected = AddMore)
-    }
-
-    @Test
-    fun aListeningUpdateThatChangesNothingIsANoOp() {
-        assertTransition(Normal, ClipboardListeningUpdated, empty = false, listening = true, expected = Normal)
-        assertTransition(AddMore, ClipboardListeningUpdated, empty = true, listening = true, expected = AddMore)
-        assertTransition(
-            EnableListening, ClipboardListeningUpdated,
-            empty = true, listening = false, expected = EnableListening,
-        )
-    }
-
-    /**
-     * Pins an asymmetry worth knowing about: leaving [Normal] or [AddMore] for the listening
-     * prompt ignores the database flag, so a listening-off update from [Normal] with an empty
-     * database goes straight to the prompt rather than to [AddMore].
-     */
-    @Test
-    fun leavingForTheListeningPromptIgnoresTheDatabaseFlag() {
-        assertTransition(Normal, ClipboardListeningUpdated, empty = true, listening = false, expected = EnableListening)
-        assertTransition(AddMore, ClipboardListeningUpdated, empty = false, listening = false, expected = EnableListening)
     }
 
     // endregion

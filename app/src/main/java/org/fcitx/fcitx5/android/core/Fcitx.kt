@@ -7,7 +7,6 @@ package org.fcitx.fcitx5.android.core
 import android.content.Context
 import android.os.Build
 import androidx.annotation.Keep
-import androidx.core.content.ContextCompat
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
@@ -24,7 +23,6 @@ import org.fcitx.fcitx5.android.engine.host.Keyboard
 import org.fcitx.fcitx5.android.engine.learn.control.LearningOp
 import org.fcitx.fcitx5.android.utils.Locales
 import org.fcitx.fcitx5.android.utils.appContext
-import org.fcitx.fcitx5.android.utils.toast
 import timber.log.Timber
 import java.io.File
 import java.util.concurrent.CopyOnWriteArrayList
@@ -260,9 +258,8 @@ class Fcitx(private val context: Context) : FcitxAPI, FcitxLifecycleOwner {
         @Suppress("unused")
         @JvmStatic
         fun showToast(s: String) {
-            ContextCompat.getMainExecutor(appContext).execute {
-                appContext.toast(s)
-            }
+            // on the keyboard when it is up (§3), a toast only with none; a tip, not a failure (F3464)
+            EngineNotices.tip(s)
         }
 
         private val eventFlow_ =

@@ -7,17 +7,21 @@ package org.fcitx.fcitx5.android.input.candidates.expanded.window
 
 import android.graphics.drawable.ShapeDrawable
 import android.graphics.drawable.shapes.RectShape
+import android.util.DisplayMetrics
+import android.view.Gravity
 import android.view.View
 import androidx.paging.Pager
 import androidx.paging.PagingConfig
+import androidx.recyclerview.widget.LinearSmoothScroller
 import androidx.recyclerview.widget.RecyclerView
+import androidx.transition.Slide
+import androidx.transition.Transition
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import org.fcitx.fcitx5.android.core.CandidateAction
 import org.fcitx.fcitx5.android.core.FcitxEvent
 import org.fcitx.fcitx5.android.daemon.launchOnReady
-import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.input.bar.ExpandButtonStateMachine.BooleanKey.ExpandedCandidatesEmpty
 import org.fcitx.fcitx5.android.input.bar.ExpandButtonStateMachine.TransitionEvent.ExpandedCandidatesAttached
 import org.fcitx.fcitx5.android.input.bar.ExpandButtonStateMachine.TransitionEvent.ExpandedCandidatesDetached
@@ -38,12 +42,16 @@ import org.fcitx.fcitx5.android.input.keyboard.CommonKeyActionListener
 import org.fcitx.fcitx5.android.input.keyboard.KeyAction
 import org.fcitx.fcitx5.android.input.keyboard.KeyActionListener
 import org.fcitx.fcitx5.android.input.keyboard.KeyboardWindow
+import org.fcitx.fcitx5.android.input.motion.Motion
 import org.fcitx.fcitx5.android.input.wm.InputWindow
 import org.fcitx.fcitx5.android.input.wm.InputWindowManager
+import org.fcitx.fcitx5.android.utils.interpolator
+import org.fcitx.fcitx5.android.utils.motionSettings
 import org.mechdancer.dependency.manager.must
 import splitties.dimensions.dp
 import splitties.views.recyclerview.verticalLayoutManager
 import kotlin.math.max
+import kotlin.math.min
 
 abstract class BaseExpandedCandidateWindow<T : BaseExpandedCandidateWindow<T>> :
     InputWindow.SimpleInputWindow<T>(), InputBroadcastReceiver {
@@ -58,7 +66,8 @@ abstract class BaseExpandedCandidateWindow<T : BaseExpandedCandidateWindow<T>> :
     private val windowManager: InputWindowManager by manager.must()
     private val returnKeyDrawable: ReturnKeyDrawableComponent by manager.must()
 
-    protected val disableAnimation by AppPrefs.getInstance().advanced.disableAnimation
+    // the pages' scroll too: 移除动画 does not scale RecyclerView's scroller, as it does an animator
+    private val animates: Boolean get() = motionSettings().animates
 
     private lateinit var candidateLayout: ExpandedCandidateLayout
 
@@ -71,10 +80,38 @@ abstract class BaseExpandedCandidateWindow<T : BaseExpandedCandidateWindow<T>> :
         }
     }
 
-    abstract fun onCreateCandidateLayout(): ExpandedCandidateLayout
+    /** Draws the dividers between candidates, as the layout places them. */
+    protected abstract fun newDivider(): RecyclerView.ItemDecoration
+
+    // the two layout managers have these alike but share no type for them
+    protected abstract fun firstFullyVisible(): Int
+    protected abstract fun lastFullyVisible(): Int
+
+    // opens down out of the bar and closes back up into it: the keyboard's whole area, Motion's Long
+    override fun enterAnimation(lastWindow: InputWindow): Transition = Slide(Gravity.TOP).apply {
+        duration = Motion.Long.enter(motionSettings())
+        interpolator = Motion.Curve.Enter.interpolator
+    }
+
+    override fun exitAnimation(nextWindow: InputWindow): Transition = Slide(Gravity.TOP).apply {
+        duration = Motion.Long.exit(motionSettings())
+        interpolator = Motion.Curve.Exit.interpolator
+    }
 
     final override fun onCreateView(): View {
-        candidateLayout = onCreateCandidateLayout().apply {
+        candidateLayout = ExpandedCandidateLayout(context, theme).apply {
+            recyclerView.apply {
+                adapter = this@BaseExpandedCandidateWindow.adapter
+                layoutManager = this@BaseExpandedCandidateWindow.layoutManager
+                addItemDecoration(newDivider())
+                addOnScrollListener(object : RecyclerView.OnScrollListener() {
+                    override fun onScrolled(recyclerView: RecyclerView, dx: Int, dy: Int) {
+                        pageUpBtn.isEnabled = firstFullyVisible() > 0
+                        val count = this@BaseExpandedCandidateWindow.layoutManager.itemCount
+                        pageDnBtn.isEnabled = lastFullyVisible() < count - 1
+                    }
+                })
+            }
             scrollableTabs.apply {
                 adapter = tabsAdapter
                 layoutManager = verticalLayoutManager()
@@ -148,9 +185,22 @@ abstract class BaseExpandedCandidateWindow<T : BaseExpandedCandidateWindow<T>> :
     }
     private var candidatesSubmitJob: Job? = null
 
-    abstract fun prevPage()
+    private fun prevPage() = smoothScrollTo(max(firstFullyVisible() - 1, 0), LinearSmoothScroller.SNAP_TO_END)
 
-    abstract fun nextPage()
+    private fun nextPage() {
+        val count = layoutManager.itemCount
+        // the first page not loaded yet (Down is enabled till then): -1 would throw
+        if (count == 0) return
+        smoothScrollTo(min(lastFullyVisible() + 1, count - 1), LinearSmoothScroller.SNAP_TO_START)
+    }
+
+    private fun smoothScrollTo(position: Int, snap: Int) {
+        layoutManager.startSmoothScroll(object : LinearSmoothScroller(context) {
+            override fun getVerticalSnapPreference() = snap
+            override fun calculateSpeedPerPixel(dm: DisplayMetrics?) =
+                if (!animates) Float.MIN_VALUE else super.calculateSpeedPerPixel(dm)
+        }.apply { targetPosition = position })
+    }
 
     override fun onAttached() {
         bar.expandButtonStateMachine.push(ExpandedCandidatesAttached)

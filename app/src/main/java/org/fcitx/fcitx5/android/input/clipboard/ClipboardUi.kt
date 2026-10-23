@@ -10,10 +10,11 @@ import android.widget.ViewAnimator
 import androidx.transition.Fade
 import androidx.transition.TransitionManager
 import org.fcitx.fcitx5.android.R
-import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.input.bar.ui.ToolButton
+import org.fcitx.fcitx5.android.input.motion.Motion
+import org.fcitx.fcitx5.android.utils.motionSettings
 import splitties.dimensions.dp
 import splitties.views.backgroundColor
 import splitties.views.dsl.coordinatorlayout.coordinatorLayout
@@ -44,7 +45,6 @@ class ClipboardUi(override val ctx: Context, private val theme: Theme) : Ui {
     }
 
     private val keyBorder by ThemeManager.prefs.keyBorder
-    private val disableAnimation by AppPrefs.getInstance().advanced.disableAnimation
 
     override val root = coordinatorLayout {
         if (!keyBorder) {
@@ -67,8 +67,10 @@ class ClipboardUi(override val ctx: Context, private val theme: Theme) : Ui {
 
     fun switchUiByState(state: ClipboardStateMachine.State) {
         Timber.d("Switch clipboard to $state")
-        if (!disableAnimation)
-            TransitionManager.beginDelayedTransition(root, Fade().apply { duration = 100L })
+        // a panel's change, as Motion says: Medium, and none with animation off
+        val motion = motionSettings()
+        if (motion.animates)
+            TransitionManager.beginDelayedTransition(root, Fade().apply { duration = Motion.Medium.enter(motion) })
         when (state) {
             ClipboardStateMachine.State.Normal -> {
                 viewAnimator.displayedChild = 0

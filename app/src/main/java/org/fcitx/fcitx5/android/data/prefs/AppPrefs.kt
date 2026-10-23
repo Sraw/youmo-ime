@@ -92,11 +92,6 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
                 Build.VERSION.SDK_INT < Build.VERSION_CODES.UPSIDE_DOWN_CAKE && DeviceUtil.isVivoOriginOS
             )
         }
-        val ignoreSystemWindowInsets = hidden {
-            switch(
-                R.string.ignore_system_window_insets, "ignore_system_window_insets", false
-            )
-        }
         val keyboardHeightPercentBase = hidden {
             enumList(
                 R.string.keyboard_height_percent_base,
@@ -327,6 +322,15 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
             keyboardBottomPadding = primary
             keyboardBottomPaddingLandscape = secondary
         }
+
+        // 1: docked, no room is left for the navigation bar (键盘底部边距 贴底), for ROMs that hide
+        // the gesture line yet still report its insets, leaving a blank strip under the keys
+        val keyboardBottomFlush = hidden(setByLevels = true) {
+            int(R.string.keyboard_bottom_padding, "keyboard_bottom_flush", 0, 0, 1)
+        }
+
+        /** 贴底 chosen ([keyboardBottomFlush]). */
+        val bottomFlush: Boolean get() = keyboardBottomFlush.getValue() == 1
 
         init {
             section(R.string.section_sound_and_vibration)

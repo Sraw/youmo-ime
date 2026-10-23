@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.input.cursor
 
+import org.fcitx.fcitx5.android.assertRows
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -85,34 +86,30 @@ class CursorRangeTest {
     }
 
     @Test
-    fun offsetShiftsBothBounds() {
-        val r = CursorRange(3, 7)
-        r.offset(5)
-        assertTrue(r.rangeEquals(8, 12))
-    }
-
-    @Test
-    fun offsetAcceptsNegativeAndDoesNotClampAtZero() {
-        val r = CursorRange(1, 2)
-        r.offset(-5)
+    fun anOffsetShiftsBothBounds() = assertRows(
+        "offset shifts both bounds" to {
+            val r = CursorRange(3, 7)
+            r.offset(5)
+            assertTrue(r.rangeEquals(8, 12))
+        },
+        "offset by zero is identity" to {
+            val r = CursorRange(3, 7)
+            r.offset(0)
+            assertTrue(r.rangeEquals(3, 7))
+        },
         // no clamping: the caller is responsible for keeping the range inside the buffer
-        assertTrue(r.rangeEquals(-4, -3))
-    }
-
-    @Test
-    fun offsetByZeroIsIdentity() {
-        val r = CursorRange(3, 7)
-        r.offset(0)
-        assertTrue(r.rangeEquals(3, 7))
-    }
-
-    @Test
-    fun offsetPreservesLength() {
-        val r = CursorRange(3, 7)
-        val lengthBefore = r.end - r.start
-        r.offset(-3)
-        assertEquals(lengthBefore, r.end - r.start)
-    }
+        "offset accepts negative and does not clamp at zero" to {
+            val r = CursorRange(1, 2)
+            r.offset(-5)
+            assertTrue(r.rangeEquals(-4, -3))
+        },
+        "offset preserves length" to {
+            val r = CursorRange(3, 7)
+            val lengthBefore = r.end - r.start
+            r.offset(-3)
+            assertEquals(lengthBefore, r.end - r.start)
+        },
+    )
 
     // endregion
 

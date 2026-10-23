@@ -16,9 +16,13 @@ package org.fcitx.fcitx5.android.input.keyboard
 object KeyboardHeightCap {
     const val MAX_FRACTION = 0.70
 
-    /** The keys' height: [requested] unless the whole area would pass the cap; never below 0. */
-    fun keysHeight(requested: Int, screenHeight: Int, barsHeight: Int, bottomPadding: Int): Int {
-        val room = (screenHeight * MAX_FRACTION).toInt() - barsHeight - bottomPadding
+    /**
+     * The keys' height: [requested] unless the whole area would pass the cap; never below 0.
+     * [handleHeight] is a docked drag handle (始终显示悬浮条): added to the keyboard, the keys
+     * keeping their height, but counted in the cap, which wins where it binds (the user, 2026-10-22).
+     */
+    fun keysHeight(requested: Int, screenHeight: Int, barsHeight: Int, bottomPadding: Int, handleHeight: Int = 0): Int {
+        val room = (screenHeight * MAX_FRACTION).toInt() - barsHeight - handleHeight - bottomPadding
         return requested.coerceAtMost(room).coerceAtLeast(0)
     }
 }

@@ -10,6 +10,11 @@ package org.fcitx.fcitx5.android.input.floating
  * in the zone; let go there, it docks ([FloatingKeyboard]), moved back up first, it floats on. Where
  * it already was at the bottom when the drag began (it first floats there), only a push on down of
  * [slop] takes it in: a drag along the bottom only moves it across.
+ *
+ * Grabbed from the docked keyboard (始终显示悬浮条) the finger can start below its lowest place (the
+ * docked grip is lower than the floating one goes): that [start]s as slack, taken up first as the
+ * finger comes up, as a push is, so the grip comes under the finger and stays there; the slack is no
+ * push into the zone, only a push on down past where the finger began is.
  */
 class FloatingDrag(private val slop: Float) {
 
@@ -19,13 +24,17 @@ class FloatingDrag(private val slop: Float) {
     // the keyboard was above its lowest place in this drag
     private var above = false
 
+    // of [pushed], what the finger began below its lowest place: given back, but no push into the zone
+    private var slack = 0f
+
     /** In the docking zone: let go now, it docks. */
     var inZone = false
         private set
 
-    /** A new drag, nothing pushed yet. */
-    fun start() {
-        pushed = 0f
+    /** A new drag, nothing pushed yet, or the finger [slack] below where it can go. */
+    fun start(slack: Float = 0f) {
+        this.slack = slack.coerceAtLeast(0f)
+        pushed = this.slack
         above = false
         inZone = false
     }
@@ -43,6 +52,7 @@ class FloatingDrag(private val slop: Float) {
                 at = maxTop + pushed
                 pushed = 0f
             }
+            slack = slack.coerceAtMost(pushed)
         } else {
             at = top + dy
         }
@@ -55,7 +65,7 @@ class FloatingDrag(private val slop: Float) {
         // comes back a fraction off). Where the keyboard is shown, not past the top: one as tall as
         // the room (maxTop 0) never goes above its lowest place
         if (at.coerceAtLeast(0f) < maxTop - slop) above = true
-        inZone = at >= maxTop && (above || pushed >= slop)
+        inZone = at >= maxTop && (above || pushed - slack >= slop)
         return at.coerceAtLeast(0f)
     }
 }

@@ -33,6 +33,7 @@ import org.fcitx.fcitx5.android.data.clipboard.db.ClipboardEntry
 import org.fcitx.fcitx5.android.data.pinyin.MergedDictionary
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.prefs.ManagedPreference
+import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.input.bar.ExpandButtonStateMachine.State.ClickToAttachWindow
 import org.fcitx.fcitx5.android.input.bar.ExpandButtonStateMachine.State.ClickToDetachWindow
 import org.fcitx.fcitx5.android.input.bar.ExpandButtonStateMachine.State.Hidden
@@ -162,7 +163,8 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
             }
         }
 
-    // the first start after 0.3.1 compiles its text dictionaries (a minute for 1.9 million words):
+    // the first start after an older build (0.3.1's or 0.3.2's dictionaries, converted, or a kill's owed
+    // upgrade) compiles its dictionaries (a minute for 1.9 million words):
     // typing goes on without them meanwhile, the idle bar says how far, and a notice when they are in
     private fun showDictionaryUpgrade(ui: IdleUi) {
         imeScope.launch {
@@ -173,7 +175,11 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
         }
         imeScope.launch {
             MergedDictionary.done.collect { (kind, ok) ->
-                if (kind == MergedDictionary.Kind.UPGRADE) service.say(if (ok) R.string.dict_upgraded else R.string.dict_upgrade_failed)
+                // a failure stays, as failures do (design rule 4); a success is a plain line
+                if (kind == MergedDictionary.Kind.UPGRADE) {
+                    if (ok) service.say(R.string.dict_upgraded)
+                    else service.say(service.getString(R.string.dict_upgrade_failed), steady = true)
+                }
             }
         }
     }
@@ -578,7 +584,8 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
     }
 
     companion object {
-        const val HEIGHT = 40
+        /** The bar's height in dp, from 候选字号; the input view is made anew when that changes. */
+        val HEIGHT: Int get() = CandidateBarHeight.dp(ThemeManager.prefs.candidateTextSize.getValue())
 
         /**
          * The row above the bar where the code being typed shows ([PreeditComponent]), in dp: the
@@ -586,6 +593,15 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
          * typed, so the keyboard keeps its height and the app does not jump.
          */
         const val PREEDIT_HEIGHT = 18
+
+        /** The bar's buttons are never narrower than this, in dp, however short 候选字号 makes the bar. */
+        const val MIN_TOUCH_DP = 40
+
+        /**
+         * The bar's button icons, in dp, fixed: in the button's 10 dp padding an icon shrank with
+         * the bar, to about 8 dp at 候选字号 14 (a 28 dp bar).
+         */
+        const val ICON_DP = 20
     }
 
     fun onKeyboardLayoutSwitched(isNumber: Boolean) {

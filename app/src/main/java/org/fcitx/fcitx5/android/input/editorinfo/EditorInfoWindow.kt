@@ -48,7 +48,8 @@ class EditorInfoWindow : InputWindow.ExtendedInputWindow<EditorInfoWindow>() {
             setOnClickListener {
                 val clipData = ClipData.newPlainText("", buildMarkdownString())
                 context.clipboardManager.setPrimaryClip(clipData)
-                service.say(R.string.done)
+                // what was done, as every copy says it (§3 rule 3): not a bare 完成
+                service.say(R.string.text_copied)
             }
         }
     }
@@ -68,5 +69,5 @@ class EditorInfoWindow : InputWindow.ExtendedInputWindow<EditorInfoWindow>() {
         ui.setValues(propertyMap)
     }
 
-    override fun onDetached() {}
+    override fun onDetached() = Unit
 }

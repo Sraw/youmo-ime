@@ -32,6 +32,7 @@ import android.view.inputmethod.InlineSuggestionsRequest
 import android.view.inputmethod.InlineSuggestionsResponse
 import android.view.inputmethod.InputMethodSubtype
 import android.widget.FrameLayout
+import android.widget.Toast
 import android.widget.inline.InlinePresentationSpec
 import androidx.annotation.Keep
 import androidx.annotation.RequiresApi
@@ -56,6 +57,7 @@ import org.fcitx.fcitx5.android.BuildConfig
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.core.CapabilityFlag
 import org.fcitx.fcitx5.android.core.CapabilityFlags
+import org.fcitx.fcitx5.android.core.EngineNotices
 import org.fcitx.fcitx5.android.core.FcitxAPI
 import org.fcitx.fcitx5.android.core.FcitxEvent
 import org.fcitx.fcitx5.android.core.FcitxKeyMapping
@@ -90,6 +92,7 @@ import org.fcitx.fcitx5.android.input.editing.toEditorTraits
 import org.fcitx.fcitx5.android.input.hardware.TakenKey
 import org.fcitx.fcitx5.android.input.keyboard.AddressKeys
 import org.fcitx.fcitx5.android.input.keyboard.PendingInputPolicy
+import org.fcitx.fcitx5.android.input.learning.UndoChip
 import org.fcitx.fcitx5.android.utils.InputMethodUtil
 import org.fcitx.fcitx5.android.utils.Locales
 import org.fcitx.fcitx5.android.utils.alpha
@@ -175,11 +178,28 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
      * while its app may not post notifications, Android 13's default ("Suppressing toast … by user
      * request"); one from no keyboard shown, as the settings' toasts are, still is.
      */
-    fun say(@StringRes id: Int) {
+    fun say(@StringRes id: Int) = say(getString(id))
+
+    /**
+     * [message] said as [say] says, with 撤销 doing [undo] if there is one; [steady], kept as keys
+     * are typed and 6 s (a failure, [EngineNotices.failed]). With no keyboard shown to say it on, a
+     * toast (long, steady), and nothing to take back: [undo] lapses.
+     */
+    fun say(message: String, undo: UndoChip.Undo? = null, steady: Boolean = false) {
         // the view shown, not the one the device mode picks: a key typed with ⋯ open flips that mode
         val view = inputView?.takeIf { it.isShown } ?: candidatesView?.takeIf { it.isShown }
-        if (view != null) view.say(getString(id)) else toast(id)
+        when {
+            view == null -> {
+                toast(message, if (steady) Toast.LENGTH_LONG else Toast.LENGTH_SHORT)
+                undo?.lapsed?.invoke()
+            }
+            // shown, but its window not yet (or no longer) on the screen: the chip lapsed [undo] (F3530)
+            !view.say(message, undo, steady) -> toast(message, if (steady) Toast.LENGTH_LONG else Toast.LENGTH_SHORT)
+        }
     }
+
+    // what the engine says, said here while this keyboard runs
+    private val engineSayer = EngineNotices.Sayer { message, steady -> say(message, steady = steady) }
 
     /** nothing said out loud goes into a password, its characters shown or not */
     val inPasswordField get() = fieldPolicy.password
@@ -246,7 +266,6 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         prefs.keyboard.t9Letters,
         prefs.keyboard.t9Symbols,
         prefs.advanced.disableAnimation,
-        prefs.advanced.ignoreSystemWindowInsets,
     )
 
     private fun replaceInputView(theme: Theme, start: Boolean = false): InputView {
@@ -311,6 +330,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     }
 
     override fun onCreate() {
+        EngineNotices.sayer = engineSayer
         pickedLocalesChanged()
         fcitx = FcitxDaemon.connect(javaClass.name)
         lifecycleScope.launch {
@@ -1375,6 +1395,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     }
 
     override fun onDestroy() {
+        if (EngineNotices.sayer === engineSayer) EngineNotices.sayer = null
         getSystemService(InputManager::class.java).unregisterInputDeviceListener(inputDeviceListener)
         recreateInputViewPrefs.forEach {
             it.unregisterOnChangeListener(recreateInputViewListener)

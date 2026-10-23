@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.input.floating
 
+import kotlin.math.abs
 import kotlin.math.roundToInt
 
 /**
@@ -51,6 +52,32 @@ object FloatingKeyboard {
     /** The [Spot] of a keyboard dragged to [left], [top], kept within the parent. */
     fun spot(left: Float, top: Float, w: Float, h: Float, parentW: Float, parentH: Float): Spot =
         Spot(share(left, parentW - w), share(top, parentH - h))
+
+    /**
+     * Where it goes let go of by the docked keyboard (始终显示悬浮条, its grip long pressed): the
+     * finger at [fingerX], [fingerY] (from the room's top left) on its grip, [gripX], [gripY] in it,
+     * so the drag goes on from there; within the room, as a drag keeps it, where the finger is
+     * too near an edge for that (the bottom above all: the docked grip is lower than it floats).
+     */
+    fun underFinger(fingerX: Float, fingerY: Float, gripX: Float, gripY: Float, w: Float, h: Float, parentW: Float, room: Float): Spot =
+        spot(fingerX - gripX, fingerY - gripY, w, h, parentW, room)
+
+    /** Docked to floating, along one axis: its scale as it starts to shrink, the docked keyboard's size [fromSize] over its own [toSize]. */
+    fun startScale(fromSize: Float, toSize: Float): Float = if (toSize <= 0f) 1f else fromSize / toSize
+
+    /**
+     * Docked to floating, it shrinks from the docked keyboard ([from], [fromSize] along one axis) to
+     * its own place ([to], [toSize]): the pivot, from its own edge, its [startScale] is about, so
+     * scaled it covers the docked keyboard exactly. About that one point, a drag moving it as it
+     * shrinks takes the shrink along. No change in size, the middle (any would do).
+     */
+    fun pivot(from: Float, fromSize: Float, to: Float, toSize: Float): Float {
+        val scale = startScale(fromSize, toSize)
+        return if (abs(1f - scale) < NO_SCALE) toSize / 2 else (from - to) / (1f - scale)
+    }
+
+    // closer to 1 than this the keyboard does not change size, and a pivot would be far off
+    private const val NO_SCALE = 0.001f
 
     /**
      * Its corners' radius, in dp, as round as the keys (按键圆角): the keys' own [keyRadius] and

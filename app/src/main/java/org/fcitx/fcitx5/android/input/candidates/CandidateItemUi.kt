@@ -10,6 +10,7 @@ import androidx.core.text.buildSpannedString
 import androidx.core.text.color
 import org.fcitx.fcitx5.android.core.CandidateWord
 import org.fcitx.fcitx5.android.data.theme.Theme
+import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.input.AutoScaleTextView
 import org.fcitx.fcitx5.android.input.keyboard.CustomGestureView
 import org.fcitx.fcitx5.android.utils.pressHighlightDrawable
@@ -25,7 +26,8 @@ class CandidateItemUi(override val ctx: Context, val theme: Theme) : Ui {
 
     private val text = view(::AutoScaleTextView) {
         scaleMode = AutoScaleTextView.Mode.Proportional
-        textSize = 20f // sp
+        // 候选字号: the bar, its 联想 and the expanded grid; the view is made anew when it changes
+        textSize = ThemeManager.prefs.candidateTextSize.getValue().toFloat() // sp
         isSingleLine = true
         gravity = gravityCenter
         setTextColor(theme.candidateTextColor)

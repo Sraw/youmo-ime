@@ -10,11 +10,13 @@ import androidx.transition.Transition
 import androidx.transition.TransitionManager
 import androidx.transition.TransitionSet
 import org.fcitx.fcitx5.android.R
-import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.input.broadcast.InputBroadcastReceiver
 import org.fcitx.fcitx5.android.input.broadcast.InputBroadcaster
 import org.fcitx.fcitx5.android.input.dependency.UniqueViewComponent
 import org.fcitx.fcitx5.android.input.dependency.context
+import org.fcitx.fcitx5.android.input.motion.Motion
+import org.fcitx.fcitx5.android.utils.interpolator
+import org.fcitx.fcitx5.android.utils.motionSettings
 import org.mechdancer.dependency.DynamicScope
 import org.mechdancer.dependency.manager.must
 import org.mechdancer.dependency.minusAssign
@@ -39,22 +41,33 @@ class InputWindowManager : UniqueViewComponent<InputWindowManager, FrameLayout>(
         private set
     private var currentView: View? = null
 
-    private val disableAnimation by AppPrefs.getInstance().advanced.disableAnimation
-
+    /**
+     * One window for another (⋯'s panels, the clipboard, the candidates expanded): each as [Motion]
+     * says, a panel's [Motion.Medium] unless the window set its own (the candidates expanded, Long),
+     * coming in slowing to a stop and going speeding away. Animation off, at once.
+     */
     private fun prepareAnimation(
         exitAnimation: Transition?,
         enterAnimation: Transition?,
         remove: View,
         add: View
     ) {
-        if (disableAnimation)
+        val motion = motionSettings()
+        if (!motion.animates)
             return
-        enterAnimation?.addTarget(add)
-        exitAnimation?.addTarget(remove)
+        enterAnimation?.apply {
+            if (duration < 0) duration = Motion.Medium.enter(motion)
+            if (interpolator == null) interpolator = Motion.Curve.Enter.interpolator
+            addTarget(add)
+        }
+        exitAnimation?.apply {
+            if (duration < 0) duration = Motion.Medium.exit(motion)
+            if (interpolator == null) interpolator = Motion.Curve.Exit.interpolator
+            addTarget(remove)
+        }
         TransitionManager.beginDelayedTransition(view, TransitionSet().apply {
             enterAnimation?.let { addTransition(it) }
             exitAnimation?.let { addTransition(it) }
-            duration = 100
         })
     }
 
@@ -92,20 +105,6 @@ class InputWindowManager : UniqueViewComponent<InputWindowManager, FrameLayout>(
         essentialWindows[windowKey]?.let { (window, _) ->
             attachWindow(window)
         } ?: throw IllegalStateException("$windowKey is not a known essential window key")
-    }
-
-    /**
-     * Remove an essential window
-     */
-    fun removeEssentialWindow(windowKey: EssentialWindow.Key) {
-        val (window, _) = essentialWindows[windowKey]
-            ?: throw IllegalStateException("$windowKey is not a known essential window key")
-        if (currentWindow === window)
-            throw IllegalStateException("$windowKey cannot be removed when it's active")
-        // remove from scope
-        scope -= window
-        // remove from map
-        essentialWindows.remove(windowKey)
     }
 
     /**

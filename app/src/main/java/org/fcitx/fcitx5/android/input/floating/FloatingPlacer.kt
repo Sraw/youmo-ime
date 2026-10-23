@@ -70,6 +70,26 @@ class FloatingPlacer(private val parent: View, private val view: View) {
     }
 
     /**
+     * Let go of by the docked keyboard ([FloatingHandoff]): its grip, [gripX], [gripY] in it, under
+     * the finger at [fingerX], [fingerY] in the parent, within the screen. Laid out first: its size
+     * is not known before. Kept as any drag is, as it ends ([drop]): not if it docks, the place
+     * kept the last it floated at; [keep] the finger lifted before it was laid out, kept now.
+     */
+    fun grabbed(fingerX: Float, fingerY: Float, gripX: Float, gripY: Float, keep: Boolean) {
+        spot = FloatingKeyboard.underFinger(fingerX, fingerY - topInset, gripX, gripY, view.width.toFloat(), view.height.toFloat(), parent.width.toFloat(), room)
+        place()
+        // the finger below where it can go (the docked grip is lower): taken up first as it comes up,
+        // the grip then under it (MN-11 on redroid: kept 150 px above the finger all the way up).
+        // Kept, no finger is down: the next drag starts afresh (F3470: else it stuck for the slack)
+        dock.start(slack = if (keep) 0f else fingerY - (view.top + view.translationY + gripY))
+        moved = !keep
+        if (keep) {
+            prefs.floatingKeyboardX.setValue(spot.x)
+            prefs.floatingKeyboardY.setValue(spot.y)
+        }
+    }
+
+    /**
      * The drag ended: kept there, if it moved; true if [lifted] in the docking zone, to dock it. A
      * cancelled drag or a second finger never docks: the zone is just above the gesture bar, whose
      * swipe the system takes. Docked, the place kept is the last it floated at, not the zone's.

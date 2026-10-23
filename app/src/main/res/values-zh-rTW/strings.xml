@@ -190,7 +190,7 @@
     <string name="exception_user_data_metadata">無法找到使用者資料的中繼資料</string>
     <string name="exception_user_data_package_name_mismatch">使用者資料與目前應用程式不符合</string>
     <string name="user_data_imported">已匯入來自 %1$s 的使用者資料，正在重新啟動</string>
-    <string name="confirm_import_user_data">匯入使用者資料會覆寫設定，學到的和詞庫與手機上現有的合併；重新啟動後生效。是否繼續？</string>
+    <string name="confirm_import_user_data">匯入使用者資料會覆寫設定、自訂短語和標點，學到的和詞庫與手機上現有的合併；重新啟動後生效。是否繼續？</string>
     <string name="clear_clp_db_confirm">剪貼簿資料庫將會被完全清空，包括已置頂條目。是否繼續？</string>
     <string name="clear_clp_db_not_all">部分剪貼簿資料未能清除，可能仍然存在，或在下次啟動時重新出現；再次清空，或重新啟動後再清空，或許有效。</string>
     <string name="expand_keypress_area">將按鍵範圍擴展至邊緣</string>
@@ -217,13 +217,13 @@
     <string name="automatic">自動</string>
     <string name="horizontal">橫向</string>
     <string name="vertical">豎向</string>
-    <string name="candidates_font_size">候選詞字體大小</string>
+    <string name="candidates_font_size">浮動候選窗字號</string>
+    <string name="candidate_text_size">候選字號</string>
     <string name="candidates_padding">候選詞邊距</string>
     <string name="candidates_window_min_width">候選視窗最小寬度</string>
     <string name="candidates_window_padding">候選視窗邊距</string>
     <string name="restart_fcitx_instance">重新啟動 Fcitx 實例</string>
     <string name="restart_fcitx_instance_confirm">Fcitx 實例將被銷燬並重新初始化。繼續嗎？</string>
-    <string name="ignore_system_window_insets">忽略系統視窗邊襯區 (WindowInsets)</string>
     <string name="haptic_on_repeat">重複按鍵時的觸覺回饋</string>
     <string name="redo">重做</string>
     <string name="status_area">狀態區</string>
@@ -265,7 +265,6 @@
     <string name="a11y_key_action_previous">上一項</string>
     <string name="a11y_key_space">空格鍵</string>
     <string name="a11y_key_space_with_ime">空格鍵，%1$s</string>
-    <string name="a11y_key_quick_phrase">快速片語</string>
     <string name="a11y_key_switch_language">切換語言</string>
     <string name="a11y_key_nine_language">中/英切換</string>
     <string name="a11y_key_number_pad">數字鍵盤</string>
@@ -345,6 +344,7 @@
     <string name="learning_table_blocks_entry">碼表裡按碼封鎖的：%1$d 個 ›</string>
     <string name="learning_not_now">現在還做不了：先解鎖手機</string>
     <string name="learning_habits_off_said">已不用我的輸入習慣，在 ⋯ 裡恢復</string>
+    <string name="learning_habits_on_said">已恢復用我的輸入習慣</string>
     <string name="learning_use_habits">用我的輸入習慣</string>
     <string name="learning_use_habits_summary">關掉時鍵盤像剛裝好：不學，也不用你的任何記錄，只有封鎖照常。借手機時用；和 ⋯ 裡的是同一個開關</string>
     <string name="my_words_pinned">固定的詞</string>
@@ -467,6 +467,7 @@
     <string name="level_standard">標準</string>
     <string name="level_tall">高</string>
     <string name="level_taller">很高</string>
+    <string name="level_flush">貼底</string>
     <string name="level_none">無</string>
     <string name="level_narrow">窄</string>
     <string name="level_wide">寬</string>
@@ -686,6 +687,7 @@
     <string name="dict_change_failed">修改失敗</string>
     <string name="dict_analysing_title">正在讀取詞庫</string>
     <string name="dict_progress_analysing">正在分析格式… %1$d%%</string>
+    <string name="dict_progress_converting">正在轉換… %1$d%%</string>
     <string name="dict_progress_compiling">正在整理詞條… %1$d%%</string>
     <string name="dict_progress_merging">正在和其他詞庫合併… %1$d%%</string>
     <string name="dict_progress_writing">正在寫入… %1$d%%</string>
@@ -694,6 +696,9 @@
     <string name="dict_upgrading">正在升級詞庫格式 %1$d%%</string>
     <string name="dict_upgraded">詞庫格式已升級</string>
     <string name="dict_upgrade_failed">詞庫格式升級失敗，打開設定裡的詞庫頁可重試</string>
+    <string name="dict_unreadable">讀不了，沒有並入：刪掉後重新匯入</string>
+    <string name="dict_damaged">檔案損壞，並入了 %1$s，可能不全：刪掉後重新匯入</string>
+    <string name="dict_unconverted">沒轉換成（手機空間不夠？）：騰出空間後重新打開這一頁</string>
     <string name="dict_exists_user_only">基礎詞庫裡已有名為「%1$s」的詞庫。改為併入使用者詞庫嗎？</string>
     <string name="import_into_user_short">併入使用者詞庫</string>
     <string name="dict_progress_copying">正在儲存詞庫… %1$d%%</string>
@@ -737,6 +742,7 @@
     <string name="floating_handle">懸浮鍵盤拖動條</string>
     <string name="floating_handle_bottom">下面</string>
     <string name="floating_handle_top">上面</string>
+    <string name="always_show_floating_handle">始終顯示懸浮條</string>
     <string name="show_touch_keyboard">顯示螢幕鍵盤</string>
     <string name="hardware_switch_shortcuts">實體鍵盤快速鍵</string>
     <string name="hardware_switch_shortcuts_summary">單按 Shift 或 Ctrl+空格切換中英，Ctrl+Shift 輪流切換輸入法</string>

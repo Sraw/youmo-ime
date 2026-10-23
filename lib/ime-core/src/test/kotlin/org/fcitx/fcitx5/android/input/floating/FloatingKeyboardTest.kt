@@ -86,4 +86,32 @@ class FloatingKeyboardTest {
         // a wider share than that: the share itself
         assertEquals(0.9f, FloatingKeyboard.textScale(450, 500), 1e-6f)
     }
+
+    @Test
+    fun letGoOfByTheDockedOneItsGripIsUnderTheFingerWithinTheRoom() {
+        // a 400×300 keyboard, its grip at the middle of its bottom strip, in a 1000×2000 room
+        fun at(fingerX: Float, fingerY: Float) =
+            FloatingKeyboard.underFinger(fingerX, fingerY, gripX = 200f, gripY = 288f, w = 400f, h = 300f, parentW = 1000f, room = 2000f)
+        // its left 300, its top 850: the middle of the room it moves in
+        assertEquals(Spot(0.5f, 0.5f), at(500f, 1138f))
+        // the docked grip, below the room's bottom: as low as it goes, the drag going on from there
+        assertEquals(Spot(0.5f, 1f), at(500f, 2100f))
+        // by the left edge, at the top: kept in
+        assertEquals(Spot(0f, 0f), at(50f, 10f))
+    }
+
+    @Test
+    fun itShrinksFromTheDockedKeyboardAboutOnePoint() {
+        // docked 0..1000 wide; floating 300..700
+        val scale = FloatingKeyboard.startScale(1000f, 400f)
+        assertEquals(2.5f, scale, 0f)
+        val pivot = FloatingKeyboard.pivot(0f, 1000f, 300f, 400f)
+        // scaled about the pivot, its edges are the docked one's
+        assertEquals(0f, 300f + pivot * (1 - scale), 0.01f)
+        assertEquals(1000f, 300f + pivot + (400f - pivot) * scale, 0.01f)
+        // the same size: no shrink, any pivot
+        assertEquals(1f, FloatingKeyboard.startScale(400f, 400f), 0f)
+        assertEquals(200f, FloatingKeyboard.pivot(0f, 400f, 300f, 400f), 0f)
+        assertEquals("not laid out", 1f, FloatingKeyboard.startScale(400f, 0f), 0f)
+    }
 }

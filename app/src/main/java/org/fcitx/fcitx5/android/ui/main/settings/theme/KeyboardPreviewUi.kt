@@ -22,6 +22,7 @@ import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.data.theme.ThemePrefs.NavbarBackground
 import org.fcitx.fcitx5.android.input.bar.KawaiiBarComponent
+import org.fcitx.fcitx5.android.input.floating.FloatingHandle
 import org.fcitx.fcitx5.android.input.keyboard.KeyboardHeightCap
 import org.fcitx.fcitx5.android.input.keyboard.TextKeyboard
 import org.fcitx.fcitx5.android.utils.navbarFrameHeight
@@ -76,6 +77,7 @@ class KeyboardPreviewUi(override val ctx: Context, val theme: Theme) : Ui {
         }
 
     private val navbarBackground = ThemeManager.prefs.navbarBackground
+    private val keyboardBottomFlush = keyboardPrefs.keyboardBottomFlush
     private val keyBorder by ThemeManager.prefs.keyBorder
 
     private val navbarBkgChangeListener = ManagedPreference.OnChangeListener<Any> { _, _ ->
@@ -113,6 +115,7 @@ class KeyboardPreviewUi(override val ctx: Context, val theme: Theme) : Ui {
             recalculateSize()
             onSizeMeasured?.invoke(intrinsicWidth, intrinsicHeight)
             navbarBackground.registerOnChangeListener(navbarBkgChangeListener)
+            keyboardBottomFlush.registerOnChangeListener(navbarBkgChangeListener)
         }
 
         override fun onConfigurationChanged(newConfig: Configuration?) {
@@ -123,6 +126,7 @@ class KeyboardPreviewUi(override val ctx: Context, val theme: Theme) : Ui {
 
         override fun onDetachedFromWindow() {
             navbarBackground.unregisterOnChangeListener(navbarBkgChangeListener)
+            keyboardBottomFlush.unregisterOnChangeListener(navbarBkgChangeListener)
             super.onDetachedFromWindow()
         }
     }
@@ -138,8 +142,10 @@ class KeyboardPreviewUi(override val ctx: Context, val theme: Theme) : Ui {
             Configuration.ORIENTATION_LANDSCAPE -> keyboardHeightPercentLandscape
             else -> keyboardHeightPercent
         }
-        // capped as the real keyboard is (InputView), or a landscape 很高 preview stands taller than it
-        return w to KeyboardHeightCap.keysHeight(h * hPercent / 100, h, barHeight, keyboardBottomPaddingPx)
+        // capped as the real keyboard is (InputView), or a landscape 很高 preview stands taller than it;
+        // the docked handle (始终显示悬浮条) counted in the cap there too, though not drawn here
+        val handle = if (ThemeManager.prefs.alwaysShowHandle.getValue()) ctx.dp(FloatingHandle.HEIGHT_DP) else 0
+        return w to KeyboardHeightCap.keysHeight(h * hPercent / 100, h, barHeight, keyboardBottomPaddingPx, handle)
     }
 
     init {
@@ -162,8 +168,8 @@ class KeyboardPreviewUi(override val ctx: Context, val theme: Theme) : Ui {
         intrinsicHeight = barHeight + keyboardHeight
         // extra bottom padding
         intrinsicHeight += keyboardBottomPaddingPx
-        // windowInsets navbar padding
-        if (navbarBackground.getValue() == NavbarBackground.Full) {
+        // windowInsets navbar padding; none at 贴底, as InputView leaves it out there
+        if (navbarBackground.getValue() == NavbarBackground.Full && !keyboardPrefs.bottomFlush) {
             ViewCompat.getRootWindowInsets(root)?.also {
                 // IME window has different navbar height when system navigation in "gesture navigation" mode
                 // thus the inset from Activity root window is unreliable

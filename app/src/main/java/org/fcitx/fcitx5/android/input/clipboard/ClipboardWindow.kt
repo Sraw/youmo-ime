@@ -4,17 +4,13 @@
  */
 package org.fcitx.fcitx5.android.input.clipboard
 
-import android.annotation.SuppressLint
 import android.content.Intent
 import android.view.View
-import android.view.ViewGroup
-import android.widget.FrameLayout
 import android.widget.PopupMenu
 import androidx.annotation.Keep
 import androidx.core.text.bold
 import androidx.core.text.buildSpannedString
 import androidx.core.text.color
-import androidx.core.view.updateLayoutParams
 import androidx.lifecycle.lifecycleScope
 import androidx.paging.CombinedLoadStates
 import androidx.paging.Pager
@@ -22,9 +18,6 @@ import androidx.paging.PagingConfig
 import androidx.recyclerview.widget.ItemTouchHelper
 import androidx.recyclerview.widget.RecyclerView
 import androidx.recyclerview.widget.StaggeredGridLayoutManager
-import com.google.android.material.snackbar.BaseTransientBottomBar.BaseCallback
-import com.google.android.material.snackbar.Snackbar
-import com.google.android.material.snackbar.SnackbarContentLayout
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import org.fcitx.fcitx5.android.R
@@ -53,7 +46,6 @@ import org.fcitx.fcitx5.android.utils.item
 import org.fcitx.fcitx5.android.utils.styledColorOrDefault
 import org.mechdancer.dependency.manager.must
 import splitties.dimensions.dp
-import splitties.views.dsl.core.withTheme
 
 class ClipboardWindow : InputWindow.ExtendedInputWindow<ClipboardWindow>() {
 
@@ -61,11 +53,6 @@ class ClipboardWindow : InputWindow.ExtendedInputWindow<ClipboardWindow>() {
     private val windowManager: InputWindowManager by manager.must()
     private val theme by manager.theme()
     private val imeScope by manager.imeScope()
-
-    private val snackbarCtx by lazy {
-        context.withTheme(R.style.InputViewSnackbarTheme)
-    }
-    private var snackbarInstance: Snackbar? = null
 
     private lateinit var stateMachine: EventStateMachine<ClipboardStateMachine.State, ClipboardStateMachine.TransitionEvent, ClipboardStateMachine.BooleanKey>
 
@@ -126,7 +113,7 @@ class ClipboardWindow : InputWindow.ExtendedInputWindow<ClipboardWindow>() {
             override fun onDelete(id: Int) {
                 service.lifecycleScope.launch {
                     ClipboardManager.delete(id)
-                    showUndoSnackbar(id)
+                    sayDeleted(id)
                 }
             }
 
@@ -165,7 +152,7 @@ class ClipboardWindow : InputWindow.ExtendedInputWindow<ClipboardWindow>() {
                     val entry = adapter.getEntryAt(position) ?: return
                     service.lifecycleScope.launch {
                         ClipboardManager.delete(entry.id)
-                        showUndoSnackbar(entry.id)
+                        sayDeleted(entry.id)
                     }
                 }
             }).attachToRecyclerView(recyclerView)
@@ -201,7 +188,7 @@ class ClipboardWindow : InputWindow.ExtendedInputWindow<ClipboardWindow>() {
             menu.item(android.R.string.ok) {
                 service.lifecycleScope.launch {
                     val ids = ClipboardManager.deleteAll(skipPinned)
-                    showUndoSnackbar(*ids)
+                    sayDeleted(*ids)
                 }
             }
             setOnDismissListener {
@@ -211,61 +198,14 @@ class ClipboardWindow : InputWindow.ExtendedInputWindow<ClipboardWindow>() {
         }
     }
 
-    private val pendingDeleteIds = arrayListOf<Int>()
+    private val deleted = DeletedEntries(
+        undoDelete = { ids -> service.lifecycleScope.launch { ClipboardManager.undoDelete(*ids) } },
+        purge = { ids -> service.lifecycleScope.launch { ClipboardManager.purgeMarked(*ids) } },
+    )
 
-    @SuppressLint("RestrictedApi")
-    private fun showUndoSnackbar(vararg id: Int) {
-        id.forEach { pendingDeleteIds.add(it) }
-        val str = context.resources.getString(R.string.num_items_deleted, pendingDeleteIds.size)
-        snackbarInstance = Snackbar.make(snackbarCtx, ui.root, str, Snackbar.LENGTH_LONG)
-            .setBackgroundTint(theme.popupBackgroundColor)
-            .setTextColor(theme.popupTextColor)
-            .setActionTextColor(theme.genericActiveBackgroundColor)
-            .setAction(R.string.undo) {
-                // taken now: a delete made while this is written is another snackbar's to undo
-                val ids = pendingDeleteIds.toIntArray()
-                pendingDeleteIds.clear()
-                service.lifecycleScope.launch {
-                    ClipboardManager.undoDelete(*ids)
-                }
-            }
-            .addCallback(object : Snackbar.Callback() {
-                override fun onDismissed(transientBottomBar: Snackbar, event: Int) {
-                    // a newer snackbar has taken the pending ids to undo or purge: Material reports
-                    // this one's TIMEOUT only after its hide animation, when a delete may have come
-                    if (snackbarInstance !== transientBottomBar) return
-                    snackbarInstance = null
-                    when (event) {
-                        BaseCallback.DISMISS_EVENT_SWIPE,
-                        BaseCallback.DISMISS_EVENT_MANUAL,
-                        BaseCallback.DISMISS_EVENT_TIMEOUT -> {
-                            // now, not after the purge: a delete made meanwhile keeps its id to undo
-                            val ids = pendingDeleteIds.toIntArray()
-                            pendingDeleteIds.clear()
-                            service.lifecycleScope.launch {
-                                ClipboardManager.purgeMarked(*ids)
-                            }
-                        }
-                        BaseCallback.DISMISS_EVENT_ACTION,
-                        BaseCallback.DISMISS_EVENT_CONSECUTIVE -> {
-                            // user clicked "undo" or deleted more items which makes a new snackbar
-                        }
-                    }
-                }
-            }).apply {
-                val hMargin = snackbarCtx.dp(24)
-                val vMargin = snackbarCtx.dp(16)
-                view.updateLayoutParams<ViewGroup.MarginLayoutParams> {
-                    leftMargin = hMargin
-                    rightMargin = hMargin
-                    bottomMargin = vMargin
-                }
-                ((view as FrameLayout).getChildAt(0) as SnackbarContentLayout).apply {
-                    messageView.letterSpacing = 0f
-                    actionView.letterSpacing = 0f
-                }
-                show()
-            }
+    private fun sayDeleted(vararg id: Int) {
+        val (count, undo) = deleted.deleted(*id)
+        service.say(context.resources.getString(R.string.num_items_deleted, count), undo)
     }
 
     override fun onAttached() {
@@ -297,7 +237,6 @@ class ClipboardWindow : InputWindow.ExtendedInputWindow<ClipboardWindow>() {
         adapterSubmitJob?.cancel()
         promptJob?.cancel()
         promptMenu?.dismiss()
-        snackbarInstance?.dismiss()
     }
 
     override val title: String by lazy {

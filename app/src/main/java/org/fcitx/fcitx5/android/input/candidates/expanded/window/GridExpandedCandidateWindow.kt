@@ -6,13 +6,9 @@
 package org.fcitx.fcitx5.android.input.candidates.expanded.window
 
 import android.content.res.Configuration
-import android.util.DisplayMetrics
 import androidx.recyclerview.widget.GridLayoutManager
-import androidx.recyclerview.widget.LinearSmoothScroller
-import androidx.recyclerview.widget.RecyclerView
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.input.candidates.CandidateViewHolder
-import org.fcitx.fcitx5.android.input.candidates.expanded.ExpandedCandidateLayout
 import org.fcitx.fcitx5.android.input.candidates.expanded.GridPagingCandidateViewAdapter
 import org.fcitx.fcitx5.android.input.candidates.expanded.SpanHelper
 import org.fcitx.fcitx5.android.input.candidates.expanded.decoration.GridDecoration
@@ -49,48 +45,9 @@ class GridExpandedCandidateWindow :
         }
     }
 
-    override fun onCreateCandidateLayout(): ExpandedCandidateLayout =
-        ExpandedCandidateLayout(context, theme).apply {
-            recyclerView.apply {
-                adapter = this@GridExpandedCandidateWindow.adapter
-                layoutManager = this@GridExpandedCandidateWindow.layoutManager
-                addItemDecoration(GridDecoration(dividerDrawable))
-                addOnScrollListener(object : RecyclerView.OnScrollListener() {
-                    override fun onScrolled(recyclerView: RecyclerView, dx: Int, dy: Int) {
-                        (recyclerView.layoutManager as GridLayoutManager).apply {
-                            pageUpBtn.isEnabled = findFirstCompletelyVisibleItemPosition() > 0
-                            pageDnBtn.isEnabled =
-                                findLastCompletelyVisibleItemPosition() < itemCount - 1
-                        }
-                    }
-                })
-            }
-        }
+    override fun newDivider() = GridDecoration(dividerDrawable)
 
-    override fun prevPage() {
-        layoutManager.apply {
-            var prev = findFirstCompletelyVisibleItemPosition() - 1
-            if (prev < 0) prev = 0
-            startSmoothScroll(object : LinearSmoothScroller(context) {
-                override fun getVerticalSnapPreference() = SNAP_TO_END
-                override fun calculateSpeedPerPixel(dm: DisplayMetrics?) =
-                    if (disableAnimation) Float.MIN_VALUE else super.calculateSpeedPerPixel(dm)
-            }.apply { targetPosition = prev })
-        }
-    }
+    override fun firstFullyVisible() = layoutManager.findFirstCompletelyVisibleItemPosition()
 
-    override fun nextPage() {
-        layoutManager.apply {
-            // the first page not loaded yet (Down is enabled till then): -1 would throw
-            if (itemCount == 0) return
-            var next = findLastCompletelyVisibleItemPosition() + 1
-            if (next >= itemCount) next = itemCount - 1
-            startSmoothScroll(object : LinearSmoothScroller(context) {
-                override fun getVerticalSnapPreference() = SNAP_TO_START
-                override fun calculateSpeedPerPixel(dm: DisplayMetrics?) =
-                    if (disableAnimation) Float.MIN_VALUE else super.calculateSpeedPerPixel(dm)
-            }.apply { targetPosition = next })
-        }
-    }
-
+    override fun lastFullyVisible() = layoutManager.findLastCompletelyVisibleItemPosition()
 }

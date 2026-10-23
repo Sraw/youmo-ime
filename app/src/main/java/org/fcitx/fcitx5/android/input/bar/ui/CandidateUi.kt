@@ -8,6 +8,7 @@ import android.content.Context
 import android.view.View
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.data.theme.Theme
+import org.fcitx.fcitx5.android.input.bar.KawaiiBarComponent
 import splitties.dimensions.dp
 import splitties.views.dsl.constraintlayout.before
 import splitties.views.dsl.constraintlayout.centerVertically
@@ -23,10 +24,12 @@ class CandidateUi(override val ctx: Context, theme: Theme, private val horizonta
     val expandButton = ToolButton(ctx, R.drawable.ic_baseline_expand_more_24, theme).apply {
         id = R.id.expand_candidate_btn
         visibility = View.INVISIBLE
+        fixIconSize(ctx.dp(KawaiiBarComponent.ICON_DP))
     }
 
     override val root = ctx.constraintLayout {
-        add(expandButton, lParams(dp(40)) {
+        // the bar's height (候选字号), never narrower than a 40 dp touch target
+        add(expandButton, lParams(dp(maxOf(KawaiiBarComponent.HEIGHT, KawaiiBarComponent.MIN_TOUCH_DP)), dp(KawaiiBarComponent.HEIGHT)) {
             centerVertically()
             endOfParent()
         })

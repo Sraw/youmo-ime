@@ -16,6 +16,7 @@ import org.fcitx.fcitx5.android.data.prefs.ManagedPreference
 import org.fcitx.fcitx5.android.data.prefs.ManagedPreferenceCategory
 import org.fcitx.fcitx5.android.data.prefs.ManagedPreferenceEnum
 import org.fcitx.fcitx5.android.data.prefs.ManagedPreferenceUi.Levels.Level
+import org.fcitx.fcitx5.android.input.bar.CandidateBarHeight
 import org.fcitx.fcitx5.android.input.floating.FloatingHandleSide
 import org.fcitx.fcitx5.android.input.keyboard.OneHanded
 import org.fcitx.fcitx5.android.input.keyboard.SplitDock
@@ -69,14 +70,22 @@ class ThemePrefs(sharedPreferences: SharedPreferences) :
         )
         levels(
             R.string.keyboard_bottom_padding, "keyboard_bottom_padding_level",
-            defaults(keyboard.keyboardBottomPadding, keyboard.keyboardBottomPaddingLandscape),
+            defaults(keyboard.keyboardBottomPadding, keyboard.keyboardBottomPaddingLandscape, keyboard.keyboardBottomFlush),
             listOf(
-                Level(R.string.level_none, 0, 0),
-                Level(R.string.level_little, 8, 4),
-                Level(R.string.level_more, 20, 12),
+                Level(R.string.level_flush, 0, 0, 1),
+                Level(R.string.level_none, 0, 0, 0),
+                Level(R.string.level_little, 8, 4, 0),
+                Level(R.string.level_more, 20, 12, 0),
             )
         )
     }
+
+    // the on-screen bar's words, its 联想 and the expanded grid; the bar grows with it, the keys
+    // keep their height (CandidateBarHeight). The floating window has its own candidates_window_font_size
+    val candidateTextSize = int(
+        R.string.candidate_text_size, "candidate_text_size",
+        CandidateBarHeight.DEFAULT_TEXT_SP, 14, 28, "sp"
+    )
 
     // the letters in two halves, for the thumbs, on a phone on its side (TextKeyboard.splits)
     val splitKeyboard = enumList(R.string.split_keyboard, "split_keyboard", SplitKeyboardMode.Auto)
@@ -102,6 +111,11 @@ class ThemePrefs(sharedPreferences: SharedPreferences) :
 
     // where its drag handle is: made anew for it too. Set also while it does not float, for the next time
     val floatingHandle = enumList(R.string.floating_handle, "floating_handle", FloatingHandleSide.Bottom)
+
+    // the handle on the docked keyboard too, where floatingHandle puts it, added to the keyboard (the
+    // keys keep their height unless the 70% cap binds, the user 2026-10-22);
+    // its grip long pressed lets the keyboard go floating under the finger. Made anew for it
+    val alwaysShowHandle = switch(R.string.always_show_floating_handle, "always_show_floating_handle", false)
 
     init {
         section(R.string.section_key_style)

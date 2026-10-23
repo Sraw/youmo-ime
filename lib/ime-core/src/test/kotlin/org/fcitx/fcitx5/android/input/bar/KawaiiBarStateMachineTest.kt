@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.input.bar
 
+import org.fcitx.fcitx5.android.assertRows
 import org.fcitx.fcitx5.android.input.bar.KawaiiBarStateMachine.BooleanKey.CandidateEmpty
 import org.fcitx.fcitx5.android.input.bar.KawaiiBarStateMachine.BooleanKey.PreeditEmpty
 import org.fcitx.fcitx5.android.input.bar.KawaiiBarStateMachine.State
@@ -36,6 +37,11 @@ class KawaiiBarStateMachineTest {
             seen.clear()
         }
 
+    /** Every pair of preedit-empty and candidates-empty flags. */
+    private fun eachFlags(check: (Boolean, Boolean) -> Unit) {
+        for (preedit in listOf(true, false)) for (candidate in listOf(true, false)) check(preedit, candidate)
+    }
+
     private fun assertTransition(
         from: State,
         event: TransitionEvent,
@@ -65,115 +71,46 @@ class KawaiiBarStateMachineTest {
         assertEquals(true, m.getBooleanState(CandidateEmpty))
     }
 
-    // region PreeditUpdated
-
     @Test
-    fun preeditUpdatedEntersCandidateOnlyWhenBothPreeditAndCandidatesArePresent() {
-        assertTransition(Idle, PreeditUpdated, preeditEmpty = false, candidateEmpty = false, expected = Candidate)
-        assertTransition(Idle, PreeditUpdated, preeditEmpty = false, candidateEmpty = true, expected = Idle)
-        assertTransition(Idle, PreeditUpdated, preeditEmpty = true, candidateEmpty = false, expected = Idle)
-        assertTransition(Idle, PreeditUpdated, preeditEmpty = true, candidateEmpty = true, expected = Idle)
-    }
-
-    @Test
-    fun preeditUpdatedLeavesCandidateWhenThePreeditIsCleared() {
-        assertTransition(Candidate, PreeditUpdated, preeditEmpty = true, candidateEmpty = false, expected = Idle)
-        assertTransition(Candidate, PreeditUpdated, preeditEmpty = true, candidateEmpty = true, expected = Idle)
-    }
-
-    @Test
-    fun preeditUpdatedKeepsCandidateWhileThePreeditIsNonEmpty() {
-        assertTransition(Candidate, PreeditUpdated, preeditEmpty = false, candidateEmpty = false, expected = Candidate)
-        assertTransition(Candidate, PreeditUpdated, preeditEmpty = false, candidateEmpty = true, expected = Candidate)
-    }
-
-    @Test
-    fun preeditUpdatedNeverDisturbsAnAttachedWindow() {
-        for (preedit in listOf(true, false)) {
-            for (candidate in listOf(true, false)) {
-                assertTransition(Title, PreeditUpdated, preedit, candidate, expected = Title)
+    fun eachEventMovesTheBarAsThePreeditAndCandidatesSay() = assertRows(
+        "a preedit with candidates enters Candidate" to { assertTransition(Idle, PreeditUpdated, preeditEmpty = false, candidateEmpty = false, expected = Candidate) },
+        "a preedit without candidates stays Idle" to { assertTransition(Idle, PreeditUpdated, preeditEmpty = false, candidateEmpty = true, expected = Idle) },
+        "no preedit, though candidates, stays Idle on a preedit update" to { assertTransition(Idle, PreeditUpdated, preeditEmpty = true, candidateEmpty = false, expected = Idle) },
+        "nothing at all stays Idle on a preedit update" to { assertTransition(Idle, PreeditUpdated, preeditEmpty = true, candidateEmpty = true, expected = Idle) },
+        "the preedit cleared leaves Candidate (candidates left)" to { assertTransition(Candidate, PreeditUpdated, preeditEmpty = true, candidateEmpty = false, expected = Idle) },
+        "the preedit cleared leaves Candidate (none left)" to { assertTransition(Candidate, PreeditUpdated, preeditEmpty = true, candidateEmpty = true, expected = Idle) },
+        "Candidate is kept while the preedit is non-empty (candidates)" to { assertTransition(Candidate, PreeditUpdated, preeditEmpty = false, candidateEmpty = false, expected = Candidate) },
+        "Candidate is kept while the preedit is non-empty (no candidates)" to { assertTransition(Candidate, PreeditUpdated, preeditEmpty = false, candidateEmpty = true, expected = Candidate) },
+        "a preedit update never disturbs an attached window" to {
+            eachFlags { preedit, candidate -> assertTransition(Title, PreeditUpdated, preedit, candidate, expected = Title) }
+        },
+        "candidates enter Candidate as soon as there are some (no preedit)" to { assertTransition(Idle, CandidatesUpdated, preeditEmpty = true, candidateEmpty = false, expected = Candidate) },
+        "candidates enter Candidate as soon as there are some (a preedit)" to { assertTransition(Idle, CandidatesUpdated, preeditEmpty = false, candidateEmpty = false, expected = Candidate) },
+        "no candidates stay Idle (no preedit)" to { assertTransition(Idle, CandidatesUpdated, preeditEmpty = true, candidateEmpty = true, expected = Idle) },
+        "no candidates stay Idle (a preedit)" to { assertTransition(Idle, CandidatesUpdated, preeditEmpty = false, candidateEmpty = true, expected = Idle) },
+        "Candidate is left only when preedit and candidates are both empty" to { assertTransition(Candidate, CandidatesUpdated, preeditEmpty = true, candidateEmpty = true, expected = Idle) },
+        "a preedit left keeps Candidate though the candidates went" to { assertTransition(Candidate, CandidatesUpdated, preeditEmpty = false, candidateEmpty = true, expected = Candidate) },
+        "candidates left keep Candidate (no preedit)" to { assertTransition(Candidate, CandidatesUpdated, preeditEmpty = true, candidateEmpty = false, expected = Candidate) },
+        "candidates left keep Candidate (a preedit)" to { assertTransition(Candidate, CandidatesUpdated, preeditEmpty = false, candidateEmpty = false, expected = Candidate) },
+        "a candidates update never disturbs an attached window" to {
+            eachFlags { preedit, candidate -> assertTransition(Title, CandidatesUpdated, preedit, candidate, expected = Title) }
+        },
+        "attaching a window always shows the title, whatever the flags" to {
+            for (from in listOf(Idle, Candidate)) {
+                eachFlags { preedit, candidate -> assertTransition(from, ExtendedWindowAttached, preedit, candidate, expected = Title) }
             }
-        }
-    }
-
-    // endregion
-
-    // region CandidatesUpdated
-
-    @Test
-    fun candidatesUpdatedEntersCandidateAsSoonAsThereAreCandidates() {
-        assertTransition(Idle, CandidatesUpdated, preeditEmpty = true, candidateEmpty = false, expected = Candidate)
-        assertTransition(Idle, CandidatesUpdated, preeditEmpty = false, candidateEmpty = false, expected = Candidate)
-    }
-
-    @Test
-    fun candidatesUpdatedStaysIdleWithoutCandidates() {
-        assertTransition(Idle, CandidatesUpdated, preeditEmpty = true, candidateEmpty = true, expected = Idle)
-        assertTransition(Idle, CandidatesUpdated, preeditEmpty = false, candidateEmpty = true, expected = Idle)
-    }
-
-    @Test
-    fun candidatesUpdatedLeavesCandidateOnlyWhenPreeditAndCandidatesAreBothEmpty() {
-        assertTransition(Candidate, CandidatesUpdated, preeditEmpty = true, candidateEmpty = true, expected = Idle)
-        assertTransition(Candidate, CandidatesUpdated, preeditEmpty = false, candidateEmpty = true, expected = Candidate)
-        assertTransition(Candidate, CandidatesUpdated, preeditEmpty = true, candidateEmpty = false, expected = Candidate)
-        assertTransition(Candidate, CandidatesUpdated, preeditEmpty = false, candidateEmpty = false, expected = Candidate)
-    }
-
-    @Test
-    fun candidatesUpdatedNeverDisturbsAnAttachedWindow() {
-        for (preedit in listOf(true, false)) {
-            for (candidate in listOf(true, false)) {
-                assertTransition(Title, CandidatesUpdated, preedit, candidate, expected = Title)
-            }
-        }
-    }
-
-    // endregion
-
-    // region window attach / detach
-
-    @Test
-    fun attachingAWindowAlwaysShowsTheTitleRegardlessOfFlags() {
-        for (from in listOf(Idle, Candidate)) {
-            for (preedit in listOf(true, false)) {
-                for (candidate in listOf(true, false)) {
-                    assertTransition(from, ExtendedWindowAttached, preedit, candidate, expected = Title)
-                }
-            }
-        }
-    }
-
-    @Test
-    fun attachingAWindowWhileAlreadyShowingATitleIsANoOp() {
-        assertTransition(Title, ExtendedWindowAttached, preeditEmpty = true, candidateEmpty = true, expected = Title)
-    }
-
-    /**
-     * `WindowDetached` declares two rules from [Title]; the guarded one is written first so it
-     * wins when candidates exist. This pins that ordering -- reordering the rules in the source
-     * would silently send the bar to [Idle] with candidates still on screen.
-     */
-    @Test
-    fun detachingAWindowPrefersCandidateOverIdleWhenCandidatesExist() {
-        assertTransition(Title, WindowDetached, preeditEmpty = true, candidateEmpty = false, expected = Candidate)
-        assertTransition(Title, WindowDetached, preeditEmpty = false, candidateEmpty = false, expected = Candidate)
-    }
-
-    @Test
-    fun detachingAWindowFallsBackToIdleWithoutCandidates() {
-        assertTransition(Title, WindowDetached, preeditEmpty = true, candidateEmpty = true, expected = Idle)
-        assertTransition(Title, WindowDetached, preeditEmpty = false, candidateEmpty = true, expected = Idle)
-    }
-
-    @Test
-    fun detachingAWindowDoesNothingWhenNoWindowIsAttached() {
-        for (from in listOf(Idle, Candidate)) {
-            assertTransition(from, WindowDetached, preeditEmpty = true, candidateEmpty = false, expected = from)
-        }
-    }
-
-    // endregion
+        },
+        "attaching a window while already showing a title is a no-op" to { assertTransition(Title, ExtendedWindowAttached, preeditEmpty = true, candidateEmpty = true, expected = Title) },
+        // WindowDetached declares two rules from Title; the guarded one is written first so it wins
+        // when candidates exist: reordering them would send the bar to Idle with candidates shown
+        "detaching a window prefers Candidate over Idle when candidates exist (no preedit)" to { assertTransition(Title, WindowDetached, preeditEmpty = true, candidateEmpty = false, expected = Candidate) },
+        "detaching a window prefers Candidate over Idle when candidates exist (a preedit)" to { assertTransition(Title, WindowDetached, preeditEmpty = false, candidateEmpty = false, expected = Candidate) },
+        "detaching a window falls back to Idle without candidates (no preedit)" to { assertTransition(Title, WindowDetached, preeditEmpty = true, candidateEmpty = true, expected = Idle) },
+        "detaching a window falls back to Idle without candidates (a preedit)" to { assertTransition(Title, WindowDetached, preeditEmpty = false, candidateEmpty = true, expected = Idle) },
+        "detaching does nothing when no window is attached" to {
+            for (from in listOf(Idle, Candidate)) assertTransition(from, WindowDetached, preeditEmpty = true, candidateEmpty = false, expected = from)
+        },
+    )
 
     // region realistic sequences
 

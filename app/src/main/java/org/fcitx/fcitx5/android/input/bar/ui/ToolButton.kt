@@ -10,11 +10,11 @@ import android.view.ViewPropertyAnimator
 import android.widget.ImageView
 import androidx.annotation.ColorInt
 import androidx.annotation.DrawableRes
-import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.input.keyboard.CustomGestureView
 import org.fcitx.fcitx5.android.utils.borderlessRippleDrawable
 import org.fcitx.fcitx5.android.utils.circlePressHighlightDrawable
+import org.fcitx.fcitx5.android.utils.motionSettings
 import splitties.dimensions.dp
 import splitties.views.dsl.core.add
 import splitties.views.dsl.core.imageView
@@ -25,10 +25,6 @@ import splitties.views.imageResource
 import splitties.views.padding
 
 class ToolButton(context: Context) : CustomGestureView(context) {
-
-    companion object {
-        val disableAnimation by AppPrefs.getInstance().advanced.disableAnimation
-    }
 
     private val image = imageView {
         isClickable = false
@@ -66,7 +62,8 @@ class ToolButton(context: Context) : CustomGestureView(context) {
     }
 
     fun setPressHighlightColor(@ColorInt color: Int) {
-        background = if (disableAnimation) {
+        // the ripple's spread is animation too: off with 移除动画 as with 禁用动画
+        background = if (!motionSettings().animates) {
             circlePressHighlightDrawable(color)
         } else {
             borderlessRippleDrawable(color, dp(20))

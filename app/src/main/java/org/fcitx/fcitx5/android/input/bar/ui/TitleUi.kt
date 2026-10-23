@@ -10,6 +10,7 @@ import android.view.View
 import androidx.core.view.isVisible
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.data.theme.Theme
+import org.fcitx.fcitx5.android.input.bar.KawaiiBarComponent
 import splitties.dimensions.dp
 import splitties.views.dsl.constraintlayout.after
 import splitties.views.dsl.constraintlayout.bottomOfParent
@@ -31,6 +32,7 @@ class TitleUi(override val ctx: Context, theme: Theme) : Ui {
 
     private val backButton = ToolButton(ctx, R.drawable.ic_baseline_arrow_back_24, theme).apply {
         contentDescription = ctx.getString(R.string.back_to_keyboard)
+        fixIconSize(ctx.dp(KawaiiBarComponent.ICON_DP))
     }
 
     private val titleText = textView {
@@ -42,13 +44,18 @@ class TitleUi(override val ctx: Context, theme: Theme) : Ui {
 
     private var extension: View? = null
 
+    // as tall as the bar (候选字号), so nothing is cut at a small size; the button never narrower
+    // than a 40 dp touch target
+    private val barHeight = ctx.dp(KawaiiBarComponent.HEIGHT)
+    private val buttonWidth = ctx.dp(maxOf(KawaiiBarComponent.HEIGHT, KawaiiBarComponent.MIN_TOUCH_DP))
+
     override val root = constraintLayout {
-        add(backButton, lParams(dp(40), dp(40)) {
+        add(backButton, lParams(buttonWidth, barHeight) {
             topOfParent()
             startOfParent()
             bottomOfParent()
         })
-        add(titleText, lParams(wrapContent, dp(40)) {
+        add(titleText, lParams(wrapContent, barHeight) {
             topOfParent()
             after(backButton, dp(8))
             bottomOfParent()
@@ -76,7 +83,7 @@ class TitleUi(override val ctx: Context, theme: Theme) : Ui {
         titleText.isVisible = showTitle
         extension = view
         root.run {
-            add(view, lParams(matchConstraints, dp(40)) {
+            add(view, lParams(matchConstraints, barHeight) {
                 centerVertically()
                 if (showTitle) {
                     endOfParent(dp(5))

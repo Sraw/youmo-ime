@@ -5,6 +5,7 @@
 
 package org.fcitx.fcitx5.android.input
 
+import android.graphics.Rect
 import android.os.SystemClock
 import android.util.SparseArray
 import android.view.MotionEvent
@@ -20,6 +21,7 @@ import androidx.core.text.bold
 import androidx.core.text.buildSpannedString
 import androidx.core.text.color
 import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.doOnPreDraw
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
@@ -28,17 +30,19 @@ import org.fcitx.fcitx5.android.core.EngineBridge
 import org.fcitx.fcitx5.android.core.FcitxEvent
 import org.fcitx.fcitx5.android.daemon.FcitxConnection
 import org.fcitx.fcitx5.android.data.InputFeedbacks
-import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.data.theme.ThemePrefs
+import org.fcitx.fcitx5.android.engine.learn.control.LearningOp
 import org.fcitx.fcitx5.android.engine.learn.control.LearningResult
 import org.fcitx.fcitx5.android.input.learning.CandidateLearningMenu
 import org.fcitx.fcitx5.android.input.learning.UndoChip
 import org.fcitx.fcitx5.android.utils.navbarFrameHeight
+import org.fcitx.fcitx5.android.utils.popIn
 import org.fcitx.fcitx5.android.utils.styledColorOrDefault
 import splitties.dimensions.dp
 import splitties.views.dsl.core.withTheme
+import timber.log.Timber
 import kotlin.math.max
 import kotlin.math.min
 
@@ -105,7 +109,7 @@ abstract class BaseInputView(
     /** Whether a candidate's index counts from the page shown (the floating list's), not from the first of all. */
     protected open val pagedCandidates = false
 
-    // what a long press's act did, to be taken back: over the top of [undoAnchor]
+    // the keyboard's one notice: what a long press's act did, to be taken back, and what it says
     private var undoChip: UndoChip? = null
 
     /** What the undo chip shows over the top of: the candidates' bar, not a window-high view. */
@@ -123,18 +127,76 @@ abstract class BaseInputView(
     /** The lowest window y the chip may reach when it goes below: the window's bottom less the navigation bar. */
     protected open val undoBottomLimit: Int get() = rootView.height - (rootWindowInsets?.let(::floatingBottomInset) ?: 0)
 
+    /**
+     * Floating, the keyboard's rectangle and the room it floats in, in window pixels, set into
+     * [keyboard] and [screen]: the chip goes on the keyboard's side toward the screen's middle
+     * ([UndoChipPlacement.floating]). False docked.
+     */
+    protected open fun undoFloating(keyboard: Rect, screen: Rect): Boolean = false
+
+    private val undoKeyboard = Rect()
+    private val undoScreen = Rect()
+
+    private fun undoPlace(width: Int, height: Int, aboveKeys: Boolean): UndoChipPlacement.Place {
+        val gap = dp(4)
+        if (undoFloating(undoKeyboard, undoScreen)) {
+            return UndoChipPlacement.floating(undoScreen.box(), undoKeyboard.box(), width, height, gap)
+        }
+        val bar = IntArray(2).also { undoAnchor.getLocationInWindow(it) }
+        val over = undoAbove
+        val aboveAt = IntArray(2).also { over.getLocationInWindow(it) }
+        return UndoChipPlacement.docked(
+            windowWidth = undoAnchor.rootView.width,
+            chipWidth = width,
+            candidates = aboveKeys || undoAnchorShowsCandidates,
+            barTop = bar[1],
+            aboveTop = aboveAt[1],
+            chipHeight = height,
+            gap = gap,
+            belowBottom = if (undoBelowOk) aboveAt[1] + over.height else null,
+            // off the bottom PopupWindow would clip it back over the keys
+            bottomLimit = undoBottomLimit,
+        )
+    }
+
+    private fun Rect.box() = UndoChipPlacement.Box(left, top, right, bottom)
+
     private val learningMenu by lazy { CandidateLearningMenu(themedContext, fcitx, service.lifecycleScope, ::chip) }
 
-    private fun chip(message: String, token: Long, aboveKeys: Boolean = false) {
+    private fun notice(message: String, undo: UndoChip.Undo?, aboveKeys: Boolean, steady: Boolean = false): Boolean {
+        // one line per notice, never its text (it may hold a word typed): UAT counts these to
+        // catch a notice said twice, which crossfades in the same chip and can't be seen as two
+        Timber.i("say")
         chipTyping.chipShown()
-        (undoChip ?: UndoChip(undoAnchor, theme, service.lifecycleScope, fcitx, { undoAbove }, { undoAnchorShowsCandidates }, undoBelowOk, { undoBottomLimit }).also { undoChip = it }).show(message, token, aboveKeys)
+        val chip = undoChip ?: UndoChip(undoAnchor, theme, ::undoPlace).also { undoChip = it }
+        return chip.show(message, undo, aboveKeys, steady)
+    }
+
+    // a long press's act said over the bar, with what takes it back: only the last act, and only
+    // while nothing else was learned after it; the engine says so (Unavailable) and so does the chip then
+    private fun chip(message: String, token: Long) {
+        val undo = if (token == LearningResult.NO_UNDO) null else UndoChip.Undo({ learningUndo(token) })
+        notice(message, undo, aboveKeys = false)
+    }
+
+    private fun learningUndo(token: Long) {
+        service.lifecycleScope.launch {
+            when (fcitx.runOnReady { learning(LearningOp.Undo(token)) }) {
+                LearningResult.Unavailable -> chip(context.getString(R.string.learning_undo_gone), LearningResult.NO_UNDO)
+                // a disk that failed: said, as 清掉最近 says it, not the chip just gone
+                LearningResult.Failed -> chip(context.getString(R.string.learning_try_again), LearningResult.NO_UNDO)
+                else -> {}
+            }
+        }
     }
 
     /**
-     * [message] said for a moment above the keyboard, in the chip a long press's act shows
-     * ([FcitxInputMethodService.say]); not over the bar, whose buttons it hid (the user, 2026-10-22).
+     * [message] said for a moment above the keyboard ([FcitxInputMethodService.say]), with 撤销
+     * doing [undo] if there is one; not over the bar, whose buttons it hid (the user, 2026-10-22).
+     * [steady]: not put away by typing ([UndoChip.show]). False if it could not be shown, [undo] lapsed.
      */
-    fun say(message: String) = chip(message, LearningResult.NO_UNDO, aboveKeys = true)
+    fun say(message: String, undo: UndoChip.Undo? = null, steady: Boolean = false) =
+        notice(message, undo, aboveKeys = true, steady)
 
     private val chipTyping = ChipTyping()
 
@@ -143,10 +205,12 @@ abstract class BaseInputView(
             is FcitxEvent.ClientPreeditEvent -> chipTyping.editorPreedit(event.data.toString())
             is FcitxEvent.InputPanelEvent -> chipTyping.barPreedit(event.data.preedit.toString())
             // a key the engine let through, or a word put in: typing too
-            is FcitxEvent.KeyEvent, is FcitxEvent.CommitStringEvent -> chipTyping.typed()
+            is FcitxEvent.KeyEvent -> chipTyping.key(event.data.up)
+            is FcitxEvent.CommitStringEvent -> chipTyping.typed()
             else -> false
         }
-        if (goes) undoChip?.dismiss()
+        // typing on: put away as a tap would, the act standing
+        if (goes) undoChip?.typed()
     }
 
     /** The candidate [text] at [idx] deleted or its learning forgotten, as its long press would (Shift+Delete). */
@@ -219,7 +283,10 @@ abstract class BaseInputView(
                     candidateActionMenuClosed = SystemClock.uptimeMillis()
                     if (candidateActionMenu === menu) candidateActionMenu = null
                 }
+                // not the platform's drop-down animation: grown out of the candidate pressed (Motion)
+                animationStyle = 0
                 show()
+                listView?.rootView?.let { decor -> decor.doOnPreDraw { growFrom(decor, view) } }
             }
         }
     }
@@ -273,6 +340,13 @@ abstract class BaseInputView(
         }
     }
 
+    // the menu's window [decor] grown from the middle of the candidate [pressed], wherever it opened
+    private fun growFrom(decor: View, pressed: View) {
+        val at = IntArray(2).also(decor::getLocationOnScreen)
+        val from = IntArray(2).also(pressed::getLocationOnScreen)
+        decor.popIn((from[0] + pressed.width / 2 - at[0]).toFloat(), (from[1] + pressed.height / 2 - at[1]).toFloat())
+    }
+
     private fun ListAdapter.widest(parent: ViewGroup): Int {
         val unspecified = View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED)
         var widest = 0
@@ -305,6 +379,8 @@ abstract class BaseInputView(
         return max(navBarBottomInset(windowInsets), if (gestures > 0) context.navbarFrameHeight() else 0)
     }
 
+    private var loggedInsets: List<Int>? = null
+
     private fun navBarBottomInset(windowInsets: WindowInsets): Int {
         val insets = WindowInsetsCompat.toWindowInsetsCompat(windowInsets)
         // use navigation bar insets when available
@@ -320,21 +396,26 @@ abstract class BaseInputView(
                 insetsBottom = max(gesturesBottom, context.navbarFrameHeight())
             }
         }
+        // some ROMs hiding the gesture line still report it, leaving a blank strip under the
+        // keyboard: the raw values go to the log a user exports, once each time they change
+        val seen = listOf(
+            navBars.bottom, mandatory.bottom,
+            insets.getInsets(WindowInsetsCompat.Type.systemGestures()).bottom,
+            insets.getInsets(WindowInsetsCompat.Type.tappableElement()).bottom,
+            context.navbarFrameHeight(), insetsBottom,
+        )
+        if (seen != loggedInsets) {
+            loggedInsets = seen
+            Timber.i("nav bar bottom inset: navigationBars=%d mandatorySystemGestures=%d systemGestures=%d tappableElement=%d navbarFrameHeight=%d -> %d", *seen.toTypedArray())
+        }
         return insetsBottom
     }
 
-    private val ignoreSystemWindowInsets by AppPrefs.getInstance().advanced.ignoreSystemWindowInsets
-
     override fun onAttachedToWindow() {
         super.onAttachedToWindow()
-        if (ignoreSystemWindowInsets) {
-            // suppress view's own onApplyWindowInsets
-            setOnApplyWindowInsetsListener { _, insets -> insets }
-        } else {
-            // on API 35+, we must call requestApplyInsets() manually after replacing views,
-            // otherwise View#onApplyWindowInsets won't be called. ¯\_(ツ)_/¯
-            requestApplyInsets()
-        }
+        // on API 35+, we must call requestApplyInsets() manually after replacing views,
+        // otherwise View#onApplyWindowInsets won't be called. ¯\_(ツ)_/¯
+        requestApplyInsets()
     }
 
     override fun onDetachedFromWindow() {
