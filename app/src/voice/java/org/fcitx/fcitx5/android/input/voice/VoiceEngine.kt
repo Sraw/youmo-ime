@@ -202,8 +202,8 @@ object VoiceEngine {
             ),
             tokens = "$DIR/tokens.txt",
             numThreads = THREADS,
-            // given, not found out: for that, sherpa-onnx reads all of encoder.ort onto the heap and
-            // makes a session of it, its weights copied, before mapping it (OfflineRecognizerImpl::Create)
+            // the only family built (lib/sherpa-onnx/README.md); upstream would otherwise read all of
+            // encoder.ort onto the heap to find it out
             modelType = "transducer",
             modelingUnit = "bpe",
             bpeVocab = "$DIR/bpe.vocab",

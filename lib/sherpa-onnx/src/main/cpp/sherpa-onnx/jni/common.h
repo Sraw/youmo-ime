@@ -140,10 +140,6 @@
     cpp_field = env->GetBooleanField(config, fid);                           \
   } while (0)
 
-// defined in jni.cc
-jobject NewInteger(JNIEnv *env, int32_t value);
-jobject NewFloat(JNIEnv *env, float value);
-
 // Wrapper for NewStringUTF that strips invalid UTF-8 byte sequences first.
 // This prevents JNI crashes when the ASR model outputs invalid UTF-8
 // (e.g., orphaned UTF-16 surrogate halves from the Arabic moonshine model).

@@ -11,40 +11,13 @@ if(NOT DEFINED ANDROID_ABI)
 endif()
 
 set(sources
-  audio-tagging.cc
   common.cc
-  jni.cc
-  keyword-spotter.cc
-  offline-diacritization.cc
-  offline-punctuation.cc
   offline-recognizer.cc
-  offline-speech-denoiser.cc
   offline-stream.cc
-  online-speech-denoiser.cc
-  online-punctuation.cc
-  online-recognizer.cc
-  online-stream.cc
-  speaker-embedding-extractor.cc
-  speaker-embedding-manager.cc
-  speech-denoiser.cc
-  spoken-language-identification.cc
   version.cc
   voice-activity-detector.cc
   wave-reader.cc
-  wave-writer.cc
 )
-
-if(SHERPA_ONNX_ENABLE_TTS)
-  list(APPEND sources
-    offline-tts.cc
-  )
-endif()
-
-if(SHERPA_ONNX_ENABLE_SPEAKER_DIARIZATION)
-  list(APPEND sources
-    offline-speaker-diarization.cc
-  )
-endif()
 
 add_library(sherpa-onnx-jni SHARED ${sources})
 

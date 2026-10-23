@@ -12,18 +12,8 @@ data class SileroVadModelConfig(
     var maxSpeechDuration: Float = 5.0F,
 )
 
-data class TenVadModelConfig(
-    var model: String = "",
-    var threshold: Float = 0.5F,
-    var minSilenceDuration: Float = 0.25F,
-    var minSpeechDuration: Float = 0.25F,
-    var windowSize: Int = 256,
-    var maxSpeechDuration: Float = 5.0F,
-)
-
 data class VadModelConfig(
     var sileroVadModelConfig: SileroVadModelConfig = SileroVadModelConfig(),
-    var tenVadModelConfig: TenVadModelConfig = TenVadModelConfig(),
     var sampleRate: Int = 16000,
     var numThreads: Int = 1,
     var provider: String = "cpu",
@@ -105,48 +95,4 @@ class Vad(
             System.loadLibrary("sherpa-onnx-jni")
         }
     }
-}
-
-// Please visit
-// https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/silero_vad.onnx
-// to download silero_vad.onnx
-// and put it inside the assets/
-// directory
-//
-// For ten-vad, please use
-// https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/ten-vad.onnx
-//
-fun getVadModelConfig(type: Int): VadModelConfig? {
-    when (type) {
-        0 -> {
-            return VadModelConfig(
-                sileroVadModelConfig = SileroVadModelConfig(
-                    model = "silero_vad.onnx",
-                    threshold = 0.5F,
-                    minSilenceDuration = 0.25F,
-                    minSpeechDuration = 0.25F,
-                    windowSize = 512,
-                ),
-                sampleRate = 16000,
-                numThreads = 1,
-                provider = "cpu",
-            )
-        }
-
-        1 -> {
-            return VadModelConfig(
-                tenVadModelConfig = TenVadModelConfig(
-                    model = "ten-vad.onnx",
-                    threshold = 0.5F,
-                    minSilenceDuration = 0.25F,
-                    minSpeechDuration = 0.25F,
-                    windowSize = 256,
-                ),
-                sampleRate = 16000,
-                numThreads = 1,
-                provider = "cpu",
-            )
-        }
-    }
-    return null
 }

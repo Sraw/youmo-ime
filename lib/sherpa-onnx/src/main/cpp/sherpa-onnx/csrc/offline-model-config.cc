@@ -13,26 +13,6 @@ namespace sherpa_onnx {
 
 void OfflineModelConfig::Register(ParseOptions *po) {
   transducer.Register(po);
-  paraformer.Register(po);
-  nemo_ctc.Register(po);
-  whisper.Register(po);
-  fire_red_asr.Register(po);
-  tdnn.Register(po);
-  zipformer_ctc.Register(po);
-  wenet_ctc.Register(po);
-  sense_voice.Register(po);
-  moonshine.Register(po);
-  dolphin.Register(po);
-  canary.Register(po);
-  cohere_transcribe.Register(po);
-  omnilingual.Register(po);
-  funasr_nano.Register(po);
-  medasr.Register(po);
-  fire_red_asr_ctc.Register(po);
-  qwen3_asr.Register(po);
-
-  po->Register("telespeech-ctc", &telespeech_ctc,
-               "Path to model.onnx for telespeech ctc");
 
   po->Register("tokens", &tokens, "Path to tokens.txt");
 
@@ -47,9 +27,7 @@ void OfflineModelConfig::Register(ParseOptions *po) {
 
   po->Register("model-type", &model_type,
                "Specify it to reduce model initialization time. "
-               "Valid values are: transducer, paraformer, nemo_ctc, whisper, "
-               "tdnn, zipformer2_ctc, telespeech_ctc, fire_red_asr."
-               "All other values lead to loading the model twice.");
+               "Valid values are: transducer (youmo: the only family built).");
   po->Register(
       "modeling-unit", &modeling_unit,
       "The modeling unit of the model, commonly used units are bpe, "
@@ -79,32 +57,11 @@ bool OfflineModelConfig::Validate() const {
       SHERPA_ONNX_LOGE("num_threads should be > 0. Given %d", num_threads);
       return false;
     }
-    if (!sense_voice.model.empty() && (EndsWith(sense_voice.model, ".rknn"))) {
-      SHERPA_ONNX_LOGE(
-          "--provider is %s, which is not rknn, but you pass a rknn model "
-          "filename. model: '%s'",
-          provider.c_str(), sense_voice.model.c_str());
-      return false;
-    }
   }
 
-  if (provider == "rknn") {
-    if (!sense_voice.model.empty() && (EndsWith(sense_voice.model, ".onnx"))) {
-      SHERPA_ONNX_LOGE(
-          "--provider is rknn, but you pass an onnx model "
-          "filename. model: '%s'",
-          sense_voice.model.c_str());
-      return false;
-    }
-  }
-
-  // For FunASR-nano and Qwen3-ASR, tokens file is not required (tokenizer is
-  // loaded from directory). Check tokens only for other model types.
-  if (funasr_nano.encoder_adaptor.empty() && qwen3_asr.conv_frontend.empty()) {
-    if (!FileExists(tokens)) {
-      SHERPA_ONNX_LOGE("tokens: '%s' does not exist", tokens.c_str());
-      return false;
-    }
+  if (!FileExists(tokens)) {
+    SHERPA_ONNX_LOGE("tokens: '%s' does not exist", tokens.c_str());
+    return false;
   }
 
   if (!modeling_unit.empty() &&
@@ -114,83 +71,6 @@ bool OfflineModelConfig::Validate() const {
       SHERPA_ONNX_LOGE("bpe_vocab: '%s' does not exist", bpe_vocab.c_str());
       return false;
     }
-  }
-
-  if (!paraformer.model.empty()) {
-    return paraformer.Validate();
-  }
-
-  if (!nemo_ctc.model.empty()) {
-    return nemo_ctc.Validate();
-  }
-
-  if (!whisper.encoder.empty()) {
-    return whisper.Validate();
-  }
-
-  if (!fire_red_asr.encoder.empty()) {
-    return fire_red_asr.Validate();
-  }
-
-  if (!tdnn.model.empty()) {
-    return tdnn.Validate();
-  }
-
-  if (!zipformer_ctc.model.empty()) {
-    return zipformer_ctc.Validate();
-  }
-
-  if (!wenet_ctc.model.empty()) {
-    return wenet_ctc.Validate();
-  }
-
-  if (!sense_voice.model.empty() ||
-      !sense_voice.qnn_config.context_binary.empty()) {
-    return sense_voice.Validate();
-  }
-
-  if (!moonshine.encoder.empty() ||
-      !moonshine.decoder.empty() ||
-      !moonshine.qnn_config.context_binary.empty()) {
-    return moonshine.Validate();
-  }
-
-  if (!dolphin.model.empty()) {
-    return dolphin.Validate();
-  }
-
-  if (!canary.encoder.empty()) {
-    return canary.Validate();
-  }
-
-  if (!cohere_transcribe.encoder.empty()) {
-    return cohere_transcribe.Validate();
-  }
-
-  if (!omnilingual.model.empty()) {
-    return omnilingual.Validate();
-  }
-
-  if (!funasr_nano.encoder_adaptor.empty()) {
-    return funasr_nano.Validate();
-  }
-
-  if (!medasr.model.empty()) {
-    return medasr.Validate();
-  }
-
-  if (!fire_red_asr_ctc.model.empty()) {
-    return fire_red_asr_ctc.Validate();
-  }
-
-  if (!qwen3_asr.conv_frontend.empty()) {
-    return qwen3_asr.Validate();
-  }
-
-  if (!telespeech_ctc.empty() && !FileExists(telespeech_ctc)) {
-    SHERPA_ONNX_LOGE("telespeech_ctc: '%s' does not exist",
-                     telespeech_ctc.c_str());
-    return false;
   }
 
   if (IsQnnTransducerArtifact(transducer) && provider != "qnn") {
@@ -229,24 +109,6 @@ std::string OfflineModelConfig::ToString() const {
 
   os << "OfflineModelConfig(";
   os << "transducer=" << transducer.ToString() << ", ";
-  os << "paraformer=" << paraformer.ToString() << ", ";
-  os << "nemo_ctc=" << nemo_ctc.ToString() << ", ";
-  os << "whisper=" << whisper.ToString() << ", ";
-  os << "fire_red_asr=" << fire_red_asr.ToString() << ", ";
-  os << "tdnn=" << tdnn.ToString() << ", ";
-  os << "zipformer_ctc=" << zipformer_ctc.ToString() << ", ";
-  os << "wenet_ctc=" << wenet_ctc.ToString() << ", ";
-  os << "sense_voice=" << sense_voice.ToString() << ", ";
-  os << "moonshine=" << moonshine.ToString() << ", ";
-  os << "dolphin=" << dolphin.ToString() << ", ";
-  os << "canary=" << canary.ToString() << ", ";
-  os << "cohere_transcribe=" << cohere_transcribe.ToString() << ", ";
-  os << "omnilingual=" << omnilingual.ToString() << ", ";
-  os << "funasr_nano=" << funasr_nano.ToString() << ", ";
-  os << "medasr=" << medasr.ToString() << ", ";
-  os << "fire_red_asr_ctc=" << fire_red_asr_ctc.ToString() << ", ";
-  os << "qwen3_asr=" << qwen3_asr.ToString() << ", ";
-  os << "telespeech_ctc=\"" << telespeech_ctc << "\", ";
   os << "tokens=\"" << tokens << "\", ";
   os << "num_threads=" << num_threads << ", ";
   os << "debug=" << (debug ? "True" : "False") << ", ";

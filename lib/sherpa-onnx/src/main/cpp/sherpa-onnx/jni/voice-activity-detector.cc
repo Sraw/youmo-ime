@@ -41,30 +41,6 @@ static VadModelConfig GetVadModelConfig(JNIEnv *env, jobject config, bool *ok) {
                              maxSpeechDuration, silero_vad_config_cls,
                              silero_vad_config);
 
-  fid = env->GetFieldID(cls, "tenVadModelConfig",
-                        "Lcom/k2fsa/sherpa/onnx/TenVadModelConfig;");
-  jobject ten_vad_config = env->GetObjectField(config, fid);
-  jclass ten_vad_config_cls = env->GetObjectClass(ten_vad_config);
-
-  SHERPA_ONNX_JNI_READ_STRING(ans.ten_vad.model, model, ten_vad_config_cls,
-                              ten_vad_config);
-
-  SHERPA_ONNX_JNI_READ_FLOAT(ans.ten_vad.threshold, threshold,
-                             ten_vad_config_cls, ten_vad_config);
-
-  SHERPA_ONNX_JNI_READ_FLOAT(ans.ten_vad.min_silence_duration,
-                             minSilenceDuration, ten_vad_config_cls,
-                             ten_vad_config);
-
-  SHERPA_ONNX_JNI_READ_FLOAT(ans.ten_vad.min_speech_duration, minSpeechDuration,
-                             ten_vad_config_cls, ten_vad_config);
-
-  SHERPA_ONNX_JNI_READ_INT(ans.ten_vad.window_size, windowSize,
-                           ten_vad_config_cls, ten_vad_config);
-
-  SHERPA_ONNX_JNI_READ_FLOAT(ans.ten_vad.max_speech_duration, maxSpeechDuration,
-                             ten_vad_config_cls, ten_vad_config);
-
   SHERPA_ONNX_JNI_READ_INT(ans.sample_rate, sampleRate, cls, config);
 
   SHERPA_ONNX_JNI_READ_INT(ans.num_threads, numThreads, cls, config);

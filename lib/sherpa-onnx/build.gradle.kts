@@ -31,15 +31,8 @@ android {
                     // the pinned, SHA-256 checked onnxruntime, not one found on the build machine
                     "-DSHERPA_ONNX_USE_PRE_INSTALLED_ONNXRUNTIME_IF_AVAILABLE=OFF",
                     "-DSHERPA_ONNX_ENABLE_JNI=ON",
-                    "-DSHERPA_ONNX_ENABLE_C_API=OFF",
-                    "-DSHERPA_ONNX_ENABLE_TTS=OFF",
-                    "-DSHERPA_ONNX_ENABLE_SPEAKER_DIARIZATION=OFF",
                     "-DSHERPA_ONNX_ENABLE_BINARY=OFF",
-                    "-DSHERPA_ONNX_ENABLE_PYTHON=OFF",
-                    "-DSHERPA_ONNX_ENABLE_TESTS=OFF",
                     "-DSHERPA_ONNX_ENABLE_CHECK=OFF",
-                    "-DSHERPA_ONNX_ENABLE_PORTAUDIO=OFF",
-                    "-DSHERPA_ONNX_ENABLE_WEBSOCKET=OFF",
                 )
                 targets("sherpa-onnx-jni")
             }

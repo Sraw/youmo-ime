@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # The C++ unit tests of what we changed in sherpa-onnx, run on this machine rather than a phone:
-# googletest and simple-sentencepiece (as upstream's cmake/googletest.cmake and
-# cmake/simple-sentencepiece.cmake pin them, SHA-256 checked) and the few sources they need,
+# googletest (the version upstream's cmake/googletest.cmake pinned) and simple-sentencepiece
+# (as cmake/simple-sentencepiece.cmake pins it), SHA-256 checked and the few sources they need,
 # compiled with the host's g++. Usage: lib/sherpa-onnx/host-test.sh
 set -euo pipefail
 here=$(cd "$(dirname "$0")" && pwd)
