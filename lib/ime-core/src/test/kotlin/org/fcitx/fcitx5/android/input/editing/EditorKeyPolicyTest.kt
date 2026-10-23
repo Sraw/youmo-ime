@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.input.editing
 
+import org.fcitx.fcitx5.android.assertRows
 import org.fcitx.fcitx5.android.input.editing.EditorKeyPolicy.ArrowAction
 import org.fcitx.fcitx5.android.input.editing.EditorKeyPolicy.Direction
 import org.fcitx.fcitx5.android.input.editing.EditorKeyPolicy.ReturnAction
@@ -68,19 +69,19 @@ class EditorKeyPolicyTest {
     // region arrows
 
     @Test
-    fun anArrowMovesACollapsedCursorByOne() {
-        val t = EditorTraits()
-        assertEquals(ArrowAction.MoveCursor(3), EditorKeyPolicy.onArrow(t, Direction.Left, 4, 4))
-        assertEquals(ArrowAction.MoveCursor(5), EditorKeyPolicy.onArrow(t, Direction.Right, 4, 4))
-    }
-
-    /** On a selection an arrow collapses to the side it points at, and goes no further. */
-    @Test
-    fun anArrowCollapsesASelectionToThatSide() {
-        val t = EditorTraits()
-        assertEquals(ArrowAction.MoveCursor(2), EditorKeyPolicy.onArrow(t, Direction.Left, 2, 6))
-        assertEquals(ArrowAction.MoveCursor(6), EditorKeyPolicy.onArrow(t, Direction.Right, 2, 6))
-    }
+    fun anArrowMovesOrCollapses() = assertRows(
+        "an arrow moves a collapsed cursor by one" to {
+            val t = EditorTraits()
+            assertEquals(ArrowAction.MoveCursor(3), EditorKeyPolicy.onArrow(t, Direction.Left, 4, 4))
+            assertEquals(ArrowAction.MoveCursor(5), EditorKeyPolicy.onArrow(t, Direction.Right, 4, 4))
+        },
+        // On a selection an arrow collapses to the side it points at, and goes no further.
+        "an arrow collapses a selection to that side" to {
+            val t = EditorTraits()
+            assertEquals(ArrowAction.MoveCursor(2), EditorKeyPolicy.onArrow(t, Direction.Left, 2, 6))
+            assertEquals(ArrowAction.MoveCursor(6), EditorKeyPolicy.onArrow(t, Direction.Right, 2, 6))
+        },
+    )
 
     /** At the start the target is -1, which the editor ignores. Pinned so a change is deliberate. */
     @Test

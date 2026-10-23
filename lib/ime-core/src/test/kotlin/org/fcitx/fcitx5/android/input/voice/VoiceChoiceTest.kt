@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.input.voice
 
+import org.fcitx.fcitx5.android.assertRows
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -44,9 +45,32 @@ class VoiceChoiceTest {
     }
 
     @Test
-    fun theFirstWithoutTheBlockedWordStandingIsTyped() {
-        assertEquals("开放了", choose(heard("开饭了", "开放了"), blocked, FakeLanguage(words)))
-    }
+    fun whatIsTypedInsteadOfABlockedWord() = assertRows(
+        "the first without the blocked word standing is typed" to {
+            assertEquals("开放了", choose(heard("开饭了", "开放了"), blocked, FakeLanguage(words)))
+        },
+        "before the search again one below with the word at all is passed over" to {
+            // 开饭啦 below the first, though not split: passed over for 开放了
+            assertEquals("开放了", choose(heard("开饭了", "开饭啦", "开放了"), blocked, FakeLanguage(mapOf("开饭了" to intArrayOf(0, 2, 3)))))
+        },
+        "the search again with it in none is typed" to {
+            assertEquals("开放了", choose(heard("开饭了"), blocked, FakeLanguage(words)) { heard("开放了") })
+        },
+        "the search again still with it in each types its best" to {
+            val again = VoiceChoice.Heard(listOf("开饭啦", "开饭了"), FloatArray(0), "开饭啦")
+            assertEquals("开饭啦", choose(heard("开饭了"), blocked, FakeLanguage(words)) { again })
+        },
+        "the search again's best is typed as the recognizer writes it whichever others have the word" to {
+            // a lower hypothesis with it standing: its best still typed as written, not as its first hypothesis
+            val again = VoiceChoice.Heard(listOf("开放了", "开饭了"), FloatArray(0), "开放了。")
+            assertEquals("开放了。", choose(heard("开饭了"), blocked, FakeLanguage(words)) { again })
+        },
+        "the search again's lower without it standing beats its best with it" to {
+            // the search has nothing after it: 打开饭盒 (开饭 across two words) over 开饭啦 typed with it
+            val split = words + ("打开饭盒" to intArrayOf(0, 2, 4))
+            assertEquals("打开饭盒", choose(heard("开饭了"), blocked, FakeLanguage(split)) { heard("开饭啦", "打开饭盒") })
+        },
+    )
 
     @Test
     fun eachWithItTheSearchAgainsFirstWithoutItIsTyped() {
@@ -60,24 +84,12 @@ class VoiceChoiceTest {
     }
 
     @Test
-    fun theSearchAgainWithItInNoneIsTyped() {
-        assertEquals("开放了", choose(heard("开饭了"), blocked, FakeLanguage(words)) { heard("开放了") })
-    }
-
-    @Test
     fun theSearchAgainWithItInNoneIsTypedAsTheRecognizerWritesIt() {
         // its text, where it is not its first hypothesis as written
         val again = VoiceChoice.Heard(listOf("开放了"), FloatArray(0), "开放了。")
         assertEquals("开放了。", choose(heard("开饭了"), blocked, FakeLanguage(words)) { again })
         // and with no hypotheses, only its text
         assertEquals("开放啦", choose(heard("开饭了"), blocked, FakeLanguage(words)) { VoiceChoice.Heard(emptyList(), FloatArray(0), "开放啦") })
-    }
-
-    @Test
-    fun theSearchAgainsBestIsTypedAsTheRecognizerWritesItWhicheverOthersHaveTheWord() {
-        // a lower hypothesis with it standing: its best still typed as written, not as its first hypothesis
-        val again = VoiceChoice.Heard(listOf("开放了", "开饭了"), FloatArray(0), "开放了。")
-        assertEquals("开放了。", choose(heard("开饭了"), blocked, FakeLanguage(words)) { again })
     }
 
     @Test
@@ -88,25 +100,6 @@ class VoiceChoiceTest {
         val heard = VoiceChoice.Heard(listOf("开放了", "开饭了", "开发了"), floatArrayOf(0f, 0f, 0f), "开放了")
         assertEquals("开饭了", choose(heard, emptyList(), language))
         assertEquals("开放了", choose(heard, blocked, language))
-    }
-
-    @Test
-    fun theSearchAgainsLowerWithoutItStandingBeatsItsBestWithIt() {
-        // the search has nothing after it: 打开饭盒 (开饭 across two words) over 开饭啦 typed with it
-        val split = words + ("打开饭盒" to intArrayOf(0, 2, 4))
-        assertEquals("打开饭盒", choose(heard("开饭了"), blocked, FakeLanguage(split)) { heard("开饭啦", "打开饭盒") })
-    }
-
-    @Test
-    fun beforeTheSearchAgainOneBelowWithTheWordAtAllIsPassedOver() {
-        // 开饭啦 below the first, though not split: passed over for 开放了
-        assertEquals("开放了", choose(heard("开饭了", "开饭啦", "开放了"), blocked, FakeLanguage(mapOf("开饭了" to intArrayOf(0, 2, 3)))))
-    }
-
-    @Test
-    fun theSearchAgainStillWithItInEachTypesItsBest() {
-        val again = VoiceChoice.Heard(listOf("开饭啦", "开饭了"), FloatArray(0), "开饭啦")
-        assertEquals("开饭啦", choose(heard("开饭了"), blocked, FakeLanguage(words)) { again })
     }
 
     private fun heard(vararg nbest: String) = VoiceChoice.Heard(nbest.toList(), FloatArray(0), nbest.first())

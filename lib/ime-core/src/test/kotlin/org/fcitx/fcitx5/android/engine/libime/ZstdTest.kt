@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.engine.libime
 
+import org.fcitx.fcitx5.android.assertRows
 import org.fcitx.fcitx5.android.engine.data.DataFormatException
 import org.fcitx.fcitx5.android.engine.libime.Fixtures.resource
 import org.fcitx.fcitx5.android.engine.libime.Fixtures.sha256
@@ -27,41 +28,28 @@ class ZstdTest {
     }
 
     @Test
-    fun textAsTheBestLevelPacksIt() {
-        // over 128 KiB: two blocks, Huffman literals in four streams, tables carried between them
-        assertDigest(TEXT, 140000, decompressed("text.19.zst"))
-    }
-
-    @Test
-    fun textAsTheFastestLevelPacksIt() {
-        assertDigest(TEXT, 140000, decompressed("text.fast.zst"))
-    }
-
-    @Test
-    fun textWithASmallWindow() {
-        // short offsets over and over: the repeated ones
-        assertDigest(TEXT, 140000, decompressed("text.window.zst"))
-    }
-
-    @Test
-    fun randomBytesAreKeptRaw() {
-        assertDigest("91382123a8e56dcc00ea9bf9080a94a30e6be48a26e7fdc1439f2b977c2bd47b", 1000, decompressed("random.zst"))
-    }
-
-    @Test
-    fun zerosAreOneByteRepeated() {
-        assertArrayEquals(ByteArray(100000), decompressed("zeros.zst"))
-    }
-
-    @Test
-    fun framesFollowingEachOtherAreJoined() {
-        assertDigest("1d2580f0c17ed2408c85b43cfbec5ff708cd667353f2d63daaf755394f1dd15b", 2000, decompressed("two-frames.zst"))
-    }
-
-    @Test
-    fun aFrameWithoutItsChecksum() {
-        assertDigest("31e55702c0cf3be8bb8e3298cdb8a9be64cdbeaf74f886ca906903a03a2ff20f", 1000, decompressed("unchecked.zst"))
-    }
+    fun eachFrameDecompressesToWhatWasPacked() = assertRows(
+        "text as the best level packs it" to {
+            // over 128 KiB: two blocks, Huffman literals in four streams, tables carried between them
+            assertDigest(TEXT, 140000, decompressed("text.19.zst"))
+        },
+        "text as the fastest level packs it" to {
+            assertDigest(TEXT, 140000, decompressed("text.fast.zst"))
+        },
+        "text with a small window" to {
+            // short offsets over and over: the repeated ones
+            assertDigest(TEXT, 140000, decompressed("text.window.zst"))
+        },
+        "random bytes are kept raw" to {
+            assertDigest("91382123a8e56dcc00ea9bf9080a94a30e6be48a26e7fdc1439f2b977c2bd47b", 1000, decompressed("random.zst"))
+        },
+        "frames following each other are joined" to {
+            assertDigest("1d2580f0c17ed2408c85b43cfbec5ff708cd667353f2d63daaf755394f1dd15b", 2000, decompressed("two-frames.zst"))
+        },
+        "a frame without its checksum" to {
+            assertDigest("31e55702c0cf3be8bb8e3298cdb8a9be64cdbeaf74f886ca906903a03a2ff20f", 1000, decompressed("unchecked.zst"))
+        },
+    )
 
     @Test
     fun skippableFramesAreSkipped() {
@@ -115,7 +103,8 @@ class ZstdTest {
     @Test
     fun moreThanTheLimitFails() {
         assertThrows(DataFormatException::class.java) { Zstd.decompress(resource("zeros.zst"), limit = 99999) }
-        assertEquals(100000, Zstd.decompress(resource("zeros.zst"), limit = 100000).size)
+        // zeros are one byte repeated
+        assertArrayEquals(ByteArray(100000), Zstd.decompress(resource("zeros.zst"), limit = 100000))
     }
 
     @Test

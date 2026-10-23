@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.engine.learn
 
+import org.fcitx.fcitx5.android.assertRows
 import org.fcitx.fcitx5.android.engine.learn.CommitRows.Pick
 import org.fcitx.fcitx5.android.engine.learn.CommitRows.Shown
 import org.junit.Assert.assertEquals
@@ -57,11 +58,21 @@ class CommitRowsTest {
     }
 
     @Test
-    fun aWordPickedAloneIsOneRowOfEveryLevel() {
-        val shown = Shown(0, listOf("你"), intArrayOf(2))
-        val pick = Pick(0, listOf(word("拟", "ni")), intArrayOf(2), 'B', "你", shown)
-        assertEquals(listOf("ni||拟|B|corrected|7"), rows("ni", "", pick))
-    }
+    fun aSinglePickIsOneRow() = assertRows(
+        "a word picked alone is one row of every level" to {
+            val shown = Shown(0, listOf("你"), intArrayOf(2))
+            val pick = Pick(0, listOf(word("拟", "ni")), intArrayOf(2), 'B', "你", shown)
+            assertEquals(listOf("ni||拟|B|corrected|7"), rows("ni", "", pick))
+        },
+        "no reference is no correction" to {
+            val pick = Pick(0, listOf(word("nihao")), intArrayOf(5), 'F', "", null)
+            assertEquals(listOf("nihao||nihao|F|used|3"), rows("nihao", "", pick))
+        },
+        "a pick of syllables taken is h" to {
+            val pick = Pick(0, listOf(word("你", "ni")), intArrayOf(2), 'H', "拟", null)
+            assertEquals(listOf("ni||你|H|corrected|3"), rows("ni", "", pick))
+        },
+    )
 
     @Test
     fun theFirstPickedIsUsedEverywhere() {
@@ -82,17 +93,5 @@ class CommitRowsTest {
             listOf("ni||拟|C|corrected|1", "zai|拟|再|A|used|1", "nizai||拟再|C|corrected|2"),
             rows("nizai", "", ni, zai),
         )
-    }
-
-    @Test
-    fun noReferenceIsNoCorrection() {
-        val pick = Pick(0, listOf(word("nihao")), intArrayOf(5), 'F', "", null)
-        assertEquals(listOf("nihao||nihao|F|used|3"), rows("nihao", "", pick))
-    }
-
-    @Test
-    fun aPickOfSyllablesTakenIsH() {
-        val pick = Pick(0, listOf(word("你", "ni")), intArrayOf(2), 'H', "拟", null)
-        assertEquals(listOf("ni||你|H|corrected|3"), rows("ni", "", pick))
     }
 }

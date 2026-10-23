@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.input.editing
 
+import org.fcitx.fcitx5.android.assertRows
 import org.fcitx.fcitx5.android.core.CoreLog
 import org.fcitx.fcitx5.android.core.FormattedText
 import org.junit.Assert.assertEquals
@@ -238,28 +239,26 @@ class EditingSessionTest {
     }
 
     @Test
-    fun extendingTheSelectionToTheLeft() {
-        val (s, _) = session("abcdef", cursor = 4)
-        s.selection.resetTo(4)
-        s.applySelectionOffset(-2, 0)
-        assertTrue(s.selection.latest.rangeEquals(2, 4))
-    }
-
-    @Test
-    fun movingBothEndsShiftsTheWholeSelection() {
-        val (s, _) = session("abcdef", cursor = 0)
-        s.selection.resetTo(1, 3)
-        s.applySelectionOffset(1, 1)
-        assertTrue(s.selection.latest.rangeEquals(2, 4))
-    }
-
-    @Test
-    fun theStartIsClampedAtTheBeginningOfTheBuffer() {
-        val (s, _) = session("abc", cursor = 1)
-        s.selection.resetTo(1)
-        s.applySelectionOffset(-5, 0)
-        assertTrue("clamped to 0 rather than going negative", s.selection.latest.rangeEquals(0, 1))
-    }
+    fun aSelectionOffsetMovesItsEnds() = assertRows(
+        "extending the selection to the left" to {
+            val (s, _) = session("abcdef", cursor = 4)
+            s.selection.resetTo(4)
+            s.applySelectionOffset(-2, 0)
+            assertTrue(s.selection.latest.rangeEquals(2, 4))
+        },
+        "the start is clamped at the beginning of the buffer" to {
+            val (s, _) = session("abc", cursor = 1)
+            s.selection.resetTo(1)
+            s.applySelectionOffset(-5, 0)
+            assertTrue("clamped to 0 rather than going negative", s.selection.latest.rangeEquals(0, 1))
+        },
+        "moving both ends shifts the whole selection" to {
+            val (s, _) = session("abcdef", cursor = 0)
+            s.selection.resetTo(1, 3)
+            s.applySelectionOffset(1, 1)
+            assertTrue(s.selection.latest.rangeEquals(2, 4))
+        },
+    )
 
     /** An offset that would turn the range inside out is dropped, not applied backwards. */
     @Test
@@ -306,29 +305,29 @@ class EditingSessionTest {
     // region deleteSurrounding
 
     @Test
-    fun deletingBeforeTheCursorMovesThePredictedCursorBack() {
-        val (s, e) = session("abcdef", cursor = 4)
-        s.selection.resetTo(4)
-        e.reportSelection(4)
+    fun deletingAroundTheCursorPredictsWhereItGoes() = assertRows(
+        "deleting before the cursor moves the predicted cursor back" to {
+            val (s, e) = session("abcdef", cursor = 4)
+            s.selection.resetTo(4)
+            e.reportSelection(4)
 
-        s.deleteSurrounding(before = 2, after = 0, inCodePoints = false)
+            s.deleteSurrounding(before = 2, after = 0, inCodePoints = false)
 
-        assertEquals("abef", e.text)
-        assertTrue(s.selection.latest.rangeEquals(2))
-    }
+            assertEquals("abef", e.text)
+            assertTrue(s.selection.latest.rangeEquals(2))
+        },
+        // Deleting after the cursor does not move it, so nothing is predicted.
+        "deleting after the cursor leaves the prediction alone" to {
+            val (s, e) = session("abcdef", cursor = 2)
+            s.selection.resetTo(2)
+            e.reportSelection(2)
 
-    /** Deleting after the cursor does not move it, so nothing is predicted. */
-    @Test
-    fun deletingAfterTheCursorLeavesThePredictionAlone() {
-        val (s, e) = session("abcdef", cursor = 2)
-        s.selection.resetTo(2)
-        e.reportSelection(2)
+            s.deleteSurrounding(before = 0, after = 2, inCodePoints = false)
 
-        s.deleteSurrounding(before = 0, after = 2, inCodePoints = false)
-
-        assertEquals("abef", e.text)
-        assertTrue(s.selection.latest.rangeEquals(2))
-    }
+            assertEquals("abef", e.text)
+            assertTrue(s.selection.latest.rangeEquals(2))
+        },
+    )
 
     /**
      * One press should remove a whole emoji, not half a surrogate pair. The session's job is to
@@ -769,19 +768,19 @@ class EditingSessionTest {
     }
 
     @Test
-    fun aReportedComposingSpanIsLeftAlone() {
-        val (s, e) = session("ni", cursor = 2)
-        s.compose("ni", start = 0)
-        assertEquals(EditingSession.CursorUpdate.None, s.report(2, composing = 0 to 2))
-        assertTrue(e.calls.isEmpty())
-    }
-
-    @Test
-    fun nothingIsRestoredWhenThereIsNoComposition() {
-        val (s, e) = session("ni", cursor = 2)
-        s.report(2)
-        assertTrue(e.calls.isEmpty())
-    }
+    fun aReportThatNeedsNoRestoringEditsNothing() = assertRows(
+        "a reported composing span is left alone" to {
+            val (s, e) = session("ni", cursor = 2)
+            s.compose("ni", start = 0)
+            assertEquals(EditingSession.CursorUpdate.None, s.report(2, composing = 0 to 2))
+            assertTrue(e.calls.isEmpty())
+        },
+        "nothing is restored when there is no composition" to {
+            val (s, e) = session("ni", cursor = 2)
+            s.report(2)
+            assertTrue(e.calls.isEmpty())
+        },
+    )
 
     /** An InputFilter may also have changed the text, so the old range means nothing then. */
     @Test
@@ -793,19 +792,23 @@ class EditingSessionTest {
     }
 
     @Test
-    fun theUserMovingTheCursorWithNothingComposedResetsFcitx() {
-        val (s, _) = session("abcdef", cursor = 6)
-        assertEquals(EditingSession.CursorUpdate.ResetIfNotEmpty, s.report(2))
-        assertTrue("the report is the new truth", s.selection.latest.rangeEquals(2))
-    }
-
-    // the engine is told as for a cursor: what English committed may no longer be before it
-    @Test
-    fun theUserSelectingWithNothingComposedResetsFcitx() {
-        val (s, _) = session("hello world", cursor = 11)
-        assertEquals(EditingSession.CursorUpdate.ResetIfNotEmpty, s.report(6, 11))
-        assertTrue(s.selection.latest.rangeEquals(6, 11))
-    }
+    fun withNothingComposedACursorReportResetsFcitx() = assertRows(
+        "the user moving the cursor with nothing composed resets fcitx" to {
+            val (s, _) = session("abcdef", cursor = 6)
+            assertEquals(EditingSession.CursorUpdate.ResetIfNotEmpty, s.report(2))
+            assertTrue("the report is the new truth", s.selection.latest.rangeEquals(2))
+        },
+        // the engine is told as for a cursor: what English committed may no longer be before it
+        "the user selecting with nothing composed resets fcitx" to {
+            val (s, _) = session("hello world", cursor = 11)
+            assertEquals(EditingSession.CursorUpdate.ResetIfNotEmpty, s.report(6, 11))
+            assertTrue(s.selection.latest.rangeEquals(6, 11))
+        },
+        "the ignore system cursor setting still resets fcitx with nothing composed" to {
+            val (s, _) = session("abc", cursor = 3)
+            assertEquals(EditingSession.CursorUpdate.ResetIfNotEmpty, s.report(1, ignore = true))
+        },
+    )
 
     @Test
     fun anUnexpectedSelectionIsTrackedButLeavesTheCompositionAlone() {
@@ -852,12 +855,6 @@ class EditingSessionTest {
         s.compose("nihao", start = 2)
         assertEquals(EditingSession.CursorUpdate.FocusOutIn, s.report(0, ignore = true))
         assertEquals(listOf("finishComposingText()"), e.calls)
-    }
-
-    @Test
-    fun theIgnoreSystemCursorSettingStillResetsFcitxWithNothingComposed() {
-        val (s, _) = session("abc", cursor = 3)
-        assertEquals(EditingSession.CursorUpdate.ResetIfNotEmpty, s.report(1, ignore = true))
     }
 
     @Test

@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.input.editing
 
+import org.fcitx.fcitx5.android.assertRows
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
@@ -15,18 +16,33 @@ class CodePointsTest {
     private val low = wave[1]
 
     @Test
-    fun plainTextIsOneUnitPerCodePoint() {
-        assertEquals(2, CodePoints.lengthOfLast("abcd", 2))
-        assertEquals(2, CodePoints.lengthOfFirst("abcd", 2))
-    }
-
-    @Test
-    fun aSurrogatePairIsTwoUnits() {
-        assertEquals(2, CodePoints.lengthOfLast("a$wave", 1))
-        assertEquals(2, CodePoints.lengthOfFirst("${wave}a", 1))
-        assertEquals(3, CodePoints.lengthOfLast("a$wave", 2))
-        assertEquals(3, CodePoints.lengthOfFirst("${wave}a", 2))
-    }
+    fun eachCodePointCountedIsItsUnits() = assertRows(
+        "plain text is one unit per code point" to {
+            assertEquals(2, CodePoints.lengthOfLast("abcd", 2))
+            assertEquals(2, CodePoints.lengthOfFirst("abcd", 2))
+        },
+        "a surrogate pair is two units" to {
+            assertEquals(2, CodePoints.lengthOfLast("a$wave", 1))
+            assertEquals(2, CodePoints.lengthOfFirst("${wave}a", 1))
+            assertEquals(3, CodePoints.lengthOfLast("a$wave", 2))
+            assertEquals(3, CodePoints.lengthOfFirst("${wave}a", 2))
+        },
+        "asking for more than there is gives the whole text" to {
+            assertEquals(3, CodePoints.lengthOfLast("a$wave", 10))
+            assertEquals(3, CodePoints.lengthOfFirst("a$wave", 10))
+            assertEquals(0, CodePoints.lengthOfLast("", 1))
+            assertEquals(0, CodePoints.lengthOfFirst("", 1))
+        },
+        "zero code points is zero units" to {
+            assertEquals(0, CodePoints.lengthOfLast("a$wave", 0))
+            assertEquals(0, CodePoints.lengthOfFirst("a$wave", 0))
+        },
+        // Only the code points counted matter: malformed text further away is never reached.
+        "an unpaired surrogate beyond the count does not matter" to {
+            assertEquals(1, CodePoints.lengthOfLast("${low}ab", 1))
+            assertEquals(1, CodePoints.lengthOfFirst("ab$high", 1))
+        },
+    )
 
     @Test
     fun mixedTextIsMeasuredPerCodePoint() {
@@ -34,20 +50,6 @@ class CodePointsTest {
         assertEquals(5, CodePoints.lengthOfLast(text, 3))
         assertEquals(3, CodePoints.lengthOfLast(text, 2))
         assertEquals(3, CodePoints.lengthOfFirst(text, 2))
-    }
-
-    @Test
-    fun askingForMoreThanThereIsGivesTheWholeText() {
-        assertEquals(3, CodePoints.lengthOfLast("a$wave", 10))
-        assertEquals(3, CodePoints.lengthOfFirst("a$wave", 10))
-        assertEquals(0, CodePoints.lengthOfLast("", 1))
-        assertEquals(0, CodePoints.lengthOfFirst("", 1))
-    }
-
-    @Test
-    fun zeroCodePointsIsZeroUnits() {
-        assertEquals(0, CodePoints.lengthOfLast("a$wave", 0))
-        assertEquals(0, CodePoints.lengthOfFirst("a$wave", 0))
     }
 
     /**
@@ -64,12 +66,5 @@ class CodePointsTest {
         assertNull("reversed order is not a pair", CodePoints.lengthOfLast("$low$high", 1))
         assertNull("a letter then a low surrogate is not a pair", CodePoints.lengthOfLast("a$low", 1))
         assertNull("a high surrogate then a letter is not a pair", CodePoints.lengthOfFirst("${high}a", 1))
-    }
-
-    /** Only the code points counted matter: malformed text further away is never reached. */
-    @Test
-    fun anUnpairedSurrogateBeyondTheCountDoesNotMatter() {
-        assertEquals(1, CodePoints.lengthOfLast("${low}ab", 1))
-        assertEquals(1, CodePoints.lengthOfFirst("ab$high", 1))
     }
 }

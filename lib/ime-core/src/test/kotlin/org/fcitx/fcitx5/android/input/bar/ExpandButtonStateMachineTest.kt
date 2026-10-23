@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.input.bar
 
+import org.fcitx.fcitx5.android.assertRows
 import org.fcitx.fcitx5.android.input.bar.ExpandButtonStateMachine.BooleanKey.ExpandedCandidatesEmpty
 import org.fcitx.fcitx5.android.input.bar.ExpandButtonStateMachine.State
 import org.fcitx.fcitx5.android.input.bar.ExpandButtonStateMachine.State.ClickToAttachWindow
@@ -56,95 +57,25 @@ class ExpandButtonStateMachineTest {
         assertEquals(true, m.getBooleanState(ExpandedCandidatesEmpty))
     }
 
-    // region ExpandedCandidatesUpdated
-
     @Test
-    fun theButtonAppearsWhenExpandedCandidatesArrive() {
-        assertTransition(Hidden, ExpandedCandidatesUpdated, expandedEmpty = false, expected = ClickToAttachWindow)
-    }
-
-    @Test
-    fun theButtonStaysHiddenWithoutExpandedCandidates() {
-        assertTransition(Hidden, ExpandedCandidatesUpdated, expandedEmpty = true, expected = Hidden)
-    }
-
-    @Test
-    fun theButtonDisappearsWhenExpandedCandidatesRunOut() {
-        assertTransition(ClickToAttachWindow, ExpandedCandidatesUpdated, expandedEmpty = true, expected = Hidden)
-    }
-
-    @Test
-    fun theButtonStaysVisibleWhileExpandedCandidatesRemain() {
-        assertTransition(
-            ClickToAttachWindow, ExpandedCandidatesUpdated,
-            expandedEmpty = false, expected = ClickToAttachWindow,
-        )
-    }
-
-    /**
-     * There is no rule from [ClickToDetachWindow] for this event: while the expanded window is
-     * open the button keeps meaning "close me", even if the candidate list changes underneath.
-     */
-    @Test
-    fun updatingCandidatesWhileTheWindowIsOpenDoesNotChangeTheButton() {
-        assertTransition(
-            ClickToDetachWindow, ExpandedCandidatesUpdated,
-            expandedEmpty = true, expected = ClickToDetachWindow,
-        )
-        assertTransition(
-            ClickToDetachWindow, ExpandedCandidatesUpdated,
-            expandedEmpty = false, expected = ClickToDetachWindow,
-        )
-    }
-
-    // endregion
-
-    // region attach / detach
-
-    @Test
-    fun attachingFlipsTheButtonToDetachRegardlessOfTheCandidateFlag() {
-        assertTransition(
-            ClickToAttachWindow, ExpandedCandidatesAttached,
-            expandedEmpty = false, expected = ClickToDetachWindow,
-        )
-        assertTransition(
-            ClickToAttachWindow, ExpandedCandidatesAttached,
-            expandedEmpty = true, expected = ClickToDetachWindow,
-        )
-    }
-
-    @Test
-    fun attachingFromAnyOtherStateIsANoOp() {
-        assertTransition(Hidden, ExpandedCandidatesAttached, expandedEmpty = false, expected = Hidden)
-        assertTransition(
-            ClickToDetachWindow, ExpandedCandidatesAttached,
-            expandedEmpty = false, expected = ClickToDetachWindow,
-        )
-    }
-
-    @Test
-    fun detachingReturnsToAttachWhenCandidatesRemain() {
-        assertTransition(
-            ClickToDetachWindow, ExpandedCandidatesDetached,
-            expandedEmpty = false, expected = ClickToAttachWindow,
-        )
-    }
-
-    @Test
-    fun detachingHidesTheButtonWhenNothingIsLeftToExpand() {
-        assertTransition(ClickToDetachWindow, ExpandedCandidatesDetached, expandedEmpty = true, expected = Hidden)
-    }
-
-    @Test
-    fun detachingFromAnyOtherStateIsANoOp() {
-        assertTransition(Hidden, ExpandedCandidatesDetached, expandedEmpty = false, expected = Hidden)
-        assertTransition(
-            ClickToAttachWindow, ExpandedCandidatesDetached,
-            expandedEmpty = false, expected = ClickToAttachWindow,
-        )
-    }
-
-    // endregion
+    fun eachEventMovesTheButtonAsTheCandidatesLeft() = assertRows(
+        "the button appears when expanded candidates arrive" to { assertTransition(Hidden, ExpandedCandidatesUpdated, expandedEmpty = false, expected = ClickToAttachWindow) },
+        "the button stays hidden without expanded candidates" to { assertTransition(Hidden, ExpandedCandidatesUpdated, expandedEmpty = true, expected = Hidden) },
+        "the button disappears when expanded candidates run out" to { assertTransition(ClickToAttachWindow, ExpandedCandidatesUpdated, expandedEmpty = true, expected = Hidden) },
+        "the button stays visible while expanded candidates remain" to { assertTransition(ClickToAttachWindow, ExpandedCandidatesUpdated, expandedEmpty = false, expected = ClickToAttachWindow) },
+        // no rule from ClickToDetachWindow for this event: while the window is open the button
+        // keeps meaning "close me", even if the candidate list changes underneath
+        "updating candidates while the window is open does not change the button (none left)" to { assertTransition(ClickToDetachWindow, ExpandedCandidatesUpdated, expandedEmpty = true, expected = ClickToDetachWindow) },
+        "updating candidates while the window is open does not change the button (some left)" to { assertTransition(ClickToDetachWindow, ExpandedCandidatesUpdated, expandedEmpty = false, expected = ClickToDetachWindow) },
+        "attaching flips the button to detach (candidates left)" to { assertTransition(ClickToAttachWindow, ExpandedCandidatesAttached, expandedEmpty = false, expected = ClickToDetachWindow) },
+        "attaching flips the button to detach regardless of the candidate flag" to { assertTransition(ClickToAttachWindow, ExpandedCandidatesAttached, expandedEmpty = true, expected = ClickToDetachWindow) },
+        "attaching while hidden is a no-op" to { assertTransition(Hidden, ExpandedCandidatesAttached, expandedEmpty = false, expected = Hidden) },
+        "attaching while attached is a no-op" to { assertTransition(ClickToDetachWindow, ExpandedCandidatesAttached, expandedEmpty = false, expected = ClickToDetachWindow) },
+        "detaching returns to attach when candidates remain" to { assertTransition(ClickToDetachWindow, ExpandedCandidatesDetached, expandedEmpty = false, expected = ClickToAttachWindow) },
+        "detaching hides the button when nothing is left to expand" to { assertTransition(ClickToDetachWindow, ExpandedCandidatesDetached, expandedEmpty = true, expected = Hidden) },
+        "detaching while hidden is a no-op" to { assertTransition(Hidden, ExpandedCandidatesDetached, expandedEmpty = false, expected = Hidden) },
+        "detaching while detached is a no-op" to { assertTransition(ClickToAttachWindow, ExpandedCandidatesDetached, expandedEmpty = false, expected = ClickToAttachWindow) },
+    )
 
     // region realistic sequences
 

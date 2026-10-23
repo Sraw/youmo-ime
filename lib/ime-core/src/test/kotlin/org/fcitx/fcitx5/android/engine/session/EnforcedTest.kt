@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.engine.session
 
+import org.fcitx.fcitx5.android.assertRows
 import org.fcitx.fcitx5.android.engine.data.NgramModel.Companion.NO_WORD
 import org.fcitx.fcitx5.android.engine.lattice.Candidate
 import org.junit.Assert.assertEquals
@@ -38,28 +39,35 @@ class EnforcedTest {
         assertEquals(listOf(id("我"), id("指导")), out[0].words.toList())
     }
 
-    // a first at the sentence's start follows what is before the input
     @Test
-    fun aFirstAtTheStartFollowsTheWordBefore() {
-        val s = listOf(sentence("知道" to 6))
-        assertEquals("指导", Enforced.apply(s, listOf(item("指导", 0, 6, "我", Enforced.Kind.FIRST)), "我", text).single().text)
-        assertEquals("知道", Enforced.apply(s, listOf(item("指导", 0, 6, "我", Enforced.Kind.FIRST)), "", text).single().text)
-    }
+    fun aFirstAtAStartFollowsTheWordBefore() = assertRows(
+        // a first at the sentence's start follows what is before the input
+        "a first at the start follows the word before" to {
+            val s = listOf(sentence("知道" to 6))
+            assertEquals("指导", Enforced.apply(s, listOf(item("指导", 0, 6, "我", Enforced.Kind.FIRST)), "我", text).single().text)
+            assertEquals("知道", Enforced.apply(s, listOf(item("指导", 0, 6, "我", Enforced.Kind.FIRST)), "", text).single().text)
+        },
+        // F2814: input starting with a separator ('zhidao) starts the graph at 1, the sentence's first word there
+        "a first at a start past a separator follows the word before" to {
+            val s = listOf(sentence("知道" to 7))
+            assertEquals("指导", Enforced.apply(s, listOf(item("指导", 1, 7, "我", Enforced.Kind.FIRST)), "我", text, start = 1).single().text)
+            assertEquals("知道", Enforced.apply(s, listOf(item("指导", 1, 7, "我", Enforced.Kind.FIRST)), "", text, start = 1).single().text)
+        },
+    )
 
-    // F2814: input starting with a separator ('zhidao) starts the graph at 1, the sentence's first word there
     @Test
-    fun aFirstAtAStartPastASeparatorFollowsTheWordBefore() {
-        val s = listOf(sentence("知道" to 7))
-        assertEquals("指导", Enforced.apply(s, listOf(item("指导", 1, 7, "我", Enforced.Kind.FIRST)), "我", text, start = 1).single().text)
-        assertEquals("知道", Enforced.apply(s, listOf(item("指导", 1, 7, "我", Enforced.Kind.FIRST)), "", text, start = 1).single().text)
-    }
-
-    // 知道了 a word over zhidao and le: covered by a longer word, it stays
-    @Test
-    fun aWordOverTheEndKeepsTheSentence() {
-        val s = listOf(sentence("老师" to 6, "知道了" to 14))
-        assertEquals("老师知道了", Enforced.apply(s, listOf(item("指导", 6, 12, null, Enforced.Kind.PIN)), "", text).single().text)
-    }
+    fun whatAnItemCannotCoverKeepsTheSentence() = assertRows(
+        // 知道了 a word over zhidao and le: covered by a longer word, it stays
+        "a word over the end keeps the sentence" to {
+            val s = listOf(sentence("老师" to 6, "知道了" to 14))
+            assertEquals("老师知道了", Enforced.apply(s, listOf(item("指导", 6, 12, null, Enforced.Kind.PIN)), "", text).single().text)
+        },
+        // the text rebuilt round text kept as typed: from the side that has none
+        "text kept as typed stays" to {
+            val s = listOf(sentence("x" to 1, "知道" to 7))
+            assertEquals("x指导", Enforced.apply(s, listOf(item("指导", 1, 7, null, Enforced.Kind.PIN)), "", text).single().text)
+        },
+    )
 
     // review-1c N3: a first fits only after an item that stands: 老师 and 喔 overlap, so neither, and the first after 老师
     // takes no place from the word added by hand
@@ -77,13 +85,6 @@ class EnforcedTest {
     fun aPinAppliesAfterAnything() {
         val s = listOf(sentence("我" to 2, "知道" to 8, "了" to 10))
         assertEquals("我指导了", Enforced.apply(s, listOf(item("指导", 2, 8, null, Enforced.Kind.PIN)), "", text).single().text)
-    }
-
-    // the text rebuilt round text kept as typed: from the side that has none
-    @Test
-    fun textKeptAsTypedStays() {
-        val s = listOf(sentence("x" to 1, "知道" to 7))
-        assertEquals("x指导", Enforced.apply(s, listOf(item("指导", 1, 7, null, Enforced.Kind.PIN)), "", text).single().text)
     }
 
     @Test

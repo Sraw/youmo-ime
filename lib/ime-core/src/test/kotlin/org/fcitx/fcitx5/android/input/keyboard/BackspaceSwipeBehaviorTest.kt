@@ -18,11 +18,6 @@ class BackspaceSwipeBehaviorTest {
 
     private val behavior = BackspaceSwipeBehavior()
 
-    @Test
-    fun startsIdle() {
-        assertEquals(State.Stopped, behavior.state)
-    }
-
     // region selecting, with nothing composed
 
     @Test
@@ -130,12 +125,10 @@ class BackspaceSwipeBehaviorTest {
 
     @Test
     fun releasingWithoutHavingMovedDoesNothing() {
+        assertEquals("a touch starts stopped", State.Stopped, behavior.state)
         assertEquals(ReleaseEffect.None, behavior.onRelease(totalCount = 0))
         assertEquals(State.Stopped, behavior.state)
-    }
-
-    @Test
-    fun releasingWithoutHavingMovedDoesNothingEvenAfterALeftwardCount() {
+        // even after a leftward count
         assertEquals(ReleaseEffect.None, behavior.onRelease(totalCount = -5))
     }
 

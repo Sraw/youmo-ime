@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.input.editing
 
+import org.fcitx.fcitx5.android.assertRows
 import org.fcitx.fcitx5.android.input.editing.ForwardedKeys.Action
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -18,26 +19,22 @@ class ForwardedKeysTest {
     private val capsLockOn = 0x100000 // META_CAPS_LOCK_ON
 
     @Test
-    fun aKeyWithAKeyCodeIsSentBothWays() {
-        assertEquals(Action.SendKey(keycodeA, up = false), ForwardedKeys.decide(keycodeA, up = false, unicode = 'a'.code))
-        assertEquals(Action.SendKey(keycodeA, up = true), ForwardedKeys.decide(keycodeA, up = true, unicode = 'a'.code))
-    }
-
-    @Test
-    fun aKeyWithNoKeyCodeIsTypedOnceOnKeyDown() {
-        assertEquals(Action.CommitChar("é"), ForwardedKeys.decide(ForwardedKeys.KEYCODE_UNKNOWN, up = false, unicode = 'é'.code))
-        assertEquals(Action.Ignore, ForwardedKeys.decide(ForwardedKeys.KEYCODE_UNKNOWN, up = true, unicode = 'é'.code))
-    }
-
-    @Test
-    fun aCharacterBeyondTheBasicPlaneIsTypedWhole() {
-        assertEquals(Action.CommitChar("👋"), ForwardedKeys.decide(ForwardedKeys.KEYCODE_UNKNOWN, false, 0x1F44B))
-    }
-
-    @Test
-    fun aKeyWithNeitherIsIgnored() {
-        assertEquals(Action.Ignore, ForwardedKeys.decide(ForwardedKeys.KEYCODE_UNKNOWN, up = false, unicode = 0))
-    }
+    fun aForwardedKeyIsSentTypedOrIgnored() = assertRows(
+        "a key with a key code is sent both ways" to {
+            assertEquals(Action.SendKey(keycodeA, up = false), ForwardedKeys.decide(keycodeA, up = false, unicode = 'a'.code))
+            assertEquals(Action.SendKey(keycodeA, up = true), ForwardedKeys.decide(keycodeA, up = true, unicode = 'a'.code))
+        },
+        "a key with no key code is typed once on key down" to {
+            assertEquals(Action.CommitChar("é"), ForwardedKeys.decide(ForwardedKeys.KEYCODE_UNKNOWN, up = false, unicode = 'é'.code))
+            assertEquals(Action.Ignore, ForwardedKeys.decide(ForwardedKeys.KEYCODE_UNKNOWN, up = true, unicode = 'é'.code))
+        },
+        "a key with neither is ignored" to {
+            assertEquals(Action.Ignore, ForwardedKeys.decide(ForwardedKeys.KEYCODE_UNKNOWN, up = false, unicode = 0))
+        },
+        "a character beyond the basic plane is typed whole" to {
+            assertEquals(Action.CommitChar("👋"), ForwardedKeys.decide(ForwardedKeys.KEYCODE_UNKNOWN, false, 0x1F44B))
+        },
+    )
 
     @Test
     fun onlyThePickerCharacterOpensThePicker() {

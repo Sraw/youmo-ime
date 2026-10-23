@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.engine.lattice
 
+import org.fcitx.fcitx5.android.assertRows
 import org.fcitx.fcitx5.android.engine.data.NgramModel.Companion.NO_WORD
 import org.fcitx.fcitx5.android.engine.data.PinyinData
 import org.fcitx.fcitx5.android.engine.data.PinyinDataBuilder
@@ -66,30 +67,26 @@ class TextWordsTest {
     }
 
     @Test
-    fun aCharNoWordCoversIsNoWordBeforeTheLast() {
-        assertEquals(listOf("-", "你好"), lastTwo("x你好"))
-        assertEquals(listOf("-", "人"), lastTwo("你好吗x人"))
-    }
-
-    @Test
-    fun textEndingWithNoWordIsNoContext() {
-        assertEquals(emptyList<String>(), lastTwo("你好 "))
-        assertEquals(emptyList<String>(), lastTwo("你好x"))
-        assertEquals(emptyList<String>(), lastTwo(""))
-    }
-
-    @Test
-    fun aCharPastTheBmpIsNoWord() {
-        assertEquals(emptyList<String>(), lastTwo("你好\uD83D\uDE00"))
-        assertEquals(listOf("-", "你好"), lastTwo("\uD83D\uDE00你好"))
-        // the window starting on the second half of one
-        assertEquals(listOf("你好", "吗"), lastTwo("\uD83D\uDE00" + "你好".repeat(11) + "吗"))
-    }
-
-    @Test
-    fun onlyTheEndOfLongTextIsRead() {
-        assertEquals(listOf("你好", "吗"), lastTwo("x".repeat(10_000) + "你好".repeat(20) + "吗"))
-    }
+    fun theContextIsTheLastTwoWordsOfTheText() = assertRows(
+        "only the end of long text is read" to {
+            assertEquals(listOf("你好", "吗"), lastTwo("x".repeat(10_000) + "你好".repeat(20) + "吗"))
+        },
+        "a char no word covers is no word before the last" to {
+            assertEquals(listOf("-", "你好"), lastTwo("x你好"))
+            assertEquals(listOf("-", "人"), lastTwo("你好吗x人"))
+        },
+        "text ending with no word is no context" to {
+            assertEquals(emptyList<String>(), lastTwo("你好 "))
+            assertEquals(emptyList<String>(), lastTwo("你好x"))
+            assertEquals(emptyList<String>(), lastTwo(""))
+        },
+        "a char past the BMP is no word" to {
+            assertEquals(emptyList<String>(), lastTwo("你好\uD83D\uDE00"))
+            assertEquals(listOf("-", "你好"), lastTwo("\uD83D\uDE00你好"))
+            // the window starting on the second half of one
+            assertEquals(listOf("你好", "吗"), lastTwo("\uD83D\uDE00" + "你好".repeat(11) + "吗"))
+        },
+    )
 
     @Test
     fun theLastTwoWordsAreTheDecodersContextTheOneBeforeFirst() {

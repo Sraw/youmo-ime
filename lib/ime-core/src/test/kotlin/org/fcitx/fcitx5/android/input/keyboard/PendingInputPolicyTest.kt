@@ -4,35 +4,34 @@
  */
 package org.fcitx.fcitx5.android.input.keyboard
 
+import org.fcitx.fcitx5.android.assertRows
 import org.fcitx.fcitx5.android.engine.host.Engines
 import org.fcitx.fcitx5.android.engine.pinyin.ShuangpinScheme
 import org.fcitx.fcitx5.android.input.keyboard.PendingInputPolicy.Resolution
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertTrue
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class PendingInputPolicyTest {
 
     @Test
-    fun chineseTakesTheFirstCandidateForAPreedit() {
-        assertEquals(Resolution.SelectFirstCandidate, PendingInputPolicy.resolve("zh_CN", hasPreedit = true))
-        assertEquals(Resolution.SelectFirstCandidate, PendingInputPolicy.resolve("zh_TW", hasPreedit = true))
-        assertEquals(Resolution.SelectFirstCandidate, PendingInputPolicy.resolve("zh", hasPreedit = true))
-    }
-
-    @Test
-    fun chineseLeavesPredictionsAlone() {
-        assertEquals(Resolution.None, PendingInputPolicy.resolve("zh_CN", hasPreedit = false))
-    }
-
-    @Test
-    fun otherLanguagesKeepWhatWasTyped() {
-        assertEquals(Resolution.FinishComposing, PendingInputPolicy.resolve("en", hasPreedit = true))
-        assertEquals(Resolution.FinishComposing, PendingInputPolicy.resolve("ja", hasPreedit = true))
-        assertEquals("finishing with nothing composed is harmless", Resolution.FinishComposing,
-            PendingInputPolicy.resolve("en", hasPreedit = false))
-    }
+    fun whatIsPendingIsResolvedByTheLanguage() = assertRows(
+        "chinese takes the first candidate for a preedit" to {
+            assertEquals(Resolution.SelectFirstCandidate, PendingInputPolicy.resolve("zh_CN", hasPreedit = true))
+            assertEquals(Resolution.SelectFirstCandidate, PendingInputPolicy.resolve("zh_TW", hasPreedit = true))
+            assertEquals(Resolution.SelectFirstCandidate, PendingInputPolicy.resolve("zh", hasPreedit = true))
+        },
+        "chinese leaves predictions alone" to {
+            assertEquals(Resolution.None, PendingInputPolicy.resolve("zh_CN", hasPreedit = false))
+        },
+        "other languages keep what was typed" to {
+            assertEquals(Resolution.FinishComposing, PendingInputPolicy.resolve("en", hasPreedit = true))
+            assertEquals(Resolution.FinishComposing, PendingInputPolicy.resolve("ja", hasPreedit = true))
+            assertEquals("finishing with nothing composed is harmless", Resolution.FinishComposing,
+                PendingInputPolicy.resolve("en", hasPreedit = false))
+        },
+    )
 
     /**
      * Characterises, not specifies: the upstream check is a plain prefix test on fcitx's

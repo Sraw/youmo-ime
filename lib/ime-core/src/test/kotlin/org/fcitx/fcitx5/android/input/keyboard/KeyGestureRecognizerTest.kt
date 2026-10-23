@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.input.keyboard
 
+import org.fcitx.fcitx5.android.assertRows
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -44,31 +45,29 @@ class KeyGestureRecognizerTest {
     // region bounds
 
     @Test
-    fun aPointInsideTheKeyIsInside() {
-        val r = recognizer()
-        assertTrue(r.pointInView(0f, 0f))
-        assertTrue(r.pointInView(50f, 25f))
-        assertTrue(r.pointInView(99f, 49f))
-    }
-
-    /** The hit area is grown by the touch slop on every side. */
-    @Test
-    fun theSlopMarginCountsAsInside() {
-        val r = recognizer()
-        assertTrue("left edge minus slop", r.pointInView(-8f, 25f))
-        assertTrue("top edge minus slop", r.pointInView(50f, -8f))
-        assertTrue("right edge plus slop", r.pointInView(107f, 25f))
-        assertTrue("bottom edge plus slop", r.pointInView(50f, 57f))
-    }
-
-    @Test
-    fun beyondTheSlopMarginIsOutside() {
-        val r = recognizer()
-        assertFalse(r.pointInView(-9f, 25f))
-        assertFalse(r.pointInView(50f, -9f))
-        assertFalse(r.pointInView(108f, 25f))
-        assertFalse(r.pointInView(50f, 58f))
-    }
+    fun theKeyIsItsAreaGrownByTheSlop() = assertRows(
+        "a point inside the key is inside" to {
+            val r = recognizer()
+            assertTrue(r.pointInView(0f, 0f))
+            assertTrue(r.pointInView(50f, 25f))
+            assertTrue(r.pointInView(99f, 49f))
+        },
+        // The hit area is grown by the touch slop on every side.
+        "the slop margin counts as inside" to {
+            val r = recognizer()
+            assertTrue("left edge minus slop", r.pointInView(-8f, 25f))
+            assertTrue("top edge minus slop", r.pointInView(50f, -8f))
+            assertTrue("right edge plus slop", r.pointInView(107f, 25f))
+            assertTrue("bottom edge plus slop", r.pointInView(50f, 57f))
+        },
+        "beyond the slop margin is outside" to {
+            val r = recognizer()
+            assertFalse(r.pointInView(-9f, 25f))
+            assertFalse(r.pointInView(50f, -9f))
+            assertFalse(r.pointInView(108f, 25f))
+            assertFalse(r.pointInView(50f, 58f))
+        },
+    )
 
     // endregion
 
@@ -136,20 +135,20 @@ class KeyGestureRecognizerTest {
     }
 
     @Test
-    fun crossingTheThresholdCountsOneStep() {
-        val r = recognizer()
-        r.onDown(0f, 0f)
-        assertEquals(1, r.move(24f, 0f).countX)
-        assertEquals(1, r.swipeTotalX)
-    }
-
-    @Test
-    fun oneBigJumpCountsEveryThresholdItCrossed() {
-        val r = recognizer()
-        r.onDown(0f, 0f)
-        assertEquals(3, r.move(72f, 0f).countX)
-        assertEquals(3, r.swipeTotalX)
-    }
+    fun eachThresholdCrossedCountsAStep() = assertRows(
+        "crossing the threshold counts one step" to {
+            val r = recognizer()
+            r.onDown(0f, 0f)
+            assertEquals(1, r.move(24f, 0f).countX)
+            assertEquals(1, r.swipeTotalX)
+        },
+        "one big jump counts every threshold it crossed" to {
+            val r = recognizer()
+            r.onDown(0f, 0f)
+            assertEquals(3, r.move(72f, 0f).countX)
+            assertEquals(3, r.swipeTotalX)
+        },
+    )
 
     /**
      * The remainder carries forward, so a slow drag still accumulates: three 10px samples add
@@ -303,49 +302,43 @@ class KeyGestureRecognizerTest {
     // region what counts as a click
 
     @Test
-    fun aCleanTapIsAClick() {
-        val r = recognizer()
-        r.onDown(50f, 25f)
-        assertTrue(r.onUp(1000L, longPressTriggered = false, repeatStarted = false).performClick)
-    }
-
-    @Test
-    fun aTapThatWanderedOffTheKeyIsNotAClick() {
-        val r = recognizer()
-        r.onDown(50f, 25f)
-        r.move(200f, 25f)
-        assertFalse(r.onUp(1000L, longPressTriggered = false, repeatStarted = false).performClick)
-    }
-
-    @Test
-    fun aLongPressIsNotAlsoAClick() {
-        val r = recognizer(longPress = true)
-        r.onDown(50f, 25f)
-        assertFalse(r.onUp(1000L, longPressTriggered = true, repeatStarted = false).performClick)
-    }
-
-    @Test
-    fun aRepeatIsNotAlsoAClick() {
-        val r = recognizer(repeat = true)
-        r.onDown(50f, 25f)
-        assertFalse(r.onUp(1000L, longPressTriggered = false, repeatStarted = true).performClick)
-    }
-
-    @Test
-    fun aSwipeRepeatIsNotAlsoAClick() {
-        val r = recognizer(swipeRepeat = true)
-        r.onDown(0f, 0f)
-        r.move(24f, 0f)
-        assertFalse(r.onUp(1000L, longPressTriggered = false, repeatStarted = false).performClick)
-    }
-
-    @Test
-    fun aGestureTheListenerConsumedIsNotAlsoAClick() {
-        val r = recognizer()
-        r.onDown(50f, 25f)
-        r.markGestureConsumed()
-        assertFalse(r.onUp(1000L, longPressTriggered = false, repeatStarted = false).performClick)
-    }
+    fun whatTheKeyDidInsteadIsNotAlsoAClick() = assertRows(
+        "a long press is not also a click" to {
+            val r = recognizer(longPress = true)
+            r.onDown(50f, 25f)
+            assertFalse(r.onUp(1000L, longPressTriggered = true, repeatStarted = false).performClick)
+        },
+        "a repeat is not also a click" to {
+            val r = recognizer(repeat = true)
+            r.onDown(50f, 25f)
+            assertFalse(r.onUp(1000L, longPressTriggered = false, repeatStarted = true).performClick)
+        },
+        // Long-press backspace: hold, repeat fires, lift produces no extra click.
+        "holding for repeat does not also click on release" to {
+            val r = recognizer(swipe = false, repeat = true)
+            r.onDown(50f, 25f)
+            r.onMove(51f, 25f, longPressTriggered = false, repeatStarted = true)
+            assertFalse(r.onUp(2000L, longPressTriggered = false, repeatStarted = true).performClick)
+        },
+        "a gesture the listener consumed is not also a click" to {
+            val r = recognizer()
+            r.onDown(50f, 25f)
+            r.markGestureConsumed()
+            assertFalse(r.onUp(1000L, longPressTriggered = false, repeatStarted = false).performClick)
+        },
+        "a swipe repeat is not also a click" to {
+            val r = recognizer(swipeRepeat = true)
+            r.onDown(0f, 0f)
+            r.move(24f, 0f)
+            assertFalse(r.onUp(1000L, longPressTriggered = false, repeatStarted = false).performClick)
+        },
+        "a tap that wandered off the key is not a click" to {
+            val r = recognizer()
+            r.onDown(50f, 25f)
+            r.move(200f, 25f)
+            assertFalse(r.onUp(1000L, longPressTriggered = false, repeatStarted = false).performClick)
+        },
+    )
 
     /**
      * The consumed flag is cleared between touches on every key, not only on keys that swipe:
@@ -539,15 +532,6 @@ class KeyGestureRecognizerTest {
 
     // region realistic sequences
 
-    /** Long-press backspace: hold, repeat fires, lift produces no extra click. */
-    @Test
-    fun holdingForRepeatDoesNotAlsoClickOnRelease() {
-        val r = recognizer(swipe = false, repeat = true)
-        r.onDown(50f, 25f)
-        r.onMove(51f, 25f, longPressTriggered = false, repeatStarted = true)
-        assertFalse(r.onUp(2000L, longPressTriggered = false, repeatStarted = true).performClick)
-    }
-
     /** Swipe up on a letter key to type its digit: two steps up, no click on release. */
     @Test
     fun swipingUpForTheAlternateSymbolSuppressesTheClick() {
@@ -561,6 +545,10 @@ class KeyGestureRecognizerTest {
     /** Tap and drag slightly, staying within threshold: still an ordinary click. */
     @Test
     fun aSlightlyImpreciseTapIsStillAClick() {
+        // a clean tap, on a recognizer of its own
+        val clean = recognizer()
+        clean.onDown(50f, 25f)
+        assertTrue(clean.onUp(1000L, longPressTriggered = false, repeatStarted = false).performClick)
         val r = recognizer()
         r.onDown(50f, 25f)
         r.move(53f, 27f)

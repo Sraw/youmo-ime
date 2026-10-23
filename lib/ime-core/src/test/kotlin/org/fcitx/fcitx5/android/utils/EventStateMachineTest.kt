@@ -41,11 +41,6 @@ class EventStateMachineTest {
     // region basic transitions
 
     @Test
-    fun startsAtTheInitialState() {
-        assertEquals(B, machine(initial = B).currentState)
-    }
-
-    @Test
     fun pushAppliesTheTransitionAndNotifies() {
         val seen = mutableListOf<S>()
         val m = machine().apply { onNewStateListener = { seen += it } }

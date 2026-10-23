@@ -49,10 +49,7 @@ class WordIndexTest {
         assertEquals(NO_WORD, index.find("词3000"))
         assertEquals(NO_WORD, index.find(""))
         assertEquals(NO_WORD, index.find("他说你好吗", 1, 3))
-    }
-
-    @Test
-    fun anEmptyModelFindsNothing() {
+        // an empty model finds nothing
         assertEquals(NO_WORD, WordIndex(data.vocabulary, 0).find("你"))
     }
 }

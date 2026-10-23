@@ -576,17 +576,6 @@ class KeyboardTest {
         assertEquals("hello ", keyboard.onEvent(EngineEvent.CHAR, Keyboard.GLIDE).commit)
     }
 
-    /** No text read (no context sent), the app's own Backspace takes the last char typed off what the session keeps, not all it knows. */
-    @Test
-    fun aBackspaceTheAppDidWithNothingReadKeepsTheCharBefore() {
-        val english = EnglishSession(EnglishDecoderTest.data())
-        val keyboard = Keyboard(english, nineKeys = false)
-        "abc".forEach { keyboard.onEvent(EngineEvent.TYPED, it.code) }
-        keyboard.onEvent(EngineEvent.TYPED, BACKSPACE)
-        english.offerGlide(GlideDecoderTest.glide("hello"))
-        assertEquals(" hello ", keyboard.onEvent(EngineEvent.CHAR, Keyboard.GLIDE).commit)
-    }
-
     /** The app's own Backspace where English suggests nothing (TYPED of Session.ERASED): the last char known taken off, not all of it forgotten. */
     @Test
     fun aBackspaceTheAppDidTakesOffTheLastCharKnown() {
@@ -622,6 +611,8 @@ class KeyboardTest {
             english.offerGlide(GlideDecoderTest.glide("hello"))
             return keyboard.onEvent(EngineEvent.CHAR, Keyboard.GLIDE).commit
         }
+        // no text read (no context sent): one Backspace takes the last char typed off what the session keeps, not all it knows
+        assertEquals(" hello ", glidedAfter("abc", 1))
         assertEquals(" hello ", glidedAfter("ab c", 2))
         assertEquals(" hello ", glidedAfter("ab c", 3))
         assertEquals("hello ", glidedAfter("ab c", 4))
