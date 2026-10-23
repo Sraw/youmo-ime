@@ -21,7 +21,7 @@ object Versions {
     const val defaultBuildTools = "36.1.0"
 
     // NOTE: raise this for a release; the version code follows it (versionCodeOf)
-    const val baseVersionName = "0.3.1"
+    const val baseVersionName = "0.3.2"
     val baseVersionCode = versionCodeOf(baseVersionName)
 
     private val abiIds = mapOf("armeabi-v7a" to 1, "arm64-v8a" to 2, "x86" to 3, "x86_64" to 4)
