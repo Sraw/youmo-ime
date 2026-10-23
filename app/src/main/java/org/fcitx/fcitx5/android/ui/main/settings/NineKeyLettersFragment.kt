@@ -5,19 +5,12 @@
 package org.fcitx.fcitx5.android.ui.main.settings
 
 import android.content.Context
-import android.os.Bundle
 import android.text.InputFilter
 import android.text.InputType
-import android.view.LayoutInflater
 import android.view.View
-import android.view.ViewGroup
 import android.widget.EditText
-import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.appcompat.app.AlertDialog
-import androidx.core.view.ViewCompat
-import androidx.core.view.WindowInsetsCompat
-import androidx.fragment.app.Fragment
 import com.google.android.material.R as MaterialR
 import com.google.android.material.button.MaterialButton
 import kotlinx.coroutines.Dispatchers
@@ -35,7 +28,6 @@ import splitties.views.dsl.core.horizontalLayout
 import splitties.views.dsl.core.lParams
 import splitties.views.dsl.core.matchParent
 import splitties.views.dsl.core.verticalLayout
-import splitties.views.dsl.core.wrapInScrollView
 import kotlin.coroutines.CoroutineContext
 
 /**
@@ -43,7 +35,7 @@ import kotlin.coroutines.CoroutineContext
  * each with its letters and its digit small, one set otherwise than on a phone outlined. Tapping
  * one asks for its letters; [NineKeyLetters] keeps them to what a key can type.
  */
-class NineKeyLettersFragment : Fragment() {
+class NineKeyLettersFragment : KeyCapsPageFragment() {
 
     private val pref get() = AppPrefs.getInstance().keyboard.t9Letters
 
@@ -53,35 +45,7 @@ class NineKeyLettersFragment : Fragment() {
     private fun save(value: NineKeyLetters) =
         saveLetters(value, letters, { pref.setValue(it.serialize()) }, FcitxDaemon.getFirstConnectionOrNull())
 
-    private lateinit var content: LinearLayout
-
-    override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
-        val ctx = requireContext()
-        content = ctx.verticalLayout {
-            val pad = ctx.dp(16)
-            setPadding(pad, ctx.dp(8), pad, pad)
-        }
-        return content.wrapInScrollView {
-            clipToPadding = false
-            ViewCompat.setOnApplyWindowInsetsListener(this) { view, insets ->
-                view.setPadding(0, 0, 0, insets.getInsets(WindowInsetsCompat.Type.navigationBars()).bottom)
-                insets
-            }
-        }
-    }
-
-    override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
-        super.onViewCreated(view, savedInstanceState)
-        rebuild()
-    }
-
-    override fun onStop() {
-        // before the first unlock the keyboard reads them from device-protected storage
-        AppPrefs.getInstance().syncToDeviceEncryptedStorage()
-        super.onStop()
-    }
-
-    private fun rebuild() {
+    override fun rebuild() {
         val ctx = requireContext()
         val current = letters
         content.apply {

@@ -5,22 +5,16 @@
 package org.fcitx.fcitx5.android.ui.main.settings
 
 import android.content.Context
-import android.os.Bundle
 import android.text.InputType
 import android.view.Gravity
-import android.view.LayoutInflater
 import android.view.View
-import android.view.ViewGroup
 import android.view.inputmethod.EditorInfo
 import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.annotation.StringRes
 import androidx.appcompat.app.AlertDialog
-import androidx.core.view.ViewCompat
-import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.isVisible
-import androidx.fragment.app.Fragment
 import com.google.android.flexbox.FlexWrap
 import com.google.android.flexbox.FlexboxLayout
 import com.google.android.material.button.MaterialButton
@@ -46,7 +40,7 @@ import splitties.views.dsl.core.wrapInScrollView
  * with its first long-press character small where the keyboard shows it, a changed one outlined. The decisions
  * (replace, disable, carry over to Shift) live in [PopupOverrides]; this shows and writes them.
  */
-class PopupOverridesFragment : Fragment() {
+class PopupOverridesFragment : KeyCapsPageFragment() {
 
     private val pref get() = AppPrefs.getInstance().internal.popupOverrides
 
@@ -54,35 +48,7 @@ class PopupOverridesFragment : Fragment() {
         get() = PopupOverrides.parse(pref.getValue())
         set(value) = pref.setValue(value.serialize())
 
-    private lateinit var content: LinearLayout
-
-    override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
-        val ctx = requireContext()
-        content = ctx.verticalLayout {
-            val pad = ctx.dp(16)
-            setPadding(pad, ctx.dp(8), pad, pad)
-        }
-        return content.wrapInScrollView {
-            clipToPadding = false
-            ViewCompat.setOnApplyWindowInsetsListener(this) { view, insets ->
-                view.setPadding(0, 0, 0, insets.getInsets(WindowInsetsCompat.Type.navigationBars()).bottom)
-                insets
-            }
-        }
-    }
-
-    override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
-        super.onViewCreated(view, savedInstanceState)
-        rebuild()
-    }
-
-    override fun onStop() {
-        // before the first unlock the keyboard reads them from device-protected storage
-        AppPrefs.getInstance().syncToDeviceEncryptedStorage()
-        super.onStop()
-    }
-
-    private fun rebuild() {
+    override fun rebuild() {
         val ctx = requireContext()
         val current = overrides
         content.apply {

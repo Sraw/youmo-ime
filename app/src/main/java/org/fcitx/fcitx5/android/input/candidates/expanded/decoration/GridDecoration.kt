@@ -10,7 +10,6 @@ import android.graphics.drawable.Drawable
 import android.view.View
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.RecyclerView
-import splitties.dimensions.dp
 
 class GridDecoration(val drawable: Drawable) : RecyclerView.ItemDecoration() {
 
@@ -24,18 +23,7 @@ class GridDecoration(val drawable: Drawable) : RecyclerView.ItemDecoration() {
         val layoutManager = parent.layoutManager as GridLayoutManager
         // add space for items except last in each row
         if (lp.spanIndex + lp.spanSize != layoutManager.spanCount) {
-            when (parent.layoutDirection) {
-                View.LAYOUT_DIRECTION_LTR -> {
-                    outRect.right = drawable.intrinsicWidth
-                }
-                View.LAYOUT_DIRECTION_RTL -> {
-                    outRect.left = drawable.intrinsicWidth
-                }
-                else -> {
-                    // should not reach here
-                    outRect.set(0, 0, 0, 0)
-                }
-            }
+            outRect.setTrailingDivider(parent, drawable)
         } else {
             outRect.set(0, 0, 0, 0)
         }
@@ -52,29 +40,7 @@ class GridDecoration(val drawable: Drawable) : RecyclerView.ItemDecoration() {
             // skip if it is the last item in each row
             if (lp.spanIndex + lp.spanSize == layoutManager.spanCount)
                 continue
-            val left: Int
-            val right: Int
-            when (parent.layoutDirection) {
-                View.LAYOUT_DIRECTION_LTR -> {
-                    left = view.right + lp.rightMargin
-                    right = left + drawable.intrinsicWidth
-                }
-                View.LAYOUT_DIRECTION_RTL -> {
-                    right = view.left + lp.leftMargin
-                    left = right - drawable.intrinsicWidth
-                }
-                else -> {
-                    // should not reach here
-                    left = view.left
-                    right = left + drawable.intrinsicWidth
-                }
-            }
-            val top = view.top - lp.topMargin
-            val bottom = view.bottom + lp.bottomMargin
-            // make the divider shorter
-            val vInset = parent.dp(8)
-            drawable.setBounds(left, top + vInset, right, bottom - vInset)
-            drawable.draw(c)
+            drawTrailingDivider(c, parent, view, drawable)
         }
     }
 }
