@@ -18,6 +18,7 @@ import org.fcitx.fcitx5.android.daemon.FcitxDaemon
 import org.fcitx.fcitx5.android.data.RecentlyUsed
 import org.fcitx.fcitx5.android.data.pinyin.CustomPhraseManager
 import org.fcitx.fcitx5.android.data.pinyin.ImportedDictionaries
+import org.fcitx.fcitx5.android.data.pinyin.MergedDictionary
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.restoreDirectory
 import org.fcitx.fcitx5.android.engine.data.DataFormatException
@@ -39,6 +40,7 @@ import org.fcitx.fcitx5.android.engine.pinyin.ShuangpinScheme
 import org.fcitx.fcitx5.android.engine.session.Choice
 import org.fcitx.fcitx5.android.engine.session.Offer
 import org.fcitx.fcitx5.android.engine.session.Snapshot
+import org.fcitx.fcitx5.android.engine.user.DictionaryFile
 import org.fcitx.fcitx5.android.engine.user.LibimeImport
 import org.fcitx.fcitx5.android.input.popup.EmojiModifier
 import org.fcitx.fcitx5.android.utils.Const
@@ -341,9 +343,8 @@ object EngineBridge {
 
     /**
      * The custom phrases and the dictionaries turned on in [dir], fcitx's pinyin data directory, as
-     * the editors keep them; a file that cannot be read is left out, the rest still read. The
-     * dictionaries are read only when the engine asks, and again only when one of them changed;
-     * libime's are turned into text first.
+     * the editors keep them; the phrases not read are left out. The dictionaries are the file
+     * compiled from them ([MergedDictionary]); libime's are turned into text first.
      */
     internal fun additions(dir: File): Engines.Additions {
         val phraseFile = File(dir, "customphrase")
@@ -359,31 +360,22 @@ object EngineBridge {
         }
         val dictionaryDir = File(dir, "dictionaries")
         ImportedDictionaries.migrate(dictionaryDir)
-        val dictionaries = dictionaryDir.listFiles { f -> f.name.endsWith(".txt") }.orEmpty().sortedBy { it.name }
-        val seen = dictionaries.joinToString("\n") { "${it.name} ${it.length()} ${it.lastModified()}" }
         val save = PhraseFile(phraseFile, phrases, read, phraseSaves)::save
-        // one that cannot be read is left out, the rest still read; then the first failure is
-        // thrown, for the engine to know a dictionary is missing: removing a word it may list
-        // forgets nothing then (UserLexicon.selfMade)
-        fun read() = sequence {
-            var failure: IOException? = null
-            for (file in dictionaries) {
-                val lines = try {
-                    file.readLines()
-                } catch (e: IOException) {
-                    Timber.w(e, "pinyin dictionary %s", file.name)
-                    if (failure == null) failure = e
-                    emptyList()
-                }
-                yieldAll(lines)
-            }
-            failure?.let { throw it }
-        }
+        // the compiled file, never the texts (0.3.1 read them whole here and ran the heap out at
+        // every focus): one not made yet, or stale, is compiled off this thread, the engine reloaded then
+        val seen = MergedDictionary.current(dictionaryDir)
+        val merged = seen.file
+        Timber.d("merged dictionaries: %s", merged?.let { "${it.size} words" } ?: "none yet")
         return Engines.Additions(
             phrases = phrases,
-            dictionaries = seen,
+            dictionaries = seen.token,
             savePhrases = save,
-            dictionary = { read() },
+            dictionary = { merged },
+            indexes = dictionaryDir,
+            // the file there, stale or not, for an older build's learning converted before the first is in (review S4)
+            dictionaryNow = { File(dictionaryDir, MergedDictionary.FILE).takeIf { it.isFile }?.let { DictionaryFile.open(it) } },
+            dictionaryStale = seen.stale,
+            dictionaryPending = { MergedDictionary.pending(dictionaryDir) },
         )
     }
 

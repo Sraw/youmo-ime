@@ -1,6 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- DataManager.dataDir's assets, synced again on the next start: device-protected storage
-     (device_root) from Android 7, the data root (root) on Android 6 -->
+<!-- DataManager.dataDir's assets, in device-protected storage (device_root), synced again on the next start -->
 <full-backup-content>
     <exclude
         domain="device_root"
@@ -10,15 +9,6 @@
         path="descriptor.json" />
     <exclude
         domain="device_root"
-        path="README.md" />
-    <exclude
-        domain="root"
-        path="usr" />
-    <exclude
-        domain="root"
-        path="descriptor.json" />
-    <exclude
-        domain="root"
         path="README.md" />
     <exclude
         domain="root"

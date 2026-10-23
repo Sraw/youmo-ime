@@ -67,7 +67,7 @@ class EnginesLearningTest : EnginesFixture() {
     @Test
     fun pinsConvertedOffTheTypingThreadTakeTheirPhrasesOutOnceInPlace() {
         val saved = ArrayList<String>()
-        val additions = { Engines.Additions("ni,1=拟\n", "", { saved += it.all.joinToString(" ") }) { emptySequence() } }
+        val additions = { Engines.Additions("ni,1=拟\n", "", { saved += it.all.joinToString(" ") }, dictionary = { null }) }
         val dir = folder.newFolder("engine")
         dir.resolve(Engines.userTable("engine-wubi")).writeBytes(TableLog.FORMAT.header())
         val queued = ArrayList<Runnable>()

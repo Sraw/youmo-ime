@@ -10,7 +10,6 @@ package org.fcitx.fcitx5.android.input.voice
  */
 object HotwordSpelling {
 
-    // Character.UnicodeScript is API 24
     private val HAN_WORD = Regex("\\p{IsHan}{2,12}")
 
     /**

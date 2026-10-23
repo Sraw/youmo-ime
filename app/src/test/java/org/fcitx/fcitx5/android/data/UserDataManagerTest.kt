@@ -117,6 +117,21 @@ class UserDataManagerTest {
         assertEquals(listOf("engine"), File(folder.root, "fresh").list()!!.filter { it.startsWith("engine") })
     }
 
+    // the merged dictionaries' compiled file is made again from their texts: as large as they are, never carried
+    @Test
+    fun theDictionariesGoWithoutWhatIsCompiledFromThem() {
+        val old = install("old")
+        val dictionaries = File(old.external, "data/pinyin/dictionaries").apply { mkdirs() }
+        File(dictionaries, "frost.txt").writeText("你好 ni'hao 0.0\n")
+        File(dictionaries, "merged.ymd").writeText("compiled")
+        File(dictionaries, "merged.wubi86.ymc").writeText("indexed")
+        File(dictionaries, ".merged.ymd.build/run0").apply { parentFile!!.mkdirs() }.writeText("half")
+        val fresh = install("fresh")
+        UserDataManager.import(exported(old), fresh).getOrThrow()
+        val restored = File(fresh.external, "data/pinyin/dictionaries")
+        assertEquals(listOf("frost.txt"), restored.walkTopDown().filter { it.isFile }.map { it.name }.toList())
+    }
+
     @Test
     fun whatAnAppMarkedSensitiveOnTheClipboardIsLeftOutOfTheBackup() = runTest {
         val old = install("old").apply { dataBases.mkdirs() }

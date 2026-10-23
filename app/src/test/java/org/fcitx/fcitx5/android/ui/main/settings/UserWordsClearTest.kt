@@ -23,13 +23,6 @@ class UserWordsClearTest {
         assertEquals(0, blockedThatReturn(emptyMap(), null))
     }
 
-    // 全部清空 ticked: the dialog lists what goes, all that was kept but the custom phrases
-    @Test
-    fun theDialogSaysWhatTheTickClears() {
-        assertEquals(R.string.learning_clear_learned_message, clearMessage(all = false))
-        assertEquals(R.string.learning_clear_all_message, clearMessage(all = true))
-    }
-
     // F3231: 清掉学到的 tells cleared, a disk that failed, or not now (anything else: locked, no engine)
     @Test
     fun clearingTellsWhatHappened() {

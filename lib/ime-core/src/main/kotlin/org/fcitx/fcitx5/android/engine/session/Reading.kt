@@ -60,10 +60,10 @@ internal fun reading(
 
 private const val MISREAD = SyllableMatches.FUZZY or SyllableMatches.TYPO or SyllableMatches.NEIGHBOUR
 
-// the trie [word] is in: the user's start-only words where it is one only imported, else the user's
-// where it is theirs, else the dictionary's
+// the trie [word] is in: the user's start-only words where it is one only imported, a merged
+// dictionary's where it is one of those, else the user's where it is theirs, else the dictionary's
 private class Spelt(private val word: Int, private val dictionary: PinyinDictionary, private val own: UserWords?) {
-    private val starts = own?.takeIf { it.startOnly(word) }?.startWords
+    private val starts = own?.let { if (it.startOnly(word)) it.startWords else if (it.isMerged(word)) it.mergedWords else null }
 
     val root = starts?.root ?: own?.root ?: dictionary.root
 

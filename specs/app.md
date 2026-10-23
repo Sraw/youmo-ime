@@ -12,7 +12,7 @@ an ime-core class with a test.
 | `daemon/` | `FcitxDaemon`: the one fcitx instance, shared by connections (`FcitxConnection`) |
 | `input/` | The `InputMethodService` (`FcitxInputMethodService`), `InputView`, and what the keyboard shows: `bar/` (the candidate bar / toolbar, `KawaiiBarComponent`), `candidates/` (horizontal bar, expanded grid, floating window for physical keyboards), `keyboard/` (`TextKeyboard`, `T9Keyboard`, `NumberKeyboard`, `KeyDef`/`KeyDefPreset`, `KeyView`, `CommonKeyActionListener`), `picker/` (symbols, emoji), `popup/` (key previews, long-press keyboards), `clipboard/`, `editing/` (text editing panel, `InputConnectionEditor`), `status/` (the "more" panel), `preedit/`, `broadcast/`, `wm/` (`InputWindowManager`), `handwriting/`, `floating/` (the floating keyboard), `dialog/`, `editorinfo/` (the `EditorInfo` inspector), `learning/` (a candidate's long-press menu worded by the app from the engine's `LearningResult.Menu`, `CandidateLearningMenu`; the undo chip, `UndoChip`: above the whole keyboard while candidates show, below a window with no room above when it fits the window, over the bar otherwise, placed by ime-core's `UndoChipPlacement`) |
 | `provider/` | `FcitxDataProvider` |
-| `data/` | File-backed managers: `prefs/` (`AppPrefs`, the managed preference framework), `theme/`, `clipboard/` (Room), `pinyin/` (imported dictionaries, custom phrases), `punctuation/`, `UserDataManager` (backup/restore); `DataManager` (syncs `assets/usr`) is in `core/data/` |
+| `data/` | File-backed managers: `prefs/` (`AppPrefs`, the managed preference framework), `theme/`, `clipboard/` (Room), `pinyin/` (imported dictionaries, custom phrases; `MergedDictionary` compiles the dictionaries turned on into `merged.ymd` on one `dictionary-compile` thread, keyed by a stamp of the sources, the base data and a compiler revision; the engine maps the file, uses a stale one until the new one is made, and is reloaded through `made`), `punctuation/`, `UserDataManager` (backup/restore); `DataManager` (syncs `assets/usr`) is in `core/data/` |
 | `ui/` | Settings: `main/` (`MainActivity`, `MainFragment` = the home page, `settings/` pages and `SettingsRoute`, `settings/search/`), `setup/` (the first-run wizard), `common/` |
 | `utils/` | Small helpers (`AppUtil`, `Const`, extensions) |
 | `src/main/cpp/` | `native-lib.cpp` (JNI), `androidfrontend` (fcitx frontend for the service), `androidengine` (the addon in front of ime-core's input methods), `androidaddonloader`, `androidnotification` (fcitx tips as toasts), `matrix-kernel.cpp` |
@@ -286,7 +286,7 @@ Rules for settings, all decided:
 ## Persistence and backups
 
 `UserDataManager` exports one zip: `shared_prefs`, the clipboard database (less what an app marked
-sensitive), the external files dir (fcitx config, custom phrases, imported dictionaries, themes)
+sensitive), the external files dir (fcitx config, custom phrases, imported dictionaries as text; the compiled `merged.ymd`/`.ymc` are left out and made again after a restore, themes)
 and the engine's `files/engine/` (learned words, word lists).
 Restoring stops fcitx, closes the clipboard database, replaces the files, then restarts the
 process (`AppUtil.restart`); a failed restore reopens what it stopped (`restartAfterFailedImport`).

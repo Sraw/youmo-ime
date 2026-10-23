@@ -8,6 +8,8 @@ import org.fcitx.fcitx5.android.engine.learn.LearnLog
 import org.fcitx.fcitx5.android.engine.session.Offer
 import org.fcitx.fcitx5.android.engine.table.TableOptions
 import org.fcitx.fcitx5.android.engine.table.TableUser.TableLog
+import org.fcitx.fcitx5.android.engine.user.DictionaryCompiler
+import org.fcitx.fcitx5.android.engine.user.DictionaryFile
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -23,16 +25,22 @@ import java.util.concurrent.Executor
  */
 class TableRegistryTest : EnginesFixture() {
 
+    // wired as Engines wires it: the merged dictionaries coded from their file, into an index of the table's
+    private fun wired(warmUps: Executor, assets: EngineAssets, lexicon: UserLexicon): TableRegistry {
+        val indexes = indexDir()
+        return TableRegistry(::load, null, {}, { it.run() }, warmUps, assets, lexicon, indexes = { indexes })
+    }
+
     @get:Rule
     val folder = TemporaryFolder()
 
     @Test
     fun aWordAddedInAnotherReadingOfOneListedIsNotCodedTwice() {
-        val additions = Engines.Additions("", "d") { sequenceOf("你好 ni'hao 0") }
+        val additions = Engines.Additions("", "d", indexes = indexDir(), dictionary = compiled(::load) { sequenceOf("你好 ni'hao 0") })
         val now = Executor { it.run() }
         val assets = EngineAssets(::load, {}, null)
         val lexicon = UserLexicon(null, {}, { null }, { additions }, assets, forgetInTables = {}, dropSessions = {})
-        val registry = TableRegistry(::load, null, {}, now, now, assets, lexicon)
+        val registry = wired(now, assets, lexicon)
         val wubi = "engine-wubi"
         val shared = registry.shared(registry.table(wubi), wubi)
         assertEquals(listOf("wqvb" to "你好"), shared.words("wqvb"))
@@ -68,7 +76,7 @@ class TableRegistryTest : EnginesFixture() {
         val table = File(dir, Engines.userTable("engine-wubi"))
         // whether the table's log was there yet when the record opened: not, if the record came first
         val order = ArrayList<Boolean>()
-        val registry = TableRegistry(::load, dir, {}, now, now, assets, lexicon, { false }) { order += table.exists() }
+        val registry = TableRegistry(::load, dir, {}, now, now, assets, lexicon, { false }, beforeOpen = { order += table.exists() })
         registry.table("engine-wubi")
         registry.table("engine-wubi")
         assertEquals(listOf(false), order)
@@ -123,18 +131,17 @@ class TableRegistryTest : EnginesFixture() {
     @Test
     fun theListedWordsAreCodedInTheBackgroundAndTillThenATableHasAddedOnesOnly() {
         // F2443: the pending state, on a queued executor rather than in place
-        val additions = Engines.Additions("", "d") { sequenceOf("你好 ni'hao 0") }
+        val additions = Engines.Additions("", "d", indexes = indexDir(), dictionary = compiled(::load) { sequenceOf("你好 ni'hao 0") })
         val now = Executor { it.run() }
         val queued = ArrayList<Runnable>()
         val assets = EngineAssets(::load, {}, null)
         val lexicon = UserLexicon(null, {}, { null }, { additions }, assets, forgetInTables = {}, dropSessions = {})
-        val registry = TableRegistry(::load, null, {}, now, { queued += it }, assets, lexicon)
+        val registry = wired({ queued += it }, assets, lexicon)
         val shared = registry.shared(registry.table(WUBI), WUBI)
         assertEquals(emptyList<Pair<String, String>>(), shared.words("wqvb"))
         assertTrue(lexicon.addWord("好你", "hao ni"))
         assertEquals(listOf("vbwq" to "好你"), shared.words("vbwq"))
-        assertEquals(1, queued.size)
-        queued.removeAt(0).run()
+        while (queued.isNotEmpty()) queued.removeAt(0).run()
         assertEquals(listOf("wqvb" to "你好"), shared.words("wqvb"))
         assertEquals(listOf("vbwq" to "好你"), shared.words("vbwq"))
         assertTrue(queued.isEmpty())
@@ -143,18 +150,17 @@ class TableRegistryTest : EnginesFixture() {
     @Test
     fun theListedWordsStartCodingAsATableComesUpNotAtItsFirstKey() {
         // UAT TBL-12a: coded at the first key, an imported word came too late for the first code
-        val additions = Engines.Additions("", "d") { sequenceOf("你好 ni'hao 0") }
+        val additions = Engines.Additions("", "d", indexes = indexDir(), dictionary = compiled(::load) { sequenceOf("你好 ni'hao 0") })
         val now = Executor { it.run() }
         val queued = ArrayList<Runnable>()
         val assets = EngineAssets(::load, {}, null)
         val lexicon = UserLexicon(null, {}, { null }, { additions }, assets, forgetInTables = {}, dropSessions = {})
-        val registry = TableRegistry(::load, null, {}, now, { queued += it }, assets, lexicon)
+        val registry = wired({ queued += it }, assets, lexicon)
         registry.prepare(WUBI)   // no session yet: nothing loaded, nothing coded
         assertTrue(queued.isEmpty())
         val shared = registry.shared(registry.table(WUBI), WUBI)
         registry.prepare(WUBI)
-        assertEquals(1, queued.size)
-        queued.removeAt(0).run()
+        while (queued.isNotEmpty()) queued.removeAt(0).run()
         // the first key finds them coded
         assertEquals(listOf("wqvb" to "你好"), shared.words("wqvb"))
         assertTrue(queued.isEmpty())
@@ -247,7 +253,7 @@ class TableRegistryTest : EnginesFixture() {
         var name = "a"
         val queued = ArrayList<Runnable>()
         fun runAll() { while (queued.isNotEmpty()) queued.removeAt(0).run() }
-        Engines(::load, null, additions = { Engines.Additions("", name) { lines } }, warmUps = { queued += it }).use { engines ->
+        Engines(::load, null, additions = { Engines.Additions("", name, indexes = indexDir(), dictionary = compiled(::load) { lines }) }, warmUps = { queued += it }).use { engines ->
             engines.settings = wubiShown
             engines.type(WUBI, "w")
             runAll()
@@ -262,4 +268,73 @@ class TableRegistryTest : EnginesFixture() {
             assertTrue("你好" in engines.type(WUBI, "wqvb").candidates)
         }
     }
+
+    @Test
+    fun theMergedFilesWordsComeFromAnIndexOnDiskBuiltInTheBackgroundAndKept() {
+        // design D4: coded once into the table's index, not listed as objects (0.3.1 ran out of heap so)
+        val file = mergedFile("merged.ymd", "s", "好你 hao'ni 0.5", "门你 men'ni 0.2")
+        val queued = ArrayList<Runnable>()
+        val assets = EngineAssets(::load, {}, null)
+        val lexicon = mergedLexicon(assets, file)
+        fun registry() = TableRegistry(::load, null, {}, { it.run() }, { queued += it }, assets, lexicon, indexes = { folder.root })
+        val first = registry()
+        val shared = first.shared(first.table(WUBI), WUBI)
+        assertEquals(emptyList<Pair<String, String>>(), shared.words("vbwq"))
+        assertFalse(shared.leadsAnywhere("vbw"))
+        while (queued.isNotEmpty()) queued.removeAt(0).run()
+        assertEquals(listOf("vbwq" to "好你"), shared.words("vbwq"))
+        assertTrue(shared.leadsAnywhere("vbw"))
+        assertTrue(File(folder.root, "merged.$WUBI.ymc").exists())
+        // added by hand once the index has it: offered once
+        assertTrue(lexicon.addWord("好你", "hao ni"))
+        assertEquals(listOf("vbwq" to "好你"), shared.words("vbwq"))
+        // the next start opens the index kept, built for the same table and file
+        val modified = File(folder.root, "merged.$WUBI.ymc").lastModified()
+        val again = registry()
+        val shared2 = again.shared(again.table(WUBI), WUBI)
+        shared2.prepare()
+        while (queued.isNotEmpty()) queued.removeAt(0).run()
+        assertEquals(listOf("vbwq" to "好你"), shared2.words("vbwq"))
+        assertEquals(modified, File(folder.root, "merged.$WUBI.ymc").lastModified())
+    }
+
+    // review F3295: the file merged again (another word, another stamp) at the same index path: built again,
+    // not the old index's places read into the new file
+    @Test
+    fun anIndexOfAnotherMergedFileIsBuiltAgain() {
+        val queued = ArrayList<Runnable>()
+        val assets = EngineAssets(::load, {}, null)
+        fun typed(file: DictionaryFile, code: String): List<Pair<String, String>> {
+            val registry = TableRegistry(::load, null, {}, { it.run() }, { queued += it }, assets, mergedLexicon(assets, file), indexes = { folder.root })
+            val shared = registry.shared(registry.table(WUBI), WUBI)
+            shared.prepare()
+            while (queued.isNotEmpty()) queued.removeAt(0).run()
+            return shared.words(code)
+        }
+        assertEquals(listOf("vbwq" to "好你"), typed(mergedFile("a.ymd", "a", "好你 hao'ni 0.5"), "vbwq"))
+        // the same path compiled again: its stamp alone tells the index is another's (review F3432)
+        val newer = mergedFile("a.ymd", "b", "你好 ni'hao 0.2")
+        assertEquals(emptyList<Pair<String, String>>(), typed(newer, "vbwq"))
+        assertEquals(listOf("wqvb" to "你好"), typed(newer, "wqvb"))
+    }
+
+    // review F3303: a word added by hand that the merged file has too, while no index is kept: offered still
+    @Test
+    fun aWordAddedByHandThatTheFileHasIsOfferedWithoutAnIndex() {
+        val assets = EngineAssets(::load, {}, null)
+        val lexicon = mergedLexicon(assets, mergedFile("merged.ymd", "s", "好你 hao'ni 0.5"))
+        val registry = TableRegistry(::load, null, {}, { it.run() }, { it.run() }, assets, lexicon)
+        val shared = registry.shared(registry.table(WUBI), WUBI)
+        assertTrue(lexicon.addWord("好你", "hao ni"))
+        assertEquals(listOf("vbwq" to "好你"), shared.words("vbwq"))
+    }
+
+    private fun mergedFile(name: String, stamp: String, vararg lines: String): DictionaryFile {
+        val f = File(folder.root, name)
+        DictionaryCompiler.compile(listOf(lines.asSequence()), f, stamp = stamp)
+        return DictionaryFile.open(f)
+    }
+
+    private fun mergedLexicon(assets: EngineAssets, file: DictionaryFile) =
+        UserLexicon(null, {}, { null }, { Engines.Additions("", "d", dictionary = { file }) }, assets, forgetInTables = {}, dropSessions = {})
 }

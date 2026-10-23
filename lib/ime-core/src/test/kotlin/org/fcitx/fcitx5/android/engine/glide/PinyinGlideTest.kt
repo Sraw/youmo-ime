@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.engine.glide
 
+import org.fcitx.fcitx5.android.engine.data.NgramModel.Companion.NO_WORD
 import org.fcitx.fcitx5.android.engine.data.PinyinData
 import org.fcitx.fcitx5.android.engine.data.PinyinDataBuilder
 import org.fcitx.fcitx5.android.engine.lattice.UserWords
@@ -11,7 +12,10 @@ import org.fcitx.fcitx5.android.engine.learn.ImportedWords
 import org.fcitx.fcitx5.android.engine.learn.import
 import org.fcitx.fcitx5.android.engine.pinyin.ShuangpinScheme
 import org.fcitx.fcitx5.android.engine.pinyin.Syllables
+import org.fcitx.fcitx5.android.engine.user.DictionaryCompiler
+import org.fcitx.fcitx5.android.engine.user.DictionaryFile
 import org.fcitx.fcitx5.android.engine.user.UserModel
+import org.fcitx.fcitx5.android.engine.user.UserScorer
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -187,5 +191,49 @@ class PinyinGlideTest {
         model.own(woai)
         version++
         assertEquals(1, user.decode(path("woai"), GlideLayout.QWERTY, 10).count { it.word == "我爱" })
+    }
+
+    // review S6: a merged file's words glide, its best first, a blocked one skipped
+    @Test
+    fun aMergedDictionarysWordsGlideBestFirstTheBlockedSkipped() {
+        val file = java.io.File.createTempFile("merged", ".ymd").apply { deleteOnExit() }
+        DictionaryCompiler.compile(listOf(sequenceOf("我爱 wo'ai 0.5", "卧碍 wo'ai 0.01")), file, inBase = DictionaryCompiler.inBase(data))
+        val model = UserModel(data.dictionary, data.vocabulary, data.wordIndex, DictionaryFile.open(file))
+        var version = 0
+        // scored as Engines scores a glide: the user's scorer, a merged word by its file's rank till chosen
+        val scorer = UserScorer(data.model, model)
+        val context = scorer.context(NO_WORD, NO_WORD)
+        val user = PinyinGlide(data, user = { PinyinGlide.User(version, { scorer.scoreAfter(context, it) }, model, { model.count(it) > 0f }) { w, _ -> model.blocked(w, -1) } })
+        fun woai() = user.decode(path("woai"), GlideLayout.QWERTY, 10).filter { it.keys == "wo'ai" }.map { it.word }
+        assertEquals(listOf("我爱"), woai())
+        model.block(UserModel.Entry("我爱", syl("wo", "ai")))
+        version++
+        assertEquals(listOf("卧碍"), woai())
+        model.unblock(UserModel.Entry("我爱", syl("wo", "ai")))
+        version++
+        assertEquals(listOf("我爱"), woai())
+        // learned, second in its file: scored with its counts, found past the first (review S5)
+        model.addCount(UserModel.Entry("卧碍", syl("wo", "ai")), 5f)
+        version++
+        assertEquals(listOf("卧碍"), woai())
+    }
+
+    // review R12: an imported and a merged word on one path the dictionary lacks: the path read once,
+    // carrying both tries' nodes, so with the imported one blocked the merged one is there
+    @Test
+    fun anImportedAndAMergedWordOnOnePathAreOneReading() {
+        val file = java.io.File.createTempFile("merged", ".ymd").apply { deleteOnExit() }
+        DictionaryCompiler.compile(listOf(sequenceOf("卧碍 wo'ai 0.5")), file, inBase = DictionaryCompiler.inBase(data))
+        val model = UserModel(data.dictionary, data.vocabulary, data.wordIndex, DictionaryFile.open(file))
+        model.attachImports(ImportedWords().import("我爱" to "wo ai"))
+        var version = 0
+        val scorer = UserScorer(data.model, model)
+        val context = scorer.context(NO_WORD, NO_WORD)
+        val user = PinyinGlide(data, user = { PinyinGlide.User(version, { scorer.scoreAfter(context, it) }, model, { model.count(it) > 0f }) { w, _ -> model.blocked(w, -1) } })
+        fun woai() = user.decode(path("woai"), GlideLayout.QWERTY, 10).filter { it.keys == "wo'ai" }.map { it.word }
+        assertEquals(1, woai().size)
+        model.block(UserModel.Entry("我爱", syl("wo", "ai")))
+        version++
+        assertEquals(listOf("卧碍"), woai())
     }
 }

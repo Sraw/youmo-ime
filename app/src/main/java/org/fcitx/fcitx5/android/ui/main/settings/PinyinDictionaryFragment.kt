@@ -8,6 +8,7 @@ import android.content.Context
 import android.graphics.Typeface
 import android.net.Uri
 import android.os.Bundle
+import android.provider.OpenableColumns
 import android.text.SpannableStringBuilder
 import android.text.style.RelativeSizeSpan
 import android.text.style.StyleSpan
@@ -24,24 +25,42 @@ import androidx.preference.Preference
 import androidx.preference.PreferenceCategory
 import com.google.android.material.snackbar.Snackbar
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.drop
+import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.core.FcitxAPI
+import org.fcitx.fcitx5.android.data.pinyin.ImportedDictionaries
 import org.fcitx.fcitx5.android.data.pinyin.ImportedDictionaries.Unread
+import org.fcitx.fcitx5.android.data.pinyin.MergedDictionary
 import org.fcitx.fcitx5.android.data.pinyin.PinyinDictManager
+import org.fcitx.fcitx5.android.data.pinyin.countWordLines
 import org.fcitx.fcitx5.android.data.pinyin.dict.PinyinDictionary
 import org.fcitx.fcitx5.android.data.pinyin.dict.TextDictionary
 import org.fcitx.fcitx5.android.engine.host.Engines
 import org.fcitx.fcitx5.android.engine.host.ImportLayer
 import org.fcitx.fcitx5.android.engine.learn.backup.LearnBackup
+import org.fcitx.fcitx5.android.engine.user.DictionaryCompiler
+import org.fcitx.fcitx5.android.engine.user.DictionaryFormat
 import org.fcitx.fcitx5.android.engine.user.ImportFiles
 import org.fcitx.fcitx5.android.engine.user.WordListFiles
 import org.fcitx.fcitx5.android.engine.user.WordLists
 import org.fcitx.fcitx5.android.ui.common.PaddingPreferenceFragment
-import org.fcitx.fcitx5.android.ui.common.withLoadingDialog
+import org.fcitx.fcitx5.android.ui.common.ProgressBarDialog
+import org.fcitx.fcitx5.android.ui.common.ProgressBarDialogIndeterminate
+import org.fcitx.fcitx5.android.ui.common.withLoading
 import org.fcitx.fcitx5.android.ui.main.MainViewModel
 import org.fcitx.fcitx5.android.ui.main.MainViewModel.ButtonMode
 import org.fcitx.fcitx5.android.ui.main.launchOutlivingPage
@@ -53,9 +72,16 @@ import org.fcitx.fcitx5.android.utils.navigateWithAnim
 import org.fcitx.fcitx5.android.utils.queryFileName
 import org.fcitx.fcitx5.android.utils.toast
 import org.fcitx.fcitx5.android.utils.withLowercaseExtension
+import splitties.dimensions.dp
+import splitties.resources.resolveThemeAttribute
+import splitties.views.dsl.core.textView
+import splitties.views.textAppearance
 import timber.log.Timber
+import java.io.File
 import java.io.InputStream
+import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.coroutines.CoroutineContext
+import kotlin.coroutines.resume
 
 /**
  * The words and phrases (词库与短语): the user dictionary, then the base one, as they rank, and
@@ -86,6 +112,10 @@ class PinyinDictionaryFragment : PaddingPreferenceFragment() {
 
     private class Listed(val dictionary: TextDictionary, val words: Int)
 
+    // what says a compile is under way, and the rows of the dictionaries it upgrades: told its percent as it goes
+    private var status: Preference? = null
+    private val upgrading = ArrayList<Preference>()
+
     private enum class Target(@StringRes val title: Int, @StringRes val hint: Int) {
         BASE(R.string.layer_base_recommended, R.string.import_into_base),
         USER(R.string.layer_user, R.string.import_into_user),
@@ -100,11 +130,41 @@ class PinyinDictionaryFragment : PaddingPreferenceFragment() {
         preferenceScreen = preferenceManager.createPreferenceScreen(requireContext())
     }
 
+    private var retried = false
+
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
         viewModel.toolbarButton.value = ButtonMode.NONE
         toldUnread = false
         rebuild()
+        // what failed to compile in this process is compiled again now, as the failure's notice says (review M3);
+        // and the import files a killed page left in the cache are cleared (review S3)
+        // once a page visit: not at each rotation or return from a sub-page, a minute's compile each (review NIT)
+        if (savedInstanceState == null && !retried) {
+            retried = true
+            lifecycleScope.launch(Dispatchers.IO) {
+                MergedDictionary.retry(PinyinDictManager.pinyinDicDir)
+                PinyinDictManager.sweepCache()
+            }
+        }
+        viewLifecycleOwner.lifecycleScope.launch {
+            MergedDictionary.done.collect { (kind, ok) ->
+                if (!ok && kind == MergedDictionary.Kind.UPDATE) {
+                    context?.let { AlertDialog.Builder(it).setMessage(R.string.dict_update_failed).setPositiveButton(android.R.string.ok, null).show() }
+                }
+            }
+        }
+        // the merged file made anew (an upgrade, a dictionary off or deleted): said till it is in use, then listed as it is.
+        // Listed again only as one starts or ends (the list just built has the one now), not at each percent: the
+        // status row is set only once the list is read, and each step restarted that read (review NIT)
+        viewLifecycleOwner.lifecycleScope.launch {
+            MergedDictionary.work.map { it?.kind }.distinctUntilChanged().drop(1).collect { rebuild() }
+        }
+        viewLifecycleOwner.lifecycleScope.launch {
+            MergedDictionary.work.filterNotNull().collect { work ->
+                said(work).let { text -> status?.summary = text; upgrading.forEach { it.summary = text } }
+            }
+        }
         // a file opened with the app, once (the home page passes none, as "")
         if (savedInstanceState == null && !asked) args.uri?.takeIf { it.isNotEmpty() }?.let { askTarget(Uri.parse(it)) }
         asked = true
@@ -168,7 +228,24 @@ class PinyinDictionaryFragment : PaddingPreferenceFragment() {
         user.addPreference(R.string.imported_lists, R.string.imported_lists_summary) { showImports() }
         val base = category(R.string.layer_base)
         base.addPreference(builtIn(R.string.builtin_base_title, R.string.builtin_base_summary))
-        listed.forEach { base.addPreference(row(it)) }
+        val work = MergedDictionary.work.value
+        status = work?.let {
+            Preference(ctx).apply {
+                setTitle(if (it.kind == MergedDictionary.Kind.UPGRADE) R.string.dict_upgrading_title else R.string.dict_updating_title)
+                summary = said(it)
+                isSelectable = false
+                isIconSpaceReserved = false
+            }.also(base::addPreference)
+        }
+        upgrading.clear()
+        listed.forEach { item ->
+            val row = row(item)
+            if (work?.kind == MergedDictionary.Kind.UPGRADE && item.dictionary.isEnabled) {
+                row.summary = said(work)
+                upgrading += row
+            }
+            base.addPreference(row)
+        }
         val files = category(R.string.import_section)
         files.addPreference(R.string.import_dict, R.string.import_dict_summary) { launcher.launch("*/*") }
         val phrases = category(R.string.section_phrases)
@@ -197,6 +274,9 @@ class PinyinDictionaryFragment : PaddingPreferenceFragment() {
         isIconSpaceReserved = false
     }
 
+    private fun said(work: MergedDictionary.Work) =
+        getString(if (work.kind == MergedDictionary.Kind.UPGRADE) R.string.dict_upgrading else R.string.dict_updating, work.percent)
+
     private fun row(item: Listed) = Preference(requireContext()).apply {
         val dictionary = item.dictionary
         title = dictionary.name
@@ -211,7 +291,7 @@ class PinyinDictionaryFragment : PaddingPreferenceFragment() {
         val actions = listOf(
             (if (dictionary.isEnabled) R.string.dict_turn_off else R.string.dict_turn_on) to {
                 change {
-                    runCatching { check(if (dictionary.isEnabled) dictionary.disable() else dictionary.enable()) { "cannot rename ${dictionary.file.name}" } }
+                    runCatching { check(PinyinDictManager.turn(dictionary, !dictionary.isEnabled)) { "cannot rename ${dictionary.file.name}" } }
                 }
             },
             R.string.delete to { confirmDelete(dictionary) },
@@ -246,18 +326,35 @@ class PinyinDictionaryFragment : PaddingPreferenceFragment() {
      */
     private fun askTarget(uri: Uri) {
         val ctx = requireContext()
-        lifecycleScope.withLoadingDialog(ctx) {
+        lifecycleScope.launch {
             try {
-                val incoming = inspect(ctx, uri) ?: return@withLoadingDialog
+                val incoming = inspect(ctx, uri) ?: return@launch
                 if (incoming.backup) {
                     restore.from(uri)
-                    return@withLoadingDialog
+                    return@launch
                 }
                 if (incoming.brokenBackup) {
                     ctx.toast(R.string.learning_backup_failed)
-                    return@withLoadingDialog
+                    return@launch
                 }
-                showTargets(ctx, uri, incoming)
+                // one of that name in the base already: only the user dictionary is left to it, asked
+                // before the whole file is read for nothing (frost's 42 s, then 已存在; review S7)
+                val userOnly = mergesIntoBase(incoming.fileName) &&
+                    withContext(Dispatchers.IO) { ImportedDictionaries.hasDictionary(PinyinDictManager.pinyinDicDir, incoming.name) }
+                if (userOnly && !askUserOnly(ctx, incoming.name)) return@launch
+                // the whole file read through before anything is imported (D6): what it is shows
+                // in the dialog, and one not surely read is refused here, for either dictionary
+                val prepared = analyse(ctx, uri, incoming)
+                val analysis = prepared.analysis
+                // refused for either dictionary only when its text is not read at all; else the
+                // user dictionary takes it line by line as before, the base refusing it then (review OQ1)
+                if (analysis is DictionaryFormat.Refused && analysis.reason in UNREADABLE_TEXT) {
+                    // a copy as large as the file, maybe two: off the main thread, as the other ways out close it
+                    withContext(NonCancellable + Dispatchers.IO) { prepared.close() }
+                    ctx.importErrorDialog(PinyinDictManager.refusal(analysis.reason))
+                    return@launch
+                }
+                if (userOnly) import(uri, incoming, Target.USER, prepared) else showTargets(ctx, uri, incoming, prepared)
             } catch (e: CancellationException) {
                 // the page left: nothing to show the error on
                 throw e
@@ -269,6 +366,39 @@ class PinyinDictionaryFragment : PaddingPreferenceFragment() {
         }
     }
 
+    // whether the user takes the user dictionary for a file whose name the base has already
+    private suspend fun askUserOnly(ctx: Context, name: String): Boolean = suspendCancellableCoroutine { cont ->
+        val dialog = AlertDialog.Builder(ctx)
+            .setTitle(R.string.import_dict)
+            .setMessage(getString(R.string.dict_exists_user_only, name))
+            .setPositiveButton(R.string.import_into_user_short) { _, _ -> if (cont.isActive) cont.resume(true) }
+            .setNegativeButton(android.R.string.cancel, null)
+            .setOnDismissListener { if (cont.isActive) cont.resume(false) }
+            .show()
+        cont.invokeOnCancellation { dialog.dismiss() }
+    }
+
+    // the whole file read through, its progress shown; the page gone or Cancel stops it, its files cleared
+    private suspend fun analyse(ctx: Context, uri: Uri, incoming: Incoming): PinyinDictManager.Prepared =
+        withProgress(ctx, R.string.dict_analysing_title) { said, cancelled ->
+            // not cancellable itself (its token is): what it made is closed here if the page went meanwhile
+            withContext(NonCancellable + Dispatchers.IO) {
+                val size = ctx.contentResolver.query(uri, arrayOf(OpenableColumns.SIZE), null, null, null)?.use {
+                    if (it.moveToFirst() && !it.isNull(0)) it.getLong(0) else 0L
+                } ?: 0L
+                PinyinDictManager.prepare(ctx.contentResolver.openInputStreamOrThrow(uri), incoming.fileName, size) { share ->
+                    if (cancelled.get()) throw CancellationException("cancelled")
+                    said.value = ctx.getString(R.string.dict_progress_analysing, (share * 100).toInt()) to (share * 100).toInt()
+                }.also { made ->
+                    // done as the page went: its result is thrown away by the cancelled scope, its files not left
+                    if (cancelled.get()) {
+                        made.close()
+                        throw CancellationException("cancelled")
+                    }
+                }
+            }
+        }
+
     /**
      * The file at [uri] to import; null for one without a name. Its type is not checked here: the
      * user dictionary takes any text, only the base wants a dictionary's extension.
@@ -276,7 +406,7 @@ class PinyinDictionaryFragment : PaddingPreferenceFragment() {
     private suspend fun inspect(ctx: Context, uri: Uri): Incoming? {
         val cr = ctx.contentResolver
         val fileName = withContext(Dispatchers.IO) { cr.queryFileName(uri) } ?: return null
-        val head = withContext(Dispatchers.IO) { cr.openInputStreamOrThrow(uri).use { it.readAtMost(EXPORT_PEEK) } }
+        val head = withContext(Dispatchers.IO) { cr.openInputStreamOrThrow(uri).use { it.readAtMost(PinyinDictManager.EXPORT_PEEK) } }
         return incoming(fileName, head)
     }
 
@@ -284,8 +414,9 @@ class PinyinDictionaryFragment : PaddingPreferenceFragment() {
      * Asks which dictionary [incoming] goes into, the user dictionary picked to begin with if
      * [startsInUser], else the base, and imports it there.
      */
-    private fun showTargets(ctx: Context, uri: Uri, incoming: Incoming) {
-        val targets = Target.entries
+    private fun showTargets(ctx: Context, uri: Uri, incoming: Incoming, prepared: PinyinDictManager.Prepared) {
+        // a file the base refuses by its name is offered only the user dictionary, not refused after (review F3444)
+        val targets = if (offersBase(incoming)) Target.entries else listOf(Target.USER)
         val items = targets.map { target ->
             SpannableStringBuilder()
                 .inSpans(StyleSpan(Typeface.BOLD)) { append(getString(target.title)) }
@@ -295,34 +426,116 @@ class PinyinDictionaryFragment : PaddingPreferenceFragment() {
                 .inSpans(RelativeSizeSpan(GAP)) { append("\n") }
         }.toTypedArray<CharSequence>()
         var picked = targets.indexOf(if (startsInUser(incoming)) Target.USER else Target.BASE)
+        var importing = false
+        val title = getString(R.string.import_into_title)
         AlertDialog.Builder(ctx)
-            .setTitle(R.string.import_into_title)
+            // what the file was read as, under the question (a message would take the items' place)
+            .apply {
+                val detected = prepared.analysis as? DictionaryFormat.Detected
+                if (detected == null) {
+                    setTitle(title)
+                } else {
+                    // a custom title: the standard one is cut at two lines, and with it the word count (review S6)
+                    setCustomTitle(detectedTitle(ctx, title, describe(detected)))
+                }
+            }
             .setSingleChoiceItems(items, picked) { _, which -> picked = which }
-            .setPositiveButton(R.string.import_dict) { _, _ -> import(uri, incoming, targets[picked]) }
+            .setPositiveButton(R.string.import_dict) { _, _ ->
+                importing = true
+                import(uri, incoming, targets[picked], prepared)
+            }
             .setNegativeButton(android.R.string.cancel, null)
+            .setOnDismissListener { if (!importing) lifecycleScope.launch(NonCancellable + Dispatchers.IO) { prepared.close() } }
             .show()
     }
 
-    private fun import(uri: Uri, incoming: Incoming, target: Target) {
+    private fun detectedTitle(ctx: Context, title: String, detected: String) = ctx.textView {
+        text = SpannableStringBuilder()
+            .inSpans(RelativeSizeSpan(TITLE)) { append(title) }
+            .append("\n")
+            .inSpans(RelativeSizeSpan(SMALL)) { append(detected) }
+        textAppearance = ctx.resolveThemeAttribute(android.R.attr.textAppearanceListItem)
+        setPadding(dp(24), dp(20), dp(24), dp(4))
+    }
+
+    /** [detected] as the confirm dialog says it: `Rime 词库 · 拼音用空格分开 · 第三列是词频 · 1914417 个词`. */
+    private fun describe(detected: DictionaryFormat.Detected): String {
+        val parts = ArrayList<String>()
+        parts += getString(if (detected.source == DictionaryFormat.Source.RIME) R.string.dict_detected_rime else R.string.dict_detected_plain)
+        if (detected.charset != Charsets.UTF_8) {
+            val name = if (detected.charset.name() == "GB18030") "GBK" else detected.charset.name().removeSuffix("LE").removeSuffix("BE")
+            parts += getString(R.string.dict_detected_charset, name)
+        }
+        if (detected.order == DictionaryFormat.Order.PINYIN_FIRST) parts += getString(R.string.dict_detected_pinyin_first)
+        parts += getString(
+            when (detected.reading) {
+                DictionaryFormat.Reading.APOSTROPHES -> R.string.dict_detected_apostrophes
+                DictionaryFormat.Reading.SPACES -> R.string.dict_detected_spaces
+                DictionaryFormat.Reading.RUN_TOGETHER -> R.string.dict_detected_run_together
+                DictionaryFormat.Reading.NONE -> R.string.dict_detected_no_pinyin
+            },
+        )
+        parts += getString(
+            when (detected.weight) {
+                DictionaryFormat.Weight.PROBABILITY -> R.string.dict_detected_probability
+                DictionaryFormat.Weight.COUNT -> R.string.dict_detected_count
+                DictionaryFormat.Weight.LOG -> R.string.dict_detected_log
+                DictionaryFormat.Weight.NONE -> R.string.dict_detected_no_weight
+            },
+        )
+        // the words the base takes; those without pinyin only the user dictionary does, said apart (review NIT)
+        parts += resources.getQuantityString(R.plurals.word_count, detected.words, detected.words)
+        if (detected.textOnly > 0) parts += resources.getQuantityString(R.plurals.dict_detected_text_only, detected.textOnly, detected.textOnly)
+        if (detected.unread > 0) parts += resources.getQuantityString(R.plurals.dict_detected_unread, detected.unread, detected.unread)
+        return parts.joinToString(" · ")
+    }
+
+    private fun import(uri: Uri, incoming: Incoming, target: Target, prepared: PinyinDictManager.Prepared) {
         val ctx = requireContext()
-        val cr = ctx.contentResolver
-        lifecycleScope.withLoadingDialog(ctx, R.string.importing) {
+        lifecycleScope.launch {
             try {
                 if (target == Target.USER) {
-                    importIntoUser(uri, incoming.fileName)
-                    return@withLoadingDialog
+                    // the user dictionary's imported words are in the heap: counted first with those
+                    // imported before, never half imported; a file refused for the base by its lines
+                    val words = withContext(Dispatchers.IO) { wordsForUser(prepared.analysis) { countLines(prepared.text) } }
+                    val already = viewModel.fcitx.runOnReady { importBatches() }.sumOf { it.left }
+                    if (tooLargeForUser(words, already)) {
+                        // the file alone too large, or the imports there with it: each its own advice (review F3413)
+                        ctx.importErrorDialog(userCapMessage(words))
+                        return@launch
+                    }
+                    withLoading(LOADING_AFTER, { ctx.ProgressBarDialogIndeterminate(R.string.importing).show() }, { it.dismiss() }) {
+                        importIntoUser(uri, incoming.fileName)
+                    }
+                    return@launch
                 }
-                if (PinyinDictionary.Type.fromFileName(withLowercaseExtension(incoming.fileName)) == null) {
+                // a guard only: showTargets offers the base for none of these (offersBase)
+                if (!offersBase(incoming)) {
                     ctx.importErrorDialog(R.string.invalid_dict)
-                    return@withLoadingDialog
+                    return@launch
                 }
-                val imported = withContext(Dispatchers.IO) {
-                    ManagedDictionaries.importFile(incoming) { cr.openInputStreamOrThrow(uri) }
+                // compiled into the merged file before this returns: the engine reloaded has the words
+                withProgress(ctx, R.string.importing) { said, cancelled ->
+                    coroutineScope {
+                        val shown = launch {
+                            MergedDictionary.work.collect { work ->
+                                if (work != null) said.value = getString(stageText(work.stage), work.percent) to work.percent
+                            }
+                        }
+                        try {
+                            withContext(NonCancellable + Dispatchers.IO) {
+                                PinyinDictManager.importPrepared(prepared, incoming.name, cancelled) { share ->
+                                    val percent = (share * 100).toInt()
+                                    said.value = getString(R.string.dict_progress_copying, percent) to percent
+                                }
+                            }.getOrThrow()
+                        } finally {
+                            shown.cancel()
+                        }
+                    }
                 }
-                if (!imported) {
-                    ctx.importErrorDialog(R.string.dict_already_exists)
-                    return@withLoadingDialog
-                }
+                // the compile told the engine already (MergedDictionary.made), but only if fcitx was ready
+                // then (runIfReady); this waits for it: one reload more, the words surely there
                 viewModel.fcitx.runOnReady { reloadEngine() }
                 rebuild()
             } catch (e: CancellationException) {
@@ -330,7 +543,56 @@ class PinyinDictionaryFragment : PaddingPreferenceFragment() {
                 throw e
             } catch (e: Exception) {
                 ctx.importErrorDialog(e)
+            } finally {
+                // the page gone, too: about twice the file in the cache otherwise (review S3)
+                withContext(NonCancellable + Dispatchers.IO) { prepared.close() }
             }
+        }
+    }
+
+    @StringRes
+    private fun stageText(stage: DictionaryCompiler.Stage) = when (stage) {
+        DictionaryCompiler.Stage.READ -> R.string.dict_progress_compiling
+        DictionaryCompiler.Stage.MERGE -> R.string.dict_progress_merging
+        DictionaryCompiler.Stage.WRITE -> R.string.dict_progress_writing
+    }
+
+    /**
+     * [block] under a [ProgressBarDialog] titled [title]: it sets what the dialog says and how far
+     * (text to percent); its cancel sets the flag [block] checks and calls [cancel]. A cancel
+     * ends it as a CancellationException, as one that is not imported is not an error to show.
+     */
+    private suspend fun <T> withProgress(
+        ctx: Context,
+        @StringRes title: Int,
+        block: suspend (MutableStateFlow<Pair<String, Int>>, AtomicBoolean) -> T,
+    ): T = coroutineScope {
+        val cancelled = AtomicBoolean()
+        // the page gone (a rotation) stops the work too, at once: run on blind, it left its files in the cache (review S3).
+        // Told by a child cancelled with the scope; the scope's own completion waits for the NonCancellable work
+        var finished = false
+        val watching = launch(start = CoroutineStart.UNDISPATCHED) {
+            try {
+                awaitCancellation()
+            } finally {
+                if (!finished) cancelled.set(true)
+            }
+        }
+        val dialog = ProgressBarDialog(ctx, title) { cancelled.set(true) }
+        val said = MutableStateFlow("" to 0)
+        // not for a moment's work: a three-word file's dialog only flashed
+        val showing = launch {
+            delay(LOADING_AFTER)
+            dialog.show()
+            said.collect { (text, percent) -> dialog.set(text, percent) }
+        }
+        try {
+            block(said, cancelled)
+        } finally {
+            finished = true
+            watching.cancel()
+            showing.cancel()
+            dialog.dismiss()
         }
     }
 
@@ -409,9 +671,13 @@ class PinyinDictionaryFragment : PaddingPreferenceFragment() {
     companion object {
         private const val SMALL = 0.85f
         private const val GAP = 0.6f
+        private const val TITLE = 1.15f
 
-        // the export's header is its first line, and a blocked word's `!` is soon there if it has one
-        private const val EXPORT_PEEK = 64 shl 10
+        // refused whatever dictionary it is for: no text read in it, or no word in it at all
+        private val UNREADABLE_TEXT = setOf(DictionaryFormat.Reason.ENCODING, DictionaryFormat.Reason.BINARY, DictionaryFormat.Reason.NO_WORDS)
+
+        // the spinner of an import into the user dictionary, once it takes this long (ms)
+        private const val LOADING_AFTER = 200L
 
         // the process's: a page made anew reads again only the dictionaries that changed
         private val wordCounts = WordCounts { PinyinDictManager.wordCount(it) }
@@ -419,8 +685,8 @@ class PinyinDictionaryFragment : PaddingPreferenceFragment() {
         // the process's too: a page made anew (a rotation) makes its changes after those of the one it replaces
         private val changes = DictionaryChanges({ launchOutlivingPage("dictionaries", it) }) {
             Timber.w(it, "dictionaries")
-            // the page may be gone by now
-            appContext.toast(R.string.dict_change_failed)
+            // the page may be gone by now; one refused (too many words) says why
+            if (it is PinyinDictManager.Refusal) appContext.toast(it.message) else appContext.toast(R.string.dict_change_failed)
         }
     }
 }
@@ -437,10 +703,22 @@ internal fun readAsWordList(fileName: String) =
 
 /**
  * Whether the user dictionary, not the base, is picked to begin with for [incoming]: for its own
- * export, and for a file of no dictionary's type, which only it takes.
+ * export, and for a file of no dictionary's type or of a name no base file can have, which only it
+ * takes (review F3423: not offered the base first only to be refused after the analysis).
  */
-internal fun startsInUser(incoming: Incoming) =
-    incoming.userExport || PinyinDictionary.Type.fromFileName(withLowercaseExtension(incoming.fileName)) == null
+internal fun startsInUser(incoming: Incoming) = incoming.userExport || !offersBase(incoming)
+
+/** Whether the base dictionary is offered for [incoming] at all: a file it takes, of a name a base file can have. */
+internal fun offersBase(incoming: Incoming) = mergesIntoBase(incoming.fileName) && incoming.namedForBase
+
+/** Whether a file named [fileName] is Rime's dictionary (`*.dict.yaml`): text the base takes, its header skipped. */
+internal fun isRimeDictionary(fileName: String) = fileName.lowercase().endsWith(RIME_DICTIONARY)
+
+private const val RIME_DICTIONARY = ".dict.yaml"
+
+/** Whether the base dictionary takes a file named [fileName]: a dictionary's type, or Rime's. */
+internal fun mergesIntoBase(fileName: String) =
+    PinyinDictionary.Type.fromFileName(withLowercaseExtension(fileName)) != null || isRimeDictionary(fileName)
 
 /**
  * The words of the file named [fileName], as [open] reads it, imported into the user dictionary
@@ -493,38 +771,46 @@ internal fun incoming(fileName: String, head: ByteArray?) = Incoming(
  * a learning backup or a bare learning log (this build's export, 另存一份's copy).
  */
 internal class Incoming(val fileName: String, val userExport: Boolean = false, val backup: Boolean = false) {
-    /** what it is kept as */
-    val name = PinyinDictionary.nameOf(fileName)
+    /** what it is kept as: Rime's `luna_pinyin.dict.yaml` as luna_pinyin */
+    val name = if (isRimeDictionary(fileName)) fileName.dropLast(RIME_DICTIONARY.length) else PinyinDictionary.nameOf(fileName)
+
+    /** Whether [name] can name a file of the base: `.dict.yaml` alone names none, a hidden `.txt` the list shows untitled. */
+    val namedForBase get() = name.isNotEmpty() && !name.startsWith(".")
 
     /** Named as a backup, and not one (cut short, or damaged): never offered as words, read as text it is noise. */
     val brokenBackup get() = !backup && withLowercaseExtension(fileName).endsWith(LearnBackup.EXTENSION)
 }
 
-/** Where a file the user imports goes: the dictionaries [PinyinDictManager] keeps, or a test's. */
-internal interface ImportTarget {
-    /** The type of the dictionary of [name] there, if there is one. */
-    fun typeOf(name: String): PinyinDictionary.Type?
-
-    fun import(stream: InputStream, fileName: String)
-}
+/** More words than this go into the base dictionary only: the user dictionary's imported words are held in the heap (~200 B each). */
+internal const val USER_MAX_WORDS = 100_000
 
 /**
- * Imports [incoming], as [open] reads it, into the base dictionary; false, with nothing read or
- * changed, where one of its name is there.
+ * The words a file analysed as [analysis] puts in the user dictionary: those [DictionaryFormat]
+ * counted, with pinyin or without; for one it refused for the base (two layouts, initials only…),
+ * which the user dictionary still reads line by line, its [lines]; none counted for the user's own
+ * export, not analysed, as before.
  */
-internal fun ImportTarget.importFile(incoming: Incoming, open: () -> InputStream): Boolean {
-    if (typeOf(incoming.name) != null) return false
-    open().use { import(it, incoming.fileName) }
-    return true
+internal fun wordsForUser(analysis: DictionaryFormat.Analysis?, lines: () -> Int): Int = when (analysis) {
+    null -> 0
+    is DictionaryFormat.Detected -> analysis.words + analysis.textOnly
+    is DictionaryFormat.Refused -> lines()
 }
 
-private object ManagedDictionaries : ImportTarget {
-    override fun typeOf(name: String) = PinyinDictManager.listDictionaries().firstOrNull { it.name == name }?.type
+/** The lines of [file] that may be words, counted as the page counts a dictionary's ([countWordLines]). */
+internal fun countLines(file: File): Int = countWordLines(file)
 
-    override fun import(stream: InputStream, fileName: String) {
-        PinyinDictManager.importFromInputStream(stream, fileName).getOrThrow()
-    }
-}
+/**
+ * Whether a file of [words] (as [wordsForUser] counts the file, not the words it would newly add)
+ * would take the user dictionary's imported words, [already] there (the lists imported, what is
+ * left of each), past [USER_MAX_WORDS]: the total is what the heap holds, not one import's. Only
+ * the user's own export (0, not counted) is never refused: 0.3.1 had no cap, so an upgraded user
+ * may be past it already (review F3413); counting the file keeps the rule one users can predict.
+ */
+internal fun tooLargeForUser(words: Int, already: Int) = words > 0 && already.toLong() + words > USER_MAX_WORDS
+
+/** The advice for a file [tooLargeForUser] refused: the file alone too large, or the imports there with it (review F3413). */
+internal fun userCapMessage(words: Int) =
+    if (words > USER_MAX_WORDS) R.string.dict_too_large_for_user else R.string.dict_user_imports_full
 
 /**
  * How many words each dictionary has, as [count] reads them, read again only for one whose file

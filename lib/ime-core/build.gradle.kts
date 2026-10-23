@@ -85,6 +85,10 @@ kover {
             // FakeEditor is test code, whatever source set it lives in
             excludedSourceSets.add("testFixtures")
         }
+        instrumentation {
+            // the bounded-heap tests time their keys; the coverage agent would slow them and add to the 48 MB heap
+            disabledForTestTasks.add("boundedHeapTest")
+        }
     }
     reports {
         verify {
@@ -98,3 +102,19 @@ kover {
         }
     }
 }
+
+// A merged dictionary's words must compile and open in a small heap (DictionaryFileBoundedHeapTest):
+// 0.3.1 ran a phone's 256 MB out with them. Alone in a 48 MB JVM, so the bound is the heap's own
+tasks.named<Test>("test") {
+    exclude("**/*BoundedHeapTest*")
+}
+val boundedHeapTest = tasks.register<Test>("boundedHeapTest") {
+    description = "Compiles, opens and codes for a table a large dictionary in a 48 MB heap."
+    group = "verification"
+    val main = tasks.named<Test>("test").get()
+    testClassesDirs = main.testClassesDirs
+    classpath = main.classpath
+    filter.includeTestsMatching("*BoundedHeapTest")
+    maxHeapSize = "48m"
+}
+tasks.named("check") { dependsOn(boundedHeapTest) }

@@ -4,10 +4,15 @@
  */
 package org.fcitx.fcitx5.android.engine.lattice
 
+import org.fcitx.fcitx5.android.engine.user.DictionaryCompiler
+import org.fcitx.fcitx5.android.engine.user.DictionaryFile
+import org.fcitx.fcitx5.android.engine.user.UserFixtures
+import org.fcitx.fcitx5.android.engine.user.UserModel
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.io.File
 
 class CoarseWordsTest {
 
@@ -79,5 +84,25 @@ class CoarseWordsTest {
         assertEquals("counts looked up for words off the list", 0, user.asked)
         assertTrue(list.unasked(3, user, 10))
         assertEquals("counts looked up for a word of the list", 1, user.asked)
+    }
+
+    // review S6: a merged dictionary's word on the list is unasked by its id, till the user typed it
+    @Test
+    fun aMergedDictionarysWordOnTheListIsUnaskedTillTyped() {
+        val data = UserFixtures.data
+        val file = File.createTempFile("merged", ".ymd").apply { deleteOnExit() }
+        DictionaryCompiler.compile(listOf(sequenceOf("妮好 ni'hao 0.5", "拟浩 ni'hao 0.1")), file)
+        val user = UserModel(
+            data.dictionary, data.vocabulary, data.wordIndex,
+            DictionaryFile.open(file),
+        )
+        val coarse = CoarseWords.of({ -1 }, listOf("拟浩"))
+        val entry = { t: String -> UserModel.Entry(t, UserFixtures.syl("ni", "hao")) }
+        val listed = user.known(entry("拟浩"))
+        assertTrue(user.isMerged(listed))
+        assertTrue(coarse.unasked(listed, user, data.vocabulary.size))
+        assertFalse(coarse.unasked(user.known(entry("妮好")), user, data.vocabulary.size))
+        user.learn(null, listOf(entry("拟浩")))
+        assertFalse(coarse.unasked(listed, user, data.vocabulary.size))
     }
 }

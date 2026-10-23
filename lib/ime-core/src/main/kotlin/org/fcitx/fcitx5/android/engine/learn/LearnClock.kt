@@ -77,7 +77,7 @@ interface LearnClock {
 
         private const val HOUR_MINUTES = 60
 
-        // Math.floorDiv is API 24
+        // by hand, not Math.floorDiv: written for an API floor below 24
         internal fun floorDiv(x: Long, y: Long): Long {
             val q = x / y
             return if ((x % y != 0L) && ((x xor y) < 0)) q - 1 else q

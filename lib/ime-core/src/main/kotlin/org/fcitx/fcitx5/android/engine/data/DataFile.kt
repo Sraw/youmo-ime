@@ -6,6 +6,7 @@ package org.fcitx.fcitx5.android.engine.data
 
 import java.io.ByteArrayOutputStream
 import java.io.OutputStream
+import java.io.RandomAccessFile
 import java.nio.Buffer
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
@@ -81,6 +82,9 @@ class DataFile private constructor(buffer: ByteBuffer, expectedKind: Int, expect
 
     fun has(id: Int): Boolean = id in sections
 
+    /** The ids of the sections the file lists, in no order: for this module's tests. */
+    internal val ids: Set<Int> get() = sections.keys
+
     /** A little-endian view of section [id], indexed from 0. */
     fun section(id: Int): ByteBuffer {
         val range = sections[id] ?: throw DataFormatException("missing section $id")
@@ -124,13 +128,7 @@ class DataFile private constructor(buffer: ByteBuffer, expectedKind: Int, expect
             require(sections.put(id, bytes) == null) { "section $id added twice" }
         }
 
-        fun addMeta(id: Int, meta: Map<String, String>) = apply {
-            meta.forEach { (k, v) -> require('=' !in k && '\n' !in k && '\n' !in v && '\r' !in k && '\r' !in v) { "bad meta entry $k=$v" } }
-            val bytes = meta.entries.joinToString("") { "${it.key}=${it.value}\n" }.toByteArray(Charsets.UTF_8)
-            // the reader's limit: a file it would refuse fails here, where it is made
-            require(bytes.size <= MAX_META_BYTES) { "meta section of ${bytes.size} bytes, over $MAX_META_BYTES" }
-            add(id, bytes)
-        }
+        fun addMeta(id: Int, meta: Map<String, String>) = add(id, metaBytes(meta))
 
         fun writeTo(out: OutputStream) {
             val header = LittleEndianOutput(HEADER_BYTES + sections.size * ENTRY_BYTES)
@@ -165,6 +163,7 @@ class DataFile private constructor(buffer: ByteBuffer, expectedKind: Int, expect
         const val KIND_PINYIN = 1
         const val KIND_TABLE = 2
         const val KIND_ENGLISH = 3
+        const val KIND_USER_DICTIONARY = 4
 
         private val MAGIC = "FCITXIME".toByteArray(Charsets.US_ASCII)
         private const val HEADER_BYTES = 24
@@ -184,17 +183,91 @@ class DataFile private constructor(buffer: ByteBuffer, expectedKind: Int, expect
         fun open(buffer: ByteBuffer, kind: Int, kindVersion: Int, verify: Boolean = true): DataFile =
             DataFile(buffer, kind, kindVersion, verify)
 
-        // CRC32.update(ByteBuffer) needs API 26: copy through a small array instead
-        private fun crc32(buffer: ByteBuffer): Int {
-            val crc = CRC32()
-            val chunk = ByteArray(minOf(CRC_CHUNK, buffer.remaining()))
-            while (buffer.hasRemaining()) {
-                val n = minOf(chunk.size, buffer.remaining())
-                buffer.get(chunk, 0, n)
-                crc.update(chunk, 0, n)
+        /**
+         * The file [Writer] makes, written to [file] a section at a time, as [write] streams each
+         * of [ids] (in that order), the header last: for one too large to hold in the heap (a
+         * dictionary the user merged, DictionaryCompiler).
+         */
+        fun stream(file: RandomAccessFile, kind: Int, kindVersion: Int, ids: List<Int>, write: (Int, OutputStream) -> Unit) {
+            require(ids.toSet().size == ids.size && ids.size <= MAX_SECTIONS) { "sections $ids" }
+            val headerBytes = HEADER_BYTES + ids.size * ENTRY_BYTES
+            val out = SectionOutput(file)
+            out.pad((headerBytes + 7L) and 7L.inv())
+            val header = LittleEndianOutput(headerBytes)
+            header.write(MAGIC)
+            header.writeInt(VERSION)
+            header.writeInt(kind)
+            header.writeInt(ids.size)
+            header.writeInt(kindVersion)
+            for (id in ids) {
+                out.pad((out.at + 7L) and 7L.inv())
+                val from = out.at
+                out.crc.reset()
+                write(id, out)
+                header.writeInt(id)
+                header.writeInt(out.crc.value.toInt())
+                header.writeLong(from)
+                header.writeLong(out.at - from)
             }
-            return crc.value.toInt()
+            out.flush()
+            file.setLength(out.at)
+            file.seek(0)
+            file.write(header.toByteArray())
         }
+
+        /**
+         * [meta] as a meta section's bytes, for [Writer.addMeta] and a [stream]ed file alike: the
+         * reader's limit checked, so a file it would refuse fails where it is made.
+         * @throws IllegalArgumentException for a key with `=` or a line break, a value with a line break, or too many bytes
+         */
+        fun metaBytes(meta: Map<String, String>): ByteArray {
+            meta.forEach { (k, v) -> require('=' !in k && '\n' !in k && '\n' !in v && '\r' !in k && '\r' !in v) { "bad meta entry $k=$v" } }
+            val bytes = meta.entries.joinToString("") { "${it.key}=${it.value}\n" }.toByteArray(Charsets.UTF_8)
+            require(bytes.size <= MAX_META_BYTES) { "meta section of ${bytes.size} bytes, over $MAX_META_BYTES" }
+            return bytes
+        }
+
+        private class SectionOutput(private val file: RandomAccessFile) : OutputStream() {
+            val crc = CRC32()
+            var at = 0L
+            private val buf = ByteArray(CRC_CHUNK)
+            private var n = 0
+
+            fun pad(to: Long) {
+                while (at < to) {
+                    if (n == buf.size) flush()
+                    buf[n++] = 0
+                    at++
+                }
+            }
+
+            override fun write(b: Int) {
+                if (n == buf.size) flush()
+                buf[n++] = b.toByte()
+                crc.update(b)
+                at++
+            }
+
+            override fun write(b: ByteArray, off: Int, len: Int) {
+                crc.update(b, off, len)
+                var i = off
+                while (i < off + len) {
+                    if (n == buf.size) flush()
+                    val k = minOf(buf.size - n, off + len - i)
+                    System.arraycopy(b, i, buf, n, k)
+                    n += k
+                    i += k
+                }
+                at += len
+            }
+
+            override fun flush() {
+                file.write(buf, 0, n)
+                n = 0
+            }
+        }
+
+        private fun crc32(buffer: ByteBuffer): Int = CRC32().apply { update(buffer) }.value.toInt()
     }
 }
 

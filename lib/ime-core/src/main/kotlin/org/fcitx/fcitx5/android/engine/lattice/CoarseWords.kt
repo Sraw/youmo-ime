@@ -31,9 +31,28 @@ class CoarseWords private constructor(private val ids: BitSet, private val texts
      * list's the user never typed.
      */
     fun unasked(word: Int, user: UserWords?, vocabularySize: Int): Boolean {
-        // asked of every arc of a lattice, nearly none of the list: the list first, the counts after
-        val listed = has(word) || word >= vocabularySize && user != null && has(user.text(word))
+        // asked of every arc of a lattice, nearly none of the list: the list first, the counts after.
+        // A merged dictionary's word by its id, looked up once: hundreds of arcs a key are, and a
+        // String made for each one's text would be garbage on every key
+        val listed = has(word) || word >= vocabularySize && user != null &&
+            if (user.isMerged(word)) mergedOf(user).binarySearch(word) >= 0 else has(user.text(word))
         return listed && (user == null || user.count(word) <= 0f)
+    }
+
+    // the merged dictionaries' ids of the list's texts, sorted, for the merged words of the user's
+    // they were found for: searched, not a set of boxed ids (ids past 2^27 are no cached Integer)
+    private var mergedFor: StartWords? = null
+    private var mergedIds = IntArray(0)
+
+    private fun mergedOf(user: UserWords): IntArray {
+        val merged = user.mergedWords
+        if (merged !== mergedFor) {
+            val out = ArrayList<Int>()
+            texts.forEach { text -> user.forEachMergedOfText(text) { out += it } }
+            mergedIds = out.toIntArray().apply { sort() }
+            mergedFor = merged
+        }
+        return mergedIds
     }
 
     companion object {

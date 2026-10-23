@@ -92,7 +92,7 @@ class LastWord(
     }
 }
 
-/** Han characters, by code point: not Character.UnicodeScript, which API 23 lacks. */
+/** Han characters, by code point (written for an API floor below Character.UnicodeScript's 24). */
 internal object Han {
     // CJK unified ideographs, extension A, the supplementary planes' and the compatibility ones
     fun isHan(c: Int) = c in 0x4E00..0x9FFF || c in 0x3400..0x4DBF || c in 0x20000..0x323AF || c in 0xF900..0xFAFF

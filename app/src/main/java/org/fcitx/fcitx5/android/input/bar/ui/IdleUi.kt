@@ -5,6 +5,7 @@
 package org.fcitx.fcitx5.android.input.bar.ui
 
 import android.content.Context
+import android.content.res.ColorStateList
 import android.transition.Slide
 import android.transition.TransitionManager
 import android.transition.TransitionSet
@@ -13,6 +14,7 @@ import android.view.View
 import android.view.animation.AlphaAnimation
 import android.view.animation.AnimationSet
 import android.view.animation.TranslateAnimation
+import android.widget.ProgressBar
 import android.widget.Space
 import android.widget.ViewAnimator
 import org.fcitx.fcitx5.android.R
@@ -40,9 +42,10 @@ import splitties.views.dsl.constraintlayout.matchConstraints
 import splitties.views.dsl.constraintlayout.startOfParent
 import splitties.views.dsl.core.Ui
 import splitties.views.dsl.core.add
-import splitties.views.dsl.core.lParams
 import splitties.views.dsl.core.frameLayout
+import splitties.views.dsl.core.lParams
 import splitties.views.dsl.core.matchParent
+import splitties.views.dsl.core.textView
 import splitties.views.imageResource
 import timber.log.Timber
 
@@ -121,6 +124,48 @@ class IdleUi(
         add(calculationUi.root, lParams(matchParent, matchParent))
     }
 
+    private val workText = textView {
+        isSingleLine = true
+        textSize = 14f
+        setTextColor(theme.altKeyTextColor)
+        gravity = Gravity.CENTER
+    }
+
+    private val workBar = ProgressBar(ctx, null, android.R.attr.progressBarStyleHorizontal).apply {
+        max = 100
+        progressTintList = ColorStateList.valueOf(theme.accentKeyBackgroundColor)
+    }
+
+    // a long job the keyboard waits on without stopping typing (the dictionaries' format upgraded),
+    // said where the bar is idle, with a thin line of how far
+    private val workUi = frameLayout {
+        visibility = View.GONE
+        add(workText, lParams(matchParent, matchParent))
+        add(workBar, lParams(matchParent, dp(WORK_BAR_DP)) { gravity = Gravity.BOTTOM })
+    }
+
+    private var workShown: String? = null
+
+    /**
+     * [text] said over the idle bar at [percent], or nothing (null): the bar as it was. Said only
+     * while the bar is empty: the toolbar, a clipboard or autofill suggestion keep their place,
+     * the thin line alone telling of the work then (review S4).
+     */
+    fun showWork(text: String?, percent: Int) {
+        workShown = text
+        workBar.progress = percent
+        layOutWork()
+    }
+
+    private fun layOutWork() {
+        val text = workShown
+        val alone = text != null && currentState == Display.Empty
+        workUi.visibility = if (text == null) View.GONE else View.VISIBLE
+        workText.visibility = if (alone) View.VISIBLE else View.INVISIBLE
+        animator.visibility = if (alone) View.INVISIBLE else View.VISIBLE
+        if (text != null) workText.text = text
+    }
+
     private val inAnimation by lazy {
         AnimationSet(true).apply {
             duration = 200L
@@ -157,6 +202,11 @@ class IdleUi(
             centerVertically()
         })
         add(animator, lParams(matchConstraints, matchParent) {
+            after(menuButton)
+            before(emojiButton)
+            centerVertically()
+        })
+        add(workUi, lParams(matchConstraints, matchParent) {
             after(menuButton)
             before(emojiButton)
             centerVertically()
@@ -250,7 +300,12 @@ class IdleUi(
             popup.dismissAll()
         }
         currentState = state
+        layOutWork()
         updateMenuButtonContentDescription()
         updateMenuButtonRotation(instant = !fromUser)
+    }
+
+    companion object {
+        private const val WORK_BAR_DP = 2
     }
 }

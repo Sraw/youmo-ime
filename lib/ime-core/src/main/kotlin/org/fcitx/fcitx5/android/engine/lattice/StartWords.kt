@@ -5,10 +5,10 @@
 package org.fcitx.fcitx5.android.engine.lattice
 
 /**
- * The words offered only as the word the input starts with, never inside a sentence nor after
- * another word (U-101, C19: those only imported), by the syllables they read: node [root] the
- * root, each node's children in a run from [firstChild], sorted by the [syllable] reaching them.
- * The decoder walks it from the input's start alone ([UserWords.startWords]).
+ * A syllable trie of words beside the user's: node [root] the root, each node's children in a run
+ * from [firstChild], sorted by the [syllable] reaching them. Two uses: [UserWords.startWords], the
+ * words only imported, walked from the input's start alone (U-101, C19); and [UserWords.mergedWords],
+ * the merged dictionaries', walked mid-sentence too.
  */
 interface StartWords {
     val root: Int get() = 0

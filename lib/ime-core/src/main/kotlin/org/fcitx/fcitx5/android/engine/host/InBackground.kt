@@ -11,9 +11,10 @@ import java.util.concurrent.Executor
  * till it is made. Asked for under another key (what it is made of changed), the one made for an
  * older key is dropped, however late it comes, and so is one being made. A make that throws is
  * reported to [onError] and stays unmade for its key (null, not retried at every [get]): it runs
- * on a bare thread, where an uncaught exception would kill the input method.
+ * on a bare thread, where an uncaught exception would kill the input method. An Error too: an
+ * OutOfMemoryError coding a merged dictionary for a table (0.3.1) killed it so, crash-looping.
  */
-internal class InBackground<V : Any>(private val executor: Executor, private val onError: (Exception) -> Unit) {
+internal class InBackground<V : Any>(private val executor: Executor, private val onError: (Throwable) -> Unit) {
     private val lock = Any()
     private var asked: Any? = null
     private var made: V? = null
@@ -40,7 +41,7 @@ internal class InBackground<V : Any>(private val executor: Executor, private val
             if (!stillAsked()) return@execute
             val value = try {
                 work(stillAsked)
-            } catch (@Suppress("TooGenericExceptionCaught") e: Exception) {
+            } catch (@Suppress("TooGenericExceptionCaught") e: Throwable) {
                 // whatever it throws: on a bare thread, uncaught, it would kill the input method
                 onError(e)
                 return@execute

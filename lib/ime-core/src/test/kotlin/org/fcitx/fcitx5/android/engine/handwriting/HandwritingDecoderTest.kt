@@ -14,6 +14,8 @@ import org.fcitx.fcitx5.android.engine.lattice.WordScorer
 import org.fcitx.fcitx5.android.engine.learn.ImportedWords
 import org.fcitx.fcitx5.android.engine.learn.import
 import org.fcitx.fcitx5.android.engine.pinyin.Syllables
+import org.fcitx.fcitx5.android.engine.user.DictionaryCompiler
+import org.fcitx.fcitx5.android.engine.user.DictionaryFile
 import org.fcitx.fcitx5.android.engine.user.UserModel
 import org.fcitx.fcitx5.android.engine.user.UserScorer
 import org.junit.Assert.assertEquals
@@ -356,5 +358,21 @@ class HandwritingDecoderTest {
         user.own(renHang)
         repeat(3) { user.learn(null, listOf(renHang)) }
         assertTrue("人行" in words())
+    }
+
+    // review S6: a merged file's word (DictionaryFile) is written as one word, at its file's reading, once learned; blocked, it is not
+    @Test
+    fun `a merged dictionary's word is found by its characters, and not once blocked`() {
+        val d = walkers()
+        val file = java.io.File.createTempFile("merged", ".ymd").apply { deleteOnExit() }
+        DictionaryCompiler.compile(listOf(sequenceOf("行人 hang'ren 0.5")), file, inBase = DictionaryCompiler.inBase(d))
+        val user = UserModel(d.dictionary, d.vocabulary, d.wordIndex, DictionaryFile.open(file))
+        fun endings() = walkersDecoder(d, user).decode(listOf(read("行"), read("人"))).endings.map { it.words.toString() }
+        // unpicked it is the unknown word, below 行 + 人; learned, the file's word is read as one, from its trie
+        assertEquals(listOf("[行(hang), 人(ren)]"), endings())
+        user.addCount(UserModel.Entry("行人", walk("hang ren")), 5f)
+        assertEquals(listOf("[行人(hang ren)]"), endings())
+        user.block(UserModel.Entry("行人", walk("hang ren")))
+        assertTrue(endings().toString(), "[行人(hang ren)]" !in endings())
     }
 }

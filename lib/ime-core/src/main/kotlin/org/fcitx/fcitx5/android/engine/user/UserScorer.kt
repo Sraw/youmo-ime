@@ -46,6 +46,10 @@ class UserScorer(
         if (same >= model.vocabularySize) {
             val packed = user.score(word)
             if (!packed.isNaN()) base += packed - model.unknownScore
+            // a merged dictionary's word not yet the user's: below the unknown word as its dictionary
+            // ranks it, so the commoner of its homophones comes first (docs: 按常用程度排)
+            val merged = user.mergedScore(word)
+            if (!merged.isNaN()) base += MERGED_SPAN * merged
         }
         base = minOf(0f, base)
         // weight 0: the model's score as it is, not through 10^x and back
@@ -60,5 +64,9 @@ class UserScorer(
         // top1 81.4% learning nothing, 85.9 / 87.7 / 85.1% learning), and near the best on text
         // typed again (97.1 / 98.2 / 98.6%)
         const val DEFAULT_WEIGHT = 0.1f
+
+        // how much of a merged dictionary's log10 spread a word's score keeps: rime-frost's words span
+        // about 6 below its best, so its rarest go 1.5 below the unknown word, still in a sentence's reach
+        const val MERGED_SPAN = 0.25f
     }
 }

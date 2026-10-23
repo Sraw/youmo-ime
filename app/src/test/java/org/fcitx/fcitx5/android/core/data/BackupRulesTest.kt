@@ -12,8 +12,8 @@ import java.io.File
 import javax.xml.parsers.DocumentBuilderFactory
 
 /**
- * The backup rules leave out what [DataManager] syncs into its dataDir: device-protected storage
- * (device_root) from Android 7, the data root (root) on Android 6. Rules for files/ match nothing
+ * The backup rules leave out what [DataManager] syncs into its dataDir, in device-protected storage
+ * (device_root). Rules for files/ match nothing
  * there, and a restored descriptor.json would keep sync() from installing what the restore skipped.
  */
 class BackupRulesTest {
@@ -44,11 +44,9 @@ class BackupRulesTest {
     }
 
     @Test
-    fun fullBackupLeavesOutTheSyncedAssetsOnEveryVersion() {
+    fun fullBackupLeavesOutTheSyncedAssets() {
         val excluded = excludes(parse("src/main/res/xml/full_backup_content.xml"))
-        for (domain in listOf("device_root", "root")) {
-            for (path in SYNCED) assertTrue("$domain/$path", (domain to path) in excluded)
-        }
+        for (path in SYNCED) assertTrue("device_root/$path", ("device_root" to path) in excluded)
     }
 
     // :app unit tests run without merged resources, so the rules are read from the source tree

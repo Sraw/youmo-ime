@@ -43,7 +43,7 @@ object LexiconView {
         // uses, gathered once for the list (a scan of the stats a word was too slow: review-E-engine S8)
         val coded by lazy(LazyThreadSafetyMode.NONE) {
             HashMap<String, Int>().also { days ->
-                // no Map.merge below API 24
+                // by hand, not Map.merge: written for an API floor below 24
                 for ((key, stat) in state.stats) days[key.text] = maxOf(days[key.text] ?: Int.MIN_VALUE, stat.uses.lastDay)
             }
         }

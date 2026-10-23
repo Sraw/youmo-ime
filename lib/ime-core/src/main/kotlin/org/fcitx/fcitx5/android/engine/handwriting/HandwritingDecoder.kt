@@ -242,7 +242,7 @@ class HandwritingDecoder(
         searchStart = start
         searchArcs = arcs
         foundTexts.clear()
-        extend(start, dictionary.root, user?.root ?: -1, StringBuilder(), 0.0)
+        extend(start, dictionary.root, user?.root ?: -1, user?.mergedWords?.root ?: -1, StringBuilder(), 0.0)
         return arcs
     }
 
@@ -294,8 +294,10 @@ class HandwritingDecoder(
     // the syllables read from the start of the word being looked for to [extend]'s position
     private val path = IntArray(MAX_WORD)
 
-    // the words of two characters or more going on from [text] (through [node] and [userNode]) at [at]
-    private fun extend(at: Int, node: Int, userNode: Int, text: StringBuilder, ink: Double) {
+    // the words of two characters or more going on from [text] (through [node], [userNode] and the
+    // merged dictionaries' [mergedNode]) at [at]
+    private fun extend(at: Int, node: Int, userNode: Int, mergedNode: Int, text: StringBuilder, ink: Double) {
+        val merged = user?.mergedWords
         if (at == searched.size || at - searchStart == MAX_WORD) return
         val p = searched[at]
         val map = readings()
@@ -307,18 +309,20 @@ class HandwritingDecoder(
             for (s in syllables) {
                 val child = if (node < 0) -1 else dictionary.child(node, s)
                 val userChild = if (userNode < 0 || user == null) -1 else user.child(userNode, s)
-                if (child < 0 && userChild < 0) continue
+                val mergedChild = if (mergedNode < 0 || merged == null) -1 else merged.child(mergedNode, s)
+                if (child < 0 && userChild < 0 && mergedChild < 0) continue
                 path[at - searchStart] = s
-                if (at > searchStart) word(at + 1, text, child, userChild, scored)
-                if (goesOn(child, userChild)) extend(at + 1, child, userChild, text, scored)
+                if (at > searchStart) word(at + 1, text, child, userChild, mergedChild, scored)
+                if (goesOn(child, userChild, mergedChild)) extend(at + 1, child, userChild, mergedChild, text, scored)
             }
             text.setLength(text.length - c.length)
         }
     }
 
-    // whether longer words go on through [node] or [userNode]
-    private fun goesOn(node: Int, userNode: Int) =
-        (node >= 0 && dictionary.childCount(node) > 0) || (userNode >= 0 && user != null && user.childCount(userNode) > 0)
+    // whether longer words go on through [node], [userNode] or [mergedNode]
+    private fun goesOn(node: Int, userNode: Int, mergedNode: Int) =
+        (node >= 0 && dictionary.childCount(node) > 0) || (userNode >= 0 && user != null && user.childCount(userNode) > 0) ||
+            (mergedNode >= 0 && user?.mergedWords?.let { it.childCount(mergedNode) > 0 } == true)
 
     // the weight of a reading the user still has [word] at: above the dictionary's (log10, at most 0),
     // and of two such readings of one text (the user's own and the dictionary's, two ids) the more typed
@@ -329,7 +333,7 @@ class HandwritingDecoder(
     // user learned it at while it is still their choice (typed or added by hand), whichever order the
     // readings are found in; else the one the dictionary weighs highest of those found (learned so, as
     // alone reads a character), else the first
-    private fun word(end: Int, text: StringBuilder, node: Int, userNode: Int, ink: Double) {
+    private fun word(end: Int, text: StringBuilder, node: Int, userNode: Int, mergedNode: Int, ink: Double) {
         val t = text.toString()
         val found = foundTexts[t]
         if (node >= 0) {
@@ -345,7 +349,25 @@ class HandwritingDecoder(
                 return
             }
         }
-        if (userNode < 0 || user == null) return
+        if (user == null) return
+        if (userNode >= 0 && userWord(end, t, user, userNode, ink)) return
+        val merged = user.mergedWords ?: return
+        if (mergedNode < 0) return
+        for (k in 0 until merged.wordCount(mergedNode)) {
+            val id = merged.word(mergedNode, k)
+            // a merged dictionary's word: as the user's never picked, only where nothing else reads it, unless theirs
+            if (user.text(id) == t && !user.blockedAnyhow(id)) {
+                val weight = if (user.reading(id) != null) theirs(id) else Float.NEGATIVE_INFINITY
+                val now = foundTexts[t]
+                if (now == null || weight > now.second) found(t, Arc(searchStart, end, id, t, ink, path.copyOf(end - searchStart)), weight, now?.first)
+                return
+            }
+        }
+    }
+
+    // [t] as a word of the user's trie at [userNode]: whether one is
+    private fun userWord(end: Int, t: String, user: UserWords, userNode: Int, ink: Double): Boolean {
+        val found = foundTexts[t]
         for (k in 0 until user.wordCount(userNode)) {
             val id = user.word(userNode, k)
             // a word only imported is none of a sentence till the user's, as the pinyin decoder holds it to the input's start (U-101, C19)
@@ -355,9 +377,10 @@ class HandwritingDecoder(
                 // reads the word
                 val weight = if (user.reading(id) != null) theirs(id) else Float.NEGATIVE_INFINITY
                 if (found == null || weight > found.second) found(t, Arc(searchStart, end, id, t, ink, path.copyOf(end - searchStart)), weight, found?.first)
-                return
+                return true
             }
         }
+        return false
     }
 
     // which of [node]'s words is [id]; -1 for none

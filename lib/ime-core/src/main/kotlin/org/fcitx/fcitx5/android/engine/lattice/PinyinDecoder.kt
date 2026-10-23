@@ -166,7 +166,7 @@ class PinyinDecoder(
             arcs.start[at] = arcs.size
             if (graph.edges(at).isEmpty()) continue
             val limit = if (at == graph.start) Int.MAX_VALUE else wordsPerReading
-            collect(graph, at, dictionary.root, user?.root ?: -1, 0f, false, limit)
+            collect(graph, at, dictionary.root, user?.root ?: -1, user?.mergedWords?.root ?: -1, 0f, false, limit)
             // nothing in the dictionary starts here: keep what was typed, so every path goes on. Asked
             // before the words only imported: no path goes on from those (review-G S2)
             if (arcs.size == arcs.start[at]) {
@@ -179,11 +179,13 @@ class PinyinDecoder(
     }
 
     /**
-     * Adds the words of every path from [node] in the dictionary, and [userNode] in the user's
-     * words, that the graph spells from [at]; -1 for a trie the path has left. [short]: a syllable
+     * Adds the words of every path from [node] in the dictionary, [userNode] in the user's words
+     * and [mergedNode] in the dictionaries they merged, that the graph spells from [at]; -1 for a
+     * trie the path has left. [short]: a syllable
      * of the path typed short (简拼, the start of one), whose words are scored by [uncounted].
      */
-    private fun collect(graph: SyllableGraph, at: Int, node: Int, userNode: Int, cost: Float, short: Boolean, limit: Int) {
+    private fun collect(graph: SyllableGraph, at: Int, node: Int, userNode: Int, mergedNode: Int, cost: Float, short: Boolean, limit: Int) {
+        val merged = user?.mergedWords
         for (e in graph.edges(at)) {
             val kind = graph.kind(e)
             if (kind == Kind.RAW) continue
@@ -194,7 +196,8 @@ class PinyinDecoder(
             for (i in 0 until matches.size) {
                 val child = if (node < 0) -1 else dictionary.child(node, matches.syllable(i))
                 val userChild = if (userNode < 0 || user == null) -1 else user.child(userNode, matches.syllable(i))
-                if (child < 0 && userChild < 0) continue
+                val mergedChild = if (mergedNode < 0 || merged == null) -1 else merged.child(mergedNode, matches.syllable(i))
+                if (child < 0 && userChild < 0 && mergedChild < 0) continue
                 val c = edgeCost + penalty(matches.flags(i)) + nasal(kind, matches.syllable(i))
                 var more = false
                 if (child >= 0) {
@@ -203,13 +206,26 @@ class PinyinDecoder(
                     more = dictionary.childCount(child) > 0
                     if (to == graph.end) lookAhead(kind, to, child, c, words, edgeShort)
                 }
-                if (userChild >= 0 && user != null) {
-                    addUserWords(to, user, userChild, c, edgeShort)
-                    more = more || user.childCount(userChild) > 0
-                }
-                if (to < graph.end && more) collect(graph, to, child, userChild, c, edgeShort, limit)
+                if (addOthers(to, userChild, mergedChild, c, edgeShort, limit)) more = true
+                if (to < graph.end && more) collect(graph, to, child, userChild, mergedChild, c, edgeShort, limit)
             }
         }
+    }
+
+    // the user's words at [userNode] and the merged dictionaries' at [mergedNode] (-1 for none): whether longer ones go on
+    private fun addOthers(to: Int, userNode: Int, mergedNode: Int, cost: Float, short: Boolean, limit: Int): Boolean {
+        val user = user ?: return false
+        var more = false
+        if (userNode >= 0) {
+            addUserWords(to, user, userNode, cost, short)
+            more = user.childCount(userNode) > 0
+        }
+        val merged = user.mergedWords
+        if (mergedNode >= 0 && merged != null) {
+            addMergedWords(to, user, merged, mergedNode, minOf(merged.wordCount(mergedNode), limit), cost, short)
+            more = more || merged.childCount(mergedNode) > 0
+        }
+        return more
     }
 
     /**
@@ -254,6 +270,22 @@ class PinyinDecoder(
         for (w in 0 until user.wordCount(node)) {
             val word = user.word(node, w)
             if (!user.blocked(word, -1)) arcs.add(to, word, cost + coarseness(word), short = short)
+        }
+    }
+
+    // the first [words] of a merged dictionary's at [node], best first, as many as the dictionary's
+    // own: rime-frost has hundreds at a syllable, each an arc the scorer would weigh on every key
+    private fun addMergedWords(to: Int, user: UserWords, merged: StartWords, node: Int, words: Int, cost: Float, short: Boolean) {
+        for (w in 0 until words) {
+            val word = merged.word(node, w)
+            if (!user.blocked(word, -1)) arcs.add(to, word, cost + coarseness(word), short = short)
+        }
+        // past the limit, the user's chosen ones still: a word they added, low in its dictionary (review S5)
+        if (words < merged.wordCount(node) && user.anyMergedChosen()) {
+            for (w in words until merged.wordCount(node)) {
+                val word = merged.word(node, w)
+                if (user.chosen(word) && !user.blocked(word, -1)) arcs.add(to, word, cost + coarseness(word), short = short)
+            }
         }
     }
 

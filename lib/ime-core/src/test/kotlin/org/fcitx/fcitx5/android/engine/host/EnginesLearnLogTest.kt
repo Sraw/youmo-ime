@@ -283,7 +283,7 @@ class EnginesLearnLogTest : EnginesFixture() {
         val niHao = UserModel.Entry("妮好", intArrayOf(Syllables.id("ni"), Syllables.id("hao")))
         File(dir, Engines.USER_PINYIN).writeBytes(UserLog.header() + UserLog.sentence(null, listOf(niHao)))
         val saved = ArrayList<String>()
-        val additions = { Engines.Additions("nihao,1=妮好\n", "", { saved += it.all.joinToString(" ") }) { emptySequence() } }
+        val additions = { Engines.Additions("nihao,1=妮好\n", "", { saved += it.all.joinToString(" ") }, dictionary = { null }) }
         Engines(::load, dir, additions = additions, warmUps = inPlace).use { engines ->
             engines.type(Engines.PINYIN, "ni")
             engines.onEvent(Engines.PINYIN, EngineEvent.RESET, 0)

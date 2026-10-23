@@ -139,7 +139,7 @@ Settings for the engine live in fcitx's config of the `androidengine` addon (its
 | Engine data (read-only) | APK assets, memory-mapped | build (`EngineDataPlugin`, `VoiceDataPlugin`, `HandwritingDataPlugin`: the handwriting models, `.ort`/`.data` uncompressed, both builds) |
 | fcitx's own data (punctuation tables, addon configs, locale) | `assets/usr` synced into the app's data dir at start (`DataManager`, keyed by `descriptor.json`) | build |
 | What the engine learned | `files/engine/` (`EngineBridge.userDir`): pinyin's user log, each table's and English's, the word lists (added, blocked) | engine: append-only logs (`RecordStore`), lists written whole |
-| fcitx config and data home | the external files dir (`Android/data/<package>/files`, `HOME` / `FCITX_CONFIG_HOME` / `FCITX_DATA_HOME` set in `native-lib.cpp`): `config/` (the profile, `conf/*.conf` incl. the input methods' options), `data/pinyin/customphrase`, `data/pinyin/dictionaries/` (imported dictionaries, as text), `data/data/quickphrase.d`, `theme/` | fcitx, the app's managers |
+| fcitx config and data home | the external files dir (`Android/data/<package>/files`, `HOME` / `FCITX_CONFIG_HOME` / `FCITX_DATA_HOME` set in `native-lib.cpp`): `config/` (the profile, `conf/*.conf` incl. the input methods' options), `data/pinyin/customphrase`, `data/pinyin/dictionaries/` (imported dictionaries, as text, and `merged.ymd` compiled from those on; not in a backup), `data/data/quickphrase.d`, `theme/` | fcitx, the app's managers |
 | App preferences | `shared_prefs` (`AppPrefs`, `ThemePrefs`) | app |
 | Clipboard | Room database in `databases/` (`ClipboardManager`) | app |
 

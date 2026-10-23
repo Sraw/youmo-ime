@@ -7,6 +7,7 @@ package org.fcitx.fcitx5.android.engine.glide
 import org.fcitx.fcitx5.android.engine.data.NgramModel.Companion.NO_WORD
 import org.fcitx.fcitx5.android.engine.data.PinyinData
 import org.fcitx.fcitx5.android.engine.lattice.Penalties
+import org.fcitx.fcitx5.android.engine.lattice.StartWords
 import org.fcitx.fcitx5.android.engine.lattice.UserWords
 import org.fcitx.fcitx5.android.engine.pinyin.ShuangpinScheme
 import org.fcitx.fcitx5.android.engine.pinyin.Syllables
@@ -156,6 +157,8 @@ class PinyinGlide(
         private val words = scoredFor.words
         // the words only imported: a glide is a word the input starts with, so these glide too (U-101)
         private val starts = words?.startWords
+        // the dictionaries the user merged: a fourth trie, walked beside the others
+        private val merged = words?.mergedWords
         private val learned = scoredFor.learned
 
         // the word [pick] found
@@ -168,62 +171,79 @@ class PinyinGlide(
         private inner class Found(val word: Int, val syllables: IntArray, val score: Float)
 
         fun run(): List<GlideReading> {
-            visit(dictionary.root, words?.root ?: -1, starts?.root ?: -1, 0, 0)
+            visit(Nodes(dictionary.root, words?.root ?: -1, starts?.root ?: -1, merged?.root ?: -1), 0, 0)
             return best.map { reading(it) }
         }
 
-        // the children of [node], the user's [userNode] and the imported [startNode] (-1 for none of
-        // each), [depth] letters and [count] syllables in: a reading of all three is one reading
-        private fun visit(node: Int, userNode: Int, startNode: Int, depth: Int, count: Int) {
-            if (node >= 0) {
-                val first = dictionary.firstChild(node)
-                for (child in first until first + dictionary.childCount(node)) {
+        // where a reading is in each trie: the dictionary's, the user's, the imported, the merged (-1 for none of each)
+        private inner class Nodes(val node: Int, val user: Int, val start: Int, val merged: Int)
+
+        // the children of [at]'s nodes, [depth] letters and [count] syllables in: a reading of all four is one reading
+        private fun visit(at: Nodes, depth: Int, count: Int) {
+            if (at.node >= 0) {
+                val first = dictionary.firstChild(at.node)
+                for (child in first until first + dictionary.childCount(at.node)) {
                     val s = dictionary.syllable(child)
-                    reach(child, if (userNode >= 0) checkNotNull(words).child(userNode, s) else -1, startChild(startNode, s), s, depth, count)
+                    reach(Nodes(child, userChild(at.user, s), startChild(at.start, s), mergedChild(at.merged, s)), s, depth, count)
                 }
             }
-            if (userNode >= 0 && checkNotNull(words).childCount(userNode) > 0) visitUsers(node, userNode, startNode, depth, count)
-            if (startNode >= 0) visitStarts(node, userNode, startNode, depth, count)
+            if (at.user >= 0 && checkNotNull(words).childCount(at.user) > 0) visitUsers(at, depth, count)
+            if (at.start >= 0) visitOthers(at, checkNotNull(starts), at.start, depth, count)
+            if (at.merged >= 0) visitOthers(at, checkNotNull(merged), at.merged, depth, count)
         }
+
+        private fun userChild(userNode: Int, s: Int) = if (userNode >= 0) checkNotNull(words).child(userNode, s) else -1
 
         private fun startChild(startNode: Int, s: Int) = if (startNode >= 0) checkNotNull(starts).child(startNode, s) else -1
 
-        // the user's children of [userNode] the dictionary's [node] has not: the user's trie tells a
-        // child by its syllable only, and it is small
-        private fun visitUsers(node: Int, userNode: Int, startNode: Int, depth: Int, count: Int) {
+        private fun mergedChild(mergedNode: Int, s: Int) = if (mergedNode >= 0) checkNotNull(merged).child(mergedNode, s) else -1
+
+        // the children of [at]'s user node that its dictionary node lacks: the user's trie
+        // tells a child by its syllable only, and it is small
+        private fun visitUsers(at: Nodes, depth: Int, count: Int) {
             val own = checkNotNull(words)
             for (s in 0 until Syllables.count) {
-                val userChild = own.child(userNode, s)
-                if (userChild >= 0 && (node < 0 || dictionary.child(node, s) < 0)) reach(-1, userChild, startChild(startNode, s), s, depth, count)
+                val userChild = own.child(at.user, s)
+                if (userChild >= 0 && (at.node < 0 || dictionary.child(at.node, s) < 0)) {
+                    reach(Nodes(-1, userChild, startChild(at.start, s), mergedChild(at.merged, s)), s, depth, count)
+                }
             }
         }
 
-        // the imported children of [startNode] neither the dictionary's [node] nor the user's [userNode] has
-        private fun visitStarts(node: Int, userNode: Int, startNode: Int, depth: Int, count: Int) {
-            val imported = checkNotNull(starts)
-            val first = imported.firstChild(startNode)
-            for (child in first until first + imported.childCount(startNode)) {
-                val s = imported.syllable(child)
-                val inDictionary = node >= 0 && dictionary.child(node, s) >= 0
-                val inUserTrie = userNode >= 0 && checkNotNull(words).child(userNode, s) >= 0
-                if (!inDictionary && !inUserTrie) reach(-1, -1, child, s, depth, count)
+        // the children of [trieNode] in [trie] (the imported or the merged) that no trie before it has:
+        // reached once, each with every trie's node of its syllable
+        private fun visitOthers(at: Nodes, trie: StartWords, trieNode: Int, depth: Int, count: Int) {
+            val first = trie.firstChild(trieNode)
+            for (child in first until first + trie.childCount(trieNode)) {
+                val s = trie.syllable(child)
+                val inDictionary = at.node >= 0 && dictionary.child(at.node, s) >= 0
+                val inUserTrie = at.user >= 0 && checkNotNull(words).child(at.user, s) >= 0
+                val inStarts = trie !== starts && at.start >= 0 && checkNotNull(starts).child(at.start, s) >= 0
+                if (!inDictionary && !inUserTrie && !inStarts) {
+                    val startNode = if (trie === starts) child else -1
+                    reach(Nodes(-1, -1, startNode, mergedChild(at.merged, s)), s, depth, count)
+                }
             }
         }
 
-        // [node], [userNode] and [startNode] by [syllable], from [depth] letters and [count] syllables in
-        private fun reach(node: Int, userNode: Int, startNode: Int, syllable: Int, depth: Int, count: Int) {
+        // [at]'s nodes by [syllable], from [depth] letters and [count] syllables in
+        private fun reach(at: Nodes, syllable: Int, depth: Int, count: Int) {
             val d = stepped(spelling.of(syllable), depth) ?: return
             syllables[count] = syllable
-            val any = (node >= 0 && dictionary.wordCount(node) > 0) ||
-                (userNode >= 0 && checkNotNull(words).wordCount(userNode) > 0) ||
-                (startNode >= 0 && checkNotNull(starts).wordCount(startNode) > 0)
-            if (any) glide.cost(d)?.let { keep(count + 1, pick(node, userNode, startNode) - it) }
-            if (d < MAX_LETTERS) visit(node, userNode, startNode, d, count + 1)
+            val any = (at.node >= 0 && dictionary.wordCount(at.node) > 0) ||
+                (at.user >= 0 && checkNotNull(words).wordCount(at.user) > 0) ||
+                (at.start >= 0 && checkNotNull(starts).wordCount(at.start) > 0) ||
+                (at.merged >= 0 && checkNotNull(merged).wordCount(at.merged) > 0)
+            if (any) glide.cost(d)?.let { keep(count + 1, pick(at) - it) }
+            if (d < MAX_LETTERS) visit(at, d, count + 1)
         }
 
-        // the likeliest word not blocked of [node]'s, [userNode]'s and [startNode]'s, into [picked]: the dictionary's
+        // the likeliest word not blocked of [at]'s dictionary, user, imported and merged nodes, into [picked]: the dictionary's
         // as worked out before but for those the user has counts of now, worked out again
-        private fun pick(node: Int, userNode: Int, startNode: Int): Float {
+        private fun pick(at: Nodes): Float {
+            val node = at.node
+            val userNode = at.user
+            val startNode = at.start
             var best = Float.NEGATIVE_INFINITY
             picked = NO_WORD
             if (node >= 0) {
@@ -257,7 +277,37 @@ class PinyinGlide(
                     }
                 }
             }
+            if (at.merged >= 0) pickMerged(at.merged, best)?.let { best = it }
             return best
+        }
+
+        // the merged dictionaries' best word at [mergedNode] not blocked, into [picked] if above [above]: its
+        // words come best first, and rime-frost has hundreds at a syllable, so the first is the one scored
+        private fun pickMerged(mergedNode: Int, above: Float): Float? {
+            val trie = checkNotNull(merged)
+            val words = scoredFor.words
+            val learned = scoredFor.learned
+            // the user's chosen or learned words score above where their file ranks them: looked for past the first
+            val chosen = words?.anyMergedChosen() == true || (learned != null && words?.anyMergedCounted() != false)
+            var top = above
+            var best = NO_WORD
+            var seen = false
+            for (i in 0 until trie.wordCount(mergedNode)) {
+                val word = trie.word(mergedNode, i)
+                val theirs = words?.chosen(word) == true || learned?.invoke(word) == true
+                if ((!seen || theirs) && !scoredFor.blocked(word, -1)) {
+                    val score = score(word)
+                    if (score > top) {
+                        top = score
+                        best = word
+                    }
+                    seen = true
+                    if (!chosen) break
+                }
+            }
+            if (best == NO_WORD) return null
+            picked = best
+            return top
         }
 
         private fun pickLearned(node: Int, above: Float): Float {

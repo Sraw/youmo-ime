@@ -17,6 +17,7 @@ import org.fcitx.fcitx5.android.core.EngineMigration
 import org.fcitx.fcitx5.android.data.clipboard.CLIPBOARD_DATABASE
 import org.fcitx.fcitx5.android.data.clipboard.db.ClipboardEntry
 import org.fcitx.fcitx5.android.data.clipboard.importedClipboardMarker
+import org.fcitx.fcitx5.android.data.pinyin.MergedDictionary
 import org.fcitx.fcitx5.android.engine.host.Engines
 import org.fcitx.fcitx5.android.engine.host.LibimeMigration
 import org.fcitx.fcitx5.android.engine.learn.LearnLog
@@ -151,8 +152,9 @@ object UserDataManager {
                     db.inputStream().use { it.copyTo(zipStream) }
                 }
             }
-            // external
-            writeFileTree(dirs.external, "external", zipStream)
+            // external, but for what is compiled from the dictionaries there (MergedDictionary): made
+            // again from them after a restore, and as large as they are
+            writeFileTree(dirs.external, "external", zipStream) { MergedDictionary.isCompiled(it) }
             // engine, but for a log being compacted (RecordStore): it holds nothing the log has not; the
             // backups, which are the phone's own; and with the learning given, the files it is made of
             // and the old logs it was converted from (PLAN §3)

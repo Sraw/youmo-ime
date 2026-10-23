@@ -13,6 +13,7 @@ import org.fcitx.fcitx5.android.engine.learn.Code
 import org.fcitx.fcitx5.android.engine.learn.Habits
 import org.fcitx.fcitx5.android.engine.learn.Kinds
 import org.fcitx.fcitx5.android.engine.learn.Learner
+import org.fcitx.fcitx5.android.engine.pinyin.Syllables
 import org.fcitx.fcitx5.android.engine.session.Action.Key
 import org.fcitx.fcitx5.android.engine.session.Session
 import org.fcitx.fcitx5.android.engine.session.Snapshot
@@ -70,3 +71,21 @@ internal fun Session.type(keys: String): Pair<String, Snapshot> {
     for (c in keys) last = apply(Key(c)).also { commit += it.commit }
     return commit to last!!
 }
+
+/**
+ * A table of [chars] characters from 一 on, each under a code of four of a…y, and every word of
+ * two of them as a dictionary line (`text pin'yin weight`): many words a table codes, for the
+ * merged dictionary's index ([CodedIndex]).
+ */
+internal fun manyWords(chars: Int): Pair<TableDictionary, Sequence<String>> {
+    fun code(i: Int) = String(CharArray(4) { k -> 'a' + (i / pow25(k)) % 25 })
+    val han = List(chars) { (0x4E00 + it).toChar() }
+    // readings spread over the syllables: the compiler holds one reading's words at a time
+    val syllables = (0 until Syllables.count).map(Syllables::spelling).filter { it[0].isLowerCase() }
+    val reading = han.associateWith { syllables[it.code % syllables.size] }
+    val table = dictionary(*Array(chars) { "${code(it)} ${han[it]}" })
+    val words = han.asSequence().flatMap { a -> han.asSequence().map { b -> "$a$b ${reading[a]}'${reading[b]} ${1 + (a.code * 31 + b.code) % 1000}" } }
+    return table to words
+}
+
+private fun pow25(k: Int): Int = (0 until k).fold(1) { p, _ -> p * 25 }

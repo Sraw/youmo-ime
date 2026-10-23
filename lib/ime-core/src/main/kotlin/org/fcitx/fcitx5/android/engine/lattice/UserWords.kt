@@ -44,6 +44,34 @@ interface UserWords {
      */
     val startWords: StartWords? get() = null
 
+    /**
+     * The dictionaries the user merged into the base one, by their syllables, words best first:
+     * walked beside this trie everywhere, as words of the user's dictionaries always were, but read
+     * from their compiled file in place (DictionaryFile), never put in this trie. Null for none.
+     */
+    val mergedWords: StartWords? get() = null
+
+    /** Whether [word] is one of [mergedWords]'. */
+    fun isMerged(word: Int): Boolean = false
+
+    /** Each id of [mergedWords] whose text is [text]. */
+    fun forEachMergedOfText(text: String, visit: (Int) -> Unit) {}
+
+    /**
+     * Whether any of [mergedWords] is the user's choice (owned, added by hand): if so, a walker that
+     * cuts a node's words at a limit looks on past it for [chosen] ones (review S5).
+     */
+    fun anyMergedChosen(): Boolean = false
+
+    /**
+     * Whether any of [mergedWords] has counts of the user's: if not, a glide takes a merged node's
+     * first word alone though it scores learned ones. True unless the model keeps track.
+     */
+    fun anyMergedCounted(): Boolean = true
+
+    /** Whether [word] is the user's choice: owned or added by hand. */
+    fun chosen(word: Int): Boolean = false
+
     /** Whether [word] is blocked in some reading: not predicted, as a prediction has none. */
     fun blockedAnyhow(word: Int): Boolean = false
 

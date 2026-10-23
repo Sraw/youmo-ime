@@ -16,6 +16,7 @@ import org.fcitx.fcitx5.android.engine.phrase.CustomPhrases
 import org.fcitx.fcitx5.android.engine.phrase.PhraseBook
 import org.fcitx.fcitx5.android.engine.pinyin.LatinWords
 import org.fcitx.fcitx5.android.engine.pinyin.Syllables
+import org.fcitx.fcitx5.android.engine.user.DictionaryFile
 import org.fcitx.fcitx5.android.engine.user.HabitCounts
 import org.fcitx.fcitx5.android.engine.user.ImportFiles
 import org.fcitx.fcitx5.android.engine.user.LibimeImport
@@ -83,6 +84,35 @@ internal class UserLexicon(
         return userAdditions
     }
 
+    // the merged dictionaries of the additions last read, opened once for them: a failure told once,
+    // typing going on without them, not tried again on every focus as 0.3.1's OOM was
+    private var mergedOf: Additions? = null
+    private var mergedFile: DictionaryFile? = null
+    private var mergedFailed = false
+
+    private fun merged(): DictionaryFile? {
+        val now = added()
+        if (now === mergedOf) return mergedFile
+        mergedOf = now
+        // failed until the open returns: an unchecked throw is not remembered as "no dictionaries" (F3403),
+        // nor is the last additions' file kept under these
+        mergedFailed = true
+        mergedFile = null
+        mergedFile = try {
+            now?.dictionary?.invoke().also { mergedFailed = false }
+        } catch (e: IOException) {
+            onError(e)
+            null
+        }
+        return mergedFile
+    }
+
+    // whether the merged file was compiled against another base dictionary than this one's (review S7)
+    private fun stale() = added()?.dictionaryStale == true
+
+    /** Where the tables keep their indexes of the merged dictionaries: [Additions.indexes]. */
+    fun indexes(): File? = added()?.indexes
+
     private var phrases: PhraseBook? = null
 
     fun phrases(): PhraseBook = phrases ?: PhraseBook(CustomPhrases.parse(added()?.phrases.orEmpty()), CustomPhrases.BUILT_IN) {
@@ -106,15 +136,21 @@ internal class UserLexicon(
         override fun modelWord(word: Int) = userModel?.modelWord(word) ?: word
     }
 
-    // the dictionaries' words go in listed, uncounted: scored as the model's unknown word until
-    // the user owns them. The words added by hand are the user's choice: scored as the model's word
-    // of their text from the start (UserModel.modelWord)
-    fun user(): UserModel = userModel ?: UserModel(pinyinData.dictionary, pinyinData.vocabulary, index = pinyinData.wordIndex).also { model ->
+    // the dictionaries' words are the model's, listed, uncounted: scored below the model's unknown
+    // word as their dictionary ranks them until the user owns them. The words added by hand are the
+    // user's choice: scored as the model's word of their text from the start (UserModel.modelWord)
+    fun user(): UserModel = userModel ?: UserModel(pinyinData.dictionary, pinyinData.vocabulary, pinyinData.wordIndex, merged(), stale()).also { model ->
+        // kept while it is made, for what attach asks of it; not once a step failed, so the next
+        // need makes it whole again rather than going on with half of it
         userModel = model
-        newlyListed.clear()
-        addDictionaries(model)
-        lists.applyTo(model)
-        attach(model)
+        try {
+            newlyListed.clear()
+            lists.applyTo(model)
+            attach(model)
+        } catch (@Suppress("TooGenericExceptionCaught") e: Throwable) {
+            userModel = null
+            throw e
+        }
     }
 
     /**
@@ -132,14 +168,17 @@ internal class UserLexicon(
     @Throws(IOException::class)
     fun legacyModel(file: File? = null): UserModel? {
         val dir = userDir ?: return null
-        val model = UserModel(pinyinData.dictionary, pinyinData.vocabulary, index = pinyinData.wordIndex)
+        // with the merged dictionaries from the first: a word of theirs the old log replays is theirs, not made (M2)
+        // the file on disk opened now if none is yet: stale, maybe (review S4)
+        val open = merged()
+        val dictionary = open ?: added()?.dictionaryNow?.invoke()
+        val model = UserModel(pinyinData.dictionary, pinyinData.vocabulary, pinyinData.wordIndex, dictionary, if (open != null) stale() else dictionary != null)
         val log = file ?: File(dir, USER_PINYIN)
         // one cut short of its header (killed as 0.3.0 first wrote it, a full disk) is as none, as the
         // tables' and English's logs are: not a failure owed to every start
         val bytes = if (log.isFile) log.readBytes() else null
         val read = if (bytes != null && UserLog.hasHeader(bytes)) UserLog.read(bytes, model) else 0
         if (read <= UserLog.header().size && (file != null || !importLegacy(model))) return null
-        addDictionaries(model)
         lists.applyTo(model)
         return model
     }
@@ -286,19 +325,14 @@ internal class UserLexicon(
         // a settings action, not a key: a word whose first character reads there as it never does alone (了解) found too
         texts -= LibimeImport.readings(pinyinData.dictionary, pinyinData.vocabulary, texts, strayFirst = true).keys
         lists.addedWords.forEach { texts -= it.text }
-        var unread = false
-        // read again, as the model is made again: the dictionaries are not kept in memory, and the
-        // model lists a dictionary's word as it does one added
-        forEachDictionaryWord(
-            failed = {
-                unread = true
-                onError(it)
-            },
-        ) {
-            left -= it
-            texts -= it.text
+        // a merged dictionary's word stays, a word of its text no word of the user's
+        val file = merged()
+        if (file != null) {
+            left.removeAll { file.find(it) >= 0 }
+            texts.removeAll(file::hasText)
         }
-        if (unread || addedFailed) return null
+        // nor while the merged file is being made (0.3.1's minute of upgrade) or failed: its words not known yet
+        if (mergedFailed || addedFailed || added()?.dictionaryPending?.invoke() == true) return null
         return removed.filter { it in left } to texts
     }
 
@@ -446,23 +480,6 @@ internal class UserLexicon(
         freshModel = null
     }
 
-    private fun addDictionaries(model: UserModel) {
-        forEachDictionaryWord(onError) { model.list(it) }
-    }
-
-    /**
-     * Each word of the user's dictionaries, all merged into the base one, as it is read, to [each].
-     * [failed] hears of each that does not read.
-     */
-    private fun forEachDictionaryWord(failed: (IOException) -> Unit, each: (Entry) -> Unit) {
-        // as they are read: one dictionary in the heap at a time, not all their lines at once
-        try {
-            added()?.dictionary?.invoke()?.forEach { line -> LibimeImport.dictionaryEntry(line)?.let(each) }
-        } catch (e: IOException) {
-            failed(e)
-        }
-    }
-
     /**
      * What libime learned, into a log with nothing in it yet. A failure to read or learn them is
      * thrown (as an [IOException]): the conversion that asked is owed to the next start.
@@ -600,9 +617,8 @@ internal class UserLexicon(
      * their own words, counts or pairs, none added by hand. [attach] is not told: nothing of the
      * learning record is in it.
      */
-    fun freshUser(): UserModel = freshModel ?: UserModel(pinyinData.dictionary, pinyinData.vocabulary, index = pinyinData.wordIndex).also { model ->
+    fun freshUser(): UserModel = freshModel ?: UserModel(pinyinData.dictionary, pinyinData.vocabulary, pinyinData.wordIndex, merged(), stale()).also { model ->
         freshModel = model
-        addDictionaries(model)
         lists.blockedWords.forEach { model.block(it) }
     }
 

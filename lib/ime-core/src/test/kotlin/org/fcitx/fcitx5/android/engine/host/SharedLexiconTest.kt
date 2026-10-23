@@ -217,7 +217,7 @@ class SharedLexiconTest {
 
     @Test
     fun aWordOfAnImportedDictionaryIsTypedInTheTablesThoughPinyinsDictionaryHasIt() {
-        val additions = Engines.Additions("", "d") { sequenceOf("你好 ni'hao 0") }
+        val additions = Engines.Additions("", "d", indexes = indexDir(), dictionary = compiled(::load) { sequenceOf("你好 ni'hao 0") })
         Engines(knownToPinyin(another = true), folder.newFolder("engine"), warmUps = { it.run() }, additions = { additions }).use { engines ->
             val typed = engines.type("engine-wubi", "wqvb")
             assertEquals("", typed.commit)
@@ -261,7 +261,7 @@ class SharedLexiconTest {
     // F2442: what the real SharedWords.learned lets a table offer to forget, as the owner decided
     @Test
     fun aSharedWordIsForgettableInATableOnlyOnceTypedOrMade() {
-        val additions = Engines.Additions("", "d") { sequenceOf("你好 ni'hao 0") }
+        val additions = Engines.Additions("", "d", indexes = indexDir(), dictionary = compiled(::load) { sequenceOf("你好 ni'hao 0") })
         Engines(knownToPinyin(another = true), folder.newFolder("engine"), warmUps = { it.run() }, additions = { additions }).use { engines ->
             fun forgettable(code: String = "wqvb", text: String = "你好"): Boolean {
                 val i = engines.type("engine-wubi", code).candidates.indexOf(text)

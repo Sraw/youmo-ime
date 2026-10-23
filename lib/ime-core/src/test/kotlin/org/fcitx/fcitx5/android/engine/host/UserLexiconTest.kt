@@ -4,9 +4,14 @@
  */
 package org.fcitx.fcitx5.android.engine.host
 
+import org.fcitx.fcitx5.android.engine.assertRows
 import org.fcitx.fcitx5.android.engine.data.CodeTableReader
 import org.fcitx.fcitx5.android.engine.data.PinyinDataBuilder
+import org.fcitx.fcitx5.android.engine.pinyin.Syllables
 import org.fcitx.fcitx5.android.engine.session.Offer
+import org.fcitx.fcitx5.android.engine.user.DictionaryFile
+import org.fcitx.fcitx5.android.engine.user.UserLog
+import org.fcitx.fcitx5.android.engine.user.UserModel
 import org.fcitx.fcitx5.android.engine.user.WordListFiles
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
@@ -264,62 +269,89 @@ class UserLexiconTest : EnginesFixture() {
         }
     }
 
+    // what the user's dictionaries have not known when a word added by hand is taken off: none to
+    // know them by, so the removal forgets nothing of what was learned of it (review M4, F3287)
     @Test
-    fun aWordTakenOffWhileADictionaryDoesNotReadKeepsWhatWasLearnedOfIt() {
-        val dir = folder.newFolder("engine")
-        var readable = true
-        val additions = Engines.Additions("", "d") {
-            if (!readable) throw IOException("unreadable")
-            // 拟好 beside it: a word added by hand alone over its keys would be first at once (U-65), with no picks to keep
-            sequenceOf("妮浩 ni'hao 0", "拟好 ni'hao 0")
-        }
-        val errors = ArrayList<IOException>()
-        Engines(::load, dir, onError = { errors += it }, additions = { additions }).use { engines ->
-            // the decoder's scores alone: the sentence model would weigh the readings again
-            engines.settings = EngineSettings(modelLevel = ModelLevel.LOW)
-            assertTrue(engines.addWord("妮浩", "nihao"))
-            engines.pickUntilFirst("nihao", "妮浩")
-            readable = false
-            engines.removeWord(Engines.UserWord("妮浩", "ni hao", Engines.UserWord.Kind.ADDED))
-            assertTrue(errors.any { it.message == "unreadable" })
-            readable = true
-            // the dictionary's word, its picks not forgotten as the user's own
-            assertEquals("妮浩", engines.type(Engines.PINYIN, "nihao").candidates.first())
+    fun aWordTakenOffWhileTheDictionariesAreNotKnownKeepsWhatWasLearnedOfIt() {
+        // 拟好 beside it: a word added by hand alone over its keys would be first at once (U-65), with no picks to keep
+        val made = compiled(::load) { sequenceOf("妮浩 ni'hao 0", "拟好 ni'hao 0") }
+        val unreadable: () -> DictionaryFile? = { throw IOException("unreadable") }
+        // why the dictionaries are not known, the additions read then, and how many "unreadable" are told
+        // (a failure told once, however often the model is made again)
+        class Row(val why: String, val told: IntRange, val unchecked: Boolean = false, val failing: () -> Engines.Additions?)
+        val rows = listOf(
+            Row("the merged file does not open", 1..1) { Engines.Additions("", "d", indexes = indexDir(), dictionary = unreadable) },
+            // not made yet (an upgrade's minute) or failed
+            Row("the merged file is pending", 0..0) { Engines.Additions("", "pending", dictionary = { null }, dictionaryPending = { true }) },
+            // which dictionaries the user has is not known: 妮浩 may be one's word
+            Row("the additions do not read", 1..Int.MAX_VALUE) { throw IOException("unreadable") },
+            // review F3403/F3411: an unchecked throw from the open, not remembered as "no dictionaries"
+            Row("the open throws unchecked", 0..0, unchecked = true) {
+                Engines.Additions("", "d", indexes = indexDir(), dictionary = throwing(IllegalStateException("bug")))
+            },
+        )
+        assertRows(rows, { it.why }) { row ->
+            val why = row.why
+            val dir = folder.newFolder()
+            val additions = { Engines.Additions("", "d", indexes = indexDir(), dictionary = made) }
+            Engines(::load, dir, additions = additions).use { engines ->
+                // the decoder's scores alone: the sentence model would weigh the readings again
+                engines.settings = EngineSettings(modelLevel = ModelLevel.LOW)
+                assertTrue(why, engines.addWord("妮浩", "nihao"))
+                engines.pickUntilFirst("nihao", "妮浩")
+            }
+            val errors = ArrayList<IOException>()
+            Engines(::load, dir, onError = { errors += it }, additions = row.failing).use { engines ->
+                fun guarded(step: () -> Unit) = if (row.unchecked) runCatching(step).let {} else step()
+                // typed first: the removal asks again what that failed open left
+                guarded { engines.type(Engines.PINYIN, "nihao") }
+                guarded { engines.removeWord(Engines.UserWord("妮浩", "ni hao", Engines.UserWord.Kind.ADDED)) }
+                guarded { engines.type(Engines.PINYIN, "nihao") }
+            }
+            assertTrue("$why: $errors", errors.count { it.message == "unreadable" } in row.told)
+            Engines(::load, dir, additions = additions).use { engines ->
+                engines.settings = EngineSettings(modelLevel = ModelLevel.LOW)
+                // the dictionary's word, its picks not forgotten as the user's own
+                assertEquals(why, "妮浩", engines.type(Engines.PINYIN, "nihao").candidates.first())
+            }
         }
     }
 
+    private fun throwing(e: RuntimeException): () -> DictionaryFile? = { throw e }
+
+    // review F3304: a model whose making failed half-way is not kept; the next need makes it whole
     @Test
-    fun aWordTakenOffWhileTheAdditionsDoNotReadKeepsWhatWasLearnedOfIt() {
-        val dir = folder.newFolder("engine")
-        // 拟好 beside it: a word added by hand alone over its keys would be first at once (U-65), with no picks to keep
-        val additions = Engines.Additions("", "d") { sequenceOf("妮浩 ni'hao 0", "拟好 ni'hao 0") }
-        Engines(::load, dir, additions = { additions }).use { engines ->
-            // the decoder's scores alone: the sentence model would weigh the readings again
-            engines.settings = EngineSettings(modelLevel = ModelLevel.LOW)
-            assertTrue(engines.addWord("妮浩", "nihao"))
-            engines.pickUntilFirst("nihao", "妮浩")
-        }
-        val errors = ArrayList<IOException>()
-        // which dictionaries the user has is not known: 妮浩 may be one's word
-        Engines(::load, dir, onError = { errors += it }, additions = { throw IOException("unreadable") }).use { engines ->
-            engines.removeWord(Engines.UserWord("妮浩", "ni hao", Engines.UserWord.Kind.ADDED))
-            assertTrue(errors.any { it.message == "unreadable" })
-        }
-        Engines(::load, dir, additions = { additions }).use { engines ->
-            engines.settings = EngineSettings(modelLevel = ModelLevel.LOW)
-            // the dictionary's word, its picks not forgotten as the user's own
-            assertEquals("妮浩", engines.type(Engines.PINYIN, "nihao").candidates.first())
-        }
+    fun aUserModelWhoseMakingFailedIsMadeWholeAtTheNextNeed() {
+        val assets = EngineAssets(::load, {}, null)
+        var fail = true
+        val attached = ArrayList<UserModel>()
+        val lexicon = UserLexicon(
+            null, {}, { null }, { null }, assets, forgetInTables = {}, dropSessions = {},
+            attach = { model ->
+                attached += model
+                if (fail) throw IllegalStateException("attach")
+            },
+        )
+        assertEquals("attach", runCatching { lexicon.user() }.exceptionOrNull()?.message)
+        fail = false
+        val model = lexicon.user()
+        // made again and attached, not the half-made one handed on
+        assertEquals(2, attached.size)
+        assertTrue(model === attached[1] && model !== attached[0])
+        assertTrue(model === lexicon.user())
     }
 
     @Test
     fun aWordTakenOffBeforeTheModelIsMadeIsForgottenInTheOneMadeThen() {
         val dir = folder.newFolder("engine")
         var reads = 0
-        val additions = Engines.Additions("", "d") {
-            reads++
-            sequenceOf("你好 ni'hao 0")
-        }
+        val additions = Engines.Additions(
+            "", "d",
+            indexes = indexDir(), dictionary = compiled(::load) {
+                reads++
+                sequenceOf("你好 ni'hao 0")
+            },
+        )
         Engines(::load, dir, additions = { additions }).use { engines ->
             assertTrue(engines.addWord("妮浩", "nihao"))
             engines.pick("nihao", "妮浩")
@@ -372,5 +404,23 @@ class UserLexiconTest : EnginesFixture() {
             .entry("了解", syl("liao", "jie"))
             .build()
             .toByteArray()
+    }
+
+    // review S4: an older build's log converted at a fresh start, before the merged file's open (queued)
+    // came: opened now, its words are the dictionaries', not the user's made words for good
+    @Test
+    fun aLegacyLogConvertedBeforeTheMergedFileOpensKnowsItsWords() {
+        val dir = folder.newFolder("user")
+        val niHao = UserModel.Entry("妮好", intArrayOf(Syllables.id("ni"), Syllables.id("hao")))
+        val log = File(dir, Engines.USER_PINYIN).apply { writeBytes(UserLog.header() + UserLog.sentence(null, listOf(niHao))) }
+        fun lexicon(now: () -> DictionaryFile?) = UserLexicon(
+            dir, { throw it }, { null },
+            { Engines.Additions("", "d", dictionary = { null }, dictionaryNow = now) }, EngineAssets(::load, {}, null),
+            forgetInTables = {}, dropSessions = {},
+        )
+        assertEquals(listOf("妮好"), lexicon { null }.legacyModel(log)!!.madeWords().map { it.first.text })
+        val model = lexicon(compiled(::load) { sequenceOf("妮好 ni'hao 0.5") }).legacyModel(log)!!
+        assertEquals(emptyList<Pair<UserModel.Entry, Float>>(), model.madeWords())
+        assertTrue(model.isMerged(model.known(niHao)))
     }
 }

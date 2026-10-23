@@ -158,6 +158,24 @@ keeps its own, the model they follow.
   (`ImportedDictionaries.migrate` moves those an older build listed in `.new-words` there and
   deletes the list); the settings show the built-in new words as part of 基础词库. `LayerPrior`
   adds one log10 value per layer; picks no longer move it.
+- **Imported dictionaries: analysed, then compiled** (D5, D6). A file for either dictionary is read
+  through by `DictionaryFormat.analyse` before a word is imported: charset (BOM, else strict UTF-8,
+  else strict GB18030), Rime's `---`…`...` header, and from a sample of ~2,000 lines spread over the
+  file which column is the text, how the pinyin is spelt and what the numbers are. Anything unsure is
+  `Refused` with a reason (格式不支持), never imported half right: a second layout or kind of number
+  over 2% (1% for numbers), initials only, more than 2% of all lines unread, the sample's characters
+  mostly not having their pinyin as the base dictionary reads them (`MISMATCH`, GB18030-decoded files only: Big5 decoded as GBK,
+  or no Mandarin readings), more words than `DictionaryCompiler.MAX_WORDS` (`TOO_MANY`). `analyse`'s
+  `write` callback gets every word read with its pinyin, in the one form the sources keep (`text pin'yin weight`);
+  the app writes them to the file `PinyinDictManager.Prepared.lines`, which the import reads. The app (`PinyinDictManager.prepare`/
+  `importPrepared`) keeps the texts in `dictionaries/` as sources only and compiles those on into
+  `merged.ymd` (`MergedDictionary`, `DictionaryCompiler`) on one thread for the process; the engine
+  maps that file and never parses the texts (0.3.1 did, at each focus, and ran out of heap on 1.9M
+  words). A stamp of the sources' names, sizes and times says when to compile again; a stale file is
+  used until the new one is made, then the engine is reloaded. The user dictionary holds at most
+  100,000 imported words in total (`USER_MAX_WORDS`): the file's words plus those of earlier
+  imports still kept (`ImportLayer.Batch.left`), as its imported words are in the heap. A file
+  refused for the base (`Refused`, imported line by line) counts its non-blank, non-comment lines.
 - **Imported words** (U-101, U-102). Another input method's list read into the user dictionary
   (`UserLexicon.importWords`; the user's own export, `WordListFiles.exportMark` with `old`, is added
   as before) is a batch in the learning record (`ImportBatch`/`Imported`/`ImportUndo`, rows
@@ -547,7 +565,9 @@ place. Rules that keep old files and old users working:
 - **The user's controls over learning (`learn/control/`, PLAN §2.8, impl/streams/E-design.md).**
   One entry, `Engines.learning(im, op)` (`FcitxAPI.learning` in the app), for every `LearningOp`:
   a long press's menu and acts, the undo chip, U-93's switch (`Engines.useHabits`: sessions made
-  as installed but for the blocks), U-88 清掉最近 and U-86 清空学到的, the lexicon page's lists.
+  as installed but for the blocks and the turned-on base dictionaries, a setting, not a habit:
+  pinyin's `freshUser` keeps them, and tables offer their blocks plus those dictionaries' words,
+  `TableRegistry.dictionariesOnly`, never own, added or learned words; review F3412), U-88 清掉最近 and U-86 清空学到的, the lexicon page's lists.
   A candidate's act goes as its long press always did, as the host's event, so the addon shows the
   list it leaves; what changes the list otherwise has the app send `Keyboard.AGAIN`, a private-use
   key the session answers by reading its input anew (`Session.reread`). `LearningControl` keeps

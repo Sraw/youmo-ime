@@ -13,6 +13,8 @@ import org.fcitx.fcitx5.android.engine.pinyin.Fuzzy
 import org.fcitx.fcitx5.android.engine.pinyin.PinyinSegmenter
 import org.fcitx.fcitx5.android.engine.pinyin.Syllables
 import org.fcitx.fcitx5.android.engine.pinyin.T9Segmenter
+import org.fcitx.fcitx5.android.engine.user.DictionaryCompiler
+import org.fcitx.fcitx5.android.engine.user.DictionaryFile
 import org.fcitx.fcitx5.android.engine.user.UserModel
 import org.fcitx.fcitx5.android.engine.user.UserScorer
 import org.junit.Assert.assertEquals
@@ -578,5 +580,41 @@ class PinyinDecoderTest {
         val r = d.decode(plain.segment("zhuangnihao"), sentences = 8, words = 64)
         assertTrue(r.sentences.isNotEmpty())
         assertTrue(r.words.any { it.words.toList() == listOf(user.known(UserModel.Entry("妆", syl("zhuang")))) })
+    }
+
+    // a merged dictionary (DictionaryFile) of 妮 泥 尼 at ni, and 倪 without a weight
+    private fun mergedModel(): UserModel {
+        val file = java.io.File.createTempFile("merged", ".ymd").apply { deleteOnExit() }
+        DictionaryCompiler.compile(
+            listOf(sequenceOf("妮 ni 0.5", "泥 ni 0.05", "尼 ni 0.005", "倪 ni 0", "你 ni 0.9")),
+            file,
+            inBase = DictionaryCompiler.inBase(data),
+        )
+        return UserModel(data.dictionary, data.vocabulary, data.wordIndex, DictionaryFile.open(file))
+    }
+
+    // review MUST-2/S6: a merged file's words come in its order, one without a weight after all weighted
+    @Test
+    fun mergedWordsComeAsTheirFileRanksThemTheUnweightedLast() {
+        val user = mergedModel()
+        val words = PinyinDecoder(data.dictionary, data.vocabulary, UserScorer(data.model, user), user = user)
+            .decode(plain.segment("ni")).words.map { it.text }
+        // the base's 你 once, from the base
+        assertEquals(1, words.count { it == "你" })
+        val order = listOf("妮", "泥", "尼").map(words::indexOf)
+        assertTrue(order.toString(), order.all { it >= 0 } && order == order.sorted())
+        assertTrue(words.indexOf("泥") < words.indexOf("倪"))
+    }
+
+    // review S5/S6: mid-sentence a node's merged words are cut at the limit, but not the user's chosen one
+    @Test
+    fun mergedWordsAreCutMidSentenceButNotOneTheUserChose() {
+        val user = mergedModel()
+        fun sentencesWith(text: String) = PinyinDecoder(data.dictionary, data.vocabulary, UserScorer(data.model, user), wordsPerReading = 1, user = user)
+            .decode(plain.segment("haoni"), sentences = 50).sentences.count { it.text == "好$text" }
+        assertEquals(1, sentencesWith("妮"))
+        assertEquals(0, sentencesWith("尼"))
+        user.listByHand(UserModel.Entry("尼", syl("ni")))
+        assertEquals(1, sentencesWith("尼"))
     }
 }

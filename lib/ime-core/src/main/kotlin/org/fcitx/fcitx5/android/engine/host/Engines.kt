@@ -66,6 +66,7 @@ import org.fcitx.fcitx5.android.engine.table.TableLanguage
 import org.fcitx.fcitx5.android.engine.table.TableOptions
 import org.fcitx.fcitx5.android.engine.table.TableSession
 import org.fcitx.fcitx5.android.engine.table.TableUser
+import org.fcitx.fcitx5.android.engine.user.DictionaryFile
 import org.fcitx.fcitx5.android.engine.user.HabitCounts
 import org.fcitx.fcitx5.android.engine.user.LibimeImport
 import org.fcitx.fcitx5.android.engine.user.UserModel
@@ -137,8 +138,34 @@ class Engines(
         val phrases: String,
         val dictionaries: String,
         val savePhrases: (CustomPhrases) -> Unit = {},
-        /** The lines of the dictionaries turned on, merged into the base dictionary. */
-        val dictionary: () -> Sequence<String>,
+        /**
+         * The dictionaries turned on, merged into the base dictionary, compiled (DictionaryCompiler)
+         * and opened, or null for none: asked once per these additions, on the fcitx thread, so the
+         * file is mapped, never read through (a 1.9-million-word one ran 0.3.1's heap out, read).
+         * @throws java.io.IOException if it cannot be opened: typing goes on without it, told once
+         */
+        val dictionary: () -> DictionaryFile?,
+        /** Where the tables keep their index of [dictionary]'s words (CodedIndex), beside it; null for none kept. */
+        val indexes: File? = null,
+        /**
+         * The merged file on disk opened now, stale or not, for when [dictionary] has none yet (its
+         * open queued at a fresh start): an older build's learning converted then must know the
+         * dictionaries' words, or they become the user's made words for good (review S4). Rare
+         * (a conversion owed), so the CRC pass on the fcitx thread is accepted.
+         * @throws java.io.IOException if it cannot be opened
+         */
+        val dictionaryNow: () -> DictionaryFile? = { null },
+        /**
+         * Whether [dictionary] was compiled against another base dictionary (an update's, its
+         * recompile not done): its words the base has now are left to the base till then (review S7).
+         */
+        val dictionaryStale: Boolean = false,
+        /**
+         * Whether the dictionaries turned on are not all in [dictionary] yet (compiled, or one
+         * failed): a word they may have is not known to be none of theirs, so removing it
+         * forgets no learning, as when [dictionary] does not open (review M4).
+         */
+        val dictionaryPending: () -> Boolean = { false },
     )
 
     private val assets = EngineAssets(load, onError, kernel, emojiShows, textShows)
@@ -162,7 +189,8 @@ class Engines(
     private val imports = ImportLayer(::learnLog, { lexicon.user() }, { lexicon.isBlockedWord(it) }, ::dropSessions)
 
     private val tables = TableRegistry(load, userDir, onError, compactions, warmUps, assets, lexicon,
-        knows = { habits.knows(it) }, recorded = { learnLog().onDisk }, beforeOpen = { learnLog() })
+        knows = { habits.knows(it) }, recorded = { learnLog().onDisk }, beforeOpen = { learnLog() },
+        indexes = lexicon::indexes)
 
     private val english = EnglishLexicon(::learnLog)
 
@@ -980,22 +1008,12 @@ class Engines(
         }
     }
 
-    // the user's words a table offers, and the blocks it keeps; while habits are off (U-93) the blocks alone
+    // the user's words a table offers, and the blocks it keeps; while habits are off (U-93) the blocks
+    // and the dictionaries turned on alone, as pinyin's fresh model keeps them (review F3412)
     private fun sharedWords(table: TableRegistry.Table, im: String): SharedWords {
-        val shared = tables.shared(table, im)
-        if (!useHabits) return BlocksOnly(shared)
+        val shared = if (useHabits) tables.shared(table, im) else tables.dictionariesOnly(table, im)
         shared.prepare()
         return shared
-    }
-
-    private class BlocksOnly(shared: SharedWords) : SharedWords by shared {
-        override fun words(prefix: String) = emptyList<Pair<String, String>>()
-
-        override fun leadsAnywhere(prefix: String) = false
-
-        override fun learned(text: String) = false
-
-        override fun prepare() = Unit
     }
 
     // the words added by hand, as the sessions offer them: none while habits are off (U-93)

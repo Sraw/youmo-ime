@@ -9,16 +9,20 @@ import org.fcitx.fcitx5.android.engine.host.Engines.Companion.TABLES
 import org.fcitx.fcitx5.android.engine.host.Engines.Companion.TABLE_DIR
 import org.fcitx.fcitx5.android.engine.host.Engines.Companion.TOLD
 import org.fcitx.fcitx5.android.engine.host.Engines.Companion.userTable
+import org.fcitx.fcitx5.android.engine.table.CodedIndex
 import org.fcitx.fcitx5.android.engine.table.CodedWords
 import org.fcitx.fcitx5.android.engine.table.SharedWords
 import org.fcitx.fcitx5.android.engine.table.TableDictionary
 import org.fcitx.fcitx5.android.engine.table.TableOptions
 import org.fcitx.fcitx5.android.engine.table.TableUser
+import org.fcitx.fcitx5.android.engine.user.DictionaryFile
 import org.fcitx.fcitx5.android.engine.user.UserModel
 import java.io.File
 import java.io.IOException
+import java.nio.Buffer
 import java.nio.ByteBuffer
 import java.util.concurrent.Executor
+import java.util.zip.CRC32
 
 /**
  * The table input methods of [Engines], each loaded at first need and kept, with what the user
@@ -43,6 +47,10 @@ internal class TableRegistry(
     // the learning record opened, before an older build's log is: its conversion reads that log's
     // picks, which this build no longer keeps, and opening a large one compacts it (review C S5)
     private val beforeOpen: () -> Unit = {},
+    // where the tables' indexes of the dictionaries the user merged ([UserModel.dictionaryFile])
+    // are kept: coded per table on disk ([CodedIndex]), never as objects (0.3.1 ran out of heap
+    // so); null keeps none, and the tables offer none of the file's words
+    private val indexes: () -> File? = { null },
 ) {
 
     /** A table and what the user taught it: both outlive the sessions made over them. */
@@ -50,6 +58,8 @@ internal class TableRegistry(
         val dictionary: TableDictionary,
         val user: TableUser,
         val store: TableUser.Store?,
+        // the table's data as loaded: what its index of a merged file is keyed on
+        val data: ByteBuffer? = null,
     ) {
         var shared: SharedWords? = null
 
@@ -66,6 +76,8 @@ internal class TableRegistry(
         var listedFrom = 0
         var laterTo = -1
         var ownAt = -1
+        // the merged file's words coded for this table, opened or built off the input thread
+        var indexing: InBackground<CodedIndex>? = null
     }
 
     private val listedSince get() = lexicon.listedSince
@@ -77,8 +89,15 @@ internal class TableRegistry(
      * the table's own entries, which a block from pinyin leaves (C12).
      */
     fun shared(table: Table, im: String): SharedWords = table.shared ?: object : SharedWords {
-        override fun words(prefix: String) = coded().flatMap { it.words(prefix) }
-        override fun leadsAnywhere(prefix: String) = coded().any { it.leadsAnywhere(prefix) }
+        // a word added by hand that the file has too comes from both: offered once (review F3303)
+        override fun words(prefix: String): List<Pair<String, String>> {
+            val listed = coded().flatMap { it.words(prefix) }
+            val merged = mergedNow()?.let { (index, file) -> index.exact(prefix, file) }.orEmpty()
+            return if (merged.isEmpty()) listed else (listed + merged).distinct()
+        }
+        override fun longer(prefix: String, byLength: Boolean) =
+            mergedNow()?.let { (index, file) -> index.longer(prefix, byLength, file) }.orEmpty()
+        override fun leadsAnywhere(prefix: String) = coded().any { it.leadsAnywhere(prefix) } || mergedNow()?.first?.leadsAnywhere(prefix) == true
         override fun blocked(text: String) = lexicon.isBlockedWord(text)
         override fun blockable(text: String) = text.codePointCount(0, text.length) >= 2 && assets.pinyinOf(text) != null
         override fun forget(text: String) = lexicon.forgetEverywhere(text)
@@ -87,7 +106,10 @@ internal class TableRegistry(
             knows(text) || lexicon.addedOf(text).isNotEmpty() || lexicon.user().let { m -> m.entriesOf(text).any { m.hasLearned(listOf(it)) } }
         override fun prepare() {
             coded()
+            mergedNow()
         }
+
+        private fun mergedNow(): Pair<CodedIndex, DictionaryFile>? = merged(table, im, lexicon.user())
 
         private fun coded(): List<CodedWords> {
             val model = lexicon.user()
@@ -102,7 +124,7 @@ internal class TableRegistry(
                 ?: coded(table, model)?.also { table.listed = it }
                 ?: CodedWords(table.dictionary, emptyList())
             val later = table.later?.takeIf { table.laterTo == listedSince.size }
-                ?: listedLater(table, listed).also {
+                ?: listedLater(table, listed, merged(table, im, model)).also {
                     table.later = it
                     table.laterTo = listedSince.size
                 }
@@ -129,6 +151,9 @@ internal class TableRegistry(
         val coding = table.coding ?: InBackground<Listed>(coding) { onError(IOException("coding the user's words for a table", it)) }.also { table.coding = it }
         val dictionary = table.dictionary
         val made = coding.get(model to model.listings - listedSince.size) {
+            // the merged file's words are not listed but left to its index (1.9 million of them were
+            // 250 MB a table); one also added by hand is coded here too, offered whether the index
+            // opens or not ([words] shows it once)
             val texts = model.listedTexts()
             val at = model.listings
             val from = listedSince.size
@@ -145,13 +170,61 @@ internal class TableRegistry(
     // the listed words coded, and the listings and add()s they were read at
     internal class Listed(val words: CodedWords, val at: Int, val from: Int)
 
-    /** What add() listed since [table]'s [listed] were coded, coded alone; a text listed before in another reading left out, coded already. */
-    private fun listedLater(table: Table, listed: CodedWords): CodedWords {
+    /**
+     * What add() listed since [table]'s [listed] were coded, coded alone; a text listed before in
+     * another reading left out, coded already, there or in the merged file's [index].
+     */
+    private fun listedLater(table: Table, listed: CodedWords, index: Pair<CodedIndex, DictionaryFile>?): CodedWords {
         val texts = listedSince.subList(table.listedFrom, listedSince.size).filterNot { text ->
-            table.dictionary.encode(text)?.let { code -> listed.words(code).any { it.first == code && it.second == text } } == true
+            table.dictionary.encode(text)?.let { code ->
+                listed.words(code).any { it.first == code && it.second == text } || index?.let { (i, file) -> i.has(code, text, file) } == true
+            } == true
         }
         return CodedWords(table.dictionary, texts)
     }
+
+    /**
+     * [shared] while 「不用我的输入习惯」 is on (U-93): the blocks, and the words of the dictionaries
+     * the user turned on, a setting, not a habit, as pinyin's [UserLexicon.freshUser] keeps them
+     * (review F3412); none of the user's own, added or learned.
+     */
+    fun dictionariesOnly(table: Table, im: String): SharedWords = object : SharedWords by shared(table, im) {
+        private fun mergedNow() = merged(table, im, lexicon.freshUser())
+        override fun words(prefix: String) = mergedNow()?.let { (index, file) -> index.exact(prefix, file) }.orEmpty()
+        override fun longer(prefix: String, byLength: Boolean) =
+            mergedNow()?.let { (index, file) -> index.longer(prefix, byLength, file) }.orEmpty()
+        override fun leadsAnywhere(prefix: String) = mergedNow()?.first?.leadsAnywhere(prefix) == true
+        override fun learned(text: String) = false
+        override fun prepare() {
+            mergedNow()
+        }
+    }
+
+    /**
+     * [table]'s index of the file merged into [model], opened (or built, a first time or for
+     * another file or table data) on [coding]; null till then, or with no file or place for it.
+     * An OutOfMemoryError there is reported, not a dead input method ([InBackground]), though the
+     * build is bounded ([CodedIndex.RUN]) so it should never come.
+     */
+    private fun merged(table: Table, im: String, model: UserModel): Pair<CodedIndex, DictionaryFile>? {
+        val file = model.dictionaryFile ?: return null
+        val dest = indexes()?.let { File(it, "merged.$im.ymc") } ?: return null
+        val indexing = table.indexing
+            ?: InBackground<CodedIndex>(coding) { onError(IOException("coding the merged dictionaries for a table", it)) }.also { table.indexing = it }
+        val dictionary = table.dictionary
+        val data = table.data
+        val index = indexing.get(file) {
+            { stillAsked ->
+                val key = "${data?.let(::crc32) ?: 0}/${file.size}/${file.stamp}"
+                // stopped: what it returns is dropped
+                CodedIndex.open(dest, key) ?: CodedIndex.build(dictionary, file, dest, key, stillAsked) ?: CodedIndex.NONE
+            }
+        } ?: return null
+        return index to file
+    }
+
+    // the whole buffer, its position left as it was: CRC32.update(ByteBuffer) is API 26, minSdk 29 (review F3268)
+    private fun crc32(buffer: ByteBuffer): Long = CRC32().apply { update(buffer.duplicate().also { (it as Buffer).clear() }) }.value
 
     /**
      * What [table] saved before pinyin heard of its phrases, told it once: a phrase the user took
@@ -218,10 +291,11 @@ internal class TableRegistry(
     private val tables = HashMap<String, Table>()
 
     fun table(im: String): Table = tables.getOrPut(im) {
-        val dictionary = TableDictionary(CodeTable.load(load("$TABLE_DIR/${TABLES.getValue(im).file}"), verify = false))
+        val data = load("$TABLE_DIR/${TABLES.getValue(im).file}")
+        val dictionary = TableDictionary(CodeTable.load(data.duplicate(), verify = false))
         val user = TableUser(dictionary)
         if (userDir != null) beforeOpen()
-        Table(dictionary, user, userDir?.let { openStore(File(it, userTable(im)), user) })
+        Table(dictionary, user, userDir?.let { openStore(File(it, userTable(im)), user) }, data)
     }
 
     // a log that cannot be read or moved aside: learn in memory rather than not type

@@ -7,6 +7,7 @@ package org.fcitx.fcitx5.android.core
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.data.pinyin.CustomPhraseManager
 import org.fcitx.fcitx5.android.data.pinyin.ImportedDictionaries
+import org.fcitx.fcitx5.android.data.pinyin.MergedDictionary
 import org.fcitx.fcitx5.android.data.pinyin.customphrase.PinyinCustomPhrase
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.replaceDirectory
@@ -220,32 +221,46 @@ class EngineBridgeTest {
         assertEquals(listOf(phone, email), CustomPhraseManager.load(file))
     }
 
-    // one an older build merged into the new words is read into the base, its list gone
+    // one an older build merged into the new words is merged into the base, its list gone; and 0.3.1's
+    // texts are never read here (the fcitx thread), but compiled once off it (the migration), the
+    // engine told of the file then
     @Test
-    fun aDictionaryOnceMergedIntoTheNewWordsIsReadIntoTheBase() {
+    fun theDictionariesAreCompiledOffTheEnginesThreadNotReadByIt() {
         val dictionaries = File(folder.root, "dictionaries").apply { mkdirs() }
         File(dictionaries, "mine.txt").writeText("你好 ni'hao 0.0\n")
         File(dictionaries, "theirs.txt").writeText("搭子 da'zi 0.0\n")
         val list = File(dictionaries, ImportedDictionaries.INTO_NEW).apply { writeText("mine\n") }
-        val added = EngineBridge.additions(folder.root)
-        assertEquals(listOf("你好 ni'hao 0.0", "搭子 da'zi 0.0"), added.dictionary().toList())
-        assertFalse(list.exists())
-        // a change of a dictionary is told apart, as the engine reads them again for it
-        File(dictionaries, "theirs.txt").writeText("搭子 da'zi 0.0\n妮 ni 0.0\n")
-        assertNotEquals(added.dictionaries, EngineBridge.additions(folder.root).dictionaries)
-    }
-
-    @Test
-    fun aDictionaryThatCannotBeReadIsLeftOutAndTheEngineToldAfterTheRest() {
-        val dictionaries = File(folder.root, "dictionaries").apply { mkdirs() }
-        val gone = File(dictionaries, "a.txt").apply { writeText("搭子 da'zi 0.0\n") }
-        File(dictionaries, "b.txt").writeText("你好 ni'hao 0.0\n")
-        val added = EngineBridge.additions(folder.root)
-        gone.delete()
-        val read = ArrayList<String>()
-        // as UserLexicon reads them: what failed is heard of only after the others went in
-        assertThrows(IOException::class.java) { added.dictionary().forEach { read += it } }
-        assertEquals(listOf("你好 ni'hao 0.0"), read)
+        MergedDictionary.reset()
+        var made = 0
+        MergedDictionary.made = { made++ }
+        MergedDictionary.base = { null }
+        try {
+            val added = EngineBridge.additions(folder.root)
+            assertFalse(list.exists())
+            assertNull(added.dictionary())
+            MergedDictionary.refreshNow(dictionaries)
+            val merged = MergedDictionary.current(dictionaries).file!!
+            assertEquals(2, merged.size)
+            assertTrue(merged.hasText("搭子"))
+            assertTrue(made > 0)
+            assertEquals(mapOf("mine" to 1, "theirs" to 1), MergedDictionary.sourceWords(dictionaries))
+            // the engine is told of another file, as it reads them again for it
+            assertNotEquals(added.dictionaries, EngineBridge.additions(folder.root).dictionaries)
+            // a change of a dictionary is compiled again
+            File(dictionaries, "theirs.txt").writeText("搭子 da'zi 0.0\n妮 ni 0.0\n")
+            MergedDictionary.refreshNow(dictionaries)
+            assertEquals(3, MergedDictionary.current(dictionaries).file!!.size)
+            // none on: no file
+            File(dictionaries, "mine.txt").delete()
+            File(dictionaries, "theirs.txt").delete()
+            MergedDictionary.refreshNow(dictionaries)
+            assertNull(MergedDictionary.current(dictionaries).file)
+            assertFalse(File(dictionaries, MergedDictionary.FILE).exists())
+        } finally {
+            MergedDictionary.refreshNow(dictionaries)
+            MergedDictionary.reset()
+            MergedDictionary.made = {}
+        }
     }
 
     @Test

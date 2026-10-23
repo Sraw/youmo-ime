@@ -145,7 +145,7 @@ object ImportFiles {
 
         private fun ByteBuffer.skip(n: Int) = seek(position() + n)
 
-        // Buffer's: ByteBuffer.position(int) returning ByteBuffer is Java 9's, not Android 6's. Past the end, as a read past it
+        // Buffer's: ByteBuffer.position(int) returning ByteBuffer is Java 9's, not on every Android. Past the end, as a read past it
         private fun ByteBuffer.seek(at: Int) {
             if (at !in 0..limit()) throw BufferUnderflowException()
             (this as Buffer).position(at)

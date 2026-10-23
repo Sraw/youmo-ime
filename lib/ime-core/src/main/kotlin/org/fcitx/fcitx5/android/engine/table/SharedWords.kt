@@ -12,8 +12,18 @@ import java.util.TreeMap
  * by none of them. The phrases a table saved in an older build go the other way (TableRegistry).
  */
 interface SharedWords {
-    /** The user's words under codes starting with [prefix], code and text; none the table has so. */
+    /**
+     * The user's words under codes starting with [prefix], code and text; none the table has so.
+     * But those [longer] gives, which come after these at their code length.
+     */
     fun words(prefix: String): List<Pair<String, String>>
+
+    /**
+     * The words of the merged dictionaries under a code longer than [prefix], read as asked for:
+     * by code length, then code ([byLength]), or by code; none [words] has. Some 80,000 a letter
+     * of 五笔 for rime-frost: made whole at every key, they were 22 MB of garbage a key.
+     */
+    fun longer(prefix: String, byLength: Boolean): Sequence<Pair<String, String>> = emptySequence()
 
     /** Whether one of [words] has a code starting with [prefix]. */
     fun leadsAnywhere(prefix: String): Boolean

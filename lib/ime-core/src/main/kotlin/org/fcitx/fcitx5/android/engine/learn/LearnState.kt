@@ -542,7 +542,7 @@ class LearnState {
             else -> Unit
         }
         for (r in a.added) when (r) {
-            // no Map.putIfAbsent below API 24
+            // by hand, not Map.putIfAbsent: written for an API floor below 24
             is MineRow -> {
                 if (r.text !in mine) setMine(r.text, r.value)
                 // its sequence taken: no commit after it shares it (review-int-records S4)

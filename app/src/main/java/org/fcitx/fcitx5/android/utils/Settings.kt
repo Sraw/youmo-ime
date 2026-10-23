@@ -11,16 +11,6 @@ fun errInvalidType(cls: Class<*>): Nothing {
     throw IllegalArgumentException("Invalid settings type ${cls.name}")
 }
 
-inline fun <reified T> getGlobalSettings(name: String): T {
-    return when (T::class.java) {
-        String::class.java -> Settings.Global.getString(appContext.contentResolver, name)
-        Float::class.javaObjectType -> Settings.Global.getFloat(appContext.contentResolver, name, 0f)
-        Long::class.javaObjectType -> Settings.Global.getLong(appContext.contentResolver, name, 0L)
-        Int::class.javaObjectType -> Settings.Global.getInt(appContext.contentResolver, name, 0)
-        else -> errInvalidType(T::class.java)
-    } as T
-}
-
 inline fun <reified T> getSecureSettings(name: String): T {
     return when (T::class.java) {
         // unset reads as empty, as an unset number reads as 0: null would fail the cast to String

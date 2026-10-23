@@ -184,7 +184,7 @@ class EnginesTest : EnginesFixture() {
     private var dictionaryReads = 0
 
     private fun added(phrases: String, dictionaries: String, vararg lines: String) =
-        Engines.Additions(phrases, dictionaries) { dictionaryReads++; lines.asSequence() }
+        Engines.Additions(phrases, dictionaries, indexes = indexDir(), dictionary = compiled(::load) { dictionaryReads++; lines.asSequence() })
 
     private fun Engines.pickUntilFirst(text: String) {
         repeat(MAX_PICKS) {
@@ -200,7 +200,7 @@ class EnginesTest : EnginesFixture() {
     @Test
     fun aDictionaryWordIsMergedIntoTheBase() {
         // no scores in a dictionary: 妮 and 泥, merged into the base, at the unknown word's until picked
-        val additions = Engines.Additions("", "d") { sequenceOf("妮 ni 0", "泥 ni 0") }
+        val additions = Engines.Additions("", "d", indexes = indexDir(), dictionary = compiled(::load) { sequenceOf("妮 ni 0", "泥 ni 0") })
         Engines(::load, folder.newFolder("engine"), { throw it }, additions = { additions }).use { engines ->
             val candidates = engines.type(Engines.PINYIN, "ni").candidates
             assertEquals(listOf("你", "拟"), candidates.take(2))
@@ -309,7 +309,7 @@ class EnginesTest : EnginesFixture() {
     fun aCandidatePinnedIsTheLearningRecordsUnderItsOwnCodeThePhrasesUntouched() {
         val saved = ArrayList<String>()
         val errors = ArrayList<IOException>()
-        val additions = Engines.Additions("", "", { saved += it.all.joinToString(" ") }) { emptySequence() }
+        val additions = Engines.Additions("", "", { saved += it.all.joinToString(" ") }, dictionary = { null })
         val engines = Engines(::load, null, { errors += it }, additions = { additions })
         assertEquals(emptySet<Offer>(), engines.offers(Engines.PINYIN, 0))
         val shown = engines.type(Engines.PINYIN, "ni")
@@ -331,7 +331,7 @@ class EnginesTest : EnginesFixture() {
     @Test
     fun pinsConvertedFromPhrasesTakeThemOutOnce() {
         val saved = ArrayList<String>()
-        val additions = { Engines.Additions("ni,1=拟\nhao,1=呢\n", "", { saved += it.all.joinToString(" ") }) { emptySequence() } }
+        val additions = { Engines.Additions("ni,1=拟\nhao,1=呢\n", "", { saved += it.all.joinToString(" ") }, dictionary = { null }) }
         val dir = folder.newFolder("engine")
         Engines(::load, dir, additions = additions).use { engines ->
             assertEquals("拟", engines.type(Engines.PINYIN, "ni").candidates.first())
@@ -350,7 +350,7 @@ class EnginesTest : EnginesFixture() {
     @Test
     fun aPinOfAnAbbreviationTakesItsPhraseOut() {
         val saved = ArrayList<String>()
-        val additions = { Engines.Additions("nh,1=你好\n", "", { saved += it.all.joinToString(" ") }) { emptySequence() } }
+        val additions = { Engines.Additions("nh,1=你好\n", "", { saved += it.all.joinToString(" ") }, dictionary = { null }) }
         Engines(::load, folder.newFolder("engine"), additions = additions).use { engines ->
             val shown = engines.type(Engines.PINYIN, "nh").candidates
             assertEquals("你好", shown.first())
@@ -363,7 +363,7 @@ class EnginesTest : EnginesFixture() {
     @Test
     fun aPhraseOfThePinsTextIsShownOnce() {
         val dir = folder.newFolder("engine")
-        val additions = { Engines.Additions("nh,1=你好\n", "", { }) { emptySequence() } }
+        val additions = { Engines.Additions("nh,1=你好\n", "", { }, dictionary = { null }) }
         Engines(::load, dir, additions = additions).use { it.type(Engines.PINYIN, "nh") }
         // the phrase again, the pin kept: both of 你好
         Engines(::load, dir, additions = additions).use { engines ->
@@ -380,7 +380,7 @@ class EnginesTest : EnginesFixture() {
         assertEquals(listOf("你", "拟"), engines.type(Engines.PINYIN, "ni").candidates)
         assertEquals(1, errors.size)
         val dictionaries = Engines(::load, null, { errors += it }, additions = {
-            Engines.Additions("ni,1=呢", "a") { throw IOException("no") }
+            Engines.Additions("ni,1=呢", "a", dictionary = { throw IOException("no") })
         })
         assertEquals(listOf("呢", "你", "拟"), dictionaries.type(Engines.PINYIN, "ni").candidates)
         assertEquals(2, errors.size)
@@ -688,7 +688,7 @@ class EnginesTest : EnginesFixture() {
 
     @Test
     fun aWordAddedAfterATableCodedTheListedOnesIsCodedThereAloneAndOfferedOnce() {
-        val additions = Engines.Additions("", "d") { sequenceOf("你好 ni'hao 0") }
+        val additions = Engines.Additions("", "d", indexes = indexDir(), dictionary = compiled(::load) { sequenceOf("你好 ni'hao 0") })
         val wubi = "engine-wubi"
         // the listed words coded at once: in the background, a slow machine typed before they were
         Engines(::load, null, additions = { additions }, warmUps = { it.run() }).use { engines ->

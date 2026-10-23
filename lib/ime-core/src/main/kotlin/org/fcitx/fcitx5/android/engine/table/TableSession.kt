@@ -97,7 +97,7 @@ class TableSession(
      * saved here, a word of the other input methods), or an [emoji] the first stands for. A
      * [pinyin] entry's [code] is its pinyin, without the marker.
      */
-    private class Item(
+    internal class Item(
         val code: String,
         val text: String,
         val index: Int = -1,
@@ -641,24 +641,28 @@ class TableSession(
             }
         }
         keys.sort()
-        val order = IntArray(keys.size) { (keys[it] and POSITION_MASK).toInt() }
-        ownFirst(order, found::spelt)
-        val pinned = habits.pinned(here)?.text
+        val tail = Longer(code, alone, keys, found)
         // the 重码: the candidates (at [order]'s positions) of the whole code typed, past those kept in
         // order; sorted by length, none comes after the first longer code (what ownFirst moves forward
-        // past pinyin entries is none either): the rest is not looked at
+        // past pinyin entries is none either): the rest is not looked at. The longer codes from
+        // [tail] come after it, so it is the same with them or without
         val longer = keys.indexOfFirst { ((it shr LENGTH_SHIFT) and MAX_LENGTH.toLong()) > code.length }
-        val reach = if (code.length <= noSort) 0 else if (longer < 0) order.size else longer
+        val reach = if (code.length <= noSort) 0 else if (longer < 0) keys.size else longer
+        // what is reordered; the rest is read on as merged. Unsorted, all of it: every merged word
+        // under a longer code read at each key (some 80,000 a letter with rime-frost), which no
+        // preset does, sortByCodeLength being on in all of them (review F3320)
+        val order = tail.order.prefix(if (options.sortByCodeLength) maxOf(reach, tail.order.indexOfFirst { !found.spelt(it) } + 1) else Int.MAX_VALUE)
+        ownFirst(order, found::spelt)
+        val pinned = habits.pinned(here)?.text
         val blocked = { item: Item -> item.text in blockedHere || (!item.inTable && shared.blocked(item.text)) }
         // the table's own first, before 调频's models and the habits ranked it: picked over another shown first, a use of it (F2739)
-        val own = order.asSequence().map { found.item(it) ?: entryItem(found.entry(it)) }.firstOrNull { !blocked(it) }?.text.orEmpty()
+        val own = (order.asSequence() + tail.order.from(order.size)).map(tail::item).firstOrNull { !blocked(it) }?.text.orEmpty()
         val made = { placed: IntArray ->
             val shown = TableHabitOrder.pinnedFirst(byHabit(code, placed, reach, { found.item(it) == null && !found.spelt(it) }) { found.text(it, table) }, pinned) {
                 found.text(it, table)
             }
-            Ranking(blocked, emojiOf, phrasesOf, own) { at ->
-                shown.getOrNull(at)?.let { found.item(it) ?: entryItem(found.entry(it)) }
-            }
+            val read = tail.read(shown, pinned)
+            Ranking(blocked, emojiOf, phrasesOf, own) { if (read.hasNext()) tail.item(read.next()) else null }
         }
         if (reach == 0) return made(order)
         return weighed(code, order, reach, { k -> kind(code, found, order[k]) }, blockedHere, made)
@@ -696,24 +700,34 @@ class TableSession(
     }
 
     /**
-     * A code's candidates at [rank]'s positions: the [saved] phrases, the table's [entries]
-     * (the first [coded] by code, the rest by pinyin), then the other input methods' words ([others]).
+     * The merged dictionaries' words under codes longer than [code], read as far as they are
+     * shown ([MergedOrder]): they sort after every other candidate as long; none where the code
+     * commits its lone entry ([alone]).
      */
-    private class Found(val saved: List<Item>, val entries: IntArray, val coded: Int, val others: List<Item>) {
-        private val sharedFrom = saved.size + entries.size
-        val size get() = sharedFrom + others.size
+    private inner class Longer(private val code: String, alone: Boolean, keys: LongArray, private val found: Found) {
+        private val words = if (alone) emptySequence() else shared.longer(code, options.sortByCodeLength).filterNot { (c, text) -> user.isSaved(c, text) }.map { (c, text) -> Item(c, text) }
 
-        fun item(at: Int): Item? = when {
-            at < saved.size -> saved[at]
-            at >= sharedFrom -> others[at - sharedFrom]
-            else -> null
+        val order = MergedOrder(IntArray(keys.size) { (keys[it] and POSITION_MASK).toInt() }, keys, words.iterator(), ::before, found::addTail)
+
+        fun item(at: Int): Item = found.item(at) ?: entryItem(found.entry(at))
+
+        /**
+         * The positions to show: [shown] (those reordered), then the rest as [order] has them; one
+         * [pinned] past [shown] put first, as pinnedFirst would, its later place then the same
+         * text again (shown once).
+         */
+        fun read(shown: IntArray, pinned: String?): Iterator<Int> {
+            val front = pinned?.takeIf { p -> shown.none { found.text(it, table) == p } }?.let { p -> order.first({ found.text(it, table) == p }, word(p)) }
+            return (listOfNotNull(front).asSequence() + shown.asSequence() + order.from(shown.size)).iterator()
         }
 
-        fun spelt(at: Int) = at in saved.size + coded until sharedFrom
+        // [text] one of them, none saved here: the candidate it is
+        private fun word(text: String): Item? = table.encode(text)?.takeIf { it.length > code.length && it.startsWith(code) && !user.isSaved(it, text) }
+            ?.let { c -> shared.words(c).firstOrNull { it == c to text } }?.let { (c, t) -> Item(c, t) }
 
-        fun entry(at: Int) = entries[at - saved.size]
-
-        fun text(at: Int, table: TableDictionary) = item(at)?.text ?: table.text(entry(at))
+        // whether [item] sorts before the candidate of [key], codes sorted by length
+        private fun before(key: Long, item: Item) = options.sortByCodeLength &&
+            (key shr GROUP_SHIFT) and 1L == 1L && ((key shr LENGTH_SHIFT) and MAX_LENGTH.toLong()) > minOf(item.code.length, MAX_LENGTH)
     }
 
     /**

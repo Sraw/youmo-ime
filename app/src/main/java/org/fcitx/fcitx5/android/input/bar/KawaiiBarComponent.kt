@@ -30,6 +30,7 @@ import org.fcitx.fcitx5.android.core.CapabilityFlags
 import org.fcitx.fcitx5.android.core.FcitxEvent.CandidateListEvent
 import org.fcitx.fcitx5.android.data.clipboard.ClipboardManager
 import org.fcitx.fcitx5.android.data.clipboard.db.ClipboardEntry
+import org.fcitx.fcitx5.android.data.pinyin.MergedDictionary
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.prefs.ManagedPreference
 import org.fcitx.fcitx5.android.input.bar.ExpandButtonStateMachine.State.ClickToAttachWindow
@@ -160,6 +161,22 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
                 else -> {}
             }
         }
+
+    // the first start after 0.3.1 compiles its text dictionaries (a minute for 1.9 million words):
+    // typing goes on without them meanwhile, the idle bar says how far, and a notice when they are in
+    private fun showDictionaryUpgrade(ui: IdleUi) {
+        imeScope.launch {
+            MergedDictionary.work.collect { work ->
+                val upgrade = work?.takeIf { it.kind == MergedDictionary.Kind.UPGRADE }
+                ui.showWork(upgrade?.let { context.getString(R.string.dict_upgrading, it.percent) }, upgrade?.percent ?: 0)
+            }
+        }
+        imeScope.launch {
+            MergedDictionary.done.collect { (kind, ok) ->
+                if (kind == MergedDictionary.Kind.UPGRADE) service.say(if (ok) R.string.dict_upgraded else R.string.dict_upgrade_failed)
+            }
+        }
+    }
 
     private fun launchClipboardTimeoutJob() {
         clipboardTimeoutJob?.cancel()
@@ -428,6 +445,7 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
     }
 
     override fun onScopeSetupFinished(scope: DynamicScope) {
+        showDictionaryUpgrade(idleUi)
         ClipboardManager.lastEntry?.let {
             val now = System.currentTimeMillis()
             val clipboardTimeout = clipboardItemTimeout.getValue() * 1000L

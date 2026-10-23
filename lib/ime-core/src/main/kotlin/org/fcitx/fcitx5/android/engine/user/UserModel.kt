@@ -41,6 +41,9 @@ class UserModel(
     private val dictionary: PinyinDictionary,
     private val vocabulary: Vocabulary,
     private val index: WordIndex? = null,
+    private val merged: DictionaryFile? = null,
+    // [merged] compiled against another base: each of its words checked against this one's (review S7)
+    private val mergedStale: Boolean = false,
 ) : UserWords, LayerPrior.PackLayers {
 
     /** A word committed: its [text], read as [syllables]. */
@@ -98,6 +101,13 @@ class UserModel(
     private val importSame = HashMap<Int, Int>()
     private var startTrie: ImportTrie? = null
     private var startTrieOf = -1
+
+    // the words of the dictionaries the user merged ([merged], DictionaryFile): each by id from
+    // mergedBase up by its place there, read from the file in place and walked in its own trie
+    // ([mergedWords]), never copied: 1.9 million of them as objects ran a phone's heap out (0.3.1).
+    // Listed all, as a dictionary's word always was; a word the base has as well keeps the base's id
+    private val mergedBase = vocabulary.size + MERGED_OFFSET
+    private val mergedByHand = HashSet<Int>()
 
     // unigrams under NO_WORD, bigrams under their first word
     private val counts = Counts()
@@ -161,7 +171,7 @@ class UserModel(
 
     // an imported word's id found by its text ([idsOfText]) once it has an entry: given one, its text changed
     private fun entered(id: Int, entry: Entry) {
-        if (isImport(id) && id !in entries) wordChanged(entry.text)
+        if ((isImport(id) || isMerged(id)) && id !in entries) wordChanged(entry.text)
         entries[id] = entry
     }
 
@@ -198,7 +208,10 @@ class UserModel(
      */
     fun own(entry: Entry): Int {
         val id = idAsTyped(entry)
-        if (owned.add(id)) changes++
+        if (owned.add(id)) {
+            changes++
+            mergedChoice(id)
+        }
         if (isImport(id)) settle(id)
         return id
     }
@@ -210,8 +223,9 @@ class UserModel(
     fun disown(entry: Entry) {
         val id = ids[entry] ?: return
         if (!owned.remove(id)) return
+        mergedChoice(id)
         changes++
-        if (isImport(id)) settle(id) else if (id >= vocabulary.size && id !in listed) dropOwn(entry, id)
+        if (isImport(id)) settle(id) else if (id >= vocabulary.size && !isListed(id)) dropOwn(entry, id)
     }
 
     /**
@@ -254,7 +268,7 @@ class UserModel(
                 // one the dictionary or the user's has as another word (listed before the record was read) is that word
                 startTrie = ImportTrie(imports, importBase) { place ->
                     val entry = Entry(imports.text(place), imports.syllables(place))
-                    ids[entry].let { it != null && it != importBase + place } || inDictionary(entry) != NO_WORD
+                    ids[entry].let { it != null && it != importBase + place } || inDictionary(entry) != NO_WORD || mergedId(entry) != NO_WORD
                 }
                 startTrieOf = imports.grown
             }
@@ -263,11 +277,77 @@ class UserModel(
 
     private fun isImport(id: Int) = id >= importBase
 
+    // the id ranges, one per kind of word: a when over them is exhaustive, so a new kind is not
+    // missed in one of the places that tell them apart (review F3281)
+    private enum class Kind { BASE, USER, MERGED, IMPORT }
+
+    private fun kindOf(id: Int): Kind = when {
+        isImport(id) -> Kind.IMPORT
+        isMerged(id) -> Kind.MERGED
+        id >= vocabulary.size -> Kind.USER
+        else -> Kind.BASE
+    }
+
+    override fun isMerged(word: Int) = word >= mergedBase && word < importBase
+
+    // the id of entry as a merged dictionary has it, else NO_WORD
+    private fun mergedId(entry: Entry): Int = merged?.find(entry)?.takeIf { it >= 0 }?.let { mergedBase + it } ?: NO_WORD
+
+    // listed: of the user's dictionaries (all of a merged one's), or added by hand
+    private fun isListed(id: Int) = id in listed || isMerged(id)
+
+    override val mergedWords: StartWords? = merged?.let { file ->
+        object : StartWords {
+            override fun child(node: Int, syllable: Int) = file.child(node, syllable)
+            override fun firstChild(node: Int) = file.firstChild(node)
+            override fun childCount(node: Int) = file.childCount(node)
+            override fun syllable(node: Int) = file.nodeSyllable(node)
+            override fun wordCount(node: Int) = file.wordCount(node)
+            override fun word(node: Int, index: Int) = mergedBase + file.word(node, index)
+        }
+    }
+
+    // the trie's places only, as [idsOfText] and [mergedEntryOf]: one past trieWords is a base word's, in no trie (review F3342)
+    override fun forEachMergedOfText(text: String, visit: (Int) -> Unit) {
+        merged?.let { file -> file.forEachOfText(text) { if (it < file.trieWords) visit(mergedBase + it) } }
+    }
+
+    /** See [UserWords.anyMergedChosen]: asked per key, so a bit set's emptiness, not a walk of [owned]. */
+    override fun anyMergedChosen(): Boolean = !mergedChosen.isEmpty
+
+    /** See [UserWords.anyMergedCounted]: asked per glide, so a count kept as the counts change. */
+    override fun anyMergedCounted(): Boolean = mergedCounted > 0
+
+    // the merged words chosen ([chosen]), by place: [chosen] asked of each past the decoder's limit
+    // without boxing an id into [owned]'s or [mergedByHand]'s lookups (review F3277)
+    private val mergedChosen = java.util.BitSet()
+
+    // how many merged words have a count of their own
+    private var mergedCounted = 0
+
+    // [mergedChosen] kept in step with [owned] and [mergedByHand], for [id] one of them just changed
+    private fun mergedChoice(id: Int) {
+        if (isMerged(id)) mergedChosen[id - mergedBase] = id in owned || id in mergedByHand
+    }
+
+    // [mergedCounted] as [word]'s count went from [was] to [now]
+    private fun counted(word: Int, was: Float, now: Float) {
+        if (!isMerged(word) || (was > 0f) == (now > 0f)) return
+        if (now > 0f) mergedCounted++ else mergedCounted--
+    }
+
+    /**
+     * The score a merged dictionary gave word [id], log10 against its best word (so at most 0), NaN
+     * for none, a word of no merged dictionary's, or one the user chose ([chosen]), scored as theirs:
+     * [UserScorer] puts it below the model's unknown word.
+     */
+    fun mergedScore(id: Int): Float = if (isMerged(id) && !chosen(id)) checkNotNull(merged).score(id - mergedBase) else Float.NaN
+
     // the id of entry as imported, if it is
     private fun importId(entry: Entry): Int? = imports?.find(entry.text, entry.syllables)?.takeIf { it >= 0 }?.let { importBase + it }
 
-    // the id entry has, made or imported, without making one
-    private fun idOf(entry: Entry): Int? = ids[entry] ?: importId(entry)
+    // the id entry has, made, merged or imported, without making one: id()'s order (review S3)
+    private fun idOf(entry: Entry): Int? = ids[entry] ?: mergedId(entry).takeIf { it != NO_WORD } ?: importId(entry)
 
     // an imported word in the trie while it is a whole word (the user's own, listed, added by hand), else offered from the start alone
     private fun settle(id: Int) {
@@ -294,6 +374,7 @@ class UserModel(
         predicted.clear()
         typedTexts.clear()
         total = 0f
+        mergedCounted = 0
         changes++
     }
 
@@ -304,6 +385,7 @@ class UserModel(
         val was = counts[key]
         if (was == count) return
         counts[key] = count
+        counted(word, was, count)
         total += count - was
         if (was <= 0f && count > 0f) {
             changes++
@@ -371,12 +453,18 @@ class UserModel(
 
     private fun recomputeTotal() {
         total = 0f
-        counts.forEach { key, count -> if (first(key) == NO_WORD) total += count }
+        mergedCounted = 0
+        counts.forEach { key, count ->
+            if (first(key) == NO_WORD) {
+                total += count
+                if (count > 0f && isMerged(second(key))) mergedCounted++
+            }
+        }
     }
 
     private fun dropOwn(word: Entry, id: Int) {
         wordChanged(word.text)
-        owned.remove(id)
+        if (owned.remove(id)) mergedChoice(id)
         trie.remove(word.syllables, id)
         // learned again, it is a new word, put back in the trie
         ids.remove(word)
@@ -452,6 +540,7 @@ class UserModel(
     fun id(entry: Entry): Int {
         ids[entry]?.let { return it }
         var id = inDictionary(entry)
+        if (id == NO_WORD) id = mergedId(entry)
         if (id == NO_WORD) id = importId(entry) ?: NO_WORD
         if (id == NO_WORD) {
             id = vocabulary.size + newWords.size
@@ -492,7 +581,15 @@ class UserModel(
 
     /** [list]s [entry] as a word the user added by hand: scored as the model's of its text ([modelWord]). */
     fun listByHand(entry: Entry): Int = list(entry).also {
-        if (isImport(it)) importedByHand += it else if (it >= vocabulary.size) byHand[it - vocabulary.size] = true
+        when (kindOf(it)) {
+            Kind.IMPORT -> importedByHand += it
+            Kind.MERGED -> {
+                mergedByHand += it
+                mergedChoice(it)
+            }
+            Kind.USER -> byHand[it - vocabulary.size] = true
+            Kind.BASE -> Unit
+        }
     }
 
     /**
@@ -500,7 +597,15 @@ class UserModel(
      * unknown word, unless the user owns it ([chosen]).
      */
     fun unlistByHand(entry: Entry) {
-        ids[entry]?.let { if (isImport(it)) importedByHand -= it else if (it >= vocabulary.size) byHand[it - vocabulary.size] = false }
+        ids[entry]?.let {
+            when (kindOf(it)) {
+                Kind.IMPORT -> importedByHand -= it
+                Kind.MERGED -> mergedByHand -= it
+                Kind.USER -> byHand[it - vocabulary.size] = false
+                Kind.BASE -> Unit
+            }
+            mergedChoice(it)
+        }
     }
 
     /**
@@ -513,7 +618,8 @@ class UserModel(
         if (!listed.remove(id)) return
         if (!latinListed.remove(id)) listings++
         changes++
-        if (isImport(id)) settle(id) else if (id >= vocabulary.size && id !in owned) dropOwn(entry, id)
+        // one a merged dictionary has stays its word, offered from there (as libime leaves its extra dictionaries be)
+        if (isImport(id)) settle(id) else if (id >= vocabulary.size && !isMerged(id) && id !in owned) dropOwn(entry, id)
     }
 
     /**
@@ -543,7 +649,7 @@ class UserModel(
      */
     override fun modelWord(word: Int): Int {
         if (word < vocabulary.size) return word
-        if (isImport(word)) {
+        if (isImport(word) || isMerged(word)) {
             if (!chosen(word)) return word
             val same = importSame.getOrPut(word) { index?.find(text(word)) ?: NO_WORD }
             return if (same == NO_WORD) word else same
@@ -554,7 +660,12 @@ class UserModel(
 
     /** Whether [word] is one the user added by hand ([listByHand]), of the user's own trie or imported so. */
     fun addedByHand(word: Int): Boolean =
-        if (isImport(word)) word in importedByHand else word >= vocabulary.size && byHand[word - vocabulary.size]
+        when (kindOf(word)) {
+            Kind.IMPORT -> word in importedByHand
+            Kind.MERGED -> word in mergedByHand
+            Kind.USER -> byHand[word - vocabulary.size]
+            Kind.BASE -> false
+        }
 
     /**
      * Whether [word] is the user's choice: their own ([owns]), or added by hand. The one test of
@@ -562,7 +673,7 @@ class UserModel(
      * imported, from a dictionary or a pack, is not, nor one of the dictionary's typed, whose
      * reading is the dictionary's. Never a count, which fades (impl/design-1b.md M3).
      */
-    fun chosen(word: Int): Boolean = addedByHand(word) || owns(word)
+    override fun chosen(word: Int): Boolean = if (isMerged(word)) mergedChosen[word - mergedBase] else addedByHand(word) || owns(word)
 
     /**
      * The log10 probability a pack gave word [id], or NaN: [UserScorer] uses it where the model has
@@ -582,14 +693,14 @@ class UserModel(
         val id = idOf(entry)
         return when {
             id != null && addedByHand(id) -> Row.ADDED
-            (id != null && id in listed) || inDictionary(entry) != NO_WORD -> Row.DICTIONARY
+            (id != null && isListed(id)) || inDictionary(entry) != NO_WORD || mergedId(entry) != NO_WORD -> Row.DICTIONARY
             id != null && startOnly(id) -> Row.IMPORTED
             else -> Row.NONE
         }
     }
 
     // a word the user made, typing it (learn), not the dictionary's nor one of their dictionaries', nor imported
-    private fun isMade(id: Int) = id >= vocabulary.size && id !in listed && !isImport(id)
+    private fun isMade(id: Int) = id >= vocabulary.size && !isListed(id) && !isImport(id)
 
     /** The id of [entry] if it has one, the dictionary's, imported or the user's, without making it the user's word; else [NO_WORD]. */
     fun known(entry: Entry): Int = if (knows(entry)) id(entry) else NO_WORD
@@ -601,6 +712,11 @@ class UserModel(
         newByText[text]?.forEach { id -> if (entries[id]?.let { it in ids } == true && id !in out) out += id }
         // an imported word typed: a pair after it goes on from it too
         imports?.placesOf(text)?.forEach { place -> (importBase + place).let { if (it in entries && it !in out) out += it } }
+        // a merged word's, typed or not: one committed in a table or handwriting is learned and
+        // paired under it (review S2); those the base has come back through index above
+        merged?.let { file ->
+            file.forEachOfText(text) { place -> (mergedBase + place).let { if (place < file.trieWords && it !in out) out += it } }
+        }
         return out
     }
 
@@ -649,7 +765,22 @@ class UserModel(
     override fun blocked(word: Int, node: Int) =
         blockedAnyhow(word) && (word >= vocabulary.size || key(node, word) in blockedReadings)
 
-    override fun blockedAnyhow(word: Int) = blockedIds[word.toLong()] > 0f
+    override fun blockedAnyhow(word: Int) = blockedIds[word.toLong()] > 0f || mergedStale && inStaleBase(word)
+
+    // a stale file's word the base has now: the base's alone, offered and blocked as that (review S7).
+    // Looked up once a place, only while the recompile is owed
+    private val staleChecked = java.util.BitSet()
+    private val staleInBase = java.util.BitSet()
+
+    private fun inStaleBase(word: Int): Boolean {
+        if (!isMerged(word)) return false
+        val place = word - mergedBase
+        if (!staleChecked[place]) {
+            staleChecked.set(place)
+            if (inDictionary(checkNotNull(merged).entry(place)) != NO_WORD) staleInBase.set(place)
+        }
+        return staleInBase[place]
+    }
 
     /** What the user turned off as a prediction after a word (U-72): their learning record's, set as the model is made. */
     var predictionsOff: (prev: String, next: String) -> Boolean = { _, _ -> false }
@@ -673,11 +804,14 @@ class UserModel(
      * they offer. See [listings].
      */
     fun listedTexts(): List<String> {
-        val out = listed.filterNot(latinListed::contains).mapNotNullTo(LinkedHashSet()) { id -> entries[id]?.text ?: if (id < vocabulary.size) vocabulary.word(id) else null }
+        val out = listed.filterNot(latinListed::contains).mapNotNullTo(LinkedHashSet()) { id -> entries[id]?.text ?: if (id < vocabulary.size) vocabulary.word(id) else if (isMerged(id)) text(id) else null }
         // the words imported too: the tables offer them as they do a dictionary's (TBL-12a), after their own, never at a code alone (D8)
         imports?.let { i -> i.places().mapTo(out, i::text) }
         return out.toList()
     }
+
+    /** The dictionaries the user merged, compiled: what [mergedWords] walks. */
+    val dictionaryFile: DictionaryFile? get() = merged
 
     /**
      * The texts of the words the user owns ([own]), for the other input methods to offer too; not
@@ -697,6 +831,15 @@ class UserModel(
         ?.map { newWords[it - vocabulary.size] }
         ?.filter { it in ids }
         ?.maxByOrNull { counts[key(NO_WORD, ids.getValue(it))] }
+        ?: mergedEntryOf(text)
+
+    // a merged dictionary's reading of text, its best ranked: one never typed in pinyin (review S2)
+    private fun mergedEntryOf(text: String): Entry? {
+        val file = merged ?: return null
+        var best = -1
+        file.forEachOfText(text) { place -> if (place < file.trieWords && (best < 0 || file.score(place) > file.score(best))) best = place }
+        return if (best < 0) null else file.entry(best)
+    }
 
     /** Whether the user typed [text] as a word with an id here, however read. */
     fun typed(text: String): Boolean = text in typedTexts
@@ -705,7 +848,8 @@ class UserModel(
     fun hasText(text: String): Boolean = ids.keys.any { it.text == text }
 
     /** Whether the dictionary or the user has [entry] as a word already. */
-    fun knows(entry: Entry): Boolean = ids[entry]?.let { !gone(it) } == true || inDictionary(entry) != NO_WORD || importId(entry) != null
+    fun knows(entry: Entry): Boolean =
+        ids[entry]?.let { !gone(it) } == true || inDictionary(entry) != NO_WORD || mergedId(entry) != NO_WORD || importId(entry) != null
 
     // an id an imported word had, its batch undone or the word deleted since, and nothing else the user's: as
     // after a restart, no word (U-84), so the same list imports it again (review-G S1)
@@ -717,7 +861,7 @@ class UserModel(
      * word is no new word).
      */
     fun knowsText(text: String): Boolean =
-        index?.find(text)?.let { it >= 0 } == true || newByText[text]?.any { it in listed } == true
+        index?.find(text)?.let { it >= 0 } == true || newByText[text]?.any { it in listed } == true || merged?.hasText(text) == true
 
     /** How many words the user added to the dictionary's, forgotten ones too: no id is given twice. */
     val size: Int get() = newWords.size
@@ -730,21 +874,31 @@ class UserModel(
 
     override fun word(node: Int, index: Int) = trie.word(node, index)
 
-    override fun text(word: Int) = if (isImport(word)) checkNotNull(imports).text(word - importBase) else newWords[word - vocabulary.size].text
+    override fun text(word: Int) = when (kindOf(word)) {
+        Kind.IMPORT -> checkNotNull(imports).text(word - importBase)
+        Kind.MERGED -> checkNotNull(merged).text(word - mergedBase)
+        Kind.USER, Kind.BASE -> newWords[word - vocabulary.size].text
+    }
 
     // as learned: a word of the dictionary's too, read as the user typed it (行 as hang); only while
     // it is their choice (chosen): forgetting a word of the dictionary's keeps its entry, and a reading
     // kept so would learn the word back at the reading forgotten; one only imported, its reading
     // perhaps wrong, would take the decoder's arc from the dictionary's reading of the word (行人)
     override fun reading(word: Int) = if (chosen(word)) {
-        entries[word]?.syllables ?: if (isImport(word)) imports?.syllables(word - importBase) else newWords.getOrNull(word - vocabulary.size)?.syllables
+        entries[word]?.syllables ?: when (kindOf(word)) {
+            Kind.IMPORT -> imports?.syllables(word - importBase)
+            Kind.MERGED -> merged?.syllables(word - mergedBase)
+            Kind.USER, Kind.BASE -> newWords.getOrNull(word - vocabulary.size)?.syllables
+        }
     } else {
         null
     }
 
     private fun add(first: Int, second: Int, count: Float) {
-        if (first == NO_WORD && counts[key(first, second)] == 0f) changes++
+        val was = counts[key(first, second)]
+        if (first == NO_WORD && was == 0f) changes++
         counts.add(key(first, second), count)
+        if (first == NO_WORD) counted(second, was, counts[key(first, second)])
         if (first == NO_WORD) total += count else followers.getOrPut(first) { HashSet() } += second
         if (first == NO_WORD && counts[key(first, second)] > 0f) entries[second]?.let { typedTexts += it.text }
     }
@@ -761,6 +915,9 @@ class UserModel(
         private const val INITIAL_WORDS = 16
         // where the ids of the words imported start, past the dictionary's: no user makes 2^28 words
         private const val IMPORT_OFFSET = 1 shl 28
+        // where the ids of the merged dictionaries' words start, below the imported: DictionaryCompiler
+        // takes no more than MAX_WORDS, well short of the 2^27 between
+        private const val MERGED_OFFSET = 1 shl 27
         // counts the model pretends were spent on words not yet typed: one word typed once is
         // not yet all the user will ever type
         internal const val UNSEEN = 20f

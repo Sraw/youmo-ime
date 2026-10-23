@@ -105,6 +105,11 @@ long press's undo chip with nothing to undo). The settings' toasts are fine.
 - A downgrade to 0.3.0 while 0.3.1's first conversion is still owed (`learn.converting`) loses the
   older build's counts: when 0.3.1 is installed again it finds a log that is not empty and has no
   marker, takes only the words (`LegacyConversion.since`), and writes the marker. Rare, and accepted.
+- Never write a mapped file in place (`merged.ymd`, the tables' `.ymc`): the engine reads it while
+  you write, and a page changed under a mapping is garbage to it, or a SIGBUS once the file is
+  shorter. Write `<name>.tmp`, fsync, rename over it; the old mapping keeps the old inode.
+- A user's text dictionary is never parsed on the fcitx thread at start: 0.3.1 did, and 1.9M words
+  ran the 256 MB heap out at every focus. Compile it off the thread (`MergedDictionary`).
 - Data releases are pinned by SHA-256; a re-uploaded asset with the same name fails the build. Make
   a new release instead.
 

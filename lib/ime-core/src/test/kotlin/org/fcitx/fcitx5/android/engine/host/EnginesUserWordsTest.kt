@@ -100,7 +100,7 @@ class EnginesUserWordsTest {
     fun aWordAddedByHandAtANewReadingIsTheModelsWordAndOneImportedIsNot() {
         // at nin, which the dictionary lacks: 拟 added by hand, the model's 拟 (-3); 你, merged into
         // the base, the unknown word's (-7) till picked, though the model's 你 (-2) would come first
-        val additions = Engines.Additions("", "d") { sequenceOf("你 nin 0") }
+        val additions = Engines.Additions("", "d", indexes = indexDir(), dictionary = compiled(::load) { sequenceOf("你 nin 0") })
         // 拟 is offered too, as ni with n begun, after it; sentences of ni n may come first
         val order = listOf("拟", "你")
         fun Engines.atNin() = type(Engines.PINYIN, "nin").candidates.filter { it in order }.also { onEvent(Engines.PINYIN, EngineEvent.RESET, 0) }

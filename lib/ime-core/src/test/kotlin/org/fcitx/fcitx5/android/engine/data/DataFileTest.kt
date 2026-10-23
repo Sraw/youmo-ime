@@ -9,6 +9,8 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
 import org.junit.Test
+import java.io.File
+import java.io.RandomAccessFile
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.util.zip.CRC32
@@ -239,6 +241,26 @@ class DataFileTest {
             fail("read a header that is not there")
         } catch (e: DataFormatException) {
             assertTrue(e.message!!.contains("truncated header"))
+        }
+    }
+
+    // the second writer, for a file too large for the heap, makes the file Writer makes: byte for byte
+    @Test
+    fun aStreamedFileIsTheOneWriterMakes() {
+        val sections = sortedMapOf(1 to byteArrayOf(9), 2 to ByteArray(13) { it.toByte() }, 5 to ByteArray(0), 7 to ByteArray(70_000) { (it * 31).toByte() })
+        val meta = mapOf("码长" to "4", "name" to "a=b")
+        val written = DataFile.Writer(DataFile.KIND_TABLE, KIND_VERSION).addMeta(0, meta)
+            .also { w -> sections.forEach { (id, bytes) -> w.add(id, bytes) } }.toByteArray()
+        val file = File.createTempFile("stream", ".data")
+        try {
+            RandomAccessFile(file, "rw").use { f ->
+                DataFile.stream(f, DataFile.KIND_TABLE, KIND_VERSION, listOf(0) + sections.keys) { id, out ->
+                    if (id == 0) out.write(DataFile.metaBytes(meta)) else sections.getValue(id).let { b -> b.forEachIndexed { i, x -> if (i % 2 == 0) out.write(x.toInt()) else out.write(b, i, 1) } }
+                }
+            }
+            assertTrue(written.contentEquals(file.readBytes()))
+        } finally {
+            file.delete()
         }
     }
 

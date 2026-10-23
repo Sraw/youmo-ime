@@ -13,7 +13,7 @@ import java.util.concurrent.Executor
 
 class InBackgroundTest {
 
-    private val errors = ArrayList<Exception>()
+    private val errors = ArrayList<Throwable>()
 
     // runs what it was handed only when told, in any order
     private class Later : Executor {
@@ -68,6 +68,17 @@ class InBackgroundTest {
         assertNull(b.get(2) { { "b" } })
         later.run(0)
         assertEquals("b", b.get(2) { { "c" } })
+    }
+
+    @Test
+    fun anErrorInAMakeIsReportedToo() {
+        // 0.3.1: an OutOfMemoryError coding a merged dictionary for a table, uncaught, crash-looped the input method
+        val later = Later()
+        val b = InBackground<String>(later) { errors += it }
+        b.get(1) { { throw OutOfMemoryError("heap") } }
+        later.run(0)
+        assertEquals(listOf("heap"), errors.map { it.message })
+        assertNull(b.get(1) { { "a" } })
     }
 
     @Test
