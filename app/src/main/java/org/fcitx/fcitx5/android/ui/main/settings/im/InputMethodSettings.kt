@@ -38,7 +38,6 @@ import org.fcitx.fcitx5.android.input.keyboard.T9EnglishTyping
 import org.fcitx.fcitx5.android.input.keyboard.T9MultiTap
 import org.fcitx.fcitx5.android.ui.main.settings.LearningRestore
 import org.fcitx.fcitx5.android.ui.main.settings.SettingsRoute
-import kotlin.math.abs
 
 /** Does an [InputMethodSettings.Action], then tells whether it was done, on the main thread. */
 typealias ImAct = (InputMethodSettings.Action, done: (Boolean) -> Unit) -> Unit
@@ -156,12 +155,6 @@ object InputMethodSettings {
 
     private fun numbers(range: IntRange): (String) -> String = { v ->
         v.toIntOrNull()?.coerceIn(range)?.toString() ?: range.first.toString()
-    }
-
-    /** The value of [values] (numbers) nearest to a number, the first for what is not one. */
-    private fun nearestOf(values: List<String>): (String) -> String = { v ->
-        val n = v.toIntOrNull()
-        if (n == null) values.first() else values.minBy { abs(it.toInt() - n) }
     }
 
     private val PAGE_SIZES = EngineSettings.PAGE_SIZES.map { it.toString() }

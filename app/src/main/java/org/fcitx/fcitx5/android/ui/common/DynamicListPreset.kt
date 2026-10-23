@@ -33,18 +33,3 @@ fun <T> Context.DynamicListUi(
 
     override fun showEntry(x: T): String = show(x)
 }
-
-@Suppress("FunctionName")
-fun <T> Context.CheckBoxListUi(
-    initialEntries: List<T>,
-    initCheckBox: (CheckBox.(T) -> Unit),
-    initSettingsButton: (ImageButton.(T) -> Unit),
-    show: (T) -> String
-) = DynamicListUi(
-    BaseDynamicListUi.Mode.Immutable(),
-    initialEntries,
-    false,
-    initCheckBox,
-    initSettingsButton,
-    show
-)

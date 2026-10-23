@@ -7,6 +7,7 @@ package org.fcitx.fcitx5.android.data.prefs
 import android.content.SharedPreferences
 import androidx.core.content.edit
 import org.fcitx.fcitx5.android.utils.WeakHashSet
+import timber.log.Timber
 import kotlin.properties.ReadWriteProperty
 import kotlin.reflect.KProperty
 
@@ -30,6 +31,19 @@ abstract class ManagedPreference<T : Any>(
     abstract fun getValue(): T
 
     abstract fun putValueTo(editor: SharedPreferences.Editor)
+
+    /**
+     * [read], or the default (written back) when the stored value can't be read: a key whose type
+     * changed between versions throws ClassCastException, a codec's decode whatever it throws.
+     */
+    protected inline fun readOrReset(read: () -> T): T = try {
+        read()
+    } catch (@Suppress("TooGenericExceptionCaught") e: Exception) {
+        // as the five catches this replaces: a stored value of another type or format, not an Error
+        Timber.w(e, "preference %s unreadable, reset", key)
+        setValue(defaultValue)
+        defaultValue
+    }
 
     override fun getValue(thisRef: Any?, property: KProperty<*>): T = getValue()
 
@@ -70,13 +84,8 @@ abstract class ManagedPreference<T : Any>(
             sharedPreferences.edit { putBoolean(key, value) }
         }
 
-        override fun getValue(): Boolean {
-            return try {
-                sharedPreferences.getBoolean(key, defaultValue)
-            } catch (e: Exception) {
-                setValue(defaultValue)
-                defaultValue
-            }
+        override fun getValue(): Boolean = readOrReset {
+            sharedPreferences.getBoolean(key, defaultValue)
         }
 
         override fun putValueTo(editor: SharedPreferences.Editor) {
@@ -91,13 +100,8 @@ abstract class ManagedPreference<T : Any>(
             sharedPreferences.edit { putString(key, value) }
         }
 
-        override fun getValue(): String {
-            return try {
-                sharedPreferences.getString(key, defaultValue)!!
-            } catch (e: Exception) {
-                setValue(defaultValue)
-                defaultValue
-            }
+        override fun getValue(): String = readOrReset {
+            sharedPreferences.getString(key, defaultValue)!!
         }
 
         override fun putValueTo(editor: SharedPreferences.Editor) {
@@ -116,15 +120,10 @@ abstract class ManagedPreference<T : Any>(
             sharedPreferences.edit { putString(key, codec.encode(value)) }
         }
 
-        override fun getValue(): T {
-            return try {
-                sharedPreferences.getString(key, null)?.let {
-                    codec.decode(it)
-                } ?: defaultValue
-            } catch (e: Exception) {
-                setValue(defaultValue)
-                defaultValue
-            }
+        override fun getValue(): T = readOrReset {
+            sharedPreferences.getString(key, null)?.let {
+                codec.decode(it)
+            } ?: defaultValue
         }
 
         override fun putValueTo(editor: SharedPreferences.Editor) {
@@ -140,13 +139,8 @@ abstract class ManagedPreference<T : Any>(
             sharedPreferences.edit { putInt(key, value) }
         }
 
-        override fun getValue(): Int {
-            return try {
-                sharedPreferences.getInt(key, defaultValue)
-            } catch (e: Exception) {
-                setValue(defaultValue)
-                defaultValue
-            }
+        override fun getValue(): Int = readOrReset {
+            sharedPreferences.getInt(key, defaultValue)
         }
 
         override fun putValueTo(editor: SharedPreferences.Editor) {
@@ -160,13 +154,8 @@ abstract class ManagedPreference<T : Any>(
             sharedPreferences.edit { putFloat(key, value) }
         }
 
-        override fun getValue(): Float {
-            return try {
-                sharedPreferences.getFloat(key, defaultValue)
-            } catch (e: Exception) {
-                setValue(defaultValue)
-                defaultValue
-            }
+        override fun getValue(): Float = readOrReset {
+            sharedPreferences.getFloat(key, defaultValue)
         }
 
         override fun putValueTo(editor: SharedPreferences.Editor) {

@@ -30,7 +30,6 @@
 #include <fcitx-utils/standardpath.h>
 #include <fcitx-utils/stringutils.h>
 #include <fcitx-utils/utf8.h>
-#include <fcitx-config/iniparser.h>
 
 #include <quickphrase_public.h>
 #include <unicode_public.h>
@@ -1182,32 +1181,6 @@ Java_org_fcitx_fcitx5_android_core_Key_create(JNIEnv *env, jclass clazz, jint sy
             *JString(env, key.toString(fcitx::KeyStringFormat::Portable)),
             *JString(env, key.toString(fcitx::KeyStringFormat::Localized))
     );
-}
-
-extern "C"
-JNIEXPORT jobject JNICALL
-Java_org_fcitx_fcitx5_android_utils_Ini_readFromIni(JNIEnv *env, jclass clazz, jstring src) {
-    fcitx::RawConfig config;
-    FILE *fp = std::fopen(*CString(env, src), "rb");
-    if (!fp) {
-        return nullptr;
-    }
-    fcitx::readFromIni(config, fp);
-    std::fclose(fp);
-    return fcitxRawConfigToJObject(env, config);
-}
-
-extern "C"
-JNIEXPORT void JNICALL
-Java_org_fcitx_fcitx5_android_utils_Ini_writeAsIni(JNIEnv *env, jclass clazz, jstring dest, jobject value) {
-    FILE *fp = std::fopen(*CString(env, dest), "wb");
-    if (!fp) {
-        throwJavaException(env, "Unable to open file");
-        return;
-    }
-    auto config = jobjectToRawConfig(env, value);
-    fcitx::writeAsIni(config, fp);
-    std::fclose(fp);
 }
 
 #pragma GCC diagnostic pop

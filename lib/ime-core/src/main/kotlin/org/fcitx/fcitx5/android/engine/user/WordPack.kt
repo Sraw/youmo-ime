@@ -73,10 +73,6 @@ class WordPack(val layer: String, val words: List<Word>) {
 
         private fun fail(source: String, line: Int, message: String): Nothing = throw SourceException(source, line, message)
 
-        /** A pack's name as a file is named for it (`<name>.words`): ASCII letters, digits, `.`, `_`, `-`, not starting with a dot. */
-        fun validName(name: String) =
-            name.length in 1..MAX_NAME && name[0] != '.' && name.all { it in 'A'..'Z' || it in 'a'..'z' || it in '0'..'9' || it == '.' || it == '_' || it == '-' }
-
         private const val MAX_NAME = 64
 
         /**

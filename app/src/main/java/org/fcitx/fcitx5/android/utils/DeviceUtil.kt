@@ -6,12 +6,9 @@
 package org.fcitx.fcitx5.android.utils
 
 import android.os.Build
+import timber.log.Timber
 
 object DeviceUtil {
-
-    val isMIUI: Boolean by lazy {
-        getSystemProperty("ro.miui.ui.version.name").isNotEmpty()
-    }
 
     /**
      * https://www.cnblogs.com/qixingchao/p/15899405.html
@@ -29,7 +26,9 @@ object DeviceUtil {
                 .getDeclaredField("SEM_PLATFORM_INT")
                 .getInt(null)
             semPlatformInt > 90000
-        } catch (e: Exception) {
+        } catch (@Suppress("TooGenericExceptionCaught") e: Exception) {
+            // only Samsung's Build.VERSION has the field; any vendor ROM's oddity reads as not One UI, not a crash
+            Timber.d(e, "not One UI")
             false
         }
     }

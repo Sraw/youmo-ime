@@ -24,9 +24,5 @@ fun Project.epn(env: String, prop: String) =
     System.getenv(env)?.takeIf { it.isNotBlank() }
         ?: runCatching { property(prop)!!.toString() }.getOrNull()
 
-fun Project.epr(env: String, prop: String) = ep(env, prop) {
-    error("Neither environment variable $env nor project property $prop is set")
-}
-
 fun String.capitalized(): String =
     if (get(0).isUpperCase()) this else replaceFirstChar { get(0).uppercaseChar() }

@@ -6,6 +6,7 @@
 package org.fcitx.fcitx5.android.utils
 
 import android.annotation.SuppressLint
+import timber.log.Timber
 
 @SuppressLint("PrivateApi")
 fun getSystemProperty(key: String): String {
@@ -13,7 +14,9 @@ fun getSystemProperty(key: String): String {
         Class.forName("android.os.SystemProperties")
             .getMethod("get", String::class.java)
             .invoke(null, key) as String
-    } catch (e: Exception) {
+    } catch (@Suppress("TooGenericExceptionCaught") e: Exception) {
+        // a ROM without the hidden class, or one that hides or guards it: no such property, not a crash at start
+        Timber.d(e, "no system property %s", key)
         ""
     }
 }

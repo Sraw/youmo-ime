@@ -93,8 +93,7 @@ abstract class FcitxPreferenceFragment : PaddingPreferenceFragment() {
      * the graph would have been initialized when `NavHostFragment` got inflated, and does not suffer
      * from this problem? But maintain navigation destinations in XML is too tedious ...
      */
-    final override fun onCreatePreferences(savedInstanceState: Bundle?, rootKey: String?) {
-    }
+    final override fun onCreatePreferences(savedInstanceState: Bundle?, rootKey: String?) = Unit
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)

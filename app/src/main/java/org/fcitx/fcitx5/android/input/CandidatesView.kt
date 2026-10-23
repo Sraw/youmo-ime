@@ -372,7 +372,9 @@ class CandidatesView(
             inputPanel.auxUp.isEmpty() && inputPanel.auxDown.isEmpty()
 
     fun updateCursorAnchor(@Size(4) anchor: FloatArray, @Size(2) parent: FloatArray) {
-        val (horizontal, bottom, _, top) = anchor
+        val horizontal = anchor[0]
+        val bottom = anchor[1]
+        val top = anchor[3]
         val (parentWidth, parentHeight) = parent
         anchorPosition[0] = horizontal
         anchorPosition[1] = bottom

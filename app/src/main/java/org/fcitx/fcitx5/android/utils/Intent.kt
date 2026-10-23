@@ -11,9 +11,7 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Build
 import android.os.Parcelable
-import android.provider.DocumentsContract
 import android.widget.Toast
-import org.fcitx.fcitx5.android.BuildConfig
 import timber.log.Timber
 
 inline fun <reified T : Parcelable> Intent.parcelable(key: String): T? {
@@ -43,22 +41,4 @@ fun Context.openUrl(url: String) {
         Timber.w(e, "no browser for %s", url)
         toast(url, Toast.LENGTH_LONG)
     }
-}
-
-fun buildPrimaryStorageIntent(path: String = ""): Intent {
-    val initialUri = appContext.storageManager.primaryStorageVolume.createOpenDocumentTreeIntent()
-        .parcelable<Uri>(DocumentsContract.EXTRA_INITIAL_URI)!!
-    val uri = Uri.Builder()
-        .scheme(initialUri.scheme)
-        .authority(initialUri.authority)
-        .encodedPath(
-            initialUri.path!!.replaceFirst("/root/", "/document/") +
-                    Uri.encode(":Android/data/${BuildConfig.APPLICATION_ID}/files/$path")
-        ).build()
-    return Intent(Intent.ACTION_VIEW, uri)
-}
-
-fun buildDocumentsProviderIntent(): Intent {
-    val uri = DocumentsContract.buildRootUri("${BuildConfig.APPLICATION_ID}.provider", "files")
-    return Intent(Intent.ACTION_VIEW, uri)
 }

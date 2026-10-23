@@ -100,8 +100,4 @@ abstract class PopupContainerUi(
     abstract fun onChangeFocus(x: Float, y: Float): Boolean
 
     abstract fun onTrigger(): KeyAction?
-
-    companion object {
-        fun limitIndex(i: Int, limit: Int) = if (i < 0) 0 else if (i >= limit) limit - 1 else i
-    }
 }

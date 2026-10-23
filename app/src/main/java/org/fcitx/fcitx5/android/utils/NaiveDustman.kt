@@ -25,10 +25,6 @@ class NaiveDustman<T> {
     var onDirty: (() -> Unit)? = null
     var onClean: (() -> Unit)? = null
 
-    fun forceDirty() {
-        dirty = true
-    }
-
     private fun updateDirtyStatus(key: String, boolean: Boolean) {
         if (boolean) {
             dirtyStatus.add(key)
@@ -57,5 +53,4 @@ class NaiveDustman<T> {
         initialValues.clear()
         initialValues.putAll(initial)
     }
-
 }

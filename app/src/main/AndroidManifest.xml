@@ -142,17 +142,6 @@
                 android:resource="@xml/input_method" />
         </service>
 
-        <provider
-            android:name=".provider.FcitxDataProvider"
-            android:authorities="${applicationId}.provider"
-            android:exported="true"
-            android:grantUriPermissions="true"
-            android:permission="android.permission.MANAGE_DOCUMENTS">
-            <intent-filter>
-                <action android:name="android.content.action.DOCUMENTS_PROVIDER" />
-            </intent-filter>
-        </provider>
-
         <!-- remove unneeded components from com.canhub.cropper -->
         <!--suppress DeprecatedClassUsageInspection -->
         <activity

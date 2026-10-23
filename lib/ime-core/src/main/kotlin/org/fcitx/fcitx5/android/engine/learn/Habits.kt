@@ -44,9 +44,6 @@ interface Habits {
     /** The commit that first used [words] under [code] (STAT's firstSeq), 0 if none or not known: what breaks a tie of uses. */
     fun firstUse(code: Code, words: Words): Long
 
-    /** The typing day [text] became the user's word, or -1. */
-    fun mineSince(text: String): Int
-
     /** The commit [text] became the user's word in, or -1 if it is none of theirs: their words' order (U-10). */
     fun mineOrder(text: String): Long
 
@@ -97,7 +94,6 @@ interface Habits {
         override fun pinned(code: Code): Words? = null
         override fun used(code: Code): List<Words> = emptyList()
         override fun firstUse(code: Code, words: Words) = 0L
-        override fun mineSince(text: String) = -1
         override fun mineOrder(text: String) = -1L
         override fun knows(text: String) = false
         override fun isWord(text: String) = false
@@ -189,8 +185,6 @@ class LogHabits(private val log: () -> LearnLog, private val onError: (IOExcepti
     }
 
     override fun firstUse(code: Code, words: Words) = stat(code, words)?.firstSeq ?: 0L
-
-    override fun mineSince(text: String) = state.mine[text]?.since ?: -1
 
     override fun mineOrder(text: String) = state.mine[text]?.sinceSeq ?: -1L
 

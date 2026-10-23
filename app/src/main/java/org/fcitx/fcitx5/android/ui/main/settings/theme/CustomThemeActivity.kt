@@ -348,8 +348,8 @@ class CustomThemeActivity : AppCompatActivity() {
             }
             brightnessSeekBar.setOnSeekBarChangeListener(object :
                 SeekBar.OnSeekBarChangeListener {
-                override fun onStartTrackingTouch(bar: SeekBar) {}
-                override fun onStopTrackingTouch(bar: SeekBar) {}
+                override fun onStartTrackingTouch(bar: SeekBar) = Unit
+                override fun onStopTrackingTouch(bar: SeekBar) = Unit
 
                 override fun onProgressChanged(bar: SeekBar, progress: Int, fromUser: Boolean) {
                     if (fromUser) updateState()

@@ -6,10 +6,8 @@ package org.fcitx.fcitx5.android.utils
 
 import android.os.Process
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.asFlow
@@ -31,27 +29,6 @@ class Logcat(val pid: Int? = Process.myPid()) : CoroutineScope by CoroutineScope
      * Nothing would be emitted until [initLogFlow] was called
      */
     val logFlow: SharedFlow<String> by lazy { flow.asSharedFlow() }
-
-    /**
-     * Get a snapshot of logcat
-     */
-    fun getLogAsync(): Deferred<Result<List<String>>> = async {
-        runCatching {
-            Runtime.getRuntime()
-                .exec(arrayOf("logcat", pid?.let { "--pid=$it" } ?: "", "-d"))
-                .inputStream
-                .bufferedReader()
-                .readLines()
-        }
-    }
-
-    /**
-     * Clear logcat
-     */
-    fun clearLog(): Job =
-        launch {
-            runCatching { Runtime.getRuntime().exec(arrayOf("logcat", "-c")) }
-        }
 
     /**
      * Create a process reading logcat, sending lines to [logFlow]

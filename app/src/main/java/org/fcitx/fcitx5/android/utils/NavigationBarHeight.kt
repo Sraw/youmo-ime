@@ -9,6 +9,7 @@ import android.annotation.SuppressLint
 import android.content.Context
 import android.content.res.Resources
 import splitties.dimensions.dp
+import timber.log.Timber
 
 private const val FALLBACK_NAVBAR_HEIGHT = 48
 
@@ -23,6 +24,7 @@ fun Context.navbarFrameHeight(): Int {
     return try {
         resources.getDimensionPixelSize(resId)
     } catch (e: Resources.NotFoundException) {
+        Timber.d(e, "no navigation_bar_frame_height, using %d dp", FALLBACK_NAVBAR_HEIGHT)
         dp(FALLBACK_NAVBAR_HEIGHT)
     }
 }

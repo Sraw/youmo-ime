@@ -120,7 +120,7 @@ class InlineSuggestionsUi(override val ctx: Context) : Ui {
                         .apply()
                 }
 
-                override fun onDestroyed(surfaceControl: SurfaceControl) {}
+                override fun onDestroyed(surfaceControl: SurfaceControl) = Unit
             })
             flexbox.addView(it)
             it.updateLayoutParams<FlexboxLayout.LayoutParams> {

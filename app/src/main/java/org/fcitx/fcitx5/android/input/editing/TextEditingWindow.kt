@@ -128,7 +128,7 @@ class TextEditingWindow : InputWindow.ExtendedInputWindow<TextEditingWindow>(),
         onSelectionUpdate(range.start, range.end)
     }
 
-    override fun onDetached() {}
+    override fun onDetached() = Unit
 
     override fun onSelectionUpdate(start: Int, end: Int) {
         hasSelection = start != end

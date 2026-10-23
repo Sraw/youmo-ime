@@ -52,8 +52,8 @@ object PunctuationManager {
     }
 
     /**
-     * [fcitx] as the daemon hands it to its connections: reloading its config reads the tables
-     * again, which FcitxDataProvider lets the user edit, so what [load] kept goes with it.
+     * [fcitx] as the daemon hands it to its connections: any reload of its config reads the
+     * tables again, so what [load] kept goes with it.
      */
     fun forgettingOnReload(fcitx: FcitxAPI): FcitxAPI = object : FcitxAPI by fcitx {
         override suspend fun reloadConfig() {
@@ -68,7 +68,6 @@ object PunctuationManager {
         forget()
     }
 
-    const val MAP_ENTRY_CONFIG = "Entries\$PunctuationMapEntryConfig"
     const val ENTRIES = "Entries"
     const val KEY = "Key"
     const val MAPPING = "Mapping"

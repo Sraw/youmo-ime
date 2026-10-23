@@ -10,7 +10,6 @@ import android.content.Context
 import android.media.AudioManager
 import android.os.UserManager
 import android.os.Vibrator
-import android.os.storage.StorageManager
 import android.view.WindowManager
 import android.view.inputmethod.InputMethodManager
 import androidx.core.content.getSystemService
@@ -26,9 +25,6 @@ val Context.inputMethodManager
 
 val Context.notificationManager
     get() = getSystemService<NotificationManager>()!!
-
-val Context.storageManager
-    get() = getSystemService<StorageManager>()!!
 
 val Context.vibrator
     get() = getSystemService<Vibrator>()!!

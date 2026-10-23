@@ -11,7 +11,16 @@ import androidx.constraintlayout.widget.ConstraintLayout
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.input.broadcast.ReturnKeyAppearance
-import org.fcitx.fcitx5.android.input.keyboard.*
+import org.fcitx.fcitx5.android.input.keyboard.BackspaceKey
+import org.fcitx.fcitx5.android.input.keyboard.BaseKeyboard
+import org.fcitx.fcitx5.android.input.keyboard.ImageKeyView
+import org.fcitx.fcitx5.android.input.keyboard.KeyAction
+import org.fcitx.fcitx5.android.input.keyboard.KeyDef
+import org.fcitx.fcitx5.android.input.keyboard.LayoutSwitchKey
+import org.fcitx.fcitx5.android.input.keyboard.ReturnKey
+import org.fcitx.fcitx5.android.input.keyboard.SpaceKey
+import org.fcitx.fcitx5.android.input.keyboard.TextKeyboard
+import org.fcitx.fcitx5.android.input.keyboard.showReturnAction
 import splitties.views.dsl.constraintlayout.above
 import splitties.views.dsl.constraintlayout.after
 import splitties.views.dsl.constraintlayout.below

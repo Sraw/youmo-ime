@@ -74,7 +74,7 @@ object FcitxDaemon {
 
     private val clients = mutableMapOf<String, FcitxConnection>()
 
-    // fcitx reads its punctuation tables as it starts: FcitxDataProvider lets the user edit them meanwhile
+    // fcitx reads its punctuation tables as it starts: what was cached of them before goes
     private fun start() {
         PunctuationManager.starting(realFcitx::start)
     }

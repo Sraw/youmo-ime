@@ -94,7 +94,7 @@ class PunctuationManagerTest {
         val fcitx = PunctuationManager.forgettingOnReload(tables)
         tables.change("zh_CN", comma)
         assertEquals(comma, PunctuationManager.load(fcitx, "zh_CN"))
-        // the file edited through FcitxDataProvider, which then has fcitx reload
+        // the file changed on disk, which then has fcitx reload
         tables.change("zh_CN", both)
         fcitx.reloadConfig()
         assertEquals(both, PunctuationManager.load(fcitx, "zh_CN"))
