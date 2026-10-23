@@ -194,6 +194,28 @@ object UserDataManager {
         }
     }
 
+    /**
+     * What the backup in [backup] (its `external`) lacks of the settings and the text files the user edits,
+     * [FOLLOWED], deleted from [external]: those follow the backup, while dictionaries, themes and the other
+     * collections are merged; an entry whose name starts with a dot (the `.libime` copies EngineMigration
+     * keeps) is left alone, and a backup without `external/config` at all keeps all of the phone's.
+     * EngineMigration's `config/tables.order-unset` goes too when the backup lacks it, on purpose: it notes
+     * this phone's locked start, and the settings it was about are now the backup's.
+     * Run after the copy, so an import failing in it leaves the phone's settings whole.
+     */
+    private fun pruneAbsent(backup: File, external: File) {
+        if (!File(backup, "config").isDirectory) return
+        for (path in FOLLOWED) {
+            val target = File(external, path)
+            target.walkBottomUp().filter { it.isFile }.forEach { file ->
+                val relative = file.relativeTo(external).path
+                if (relative.split(File.separatorChar).none { it.startsWith(".") } && !File(backup, relative).exists()) {
+                    file.delete()
+                }
+            }
+        }
+    }
+
     fun import(src: InputStream) = import(src, appDirs)
 
     internal fun import(src: InputStream, dirs: Dirs) = runCatching {
@@ -238,6 +260,9 @@ object UserDataManager {
                     .onFailure { Timber.w(it, "Clipboard database import not marked: its next open keeps it as the user's") }
             }
             copyDir(File(tempDir, "external"), dirs.external)
+            // the settings are the backup's (PR-10): a config file it has not was at its defaults when it was
+            // made, fcitx writing only what is set, so the phone's is dropped, not left over the backup's
+            pruneAbsent(File(tempDir, "external"), dirs.external)
             // keep importing recently_used for backwords compatibility
             copyDir(File(tempDir, "recently_used"), dirs.recentlyUsed)
             // last: an import failing after it would start fcitx again on the logs it replaced
@@ -290,8 +315,9 @@ object UserDataManager {
     // a backup of a build before tables.order-kept: its tables typed with keep 调频 on in the
     // settings it brings, as EngineMigration does at such a build's first start. The phone's own
     // marker stays (importEngine), so that start never comes for the backup's logs (R11 F2745).
-    // A backup without the addon's settings leaves the phone's, which fcitx writes in full once any
-    // setting changes: their 调频 off is fcitx's default, not what the backup's build had (F3123)
+    // A backup without the addon's settings: the phone's are gone (pruneAbsent) or, from a zip without
+    // external/config, left, and fcitx writes them in full once any setting changes, so their 调频 off is
+    // fcitx's default, not what the backup's build had (F3123): the typed tables' set either way
     private fun keepOrderOfOlderBuild(source: File, configHome: File, broughtSettings: Boolean) {
         if (File(source, EngineMigration.ORDER_KEPT).exists()) return
         val typed = Engines.TABLES.keys.filter { File(source, Engines.userTable(it)).exists() }
@@ -330,6 +356,10 @@ object UserDataManager {
 
     // of a backup's engine directory, what is its learning, with its old logs: merged by the engine at its next start
     private val STASHED = listOf(LearnLog.FILE, WordLists.ADDED, WordLists.BLOCKED)
+
+    // under external: fcitx's settings (punctuation.conf, androidengine.conf, ...), the custom phrases, the
+    // quick phrases (fcitx's PkgData data/quickphrase.d) and the punctuation maps (PkgData punctuation/punc.mb.*)
+    private val FOLLOWED = listOf("config", "data/pinyin/customphrase", "data/data/quickphrase.d", "data/punctuation")
 
     // the androidengine addon's settings, under fcitx's config home
     private const val ENGINE_SETTINGS = "conf/androidengine.conf"

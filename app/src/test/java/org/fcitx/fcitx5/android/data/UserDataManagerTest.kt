@@ -8,6 +8,7 @@ import androidx.room.Room
 import kotlinx.coroutines.test.runTest
 import org.fcitx.fcitx5.android.BuildConfig
 import org.fcitx.fcitx5.android.FcitxApplication
+import org.fcitx.fcitx5.android.assertRows
 import org.fcitx.fcitx5.android.core.EngineMigration
 import org.fcitx.fcitx5.android.data.clipboard.db.ClipboardDatabase
 import org.fcitx.fcitx5.android.data.clipboard.db.ClipboardEntry
@@ -330,20 +331,96 @@ class UserDataManagerTest {
         assertFalse(File(other.external, "config/conf/androidengine.conf").exists())
     }
 
-    // R11 F3123: a zip without the addon's settings over a phone whose fcitx wrote them in full,
+    // PR-10: a setting changed after the backup was made goes back with it, though its default is not in the backup
+    @Test
+    fun aBackupsSettingsReplaceThePhonesThoseAtTheirDefaultsIncluded() {
+        val phone = install("phone")
+        val config = File(phone.external, "config").apply { File(this, "conf").mkdirs() }
+        File(config, "conf/androidengine.conf").writeText("PageSize=5\n")
+        File(config, "conf/punctuation.conf").writeText("phone's")
+        File(phone.external, "data/pinyin/dictionaries").mkdirs()
+        File(phone.external, "data/pinyin/dictionaries/mine.txt").writeText("the phone's dictionary")
+        val backup = zip(
+            BuildConfig.APPLICATION_ID,
+            "external/config/config" to "backup's",
+            "external/config/conf/punctuation.conf" to "backup's",
+        )
+        UserDataManager.import(backup, phone).getOrThrow()
+        assertFalse(File(config, "conf/androidengine.conf").exists())
+        assertEquals("backup's", File(config, "conf/punctuation.conf").readText())
+        assertEquals("backup's", File(config, "config").readText())
+        // what is not settings is merged as before
+        assertEquals("the phone's dictionary", File(phone.external, "data/pinyin/dictionaries/mine.txt").readText())
+    }
+
+    // R11 F3123: a backup without the addon's settings over a phone whose fcitx wrote them in full,
     // 调频 off as its default: the backup's typed table orders by use again, one it did not type stays off
     @Test
     fun aBackupWithoutTheAddonsSettingsTurnsItsTypedTablesOrderingOnOverThePhones() {
         val ordered = Engines.TABLES.entries.filter { it.value.options.orderByUse }
         val (im, typed) = ordered[0]
         val untyped = ordered.first { it.value.group != typed.group }.value
-        val phone = install("phone")
-        val settings = File(phone.external, "config/conf/androidengine.conf").apply { parentFile!!.mkdirs() }
-        settings.writeText("[${typed.group}]\n${TableSettings.ORDER_POLICY}=No\n\n[${untyped.group}]\n${TableSettings.ORDER_POLICY}=No\n")
-        UserDataManager.import(zip(BuildConfig.APPLICATION_ID, "engine/${Engines.userTable(im)}" to "a log"), phone).getOrThrow()
-        val conf = settings.readText()
-        assertTrue(conf, "[${typed.group}]\n${TableSettings.ORDER_POLICY}=${TableSettings.ORDER_BY_USE}" in conf)
-        assertTrue(conf, "[${untyped.group}]\n${TableSettings.ORDER_POLICY}=No" in conf)
+        fun restored(name: String, vararg entries: Pair<String, String>): String {
+            val phone = install(name)
+            val settings = File(phone.external, "config/conf/androidengine.conf").apply { parentFile!!.mkdirs() }
+            settings.writeText("[${typed.group}]\n${TableSettings.ORDER_POLICY}=No\n\n[${untyped.group}]\n${TableSettings.ORDER_POLICY}=No\n")
+            val log = "engine/${Engines.userTable(im)}" to "a log"
+            UserDataManager.import(zip(BuildConfig.APPLICATION_ID, log, *entries), phone).getOrThrow()
+            return settings.readText()
+        }
+        val on = "${TableSettings.ORDER_POLICY}=${TableSettings.ORDER_BY_USE}"
+        assertRows(
+            // F3724: a real backup's shape: the phone's settings pruned, then the typed table's set
+            "with external/config" to {
+                val conf = restored("full", "external/config/config" to "backup's")
+                assertTrue(conf, "[${typed.group}]\n$on" in conf)
+                assertFalse(conf, "[${untyped.group}]\n$on" in conf)
+            },
+            "a zip without external/config keeps the phone's settings" to {
+                val conf = restored("bare")
+                assertTrue(conf, "[${typed.group}]\n$on" in conf)
+                assertTrue(conf, "[${untyped.group}]\n${TableSettings.ORDER_POLICY}=No" in conf)
+            },
+        )
+    }
+
+    // F3717/F3719: the text files the user edits follow the backup as the settings do; the collections,
+    // the dot-entries (EngineMigration's .libime copies) and, from a zip without external/config, all are kept
+    @Test
+    fun theUsersTextFilesFollowTheBackupItsCollectionsAndDotEntriesStay() {
+        val phoneOwn = listOf(
+            "data/pinyin/customphrase", "data/data/quickphrase.d/mine.mb", "data/punctuation/punc.mb.zh_CN",
+            "config/conf/pinyin.conf",
+        )
+        fun phone(name: String) = install(name).also { dirs ->
+            (phoneOwn + listOf("config/.libime/conf/pinyin.conf", "data/punctuation/.libime/x", "data/pinyin/dictionaries/mine.txt"))
+                .forEach { File(dirs.external, it).apply { parentFile!!.mkdirs() }.writeText("phone's") }
+        }
+        val full = phone("full")
+        UserDataManager.import(zip(BuildConfig.APPLICATION_ID, "external/config/config" to "backup's"), full).getOrThrow()
+        val own = phone("own")
+        UserDataManager.import(
+            zip(BuildConfig.APPLICATION_ID, "external/config/config" to "backup's", "external/data/pinyin/customphrase" to "backup's"),
+            own,
+        ).getOrThrow()
+        val bare = phone("bare")
+        UserDataManager.import(zip(BuildConfig.APPLICATION_ID, "engine/x" to "x"), bare).getOrThrow()
+        assertRows(
+            "a backup without them leaves no phone-added phrases, quick phrases, punctuation or settings" to {
+                phoneOwn.forEach { assertFalse(it, File(full.external, it).exists()) }
+            },
+            "dot-entries are left alone" to {
+                assertTrue(File(full.external, "config/.libime/conf/pinyin.conf").exists())
+                assertTrue(File(full.external, "data/punctuation/.libime/x").exists())
+            },
+            "the backup's own replaces the phone's" to {
+                assertEquals("backup's", File(own.external, "data/pinyin/customphrase").readText())
+            },
+            "dictionaries are merged" to { assertTrue(File(full.external, "data/pinyin/dictionaries/mine.txt").exists()) },
+            "a zip without external/config keeps them all" to {
+                phoneOwn.forEach { assertTrue(it, File(bare.external, it).exists()) }
+            },
+        )
     }
 
     private fun stashes(phone: UserDataManager.Dirs) =
