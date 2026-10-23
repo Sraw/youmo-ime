@@ -14,7 +14,10 @@
 Needs: SDK platform 36, build-tools 36.1.0, NDK 28.0.13004108, CMake 3.31.6 (or `cmake.dir` in
 `local.properties`), extra-cmake-modules, gettext ≥ 0.20, a JDK 17 or newer to run Gradle (CI uses 17;
 code targets Java 11). Versions are in `build-logic/convention/src/main/kotlin/Versions.kt`. Submodules:
-`git submodule update --init --recursive` (fcitx5, its prebuilt dependencies, chinese-addons).
+`git submodule update --init --recursive` (fcitx5 only). Its prebuilt dependencies (OpenCC, marisa, libuv,
+libintl-lite for the four ABIs, 9.4 MB) are in `lib/fcitx5/src/main/cpp/prebuilt`, see its README. Of fcitx5-chinese-addons
+only the modules built are vendored (`lib/fcitx5-chinese-addons/src/main/cpp/fcitx5-chinese-addons`, upstream
+5.1.13, with its `po/` cut to zh_CN/zh_TW).
 
 Memory: compiling the pinyin data alone is ~4 GB resident (3.6 GB measured, in a JVM of its own;
 BUILDING.md's 5 GB counts the Gradle daemon beside it) and three table compiles run at once
@@ -143,8 +146,8 @@ batch is curated. A word in either list is never put before a curator again.
 
 `app/src/main/cpp` builds `native-lib` (JNI), the fcitx frontend and the addons the app adds
 (`androidengine`, `androidfrontend`, `androidaddonloader`, `androidnotification`) and
-`matrix-kernel.cpp`. `lib/fcitx5` builds Fcitx5 itself from the submodule with prebuilt
-dependencies (`lib/fcitx5/src/main/cpp/prebuilt`). Host tests for native helpers:
+`matrix-kernel.cpp`. `lib/fcitx5` builds Fcitx5 itself from the submodule with the
+prebuilt dependencies kept in the repository (`lib/fcitx5/src/main/cpp/prebuilt`). Host tests for native helpers:
 `app/src/test/cpp/host-test.sh`, `lib/sherpa-onnx/host-test.sh` (CI runs both).
 
 When adding a method to the JNI surface or to `FcitxAPI`, read the Kotlin incremental compilation

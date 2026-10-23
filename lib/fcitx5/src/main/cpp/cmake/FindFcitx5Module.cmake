@@ -3,7 +3,7 @@ set(Fcitx5Module_FOUND TRUE)
 # prefab dependency
 find_package(fcitx5 REQUIRED CONFIG)
 
-set(FCITX5_MODULE_NAMES Clipboard IMSelector Notifications QuickPhrase Spell Unicode)
+set(FCITX5_MODULE_NAMES Clipboard Notifications QuickPhrase Unicode)
 foreach(Mod IN LISTS FCITX5_MODULE_NAMES)
     string(TOLOWER "${Mod}" mod)
     set(MOD_INTERFACE "fcitx5-module-${mod}-interface")

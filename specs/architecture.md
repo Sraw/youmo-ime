@@ -9,7 +9,7 @@
 | `app/src/text`, `app/src/voice` | flavor source sets (`speech` dimension) | Each defines `VoiceFeature` with the same signatures; only `voice` has voice input, sherpa-onnx and `RECORD_AUDIO`. |
 | `lib/ime-eval` | JVM CLI | Typing simulated over test sets; top-1 accuracy, predictions, English, learning. Never shipped. |
 | `lib/ime-dict-tool` | JVM CLI | Compiles text sources into the engine's data files (pinyin, tables, strokes, English), mixes models, packs word packs, finds new words. Runs on the build host only. |
-| `lib/fcitx5`, `lib/fcitx5-chinese-addons` | native (CMake) | Fcitx5 (with its quickphrase, unicode, clipboard, imselector, notifications and spell modules) and, of chinese-addons, only punctuation, chttrans (简繁), fullwidth and scel2org5 (reading 搜狗 `.scel`), as submodules built for Android. Its pinyin and table engines are not built: the input methods are `ime-core`'s. |
+| `lib/fcitx5`, `lib/fcitx5-chinese-addons` | native (CMake) | Fcitx5 (with its quickphrase, unicode, clipboard and notifications modules; spell and imselector are not built) and, of chinese-addons, only punctuation, chttrans (简繁), fullwidth and scel2org5 (reading 搜狗 `.scel`), vendored, built for Android. Its pinyin and table engines are not built: the input methods are `ime-core`'s. |
 | `lib/sherpa-onnx` | native | The speech recognizer, vendored and built from source; voice build only. |
 | `lib/handwriting` | Android library, native | The handwriting recognizers' runtime: onnxruntime (the very file sherpa-onnx links, so a voice build packs one) and a small JNI to it, `OrtModel`, which runs an ORT-format model mapped from the APK. Both builds. |
 | `codegen` | annotation processing | Generates the app's key and scancode mapping tables. |

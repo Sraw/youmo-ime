@@ -14,6 +14,13 @@ plugins {
 }
 
 android {
+    // copy-fcitx5-modules copies into AGP's obj dirs, which keep .so files from older builds;
+    // these modules are no longer built
+    packaging {
+        jniLibs {
+            excludes += listOf("**/libspell.so", "**/libimselector.so")
+        }
+    }
     namespace = "org.fcitx.fcitx5.android"
 
     defaultConfig {
@@ -109,6 +116,14 @@ fcitxComponent {
     includeLibs = listOf(
         "fcitx5",
         "fcitx5-chinese-addons"
+    )
+    // fcitx5 installs every module's .conf; spell (quick phrase's English hints, the English input
+    // method has its own words) and imselector (nothing of ours calls it) are not built
+    excludeFiles = listOf(
+        "usr/share/fcitx5/addon/spell.conf",
+        "usr/share/fcitx5/addon/imselector.conf",
+        // left in assets/ by builds before they were dropped; cmake --install never deletes
+        "usr/share/fcitx5/spell"
     )
     installPrebuiltAssets = true
 }

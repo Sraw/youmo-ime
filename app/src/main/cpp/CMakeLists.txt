@@ -44,9 +44,7 @@ target_link_libraries(native-lib
 add_custom_target(copy-fcitx5-modules
         COMMAND ${CMAKE_COMMAND} -E copy_if_different
         $<TARGET_PROPERTY:fcitx5::clipboard,IMPORTED_LOCATION>
-        $<TARGET_PROPERTY:fcitx5::imselector,IMPORTED_LOCATION>
         $<TARGET_PROPERTY:fcitx5::quickphrase,IMPORTED_LOCATION>
-        $<TARGET_PROPERTY:fcitx5::spell,IMPORTED_LOCATION>
         $<TARGET_PROPERTY:fcitx5::unicode,IMPORTED_LOCATION>
         $<TARGET_PROPERTY:fcitx5-chinese-addons::scel2org5,IMPORTED_LOCATION>
         $<TARGET_PROPERTY:fcitx5-chinese-addons::chttrans,IMPORTED_LOCATION>
@@ -57,5 +55,4 @@ add_custom_target(copy-fcitx5-modules
         )
 
 # install prebuilt assets
-install(FILES "${PREBUILT_DIR}/spell-dict/en_dict.fscd" DESTINATION "${FCITX_INSTALL_PKGDATADIR}/spell" COMPONENT prebuilt-assets)
 install(DIRECTORY "${PREBUILT_DIR}/opencc/data/" DESTINATION "${FCITX_INSTALL_DATADIR}/opencc" COMPONENT prebuilt-assets)

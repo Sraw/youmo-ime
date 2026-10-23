@@ -46,6 +46,8 @@ option(USE_SYSTEMD "" OFF)
 option(ENABLE_XDGAUTOSTART "" OFF)
 option(ENABLE_EMOJI "" OFF)
 option(ENABLE_LIBUUID "" OFF)
+# spell is not built, but its CMake still defines an ALL target that downloads the dictionary
+option(BUILD_SPELL_DICT "" OFF)
 add_subdirectory(fcitx5)
 # for std::osyncstream
 target_compile_options(Fcitx5Utils PRIVATE "-fexperimental-library")

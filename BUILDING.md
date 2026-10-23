@@ -19,7 +19,7 @@
 ```shell
 git clone https://github.com/Sraw/youmo-ime.git
 cd youmo-ime
-git submodule update --init --recursive
+git submodule update --init --recursive   # 只有 fcitx5；预编译依赖和 chinese-addons 的模块已在仓库里
 sudo apt install extra-cmake-modules gettext   # Debian/Ubuntu；Arch：pacman -S extra-cmake-modules；macOS：brew install extra-cmake-modules gettext
 ./gradlew :app:assembleTextDebug   # 带语音：:app:assembleVoiceDebug
 ```
@@ -27,6 +27,15 @@ sudo apt install extra-cmake-modules gettext   # Debian/Ubuntu；Arch：pacman -
 版本有两个：`text`（纯文字，默认）和 `voice`（离线语音输入，多一个录音权限和约 180 MB 的语音模型），都不申请网络权限。
 `./gradlew :app:assembleRelease` 两个都打。默认四种 ABI 都编，只编一种快得多：手机加 `-PbuildABI=arm64-v8a`（发布的安装包就是这样打的），
 x86_64 的模拟器或 redroid 加 `-PbuildABI=x86_64`。
+
+从 0.3.2 及更早版本的检出更新时（预编译依赖和 chinese-addons 从子模块改成了仓库里的目录），pull/merge 前先执行一次，否则 git 会因子模块留下的文件而中止：
+
+```
+git submodule deinit -f lib/fcitx5/src/main/cpp/prebuilt lib/fcitx5-chinese-addons/src/main/cpp/fcitx5-chinese-addons
+rm -rf lib/fcitx5/src/main/cpp/prebuilt lib/fcitx5-chinese-addons/src/main/cpp/fcitx5-chinese-addons
+```
+
+之后切回旧提交用 `git checkout <旧提交> && git submodule update --init`，回来时再执行一次上面两行。
 
 ### 数据
 
@@ -104,7 +113,7 @@ signKeyPwd=...
 ```shell
 git clone https://github.com/Sraw/youmo-ime.git
 cd youmo-ime
-git submodule update --init --recursive
+git submodule update --init --recursive   # fcitx5 only; the prebuilt dependencies and chinese-addons modules are in the repository
 sudo apt install extra-cmake-modules gettext   # Debian/Ubuntu; Arch: pacman -S extra-cmake-modules; macOS: brew install extra-cmake-modules gettext
 ./gradlew :app:assembleTextDebug   # with voice: :app:assembleVoiceDebug
 ```
@@ -112,6 +121,16 @@ sudo apt install extra-cmake-modules gettext   # Debian/Ubuntu; Arch: pacman -S 
 There are two builds, neither with a network permission: `text`, the default, and `voice`, offline voice input, with the microphone
 permission and a ~180 MB speech model. `./gradlew :app:assembleRelease` makes both. All four ABIs are built by default; one is much faster:
 `-PbuildABI=arm64-v8a` for phones (as the released APKs are built), `-PbuildABI=x86_64` for an x86_64 emulator or redroid.
+
+Updating a checkout from 0.3.2 or earlier (the prebuilt dependencies and chinese-addons went from submodules to directories
+in the repository): run this once before pulling or merging, or git aborts on the files the submodules left behind:
+
+```
+git submodule deinit -f lib/fcitx5/src/main/cpp/prebuilt lib/fcitx5-chinese-addons/src/main/cpp/fcitx5-chinese-addons
+rm -rf lib/fcitx5/src/main/cpp/prebuilt lib/fcitx5-chinese-addons/src/main/cpp/fcitx5-chinese-addons
+```
+
+To go back to an older commit, `git checkout <old> && git submodule update --init`; coming back needs the two lines again.
 
 ### Data
 
