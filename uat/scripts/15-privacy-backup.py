@@ -2,7 +2,7 @@
 前提/操作/预期."""
 import time
 
-from uat import PKG, Blocked, case, check, first, has, home, menu_tap, open_url, reset, script
+from uat import PKG, Blocked, add_im, case, check, first, has, home, menu_tap, open_url, reset, script
 
 
 def words13():
@@ -165,6 +165,8 @@ def restore(d, fname):
 def setup_dz_word(d):
     words13().dz(d)
     words13().add_word(d, "澜境花园", "lan jing hua yuan")
+    # an imported base dictionary too: backups leave merged.ymd out, a restore merges it again
+    words13().import_dict_words(d)
 
 
 @case("PR-09", base="B0-设置", mutates=True)
@@ -187,11 +189,25 @@ def pr10(d):
     d.clear()
     d.type("lanjinghuayuan")
     c2 = d.cands()
+    d.clear()
+    rows = words13().dictionaries(d)
+    # compiled again after the restart: a few seconds for dict-words
+    k = []
+    for _ in range(10):
+        k = words13().words(words13().page_cands(d, "kemiaotangpu"))
+        d.clear()
+        if "氪喵糖铺" in k:
+            break
+        time.sleep(3)
+    # the name and its status (已开启 · N 个词) are separate texts of one row
+    i = rows.index("dict-words") if "dict-words" in rows else -1
+    check(i >= 0 and i + 1 < len(rows) and "个词" in rows[i + 1], f"基础词库一节 {rows}")
+    check("氪喵糖铺" in k, f"kemiaotangpu {k[:4]}")
     check("覆盖" in warn, f"确认前的提示「{warn[:60]}」")
     check(restarted, "应用没有重启")
     check(first(c1) == "北京市海淀区", f"dz {c1[:3]}")
     check(first(c2) == "澜境花园", f"lanjinghuayuan {c2[:3]}")
-    return f"提示有覆盖；重启了；dz {c1[:1]}；{c2[:1]}"
+    return f"提示有覆盖；重启了；dz {c1[:1]}；{c2[:1]}；基础词库 {rows[:3]}；kemiaotangpu {k[:2]}"
 
 
 @case("PR-34", base="B0-设置", mutates=True)
@@ -401,13 +417,18 @@ def pr17(d):
     tb.status_panel(d)
     d.tap(d.screen().find(text="不用我的输入习惯", where="ime").c, 0.1)
     # said once as it goes off (the chip above the keyboard, up 2 s), and nothing kept on the bar after
-    said = tb.said(d, "已不用我的输入习惯，在设置里恢复")
+    # the chip tapped from the dump that found it: another dump first may outlast its 2 s, the tap
+    # then landing on the page above the keyboard
+    chip = None
+    end = time.time() + 2.0
+    while chip is None and time.time() < end:
+        chip = d.screen().find(contains="已不用我的输入习惯，在 ⋯ 里恢复", where="all")
+    said = chip is not None
     # a tap on it takes it away, and only it: the panel under it stays
-    chip = d.screen().find(contains="已不用我的输入习惯，在设置里恢复", where="all")
     if chip:
         d.tap(chip.c, 0.3)
     s = d.screen()
-    tapped_away = chip is None or not s.find(contains="已不用我的输入习惯，在设置里恢复", where="all")
+    tapped_away = chip is None or not s.find(contains="已不用我的输入习惯，在 ⋯ 里恢复", where="all")
     panel_kept = bool(s.find(text="恢复我的输入习惯", where="ime"))
     tb.back_to_keys(d)
     time.sleep(2)
@@ -426,7 +447,7 @@ def pr17(d):
     status_entry(d, "恢复我的输入习惯")
     script("05-toolbar").back_to_keys(d)
     hdr2, rec2 = recent_emoji(d)
-    check(said, "关掉时没有提示「已不用我的输入习惯，在设置里恢复」")
+    check(said, "关掉时没有提示「已不用我的输入习惯，在 ⋯ 里恢复」")
     check(not kept, f"键盘上留着 {kept}")
     check(tapped_away and panel_kept, f"点提示：消失 {tapped_away}，⋯ 面板还在 {panel_kept}")
     check(first(w) == "王小明" and not has(w, "汪小明"), f"wangxiaoming {w[:4]}")
@@ -438,6 +459,39 @@ def pr17(d):
     check("恢复我的输入习惯" in ent, f"⋯ 里 {ent[:16]}")
     check(hdr2 == "最近使用" and any(x.startswith("😀") for x in rec2), f"恢复后表情第一页「{hdr2}」{rec2[:5]}")
     return f"弹出提示、不留标记；wangxiaoming {w[:2]}；shi {s1[:2]}；dz {z[:2]}；表情第一页「{hdr}」；恢复后「{hdr2}」{rec2[:2]}"
+
+
+@case("PR-17a", base="B0-设置", mutates=True)
+def pr17a(d):
+    """habits off: the base dictionaries stay, in pinyin and in a table; a word added by hand does not"""
+    w13 = words13()
+    w13.import_dict_words(d)
+    add_im(d, "五笔")
+    w13.add_word(d, "鲸园", "jing yuan")
+    time.sleep(5.0)   # the imported words get their table codes in the background
+    d.open_page("text")
+    d.switch_im("拼音")
+    status_entry(d, "不用我的输入习惯")
+    script("05-toolbar").back_to_keys(d)
+    time.sleep(2.5)   # the chip above the keyboard gone
+    d.type("liangziwenhuacun")
+    py = w13.words(d.all_cands())
+    d.clear()
+    d.type("jingyuan")
+    own = w13.words(d.all_cands())
+    d.clear()
+    d.switch_im("五笔")
+    d.type("jbys")
+    time.sleep(0.4)
+    wb = w13.words(d.all_cands())
+    d.clear()
+    d.switch_im("拼音")
+    status_entry(d, "恢复我的输入习惯")
+    script("05-toolbar").back_to_keys(d)
+    check("量子文化村" in py, f"liangziwenhuacun {py[:5]}")
+    check("鲸园" not in own, f"jingyuan {own[:5]}")
+    check("量子计算机" in wb and "量子文化村" in wb, f"jbys {wb[:8]}")
+    return f"拼音 {py[:2]}；五笔 jbys {wb[:5]}"
 
 
 @case("PR-21", mutates=True)
@@ -454,7 +508,10 @@ def pr21(d):
     b = next((n for n in s.nodes if n.text == "清掉"), None)
     if not b:
         raise Blocked(f"没有确认框：{[n.text for n in s.nodes if n.text][:8]}")
-    d.tap(b.c, 1.5)
+    d.tap(b.c, 0.1)
+    # the result, said above the keys (the chip, 2 s)
+    cleared = script("05-toolbar").said(d, "已清掉")
+    time.sleep(1.4)
     d.open_page("text")
     d.switch_im("拼音")
     d.type("ta")
@@ -468,6 +525,7 @@ def pr21(d):
     d.clear()
     hdr, rec = recent_emoji(d)
     check("退回恢复前" in msg and "不能" in msg, f"确认框「{msg}」")
+    check(cleared, "清掉后没有提示「已清掉」")
     check(first(c) == "带来" and c[1:2] != ["点了"], f"「他 dl」{c[:4]}")
     check(first(s1) == cc, f"shi {s1[:4]}（C=「{cc}」）")
     check(hdr != "最近使用" or not any(x.startswith("😀") for x in rec), f"表情第一页「{hdr}」{rec[:6]}")

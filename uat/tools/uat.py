@@ -47,6 +47,14 @@ BROWSER = "org.chromium.webview_shell/.WebViewBrowserActivity"
 IMAGE = "redroid/redroid:14.0.0_64only-latest"
 # serial port -> container; only these two are ever started, stopped or rooted by this tool
 CONTAINERS = {"5556": "youmo-redroid", "5557": "youmo-redroid2"}
+
+
+def container_on(port):
+    """the container publishing adb on 127.0.0.1:port; one started by hand may not have this tool's
+    name (youmo-redroid-2), and root() through a wrong name reads nothing"""
+    out = subprocess.run(["docker", "ps", "--filter", f"publish={port}", "--format", "{{.Names}}"],
+                         capture_output=True, text=True).stdout.split()
+    return out[0] if len(out) == 1 else CONTAINERS[port]
 EMU_PORT = "5554"   # the emulator: emulator-5554, no container
 AVD_HOME, AVD = os.path.join(REPO, "dev", "avd"), "youmo_kb"
 MIC = "uat-mic"   # a PulseAudio (PipeWire) null sink; the emulator records its monitor
@@ -315,7 +323,7 @@ class Device:
         self.flavor = flavor   # the build under test (--flavor): voice-only cases, SET-01's reinstall
         self.emu = self.port == EMU_PORT
         self.serial = f"emulator-{self.port}" if self.emu else f"127.0.0.1:{self.port}"
-        self.container = None if self.emu else CONTAINERS[self.port]
+        self.container = None if self.emu else container_on(self.port)
         self.run = run
         self.case = None
         self._keys = None
@@ -974,7 +982,12 @@ class Device:
     def goto(self, *titles):
         """from where we are, tap each title in turn (scrolling to it)"""
         for t in titles:
+            before = self.screen().texts()
             self.tap_text(t, after=1.0)
+            # a tap right after the activity (re)starts can be lost (seen on the release build):
+            # still the same page, so tap once more
+            if self.screen().texts() == before:
+                self.tap_text(t, after=1.0)
 
     def switch(self, title, on):
         """set a switch/checkbox preference; returns whether it was changed"""

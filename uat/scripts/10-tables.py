@@ -1,6 +1,7 @@
 """uat/10-tables.md (B0-五笔 and the other tables). The .md is the source of truth; each function
 follows its case's 前提/操作/预期."""
 import re
+import statistics
 import time
 
 from uat import PKG, Blocked, add_im, case, script, check, first, gear, glide_shot, has, home, menu_tap, popup, popup_slide
@@ -675,6 +676,53 @@ def tbl12b(d):
     c2, t = d.candidates(), d.field_text()
     check(t == "打嘴炮" and not has(c2, "氪喵糖铺"), f"rkoq 的候选 {c2[:4]}，框里「{t}」")
     return f"jbys：{c[:5]}；rkoq →「{t}」"
+
+
+@case("TBL-12c", base="B0-设置", mutates=True)
+def tbl12c(d):
+    """frost in the base dictionary, coded for 五笔 through the merged file: typing stays, the heap too"""
+    words13 = script("13-words")
+    src = words13.frost(d)
+    d.open_page("text")
+    d.switch_im("拼音")
+    base = words13.heap_base(d)
+    d.adb("push", src, "/sdcard/Download/frost_dict_for_fcitx5.txt", timeout=300)
+    words13.import_file(d, "frost_dict_for_fcitx5.txt", "基础词库")
+    if not any("frost_dict_for_fcitx5" in r for r in words13.dictionaries(d)):
+        raise Blocked("前提没到：frost 没并入基础词库")
+    add_im(d, "五笔")
+    on_page(d, "五笔")
+    time.sleep(30.0)   # its words get their codes in the background
+    d.type("jbys")
+    time.sleep(0.4)
+    c = words(d.all_cands())
+    d.clear()
+    more = []
+    for code in ("gg", "wq"):
+        d.type(code)
+        time.sleep(0.4)
+        more.append(words(d.candidates())[:3])
+        d.clear()
+    # coding frost for 五笔 runs on past the 30 s above and holds ~100 MB live while it does (read
+    # after a GC); the case is about what stays, so wait for it to finish before the readings
+    # two low readings in a row: one alone can fall between two batches of the coding
+    peak, low = 0, 0
+    for _ in range(30):
+        h = words13.java_heap(d)
+        peak = max(peak, h or 0)
+        # no reading is not a low one
+        low = low + 1 if h is not None and h - statistics.median(base[1:]) < words13.HEAP_RISE_KB // 2 else 0
+        if low == 2:
+            break
+        time.sleep(3.0)
+    heap = words13.heaps(d)
+    rise = words13.heap_rise(base, heap)
+    # the table's own three first, in whatever order; then frost's
+    own = [c.index(w) if w in c else 99 for w in ("临阵磨枪", "电子文档", "电子计算机")]
+    check(sorted(own) == [0, 1, 2], f"jbys 的候选 {c[:8]}（码表自己的词该在最前）")
+    check(all(more), f"gg、wq 的候选 {more}")
+    check(rise is not None and rise < words13.HEAP_RISE_KB, f"Java 堆 {base} → {heap} KB")
+    return f"jbys：{c[:5]}；gg、wq {more}；Java 堆 {base} → {heap} KB（编码时最高 {peak} KB）"
 
 
 @case("TBL-16b", base="B0-五笔", mutates="learn", clean=True)

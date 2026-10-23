@@ -804,7 +804,7 @@ case("ST-24", base="B0-设置", needs="skip:按键音要真机")(lambda d: None)
 
 @case("ST-25", base="B0-设置", mutates=True)
 def st25(d):
-    d.goto("界面语言")
+    home(d, "界面语言")
     d.tap_text("English", scroll=False, after=2.5)
     d.open_settings()
     s = d.screen()

@@ -3,7 +3,7 @@
 区域代号 `WD`。要导入的文件先放到手机的"下载"目录：
 
 ```sh
-adb push uat/fixtures/userwords.txt uat/fixtures/dict-words.txt uat/fixtures/words.csv uat/fixtures/extra.dict uat/fixtures/extra.scel uat/fixtures/big-words.txt uat/fixtures/big-words.list uat/fixtures/old-export.txt /sdcard/Download/
+adb push uat/fixtures/userwords.txt uat/fixtures/dict-words.txt uat/fixtures/words.csv uat/fixtures/extra.dict uat/fixtures/extra.scel uat/fixtures/big-words.txt uat/fixtures/big-words.list uat/fixtures/old-export.txt uat/fixtures/rime-words.dict.yaml uat/fixtures/mixed-words.txt uat/fixtures/initials-words.txt uat/fixtures/gbk-words.txt uat/fixtures/log-words.txt uat/fixtures/binary-words.bin uat/fixtures/pinyin-first.txt uat/fixtures/rime-percent.dict.yaml uat/fixtures/trad-words.txt uat/fixtures/trad-big5.txt uat/fixtures/no-pinyin-some.txt uat/fixtures/no-pinyin-most.txt /sdcard/Download/
 ```
 
 ## 词库页
@@ -118,12 +118,12 @@ adb push uat/fixtures/userwords.txt uat/fixtures/dict-words.txt uat/fixtures/wor
 ### WD-14 [P1] 读不出词的文件给出原因
 - **前提**：B0-设置，"下载"目录里有一个空的 `empty.txt`（`adb shell touch /sdcard/Download/empty.txt`）。
 - **操作**：**导入词库**，选 `empty.txt`。
-- **预期**：提示读不出词（说明原因），词库页没有新增条目。
+- **预期**：不出并入哪个词库的选择，直接提示"格式不支持：里面没有一行是词和拼音"，词库页没有新增条目。
 
-### WD-14a [P1] 不是词库类型的文件默认并入用户词库
-- **前提**：B0-设置，`words.csv`（内容同 `userwords.txt`）已放到"下载"目录。
-- **操作**：**词库与短语 → 导入词库**，选 `words.csv`，看 **并入哪个词库？**；改选"基础词库（推荐）"，点 **导入词库**。
-- **预期**：对话框一开始选的是"用户词库"；改成基础词库导入后提示"词典类型无效"，词库页没有新增条目。
+### WD-14a [P1] 不是词库类型的文件、隐藏文件只能并入用户词库
+- **前提**：B0-设置，`words.csv`（内容同 `userwords.txt`）和 `.hidden.txt`（`userwords.txt` 的一份，名字以 `.` 开头）已放到"下载"目录。
+- **操作**：**词库与短语 → 导入词库**，选 `words.csv`，看 **并入哪个词库？**，取消；再选 `.hidden.txt`（文件选择里点 **⋮ → 显示隐藏的文件** 才看得到），看，取消。
+- **预期**：两个文件的对话框里都只有"用户词库"一项，并已选好；取消后词库页没有新增条目。
 
 ### WD-14b [P1] .dict 词库也能并入用户词库
 <!-- learning: U-101 -->
@@ -136,6 +136,81 @@ adb push uat/fixtures/userwords.txt uat/fixtures/dict-words.txt uat/fixtures/wor
 - **前提**：B0-设置，`extra.scel`（搜狗细胞词库格式，两个词：「骁骎 xiao'qin」「琮璟 cong'jing」，各带词频）已放到"下载"目录。
 - **操作**：**词库与短语 → 导入词库**，选 `extra.scel`，**并入哪个词库？** 选"用户词库"，导入；打开 **导入的词**；回测试页打 c o n g j i n g 看候选。
 - **预期**：导入完成提示导入 2 个词；**导入的词** 里有 `extra.scel` 这一批，2 个词还不是你的；「琮璟」在候选里，排在词库自带的同拼音词（如「从警」）后面。
+
+### WD-14d [P0] 上百万词的大词库并入基础词库，键盘不崩
+- **前提**：B0-设置，雾凇拼音（rime-frost）发布的 `frost_dict_for_fcitx5.txt`（约 89 MB、191 万行，词、`'` 分开的拼音、概率三列；是哪一份、哈希多少见 [README](README.md) 的 fixtures 一行）已放到"下载"目录。
+- **操作**：**词库与短语 → 导入词库**，选它，看 **并入哪个词库？** 的标题；选"基础词库（推荐）"导入，等导入完；回测试页点输入框弹出键盘，按 [README](README.md#量-java-堆) 的做法量 Java 堆 5 次（导入前也这样弹出键盘、打几个字量 5 次作对照）；打 a b a z h o u（阿坝州）、g e n n i s h u o（跟你说）。
+- **预期**：读文件和导入时对话框有进度条和百分比（正在分析格式、正在整理词条……），一路往前走，各一分钟以内；标题下面写着"词库文本 · 拼音用 ' 分开 · 第三列是概率 · 1914461 个词 · 176 行读不懂"（词数只算带拼音的词，只写了词的行另写"N 个词没有拼音"）；导入完词库页"基础词库"一节列出 frost_dict_for_fcitx5，写着约 191 万个词；键盘照常弹出、打字不卡、不崩，Java 堆和导入前差不多（后 4 次读数的中位数比导入前多不到 64 MB；不该是上百 MB）；候选里有「阿坝州」，gennishuo 前三个候选里有「跟你说」。
+
+### WD-14e [P1] Rime 词库（.dict.yaml）认出格式，并入基础词库
+- **前提**：B0-设置，`rime-words.dict.yaml`（Rime 的表头，三个词，拼音用空格分开，带词频）已放到"下载"目录。
+- **操作**：**导入词库**，选 `rime-words.dict.yaml`，看标题和一开始选的；选"基础词库（推荐）"导入；回测试页打 k e m i a o x i n g g a n g。
+- **预期**：一开始选的是"基础词库（推荐）"；标题下面写着"Rime 词库 · 拼音用空格分开 · 第三列是词频 · 3 个词"；词库页列出 rime-words；候选里有「氪喵星港」。
+
+### WD-14f [P1] 格式拿不准的文件不导入，说明原因
+- **前提**：B0-设置，`mixed-words.txt`（一半行词在前、一半拼音在前）、`initials-words.txt`（拼音只写声母）、`gbk-words.txt`（GBK 编码的两个词）已放到"下载"目录。
+- **操作**：依次 **导入词库** 选 `mixed-words.txt`、`initials-words.txt`，各选"基础词库"点 **导入词库**；再导入 `gbk-words.txt`，看标题，取消。
+- **预期**：前两个照样弹出并入哪个词库的选择（标题下面没有认出的格式），选"基础词库"导入后分别提示"格式不支持：文件里混有不同格式的行"和"格式不支持：只有声母，无法确定读音"，词库页没有新增条目（选"用户词库"的话照旧逐行导入，读不懂的行跳过）；`gbk-words.txt` 的标题下面写着"GBK 编码"和"2 个词"。
+
+### WD-14g [P1] 超过 10 万词的词库不能并入用户词库
+- **前提**：B0-设置，"下载"里有 `user-100k.txt`，100,001 个六字词带拼音，这样生成再推过去：`python3 -c "import itertools as i;c=list(zip('啊吧擦大饿发嘎哈鸡卡','a ba ca da e fa ga ha ji ka'.split()));open('user-100k.txt','w').write(''.join(''.join(x[0] for x in w)+' '+\"'\".join(x[1] for x in w)+'\\n' for w in i.islice(i.product(c,repeat=6),100001)))"`、`adb push user-100k.txt /sdcard/Download/`。
+- **操作**：**导入词库**，选 `user-100k.txt`，选"用户词库"，导入。
+- **预期**：提示"这个词库太大，请并入基础词库"；**导入的词** 里没有这一批，用户词库不变。
+
+### WD-14h [P0] 从 0.3.1 升级：已导入的大词库在后台合成，键盘不崩
+- **前提**：B0-设置，先回测试页弹出键盘、打几个字，按 [README](README.md#量-java-堆) 的做法量 Java 堆 5 次作对照；强行停止应用；把 `frost_dict_for_fcitx5.txt` 按 0.3.1 存词库的样子放进词库目录：`adb push frost_dict_for_fcitx5.txt /sdcard/Android/data/<包名>/files/data/pinyin/dictionaries/frost.txt`，再 `adb shell "touch -d '2020-01-01 00:00:00' <同一路径>"`（整条命令加双引号：不加的话电脑上的 shell 吃掉单引号，`00:00:00` 被当成另一个文件）（应用按文件时间早于安装认出是旧版留下的；`adb push` 保留电脑上的时间，文件比安装新就不走升级），删掉那里的 `merged.ymd`（如果有）；再放一个 0.3.1 停用的词库 `old.txt.disable`（一行「氪喵星港 ke'miao'xing'gang 0.0」）。
+- **操作**：回测试页点输入框弹出键盘，马上打几个字；等一分钟，看词库目录；按 [README](README.md#量-java-堆) 的做法量 Java 堆 5 次；打 a b a z h o u。
+- **预期**：键盘马上弹出、照常打字，不崩、不卡（0.3.1 在这里每次弹键盘都内存不够、最后崩掉）；合成时空闲栏写着「正在升级词库格式 N%」，下面一条细进度线往前走；合好后提示「词库格式已升级」；一分钟内词库目录里多了 `merged.ymd`，`frost.txt` 还在；Java 堆和对照差不多（后 4 次读数的中位数多不到 64 MB）；候选里有「阿坝州」，打 g e n n i s h u o 前三个候选里有「跟你说」；词库页列出 frost，写着约 191 万个词；old 列成「已关闭」，打 kemiaoxinggang 没有「氪喵星港」。合成快（正式版约 15 秒）时空闲栏和提示可能来不及看到，以 `merged.ymd`、合成日志和候选为准。
+
+### WD-14i [P1] 导入大词库时取消：什么都不变
+- **前提**：B0-设置，已按 WD-14e 把 `rime-words.dict.yaml` 并入基础词库；`frost_dict_for_fcitx5.txt` 放在下载目录。
+- **操作**：**词库与短语 → 导入词库** 选 frost，看读文件时的对话框；选「基础词库」点 **导入词库**，对话框显示「正在整理词条… N%」时点 **取消**；再导入一次，点 **导入词库** 后等「正在导入」对话框出现马上点它的 **取消**（还在保存词库时，记下这时对话框写的什么）；看词库页、词库目录和应用的缓存目录（`docker exec <容器> ls -a /data/data/<包名>/cache`，模拟器上先 `adb root` 再 `adb shell ls -a …`；列不出来就记为阻塞）；打 k e m i a o x i n g g a n g。
+- **预期**：读文件和导入时都有进度条和百分比（正在分析格式，再到正在整理词条），一路往前走；取消后对话框关掉，不报错；词库页和词库目录跟导入前一样（没有 frost，没有 `.tmp` 或 `.build` 文件），缓存目录里没有 `import*` 文件；候选里仍有「氪喵星港」。
+
+### WD-14j [P1] 停用、启用、删除词库：合好之前页面说正在更新
+- **前提**：B0-设置，已按 WD-14e 把 `rime-words.dict.yaml` 并入基础词库。
+- **操作**：在词库页点 rime-words → **关闭**，打 k e m i a o x i n g g a n g；再 **开启**，再打；再 **删除**，再打。（换成 frost 这样的大词库更容易看到进度，见 WD-14j2。）
+- **预期**：每次操作后行的状态马上变；合成时间长时（大词库）「基础词库」一节显示「正在更新词库」和「正在更新 N%，完成前打字仍用原来的词库」，合好以后词数更新（3 个词的小词库来不及看到）；关闭后没有「氪喵星港」，开启后又有，删除后行没了、也没有这个词。
+
+### WD-14j2 [P1] 大词库合成中关闭另一个词库
+- **前提**：B0-设置，已按 WD-14e 把 `rime-words.dict.yaml` 并入基础词库；frost（`UAT_FROST`，见 WD-14d）在手边，没有就记 Blocked。
+- **操作**：把 frost 也并入基础词库；在 frost 上点 **关闭**（剩下的小，马上合好），再点 **开启**；「基础词库」一节显示「正在更新 N%」时马上把 rime-words **关闭**。
+- **预期**：不弹"词库没能更新"；合好以后 frost「已开启 · 1914461 个词」，rime-words「已关闭 · 3 个词」。
+
+### WD-14k [P1] 第三列按认出的含义排先后
+- **前提**：B0-设置，`log-words.txt`（四个词，第三列是对数概率，三行负数、一行「量子喵星」是 `1`；「氪喵糖果」「氪喵堂果」拼音都是 ke'miao'tang'guo，文件里「氪喵糖果」在前、数小：-9.5 对 -3.2）已放到"下载"目录。
+- **操作**：**导入词库**，选 `log-words.txt`，看标题；选"基础词库（推荐）"导入；回测试页打 k e m i a o t a n g g u o。
+- **预期**：标题下面写着"第三列是对数概率"和"4 个词"；候选里「氪喵堂果」排在「氪喵糖果」前面（数大的在前，不按文件里的先后；一行 `1` 不让整个文件改按文件里的先后出词）。
+
+### WD-14l [P1] 二进制文件直接拒绝；拼音在前、连写的词库认得出
+- **前提**：B0-设置，`binary-words.bin`（含 NUL 字节的二进制文件，代替搜狗 `.bin` 备份）、`pinyin-first.txt`（三行，拼音在前且连写，如 `kemiaoyu 氪喵屿`）已放到"下载"目录。
+- **操作**：**导入词库** 选 `binary-words.bin`；再 **导入词库** 选 `pinyin-first.txt`，看标题，选"基础词库（推荐）"导入；回测试页打 k e m i a o y u。
+- **预期**：`binary-words.bin` 读完不出并入哪个词库的选择，直接提示"格式不支持：这不是文本文件"，词库页没有新增；`pinyin-first.txt` 的标题下面写着"拼音在前"和"拼音连写"、"3 个词"，词库页列出 pinyin-first，候选里有「氪喵屿」。
+
+### WD-14m [P1] 同名的词库已在基础词库：先问要不要改并入用户词库
+- **前提**：B0-设置，按 WD-11 把 `dict-words.txt` 并入基础词库；然后用同名、五个新词的 `uat/fixtures/same-name/dict-words.txt` 换掉"下载"里那份：`adb push uat/fixtures/same-name/dict-words.txt /sdcard/Download/`（原来那五个词已在基础词库里，再导入一个也不会进用户词库）。用完把原来的推回去。
+- **操作**：再 **导入词库** 选 `dict-words.txt`，看出来的对话框；点 **并入用户词库**；打开 **导入的词**。
+- **预期**：选完文件马上（还没出"正在分析格式"的进度）弹出"基础词库里已有名为「dict-words」的词库。改为并入用户词库吗？"，不出并入哪个词库的选择；点 **并入用户词库** 后读文件、导入完成，提示导入 5 个词；**导入的词** 里有 `dict-words.txt` 这一批；基础词库一节仍只有一个 dict-words。
+
+### WD-14n [P2] Rime 词库里写成百分数的权重照常导入
+- **前提**：B0-设置，`rime-percent.dict.yaml`（Rime 表头，三个词，两行第三列是 `5%`、`80%` 这样的百分数，一行没有）已放到"下载"目录。
+- **操作**：**导入词库** 选它，看标题；选"基础词库（推荐）"导入；回测试页打 k e m i a o d e n g g a n g。
+- **预期**：不提示格式不支持；标题下面写着"Rime 词库"和"3 个词"、没有"读不懂"；词库页列出 rime-percent；候选里有「氪喵灯港」。
+
+### WD-14o [P1] 用户词库 10 万词的上限按导入的词总数算
+- **前提**：B0-设置，"下载"里有 `big-words.txt` 和 `user-99k.txt`（99,500 个六字词带拼音，生成法同 WD-14g，把 `100001` 换成 `99500`、文件名换成 `user-99k.txt`）。
+- **操作**：**导入词库** 选 `big-words.txt`，选"用户词库"导入；再导入 `user-99k.txt`，选"用户词库"；打开 **导入的词**，把 `big-words.txt` 那一批撤掉；再把 `user-99k.txt` 导入用户词库。
+- **预期**：`big-words.txt` 导入 1001 个词；第一次导入 `user-99k.txt` 提示"用户词库里导入的词已近上限，放不下这些词；请并入基础词库，或先删掉以前导入的词"（单看它不到 10 万，加上已导入的 1001 个就超了），**导入的词** 里没有这一批；撤掉 `big-words.txt` 后再导入成功，提示导入 99500 个词。
+
+### WD-14p [P1] UTF-8 的繁体词库能并入基础词库；Big5 的不行
+- **前提**：B0-设置，`trad-words.txt`（UTF-8，12 个繁体词，如「氪喵燈塔」ke miao deng ta）和同样内容存成 Big5 的 `trad-big5.txt` 已放到"下载"目录。
+- **操作**：**导入词库** 选 `trad-words.txt`，选"基础词库（推荐）"导入；回测试页打 k e m i a o d e n g t a；再 **导入词库** 选 `trad-big5.txt`，选"基础词库"点 **导入词库**。
+- **预期**：`trad-words.txt` 照常导入（字和读音对不上只查按 GBK 读的文件），词库页列出 trad-words，候选里有「氪喵燈塔」；`trad-big5.txt` 提示"格式不支持：字和读音大多对不上…"，词库页没有 trad-big5。
+
+### WD-14q [P1] 只写了词的行：确认框单列，太多就不并入基础词库
+- **前提**：B0-设置，`no-pinyin-some.txt`（60 行带拼音，1 行只有词「氪喵无音」）、`no-pinyin-most.txt`（3 行带拼音，7 行只有词）已放到"下载"目录。
+- **操作**：**导入词库** 选 `no-pinyin-some.txt`，看标题，取消；再 **导入词库** 选 `no-pinyin-most.txt`，选"基础词库"点 **导入词库**。
+- **预期**：`no-pinyin-some.txt` 的标题下面写着"60 个词"和"1 个词没有拼音（只能并入用户词库）"；`no-pinyin-most.txt` 提示"格式不支持：有些行没有拼音；没有拼音的词只能并入用户词库"，词库页没有新增。
 
 ## 自定义短语
 

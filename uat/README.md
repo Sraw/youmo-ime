@@ -31,6 +31,17 @@
 | [18-lifecycle.md](18-lifecycle.md) | 转屏、切换应用、换输入框、引擎重启这些时刻 |
 | [fixtures/](fixtures/) | 测试页 `fields.html` 和导入用的词表 |
 
+大词库的用例（WD-14d、14h、14i、14j2、TBL-12c）要雾凇拼音（[rime-frost](https://github.com/gaboolic/rime-frost/releases)）发布的
+`frost_dict_for_fcitx5.txt`，约 89 MB，不放进 fixtures：下载后用环境变量 `UAT_FROST=<路径>` 指给脚本。用例里的数
+（1914461 个词、176 行读不懂）出自 SHA-256 为 `86473190c505691c7f1ef7b87345a16b555c75fea30527f472a151b6eb1ad41f`
+的那一份（1914637 行），脚本先核对哈希，对不上记为 Blocked；换新版时连同用例里的数一起改。
+
+### 量 Java 堆
+
+每次读数前先让应用做一次垃圾回收：以 root 给它发 SIGUSR1（redroid 上 `docker exec <容器> sh -c 'kill -10 $(pidof <包名>)'`，
+模拟器上 adbd 是 root，直接 `adb shell 'kill -10 $(pidof <包名>)'`），等 1 秒，再看 `adb shell dumpsys meminfo <包名>` 里 App Summary 的 Java Heap。
+不先回收会读到后台工作留下的、还没回收的垃圾（实测 130 MB，一秒后 60 MB）。第一次读数常偏高，不算；比的是后 4 次的中位数。
+
 用户文档（[`docs/`](../docs/README.md)）说应用该怎样，这里的预期就照它写；两者不一致时，先弄清哪边错了，
 改对的那边，不要只改测试迁就现状。
 

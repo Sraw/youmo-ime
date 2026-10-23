@@ -1,0 +1,12 @@
+# Rime dictionary
+# encoding: utf-8
+
+---
+name: rime-words
+version: "2026.10.22"
+sort: by_weight
+...
+
+氪喵星港	ke miao xing gang	300
+量子喵站	liang zi miao zhan	120
+鲸氪灯塔	jing ke deng ta	50
