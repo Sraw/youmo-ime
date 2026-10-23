@@ -71,7 +71,9 @@ class EnginesMergedTest : EnginesFixture() {
     }
 
     // review S6: a key's time with a file of 300,000 words over every syllable, against none: the
-    // walkers' merged trie adds arcs, never a pass over the file. Generous bounds: a slow CI machine
+    // walkers' merged trie adds arcs, never a pass over the file. Its arcs make a key about 3.5 times
+    // as long here (0.5 against 1.7 ms); a pass over the file would be tens of ms. Generous bounds and
+    // the best of a few batches: a slow CI machine, under the coverage agent, with GC in between
     @Test
     fun aKeyTakesAboutAsLongWithAFileOfManyWordsAsWithout() {
         val random = Random(7)
@@ -88,23 +90,26 @@ class EnginesMergedTest : EnginesFixture() {
                 engines.type(Engines.PINYIN, "ni")
                 engines.onEvent(Engines.PINYIN, EngineEvent.RESET, 0)
                 val keys = "nihaoshijiezhongguoren"
-                val start = System.nanoTime()
-                repeat(ROUNDS) {
-                    engines.type(Engines.PINYIN, keys)
-                    engines.onEvent(Engines.PINYIN, EngineEvent.RESET, 0)
+                return (1..BATCHES).minOf {
+                    val start = System.nanoTime()
+                    repeat(ROUNDS) {
+                        engines.type(Engines.PINYIN, keys)
+                        engines.onEvent(Engines.PINYIN, EngineEvent.RESET, 0)
+                    }
+                    (System.nanoTime() - start) / 1e6 / (ROUNDS * keys.length)
                 }
-                return (System.nanoTime() - start) / 1e6 / (ROUNDS * keys.length)
             }
         }
         val without = perKey(null)
         val with = perKey(big)
         println("per key: ${"%.3f".format(without)} ms without, ${"%.3f".format(with)} ms with $WORDS merged words")
-        assertTrue("$with ms a key against $without", with < without * 3 + 2)
+        assertTrue("$with ms a key against $without", with < without * 6 + 5)
     }
 
     private companion object {
         const val WUBI = "engine-wubi"
         const val WORDS = 300_000
         const val ROUNDS = 5
+        const val BATCHES = 3
     }
 }
