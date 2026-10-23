@@ -8,6 +8,48 @@ Each release lists its **main changes** (new features, large improvements), its 
 
 ---
 
+## 0.3.2（2026-10-23）
+
+### 主要变化
+
+- **导入大词库不再崩溃**：导入的词库现在在导入时整理一次，存成本应用自己的词库文件，弹出键盘时不再整个读一遍。导入 190 万词的词库（比如 rime-frost）后，
+  键盘的内存占用和没导入时差不多。0.3.1 里导入过词库的，升级后第一次打开会在后台转换一次，空闲栏显示「正在升级词库格式」和进度。
+- **导入前先看格式**：导入时先分析文件：编码（UTF-8、GBK、UTF-16）、表头、哪一列是词、哪一列是拼音、第三列是概率、代价还是词频。确认框里写明认出了什么；
+  看不准的就说「格式不支持」和原因，不会导错。第三列按认出的含义参与排序。导入有进度条，可以取消。
+- **最低系统版本改为 Android 10**：Android 6–9 的手机装不了这个版本。
+
+### 小改动
+
+- 几个基础词库开关、删除时会重新整理，词库页上这一行显示「正在更新」。
+- 并入用户词库的词表最多 10 万词（导入过的加起来算），更大的请并入基础词库；自己导出的备份不受限。
+- 关掉「用我的输入习惯」时，开着的基础词库照常出词，五笔等码表和拼音一样。
+
+### 修复
+
+- 修复导入很大的词库后，每次弹出键盘都内存不足、输入法反复崩溃的问题。
+
+### Main changes
+
+- **Large dictionaries no longer crash the keyboard**: an imported dictionary is now converted once, at import, into the app's own dictionary file, and showing
+  the keyboard no longer reads it whole. With a 1.9-million-word dictionary (rime-frost, say) the keyboard uses about as much memory as without it.
+  Dictionaries imported in 0.3.1 are converted once in the background on the first start after the upgrade; the idle bar shows 「正在升级词库格式」 with its progress.
+- **The format is checked before an import**: the file's encoding (UTF-8, GBK, UTF-16), header, which column holds the word and which the pinyin, and whether the third
+  column is a probability, a cost or a frequency. The confirm dialog says what was found; a file it cannot read with confidence is refused with the reason, never
+  imported wrongly. The third column ranks words by what it was found to mean. Imports show their progress and can be cancelled.
+- **Android 10 or later is now required**: phones on Android 6–9 cannot install this version.
+
+### Smaller changes
+
+- Turning a base dictionary on or off, or deleting one, rebuilds them; its row on the dictionary page shows 「正在更新」 meanwhile.
+- A word list merged into the user dictionary may hold at most 100,000 words (all such imports together); larger ones go into the base dictionary. Your own exported backup is exempt.
+- With 「用我的输入习惯」 off, the turned-on base dictionaries still offer their words, in 五笔 and the other tables as in pinyin.
+
+### Fixes
+
+- Fixed the keyboard running out of memory, and the input method crashing again and again, after a very large dictionary was imported.
+
+---
+
 ## 0.3.1（2026-10-22）
 
 ### 主要变化

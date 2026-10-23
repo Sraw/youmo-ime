@@ -9,7 +9,7 @@
 <a href="https://github.com/Sraw/youmo-ime/releases/latest"><img src="https://img.shields.io/github/downloads/Sraw/youmo-ime/latest/total?label=downloads" alt="这一版的下载数 / downloads of this release"></a>
 <a href="https://github.com/Sraw/youmo-ime/actions/workflows/unit_test.yml"><img src="https://github.com/Sraw/youmo-ime/actions/workflows/unit_test.yml/badge.svg?branch=main" alt="Unit Tests"></a>
 <a href="LICENSE"><img src="https://img.shields.io/badge/license-LGPL--2.1--or--later-blue" alt="LGPL-2.1-or-later"></a>
-<img src="https://img.shields.io/badge/Android-6.0%2B%20arm64-3DDC84?logo=android&logoColor=white" alt="Android 6.0+ arm64">
+<img src="https://img.shields.io/badge/Android-10%2B%20arm64-3DDC84?logo=android&logoColor=white" alt="Android 10+ arm64">
 <a href="https://t.me/+smgndImIg7EzNjYx"><img src="https://img.shields.io/badge/Telegram-%E4%BA%A4%E6%B5%81%E7%BE%A4-26A5E4?logo=telegram&logoColor=white" alt="Telegram 交流群"></a></p>
 
 <p align="center">
@@ -43,7 +43,6 @@
 - **横屏分体、单手、悬浮键盘，实体键盘**：横屏时字母键分成左右两半；键盘可以缩到一边单手打，或变成能拖动的小窗；接实体键盘时候选显示在光标旁。
 - **边打边学**：记住你选的词和顺序，常用的排到前面；能导入搜狗等输入法的词库；长按候选可以删除、固定、屏蔽，做错了马上撤销；学到的东西自动备份，换手机能恢复。
 - **离线语音**（语音版）：按住空格说话，可以中英混说，自动加标点；带口音的普通话也能识别。目前只支持普通话和英语，还不支持方言。
-- **越用越顺手**：记住你的用词；可以导入搜狗等词库；长按候选可以忘掉、置顶或屏蔽。
 
 每项功能和设置的详细说明见[使用说明](docs/README.md)。
 
@@ -60,8 +59,8 @@
 
 ### 下载
 
-到 [Releases](https://github.com/Sraw/youmo-ime/releases/latest) 下载最新版：文字版约 310 MB，语音版约 470 MB（多申请录音权限）。
-需要 Android 6.0 以上的 arm64 手机。模型和词库都在安装包里，所以包比较大。持续更新中，词库每月更新一次。
+到 [Releases](https://github.com/Sraw/youmo-ime/releases/latest) 下载最新版：文字版约 320 MB，语音版约 480 MB（多申请录音权限）。
+需要 Android 10 以上的 arm64 手机。模型和词库都在安装包里，所以包比较大。持续更新中，词库每月更新一次。
 
 ### 下一步计划
 
@@ -122,8 +121,8 @@ Nine keys, main set: 88.8%. English with one key in 25 slipping: 73.8% of slippe
 
 ### Download
 
-The latest from [Releases](https://github.com/Sraw/youmo-ime/releases/latest): text build about 310 MB, voice build about 470 MB (asks for the microphone too).
-Needs an arm64 phone on Android 6.0 or later. The models and dictionary are inside the APK, hence its size. Actively updated; the dictionary gets new words every month.
+The latest from [Releases](https://github.com/Sraw/youmo-ime/releases/latest): text build about 320 MB, voice build about 480 MB (asks for the microphone too).
+Needs an arm64 phone on Android 10 or later. The models and dictionary are inside the APK, hence its size. Actively updated; the dictionary gets new words every month.
 
 ### Next
 
