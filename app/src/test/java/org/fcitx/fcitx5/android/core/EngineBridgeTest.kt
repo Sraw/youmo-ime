@@ -222,7 +222,7 @@ class EngineBridgeTest {
     }
 
     // one an older build merged into the new words is merged into the base, its list gone; and 0.3.1's
-    // texts are never read here (the fcitx thread), but compiled once off it (the migration), the
+    // texts are never read here (the fcitx thread), but converted and compiled once off it, the
     // engine told of the file then
     @Test
     fun theDictionariesAreCompiledOffTheEnginesThreadNotReadByIt() {
@@ -246,13 +246,16 @@ class EngineBridgeTest {
             assertEquals(mapOf("mine" to 1, "theirs" to 1), MergedDictionary.sourceWords(dictionaries))
             // the engine is told of another file, as it reads them again for it
             assertNotEquals(added.dictionaries, EngineBridge.additions(folder.root).dictionaries)
-            // a change of a dictionary is compiled again
+            // kept gzip'd, the texts gone
+            assertEquals(listOf("mine.txt.gz", "theirs.txt.gz"), dictionaries.list()!!.filter { it.endsWith(".gz") }.sorted())
+            assertFalse(File(dictionaries, "mine.txt").exists())
+            // a change of a dictionary is compiled again: a text of its name (a 0.3.2 backup restored) wins
             File(dictionaries, "theirs.txt").writeText("搭子 da'zi 0.0\n妮 ni 0.0\n")
             MergedDictionary.refreshNow(dictionaries)
             assertEquals(3, MergedDictionary.current(dictionaries).file!!.size)
             // none on: no file
-            File(dictionaries, "mine.txt").delete()
-            File(dictionaries, "theirs.txt").delete()
+            File(dictionaries, "mine.txt.gz").delete()
+            File(dictionaries, "theirs.txt.gz").delete()
             MergedDictionary.refreshNow(dictionaries)
             assertNull(MergedDictionary.current(dictionaries).file)
             assertFalse(File(dictionaries, MergedDictionary.FILE).exists())

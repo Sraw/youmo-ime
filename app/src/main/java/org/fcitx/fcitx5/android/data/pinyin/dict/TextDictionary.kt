@@ -10,7 +10,8 @@ import java.io.File
 
 /**
  * A dictionary in libime's text format, a word a line (`text pin'yin cost`): one to import, or
- * one imported, which the engine reads and which is turned off by naming it `.txt.disable`.
+ * one imported, kept gzip-compressed ([SourceNames]) and turned off by naming it `.txt.gz.disable`;
+ * one an older build kept as `.txt[.disable]` till the compile thread converts it.
  */
 class TextDictionary(file: File) : PinyinDictionary() {
     override var file: File = file
@@ -22,13 +23,12 @@ class TextDictionary(file: File) : PinyinDictionary() {
         private set
 
     override val name: String
-        get() = nameOf(file.name)
+        get() = SourceNames.nameOf(file.name)
 
     init {
         ensureFileExists()
         isEnabled = when {
-            file.name.endsWith(".${type.ext}") -> true
-            file.name.endsWith(".${type.ext}.$DISABLE") -> false
+            SourceNames.isSource(file.name) || SourceNames.isText(file.name) -> SourceNames.isOn(file.name)
             else -> errorArg(R.string.exception_text_dict_filename, file.name)
         }
     }
@@ -41,7 +41,7 @@ class TextDictionary(file: File) : PinyinDictionary() {
 
     private fun rename(enabled: Boolean): Boolean {
         if (isEnabled == enabled) return true
-        val newFile = file.resolveSibling(fileName(name, enabled))
+        val newFile = file.resolveSibling(if (SourceNames.isSource(file.name)) fileName(name, enabled) else SourceNames.textName(name, enabled))
         // renameTo replaces a file there on most filesystems: never another dictionary
         if (newFile.exists() || !file.renameTo(newFile)) return false
         file = newFile
@@ -51,13 +51,15 @@ class TextDictionary(file: File) : PinyinDictionary() {
 
     override fun toTextDictionary(dest: File): TextDictionary {
         ensureTxt(dest)
-        file.copyTo(dest)
+        // a kept one's text, not its gzip
+        SourceNames.open(file).use { input -> dest.outputStream().use { input.copyTo(it) } }
         return TextDictionary(dest)
     }
 
     companion object {
         const val DISABLE = "disable"
 
-        fun fileName(name: String, enabled: Boolean = true) = "$name.${Type.Text.ext}" + if (enabled) "" else ".$DISABLE"
+        /** The file a dictionary called [name] is kept in, on or off ([SourceNames.fileName]). */
+        fun fileName(name: String, enabled: Boolean = true) = SourceNames.fileName(name, enabled)
     }
 }

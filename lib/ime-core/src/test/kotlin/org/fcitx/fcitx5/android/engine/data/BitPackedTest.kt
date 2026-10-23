@@ -4,7 +4,9 @@
  */
 package org.fcitx.fcitx5.android.engine.data
 
+import org.fcitx.fcitx5.android.engine.assertRows
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
 import org.junit.Test
@@ -120,6 +122,20 @@ class BitPackedTest {
             fail("accepted")
         } catch (e: DataFormatException) {
             assertTrue(e.message, e.message!!.contains("5 at 1"))
+        }
+    }
+
+    // the streaming writer's misuse refused as it happens, not a table read wrong later (review F3614)
+    @Test
+    fun theWriterRefusesMoreValuesTooWideOrTooFew() {
+        val rows = listOf<Pair<String, (BitPacked.Writer) -> Unit>>(
+            "more than 2 values" to { w -> repeat(3) { w.add(1) } },
+            "value 4 at 0 of 2 bits" to { w -> w.add(4) },
+            "1 of 2 values" to { w -> w.add(1); w.finish() },
+        )
+        assertRows(rows, { it.first }) { (why, misuse) ->
+            val e = assertThrows(IllegalArgumentException::class.java) { misuse(BitPacked.Writer(java.io.ByteArrayOutputStream(), 2, 2)) }
+            assertEquals(why, e.message)
         }
     }
 }

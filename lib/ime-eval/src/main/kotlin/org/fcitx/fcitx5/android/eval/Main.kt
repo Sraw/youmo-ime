@@ -34,12 +34,15 @@ import org.fcitx.fcitx5.android.engine.session.Action
 import org.fcitx.fcitx5.android.engine.session.PinyinSession
 import org.fcitx.fcitx5.android.engine.table.TableDictionary
 import org.fcitx.fcitx5.android.engine.table.TableLanguage
+import org.fcitx.fcitx5.android.engine.user.DictionaryCompiler
+import org.fcitx.fcitx5.android.engine.user.DictionaryFile
 import org.fcitx.fcitx5.android.engine.user.LearningUse
 import org.fcitx.fcitx5.android.engine.user.WordPack
 import java.io.File
 import java.io.IOException
 import java.io.RandomAccessFile
 import java.nio.channels.FileChannel
+import java.nio.file.Files
 import java.util.Locale
 import java.util.Random
 import kotlin.system.exitProcess
@@ -56,11 +59,11 @@ internal val COMMANDS = listOf(
     },
     Command(
         "pinyin",
-        "<pinyin.data> <set.tsv> <result.tsv> [--scheme <scheme>] [--fuzzy all|<pair>,...] [--half <half>] [--neighbours on|off] [--rerank <model.safetensors>] [--refine <model.safetensors>] [--weight <rerank>[,<refine>]] [--limit <rerank>[,<refine>]] [--beam <n>] [--sentences <n>] [--layers <name>=<log10>,...] [--pack <file.words>] [--threads <n>]",
-        3..3, "scheme", "fuzzy", "half", "neighbours", "rerank", "refine", "weight", "limit", "beam", "sentences", "layers", "pack", "threads",
+        "<pinyin.data> <set.tsv> <result.tsv> [--scheme <scheme>] [--fuzzy all|<pair>,...] [--half <half>] [--neighbours on|off] [--rerank <model.safetensors>] [--refine <model.safetensors>] [--weight <rerank>[,<refine>]] [--limit <rerank>[,<refine>]] [--beam <n>] [--sentences <n>] [--layers <name>=<log10>,...] [--pack <file.words>] [--merged <dictionary.txt> [--stale]] [--threads <n>]",
+        3..3, "scheme", "fuzzy", "half", "neighbours", "rerank", "refine", "weight", "limit", "beam", "sentences", "layers", "pack", "merged", "stale", "threads",
     ) { args, _, _ ->
         val (dataPath, setPath, resultPath) = args.operands
-        runPinyin(dataPath, setPath, resultPath, RunOptions(args.options), Models(args.options), args.options["layers"], args.options["pack"])
+        runPinyin(dataPath, setPath, resultPath, RunOptions(args.options), Models(args.options), args.options["layers"], args.options["pack"], args.options["merged"], "stale" in args.options)
     },
     Command(
         "predict", "<pinyin.data> <predict.tsv> [--offers <out.tsv>] [--threads <n>] [--rerank <model.safetensors> [--weight <w>]]",
@@ -290,8 +293,8 @@ internal class Command(
     val options = options.toSet()
 }
 
-/** Options that take no value: `--gate`. */
-private val FLAGS = setOf("gate")
+/** Options that take no value: `--gate`, `--stale`. */
+private val FLAGS = setOf("gate", "stale")
 
 /** Arguments split into the positional ones and `--name value` options, a [FLAGS] one with an empty value. */
 internal class Arguments(args: Array<String>) {
@@ -341,6 +344,8 @@ private const val GLIDE_WOBBLE = 0.3f
 private const val LEARN_LOG_COMMITS = 200_000
 private const val LEARN_LOG_DAYS = 365
 
+private const val NANOS_PER_MILLI = 1_000_000
+
 /** Full pinyin without the Latin words. */
 private const val NO_LATIN = "no-latin"
 
@@ -367,6 +372,8 @@ private fun optionsValid(options: Map<String, String>): Boolean {
         valid("user-counts") { it in setOf("full", "none", "multi") },
         valid("short-guard") { it in ON_OFF },
         valid("seed") { (it.toIntOrNull() ?: -1) >= 0 },
+        // a merged dictionary's file is what is stale
+        valid("stale") { "merged" in options },
         listOf("threads", "beam", "sentences").all { name -> valid(name) { (it.toIntOrNull() ?: 0) > 0 } },
         // only full pinyin reads slips: 双拼 and the nine keys read none
         valid("neighbours") { it in ON_OFF && (scheme == null || scheme == NO_LATIN) },
@@ -488,18 +495,45 @@ private fun score(setPath: String, resultPath: String, baselinePath: String?, ha
     return 0
 }
 
-private fun runPinyin(dataPath: String, setPath: String, resultPath: String, options: RunOptions, models: Models, layers: String?, packPath: String?): Int {
+@Suppress("LongParameterList")
+private fun runPinyin(
+    dataPath: String, setPath: String, resultPath: String, options: RunOptions, models: Models, layers: String?, packPath: String?,
+    mergedPath: String?, stale: Boolean,
+): Int {
     val pack = packPath?.let { path -> File(path).useLines { WordPack.parse(it, path) } }
-    // a data file each: its buffers are not to be shared
-    val results = dealt(Halves.select(readSet(setPath), options.half), options.threads, {
-        val data = loadData(dataPath)
-        PinyinRun(
-            data, options.segmenter(data), beam = options.beam, sentenceCount = options.sentences, layers = layers, pack = pack,
-            reranker = models.reranker, refiner = models.refiner,
-        )
-    }) { hand -> run(hand) }
-    File(resultPath).printWriter().use { out -> results.forEach { out.println(RunResultFormat.format(it)) } }
+    val work = mergedPath?.let { Files.createTempDirectory("ime-eval-merged").toFile() }
+    try {
+        val merged = mergedPath?.let { compileMerged(it, loadData(dataPath), File(checkNotNull(work), "merged.ymd")) }
+        // a data file each: its buffers are not to be shared
+        val results = dealt(Halves.select(readSet(setPath), options.half), options.threads, {
+            val data = loadData(dataPath)
+            PinyinRun(
+                data, options.segmenter(data), beam = options.beam, sentenceCount = options.sentences, layers = layers, pack = pack,
+                reranker = models.reranker, refiner = models.refiner,
+                merged = merged?.let { DictionaryFile.open(it, verify = false) }, mergedStale = stale,
+            )
+        }) { hand -> run(hand) }
+        File(resultPath).printWriter().use { out -> results.forEach { out.println(RunResultFormat.format(it)) } }
+    } finally {
+        work?.deleteRecursively()
+    }
     return 0
+}
+
+/**
+ * [source], a dictionary's text as the app keeps one, compiled as the app compiles it, against
+ * [data]'s dictionary: the file typing with it reads, its size told on stderr.
+ */
+private fun compileMerged(source: String, data: PinyinData, dest: File): File {
+    val started = System.nanoTime()
+    val result = File(source).useLines { lines -> DictionaryCompiler.compile(listOf(lines), dest, inBase = DictionaryCompiler.inBase(data)) }
+    System.err.println(
+        "merged: ${result.words} words, ${result.inBase} the base's, ${result.unread} unread; " +
+            "${dest.length()} bytes, compiled in ${(System.nanoTime() - started) / NANOS_PER_MILLI} ms",
+    )
+    // checked once here; each thread opens it unchecked
+    DictionaryFile.open(dest)
+    return dest
 }
 
 /**

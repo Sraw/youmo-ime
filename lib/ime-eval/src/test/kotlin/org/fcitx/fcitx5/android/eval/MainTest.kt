@@ -12,6 +12,7 @@ import org.fcitx.fcitx5.android.engine.pinyin.Syllables
 import org.fcitx.fcitx5.android.engine.rerank.SentencePicker
 import org.fcitx.fcitx5.android.engine.rerank.SentenceRefiner
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
@@ -143,6 +144,7 @@ class MainTest {
             arrayOf("pinyin", "d", "s", "r", "--scheme", "ms", "--neighbours", "on"), // 双拼 reads none
             arrayOf("pinyin", "d", "s", "r", "--scheme", "t9", "--neighbours", "on"), // nor the nine keys
             arrayOf("pinyin", "d", "s", "r", "--threads", "0"),
+            arrayOf("pinyin", "d", "s", "r", "--stale"), // stale is a merged dictionary's
             arrayOf("pinyin", "d", "s", "r", "--beam", "x"),
             arrayOf("pinyin", "d", "s", "r", "--beam", "0"),
             arrayOf("pinyin", "d", "s", "r", "--sentences", "-1"),
@@ -301,6 +303,22 @@ class MainTest {
         val (unread, said) = releaseReport(launcher(scores.toString(), learning(emptyList())))
         assertEquals(said, 2, unread)
         assertTrue(said, "learn typed a third time: no number in its output" in said)
+    }
+
+    // a dictionary's text compiled as the app compiles one: its words typed as the app offers them
+    @Test
+    fun aMergedDictionarysWordsAreOffered() {
+        val set = tmp.newFile("set.tsv").apply { writeText("nima\t泥马\tdaily\n") }
+        val merged = tmp.newFile("merged.txt").apply { writeText("泥马 ni'ma 0.5\n你好 ni'hao 0.5\n") }
+        val data = dataFile()
+        val result = File(tmp.root, "result.tsv")
+        fun candidates(vararg options: String): List<String> {
+            assertEquals(0, exit("pinyin", data.path, set.path, result.path, "--threads", "1", *options))
+            return result.useLines { RunResultFormat.parse(it) }.single().candidates
+        }
+        assertFalse("泥马" in candidates())
+        assertTrue("泥马" in candidates("--merged", merged.path))
+        assertTrue("泥马" in candidates("--merged", merged.path, "--stale"))
     }
 
     @Test

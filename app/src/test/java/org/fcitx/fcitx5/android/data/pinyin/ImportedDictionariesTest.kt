@@ -5,14 +5,18 @@
 package org.fcitx.fcitx5.android.data.pinyin
 
 import org.fcitx.fcitx5.android.data.pinyin.ImportedDictionaries.Unread
+import org.fcitx.fcitx5.android.engine.assertRows
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertThrows
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
 import java.io.File
 import java.io.IOException
+import java.util.zip.GZIPInputStream
 
 class ImportedDictionariesTest {
 
@@ -31,19 +35,19 @@ class ImportedDictionariesTest {
 
     @Test
     fun aDictionaryIsKeptAsTheEngineReadsIt() {
-        val dest = File(dir, "a.txt")
+        val dest = File(dir, "a.txt.gz")
         val words = ImportedDictionaries.write(sequenceOf("\uFEFF你好\tni'hao", "junk", "绿 lü -1"), dest)
         assertEquals(2, words)
-        assertEquals("你好 ni'hao 0.0\n绿 lü -1.0\n", dest.readText())
-        assertEquals(listOf("a.txt"), names())
+        assertEquals("你好 ni'hao 0.0\n绿 lü -1.0\n", gunzip(dest))
+        assertEquals(listOf("a.txt.gz"), names())
     }
 
     @Test
     fun aDictionaryWithNothingToReadIsNotWritten() {
-        val dest = File(dir, "a.txt").apply { writeText("你 ni 0.0\n") }
+        val dest = File(dir, "a.txt.gz").apply { writeText("你 ni 0.0\n") }
         assertEquals(0, ImportedDictionaries.write(sequenceOf("junk", ""), dest))
         assertEquals("你 ni 0.0\n", dest.readText())
-        assertEquals(listOf("a.txt"), names())
+        assertEquals(listOf("a.txt.gz"), names())
     }
 
     @Test
@@ -63,7 +67,7 @@ class ImportedDictionariesTest {
         File(dir, "mine.txt").writeText("搭子 da'zi 0\n")
         File(dir, "b.dict").writeBytes(extra)
         ImportedDictionaries.migrate(dir)
-        assertEquals(listOf(".libime", "b.txt", "mine.txt"), names())
+        assertEquals(listOf(".libime", "b.txt.gz", "mine.txt"), names())
     }
 
     // two dictionaries shown, the user's and the base: one an older build merged into the new words
@@ -87,12 +91,12 @@ class ImportedDictionariesTest {
         File(dir, "on.dict").writeBytes(extra)
         File(dir, "off.dict.disable").writeBytes(extra)
         ImportedDictionaries.migrate(dir)
-        assertEquals(listOf(".libime", "off.txt.disable", "on.txt"), names())
-        assertEquals("骁骎 xiao'qin 0.0\n琮璟 cong'jing 0.0\n", File(dir, "on.txt").readText())
+        assertEquals(listOf(".libime", "off.txt.gz.disable", "on.txt.gz"), names())
+        assertEquals("骁骎 xiao'qin 0.0\n琮璟 cong'jing 0.0\n", gunzip(File(dir, "on.txt.gz")))
         assertEquals(listOf("off.dict.disable", "on.dict"), aside())
         // and again, nothing left to do
         ImportedDictionaries.migrate(dir)
-        assertEquals(listOf(".libime", "off.txt.disable", "on.txt"), names())
+        assertEquals(listOf(".libime", "off.txt.gz.disable", "on.txt.gz"), names())
         assertEquals(listOf("off.dict.disable", "on.dict"), aside())
     }
 
@@ -122,7 +126,7 @@ class ImportedDictionariesTest {
         File(dir, "empty.dict").writeBytes(byteArrayOf(0, 0x0f, 0xc6.toByte(), 0x13, 0, 0, 0, 1) + ByteArray(20))
         ImportedDictionaries.migrate(dir)
         assertEquals(listOf(".libime"), names())
-        assertFalse(File(dir, "empty.txt").exists())
+        assertFalse(File(dir, "empty.txt.gz").exists())
     }
 
     @Test
@@ -251,8 +255,8 @@ class ImportedDictionariesTest {
         ImportedDictionaries.migrate(dir)
         // looked at before the new one is turned into x.txt: another dictionary, never told of
         assertEquals(listOf(Unread("x.dict", Unread.Reason.DAMAGED)), ImportedDictionaries.unread(dir))
-        assertEquals(listOf(".libime", "x.txt"), names())
-        assertEquals("骁骎 xiao'qin 0.0\n琮璟 cong'jing 0.0\n", File(dir, "x.txt").readText())
+        assertEquals(listOf(".libime", "x.txt.gz"), names())
+        assertEquals("骁骎 xiao'qin 0.0\n琮璟 cong'jing 0.0\n", gunzip(File(dir, "x.txt.gz")))
         assertEquals(listOf("x.dict", "x.dict.1"), aside())
     }
 
@@ -279,7 +283,7 @@ class ImportedDictionariesTest {
     fun aDictionaryOfANameAlreadyAsideKeepsBoth() {
         File(dir, "a.dict").writeBytes(extra)
         ImportedDictionaries.migrate(dir)
-        File(dir, "a.txt").delete()
+        File(dir, "a.txt.gz").delete()
         File(dir, "a.dict").writeBytes(extra.copyOf(30))
         ImportedDictionaries.migrate(dir)
         assertEquals(listOf("a.dict", "a.dict.1"), aside())
@@ -289,9 +293,124 @@ class ImportedDictionariesTest {
     @Test
     fun aDictionaryThatCannotBeWrittenFails() {
         // a directory where the text should go: the rename fails
-        val dest = File(dir, "a.txt").apply { mkdir() }
+        val dest = File(dir, "a.txt.gz").apply { mkdir() }
         assertThrows(IOException::class.java) { ImportedDictionaries.write(sequenceOf("你 ni 0.0"), dest) }
-        assertEquals(listOf("a.txt"), names())
+        assertEquals(listOf("a.txt.gz"), names())
     }
+
+    // a dictionary is any of four files by its name: an older build's text, on or off, or one kept, on or off
+    @Test
+    fun aNameIsTakenByAnyOfItsFourFiles() {
+        assertRows(listOf("a.txt", "a.txt.disable", "a.txt.gz", "a.txt.gz.disable"), { it }) { file ->
+            dir.listFiles()!!.forEach { it.delete() }
+            File(dir, file).writeText("你 ni 0.0\n")
+            assertTrue(file, ImportedDictionaries.hasDictionary(dir, "a"))
+            assertFalse(file, ImportedDictionaries.hasDictionary(dir, "b"))
+            // and an import of its name made meanwhile is not renamed over it, refused as a name taken (F3603)
+            val temp = File(dir, "a.txt.gz.tmp").apply { writeText("new") }
+            assertThrows(file, ImportedDictionaries.NameTaken::class.java) { ImportedDictionaries.commit(temp, File(dir, "a.txt.gz")) }
+            assertEquals(file, listOf(file, "a.txt.gz.tmp").sorted(), names())
+        }
+    }
+
+    // a tmp another write of its path deleted is never renamed into place as an empty file (F3594)
+    @Test
+    fun aTmpGoneIsNotCommitted() {
+        assertThrows(IOException::class.java) { ImportedDictionaries.commit(File(dir, "a.txt.gz.tmp"), File(dir, "a.txt.gz")) }
+        assertEquals(emptyList<String>(), names())
+    }
+
+    // each of a dictionary's kept files deleted, though one before it could not be: whether all went (F3598).
+    // Its text refused, its gzip stays too: the two never parted, the text not converted again (F3686)
+    @Test
+    fun aDeleteGoesOnPastAFileThatStays() {
+        // a directory of a file's name, not empty: its delete fails
+        File(dir, "a.txt.gz").apply { mkdir() }.resolve("inside").writeText("x")
+        File(dir, "a.txt.gz.disable").writeText("kept")
+        assertFalse(ImportedDictionaries.delete(dir, "a"))
+        assertEquals(listOf("a.txt.gz"), names())
+        File(dir, "b.txt").apply { mkdir() }.resolve("inside").writeText("x")
+        File(dir, "b.txt.gz").writeText("kept")
+        assertFalse(ImportedDictionaries.delete(dir, "b"))
+        assertEquals(listOf("a.txt.gz", "b.txt", "b.txt.gz"), names())
+    }
+
+    // the page lists one row a name: the text if there is one (it wins, converted next), else the
+    // kept one; kept both on and off with no text, the newer stays, the on one at one time (RN3)
+    @Test
+    fun oneOfANameIsListedOnceAndTheNewerOfTwoKeptStays() {
+        File(dir, "a.txt").writeText("text")
+        File(dir, "a.txt.gz.disable").writeText("kept")
+        File(dir, "b.txt.gz").apply { writeText("old"); setLastModified(1_000_000) }
+        File(dir, "b.txt.gz.disable").apply { writeText("new"); setLastModified(2_000_000) }
+        File(dir, "c.txt.gz").apply { writeText("on"); setLastModified(1_000_000) }
+        File(dir, "c.txt.gz.disable").apply { writeText("off"); setLastModified(1_000_000) }
+        // texts both on and off by the same rule, before either is converted: not the off one always (F3596)
+        File(dir, "d.txt").apply { writeText("new"); setLastModified(2_000_000) }
+        File(dir, "d.txt.disable").apply { writeText("old"); setLastModified(1_000_000) }
+        File(dir, "e.txt").apply { writeText("on"); setLastModified(1_000_000) }
+        File(dir, "e.txt.disable").apply { writeText("off"); setLastModified(1_000_000) }
+        assertEquals(listOf("a.txt", "b.txt.gz.disable", "c.txt.gz", "d.txt", "e.txt"), ImportedDictionaries.list(dir).map { it.name })
+        // the text's conversion settles a's
+        assertEquals(listOf("a.txt", "a.txt.gz.disable", "b.txt.gz.disable", "c.txt.gz", "d.txt", "e.txt"), names())
+    }
+
+    // turned and deleted by name: whichever of its files is there now, not the one listed (RS1)
+    @Test
+    fun aDictionaryIsTurnedAndDeletedByItsName() {
+        File(dir, "a.txt.gz").writeText("kept")
+        assertTrue(ImportedDictionaries.turn(dir, "a", false))
+        assertEquals(listOf("a.txt.gz.disable"), names())
+        assertTrue(ImportedDictionaries.turn(dir, "a", false))
+        // an older build's text beside it (its delete refused after its conversion): both turned,
+        // never parted, or the text is converted again and an upgrade told (F3686)
+        File(dir, "a.txt").writeText("text")
+        assertTrue(ImportedDictionaries.turn(dir, "a", false))
+        assertEquals(listOf("a.txt.disable", "a.txt.gz.disable"), names())
+        assertTrue(ImportedDictionaries.turn(dir, "a", true))
+        assertEquals(listOf("a.txt", "a.txt.gz"), names())
+        // a backup's gzip of the other state beside them (settle leaves the pair while the text is there):
+        // that one is it, skipped, not a refused rename failing the turn (F3700)
+        File(dir, "a.txt.gz.disable").writeText("backup")
+        assertTrue(ImportedDictionaries.turn(dir, "a", false))
+        assertEquals(listOf("a.txt.disable", "a.txt.gz", "a.txt.gz.disable"), names())
+        File(dir, "a.txt.gz.disable").delete()
+        assertTrue(ImportedDictionaries.turn(dir, "a", true))
+        assertEquals(listOf("a.txt", "a.txt.gz"), names())
+        // the gzip's rename refused (one of its name there, a directory): the text turned back
+        File(dir, "a.txt.gz.disable").mkdir()
+        assertFalse(ImportedDictionaries.turn(dir, "a", false))
+        File(dir, "a.txt.gz.disable").delete()
+        assertEquals(listOf("a.txt", "a.txt.gz"), names())
+        assertFalse(ImportedDictionaries.turn(dir, "gone", true))
+        assertTrue(ImportedDictionaries.delete(dir, "a"))
+        assertEquals(emptyList<String>(), names())
+    }
+
+    // a conversion's gzip put in the text's place, on or off as the text is at the commit; dropped
+    // if the text went or changed since it was read
+    @Test
+    fun aConversionIsCommittedAsTheTextIsThen() {
+        val text = File(dir, "a.txt").apply { writeText("你 ni 0.0\n") }
+        val length = text.length()
+        val modified = text.lastModified()
+        File(dir, "a.txt.gz").writeText("kept before")
+        // turned off as it was read: its length and time kept by the rename
+        assertTrue(text.renameTo(File(dir, "a.txt.disable")))
+        val temp = File(dir, "a.txt.gz.tmp").apply { writeText("gzip") }
+        assertNull(ImportedDictionaries.commitConversion(dir, "a", temp, length, modified)!!.left)
+        assertEquals(listOf("a.txt.gz.disable"), names())
+        assertEquals("gzip", File(dir, "a.txt.gz.disable").readText())
+        // changed since (a backup restored over it): not committed, the text left to convert again
+        File(dir, "b.txt").apply { writeText("new words"); setLastModified(modified) }
+        val other = File(dir, "b.txt.gz.tmp").apply { writeText("gzip") }
+        assertNull(ImportedDictionaries.commitConversion(dir, "b", other, length, modified))
+        assertEquals(listOf("a.txt.gz.disable", "b.txt"), names())
+        // deleted since: nothing
+        assertNull(ImportedDictionaries.commitConversion(dir, "c", File(dir, "c.txt.gz.tmp").apply { writeText("gzip") }, 1, 1))
+        assertEquals(listOf("a.txt.gz.disable", "b.txt"), names())
+    }
+
+    private fun gunzip(file: File) = GZIPInputStream(file.inputStream()).bufferedReader().use { it.readText() }
 
 }

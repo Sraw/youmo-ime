@@ -168,11 +168,20 @@ keeps its own, the model they follow.
   or no Mandarin readings), more words than `DictionaryCompiler.MAX_WORDS` (`TOO_MANY`). `analyse`'s
   `write` callback gets every word read with its pinyin, in the one form the sources keep (`text pin'yin weight`);
   the app writes them to the file `PinyinDictManager.Prepared.lines`, which the import reads. The app (`PinyinDictManager.prepare`/
-  `importPrepared`) keeps the texts in `dictionaries/` as sources only and compiles those on into
+  `importPrepared`) keeps the texts in `dictionaries/` gzip-compressed (`<name>.txt.gz`, off
+  `<name>.txt.gz.disable`; rime-frost 84.5 MiB of text to 23.6) as sources only and compiles those on into
   `merged.ymd` (`MergedDictionary`, `DictionaryCompiler`) on one thread for the process; the engine
   maps that file and never parses the texts (0.3.1 did, at each focus, and ran out of heap on 1.9M
-  words). A stamp of the sources' names, sizes and times says when to compile again; a stale file is
-  used until the new one is made, then the engine is reloaded. The user dictionary holds at most
+  words). `merged.ymd` is a cache of the sources: out of backups, free to change layout (bump
+  `DictionaryFile.VERSION` and `MergedDictionary.REVISION`), made again from them. A stamp of the
+  sources' names, sizes and times says when to compile again; a stale file is
+  used until the new one is made, then the engine is reloaded. A plain `<name>.txt[.disable]` (0.3.1
+  and 0.3.2 kept them so, a restored older backup brings them) is converted to `.gz` on the compile
+  thread at the top of the next compile, shown as its first stage (`MergedDictionary.Step.CONVERT`);
+  a `.txt` is always whole, so it is converted again over a same-name `.gz` (a kill between the
+  rename and the delete, an older backup restored over this build's files). Every create, rename and
+  delete of a source is under one lock (`ImportedDictionaries`'), gzip and deflate outside it into a
+  `.tmp`; see [pitfalls](pitfalls.md) for its order. The user dictionary holds at most
   100,000 imported words in total (`USER_MAX_WORDS`): the file's words plus those of earlier
   imports still kept (`ImportLayer.Batch.left`), as its imported words are in the heap. A file
   refused for the base (`Refused`, imported line by line) counts its non-blank, non-comment lines.
@@ -610,6 +619,25 @@ place. Rules that keep old files and old users working:
   them: a later build must not put kind ids in rows it expects a backup to carry. `TABLE_WORD` rows
   are a mirror of `<im>.user` (`TableUser`, which serves a table's saved phrases and tells pinyin
   through `learnSaved`): converted, merged, backed up and kept by 清空, read by nothing yet. An older build's PICKED records are kept through compaction until converted (review R11 F2649).
+- **`merged.ymd`, version 2** (`DictionaryFile`, `DictionaryCompiler`; `dev/design/dict-size.md` §3).
+  Trie words come in the nodes' breadth-first order, so a node's words are the run between two
+  entries of `WORD_START` (nodes + 1); a trie word's syllables are its node's path, read walking up
+  (`syllables`, `length`: for a chosen or learned word, never per arc), and only the words kept
+  apart for the base (from `trieWords` up) store theirs (`SYL_START`/`SYLLABLES`). Scores are u16
+  codes into `SCORE_BOOK`, the file's distinct scores when there are at most 65,536 (exact; frost
+  has 9,014; meta `scores` = `book`), else linear over [floor, 0] with the best exactly 0f (`linear`,
+  the book holding the floor); −0f is written 0f. The text index is `TEXT_PLACES` (places sorted by
+  their text's slot, `BitPacked`) and `TEXT_BUCKETS` (each slot's start, `EliasFano`): `find` walks the
+  trie by syllables, then a bucket for places past `trieWords`. `TEXT_START`, `FIRST_CHILD`,
+  `NODE_SYLLABLE`, `WORD_START` are `BitPacked` at per-file widths. frost: 105.6 MiB (v1) to 49.4.
+  `checkStructure` holds the BFS invariant (`firstChild[i] > i`); a walk up stops below the root as
+  well, so a damaged file read before its check (`verify = false`) gives a short reading, never a
+  walk that does not end. A text's learned reading (`UserModel.mergedEntryOf`) is its best-scored
+  trie place; on a tie the lowest place wins: the shortest reading, then the lowest syllable ids
+  (v1 took the highest; neither is wrong, words of an unweighted source all tie). A v1 file is refused
+  (`format version 1, this build reads 2`), deleted and compiled again; a table's `.ymc`
+  (`CodedIndex`) is keyed by the file's stamp and is rebuilt with it. Per-key cost is gated by
+  `ime-eval pinyin --merged <source.txt> [--stale]` ([testing](testing.md)).
 - **Untrusted input.** Imported dictionaries, safetensors headers, libime files and zstd frames come
   from outside: every size is checked before allocating, nesting is bounded (`Json.MAX_DEPTH`),
   and a failure says what did not fit. Keep it so.

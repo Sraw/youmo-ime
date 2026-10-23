@@ -4,7 +4,9 @@
  */
 package org.fcitx.fcitx5.android.engine.data
 
+import org.fcitx.fcitx5.android.engine.assertRows
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
 import org.junit.Test
@@ -141,6 +143,20 @@ class EliasFanoTest {
             fail("accepted, expected $reason")
         } catch (e: DataFormatException) {
             assertTrue(e.message, e.message!!.contains(reason))
+        }
+    }
+
+    // the streaming writer's misuse refused as it happens, not a table read wrong later (review F3614)
+    @Test
+    fun theWriterRefusesMoreValuesPastItsMaxOrTooFew() {
+        val rows = listOf<Pair<String, (EliasFano.Writer) -> Unit>>(
+            "more than 2 values" to { w -> repeat(3) { w.add(1) } },
+            "value 11 at 0 past 10" to { w -> w.add(11) },
+            "1 of 2 values" to { w -> w.add(1); w.finish() },
+        )
+        assertRows(rows, { it.first }) { (why, misuse) ->
+            val e = assertThrows(IllegalArgumentException::class.java) { misuse(EliasFano.Writer(java.io.ByteArrayOutputStream(), 2, 10)) }
+            assertEquals(why, e.message)
         }
     }
 }

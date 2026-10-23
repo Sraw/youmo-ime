@@ -173,42 +173,79 @@ class EliasFano(buffer: ByteBuffer) {
         /** [values], which must not decrease, in this form. */
         fun encode(values: IntArray): ByteArray {
             val size = values.size
-            for (i in values.indices) {
-                require(values[i] >= 0) { "negative value ${values[i]} at $i" }
-                require(i == 0 || values[i] >= values[i - 1]) { "decreasing at $i" }
-            }
-            val max = if (size == 0) 0 else values[size - 1]
-            // the low width that makes the whole smallest: about log2 of the mean gap
-            val lowWidth = if (size == 0) 0 else (63 - java.lang.Long.numberOfLeadingZeros(maxOf(1L, (max.toLong() + 1) / size)))
+            val max = values.maxOrNull() ?: 0
+            val out = java.io.ByteArrayOutputStream()
+            Writer(out, size, max.coerceAtLeast(0)).apply { values.forEach(::add) }.finish()
+            return out.toByteArray()
+        }
+    }
+
+    /**
+     * [size] values, which must not decrease and end at most at [max], written to [out] as they
+     * come, the layout [EliasFano] reads: the low bits streamed, the upper bits and samples (some 2
+     * bits a value) held till [finish]. For a table too large to build in the heap first (a
+     * dictionary the user merged, DictionaryCompiler).
+     */
+    class Writer(private val out: java.io.OutputStream, private val size: Int, max: Int) {
+        // the low width that makes the whole smallest: about log2 of the mean gap
+        private val lowWidth = if (size == 0) 0 else (63 - java.lang.Long.numberOfLeadingZeros(maxOf(1L, (max.toLong() + 1) / size)))
+        private val upper: LongArray
+        private val maxValue = max
+        private val samples = IntArray(samplesFor(size))
+        private var count = 0
+        private var previous = 0
+        private var lowUsed = 0
+        private var lowWord = 0L
+
+        init {
+            require(size >= 0 && max >= 0) { "$size values up to $max" }
             val upperBits = size.toLong() + (max.toLong() ushr lowWidth) + 1
             require(upperBits <= MAX_UPPER_WORDS * 64L) { "$size values up to $max: bit positions past an int" }
-            val upperWords = ((upperBits + 63) / 64).toInt()
-            val low = LongArray(lowWords(lowWidth, size).toInt())
-            val upper = LongArray(upperWords)
-            val samples = IntArray(samplesFor(size))
-            for (i in 0 until size) {
-                val v = values[i].toLong()
-                if (lowWidth > 0) {
-                    val at = i.toLong() * lowWidth
-                    val w = (at ushr 6).toInt()
-                    val shift = (at and 63).toInt()
-                    val bits = v and ((1L shl lowWidth) - 1)
-                    low[w] = low[w] or (bits shl shift)
-                    if (shift + lowWidth > 64) low[w + 1] = low[w + 1] or (bits ushr (64 - shift))
+            upper = LongArray(((upperBits + 63) / 64).toInt())
+            writeInt(lowWidth)
+            writeInt(size)
+            writeInt(upper.size)
+            writeInt(samples.size)
+        }
+
+        fun add(value: Int) {
+            require(count < size) { "more than $size values" }
+            require(value >= 0) { "negative value $value at $count" }
+            require(value <= maxValue) { "value $value at $count past $maxValue" }
+            require(count == 0 || value >= previous) { "decreasing at $count" }
+            previous = value
+            val v = value.toLong()
+            if (lowWidth > 0) {
+                // packed as BitPacked packs them, without its header
+                val bits = v and ((1L shl lowWidth) - 1)
+                lowWord = lowWord or (bits shl lowUsed)
+                lowUsed += lowWidth
+                if (lowUsed >= 64) {
+                    writeLong(lowWord)
+                    lowUsed -= 64
+                    lowWord = if (lowUsed == 0) 0L else bits ushr (lowWidth - lowUsed)
                 }
-                val bit = (v ushr lowWidth) + i
-                upper[(bit ushr 6).toInt()] = upper[(bit ushr 6).toInt()] or (1L shl (bit and 63).toInt())
-                if (i % SAMPLE == 0) samples[i / SAMPLE] = bit.toInt()
             }
-            val out = LittleEndianOutput(HEADER_BYTES + (low.size + upper.size) * 8 + samples.size * 4)
-            out.writeInt(lowWidth)
-            out.writeInt(size)
-            out.writeInt(upperWords)
-            out.writeInt(samples.size)
-            low.forEach(out::writeLong)
-            upper.forEach(out::writeLong)
-            samples.forEach(out::writeInt)
-            return out.toByteArray()
+            val bit = (v ushr lowWidth) + count
+            upper[(bit ushr 6).toInt()] = upper[(bit ushr 6).toInt()] or (1L shl (bit and 63).toInt())
+            if (count % SAMPLE == 0) samples[count / SAMPLE] = bit.toInt()
+            count++
+        }
+
+        fun finish() {
+            require(count == size) { "$count of $size values" }
+            if (lowUsed > 0) writeLong(lowWord)
+            lowUsed = 0
+            upper.forEach(::writeLong)
+            samples.forEach(::writeInt)
+        }
+
+        private fun writeInt(v: Int) {
+            for (i in 0 until 4) out.write(v ushr (8 * i))
+        }
+
+        private fun writeLong(v: Long) {
+            for (i in 0 until 8) out.write((v ushr (8 * i)).toInt())
         }
     }
 }

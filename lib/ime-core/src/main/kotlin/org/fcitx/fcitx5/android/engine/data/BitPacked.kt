@@ -100,20 +100,54 @@ class BitPacked(buffer: ByteBuffer) {
                 if (v > max) max = v
             }
             val width = widthFor(max)
-            val words = LongArray(words(width, size).toInt())
-            for (i in 0 until size) {
-                val bit = i.toLong() * width
-                val w = (bit ushr 6).toInt()
-                val shift = (bit and 63).toInt()
-                val v = value(i).toLong()
-                words[w] = words[w] or (v shl shift)
-                if (shift + width > 64) words[w + 1] = words[w + 1] or (v ushr (64 - shift))
-            }
-            val out = LittleEndianOutput(byteSize(width, size).toInt())
-            out.writeInt(width)
-            out.writeInt(size)
-            words.forEach(out::writeLong)
+            val out = java.io.ByteArrayOutputStream(byteSize(width, size).toInt())
+            Writer(out, width, size).apply { for (i in 0 until size) add(value(i)) }.finish()
             return out.toByteArray()
+        }
+    }
+
+    /**
+     * [size] values of [width] bits written to [out] as they come, the layout [BitPacked] reads:
+     * for a table too large to build in the heap first (a dictionary the user merged, DictionaryCompiler).
+     */
+    class Writer(private val out: java.io.OutputStream, private val width: Int, private val size: Int) {
+        private var bits = 0L
+        private var used = 0
+        private var count = 0
+
+        init {
+            require(width in 1..MAX_WIDTH && size >= 0) { "$size values of $width bits" }
+            writeInt(width)
+            writeInt(size)
+        }
+
+        fun add(value: Int) {
+            require(value >= 0 && value < 1L shl width) { "value $value at $count of $width bits" }
+            require(count < size) { "more than $size values" }
+            count++
+            bits = bits or (value.toLong() shl used)
+            used += width
+            if (used >= 64) {
+                writeLong(bits)
+                used -= 64
+                // the high bits of a value straddling two words begin the next
+                bits = if (used == 0) 0L else value.toLong() ushr (width - used)
+            }
+        }
+
+        /** The last word written: every value added. */
+        fun finish() {
+            require(count == size) { "$count of $size values" }
+            if (used > 0) writeLong(bits)
+            used = 0
+        }
+
+        private fun writeInt(v: Int) {
+            for (i in 0 until 4) out.write(v ushr (8 * i))
+        }
+
+        private fun writeLong(v: Long) {
+            for (i in 0 until 8) out.write((v ushr (8 * i)).toInt())
         }
     }
 }

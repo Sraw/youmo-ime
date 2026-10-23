@@ -52,7 +52,6 @@ import org.fcitx.fcitx5.android.data.pinyin.dict.TextDictionary
 import org.fcitx.fcitx5.android.engine.host.Engines
 import org.fcitx.fcitx5.android.engine.host.ImportLayer
 import org.fcitx.fcitx5.android.engine.learn.backup.LearnBackup
-import org.fcitx.fcitx5.android.engine.user.DictionaryCompiler
 import org.fcitx.fcitx5.android.engine.user.DictionaryFormat
 import org.fcitx.fcitx5.android.engine.user.ImportFiles
 import org.fcitx.fcitx5.android.engine.user.WordListFiles
@@ -110,7 +109,18 @@ class PinyinDictionaryFragment : PaddingPreferenceFragment() {
     /** whether this view told of the dictionaries put aside unread: the list is built again after each change */
     private var toldUnread = false
 
-    private class Listed(val dictionary: TextDictionary, val words: Int)
+    // [left]: why its words are not (all) in the merged ones (F3592, F3593, F3645)
+    private class Listed(val dictionary: TextDictionary, val words: Int, val left: Left = Left.NONE)
+
+    private enum class Left {
+        NONE,
+
+        // its file could not be read: a text, or a gzip damaged (what was read before the damage kept)
+        UNREADABLE,
+
+        // a text not converted for want of space: nothing wrong with it, not to be deleted
+        UNCONVERTED,
+    }
 
     // what says a compile is under way, and the rows of the dictionaries it upgrades: told its percent as it goes
     private var status: Preference? = null
@@ -182,7 +192,17 @@ class PinyinDictionaryFragment : PaddingPreferenceFragment() {
             changes.awaitMade()
             val listed = withContext(Dispatchers.IO) {
                 val dictionaries = PinyinDictManager.listDictionaries()
-                dictionaries.zip(wordCounts.of(dictionaries)) { dictionary, words -> Listed(dictionary, words) }
+                val dir = PinyinDictManager.pinyinDicDir
+                val unreadable = MergedDictionary.unreadable(dir)
+                val unconverted = MergedDictionary.unconverted(dir)
+                dictionaries.zip(wordCounts.of(dictionaries)) { dictionary, words ->
+                    val left = when (dictionary.name) {
+                        in unreadable -> Left.UNREADABLE
+                        in unconverted -> Left.UNCONVERTED
+                        else -> Left.NONE
+                    }
+                    Listed(dictionary, words, left)
+                }
             }
             // read after the list: listing it runs the migration when the engine has not yet
             val unread = if (tell) withContext(Dispatchers.IO) { PinyinDictManager.unread() } else emptyList()
@@ -281,7 +301,14 @@ class PinyinDictionaryFragment : PaddingPreferenceFragment() {
         val dictionary = item.dictionary
         title = dictionary.name
         val state = getString(if (dictionary.isEnabled) R.string.dict_on else R.string.dict_off)
-        summary = getString(R.string.dict_summary, state, resources.getQuantityString(R.plurals.word_count, item.words, item.words))
+        val count = resources.getQuantityString(R.plurals.word_count, item.words, item.words)
+        val words = when (item.left) {
+            // a damaged gzip's words read before the damage are in, all of them if only its end is bad (F3648)
+            Left.UNREADABLE -> if (item.words > 0) getString(R.string.dict_damaged, count) else getString(R.string.dict_unreadable)
+            Left.UNCONVERTED -> getString(R.string.dict_unconverted)
+            Left.NONE -> count
+        }
+        summary = getString(R.string.dict_summary, state, words)
         isIconSpaceReserved = false
         setOnPreferenceClickListener { act(item); true }
     }
@@ -551,10 +578,11 @@ class PinyinDictionaryFragment : PaddingPreferenceFragment() {
     }
 
     @StringRes
-    private fun stageText(stage: DictionaryCompiler.Stage) = when (stage) {
-        DictionaryCompiler.Stage.READ -> R.string.dict_progress_compiling
-        DictionaryCompiler.Stage.MERGE -> R.string.dict_progress_merging
-        DictionaryCompiler.Stage.WRITE -> R.string.dict_progress_writing
+    private fun stageText(stage: MergedDictionary.Step) = when (stage) {
+        MergedDictionary.Step.CONVERT -> R.string.dict_progress_converting
+        MergedDictionary.Step.READ -> R.string.dict_progress_compiling
+        MergedDictionary.Step.MERGE -> R.string.dict_progress_merging
+        MergedDictionary.Step.WRITE -> R.string.dict_progress_writing
     }
 
     /**

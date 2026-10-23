@@ -23,6 +23,7 @@ import org.fcitx.fcitx5.android.engine.rerank.SentenceRefiner
 import org.fcitx.fcitx5.android.engine.session.CoarseCandidates
 import org.fcitx.fcitx5.android.engine.session.PinyinSession
 import org.fcitx.fcitx5.android.engine.session.endsOnSyllable
+import org.fcitx.fcitx5.android.engine.user.DictionaryFile
 import org.fcitx.fcitx5.android.engine.user.UserModel
 import org.fcitx.fcitx5.android.engine.user.UserScorer
 import org.fcitx.fcitx5.android.engine.user.WordPack
@@ -54,6 +55,10 @@ class PinyinRun(
      * picking, where and for as long as [PinyinSession] lets it; not timed.
      */
     private val refiner: (() -> SentenceRefiner)? = null,
+    /** The dictionaries the user merged, compiled: their words offered as the app's user model offers them. */
+    merged: DictionaryFile? = null,
+    /** [merged] compiled against another base dictionary, as after an app update till the recompile. */
+    mergedStale: Boolean = false,
 ) {
     // the user model is read only when scoring, by then made
     private val prior: LayerPrior? = layers?.let { spec ->
@@ -64,9 +69,15 @@ class PinyinRun(
         }
         LayerPrior.parse(data.layers, spec, listOfNotNull(pack?.layer), extra)
     }
-    private val user: UserModel? = pack?.let { p ->
-        val layer = prior?.layer(p.layer) ?: 1
-        UserModel(data.dictionary, data.vocabulary, index = data.wordIndex).also { u -> p.words.forEach { u.list(it.entry, it.score, layer, data.model.vocabularySize) } }
+    private val user: UserModel? = if (pack == null && merged == null) {
+        null
+    } else {
+        UserModel(data.dictionary, data.vocabulary, index = data.wordIndex, merged = merged, mergedStale = mergedStale).also { u ->
+            pack?.let { p ->
+                val layer = prior?.layer(p.layer) ?: 1
+                p.words.forEach { u.list(it.entry, it.score, layer, data.model.vocabularySize) }
+            }
+        }
     }
     // as the app's session has them
     private val coarse = CoarseWords.of({ data.wordIndex.find(it) })
