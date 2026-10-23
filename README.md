@@ -6,7 +6,7 @@
 
 <p align="center">
 <a href="https://github.com/Sraw/youmo-ime/releases/latest"><img src="https://img.shields.io/github/v/release/Sraw/youmo-ime?label=release" alt="最新版本 / latest release"></a>
-<a href="https://github.com/Sraw/youmo-ime/releases/latest"><img src="https://img.shields.io/github/downloads/Sraw/youmo-ime/latest/total?label=downloads" alt="这一版的下载数 / downloads of this release"></a>
+<a href="https://github.com/Sraw/youmo-ime/releases"><img src="https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2FSraw%2Fyoumo-ime%2Fbadges%2Fdownloads.json" alt="累计下载数（所有版本的 APK）/ downloads of every release's APKs"></a>
 <a href="https://github.com/Sraw/youmo-ime/actions/workflows/unit_test.yml"><img src="https://github.com/Sraw/youmo-ime/actions/workflows/unit_test.yml/badge.svg?branch=main" alt="Unit Tests"></a>
 <a href="LICENSE"><img src="https://img.shields.io/badge/license-LGPL--2.1--or--later-blue" alt="LGPL-2.1-or-later"></a>
 <img src="https://img.shields.io/badge/Android-10%2B%20arm64-3DDC84?logo=android&logoColor=white" alt="Android 10+ arm64">

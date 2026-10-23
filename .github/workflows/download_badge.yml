@@ -1,0 +1,41 @@
+name: Download Badge
+
+# The README's download count: every app release's APKs (v* tags) added up. shields.io's own
+# total would also count the data releases (engine-data, sentence-models, …), which builds and CI
+# fetch on every run, so it would mostly count machines. The count goes to a JSON file on the
+# `badges` branch, one commit force-pushed each time, which the badge reads through shields.io's
+# endpoint badge.
+
+on:
+  schedule:
+    - cron: "41 */6 * * *"
+  release:
+    types:
+      - published
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  badge:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Count and publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          n=$(gh api "repos/$GITHUB_REPOSITORY/releases" --paginate \
+            --jq '.[] | select(.draft | not) | select(.tag_name | startswith("v"))
+                  | .assets[] | select(.name | endswith(".apk")) | .download_count' \
+            | awk '{ s += $1 } END { print s + 0 }')
+          echo "app downloads: $n"
+          mkdir badges && cd badges
+          printf '{"schemaVersion":1,"label":"downloads","message":"%s","color":"blue"}\n' "$n" > downloads.json
+          git init -q -b badges
+          git add downloads.json
+          git -c user.name="github-actions[bot]" \
+              -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+              commit -q -m "Download count: $n"
+          git push -q --force "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" HEAD:badges
