@@ -4,7 +4,6 @@
  */
 package org.fcitx.fcitx5.android.data.prefs
 
-import android.os.Build
 import android.os.Bundle
 import androidx.annotation.CallSuper
 import androidx.lifecycle.lifecycleScope
@@ -40,9 +39,7 @@ abstract class ManagedPreferenceFragment(private val preferenceProvider: Managed
     }
 
     override fun onStop() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-            AppPrefs.getInstance().syncToDeviceEncryptedStorage()
-        }
+        AppPrefs.getInstance().syncToDeviceEncryptedStorage()
         super.onStop()
     }
 

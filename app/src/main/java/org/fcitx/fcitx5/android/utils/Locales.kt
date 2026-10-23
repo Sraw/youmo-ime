@@ -40,14 +40,8 @@ object Locales {
         private set
 
     fun onLocaleChange(configuration: Configuration) {
-        val system = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-            val localeList = configuration.locales
-            (0..<localeList.size()).map { localeList[it] }
-        } else {
-            @Suppress("DEPRECATION")
-            val locale = configuration.locale
-            listOf(locale)
-        }
+        val localeList = configuration.locales
+        val system = (0..<localeList.size()).map { localeList[it] }
         // fcitx translates its own strings too: from Android 13 on the configuration has the app's
         // language, below that only appcompat and the app's prefs know it
         val app = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {

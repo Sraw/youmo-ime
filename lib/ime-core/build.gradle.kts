@@ -45,9 +45,9 @@ animalsniffer {
 }
 
 dependencies {
-    // minSdk 23 plus the java.* APIs that the app's core library desugaring (desugar_jdk_libs
-    // 2.x) backports; keep in step with minSdk and that dependency
-    signature(variantOf(libs.gummyBears.api23) { classifier("coreLib2"); artifactType("signature") })
+    // minSdk 29; keep in step with minSdk. gummy-bears publishes no coreLib2 (desugared java.*)
+    // variant for API 29, so APIs only desugaring would supply are rejected here too
+    signature(variantOf(libs.gummyBears.api29) { artifactType("signature") })
     testImplementation(libs.junit)
 }
 

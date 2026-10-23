@@ -11,7 +11,7 @@ any change to behaviour or settings.
 
 - `lib/ime-core` — plain JVM module (`java-library`, no Android on the classpath). **Decision logic
   belongs here**: cursor/composing tracking, gesture recognition, key policy, state machines.
-  Written so it is testable in milliseconds. Guarded by animal-sniffer (Android API 23 surface)
+  Written so it is testable in milliseconds. Guarded by animal-sniffer (Android API 29 surface)
   and Kover floors (90% overall, 60% per package).
 - `app` — Android glue: Views, the `InputMethodService`, preferences, file-backed managers,
   JNI-facing `core/`. Keep it thin: read prefs / Android state, pass *values* into ime-core

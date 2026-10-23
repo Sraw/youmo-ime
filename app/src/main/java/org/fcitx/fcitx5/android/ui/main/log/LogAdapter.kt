@@ -5,7 +5,6 @@
 package org.fcitx.fcitx5.android.ui.main.log
 
 import android.graphics.Typeface
-import android.os.Build
 import android.view.ViewGroup
 import android.view.ViewGroup.MarginLayoutParams
 import android.view.textclassifier.TextClassifier
@@ -39,9 +38,7 @@ class LogAdapter(private val entries: ArrayList<CharSequence> = ArrayList()) :
         parent.textView {
             textSize = 12f
             typeface = Typeface.MONOSPACE
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                setTextClassifier(TextClassifier.NO_OP)
-            }
+            setTextClassifier(TextClassifier.NO_OP)
             layoutParams = MarginLayoutParams(wrapContent, wrapContent).apply {
                 marginStart = dp(4)
                 marginEnd = dp(4)

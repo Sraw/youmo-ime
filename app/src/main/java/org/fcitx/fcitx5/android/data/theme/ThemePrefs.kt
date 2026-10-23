@@ -211,7 +211,7 @@ class ThemePrefs(sharedPreferences: SharedPreferences) :
         enumList(
             R.string.navbar_background,
             "navbar_background",
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) NavbarBackground.Full else NavbarBackground.ColorOnly,
+            NavbarBackground.Full,
             // 35+ forces edge to edge
             enableUiOn = { Build.VERSION.SDK_INT < Build.VERSION_CODES.VANILLA_ICE_CREAM }
         )

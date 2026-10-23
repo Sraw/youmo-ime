@@ -53,18 +53,8 @@ interface InputEditor {
      *
      * @param inCodePoints delete whole code points rather than UTF-16 units, so one press
      * removes a complete emoji instead of half a surrogate pair.
-     * @param composingBefore units of composing text before the selection, i.e. how far before
-     * the cursor the editor actually starts deleting. The caller knows the composing region; an
-     * editor without a native code-point deletion needs it to measure from the right place.
-     * @param composingAfter likewise after the selection
      */
-    fun deleteSurroundingText(
-        before: Int,
-        after: Int,
-        inCodePoints: Boolean,
-        composingBefore: Int = 0,
-        composingAfter: Int = 0,
-    )
+    fun deleteSurroundingText(before: Int, after: Int, inCodePoints: Boolean)
 
     /** Groups the calls in [block] so the editor sees one atomic change. */
     fun batchEdit(block: () -> Unit)

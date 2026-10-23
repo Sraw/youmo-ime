@@ -5,7 +5,6 @@
 package org.fcitx.fcitx5.android.input.status
 
 import android.app.AlertDialog
-import android.os.Build
 import android.view.View
 import android.widget.PopupMenu
 import androidx.annotation.StringRes
@@ -111,7 +110,7 @@ class StatusAreaWindow : InputWindow.ExtendedInputWindow<StatusAreaWindow>(),
                         val popup = PopupMenu(context, view)
                         val menu = popup.menu
                         val hasDivider =
-                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P && !DeviceUtil.isHMOS && !DeviceUtil.isHonorMagicOS) {
+                            if (!DeviceUtil.isHMOS && !DeviceUtil.isHonorMagicOS) {
                                 menu.setGroupDividerEnabled(true)
                                 true
                             } else {

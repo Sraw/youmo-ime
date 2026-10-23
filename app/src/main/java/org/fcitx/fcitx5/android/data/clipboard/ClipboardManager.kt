@@ -15,7 +15,6 @@ import android.database.sqlite.SQLiteFullException
 import android.database.sqlite.SQLiteOutOfMemoryException
 import android.database.sqlite.SQLiteReadOnlyDatabaseException
 import android.database.sqlite.SQLiteTableLockedException
-import android.os.Build
 import androidx.annotation.Keep
 import androidx.annotation.VisibleForTesting
 import androidx.room.Room
@@ -343,14 +342,12 @@ object ClipboardManager : ClipboardManager.OnPrimaryClipChangedListener,
     }
 
     private var lastClipTimestamp = -1L
-    private var lastClipHash = 0
 
     // duplicates are of a start's clips: a test's app, started again in this process, has its clock started over, while
     // this object keeps the last start's
     @VisibleForTesting
     internal fun resetDuplicateCheck() {
         lastClipTimestamp = -1L
-        lastClipHash = 0
     }
 
     override fun onPrimaryClipChanged() {
@@ -359,17 +356,9 @@ object ClipboardManager : ClipboardManager.OnPrimaryClipChangedListener,
          * skip duplicate ClipData
          * https://developer.android.com/reference/android/content/ClipboardManager.OnPrimaryClipChangedListener#onPrimaryClipChanged()
          */
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val timestamp = clip.description.timestamp
-            if (timestamp == lastClipTimestamp) return
-            lastClipTimestamp = timestamp
-        } else {
-            val timestamp = System.currentTimeMillis()
-            val hash = clip.hashCode()
-            if (timestamp - lastClipTimestamp < 100L && hash == lastClipHash) return
-            lastClipTimestamp = timestamp
-            lastClipHash = hash
-        }
+        val timestamp = clip.description.timestamp
+        if (timestamp == lastClipTimestamp) return
+        lastClipTimestamp = timestamp
         launch {
             mutex.withLock {
                 val entry = ClipboardEntry.fromClipData(clip, ::transform) ?: return@withLock

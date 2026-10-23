@@ -22,8 +22,8 @@ detekt = "2.0.0-alpha.6"
 [libraries]
 android-gradlePlugin = { group = "com.android.tools.build", name = "gradle", version.ref = "androidGradlePlugin" }
 android-desugarJDKLibs = { group = "com.android.tools", name = "desugar_jdk_libs", version = "2.1.5" }
-# Android API 23 (minSdk) plus what desugar_jdk_libs 2.x backports, as an animal-sniffer signature
-gummyBears-api23 = { group = "com.toasttab.android", name = "gummy-bears-api-23", version = "0.15.0" }
+# Android API 29 (minSdk), as an animal-sniffer signature (API 29 has no coreLib2 variant)
+gummyBears-api29 = { group = "com.toasttab.android", name = "gummy-bears-api-29", version = "0.15.0" }
 kotlin-gradlePlugin = { group = "org.jetbrains.kotlin", name = "kotlin-gradle-plugin", version.ref = "kotlin" }
 kotlinx-coroutines = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-android", version.ref = "coroutines" }
 kotlinx-coroutines-test = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-test", version.ref = "coroutines" }

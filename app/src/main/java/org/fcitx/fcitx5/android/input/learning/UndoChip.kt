@@ -5,7 +5,6 @@
 package org.fcitx.fcitx5.android.input.learning
 
 import android.graphics.drawable.GradientDrawable
-import android.os.Build
 import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
@@ -119,11 +118,7 @@ class UndoChip(
         ViewCompat.setAccessibilityPaneTitle(chip, message)
         val shownMs = if (aboveKeys) SAID_MS else SHOWN_MS
         val shown = ctx.getSystemService(AccessibilityManager::class.java)?.let { a ->
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                a.getRecommendedTimeoutMillis(shownMs.toInt(), AccessibilityManager.FLAG_CONTENT_TEXT or AccessibilityManager.FLAG_CONTENT_CONTROLS).toLong()
-            } else {
-                null
-            }
+            a.getRecommendedTimeoutMillis(shownMs.toInt(), AccessibilityManager.FLAG_CONTENT_TEXT or AccessibilityManager.FLAG_CONTENT_CONTROLS).toLong()
         } ?: shownMs
         anchor.postDelayed(dismiss, shown)
     }

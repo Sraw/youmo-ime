@@ -47,7 +47,7 @@ open class InputEditorContractTest {
     }
 
     private class Fake(text: String, selStart: Int, selEnd: Int) : Subject {
-        private val fake = FakeEditor(text, selStart, reselectsZeroAfterInsert = Build.VERSION.SDK_INT > 23)
+        private val fake = FakeEditor(text, selStart, reselectsZeroAfterInsert = Build.VERSION.SDK_INT > 29) // run at 29 and 35 only; 30-34 unverified
             .apply { reportSelection(selStart, selEnd) }
         override val editor: InputEditor = fake
         override var returned = mutableListOf<String>()
@@ -220,20 +220,19 @@ open class InputEditorContractTest {
             Scenario("an emoji after", "${wave}a", 0) { editor.deleteSurroundingText(0, 1, true) },
             Scenario("mixed", "x${wave}b$wave", 6) { editor.deleteSurroundingText(3, 0, true) },
             Scenario("more than there is", "a$wave", 3) { editor.deleteSurroundingText(9, 9, true) },
-            // the composing arguments are what EditingSession would pass: how far the
-            // composition sticks out past the selection on each side
+            // the editor widens the deletion by its own composing region
             Scenario("around a composition", "a${wave}bc${wave}d", 4) {
                 editor.setComposingRegion(3, 4)
-                editor.deleteSurroundingText(1, 1, true, composingBefore = 1, composingAfter = 0)
+                editor.deleteSurroundingText(1, 1, true)
             },
             Scenario("a composition before the cursor, an emoji before it", "a${wave}bcde", 7) {
                 editor.setComposingRegion(3, 5)
                 // the editor deletes from the composition's start, 4 units before the cursor
-                editor.deleteSurroundingText(1, 0, true, composingBefore = 4, composingAfter = 0)
+                editor.deleteSurroundingText(1, 0, true)
             },
             Scenario("the cursor inside a composition, emoji on both sides", "${wave}bcd$wave", 3) {
                 editor.setComposingRegion(2, 5)
-                editor.deleteSurroundingText(1, 1, true, composingBefore = 1, composingAfter = 2)
+                editor.deleteSurroundingText(1, 1, true)
             },
             Scenario("a malformed after side refuses the whole deletion", "a${wave}b$high", 4) {
                 editor.deleteSurroundingText(1, 1, true)
@@ -309,14 +308,7 @@ open class InputEditorContractTest {
                         e.editor.deleteSurroundingText(a, b, inCodePoints = false)
                     }
                     6 -> "deleteSurroundingText($a, $b, code points)" to { e: Subject ->
-                        // the composing overhang: a copy of EditingSession.composingOverhang(),
-                        // which is private to ime-core; change the two together
-                        val o = e.outcome(emptyList())
-                        val (s0, s1) = o.selection.let { minOf(it.first, it.second) to maxOf(it.first, it.second) }
-                        val (c0, c1) = o.composing
-                        val before = if (c0 < 0) 0 else (s0 - c0).coerceAtLeast(0)
-                        val after = if (c0 < 0) 0 else (c1 - s1).coerceAtLeast(0)
-                        e.editor.deleteSurroundingText(a, b, inCodePoints = true, before, after)
+                        e.editor.deleteSurroundingText(a, b, inCodePoints = true)
                     }
                     else -> "textBeforeCursor($a)" to { e: Subject ->
                         e.returned += "${e.editor.textBeforeCursor(a.coerceAtLeast(0))}"
@@ -332,11 +324,7 @@ open class InputEditorContractTest {
         run(scenarios)
     }
 
-    /**
-     * The same contract at API 23, the app's minSdk. There is no
-     * `deleteSurroundingTextInCodePoints` below API 24, so [InputConnectionEditor] measures the
-     * code points itself and deletes that many units; this is the only place that path runs.
-     */
-    @Config(sdk = [23])
+    /** The same contract at API 29, the app's minSdk. */
+    @Config(sdk = [29])
     class AtMinSdk : InputEditorContractTest()
 }

@@ -5,7 +5,6 @@
 package org.fcitx.fcitx5.android.ui.main.settings
 
 import android.content.Context
-import android.os.Build
 import android.os.Bundle
 import android.text.InputType
 import android.view.Gravity
@@ -79,9 +78,7 @@ class PopupOverridesFragment : Fragment() {
 
     override fun onStop() {
         // before the first unlock the keyboard reads them from device-protected storage
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-            AppPrefs.getInstance().syncToDeviceEncryptedStorage()
-        }
+        AppPrefs.getInstance().syncToDeviceEncryptedStorage()
         super.onStop()
     }
 

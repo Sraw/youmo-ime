@@ -4,7 +4,6 @@
  */
 package org.fcitx.fcitx5.android.input.clipboard
 
-import android.os.Build
 import android.view.ViewGroup
 import android.widget.PopupMenu
 import androidx.paging.PagingDataAdapter
@@ -119,7 +118,7 @@ abstract class ClipboardAdapter(
                 menu.item(R.string.delete, R.drawable.ic_baseline_delete_24, iconTint) {
                     onDelete(entry.id)
                 }
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && !DeviceUtil.isSamsungOneUI && !DeviceUtil.isFlyme) {
+                if (!DeviceUtil.isSamsungOneUI && !DeviceUtil.isFlyme) {
                     popup.setForceShowIcon(true)
                 }
                 popup.setOnDismissListener {

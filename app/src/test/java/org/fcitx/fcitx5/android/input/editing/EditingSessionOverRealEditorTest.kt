@@ -23,7 +23,7 @@ import org.robolectric.annotation.Config
  * editor's next report as the user moving the cursor.
  *
  * Complements `InputEditorContractTest`, which checks the fake; this checks the session's
- * arithmetic against the real thing, including the API 23 path in [InputConnectionEditor].
+ * arithmetic against the real thing.
  */
 @RunWith(RobolectricTestRunner::class)
 open class EditingSessionOverRealEditorTest {
@@ -187,7 +187,7 @@ open class EditingSessionOverRealEditorTest {
         repeat(300) { n ->
             val initial = text(6)
             val setup = Setup(initial, initial.length)
-            val fake = FakeEditor(initial, initial.length, reselectsZeroAfterInsert = android.os.Build.VERSION.SDK_INT > 23)
+            val fake = FakeEditor(initial, initial.length, reselectsZeroAfterInsert = android.os.Build.VERSION.SDK_INT > 29)
             val twin = EditingSession(fake).apply { selection.resetTo(initial.length) }
             val log = mutableListOf<String>()
             for (step in 0 until random.nextInt(1, 10)) {
@@ -244,7 +244,7 @@ open class EditingSessionOverRealEditorTest {
         assertTrue(failures.take(5).joinToString("\n"), failures.isEmpty())
     }
 
-    /** The same at the app's minSdk, where [InputConnectionEditor] measures code points itself. */
-    @Config(sdk = [23])
+    /** The same at the app's minSdk. */
+    @Config(sdk = [29])
     class AtMinSdk : EditingSessionOverRealEditorTest()
 }

@@ -27,7 +27,7 @@ values into an `ime-core` class, and applies what it returns. The pattern to cop
 arguments, no `AppPrefs`, no `Context`. Measured and deliberately not done: an `ImeHost`
 interface over the service, injecting `AppPrefs` everywhere, a DI framework.
 
-`ime-core` is checked against Android's API 23 surface by animal-sniffer (it runs on the phone),
+`ime-core` is checked against Android's API 29 surface by animal-sniffer (it runs on the phone),
 and held to Kover floors: 90% line coverage overall, 60% per package.
 
 ## Processes and threads

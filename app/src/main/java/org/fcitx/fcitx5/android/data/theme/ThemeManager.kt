@@ -5,9 +5,7 @@
 package org.fcitx.fcitx5.android.data.theme
 
 import android.content.res.Configuration
-import android.os.Build
 import androidx.annotation.Keep
-import androidx.annotation.RequiresApi
 import androidx.core.content.edit
 import androidx.preference.PreferenceManager
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
@@ -150,7 +148,6 @@ object ThemeManager {
         activeTheme = evaluateActiveTheme()
     }
 
-    @RequiresApi(Build.VERSION_CODES.N)
     fun syncToDeviceEncryptedStorage() {
         val ctx = appContext.createDeviceProtectedStorageContext()
         val sp = PreferenceManager.getDefaultSharedPreferences(ctx)

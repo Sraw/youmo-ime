@@ -6,10 +6,5 @@
 package org.fcitx.fcitx5.android.utils
 
 import android.content.ClipData
-import android.os.Build
 
-fun ClipData.timestamp() = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-    description.timestamp
-} else {
-    System.currentTimeMillis()
-}
+fun ClipData.timestamp() = description.timestamp

@@ -5,7 +5,6 @@
 package org.fcitx.fcitx5.android.data
 
 import android.media.AudioManager
-import android.os.Build
 import android.os.VibrationEffect
 import android.provider.Settings
 import android.view.HapticFeedbackConstants
@@ -50,8 +49,7 @@ object InputFeedbacks {
 
     private val vibrator = appContext.vibrator
 
-    private val hasAmplitudeControl =
-        (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) && vibrator.hasAmplitudeControl()
+    private val hasAmplitudeControl = vibrator.hasAmplitudeControl()
 
     fun hapticFeedback(view: View, longPress: Boolean = false, keyUp: Boolean = false) {
         when (hapticOnKeyPress) {
@@ -70,7 +68,7 @@ object InputFeedbacks {
         } else {
             duration = buttonPressVibrationMilliseconds.toLong()
             amplitude = buttonPressVibrationAmplitude
-            hfc = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1 && keyUp) {
+            hfc = if (keyUp) {
                 HapticFeedbackConstants.KEYBOARD_RELEASE
             } else {
                 HapticFeedbackConstants.KEYBOARD_TAP
@@ -85,12 +83,9 @@ object InputFeedbacks {
             // but `view.performHapticFeedback()` with `FLAG_IGNORE_GLOBAL_SETTING` still works
             if (hasAmplitudeControl && amplitude != 0) {
                 vibrator.vibrate(VibrationEffect.createOneShot(duration, amplitude))
-            } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            } else {
                 val ve = VibrationEffect.createOneShot(duration, VibrationEffect.DEFAULT_AMPLITUDE)
                 vibrator.vibrate(ve)
-            } else {
-                @Suppress("DEPRECATION")
-                vibrator.vibrate(duration)
             }
         } else {
             var flags = HapticFeedbackConstants.FLAG_IGNORE_VIEW_SETTING

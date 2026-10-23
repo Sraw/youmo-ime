@@ -249,13 +249,13 @@ class FcitxDataProviderTest {
      */
     @OptIn(ExperimentalCoroutinesApi::class)
     @Test
-    @Config(sdk = [23])
+    @Config(sdk = [29])
     fun aFinishedWriteHasFcitxReadItsConfigAgain() = runTest {
         val fcitx = FakeFcitxConnection(this)
         provider.connection = { fcitx }
         File(root, "config/config").apply { parentFile!!.mkdirs(); writeText("a") }
-        // not through an AutoCloseOutputStream: at SDK 23 it closes the descriptor first, and Robolectric's
-        // shadow, re-entered from the stream it closes, reports that one close twice; a device reports it once
+        // not through an AutoCloseOutputStream: it closes the descriptor first, and Robolectric's
+        // shadow at SDK 29, re-entered from the stream it closes, reports that one close twice; a device reports it once
         provider.openDocument("$rootId/config/config", "wt", null).use { pfd ->
             FileOutputStream(pfd.fileDescriptor).use { it.write("b".toByteArray()) }
         }
@@ -271,7 +271,7 @@ class FcitxDataProviderTest {
      */
     @OptIn(ExperimentalCoroutinesApi::class)
     @Test
-    @Config(sdk = [23])
+    @Config(sdk = [29])
     fun aWriteWhileFcitxStartsIsReadOnceItIsReady() = runTest {
         val fcitx = FakeFcitxConnection(this).apply { api.isReady = false }
         provider.connection = { fcitx }
@@ -287,7 +287,7 @@ class FcitxDataProviderTest {
     /** Files written while fcitx starts are all read by the one reload that waits for it, not one reload each. */
     @OptIn(ExperimentalCoroutinesApi::class)
     @Test
-    @Config(sdk = [23])
+    @Config(sdk = [29])
     fun writesWhileFcitxStartsShareOneReload() = runTest {
         val fake = FakeFcitxConnection(this)
         val ready = CompletableDeferred<Unit>()
@@ -332,7 +332,7 @@ class FcitxDataProviderTest {
     /** A reload cancelled before fcitx was ready (fcitx stopped) leaves the next write a reload of its own. */
     @OptIn(ExperimentalCoroutinesApi::class)
     @Test
-    @Config(sdk = [23])
+    @Config(sdk = [29])
     fun aReloadCancelledBeforeFcitxIsReadyLeavesTheNextWriteItsOwn() = runTest {
         val stopping = CoroutineScope(StandardTestDispatcher(testScheduler) + Job())
         val never = CompletableDeferred<Unit>()
@@ -358,7 +358,7 @@ class FcitxDataProviderTest {
     /** A reload that has read the files and then finishes leaves a newer one, queued meanwhile, waiting alone. */
     @OptIn(ExperimentalCoroutinesApi::class)
     @Test
-    @Config(sdk = [23])
+    @Config(sdk = [29])
     fun aFinishedReloadDoesNotClearTheOneQueuedAfterIt() = runTest {
         val fake = FakeFcitxConnection(this)
         val before = mutableListOf<CompletableDeferred<Unit>>()

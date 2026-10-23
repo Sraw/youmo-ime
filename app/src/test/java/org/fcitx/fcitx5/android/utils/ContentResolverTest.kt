@@ -22,7 +22,7 @@ import org.robolectric.annotation.Config
 
 @RunWith(RobolectricTestRunner::class)
 // minSdk and the pinned SDK, the two ends of the supported range
-@Config(sdk = [23, 35])
+@Config(sdk = [29, 35])
 class ContentResolverTest {
 
     /** A provider that names each document by the uri's `name` parameter: NULL without one. */

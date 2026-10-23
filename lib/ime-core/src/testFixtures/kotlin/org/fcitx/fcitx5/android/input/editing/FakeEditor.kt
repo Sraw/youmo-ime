@@ -22,7 +22,8 @@ class FakeEditor(
     /**
      * `commitText`/`setComposingText` place the cursor in the old text, clamped to it, and let
      * the edit carry it along (read from AOSP's `replaceTextInternal`). Newer versions (seen at
-     * API 35, not at API 23; the exact version was not pinned down) then put it back for
+     * API 35, not at API 29, the minSdk: InputEditorContractTest holds both under Robolectric; 30-34 not
+     * checked) then put it back for
      * `newCursorPosition == 0` at a collapsed cursor, so it ends up before the new text rather
      * than carried after it.
      */
@@ -181,17 +182,9 @@ class FakeEditor(
     /**
      * Deletes around the selection -- widened to take in the composing region, so composing
      * text itself is never deleted -- and never the selection itself.
-     *
-     * The composing arguments are what the caller believes; this editor, like a real one,
-     * works the widening out from its own composing region instead.
+     * Like a real editor, it works the widening out from its own composing region.
      */
-    override fun deleteSurroundingText(
-        before: Int,
-        after: Int,
-        inCodePoints: Boolean,
-        composingBefore: Int,
-        composingAfter: Int,
-    ) {
+    override fun deleteSurroundingText(before: Int, after: Int, inCodePoints: Boolean) {
         calls += "deleteSurroundingText($before, $after, inCodePoints=$inCodePoints)"
         if (!isAvailable) return
         var a = minOf(selectionStart, selectionEnd)

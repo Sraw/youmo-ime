@@ -13,7 +13,6 @@ import android.os.Build
 import android.os.Parcelable
 import android.provider.DocumentsContract
 import android.widget.Toast
-import androidx.annotation.RequiresApi
 import org.fcitx.fcitx5.android.BuildConfig
 import timber.log.Timber
 
@@ -46,7 +45,6 @@ fun Context.openUrl(url: String) {
     }
 }
 
-@RequiresApi(Build.VERSION_CODES.Q)
 fun buildPrimaryStorageIntent(path: String = ""): Intent {
     val initialUri = appContext.storageManager.primaryStorageVolume.createOpenDocumentTreeIntent()
         .parcelable<Uri>(DocumentsContract.EXTRA_INITIAL_URI)!!

@@ -12,9 +12,7 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.content.SharedPreferences
 import android.content.res.Configuration
-import android.os.Build
 import android.os.Process
-import androidx.annotation.RequiresApi
 import androidx.core.content.ContextCompat
 import androidx.core.content.edit
 import androidx.preference.PreferenceManager
@@ -81,7 +79,7 @@ class FcitxApplication : Application() {
         private set
 
     val directBootAwareContext: Context
-        get() = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N && isDirectBootMode) {
+        get() = if (isDirectBootMode) {
             createDeviceProtectedStorageContext()
         } else {
             applicationContext
@@ -91,7 +89,7 @@ class FcitxApplication : Application() {
         super.onCreate()
         // settings screens follow the wallpaper palette on Android 12+; the keyboard has its own themes
         DynamicColors.applyToActivitiesIfAvailable(this)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N && !userManager.isUserUnlocked) {
+        if (!userManager.isUserUnlocked) {
             isDirectBootMode = true
             registerReceiver(unlockReceiver, IntentFilter(Intent.ACTION_USER_UNLOCKED))
         }
@@ -148,8 +146,8 @@ class FcitxApplication : Application() {
         Locales.onLocaleChange(resources.configuration)
         registerReceiver(shutdownReceiver, IntentFilter(Intent.ACTION_SHUTDOWN))
         // the app posts no notifications (and asks for no permission to): an older version's channels go
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) deleteNotificationChannels(notificationManager, sharedPrefs)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N && !isDirectBootMode) {
+        deleteNotificationChannels(notificationManager, sharedPrefs)
+        if (!isDirectBootMode) {
             AppPrefs.getInstance().syncToDeviceEncryptedStorage()
             ThemeManager.syncToDeviceEncryptedStorage()
         }
@@ -193,7 +191,6 @@ class FcitxApplication : Application() {
          * that the list is empty, and asking the system for it is a call on the main thread at every
          * start, the keyboard's too.
          */
-        @RequiresApi(Build.VERSION_CODES.O)
         internal fun deleteNotificationChannels(manager: NotificationManager, prefs: SharedPreferences) {
             if (prefs.getBoolean(NOTIFICATION_CHANNELS_DELETED, false)) return
             manager.notificationChannels.forEach { manager.deleteNotificationChannel(it.id) }

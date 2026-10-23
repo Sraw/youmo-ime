@@ -348,7 +348,7 @@ class EditingSession(
         if (!editor.isAvailable) return
         // after the cursor, or around what is composed, a closing one put in may go too
         if (after > 0 || composing.isNotEmpty()) pairs.forget()
-        val (overhangBefore, overhangAfter) = composingOverhang()
+        val overhangBefore = composingOverhang()
         if (before > 0) {
             // null: malformed text, which the editor refuses to delete at all
             val units = if (inCodePoints) {
@@ -364,18 +364,16 @@ class EditingSession(
                 if (composing.isNotEmpty()) composing.offset(-units)
             }
         }
-        editor.deleteSurroundingText(before, after, inCodePoints, overhangBefore, overhangAfter)
+        editor.deleteSurroundingText(before, after, inCodePoints)
     }
 
     /**
-     * How far the composing region sticks out beyond the selection on each side, in units.
+     * How far the composing region sticks out before the selection, in units.
      * The editor deletes around the union of the two, never the composing text itself.
-     * Copied by the app's InputEditorContractTest.randomSequences: change the two together.
      */
-    private fun composingOverhang(): Pair<Int, Int> {
-        if (composing.isEmpty()) return 0 to 0
-        val sel = selection.latest
-        return (sel.start - composing.start).coerceAtLeast(0) to (composing.end - sel.end).coerceAtLeast(0)
+    private fun composingOverhang(): Int {
+        if (composing.isEmpty()) return 0
+        return (selection.latest.start - composing.start).coerceAtLeast(0)
     }
 
     /**
@@ -446,10 +444,7 @@ class EditingSession(
         val wanted = count * 2 + overhang // enough for every code point to be a surrogate pair
         val text = editor.textBeforeCursor(wanted) ?: return count
         // Shorter than the cursor position allows means the editor held text back, not that
-        // the text starts there; counting what came back would under-predict. (Below API 24,
-        // InputConnectionEditor cannot tell the two apart and measures what came back, so for
-        // such an editor the deletion can fall short of this prediction; the next cursor report
-        // then corrects it.)
+        // the text starts there; counting what came back would under-predict.
         if (text.length < minOf(wanted, cursor)) return count
         return CodePoints.lengthOfLast(text.subSequence(0, text.length - overhang), count)
     }

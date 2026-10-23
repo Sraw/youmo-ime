@@ -42,9 +42,7 @@ class NavigationBarManager {
     }
 
     private fun Window.enforceNavbarContrast(enforced: Boolean) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            isNavigationBarContrastEnforced = enforced
-        }
+        isNavigationBarContrastEnforced = enforced
     }
 
     private fun evaluateWithVirtualKeyboard(window: Window) {

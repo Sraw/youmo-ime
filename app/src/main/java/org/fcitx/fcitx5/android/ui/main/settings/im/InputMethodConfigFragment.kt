@@ -4,7 +4,6 @@
  */
 package org.fcitx.fcitx5.android.ui.main.settings.im
 
-import android.os.Build
 import androidx.preference.PreferenceScreen
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -48,9 +47,7 @@ class InputMethodConfigFragment : FcitxPreferenceFragment() {
 
     override fun onStop() {
         // 连按 and English's auto-caps are the keyboard's: before the first unlock it reads them from device-protected storage
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-            AppPrefs.getInstance().syncToDeviceEncryptedStorage()
-        }
+        AppPrefs.getInstance().syncToDeviceEncryptedStorage()
         super.onStop()
     }
 }

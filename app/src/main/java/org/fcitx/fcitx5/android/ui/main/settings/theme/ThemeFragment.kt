@@ -6,7 +6,6 @@ package org.fcitx.fcitx5.android.ui.main.settings.theme
 
 import android.content.Context
 import android.content.res.Configuration
-import android.os.Build
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
@@ -192,9 +191,7 @@ class ThemeFragment : Fragment() {
     }
 
     override fun onStop() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-            ThemeManager.syncToDeviceEncryptedStorage()
-        }
+        ThemeManager.syncToDeviceEncryptedStorage()
         super.onStop()
     }
 

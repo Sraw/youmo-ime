@@ -6,7 +6,6 @@ package org.fcitx.fcitx5.android.ui.main.settings
 
 import android.content.Context
 import android.content.res.TypedArray
-import android.os.Build
 import android.text.InputType
 import android.text.method.DigitsKeyListener
 import androidx.preference.EditTextPreference
@@ -51,12 +50,7 @@ class EditTextIntPreference(context: Context) : EditTextPreference(context) {
         setOnBindEditTextListener {
             it.setText(textForValue())
             it.inputType = InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_FLAG_DECIMAL
-            it.keyListener = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                DigitsKeyListener.getInstance(Locale.ROOT, min < 0, false)
-            } else {
-                @Suppress("DEPRECATION")
-                DigitsKeyListener.getInstance(min < 0, false)
-            }
+            it.keyListener = DigitsKeyListener.getInstance(Locale.ROOT, min < 0, false)
         }
     }
 

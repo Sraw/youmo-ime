@@ -5,7 +5,6 @@
 package org.fcitx.fcitx5.android.core.data
 
 import android.content.res.AssetManager
-import android.os.Build
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import org.fcitx.fcitx5.android.BuildConfig
@@ -37,15 +36,10 @@ object DataManager {
         return json.encodeToString(descriptor)
     }
 
-    // If Android version supports direct boot, we put the hierarchy in device encrypted storage
-    // instead of credential encrypted storage so that data can be accessed before user unlock.
+    // The hierarchy is in device encrypted storage instead of credential encrypted storage so
+    // that data can be accessed before user unlock.
     // The backup rules (res/xml) leave it out by these domains, device_root and root: move them along
-    val dataDir: File = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-        Timber.d("Using device protected storage")
-        appContext.createDeviceProtectedStorageContext().dataDir
-    } else {
-        File(appContext.applicationInfo.dataDir)
-    }
+    val dataDir: File = appContext.createDeviceProtectedStorageContext().dataDir
 
     private fun AssetManager.getDataDescriptor(): DataDescriptor {
         return open(BuildConfig.DATA_DESCRIPTOR_NAME)
@@ -84,16 +78,6 @@ object DataManager {
         // save the new hierarchy as the data descriptor to be used in the next run
         destDescriptorFile.bufferedWriter().use {
             it.write(serializeDataDescriptor(DataHierarchy.installed(shipped)))
-        }
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-            // remove old assets from credential encrypted storage
-            val oldDataDir = appContext.dataDir
-            val oldDataDescriptor = oldDataDir.resolve(BuildConfig.DATA_DESCRIPTOR_NAME)
-            if (oldDataDescriptor.exists()) {
-                oldDataDescriptor.delete()
-                oldDataDir.resolve("README.md").delete()
-                oldDataDir.resolve("usr").deleteRecursively()
-            }
         }
         Timber.d("Synced")
     }

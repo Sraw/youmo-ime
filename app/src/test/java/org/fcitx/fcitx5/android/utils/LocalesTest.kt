@@ -75,8 +75,8 @@ class LocalesTest {
     }
 
     @Test
-    // Android 6: the configuration's one locale, and the language picked, as each start reads them
-    @Config(sdk = [23], application = FcitxApplication::class)
+    // Android 10: the configuration's one locale, and the language picked, as each start reads them
+    @Config(sdk = [29], application = FcitxApplication::class)
     fun aLanguagePickedInTheAppComesFirstBeforeAndroid13() {
         // the keyboard starts before any activity: appcompat does not know it yet, the app's preferences do
         val picked = AppPrefs.getInstance().internal.appLanguage
@@ -94,7 +94,7 @@ class LocalesTest {
     }
 
     @Test
-    @Config(sdk = [23], application = FcitxApplication::class)
+    @Config(sdk = [29], application = FcitxApplication::class)
     fun aLanguagePickedInTheAppIsFcitxsAtOnceAndThePhonesAgainWhenItIsPicked() {
         @Suppress("DEPRECATION")
         val phone = appContext.resources.configuration.locale
@@ -129,13 +129,13 @@ class LocalesTest {
 
     // picked(): below Android 13 appcompat's pick, else the app's copy; from 13 on the system's alone
     @Test
-    @Config(sdk = [23], application = FcitxApplication::class)
+    @Config(sdk = [29], application = FcitxApplication::class)
     fun nothingPickedBeforeAndroid13IsThePhonesLanguages() {
         assertEquals("", Locales.picked(appContext).toLanguageTags())
     }
 
     @Test
-    @Config(sdk = [23], application = FcitxApplication::class)
+    @Config(sdk = [29], application = FcitxApplication::class)
     fun theAppsCopyStandsInBeforeAndroid13UntilAppcompatKnowsThePick() {
         val copy = AppPrefs.getInstance().internal.appLanguage
         copy.setValue("zh-TW")
@@ -147,7 +147,7 @@ class LocalesTest {
     }
 
     @Test
-    @Config(sdk = [23], application = FcitxApplication::class)
+    @Config(sdk = [29], application = FcitxApplication::class)
     fun appcompatsPickComesBeforeTheAppsCopyBeforeAndroid13() {
         val copy = AppPrefs.getInstance().internal.appLanguage
         copy.setValue("zh-TW")

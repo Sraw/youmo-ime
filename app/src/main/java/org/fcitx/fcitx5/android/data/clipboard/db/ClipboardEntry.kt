@@ -46,11 +46,7 @@ data class ClipboardEntry(
             // TODO: handle multiple items (when does this happen?)
             val item = clipData.getItemAt(0) ?: return null
             val str = item.text?.toString() ?: return null
-            val sensitive = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-                desc.extras?.getBoolean(IS_SENSITIVE) ?: false
-            } else {
-                false
-            }
+            val sensitive = desc.extras?.getBoolean(IS_SENSITIVE) ?: false
             return ClipboardEntry(
                 text = if (transformer != null) transformer(str) else str,
                 timestamp = clipData.timestamp(),

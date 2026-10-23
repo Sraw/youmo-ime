@@ -9,7 +9,6 @@ import android.graphics.Typeface
 import android.graphics.drawable.ShapeDrawable
 import android.graphics.drawable.shapes.OvalShape
 import android.icu.text.BreakIterator
-import android.os.Build
 import android.util.TypedValue
 import android.view.View
 import android.view.ViewGroup
@@ -53,12 +52,8 @@ class StatusAreaEntryUi(override val ctx: Context, private val theme: Theme) : U
     val textIcon = view(::AutoScaleTextView) {
         setTextSize(TypedValue.COMPLEX_UNIT_DIP, 20f)
         // keep original typeface, apply textStyle only
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-            // 600 = Semi Bold, 700 = Bold which is too heavy
-            typeface = Typeface.create(typeface, 600, false)
-        } else {
-            setTypeface(typeface, Typeface.BOLD)
-        }
+        // 600 = Semi Bold, 700 = Bold which is too heavy
+        typeface = Typeface.create(typeface, 600, false)
     }
 
     val label = textView {
@@ -114,12 +109,8 @@ class StatusAreaEntryUi(override val ctx: Context, private val theme: Theme) : U
 
     private fun getFirstCharacter(s: String): String {
         if (s.isEmpty()) return ""
-        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-            val iterator = BreakIterator.getCharacterInstance()
-            iterator.setText(s)
-            s.substring(iterator.first(), iterator.next())
-        } else {
-            s.substring(0, s.offsetByCodePoints(0, 1))
-        }
+        val iterator = BreakIterator.getCharacterInstance()
+        iterator.setText(s)
+        return s.substring(iterator.first(), iterator.next())
     }
 }

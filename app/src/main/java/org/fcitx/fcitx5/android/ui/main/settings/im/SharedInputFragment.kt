@@ -4,7 +4,6 @@
  */
 package org.fcitx.fcitx5.android.ui.main.settings.im
 
-import android.os.Build
 import androidx.preference.PreferenceScreen
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.core.FcitxAPI
@@ -35,9 +34,7 @@ class SharedInputFragment : FcitxPreferenceFragment() {
 
     override fun onStop() {
         // glide typing and the pairs are the keyboard's: before the first unlock it reads them from device-protected storage
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-            AppPrefs.getInstance().syncToDeviceEncryptedStorage()
-        }
+        AppPrefs.getInstance().syncToDeviceEncryptedStorage()
         super.onStop()
     }
 }

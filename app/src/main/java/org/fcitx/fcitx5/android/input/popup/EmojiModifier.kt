@@ -11,7 +11,6 @@ import android.icu.lang.UProperty
 import android.icu.text.UnicodeSet
 import android.os.Build
 import android.text.TextPaint
-import androidx.annotation.RequiresApi
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.data.prefs.ManagedPreferenceEnum
 
@@ -29,7 +28,6 @@ object EmojiModifier {
     /**
      * **Special Case 1:** Drop `U+FE0F` (Variation Selector-16) when combining with skin tone
      */
-    @RequiresApi(Build.VERSION_CODES.P)
     private fun shouldSkipVariationSelector16(ch: Int): Boolean {
         return UCharacter.hasBinaryProperty(ch, UProperty.EMOJI_MODIFIER_BASE)
                 && !UCharacter.hasBinaryProperty(ch, UProperty.EMOJI_PRESENTATION)
@@ -44,11 +42,6 @@ object EmojiModifier {
         0x1F9D1, 0x200D, 0x1F91D, 0x200D, 0x1F9D1,
     )
 
-    fun isSupported(): Boolean {
-        // UProperty.EMOJI_MODIFIER_BASE requires API 28
-        return Build.VERSION.SDK_INT >= Build.VERSION_CODES.P
-    }
-
     private fun isModifiable(modifiable: BooleanArray): Boolean {
         val sum = modifiable.count { it }
         // bail if too crowded
@@ -56,7 +49,6 @@ object EmojiModifier {
         return sum == 1 || sum == 2
     }
 
-    @RequiresApi(Build.VERSION_CODES.P)
     private fun getCodePoints(emoji: String): Pair<IntArray, BooleanArray> {
         val codePoints = emoji.codePoints().toArray()
         val modifiable = BooleanArray(codePoints.size) {
@@ -69,7 +61,6 @@ object EmojiModifier {
         return codePoints to modifiable
     }
 
-    @RequiresApi(Build.VERSION_CODES.P)
     private fun buildEmoji(codePoints: IntArray, modifiable: BooleanArray, tone: SkinTone): String {
         return buildString {
             var i = 0
@@ -113,7 +104,6 @@ object EmojiModifier {
     }
 
     fun getPreferredTone(emoji: String, tone: SkinTone): String {
-        if (!isSupported()) return emoji
         val (codePoints, modifiable) = getCodePoints(emoji)
         if (tone == SkinTone.Default || !isModifiable(modifiable)) return emoji
         val candidate = buildEmoji(codePoints, modifiable, tone)
@@ -121,7 +111,6 @@ object EmojiModifier {
     }
 
     fun produceSkinTones(emoji: String, excludeTone: SkinTone): Array<String>? {
-        if (!isSupported()) return null
         val (codePoints, modifiable) = getCodePoints(emoji)
         if (!isModifiable(modifiable)) return null
         val candidates = SkinTone.entries

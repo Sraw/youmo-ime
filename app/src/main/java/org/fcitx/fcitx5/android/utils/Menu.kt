@@ -6,14 +6,12 @@
 package org.fcitx.fcitx5.android.utils
 
 import android.content.res.ColorStateList
-import android.os.Build
 import android.view.Menu
 import android.view.MenuItem
 import android.view.SubMenu
 import androidx.annotation.ColorInt
 import androidx.annotation.DrawableRes
 import androidx.annotation.StringRes
-import splitties.resources.drawable
 
 fun MenuItem.setup(
     @DrawableRes icon: Int,
@@ -22,12 +20,8 @@ fun MenuItem.setup(
     onClick: Function0<Any?>?
 ): MenuItem {
     if (icon != 0 && iconTint != 0) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            iconTintList = ColorStateList.valueOf(iconTint)
-            setIcon(icon)
-        } else {
-            setIcon(appContext.drawable(icon)?.apply { setTint(iconTint) })
-        }
+        iconTintList = ColorStateList.valueOf(iconTint)
+        setIcon(icon)
     }
     if (showAsAction) {
         setShowAsAction(MenuItem.SHOW_AS_ACTION_IF_ROOM)

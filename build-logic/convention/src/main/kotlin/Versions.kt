@@ -9,7 +9,7 @@ object Versions {
 
     val java = JavaVersion.VERSION_11
     const val compileSdk = 36
-    const val minSdk = 23
+    const val minSdk = 29
     const val targetSdk = 36
 
     // the translations the app ships (gettext's names), English being the source: here once for
