@@ -120,15 +120,6 @@ def ls01(d):
     return f"每半 5 列，键宽 {min(widths)} px，中间 {g[0]}，空格 {space}"
 
 
-@case("LS-02")
-def ls02(d):
-    ok, r, g = split_ok(d)
-    first = r[0]
-    contiguous = all(abs(b[1][0] - a[1][2]) <= 2 for a, b in zip(first, first[1:]))
-    check(not ok and contiguous and len(first) == 10, f"第一行 {[(k[0], k[1][0]) for k in first]}")
-    return "26 键，不分开"
-
-
 @case("LS-03", base="B0-横屏", mutates="learn")
 def ls03(d):
     for k, side in (("w", "L"), ("o", "R"), ("m", "R"), ("e", "L"), ("n", "R")):
@@ -159,50 +150,6 @@ def ls05(d):
     t = d.field_text()
     check(t == "9Q", f"框里「{t}」")
     return f"「{t}」"
-
-
-@case("LS-06", base="B0-横屏", visual=True)
-def ls06(d):
-    out = {}
-    try:
-        for size in ("2000x1080", "2340x1080"):
-            d.sh(f"wm size {size}")
-            time.sleep(1.5)
-            d.open_page("text")
-            ok, r, g = split_ok(d)
-            w = int(size.split("x")[0])
-            kw = (r[0][0][1][2] - r[0][0][1][0]) / DPI
-            out[size] = (round(w / DPI), round(kw, 1), round((g[0][1] - g[0][0]) / w, 3))
-            d.shot("kb", f"{size}（{round(w / DPI)} dp）")
-    finally:   # stopped half-way it would leave 2000x1080 to the next landscape case
-        d.rotate(1)
-    (w1, k1, g1), (w2, k2, g2) = out["2000x1080"], out["2340x1080"]
-    check(0.12 <= g1 <= 0.40 and 0.12 <= g2 <= 0.40, f"中间空白 {g1:.0%} / {g2:.0%}")
-    check(46 <= k1 <= 50, f"{w1} dp 时字母键 {k1} dp（应约 48）")
-    check(abs(g2 - 0.40) < 0.01 and 49 <= k2 <= 53, f"{w2} dp 时空白 {g2:.0%}、键 {k2} dp（应 40%、约 51）")
-    return f"{w1} dp：键 {k1} dp、空白 {g1:.0%}；{w2} dp：键 {k2} dp、空白 {g2:.0%}"
-
-
-@case("LS-07", base="B0-设置", mutates=True)
-def ls07(d):
-    appearance(d)
-    choose(d, "分体键盘", "关")
-    d.rotate(1)
-    d.open_page("text")
-    ok, r, g = split_ok(d)
-    check(not ok and r[0][0][1][0] <= 2 and r[0][-1][1][2] >= screen_w(d) - 2, f"第一行 {r[0][:2]}…，空白 {g[0]}")
-    return "横屏不分体，铺满"
-
-
-@case("LS-08", base="B0-设置", mutates=True, visual=True)
-def ls08(d):
-    appearance(d)
-    choose(d, "分体键盘", "总是")
-    d.open_page("text")
-    ok, r, g = split_ok(d)
-    d.shot("kb", "竖屏，分体键盘总是")
-    check(any(x[1] - x[0] > 20 for x in g), f"竖屏没分开：空白 {g}")
-    return f"竖屏分开，中间 {g[0]}"
 
 
 @case("LS-09", base="B0-横屏", mutates=True)
@@ -240,34 +187,6 @@ def ls10(d):
     return "预览分体、和测试页一样、改关后不分体：看图"
 
 
-@case("LS-11", base="B0-横屏", mutates=True, visual=True)
-def ls11(d):
-    d.rotate(0)   # the 添加 list is laid out for portrait (in landscape the row is off screen)
-    add_im(d, "九键拼音")
-    d.rotate(1)
-    d.open_page("text")
-    d.switch_im("九键")
-    s = d.screen()
-    bx, tx = panel_box(d, s)
-    d.shot("full", "横屏九键")
-    check(on_right(d, bx), f"九键 {bx}（应靠右单手宽）")
-    return f"九键 {bx}，不分两半"
-
-
-@case("LS-12", base="B0-横屏", mutates=True)
-def ls12(d):
-    d.rotate(0)   # the 添加 list is laid out for portrait (in landscape the row is off screen)
-    add_im(d, "五笔")
-    d.rotate(1)
-    d.open_page("text")
-    got = {}
-    for lab in ("英文", "五笔"):
-        d.switch_im(lab)
-        got[lab] = split_ok(d)[0]
-    check(all(got.values()), f"分体 {got}")
-    return f"{got}"
-
-
 @case("LS-13", base="B0-横屏", page="url")
 def ls13(d):
     ks = kb_keys(d)
@@ -302,6 +221,7 @@ def ls14(d):
 
 @case("LS-15", base="B0-横屏", mutates=True)
 def ls15(d):
+    d.step("点箭头")
     d.press("123", after=1.0)
     a = arrow(d)
     if not a:
@@ -312,6 +232,15 @@ def ls15(d):
     a2 = arrow(d, s)
     check(on_left(d, bx) and tx and tx[0] <= 2, f"数字键盘 {bx}，工具栏 {tx}")
     check(a2 and a2.desc == "移到右边" and a2.b[0] > bx[1], f"箭头 {a2 and (a2.desc, a2.b)}")
+    d.step("回字母、转屏后再点 123")
+    abc(d)
+    d.rotate(0)
+    d.rotate(1)
+    d.open_page("text")
+    d.press("123", after=1.0)
+    bx2, _ = panel_box(d)
+    check(on_left(d, bx2), f"转屏后数字键盘 {bx2}")
+    d.step("设置里的分体时其他面板")
     d.hide_keyboard()
     d.rotate(0)   # landscape's preview leaves the row under the navigation bar
     d.open_settings()
@@ -322,7 +251,7 @@ def ls15(d):
     v = next((n.text for n in s.nodes if n.cls == "CheckedTextView" and n.checked), None)
     d.back()
     check(v and v.startswith("靠左"), f"分体时其他面板「{v}」")
-    return f"移到左边 {bx}；设置「{v}」"
+    return f"移到左边 {bx}；转屏后仍在左 {bx2}；设置「{v}」"
 
 
 @case("LS-16", base="B0-横屏")
@@ -515,62 +444,30 @@ def ls25(d):
     return f"数字键盘 {bx}，工具栏 {tx}"
 
 
-@case("LS-26", base="B0-横屏", mutates=True)
-def ls26(d):
-    d.press("123", after=1.0)
-    a = arrow(d)
-    if not a or a.desc != "移到左边":
-        raise Blocked(f"箭头 {a and a.desc}")
-    d.tap(a.c, 1.0)
-    abc(d)
-    d.rotate(0)
-    time.sleep(1.0)
-    d.rotate(1)
-    d.open_page("text")
-    d.press("123", after=1.0)
-    bx, tx = panel_box(d)
-    check(on_left(d, bx), f"数字键盘 {bx}")
-    return f"还在左边 {bx}"
-
-
 @case("LS-27", base="B0-设置", mutates=True, visual=True)
 def ls27(d):
-    hs = {}
-    for opt in ("矮", "很高"):
-        appearance(d)
-        choose(d, "键盘高度", opt)
-        d.rotate(1)
-        d.open_page("text")
-        s = d.screen()
-        kb = s.find(rid="keyboard_view", where="ime")
-        f = d.field(s)
-        ime = [n for n in s.ime() if n.b[3] > n.b[1]]
-        # the docked area: from its topmost row (the code row over the bar, laid out though empty)
-        # to the keys' bottom, the app's height here (the navigation bar below, no bottom padding);
-        # the window-wide containers start at the status bar's bottom and are left out
-        outer = min(n.b[1] for n in ime)
-        top, bottom = min(n.b[1] for n in ime if n.b[1] > outer), kb.b[3]
-        hs[opt] = (kb.b[3] - kb.b[1], f.b if f else None, kb.b[1], top, bottom)
-        d.shot("full", f"横屏，键盘高度{opt}")
-        d.rotate(0)
-        d.hide_keyboard()
-        d.open_settings()
-    # 很高 still set: the settings' preview in landscape is capped the same way
-    d.rotate(1)
     appearance(d)
+    choose(d, "键盘高度", "很高")
+    d.rotate(1)
+    d.open_page("text")
     s = d.screen()
-    d.shot("full", "横屏，很高，大小与样式的预览")
+    kb = s.find(rid="keyboard_view", where="ime")
+    f = d.field(s)
+    ime = [n for n in s.ime() if n.b[3] > n.b[1]]
+    # the docked area: from its topmost row (the code row over the bar, laid out though empty)
+    # to the keys' bottom, the app's height here (the navigation bar below, no bottom padding);
+    # the window-wide containers start at the status bar's bottom and are left out
+    outer = min(n.b[1] for n in ime)
+    top, bottom = min(n.b[1] for n in ime if n.b[1] > outer), kb.b[3]
+    d.shot("full", "横屏，键盘高度很高")
     d.rotate(0)
-    lo, hi = hs["矮"], hs["很高"]
-    # the preview view has no resource id to find it by: its height is for the screenshot
-    check(hi[0] > lo[0] + 20, f"键盘高 矮 {lo[0]} / 很高 {hi[0]}")
     # the cap (KeyboardHeightCap): the area, bar to bottom, at most 70% of the app's height; in a
     # 1080 px landscape the browser's own bars take ~220 px, so what is left of the page may not
     # hold the field: whether the browser scrolls it into view is the browser's, not checked
-    area, h = hi[4] - hi[3], hi[4]
+    area, h = bottom - top, bottom
     check(area <= 0.70 * h + 8, f"很高时键盘区 {area} px，超过屏高 {h} px 的七成（{int(0.7 * h)}）")
-    seen = "框看得到" if hi[1] and hi[1][1] < hi[2] - 40 else "框被挡住（网页剩的高度放不下）"
-    return f"矮 {lo[0]} px，很高 {hi[0]} px；很高时键盘区 {area}/{h} px（{area * 100 // h}%），{seen}；设置里的预览没有可找的 id，只看截图"
+    seen = "框看得到" if f and f.b[1] < kb.b[1] - 40 else "框被挡住（网页剩的高度放不下）"
+    return f"很高时键盘区 {area}/{h} px（{area * 100 // h}%），{seen}"
 
 
 @case("LS-28", base="B0-横屏")

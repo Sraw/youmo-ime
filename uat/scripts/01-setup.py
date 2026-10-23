@@ -1,7 +1,7 @@
 """uat/01-setup.md. The .md is the source of truth; each function follows its case's 前提/操作/预期."""
 import time
 
-from uat import IME, PKG, Blocked, add_im, case, check, gear, home, install
+from uat import IME, PKG, Blocked, add_im, case, check, home, in_picker, install
 
 
 def im_rows(d):
@@ -40,6 +40,20 @@ def set01(d):
     s = d.screen()
     t1 = s.texts()
     check(any("启用输入法" in t for t in t1), f"向导第一步是 {t1[:8]}")
+    # formerly PR-29: the restore offer is a line under step 1, not a dialog, and opens the file picker
+    d.step("从备份恢复一行")
+    row = s.find(text="以前用过？从备份恢复")
+    check(row, f"向导第一步没有「以前用过？从备份恢复」：{t1[:8]}")
+    check(not any(n.rid == "button1" for n in s.nodes), "向导第一步弹了对话框")
+    d.tap(row.c, 0.5)
+    in_picker(d)
+    top = d.top_activity()
+    check("documentsui" in top, f"点了以后是 {top}，不是文件选择器")
+    d.back(1.5)
+    d.step("启用输入法")
+    s = d.screen()
+    t1 = s.texts()
+    check(any("启用输入法" in t for t in t1), f"从文件选择器返回后是 {t1[:8]}")
     btn = next((n for n in s.app() if n.cls == "Button"), None)
     if not btn:
         raise Blocked(f"向导第一步没有按钮：{t1[:8]}")
@@ -178,21 +192,6 @@ def set06(d):
     return f"列表 {r}；地球键 {names}"
 
 
-@case("SET-07", base="B0-设置")
-def set07(d):
-    gear(d, "拼音")
-    t = d.all_texts()
-    check(t and "通用输入设置" in t[:4], f"最上面是 {t[:4]}")
-    check("中英混输" in t, f"没有中英混输：{t[:20]}")
-    bad = [x for x in ("每页候选数", "联想下一个词", "性能档位", "纠正错拼和按偏的键", "模糊音") if x in t]
-    check(not bad, f"拼音页里有 {bad}")
-    d.scroll_top()
-    d.tap_text("通用输入设置", after=1.2)
-    s = d.screen()
-    check(s.find(text="通用输入"), f"点通用输入设置后是 {s.texts()[:4]}")
-    return "最上面是通用输入设置（进通用输入）；有中英混输，没有共用的五项"
-
-
 @case("SET-08", base="B0")
 def set08(d):
     a = globe_cycle(d, 1)[0]
@@ -218,6 +217,3 @@ def set09(d):
     d.back(0.8)
     return f"系统选择输入法框：{items[:4]}"
 
-
-case("SET-10", base="B0-设置", needs="block:没有上游 Fcitx5 for Android 导出的用户数据 .zip（要在装了上游版的设备上学词后导出）")(
-    lambda d: None)

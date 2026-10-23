@@ -176,26 +176,53 @@ def lc08(d):
     return f"键盘正常；「{t}」"
 
 
-@case("LC-09", mutates=True, visual=True)
-def lc09(d):
-    l0 = d.lum((0, 1600, 1080, 2100))
-    d.sh("cmd uimode night yes")
-    time.sleep(2.5)
-    up = keyboard_up(d)
+def night(d, on, l0):
+    """系统深色模式 on/off with the keyboard up; returns (still up, its brightness after, the text typed).
+    The brightness is polled: the theme follows once the configuration change reaches the service"""
+    box = (0, 1600, 1080, 2100)
+    d.sh(f"cmd uimode night {'yes' if on else 'no'}")
+    end, l1 = time.time() + 5, l0
+    while time.time() < end:
+        # a sample counts only with the keyboard there on both sides of it: in the gap while its
+        # window is rebuilt the box shows the page, light whatever the keyboard's theme
+        if keyboard_up(d):
+            l = d.lum(box)
+            if keyboard_up(d):
+                l1 = l
+                if (l1 < l0 - 40) if on else (l1 > l0 + 40):
+                    break
+        time.sleep(0.3)
+    # the keyboard's window is rebuilt for the new configuration: gone for a moment, not for good
+    end, up = time.time() + 3, False
+    while time.time() < end and not up:
+        up = keyboard_up(d)
+        if not up:
+            time.sleep(0.3)
     if not up:
         tap_field(d)
-    l1 = d.lum((0, 1600, 1080, 2100))
-    d.shot("kb", "切到深色后")
+        l1 = d.lum(box)
+    d.shot("kb", f"切到{'深色' if on else '浅色'}后")
+    d.clear()
     d.type("nihao")
     d.cands()
     d.space()
-    t = d.field_text()
-    d.sh("cmd uimode night no")
-    time.sleep(1.5)
-    check(up, "切深色后键盘没了（要点框才回来）")
+    return up, l1, d.field_text()
+
+
+@case("LC-09", mutates=True, visual=True)
+def lc09(d):
+    l0 = d.lum((0, 1600, 1080, 2100))
+    d.step("切到深色")
+    up1, l1, t1 = night(d, True, l0)
+    check(up1, "切深色后键盘没了（要点框才回来）")
     check(l1 < l0 - 40, f"键盘亮度 {l0:.0f} → {l1:.0f}（没换成深色）")
-    check(t == "你好", f"打出「{t}」")
-    return f"亮度 {l0:.0f}→{l1:.0f}；「{t}」"
+    check(t1 == "你好", f"深色时打出「{t1}」")
+    d.step("切回浅色")
+    up2, l2, t2 = night(d, False, l1)
+    check(up2, "切回浅色后键盘没了（要点框才回来）")
+    check(l2 > l1 + 40, f"键盘亮度 {l1:.0f} → {l2:.0f}（没换回浅色）")
+    check(t2 == "你好", f"浅色时打出「{t2}」")
+    return f"亮度 {l0:.0f}→{l1:.0f}→{l2:.0f}；两次都打出「你好」"
 
 
 @case("LC-10", base="B0-设置", mutates=True)
@@ -242,5 +269,3 @@ def lc11(d):
     check(t == "你好", f"打出「{t}」（候选 {c[:2]}）")
     return f"「{t}」"
 
-
-case("LC-12", needs="skip:分屏要真机或平板（用例自己写的）；redroid 没有分屏")(lambda d: None)

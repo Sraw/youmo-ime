@@ -29,9 +29,10 @@
 | [16-landscape-split.md](16-landscape-split.md) | 横屏、分体键盘、分体时其他面板靠边 |
 | [17-hardware-keyboard.md](17-hardware-keyboard.md) | 实体键盘 |
 | [18-lifecycle.md](18-lifecycle.md) | 转屏、切换应用、换输入框、引擎重启这些时刻 |
+| [19-motion-notices.md](19-motion-notices.md) | 提示条（位置、替换、配色）、始终显示悬浮条、候选字号 |
 | [fixtures/](fixtures/) | 测试页 `fields.html` 和导入用的词表 |
 
-大词库的用例（WD-14d、14h、14i、14j2、TBL-12c）要雾凇拼音（[rime-frost](https://github.com/gaboolic/rime-frost/releases)）发布的
+大词库的用例（WD-14d、14h、14i、14j2、14s、14s2、14t、14t2、14w、TBL-12c；发版时手动跑的 WD-14r、14v、TBL-12d 也要）要雾凇拼音（[rime-frost](https://github.com/gaboolic/rime-frost/releases)）发布的
 `frost_dict_for_fcitx5.txt`，约 89 MB，不放进 fixtures：下载后用环境变量 `UAT_FROST=<路径>` 指给脚本。用例里的数
 （1914461 个词、176 行读不懂）出自 SHA-256 为 `86473190c505691c7f1ef7b87345a16b555c75fea30527f472a151b6eb1ad41f`
 的那一份（1914637 行），脚本先核对哈希，对不上记为 Blocked；换新版时连同用例里的数一起改。
@@ -95,8 +96,10 @@ adb shell ime set io.github.sraw.youmo.debug/org.fcitx.fcitx5.android.input.Fcit
 ### 测试页
 
 [`fixtures/fields.html`](fixtures/fields.html) 有测试用的各种输入框，用例里用「」里的名字指它们：
-「普通文本」「句子」「聊天」「密码」「网址」「邮箱」「数字」「电话」「搜索」「下一项」「不要提示」「长文本」。
-它们的 id 依次是 `text` `sentence` `chat` `password` `url` `email` `number` `tel` `search` `next` `nosuggest` `long`；
+「普通文本」「句子」「聊天」「密码」「网址」「邮箱」「数字」「电话」「搜索」「下一项」「不要提示」「长文本」，
+还有预填好文字、给复制用的「链接」（带跟踪参数的网址）和「短词1」–「短词5」（公园、今天、天气、我们、一起）。
+它们的 id 依次是 `text` `sentence` `chat` `password` `url` `email` `number` `tel` `search` `next` `nosuggest` `long`
+`link` `clip1`…`clip5`（`#clips` 一起显示那五个短词框）；
 地址后加 `#<id>`（例如 `fields.html#chat`）只显示那一个框，放在页面最上面（「聊天」框在最下面，见下）；在已经打开测试页的标签里改 `#<id>` 也马上生效。
 
 在电脑上起一个本地网页服务，转发到手机，用手机的 Chrome 打开：
@@ -111,7 +114,21 @@ adb shell am start -a android.intent.action.VIEW -d http://127.0.0.1:8000/fields
 
 「聊天」框按回车或点"发送"后会把内容记进它的记录并清空，像聊天应用发出一条消息；`fields.html#chat` 时它和"发送"按钮贴在页面底部，键盘弹出后紧贴键盘上沿，像聊天应用的输入栏。
 「搜索」框按回车会执行搜索：搜的词写在框下面，框失去焦点，键盘收起。
-无痕模式的测试在 Chrome 的无痕标签页里打开同一个地址。
+### 测试宿主
+
+测试页是 WebView 里的网页框，有几样它给不了：回车是"下一项"并真的跳到下一个框（WebView 不理输入法的"下一项"）、
+"不要个性化学习"的框（`IME_FLAG_NO_PERSONALIZED_LEARNING`，无痕标签页的框就这样）、标成敏感的剪贴板内容
+（`ClipDescription.EXTRA_IS_SENSITIVE`，密码管理器复制密码时这样标）。这些用调试包里的原生输入框
+`TypingHostActivity`（`app/src/debug`，不导出，用 root 起）：
+
+```sh
+adb shell su 0 am start -n io.github.sraw.youmo.debug/org.fcitx.fcitx5.android.input.TypingHostActivity --ez next true
+#   --ez next true：「第一项」（回车是下一项）和下面的「第二项」；--ez noLearning true：不要个性化学习；
+#   --es sensitiveClip mima1234：打开时把这段文字标成敏感放上剪贴板
+```
+
+（redroid 上 root 是 `docker exec <容器> am start …`；脚本里是 `open_host(d, next=True)` 这样。）真机上也可以照用例里写的，
+用 Chrome 的无痕标签页、真的密码管理器。用到它的是 KB-21、PR-07、PR-08、PR-12。
 
 ## 设备
 
@@ -121,19 +138,43 @@ adb shell am start -a android.intent.action.VIEW -d http://127.0.0.1:8000/fields
 | 实体键盘（17） | 真机接蓝牙或 USB 键盘；或者 Android 模拟器加一个 uinput 键盘（见 [17-hardware-keyboard.md](17-hardware-keyboard.md) 开头）。**不要在 redroid 里造虚拟键盘**：redroid 和宿主机共用内核，造出来的键盘宿主机也会收到 |
 | 横屏与分体（16） | 屏幕横过来宽度不少于 600 dp 的手机或平板，模拟器也行 |
 | 语音（12） | 真机，有麦克风，装语音版 |
-| 振动、按键音 | 真机 |
 
 redroid 里有浏览器"WebView Browser Tester"（`org.chromium.webview_shell`），测试页在它里面打开（`am start -a android.intent.action.VIEW -d <地址> -n org.chromium.webview_shell/.WebViewBrowserActivity`）。
 
 ## 自动跑（redroid）
 
 `uat/tools/uat.py` 在 redroid 上照用例操作、读回结果；用例脚本在 `uat/scripts/<文件名>.py`，一个 .md 一个，
-**.md 仍是准绳**：脚本照前提/操作/预期做，做不到就记"阻塞"并写原因，不放宽预期。每个 .md 都有脚本；
-12（语音）、17（实体键盘）在 redroid 上整份记"跳过"（用例的 `needs="emu:…"`，不先重置；语音版才有的用例在文字版上
-也记"跳过"，`needs="voice:…"`），它们在模拟器上跑（见下面"自动跑（模拟器）"）；其余各份里 redroid 做不到的几条也是（分屏、无痕标签页、
-密码管理器、振动和按键音、语音版安装、发版升级）。横屏是把屏幕改成 2340×1080（851 dp，`Device.rotate`），
-redroid 的显示不会真的转。手写用 `scripts/hw_strokes.py` 里的笔画在书写板上画字；HW-10a 要电脑上有 pypinyin（`pip install --user pypinyin`），没有就记阻塞。装包时比较设备上的 APK
-和 `app/build/outputs` 里最新的那个（同一个版本号会重新构建），不同就重装。
+**.md 仍是准绳**：脚本照前提/操作/预期做，做不到就记"阻塞"并写原因，不放宽预期。每条用例都要有脚本：.md 里有、
+脚本里没有的编号，跑的时候记 **阻塞「没有脚本」**，不会从结果里消失。合并过的长用例在每一段前用 `d.step("…")` 起名，
+失败或阻塞时结果写"「那一段」这一步：……"。
+
+有些用例有自己的地方跑，用 `needs=` 标出来；在 redroid 上它们不跑、不先重置，结果里不算"跳过"，单列在
+**「在别处跑」**一节（汇总写"另有在别处跑 N 条，不计入"）：
+
+| `needs=` | 在哪跑 | 例子 |
+|---|---|---|
+| `emu:…` | 模拟器（见下面"自动跑（模拟器）"） | 17 实体键盘的 HK 用例、TB-36（两根手指） |
+| `voice:…`（或 `emu,voice:…`） | 语音版 | 12 语音 |
+| `release:…` | 发版时手动（要上一版正式包或两个版本的包） | PR-13、PR-14、PR-30、TBL-12d、TBL-33、TBL-43、WD-14r、WD-14v |
+| `manual:…` | 真机或手工 | HK-03a、HK-03b、HK-30、HK-33、MN-13 |
+
+`skip:…`／`block:…` 只留给别的原因，记"跳过"／"阻塞"。
+
+现在共 455 条（P0 93、P1 347、P2 15）：redroid 上跑 384 条，在别处跑 71 条（模拟器 37、语音版 21、发版时手动 8、真机或手工 5）。
+
+横屏是把屏幕改成 2340×1080（851 dp，`Device.rotate`，等到界面按新尺寸排好），redroid 的显示不会真的转。手写用 `scripts/hw_strokes.py`
+里的笔画在书写板上画字。装包时比较设备上的 APK 和 `app/build/outputs` 里最新的那个（同一个版本号会重新构建），不同就重装。
+
+每次点、划之后只停很短（`PAUSE`：点 0.15 s、打字 0.25 s……），原来停顿（`OLD`）剩下的部分记在账上，
+下一次读界面前补齐：打完字马上读框里的字，看到的和原来一样（机器忙时网页框的字会晚到），连着点、中间不读界面的就不用等。
+读界面时 Dumper 还会等界面静下来（150 ms 没有变化）。进设置页等页面换了并且两次读到的一样、选列表项等对话框出来再关上、
+转屏等尺寸变了、测试页的框和键盘两次读到的位置一样（窗口滑进来的半路上读到的位置不能点）、另存的文件大小不再变，
+都是等到条件满足就走，不是固定秒数；脚本里写明的 `after=` 照写的停。
+键盘等不到时，先看当前输入法还是不是我们的（`pm clear` 后系统有时晚一点换成 LatinIME），是就再点一下框，
+还等不到就报阻塞，并写明当前输入法、进程在不在、前台是哪个界面。
+怀疑失败是时机问题时，加 `UAT_SLOW=1` 用原来的长停顿再跑一次对比。
+测试页的本地网页服务按第一台设备取端口（5556 → 8765，5557 → 8766，模拟器 8774）；端口被占时运行器直接退出，
+停掉占用的服务或用 `UAT_HTTP_PORT=<端口>` 换一个。
 
 ```sh
 BUILD_ABI=x86_64 ./gradlew :app:assembleTextDebug   # 没有 debug 包时（运行器只要 x86_64）
@@ -145,13 +186,16 @@ uat/tools/uat.py down                       # 用完关掉第二台
 
 测发布包（正式版发版前）：先 `BUILD_ABI=x86_64 ./gradlew :app:assembleTextRelease`（要签名密钥，没有就只出
 `-unsigned.apk`，装不上），再在命令前加 `UAT_BUILD=release`：装 `io.github.sraw.youmo`，设备上的 debug 包先卸掉
-（两个都在时系统的输入法列表有两个幽默输入法）。
+（两个都在时系统的输入法列表有两个幽默输入法）。用测试宿主的那四条（KB-21、PR-07、PR-08、PR-12）照样跑：
+`open_host` 在这一条里临时装上 debug 包（要先有 x86_64 debug 包），只当宿主应用、把它自己的输入法停用，
+这条结束就卸掉，所以别的用例（SET-01 的向导）仍只看到一个幽默输入法。正式包里不认 debug 包的测试标记，
+宿主框对它就是别的应用的框。
 
 ## 自动跑（模拟器）
 
 实体键盘（17）和语音（12）在模拟器上跑：`uat.py emu-up` 起无界面模拟器（端口 5554，Xvfb；语音要宿主机
 PulseAudio 的虚拟音源，语音片段先用 `uat/tools/voice-clips.py` 合成），跑完 `uat.py emu-down`。模拟器单独跑，
-不和 redroid 同一次（`run` 会拒绝）。`--flavor` 要和装的包一致：运行器把它传给用例，文字版上语音用例记"跳过"。
+不和 redroid 同一次（`run` 会拒绝）。`--flavor` 要和装的包一致：运行器把它传给用例，文字版上语音用例单列为"在别处跑"。
 
 ```sh
 BUILD_ABI=x86_64 ./gradlew :app:assembleVoiceDebug   # 语音版
@@ -163,7 +207,9 @@ uat/tools/uat.py emu-down
 
 - **分组**：同一基线（和同一页面）的用例是一组，基线只到一次。组里先跑不改状态的，再跑只因上屏而学词的，
   最后跑改设置、改词的；改过状态的用例之后、下一条之前才重置（`pm clear` 再到基线）。要"没学过词"的用例
-  （`clean=True`）前面若有上屏过的，也先重置。
+  （`clean=True`）前面若有上屏过的，也先重置。不改状态的用例之间只做软重置（清空框、回到拼音、收起工具栏）。
+  （2026-10-22 量过用快照代替 `pm clear`：杀进程再解包要 9–18 s 且越杀越慢（系统对反复崩溃的服务推迟重启），
+  `pm clear` 后解包 7–18 s、有一次键盘没起来；`pm clear` 本身 B0 约 8 s，没有稳定的收益，所以不用快照。）
 - **机器判断**：框里的字、候选、拼音行（光标画成 `|`）、设置页的文字和开关、弹出的字符、键的位置大小、
   键盘亮度，都从界面树（每台设备上常驻的 `Dumper.java`，一次约 0.1 s）和截图像素读回来判断。
 - **拼图**：只有预期要靠眼睛看的用例（`visual=True`）截图，裁到相关区域、缩小，每组拼成一张
@@ -189,4 +235,4 @@ uat/tools/uat.py emu-down
 ## 记录结果
 
 一次测试跑完，在 `uat/runs/` 下记一个文件 `<日期>-<设备>-<版本>.md`：每条一行，编号、结果
-（通过 / 失败 / 阻塞 / 跳过）、失败时看到了什么。测试定义文件里不记结果。
+（通过 / 失败 / 阻塞 / 跳过）、失败时看到了什么；在别处跑的单列在后面。测试定义文件里不记结果。

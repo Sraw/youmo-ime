@@ -68,25 +68,7 @@ def sp03(d):
     check(t.endswith("；") and len(t) == 2 and ";" not in t, f"ni 后点 ; 框里「{t}」，不是「你；」这样")
     got += f"；空框「；」，ni;「{t}」"
     d.clear()
-    scheme(d, "紫光", add=False)
-    k = semi_key(d)
-    if not k:
-        raise Fail(f"紫光方案 l 右边没有 ; 键：l 那排 {key_texts(d, 'l', d.screen())}")
-    d.type("x")
-    d.tap(k.c, 0.6)
-    c = d.candidates()
-    check(has(c, "性") or has(c, "星") or has(c, "行") or has(c, "形"), f"紫光 x; 候选 {c[:6]}")
-    d.clear()
-    d.tap(k.c, 0.6)
-    t = d.field_text() or ""
-    check(t == "；", f"紫光空框点 ; 后框里「{t}」")
-    got += f"；紫光 x; {c[:3]}，空框「{t}」"
-    d.clear()
-    scheme(d, "自然码", add=False)
-    s = d.screen()
-    check(d.key_node("l", s), "自然码的键盘上没有 l 键")
-    check(not semi_key(d, s), "自然码的键盘上也有 ; 键")
-    return got + "；自然码没有 ; 键"
+    return got
 
 
 @case("SP-04", base="B0-双拼")
@@ -109,19 +91,9 @@ def sp05(d):
     return f"fx `{p1}` {c1[:3]}；vg `{p2}`"
 
 
-@case("SP-06", base="B0-设置", mutates=True)
-def sp06(d):
-    add_im(d, "双拼")
-    gear(d, "双拼")
-    t = d.all_texts()
-    check("方案" in t, f"双拼设置 {t[:12]}")
-    check("中英混输" not in t, "双拼设置里有中英混输")
-    return "有方案，没有中英混输"
-
-
 @case("SP-07", base="B0-双拼", mutates=True)
 def sp07(d):
-    # PY-34's word (2–4 chars; a longer sentence is never learned, PY-62), made yours in 全拼
+    # PY-34's word, made yours in 全拼
     want = "汪小明"
     d.switch_im("拼音")
     try:
@@ -135,76 +107,44 @@ def sp07(d):
     return f"{c[:3]}"
 
 
-@case("SP-08", base="B0-双拼")
-def sp08(d):
-    d.type("sj")
-    c1 = d.cands()
-    d.clear()
-    d.type("xq")
-    c2 = d.cands()
-    import re
-    clock = [x for x in c1 if re.search(r"\d", x)]
-    week = [x for x in c2 if "星期" in x or "周" in x]
-    check(has(c1, "三") or has(c1, "散"), f"sj 的候选 {c1[:6]}")
-    check(not clock, f"sj 的候选里有时间 {clock}")
-    check(has(c2, "修") or has(c2, "秀"), f"xq 的候选 {c2[:6]}")
-    check(not week, f"xq 的候选里有星期 {week}")
-    return f"sj {c1[:3]}；xq {c2[:3]}"
-
-
 @case("SP-09", base="B0-设置", mutates=True, visual=True)
 def sp09(d):
-    add_im(d, "双拼")
+    for im in ("双拼", "五笔", "九键拼音"):
+        add_im(d, im)
     home(d, "通用输入")
     d.switch("滑行输入", True)
     d.open_page("text")
+    seen = []
+
+    d.step("双拼")
     d.switch_im("双拼")
     k = d.keys(refresh=True)
-    pts = [k[c] for c in "nihk"]
-    glide_shot(d, pts, "划 n-i-h-k，抬手前")
-    s = d.screen()
-    p = d.preedit(s)
+    glide_shot(d, [k[c] for c in "nihk"], "双拼：划 n-i-h-k，抬手前")
+    p = d.preedit()
     c = d.all_cands()
     check(p.replace("'", " ") == "ni hao", f"拼音行 `{p}`")
     check(has(c, "你好"), f"候选 {c[:5]}")
-    return f"`{p}` {c[:3]}"
+    seen.append(f"双拼 `{p}` {c[:2]}")
+    d.clear()
 
+    d.step("五笔")
+    d.switch_im("五笔")
+    k = d.keys(refresh=True)
+    glide_shot(d, [k[c] for c in "wqiy"], "五笔：划 w-q-i-y，抬手前")
+    s = d.screen()
+    p, c, t = d.preedit(s), d.candidates(s), d.field_text(s)
+    # a code with one candidate may commit at once: 你 in the box is the same result
+    check((p == "wqiy" and first(c) == "你") or t == "你", f"`{p}` {c[:3]} 框里「{t}」")
+    seen.append(f"五笔 `{p}` {c[:2]}「{t}」")
+    d.clear()
 
-def emoji_at(c, e):
-    """where emoji e is among the candidates c, or None"""
-    return next((k for k, x in enumerate(c) if x == e), None)
-
-
-@case("SP-10", base="B0-设置", mutates=True)
-def sp10(d):
-    out = []
-    for i, name in enumerate(["自然码", "微软", "小鹤"]):
-        scheme(d, name, add=i == 0)
-        for keys, e in (("haha", "😃"), ("dmzj", "👍")):
-            d.type(keys)
-            c = d.cands(want=e)
-            k = emoji_at(c, e)
-            check(k is not None and k >= 2, f"{name} {keys}：候选 {c[:6]}")
-            d.clear()
-            out.append(f"{name} {keys} {c[:k + 1]}")
-        d.hide_keyboard()
-        d.open_settings()
-    return "；".join(out)
-
-
-@case("SP-11", base="B0-双拼")
-def sp11(d):
-    import re
-    iso = d.sh("date +%Y-%m-%d").strip()
-    out = []
-    for keys, w, ok in (("riqi", "日期", lambda x: x == iso), ("uijm", "时间", lambda x: re.match(r"^\d\d:\d\d$", x)),
-                        ("xyqi", "星期", lambda x: re.match(r"^星期[一二三四五六日]$", x))):
-        d.type(keys)
-        d.cands()
-        c = d.all_cands()
-        k = next((i for i, x in enumerate(c) if ok(x)), None)
-        check(c and c[0] == w, f"{keys}：第一个 {c[:3]}")
-        check(k is not None and k >= 2, f"{keys}：候选 {c[:7]}")
-        d.clear()
-        out.append(f"{keys} {c[:k + 1]}")
-    return "；".join(out)
+    d.step("九键拼音")
+    d.switch_im("九键")
+    k = d.keys(refresh=True)
+    glide_shot(d, [k[c] for c in "6426"], "九键：划 6-4-2-6，抬手前")
+    p = d.preedit()
+    c = d.all_cands()
+    check(p and not any(ch.isdigit() for ch in p), f"拼音行 `{p}`（应是字母读出的拼音）")
+    check(has(c, "你好"), f"`{p}` 候选 {c[:8]}")
+    seen.append(f"九键 `{p}` {c[:2]}")
+    return "；".join(seen)

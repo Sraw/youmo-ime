@@ -333,7 +333,7 @@ def touchscreen(d):
 
 
 def mt(d, *steps):
-    """two fingers on the emulator's touchscreen (sendevent, root): ("down", slot, x, y),
+    """fingers on the emulator's touchscreen (sendevent, root): ("down"|"move", slot, x, y),
     ("up", slot), ("sleep", s)"""
     TOUCH, mx, my, w, h = touchscreen(d)
     cmds = []
@@ -348,6 +348,8 @@ def mt(d, *steps):
             # the device has no BTN_TOUCH: a contact is its tracking id, pressure and size
             cmds += [f"sendevent {TOUCH} 3 57 {100 + slot}", f"sendevent {TOUCH} 3 53 {x}",
                      f"sendevent {TOUCH} 3 54 {y}", f"sendevent {TOUCH} 3 58 512", f"sendevent {TOUCH} 3 48 8"]
+        elif st[0] == "move":
+            cmds += [f"sendevent {TOUCH} 3 53 {st[2] * mx // w}", f"sendevent {TOUCH} 3 54 {st[3] * my // h}"]
         else:
             cmds.append(f"sendevent {TOUCH} 3 57 -1")
         cmds.append(f"sendevent {TOUCH} 0 0 0")
@@ -536,6 +538,10 @@ def vo18(d):
 @case("VO-19", base="B0-语音", mutates=True, needs=EV, clean=True)
 def vo19(d):
     d.switch_im("拼音")
+    # the baseline after the same 前文 the dictation leaves: its text ends in 。, a sentence start,
+    # which by itself moves wangxiaoming's 4th; only learning would move them further
+    d.press(".")   # 。 in 拼音
+    d.clear()
     d.type("wangxiaoming")
     c0 = d.cands()[:5]
     d.clear()

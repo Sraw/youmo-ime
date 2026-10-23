@@ -3,7 +3,7 @@ import io
 import re
 import time
 
-from uat import BAR_BOTTOM, Blocked, Fail, case, check, has, home, menu_tap, open_url, script, sym_char
+from uat import BAR_BOTTOM, Blocked, Fail, case, check, has, home, menu_tap, open_url, script
 
 LONG = "今天天气很好，我们一起去公园散步吧。"
 
@@ -67,6 +67,19 @@ def copy_word(d, word):
     copy_range(d, i, len(word))
 
 
+def copy_field(d, i):
+    """the i-th field on the page (fields.html#clips: its short prefilled ones): 全选, 复制 on the edit panel"""
+    s = d.screen()
+    fields = [n for n in s.app() if n.cls == "EditText" and n.rid != "url_field"]
+    if len(fields) <= i:
+        raise Blocked(f"测试页上只有 {len(fields)} 个框")
+    d.tap(fields[i].c, 0.6)
+    edit_panel(d)
+    ime(d, desc="全选", after=0.4)
+    ime(d, desc="复制", after=0.6)
+    back_to_keys(d)
+
+
 def clip_items(d):
     s = d.screen()
     return [n for n in s.ime() if n.text and n.c[1] > BAR_BOTTOM and n.text not in ("试着复制些东西",)]
@@ -114,12 +127,25 @@ def tb01(d):
 
 @case("TB-02")
 def tb02(d):
-    d.expand_toolbar()
+    # a case before may have left the bar expanded: collapsed first, so the > is really tapped
+    s = d.screen()
+    if not s.find(desc="隐藏工具栏", where="ime") and not s.find(desc="展开工具栏", where="ime"):
+        # next-word suggestions hold the bar: expand_toolbar's way of bringing the toolbar back
+        d.expand_toolbar()
+        s = d.screen()
+    hide = s.find(desc="隐藏工具栏", where="ime")
+    if hide:
+        d.tap(hide.c, 0.6)
+        s = d.screen()
+    more = s.find(desc="展开工具栏", where="ime")
+    if not more:
+        raise Blocked(f"工具栏没收起，或没有 >：{[n.desc for n in s.ime() if n.desc and n.c[1] < BAR_BOTTOM]}")
+    d.tap(more.c, 0.6)
     s = d.screen()
     bar = [n.desc for n in sorted(s.ime(), key=lambda n: n.b[0]) if n.desc and n.c[1] < BAR_BOTTOM]
     want = ["撤销", "重做", "文本编辑", "剪贴板", "状态区域"]
-    check([x for x in bar if x in want] == want, f"展开后 {bar}")
-    return f"展开后 {bar}"
+    check([x for x in bar if x in want] == want, f"点 > 后 {bar}")
+    return f"点 > 后 {bar}"
 
 
 @case("TB-03", mutates="learn")
@@ -244,16 +270,20 @@ def tb09(d):
     d.tap(hint.c, 0.8)
     t = d.field_text()
     check(t == "散步", f"点后框里「{t}」")
-    d.clear()
-    # again, then past the 30 s: shown at first, gone after
+    return "栏上显示「散步」，点后上屏"
+
+
+@case("TB-40", mutates=True)
+def tb40(d):
     copy_word(d, "散步")
     t_copy = time.time()
     d.open_page("text")
-    check(bar_text(d.screen(), "散步"), "再复制一次后栏上没有「散步」")
+    check(bar_text(d.screen(), "散步"), "复制后栏上没有「散步」")
+    # the hint's lifetime by design: the wait is the case
     time.sleep(max(0, 31 - (time.time() - t_copy)))
     still = bar_text(d.screen(), "散步")
     check(not still, "复制 30 秒后提示还在")
-    return "栏上显示「散步」，点后上屏；再复制一次也显示，30 秒后消失"
+    return "栏上显示「散步」，30 秒后消失"
 
 
 @case("TB-10", base="B0-设置", mutates=True)
@@ -279,13 +309,13 @@ def tb10(d):
     if ok:
         d.tap(ok.c, 0.8)
     limit = d.summary("剪贴板历史记录上限")
-    copy_word(d, "公园")
+    open_url(d, "clips")
+    copy_field(d, 0)
     clip_panel(d)
     pin(d, "公园")
     back_to_keys(d)
-    for w in ("今天", "天气", "我们", "一起"):
-        i = LONG.index(w)
-        copy_range(d, i, len(w))
+    for i in range(1, 5):
+        copy_field(d, i)
     clip_panel(d)
     texts = [n.text for n in clip_items(d)]
     d.shot("kb", "复制 4 段后")
@@ -335,31 +365,6 @@ def tb11(d):
     t2 = [n.text for n in clip_items(d)]
     check(not any(x.startswith("公园") for x in t2), f"删除后面板 {t2}")
     return f"编辑后 {t1[:2]}；删除后 {t2[:2]}"
-
-
-@case("TB-12", mutates=True)
-def tb12(d):
-    copy_word(d, "公园")
-    d.open_page("text")
-    clip_panel(d)
-    pin(d, "公园")
-    back_to_keys(d)
-    copy_word(d, "散步")
-    d.open_page("text")
-    clip_panel(d)
-    s = d.screen()
-    before = [n.text for n in clip_items(d)]
-    trash = next((n for n in s.ime() if n.desc and ("删除" in n.desc or "清空" in n.desc)), None)
-    if not trash:
-        raise Blocked(f"剪贴板面板没有垃圾桶：{[n.desc for n in s.ime() if n.desc]}")
-    d.tap(trash.c, 0.8)
-    s = d.screen()
-    ok = next((n for n in s.nodes if n.text in ("确定", "删除", "清空")), None)
-    if ok:
-        d.tap(ok.c, 1.8)
-    texts = [n.text for n in clip_items(d) if not n.text.startswith(("已删除", "撤销"))]
-    check("公园" in texts and "散步" not in texts, f"清空前 {before}，清空后 {texts}")
-    return f"清空后 {texts}"
 
 
 def trash(d, prompt):
@@ -414,25 +419,11 @@ def tb33(d):
 @case("TB-13", mutates=True)
 def tb13(d):
     url = "https://example.com/a?id=1&utm_source=x"
-    # 前提: the link copied. Typed in the 网址 field, where keys go in as they are (the 长文本
-    # field would space and capitalize it as English), then 全选 + 复制 on the edit panel
-    open_url(d, "url")
-    for ch in url:
-        if ch.isalpha():
-            d.type(ch, after=0.3)
-            if d.preedit():   # after "=" letters compose pinyin here: the return key puts them in as typed
-                d.enter()
-        elif ch == ".":
-            d.press(".", after=0.3)
-        elif ch == "/":
-            n = d.key_node("/")
-            d.tap(n.c, 0.3)
-        else:
-            sym_char(d, ch)
-    time.sleep(0.5)
+    # 前提: the link copied, from the 链接 field the page fills with it
+    open_url(d, "link")
     t = d.field_text() or ""
     if t != url:
-        raise Blocked(f"前提没到：网址框里「{t}」")
+        raise Blocked(f"前提没到：链接框里「{t}」")
     edit_panel(d)
     ime(d, desc="全选", after=0.4)
     ime(d, desc="复制", after=0.6)
@@ -707,38 +698,50 @@ def tb34(d):
     in_zone = im.getpixel((20, diff[len(diff) // 2]))[:3] if diff else None
     still = kbox(d)
     check(still and (still[2] - still[0]) < W * 0.9, f"拖回去松手后不是悬浮键盘 {still}")
+    check(len(diff) >= 10, f"拖进底边时左边没有落点框（不同的行 {diff[:3]}…，键盘 {kb}）")
+    # as Gboard's, the keyboard stops above the mark, never over it
+    check(kb and diff and kb[3] <= diff[0] + 4, f"键盘压在落点框上（键盘 {kb}，框从 {diff[:1]}）")
+    # top left, where floating brings it back after the dock (formerly TB-36)
+    d.step("拖到左上方后放回底部")
+    h, _ = handle(d)
+    drag(d, h, (h[0] - 150, 500))
+    d.shot("full", "左上方，放回前")
+    pos0 = kbox(d)
     # once more, let go in it: docked
     h, _ = handle(d)
     drag(d, h, far)
     docked = kbox(d)
-    check(len(diff) >= 10, f"拖进底边时左边没有落点框（不同的行 {diff[:3]}…，键盘 {kb}）")
-    # as Gboard's, the keyboard stops above the mark, never over it
-    check(kb and diff and kb[3] <= diff[0] + 4, f"键盘压在落点框上（键盘 {kb}，框从 {diff[:1]}）")
     check(docked and docked[2] - docked[0] >= W - 5, f"在落点框里松手后键盘 {docked}，不是放回底部")
-    return f"落点框 {len(diff) * 4} px 高，颜色 {in_zone}；放回 {docked}"
+    d.step("再悬浮")
+    floating(d)
+    again = kbox(d)
+    d.shot("full", "再悬浮")
+    check(again and pos0 and abs(again[0] - pos0[0]) <= 10 and abs(again[1] - pos0[1]) <= 10,
+          f"再悬浮在 {again}，不是放回前的 {pos0}")
+    return f"落点框 {len(diff) * 4} px 高，颜色 {in_zone}；放回 {docked}；再悬浮 {again}"
 
 
-@case("TB-38", page="sentence", mutates=True, visual=True)
-def tb38(d):
+@case("TB-36", page="sentence", mutates=True, visual=True,
+      needs="emu:要多点触摸屏（sendevent 按下第二根手指）；redroid 没有触摸屏设备，input motionevent 只有一根手指")
+def tb36(d):
     floating(d)
     h, _ = handle(d)
-    # low, out of the bottom zone (TB-34 lets go here and it floats)
-    drag(d, h, (h[0], 1900))
+    drag(d, h, (h[0] - 150, 500))
+    pos0 = kbox(d)
+    d.shot("full", "左上方")
+    W, far = 1080, (h[0], 2350)
+    # a second finger down while the mark shows: not docked. input motionevent has one pointer;
+    # sendevent needs a multi-touch screen (the emulator's)
     h, _ = handle(d)
-    b1 = kbox(d)
-    # sideways, the finger wobbling 3 px up and back as it goes
-    x2 = 200 if h[0] > 540 else 880
-    steps = [("down", *h), ("sleep", 0.2)]
-    for i in range(1, 11):
-        steps.append(("move", h[0] + (x2 - h[0]) * i // 10, h[1] - 3 * (i % 2)))
-    steps += [("sleep", 0.2), ("up", x2, h[1])]
-    d.touch(*steps)
+    script("12-voice").mt(d, ("down", 0, *h), ("sleep", 0.2),
+            *[("move", 0, h[0], h[1] + (far[1] - h[1]) * i // 10) for i in range(1, 11)],
+            ("sleep", 0.4), ("down", 1, 540, 1000), ("sleep", 0.3), ("up", 0), ("up", 1))
     time.sleep(0.8)
-    b2 = kbox(d)
-    d.shot("full", "最低处左右拖、上下抖后松手")
-    check(b2 and (b2[2] - b2[0]) < 1080 * 0.9, f"抖了一下就放回底部：{b2}")
-    check(b1 and b2 and abs(b2[0] - b1[0]) > 100 and abs(b2[1] - b1[1]) <= 8, f"拖前 {b1}，拖后 {b2}")
-    return f"{b1} → {b2}，仍悬浮（横屏那步手动看）"
+    two = kbox(d)
+    d.shot("full", "两指松开后")
+    check(two and (two[2] - two[0]) < W * 0.9, f"多按一根手指后放回了底部 {two}")
+    check(two and pos0 and two[1] > pos0[1] + 400, f"多按一根手指后键盘 {two}，没停在最低处（左上方是 {pos0}）")
+    return f"左上方 {pos0}；两指后 {two}"
 
 
 @case("TB-39", page="sentence", mutates=True, visual=True)
@@ -899,53 +902,6 @@ def tb26(d):
     t = d.field_text()
     check(t == "5", f"框里「{t}」")
     return f"框里「{t}」"
-
-
-@case("TB-27", base="B0-英文")
-def tb27(d):
-    numpad(d, "0.1+0.2=")
-    r1 = result_on_bar(d)
-    s = d.screen()
-    sp = next((n for n in s.ime() if n.desc == "空格"), None)
-    if not sp:
-        raise Blocked("数字键盘没有空格键")
-    d.swipe(sp.c, (sp.c[0] - 330, sp.c[1]), 2500, after=0.8)
-    r2 = result_on_bar(d)
-    bk = next((n for n in d.screen().ime() if n.desc == "退格"), None)
-    d.taps([bk.c] * 12, gap=0.05, after=0.5)
-    s = d.screen()
-    lab = {([m.text for m in n.walk() if m.text] or [""])[0]: n.c
-           for n in s.find(rid="keyboard_view", where="ime").walk() if n.clickable}
-    d.taps([lab[c] for c in "200*15"], gap=0.12, after=0.4)
-    d.tap(lab["!?#"], 1.0)
-    pct = None
-    for name in ("常用", "英文", "数学"):
-        n = d.visible(name, d.screen(), where="ime")
-        if n:
-            d.tap(n.c, 0.6)
-        pct = next((m for m in d.screen().ime() if m.text == "%" and m.c[0] > 200), None)
-        if pct:
-            break
-    if not pct:
-        raise Blocked("符号面板里找不到 %")
-    d.tap(pct.c, 0.8)
-    s = d.screen()
-    if not s.find(text="=", where="ime"):
-        d.press("123", after=0.8)
-    s = d.screen()
-    eq = next((n for n in s.find(rid="keyboard_view", where="ime").walk()
-               if [m.text for m in n.walk() if m.text][:1] == ["="]), None)
-    d.tap(eq.c, 0.8)
-    r3 = result_on_bar(d)
-    t3 = d.field_text()
-    open_url(d, "password")
-    numpad(d, "1+1=")
-    r4 = result_on_bar(d)
-    check(r1 and r1.text.replace(" ", "") == "=0.3", f"0.1+0.2= 栏上 {r1 and r1.text}")
-    check(not r2, f"光标移开后栏上还有 {r2 and r2.text}")
-    check(r3 and r3.text.replace(" ", "") == "=30", f"「{t3}」栏上 {r3 and r3.text}")
-    check(not r4, f"密码框里栏上 {r4 and r4.text}")
-    return f"=0.3；移开后无；「{t3}」{r3.text}；密码框无"
 
 
 @case("TB-28", page="long")

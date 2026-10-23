@@ -45,24 +45,42 @@ IME = f"{PKG}/org.fcitx.fcitx5.android.input.FcitxInputMethodService"
 MAIN = f"{PKG}/org.fcitx.fcitx5.android.ui.main.MainActivity"
 BROWSER = "org.chromium.webview_shell/.WebViewBrowserActivity"
 IMAGE = "redroid/redroid:14.0.0_64only-latest"
-# serial port -> container; only these two are ever started, stopped or rooted by this tool
+# serial port -> container; only these two are ever started, stopped or rooted by this tool. A
+# container already running on the port under another name (a stream's own youmo-redroid-2) is that
+# port's: see container_for
 CONTAINERS = {"5556": "youmo-redroid", "5557": "youmo-redroid2"}
 
 
-def container_on(port):
-    """the container publishing adb on 127.0.0.1:port; one started by hand may not have this tool's
-    name (youmo-redroid-2), and root() through a wrong name reads nothing"""
-    out = subprocess.run(["docker", "ps", "--filter", f"publish={port}", "--format", "{{.Names}}"],
-                         capture_output=True, text=True).stdout.split()
-    return out[0] if len(out) == 1 else CONTAINERS[port]
+def container_for(port):
+    """the container publishing 127.0.0.1:<port>, else this tool's name for it"""
+    out = subprocess.run(["docker", "ps", "--format", "{{.Names}} {{.Ports}}"], capture_output=True,
+                         text=True).stdout
+    for line in out.splitlines():
+        name, _, ports = line.partition(" ")
+        if f"127.0.0.1:{port}->5555/tcp" in ports:
+            return name
+    return CONTAINERS[port]
 EMU_PORT = "5554"   # the emulator: emulator-5554, no container
 AVD_HOME, AVD = os.path.join(REPO, "dev", "avd"), "youmo_kb"
 MIC = "uat-mic"   # a PulseAudio (PipeWire) null sink; the emulator records its monitor
 SPEAKER = "uat-out"   # another, the emulator's output: not into uat-mic, where it came back as speech
 CLIPS = os.path.join(OUT, "voice-clips")
-HTTP_PORT = 8765  # host side of `adb reverse tcp:8000`
+# host side of `adb reverse tcp:8000`: one per first device, so two runs at once (on 5556 and on 5557,
+# from two checkouts) each serve their own fixtures rather than the other's
+HTTP_PORT = int(os.environ.get("UAT_HTTP_PORT", "0")) or None
 FONT = "/usr/share/fonts/truetype/droid/DroidSansFallbackFull.ttf"   # CJK; it draws no Latin
 FONT_LATIN = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"
+
+
+# The pause after a touch. It was all slept after every touch (OLD); now a short part after it
+# (PAUSE) spaces the touches, and the rest is owed only by the next read of the screen (Device.screen):
+# a field read right after typing still sees what the old pause let it see (a busy host delays a web
+# field's text: PY-01 read 「你抱」 at 0.25 s under a load of 20), while touches with no read between
+# them, and waits that poll for their outcome (goto, choose), do not pay it. An explicit after= is
+# slept as given. UAT_SLOW=1 sleeps the old pauses in full after each touch
+SLOW = os.environ.get("UAT_SLOW") == "1"
+OLD = {"tap": 0.3, "taps": 0.4, "swipe": 0.4, "type": 0.5, "press": 0.5, "tap_text": 0.8, "back": 0.8}
+PAUSE = OLD if SLOW else {"tap": 0.15, "taps": 0.2, "swipe": 0.2, "type": 0.25, "press": 0.25, "tap_text": 0.3, "back": 0.4}
 
 
 class Fail(Exception):
@@ -75,6 +93,16 @@ class Blocked(Exception):
 
 class Skip(Exception):
     pass
+
+
+class Elsewhere(Exception):
+    """the case has its own place to run (the emulator, the voice build, a release by hand, a real
+    phone): listed as 在别处跑 apart from the run's counts, not as 跳过 here"""
+    pass
+
+
+# needs kinds that name where a case runs instead
+ELSEWHERE = {"emu": "模拟器", "voice": "语音版", "release": "发版时手动", "manual": "真机或手工"}
 
 
 # ---------------------------------------------------------------- the case registry
@@ -100,10 +128,13 @@ class Case:
             return Skip, why
         if "block" in kinds:
             return Blocked, why
+        for k in ("release", "manual"):
+            if k in kinds:
+                return Elsewhere, f"{ELSEWHERE[k]}：{why}"
         if "emu" in kinds and not d.emu:
-            return Skip, why
+            return Elsewhere, f"{ELSEWHERE['emu']}：{why}"
         if "voice" in kinds and d.flavor != "voice":
-            return Skip, "文字版没有语音输入（--flavor voice 装语音版再跑）"
+            return Elsewhere, f"{ELSEWHERE['voice']}：文字版没有语音输入（--flavor voice 装语音版再跑）"
         return None
 
     @property
@@ -125,7 +156,8 @@ def case(id, base="B0", page=None, mutates=False, clean=False, visual=False, nee
     from), True (changes settings, words, the system). clean: the case needs no learning before it.
     visual: part of the 预期 is only seen on a screenshot -> 待看图 unless a machine check failed.
     needs: "skip:<why>" / "block:<why>" when redroid cannot run it at all; "emu:<why>" for the emulator
-    only, "voice:<why>" for the voice build only, "emu,voice:<why>" both: skipped elsewhere, no reset."""
+    only, "voice:<why>" for the voice build only, "emu,voice:<why>" both; "release:<why>" run by hand
+    at a release, "manual:<why>" on a real phone: those four are 在别处跑 where unmet, no reset."""
     if page is None:
         page = "设置" if base == "B0-设置" else "text"
 
@@ -188,6 +220,11 @@ def _load_scripts(areas, files):
         for cid in set(CASES) - before:
             CASES[cid].area = f[:2]
         md = parse_md(os.path.join(UAT, f[:-3] + ".md"))
+        for cid in md:
+            if cid not in CASES:
+                # a case in the .md with no script would not show in a run at all and look covered
+                CASES[cid] = Case(lambda d: None, cid, "B0", "text", False, False, False, "block:没有脚本")
+                CASES[cid].area = f[:2]
         for c in list(CASES.values()):
             if c.id in md:
                 c.title, _, c.expect = md[c.id]
@@ -323,13 +360,19 @@ class Device:
         self.flavor = flavor   # the build under test (--flavor): voice-only cases, SET-01's reinstall
         self.emu = self.port == EMU_PORT
         self.serial = f"emulator-{self.port}" if self.emu else f"127.0.0.1:{self.port}"
-        self.container = None if self.emu else container_on(self.port)
+        self.container = None if self.emu else container_for(self.port)
         self.run = run
         self.case = None
         self._keys = None
         # unique page URLs across runs: WebView caches a URL it loaded before (heuristic freshness)
         self.reload_n = int(time.time() * 1000) * 10 + int(port) % 10
         self.page = None
+        self.host = None   # the test host's extras while it is the field (open_host)
+        self._step = None
+        self.after_case = []
+        # scrolled down since the last scroll to the top (tap_text); known to be at the top
+        self._scrolled, self._at_top = False, False
+        self._quiet_at = 0.0   # a read waits till then (owe)
 
     # --- adb
     def adb(self, *args, binary=False, check=False, timeout=60):
@@ -419,7 +462,20 @@ class Device:
                 buf += x
         return buf.decode("utf-8")
 
+    def owe(self, kind, after):
+        """after a touch slept PAUSE[kind] (after is None: the default): the rest of the old pause is
+        owed by the next read"""
+        if after is None:
+            self._quiet_at = max(self._quiet_at, time.time() + OLD[kind] - PAUSE[kind])
+
+    def settle(self):
+        """sleep what the last touches owe; every read of the screen (a dump or a screenshot) first"""
+        wait = self._quiet_at - time.time()
+        if wait > 0:
+            time.sleep(wait)
+
     def screen(self):
+        self.settle()
         if getattr(self, "fwd", None):
             for _ in range(3):
                 try:
@@ -490,25 +546,54 @@ class Device:
             time.sleep(step)
         raise Blocked(f"timed out waiting for {what}")
 
+    def step(self, name):
+        """name the stage a long case is in: a failure or block from here on says which step it was
+        (a merged case keeps every check of the cases merged into it, so its message must say where)"""
+        self._step = name
+
+    def expect_field(self, want, timeout=3.0, msg=None):
+        """the focused field's text, polled until it is want (a str, or a predicate on the text) or
+        timeout: instead of a fixed sleep before reading it. Fail with msg (its literal "{got}" is
+        replaced by the text there at the end), or with what was there"""
+        ok = want if callable(want) else (lambda t: t == want)
+        end = time.time() + timeout
+        while True:
+            got = self.field_text()
+            # no focused field is not an empty one: the focus gone or the keyboard closed fails
+            if got is not None and ok(got):
+                return got
+            if time.time() >= end:
+                if got is None:
+                    raise Fail("没有获得焦点的输入框")
+                # msg may name what was there as {got}: read at the failure, not before the wait
+                raise Fail(msg.replace("{got}", got) if msg else
+                           f"框里是「{got}」，不是「{want}」" if isinstance(want, str) else f"框里是「{got}」")
+            time.sleep(0.15)
+
     def wait_text(self, text, timeout=15, where="app", contains=False):
         return self.wait(lambda s: s.find(contains=text, where=where) if contains
                          else s.find(text=text, where=where) or s.find(desc=text, where=where),
                          timeout, what=f"「{text}」")
 
     # --- touching
-    def tap(self, xy, after=0.3):
+    def tap(self, xy, after=None, owe="tap"):
         self.sh(f"input tap {xy[0]} {xy[1]}")
-        time.sleep(after)
+        time.sleep(PAUSE["tap"] if after is None else after)
+        if owe:
+            self.owe(owe, after)
 
-    def taps(self, points, gap=0.05, after=0.4):
+    def taps(self, points, gap=0.05, after=None, owe="taps"):
         cmd = f"; sleep {gap}; ".join(f"input tap {x} {y}" for x, y in points)
         if cmd:
             self.sh(cmd)
-        time.sleep(after)
+        time.sleep(PAUSE["taps"] if after is None else after)
+        self.owe(owe, after)
 
-    def swipe(self, a, b, ms=300, after=0.4):
+    def swipe(self, a, b, ms=300, after=None):
         self.sh(f"input swipe {a[0]} {a[1]} {b[0]} {b[1]} {ms}")
-        time.sleep(after)
+        self._at_top = False   # a script's own swipe may have scrolled the page; scroll() sets it after
+        time.sleep(PAUSE["swipe"] if after is None else after)
+        self.owe("swipe", after)
 
     def hold(self, xy, ms):
         self.swipe(xy, xy, ms)
@@ -554,20 +639,37 @@ class Device:
             return False
         return next((n for n in found if tappable(n)), found[0] if found else None)
 
-    def tap_text(self, text, where="app", contains=False, scroll=True, after=0.8):
+    def tap_text(self, text, where="app", contains=False, scroll=True, after=None, owe=True):
+        """owe=False: the caller polls for what the tap brings (goto, choose), no old pause owed"""
         s = self.screen()
         n = self.visible(text, s, where, contains)
         if not n and scroll:
-            self.scroll_top()
-            for _ in range(10):
-                s = self.screen()
-                n = self.visible(text, s, where, contains)
-                if n or not self.scroll(s):
-                    break
+            # not scrolled down since the last time at the top: a fresh page is at its top already, so
+            # look down from here first (a swipe up at the top costs a second for nothing); a page
+            # come back to scrolled (the back stack keeps its place) is found by the top-and-down after
+            if self._scrolled:
+                self.scroll_top()
+            n = self._scan_down(text, where, contains)
+            if not n and not self._at_top:
+                self.scroll_top()
+                n = self._scan_down(text, where, contains)
         if n:
-            self.tap(n.c, after)
+            # what was on screen as it was tapped (scrolled to it): goto waits for a change from this
+            self._tapped_on = self.screen().texts()
+            self.tap(n.c, PAUSE["tap_text"] if after is None else after, owe=False)
+            if owe:
+                self.owe("tap_text", after)
+            self._at_top = False
             return n
         raise Blocked(f"no 「{text}」 on screen")
+
+    def _scan_down(self, text, where, contains):
+        for _ in range(10):
+            s = self.screen()
+            n = self.visible(text, s, where, contains)
+            if n or not self.scroll(s):
+                return n
+        return None
 
     def scroll(self, s=None, up=False):
         """scroll the app's biggest scrollable list one screen; False when it did not move"""
@@ -580,12 +682,16 @@ class Device:
         before = s.texts()
         a, b = (x1 // 2, y0 + (y1 - y0) * 3 // 4), (x1 // 2, y0 + (y1 - y0) // 5)
         self.swipe(b if up else a, a if up else b, 400, after=0.6)
-        return self.screen().texts() != before
+        moved = self.screen().texts() != before
+        if moved:
+            self._scrolled, self._at_top = not up, False
+        return moved
 
     def scroll_top(self):
         for _ in range(10):
             if not self.scroll(up=True):
-                return
+                break
+        self._scrolled, self._at_top = False, True
 
     def all_texts(self):
         """texts of the whole scrolling page, top to bottom, scrolling down to its end"""
@@ -606,7 +712,7 @@ class Device:
         name: space bksp shift enter globe , . 符 123 (and the nine keys' digits)"""
         if self._keys and not refresh:
             return self._keys
-        kb = self.wait(lambda s: s.find(rid="keyboard_view", where="ime"), what="the keyboard")
+        kb = self.need_keyboard()
         names = {"button_space": "space", "button_backspace": "bksp", "button_caps": "shift",
                  "button_return": "enter", "button_lang": "globe", "button_comma": ",",
                  "button_period": "."}
@@ -630,6 +736,48 @@ class Device:
         self._keys = k
         return k
 
+    def need_keyboard(self, timeout=20):
+        """our keyboard's view, waited for. Not up after a few seconds: another input method may have
+        taken over (the system falls back to LatinIME after a `pm clear`, at times late) or the field
+        lost the request; ours set again and the focused field tapped, once. Blocked with what was
+        current, so a run's log tells a lost keyboard from a dead process"""
+        # where it stays, too: a case reads the keys (or the floating handle) next, and the window
+        # sliding up has them lower than they end. Up once its bounds read the same twice, or once
+        # when they are where the keyboard last settled: keys(refresh=True) comes here on every key,
+        # and a second read each time cost a dump and a wait's step per key
+        kb = [self._kb_at] if getattr(self, "_kb_at", None) else []
+
+        def up(s):
+            v = s.find(rid="keyboard_view", where="ime")
+            settled = v is not None and kb == [v.b]
+            kb[:] = [v.b] if v else []
+            if settled:
+                self._kb_at = v.b
+            return v if settled else None
+        try:
+            return self.wait(up, min(6, timeout), what="the keyboard")
+        except Blocked:
+            pass
+        diag = ""
+        if self.sh("settings get secure default_input_method").strip() != IME:
+            try:
+                ensure_ime(self)
+            except Blocked as e:   # its own block would hide what is said below
+                diag = f"；{e}"
+        f = self.field()
+        if f:
+            # open_page's point: a tall field's text keeps its cursor at the end
+            self.tap((f.b[2] - 40, f.b[3] - 25) if f.b[3] - f.b[1] > 150 else f.c, 0.5)
+        kb.clear()   # bounds from before the tap do not count as the first of two
+        self._kb_at = None
+        try:
+            return self.wait(up, max(1, timeout - 6), what="the keyboard")
+        except Blocked:
+            cur = self.sh("settings get secure default_input_method").strip().split("/")[0]
+            alive = bool(self.sh(f"pidof {PKG}").strip())
+            raise Blocked(f"timed out waiting for the keyboard（当前输入法 {cur}，进程{'在' if alive else '不在'}，"
+                          f"前台 {self.top_activity().split('/')[-1]}{diag}）")
+
     def key_node(self, label, s=None):
         s = s or self.screen()
         kb = s.find(rid="keyboard_view", where="ime")
@@ -640,7 +788,7 @@ class Device:
                     return n
         return None
 
-    def type(self, keys, after=0.5):
+    def type(self, keys, after=None):
         """tap letters (and , . on the bottom row); ' ' is the space key"""
         # the keys read afresh: one-handed, floating, a panel or another layout move them
         k = self.keys(refresh=True)
@@ -652,7 +800,9 @@ class Device:
                 if name not in k:
                     raise Blocked(f"no key {ch!r}")
             pts.append(k[name])
-        self.taps(pts, after=after)
+        self.taps(pts, after=PAUSE["type"] if after is None else after, owe="type")
+        if after is None:
+            self.owe("type", None)
 
     def glide(self, word, nine=False, after=0.8):
         """a finger over the word's keys without lifting (input motionevent moves, ~6 per hop);
@@ -668,13 +818,15 @@ class Device:
         self.touch(*path_steps(pts), ("up", *pts[-1]))
         time.sleep(after)
 
-    def press(self, name, n=1, after=0.5):
+    def press(self, name, n=1, after=None):
         k = self.keys(refresh=True)
         if name not in k:
             k = self.keys(refresh=True)
         if name not in k:
             raise Blocked(f"no key {name}")
-        self.taps([k[name]] * n, after=after)
+        self.taps([k[name]] * n, after=PAUSE["press"] if after is None else after)
+        if after is None:
+            self.owe("press", None)
 
     def space(self):
         self.press("space")
@@ -834,9 +986,11 @@ class Device:
             p, t = self.preedit(s), self.field_text(s) or ""
             if not p and not t:
                 return
-            # committed text alone: reload the page instead of backspacing it, as a backspace
-            # right after a commit takes the commit back and unlearns it (PY-64)
-            on_page = self.page and "webview_shell" in self.top_activity()
+            # committed text alone: reload the page (or start the test host afresh) instead of
+            # backspacing it, as a backspace right after a commit takes the commit back and unlearns
+            # it (PY-64)
+            top = self.top_activity()
+            on_page = self.page and "webview_shell" in top or self.host is not None and "TypingHostActivity" in top
             if not p and on_page:
                 break
             if "|" in p:   # the cursor inside the composing row: backspace stops at its start
@@ -851,8 +1005,11 @@ class Device:
                         break
                 continue
             self.press("bksp", min(len(p) + len(t) + 1, 40), after=0.3)
-        if self.page:
-            self.open_page(self.page)
+        if self.page or self.host is not None:
+            if self.page:
+                self.open_page(self.page)
+            else:
+                open_host(self, **self.host)
             if not self.preedit() and not self.field_text():
                 return
         raise Blocked("could not empty the field")
@@ -863,19 +1020,28 @@ class Device:
         self.reload_n += 1
         url = f"http://127.0.0.1:8000/fields.html?r={self.reload_n}#{page}"
         self.sh(f"am start -a android.intent.action.VIEW -d '{url}' -n {BROWSER}")
+        # the field where it stays: coming from another app the browser's window slides in, and
+        # bounds read on the way are off the screen (seen: x 1633 on a 1080 screen, three taps
+        # into nothing, the keyboard never asked for) — so twice the same before it is tapped
+        last = []
+
         def ready(s):
             for n in s.app():
                 if n.cls == "EditText" and n.pkg == "org.chromium.webview_shell" and n.rid != "url_field":
-                    return n
+                    settled = last == [n.b]
+                    last[:] = [n.b]
+                    return n if settled else None
         try:
             f = self.wait(ready, 20, what="the test page")
         except Blocked:   # seen once after the system file picker: the browser did not come back
             self.sh(f"am force-stop org.chromium.webview_shell; am start -a android.intent.action.VIEW "
                     f"-d '{url}' -n {BROWSER}")
             f = self.wait(ready, 20, what="the test page")
-        # near the field's bottom-right corner: in a field with text the cursor lands at its end
-        at = (f.b[2] - 40, f.b[3] - 25) if f.b[3] - f.b[1] > 150 else f.c
         for i in range(3):
+            if i:   # where the field is now, not where it was on the first try
+                f = self.wait(ready, 10, what="the test page")
+            # near the field's bottom-right corner: in a field with text the cursor lands at its end
+            at = (f.b[2] - 40, f.b[3] - 25) if f.b[3] - f.b[1] > 150 else f.c
             self.tap(at, 0.8)
             if self.emu and self.kb_plugged():
                 # a hardware keyboard typed on: a tap in a web field tells the input method nothing,
@@ -885,14 +1051,16 @@ class Device:
                 if b and not s.find(rid="keyboard_view", where="ime"):
                     self.tap(b.c, 0.8)
             try:
-                self.wait(lambda s: s.find(rid="keyboard_view", where="ime"), 8 + 8 * i, what="the keyboard")
+                self.need_keyboard(8 + 8 * i)
                 break
             except Blocked:
                 if i == 2:
                     raise
                 ensure_ime(self)
         self.page = page
+        self.host = None
         self._keys = None
+        self._at_top = False
 
     def at_home(self, s):
         """the settings home: the app's name as the title and the search button"""
@@ -903,6 +1071,7 @@ class Device:
     def open_settings(self):
         """the settings home: back out of the app's pages rather than relaunching it (a relaunch
         with CLEAR_TASK over itself left a finishing activity that took the next tap away)"""
+        self._at_top = False
         for _ in range(8):
             if "MainActivity" not in self.top_activity():
                 self.sh(f"am start -W -n {MAIN}")
@@ -913,9 +1082,11 @@ class Device:
             self.back()
         raise Blocked("could not reach the settings home")
 
-    def back(self, after=0.8):
+    def back(self, after=None):
+        self._at_top = False   # the page come back to keeps its place: may be scrolled
         self.sh("input keyevent KEYCODE_BACK")
-        time.sleep(after)
+        time.sleep(PAUSE["back"] if after is None else after)
+        self.owe("back", after)
 
     def im_label(self, s=None):
         s = s or self.screen()
@@ -944,8 +1115,17 @@ class Device:
         (w851dp, "land") and go through the same configuration change as on a turn"""
         self.sh("wm size 2340x1080" if r else "wm size reset")
         self.rot = r
-        time.sleep(2.0)
         self._keys = None
+        self._kb_at = None   # the keyboard is laid out again: its old bounds are not where it settles
+        # until the apps are laid out for the new size (a window as wide as landscape, or none wider
+        # than portrait) rather than a fixed 2 s; then a moment for the keyboard to come back
+        wide = lambda s: max((n.b[2] for n in s.nodes), default=0)
+        try:
+            self.wait(lambda s: wide(s) > 1200 if r else 0 < wide(s) <= 1080, 6, step=0.2,
+                      what="the new screen size")
+        except Blocked:
+            pass
+        time.sleep(0.6 if not SLOW else 2.0)
 
     def expand_toolbar(self):
         s = self.screen()
@@ -972,6 +1152,7 @@ class Device:
         n = self.screen().find(desc="隐藏键盘", where="ime")
         if n:
             self.tap(n.c)
+            self._kb_at = None   # gone: the next one up slides in again
 
     # --- settings rows
     def row(self, title, s=None):
@@ -980,31 +1161,64 @@ class Device:
         return n.row() if n else None
 
     def goto(self, *titles):
-        """from where we are, tap each title in turn (scrolling to it)"""
+        """from where we are, tap each title in turn (scrolling to it), each time until the screen
+        changed (the page opened) rather than a fixed second"""
         for t in titles:
-            before = self.screen().texts()
-            self.tap_text(t, after=1.0)
-            # a tap right after the activity (re)starts can be lost (seen on the release build):
-            # still the same page, so tap once more
-            if self.screen().texts() == before:
-                self.tap_text(t, after=1.0)
+            self.tap_text(t, after=0.2 if not SLOW else 1.0, owe=False)
+            before = self._tapped_on
+            now = self.screen().texts()
+            for attempt in range(2):
+                end = time.time() + 3
+                while time.time() < end and now == before:
+                    time.sleep(0.15)
+                    now = self.screen().texts()
+                if now != before or attempt:
+                    break
+                # a tap right after the activity (re)starts can be lost (seen on the release build):
+                # still the same page, so tap once more
+                self.tap_text(t, after=0.2 if not SLOW else 1.0, owe=False)
+                now = self.screen().texts()
+            # changed is not arrived: the pages slide in, and a frame mid-way has both or neither.
+            # Settled once two reads agree
+            end = time.time() + 2
+            while time.time() < end:
+                time.sleep(0.15)
+                again = self.screen().texts()
+                if again == now:
+                    break
+                now = again
+            self._scrolled, self._at_top = False, False
 
     def switch(self, title, on):
         """set a switch/checkbox preference; returns whether it was changed"""
         for _ in range(8):
             s = self.screen()
             r = self.row(title, s)
+            # the pages run under the navigation bar (edge to edge): a row whose middle is behind it
+            # is not tapped there (ST-05: 跟随系统夜间模式 at the bottom once 大小与样式 grew)
+            nav = [n.b[1] for n in s.nodes if n.pkg == "com.android.systemui" and n.b[1] > 1200 and n.b[3] > n.b[1]]
+            if r and nav and r.c[1] >= min(nav) - 10 and self.scroll(s):
+                continue
             if r:
                 w = [n for n in r.walk() if n.cls in ("Switch", "SwitchCompat", "CheckBox", "SwitchMaterial")]
                 if not w:
                     raise Blocked(f"「{title}」 has no switch")
                 if w[0].checked != on:
+                    # a tap right after the activity (re)starts can be lost (goto's note; ST-05 on the
+                    # release build, as the first thing after a reset): still as it was, tap once more
                     self.tap(r.c, 0.8)
-                    r2 = self.row(title)
-                    w2 = [n for n in r2.walk() if n.cls == w[0].cls] if r2 else []
-                    if not w2 or w2[0].checked != on:
-                        raise Fail(f"「{title}」 did not turn {'on' if on else 'off'}")
-                    return True
+                    for retry in (True, False):
+                        s2 = self.screen()
+                        r2 = self.row(title, s2)
+                        w2 = [n for n in r2.walk() if n.cls == w[0].cls] if r2 else []
+                        if w2 and w2[0].checked == on:
+                            return True
+                        # again only when nothing happened: same page, same state, no dialog (F3721)
+                        dialog = any(n.rid in ("alertTitle", "button1") for n in s2.nodes)
+                        if not retry or not w2 or w2[0].checked != w[0].checked or dialog:
+                            break
+                        self.tap(r.c, 0.8)
+                    raise Fail(f"「{title}」 did not turn {'on' if on else 'off'}")
                 return False
             if not self.scroll(s):
                 break
@@ -1047,6 +1261,7 @@ class Device:
 
     def png(self):
         from PIL import Image
+        self.settle()
         return Image.open(io.BytesIO(self.adb("exec-out", "screencap", "-p", binary=True))).convert("RGB")
 
     def lum(self, box, im=None):
@@ -1067,7 +1282,9 @@ class Device:
         field (the field down to the keyboard's bottom), app (the app window), top (upper half),
         full; or a (x0, y0, x1, y1) box"""
         from PIL import Image
-        png = png or self.adb("exec-out", "screencap", "-p", binary=True)
+        if png is None:
+            self.settle()
+            png = self.adb("exec-out", "screencap", "-p", binary=True)
         im = Image.open(io.BytesIO(png)).convert("RGB")
         W, H = im.size
         if isinstance(region, tuple):
@@ -1206,6 +1423,9 @@ def soft_reset(d, base, page):
     if abc and not s.find(rid="button_lang", where="ime"):
         d.tap(abc.c, 0.6)
         d._keys = None
+    fold = s.find(desc="隐藏工具栏", where="ime")   # a case left the toolbar open: the next starts closed
+    if fold:
+        d.tap(fold.c, 0.4)
     if page in PREFILLED:   # its text is part of the case: a fresh page
         d.open_page(page)
     else:
@@ -1253,16 +1473,32 @@ def home(d, *path):
 
 def choose(d, title, option):
     """a list preference: its row, then the option whose text starts with option (确定 if any)"""
-    d.tap_text(title, after=1.0)
+    d.tap_text(title, after=0.2 if not SLOW else 1.0, owe=False)
+
+    def dialog(s):
+        return s.find(rid="select_dialog_listview") or s.find(rid="alertTitle")
+
+    def opt(s):
+        # the options in the dialog only: the row behind it shows the current value as its summary
+        box = dialog(s)
+        pool = [n for n in box.walk()] if box and box.rid == "select_dialog_listview" else s.app()
+        return next((n for n in pool if n.text == option), None) or \
+            next((n for n in pool if n.text.startswith(option) and n.text != title and n.rid != "summary"), None)
+    try:   # the dialog up, then the option in it
+        d.wait(dialog, 3, step=0.15)
+        n = d.wait(opt, 2, step=0.15)
+    except Blocked:
+        raise Blocked(f"「{title}」里没有「{option}」：{d.screen().texts()[:12]}")
+    d.tap(n.c, 0.3 if not SLOW else 1.0)
+    # a 确定 only in a dialog still up: one fading out lets the tap through to the rows behind it
     s = d.screen()
-    n = next((n for n in s.app() if n.text == option), None) or \
-        next((n for n in s.app() if n.text.startswith(option) and n.text != title), None)
-    if not n:
-        raise Blocked(f"「{title}」里没有「{option}」：{s.texts()[:12]}")
-    d.tap(n.c, 1.0)
-    ok = d.screen().find(text="确定")
+    ok = s.find(text="确定") if dialog(s) else None
     if ok:
-        d.tap(ok.c, 1.0)
+        d.tap(ok.c, 0.3 if not SLOW else 1.0)
+    try:   # the dialog gone
+        d.wait(lambda s: not dialog(s), 3, step=0.15)
+    except Blocked:
+        pass
 
 
 def path_steps(pts, per_hop=6):
@@ -1419,6 +1655,91 @@ def flick(d, key, dy=130, ms=200):
     d.swipe((x, y), (x, y + dy), ms)
 
 
+HOST_PKG = "io.github.sraw.youmo.debug"
+HOST = f"{HOST_PKG}/org.fcitx.fcitx5.android.input.TypingHostActivity"
+
+
+def open_host(d, **extras):
+    """the debug build's TypingHostActivity, a native EditText with what a web field cannot have:
+    next=True (an IME_ACTION_NEXT field and a second one under it), noLearning=True
+    (IME_FLAG_NO_PERSONALIZED_LEARNING), sensitiveClip="…" (that text on the clipboard marked
+    sensitive). Not exported: started as root. A release run (UAT_BUILD=release) has no debug package:
+    it is installed for this case as a host app only, its own input method disabled so the system
+    has one 幽默输入法, and removed when the case ends (SET-01's wizard must see one)"""
+    if BUILD == "release":
+        # removed when the case ends whether this case put it there or a run before left it
+        # once a case: clear() opens it again, and a second pm uninstall only logs a failure
+        if not any(getattr(u, "unhost", False) for u in d.after_case):
+            u = lambda: unhost(d)   # noqa: E731
+            u.unhost = True
+            d.after_case.append(u)
+        if not d.sh(f"pm path {HOST_PKG}").strip():
+            dp = os.path.join(REPO, "app/build/outputs/apk/text/debug")
+            apks = sorted((os.path.join(dp, f) for f in (os.listdir(dp) if os.path.isdir(dp) else [])
+                           if "x86_64" in f and f.endswith(".apk")), key=os.path.getmtime)
+            if not apks:
+                raise Blocked("正式包跑时要 debug 包当测试宿主：BUILD_ABI=x86_64 ./gradlew :app:assembleTextDebug")
+            d.adb("install", "-r", apks[-1], check=True, timeout=600)
+        d.sh(f"ime disable {HOST_PKG}/org.fcitx.fcitx5.android.input.FcitxInputMethodService")
+        ensure_ime(d)
+    args = " ".join(f"--ez {k} true" if v is True else f"--es {k} '{v}'" for k, v in extras.items())
+    # a new task each time: the extras of this start, not an instance left from another case
+    d.root(f"am start -W -f 0x10008000 -n {HOST} {args}")
+    d.wait(lambda s: s.find(rid="keyboard_view", where="ime") and d.field(s), 15, what="the test host's field")
+    d.page = None
+    # started afresh by clear() as a page is reloaded; the clip is not put on the clipboard again
+    d.host = {k: v for k, v in extras.items() if k != "sensitiveClip"}
+    d._keys = None
+
+
+def in_picker(d, timeout=8):
+    """until the system's file picker (DocumentsUI) is in front and shows its content, rather than a
+    fixed 2.5 s after the tap that opens it; the caller still checks top_activity and says what failed"""
+    def shown(s):
+        return "documentsui" in d.top_activity() and any(n.pkg.endswith("documentsui") and n.text for n in s.nodes)
+    try:
+        d.wait(shown, timeout, step=0.2, what="the file picker")
+    except Blocked:
+        pass
+
+
+def new_files(d, folder, before, timeout=10):
+    """the files new in folder since before (a set of names), polled until there is one or timeout:
+    the app writes what the picker named after the picker closed"""
+    end = time.time() + timeout
+    while True:
+        new = sorted(set(d.sh(f"ls -1 {folder}").splitlines()) - before)
+        if new or time.time() >= end:
+            break
+        time.sleep(0.3)
+    # named is not written: the picker makes the file empty and the app fills it after. Done once
+    # each file's size is not 0 and the same at two reads 0.5 s apart
+    sizes = None
+    while new:
+        now = [d.sh(f"stat -c %s '{folder}/{f}'").strip() for f in new]
+        # a size, not a stat that failed (gone, renamed): "" would read as stable and not 0
+        if now == sizes and all(x.isdigit() and x != "0" for x in now) or time.time() >= end + 5:
+            break
+        sizes = now
+        time.sleep(0.5)
+    # and the app done with it: the save runs under a loading dialog (toast after), and a case
+    # may reset (pm clear) next
+    while new and time.time() < end + 10:
+        s = d.screen()
+        if s.app() and not any(n.cls == "ProgressBar" for n in s.app()):
+            break
+        time.sleep(0.3)
+    time.sleep(0.5)
+    return new
+
+
+def unhost(d):
+    """the debug package a release run installed as a host: gone, or said so (SET-01 would see two)"""
+    out = d.sh(f"pm uninstall {HOST_PKG}").strip()
+    if "Success" not in out:
+        print(f"! {d.case.id if d.case else ''}: pm uninstall {HOST_PKG}: {out[:80]}", flush=True)
+
+
 def open_url(d, page, field=0):
     """the test page with this hash (or "" for all fields), the field-th field tapped"""
     d.reload_n += 1
@@ -1431,6 +1752,7 @@ def open_url(d, page, field=0):
     f = d.wait(ready, 20, what="the test page")
     d.tap(f[field].c, 1.0)
     d.page = None
+    d.host = None
     d._keys = None
 
 
@@ -1488,14 +1810,21 @@ class Run:
     def record(self, c, state, seen, dev, secs):
         with self.lock:
             self.results[c.id] = (state, seen, dev, secs)
-            tag = {"通过": ".", "失败": "F", "阻塞": "B", "跳过": "s", "待看图": "v"}[state]
+            tag = {"通过": ".", "失败": "F", "阻塞": "B", "跳过": "s", "待看图": "v", "在别处跑": "o"}[state]
             print(f"{tag} {c.id} {state} [{dev} {secs:.0f}s]" + (f" {seen[:80]}" if state in ("失败", "阻塞") else ""),
                   flush=True)
         self.save()   # as each case ends: a runner stopped half-way keeps what it ran
 
 
+def stepped(d, e):
+    """the message, after the step it happened in (Device.step) when the case named one"""
+    return f"「{d._step}」这一步：{e}" if getattr(d, "_step", None) else str(e)
+
+
 def run_case(d, c, run):
     d.case = c
+    d._step = None
+    d.after_case = []   # undone when the case ends, however it ends (open_host's package)
     t0 = time.time()
     try:
         unmet = c.unmet(d)
@@ -1504,14 +1833,21 @@ def run_case(d, c, run):
         seen = c.fn(d) or ""
         state = "待看图" if c.visual else "通过"
     except Fail as e:
-        state, seen = "失败", str(e)
+        state, seen = "失败", stepped(d, e)
     except Blocked as e:
-        state, seen = "阻塞", str(e)
+        state, seen = "阻塞", stepped(d, e)
     except Skip as e:
         state, seen = "跳过", str(e)
+    except Elsewhere as e:
+        state, seen = "在别处跑", str(e)
     except Exception as e:  # a script error: blocked, with where
         tb = traceback.extract_tb(e.__traceback__)[-1]
-        state, seen = "阻塞", f"脚本出错 {type(e).__name__}: {e} ({os.path.basename(tb.filename)}:{tb.lineno})"
+        state, seen = "阻塞", stepped(d, f"脚本出错 {type(e).__name__}: {e} ({os.path.basename(tb.filename)}:{tb.lineno})")
+    for undo in reversed(d.after_case):
+        try:
+            undo()
+        except Exception:   # a cleanup that failed leaves the next reset to it
+            pass
     run.record(c, state, seen, d.port, time.time() - t0)
     return state
 
@@ -1685,18 +2021,34 @@ def wrap(text, font, width):
 
 
 def counts_text(results):
-    counts = {}
+    """the counts of what ran here; the cases that run elsewhere after them, apart"""
+    counts, away = {}, 0
     for st, *_ in results.values():
-        counts[st] = counts.get(st, 0) + 1
-    return "，".join(f"{k} {v}" for k, v in sorted(counts.items()))
+        if st == "在别处跑":
+            away += 1
+        else:
+            counts[st] = counts.get(st, 0) + 1
+    return "，".join(f"{k} {v}" for k, v in sorted(counts.items())) + \
+        (f"（另有在别处跑 {away} 条，不计入）" if away else "")
+
+
+def by_id(i):
+    return (i.split("-")[0], int(re.sub(r"\D", "", i) or 0), i)
 
 
 def table(results):
-    """the results file's table, from results.json's {id: [state, seen, …]}"""
+    """the results file's table, from results.json's {id: [state, seen, …]}; the cases that run
+    elsewhere in a list of their own after it"""
     lines = ["| 编号 | 结果 | 看到的 |", "|---|---|---|"]
-    for cid in sorted(results, key=lambda i: (i.split("-")[0], int(re.sub(r"\D", "", i) or 0), i)):
+    away = []
+    for cid in sorted(results, key=by_id):
         st, seen, *_ = results[cid]
+        if st == "在别处跑":
+            away.append(f"- {cid}：{seen}")
+            continue
         lines.append(f"| {cid} | {st} | {seen.replace('|', '/').replace(chr(10), ' ')} |")
+    if away:
+        lines += ["", f"## 在别处跑（{len(away)} 条，不在这里跑，不算跳过）", ""] + away
     return lines
 
 
@@ -1711,9 +2063,9 @@ def write_results(run, cases, version, ports, wall, sheets, flavor="text"):
     lines = [f"# {run.name}", "", dev,
              f"- 包：{'语音版' if flavor == 'voice' else '文字版'} x86_64 {BUILD}（{PKG}）{version}",
              # the ids of a short rerun say which rows are new; a whole run is just its count
-             f"- 跑法：`uat/tools/uat.py run`（最近一次跑 {len(run.ids)} 条"
+             f"- 跑法：`uat/tools/uat.py run`（最近一次跑 {sum(1 for i in run.ids if run.results.get(i, ('',))[0] != '在别处跑')} 条"
              f"{'：' + ', '.join(run.ids) if len(run.ids) <= 12 else ''}，用时 {wall:.0f} s）；"
-             f"共 {len(run.results)} 条：" + counts_text(run.results),
+             f"共 {sum(1 for v in run.results.values() if v[0] != '在别处跑')} 条：" + counts_text(run.results),
              f"- 图：`dev/uat-out/{run.name}/`（{len(sheets)} 张拼图）；待看图的看过拼图后用 `uat.py mark` 改",
              ""] + table(run.results)
     run.save()
@@ -1735,7 +2087,8 @@ def mark(run_name, cid, state, note):
     write_atomic(rj, json.dumps(res, ensure_ascii=False))
     with open(p, encoding="utf-8") as f:
         head = f.read().split("\n| 编号 |")[0].split("\n")
-    head = [re.sub(r"(共 \d+ 条：).*", lambda m: m.group(1) + counts_text(res), ln) if ln.startswith("- 跑法：") else ln
+    here = sum(1 for v in res.values() if v[0] != "在别处跑")
+    head = [re.sub(r"共 \d+ 条：.*", lambda m: f"共 {here} 条：" + counts_text(res), ln) if ln.startswith("- 跑法：") else ln
             for ln in head]
     write_atomic(p, "\n".join(head + table(res)) + "\n")
     print(f"{cid} {state}")
@@ -1744,7 +2097,7 @@ def mark(run_name, cid, state, note):
 # ---------------------------------------------------------------- devices and the page server
 
 def up(port="5557"):
-    name = CONTAINERS[port]
+    name = container_for(port)   # one already on the port (a stream's own) is used, not a second made
     serial = f"127.0.0.1:{port}"
     if subprocess.run(["docker", "inspect", name], capture_output=True).returncode == 0:
         # stopped (docker stop, or the emulator's turn): started again, a running one left as it is
@@ -1811,8 +2164,11 @@ def down(port="5557"):
     if port not in ("5557",):
         sys.exit("down only removes the second device")
     subprocess.run(["adb", "disconnect", f"127.0.0.1:{port}"], capture_output=True)
-    subprocess.run(["docker", "rm", "-f", CONTAINERS[port]], capture_output=True)
-    print(f"{CONTAINERS[port]} removed")
+    name = container_for(port)
+    if not name.startswith("youmo-redroid"):   # another project's device on the port: not ours to remove
+        sys.exit(f"{name} on {port} is not a youmo-redroid: left as it is")
+    subprocess.run(["docker", "rm", "-f", name], capture_output=True)
+    print(f"{name} removed")
 
 
 def emu_up():
@@ -1908,8 +2264,8 @@ def start_server():
     s = __import__("socket").socket()
     busy = s.connect_ex(("127.0.0.1", HTTP_PORT)) == 0
     s.close()
-    if busy:
-        return None
+    if busy:   # this run's port taken: its fixtures may be another checkout's
+        sys.exit(f"127.0.0.1:{HTTP_PORT} is in use: stop that server or set UAT_HTTP_PORT")
     p = subprocess.Popen([sys.executable, "-m", "http.server", str(HTTP_PORT), "--bind", "127.0.0.1",
                           "-d", os.path.join(UAT, "fixtures")],
                          stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
@@ -1926,6 +2282,8 @@ def cmd_run(a):
     if not cases:
         sys.exit("no cases")
     ports = a.devices.split(",")
+    global HTTP_PORT
+    HTTP_PORT = HTTP_PORT or 8765 + (int(ports[0]) - 5556 if ports[0] in CONTAINERS else 9)
     for p in ports:
         if p not in CONTAINERS and p != EMU_PORT:
             sys.exit(f"unknown device {p}")
@@ -1968,7 +2326,9 @@ def cmd_run(a):
         st = run.results[cid][0]
         counts[st] = counts.get(st, 0) + 1
     nshots = sum(1 for x in run.shots if x[0] in run.ids)
-    print(f"{len(run.ids)} cases in {wall:.0f} s: " + ", ".join(f"{k} {v}" for k, v in sorted(counts.items())))
+    away = counts.pop("在别处跑", 0)
+    print(f"{len(run.ids) - away} cases in {wall:.0f} s: " + ", ".join(f"{k} {v}" for k, v in sorted(counts.items()))
+          + (f"; {away} run elsewhere (在别处跑)" if away else ""))
     print(f"results {os.path.relpath(p, REPO)}; {len(sheets)} sheets, {nshots} shots in {os.path.relpath(run.dir, REPO)}/")
 
 

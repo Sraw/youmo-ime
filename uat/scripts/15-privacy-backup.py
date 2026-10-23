@@ -1,8 +1,13 @@
 """uat/15-privacy-backup.md. The .md is the source of truth; each function follows its case's
 前提/操作/预期."""
+import os
+import tempfile
 import time
+import zipfile
 
-from uat import PKG, Blocked, add_im, case, check, first, has, home, menu_tap, open_url, reset, script
+BULLET = "\u2022"   # ClipboardEntry.BULLET: a sensitive clip is shown as these
+
+from uat import BAR_BOTTOM, PKG, Blocked, Fail, add_im, case, open_host, check, choose, ensure_ime, first, has, home, menu_tap, open_url, reset, script, in_picker, new_files
 
 
 def words13():
@@ -37,7 +42,7 @@ def pr02(d):
     p = perms(d)
     bad = [x for x in p if any(w in x for w in ("NOTIFICATION", "CONTACTS", "LOCATION", "STORAGE", "MEDIA_", "CAMERA"))]
     check(not bad, f"有 {bad}")
-    return f"只有 {p}；导入导出走系统文件选择（WD-09、PR-09）"
+    return f"只有 {p}；导入导出走系统文件选择（WD-09、PR-10）"
 
 
 def password(d):
@@ -99,8 +104,60 @@ def pr05(d):
     return f"数字行 {''.join(digits)}；框里 {len(t)} 个圆点"
 
 
-case("PR-07", needs="skip:要 Chrome 无痕标签页；redroid 上的 WebView 测试浏览器没有无痕模式")(lambda d: None)
-case("PR-08", needs="skip:要一个会把复制的密码标成敏感的密码管理器（用例：没有记阻塞）；redroid 上没有")(lambda d: None)
+@case("PR-07", mutates=True, clean=True)
+def pr07(d):
+    py = script("06-pinyin")
+    d.step("不要个性化学习的框里选两次")
+    open_host(d, noLearning=True)
+    py.learn_sentence(d, 2)
+    d.step("第三次打")
+    d.type(py.SENTENCE_PY)
+    c = d.cands()
+    d.clear()
+    check(first(c) == "王小明", f"第三次 {c[:3]}，学了")
+    d.step("用户词库")
+    d.hide_keyboard()
+    words13().user_lexicon(d, "自动学到的词")   # the top page lists sections and counts, no words
+    t = d.all_texts()
+    check(py.SENTENCE not in t, f"用户词库里有「{py.SENTENCE}」")
+    # the control: the same steps in the host's plain field do learn, so what kept it from learning
+    # above is the flag (the host is in this app's package: were its field taken as the app's own, it
+    # would learn nothing either and the check above prove nothing)
+    d.step("对照：普通框里同样选两次会学")
+    open_host(d)
+    py.learn_sentence(d, 2)
+    d.type(py.SENTENCE_PY)
+    c2 = d.cands()
+    d.clear()
+    check(first(c2) == py.SENTENCE, f"普通框里选两次后第三次 {c2[:3]}：测试宿主的框不学，上面的不学说明不了什么")
+    return f"第三次 {c[:2]}；用户词库里没有「{py.SENTENCE}」；对照：普通框里学了 {c2[:1]}"
+
+
+SECRET = "mima1234"
+
+
+def sensitive_clip(d):
+    """a clip marked sensitive, as a password manager copies a password: from the test host"""
+    open_host(d, sensitiveClip=SECRET)
+    d.open_page("text")
+
+
+@case("PR-08", mutates=True)
+def pr08(d):
+    tb = script("05-toolbar")
+    sensitive_clip(d)
+    d.step("剪贴板提示")
+    s = d.screen()
+    bar = [n.text for n in s.ime() if n.text and n.c[1] < BAR_BOTTOM]
+    check(not any(SECRET in t for t in bar), f"提示是明文：{bar[:6]}")
+    check(any(t and set(t) == {BULLET} for t in bar), f"栏上没有圆点的提示：{bar[:6]}")
+    d.step("剪贴板面板")
+    tb.clip_panel(d)
+    items = [n.text for n in tb.clip_items(d)]
+    tb.back_to_keys(d)
+    check(not any(SECRET in t for t in items), f"面板里是明文：{items[:4]}")
+    check(items and items[0].startswith(BULLET), f"面板第一条 {items[:3]}")
+    return f"提示和面板都是圆点：{items[0][:12]}"
 
 
 def backup(d):
@@ -108,12 +165,15 @@ def backup(d):
     d.hide_keyboard()
     home(d, "备份与恢复")
     before = set(d.sh(f"ls -1 {DOWNLOAD}").splitlines())
-    d.tap_text("备份全部", after=2.5)
+    d.tap_text("备份全部", after=0.3)
+    in_picker(d)
     if "documentsui" not in d.top_activity():
         raise Blocked(f"没出保存界面：{d.top_activity()}")
     s = d.screen()
     name = next((n.text for n in s.app() if n.cls == "EditText"), "")
     d.tap_text("保存", where="all", scroll=False, after=0.3)
+    # the toast is in no UI dump (03-t9's note): 备份成功 is read off the picture
+    d.shot("full", "备份后的提示（应为备份成功）")
     msgs = []
     for _ in range(10):
         msgs += [n.text for n in d.screen().nodes if n.text and ("备份" in n.text or "成功" in n.text)]
@@ -123,8 +183,9 @@ def backup(d):
     return name, new, msgs
 
 
-def restore(d, fname):
-    """从备份恢复 → fname; returns the confirmation's text, after the app came back"""
+def restore(d, fname, own_check=False):
+    """从备份恢复 → fname; returns (the confirmation's text, restarted), after the app came back.
+    Not restarted fails here (F3725), unless own_check: then the caller checks it"""
     d.hide_keyboard()
     home(d, "备份与恢复")
     d.tap_text("从备份恢复", after=1.2)
@@ -150,15 +211,27 @@ def restore(d, fname):
     b = next((n for n in s.nodes if n.rid == "button1"), None)   # a second confirmation, if any
     if b:
         d.tap(b.c, 1.0)
-    for _ in range(20):
+    # polled, not slept: the process changes, then ours is set again and the restarted page shows
+    end, now = time.time() + 20, pid
+    while time.time() < end:
         now = d.sh(f"pidof {PKG}").strip()
         if now and now != pid:
             break
-        time.sleep(1.0)
+        time.sleep(0.3)
     restarted = bool(now) and now != pid   # "" : not back at all
-    time.sleep(3.0)
-    d.sh(f"ime enable {PKG}/org.fcitx.fcitx5.android.input.FcitxInputMethodService; "
-         f"ime set {PKG}/org.fcitx.fcitx5.android.input.FcitxInputMethodService")
+    ensure_ime(d)
+    if not restarted:
+        if own_check:
+            return warn, restarted   # the caller's check says it did not restart (F3714)
+        raise Fail("应用没有重启")
+    # the restarted settings home itself: the new process can be up (the keyboard's service)
+    # before its page is, and a tap made meanwhile is lost when the page comes over it
+    try:
+        d.wait(lambda s: "MainActivity" in d.top_activity() and d.at_home(s), timeout=15, what="恢复后重启的设置首页")
+    except Blocked:
+        s = d.screen()
+        raise Blocked(f"恢复后：{d.top_activity()} {s.texts()[:8]}")
+    time.sleep(1.0)
     return warn, restarted
 
 
@@ -169,22 +242,27 @@ def setup_dz_word(d):
     words13().import_dict_words(d)
 
 
-@case("PR-09", base="B0-设置", mutates=True)
-def pr09(d):
+def per_page(d):
+    """实体键盘 → 每页候选数: the option checked in its list"""
+    home(d, "实体键盘")
+    d.tap_text("每页候选数", after=1.0)
+    v = next((n.text for n in d.screen().app() if n.checked), None)
+    d.back()
+    return v
+
+
+@case("PR-10", base="B0-设置", mutates=True, visual=True)
+def pr10(d):
+    d.step("备份")
     setup_dz_word(d)
     name, new, msgs = backup(d)
     check(new and new[0].startswith("youmo_") and new[0].endswith(".zip"), f"下载里新文件 {new}（保存名 {name}）")
-    return f"{new[:1]}；提示 {msgs[:1] or '（toast 没抓到）'}"
-
-
-@case("PR-10", base="B0-设置", mutates=True)
-def pr10(d):
-    setup_dz_word(d)
-    name, new, msgs = backup(d)
-    if not new:
-        raise Blocked("前提没到：备份没有文件")
+    d.step("重置后恢复")
     reset(d, "B0-设置", "设置")
-    warn, restarted = restore(d, new[0])
+    warn, restarted = restore(d, new[0], own_check=True)
+    # checked before anything else: the rest means nothing without a restart (F3725)
+    check("覆盖" in warn and "标点" in warn, f"确认前的提示「{warn[:60]}」")
+    check(restarted, "应用没有重启")
     c1 = words13().page_cands(d, "dz")
     d.clear()
     d.type("lanjinghuayuan")
@@ -202,12 +280,38 @@ def pr10(d):
     # the name and its status (已开启 · N 个词) are separate texts of one row
     i = rows.index("dict-words") if "dict-words" in rows else -1
     check(i >= 0 and i + 1 < len(rows) and "个词" in rows[i + 1], f"基础词库一节 {rows}")
-    check("氪喵糖铺" in k, f"kemiaotangpu {k[:4]}")
-    check("覆盖" in warn, f"确认前的提示「{warn[:60]}」")
-    check(restarted, "应用没有重启")
     check(first(c1) == "北京市海淀区", f"dz {c1[:3]}")
     check(first(c2) == "澜境花园", f"lanjinghuayuan {c2[:3]}")
-    return f"提示有覆盖；重启了；dz {c1[:1]}；{c2[:1]}；基础词库 {rows[:3]}；kemiaotangpu {k[:2]}"
+    check("氪喵糖铺" in k, f"kemiaotangpu {k[:4]}")
+    d.step("改了再恢复")
+    words13().add_phrase(d, "yx", [("raw", "test"), ("sym", "@"), ("raw", "example"), ("sym", "."), ("raw", "com")])
+    c0 = words13().page_cands(d, "yx")
+    if first(c0) != "test@example.com":
+        raise Blocked(f"前提没到：yx {c0[:3]}")
+    d.clear()
+    d.hide_keyboard()
+    home(d, "实体键盘")
+    choose(d, "每页候选数", "5")
+    # a punctuation changed after the backup follows it too (F3726)
+    script("14-settings").st28(d)   # , → 、
+    with tempfile.TemporaryDirectory() as tmp:
+        local = os.path.join(tmp, new[0])
+        d.adb("pull", f"{DOWNLOAD}/{new[0]}", local, timeout=120)
+        with zipfile.ZipFile(local) as z:
+            dicts = [x for x in z.namelist() if "/dictionaries/" in x and not x.endswith("/")]
+    restore(d, new[0])
+    d.open_page("text")
+    d.press(",")
+    pt = d.field_text()
+    d.clear()
+    n = per_page(d)
+    c = [x.split(" ")[0] for x in words13().page_cands(d, "yx")]
+    check(any(x.endswith("/dict-words.txt.gz") for x in dicts)
+          and not any(x.endswith(("merged.ymd", ".tmp", "/dict-words.txt")) for x in dicts), f"备份里的词库 {dicts}")
+    check(n == "7", f"再恢复后每页候选数「{n}」")
+    check("test@example.com" not in c, f"再恢复后 yx {c[:4]}")
+    check(pt == "，", f"再恢复后点底排的，打出「{pt}」")
+    return f"{new[:1]}；提示 {msgs[:1] or '（看截图）'}；重启了；dz {c1[:1]}；{c2[:1]}；基础词库 {rows[:3]}；kemiaotangpu {k[:2]}；再恢复后每页 {n}，yx {c[:2]}，标点「{pt}」"
 
 
 @case("PR-34", base="B0-设置", mutates=True)
@@ -224,7 +328,8 @@ def pr34(d):
     d.hide_keyboard()
     home(d, "备份与恢复")
     before = set(d.sh(f"ls -1 {DOWNLOAD}").splitlines())
-    d.tap_text("备份全部", after=2.5)
+    d.tap_text("备份全部", after=0.3)
+    in_picker(d)
     if "documentsui" not in d.top_activity():
         raise Blocked(f"没出保存界面：{d.top_activity()}")
     # turned while the picker is open: the settings page behind it is rebuilt before the save
@@ -245,26 +350,83 @@ def pr34(d):
     return f"{new[0]}；恢复后 {c[:3]}"
 
 
-@case("PR-11", base="B0-设置", mutates=True)
-def pr11(d):
-    setup_dz_word(d)
-    name, new, msgs = backup(d)
+@case("PR-12", mutates=True)
+def pr12(d):
+    tb = script("05-toolbar")
+    d.step("敏感的和「公园」进剪贴板")
+    sensitive_clip(d)
+    tb.copy_word(d, "公园")
+    d.open_page("text")
+    tb.clip_panel(d)
+    items = [n.text for n in tb.clip_items(d)]
+    tb.back_to_keys(d)
+    if not (any(t.startswith("公园") for t in items) and any(t.startswith(BULLET) for t in items)):
+        raise Blocked(f"前提没到：剪贴板 {items[:4]}")
+    d.step("备份")
+    _, new, _ = backup(d)
     if not new:
-        raise Blocked("前提没到：备份没有文件")
-    words13().add_phrase(d, "yx", [("raw", "test"), ("sym", "@"), ("raw", "example"), ("sym", "."), ("raw", "com")])
-    c0 = words13().page_cands(d, "yx")
-    if first(c0) != "test@example.com":
-        raise Blocked(f"前提没到：yx {c0[:3]}")
-    d.clear()
+        raise Blocked("备份没有新文件")
+    d.step("重置后恢复")
+    reset(d, "B0-设置", "设置")
     restore(d, new[0])
-    c = [x.split(" ")[0] for x in words13().page_cands(d, "yx")]
-    check("test@example.com" not in c, f"恢复后 yx {c[:4]}")
-    return f"恢复后 yx {c[:3]}"
+    d.open_page("text")
+    tb.clip_panel(d)
+    after = [n.text for n in tb.clip_items(d)]
+    tb.back_to_keys(d)
+    check(any(t.startswith("公园") for t in after), f"恢复后没有「公园」：{after[:4]}")
+    check(not any(t.startswith(BULLET) or SECRET in t for t in after), f"恢复后敏感的那条还在：{after[:4]}")
+    return f"恢复后剪贴板 {after[:3]}"
+case("PR-13", needs="release:要同一版本的语音版正式包，覆盖安装文字版")(lambda d: None)
+@case("PR-10a", base="B0-设置", mutates=True)
+def pr10a(d):
+    """design §4 rule: a 0.3.2 backup's plain .txt restored over this build's .gz turned off: the
+    backup's state wins, one row, no reset"""
+    w = words13()
+    w.import_dict_words(d)
+    name = w.old_backup(d)
+    w.dict_row_menu(d, "关闭")
+    if "dict-words.txt.gz.disable" not in w.dict_files(d):
+        raise Blocked(f"关闭后目录 {w.dict_files(d)}")
+    restore(d, name)
+    d.open_page("text")
+    d.switch_im("拼音")
+    k = w.kemiaotangpu(d)
+    rows = w.dictionaries(d)
+    files = w.dict_files(d)
+    i = rows.index("dict-words") if "dict-words" in rows else -1
+    check("氪喵糖铺" in k, f"kemiaotangpu {k[:4]}")
+    check(rows.count("dict-words") == 1 and i + 1 < len(rows) and "已开启" in rows[i + 1], f"基础词库一节 {rows}")
+    check([f for f in files if f.startswith("dict-words")] == ["dict-words.txt.gz"], f"词库目录 {files}")
+    return f"kemiaotangpu {k[:2]}；词库页 {rows[i:i + 2]}；目录 {files}"
 
 
-case("PR-12", needs="skip:要 PR-08 的敏感剪贴板条目（密码管理器），redroid 上没有")(lambda d: None)
-case("PR-13", needs="skip:要同一版本的语音版 APK（这次只构建了文字版调试包）")(lambda d: None)
-case("PR-14", needs="skip:发版时用正式版跑（上一版正式版装上再覆盖安装这一版正式版，签名要一致）")(lambda d: None)
+@case("PR-10b", base="B0-设置", mutates=True)
+def pr10b(d):
+    """design §4 RN3: a backup with dict-words on restored over it turned off, no reset: the newer
+    (the backup's copy) wins, one row, no .gz.disable left beside the .gz"""
+    w = words13()
+    w.import_dict_words(d)
+    _, new, _ = backup(d)
+    if not new:
+        raise Blocked("备份全部没在下载里留下文件")
+    w.dict_row_menu(d, "关闭")
+    if "dict-words.txt.gz.disable" not in w.dict_files(d):
+        raise Blocked(f"关闭后目录 {w.dict_files(d)}")
+    restore(d, new[0])
+    d.open_page("text")
+    d.switch_im("拼音")
+    k = w.kemiaotangpu(d)
+    rows = w.dictionaries(d)
+    files = w.dict_files(d)
+    i = rows.index("dict-words") if "dict-words" in rows else -1
+    check("氪喵糖铺" in k, f"kemiaotangpu {k[:4]}")
+    check(rows.count("dict-words") == 1 and i + 1 < len(rows) and "已开启" in rows[i + 1], f"基础词库一节 {rows}")
+    check([f for f in files if f.startswith("dict-words")] == ["dict-words.txt.gz"], f"词库目录 {files}")
+    return f"kemiaotangpu {k[:2]}；词库页 {rows[i:i + 2]}；目录 {files}"
+
+
+case("PR-14", needs="release:上一版正式版装上再覆盖安装这一版正式版，签名要一致")(lambda d: None)
+case("PR-30", needs="release:要 v0.3.0 正式版装上再覆盖安装这一版正式版")(lambda d: None)
 
 
 @case("PR-15", base="B0-设置", mutates=True)
@@ -444,8 +606,14 @@ def pr17(d):
     d.clear()
     hdr, _ = recent_emoji(d)
     ent = status_texts(d)
-    status_entry(d, "恢复我的输入习惯")
-    script("05-toolbar").back_to_keys(d)
+    # PR-19 folded in: the switch on 用户词库 is the same one as ⋯'s entry
+    d.hide_keyboard()
+    words13().user_lexicon(d)
+    sw = words13().switch_on(d, "用我的输入习惯")
+    d.switch("用我的输入习惯", True)
+    d.open_page("text")
+    d.switch_im("拼音")
+    ent2 = status_texts(d)
     hdr2, rec2 = recent_emoji(d)
     check(said, "关掉时没有提示「已不用我的输入习惯，在 ⋯ 里恢复」")
     check(not kept, f"键盘上留着 {kept}")
@@ -457,6 +625,8 @@ def pr17(d):
     check(not has(z, "北京市海淀区"), f"dz {z[:4]}")
     check(hdr != "最近使用", f"表情面板第一页是「{hdr}」")
     check("恢复我的输入习惯" in ent, f"⋯ 里 {ent[:16]}")
+    check(sw is False, f"用户词库页顶「用我的输入习惯」{sw}")
+    check("不用我的输入习惯" in ent2, f"打开后 ⋯ 里 {ent2[:16]}")
     check(hdr2 == "最近使用" and any(x.startswith("😀") for x in rec2), f"恢复后表情第一页「{hdr2}」{rec2[:5]}")
     return f"弹出提示、不留标记；wangxiaoming {w[:2]}；shi {s1[:2]}；dz {z[:2]}；表情第一页「{hdr}」；恢复后「{hdr2}」{rec2[:2]}"
 
@@ -532,38 +702,6 @@ def pr21(d):
     return f"确认框写明不能退回；他 dl {c[:3]}；shi {s1[:2]}；最近 {rec[:3]}"
 
 
-@case("PR-23", mutates="learn")
-def pr23(d):
-    from uat import sym_char
-    d.switch_im("英文")
-    for i in range(2):
-        d.type("abc")
-        sym_char(d, "@")
-        d.type("example")
-        sym_char(d, ".")
-        d.type("com")
-        d.space()
-    d.switch_im("拼音")
-    for i in range(2):
-        d.press("123", after=0.8)
-        k = d.keys(refresh=True)
-        d.taps([k[c] for c in "13800000000"], after=0.4)
-        script("04-panels").ime_tap(d, text="ABC", after=0.6)
-        d._keys = None
-        d.space()
-    t = d.field_text()
-    if t.count("abc@example.com") != 2 or t.count("13800000000") != 2:
-        raise Blocked(f"框里「{t}」")
-    rows = []
-    w = words13()
-    for page in ("手动添加的词", "自动学到的词"):
-        w.user_lexicon(d, page)
-        rows += w.list_texts(d)
-    bad = [r for r in rows if any(x in r for x in ("138", "0000", "@", "example.com", "abc@"))]
-    check(not bad, f"用户词库里有 {bad[:4]}")
-    return f"框里「{t}」；用户词库 {rows[:6]}"
-
-
 # ---------------------------------------------------------------- 自动备份
 
 def backups(d):
@@ -612,27 +750,6 @@ def pr26(d):
     check(len(mine) == 1 and not set(mine) & set(old), f"清空后这次安装的备份 {mine}（之前 {old}）")
     check(first(c) == "带来", f"恢复后「他 dl」{c[:4]}")
     return f"之前 {old[:1]}；清空后 {mine}；恢复后 {c[:3]}"
-
-
-@case("PR-31", base="B0-设置", mutates=True)
-def pr31(d):
-    w = words13()
-    w.add_word(d, "蓝鲸花园", "lan jing hua yuan")
-    name = w.export_lexicon(d)
-    w.cut_exports(d, name)
-    w.user_lexicon(d, "手动添加的词")
-    before = w.list_texts(d)
-    d.back()
-    d.tap_text("学习备份", after=1.2)
-    d.tap_text("从备份恢复", after=2.5)
-    msgs, opts, dialog = w.pick_refused(d, "cut2.fxlb")
-    d.open_settings()
-    w.user_lexicon(d, "手动添加的词")
-    after = w.list_texts(d)
-    check(any("不是本输入法的备份" in m for m in msgs), f"提示 {msgs[:3]}")
-    check(not opts and not dialog, f"出了选择 {opts[:3]} / 确认框 {dialog[:1]}")
-    check(after == before, f"用户词库 {before[:4]} → {after[:4]}")
-    return f"cut2.fxlb「{next((m for m in msgs if '不是' in m), '')}」；没有确认框；用户词库不变"
 
 
 @case("PR-27", mutates=True)
@@ -689,11 +806,12 @@ def pr32(d):
     w.user_lexicon(d, "学习备份")
     before = set(d.sh(f"ls -1 {DOWNLOAD}").splitlines())
     d.tap_text("另存一份到看得见的文件夹", after=1.0)
-    d.tap_text("确定", after=2.5)
+    d.tap_text("确定", after=0.3)
+    in_picker(d)
     if "documentsui" not in d.top_activity():
         raise Blocked(f"另存没出保存界面：{d.top_activity()}")
-    d.tap_text("保存", where="all", scroll=False, after=2.5)
-    new = sorted(set(d.sh(f"ls -1 {DOWNLOAD}").splitlines()) - before)
+    d.tap_text("保存", where="all", scroll=False, after=0.3)
+    new = new_files(d, DOWNLOAD, before)
     if not new:
         raise Blocked("另存后下载里没有新文件")
     reset(d, "B0-设置", "设置")
@@ -706,6 +824,9 @@ def pr32(d):
     d.clear()
     d.open_settings()
     w.user_lexicon(d, "学习备份")
+    # slept, not polled, here: polled (picker, then its 确定) the restore came a few seconds after
+    # the 固定首位 above, and 6 runs in 7 restored no 屏蔽 at all; slept, every run kept it. Likely the
+    # app's (a restore close behind a pin losing the backup's block), left for the app to look at
     d.tap_text("从备份恢复", after=2.5)
     if "documentsui" not in d.top_activity():
         raise Blocked(f"没出文件选择：{d.top_activity()}")
@@ -735,31 +856,6 @@ def pr32(d):
     return f"屏蔽的词 {blocked[:3]}；固定的词 {pinned[:3]}；shi {c[:4]}"
 
 
-@case("PR-33", base="B0-设置", mutates=True)
-def pr33(d):
-    w = words13()
-    # a real backup's head padded past 64 MB: an all-zero file is refused by its head, never by size
-    saved = _save_copy(d)
-    d.sh(f"cd {DOWNLOAD} && (cat '{saved}'; head -c 68157440 /dev/zero) > big.fxlb && rm -f '{saved}'")
-    d.open_settings()
-    w.user_lexicon(d, "手动添加的词")
-    before = w.list_texts(d)
-    d.back()
-    d.tap_text("学习备份", after=1.2)
-    t0 = time.time()
-    d.tap_text("从备份恢复", after=2.5)
-    msgs, opts, dialog = w.pick_refused(d, "big.fxlb")
-    secs = time.time() - t0
-    d.sh(f"rm -f {DOWNLOAD}/big.fxlb")
-    d.open_settings()
-    w.user_lexicon(d, "手动添加的词")
-    after = w.list_texts(d)
-    check(any("不是本输入法的备份" in m for m in msgs), f"提示 {msgs[:3]}")
-    check(not opts and not dialog, f"出了选择 {opts[:3]} / 确认框 {dialog[:1]}")
-    check(after == before, f"用户词库 {before[:4]} → {after[:4]}")
-    return f"big.fxlb「{next((m for m in msgs if '不是' in m), '')}」；{secs:.0f} 秒；用户词库不变"
-
-
 # ---------------------------------------------------------------- R11: restore merges, 退回恢复前
 
 def _save_copy(d):
@@ -767,11 +863,12 @@ def _save_copy(d):
     w.user_lexicon(d, "学习备份")
     before = set(d.sh(f"ls -1 {DOWNLOAD}").splitlines())
     d.tap_text("另存一份到看得见的文件夹", after=1.0)
-    d.tap_text("确定", after=2.5)
+    d.tap_text("确定", after=0.3)
+    in_picker(d)
     if "documentsui" not in d.top_activity():
         raise Blocked(f"另存没出保存界面：{d.top_activity()}")
-    d.tap_text("保存", where="all", scroll=False, after=2.5)
-    new = sorted(set(d.sh(f"ls -1 {DOWNLOAD}").splitlines()) - before)
+    d.tap_text("保存", where="all", scroll=False, after=0.3)
+    new = new_files(d, DOWNLOAD, before)
     if not new:
         raise Blocked("另存后下载里没有新文件")
     return new[0]
@@ -805,7 +902,7 @@ def _typed(d, code, want=None):
 
 
 def _pr24(d):
-    """PR-24's 前提 and 操作 (restored twice); returns (C, D)"""
+    """PR-25's 前提 and its restore (twice); returns (C, D)"""
     py = script("06-pinyin")
     d.open_page("text")   # B0-设置 starts on the settings
     d.switch_im("拼音")
@@ -835,21 +932,18 @@ def _pr24(d):
     return cc, dd
 
 
-@case("PR-24", base="B0-设置", mutates=True, visual=True)
-def pr24(d):
+@case("PR-25", base="B0-设置", mutates=True, visual=True)
+def pr25(d):
+    d.step("恢复合并")
     cc, dd = _pr24(d)
     s = _typed(d, "shi")
     j = _typed(d, "jingmiaoyu", want="鲸喵屿")
     w = _typed(d, "wangxiaoming")
-    check(first(s) == dd, f"shi {s[:3]}（C=「{cc}」，D=「{dd}」）")
-    check("鲸喵屿" in j, f"jingmiaoyu {j[:3]}")
-    check(first(w) == "汪小明", f"wangxiaoming {w[:3]}")
-    return f"C=「{cc}」 D=「{dd}」；shi {s[:2]}；{j[:1]}；{w[:2]}"
-
-
-@case("PR-25", base="B0-设置", mutates=True)
-def pr25(d):
-    cc, dd = _pr24(d)
+    check(first(s) == dd, f"恢复后 shi {s[:3]}（C=「{cc}」，D=「{dd}」）")
+    check("鲸喵屿" in j, f"恢复后 jingmiaoyu {j[:3]}")
+    check(first(w) == "汪小明", f"恢复后 wangxiaoming {w[:3]}")
+    d.step("退回恢复前")
+    d.hide_keyboard()
     words13().user_lexicon(d, "学习备份")
     d.tap_text("退回恢复前", after=1.0)
     s0 = d.screen()
@@ -860,9 +954,9 @@ def pr25(d):
     d.tap(b.c, 0.6)
     d.shot("full", "退回后的提示（应为\"已退回恢复前\"）")
     time.sleep(2.4)
-    s = _typed(d, "shi")
-    j = _typed(d, "jingmiaoyu", want="鲸喵屿")
+    s2 = _typed(d, "shi")
+    j2 = _typed(d, "jingmiaoyu", want="鲸喵屿")
     check(all(x in msg for x in ("学到", "固定", "屏蔽")), f"确认框「{msg}」")
-    check(first(s) == dd, f"shi {s[:3]}（D=「{dd}」）")
-    check("鲸喵屿" in j, f"jingmiaoyu {j[:3]}")
-    return f"「{msg[:40]}」；shi {s[:2]}；{j[:1]}"
+    check(first(s2) == dd, f"退回后 shi {s2[:3]}（D=「{dd}」）")
+    check("鲸喵屿" in j2, f"退回后 jingmiaoyu {j2[:3]}")
+    return f"恢复后 shi {s[:2]}，{j[:1]}，{w[:1]}；「{msg[:40]}」；退回后 shi {s2[:2]}；{j2[:1]}"

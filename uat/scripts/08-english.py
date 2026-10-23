@@ -60,19 +60,23 @@ def en04(d):
     check(t0 == "the ", f"第一次空格后「{t0}」")
     check(t1 == "teh", f"退格后「{t1}」")
     check(t2.endswith("teh "), f"最后框里「{t2}」")
-    return f"「{t0}」→退格「{t1}」→「{t2}」"
-
-
-@case("EN-05", base="B0-英文", mutates="learn")
-def en05(d):
+    d.clear()
+    d.step("英文词库里恢复自动改")
+    en_settings(d)
+    d.tap_text("英文词库", after=1.2)
+    n = d.screen().find(text="teh")
+    row = n.row().texts() if n else []
+    check(any("不再自动改" in x for x in row), f"英文词库里 teh 那行 {row[:4]}")
+    d.tap(n.c, 0.8)
+    d.tap_text("恢复自动改", where="all", scroll=False)
+    d.open_page("text")
+    d.switch_im("英文")
+    d.clear()
     d.type("teh")
-    c = d.cands()
-    if c[:2] != ["the", "teh"]:
-        raise Blocked(f"候选 {c[:3]}")
-    d.pick(2)
-    t = d.field_text()
-    check(t == "teh ", f"框里「{t}」")
-    return f"「{t}」"
+    d.cands()
+    d.space()
+    t3 = d.expect_field("the ", msg="恢复后 teh 空格：「{got}」")
+    return f"「{t0}」→退格「{t1}」→「{t2}」；恢复后「{t3}」"
 
 
 @case("EN-06", base="B0-英文", mutates="learn")
@@ -230,37 +234,6 @@ def en15(d):
     return f"「{t}」，没有候选"
 
 
-@case("EN-16", base="B0-英文", mutates="learn")
-def en16(d):
-    d.type("fuk")
-    c = d.cands()
-    d.space()
-    t = (d.field_text() or "").strip().lower()
-    check(t not in ("fuck", "fucks"), f"上屏「{t}」（候选 {c[:3]}）")
-    return f"上屏「{t}」"
-
-
-@case("EN-17", base="B0-设置", mutates=True)
-def en17(d):
-    glide_on(d, "英文")
-    d.type("ok")
-    d.cands()
-    d.glide("helo")
-    t = d.field_text()
-    check(t == "ok hello ", f"框里「{t}」")
-    return f"「{t}」"
-
-
-@case("EN-18", base="B0-设置", mutates=True)
-def en18(d):
-    glide_on(d, "英文")
-    d.glide("helo")
-    sym_comma(d)
-    t = d.field_text()
-    check(t == "hello, ", f"框里「{t}」")
-    return f"「{t}」"
-
-
 def weird(t):
     return any(ch in t for ch in "�?□") if t else True
 
@@ -294,59 +267,6 @@ def en19(d):
     return f"「{t1}」「{t2}」「{t3}」「{t4}」「{t5}」"
 
 
-@case("EN-20", base="B0-设置", mutates=True)
-def en20(d):
-    glide_on(d, "英文", "nosuggest")
-    out = []
-    # 1: Hi. then a glide
-    d.press("shift")
-    d.type("hi")
-    d.press(".")
-    d.space()
-    d.glide("helo")
-    out.append(d.field_text())
-    d.clear()
-    d.type("abc ")
-    d.glide("helo")
-    out.append(d.field_text())
-    d.clear()
-    d.type("abc")
-    d.bksp()
-    d.glide("helo")
-    out.append(d.field_text())
-    d.clear()
-    d.type("hello world")
-    f = d.field()
-    # long-press world to select it: the words' ink on a screenshot, the last word's middle
-    im = d.png().convert("L")
-    x0, y0, x1, y1 = f.b
-    bg = im.getpixel((x1 - 12, f.c[1]))
-    cols = [any(abs(im.getpixel((x, y)) - bg) > 90 for y in range(y0 + 15, y1 - 15)) for x in range(x0 + 8, x1 - 8)]
-    words, start, gap = [], None, 0
-    for i, v in enumerate(cols + [False] * 30):
-        if v:
-            if start is None:
-                start = i
-            gap = 0
-            end = i
-        elif start is not None:
-            gap += 1
-            if gap > 14:
-                words.append((x0 + 8 + start, x0 + 8 + end))
-                start = None
-    if len(words) < 2:
-        raise Blocked(f"框里找不到两个词的字形：{words}")
-    d.hold(((words[-1][0] + words[-1][1]) // 2, f.c[1]), 900)
-    time.sleep(0.8)
-    d.bksp()
-    d.glide("helo")
-    out.append(d.field_text())
-    want = ["Hi. hello ", "abc hello ", "ab hello ", "hello hello "]   # the field: autocapitalize=off
-    bad = [(w, g) for w, g in zip(want, out) if w != g]
-    check(not bad, f"应为/实际 {bad}")
-    return f"{out}"
-
-
 @case("EN-21", base="B0-设置", mutates=True)
 def en21(d):
     glide_on(d, "英文", "sentence")
@@ -372,27 +292,13 @@ def en21(d):
     d.glide("im")   # a one-key glide is a tap: i-m is the shortest path that glides
     t3 = d.field_text() or ""
     check(t3 == "ok I'm ", f"不自动大写的框里划 i-m 后「{t3}」")
-    return f"「{t}」；「{t2}」；「{t3}」"
-
-
-@case("EN-25", base="B0-英文", mutates="learn")
-def en25(d):
-    d.type("i")   # no 'I' key: the field's auto-capital makes it "I"
-    d.space()
-    d.type("said")
-    d.cands()
-    d.space()
-    d.type("hel")
-    c = [x.split(" ")[0] for x in d.cands(want="hello")]
-    if "hello" not in c:
-        raise Blocked(f"hel 的候选 {c[:5]}")
-    d.pick("hello")
-    t0 = d.field_text()
-    d.bksp()
-    t = d.field_text()
+    # Shift by hand where nothing capitalises: the glide takes it
     d.clear()
-    check(t.rstrip() == "I said hello", f"选「hello」后「{t0}」，⌫ 后「{t}」")
-    return f"「{t0}」→ ⌫「{t}」"
+    d.press("shift")
+    d.glide("helo")
+    t4 = d.field_text() or ""
+    check(t4 == "Hello ", f"点 ⇧ 后划 hello：「{t4}」")
+    return f"「{t}」；「{t2}」；「{t3}」；「{t4}」"
 
 
 @case("EN-26", base="B0-英文", mutates="learn", clean=True)

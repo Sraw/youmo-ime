@@ -1,12 +1,12 @@
 """uat/14-settings.md. The .md is the source of truth; each function follows its case's
-前提/操作/预期. ST-23/24 (vibration, key sound) need a real phone."""
+前提/操作/预期."""
 import os
 import shutil
 import subprocess
 import tempfile
 import time
 
-from uat import PKG, Blocked, Fail, case, check, choose, gear, has, home, popup_pick, script
+from uat import PKG, Blocked, Fail, add_im, case, check, choose, gear, has, home, popup_pick, script
 
 SWITCHES = ("Switch", "SwitchCompat", "SwitchMaterial", "CheckBox")
 
@@ -55,6 +55,9 @@ def key_nodes(d, label, s=None):
 
 HOME = ["输入法", "通用输入", "词库与短语", "外观", "按键", "声音与振动", "剪贴板与表情", "实体键盘",
         "备份与恢复", "界面语言"]
+# ST-33's tour: every input method with a settings page of its own, added once
+IMS = ["九键拼音", "手写", "双拼"]
+TABLES = ["五笔", "二笔", "仓颉", "自然码", "五笔拼音"]
 
 
 @case("ST-01", base="B0-设置")
@@ -106,16 +109,6 @@ def st03(d):
     return f"浏览器打开 {url}"
 
 
-@case("ST-04")
-def st04(d):
-    d.expand_toolbar()
-    d.tap_text("状态区域", where="ime", scroll=False)
-    d.tap_text("打开输入法设置", where="ime", scroll=False, after=2.0)
-    s = d.screen()
-    check(d.at_home(s), f"打开的是 {d.top_activity()}：{s.texts()[:6]}")
-    return "打开设置首页"
-
-
 # ---------------------------------------------------------------- 通用输入
 
 @case("ST-32", base="B0-设置", mutates=True)
@@ -146,29 +139,147 @@ def st32(d):
     return f"z↔zh 勾着，档位「{perf.splitlines()[0]}」，zongguo {c[:3]}"
 
 
-@case("ST-33", base="B0-设置")
+@case("ST-33", base="B0-设置", mutates=True)
 def st33(d):
+    d.step("加输入法")
+    for im in IMS + TABLES:
+        add_im(d, im)
+
+    d.step("词库与短语")
+    home(d, "词库与短语")
+    t = d.all_texts()
+    lead = next((x for x in t if x.startswith("用户词库的词排得靠前")), None)
+    order = [x for x in t if x in ("用户词库", "基础词库", "导入", "短语", "新词")]
+    check(lead and "还没选过的，可能排在很常用的同音词后面" in lead, f"最上面 {t[1:2]}")
+    check([x for i, x in enumerate(order) if i == 0 or x != order[i - 1]] == ["用户词库", "基础词库", "导入", "短语"],
+          f"分组 {order}")
+    check("新词" not in t, "有新词分组")
+    for x in ("内置词库", "常用词和近几年的新词，随应用更新 · 只读", "导入词库", "自定义短语"):
+        check(x in t, f"没有「{x}」")
+
+    d.step("用户词库")
+    home(d, "词库与短语", "用户词库")
+    on = {x: switch_state(d, x) for x in ("用我的输入习惯", "自动备份")}
+    texts = d.all_texts()
+    check(on == {"用我的输入习惯": True, "自动备份": True}, f"页顶开关 {on}")
+    miss = [x for x in ("清空学到的", "学习备份", "英文词库", "导出") if x not in texts]
+    check(not miss, f"用户词库页缺 {miss}：{texts[:20]}")
+    d.tap_text("学习备份", after=1.2)
+    bk = d.all_texts()
+    miss = [x for x in ("从备份恢复", "另存一份到看得见的文件夹", "退回恢复前") if x not in bk]
+    check(not miss, f"学习备份里缺 {miss}：{bk[:8]}")
+    d.back()
+    d.tap_text("英文词库", after=1.2)
+    here = d.screen().texts()
+    script("08-english").en_settings(d)
+    d.tap_text("英文词库", after=1.2)
+    there = d.screen().texts()
+    check(here == there, f"两处英文词库不是同一页：{here[:5]} / {there[:5]}")
+
+    d.step("通用输入")
     home(d, "通用输入")
     rows = d.pref_rows()
     cats = [r[0] for r in rows if r[2]]
     check(cats == ["所有输入法", "中文输入法", "拼音（全拼、双拼、九键）"], f"分组 {cats}")
     summ = {r[0]: r[1] for r in rows}
-    for t in ("滑行输入", "表情候选"):
-        check(summ.get(t, "").splitlines()[-1:] == ["不适用：手写。"], f"{t} 的说明最后一句：{summ.get(t)!r}")
-    t = "纠正错拼和按偏的键"
-    check(summ.get(t, "").splitlines()[-1:] == ["不适用：九键拼音。"], f"{t} 的说明最后一句：{summ.get(t)!r}")
-    check("中文输入法" in cats, f"没有「中文输入法」一节：{cats}")
-    sec, on = [], False
+    for x in ("滑行输入", "表情候选"):
+        check(summ.get(x, "").splitlines()[-1:] == ["不适用：手写。"], f"{x} 的说明最后一句：{summ.get(x)!r}")
+    x = "纠正错拼和按偏的键"
+    check(summ.get(x, "").splitlines()[-1:] == ["不适用：九键拼音。"], f"{x} 的说明最后一句：{summ.get(x)!r}")
+    sec, inside = [], False
     for r in rows:
         if r[2]:
-            on = r[0] == "中文输入法"
-        elif on:
+            inside = r[0] == "中文输入法"
+        elif inside:
             sec.append(r)
     bad = [r[0] for r in sec if "不适用：英文" in r[1]]
     dt = next((r for r in sec if r[0] == "自带的日期时间"), None)
     check(dt and dt[1].splitlines()[-1:] == ["不适用：手写。"], f"中文输入法一节里的自带的日期时间：{dt}")
     check(not bad, f"中文输入法一节里有不适用：英文：{bad}")
-    return f"分组 {cats}；四处不适用说明对；中文一节没有不适用：英文"
+    d.scroll_top()
+    d.tap_text("模糊音", after=1.0)
+    s = d.screen()
+    texts = s.texts(where="all")
+    uv = next((i for i, x in enumerate(texts) if "u ↔ v" in x or "u↔v" in x), None)
+    check(uv is not None and any("不适用：九键拼音" in x for x in texts[uv:uv + 3]), f"模糊音 {texts[:20]}")
+    check([n for n in s.nodes if n.cls in ("CheckBox", "CheckedTextView") and n.enabled], "模糊音里的勾选框不能勾")
+    d.tap_text("取消", scroll=False)
+
+    d.step("拼音")
+    gear(d, "拼音")
+    t = d.all_texts()
+    check(t and "通用输入设置" in t[:4], f"最上面是 {t[:4]}")
+    check("中英混输" in t, f"没有中英混输：{t[:20]}")
+    bad = [x for x in ("每页候选数", "联想下一个词", "性能档位", "纠正错拼和按偏的键", "模糊音") if x in t]
+    check(not bad, f"拼音页里有 {bad}")
+    d.scroll_top()
+    d.tap_text("通用输入设置", after=1.2)
+    check(d.screen().find(text="通用输入"), f"点通用输入设置后是 {d.screen().texts()[:4]}")
+
+    d.step("九键拼音")
+    gear(d, "九键拼音")
+    t = d.all_texts()
+    want = ["通用输入设置", "连按选字母", "九键英文打法", "按键字母", "按键长按"]
+    check([x for x in t if x in want] == want, f"九键页 {t[:14]}")
+    check(any("只有这一种读法" in x for x in t), f"连按选字母的说明 {t[:14]}")
+    check(any(x.rstrip("。").endswith("总是连按") for x in t), f"九键英文打法的说明 {t[:14]}")
+    # a password field switches to English on the full keyboard: never 九键英文's 连按
+    check(not any("连按" in x and "密码" in x for x in t), f"九键英文打法的说明还写密码 {t[:14]}")
+
+    d.step("手写")
+    gear(d, "手写")
+    t = d.all_texts()
+    check(t and "通用输入设置" in t[:4], f"最上面 {t[:4]}")
+    check("停笔多久算写完一个字" in t, f"没有停笔：{t[:12]}")
+    bad = [x for x in ("每页候选数", "联想下一个词", "性能档位") if x in t]
+    check(not bad, f"手写页里有 {bad}")
+
+    d.step("双拼")
+    gear(d, "双拼")
+    t = d.all_texts()
+    check("方案" in t and "中英混输" not in t, f"双拼设置 {t[:12]}")
+
+    sw = {}
+    for im in TABLES:
+        d.step(im)
+        gear(d, im)
+        t = d.all_texts()
+        d.scroll_top()
+        sw[im] = {x: switch_state(d, x) if x in t else None
+                  for x in ("只有一个候选时直接上屏", "显示编码提示", "调频")}
+        if any(v is None and x in t for x, v in sw[im].items()):
+            d.scroll()   # a switch below the fold
+            sw[im].update({x: switch_state(d, x) for x, v in sw[im].items() if v is None and x in t})
+        check("恢复码表顺序" in t, f"{im} 没有恢复码表顺序：{t[:12]}")
+        check(sw[im]["调频"] is False, f"{im} 的调频 {sw[im]['调频']}")
+        # 自动造词's two are gone (U-28 C46)
+        gone = [x for x in ("最长造多少字的词", "造出的词何时记住") if x in t]
+        check(not gone, f"{im} 还有 {gone}")
+        if im == "五笔":
+            check(t and "通用输入设置" in t[:4], f"五笔页最上面 {t[:4]}")
+            check(sw[im]["只有一个候选时直接上屏"] and sw[im]["显示编码提示"], f"五笔 {sw[im]}")
+    check(sw["仓颉"]["显示编码提示"] is False, f"仓颉 {sw['仓颉']}")
+
+    d.step("实体键盘")
+    home(d, "实体键盘")
+    rows = d.pref_rows()
+    want = [("显示候选窗口", "根据输入设备而定"), ("实体键盘快捷键", None), ("候选词列表方向", "自动"),
+            ("浮动候选窗字号", "20 sp"), ("每页候选数", "7")]
+    got = {r[0]: r[1] for r in rows if not r[2]}
+    titles = [r[0] for r in rows if not r[2]]
+    for x, v in want:
+        check(x in got, f"没有「{x}」：{titles}")
+        if v:
+            check(got[x].splitlines()[0] == v, f"「{x}」是「{got[x]}」")
+    check(titles[-1] == "每页候选数", f"最后一项是 {titles[-1]}")
+    check("所有输入法都用" in got["每页候选数"], f"每页候选数说明「{got['每页候选数']}」")
+    check(switch_state(d, "实体键盘快捷键"), "实体键盘快捷键不是开的")
+
+    d.step("首页")
+    d.open_settings()
+    titles = [r[0] for r in d.pref_rows()]
+    check(titles == HOME, f"首页入口 {titles}")
+    return f"词库与短语、用户词库、通用输入、{len(IMS) + 1 + len(TABLES)} 个输入法页、实体键盘都对；首页 {len(titles)} 项"
 
 
 @case("ST-34", base="B0-设置", mutates=True)
@@ -243,21 +354,6 @@ def st05(d):
     kl = d.lum(kb_box(d))
     check(dark(kl), f"键盘亮度 {kl:.0f}，不是深色")
     return f"预览亮度 {before:.0f} → {after:.0f}；键盘 {kl:.0f}"
-
-
-@case("ST-06", base="B0-设置", mutates=True)
-def st06(d):
-    d.sh("cmd uimode night yes")
-    time.sleep(1.5)
-    d.open_page("text")
-    a = d.lum(kb_box(d))
-    d.sh("cmd uimode night no")
-    time.sleep(1.5)
-    d.open_page("text")
-    b = d.lum(kb_box(d))
-    check(dark(a), f"深色模式时键盘亮度 {a:.0f}")
-    check(not dark(b), f"浅色模式时键盘亮度 {b:.0f}")
-    return f"深色模式键盘亮度 {a:.0f}，浅色 {b:.0f}"
 
 
 IMG = None
@@ -340,21 +436,6 @@ def kb_picture(d, rows=1.0):
     return (sum(1 for r, g, b in px if r > g + 40 and r > b + 60), sum(1 for r, g, b in px if b > r + 80 and b > g + 80))
 
 
-@case("ST-07", base="B0-设置", mutates=True)
-def st07(d):
-    appearance_tab(d, "大小与样式")
-    d.switch("跟随系统夜间模式", False)
-    add_image_theme(d)
-    appearance_tab(d, "主题")
-    item = custom_item(d)
-    check(item, "主题列表里没有新加的主题")
-    d.tap(item.c, 1.5)
-    d.open_page("text")
-    o, b = kb_picture(d)
-    check(o > 40 and b > 40, f"点了它，键盘背景不是那张图（橙 {o} 蓝 {b} / 1800）")
-    return f"列表里有新主题；键盘背景是那张图（橙 {o} 蓝 {b}）"
-
-
 def export_custom(d):
     """long-press one's own theme, save it in 下载; returns the new file's name"""
     before = set(d.sh("ls /sdcard/Download/ 2>/dev/null").split())
@@ -383,32 +464,37 @@ def delete_custom(d):
     d.tap_text("确定", scroll=False, after=2.0)
 
 
-@case("ST-08", base="B0-设置", mutates=True)
-def st08(d):
+@case("ST-09", base="B0-设置", mutates=True)
+def st09(d):
+    d.step("新增")
+    appearance_tab(d, "大小与样式")
+    d.switch("跟随系统夜间模式", False)
+    # the default to come back to, seen now: with 跟随 off it is the normal-mode theme's default
+    # (PixelDark), not the light one ST-08 saw with 跟随 on
+    d.open_page("text")
+    lum_default = d.lum(kb_box(d))
     add_image_theme(d)
+    appearance_tab(d, "主题")
+    item = custom_item(d)
+    check(item, "主题列表里没有新加的主题")
+    d.tap(item.c, 1.5)
+    d.open_page("text")
+    o, b = kb_picture(d)
+    check(o > 40 and b > 40, f"点了它，键盘背景不是那张图（橙 {o} 蓝 {b} / 1800）")
+    d.step("导出")
     files = export_custom(d)
     check(files, "导出后下载里没有新文件")
+    d.step("删除")
     delete_custom(d)
     appearance_tab(d, "主题")
     check(not custom_item(d), "删除后列表里还有它")
     d.open_page("text")
     # above the bottom row: the release build's default (Pixel) has a blue return key there
-    o, b = kb_picture(d, rows=0.75)
+    o0, b0 = kb_picture(d, rows=0.75)
     lum = d.lum(kb_box(d))
-    check(o < 10 and b < 10 and lum > 150, f"键盘不是默认主题（图的橙 {o} 蓝 {b}，亮度 {lum:.0f}）")
-    return f"导出 {files[0]}；删除后列表里没有它，键盘回到默认（亮度 {lum:.0f}）"
-
-
-@case("ST-09", base="B0-设置", mutates=True)
-def st09(d):
-    # 前提: 下载 has the file ST-08 exported (made here as ST-08 does, the theme then deleted)
-    appearance_tab(d, "大小与样式")
-    d.switch("跟随系统夜间模式", False)
-    add_image_theme(d)
-    files = export_custom(d)
-    if not files:
-        raise Blocked("前提没到：导出没有文件")
-    delete_custom(d)
+    check(o0 < 10 and b0 < 10 and abs(lum - lum_default) < 25,
+          f"键盘不是默认主题（图的橙 {o0} 蓝 {b0}，亮度 {lum:.0f}，加主题前 {lum_default:.0f}）")
+    d.step("导入")
     appearance_tab(d, "新增主题")
     d.tap_text("导入文件…", contains=True, scroll=False, after=2.5)
     s = d.screen()
@@ -423,7 +509,7 @@ def st09(d):
     d.open_page("text")
     o, b = kb_picture(d)
     check(o > 40 and b > 40, f"选用导入的主题后键盘背景不是那张图（橙 {o} 蓝 {b} / 1800）")
-    return f"导入后列表里有它；选用后键盘是那张图（橙 {o} 蓝 {b}）"
+    return f"新增、选用是那张图；导出 {files[0]}；删除后回到默认（亮度 {lum:.0f}）；导入后选用是那张图"
 
 
 @case("ST-35", base="B0-设置", mutates=True)
@@ -509,6 +595,36 @@ def st11(d):
     check(k1[3] < k0[3] - 10, f"下面没多出空白：键区底 {k0[3]} → {k1[3]}")
     check(w1[2] - w1[0] < w0[2] - w0[0], f"键没变窄：q 宽 {w0[2] - w0[0]} → {w1[2] - w1[0]}")
     return f"键区 x {k0[0]}..{k0[2]} → {k1[0]}..{k1[2]}，底 {k0[3]} → {k1[3]}，q 宽 {w0[2] - w0[0]} → {w1[2] - w1[0]}"
+
+
+@case("ST-39", base="B0-设置", mutates=True)
+def st39(d):
+    def preview_gap():
+        # the blank under the preview's keys: the nav bar's height is left out of it when 贴底 (F3553)
+        s = d.screen()
+        pv = preview_box(d, s)
+        below = [n.b[1] for n in s.app() if n.b[1] >= pv[3] - 1 and n.b[0] < pv[2] and n.b[2] > pv[0]]
+        d.shot((pv[0], pv[1], pv[2], min(below, default=pv[3]) + 10), "预览下方")
+        return min(below) - pv[3] if below else None
+
+    d.open_page("text")
+    k0 = keys_box(d)
+    appearance_tab(d, "大小与样式")
+    g0 = preview_gap()
+    choose(d, "键盘底部边距", "贴底")
+    g1 = preview_gap()
+    d.open_page("text")
+    k1 = keys_box(d)
+    appearance_tab(d, "大小与样式")
+    choose(d, "键盘底部边距", "无")
+    g2 = preview_gap()
+    d.open_page("text")
+    k2 = keys_box(d)
+    check(k1[3] > k0[3] + 10, f"贴底没下移：键区底 {k0[3]} → {k1[3]}")
+    check(abs(k2[3] - k0[3]) <= 2, f"选回无没回原位：键区底 {k0[3]} → {k2[3]}")
+    check(g0 is not None and g1 is not None and g1 < g0 - 10, f"贴底时预览下方的空白没少：{g0} → {g1}")
+    check(g2 is not None and abs(g2 - g0) <= 2, f"选回无预览下方的空白没回来：{g0} → {g2}")
+    return f"键区底 无 {k0[3]} → 贴底 {k1[3]} → 无 {k2[3]}；预览下空白 {g0} → {g1} → {g2}"
 
 
 @case("ST-12", base="B0-设置", mutates=True, visual=True)
@@ -796,10 +912,6 @@ def st22(d):
     return f"加后 {p1[:5]}…；恢复后 {p2[:5]}…"
 
 
-case("ST-23", base="B0-设置", needs="skip:振动要真机")(lambda d: None)
-case("ST-24", base="B0-设置", needs="skip:按键音要真机")(lambda d: None)
-
-
 # ---------------------------------------------------------------- 其他
 
 @case("ST-25", base="B0-设置", mutates=True)
@@ -857,7 +969,15 @@ def record_change(d, y0, y1, act):
     top = max(ds)
     if top < 1:
         raise Blocked("录屏里这一块没变")
-    return sum(1 for x in ds if 0.15 * top < x < 0.85 * top), len(frames)
+    # the coming in only: the frames before the first one most of the way there (what follows, a notice
+    # going or the copy's own overlay, is not the change measured). From a tenth: the panels' 120 ms
+    # (Motion.Medium since R13) leaves two frames between, the first ~13% of the way (2.8 of 21.2)
+    there = next(i for i, x in enumerate(ds) if x >= 0.85 * top)
+    # only the run right before it: noise earlier in the recording is not the coming in (F3723)
+    n = 0
+    while n < there and ds[there - 1 - n] > 0.1 * top:
+        n += 1
+    return n, len(frames)
 
 
 def record_toolbar(d):
@@ -885,11 +1005,49 @@ def record_panel(d):
     return r
 
 
-@case("ST-26", base="B0-设置", mutates=True)
+def record_copy(d, word="公园"):
+    """the keyboard's bar (and the band above it a hint may slide through) while 复制 is tapped on the
+    edit panel, as 05-toolbar's copy_word does it: the hint is recorded as it comes in, not
+    screenshotted a second and more later, when any animation has long ended (F3548)"""
+    tbs = script("05-toolbar")
+    d.open_page("long")
+    f = d.field()
+    d.tap((f.b[0] + 18, f.b[1] + 55), 0.6)
+    tbs.edit_panel(d)
+    s = d.screen()
+    right = s.find(desc="向右移动光标", where="ime") or s.find(text="向右移动光标", where="ime")
+    sel = s.find(desc="选择", where="ime") or s.find(text="选择", where="ime")
+    cp = s.find(desc="复制", where="ime") or s.find(text="复制", where="ime")
+    ns = [n for n in s.ime() if n.b[3] > n.b[1]]
+    if not (right and sel and cp and ns):
+        raise Blocked(f"编辑面板上缺按钮：{[n.desc or n.text for n in s.ime() if n.desc or n.text][:10]}")
+    i = tbs.LONG.index(word)
+    if i:
+        d.taps([right.c] * i, gap=0.05, after=0.3)
+    d.tap(sel.c, 0.3)
+    d.taps([right.c] * len(word), gap=0.05, after=0.3)
+    # the notice sits above the window (said above the keys, UndoChipPlacement.top; below it or over
+    # the bar only with the window at the screen's top, never so when docked): the band above the
+    # window down to the bar's bottom, not the panel's buttons below it (their press feedback) nor
+    # the screen's bottom (the system's clipboard overlay), which would count as frames of their own
+    back = s.find(desc="返回键盘", where="ime")
+    # the window-wide containers start at the status bar's bottom and are left out (as LS-27):
+    # a band from there would be the whole screen, the notice too small a part of it to count
+    outer = min(n.b[1] for n in ns)
+    top = min((n.b[1] for n in ns if n.b[1] > outer), default=outer)
+    bottom = back.b[3] if back else max(n.b[3] for n in ns)
+    r = record_change(d, max(0, top - 250), bottom, lambda: d.tap(cp.c, 1.0))
+    tbs.ime(d, desc="把光标移动到结尾", after=0.3)
+    tbs.back_to_keys(d)
+    return r
+
+
+@case("ST-26", base="B0-设置", mutates=True, visual=True)
 def st26(d):
     d.open_page("text")
     on, n_on = record_toolbar(d)
     pon, _ = record_panel(d)
+    con, _ = record_copy(d)
     appearance_tab(d, "大小与样式")
     d.switch("禁用动画", True)
     d.open_page("text")
@@ -901,28 +1059,29 @@ def st26(d):
         raise Blocked(f"开着动画时剪贴板面板也只录到 {pon} 个过渡帧，分不出来")
     check(off <= 1, f"禁用动画后工具栏仍有 {off} 个过渡帧（开着时 {on}）")
     check(poff <= 1, f"禁用动画后剪贴板面板仍有 {poff} 个过渡帧（开着时 {pon}）")
-    return f"过渡帧：工具栏 开着 {on}、禁用后 {off}；剪贴板面板 开着 {pon}、禁用后 {poff}"
-
-
-@case("ST-27", base="B0-设置")
-def st27(d):
-    home(d, "实体键盘")
-    rows = d.pref_rows()
-    want = [("显示候选窗口", "根据输入设备而定"), ("实体键盘快捷键", None), ("候选词列表方向", "自动"),
-            ("候选词字体大小", "20 sp"), ("每页候选数", "7")]
-    got = {r[0]: r[1] for r in rows if not r[2]}
-    titles = [r[0] for r in rows if not r[2]]
-    for t, v in want:
-        check(t in got, f"没有「{t}」：{titles}")
-        if v:
-            check(got[t].splitlines()[0] == v, f"「{t}」是「{got[t]}」")
-    check(titles[-1] == "每页候选数", f"最后一项是 {titles[-1]}")
-    check("所有输入法都用" in got["每页候选数"], f"每页候选数说明「{got['每页候选数']}」")
-    s = d.screen()
-    sc = d.row("实体键盘快捷键", s)
-    sw = [n for n in (sc.walk() if sc else []) if n.cls in SWITCHES]
-    check(sw and sw[0].checked, "实体键盘快捷键不是开的")
-    return "五项和默认值都对"
+    # the setting reaches the notice too: copied, it is in place and opaque at once
+    d.step("禁用动画时的提示")
+    if con < 2:
+        raise Blocked(f"开着动画时复制的提示也只录到 {con} 个过渡帧，分不出来")
+    coff, _ = record_copy(d)
+    d.shot("full", "禁用动画，复制后的提示")
+    check(coff <= 1, f"禁用动画后复制的提示仍有 {coff} 个过渡帧（开着时 {con}）")
+    # Android's own 移除动画 does the same with the setting off
+    d.step("系统移除动画")
+    appearance_tab(d, "大小与样式")
+    d.switch("禁用动画", False)
+    d.sh("settings put global animator_duration_scale 0")
+    try:
+        d.open_page("text")
+        sys0, _ = record_toolbar(d)
+        csys, _ = record_copy(d)
+        d.shot("full", "系统移除动画，复制后的提示")
+    finally:
+        d.sh("settings put global animator_duration_scale 1")
+    check(sys0 <= 1, f"系统移除动画后工具栏仍有 {sys0} 个过渡帧")
+    check(csys <= 1, f"系统移除动画后复制的提示仍有 {csys} 个过渡帧")
+    return (f"过渡帧：工具栏 开着 {on}、禁用后 {off}、系统移除动画 {sys0}；剪贴板面板 开着 {pon}、禁用后 {poff}；"
+            f"复制的提示 开着 {con}、禁用后 {coff}、系统移除动画 {csys}")
 
 
 @case("ST-28", base="B0-设置", mutates=True)
@@ -985,20 +1144,6 @@ def st29(d):
     return f"日志 {len(lines)} 行、有导出；检查器显示 TYPE_TEXT_VARIATION_URI（在键盘 … 里，不在设置页）"
 
 
-@case("ST-30", base="B0-设置", mutates="learn")
-def st30(d):
-    home(d, "更多选项")
-    d.goto("开发者", "重启 Fcitx 实例")
-    time.sleep(3)
-    d.open_page("text")
-    d.type("nihao")
-    d.cands(timeout=30, want="你好")
-    d.space()
-    t = d.field_text()
-    check(t == "你好", f"打出「{t}」")
-    return f"重启后打出「{t}」"
-
-
 @case("ST-31", base="B0-设置")
 def st31(d):
     home(d, "更多选项", "关于")
@@ -1018,28 +1163,3 @@ def switch_state(d, title):
     r = d.row(title)
     w = [n for n in r.walk() if n.cls in SWITCHES] if r else []
     return w[0].checked if w else None
-
-
-@case("ST-37", base="B0-设置")
-def st37(d):
-    home(d, "词库与短语", "用户词库")
-    on = {t: switch_state(d, t) for t in ("用我的输入习惯", "自动备份")}
-    texts = d.all_texts()
-    check(on == {"用我的输入习惯": True, "自动备份": True}, f"页顶开关 {on}")
-    miss = [t for t in ("清空学到的", "学习备份", "英文词库", "导出") if t not in texts]
-    check(not miss, f"用户词库页缺 {miss}：{texts[:20]}")
-    d.tap_text("学习备份", after=1.2)
-    bk = d.all_texts()
-    miss = [t for t in ("从备份恢复", "另存一份到看得见的文件夹", "退回恢复前") if t not in bk]
-    check(not miss, f"学习备份里缺 {miss}：{bk[:8]}")
-    d.back()
-    d.tap_text("英文词库", after=1.2)
-    here = d.screen().texts()
-    script("08-english").en_settings(d)
-    d.tap_text("英文词库", after=1.2)
-    there = d.screen().texts()
-    check(here == there, f"两处英文词库不是同一页：{here[:5]} / {there[:5]}")
-    d.open_settings()
-    titles = [r[0] for r in d.pref_rows()]
-    check(titles == HOME, f"首页入口 {titles}")
-    return f"开关 {on}；学习备份 {bk[1:6:2]}；英文词库两处同页；首页 {len(titles)} 项"

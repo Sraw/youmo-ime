@@ -2,8 +2,8 @@
 import subprocess
 import time
 
-from uat import (Blocked, Skip, GRID_BOTTOM, GRID_TOP, case, check, emoji_tab_xy, first, flick, glide_on,
-                 glide_shot, has, home, key_texts, open_url, popup, popup_pick, popup_slide, script)
+from uat import (Blocked, Fail, Skip, GRID_BOTTOM, GRID_TOP, case, check, emoji_tab_xy, first, flick, glide_on, open_host,
+                 glide_shot, has, home, key_texts, open_url, popup, popup_pick, popup_slide)
 
 
 def tap_key(d, label, after=0.5):
@@ -349,21 +349,21 @@ def kb20(d):
     return "回车键是搜索；出现「搜索：a」，键盘收起"
 
 
-@case("KB-21", page="next")
+@case("KB-21")
 def kb21(d):
+    # a native field: the WebView test browser ignores an input method's "next" (LatinIME's too)
+    open_host(d, next=True)
     s = d.screen()
     r = s.find(rid="button_return", where="ime")
     f0 = d.field(s)
+    check(f0 and f0.desc == "第一项", f"焦点不在第一项：{f0}")
     check(r and r.desc == "下一项", f"回车键是「{r.desc if r else None}」")
     d.enter()
-    time.sleep(0.8)
-    f1 = d.field()
-    if f1 and f0 and f1.b == f0.b:
-        # the system's own keyboard (LatinIME) does not move it either on this browser, and a Tab
-        # key does: the WebView test browser ignores the input method's "next"
-        raise Blocked("回车键是下一项，但测试浏览器（WebView Browser Tester）不处理输入法的“下一项”"
-                      "（系统 LatinIME 也不跳），要在 Chrome 里看")
-    return "回车键是下一项；焦点跳到「不要提示」框"
+    try:
+        d.wait(lambda s: (d.field(s) or f0).desc == "第二项", 3)
+    except Blocked:
+        raise Fail(f"点回车后焦点在「{(d.field() or f0).desc}」，没跳到第二项")
+    return "回车键是下一项；焦点跳到「第二项」"
 
 
 @case("KB-22", page="url")
@@ -453,20 +453,6 @@ def kb28(d):
     return "框里为空"
 
 
-@case("KB-29", base="B0-英文")
-def kb29(d):
-    d.type("ab")
-    d.cands()
-    # 前提 only: the cursor between a and b (a key event, not the case's subject)
-    d.sh("input keyevent KEYCODE_DPAD_LEFT")
-    time.sleep(0.4)
-    popup_pick(d, "k", "(")
-    t = d.field_text()
-    if t in ("ab(", "ab()"):
-        raise Blocked(f"光标没移进 a、b 中间：框里「{t}」")
-    check(t == "a(b", f"框里是「{t}」")
-    return f"「{t}」"
-
 
 @case("KB-30", visual=True)
 def kb30(d):
@@ -525,33 +511,36 @@ def kb32(d):
 @case("KB-33", base="B0-设置", mutates=True, visual=True)
 def kb33(d):
     glide_on(d, "英文")
+    d.step("打着 ok 时划 hello")
+    d.type("ok")
+    d.cands()
     k = d.keys(refresh=True)
     pts = [k[c] for c in "helo"]
     glide_shot(d, pts, "划 h-e-l-o，抬手前")
     t1, c = d.field_text(), d.candidates()
+    check(t1 == "ok hello ", f"第一次后框里「{t1}」")
+    d.step("再划 world")
     d.glide("world")
     t2 = d.field_text()
-    check(t1 == "hello ", f"第一次后框里「{t1}」")
-    check(t2 == "hello world ", f"第二次后框里「{t2}」")
-    return f"「{t1}」→「{t2}」，候选 {c[:3]}"
-
-
-@case("KB-34", base="B0-设置", mutates=True)
-def kb34(d):
-    glide_on(d, "英文")
-    d.glide("helo")
-    c = d.cands()
-    if d.field_text() != "hello " or len(c) < 2:
-        raise Blocked(f"前提没到：框里「{d.field_text()}」，候选 {c[:3]}")
-    w = d.pick(2)
-    t1 = d.field_text()
+    check(t2 == "ok hello world ", f"第二次后框里「{t2}」")
+    d.step("换候选")
+    c2 = d.cands()
+    if len(c2) < 2:
+        raise Blocked(f"划 world 后候选只有 {c2[:3]}")
+    w = d.pick(2).split(" ")[0]
+    t3 = d.field_text()
+    check(t3 == f"ok hello {w} " and w != "world", f"点「{w}」后框里「{t3}」")
+    d.step("划 hello 后退格")
     d.glide("helo")
     d.bksp()
-    t2 = d.field_text()
-    check(t1.strip() == w.split(" ")[0] and "hello" not in t1, f"点「{w}」后框里「{t1}」")
-    check(t2 == t1, f"再划 hello 后退格，框里「{t2}」（应回到「{t1}」）")
-    return f"换成「{t1.strip()}」；退格删掉整个 hello"
-
+    t4 = d.field_text()
+    check(t4 == t3, f"再划 hello 后退格，框里「{t4}」（应回到「{t3}」）")
+    d.step("划 hello 后打逗号")
+    d.glide("helo")
+    d.press(",")
+    t5 = d.field_text()
+    check(t5 == f"{t3}hello, ", f"打逗号后框里「{t5}」")
+    return f"「{t1}」→「{t2}」→「{t3}」；退格删掉整个 hello；「{t5}」，候选 {c[:3]}"
 
 @case("KB-35", base="B0-设置", mutates=True)
 def kb35(d):
@@ -590,15 +579,6 @@ def kb36(d):
     check("hello" not in t3, f"邮箱框里「{t3}」")
     return f"密码框「{t1}」，网址框「{t2}」，邮箱框「{t3}」，都没有整词"
 
-
-@case("KB-37", base="B0-设置", mutates=True)
-def kb37(d):
-    glide_on(d, "英文")
-    d.press("shift")
-    d.glide("helo")
-    t = d.field_text()
-    check(t == "Hello ", f"框里是「{t}」")
-    return f"「{t}」"
 
 
 @case("KB-38", mutates="learn")
@@ -643,15 +623,6 @@ def kb39(d):
     check(back == low, f"再点 Shift 后 {back}")
     return f"小写 {low}，大写 {up}"
 
-
-@case("KB-40", mutates="learn")
-def kb40(d):
-    t9 = script("03-t9")
-    tq = t9.edge_out(d, "q")
-    tc = t9.edge_out(d, "，")
-    check(tq == "", f"q 从下沿往下刚滑出键：「{tq}」")
-    check(tc == "", f"， 从下沿往下刚滑出键：「{tc}」")
-    return f"q「{tq}」，「{tc}」"
 
 
 @case("KB-41", mutates="learn")

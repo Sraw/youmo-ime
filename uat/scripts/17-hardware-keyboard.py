@@ -6,7 +6,7 @@ import time
 
 from uat import PKG, Blocked, Fail, add_im, case, check, choose, home, script
 
-MANUAL_NO_CURSOR = ("skip:要一个不告诉输入法光标位置的应用（终端、游戏、自绘编辑器）；模拟器上没有，"
+MANUAL_NO_CURSOR = ("manual:要一个不告诉输入法光标位置的应用（终端、游戏、自绘编辑器）；模拟器上没有，"
                     "测试页和系统应用都告诉光标")
 BUTTON = "显示屏幕键盘"
 
@@ -409,7 +409,7 @@ def hk12(d):
     return f"En「{t1}」；拼「{t}」"
 
 
-@case("HK-30", base="B0-实体", needs="skip:要分屏（上面测试页、下面设置）再点回上面的窗口；模拟器上 adb 摆不出分屏，手动做")
+@case("HK-30", base="B0-实体", needs="manual:要分屏（上面测试页、下面设置）再点回上面的窗口；模拟器上 adb 摆不出分屏，手动做")
 def hk30(d):
     pass
 
@@ -746,4 +746,221 @@ def hk28(d):
     return f"收起，小窗 {c[:3]}；回来的是分体键盘"
 
 
-case("HK-33", base="B0-实体", needs="skip:要一个输入框在屏幕最顶上的应用（候选窗贴屏幕顶）；测试页的框不够高，手动跑")(lambda d: None)
+case("HK-33", base="B0-实体", needs="manual:要一个输入框在屏幕最顶上的应用（候选窗贴屏幕顶）；测试页的框不够高，手动跑")(lambda d: None)
+
+
+# ---------------------------------------------------------------- Shift+Delete (HK-31, HK-32)
+
+# emu-keyboard.sh's key/combo release at once; holding a key down for a while (the system's key
+# repeat) or releasing in a given order needs the raw events, on the same device it registered
+RAW = {"SHIFT": 42, "DEL": 111}
+
+
+def raw(d, *steps):
+    """("down"|"up", key) or a float to sleep, in one adb shell"""
+    emu_only(d)
+    dev = d.sh("dumpsys input | grep -A3 'Test USB Keyboard' | grep -o '/dev/input/event[0-9]*' | head -1").strip()
+    if not dev:
+        raise Blocked("没有实体键盘：先 emu-keyboard.sh up")
+    s = ""
+    for x in steps:
+        if isinstance(x, float):
+            s += f"sleep {x};"
+        else:
+            s += f"sendevent {dev} 1 {RAW[x[1]]} {1 if x[0] == 'down' else 0}; sendevent {dev} 0 0 0;"
+    d.sh(s)
+    d._keys = None
+
+
+def fpick(d, want, pages=4):
+    """the floating window's candidate want, by its number key, paging down to it: a word not yet
+    learned (点了 for 他 dl) sits past the first page of the window's 7"""
+    c = fcands(d.screen())
+    for _ in range(pages):
+        if want in c[:9]:
+            break
+        key(d, "PAGEDOWN")
+        c = fcands(d.screen())
+    if want not in c[:9]:
+        raise Blocked(f"小窗里前 {pages + 1} 页没有「{want}」：{c[:9]}")
+    key(d, str(c.index(want) + 1))
+
+
+def ta_dl(d):
+    """他, then dl; returns the window's candidates"""
+    typ(d, "ta")
+    fpick(d, "他")
+    typ(d, "dl")
+    return fcands(d.screen())
+
+
+def learn_dl(d):
+    """PY-54's steps on the hardware keyboard: after 他, 点了 picked twice for dl"""
+    typ(d, "a")   # the touch keyboard away first
+    key(d, "ESC")
+    # 点了 sits far down dl's list (PY-54 scrolls the touch keyboard's to it), many pages of the
+    # window's 7 in. It has to be picked from dl itself: picked from dianle it does not rise for dl
+    for _ in range(2):
+        ta_dl(d)
+        fpick(d, "点了", pages=60)
+    c = ta_dl(d)
+    if not c or c[0] != "点了":
+        raise Blocked(f"前提没到：「他」后 dl 选了两次「点了」仍是 {c[:4]}")
+
+
+def undo_chips(d, timeout=2.0):
+    """the undo hints said of 点了 seen over timeout, one per time it came up (from none to one: its
+    bounds may move as it slides in, and a second one in the same place is still a second), and one
+    more for a dump holding two: a second hint said while one is up crossfades in the same chip
+    (rule 5), which never goes away between them (F3547):
+    [(chip bounds as first seen, window top, window bottom)]"""
+    end, seen, up = time.time() + timeout, [], False
+    while time.time() < end:
+        s = d.screen()
+        chips = [n for n in s.nodes if "「点了」" in (n.text or "")]
+        chip = chips[0] if chips else None
+        ns = fcand_nodes(s)
+        shown = bool(chip and s.find(text="撤销", where="all"))
+        at = (chip.b, min(n.b[1] for n in ns) if ns else None, max(n.b[3] for n in ns) if ns else None) \
+            if chip else None
+        if shown and not up:
+            seen.append(at)
+        if shown and len(chips) > 1 and len(seen) < 2:
+            seen.append(at)
+        up = shown
+        time.sleep(0.2)
+    return seen
+
+
+def says_reset(d):
+    d.adb("logcat", "-c")
+
+
+def says(d):
+    """the notices put up in the chip since says_reset (BaseInputView.notice, one log line each), so a
+    second one crossfading in the same chip is counted too (F3547); a toast said with no keyboard
+    shown is not one"""
+    return sum(1 for l in d.adb("logcat", "-d", "-s", "*:I").splitlines() if l.rstrip().endswith(": say"))
+
+
+def chip_clear(seen):
+    """above the window, or below it when the window is at the screen's top: never over it"""
+    b, top, bottom = seen[0]
+    return top is None or b[3] <= top + 4 or b[1] >= bottom - 4
+
+
+@case("HK-31", base="B0-实体", mutates=True, needs=EMU)
+def hk31(d):
+    d.step("按住 Shift+Delete")
+    learn_dl(d)   # 他 dl is up, 点了 first and highlighted
+    says_reset(d)
+    raw(d, ("down", "SHIFT"), ("down", "DEL"), 1.5, ("up", "DEL"), ("up", "SHIFT"))
+    seen = undo_chips(d)
+    said = says(d)
+    key(d, "ESC")
+    c = ta_dl(d)
+    key(d, "ESC")
+    check(len(seen) == 1 and said == 1, f"撤销提示出现 {len(seen)} 次，说了 {said} 次")
+    check(seen and chip_clear(seen), f"提示 {seen[:1]} 盖着候选窗")
+    check(c and c[0] == "带来", f"忘掉后「他 dl」{c[:4]}")
+    d.step("按住 Delete 时再按一次 Shift")
+    learn_dl(d)
+    before = field_text(d)
+    says_reset(d)
+    # watched while Delete is still down: the last Shift up is a key, and a key typed puts the hint
+    # away (UndoChip.typed), so after both are up it is gone; once only is what says counts
+    raw(d, ("down", "SHIFT"), ("down", "DEL"), 0.6)
+    seen2 = undo_chips(d, timeout=1.0)
+    raw(d, ("up", "SHIFT"), 0.3, ("down", "SHIFT"), 0.3, ("up", "DEL"), ("up", "SHIFT"))
+    said2 = says(d)
+    after = field_text(d)
+    key(d, "ESC")
+    c2 = ta_dl(d)
+    key(d, "ESC")
+    typ(d, "ni")
+    n = fcands(d.screen())
+    key(d, "ESC")
+    check(after == before, f"框里「{before}」→「{after}」")
+    check(len(seen2) == 1 and said2 == 1, f"第二次撤销提示出现 {len(seen2)} 次，说了 {said2} 次")
+    check(c2 and c2[0] == "带来", f"第二次忘掉后「他 dl」{c2[:4]}")
+    check("你" in n[:3], f"之后 ni 的小窗 {n[:4]}（不是中文了？）")
+    return f"提示 1 次，不盖候选；忘掉后 {c[:2]}；再按 Shift 那次：字没删，忘 1 次，{c2[:2]}，ni {n[:2]}"
+
+
+@case("HK-32", base="B0-实体", mutates=True, needs=EMU)
+def hk32(d):
+    learn_dl(d)
+    # down to both released well under ¼ s: one adb shell, no sleeps between the events
+    says_reset(d)
+    raw(d, ("down", "SHIFT"), ("down", "DEL"), ("up", "DEL"), ("up", "SHIFT"))
+    seen = undo_chips(d)
+    said = says(d)
+    key(d, "ESC")
+    typ(d, "ni")
+    s = d.screen()
+    p, n = fpre(s), fcands(s)
+    key(d, "ESC")
+    check(len(seen) == 1 and said == 1, f"撤销提示出现 {len(seen)} 次，说了 {said} 次")
+    check(seen and chip_clear(seen), f"提示 {seen[:1]} 盖着候选窗")
+    check("你" in n[:3], f"之后 ni：小窗「{p}」{n[:4]}（切成英文了？）")
+    return f"提示 1 次；之后 ni {n[:3]}"
+
+
+@case("HK-34", base="B0-设置", mutates=True, needs=EMU)
+def hk34(d):
+    emu_only(d)
+    hw_settings(d, "每页候选数", "3")
+    d.kb("up")
+    time.sleep(1)
+    d.open_page("text")
+    typ(d, "shi")
+    p1 = fcands(d.screen())
+    key(d, "EQUAL")
+    p2 = fcands(d.screen())
+    key(d, "ESC")
+    check(len(p1) == 3, f"一页 {len(p1)} 个：{p1}")
+    check(len(p2) == 3 and p2 != p1, f"= 后 {p2}（第一页 {p1}）")
+    return f"第一页 {p1}，= 后 {p2}"
+
+
+def tip_seen(d, timeout=1.5):
+    """the engine's tip about full-width punctuation, waited for; its text, else None"""
+    end = time.time() + timeout
+    while time.time() < end:
+        n = d.screen().find(contains="全角标点", where="all")
+        if n:
+            return n.text
+        time.sleep(0.1)
+    return None
+
+
+@case("HK-35", base="B0-实体", mutates=True, needs=EMU)
+def hk35(d):
+    typ(d, "a")   # the touch keyboard away first
+    key(d, "ESC")
+    d.step("Ctrl+. 后马上打字")
+    # timed from the shortcut to the last look, the screen reads on either side included: the tip
+    # can't be older than that, so under 1.8 s its 2 s timeout can't be what put it away (F3583)
+    t0 = time.time()
+    combo(d, "CTRL", "DOT", after=0)
+    t1 = tip_seen(d)
+    typ(d, "n", after=0.4)
+    gone1 = tip_seen(d, 0.3) is None
+    late = time.time() - t0
+    if t1 and gone1 and late >= 1.8:
+        # the 2 s timeout could have closed it by now: a pass would not show typing did
+        raise Blocked(f"按下 Ctrl+. 后 {late:.1f} 秒才看完提示，2 秒超时可能已经收起它")
+    key(d, "ESC")
+    d.step("Ctrl+. 后不打字")
+    combo(d, "CTRL", "DOT", after=0)
+    t2 = tip_seen(d)
+    time.sleep(2.6)   # said for 2 s (rule 5), not the 6 s a failure stays
+    gone2 = tip_seen(d, 0.3) is None
+    combo(d, "CTRL", "DOT", after=0)
+    t3 = tip_seen(d)
+    check(t1, "第一次 Ctrl+. 没有提示")
+    check(gone1, f"打了 n 提示「{t1}」还在")
+    check(t2 and t2 != t1, f"第二次 Ctrl+. 的提示「{t2}」（第一次「{t1}」）")
+    check(gone2, f"不打字约 2.6 秒后提示「{t2}」还在")
+    check(t3 == t1, f"第三次 Ctrl+. 的提示「{t3}」，和第一次「{t1}」不同")
+    return f"「{t1}」→「{t2}」→「{t3}」，打字那次 {late:.1f} 秒内看完"

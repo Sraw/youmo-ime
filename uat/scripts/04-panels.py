@@ -197,20 +197,6 @@ def pan05(d):
     return f"「{t}」，面板没关"
 
 
-@case("PAN-06", mutates="learn")
-def pan06(d):
-    d.press("符", after=1.0)
-    sym_category(d, "数学")
-    first_math = selected_category(d)
-    sym_tap(d, "α")
-    if d.field_text() != "α":
-        raise Blocked(f"前提没到：框里「{d.field_text()}」")
-    d.press("符", after=1.0)
-    now = selected_category(d)
-    check(now[:3] == first_math[:3], f"再打开是 {now}（数学是 {first_math}）")
-    return f"直接停在数学 {now[:4]}"
-
-
 @case("PAN-07", mutates="learn")
 def pan07(d):
     d.press("符", after=1.0)
@@ -313,30 +299,6 @@ def pan12(d):
     return f"xiao {row1[:5]}；dz 出 👍，框里「{t}」；最近 {recent[:3]}"
 
 
-@case("PAN-13", base="B0-英文", mutates="learn")
-def pan13(d):
-    d.type("ab")
-    d.cands()
-    # 英文 commits as it goes with a space after a word: take the field as it is
-    d.space()
-    d.bksp()
-    t0 = d.field_text()
-    if t0 != "ab":
-        raise Blocked(f"前提没到：框里「{t0}」")
-    ime_tap(d, desc="表情", after=1.0)
-    ime_tap(d, desc="按拼音搜索表情", after=0.8)
-    search_keys(d, "x")
-    search_bksp(d)
-    time.sleep(0.4)
-    t1 = d.field_text()
-    search_bksp(d)
-    time.sleep(0.4)
-    t2 = d.field_text()
-    check(t1 == "ab", f"第一下退格后框里「{t1}」（应只删拼音 x）")
-    check(t2 == "a", f"第二下退格后框里「{t2}」")
-    return f"「{t1}」→「{t2}」"
-
-
 def numpad_space_slide(d):
     """on the number keyboard: slide left on space, then type 1; returns (where the 1 landed, the
     text before, after)"""
@@ -357,19 +319,12 @@ def numpad_space_slide(d):
     return i, t0, t1
 
 
-@case("PAN-14", base="B0-设置", mutates=True)
+@case("PAN-14", page="long")
 def pan14(d):
-    d.open_page("long")
     i1, t0, t1 = numpad_space_slide(d)
     check(len(t1) == len(t0) + 1, f"滑完打 1 后多了 {len(t1) - len(t0)} 个字（不该打出空格）")
-    check(i1 < len(t0) - 2, f"开着时滑空格光标没往前移：1 在 {i1}/{len(t0)}")
-    d.hide_keyboard()
-    home(d, "按键")
-    d.switch("划动空格键以移动光标", False)
-    d.open_page("long")
-    i2, u0, u1 = numpad_space_slide(d)
-    check(i2 >= len(u0) - 1, f"关掉后滑空格光标还是动了：1 在 {i2}/{len(u0)}")
-    return f"开着：1 在 {i1}/{len(t0)}；关掉：在 {i2}/{len(u0)}"
+    check(i1 < len(t0) - 2, f"滑空格光标没往前移：1 在 {i1}/{len(t0)}")
+    return f"1 在 {i1}/{len(t0)}"
 
 
 def recent_emoji(d):

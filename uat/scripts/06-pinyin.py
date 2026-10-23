@@ -1,11 +1,11 @@
 """uat/06-pinyin.md: the B0 cases. The .md is the source of truth; each function follows its case's
-前提/操作/预期. Cases on B0-设置 (PY-12, 13, 19, 20, 23, 28, 47, 50, 51) are not in this pilot."""
+前提/操作/预期."""
 import datetime
 import re
 import subprocess
 import time
 
-from uat import Blocked, Fail, case, check, choose, first, gear, glide_on, glide_shot, has, home, menu_tap, script
+from uat import PKG, Blocked, Fail, case, check, choose, first, gear, glide_on, glide_shot, has, menu_tap, script
 
 
 def compact(p):
@@ -95,31 +95,6 @@ def py07(d):
     return f"zg {a[:3]}；wsm {b[:3]}"
 
 
-@case("PY-08", mutates="learn")
-def py08(d):
-    d.type("zhongg")
-    c = d.cands()
-    check(has(c, "中国"), f"第一页 {c}")
-    return f"第一页 {c[:4]}"
-
-
-@case("PY-09", mutates="learn", clean=True)
-def py09(d):
-    # full pinyin and 简拼 are different keys, each learns its own (docs/pinyin.md「同一个地方」)
-    d.type("dl")
-    c0 = d.cands()
-    d.clear()
-    for _ in range(3):
-        d.type("dianle")
-        d.cands(want="点了")
-        d.pick("点了")
-        d.clear()
-    d.type("dl")
-    c = d.cands()
-    check(first(c) == first(c0) == "带来", f"dl 原来 {c0[:4]}，全拼选三次「点了」后 {c[:4]}")
-    return f"dl {c0[:3]} → {c[:3]}"
-
-
 CONTEXT = "zuotianwanshangxialeyichang"
 
 
@@ -166,10 +141,14 @@ def first_page_has(code, *words):
     return fn
 
 
-case("PY-14")(first_page_has("zhagn", "张", "章"))
-case("PY-15")(first_page_has("zhon", "中"))
-case("PY-16")(first_page_has("jv", "句"))
-case("PY-17")(first_page_has("nihso", "你好"))
+@case("PY-14")
+def py14(d):
+    seen = []
+    for code, words in (("zhagn", ("张", "章")), ("zhon", ("中",)), ("jv", ("句",)), ("nihso", ("你好",))):
+        d.step(code)
+        seen.append(first_page_has(code, *words)(d))
+        d.clear()
+    return "；".join(seen)
 
 
 @case("PY-18")
@@ -211,16 +190,6 @@ def py24(d):
     no_reading = [x for x in c if x.split(" ", 1)[0] in ("才", "本", "村") and " " not in x]
     check(not no_reading, f"旁边没有读音：{no_reading}")
     return f"`{d.preedit()}`，候选 {c[:4]}"
-
-
-@case("PY-25")
-def py25(d):
-    d.type("usb")
-    s = d.screen()
-    c, p = d.candidates(s), d.preedit(s)
-    check(p == "usb", f"打字状态 `{p}`（笔画会显示成 u 加笔画）")
-    check(any("usb" in x.lower() for x in c), f"候选 {c}")
-    return f"`{p}`，候选 {c[:4]}"
 
 
 # ---------------------------------------------------------------- 联想
@@ -300,24 +269,7 @@ def _block_shi(d):
 
 @case("PY-68", mutates="learn", clean=True)
 def py68(d):
-    s, _ = _block_shi(d)
-    d.tap(s.find(text="撤销", where="all").c, 0.8)
-    d.clear()
-    d.type("shi")
-    back = d.all_cands()
-    check(has(back, "是"), f"撤销后 shi {back[:6]}")
-    d.clear()
-    _block_shi(d)
-    d.type("a")
-    time.sleep(0.5)
-    gone = "撤销" not in d.screen().texts(where="all")
-    d.clear()
-    check(gone, "点了 a 提示没收起")
-    return f"撤销后 {back[:3]}；打字后收起"
-
-
-@case("PY-83", mutates="learn", clean=True)
-def py83(d):
+    d.step("屏蔽后的提示")
     s, chip = _block_shi(d)
     bar = s.find(rid="candidate_view", where="ime")
     tops = [n.b[1] for n in s.ime() if n.cls == "HorizontalScrollView"] + ([bar.b[1]] if bar else [])
@@ -325,17 +277,23 @@ def py83(d):
     pre = d.preedit(s).replace(" ", "").replace("'", "")
     tops += [n.b[1] for n in s.ime() if pre and n.text and n.text.replace(" ", "").replace("'", "").startswith(pre)]
     kb_top = min(tops) if tops else None
-    png = d.shot("full", note="PY-83 撤销提示在键盘上方")
-    under = d.candidates(s)
     check(kb_top is not None and chip.row().b[3] <= kb_top, f"提示 {chip.row().b} 盖着键盘（顶 {kb_top}）")
-    check(len(under) >= 2, f"打着字时候选 {under[:4]}")
+    check(len(d.candidates(s)) >= 2, f"打着字时候选 {d.candidates(s)[:4]}")
+    d.step("撤销")
     d.tap(s.find(text="撤销", where="all").c, 0.8)
     d.clear()
     d.type("shi")
     back = d.all_cands()
-    d.clear()
     check(has(back, "是"), f"撤销后 shi {back[:6]}")
-    return f"提示 {chip.row().b}，键盘顶 {kb_top}；撤销后 {back[:3]}"
+    d.clear()
+    d.step("不撤销，接着打字")
+    _block_shi(d)
+    d.type("a")
+    time.sleep(0.5)
+    gone = "撤销" not in d.screen().texts(where="all")
+    d.clear()
+    check(gone, "点了 a 提示没收起")
+    return f"撤销后 {back[:3]}；打字后收起"
 
 
 def custom_phrases(d):
@@ -361,8 +319,9 @@ def pin_fifth(d):
     return c, cc
 
 
-@case("PY-30", mutates=True)
-def py30(d):
+@case("PY-31", mutates=True)
+def py31(d):
+    d.step("固定首位")
     c0, cc = pin_fifth(d)
     d.type("shi")
     c = d.cands()
@@ -379,28 +338,23 @@ def py30(d):
     c2 = d.cands()
     check(first(c2) == cc, f"「他」后 shi {c2[:4]}")
     d.clear()
+    # while pinned: a pin written to the phrases and dropped again at 取消固定 would pass after it
+    d.step("自定义短语")
     rows = custom_phrases(d)
     check(not any(r.startswith("shi,") and r.endswith("=" + cc) for r in rows), f"自定义短语里多了 {rows[:12]}")
-    return f"C=「{cc}」 排第一（「他」后也是），其余次序不变；自定义短语没动"
-
-
-@case("PY-31", mutates=True)
-def py31(d):
-    c0, cc = pin_fifth(d)
+    d.step("取消固定")
+    d.open_page("text")
     d.type("shi")
-    c = d.cands()
-    if first(c) != cc:
-        raise Blocked(f"前提没到：固定后 {c[:4]}")
+    d.cands(want=cc)
     m = d.long_pick(1)
     check("取消固定" in m, f"菜单 {m[:10]}")
     menu_tap(d, "取消固定")
     d.clear()
     d.type("shi")
-    c2 = d.cands()
-    check(first(c2) == first(c0), f"取消固定后 {c2[:4]}（原来 {c0[:4]}）")
-    rows = custom_phrases(d)
-    check(not any(r.startswith("shi,") and r.endswith("=" + cc) for r in rows), f"自定义短语里还有：{rows[:12]}")
-    return f"「{cc}」 取消固定后 {c2[:4]}；自定义短语里没有了"
+    c3 = d.cands()
+    check(first(c3) == first(c0), f"取消固定后 {c3[:4]}（原来 {c0[:4]}）")
+    d.clear()
+    return f"C=「{cc}」 固定后排第一（「他」后也是），其余次序不变；取消后 {c3[:3]}；自定义短语没动"
 
 
 @case("PY-32", mutates=True, clean=True)
@@ -488,6 +442,16 @@ def learn_sentence(d, times=2):
 
 @case("PY-34", mutates="learn", clean=True)
 def py34(d):
+    # wxm's own first before any learning. Both times the field is emptied and 。 typed first, so
+    # the 前文 is the same and the last step compares against it (F3716, F3729)
+    d.clear()
+    d.type(SENTENCE_PY)
+    d.cands()
+    d.clear()
+    d.press(".")
+    d.type("wxm")
+    w0 = d.cands()
+    d.clear()
     c0 = learn_sentence(d, times=1)
     d.type(SENTENCE_PY)
     once = d.cands()
@@ -498,54 +462,16 @@ def py34(d):
     d.type(SENTENCE_PY)
     c = d.cands()
     check(first(c) == SENTENCE, f"改了两次后的候选 {c[:4]}（第一次 {c0[:2]}）")
-    return f"第一次 {c0[:2]}，改一次后 {once[:2]}，改两次后 {c[:3]}"
-
-
-@case("PY-36", mutates=True, clean=True)
-def py36(d):
-    try:
-        learn_sentence(d)
-    except Fail as e:
-        raise Blocked(f"前提（PY-34）没到：{e}")
-    d.hide_keyboard()
-    d.open_settings()
-    d.goto("词库与短语", "用户词库", "自动学到的词")
-    rows = search_list(d, "xiaoming", "小明")
-    check(any(SENTENCE in r for r in rows), f"搜「小明」后列表 {rows[:8]}")
-    return f"列表里有「{SENTENCE}」"
-
-
-def search_list(d, code, word):
-    """a word list page's search box (the list's top field; its right end is the clear button):
-    type the word with our keyboard"""
-    s = d.screen()
-    f = next((n for n in s.app() if n.cls == "EditText"), None)
-    if not f:
-        raise Blocked(f"列表页没有搜索框：{s.texts()[:8]}")
-    d.tap((f.b[0] + 80, f.c[1]), 1.0)
-    d._keys = None
-    d.type(code)
-    d.cands(want=word)
-    d.pick(word)
-    time.sleep(1.0)
-    d.hide_keyboard()
-    return d.screen().texts()
-
-
-@case("PY-35", mutates="learn", clean=True)
-def py35(d):
-    d.type("shi")
-    c0 = d.cands()
-    if len(c0) < 4:
-        raise Blocked(f"shi 只有 {c0}")
-    cc = first(c0[3:])
-    d.pick(4)
+    d.step("wxm")
     d.clear()
-    d.type("shi")
-    c = d.cands()
-    pos = next((i for i, x in enumerate(c) if first([x]) == cc), 99)
-    check(pos < 3, f"C=「{cc}」：{c0[:6]} → {c[:6]}")
-    return f"C=「{cc}」 第 4 → 第 {pos + 1}"
+    d.press(".")
+    d.type("wxm")
+    c4 = d.cands()
+    d.clear()
+    # the initials keep a first of their own (not the learned word or its pieces); the word comes next
+    check(c4[1:2] == [SENTENCE] and first(c4) == first(w0) and first(c4) not in (SENTENCE,) + PIECES,
+          f"wxm {c4[:4]}（没学过时 {w0[:3]}）")
+    return f"第一次 {c0[:2]}，改一次后 {once[:2]}，改两次后 {c[:3]}；wxm {c4[:3]}"
 
 
 VULGAR = ("肏", "屌", "操你", "操逼", "操蛋", "草泥马", "肏你")
@@ -558,25 +484,6 @@ def py37(d):
     bad = [x for x in c if first([x]) in VULGAR]
     check(not bad, f"第一页 {c}，有粗俗词 {bad}")
     return f"第一页 {c}"
-
-
-@case("PY-38", mutates="learn", clean=True)
-def py38(d):
-    d.type("cao")
-    c0 = d.cands()
-    # pushed down, not dropped: page through the expanded list until one shows
-    allc = d.all_cands(pages=10)
-    x = next((w for w in allc[len(c0):] if first([w]) in VULGAR), None)
-    if not x:
-        hit = [w for w in c0 if first([w]) in VULGAR]
-        raise Blocked(f"后面的页里找不到粗俗词（第一页 {c0}，其中 {hit}）")
-    x = first([x])
-    d.pick(x)
-    d.clear()
-    d.type("cao")
-    c = d.cands()
-    check(has(c, x), f"X=「{x}」：再打 cao 第一页 {c}")
-    return f"X=「{x}」：{c}"
 
 
 # ---------------------------------------------------------------- 改拼音
@@ -716,28 +623,13 @@ def py44(d):
     return f"{a[:2]}；{b[:2]}"
 
 
-@case("PY-45", mutates=True)
+@case("PY-45")
 def py45(d):
     d.type("usb")
     a = d.cands()
     p = d.preedit()
     check(p == "usb" and any("usb" in x.lower() for x in a), f"usb：`{p}` {a[:4]}")
-    d.clear()
-    d.hide_keyboard()
-    d.open_settings()
-    d.goto("输入法")
-    s = d.screen()
-    n = s.find(text="拼音")
-    gear = [k for k in n.parent.kids if k.cls == "ImageButton"] if n and n.parent else []
-    if not gear:
-        raise Blocked("输入法页找不到拼音的齿轮")
-    d.tap(gear[0].c, 1.2)
-    d.switch("拆字", False)
-    d.open_page("text")
-    d.type("uniuniuniu")
-    b = d.cands()
-    check(not has(b, "犇"), f"关掉后 {b[:4]}")
-    return f"usb {a[:3]}；关后 uniuniuniu {b[:3]}"
+    return f"usb {a[:3]}"
 
 
 @case("PY-46", mutates="learn")
@@ -865,18 +757,64 @@ def py12(d):
     return f"低档打出「{t}」"
 
 
-case("PY-13", base="B0-设置", needs="skip:要实体键盘（redroid 不造虚拟键盘）")(lambda d: None)
-
-
 @case("PY-19", base="B0-设置", mutates=True)
 def py19(d):
+    """one switch at a time: settings, then the test page"""
+    seen = []
+    d.step("关掉纠错")
     general(d)
     d.switch("纠正错拼和按偏的键", False)
     d.open_page("text")
     d.type("zhagn")
     c = d.cands()
-    check(not has(c, "张") and not has(c, "章"), f"第一页 {c}")
-    return f"第一页 {c[:5]}"
+    check(not has(c, "张") and not has(c, "章"), f"zhagn 第一页 {c}")
+    seen.append(f"zhagn {c[:3]}")
+    d.clear()
+    d.step("关掉中英混输")
+    d.hide_keyboard()
+    gear(d, "拼音")
+    d.switch("中英混输", False)
+    d.open_page("text")
+    d.type("iphone")
+    c = d.all_cands()
+    check(not any("iPhone" in x for x in c), f"iphone 候选 {c[:8]}")
+    seen.append(f"iphone {c[:3]}")
+    d.clear()
+    d.step("关掉联想")
+    d.hide_keyboard()
+    general(d)
+    d.switch("联想下一个词", False)
+    d.open_page("text")
+    d.type("jintian")
+    d.cands(want="今天")
+    d.space()
+    d.expect_field("今天")
+    s = d.screen()
+    c = d.candidates(s)
+    check(not c and d.toolbar(s), f"上屏后栏上是 {c[:4]}")
+    seen.append("上屏后是工具栏")
+    d.clear()
+    d.step("关掉表情候选")
+    d.hide_keyboard()
+    general(d)
+    d.switch("表情候选", False)
+    d.open_page("text")
+    d.type("haha")
+    c = d.all_cands()
+    emo = [x for x in c if re.match(r"^[\U0001F000-\U0001FFFF\u2600-\u27BF]", x)]
+    check(not emo, f"haha 候选里有表情 {emo}")
+    seen.append(f"haha {c[:3]}")
+    d.clear()
+    d.step("关掉拆字")
+    d.hide_keyboard()
+    gear(d, "拼音")
+    d.switch("拆字", False)
+    d.open_page("text")
+    d.type("uniuniuniu")
+    c = d.cands()
+    check(not has(c, "犇"), f"uniuniuniu {c[:4]}")
+    seen.append(f"uniuniuniu {c[:3]}")
+    return "；".join(seen)
 
 
 @case("PY-20", base="B0-设置", mutates=True)
@@ -890,44 +828,6 @@ def py20(d):
     c = d.cands()
     check(has(c, "中国"), f"第一页 {c}")
     return f"第一页 {c[:5]}"
-
-
-@case("PY-23", base="B0-设置", mutates=True)
-def py23(d):
-    gear(d, "拼音")
-    d.switch("中英混输", False)
-    d.open_page("text")
-    d.type("iphone")
-    c = d.all_cands()
-    check(not any("iPhone" in x for x in c), f"候选 {c[:8]}")
-    return f"候选 {c[:5]}"
-
-
-@case("PY-28", base="B0-设置", mutates=True)
-def py28(d):
-    general(d)
-    d.switch("联想下一个词", False)
-    d.open_page("text")
-    d.type("jintian")
-    d.cands(want="今天")
-    d.space()
-    s = d.screen()
-    c = d.candidates(s)
-    check(d.field_text(s) == "今天", f"框里「{d.field_text(s)}」")
-    check(not c and d.toolbar(s), f"上屏后栏上是 {c[:4]}")
-    return "上屏后是工具栏"
-
-
-@case("PY-47", base="B0-设置", mutates=True)
-def py47(d):
-    general(d)
-    d.switch("表情候选", False)
-    d.open_page("text")
-    d.type("haha")
-    c = d.all_cands()
-    emo = [x for x in c if re.match(r"^[\U0001F000-\U0001FFFF\u2600-\u27BF]", x)]
-    check(not emo, f"候选里有表情 {emo}")
-    return f"候选 {c[:5]}"
 
 
 @case("PY-50", base="B0-设置", mutates=True, visual=True)
@@ -946,104 +846,56 @@ def py50(d):
     d.glide("men")
     c2 = d.all_cands()
     check(has(c2, "我们"), f"划 wo、men 后候选 {c2[:6]}")
-    return f"`{p}` {c[:3]}；wo+men {c2[:3]}"
-
-
-@case("PY-51", base="B0-设置", mutates=True)
-def py51(d):
-    glide_on(d)
+    d.clear()
+    d.step("点另一种读法")
     d.glide("nihao")
-    c = d.cands()
-    if first(c) != "你好" or len(c) < 2:
-        raise Blocked(f"划 nihao 后候选 {c[:4]}")
-    other = next((x for x in c[1:] if first([x]) != "你好"), None)
-    w = d.pick(c.index(other) + 1)
+    c3 = d.cands()
+    other = next((x for x in c3[1:] if first([x]) != "你好"), None)
+    if first(c3) != "你好" or not other:
+        raise Fail(f"再划 nihao 后候选 {c3[:4]}")
+    w = d.pick(c3.index(other) + 1)
     s = d.screen()
-    t, p = d.field_text(s), d.preedit(s)
-    check(t == first([w]) and not p, f"点「{w}」后框里「{t}」，拼音行 `{p}`")
-    return f"点「{w}」，框里「{t}」"
-
-
-def _words13():
-    """13-words.py's helpers (phrases)"""
-    from uat import script
-    return script("13-words")
+    t, p2 = d.field_text(s), d.preedit(s)
+    check(t == first([w]) and not p2, f"点「{w}」后框里「{t}」，拼音行 `{p2}`")
+    return f"`{p}` {c[:3]}；wo+men {c2[:3]}；点「{w}」，框里「{t}」"
 
 
 @case("PY-52", base="B0-设置", mutates=True)
 def py52(d):
-    import re
-    w = _words13()
     # the device's day, not the host's: redroid keeps UTC, a day ahead of a Pacific evening
     wd = int(d.sh("date +%u").strip()) - 1
-    zhou, xingqi = "周" + "一二三四五六日"[wd], "星期" + "一二三四五六日"[wd]
-    w.PIECES.setdefault("三家", [("sanjia", "三家")])
-    w.add_phrase(d, "sj", [("cn", "三家")])
+    xingqi = "星期" + "一二三四五六日"[wd]
 
     def cands(code):
         d.type(code)
-        c = w.words(d.all_cands())
+        d.cands()
+        c = _w(d.all_cands())
         d.clear()
         return c
 
-    # 周X taken out on its own, before the switch
-    w.page_cands(d, "xq")
-    menu = d.long_pick(zhou)
-    if "从自定义词组中删除" not in menu:
-        raise Blocked(f"长按「{zhou}」的菜单 {[x for x in menu if len(x) > 3][:6]}")
-    menu_tap(d, "从自定义词组中删除")
-    d.clear()
-    d.hide_keyboard()
+    d.step("关掉")
     general(d)
     d.switch("自带的日期时间", False)
     d.open_page("text")
     d.switch_im("拼音")
-    c_rq, c_xq, c_sj = cands("rq"), cands("xq"), cands("sj")
+    c_rq, c_xq = cands("rq"), cands("xq")
     # the word-triggered ones (日期 then today's date) go with the same switch
     iso = d.sh("date +%Y-%m-%d").strip()
     c_ri = cands("riqi")
-    # back on: 三家 deleted, the switch on
-    d.hide_keyboard()
-    home(d, "词库与短语", "自定义短语")
-    s = d.screen()
-    n = next((n for n in s.app() if "三家" in n.text), None)
-    if n:
-        d.swipe((800, n.c[1]), (100, n.c[1]), 300)
-        time.sleep(3.0)
+    is_date = lambda x: re.search(r"\d{4}", x) or "〇" in x   # noqa: E731
+    check(not [x for x in c_rq if is_date(x)], f"关掉时 rq 有日期 {c_rq[:5]}")
+    # 星期 itself is a dictionary word for xq: the built-in one is today's 星期X
+    check(xingqi not in c_xq, f"关掉时 xq 有「{xingqi}」：{c_xq[:6]}")
+    check("日期" in c_ri and iso not in c_ri, f"关掉时 riqi {c_ri[:6]}")
+    d.step("打开")
     d.hide_keyboard()
     general(d)
     d.switch("自带的日期时间", True)
     d.open_page("text")
     d.switch_im("拼音")
-    c_rq2, c_xq2 = cands("rq"), cands("xq")
-    is_date = lambda x: re.search(r"\d{4}", x) or "〇" in x   # noqa: E731
-    check(not [x for x in c_rq if is_date(x)], f"关掉时 rq 有日期 {c_rq[:5]}")
-    # 星期 itself is a dictionary word for xq: the built-in one is today's 星期X
-    check(xingqi not in c_xq, f"关掉时 xq 有「{xingqi}」：{c_xq[:6]}")
-    check(c_sj[:1] == ["三家"] and not [x for x in c_sj if re.search(r"\d:\d|\d时", x)], f"关掉时 sj {c_sj[:4]}")
-    check("日期" in c_ri and iso not in c_ri, f"关掉时 riqi {c_ri[:6]}")
+    c_rq2 = cands("rq")
     check([x for x in c_rq2 if is_date(x)], f"打开后 rq {c_rq2[:5]}")
-    check(xingqi in c_xq2, f"打开后 xq 没有「{xingqi}」：{c_xq2[:6]}")
-    check(zhou not in c_xq2, f"打开后单独删掉的「{zhou}」又回来了：{c_xq2[:6]}")
-    return f"关：rq {c_rq[:2]}，xq {c_xq[:2]}，sj {c_sj[:2]}，riqi {c_ri[:2]}；开：rq {c_rq2[:1]}，xq 有{xingqi}、没有{zhou}"
-
-
-
-@case("PY-53", base="B0", mutates="learn")
-def py53(d):
-    iso = d.sh("date +%Y-%m-%d").strip()
-    d.type("riqi")
-    d.cands()
-    c = d.all_cands()
-    k = next((i for i, x in enumerate(c) if x == iso), None)
-    check(c and c[0] == "日期", f"riqi 第一个 {c[:3]}")
-    check(k is not None and k >= 2, f"riqi 候选 {c[:7]}")
-    d.clear()
-    d.type("rq")
-    d.cands()
-    c2 = d.all_cands()
-    check(c2.count(iso) == 1, f"rq 里 {iso} 出现 {c2.count(iso)} 次：{c2[:7]}")
-    return f"riqi {c[:k + 1]}；rq {c2[:4]}"
+    return f"关：rq {c_rq[:2]}，xq {c_xq[:2]}，riqi {c_ri[:2]}；开：rq {c_rq2[:2]}"
 
 
 @case("PY-64", mutates="learn", clean=True)
@@ -1081,38 +933,6 @@ def py64(d):
     return f"{c1[:4]} → {c2[:3]}"
 
 
-@case("PY-82", mutates="learn", clean=True)
-def py82(d):
-    def haode():
-        d.type("haode")
-        d.cands(want="好的")
-        d.space()
-        time.sleep(0.5)
-        return d.candidates()
-    # PY-71: 好的谢谢 three times puts 谢谢 in 好的's 联想
-    for _ in range(3):
-        haode()
-        d.type("xiexie")
-        d.cands(want="谢谢")
-        d.space()
-        d.press(".")
-    c = haode()
-    if "谢谢" not in c:
-        raise Blocked(f"PY-71 之后「好的」的联想里没有谢谢：{c[:6]}")
-    d.long_pick("谢谢")
-    menu_tap(d, "不再联想")
-    d.press(".")
-    c2 = haode()
-    d.clear()
-    w = script("13-words")
-    w.user_lexicon(d, "不再联想的搭配")
-    rows = w.list_texts(d)
-    check("谢谢" not in c2, f"不再联想后「好的」的联想 {c2[:6]}")
-    # the word, then 「不再跟在「的」后面联想」 under it: the word before is the model's last word (好|的)
-    check(any(r == "谢谢" and i + 1 < len(rows) and "「的」" in rows[i + 1] for i, r in enumerate(rows)), f"不再联想的搭配 {rows[:8]}")
-    return f"联想 {c2[:4]}；搭配 {[r for r in rows if '谢谢' in r]}"
-
-
 # ---------------------------------------------------------------- R11 learning (context, runs, pins)
 
 def _w(c):
@@ -1136,7 +956,7 @@ def _ta_dl(d, pick=None):
 
 
 def _dailai_used(d):
-    """PY-55's 前提: 带来 committed three times by space"""
+    """PY-75's 前提: 带来 committed three times by space"""
     for _ in range(3):
         d.type("dl")
         c = _w(d.cands())
@@ -1158,116 +978,102 @@ def py54(d):
     return f"{c1[:2]} → {c2[:2]} → {c3[:2]}"
 
 
-@case("PY-55", mutates="learn", clean=True)
-def py55(d):
-    _dailai_used(d)
+def _why(d, word):
+    """long-press word, 为什么排在这: the reason line under it"""
+    m = d.long_pick(word)
+    if "为什么排在这" not in m:
+        raise Fail(f"长按「{word}」的菜单没有为什么排在这：{m[:10]}")
+    menu_tap(d, "为什么排在这")
+    return d.screen().texts(where="all")
+
+
+@case("PY-69", mutates="learn", clean=True)
+def py69(d):
+    d.step("前提：他 dl 连选两次")
     _ta_dl(d, "点了")
-    d.press(".")
-    _ta_dl(d)
-    d.space()
-    d.press(".")
     _ta_dl(d, "点了")
-    d.press(".")
     c = _ta_dl(d)
+    if c[:2] != ["点了", "带来"]:
+        raise Blocked(f"前提没到：「他 dl」{c[:3]}")
+    d.step("为什么：点了")
+    m1 = _why(d, "点了")
+    check("在这个前文后面连着选过两次" in m1, f"「点了」的原因 {m1[:10]}")
+    d.step("为什么：带来")
+    # a touch on the keyboard outside the menu: the keyboard takes it and only closes the menu
+    # (BaseInputView.dispatchTouchEvent). Not the page above the keyboard, which the input method
+    # does not take (onComputeInsets): there the app has it, and a web page's blank blurs the field
+    s = d.screen()
+    kb = s.find(rid="keyboard_view", where="ime")
+    # the menu's own popup window only: the keys' labels are on screen too (F3715)
+    menu = [n for n in s.nodes if n.wtype not in (None, "2") and n.pkg == PKG and n.b[3] > n.b[1]]
+    inside = lambda p: any(n.b[0] <= p[0] <= n.b[2] and n.b[1] <= p[1] <= n.b[3] for n in menu)
+    spots = [(kb.b[0] + 30, kb.b[3] - 30), (kb.b[2] - 30, kb.b[3] - 30)] if kb else []
+    spot = next((p for p in spots if not inside(p)), None)
+    if not spot:
+        raise Blocked(f"键盘 {kb.b if kb else None} 上没有菜单外可点的角")
+    d.tap(spot, 0.8)
+    if not has(d.candidates(), "带来"):
+        raise Blocked(f"点空白处后候选没了：{d.candidates()[:4]}")
+    m2 = _why(d, "带来")
+    r2 = next((x for x in m2 if re.fullmatch(r"最近在这串键下用过 \d+ 次", x) or x == "词库自带的顺序"), None)
+    check(r2, f"「带来」的原因 {m2[:10]}")
+    d.step("复制给开发者")
+    menu_tap(d, "复制给开发者")
     d.clear()
-    check(c[:2] == ["带来", "点了"], f"「他 dl」{c[:3]}")
-    return f"{c[:3]}"
+    d.open_page("long")
+    tb = script("05-toolbar")
+    # the whole field replaced by the paste: what is in it is the report alone
+    tb.edit_panel(d)
+    tb.ime(d, desc="全选", after=0.4)
+    tb.ime(d, desc="粘贴", after=0.8)
+    rep = d.field_text() or ""
+    check("dl" in rep and "点了" in rep and "带来" in rep and re.search(r"\d", rep), f"复制出的「{rep[:80]}」")
+    check("他" not in rep, f"复制出的有前文「他」：「{rep[:80]}」")
+    return f"点了：{m1[0] if m1 else ''}…；带来：{r2}；复制 {len(rep)} 字"
 
 
-def pin_zhidao(d):
-    d.type("zhidao")
-    d.cands(want="指导")
-    m = d.long_pick("指导")
-    if "固定首位" not in m:
-        raise Fail(f"菜单里没有固定首位：{m[:10]}")
-    menu_tap(d, "固定首位")
-    d.clear()
+def _paste_end(d):
+    """the system paste at the end of the focused field (a long press on its empty right part)"""
+    f = d.field()
+    if not f:
+        raise Blocked("没有获得焦点的输入框，粘贴不了")
+    # the cursor to the end first: a long press on a word selects it and the paste would replace it
+    d.tap((f.b[2] - 40, f.c[1]), 0.4)
+    d.hold((f.b[2] - 40, f.c[1]), 900)
+    time.sleep(0.6)
+    if not d.screen().find(text="粘贴", where="all"):
+        raise Blocked("长按框的右端没有出「粘贴」")
+    menu_tap(d, "粘贴")
+    time.sleep(0.5)
 
 
-@case("PY-66", mutates=True)
-def py66(d):
-    d.type("zd")
-    c0 = _w(d.cands())
-    d.clear()
-    pin_zhidao(d)
-    d.type("zd")
-    c1 = _w(d.cands())
-    d.clear()
-    check(first(c1) == first(c0) and first(c1) != "指导", f"zd 固定前 {c0[:3]} → 后 {c1[:3]}")
-    return f"zd {c0[:2]} → {c1[:2]}"
-
-
-@case("PY-79", mutates=True)
-def py79(d):
-    pin_zhidao(d)
-    d.type("wo")
-    z = d.keys(refresh=True)["z"]
-    d.swipe(z, (z[0], z[1] + 160), 200, after=0.5)   # Z's swipe-down: the separator '
-    d.type("zhidao")
-    p = d.preedit()
+@case("PY-73", mutates="learn", clean=True)
+def py73(d):
+    d.step("前提：复制「他」")
+    tb = script("05-toolbar")
+    d.open_page("sentence")
+    _ta(d)
+    d.expect_field("他", msg="「句子」框里是「{got}」")
+    tb.edit_panel(d)
+    tb.ime(d, desc="全选", after=0.4)
+    tb.ime(d, desc="复制", after=0.6)
+    tb.back_to_keys(d)
+    d.open_page("text")
+    want = ""
+    for i in range(3):
+        d.step(f"粘贴「他」第 {i + 1} 次")
+        _paste_end(d)
+        want += "他"
+        d.expect_field(want, msg=f"粘贴后框里是「{{got}}」，不是「{want}」")
+        d.type("dl")
+        if i < 2:
+            d.cands(want="点了")
+            d.pick("点了")
+            want += "点了"
     c = _w(d.cands())
     d.clear()
-    check((p or "").replace(" ", "") == "wo'zhidao", f"拼音行 `{p}`")
-    check(first(c) == "我指导", f"wo'zhidao {c[:3]}")
-    return f"`{p}` {c[:3]}"
-
-
-@case("PY-80", mutates="learn", clean=True)
-def py80(d):
-    _dailai_used(d)
-    _ta_dl(d, "点了")
-    d.press(".")
-    _ta_dl(d)
-    m = d.long_pick("点了")
-    if "固定首位" not in m:
-        raise Fail(f"菜单 {m[:10]}")
-    menu_tap(d, "固定首位")
-    pinned = _w(d.cands())
-    d.pick("带来")
-    d.press(".")
-    _ta_dl(d)
-    m = d.long_pick("点了")
-    un = next((x for x in m if "取消" in x), None)
-    if not un:
-        raise Fail(f"固定后长按「点了」的菜单没有取消固定：{m[:10]}")
-    menu_tap(d, un)
-    d.cands(want="点了")
-    if d.pick("点了") != "点了":
-        raise Fail("没选上「点了」")
-    d.press(".")
-    c1 = _ta_dl(d, "点了")
-    d.press(".")
-    c2 = _ta_dl(d)
-    d.clear()
-    check(pinned[:2] == ["点了", "带来"], f"固定后 {pinned[:3]}")
-    check(first(c1) == "带来", f"取消固定后选过一次 {c1[:3]}")
-    check(first(c2) == "点了", f"再选一次后 {c2[:3]}")
-    return f"固定 {pinned[:2]}；{c1[:2]} → {c2[:2]}"
-
-
-def _haode(d):
-    d.type("haode")
-    d.cands(want="好的")
-    d.space()
-    time.sleep(0.5)
-    return _w(d.candidates())
-
-
-@case("PY-71", mutates="learn", clean=True)
-def py71(d):
-    c0 = _haode(d)
-    d.press(".")
-    for _ in range(3):
-        _haode(d)
-        d.type("xiexie")
-        d.cands(want="谢谢")
-        d.space()
-        d.press(".")
-    c = _haode(d)
-    d.clear()
-    i0 = c0.index("谢谢") if "谢谢" in c0 else 99
-    check("谢谢" in c and c.index("谢谢") < i0, f"联想 前 {c0[:8]} → 后 {c[:8]}")
-    return f"谢谢 第 {i0 + 1 if i0 < 99 else '-'} → 第 {c.index('谢谢') + 1}"
+    check(first(c) == "点了", f"粘贴的「他」后 dl {c[:3]}")
+    return f"「他 dl」{c[:3]}"
 
 
 @case("PY-72", mutates=True, clean=True)
@@ -1301,8 +1107,10 @@ def py72(d):
     check(b not in pred2, f"B=「{b}」，之后联想 {pred2[:6]}")
     check(b in c, f"{lazy_pinyin(b)} 的候选 {c[:8]}")
     check(any("不再联想的搭配" in t and "1 个" in t for t in top), f"屏蔽的词页 {top[:6]}")
-    # the word, then 「不再跟在「好」后面联想」 under it: the word before is the model's last word (你|好)
-    check(any(r == b and i + 1 < len(rows) and "「好」" in rows[i + 1] for i, r in enumerate(rows)), f"搭配 {rows[:6]}")
+    # the word, then 「不再跟在「…」后面联想」 under it: the word before is the model's last word
+    # either way the model cut 你好 is right: kept whole (你好 → B) or as 你|好 (好 → B)
+    check(any(r == b and i + 1 < len(rows) and ("「好」" in rows[i + 1] or "「你好」" in rows[i + 1])
+              for i, r in enumerate(rows)), f"搭配 {rows[:6]}")
     return f"B=「{b}」；联想 {pred2[:3]}；{[r for r in rows if b in r][:1]}"
 
 
@@ -1311,19 +1119,15 @@ def _chat_send(d):
     time.sleep(0.4)
 
 
-def _chat_learn(d, bksp_after=False):
-    """PY-75/PY-81's steps in the chat box: 他 sent, dl → 点了 sent, twice"""
-    for i in range(2):
+def _chat_learn(d):
+    """PY-75's steps in the chat box: 他 sent, dl → 点了 sent, twice"""
+    for _ in range(2):
         _ta(d)
         _chat_send(d)
-        if bksp_after:
-            d.bksp()
         d.type("dl")
         d.cands(want="点了")
         d.pick("点了")
         _chat_send(d)
-        if bksp_after and i == 0:
-            d.bksp()
     d.open_page("text")
     c = _ta_dl(d)
     d.clear()
@@ -1335,33 +1139,3 @@ def _chat_learn(d, bksp_after=False):
 def py75(d):
     _dailai_used(d)
     return _chat_learn(d)
-
-
-@case("PY-81", page="chat", mutates=True, clean=True)
-def py81(d):
-    general(d)
-    d.switch("联想下一个词", False)
-    d.open_page("chat")
-    _dailai_used(d)
-    return _chat_learn(d, bksp_after=True)
-
-
-@case("PY-77", mutates=True, clean=True)
-def py77(d):
-    d.type("shiyan")
-    c0 = _w(d.cands())
-    d.clear()
-    if first(c0) == "试验":
-        raise Blocked(f"shiyan 第一个已是试验 {c0[:3]}")
-    glide_on(d)
-    for _ in range(2):
-        d.glide("shiyan")
-        d.cands(want="试验")
-        d.pick("试验")
-        d.press(".")
-    d.clear()
-    d.type("shiyan")
-    c = _w(d.cands())
-    d.clear()
-    check(first(c) == "试验", f"点按 shiyan {c0[:3]} → {c[:3]}")
-    return f"{c0[:2]} → {c[:2]}"

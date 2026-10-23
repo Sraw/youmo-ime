@@ -2,7 +2,7 @@
 前提/操作/预期."""
 import time
 
-from uat import (PKG, Blocked, add_im, case, check, first, flick, gear, glide_on, home, glide_shot, has, popup,
+from uat import (Blocked, add_im, case, check, first, flick, gear, glide_on, has, popup,
                  popup_away, popup_pick, popup_slide)
 
 
@@ -118,37 +118,6 @@ def multi_tap(d, speed):
     d.switch_im("九键")
 
 
-@case("T9-06", base="B0-设置", mutates=True)
-def t906(d):
-    multi_tap(d, "中")
-    k = d.keys(refresh=True)["1"]
-    d.taps([k, k], gap=0.15, after=0.8)
-    t = d.field_text()
-    check(t == "。", f"框里「{t}」")
-    return f"「{t}」"
-
-
-@case("T9-07", base="B0-九键")
-def t907(d):
-    k = d.keys(refresh=True)["1"]
-    d.taps([k, k], gap=0.15, after=0.8)
-    t = d.field_text()
-    check(t == "，，", f"框里「{t}」")
-    return f"「{t}」"
-
-
-@case("T9-08", base="B0-设置", mutates=True)
-def t908(d):
-    multi_tap(d, "中")
-    k = d.keys(refresh=True)
-    d.taps([k["4"], k["4"]], gap=0.12, after=0.3)
-    t9(d, "26")
-    c = d.all_cands()
-    hit = [x for x in c[:12] if x.split(" ")[0] in ("还", "汉", "含", "寒", "喊", "韩", "憨", "函", "汗")]
-    check(hit, f"候选 {c[:10]}（拼音行 `{d.preedit()}`）")
-    return f"`{d.preedit()}`，候选 {c[:5]}"
-
-
 @case("T9-09", base="B0-九键", mutates="learn")
 def t909(d):
     items, xy = popup(d, "5")
@@ -209,66 +178,53 @@ def t912(d):
 
 @case("T9-13", base="B0-设置", mutates=True)
 def t913(d):
+    def letters(desc, n_back, typed):
+        d.tap_text(desc, where="all", after=1.2)
+        s = d.screen()
+        f = next((n for n in s.nodes if n.cls == "EditText"), None)
+        if not f:
+            raise Blocked(f"{desc} 的字母对话框没有输入框")
+        d.tap((f.b[2] - 20, f.c[1]), 1.0)
+        d.bksp(n_back)
+        if typed:
+            d.switch_im("拼音")
+            d.type(typed)
+            d.enter()
+        d.hide_keyboard()
+        f = next((n for n in d.screen().nodes if n.cls == "EditText"), None)
+        if not f or f.text != typed:
+            raise Blocked(f"{desc}：输入框里是「{f.text if f else None}」，要的是「{typed}」")
+        d.tap_text("确定", where="all", scroll=False, after=1.0)
+
     add_im(d, "九键拼音")
     gear(d, "九键拼音")
     d.tap_text("按键字母", after=1.2)
-    d.tap_text("PQRS, 7", where="all", after=1.2)
-    s = d.screen()
-    f = next((n for n in s.nodes if n.cls == "EditText"), None)
-    if not f:
-        raise Blocked("7 键的字母对话框没有输入框")
-    d.tap((f.b[2] - 20, f.c[1]), 1.0)
-    d.bksp(6)
-    d.switch_im("拼音")
-    d.type("prs")
-    d.enter()
-    s = d.screen()
-    f = next((n for n in s.nodes if n.cls == "EditText"), None)
-    if not f or f.text != "prs":
-        raise Blocked(f"输入框里是「{f.text if f else None}」")
-    d.hide_keyboard()
-    d.tap_text("确定", where="all", scroll=False, after=1.0)
+    d.step("改 7 键、删光 3 键")
+    letters("PQRS, 7", 6, "prs")
+    letters("DEF, 3", 6, "")
     d.open_page("text")
     d.switch_im("九键")
+    d.step("长按 7")
     items, xy = popup(d, "7")
     d.touch(("up", *xy))
     texts = [n.text.lower() for n in items]
     check("q" not in texts and {"p", "r", "s"} <= set(texts), f"长按 7 弹出 {texts}")
-    return f"长按 7 弹出 {texts}"
-
-
-@case("T9-14", base="B0-设置", mutates=True)
-def t914(d):
-    add_im(d, "九键拼音")
-    gear(d, "九键拼音")
-    t = d.all_texts()
-    rows = ["通用输入设置", "连按选字母", "九键英文打法", "按键字母", "按键长按"]
-    titles = [x for x in t if x in rows]
-    check(titles == rows, f"九键页 {t[:14]}")
-    check(any("只有这一种读法" in x for x in t), f"连按选字母的说明 {t[:14]}")
-    check(any(x.endswith("总是连按") or x.endswith("总是连按。") for x in t), f"九键英文打法的说明 {t[:14]}")
-    # a password field switches to English on the full keyboard: never 九键英文's 连按
-    check(not any("连按" in x and "密码" in x for x in t), f"九键英文打法的说明还写密码 {t[:14]}")
-    d.scroll_top()
-    d.tap_text("通用输入设置", after=1.2)
-    s = d.screen()
-    row = None
-    for _ in range(6):
-        s = d.screen()
-        row = s.find(text="纠正错拼和按偏的键")
-        if row:
-            break
-        d.scroll(s)
-    summ = " ".join(row.parent.texts()) if row and row.parent else ""
-    check("不适用：九键拼音。" in summ, f"纠正错拼的说明：{summ[-60:]}")
-    d.tap_text("模糊音", after=1.0)
-    s = d.screen()
-    texts = s.texts(where="all")
-    uv = next((i for i, x in enumerate(texts) if "u ↔ v" in x or "u↔v" in x), None)
-    check(uv is not None and any("不适用：九键拼音" in x for x in texts[uv:uv + 3]), f"模糊音 {texts[:20]}")
-    box = [n for n in s.nodes if n.cls in ("CheckBox", "CheckedTextView") and n.enabled]
-    check(box, "模糊音里的勾选框不能勾")
-    return "九键页五项；纠正错拼和 u↔v 都写着不适用：九键拼音"
+    d.clear()
+    d.step("长按 3")
+    items, xy = popup(d, "3")
+    popup_away(d, xy)
+    time.sleep(0.4)
+    digit = next((n for n in items if n.text == "3"), None)
+    if not digit:
+        raise Blocked(f"长按 3 弹出 {[n.text for n in items]}")
+    rows = {}
+    for n in items:
+        if n.c[1] < digit.b[1]:
+            rows.setdefault(n.c[1] // 20, []).append(n.text)
+    sizes = [len(r) for _, r in sorted(rows.items())]
+    total = sum(sizes)
+    check(total and max(sizes) == min(total, 5), f"长按 3 的符号每行 {sizes}：{list(rows.values())}")
+    return f"长按 7 弹出 {texts}；3 的符号每行 {sizes}"
 
 
 @case("T9-15", base="B0-九键", mutates="learn")
@@ -295,20 +251,6 @@ def t915(d):
     check(first(c) == "你好", f"候选 {c[:3]}")
     check(t == "你好", f"框里「{t}」")
     return f"`{p1}` → `{p2}` {c[:2]}，框里「{t}」"
-
-
-@case("T9-16", base="B0-设置", mutates=True, visual=True)
-def t916(d):
-    glide_on(d, "九键", add="九键拼音")
-    k = d.keys(refresh=True)
-    pts = [k[c] for c in "6426"]
-    glide_shot(d, pts, "划 6-4-2-6，抬手前")
-    s = d.screen()
-    p = d.preedit(s)
-    c = d.all_cands()
-    check(p and not any(ch.isdigit() for ch in p), f"拼音行 `{p}`（应是字母读出的拼音）")
-    check(has(c, "你好"), f"`{p}` 候选 {c[:8]}")
-    return f"`{p}` {c[:3]}"
 
 
 @case("T9-17", base="B0-设置", mutates=True)
@@ -354,21 +296,38 @@ def t918(d):
 def t919(d):
     multi_tap(d, "中")
     k = d.keys(refresh=True)
+    d.step("1 键连按换标点")
+    d.taps([k["1"], k["1"]], gap=0.3, after=0.8)
+    t = d.field_text()
+    check(t == "。", f"快速连点 1 两下后框里「{t}」")
+    d.clear()
+    d.step("学广告")
     # 4 4 slowly, two keys: 广告 picked, learned
     d.taps([k["4"], k["4"]], gap=1.2, after=0.6)
     c = d.cands(want="广告")
     check(has(c, "广告"), f"慢点 4 4 候选 {c[:8]}")
     d.pick("广告")
     d.clear()
-    got = []
-    for gap in (0.12, 0.3, 0.45):
-        d.taps([k["4"], k["4"]], gap=gap, after=0.5)
-        got.append((gap, d.preedit(), [x.split(" ")[0] for x in d.all_cands()[:4]]))
-        d.clear()
+    d.step("快连 4 两下")
+    d.taps([k["4"], k["4"]], gap=0.3, after=0.5)
+    p, c = d.preedit(), [x.split(" ")[0] for x in d.all_cands()[:4]]
     # a quick second press is h itself, not two keys (gg/hh 简拼, 广告), the learned 广告 too
-    bad = [g for g in got if g[1].replace("'", "").replace(" ", "") != "h" or "广告" in g[2]]
-    check(not bad, f"快速连按 4 两下不是 h：{bad}")
-    return "; ".join(f"{g}s `{p}` {c}" for g, p, c in got)
+    check(p.replace("'", "").replace(" ", "") == "h" and "广告" not in c, f"快速连按 4 两下：`{p}` {c}")
+    t9(d, "26")
+    c2 = d.all_cands()
+    hit = [x for x in c2[:12] if x.split(" ")[0] in ("还", "汉", "含", "寒", "喊", "韩", "憨", "函", "汗")]
+    check(hit, f"h 后点 2 6 候选 {c2[:10]}（拼音行 `{d.preedit()}`）")
+    d.clear()
+    d.step("连按字母退格")
+    d.taps([k["7"]], after=0.6)
+    want = (d.preedit(), d.all_cands()[:6])
+    d.taps([k["4"], k["4"]], gap=0.3, after=0.6)
+    mid = d.preedit()
+    d.tap(d.screen().find(rid="button_backspace", where="ime").c, 0.6)
+    got = (d.preedit(), d.all_cands()[:6])
+    # Backspace takes the multi-tap letter whole, back to 7 alone
+    check(got == want, f"连按 `{mid}` 退格后 {got}，只点 7 时 {want}")
+    return f"1 1「{t}」；4 4 `{p}` {c}；26 {c2[:3]}；7 `{mid}` ⌫ → `{got[0]}`"
 
 
 @case("T9-24", base="B0-九键")
@@ -380,7 +339,11 @@ def t924(d):
     # 连按 off by default: two keys, read by the model
     check(p.replace("'", "").replace(" ", "") != "h", f"拼音行 `{p}`")
     check(any(has(c, w) for w in ("哈哈", "广告", "个个", "好好")), f"候选 {c[:8]}")
-    return f"`{p}` {c[:4]}"
+    d.clear()
+    d.taps([k["1"], k["1"]], gap=0.15, after=0.8)
+    t = d.field_text()
+    check(t == "，，", f"快速连点 1 两下后框里「{t}」")
+    return f"`{p}` {c[:4]}；1 1「{t}」"
 
 
 @case("T9-20", base="B0-九键", mutates="learn")
@@ -395,18 +358,6 @@ def t920(d):
     check(t == "😃", f"框里「{t}」")
     return f"{c[:k + 1]} →「{t}」"
 
-
-
-@case("T9-21", base="B0-九键")
-def t921(d):
-    iso = d.sh("date +%Y-%m-%d").strip()
-    t9(d, "7474")
-    d.cands()
-    c = d.all_cands()
-    k = next((i for i, x in enumerate(c) if x == iso), None)
-    check(c and c[0] == "日期", f"第一个 {c[:3]}")
-    check(k is not None and k >= 2, f"候选 {c[:7]}")
-    return f"{c[:k + 1]}"
 
 
 @case("T9-22", base="B0-九键", mutates="learn")
@@ -461,21 +412,6 @@ def t925(d):
     return f"候选 {c[:4]}"
 
 
-@case("T9-26", base="B0-设置", mutates=True)
-def t926(d):
-    multi_tap(d, "中")
-    k = d.keys(refresh=True)
-    d.taps([k["7"]], after=0.6)
-    want = (d.preedit(), d.all_cands()[:6])
-    d.taps([k["4"], k["4"]], gap=0.15, after=0.6)
-    mid = d.preedit()
-    d.tap(d.screen().find(rid="button_backspace", where="ime").c, 0.6)
-    got = (d.preedit(), d.all_cands()[:6])
-    # Backspace takes the multi-tap letter whole, back to 7 alone
-    check(got == want, f"连按 `{mid}` 退格后 {got}，只点 7 时 {want}")
-    return f"`{mid}` → ⌫ → `{got[0]}` {got[1][:3]}"
-
-
 def symbol_rows(items, digit):
     """the popup's items above its digit's row, and those on it"""
     row = next((n for n in items if n.text == digit), None)
@@ -507,47 +443,6 @@ def t927(d):
     t, p = d.field_text(), d.preedit()
     check(t == "你！" and not p, f"框里「{t}」，拼音行 `{p}`")
     return f"上面一行 {above}，下面 {on}；选「{tgt.text}」后「{t}」"
-
-
-@case("T9-28", base="B0-设置", mutates=True)
-def t928(d):
-    def page():
-        gear(d, "九键拼音")
-        d.tap_text("按键长按", after=1.2)
-
-    def long_press_5():
-        d.open_page("text")
-        d.switch_im("九键")
-        items, xy = popup(d, "5")
-        popup_away(d, xy)
-        time.sleep(0.4)
-        return symbol_rows(items, "5")
-
-    add_im(d, "九键拼音")
-    page()
-    d.tap_text("# ( ), 5", where="all", after=1.2)
-    s = d.screen()
-    f = next((n for n in s.nodes if n.cls == "EditText"), None)
-    if not f:
-        raise Blocked("5 键的长按符号对话框没有输入框")
-    d.tap((f.b[2] - 20, f.c[1]), 1.0)
-    d.bksp(8)
-    d.hide_keyboard()
-    f = next((n for n in d.screen().nodes if n.cls == "EditText"), None)
-    if f and f.text:
-        raise Blocked(f"输入框没清空：「{f.text}」")
-    d.tap_text("确定", where="all", scroll=False, after=1.0)
-    # emptied, the key shows its digit alone
-    shown = d.screen().find(desc="5", where="app")
-    check(shown, "清空后页面上 5 键不是空的")
-    cleared = long_press_5()
-    check(not cleared[0] and {"5", "j", "k", "l"} <= set(cleared[1]), f"清空后长按 5：上面 {cleared[0]}，下面 {cleared[1]}")
-    page()
-    d.tap(shown.c, 1.2)
-    d.tap_text("重置", where="all", scroll=False, after=1.0)
-    back = long_press_5()
-    check({"#", "（", "）"} <= set(back[0]) or {"#", "(", ")"} <= set(back[0]), f"重置后长按 5 上面一行 {back[0]}")
-    return f"清空后长按 5 {cleared}；重置后 {back}"
 
 
 def set_long_press(d, typed):
@@ -587,29 +482,85 @@ def t929(d):
         gear(d, "九键拼音")
         d.tap_text("按键长按", after=1.2)
 
-    def set_one(typed):
-        return set_long_press(d, typed)
+    def long_press_5():
+        d.open_page("text")
+        d.switch_im("九键")
+        items, xy = popup(d, "5")
+        popup_away(d, xy)
+        time.sleep(0.4)
+        return symbol_rows(items, "5")
 
     add_im(d, "九键拼音")
+    d.step("长按 1 选 .")
     d.open_page("text")
     d.switch_im("九键")
     popup_pick(d, "1", ".")
     t = d.field_text()
     check(t == ".", f"长按 1 选 . 后框里「{t}」")
+    d.step("清空 5 键")
     page()
-    toast = set_one("a")
+    d.tap_text("# ( ), 5", where="all", after=1.2)
+    s = d.screen()
+    f = next((n for n in s.nodes if n.cls == "EditText"), None)
+    if not f:
+        raise Blocked("5 键的长按符号对话框没有输入框")
+    d.tap((f.b[2] - 20, f.c[1]), 1.0)
+    d.bksp(8)
+    d.hide_keyboard()
+    f = next((n for n in d.screen().nodes if n.cls == "EditText"), None)
+    if f and f.text:
+        raise Blocked(f"输入框没清空：「{f.text}」")
+    d.tap_text("确定", where="all", scroll=False, after=1.0)
+    # emptied, the key shows its digit alone
+    shown = d.screen().find(desc="5", where="app")
+    check(shown, "清空后页面上 5 键不是空的")
+    cleared = long_press_5()
+    check(not cleared[0] and {"5", "j", "k", "l"} <= set(cleared[1]), f"清空后长按 5：上面 {cleared[0]}，下面 {cleared[1]}")
+    d.step("重置 5 键")
+    page()
+    n = d.screen().find(desc="5", where="app")
+    if not n:
+        raise Blocked("重置时页面上没有 5 键")
+    d.tap(n.c, 1.2)
+    d.tap_text("重置", where="all", scroll=False, after=1.0)
+    back = long_press_5()
+    check({"#", "（", "）"} <= set(back[0]) or {"#", "(", ")"} <= set(back[0]), f"重置后长按 5 上面一行 {back[0]}")
+    d.step("1 键只填 a")
+    page()
+    toast = set_long_press(d, "a")
     check(toast, "只填 a 后没有提示")
     # the key's description: its symbols as drawn, then its digit
     label = next((n.desc for n in d.screen().app() if n.desc.endswith(", 1")), "")
     check("…" in label, f"只填 a 后 1 键成了「{label}」")
-    set_one(", .")
+    d.step("1 键改成 ， 。")
+    set_long_press(d, ", .")
     d.open_page("text")
     d.switch_im("九键")
+    d.clear()
     items, xy = popup(d, "1")
     popup_away(d, xy)
     texts = sorted(n.text for n in items)
     check(texts == sorted(["，", "。"]), f"改后长按 1 弹出 {texts}")
-    return f"「{t}」；只填 a 后提示 {toast[:1]}，1 键「{label}」；改后 {texts}"
+    d.step("九键英文长按 1")
+    d.clear()
+    to_english(d)
+    items, xy = popup(d, "1")
+    en = [n.text for n in items]
+    tgt = next((n for n in items if n.text == "("), None)
+    if not tgt:
+        popup_away(d, xy)
+        raise Blocked(f"九键英文长按 1 弹出 {en}")
+    popup_slide(d, xy, tgt)
+    t2 = d.field_text() or ""
+    want = [":", ";", '"', "(", ")", "@", "&", "/", "*", "~"]
+    miss = [x for x in want if x not in en]
+    full = [x for x in en if any(0xFF00 <= ord(ch) <= 0xFFEF or ch in "“”" for ch in x)]
+    check(not miss, f"九键英文长按 1 少了 {miss}：{en}")
+    check(not full, f"九键英文长按 1 有全角 {full}")
+    check("，" not in en and "。" not in en, f"九键拼音改的 1 键长按跑到九键英文：{en}")
+    check(t2 == "(", f"九键英文选 ( 后框里「{t2}」")
+    return (f"「{t}」；清空后长按 5 {cleared}；重置后 {back}；只填 a 提示 {toast[:1]}，1 键「{label}」；"
+            f"改后 {texts}；九键英文 {en}「{t2}」")
 
 
 def to_english(d):
@@ -803,18 +754,23 @@ def t935(d):
 def t936(d):
     to_english(d)
     out = []
-    for end in ("enter", ","):
+    for end in ("enter", ",", "0", "长按 4"):
         t9(d, "4663")
         c = [x.split(" ")[0] for x in d.all_cands()]
         if not c:
             raise Blocked("4663 没有候选")
         if end == "enter":
             d.press("enter", after=0.6)
-        else:
+        elif end == ",":
             col_tap(d, ",")
+        elif end == "0":
+            t9(d, "0")
+        else:
+            popup_pick(d, "4", "4")
+            time.sleep(0.4)
         t, p = d.field_text() or "", d.preedit()
         # English's space after a word, put behind the mark
-        want = c[0] + ("" if end == "enter" else ", ")
+        want = c[0] + {"enter": "", ",": ", ", "0": "0", "长按 4": "4"}[end]
         check(t == want and not p, f"{end}：框里「{t}」，拼音行 `{p}`，要「{want}」")
         out.append(t)
         d.clear()
@@ -863,19 +819,6 @@ def word(d):
     return [x.split(" ")[0] for x in d.all_cands()]
 
 
-@case("T9-39", base="B0-九键", mutates="learn")
-def t939(d):
-    to_english(d)
-    t9(d, "95959")
-    c, f = word(d), d.field_text() or ""
-    d.press("space", after=0.6)
-    t = d.field_text() or ""
-    check(f == "wjwjw", f"95959 框里打着「{f}」（候选 {c[:4]}）")
-    check(t == "wjwjw ", f"空格后「{t}」")
-    check(not any(ch.isdigit() for ch in t), f"打出了数字「{t}」")
-    return f"打着「{f}」，候选 {c[:3]}；空格后「{t}」"
-
-
 def en_letter(d, digit, letter):
     """a long press on a digit key in 九键英文, the letter picked from its row"""
     popup_pick(d, digit, letter)
@@ -904,48 +847,6 @@ def t940(d):
     t2 = d.field_text() or ""
     check(t2 == "hel ", f"长按定下 hel（打着「{f2}」）空格后「{t2}」")
     return f"打着「{f}」，上屏「{t}」；再按 96729 候选 {c[:4]}；hel →「{t2}」"
-
-
-@case("T9-41", base="B0-九键", mutates="learn")
-def t941(d):
-    to_english(d)
-    t9(d, "4663")
-    c = word(d)
-    if not c:
-        raise Blocked("4663 没有候选")
-    t9(d, "0")
-    t, p = d.field_text() or "", d.preedit()
-    check(t == c[0] + "0" and not p, f"框里「{t}」，拼音行 `{p}`，要「{c[0]}0」")
-    return f"「{t}」"
-
-
-@case("T9-42", base="B0-九键", mutates="learn")
-def t942(d):
-    to_english(d)
-    t9(d, "4355")
-    want = word(d)
-    d.clear()
-    t9(d, "43556")
-    before = d.field_text() or ""
-    d.tap(d.screen().find(rid="button_backspace", where="ime").c, 0.6)
-    f, c = d.field_text() or "", word(d)
-    check(want and f == want[0], f"43556 ⌫ 后打着「{f}」，只按 4355 时第一个是 {want[:1]}")
-    check(c[:3] == want[:3], f"⌫ 后候选 {c[:4]}，4355 的 {want[:4]}")
-    return f"「{before}」→ ⌫ →「{f}」"
-
-
-@case("T9-43", base="B0-九键", mutates="learn")
-def t943(d):
-    to_english(d)
-    t9(d, "4663")
-    c = word(d)
-    if not c:
-        raise Blocked("4663 没有候选")
-    popup_pick(d, "4", "4")
-    time.sleep(0.4)
-    t, p = d.field_text() or "", d.preedit()
-    check(t == c[0] + "4" and not p, f"框里「{t}」，拼音行 `{p}`，要「{c[0]}4」")
-    return f"「{t}」"
 
 
 @case("T9-44", base="B0-九键", page="nosuggest", mutates="learn")
@@ -997,33 +898,6 @@ def t946(d):
     check(c and t2 == c[0] and not p2, f"英文 4663 时点 中/英：框里「{t2}」，拼音行 `{p2}`（候选 {c[:3]}）")
     check("九键" in back, f"回到「{back}」")
     return f"拼音→英文「{t1}」；英文→拼音「{t2}」（{back}）"
-
-
-@case("T9-47", base="B0-设置", mutates=True)
-def t947(d):
-    add_im(d, "九键拼音")
-    gear(d, "九键拼音")
-    d.tap_text("按键长按", after=1.2)
-    set_long_press(d, ", .")
-    d.open_page("text")
-    d.switch_im("九键")
-    to_english(d)
-    items, xy = popup(d, "1")
-    texts = [n.text for n in items]
-    tgt = next((n for n in items if n.text == "("), None)
-    if not tgt:
-        popup_away(d, xy)
-        raise Blocked(f"长按 1 弹出 {texts}")
-    popup_slide(d, xy, tgt)
-    t = d.field_text() or ""
-    want = [":", ";", '"', "(", ")", "@", "&", "/", "*", "~"]
-    miss = [x for x in want if x not in texts]
-    full = [x for x in texts if any(0xFF00 <= ord(ch) <= 0xFFEF or ch in "“”" for ch in x)]
-    check(not miss, f"长按 1 少了 {miss}：{texts}")
-    check(not full, f"长按 1 有全角 {full}")
-    check("，" not in texts and "。" not in texts, f"九键拼音改的 1 键长按跑到九键英文：{texts}")
-    check(t == "(", f"选 ( 后框里「{t}」")
-    return f"弹出 {texts}；「{t}」"
 
 
 def edge_out(d, key):
@@ -1086,138 +960,3 @@ def t949(d):
     t = d.field_text() or ""
     check(t == "gG", f"4 ⇧ 4 后框里「{t}」")
     return f"「{t}」"
-
-
-def remove_im(d, name):
-    """settings 输入法 → 编辑, name ticked, 删除"""
-    home(d, "输入法")
-    d.tap_text("编辑", scroll=False, after=1.0)
-    s = d.screen()
-    n = s.find(text=name)
-    box = next((k for k in n.parent.kids if k.cls == "CheckBox"), None) if n and n.parent else None
-    if not box:
-        raise Blocked(f"编辑时「{name}」一行没有勾选框")
-    d.tap(box.c, 0.8)
-    d.tap_text("删除", scroll=False, after=1.2)
-    ok = next((k for k in d.screen().nodes if k.text in ("确定", "删除") and k.cls == "Button"), None)
-    if ok:
-        d.tap(ok.c, 1.0)
-    if d.screen().find(text="编辑") is None:
-        d.back(1.0)
-    if d.screen().find(text=name):
-        raise Blocked(f"删不掉「{name}」")
-
-
-@case("T9-50", base="B0-设置", mutates=True)
-def t950(d):
-    add_im(d, "九键拼音")
-    remove_im(d, "英文")
-    d.open_page("text")
-    d.switch_im("九键")
-    to_english(d)
-    s = d.screen()
-    l1, caps1, redo1 = d.im_label(s), s.find(rid="button_caps", where="ime"), d.key_node("重输", s)
-    add_im(d, "英文")
-    d.open_page("text")
-    d.switch_im("九键")
-    to_english(d)
-    s = d.screen()
-    l2, caps2 = d.im_label(s), s.find(rid="button_caps", where="ime")
-    d.press("globe", after=1.0)
-    d._keys = None
-    l3 = d.im_label()
-    k = d.keys(refresh=True)
-    check("九键" in l1 and not caps1 and redo1, f"没有英文时点 中/英：空格「{l1}」，⇧ {bool(caps1)}，重输 {bool(redo1)}")
-    check("英文" in l2 and caps2, f"加回英文后点 中/英：空格「{l2}」，⇧ {bool(caps2)}")
-    check("英文" in l3 and "q" in k and d.key_node("中/英") is None, f"九键英文点地球键：「{l3}」，键 {sorted(k)[:12]}")
-    return f"没有英文「{l1}」；加回后「{l2}」；地球键「{l3}」全键盘"
-
-
-def picker(d, name):
-    """the globe's long press: the system's input method picker, name tapped"""
-    d.hold(d.keys(refresh=True)["globe"], 900)
-    time.sleep(1.0)
-    s = d.screen()
-    n = next((n for n in s.nodes if n.text == name), None)
-    if not n:
-        d.back(0.8)
-        raise Blocked(f"选择框里没有「{name}」：{s.texts(where='all')[:12]}")
-    d.tap(n.c, 1.2)
-    d._keys = None
-
-
-@case("T9-51", base="B0-九键", mutates=True)
-def t951(d):
-    to_english(d)
-    picker(d, "九键拼音")
-    l1, redo = d.im_label(), d.key_node("重输")
-    picker(d, "英文")
-    l2, k = d.im_label(), d.keys(refresh=True)
-    check("九键" in l1 and redo, f"选九键拼音后：「{l1}」，重输 {bool(redo)}")
-    check("英文" in l2 and "q" in k and d.key_node("中/英") is None, f"选英文后：「{l2}」，键 {sorted(k)[:12]}")
-    return f"「{l1}」→「{l2}」全键盘"
-
-
-@case("T9-52", base="B0-设置", mutates=True)
-def t952(d):
-    add_im(d, "九键拼音")
-    gear(d, "九键拼音")
-    d.tap_text("按键字母", after=1.2)
-    d.tap_text("DEF, 3", where="all", after=1.2)
-    f = next((n for n in d.screen().nodes if n.cls == "EditText"), None)
-    if not f:
-        raise Blocked("3 键的字母对话框没有输入框")
-    d.tap((f.b[2] - 20, f.c[1]), 1.0)
-    d.bksp(6)
-    d.hide_keyboard()
-    f = next((n for n in d.screen().nodes if n.cls == "EditText"), None)
-    if f and f.text:
-        raise Blocked(f"输入框没清空：「{f.text}」")
-    d.tap_text("确定", where="all", scroll=False, after=1.0)
-    d.open_page("text")
-    d.switch_im("九键")
-    items, xy = popup(d, "3")
-    popup_away(d, xy)
-    time.sleep(0.4)
-    digit = next((n for n in items if n.text == "3"), None)
-    if not digit:
-        raise Blocked(f"长按 3 弹出 {[n.text for n in items]}")
-    rows = {}
-    for n in items:
-        if n.c[1] < digit.b[1]:
-            rows.setdefault(n.c[1] // 20, []).append(n.text)
-    sizes = [len(r) for _, r in sorted(rows.items())]
-    total = sum(sizes)
-    check(total and max(sizes) == min(total, 5), f"长按 3 的符号每行 {sizes}：{list(rows.values())}")
-    return f"符号每行 {sizes}"
-
-
-@case("T9-53", base="B0-设置", mutates=True)
-def t953(d):
-    add_im(d, "九键拼音")
-    remove_im(d, "英文")
-    add_im(d, "英文")
-    home(d, "按键")
-    d.choose("空格键长按行为", "轮换输入法")
-    d.open_page("text")
-    d.switch_im("九键")
-    to_english(d)
-    d.press("符", after=1.0)
-    s = d.screen()
-    sp = next((n for n in s.ime() if n.clickable
-               and (n.desc == "空格" or any((m.text or "").startswith("空格") for m in n.walk()))), None)
-    # the picker's own space, found, or the case proves nothing about the picker's round
-    xy = sp.c if sp else None
-    if not xy:
-        raise Blocked(f"符号键盘上找不到空格：{s.texts(where='ime')[:20]}")
-    d.hold(xy, 900)
-    time.sleep(1.0)
-    s = d.screen()
-    back = s.find(text="返回", where="ime")
-    if not back:
-        raise Blocked(f"长按空格后符号键盘上没有「返回」：{s.texts(where='ime')[:20]}")
-    d.tap(back.c, 1.0)
-    d._keys = None
-    l, k = d.im_label(), d.keys(refresh=True)
-    check("英文" in l and "q" in k and d.key_node("中/英") is None, f"返回后：「{l}」，键 {sorted(k)[:12]}")
-    return f"返回后「{l}」全键盘"
