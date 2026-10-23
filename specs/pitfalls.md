@@ -32,6 +32,14 @@ process. If memory looks high, `pgrep -fa KotlinCompileDaemon`.
 Type resolution does not work in this setup, so detekt rules that need types do not run. Do not
 take a clean detekt as proof of type-level correctness.
 
+### Native build outputs keep what is no longer built
+
+`cmake --install` into `app/src/main/assets/` and the module copy into AGP's `obj/` dirs never delete,
+so a module or file dropped from the build keeps shipping from existing checkouts. Drop it through
+`fcitxComponent.excludeFiles` (assets) or `packaging.jniLibs.excludes` (`.so`). Likewise fcitx's
+translation macro globs `*.po` without `CONFIGURE_DEPENDS`; the `po/CMakeLists.txt` files depend on
+`LINGUAS`, so keep `LINGUAS` in step when a language comes or goes.
+
 ## Android behaviour
 
 ### The cursor reports lag
@@ -78,8 +86,8 @@ A new preference the keyboard needs at a lock screen must be in that copy.
 
 A toast from the keyboard is dropped while the app may not post notifications, Android 13's default
 (logcat: `Suppressing toast from package … by user request`): the input method is never the
-foreground app. What the keyboard says goes above it instead, `FcitxInputMethodService.say` (the
-long press's undo chip with nothing to undo). The settings' toasts are fine.
+foreground app. What the keyboard says goes in its notice instead, `FcitxInputMethodService.say`
+(`tell` from another thread), see [Notices](app.md#notices). The settings' toasts are fine.
 
 ## Device testing
 
@@ -110,6 +118,18 @@ long press's undo chip with nothing to undo). The settings' toasts are fine.
   shorter. Write `<name>.tmp`, fsync, rename over it; the old mapping keeps the old inode.
 - A user's text dictionary is never parsed on the fcitx thread at start: 0.3.1 did, and 1.9M words
   ran the 256 MB heap out at every focus. Compile it off the thread (`MergedDictionary`).
+- Never wait on the dictionary compile (`refreshNow`, `refresh(…).get()`, `compiles.submit(…).get()`)
+  while holding the sources lock (`ImportedDictionaries`' monitor): the compile thread takes it to
+  commit a conversion and to sweep, so the wait deadlocks. Commit a source in a short locked block,
+  leave it, then compile; gzip and deflate run outside the lock into a `.tmp`.
+- Never turn or delete a dictionary by the `File` a page listed: a conversion may have replaced
+  `x.txt` by `x.txt.gz` since. Resolve the name under the lock.
+- After an upgrade from 0.3.1/0.3.2 imported words are missing until the conversion and compile end
+  (accepted). A 0.3.0 learning conversion still owed then (`UserLexicon.legacyModel` via
+  `dictionaryNow`) runs without merged words: rare, accepted.
+- A downgrade to 0.3.2 lists no `.txt.gz`: imported base dictionaries are hidden there (the files
+  stay; 0.3.2 deletes `merged.ymd` v2 and the `.ymc`s) and come back on re-upgrade; a same-name
+  import made in 0.3.2 wins then (its `.txt` is converted over the `.gz`).
 - Data releases are pinned by SHA-256; a re-uploaded asset with the same name fails the build. Make
   a new release instead.
 

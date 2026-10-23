@@ -10,12 +10,11 @@ an ime-core class with a test.
 |---|---|
 | `core/` | The JNI side of fcitx: `Fcitx` (native lifecycle, the fcitx thread), `FcitxAPI` (suspend calls into fcitx), `FcitxEvent` (events out of it), `EngineBridge` (where the native `androidengine` addon reaches ime-core's `Engines`), `EngineMigration`, `SubtypeManager`, `InputMethodNames`, `NativeMatrixKernel` |
 | `daemon/` | `FcitxDaemon`: the one fcitx instance, shared by connections (`FcitxConnection`) |
-| `input/` | The `InputMethodService` (`FcitxInputMethodService`), `InputView`, and what the keyboard shows: `bar/` (the candidate bar / toolbar, `KawaiiBarComponent`), `candidates/` (horizontal bar, expanded grid, floating window for physical keyboards), `keyboard/` (`TextKeyboard`, `T9Keyboard`, `NumberKeyboard`, `KeyDef`/`KeyDefPreset`, `KeyView`, `CommonKeyActionListener`), `picker/` (symbols, emoji), `popup/` (key previews, long-press keyboards), `clipboard/`, `editing/` (text editing panel, `InputConnectionEditor`), `status/` (the "more" panel), `preedit/`, `broadcast/`, `wm/` (`InputWindowManager`), `handwriting/`, `floating/` (the floating keyboard), `dialog/`, `editorinfo/` (the `EditorInfo` inspector), `learning/` (a candidate's long-press menu worded by the app from the engine's `LearningResult.Menu`, `CandidateLearningMenu`; the undo chip, `UndoChip`: above the whole keyboard while candidates show, below a window with no room above when it fits the window, over the bar otherwise, placed by ime-core's `UndoChipPlacement`) |
-| `provider/` | `FcitxDataProvider` |
-| `data/` | File-backed managers: `prefs/` (`AppPrefs`, the managed preference framework), `theme/`, `clipboard/` (Room), `pinyin/` (imported dictionaries, custom phrases; `MergedDictionary` compiles the dictionaries turned on into `merged.ymd` on one `dictionary-compile` thread, keyed by a stamp of the sources, the base data and a compiler revision; the engine maps the file, uses a stale one until the new one is made, and is reloaded through `made`), `punctuation/`, `UserDataManager` (backup/restore); `DataManager` (syncs `assets/usr`) is in `core/data/` |
+| `input/` | The `InputMethodService` (`FcitxInputMethodService`), `InputView`, and what the keyboard shows: `bar/` (the candidate bar / toolbar, `KawaiiBarComponent`), `candidates/` (horizontal bar, expanded grid, floating window for physical keyboards), `keyboard/` (`TextKeyboard`, `T9Keyboard`, `NumberKeyboard`, `KeyDef`/`KeyDefPreset`, `KeyView`, `CommonKeyActionListener`), `picker/` (symbols, emoji), `popup/` (key previews, long-press keyboards), `clipboard/`, `editing/` (text editing panel, `InputConnectionEditor`), `status/` (the "more" panel), `preedit/`, `broadcast/`, `wm/` (`InputWindowManager`), `handwriting/`, `floating/` (the floating keyboard), `dialog/`, `editorinfo/` (the `EditorInfo` inspector), `learning/` (a candidate's long-press menu worded by the app from the engine's `LearningResult.Menu`, `CandidateLearningMenu`; the undo chip, `UndoChip`, the keyboard's one notice: see [Notices](#notices)) |
+| `data/` | File-backed managers: `prefs/` (`AppPrefs`, the managed preference framework), `theme/`, `clipboard/` (Room), `pinyin/` (imported dictionaries, custom phrases; sources are `<name>.txt.gz[.disable]`, named through `SourceNames`; `MergedDictionary` compiles the dictionaries turned on into `merged.ymd` on one `dictionary-compile` thread, keyed by a stamp of the sources, the base data and a compiler revision; the engine maps the file, uses a stale one until the new one is made, and is reloaded through `made`. An older build's plain `.txt` is work by itself (`SourceNames.unconverted`: `current()`, `pending()`, `mergedWords` count it): the next compile gzips it first (`Step.CONVERT`, the progress's first share, 正在转换 on the 词库 page, the idle bar's 正在升级词库格式) through `<name>.txt.gz.convert.tmp`, and is an upgrade (UPGRADE) only by what it finds: a text converted or not, a v1 `merged.ymd` dropped, or `.merged.upgrading` (written before the first conversion or the drop, deleted when a non-import compile ends, so a kill in between is still an upgrade at the next start); never by files' times. A text that cannot be read, or a `.gz` that is not gzip or is cut short, is skipped and listed in `.merged.unreadable` (the page: 读不了 / 文件损坏，可能不全, delete and import again; a damaged `.gz` keeps what was read before the damage); a text whose gzip cannot be written (the disk full) stays as it is, listed in `.merged.unwritten` (the page: 没转换成, free space and reopen). A text converted whose delete is refused is listed in `.merged.left`: not converted again while its `.gz` of the same state is there (its words are in it); each compile tries its delete again (no reconversion, no UPGRADE) and drops the entry once it is gone, or once that `.gz` is (deleted outside the page, or a restore left only the other state), the text then converted like any other. The entry is the text's name on, length and mtime (`leftKey`), so a turn keeps it. Listed files are skipped at each start and reload till they change; only a `.merged.left` text leaves `pending()` false, an unreadable or unwritten one keeps it true (its words are owed). Opening the 词库 page (`retry`) clears `.merged.unwritten` and `.merged.unreadable` (but a damaged `.gz`'s entry), never `.merged.left`. Imported words are missing until it ends. `turn`/`delete` resolve a dictionary by name under the sources lock, never the `File` the page listed, and act on all its files together: `turn` renames a text and its `.gz` both (the text turned back if the `.gz`'s rename is refused), `delete` deletes the text first and keeps the `.gz` if that is refused, so the two never split), `punctuation/`, `UserDataManager` (backup/restore); `DataManager` (syncs `assets/usr`) is in `core/data/` |
 | `ui/` | Settings: `main/` (`MainActivity`, `MainFragment` = the home page, `settings/` pages and `SettingsRoute`, `settings/search/`), `setup/` (the first-run wizard), `common/` |
 | `utils/` | Small helpers (`AppUtil`, `Const`, extensions) |
-| `src/main/cpp/` | `native-lib.cpp` (JNI), `androidfrontend` (fcitx frontend for the service), `androidengine` (the addon in front of ime-core's input methods), `androidaddonloader`, `androidnotification` (fcitx tips as toasts), `matrix-kernel.cpp` |
+| `src/main/cpp/` | `native-lib.cpp` (JNI), `androidfrontend` (fcitx frontend for the service), `androidengine` (the addon in front of ime-core's input methods), `androidaddonloader`, `androidnotification` (fcitx tips, said in the keyboard's notice, a toast with no keyboard up), `matrix-kernel.cpp` |
 
 ## The input view
 
@@ -33,6 +32,51 @@ ends with `=`, worked out by `Calculation` in ime-core, and dropped as the curso
 Work tied to the view runs in the view's scope (`dependency/Functions.kt`): a theme or layout
 change replaces the view and must cancel what touched the old one. Work that must survive it goes
 on the service's scope.
+
+### Notices
+
+What the keyboard says goes in one place, `UndoChip` (`input/learning/`), reached through
+`FcitxInputMethodService.say` (a string, optionally an `UndoChip.Undo`), `BaseInputView.say`, or
+`core.EngineNotices` from the engine's own threads (`tip`, a 2 s line; `failed`, steady, 6 s).
+Its lifecycle (shown, lapsed, typed away, put away, undone) is ime-core's `NoticeState`, which
+`UndoChip` calls; the window, animation and rows stay in `UndoChip`. Where it goes is ime-core's
+`UndoChipPlacement`: docked above the keyboard (a long press's chip over the bar while it shows no
+candidates; below a window with no room above when it fits), floating on the keyboard's side
+toward the screen's middle (`floating`, fed the keyboard's rect and the room by
+`InputView.undoFloating`). The rules, which a review checks every new switch or act against:
+
+1. **A state the keyboard does not show is said when it changes, both ways**: 不用我的输入习惯
+   off and back on each say so. A switch said one way only is half done.
+2. **What the keyboard shows is not said**: one-handed, floating, a theme, another input method.
+   The keyboard changing is the notice.
+3. **A result that lands elsewhere is said**: copied, cut, cleared, a report copied, could not undo.
+4. **A failure is always said** (a disk that failed, an engine that cannot load, the list changed
+   under a menu).
+5. **One at a time**: a new notice takes the shown one's place in the same box (words crossfaded,
+   size eased); the one replaced lapses, its act standing. With 撤销 it stays 6 s, a line said 2 s
+   (longer as accessibility asks); a tap puts it away, typing too, except a failure `EngineNotices.failed` says
+   (`steady`): the key it failed on reaches the keyboard after it; said once, it stays 6 s too. A
+   replaced row's 撤销 takes nothing back, and the fading row swallows taps (none reaches the box).
+6. **In the keyboard only this notice**: no `Toast` (Android 13 drops an input method's, see
+   [pitfalls](pitfalls.md)), no `Snackbar`. A toast only when no keyboard is shown to say it on.
+
+Its colours are the theme's: `popupBackgroundColor` under a `dividerColor` hairline, 撤销 a text
+button in `accentKeyBackgroundColor` kept at 4.5:1 on it (ime-core's `Contrast.legible`, blended
+toward `popupTextColor`; `UndoChipColourTest` checks every preset) with a rounded
+`keyPressHighlightColor` ripple, a thin line between it and the words. 撤销 takes the chip's end and,
+by a `TouchDelegate`, the line beside it: a near miss is not a tap that lapses the act.
+
+### Motion
+
+Every animation takes its length and curve from ime-core's `Motion` (Short 100 ms, Medium 120,
+Long 150: nothing longer than 150 ms, the owner's rule of 2026-10-23; going is three quarters of coming) and `utils/Motion.kt` (`motionSettings()`, the
+curves' interpolators): no literal durations. Android's 移除动画 or 禁用动画 makes each instant. What
+typing does is never animated: a key's preview, the candidates changing, a layout switched (the
+pickers included), the bar going from idle to candidates. Short: the long-press keys and a
+candidate's menu growing out of what was pressed (`utils/PopIn.kt`), a notice replaced. Medium: a
+notice coming, one window for another (`InputWindowManager`, unless the window sets its own), the
+idle bar's views and the ⋯ icon. Long: the candidates expanded (`BaseExpandedCandidateWindow`'s
+slide from the top) and the whole keyboard moving.
 
 ### Keys
 
@@ -101,6 +145,40 @@ the bottom), a buzz under 按键振动, and let go there it docks: only a real l
 so a turn keeps its corner. `FcitxInputMethodService.onComputeInsets` then gives the app the whole
 height (it is not laid out again) and only `InputView.floatingRegion` takes touches
 (`TOUCHABLE_INSETS_REGION`). Floating, the letters never split (`TextKeyboard.splits`, `widthDp`).
+
+`ThemePrefs.alwaysShowHandle` (始终显示悬浮条, the view made anew for it) puts the same `FloatingHandle`
+on the docked keyboard, top or bottom as `floatingHandle` says, nothing at its right end; with the board
+at a side it goes with it as the bars do (`floating/BoardFollowers`), its grip at the board's middle. Its 24 dp
+is added to the keyboard: the keys keep their height (the owner's rule, 2026-10-22: keys never give
+up room to what is put round them), except where `KeyboardHeightCap` binds (landscape, a tall level):
+the strip counts with the bars there and the cap wins (the owner, 2026-10-22), so the field still shows. All of this is
+`floating/FloatingController` (the handle, the placer, the dock mark, the switches), the input view
+only placing its views and passing its insets, attach and detach on. The grip held for the system's
+long-press time (`GripPress` in ime-core) buzzes and sets `floatingKeyboard`: ThemeManager makes the
+view anew at once, `setInputView` takes the old one out of the service's input area (the framework
+cancels its touch) and the rest of that touch reaches the input area itself, unheld and unsplit.
+`FloatingHandoff`, its touch listener till the finger lifts, passes it to the new view's controller
+(`carried`), following only the grip's finger in that touch (`HandoffTouch` in ime-core: its pointer
+id; a thumb resting on a key is in the same stream). Not the down time: events injected one at a
+time (adb's `input motionevent`, as the UAT drives it) each carry their own. A new touch coming down,
+unheld at the frame or on the new input view (`InputView.onInterceptTouchEvent` →
+`FloatingHandoff.newTouch`), ends a handoff whose end was never seen. Grabbed with the finger below
+where the floating keyboard can go (the docked grip is lower), that overshoot is slack in
+`FloatingDrag`, taken up first as the finger rises, so the grip comes under it; it is no push into
+the docking zone. TalkBack's long press has no touch: the keyboard floats with its grip where
+the grip was, and no handoff starts. The new view, once laid out (`FloatingSwitch` in ime-core keeps
+the moves till then, and the lift if it came first), puts its grip under the finger
+(`FloatingKeyboard.underFinger`, kept within the room; the place is kept as a drag's is, so dragged
+straight back into the zone the last floating place stays) and shrinks from the docked keyboard's
+bounds about one point (`startScale`, `pivot`), so the drag moving it as it shrinks takes the shrink
+along. Switched to floating any other way while shown (the status area's 悬浮键盘), the docked view
+leaves its bounds as it is taken out (`DockedBounds`, taken only by the next view put in the same
+frame; a shrink not shown before the keyboard hides is dropped) and the floating one shrinks from them
+at its kept spot. Docking slides it down (`FloatingSwitch.dock`), its drag over meanwhile; the slide
+ended, cancelled or its view made anew under it, it docks. One-handed to a side or across slides the
+board and its bars (`floating/BoardMover`, `BoardMove` in ime-core); back to the whole width they
+widen from where they are drawn, about the same pivot; a window or layout putting the board at a
+side is never animated, nor a move while the keyboard is hidden.
 
 Glide typing (`keyboard/GlideInput`, held by `TextKeyboard` and `T9Keyboard`): it sees every touch
 before the keys (`dispatch`), `GlideGesture` deciding when a finger glides; as a glide starts the keys
@@ -286,7 +364,7 @@ Rules for settings, all decided:
 ## Persistence and backups
 
 `UserDataManager` exports one zip: `shared_prefs`, the clipboard database (less what an app marked
-sensitive), the external files dir (fcitx config, custom phrases, imported dictionaries as text; the compiled `merged.ymd`/`.ymc` are left out and made again after a restore, themes)
+sensitive), the external files dir (fcitx config, custom phrases, imported dictionaries as their `.txt.gz` sources; the compiled `merged.ymd`/`.ymc`, any `.txt.gz.tmp`/`.txt.gz.convert.tmp` and the markers `.merged.failed`, `.merged.unreadable`, `.merged.unwritten`, `.merged.left`, `.merged.upgrading` are left out (`MergedDictionary.isCompiled`) and made again after a restore, themes). A restore overlays the dictionaries directory: an older backup's `.txt` is converted again over a same-name `.gz`; both `.gz` states of one name keep the newer (equal mtimes: the one turned on)
 and the engine's `files/engine/` (learned words, word lists).
 Restoring stops fcitx, closes the clipboard database, replaces the files, then restarts the
 process (`AppUtil.restart`); a failed restore reopens what it stopped (`restartAfterFailedImport`).

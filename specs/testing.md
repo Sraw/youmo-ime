@@ -40,6 +40,28 @@ the tool or build-logic tests if those changed. Unit tests need no submodules, N
 - No `@Ignore`, `.only`, skipped or placeholder tests left behind.
 - Kover: 90% lines overall in ime-core, 60% per package. A new package needs its tests.
 
+Keeping the suite lean. In 2026-10 a one-off PIT mutation run found 22 tests that killed no
+mutant: 3 were deleted, 1 merged and 18 kept with a reason. It also found about 150 tests that
+differed only in their inputs; they became 27 tables.
+
+- A new case of a behaviour already tested is a row in that test, not a new test. Look in the class's
+  test file first.
+- Tests that differ only in inputs (two or more, where the reasons read better as a list) become one
+  table: `assertRows("why" to { … }, …)`, or `assertRows(rows, why) { … }` for rows of data (ime-core testFixtures, `AssertRows.kt`: one implementation). Each row keeps its own setup and
+  state. The table checks every row, then fails once, naming each failed row by its why.
+- Don't write a test of a bare default (`startsIdle`). Assert the default as the first line of a
+  test that uses it, unless it is a default the user sees.
+- A test pinned to a bug names the bug in a comment (UAT id, review id, commit). It is never deleted
+  or folded into another test's assertions. It may become a row, keeping its name as the row's why
+  and its comment.
+- A test of a contract that mutation cannot see (a C++ header, a data file, a format, a fixture)
+  says `contract:` in a comment.
+- A big end-to-end test that happens to cover a small one is no reason to delete the small one.
+  Only a sibling testing the same behaviour is.
+- In a mutation run, when one is at hand: a test that kills nothing its siblings miss becomes a row
+  or gets a reason from the rules above. A method the tool made no mutants of is a blind spot, not
+  a sign the test is redundant.
+
 ## The evaluation (`lib/ime-eval`)
 
 Required for any change to segmentation, decoding, penalties, scoring, the sentence models'
@@ -72,6 +94,15 @@ typing on simulated paths, `--wobble` the key-width noise), `pinyin-glide` (the 
 of a pinyin set; `--shuangpin <scheme>`, `--keys nine`, `--table <table.data>`, `--word <pinyin>` one
 clean path's readings), `tune` (penalties), `score` (compare a result with a baseline), `handwriting` (handwriting's sentence reading), `table` (a table's codes, optionally with pinyin and the models), `sentences` (each sample's sentences written out), `predict-learn` (联想 after learning), `learn-log-bench` (a heavy year's learning record opened, folded and opened again; `--legacy <pinyin.data>`: a heavy user's old logs converted at the first open, and caught up after an older build wrote them; `--counts <pinyin.data>`: what the ranking's counts cost on that record, attached, made anew and per key typed; not together with `--legacy`, which reuses `<dir>/legacy`), `predict-set` (a 联想 set made from a set), `shuangpin` (a set turned into a 双拼 scheme's keys), `slips` (a set with slips put in), `chars` (the data's characters), `lm` (a sentence model's scores of texts), `libime` (reading libime's pinyin, history or table files);
 run `ime-eval` with no arguments for the full usage.
+
+A change to `merged.ymd`'s layout or reader is gated per key: `ime-eval pinyin <pinyin.data> <set.tsv>
+<out.tsv> --merged <source.txt> [--stale]` compiles the text with `DictionaryCompiler.compile` into a
+temp directory (the base split from the eval's own data) and reads it as the app does; `--stale` sets
+`mergedStale`. Old reader against new, same frost source, same idle box, runs alternated, median of
+≥ 3: p95 ms per key within +10%, candidates identical (2026-10-23 v1 → v2: p95 3.2 → 3.3 ms,
+`--stale` 3.2 → 3.5; every sample's ten the same). A table's `.ymc` over it is timed once with it
+(`CodedIndex.build`, wbx over frost, ~1.9M text lookups, 3 runs each): v1 5.0–5.6 s, v2 5.9–6.1 s
+(5.2 → 6.0 s by median, +15%), once a stamp, in the background.
 
 Report top-1 (and the change in samples won and lost) on at least the main, web, chat and new sets,
 with the default reading (neighbouring keys on, both models). `release-report.sh` runs the full gate
@@ -121,7 +152,13 @@ the case files hold no results. `uat/README.md` has the format, the baselines an
 
 The runner, `uat/tools/uat.py`: `up` / `down` (two redroids, `youmo-redroid` on 5556 and
 `youmo-redroid2` on 5557), `run [--areas] [--ids] [--devices]` (`UAT_BUILD=release`: on the signed x86_64
-release APK, the debug package uninstalled first), `mark` (a visual case after its sheet
-is seen), `emu-up` / `emu-down`. One script per case file (`uat/scripts/<file>.py`; handwriting's
-strokes in `hw_strokes.py`); the UI read back by a resident `Dumper.java`; visual cases go on contact
-sheets, reviewed per `uat/tools/sheet-review.md`. Details in `uat/README.md`.
+release APK, the debug package uninstalled first and installed back only for the cases that type into
+its `TypingHostActivity`), `mark` (a visual case after its sheet is seen), `emu-up` / `emu-down`. One
+script per case file (`uat/scripts/<file>.py`; handwriting's strokes in `hw_strokes.py`); a case in a
+.md with no script is reported blocked (没有脚本), never left out; a case whose `needs=` names another
+place (the emulator, the voice build, a release by hand, a real phone) is listed as 在别处跑, not counted
+as skipped. The UI is read back by a resident `Dumper.java`, which waits for the screen to settle, so
+the runner polls for what it waits on rather than sleeping; visual cases go on contact sheets, reviewed
+per `uat/tools/sheet-review.md`. The debug build's `TypingHostActivity` is the native field for what the
+WebView test page cannot set (an IME_ACTION_NEXT field, no personalized learning, a sensitive clip).
+Details in `uat/README.md`.
