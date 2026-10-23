@@ -8,6 +8,43 @@ Each release lists its **main changes** (new features, large improvements), its 
 
 ---
 
+## 未发布 / Unreleased
+
+### 主要变化
+
+- **导入的词库占的空间少了六成**：导入的词库压缩存放，合成的文件也更紧凑。导入雾凇拼音（rime-frost）后占用从约 190 MB 降到约 75 MB，打字速度不变。
+  从 0.3.1 或 0.3.2 升级后第一次启动会在后台转换一次（雾凇拼音约一两分钟），空闲栏显示「正在升级词库格式」和进度，这期间打不出导入的词。
+  **装回 0.3.2 时**，并入基础词库的导入词库在 0.3.2 里看不到、打不出；文件还在，再升级回来就又有了。
+
+### 小改动
+
+- 快速输入（长按「符」）不再给英文单词提示；颜文字、`:表情名:` 和 `\符号名` 照旧。
+- 系统「文件」应用里不再显示幽默输入法的数据目录。
+
+### 修复
+
+- 从备份恢复时，设置、自定义短语和标点现在完全以备份为准：备份之后在手机上新加的自定义短语、改过的标点会被去掉，不再和备份混在一起。
+
+### Main changes
+
+- **Imported dictionaries take 60% less space**: they are stored compressed, and the compiled file is more compact. With rime-frost
+  imported, storage goes from about 190 MB to about 75 MB, with typing as fast as before. The first start after upgrading from 0.3.1 or 0.3.2
+  converts them in the background (a minute or two for rime-frost); the idle bar shows 「正在升级词库格式」 and its progress, and imported
+  words cannot be typed until it ends. **Going back to 0.3.2** hides dictionaries imported into the base dictionary there: the files stay,
+  and they return when you upgrade again.
+
+### Smaller changes
+
+- Quick input (long-press 「符」) no longer suggests English words; kaomoji, `:emoji-name:` and `\symbol-name` work as before.
+- The system Files app no longer shows Youmo's data folder.
+
+### Fixes
+
+- Restoring a backup now takes settings, custom phrases and punctuation wholly from the backup: phrases added or punctuation changed on the
+  phone after the backup are dropped instead of mixed in.
+
+---
+
 ## 0.3.2（2026-10-23）
 
 ### 主要变化
