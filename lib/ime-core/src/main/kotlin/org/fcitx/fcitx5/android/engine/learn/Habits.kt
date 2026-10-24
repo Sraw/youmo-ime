@@ -59,6 +59,22 @@ interface Habits {
     /** Whether [text] is a word for [LastWord]: the user's. */
     fun isWord(text: String): Boolean
 
+    /**
+     * [words] across the spellings of one keyboard [kind] (U-20, D32 B): its uses in the last 30
+     * typing days under the codes spelling it in full, its corrections under the 简拼 ones ([SpelledForm]).
+     */
+    fun spelled(kind: String, words: Words): Spelled = Spelled.NONE
+
+    /** The words of [kind] with a count of [spelled], typed under codes whose first key is [first]: to put in where the decoder lacks them. */
+    fun spelledFrom(kind: String, first: Char): List<Words> = emptyList()
+
+    /** What [spelled] tells: uses spelt in full, corrections under 简拼. */
+    data class Spelled(val fullUses: Int, val initialsCorrections: Int) {
+        companion object {
+            val NONE = Spelled(0, 0)
+        }
+    }
+
     /** How often each syllable was taken for [digits] on the nine keys of [layout]. */
     fun bar(layout: String, digits: String): Map<String, Int>
 
@@ -124,6 +140,7 @@ fun Habits.rankView(pins: Boolean = true, mine: Boolean = true, imports: Boolean
         override fun firstUse(code: Code, words: Words) = h.firstUse(code, words)
         override fun mineOrder(text: String) = if (mine) h.mineOrder(text) else -1L
         override fun importOrder(text: String) = if (imports) h.importOrder(text) else -1L
+        override fun spelled(kind: String, words: Words) = h.spelled(kind, words)
     }
 }
 
@@ -223,6 +240,53 @@ class LogHabits(private val log: () -> LearnLog, private val onError: (IOExcepti
     }
 
     override fun isWord(text: String) = text in state.mine
+
+    // read off the state's rows of the word, and of the keyboard and first key: no index to make
+    // again after each commit (R14 F3733)
+    override fun spelled(kind: String, words: Words): Habits.Spelled {
+        val s = state
+        val keyboard = Kinds.keyboard(kind)
+        val from = s.day - LearnState.WINDOW + 1
+        var uses = 0
+        var corrections = 0
+        for ((key, stat) in s.statsOf(words.text, words.reading)) {
+            if (Kinds.keyboard(key.code.kind) != keyboard) continue
+            when (SpelledForm.of(key.code.kind, key.code.keys, key.reading)) {
+                SpelledForm.FULL -> uses += stat.uses.sumFrom(from)
+                SpelledForm.INITIALS -> corrections += stat.corrections.sumFrom(Int.MIN_VALUE) + stat.older
+                SpelledForm.PART, null -> Unit
+            }
+        }
+        return if (uses == 0 && corrections == 0) Habits.Spelled.NONE else Habits.Spelled(uses, corrections)
+    }
+
+    // spelledFrom's words by keyboard and first key, of the state as it is: each level of a key asks
+    private var fromOf: LearnState? = null
+    private var fromAt = -1L
+    private var fromDay = 0
+    private val fromCache = HashMap<Pair<String, Char>, List<Words>>()
+
+    override fun spelledFrom(kind: String, first: Char): List<Words> {
+        val s = state
+        // advance() moves the day with no version of its own
+        if (s !== fromOf || s.version != fromAt || s.day != fromDay) {
+            fromOf = s
+            fromAt = s.version
+            fromDay = s.day
+            fromCache.clear()
+        }
+        val keyboard = Kinds.keyboard(kind)
+        return fromCache.getOrPut(keyboard to first) { spelledFrom(s, kind, keyboard, first) }
+    }
+
+    private fun spelledFrom(s: LearnState, kind: String, keyboard: String, first: Char): List<Words> {
+        // a digit on the nine keys: the words of each letter on its key
+        val firsts = SpelledForm.nineKeyLetters(keyboard, first).ifEmpty { first.toString() }
+        val words = LinkedHashSet<Words>()
+        for (c in firsts) for (stat in s.spelledFrom(keyboard, c).values) words += stat.words
+        // only those that move a word: walked each key, so none that would not
+        return words.filter { w -> spelled(kind, w).let { it.fullUses >= HabitRanker.FULL_USES || it.initialsCorrections > 0 } }
+    }
 
     override fun importOrder(text: String) = state.imports.order(text)
 

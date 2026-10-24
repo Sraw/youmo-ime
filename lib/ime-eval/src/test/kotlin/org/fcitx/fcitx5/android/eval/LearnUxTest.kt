@@ -88,6 +88,8 @@ class LearnUxTest {
             arrayOf("scenario s", "}"),
             arrayOf("scenario s", "expect top2 你"),
             arrayOf("scenario s", "expect last 你"),
+            arrayOf("scenario s", "expect within0 你"),
+            arrayOf("scenario s", "expect lacks0 你"),
             arrayOf("scenario s", "type ni qp"),
             arrayOf("scenario s", "space", "pending why"),
             arrayOf("scenario s", "del 0"),
@@ -134,9 +136,18 @@ class LearnUxTest {
             expect notfirst 拟
             expect before 你 拟
             expect top2 拟,你
+            expect within1 你
+            expect within1 拟
+            expect lacks1 拟
+            expect lacks1 你
+            expect lacks 拟
             """,
         )
-        assertEquals(listOf(Status.PASS, Status.FAIL, Status.PASS, Status.PASS, Status.FAIL), results.map { it.status })
+        // within<n>/lacks<n>: in the first n or not (R14 F3737); a bare lacks, not in the first 200
+        assertEquals(
+            listOf(Status.PASS, Status.FAIL, Status.PASS, Status.PASS, Status.FAIL, Status.PASS, Status.FAIL, Status.PASS, Status.FAIL, Status.FAIL),
+            results.map { it.status },
+        )
         assertEquals("shown: 你 拟", results[1].detail)
     }
 

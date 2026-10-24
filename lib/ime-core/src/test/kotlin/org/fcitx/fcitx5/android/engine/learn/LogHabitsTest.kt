@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.engine.learn
 
+import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -127,5 +128,81 @@ class LogHabitsTest {
             pick("叫", Row.CORRECTED or Row.OWN_FIRST)
             assertEquals(kind, "叫", habits.first(code, "")?.text)
         }
+    }
+
+    // U-20 (D32 B): full spellings' uses and 简拼's corrections, each within its keyboard; forgotten
+    // and 30 typing days on, gone
+    @Test
+    fun spellingsAcrossOneKeyboardAreCountedThereAlone() {
+        val clock = FakeClock()
+        val log = LearnLog(null, clock)
+        val habits = LogHabits({ log })
+        val t9 = Kinds.nineKeys(NineKeyLetters.STANDARD.tag())
+        val fenghua = Words.of("奉化", "feng hua")
+        repeat(2) { habits.record(listOf(row("fenghua", "奉化", "feng hua"))) }
+        habits.record(listOf(row("fengh", "奉化", "feng hua")))
+        habits.record(listOf(corrected("dl", "点了", "dian le")))
+        habits.record(listOf(row("3364482", "奉化", "feng hua", kind = t9)))
+        assertEquals(Habits.Spelled(2, 0), habits.spelled(Kinds.FULL, fenghua))
+        assertEquals(Habits.Spelled(0, 1), habits.spelled(Kinds.FULL, Words.of("点了", "dian le")))
+        assertEquals(Habits.Spelled(1, 0), habits.spelled(t9, fenghua))
+        // 连按 is the nine keys' too
+        habits.record(listOf(row("fenghua", "奉化", "feng hua", kind = Kinds.nineKeysMultiTap(NineKeyLetters.STANDARD.tag()))))
+        assertEquals(Habits.Spelled(2, 0), habits.spelled(t9, fenghua))
+        assertEquals(listOf("点了"), habits.spelledFrom(Kinds.FULL, 'd').map { it.text })
+        assertEquals(listOf("奉化"), habits.spelledFrom(t9, '3').map { it.text })
+        // used once spelt out, 发挥 moves nothing: not walked
+        habits.record(listOf(row("fahui", "发挥", "fa hui")))
+        assertEquals(listOf("奉化"), habits.spelledFrom(Kinds.FULL, 'f').map { it.text })
+        // only rows U-20 counts are kept by word: a syllable alone and a table's are not (R14 F3761, F3774)
+        habits.record(listOf(row("de", "的", "de"), row("dehua", "的话", "de hua", kind = Kinds.table("wubi"))))
+        assertTrue(log.state.statsOf("的", "de").isEmpty())
+        assertTrue(log.state.statsOf("的话", "de hua").isEmpty())
+        assertEquals(1, log.state.statsOf("发挥", "fa hui").size)
+        habits.forget("点了")
+        assertEquals(Habits.Spelled.NONE, habits.spelled(Kinds.FULL, Words.of("点了", "dian le")))
+        // 30 typing days of other commits on: the uses gone
+        repeat(LearnState.WINDOW) {
+            clock.days(1)
+            habits.record(listOf(row("ni", "你", "ni")))
+        }
+        assertEquals(Habits.Spelled.NONE, habits.spelled(Kinds.FULL, fenghua))
+        assertTrue(habits.spelledFrom(Kinds.FULL, 'f').isEmpty())
+    }
+
+    // 连按's codes start with letters, the digits' with digits: each finds the other's words (R14 F3731)
+    @Test
+    fun multiTapAndDigitsFindEachOthersWords() {
+        val log = LearnLog(null, FakeClock())
+        val habits = LogHabits({ log })
+        val tag = NineKeyLetters.STANDARD.tag()
+        repeat(2) { habits.record(listOf(row("fenghua", "奉化", "feng hua", kind = Kinds.nineKeysMultiTap(tag)))) }
+        assertEquals(listOf("奉化"), habits.spelledFrom(Kinds.nineKeys(tag), '3').map { it.text })
+        assertEquals(listOf("奉化"), habits.spelledFrom(Kinds.nineKeysMultiTap(tag), 'f').map { it.text })
+        repeat(2) { habits.record(listOf(row("944326", "知道", "zhi dao", kind = Kinds.nineKeys(tag)))) }
+        assertEquals(listOf("知道"), habits.spelledFrom(Kinds.nineKeysMultiTap(tag), 'z').map { it.text })
+        assertEquals(listOf("知道"), habits.spelledFrom(Kinds.nineKeys(tag), '9').map { it.text })
+        // a layout of the user's: f on 2, so 2 finds 奉化 and 3 does not (R14 F3768)
+        val custom = NineKeyLetters.parse("abcf,de,ghi,jkl,mno,pqrs,tuv,wxyz").tag()
+        repeat(2) { habits.record(listOf(row("2364482", "奉化", "feng hua", kind = Kinds.nineKeys(custom)))) }
+        assertEquals(listOf("奉化"), habits.spelledFrom(Kinds.nineKeys(custom), '2').map { it.text })
+        assertTrue(habits.spelledFrom(Kinds.nineKeys(custom), '3').isEmpty())
+    }
+
+    // a correction under 简拼 lifts till its row is swept: 30 typing days with no use of it there (R14 F3751)
+    @Test
+    fun aCorrectionsFloorGoesWithItsRow() {
+        val clock = FakeClock()
+        val log = LearnLog(null, clock)
+        val habits = LogHabits({ log })
+        val dianle = Words.of("点了", "dian le")
+        habits.record(listOf(corrected("dl", "点了", "dian le")))
+        assertEquals(Habits.Spelled(0, 1), habits.spelled(Kinds.FULL, dianle))
+        repeat(LearnState.WINDOW) {
+            clock.days(1)
+            habits.record(listOf(row("ni", "你", "ni")))
+        }
+        assertEquals(Habits.Spelled.NONE, habits.spelled(Kinds.FULL, dianle))
+        assertTrue(habits.spelledFrom(Kinds.FULL, 'd').isEmpty())
     }
 }

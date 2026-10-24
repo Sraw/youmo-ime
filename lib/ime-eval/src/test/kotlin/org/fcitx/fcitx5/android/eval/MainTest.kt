@@ -416,12 +416,12 @@ class MainTest {
             assertEquals(0, runCli(arrayOf("learn-log-bench", dir.path, "--commits", "60", "--days", "3", *options), out, StringBuilder()))
             return out.lines().filter { it.isNotBlank() }
         }
-        assertEquals(listOf("unfolded log", "fold at start", "folded log", "state"), bench().map { it.substringBefore("  ").trim() })
+        assertEquals(listOf("unfolded log", "fold at start", "folded log", "state", "spellings"), bench().map { it.substringBefore("  ").trim() })
         assertTrue(bench("--counts", data.path).first().startsWith("counts "))
         assertTrue(bench("--legacy", data.path).first().startsWith("conversion "))
         // again over what the last left
         assertTrue(bench("--legacy", data.path)[1].startsWith("catch-up "))
-        assertEquals(4, bench().size)
+        assertEquals(5, bench().size)
         assertThrows(IllegalArgumentException::class.java) { bench("--legacy", data.path, "--counts", data.path) }
         File(dir, "notes.txt").writeText("mine")
         assertThrows(IllegalArgumentException::class.java) { bench() }

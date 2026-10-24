@@ -46,6 +46,11 @@ object Kinds {
     fun nineKeysMultiTap(layout: String) = "t9m:$layout"
     fun table(im: String) = "$TABLE$im"
 
+    /** The keyboard [kind] is typed on: the nine keys' 连按 theirs (U-20 links the spellings of one keyboard). */
+    fun keyboard(kind: String) = if (kind.startsWith(NINE_MULTI_TAP)) "t9:" + kind.removePrefix(NINE_MULTI_TAP) else kind
+
+    private const val NINE_MULTI_TAP = "t9m:"
+
     /** The table input method a table's [kind] is of. */
     fun tableOf(kind: String) = kind.removePrefix(TABLE)
 

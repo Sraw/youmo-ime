@@ -315,6 +315,8 @@
     <string name="learning_why_pinned">Pinned first under these keys</string>
     <string name="learning_why_first_here">Picked twice in a row after the word before it</string>
     <string name="learning_why_across">You often pick it over the first, and used it a lot lately</string>
+    <string name="learning_why_floored">Picked over the first under its initials</string>
+    <string name="learning_why_lifted">Often picked typed in full on this keyboard</string>
     <string name="learning_why_mine">One of your words</string>
     <string name="learning_why_imported">From an import</string>
     <string name="learning_why_dictionary">The dictionary\'s order</string>

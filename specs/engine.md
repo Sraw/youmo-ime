@@ -153,6 +153,26 @@ keeps its own, the model they follow.
   under 简拼 the first is the model's alone, what was typed in full never moves it (D32). The
   user's own words come next to it there by the ranking, not by the scores. Do not add per-case
   boosts or global penalties for "my word should win" (both were tried and lost on the sets).
+- **Across one keyboard's spellings** (U-20, D32 B; the user's rule in docs/pinyin.md 完整拼音和简拼).
+  Not in the scores but in the ranking (`HabitRanker.spellings`): `SpelledForm` tells a code's keys
+  as the full spelling, the 简拼 (a key a syllable) or a part of a word of two syllables or more, by
+  their count alone (fewer keys than syllables: none). A word used ≥2 times spelt in full on the same
+  keyboard (`Kinds.keyboard`: 连按 is the nine keys') and not under the code goes up to third under
+  its 简拼 or a part (fourth behind a pin, after any floored word; one already in the first three stays);
+  one corrected to under a 简拼 is no lower than second spelt in full or in part (right after a pin),
+  the floor before the lift. A word moved so, or held at its place so, shows `Tier.FLOORED` or `Tier.LIFTED` (为什么排在这, and `kept` holds it
+  in a sentence's first page). Counted from the STAT rows as they are: `LearnState` keeps them by word
+  and, for full and 简拼 codes, by keyboard and first key (`SpelledForm.filedUnder`: the nine keys by
+  the reading's first letter, so 连按's letters and digits meet), so nothing is rebuilt after a commit;
+  no record of its own, no format change. `HabitOrder` walks in such words the decoder lacks, where
+  `SpelledForm.spells` says the keys start each syllable in turn.
+  Measured (2026-10-24, this machine's JVM, `ime-eval learn-log-bench`, 200,000 commits over 365
+  days): a key typed with the record 0.81 ms before and after (v0.3.2: 0.81); the words of one first
+  key and their counts, as the first key after a commit finds them, 0.13 ms (an index rebuilt per
+  commit, as first written, was 2.2 ms). The two indexes hold only rows of words of two syllables or
+  more spelt in full or by 简拼: on the bench, where every row is one, about 1 MB of heap for 4,865
+  rows (state 10.7 MB with them, 9.7 MB without). `ime-eval learn` held-out was unchanged by the rule (90.3 / 91.1 / 90.7 before and after),
+  as it reads only the first, which this never moves; learn-ux `spelled.txt` passes 9 of 9.
 - **Layers.** The dictionary has layers (`WordLayers`: the base from libime, `new` from
   `lexicon/add.tsv` via the word pack, `latin`). Imported dictionaries are merged into the base only
   (`ImportedDictionaries.migrate` moves those an older build listed in `.new-words` there and

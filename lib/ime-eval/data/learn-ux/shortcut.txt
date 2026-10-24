@@ -1,6 +1,6 @@
-# U-20 简拼和全拼各学各的【D32】：dl 下的选择不改 dianle 下的顺序，反过来也一样。
+# U-20 简拼和全拼各排各的【D32 B】：全拼用得再多也不改 dl 的第一个（它们只互相带进前三，见 spelled.txt）。
 
-scenario full pinyin use does not move 简拼
+scenario full pinyin use does not move 简拼's first
 clear
 type dl
 expect first 带来

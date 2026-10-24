@@ -82,6 +82,18 @@ class LearnState {
     /** The rows of what was used under [code]. */
     fun statsOf(code: Code): Map<StatKey, Stat> = statsByCode[code].orEmpty()
 
+    // those spelling their words in full or by 简拼, by word and by keyboard and first key
+    // ([SpelledForm.filedUnder]): what U-20 counts at a key, with no pass over every row after
+    // each commit (R14 F3733); kept with statMap too
+    private val statsByWord = HashMap<Pair<String, String>, HashMap<StatKey, Stat>>()
+    private val spelledByFirst = HashMap<Pair<String, Char>, HashMap<StatKey, Stat>>()
+
+    /** The rows of [text] read [reading] under codes spelling it in full or by 简拼 ([SpelledForm]), of any keyboard. */
+    fun statsOf(text: String, reading: String): Map<StatKey, Stat> = statsByWord[text to reading].orEmpty()
+
+    /** The rows spelling their words in full or by 简拼 on [keyboard] ([Kinds.keyboard]), filed under [first] ([SpelledForm.filedUnder]). */
+    fun spelledFrom(keyboard: String, first: Char): Map<StatKey, Stat> = spelledByFirst[keyboard to first].orEmpty()
+
     /** The words of the whole commits by text, then reading: when each was used ([WordUseRow]). */
     val wordUses = HashMap<String, HashMap<String, DayCounts>>()
     val firsts = HashMap<FirstKey, First>()
@@ -418,13 +430,31 @@ class LearnState {
     private fun putStat(key: StatKey, stat: Stat) {
         statMap[key] = stat
         statsByCode.getOrPut(key.code) { HashMap() }[key] = stat
+        // only the rows U-20 counts, words of two syllables or more spelt in full or by 简拼 (R14 F3761)
+        val spelled = spelledKey(key) ?: return
+        statsByWord.getOrPut(key.text to key.reading) { HashMap(2) }[key] = stat
+        spelledByFirst.getOrPut(spelled) { HashMap() }[key] = stat
+    }
+
+    private fun spelledKey(key: StatKey): Pair<String, Char>? {
+        val form = SpelledForm.of(key.code.kind, key.code.keys, key.reading)
+        if (form != SpelledForm.FULL && form != SpelledForm.INITIALS) return null
+        val kind = Kinds.keyboard(key.code.kind)
+        return SpelledForm.filedUnder(kind, key.code.keys, key.reading)?.let { kind to it }
+    }
+
+    private fun <K> HashMap<K, HashMap<StatKey, Stat>>.drop(at: K, key: StatKey) {
+        val of = this[at] ?: return
+        of.remove(key)
+        if (of.isEmpty()) remove(at)
     }
 
     private fun removeStat(key: StatKey) {
         statMap.remove(key) ?: return
-        val of = statsByCode[key.code] ?: return
-        of.remove(key)
-        if (of.isEmpty()) statsByCode.remove(key.code)
+        statsByCode.drop(key.code, key)
+        val spelled = spelledKey(key) ?: return
+        statsByWord.drop(key.text to key.reading, key)
+        spelledByFirst.drop(spelled, key)
     }
 
     private inline fun removeStatsIf(drop: (StatKey, Stat) -> Boolean) {

@@ -1,0 +1,171 @@
+# U-20（D32 B，2026-10-24）：一个键盘里，完整拼写和简拼互通。
+# 只在全拼里用过（≥2 次）的词，简拼下最多提到第 3；第 1 留给在这个简拼下用过的词，原来更靠前的不动。
+# 在简拼下纠正选过、计入次数的词：全拼和半截下不低于第 2；纠正次数作废后底线取消。
+# 奉化 is fh's 81st fresh (dev/design/learning-fh-report.md); 点了 beyond the first page of dl.
+# Each input after a ctx of its own: 点了 just committed before dl reads dl by context, not by this rule.
+
+scenario 奉化 fenghua twice then fh
+ctx 他
+type fh
+expect lacks4 奉化
+pick 发挥
+ctx 他
+type fenghua
+pick 奉化
+ctx 他
+type fh
+# used once spelt out: not yet
+expect lacks4 奉化
+pick 发挥
+ctx 他
+type fenghua
+pick 奉化
+ctx 他
+type fh
+expect within3 奉化
+expect notfirst 奉化
+pick 奉化
+ctx 他
+type fh
+# picked under fh: U-02 there
+expect within2 奉化
+pick 奉化
+ctx 他
+type fh
+expect first 奉化
+
+scenario 点了 dianle twice then dl
+ctx 他
+type dianle
+pick 点了
+ctx 他
+type dianle
+pick 点了
+ctx 他
+type dl
+expect within3 点了
+expect first 带来
+pick 带来
+
+scenario 指导 zhidao twice, 知道 used under zd stays first
+clear
+type zd
+pick 知道
+clear
+type zhidao
+pick 指导
+clear
+type zhidao
+pick 指导
+ctx 我
+type zd
+expect first 知道
+expect within3 指导
+pick 知道
+
+scenario 点了 picked under dl: dianle and dianl no lower than second
+ctx 他
+type dl
+pick 点了
+ctx 他
+type dianl
+expect within2 点了
+pick 点了
+ctx 他
+type dianle
+expect within2 点了
+pick 点了
+
+scenario 点了's floor goes with its dl counts
+clear
+type dl
+pick 点了
+clear
+type dianl
+expect within2 点了
+pick 电力
+repeat 31 {
+day
+clear
+type nihao
+space
+}
+clear
+type dianl
+expect lacks2 点了
+show
+pick 电力
+
+scenario 双拼 within its keyboard: 自然码 fghw twice, then fgh
+# 自然码's two keys are a syllable (fh: fang), so a 简拼 of two is read so: the part fgh stands in
+ctx 他
+type fghw kb=sp:ziranma
+pick 奉化
+ctx 他
+type fghw kb=sp:ziranma
+pick 奉化
+ctx 他
+type fgh kb=sp:ziranma
+expect within3 奉化
+pick 奉化
+
+scenario 全拼's uses do not reach 双拼
+ctx 他
+type fenghua
+pick 奉化
+ctx 他
+type fenghua
+pick 奉化
+ctx 他
+type fgh kb=sp:ziranma
+expect lacks4 奉化
+show
+space
+
+scenario 九键 3364482 twice, then 33644
+# the app's nine keys read no 简拼 (T9Segmenter abbreviations off: 34 is fe/di…, never 奉化): the part 33644 (feng h) stands in
+ctx 他
+type 3364482 kb=t9
+pick 奉化
+ctx 他
+type 3364482 kb=t9
+pick 奉化
+ctx 他
+type 33644 kb=t9
+expect within3 奉化
+show
+pick 奉化
+ctx 他
+type 34 kb=t9
+expect lacks 奉化
+show
+space
+
+scenario 奉化 fenghua twice then the 半截 fengh and feng'h
+# 半截 of full pinyin (the user, R14): fengh and feng'h are parts of fenghua, lifted as fh is
+ctx 他
+type fengh
+expect lacks3 奉化
+show
+space
+ctx 他
+type feng'h
+expect lacks3 奉化
+space
+ctx 他
+type fenghua
+pick 奉化
+ctx 他
+type fenghua
+pick 奉化
+ctx 他
+type fengh
+expect within3 奉化
+expect notfirst 奉化
+show
+space
+ctx 他
+type feng'h
+expect within3 奉化
+show
+space

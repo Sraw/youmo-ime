@@ -311,6 +311,8 @@
     <string name="learning_why_pinned">固定了：在这串键下总排第一</string>
     <string name="learning_why_first_here">在这个前文后面连着选过两次</string>
     <string name="learning_why_across">你常改选它、最近用得多</string>
+    <string name="learning_why_floored">在简拼下改选过它</string>
+    <string name="learning_why_lifted">这种键盘上打全时常选它</string>
     <string name="learning_why_mine">你的词</string>
     <string name="learning_why_imported">来自导入的词</string>
     <string name="learning_why_dictionary">词库自带的顺序</string>
