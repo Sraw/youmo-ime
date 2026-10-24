@@ -8,6 +8,18 @@ Each release lists its **main changes** (new features, large improvements), its 
 
 ---
 
+## 0.3.3（2026-10-24）
+
+### 修复
+
+- 全拼打过的词，简拼下也会往前排：完整拼音打过两次的词（比如「奉化」），在简拼 `fh` 下排到第三；简拼下改选过的词，打完整拼音时至少排第二。简拼的第一个照旧按你在简拼下的选择。双拼、九键里是完整的和打一半的互相带，只在各自的键盘里。
+
+### Fixes
+
+- Words typed in full pinyin now move up under their abbreviation too: a word typed in full twice (奉化, say) comes third under `fh`; a word picked over the first under an abbreviation is at least second when typed in full. The first under an abbreviation still follows your picks there. In 双拼 and on the nine keys, keys typed in full and keys typed in part lift each other the same way, each keyboard on its own.
+
+---
+
 ## 0.3.2（2026-10-23）
 
 ### 主要变化
