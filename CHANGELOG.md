@@ -8,22 +8,44 @@ Each release lists its **main changes** (new features, large improvements), its 
 
 ---
 
-## 未发布 / Unreleased
+## 0.4.0（未发布）
 
 ### 主要变化
 
 - **导入的词库占的空间少了六成**：导入的词库压缩存放，合成的文件也更紧凑。导入雾凇拼音（rime-frost）后占用从约 190 MB 降到约 75 MB，打字速度不变。
   从 0.3.1 或 0.3.2 升级后第一次启动会在后台转换一次（雾凇拼音约一两分钟），空闲栏显示「正在升级词库格式」和进度，这期间打不出导入的词。
   **装回 0.3.2 时**，并入基础词库的导入词库在 0.3.2 里看不到、打不出；文件还在，再升级回来就又有了。
+- **始终显示悬浮条**（设置 → 外观，默认关）：键盘停在底部时也有那条拖动条；长按条中间的短横，键盘就变成悬浮键盘停在手指下面，不松手可以接着拖，拖回底部松手又放回去。
+- **拼音 14 键**（输入法 → 拼音 → **键盘**）：两个字母一个键，键大一倍，和讯飞的「拼音双键」一样。点在键的左半或右半，优先读成那一边的字母，已经学到的顺序仍然优先；编码行右边有音节条，从左往右点音节定下来。
+- **双拼 18 键和九键双拼**（输入法 → 双拼 → **键盘**）：每个方案都能用分组的 18 键或九宫格；音节条上也有声母，点一个就定下这个字的声母。九键双拼重码很多，要多选几次。
+- **语音说到最后一个字就松开也不丢字**：松开后再录 0.3 秒；声音小时自动放大再识别。
 
 ### 小改动
 
+- **候选字号**可调 14–28 sp：候选栏、联想和展开的候选跟着变，按键高度不变。实体键盘候选窗的字号改名为 **浮动候选窗字号**。
+- **键盘底部边距**多了「贴底」：隐藏了手势条、键盘下面却还空着一条的手机，键盘可以贴到屏幕最下面。
+- 复制、删词、屏蔽等的提示合成一种提示条：能撤销的停 6 秒，连着做几次时计数累加，不再一条盖一条。
+- 动画都更短（最长 150 ms）；**禁用动画** 和系统的"移除动画"现在关掉键盘里的全部动画。
+- 全拼打过两次、在简拼下提到第三的词，遇上表情候选时仍是第三，表情往后挪一位（全拼打过两次「售价」后，`shouj` 出「手机、收集、售价、📱」；0.3.3 是表情第三、这个词第四）。
 - 快速输入（长按「符」）不再给英文单词提示；颜文字、`:表情名:` 和 `\符号名` 照旧。
 - 系统「文件」应用里不再显示幽默输入法的数据目录。
+- 输入法框架换成了本项目按 Fcitx5 用 Kotlin 重写的版本，安装包里不再带原生的 Fcitx5。打字、设置、标点、繁体、快速输入和 Unicode 输入照旧，
+  设置文件原样沿用，升级后不用重新设置。想装回旧版本，先「备份全部」再卸载、装旧版、从备份恢复（见使用说明的常见问题）。
+- 实体键盘上去掉了几个原生 Fcitx5 自带、本来就少有人用的快捷键：Ctrl+; 剪贴板历史、韩文的 Hangul_Hanja / Hangul_Romaja 键、Super+空格切换输入法组（只有一个组，原来也不起作用）。
+  Ctrl+.（中英文标点）、Ctrl+Shift+F（简繁）、快速输入和 Unicode 输入的快捷键照旧。
+- 语音开始时先显示「准备中…」，麦克风真正开始收音才变成「正在听…」并轻震一下；2 秒收不到声音时显示「麦克风没有声音」（多半是麦克风开关关了或别的应用在录音）。
+- 语音面板上松开后马上点回车：等这句上屏后再回车，发出去的不是空消息；退格照常马上删。
+- 候选之间的空隙跟着候选字号变，字小时一页放得下更多候选；单个字仍不窄于 32 dp，便于点。
+- 拼音 14 键、双拼 18 键和九键双拼上没有中/英键，空格更宽；到英文按 🌐。
+- 手工改配置文件才能改的几项不再生效：`config/config` 里的全局项（比如 `DefaultPageSize`），`chttrans.conf` 里的 `Engine=Native` 和自定的 OpenCC 配置（只有从上游 fcitx5-android 带来的配置才会有）。界面上能改的设置都不受影响。
 
 ### 修复
 
 - 从备份恢复时，设置、自定义短语和标点现在完全以备份为准：备份之后在手机上新加的自定义短语、改过的标点会被去掉，不再和备份混在一起。
+- 语音输入时咳嗽、清嗓子、喘气不再打出「咳咳」「哼哼」「Huh」。
+- 按住说话时，0.3.3 在麦克风还没开始收音时就显示「正在听」，刚开口的约 1 秒会丢；现在等真正收音才提示开始说。
+- 开着英文标点时，用 TalkBack 按地球键切回拼音，读到的输入法名不再在一秒多里还是「英文」。
+- 在键盘上改的设置（比如切到繁體）现在马上保存，切完立刻强行停止应用也不会丢。
 
 ### Main changes
 
@@ -32,16 +54,64 @@ Each release lists its **main changes** (new features, large improvements), its 
   converts them in the background (a minute or two for rime-frost); the idle bar shows 「正在升级词库格式」 and its progress, and imported
   words cannot be typed until it ends. **Going back to 0.3.2** hides dictionaries imported into the base dictionary there: the files stay,
   and they return when you upgrade again.
+- **始终显示悬浮条** (Settings → 外观, off by default): the drag strip shows while the keyboard is docked too; long-press the
+  handle in its middle and the keyboard floats under your finger, to drag on without lifting, and docks again when dropped at the bottom.
+- **Pinyin 14 keys** (输入法 → 拼音 → **键盘**): two letters a key, keys twice as wide, like iFlytek's 拼音双键. Tapping the left or right
+  half of a key favours that half's letter, while orders you have taught it still come first; a strip of syllables on the code row fixes the
+  reading left to right.
+- **Shuangpin 18 keys and nine keys** (输入法 → 双拼 → **键盘**): every scheme works on the grouped 18 keys or the nine-key grid; the
+  syllable strip also shows initials, and tapping one fixes that character's initial. Nine-key shuangpin has many clashes, so expect to pick more.
+- **Voice keeps the last word**: it records 0.3 s more after you let go, and quiet speech is boosted before recognition.
 
 ### Smaller changes
 
+- **候选字号** (candidate text size) is adjustable, 14–28 sp: the candidate bar, predictions and the expanded list follow, keys keep their
+  height. The hardware keyboard's candidate window setting is renamed **浮动候选窗字号**.
+- **键盘底部边距** (bottom padding) gains 「贴底」 (flush): on phones that hide the gesture bar yet leave a strip under the keyboard, the
+  keyboard can sit at the very bottom.
+- Notices for copy, delete, block and the like are one kind of notice bar: one that can be undone stays 6 seconds, and repeating the
+  action adds to its count instead of covering it with another.
+- Animations are shorter (150 ms at most); **禁用动画** and the system's "Remove animations" now turn off every animation in the keyboard.
+- A word typed twice in full and lifted to third under its initials stays third when an emoji candidate shows: the emoji moves a place down
+  (售价 typed twice in full, `shouj` gives 手机, 收集, 售价, 📱; 0.3.3 put the emoji third and the word fourth).
 - Quick input (long-press 「符」) no longer suggests English words; kaomoji, `:emoji-name:` and `\symbol-name` work as before.
 - The system Files app no longer shows Youmo's data folder.
+- The input method framework is now this project's Kotlin port of Fcitx5; the APK no longer carries native Fcitx5. Typing, settings, punctuation,
+  traditional output, quick input and Unicode input work as before, and the settings files are kept as they are: nothing to set again after
+  upgrading. To go back to an older version, 「备份全部」 first, then uninstall, install the old version and restore the backup (see the manual's FAQ).
+- A few hardware-keyboard shortcuts native Fcitx5 brought along, rarely used, are gone: Ctrl+; (clipboard history), the Korean Hangul_Hanja /
+  Hangul_Romaja keys, and Super+Space to switch input method groups (there is only one group; it did nothing before either).
+  Ctrl+. (Chinese/English punctuation), Ctrl+Shift+F (simplified/traditional) and the quick input and Unicode shortcuts stay.
+- Voice shows 「准备中…」 first and 「正在听…」 with a short vibration once the microphone really delivers sound; after 2 s without sound
+  it shows 「麦克风没有声音」 (the microphone switch is likely off, or another app is recording).
+- On the voice panel, Enter pressed right after letting go waits for the text, then acts, so a chat does not send an empty message; delete acts at once.
+- Candidate spacing follows the candidate text size, so small text fits more candidates on a page; a single character stays at least 32 dp wide to tap.
+- Pinyin 14 keys, shuangpin 18 keys and nine-key shuangpin have no 中/英 key, and a wider space bar; 🌐 gets to English.
+- Settings that only a hand-edited config file could change no longer apply: global items in `config/config` (such as `DefaultPageSize`), and
+  `Engine=Native` or a custom OpenCC profile in `chttrans.conf` (found only in configs carried over from upstream fcitx5-android). Every setting
+  the app shows is unaffected.
 
 ### Fixes
 
 - Restoring a backup now takes settings, custom phrases and punctuation wholly from the backup: phrases added or punctuation changed on the
   phone after the backup are dropped instead of mixed in.
+- In voice input, coughs, throat clearing and breathing no longer type 咳咳, 哼哼 or "Huh".
+- Hold-to-talk: 0.3.3 showed 正在听 before the microphone was on, and about the first second was lost; it now says so only once sound comes in.
+- With English punctuation on, TalkBack no longer reads the old input method's name for over a second after the globe key
+  switches back to pinyin.
+- Settings changed from the keyboard (such as switching to 繁體) are now kept even if the app is stopped right away.
+
+---
+
+## 0.3.3（2026-10-24）
+
+### 修复
+
+- 全拼打过的词，简拼下也会往前排：完整拼音打过两次的词（比如「奉化」），在简拼 `fh` 下排到第三；简拼下改选过的词，打完整拼音时至少排第二。简拼的第一个照旧按你在简拼下的选择。双拼、九键里是完整的和打一半的互相带，只在各自的键盘里。
+
+### Fixes
+
+- Words typed in full pinyin now move up under their abbreviation too: a word typed in full twice (奉化, say) comes third under `fh`; a word picked over the first under an abbreviation is at least second when typed in full. The first under an abbreviation still follows your picks there. In 双拼 and on the nine keys, keys typed in full and keys typed in part lift each other the same way, each keyboard on its own.
 
 ---
 
