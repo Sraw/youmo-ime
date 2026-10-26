@@ -161,6 +161,8 @@ class EngineDataPlugin : Plugin<Project> {
             "engine-data/chaizi-${CHAIZI_COMMIT.take(8)}-jt.txt",
         )
 
+        const val OPENCC_TASK = "compileOpenccData"
+
         const val MODEL_TASK = "copySentenceModels"
         // a tag of its own, not "latest": what is downloaded is what was measured
         private const val MODELS_RELEASE = "sentence-models-20261001"
@@ -257,6 +259,14 @@ class EngineDataPlugin : Plugin<Project> {
             pinyin.set(compile.flatMap { it.outputDir.file("engine/pinyin.data") })
             outputDir.set(target.layout.buildDirectory.dir("generated/engine-chaizi"))
         }
+        // OpenCC 1.2.0's s2tw dictionaries, committed (lib/ime-dict-tool/opencc/README.md): frozen data
+        val opencc = target.tasks.register<CompileOpenccData>(OPENCC_TASK) {
+            classpath.from(tool)
+            toolCode.set(fingerprint.flatMap { it.outputFile })
+            val dir = target.rootProject.layout.projectDirectory.dir("lib/ime-dict-tool/opencc")
+            dictionaries.from(listOf("STPhrases", "STCharacters", "TWVariants").map { dir.file("$it.txt") })
+            outputDir.set(target.layout.buildDirectory.dir("generated/engine-opencc"))
+        }
         val tableRuns = target.gradle.sharedServices.registerIfAbsent("engineTableRuns", TableRuns::class.java)
         val tables = target.tasks.register<CompileTables>(TABLES_TASK) {
             classpath.from(tool)
@@ -293,6 +303,7 @@ class EngineDataPlugin : Plugin<Project> {
             variant.sources.assets?.addGeneratedSourceDirectory(english, CompileEnglishData::outputDir)
             variant.sources.assets?.addGeneratedSourceDirectory(emoji, CompileEmojiData::outputDir)
             variant.sources.assets?.addGeneratedSourceDirectory(chaizi, CompileChaiziData::outputDir)
+            variant.sources.assets?.addGeneratedSourceDirectory(opencc, CompileOpenccData::outputDir)
             variant.sources.assets?.addGeneratedSourceDirectory(tables, CompileTables::outputDir)
             variant.sources.assets?.addGeneratedSourceDirectory(model, CopyModels::outputDir)
         }
@@ -489,6 +500,24 @@ class EngineDataPlugin : Plugin<Project> {
         fun compile() {
             // the pinyin data mapped, as for the emoji
             runTool("chaizi.data", "1g") { listOf("chaizi", "-o", it, "--pinyin", pinyin.get().asFile.path, source.get().asFile.path) }
+        }
+    }
+
+    /** `engine/opencc-s2tw.data`: ime-dict-tool's `opencc` of OpenCC 1.2.0's three s2tw dictionaries, in that order. */
+    @CacheableTask
+    abstract class CompileOpenccData : ToolDataTask() {
+        @get:InputFiles
+        @get:PathSensitive(PathSensitivity.NAME_ONLY)
+        abstract val dictionaries: ConfigurableFileCollection
+
+        // the order is the tool's argument order, which @InputFiles' fingerprint ignores
+        @get:Input
+        val dictionaryOrder: List<String>
+            get() = dictionaries.files.map { it.name }
+
+        @TaskAction
+        fun compile() {
+            runTool("opencc-s2tw.data", "256m") { listOf("opencc", "-o", it) + dictionaries.files.map { f -> f.path } }
         }
     }
 
