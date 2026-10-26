@@ -17,9 +17,11 @@ import org.junit.Test
 import org.junit.rules.TemporaryFolder
 import java.io.File
 import java.io.IOException
+import java.lang.Float.floatToRawIntBits
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import kotlin.math.log10
+import kotlin.random.Random
 
 class DictionaryFileTest {
 
@@ -236,23 +238,34 @@ class DictionaryFileTest {
         DictionaryCompiler.compile(listOf(sequenceOf("幽默 you'mo 0.5", "好 hao 0.2", "中国 zhong'guo 0.1")), file, inBase = { t, _ -> t == "中国" })
         val bytes = file.readBytes()
         assertEquals(3, DictionaryFile.of(rewritten(bytes)).size)
-        val rows = listOf<Triple<String, (Map<String, String>) -> Map<String, String>, (Int, ByteBuffer) -> Unit>>(
-            Triple("other syllables", { it + ("syllableChecksum" to "1") }, { _, _ -> }),
+        // the message names the whole table: "syllables" must not pass on node syllables' message. A
+        // run's or a bound's check names its table first ("text places: 3 at 0 is not below 3"), the
+        // rest end on it
+        data class Row(
+            val why: String,
+            val meta: (Map<String, String>) -> Map<String, String>,
+            val change: (Int, ByteBuffer) -> Unit,
+            val named: (why: String, message: String) -> Boolean,
+        )
+        val endsOn = { why: String, m: String -> m.endsWith("bad structure: $why") }
+        val first = { why: String, m: String -> ": $why: " in m }
+        val rows = listOf(
+            Row("other syllables", { it + ("syllableChecksum" to "1") }, { _, _ -> }, { why, m -> m.endsWith("of $why") }),
             // BitPacked's values from byte 8, after its width and size; EliasFano's upper bits after
             // its 16 bytes of header and its low bits, cleared: no value where one must be
-            Triple("text buckets", { it }, { id, b -> if (id == DictionaryFile.TEXT_BUCKETS) b.putLong(eliasFanoUpper(b), 0L) }),
+            Row("text buckets", { it }, { id, b -> if (id == DictionaryFile.TEXT_BUCKETS) b.putLong(eliasFanoUpper(b), 0L) }, first),
             // review F3634: a place past the words, the index every forEachOfText follows
-            Triple("text places", { it }, { id, b -> if (id == DictionaryFile.TEXT_PLACES) putPacked(b, 0, 3) }),
+            Row("text places", { it }, { id, b -> if (id == DictionaryFile.TEXT_PLACES) putPacked(b, 0, 3) }, first),
             // a node's syllable past the table, node 1 (the root's has none)
-            Triple("node syllables", { it }, { id, b -> if (id == DictionaryFile.NODE_SYLLABLE) putPacked(b, 1, Syllables.count) }),
-            Triple("node words", { it }, { id, b -> if (id == DictionaryFile.WORD_START) b.putLong(8, -1L) }),
-            Triple("children", { it }, { id, b -> if (id == DictionaryFile.FIRST_CHILD) b.putLong(8, 0L) }),
-            Triple("syllables", { it }, { id, b -> if (id == DictionaryFile.SYLLABLES) b.putShort(0, Short.MAX_VALUE) }),
-            Triple("score codes", { it }, { id, b -> if (id == DictionaryFile.SCORES) b.putShort(0, Short.MAX_VALUE) }),
+            Row("node syllables", { it }, { id, b -> if (id == DictionaryFile.NODE_SYLLABLE) putPacked(b, 1, Syllables.count) }, endsOn),
+            Row("node words", { it }, { id, b -> if (id == DictionaryFile.WORD_START) b.putLong(8, -1L) }, first),
+            Row("children", { it }, { id, b -> if (id == DictionaryFile.FIRST_CHILD) b.putLong(8, 0L) }, endsOn),
+            Row("syllables", { it }, { id, b -> if (id == DictionaryFile.SYLLABLES) b.putShort(0, Short.MAX_VALUE) }, endsOn),
+            Row("score codes", { it }, { id, b -> if (id == DictionaryFile.SCORES) b.putShort(0, Short.MAX_VALUE) }, endsOn),
         )
-        assertRows(rows, { it.first }) { (why, meta, change) ->
-            val e = assertThrows(why, IOException::class.java) { DictionaryFile.of(rewritten(bytes, meta, change)) }
-            assertTrue("$why: ${e.message}", e.message!!.contains(why))
+        assertRows(rows, { it.why }) { row ->
+            val e = assertThrows(row.why, IOException::class.java) { DictionaryFile.of(rewritten(bytes, row.meta, row.change)) }
+            assertTrue("${row.why}: ${e.message}", row.named(row.why, e.message!!))
         }
     }
 
@@ -360,7 +373,7 @@ class DictionaryFileTest {
     // through the codebook; found by reading and by text, each at a place of its own
     @Test
     fun aRandomDictionaryReadsBackWordForWord() {
-        val r = kotlin.random.Random(3)
+        val r = Random(3)
         val spellings = (0 until Syllables.count).filter { Syllables.spelling(it)[0].isLowerCase() }
         val weights = FloatArray(40) { (it + 1) / 40f }
         val words = LinkedHashMap<Pair<String, List<Int>>, Float>()
@@ -413,7 +426,7 @@ class DictionaryFileTest {
             assertEquals(log10((i + 1).toFloat() / n), d.score(p), step / 2 + 1e-6f)
         }
         // the best +0f exactly, not floor * 0 = -0f, which assertEquals(0f, x, 0f) lets through (review F3623)
-        assertEquals(0, java.lang.Float.floatToRawIntBits(d.score(d.find(text(n - 1), ids(*reading(n - 1).toTypedArray())))))
+        assertEquals(0, floatToRawIntBits(d.score(d.find(text(n - 1), ids(*reading(n - 1).toTypedArray())))))
         val node = d.child(d.child(DictionaryFile.ROOT, Syllables.id("shi")), Syllables.id("shi"))
         val texts = (0 until d.wordCount(node)).map { d.text(d.word(node, it)) }
         assertEquals((0 until n step readings.size).reversed().map(::text), texts)

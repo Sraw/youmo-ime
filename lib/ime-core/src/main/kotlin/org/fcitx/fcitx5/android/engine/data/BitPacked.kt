@@ -111,6 +111,7 @@ class BitPacked(buffer: ByteBuffer) {
      * for a table too large to build in the heap first (a dictionary the user merged, DictionaryCompiler).
      */
     class Writer(private val out: java.io.OutputStream, private val width: Int, private val size: Int) {
+        private val bytes = LittleEndian(out)
         private var bits = 0L
         private var used = 0
         private var count = 0
@@ -142,12 +143,26 @@ class BitPacked(buffer: ByteBuffer) {
             used = 0
         }
 
-        private fun writeInt(v: Int) {
-            for (i in 0 until 4) out.write(v ushr (8 * i))
-        }
+        private fun writeInt(v: Int) = bytes.writeInt(v)
 
-        private fun writeLong(v: Long) {
-            for (i in 0 until 8) out.write((v ushr (8 * i)).toInt())
-        }
+        private fun writeLong(v: Long) = bytes.writeLong(v)
+    }
+}
+
+/**
+ * Ints and longs written to [out] low byte first, a whole value per write: BitPacked's and
+ * EliasFano's writers, which build the large tables of the data tools a long at a time.
+ */
+internal class LittleEndian(private val out: java.io.OutputStream) {
+    private val buffer = ByteArray(8)
+
+    fun writeInt(v: Int) {
+        for (i in 0 until 4) buffer[i] = (v ushr (8 * i)).toByte()
+        out.write(buffer, 0, 4)
+    }
+
+    fun writeLong(v: Long) {
+        for (i in 0 until 8) buffer[i] = (v ushr (8 * i)).toByte()
+        out.write(buffer, 0, 8)
     }
 }

@@ -187,6 +187,7 @@ class EliasFano(buffer: ByteBuffer) {
      * dictionary the user merged, DictionaryCompiler).
      */
     class Writer(private val out: java.io.OutputStream, private val size: Int, max: Int) {
+        private val bytes = LittleEndian(out)
         // the low width that makes the whole smallest: about log2 of the mean gap
         private val lowWidth = if (size == 0) 0 else (63 - java.lang.Long.numberOfLeadingZeros(maxOf(1L, (max.toLong() + 1) / size)))
         private val upper: LongArray
@@ -240,12 +241,8 @@ class EliasFano(buffer: ByteBuffer) {
             samples.forEach(::writeInt)
         }
 
-        private fun writeInt(v: Int) {
-            for (i in 0 until 4) out.write(v ushr (8 * i))
-        }
+        private fun writeInt(v: Int) = bytes.writeInt(v)
 
-        private fun writeLong(v: Long) {
-            for (i in 0 until 8) out.write((v ushr (8 * i)).toInt())
-        }
+        private fun writeLong(v: Long) = bytes.writeLong(v)
     }
 }

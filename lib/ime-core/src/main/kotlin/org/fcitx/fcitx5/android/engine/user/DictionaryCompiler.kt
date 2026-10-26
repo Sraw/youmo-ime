@@ -31,7 +31,7 @@ import kotlin.math.log10
  * (at import, at a change of which are on, at a new base dictionary). It runs in the keyboard's
  * process beside typing, so its heap is bounded whatever the size: the lines are streamed and
  * sorted on disk in runs ([RUN_WORDS] words in the heap at a time), merged, and written a
- * section at a time; the largest thing held is the text index as it is sorted, 8 bytes a word. Rime-frost's 1.9
+ * section at a time; the largest thing held is the text index as it is sorted, 4 bytes a slot and a place (8 to 12 bytes a word: a slot per word to two). Rime-frost's 1.9
  * million words compile in 48 MB (DictionaryFileBoundedHeapTest proves 2 million in that).
  *
  * The words come out in their trie's breadth-first order, so a node's words are a run of places:
@@ -660,8 +660,8 @@ object DictionaryCompiler {
                 DictionaryFile.CHARS -> parts.forEach { copy(it.chars.file, out) }
                 DictionaryFile.SYL_START -> writeStarts(out, checkNotNull(base.syls).count.toInt(), size - trieWords, listOf(checkNotNull(base.sylLengths)))
                 DictionaryFile.SYLLABLES -> copy(checkNotNull(base.syls).file, out)
-                DictionaryFile.SCORE_BOOK -> LittleEndian(out).apply { book.forEach { int(java.lang.Float.floatToRawIntBits(it)) } }.flush()
-                DictionaryFile.SCORES -> LittleEndian(out).apply {
+                DictionaryFile.SCORE_BOOK -> BufferedLittleEndian(out).apply { book.forEach { int(java.lang.Float.floatToRawIntBits(it)) } }.flush()
+                DictionaryFile.SCORES -> BufferedLittleEndian(out).apply {
                     for (part in parts) readInts(part.scores.file) { short(code(java.lang.Float.intBitsToFloat(it), book)) }
                 }.flush()
                 DictionaryFile.FIRST_CHILD, DictionaryFile.NODE_SYLLABLE, DictionaryFile.WORD_START -> writeTrie(id, out)
@@ -729,7 +729,8 @@ object DictionaryCompiler {
             val (width, count) = when (id) {
                 DictionaryFile.FIRST_CHILD -> BitPacked.widthFor(nodes) to nodes + 1
                 DictionaryFile.NODE_SYLLABLE -> BitPacked.widthFor(Syllables.count - 1) to nodes
-                else -> BitPacked.widthFor(trieWords) to nodes + 1
+                DictionaryFile.WORD_START -> BitPacked.widthFor(trieWords) to nodes + 1
+                else -> error("section $id")
             }
             val w = BitPacked.Writer(out, width, count)
             var children = 1
@@ -744,7 +745,8 @@ object DictionaryCompiler {
                         when (id) {
                             DictionaryFile.FIRST_CHILD -> w.add(children).also { children += row[2] }
                             DictionaryFile.NODE_SYLLABLE -> w.add(row[0])
-                            else -> w.add(words).also { words += row[1] }
+                            DictionaryFile.WORD_START -> w.add(words).also { words += row[1] }
+                            else -> error("section $id")
                         }
                     }
                 }
@@ -773,7 +775,9 @@ object DictionaryCompiler {
         }
     }
 
-    private class LittleEndian(out: OutputStream) {
+    // buffered and with shorts, for the score files written a value at a time: engine.data's
+    // LittleEndian writes straight through and has neither
+    private class BufferedLittleEndian(out: OutputStream) {
         private val out = DataOutputStream(BufferedOutputStream(out, BUFFER))
         fun int(v: Int) = out.writeInt(Integer.reverseBytes(v))
         fun short(v: Int) = out.writeShort(java.lang.Short.reverseBytes(v.toShort()).toInt())

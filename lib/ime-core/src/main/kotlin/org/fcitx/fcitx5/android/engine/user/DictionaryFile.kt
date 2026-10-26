@@ -34,8 +34,8 @@ import java.nio.channels.FileChannel
  *
  * Version 2 is the first's at half the size (rime-frost 105.6 MiB to some 49): the words in the
  * nodes' breadth-first order, so a node's run is told by one start; a trie word's syllables are its
- * node's path, read walking up ([syllables]: for a word chosen or learned, never per arc), and only
- * those apart stored; scores as u16 codes into a book of the distinct ones (exact), or linear from
+ * node's path, read walking up ([syllables]: for a word chosen or learned; on an arc only once a
+ * place, while a stale file is still read, UserModel.inStaleBase), and only those apart stored; scores as u16 codes into a book of the distinct ones (exact), or linear from
  * the least past 65,536 of them; the text index the places sorted by their text's slot, with
  * where each slot's run starts; the int arrays [BitPacked], the bucket starts [EliasFano].
  *
@@ -152,7 +152,8 @@ class DictionaryFile private constructor(buffer: ByteBuffer, verify: Boolean) {
 
     /**
      * A word apart's syllables as stored; a trie word's its node's path, walked up: some hundred
-     * reads, for a word chosen or learned, never per arc of a key.
+     * reads, for a word chosen or learned; on a key's arcs only once a place, and only while an
+     * older merged file is still read till its recompile (UserModel.inStaleBase).
      */
     fun syllables(place: Int): IntArray {
         if (place >= trieWords) {
@@ -294,7 +295,7 @@ class DictionaryFile private constructor(buffer: ByteBuffer, verify: Boolean) {
 
     companion object {
         const val ROOT = 0
-        internal const val VERSION = 2
+        const val VERSION = 2
         internal const val META = 0
         internal const val TEXT_START = 1
         internal const val CHARS = 2

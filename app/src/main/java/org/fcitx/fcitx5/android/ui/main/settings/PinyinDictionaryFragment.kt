@@ -109,18 +109,8 @@ class PinyinDictionaryFragment : PaddingPreferenceFragment() {
     /** whether this view told of the dictionaries put aside unread: the list is built again after each change */
     private var toldUnread = false
 
-    // [left]: why its words are not (all) in the merged ones (F3592, F3593, F3645)
-    private class Listed(val dictionary: TextDictionary, val words: Int, val left: Left = Left.NONE)
-
-    private enum class Left {
-        NONE,
-
-        // its file could not be read: a text, or a gzip damaged (what was read before the damage kept)
-        UNREADABLE,
-
-        // a text not converted for want of space: nothing wrong with it, not to be deleted
-        UNCONVERTED,
-    }
+    // [missing]: why its words are not (all) in the merged ones (F3592, F3593, F3645)
+    private class Listed(val dictionary: TextDictionary, val words: Int, val missing: Missing = Missing.NONE)
 
     // what says a compile is under way, and the rows of the dictionaries it upgrades: told its percent as it goes
     private var status: Preference? = null
@@ -196,12 +186,12 @@ class PinyinDictionaryFragment : PaddingPreferenceFragment() {
                 val unreadable = MergedDictionary.unreadable(dir)
                 val unconverted = MergedDictionary.unconverted(dir)
                 dictionaries.zip(wordCounts.of(dictionaries)) { dictionary, words ->
-                    val left = when (dictionary.name) {
-                        in unreadable -> Left.UNREADABLE
-                        in unconverted -> Left.UNCONVERTED
-                        else -> Left.NONE
+                    val missing = when (dictionary.name) {
+                        in unreadable -> Missing.UNREADABLE
+                        in unconverted -> Missing.UNCONVERTED
+                        else -> Missing.NONE
                     }
-                    Listed(dictionary, words, left)
+                    Listed(dictionary, words, missing)
                 }
             }
             // read after the list: listing it runs the migration when the engine has not yet
@@ -302,11 +292,11 @@ class PinyinDictionaryFragment : PaddingPreferenceFragment() {
         title = dictionary.name
         val state = getString(if (dictionary.isEnabled) R.string.dict_on else R.string.dict_off)
         val count = resources.getQuantityString(R.plurals.word_count, item.words, item.words)
-        val words = when (item.left) {
-            // a damaged gzip's words read before the damage are in, all of them if only its end is bad (F3648)
-            Left.UNREADABLE -> if (item.words > 0) getString(R.string.dict_damaged, count) else getString(R.string.dict_unreadable)
-            Left.UNCONVERTED -> getString(R.string.dict_unconverted)
-            Left.NONE -> count
+        val words = when (wordsShown(item.missing, item.words)) {
+            WordsShown.DAMAGED -> getString(R.string.dict_damaged, count)
+            WordsShown.UNREADABLE -> getString(R.string.dict_unreadable)
+            WordsShown.UNCONVERTED -> getString(R.string.dict_unconverted)
+            WordsShown.COUNT -> count
         }
         summary = getString(R.string.dict_summary, state, words)
         isIconSpaceReserved = false
@@ -778,6 +768,31 @@ private const val MAX_SCEL = 32 shl 20
 
 /** The words of a .scel file, [bytes], as lines of a word list: `词 pin'yin 12`. */
 internal fun scelLines(bytes: ByteArray): List<String> = ArrayList<String>().also { out -> ImportFiles.Scel.read(bytes) { out += it.line() } }
+
+/** Why a dictionary's words are not (all) in the merged ones (F3592, F3593, F3645). */
+internal enum class Missing {
+    NONE,
+
+    // its file could not be read: a text, or a gzip damaged (what was read before the damage kept)
+    UNREADABLE,
+
+    // a text not converted for want of space: nothing wrong with it, not to be deleted
+    UNCONVERTED,
+}
+
+/** What a dictionary's row says of its words. */
+internal enum class WordsShown { COUNT, DAMAGED, UNREADABLE, UNCONVERTED }
+
+/**
+ * A row's words as [missing] and [words] (the merged file's count for one on, the text's lines for
+ * one off) have it: an unreadable one with words counted is a gzip damaged past them, its words read
+ * before the damage in (F3648); none counted, nothing of it was read (a bad gzip's count is 0).
+ */
+internal fun wordsShown(missing: Missing, words: Int) = when (missing) {
+    Missing.UNREADABLE -> if (words > 0) WordsShown.DAMAGED else WordsShown.UNREADABLE
+    Missing.UNCONVERTED -> WordsShown.UNCONVERTED
+    Missing.NONE -> WordsShown.COUNT
+}
 
 /**
  * The lists imported with words still not the user's, newest first: the one just imported is the
