@@ -23,6 +23,8 @@ import org.fcitx.fcitx5.android.engine.pinyin.Syllables
 import org.fcitx.fcitx5.android.engine.stroke.Strokes
 import org.fcitx.fcitx5.android.engine.table.TableText
 import org.fcitx.fcitx5.android.engine.user.WordPack
+import org.fcitx.fcitx5.android.host.ChineseConverter
+import org.fcitx.fcitx5.android.host.OpenCCData
 import org.fcitx.fcitx5.android.input.voice.HotwordSpelling
 import java.io.File
 import java.io.FileNotFoundException
@@ -71,6 +73,22 @@ private val COMMANDS = listOf(
         """,
         inputs = 1..1,
     ) { options, out -> table(options.output!!, options.inputs.single(), options.words, options.pinyin, out) },
+    Command(
+        "opencc -o <out> <STPhrases.txt> <STCharacters.txt> <TWVariants.txt>",
+        """
+            OpenCC 1.2.0's s2tw dictionaries as the
+            data ChineseConverter maps (OpenCCData)
+        """,
+        inputs = 3..3,
+    ) { options, out ->
+        // by position, so the order is checked: another (STCharacters first) would convert character by
+        // character, STPhrases no longer splitting the text into words, and still compile
+        val names = options.inputs.map { File(it).nameWithoutExtension }
+        require(names == ChineseConverter.S2TW) { "expected ${ChineseConverter.S2TW.joinToString(" ") { "$it.txt" }} in that order, got ${names.joinToString(" ")}" }
+        val bytes = OpenCCData.write(options.inputs.map { OpenCCData.parse(File(it).readText()) })
+        File(options.output!!).writeBytes(bytes)
+        out.appendLine("wrote ${options.output}: ${bytes.size} bytes")
+    },
     Command("strokes -o <out> <stroke.dict.yaml>", "compile rime-stroke's characters by their strokes", 1..1) { options, out ->
         strokes(options.output!!, options.inputs.single(), out)
     },

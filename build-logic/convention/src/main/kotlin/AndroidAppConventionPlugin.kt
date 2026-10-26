@@ -34,7 +34,6 @@ import javax.xml.parsers.DocumentBuilderFactory
 /**
  * The prototype of an Android Application
  *
- * - Configure dependency for [DataDescriptorPlugin] task (If have)
  * - Provide default configuration for `android {...}`
  * - Add desugar JDK libs
  * - Fail the build if the merged manifest asks for a permission not on the list ([PermissionCheckTask])
@@ -129,18 +128,6 @@ class AndroidAppConventionPlugin : AndroidBaseConventionPlugin() {
         target.tasks.withType<CompileArtProfileTask> { enabled = false }
 
         target.extensions.configure<ApplicationAndroidComponentsExtension> {
-            // Add dependency relationships for data descriptor task
-            onVariants { v ->
-                val variantName = v.name.capitalized()
-                // Evaluation should be delayed as we need be able to see other tasks
-                target.afterEvaluate {
-                    tasks.findByName(DataDescriptorPlugin.TASK)?.also {
-                        tasks.findByName("merge${variantName}Assets")?.dependsOn(it)
-                        tasks.findByName("lintVitalAnalyze${variantName}")?.dependsOn(it)
-                        tasks.findByName("generate${variantName}LintVitalReportModel")?.dependsOn(it)
-                    }
-                }
-            }
             // Check the merged manifest in its own path, so no APK or bundle is built without it
             onVariants { v ->
                 val permitted = PermissionCheckTask.allowedFor(v.productFlavors)
@@ -151,14 +138,7 @@ class AndroidAppConventionPlugin : AndroidBaseConventionPlugin() {
                     .wiredWithFiles(PermissionCheckTask::mergedManifest, PermissionCheckTask::checkedManifest)
                     .toTransform(SingleArtifact.MERGED_MANIFEST)
             }
-            // Make data descriptor depend on fcitx component if have
-            // Since we are using finalizeDsl, there is no need to do afterEvaluate
             finalizeDsl {
-                target.tasks.findByName(DataDescriptorPlugin.TASK)?.also { dataDescriptorTask ->
-                    FcitxComponentPlugin.DEPENDENT_TASKS
-                        .mapNotNull { taskName -> target.tasks.findByName(taskName) }
-                        .forEach { componentTask -> dataDescriptorTask.dependsOn(componentTask) }
-                }
                 // applicationId is not set upon apply
                 it.defaultConfig {
                     // https://www.norio.be/blog/archivesBaseName-removed-from-gradle9.html

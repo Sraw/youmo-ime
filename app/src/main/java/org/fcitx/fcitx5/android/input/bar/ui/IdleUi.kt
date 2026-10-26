@@ -190,8 +190,8 @@ class IdleUi(
 
     private val idleBody = constraintLayout {
         // as tall as the bar; at a small 候选字号 still 40 dp wide, a finger's target
-        val size = dp(KawaiiBarComponent.HEIGHT)
-        val buttonWidth = dp(maxOf(KawaiiBarComponent.HEIGHT, KawaiiBarComponent.MIN_TOUCH_DP))
+        val size = dp(KawaiiBarComponent.heightDp())
+        val buttonWidth = dp(KawaiiBarComponent.buttonWidthDp())
         add(menuButton, lParams(buttonWidth, size) {
             startOfParent()
             centerVertically()

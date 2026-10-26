@@ -76,6 +76,9 @@ class ShuangpinScheme(keys: String, val zero: String) {
     internal fun typesInitial(key: Char): Boolean =
         initials.values.any { key in it } || key.toString() in SpellingIndex.INITIALS
 
+    /** The initials [key] types, in [SpellingIndex.INITIALS]' order: 自然码's v zh, and v itself none. */
+    internal fun initialsOn(key: Char): List<String> = SpellingIndex.INITIALS.filter { key in initialKeys(it) }
+
     private fun initialKeys(init: String): String {
         val mapped = initials[init].orEmpty()
         // libime reads a letter as its own initial even when it also types another one

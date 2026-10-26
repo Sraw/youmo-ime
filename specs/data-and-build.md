@@ -12,16 +12,17 @@
 | Build-logic's own tests | `./gradlew -p build-logic test` |
 
 Needs: SDK platform 36, build-tools 36.1.0, NDK 28.0.13004108, CMake 3.31.6 (or `cmake.dir` in
-`local.properties`), extra-cmake-modules, gettext ≥ 0.20, a JDK 17 or newer to run Gradle (CI uses 17;
-code targets Java 11). Versions are in `build-logic/convention/src/main/kotlin/Versions.kt`. Submodules:
-`git submodule update --init --recursive` (fcitx5 only). Its prebuilt dependencies (OpenCC, marisa, libuv,
-libintl-lite for the four ABIs, 9.4 MB) are in `lib/fcitx5/src/main/cpp/prebuilt`, see its README. Of fcitx5-chinese-addons
-only the modules built are vendored (`lib/fcitx5-chinese-addons/src/main/cpp/fcitx5-chinese-addons`, upstream
-5.1.13, with its `po/` cut to zh_CN/zh_TW).
+`local.properties`; for `lib/handwriting` and `lib/sherpa-onnx`), a JDK 21 to run Gradle (CI uses 21, as the local build, so the unit tests' screenshots are compared on the JDK they were recorded on;
+the Android modules target Java 21, `lib/ime-core` stays at the JDK 11 API as a guard against JDK-only members; host tools take the JDK's own). Versions are in `build-logic/convention/src/main/kotlin/Versions.kt`. No submodules:
+fcitx5 and chinese-addons are not in the tree. The few upstream files the app carries (punctuation
+table, quick phrase tables, `charselectdata`) are in `app/src/main/host-assets/pkgdata`
+(`host-assets.md`: source, SHA-256, licence); the generators of the host's golden files and key
+tables fetch upstream fcitx5 442edbc9 and chinese-addons 0d3fd040 by `lib/ime-core/tools/upstream.sh`
+(GitHub tarballs, SHA-256 pinned, cached).
 
 Memory: compiling the pinyin data alone is ~4 GB resident (3.6 GB measured, in a JVM of its own;
 BUILDING.md's 5 GB counts the Gradle daemon beside it) and three table compiles run at once
-(1 GB each); a native rebuild of fcitx5 peaks around 4 GB with Gradle. The repository sets
+(1 GB each). The repository sets
 `-Xmx2048m`; on a small machine run without the daemon and do not build while an emulator runs.
 
 ## Convention plugins (`build-logic/convention`)
@@ -30,9 +31,6 @@ BUILDING.md's 5 GB counts the Gradle daemon beside it) and three table compiles 
 |---|---|
 | `AndroidAppConventionPlugin` | app defaults (SDKs, version from tags, signing from env/properties, R8), and `PermissionCheckTask`: fails the build if the merged manifest asks for a permission not on its allowlist |
 | `AndroidLib…`, `AndroidBase…` | library and shared Android defaults |
-| `Native…ConventionPlugin`, `NativeBuildTasks` | CMake/NDK setup, ABI selection (`-PbuildABI`) |
-| `FcitxComponentPlugin`, `FcitxHeadersPlugin` | build fcitx's CMake targets and install their files into the app's assets; export headers |
-| `DataDescriptorPlugin` | `descriptor.json`: the SHA-256 of every file under `src/main/assets`, so `DataManager` syncs only what changed |
 | `EngineDataPlugin` | downloads (SHA-256 pinned) and compiles the engine's data into generated assets, stored uncompressed (see below) |
 | `VoiceDataPlugin` | voice build only: the recognizer's models, VAD, hotword list |
 | `HandwritingDataPlugin` | both builds: `:lib:handwriting` (onnxruntime, `pickFirst` with sherpa-onnx's identical copy) and the handwriting models |
@@ -41,7 +39,9 @@ BUILDING.md's 5 GB counts the Gradle daemon beside it) and three table compiles 
 | `ToolFingerprint` | hashes the classes the dict tool's `main` reaches, so the data task re-runs only when code that makes data changes, not on every ime-core edit |
 | `DownloadTasks`, `Hashes` | downloads pinned by SHA-256, and the hashing they and the fingerprints use |
 | `Utils`, `Versions` | shared helpers; SDK and tool versions |
-| `ProjectExtensions` | version name from `git describe --tags --long --match v[0-9]*` |
+| `NativeAppConventionPlugin` | ABI splits (`-PbuildABI`, one APK per ABI) and a version code per ABI |
+| `UnitTestResourcesPlugin` | gives Robolectric the app's linked resources (res + manifest) without its assets, so unit tests do not depend on merged assets and the engine data they drag in |
+| `ProjectExtensions` | version name from `git describe --tags --long --match v[0-9]*`; ABI selection (`-PbuildABI`) for the native libraries, which `lib/handwriting` and `lib/sherpa-onnx` build with their own CMake through `lib-convention` |
 
 Any edit to build-logic changes the data task's implementation, so the next build compiles the
 engine data again (a few minutes). Expected.
@@ -144,13 +144,15 @@ batch is curated. A word in either list is never put before a curator again.
 
 ## Native code
 
-`app/src/main/cpp` builds `native-lib` (JNI), the fcitx frontend and the addons the app adds
-(`androidengine`, `androidfrontend`, `androidaddonloader`, `androidnotification`) and
-`matrix-kernel.cpp`. `lib/fcitx5` builds Fcitx5 itself from the submodule with the
-prebuilt dependencies kept in the repository (`lib/fcitx5/src/main/cpp/prebuilt`). Host tests for native helpers:
-`app/src/test/cpp/host-test.sh`, `lib/sherpa-onnx/host-test.sh` (CI runs both).
+The app has no native code of its own; the fcitx host is Kotlin ([host.md](host.md)).
+`lib/handwriting` builds `libyoumo-handwriting` (linked to onnxruntime, loaded only when
+handwriting is used) and `libyoumo-matrix` (`matrix-kernel.cpp`, the sentence models' kernel,
+`-O3` even in debug, no onnxruntime); `NativeMatrixKernel.loaded` falls back to
+`MatrixKernel.JVM` when it does not load. `lib/sherpa-onnx` builds the recognizer (voice build).
+The APK's `.so` files are those, onnxruntime's and `libc++_shared`. Host tests for native helpers:
+`lib/sherpa-onnx/host-test.sh` (CI runs it).
 
-When adding a method to the JNI surface or to `FcitxAPI`, read the Kotlin incremental compilation
+When adding a method to `FcitxAPI`, read the Kotlin incremental compilation
 trap in [pitfalls.md](pitfalls.md#kotlin-ic-and-interface-delegation) before building an APK.
 
 ## Versions and releases
@@ -175,7 +177,7 @@ trap in [pitfalls.md](pitfalls.md#kotlin-ic-and-interface-delegation) before bui
 
 | Workflow | When | Runs |
 |---|---|---|
-| `unit_test.yml` | push, PR | `:lib:ime-core:check`, dict-tool and eval tests, build-logic tests, `:app:testTextDebugUnitTest`, voice test compile, native host tests, Python tool tests (`lexicon/tools`, `lib/ime-eval/tools`), detekt, Kover reports, test failures annotated |
+| `unit_test.yml` | push, PR | `:lib:ime-core:check`, dict-tool and eval tests, build-logic tests, `:app:testTextDebugUnitTest`, voice test compile, sherpa-onnx's host tests, Python tool tests (`lexicon/tools`, `lib/ime-eval/tools`), detekt, Kover reports, test failures annotated |
 | `pull_request.yml` | PR | `assembleTextRelease` and `assembleVoiceRelease` on Ubuntu (unsigned) |
 | `engine_downloads.yml` | push to main changing `EngineDataPlugin.kt`, `HandwritingDataPlugin.kt`, `lib/handwriting/build.gradle.kts` or the workflow; Mon/Thu 04:41; on demand | the engine data's download tasks alone (the handwriting models and onnxruntime too, a cache of their own), saving the `engine-downloads-*` cache a new pull request's build reads |
 | `emulator_test.yml` | weekly, and PRs labelled `emulator` | instrumented tests (`FcitxTest`, `SoftKeyboardTest` …) for Text and Voice on an API 35 emulator |

@@ -5,25 +5,41 @@
 import com.android.build.api.dsl.ApplicationExtension
 import com.android.build.api.variant.ApplicationAndroidComponentsExtension
 import com.android.build.api.variant.FilterConfiguration.FilterType
+import org.gradle.api.Plugin
 import org.gradle.api.Project
 import org.gradle.kotlin.dsl.configure
 
+/**
+ * An app that packs the native libraries of its library modules (handwriting, sherpa-onnx) and has
+ * none of its own to build: an APK per ABI, each with its own version code.
+ */
 @Suppress("unused")
-class NativeAppConventionPlugin : NativeBaseConventionPlugin() {
+class NativeAppConventionPlugin : Plugin<Project> {
 
     override fun apply(target: Project) {
-        super.apply(target)
-
         target.pluginManager.apply(target.libs.plugins.android.application.get().pluginId)
 
+        // split apks should be disabled when building bundle
+        // https://issuetracker.google.com/issues/402800800
+        val isBuildingBundle = target.rootProject.gradle.startParameter.taskNames.any {
+            it.startsWith("${target.path}:bundle")
+        }
         target.extensions.configure<ApplicationExtension> {
+            ndkVersion = target.ndkVersion
+            if (!isBuildingBundle) {
+                splits.abi {
+                    isEnable = true
+                    isUniversalApk = false
+                    reset()
+                    (target.buildAbiOverride?.split(",") ?: Versions.supportedABIs).forEach {
+                        include(it)
+                    }
+                }
+            }
             packaging {
                 jniLibs {
                     useLegacyPackaging = true
                 }
-            }
-            buildFeatures {
-                prefab = true
             }
         }
 

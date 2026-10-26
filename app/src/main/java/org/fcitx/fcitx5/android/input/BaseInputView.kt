@@ -16,6 +16,7 @@ import android.widget.ArrayAdapter
 import android.widget.FrameLayout
 import android.widget.ListAdapter
 import android.widget.ListPopupWindow
+import androidx.annotation.VisibleForTesting
 import androidx.constraintlayout.widget.ConstraintLayout
 import androidx.core.text.bold
 import androidx.core.text.buildSpannedString
@@ -96,7 +97,8 @@ abstract class BaseInputView(
         fcitx.runIfReady { triggerCandidateAction(idx, actionIdx, text) }
     }
 
-    private var candidateActionMenu: ListPopupWindow? = null
+    @VisibleForTesting
+    internal var candidateActionMenu: ListPopupWindow? = null
 
     val themedContext = context.withTheme(R.style.Theme_InputViewTheme)
 
@@ -388,21 +390,22 @@ abstract class BaseInputView(
         // in case navigation bar insets goes wrong (eg. on LineageOS 21+ with gesture navigation)
         // use mandatory system gesture insets
         val mandatory = insets.getInsets(WindowInsetsCompat.Type.mandatorySystemGestures())
+        val gesturesBottom = insets.getInsets(WindowInsetsCompat.Type.systemGestures()).bottom
+        val frame = context.navbarFrameHeight()
         var insetsBottom = max(navBars.bottom, mandatory.bottom)
         if (insetsBottom <= 0) {
             // check system gesture insets and fallback to navigation_bar_frame_height just in case
-            val gesturesBottom = insets.getInsets(WindowInsetsCompat.Type.systemGestures()).bottom
             if (gesturesBottom > 0) {
-                insetsBottom = max(gesturesBottom, context.navbarFrameHeight())
+                insetsBottom = max(gesturesBottom, frame)
             }
         }
         // some ROMs hiding the gesture line still report it, leaving a blank strip under the
         // keyboard: the raw values go to the log a user exports, once each time they change
         val seen = listOf(
             navBars.bottom, mandatory.bottom,
-            insets.getInsets(WindowInsetsCompat.Type.systemGestures()).bottom,
+            gesturesBottom,
             insets.getInsets(WindowInsetsCompat.Type.tappableElement()).bottom,
-            context.navbarFrameHeight(), insetsBottom,
+            frame, insetsBottom,
         )
         if (seen != loggedInsets) {
             loggedInsets = seen

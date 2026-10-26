@@ -62,7 +62,7 @@ android {
                     "-DANDROID_STL=c++_shared",
                     "-DORT_DIR=${onnxruntimeDir.get().asFile.absolutePath}",
                 )
-                targets("youmo-handwriting")
+                targets("youmo-handwriting", "youmo-matrix")
             }
         }
     }

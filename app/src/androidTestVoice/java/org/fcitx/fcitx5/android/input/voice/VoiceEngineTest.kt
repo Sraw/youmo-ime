@@ -169,7 +169,7 @@ class VoiceEngineTest {
     // split: TextWords.boundaries in place of the engine's
     private fun hear(hotwords: VoiceHotwords.Words, split: (String) -> IntArray = { IntArray(0) }): List<String> {
         val recognizer = VoiceEngine.acquire(app.assets)
-        val vad = VoiceEngine.vad(app.assets)
+        val vad = VoiceEngine.takeVad(app.assets)
         val history = VoiceEngine.history()
         val texts = mutableListOf<String>()
         try {

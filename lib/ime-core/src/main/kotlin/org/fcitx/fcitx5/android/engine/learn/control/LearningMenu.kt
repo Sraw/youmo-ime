@@ -70,6 +70,12 @@ object LearningMenu {
         FIRST_HERE,
         ACROSS,
         USED,
+
+        /** No lower than second: picked over the first under its 简拼 (U-20, D32 B). */
+        FLOORED,
+
+        /** Up to third: used typed in full on this keyboard (U-20, D32 B). */
+        LIFTED,
         MINE,
         IMPORTED,
         DICTIONARY,
@@ -97,6 +103,8 @@ object LearningMenu {
         HabitRanker.Tier.FIRST_HERE -> Reason.FIRST_HERE
         HabitRanker.Tier.ACROSS -> Reason.ACROSS
         HabitRanker.Tier.USED -> Reason.USED
+        HabitRanker.Tier.FLOORED -> Reason.FLOORED
+        HabitRanker.Tier.LIFTED -> Reason.LIFTED
         HabitRanker.Tier.MINE -> Reason.MINE
         HabitRanker.Tier.IMPORTED -> Reason.IMPORTED
         HabitRanker.Tier.DICTIONARY -> Reason.DICTIONARY

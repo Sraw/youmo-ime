@@ -39,6 +39,20 @@ class MainTest {
     }
 
     @Test
+    fun openccTakesS2twsDictionariesInTheirOrderOnly() {
+        // F3929: by position, STCharacters before STPhrases would compile and convert char by char
+        val phrases = file("STPhrases.txt", "头发\t頭髮")
+        val chars = file("STCharacters.txt", "发\t發 髮")
+        val variants = file("TWVariants.txt", "线\t線")
+        val output = tmp.root.resolve("opencc.data").path
+        val (code, _, err) = run("opencc", "-o", output, chars, phrases, variants)
+        assertEquals(1, code)
+        assertTrue(err, "STPhrases.txt STCharacters.txt TWVariants.txt in that order" in err)
+        assertFalse(File(output).exists())
+        assertEquals(0, run("opencc", "-o", output, phrases, chars, variants).first)
+    }
+
+    @Test
     fun pinyinDataIsCompiledAndChecksOutAgainstItsModel() {
         val lm = file("lm.arpa", ReadersTest.TINY_ARPA)
         val dict = file("dict.txt", "你\tni\t0\n好 hao\n你好 ni'hao\n嗯 xyz\n")

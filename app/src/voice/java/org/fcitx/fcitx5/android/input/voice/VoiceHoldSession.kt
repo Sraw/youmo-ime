@@ -7,6 +7,7 @@ package org.fcitx.fcitx5.android.input.voice
 import android.os.Handler
 import android.os.Looper
 import androidx.annotation.StringRes
+import androidx.annotation.VisibleForTesting
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.daemon.FcitxConnection
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
@@ -27,6 +28,12 @@ class VoiceHoldSession(
     private val commit: (String) -> Unit,
 ) {
     interface Ui {
+        /** the microphone really on (its first sample not zero): 正在听 and a short vibration, 准备中 before */
+        fun ready()
+
+        /** 2 s of zeroes, none other yet: 麦克风没有声音 until [ready] */
+        fun silent()
+
         /** what was said so far, as it will be typed */
         fun heard(text: String)
 
@@ -46,9 +53,13 @@ class VoiceHoldSession(
     // the field it is said for
     private val field = service.currentInputEditorInfo
     private val main = Handler(Looper.getMainLooper())
-    private var listener: VoiceListener? = null
+    private var listener: Listening? = null
 
     var over = false
+        private set
+
+    /** ended by the 15 s give-up, not by the recognizer: the panel's waiting Enter is dropped (VoiceTailEnter) */
+    var gaveUp = false
         private set
 
     /** lifted, the rest the recognizer's: the finger has nothing more to say */
@@ -56,6 +67,16 @@ class VoiceHoldSession(
 
     private val events = object : VoiceListener.Events {
         override fun loaded() = Unit
+
+        // lifted already (识别中… showing), or over: nothing to tell
+        override fun ready() {
+            if (!over && !hold.released) ui.ready()
+        }
+
+        override fun silent() {
+            if (!over && !hold.released) ui.silent()
+        }
+
         override fun speechStarted() = Unit
         override fun speechEnded() = Unit
 
@@ -76,12 +97,12 @@ class VoiceHoldSession(
 
     /** The press: the microphone opens now, the models load meanwhile. */
     fun begin() {
-        listener = VoiceListener(
+        listener = (listening?.invoke(events) ?: VoiceListener(
             service.assets,
             events,
             hotwords = { VoiceEngine.userHotwords(fcitx, habits = AppPrefs.getInstance().internal.useHabits.getValue()) },
             language = VoiceEngine.language(fcitx),
-        ).also {
+        )).also {
             it.load()
             it.start()
         }
@@ -92,7 +113,8 @@ class VoiceHoldSession(
         if (!over && hold.moved(dx, dy)) ui.zone(hold.zone == VoiceHold.Zone.Cancel)
     }
 
-    fun lift() {
+    /** The finger up at [at] (its event's uptime, ms): the tail after it counts from there. */
+    fun lift(at: Long) {
         if (over || hold.released) return
         if (!hold.release()) {
             end(null)
@@ -100,8 +122,11 @@ class VoiceHoldSession(
         }
         ui.recognizing()
         // the models not coming in, or a stretch not coming back: not waiting for good
-        main.postDelayed({ end(R.string.voice_hold_nothing) }, FINISH_MS)
-        listener?.finish {
+        main.postDelayed({
+            gaveUp = true
+            end(R.string.voice_hold_nothing)
+        }, FINISH_MS)
+        listener?.finish(at) {
             // still the field it was said for: not text landing somewhere else
             val text = VoiceCommit.typed(
                 hold.text,
@@ -109,12 +134,22 @@ class VoiceHoldSession(
                 passwordField = service.inPasswordField,
             )
             if (text != null) {
+                // commit before end: the panel's waiting Enter goes out from Ui.ended, after the
+                // text's own fcitx job (VoiceWindow, VoiceTailEnter); ended first, it would beat the text
                 commit(text)
                 end(null)
             } else {
                 end(R.string.voice_hold_nothing)
             }
         }
+    }
+
+    /**
+     * A new press after the lift (the user's rule): the tail ends now, what was said is still
+     * typed, the press itself counts for nothing. Recognizing already, it changes nothing.
+     */
+    fun pressedAgain() {
+        if (!over && hold.released) listener?.cut()
     }
 
     /** Dropped, whatever was heard: another field, the keyboard gone, the touch taken away. */
@@ -129,7 +164,27 @@ class VoiceHoldSession(
         ui.ended(message)
     }
 
+    /** What [VoiceListener] is to a session: the microphone, the VAD and the recognizer behind [VoiceListener.Events]. */
+    interface Listening {
+        fun load()
+        fun start()
+        /** the microphone closed a tail after [liftedAt] (uptime, ms), what was heard typed, then [done] */
+        fun finish(liftedAt: Long, done: () -> Unit)
+
+        /** the microphone closed now, what was heard still recognized */
+        fun cut()
+        fun close()
+    }
+
     companion object {
+        /**
+         * The JVM's UAT tests' recognizer: what is heard told straight to the events, the chain
+         * after the recognizer (VoiceHold, VoiceText, VoiceCommit, the commit) the app's own.
+         * sherpa-onnx and the microphone are a device's.
+         */
+        @VisibleForTesting
+        internal var listening: ((VoiceListener.Events) -> Listening)? = null
+
         private const val FINISH_MS = 15_000L
 
         /** how long a message shows before the hold's view goes */

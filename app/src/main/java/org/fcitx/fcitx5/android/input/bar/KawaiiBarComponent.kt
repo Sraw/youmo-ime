@@ -33,6 +33,8 @@ import org.fcitx.fcitx5.android.data.clipboard.db.ClipboardEntry
 import org.fcitx.fcitx5.android.data.pinyin.MergedDictionary
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.prefs.ManagedPreference
+import org.fcitx.fcitx5.android.data.prefs.PinyinKeyboard
+import org.fcitx.fcitx5.android.data.prefs.ShuangpinKeyboard
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.input.bar.ExpandButtonStateMachine.State.ClickToAttachWindow
 import org.fcitx.fcitx5.android.input.bar.ExpandButtonStateMachine.State.ClickToDetachWindow
@@ -304,7 +306,7 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
             hideKeyboardButton.apply {
                 setOnClickListener(hideKeyboardCallback)
                 swipeEnabled = true
-                swipeThresholdY = dp(HEIGHT.toFloat())
+                swipeThresholdY = dp(heightDp().toFloat())
                 swipeThresholdX = swipeThresholdY
                 onGestureListener = swipeHideKeyboardCallback
             }
@@ -365,7 +367,7 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
         CandidateUi(context, theme, horizontalCandidate.view).apply {
             expandButton.apply {
                 swipeEnabled = true
-                swipeThresholdY = dp(HEIGHT.toFloat())
+                swipeThresholdY = dp(heightDp().toFloat())
                 onGestureListener = swipeDownExpandCallback
                 // with candidates or predictions shown the bar has no ⌄ of its own: this one hides
                 // the keyboard when held, as the swipe down does
@@ -476,6 +478,8 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
         }
         // nothing said out loud goes into a password
         idleUi.voiceButton.isVisible = VoiceFeature.AVAILABLE && !service.inPasswordField
+        // the first hold of a process finds its VAD made (the start's latency)
+        if (idleUi.voiceButton.isVisible) VoiceFeature.shown(context)
         evalIdleUiState()
     }
 
@@ -523,7 +527,7 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
     }
 
     private val suggestionSize by lazy {
-        Size(ViewGroup.LayoutParams.WRAP_CONTENT, context.dp(HEIGHT))
+        Size(ViewGroup.LayoutParams.WRAP_CONTENT, context.dp(heightDp()))
     }
 
     private val directExecutor by lazy {
@@ -584,8 +588,17 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
     }
 
     companion object {
-        /** The bar's height in dp, from 候选字号; the input view is made anew when that changes. */
-        val HEIGHT: Int get() = CandidateBarHeight.dp(ThemeManager.prefs.candidateTextSize.getValue())
+        /**
+         * The bar's height in dp, from 候选字号 (a preference read, so read once a view); the input
+         * view is made anew when that changes.
+         */
+        fun heightDp(): Int = CandidateBarHeight.dp(ThemeManager.prefs.candidateTextSize.getValue())
+
+        /** A candidate's side padding in dp, from 候选字号 ([CandidateSpacing]). */
+        fun candidatePaddingDp(): Int = CandidateSpacing.paddingDp(ThemeManager.prefs.candidateTextSize.getValue())
+
+        /** A bar button's width in dp: the bar's height, never under [MIN_TOUCH_DP]. */
+        fun buttonWidthDp(): Int = maxOf(heightDp(), MIN_TOUCH_DP)
 
         /**
          * The row above the bar where the code being typed shows ([PreeditComponent]), in dp: the
@@ -593,6 +606,20 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
          * typed, so the keyboard keeps its height and the app does not jump.
          */
         const val PREEDIT_HEIGHT = 18
+
+        /**
+         * The code row's height in dp ([PREEDIT_HEIGHT]), and [MIN_TOUCH_DP] where pinyin's keyboard
+         * is the 14 keys or 双拼's the 18, whose syllables are tapped on it (九键双拼's are in its
+         * column). The same for every input method (the user, 2026-10-25): the keyboard never jumps
+         * from one to the next; the input view is made anew when either setting changes.
+         */
+        fun preeditHeight(): Int = AppPrefs.getInstance().keyboard.let {
+            preeditHeight(it.pinyinKeyboard.getValue(), it.shuangpinKeyboard.getValue())
+        }
+
+        /** [preeditHeight] for pinyin's keyboard [pinyin] and 双拼's [shuangpin]. */
+        fun preeditHeight(pinyin: PinyinKeyboard, shuangpin: ShuangpinKeyboard = ShuangpinKeyboard.Full): Int =
+            if (pinyin == PinyinKeyboard.Keys14 || shuangpin == ShuangpinKeyboard.Keys18) MIN_TOUCH_DP else PREEDIT_HEIGHT
 
         /** The bar's buttons are never narrower than this, in dp, however short 候选字号 makes the bar. */
         const val MIN_TOUCH_DP = 40

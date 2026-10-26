@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.engine.data
 
+import org.fcitx.fcitx5.android.engine.assertRows
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -266,5 +267,23 @@ class DataFileTest {
 
     private companion object {
         const val KIND_VERSION = 3
+    }
+
+    // what MergedDictionary reads to tell 0.3.2's dictionary from a damaged one, without mapping 52 MB
+    @Test
+    fun theKindsVersionIsPeekedFromTheHeaderAloneOrNullForAnythingElse() {
+        val ours = sample()
+        val otherContainer = sample().also { ByteBuffer.wrap(it).order(ByteOrder.LITTLE_ENDIAN).putInt(8, DataFile.VERSION + 1) }
+        val rows = listOf(
+            Triple("this container: the kind's version, however damaged the sections", ours.copyOf(ours.size - 1), KIND_VERSION),
+            Triple("another container version: not ours to read", otherContainer, null),
+            Triple("not an engine data file", ByteArray(64) { 'x'.code.toByte() }, null),
+            Triple("shorter than a header", ours.copyOf(23), null),
+        )
+        assertRows(rows, { it.first }) { (_, bytes, expected) ->
+            val file = File.createTempFile("peek", ".data").apply { deleteOnExit(); writeBytes(bytes) }
+            assertEquals(expected, DataFile.peekKindVersion(file))
+        }
+        assertEquals(null, DataFile.peekKindVersion(File("/nonexistent/peek.data")))
     }
 }

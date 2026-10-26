@@ -10,7 +10,7 @@ import org.fcitx.fcitx5.android.engine.pinyin.UserLatinWords
 import org.fcitx.fcitx5.android.engine.user.UserModel
 
 /**
- * U-31 §3 (EN-24): the English words English learned, its dictionary's aside ([englishHas]), typed
+ * U-31 §3 (原 EN-24): the English words English learned, its dictionary's aside ([englishHas]), typed
  * in 全拼's 中英混输 as the dictionary's Latin words are (youmo): listed in the user's model and
  * spelled by [words]. Made again as English's words change ([LearnState.englishVersion], not at
  * each pinyin commit: review-uat-fixes S9), before a key of 全拼's.

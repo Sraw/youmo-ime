@@ -13,6 +13,8 @@ import org.fcitx.fcitx5.android.engine.learn.Habits
 import org.fcitx.fcitx5.android.engine.learn.Han
 import org.fcitx.fcitx5.android.engine.learn.HabitRanker
 import org.fcitx.fcitx5.android.engine.learn.HabitRanker.Tier
+import org.fcitx.fcitx5.android.engine.learn.Kinds
+import org.fcitx.fcitx5.android.engine.learn.SpelledForm
 import org.fcitx.fcitx5.android.engine.learn.Word
 import org.fcitx.fcitx5.android.engine.learn.Words
 import org.fcitx.fcitx5.android.engine.pinyin.LatinWords
@@ -89,6 +91,7 @@ internal class HabitOrder(
         override fun firstUse(code: Code, words: Words) = habits.firstUse(code, words)
         override fun mineOrder(text: String) = habits.mineOrder(text).takeIf { it >= 0 } ?: addedOrder[text]?.let { HAND + it } ?: -1L
         override fun importOrder(text: String) = habits.importOrder(text)
+        override fun spelled(kind: String, words: Words) = habits.spelled(kind, words)
     }
 
     /**
@@ -121,13 +124,15 @@ internal class HabitOrder(
         val pinned = habits.pinned(code)
         val firstHere = habits.first(code, prev)
         val used = habits.used(code)
-        val habitsHere = pinned != null || firstHere != null || used.isNotEmpty()
+        // the words this keyboard's other spellings of the code raise here (U-20, D32 B), read so
+        val spelled = spelledHere(code)
+        val habitsHere = pinned != null || firstHere != null || used.isNotEmpty() || spelled.isNotEmpty()
         if (habitsOnly && !habitsHere) return null
         val injected = ArrayList<Candidate>()
         fun add(c: Candidate) {
             if (present.add(c.text)) injected += c
         }
-        for (w in listOfNotNull(pinned, firstHere) + used) if (w.text !in present) walk(graph, end, w)?.let(::add)
+        for (w in listOfNotNull(pinned, firstHere) + used + spelled) if (w.text !in present) walk(graph, end, w)?.let(::add)
         // the user's own words and those added by hand the input reads here: theirs under every code; those imported, in their slot
         val user = user
         if (user != null && !habitsOnly) {
@@ -142,6 +147,17 @@ internal class HabitOrder(
                 .take(IMPORTS_PER_LEVEL).forEach { add(it.first) }
         }
         return Level(end, code, prev, injected.map { Candidate(it.text, it.end, low, it.words, it.ends) }, habitsHere)
+    }
+
+    // those of the code's keyboard and first key whose counts across its spellings move them under it
+    private fun spelledHere(code: Code): List<Words> {
+        val first = code.keys.firstOrNull { it != '\'' } ?: return emptyList()
+        return habits.spelledFrom(code.kind, first).filter { w ->
+            val form = SpelledForm.of(code.kind, code.keys, w.reading) ?: return@filter false
+            if (!SpelledForm.spells(Kinds.keyboard(code.kind), code.keys, w.reading)) return@filter false
+            val s = habits.spelled(code.kind, w)
+            (form != SpelledForm.INITIALS && s.initialsCorrections > 0) || (form != SpelledForm.FULL && s.fullUses >= HabitRanker.FULL_USES)
+        }
     }
 
     /**

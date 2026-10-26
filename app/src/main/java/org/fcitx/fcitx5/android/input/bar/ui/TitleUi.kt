@@ -46,8 +46,8 @@ class TitleUi(override val ctx: Context, theme: Theme) : Ui {
 
     // as tall as the bar (候选字号), so nothing is cut at a small size; the button never narrower
     // than a 40 dp touch target
-    private val barHeight = ctx.dp(KawaiiBarComponent.HEIGHT)
-    private val buttonWidth = ctx.dp(maxOf(KawaiiBarComponent.HEIGHT, KawaiiBarComponent.MIN_TOUCH_DP))
+    private val barHeight = ctx.dp(KawaiiBarComponent.heightDp())
+    private val buttonWidth = ctx.dp(KawaiiBarComponent.buttonWidthDp())
 
     override val root = constraintLayout {
         add(backButton, lParams(buttonWidth, barHeight) {

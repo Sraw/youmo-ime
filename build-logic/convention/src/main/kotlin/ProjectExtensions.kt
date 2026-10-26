@@ -7,7 +7,6 @@ import com.android.build.api.dsl.ApkSigningConfig
 import org.gradle.accessors.dm.LibrariesForLibs
 import org.gradle.api.NamedDomainObjectContainer
 import org.gradle.api.Project
-import org.gradle.api.Task
 import org.gradle.kotlin.dsl.the
 import java.io.File
 import java.nio.file.Files
@@ -28,12 +27,6 @@ fun Project.runCmd(cmd: String, defaultValue: String = ""): String {
 }
 
 val Project.libs get() = the<LibrariesForLibs>()
-
-val Project.assetsDir: File
-    get() = file("src/main/assets").also { it.mkdirs() }
-
-val Project.cleanTask: Task
-    get() = tasks.getByName("clean")
 
 val Project.cmakeVersion
     get() = ep("CMAKE_VERSION", "cmakeVersion") { Versions.defaultCMake }

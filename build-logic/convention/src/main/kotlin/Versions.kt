@@ -7,13 +7,12 @@ import org.gradle.api.JavaVersion
 
 object Versions {
 
-    val java = JavaVersion.VERSION_11
+    val java = JavaVersion.VERSION_21
     const val compileSdk = 36
     const val minSdk = 29
     const val targetSdk = 36
 
-    // the translations the app ships (gettext's names), English being the source: here once for
-    // the app's resources (localeFilters) and fcitx's catalogs (FcitxComponentPlugin)
+    // the translations the app ships, English being the source (the app's localeFilters)
     val translations = listOf("zh_CN", "zh_TW")
 
     const val defaultCMake = "3.31.6"
@@ -21,7 +20,7 @@ object Versions {
     const val defaultBuildTools = "36.1.0"
 
     // NOTE: raise this for a release; the version code follows it (versionCodeOf)
-    const val baseVersionName = "0.3.2"
+    const val baseVersionName = "0.4.0"
     val baseVersionCode = versionCodeOf(baseVersionName)
 
     private val abiIds = mapOf("armeabi-v7a" to 1, "arm64-v8a" to 2, "x86" to 3, "x86_64" to 4)

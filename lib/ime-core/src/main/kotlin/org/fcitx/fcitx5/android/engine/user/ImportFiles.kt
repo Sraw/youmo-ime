@@ -77,6 +77,20 @@ object ImportFiles {
             }
         }
 
+        /**
+         * [bytes] as scel2org5 wrote it for the pinyin dictionary import (`scel2org5 -o`): a line
+         * `词\tpin'yin\t0` per word (`scel2org5.cpp:447`), in the file's order, into [out].
+         *
+         * @throws IOException as [read], or as [out] throws
+         */
+        @Throws(IOException::class)
+        fun writeTextDictionary(bytes: ByteArray, out: Appendable) =
+            read(bytes) { out.append(it.text).append('\t').append(it.pinyin).append("\t0\n") }
+
+        /** [writeTextDictionary] into a String. */
+        @Throws(IOException::class)
+        fun textDictionary(bytes: ByteArray): String = StringBuilder().also { writeTextDictionary(bytes, it) }.toString()
+
         // every read is relative or checked: a file cut short, or not as it should be, underflows
         private fun read(buffer: ByteBuffer, sink: (Word) -> Unit) {
             buffer.seek(PHRASE_OFFSET)

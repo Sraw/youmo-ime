@@ -40,11 +40,55 @@ object Kinds {
     /** 联想 picked, in any input method: keyed by the word it follows, by its text, never pinyin's order (review C S1). */
     const val PREDICTION = "pred"
     private const val TABLE = "tb:"
+    private const val SHUANGPIN = "sp:"
+    private const val KEYS = "qk:"
+    private const val SHUANGPIN_KEYS = "spk:"
 
-    fun shuangpin(scheme: String) = "sp:$scheme"
+    fun shuangpin(scheme: String) = "$SHUANGPIN$scheme"
     fun nineKeys(layout: String) = "t9:$layout"
     fun nineKeysMultiTap(layout: String) = "t9m:$layout"
+
+    /** A grouped keyboard's keys, [tag] its groups (NineKeyLetters.tag, `qw,er,…,m` the 14 keys'): apart from qp and t9. */
+    fun keys(tag: String) = "$KEYS$tag"
+
+    /**
+     * 双拼 on a grouped keyboard: [scheme] as [shuangpin]'s, [tag] the keys' (NineKeyLetters.G18
+     * or NINE_SP): apart from sp: and from each other, a scheme's keys meaning other syllables on
+     * each. Not under `sp:`: whatever asks whether a kind is 双拼's asks [isShuangpin].
+     */
+    fun shuangpinKeys(scheme: String, tag: String) = "$SHUANGPIN_KEYS$scheme:$tag"
+
+    /** Whether [kind] is 双拼's, on any keyboard ([shuangpin], [shuangpinKeys]): two keys a syllable. */
+    fun isShuangpin(kind: String) = kind.startsWith(SHUANGPIN) || kind.startsWith(SHUANGPIN_KEYS)
+
+    /** [kind]'s 双拼 scheme ([shuangpin], [shuangpinKeys]), or null for any other kind. */
+    fun shuangpinScheme(kind: String): String? = when {
+        kind.startsWith(SHUANGPIN_KEYS) -> kind.removePrefix(SHUANGPIN_KEYS).substringBefore(':')
+        kind.startsWith(SHUANGPIN) -> kind.removePrefix(SHUANGPIN)
+        else -> null
+    }
+
+    /**
+     * The layout a syllable taken from a bar ([Take]) of [kind] is kept under: a grouped 双拼
+     * kind's `<scheme>:<tag>`, its scheme's keys reading other syllables than another's; the
+     * keys' [tag] for any other (the nine keys', the 14 keys').
+     */
+    fun takeLayout(kind: String, tag: String) = if (kind.startsWith(SHUANGPIN_KEYS)) kind.removePrefix(SHUANGPIN_KEYS) else tag
+
+    /** The grouped keyboard's tag of a [keys] or [shuangpinKeys] kind, null for another kind. */
+    fun keysTag(kind: String): String? = when {
+        kind.startsWith(KEYS) -> kind.removePrefix(KEYS)
+        // a scheme's name has no colon (EngineSettings.SCHEMES), the tag no colon either
+        kind.startsWith(SHUANGPIN_KEYS) -> kind.substringAfter(':').substringAfter(':', "").ifEmpty { null }
+        else -> null
+    }
+
     fun table(im: String) = "$TABLE$im"
+
+    /** The keyboard [kind] is typed on: the nine keys' 连按 theirs (U-20 links the spellings of one keyboard). */
+    fun keyboard(kind: String) = if (kind.startsWith(NINE_MULTI_TAP)) "t9:" + kind.removePrefix(NINE_MULTI_TAP) else kind
+
+    private const val NINE_MULTI_TAP = "t9m:"
 
     /** The table input method a table's [kind] is of. */
     fun tableOf(kind: String) = kind.removePrefix(TABLE)
@@ -102,7 +146,7 @@ class Row(
     }
 }
 
-/** A syllable taken from the nine keys' bar, for its digits, that the commit kept. */
+/** A syllable taken from the nine keys' bar, for its digits, that the commit kept; [layout] as Kinds.takeLayout has it. */
 data class Take(val layout: String, val digits: String, val syllable: String)
 
 /** A first, the words corrected to since it was last used, the typing day last typed, and the commit that changed it last. */

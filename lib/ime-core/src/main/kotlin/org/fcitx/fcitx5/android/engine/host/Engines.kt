@@ -44,6 +44,8 @@ import org.fcitx.fcitx5.android.engine.learn.control.LearningOp
 import org.fcitx.fcitx5.android.engine.learn.control.LearningResult
 import org.fcitx.fcitx5.android.engine.phrase.CustomPhrases
 import org.fcitx.fcitx5.android.engine.phrase.PhraseBook
+import org.fcitx.fcitx5.android.engine.pinyin.GroupedShuangpinSegmenter
+import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
 import org.fcitx.fcitx5.android.engine.pinyin.PinyinSegmenter
 import org.fcitx.fcitx5.android.engine.pinyin.Segmenter
 import org.fcitx.fcitx5.android.engine.pinyin.ShuangpinScheme
@@ -107,7 +109,7 @@ class Engines(
     private val legacy: () -> LibimeImport.Legacy? = { null },
     private val additions: () -> Additions? = { null },
     private val kernel: MatrixKernel? = null,
-    private val warmUps: Executor = Executor { Thread(it, "engine-warm-up").apply { isDaemon = true }.start() },
+    warmUps: Executor = Executor { Thread(it, "engine-warm-up").apply { isDaemon = true }.start() },
     /** Whether the phone can draw an emoji: those it cannot are no candidates. */
     private val emojiShows: (String) -> Boolean = { true },
     /** Whether the phone can draw a text: a rare character it cannot is no candidate. */
@@ -122,8 +124,14 @@ class Engines(
     private val legacyFiles: List<File> = emptyList(),
     /** What the older builds' learning's conversion did, for the app's log; [ConversionNote.Made] on a [warmUps] thread. */
     onConversion: (ConversionNote) -> Unit = {},
-    /** Monotonic milliseconds: how long typing has paused ([paused]). */
-    uptimeMillis: () -> Long = OwedConversion.UPTIME,
+    /** Monotonic milliseconds: how long typing has paused ([paused]), how soon a space follows a table's code that committed itself. */
+    private val uptimeMillis: () -> Long = OwedConversion.UPTIME,
+    /**
+     * The time and zone learning stamps its records with, its backups and imports dated by, and
+     * the spans the user clears (今天, the last hour) are read against: the device's, or a replay's,
+     * so the same keys learn the same way in a test as on the phone (design §7.2).
+     */
+    private val learnClock: LearnClock = LearnClock.System,
 ) : Closeable {
 
     /**
@@ -172,7 +180,10 @@ class Engines(
 
     // a thread for each compaction an append makes due, so a key does not wait on the disk: none
     // kept, so the logs opened again after close() still have one
-    private val compactions = Executor { Thread(it, "record-compaction").apply { isDaemon = true }.start() }
+    private val compactions = BackgroundWork.counted(Executor { Thread(it, "record-compaction").apply { isDaemon = true }.start() })
+
+    // counted for the debug build's idle signal (BackgroundWork)
+    private val warmUps = BackgroundWork.counted(warmUps)
 
     private val lexicon: UserLexicon = UserLexicon(
         userDir, onError, legacy, additions, assets,
@@ -186,9 +197,10 @@ class Engines(
     )
 
     // the imported words (U-101): in the learning record, told to the user model
-    private val imports = ImportLayer(::learnLog, { lexicon.user() }, { lexicon.isBlockedWord(it) }, ::dropSessions)
+    private val imports = ImportLayer(::learnLog, { lexicon.user() }, { lexicon.isBlockedWord(it) }, ::dropSessions, learnClock)
 
-    private val tables = TableRegistry(load, userDir, onError, compactions, warmUps, assets, lexicon,
+    // `this.`: in an initializer the bare name is the constructor's uncounted executor.
+    private val tables = TableRegistry(load, userDir, onError, compactions, this.warmUps, assets, lexicon,
         knows = { habits.knows(it) }, recorded = { learnLog().onDisk }, beforeOpen = { learnLog() },
         indexes = lexicon::indexes)
 
@@ -210,7 +222,7 @@ class Engines(
     // internal: a test reaches the record opened as its first use opens it (EnginesRecordFaultTest)
     internal fun learnLog(): LearnLog = learnLog ?: run {
         val legacy = userDir?.let { dir -> legacyConversion(dir, lexicon::legacyModel, lexicon.phrases().offered(builtIns = false)) }
-        val log = LearnLog(userDir?.let { File(it, LearnLog.FILE) }, onError = onError, background = compactions)
+        val log = LearnLog(userDir?.let { File(it, LearnLog.FILE) }, learnClock, onError = onError, background = compactions)
         learnLog = log
         try {
             // a clear killed before it said in the marker that it deleted the older builds' files
@@ -235,10 +247,10 @@ class Engines(
     private fun notOpened(log: LearnLog, e: Exception) {
         onError(IOException("the learning record not opened", e))
         runCatching { log.close() }
-        learnLog = LearnLog(null, onError = onError)
+        learnLog = LearnLog(null, learnClock, onError = onError)
     }
 
-    private val owed = OwedConversion(warmUps, onError, onConversion, uptimeMillis)
+    private val owed = OwedConversion(this.warmUps, onError, onConversion, uptimeMillis)
 
     // the phrases of the pins converted looked at this run: see movePins
     private var pinsMoved = false
@@ -291,7 +303,7 @@ class Engines(
     // the learning backups (U-100, U-106; impl/streams/D-design.md): made every few typing days and when asked, listed, merged in when restored
     private val backups: BackupControl = BackupControl(
         Backups(userDir?.let { File(it, Backups.DIR) }, Backups.installId(installFile, onError), onError, compactions),
-        LearnClock.System,
+        learnClock,
         appVersion,
         state = { learnLog().state },
         lists = { listed(UserWord.Kind.ADDED) to listed(UserWord.Kind.BLOCKED) },
@@ -334,7 +346,7 @@ class Engines(
         userDir, onError,
         read = { dir ->
             val conversion = legacyConversion(dir, { lexicon.legacyModel(File(dir, USER_PINYIN)) }, null)
-            RestoreStash.read(dir, { conversion.into(it, LearnClock.System) }, onError)
+            RestoreStash.read(dir, { conversion.into(it, learnClock) }, onError)
         },
         // the older build's learning made in first: the copy for 退回恢复前 has it (a revert keeps it).
         // Made here, at the start, on this thread (seconds for a heavy user, the background one begun
@@ -356,13 +368,13 @@ class Engines(
     private fun predictionOff(prev: String, next: String) = learnLog?.state?.noPredict?.contains(prev to next) == true
 
     // the user's acts on what was learned (impl/streams/E-design.md): the older builds' pinyin log goes with what is cleared
-    private val control = LearningControl(::learnLog, legacy = { userDir?.let(LegacyConversion::retired).orEmpty() + legacyFiles }, onError = onError)
+    private val control = LearningControl(::learnLog, learnClock, legacy = { userDir?.let(LegacyConversion::retired).orEmpty() + legacyFiles }, onError = onError)
 
     private val learning by lazy(LazyThreadSafetyMode.NONE) {
         LearningOps(
-            sessions::get, lexicon, ::learnLog, control,
+            { sessions[pairs.shownSession(it)] }, lexicon, ::learnLog, control,
             habits = { useHabits }, useHabits = { useHabits = it }, dropSessions = ::dropSessions,
-            first = { keyboards[it]?.first ?: 0 }, tableForgets = { tables.forgets },
+            first = { keyboards[pairs.shownSession(it)]?.first ?: 0 }, tableForgets = { tables.forgets },
             // a clear forgets the backups that hold what it clears first, and saves one of what is left after (C25)
             backups = backups, backup = backups::run, restoreCorrection = ::restoreEnglishCorrection,
             clearTables = tables::clearSaved, resetTableOrder = ::resetTableOrder,
@@ -387,8 +399,12 @@ class Engines(
      * press's event for the candidate at an index, as it always did, so it shows the list left
      * (the addon's; by default the keyboard's here).
      */
-    fun learning(im: String?, op: LearningOp, act: (event: Int, index: Int) -> Boolean = { event, index -> im?.let { keyboards[it] }?.onEvent(event, index) != null }): LearningResult =
+    fun learning(im: String?, op: LearningOp, act: (event: Int, index: Int) -> Boolean = { event, index -> pressShown(im, event, index) }): LearningResult =
         withConversionMade(OwedConversion.readsTheWhole(op)) { learning.apply(im, op, act) }
+
+    // the long press's event for the keyboard [im] shows; false with none made, where a pair would
+    // make one just to take it
+    internal fun pressShown(im: String?, event: Int, index: Int): Boolean = im?.takeIf { keyboards.containsKey(pairs.shownSession(it)) }?.let { pairs[it]?.onEvent(event, index) ?: keyboards[it]?.onEvent(event, index) } != null
 
     // [method]'s options as [s] sets them: what 与 X 同码 checks is what the session offers
     private fun tableOptions(method: TableMethod, s: EngineSettings): TableOptions = s.tables[method.group]?.applyTo(method.options) ?: method.options
@@ -648,6 +664,7 @@ class Engines(
     private fun dropSessions() {
         (sessions[HANDWRITING] as? HandwritingSession)?.let { inkEndedBefore = maxOf(inkEndedBefore, it.latestPiece) }
         keyboards.clear()
+        pairs.values.forEach(KeyboardPair::drop)
         sessions.clear()
         coarseWords = null
         assets.dropDecoderExtensions()
@@ -673,14 +690,19 @@ class Engines(
     fun onEvent(im: String, event: Int, arg: Int, learning: Boolean = true): Snapshot {
         owed.keyed()
         if (im == PINYIN) syncLatin()
-        val keyboard = keyboards[im] ?: Keyboard(session(im), nineKeys = im == T9).also {
-            keyboards[im] = it
-            // one made after the field's context (its first key, sessions made anew): the field's flags all
-            // the same, its text not known as a context would make it (review-int S5)
-            if (fieldFlags != 0) it.fieldFlags(fieldFlags)
-        }
-        return keyboard.onEvent(event, arg, learning)
+        return pairs[im]?.onEvent(event, arg, learning) ?: keyboard(im).onEvent(if (event == EngineEvent.HARD_CHAR) EngineEvent.CHAR else event, arg, learning)
     }
+
+    private fun keyboard(im: String): Keyboard = keyboards[im] ?: Keyboard(session(im), nineKeys = im == T9 || im in KeyboardPair.KEYED).also {
+        keyboards[im] = it
+        // one made after the field's context (its first key, sessions made anew): the field's flags all
+        // the same, its text not known as a context would make it (review-int S5)
+        if (fieldFlags != 0) it.fieldFlags(fieldFlags)
+    }
+
+    // pinyin's and 双拼's keyboards: grouped keys' codes each to a session of their own, made at the first (design
+    // §1.3, §1.4); a pair's sessionOf is the session an input method's candidates are now of
+    private val pairs = mapOf(PINYIN to KeyboardPair.pinyin(::keyboard), SHUANGPIN to KeyboardPair.shuangpin(::keyboard) { settings.scheme })
 
     /**
      * What learning leaves out in the field now ([Action.Context.learnFlags]), as its last [context]
@@ -718,11 +740,13 @@ class Engines(
         if (im in TABLES) tables.prepare(im)
         fieldFlags = learnFlags
         var offers = false
-        for ((name, keyboard) in keyboards) {
+        // pinyin's and 双拼's through their pairs, below
+        for ((name, keyboard) in keyboards.asSequence().filter { (n, _) -> n !in KeyboardPair.KEYED && n !in pairs }) {
             // only [im]'s: another's candidates would stay on show where nothing resets them, its contexts ignored
             val shows = keyboard.context(before, learning, cleared, learnFlags, started, after, selected, offers = name == im, said = said)
             if (name == im && shows && sessions[name] is EnglishSession) offers = true
         }
+        for ((name, pair) in pairs) pair.context(before, learning, cleared, learnFlags, started, after, selected, offers = im == name, said = said)
         return offers
     }
 
@@ -829,10 +853,10 @@ class Engines(
     val inkEnded: Int get() = (sessions[HANDWRITING] as? HandwritingSession)?.ended ?: inkEndedBefore
 
     /** Candidates of [im]'s input, from the [from]th, at most [count]; none if it has no session yet. */
-    fun candidates(im: String, from: Int, count: Int): List<Choice> = sessions[im]?.candidates(from, count).orEmpty()
+    fun candidates(im: String, from: Int, count: Int): List<Choice> = sessions[pairs.shownSession(im)]?.candidates(from, count).orEmpty()
 
     /** What a long press on the [index]th of [im]'s candidates offers; nothing if it has no session yet. */
-    fun offers(im: String, index: Int): Set<Offer> = sessions[im]?.offers(index).orEmpty()
+    fun offers(im: String, index: Int): Set<Offer> = sessions[pairs.shownSession(im)]?.offers(index).orEmpty()
 
     // each of [glides] made a GlideSession or an EnglishSession, which offerGlide hands the glide to
     private fun session(im: String): Session = sessions.getOrPut(im) {
@@ -847,6 +871,11 @@ class Engines(
                 val looked = ForgetsInTables(StrokeLookup(pinyin, assets::strokes, assets::charReading, s.pageSize, blocked = lexicon::isBlocked, follow = pinyin::follow, retype = pinyin::typeAll))
                 GlideSession(looked, syllableBoundary, blocked = glideHeldBack(), heldBack = heldBack(pinyin)) { g, n -> pinyinGlide.decode(g.path, g.layout, n) }
             }
+            // the 14 keys: no glide, nor 笔画查字 (u is on UI, no stroke key of its own). 简拼 only where nothing
+            // else is read, as on the nine keys. Top-1, both models on, the same samples (one exact reading each, so
+            // no 简拼 among them; 2026-10-25): full pinyin / 14 keys / nine keys 97.0 / 94.6 / 88.8% on pinyin.tsv's
+            // 429, 73.4 / 61.3 / 53.6% on chat's held-out 983. g14 and g14-strict alike there; strict is faster
+            PINYIN_KEYS -> ForgetsInTables(pinyinSession(T9Segmenter(s.fuzzy, abbreviations = false, letters = NineKeyLetters.G14), spell = true))
             ENGLISH -> {
                 val data = warmUpEnglish()
                 EnglishSession(data, pageSize = s.pageSize, user = if (useHabits) english.user() else EnglishUser.OFF, nineKeys = s.nineKeys)
@@ -877,6 +906,8 @@ class Engines(
                     heldBack = heldBack(pinyin),
                 ) { g, n -> pinyinGlide.decode(g.path, g.layout, n) }
             }
+            // the 18 keys and the nine keys: as the 14 keys, no glide nor 笔画查字; learned under spk: (CommitRecorder)
+            SHUANGPIN_KEYS18, SHUANGPIN_NINE -> ForgetsInTables(pinyinSession(GroupedShuangpinSegmenter(s.scheme, KeyboardPair.lettersOf(im), s.fuzzy, s.typos), spell = true, kind = Kinds.shuangpin(s.shuangpin)))
             SHUANGPIN -> {
                 val spelling = PinyinGlide.Spelling.shuangpin(s.scheme)
                 val pinyin = pinyinSession(ShuangpinSegmenter(s.scheme, s.fuzzy, s.typos), spell = true, kind = Kinds.shuangpin(s.shuangpin))
@@ -914,7 +945,7 @@ class Engines(
                 )
                 // a glide after a code typed picks its first candidate: the next code is the glide's
                 GlideSession(
-                    TableSession(table.dictionary, options, lookUp?.let(::ForgetsInTables), if (useHabits) table.user else TableUser(table.dictionary), sharedWords(table, im), language),
+                    TableSession(table.dictionary, options, lookUp?.let(::ForgetsInTables), if (useHabits) table.user else TableUser(table.dictionary), sharedWords(table, im), language, uptimeMillis),
                     between = Action.Pick(0),
                     blocked = glideHeldBack { false },
                 ) { g, n -> glide.decode(g.path, g.layout, n) }
@@ -1084,12 +1115,33 @@ class Engines(
         const val PINS_MOVED = "learn.pins-moved"
 
         const val PINYIN = "engine-pinyin"
+
+        /**
+         * Pinyin on the 14 keys: no fcitx input method, the session [PINYIN] hands the keys' codes
+         * to (NineKeyLetters.G14), named for what is not for it (InputMethodSettings' notFor). Never
+         * in an answer: the 14 keys' are [PINYIN]'s, the input method the router has active.
+         */
+        const val PINYIN_KEYS = "engine-pinyin#keys"
+
         const val SHUANGPIN = "engine-shuangpin"
+
+        /**
+         * 双拼 on the 18 keys and on the nine keys (NineKeyLetters.G18, NINE_SP): as [PINYIN_KEYS],
+         * sessions [SHUANGPIN] hands the keys' codes to, names for settings' "not for", never in an
+         * answer (those are [SHUANGPIN]'s).
+         */
+        const val SHUANGPIN_KEYS18 = "engine-shuangpin#keys18"
+        const val SHUANGPIN_NINE = "engine-shuangpin#nine"
 
         /** Pinyin on a phone's nine keys (九键). */
         const val T9 = "engine-t9"
 
         const val WUBI = "engine-wubi"
+
+        const val CANGJIE = "engine-cangjie"
+        const val ZIRANMA = "engine-ziranma"
+        const val ERBI = "engine-erbi"
+        const val WUBI_PINYIN = "engine-wubipinyin"
 
         /** Handwriting: characters written one at a time on a pad, read as a sentence. */
         const val HANDWRITING = "engine-handwriting"
@@ -1127,10 +1179,23 @@ class Engines(
             tableKeys: () -> Set<Char> = { emptySet() },
         ): Boolean = when (im) {
             T9 -> Character.isDigit(c) || separates(c, composing)
-            SHUANGPIN -> c <= Char.MAX_VALUE.code && scheme.types(c.toChar()) || separates(c, composing)
-            PINYIN -> separates(c, composing)
+            // the 18 keys' and the nine keys' codes too, never typed as they are
+            SHUANGPIN -> c <= Char.MAX_VALUE.code && scheme.types(c.toChar()) || readsCode(SHUANGPIN, c) || separates(c, composing)
+            // the 14 keys' codes: never typed as they are, nor reaching the field (design §1.2)
+            PINYIN -> readsCode(PINYIN, c) || separates(c, composing)
             // with nothing typed a table's is text, as ' is: through the table 二笔's / alone would be 、
             else -> composing && c <= Char.MAX_VALUE.code && c.toChar() in tableKeys()
+        }
+
+        /**
+         * Whether [im] reads the grouped keyboard code [c] (NineKeyLetters.ofCode): pinyin the 14
+         * keys', 双拼 the 18 keys' and the nine keys' 双拼's. A code is one keyboard's alone, so
+         * one another input method gets (the keyboard shown behind a switch) is dropped, never read.
+         */
+        fun readsCode(im: String, c: Int): Boolean = when (NineKeyLetters.ofCode(c)) {
+            null -> false
+            NineKeyLetters.G14 -> im == PINYIN
+            else -> im == SHUANGPIN
         }
 
         // with nothing typed ' is the app's: through the engine it would be a mark, ‘
@@ -1185,11 +1250,55 @@ class Engines(
         /** Each table input method. */
         val TABLES: Map<String, TableMethod> = mapOf(
             WUBI to TableMethod("wbx.data", "Wubi", TableOptions.WUBI, "wbx"),
-            "engine-cangjie" to TableMethod("cj.data", "Cangjie", TableOptions.CANGJIE, "cangjie"),
-            "engine-ziranma" to TableMethod("zrm.data", "Ziranma", TableOptions.ZIRANMA, "zrm"),
-            "engine-erbi" to TableMethod("erbi.data", "Erbi", TableOptions.ERBI, "erbi"),
-            "engine-wubipinyin" to TableMethod("wbpy.data", "WubiPinyin", TableOptions.WUBI_PINYIN, "wbpy"),
+            CANGJIE to TableMethod("cj.data", "Cangjie", TableOptions.CANGJIE, "cangjie"),
+            ZIRANMA to TableMethod("zrm.data", "Ziranma", TableOptions.ZIRANMA, "zrm"),
+            ERBI to TableMethod("erbi.data", "Erbi", TableOptions.ERBI, "erbi"),
+            WUBI_PINYIN to TableMethod("wbpy.data", "WubiPinyin", TableOptions.WUBI_PINYIN, "wbpy"),
         )
+
+        /**
+         * The input methods the host lists, in this order (`androidengine.cpp:337-358`, which the
+         * native addon had): what the input method page and the picker show of each, its icon,
+         * its language.
+         */
+        val LISTED: List<ListedInputMethod> = listOf(
+            ListedInputMethod(PINYIN, "拼", "拼音", "fcitx-pinyin", ListedInputMethod.CHINESE),
+            ListedInputMethod(SHUANGPIN, "双", "双拼", "fcitx-shuangpin", ListedInputMethod.CHINESE),
+            ListedInputMethod(T9, "九", "九键拼音", "fcitx-pinyin", ListedInputMethod.CHINESE),
+            ListedInputMethod(WUBI, "五", "五笔", "fcitx-wubi", ListedInputMethod.CHINESE),
+            ListedInputMethod(CANGJIE, "倉", "仓颉", "fcitx-cangjie", ListedInputMethod.CHINESE),
+            ListedInputMethod(ZIRANMA, "自", "自然码", "fcitx-ziranma", ListedInputMethod.CHINESE),
+            ListedInputMethod(ERBI, "二", "二笔", "fcitx-erbi", ListedInputMethod.CHINESE),
+            ListedInputMethod(WUBI_PINYIN, "五", "五笔拼音", "fcitx-wubi", ListedInputMethod.CHINESE),
+            ListedInputMethod(HANDWRITING, "手", "手写", "draw-freehand", ListedInputMethod.CHINESE, composesText = true),
+            ListedInputMethod(ENGLISH, "En", "English", "input-keyboard", "en", composesText = true),
+        )
+
+        /** The one of [LISTED] named [im]; null for any other. */
+        fun listed(im: String): ListedInputMethod? = LISTED.firstOrNull { it.name == im }
+    }
+}
+
+/**
+ * An input method as the host lists it: its [name], the short [label] the input method name
+ * overlay and the status area show, the [text] the lists show, its [icon] and [language].
+ * [composesText]: what it has typed is the text itself (English's word, handwriting's characters),
+ * shown in the app as composing text; a code (pinyin's, a table's) is shown above the candidates
+ * (`composesText`, `androidengine.cpp:375-383`).
+ */
+data class ListedInputMethod(
+    val name: String,
+    val label: String,
+    val text: String,
+    val icon: String,
+    val language: String,
+    val composesText: Boolean = false,
+) {
+    /** It types Chinese: Chinese marks for its punctuation keys, and the status area's toggles (`typesChinese`, `:368-373`). */
+    val chinese get() = language == CHINESE
+
+    companion object {
+        const val CHINESE = "zh_CN"
     }
 }
 
@@ -1208,3 +1317,6 @@ internal fun closeQuietly(closeable: Closeable, onError: (IOException) -> Unit) 
  * [libime] the name libime's table input method had.
  */
 class TableMethod(val file: String, val group: String, val options: TableOptions, val libime: String)
+
+// the session whose candidates [im] shows: a pair's keyed one where it took the last key
+private fun Map<String, KeyboardPair>.shownSession(im: String): String = this[im]?.sessionOf(im) ?: im

@@ -20,6 +20,7 @@ import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.engine.learn.control.LearningOp
 import org.fcitx.fcitx5.android.engine.learn.control.LearningResult
+import org.fcitx.fcitx5.android.input.bar.KawaiiBarComponent
 import org.fcitx.fcitx5.android.input.bar.ui.ToolButton
 import org.fcitx.fcitx5.android.input.broadcast.InputBroadcastReceiver
 import org.fcitx.fcitx5.android.input.dependency.fcitx
@@ -275,6 +276,7 @@ class StatusAreaWindow : InputWindow.ExtendedInputWindow<StatusAreaWindow>(),
     private val editorInfoButton by lazy {
         ToolButton(context, R.drawable.ic_baseline_info_24, theme).apply {
             contentDescription = context.getString(R.string.editor_info_inspector)
+            fixIconSize(context.dp(KawaiiBarComponent.ICON_DP))
             setOnClickListener { windowManager.attachWindow(EditorInfoWindow()) }
         }
     }
@@ -282,16 +284,19 @@ class StatusAreaWindow : InputWindow.ExtendedInputWindow<StatusAreaWindow>(),
     private val settingsButton by lazy {
         ToolButton(context, R.drawable.ic_baseline_settings_24, theme).apply {
             contentDescription = context.getString(R.string.open_input_method_settings)
+            fixIconSize(context.dp(KawaiiBarComponent.ICON_DP))
             setOnClickListener { AppUtil.launchMain(context) }
         }
     }
 
     private val barExtension by lazy {
         context.horizontalLayout {
+            val width = dp(KawaiiBarComponent.buttonWidthDp())
+            val height = dp(KawaiiBarComponent.heightDp())
             if (editorInfoInspector) {
-                add(editorInfoButton, lParams(dp(40), dp(40)))
+                add(editorInfoButton, lParams(width, height))
             }
-            add(settingsButton, lParams(dp(40), dp(40)))
+            add(settingsButton, lParams(width, height))
         }
     }
 

@@ -8,11 +8,11 @@ import android.os.Handler
 import android.os.Looper
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.core.EngineBridge
+import org.fcitx.fcitx5.android.core.EngineNotices
 import org.fcitx.fcitx5.android.engine.handwriting.InkNet
 import org.fcitx.fcitx5.android.engine.handwriting.InkReading
 import org.fcitx.fcitx5.android.engine.handwriting.InkRecognizer
 import org.fcitx.fcitx5.android.handwriting.OrtModel
-import org.fcitx.fcitx5.android.core.EngineNotices
 import org.fcitx.fcitx5.android.utils.appContext
 import timber.log.Timber
 import java.nio.ByteBuffer

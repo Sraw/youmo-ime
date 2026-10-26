@@ -4,9 +4,11 @@
  */
 package org.fcitx.fcitx5.android.engine.host
 
+import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
 import org.fcitx.fcitx5.android.engine.session.Action
 import org.fcitx.fcitx5.android.engine.session.Session
 import org.fcitx.fcitx5.android.engine.session.Snapshot
+import kotlin.math.roundToInt
 
 /** The events the androidengine addon sends, numbered as it numbers them (androidengine_public.h). */
 object EngineEvent {
@@ -61,6 +63,13 @@ object EngineEvent {
      * with: on the nine keys 2 is abc, KP_2 is 2.
      */
     const val KEYPAD = 16
+
+    /**
+     * A hardware keyboard's character no letter, sent to 双拼 alone (KeyRouter): a key the scheme may
+     * type (微软's ;), its full keyboard's, where the screen's same char is a mark of the grouped keys'
+     * typing (review S1). Any session takes it as [CHAR].
+     */
+    const val HARD_CHAR = 17
 }
 
 /**
@@ -86,6 +95,9 @@ object EngineEvent {
 class Keyboard(private val session: Session, private val nineKeys: Boolean) {
 
     private var shown: Snapshot = IDLE
+
+    /** What the last event or [context] left on show: preedit, candidates, predictions. */
+    val showing: Snapshot get() = shown
 
     /** Where the page shown starts among all the candidates ([Snapshot.first]): a paged list's index counts from it. */
     val first get() = shown.first
@@ -161,6 +173,11 @@ class Keyboard(private val session: Session, private val nineKeys: Boolean) {
 
     private fun char(codePoint: Int): Snapshot {
         hostChar(codePoint)?.let { return it }
+        // whatever the session: one sent the wrong way reads as its code would, never as U+FFFD ending the input
+        if (codePoint in TAPS) {
+            val (code, at) = untapped(codePoint)
+            return session.apply(Action.Key(code, at = at))
+        }
         if (codePoint in NINE_DIGITS) {
             val n = codePoint - NINE_DIGITS.first
             return session.apply(Action.NineKey('0' + n % DIGITS, upper = n >= DIGITS))
@@ -292,9 +309,10 @@ class Keyboard(private val session: Session, private val nineKeys: Boolean) {
         /**
          * Characters of the private use area the nine-key keyboard sends for a syllable it offers
          * (see [Snapshot.syllables]): [syllableKey]. fcitx passes any character on, so this needs
-         * no event of its own; no keyboard types one otherwise.
+         * no event of its own; no keyboard types one otherwise. U+F8C0 on (the area's last 64) is
+         * not theirs: it is the grouped keyboards' codes (NineKeyLetters.CODES).
          */
-        val SYLLABLES = '\uE000'..'\uF8FF'
+        val SYLLABLES = '\uE000' until '\uE000' + Action.Syllable.IDS * Action.Syllable.MAX
 
         /** The character for the syllable at [index] of the list [id] ([Snapshot.syllablesId]). */
         fun syllableKey(index: Int, id: Int): Char {
@@ -361,6 +379,55 @@ class Keyboard(private val session: Session, private val nineKeys: Boolean) {
             in 'a'..'z' -> NINE_LETTERS.first + (letter - 'a')
             in 'A'..'Z' -> NINE_LETTERS.first + ALPHABET + (letter - 'A')
             else -> throw IllegalArgumentException("nine key letter $letter")
+        }
+
+        // the 14 keys' codes' block (NineKeyLetters.G14_BLOCK)
+        private val FIRST_CODE = NineKeyLetters.G14_BLOCK.first.toChar()
+        private val LAST_CODE = NineKeyLetters.G14_BLOCK.last.toChar()
+
+        /** How many places across a key [tapKey] tells apart: the middle one, 8, is the key's centre. */
+        const val TAP_STEPS = 17
+
+        /**
+         * Characters of the supplementary private use area a grouped keyboard sends for a tap on a
+         * key of two letters, a code and where across the key it fell: [tapKey]. After [AGAIN],
+         * in the codes' alphabetical order: the 14 keys' alone (26 × [TAP_STEPS]); G18's would take
+         * 26 to 51, not in this range yet. Only on a key's way to the engine: never
+         * learned, kept or backed up, so its numbering may change.
+         */
+        val TAPS = 0xF0200 until 0xF0200 + ALPHABET * TAP_STEPS
+
+        /**
+         * The character for a tap at [at] across the key of [code] (0 its left edge, 1 its right),
+         * to the nearest of [TAP_STEPS]. Clamped first: just past 1 would round into the next code's
+         * places, learned under that key. NaN is no place; send the code itself.
+         */
+        fun tapKey(code: Char, at: Float): Int {
+            require(code in FIRST_CODE..LAST_CODE && !at.isNaN()) { "tap $code at $at" }
+            return TAPS.first + (code - FIRST_CODE) * TAP_STEPS + (at.coerceIn(0f, 1f) * (TAP_STEPS - 1)).roundToInt()
+        }
+
+        // a [tapKey]'s code and place back
+        private fun untapped(codePoint: Int): Pair<Char, Float> {
+            val n = codePoint - TAPS.first
+            return (FIRST_CODE + n / TAP_STEPS) to (n % TAP_STEPS).toFloat() / (TAP_STEPS - 1)
+        }
+
+        /**
+         * The letter [codePoint] stands for typed as it is, for a temporary mode (quick phrase,
+         * Unicode) that reads letters and none of a keyboard's codes: a [tapKey] its half's letter
+         * (the first at the centre), a grouped keyboard's code (the 14 keys', the 18 keys', the nine
+         * keys' 双拼's: [NineKeyLetters.ofCode]) its key's first letter ([NineKeyLetters.asTyped]);
+         * null for any other.
+         */
+        fun typedLetter(codePoint: Int): Char? {
+            // a code alone has no side: its key's first letter, whichever keyboard's it is
+            if (codePoint !in TAPS) return NineKeyLetters.ofCode(codePoint)?.letters(codePoint.toChar())?.first()
+            val (code, at) = untapped(codePoint)
+            // the taps are the 14 keys' alone yet: G18's go at indices 26 to 51 (design §1.4)
+            val group = NineKeyLetters.G14.letters(code).ifEmpty { return null }
+            // past the middle goes against the first letter
+            return if (group.length > 1 && NineKeyLetters.G14.against(0, at) > 0f) group[1] else group[0]
         }
 
         private val IDLE = Snapshot(

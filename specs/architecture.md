@@ -4,20 +4,19 @@
 
 | Module | Kind | What it holds |
 |---|---|---|
-| `lib/ime-core` | plain JVM (`java-library`), no Android on the classpath | The engine (`engine/`: pinyin, tables, English, strokes, phrases, learning, ranking, data formats, the host that lists the input methods), the keyboard's decisions (`input/`: cursor and composing tracking, key and gesture policies, bar state machines, voice decisions, field policy), `core/` (`CoreLog`, `FcitxUtils`, `FormattedText`), `ui/search/SettingsSearch` and `utils/EventStateMachine`. Tested in milliseconds. |
-| `app` | Android application | The `InputMethodService`, the keyboard's views and windows, the settings UI, file-backed managers (clipboard, themes, dictionaries, backups), the JNI side of fcitx (`core/`), native code (`src/main/cpp`). |
+| `lib/ime-core` | plain JVM (`java-library`), no Android on the classpath | The engine (`engine/`: pinyin, tables, English, strokes, phrases, learning, ranking, data formats, the host that lists the input methods), the input method framework (`host/`: fcitx5's instance, key pipeline, input contexts and the modules the app uses, ported to Kotlin; [host.md](host.md)), the keyboard's decisions (`input/`: cursor and composing tracking, key and gesture policies, bar state machines, voice decisions, field policy), `core/` (`CoreLog`, `FcitxUtils`, `FormattedText`), `ui/search/SettingsSearch` and `utils/EventStateMachine`. Tested in milliseconds. |
+| `app` | Android application | The `InputMethodService`, the keyboard's views and windows, the settings UI, file-backed managers (clipboard, themes, dictionaries, backups), `core/`: `KotlinFcitx` (the `FcitxAPI` over ime-core's host, on one thread), `EngineBridge` (the engines' Android side). No native code of its own. |
 | `app/src/text`, `app/src/voice` | flavor source sets (`speech` dimension) | Each defines `VoiceFeature` with the same signatures; only `voice` has voice input, sherpa-onnx and `RECORD_AUDIO`. |
 | `lib/ime-eval` | JVM CLI | Typing simulated over test sets; top-1 accuracy, predictions, English, learning. Never shipped. |
 | `lib/ime-dict-tool` | JVM CLI | Compiles text sources into the engine's data files (pinyin, tables, strokes, English), mixes models, packs word packs, finds new words. Runs on the build host only. |
-| `lib/fcitx5`, `lib/fcitx5-chinese-addons` | native (CMake) | Fcitx5 (with its quickphrase, unicode, clipboard and notifications modules; spell and imselector are not built) and, of chinese-addons, only punctuation, chttrans (简繁), fullwidth and scel2org5 (reading 搜狗 `.scel`), vendored, built for Android. Its pinyin and table engines are not built: the input methods are `ime-core`'s. |
 | `lib/sherpa-onnx` | native | The speech recognizer, vendored and built from source; voice build only. |
-| `lib/handwriting` | Android library, native | The handwriting recognizers' runtime: onnxruntime (the very file sherpa-onnx links, so a voice build packs one) and a small JNI to it, `OrtModel`, which runs an ORT-format model mapped from the APK. Both builds. |
+| `lib/handwriting` | Android library, native | The handwriting recognizers' runtime: onnxruntime (the very file sherpa-onnx links, so a voice build packs one) and a small JNI to it, `OrtModel`, which runs an ORT-format model mapped from the APK; and `libyoumo-matrix`, the sentence models' kernel, without onnxruntime. Both builds. |
 | `codegen` | annotation processing | Generates the app's key and scancode mapping tables. |
-| `build-logic` | included build | Gradle convention plugins: Android/native conventions, data download and compile, voice data, permission check, version from tags, detekt. |
+| `build-logic` | included build | Gradle convention plugins: Android conventions, data download and compile, voice data, permission check, version from tags, detekt. |
 | `lexicon/` | data | The curated new words, removed and corrected readings, misreadings, Latin words: decisions kept in the repository. |
 
 Dependencies point one way: `app` → `lib/ime-core`; `lib/ime-eval` and `lib/ime-dict-tool` →
-`lib/ime-core`. Nothing in `ime-core` knows Android, fcitx's JNI or the app.
+`lib/ime-core`. Nothing in `ime-core` knows Android or the app.
 
 ## Where logic goes
 
@@ -35,22 +34,29 @@ and held to Kover floors: 90% line coverage overall, 60% per package.
 One process. Inside it:
 
 - **Main thread**: the service, views, settings UI.
-- **The fcitx thread**: Fcitx5 runs its event loop here (`Fcitx`, `FcitxDispatcher`). Every call
-  into fcitx goes through `FcitxAPI`, whose methods are `suspend` and dispatched to this thread.
-  The engine's sessions run here too: the native `androidengine` addon calls `EngineBridge` through
-  JNI on this thread, so the sessions are this thread's alone and nothing in them locks.
+- **The host thread** (`fcitx-main`, still called the fcitx thread): `HostDispatcher`, one
+  scheduled executor, is both the coroutine dispatcher every `FcitxAPI` call (`suspend`) runs on
+  and the `HostClock` whose timers (the refine pause, the input method name overlay) run strictly
+  in order with the calls around them. `HostCore` and the engine's sessions live on it alone, so
+  nothing in them locks. `KotlinFcitx.stop` runs a last job (flush the config writer, close the
+  engine) and drops timers not yet due.
+- **`host-config`** (`ConfigWriter`): writes each changed config file in the background, merged
+  per file, atomically; flushed at stop and before `save()` returns.
+- **`host-quickphrase`**: reads the quick phrase tables once at start, beside the engine's load; a
+  lookup before they are read waits. charselect's search index is built on a thread of its own
+  after the first Unicode trigger.
 - **IO / Default dispatchers**: file work (imports, backups, the clipboard database), and the
   engine's own background saves.
 - **`engine-phrases`** (`EngineBridge`): one thread saving the custom phrases file, one save at a
   time, in order.
 - **`record-compaction`** (`Engines`): a daemon thread for each compaction of a user log
-  (`RecordStore`), at most every few thousand records. The fcitx thread, which learns, reads the
-  counts; this thread writes and syncs them to a new file, which the next append on the fcitx
+  (`RecordStore`), at most every few thousand records. The host thread, which learns, reads the
+  counts; this thread writes and syncs them to a new file, which the next append on the host
   thread puts in place.
 - **`engine-warm-up`** (`Engines`): a daemon thread for each warm-up, once for each `Engines` (made
-  anew as fcitx starts again after it exited, `EngineBridge.close()`): pinyin's data and word index
+  anew as the host starts again after it stopped, `EngineBridge.close()`): pinyin's data and word index
   as the first field starts in a Chinese input method (全拼, 双拼, 九键, handwriting, a table; not in
-  English: a switch from English to one reads them on the fcitx thread as its session is made),
+  English: a switch from English to one reads them on the host thread as its session is made),
   English's keys and word index as its session is first made, and the tables' shared words, coded
   for the tables (`TableRegistry`). A session
   made meanwhile waits for them: `EngineAssets.pinyinData` and the word indexes are synchronized
@@ -58,13 +64,14 @@ One process. Inside it:
 - **Voice** (voice build): the microphone reader, the VAD and the recognizer on threads of their own
   (`VoiceListener`).
 - **`handwriting`** (`HandwritingRecognition`): the handwriting recognizers, one read at a time; a
-  read made stale by a newer stroke is skipped. Its reading goes to the engine as a fcitx job: the
+  read made stale by a newer stroke is skipped. Its reading goes to the engine as a host job: the
   reading offered (`EngineBridge.offerInk`), then a key (`Keyboard.INK`) that shows it, in order
   with the keys and taps around it.
 
-Access to fcitx from outside the service goes through `FcitxDaemon` → `FcitxConnection`
+Access to the host from outside the service goes through `FcitxDaemon` → `FcitxConnection`
 (`runOnReady`, `runIfReady`, `runImmediately` for cached reads and `eventFlow` only). Never
-`runBlocking` on the main thread to wait for fcitx.
+`runBlocking` on the main thread to wait for the host. `FcitxDaemon` starts `KotlinFcitx` with the
+first client and stops it after the last.
 
 ## A key, from the finger to the editor
 
@@ -72,22 +79,27 @@ Access to fcitx from outside the service goes through `FcitxDaemon` → `FcitxCo
    gesture (`KeyGestureRecognizer` in ime-core decides tap, swipe, long press, repeat) and emits a
    `KeyAction` from its `KeyDef` (`KeyDefPreset.kt`).
 2. `CommonKeyActionListener` turns it into a call on the service: most become
-   `service.postFcitxJob { sendKey(...) }`, onto the fcitx thread.
-3. Fcitx5 routes the key to the current input method. For the app's own input methods that is the
-   `androidengine` addon (`app/src/main/cpp/androidengine`), which maps it to an engine event
-   (`androidengine_public.h`; mirrored in ime-core's `engine/host/Keyboard.kt`) and calls
-   `EngineBridge.onEvent` through JNI.
-4. `EngineBridge` hands it to `Engines` (ime-core), which applies an `Action` to the input method's
-   `Session` (`PinyinSession`, `TableSession`, `EnglishSession`, …) and gets a `Snapshot` back:
-   text to commit, the preedit, the page of candidates, hints, whether there is more to refine.
-5. The addon renders the snapshot as fcitx's input panel and commit; fcitx emits `FcitxEvent`s
-   (`CandidateListEvent`, `CommitStringEvent`, `ClientPreeditEvent`, `InputPanelEvent` …) back
-   over JNI.
+   `service.postFcitxJob { sendKey(...) }`, onto the host thread.
+3. `KotlinFcitx.sendKey` calls `HostCore.sendKey` on the active input context, which runs the key
+   through `KeyPipeline`, fcitx's phases in order: an active temp mode (quick phrase, Unicode) takes
+   every key; else the engine (`KeyRouter`) maps it to an `EngineEvent` (`engine/host/Keyboard.kt`)
+   for the input method's session; then the modules' hooks (fullwidth, Ctrl+. for punctuation,
+   Ctrl+Shift+F for 简繁); a key nobody accepted goes back to the app. See [host.md](host.md).
+4. Through the `EngineHost` port (the app's `EngineBridge`), `Engines` (ime-core) applies an
+   `Action` to the input method's `Session` (`PinyinSession`, `TableSession`, `EnglishSession`, …)
+   and gets a `Snapshot` back: text to commit, the preedit, the page of candidates, hints, whether
+   there is more to refine.
+5. `KeyRouter` shows the snapshot as the context's panel; commits go through the commit filters
+   (punctuation, 简繁) and the panel through the output filters (简繁 converts every candidate).
+   `HostCore` emits `HostEvent`s at once for commits and keys handed back, the panel once at the end
+   of the key; `KotlinFcitx` turns them into `FcitxEvent`s (`CandidateListEvent`,
+   `CommitStringEvent`, `ClientPreeditEvent`, `InputPanelEvent` …) on `eventFlow`, which keeps
+   every event however slow its collector.
 6. On the main thread, `FcitxInputMethodService` applies commits and the composing text through
    `EditingSession` (ime-core), which keeps its own idea of cursor and selection ahead of the
    editor's lagging reports (`CursorTracker`); `InputView` broadcasts panel events to the bar
    (`KawaiiBarComponent`), the candidate views and the preedit.
-7. While the user pauses, the addon sends `Refine` after a short delay so the 25M model can pick a
+7. While the user pauses, `Refiner` sends `Refine` after a short delay so the 25M model can pick a
    better first candidate; any key drops what is left of that work.
 
 The engine also reads the editor: on a field focused or the cursor moved, the service reads the
@@ -98,8 +110,8 @@ box that clears itself, for the reply typed next; told as `Action.Context.cleare
 as the field is empty: English scores after it but puts no glide's space after it, nor has a
 Backspace take any of it.
 
-Where the preedit shows is the input method's (`composesText` in `androidengine.cpp`, set as the
-input context's `setEnablePreedit` on activation and again at each event the engine sends; turned off as
+Where the preedit shows is the input method's (`KeyRouter.composesText`, set as the
+input context's `preeditEnabled` on activation and again at each event the engine sends; turned off as
 quick phrase or Unicode starts, so their code shows above the candidates in English and handwriting too): English's
 word and handwriting's characters are the text itself and go into the app's text as composing
 text, where the field takes it (`CapabilityFlag.Preedit`), kept there as the keyboard goes. A code
@@ -126,20 +138,21 @@ from the APK's assets: `engine/pinyin.data`, `engine/table/<name>.data`, `engine
 owns the user's words (learned, added, blocked, imported dictionaries, custom phrases) shared
 across every input method.
 
-Settings for the engine live in fcitx's config of the `androidengine` addon (its options are in
-`androidengine.h`, keyed as libime's pinyin config was so old settings carry over;
-`LibimeMigration`/`EngineMigration` move them). The addon passes the config to
-`EngineBridge.configure`, parsed by `EngineSettings`. The settings UI edits it through
-`FcitxAPI.getImConfig`/`setImConfig` (see [app.md](app.md#settings)).
+Settings for the engine live where fcitx kept them, `config/conf/androidengine.conf`, in fcitx's INI
+(`EngineOptions`, the option table of the former `androidengine` addon, keyed as libime's pinyin
+config was so old settings carry over; `LibimeMigration`/`EngineMigration` move them). `HostCore.configure`
+gives the router the page size and English suggestions and the engines the rest, flattened and
+parsed by `EngineSettings`. The settings UI edits it through `FcitxAPI.getImConfig`/`setImConfig`
+(see [app.md](app.md#settings)).
 
 ## Where data lives on the phone
 
 | What | Where | Written by |
 |---|---|---|
 | Engine data (read-only) | APK assets, memory-mapped | build (`EngineDataPlugin`, `VoiceDataPlugin`, `HandwritingDataPlugin`: the handwriting models, `.ort`/`.data` uncompressed, both builds) |
-| fcitx's own data (punctuation tables, addon configs, locale) | `assets/usr` synced into the app's data dir at start (`DataManager`, keyed by `descriptor.json`) | build |
+| fcitx's built-in data (the zh_CN punctuation table, quick phrase's emoji and LaTeX tables, `charselectdata`) | APK assets under `pkgdata/`, read from assets (`charselectdata` whole into the heap the first time Unicode input is opened, the tables parsed; `KotlinFcitx.BUILT_IN`; sources and SHA-256 in `app/src/main/host-assets.md`) | repository |
 | What the engine learned | `files/engine/` (`EngineBridge.userDir`): pinyin's user log, each table's and English's, the word lists (added, blocked) | engine: append-only logs (`RecordStore`), lists written whole |
-| fcitx config and data home | the external files dir (`Android/data/<package>/files`, `HOME` / `FCITX_CONFIG_HOME` / `FCITX_DATA_HOME` set in `native-lib.cpp`): `config/` (the profile, `conf/*.conf` incl. the input methods' options), `data/pinyin/customphrase`, `data/pinyin/dictionaries/` (imported dictionaries, as text, and `merged.ymd` compiled from those on; not in a backup), `data/data/quickphrase.d`, `theme/` | fcitx, the app's managers |
+| fcitx config and data home | the external files dir (`Android/data/<package>/files`, `EngineBridge.fcitxHome()`; the paths fcitx used): `config/` (the profile, `conf/*.conf` incl. the input methods' options), `data/pinyin/customphrase`, `data/pinyin/dictionaries/` (imported dictionaries, as text, and `merged.ymd` compiled from those on; not in a backup), `data/data/quickphrase.d`, `theme/` | the host (`ConfigWriter`), the app's managers |
 | App preferences | `shared_prefs` (`AppPrefs`, `ThemePrefs`) | app |
 | Clipboard | Room database in `databases/` (`ClipboardManager`) | app |
 

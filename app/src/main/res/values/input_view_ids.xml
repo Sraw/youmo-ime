@@ -6,4 +6,6 @@
     <item name="expanded_candidate_view" type="id" />
     <item name="input_window" type="id" />
     <item name="button_panel_lock" type="id"/>
+    <item name="code_row_text" type="id" />
+    <item name="code_row_syllables" type="id" />
 </resources>

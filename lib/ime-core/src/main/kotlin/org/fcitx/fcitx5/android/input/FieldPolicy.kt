@@ -57,7 +57,7 @@ class FieldPolicy(private val memory: ContextMemory) {
      * [im] became the active input method: whether to tell it the field as one [Action.Context.started].
      * fcitx resets the session it activates, which leaves its journal unverified (U-03), and nothing
      * else tells it this field: in one empty no context would verify it again, so nothing deleted
-     * at once would be taken back (UAT HW-22/23, a switch to 手写). The field is new to that session;
+     * at once would be taken back (UAT HW-23, a switch to 手写; 原 HW-22 已删). The field is new to that session;
      * any text in it another input method's. Not the same one again, nor with no field focused.
      */
     fun inputMethodChanged(im: String): Boolean = (focused && im != inputMethod).also { inputMethod = im }

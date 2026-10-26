@@ -11,10 +11,13 @@ import org.fcitx.fcitx5.android.input.broadcast.InputBroadcastReceiver
 import org.fcitx.fcitx5.android.input.dependency.context
 import org.fcitx.fcitx5.android.input.dependency.inputMethodService
 import org.fcitx.fcitx5.android.input.dependency.theme
+import org.fcitx.fcitx5.android.input.keyboard.CommonKeyActionListener
+import org.fcitx.fcitx5.android.input.keyboard.KeyActionListener
 import org.mechdancer.dependency.Dependent
 import org.mechdancer.dependency.UniqueComponent
 import org.mechdancer.dependency.manager.ManagedHandler
 import org.mechdancer.dependency.manager.managedHandler
+import org.mechdancer.dependency.manager.must
 import splitties.dimensions.dp
 import splitties.views.horizontalPadding
 
@@ -24,6 +27,7 @@ class PreeditComponent : UniqueComponent<PreeditComponent>(), Dependent, InputBr
     private val context by manager.context()
     private val theme by manager.theme()
     private val service by manager.inputMethodService()
+    private val commonKeyActionListener: CommonKeyActionListener by manager.must()
 
     val ui by lazy {
         CodeRowUi(context, theme, setupTextView = {
@@ -42,6 +46,8 @@ class PreeditComponent : UniqueComponent<PreeditComponent>(), Dependent, InputBr
                 val tapped = shown
                 service.postFcitxJob { if (inputPanelCached.preedit.toString() == tapped) moveCursor(at) }
             }
+            // a syllable taken goes as 九键's column's does, through the keys' listener
+            syllables.onPick = { commonKeyActionListener.listener.onKeyAction(it, KeyActionListener.Source.Keyboard) }
         }
     }
 

@@ -122,7 +122,7 @@ class EnginesHandwritingTest : EnginesFixture() {
         engines.close()
     }
 
-    // UAT HW-10a: turned off after 好, not offered when 好 is written and put in again
+    // turned off after 好, not offered when 好 is written and put in again
     @Test
     fun handwritingsPredictionTurnedOffStaysOffWhenItsWordIsWrittenAgain() {
         val engines = Engines(::load, folder.newFolder(), warmUps = inPlace)

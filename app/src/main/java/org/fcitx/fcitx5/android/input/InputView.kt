@@ -23,6 +23,7 @@ import android.widget.FrameLayout
 import android.widget.ImageView
 import androidx.annotation.Keep
 import androidx.annotation.RequiresApi
+import androidx.annotation.VisibleForTesting
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.isVisible
 import androidx.core.view.updateLayoutParams
@@ -189,7 +190,8 @@ class InputView(
     private val preedit = PreeditComponent()
     private val commonKeyActionListener = CommonKeyActionListener()
     private val windowManager = InputWindowManager()
-    private val kawaiiBar = KawaiiBarComponent()
+    @VisibleForTesting
+    internal val kawaiiBar = KawaiiBarComponent()
 
     // over the candidates' bar: this view is as high as the window, its top the screen's (setInputView)
     override val undoAnchor: View get() = kawaiiBar.view
@@ -401,11 +403,11 @@ class InputView(
                     rightToRight = LayoutParams.PARENT_ID
                 })
             }
-            add(preedit.ui.root, lParams(0, dp(KawaiiBarComponent.PREEDIT_HEIGHT)) {
+            add(preedit.ui.root, lParams(0, dp(KawaiiBarComponent.preeditHeight())) {
                 if (floatingHandle != null && !handleAtBottom) below(floatingHandle) else topOfParent()
                 // start and end set in updateKeyboardSize, as the bar's
             })
-            add(kawaiiBar.view, lParams(0, dp(KawaiiBarComponent.HEIGHT)) {
+            add(kawaiiBar.view, lParams(0, dp(KawaiiBarComponent.heightDp())) {
                 below(preedit.ui.root)
                 // start and end set in updateKeyboardSize
             })
@@ -481,7 +483,7 @@ class InputView(
             KeyboardHeightCap.keysHeight(
                 keyboardHeightPx,
                 resources.displayMetrics.heightPixels,
-                dp(KawaiiBarComponent.HEIGHT + KawaiiBarComponent.PREEDIT_HEIGHT),
+                dp(KawaiiBarComponent.heightDp() + KawaiiBarComponent.preeditHeight()),
                 keyboardBottomPaddingPx,
                 handleHeight = handle,
             )

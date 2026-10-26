@@ -17,6 +17,7 @@ import org.fcitx.fcitx5.android.engine.learn.LearnTo
 import org.fcitx.fcitx5.android.engine.learn.LogHabits
 import org.fcitx.fcitx5.android.engine.learn.LegacyConversion
 import org.fcitx.fcitx5.android.engine.learn.Row
+import org.fcitx.fcitx5.android.engine.learn.SpelledForm
 import org.fcitx.fcitx5.android.engine.learn.Word
 import org.fcitx.fcitx5.android.engine.learn.Words
 import org.fcitx.fcitx5.android.engine.phrase.CustomPhrases
@@ -50,12 +51,16 @@ internal class LearnLogBench(private val commits: Int, private val days: Int, pr
         val stats: Int,
         val mine: Int,
         val pairs: Int,
+        val spelledMs: Double,
+        val heapBytes: Long,
+        val spelledRows: Int,
     ) {
         fun lines() = listOf(
             "unfolded log      %,d bytes, opened in %d ms".format(unfoldedBytes, unfoldedOpenMs),
             "fold at start     %d ms".format(foldMs),
             "folded log        %,d bytes, opened in %d ms".format(foldedBytes, foldedOpenMs),
-            "state             %,d used rows, %,d words of the user's, %,d pairs".format(stats, mine, pairs),
+            "state             %,d used rows (%,d of them indexed for U-20), %,d words of the user's, %,d pairs; %,d bytes of heap".format(stats, spelledRows, mine, pairs, heapBytes),
+            "spellings         %.3f ms at a key (U-20: the first key after a commit, of the most used word's first letter)".format(spelledMs),
         )
     }
 
@@ -103,7 +108,17 @@ internal class LearnLogBench(private val commits: Int, private val days: Int, pr
         val fold = (System.nanoTime() - foldStart) / NANOS_PER_MS
         var state = LearnLog(file, clock).also { it.open() }.also { it.close() }.state
         val foldedOpen = best { state = LearnLog(file, clock).also { it.open() }.also { it.close() }.state }
-        return Result(unfolded, unfoldedOpen, fold, file.length(), foldedOpen, state.stats.size, state.mine.size, state.pairs.size)
+        // what a key pays to count the words across the spellings (R14 F3733): the first letter of most rows;
+        // and what the state holds, its indexes in it (R14 F3761)
+        val before = usedHeap()
+        val opened = LearnLog(file, clock).also { it.open() }
+        val heap = usedHeap() - before
+        val spelledRows = opened.state.stats.keys.count { SpelledForm.of(it.code.kind, it.code.keys, it.reading).let { f -> f == SpelledForm.FULL || f == SpelledForm.INITIALS } }
+        val first = vocabulary[0].reading.first()
+        // anew each time: as the first key after a commit finds it
+        val spelled = bestNanos { LogHabits({ opened }).let { h -> h.spelledFrom(Kinds.FULL, first).forEach { h.spelled(Kinds.FULL, it) } } } / NANOS_PER_MS.toDouble()
+        opened.close()
+        return Result(unfolded, unfoldedOpen, fold, file.length(), foldedOpen, state.stats.size, state.mine.size, state.pairs.size, spelled, heap, spelledRows)
     }
 
     /** What the counts cost on [run]'s record: made anew (a new typing day, a word formed), and a key typed (review-1b S1). */
@@ -260,6 +275,12 @@ internal class LearnLogBench(private val commits: Int, private val days: Int, pr
         val start = System.nanoTime()
         run()
         System.nanoTime() - start
+    }
+
+    // the heap in use after a collection: a lower bound of what is live, enough for a difference
+    private fun usedHeap(): Long {
+        repeat(2) { System.gc() }
+        return Runtime.getRuntime().let { it.totalMemory() - it.freeMemory() }
     }
 
     // the best of a few runs, in milliseconds: the first warms the JVM

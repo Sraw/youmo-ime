@@ -990,7 +990,7 @@ class EditingSessionTest {
         s.updateComposingText(preedit("nihao", cursor = 5))
         e.calls.clear()
         s.updateComposingText(preedit("nihao", cursor = -1))
-        assertEquals(listOf("beginBatchEdit()", "endBatchEdit()"), e.calls)
+        assertEquals("no empty batch either", listOf<String>(), e.calls)
         assertTrue(s.selection.latest.rangeEquals(5))
     }
 
@@ -1000,7 +1000,7 @@ class EditingSessionTest {
         s.updateComposingText(preedit("nihao", cursor = 5))
         e.calls.clear()
         s.updateComposingText(preedit("nihao", cursor = 5))
-        assertEquals(listOf("beginBatchEdit()", "endBatchEdit()"), e.calls)
+        assertEquals("no empty batch either", listOf<String>(), e.calls)
     }
 
     @Test
@@ -1018,7 +1018,7 @@ class EditingSessionTest {
     fun anEmptyPreeditWithNothingComposedTouchesNothing() {
         val (s, e) = session("ab", cursor = 1)
         s.updateComposingText(FormattedText.Empty)
-        assertEquals(listOf("beginBatchEdit()", "endBatchEdit()"), e.calls)
+        assertEquals("no empty batch either", listOf<String>(), e.calls)
         assertTrue(s.selection.latest.rangeEquals(1))
     }
 

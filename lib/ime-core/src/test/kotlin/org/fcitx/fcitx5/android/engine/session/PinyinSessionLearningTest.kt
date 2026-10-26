@@ -150,7 +150,7 @@ class PinyinSessionLearningTest {
         assertEquals(1, learner.habits.uses(PredictionOrder.code("我"), PredictionOrder.words("再")))
     }
 
-    // UAT PY-71 (好的谢谢): the pair is learned after the word the text ends with, 你好, though the
+    // 好的谢谢: the pair is learned after the word the text ends with, 你好, though the
     // decoder read it 你 好; 联想 after it looked under 好 and never found it
     @Test
     fun whatIsOftenTypedAfterAWordReadInPiecesIsPredictedAfterIt() {

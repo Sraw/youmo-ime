@@ -199,7 +199,7 @@ internal class CommitJournal {
         this.selected = selected
         if (selected) return
         // an editor that would not say: not known what is there, so nothing is read from it (review-1c M1).
-        // One that said empty is a field empty, checked as any text (HW-22/23: an empty field refocused after a Reset)
+        // One that said empty is a field empty, checked as any text (原 HW-22/23: an empty field refocused after a Reset)
         if (before.isEmpty() && !said) return unverify()
         if (empty) return known(before, after)
         // as the Backspace left it (an editor that tells each); else the text either side of a selection

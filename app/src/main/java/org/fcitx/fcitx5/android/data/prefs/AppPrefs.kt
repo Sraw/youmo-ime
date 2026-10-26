@@ -175,6 +175,16 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
          */
         val t9Letters = string("t9_letters", "")
 
+        /** Shown on the pinyin page: the on-screen keyboard pinyin is typed on. A hardware keyboard types 全拼 still. */
+        val pinyinKeyboard = stringLike(PINYIN_KEYBOARD, object : ManagedPreference.StringLikeCodec<PinyinKeyboard> {
+            override fun decode(raw: String) = PinyinKeyboard.entries.firstOrNull { it.name == raw }
+        }, PinyinKeyboard.Full)
+
+        /** Shown on the 双拼 page: the on-screen keyboard 双拼 is typed on, any scheme on any. A hardware keyboard types the full one still. */
+        val shuangpinKeyboard = stringLike(SHUANGPIN_KEYBOARD, object : ManagedPreference.StringLikeCodec<ShuangpinKeyboard> {
+            override fun decode(raw: String) = ShuangpinKeyboard.entries.firstOrNull { it.name == raw }
+        }, ShuangpinKeyboard.Full)
+
         /**
          * What each of 九键's keys 1 to 9 offers on a long press besides its digit and letters
          * ([NineKeySymbols.serialize], empty as by default): set on its own page from the 九键 page.
@@ -647,6 +657,10 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
         // keys an input method's page names its rows by (InputMethodSettings); the others are only this file's
         const val T9_MULTI_TAP = "t9_multi_tap"
         const val T9_ENGLISH_TYPING = "t9_english_typing"
+        const val PINYIN_KEYBOARD = "pinyin_keyboard"
+
+        const val SHUANGPIN_KEYBOARD = "shuangpin_keyboard"
+
         const val ENGLISH_AUTO_CAPS = "english_auto_caps"
         const val GLIDE_TYPING = "glide_typing"
         const val AUTO_PAIRS = "auto_pairs"
@@ -676,4 +690,17 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
                         "device; a unit test must call AppPrefs.init(sharedPreferences) itself."
             )
     }
+}
+
+/** Pinyin's on-screen keyboard: the full one, or the 14 keys of two letters each (拼音双键). Kept by name: never rename one. */
+enum class PinyinKeyboard(override val stringRes: Int) : ManagedPreferenceEnum {
+    Full(R.string.pinyin_keyboard_full),
+    Keys14(R.string.pinyin_keyboard_14)
+}
+
+/** 双拼's on-screen keyboard: the full one, the 18 keys, or the nine keys (many more alike). Kept by name: never rename one. */
+enum class ShuangpinKeyboard(override val stringRes: Int) : ManagedPreferenceEnum {
+    Full(R.string.pinyin_keyboard_full),
+    Keys18(R.string.shuangpin_keyboard_18),
+    NineKeys(R.string.shuangpin_keyboard_nine)
 }

@@ -15,7 +15,6 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
-import org.junit.Assume.assumeTrue
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -117,19 +116,17 @@ class PinyinDictManagerTest {
         }
     }
 
-    @Test(timeout = 10_000)
-    fun aConverterIsReadThroughAsItRunsAndWhatItPrintedIsTheError() {
-        assumeTrue(File("/bin/sh").canExecute())
-        val lib = RuntimeEnvironment.getApplication().cacheDir
-        // 100 000 bytes, more than a pipe holds: read only after the wait, it would never end
-        val loud = "i=0; while [ \$i -lt 2000 ]; do echo 0123456789012345678901234567890123456789012345678 >&2; i=\$((i+1)); done; exit 3"
-        val e = assertThrows(IOException::class.java) { PinyinDictManager.runConverter(listOf("/bin/sh", "-c", loud), lib) }
-        assertEquals(100_000, e.message!!.length)
-        val path = assertThrows(IOException::class.java) {
-            PinyinDictManager.runConverter(listOf("/bin/sh", "-c", "echo \"\$LD_LIBRARY_PATH\"; exit 1"), lib)
-        }
-        assertEquals("${lib.absolutePath}\n", path.message)
-        PinyinDictManager.runConverter(listOf("/bin/sh", "-c", "exit 0"), lib)
+    @Test
+    fun aSogouCellDictionaryBecomesScel2org5sTextAndABrokenOneFails() {
+        // relative to app/, where Gradle runs the tests; an IDE's other working directory would read as a converter failure
+        val scel = File("../uat/fixtures/scel")
+        check(scel.isDirectory) { "fixtures not found at ${scel.absolutePath}: run with app/ as the working directory" }
+        val dest = File(RuntimeEnvironment.getApplication().cacheDir, "extra.txt")
+        PinyinDictManager.sougouDictConv(File(scel, "extra.scel"), dest)
+        assertEquals(File(scel, "extra.txt").readText(), dest.readText())
+        assertThrows(IOException::class.java) { PinyinDictManager.sougouDictConv(File(scel, "truncated.scel"), dest) }
+        // the half written, not the call before's output left in its place (F3793)
+        assertFalse(dest.exists())
     }
 
     // a word list as other input methods export them, its layout told from the whole file (D6)

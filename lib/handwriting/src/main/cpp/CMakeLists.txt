@@ -19,3 +19,10 @@ target_link_libraries(youmo-handwriting PRIVATE onnxruntime android log)
 target_compile_options(youmo-handwriting PRIVATE -Wall -Wextra -Werror)
 # 16 KB pages (Android 15+)
 target_link_options(youmo-handwriting PRIVATE "-Wl,-z,max-page-size=16384")
+
+# the sentence models' inner loop (NativeMatrixKernel), a library of its own: every user's first key
+# loads it, and onnxruntime (25 MB on arm64) is loaded only when handwriting is used
+add_library(youmo-matrix SHARED matrix-kernel.cpp)
+# vectorised at -O3 even in a debug build, which is -O0
+target_compile_options(youmo-matrix PRIVATE -O3 -Wall -Wextra -Werror)
+target_link_options(youmo-matrix PRIVATE "-Wl,-z,max-page-size=16384")

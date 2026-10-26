@@ -13,15 +13,16 @@ user, and every setting, is in [`docs/`](../docs/README.md).
 | [data-and-build.md](data-and-build.md) | touching `build-logic`, a data release, `lexicon/`, native code, versions, CI |
 | [testing.md](testing.md) | finishing any change: which tests, the evaluation, trying it on a device |
 | [conventions.md](conventions.md) | writing code, comments, commits; adding a setting; product rules that are decided |
+| [host.md](host.md) | touching `lib/ime-core/.../host` or `KotlinFcitx`, the fcitx host in Kotlin: the key pipeline and its extension points, which input method a field is on |
 | [pitfalls.md](pitfalls.md) | debugging something odd; before building an APK to ship or test |
 
 ## The project in five lines
 
 - 幽默输入法 (Youmo IME), `io.github.sraw.youmo`: an offline Chinese input method for Android,
   branched from fcitx5-android and never merged back. Upstream compatibility is not a constraint.
-- Fcitx5 (C++, through JNI) stays as the input method framework; the input methods themselves
-  (pinyin, 九键, 双拼, five code tables, handwriting, English) are this project's own engine in Kotlin, in
-  `lib/ime-core`, reached from a small fcitx addon (`androidengine`).
+- The input method framework is fcitx5's, ported to Kotlin (`lib/ime-core`'s `host/`, settings still in
+  fcitx's INI files); the input methods themselves (pinyin, 九键, 双拼, five code tables, handwriting,
+  English) are this project's own engine in Kotlin, also in `lib/ime-core`. No native fcitx is left.
 - Ranking: an n-gram decoder over a word lattice, two small sentence models (4M, 25M) reranking its
   best sentences, and what the user typed. All on the phone; the app has no network permission.
 - Two builds (the `speech` flavor dimension): `text` and `voice` (offline voice input, X-ASR on

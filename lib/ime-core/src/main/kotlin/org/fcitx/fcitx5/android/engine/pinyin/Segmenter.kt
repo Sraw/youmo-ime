@@ -8,6 +8,13 @@ package org.fcitx.fcitx5.android.engine.pinyin
 fun interface Segmenter {
     fun segment(input: String): SyllableGraph
 
+    /**
+     * [input] as [segment] has it, [taps] where across its key each place was tapped (NaN for no
+     * place; null for none at all): weighed where a key types two letters, the grouped keyboards'
+     * ([T9Segmenter]). Any other way of typing has no such keys.
+     */
+    fun segment(input: String, taps: FloatArray?): SyllableGraph = segment(input)
+
     /** Whether [c] is a key of this way of typing: what a keyboard hands to the engine. */
     fun reads(c: Char): Boolean = c in 'a'..'z'
 

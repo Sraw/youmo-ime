@@ -278,7 +278,8 @@ class InputMethodSettingsScreenTest {
         assertEquals("${placeholder(R.string.im_glide_summary)}\n${placeholder(R.string.im_not_for)}", shared.titled(R.string.im_glide).summary?.toString())
         val level = shared.findPreference<ListPreference>(EngineSettings.MODEL_LEVEL)!!
         assertEquals("${level.entry}\n${placeholder(R.string.im_model_level_summary)}", level.summary?.toString())
-        assertEquals(placeholder(R.string.im_chaizi_summary), screen(Engines.PINYIN).titled(R.string.im_chaizi).summary?.toString())
+        // pinyin's own: not for the 14 keys (the hardware keyboard still types full pinyin)
+        assertEquals("${placeholder(R.string.im_chaizi_summary)}\n${placeholder(R.string.im_not_for)}", screen(Engines.PINYIN).titled(R.string.im_chaizi).summary?.toString())
     }
 
     // every input method's page opens the shared one from its first row

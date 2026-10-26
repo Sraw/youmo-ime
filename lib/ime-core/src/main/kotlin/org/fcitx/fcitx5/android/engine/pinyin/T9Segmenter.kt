@@ -40,12 +40,18 @@ import java.util.TreeMap
  * A syllable the user chose for the first digits not yet chosen
  * ([Action.Syllable][org.fcitx.fcitx5.android.engine.session.Action.Syllable]) is in the input as
  * its letters and a separator: read as that syllable alone, or as an initial for a letter (`h`).
+ *
+ * On a grouped keyboard ([NineKeyLetters.isGrouped]) each key of two letters may come with where it
+ * was tapped ([segment] with taps): each edge then says, for each syllable, how far the letters it
+ * reads its keys as go against those places ([SyllableGraph.against]). The letters are those of
+ * the spelling actually typed for it (a fuzzy partner's, üe's ue), kept beside the index as the
+ * group's first or second letter of each key.
  */
 class T9Segmenter(
     fuzzy: Set<Fuzzy> = emptySet(),
     private val abbreviations: Boolean = true,
-    val letters: NineKeyLetters = NineKeyLetters.STANDARD,
-) : Segmenter {
+    override val letters: NineKeyLetters = NineKeyLetters.STANDARD,
+) : KeyedSegmenter {
 
     // digits typing a syllable whole, the start of one, and an initial
     private val whole = HashMap<String, SyllableMatches>()
@@ -59,11 +65,38 @@ class T9Segmenter(
     // 啊, 呃, 哦, 呣, 嗯 and 儿 alone would keep 简拼 off every 2, 3, 6 and 7
     private val regular = HashSet<String>()
 
+    // on a grouped keyboard, beside each of whole, starts and initials: which of its key's letters
+    // the spelling kept for each syllable has at each key, two bits a key, the first key lowest
+    private val wholeLetters = HashMap<String, IntArray>()
+    private val startLetters = HashMap<String, IntArray>()
+    private val initialLetters = HashMap<String, IntArray>()
+
+    /**
+     * How many times two spellings of a syllable kept for the same keys and flags had different
+     * letters: none, or which one [SyllableGraph.against] judges would depend on the order read.
+     */
+    internal var letterTies = 0
+        private set
+
     init {
         val wholeIds = HashMap<String, TreeMap<Int, Int>>()
         val startIds = HashMap<String, TreeMap<Int, Int>>()
         val initialIds = HashMap<String, TreeMap<Int, Int>>()
         val letterIds = HashMap<String, TreeMap<Int, Int>>()
+        val grouped = letters.isGrouped
+        val wholeChoices = HashMap<String, TreeMap<Int, Int>>()
+        val startChoices = HashMap<String, TreeMap<Int, Int>>()
+        val initialChoices = HashMap<String, TreeMap<Int, Int>>()
+        // keepBest, and on a grouped keyboard the letters of the spelling it kept
+        fun keep(ids: HashMap<String, TreeMap<Int, Int>>, choices: HashMap<String, TreeMap<Int, Int>>, keys: String, id: Int, flags: Int, typed: String) {
+            val into = ids.getOrPut(keys) { TreeMap() }
+            val old = into[id]
+            keepBest(into, id, flags)
+            if (!grouped) return
+            val choice = choiceOf(keys, typed)
+            val kept = choices.getOrPut(keys) { TreeMap() }
+            if (old == null || flags < old) kept[id] = choice else if (flags == old && kept[id] != choice) letterTies++
+        }
         val initialRules = fuzzy.filter { it.onInitial }
         for (id in 0 until Syllables.count) {
             val spelling = Syllables.spelling(id)
@@ -77,7 +110,7 @@ class T9Segmenter(
                 if (init.isNotEmpty()) keepBest(letterIds.getOrPut(init) { TreeMap() }, id, SyllableMatches.COMPLETION)
                 SpellingIndex.variants(init, initialRules).flatMap { (i, iFlags) ->
                     if (i.isNotEmpty()) {
-                        for (keys in letters.typings(i)) keepBest(initialIds.getOrPut(keys) { TreeMap() }, id, iFlags or SyllableMatches.COMPLETION)
+                        for (keys in letters.typings(i)) keep(initialIds, initialChoices, keys, id, iFlags or SyllableMatches.COMPLETION, i)
                     }
                     // with no initial the final is the syllable: ou's partner u is none, as in 双拼
                     SpellingIndex.finalsAfter(i, fin, finalRules).map { (f, fFlags) -> i + f to (iFlags or fFlags) }
@@ -85,11 +118,15 @@ class T9Segmenter(
             }
             for ((s, flags) in spellings) {
                 // üe is typed ue too (略 lue): on a phone u and v share 8, on the user's keys maybe not
-                val typings = letters.typings(s) + if ("ve" in s) letters.typings(s.replace("ve", "ue")) else emptyList()
-                for (keys in typings.distinct()) {
-                    if (parts != null && s.length > 1) regular += keys
-                    keepBest(wholeIds.getOrPut(keys) { TreeMap() }, id, flags)
-                    for (n in 1 until keys.length) keepBest(startIds.getOrPut(keys.substring(0, n)) { TreeMap() }, id, flags or SyllableMatches.COMPLETION)
+                val typed = if ("ve" in s) listOf(s, s.replace("ve", "ue")) else listOf(s)
+                val seen = HashSet<String>()
+                for (t in typed) {
+                    for (keys in letters.typings(t)) {
+                        if (!seen.add(keys)) continue
+                        if (parts != null && s.length > 1) regular += keys
+                        keep(wholeIds, wholeChoices, keys, id, flags, t)
+                        for (n in 1 until keys.length) keep(startIds, startChoices, keys.substring(0, n), id, flags or SyllableMatches.COMPLETION, t)
+                    }
                 }
             }
         }
@@ -97,15 +134,29 @@ class T9Segmenter(
         startIds.forEach { (k, m) -> starts[k] = toMatches(m) }
         initialIds.forEach { (k, m) -> initials[k] = toMatches(m) }
         letterIds.forEach { (k, m) -> byInitial[k] = toMatches(m) }
+        // in the matches' order: by syllable
+        wholeChoices.forEach { (k, m) -> wholeLetters[k] = m.values.toIntArray() }
+        startChoices.forEach { (k, m) -> startLetters[k] = m.values.toIntArray() }
+        initialChoices.forEach { (k, m) -> initialLetters[k] = m.values.toIntArray() }
+    }
+
+    // which of its key's letters each of [typed] is, [keys] the keys typing it: two bits a key
+    private fun choiceOf(keys: String, typed: String): Int {
+        var choice = 0
+        for (k in keys.indices) choice = choice or (letters.letters(keys[k]).indexOf(typed[k]).coerceIn(0, LETTER_MASK) shl (LETTER_BITS * k))
+        return choice
     }
 
     // the letters of a syllable taken are the session's to put in, not typed
-    override fun reads(c: Char) = c in '2'..'9' && letters.letters(c).isNotEmpty()
+    override fun reads(c: Char) = letters.isCode(c) && letters.letters(c).isNotEmpty()
 
-    override val typesLetters: Boolean get() = false
+    override fun segment(input: String): SyllableGraph = segment(input, null)
 
-    override fun segment(input: String): SyllableGraph = GraphEdges.build(input) { at, edges ->
-        if (input[at] in 'a'..'z') chosen(input, at, edges) else walk(input, at, edges)
+    override fun segment(input: String, taps: FloatArray?): SyllableGraph {
+        val placed = taps?.takeIf { letters.isGrouped && it.any { at -> !at.isNaN() } }
+        return GraphEdges.build(input) { at, edges ->
+            if (input[at] in 'a'..'z') chosen(input, at, edges) else walk(input, at, edges, placed)
+        }
     }
 
     /** The syllable, or initial, chosen at [at]: its letters up to the separator. */
@@ -121,38 +172,65 @@ class T9Segmenter(
         }
     }
 
-    private fun walk(input: String, at: Int, edges: GraphEdges) {
+    private fun walk(input: String, at: Int, edges: GraphEdges, taps: FloatArray?) {
         var longest = 0
         var length = 0
-        val initialEdges = ArrayList<Pair<Int, SyllableMatches>>()
+        val initialEdges = ArrayList<Triple<Int, SyllableMatches, FloatArray?>>()
         while (at + length < input.length && isKey(input[at + length]) && length < MAX_SYLLABLE) {
             length++
             val typed = input.substring(at, at + length)
             val keys = keysOf(typed)
-            if (read(input, at, typed, keys, edges)) longest = length
-            initials[keys]?.let { fitting(it, typed) }?.let { initialEdges += length to it }
+            if (read(input, at, typed, keys, edges, taps)) longest = length
+            initials[keys]?.let { fitting(it, typed) }?.let { initialEdges += Triple(length, it, taps?.let { t -> against(it, initials[keys], initialLetters[keys], typed, at, t) }) }
             // no syllable goes on from here: nor from a longer one
             if (keys !in starts) break
         }
-        for ((n, m) in initialEdges) {
+        for ((n, m, against) in initialEdges) {
             // at the end the start of a syllable is read already, as PARTIAL
             if (endsAt(input, at + n)) continue
-            if (longest == 0 || abbreviations && longest <= n) edges.add(at, n, Kind.INITIAL, m)
+            if (longest == 0 || abbreviations && longest <= n) edges.add(at, n, Kind.INITIAL, m, against)
         }
     }
 
     // the syllables [typed], the presses from [at] as [keys], are, whole or started; whether a regular one is whole
-    private fun read(input: String, at: Int, typed: String, keys: String, edges: GraphEdges): Boolean {
+    private fun read(input: String, at: Int, typed: String, keys: String, edges: GraphEdges, taps: FloatArray?): Boolean {
         val full = whole[keys]?.let { fitting(it, typed) }
-        full?.let { edges.add(at, typed.length, Kind.SYLLABLE, it) }
+        // no taps (the nine keys, any key typed with no place): no lookups for them, in the hottest loop of a key
+        full?.let { edges.add(at, typed.length, Kind.SYLLABLE, it, taps?.let { t -> against(it, whole[keys], wholeLetters[keys], typed, at, t) }) }
         if (endsAt(input, at + typed.length)) {
-            starts[keys]?.let { fitting(it, typed) }?.let { edges.add(at, typed.length, if (full != null) Kind.EXTENDED else Kind.PARTIAL, it) }
+            starts[keys]?.let { fitting(it, typed) }?.let {
+                edges.add(at, typed.length, if (full != null) Kind.EXTENDED else Kind.PARTIAL, it, taps?.let { t -> against(it, starts[keys], startLetters[keys], typed, at, t) })
+            }
         }
         return isRegular(keys, full)
     }
 
+    /**
+     * For each of [m] (of [all], fitted to [typed]), how far its letters go against where [typed]'s
+     * keys from input place [at] were tapped ([SyllableGraph.against]), [choices] its letters
+     * beside [all]; null where no key of two letters has a place, so the graph is as untapped.
+     */
+    @Suppress("ReturnCount")
+    private fun against(m: SyllableMatches, all: SyllableMatches?, choices: IntArray?, typed: String, at: Int, taps: FloatArray): FloatArray? {
+        if (all == null || choices == null) return null
+        var any = false
+        val out = FloatArray(m.size) { i ->
+            val choice = choices[all.indexOf(m.syllable(i))]
+            var sum = 0f
+            for (k in typed.indices) {
+                val tap = taps.getOrElse(at + k) { Float.NaN }
+                // a letter typed as itself, a key of one letter: nothing to weigh
+                if (tap.isNaN() || !letters.isCode(typed[k]) || letters.letters(typed[k]).length < 2) continue
+                sum += letters.against((choice shr (LETTER_BITS * k)) and LETTER_MASK, tap)
+            }
+            if (sum > 0f) any = true
+            sum
+        }
+        return out.takeIf { any }
+    }
+
     // a letter typed as itself as any key typing it: every way to type a syllable is indexed
-    private fun keysOf(typed: String) = buildString(typed.length) { typed.forEach { append(if (it in '2'..'9') it else letters.key(it.lowercaseChar())) } }
+    private fun keysOf(typed: String) = buildString(typed.length) { typed.forEach { append(if (letters.isCode(it)) it else letters.key(it.lowercaseChar())) } }
 
     // [spelling] has [c] at [k]; üe is spelt lve here and typed lue as well (略, 虐)
     private fun spells(spelling: String, k: Int, c: Char) =
@@ -180,16 +258,41 @@ class T9Segmenter(
         return SyllableMatches(IntArray(kept.size) { matches.syllable(kept[it]) }, IntArray(kept.size) { matches.flags(kept[it]) })
     }
 
+    /**
+     * [text], of the input, as it is shown or committed: a letter typed as itself lower case, a
+     * grouped key's code its first letter ([NineKeyLetters.asTyped]).
+     */
+    override fun asTyped(text: CharSequence): String = letters.asTyped(text.toString())
+
+    /** Whether [c] is a key typed: one of the keys' codes (the nine keys' digits) or a letter typed as itself. */
+    override fun isKey(c: Char): Boolean = letters.isCode(c) || c in FIXED
+
+    override fun initialsOf(code: Char): List<String> = initialsOf(letters, code)
+
+    // digits say nothing: of a syllable still being typed as many letters as were typed
+    override fun started(syllable: Int, keys: Int): String = Syllables.spelling(syllable).take(keys)
+
     companion object {
         private const val MAX_SYLLABLE = 6
+
+        /** The letters that are an initial alone. */
+        private const val INITIAL_LETTERS = "bcdfghjklmnpqrstwxyz"
+
+        // a key's letter, the group's first or second, in a choice of [choiceOf]
+        private const val LETTER_BITS = 2
+        private const val LETTER_MASK = 3
 
         /** A letter typed as itself, as it stands in the input: see the class. */
         val FIXED = 'A'..'Z'
 
-        /** [text], of the input, as it is shown or committed: a letter typed as itself lower case. */
+        /** [asTyped] on the nine keys' digits ([NineKeyLetters.STANDARD]'s codes), where the codes are digits whatever the layout. */
         fun asTyped(text: CharSequence): String = text.toString().lowercase()
 
-        /** Whether [c] is a key typed: a digit or a letter typed as itself. */
+        /** [initialsOf] on [letters]: the key's letters that are an initial alone; a letter typed as itself offers itself alone. */
+        fun initialsOf(letters: NineKeyLetters, code: Char): List<String> =
+            (if (code in FIXED) code.lowercase() else letters.letters(code)).filter { it in INITIAL_LETTERS }.map { it.toString() }
+
+        /** [isKey] on the nine keys, whatever their layout: a digit or a letter typed as itself. */
         fun isKey(c: Char): Boolean = c in '2'..'9' || c in FIXED
     }
 }

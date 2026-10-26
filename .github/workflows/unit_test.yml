@@ -1,16 +1,15 @@
 name: Unit Tests
 
-# JVM unit tests, the lexicon tools' Python tests, and the C++ tests of our sherpa-onnx changes and
-# of native-lib's helpers, built with the host's compiler (the host-test.sh scripts).
+# JVM unit tests, the lexicon tools' Python tests, and the C++ tests of our sherpa-onnx changes,
+# built with the host's compiler (lib/sherpa-onnx/host-test.sh).
 # Deliberately separate from the build workflow:
-#   - no submodules (verified: `:app:testTextDebugUnitTest` configures and runs on a submodule-free checkout)
 #   - no NDK, no CMake (the task graph for `:app:testTextDebugUnitTest` contains no native tasks)
 #   - single OS
 # so it takes a few minutes rather than the build jobs' half hour, and can gate every push.
 #
-# Java 17, like the jobs that build APKs here (pull_request, emulator_test): tests
-# run on the JDK the release is built with. Bytecode target is Java 11 either way
-# (build-logic/convention/src/main/kotlin/Versions.kt).
+# JDK 21, like the jobs that build APKs here (pull_request, emulator_test) and the one the
+# screenshot goldens are recorded on. The Android modules target 21 (Versions.java in
+# build-logic/convention/src/main/kotlin/Versions.kt); lib/ime-core stays on the Java 11 API.
 
 on:
   pull_request:
@@ -55,7 +54,7 @@ jobs:
         uses: actions/setup-java@v5
         with:
           distribution: "temurin"
-          java-version: "17"
+          java-version: "21"
 
       - name: Setup Android environment
         uses: android-actions/setup-android@be39fa834029ff78f1a44aa3bb0819b8fc2bd8fd # v4.0.4
@@ -80,23 +79,41 @@ jobs:
       # plain JVM too; its tests are what covers the mix and the crawl, whose output builds download.
       # Its coverage is reported, with no floor.
       # :lib:ime-eval, the evaluation harness, is a third: its tests drive ime-core's engine API and
-      # fail while the sets made from data/pinyin.tsv have not been remade after it changed.
+      # fail while the sets made from data/pinyin.tsv have not been remade after it changed. Its uatTest
+      # source set (the UAT cases replayed on the JVM) is only compiled: running it needs the app's data.
       # :build-logic:convention's tests are the build plugins' own (the data's fingerprints and
       # hashes, detekt's sources).
       # --continue: the coverage report is wanted most when a check has failed
       - name: Run core logic, dict tool and evaluation tests, API level check and coverage floors
-        run: ./gradlew --build-cache --continue :lib:ime-core:check :lib:ime-core:koverHtmlReport :lib:ime-dict-tool:test :lib:ime-dict-tool:koverHtmlReport :lib:ime-eval:test :build-logic:convention:test
+        run: ./gradlew --build-cache --continue :lib:ime-core:check :lib:ime-core:koverHtmlReport :lib:ime-dict-tool:test :lib:ime-dict-tool:koverHtmlReport :lib:ime-eval:test :lib:ime-eval:compileUatTestKotlin :build-logic:convention:test
 
-      # text debug only: the voice flavour's own code is tested by the voice tests in ime-core
+      # text debug only: the voice flavour's own code is tested by the voice tests in ime-core.
+      # The screenshot tests compare against app/src/test/screenshots (roborazzi.test.verify in
+      # gradle.properties); goldens are recorded on JDK 21 locally, the JDK set up above.
+      # One ABI: a build of all four links resources once per split, and the unit tests need one.
       - name: Run app unit tests
         if: success() || failure()
+        env:
+          BUILD_ABI: x86_64
         run: ./gradlew --build-cache :app:testTextDebugUnitTest :app:koverLogTextDebug
 
+      # what a changed look drew: <name>_actual.png and _compare.png beside the golden
+      - name: Upload screenshot differences
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: roborazzi-differences
+          path: app/build/outputs/roborazzi/
+          if-no-files-found: ignore
+
       # no other job sees the voice flavour on a push: its own code (src/voice), whose VoiceFeature
-      # the text stub has to match, and the unit tests' sources against it
-      - name: Compile the voice flavour
+      # the text stub has to match, the unit tests' sources against it, and the voice-only tests
+      # (VoiceKeyboardUatTest, VoiceHoldUatTest); the shared tests already ran on the text flavour
+      - name: Compile the voice flavour and run its own tests
         if: success() || failure()
-        run: ./gradlew --build-cache :app:compileVoiceDebugUnitTestKotlin
+        env:
+          BUILD_ABI: x86_64
+        run: ./gradlew --build-cache :app:testVoiceDebugUnitTest --tests '*Voice*'
 
       # the C++ tests of our sherpa-onnx changes (context graph, hotword and blocked-phrase encoding):
       # the runner's g++, with googletest and simple-sentencepiece downloaded SHA-256 checked; no NDK,
@@ -105,10 +122,23 @@ jobs:
         if: success() || failure()
         run: lib/sherpa-onnx/host-test.sh
 
-      # native-lib's helpers that need neither JNI nor fcitx (UTF-16 to UTF-8), the same way
-      - name: Run native-lib host tests
+      # uat.py's record keeping (attempts, flakes, the JVM cases' run file), no device
+      - name: Run UAT tool tests
         if: success() || failure()
-        run: app/src/test/cpp/host-test.sh
+        working-directory: uat/tools
+        run: python3 -m unittest test_uat
+
+      # the parity driver's log splitting, uat export and dry run (fcitx-replacement §7.2), no device
+      - name: Run parity tool tests
+        if: success() || failure()
+        working-directory: uat/parity
+        run: python3 -m unittest test_parity
+
+      # the release gates' scripts (uat/gates): backup retargeting, the INI reading of their checks
+      - name: Run gate tool tests
+        if: success() || failure()
+        working-directory: uat/gates
+        run: python3 -m unittest test_gates
 
       # the lexicon tools' tests: apply.py is the only check that a curator's readings did not slip a line
       - name: Run lexicon tool tests

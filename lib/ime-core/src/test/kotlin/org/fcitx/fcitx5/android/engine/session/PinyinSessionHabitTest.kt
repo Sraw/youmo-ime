@@ -181,6 +181,54 @@ class PinyinSessionHabitTest {
         assertEquals("点了", s.type("dl").candidates.first())
     }
 
+    // U-20 (D32 B), R14 F3734: 点了, no word of the dictionary, corrected to once under dl is walked in
+    // under dianl, no lower than second; under dl itself it goes by U-02
+    @Test
+    fun aWordCorrectedToUnderItsInitialsIsWalkedInSpeltInPart() {
+        val dl = pinyinDataOf(
+            Triple("带来", "dai lai", -2f), Triple("电量", "dian liang", -2f), Triple("店里", "dian li", -2f), Triple("电力", "dian li", -2.1f), Triple("点", "dian", -3f), Triple("打", "da", -3f),
+            Triple("了", "le", -4f), Triple("来", "lai", -3f), Triple("量", "liang", -3f), Triple("里", "li", -2f),
+        )
+        val learner = Learner(dl)
+        val s = PinyinSession(dl, PinyinSegmenter(), pageSize = 20, prediction = false, user = learner.model, learnTo = learner.learnTo())
+        val fresh = s.type("dianl").candidates.indexOf("点了")
+        assertTrue("$fresh", fresh < 0 || fresh > 1)
+        s.apply(Reset)
+        val shown = s.type("dl").candidates
+        val rest = s.apply(Select(shown.indexOf("点"))).candidates
+        assertEquals("点了", s.apply(Select(rest.indexOf("了"))).commit)
+        s.apply(Reset)
+        assertEquals(1, s.type("dianl").candidates.indexOf("点了"))
+    }
+
+    // U-20 (D32 B): 奉化 used twice spelt in full goes third under its 简拼 and its parts (fengh, feng'h:
+    // 半截 as the user asked); once is not enough, and never first nor second so
+    @Test
+    fun aWordUsedTwiceSpeltInFullGoesThirdUnderItsInitialsAndParts() {
+        val fh = pinyinDataOf(
+            Triple("风化", "feng hua", -1.5f), Triple("丰厚", "feng hou", -1.6f), Triple("风火", "feng huo", -1.7f),
+            Triple("凤凰", "feng huang", -1.8f), Triple("发挥", "fa hui", -1.4f), Triple("奉化", "feng hua", -4f),
+            Triple("风", "feng", -2f), Triple("化", "hua", -2f), Triple("奉", "feng", -4f),
+        )
+        val learner = Learner(fh)
+        val s = PinyinSession(fh, PinyinSegmenter(), pageSize = 20, prediction = false, user = learner.model, learnTo = learner.learnTo(), emoji = { listOf("🌀") })
+        fun at(keys: String) = s.type(keys).candidates.indexOf("奉化").also { s.apply(Reset) }
+        val fresh = listOf("fh", "fengh", "feng'h").associateWith(::at)
+        assertTrue("$fresh", fresh.values.all { it > 2 })
+        fun use() {
+            val shown = s.type("fenghua").candidates
+            s.apply(Select(shown.indexOf("奉化")))
+            s.apply(Reset)
+        }
+        use()
+        assertEquals(fresh, fresh.keys.associateWith(::at))
+        use()
+        for (keys in fresh.keys) {
+            val shown = s.type(keys).candidates.also { s.apply(Reset) }
+            assertEquals(keys, listOf("奉化", "🌀"), shown.subList(2, 4))
+        }
+    }
+
     // review-1b S3: where nothing is learned (a password) the pin is still first, nothing recorded
     @Test
     fun aPinIsFirstWhereNothingIsLearned() {

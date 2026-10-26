@@ -60,3 +60,13 @@ internal fun sessionTestData() = PinyinData.load(
             .build().toByteArray(),
     ),
 )
+
+/** A session that keeps each action it is told, to see who was told what. */
+internal class RecordedSession(private val s: Session) : Session by s {
+    val actions = ArrayList<Action>()
+
+    override fun apply(action: Action): Snapshot {
+        actions += action
+        return s.apply(action)
+    }
+}

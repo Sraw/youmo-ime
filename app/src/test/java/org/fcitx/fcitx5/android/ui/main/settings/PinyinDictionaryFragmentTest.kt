@@ -303,4 +303,21 @@ class PinyinDictionaryFragmentTest {
         runCurrent()
         assertEquals(listOf("before", "listed", "listed anew"), c.made)
     }
+
+    // what a dictionary's row on the 词库 page says of its words, as why they are missing and how many were counted (F3648)
+    private class WordsRow(val why: String, val missing: Missing, val words: Int, val shown: WordsShown)
+
+    @Test
+    fun eachRowSaysWhatOfItsWordsIsIn() = assertRows(
+        listOf(
+            WordsRow("nothing missing: its count", Missing.NONE, 12, WordsShown.COUNT),
+            WordsRow("nothing missing, none counted: still its count (0)", Missing.NONE, 0, WordsShown.COUNT),
+            // the words read before the damage are in the merged file, counted in its header
+            WordsRow("a gzip damaged past some words: damaged, with them", Missing.UNREADABLE, 12, WordsShown.DAMAGED),
+            // a text that could not be read, or a gzip bad from its start (its count throws: 0)
+            WordsRow("unreadable with none counted: unreadable", Missing.UNREADABLE, 0, WordsShown.UNREADABLE),
+            WordsRow("not converted for want of space: said so, whatever counted", Missing.UNCONVERTED, 12, WordsShown.UNCONVERTED),
+        ),
+        { it.why },
+    ) { assertEquals(it.shown, wordsShown(it.missing, it.words)) }
 }

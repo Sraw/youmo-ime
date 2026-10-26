@@ -155,7 +155,7 @@ class PredictionOrderTest {
         assertEquals(listOf("好", "吗", "呀", "啊", "你们"), texts())
     }
 
-    // PY-71: offered after the word as put in (你们, read 你 们): a word put back is turned off after it too, not after the decoder's piece
+    // 原 PY-71: offered after the word as put in (你们, read 你 们): a word put back is turned off after it too, not after the decoder's piece
     @Test
     fun aWordPutBackAfterTheWholeWordIsTurnedOffAfterIt() {
         picked("们", "你们", "好")

@@ -6,9 +6,10 @@ package org.fcitx.fcitx5.android.eval
 
 /**
  * One thing a user types as [input], and what they meant by it, after [context] when there is
- * any: the text before the cursor.
+ * any: the text before the cursor. [taps]: where across its key each of [input] was tapped, for
+ * the 14 keys ([Taps]); null for none.
  */
-data class Sample(val input: String, val expected: String, val tag: String, val context: String = "")
+data class Sample(val input: String, val expected: String, val tag: String, val context: String = "", val taps: List<Float>? = null)
 
 object EvalSet {
 

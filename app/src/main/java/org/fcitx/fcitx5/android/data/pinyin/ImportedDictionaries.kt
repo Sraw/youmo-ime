@@ -143,16 +143,18 @@ object ImportedDictionaries {
         val files = filesOf(dir, name).filter { it.isFile }
         if (files.isEmpty()) return false
         val turned = ArrayList<TextDictionary>()
+        fun turn(dictionary: TextDictionary, to: Boolean) = if (to) dictionary.enable() else dictionary.disable()
         for (dictionary in files.map(::TextDictionary)) {
             // one of its kind already in the state asked (a backup's overlaid beside a text): that one is it
             if (dictionary.isEnabled == on || dictionary.file.resolveSibling(twin(dictionary.file.name)) in files) continue
-            if (if (on) dictionary.enable() else dictionary.disable()) {
-                turned += dictionary
-            } else {
+            if (!turn(dictionary, on)) {
                 // one refused back leaves a text and its gzip parted (F3686): logged, to tell it on a device (F3701)
-                turned.filterNot { if (on) it.disable() else it.enable() }.forEach { Timber.w("%s: cannot turn it back", it.file.name) }
+                for (back in turned) {
+                    if (!turn(back, !on)) Timber.w("%s: cannot turn it back", back.file.name)
+                }
                 return false
             }
+            turned += dictionary
         }
         return true
     }
@@ -181,7 +183,7 @@ object ImportedDictionaries {
      * [modified]), put in its place, on or off as the text is now (a turn renames it meanwhile,
      * its length and time kept), the text deleted after: false, [temp] dropped, if the text went
      * or changed since (deleted, or a backup restored over it), converted again then if it is there.
-     * [Committed.left]: the text's [MergedDictionary.leftKey] if its delete was refused, taken here under the lock.
+     * [Committed.left]: the text's [LegacyTextConversion.leftKey] if its delete was refused, taken here under the lock.
      *
      * @throws IOException if it could not be renamed
      */
@@ -206,10 +208,10 @@ object ImportedDictionaries {
         // converted again over the kept one at the next start: a text is always whole
         if (text.delete()) return Committed(null)
         Timber.w("%s: cannot delete it, tried again at each compile", text.name)
-        return Committed(MergedDictionary.leftKey(text))
+        return Committed(LegacyTextConversion.leftKey(text))
     }
 
-    /** A conversion committed: [left], the [MergedDictionary.leftKey] of its text if that could not be deleted. */
+    /** A conversion committed: [left], the [LegacyTextConversion.leftKey] of its text if that could not be deleted. */
     internal class Committed(val left: String?)
 
     /**

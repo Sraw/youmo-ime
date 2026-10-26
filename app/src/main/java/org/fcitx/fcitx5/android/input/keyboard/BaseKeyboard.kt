@@ -10,6 +10,7 @@ import android.graphics.Rect
 import android.view.InputDevice
 import android.view.MotionEvent
 import android.view.View
+import android.view.accessibility.AccessibilityEvent
 import androidx.annotation.CallSuper
 import androidx.annotation.Keep
 import androidx.annotation.VisibleForTesting
@@ -101,6 +102,9 @@ abstract class BaseKeyboard(
 
     /** The layout's glide typing (滑行输入), if it has one: see [glideInput]. */
     protected open val glide: GlideInput? = null
+
+    /** Whether the layout shows the syllables to take itself (九键's column): the code row's then show none. */
+    open val ownsSyllables: Boolean get() = false
 
     /**
      * Glide typing over [letters], taken where [enabled] says and the setting is on, in a field
@@ -285,6 +289,9 @@ abstract class BaseKeyboard(
     /** What swiping [view] types where the user chose it ([TextKeyboard]): [SwipeChoice.BuiltIn] for what its key says. */
     protected open fun swipeText(view: KeyView): SwipeChoice = SwipeChoice.BuiltIn
 
+    /** What a tap on [view] sends for its [action]: the action itself, but where a keyboard adds where it fell ([CustomGestureView.clickAt]). */
+    protected open fun pressed(view: CustomGestureView, action: KeyAction): KeyAction = action
+
     private fun createKeyView(def: KeyDef): KeyView {
         return when (def.appearance) {
             is KeyDef.Appearance.AltText -> AltTextKeyView(context, theme, def.appearance)
@@ -299,7 +306,7 @@ abstract class BaseKeyboard(
                 is ReturnKey -> InputFeedbacks.SoundEffect.Return
                 else -> InputFeedbacks.SoundEffect.Standard
             }
-            // the number pad's space moves the cursor too (TB-27): it had the press only
+            // the number pad's space moves the cursor too (UAT PAN-14): it had the press only
             if (def is SpaceKey || def is MiniSpaceKey) {
                 spaceKeys.add(this)
                 swipeEnabled = spaceSwipeMoveCursor.getValue()
@@ -356,8 +363,8 @@ abstract class BaseKeyboard(
             def.behaviors.forEach {
                 when (it) {
                     is KeyDef.Behavior.Press -> {
-                        setOnClickListener { _ ->
-                            onAction(it.action)
+                        setOnClickListener { view ->
+                            onAction(pressed(view as CustomGestureView, it.action))
                         }
                     }
                     is KeyDef.Behavior.LongPress -> {
@@ -672,6 +679,11 @@ abstract class BaseKeyboard(
         // TalkBack reads the key's description instead of the text drawn on it, so the name
         // has to be in the description too
         space.contentDescription = context.getString(R.string.a11y_key_space_with_ime, imeName)
+        // the label's text and this description, changed together, go out as one event for the key
+        // with no subtree change: the accessibility cache kept the key's old node, and the old name
+        // was read for about a second after a switch (to 拼音 with 英文标点 on; with 中文标点 the
+        // punctuation keys' relabel happened to bring a subtree change along). Said outright here
+        space.parent?.notifySubtreeAccessibilityStateChanged(space, space, AccessibilityEvent.CONTENT_CHANGE_TYPE_SUBTREE)
     }
 
     /**

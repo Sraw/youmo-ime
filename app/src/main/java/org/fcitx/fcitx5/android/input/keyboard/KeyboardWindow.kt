@@ -18,6 +18,8 @@ import org.fcitx.fcitx5.android.core.FcitxAPI
 import org.fcitx.fcitx5.android.core.InputMethodEntry
 import org.fcitx.fcitx5.android.core.InputMethodNames
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
+import org.fcitx.fcitx5.android.data.prefs.PinyinKeyboard
+import org.fcitx.fcitx5.android.data.prefs.ShuangpinKeyboard
 import org.fcitx.fcitx5.android.engine.host.Engines
 import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
 import org.fcitx.fcitx5.android.input.bar.KawaiiBarComponent
@@ -31,6 +33,7 @@ import org.fcitx.fcitx5.android.input.editing.toEditorTraits
 import org.fcitx.fcitx5.android.input.picker.PickerWindow
 import org.fcitx.fcitx5.android.input.popup.PopupActionListener
 import org.fcitx.fcitx5.android.input.popup.PopupComponent
+import org.fcitx.fcitx5.android.input.preedit.PreeditComponent
 import org.fcitx.fcitx5.android.input.wm.EssentialWindow
 import org.fcitx.fcitx5.android.input.wm.InputWindow
 import org.fcitx.fcitx5.android.input.wm.InputWindowManager
@@ -49,6 +52,7 @@ class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), Essentia
     private val popup: PopupComponent by manager.must()
     private val bar: KawaiiBarComponent by manager.must()
     private val returnKeyDrawable: ReturnKeyDrawableComponent by manager.must()
+    private val preedit: PreeditComponent by manager.must()
 
     companion object : EssentialWindow.Key
 
@@ -75,6 +79,10 @@ class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), Essentia
         TextKeyboard.Name to { TextKeyboard(context, theme) },
         T9Keyboard.Name to { nineKeys(english = false) },
         T9Keyboard.EnglishName to { nineKeys(english = true) },
+        GroupedKeyboard.Name14 to { GroupedKeyboard(context, theme) },
+        GroupedKeyboard.Name18 to { GroupedKeyboard(context, theme, NineKeyLetters.G18) },
+        // the user's 按键字符 (its symbols) as 九键拼音 has them; its letters are 全拼's alone
+        T9Keyboard.ShuangpinName to { T9Keyboard(context, theme, symbols = NineKeySymbols.parse(AppPrefs.getInstance().keyboard.t9Symbols.getValue()), shuangpin = true) },
         NumberKeyboard.Name to { NumberKeyboard(context, theme) },
         HandwritingKeyboard.Name to {
             HandwritingKeyboard(
@@ -159,6 +167,8 @@ class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), Essentia
             it.inPasswordField = service.inPasswordField
             (it as? T9Keyboard)?.noSuggestions = noSuggestions
             it.address = address
+            stripOwned = it.ownsSyllables
+            preedit.ui.syllables.owned = stripHidden()
             spaceKeys.attach(it) {
                 keyboardView.apply { add(it, lParams(matchParent, matchParent)) }
                 it.onAttach()
@@ -166,6 +176,15 @@ class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), Essentia
             }
         }
     }
+
+    // whether the keyboard shown offers the syllables itself (九键's column), as it attached
+    private var stripOwned = false
+
+    // the code row's strip hidden: 九键's column offers the syllables, or 九键双拼's 123 shows a code row
+    // of 18dp, too low for a strip to be tapped; on each attach and input method change (123 stays)
+    private fun stripHidden() = syllablesOwned(
+        stripOwned, spaceKeys.current?.uniqueName, shuangpinKeyboard.getValue(), KawaiiBarComponent.preeditHeight()
+    )
 
     /** Whether the letters are the layout shown, which take the whole width, split. */
     val lettersShown get() = currentKeyboardName == TextKeyboard.Name
@@ -254,18 +273,21 @@ class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), Essentia
     // keyboard for a moment
     private val showAnew: () -> Unit = { spaceKeys.current?.let(::onImeUpdate) }
 
+    // pinyin's and 双拼's keyboards
+    private val pinyinKeyboard = AppPrefs.getInstance().keyboard.pinyinKeyboard
+    private val shuangpinKeyboard = AppPrefs.getInstance().keyboard.shuangpinKeyboard
+
     override fun onImeUpdate(ime: InputMethodEntry) {
         spaceKeys.current = ime
+        preedit.ui.syllables.owned = stripHidden()
         val nine = EnglishLayoutPolicy.nineKeys(ime.uniqueName, englishOnNineKeys.getValue())
-        if (englishOnNineKeys.getValue() && EnglishLayoutPolicy.endsNineKeys(ime.uniqueName, fcitx.runImmediately { inputMethodEntryCached }.uniqueName)) {
+        val ends = EnglishLayoutPolicy.endsNineKeys(ime.uniqueName, fcitx.runImmediately { inputMethodEntryCached }.uniqueName)
+        if (englishOnNineKeys.getValue() && ends) {
             englishOnNineKeys.setValue(false)
         }
-        val letters = when (ime.uniqueName) {
-            Engines.T9 -> T9Keyboard.Name
-            Engines.HANDWRITING -> HandwritingKeyboard.Name
-            Engines.ENGLISH -> if (nine) T9Keyboard.EnglishName else TextKeyboard.Name
-            else -> TextKeyboard.Name
-        }
+        val keys14 = pinyinKeyboard.getValue() == PinyinKeyboard.Keys14
+        val sp = shuangpinKeyboard.getValue()
+        val letters = lettersOf(ime.uniqueName, nine, keys14, sp)
         val shown = lettersLayout.inputMethodChanged(letters, currentKeyboardName)
         // a layout shown anew is told the input method as it is attached
         if (shown != null) showLayout(shown) else currentKeyboard?.let(spaceKeys::show)
@@ -308,6 +330,32 @@ class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), Essentia
     private fun notifyBarLayoutChanged() {
         bar.onKeyboardLayoutSwitched(currentKeyboardName == NumberKeyboard.Name)
     }
+}
+
+/**
+ * Whether the code row's syllables are hidden: the keyboard offers them itself ([owns], 九键's
+ * column), or 九键双拼's code row ([shuangpin], with [im] 双拼) is [preeditHeight] dp, under a
+ * touch target (on its 123, whose keyboard owns none). With the 14 or 18 keys the row is 40dp.
+ */
+internal fun syllablesOwned(owns: Boolean, im: String?, shuangpin: ShuangpinKeyboard, preeditHeight: Int): Boolean =
+    owns || (im == Engines.SHUANGPIN && shuangpin == ShuangpinKeyboard.NineKeys && preeditHeight < KawaiiBarComponent.MIN_TOUCH_DP)
+
+/**
+ * The letters' layout of input method [ime]: 九键's, handwriting's, English's on the nine keys
+ * where 中/英 brought it there ([nine]), pinyin's 14 keys where its setting has them ([keys14]),
+ * 双拼's 18 keys or nine keys as its setting has them ([shuangpin]); the full keyboard else.
+ */
+internal fun lettersOf(ime: String, nine: Boolean, keys14: Boolean, shuangpin: ShuangpinKeyboard = ShuangpinKeyboard.Full): String = when (ime) {
+    Engines.T9 -> T9Keyboard.Name
+    Engines.HANDWRITING -> HandwritingKeyboard.Name
+    Engines.ENGLISH -> if (nine) T9Keyboard.EnglishName else TextKeyboard.Name
+    Engines.PINYIN -> if (keys14) GroupedKeyboard.Name14 else TextKeyboard.Name
+    Engines.SHUANGPIN -> when (shuangpin) {
+        ShuangpinKeyboard.Full -> TextKeyboard.Name
+        ShuangpinKeyboard.Keys18 -> GroupedKeyboard.Name18
+        ShuangpinKeyboard.NineKeys -> T9Keyboard.ShuangpinName
+    }
+    else -> TextKeyboard.Name
 }
 
 /**

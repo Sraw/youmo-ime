@@ -13,7 +13,9 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import org.fcitx.fcitx5.android.daemon.FcitxDaemon
 import org.fcitx.fcitx5.android.data.pinyin.dict.SourceNames
+import org.fcitx.fcitx5.android.engine.data.DataFile
 import org.fcitx.fcitx5.android.engine.data.PinyinData
+import org.fcitx.fcitx5.android.engine.host.BackgroundWork
 import org.fcitx.fcitx5.android.engine.host.Engines
 import org.fcitx.fcitx5.android.engine.user.DictionaryCompiler
 import org.fcitx.fcitx5.android.engine.user.DictionaryFile
@@ -22,21 +24,21 @@ import timber.log.Timber
 import java.io.EOFException
 import java.io.File
 import java.io.FileInputStream
-import java.io.FileNotFoundException
 import java.io.FilterInputStream
 import java.io.IOException
 import java.io.InputStream
-import java.io.RandomAccessFile
 import java.nio.ByteBuffer
-import java.nio.ByteOrder
 import java.nio.channels.FileChannel
 import java.security.MessageDigest
 import java.util.Collections
 import java.util.concurrent.CancellationException
 import java.util.concurrent.ExecutionException
+import java.util.concurrent.Executor
 import java.util.concurrent.ExecutorService
-import java.util.concurrent.Executors
 import java.util.concurrent.Future
+import java.util.concurrent.LinkedBlockingQueue
+import java.util.concurrent.ThreadPoolExecutor
+import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicReference
 import java.util.zip.CRC32
@@ -74,7 +76,11 @@ object MergedDictionary {
 
     // the one compile at a time, with at most one more waiting: a change made while one runs is
     // compiled after it, from the files as they are then
-    private val compiles: ExecutorService = Executors.newSingleThreadExecutor { Thread(it, "dictionary-compile").apply { isDaemon = true } }
+    // each counted till it has run, for the debug build's idle signal (BackgroundWork)
+    private val compiles: ExecutorService = object : ThreadPoolExecutor(1, 1, 0, TimeUnit.MILLISECONDS, LinkedBlockingQueue(),
+        { Thread(it, "dictionary-compile").apply { isDaemon = true } }) {
+        override fun execute(command: Runnable) = BackgroundWork.counted(Executor { super.execute(it) }).execute(command)
+    }
     private val queued = AtomicBoolean()
 
     // stamps that failed to compile (the disk full, too many words): not tried again at each
@@ -92,111 +98,35 @@ object MergedDictionary {
         runCatching { File(dir, FAILED).writeText(stamp) }.onFailure { Timber.w(it, "%s", FAILED) }
     }
 
-    // dictionaries' files that could not be read, as name, length and time ([signature]): an older
+    // dictionaries' files that could not be read, as name, length and time ([Signature]): an older
     // build's text that could not be read, a kept one whose gzip is damaged. Skipped, the others
     // compiled; not tried again at each reload and start (kept in its file), but once the file
     // changes or the 词库 page opens ([retry]), which names them ([unreadable]) (F3592, F3593)
-    private val unreadNotes = Notes(".merged.unreadable")
+    internal val unreadNotes = Notes(".merged.unreadable")
 
     // an older build's texts read but not converted, their gzip not written (the disk full): kept
     // as they were, skipped like [unreadNotes] till the 词库 page opens ([retry]), which says to free
     // space, not to delete them ([unconverted]): nothing is wrong with them (F3645)
-    private val unwrittenNotes = Notes(".merged.unwritten")
+    internal val unwrittenNotes = Notes(".merged.unwritten")
 
     // an older build's texts converted, their gzip in place, but the text itself not deleted (refused):
     // not converted again at each start (an upgrade told each time, F3660) while that gzip, of the
     // text's state, is there; its delete tried again at each compile, the note dropped once it is
     // gone, or once the gzip is (deleted: the text converted then like any, F3674, F3675; a turn
     // renames both, the note kept, F3686).
-    // Not named on the page nor cleared by [retry]: its words are in the gzip, nothing is owed
-    private val leftNotes = Notes(".merged.left")
-
-    private class Notes(val fileName: String) {
-        val signatures = HashSet<String>()
-    }
+    // Not named on the page nor cleared by [retry]: its words are in the gzip, nothing is owed.
+    // Noted by its name on ([LegacyTextConversion.leftKey]), whichever state it is in
+    internal val leftNotes = Notes(".merged.left", LegacyTextConversion::leftKey)
 
     // an upgrade's compile owed: its texts converted or the file of the format before dropped, the
     // compile not done yet. A kill meanwhile leaves no text nor old file to tell it by (F3601)
     private const val UPGRADING = ".merged.upgrading"
 
-    internal fun signature(f: File) = "${f.name}\t${f.length()}\t${f.lastModified()}"
-
-    private fun fileNameOf(signature: String) = signature.substringBeforeLast('\t').substringBeforeLast('\t')
-
-    private fun notedIn(dir: File, notes: Notes): Set<String> =
-        synchronized(notes) { notes.signatures.toSet() } + runCatching { File(dir, notes.fileName).readLines() }.getOrDefault(emptyList())
-
-    // [signatures] kept in [notes], with those before whose files are still as they were
-    private fun note(dir: File, notes: Notes, signatures: Collection<String>, key: (File) -> String = ::signature) {
-        if (signatures.isEmpty()) return
-        synchronized(notes) { notes.signatures += signatures }
-        val there = dir.listFiles().orEmpty().mapTo(HashSet(), key)
-        runCatching { File(dir, notes.fileName).writeText(notedIn(dir, notes).filter { it in there }.joinToString("") { "$it\n" }) }
-            .onFailure { Timber.w(it, "%s", notes.fileName) }
-    }
-
-    // [signatures] no longer kept in [notes]
-    private fun forget(dir: File, notes: Notes, signatures: Collection<String>) {
-        if (signatures.isEmpty()) return
-        synchronized(notes) { notes.signatures -= signatures.toSet() }
-        val file = File(dir, notes.fileName)
-        val kept = runCatching { file.readLines() }.getOrDefault(emptyList()) - signatures.toSet()
-        runCatching { if (kept.isEmpty()) file.delete() else file.writeText(kept.joinToString("") { "$it\n" }) }
-            .onFailure { Timber.w(it, "%s", notes.fileName) }
-    }
-
-    /**
-     * A left text as [leftNotes] has it: its signature by its name on, whichever state it is in. A turn
-     * renames a dictionary's text and gzip together (F3686), and the note stays the text's.
-     */
-    internal fun leftKey(text: File) = "${SourceNames.textName(SourceNames.nameOf(text.name), true)}\t${text.length()}\t${text.lastModified()}"
-
-    // the text, on or off, [key] notes in [leftNotes] as it is now; null if there is none
-    private fun leftText(dir: File, key: String): File? {
-        val name = SourceNames.nameOf(fileNameOf(key))
-        return listOf(true, false).map { File(dir, SourceNames.textName(name, it)) }.firstOrNull { it.isFile && leftKey(it) == key }
-    }
-
-    // the texts noted in [leftNotes] whose gzip of their own state is there: their words are in it
-    private fun leftHeld(dir: File): Set<String> = notedIn(dir, leftNotes).filterTo(HashSet()) {
-        val text = leftText(dir, it) ?: return@filterTo false
-        File(dir, SourceNames.fileName(SourceNames.nameOf(text.name), SourceNames.isOn(text.name))).isFile
-    }
-
-    // each text noted in [leftNotes] deleted again, under the sources lock (no reconversion, no
-    // upgrade told); the note dropped once it is gone or its gzip is (F3674, F3675)
-    private fun retryLeft(dir: File) {
-        val noted = notedIn(dir, leftNotes)
-        if (noted.isEmpty()) return
-        val dropped = synchronized(ImportedDictionaries) {
-            val held = leftHeld(dir)
-            noted.filter { s ->
-                val text = leftText(dir, s)
-                text == null || s !in held || text.delete()
-            }
-        }
-        forget(dir, leftNotes, dropped)
-    }
-
-    private fun namesIn(dir: File, notes: Notes): Set<String> {
-        val there = dir.listFiles().orEmpty().mapTo(HashSet(), ::signature)
-        return notedIn(dir, notes).filter { it in there }.mapTo(HashSet()) { SourceNames.nameOf(fileNameOf(it)) }
-    }
-
     /** The names of [dir]'s dictionaries that could not be read, left out of the merged file till they change: for the page to name. */
-    fun unreadable(dir: File): Set<String> = namesIn(dir, unreadNotes)
+    fun unreadable(dir: File): Set<String> = unreadNotes.namesIn(dir)
 
     /** The names of [dir]'s texts not converted for want of space, kept as they were till the page opens again: for the page to name. */
-    fun unconverted(dir: File): Set<String> = namesIn(dir, unwrittenNotes)
-
-    // an older build's texts in [dir] still to convert: not those that could not be before
-    private fun toConvert(dir: File): List<File> {
-        val texts = SourceNames.unconverted(dir)
-        if (texts.isEmpty()) return texts
-        val skipped = notedIn(dir, unreadNotes) + notedIn(dir, unwrittenNotes)
-        val held = leftHeld(dir)
-        return texts.filter { signature(it) !in skipped && leftKey(it) !in held }
-    }
+    fun unconverted(dir: File): Set<String> = unwrittenNotes.namesIn(dir)
 
     private fun owe(marker: File) {
         runCatching { marker.createNewFile() }.onFailure { Timber.w(it, "%s", UPGRADING) }
@@ -204,8 +134,11 @@ object MergedDictionary {
 
     private var swept = false
 
-    // the process's start, wall-clock: a dictionary's tmp older is a killed one's, swept; one this process writes is not
-    private val startedAt = System.currentTimeMillis()
+    // this object's first use in the process, wall-clock, less [MTIME_SLACK_MS]: a dictionary's tmp older is a killed
+    // one's, swept; one this process writes is not, though the storage keep its time to the second only (F4100)
+    private val startedAt = System.currentTimeMillis() - MTIME_SLACK_MS
+
+    private const val MTIME_SLACK_MS = 2_000L
 
     /**
      * What a compile is for: an upgrade, the first from what an older build left (0.3.1's texts, or
@@ -302,7 +235,7 @@ object MergedDictionary {
      */
     fun current(dir: File): Seen {
         val sources = sources(dir)
-        val unconverted = toConvert(dir)
+        val unconverted = LegacyTextConversion.toConvert(dir)
         if (unconverted.isNotEmpty()) {
             // an older build's texts (0.3.1's or 0.3.2's, or a backup of theirs restored): pending till
             // converted and compiled, without the 词库 page opened; the file in use meanwhile, or the one
@@ -365,8 +298,8 @@ object MergedDictionary {
         // words, till it is converted: pending, a word of it not taken for none of theirs (F3677)
         val texts = SourceNames.unconverted(dir)
         if (texts.isNotEmpty()) {
-            val held = leftHeld(dir)
-            if (texts.any { SourceNames.isOn(it.name) && leftKey(it) !in held }) return true
+            val held = LegacyTextConversion.leftHeld(dir)
+            if (texts.any { SourceNames.isOn(it.name) && LegacyTextConversion.leftKey(it) !in held }) return true
         }
         val sources = sources(dir)
         return sources.isNotEmpty() && opened.get()?.stamp != stamp(sources)
@@ -397,15 +330,8 @@ object MergedDictionary {
         synchronized(failed) { failed.clear() }
         File(dir, FAILED).delete()
         // the texts not converted tried again; a damaged gzip stays named, its compile (of the same stamp) not run again
-        val left = notedIn(dir, unreadNotes).filterNot { SourceNames.isText(fileNameOf(it)) }
-        synchronized(unreadNotes) {
-            unreadNotes.signatures.clear()
-            unreadNotes.signatures += left
-        }
-        File(dir, unreadNotes.fileName).delete()
-        note(dir, unreadNotes, left)
-        synchronized(unwrittenNotes) { unwrittenNotes.signatures.clear() }
-        File(dir, unwrittenNotes.fileName).delete()
+        unreadNotes.replace(dir, unreadNotes.notedIn(dir).filterNot { SourceNames.isText(Signature.fileNameOf(it)) })
+        unwrittenNotes.replace(dir, emptyList())
         // one queued already (a check's) runs after the clear: waited for through a step behind it, on the one thread
         return refresh(dir) ?: compiles.submit {}
     }
@@ -433,20 +359,23 @@ object MergedDictionary {
         sweep(dir)
         if (cancel.get()) throw CancellationException("cancelled")
         try {
-            make(dir, forImport, Progress(if (forImport) Kind.UPDATE else Kind.UPGRADE, cancel))
+            makeFrom(dir, forImport, Progress(if (forImport) Kind.UPDATE else Kind.UPGRADE, cancel))
         } finally {
             // once, at the end: not between the conversion and the compile, the bar emptied between (F3597)
             working.value = null
         }
     }
 
-    private fun make(dir: File, forImport: Boolean, progress: Progress) {
+    // the work of [make], after its sweep
+    private fun makeFrom(dir: File, forImport: Boolean, progress: Progress) {
         val dest = File(dir, FILE)
         val owed = File(dir, UPGRADING)
         // one this reader refuses (0.3.2's, 105 MiB for frost) freed before the conversion writes beside it
         val dropped = dropUnread(dest)
         if (dropped) owe(owed)
-        val converted = convert(dir, progress, owed)
+        val conversion = LegacyTextConversion.convert(dir, { owe(owed) }, { progress.converting = true }) { progress.tell(Step.CONVERT, it) }
+        progress.unconverted = conversion.unconverted
+        val converted = conversion.any
         // a backup's kept both on and off (no text of its name): one of them
         ImportedDictionaries.settle(dir)
         val sources = sources(dir)
@@ -483,7 +412,8 @@ object MergedDictionary {
             return
         }
         compile(sources, dest, stamp, base, progress, tells = !forImport)
-        if (!forImport) owed.delete()
+        // an import's too: one whose compile converted texts made the marker, and the compile is done (F4099)
+        owed.delete()
         File(dir, FAILED).delete()
     }
 
@@ -498,34 +428,17 @@ object MergedDictionary {
         }
     }
 
-    // [dest] deleted if this reader refuses it (another format, damaged): whether it was of the
-    // format before, an upgrade; a damaged one of this format is made again as an update (F3599)
+    // [dest] deleted if its header is not this reader's format: whether it was of the format before,
+    // an upgrade. One whose header says this format is kept here: a damaged one is caught by
+    // openOrDelete's verified open and made again as an update (F3599), without mapping it twice (F4044)
     private fun dropUnread(dest: File): Boolean {
         if (!dest.isFile) return false
-        try {
-            DictionaryFile.open(dest, verify = false)
-            return false
-        } catch (e: IOException) {
-            Timber.w(e, "%s: deleted, made again", FILE)
-        }
-        val before = ofFormatBefore(dest)
+        val format = DataFile.peekKindVersion(dest)
+        if (format == DictionaryFile.VERSION) return false
+        Timber.w("%s: format %s, deleted, made again", FILE, format)
         if (!dest.delete()) Timber.w("%s: cannot delete it", FILE)
-        return before
+        return format == FORMAT_BEFORE
     }
-
-    // an engine data file (DataFile's header: magic, container version, kind, sections, the kind's version) of the format before
-    private fun ofFormatBefore(file: File): Boolean = runCatching {
-        RandomAccessFile(file, "r").use { f ->
-            val header = ByteArray(HEADER_BYTES)
-            f.readFully(header)
-            val b = ByteBuffer.wrap(header).order(ByteOrder.LITTLE_ENDIAN)
-            header.copyOf(MAGIC.size).contentEquals(MAGIC) && b.getInt(KIND_VERSION_AT) == FORMAT_BEFORE
-        }
-    }.getOrDefault(false)
-
-    private val MAGIC = "FCITXIME".toByteArray()
-    private const val HEADER_BYTES = 24
-    private const val KIND_VERSION_AT = 20
 
     // merged.ymd's format in 0.3.2 and 0.3.1 (DictionaryFile v1)
     private const val FORMAT_BEFORE = 1
@@ -544,113 +457,6 @@ object MergedDictionary {
             val percent = (from + (to - from) * share.coerceIn(0f, 1f)).toInt()
             if (working.value?.percent != percent || working.value?.stage != step) working.value = Work(kind, step, percent).also(told)
         }
-    }
-
-    /**
-     * Each text an older build left in [dir] gzip'd into a tmp, outside the sources lock, then put
-     * in its place under it ([ImportedDictionaries.commitConversion]), till none is left: one
-     * turned, deleted or restored over meanwhile is listed again. Whether any was converted. One
-     * that cannot be is skipped, the others converted, and noted
-     * ([unreadable] if it could not be read, else [unconverted]; [Progress.unconverted]); not tried again till it changes or is retried (F3592).
-     * [owed] made first: a kill after a commit leaves the upgrade owed.
-     */
-    private fun convert(dir: File, progress: Progress, owed: File): Boolean {
-        // a text both on and off (a backup restored over the other state): the newer one, before either is gzip'd (F3596)
-        ImportedDictionaries.settle(dir)
-        val failed = ArrayList<String>()
-        val unread = ArrayList<String>()
-        // committed this pass: a text whose delete failed after its commit is not converted again in it (F3649)
-        val done = HashSet<String>()
-        // such a text, as it is: not converted again at a later start either (F3660); its signature
-        // taken under the sources lock, a turn meanwhile renaming it (F3675)
-        // (no test of the write: a delete refused while the rename beside it is allowed needs a hook in this code)
-        val left = ArrayList<String>()
-        retryLeft(dir)
-        fun left() = toConvert(dir).filter { signature(it) !in failed && signature(it) !in unread && SourceNames.nameOf(it.name) !in done }
-        var texts = left()
-        if (texts.isEmpty()) return false
-        owe(owed)
-        progress.converting = true
-        val total = texts.sumOf { it.length() }.coerceAtLeast(1)
-        var read = 0L
-        var converted = false
-        progress.tell(Step.CONVERT, 0f)
-        while (texts.isNotEmpty()) {
-            val seen = texts.map(::signature)
-            var committed = false
-            for (text in texts) {
-                val name = SourceNames.nameOf(text.name)
-                val length = text.length()
-                val modified = text.lastModified()
-                val temp = File(dir, name + SourceNames.CONVERT_TMP)
-                try {
-                    val gzipped = gzip(text, temp) { n ->
-                        read += n
-                        progress.tell(Step.CONVERT, read.toFloat() / total)
-                    }
-                    val commit = if (gzipped) ImportedDictionaries.commitConversion(dir, name, temp, length, modified) else null
-                    if (commit != null) {
-                        committed = true
-                        converted = true
-                        done += name
-                        left += listOfNotNull(commit.left)
-                    }
-                } catch (e: Unread) {
-                    Timber.w(e.cause, "%s: cannot be read", text.name)
-                    unread += "${text.name}\t$length\t$modified"
-                } catch (e: IOException) {
-                    // its gzip not written (most likely the disk full): kept as it is, tried again when the page opens (F3645)
-                    Timber.w(e, "%s: not converted", text.name)
-                    failed += "${text.name}\t$length\t$modified"
-                } finally {
-                    temp.delete()
-                }
-            }
-            texts = left()
-            // none could be, and they are as they were: not here for ever, tried again once they change
-            if (!committed && texts.map(::signature) == seen) {
-                failed += seen.filter { it !in unread }
-                break
-            }
-        }
-        note(dir, unreadNotes, unread)
-        note(dir, unwrittenNotes, failed)
-        note(dir, leftNotes, left, ::leftKey)
-        progress.unconverted = failed.isNotEmpty() || unread.isNotEmpty()
-        return converted
-    }
-
-    // a text's own read failed, not the gzip's write: the text is what is wrong (F3645)
-    private class Unread(cause: IOException) : IOException(cause)
-
-    // [text] gzip'd into [temp], synced, [read] told of the bytes as they go; false if it is not
-    // there (turned or deleted since it was listed: listed again)
-    // @throws Unread if the text cannot be read, another IOException if the gzip cannot be written
-    private fun gzip(text: File, temp: File, read: (Int) -> Unit): Boolean {
-        val input = try {
-            FileInputStream(text)
-        } catch (e: FileNotFoundException) {
-            // there but not to be read: a failure, not a text gone
-            if (text.exists()) throw Unread(e)
-            Timber.d(e, "%s: listed again", text.name)
-            return false
-        }
-        input.use {
-            SourceNames.writeGzip(temp) { out ->
-                val buffer = ByteArray(CONVERT_BUFFER)
-                while (true) {
-                    val n = try {
-                        input.read(buffer)
-                    } catch (e: IOException) {
-                        throw Unread(e)
-                    }
-                    if (n < 0) break
-                    out.write(buffer, 0, n)
-                    read(n)
-                }
-            }
-        }
-        return true
     }
 
     // [sources] compiled into [dest], told as [progress]'s kind in [work] and [done] as it goes; the engine told then.
@@ -672,7 +478,7 @@ object MergedDictionary {
         try {
             val result = DictionaryCompiler.compile(
                 sources.map { f ->
-                    val signature = signature(f)
+                    val signature = Signature.lineOf(f)
                     linesOf(f, inputs, { read += it }) { damaged += signature }
                 },
                 dest,
@@ -686,7 +492,7 @@ object MergedDictionary {
             )
             Timber.i("merged dictionaries: %d words of %d files, %d of the base, %d lines unread", result.words, sources.size, result.inBase, result.unread)
             opened.set(Opened(stamp, DictionaryFile.open(dest)))
-            note(dest.parentFile!!, unreadNotes, damaged)
+            unreadNotes.note(dest.parentFile!!, damaged)
             ok = true
             tellMade()
         } catch (e: IOException) {
@@ -759,8 +565,6 @@ object MergedDictionary {
 
     private const val CONVERT_SHARE = 30f
 
-    private const val CONVERT_BUFFER = 1 shl 16
-
     // a file that is damaged, cut short or of another build is deleted: compiled again
     private fun openOrDelete(dest: File): DictionaryFile? {
         if (!dest.exists()) return null
@@ -806,9 +610,9 @@ object MergedDictionary {
         compiles.submit {}.get()
         opened.set(null)
         synchronized(failed) { failed.clear() }
-        synchronized(unreadNotes) { unreadNotes.signatures.clear() }
-        synchronized(unwrittenNotes) { unwrittenNotes.signatures.clear() }
-        synchronized(leftNotes) { leftNotes.signatures.clear() }
+        unreadNotes.clear()
+        unwrittenNotes.clear()
+        leftNotes.clear()
         swept = false
         queued.set(false)
         working.value = null

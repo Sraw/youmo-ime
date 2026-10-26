@@ -4,6 +4,8 @@
  */
 package org.fcitx.fcitx5.android.input.popup
 
+import org.fcitx.fcitx5.android.host.KeyCodes
+
 /**
  * What the user changed about the characters a key offers on long press.
  *
@@ -15,7 +17,7 @@ package org.fcitx.fcitx5.android.input.popup
  * Stored as text, one line per key: the label, then its candidates, all separated by
  * whitespace (including full-width spaces). So neither can contain whitespace, which no real key
  * label or candidate does. A candidate longer than one character is committed as text.
- * A later line for the same label wins.
+ * A later line for the same label wins. A keyboard's own code is never offered ([rejects]).
  */
 class PopupOverrides private constructor(private val table: Map<String, List<String>>) {
 
@@ -31,7 +33,11 @@ class PopupOverrides private constructor(private val table: Map<String, List<Str
      * @return what to show on long press; null when there is nothing to show
      */
     fun resolve(label: String, preset: Array<String>?): Array<String>? {
-        val items = table[label] ?: shiftedOverride(label) ?: return preset
+        // a code kept by an older build (0.3.x, a backup) is not offered, but stays in the text as written
+        val stored = table[label] ?: shiftedOverride(label) ?: return preset
+        val items = stored.filterNot(::rejects)
+        // emptied only by codes left out: the user switched nothing off, so the built-in ones show
+        if (items.isEmpty() && stored.isNotEmpty()) return preset
         return items.takeIf { it.isNotEmpty() }?.toTypedArray()
     }
 
@@ -48,7 +54,7 @@ class PopupOverrides private constructor(private val table: Map<String, List<Str
     private fun upperCase(item: String): String = item.uppercase().takeIf { it.length == item.length } ?: item
 
     fun with(label: String, items: List<String>): PopupOverrides {
-        val clean = items.filter { it.isNotEmpty() }
+        val clean = items.filter { it.isNotEmpty() && !rejects(it) }
         return PopupOverrides(LinkedHashMap(table).also { it[label] = clean })
     }
 
@@ -73,6 +79,17 @@ class PopupOverrides private constructor(private val table: Map<String, List<Str
 
         /** Splits [text] into words the way the stored format does. */
         fun tokens(text: String): List<String> = text.split(whitespace).filter { it.isNotEmpty() }
+
+        /**
+         * Whether [item] is a keyboard's own code alone, refused ([KeyCodes.isInternal]): the grouped
+         * keyboards' codes (NineKeyLetters.CODES) and any other private use character (Keyboard's SYLLABLES, TAPS, INK…, some past the BMP: one
+         * character, two chars). A popup sends any single code point as a key, read as that key;
+         * text of more characters is committed as text, never read so. Not
+         * kept by [with] (the settings page says why) nor offered by [resolve]; what an older build
+         * stored stays in the text, so a save of another key does not rewrite it.
+         */
+        fun rejects(item: String): Boolean =
+            item.isNotEmpty() && item.codePointCount(0, item.length) == 1 && KeyCodes.isInternal(item.codePointAt(0))
 
         /** Never throws: a line that does not parse is skipped, so a bad edit cannot break typing. */
         fun parse(text: String): PopupOverrides {

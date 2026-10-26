@@ -65,7 +65,7 @@ class HandwritingSessionUndoTest {
         assertFalse("人" in learner.log.state.wordUses)
     }
 
-    // switched to in an empty field (UAT HW-22/23): fcitx's reset of the session leaves the field
+    // switched to in an empty field (UAT HW-23): fcitx's reset of the session leaves the field
     // unknown, an empty context does not say it; told the field started (FieldPolicy.inputMethodChanged), it is known
     @Test
     fun switchedToInAnEmptyFieldTheFieldToldStartedLetsADeletionBeTakenBack() {
@@ -112,7 +112,7 @@ class HandwritingSessionUndoTest {
         assertEquals(1, uses(code("高", "话"), "高"))
     }
 
-    // HW-22: 人 picked over 天, 天 put in by space and deleted, 人 picked again: two running, 人 first
+    // 人 picked over 天, 天 put in by space and deleted, 人 picked again: two running, 人 first
     @Test
     fun aDeletedAutoCommitBreaksNoCorrectionsRunning() {
         put(tianRead, "人")

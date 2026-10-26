@@ -34,6 +34,8 @@ fun Timber.Forest.setupForest(verbose: Boolean) {
     // keeps it in step with the tree, and leaving it null when debug logging is off preserves
     // the old behaviour of not formatting messages that would be dropped anyway.
     CoreLog.sink = if (debugLogging) ({ Timber.tag("ime-core").d(it) }) else null
+    // errors always: a release build's exported log must still carry them
+    CoreLog.errorSink = { Timber.tag("ime-core").e(it) }
     // state machine tracing follows the setting alone, as it did before it moved to ime-core
     CoreLog.verbose = verbose
 }

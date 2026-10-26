@@ -57,7 +57,7 @@ class TableHabitsTest {
         assertTrue(recorded.all { it.prev == "" })
     }
 
-    // F2739 (TBL-39): 员 corrected to once, then shown first (here by a pin; 调频's models do it on a
+    // F2739 (原 TBL-39): 员 corrected to once, then shown first (here by a pin; 调频's models do it on a
     // phone); 叫, the table's own first, picked over it is a use of it: the streak restarts, so 员 needs
     // two more picks to be first
     @Test
@@ -86,7 +86,7 @@ class TableHabitsTest {
         assertEquals("员", learner.habits.first(code, "")?.text)
     }
 
-    // TBL-39: the own first picked while a pin shows another first leaves, once unpinned, the own first first
+    // 原 TBL-39: the own first picked while a pin shows another first leaves, once unpinned, the own first first
     @Test
     fun theOwnFirstPickedUnderAPinIsStillFirstOnceUnpinned() {
         val t = session(TableOptions.WUBI.copy(autoSelect = false, orderByUse = true))
@@ -360,7 +360,7 @@ class TableHabitsTest {
         assertEquals(Tier.FIRST_HERE, t.why(0)!!.tier)
     }
 
-    // verify-int-step1a G1: 一、二级简码 stay in order under 调频 whatever is picked, and say no why (TBL-13)
+    // verify-int-step1a G1: 一、二级简码 stay in order under 调频 whatever is picked, and say no why (原 TBL-13)
     @Test
     fun withOrderByUseAShortCodesWordsNeverMove() {
         val short = dictionary("a 工", "a 戈", "aa 式", "aa 戒", "aaaa 工")

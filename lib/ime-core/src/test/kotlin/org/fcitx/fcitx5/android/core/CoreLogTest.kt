@@ -15,7 +15,15 @@ class CoreLogTest {
     @After
     fun detach() {
         CoreLog.sink = null
+        CoreLog.errorSink = null
         CoreLog.verbose = false
+    }
+
+    @Test
+    fun errorsReachTheErrorSinkWithoutASinkOrVerbose() {
+        CoreLog.errorSink = { logged += it }
+        CoreLog.e("x")
+        assertEquals(listOf("x"), logged)
     }
 
     @Test

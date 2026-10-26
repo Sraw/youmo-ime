@@ -88,4 +88,12 @@ class StringEscapeTest {
         Assert.assertEquals("abc", FcitxUtils.unescapeForValue("abc"))
         Assert.assertEquals("你好", FcitxUtils.unescapeForValue("你好"))
     }
+
+    @Test
+    fun aQuoteInsideIsNoValueAnEscapedEndIsKeptAsWritten() {
+        // fcitx-utils/stringutils.cpp:390-402, 435-499 (QuickPhrase's table reads its values with it)
+        Assert.assertNull(FcitxUtils.unescapeForValue("\"a\"b\""))
+        Assert.assertEquals("\"a\\\"", FcitxUtils.unescapeForValue("\"a\\\""))
+        Assert.assertEquals("\"", FcitxUtils.unescapeForValue("\""))
+    }
 }

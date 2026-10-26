@@ -71,7 +71,7 @@ class UserModel(
     // those of them from the user's dictionaries: see list
     private val listed = HashSet<Int>()
 
-    // of [listed], English's words pinyin spells (EN-24): neither in [listedTexts] nor counted in
+    // of [listed], English's words pinyin spells (原 EN-24): neither in [listedTexts] nor counted in
     // [listings], as the tables code no letters (review-uat-fixes S8: each word learned recoded them all)
     private val latinListed = HashSet<Int>()
     // those of them the user added by hand (listByHand), by id from vocabulary.size up as sameText: in
@@ -805,7 +805,7 @@ class UserModel(
      */
     fun listedTexts(): List<String> {
         val out = listed.filterNot(latinListed::contains).mapNotNullTo(LinkedHashSet()) { id -> entries[id]?.text ?: if (id < vocabulary.size) vocabulary.word(id) else if (isMerged(id)) text(id) else null }
-        // the words imported too: the tables offer them as they do a dictionary's (TBL-12a), after their own, never at a code alone (D8)
+        // the words imported too: the tables offer them as they do a dictionary's (原 TBL-12a), after their own, never at a code alone (D8)
         imports?.let { i -> i.places().mapTo(out, i::text) }
         return out.toList()
     }

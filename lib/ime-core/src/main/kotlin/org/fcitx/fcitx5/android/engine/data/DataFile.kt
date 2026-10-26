@@ -5,6 +5,8 @@
 package org.fcitx.fcitx5.android.engine.data
 
 import java.io.ByteArrayOutputStream
+import java.io.File
+import java.io.IOException
 import java.io.OutputStream
 import java.io.RandomAccessFile
 import java.nio.Buffer
@@ -167,6 +169,8 @@ class DataFile private constructor(buffer: ByteBuffer, expectedKind: Int, expect
 
         private val MAGIC = "FCITXIME".toByteArray(Charsets.US_ASCII)
         private const val HEADER_BYTES = 24
+        private const val VERSION_AT = 8
+        private const val KIND_VERSION_AT = 20
         private const val ENTRY_BYTES = 24
         private const val MAX_SECTIONS = 256
         private const val MAX_META_BYTES = 64 * 1024
@@ -182,6 +186,26 @@ class DataFile private constructor(buffer: ByteBuffer, expectedKind: Int, expect
          */
         fun open(buffer: ByteBuffer, kind: Int, kindVersion: Int, verify: Boolean = true): DataFile =
             DataFile(buffer, kind, kindVersion, verify)
+
+        /**
+         * The kind's format version in [file]'s header, read without mapping the file: null unless
+         * it is an engine data file of this container [VERSION] and at least a header long.
+         */
+        fun peekKindVersion(file: File): Int? = try {
+            RandomAccessFile(file, "r").use { f ->
+                val header = ByteArray(HEADER_BYTES)
+                if (f.length() < HEADER_BYTES) {
+                    null
+                } else {
+                    f.readFully(header)
+                    val b = ByteBuffer.wrap(header).order(ByteOrder.LITTLE_ENDIAN)
+                    val ours = header.copyOf(MAGIC.size).contentEquals(MAGIC) && b.getInt(VERSION_AT) == VERSION
+                    if (ours) b.getInt(KIND_VERSION_AT) else null
+                }
+            }
+        } catch (_: IOException) {
+            null
+        }
 
         /**
          * The file [Writer] makes, written to [file] a section at a time, as [write] streams each

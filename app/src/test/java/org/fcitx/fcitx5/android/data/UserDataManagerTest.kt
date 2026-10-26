@@ -396,29 +396,36 @@ class UserDataManagerTest {
             (phoneOwn + listOf("config/.libime/conf/pinyin.conf", "data/punctuation/.libime/x", "data/pinyin/dictionaries/mine.txt"))
                 .forEach { File(dirs.external, it).apply { parentFile!!.mkdirs() }.writeText("phone's") }
         }
-        val full = phone("full")
-        UserDataManager.import(zip(BuildConfig.APPLICATION_ID, "external/config/config" to "backup's"), full).getOrThrow()
-        val own = phone("own")
-        UserDataManager.import(
-            zip(BuildConfig.APPLICATION_ID, "external/config/config" to "backup's", "external/data/pinyin/customphrase" to "backup's"),
-            own,
-        ).getOrThrow()
-        val bare = phone("bare")
-        UserDataManager.import(zip(BuildConfig.APPLICATION_ID, "engine/x" to "x"), bare).getOrThrow()
+        // each row its own phone and import: a failing import shows in its row, not in every row that reads it
+        fun full(name: String) = phone(name).also {
+            UserDataManager.import(zip(BuildConfig.APPLICATION_ID, "external/config/config" to "backup's"), it).getOrThrow()
+        }
+        fun own() = phone("own").also {
+            UserDataManager.import(
+                zip(BuildConfig.APPLICATION_ID, "external/config/config" to "backup's", "external/data/pinyin/customphrase" to "backup's"),
+                it,
+            ).getOrThrow()
+        }
+        fun bare() = phone("bare").also {
+            UserDataManager.import(zip(BuildConfig.APPLICATION_ID, "engine/x" to "x"), it).getOrThrow()
+        }
         assertRows(
             "a backup without them leaves no phone-added phrases, quick phrases, punctuation or settings" to {
-                phoneOwn.forEach { assertFalse(it, File(full.external, it).exists()) }
+                val dirs = full("full")
+                phoneOwn.forEach { assertFalse(it, File(dirs.external, it).exists()) }
             },
             "dot-entries are left alone" to {
-                assertTrue(File(full.external, "config/.libime/conf/pinyin.conf").exists())
-                assertTrue(File(full.external, "data/punctuation/.libime/x").exists())
+                val dirs = full("dots")
+                assertTrue(File(dirs.external, "config/.libime/conf/pinyin.conf").exists())
+                assertTrue(File(dirs.external, "data/punctuation/.libime/x").exists())
             },
             "the backup's own replaces the phone's" to {
-                assertEquals("backup's", File(own.external, "data/pinyin/customphrase").readText())
+                assertEquals("backup's", File(own().external, "data/pinyin/customphrase").readText())
             },
-            "dictionaries are merged" to { assertTrue(File(full.external, "data/pinyin/dictionaries/mine.txt").exists()) },
+            "dictionaries are merged" to { assertTrue(File(full("dicts").external, "data/pinyin/dictionaries/mine.txt").exists()) },
             "a zip without external/config keeps them all" to {
-                phoneOwn.forEach { assertTrue(it, File(bare.external, it).exists()) }
+                val dirs = bare()
+                phoneOwn.forEach { assertTrue(it, File(dirs.external, it).exists()) }
             },
         )
     }

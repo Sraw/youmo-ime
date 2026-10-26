@@ -5,7 +5,6 @@
 
 package org.fcitx.fcitx5.android.input.candidates.horizontal
 
-import android.content.res.Configuration
 import android.graphics.drawable.ShapeDrawable
 import android.graphics.drawable.shapes.RectShape
 import androidx.core.view.updateLayoutParams
@@ -22,6 +21,7 @@ import org.fcitx.fcitx5.android.daemon.launchOnReady
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.input.bar.ExpandButtonStateMachine.BooleanKey.ExpandedCandidatesEmpty
 import org.fcitx.fcitx5.android.input.bar.ExpandButtonStateMachine.TransitionEvent.ExpandedCandidatesUpdated
+import org.fcitx.fcitx5.android.input.bar.CandidateSpacing
 import org.fcitx.fcitx5.android.input.bar.KawaiiBarComponent
 import org.fcitx.fcitx5.android.input.broadcast.InputBroadcastReceiver
 import org.fcitx.fcitx5.android.input.candidates.CandidateViewHolder
@@ -48,14 +48,6 @@ class HorizontalCandidateComponent :
     private val bar: KawaiiBarComponent by manager.must()
 
     private val fillStyle by AppPrefs.getInstance().keyboard.horizontalCandidateStyle
-    private val maxSpanCountPref by lazy {
-        AppPrefs.getInstance().keyboard.run {
-            if (context.resources.configuration.orientation == Configuration.ORIENTATION_PORTRAIT)
-                expandedCandidateGridSpanCount
-            else
-                expandedCandidateGridSpanCountLandscape
-        }
-    }
 
     private var layoutMinWidth = 0
     private var layoutFlexGrow = 1f
@@ -69,9 +61,9 @@ class HorizontalCandidateComponent :
 
     /**
      * (for [HorizontalCandidateMode.AutoFillWidth] only)
-     * Second layout pass is needed when:
-     * [^1] total candidates count < maxSpanCount && [^2] RecyclerView cannot display all of them
-     * In that case, displayed candidates should be stretched evenly (by setting flexGrow to 1.0f).
+     * Each candidate takes its natural width, so as many fit as their text allows, and they are bound
+     * stretched (flexGrow 1) to fill the small leftover beside ⌄. Only a short list that fits whole
+     * ([CandidateSpacing.stretches] false) needs a second pass, back to natural width.
      */
     private var secondLayoutPassNeeded = false
     private var secondLayoutPassDone = false
@@ -126,15 +118,14 @@ class HorizontalCandidateComponent :
                 super.onLayoutCompleted(state)
                 val cnt = this.childCount
                 if (secondLayoutPassNeeded) {
-                    if (cnt < adapter.candidates.size) {
-                        // [^2] RecyclerView can't display all candidates
+                    if (!CandidateSpacing.stretches(cnt, adapter.total)) {
                         // update LayoutParams in onLayoutCompleted would trigger another
                         // onLayoutCompleted, skip the second one to avoid infinite loop
                         if (secondLayoutPassDone) return
                         secondLayoutPassDone = true
                         for (i in 0 until cnt) {
                             getChildAt(i)!!.updateLayoutParams<LayoutParams> {
-                                flexGrow = 1f
+                                flexGrow = 0f
                             }
                         }
                     } else {
@@ -158,15 +149,7 @@ class HorizontalCandidateComponent :
     }
 
     override val view by lazy {
-        object : RecyclerView(context) {
-            override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
-                super.onSizeChanged(w, h, oldw, oldh)
-                if (fillStyle == AutoFillWidth) {
-                    val maxSpanCount = maxSpanCountPref.getValue()
-                    layoutMinWidth = w / maxSpanCount - dividerDrawable.intrinsicWidth
-                }
-            }
-        }.apply {
+        RecyclerView(context).apply {
             id = R.id.candidate_view
             itemAnimator = null
             adapter = this@HorizontalCandidateComponent.adapter
@@ -178,7 +161,6 @@ class HorizontalCandidateComponent :
     override fun onCandidateUpdate(data: FcitxEvent.CandidateListEvent.Data) {
         val candidates = data.candidates
         val total = data.total
-        val maxSpanCount = maxSpanCountPref.getValue()
         if (english) {
             layoutMinWidth = view.width / ENGLISH_SLOTS - dividerDrawable.intrinsicWidth
             // fewer words keep their slots, not the whole bar
@@ -191,10 +173,10 @@ class HorizontalCandidateComponent :
                 secondLayoutPassNeeded = false
             }
             AutoFillWidth -> {
-                layoutMinWidth = view.width / maxSpanCount - dividerDrawable.intrinsicWidth
-                layoutFlexGrow = if (candidates.size < maxSpanCount) 0f else 1f
-                // [^1] total candidates count < maxSpanCount
-                secondLayoutPassNeeded = candidates.size < maxSpanCount
+                layoutMinWidth = 0
+                layoutFlexGrow = 1f
+                // a pass is needed only when every word may fit: then they unstretch
+                secondLayoutPassNeeded = !CandidateSpacing.stretches(candidates.size, total)
                 secondLayoutPassDone = false
             }
             AlwaysFillWidth -> {

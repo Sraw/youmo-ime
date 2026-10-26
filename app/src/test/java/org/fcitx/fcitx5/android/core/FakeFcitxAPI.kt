@@ -48,12 +48,6 @@ class FakeFcitxAPI : FcitxAPI {
     private val addonSubConfigs = mutableMapOf<Pair<String, String>, RawConfig>()
     private val imConfigs = mutableMapOf<String, RawConfig>()
 
-    override fun setLogRule(verbose: Boolean) {
-        calls += "setLogRule($verbose)"
-    }
-
-    override fun translate(str: String, domain: String) = str
-
     override suspend fun save() {
         calls += "save()"
     }
@@ -79,8 +73,10 @@ class FakeFcitxAPI : FcitxAPI {
     // no table to code them by
     override suspend fun sameCodes(texts: List<String>, ims: List<String>): Map<String, List<Pair<String, String>>> = emptyMap()
 
-    // no dictionary to read it by
-    override suspend fun pinyinOf(text: String): String? = null
+    /** What [pinyinOf] reads a word as: no dictionary to read it by, so none unless set here. */
+    val readings = mutableMapOf<String, String>()
+
+    override suspend fun pinyinOf(text: String): String? = readings[text]
 
     // no model: each char a word of its own
     override suspend fun wordBoundaries(texts: List<String>) = texts.associateWith { IntArray(it.length + 1) { i -> i } }

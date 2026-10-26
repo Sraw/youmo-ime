@@ -29,11 +29,11 @@ import org.fcitx.fcitx5.android.engine.phrase.Chaizi
 import org.fcitx.fcitx5.android.engine.phrase.AsideCandidates
 import org.fcitx.fcitx5.android.engine.phrase.PhraseBook
 import org.fcitx.fcitx5.android.engine.pinyin.LatinWords
+import org.fcitx.fcitx5.android.engine.pinyin.KeyedSegmenter
 import org.fcitx.fcitx5.android.engine.pinyin.Segmenter
 import org.fcitx.fcitx5.android.engine.pinyin.SyllableGraph
 import org.fcitx.fcitx5.android.engine.pinyin.SyllableGraph.Kind
 import org.fcitx.fcitx5.android.engine.pinyin.Syllables
-import org.fcitx.fcitx5.android.engine.pinyin.T9Segmenter
 import org.fcitx.fcitx5.android.engine.rerank.Reranker
 import org.fcitx.fcitx5.android.engine.rerank.SentencePicker
 import org.fcitx.fcitx5.android.engine.rerank.SentenceRefiner
@@ -206,13 +206,14 @@ class PinyinSession(
     private val candidates get() = lastRead.candidates
     private var unrefined: List<Candidate>? = null // the decoder's sentences, till the refiner picks one
     private var refined = 0 // slices of refining spent on them
+    // the keys of letter groups, if the segmenter's are (the nine keys, the 14 keys, 双拼's 18 and nine keys)
+    private val keyed = segmenter as? KeyedSegmenter
     private val recorder = CommitRecorder(
-        learnTo, (segmenter as? T9Segmenter)?.letters, user, { habitOrder.isAdded(it) || data.wordIndex.find(it) != NO_WORD }, segmenter::segment,
+        learnTo, keyed?.letters, user, { habitOrder.isAdded(it) || data.wordIndex.find(it) != NO_WORD }, segmenter::segment,
         split = { textWords.boundaries(it) }, isAdded = { habitOrder.isAdded(it) },
     )
-    private val nineKeys = (segmenter as? T9Segmenter)?.let { t9 ->
-        val layout = t9.letters.tag()
-        NineKeys(data, t9.letters, recorder.pressed) { digits -> if (learning && recorder.learns) recorder.habits.bar(layout, digits) else emptyMap() }
+    private val nineKeys = keyed?.let { k ->
+        NineKeys(data, k.letters, recorder.pressed, k::isKey, k::initialsOf) { digits -> if (learning && recorder.learns) recorder.habits.bar(recorder.takeLayout, digits) else emptyMap() }
     }
     private val habitOrder: HabitOrder = HabitOrder(data, user, recorder, decoder, addedWords)
     private var page = 0
@@ -238,7 +239,7 @@ class PinyinSession(
     private fun act(action: Action): Snapshot = when (action) {
         Action.Refine -> refine()
         Action.Ink, Action.Glide, is Action.NineKey -> snapshot()
-        is Action.Key -> type(action.char, action.glided)
+        is Action.Key -> type(action.char, action.glided, action.at)
         is Action.Letter -> letter(action.letter, action.again, glided = action.glided)
         Action.Backspace -> backspace()
         // nothing to pick past the page: the key (space, a digit) is the app's
@@ -326,17 +327,17 @@ class PinyinSession(
         return snapshot()
     }
 
-    private fun type(c: Char, glided: Boolean = false): Snapshot {
+    private fun type(c: Char, glided: Boolean = false, at: Float = Float.NaN): Snapshot {
         if (!reads(c) || !segmenter.readsAfter(input.substring(readFrom(), cursor), c)) return leave()
         // on the nine keys 1 is 分词
-        insert((if (c == NINE_KEYS_SEPARATOR && nineKeys != null) SyllableGraph.SEPARATOR else c).toString(), glided)
+        insert((if (c == NINE_KEYS_SEPARATOR && nineKeys?.oneSeparates == true) SyllableGraph.SEPARATOR else c).toString(), glided, at)
         read()
         return snapshot()
     }
 
     // [keys] typed at the cursor, never before the pieces' end (read and moved keep it there)
-    private fun insert(keys: String, glided: Boolean = false) {
-        recorder.pressed.insert(cursor, keys, glided, input = input, letters = (segmenter as? T9Segmenter)?.letters)
+    private fun insert(keys: String, glided: Boolean = false, at: Float = Float.NaN) {
+        recorder.pressed.insert(cursor, keys, glided, at, input = input, letters = keyed?.letters)
         input.insert(cursor, keys)
         cursor += keys.length
     }
@@ -371,7 +372,7 @@ class PinyinSession(
         } else {
             // at the start of the input: nothing before it is the session's to delete
             if (cursor == 0) return snapshot()
-            recorder.pressed.delete(cursor - 1, input, (segmenter as? T9Segmenter)?.letters)
+            recorder.pressed.delete(cursor - 1, input, keyed?.letters)
             input.deleteCharAt(--cursor)
             while (pieces.isNotEmpty() && (pieces.last().end > cursor || pieces.last().end >= input.length)) pieces.removeAt(pieces.size - 1)
         }
@@ -396,7 +397,7 @@ class PinyinSession(
     }
 
     override fun reads(c: Char): Boolean =
-        segmenter.reads(c) || (c == SyllableGraph.SEPARATOR || c == NINE_KEYS_SEPARATOR && nineKeys != null) && input.isNotEmpty()
+        segmenter.reads(c) || (c == SyllableGraph.SEPARATOR || c == NINE_KEYS_SEPARATOR && nineKeys?.oneSeparates == true) && input.isNotEmpty()
 
     override fun candidates(from: Int, count: Int): List<Choice> {
         readUntil(from + count)
@@ -748,7 +749,7 @@ class PinyinSession(
         val own = if (prev == NO_WORD || data.wordIndex.find(learned) != NO_WORD) NO_WORD else ownWord(user, text(prev), learned)
         // after the user's own word, what follows the decoder's word it ends with
         val offer = if (own == NO_WORD) {
-            // what was put in after it is counted after that word, as the record has its text (UAT PY-71)
+            // what was put in after it is counted after that word, as the record has its text (原 UAT PY-71)
             val decoded = if (prev == NO_WORD) "" else text(prev)
             val whole = if (decoded.isEmpty() || learned.length <= decoded.length || !learned.endsWith(decoded)) NO_WORD else data.wordIndex.find(learned)
             predictionOrder.offer(recorder.habits, prev2, prev, if (whole == NO_WORD) prev else whole, tail)
@@ -802,7 +803,8 @@ class PinyinSession(
             nineKeys?.clear()
             return
         }
-        val graph = segmenter.segment(input.substring(readFrom()))
+        // where each key was tapped, as the input stands: the 14 keys' letters weighed by it (none elsewhere)
+        val graph = segmenter.segment(input.substring(readFrom()), if (keyed?.letters?.isGrouped == true) recorder.pressed.taps(readFrom(), input.length) else null)
         val (prev2, prev) = TextWords.previous(context + pieces.flatMap { it.words.asList() })
         val decoding = decoder.decode(graph, prev2, prev)
         // what the user's sentences keep put in them, before anything reranks them (U-08, design-1c §1)
@@ -860,7 +862,7 @@ class PinyinSession(
         // the emoji go with the reading shown first: not one held past the first page, nor one a pinned phrase put second
         // the dates 日期 stands for and so on, where the input is no key of them (双拼's sj is a syllable): never twice
         val wordPhrases = { word: String -> if (builtInPhrases && placed.isEmpty()) phraseBook.builtInsOf(word) { time ?: now() } else emptyList() }
-        val withAside = AsideCandidates.place(read, key, emoji, chaizi.takeUnless { spell }, { it.text }, { it.end == rest }, asText, wordPhrases) { coarseCandidates.order(readPlaced, pageSize, readHeld).firstOrNull() }
+        val withAside = AsideCandidates.place(read, key, emoji, chaizi.takeUnless { spell }, { it.text }, { it.end == rest }, asText, wordPhrases, first = { coarseCandidates.order(readPlaced, pageSize, readHeld).firstOrNull() }) { ordered.tier(it) == Tier.LIFTED }
         // nothing set aside: the list worked out for that is the one listed
         val listed = if (withAside.candidates === read) readPlaced else withPhrases(withAside.candidates)
         val held = if (withAside.candidates === read) readHeld else coarseCandidates.held(listed, pageSize, kept)
@@ -936,8 +938,8 @@ class PinyinSession(
         )
     }
 
-    // text kept as typed as it shows and is committed: see T9Segmenter.asTyped
-    private fun asTyped(text: String) = if (segmenter is T9Segmenter) T9Segmenter.asTyped(text) else text
+    // text kept as typed as it shows and is committed: see KeyedSegmenter.asTyped (a grouped key's code never reaches the field)
+    private fun asTyped(text: String) = keyed?.asTyped(text) ?: text
 
     // how the input shows: its syllables, as typed, spelt (an inner class, for the session's size)
     private val shows = Shows()
@@ -985,9 +987,7 @@ class PinyinSession(
         private fun shown(graph: SyllableGraph, edge: Int, syllable: Int): String = when {
             // digits say nothing: the syllable read, a fuzzy one too (9664 as zhong with z for zh), and
             // of one still being typed as many letters as were typed
-            segmenter is T9Segmenter -> Syllables.spelling(syllable).let {
-                if (graph.kind(edge) == Kind.SYLLABLE) it else it.take(graph.text(edge).length)
-            }
+            keyed != null -> if (graph.kind(edge) == Kind.SYLLABLE) Syllables.spelling(syllable) else keyed.started(syllable, graph.text(edge).length)
             spell && graph.kind(edge) == Kind.SYLLABLE -> Syllables.spelling(syllable)
             else -> graph.text(edge)
         }

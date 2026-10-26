@@ -36,7 +36,6 @@ class BuildMetadataPlugin : Plugin<Project> {
             defaultConfig {
                 buildConfigField("String", "BUILD_GIT_HASH", "\"$commit\"")
                 buildConfigField("long", "BUILD_TIME", time)
-                buildConfigField("String", "DATA_DESCRIPTOR_NAME", "\"${DataDescriptorPlugin.FILE_NAME}\"")
             }
         }
         target.extensions.configure<ApplicationAndroidComponentsExtension> {

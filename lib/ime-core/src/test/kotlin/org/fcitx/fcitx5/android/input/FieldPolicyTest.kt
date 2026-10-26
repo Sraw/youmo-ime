@@ -93,7 +93,7 @@ class FieldPolicyTest {
         assertNull(policy.told(5, { "" }, { "" }))
     }
 
-    // HW-22/23: an editor's own empty answer is said, a null (it would not say) is not, nor a sensitive field's
+    // HW-23: an editor's own empty answer is said, a null (it would not say) is not, nor a sensitive field's
     @Test
     fun anEmptyFieldIsSaidOnlyWhereTheEditorAnswered() {
         policy.focusAnother("chat", password = false, sensitive = false)
@@ -103,7 +103,7 @@ class FieldPolicyTest {
         assertFalse(policy.told(3, { "" }, { "" })!!.said)
     }
 
-    // U-03: the session of an input method switched to is told the field as started, once, in a field (UAT HW-22/23)
+    // U-03: the session of an input method switched to is told the field as started, once, in a field (UAT HW-23)
     @Test
     fun anInputMethodSwitchedToInAFieldIsToldItStarted() {
         assertFalse(policy.inputMethodChanged("pinyin"))

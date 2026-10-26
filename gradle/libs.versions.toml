@@ -13,6 +13,7 @@ coroutines = "1.11.0"
 mockk = "1.14.11"
 turbine = "1.2.1"
 robolectric = "4.17"
+roborazzi = "1.76.0"
 # dev.detekt (the 2.x line, whose coordinates and config keys differ from detekt 1.x) has only
 # alpha releases on Maven so far. Baselines (config/detekt/baseline-*.xml) are tied to this
 # version's rule set: after bumping it, run `./gradlew detektBaseline` (on its own) and review the
@@ -26,10 +27,13 @@ android-desugarJDKLibs = { group = "com.android.tools", name = "desugar_jdk_libs
 gummyBears-api29 = { group = "com.toasttab.android", name = "gummy-bears-api-29", version = "0.15.0" }
 kotlin-gradlePlugin = { group = "org.jetbrains.kotlin", name = "kotlin-gradle-plugin", version.ref = "kotlin" }
 kotlinx-coroutines = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-android", version.ref = "coroutines" }
+kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "coroutines" }
 kotlinx-coroutines-test = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-test", version.ref = "coroutines" }
 mockk = { module = "io.mockk:mockk", version.ref = "mockk" }
 turbine = { module = "app.cash.turbine:turbine", version.ref = "turbine" }
 robolectric = { module = "org.robolectric:robolectric", version.ref = "robolectric" }
+roborazzi = { module = "io.github.takahirom.roborazzi:roborazzi", version.ref = "roborazzi" }
+roborazzi-junit-rule = { module = "io.github.takahirom.roborazzi:roborazzi-junit-rule", version.ref = "roborazzi" }
 kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version = "1.11.0" }
 androidx-activity = { module = "androidx.activity:activity-ktx", version = "1.13.0" }
 androidx-appcompat = { module = "androidx.appcompat:appcompat", version = "1.7.1" }
@@ -93,4 +97,5 @@ kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", versi
 ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
 aboutlibraries = { id = "com.mikepenz.aboutlibraries.plugin.android", version.ref = "aboutlibraries" }
 kotlin-parcelize = { id = "org.jetbrains.kotlin.plugin.parcelize", version.ref = "kotlin" }
+roborazzi = { id = "io.github.takahirom.roborazzi", version.ref = "roborazzi" }
 detekt = { id = "dev.detekt", version.ref = "detekt" }

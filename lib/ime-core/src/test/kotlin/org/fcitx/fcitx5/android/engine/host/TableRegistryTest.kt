@@ -149,7 +149,7 @@ class TableRegistryTest : EnginesFixture() {
 
     @Test
     fun theListedWordsStartCodingAsATableComesUpNotAtItsFirstKey() {
-        // UAT TBL-12a: coded at the first key, an imported word came too late for the first code
+        // coded at the first key, an imported word came too late for the first code
         val additions = Engines.Additions("", "d", indexes = indexDir(), dictionary = compiled(::load) { sequenceOf("你好 ni'hao 0") })
         val now = Executor { it.run() }
         val queued = ArrayList<Runnable>()

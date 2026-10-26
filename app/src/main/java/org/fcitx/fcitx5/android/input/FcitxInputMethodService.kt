@@ -37,6 +37,7 @@ import android.widget.inline.InlinePresentationSpec
 import androidx.annotation.Keep
 import androidx.annotation.RequiresApi
 import androidx.annotation.StringRes
+import androidx.annotation.VisibleForTesting
 import androidx.autofill.inline.UiVersions
 import androidx.autofill.inline.common.ImageViewStyle
 import androidx.autofill.inline.common.TextViewStyle
@@ -66,6 +67,9 @@ import org.fcitx.fcitx5.android.core.KeyStates
 import org.fcitx.fcitx5.android.core.KeySym
 import org.fcitx.fcitx5.android.core.ScancodeMapping
 import org.fcitx.fcitx5.android.core.SubtypeManager
+import org.fcitx.fcitx5.android.core.fromKeyEvent
+import org.fcitx.fcitx5.android.core.keyCode
+import org.fcitx.fcitx5.android.core.metaStateOf
 import org.fcitx.fcitx5.android.core.plus
 import org.fcitx.fcitx5.android.core.toSpannedString
 import org.fcitx.fcitx5.android.daemon.FcitxConnection
@@ -77,6 +81,7 @@ import org.fcitx.fcitx5.android.data.prefs.ManagedPreferenceProvider
 import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.engine.session.Action
+import org.fcitx.fcitx5.android.host.KeyCodes
 import org.fcitx.fcitx5.android.input.bar.Calculation
 import org.fcitx.fcitx5.android.input.bar.CalculationOffer
 import org.fcitx.fcitx5.android.input.cursor.CursorRange
@@ -125,7 +130,8 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
 
     // a keyboard unplugged or switched off: the configuration is no help, on a device that reports a
     // keyboard built in it stays the same (the emulator's)
-    private val inputDeviceListener = object : InputManager.InputDeviceListener {
+    @VisibleForTesting
+    internal val inputDeviceListener = object : InputManager.InputDeviceListener {
         override fun onInputDeviceAdded(deviceId: Int) = Unit
         override fun onInputDeviceChanged(deviceId: Int) = Unit
         override fun onInputDeviceRemoved(deviceId: Int) {
@@ -188,13 +194,14 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     fun say(message: String, undo: UndoChip.Undo? = null, steady: Boolean = false) {
         // the view shown, not the one the device mode picks: a key typed with ⋯ open flips that mode
         val view = inputView?.takeIf { it.isShown } ?: candidatesView?.takeIf { it.isShown }
+        val length = if (steady) Toast.LENGTH_LONG else Toast.LENGTH_SHORT
         when {
             view == null -> {
-                toast(message, if (steady) Toast.LENGTH_LONG else Toast.LENGTH_SHORT)
+                toast(message, length)
                 undo?.lapsed?.invoke()
             }
             // shown, but its window not yet (or no longer) on the screen: the chip lapsed [undo] (F3530)
-            !view.say(message, undo, steady) -> toast(message, if (steady) Toast.LENGTH_LONG else Toast.LENGTH_SHORT)
+            !view.say(message, undo, steady) -> toast(message, length)
         }
     }
 
@@ -265,6 +272,9 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         // drawn on 九键's keys, and in their long press
         prefs.keyboard.t9Letters,
         prefs.keyboard.t9Symbols,
+        // the 14 keys for pinyin, 双拼's 18 or nine keys, and the code row's height with them (KawaiiBarComponent.preeditHeight)
+        prefs.keyboard.pinyinKeyboard,
+        prefs.keyboard.shuangpinKeyboard,
         prefs.advanced.disableAnimation,
     )
 
@@ -374,7 +384,8 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
                         FcitxKeyMapping.FcitxKey_Return -> handleReturnKey()
                         FcitxKeyMapping.FcitxKey_Left -> handleArrowKey(EditorKeyPolicy.Direction.Left)
                         FcitxKeyMapping.FcitxKey_Right -> handleArrowKey(EditorKeyPolicy.Direction.Right)
-                        else -> if (it.unicode > 0) {
+                        // a keyboard's own code handed back unhandled (no focused context): never text
+                        else -> if (it.unicode > 0 && !KeyCodes.isInternal(it.unicode)) {
                             commitTyped(Character.toString(it.unicode))
                         } else {
                             Timber.w("Unhandled Virtual KeyEvent: $it")

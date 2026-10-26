@@ -59,4 +59,19 @@ data class Penalties(
      * place it (a glide, ends but the whole and the first word's; review-G S2).
      */
     val imported: Float = -2f,
+    /**
+     * A grouped key's letter read where the tap fell on its other letter's side, at the far edge:
+     * scaled by how far past the centre ([SyllableGraph.against][org.fcitx.fcitx5.android.engine.pinyin.SyllableGraph.against]),
+     * 0 at the centre, so a tap there reads as no place at all. No dead zone (user, 2026-10-25).
+     * Simulated taps (`ime-eval pinyin --taps`), the 14 keys' `--same` sets, both sentence models:
+     * α was first swept over 0.5, 1, 1.5 and 2 on the held-out halves (scratchpad/tap/grid.sh), and
+     * the user chose 1 from that; the rule to choose it on the tune halves was written afterwards,
+     * as a check: the best mean of four informed hands (σ 0.2, σ 0.3, shifted ±0.15) among those
+     * costing a hand tapping near the centre, unaware of this, at most 1 point. It gives 1 again
+     * (1.5 costs that hand 2.2 points). Held-out at 1 with this code, chat (983): 61.3% untapped,
+     * 69.0% taps on their letters' centres, 67.3% σ 0.2, 65.9% σ 0.3, 59.9% near the centre;
+     * pinyin.tsv (203): 95.6, 96.6, 96.1, 95.6, 95.1. Simulated hands, no real touches: for choosing
+     * α only.
+     */
+    val tap: Float = -1f,
 )

@@ -30,7 +30,7 @@ import org.fcitx.fcitx5.android.engine.user.UserModel.Entry
  */
 internal class CommitRecorder(
     to: LearnTo,
-    /** The nine keys' letters, if the session's keys are theirs: their layout's kind. */
+    /** The nine keys' letters, or a grouped keyboard's (the 14 keys'), if the session's keys are theirs: their layout's kind. */
     letters: NineKeyLetters?,
     /** The user model, as `UserLexicon.user()` builds it: where a word comes from ([UserModel.origin]). */
     private val user: UserModel?,
@@ -45,8 +45,19 @@ internal class CommitRecorder(
 ) {
     val habits = to.habits
     private val layout = letters?.tag()
-    private val kind = layout?.let(Kinds::nineKeys) ?: to.kind
-    private val multiTapKind = layout?.let(Kinds::nineKeysMultiTap)
+    // a grouped keyboard's keys apart from the nine keys' (qk:, not t9:): it has no 连按 either
+    private val grouped = layout != null && NineKeyLetters.grouped(layout) != null
+    // grouped 双拼 (to.kind sp:<scheme>) spk:<scheme>:<tag>, the 14 keys qk:<tag>
+    private val kind = when {
+        layout == null -> to.kind
+        !grouped -> Kinds.nineKeys(layout)
+        Kinds.isShuangpin(to.kind) -> Kinds.shuangpinKeys(to.kind.substringAfter(':'), layout)
+        else -> Kinds.keys(layout)
+    }
+
+    /** The layout a syllable taken off the bar is kept under ([Kinds.takeLayout]); "" where the keys have no bar. */
+    val takeLayout = layout?.let { Kinds.takeLayout(kind, it) }.orEmpty()
+    private val multiTapKind = layout?.takeUnless { grouped }?.let(Kinds::nineKeysMultiTap)
     private val simplify = to.simplify
     private val lastWord = LastWord({ isWord(it) || habits.isWord(it) }, simplify, split) { isAdded(it) || habits.isWord(it) }
     val pressed = PressedKeys()
@@ -156,7 +167,7 @@ internal class CommitRecorder(
 
     /** A commit of [picks], with the syllables taken of [nineKeys]. */
     fun commit(picks: List<CommitRows.Pick>, nineKeys: NineKeys?) = safely {
-        val takes = if (layout == null) emptyList() else nineKeys?.takes(layout).orEmpty()
+        val takes = if (layout == null) emptyList() else nineKeys?.takes(takeLayout).orEmpty()
         val prev = prev()
         val rows = CommitRows.build(prev, picks, ::code, ::origin)
         // commits deleted whole just before, typed again by this one: corrected to there (U-03)

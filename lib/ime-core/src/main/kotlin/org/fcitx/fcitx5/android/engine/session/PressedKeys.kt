@@ -18,8 +18,12 @@ import org.fcitx.fcitx5.android.engine.pinyin.SyllableGraph
  */
 internal class PressedKeys {
 
-    /** [length] places of the input, typed as [keys]; [glided], by a glide; [multiTap], a letter the nine keys' 连按 chose. */
-    class Run(val length: Int, val keys: String, val glided: Boolean = false, val multiTap: Boolean = false)
+    /**
+     * [length] places of the input, typed as [keys]; [glided], by a glide; [multiTap], a letter the
+     * nine keys' 连按 chose; [at], where across its key a grouped keyboard's tap fell (NaN for none,
+     * and for a run of several: a syllable taken has its letters, no place).
+     */
+    class Run(val length: Int, val keys: String, val glided: Boolean = false, val multiTap: Boolean = false, val at: Float = Float.NaN)
 
     private val runs = ArrayList<Run>()
 
@@ -32,18 +36,20 @@ internal class PressedKeys {
     }
 
     /**
-     * [text] typed at [at], a key a place, each as [keyOf] files it. Within a run of several (a
-     * syllable taken), that run is split first into a key a place of [input] (as it is before), as
-     * [delete] splits it.
+     * [text] typed at [at], a key a place, each as [keyOf] files it; [tapAt], where across its key
+     * a single key was tapped (a text of several has none). Within a run of several (a syllable
+     * taken), that run is split first into a key a place of [input] (as it is before), as [delete]
+     * splits it.
      */
-    fun insert(at: Int, text: String, glided: Boolean = false, multiTap: Boolean = false, input: CharSequence? = null, letters: NineKeyLetters? = null) {
+    fun insert(at: Int, text: String, glided: Boolean = false, tapAt: Float = Float.NaN, input: CharSequence? = null, letters: NineKeyLetters? = null) {
         if (input != null) {
             runAt(at)?.takeIf { (i, start) -> start < at && runs[i].length > 1 }?.let { (i, start) ->
                 runs.addAll(i, split(runs.removeAt(i), start, input, letters) { true })
             }
         }
         var i = indexAt(at)
-        for (c in text) runs.add(i++, Run(1, keyOf(c), glided, multiTap))
+        val place = if (text.length == 1) tapAt else Float.NaN
+        for (c in text) runs.add(i++, Run(1, keyOf(c), glided, at = place))
     }
 
     /**
@@ -62,13 +68,15 @@ internal class PressedKeys {
         (start until start + run.length).filter(kept).map { place ->
             val c = input[place]
             val keys = if (letters != null && c in 'a'..'z') letters.key(c).toString() else keyOf(c)
-            Run(1, keys, run.glided, run.multiTap)
+            // the letters of a syllable taken were picked, not tapped
+            Run(1, keys, run.glided, run.multiTap, at = Float.NaN)
         }
 
     /** The place at [at] typed again as [keys] (a 连按 press: the letter in place of the key). */
     fun set(at: Int, keys: String, multiTap: Boolean) {
         val (i, _) = runAt(at) ?: return
-        runs[i] = Run(1, keys, runs[i].glided, multiTap)
+        // the letter 连按 chose, no place across the key
+        runs[i] = Run(1, keys, runs[i].glided, multiTap, at = Float.NaN)
     }
 
     /** The places from [from] up to [to] made one run of [length] places, for [keys]; then [added] separators, of none. */
@@ -92,6 +100,26 @@ internal class PressedKeys {
     fun keys(from: Int, to: Int): String {
         val (i, j) = indices(from, to)
         return runs.subList(i, j).joinToString("") { it.keys }
+    }
+
+    /**
+     * Where each place from [from] up to [to] was tapped across its key, a place each (NaN for
+     * none: a run of several, a key with no place); null where none has one. Walked a place at a
+     * time, not by [indices], which has the runs that start in the span.
+     */
+    fun taps(from: Int, to: Int): FloatArray? {
+        val out = FloatArray(to - from) { Float.NaN }
+        var place = 0
+        var any = false
+        for (run in runs) {
+            if (place >= to) break
+            if (run.length == 1 && place >= from && !run.at.isNaN()) {
+                out[place - from] = run.at
+                any = true
+            }
+            place += run.length
+        }
+        return out.takeIf { any }
     }
 
     fun glided(from: Int, to: Int): Boolean {

@@ -12,6 +12,7 @@ import androidx.preference.PreferenceScreen
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.core.RawConfig
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
+import org.fcitx.fcitx5.android.engine.assertRows
 import org.fcitx.fcitx5.android.engine.host.EngineSettings
 import org.fcitx.fcitx5.android.engine.host.Engines
 import org.fcitx.fcitx5.android.ui.main.MainFragment
@@ -100,6 +101,22 @@ class SettingsIndexTest {
         assertFalse(AppPrefs.getInstance().keyboard.soundOnKeyPress.key in on(SettingsRoute.Keys))
         assertTrue(AppPrefs.getInstance().keyboard.popupOnKeyPress.key in on(SettingsRoute.Keys))
         assertFalse(AppPrefs.AUTO_PAIRS in on(SettingsRoute.Keys))
+    }
+
+    // the app's own keyboard choices on fcitx's pages: found, and opening their input method's page
+    @Test
+    fun theKeyboardChoicesAreFoundOnTheirInputMethodsPage() {
+        val all = entries(context())
+        assertRows(
+            listOf(
+                Triple(AppPrefs.PINYIN_KEYBOARD, Engines.PINYIN, "全拼's keyboard, on pinyin's page"),
+                Triple(AppPrefs.SHUANGPIN_KEYBOARD, Engines.SHUANGPIN, "双拼's, under its scheme"),
+            ),
+            { it.third },
+        ) { (key, im, _) ->
+            val found = all.filter { it.target.key == key }
+            assertEquals(listOf(im), found.map { (it.target.route as SettingsRoute.InputMethodConfig).uniqueName })
+        }
     }
 
     @Test

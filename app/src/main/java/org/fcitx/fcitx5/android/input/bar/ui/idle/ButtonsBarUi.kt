@@ -40,11 +40,11 @@ class ButtonsBarUi(override val ctx: Context, private val theme: Theme) : Ui {
     // as tall as the bar (候选字号) and as wide as the other bar buttons; narrower where the bar is
     // (the floating keyboard's), down to MIN_SIZE, then scrolled; the icon its size all the same
     private fun toolButton(@DrawableRes icon: Int) = ToolButton(ctx, icon, theme).also {
-        val width = ctx.dp(maxOf(KawaiiBarComponent.HEIGHT, KawaiiBarComponent.MIN_TOUCH_DP))
+        val width = ctx.dp(KawaiiBarComponent.buttonWidthDp())
         it.fixIconSize(ctx.dp(KawaiiBarComponent.ICON_DP))
         buttons.addView(
             it,
-            FlexboxLayout.LayoutParams(width, ctx.dp(KawaiiBarComponent.HEIGHT)).apply { minWidth = ctx.dp(MIN_SIZE) }
+            FlexboxLayout.LayoutParams(width, ctx.dp(KawaiiBarComponent.heightDp())).apply { minWidth = ctx.dp(MIN_SIZE) }
         )
     }
 

@@ -62,6 +62,19 @@ open class CustomGestureView(ctx: Context) : FrameLayout(ctx) {
     /** the finger on this key, by the id the keyboard's touch gives it */
     var touchPointer = MotionEvent.INVALID_POINTER_ID
         private set
+
+    // where across the key the finger came down, 0 its left edge and 1 its right: nearest what was
+    // aimed at, a lift is dragged off it. The view's width, its margins too (KeyView's hMargin)
+    private var downAt = Float.NaN
+
+    /**
+     * Where across the key the touch that clicks it came down ([downAt]), for the click listener
+     * alone: set as the finger lifts, before the touch's state is reset, cleared once the click
+     * returns. NaN for a click no touch made (TalkBack), one that left the key or swiped past the
+     * threshold, and for a swipe's own click (SymbolSwipe's Tap, made at the Up before this is set).
+     */
+    var clickAt = Float.NaN
+        private set
     var longPressEnabled
         get() = recognizer.longPressEnabled
         set(value) {
@@ -128,6 +141,12 @@ open class CustomGestureView(ctx: Context) : FrameLayout(ctx) {
         }
     }
 
+    private fun across(x: Float) = if (width > 0) x / width else Float.NaN
+
+    // where the touch came down, if it stayed a tap: on the key, swiped past no threshold
+    private fun tapPlace() =
+        if (!recognizer.touchMovedOutside && recognizer.swipeTotalX == 0 && recognizer.swipeTotalY == 0) downAt else Float.NaN
+
     private fun resetState() {
         stopTimers()
         recognizer.resetForNextTouch()
@@ -170,6 +189,8 @@ open class CustomGestureView(ctx: Context) : FrameLayout(ctx) {
                 if (!isEnabled) return false
                 // split from the keyboard's touch, the event keeps the finger's id
                 touchPointer = event.getPointerId(0)
+                downAt = across(x)
+                clickAt = Float.NaN
                 drawableHotspotChanged(x, y)
                 isPressed = true
                 InputFeedbacks.hapticFeedback(this)
@@ -211,10 +232,15 @@ open class CustomGestureView(ctx: Context) : FrameLayout(ctx) {
                     longPressTriggered = longPressTriggered,
                     repeatStarted = repeatStarted,
                 )
+                // not on every Move, which a grouped key dispatches however little the finger moved: only
+                // a swipe past the threshold, or off the key, is no tap. The total is signed, so one
+                // swiped a step and back counts as a tap, as it clicks anyway
+                clickAt = tapPlace()
                 resetState()
                 if (outcome.performClick) {
                     if (outcome.isDoubleTap) onDoubleTapListener?.invoke(this) else performClick()
                 }
+                clickAt = Float.NaN
                 return true
             }
             MotionEvent.ACTION_MOVE -> {
@@ -237,6 +263,7 @@ open class CustomGestureView(ctx: Context) : FrameLayout(ctx) {
                 return true
             }
             MotionEvent.ACTION_CANCEL -> {
+                clickAt = Float.NaN
                 dispatchGestureEvent(GestureType.Up, event.x, event.y, cancelled = true)
                 cancelGestures()
                 return true

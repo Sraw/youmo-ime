@@ -15,6 +15,7 @@ import com.k2fsa.sherpa.onnx.OfflineRecognizerResult
 import com.k2fsa.sherpa.onnx.OfflineStream
 import com.k2fsa.sherpa.onnx.OfflineTransducerModelConfig
 import com.k2fsa.sherpa.onnx.SileroVadModelConfig
+import com.k2fsa.sherpa.onnx.SpeechSegment
 import com.k2fsa.sherpa.onnx.Vad
 import com.k2fsa.sherpa.onnx.VadModelConfig
 import kotlinx.coroutines.CoroutineScope
@@ -57,6 +58,8 @@ object VoiceEngine {
                 if (users == 0) {
                     recognizer?.release()
                     recognizer = null
+                    // voice not used a while: the spare's native memory back too, made again on the next show
+                    spareVad.clear()
                 }
             }
         }
@@ -65,6 +68,8 @@ object VoiceEngine {
     /** The recognizer, read in if it is not; on a worker thread. [release] when done with it. */
     fun acquire(assets: AssetManager): OfflineRecognizer = synchronized(lock) {
         main.removeCallbacks(letGo)
+        // in use: the spare is let go with the recognizer (letGo), counted from the last use, not the last show
+        main.removeCallbacks(letGoSpare)
         val loaded = recognizer ?: OfflineRecognizer(assets, config()).also { recognizer = it }
         users++
         loaded
@@ -79,16 +84,22 @@ object VoiceEngine {
     private const val LEAD_IN = SAMPLE_RATE * 3 / 10
 
     // the longest stretch the VAD lets through, in seconds: the history holds as much and more
-    private const val MAX_SPEECH_S = 20
+    const val MAX_SPEECH_S = 20
 
     /** enough for the longest stretch the VAD lets through, its pause and lead-in (under 2 s) */
     fun history() = AudioHistory(SAMPLE_RATE * (MAX_SPEECH_S + 2))
 
     /** The front stretch the VAD has cut, popped, with its lead-in from [history]. */
-    fun nextStretch(vad: Vad, history: AudioHistory): FloatArray {
+    fun nextStretch(vad: Vad, history: AudioHistory, dropped: Long = 0): FloatArray {
         val segment = vad.front()
         vad.pop()
-        return history.before(segment.start.toLong(), LEAD_IN) + segment.samples
+        return stretch(segment, history, dropped)
+    }
+
+    /** [segment], popped already, with its lead-in from [history]: front() copies the whole stretch over JNI, read once */
+    fun stretch(segment: SpeechSegment, history: AudioHistory, dropped: Long = 0): FloatArray {
+        // the VAD's positions start after what a backlog dropped before it came (VoiceBacklog.dropped)
+        return history.before(segment.start + dropped, LEAD_IN) + segment.samples
     }
 
     /**
@@ -173,8 +184,54 @@ object VoiceEngine {
     // the engine busy or starting: the text as heard, not a wait
     private const val LANGUAGE_MS = 1000L
 
-    /** One for each time the microphone opens: it keeps the state of what it has heard. */
-    fun vad(assets: AssetManager) = Vad(
+    // a VAD made ahead for the next opening: its model read in before the press, not after the
+    // microphone opens (the start's latency, dev/design/voice-start-latency.md). Its own, lock-free:
+    // under [lock] the capture thread waited out a whole model load (VoiceSpare)
+    private val spareVad = VoiceSpare<Vad> { it.release() }
+
+    /** One for each time the microphone opens, the spare if one was made: it keeps the state of what it has heard. */
+    fun takeVad(assets: AssetManager): Vad = spareVad.take() ?: vad(assets)
+
+    // the spare made on a show with no use after it: let go after the same idle as the recognizer
+    private val letGoSpare = Runnable {
+        Dispatchers.IO.asExecutor().execute {
+            synchronized(lock) { if (users == 0) spareVad.clear() }
+        }
+    }
+
+    /**
+     * [prepareVad] on a thread of its own: the voice key shown, the first press of a process finds
+     * one made (built on show rather than on the press: the cold press stays fast). Let go [KEEP_MS]
+     * after the last show if voice is not used meanwhile.
+     */
+    fun prepareVadSoon(assets: AssetManager) {
+        main.removeCallbacks(letGoSpare)
+        main.postDelayed(letGoSpare, KEEP_MS)
+        if (spareVad.ready) return
+        Dispatchers.IO.asExecutor().execute {
+            // an Error too (sherpa's library not loading, memory running out): no handler on this
+            // executor, it would end the process on every show
+            @Suppress("TooGenericExceptionCaught")
+            try {
+                prepareVad(assets)
+            } catch (e: Throwable) {
+                // made when the microphone opens instead
+                Timber.w(e, "voice vad")
+            }
+        }
+    }
+
+    /** [vad] made for an opening that closed before using it: kept for the next one, not made again */
+    fun offerVad(vad: Vad) {
+        spareVad.offer(vad)
+    }
+
+    /** A spare VAD made for the next opening, if there is none; off the main thread. */
+    fun prepareVad(assets: AssetManager) {
+        spareVad.build { vad(assets) }
+    }
+
+    private fun vad(assets: AssetManager) = Vad(
         assets,
         VadModelConfig(
             sileroVadModelConfig = SileroVadModelConfig(
@@ -202,8 +259,8 @@ object VoiceEngine {
             ),
             tokens = "$DIR/tokens.txt",
             numThreads = THREADS,
-            // the only family built (lib/sherpa-onnx/README.md); upstream would otherwise read all of
-            // encoder.ort onto the heap to find it out
+            // the only family built (lib/sherpa-onnx/README.md): empty or "transducer", Create refuses
+            // any other (a misspelt type fails at once, not as a model that will not load)
             modelType = "transducer",
             modelingUnit = "bpe",
             bpeVocab = "$DIR/bpe.vocab",

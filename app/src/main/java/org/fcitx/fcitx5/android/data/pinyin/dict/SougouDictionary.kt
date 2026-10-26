@@ -23,7 +23,7 @@ class SougouDictionary(file: File) : PinyinDictionary() {
 
     override fun toTextDictionary(dest: File): TextDictionary {
         ensureTxt(dest)
-        PinyinDictManager.sougouDictConv(file.absolutePath, dest.absolutePath)
+        PinyinDictManager.sougouDictConv(file, dest)
         return TextDictionary(dest)
     }
 }

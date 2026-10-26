@@ -88,6 +88,43 @@ class PinyinSessionRefineTest {
         assertTrue(session.type("ma").refines)
     }
 
+    /**
+     * Keeps its work as [org.fcitx.fcitx5.android.engine.rerank.Reranker]'s scorer does: a unit for
+     * each start of a reading, [budget] of them a call, kept for later calls; all done, the last
+     * reading is its pick. [slices] few, for an input's work to pass them.
+     */
+    private class KeepingRefiner(override val slices: Int) : SentenceRefiner {
+        private val done = HashSet<String>()
+
+        private fun units(readings: List<String>) = readings.flatMap { r -> (1..r.length).map { r.take(it) } }.toSet()
+
+        override fun refine(context: String, readings: List<String>, scores: List<Float>, budget: Int): Int? {
+            done += (units(readings) - done).take(budget)
+            return if (done.containsAll(units(readings))) readings.lastIndex else null
+        }
+    }
+
+    private fun PinyinSession.paused(): Snapshot {
+        var shown = apply(Action.Refine)
+        while (shown.refines) shown = apply(Action.Refine)
+        return shown
+    }
+
+    @Test
+    fun slicesBetweenKeysAreReusedAtThePauseSoTheTapPaceMayChangeTheResult() {
+        // DECISIONS.md 2026-10-25 (r2-7560): the pause goes on from work slices between keys did, its
+        // slices capped; typed with no slice between keys, the same input may give up where slow typing picks
+        fun typed(slow: Boolean): Snapshot {
+            val session = PinyinSession(data, PinyinSegmenter(), refiner = KeepingRefiner(slices = 6)) { _, _, _ -> 0 }
+            for (c in "nizaima") {
+                val shown = session.apply(Key(c))
+                if (slow && shown.refines) session.paused()
+            }
+            return session.paused()
+        }
+        assertNotEquals(typed(slow = false).candidates[0], typed(slow = true).candidates[0])
+    }
+
     @Test
     fun whileLearningIsOffTheRefinerIsToldNothingOfTheTextBefore() {
         val contexts = ArrayList<String>()

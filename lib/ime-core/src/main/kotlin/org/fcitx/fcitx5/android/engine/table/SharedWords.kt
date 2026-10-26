@@ -47,7 +47,7 @@ interface SharedWords {
     /**
      * Starts whatever [words] needs made in the background, as the table comes up rather than at
      * its first key: coded at the first key, the dictionaries' words came too late for the first
-     * code typed, which committed the table's only candidate instead (UAT TBL-12a).
+     * code typed, which committed the table's only candidate instead (原 UAT TBL-12a).
      */
     fun prepare() = Unit
 

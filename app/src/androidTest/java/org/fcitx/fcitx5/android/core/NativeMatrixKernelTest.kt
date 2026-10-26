@@ -29,8 +29,8 @@ class NativeMatrixKernelTest {
         @BeforeClass
         @JvmStatic
         fun load() {
-            // as Fcitx loads it; the kernel needs no running engine
-            System.loadLibrary("native-lib")
+            // as NativeMatrixKernel.loaded does; the kernel needs no running engine
+            System.loadLibrary("youmo-matrix")
         }
     }
 

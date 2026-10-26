@@ -7,6 +7,7 @@ package org.fcitx.fcitx5.android.input.editorinfo
 import android.content.ClipData
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.input.FcitxInputMethodService
+import org.fcitx.fcitx5.android.input.bar.KawaiiBarComponent
 import org.fcitx.fcitx5.android.input.bar.ui.ToolButton
 import org.fcitx.fcitx5.android.input.dependency.inputMethodService
 import org.fcitx.fcitx5.android.input.dependency.theme
@@ -45,6 +46,7 @@ class EditorInfoWindow : InputWindow.ExtendedInputWindow<EditorInfoWindow>() {
     private val copyButton by lazy {
         ToolButton(context, R.drawable.ic_baseline_content_copy_24, theme).apply {
             contentDescription = context.getString(R.string.a11y_copy)
+            fixIconSize(context.dp(KawaiiBarComponent.ICON_DP))
             setOnClickListener {
                 val clipData = ClipData.newPlainText("", buildMarkdownString())
                 context.clipboardManager.setPrimaryClip(clipData)
@@ -56,7 +58,7 @@ class EditorInfoWindow : InputWindow.ExtendedInputWindow<EditorInfoWindow>() {
 
     private val barExtension by lazy {
         context.horizontalLayout {
-            add(copyButton, lParams(dp(40), dp(40)))
+            add(copyButton, lParams(dp(KawaiiBarComponent.buttonWidthDp()), dp(KawaiiBarComponent.heightDp())))
         }
     }
 

@@ -12,11 +12,15 @@ import android.widget.FrameLayout
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.core.InputMethodEntry
+import org.fcitx.fcitx5.android.data.prefs.ShuangpinKeyboard
 import org.fcitx.fcitx5.android.data.theme.ThemePreset
 import org.fcitx.fcitx5.android.engine.host.Engines
+import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
 import org.fcitx.fcitx5.android.ui.main.settings.PlaceholderStrings
 import org.fcitx.fcitx5.android.ui.main.settings.placeholder
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -82,5 +86,51 @@ class KeyboardWindowTest {
         spaceKeys.show(numbers)
         show(letters, Engines.SHUANGPIN)
         assertEquals(listOf(placeholder(R.string.im_shuangpin)), frame.announced)
+    }
+
+    @Test
+    fun pinyinShowsTheFourteenKeysAsItsSettingHasThemAndEnglishTheFullKeyboard() {
+        assertEquals(GroupedKeyboard.Name14, lettersOf(Engines.PINYIN, nine = false, keys14 = true))
+        assertEquals(TextKeyboard.Name, lettersOf(Engines.PINYIN, nine = false, keys14 = false))
+        // English with the 14 keys chosen: the full keyboard
+        assertEquals(TextKeyboard.Name, lettersOf(Engines.ENGLISH, nine = false, keys14 = true))
+        // the others as they were
+        assertEquals(T9Keyboard.EnglishName, lettersOf(Engines.ENGLISH, nine = true, keys14 = true))
+        assertEquals(T9Keyboard.Name, lettersOf(Engines.T9, nine = false, keys14 = true))
+        assertEquals(TextKeyboard.Name, lettersOf(Engines.SHUANGPIN, nine = false, keys14 = true))
+        assertEquals(HandwritingKeyboard.Name, lettersOf(Engines.HANDWRITING, nine = false, keys14 = true))
+    }
+
+    @Test
+    fun shuangpinShowsTheKeyboardItsSettingHas() {
+        assertEquals(TextKeyboard.Name, lettersOf(Engines.SHUANGPIN, nine = false, keys14 = false, ShuangpinKeyboard.Full))
+        assertEquals(GroupedKeyboard.Name18, lettersOf(Engines.SHUANGPIN, nine = false, keys14 = false, ShuangpinKeyboard.Keys18))
+        assertEquals(T9Keyboard.ShuangpinName, lettersOf(Engines.SHUANGPIN, nine = false, keys14 = true, ShuangpinKeyboard.NineKeys))
+        // pinyin's own and English's full keyboard whatever 双拼's is
+        assertEquals(TextKeyboard.Name, lettersOf(Engines.PINYIN, nine = false, keys14 = false, ShuangpinKeyboard.Keys18))
+        assertEquals(TextKeyboard.Name, lettersOf(Engines.ENGLISH, nine = false, keys14 = false, ShuangpinKeyboard.Keys18))
+        assertEquals(T9Keyboard.Name, lettersOf(Engines.T9, nine = false, keys14 = false, ShuangpinKeyboard.NineKeys))
+    }
+
+    @Test
+    fun onlyTheNineKeysColumnsOwnTheSyllables() {
+        assertEquals(true, T9Keyboard(context, ThemePreset.PixelDark, shuangpin = true).ownsSyllables)
+        assertEquals(true, T9Keyboard(context, ThemePreset.PixelDark).ownsSyllables)
+        assertEquals(false, T9Keyboard(context, ThemePreset.PixelDark, english = true).ownsSyllables)
+        assertEquals(false, GroupedKeyboard(context, ThemePreset.PixelDark, NineKeyLetters.G18).ownsSyllables)
+        assertEquals(false, TextKeyboard(context, ThemePreset.PixelDark).ownsSyllables)
+    }
+
+    @Test
+    fun theCodeRowsSyllablesHideWhereTheKeyboardOffersThemOrTheRowIsTooLowToTap() {
+        // the keyboard's own column (九键) owns them, whatever the input method
+        assertTrue(syllablesOwned(true, Engines.PINYIN, ShuangpinKeyboard.Full, 18))
+        // 九键双拼's 123: an 18dp code row is under a touch target
+        assertTrue(syllablesOwned(false, Engines.SHUANGPIN, ShuangpinKeyboard.NineKeys, 18))
+        // the same with pinyin on the 14 keys: the row is 40dp, the strip can be tapped
+        assertFalse(syllablesOwned(false, Engines.SHUANGPIN, ShuangpinKeyboard.NineKeys, 40))
+        // 双拼 18 键 and pinyin show their strip
+        assertFalse(syllablesOwned(false, Engines.SHUANGPIN, ShuangpinKeyboard.Keys18, 40))
+        assertFalse(syllablesOwned(false, Engines.PINYIN, ShuangpinKeyboard.NineKeys, 18))
     }
 }

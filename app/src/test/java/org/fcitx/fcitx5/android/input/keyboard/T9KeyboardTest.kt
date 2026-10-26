@@ -25,6 +25,7 @@ import org.fcitx.fcitx5.android.core.KeyStates
 import org.fcitx.fcitx5.android.core.KeySym
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.theme.ThemePreset
+import org.fcitx.fcitx5.android.engine.host.Engines
 import org.fcitx.fcitx5.android.engine.host.Keyboard
 import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
 import org.fcitx.fcitx5.android.input.popup.PopupAction
@@ -521,6 +522,35 @@ class T9KeyboardTest {
             assertTrue(keyboard.findViewById<View>(R.id.button_nine_language).isVisible)
             keyboard.address = AddressKeys.NONE
             assertTrue(globe.isVisible)
+        }
+    }
+
+    // the code row's syllables of the 14 keys are in the same flow: the column takes 九键's alone
+    @Test
+    @Config(application = FcitxApplication::class)
+    fun theColumnShowsTheNineKeysSyllablesAloneNotAnotherInputMethods() {
+        val keyboard = T9Keyboard(PlaceholderStrings(RuntimeEnvironment.getApplication()), ThemePreset.PixelDark)
+        val items = (0 until keyboard.childCount).map { keyboard.getChildAt(it) }.filterIsInstance<ScrollView>().single().getChildAt(0) as ViewGroup
+        fun column() = (0 until items.childCount).map { items.getChildAt(it) as TextView }.filter { it.isVisible }.map { it.text.toString() }
+        val activity = Robolectric.buildActivity(Activity::class.java).setup().get()
+        activity.setContentView(keyboard)
+        val looper = shadowOf(Looper.getMainLooper())
+        try {
+            EngineBridge.syllablesState.value = EngineBridge.SyllableState(Engines.PINYIN, composing = true, syllables = listOf("bu", "nu"), id = 1)
+            looper.idle()
+            assertEquals(T9Keyboard.labels(EngineBridge.T9State()), column())
+            EngineBridge.syllablesState.value = EngineBridge.SyllableState(Engines.T9, composing = true, syllables = listOf("ni", "mi"), id = 2)
+            looper.idle()
+            assertEquals(listOf("ni", "mi"), column())
+            // a switch away: 九键's answer and the next one's at once, the last alone seen (3daa0415b:
+            // a filter on the input method kept the stale syllables shown)
+            (keyboard.parent as ViewGroup).removeView(keyboard)
+            EngineBridge.syllablesState.value = EngineBridge.SyllableState(Engines.PINYIN, composing = true, syllables = listOf("bu"), id = 3)
+            activity.setContentView(keyboard)
+            looper.idle()
+            assertEquals(T9Keyboard.labels(EngineBridge.T9State()), column())
+        } finally {
+            EngineBridge.syllablesState.value = EngineBridge.SyllableState()
         }
     }
 }

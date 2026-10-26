@@ -4,6 +4,8 @@
  */
 package org.fcitx.fcitx5.android.engine.session
 
+import java.nio.ByteBuffer
+import org.fcitx.fcitx5.android.engine.assertRows
 import org.fcitx.fcitx5.android.engine.data.PinyinData
 import org.fcitx.fcitx5.android.engine.data.PinyinDataBuilder
 import org.fcitx.fcitx5.android.engine.host.EngineEvent
@@ -16,6 +18,8 @@ import org.fcitx.fcitx5.android.engine.pinyin.Fuzzy
 import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
 import org.fcitx.fcitx5.android.engine.pinyin.PinyinSegmenter
 import org.fcitx.fcitx5.android.engine.pinyin.T9Segmenter
+import org.fcitx.fcitx5.android.engine.pinyin.g14
+import org.fcitx.fcitx5.android.engine.pinyin.g14Code
 import org.fcitx.fcitx5.android.engine.rerank.SentenceRefiner
 import org.fcitx.fcitx5.android.engine.session.Action.Backspace
 import org.fcitx.fcitx5.android.engine.session.Action.Key
@@ -24,7 +28,6 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
-import java.nio.ByteBuffer
 
 class PinyinSessionT9Test {
 
@@ -518,4 +521,129 @@ class PinyinSessionT9Test {
         assertTrue("不" !in s.candidates)
     }
 
+    // U-20 (D32 B) on the nine keys (R14 F3765, F3770): 奉化 used twice in full, by digits or by 连按,
+    // is third under a part, by digits (33644) or by 连按 (fengh); not in the first three before.
+    // 连按 is the nine keys' too. A word of the dictionary: one made of 奉 and 化 would be the
+    // user's after two, second by that
+    @Test
+    fun aWordUsedTwiceInFullGoesThirdUnderAPartOfTheDigitsOrOf连按() {
+        val data = dataOf(
+            Triple("风格", -1.5f, "feng ge"), Triple("风光", -1.6f, "feng guang"), Triple("丰厚", -1.7f, "feng hou"),
+            Triple("凤凰", -1.8f, "feng huang"), Triple("风化", -1.9f, "feng hua"), Triple("奉化", -6f, "feng hua"), Triple("风", -2f, "feng"),
+        )
+        // each letter its key pressed as often as its place there
+        val fengh: Session.() -> Snapshot = { press('3', 3); press('3', 2); press('6', 2); press('4', 1); press('4', 2) }
+        val fenghua: Session.() -> Snapshot = { fengh(); press('8', 2); press('2', 1) }
+        val digits: Session.() -> Snapshot = { type("33644") }
+        class Case(val why: String, val learn: Session.() -> Snapshot, val ask: Session.() -> Snapshot)
+        val rows = listOf(
+            Case("learnt by digits, asked by digits", { type("3364482") }, digits),
+            Case("learnt by digits, asked by 连按", { type("3364482") }, fengh),
+            Case("learnt by 连按, asked by digits", fenghua, digits),
+            Case("learnt by 连按, asked by 连按", fenghua, fengh),
+        )
+        assertRows(rows, { it.why }) { row ->
+            val learner = Learner(data)
+            val s = PinyinSession(data, T9Segmenter(abbreviations = false), spell = true, pageSize = 20, prediction = false, user = learner.model, learnTo = learner.learnTo())
+            fun at() = row.ask(s).candidates.indexOf("奉化").also { s.apply(Action.Reset) }
+            val fresh = at()
+            assertTrue("${row.why}: fresh $fresh", fresh < 0 || fresh > 2)
+            repeat(2) {
+                val shown = row.learn(s).candidates
+                assertTrue("${row.why}: $shown", "奉化" in shown)
+                s.apply(Action.Select(shown.indexOf("奉化")))
+                s.apply(Action.Reset)
+            }
+            assertEquals(row.why, 2, at())
+        }
+    }
+
+    // F3776: where the decoder leaves 奉化 off 33644 (more feng h… words ahead of it than a level
+    // holds), the lift walks it in. The fresh check only shows it is off the first page; that the
+    // decoder dropped it is shown by the last assertion, which fails without the walk-in
+    @Test
+    fun aWordTheDecoderLeavesOffAPartIsWalkedIn() {
+        val others = listOf("feng hou", "feng huang", "feng hui", "feng huo", "feng hong", "feng hun").flatMapIndexed { r, reading ->
+            (0 until 14).map { i -> Triple(String(Character.toChars(0x4E00 + r * 20 + i)) + "风", -1f - i * 0.01f, reading) }
+        }
+        val data = dataOf(*(others + Triple("奉化", -6f, "feng hua") + Triple("风", -2f, "feng")).toTypedArray())
+        val learner = Learner(data)
+        val s = PinyinSession(data, T9Segmenter(abbreviations = false), spell = true, pageSize = 20, prediction = false, user = learner.model, learnTo = learner.learnTo())
+        val fresh = s.type("33644").candidates
+        assertTrue(fresh.toString(), "奉化" !in fresh)
+        s.apply(Action.Reset)
+        repeat(2) {
+            val shown = s.type("3364482").candidates
+            s.apply(Action.Select(shown.indexOf("奉化")))
+            s.apply(Action.Reset)
+        }
+        assertEquals(2, s.type("33644").candidates.indexOf("奉化"))
+    }
+
+    // the 14 keys (design §1.1, §5.1): ni hao is BN UI GH AS OP's codes (g14)
+    private fun session14(habits: RecordingHabits? = null) = PinyinSession(
+        data, T9Segmenter(abbreviations = false, letters = NineKeyLetters.G14), spell = true, prediction = false,
+        learnTo = habits?.let { LearnTo(it) } ?: LearnTo(),
+    )
+
+    private val nihao14 = NineKeyLetters.G14.typings("nihao").single()
+
+    @Test
+    fun onTheFourteenKeysASentenceReadsAndTwoSyllablesTakenGoBackLastFirst() {
+        val session = session14()
+        val s = session.type(nihao14)
+        assertEquals("你好", s.candidates[0])
+        assertEquals("ni hao", s.preedit)
+        assertEquals("ni", s.syllables.first())
+        assertTrue(s.syllables.toString(), "bu" in s.syllables)
+        val ni = session.apply(Action.Syllable(0))
+        assertEquals("ni'hao", ni.preedit)
+        assertTrue(ni.syllables.toString(), "hao" in ni.syllables && "gao" in ni.syllables)
+        val both = session.apply(Action.Syllable(ni.syllables.indexOf("hao")))
+        assertEquals("你好", both.candidates[0])
+        assertTrue(both.syllables.isEmpty())
+        // last taken, first given back: hao, then ni
+        val back = session.apply(Backspace)
+        assertTrue(back.syllables.toString(), "hao" in back.syllables && "ni" !in back.syllables)
+        assertEquals(s.syllables, session.apply(Backspace).syllables)
+    }
+
+    @Test
+    fun onTheFourteenKeysTheApostropheSeparatesAndOneIsNoKey() {
+        val session = session14()
+        val separated = session.type(nihao14.substring(0, 2) + "'" + nihao14.substring(2))
+        assertEquals("ni'hao", separated.preedit)
+        // a 1 swiped off a key comes as the keypad's: typed it is no separator, nor read
+        assertFalse(session.reads('1'))
+        assertEquals("nihao", session.apply(Action.CommitRaw).commit)
+    }
+
+    @Test
+    fun aKeyThatReadsNothingShowsAndCommitsAsItsFirstLetter() {
+        // UI alone: no syllable starts with u or i
+        val session = session14()
+        val ui = session.type(g14("ui"))
+        assertEquals("u", ui.preedit)
+        // nor the decoder's candidate kept as typed
+        assertTrue(ui.candidates.toString(), ui.candidates.none { c -> c.any { it.code in NineKeyLetters.CODES } })
+        val commit = session.apply(Action.CommitRaw).commit
+        assertEquals("u", commit)
+        assertTrue(commit.none { it.code in NineKeyLetters.CODES })
+        // nor through a keyboard's Enter
+        val keyboard = Keyboard(session14(), nineKeys = true)
+        keyboard.onEvent(EngineEvent.CHAR, g14Code('u').code)
+        keyboard.onEvent(EngineEvent.CHAR, g14Code('b').code)
+        // UI as typed, BN read: n (嗯)
+        val entered = keyboard.onEvent(EngineEvent.ENTER, 0).commit
+        assertEquals("un", entered)
+    }
+
+    @Test
+    fun aWordIsPinnedUnderTheFourteenKeysOwnKind() {
+        val habits = RecordingHabits()
+        val session = session14(habits)
+        session.type(nihao14)
+        session.apply(Action.Pin(0))
+        assertTrue(habits.pins.toString(), habits.pins.single().startsWith("${Kinds.keys(NineKeyLetters.G14.tag())}:"))
+    }
 }

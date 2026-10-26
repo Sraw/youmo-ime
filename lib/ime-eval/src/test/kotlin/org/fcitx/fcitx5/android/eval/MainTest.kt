@@ -97,6 +97,7 @@ class MainTest {
                     "echo \"\$*\" >> \"\$0.calls\"",
                     "case \"\$1\" in",
                     "  t9) : > \"\$3\" ;;",
+                    "  shuangpin) : > \"\$4\" ;;",
                     "  pinyin) : > \"\$4\" ;;",
                     "  score | learn) cat \"\$(dirname \"\$0\")/\$1\" ;;",
                     "  *) exit 3 ;;",
@@ -271,6 +272,12 @@ class MainTest {
         val made = calls.readLines()
         assertTrue(made.joinToString("\n"), made.any { it.startsWith("t9 ") && it.endsWith("/t9-chat.set.tsv") })
         assertTrue(made.joinToString("\n"), made.any { it.startsWith("pinyin ") && "/t9-chat.set.tsv " in it && "--scheme t9-strict" in it })
+        // grouped 双拼's sets typed by `shuangpin --keys`, read by their scheme (review N6)
+        assertTrue(made.joinToString("\n"), made.any { it.startsWith("shuangpin xiaohe ") && it.endsWith("/sp18-chat.set.tsv --keys 18") })
+        assertTrue(made.joinToString("\n"), made.any { it.startsWith("pinyin ") && "/spnine-chat.set.tsv " in it && "--scheme xiaohe-nine" in it })
+        // the 14 keys' sets typed as codes by `t9 --keys 14`, not as digits
+        assertTrue(made.joinToString("\n"), made.any { it.startsWith("t9 ") && it.endsWith("/g14-chat.set.tsv --keys 14") })
+        assertTrue(made.joinToString("\n"), made.any { it.startsWith("pinyin ") && "/g14-chat.set.tsv " in it && "--scheme g14-strict" in it })
 
         // that run's dir as BASE, as the script wrote it: each set's results, and the options it read them with
         val base = written
@@ -434,12 +441,12 @@ class MainTest {
             assertEquals(0, runCli(arrayOf("learn-log-bench", dir.path, "--commits", "60", "--days", "3", *options), out, StringBuilder()))
             return out.lines().filter { it.isNotBlank() }
         }
-        assertEquals(listOf("unfolded log", "fold at start", "folded log", "state"), bench().map { it.substringBefore("  ").trim() })
+        assertEquals(listOf("unfolded log", "fold at start", "folded log", "state", "spellings"), bench().map { it.substringBefore("  ").trim() })
         assertTrue(bench("--counts", data.path).first().startsWith("counts "))
         assertTrue(bench("--legacy", data.path).first().startsWith("conversion "))
         // again over what the last left
         assertTrue(bench("--legacy", data.path)[1].startsWith("catch-up "))
-        assertEquals(4, bench().size)
+        assertEquals(5, bench().size)
         assertThrows(IllegalArgumentException::class.java) { bench("--legacy", data.path, "--counts", data.path) }
         File(dir, "notes.txt").writeText("mine")
         assertThrows(IllegalArgumentException::class.java) { bench() }

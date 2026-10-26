@@ -4,11 +4,13 @@
  */
 package org.fcitx.fcitx5.android.eval
 
-import org.fcitx.fcitx5.android.engine.data.PinyinDataBuilder
+import java.nio.ByteBuffer
 import org.fcitx.fcitx5.android.engine.data.PinyinData
+import org.fcitx.fcitx5.android.engine.data.PinyinDataBuilder
 import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
 import org.fcitx.fcitx5.android.engine.pinyin.Syllables
 import org.fcitx.fcitx5.android.engine.pinyin.T9Segmenter
+import org.fcitx.fcitx5.android.engine.pinyin.g14
 import org.fcitx.fcitx5.android.engine.session.Action
 import org.fcitx.fcitx5.android.engine.session.PinyinSession
 import org.junit.Assert.assertEquals
@@ -17,7 +19,6 @@ import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
-import java.nio.ByteBuffer
 
 class T9SetTest {
 
@@ -123,5 +124,78 @@ class T9SetTest {
         }
         assertTrue("时间" in candidates("t9"))
         assertFalse("时间" in candidates("t9-strict"))
+    }
+
+    // the 14 keys (design §5.2): each letter its group's code, no 连按
+    @Test
+    fun onTheFourteenKeysEachLetterIsItsKeysCode() {
+        val samples = listOf(Sample("nihao", "你好", "daily"), Sample("lv", "绿", "daily"))
+        assertEquals(listOf(g14("bn ui gh as op"), g14("l cv")), T9Set.convert(samples, keys = NineKeyLetters.G14).map { it.input })
+        val set = tmp.newFile("set14.tsv").apply { writeText("nihao\t你好\tdaily\n") }
+        val converted = tmp.newFile("g14.tsv")
+        val out = StringBuilder()
+        assertEquals(0, runCli(arrayOf("t9", set.path, converted.path, "--keys", "14"), out, StringBuilder()))
+        assertEquals("1 of 1 samples typed on the 14 keys", out.trim())
+        assertEquals(g14("bn ui gh as op"), converted.useLines { EvalSet.parse(it) }.single().input)
+        // the samples kept, as they were, for full pinyin on the same ones
+        val two = tmp.newFile("two.tsv").apply { writeText("nihao\t你好\tdaily\nnh\t你好\tabbrev\n") }
+        val same = tmp.newFile("same.tsv")
+        assertEquals(0, runCli(arrayOf("t9", two.path, converted.path, "--keys", "14", "--same", same.path), StringBuilder(), StringBuilder()))
+        assertEquals(listOf("nihao"), same.useLines { EvalSet.parse(it) }.map { it.input })
+        val err = StringBuilder()
+        assertEquals(2, runCli(arrayOf("t9", set.path, converted.path, "--keys", "14", "--presses", "letters"), StringBuilder(), err))
+        assertTrue(err.toString(), "t9: --presses letters is the nine keys' alone, not --keys 14" in err)
+        assertEquals(2, runCli(arrayOf("t9", set.path, converted.path, "--keys", "13"), StringBuilder(), StringBuilder()))
+    }
+
+    @Test
+    fun theG14SchemesReadTheFourteenKeys() {
+        val data = tmp.newFile("pinyin14.data").apply {
+            writeBytes(
+                PinyinDataBuilder()
+                    .unigram("<unk>", -7f, 0f)
+                    .unigram("你好", -3f, 0f)
+                    .entry("你好", intArrayOf(Syllables.id("ni"), Syllables.id("hao")))
+                    .build().toByteArray(),
+            )
+        }
+        val set = tmp.newFile("g14set.tsv").apply { writeText("${g14("bn")}${g14("ui")}${g14("gh")}${g14("as")}${g14("op")}\t你好\tdaily\n") }
+        val result = tmp.newFile("g14result.tsv")
+        for (scheme in listOf("g14", "g14-strict")) {
+            assertEquals(0, runCli(arrayOf("pinyin", data.path, set.path, result.path, "--scheme", scheme), StringBuilder(), StringBuilder()))
+            assertEquals(scheme, "你好", result.useLines { RunResultFormat.parse(it) }.single().candidates.first())
+        }
+        // glides and English have no 14 keys
+        assertEquals(2, runCli(arrayOf("english", data.path, set.path, "--keys", "14"), StringBuilder(), StringBuilder()))
+        assertEquals(2, runCli(arrayOf("pinyin-glide", data.path, set.path, "--keys", "14"), StringBuilder(), StringBuilder()))
+    }
+
+    // `pinyin --taps` (k14-tap-position): where the hand tapped decides between the letters of a key
+    @Test
+    fun whereTheTapsLandDecidesBetweenAKeysLetters() {
+        val data = tmp.newFile("pinyintaps.data").apply {
+            writeBytes(
+                PinyinDataBuilder()
+                    .unigram("<unk>", -7f, 0f)
+                    .unigram("你好", -3f, 0f)
+                    .unigram("不好", -2.5f, 0f)
+                    .entry("你好", intArrayOf(Syllables.id("ni"), Syllables.id("hao")))
+                    .entry("不好", intArrayOf(Syllables.id("bu"), Syllables.id("hao")))
+                    .build().toByteArray(),
+            )
+        }
+        val set = tmp.newFile("tapset.tsv").apply { writeText("nihao\t你好\tdaily\n") }
+        val result = tmp.newFile("tapresult.tsv")
+        fun first(vararg options: String): String {
+            assertEquals(0, runCli(arrayOf("pinyin", data.path, set.path, result.path, "--scheme", "g14-strict", *options), StringBuilder(), StringBuilder()))
+            return result.useLines { RunResultFormat.parse(it) }.single().candidates.first()
+        }
+        // on each letter's centre n and i outweigh 不好's better model score; tapped mid-key, nothing does
+        assertEquals("你好", first("--taps", "perfect:1"))
+        assertEquals("不好", first("--taps", "middle:1"))
+        // the taps type the 14 keys only, and a spec that does not parse is a usage error
+        for (bad in listOf(arrayOf("--scheme", "t9-strict", "--taps", "perfect:1"), arrayOf("--scheme", "g14-strict", "--taps", "perfect:x"), arrayOf("--scheme", "g14-strict", "--taps", "perfect:-1"))) {
+            assertEquals(bad.joinToString(" "), 2, runCli(arrayOf("pinyin", data.path, set.path, result.path, *bad), StringBuilder(), StringBuilder()))
+        }
     }
 }

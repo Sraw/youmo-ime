@@ -150,7 +150,7 @@ object ClipboardManager : ClipboardManager.OnPrimaryClipChangedListener,
     // what a start does once a database is open: each step's failure only logged
     private suspend fun tidyUp() {
         startUp {
-            // marked by a process that died with its undo snackbar up: nothing can undo them now
+            // marked by a process that died with its undo offer up: nothing can undo them now
             clbDao.purgeAllMarked()
             // the limit applied here, after the open, rather than by a launch of limitListener's that could run before it
             removeOutdated()
@@ -271,7 +271,7 @@ object ClipboardManager : ClipboardManager.OnPrimaryClipChangedListener,
         updateItemCount()
     }
 
-    // none, for its snackbar to offer back, if they cannot be marked
+    // none, for the keyboard's undo hint to offer back, if they cannot be marked
     suspend fun deleteAll(skipPinned: Boolean = true): IntArray = orNeutral(IntArray(0)) {
         val ids = if (skipPinned) {
             clbDao.findUnpinnedIds()
@@ -341,7 +341,8 @@ object ClipboardManager : ClipboardManager.OnPrimaryClipChangedListener,
         }
     }
 
-    private var lastClipTimestamp = -1L
+    @VisibleForTesting
+    internal var lastClipTimestamp = -1L
 
     // duplicates are of a start's clips: a test's app, started again in this process, has its clock started over, while
     // this object keeps the last start's
@@ -389,7 +390,7 @@ object ClipboardManager : ClipboardManager.OnPrimaryClipChangedListener,
         // the last one we will keep; with fewer than limit unpinned, none is outdated
         val last = lastKept(limitPref.getValue(), System.currentTimeMillis()) { clbDao.unpinnedTimestampAt(it) } ?: return
         // delete all unpinned before that, or delete all when limit <= 0; outright, as no undo
-        // offers them back and a purge takes only what its snackbar showed
+        // offers them back and a purge takes only what its undo hint showed
         clbDao.deleteUnpinnedEarlierThan(last)
     }
 

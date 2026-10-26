@@ -79,7 +79,7 @@ class CommonKeyActionListener :
         } else {
             null
         }
-        // dropped first, from wherever: English next is its own input method, the full keyboard
+        // dropped first: English next is its own input method, the full keyboard
         englishOnNineKeys.setValue(false)
         when (next) {
             null -> enumerateIme()

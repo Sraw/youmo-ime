@@ -198,7 +198,7 @@ class PinyinDecoder(
                 val userChild = if (userNode < 0 || user == null) -1 else user.child(userNode, matches.syllable(i))
                 val mergedChild = if (mergedNode < 0 || merged == null) -1 else merged.child(mergedNode, matches.syllable(i))
                 if (child < 0 && userChild < 0 && mergedChild < 0) continue
-                val c = edgeCost + penalty(matches.flags(i)) + nasal(kind, matches.syllable(i))
+                val c = edgeCost + penalty(matches.flags(i)) + nasal(kind, matches.syllable(i)) + penalties.tap * graph.against(e, i)
                 var more = false
                 if (child >= 0) {
                     val words = minOf(dictionary.wordCount(child), limit)
@@ -245,7 +245,7 @@ class PinyinDecoder(
             for (i in 0 until matches.size) {
                 val child = starts.child(node, matches.syllable(i))
                 if (child < 0) continue
-                val c = cost + penalty(kind) + penalty(matches.flags(i)) + nasal(kind, matches.syllable(i))
+                val c = cost + penalty(kind) + penalty(matches.flags(i)) + nasal(kind, matches.syllable(i)) + penalties.tap * graph.against(e, i)
                 for (w in 0 until starts.wordCount(child)) {
                     val word = starts.word(child, w)
                     if (user.startOnly(word) && !user.blocked(word, -1)) arcs.add(to, word, c + penalties.imported, short = edgeShort, startOnly = true)

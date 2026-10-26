@@ -168,6 +168,7 @@ class PopupOverridesFragment : KeyCapsPageFragment() {
             isSingleLine = true
         }
         fun addTyped() {
+            if (rejected(field)) return
             editor.add(field.text.toString())
             field.text = null
             render()
@@ -194,12 +195,7 @@ class PopupOverridesFragment : KeyCapsPageFragment() {
         val builder = AlertDialog.Builder(ctx)
             .setTitle(getString(R.string.long_press_of, label))
             .setView(layout.wrapInScrollView())
-            .setPositiveButton(android.R.string.ok) { _, _ ->
-                // a word left typed in the field counts as added
-                editor.add(field.text.toString())
-                overrides = current.withEdit(label, editor.items, preset)
-                rebuild()
-            }
+            .setPositiveButton(android.R.string.ok, null)
             .setNegativeButton(android.R.string.cancel, null)
         if (current[label] != null) {
             builder.setNeutralButton(R.string.reset) { _, _ ->
@@ -207,7 +203,15 @@ class PopupOverridesFragment : KeyCapsPageFragment() {
                 rebuild()
             }
         }
-        builder.show().setCanceledOnTouchOutside(false)
+        builder.show().apply { setCanceledOnTouchOutside(false) }
+            // a word left typed in the field counts as added; one holding a key code is said so, the dialog kept
+            .onPositiveButtonClick onClick@{
+                if (rejected(field)) return@onClick false
+                editor.add(field.text.toString())
+                overrides = current.withEdit(label, editor.items, preset)
+                rebuild()
+                true
+            }
     }
 
     private fun askLabel() {
@@ -231,6 +235,8 @@ class PopupOverridesFragment : KeyCapsPageFragment() {
             // a label that is no one key is said so, not dropped with the dialog
             .onPositiveButtonClick onClick@{
                 val label = keyLabel(field.text.toString())
+                // a key named by a code is no key (keys look their long press up by letter): refused, so the user is told
+                if (rejected(field)) return@onClick false
                 if (label == null) {
                     field.error = getString(R.string.invalid_value)
                     field.requestFocus()
@@ -239,6 +245,17 @@ class PopupOverridesFragment : KeyCapsPageFragment() {
                 edit(label)
                 true
             }
+    }
+
+    /**
+     * Whether [field] holds a keyboard's key code, which PopupOverrides never keeps (a key typing it
+     * would be read as that key): said under the field, not dropped without a word.
+     */
+    private fun rejected(field: EditText): Boolean {
+        val code = keyCodeIn(field.text.toString()) ?: return false
+        field.error = getString(R.string.popup_overrides_code_rejected, shownCode(code))
+        field.requestFocus()
+        return true
     }
 
     private fun confirmResetAll() {
@@ -271,6 +288,20 @@ class PopupOverridesFragment : KeyCapsPageFragment() {
 internal fun PopupOverrides.withEdit(label: String, items: List<String>, preset: Array<String>?): PopupOverrides {
     val unedited = without(label)
     return if (unedited.resolve(label, preset)?.toList().orEmpty() == items) unedited else with(label, items)
+}
+
+/**
+ * The first item of [text] that PopupOverrides rejects (a keyboard's key code alone), or null: a
+ * code within longer text is text, kept as [PopupOverrides.with] keeps it.
+ */
+internal fun keyCodeIn(text: String): String? = PopupOverrides.tokens(text).firstOrNull(PopupOverrides::rejects)
+
+/**
+ * [code] (one code point, a supplementary tap code too) as the error says it: a private-use one
+ * (双拼's 18 keys') as U+F8C1, most fonts drawing it blank.
+ */
+internal fun shownCode(code: String): String = code.codePointAt(0).let {
+    if (Character.getType(it) == Character.PRIVATE_USE.toInt()) "U+%04X".format(it) else code
 }
 
 /** The key [text] names, or null: a label is one word of the stored format, so none or two name no key. */

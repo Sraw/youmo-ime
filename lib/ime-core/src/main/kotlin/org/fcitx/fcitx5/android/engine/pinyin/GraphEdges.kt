@@ -15,13 +15,18 @@ internal class GraphEdges private constructor(private val input: String) {
     private val to = IntList()
     private val kinds = ArrayList<Kind>()
     private val matches = ArrayList<SyllableMatches>()
+    private val against = ArrayList<FloatArray?>()
 
-    /** Adds an edge over the [length] characters at [at], leading past any separators after them. */
-    fun add(at: Int, length: Int, kind: Kind, m: SyllableMatches) {
+    /**
+     * Adds an edge over the [length] characters at [at], leading past any separators after them;
+     * [taps], a value for each of [m] as [SyllableGraph.against] has them, or null for none.
+     */
+    fun add(at: Int, length: Int, kind: Kind, m: SyllableMatches, taps: FloatArray? = null) {
         from += at
         to += skipSeparators(input, at + length)
         kinds += kind
         matches += m
+        against += taps
     }
 
     companion object {
@@ -56,5 +61,8 @@ internal class GraphEdges private constructor(private val input: String) {
     private val size get() = from.size
 
     private fun toGraph(start: Int) =
-        SyllableGraph(input, start, firstEdge, from.toArray(), to.toArray(), kinds.toTypedArray(), matches.toTypedArray())
+        SyllableGraph(
+            input, start, firstEdge, from.toArray(), to.toArray(), kinds.toTypedArray(), matches.toTypedArray(),
+            against.takeIf { a -> a.any { it != null } }?.toTypedArray(),
+        )
 }

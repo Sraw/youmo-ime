@@ -32,7 +32,7 @@ class CommitJournalTest {
     private fun context(before: String, after: String? = null, started: Boolean = false, cleared: Boolean = false, selected: Boolean = false, said: Boolean = false) =
         journal.context(before, after, started, cleared, selected, said)
 
-    // HW-22/23: an empty field focused again after a Reset. Not said (the editor would not): still not known, a Backspace
+    // HW-23: an empty field focused again after a Reset. Not said (the editor would not): still not known, a Backspace
     // drops all (review-1c M1); said empty by the editor, the field is empty, known: what is then written and deleted is taken back
     @Test
     fun anEmptyFieldTheEditorSaidIsKnownOneItWouldNotSayIsNot() {

@@ -7,7 +7,7 @@ package org.fcitx.fcitx5.android
 import android.os.SystemClock
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
-import org.fcitx.fcitx5.android.core.Fcitx
+import org.fcitx.fcitx5.android.core.FcitxInstance
 import org.fcitx.fcitx5.android.core.FcitxEvent
 import org.fcitx.fcitx5.android.core.KeyState
 import org.fcitx.fcitx5.android.core.RawConfig
@@ -39,7 +39,7 @@ class FcitxTest {
     private companion object {
 
         val harness = TestFcitx()
-        val fcitx: Fcitx get() = harness.fcitx
+        val fcitx: FcitxInstance get() = harness.fcitx
         val latestInputPanel get() = harness.latestInputPanel
         val latestPaged get() = harness.latestPaged
 

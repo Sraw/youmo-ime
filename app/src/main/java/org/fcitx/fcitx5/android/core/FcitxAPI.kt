@@ -35,10 +35,6 @@ interface FcitxAPI {
 
     val inputPanelCached: FcitxEvent.InputPanelEvent.Data
 
-    fun setLogRule(verbose: Boolean)
-
-    fun translate(str: String, domain: String = "fcitx5"): String
-
     suspend fun save()
 
     suspend fun reloadConfig()

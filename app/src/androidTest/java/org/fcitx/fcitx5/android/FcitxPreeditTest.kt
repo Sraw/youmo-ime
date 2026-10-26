@@ -7,11 +7,10 @@ package org.fcitx.fcitx5.android
 import kotlinx.coroutines.runBlocking
 import org.fcitx.fcitx5.android.core.CapabilityFlag
 import org.fcitx.fcitx5.android.core.CapabilityFlags
-import org.fcitx.fcitx5.android.core.Fcitx
 import org.fcitx.fcitx5.android.core.FcitxEvent
+import org.fcitx.fcitx5.android.core.FcitxInstance
 import org.fcitx.fcitx5.android.core.InputMethodNames
 import org.fcitx.fcitx5.android.core.KeyState
-import org.fcitx.fcitx5.android.core.RawConfig
 import org.fcitx.fcitx5.android.engine.host.Engines
 import org.junit.After
 import org.junit.AfterClass
@@ -21,12 +20,10 @@ import org.junit.BeforeClass
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.Timeout
-import java.io.File
 
 /**
- * Where what is typed shows is the input method's (androidengine's composesText), whatever fcitx's
- * own config turns, and fcitx's hotkeys that would act beside the app's stay off: Ctrl+Alt+P, which
- * turns the preedit over, and a lone Shift, which switched as the app's HardwareShortcuts does.
+ * Where what is typed shows is the input method's (androidengine's composesText, kept by the Kotlin
+ * host): English's word in the app, every code above the candidates.
  */
 class FcitxPreeditTest {
 
@@ -36,7 +33,7 @@ class FcitxPreeditTest {
     private companion object {
 
         val harness = TestFcitx()
-        val fcitx: Fcitx get() = harness.fcitx
+        val fcitx: FcitxInstance get() = harness.fcitx
         val latestInputPanel get() = harness.latestInputPanel
 
         @BeforeClass
@@ -50,22 +47,6 @@ class FcitxPreeditTest {
         private suspend fun awaitQuiet() = harness.awaitQuiet()
 
         private suspend fun eventsTillQuiet() = harness.eventsTillQuiet()
-
-        /** fcitx's own Behavior/PreeditEnabledByDefault, saved and read again: it turns every input context's. */
-        private suspend fun preeditEnabledByDefault(enabled: Boolean) = fcitx.setGlobalConfig(
-            RawConfig(arrayOf(RawConfig("Behavior", arrayOf(RawConfig("PreeditEnabledByDefault", enabled)))))
-        )
-
-        /** The keys of fcitx's TriggerKeys, AltTriggerKeys and TogglePreedit. */
-        private suspend fun hotkeys() = listOf("TriggerKeys", "AltTriggerKeys", "TogglePreedit").map { name ->
-            fcitx.getGlobalConfig()["cfg"]["Hotkey"][name].subItems.orEmpty().map { it.value }
-        }
-
-        val noKeys = listOf(emptyList<String>(), emptyList(), emptyList())
-
-        /** fcitx's own config, as the documents provider writes it. */
-        private fun fcitxConfig(): File = FcitxApplication.getInstance().directBootAwareContext
-            .let { it.getExternalFilesDir(null) ?: it.filesDir }.resolve("config/config")
     }
 
     @Before
@@ -76,18 +57,14 @@ class FcitxPreeditTest {
 
     /**
      * In a field that takes composing text, English's word goes into it and pinyin's code above the
-     * candidates, after fcitx reads its config with the preedit of every input context turned the
-     * other way: the second of each pair of saves a change, which fcitx applies.
+     * candidates: the input method's, there being no fcitx-wide preedit option on the Kotlin host.
      */
     @Test
-    fun eachInputMethodsPreeditStaysWhereItPutsItAfterFcitxReadsItsConfig(): Unit = runBlocking {
-        val before = fcitx.getGlobalConfig()["cfg"]["Behavior"]["PreeditEnabledByDefault"].value == "True"
+    fun eachInputMethodsPreeditStaysWhereItPutsIt(): Unit = runBlocking {
         fcitx.setCapFlags(CapabilityFlags(CapabilityFlag.Sensitive, CapabilityFlag.Preedit))
         fcitx.setEnabledIme(arrayOf(Engines.PINYIN, InputMethodNames.KEYBOARD))
         try {
             fcitx.activateIme(InputMethodNames.KEYBOARD)
-            preeditEnabledByDefault(true)
-            preeditEnabledByDefault(false)
             awaitQuiet()
             "hel".forEach { fcitx.sendKey(it, KeyState.Virtual.state) }
             val english = eventsTillQuiet().filterIsInstance<FcitxEvent.ClientPreeditEvent>().lastOrNull()
@@ -95,8 +72,6 @@ class FcitxPreeditTest {
             fcitx.reset()
 
             fcitx.activateIme(Engines.PINYIN)
-            preeditEnabledByDefault(false)
-            preeditEnabledByDefault(true)
             awaitQuiet()
             "ni".forEach { fcitx.sendKey(it) }
             val pinyin = eventsTillQuiet().filterIsInstance<FcitxEvent.ClientPreeditEvent>()
@@ -104,42 +79,7 @@ class FcitxPreeditTest {
             Assert.assertEquals("above the candidates", "ni", latestInputPanel.preedit.toString())
         } finally {
             fcitx.setCapFlags(CapabilityFlags(CapabilityFlag.Sensitive))
-            preeditEnabledByDefault(before)
             fcitx.reset()
-        }
-    }
-
-    /**
-     * Both stay off after fcitx reads a config that lacks them (one written through the documents
-     * provider from before they were turned off), and after a save that sets them again.
-     */
-    @Test
-    fun fcitxsLoneShiftAndPreeditToggleStayOffAfterItReadsItsConfig(): Unit = runBlocking {
-        val file = fcitxConfig()
-        val saved = file.takeIf { it.exists() }?.readText()
-        try {
-            Assert.assertEquals("as fcitx started", noKeys, hotkeys())
-            // the harness's own setting kept, as TestFcitx.start set it
-            file.writeText("[Behavior]\nShowInputMethodInformation=False\n")
-            fcitx.reloadConfig()
-            Assert.assertEquals("a config without them read", noKeys, hotkeys())
-            fcitx.setGlobalConfig(
-                RawConfig(
-                    arrayOf(
-                        RawConfig(
-                            "Hotkey", arrayOf(
-                                RawConfig("TriggerKeys", arrayOf(RawConfig("0", "Control+space"))),
-                                RawConfig("AltTriggerKeys", arrayOf(RawConfig("0", "Shift_L"))),
-                                RawConfig("TogglePreedit", arrayOf(RawConfig("0", "Control+Alt+P")))
-                            )
-                        )
-                    )
-                )
-            )
-            Assert.assertEquals("set again", noKeys, hotkeys())
-        } finally {
-            if (saved != null) file.writeText(saved) else file.delete()
-            fcitx.reloadConfig()
         }
     }
 

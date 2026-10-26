@@ -34,6 +34,13 @@ object VoiceFeature {
         VoiceHoldOverlay(inputView, overlay, pointer, commit).begin()
     }
 
+    /** Voice offered on the keyboard (the bar's microphone shown): the next opening's VAD made ahead. */
+    fun shown(context: Context) {
+        if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
+            VoiceEngine.prepareVadSoon(context.assets)
+        }
+    }
+
     /** on the licences page */
     fun credits(context: Context) = listOf(
         Credit(context.getString(R.string.voice_model_credit), "Apache-2.0", "https://github.com/Gilgamesh-J/X-ASR"),

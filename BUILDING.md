@@ -9,8 +9,9 @@
 ### 需要
 
 - Android SDK Platform 36 与 Build-Tools 36.1.0；
-- Android NDK 28.0.13004108 与 CMake 3.31.6；
-- [extra-cmake-modules](https://github.com/KDE/extra-cmake-modules)、GNU gettext ≥ 0.20。
+- Android NDK 28.0.13004108 与 CMake 3.31.6（编手写识别和语音识别的原生库：onnxruntime 的 JNI、句子模型的矩阵核心、sherpa-onnx）。
+
+仓库没有子模块。
 
 版本以 [Versions.kt](build-logic/convention/src/main/kotlin/Versions.kt) 为准。
 
@@ -19,8 +20,6 @@
 ```shell
 git clone https://github.com/Sraw/youmo-ime.git
 cd youmo-ime
-git submodule update --init --recursive   # 只有 fcitx5；预编译依赖和 chinese-addons 的模块已在仓库里
-sudo apt install extra-cmake-modules gettext   # Debian/Ubuntu；Arch：pacman -S extra-cmake-modules；macOS：brew install extra-cmake-modules gettext
 ./gradlew :app:assembleTextDebug   # 带语音：:app:assembleVoiceDebug
 ```
 
@@ -28,14 +27,14 @@ sudo apt install extra-cmake-modules gettext   # Debian/Ubuntu；Arch：pacman -
 `./gradlew :app:assembleRelease` 两个都打。默认四种 ABI 都编，只编一种快得多：手机加 `-PbuildABI=arm64-v8a`（发布的安装包就是这样打的），
 x86_64 的模拟器或 redroid 加 `-PbuildABI=x86_64`。
 
-从 0.3.2 及更早版本的检出更新时（预编译依赖和 chinese-addons 从子模块改成了仓库里的目录），pull/merge 前先执行一次，否则 git 会因子模块留下的文件而中止：
+从 0.3.x 的检出更新时（原生 fcitx5 和 chinese-addons 已删掉，fcitx5 子模块也去掉了），pull/merge 前先执行一次，否则子模块留下的文件会挡住 git：
 
 ```
-git submodule deinit -f lib/fcitx5/src/main/cpp/prebuilt lib/fcitx5-chinese-addons/src/main/cpp/fcitx5-chinese-addons
-rm -rf lib/fcitx5/src/main/cpp/prebuilt lib/fcitx5-chinese-addons/src/main/cpp/fcitx5-chinese-addons
+git submodule deinit -f --all
+rm -rf lib/fcitx5 lib/fcitx5-chinese-addons
 ```
 
-之后切回旧提交用 `git checkout <旧提交> && git submodule update --init`，回来时再执行一次上面两行。
+之后要构建 0.3.x 的旧提交，用 `git checkout <旧提交> && git submodule update --init --recursive`，并装上 extra-cmake-modules 和 GNU gettext ≥ 0.20；回来时再执行一次上面两行。
 
 ### 数据
 
@@ -81,9 +80,11 @@ signKeyPwd=...
 | 位置 | 内容 |
 |---|---|
 | `lib/ime-core` | 纯 JVM 模块，不依赖 Android：拼音与码表引擎、解码器、句子模型推理，以及各种决策逻辑 |
-| `app` | Android 部分：界面、`InputMethodService`、设置、与 Fcitx5 的 JNI 桥 |
+| `lib/ime-core` 的 `host/` | 输入法框架：按 Fcitx5 的代码用 Kotlin 重写（输入上下文、按键管线、标点、全角、简繁、快速输入、Unicode） |
+| `app` | Android 部分：界面、`InputMethodService`、设置，以及在一个线程上运行框架的 `KotlinFcitx` |
 | `app/src/voice`、`app/src/text` | 两个版本各自的代码：语音输入只在 `voice` 里 |
 | `lib/sherpa-onnx` | 语音识别运行库（sherpa-onnx 的源码，有本项目的改动） |
+| `lib/handwriting` | 手写识别的运行库（onnxruntime 和一个小 JNI）和句子模型的矩阵核心（`libyoumo-matrix`） |
 | `lib/ime-eval` | 评测：用测试集模拟打字，算首选正确率等指标 |
 | `lib/ime-dict-tool` | 从文本源构建引擎数据（只在构建时用，不进安装包） |
 | `lexicon/` | 新词的来源和校对记录 |
@@ -103,8 +104,9 @@ signKeyPwd=...
 ### Requirements
 
 - Android SDK Platform 36 and Build-Tools 36.1.0;
-- Android NDK 28.0.13004108 and CMake 3.31.6;
-- [extra-cmake-modules](https://github.com/KDE/extra-cmake-modules) and GNU gettext ≥ 0.20.
+- Android NDK 28.0.13004108 and CMake 3.31.6 (for the handwriting and speech native libraries: onnxruntime's JNI, the sentence models' matrix kernel, sherpa-onnx).
+
+The repository has no submodules.
 
 [Versions.kt](build-logic/convention/src/main/kotlin/Versions.kt) has the current versions.
 
@@ -113,8 +115,6 @@ signKeyPwd=...
 ```shell
 git clone https://github.com/Sraw/youmo-ime.git
 cd youmo-ime
-git submodule update --init --recursive   # fcitx5 only; the prebuilt dependencies and chinese-addons modules are in the repository
-sudo apt install extra-cmake-modules gettext   # Debian/Ubuntu; Arch: pacman -S extra-cmake-modules; macOS: brew install extra-cmake-modules gettext
 ./gradlew :app:assembleTextDebug   # with voice: :app:assembleVoiceDebug
 ```
 
@@ -122,15 +122,16 @@ There are two builds, neither with a network permission: `text`, the default, an
 permission and a ~180 MB speech model. `./gradlew :app:assembleRelease` makes both. All four ABIs are built by default; one is much faster:
 `-PbuildABI=arm64-v8a` for phones (as the released APKs are built), `-PbuildABI=x86_64` for an x86_64 emulator or redroid.
 
-Updating a checkout from 0.3.2 or earlier (the prebuilt dependencies and chinese-addons went from submodules to directories
-in the repository): run this once before pulling or merging, or git aborts on the files the submodules left behind:
+Updating a checkout of 0.3.x (native fcitx5 and chinese-addons are deleted, and with them the fcitx5 submodule): run this once
+before pulling or merging, or the files the submodule left behind get in git's way:
 
 ```
-git submodule deinit -f lib/fcitx5/src/main/cpp/prebuilt lib/fcitx5-chinese-addons/src/main/cpp/fcitx5-chinese-addons
-rm -rf lib/fcitx5/src/main/cpp/prebuilt lib/fcitx5-chinese-addons/src/main/cpp/fcitx5-chinese-addons
+git submodule deinit -f --all
+rm -rf lib/fcitx5 lib/fcitx5-chinese-addons
 ```
 
-To go back to an older commit, `git checkout <old> && git submodule update --init`; coming back needs the two lines again.
+To build an old 0.3.x commit, `git checkout <old> && git submodule update --init --recursive`, with extra-cmake-modules and GNU
+gettext ≥ 0.20 installed; coming back needs the two lines again.
 
 ### Data
 
@@ -176,9 +177,11 @@ A change to what users see or to a setting updates the [user's manual](docs/READ
 | Where | What |
 |---|---|
 | `lib/ime-core` | Plain JVM, no Android: the pinyin and table engines, the decoder, sentence-model inference, and the decision logic |
-| `app` | The Android part: views, the `InputMethodService`, preferences, the JNI bridge to Fcitx5 |
+| `lib/ime-core`'s `host/` | The input method framework, ported from Fcitx5's code to Kotlin (input contexts, key pipeline, punctuation, full width, simplified/traditional, quick input, Unicode) |
+| `app` | The Android part: views, the `InputMethodService`, preferences, and `KotlinFcitx`, which runs the framework on one thread |
 | `app/src/voice`, `app/src/text` | Each build's own code: voice input is only in `voice` |
 | `lib/sherpa-onnx` | The speech recognition runtime (sherpa-onnx's source, with this project's changes) |
+| `lib/handwriting` | The handwriting recognizers' runtime (onnxruntime and a small JNI) and the sentence models' matrix kernel (`libyoumo-matrix`) |
 | `lib/ime-eval` | Evaluation: types the test sets and measures top-1 accuracy and more |
 | `lib/ime-dict-tool` | Builds the engine data from text sources (build time only, not in the APK) |
 | `lexicon/` | Where the new words come from, and their curation |

@@ -24,6 +24,8 @@ import org.fcitx.fcitx5.android.core.RawConfig
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.prefs.ManagedPreference
 import org.fcitx.fcitx5.android.data.prefs.ManagedPreferenceEnum
+import org.fcitx.fcitx5.android.data.prefs.PinyinKeyboard
+import org.fcitx.fcitx5.android.data.prefs.ShuangpinKeyboard
 import org.fcitx.fcitx5.android.engine.host.EngineSettings
 import org.fcitx.fcitx5.android.engine.host.Engines
 import org.fcitx.fcitx5.android.engine.host.Engines.UserWord
@@ -171,6 +173,10 @@ object InputMethodSettings {
         ShuangpinScheme.GB to R.string.shuangpin_gb,
     )
 
+    /** The name of [EngineSettings.SCHEMES]' [key] as the scheme row shows it, null for a key of no scheme. */
+    internal fun schemeName(context: Context, key: String): String? =
+        EngineSettings.SCHEMES[key]?.let { context.getString(SHUANGPIN.getValue(it)) }
+
     private val MODEL_LEVELS = mapOf(
         ModelLevel.LOW to R.string.im_model_level_low,
         ModelLevel.MEDIUM to R.string.im_model_level_medium,
@@ -194,8 +200,9 @@ object InputMethodSettings {
     val SHARED: List<Item> = listOf(
         Section(
             R.string.shared_section_all, listOf(
-                // the keyboard's: a word by gliding across its keys, every input method's but handwriting's (Engines.glides)
-                AppToggle(AppPrefs.GLIDE_TYPING, R.string.im_glide, R.string.im_glide_summary, notFor = listOf(Engines.HANDWRITING)) {
+                // the keyboard's: a word by gliding across its keys, every input method's but handwriting's (Engines.glides);
+                // the grouped keyboards (the 14 keys, 双拼's 18 keys and nine keys) have no glide
+                AppToggle(AppPrefs.GLIDE_TYPING, R.string.im_glide, R.string.im_glide_summary, notFor = listOf(Engines.HANDWRITING, Engines.PINYIN_KEYS, Engines.SHUANGPIN_KEYS18, Engines.SHUANGPIN_NINE)) {
                     AppPrefs.getInstance().keyboard.glideTyping
                 },
                 AppToggle(AppPrefs.AUTO_PAIRS, R.string.auto_pairs, 0) { AppPrefs.getInstance().keyboard.autoPairs },
@@ -224,10 +231,11 @@ object InputMethodSettings {
         ),
         Section(
             R.string.shared_section_pinyin, listOf(
-                // the nine keys type digits: no letter slips onto its neighbour
-                Toggle("${EngineSettings.FUZZY}/${EngineSettings.TYPOS}", text(R.string.im_typos), R.string.im_typos_summary, notFor = listOf(Engines.T9)),
+                // the nine keys and the 14 keys type keys, not letters: no letter slips onto its neighbour. 九键双拼's
+                // one slip read, ü typed v, is none there: u and v share 8 (the 18 keys keep them apart)
+                Toggle("${EngineSettings.FUZZY}/${EngineSettings.TYPOS}", text(R.string.im_typos), R.string.im_typos_summary, notFor = listOf(Engines.T9, Engines.PINYIN_KEYS, Engines.SHUANGPIN_NINE)),
                 // u and v are both on 8
-                Flags(EngineSettings.FUZZY, R.string.im_fuzzy, R.string.im_fuzzy_none, FUZZY, notFor = mapOf(Fuzzy.V_U.name to listOf(Engines.T9))),
+                Flags(EngineSettings.FUZZY, R.string.im_fuzzy, R.string.im_fuzzy_none, FUZZY, notFor = mapOf(Fuzzy.V_U.name to listOf(Engines.T9, Engines.SHUANGPIN_NINE))),
             )
         ),
     )
@@ -244,12 +252,18 @@ object InputMethodSettings {
 
     private val pinyin = listOf(
         sharedLink,
+        // the keyboard's: the full keyboard or the 14 keys, the engine reading either (KeyboardPair). First,
+        // the page's main choice, and in no section: a section 键盘 over a row 键盘 said it twice
+        AppChoice(AppPrefs.PINYIN_KEYBOARD, R.string.pinyin_keyboard, R.string.pinyin_keyboard_summary, PinyinKeyboard.entries) {
+            AppPrefs.getInstance().keyboard.pinyinKeyboard
+        },
         Section(
             R.string.im_section_typing, listOf(
-                // full pinyin's alone: 双拼's u is a key of its own, 九键's no letter
-                Toggle(EngineSettings.CHAIZI, text(R.string.im_chaizi), R.string.im_chaizi_summary),
+                // full pinyin's alone: 双拼's u is a key of its own, 九键's no letter. Not hidden on
+                // the 14 keys: a hardware keyboard still types full pinyin and reads both
+                Toggle(EngineSettings.CHAIZI, text(R.string.im_chaizi), R.string.im_chaizi_summary, notFor = listOf(Engines.PINYIN_KEYS)),
                 // full pinyin's alone: 双拼 types its letters otherwise, the nine keys digits
-                Toggle(EngineSettings.LATIN_WORDS, text(R.string.im_latin_words), R.string.im_latin_words_summary),
+                Toggle(EngineSettings.LATIN_WORDS, text(R.string.im_latin_words), R.string.im_latin_words_summary, notFor = listOf(Engines.PINYIN_KEYS)),
             )
         ),
     )
@@ -260,9 +274,14 @@ object InputMethodSettings {
             R.string.im_section_scheme, listOf(
                 Choice(
                     EngineSettings.SHUANGPIN_PROFILE, R.string.im_shuangpin_scheme, EngineSettings.SCHEMES.keys.toList(),
-                    label = { ctx, v -> ctx.getString(SHUANGPIN.getValue(EngineSettings.SCHEMES.getValue(v))) },
+                    label = { ctx, v -> schemeName(ctx, v) ?: v },
                     nearest = { v -> if (v in EngineSettings.SCHEMES) v else EngineSettings.ZIRANMA },
-                )
+                ),
+                // the keyboard's: the full keyboard, the 18 keys or the nine keys, each open to every
+                // scheme (the engine reads each keyboard's codes, KeyboardPair); none of the page to hide
+                AppChoice(AppPrefs.SHUANGPIN_KEYBOARD, R.string.shuangpin_keyboard, R.string.shuangpin_keyboard_summary, ShuangpinKeyboard.entries) {
+                    AppPrefs.getInstance().keyboard.shuangpinKeyboard
+                },
             )
         ),
     )

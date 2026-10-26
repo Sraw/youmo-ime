@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.ui.main.settings
 
+import android.content.Context
 import android.os.Bundle
 import androidx.appcompat.app.AlertDialog
 import androidx.fragment.app.activityViewModels
@@ -17,8 +18,10 @@ import org.fcitx.fcitx5.android.engine.learn.Kinds
 import org.fcitx.fcitx5.android.engine.learn.control.LearningOp
 import org.fcitx.fcitx5.android.engine.learn.control.LearningResult
 import org.fcitx.fcitx5.android.engine.learn.control.ListedItem
+import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
 import org.fcitx.fcitx5.android.ui.common.PaddingPreferenceFragment
 import org.fcitx.fcitx5.android.ui.main.MainViewModel
+import org.fcitx.fcitx5.android.ui.main.settings.im.InputMethodSettings
 import org.fcitx.fcitx5.android.utils.lazyRoute
 
 /**
@@ -79,7 +82,7 @@ class LearnedItemsFragment : PaddingPreferenceFragment() {
     private fun detail(item: ListedItem): String {
         val code = item.code ?: return getString(R.string.learning_no_predict_detail, item.prev)
         val table = code.kind.takeIf { it.startsWith(TABLE) }?.let { names[it.removePrefix(TABLE)] }
-        return getString(if (item.blocked) R.string.learning_table_blocked_detail else R.string.learning_pinned_detail, code.keys, table ?: getString(kind(code)))
+        return getString(if (item.blocked) R.string.learning_table_blocked_detail else R.string.learning_pinned_detail, keys(code), table ?: label(requireContext(), code))
     }
 
     private fun confirmRemove(item: ListedItem) {
@@ -104,6 +107,15 @@ class LearnedItemsFragment : PaddingPreferenceFragment() {
 
     companion object {
         private val TABLE = Kinds.table("")
+        private val KEYS = Kinds.keys("")
+
+        /**
+         * A pin's keys as the user reads them: a grouped keyboard's codes (private use, most fonts
+         * draw them blank, TalkBack reads nothing) as their letters, `bn ui`;
+         * any other kind's as stored.
+         */
+        fun keys(code: Code): String =
+            Kinds.keysTag(code.kind)?.let { NineKeyLetters.grouped(it) }?.shown(code.keys) ?: code.keys
 
         fun title(what: LearningOp.Listed) = when (what) {
             LearningOp.Listed.PINS -> R.string.my_words_pinned
@@ -111,12 +123,27 @@ class LearnedItemsFragment : PaddingPreferenceFragment() {
             LearningOp.Listed.TABLE_BLOCKS -> R.string.my_words_table_blocked
         }
 
+        /**
+         * [kind]'s name, and a 双拼 pin's scheme after it (`双拼 18 键 · 自然码`), on any keyboard: its
+         * keys read other syllables under each scheme, so two pins of the same keys are told apart.
+         */
+        fun label(context: Context, code: Code): String {
+            val kind = context.getString(kind(code))
+            val scheme = Kinds.shuangpinScheme(code.kind)?.let { InputMethodSettings.schemeName(context, it) }
+            return if (scheme == null) kind else context.getString(R.string.learning_kind_with_scheme, kind, scheme)
+        }
+
         /** The keyboard a pin's [code] is of, as the user knows it. */
         fun kind(code: Code) = when {
             code.kind == Kinds.FULL -> R.string.learning_kind_full
             code.kind == Kinds.HANDWRITING -> R.string.learning_kind_handwriting
             code.kind.startsWith(Kinds.shuangpin("")) -> R.string.learning_kind_shuangpin
+            // the keyboard from the kind's tag; its scheme said by [label]
+            Kinds.isShuangpin(code.kind) ->
+                if (Kinds.keysTag(code.kind) == NineKeyLetters.NINE_SP.tag()) R.string.learning_kind_shuangpin_nine
+                else R.string.learning_kind_shuangpin_keys18
             code.kind.startsWith(Kinds.nineKeys("")) || code.kind.startsWith(Kinds.nineKeysMultiTap("")) -> R.string.learning_kind_nine_keys
+            code.kind.startsWith(KEYS) -> R.string.learning_kind_keys14
             else -> R.string.learning_kind_table
         }
     }

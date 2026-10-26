@@ -1,10 +1,9 @@
 {
     "uniqueId": "fcitx/fcitx5",
-    "artifactVersion": "5.1.21",
-    "description": "Next generation of fcitx",
+    "artifactVersion": "442edbc9",
+    "description": "Next generation of fcitx. The app's input method framework (input contexts, key pipeline, quick phrase, Unicode input) is ported from its code to Kotlin; its quick phrase tables (emoji, emoji-eac, latex) and charselectdata ship unchanged in the app's assets under pkgdata/.",
     "name": "fcitx/fcitx5",
     "website": "https://github.com/fcitx/fcitx5",
-    "tag": "native",
     "licenses": [
         "LGPL-2.1-or-later"
     ]

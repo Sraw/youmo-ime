@@ -6,6 +6,7 @@ package org.fcitx.fcitx5.android.core
 
 import android.view.KeyEvent
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -26,7 +27,7 @@ class KeyStatesTest {
         assertEquals(KeyStates(KeyState.Shift), states(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_SHIFT_RIGHT, 0))
         assertEquals(KeyStates.Empty, states(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_CTRL_RIGHT, KeyEvent.META_CTRL_ON))
         assertEquals(KeyStates(KeyState.Alt), states(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_ALT_LEFT, 0))
-        assertEquals(KeyStates(KeyState.Meta), states(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_META_LEFT, 0))
+        assertEquals(KeyStates(KeyState.Meta, KeyState.Super), states(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_META_LEFT, 0))
     }
 
     @Test
@@ -69,5 +70,17 @@ class KeyStatesTest {
         // Shift still held has the bit off
         assertEquals(shift, KeyStates.Empty.metaStateOf(KeyEvent.KEYCODE_SHIFT_RIGHT, up = false))
         assertEquals(0, KeyStates(KeyState.Shift).metaStateOf(KeyEvent.KEYCODE_SHIFT_LEFT, up = true))
+    }
+
+    @Test
+    fun metaIsSuperAsFcitxsHotkeysNameIt() { // F3809
+        // Super+` opens quick input (QuickPhrase's trigger keys); fcitx's normalize drops Meta alone. The
+        // space, not the `: Robolectric's key map gives every key its own char as its number, which the
+        // symbol rule above strips (a device's generic.kcm types nothing for Meta+`, so it is not stripped)
+        val meta = KeyEvent.META_META_ON or KeyEvent.META_META_LEFT_ON
+        val space = KeyStates.fromKeyEvent(KeyEvent(0, 0, KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_SPACE, 0, meta))
+        assertTrue(space.has(KeyState.Super))
+        // as the editor gets it back: Meta, not more
+        assertEquals(meta, space.metaState)
     }
 }

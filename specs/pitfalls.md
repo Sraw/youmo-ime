@@ -23,7 +23,7 @@ change reaches the dict tool's code (`ToolFingerprint`): `engine/data`, `pinyin`
 
 ### Memory
 
-The data compile, a native rebuild and an emulator do not fit together in 15 GB. A stray
+The data compile, a release build and an emulator do not fit together in 15 GB. A stray
 `KotlinCompileDaemon` (Xmx3g, idle for hours) came from build-logic once; it now compiles in
 process. If memory looks high, `pgrep -fa KotlinCompileDaemon`.
 
@@ -34,11 +34,19 @@ take a clean detekt as proof of type-level correctness.
 
 ### Native build outputs keep what is no longer built
 
-`cmake --install` into `app/src/main/assets/` and the module copy into AGP's `obj/` dirs never delete,
-so a module or file dropped from the build keeps shipping from existing checkouts. Drop it through
-`fcitxComponent.excludeFiles` (assets) or `packaging.jniLibs.excludes` (`.so`). Likewise fcitx's
-translation macro globs `*.po` without `CONFIGURE_DEPENDS`; the `po/CMakeLists.txt` files depend on
-`LINGUAS`, so keep `LINGUAS` in step when a language comes or goes.
+A checkout that built 0.3.x still holds native fcitx's `cmake --install` output in
+`app/src/main/assets/usr` (and `descriptor.json`) and its `.so` files in AGP's `obj/` dirs: nothing
+deletes them. The app build ignores them instead, so they never ship again from such a checkout:
+`androidResources.ignoreAssetsPatterns` (`<dir>usr`, `descriptor.json`; the list repeats aapt's default patterns first, since a non-empty list replaces them rather than adding to them) and the old libraries in
+`packaging.jniLibs.excludes` (`app/build.gradle.kts`). Check a release APK with `unzip -l` (no
+`libFcitx5*`, `libnative-lib`, `libpunctuation`, no `assets/usr/`). The same holds for any native
+library dropped from `lib/handwriting` or `lib/sherpa-onnx` later: exclude it through
+`packaging.jniLibs.excludes`.
+
+On the phone, 0.3.x's data sync left fcitx's files in device-protected storage (`usr/`, `learn/`,
+`README.md`, listed in `descriptor.json`; 7.4 MB from 0.3.2). `FcitxApplication.deleteNativeData` removes exactly
+the listed paths at the first start after the upgrade, the descriptor last (no descriptor: nothing
+to do). User data was never there: fcitx's config and data are in the external files dir.
 
 ## Android behaviour
 
@@ -75,8 +83,8 @@ in a password field and an address field, not only a plain one.
 
 ### Restoring user data needs a new process
 
-fcitx holds the config and the engine holds its logs open; replacing them under a running process
-leaves it writing to the old files. A restore stops fcitx, replaces, then restarts the process.
+The host holds the config and the engine holds its logs open; replacing them under a running process
+leaves it writing to the old files. A restore stops the host, replaces, then restarts the process.
 
 ### Direct boot
 
@@ -116,7 +124,7 @@ foreground app. What the keyboard says goes in its notice instead, `FcitxInputMe
 - Never write a mapped file in place (`merged.ymd`, the tables' `.ymc`): the engine reads it while
   you write, and a page changed under a mapping is garbage to it, or a SIGBUS once the file is
   shorter. Write `<name>.tmp`, fsync, rename over it; the old mapping keeps the old inode.
-- A user's text dictionary is never parsed on the fcitx thread at start: 0.3.1 did, and 1.9M words
+- A user's text dictionary is never parsed on the host thread at start: 0.3.1 did, and 1.9M words
   ran the 256 MB heap out at every focus. Compile it off the thread (`MergedDictionary`).
 - Never wait on the dictionary compile (`refreshNow`, `refresh(…).get()`, `compiles.submit(…).get()`)
   while holding the sources lock (`ImportedDictionaries`' monitor): the compile thread takes it to

@@ -1,3 +1,0 @@
-[submodule "lib/fcitx5/src/main/cpp/fcitx5"]
-	path = lib/fcitx5/src/main/cpp/fcitx5
-	url = https://github.com/fcitx/fcitx5.git

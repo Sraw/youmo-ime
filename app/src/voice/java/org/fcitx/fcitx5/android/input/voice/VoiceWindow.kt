@@ -15,7 +15,6 @@ import android.os.Handler
 import android.os.Looper
 import android.util.TypedValue
 import android.view.Gravity
-import android.view.HapticFeedbackConstants
 import android.view.MotionEvent
 import android.view.View
 import android.view.inputmethod.EditorInfo
@@ -27,6 +26,8 @@ import androidx.appcompat.widget.AppCompatTextView
 import androidx.core.content.ContextCompat
 import androidx.core.graphics.ColorUtils
 import androidx.core.widget.TextViewCompat
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.launch
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.core.CapabilityFlags
 import org.fcitx.fcitx5.android.core.FcitxKeyMapping
@@ -67,6 +68,10 @@ class VoiceWindow : InputWindow.ExtendedInputWindow<VoiceWindow>(), InputBroadca
 
     // this touch started the session: its moves, its lift and its cancel are the session's
     private var holding = false
+
+    // Enter pressed in the tail waits for the text, in the field it was pressed in
+    private val tailEnter = VoiceTailEnter()
+    private var enterField: EditorInfo? = null
 
     private lateinit var heard: TextView
     private lateinit var pulse: VoicePulseView
@@ -110,9 +115,9 @@ class VoiceWindow : InputWindow.ExtendedInputWindow<VoiceWindow>(), InputBroadca
         val row = LinearLayout(ctx).apply {
             gravity = Gravity.CENTER
             clipChildren = false
-            addView(key(R.drawable.ic_baseline_backspace_24, R.string.backspace, FcitxKeyMapping.FcitxKey_BackSpace, repeat = true), side())
+            addView(key(R.drawable.ic_baseline_backspace_24, R.string.backspace, FcitxKeyMapping.FcitxKey_BackSpace, repeat = true, VoiceTailEnter.Key.BACKSPACE), side())
             addView(stage, LinearLayout.LayoutParams(ctx.dp(STAGE), ctx.dp(STAGE)))
-            addView(key(R.drawable.ic_baseline_keyboard_return_24, R.string.a11y_key_enter, FcitxKeyMapping.FcitxKey_Return, repeat = false), side())
+            addView(key(R.drawable.ic_baseline_keyboard_return_24, R.string.a11y_key_enter, FcitxKeyMapping.FcitxKey_Return, repeat = false, VoiceTailEnter.Key.ENTER), side())
         }
         label = TextView(ctx).apply {
             textSize = 13f
@@ -145,7 +150,7 @@ class VoiceWindow : InputWindow.ExtendedInputWindow<VoiceWindow>(), InputBroadca
     }
 
     /** Deleting and a new line: light rings beside the microphone, not buttons as big as it. */
-    private fun key(icon: Int, description: Int, sym: Int, repeat: Boolean) = CustomGestureView(context).apply {
+    private fun key(icon: Int, description: Int, sym: Int, repeat: Boolean, tail: VoiceTailEnter.Key) = CustomGestureView(context).apply {
         val ring = GradientDrawable().apply {
             shape = GradientDrawable.OVAL
             setColor(ColorUtils.setAlphaComponent(theme.keyTextColor, KEY_FILL))
@@ -163,7 +168,17 @@ class VoiceWindow : InputWindow.ExtendedInputWindow<VoiceWindow>(), InputBroadca
         }, FrameLayout.LayoutParams(context.dp(ICON), context.dp(ICON), Gravity.CENTER))
         contentDescription = context.getString(description)
         val press = { commonKeyActionListener.listener.onKeyAction(KeyAction.SymAction(KeySym(sym)), KeyActionListener.Source.Keyboard) }
-        setOnClickListener { press() }
+        setOnClickListener {
+            val s = session
+            val again = tailEnter.waiting
+            // lifted, the last words still coming: Enter ends the tail and goes once they are in
+            if (s != null && tailEnter.press(tail, s.released, s.over) == VoiceTailEnter.Press.AFTER_TEXT) {
+                if (!again) s.pressedAgain()
+                enterField = service.currentInputEditorInfo
+            } else {
+                press()
+            }
+        }
         if (repeat) {
             repeatEnabled = true
             onRepeatListener = { press() }
@@ -184,7 +199,7 @@ class VoiceWindow : InputWindow.ExtendedInputWindow<VoiceWindow>(), InputBroadca
             }
             // a press while the last is recognized was not one: its cancel drops nothing
             MotionEvent.ACTION_MOVE -> if (holding) session?.moved(ev.rawX - centreX, ev.rawY - centreY)
-            MotionEvent.ACTION_UP -> if (holding) session?.lift()
+            MotionEvent.ACTION_UP -> if (holding) session?.lift(ev.eventTime)
             MotionEvent.ACTION_CANCEL -> if (holding) session?.drop()
         }
         if (ev.actionMasked == MotionEvent.ACTION_UP || ev.actionMasked == MotionEvent.ACTION_CANCEL) holding = false
@@ -192,8 +207,12 @@ class VoiceWindow : InputWindow.ExtendedInputWindow<VoiceWindow>(), InputBroadca
     }
 
     private fun press(v: View) {
-        // the last still being recognized: it is typed first, then another
-        if (session?.over == false) return
+        // the last still being recorded (its tail) or recognized: it is typed first, then another;
+        // its tail ends now
+        if (session?.over == false) {
+            session?.pressedAgain()
+            return
+        }
         main.removeCallbacksAndMessages(null)
         when {
             !permitted() -> {
@@ -203,7 +222,7 @@ class VoiceWindow : InputWindow.ExtendedInputWindow<VoiceWindow>(), InputBroadca
             service.inPasswordField -> say(R.string.voice_no_password)
             else -> {
                 v.parent.requestDisallowInterceptTouchEvent(true)
-                v.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
+                VoiceStyle.vibrate(v)
                 // off the button, grown as it is while held, and a finger's slack
                 val off = context.dp(MIC) / 2f * PRESSED_SCALE + context.dp(SLACK)
                 session = VoiceHoldSession(service, fcitx, VoiceHold(off, around = true), ui) { text ->
@@ -221,6 +240,9 @@ class VoiceWindow : InputWindow.ExtendedInputWindow<VoiceWindow>(), InputBroadca
 
     /** The field left, the keyboard hidden: what is being said is dropped. */
     private fun drop() {
+        // before the session's own ended(null), which would read as typed
+        tailEnter.ended(VoiceTailEnter.End.DROPPED, sameField = false)
+        enterField = null
         session?.drop()
         session = null
     }
@@ -247,6 +269,24 @@ class VoiceWindow : InputWindow.ExtendedInputWindow<VoiceWindow>(), InputBroadca
     // reflection, and R8 merges an interface away that only one class implements (a release
     // build crashed on it)
     private val ui = object : VoiceHoldSession.Ui {
+        // in the zone where lifting drops it: no 正在听 cue felt under 松开取消
+        private var cancelling = false
+        // this hold's microphone on, and its cue felt: one cue a hold, put off past the cancel zone
+        private var on = false
+        private var cued = false
+
+        override fun ready() {
+            on = true
+            // the cue to start talking: felt as well as seen
+            if (!cancelling) {
+                cued = true
+                VoiceStyle.vibrate(mic, cue = true)
+            }
+            say(R.string.voice_hold_listening)
+        }
+
+        override fun silent() = say(R.string.voice_hold_silent)
+
         override fun heard(text: String) {
             heard.text = text
             heard.setTextColor(theme.keyTextColor)
@@ -257,7 +297,11 @@ class VoiceWindow : InputWindow.ExtendedInputWindow<VoiceWindow>(), InputBroadca
         }
 
         override fun zone(cancel: Boolean) {
-            mic.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
+            cancelling = cancel
+            // back from the cancel zone with the microphone come on there: its cue now
+            val cue = !cancel && on && !cued
+            if (cue) cued = true
+            VoiceStyle.vibrate(mic, cue = cue)
             val color = if (cancel) VoiceStyle.CANCEL_RED else theme.accentKeyBackgroundColor
             micBackground.micColors(color)
             pulse.color = color
@@ -271,6 +315,17 @@ class VoiceWindow : InputWindow.ExtendedInputWindow<VoiceWindow>(), InputBroadca
         }
 
         override fun ended(message: Int?) {
+            // a lift in the cancel zone ends here with no zone(false): the next hold's cue needs it reset
+            cancelling = false
+            on = false
+            cued = false
+            val end = when {
+                message == null -> VoiceTailEnter.End.TYPED
+                session?.gaveUp == true -> VoiceTailEnter.End.GAVE_UP
+                else -> VoiceTailEnter.End.NOTHING
+            }
+            if (tailEnter.ended(end, sameField = service.currentInputEditorInfo === enterField)) enterAfterText()
+            enterField = null
             settle()
             label.setText(R.string.voice_press_to_talk)
             if (message == null) {
@@ -282,8 +337,26 @@ class VoiceWindow : InputWindow.ExtendedInputWindow<VoiceWindow>(), InputBroadca
         }
     }
 
+    /**
+     * The waiting Enter, after the text: the text's commit is a fcitx job that posts its putting in
+     * to the main thread (commitOverEngine). This job, queued after it, posts the Enter to the main
+     * thread after that, so the Enter is pressed once the text is in the field, not merely after
+     * fcitx heard of it.
+     */
+    private fun enterAfterText() {
+        service.postFcitxJob {
+            service.lifecycleScope.launch {
+                commonKeyActionListener.listener.onKeyAction(
+                    KeyAction.SymAction(KeySym(FcitxKeyMapping.FcitxKey_Return)),
+                    KeyActionListener.Source.Keyboard,
+                )
+            }
+        }
+    }
+
     private fun talking() {
-        say(R.string.voice_hold_listening)
+        // 正在听 once the microphone is really on (ui.ready), not as the finger goes down
+        say(R.string.voice_hold_preparing)
         label.setText(R.string.voice_release_to_type)
         mic.animate().scaleX(PRESSED_SCALE).scaleY(PRESSED_SCALE).setDuration(VoiceStyle.ANIMATE_MS).start()
         pulse.active = true

@@ -20,6 +20,9 @@ import com.google.android.material.color.DynamicColors
 import kotlinx.coroutines.CoroutineName
 import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.plus
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import org.fcitx.fcitx5.android.daemon.FcitxDaemon
 import org.fcitx.fcitx5.android.data.clipboard.ClipboardManager
 import org.fcitx.fcitx5.android.data.importedUserDataMarker
@@ -34,6 +37,7 @@ import org.fcitx.fcitx5.android.utils.startActivity
 import org.fcitx.fcitx5.android.utils.userManager
 import timber.log.Timber
 import java.io.File
+import kotlin.concurrent.thread
 import kotlin.system.exitProcess
 
 class FcitxApplication : Application() {
@@ -147,6 +151,9 @@ class FcitxApplication : Application() {
         registerReceiver(shutdownReceiver, IntentFilter(Intent.ACTION_SHUTDOWN))
         // the app posts no notifications (and asks for no permission to): an older version's channels go
         deleteNotificationChannels(notificationManager, sharedPrefs)
+        thread(name = "native-data-cleanup", priority = Thread.MIN_PRIORITY) {
+            deleteNativeData(createDeviceProtectedStorageContext().dataDir)
+        }
         if (!isDirectBootMode) {
             AppPrefs.getInstance().syncToDeviceEncryptedStorage()
             ThemeManager.syncToDeviceEncryptedStorage()
@@ -198,6 +205,36 @@ class FcitxApplication : Application() {
         }
 
         private const val NOTIFICATION_CHANNELS_DELETED = "notification_channels_deleted"
+
+        /**
+         * What 0.3.x's native host copied out of the APK into [dir] (device-protected storage):
+         * fcitx's data under `usr/` (7.4 MB from 0.3.2), `learn/`, `README.md`, each listed in `descriptor.json`.
+         * Nothing reads them since the Kotlin host, which reads the APK's assets. Only the listed paths
+         * go, files first, then their directories if empty; the descriptor last, once each was tried (one
+         * that will not go is logged and left), so a start that stops halfway does the rest next time, and
+         * its absence makes every later start a no-op.
+         */
+        internal fun deleteNativeData(dir: File) {
+            val descriptor = dir.resolve(NATIVE_DESCRIPTOR)
+            if (!descriptor.exists()) return
+            val listed = runCatching {
+                Json.parseToJsonElement(descriptor.readText()).jsonObject.getValue("files").jsonObject
+                    .mapValues { it.value.jsonPrimitive.content }
+            }.getOrElse {
+                Timber.w(it, "native data descriptor unreadable, left alone")
+                return
+            }
+            // a blank hash is a directory
+            val (dirs, files) = listed.entries.partition { it.value.isBlank() }
+            files.forEach { dir.resolve(it.key).delete() }
+            dirs.map { it.key }.sortedByDescending { it.count { c -> c == '/' } }
+                .forEach { dir.resolve(it).delete() } // only when empty
+            // tried once: a file that will not go is logged and left, not tried again at every start
+            files.filter { dir.resolve(it.key).exists() }.forEach { Timber.w("native data left: %s", it.key) }
+            descriptor.delete()
+        }
+
+        private const val NATIVE_DESCRIPTOR = "descriptor.json"
 
         private const val MAX_STACKTRACE_SIZE = 128000
 

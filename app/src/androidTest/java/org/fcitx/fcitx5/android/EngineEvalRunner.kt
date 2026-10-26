@@ -16,8 +16,9 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import org.fcitx.fcitx5.android.core.EngineBridge
-import org.fcitx.fcitx5.android.core.Fcitx
 import org.fcitx.fcitx5.android.core.FcitxEvent
+import org.fcitx.fcitx5.android.core.FcitxInstance
+import org.fcitx.fcitx5.android.core.KotlinFcitx
 import org.fcitx.fcitx5.android.engine.host.Engines
 import org.fcitx.fcitx5.android.engine.learn.LearnLog
 import org.fcitx.fcitx5.android.engine.store.RecordFormat
@@ -62,7 +63,7 @@ class EngineEvalRunner {
         }
         val dir = checkNotNull(context.getExternalFilesDir("eval")) { "external storage unavailable" }
         val out = File(dir, "$set-$ime.tsv")
-        val fcitx = Fcitx(context)
+        val fcitx: FcitxInstance = KotlinFcitx(context)
         val scope = MainScope()
         try {
             runBlocking {
@@ -123,12 +124,13 @@ class EngineEvalRunner {
      * returns the result line.
      *
      * Each latency is the round trip of one `sendKey`: the engine's handling of the key, where
-     * it decodes and builds its candidate list, plus two thread hops. It excludes the UI
-     * flush fcitx runs afterwards (marshalling candidates to Java), which the uncounted
-     * `isEmpty()` waits out so it cannot land on the next key's clock. Compare engines through
+     * it decodes and builds its candidate list, plus two hops to and from the host thread
+     * (KotlinFcitx's `onHost`). Anything the host thread still has queued after the key (a
+     * refine's events) the uncounted `isEmpty()`, a second turn on that thread, waits out so it
+     * cannot land on the next key's clock. Compare engines through
      * this same runner; do not read the numbers as pure decoding time.
      */
-    private suspend fun typeAndCollect(fcitx: Fcitx, sample: Sample): String = withTimeout(INPUT_TIMEOUT_MS) {
+    private suspend fun typeAndCollect(fcitx: FcitxInstance, sample: Sample): String = withTimeout(INPUT_TIMEOUT_MS) {
         fcitx.reset()
         // after the reset, as the service tells it
         if (sample.context.isNotEmpty()) fcitx.engineContext(sample.context)
@@ -145,11 +147,11 @@ class EngineEvalRunner {
 
     /**
      * The candidates once the user pauses, as PinyinRun scores them (`paused`): read once the engine
-     * has no refining left for the last key ([EngineBridge.refining]). The addon's refine events and
-     * this read take turns on the fcitx thread, so the list read then is the refined one. One still
+     * has no refining left for the last key ([EngineBridge.refining]). HostCore's refine snapshots and
+     * this read take turns on the host thread, so the list read then is the refined one. One still
      * refining after [REFINE_TIMEOUT_MS] is read as it stands and counted in [unrefined].
      */
-    private suspend fun candidatesOncePaused(fcitx: Fcitx): List<String> {
+    private suspend fun candidatesOncePaused(fcitx: FcitxInstance): List<String> {
         val deadline = SystemClock.uptimeMillis() + REFINE_TIMEOUT_MS
         while (EngineBridge.refining && SystemClock.uptimeMillis() < deadline) delay(REFINE_POLL_MS)
         if (EngineBridge.refining) unrefined++

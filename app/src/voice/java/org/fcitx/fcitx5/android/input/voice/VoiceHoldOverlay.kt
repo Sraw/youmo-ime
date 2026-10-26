@@ -10,7 +10,6 @@ import android.graphics.drawable.GradientDrawable
 import android.os.Handler
 import android.os.Looper
 import android.view.Gravity
-import android.view.HapticFeedbackConstants
 import android.view.MotionEvent
 import android.view.View
 import android.widget.FrameLayout
@@ -71,12 +70,24 @@ class VoiceHoldOverlay(
         }
         addView(wave, FrameLayout.LayoutParams(ctx.dp(WAVE_WIDTH), ctx.dp(WAVE_HEIGHT), Gravity.CENTER))
     }
+    // what the status line says (listeningText): ready before silent
+    // the microphone's first sample not zero come: what 正在听 waits for
+    private var ready = false
+    // 2 s of zeroes before the first sound
+    private var silent = false
+    // in the zone where lifting drops it: 松开手指，取消输入 stays as the microphone comes on
+    private var cancelling = false
+    // the 正在听 cue felt this hold (the card is made anew for each)
+    private var cued = false
+
     private val status = TextView(ctx).apply {
         textSize = 15f
         gravity = Gravity.CENTER
         setTextColor(theme.keyTextColor)
-        setText(R.string.voice_hold_listening)
+        // 正在听 once the microphone is really on (ready), not as the finger goes down
+        setText(R.string.voice_hold_preparing)
     }
+
     private val hint = TextView(ctx).apply {
         textSize = 12f
         gravity = Gravity.CENTER
@@ -123,21 +134,47 @@ class VoiceHoldOverlay(
     }
 
     override fun touched(ev: MotionEvent) {
-        // lifted, the rest is the recognizer's: a tap or a stray cancel drops nothing said
-        if (session.over || session.released) return
+        if (session.over) return
+        // lifted, the rest is the recognizer's: a tap or a stray cancel drops nothing said. A new
+        // press ends the tail still being recorded, anywhere on the keyboard's view
+        if (session.released) {
+            val action = ev.actionMasked
+            if (action == MotionEvent.ACTION_DOWN || action == MotionEvent.ACTION_POINTER_DOWN) session.pressedAgain()
+            return
+        }
         when (ev.actionMasked) {
             MotionEvent.ACTION_MOVE -> {
                 val i = ev.findPointerIndex(pointer)
                 if (i >= 0) session.moved(0f, ev.getY(i) - downY)
             }
-            MotionEvent.ACTION_UP -> session.lift()
-            MotionEvent.ACTION_POINTER_UP -> if (ev.getPointerId(ev.actionIndex) == pointer) session.lift()
+            MotionEvent.ACTION_UP -> session.lift(ev.eventTime)
+            MotionEvent.ACTION_POINTER_UP -> if (ev.getPointerId(ev.actionIndex) == pointer) session.lift(ev.eventTime)
             MotionEvent.ACTION_CANCEL -> session.drop()
         }
     }
 
     /** another field, or the keyboard hidden: nothing typed, the microphone closed */
     override fun inputEnded() = session.drop()
+
+    override fun ready() {
+        ready = true
+        if (cancelling) return
+        cued = true
+        // the cue to start talking: felt as well as seen; not under 松开手指，取消输入, which it would contradict
+        VoiceStyle.vibrate(card, cue = true)
+        status.setText(R.string.voice_hold_listening)
+    }
+
+    override fun silent() {
+        silent = true
+        if (!cancelling) status.setText(R.string.voice_hold_silent)
+    }
+
+    private fun listeningText() = when {
+        ready -> R.string.voice_hold_listening
+        silent -> R.string.voice_hold_silent
+        else -> R.string.voice_hold_preparing
+    }
 
     override fun heard(text: String) {
         heard.text = text
@@ -146,8 +183,12 @@ class VoiceHoldOverlay(
     override fun level(level: Float) = wave.level(level)
 
     override fun zone(cancel: Boolean) {
-        card.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
-        status.setText(if (cancel) R.string.voice_hold_cancel else R.string.voice_hold_listening)
+        cancelling = cancel
+        // back from the cancel zone with the microphone come on there: its cue now, once
+        val cue = !cancel && ready && !cued
+        if (cue) cued = true
+        VoiceStyle.vibrate(card, cue = cue)
+        status.setText(if (cancel) R.string.voice_hold_cancel else listeningText())
         val text = if (cancel) CANCEL_TEXT else theme.keyTextColor
         status.setTextColor(text)
         heard.setTextColor(text)

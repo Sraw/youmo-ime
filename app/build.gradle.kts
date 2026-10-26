@@ -2,25 +2,18 @@ plugins {
     id("org.fcitx.fcitx5.android.app-convention")
     id("org.fcitx.fcitx5.android.native-app-convention")
     id("org.fcitx.fcitx5.android.build-metadata")
-    id("org.fcitx.fcitx5.android.data-descriptor")
-    id("org.fcitx.fcitx5.android.fcitx-component")
     id("org.fcitx.fcitx5.android.engine-data")
     id("org.fcitx.fcitx5.android.voice-data")
     id("org.fcitx.fcitx5.android.handwriting-data")
+    id("org.fcitx.fcitx5.android.unit-test-resources")
     alias(libs.plugins.kotlin.parcelize)
     alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.ksp)
     alias(libs.plugins.kover)
+    alias(libs.plugins.roborazzi)
 }
 
 android {
-    // copy-fcitx5-modules copies into AGP's obj dirs, which keep .so files from older builds;
-    // these modules are no longer built
-    packaging {
-        jniLibs {
-            excludes += listOf("**/libspell.so", "**/libimselector.so")
-        }
-    }
     namespace = "org.fcitx.fcitx5.android"
 
     defaultConfig {
@@ -28,22 +21,6 @@ android {
         // the id without the build type's suffix (.debug): UserDataOrigin's root, for importing backups
         buildConfigField("String", "APPLICATION_ID_ROOT", "\"$applicationId\"")
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-
-        @Suppress("UnstableApiUsage")
-        externalNativeBuild {
-            cmake {
-                targets(
-                    // jni
-                    "native-lib",
-                    // copy fcitx5 built-in addon libraries
-                    "copy-fcitx5-modules",
-                    // android specific modules
-                    "androidfrontend",
-                    "androidnotification",
-                    "androidengine"
-                )
-            }
-        }
     }
 
     buildFeatures {
@@ -91,6 +68,30 @@ android {
         // Chinese and English only, library translations too; zh-HK/zh-MO still resolve to
         // values-zh-rTW through Android's Hant script matching
         localeFilters += listOf("en") + Versions.translations.map { it.replace("_", "-r") }
+        // what the native host's CMake install left in src/main/assets (usr/: fcitx's data and
+        // catalogs) and its data descriptor (descriptor.json), in checkouts that built it:
+        // ignored files, never deleted
+        // a non-empty list replaces aapt's default one rather than adding to it, so that is
+        // repeated first (dot files, `_` dirs, backups~, VCS and OS litter)
+        @Suppress("UnstableApiUsage")
+        ignoreAssetsPatterns += listOf(
+            "!.svn", "!.git", "!.ds_store", "!*.scc", ".*", "<dir>_*", "!CVS", "!thumbs.db",
+            "!picasa.ini", "!*~",
+        ) + listOf("<dir>usr", "descriptor.json")
+    }
+
+    // the native fcitx host's libraries, no longer built: copy-fcitx5-modules and CMake copied
+    // them into AGP's obj dirs, which keep .so files from older builds
+    packaging {
+        jniLibs {
+            excludes += listOf(
+                "libspell", "libimselector",
+                "libFcitx5Core", "libFcitx5Utils", "libFcitx5Config", "libnative-lib",
+                "libandroidengine", "libandroidfrontend", "libandroidnotification",
+                "libchttrans", "libclipboard", "libfullwidth", "libpunctuation", "libquickphrase",
+                "libunicode", "libscel2org5",
+            ).map { "**/$it.so" }
+        }
     }
 
     testOptions {
@@ -100,32 +101,29 @@ android {
             // whose fields all read 0, say). Logic belongs in :lib:ime-core; anything that
             // genuinely needs the framework runs under Robolectric.
             isReturnDefaultValues = false
-            // Also intentionally left off. Turning it on makes :app:test depend on the
-            // merged-assets pipeline, which drags in the fcitx-component CMake install tasks;
-            // those fail outside a native build with "Cannot query ... property 'cxxAbiModel'".
-            // Consequence: Robolectric tests can use the framework but not the app's own
-            // resources (no R.string lookups).
+            // Also left off. Turning it on made :app:test depend on the merged-assets pipeline,
+            // which dragged in the native host's CMake install tasks (gone since the Kotlin host);
+            // the resources reach Robolectric without the assets instead: unit-test-resources.
             isIncludeAndroidResources = false
+            // Robolectric keeps what each test's keyboard left in the app's objects till the JVM
+            // ends; the UAT classes, a keyboard or more a test, ran out of Gradle's 512 MB default
+            all { it.maxHeapSize = "1g" }
         }
     }
+    // fcitx's built-in data the Kotlin host reads (host-assets.md)
+    sourceSets.getByName("main").assets.srcDir("src/main/host-assets")
     // the evaluation sets, for EngineEvalRunner (lib/ime-eval/run-on-device.sh)
     sourceSets.getByName("androidTest").assets.srcDir("../lib/ime-eval/data")
 }
 
-fcitxComponent {
-    includeLibs = listOf(
-        "fcitx5",
-        "fcitx5-chinese-addons"
-    )
-    // fcitx5 installs every module's .conf; spell (quick phrase's English hints, the English input
-    // method has its own words) and imselector (nothing of ours calls it) are not built
-    excludeFiles = listOf(
-        "usr/share/fcitx5/addon/spell.conf",
-        "usr/share/fcitx5/addon/imselector.conf",
-        // left in assets/ by builds before they were dropped; cmake --install never deletes
-        "usr/share/fcitx5/spell"
-    )
-    installPrebuiltAssets = true
+// Screenshots are compared in the text flavor only: the voice build's bar has a microphone, so
+// every golden would differ. Its unit tests still run every assertion, captureRoboImage a no-op
+// with record, compare and verify all off (Roborazzi's plugin sets them from roborazzi.test.*;
+// this doFirst, added at configuration, runs after the plugin's own).
+tasks.withType<Test>().matching { it.name.startsWith("testVoice") }.configureEach {
+    doFirst {
+        listOf("record", "compare", "verify").forEach { systemProperty("roborazzi.test.$it", "false") }
+    }
 }
 
 androidComponents {
@@ -145,8 +143,6 @@ ksp {
 dependencies {
     implementation(project(":lib:ime-core"))
     ksp(project(":codegen"))
-    implementation(project(":lib:fcitx5"))
-    implementation(project(":lib:fcitx5-chinese-addons"))
     implementation(libs.kotlinx.coroutines)
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.androidx.activity)
@@ -193,6 +189,8 @@ dependencies {
     testImplementation(libs.mockk)
     testImplementation(libs.turbine)
     testImplementation(libs.robolectric)
+    testImplementation(libs.roborazzi)
+    testImplementation(libs.roborazzi.junit.rule)
     testImplementation(testFixtures(project(":lib:ime-core")))
     androidTestImplementation(libs.androidx.test.runner)
     androidTestImplementation(libs.androidx.test.rules)

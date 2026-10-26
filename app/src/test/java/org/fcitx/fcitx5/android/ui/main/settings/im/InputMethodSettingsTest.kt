@@ -126,8 +126,8 @@ class InputMethodSettingsTest {
     @Test
     fun eachPageHasItsOwnOptionsAfterTheWayToTheSharedOnes() {
         val own = mapOf(
-            Engines.PINYIN to listOf(EngineSettings.CHAIZI, EngineSettings.LATIN_WORDS),
-            Engines.SHUANGPIN to listOf(EngineSettings.SHUANGPIN_PROFILE),
+            Engines.PINYIN to listOf(EngineSettings.CHAIZI, EngineSettings.LATIN_WORDS, AppPrefs.PINYIN_KEYBOARD),
+            Engines.SHUANGPIN to listOf(EngineSettings.SHUANGPIN_PROFILE, AppPrefs.SHUANGPIN_KEYBOARD),
             Engines.T9 to listOf(AppPrefs.T9_MULTI_TAP, AppPrefs.T9_ENGLISH_TYPING, InputMethodSettings.T9_LETTERS, InputMethodSettings.T9_SYMBOLS),
             Engines.HANDWRITING to listOf(AppPrefs.HANDWRITING_PAUSE),
             Engines.ENGLISH to listOf(EngineSettings.ENGLISH_SUGGEST, AppPrefs.ENGLISH_AUTO_CAPS, InputMethodSettings.ENGLISH_WORDS),
@@ -151,8 +151,8 @@ class InputMethodSettingsTest {
             is InputMethodSettings.Titled -> row.notFor
             else -> error("$row")
         }
-        // the keyboard's glide: every input method's that reads one
-        assertEquals(appInputMethods.filterNot { Engines.glides(it) }, notFor(AppPrefs.GLIDE_TYPING))
+        // the keyboard's glide: every input method's that reads one; the 14 keys and 双拼's 18 and nine keys have none
+        assertEquals(appInputMethods.filterNot { Engines.glides(it) } + Engines.PINYIN_KEYS + Engines.SHUANGPIN_KEYS18 + Engines.SHUANGPIN_NINE, notFor(AppPrefs.GLIDE_TYPING))
         assertEquals(emptyList<String>(), notFor(AppPrefs.AUTO_PAIRS))
         assertEquals(emptyList<String>(), notFor(AppPrefs.CALCULATION_REPLACES_SUM))
         // the Chinese input methods' section says English for all of it: under a row, only an exception within it
@@ -161,12 +161,12 @@ class InputMethodSettingsTest {
         assertEquals(listOf(Engines.HANDWRITING), notFor(EngineSettings.BUILT_IN_PHRASES))
         assertEquals(emptyList<String>(), notFor(EngineSettings.MODEL_LEVEL))
         assertEquals(emptyList<String>(), notFor(InputMethodSettings.PUNCTUATION))
-        assertEquals(listOf(Engines.T9), notFor("${EngineSettings.FUZZY}/${EngineSettings.TYPOS}"))
-        // u and v are both on 8: the pair alone is said to be no use to the nine keys, the others are
+        assertEquals(listOf(Engines.T9, Engines.PINYIN_KEYS, Engines.SHUANGPIN_NINE), notFor("${EngineSettings.FUZZY}/${EngineSettings.TYPOS}"))
+        // u and v are both on 8 (9 keys' 双拼 too): the pair alone is said to be no use to the nine keys, the others are
         val fuzzy = rows.filterIsInstance<Flags>().single()
-        assertEquals(mapOf(Fuzzy.V_U.name to listOf(Engines.T9)), fuzzy.notFor)
+        assertEquals(mapOf(Fuzzy.V_U.name to listOf(Engines.T9, Engines.SHUANGPIN_NINE)), fuzzy.notFor)
         // each a name the app has: one it does not know would be said by its id
-        val named = appInputMethods.toSet()
+        val named = appInputMethods.toSet() + Engines.PINYIN_KEYS + Engines.SHUANGPIN_KEYS18 + Engines.SHUANGPIN_NINE
         rows.forEach { row ->
             val all = when (row) {
                 is Toggle -> row.notFor
@@ -185,5 +185,19 @@ class InputMethodSettingsTest {
         assertEquals(EngineSettings.FUZZY, fuzzy.path)
         assertEquals(Fuzzy.entries.map { it.name }.sorted(), fuzzy.flags.map { it.first }.sorted())
         assertEquals(TableSettings.KEYS.sorted(), keys("engine-wubi").filter { it != InputMethodSettings.SHARED_LINK && it != InputMethodSettings.RESET_TABLE_ORDER }.sorted())
+    }
+
+    // the page's main choice, right under the way to the shared page
+    @Test
+    fun pinyinsKeyboardIsItsFirstOwnRow() {
+        assertEquals(AppPrefs.PINYIN_KEYBOARD, keys(Engines.PINYIN)[1])
+    }
+
+    // the hardware keyboard still types full pinyin and reads both: said not for the 14 keys, not hidden
+    @Test
+    fun pinyinsOwnOptionsSayTheyAreNoUseToThe14Keys() {
+        val rows = InputMethodSettings.of(Engines.PINYIN)!!.flat().filterIsInstance<Toggle>().associateBy { it.key }
+        assertEquals(listOf(Engines.PINYIN_KEYS), rows.getValue(EngineSettings.CHAIZI).notFor)
+        assertEquals(listOf(Engines.PINYIN_KEYS), rows.getValue(EngineSettings.LATIN_WORDS).notFor)
     }
 }

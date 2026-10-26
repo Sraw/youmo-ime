@@ -23,6 +23,7 @@ plugins {
 //  - compile against the JDK 11 API rather than the host JDK's (`release`);
 //  - check the result against Android's actual API at minSdk (animal-sniffer, below). Android
 //    lint does not look inside a plain JVM module, so nothing else would catch it.
+// The Android modules target Java 21 (Versions.java); this one stays at the JDK 11 API on purpose.
 java {
     sourceCompatibility = JavaVersion.VERSION_11
     targetCompatibility = JavaVersion.VERSION_11
@@ -30,6 +31,12 @@ java {
 
 tasks.withType<JavaCompile>().configureEach {
     options.release.set(11)
+}
+
+// fcitx's built-in data (charselectdata, quick phrase and punctuation tables) as the app ships it:
+// the tests read that one copy, on the classpath as /pkgdata/...
+sourceSets.test {
+    resources.srcDir("../../app/src/main/host-assets")
 }
 
 kotlin {
@@ -48,26 +55,15 @@ dependencies {
     // minSdk 29; keep in step with minSdk. gummy-bears publishes no coreLib2 (desugared java.*)
     // variant for API 29, so APIs only desugaring would supply are rejected here too
     signature(variantOf(libs.gummyBears.api29) { artifactType("signature") })
+    // the host's event flow (HostEvents): a SharedFlow, as FcitxAPI.eventFlow is
+    api(libs.kotlinx.coroutines.core)
     testImplementation(libs.junit)
-}
-
-// AndroidEngineHeaderTest reads the addon's headers, outside this module: handed their paths, it
-// finds them wherever it runs from; inputs relative to the build, an edit to one alone runs it
-// again, and its result is still taken from the build cache in another checkout
-abstract class AndroidEngineHeaders : CommandLineArgumentProvider {
-    @get:InputFiles
-    @get:PathSensitive(PathSensitivity.RELATIVE)
-    abstract val headers: ConfigurableFileCollection
-
-    override fun asArguments(): Iterable<String> = headers.files.map { "-Dheader.${it.name}=${it.absolutePath}" }
+    testImplementation(libs.kotlinx.coroutines.test)
 }
 
 tasks.withType<Test>().configureEach {
     // MisreadingsTest checks the list the app build compiles: an edit to it alone runs it again
     inputs.file(rootProject.file("lexicon/misreadings.tsv")).withPathSensitivity(PathSensitivity.RELATIVE)
-    jvmArgumentProviders.add(objects.newInstance<AndroidEngineHeaders>().apply {
-        headers.from(rootProject.files("app/src/main/cpp/androidengine/androidengine.h", "app/src/main/cpp/androidengine/androidengine_public.h", "app/src/main/cpp/androidengine/androidengine.cpp"))
-    })
     testLogging {
         events("failed")
     }

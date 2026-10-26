@@ -83,6 +83,19 @@ class MergedDictionaryTest {
         MergedDictionary.reset()
     }
 
+    /** A table row from a clean start, one failed leaving nothing to the next (F3697). */
+    @Suppress("TooGenericExceptionCaught")
+    private fun cleanRow(row: () -> Unit) {
+        try {
+            row()
+            done()
+        } catch (e: Throwable) {
+            // done() throwing on what a failed row left must not hide the row's own failure (F3708)
+            runCatching { done() }.exceptionOrNull()?.let(e::addSuppressed)
+            throw e
+        }
+    }
+
     // a compile killed halfway (the app killed, the phone off) leaves its work and its file half written
     @Test
     fun whatAKilledCompileLeftIsGoneAfterTheNext() {
@@ -226,6 +239,8 @@ class MergedDictionaryTest {
             Row("kept ones, none made yet", MergedDictionary.Kind.UPDATE, modified = 1_000_000),
             Row("a file there already", MergedDictionary.Kind.UPDATE, modified = 1_000_000, fileThere = true),
             Row("an import's compile", MergedDictionary.Kind.UPDATE, modified = 1_000_000, forImport = true),
+            // its conversion made the marker, its compile is done: none left for the next start to tell an upgrade by (F4099)
+            Row("an import's compile converting a text", MergedDictionary.Kind.UPDATE, modified = 1_000_000, forImport = true, asText = true),
         )
         assertRows(rows, { it.why }) { row ->
             done()
@@ -246,14 +261,25 @@ class MergedDictionaryTest {
             MergedDictionary.told = { kinds += it.kind }
             if (row.forImport) MergedDictionary.refreshNow(dictionaries) else MergedDictionary.refresh(dictionaries)!!.get()
             assertEquals(row.why, setOf(row.kind), kinds.toSet())
+            if (row.forImport && row.asText) {
+                assertFalse(row.why, File(dictionaries, ".merged.upgrading").exists())
+                fresh()
+                kinds.clear()
+                MergedDictionary.told = { kinds += it.kind }
+                checked()
+                assertFalse(row.why, MergedDictionary.Kind.UPGRADE in kinds)
+            }
         }
     }
 
     private enum class Beside { FORMAT_BEFORE, DAMAGED, OWED }
 
-    // an engine data file's header (DataFile's: magic, container version, kind, sections, the kind's version), nothing after
+    // contract: DataFile's header as 0.3.1/0.3.2 wrote it (magic, container version 2, kind 4 = user
+    // dictionary, sections, the kind's version), nothing after. Literals, not DataFile's constants: a
+    // container bumped later must still read a real 0.3.2 merged.ymd as the format before (F4190)
     private fun header(formatVersion: Int): ByteArray =
-        ByteBuffer.allocate(64).order(ByteOrder.LITTLE_ENDIAN).put("FCITXIME".toByteArray()).putInt(1).putInt(0).putInt(0).putInt(formatVersion).array()
+        ByteBuffer.allocate(64).order(ByteOrder.LITTLE_ENDIAN).put("FCITXIME".toByteArray()).putInt(2)
+            .putInt(4).putInt(0).putInt(formatVersion).array()
 
     // converted, then killed (here cancelled) before its compile was done: an upgrade still at the next
     // start, shown and told, though no text nor file of the format before is left to tell it by (F3601, F3637)
@@ -577,6 +603,23 @@ class MergedDictionaryTest {
         }
     }
 
+    // a cancel during the conversion keeps what it noted: the text that could not be read is still named,
+    // not tried again at the next start (F4043). "locked" sorts first, so it is tried before "mine" is read
+    @Test(timeout = 20_000)
+    fun aConversionCancelledKeepsTheUnreadableNamed() {
+        val locked = text("locked", "你好 ni'hao 0.0\n")
+        assumeTrue(locked.setReadable(false) && !locked.canRead())
+        try {
+            text("mine", (1..50_000).joinToString("\n") { "词$it ci 0.0" })
+            val cancel = AtomicBoolean()
+            MergedDictionary.told = { if (it.stage == MergedDictionary.Step.CONVERT && it.percent > 0) cancel.set(true) }
+            assertTrue(runCatching { MergedDictionary.refreshNow(dictionaries, cancel) }.exceptionOrNull() is CancellationException)
+            assertEquals(setOf("locked"), MergedDictionary.unreadable(dictionaries))
+        } finally {
+            locked.setReadable(true)
+        }
+    }
+
     // a text converted whose delete was refused (F3660), as a later start finds it: noted in `.merged.left`
     // beside its gzip. Not pending, not converted again, no upgrade told; its delete tried again,
     // the note dropped once it is gone. Turned with its gzip (they are turned together), the same (F3686)
@@ -595,25 +638,21 @@ class MergedDictionaryTest {
             )
             assertRows(rows, { it.second }) { (turned, _) ->
                 try {
-                    source("frost", "你好 ni'hao 0.0\n")
-                    MergedDictionary.refreshNow(dictionaries)
-                    val left = text("frost", "你好 ni'hao 0.0\n")
-                    File(dictionaries, ".merged.left").writeText(MergedDictionary.leftKey(left) + "\n")
-                    if (turned) assertTrue(ImportedDictionaries.turn(dictionaries, "frost", false))
-                    // its words are in the gzip, compiled: nothing owed (F3684)
-                    assertFalse(MergedDictionary.pending(dictionaries))
-                    MergedDictionary.current(dictionaries)
-                    checked()
-                    assertTrue(told.none { it.stage == MergedDictionary.Step.CONVERT })
-                    assertTrue(ended.none { it.first == MergedDictionary.Kind.UPGRADE })
-                    assertEquals(listOf(SourceNames.fileName("frost", !turned)), dictionaries.list()!!.filter { it.startsWith("frost") })
-                    assertFalse(File(dictionaries, ".merged.left").exists())
-                    // each row from a clean start, one failed leaving nothing to the next (F3697)
-                    done()
-                } catch (e: Throwable) {
-                    // done() throwing on what a failed row left must not hide the row's own failure (F3708)
-                    runCatching { done() }.exceptionOrNull()?.let(e::addSuppressed)
-                    throw e
+                    cleanRow {
+                        source("frost", "你好 ni'hao 0.0\n")
+                        MergedDictionary.refreshNow(dictionaries)
+                        val left = text("frost", "你好 ni'hao 0.0\n")
+                        File(dictionaries, ".merged.left").writeText(LegacyTextConversion.leftKey(left) + "\n")
+                        if (turned) assertTrue(ImportedDictionaries.turn(dictionaries, "frost", false))
+                        // its words are in the gzip, compiled: nothing owed (F3684)
+                        assertFalse(MergedDictionary.pending(dictionaries))
+                        MergedDictionary.current(dictionaries)
+                        checked()
+                        assertTrue(told.none { it.stage == MergedDictionary.Step.CONVERT })
+                        assertTrue(ended.none { it.first == MergedDictionary.Kind.UPGRADE })
+                        assertEquals(listOf(SourceNames.fileName("frost", !turned)), dictionaries.list()!!.filter { it.startsWith("frost") })
+                        assertFalse(File(dictionaries, ".merged.left").exists())
+                    }
                 } finally {
                     MergedDictionary.told = { told += it }
                     told.clear()
@@ -639,10 +678,10 @@ class MergedDictionaryTest {
                 true to "its gzip in the other state",
             )
             assertRows(rows, { it.second }) { (otherThere, _) ->
-                try {
+                cleanRow {
                     val left = text("frost", "搭子 da'zi 0.0\n")
                     if (otherThere) source("frost", "你好 ni'hao 0.0\n", on = false)
-                    File(dictionaries, ".merged.left").writeText(MergedDictionary.leftKey(left) + "\n")
+                    File(dictionaries, ".merged.left").writeText(LegacyTextConversion.leftKey(left) + "\n")
                     ended.clear()
                     assertTrue(MergedDictionary.pending(dictionaries))
                     refreshed()
@@ -650,11 +689,6 @@ class MergedDictionaryTest {
                     assertEquals("搭子 da'zi 0.0\n", gunzip(File(dictionaries, "frost.txt.gz")))
                     assertEquals(listOf("frost.txt.gz"), dictionaries.list()!!.filter { it.startsWith("frost") })
                     assertFalse(File(dictionaries, ".merged.left").exists())
-                    done()
-                } catch (e: Throwable) {
-                    // as above (F3708)
-                    runCatching { done() }.exceptionOrNull()?.let(e::addSuppressed)
-                    throw e
                 }
             }
         } finally {

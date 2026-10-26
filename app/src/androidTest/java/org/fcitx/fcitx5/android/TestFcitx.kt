@@ -19,9 +19,9 @@ import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.withTimeoutOrNull
 import org.fcitx.fcitx5.android.core.CapabilityFlag
 import org.fcitx.fcitx5.android.core.CapabilityFlags
-import org.fcitx.fcitx5.android.core.Fcitx
 import org.fcitx.fcitx5.android.core.FcitxEvent
-import org.fcitx.fcitx5.android.core.RawConfig
+import org.fcitx.fcitx5.android.core.FcitxInstance
+import org.fcitx.fcitx5.android.core.KotlinFcitx
 import org.fcitx.fcitx5.android.engine.host.Engines
 
 /**
@@ -32,7 +32,7 @@ import org.fcitx.fcitx5.android.engine.host.Engines
  */
 class TestFcitx {
 
-    lateinit var fcitx: Fcitx
+    lateinit var fcitx: FcitxInstance
         private set
 
     /**
@@ -64,16 +64,15 @@ class TestFcitx {
 
     /** What [setUpEngine] saves over in the app's data, put back by [stop]. */
     private var enabledImeBefore: Array<String>? = null
-    private var globalConfigBefore: RawConfig? = null
 
     /** The input methods enabled as a test started, put back by [afterTest]. */
     private var enabledIme: List<String> = listOf()
 
     /** Starts fcitx and sets it up for the tests, then runs a test class's own [setUp]. */
-    fun start(setUp: suspend Fcitx.() -> Unit = {}) {
+    fun start(setUp: suspend FcitxInstance.() -> Unit = {}) {
         checkThisInputMethodIsNotBound()
         val context = InstrumentationRegistry.getInstrumentation().targetContext
-        fcitx = Fcitx(context)
+        fcitx = KotlinFcitx(context).apply { showInputMethodInformation = false }
 
         // Forward to our channel for point to point consuming. UNDISPATCHED subscribes right
         // here, before `start()`: eventFlow keeps no replay, so a ReadyEvent emitted before a
@@ -105,35 +104,22 @@ class TestFcitx {
         // `onStartInputView`; a bare engine has to do it itself.
         fcitx.activate(TEST_UID, TEST_PKG_NAME)
         fcitx.focus(true)
-        // both are saved to the app's data at once
+        // saved to the app's data at once
         enabledImeBefore = fcitx.enabledIme().map { it.uniqueName }.toTypedArray()
-        globalConfigBefore = fcitx.getGlobalConfig()["cfg"]
         // what the tests commit is not learned into the app's data: as in a field that asks
         // for no personalized learning (CapabilityFlags.fromEditorInfo)
         fcitx.setCapFlags(CapabilityFlags(CapabilityFlag.Sensitive))
         fcitx.setEnabledIme(arrayOf(Engines.PINYIN))
-        fcitx.setGlobalConfig(
-            RawConfig(
-                arrayOf(
-                    RawConfig(
-                        "Behavior", arrayOf(
-                            RawConfig("ShowInputMethodInformation", false)
-                        )
-                    )
-                )
-            )
-        )
     }
 
     /** Runs a test class's own [restore], puts back what [start] saved over, and stops fcitx. */
-    fun stop(restore: suspend Fcitx.() -> Unit = {}) {
+    fun stop(restore: suspend FcitxInstance.() -> Unit = {}) {
         // setup failed before it made one
         if (!::fcitx.isInitialized) return
         try {
             runBlocking {
                 fcitx.restore()
                 enabledImeBefore?.let { fcitx.setEnabledIme(it) }
-                globalConfigBefore?.let { fcitx.setGlobalConfig(it) }
                 fcitx.focus(false)
                 fcitx.deactivate(TEST_UID)
             }

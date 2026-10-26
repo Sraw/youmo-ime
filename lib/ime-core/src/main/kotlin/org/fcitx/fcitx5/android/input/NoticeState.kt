@@ -5,7 +5,7 @@
 package org.fcitx.fcitx5.android.input
 
 /**
- * The life of the keyboard's one notice (dev/design/motion-notices-handle.md §3), what UndoChip
+ * The life of the keyboard's one notice (specs/app.md, "Notices"), what UndoChip
  * draws: which end of an act's 撤销 is reached, whether typing puts it away, how long it stays.
  * [U] is what 撤销 takes back; of each the chip calls its undo or its lapse, once, as said here.
  */

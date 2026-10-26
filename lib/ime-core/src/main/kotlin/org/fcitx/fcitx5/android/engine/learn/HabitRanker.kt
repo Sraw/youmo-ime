@@ -23,15 +23,32 @@ package org.fcitx.fcitx5.android.engine.learn
  * exactly the code's (after them all if none is), in the order of their import (D24). Last of all, the pin of the code, if among the items, goes in front: the
  * others keep their order and tiers, a place down.
  *
+ * Across the spellings of the code's keyboard (U-20, D32 B; [SpelledForm]): a word used at least
+ * [FULL_USES] times spelt in full, not used under the code, goes up to [LIFTED_TO] under its 简拼 or
+ * a part of it; one corrected to under a 简拼 is no lower than [FLOOR] spelt in full or in part.
+ * Each only moves a word up, after the pin: the floor right behind it, the lift a place down as
+ * every other word, and after the floored; one already higher stays; each at or below its place shows
+ * [Tier.FLOORED] or [Tier.LIFTED], which `kept` holds too, but for one used here or of the user's own.
+ * None is put first so.
+ *
  * Text kept as letters (U-27) is never put first, by 1 or 2; V, it is put after only by 1 (the
  * user corrected it twice there), not by 2.
  */
 object HabitRanker {
     /** Why an item is where it is: the order of the tiers is the order of the list, but for V's. */
-    enum class Tier { PINNED, FIRST_HERE, ACROSS, USED, MINE, DICTIONARY, IMPORTED }
+    enum class Tier { PINNED, FIRST_HERE, ACROSS, USED, FLOORED, LIFTED, MINE, DICTIONARY, IMPORTED }
 
     /** Corrected to this often under a code, a word used there more than V goes first after any word before it. */
     const val CORRECTIONS = 2
+
+    /** Used this often spelt in full, a word goes up under its 简拼 (U-20): the same two as a word of the user's own. */
+    const val FULL_USES = 2
+
+    /** The highest place (from 0) a word used spelt in full goes up to under its 简拼: third. */
+    const val LIFTED_TO = 2
+
+    /** The lowest place (from 0) of a word corrected to under its 简拼, spelt in full or in part: second. */
+    const val FLOOR = 1
 
     /**
      * A candidate as ranking sees it: [words], read so; [single] one Han character; [letters] text
@@ -67,6 +84,9 @@ object HabitRanker {
 
         /** Where [text] goes among the imported words (D24: its batch, then its place there); -1 for none. */
         fun importOrder(text: String): Long = -1L
+
+        /** [words] across the spellings of the keyboard [kind] ([Habits.spelled]). */
+        fun spelled(kind: String, words: Words): Habits.Spelled = Habits.Spelled.NONE
     }
 
     /** [items] of [code], after [prev], as shown. */
@@ -86,7 +106,48 @@ object HabitRanker {
             val pinned = ranked.removeAt(pin)
             ranked.add(0, Ranked(pinned.item, Tier.PINNED, pinned.uses, pinned.original))
         }
+        spellings(ranked, code, view)
         return ranked
+    }
+
+    // U-20 across the keyboard's spellings: those corrected to under a 简拼 to FLOOR (right after a
+    // pin), then those used spelt in full to LIFTED_TO and on, a place down behind a pin as every
+    // other word is, never in front of a floored one (R14 F3732, F3742); each only up, by its counts
+    private fun <T> spellings(ranked: MutableList<Ranked<T>>, code: Code, view: View) {
+        if (ranked.size <= FLOOR) return
+        val floor = ArrayList<Pair<Ranked<T>, Int>>()
+        val lift = ArrayList<Pair<Ranked<T>, Int>>()
+        for (r in ranked.filter { !it.item.letters && it.tier != Tier.PINNED }) {
+            val form = SpelledForm.of(code.kind, code.keys, r.item.words.reading) ?: continue
+            val s = view.spelled(code.kind, r.item.words)
+            if (form != SpelledForm.INITIALS && s.initialsCorrections > 0) floor += r to s.initialsCorrections
+            else if (form != SpelledForm.FULL && r.tier != Tier.USED && s.fullUses >= FULL_USES) lift += r to s.fullUses
+        }
+        val floored = raise(ranked, floor, FLOOR, Tier.FLOORED)
+        val pinned = if (ranked[0].tier == Tier.PINNED) 1 else 0
+        raise(ranked, lift, maxOf(LIFTED_TO + pinned, floored), Tier.LIFTED)
+    }
+
+    // [words] up to [to] and on, the next place after it; gives the place after the last. One
+    // already at [to] or ahead stays, and those moved go after it (docs: 原来就在前三的不动, R14 F3749);
+    // those moved, by most counts first, and one already at its place below the user's own tiers
+    // take [tier]: what puts or keeps them there (F3736, F3762, F3771); one higher keeps its own
+    private fun <T> raise(ranked: MutableList<Ranked<T>>, words: List<Pair<Ranked<T>, Int>>, to: Int, tier: Tier): Int {
+        var at = to
+        val placed = words.map { (r, n) -> Triple(r, n, ranked.indexOf(r)) }
+        for (p in placed.filter { it.third <= to }.sortedBy { it.third }) if (p.third == at) {
+            // one of the user's (used here, their word) has a truer reason, and kept holds it already (F3771)
+            if (p.first.tier > Tier.MINE) ranked[at] = Ranked(p.first.item, tier, p.first.uses, p.first.original)
+            at++
+        }
+        for ((r, _, _) in placed.filter { it.third > to }.sortedByDescending { it.second }) {
+            val i = ranked.indexOf(r)
+            if (i < at) continue
+            ranked.removeAt(i)
+            ranked.add(at, Ranked(r.item, tier, r.uses, r.original))
+            at++
+        }
+        return at
     }
 
     /**

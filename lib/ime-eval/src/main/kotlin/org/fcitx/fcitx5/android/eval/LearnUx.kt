@@ -379,11 +379,11 @@ sealed class Step {
     data class Repeat(override val line: Int, val times: Int, val steps: List<Step>) : Step()
 
     /** `expect <kind> <words>` as written ([source]), checked on the candidates shown (the 联想 after a commit). */
-    data class Expect(override val line: Int, val source: String, val kind: Kind, val words: List<String>) : Step() {
+    data class Expect(override val line: Int, val source: String, val kind: Kind, val words: List<String>, val within: Int = 0) : Step() {
         override val onInput get() = true
 
         /** As written, but [TOP]: `top<n>`, n the words given. */
-        enum class Kind(val words: Int) { FIRST(1), NOTFIRST(1), BEFORE(2), HAS(1), LACKS(1), TOP(0) }
+        enum class Kind(val words: Int) { FIRST(1), NOTFIRST(1), BEFORE(2), HAS(1), LACKS(1), TOP(0), WITHIN(1), LACKSN(1) }
 
         fun holds(list: List<String>): Boolean = when (kind) {
             Kind.FIRST -> list.firstOrNull() == words[0]
@@ -393,6 +393,8 @@ sealed class Step {
             Kind.BEFORE -> list.indexOf(words[0]).let { a -> a >= 0 && list.indexOf(words[1]).let { b -> b < 0 || a < b } }
             // the first n, in this order
             Kind.TOP -> list.take(words.size) == words
+            Kind.WITHIN -> words[0] in list.take(within)
+            Kind.LACKSN -> words[0] !in list.take(within)
         }
     }
 }
@@ -420,6 +422,8 @@ sealed class Step {
  * todo <what>              an action not driven yet: expectations after it are pending
  * show                     the candidates shown, noted
  * expect top<n> a,b,...    the first n are these, in this order
+ * expect within<n> a       a among the first n
+ * expect lacks<n> a        a not among the first n
  * expect first a | expect notfirst a | expect before a b | expect has a | expect lacks a
  *                          notfirst holds for no candidates; before holds where b is not in the first 200;
  *                          has / lacks: a among the first 200 or not. After a commit, with nothing typed,
@@ -429,6 +433,8 @@ sealed class Step {
  */
 object LearnUxScript {
     private val TOP = Regex("top([1-9][0-9]?)")
+    private val WITHIN = Regex("within([1-9][0-9]?)")
+    private val LACKSN = Regex("lacks([1-9][0-9]?)")
 
     fun parse(file: String, lines: List<String>): List<Scenario> = Parser(file).apply { lines.forEachIndexed { i, line -> line(i + 1, line.trim()) } }.done()
 
@@ -519,10 +525,18 @@ object LearnUxScript {
             val name = rest.substringBefore(' ')
             val words = rest.substringAfter(' ', "").trim().split(Regex("[\\s,]+")).filter { it.isNotEmpty() }
             val top = TOP.matchEntire(name)?.groupValues?.get(1)?.toInt()
-            val kind = if (top != null) Step.Expect.Kind.TOP else Step.Expect.Kind.entries.firstOrNull { it != Step.Expect.Kind.TOP && it.name.lowercase() == name }
-            val wanted = top ?: kind?.words ?: bad("expect top<n>|first|notfirst|before|has|lacks")
+            val lacks = LACKSN.matchEntire(name)?.groupValues?.get(1)?.toInt()
+            val within = WITHIN.matchEntire(name)?.groupValues?.get(1)?.toInt() ?: lacks
+            val counted = setOf(Step.Expect.Kind.TOP, Step.Expect.Kind.WITHIN, Step.Expect.Kind.LACKSN)
+            val kind = when {
+                top != null -> Step.Expect.Kind.TOP
+                lacks != null -> Step.Expect.Kind.LACKSN
+                within != null -> Step.Expect.Kind.WITHIN
+                else -> Step.Expect.Kind.entries.firstOrNull { it !in counted && it.name.lowercase() == name }
+            }
+            val wanted = top ?: kind?.words ?: bad("expect top<n>|within<n>|lacks<n>|first|notfirst|before|has|lacks")
             if (words.size != wanted) bad("$wanted words wanted")
-            return Step.Expect(n, line, checkNotNull(kind), words)
+            return Step.Expect(n, line, checkNotNull(kind), words, within ?: 0)
         }
     }
 }

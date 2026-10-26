@@ -119,9 +119,11 @@ sealed class Action {
      * A key typed. One the engine [reads][Session.reads] goes into the input; any other ends it,
      * committed as the engine would have it, and is the app's (the snapshot is not
      * [handled][Snapshot.handled]): what comes after it does not run on from what came before.
-     * [glided]: typed by a glide, no key pressed (learning files it by its pinyin).
+     * [glided]: typed by a glide, no key pressed (learning files it by its pinyin). [at]: where
+     * across its key a grouped keyboard's code was tapped, 0 the left edge and 1 the right
+     * ([Keyboard.tapKey][org.fcitx.fcitx5.android.engine.host.Keyboard.tapKey]); NaN for none.
      */
-    data class Key(val char: Char, val glided: Boolean = false) : Action()
+    data class Key(val char: Char, val glided: Boolean = false, val at: Float = Float.NaN) : Action()
 
     object Backspace : Action()
 
@@ -159,8 +161,11 @@ sealed class Action {
         companion object {
             const val ANY = -1
 
-            /** Ids of the syllables offered run from 0 to this, less one, then again. */
-            const val IDS = 100
+            /**
+             * Ids of the syllables offered run from 0 to this, less one, then again: 99 so the
+             * private use area's last 64 are left over (Keyboard.SYLLABLES), the grouped keyboards' codes there.
+             */
+            const val IDS = 99
 
             /** At most this many syllables are offered. */
             const val MAX = 64

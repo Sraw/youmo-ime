@@ -6,13 +6,10 @@ package org.fcitx.fcitx5.android.core
 
 import android.text.TextPaint
 import android.util.Log
-import android.widget.Toast
-import androidx.annotation.StringRes
-import androidx.core.content.ContextCompat
+import androidx.annotation.VisibleForTesting
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
-import org.fcitx.fcitx5.android.BuildConfig
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.daemon.FcitxDaemon
@@ -43,6 +40,7 @@ import org.fcitx.fcitx5.android.engine.session.Offer
 import org.fcitx.fcitx5.android.engine.session.Snapshot
 import org.fcitx.fcitx5.android.engine.user.DictionaryFile
 import org.fcitx.fcitx5.android.engine.user.LibimeImport
+import org.fcitx.fcitx5.android.host.EngineHost
 import org.fcitx.fcitx5.android.input.popup.EmojiModifier
 import org.fcitx.fcitx5.android.utils.Const
 import org.fcitx.fcitx5.android.utils.appContext
@@ -58,45 +56,38 @@ import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicBoolean
 
 /**
- * Where the androidengine addon (native) reaches ime-core's input methods. Called only on the
- * fcitx thread, through JNI: the sessions are that thread's alone, so nothing here locks. Only the
+ * Where the Kotlin host ([host]) reaches ime-core's input methods. Called only on the host's
+ * thread (`fcitx-main`): the sessions are that thread's alone, so nothing here locks. Only the
  * custom phrases the keyboard changes are saved on a thread of their own ([PhraseFile]), which
  * [additions] waits for before it reads them.
  */
 object EngineBridge {
 
     /**
-     * One event's outcome, which the addon reads field by field. [candidates] run from [first]:
-     * the page shown ([shown] of them), then more. The addon numbers them from [first], as the
-     * session does. [actionable]: whether a long press on a candidate may offer actions ([offers]).
-     * [labels]: the keys that pick the shown candidates, empty for the digits. [refines]: whether
-     * the addon should send [EngineEvent.REFINE] while the user pauses.
-     */
-    class Result(
-        @JvmField val handled: Boolean,
-        @JvmField val commit: String,
-        @JvmField val preedit: String,
-        @JvmField val candidates: Array<String>,
-        @JvmField val hints: Array<String>,
-        @JvmField val first: Int,
-        @JvmField val shown: Int,
-        @JvmField val total: Int,
-        @JvmField val actionable: Boolean,
-        @JvmField val labels: String,
-        @JvmField val refines: Boolean,
-        @JvmField val deleteBefore: Int = 0,
-        @JvmField val cursor: Int = -1,
-    )
-
-    /**
-     * What the nine-key keyboard shows beside its keys, as the last event of [Engines.T9] left
-     * it: whether anything is typed, what its first digits not yet taken may be, and which list
-     * that is (see Snapshot.syllables, syllablesId). Set on the fcitx thread, read on the main one.
+     * What the nine-key keyboard shows beside its keys: whether anything is typed, what its first
+     * digits not yet taken may be, and which list that is (see Snapshot.syllables, syllablesId).
      */
     data class T9State(val composing: Boolean = false, val syllables: List<String> = emptyList(), val id: Int = 0)
 
-    private val t9State = MutableStateFlow(T9State())
-    val t9: StateFlow<T9State> = t9State
+    /**
+     * The syllables offered, as the last event of input method [im] left them: whether anything is
+     * typed, what its first keys not yet taken may be, which list that is. Each reader takes its
+     * own input method's alone (the nine keys' column [Engines.T9]'s, the code row's pinyin's), so
+     * none shows another's: another's state means none offered, not no news (switching input
+     * methods writes the old one's and the new one's at once, and a reader may see the last alone).
+     * [im] is the router's active input method: the 14 keys answer as [Engines.PINYIN], never as
+     * [Engines.PINYIN_KEYS]. Set on the fcitx thread, read on the main one.
+     */
+    data class SyllableState(
+        val im: String = "",
+        val composing: Boolean = false,
+        val syllables: List<String> = emptyList(),
+        val id: Int = 0,
+    )
+
+    @VisibleForTesting
+    internal val syllablesState = MutableStateFlow(SyllableState())
+    val syllables: StateFlow<SyllableState> = syllablesState
 
     private val englishTypingState = MutableStateFlow(false)
 
@@ -106,7 +97,7 @@ object EngineBridge {
      */
     val englishTyping: StateFlow<Boolean> = englishTypingState
 
-    /** Whether English suggests words, as the addon's config last said ([EngineSettings.englishSuggest]). */
+    /** Whether English suggests words, as the host's config last said ([EngineSettings.englishSuggest]). */
     @Volatile
     var englishSuggests = true
         private set
@@ -164,14 +155,15 @@ object EngineBridge {
     /** The 双拼 scheme the user set, for the keyboard to tell its keys from text (Engines.readsAsKey): set on the fcitx thread, read on the main one. */
     @Volatile
     var shuangpinScheme: ShuangpinScheme = ShuangpinScheme.ZIRANMA
-        private set
+        // a JVM test sets the scheme the engine would have read (no engine there)
+        @VisibleForTesting internal set
 
     private var made: Engines? = null
 
     // what the field's last context said learning leaves out, kept for engines made after it
     private var fieldFlags = 0
 
-    /** Made when first used, and again after [close]; on the fcitx thread only, as the addon uses it there. */
+    /** Made when first used, and again after [close]; on the fcitx thread only, as the host uses it there. */
     val engines: Engines
         get() = made ?: Engines(
             load = ::asset,
@@ -179,7 +171,7 @@ object EngineBridge {
             onError = { Timber.w(it, "engine user data") },
             legacy = ::legacy,
             additions = { additions(pinyinDir()) },
-            kernel = NativeMatrixKernel,
+            kernel = NativeMatrixKernel.loaded,
             emojiShows = EmojiModifier.validator(),
             // a paint of its own: this is the fcitx thread's, not the main one's
             textShows = TextPaint().let { paint -> paint::hasGlyph },
@@ -290,7 +282,7 @@ object EngineBridge {
 
         operator fun contains(im: String) = im in failed
 
-        /** [block], a call of [im]'s engine; what it throws is thrown on, for the addon to log. */
+        /** [block], a call of [im]'s engine; what it throws is thrown on, for the host to log. */
         fun <T> call(im: String, block: () -> T): T {
             val result = try {
                 block()
@@ -427,13 +419,13 @@ object EngineBridge {
 
     // mapped where it lies in the APK (stored uncompressed): nothing copied, and pages the OS may
     // drop. Signed with the APK, so the checksums need not be read through.
-    private fun asset(path: String): ByteBuffer = appContext.assets.openFd(path).use { fd ->
+    internal fun asset(path: String): ByteBuffer = appContext.assets.openFd(path).use { fd ->
         FileInputStream(fd.fileDescriptor).channel.use { it.map(FileChannel.MapMode.READ_ONLY, fd.startOffset, fd.length) }
     }
 
     /**
-     * Whether the input method of the last [onEvent] has refining left, its snapshot's
-     * [refines][Snapshot.refines]: the addon then sends it [EngineEvent.REFINE] while the user
+     * Whether the input method of the last [answer] has refining left, its snapshot's
+     * [refines][Snapshot.refines]: the host then sends it [EngineEvent.REFINE] while the user
      * pauses. Written on the fcitx thread once an event is answered, and left as it was while one
      * runs: read off that thread during a refining step (EngineEvalRunner), it is still true.
      */
@@ -441,63 +433,67 @@ object EngineBridge {
     var refining = false
         private set
 
-    /** [learning] is false in a password or other sensitive field: nothing typed there is kept. */
-    @JvmStatic
-    fun onEvent(im: String, event: Int, arg: Int, learning: Boolean): Result =
-        answer(im, event, { engines.onEvent(im, event, arg, learning) }) { from, count -> engines.candidates(im, from, count) }
+    /**
+     * The Kotlin host's port ([EngineHost]): [answer] of the engine's snapshot. What the engine
+     * throws is thrown on, for the host's router to log and recover from as native-lib's
+     * engineFailed did. [learning] is false in a password or other sensitive field: nothing typed
+     * there is kept.
+     */
+    val host: EngineHost = object : EngineHost {
+        override fun event(im: String, event: Int, arg: Int, learning: Boolean): Snapshot? =
+            answer(im, event) { engines.onEvent(im, event, arg, learning) }
 
-    /** [onEvent] of [im], whose engine [call] answers [event], [fetch] giving its candidates. */
-    internal fun answer(im: String, event: Int, call: () -> Snapshot, fetch: (from: Int, count: Int) -> List<Choice>): Result {
+        override fun candidates(im: String, from: Int, count: Int): List<Choice> = engines.candidates(im, from, count)
+
+        override fun offers(im: String, index: Int): Set<Offer> = engines.offers(im, index)
+
+        override fun settings(flat: String) = configure(flat)
+    }
+
+    /**
+     * [im]'s engine's answer to [event], [call], with its side effects (the syllables'
+     * and English's state, the unloadable latch, [refining]); null for an input method that cannot
+     * load, whose key the host gives back.
+     */
+    internal fun answer(im: String, event: Int, call: () -> Snapshot): Snapshot? {
         if (im in unloadable) {
             refining = false
-            return unhandled
+            // nothing typed there now: syllables shown before it became unloadable go
+            syllablesState.value = SyllableState(im)
+            return null
         }
-        val answered = try {
-            val s = unloadable.call(im, call)
-            if (im == Engines.T9 && (event != EngineEvent.REFINE || s.handled)) t9State.value = T9State(s.preedit.isNotEmpty(), s.syllables, s.syllablesId)
-            if (im == Engines.ENGLISH) englishTypingState.value = s.preedit.isNotEmpty() && !s.predicting
-            followed(im) { engines }
-            result(event, s, fetch)
+        val s = try {
+            unloadable.call(im, call).also { follow(im, event, it) }
         } catch (@Suppress("TooGenericExceptionCaught") e: Throwable) {
-            // the addon refines no more after a failure (native-lib's engineFailed)
-            refining = false
-            // nor is a word being spelled: 1 left an apostrophe with nothing typed
-            if (im == Engines.ENGLISH) englishTypingState.value = false
+            failedEvent(im)
             throw e
         }
-        refining = answered.refines
-        return answered
+        refining = s.refines
+        return s
+    }
+
+    // what the app keeps of an event's snapshot [s]: every input method's syllables, English's word being spelled
+    private fun follow(im: String, event: Int, s: Snapshot) {
+        // every input method's answer, not only while keys are typed: the 14 keys handing back to
+        // 全拼 answer with none, which clears what they offered (a gate on them would keep it shown)
+        if (event != EngineEvent.REFINE || s.handled) syllablesState.value = SyllableState(im, s.preedit.isNotEmpty(), s.syllables, s.syllablesId)
+        if (im == Engines.ENGLISH) englishTypingState.value = s.preedit.isNotEmpty() && !s.predicting
+        followed(im) { engines }
+    }
+
+    private fun failedEvent(im: String) {
+        // the host refines no more after a failure (native-lib's engineFailed)
+        refining = false
+        // nor is a word being spelled: 1 left an apostrophe with nothing typed
+        if (im == Engines.ENGLISH) englishTypingState.value = false
+        // nor any syllables to take: a tap would send an id the engine drops
+        syllablesState.value = SyllableState(im)
     }
 
     /**
-     * [s] as the addon reads it after [event]: [candidatesSent] of its candidates, from the page's
-     * first, as [fetch] gives them; the addon numbers them from [Result.first] (EngineCandidateList).
-     */
-    internal fun result(event: Int, s: Snapshot, fetch: (from: Int, count: Int) -> List<Choice>): Result {
-        val count = candidatesSent(event, s)
-        val all = if (count == 0) emptyList() else fetch(s.first, count)
-        return Result(
-            s.handled, s.commit, s.preedit,
-            all.map { it.text }.toTypedArray(), all.map { it.hint }.toTypedArray(),
-            s.first, s.candidates.size, s.total, s.actionable, s.labels, s.refines, s.deleteBefore,
-            // the addon counts code points: a character past the BMP in the pieces picked is one
-            if (s.cursor < 0) -1 else s.preedit.codePointCount(0, minOf(s.cursor, s.preedit.length)),
-        )
-    }
-
-    /**
-     * How many of [s]'s candidates, from the page's first, go to the addon after [event]: the page
-     * shown and at least a chunk, so the addon seldom asks for more; none when a refining step
-     * changed nothing, which the addon does not show.
-     */
-    internal fun candidatesSent(event: Int, s: Snapshot): Int =
-        if (s.candidates.isEmpty() || (event == EngineEvent.REFINE && !s.handled)) 0 else maxOf(CHUNK, s.candidates.size)
-
-    /**
-     * The addon's config, flattened as [EngineSettings.parse] reads it, with the nine keys' letters
+     * The host's config, flattened as [EngineSettings.parse] reads it, with the nine keys' letters
      * the keyboard draws (the app's preference, read again by [reload]); on the fcitx thread too.
      */
-    @JvmStatic
     fun configure(settings: String) {
         engines.settings = EngineSettings.parse(settings).copy(nineKeys = nineKeys())
         shuangpinScheme = engines.settings.scheme
@@ -524,7 +520,7 @@ object EngineBridge {
     internal fun shownAnew(op: LearningOp, im: String, result: LearningResult) =
         isEngines(im) && im !in unloadable && result != LearningResult.Unavailable && showsAnew(op)
 
-    // the acts on a candidate the addon shows itself, as it shows a long press's; what only reads
+    // the acts on a candidate the host shows itself, as it shows a long press's; what only reads
     // shows nothing new. Every op named: a new one must say whether it changes what is shown
     private fun showsAnew(op: LearningOp): Boolean = when (op) {
         is LearningOp.OnPage -> showsAnew(op.op)
@@ -547,7 +543,6 @@ object EngineBridge {
      * Reads [additions] and the nine keys' letters again, the sessions made anew; nothing to do
      * while the engine is not made. An input method that could not load is tried again.
      */
-    @JvmStatic
     fun reload() {
         unloadable.clear()
         made?.let { it.settings = it.settings.copy(nineKeys = nineKeys()) }
@@ -555,7 +550,6 @@ object EngineBridge {
     }
 
     /** See [Engines.context]; nothing to tell while the engine is not made. True if [im] offers words now, for a RECALL key (Engines.context) to show. */
-    @JvmStatic
     fun context(
         before: String,
         learning: Boolean,
@@ -587,24 +581,7 @@ object EngineBridge {
     /** See [Engines.tableKeys]; none while the engine is not made, no session yet, nor is it made to answer: the keyboard waits. */
     fun tableKeys(im: String): Set<Char> = made?.tableKeys(im).orEmpty()
 
-    /** Text and hint of each candidate in [from, from + count), one after the other. */
-    @JvmStatic
-    fun candidates(im: String, from: Int, count: Int): Array<String> =
-        engines.candidates(im, from, count).flatMap { listOf(it.text, it.hint) }.toTypedArray()
-
-    /** What a long press on the [index]th of [im]'s candidates offers: a bit for each [Offer]. */
-    @JvmStatic
-    fun offers(im: String, index: Int): Int = offerBits(engines.offers(im, index))
-
-    /** [offers] as the addon reads them (androidengine_public.h's EngineOffer): a bit for each. */
-    internal fun offerBits(offers: Set<Offer>): Int = offers.sumOf { it.bit }
-
-    // as when the engine fails: the key is the app's, the panel cleared
-    private val unhandled = Result(false, "", "", emptyArray(), emptyArray(), 0, 0, 0, false, "", false)
-
-    internal const val CHUNK = 32
-
-    // the addon's input methods (androidengine), but English, which is keyboard-us's
+    // the host's input methods (the native androidengine's), but English, which is keyboard-us's
     private const val ENGINE = "engine-"
     private const val LOG_TAG = "youmo-learn"
     private const val MS_PER_MINUTE = 60_000L
@@ -613,35 +590,4 @@ object EngineBridge {
     // OpenCC 1.2.0's character tables, in the APK's assets: see simplifier()
     private const val TRADITIONAL_TABLE = "learn/TSCharacters.txt"
     private const val SIMPLIFIED_TABLE = "learn/STCharacters.txt"
-}
-
-/**
- * What the engine says to the user, from any thread: on the keyboard if it is shown (§3: one notice
- * there, and Android 13 drops an input method's toasts), a toast with none. The input method sets
- * [sayer] while it runs: core does not reach into input (F3539).
- */
-object EngineNotices {
-
-    /** [message] said on the main thread; [steady], a failure (NoticeState.show). */
-    fun interface Sayer {
-        fun say(message: String, steady: Boolean)
-    }
-
-    @Volatile
-    var sayer: Sayer? = null
-
-    /** A failure, said as a key fails: not put away by the key typed after it, and long (rule 4). */
-    fun failed(@StringRes id: Int) = post(steady = true) { appContext.getString(id) }
-
-    /**
-     * A plain tip, what fcitx's own addons say (androidnotification's showTip: punctuation, full
-     * width, a group switched): said for 2 s and typed away, as any line said (rule 5, F3464).
-     */
-    fun tip(message: String) = post(steady = false) { message }
-
-    // looked up when it is said, on the main thread
-    private fun post(steady: Boolean, message: () -> String) = ContextCompat.getMainExecutor(appContext).execute {
-        val said = message()
-        sayer?.say(said, steady) ?: appContext.toast(said, if (steady) Toast.LENGTH_LONG else Toast.LENGTH_SHORT)
-    }
 }

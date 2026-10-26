@@ -22,6 +22,8 @@ class SyllableGraph internal constructor(
     private val edgeTo: IntArray,
     private val edgeKind: Array<Kind>,
     private val edgeMatches: Array<SyllableMatches>,
+    // per edge, how far each of its matches' letters go against where their keys were tapped; null for none at all
+    private val edgeAgainst: Array<FloatArray?>? = null,
 ) {
     enum class Kind {
         /** Whole syllables, exactly or through [Fuzzy] or a typo. */
@@ -61,6 +63,14 @@ class SyllableGraph internal constructor(
     fun kind(edge: Int): Kind = edgeKind[edge]
 
     fun matches(edge: Int): SyllableMatches = edgeMatches[edge]
+
+    /**
+     * How far the letters the [i]th of [edge]'s matches reads its keys as go against where the keys
+     * were tapped: for each key of two letters, 0 tapped at its centre or on its letter's side, up
+     * to 1 at the other edge, summed over the edge. 0 where nothing was tapped with a place (any
+     * keyboard but the grouped ones). What it costs is the decoder's to say, as for the flags.
+     */
+    fun against(edge: Int, i: Int): Float = edgeAgainst?.get(edge)?.get(i) ?: 0f
 
     /** The typed text of [edge], without separators. */
     fun text(edge: Int): String = text(edgeFrom[edge], edgeTo[edge])

@@ -21,7 +21,9 @@ import org.fcitx.fcitx5.android.engine.lattice.Predictor
 import org.fcitx.fcitx5.android.engine.lattice.TextWords
 import org.fcitx.fcitx5.android.engine.libime.LibimeFiles
 import org.fcitx.fcitx5.android.engine.pinyin.Fuzzy
+import org.fcitx.fcitx5.android.engine.pinyin.GroupedShuangpinSegmenter
 import org.fcitx.fcitx5.android.engine.pinyin.LatinWords
+import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
 import org.fcitx.fcitx5.android.engine.pinyin.PinyinSegmenter
 import org.fcitx.fcitx5.android.engine.pinyin.Segmenter
 import org.fcitx.fcitx5.android.engine.pinyin.ShuangpinSegmenter
@@ -38,6 +40,7 @@ import org.fcitx.fcitx5.android.engine.user.DictionaryCompiler
 import org.fcitx.fcitx5.android.engine.user.DictionaryFile
 import org.fcitx.fcitx5.android.engine.user.LearningUse
 import org.fcitx.fcitx5.android.engine.user.WordPack
+import org.fcitx.fcitx5.android.eval.parity.PARITY_COMMANDS
 import java.io.File
 import java.io.IOException
 import java.io.RandomAccessFile
@@ -59,11 +62,11 @@ internal val COMMANDS = listOf(
     },
     Command(
         "pinyin",
-        "<pinyin.data> <set.tsv> <result.tsv> [--scheme <scheme>] [--fuzzy all|<pair>,...] [--half <half>] [--neighbours on|off] [--rerank <model.safetensors>] [--refine <model.safetensors>] [--weight <rerank>[,<refine>]] [--limit <rerank>[,<refine>]] [--beam <n>] [--sentences <n>] [--layers <name>=<log10>,...] [--pack <file.words>] [--merged <dictionary.txt> [--stale]] [--threads <n>]",
-        3..3, "scheme", "fuzzy", "half", "neighbours", "rerank", "refine", "weight", "limit", "beam", "sentences", "layers", "pack", "merged", "stale", "threads",
+        "<pinyin.data> <set.tsv> <result.tsv> [--scheme <scheme>] [--fuzzy all|<pair>,...] [--half <half>] [--neighbours on|off] [--rerank <model.safetensors>] [--refine <model.safetensors>] [--weight <rerank>[,<refine>]] [--limit <rerank>[,<refine>]] [--beam <n>] [--sentences <n>] [--layers <name>=<log10>,...] [--pack <file.words>] [--merged <dictionary.txt> [--stale]] [--threads <n>] [--taps <hand>:<α>[:<seed>]]",
+        3..3, "scheme", "fuzzy", "half", "neighbours", "rerank", "refine", "weight", "limit", "beam", "sentences", "layers", "pack", "merged", "stale", "threads", "taps",
     ) { args, _, _ ->
         val (dataPath, setPath, resultPath) = args.operands
-        runPinyin(dataPath, setPath, resultPath, RunOptions(args.options), Models(args.options), args.options["layers"], args.options["pack"], args.options["merged"], "stale" in args.options)
+        runPinyin(dataPath, setPath, resultPath, RunOptions(args.options), Models(args.options))
     },
     Command(
         "predict", "<pinyin.data> <predict.tsv> [--offers <out.tsv>] [--threads <n>] [--rerank <model.safetensors> [--weight <w>]]",
@@ -78,6 +81,7 @@ internal val COMMANDS = listOf(
         "english", "<english.data> <sentences.txt> [--keys nine] [--noise <rate>] [--max-correction <cost>] [--misses <out.tsv>] [--threads <n>]",
         2..2, "keys", "noise", "max-correction", "misses", "threads",
     ) { args, out, _ ->
+        if (args.options["keys"].let { it != null && it != "nine" }) return@Command null
         val (dataPath, setPath) = args.operands
         val sentences = File(setPath).readLines().filter { it.isNotBlank() && !it.startsWith("#") }
         // checked already: see optionsValid
@@ -123,6 +127,7 @@ internal val COMMANDS = listOf(
         "pinyin-glide", "<pinyin.data> <set.tsv> [--syllables <n; 0, the words>] [--word <letters>] [--shuangpin <scheme, as EngineSettings names it>] [--keys nine] [--table <x.data>] [--wobble <key widths>] [--shape <w>] [--proximity <w>] [--edges <w>] [--corner <w>] [--turn <cos>] [--near <r>] [--ends <r>] [--misses <out.tsv>]",
         2..2, "syllables", "wobble", "shape", "proximity", "edges", "corner", "turn", "near", "ends", "misses", "word", "shuangpin", "keys", "table",
     ) { args, out, _ ->
+        if (args.options["keys"].let { it != null && it != "nine" }) return@Command null
         val (dataPath, setPath) = args.operands
         val o = args.options
         // one word's clean path: its readings, scored
@@ -189,13 +194,20 @@ internal val COMMANDS = listOf(
         val (modelPath, context) = args.operands
         lm(modelPath, context, args.operands.drop(2), out)
     },
-    Command("shuangpin", "<scheme> <set.tsv> <shuangpin-set.tsv>", 3..3) { args, out, _ ->
+    Command("shuangpin", "<scheme> <set.tsv> <shuangpin-set.tsv> [--keys 18|nine] [--same <set-kept.tsv>]", 3..3, "keys", "same") { args, out, _ ->
         val (scheme, setPath, outPath) = args.operands
-        if (scheme in ShuangpinSet.SCHEMES) writeShuangpinSet(scheme, setPath, outPath, out) else null
+        val keys = args.options["keys"]?.let { ShuangpinSet.KEYS[it] ?: return@Command null }
+        if (scheme in ShuangpinSet.SCHEMES) writeShuangpinSet(scheme, setPath, outPath, out, keys, args.options["same"]) else null
     },
-    Command("t9", "<set.tsv> <t9-set.tsv> [--presses once|letters]", 2..2, "presses") { args, out, _ ->
+    Command("t9", "<set.tsv> <t9-set.tsv> [--presses once|letters] [--keys nine|14] [--same <set-kept.tsv>]", 2..2, "presses", "keys", "same") { args, out, err ->
         val (setPath, outPath) = args.operands
-        writeT9Set(setPath, outPath, T9Set.Presses.of(args.options["presses"] ?: "once")!!, out)
+        val presses = T9Set.Presses.of(args.options["presses"] ?: "once")!!
+        val keys = T9Set.KEYS[args.options["keys"] ?: "nine"] ?: return@Command null
+        // the 14 keys have no 连按
+        if (presses != T9Set.Presses.ONCE && keys != NineKeyLetters.STANDARD) {
+            err.appendLine("t9: --presses ${presses.option} is the nine keys' alone, not --keys 14")
+            null
+        } else writeT9Set(setPath, outPath, presses, keys, out, args.options["same"])
     },
     Command("slips", "<set.tsv> <slip-set.tsv>", 2..2) { args, out, _ ->
         val (setPath, outPath) = args.operands
@@ -266,10 +278,10 @@ internal val COMMANDS = listOf(
         val (kind, path) = args.operands
         if (kind in LIBIME_KINDS) libime(kind, path, out, err) else null
     },
-)
+) + PARITY_COMMANDS
 
 val USAGE = "usage: " + COMMANDS.joinToString("\n       ") { "${it.name} ${it.usage}" } + """
-schemes: ${(ShuangpinSet.SCHEMES.keys + T9Set.SCHEMES + NO_LATIN).joinToString(" ")}
+schemes: ${(ShuangpinSet.SCHEMES.keys + ShuangpinSet.GROUPED.keys + T9Set.SCHEMES + NO_LATIN).joinToString(" ")}
 pairs: ${Fuzzy.entries.joinToString(" ") { it.name.lowercase() }}
 halves: ${Halves.NAMES.joinToString(" ")}
 presets: ${TableRun.PRESETS.keys.joinToString(" ")}
@@ -293,8 +305,8 @@ internal class Command(
     val options = options.toSet()
 }
 
-/** Options that take no value: `--gate`, `--stale`. */
-private val FLAGS = setOf("gate", "stale")
+/** Options that take no value: `--gate`, `--stale`, `--jvm`. */
+private val FLAGS = setOf("gate", "stale", "jvm")
 
 /** Arguments split into the positional ones and `--name value` options, a [FLAGS] one with an empty value. */
 internal class Arguments(args: Array<String>) {
@@ -358,7 +370,7 @@ private fun optionsValid(options: Map<String, String>): Boolean {
     return listOf(
         valid("half") { it in Halves.NAMES },
         valid("presses") { T9Set.Presses.of(it) != null },
-        valid("scheme") { it == NO_LATIN || it in ShuangpinSet.SCHEMES || it in T9Set.SCHEMES },
+        valid("scheme") { it == NO_LATIN || it in ShuangpinSet.SCHEMES || it in ShuangpinSet.GROUPED || it in T9Set.SCHEMES },
         valid("fuzzy") { fuzzyPairs(it) != null },
         valid("preset") { it in TableRun.PRESETS },
         // a table that does not order by use keeps its order whatever the text before: each row the same
@@ -368,9 +380,13 @@ private fun optionsValid(options: Map<String, String>): Boolean {
         valid("user-weight") { weight(it) != null },
         valid("max-correction") { weight(it) != null },
         valid("noise") { n -> n.toDoubleOrNull()?.let { it in 0.0..1.0 } == true },
-        valid("keys") { it == "nine" },
+        // the union; each command checks its own: english and pinyin-glide nine only, t9 nine or 14,
+        // shuangpin 18 or nine
+        valid("keys") { it in T9Set.KEYS || it in ShuangpinSet.KEYS },
         valid("user-counts") { it in setOf("full", "none", "multi") },
         valid("short-guard") { it in ON_OFF },
+        // the taps type the 14 keys: a 14-key scheme
+        valid("taps") { runCatching { Taps.parse(it) }.isSuccess && scheme != null && scheme in T9Set.SCHEMES && T9Set.lettersOf(scheme) == NineKeyLetters.G14 },
         valid("seed") { (it.toIntOrNull() ?: -1) >= 0 },
         // a merged dictionary's file is what is stale
         valid("stale") { "merged" in options },
@@ -437,6 +453,17 @@ private class RunOptions(options: Map<String, String>) {
     /** How many whole-input readings the decoder gives the rerankers. */
     val sentences = options["sentences"]?.toInt() ?: PinyinDecoder.DEFAULT_SENTENCES
     val threads = options["threads"]?.toInt() ?: Runtime.getRuntime().availableProcessors()
+    // pinyin's: the layers' weights, a word pack, a merged dictionary (and whether it is out of date)
+    val layers = options["layers"]
+    val pack = options["pack"]
+    val merged = options["merged"]
+    val stale = "stale" in options
+
+    /** The 14 keys tapped by a simulated hand ([Taps]): the set, full pinyin, typed so. */
+    val taps = options["taps"]?.let(Taps::parse)?.also {
+        require(scheme != null && scheme in T9Set.SCHEMES && T9Set.lettersOf(scheme) == NineKeyLetters.G14) { "--taps types the 14 keys: a 14-key --scheme, not $scheme" }
+    }
+
     /** Each syllable spelt out in the preedit, as the app shows 双拼 and the nine keys. */
     val spell = scheme != null && scheme != NO_LATIN
 
@@ -447,7 +474,8 @@ private class RunOptions(options: Map<String, String>) {
     fun segmenter(data: PinyinData): Segmenter = when (scheme) {
         null -> PinyinSegmenter(fuzzy, neighbours = neighbours, latin = LatinWords.of(data.dictionary))
         NO_LATIN -> PinyinSegmenter(fuzzy, neighbours = neighbours)
-        in T9Set.SCHEMES -> T9Segmenter(fuzzy, abbreviations = scheme == T9Set.ABBREVIATING)
+        in T9Set.SCHEMES -> T9Segmenter(fuzzy, abbreviations = T9Set.abbreviates(scheme), letters = T9Set.lettersOf(scheme))
+        in ShuangpinSet.GROUPED -> ShuangpinSet.GROUPED.getValue(scheme).let { (s, letters) -> GroupedShuangpinSegmenter(s, letters, fuzzy) }
         else -> ShuangpinSegmenter(ShuangpinSet.SCHEMES.getValue(scheme), fuzzy)
     }
 }
@@ -495,22 +523,24 @@ private fun score(setPath: String, resultPath: String, baselinePath: String?, ha
     return 0
 }
 
-@Suppress("LongParameterList")
-private fun runPinyin(
-    dataPath: String, setPath: String, resultPath: String, options: RunOptions, models: Models, layers: String?, packPath: String?,
-    mergedPath: String?, stale: Boolean,
-): Int {
-    val pack = packPath?.let { path -> File(path).useLines { WordPack.parse(it, path) } }
+private fun runPinyin(dataPath: String, setPath: String, resultPath: String, options: RunOptions, models: Models): Int {
+    val mergedPath = options.merged
+    val pack = options.pack?.let { path -> File(path).useLines { WordPack.parse(it, path) } }
     val work = mergedPath?.let { Files.createTempDirectory("ime-eval-merged").toFile() }
     try {
         val merged = mergedPath?.let { compileMerged(it, loadData(dataPath), File(checkNotNull(work), "merged.ymd")) }
         // a data file each: its buffers are not to be shared
-        val results = dealt(Halves.select(readSet(setPath), options.half), options.threads, {
+        val set = Halves.select(readSet(setPath), options.half)
+        val selected = options.taps?.let { spec ->
+            Taps.convert(set, spec).also { require(it.isNotEmpty()) { "--taps: no sample of $setPath has one exact reading (a set already of codes?)" } }
+        } ?: set
+        val results = dealt(selected, options.threads, {
             val data = loadData(dataPath)
             PinyinRun(
-                data, options.segmenter(data), beam = options.beam, sentenceCount = options.sentences, layers = layers, pack = pack,
+                data, options.segmenter(data), penalties = Penalties(tap = options.taps?.let { -it.alpha } ?: Penalties().tap),
+                beam = options.beam, sentenceCount = options.sentences, layers = options.layers, pack = pack,
                 reranker = models.reranker, refiner = models.refiner,
-                merged = merged?.let { DictionaryFile.open(it, verify = false) }, mergedStale = stale,
+                merged = merged?.let { DictionaryFile.open(it, verify = false) }, mergedStale = options.stale,
             )
         }) { hand -> run(hand) }
         File(resultPath).printWriter().use { out -> results.forEach { out.println(RunResultFormat.format(it)) } }
@@ -574,19 +604,31 @@ private fun writeSet(outPath: String, header: String, samples: List<Sample>) {
     }
 }
 
-private fun writeT9Set(setPath: String, outPath: String, presses: T9Set.Presses, out: Appendable): Int {
+// [same]: the samples kept, as they were, for full pinyin to be scored on the same ones (only a sample of one
+// exact reading is typed: 简拼 and half syllables are left out, so the whole set is no like for like)
+private fun writeT9Set(setPath: String, outPath: String, presses: T9Set.Presses, keys: NineKeyLetters, out: Appendable, same: String? = null): Int {
     val samples = readSet(setPath)
-    val converted = T9Set.convert(samples, presses)
-    writeSet(outPath, "$setPath typed on the nine keys by `t9`, keys pressed ${presses.option}; samples without one exact reading left out", converted)
-    out.appendLine("${converted.size} of ${samples.size} samples typed on the nine keys")
+    val converted = T9Set.convert(samples, presses, keys)
+    same?.let { path -> writeSet(path, "$setPath: the samples `t9` typed, as they were", samples.filter { T9Set.convert(listOf(it), presses, keys).isNotEmpty() }) }
+    val on = if (keys == NineKeyLetters.STANDARD) "the nine keys" else "the 14 keys"
+    writeSet(outPath, "$setPath typed on $on by `t9`, keys pressed ${presses.option}; samples without one exact reading left out", converted)
+    out.appendLine("${converted.size} of ${samples.size} samples typed on $on")
     return 0
 }
 
-private fun writeShuangpinSet(scheme: String, setPath: String, outPath: String, out: Appendable): Int {
+// [same]: the samples kept, as they were, for the full keyboard and full pinyin to be scored on the same ones
+private fun writeShuangpinSet(scheme: String, setPath: String, outPath: String, out: Appendable, keys: NineKeyLetters? = null, same: String? = null): Int {
     val samples = readSet(setPath)
-    val converted = ShuangpinSet.convert(samples, ShuangpinSet.SCHEMES.getValue(scheme))
-    writeSet(outPath, "$setPath typed in $scheme 双拼 by `shuangpin`; samples without one exact reading left out", converted)
-    out.appendLine("${converted.size} of ${samples.size} samples typed in $scheme")
+    val s = ShuangpinSet.SCHEMES.getValue(scheme)
+    val converted = ShuangpinSet.convert(samples, s, keys)
+    same?.let { path -> writeSet(path, "$setPath: the samples `shuangpin` typed, as they were", samples.filter { ShuangpinSet.convert(listOf(it), s, keys).isNotEmpty() }) }
+    val on = when (keys) {
+        null -> ""
+        NineKeyLetters.G18 -> " on the 18 keys"
+        else -> " on the nine keys"
+    }
+    writeSet(outPath, "$setPath typed in $scheme 双拼$on by `shuangpin`; samples without one exact reading left out", converted)
+    out.appendLine("${converted.size} of ${samples.size} samples typed in $scheme$on")
     return 0
 }
 

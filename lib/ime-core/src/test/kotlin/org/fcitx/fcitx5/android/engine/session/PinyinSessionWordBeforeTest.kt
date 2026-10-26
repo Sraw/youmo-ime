@@ -69,7 +69,7 @@ class PinyinSessionWordBeforeTest {
         assertTrue("你|好" in pairs())
     }
 
-    // UAT PY-80 (F2739): 点了 pinned, 带来 the decoder's first picked over it, unpinned, 点了 picked
+    // F2739: 点了 pinned, 带来 the decoder's first picked over it, unpinned, 点了 picked
     // twice running over 带来: first after 他, the first pick after the unpin a correction too
     @Test
     fun aWordPickedTwiceAfterAnUnpinIsFirst() {

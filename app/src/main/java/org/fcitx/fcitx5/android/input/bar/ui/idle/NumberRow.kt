@@ -23,6 +23,9 @@ class NumberRow(ctx: Context, theme: Theme) : BaseKeyboard(ctx, theme, Layout) {
     private var gestureStartEvent: MotionEvent? = null
     private var collapseGestureTriggered: Boolean = false
 
+    // a swipe this far collapses the row: read once, not at each move (the bar height is a preference)
+    private val collapseDistance = dp(KawaiiBarComponent.heightDp())
+
     var onCollapseListener: (() -> Unit)? = null
 
     private fun checkGesture(ev: MotionEvent): Boolean {
@@ -32,7 +35,7 @@ class NumberRow(ctx: Context, theme: Theme) : BaseKeyboard(ctx, theme, Layout) {
             val dir = if (context.resources.configuration.layoutDirection == LAYOUT_DIRECTION_LTR) 1 else -1
             val sx = startEvent.x * dir
             val cx = ev.getX(ev.actionIndex) * dir
-            val shouldCollapse = cx > sx && abs(cx - sx) > dp(KawaiiBarComponent.HEIGHT)
+            val shouldCollapse = cx > sx && abs(cx - sx) > collapseDistance
             if (shouldCollapse) {
                 Timber.d("NumberRow: intercepted gesture from child keyboard to handle swipe")
                 resetState()

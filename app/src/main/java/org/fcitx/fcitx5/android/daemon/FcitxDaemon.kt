@@ -4,12 +4,14 @@
  */
 package org.fcitx.fcitx5.android.daemon
 
+import androidx.annotation.VisibleForTesting
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
-import org.fcitx.fcitx5.android.core.Fcitx
 import org.fcitx.fcitx5.android.core.FcitxAPI
+import org.fcitx.fcitx5.android.core.FcitxInstance
 import org.fcitx.fcitx5.android.core.FcitxLifecycle
+import org.fcitx.fcitx5.android.core.KotlinFcitx
 import org.fcitx.fcitx5.android.core.lifeCycleScope
 import org.fcitx.fcitx5.android.core.whenReady
 import org.fcitx.fcitx5.android.daemon.FcitxDaemon.connect
@@ -34,7 +36,7 @@ import kotlin.concurrent.withLock
  */
 object FcitxDaemon {
 
-    private val realFcitx by lazy { Fcitx(appContext) }
+    private val realFcitx: FcitxInstance by lazy { KotlinFcitx(appContext) }
 
     // don't leak fcitx instance
     private val fcitxImpl by lazy { PunctuationManager.forgettingOnReload(realFcitx) }
@@ -80,9 +82,17 @@ object FcitxDaemon {
     }
 
     /**
+     * Test seam: when set, [connect] hands out what it makes instead of starting the Kotlin host
+     * (KotlinFcitx), so a JVM test (Robolectric) can build the whole input method service on a fake engine.
+     */
+    @VisibleForTesting
+    var testConnection: ((String) -> FcitxConnection)? = null
+
+    /**
      * Create a connection
      */
     fun connect(name: String): FcitxConnection = lock.withLock {
+        testConnection?.let { return@withLock it(name) }
         if (name in clients)
             return@withLock clients.getValue(name)
         if (realFcitx.lifecycle.currentState == FcitxLifecycle.State.STOPPED) {
@@ -98,7 +108,7 @@ object FcitxDaemon {
      * Dispose the connection
      */
     fun disconnect(name: String): Unit = lock.withLock {
-        if (name !in clients)
+        if (testConnection != null || name !in clients)
             return
         clients -= name
         if (clients.isEmpty()) {

@@ -26,6 +26,8 @@ object EmojiCandidates {
      * [AFTER], and the emoji added, so what is listed of them is told, not worked out again.
      * None added, [candidates] is returned itself, not a copy: PinyinSession.place reuses what it
      * worked out for that list by that identity.
+     * A word [lifted] to the emoji's place (third; fourth behind a pin or behind words HabitRanker
+     * floors there, HabitRanker.LIFTED_TO) keeps it, the emoji right after it: the user's own habit before an aside (R15, user 2026-10-25).
      */
     fun <T> placed(
         candidates: List<T>,
@@ -34,12 +36,16 @@ object EmojiCandidates {
         text: (T) -> String,
         whole: (T) -> Boolean,
         phrases: (String) -> List<String> = { emptyList() },
+        lifted: (T) -> Boolean = { false },
         make: (String) -> T,
     ): Pair<List<T>, List<String>> {
         val first = of?.takeIf(whole) ?: return candidates to emptyList()
         val added = pick(text(first), emoji, phrases) { e -> candidates.any { text(it) == e } }
         if (added.isEmpty()) return candidates to added
-        val at = minOf(AFTER, candidates.size)
+        // the lifted words are one run (HabitRanker.raise): a pin before it starts it a place later,
+        // several used twice take places after it; the emoji go after the whole run, never inside it
+        var at = (AFTER..minOf(AFTER + 1, candidates.size - 1)).firstOrNull { lifted(candidates[it]) } ?: minOf(AFTER, candidates.size)
+        while (at < candidates.size && lifted(candidates[at])) at++
         return candidates.subList(0, at) + added.map(make) + candidates.subList(at, candidates.size) to added
     }
 

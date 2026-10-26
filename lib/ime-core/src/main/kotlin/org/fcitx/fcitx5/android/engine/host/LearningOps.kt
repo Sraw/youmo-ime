@@ -18,6 +18,7 @@ import org.fcitx.fcitx5.android.engine.learn.control.LexiconView
 import org.fcitx.fcitx5.android.engine.learn.control.ListedItem
 import org.fcitx.fcitx5.android.engine.learn.control.MenuItem
 import org.fcitx.fcitx5.android.engine.learn.control.WordKind
+import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
 import org.fcitx.fcitx5.android.engine.session.Offer
 import org.fcitx.fcitx5.android.engine.session.Session
 import org.fcitx.fcitx5.android.engine.user.UserModel.Entry
@@ -31,6 +32,8 @@ import java.io.IOException
  * it back.
  */
 internal class LearningOps(
+    // the session an input method types with now: a pair's keyed one while it types (KeyboardPair.sessionOf),
+    // so a long press forgets, blocks or pins what that session showed (design M4)
     private val session: (String) -> Session?,
     private val lexicon: UserLexicon,
     private val log: () -> LearnLog,
@@ -252,12 +255,16 @@ internal class LearningOps(
         append("im ").append(im).append('\n')
         val shown = s.candidates(0, REPORTED)
         val code = shown.indices.firstNotNullOfOrNull { s.why(it)?.code }
-        if (code != null) append("code ").append(code.kind).append(if (code.kind == Kinds.PREDICTION) "" else " " + code.keys).append('\n')
+        if (code != null) append("code ").append(code.kind).append(if (code.kind == Kinds.PREDICTION) "" else " " + reported(code)).append('\n')
         shown.forEachIndexed { i, c ->
             val why = s.why(i)
             append(i + 1).append(' ').append(c.text).append(' ').append(why?.tier ?: "?").append(' ').append(why?.uses ?: 0).append('\n')
         }
     }
+
+    // a grouped keyboard's codes as their keys' letters (bn ui): the report is pasted where they would read as nothing
+    private fun reported(code: Code): String =
+        Kinds.keysTag(code.kind)?.let(NineKeyLetters::grouped)?.shown(code.keys) ?: code.keys
 
     private fun overview(): LearningResult.Overview {
         val state = log().state

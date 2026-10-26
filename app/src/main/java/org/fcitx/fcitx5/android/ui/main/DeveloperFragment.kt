@@ -17,7 +17,6 @@ import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.fcitx.fcitx5.android.R
-import org.fcitx.fcitx5.android.core.data.DataManager
 import org.fcitx.fcitx5.android.daemon.FcitxDaemon
 import org.fcitx.fcitx5.android.data.clipboard.ClipboardManager
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
@@ -90,9 +89,6 @@ class DeveloperFragment : PaddingPreferenceFragment() {
                 setOnPreferenceChangeListener { _, newValue ->
                     val verbose = (newValue as? Boolean) == true
                     Timber.setupForest(verbose)
-                    FcitxDaemon.getFirstConnectionOrNull()?.runIfReady {
-                        setLogRule(verbose)
-                    }
                     true
                 }
             })
@@ -114,21 +110,6 @@ class DeveloperFragment : PaddingPreferenceFragment() {
                             context.toast(R.string.done)
                         }
                     }
-                    .show()
-            }
-            addPreference(R.string.delete_and_sync_data) {
-                AlertDialog.Builder(context)
-                    .setTitle(R.string.delete_and_sync_data)
-                    .setMessage(R.string.delete_and_sync_data_message)
-                    .setPositiveButton(android.R.string.ok) { _, _ ->
-                        lifecycleScope.launch {
-                            withContext(Dispatchers.IO) {
-                                DataManager.deleteAndSync()
-                            }
-                            context.toast(R.string.synced)
-                        }
-                    }
-                    .setNegativeButton(android.R.string.cancel, null)
                     .show()
             }
             addPreference(R.string.clear_clb_db) {

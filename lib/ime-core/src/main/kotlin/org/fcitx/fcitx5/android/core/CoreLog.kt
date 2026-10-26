@@ -26,6 +26,14 @@ object CoreLog {
     @Volatile
     var verbose: Boolean = false
 
+    /** Release-level: always passed on (the exported log keeps it), whatever [verbose] and debug logging say. */
+    @Volatile
+    var errorSink: ((String) -> Unit)? = null
+
+    fun e(message: String) {
+        errorSink?.invoke(message)
+    }
+
     inline fun d(message: () -> String) {
         sink?.invoke(message())
     }

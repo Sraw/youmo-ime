@@ -9,7 +9,7 @@ package org.fcitx.fcitx5.android.engine.learn
  * whether the text was just committed here or read back from the app, so 汪小明 typed and 汪小明 in
  * the field are one context. Of a run of Han characters, the last word of the reading [split]
  * gives it (the model's likeliest words, as 联想 reads the text before: 他点了他 ends with 他, not 了他;
- * uat-triage-pinyin T9-54), or one of the user's ([isMine]) that ends it and starts where a word of
+ * uat-triage-pinyin 原 T9-54), or one of the user's ([isMine]) that ends it and starts where a word of
  * that reading does (汪｜小明 read, 汪小明 theirs); without [split], the longest [isWord] knows,
  * else the last character. A trailing run of letters as typed (an English word, code: U-52). None ("") after punctuation, a line break, an emoji, digits, a URL or
  * an e-mail address: what follows those starts afresh. The text is [simplify]d first: the app's

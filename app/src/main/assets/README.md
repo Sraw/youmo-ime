@@ -1,4 +1,5 @@
 # Assets
 
-The entire assets will be synced to application's data directory at runtime. `descriptor.json`
-is generated at build time, saving file SHA256 for syncing.
+Packed into the APK as they are; nothing here is copied out to the data directory. `learn/` holds
+OpenCC's character lists the learning reads. fcitx's built-in data the host reads is in
+`../host-assets` (see `host-assets.md`).

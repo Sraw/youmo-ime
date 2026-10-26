@@ -15,6 +15,7 @@ import org.fcitx.fcitx5.android.core.Key
 import org.fcitx.fcitx5.android.core.KeyState
 import org.fcitx.fcitx5.android.core.KeyStates
 import org.fcitx.fcitx5.android.core.KeySym
+import org.fcitx.fcitx5.android.core.fromKeyEvent
 import org.fcitx.fcitx5.android.input.editing.DeleteSurroundingFlag
 import org.fcitx.fcitx5.android.utils.styledColor
 import splitties.dimensions.dp

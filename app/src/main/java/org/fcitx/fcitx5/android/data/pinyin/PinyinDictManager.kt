@@ -12,6 +12,7 @@ import org.fcitx.fcitx5.android.data.pinyin.dict.SourceNames
 import org.fcitx.fcitx5.android.data.pinyin.dict.TextDictionary
 import org.fcitx.fcitx5.android.engine.user.DictionaryCompiler
 import org.fcitx.fcitx5.android.engine.user.DictionaryFormat
+import org.fcitx.fcitx5.android.engine.user.ImportFiles
 import org.fcitx.fcitx5.android.engine.user.WordListFiles
 import org.fcitx.fcitx5.android.ui.main.settings.readAtMost
 import org.fcitx.fcitx5.android.utils.appContext
@@ -32,11 +33,6 @@ object PinyinDictManager {
     internal val pinyinDicDir = File(
         appContext.getExternalFilesDir(null)!!, "data/pinyin/dictionaries"
     ).also { it.mkdirs() }
-
-    // only the Sougou conversion needs it, and a test's application has none
-    private val nativeDir by lazy { File(appContext.applicationInfo.nativeLibraryDir) }
-
-    private val scel2org5 by lazy { File(nativeDir, scel2org5Name) }
 
     /** The dictionaries the user imported, on or off, by name. */
     fun listDictionaries(): List<TextDictionary> {
@@ -208,7 +204,7 @@ object PinyinDictManager {
         try {
             val words = try {
                 when (val analysis = prepared.analysis) {
-                    null -> prepared.text.useLines { ImportedDictionaries.write(it, dest) }.also { made = true }
+                    null -> prepared.text.useLines { ImportedDictionaries.write(it, dest) }.also { made = it > 0 }
                     is DictionaryFormat.Refused -> refuse(analysis.reason)
                     is DictionaryFormat.Detected -> {
                         analysis.refusedForBase?.let(::refuse)
@@ -366,30 +362,18 @@ object PinyinDictManager {
         return 0
     }
 
-    fun sougouDictConv(src: String, dest: String) {
-        runConverter(listOf(scel2org5.absolutePath, "-o", dest, src), nativeDir)
-    }
-
-    /**
-     * Runs [command] with [libraryDir] as its library path, the only variable of its environment.
-     *
-     * @throws IOException if it fails, with what it printed
-     */
-    internal fun runConverter(command: List<String>, libraryDir: File) {
-        val process = ProcessBuilder(command)
-            .redirectErrorStream(true)
-            .apply { environment().run { clear(); put("LD_LIBRARY_PATH", libraryDir.absolutePath) } }
-            .start()
+    /** A .scel file as the text dictionary the import keeps: scel2org5's output, read in Kotlin (ImportFiles.Scel). */
+    @Throws(IOException::class)
+    fun sougouDictConv(src: File, dest: File) {
+        // streamed: a cell dictionary of a million words built whole in a String is tens of MB in the keyboard's own process
         try {
-            // read through before the wait: one that fills the pipe stops until it is read
-            val output = process.inputStream.bufferedReader().use { it.readText() }
-            if (process.waitFor() != 0) throw IOException(output)
-        } finally {
-            process.destroy()
+            dest.bufferedWriter().use { ImportFiles.Scel.writeTextDictionary(src.readBytes(), it) }
+        } catch (e: IOException) {
+            dest.delete()
+            throw e
         }
     }
 
-    private const val scel2org5Name = "libscel2org5.so"
 
     /** How much of a file is read to tell it: the export's header is its first line, and a blocked word's `!` is soon there if it has one. */
     internal const val EXPORT_PEEK = 64 shl 10

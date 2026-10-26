@@ -78,7 +78,7 @@ class TableSessionUndoTest {
 
     private fun uses(keys: String, text: String) = learner.habits.uses(Code(kind, keys), Words.of(text))
 
-    // TBL-37: 山 picked, 人 put in by mistake and deleted, 山 again: still two running, 山 first
+    // 原 TBL-37: 山 picked, 人 put in by mistake and deleted, 山 again: still two running, 山 first
     @Test
     fun aDeletedPickIsTakenBackAndTheRunGoesOn() {
         val t = session()
@@ -92,7 +92,7 @@ class TableSessionUndoTest {
         assertEquals("山", t.type("kkkk").second.candidates.first())
     }
 
-    // TBL-38: 调频 off, the table's order never moves; what was deleted is no use
+    // 原 TBL-38: 调频 off, the table's order never moves; what was deleted is no use
     @Test
     fun withOrderByUseOffADeletedPickIsNoUse() {
         val t = session(orderByUse = false)

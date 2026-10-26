@@ -3,12 +3,10 @@
   <ManuallySuppressedIssues/>
   <CurrentIssues>
     <ID>ComplexCondition:IdleUi.kt:IdleUi$!fromUser || disableAnimation || (state == State.InlineSuggestion || currentState == State.InlineSuggestion) || (state == State.NumberRow || currentState == State.NumberRow)</ID>
-    <ID>ComplexCondition:KeySym.kt:KeySym.Companion$charCode != 0 &amp;&amp; // skip \t, because it's charCode is different from KeySym charCode != '\t'.code &amp;&amp; // skip \n, because fcitx wants \r for return charCode != '\n'.code &amp;&amp; // skip Android's private-use character charCode != KeyCharacterMap.HEX_INPUT.code &amp;&amp; charCode != KeyCharacterMap.PICKER_DIALOG_INPUT.code</ID>
     <ID>ComplexCondition:PopupKeyboardUi.kt:PopupKeyboardUi$newRow &lt; -2 || newRow &gt; rowCount + 1 || newColumn &lt; -2 || newColumn &gt; columnCount + 1</ID>
     <ID>CyclomaticComplexMethod:BaseKeyboard.kt:BaseKeyboard$private fun createKeyView: KeyView</ID>
     <ID>CyclomaticComplexMethod:CapabilityFlag.kt:CapabilityFlags.Companion$fun fromEditorInfo: CapabilityFlags</ID>
     <ID>CyclomaticComplexMethod:ConfigDescriptor.kt:ConfigDescriptor.Companion$override fun parse: Either&lt;ParseException, ConfigDescriptor&lt;*, *&gt;&gt;</ID>
-    <ID>CyclomaticComplexMethod:DataManager.kt:DataManager$fun sync</ID>
     <ID>CyclomaticComplexMethod:EditingSessionOverRealEditorTest.kt:EditingSessionOverRealEditorTest$@Test fun randomSessions</ID>
     <ID>CyclomaticComplexMethod:FcitxInputMethodService.kt:FcitxInputMethodService$private fun handleFcitxEvent</ID>
     <ID>CyclomaticComplexMethod:PreferenceScreenFactory.kt:PreferenceScreenFactory$private fun general</ID>
@@ -19,7 +17,6 @@
     <ID>LongMethod:ConfigDescriptor.kt:ConfigDescriptor.Companion$override fun parse: Either&lt;ParseException, ConfigDescriptor&lt;*, *&gt;&gt;</ID>
     <ID>LongMethod:CustomGestureView.kt:CustomGestureView$@SuppressLint("ClickableViewAccessibility") override fun onTouchEvent: Boolean</ID>
     <ID>LongMethod:CustomThemeActivity.kt:CustomThemeActivity$override fun onCreate</ID>
-    <ID>LongMethod:DataManager.kt:DataManager$fun sync</ID>
     <ID>LongMethod:PreferenceScreenFactory.kt:PreferenceScreenFactory$private fun general</ID>
     <ID>LoopWithTooManyJumpStatements:GridDecoration.kt:GridDecoration$for</ID>
     <ID>NestedBlockDepth:FcitxInputMethodService.kt:FcitxInputMethodService$private fun handleFcitxEvent</ID>

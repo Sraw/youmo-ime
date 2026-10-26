@@ -182,4 +182,32 @@ class T9SegmenterTest {
         assertTrue(T9Segmenter.isKey('H') && T9Segmenter.isKey('4'))
         assertFalse(T9Segmenter.isKey('h') || T9Segmenter.isKey('1'))
     }
+
+    // the 14 keys (design §5.1): QW ER TY UI OP / AS DF GH JK L / ZX CV BN M, each key its code
+    private val g14 = T9Segmenter(abbreviations = false, letters = NineKeyLetters.G14)
+
+    @Test
+    fun onTheFourteenKeysEachKeyIsItsLettersAndNoInitialIsRead() {
+        val g = g14.segment(g14("bn ui gh as op"))
+        assertTrue(g.read(0, 2).toString(), setOf("ni", "bu", "bi").all { it in g.read(0, 2) })
+        assertTrue(setOf("hao", "gao").all { it in g.read(2, 5) })
+        // no 简拼 beside a syllable
+        assertTrue(g.read(0, 1, Kind.INITIAL).isEmpty())
+        // half a syllable at the end: GH on its way to hao, gao
+        assertTrue(setOf("hao", "gao").all { it in g14.segment(g14("bn ui gh")).read(2, 3, Kind.PARTIAL) })
+        // üe typed ue as well: L UI ER is lve, 略
+        assertTrue("lve" in g14.segment(g14("l ui er")).read(0, 3))
+        // UI alone starts no syllable
+        val ui = g14.segment(g14("ui"))
+        assertTrue(listOf(Kind.SYLLABLE, Kind.INITIAL, Kind.PARTIAL, Kind.EXTENDED).all { ui.read(0, 1, it).isEmpty() })
+    }
+
+    @Test
+    fun onTheFourteenKeysTheCodesAreTheKeysNotTheDigits() {
+        assertTrue(g14.isKey(g14Code('b')) && g14.isKey('H') && !g14.isKey('2'))
+        assertTrue(g14.reads(g14Code('m')) && !g14.reads('6') && !g14.reads('1'))
+        assertTrue(segmenter.isKey('2') && !segmenter.isKey(g14Code('b')))
+        assertEquals("ub", g14.asTyped(g14("ui bn")))
+        assertEquals("744h", segmenter.asTyped("744H"))
+    }
 }

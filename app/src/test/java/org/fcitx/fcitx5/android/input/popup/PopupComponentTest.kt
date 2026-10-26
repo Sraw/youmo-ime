@@ -126,6 +126,19 @@ class PopupComponentTest {
         assertEquals(listOf("1", "2", "3", "4", "5"), PopupComponent.explicitLabels(five) { "x" }.toList())
     }
 
+    // the 14 keys': a mark in the row before the symbols as its key's corner shows it; letters and digits as they are
+    @Test
+    fun aMarkInTheRowIsShownMappedItsLettersAndDigitsNot() {
+        val map = mapOf("!" to "！", "1" to "一", "c" to "C", "%" to "％")
+        val cv = KeyDef.Popup.Keyboard.Explicit(arrayOf("C", "V", "!", "c", "v", "%"), symbolsFrom = 5, inRow = 2)
+        assertEquals(listOf("C", "V", "！", "c", "v", "％"), PopupComponent.explicitLabels(cv) { map[it] ?: it }.toList())
+        val qw = KeyDef.Popup.Keyboard.Explicit(arrayOf("Q", "W", "1", "q", "w"), symbolsFrom = 5, inRow = 2)
+        assertEquals(listOf("Q", "W", "1", "q", "w"), PopupComponent.explicitLabels(qw) { map[it] ?: it }.toList())
+        // committed as they are: shown so
+        val asIs = KeyDef.Popup.Keyboard.Explicit(arrayOf("!", "%"), asIs = true)
+        assertEquals(listOf("!", "%"), PopupComponent.explicitLabels(asIs) { map[it] ?: it }.toList())
+    }
+
     // what a key's popup is made with goes on to the keys shown: 1's committed as they are, 九键's
     // symbols in rows of their own
     @Test

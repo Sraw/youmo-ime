@@ -80,7 +80,7 @@ class KeyboardPreviewUi(override val ctx: Context, val theme: Theme) : Ui {
     private val keyboardBottomFlush = keyboardPrefs.keyboardBottomFlush
     private val keyBorder by ThemeManager.prefs.keyBorder
 
-    private val navbarBkgChangeListener = ManagedPreference.OnChangeListener<Any> { _, _ ->
+    private val sizeChangeListener = ManagedPreference.OnChangeListener<Any> { _, _ ->
         recalculateSize()
     }
 
@@ -88,8 +88,8 @@ class KeyboardPreviewUi(override val ctx: Context, val theme: Theme) : Ui {
         scaleType = ImageView.ScaleType.CENTER_CROP
     }
 
-    // the bar and the row above it for the code being typed
-    private val barHeight = ctx.dp(KawaiiBarComponent.HEIGHT + KawaiiBarComponent.PREEDIT_HEIGHT)
+    // the bar and the row above it for the code being typed; read each time, as 候选字号 can change on this page
+    private val barHeight get() = ctx.dp(KawaiiBarComponent.heightDp() + KawaiiBarComponent.preeditHeight())
     private val fakeKawaiiBar = view(::View)
 
     private var keyboardWidth = -1
@@ -114,8 +114,12 @@ class KeyboardPreviewUi(override val ctx: Context, val theme: Theme) : Ui {
             super.onAttachedToWindow()
             recalculateSize()
             onSizeMeasured?.invoke(intrinsicWidth, intrinsicHeight)
-            navbarBackground.registerOnChangeListener(navbarBkgChangeListener)
-            keyboardBottomFlush.registerOnChangeListener(navbarBkgChangeListener)
+            navbarBackground.registerOnChangeListener(sizeChangeListener)
+            keyboardBottomFlush.registerOnChangeListener(sizeChangeListener)
+            // the docked handle is counted in the height cap (keyboardWindowAspectRatio)
+            ThemeManager.prefs.alwaysShowHandle.registerOnChangeListener(sizeChangeListener)
+            // the bar's height follows the candidate text size (KawaiiBarComponent.heightDp)
+            ThemeManager.prefs.candidateTextSize.registerOnChangeListener(sizeChangeListener)
         }
 
         override fun onConfigurationChanged(newConfig: Configuration?) {
@@ -125,8 +129,10 @@ class KeyboardPreviewUi(override val ctx: Context, val theme: Theme) : Ui {
         }
 
         override fun onDetachedFromWindow() {
-            navbarBackground.unregisterOnChangeListener(navbarBkgChangeListener)
-            keyboardBottomFlush.unregisterOnChangeListener(navbarBkgChangeListener)
+            navbarBackground.unregisterOnChangeListener(sizeChangeListener)
+            keyboardBottomFlush.unregisterOnChangeListener(sizeChangeListener)
+            ThemeManager.prefs.alwaysShowHandle.unregisterOnChangeListener(sizeChangeListener)
+            ThemeManager.prefs.candidateTextSize.unregisterOnChangeListener(sizeChangeListener)
             super.onDetachedFromWindow()
         }
     }
@@ -159,6 +165,7 @@ class KeyboardPreviewUi(override val ctx: Context, val theme: Theme) : Ui {
         val (w, h) = keyboardWindowAspectRatio()
         keyboardWidth = w
         keyboardHeight = h
+        fakeKawaiiBar.updateLayoutParams<ConstraintLayout.LayoutParams> { height = barHeight }
         fakeKeyboardWindow.updateLayoutParams<ConstraintLayout.LayoutParams> {
             height = keyboardHeight
             horizontalMargin = keyboardSidePaddingPx

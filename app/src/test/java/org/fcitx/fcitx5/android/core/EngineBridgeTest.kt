@@ -20,8 +20,6 @@ import org.fcitx.fcitx5.android.engine.learn.control.LearningResult
 import org.fcitx.fcitx5.android.engine.phrase.CustomPhrases
 import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
 import org.fcitx.fcitx5.android.engine.pinyin.ShuangpinScheme
-import org.fcitx.fcitx5.android.engine.session.Choice
-import org.fcitx.fcitx5.android.engine.session.Offer
 import org.fcitx.fcitx5.android.engine.session.Snapshot
 import org.fcitx.fcitx5.android.utils.appContext
 import org.junit.Assert.assertEquals
@@ -267,92 +265,61 @@ class EngineBridgeTest {
     }
 
     @Test
-    fun theAddonIsSentThePageShownAndAtLeastAChunk() {
-        fun shown(first: Int, count: Int, handled: Boolean = true) = Snapshot(
-            commit = "", preedit = "n", candidates = List(count) { "$it" }, page = 0,
-            hasPreviousPage = first > 0, hasNextPage = true, handled = handled, predicting = false, first = first,
-        )
-        assertEquals(EngineBridge.CHUNK, EngineBridge.candidatesSent(EngineEvent.CHAR, shown(0, 5)))
-        // from the page's first: those before it are not sent again
-        assertEquals(EngineBridge.CHUNK, EngineBridge.candidatesSent(EngineEvent.PAGE_DOWN, shown(40, 5)))
-        val longPage = EngineBridge.CHUNK + 8
-        assertEquals(longPage, EngineBridge.candidatesSent(EngineEvent.PAGE_DOWN, shown(40, longPage)))
-        assertEquals(EngineBridge.CHUNK, EngineBridge.candidatesSent(EngineEvent.REFINE, shown(0, 5)))
-        // nothing to show, or a slice of refining that changed nothing: the addon shows none
-        assertEquals(0, EngineBridge.candidatesSent(EngineEvent.CHAR, shown(0, 0)))
-        assertEquals(0, EngineBridge.candidatesSent(EngineEvent.REFINE, shown(0, 5, handled = false)))
-    }
-
-    @Test
-    fun theCandidatesSentRunFromThePagesFirstAsTheAddonNumbersThem() {
-        val s = Snapshot(
-            commit = "", preedit = "n", candidates = listOf("40", "41"), page = 8, hasPreviousPage = true,
-            hasNextPage = true, handled = true, predicting = false, total = 50, first = 40,
-        )
-        val asked = ArrayList<Pair<Int, Int>>()
-        val sent = EngineBridge.result(EngineEvent.PAGE_DOWN, s) { from, count ->
-            asked += from to count
-            (from until minOf(from + count, s.total)).map { Choice("$it") }
-        }
-        assertEquals(listOf(40 to EngineBridge.CHUNK), asked)
-        // EngineCandidateList's offset_: the first sent is the page's first, index 40 of all
-        assertEquals(40, sent.first)
-        assertEquals(listOf("40", "41"), sent.candidates.take(2))
-        assertEquals(10, sent.candidates.size)
-        assertEquals(2, sent.shown)
-    }
-
-    @Test
-    fun theCursorGoesToTheAddonInCodePointsNotUtf16Units() {
-        fun cursor(preedit: String, at: Int) = EngineBridge.result(
-            EngineEvent.CHAR,
-            Snapshot(
-                commit = "", preedit = preedit, candidates = emptyList(), page = 0, hasPreviousPage = false,
-                hasNextPage = false, handled = true, predicting = false, cursor = at,
-            ),
-        ) { _, _ -> emptyList() }.cursor
-        // 𠀀 (U+20000) is two UTF-16 units, one code point to the addon
-        assertEquals(2, cursor("𠀀ab", 3))
-        assertEquals(3, cursor("😀😀c", 5))
-        // none past the BMP: as it was
-        assertEquals(1, cursor("ab", 1))
-        // no cursor stays none; past the end, at the end
-        assertEquals(-1, cursor("𠀀a", -1))
-        assertEquals(2, cursor("𠀀a", 10))
-    }
-
-    @Test
     fun aRefineReadsAsRefiningWhileEachOfItsSlicesRuns() {
         fun refines(refines: Boolean) = Snapshot(
             commit = "", preedit = "n", candidates = listOf("你"), page = 0, hasPreviousPage = false,
             hasNextPage = false, handled = true, predicting = false, refines = refines,
         )
-        val fetch = { _: Int, _: Int -> listOf(Choice("你")) }
         val during = ArrayList<Boolean>()
-        // a key, then the slices the addon sends for it, the last with nothing left to refine
-        EngineBridge.answer(Engines.PINYIN, EngineEvent.CHAR, { refines(true) }, fetch)
+        // a key, then the slices the host sends for it, the last with nothing left to refine
+        EngineBridge.answer(Engines.PINYIN, EngineEvent.CHAR) { refines(true) }
         assertTrue(EngineBridge.refining)
-        EngineBridge.answer(Engines.PINYIN, EngineEvent.REFINE, { during += EngineBridge.refining; refines(true) }, fetch)
-        EngineBridge.answer(Engines.PINYIN, EngineEvent.REFINE, { during += EngineBridge.refining; refines(false) }, fetch)
-        // as EngineEvalRunner reads it off the fcitx thread while a slice runs
+        EngineBridge.answer(Engines.PINYIN, EngineEvent.REFINE) { during += EngineBridge.refining; refines(true) }
+        EngineBridge.answer(Engines.PINYIN, EngineEvent.REFINE) { during += EngineBridge.refining; refines(false) }
+        // as EngineEvalRunner reads it off the host thread while a slice runs
         assertEquals(listOf(true, true), during)
         assertFalse(EngineBridge.refining)
-        // the addon sends no refine after a failure
-        EngineBridge.answer(Engines.PINYIN, EngineEvent.CHAR, { refines(true) }, fetch)
+        // the host sends no refine after a failure, and the failure is thrown on for its router
+        EngineBridge.answer(Engines.PINYIN, EngineEvent.CHAR) { refines(true) }
+        EngineBridge.syllablesState.value = EngineBridge.SyllableState(Engines.PINYIN, true, listOf("ni"), 1)
         assertThrows(IllegalStateException::class.java) {
-            EngineBridge.answer(Engines.PINYIN, EngineEvent.REFINE, { error("a bug") }, fetch)
+            EngineBridge.answer(Engines.PINYIN, EngineEvent.REFINE) { error("a bug") }
         }
         assertFalse(EngineBridge.refining)
+        // nor syllables to take after it: a tap would send an id the engine drops
+        assertEquals(EngineBridge.SyllableState(Engines.PINYIN), EngineBridge.syllables.value)
+        EngineBridge.syllablesState.value = EngineBridge.SyllableState()
     }
 
+    // written on each answer, and a hand-back writes the empty state once
     @Test
-    fun eachOfferIsTheBitTheAddonReadsForIt() {
-        // androidengine_public.h's EngineOffer
-        assertEquals(1, EngineBridge.offerBits(setOf(Offer.FORGET)))
-        assertEquals(2, EngineBridge.offerBits(setOf(Offer.PIN)))
-        assertEquals(4, EngineBridge.offerBits(setOf(Offer.UNPIN)))
-        assertEquals(8, EngineBridge.offerBits(setOf(Offer.BLOCK)))
-        assertEquals(2 or 8, EngineBridge.offerBits(setOf(Offer.PIN, Offer.BLOCK)))
+    fun eachInputMethodsAnswerTellsItsSyllablesAndAHandBackClearsThem() {
+        fun typed(preedit: String, syllables: List<String>, id: Int = 0, handled: Boolean = true) = Snapshot(
+            commit = "", preedit = preedit, candidates = emptyList(), page = 0, hasPreviousPage = false,
+            hasNextPage = false, handled = handled, predicting = false, syllables = syllables, syllablesId = id,
+        )
+        try {
+            // 九键 as before
+            EngineBridge.answer(Engines.T9, EngineEvent.CHAR) { typed("64", listOf("ni", "mi"), 1) }
+            assertEquals(EngineBridge.SyllableState(Engines.T9, true, listOf("ni", "mi"), 1), EngineBridge.syllables.value)
+            // the 14 keys, which are pinyin's: no gate on which keys typed
+            EngineBridge.answer(Engines.PINYIN, EngineEvent.CHAR) { typed("bn", listOf("bu", "nu"), 2) }
+            assertEquals(EngineBridge.SyllableState(Engines.PINYIN, true, listOf("bu", "nu"), 2), EngineBridge.syllables.value)
+            // a refine that changed nothing keeps them
+            EngineBridge.answer(Engines.PINYIN, EngineEvent.REFINE) { typed("", emptyList(), handled = false) }
+            assertEquals(listOf("bu", "nu"), EngineBridge.syllables.value.syllables)
+            // one that did, tells
+            EngineBridge.answer(Engines.PINYIN, EngineEvent.REFINE) { typed("bn", listOf("nu"), 3) }
+            assertEquals(EngineBridge.SyllableState(Engines.PINYIN, true, listOf("nu"), 3), EngineBridge.syllables.value)
+            // handed back to 全拼, which offers none: cleared
+            EngineBridge.answer(Engines.PINYIN, EngineEvent.CHAR) { typed("n", emptyList()) }
+            assertEquals(EngineBridge.SyllableState(Engines.PINYIN, true), EngineBridge.syllables.value)
+            // another input method after: its own, empty
+            EngineBridge.answer(Engines.WUBI, EngineEvent.RESET) { typed("", emptyList()) }
+            assertEquals(EngineBridge.SyllableState(Engines.WUBI), EngineBridge.syllables.value)
+        } finally {
+            EngineBridge.syllablesState.value = EngineBridge.SyllableState()
+        }
     }
 
     // the app for its files directory
@@ -384,6 +351,21 @@ class EngineBridgeTest {
                 assertFalse(Engines.HANDWRITING in EngineBridge.unloadable)
             } finally {
                 EngineBridge.unloadable.clear()
+            }
+        }
+
+        // Robolectric: a latch is said on the keyboard (EngineNotices)
+        @Test
+        fun anInputMethodThatCannotLoadAnswersNothingAndItsSyllablesGo() {
+            EngineBridge.unloadable.clear()
+            try {
+                assertThrows(FileNotFoundException::class.java) { EngineBridge.unloadable.call("mine") { throw FileNotFoundException("mine") } }
+                EngineBridge.syllablesState.value = EngineBridge.SyllableState("mine", true, listOf("ni", "mi"), 4)
+                assertEquals(null, EngineBridge.answer("mine", EngineEvent.CHAR) { error("not called") })
+                assertEquals(EngineBridge.SyllableState("mine"), EngineBridge.syllables.value)
+            } finally {
+                EngineBridge.unloadable.clear()
+                EngineBridge.syllablesState.value = EngineBridge.SyllableState()
             }
         }
 

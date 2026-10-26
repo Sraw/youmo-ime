@@ -66,7 +66,7 @@ class Backup(
  * 不再联想, pins and whatever rows a later build keeps included), then the words added by hand
  * ([ADDED]) and blocked ([BLOCKED]), which live in their own lists, not the log. Never the clipboard.
  * Last, always and once, an [END] holding the file's length in bytes, itself included: a file cut
- * at a record's boundary, or one missing a record or given one more, does not read (WD-10d). A
+ * at a record's boundary, or one missing a record or given one more, does not read (原 WD-10d). A
  * file without it, a draft build's included, is refused.
  *
  * Evolves as the log does: version 1 for good, new record types or fields appended; one this
@@ -138,7 +138,7 @@ object LearnBackup {
         val state = LearnState()
         val reader = LearnRecords.Reader()
         // a log stops at a record cut short (the app killed while writing), but a backup is written
-        // whole: one that ends before its last byte was cut (a copy broken off), never merged in part (WD-10d)
+        // whole: one that ends before its last byte was cut (a copy broken off), never merged in part (原 WD-10d)
         var lastType: Byte = 0
         var ended = -1
         val whole = FORMAT.read(bytes) { type, input ->

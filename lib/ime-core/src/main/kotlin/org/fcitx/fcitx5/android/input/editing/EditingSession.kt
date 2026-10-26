@@ -179,6 +179,11 @@ class EditingSession(
         checkThread()
         if (!editor.isAvailable) return
         val lastSelection = selection.latest
+        // Nothing to change, nothing sent: an empty batch is still two calls on the editor. The
+        // context left behind on an app switch sends its empty preedit as the next app binds, and
+        // whether that lands before or after the bind is the system's timing.
+        val cursorMoves = text.length > 0 && text.cursor >= 0 && text.cursor + composing.start != lastSelection.start
+        if (composingText.spanEquals(text) && !cursorMoves) return
         editor.batchEdit {
             if (composingText.spanEquals(text)) {
                 // Same text: only the cursor can have moved, and only a valid one in a

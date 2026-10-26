@@ -23,7 +23,7 @@ internal object TableHabitOrder {
      * [original] (positions into what was found, the table's order, and with 调频 the models'
      * weighing of its 重码) under [here], with what each was ranked by its text; null where
      * nothing is learned. Only the first [reach] are the 重码 it may move: none where the code is
-     * kept in order (一二级简码, TBL-13), never the longer codes after them. [own] tells a position
+     * kept in order (一二级简码, 原 TBL-13), never the longer codes after them. [own] tells a position
      * of the table's own entry from a word from outside it, [text] its text.
      */
     fun order(

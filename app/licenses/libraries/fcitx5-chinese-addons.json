@@ -1,10 +1,9 @@
 {
     "uniqueId": "fcitx/fcitx5-chinese-addons",
-    "artifactVersion": "5.1.13",
-    "description": "Chinese related addon for fcitx5",
+    "artifactVersion": "0d3fd040",
+    "description": "Chinese related addon for fcitx5. Its punctuation, fullwidth, chttrans and scel2org5 are ported to Kotlin; its punc.mb.zh_CN ships unchanged in the app's assets under pkgdata/.",
     "name": "fcitx/fcitx5-chinese-addons",
     "website": "https://github.com/fcitx/fcitx5-chinese-addons",
-    "tag": "native",
     "licenses": [
         "GPL-2.0-or-later",
         "LGPL-2.1-or-later"

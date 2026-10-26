@@ -21,6 +21,7 @@ import org.fcitx.fcitx5.android.engine.learn.control.LearningResult
 import org.fcitx.fcitx5.android.engine.learn.control.ListedItem
 import org.fcitx.fcitx5.android.engine.learn.control.MenuItem
 import org.fcitx.fcitx5.android.engine.learn.control.WordKind
+import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
 import org.fcitx.fcitx5.android.engine.table.TableUser.TableLog
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -207,6 +208,17 @@ class EnginesLearningTest : EnginesFixture() {
         assertTrue("拟" in engines.texts())
         // not offered: done nothing
         assertEquals(LearningResult.Unavailable, engines.op(LearningOp.Unpin(1, "拟")))
+        engines.close()
+    }
+
+    @Test
+    fun aPressForAKeyboardNeverMadeIsNotSent() {
+        // a pair made its keyboard on the press, typed nothing, and the act read as done
+        val engines = Engines(::load, null, warmUps = inPlace)
+        val before = loaded.toList()
+        assertFalse(engines.pressShown(Engines.SHUANGPIN, EngineEvent.UNPIN, 0))
+        // nor was the keyboard made for it: no data read in for a session
+        assertEquals(before, loaded)
         engines.close()
     }
 
@@ -564,6 +576,50 @@ class EnginesLearningTest : EnginesFixture() {
         engines.type(Engines.PINYIN, "hao")
         engines.onEvent(Engines.PINYIN, EngineEvent.CHAR, ' '.code)
         assertTrue("拟" in engines.texts())
+        engines.close()
+    }
+
+    // design M4: on the 14 keys a long press acts on their session, what they show; the report spells their keys
+    @Test
+    fun onTheFourteenKeysALongPressActsOnWhatTheyShow() {
+        val engines = engines()
+        val ni = NineKeyLetters.G14.typings("ni").single()
+        repeat(2) {
+            engines.afresh()
+            engines.type(Engines.PINYIN, ni)
+            engines.onEvent(Engines.PINYIN, EngineEvent.PICK, engines.texts().indexOf("拟"))
+        }
+        // the full keyboard's pinyin learned nothing of it (qk: apart from qp)
+        engines.afresh()
+        assertEquals(0, engines.type(Engines.PINYIN, "ni").candidates.indexOf("你"))
+        engines.afresh()
+        engines.type(Engines.PINYIN, ni)
+        val at = engines.texts().indexOf("拟")
+        val menu = engines.op(LearningOp.Menu(at, "拟")) as LearningResult.Menu
+        assertEquals(Kinds.keys(NineKeyLetters.G14.tag()), menu.why!!.code!!.kind)
+        val report = (engines.op(LearningOp.Report(at, "拟")) as LearningResult.Text).text
+        assertTrue(report, " bn ui\n" in report)
+        assertTrue(report, report.none(NineKeyLetters.G14::isCode))
+        assertTrue(engines.op(LearningOp.Delete(at, "拟")) is LearningResult.Done)
+        assertTrue("拟" !in engines.onEvent(Engines.PINYIN, EngineEvent.CHAR, Keyboard.AGAIN).candidates.take(at + 1).drop(at))
+        engines.close()
+    }
+
+    // review M1: a 14 keys' commit deleted at once is the 14 keys' session's to take back (U-03), not learned
+    @Test
+    fun onTheFourteenKeysACommitDeletedAtOnceIsNotLearned() {
+        val engines = engines()
+        val ni = NineKeyLetters.G14.typings("ni").single()
+        repeat(2) {
+            // a field whose text is known: what is deleted of a commit can be taken back
+            engines.onEvent(Engines.PINYIN, EngineEvent.RESET, 0)
+            engines.context(Engines.PINYIN, "给", learnFlags = 0)
+            engines.type(Engines.PINYIN, ni)
+            assertEquals("拟", engines.onEvent(Engines.PINYIN, EngineEvent.PICK, engines.texts().indexOf("拟")).commit)
+            assertFalse(engines.onEvent(Engines.PINYIN, EngineEvent.BACKSPACE, 0).handled)
+        }
+        engines.afresh()
+        assertEquals("你", engines.type(Engines.PINYIN, ni).candidates.first())
         engines.close()
     }
 

@@ -324,10 +324,16 @@ class PopupComponent :
     companion object {
         /**
          * [keyboard]'s labels, those set apart ([KeyDef.Popup.Keyboard.Explicit.symbolsFrom]) as
-         * [mapped]: shown as the engine will type them, as a Preset's are.
+         * [mapped]: shown as the engine will type them, as a Preset's are. So is a mark in the row
+         * before them (the 14 keys' corner, as its key shows it); its letters and digits are as
+         * they are, and nothing of one committed as it is ([KeyDef.Popup.Keyboard.Explicit.asIs]).
          */
         internal fun explicitLabels(keyboard: KeyDef.Popup.Keyboard.Explicit, mapped: (String) -> String): Array<String> =
-            Array(keyboard.items.size) { if (it >= keyboard.symbolsFrom) mapped(keyboard.items[it]) else keyboard.items[it] }
+            Array(keyboard.items.size) {
+                val item = keyboard.items[it]
+                val maps = !keyboard.asIs && (it >= keyboard.symbolsFrom || item.none(Char::isLetterOrDigit))
+                if (maps) mapped(item) else item
+            }
 
         /**
          * Space each side of the bubble's text, in dp; a long press's keys leave as much each side

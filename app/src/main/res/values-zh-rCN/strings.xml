@@ -17,8 +17,6 @@
     <string name="add">添加</string>
     <string name="edit">编辑</string>
     <string name="undo">撤销</string>
-    <string name="delete_and_sync_data">删除并同步运行数据</string>
-    <string name="delete_and_sync_data_message">删除当前的数据目录，并从应用附带的资源中同步</string>
     <string name="enable_ime">启用输入法</string>
     <string name="enable_ime_hint">在“语言和输入法设置”中启用&lt;b>%1$s&lt;/b></string>
     <string name="select_ime">选择输入法</string>
@@ -32,7 +30,6 @@
     <string name="dict_already_exists">词库已存在</string>
     <string name="invalid_dict">词典类型无效</string>
     <string name="whether_import_dict">您想导入这个词库吗？</string>
-    <string name="synced">已同步！</string>
     <string name="loading">加载中</string>
     <string name="clipboard_listening">记录剪贴板历史</string>
     <string name="clipboard_limit">剪贴板历史记录上限</string>
@@ -190,7 +187,7 @@
     <string name="exception_user_data_metadata">找不到用户数据的元数据</string>
     <string name="exception_user_data_package_name_mismatch">用户数据与当前应用不匹配</string>
     <string name="user_data_imported">已导入来自 %1$s 的用户数据，正在重启…</string>
-    <string name="confirm_import_user_data">导入用户数据会覆盖设置、自定义短语和标点，学到的和词库与手机上现有的合并；重启应用后生效。继续吗？</string>
+    <string name="confirm_import_user_data">导入用户数据会覆盖设置、自定义短语、标点和剪贴板，学到的和词库与手机上现有的合并；重启应用后生效。继续吗？</string>
     <string name="clear_clp_db_confirm">剪贴板数据库将会被完全清空，包括已置顶的条目。继续吗？</string>
     <string name="clear_clp_db_not_all">部分剪贴板数据未能清除，可能仍然存在，或在下次启动时重新出现；再次清空，或重启后再清空，或许有效。</string>
     <string name="expand_keypress_area">将按键范围扩展至边缘</string>
@@ -272,6 +269,9 @@
     <string name="a11y_key_space_with_ime">空格，%1$s</string>
     <string name="a11y_key_switch_language">切换语言</string>
     <string name="a11y_key_nine_language">中/英切换</string>
+    <string name="a11y_key_separator">分词</string>
+    <string name="a11y_key_grouped">%1$s，%2$s</string>
+    <string name="a11y_syllable">拼音 %1$s</string>
     <string name="a11y_key_number_pad">数字键盘</string>
     <string name="a11y_key_emoji">表情</string>
     <string name="voice_input">语音输入</string>
@@ -310,6 +310,8 @@
     <string name="learning_why_pinned">固定了：在这串键下总排第一</string>
     <string name="learning_why_first_here">在这个前文后面连着选过两次</string>
     <string name="learning_why_across">你常改选它、最近用得多</string>
+    <string name="learning_why_floored">在简拼下改选过它</string>
+    <string name="learning_why_lifted">这种键盘上打全时常选它</string>
     <string name="learning_why_mine">你的词</string>
     <string name="learning_why_imported">来自导入的词</string>
     <string name="learning_why_dictionary">词库自带的顺序</string>
@@ -356,6 +358,8 @@
     <string name="learning_kind_full">全拼</string>
     <string name="learning_kind_shuangpin">双拼</string>
     <string name="learning_kind_nine_keys">九键</string>
+    <string name="learning_kind_with_scheme">%1$s · %2$s</string>
+    <string name="learning_kind_keys14">14 键</string>
     <string name="learning_kind_table">码表</string>
     <string name="learning_kind_handwriting">手写</string>
     <string name="learning_clear_learned">清空学到的</string>
@@ -498,6 +502,7 @@
     <string name="im_pinyin">拼音</string>
     <string name="im_shuangpin">双拼</string>
     <string name="im_t9">九键拼音</string>
+    <string name="im_pinyin_keys">拼音 14 键</string>
     <string name="im_wubi">五笔</string>
     <string name="im_cangjie">仓颉</string>
     <string name="im_ziranma">自然码</string>
@@ -532,6 +537,19 @@
     <string name="t9_multi_tap_fast">快（0.4 秒）</string>
     <string name="t9_multi_tap_medium">中（0.6 秒）</string>
     <string name="t9_multi_tap_slow">慢（0.9 秒）</string>
+    <string name="pinyin_keyboard">键盘</string>
+    <string name="pinyin_keyboard_summary">屏幕上打拼音用的键盘。实体键盘仍按全拼打。</string>
+    <string name="pinyin_keyboard_full">全键盘</string>
+    <string name="pinyin_keyboard_14">14 键</string>
+    <string name="shuangpin_keyboard">键盘</string>
+    <string name="shuangpin_keyboard_summary">屏幕上打双拼用的键盘，每个方案都能用。九键上重码很多，要多选几次。实体键盘仍按全键盘打。</string>
+    <string name="shuangpin_keyboard_18">18 键</string>
+    <string name="shuangpin_keyboard_nine">九键</string>
+    <string name="learning_kind_shuangpin_keys18">双拼 18 键</string>
+    <string name="learning_kind_shuangpin_nine">九键双拼</string>
+    <string name="im_shuangpin_keys18">双拼 18 键</string>
+    <string name="im_shuangpin_nine">九键双拼</string>
+    <string name="popup_overrides_code_rejected">%1$s 是键盘内部用的按键码，不能设成按键字符。</string>
     <string name="t9_english_typing">九键英文打法</string>
     <string name="t9_english_typing_summary">预测：每个键可以是它的任一个字母，由输入法猜出整个词（4663 是 good、home、gone）；连按：快速再按同一个键是它的下一个字母。网址、邮箱和不要联想的输入框总是连按</string>
     <string name="t9_english_predictive">预测</string>
@@ -788,4 +806,28 @@
         <item quantity="other">撤掉了 %1$d 个导入的词</item>
     </plurals>
     <string name="import_restore_failed">没能撤销，这批词没有恢复</string>
+    <!-- the Kotlin host's texts, fcitx's gettext ones (fcitx5, chinese-addons and our po files) -->
+    <string name="host_default_group">默认</string>
+    <string name="host_half">（半角）</string>
+    <string name="host_offer_forget">忘记词汇</string>
+    <string name="host_offer_pin">以自定义词组的方式置顶</string>
+    <string name="host_offer_delete_phrase">从自定义词组中删除</string>
+    <string name="host_offer_block">不再显示这个词</string>
+    <string name="host_tip_punctuation_enabled">标点: 已启用全角标点。</string>
+    <string name="host_tip_punctuation_disabled">标点: 全角标点已禁用。</string>
+    <string name="host_tip_traditional">切换到繁体中文: 已启用繁体中文。</string>
+    <string name="host_tip_simplified">切换到简体中文: 已启用简体中文。</string>
+    <string name="host_quick_phrase_aux">"快速输入: "</string>
+    <string name="host_unicode_aux">Unicode：</string>
+    <string name="host_unicode_hint">(输入编码或者描述来搜索 Unicode 字符)</string>
+    <string name="host_cjk_ideograph" formatted="false">中日韩统一表意文字-%X</string>
+    <string name="host_hangul_syllable" formatted="false">韩文音节 %s</string>
+    <string name="host_non_private_high_surrogate">&lt;非专用高半代理区></string>
+    <string name="host_private_high_surrogate">&lt;专用高半代理区></string>
+    <string name="host_low_surrogate">&lt;低半代理区></string>
+    <string name="host_private_use">&lt;专用区></string>
+    <string name="host_tangut_ideograph" formatted="false">西夏文表意文字-%X</string>
+    <string name="host_plane15_private_use">&lt;15 号平面专用区></string>
+    <string name="host_plane16_private_use">&lt;16 号平面专用区></string>
+    <string name="host_not_assigned">&lt;未指派></string>
 </resources>

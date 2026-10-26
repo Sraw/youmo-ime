@@ -424,7 +424,7 @@ class HandwritingSession(
         }
         // its words as the decoder read them, the reading it gives each (the dictionary's likeliest,
         // as 添加词 fills one in): a sentence that is no word, put in twice, is the user's word typed
-        // so (U-06, UAT HW-20). Counted by their text alone, never for pinyin's order (D28, LearnState.heard)
+        // so (U-06, 原 UAT HW-20). Counted by their text alone, never for pinyin's order (D28, LearnState.heard)
         val read = sentence.words
         val whole = read?.map { Word(it.text, it.syllables.joinToString(" ") { s -> Syllables.spelling(s) }) } ?: listOf(Word(sentence.text, ""))
         val origin = read?.let { origin(sentence.text, it) } ?: Row.DICTIONARY

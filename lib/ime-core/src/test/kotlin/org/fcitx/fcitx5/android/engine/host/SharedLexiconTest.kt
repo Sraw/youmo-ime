@@ -231,7 +231,7 @@ class SharedLexiconTest {
         }
     }
 
-    // TBL-12a, D8: a word of another input method's list, imported (U-101), is typed in the tables
+    // D8: a word of another input method's list, imported (U-101), is typed in the tables
     // as a dictionary's is, after their own; a code the table has one entry for commits it, as typed blind
     @Test
     fun anImportedWordIsTypedInTheTablesAfterTheirOwnButWhereTheTablesWordIsAlone() {

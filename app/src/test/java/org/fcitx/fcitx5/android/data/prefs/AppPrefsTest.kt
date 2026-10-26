@@ -9,6 +9,7 @@ import androidx.core.content.edit
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.data.theme.ThemePrefs
+import org.fcitx.fcitx5.android.engine.assertRows
 import org.fcitx.fcitx5.android.input.keyboard.LangSwitchBehavior
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -97,5 +98,48 @@ class AppPrefsTest {
         val later = AppPrefs(sp)
         later.resetHiddenSettings()
         assertTrue(later.registerProvider(::ThemePrefs).keyRippleEffect.getValue())
+    }
+
+    // contract: the keyboard choices are stored by the constant's name under keys that never change:
+    // one renamed would put every user's back to the full keyboard; a value this version does not know
+    // (a later keyboard's) reads as the default
+    @Test
+    fun theKeyboardChoicesAreStoredByNamesThatNeverChange() {
+        class Row(
+            val why: String,
+            val names: List<String>,
+            val entries: List<Enum<*>>,
+            val key: String,
+            val storedKey: String,
+            val set: (AppPrefs) -> Unit,
+            val stored: String,
+            val unknown: String,
+            val read: (AppPrefs) -> Enum<*>,
+            val default: Enum<*>,
+        )
+        assertRows(
+            listOf(
+                Row(
+                    "全拼's keyboard", listOf("Full", "Keys14"), PinyinKeyboard.entries, "pinyin_keyboard", AppPrefs.PINYIN_KEYBOARD,
+                    { it.keyboard.pinyinKeyboard.setValue(PinyinKeyboard.Keys14) }, "Keys14", "Keys18",
+                    { it.keyboard.pinyinKeyboard.getValue() }, PinyinKeyboard.Full,
+                ),
+                Row(
+                    "双拼's keyboard", listOf("Full", "Keys18", "NineKeys"), ShuangpinKeyboard.entries, "shuangpin_keyboard", AppPrefs.SHUANGPIN_KEYBOARD,
+                    { it.keyboard.shuangpinKeyboard.setValue(ShuangpinKeyboard.NineKeys) }, "NineKeys", "Keys14",
+                    { it.keyboard.shuangpinKeyboard.getValue() }, ShuangpinKeyboard.Full,
+                ),
+            ),
+            { it.why },
+        ) { row ->
+            sp.edit { clear() }
+            assertEquals(row.names, row.entries.map { it.name })
+            assertEquals(row.key, row.storedKey)
+            assertEquals(row.default, row.read(AppPrefs(sp)))
+            row.set(AppPrefs(sp))
+            assertEquals(row.stored, sp.getString(row.key, null))
+            sp.edit { putString(row.key, row.unknown) }
+            assertEquals(row.default, row.read(AppPrefs(sp)))
+        }
     }
 }
