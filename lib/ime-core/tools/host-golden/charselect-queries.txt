@@ -1,0 +1,168 @@
+a
+A
+1
+9
+=
+ 
+z
+latin
+LATIN
+Latin small letter a
+latin small letter a
+latin   small    letter    a
+  greek alpha
+greek alpha 
+greek small letter alpha
+alpha
+alp
+smile
+smiling face
+grinning
+face
+heart
+red heart
+snowman
+euro
+euro sign
+yen
+pound
+copyright
+registered
+trade mark
+arrow
+right arrow
+rightwards arrow
+left
+check mark
+cross
+star
+black star
+white star
+music
+note
+cjk
+ideograph
+hangul
+hangul syllable
+katakana
+hiragana
+bopomofo
+fullwidth
+fullwidth digit
+digit zero
+space
+no-break space
+zero width
+emoji
+cat
+dog
+water
+fire
+sun
+moon
+mountain
+person
+ren
+zhong
+middle
+centre
+center
+dragon
+horse
+woman
+man
+child
+U+4E00
+u+4e00
+U+4e2d
+0x4E2D
+0X4e2d
+U+1F600
+U+1f600
+0x1F600
+U+110000
+U+D800
+U+0041
+U+41
+0x41
+4e2d
+20013
+65
++65
+-1
+-65
+018
+00065
+99999999999999999999
+18446744073709551615
+18446744073709551616
+-18446744073709551615
+U+00000041
+U+FFFFFFFF
+U+FFFFFFFFF
+0x
+U+
+U+zz
+yī
+zhōng
+rén
+nǐ
+hǎo
+中
+中文
+é
+ß
+ä
+ae
+grave
+acute
+tilde
+diaeresis
+combining
+mark
+sign
+symbol
+letter
+small
+capital
+with
+of
+the
+x
+xy
+q
+qu
+qua
+greek capital
+cyrillic
+cyrillic small letter a
+arabic
+hebrew
+thai
+devanagari
+box drawings
+block
+square
+circle
+triangle
+math
+infinity
+integral
+sum
+plus
+minus
+equals
+less-than
+greater-than
+percent
+dollar
+ampersand
+hyphen
+dash
+em dash
+en dash
+quotation
+left double quotation mark
+apostrophe
+1f600
+2603

@@ -1,0 +1,10 @@
+esc1 "quoted value"
+esc2 "tab\there"
+esc3 "new\nline"
+esc4 "q\"q"
+esc5 "unterminated\"
+esc6 "a"b"
+esc7 "\x"
+esc8 "\\"
+esc9 "
+esc0 plain"quote

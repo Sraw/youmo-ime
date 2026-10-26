@@ -1,0 +1,61 @@
+Q		25	d1d08987332f83c71e520d1050c51b0b92ca307bab0cd573d31bb5667996f7e3
+C	a	user-main-a
+C	a	a-from-a-padded
+C	a	a-tab
+C	a	a-from-b
+C	b	from-b
+C	esc0	plain"quote
+C	esc1	quoted value
+C	esc2	tab\there
+C	esc3	new\nline
+C	esc4	q"q
+C	esc5	"unterminated\\"
+C	esc7	x
+C	esc8	\\
+C	esc9	"
+C	m	main-only
+C	over	user-over
+C	q	q1
+C	q	q2 with spaces
+C	u	good-u
+C	x	中文
+C	z	zed
+C	é	e-acute
+C	中	zhong
+C	Ａ	fullwidth-A
+C	😀	grin
+Q	a	4	ae8b5fd097b0eadabd81c1c071fa8e0348b7b56adea45c3190b0050a1b84e14f
+C	a	user-main-a
+C	a	a-from-a-padded
+C	a	a-tab
+C	a	a-from-b
+Q	b	1	eaa892e4cbfaab6f219841c69c7e2e84f7ff5ce9994be36d41f353a209dea9fc
+C	b	from-b
+Q	k	0	e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+Q	q	2	380bdfd41854365eedc63a554da422aebd6d72dd47e578fbc2cd10aa13fa2b81
+C	q	q1
+C	q	q2 with spaces
+Q	u	1	a0baba562a7ebec3b2742dacfeda67b807a2fc09390e7c363ebfb7360678e514
+C	u	good-u
+Q	x	1	27e48deff8d64eef3afdee53da93f0db581748cff0c97961706208fdabc7d65c
+C	x	中文
+Q	é	1	7e12664c795bf0e6a9cc9d6f4e821d1449d37b503a493d38185ede11fc3c4532
+C	é	e-acute
+Q	中	1	dc48eaf101f4fde11b750d3730328ac537508cf114f92f57b04c4ba6dd64cf30
+C	中	zhong
+Q	zz	0	e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+Q	over	1	c8e0eb19e4fb559f3ebb69b68223ad81a618de7a89a2a903ff45aa63e978b17a
+C	over	user-over
+Q	dis	0	e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+Q	esc	9	8131b5ea1d3a34e6695c1807bc6636181c522d98e0edb8b0d488660138d92838
+C	esc0	plain"quote
+C	esc1	quoted value
+C	esc2	tab\there
+C	esc3	new\nline
+C	esc4	q"q
+C	esc5	"unterminated\\"
+C	esc7	x
+C	esc8	\\
+C	esc9	"
+Q	m	1	17ced247bea29eb238c55278949bae5acb413ec7cfdafaf2dbe2cf877763012c
+C	m	main-only
