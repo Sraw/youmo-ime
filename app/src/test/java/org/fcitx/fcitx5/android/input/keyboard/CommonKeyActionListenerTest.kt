@@ -11,8 +11,11 @@ import org.fcitx.fcitx5.android.core.FcitxAPI
 import org.fcitx.fcitx5.android.core.FcitxKeyMapping
 import org.fcitx.fcitx5.android.core.FormattedText
 import org.fcitx.fcitx5.android.core.InputMethodEntry
+import org.fcitx.fcitx5.android.core.UNICODE
 import org.fcitx.fcitx5.android.engine.host.Engines
+import org.fcitx.fcitx5.android.engine.host.Keyboard
 import org.fcitx.fcitx5.android.engine.pinyin.ShuangpinScheme
+import org.fcitx.fcitx5.android.engine.pinyin.g14Code
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -56,7 +59,7 @@ class CommonKeyActionListenerTest {
         assertNull(symText(FcitxKeyMapping.FcitxKey_Return))
         assertNull(symText(FcitxKeyMapping.FcitxKey_Left))
         // the nine keys' syllables and letters, sent past Unicode's private use
-        assertNull(symText(0x01000000 + 0xe000))
+        assertNull(symText(UNICODE + 0xe000))
         // so it goes to the engine, even in an address field
         assertNull(symTypedAsIs(FcitxKeyMapping.FcitxKey_BackSpace, address = true, im = notAsked, scheme = ShuangpinScheme.ZIRANMA))
     }
@@ -201,5 +204,16 @@ class CommonKeyActionListenerTest {
         queue.runAll()
         assertEquals(emptyList<String>(), queue.tableKeysAsked)
         assertEquals(listOf("commit(;)"), queue.fcitx.calls)
+    }
+
+    // a 14-key tap with its place (Keyboard.TAPS, design k14-tap-position NIT 1): never text in an address field.
+    // What holds it is symText, which has no text for a code past Latin-1; '_' beside it shows the check can fail
+    @Test
+    fun aFourteenKeyTapIsNoTextAsItIs() {
+        val sym = UNICODE + Keyboard.tapKey(g14Code('b'), 0.75f)
+        for (im in listOf(Engines.PINYIN, Engines.ENGLISH, "")) {
+            assertNull(im, symAsIs(sym, address = true) { ShuangpinScheme.ZIRANMA }({ im }, { false }, { emptySet() }))
+            assertEquals(im, "_", symAsIs('_'.code, address = true) { ShuangpinScheme.ZIRANMA }({ im }, { false }, { emptySet() }))
+        }
     }
 }
