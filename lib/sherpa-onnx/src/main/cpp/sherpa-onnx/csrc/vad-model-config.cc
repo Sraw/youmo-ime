@@ -30,22 +30,17 @@ void VadModelConfig::Register(ParseOptions *po) {
 }
 
 bool VadModelConfig::Validate() const {
-  if (provider != "rknn") {
-    if (!silero_vad.model.empty() && EndsWith(silero_vad.model, ".rknn")) {
-      SHERPA_ONNX_LOGE(
-          "--provider is %s, which is not rknn, but you pass an rknn model "
-          "'%s'",
-          provider.c_str(), silero_vad.model.c_str());
-      return false;
-    }
+  // youmo: rknn is not built (lib/sherpa-onnx/README.md); refused here, where
+  // the JNI can report it, rather than by VadModel::Create's exit
+  if (provider == "rknn") {
+    SHERPA_ONNX_LOGE("provider rknn is not built");
+    return false;
   }
 
-  if (provider == "rknn") {
-    if (!silero_vad.model.empty() && EndsWith(silero_vad.model, ".onnx")) {
-      SHERPA_ONNX_LOGE("--provider is rknn, but you pass an onnx model '%s'",
-                       silero_vad.model.c_str());
-      return false;
-    }
+  if (!silero_vad.model.empty() && EndsWith(silero_vad.model, ".rknn")) {
+    SHERPA_ONNX_LOGE("an rknn model '%s' needs provider rknn, which is not built",
+                     silero_vad.model.c_str());
+    return false;
   }
 
   if (!silero_vad.model.empty()) {

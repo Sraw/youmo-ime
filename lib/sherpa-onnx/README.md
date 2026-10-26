@@ -54,7 +54,12 @@ Layer B is what was compiled but never ran: every recognizer but the offline tra
 greedy and modified beam search, hotwords' context graph and LM rescoring), ten-vad, and the JNI
 of the rest. So `OfflineRecognizerImpl::Create` makes a transducer recognizer or stops,
 `OfflineModelConfig` (C++ and Kotlin) holds only the transducer's fields, and `VadModelConfig` only
-silero's; the JNI reads no more than those.
+silero's; the JNI reads no more than those, except the transducer's QNN fields (`QnnConfig`,
+`csrc/qnn-config.cc`, the JNI's three QNN strings and `prependAdspLibraryPath`): they are part of
+upstream's transducer config, so they stay to keep its diff small, and are inert since `Validate`
+refuses the `qnn` provider. An empty `model_type` is taken as a transducer without reading the
+encoder's metadata, as upstream did to choose among families: a non-transducer model with no
+`model_type` fails late rather than at `Create`.
 Layer C is the build options that would now configure a broken build: speech synthesis, speaker
 diarization, the NPUs, WASM, Python, the C API, websocket, PortAudio, ALSA and the tests are gone
 from the `CMakeLists.txt` files, with the leftover NPU headers and the `cmake/` files that fetched
@@ -83,8 +88,13 @@ reach us. To sort the new release's files:
 
    ```
    cd src/main/cpp && for f in $(find sherpa-onnx -name '*.cc'); do
-     grep -q "$(basename $f)" sherpa-onnx/*/CMakeLists.txt ../../../host-test.sh ||
-       grep -qx "$f" ../../../upstream-removed.txt || echo "$f"; done
+     b=$(basename $f | sed 's/\./\\./g')
+     grep -qE "(^|[[:space:]/\"(])$b([[:space:]\")]|$)" sherpa-onnx/*/CMakeLists.txt ../../../host-test.sh ||
+       grep -qxF "$f" ../../../upstream-removed.txt ||
+       awk -v f="$f" '/\/$/ && index(f, $0) == 1 { m = 1 } END { exit !m }' ../../../upstream-removed.txt ||
+       echo "$f"; done
    ```
+   The name is matched whole (`model.cc` is not `vad-model.cc`), and a listed directory (an entry
+   ending in `/`) covers every file under it.
 4. Build `host-test.sh`, `host-eval.sh` and an APK: the Android link uses `--no-undefined`, so a kept file
    calling into a deleted one fails there rather than on the phone.

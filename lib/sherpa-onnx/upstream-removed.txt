@@ -163,6 +163,7 @@ sherpa-onnx/csrc/slice-test.cc
 sherpa-onnx/csrc/speaker-embedding-manager-test.cc
 sherpa-onnx/csrc/stack-test.cc
 sherpa-onnx/csrc/tee-stream.h
+sherpa-onnx/csrc/text-utils-test.cc
 sherpa-onnx/csrc/text2token-test.cc
 sherpa-onnx/csrc/transpose-test.cc
 sherpa-onnx/csrc/unbind-test.cc
@@ -512,7 +513,6 @@ sherpa-onnx/csrc/ten-vad-model-config.cc
 sherpa-onnx/csrc/ten-vad-model-config.h
 sherpa-onnx/csrc/ten-vad-model.cc
 sherpa-onnx/csrc/ten-vad-model.h
-sherpa-onnx/csrc/text-utils-test.cc
 sherpa-onnx/csrc/timer.cc
 sherpa-onnx/csrc/timer.h
 sherpa-onnx/csrc/transducer-keyword-decoder.cc

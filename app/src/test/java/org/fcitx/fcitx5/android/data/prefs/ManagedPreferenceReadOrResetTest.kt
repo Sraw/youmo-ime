@@ -7,6 +7,7 @@ package org.fcitx.fcitx5.android.data.prefs
 import android.content.Context
 import android.content.SharedPreferences
 import androidx.core.content.edit
+import org.fcitx.fcitx5.android.engine.assertRows
 import org.junit.Assert.assertEquals
 import org.junit.Before
 import org.junit.Test
@@ -31,22 +32,30 @@ class ManagedPreferenceReadOrResetTest {
         sp.edit { clear() }
     }
 
-    @Test
-    fun aValueOfAnotherTypeReadsAsTheDefaultWrittenBack() {
-        sp.edit { putInt("flag", 3) }
-        val pref = ManagedPreference.PBool(sp, "flag", true)
-        assertEquals(true, pref.getValue())
-        assertEquals(true, sp.getBoolean("flag", false))
-    }
+    private class Row(val why: String, val stored: SharedPreferences.Editor.() -> Unit, val read: () -> Any?, val written: () -> Any?, val default: Any)
 
     @Test
-    fun aNameTheCodecCannotDecodeReadsAsTheDefaultWrittenBack() {
-        sp.edit { putString("mode", "Bogus") }
+    fun anUnreadableValueReadsAsTheDefaultWrittenBack() {
         val codec = object : ManagedPreference.StringLikeCodec<Mode> {
             override fun decode(raw: String): Mode = enumValueOf(raw)
         }
-        val pref = ManagedPreference.PStringLike(sp, "mode", Mode.Off, codec)
-        assertEquals(Mode.Off, pref.getValue())
-        assertEquals("Off", sp.getString("mode", null))
+        assertRows(
+            listOf(
+                Row(
+                    "a key whose type changed between versions", { putInt("flag", 3) },
+                    { ManagedPreference.PBool(sp, "flag", true).getValue() }, { sp.getBoolean("flag", false) }, true,
+                ),
+                Row(
+                    "a name the codec cannot decode", { putString("mode", "Bogus") },
+                    { ManagedPreference.PStringLike(sp, "mode", Mode.Off, codec).getValue() }, { sp.getString("mode", null)?.let(codec::decode) }, Mode.Off,
+                ),
+            ),
+            { it.why },
+        ) { row ->
+            // each row its own file state, not what the row before left
+            sp.edit { clear(); row.stored(this) }
+            assertEquals(row.default, row.read())
+            assertEquals(row.default, row.written())
+        }
     }
 }

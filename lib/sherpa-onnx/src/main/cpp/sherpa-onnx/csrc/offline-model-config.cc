@@ -43,20 +43,17 @@ void OfflineModelConfig::Register(ParseOptions *po) {
 }
 
 bool OfflineModelConfig::Validate() const {
-  // For RK NPU, we reinterpret num_threads:
-  //
-  // For RK3588 only
-  // num_threads == 1 -> Select a core randomly
-  // num_threads == 0 -> Use NPU core 0
-  // num_threads == -1 -> Use NPU core 1
-  // num_threads == -2 -> Use NPU core 2
-  // num_threads == -3 -> Use NPU core 0 and core 1
-  // num_threads == -4 -> Use NPU core 0, core 1, and core 2
-  if (provider != "rknn") {
-    if (num_threads < 1) {
-      SHERPA_ONNX_LOGE("num_threads should be > 0. Given %d", num_threads);
-      return false;
-    }
+  // youmo: the NPU backends are not built (lib/sherpa-onnx/README.md); refused
+  // here, where the JNI can report it, rather than by Create's exit
+  if (provider == "rknn" || provider == "axera" || provider == "axcl" ||
+      provider == "ascend" || provider == "qnn") {
+    SHERPA_ONNX_LOGE("provider %s is not built", provider.c_str());
+    return false;
+  }
+
+  if (num_threads < 1) {
+    SHERPA_ONNX_LOGE("num_threads should be > 0. Given %d", num_threads);
+    return false;
   }
 
   if (!FileExists(tokens)) {
@@ -73,25 +70,12 @@ bool OfflineModelConfig::Validate() const {
     }
   }
 
-  if (IsQnnTransducerArtifact(transducer) && provider != "qnn") {
+  if (IsQnnTransducerArtifact(transducer)) {
     SHERPA_ONNX_LOGE(
-        "Offline transducer QNN artifacts require --provider=qnn. "
+        "Offline transducer QNN artifacts are not supported (qnn is not "
+        "built). "
         "Given provider: '%s'",
         provider.c_str());
-    return false;
-  }
-
-  if (provider == "qnn" &&
-      (!transducer.encoder_filename.empty() ||
-       !transducer.decoder_filename.empty() ||
-       !transducer.joiner_filename.empty()) &&
-      !IsQnnTransducerArtifact(transducer)) {
-    SHERPA_ONNX_LOGE(
-        "--provider=qnn requires QNN offline transducer artifacts (*.so or "
-        "--transducer.qnn-context-binary). Given encoder: '%s', decoder: '%s', "
-        "joiner: '%s'",
-        transducer.encoder_filename.c_str(), transducer.decoder_filename.c_str(),
-        transducer.joiner_filename.c_str());
     return false;
   }
 

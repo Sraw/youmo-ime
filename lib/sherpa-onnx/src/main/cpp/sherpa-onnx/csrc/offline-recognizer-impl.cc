@@ -2,6 +2,7 @@
 //
 // Copyright (c)  2023  Xiaomi Corporation
 
+#include "sherpa-onnx/csrc/offline-recognizer-impl.h"
 
 #include <memory>
 #include <sstream>
@@ -22,7 +23,6 @@
 
 #include "fst/extensions/far/far.h"
 #include "kaldifst/csrc/kaldi-fst-io.h"
-#include "onnxruntime_cxx_api.h"  // NOLINT
 #include "sherpa-onnx/csrc/file-utils.h"
 #include "sherpa-onnx/csrc/fst-utils.h"
 #include "sherpa-onnx/csrc/macros.h"
@@ -31,10 +31,10 @@
 
 namespace sherpa_onnx {
 
-std::unique_ptr<OfflineRecognizerImpl> OfflineRecognizerImpl::Create(
-    const OfflineRecognizerConfig &config) {
-  // youmo: only transducers are built (lib/sherpa-onnx/README.md, "What we
-  // removed"); upstream picks among its other model families here
+// youmo: only transducers are built (lib/sherpa-onnx/README.md, "What we
+// removed"); upstream picks among its other model families in Create. An empty
+// model_type is taken as a transducer without reading the encoder's metadata
+static void CheckTransducerOnly(const OfflineRecognizerConfig &config) {
   const std::string &provider = config.model_config.provider;
   if (provider == "rknn" || provider == "axera" || provider == "axcl" ||
       provider == "ascend" || provider == "qnn") {
@@ -49,28 +49,18 @@ std::unique_ptr<OfflineRecognizerImpl> OfflineRecognizerImpl::Create(
                      config.model_config.model_type.c_str());
     SHERPA_ONNX_EXIT(-1);
   }
+}
+
+std::unique_ptr<OfflineRecognizerImpl> OfflineRecognizerImpl::Create(
+    const OfflineRecognizerConfig &config) {
+  CheckTransducerOnly(config);
   return std::make_unique<OfflineRecognizerTransducerImpl>(config);
 }
 
 template <typename Manager>
 std::unique_ptr<OfflineRecognizerImpl> OfflineRecognizerImpl::Create(
     Manager *mgr, const OfflineRecognizerConfig &config) {
-  // youmo: only transducers are built (lib/sherpa-onnx/README.md, "What we
-  // removed"); upstream picks among its other model families here
-  const std::string &provider = config.model_config.provider;
-  if (provider == "rknn" || provider == "axera" || provider == "axcl" ||
-      provider == "ascend" || provider == "qnn") {
-    SHERPA_ONNX_LOGE("%s is not built (youmo: lib/sherpa-onnx/README.md).",
-                     provider.c_str());
-    SHERPA_ONNX_EXIT(-1);
-  }
-  if (config.model_config.transducer.encoder_filename.empty() ||
-      (!config.model_config.model_type.empty() &&
-       config.model_config.model_type != "transducer")) {
-    SHERPA_ONNX_LOGE("Only transducer models are supported, model_type: '%s'",
-                     config.model_config.model_type.c_str());
-    SHERPA_ONNX_EXIT(-1);
-  }
+  CheckTransducerOnly(config);
   return std::make_unique<OfflineRecognizerTransducerImpl>(mgr, config);
 }
 
