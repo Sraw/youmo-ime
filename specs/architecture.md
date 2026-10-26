@@ -116,7 +116,7 @@ quick phrase or Unicode starts, so their code shows above the candidates in Engl
 word and handwriting's characters are the text itself and go into the app's text as composing
 text, where the field takes it (`CapabilityFlag.Preedit`), kept there as the keyboard goes. A code
 (pinyin, the nine keys', a table's) is not text, and is shown in the keyboard's own row above the
-candidates (`PreeditComponent`, `KawaiiBarComponent.PREEDIT_HEIGHT`, there whether or not a code is
+candidates (`PreeditComponent`, `KawaiiBarComponent.preeditHeight`: 18 dp, 32 where the input method has the syllable strip; there whether or not a code is
 typed so the keyboard keeps its height; the floating window's `PreeditUi`), as 搜狗 shows its own,
 covering nothing of the app: in the app,
 a tap on another field or app had the app finish it as text before the input method heard of it

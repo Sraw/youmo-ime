@@ -23,6 +23,7 @@ import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.data.theme.ThemePrefs.NavbarBackground
 import org.fcitx.fcitx5.android.input.bar.KawaiiBarComponent
 import org.fcitx.fcitx5.android.input.floating.FloatingHandle
+import org.fcitx.fcitx5.android.input.keyboard.CodeRowHeight
 import org.fcitx.fcitx5.android.input.keyboard.KeyboardHeightCap
 import org.fcitx.fcitx5.android.input.keyboard.TextKeyboard
 import org.fcitx.fcitx5.android.utils.navbarFrameHeight
@@ -88,8 +89,10 @@ class KeyboardPreviewUi(override val ctx: Context, val theme: Theme) : Ui {
         scaleType = ImageView.ScaleType.CENTER_CROP
     }
 
-    // the bar and the row above it for the code being typed; read each time, as 候选字号 can change on this page
-    private val barHeight get() = ctx.dp(KawaiiBarComponent.heightDp() + KawaiiBarComponent.preeditHeight())
+    // the bar and the row above it for the code being typed, thin as over the full keyboard drawn here
+    // (where the cap binds, a 14 键 user's real keys are the tall row's 14 dp shorter); read each time,
+    // as 候选字号 can change on this page
+    private val barHeight get() = ctx.dp(KawaiiBarComponent.heightDp() + CodeRowHeight.THIN_DP)
     private val fakeKawaiiBar = view(::View)
 
     private var keyboardWidth = -1

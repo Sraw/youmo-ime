@@ -11,7 +11,8 @@ package org.fcitx.fcitx5.android.input.keyboard
  * 568 of ~727 px). In portrait the levels stay far below the cap.
  *
  * [barsHeight] is everything docked above the keys: the candidate bar and the code row over it (the
- * preedit line), both always laid out at their fixed heights, so no row pushes the area past the cap.
+ * preedit line), each at a height fixed while one input method is shown (the row is taller in some, CodeRowHeight),
+ * so no row pushes the area past the cap; the cap is taken anew as the input method changes.
  */
 object KeyboardHeightCap {
     const val MAX_FRACTION = 0.70

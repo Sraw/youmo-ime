@@ -734,7 +734,7 @@ def code_row_dp(d):
 
 def kb_h(d):
     """the whole input view's height above the keys' bottom: from the composing row's top (its row is
-    there, 18 or 40 dp, typing or not: the height must not jump) to the keyboard's bottom. Not the
+    there, 18 or 32 dp, typing or not: the height must not jump while typing) to the keyboard's bottom. Not the
     IME window's top: that window spans the screen, so its top is the same whatever the board"""
     b = kb_box(d)
     row = d.code_row()
@@ -763,11 +763,14 @@ def st41(d):
     k14 = code_row_dp(d)
     d.clear()
     h = {"拼音": kb_h(d)}
+    rows = {"拼音": code_row_dp(d)}
     for im in ("英文", "五笔", "九键"):
         d.switch_im(im)
         h[im] = kb_h(d)
-    d.shot("kb", "14 键时换到九键：键盘总高不变")
+        rows[im] = code_row_dp(d)
+    d.shot("kb", "14 键时换到九键：编码行变回 18dp，键盘总高和全键盘一样")
     d.switch_im("拼音")
+    h["拼音回来"] = kb_h(d)
     d.hide_keyboard()
     pinyin_keyboard(d, "全键盘")
     d.open_page("text")
@@ -775,7 +778,7 @@ def st41(d):
     d.cands()
     back = code_row_dp(d)
     d.clear()
-    # 双拼's 18 keys: the same height on English and 五笔 after them
+    # 双拼's 18 keys: 32 dp there, 18 on English and 五笔 after them
     d.hide_keyboard()
     shuangpin_keyboard(d, "18 键")
     d.open_page("text")
@@ -783,21 +786,24 @@ def st41(d):
     grouped_keys(d, "bn io")
     d.cands()
     d.clear()
-    h18 = {"双拼": kb_h(d)}
+    rows18 = {"双拼": code_row_dp(d)}
     for im in ("英文", "五笔"):
         d.switch_im(im)
-        h18[im] = kb_h(d)
+        rows18[im] = code_row_dp(d)
     d.hide_keyboard()
     shuangpin_keyboard(d, "全键盘")
     check(full == 18, f"全键盘时编码行 {full}dp")
-    check(k14 == 40, f"14 键时编码行 {k14}dp")
-    check(max(h.values()) - min(h.values()) <= 3, f"各输入法的键盘总高 {h}")
-    # the keys keep their height: the 14 keys' board is the code row's 22 dp taller
+    check(k14 == 32, f"14 键时编码行 {k14}dp")
+    check(rows == {"拼音": 32, "英文": 18, "五笔": 18, "九键": 18}, f"14 键时各输入法的编码行 {rows}")
+    # the keys keep their height: the 14 keys' board is the code row's 14 dp taller, the others as 全键盘's
     grew = (h["拼音"] - h_full) / d.dpx()
-    check(abs(grew - 22) <= 2, f"14 键比全键盘高 {grew:.0f}dp（应为 22）")
+    check(abs(grew - 14) <= 2, f"14 键比全键盘高 {grew:.0f}dp（应为 14）")
+    others = [h[im] for im in ("英文", "五笔", "九键")]
+    check(max(abs(x - h_full) for x in others) <= 3, f"其他输入法的键盘总高 {h}，全键盘 {h_full}")
+    check(abs(h["拼音回来"] - h["拼音"]) <= 3, f"换回拼音的总高 {h}")
     check(back == 18, f"改回全键盘后编码行 {back}dp")
-    check(max(h18.values()) - min(h18.values()) <= 3, f"双拼 18 键时各输入法的键盘总高 {h18}")
-    return f"{full} → {k14} → {back} dp；总高 {h}；18 键 {h18}"
+    check(rows18 == {"双拼": 32, "英文": 18, "五笔": 18}, f"双拼 18 键时各输入法的编码行 {rows18}")
+    return f"{full} → {k14} → {back} dp；编码行 {rows}；总高 {h}（全键盘 {h_full}）；18 键 {rows18}"
 
 
 @case("ST-42", base="B0-设置", mutates=True)
@@ -834,7 +840,7 @@ def st42(d):
     shuangpin_keyboard(d, "全键盘")
     home(d, "通用输入")
     glide = d.summary("滑行输入") or ""
-    check(k18 == 40 and sy, f"18 键时编码行 {k18}dp，音节条 {sy}")
-    check(k9 == 18 and not sy9, f"九键时编码行 {k9}dp，音节条 {sy9}")
+    check(k18 == 32 and sy, f"18 键时编码行 {k18}dp，音节条 {sy}")
+    check(k9 == 32 and not sy9, f"九键时编码行 {k9}dp，音节条 {sy9}")
     check("双拼 18 键" in glide and "九键双拼" in glide, f"滑行输入的说明「{glide}」")
     return f"默认「{v.split(chr(10))[0]}」；18 键 {k18}dp {sy[:3]}；九键 {k9}dp"

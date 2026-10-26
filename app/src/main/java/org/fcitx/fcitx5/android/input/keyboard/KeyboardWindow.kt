@@ -180,11 +180,9 @@ class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), Essentia
     // whether the keyboard shown offers the syllables itself (九键's column), as it attached
     private var stripOwned = false
 
-    // the code row's strip hidden: 九键's column offers the syllables, or 九键双拼's 123 shows a code row
-    // of 18dp, too low for a strip to be tapped; on each attach and input method change (123 stays)
-    private fun stripHidden() = syllablesOwned(
-        stripOwned, spaceKeys.current?.uniqueName, shuangpinKeyboard.getValue(), KawaiiBarComponent.preeditHeight()
-    )
+    // the code row's strip hidden: 九键's column offers the syllables, or the input method's code row
+    // is the thin one, too low for a strip to be tapped; on each attach and input method change
+    private fun stripHidden() = syllablesOwned(stripOwned, KawaiiBarComponent.preeditHeight(spaceKeys.current?.uniqueName))
 
     /** Whether the letters are the layout shown, which take the whole width, split. */
     val lettersShown get() = currentKeyboardName == TextKeyboard.Name
@@ -334,11 +332,10 @@ class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), Essentia
 
 /**
  * Whether the code row's syllables are hidden: the keyboard offers them itself ([owns], 九键's
- * column), or 九键双拼's code row ([shuangpin], with [im] 双拼) is [preeditHeight] dp, under a
- * touch target (on its 123, whose keyboard owns none). With the 14 or 18 keys the row is 40dp.
+ * column), or the code row is [preeditHeight] dp, the thin one ([CodeRowHeight]), too low to tap.
  */
-internal fun syllablesOwned(owns: Boolean, im: String?, shuangpin: ShuangpinKeyboard, preeditHeight: Int): Boolean =
-    owns || (im == Engines.SHUANGPIN && shuangpin == ShuangpinKeyboard.NineKeys && preeditHeight < KawaiiBarComponent.MIN_TOUCH_DP)
+internal fun syllablesOwned(owns: Boolean, preeditHeight: Int): Boolean =
+    owns || preeditHeight < CodeRowHeight.STRIP_DP
 
 /**
  * The letters' layout of input method [ime]: 九键's, handwriting's, English's on the nine keys

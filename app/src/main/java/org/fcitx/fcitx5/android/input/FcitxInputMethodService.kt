@@ -272,7 +272,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         // drawn on 九键's keys, and in their long press
         prefs.keyboard.t9Letters,
         prefs.keyboard.t9Symbols,
-        // the 14 keys for pinyin, 双拼's 18 or nine keys, and the code row's height with them (KawaiiBarComponent.preeditHeight)
+        // the 14 keys for pinyin, 双拼's 18 or nine keys, and the code row's height in those (KawaiiBarComponent.preeditHeight)
         prefs.keyboard.pinyinKeyboard,
         prefs.keyboard.shuangpinKeyboard,
         prefs.advanced.disableAnimation,

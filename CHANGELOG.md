@@ -16,8 +16,8 @@ Each release lists its **main changes** (new features, large improvements), its 
   从 0.3.1 或 0.3.2 升级后第一次启动会在后台转换一次（雾凇拼音约一两分钟），空闲栏显示「正在升级词库格式」和进度，这期间打不出导入的词。
   **装回 0.3.2 时**，并入基础词库的导入词库在 0.3.2 里看不到、打不出；文件还在，再升级回来就又有了。
 - **始终显示悬浮条**（设置 → 外观，默认关）：键盘停在底部时也有那条拖动条；长按条中间的短横，键盘就变成悬浮键盘停在手指下面，不松手可以接着拖，拖回底部松手又放回去。
-- **拼音 14 键**（输入法 → 拼音 → **键盘**）：两个字母一个键，键大一倍，和讯飞的「拼音双键」一样。点在键的左半或右半，优先读成那一边的字母，已经学到的顺序仍然优先；编码行右边有音节条，从左往右点音节定下来。
-- **双拼 18 键和九键双拼**（输入法 → 双拼 → **键盘**）：每个方案都能用分组的 18 键或九宫格；音节条上也有声母，点一个就定下这个字的声母。九键双拼重码很多，要多选几次。
+- **拼音 14 键**（输入法 → 拼音 → **键盘**）：两个字母一个键，键大一倍，和讯飞的「拼音双键」一样。点在键的左半或右半，优先读成那一边的字母，已经学到的顺序仍然优先；编码行右边有音节条，从左往右点音节定下来。这是初步支持，欢迎反馈。
+- **双拼 18 键和九键双拼**（输入法 → 双拼 → **键盘**）：每个方案都能用分组的 18 键或九宫格；音节条上也有声母，点一个就定下这个字的声母。九键双拼重码很多，要多选几次。这是初步支持，欢迎反馈。
 - **语音说到最后一个字就松开也不丢字**：松开后再录 0.3 秒；声音小时自动放大再识别。
 
 ### 小改动
@@ -58,9 +58,10 @@ Each release lists its **main changes** (new features, large improvements), its 
   handle in its middle and the keyboard floats under your finger, to drag on without lifting, and docks again when dropped at the bottom.
 - **Pinyin 14 keys** (输入法 → 拼音 → **键盘**): two letters a key, keys twice as wide, like iFlytek's 拼音双键. Tapping the left or right
   half of a key favours that half's letter, while orders you have taught it still come first; a strip of syllables on the code row fixes the
-  reading left to right.
+  reading left to right. This is preliminary support; feedback welcome.
 - **Shuangpin 18 keys and nine keys** (输入法 → 双拼 → **键盘**): every scheme works on the grouped 18 keys or the nine-key grid; the
   syllable strip also shows initials, and tapping one fixes that character's initial. Nine-key shuangpin has many clashes, so expect to pick more.
+  This is preliminary support; feedback welcome.
 - **Voice keeps the last word**: it records 0.3 s more after you let go, and quiet speech is boosted before recognition.
 
 ### Smaller changes

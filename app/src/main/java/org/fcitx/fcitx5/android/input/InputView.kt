@@ -188,6 +188,10 @@ class InputView(
     private val returnKeyDrawable = ReturnKeyDrawableComponent()
     private val preeditEmptyState = PreeditEmptyStateComponent()
     private val preedit = PreeditComponent()
+
+    // the code row's height in dp, for the input method shown (KawaiiBarComponent.preeditHeight):
+    // set anew on its change, never while typing in one
+    private var codeRowDp = KawaiiBarComponent.preeditHeight(fcitx.runImmediately { inputMethodEntryCached }.uniqueName)
     private val commonKeyActionListener = CommonKeyActionListener()
     private val windowManager = InputWindowManager()
     @VisibleForTesting
@@ -403,7 +407,7 @@ class InputView(
                     rightToRight = LayoutParams.PARENT_ID
                 })
             }
-            add(preedit.ui.root, lParams(0, dp(KawaiiBarComponent.preeditHeight())) {
+            add(preedit.ui.root, lParams(0, dp(codeRowDp)) {
                 if (floatingHandle != null && !handleAtBottom) below(floatingHandle) else topOfParent()
                 // start and end set in updateKeyboardSize, as the bar's
             })
@@ -483,7 +487,7 @@ class InputView(
             KeyboardHeightCap.keysHeight(
                 keyboardHeightPx,
                 resources.displayMetrics.heightPixels,
-                dp(KawaiiBarComponent.heightDp() + KawaiiBarComponent.preeditHeight()),
+                dp(KawaiiBarComponent.heightDp() + codeRowDp),
                 keyboardBottomPaddingPx,
                 handleHeight = handle,
             )
@@ -643,6 +647,7 @@ class InputView(
                 broadcaster.onInputPanelUpdate(it.data)
             }
             is FcitxEvent.IMChangeEvent -> {
+                updateCodeRow(it.data.uniqueName)
                 broadcaster.onImeUpdate(it.data)
             }
             is FcitxEvent.StatusAreaEvent -> {
@@ -651,6 +656,15 @@ class InputView(
             }
             else -> {}
         }
+    }
+
+    // the code row tall or thin for input method [im]; the keys keep their height (the cap aside)
+    private fun updateCodeRow(im: String) {
+        val rowDp = KawaiiBarComponent.preeditHeight(im)
+        if (rowDp == codeRowDp) return
+        codeRowDp = rowDp
+        preedit.ui.root.updateLayoutParams { height = dp(rowDp) }
+        updateKeyboardSize()
     }
 
     fun updateSelection(start: Int, end: Int) {

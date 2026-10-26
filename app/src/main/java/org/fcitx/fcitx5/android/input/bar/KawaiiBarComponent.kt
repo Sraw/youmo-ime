@@ -61,6 +61,7 @@ import org.fcitx.fcitx5.android.input.dependency.imeScope
 import org.fcitx.fcitx5.android.input.dependency.inputMethodService
 import org.fcitx.fcitx5.android.input.dependency.theme
 import org.fcitx.fcitx5.android.input.editing.TextEditingWindow
+import org.fcitx.fcitx5.android.input.keyboard.CodeRowHeight
 import org.fcitx.fcitx5.android.input.keyboard.CommonKeyActionListener
 import org.fcitx.fcitx5.android.input.keyboard.CustomGestureView
 import org.fcitx.fcitx5.android.input.keyboard.KeyboardWindow
@@ -601,25 +602,19 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
         fun buttonWidthDp(): Int = maxOf(heightDp(), MIN_TOUCH_DP)
 
         /**
-         * The row above the bar where the code being typed shows ([PreeditComponent]), in dp: the
-         * keyboard's own, as 搜狗's, so it covers nothing of the app; there whether or not one is
-         * typed, so the keyboard keeps its height and the app does not jump.
+         * The row above the bar where the code being typed shows ([PreeditComponent]), in dp, for
+         * input method [im]: the keyboard's own, as 搜狗's, so it covers nothing of the app; there
+         * whether or not one is typed, so the keyboard keeps its height while typing. Tall enough to
+         * tap where [im] shows the syllable strip, thin elsewhere ([CodeRowHeight]); the input view
+         * sets it anew as the input method changes, and is made anew when either keyboard setting does.
          */
-        const val PREEDIT_HEIGHT = 18
-
-        /**
-         * The code row's height in dp ([PREEDIT_HEIGHT]), and [MIN_TOUCH_DP] where pinyin's keyboard
-         * is the 14 keys or 双拼's the 18, whose syllables are tapped on it (九键双拼's are in its
-         * column). The same for every input method (the user, 2026-10-25): the keyboard never jumps
-         * from one to the next; the input view is made anew when either setting changes.
-         */
-        fun preeditHeight(): Int = AppPrefs.getInstance().keyboard.let {
-            preeditHeight(it.pinyinKeyboard.getValue(), it.shuangpinKeyboard.getValue())
+        fun preeditHeight(im: String?): Int = AppPrefs.getInstance().keyboard.let {
+            preeditHeight(im, it.pinyinKeyboard.getValue(), it.shuangpinKeyboard.getValue())
         }
 
-        /** [preeditHeight] for pinyin's keyboard [pinyin] and 双拼's [shuangpin]. */
-        fun preeditHeight(pinyin: PinyinKeyboard, shuangpin: ShuangpinKeyboard = ShuangpinKeyboard.Full): Int =
-            if (pinyin == PinyinKeyboard.Keys14 || shuangpin == ShuangpinKeyboard.Keys18) MIN_TOUCH_DP else PREEDIT_HEIGHT
+        /** [preeditHeight] for [im] with pinyin's keyboard [pinyin] and 双拼's [shuangpin]. */
+        fun preeditHeight(im: String?, pinyin: PinyinKeyboard, shuangpin: ShuangpinKeyboard): Int =
+            CodeRowHeight.dp(im, pinyin == PinyinKeyboard.Keys14, shuangpin != ShuangpinKeyboard.Full)
 
         /** The bar's buttons are never narrower than this, in dp, however short 候选字号 makes the bar. */
         const val MIN_TOUCH_DP = 40

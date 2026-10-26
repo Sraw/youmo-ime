@@ -183,7 +183,7 @@ def ls30(d):
     # the preview takes the code row's height off its keys as the real keyboard does (KeyboardHeightCap)
     pw, ph = size(settings.preview_box(d))
     pv = round(ph * real_w / pw) if pw else 0
-    d.shot("full", "外观页的键盘预览：和真键盘一样高（含 40dp 编码行）")
+    d.shot("full", "外观页的键盘预览：和真键盘一样高（键区）")
     check(abs(real - pv) / d.dpx() <= 3, f"预览的键高 {pv}px，真键盘 {real}px")
     return f"分体 {kb}；单手 {kb1}；悬浮 {kb2}；预览 {pv}px / 真键盘 {real}px"
 

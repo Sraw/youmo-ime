@@ -12,7 +12,7 @@ import org.fcitx.fcitx5.android.data.prefs.ShuangpinKeyboard
 import org.fcitx.fcitx5.android.data.theme.ThemePreset
 import org.fcitx.fcitx5.android.engine.host.Engines
 import org.fcitx.fcitx5.android.input.KeyboardHarness
-import org.fcitx.fcitx5.android.input.bar.KawaiiBarComponent
+import org.fcitx.fcitx5.android.input.preedit.SyllableStrip
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -47,7 +47,7 @@ class ShuangpinKeyboardScreenshotTest {
             val labels = h.texts()
             for (l in listOf("Q", "WE", "IO", "SD", "L;", "XC", "BN", "M", "分词")) assertTrue("$l in $labels", l in labels)
             // the code row a touch tall, for the syllables on it
-            assertEquals(h.inputView.resources.displayMetrics.density * KawaiiBarComponent.MIN_TOUCH_DP, h.box(h.inputView.findViewById(R.id.code_row_text)).height().toFloat(), 1f)
+            assertEquals(h.inputView.resources.displayMetrics.density * CodeRowHeight.STRIP_DP, h.box(h.inputView.findViewById(R.id.code_row_text)).height().toFloat(), 1f)
             h.capture("ShuangpinKeyboardScreenshotTest/keys18_light")
         }
     }
@@ -60,7 +60,14 @@ class ShuangpinKeyboardScreenshotTest {
             val labels = h.texts()
             for (l in listOf("ABC", "JKL;", "WXYZ", "重输", "符", "123")) assertTrue("$l in $labels", l in labels)
             assertFalse("no 中/英: $labels", "中/英" in labels)
+            // 九键双拼's own row is tall; on the letters its column has the syllables, on 123 the row does
+            val density = h.inputView.resources.displayMetrics.density
+            assertEquals(density * CodeRowHeight.STRIP_DP, h.box(h.inputView.findViewById(R.id.code_row_text)).height().toFloat(), 1f)
+            val strip = h.inputView.findViewById<SyllableStrip>(R.id.code_row_syllables)
+            assertTrue("the column owns the syllables on the letters", strip.owned)
             h.capture("ShuangpinKeyboardScreenshotTest/nine_light")
+            h.tap(h.key("123"))
+            assertFalse("123 leaves the syllables to the row", strip.owned)
         }
     }
 }

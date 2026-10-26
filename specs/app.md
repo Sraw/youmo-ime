@@ -277,16 +277,20 @@ keyboard (with the language key off and the long press at its default, none: not
 2026-10-26); the bottom row's space takes what is left, ≥ 0.15 in every field. The syllables of the leftmost keys not yet taken are on the composing row's right
 (`SyllableStrip`, id `code_row_syllables`, at most 60% of the row; the preedit is `code_row_text`),
 from `EngineBridge.syllables` for the current input method; a tap takes one, backspace at the end
-gives the last back. With the 14 keys chosen every input method's composing row is 40 dp
-(`preeditHeight()`, else `PREEDIT_HEIGHT` 18), so switching does not change the keyboard's height;
-the pref is in `recreateInputViewPrefs`.
+gives the last back. The composing row is 32 dp only while the input method shown has the strip
+(pinyin on the 14 keys, 双拼 on the 18 or nine keys) and 18 dp in every other (`CodeRowHeight` in
+ime-core, through `KawaiiBarComponent.preeditHeight(im)`); `InputView` sets it anew on each
+`IMChangeEvent` and recomputes the keys' cap (`KeyboardHeightCap`), so the keyboard changes by 14 dp
+between the two kinds (accepted, the user 2026-10-26) and never while typing in one; where the cap
+binds (landscape, 很高) the area stays put and the keys give up the 14 dp instead. The settings
+preview draws the full keyboard, with the thin row. The prefs are in `recreateInputViewPrefs`. The
+bar's buttons keep their own 40 dp floor (`MIN_TOUCH_DP`), a different thing.
 
 双拼's 18 keys (`shuangpinKeyboard == Keys18`) are the same grouped keyboard over `G18`, with the same
-syllable strip, no 中/英 and 40 dp rule: the row is 40 dp when
-`pinyinKeyboard == Keys14 || shuangpinKeyboard == Keys18`. 九键双拼 (`NineKeys`) is `T9Keyboard`
+syllable strip, no 中/英 and 32 dp row while 双拼 is shown. 九键双拼 (`NineKeys`) is `T9Keyboard`
 built for 双拼: its digits send `NINE_SP`'s codes, its 1 key `'` while typing, no 中/英 (a wider
 space), no 连按 or custom letters; its syllables in its own left column, the strip off
-(`ownsSyllables`), the row's height unchanged.
+(`ownsSyllables`; its 123 shows the strip), the row 32 dp as the 18 keys'.
 
 九键英文 (`T9Keyboard.EnglishName`, a second `T9Keyboard` built with `english = true`) is fcitx's
 English shown on the nine keys, reached only by 九键's 中/英 key (`NineKeyLanguageKey`, beside the

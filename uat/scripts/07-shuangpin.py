@@ -1,6 +1,7 @@
 """uat/07-shuangpin.md (B0-双拼). The .md is the source of truth; each function follows its case's
 前提/操作/预期."""
 
+import time
 from uat import (Blocked, Fail, add_im, case, check, choose, first, gear, glide_shot, has, home, key_texts, grouped_keys,
                  has_keyboard_code, menu_tap, pinyin_keyboard, popup, popup_away, popup_slide, shuangpin_keyboard, space_share)
 
@@ -431,7 +432,20 @@ def sp24(d):
     if got != "~":
         raise Blocked(f"2 键的符号没能填成 ~：框里「{got}」")
     d.hide_keyboard()
-    d.tap_text("确定", scroll=False, after=1.0)
+    # the dialog slides down as the keyboard goes (y 884 -> 1295 on redroid): 确定 tapped where it
+    # was hits nothing, and the symbols are never saved; tapped once it has stopped moving
+    ok, last = None, None
+    for _ in range(20):
+        ok = next((n for n in d.screen().app() if n.text == "确定" and n.cls == "Button"), None)
+        if ok and last and ok.b == last.b:
+            break
+        last = ok
+        time.sleep(0.25)
+    if not ok:
+        raise Blocked("2 键的对话框里没有「确定」")
+    d.tap(ok.c, 1.0)
+    if any(n.text == "确定" and n.cls == "Button" for n in d.screen().app()):
+        raise Blocked("点了「确定」，2 键的对话框还在")
     d.open_page("text")
     d.switch_im("双拼")
     items, xy = popup(d, "5")
@@ -442,28 +456,36 @@ def sp24(d):
     two = [n.text for n in items]
     popup_away(d, xy)
     d.clear()
-    d.press("123")
-    sy = d.syllables()
     letters = {x.lower() for x in five}
     # ; and : of the row are typed as punctuation (only the key's own tap is ing's code): shown as typed
     check({"j", "k", "l"} <= letters and "：" in five and five.count("；") + five.count(";") == 1, f"长按 5 弹出 {five}")
     check("~" in two or "～" in two, f"长按 2 弹出 {two}")
-    check(not sy, f"123 上有音节条 {sy}")
-    # the 14 keys' code row (40 dp) above: the 123 under it shows the bar, its syllables tappable
-    d.press("abc", after=0.8)
-    d.hide_keyboard()
-    pinyin_keyboard(d, "14 键")
-    d.open_page("text")
-    d.switch_im("双拼")
+    # 九键双拼's own code row is 32 dp (pinyin on 全键盘, B0's default): typing, its letters leave the
+    # syllables to the column; its 123 shows them on the row, tappable
     d.press("6")
+    row = d.code_row()
+    row_dp = round((row.b[3] - row.b[1]) / d.dpx()) if row else None
+    sy_letters = d.syllables()
     d.press("123", after=0.8)
-    sy14 = d.syllables()
-    check(sy14, "拼音用 14 键时，九键双拼打字中点 123 没有音节条")
-    if sy14:
-        d.syllable_tap(sy14[0])
+    sy = d.syllables()
+    check(row_dp == 32, f"九键双拼的编码行 {row_dp}dp")
+    check(not sy_letters, f"字母页上编码行有音节条 {sy_letters}（应在左边那一列）")
+    check(sy, "打字中点 123，编码行上没有音节条")
+    if sy:
+        d.syllable_tap(sy[0])
         p = d.preedit() or ""
-        check(sy14[0] in p, f"点音节条上的「{sy14[0]}」后拼音行 `{p}`")
-    return f"5：{five}；2：{two}；14 键代码行下 123 的音节条 {sy14[:4]}"
+        check(sy[0] in p, f"点音节条上的「{sy[0]}」后拼音行 `{p}`")
+    d.press("abc", after=0.8)
+    d.clear()
+    # 拼音 全键盘 keeps the thin row
+    d.switch_im("拼音")
+    d.type("ni")
+    d.cands()
+    prow = d.code_row()
+    py_dp = round((prow.b[3] - prow.b[1]) / d.dpx()) if prow else None
+    d.clear()
+    check(py_dp == 18, f"拼音全键盘的编码行 {py_dp}dp")
+    return f"5：{five}；2：{two}；九键双拼编码行 {row_dp}dp，123 音节条 {sy[:4]}；拼音全键盘 {py_dp}dp"
 
 
 @case("SP-23", base="B0-18键", mutates=True)

@@ -123,14 +123,26 @@ class KeyboardWindowTest {
 
     @Test
     fun theCodeRowsSyllablesHideWhereTheKeyboardOffersThemOrTheRowIsTooLowToTap() {
-        // the keyboard's own column (九键) owns them, whatever the input method
-        assertTrue(syllablesOwned(true, Engines.PINYIN, ShuangpinKeyboard.Full, 18))
-        // 九键双拼's 123: an 18dp code row is under a touch target
-        assertTrue(syllablesOwned(false, Engines.SHUANGPIN, ShuangpinKeyboard.NineKeys, 18))
-        // the same with pinyin on the 14 keys: the row is 40dp, the strip can be tapped
-        assertFalse(syllablesOwned(false, Engines.SHUANGPIN, ShuangpinKeyboard.NineKeys, 40))
-        // 双拼 18 键 and pinyin show their strip
-        assertFalse(syllablesOwned(false, Engines.SHUANGPIN, ShuangpinKeyboard.Keys18, 40))
-        assertFalse(syllablesOwned(false, Engines.PINYIN, ShuangpinKeyboard.NineKeys, 18))
+        // the keyboard's own column (九键) owns them, whatever the row
+        assertTrue(syllablesOwned(true, CodeRowHeight.STRIP_DP))
+        // a thin code row (an input method without the strip) is under a touch target
+        assertTrue(syllablesOwned(false, CodeRowHeight.THIN_DP))
+        // the 14 keys, 双拼's 18 and nine keys (its 123): the row is tall, the strip can be tapped
+        assertFalse(syllablesOwned(false, CodeRowHeight.STRIP_DP))
+    }
+
+    // the tall row goes with the letters that put syllables on it: kept in step with lettersOf
+    @Test
+    fun theTallCodeRowGoesWithTheGroupedLetters() {
+        val grouped = setOf(GroupedKeyboard.Name14, GroupedKeyboard.Name18, T9Keyboard.ShuangpinName)
+        for (im in listOf(Engines.PINYIN, Engines.SHUANGPIN, Engines.T9, Engines.ENGLISH, Engines.HANDWRITING, "wbx")) {
+            for (keys14 in listOf(false, true)) for (sp in ShuangpinKeyboard.entries) {
+                assertEquals(
+                    "$im 14=$keys14 $sp",
+                    lettersOf(im, false, keys14, sp) in grouped,
+                    CodeRowHeight.showsStrip(im, keys14, sp != ShuangpinKeyboard.Full),
+                )
+            }
+        }
     }
 }
