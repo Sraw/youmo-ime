@@ -5,8 +5,13 @@
 package org.fcitx.fcitx5.android.input.popup
 
 import org.fcitx.fcitx5.android.assertRows
+import org.fcitx.fcitx5.android.engine.host.Keyboard
+import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
+import org.fcitx.fcitx5.android.engine.pinyin.g14
+import org.fcitx.fcitx5.android.engine.pinyin.nineSp
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
@@ -118,5 +123,44 @@ class PopupOverridesTest {
         assertArrayEquals(arrayOf("1", "Q", "É"), PopupOverrides.parse("q 1 Q é").resolve("Q", preset))
         // q and Q both upper-case to Q
         assertArrayEquals(arrayOf("Q", "1"), PopupOverrides.parse("q q Q 1").resolve("Q", preset))
+    }
+
+    // whether a long press's item is refused: one code point and internal (any private use) alone
+    @Test
+    fun anInternalCodeAloneIsRejected() = assertRows(
+        "the 14 keys' codes, first and last" to { assertTrue(PopupOverrides.rejects(g14("as")) && PopupOverrides.rejects(g14("zx"))) },
+        "the 18 keys' codes, first and last" to { assertTrue(PopupOverrides.rejects("\uF8C0") && PopupOverrides.rejects(String(Character.toChars(NineKeyLetters.G18_BLOCK.last)))) },
+        "the nine keys' 双拼's codes" to { assertTrue(PopupOverrides.rejects(nineSp("2")) && PopupOverrides.rejects(nineSp("9"))) },
+        "the syllables' codes" to { assertTrue(PopupOverrides.rejects(Keyboard.SYLLABLES.first.toString())) },
+        "a tap: supplementary, two chars, one code point" to { assertTrue(PopupOverrides.rejects(String(Character.toChars(Keyboard.TAPS.first)))) },
+        // the codes of an earlier build (⒜–⒵, ⒉–⒐), and their neighbours: characters a user may want
+        "enclosed letters and digits are text" to {
+            for (c in listOf("⒜", "⒵", "⒉", "⒐", "①", "⑴", "⒈", "Ⓐ")) assertFalse(c, PopupOverrides.rejects(c))
+        },
+        // text of more characters is committed as text: never read as a key
+        "a code within text is text" to {
+            assertFalse(PopupOverrides.rejects("${g14("as")}x") || PopupOverrides.rejects("a${g14("bn")}") || PopupOverrides.rejects(nineSp("234")))
+        },
+    )
+
+    // the keyboards' own codes (design §1.1): never kept, and one an older build or a backup wrote is
+    // kept as written but never offered
+    @Test
+    fun aKeyboardsCodeIsNeverKeptNorReadBack() {
+        val qw = g14("qw")
+        assertEquals(listOf("1", "x", "⒈⒉⒊"), PopupOverrides.Empty.with("q", listOf("1", qw, "x", "⒈⒉⒊")).get("q"))
+        assertEquals(listOf("⒜", "⒉"), PopupOverrides.Empty.with("q", listOf("⒜", "⒉")).get("q"))
+        val written = "q 1 $qw x \uF8C1\n${g14("bn")} 2"
+        val read = PopupOverrides.parse(written)
+        assertEquals(written, read.serialize())
+        assertArrayEquals(arrayOf("1", "x"), read.resolve("q", preset))
+        assertEquals(listOf("x"), PopupOverrides.Empty.with("w", listOf("\uF8C1", "x")).get("w"))
+    }
+
+    // a stored line emptied only by refused codes falls back to the preset; one written empty switches it off
+    @Test
+    fun aLineOfCodesAloneShowsThePreset() {
+        assertArrayEquals(arrayOf("1"), PopupOverrides.parse("q ${g14("qw")}").resolve("q", arrayOf("1")))
+        assertNull(PopupOverrides.parse("q").resolve("q", arrayOf("1")))
     }
 }

@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.input.keyboard
 
+import org.fcitx.fcitx5.android.engine.pinyin.nineSp
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -53,6 +54,15 @@ class NineKeySymbolsTest {
         assertEquals(emptyList<String>(), NineKeySymbols.edited(""))
         assertEquals(emptyList<String>(), NineKeySymbols.edited("  "))
         assertEquals(listOf("，"), NineKeySymbols.edited("a ，"))
+    }
+
+    // 九键双拼's abc code is a key, never a symbol
+    @Test
+    fun aKeyboardsCodeIsNoSymbol() {
+        assertFalse(NineKeySymbols.allowed(nineSp("2")))
+        assertEquals(listOf("@"), NineKeySymbols.split("${nineSp("2")} @"))
+        // the code of an earlier build is text now
+        assertTrue(NineKeySymbols.allowed("⒉"))
     }
 
     @Test

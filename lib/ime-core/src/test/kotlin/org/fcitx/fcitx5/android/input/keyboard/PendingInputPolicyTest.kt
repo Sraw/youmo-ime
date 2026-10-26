@@ -7,6 +7,7 @@ package org.fcitx.fcitx5.android.input.keyboard
 import org.fcitx.fcitx5.android.assertRows
 import org.fcitx.fcitx5.android.engine.host.Engines
 import org.fcitx.fcitx5.android.engine.pinyin.ShuangpinScheme
+import org.fcitx.fcitx5.android.engine.pinyin.g14
 import org.fcitx.fcitx5.android.input.keyboard.PendingInputPolicy.Resolution
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -90,5 +91,15 @@ class PendingInputPolicyTest {
         assertTrue(PendingInputPolicy.typesAsIs(";", address = true, reads = reads(Engines.SHUANGPIN, ShuangpinScheme.ZIRANMA)))
         assertTrue(PendingInputPolicy.typesAsIs(";", address = true, reads = reads(Engines.PINYIN, ShuangpinScheme.MICROSOFT)))
         assertTrue(PendingInputPolicy.typesAsIs("2", address = true, reads = reads(Engines.SHUANGPIN, ShuangpinScheme.MICROSOFT)))
+    }
+
+    /** On the 14 keys a code is a key: never typed as it is in an address field (design §1.2). */
+    @Test
+    fun onTheFourteenKeysTheirCodesStayKeys() {
+        val pinyin = { c: Int -> Engines.readsAsKey(Engines.PINYIN, ShuangpinScheme.ZIRANMA, c) }
+        assertFalse(PendingInputPolicy.typesAsIs(g14("bn"), address = true, reads = pinyin))
+        assertFalse(PendingInputPolicy.typesAsIs(g14("m"), address = true, reads = pinyin))
+        assertTrue(PendingInputPolicy.typesAsIs("2", address = true, reads = pinyin))
+        assertTrue(PendingInputPolicy.typesAsIs("_", address = true, reads = pinyin))
     }
 }

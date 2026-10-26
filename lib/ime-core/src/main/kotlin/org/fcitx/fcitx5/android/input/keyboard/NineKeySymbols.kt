@@ -4,6 +4,8 @@
  */
 package org.fcitx.fcitx5.android.input.keyboard
 
+import org.fcitx.fcitx5.android.input.popup.PopupOverrides
+
 /**
  * What a long press on each of 九键's keys 1 to 9 offers besides its digit and letters: symbols
  * typed from there alone, never read as the key's letters (those the engine decodes and
@@ -83,11 +85,13 @@ class NineKeySymbols private constructor(private val edited: Map<Char, List<Stri
             typed.map { if (it.isWhitespace()) ' ' else it }.joinToString("").split(' ').filter(::allowed).distinct().take(MAX)
 
         /**
-         * Not a digit or a letter alone: a long press offers those of the key already, in the row
+         * Not a digit or a letter alone, nor a keyboard's own code ([PopupOverrides.rejects]): a long press offers those of the key already, in the row
          * under its symbols, and any other is no symbol. Nothing blank or spaced.
          */
         fun allowed(symbol: String): Boolean {
             if (symbol.isEmpty() || symbol.any { it.isWhitespace() }) return false
+            // a keyboard's own code (NINE_SP's code for 2 reads as 九键双拼's abc key), as a popup refuses it
+            if (PopupOverrides.rejects(symbol)) return false
             val c = symbol.singleOrNull() ?: return true
             return c !in '0'..'9' && c.lowercaseChar() !in 'a'..'z'
         }
