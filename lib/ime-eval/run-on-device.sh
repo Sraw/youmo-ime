@@ -2,7 +2,7 @@
 # Runs an evaluation set through the engine the debug APK ships (the own engine, since libime
 # left the app) on a connected device or emulator, via EngineEvalRunner, and pulls the result, ready for
 #   ./gradlew :lib:ime-eval:run --args="score data/<set>.tsv <result.tsv> [baseline/<...>.tsv]"
-# Needs the native build (it installs the debug APK); INSTALL=0 runs on the APKs installed by a
+# Needs an APK build with the NDK (it installs the debug APK); INSTALL=0 runs on the APKs installed by a
 # run before, for several sets in a row.
 #   lib/ime-eval/run-on-device.sh [set=pinyin] [ime=engine-pinyin] [out-dir=build/eval]
 set -euo pipefail

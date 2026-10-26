@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The parity test editor (ParityEditor.java): never in a build that ships. parity.py builds it
+     with the SDK's tools alone and installs it twice, renamed io.github.sraw.parity.a and .b -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="io.github.sraw.parity.a">
+    <!-- the input method's idle provider (its debug build's UatIdleProvider), asked before a mark -->
+    <queries>
+        <package android:name="io.github.sraw.youmo.debug" />
+    </queries>
+    <!-- the idle provider is guarded by DUMP; parity.py grants it after the install -->
+    <uses-permission android:name="android.permission.DUMP" />
+    <application android:label="Parity editor" android:allowBackup="false">
+        <activity
+            android:name="io.github.sraw.parity.ParityEditor"
+            android:exported="true"
+            android:launchMode="singleTask"
+            android:windowSoftInputMode="stateAlwaysVisible" />
+    </application>
+</manifest>

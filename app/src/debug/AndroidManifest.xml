@@ -12,6 +12,17 @@
             android:exported="false"
             android:theme="@android:style/Theme.Material.Light"
             android:windowSoftInputMode="stateAlwaysVisible|adjustResize" />
+
+        <!--
+            The device UAT's idle signal (uat.py Device.idle): exported so the shell can query it,
+            behind DUMP, which the shell holds and no app can get (it tells whether you are typing).
+            Debug builds only.
+        -->
+        <provider
+            android:name="org.fcitx.fcitx5.android.debug.UatIdleProvider"
+            android:authorities="${applicationId}.uat.idle"
+            android:exported="true"
+            android:permission="android.permission.DUMP" />
     </application>
 
 </manifest>
