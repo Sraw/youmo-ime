@@ -1,12 +1,15 @@
 """uat/12-voice.md (语音输入, the voice build): on the emulator only (`uat.py run --devices 5554
 --flavor voice`), whose microphone is the host's PulseAudio source; what is "said" is a clip of
 uat/tools/voice-clips.py played into it (Device.say). The .md is the source of truth."""
+import json
+import os
 import re
+import subprocess
 import time
 
-from uat import PKG, Blocked, Fail, case, check, home, script
+from uat import CLIPS, OUT, PKG, Blocked, Fail, case, check, script
 
-LISTEN, HEARD_NOTHING, CANCEL = "正在听…", "没有听清", "松开手指，取消输入"
+LISTEN, HEARD_NOTHING, PREPARING, SILENT = "正在听…", "没有听清", "准备中…", "麦克风没有声音"
 EV = "emu,voice:语音只在模拟器上的语音版跑（--devices 5554 --flavor voice），redroid 没有麦克风输入"
 
 
@@ -26,7 +29,7 @@ def plain(t):
 
 def quiet(d, timeout=6):
     """nothing of the last utterance on screen (识别中…, 没有听清): a press while 没有听清 shows
-    is not taken (VO-16), and only VO-16 means to press then"""
+    is not taken, and no device case means to press then"""
     end = time.time() + timeout
     while time.time() < end:
         s = d.screen()
@@ -35,49 +38,151 @@ def quiet(d, timeout=6):
         time.sleep(0.2)
 
 
-def hold_space(d, timeout=60, wait_quiet=True):
-    """finger down on the space key until 正在听… shows (the first use after a reset loads the
-    models); returns the space key's centre"""
+# the emulator's touchscreen, written to with sendevent (adb shell is root there): a native binary
+# starts in milliseconds where `input` starts an app_process, ±300 ms on a loaded host
+# The device, its axes' top and the screen's size are read from the emulator once (another AVD or
+# skin has others), not assumed
+_touch = {}
+
+
+def touch_screen(d):
+    """(device, x max, y max, width, height) of the emulator's first multi-touch screen"""
+    if not _touch:
+        dev, axes = None, {}
+        for line in d.sh("getevent -pl").splitlines():
+            m = re.match(r"add device \d+: (\S+)", line)
+            if m:
+                if dev and "x" in axes and "y" in axes:
+                    break
+                dev, axes = m.group(1), {}
+            for name, key in (("ABS_MT_POSITION_X", "x"), ("ABS_MT_POSITION_Y", "y")):
+                m = re.search(name + r"\s*:.*max (\d+)", line)
+                if m:
+                    axes[key] = int(m.group(1))
+        if not (dev and "x" in axes and "y" in axes):
+            raise Blocked("getevent -pl 里没有多点触摸屏")
+        w, h = map(int, re.search(r"(\d+)x(\d+)", d.sh("wm size")).groups())
+        _touch.update(dev=dev, x=axes["x"], y=axes["y"], w=w, h=h)
+    t = _touch
+    return t["dev"], t["x"], t["y"], t["w"], t["h"]
+
+
+def raw_down(d, x, y):
+    """the shell line putting a finger down at (x, y) on the touchscreen, through sendevent"""
+    dev, xm, ym, w, h = touch_screen(d)
+    X, Y = x * xm // w, y * ym // h
+    return (f"sendevent {dev} 3 47 0; sendevent {dev} 3 57 7; sendevent {dev} 3 53 {X}; "
+            f"sendevent {dev} 3 54 {Y}; sendevent {dev} 3 58 50; sendevent {dev} 0 0 0")
+
+
+def raw_up(d):
+    dev = touch_screen(d)[0]
+    return f"sendevent {dev} 3 57 4294967295; sendevent {dev} 0 0 0"
+
+
+class HalBroke(Blocked):
+    """the emulator's sound card failing (pcm_readi failed): the try says nothing of the app; a
+    case that does not retry is blocked by it"""
+
+    def __init__(self):
+        super().__init__("模拟器声卡出错（pcm_readi failed），准备中…等不到声音")
+
+
+def hal_errors(d):
+    return int(d.sh("logcat -d | grep -c 'pcm_readi failed'").strip() or 0)
+
+
+def hold_space(d, timeout=60, wait_quiet=True, raw=False):
+    """finger down on the space key until the hold shows (准备中… or 正在听…; the first use after a
+    reset loads the models); returns the space key's centre. raw: through sendevent, to be lifted with raw_up"""
     emu_only(d)
     if wait_quiet:
         quiet(d)
     x, y = d.keys(refresh=True)["space"]
-    d.touch(("down", x, y))
+    if raw:
+        d.sh(raw_down(d, x, y))
+    else:
+        d.touch(("down", x, y))
+    start = time.time()
+
+    def lift():
+        if raw:
+            d.sh(raw_up(d))
+        else:
+            d.touch(("up", x, y))
+
+    def listening(s):
+        # nothing shown past 5 s with the sound card failing: the app's start waits on the HAL
+        # (rare; the hal_errors check after the wait is the one that mostly catches it)
+        if time.time() - start > 5 and hal_errors(d):
+            raise HalBroke()
+        # 准备中… is held too: the emulator's microphone reads exact zeroes till a clip plays, so
+        # 正在听 comes with the clip (VO-26)
+        return anywhere(s, LISTEN) or anywhere(s, PREPARING) or anywhere(s, SILENT)
+
     try:
-        d.wait(lambda s: anywhere(s, LISTEN), timeout, step=0.2, what=LISTEN)
+        d.wait(listening, timeout, step=0.2, what=LISTEN)
+    except HalBroke:
+        lift()
+        settle(d)
+        raise
     except Blocked:
         s = d.screen()
         d.shot("full", f"长按空格 {timeout} s，没有「{LISTEN}」")
-        d.touch(("up", x, y))
-        raise Fail(f"长按空格 {timeout} s 没出现「{LISTEN}」：屏幕上 {[n.text for n in s.nodes if n.text][:8]}，"
+        lift()
+        raise Fail(f"长按空格 {timeout} s 没出现「{LISTEN}」「{PREPARING}」「{SILENT}」中任何一个：屏幕上 {[n.text for n in s.nodes if n.text][:8]}，"
                    f"{d.top_activity()[-40:]}")
     return x, y
 
 
-def dictate(d, clip, release=True):
-    """hold space, say the clip, let go once it is heard; returns (what showed while listening, field)"""
+def dictate(d, clip):
+    """hold space, say the clip, let go once it is heard; returns (what showed while listening and
+    after the lift, field)"""
     x, y = hold_space(d)
     time.sleep(0.3)
+    # what shows before anything is said (the keys, the status line): not a recognized text
+    before = {n.text for n in d.screen().nodes if n.text and n.pkg == PKG}
     p = d.say(clip, wait=False)
     shown = []   # what the screen showed while it was said and just after
     end = time.time() + 30
     while time.time() < end and p.poll() is None:
         shown += [n.text for n in d.screen().nodes if n.text and n.pkg == PKG and n.text not in shown]
         time.sleep(0.2)
-    time.sleep(1.2)   # the last stretch's silence: the VAD closes it
-    shown += [n.text for n in d.screen().nodes if n.text and n.pkg == PKG and n.text not in shown]
-    if not release:
-        return shown, (x, y)
+    # the last stretch's silence (1.2 s: the VAD closes it), then up to 4 s for its text to show: on
+    # a loaded host the recognizer takes longer than the silence, and VO-02 then saw only 正在听…
+    heard = len(shown)
+    end = time.time() + 4
+    settled = time.time() + 1.2
+    texts, steady = None, time.time()
+    while time.time() < end:
+        s = d.screen()
+        shown += [n.text for n in s.nodes if n.text and n.pkg == PKG and n.text not in shown]
+        if time.time() >= settled and len(shown) > heard:
+            break
+        # the final text the same as a live one already in shown: nothing new would ever come, and
+        # the status line says 正在听… while the finger is down, so the screen unchanged for 1 s is the
+        # cue, but only with a recognized text on it: with none yet the recognizer may still be on the
+        # last stretch, and lifting then is the early lift the 4 s are for
+        now = [n.text for n in s.nodes if n.text and n.pkg == PKG]
+        recognized = any(t not in before and not any(k in t for k in (LISTEN, PREPARING, SILENT, HEARD_NOTHING)) for t in now)
+        if now != texts:
+            texts, steady = now, time.time()
+        elif recognized and time.time() >= settled and time.time() - steady >= 1:
+            break
+        time.sleep(0.2)
     d.touch(("up", x, y))
-    t = settle(d)
+    # 没有听清 shows for 1.2 s after the lift (VoiceHoldSession.MESSAGE_MS): caught while settling
+    t = settle(d, seen=shown)
     return shown, t
 
 
-def settle(d, timeout=15):
-    """the field once 识别中… is over"""
+def settle(d, timeout=15, seen=None):
+    """the field once 识别中… is over; what the app showed meanwhile is added to [seen]"""
     end = time.time() + timeout
     while time.time() < end:
         s = d.screen()
+        if seen is not None:
+            seen += [n.text for n in s.nodes if n.text and n.pkg == PKG and n.text not in seen]
         if not anywhere(s, "识别中") and not anywhere(s, LISTEN):
             break
         time.sleep(0.3)
@@ -85,25 +190,98 @@ def settle(d, timeout=15):
     return d.field_text() or ""
 
 
+def host_calm(timeout=30):
+    """wait (at most [timeout] s) till the host's 1-minute load is under its core count: with the
+    host saturated (other checkouts' Gradle) the emulator's vCPUs starve, the guest's audio HAL logs
+    "pcm_readi was late delivering frames, inserting … silence" for every 16 ms and the app hears
+    digital silence (envPeak -120 dBFS, no segment) though the clip played into uat-mic"""
+    end = time.time() + timeout
+    while time.time() < end and os.getloadavg()[0] >= os.cpu_count():
+        time.sleep(5)
+
+
 def retried(d, clip, ok, before=""):
     """dictate until ok(field) holds, three times at most: the emulator's microphone drops frames
     when the host is busy (the HAL's "late delivering frames, inserting … silence"). What a miss
     added after before is taken back between tries. Returns (shown, field, tries, misses)"""
-    misses = []
+    misses, shown, t = [], [], before
+    hal = False   # the last try lost to the sound card: the result is the emulator's, blocked
     for n in range(1, 4):
-        shown, t = dictate(d, clip)
+        host_calm()
+        d.sh("logcat -c")
+        hal = True
+        try:
+            shown, t = dictate(d, clip)
+        except HalBroke:   # a try lost to the emulator's sound card, as a dropped frame's
+            misses.append("（模拟器声卡出错）")
+            time.sleep(5)
+            continue
+        if hal_errors(d) and not ok(t):   # it failed after 准备中… had shown: not the app's miss either
+            misses.append(f"（模拟器声卡出错）{t[len(before):]}")
+            if len(t) > len(before):
+                d.bksp(len(t) - len(before))
+                t = before
+            time.sleep(5)
+            continue
+        hal = False
         if ok(t) or not t.startswith(before):
             return shown, t, n, misses
         misses.append(t[len(before):])
         if len(t) > len(before):
             d.bksp(len(t) - len(before))
+    if hal:
+        raise Blocked(f"3 次里最后一次模拟器声卡出错（pcm_readi failed），不算 App 的：{misses}")
     return shown, t, 3, misses
+
+
+RATE = 16000
+# how long after the speech's start the VAD's "voice speech started" line comes (its minimum speech
+# and a window or two); a first guess, the tries' own offsets move the lift after it
+LIFT_CUE_LAG = 0.35
+# the HAL's "late delivering frames" lines a try may have and still count (a good try has 0 to 7)
+HAL_LATE_MOST = 20
+# whether the build logs the cue (a debug build of the voice tail; not R15): set from the first try
+cued = False
+NOTHING_HEARD = "nothing heard"   # lift_early's offset when the debug log has no speech segment
+# how far the VAD's segment.start falls before the speech's real start: sherpa puts the start at the
+# window it fired in less two windows and the minimum speech (the design's offset formula, + 1024)
+VAD_START_LAG = 1024
+
+
+def span(clip):
+    """the clip's speech start and end, seconds from its start (voice-clips.py's <clip>.json)"""
+    f = os.path.join(CLIPS, f"{clip}.json")
+    if not os.path.exists(f):
+        raise Blocked(f"没有 {f}：重跑 uat/tools/voice-clips.py")
+    with open(f) as j:
+        v = json.load(j)
+    return v["speech_start_s"], v["speech_end_s"]
+
+
+def capture_log(d):
+    """the debug build's one line at the microphone's close (VoiceListener): numbers, None if absent"""
+    line = d.sh("logcat -d | grep 'voice capture:' | tail -1").strip()
+    if not line:
+        return None
+    v = dict(re.findall(r"(\w+(?:\.\w+)?)=(\S+)", line))
+    num = lambda k: None if v.get(k) in (None, "null") else float(v[k])
+    got = {k: num(k) for k in ("liftFrame", "stopAt", "read", "segment.start", "segments", "envPeak", "peakGainDb")}
+    # the emulator's sound card failing mid-capture ("pcm_readi failed with 'cannot read/write stream
+    # data: I/O error'"): the HAL hands the app silence from there on, which can leave a speech
+    # segment of a syllable or two and an empty text. The emulator's, not the app's
+    got["halErrors"] = hal_errors(d)
+    # and running late: past a few, the silence it pads with shifts the record's frames against the
+    # speech, so the lift's offset is not where the finger was (seen: +83, -716 ms around -450)
+    got["halLate"] = int(d.sh("logcat -d | grep -c 'late delivering frames'").strip() or 0)
+    return got
 
 
 def tries_note(n, misses):
     return "" if n == 1 else f"（第 {n} 次；之前听成 {misses}）"
 
 
+# also on the JVM (VoiceHoldUatTest.theFirstHoldAsksForTheMicrophone); the system dialog and the way back
+# to the field after 允许 are the framework's, which Robolectric does not run
 @case("VO-01", base="B0", mutates=True, needs=EV)
 def vo01(d):
     emu_only(d)
@@ -131,145 +309,62 @@ def vo02(d):
     return f"听的时候显示 {live[:2]}；框里「{t}」{tries_note(n, miss)}"
 
 
-@case("VO-03", base="B0-语音", needs=EV)
-def vo03(d):
-    shown, (x, y) = dictate(d, "nihao", release=False)
-    if not any("你" in t or "好" in t for t in shown):
-        d.touch(("up", x, y))
-        raise Blocked(f"这一句没听到「你好」（模拟器麦克风丢帧），取消测不出：{shown[:6]}")
-    d.touch(("move", x, y - 150), ("sleep", 0.2), ("move", x, y - 300), ("sleep", 0.4))
-    s = d.screen()
-    hint = bool(anywhere(s, CANCEL))
-    d.touch(("up", x, y - 300))
-    t = settle(d)
-    check(t == "", f"上滑松开后框里「{t}」")
-    check(hint, f"上滑时没显示「{CANCEL}」")
-    return f"上滑时显示「{CANCEL}」；框里为空"
+case("VO-03", needs="jvm:VoiceHoldUatTest.slidingUpDropsIt")(lambda d: None)
 
 
-def open_panel(d):
-    """the toolbar's microphone: the voice panel; returns the big microphone's node"""
-    emu_only(d)
-    s = d.screen()
-    mic = s.find(desc="语音输入", where="ime")
-    if not mic:
-        d.expand_toolbar()
-        s = d.screen()
-        mic = s.find(desc="语音输入", where="ime")
-    if not mic:
-        raise Fail(f"工具栏上没有麦克风：{[n.desc for n in s.ime() if n.desc][:12]}")
-    d.tap(mic.c, 1.0)
-    s = d.screen()
-    if not anywhere(s, "按住话筒说话"):
-        raise Fail(f"点麦克风后没有语音面板：{[n.text for n in s.ime() if n.text][:10]}")
-    return s
+case("VO-04", needs="jvm:VoiceHoldUatTest.thePanelsMicrophoneTypesWhatIsSaid")(lambda d: None)
 
 
-def panel_mic(d, s):
-    """the panel's microphone (按住 说话) and the circle around it"""
-    m = s.find(desc="按住 说话", where="ime")
-    if not m:
-        raise Blocked(f"语音面板上找不到话筒：{[n.desc for n in s.ime() if n.desc][:10]}")
-    return m, (m.parent.b if m.parent else m.b)
+case("VO-05", needs="jvm:VoiceHoldUatTest.slidingOffThePanelsMicrophoneDropsIt")(lambda d: None)
 
 
-def panel_say(d, clip):
-    s = open_panel(d)
-    m, _ = panel_mic(d, s)
-    x, y = m.c
-    d.touch(("down", x, y))
-    d.wait(lambda s: anywhere(s, "松开 上屏") or anywhere(s, LISTEN), 60, step=0.2, what="松开 上屏")
-    time.sleep(0.3)
-    d.say(clip)
-    time.sleep(1.2)
-    d.touch(("up", x, y))
-    return settle(d)
+case("VO-06", needs="jvm:VoiceHoldUatTest.numbersAreWrittenInDigits")(lambda d: None)
 
 
-@case("VO-04", base="B0-语音", mutates="learn", needs=EV)
-def vo04(d):
-    tries = []
-    for n in range(1, 4):
-        t = panel_say(d, "zouba")
-        tries.append(t)
-        if plain(t) == "我们走吧":
-            break
-        d.back()
-        d.open_page("text")
-    check(plain(t) == "我们走吧", f"面板里说「我们走吧」，框里「{t}」（{len(tries)} 次：{tries}）")
-    return f"框里「{t}」" + ("" if len(tries) == 1 else f"（第 {len(tries)} 次；之前 {tries[:-1]}）")
+case("VO-07", needs="jvm:VoiceHoldUatTest.wordsWithNumeralsAreLeftAlone")(lambda d: None)
 
 
-@case("VO-05", base="B0-语音", needs=EV)
-def vo05(d):
-    s = open_panel(d)
-    m, ring = panel_mic(d, s)
-    x, y = m.c
-    d.touch(("down", x, y))
-    d.wait(lambda s: anywhere(s, "松开 上屏") or anywhere(s, LISTEN), 60, step=0.2, what="松开 上屏")
-    d.say("nihao")
-    heard = False
-    end = time.time() + 2
-    while time.time() < end and not heard:
-        heard = bool(anywhere(d.screen(), "你好"))
-        time.sleep(0.2)
-    out = ring[0] - 150
-    if not heard:
-        d.touch(("up", x, y))
-        raise Blocked("这一句没听到「你好」（模拟器麦克风丢帧），取消测不出")
-    d.touch(("move", (x + out) // 2, y), ("sleep", 0.1), ("move", out, y), ("sleep", 0.4))
-    hint = bool(anywhere(d.screen(), "松开 取消"))
-    d.touch(("up", out, y))
-    t = settle(d)
-    check(t == "", f"滑出话筒圈松开后框里「{t}」")
-    check(hint, "滑出话筒圈时没显示「松开 取消」")
-    return "滑出时显示「松开 取消」；框里为空"
+case("VO-08", needs="jvm:VoiceHoldUatTest.englishInChineseIsTypedAsWritten")(lambda d: None)
 
 
-def bare(t):
-    return "".join(ch for ch in t if ch not in "。，,. ")
-
-
-@case("VO-06", base="B0-语音", mutates="learn", needs=EV)
-def vo06(d):
-    _, t1, n1, m1 = retried(d, "2002", lambda t: bare(t) == "2002年")
-    check(bare(t1) == "2002年", f"说「二零零二年」，框里「{t1}」{tries_note(n1, m1)}")
-    _, t, n2, m2 = retried(d, "57", lambda t: bare(t) == "2002年57%", before=t1)
-    check(bare(t) == "2002年57%", f"再说「百分之五十七」，框里「{t}」{tries_note(n2, m2)}")
-    return f"框里「{t}」{tries_note(n1, m1)}{tries_note(n2, m2)}"
-
-
-@case("VO-07", base="B0-语音", mutates="learn", needs=EV)
-def vo07(d):
-    _, t, n, miss = retried(d, "shifen", lambda t: plain(t) == "这个电影十分有趣")
-    check(plain(t) == "这个电影十分有趣", f"框里「{t}」{tries_note(n, miss)}")
-    return f"框里「{t}」{tries_note(n, miss)}"
-
-
-@case("VO-08", base="B0-语音", mutates="learn", needs=EV)
-def vo08(d):
-    _, t, n, miss = retried(d, "iphone", lambda t: "我想买" in t)
-    check("iPhone" in t, f"说「我想买一个 iPhone」，框里「{t}」{tries_note(n, miss)}")
-    return f"框里「{t}」{tries_note(n, miss)}"
-
-
-@case("VO-09", base="B0-语音", needs=EV)
+# also on the JVM (VoiceHoldUatTest.aCoughTypesNothing); this one, the room's own noise through the gain:
+# digital silence shows no gain, so real noise is played
+@case("VO-09", base="B0-语音", mutates="learn", needs=EV)
 def vo09(d):
-    x, y = hold_space(d)
-    d.say("cough")
-    time.sleep(1.0)
-    d.touch(("up", x, y))
-    seen = None
-    end = time.time() + 6
-    while time.time() < end and not seen:
-        seen = anywhere(d.screen(), HEARD_NOTHING)
-        time.sleep(0.2)
-    t = settle(d)
-    check(t == "", f"只咳嗽一声，框里「{t}」")
-    check(seen, f"没显示「{HEARD_NOTHING}」")
-    return f"显示「{HEARD_NOTHING}」，框里为空"
+    emu_only(d)
+    lost = []
+    for _ in range(4):
+        host_calm()
+        d.sh("logcat -c")   # this try's line only, not one an earlier case left
+        try:
+            shown, t = dictate(d, "room")
+        except HalBroke:
+            lost.append("准备中…时声卡出错")
+            time.sleep(5)   # its failures come in runs: let it settle
+            continue
+        log = capture_log(d)
+        # with the debug log, the noise must have reached the app at its level (-60 dBFS played)
+        # through a working sound card: digital silence (-120) or a failed HAL leaves the field
+        # empty too and says nothing of the gain
+        if log and log["halErrors"]:
+            lost.append("声卡出错")
+        elif log and log["envPeak"] is not None and not -70 <= log["envPeak"] <= -50:
+            lost.append(f"env {log['envPeak']} dBFS")
+        else:
+            break
+        if plain(t):
+            d.bksp(len(t))
+        time.sleep(5)
+    else:
+        raise Blocked(f"4 次噪声都没按电平送到 App：{lost}")
+    check(plain(t) == "", f"只播 3 s 底噪（约 -60 dBFS），框里「{t}」")
+    check(HEARD_NOTHING in shown, f"只播底噪，松开后没显示「{HEARD_NOTHING}」：{shown[:8]}")
+    gain = f"，env 峰值 {log['envPeak']} dBFS 处增益 {log['peakGainDb']:+.1f} dB" if log and log["peakGainDb"] is not None else ""
+    return f"底噪 3 s：不上屏，显示「{HEARD_NOTHING}」{gain}" + (f"（之前不算：{lost}）" if lost else "")
 
 
+# also on the JVM (VoiceUatTest.aBlockedWordIsNotTypedFromVoice), which checks the string handed to the
+# recognizer; this one, that the stream with searchBlocked changes what is heard
 @case("VO-10", base="B0-设置", mutates=True, needs=EV)
 def vo10(d):
     emu_only(d)
@@ -281,143 +376,17 @@ def vo10(d):
     return f"框里「{t}」{tries_note(n, miss)}"
 
 
-@case("VO-11", base="B0-语音", page="password", visual=True, needs=EV)
-def vo11(d):
-    emu_only(d)
-    x, y = d.keys(refresh=True)["space"]
-    d.touch(("down", x, y), ("sleep", 1.5))
-    s = d.screen()
-    d.touch(("up", x, y))
-    check(not anywhere(s, LISTEN), "密码框里长按空格进了语音输入")
-    time.sleep(0.5)
-    s = d.screen()
-    mic = s.find(desc="语音输入", where="ime")
-    usable = bool(mic and mic.enabled)
-    check(not usable, "密码框里工具栏上有可用的麦克风")
-    # a slow drag on space still moves the cursor (Voice does not take the touch where it can't
-    # listen); a password field hides its text, so what shows is no space typed and no listening
-    d.type("abcdef")
-    n0 = len(d.field_text() or "")
-    steps = ["input motionevent DOWN {} {}".format(x, y)]
-    steps += [f"sleep 0.15; input motionevent MOVE {x - 20 * k} {y}" for k in range(1, 13)]
-    steps.append(f"input motionevent UP {x - 240} {y}")
-    d.sh("; ".join(steps))
-    time.sleep(0.6)
-    s = d.screen()
-    n1 = len(d.field_text(s) or "")
-    check(not anywhere(s, LISTEN), "慢拖空格进了语音")
-    check(n1 == n0, f"慢拖空格后框里字数 {n0} → {n1}（打出了空格？）")
-    # the hidden text gives no cursor position to read: the screenshot shows where it went
-    d.shot("field", "慢拖空格后：光标应在 abcdef 中间（不在末尾）")
-    return f"长按空格没进语音；工具栏{'有灰的' if mic else '没有'}麦克风；慢拖空格没打字、没听写；光标看图"
+case("VO-11", needs="jvm:VoiceKeyboardUatTest.aPasswordFieldHasNoVoice")(lambda d: None)
 
 
-def touchscreen(d):
-    """(event node, x max, y max, screen w, h): the first input device with multi-touch axes, and
-    the display's size; Blocked when either is not found"""
-    dev, axes = None, {}
-    for line in d.sh("getevent -pl").splitlines():
-        m = re.match(r"add device \d+: (\S+)", line)
-        if m:
-            if axes.keys() >= {"X", "Y"}:
-                break
-            dev, axes = m.group(1), {}
-            continue
-        m = re.search(r"ABS_MT_POSITION_([XY]).*max (\d+)", line)
-        if m:
-            axes[m.group(1)] = int(m.group(2))
-    size = re.search(r"(\d+)x(\d+)", d.sh("wm size").splitlines()[-1] if d.sh("wm size") else "")
-    if not dev or axes.keys() < {"X", "Y"} or not size:
-        raise Blocked(f"找不到触摸屏或屏幕尺寸：{dev} {axes} {size}")
-    return dev, axes["X"], axes["Y"], int(size.group(1)), int(size.group(2))
+case("VO-12", needs="jvm:VoiceHoldUatTest.onlyTheFieldItWasSaidForGetsIt")(lambda d: None)
 
 
-def mt(d, *steps):
-    """fingers on the emulator's touchscreen (sendevent, root): ("down"|"move", slot, x, y),
-    ("up", slot), ("sleep", s)"""
-    TOUCH, mx, my, w, h = touchscreen(d)
-    cmds = []
-    for st in steps:
-        if st[0] == "sleep":
-            cmds.append(f"sleep {st[1]}")
-            continue
-        slot = st[1]
-        cmds.append(f"sendevent {TOUCH} 3 47 {slot}")
-        if st[0] == "down":
-            x, y = st[2] * mx // w, st[3] * my // h
-            # the device has no BTN_TOUCH: a contact is its tracking id, pressure and size
-            cmds += [f"sendevent {TOUCH} 3 57 {100 + slot}", f"sendevent {TOUCH} 3 53 {x}",
-                     f"sendevent {TOUCH} 3 54 {y}", f"sendevent {TOUCH} 3 58 512", f"sendevent {TOUCH} 3 48 8"]
-        elif st[0] == "move":
-            cmds += [f"sendevent {TOUCH} 3 53 {st[2] * mx // w}", f"sendevent {TOUCH} 3 54 {st[3] * my // h}"]
-        else:
-            cmds.append(f"sendevent {TOUCH} 3 57 -1")
-        cmds.append(f"sendevent {TOUCH} 0 0 0")
-    d.root("; ".join(cmds))
+case("VO-13", needs="jvm:VoiceHoldUatTest.holdingTheSpaceForThePickerDoesNotTalk")(lambda d: None)
 
 
-@case("VO-12", base="B0-语音", page="", needs=EV)
-def vo12(d):
-    emu_only(d)
-    s = d.screen()
-    other = next((n for n in s.app() if n.rid == "sentence"), None)
-    if not other:
-        raise Blocked(f"测试页上看不到「句子」框：{[n.rid for n in s.app() if n.cls == 'EditText']}")
-    quiet(d)
-    x, y = d.keys(refresh=True)["space"]
-    mt(d, ("down", 0, x, y))
-    try:
-        d.wait(lambda s: anywhere(s, LISTEN), 60, step=0.2, what=LISTEN)
-    except Blocked:
-        mt(d, ("up", 0))
-        raise Fail(f"长按空格没出现「{LISTEN}」")
-    time.sleep(0.3)
-    d.say("nihao")
-    heard, shown = False, []
-    end = time.time() + 3
-    while time.time() < end and not heard:
-        s = d.screen()
-        heard = bool(anywhere(s, "你好"))
-        shown = [n.text for n in s.nodes if n.text and len(n.text) > 1][:6]
-        time.sleep(0.2)
-    if not heard:
-        mt(d, ("up", 0))
-        raise Blocked(f"这一句没听到「你好」（模拟器麦克风丢帧），测不了换框：{shown}")
-    # the other hand: a second finger taps 句子 while the first still holds the space key
-    mt(d, ("down", 1, *other.c), ("sleep", 0.1), ("up", 1), ("sleep", 0.8))
-    moved = next((n.focused for n in d.screen().app() if n.rid == "sentence"), False)
-    mt(d, ("up", 0))
-    settle(d)
-    time.sleep(1.0)
-    if not moved:
-        raise Blocked("第二指没点到「句子」框（焦点没移过去），测不了换框")
-    s = d.screen()
-    t_other = next((n.text for n in s.app() if n.rid == "sentence"), "") or ""
-    t_text = next((n.text for n in s.app() if n.rid == "text"), "") or ""
-    check("你好" not in t_other, f"「你好」进了「句子」框：「{t_other}」")
-    return f"听到「你好」时点「句子」框再松开：「句子」框「{t_other}」，「普通文本」框「{t_text}」"
-
-
-@case("VO-13", base="B0-设置", mutates=True, needs=EV)
-def vo13(d):
-    emu_only(d)
-    home(d, "按键")
-    d.choose("空格键长按行为", "显示输入法选择对话框")
-    d.open_page("text")
-    x, y = d.keys(refresh=True)["space"]
-    d.touch(("down", x, y), ("sleep", 1.5))
-    s = d.screen()
-    d.touch(("up", x, y))
-    time.sleep(0.8)
-    s2 = d.screen()
-    listening = anywhere(s, LISTEN)
-    picker = anywhere(s2, "选择输入法") or anywhere(s, "选择输入法")
-    d.back()
-    check(not listening, "改成输入法选择后长按空格仍进了语音")
-    check(picker, f"没弹出系统输入法选择框：{s2.texts(where='all')[:8]}")
-    return "弹出「选择输入法」，没进语音"
-
-
+# also on the JVM (VoiceUatTest.aWordAddedByHandIsListenedForHardest); this one, that the stream's hotwords
+# change what is heard
 @case("VO-14", base="B0-设置", mutates=True, needs=EV)
 def vo14(d):
     emu_only(d)
@@ -428,206 +397,318 @@ def vo14(d):
     return f"框里「{t}」{tries_note(n, miss)}"
 
 
-@case("VO-15", base="B0-设置")
-def vo15(d):
-    home(d, "更多选项", "关于")
-    d.tap_text("第三方库许可证", after=2.0)
-    for _ in range(12):
-        s = d.screen()
-        n = next((n for n in s.app() if "LibriSpeech" in n.text), None)
-        if n:
-            break
-        d.scroll(s)
-    else:
-        n = None
-    if d.flavor != "voice":   # the text build has no voice model: no LibriSpeech either
-        check(not n, "文字版的许可证页列着 LibriSpeech")
-        return "文字版：许可证页没有 LibriSpeech"
-    if not n:
-        raise Fail("许可证页没有 LibriSpeech")
-    row = n.row() or n.parent
-    texts = [m.text for m in (row.walk() if row else [n]) if m.text]
-    lic = any("CC-BY-4.0" in t or "CC BY 4.0" in t for t in texts)
-    check(lic, f"LibriSpeech 那一行 {texts}")
-    d.tap(n.c, 1.0)
-    # the link opens in the system browser: openslr.org's page 12 is the LibriSpeech corpus (SLR12)
+case("VO-15", needs="jvm:SettingsPagesUatTest.theVoiceModelsDataIsCredited")(lambda d: None)
+
+
+case("VO-16", needs="jvm:VoiceHoldUatTest.holdingAgainWhileDidntCatchThatShowsListens")(lambda d: None)
+
+
+case("VO-17", needs="jvm:VoiceUatTest.onlyTheWordAddedIsListenedFor")(lambda d: None)
+
+
+case("VO-18", needs="jvm:VoiceUatTest.anImportedWordIsNotListenedForTillAddedByHand")(lambda d: None)
+
+
+case("VO-19", needs="jvm:VoiceHoldUatTest.whatIsSaidIsContextNotLearned")(lambda d: None)
+
+
+case("VO-20", needs="jvm:VoiceUatTest.aNameTypedTwiceIsListenedFor")(lambda d: None)
+
+
+case("VO-21", needs="jvm:VoiceUatTest.aWordDeletedOrBlockedIsNotListenedFor")(lambda d: None)
+
+
+case("VO-22", needs="jvm:VoiceUatTest.habitsOffListensForNoneOfTheirs")(lambda d: None)
+
+
+case("VO-27", needs="jvm:VoiceHoldUatTest.aSilentMicrophoneIsSaidAndListeningComesWithTheFirstSound")(lambda d: None)
+
+
+def input_lag(d):
+    """how long the lift takes to send (two sendevents), less adb's own round trip: VO-23's lift is
+    sent that much earlier"""
+    def took(cmd):
+        t = time.time()
+        d.sh(cmd)
+        return time.time() - t
+    # a bare SYN_REPORT: the start-up of the same binary, no finger moved
+    dev = touch_screen(d)[0]
+    syn = f"sendevent {dev} 0 0 0; sendevent {dev} 0 0 0"
+    return max(0.0, min(took(syn) for _ in range(3)) - min(took("true") for _ in range(3)))
+
+
+def keep_log(d, clip, why):
+    """the whole logcat of a try that typed nothing though speech was heard, for its why"""
+    f = os.path.join(OUT, "voice-logs", f"{clip}-{time.strftime('%H%M%S')}-{why}.txt")
+    os.makedirs(os.path.dirname(f), exist_ok=True)
+    with open(f, "w") as o:
+        o.write(d.sh("logcat -d"))
+    return f
+
+
+def lift_early(d, clip, before_s):
+    """hold space, play the clip and lift [before_s] before its speech ends; returns (field, offset ms
+    of the lift from the speech's end as the debug log puts it or None (a build without the log: R15),
+    whether timestamped). With the debug log the lift is timed on the device from the app's own
+    "voice speech started" line (the VAD's, LIFT_CUE_LAG after the speech's start): the clip's way
+    from the host's player into the guest varies by ±500 ms, the cue's by tens. Without the log
+    (R15) from the moment the player starts, as before"""
+    global cued
+    start, end = span(clip)
+    d.sh("logcat -c")
     try:
-        s = d.wait(lambda s: s if any("SLR12" in (m.text or "") or "openslr.org/12" in (m.text or "")
-                                      for m in s.nodes) else None, 15, what="openslr.org/12")
-        link = [m.text for m in s.nodes if "SLR12" in (m.text or "") or "openslr.org" in (m.text or "")]
-    except Blocked:
-        link = []
-    top = d.top_activity()
-    d.back()
-    d.sh("am force-stop com.android.chrome")
-    check(link, f"点 LibriSpeech 没打开 openslr.org/12：{top}")
-    return f"LibriSpeech {texts}；点开是 {link[:2]}"
-
-
-@case("VO-16", base="B0-语音", mutates="learn", needs=EV)
-def vo16(d):
-    x, y = hold_space(d)
+        hold_space(d, raw=True)
+    except HalBroke:
+        return d.field_text() or "", NOTHING_HEARD, False
     time.sleep(0.3)
-    d.say("cough")
-    time.sleep(1.0)
-    d.touch(("up", x, y))
-    d.wait(lambda s: anywhere(s, HEARD_NOTHING), 8, step=0.1, what=HEARD_NOTHING)
-    # still showing: press again at once
-    d.touch(("down", x, y))
-    started = False
-    end = time.time() + 6
-    while time.time() < end and not started:
-        started = bool(anywhere(d.screen(), LISTEN))
-        time.sleep(0.2)
-    if not started:
-        d.touch(("up", x, y))
-        raise Fail(f"「{HEARD_NOTHING}」还显示着时再按住空格，6 s 没出现「{LISTEN}」（松开再按才行）")
-    time.sleep(0.3)
-    d.say("nihao")
-    time.sleep(1.2)
-    d.touch(("up", x, y))
+    if cued:
+        # 450 ms, not before_s: that one is the host-timed lift's, moved by its misses
+        wait = max(0.0, end - start - LIFT_CUE_LAG - 0.45)
+        cmd = f"logcat -m 1 -e 'voice speech started' >/dev/null; sleep {wait:.3f}; {raw_up(d)}"
+    else:
+        cmd = f"sleep {max(0.0, end - before_s):.3f}; {raw_up(d)}"
+    up = subprocess.Popen(["adb", "-s", d.serial, "shell", cmd])
+    p = d.say(clip, wait=False)
+    try:
+        up.wait(end + 5)
+    except subprocess.TimeoutExpired:   # no cue: nothing was heard; the finger lifted all the same
+        up.kill()
+        d.sh(raw_up(d))
+    p.wait(30)
+    cued = cued or bool(d.sh("logcat -d | grep -c 'voice speech started'").strip() not in ("", "0"))
     t = settle(d)
-    check(plain(t) == "你好", f"第二次说「你好」，框里「{t}」")
-    return f"第二次马上开始听，框里「{t}」"
+    log = capture_log(d)
+    if not log or log["segment.start"] is None or log["stopAt"] is None:
+        return t, None, False
+    if log["segment.start"] < 0 or log["halErrors"] or log["halLate"] > HAL_LATE_MOST:   # no speech, or the sound card failed: the clip never arrived whole
+        return t, NOTHING_HEARD, False
+    # split in two: segment.start is the second one's, and the offset below would be off by the
+    # first one's length (a build without the count: None, taken as one)
+    if (log["segments"] or 1) > 1:
+        return t, NOTHING_HEARD, False
+    if not plain(t):
+        keep_log(d, clip, "empty")
+    # no timestamp: the frames read when the capture thread saw the lift, which adds the capture
+    # path's latency to the offset
+    lift = log["liftFrame"] if log["liftFrame"] is not None else log["stopAt"] - 0.3 * RATE
+    speech_end = log["segment.start"] + VAD_START_LAG + (end - start) * RATE
+    return t, (lift - speech_end) * 1000 / RATE, log["liftFrame"] is not None
 
 
-@case("VO-17", base="B0-设置", mutates=True, needs=EV)
-def vo17(d):
+def verdict(clip, results):
+    """three counted tries, judged by what was typed alone, so the same script runs on a build
+    without the debug log (R15, the red run) and with it: 3 of 3 right passes; 2 or more wrong is
+    the design's red; one wrong is neither and fails too"""
+    wrong = sum(not ok for ok, _ in results)
+    notes = "、".join(n for _, n in results)
+    if wrong:
+        raise Fail(f"{clip}：3 次里 {wrong} 次不对（{'红：≥ 2 次失败' if wrong >= 2 else '不稳定'}）：{notes}")
+    return f"{clip}：3/3 对：{notes}"
+
+
+def counted_tries(d, clip, attempt, most=5):
+    """[attempt]() → (ok, note, counted) until three are counted, [most] attempts at most"""
+    results, every = [], []
+    for _ in range(most):
+        host_calm()
+        before = d.field_text() or ""
+        ok, note, counted, t = attempt(before)
+        every.append(note)
+        if counted:
+            results.append((ok, note))
+            if len(results) == 3:
+                return results
+        if len(t) > len(before):   # taken back either way: the next try starts from the same text
+            d.bksp(len(t) - len(before))
+    raise Blocked(f"{clip}：{most} 次里只有 {len(results)} 次算数：{every}")
+
+
+@case("VO-23", base="B0-语音", mutates="learn", needs=EV)
+def vo23(d):
     emu_only(d)
-    script("13-words").add_word(d, "澜境花园")
-    d.open_page("text")
     out = []
-    for clip, want in (("jintian", "今天天气很好"), ("nihao", "你好")):
-        _, t, n, miss = retried(d, clip, lambda t, w=want: plain(t) == w)
-        check(plain(t) == want, f"加了「澜境花园」后说「{want}」，框里「{t}」{tries_note(n, miss)}")
-        out.append(f"「{t}」{tries_note(n, miss)}")
-        d.clear()
+    for clip, want in (("jintian", "今天天气很好"), ("zouba", "我们走吧")):
+        before_s = 0.45 + input_lag(d)
+
+        def attempt(before):
+            nonlocal before_s
+            t, off, stamped = lift_early(d, clip, before_s)
+            got = t[len(before):] if t.startswith(before) else t
+            ok = plain(got) == want
+            if off is NOTHING_HEARD:   # the emulator's HAL failed: says nothing about the tail
+                time.sleep(5)   # its failures come in runs: let it settle
+                return ok, f"没收到声音、声卡出错或语音被切成两段「{got}」（不算）", False, t
+            if off is None:   # no log (R15): the time cannot be checked, the text is the result
+                return ok, f"「{got}」", True, t
+            note = f"{off:+.0f} ms{'' if stamped else '（无时间戳）'}「{got}」"
+            if -500 <= off <= -400:
+                return ok, note, True, t
+            # off the window: not counted. Timed from the host's player (no cue: R15's first try)
+            # the next lift moves by half what this one missed by: `input`'s start and the clip's
+            # way in vary by ±300 ms there, wider than the 100 ms window. Timed from the cue it
+            # stays: those land within ±10 ms of each other (-466, -477, -483, -474), so a try off
+            # the window is one the emulator's audio upset, and moving after it chased that noise
+            if not cued:
+                before_s += (off + 450) / 2000
+            return ok, note + "（不在区间，不算）", False, t
+
+        out.append(verdict(clip, counted_tries(d, clip, attempt, most=10)))
     return "；".join(out)
 
 
-def _words():
-    return script("13-words")
-
-
-def heard_once(d, clip, want):
-    """one dictation (retried only on a drop-out: an empty or cut result), then the field emptied"""
-    _, t, n, miss = retried(d, clip, lambda t: len(plain(t)) >= len(want))
-    d.clear()
-    return t, tries_note(n, miss)
-
-
-@case("VO-18", base="B0-设置", mutates=True, needs=EV)
-def vo18(d):
+@case("VO-24", base="B0-语音", mutates="learn", needs=EV)
+def vo24(d):
     emu_only(d)
-    w = _words()
-    w.push(d, "voice-import.txt")   # the .md's fixture, pushed
-    _, msgs = w.import_file(d, "voice-import.txt", "用户词库")
-    check(w.imported_count(msgs) == 1, f"导入结果 {msgs[:3]}")
-    d.open_page("text")
-    d.switch_im("拼音")
-    t1, n1 = heard_once(d, "lanjing", "我住在澜境花园")
-    check("澜境花园" not in t1, f"导入后说「我住在澜境花园」就是「{t1}」{n1}")
-    w.add_word(d, "澜境花园", "lan jing hua yuan")
-    d.open_page("text")
-    d.switch_im("拼音")
-    _, t2, n, miss = retried(d, "lanjing", lambda t: "澜境花园" in t)
-    check("澜境花园" in t2, f"手动加了以后说「我住在澜境花园」，框里「{t2}」{tries_note(n, miss)}")
-    return f"导入后「{t1}」{n1}；手动加了以后「{t2}」{tries_note(n, miss)}"
+    out = []
+    for clip, want in (("zouba-q44", "我们走吧"), ("nihao-q44", "你好")):
+        def attempt(before):
+            d.sh("logcat -c")
+            try:
+                _, t = dictate(d, clip)
+            except HalBroke:
+                time.sleep(5)   # its failures come in runs: let it settle
+                return False, "准备中…时模拟器声卡出错（不算）", False, d.field_text() or ""
+            got = t[len(before):] if t.startswith(before) else t
+            ok = plain(got) == want
+            log = capture_log(d)
+            if not log or log["envPeak"] is None:   # no log (R15): the text is the result
+                return ok, f"「{got}」", True, t
+            env, gain = log["envPeak"], log["peakGainDb"]
+            note = f"env {env} dBFS、{gain:+.1f} dB「{got}」"
+            if log["halErrors"]:   # the emulator's sound card failed mid-capture
+                time.sleep(5)   # its failures come in runs: let it settle
+                return ok, note + "（模拟器声卡出错，不算）", False, t
+            # the level in the guest off: not counted. The clip's own peak lands at -55 ± 1 dBFS
+            # (measured -55.3 to -54.3), so the top of the window has 5 dB of room; the gain is
+            # what says it was quiet speech
+            if -65 <= env <= -50 and gain >= 15:
+                return ok, note, True, t
+            return ok, note + "（电平不对，不算）", False, t
+
+        out.append(verdict(clip, counted_tries(d, clip, attempt, most=10)))
+    return "；".join(out)
 
 
-@case("VO-19", base="B0-语音", mutates=True, needs=EV, clean=True)
-def vo19(d):
-    d.switch_im("拼音")
-    # the baseline after the same 前文 the dictation leaves: its text ends in 。, a sentence start,
-    # which by itself moves wangxiaoming's 4th; only learning would move them further
-    d.press(".")   # 。 in 拼音
-    d.clear()
-    d.type("wangxiaoming")
-    c0 = d.cands()[:5]
-    d.clear()
-    heard = []
-    for _ in range(2):
-        _, t, n, miss = retried(d, "wangxiaoming", lambda t: len(plain(t)) >= 3)
-        heard.append(t + tries_note(n, miss))
-        d.clear()
-    d.type("wangxiaoming")
-    c1 = d.cands()[:5]
-    d.clear()
-    check(c1 == c0, f"说两次后拼音候选 {c1}，说之前 {c0}（听成 {heard}）")
-    w = _words()
-    w.user_lexicon(d)
-    texts = d.all_texts()
-    for page in ("自动学到的词", "手动添加的词"):
-        if page in texts:
-            d.tap_text(page, after=1.0)
-            rows = w.list_texts(d)
-            check(not any("小明" in r for r in rows), f"「{page}」里有语音新增的 {[r for r in rows if '小明' in r]}")
-            d.back()
-    return f"听成 {heard}；候选前后都是 {c0[:3]}；用户词库没有「小明」"
+# the rule itself on the JVM (VoiceHoldUatTest.pressingAgainEndsTheTailAndCountsForNothing); on the
+# device a smoke: the first sentence typed, and where the press fell written down
+@case("VO-25", base="B0-语音", mutates="learn", needs=EV)
+def vo25(d):
+    emu_only(d)
+    d.sh("logcat -c")
+    x, y = hold_space(d)
+    time.sleep(0.3)
+    d.say("nihao")
+    time.sleep(1.2)
+    before = d.field_text() or ""
+    # lifted and pressed again at once, the second press held as long as a long press
+    d.touch(("up", x, y), ("sleep", 0.05), ("down", x, y), ("sleep", 1.0), ("up", x, y))
+    t = settle(d)
+    got = t[len(before):] if t.startswith(before) else t
+    check(plain(got) == "你好", f"松开后马上再按住，上屏「{got}」，要「你好」")
+    log = capture_log(d) or {}
+    read, stop = log.get("read"), log.get("stopAt")
+    when = "不明（没有调试日志）" if read is None or stop is None else "续录中（停在 stopAt 之前）" if read < stop else "识别中"
+    return f"上屏「{got}」；再按落在{when}（read={read}, stopAt={stop}）"
 
 
-def vo20_steps(d):
-    t0, n0 = heard_once(d, "wangmingtian", "汪小明明天来")
-    if "汪小明" in t0:
-        raise Blocked(f"前提没到：没学之前就听成「{t0}」{n0}（合成语音太清楚，X-ASR 本身听得出汪小明）")
-    d.switch_im("拼音")
-    _words().learn_name(d)
-    _, t, n, miss = retried(d, "wangmingtian", lambda t: "汪小明" in t)
-    return t0, t, tries_note(n, miss)
+# the rule on the JVM (VoiceHoldUatTest, VoiceOnsetTest); on the device, that 正在听 waits for the
+# microphone's first sample not zero, and how long that took (the debug log's fromStartMs)
+@case("VO-26", base="B0-语音", mutates="learn", needs=EV)
+def vo26(d):
+    emu_only(d)
+    broke = 0
+    for _ in range(4):
+        r = vo26_try(d)
+        if r is not None:
+            return r + (f"（之前 {broke} 次模拟器声卡出错，不算）" if broke else "")
+        broke += 1
+        time.sleep(5)   # its failures come in runs: let it settle
+    raise Blocked(f"4 次都是模拟器声卡出错（pcm_readi failed）")
 
 
-@case("VO-20", base="B0-语音", mutates=True, needs=EV, clean=True)
-def vo20(d):
-    t0, t, note = vo20_steps(d)
-    check("汪小明" in t, f"拼音打两次「汪小明」后说，框里「{t}」{note}（之前「{t0}」）")
-    return f"之前「{t0}」，打两次后「{t}」{note}"
-
-
-@case("VO-21", base="B0-语音", mutates=True, needs=EV, clean=True)
-def vo21(d):
-    t0, t, note = vo20_steps(d)
-    if "汪小明" not in t:
-        raise Blocked(f"前提（VO-20）没到：打两次后仍是「{t}」")
-    d.clear()
-    w = _words()
-    w.user_lexicon(d, "自动学到的词")
-    row = next((n for n in d.screen().app() if n.text.startswith("汪小明")), None)
-    if not row:
-        raise Blocked(f"自动学到的词里没有「汪小明」：{w.list_texts(d)[:6]}")
-    d.hold(row.c, 900)
-    time.sleep(0.6)
+def vo26_try(d):
+    """one hold: 准备中… till the clip's first sound, then 正在听…, and the text; None if the
+    emulator's sound card failed. The emulator's microphone reads exact zeroes while nothing plays
+    (a phone's never does), so there 正在听 must wait for the clip"""
+    quiet(d)
+    d.sh("logcat -c")
+    try:
+        hold_space(d, raw=True)
+    except HalBroke:
+        return None
     s = d.screen()
-    dl = s.find(desc="删除") or s.find(text="删除")
-    if not dl:
-        raise Blocked(f"长按「汪小明」后没有删除：{[x.desc or x.text for x in s.app() if x.desc or x.text][:10]}")
-    d.tap(dl.c, 1.0)
-    conf = next((n for n in d.screen().nodes if n.rid == "button1"), None)
-    if conf:
-        d.tap(conf.c, 1.0)
-    rows = w.list_texts(d)
-    check(not any(r.startswith("汪小明") for r in rows), f"删除后 {rows[:6]}")
-    d.open_page("text")
-    t2, n2 = heard_once(d, "wangmingtian", "汪小明明天来")
-    check("汪小明" not in t2, f"删掉「汪小明」后说，框里「{t2}」{n2}")
-    return f"学后「{t}」；删掉后「{t2}」{n2}"
+    # the emulator reads zeroes till the clip: 2 s of them say 麦克风没有声音 (VO-27), still before 正在听
+    first = LISTEN if anywhere(s, LISTEN) else PREPARING
+    before = d.field_text() or ""
+    early = d.sh("logcat -d | grep -c 'voice ready'").strip() not in ("", "0")
+    p = d.say("nihao", wait=False)
+    seen, end = False, time.time() + 10
+    while time.time() < end and not seen:
+        seen = bool(anywhere(d.screen(), LISTEN))
+        time.sleep(0.1)
+    p.wait(30)
+    time.sleep(1.2)
+    d.sh(raw_up(d))
+    t = settle(d)
+    got = t[len(before):] if t.startswith(before) else t
+    if hal_errors(d):
+        if len(t) > len(before):
+            d.bksp(len(t) - len(before))
+        return None
+    ready = d.sh("logcat -d | grep -o 'voice ready: fromStartMs=[0-9]*' | tail -1").strip()
+    # the rule: 正在听 never before the first sample not zero. The emulator's microphone mostly reads
+    # exact zeroes till the clip plays, but not always (a HAL's padding): either order of the two
+    # is fine, 正在听 without the log is not
+    check(first == PREPARING or early, f"按下后第一眼「{first}」，却没有 voice ready 日志：正在听亮得比麦克风早")
+    check(seen and ready, f"播「你好」时{'' if seen else '没'}出现「{LISTEN}」，{ready or '没有 voice ready 日志'}")
+    check(plain(got) == "你好", f"说「你好」，框里「{got}」")
+    how = f"按下「{PREPARING}」，片段一响变「{LISTEN}」" if first == PREPARING else f"按下时麦克风已有声音，直接「{LISTEN}」"
+    return f"{how}（{ready.split(': ')[1]}，从开麦算）；框里「{got}」"
 
 
-@case("VO-22", base="B0-语音", mutates=True, needs=EV, clean=True)
-def vo22(d):
-    t0, t, note = vo20_steps(d)
-    if "汪小明" not in t:
-        raise Blocked(f"前提（VO-20）没到：打两次后仍是「{t}」")
-    d.clear()
-    pr = script("15-privacy-backup")
-    tb = script("05-toolbar")
-    # the ⋯ panel stays up after a switch in it: back to the keys, where the space is held
-    pr.status_entry(d, "不用我的输入习惯")
-    tb.back_to_keys(d)
-    t1, n1 = heard_once(d, "wangmingtian", "汪小明明天来")
-    pr.status_entry(d, "恢复我的输入习惯")
-    tb.back_to_keys(d)
-    _, t2, n, miss = retried(d, "wangmingtian", lambda x: "汪小明" in x)
-    d.clear()
-    check("汪小明" not in t1, f"不用我的输入习惯时说，框里「{t1}」{n1}")
-    check("汪小明" in t2, f"恢复后说，框里「{t2}」{tries_note(n, miss)}")
-    return f"不用时「{t1}」{n1}；恢复后「{t2}」{tries_note(n, miss)}"
+# the rule on the JVM (VoiceTailEnterTest, VoiceHoldUatTest); on the device a smoke as VO-25's: in
+# the chat box, the panel's ↵ right after the lift sends the sentence, not an empty box before it
+@case("VO-28", base="B0-语音", mutates="learn", needs=EV, page="chat")
+def vo28(d):
+    emu_only(d)
+    lost = []
+    for _ in range(3):
+        r = vo28_try(d)
+        if r is not None:
+            return r + (f"（之前 {len(lost)} 次模拟器声卡出错，不算）" if lost else "")
+        lost.append("声卡出错")
+        d.open_page("chat")   # a fresh box and log for the next try
+        time.sleep(5)    # its failures come in runs: let it settle
+    raise Blocked("3 次都是模拟器声卡出错（pcm_readi failed）")
+
+
+def vo28_try(d):
+    """one sentence said and ↵ right after the lift; None if the emulator's sound card failed"""
+    host_calm()
+    quiet(d)
+    d.sh("logcat -c")
+    s = d.screen()
+    voice = s.find(desc="语音输入", where="ime")
+    if not voice:
+        raise Blocked("工具栏上没有「语音输入」（工具栏收起了？）")
+    d.tap(voice.c, 0.8)
+    s = d.screen()
+    mic, enter = s.find(desc="按住 说话", where="ime"), s.find(desc="回车", where="ime")
+    check(mic and enter, "语音面板上没找到话筒或 ↵")
+    x, y = mic.c
+    d.touch(("down", x, y))
+    d.say("zouba")
+    time.sleep(0.3)
+    ex, ey = enter.c
+    # lifted, and ↵ at once: inside the 300 ms tail
+    d.touch(("up", x, y), ("sleep", 0.05), ("down", ex, ey), ("sleep", 0.05), ("up", ex, ey))
+    time.sleep(3)
+    s = d.screen()
+    box = d.field_text(s) or ""
+    # the page's log skips an empty send, so an empty ↵ before the sentence shows as the sentence
+    # left in the box, not as a line of its own
+    sent = sum((n.text or "").count("我们走吧") for n in s.app() if n.cls != "EditText")
+    if sent == 0 and hal_errors(d):
+        return None
+    check(sent == 1 and not plain(box), f"聊天记录里「我们走吧」{sent} 次，聊天框「{box}」")
+    return "发出「我们走吧」一次，聊天框已清空"

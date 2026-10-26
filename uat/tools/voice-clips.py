@@ -2,10 +2,15 @@
 the host's PulseAudio source that uat.py plays them into). Made on this machine, offline: Kokoro
 v1.1-zh through sherpa-onnx (the models of ~/voice-eval, VOICE_EVAL to move it), each checked by the
 X-ASR model of the same place so a clip that the recognizer cannot follow is not taken for the app's
-fault. A cough is filtered noise. Out: dev/uat-out/voice-clips/<name>.wav, 16 kHz mono.
+fault. A cough is filtered noise; `room` 3 s of pink noise at some -60 dBFS (VO-09: digital silence
+shows no gain). `<name>-q44` is the clip 44 dB down, speech said softly (VO-24). Out:
+dev/uat-out/voice-clips/<name>.wav, 16 kHz mono, and beside each spoken one <name>.json, where its
+speech starts and ends (`speech_start_s`, `speech_end_s`, as voice-eval's tailquiet/tq.py finds the
+end): VO-23 lifts the finger relative to that end.
 
     python3 uat/tools/voice-clips.py
 """
+import json
 import os
 import sys
 
@@ -19,6 +24,7 @@ OUT = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspa
                    "dev", "uat-out", "voice-clips")
 RATE = 16000
 VOICE = 50   # one of Kokoro v1.1-zh's Chinese voices (3 to 102)
+QUIET = {"zouba": 44, "nihao": 44}   # name: dB down, as <name>-q<dB> (tailquiet's cu2: the old flow hears nothing)
 
 PHRASES = {   # name: (what Kokoro is given, what X-ASR alone should hear, None: not checked)
     "jintian": ("今天天气很好", "今天天气很好"),
@@ -56,6 +62,32 @@ def pad(s, before=0.4, after=0.8):
     return np.concatenate([np.zeros(int(before * RATE), np.float32), s, np.zeros(int(after * RATE), np.float32)])
 
 
+def speech_span(s):
+    """where the speech is, in seconds: 10 ms frames over a threshold, as tailquiet/tq.py's speech_end"""
+    f = s[:len(s) // 160 * 160].reshape(-1, 160)
+    e = 10 * np.log10((f.astype(np.float64) ** 2).mean(1) + 1e-12)
+    thr = min(max(np.percentile(e, 10) + 12, e.max() - 35), e.max() - 3)
+    on = np.nonzero(e > thr)[0]
+    return on[0] * 160 / RATE, (on[-1] + 1) * 160 / RATE
+
+
+def write_span(name, s):
+    start, end = speech_span(s)
+    with open(f"{OUT}/{name}.json", "w") as f:
+        json.dump({"speech_start_s": round(float(start), 3), "speech_end_s": round(float(end), 3)}, f)
+
+
+def room():
+    """pink noise (1/f, by filtering white in the spectrum), 3 s at -60 dBFS RMS"""
+    rng = np.random.default_rng(11)
+    n = 3 * RATE
+    spec = np.fft.rfft(rng.standard_normal(n))
+    spec[1:] /= np.sqrt(np.arange(1, len(spec)))
+    spec[0] = 0
+    x = np.fft.irfft(spec, n)
+    return (x / np.sqrt(np.mean(x ** 2)) * 10 ** (-60 / 20)).astype(np.float32)
+
+
 def cough():
     rng = np.random.default_rng(7)
     n = int(0.35 * RATE)
@@ -76,6 +108,11 @@ def main():
             s = resample_poly(s, RATE, a.sample_rate).astype(np.float32)
         s = pad(s * (0.6 / max(1e-6, float(np.abs(s).max()))))
         sf.write(f"{OUT}/{name}.wav", s, RATE)
+        write_span(name, s)
+        if name in QUIET:
+            # the same speech softly: where it is stays where it was found at full level
+            sf.write(f"{OUT}/{name}-q{QUIET[name]}.wav", (s * 10 ** (-QUIET[name] / 20)).astype(np.float32), RATE)
+            write_span(f"{name}-q{QUIET[name]}", s)
         st = r.create_stream()
         st.accept_waveform(RATE, s)
         r.decode_stream(st)
@@ -85,6 +122,8 @@ def main():
         print(f"{'ok ' if ok else 'BAD'} {name}: said {text} / X-ASR heard {heard}")
     sf.write(f"{OUT}/cough.wav", pad(cough()), RATE)
     print("cough.wav: filtered noise")
+    sf.write(f"{OUT}/room.wav", room(), RATE)
+    print("room.wav: pink noise, -60 dBFS")
     sys.exit(1 if bad else 0)
 
 

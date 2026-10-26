@@ -11,6 +11,7 @@ import androidx.annotation.StringRes
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.data.InputFeedbacks
 import org.fcitx.fcitx5.android.data.theme.Theme
+import org.fcitx.fcitx5.android.input.bar.KawaiiBarComponent
 import org.fcitx.fcitx5.android.input.bar.ui.ToolButton
 import splitties.dimensions.dp
 import splitties.views.dsl.constraintlayout.above
@@ -192,9 +193,10 @@ class TextEditingUi(
 
     val clipboardButton = ToolButton(ctx, R.drawable.ic_clipboard, theme).apply {
         contentDescription = ctx.getString(R.string.clipboard)
+        fixIconSize(ctx.dp(KawaiiBarComponent.ICON_DP))
     }
 
     val extension = horizontalLayout {
-        add(clipboardButton, lParams(dp(40), dp(40)))
+        add(clipboardButton, lParams(dp(KawaiiBarComponent.buttonWidthDp()), dp(KawaiiBarComponent.heightDp())))
     }
 }

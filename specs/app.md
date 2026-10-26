@@ -8,13 +8,12 @@ an ime-core class with a test.
 
 | Package | Holds |
 |---|---|
-| `core/` | The JNI side of fcitx: `Fcitx` (native lifecycle, the fcitx thread), `FcitxAPI` (suspend calls into fcitx), `FcitxEvent` (events out of it), `EngineBridge` (where the native `androidengine` addon reaches ime-core's `Engines`), `EngineMigration`, `SubtypeManager`, `InputMethodNames`, `NativeMatrixKernel` |
+| `core/` | The host's Android side: `KotlinFcitx` (the `FcitxAPI` over ime-core's `HostCore`, its lifecycle and config files, [host.md](host.md#the-apps-side-kotlinfcitx)), `HostDispatcher` (the host thread and clock), `HostResources` (`AppHostStrings`, the host's texts from app resources), `FcitxAPI` (suspend calls into the host), `FcitxEvent` (events out of it), `EngineBridge` (ime-core's `Engines` with their Android side: assets, user dir, saves; the host's `EngineHost`), `EngineMigration`, `SubtypeManager`, `InputMethodNames`, `NativeMatrixKernel`; the Android-free DTOs of the same package (`FcitxEvent`, `KeySym`, `KeyStates`, `CandidateWord`, `InputMethodEntry`, `Action`, `FormattedText`) are in ime-core, their `KeyEvent` conversions here (`KeySymEvents.kt`, `KeyStateEvents.kt`) |
 | `daemon/` | `FcitxDaemon`: the one fcitx instance, shared by connections (`FcitxConnection`) |
 | `input/` | The `InputMethodService` (`FcitxInputMethodService`), `InputView`, and what the keyboard shows: `bar/` (the candidate bar / toolbar, `KawaiiBarComponent`), `candidates/` (horizontal bar, expanded grid, floating window for physical keyboards), `keyboard/` (`TextKeyboard`, `T9Keyboard`, `NumberKeyboard`, `KeyDef`/`KeyDefPreset`, `KeyView`, `CommonKeyActionListener`), `picker/` (symbols, emoji), `popup/` (key previews, long-press keyboards), `clipboard/`, `editing/` (text editing panel, `InputConnectionEditor`), `status/` (the "more" panel), `preedit/`, `broadcast/`, `wm/` (`InputWindowManager`), `handwriting/`, `floating/` (the floating keyboard), `dialog/`, `editorinfo/` (the `EditorInfo` inspector), `learning/` (a candidate's long-press menu worded by the app from the engine's `LearningResult.Menu`, `CandidateLearningMenu`; the undo chip, `UndoChip`, the keyboard's one notice: see [Notices](#notices)) |
-| `data/` | File-backed managers: `prefs/` (`AppPrefs`, the managed preference framework), `theme/`, `clipboard/` (Room), `pinyin/` (imported dictionaries, custom phrases; sources are `<name>.txt.gz[.disable]`, named through `SourceNames`; `MergedDictionary` compiles the dictionaries turned on into `merged.ymd` on one `dictionary-compile` thread, keyed by a stamp of the sources, the base data and a compiler revision; the engine maps the file, uses a stale one until the new one is made, and is reloaded through `made`. An older build's plain `.txt` is work by itself (`SourceNames.unconverted`: `current()`, `pending()`, `mergedWords` count it): the next compile gzips it first (`Step.CONVERT`, the progress's first share, 正在转换 on the 词库 page, the idle bar's 正在升级词库格式) through `<name>.txt.gz.convert.tmp`, and is an upgrade (UPGRADE) only by what it finds: a text converted or not, a v1 `merged.ymd` dropped, or `.merged.upgrading` (written before the first conversion or the drop, deleted when a non-import compile ends, so a kill in between is still an upgrade at the next start); never by files' times. A text that cannot be read, or a `.gz` that is not gzip or is cut short, is skipped and listed in `.merged.unreadable` (the page: 读不了 / 文件损坏，可能不全, delete and import again; a damaged `.gz` keeps what was read before the damage); a text whose gzip cannot be written (the disk full) stays as it is, listed in `.merged.unwritten` (the page: 没转换成, free space and reopen). A text converted whose delete is refused is listed in `.merged.left`: not converted again while its `.gz` of the same state is there (its words are in it); each compile tries its delete again (no reconversion, no UPGRADE) and drops the entry once it is gone, or once that `.gz` is (deleted outside the page, or a restore left only the other state), the text then converted like any other. The entry is the text's name on, length and mtime (`leftKey`), so a turn keeps it. Listed files are skipped at each start and reload till they change; only a `.merged.left` text leaves `pending()` false, an unreadable or unwritten one keeps it true (its words are owed). Opening the 词库 page (`retry`) clears `.merged.unwritten` and `.merged.unreadable` (but a damaged `.gz`'s entry), never `.merged.left`. Imported words are missing until it ends. `turn`/`delete` resolve a dictionary by name under the sources lock, never the `File` the page listed, and act on all its files together: `turn` renames a text and its `.gz` both (the text turned back if the `.gz`'s rename is refused), `delete` deletes the text first and keeps the `.gz` if that is refused, so the two never split), `punctuation/`, `UserDataManager` (backup/restore); `DataManager` (syncs `assets/usr`) is in `core/data/` |
+| `data/` | File-backed managers: `prefs/` (`AppPrefs`, the managed preference framework), `theme/`, `clipboard/` (Room), `pinyin/` (imported dictionaries, custom phrases; sources are `<name>.txt.gz[.disable]`, named through `SourceNames`; `MergedDictionary` compiles the dictionaries turned on into `merged.ymd` on one `dictionary-compile` thread, keyed by a stamp of the sources, the base data and a compiler revision; the engine maps the file, uses a stale one until the new one is made, and is reloaded through `made`. An older build's plain `.txt` is work by itself (`SourceNames.unconverted`: `current()`, `pending()`, `mergedWords` count it): the next compile gzips it first (`Step.CONVERT`, the progress's first share, 正在转换 on the 词库 page, the idle bar's 正在升级词库格式) through `<name>.txt.gz.convert.tmp`, and is an upgrade (UPGRADE) only by what it finds: a text converted or not, a v1 `merged.ymd` dropped, or `.merged.upgrading` (written before the first conversion or the drop, deleted when a non-import compile ends, so a kill in between is still an upgrade at the next start); never by files' times. A text that cannot be read, or a `.gz` that is not gzip or is cut short, is skipped and listed in `.merged.unreadable` (the page: 读不了 / 文件损坏，可能不全, delete and import again; a damaged `.gz` keeps what was read before the damage); a text whose gzip cannot be written (the disk full) stays as it is, listed in `.merged.unwritten` (the page: 没转换成, free space and reopen). A text converted whose delete is refused is listed in `.merged.left`: not converted again while its `.gz` of the same state is there (its words are in it); each compile tries its delete again (no reconversion, no UPGRADE) and drops the entry once it is gone, or once that `.gz` is (deleted outside the page, or a restore left only the other state), the text then converted like any other. The entry is the text's name on, length and mtime (`leftKey`), so a turn keeps it. Listed files are skipped at each start and reload till they change; only a `.merged.left` text leaves `pending()` false, an unreadable or unwritten one keeps it true (its words are owed). Opening the 词库 page (`retry`) clears `.merged.unwritten` and `.merged.unreadable` (but a damaged `.gz`'s entry), never `.merged.left`. Imported words are missing until it ends. `turn`/`delete` resolve a dictionary by name under the sources lock, never the `File` the page listed, and act on all its files together: `turn` renames a text and its `.gz` both (the text turned back if the `.gz`'s rename is refused), `delete` deletes the text first and keeps the `.gz` if that is refused, so the two never split), `punctuation/`, `UserDataManager` (backup/restore) |
 | `ui/` | Settings: `main/` (`MainActivity`, `MainFragment` = the home page, `settings/` pages and `SettingsRoute`, `settings/search/`), `setup/` (the first-run wizard), `common/` |
 | `utils/` | Small helpers (`AppUtil`, `Const`, extensions) |
-| `src/main/cpp/` | `native-lib.cpp` (JNI), `androidfrontend` (fcitx frontend for the service), `androidengine` (the addon in front of ime-core's input methods), `androidaddonloader`, `androidnotification` (fcitx tips, said in the keyboard's notice, a toast with no keyboard up), `matrix-kernel.cpp` |
 
 ## The input view
 
@@ -215,26 +214,25 @@ sets Shift in its own press and clears it in its release, so a lone Shift never 
 
 The shortcuts are the app's, not fcitx's (`HardwareShortcuts`, `InputMethodSwitch` in ime-core,
 applied by `HardwareKeyboard` (app, `input/`) from `FcitxInputMethodService.onKeyDown/onKeyUp`, only in
-a text field: not `EditorInfo.isTypeNull`, where fcitx has no focus and every key is the app's): a lone Shift tap (≤250 ms, fcitx's
+a text field: not `EditorInfo.isTypeNull`, where the host has no focus and every key is the app's): a lone Shift tap (≤250 ms, fcitx's
 ModifierOnlyKeyTimeout, nothing pressed between) and Ctrl+Space switch between the Chinese input
 method and English, back to the Chinese one left; Ctrl+Shift (either order) goes to the next enabled
-one. fcitx's own toggle goes to the group's first, which here is pinyin (`Fcitx.onFirstRun` puts it
-first so a field starts in it), so from wubi it went to pinyin; its TriggerKeys (Ctrl+Space, Zenkaku_Hankaku, Hangul) and
-AltTrigger Shift are turned off and saved at startup and again after each read of fcitx's config
-(`native-lib` `clearFcitxHotkeys`, which clears fcitx's Ctrl+Alt+P TogglePreedit too) so the two do
-not both switch, and the setting below leaves the keys to the app alone. Ctrl+Space is
+one. fcitx's own toggle went to the group's first, which here is pinyin (the first run puts it
+first so a field starts in it), so from wubi it went to pinyin; the host ports none of fcitx's hotkeys
+(TriggerKeys, AltTrigger, TogglePreedit, the group switch; `config/config` is not read), so the two
+never both switch, and the setting below leaves the keys to the app alone. Ctrl+Space is
 consumed where it switches: unconsumed, Android goes to the next system input method (seen with Sogou
 and Gboard). Where it has nowhere to go (one input method, or English not enabled) it is no shortcut
-and goes on, through fcitx (none of its hotkeys left), to the app (an editor's completion). The setting `AppPrefs.candidates.switchShortcuts` (实体键盘快捷键, on) turns all three off:
-the keys then go to fcitx and the app as any other.
+and goes on, through the host (no hotkeys of its own), to the app (an editor's completion). The setting `AppPrefs.candidates.switchShortcuts` (实体键盘快捷键, on) turns all three off:
+the keys then go to the host and the app as any other.
 The input method's name flashes by the cursor (fcitx's ShowInputMethodInformation).
 
 With the hardware keyboard, handwriting and the nine keys are skipped by Ctrl+Shift
 (`Engines.takesKeyboard`), and a character key pressed in one is typed by pinyin (全拼 or 双拼,
 whichever is listed first), else the first enabled Chinese input method that takes a keyboard, else
 English (`InputMethodSwitch.forKeyboard`), as Sogou and Baidu type pinyin whatever their touch
-layout; the touch one comes back with the touch keyboard (`HardwareKeyboard.touchInputMethod`, the fcitx thread's; the hand-off runs in the key's own fcitx job).
-`-`/`=` page the candidates while composing (`androidengine.cpp`, physical keys only).
+layout; the touch one comes back with the touch keyboard (`HardwareKeyboard.touchInputMethod`, the host thread's; the hand-off runs in the key's own host job).
+`-`/`=` page the candidates while composing (`KeyRouter`, physical keys only).
 
 Testing one (`uat/tools/emu-keyboard.sh`, the cases in `uat/17-hardware-keyboard.md`): the emulator, never redroid (redroid shares the host kernel, and a uinput keyboard there
 is the host's too). The emulator's own `qwerty2` is an ALPHA keyboard (sticky Shift, `unicodeChar` 0
@@ -263,6 +261,32 @@ long press has those already. In an address field the column offers what address
 while typing, from the same `address` both boards take from `KeyboardWindow`; the bottom row is as
 always (keys of their own there left the space an eighth of the width, its label pushed off). (A probe with `adb shell input text` showed the nine
 keys committing the pinyin as typed before a mark: that is a hardware key's path, not the screen's.)
+
+The 14 keys (`GroupedKeyboard`, `GroupedKeyboard.Name14`) are 拼音's touch keyboard when
+`AppPrefs.keyboard.pinyinKeyboard` is `Keys14` (`PinyinKeyboard`, stored by name: `Full`, `Keys14`).
+A tap sends its key's code (`SymAction`, as a syllable is), on a key of two letters with where the
+finger came down: `CustomGestureView.downAt` (x / width, the view's, its margins too) at ACTION_DOWN,
+made `clickAt` at ACTION_UP before `resetState` (NaN if the touch left the key or swiped past the
+threshold; a few pixels' MOVE keep it), cleared once the click returns and at DOWN and CANCEL;
+`BaseKeyboard.pressed(view, action)`, which `GroupedKeyboard` overrides, sends `Keyboard.tapKey`
+for it. TalkBack's click, a swipe's own Tap, L and M send the code alone; a swipe its corner (1–0, `~ ! @ ?`), a
+digit as a keypad key; a long press one row as the nine keys' (`Q W 1 q w`), the letters' full
+keyboard symbols above. `'` is the separator key, ⌫ backspace, no ⇧, no glide. No 中/英 (R16 F4346,
+owner 2026-10-26): English is the language key's round or the space's long press, as on the full
+keyboard (with the language key off and the long press at its default, none: not handled, owner
+2026-10-26); the bottom row's space takes what is left, ≥ 0.15 in every field. The syllables of the leftmost keys not yet taken are on the composing row's right
+(`SyllableStrip`, id `code_row_syllables`, at most 60% of the row; the preedit is `code_row_text`),
+from `EngineBridge.syllables` for the current input method; a tap takes one, backspace at the end
+gives the last back. With the 14 keys chosen every input method's composing row is 40 dp
+(`preeditHeight()`, else `PREEDIT_HEIGHT` 18), so switching does not change the keyboard's height;
+the pref is in `recreateInputViewPrefs`.
+
+双拼's 18 keys (`shuangpinKeyboard == Keys18`) are the same grouped keyboard over `G18`, with the same
+syllable strip, no 中/英 and 40 dp rule: the row is 40 dp when
+`pinyinKeyboard == Keys14 || shuangpinKeyboard == Keys18`. 九键双拼 (`NineKeys`) is `T9Keyboard`
+built for 双拼: its digits send `NINE_SP`'s codes, its 1 key `'` while typing, no 中/英 (a wider
+space), no 连按 or custom letters; its syllables in its own left column, the strip off
+(`ownsSyllables`), the row's height unchanged.
 
 九键英文 (`T9Keyboard.EnglishName`, a second `T9Keyboard` built with `english = true`) is fcitx's
 English shown on the nine keys, reached only by 九键's 中/英 key (`NineKeyLanguageKey`, beside the
@@ -311,18 +335,21 @@ Two stores, deliberately:
    (`switch`, `int`, `enumList`, `twinInt`, `levels`). A page is a `ManagedPreferenceFragment` over
    a category, or one section of it (`createUi(group, section)`: 按键 and 声音与振动 are two
    sections of `Keyboard`). These are what the keyboard reads.
-2. **fcitx config** of the input methods: the `androidengine` addon's options (C++,
-   `androidengine.h`), read by the engine (`EngineSettings`). The pages for the app's own input
+2. **fcitx config** of the input methods: `conf/androidengine.conf`, its options in ime-core's
+   `EngineOptions` (the former addon's table), read by the engine (`EngineSettings`). The pages for the app's own input
    methods are built by `InputMethodSettings` from a list of `Item`s (`Toggle`, `Choice`, `Flags`,
-   `Page`, `Action` (a confirmed button that runs on the fcitx thread, such as 恢复码表顺序: only
+   `Page`, `Action` (a confirmed button that runs on the host thread, such as 恢复码表顺序: only
    `InputMethodConfigFragment` passes the `act` that runs it; the default `act = {}` of `create`/`addTo`
    ignores it, so an `Action` on another page does nothing), and `AppChoice`/`AppToggle` for the few app preferences that belong to one input method,
    such as 九键's multi-tap or English's auto-caps, or to all of them on the shared page, such as
    glide typing, paired brackets and replacing a sum), over `FcitxAPI.getImConfig`/`setImConfig`.
-   The options every input method shares are one `config_` in the addon, so they are on one page,
+   The options every input method shares are one group in `EngineOptions`, so they are on one page,
    通用输入 (`InputMethodSettings.SHARED`, `SharedInputFragment`, saved through pinyin's config),
    each saying which input methods it is no use to (`notFor`); 每页候选数 is on 实体键盘
-   (`HARDWARE_KEYBOARD`). A page saves only the paths it shows (`InputMethodSettings.only`), so one
+   (`HARDWARE_KEYBOARD`). An option no use to pinyin on the 14 keys names `Engines.PINYIN_KEYS`
+   in `notFor` (said 「拼音 14 键」, `InputMethodNames`), shown whichever keyboard is chosen, not
+   hidden: the hardware keyboard types full pinyin still. 拼音's 键盘 (`AppChoice` over
+   `pinyinKeyboard`) is the first row of 拼音's page, in no section. 双拼's 键盘 (`AppChoice` over `shuangpinKeyboard`) is in its 方案 section, nothing on the page hidden; glide says not for 「双拼 18 键」 and 「九键双拼」 (`SHUANGPIN_KEYS18`, `SHUANGPIN_NINE`: neither glides), fuzzy u↔v not for 「九键双拼」 (`SHUANGPIN_NINE`, u and v one key). A page saves only the paths it shows (`InputMethodSettings.only`), so one
    left open behind another cannot write back the shared options it read before.
 
 Rules for settings, all decided:
@@ -354,7 +381,7 @@ Rules for settings, all decided:
 1. Decide the default first; the setting exists only if a user will want both values.
 2. App-side behaviour: add it to the right `AppPrefs` category (title and summary in strings);
    pass its value into the ime-core class that decides, never read `AppPrefs` from ime-core.
-3. Engine behaviour: add an `Option` to `androidengine.h`, read it in `EngineSettings.parse`, show it
+3. Engine behaviour: add an option to `EngineOptions`, read it in `EngineSettings.parse`, show it
    with an `Item` in `InputMethodSettings`; `nearest` maps old or odd stored values to a shown one.
 4. Strings: `values/strings.xml` (English) and `values-zh-rCN`, `values-zh-rTW` at least; the other
    locales fall back to English. Write the summary as what the user gets, not how it works.
@@ -366,7 +393,7 @@ Rules for settings, all decided:
 `UserDataManager` exports one zip: `shared_prefs`, the clipboard database (less what an app marked
 sensitive), the external files dir (fcitx config, custom phrases, imported dictionaries as their `.txt.gz` sources; the compiled `merged.ymd`/`.ymc`, any `.txt.gz.tmp`/`.txt.gz.convert.tmp` and the markers `.merged.failed`, `.merged.unreadable`, `.merged.unwritten`, `.merged.left`, `.merged.upgrading` are left out (`MergedDictionary.isCompiled`) and made again after a restore, themes). A restore overlays the dictionaries directory: an older backup's `.txt` is converted again over a same-name `.gz`; both `.gz` states of one name keep the newer (equal mtimes: the one turned on)
 and the engine's `files/engine/` (learned words, word lists).
-Restoring stops fcitx, closes the clipboard database, replaces the files, then restarts the
+Restoring stops the host, closes the clipboard database, replaces the files, then restarts the
 process (`AppUtil.restart`); a failed restore reopens what it stopped (`restartAfterFailedImport`).
 `ReplaceFile` replaces a directory in one rename so a kill leaves the old or the new, never half.
 New user data must be added to the export, and must survive a restore made by an older version
@@ -404,10 +431,72 @@ normalisation, reranking hypotheses with the pinyin model, blocked words, hotwor
 gestures) are in ime-core's `input/voice/` and tested there. `:app:compileVoiceDebugUnitTestKotlin`
 in CI keeps the voice source set compiling.
 
+### Voice: the start
+
+- 正在听 only once the microphone is really on: `VoiceOnset` (ime-core) reports the first sample not zero,
+  `VoiceListener.Events.ready` → `VoiceHoldSession.Ui.ready`; before it the overlay and the panel say 准备中…. Why:
+  the press-to-first-sample trace (dev/design/voice-start-latency.md) showed 正在听 lit hundreds of ms before
+  anything was recorded, and the user chose to show it rather than record before the press (no pre-roll: the
+  status bar's microphone dot would flash on every space). Not after the lift or a drop (the session's guard).
+- 2 s of nothing but zeroes (`VoiceOnset.silent`, the privacy toggle off or the capture taken) say 麦克风没有声音
+  (the user's rule), back to 正在听 at the first sound.
+- The cue's vibration and the voice ticks go through `VoiceStyle.vibrate` → `InputFeedbacks.hapticFeedback`, so
+  they follow 按键时振动, its length and strength.
+- The microphone is read from the moment it opens, never waiting on the models: the VAD is built beside the
+  reading (`VoiceEngine.takeVad`, a spare made ahead in a lock-free `VoiceSpare`; the voice key shown makes one,
+  `letGo` frees it, and so does `letGoSpare` `KEEP_MS` (2 min) after the last show with no use), and what is read before it is in waits in `VoiceBacklog`, handed over in order. The handoff
+  (held until the VAD, fed in order, dropped on a close, a late VAD still fed on a lift or cut, stretch
+  starts shifted by what the backlog dropped) is `VoiceVadHandoff` in ime-core, tested there. The
+  recognizer's load holds `VoiceEngine.lock`; the spare once shared it and 准备中 lasted the whole load.
+- The record's buffer is 2 s (`VoiceCaptureEnd`'s backlog cap follows it), the least the HAL takes as a last try.
+  If the HAL refuses the 2 s buffer and falls back to its minimum, the backlog fed when the VAD arrives (up to
+  several seconds, synchronously on the capture thread) can outlast the buffer; audio read meanwhile is lost.
+  Only on that fallback path; accepted rather than feeding in chunks between reads.
+- Debug lines the UAT parses: `voice ready: fromStartMs=` (start() to the first sample not zero) and
+  `voice speech started` (the VAD's onset, VO-23's lift cue).
+
+### Voice: the tail after the lift and the gain
+
+- **Tail**: lifting to type keeps the microphone on for `VoiceCaptureEnd.tail` (0.3 s, counted in
+  samples at the record's rate) from the lift. The lift's `MotionEvent.eventTime` goes
+  `VoiceHoldSession.lift(at)` → `Listening.finish(at, done)`; the capture thread turns it into a
+  frame with `AudioRecord.getTimestamp(TIMEBASE_MONOTONIC)` (`VoiceCaptureEnd.frameAt`; a timestamp
+  of nanoTime 0 taken as none). The stop point, lift frame + tail, is clamped to
+  [read, max(read, min(captured, read + bufferFrames)) + tail + 0.2 s] (captured: the timestamp's framePosition, so a reader running behind still gets all up to the lift + tail; a framePosition past what the buffer can hold unread is the HAL's error and not believed at all, the tail then counted from what was read, as it kept the microphone open some 2.5 s past the lift); without a timestamp it is what was read + tail. Capture stops at the
+  first window boundary at or past it, or after 1 s with no samples since the lift; a read error
+  after the lift ends it as a stop does (the sentence typed). `VoiceCaptureEnd.window` is the
+  per-window step, so its order (the lift seen before the window is counted) is tested in ime-core.
+  Why: lifting 300 ms before the speech ends lost the last character 57.7% of the time, at the end
+  10.7%; with the tail, lifting 300 ms early lost it 10.7% of the time, as lifting at the end did
+  (`~/voice-eval/tailquiet`, table 1 of `dev/design/voice-tail-and-quiet.md`). Lifting in the cancel
+  zone, `drop()`, `inputEnded()` and the panel's `onFinishInput`/`onStartInput` close at once, as before.
+  A new press after the lift (`ACTION_DOWN`/`POINTER_DOWN` anywhere on the input view for the space
+  card, the microphone for the panel) calls `pressedAgain()` → `Listening.cut()`: the tail ends,
+  what was heard is still typed. On the card (it covers the keys only) the press counts for nothing; a press on the toolbar or the candidates ends the tail the same way and then acts as usual (design N2). The UI does not change (识别中… at once).
+  On the panel only, Enter pressed after the lift and before the end (`VoiceTailEnter`, ime-core;
+  R16 F4486) calls `pressedAgain()` once and waits, however often pressed: it is sent once the
+  session ends, typed, nothing heard or the model/microphone failing, in the field it was pressed in;
+  dropped with the session (`drop()`, another field) and by the 15 s give-up (`VoiceHoldSession.gaveUp`:
+  that late, it would send a forgotten draft). It goes from `Ui.ended` through `postFcitxJob` and then
+  the main thread: queued after the text's `commitOverEngine` job, which posts its own putting in to
+  the main thread first, so the text is in the field before the Enter is pressed (`VoiceHoldSession.lift`
+  commits before `end` for this). Backspace acts at once. The space card covers the keys, so there any
+  press only ends the tail and counts for nothing (VO-25, unchanged by owner decision 2026-10-26).
+- **Gain**: `VoiceGain` (ime-core), one per microphone opening, on each window after `read()` and
+  before `AudioHistory`, the VAD and the level bar, so all of them hear the same. Level: the 3rd
+  loudest window RMS of the last 31 (~1 s), the first 3 windows left out; env falls at most 3 dB/s;
+  gain clamp(−30 − env, 0, +20) dB, held so a window's peak stays under 0.99; rises ramp across the
+  window. Normal speech passes unchanged, but for its first two windows (~64 ms) after a quiet
+  stretch, lifted up to the peak limit until the 3rd loudest catches up. Why: VOICE_RECOGNITION has no AGC (CDD 5.4.2), soft speech comes in at −50 to −60 dBFS where
+  silero does not fire; at −26 dB CER 30.87% → 7.17%, no-result 15% → 0, noise 3·2·1·1 of 159.
+  It is tailquiet's `Gain2` sample for sample (`VoiceGainTest`'s golden sample, ≤ 1e-5; its generator, with Gain2 copied in, is
+  `lib/ime-core/src/test/resources/voice/gain_golden.py`, and each parameter changed alone changes it). Debug
+  builds log one line of numbers at the close (`voice capture:` liftFrame, stopAt, read,
+  segment.start, segments (stretches cut), envPeak, peakGainDb: the gain where env peaked) for the UAT (uat/12 VO-23/24/25).
+
 ## Strings and languages
 
 The app speaks 简体中文, 繁體中文 and English (`AppLanguage`, chosen in the settings, independent of
 the phone's language) and nothing else: `androidResources.localeFilters` drops libraries'
-other translations, and the native install keeps only the zh_CN/zh_TW gettext catalogs. fcitx's own texts
-(menus from the addon) are translated through gettext `.po` files in `src/main/cpp/po` (domain
-`fcitx5-android`) and chinese-addons' domain for texts reused from libime.
+other translations. The host's own texts (the status area's toggles, tips, the input method name
+overlay, the default group's name) are app string resources too (`AppHostStrings`); there is no gettext.

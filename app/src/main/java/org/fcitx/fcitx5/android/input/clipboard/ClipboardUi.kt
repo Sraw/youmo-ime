@@ -12,6 +12,7 @@ import androidx.transition.TransitionManager
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
+import org.fcitx.fcitx5.android.input.bar.KawaiiBarComponent
 import org.fcitx.fcitx5.android.input.bar.ui.ToolButton
 import org.fcitx.fcitx5.android.input.motion.Motion
 import org.fcitx.fcitx5.android.utils.motionSettings
@@ -55,10 +56,11 @@ class ClipboardUi(override val ctx: Context, private val theme: Theme) : Ui {
 
     val deleteAllButton = ToolButton(ctx, R.drawable.ic_baseline_delete_sweep_24, theme).apply {
         contentDescription = ctx.getString(R.string.delete_all)
+        fixIconSize(ctx.dp(KawaiiBarComponent.ICON_DP))
     }
 
     val extension = horizontalLayout {
-        add(deleteAllButton, lParams(dp(40), dp(40)))
+        add(deleteAllButton, lParams(dp(KawaiiBarComponent.buttonWidthDp()), dp(KawaiiBarComponent.heightDp())))
     }
 
     private fun setDeleteButtonShown(enabled: Boolean) {
