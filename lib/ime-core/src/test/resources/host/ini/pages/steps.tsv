@@ -1,0 +1,11 @@
+engine-pinyin	PageSize=5\nPrediction=False\n[Fuzzy]\nL_N=True\n
+engine-wubi	Hint=False\nPageSize=4\nOrderPolicy=Freq\n
+keyboard-us	EnglishSuggest=False\n
+engine-shuangpin	ShuangpinProfile=Xiaohe\n
+engine-cangjie	AutoSelect=False\n
+engine-cangjie	Hint=bad\n
+engine-pinyin	Prediction=nope\n
+engine-handwriting	ModelLevel=Low\n
+engine-t9	[Fuzzy]\nZ_ZH=True\n
+engine-erbi	Chaizi=False\nWubi/AutoSelect=False\n
+not-an-im	PageSize=9\n

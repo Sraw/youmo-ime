@@ -87,9 +87,11 @@ object EngineMigration {
      * in [engineDir], keeps it on where its settings do not say. Once, at the first start of this
      * build ([ORDER_KEPT] says it ran): a table's log made since is a new install's. Decided only
      * once the phone is unlocked, with [engineDir] to read. A start while locked notes which tables'
-     * settings did not say yet ([ORDER_UNSET], the first such start's): fcitx saves every value,
-     * its defaults too, at the next change of any setting, and a table's `No` written so before
-     * the unlocked start is the new default, not the user's.
+     * settings did not say yet ([ORDER_UNSET], the first such start's); what such a table's group
+     * says by the unlocked start is not taken as the user's. "Did not say" is "not written": fcitx
+     * saves a value at its default commented out, `# OrderPolicy=No` under `# [Wubi]` when the whole
+     * group is (configuration.cpp:137-138, iniparser.cpp:127-142, as a device writes it), and reads
+     * `#` lines as nothing (iniparser.cpp:63): a default is never written down as a choice.
      */
     private fun orderByUseKept(configHome: File, engineDir: File?) {
         val settings = File(configHome, "conf/androidengine.conf")

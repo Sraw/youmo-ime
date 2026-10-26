@@ -160,7 +160,7 @@ class EngineMigrationTest {
         config.put("conf/androidengine.conf", "[Ziranma]\nOrderPolicy=No\n")
         EngineMigration.run(config, null)
         assertEquals("[Ziranma]\nOrderPolicy=No\n", config.resolve("conf/androidengine.conf").readText())
-        // a setting changed while still locked: fcitx saves every value, its new default for 五笔 too
+        // 五笔's No written while still locked (not as fcitx saves a default, which is commented out): taken as unset all the same
         val saved = "[Ziranma]\nOrderPolicy=No\n\n[Wubi]\nOrderPolicy=No\n"
         config.put("conf/androidengine.conf", saved)
         // a second locked start keeps what the first saw
@@ -174,6 +174,32 @@ class EngineMigrationTest {
         config.put("conf/androidengine.conf", saved)
         EngineMigration.run(config, engine)
         assertEquals(saved, config.resolve("conf/androidengine.conf").readText())
+    }
+
+    // as fcitx saved it on a device after one change (中英混输 off): defaults written commented out,
+    // a group all at its defaults too (configuration.cpp:137-138, iniparser.cpp:127-142)
+    @Test
+    fun aDefaultFcitxSavedIsNotWrittenSoATableTypedWithStillKeepsOrderingByUse() {
+        val config = folder.newFolder("config")
+        val engine = folder.newFolder("engine")
+        engine.put("wubi.user", "x")
+        val saved = "# 中英混输\nLatinWords=False\n# 提示英文单词\n# EnglishSuggest=True\n\n" +
+            "# [Wubi]\n# 自动选择候选词\n# AutoSelect=True\n# 排序规则\n# OrderPolicy=No\n\n"
+        // locked, before and after the save: 五笔's order is unset in both
+        EngineMigration.run(config, null)
+        config.put("conf/androidengine.conf", saved)
+        EngineMigration.run(config, null)
+        EngineMigration.run(config, engine)
+        val settings = config.resolve("conf/androidengine.conf").readText()
+        assertTrue(settings, settings.contains("[Wubi]\nOrderPolicy=Freq\n"))
+        assertTrue(settings.contains("LatinWords=False"))
+        // and with no locked start at all
+        val other = folder.newFolder("other")
+        val otherEngine = folder.newFolder("other-engine")
+        otherEngine.put("wubi.user", "x")
+        other.put("conf/androidengine.conf", saved)
+        EngineMigration.run(other, otherEngine)
+        assertTrue(other.resolve("conf/androidengine.conf").readText().contains("[Wubi]\nOrderPolicy=Freq\n"))
     }
 
     // review C M1: no engine directory at a new install's first start, a table typed with before the second
