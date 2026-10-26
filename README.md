@@ -61,7 +61,7 @@
 
 ### 下载
 
-到 [Releases](https://github.com/Sraw/youmo-ime/releases/latest) 下载最新版：文字版约 320 MB，语音版约 480 MB（多申请录音权限）。
+到 [Releases](https://github.com/Sraw/youmo-ime/releases/latest) 下载最新版：文字版约 310 MB，语音版约 470 MB（多申请录音权限）。
 需要 Android 10 以上的 arm64 手机。模型和词库都在安装包里，所以包比较大。持续更新中，词库每月更新一次。
 
 ### 下一步计划
@@ -126,7 +126,7 @@ The new keyboards on the chat set (only sentences whose keys spell one reading, 
 
 ### Download
 
-The latest from [Releases](https://github.com/Sraw/youmo-ime/releases/latest): text build about 320 MB, voice build about 480 MB (asks for the microphone too).
+The latest from [Releases](https://github.com/Sraw/youmo-ime/releases/latest): text build about 310 MB, voice build about 470 MB (asks for the microphone too).
 Needs an arm64 phone on Android 10 or later. The models and dictionary are inside the APK, hence its size. Actively updated; the dictionary gets new words every month.
 
 ### Next
