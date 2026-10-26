@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.input.keyboard
 
+import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.engine.host.Engines
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -57,5 +58,16 @@ class EnglishLayoutPolicyTest {
         assertFalse(EnglishLayoutPolicy.spellsWords(predictive = true, suggests = true, password = true, address = false, noSuggestions = false))
         assertFalse(EnglishLayoutPolicy.spellsWords(predictive = true, suggests = true, password = false, address = true, noSuggestions = false))
         assertFalse(EnglishLayoutPolicy.spellsWords(predictive = true, suggests = true, password = false, address = false, noSuggestions = true))
+    }
+
+
+    @Test
+    @Uat("PY-91", "SP-20")
+    fun noKeyGoesToEnglishFromPinyinOrShuangpin() {
+        // the 14 and 18 keys have no 中/英: English is the language key's round there
+        val all = listOf(Engines.PINYIN, Engines.SHUANGPIN, Engines.ENGLISH, Engines.T9)
+        assertNull(EnglishLayoutPolicy.toggled(Engines.PINYIN, all))
+        assertNull(EnglishLayoutPolicy.toggled(Engines.SHUANGPIN, all))
+        assertEquals(Engines.T9, EnglishLayoutPolicy.toggled(Engines.ENGLISH, all))
     }
 }

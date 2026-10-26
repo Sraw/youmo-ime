@@ -2,7 +2,7 @@
 前提/操作/预期."""
 import time
 
-from uat import case, check, flick, has, BAR_BOTTOM
+from uat import Blocked, case, check, flick, grouped_keys, has, has_keyboard_code, BAR_BOTTOM
 
 
 def bar_label(d, s=None):
@@ -116,3 +116,43 @@ def qu07(d):
     p = d.preedit()
     check(any(x.split(" ")[0] == "你" for x in c), f"`{p}` 候选 {c[:5]}")
     return f"`{p}` {c[:3]}"
+
+
+@case("QU-08", mutates="learn")
+def qu08(d):
+    quick(d)
+    lab = bar_label(d)
+    # without quick input hell is pinyin, whose candidates pass the check below too
+    check(any("快速输入" in x for x in lab), f"长按「符」没进快速输入：栏上 {lab}")
+    d.type("hell")
+    c = d.cands()
+    words = [x for x in c if x.lower().startswith("hel")]
+    check(not words, f"hell 的候选里有英文词 {words[:3]}")
+    return f"候选 {c[:3]}"
+
+
+@case("QU-09", base="B0-14键")
+def qu09(d):
+    unicode_mode(d)
+    # the 14 keys have no ⇧ nor a + corner (their corners are 1–0 ～ ！ @ ？): the code is typed bare,
+    # 4E2D, which Unicode input reads as well; each letter on its key's left half, each digit its corner
+    k = d.keys(refresh=True)
+    if "ui" not in k or "er" not in k or "df" not in k:
+        raise Blocked(f"不是 14 键：{sorted(k)[:12]}")
+    seen = []
+    flick(d, "ui")              # 4
+    seen.append(d.preedit())
+    grouped_keys(d, "er", at=[0.25])   # e
+    seen.append(d.preedit())
+    flick(d, "er")              # 2
+    seen.append(d.preedit())
+    grouped_keys(d, "df", at=[0.25])   # d
+    c = d.cands()
+    p = d.preedit()
+    seen.append(p)
+    check(has(c, "中"), f"`{p}` 候选 {c[:5]}")
+    d.pick("中")
+    t = d.field_text()
+    check(t == "中", f"点「中」后框里「{t}」")
+    check(not any(has_keyboard_code(x) for x in seen + [t]), f"编码里有键码：{seen}，框里「{t}」")
+    return f"`{p}` {c[:3]} → 「{t}」"

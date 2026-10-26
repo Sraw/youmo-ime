@@ -21,7 +21,9 @@ class InputMethodNamesTest {
 
     @Test
     fun everyInputMethodOfTheAppHasANameOfItsOwn() {
-        val ids = listOf(Engines.PINYIN, Engines.SHUANGPIN, Engines.T9, Engines.ENGLISH) + Engines.TABLES.keys
+        val ids = listOf(Engines.PINYIN, Engines.SHUANGPIN, Engines.T9, Engines.ENGLISH) + Engines.TABLES.keys +
+            // a grouped keyboard's session, named where a setting is not for it
+            listOf(Engines.PINYIN_KEYS, Engines.SHUANGPIN_KEYS18, Engines.SHUANGPIN_NINE)
         assertEquals(emptyList<String>(), ids.filter { InputMethodNames.of(context, it, fallback = "") == "" })
     }
 

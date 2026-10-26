@@ -21,7 +21,12 @@ object InputMethodNames {
     // the other tables' ids are the keys of Engines.TABLES, which has a constant for Wubi alone: the test holds them together
     private val names = mapOf(
         Engines.PINYIN to R.string.im_pinyin,
+        // no input method of its own: pinyin on the 14 keys, as a setting's "not for" names it
+        Engines.PINYIN_KEYS to R.string.im_pinyin_keys,
         Engines.SHUANGPIN to R.string.im_shuangpin,
+        // as PINYIN_KEYS: 双拼 on its 18 keys and on the nine keys
+        Engines.SHUANGPIN_KEYS18 to R.string.im_shuangpin_keys18,
+        Engines.SHUANGPIN_NINE to R.string.im_shuangpin_nine,
         Engines.T9 to R.string.im_t9,
         Engines.WUBI to R.string.im_wubi,
         "engine-cangjie" to R.string.im_cangjie,

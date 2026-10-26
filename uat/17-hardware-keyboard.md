@@ -28,6 +28,7 @@ uat/tools/emu-keyboard.sh combo CTRL SPACE   # 按住前面的，按最后一个
 - **前提**：B0-实体。
 - **操作**：按 n i h a o，按空格；再按 s h i，按 3。
 - **预期**：先上屏「你好」；再上屏 shi 候选窗里的第 3 个；框里是「你好」+ 那个字。
+- **JVM**：`HardwareKeyUatTest.keysGoToTheEngineAndTheTouchKeyboardGoes`（键按顺序发给引擎、屏幕键盘收起）+ `HardwareKeysUatTest.spaceCommitsTheFirstADigitPicksByNumber`（空格上屏「你好」，3 选第 3 个（`EngineReplay` 按宿主 `KeyRouter` 把实体键盘的键（isVirtual 为假）交给真的引擎；`:lib:ime-eval:uatTest`））；设备上不跑（实体键盘的冒烟是 HK-01）。
 
 ### HK-03 [P0] 点小窗上的键盘图标，屏幕键盘回来
 - **前提**：B0-实体，按过 n i 空格，屏幕键盘已收起。
@@ -63,26 +64,31 @@ uat/tools/emu-keyboard.sh combo CTRL SPACE   # 按住前面的，按最后一个
 - **前提**：B0-实体。
 - **操作**：按 a b c，按回车；再按 x y z，按 Esc。
 - **预期**：回车后框里是「abc」；Esc 后 xyz 没了，框里仍是「abc」。
+- **JVM**：`HardwareKeyUatTest.enterAndEscapeGoToTheEngine`（a b c 回车、x y z Esc 按顺序发给引擎；上屏 abc、Esc 清掉是引擎的事（A））；设备上不跑。
 
 ### HK-05 [P1] 退格删字母
 - **前提**：B0-实体。
 - **操作**：按 n i h a o，按退格。
 - **预期**：候选窗里剩 `niha`。
+- **JVM**：`HardwareKeyUatTest.backspaceGoesToTheEngine`（退格发给引擎；删字母是引擎的事（A））；设备上不跑。
 
 ### HK-06 [P0] `-` `=` 翻候选页；没在打字时是符号
 - **前提**：B0-实体。
 - **操作**：按 s h i，记下候选窗第一页；按 =；按 -；按 Esc；再按 - 和 =。
 - **预期**：= 翻到下一页（候选换了）；- 翻回第一页；没在打字时按 - = 打出「-=」。
+- **JVM**：`HardwareKeysUatTest.minusAndEqualTurnThePagesWhileTyping`（打着字时 = 下一页、- 回第一页；没在打字时是「-=」（`EngineReplay` 按宿主 `KeyRouter` 把实体键盘的键（isVirtual 为假）交给真的引擎；`:lib:ime-eval:uatTest`））；设备上不跑。
 
 ### HK-07 [P1] 刚上屏、正显示联想时按 - 是符号
 - **前提**：B0-实体。
 - **操作**：按 j i n t i a n 空格（出联想），按 -。
 - **预期**：框里是「今天-」，不是翻页。
+- **JVM**：`HardwareKeysUatTest.minusAfterACommitIsTheMark`（联想显示时 - 是符号（`EngineReplay` 按宿主 `KeyRouter` 把实体键盘的键（isVirtual 为假）交给真的引擎；`:lib:ime-eval:uatTest`））；设备上不跑。
 
 ### HK-08 [P1] PageUp / PageDown 翻页
 - **前提**：B0-实体，键盘有 PageUp / PageDown。
 - **操作**：按 s h i，按 PageDown，再按 PageUp。
 - **预期**：同 HK-06 的翻页。
+- **JVM**：`HardwareKeysUatTest.pageDownAndPageUpTurnThePages`（PageDown/PageUp 翻页（`EngineReplay` 按宿主 `KeyRouter` 把实体键盘的键（isVirtual 为假）交给真的引擎；`:lib:ime-eval:uatTest`））；设备上不跑。
 
 ## 切换输入法
 
@@ -90,21 +96,25 @@ uat/tools/emu-keyboard.sh combo CTRL SPACE   # 按住前面的，按最后一个
 - **前提**：B0-实体。
 - **操作**：按一下 Shift（马上松开）；按 h i 空格；再按一下 Shift；按 n i 空格。
 - **预期**：第一次 Shift 后光标旁闪一下"En"；hi 原样上屏；第二次后闪"拼"，ni 空格上屏「你」。
+- **JVM**：`HardwareKeyUatTest.aShiftTapSwitchesChineseAndEnglish`（单按 Shift 拼音↔英文，字母照常发给引擎）；设备上不跑。
 
 ### HK-10 [P0] 打拼音时按 Shift，拼音原样上屏并切英文
 - **前提**：B0-实体。
 - **操作**：按 n i，按一下 Shift。
 - **预期**：框里是「ni」；切到了英文（光标旁闪"En"）。
+- **JVM**：`HardwareKeyUatTest.shiftWhileTypingSwitchesToEnglish`（打着 ni 按 Shift 切到英文；切走时 ni 原样上屏是宿主（`KeyRouter`）做的）；设备上不跑。
 
 ### HK-11 [P0] 按住 Shift 打大写不切换
 - **前提**：B0-实体，按一下 Shift 切到英文。
 - **操作**：按住 Shift 按 a，松开；按 b。
 - **预期**：框里是「Ab」；仍然是英文。
+- **JVM**：`HardwareKeyUatTest.shiftHeldTypesCapitalsAndSwitchesNothing`（按住 Shift 打 A、再打 b，不切换）；设备上不跑。
 
 ### HK-12 [P0] Ctrl+空格 中英切换
 - **前提**：B0-实体。
 - **操作**：按 Ctrl+空格；按 o k；再按 Ctrl+空格；按 n i 空格。
 - **预期**：第一次后是英文，ok 原样上屏，没有多出空格；第二次后回到拼音，打出「你」。
+- **JVM**：`HardwareKeyUatTest.ctrlSpaceSwitchesAndTypesNoSpace`（Ctrl+空格 来回切，不多发空格）；设备上不跑。
 
 ### HK-30 [P1] 分屏里在设置中加了英文，回来首按 Ctrl+空格 就切换
 - **前提**：B0-实体，设置里只留拼音（删掉英文）；分屏，上面是有「普通文本」框的应用，下面是幽默输入法的设置。
@@ -115,21 +125,25 @@ uat/tools/emu-keyboard.sh combo CTRL SPACE   # 按住前面的，按最后一个
 - **前提**：B0-实体，添加了五笔；点「普通文本」框，在屏幕键盘上用地球键切到五笔。
 - **操作**：按 w，确认是五笔候选；按一下 Shift；再按一下 Shift；按 q。
 - **预期**：第一次 Shift 到英文；第二次回到五笔（不是拼音），q 的候选里有「我」。
+- **JVM**：`HardwareKeyUatTest.shiftBackFromEnglishIsWubiNotPinyin`（五笔 → 英文 → 五笔）；设备上不跑。
 
 ### HK-14 [P1] Ctrl+Shift 轮流切换，跳过手写和九键
 - **前提**：B0-实体，在 **输入法** 里依次添加五笔、九键拼音、手写（列表：拼音、英文、五笔、九键拼音、手写）。
 - **操作**：反复按 Ctrl+Shift，每次看光标旁闪出的名字。
 - **预期**：依次是 En → 五 → 拼 → En…，不出现九键和手写。
+- **JVM**：`HardwareKeyUatTest.ctrlShiftGoesRoundSkippingHandwritingAndNineKeys`（Ctrl+Shift 依次 En、五、拼、En，跳过九键和手写）；设备上不跑。
 
 ### HK-15 [P1] Shift+Ctrl 顺序反过来也行
 - **前提**：B0-实体。
 - **操作**：按住 Shift，再按 Ctrl，一起松开。
 - **预期**：切到下一个输入法（英文）。
+- **JVM**：`HardwareKeyUatTest.shiftThenCtrlToo`（Shift 再 Ctrl 也切到下一个）；设备上不跑。
 
 ### HK-16 [P1] Ctrl+C、Ctrl+V 照常给应用
 - **前提**：B0-实体，「普通文本」框里有「你好」，按 Ctrl+A 全选。
 - **操作**：按 Ctrl+C；按 → 取消选择；按 Ctrl+V。
 - **预期**：框里是「你好你好」；输入法没有切换。
+- **JVM**：`HardwareKeyUatTest.ctrlCAndCtrlVAreForTheApp`（Ctrl+C、Ctrl+V 不切换输入法）；设备上不跑。
 
 ### HK-17 [P1] 系统的输入法切换键照常
 - **前提**：B0-实体，设备上还启用了另一个输入法。
@@ -142,26 +156,31 @@ uat/tools/emu-keyboard.sh combo CTRL SPACE   # 按住前面的，按最后一个
 - **前提**：B0-实体，添加了手写；点「普通文本」框，在屏幕键盘上用地球键切到手写（屏幕上是书写板）。
 - **操作**：按 n i 空格。
 - **预期**：屏幕键盘收起；按 n 时就切成了拼音，「你」上屏。
+- **JVM**：`HardwareKeyUatTest.handwritingTypedOnIsPinyin`（手写里打 n 就换成拼音，屏幕键盘收起）；设备上不跑。
 
 ### HK-19 [P1] 叫回屏幕键盘，回到手写板
 - **前提**：B0-实体，切到手写，按 n i 空格（屏幕键盘收起）。
 - **操作**：点光标旁小窗上的键盘图标。
 - **预期**：屏幕键盘回来，而且是手写书写板，不是拼音键盘。
+- **JVM**：`HardwareKeyUatTest.theTouchKeyboardBackIsHandwriting`（点小窗的键盘按钮，回来的是手写板）；设备上不跑。
 
 ### HK-20 [P1] 九键里按实体键盘打全拼
 - **前提**：B0-实体，添加了九键拼音；在屏幕键盘上切到九键。
 - **操作**：按 2 0 2 6 h a o 空格；点光标旁小窗上的键盘图标。
 - **预期**：框里是「2026好」；屏幕键盘回来，是九键。
+- **JVM**：`HardwareKeyUatTest.nineKeysTypedOnAndBack`（九键里按 2026hao 空格都发给引擎；回来是九键）；设备上不跑。
 
 ### HK-21 [P1] 手写里写了字再按实体回车：先上屏，再按才发
 - **前提**：B0-实体，点「聊天」框，切到手写；用手指在书写板上写「人」，停笔（字在框里带下划线）。
 - **操作**：按实体键盘的回车；看聊天框；再按一次回车。
 - **预期**：第一次回车「人」上屏（下划线没了），还没发出去，和拼音里回车先上屏字母一样；第二次回车发出一条「人」，框清空。全程没有切到拼音，没有多发空消息。
+- **JVM**：`HardwareKeysUatTest.returnPutsTheWrittenInThenGoesToTheApp`（手写的字第一下回车先上屏，第二下交给应用（`EngineReplay` 按宿主 `KeyRouter` 把实体键盘的键（isVirtual 为假）交给真的引擎；`:lib:ime-eval:uatTest`））；设备上不跑。
 
 ### HK-22 [P1] 用快捷键主动切过之后，点框不再跳回手写
 - **前提**：B0-实体，切到手写，按 n i 空格（切成拼音）。
 - **操作**：按 Ctrl+Shift（切到下一个）；按 Esc；点光标旁小窗上的键盘图标。
 - **预期**：屏幕键盘回来时是用快捷键切到的那个输入法，不是手写。
+- **JVM**：`HardwareKeyUatTest.aShortcutsChoiceIsKeptWhenTheTouchKeyboardIsBack`（快捷键切过之后，键盘回来是切到的那个，不是手写）；设备上不跑。
 
 ## 其他
 
@@ -169,6 +188,7 @@ uat/tools/emu-keyboard.sh combo CTRL SPACE   # 按住前面的，按最后一个
 - **前提**：B0-实体，按一下 Shift 切到英文。
 - **操作**：按 t e h 空格。
 - **预期**：框里是「teh 」，没有改成 the，没有候选窗。
+- **JVM**：`HardwareKeysUatTest.englishTypesTheKeysAsPressed`（英文里实体键盘打 teh 空格就是「teh 」，没有候选（`EngineReplay` 按宿主 `KeyRouter` 把实体键盘的键（isVirtual 为假）交给真的引擎；`:lib:ime-eval:uatTest`））；设备上不跑。
 
 ### HK-24 [P1] 密码框里用实体键盘
 - **前提**：B0-实体，点「密码」框。
@@ -179,38 +199,45 @@ uat/tools/emu-keyboard.sh combo CTRL SPACE   # 按住前面的，按最后一个
 - **前提**：B0-设置，**实体键盘 → 显示候选窗口** 选"禁用"；接上实体键盘，回测试页点「普通文本」框。
 - **操作**：按 n i 空格。
 - **预期**：屏幕键盘不收起，候选显示在屏幕键盘上方的候选栏里；「你」上屏。
+- **JVM**：`HardwareKeyUatTest.noCandidatesWindowKeepsTheTouchKeyboard`（候选窗禁用时屏幕键盘不收起）；设备上不跑。
 
 ### HK-25a [P1] 关掉实体键盘快捷键
 - **前提**：B0-设置，**实体键盘 → 实体键盘快捷键** 关掉；接上实体键盘，回测试页点「普通文本」框，在拼音里。系统设置里只启用幽默输入法一个输入法（开关关掉后 Ctrl+空格 交给系统，启用了别的输入法时 Android 会切过去）。
 - **操作**：单按一下 Shift；按 Ctrl+Shift；按 Ctrl+空格；按 n i 空格。
 - **预期**：光标旁不闪输入法名字，一直是拼音；「你」上屏。另添加五笔，排在拼音后面，再按 Ctrl+空格 和 Ctrl+Shift，仍是拼音，不切到五笔。把开关打开后再单按 Shift，切到英文。
+- **JVM**：`HardwareKeyUatTest.shortcutsOffSwitchNothing`（快捷键关掉后 Shift、Ctrl+Shift、Ctrl+空格 都不切；打开后 Shift 又切）；设备上不跑。
 
 ### HK-26 [P1] 候选窗是竖排
 - **前提**：B0-设置，**候选词列表方向** 选"纵向"。
 - **操作**：接实体键盘，回测试页按 s h i。
 - **预期**：候选窗里的候选竖着排。
+- **JVM**：`HardwareKeyUatTest.theCandidatesWindowStandsUp`（纵向时候选窗里的候选一个在另一个下面）；设备上不跑。
 
 ### HK-27 [P1] 拔掉实体键盘，屏幕键盘自己回来
 - **前提**：B0-实体，按过 n i 空格。
 - **操作**：拔掉键盘（或在系统里断开蓝牙键盘；模拟器上 `uat/tools/emu-keyboard.sh down`），不碰屏幕；然后点 h a o 空格。
 - **预期**：拔掉后屏幕键盘自动弹出，不用点框；框里是「你好」。
+- **JVM**：`HardwareKeyUatTest.unpluggedTheTouchKeyboardComesBack`（系统说键盘没了，屏幕键盘自己回来，点 h 照常）；设备上不跑。
 
 ### HK-28 [P1] 横屏分体时接实体键盘
 - **前提**：B0-横屏，接上实体键盘。
 - **操作**：按 n i 空格；点光标旁小窗上的键盘图标。
 - **预期**：打字时屏幕键盘收起，候选窗在光标旁；回来的是分体键盘。
+- **JVM**：`HardwareKeyUatTest.landscapeSplitBack`（横屏打字收起，回来是分体键盘（G 两边都有））；设备上不跑。
 
 ### HK-31 [P1] Shift+Delete 忘掉高亮的候选，按住也只做一次
 <!-- learning: U-80 -->
 - **前提**：B0-实体，按 PY-54 在「他」后面连着选两次「点了」（「他 dl」第一个是「点了」）。
 - **操作**：打「他」，按 d l；用方向键把高亮移到「点了」；按住 Shift 和 Delete 一两秒再松开；按 Esc 清掉，再打「他」，按 d l。再来一次（先按 PY-54 重新学会「点了」）：按住 Shift 和 Delete，不松 Delete，松开 Shift 再按下，然后两个都松开（只在模拟器上做，交付前跑）。
 - **预期**：「点了」上的 **忘掉学到的** 只做了一次（撤销提示在候选窗上方，窗贴屏幕顶时在下方，不盖候选；光标那行的字看得见；只出现一次）；之后「他 dl」第一个是「带来」，回到词库的顺序。按住 Delete 时再按一次 Shift 那次：没删掉字，学到的只忘一次，仍是中文。
+- **JVM**：`HardwareKeyUatTest.shiftDeleteForgetsTheHighlightedOnceHeld`（按住 Shift+Delete 只忘一次高亮的「点了」，Delete 不给引擎；之后的顺序是引擎的事）；设备上不跑。
 
 ### HK-32 [P1] 快速 Shift+Delete 不当轻点 Shift 切中英
 <!-- learning: U-80 F2653 -->
 - **前提**：同 HK-31。
 - **操作**：打「他」，按 d l，用方向键把高亮移到「点了」；快速按 Shift+Delete（按下到两个都松开不到 ¼ 秒）；按 Esc 清掉，按 n i。
 - **预期**：「点了」忘掉一次（候选窗上方出现一次撤销提示，窗贴屏幕顶时在下方，不盖候选）；之后仍是拼音：ni 的候选是「你」「呢」这些，不是英文的 ni。
+- **JVM**：`HardwareKeyUatTest.aQuickShiftDeleteIsNoShiftTap`（快速 Shift+Delete 忘一次、不当轻点 Shift 切中英）；设备上不跑。
 
 ### HK-33 [P2] 候选窗贴着屏幕顶时，撤销提示在窗下方
 <!-- learning: U-82 -->
@@ -223,8 +250,64 @@ uat/tools/emu-keyboard.sh combo CTRL SPACE   # 按住前面的，按最后一个
 - **前提**：B0-设置，**实体键盘** 里 **每页候选数** 设为 3；接上实体键盘，回测试页点「普通文本」框。
 - **操作**：按 s h i，数光标旁小窗里的候选；按 =。
 - **预期**：小窗里一页 3 个候选（1–3），按 = 换成下一页的 3 个。（屏幕键盘的候选栏是横着滑的一整排，不分页，不受这个设置影响。）
+- **JVM**：`HardwareKeysUatTest.thePageSizeSetIsTheWindowsPage`（每页 3 个，= 换下一页的 3 个（`EngineReplay` 按宿主 `KeyRouter` 把实体键盘的键（isVirtual 为假）交给真的引擎；`:lib:ime-eval:uatTest`））；设备上不跑。
 
 ### HK-35 [P1] 引擎的提示（Ctrl+. 全角标点）说 2 秒，打字就收起
 - **前提**：B0-实体，测试页「普通文本」框，屏幕键盘已收起。
 - **操作**：按 Ctrl+.，看到提示后马上按 n；按 Esc 清掉；再按 Ctrl+.，不打字等约 3 秒；最后再按一次 Ctrl+.。
-- **预期**：第一次出现"全角标点已启用/已禁用"一类提示，按 n 后提示马上收起；第二次的提示说的是相反的状态，不打字约 2 秒后自己收起（不是常驻 6 秒）；第三次的提示和第一次相同。
+- **预期**：第一次出现「标点: 已启用全角标点。」或「标点: 全角标点已禁用。」，按 n 后提示马上收起；第二次的提示说的是相反的状态，不打字约 2 秒后自己收起（不是常驻 6 秒）；第三次的提示和第一次相同。
+
+### HK-36 [P1] Ctrl+Shift+F 简繁切换
+- **前提**：B0-实体，在拼音里，简体。
+- **操作**：按 Ctrl+Shift+F；按 g u o j i a 空格；再按 Ctrl+Shift+F；按 g u o j i a 空格。
+- **预期**：第一次光标旁提示切到繁體，候选是繁體，框里先是「國家」；第二次提示切回简体，再上屏「国家」。
+
+### HK-37 [P1] Win / ⌘ 加 ` 不进快速输入，系统拿走
+- **前提**：B0-实体，在拼音里。
+- **操作**：按 Super+`（`combo META GRAVE`）；再按 n i 空格。
+- **预期**：没有「快速输入：」小窗，框里没多出字；「你」照常上屏。按住 Win / ⌘ 时按的键 Android 系统先拿走，输入法收不到（系统日志 "Dropped event because policy consumed it"），所以 Fcitx5 的 Super+`、Super+; 在手机上用不了；快速输入用长按「符」或 Ctrl 的那组快捷键。
+
+### HK-38 [P1] Super+; 进入快速输入（引擎里）
+- **前提**：B0。
+- **操作**：在引擎里按 Super+;，打 s，↓ ↑ 翻页，Esc。
+- **预期**：进入快速输入，候选是颜文字；Esc 退出不上屏。
+- **JVM**：`QuickPhraseTest.superGraveAndSuperSemicolonTriggerOnPressOnly`（Super+` 和 Super+; 按下时进入，松开不算）；设备上不跑：Android 不把 Win / ⌘ 组合键交给输入法（HK-37）。
+
+### HK-39 [P1] Ctrl+Alt+Shift+U 按名字找字符
+- **前提**：B0-实体。
+- **操作**：按 Ctrl+Alt+Shift+U；按 d e g r e e；按 Alt+1；按 s h i。
+- **预期**：光标旁显示"Unicode："，候选里有「°」，标号是 Alt 加数字（「A-1.」）；候选词列表方向是默认的「自动」时候选窗竖着排；Alt+1 上屏第一个候选；之后 shi 的拼音候选仍横着排。
+
+### HK-40 [P1] Ctrl+Shift+U 直接打十六进制编码
+- **前提**：B0-实体。
+- **操作**：按 Ctrl+Shift+U；按 4 f 6 0；按空格。
+- **预期**：框里是「你」；之后照常打拼音。
+
+### HK-41 [P1] 去掉的 Fcitx5 快捷键不起作用
+- **前提**：B0-实体，在拼音里。
+- **操作**：依次按 Ctrl+;（`combo CTRL SEMI`）、Super+空格（`combo META SPACE`）；按 n i 空格。
+- **预期**：没有剪贴板历史的列表，也没有切输入法组或闪输入法名字；「你」照常上屏。
+
+### HK-42 [P1] Super+字母不进拼音
+- **前提**：B0-实体，在拼音里。
+- **操作**：按 Super+J（`combo META J`；J 没有系统快捷键，Super+N 会被系统拿去开通知栏）；再按 n i 空格。
+- **预期**：Super+J 后小窗里没有「j」，框里也没多出字母；之后「你」照常上屏。（这组键系统先拿走，输入法收不到，见 HK-37。）
+
+## 14 键遇上实体键盘
+
+### HK-43 [P1] 14 键时实体键盘按全拼打
+- **前提**：B0-实体。**输入法 → 拼音** 的「键盘」改成「14 键」，回测试页点「普通文本」框。
+- **操作**：按 n i h a o，看小窗的候选，按空格；清空，按 n i h，点光标旁小窗上的键盘图标，在屏幕的 14 键上点 AS。
+- **预期**：n i h a o 按全拼读，第一个候选是「你好」，空格上屏「你好」。打字中途点屏幕上的键：之前按的 `nih` 原样留在框里（字母），之后的从 14 键接着打，框里没有私用区字符。
+
+### HK-44 [P1] 14 键打完一个词，再用实体键盘
+- **前提**：同 HK-43，屏幕键盘显示着 14 键。
+- **操作**：在屏幕 14 键上点 BN UI GH AS OP（各点在 n、i、h、a、o 那一半，这串键也是「不好」）、空格；按实体键盘的 Esc（联想还在时）；按 n i，按 2。
+- **预期**：「你好」上屏，后面出联想；Esc 之后框里还是「你好」；n i 按全拼读，打字时按 2 选第 2 个候选上屏。Esc 的先后（有联想时第一下先关联想，同 HK-03；之后的才交给应用）只在 JVM 上查，设备上看不到。
+- **JVM**：`KeyboardPairTest.withNothingTypedEscapeAndDigitsAreTheAppsAfterTheFourteenKeysToo`（没打字、也没有联想时，实体键盘的 Esc 交给应用、数字照样选候选）；`EnginesKeys14Test.anEscapeClosesThePredictionsOfTheFourteenKeysFirst`（有联想时 Esc 先关联想）；设备上 Esc 只是冒烟（实体键一按触屏键盘就收起，看不到联想；网页框里 Esc 也不改字），只查「你好」后出现联想、按 2 选第 2 个候选。
+
+### HK-45 [P1] 双拼 18 键时实体键盘按全键盘双拼打
+- **前提**：B0-实体，添加"双拼"，**方案** 改成"微软"，**键盘** 改成「18 键」，回测试页点「普通文本」框，换到双拼。
+- **操作**：点工具栏的「显示屏幕键盘」，在屏幕 18 键上点 BN IO，按实体键盘的 2；清空，再点「显示屏幕键盘」（按了实体键屏幕键盘会收起），点 BN IO，按实体键盘的 d、`;`。
+- **预期**：第一次 2 选第 2 个候选上屏；第二次 BN IO 按编码行的读音留下（字母，没有私用区字符），d ; 按全键盘微软双拼读成 ding（小窗里有「定」之类）。Esc 和空格的路由见 HK-44 和 JVM。
+- **JVM**：`EnginesShuangpinKeysTest.aSemicolonTheSchemeTypesIsFullShuangpins`、`KeyboardPairTest.twoKeyedSessionsTurnByTheCodeAndAKeyFullTypesIsFulls`、`KeyRouterCodesTest.aHardwareMarkReachesShuangpinAsAHardwareChar`。

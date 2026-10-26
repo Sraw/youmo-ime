@@ -1,8 +1,8 @@
 # 用户验收测试（UAT）
 
 这里的每一条测试都站在用户的角度：**在给定的情况下，用户做给定的操作，应该看到给定的结果**。
-它们只在真实的 Android 设备上跑（真机，或者 Android 模拟器），不靠单元测试替代：单元测试证明逻辑对，
-这里证明用户用起来对。
+它们在 Android 设备上跑（真机、redroid 或模拟器）；预期能在 JVM 上完整断言的，搬到 Robolectric 上的
+整个键盘里跑（见"在 JVM 上断言的用例"），设备上只留看胶水的冒烟。单元测试证明逻辑对，这里证明用户用起来对。
 
 每条测试都是独立的：前提里写清从哪个状态开始、自己要先做什么准备，不依赖别的测试先跑过，
 也不在乎别的测试跑没跑、留下了什么。可以只挑一条跑，也可以任意顺序跑。
@@ -16,7 +16,7 @@
 | [03-t9.md](03-t9.md) | 九键键盘和九键拼音 |
 | [04-panels.md](04-panels.md) | 数字键盘、符号面板、表情面板、表情拼音搜索 |
 | [05-toolbar.md](05-toolbar.md) | 工具栏、文本编辑、剪贴板、状态面板、单手模式、悬浮键盘、计算结果 |
-| [06-pinyin.md](06-pinyin.md) | 全拼：整句、简拼、纠错、模糊音、中英混输、笔画、联想、长按候选、学词、拆字、表情候选、自带日期时间、滑行 |
+| [06-pinyin.md](06-pinyin.md) | 全拼：整句、简拼、纠错、模糊音、中英混输、笔画、联想、长按候选、学词、拆字、表情候选、自带日期时间、滑行；拼音 14 键 |
 | [07-shuangpin.md](07-shuangpin.md) | 双拼 |
 | [08-english.md](08-english.md) | 英文 |
 | [09-handwriting.md](09-handwriting.md) | 手写 |
@@ -32,7 +32,7 @@
 | [19-motion-notices.md](19-motion-notices.md) | 提示条（位置、替换、配色）、始终显示悬浮条、候选字号 |
 | [fixtures/](fixtures/) | 测试页 `fields.html` 和导入用的词表 |
 
-大词库的用例（WD-14d、14h、14i、14j2、14s、14s2、14t、14t2、14w、TBL-12c；发版时手动跑的 WD-14r、14v、TBL-12d 也要）要雾凇拼音（[rime-frost](https://github.com/gaboolic/rime-frost/releases)）发布的
+设备上跑的大词库用例（WD-14d、14h、TBL-12c；发版时手动跑的 WD-14r、14v、TBL-12d 也要；14i、14s 等搬到 JVM 的用 fixtures 里的 big-words.txt 或小词表，不要它）要雾凇拼音（[rime-frost](https://github.com/gaboolic/rime-frost/releases)）发布的
 `frost_dict_for_fcitx5.txt`，约 89 MB，不放进 fixtures：下载后用环境变量 `UAT_FROST=<路径>` 指给脚本。用例里的数
 （1914461 个词、176 行读不懂）出自 SHA-256 为 `86473190c505691c7f1ef7b87345a16b555c75fea30527f472a151b6eb1ad41f`
 的那一份（1914637 行），脚本先核对哈希，对不上记为 Blocked；换新版时连同用例里的数一起改。
@@ -75,6 +75,12 @@
 
 **B0-横屏**：B0，再把设备转成横屏（关掉自动旋转时，用系统的旋转按钮或 `adb shell settings put system user_rotation 1`），
 重新点一下「普通文本」框。
+
+**B0-14键**：B0，然后在 **输入法 → 拼音** 里把 **键盘** 选成「14 键」，回测试页点「普通文本」框。
+
+**B0-18键**：B0，在 **输入法** 里添加"双拼"（方案是默认的自然码），然后在 **输入法 → 双拼** 里把 **键盘** 选成「18 键」，回测试页点「普通文本」框，换到双拼。
+
+**B0-九键双拼**：同 B0-18键，**键盘** 选成「九键」。
 
 **B0-设置**：B0 的第 1–3 步，然后打开"幽默输入法"应用，停在设置首页。
 
@@ -128,7 +134,8 @@ adb shell su 0 am start -n io.github.sraw.youmo.debug/org.fcitx.fcitx5.android.i
 ```
 
 （redroid 上 root 是 `docker exec <容器> am start …`；脚本里是 `open_host(d, next=True)` 这样。）真机上也可以照用例里写的，
-用 Chrome 的无痕标签页、真的密码管理器。用到它的是 KB-21、PR-07、PR-08、PR-12。
+用 Chrome 的无痕标签页、真的密码管理器。KB-21、PR-07、PR-08、PR-12 原来用它，现在都在 JVM 上断言（`needs="jvm:…"`），
+没有脚本再调 `open_host`；宿主留给手工在设备上看这几种框。
 
 ## 设备
 
@@ -153,14 +160,15 @@ redroid 里有浏览器"WebView Browser Tester"（`org.chromium.webview_shell`�
 
 | `needs=` | 在哪跑 | 例子 |
 |---|---|---|
-| `emu:…` | 模拟器（见下面"自动跑（模拟器）"） | 17 实体键盘的 HK 用例、TB-36（两根手指） |
+| `emu:…` | 模拟器（见下面"自动跑（模拟器）"） | 17 实体键盘的 HK 用例 |
 | `voice:…`（或 `emu,voice:…`） | 语音版 | 12 语音 |
-| `release:…` | 发版时手动（要上一版正式包或两个版本的包） | PR-13、PR-14、PR-30、TBL-12d、TBL-33、TBL-43、WD-14r、WD-14v |
-| `manual:…` | 真机或手工 | HK-03a、HK-03b、HK-30、HK-33、MN-13 |
+| `release:…` | 发版时手动（要上一版正式包或两个版本的包） | PR-13、PR-14、PR-30、PR-35、PR-36、PR-37、PR-38、TBL-12d、TBL-33、TBL-43、WD-14r、WD-14v |
+| `manual:…` | 真机或手工 | HK-03a、HK-03b、HK-30、HK-33、MN-13、SET-11 |
+| `jvm:<测试>` | JVM 上的测试（`:app:testTextDebugUnitTest` 的 Robolectric，`:lib:ime-eval:uatTest` 的引擎回放，语音的 `:app:testVoiceDebugUnitTest`，`:lib:ime-core:test`），`uat.py jvm` 记录 | T9-01、PAN-09、ST-01、MN-20 |
 
 `skip:…`／`block:…` 只留给别的原因，记"跳过"／"阻塞"。
 
-现在共 455 条（P0 93、P1 347、P2 15）：redroid 上跑 384 条，在别处跑 71 条（模拟器 37、语音版 21、发版时手动 8、真机或手工 5）。
+现在共 532 条（P0 102、P1 414、P2 16）：redroid 上跑 145 条（其中 31 条在 JVM 上也断言，设备上留作冒烟或照跑），在别处跑 387 条（JVM 342、发版时手动 12、真机或手工 6、语音版 10、模拟器 17）。
 
 横屏是把屏幕改成 2340×1080（851 dp，`Device.rotate`，等到界面按新尺寸排好），redroid 的显示不会真的转。手写用 `scripts/hw_strokes.py`
 里的笔画在书写板上画字。装包时比较设备上的 APK 和 `app/build/outputs` 里最新的那个（同一个版本号会重新构建），不同就重装。
@@ -173,7 +181,8 @@ redroid 里有浏览器"WebView Browser Tester"（`org.chromium.webview_shell`�
 键盘等不到时，先看当前输入法还是不是我们的（`pm clear` 后系统有时晚一点换成 LatinIME），是就再点一下框，
 还等不到就报阻塞，并写明当前输入法、进程在不在、前台是哪个界面。
 怀疑失败是时机问题时，加 `UAT_SLOW=1` 用原来的长停顿再跑一次对比。
-测试页的本地网页服务按第一台设备取端口（5556 → 8765，5557 → 8766，模拟器 8774）；端口被占时运行器直接退出，
+要在这份用例下跑另一个检出构建的包（红色基线，如 VO-23 在 R15 上先红），加 `UAT_APK_REPO=<那个检出的路径>`：装包时取它的 `app/build/outputs` 里最新的 APK，用例和脚本仍用这一份。
+测试页的本地网页服务按第一台设备取端口（5556 → 8765，5557 → 8766，模拟器 8763）；端口被占时运行器直接退出，
 停掉占用的服务或用 `UAT_HTTP_PORT=<端口>` 换一个。
 
 ```sh
@@ -184,12 +193,37 @@ uat/tools/uat.py mark <run> <编号> 通过|失败 [看到了什么]     # 看�
 uat/tools/uat.py down                       # 用完关掉第二台
 ```
 
+两台 redroid 一起跑时，`run` 先用 `docker update --cpuset-cpus` 把宿主机的核按 `--devices` 的顺序平分给它们
+（12 核：0-5、6-11），这样一台上的重用例不会拖慢另一台上掐时间的用例（2026-10-23 实测：易抖的几区从 30/45 通过
+升到 39/45，只等界面空闲几乎没用）。标了 `heavy=True` 的用例照旧排在最后、一次只跑一条，别的设备都闲着。
+要自己分就写 `UAT_CPUSET=0-3/4-11`（每台一段，用 `/` 隔开），不想限就写 `UAT_CPUSET=off`；`up` 新建容器时
+`UAT_CPUSET=0-5` 只给这一台定核。只在一台上跑时，`run` 把所有核还给它（`UAT_CPUSET=off` 则不动核）。
+
 测发布包（正式版发版前）：先 `BUILD_ABI=x86_64 ./gradlew :app:assembleTextRelease`（要签名密钥，没有就只出
 `-unsigned.apk`，装不上），再在命令前加 `UAT_BUILD=release`：装 `io.github.sraw.youmo`，设备上的 debug 包先卸掉
-（两个都在时系统的输入法列表有两个幽默输入法）。用测试宿主的那四条（KB-21、PR-07、PR-08、PR-12）照样跑：
-`open_host` 在这一条里临时装上 debug 包（要先有 x86_64 debug 包），只当宿主应用、把它自己的输入法停用，
-这条结束就卸掉，所以别的用例（SET-01 的向导）仍只看到一个幽默输入法。正式包里不认 debug 包的测试标记，
-宿主框对它就是别的应用的框。
+（两个都在时系统的输入法列表有两个幽默输入法）。脚本若调 `open_host`（现在没有用例这样做），它在那一条里临时装上
+debug 包（要先有 x86_64 debug 包），只当宿主应用、把它自己的输入法停用，这条结束就卸掉，所以别的用例（SET-01 的向导）
+仍只看到一个幽默输入法。正式包里不认 debug 包的测试标记，宿主框对它就是别的应用的框。
+
+## 在 JVM 上断言的用例
+
+有些用例的 **预期** 在 JVM 上就能完整断言：`app/src/test` 里的 `KeyboardHarness` 在 Robolectric 里造出整个键盘
+（真的输入法服务和 `InputView`，引擎换成 `FakeFcitxAPI`，候选等用假事件推进来），设置页用 `MainActivity` 加同一个假引擎；
+样子用 Roborazzi 截图，和 `app/src/test/screenshots/` 里提交的金图比。测试方法上标 `@Uat("<编号>")`，用例 .md 里多一行
+**JVM** 写测试名；整条搬走的，脚本里是 `needs="jvm:…"`，redroid 上不跑。还在设备上留一条冒烟的（看引擎和界面之间的胶水），
+.md 里写明。
+
+```sh
+./gradlew :app:testTextDebugUnitTest :app:testVoiceDebugUnitTest :lib:ime-core:test :lib:ime-eval:uatTest
+                                                 # 四个都要跑：jvm 读这四处的结果；截图默认就比对（gradle.properties 的 roborazzi.test.verify）
+./gradlew :app:testTextDebugUnitTest --tests '*UatTest' -Proborazzi.test.record=true -Proborazzi.test.verify=false   # 改了样子后重录
+uat/tools/uat.py jvm                             # 读 JUnit 结果，按编号写 runs/<日期>-jvm-<版本>.md
+```
+
+`jvm` 读的是结果目录里现有的 XML，不看它是哪次构建留下的：少跑一个任务，那些用例就记成上一次（可能是旧提交）的结果，
+不会报"没有结果"。所以在 `jvm` 前把四个任务一起跑（或先删掉 `build/test-results`）。
+
+发版的"全部 P0 + 改过的功能区"照旧逐条对号：设备的 run 文件和 `jvm` 的 run 文件两份都要绿。
 
 ## 自动跑（模拟器）
 

@@ -10,7 +10,7 @@
 #
 #   export ANDROID_SERIAL=emulator-5554
 #   uat/tools/emu-keyboard.sh up            # adb root, register "Test USB Keyboard"
-#   uat/tools/emu-keyboard.sh type ni hao   # letters, digits and spaces, key by key
+#   uat/tools/emu-keyboard.sh type ni hao   # letters, digits, spaces and ; ' , . /, key by key
 #   uat/tools/emu-keyboard.sh key SHIFT     # press and release keys in turn
 #   uat/tools/emu-keyboard.sh combo CTRL SPACE   # hold the first ones, press the last
 #   uat/tools/emu-keyboard.sh down          # unplug it
@@ -70,7 +70,10 @@ type|key|combo)
     text="$*"
     for ((i = 0; i < ${#text}; i++)); do
       ch=${text:i:1}
-      if [[ "$ch" == " " ]]; then k=SPACE; else k=${ch^^}; fi
+      case $ch in
+      " ") k=SPACE ;; ";") k=SEMI ;; "'") k=APOS ;; ",") k=COMMA ;; ".") k=DOT ;; "/") k=SLASH ;;
+      *) k=${ch^^} ;;
+      esac
       check "$k"
       s+="$(ev "${C[$k]}" 1) $(ev "${C[$k]}" 0) sleep 0.08;"
     done ;;

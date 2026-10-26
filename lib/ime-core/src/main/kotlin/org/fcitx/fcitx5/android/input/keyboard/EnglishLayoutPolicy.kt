@@ -11,7 +11,8 @@ import org.fcitx.fcitx5.android.engine.host.Engines
  *
  * 九键's 中/英 key goes between 九键拼音 and English on the nine keys (九键英文), as 搜狗's does
  * (owner 2026-10-20); English come to any other way (the language key, the space's long press, a
- * hardware shortcut) is an input method of its own, on the full keyboard. The key's way in is kept
+ * hardware shortcut) is an input method of its own, on the full keyboard; the grouped keyboards (14,
+ * 18 keys) have no 中/英 (R16 F4346, owner 2026-10-26). The key's way in is kept
  * (`englishOnNineKeys`) while English stays, so the input view made anew (a turn of the screen, a
  * setting changed) shows it as it was, and dropped once anything else shows.
  */
@@ -42,8 +43,11 @@ object EnglishLayoutPolicy {
      * being one input method to the user, of those [enabled] in their order; null without it.
      * Straight there, not through 九键拼音, whose keyboard would show for a moment.
      */
-    fun nextFromNineKeys(enabled: List<String>): String? {
-        val at = enabled.indexOf(Engines.T9)
+    fun nextFromNineKeys(enabled: List<String>): String? = nextFrom(Engines.T9, enabled)
+
+    // on from [from] in the round of those [enabled]; null without it
+    private fun nextFrom(from: String, enabled: List<String>): String? {
+        val at = enabled.indexOf(from)
         return if (at < 0) null else enabled[(at + 1) % enabled.size]
     }
 

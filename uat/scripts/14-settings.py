@@ -6,7 +6,8 @@ import subprocess
 import tempfile
 import time
 
-from uat import PKG, Blocked, Fail, add_im, case, check, choose, gear, has, home, popup_pick, script
+from uat import (PKG, Blocked, add_im, case, check, choose, gear, has, home, grouped_keys, pinyin_keyboard, pinyin_keyboard_value,
+                 script, shuangpin_keyboard)
 
 SWITCHES = ("Switch", "SwitchCompat", "SwitchMaterial", "CheckBox")
 
@@ -45,12 +46,6 @@ def appearance_tab(d, tab):
     d.tap_text(tab, scroll=False, after=1.0)
 
 
-def key_nodes(d, label, s=None):
-    """a key's label nodes (the letter, then its corner's)"""
-    n = d.key_node(label, s)
-    return [m for m in n.walk() if m.text] if n else []
-
-
 # ---------------------------------------------------------------- 首页
 
 HOME = ["输入法", "通用输入", "词库与短语", "外观", "按键", "声音与振动", "剪贴板与表情", "实体键盘",
@@ -60,53 +55,13 @@ IMS = ["九键拼音", "手写", "双拼"]
 TABLES = ["五笔", "二笔", "仓颉", "自然码", "五笔拼音"]
 
 
-@case("ST-01", base="B0-设置")
-def st01(d):
-    rows = d.pref_rows()
-    titles = [r[0] for r in rows]
-    s = d.screen()
-    check(not any(r[2] for r in rows), f"有分组标题：{[r[0] for r in rows if r[2]]}")
-    check(titles == HOME, f"入口是 {titles}")
-    nosum = [r[0] for r in rows if not r[1]]
-    check(not nosum, f"没有说明：{nosum}")
-    icons = [x for x in ("搜索设置", "使用说明", "更多选项") if not s.find(desc=x)]
-    check(not icons, f"右上角缺 {icons}")
-    return "十个入口依次正确、都有说明；🔍 ? ⋮ 都在"
+case("ST-01", needs="jvm:SettingsUatTest.theHomePage")(lambda d: None)
 
 
-@case("ST-02", base="B0-设置", mutates="learn")
-def st02(d):
-    d.tap_text("搜索设置", scroll=False)
-    f = d.field()
-    if not f:
-        raise Blocked("搜索框没有焦点")
-    d.tap(f.c, 0.8)
-    d.type("mohuyin")
-    d.cands(want="模糊音")
-    d.pick("模糊音")
-    time.sleep(0.8)
-    s = d.screen()
-    res = [n for n in s.app() if n.text == "模糊音" and "Edit" not in n.cls]
-    check(res, f"结果 {s.texts()[:8]}")
-    where = [n.text for n in s.app() if n.text.startswith("通用输入")]
-    check(where, f"结果没写在通用输入下：{s.texts()[:8]}")
-    d.tap(res[0].c, 2.5)
-    s = d.screen()
-    title = [n.text for n in s.app() if n.parent and n.parent.rid == "toolbar" and n.text]
-    check(title and title[0] == "通用输入", f"打开的是 {title}")
-    check(d.visible("模糊音", s), "通用输入打开了，但模糊音那一项不在屏幕上")
-    return f"结果「模糊音」（{where[0].splitlines()[0]}），点后到通用输入并看得到模糊音"
+case("ST-02", needs="jvm:SettingsMenuUatTest.searchingFindsFuzzyPinyinAndGoesThere")(lambda d: None)
 
 
-@case("ST-03", base="B0-设置")
-def st03(d):
-    d.tap_text("使用说明", scroll=False, after=3.0)
-    top = d.top_activity()
-    s = d.screen()
-    url = next((n.text for n in s.app() if n.rid == "url_field"), "")
-    check("webview_shell" in top or "browser" in top.lower(), f"前台是 {top}")
-    check("github.com" in url, f"地址 {url}")
-    return f"浏览器打开 {url}"
+case("ST-03", needs="jvm:SettingsMenuUatTest.helpOpensTheManual")(lambda d: None)
 
 
 # ---------------------------------------------------------------- 通用输入
@@ -182,10 +137,9 @@ def st33(d):
     cats = [r[0] for r in rows if r[2]]
     check(cats == ["所有输入法", "中文输入法", "拼音（全拼、双拼、九键）"], f"分组 {cats}")
     summ = {r[0]: r[1] for r in rows}
-    for x in ("滑行输入", "表情候选"):
-        check(summ.get(x, "").splitlines()[-1:] == ["不适用：手写。"], f"{x} 的说明最后一句：{summ.get(x)!r}")
-    x = "纠正错拼和按偏的键"
-    check(summ.get(x, "").splitlines()[-1:] == ["不适用：九键拼音。"], f"{x} 的说明最后一句：{summ.get(x)!r}")
+    for x, last in (("滑行输入", "不适用：手写、拼音 14 键、双拼 18 键、九键双拼。"), ("表情候选", "不适用：手写。"),
+                    ("纠正错拼和按偏的键", "不适用：九键拼音、拼音 14 键、九键双拼。")):
+        check(summ.get(x, "").splitlines()[-1:] == [last], f"{x} 的说明最后一句：{summ.get(x)!r}")
     sec, inside = [], False
     for r in rows:
         if r[2]:
@@ -201,7 +155,7 @@ def st33(d):
     s = d.screen()
     texts = s.texts(where="all")
     uv = next((i for i, x in enumerate(texts) if "u ↔ v" in x or "u↔v" in x), None)
-    check(uv is not None and any("不适用：九键拼音" in x for x in texts[uv:uv + 3]), f"模糊音 {texts[:20]}")
+    check(uv is not None and any(x.strip().rstrip("。") == "不适用：九键拼音、九键双拼" or [y.rstrip("。") for y in x.splitlines()[-1:]] == ["不适用：九键拼音、九键双拼"] for x in texts[uv:uv + 3]), f"模糊音 {texts[:20]}")
     check([n for n in s.nodes if n.cls in ("CheckBox", "CheckedTextView") and n.enabled], "模糊音里的勾选框不能勾")
     d.tap_text("取消", scroll=False)
 
@@ -282,78 +236,13 @@ def st33(d):
     return f"词库与短语、用户词库、通用输入、{len(IMS) + 1 + len(TABLES)} 个输入法页、实体键盘都对；首页 {len(titles)} 项"
 
 
-@case("ST-34", base="B0-设置", mutates=True)
-def st34(d):
-    # 前提 B0-五笔: 输入法 里添加"五笔"，切到五笔
-    home(d, "输入法")
-    d.tap_text("添加", scroll=False, after=1.2)
-    d.tap_text("五笔", after=1.2)
-    s = d.screen()
-    if s.find(text="确定"):
-        d.tap_text("确定", scroll=False, after=1.0)
-    s = d.screen()
-    if not (s.find(text="五笔") or s.find(contains="五笔")):
-        raise Blocked(f"添加五笔后输入法页 {s.texts()[:8]}")
-    home(d, "通用输入")
-    d.switch("联想下一个词", False)
-    d.open_page("text")
-    for _ in range(4):
-        sp = d.screen().find(rid="button_space", where="ime")
-        if sp and "五笔" in sp.desc:
-            break
-        d.press("globe")
-    else:
-        raise Blocked("地球键切不到五笔")
-    d.type("khlg")
-    time.sleep(0.6)
-    s = d.screen()
-    t, p = d.field_text(s), d.preedit(s)
-    if t != "中国":
-        c = d.candidates(s)
-        if p and has(c, "中国"):
-            d.pick("中国")
-            t = d.field_text()
-    if t != "中国":
-        raise Blocked(f"khlg 没打出中国：框里「{t}」")
-    s = d.screen()
-    c = d.candidates(s)
-    check(not c, f"上屏后栏上有联想 {c}")
-    return "「中国」上屏，栏上没有联想"
+case("ST-34", needs="jvm:TablesUatTest.predictionOffHoldsForTablesToo")(lambda d: None)
 
 
 # ---------------------------------------------------------------- 外观
 
-def dark(lum):
-    return lum < 90
 
-
-def darkest_theme(d, s=None, top=None, pool=None):
-    """the darkest theme in view (of [pool], the app's nodes by default), below [top] (the
-    preview's bottom by default): built-in themes are told apart by their look, not by a name"""
-    s = s or d.screen()
-    top = preview_box(d, s)[3] + 100 if top is None else top
-    items = [n for n in (pool if pool is not None else s.app()) if n.cls == "ViewGroup" and "新增主题" not in n.texts() and
-             n.b[2] - n.b[0] > 250 and 200 < n.b[3] - n.b[1] < 300 and top < n.b[1] and n.b[3] < 2200]
-    if not items:
-        raise Blocked("主题列表里找不到主题")
-    im = d.png()
-    return min(items, key=lambda n: d.lum(n.b, im))
-
-
-@case("ST-05", base="B0-设置", mutates=True)
-def st05(d):
-    appearance_tab(d, "大小与样式")
-    d.switch("跟随系统夜间模式", False)
-    appearance_tab(d, "主题")
-    s = d.screen()
-    before = d.lum(preview_box(d, s))
-    d.tap(darkest_theme(d, s).c, 1.2)
-    after = d.lum(preview_box(d))
-    check(dark(after), f"预览亮度 {before:.0f} → {after:.0f}，没变深")
-    d.open_page("text")
-    kl = d.lum(kb_box(d))
-    check(dark(kl), f"键盘亮度 {kl:.0f}，不是深色")
-    return f"预览亮度 {before:.0f} → {after:.0f}；键盘 {kl:.0f}"
+case("ST-05", needs="jvm:SettingsUatTest.aDarkThemeTurnsPreviewAndKeyboardDark")(lambda d: None)
 
 
 IMG = None
@@ -470,7 +359,7 @@ def st09(d):
     appearance_tab(d, "大小与样式")
     d.switch("跟随系统夜间模式", False)
     # the default to come back to, seen now: with 跟随 off it is the normal-mode theme's default
-    # (PixelDark), not the light one ST-08 saw with 跟随 on
+    # (PixelDark), not the light one (lum > 150) 跟随 on would give
     d.open_page("text")
     lum_default = d.lum(kb_box(d))
     add_image_theme(d)
@@ -512,89 +401,16 @@ def st09(d):
     return f"新增、选用是那张图；导出 {files[0]}；删除后回到默认（亮度 {lum:.0f}）；导入后选用是那张图"
 
 
-@case("ST-35", base="B0-设置", mutates=True)
-def st35(d):
-    appearance_tab(d, "大小与样式")
-    d.switch("跟随系统夜间模式", False)
-    appearance_tab(d, "主题")
-    check(not custom_item(d), "开始前列表里就有自己的主题")
-    d.tap_text("新增主题", after=1.2)
-    d.tap_text("复制内置主题…", contains=True, scroll=False, after=1.5)
-    s = d.screen()
-    title = d.visible("复制内置主题", s, where="all")
-    if not title:
-        raise Blocked(f"没出内置主题列表：{s.texts(where='all')[:8]}")
-    # the dialog's own items, not the theme list behind it
-    root = title
-    while root.parent is not None:
-        root = root.parent
-    d.tap(darkest_theme(d, s, top=title.b[3], pool=list(root.walk())).c, 1.5)
-    appearance_tab(d, "主题")
-    item = custom_item(d)
-    check(item, "复制后列表里没有可编辑的主题")
-    d.tap(item.c, 1.5)
-    d.open_page("text")
-    kl = d.lum(kb_box(d))
-    check(dark(kl), f"选用复制的深色主题后键盘亮度 {kl:.0f}")
-    return f"复制出可编辑的主题；选用后键盘亮度 {kl:.0f}"
+case("ST-35", needs="jvm:SettingsMenuUatTest.aBuiltInThemeCopied")(lambda d: None)
 
 
-@case("ST-36", base="B0-设置", mutates=True)
-def st36(d):
-    appearance_tab(d, "主题")
-    s = d.screen()
-    item = darkest_theme(d, s)
-    d.tap(item.c, 1.2)
-    s = d.screen()
-    msg = d.visible("不能手动更换主题", s, where="all", contains=True)
-    check(msg, f"点主题没出提示：{s.texts(where='all')[:8]}")
-    d.tap_text("确定", where="all", scroll=False, after=1.0)
-    d.open_page("text")
-    k1 = d.lum(kb_box(d))
-    check(not dark(k1), f"点「确定」后主题换了（键盘亮度 {k1:.0f}）")
-    appearance_tab(d, "主题")
-    d.tap(darkest_theme(d).c, 1.2)
-    d.tap_text("禁用它", where="all", scroll=False, after=1.5)
-    d.open_page("text")
-    k2 = d.lum(kb_box(d))
-    check(dark(k2), f"点「禁用它」后没换成深色主题（键盘亮度 {k2:.0f}）")
-    appearance_tab(d, "大小与样式")
-    check(not d.switch("跟随系统夜间模式", False), "点「禁用它」后跟随系统夜间模式还开着")
-    return f"确定：主题不变（{k1:.0f}）；禁用它：跟随关了，换成深色（{k2:.0f}）"
+case("ST-36", needs="jvm:SettingsMenuUatTest.followingTheSystemAThemeTappedAsks")(lambda d: None)
 
 
-@case("ST-10", base="B0-设置", mutates=True)
-def st10(d):
-    hs = {}
-    for opt in ("矮", "很高"):
-        appearance_tab(d, "大小与样式")
-        choose(d, "键盘高度", opt)
-        appearance_tab(d, "大小与样式")
-        pv = preview_box(d)
-        d.open_page("text")
-        kb = keys_box(d)
-        hs[opt] = (pv[3] - pv[1], kb[3] - kb[1])
-    (p1, k1), (p2, k2) = hs["矮"], hs["很高"]
-    check(p2 > p1, f"预览高度 矮 {p1} 很高 {p2}")
-    check(k2 > k1 * 1.15, f"键盘高度 矮 {k1} 很高 {k2}")
-    return f"键盘 矮 {k1}px → 很高 {k2}px；预览 {p1} → {p2}"
+case("ST-10", needs="jvm:SettingsEffectUatTest.keyboardHeightFollowsTheSetting")(lambda d: None)
 
 
-@case("ST-11", base="B0-设置", mutates=True)
-def st11(d):
-    d.open_page("text")
-    s = d.screen()
-    k0, w0 = keys_box(d, s), d.key_node("q", s).b
-    appearance_tab(d, "大小与样式")
-    choose(d, "键盘两侧边距", "宽")
-    choose(d, "键盘底部边距", "多")
-    d.open_page("text")
-    s = d.screen()
-    k1, w1 = keys_box(d, s), d.key_node("q", s).b
-    check(k1[0] > k0[0] + 10 and k1[2] < k0[2] - 10, f"左右没多出空白：键区 x {k0[0]}..{k0[2]} → {k1[0]}..{k1[2]}")
-    check(k1[3] < k0[3] - 10, f"下面没多出空白：键区底 {k0[3]} → {k1[3]}")
-    check(w1[2] - w1[0] < w0[2] - w0[0], f"键没变窄：q 宽 {w0[2] - w0[0]} → {w1[2] - w1[0]}")
-    return f"键区 x {k0[0]}..{k0[2]} → {k1[0]}..{k1[2]}，底 {k0[3]} → {k1[3]}，q 宽 {w0[2] - w0[0]} → {w1[2] - w1[0]}"
+case("ST-11", needs="jvm:SettingsEffectUatTest.sideAndBottomMarginsNarrowAndLiftTheKeys")(lambda d: None)
 
 
 @case("ST-39", base="B0-设置", mutates=True)
@@ -627,293 +443,45 @@ def st39(d):
     return f"键区底 无 {k0[3]} → 贴底 {k1[3]} → 无 {k2[3]}；预览下空白 {g0} → {g1} → {g2}"
 
 
-@case("ST-12", base="B0-设置", mutates=True, visual=True)
-def st12(d):
-    appearance_tab(d, "大小与样式")
-    pv = preview_box(d)
-    box = (pv[0] - 10, pv[1] - 10, pv[2] + 10, pv[3] + 10)
-    d.shot(box, "预览：默认")
-    d.switch("启用按键边框", False)
-    d.shot(box, "关掉按键边框")
-    d.switch("启用按键边框", True)
-    choose(d, "按键间距", "宽松")
-    d.shot(box, "边框开，间距宽松")
-    choose(d, "按键圆角", "直角")
-    d.shot(box, "圆角：直角")
-    return "看图：平铺 / 缝隙变大 / 没有圆角"
+case("ST-12", needs="jvm:SettingsEffectUatTest.keyBorderSpacingAndCorners")(lambda d: None)
 
 
-@case("ST-13", base="B0-设置", mutates=True)
-def st13(d):
-    appearance_tab(d, "大小与样式")
-    choose(d, "标点位置", "无")
-    d.open_page("text")
-    s = d.screen()
-    corners = {k: [m.text for m in key_nodes(d, k, s)][1:] for k in "qasz"}
-    check(not any(corners.values()), f"键角还有小字 {corners}")
-    q = d.keys(refresh=True)["q"]
-    d.swipe(q, (q[0], q[1] + 130), 150)
-    t = d.field_text()
-    check(t == "1", f"下滑 q 打出「{t}」")
-    appearance_tab(d, "大小与样式")
-    choose(d, "标点位置", "底部")
-    d.open_page("text")
-    s = d.screen()
-    tx = key_nodes(d, "q", s)
-    check(len(tx) >= 2 and tx[1].b[1] > tx[0].b[1], f"底部时 q 键 {[(m.text, m.b) for m in tx]}")
-    return f"无：键角没有小字，下滑 q 打出「{t}」；底部：小字「{tx[1].text}」在字母下方"
+case("ST-13", needs="jvm:SettingsEffectUatTest.punctuationPositionNoneThenBottom")(lambda d: None)
 
 
 # ---------------------------------------------------------------- 按键
 
-@case("ST-14", base="B0-设置", mutates=True)
-def st14(d):
-    home(d, "按键")
-    d.switch("按键时弹出显示字符", False)
-    d.open_page("text")
-    s = d.screen()
-    a = d.key_node("a", s)
-    x, y = a.c
-    d.touch(("down", x, y), ("sleep", 0.25))
-    s = d.screen()
-    d.touch(("up", x, y))
-    pop = [n for n in s.ime() if n.text in ("a", "A") and n.b[3] <= a.b[1] + 10]
-    check(not pop, f"按住时上方有 {[(n.text, n.b) for n in pop]}")
-    return "按住 a 时上方没有弹出字符"
+case("ST-14", needs="jvm:SettingsEffectUatTest.noPopupOnKeyPress")(lambda d: None)
 
 
-@case("ST-15", base="B0-设置", mutates=True)
-def st15(d):
-    home(d, "按键")
-    choose(d, "划动输入标点符号及数字", "上划")
-    d.open_page("text")
-    w = d.keys()["w"]
-    d.swipe(w, (w[0], w[1] - 130), 150)
-    t1 = d.field_text()
-    d.swipe(w, (w[0], w[1] + 130), 150)
-    s = d.screen()
-    t2, p = d.field_text(s), d.preedit(s)
-    check(t1 == "2", f"上滑打出「{t1}」")
-    if not (t2 == "2" and p == "w"):
-        d.clear()
-        d.swipe(w, (w[0], w[1] + 70), 150)
-        p70 = d.preedit()
-        raise Fail(f"下滑（和上滑一样 130 px）后框里「{t2}」、打字状态 `{p}`，没当作点了 w；只滑 70 px 时 `{p70}`")
-    d.clear()
-    home(d, "按键")
-    choose(d, "划动输入标点符号及数字", "禁用")
-    d.open_page("text")
-    w = d.keys(refresh=True)["w"]
-    out = []
-    for dy in (-200, 200):   # past the key's edge either way
-        d.swipe(w, (w[0], w[1] + dy), 150)
-        s = d.screen()
-        out.append((d.field_text(s) or "", d.preedit(s)))
-        d.clear()
-    check(out == [("", ""), ("", "")], f"禁用后上下滑出键外：{out}（框里, 打字状态）")
-    return f"上划：上滑「{t1}」，下滑当作 w（`{p}`）；禁用：滑出键外什么也不打"
+case("ST-15", needs="jvm:SettingsEffectUatTest.swipeUpThenDisabled")(lambda d: None)
 
 
-@case("ST-16", base="B0-设置", mutates=True)
-def st16(d):
-    home(d, "按键")
-    choose(d, "长按延迟", "长")
-    d.open_page("text")
-    s = d.screen()
-    q = d.key_node("q", s)
-    x, y = q.c
-    d.touch(("down", x, y), ("sleep", 0.3), ("up", x, y))
-    time.sleep(0.4)
-    p = d.preedit()
-    check(p == "q", f"按 0.3 秒后打字状态 `{p}`")
-    d.clear()
-    d.touch(("down", x, y), ("sleep", 0.6))
-    s = d.screen()
-    pop = [n.text for n in s.ime() if n.text and n.b[3] <= q.b[1] + 10 and n.b[1] > q.b[1] - 600]
-    d.touch(("move", x + 1, y), ("sleep", 0.05), ("move", x, y + 300), ("up", x, y + 300))
-    check(len(pop) >= 2, f"按 0.6 秒没弹出长按字符：{pop}")
-    return f"0.3 秒打出 q；0.6 秒弹出 {pop[:6]}"
+case("ST-16", needs="jvm:SettingsEffectUatTest.aLongerLongPressDelay")(lambda d: None)
 
 
-@case("ST-17", base="B0-设置", mutates=True)
-def st17(d):
-    home(d, "按键")
-    choose(d, "空格键长按行为", "轮换输入法")
-    d.open_page("text")
-    s = d.screen()
-    sp = s.find(rid="button_space", where="ime")
-    before = sp.desc
-    d.hold(sp.c, 1000)
-    time.sleep(0.6)
-    after = d.screen().find(rid="button_space", where="ime").desc
-    check("英文" in after or "English" in after, f"空格键 {before} → {after}")
-    return f"空格键「{before}」→「{after}」"
+case("ST-17", needs="jvm:SettingsEffectUatTest.holdingTheSpaceGoesToTheNextInputMethod")(lambda d: None)
 
 
-@case("ST-18", base="B0-设置", mutates=True)
-def st18(d):
-    home(d, "按键")
-    d.switch("划动空格键以移动光标", False)
-    d.open_page("long")
-    f = d.field()
-    if not f:
-        raise Blocked("长文本框没有焦点")
-    d.tap((f.b[2] - 20, f.b[3] - 15), 0.6)   # after the last line: the cursor at the end
-    d.type("a")
-    d.space()
-    t0 = d.field_text()
-    if not t0.endswith("啊"):
-        raise Blocked(f"光标不在末尾：打 a 空格后「{t0[-12:]}」")
-    sp = d.keys()["space"]
-    d.swipe(sp, (sp[0] - 300, sp[1]), 500)
-    d.type("a")
-    d.space()
-    t1 = d.field_text()
-    ok = t1 in (t0 + "啊", t0 + " 啊")
-    check(ok, f"滑后再打 a 空格：「…{t1[-14:]}」（之前「…{t0[-10:]}」）")
-    return f"左滑后光标还在末尾：「…{t1[-6:]}」"
+case("ST-18", needs="jvm:SettingsEffectUatTest.spaceSwipeOffLeavesTheCursor")(lambda d: None)
 
 
-@case("ST-19", base="B0-设置", mutates=True)
-def st19(d):
-    home(d, "通用输入")
-    d.switch("括号和引号成对输入，光标停在中间", False)
-    d.open_page("text")
-    popup_pick(d, "k", "（")
-    t = d.field_text()
-    check(t == "（", f"框里是「{t}」")
-    return f"框里是「{t}」"
+case("ST-19", needs="jvm:SettingsEffectUatTest.bracketsUnpairedWhenOff")(lambda d: None)
 
 
-@case("ST-20", base="B0-设置", mutates=True)
-def st20(d):
-    d.open_page("text")
-    w0 = d.screen().find(rid="button_space", where="ime").b
-    home(d, "按键")
-    d.switch("显示语言切换键", False)
-    d.open_page("text")
-    s = d.screen()
-    g = s.find(rid="button_lang", where="ime")
-    w1 = s.find(rid="button_space", where="ime").b
-    check(not g, "底排还有地球键")
-    check(w1[2] - w1[0] > w0[2] - w0[0], f"空格宽 {w0[2] - w0[0]} → {w1[2] - w1[0]}")
-    return f"没有地球键，空格宽 {w0[2] - w0[0]} → {w1[2] - w1[0]}"
+case("ST-20", needs="jvm:SettingsEffectUatTest.noLanguageKeyAWiderSpace")(lambda d: None)
 
 
-def key_editor(d, key):
-    home(d, "按键", "按键字符")
-    s = d.screen()
-    k = next((n for n in s.app() if n.text == key and n.row() is not None), None)
-    if not k:
-        raise Blocked(f"按键字符页没有 {key} 键")
-    d.tap(k.row().c, 1.2)
+case("ST-21", needs="jvm:SettingsEffectUatTest.aCharacterMadeFirstIsTheCornerAndTheSwipe")(lambda d: None)
 
 
-@case("ST-21", base="B0-设置", mutates=True)
-def st21(d):
-    key_editor(d, "q")
-    d.tap_text("Q", scroll=False)
-    d.tap_text("设为首选", scroll=False)
-    d.tap_text("确定", scroll=False, after=1.0)
-    d.open_page("text")
-    s = d.screen()
-    tx = [m.text for m in key_nodes(d, "q", s)]
-    check(tx[1:2] == ["Q"], f"q 键上是 {tx}")
-    q = d.keys(refresh=True)["q"]
-    d.swipe(q, (q[0], q[1] + 130), 150)
-    t = d.field_text()
-    check(t == "Q", f"下滑 q 打出「{t}」")
-    return f"q 键角 Q，下滑打出「{t}」"
-
-
-def symbol(d, char):
-    """the 符 panel's 数学 page: tap char"""
-    s = d.screen()
-    for _ in range(6):
-        m = d.visible("数学", s, where="ime")
-        if m:
-            d.tap(m.c, 0.8)
-            break
-        col = s.find(text="常用", where="ime")
-        x = col.c[0] if col else 97
-        d.swipe((x, 1950), (x, 1600), 300)
-        s = d.screen()
-    else:
-        raise Blocked("符号面板里找不到数学")
-    for _ in range(8):
-        s = d.screen()
-        n = d.visible(char, s, where="ime")
-        if n:
-            d.tap(n.c, 0.5)
-            return
-        d.swipe((540, 2000), (540, 1650), 300)
-    raise Blocked(f"数学里找不到 {char}")
-
-
-@case("ST-22", base="B0-设置", mutates=True)
-def st22(d):
-    key_editor(d, "a")
-    s = d.screen()
-    e = next((n for n in s.app() if "Edit" in n.cls), None)
-    if not e:
-        raise Blocked("没有添加字符的输入框")
-    d.tap(e.c, 1.0)
-    d.press("符")
-    symbol(d, "α")
-    if d.screen().find(rid="keyboard_view", where="ime"):
-        d.space()
-        d.press("符")
-    else:
-        d.tap_text("空格", where="ime", scroll=False)
-    symbol(d, "β")
-    t = d.field_text()
-    if t != "α β":
-        raise Blocked(f"添加框里是「{t}」")
-    d.hide_keyboard()
-    d.tap_text("添加", scroll=False)
-    d.tap_text("确定", scroll=False, after=1.0)
-    d.open_page("text")
-
-    def popup():
-        k = d.key_node("a")
-        x, y = k.c
-        d.touch(("down", x, y), ("sleep", 0.9))
-        s = d.screen()
-        d.touch(("move", x + 1, y), ("sleep", 0.05), ("move", x, y + 300), ("up", x, y + 300))
-        return [n.text for n in s.ime() if n.text and n.b[3] <= k.b[1] + 10 and n.b[1] > k.b[1] - 700]
-    p1 = popup()
-    check("α" in p1 and "β" in p1, f"长按 a 弹出 {p1}")
-    key_editor(d, "a")
-    for label in ("重置", "恢复默认", "默认"):
-        s = d.screen()
-        n = s.find(text=label)
-        if n:
-            d.tap(n.c, 1.0)
-            break
-    else:
-        # the editor has no restore button: the key's row in the list has it (long-press)
-        d.back()
-        s = d.screen()
-        k = next((n for n in s.app() if n.text == "a"), None)
-        d.hold(k.row().c, 900)
-        time.sleep(0.8)
-        s = d.screen()
-        n = s.find(contains="恢复默认") or s.find(contains="默认")
-        if not n:
-            raise Blocked(f"找不到对 a 恢复默认的地方：{s.texts()[:12]}")
-        d.tap(n.c, 1.0)
-    s = d.screen()
-    ok = s.find(text="确定")
-    if ok:
-        d.tap(ok.c, 1.0)
-    d.open_page("text")
-    p2 = popup()
-    check("α" not in p2 and "β" not in p2, f"恢复后长按 a 仍有 {p2}")
-    return f"加后 {p1[:5]}…；恢复后 {p2[:5]}…"
+case("ST-22", needs="jvm:SettingsEffectUatTest.charactersAddedThenTheDefaultBack, KotlinHostKeyboardTest.aCircledLetterLongPressedOnTheFourteenKeysIsTypedAsText, KotlinHostKeyboardTest.aParenthesisedDigitLongPressedOnShuangpinsNineKeysIsTypedAsText, PopupOverridesFragmentTest$Dialog.aKeyCodeAloneIsRefusedAndTheDialogStays")(lambda d: None)
 
 
 # ---------------------------------------------------------------- 其他
 
+# also on the JVM (SettingsMenuUatTest.theLanguagesOfferedAreFour), which checks the choice and the
+# locale; this one, that the keyboard's own text (EngineNotices and all) follows it and typing still works
 @case("ST-25", base="B0-设置", mutates=True)
 def st25(d):
     home(d, "界面语言")
@@ -926,6 +494,8 @@ def st25(d):
     d.open_page("text")
     s = d.screen()
     sp = s.find(rid="button_space", where="ime")
+    if not sp:
+        raise Blocked("键盘上没有空格键（button_space）")
     descs = [n.desc for n in s.ime() if n.desc]
     cjk_kb = [x for x in descs + [sp.desc] if any("一" <= ch <= "鿿" for ch in x)]
     check(not cjk_kb, f"键盘上还有中文：{cjk_kb}")
@@ -935,12 +505,17 @@ def st25(d):
     t = d.field_text()
     check(t == "你好", f"打出「{t}」")
     d.hide_keyboard()
-    d.open_settings()
-    d.tap_text(titles[-1] if titles else "Language", after=1.0)
-    s = d.screen()
-    n = s.find(contains="ollow") or s.find(contains="ystem")
-    if n:
-        d.tap(n.c, 2.0)
+    # back by its English title (the row may be below the fold: goto scrolls); language_follow_system
+    home(d, "App language")
+    # the page is rebuilt for the new locale: its choices can come a few seconds after the title
+    end, n = time.time() + 6, None
+    while not n and time.time() < end:
+        n = d.screen().find(text="Same as the phone")
+        if not n:
+            time.sleep(0.5)
+    if not n:
+        raise Blocked("界面语言里没有「Same as the phone」，没能改回跟随系统")
+    d.tap(n.c, 2.0)
     return f"设置 {titles[:3]}；空格「{sp.desc}」；打出「{t}」"
 
 
@@ -1005,49 +580,17 @@ def record_panel(d):
     return r
 
 
-def record_copy(d, word="公园"):
-    """the keyboard's bar (and the band above it a hint may slide through) while 复制 is tapped on the
-    edit panel, as 05-toolbar's copy_word does it: the hint is recorded as it comes in, not
-    screenshotted a second and more later, when any animation has long ended (F3548)"""
-    tbs = script("05-toolbar")
-    d.open_page("long")
-    f = d.field()
-    d.tap((f.b[0] + 18, f.b[1] + 55), 0.6)
-    tbs.edit_panel(d)
-    s = d.screen()
-    right = s.find(desc="向右移动光标", where="ime") or s.find(text="向右移动光标", where="ime")
-    sel = s.find(desc="选择", where="ime") or s.find(text="选择", where="ime")
-    cp = s.find(desc="复制", where="ime") or s.find(text="复制", where="ime")
-    ns = [n for n in s.ime() if n.b[3] > n.b[1]]
-    if not (right and sel and cp and ns):
-        raise Blocked(f"编辑面板上缺按钮：{[n.desc or n.text for n in s.ime() if n.desc or n.text][:10]}")
-    i = tbs.LONG.index(word)
-    if i:
-        d.taps([right.c] * i, gap=0.05, after=0.3)
-    d.tap(sel.c, 0.3)
-    d.taps([right.c] * len(word), gap=0.05, after=0.3)
-    # the notice sits above the window (said above the keys, UndoChipPlacement.top; below it or over
-    # the bar only with the window at the screen's top, never so when docked): the band above the
-    # window down to the bar's bottom, not the panel's buttons below it (their press feedback) nor
-    # the screen's bottom (the system's clipboard overlay), which would count as frames of their own
-    back = s.find(desc="返回键盘", where="ime")
-    # the window-wide containers start at the status bar's bottom and are left out (as LS-27):
-    # a band from there would be the whole screen, the notice too small a part of it to count
-    outer = min(n.b[1] for n in ns)
-    top = min((n.b[1] for n in ns if n.b[1] > outer), default=outer)
-    bottom = back.b[3] if back else max(n.b[3] for n in ns)
-    r = record_change(d, max(0, top - 250), bottom, lambda: d.tap(cp.c, 1.0))
-    tbs.ime(d, desc="把光标移动到结尾", after=0.3)
-    tbs.back_to_keys(d)
-    return r
-
-
 @case("ST-26", base="B0-设置", mutates=True, visual=True)
 def st26(d):
-    d.open_page("text")
-    on, n_on = record_toolbar(d)
-    pon, _ = record_panel(d)
-    con, _ = record_copy(d)
+    # recorded with Android's animator scale at 5: the panel's 120 ms leaves about two frames between at
+    # 1, at the edge of what is recorded (one on some runs); five times as long it is plainly animated
+    d.sh("settings put global animator_duration_scale 5")
+    try:
+        d.open_page("text")
+        on, n_on = record_toolbar(d)
+        pon, _ = record_panel(d)
+    finally:
+        d.sh("settings put global animator_duration_scale 1")
     appearance_tab(d, "大小与样式")
     d.switch("禁用动画", True)
     d.open_page("text")
@@ -1059,13 +602,12 @@ def st26(d):
         raise Blocked(f"开着动画时剪贴板面板也只录到 {pon} 个过渡帧，分不出来")
     check(off <= 1, f"禁用动画后工具栏仍有 {off} 个过渡帧（开着时 {on}）")
     check(poff <= 1, f"禁用动画后剪贴板面板仍有 {poff} 个过渡帧（开着时 {pon}）")
-    # the setting reaches the notice too: copied, it is in place and opaque at once
+    # the setting reaches the notice too: copied, it is in place and opaque at once. Asserted on the JVM
+    # (UndoChipTest.withAnimationsOffItIsInPlaceAndOpaqueAtOnce): a recording cannot tell it, the
+    # notice's first frame being three quarters of the way in already; here a look
     d.step("禁用动画时的提示")
-    if con < 2:
-        raise Blocked(f"开着动画时复制的提示也只录到 {con} 个过渡帧，分不出来")
-    coff, _ = record_copy(d)
+    script("05-toolbar").copy_word(d, "公园")
     d.shot("full", "禁用动画，复制后的提示")
-    check(coff <= 1, f"禁用动画后复制的提示仍有 {coff} 个过渡帧（开着时 {con}）")
     # Android's own 移除动画 does the same with the setting off
     d.step("系统移除动画")
     appearance_tab(d, "大小与样式")
@@ -1074,18 +616,18 @@ def st26(d):
     try:
         d.open_page("text")
         sys0, _ = record_toolbar(d)
-        csys, _ = record_copy(d)
+        script("05-toolbar").copy_word(d, "公园")
         d.shot("full", "系统移除动画，复制后的提示")
     finally:
         d.sh("settings put global animator_duration_scale 1")
     check(sys0 <= 1, f"系统移除动画后工具栏仍有 {sys0} 个过渡帧")
-    check(csys <= 1, f"系统移除动画后复制的提示仍有 {csys} 个过渡帧")
     return (f"过渡帧：工具栏 开着 {on}、禁用后 {off}、系统移除动画 {sys0}；剪贴板面板 开着 {pon}、禁用后 {poff}；"
-            f"复制的提示 开着 {con}、禁用后 {coff}、系统移除动画 {csys}")
+            "复制的提示看图")
 
 
-@case("ST-28", base="B0-设置", mutates=True)
-def st28(d):
+def set_comma(d, mark):
+    """中文标点 → , set to mark, typed by its corner swipe (、 is m's corner character)"""
+    corner = {"、": "m"}[mark]
     home(d, "通用输入", "中文标点")
     s = d.screen()
     n = next((n for n in s.app() if n.text == ","), None)
@@ -1098,13 +640,18 @@ def st28(d):
         raise Blocked(f"编辑框 {[(e.text) for e in eds]}")
     d.tap(eds[1].c, 0.8)
     d.clear()
-    m = d.keys()["m"]
-    d.swipe(m, (m[0], m[1] + 130), 150)     # 、 is m's corner character
+    m = d.keys()[corner]
+    d.swipe(m, (m[0], m[1] + 130), 150)
     t = d.field_text()
-    if t != "、":
-        raise Blocked(f"改成「、」没成功：框里「{t}」")
+    if t != mark:
+        raise Blocked(f"改成「{mark}」没成功：框里「{t}」")
     d.hide_keyboard()
     d.tap_text("确定", scroll=False, after=1.0)
+
+
+@case("ST-28", base="B0-设置", mutates=True)
+def st28(d):
+    set_comma(d, "、")
     d.open_page("text")
     d.press(",")
     t = d.field_text()
@@ -1144,22 +691,150 @@ def st29(d):
     return f"日志 {len(lines)} 行、有导出；检查器显示 TYPE_TEXT_VARIATION_URI（在键盘 … 里，不在设置页）"
 
 
-@case("ST-31", base="B0-设置")
-def st31(d):
-    home(d, "更多选项", "关于")
-    texts = d.all_texts()
-    want = ["版本", "提交时间", "基础数据", "源代码", "隐私政策", "许可"]
-    miss = [w for w in want if w not in texts]
-    check(not miss, f"关于页缺 {miss}")
-    ver = texts[texts.index("当前版本") + 1] if "当前版本" in texts else "?"
-    d.tap_text("第三方库许可证", after=2.0)
-    s = d.screen()
-    libs = [n.text for n in s.app() if n.text and n.rid != "title" and len(n.text) > 3]
-    check(len(libs) >= 5, f"许可证页 {libs[:6]}")
-    return f"版本 {ver}；许可证页 {len(libs)} 行，如 {libs[1][:20]}"
+case("ST-31", needs="jvm:SettingsMenuUatTest.aboutListsVersionsSourceAndLicenses")(lambda d: None)
 
 
 def switch_state(d, title):
     r = d.row(title)
     w = [n for n in r.walk() if n.cls in SWITCHES] if r else []
     return w[0].checked if w else None
+
+
+# ---------------------------------------------------------------- 拼音的键盘
+
+NOT_14 = "拼音 14 键"
+
+
+@case("ST-40", base="B0-设置", mutates=True)
+def st40(d):
+    v = pinyin_keyboard_value(d)
+    t = d.all_texts()
+    ok = [x for x in t if NOT_14 in x]
+    check(v == "全键盘", f"「键盘」默认是「{v}」")
+    check(any("实体键盘仍按全拼打" in x for x in t), f"「键盘」的说明 {t[:16]}")
+    check("拆字" in t and "中英混输" in t and len(ok) >= 2, f"拼音页的不适用 {ok}")
+    home(d, "通用输入")
+    t2 = d.all_texts()
+    ok2 = [x for x in t2 if NOT_14 in x]
+    check("纠正错拼和按偏的键" in t2 and "滑行输入" in t2 and len(ok2) >= 2, f"通用输入的不适用 {ok2}")
+    pinyin_keyboard(d, "14 键")
+    d.open_page("text")
+    k = d.keys(refresh=True)
+    check("qw" in k and "bn" in k, f"回到框里不是 14 键：{sorted(k)[:12]}")
+    return f"默认「{v}」；不适用 {len(ok)}+{len(ok2)} 行；马上是 14 键"
+
+
+def code_row_dp(d):
+    s = d.screen()
+    row = d.code_row(s)
+    if not row:
+        raise Blocked("没有编码行")
+    return round((row.b[3] - row.b[1]) / d.dpx())
+
+
+def kb_h(d):
+    """the whole input view's height above the keys' bottom: from the composing row's top (its row is
+    there, 18 or 40 dp, typing or not: the height must not jump) to the keyboard's bottom. Not the
+    IME window's top: that window spans the screen, so its top is the same whatever the board"""
+    b = kb_box(d)
+    row = d.code_row()
+    if not row:
+        raise Blocked("没有编码行（没打字时这一行也该在）")
+    return b[3] - row.b[1]
+
+
+@case("ST-41", base="B0-设置", mutates=True, visual=True)
+def st41(d):
+    add_im(d, "五笔")
+    add_im(d, "九键拼音")
+    add_im(d, "双拼")
+    d.open_page("text")
+    d.switch_im("拼音")   # the last added is the one on
+    d.type("ni")
+    d.cands()
+    full = code_row_dp(d)
+    d.clear()
+    h_full = kb_h(d)
+    d.hide_keyboard()
+    pinyin_keyboard(d, "14 键")
+    d.open_page("text")
+    grouped_keys(d, "bn ui")
+    d.cands()
+    k14 = code_row_dp(d)
+    d.clear()
+    h = {"拼音": kb_h(d)}
+    for im in ("英文", "五笔", "九键"):
+        d.switch_im(im)
+        h[im] = kb_h(d)
+    d.shot("kb", "14 键时换到九键：键盘总高不变")
+    d.switch_im("拼音")
+    d.hide_keyboard()
+    pinyin_keyboard(d, "全键盘")
+    d.open_page("text")
+    d.type("ni")
+    d.cands()
+    back = code_row_dp(d)
+    d.clear()
+    # 双拼's 18 keys: the same height on English and 五笔 after them
+    d.hide_keyboard()
+    shuangpin_keyboard(d, "18 键")
+    d.open_page("text")
+    d.switch_im("双拼")
+    grouped_keys(d, "bn io")
+    d.cands()
+    d.clear()
+    h18 = {"双拼": kb_h(d)}
+    for im in ("英文", "五笔"):
+        d.switch_im(im)
+        h18[im] = kb_h(d)
+    d.hide_keyboard()
+    shuangpin_keyboard(d, "全键盘")
+    check(full == 18, f"全键盘时编码行 {full}dp")
+    check(k14 == 40, f"14 键时编码行 {k14}dp")
+    check(max(h.values()) - min(h.values()) <= 3, f"各输入法的键盘总高 {h}")
+    # the keys keep their height: the 14 keys' board is the code row's 22 dp taller
+    grew = (h["拼音"] - h_full) / d.dpx()
+    check(abs(grew - 22) <= 2, f"14 键比全键盘高 {grew:.0f}dp（应为 22）")
+    check(back == 18, f"改回全键盘后编码行 {back}dp")
+    check(max(h18.values()) - min(h18.values()) <= 3, f"双拼 18 键时各输入法的键盘总高 {h18}")
+    return f"{full} → {k14} → {back} dp；总高 {h}；18 键 {h18}"
+
+
+@case("ST-42", base="B0-设置", mutates=True)
+def st42(d):
+    add_im(d, "双拼")
+    gear(d, "双拼")
+    d.scroll_top()
+    v = d.summary("键盘")
+    if v is None:
+        raise Blocked("双拼页没有「键盘」")
+    t = d.all_texts()
+    check(v.split("\n")[0] == "全键盘", f"「键盘」默认是「{v}」")
+    check(any("重码" in x and "实体键盘" in x for x in t), f"「键盘」的说明 {t[:16]}")
+    shuangpin_keyboard(d, "18 键")
+    d.open_page("text")
+    d.switch_im("双拼")
+    k = d.keys(refresh=True)
+    check("we" in k and "io" in k, f"回到框里不是 18 键：{sorted(k)[:16]}")
+    grouped_keys(d, "bn io")
+    d.cands()
+    k18, sy = code_row_dp(d), d.syllables()
+    d.clear()
+    d.hide_keyboard()
+    shuangpin_keyboard(d, "九键")
+    d.open_page("text")
+    d.switch_im("双拼")
+    k = d.keys(refresh=True)
+    check(all(c in k for c in "23456789"), f"回到框里不是九键：{sorted(k)[:16]}")
+    d.taps([k["6"], k["4"]], gap=0.35, after=0.6)
+    d.cands()
+    k9, sy9 = code_row_dp(d), d.syllables()
+    d.clear()
+    d.hide_keyboard()
+    shuangpin_keyboard(d, "全键盘")
+    home(d, "通用输入")
+    glide = d.summary("滑行输入") or ""
+    check(k18 == 40 and sy, f"18 键时编码行 {k18}dp，音节条 {sy}")
+    check(k9 == 18 and not sy9, f"九键时编码行 {k9}dp，音节条 {sy9}")
+    check("双拼 18 键" in glide and "九键双拼" in glide, f"滑行输入的说明「{glide}」")
+    return f"默认「{v.split(chr(10))[0]}」；18 键 {k18}dp {sy[:3]}；九键 {k9}dp"

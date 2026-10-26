@@ -4,7 +4,8 @@ USB keyboard is uat/tools/emu-keyboard.sh's uinput one (never on redroid: there 
 import re
 import time
 
-from uat import PKG, Blocked, Fail, add_im, case, check, choose, home, script
+from uat import (PKG, Blocked, Fail, add_im, case, check, choose, gear, grouped_keys, has_keyboard_code,
+                 pinyin_keyboard, shuangpin_keyboard)
 
 MANUAL_NO_CURSOR = ("manual:要一个不告诉输入法光标位置的应用（终端、游戏、自绘编辑器）；模拟器上没有，"
                     "测试页和系统应用都告诉光标")
@@ -65,6 +66,20 @@ def fcand_nodes(s):
     return [n for n in floating(s) if n.clickable and re.match(r"^\d+\S", n.text or "")]
 
 
+# the temporary modes' labels are keyToLabel's ("1. ", "A-1. "), shown in the same text as the word
+TEMP_LABEL = r"^(?:[CASM]-)*\d+\.\s*"
+
+
+def tcand_nodes(s):
+    return [n for n in floating(s) if n.clickable and re.match(TEMP_LABEL + r"\S", n.text or "")]
+
+
+def tcands(s):
+    """the floating window's candidates in quick input / Unicode, without their label and the comment
+    after them (the phrase's key, \\alpha, the character's name: LabeledCandidateItemUi appends it)"""
+    return [re.sub(r"\s+[\\:A-Za-z_\- ]+$", "", re.sub(TEMP_LABEL, "", n.text)) for n in tcand_nodes(s)]
+
+
 def fpre(s):
     """the floating window's code (pinyin) line"""
     t = [n.text for n in floating(s) if n.text and not n.clickable]
@@ -75,38 +90,12 @@ def button(s):
     return s.find(desc=BUTTON, where="ime")
 
 
-def flash(d, want, timeout=2.0):
-    """wait for the input method's name by the cursor; returns it, else what was seen"""
-    end, seen = time.time() + timeout, []
-    while time.time() < end:
-        t = [n.text for n in floating(d.screen()) if n.text and not n.clickable]
-        seen += [x for x in t if x not in seen]
-        if want in t:
-            return want
-        time.sleep(0.1)
-    return seen
-
-
-def esc_flash(d):
-    """the name by the cursor gone: a key it ignores"""
-    time.sleep(1.2)
-
-
 def field_text(d):
     return d.field_text() or ""
 
 
 def back_on_screen(d, timeout=6):
     d.wait(lambda s: soft(s), timeout, what="the touch keyboard")
-
-
-def tap_button(d):
-    s = d.screen()
-    b = button(s)
-    if not b:
-        raise Fail(f"光标旁没有键盘图标：{[(n.text, n.desc) for n in floating(s)]}")
-    d.tap(b.c, 1.0)
-    back_on_screen(d)
 
 
 @case("HK-01", base="B0-实体", needs=EMU)
@@ -125,19 +114,7 @@ def hk01(d):
     return f"屏幕键盘收起；小窗 `{p}` {c[:4]}，右端键盘图标"
 
 
-@case("HK-02", base="B0-实体", mutates="learn", needs=EMU)
-def hk02(d):
-    typ(d, "nihao ")
-    t1 = field_text(d)
-    check(t1 == "你好", f"n i h a o 空格后框里「{t1}」")
-    typ(d, "shi")
-    c = fcands(d.screen())
-    if len(c) < 3:
-        raise Fail(f"shi 的候选窗 {c}")
-    key(d, "3")
-    t = field_text(d)
-    check(t == "你好" + c[2], f"按 3（第 3 个是「{c[2]}」），框里「{t}」")
-    return f"「你好」，shi 第 3 个「{c[2]}」→「{t}」"
+case("HK-02", needs="jvm:HardwareKeysUatTest.spaceCommitsTheFirstADigitPicksByNumber")(lambda d: None)
 
 
 @case("HK-03", base="B0-实体", mutates="learn", needs=EMU)
@@ -281,132 +258,31 @@ def search_box(d, e):
     return f"按 n i 空格「{t}」，屏幕键盘收起；点框回来"
 
 
-@case("HK-04", base="B0-实体", needs=EMU)
-def hk04(d):
-    typ(d, "abc")
-    key(d, "ENTER")
-    t1 = field_text(d)
-    typ(d, "xyz")
-    key(d, "ESC")
-    t = field_text(d)
-    check(t1 == "abc", f"回车后框里「{t1}」")
-    check(t == "abc", f"Esc 后框里「{t}」")
-    return f"回车「{t1}」；Esc 后「{t}」"
+case("HK-04", needs="jvm:HardwareKeyUatTest.enterAndEscapeGoToTheEngine")(lambda d: None)
 
 
-@case("HK-05", base="B0-实体", needs=EMU)
-def hk05(d):
-    typ(d, "nihao")
-    key(d, "BACKSPACE")
-    p = fpre(d.screen())
-    key(d, "ESC")
-    check(p.replace(" ", "").replace("'", "") == "niha", f"退格后小窗是「{p}」")
-    return f"「{p}」"
+case("HK-05", needs="jvm:HardwareKeyUatTest.backspaceGoesToTheEngine")(lambda d: None)
 
 
-def page_check(d, down, up):
-    typ(d, "shi")
-    p1 = fcands(d.screen())
-    key(d, down)
-    p2 = fcands(d.screen())
-    key(d, up)
-    p3 = fcands(d.screen())
-    check(p2 and p2 != p1, f"{down} 没翻页：{p1[:4]} → {p2[:4]}")
-    check(p3 == p1, f"{up} 没翻回第一页：{p1[:4]} → {p3[:4]}")
-    return p1, p2
+case("HK-06", needs="jvm:HardwareKeysUatTest.minusAndEqualTurnThePagesWhileTyping")(lambda d: None)
 
 
-@case("HK-06", base="B0-实体", needs=EMU)
-def hk06(d):
-    p1, p2 = page_check(d, "EQUAL", "MINUS")
-    key(d, "ESC")
-    key(d, "MINUS", "EQUAL")
-    t = field_text(d)
-    check(t == "-=", f"没在打字时按 - =，框里「{t}」")
-    return f"第一页 {p1[:3]}，= 后 {p2[:3]}，- 回来；框里「{t}」"
+case("HK-07", needs="jvm:HardwareKeysUatTest.minusAfterACommitIsTheMark")(lambda d: None)
 
 
-@case("HK-07", base="B0-实体", mutates="learn", needs=EMU)
-def hk07(d):
-    typ(d, "jintian ")
-    key(d, "MINUS")
-    t = field_text(d)
-    check(t == "今天-", f"框里「{t}」")
-    return f"「{t}」"
+case("HK-08", needs="jvm:HardwareKeysUatTest.pageDownAndPageUpTurnThePages")(lambda d: None)
 
 
-@case("HK-08", base="B0-实体", needs=EMU)
-def hk08(d):
-    p1, p2 = page_check(d, "PAGEDOWN", "PAGEUP")
-    key(d, "ESC")
-    return f"第一页 {p1[:3]}，PageDown 后 {p2[:3]}，PageUp 回来"
+case("HK-09", needs="jvm:HardwareKeyUatTest.aShiftTapSwitchesChineseAndEnglish")(lambda d: None)
 
 
-@case("HK-09", base="B0-实体", mutates="learn", needs=EMU)
-def hk09(d):
-    typ(d, "a")   # the touch keyboard away first, so the name shows by the cursor
-    key(d, "ESC")
-    key(d, "SHIFT", after=0)
-    f1 = flash(d, "En")
-    typ(d, "hi ")
-    t1 = field_text(d)
-    esc_flash(d)
-    key(d, "SHIFT", after=0)
-    f2 = flash(d, "拼")
-    typ(d, "ni ")
-    t = field_text(d)
-    check(f1 == "En", f"第一次 Shift 后光标旁是 {f1}")
-    check(t1 == "hi ", f"英文里 h i 空格，框里「{t1}」")
-    check(f2 == "拼", f"第二次 Shift 后光标旁是 {f2}")
-    check(t == "hi 你", f"框里「{t}」")
-    return f"闪 En；「{t1}」；闪 拼；「{t}」"
+case("HK-10", needs="jvm:HardwareKeyUatTest.shiftWhileTypingSwitchesToEnglish")(lambda d: None)
 
 
-@case("HK-10", base="B0-实体", needs=EMU)
-def hk10(d):
-    typ(d, "ni")
-    key(d, "SHIFT", after=0)
-    f = flash(d, "En")
-    t = field_text(d)
-    check(t == "ni", f"框里「{t}」")
-    check(f == "En", f"光标旁是 {f}")
-    return f"「{t}」，闪 En"
+case("HK-11", needs="jvm:HardwareKeyUatTest.shiftHeldTypesCapitalsAndSwitchesNothing")(lambda d: None)
 
 
-@case("HK-11", base="B0-实体", needs=EMU)
-def hk11(d):
-    typ(d, "a")
-    key(d, "ESC")
-    key(d, "SHIFT", after=0)
-    f = flash(d, "En")
-    if f != "En":
-        raise Blocked(f"Shift 没切到英文：{f}")
-    esc_flash(d)   # else the En flash may still be up and read as the code row
-    combo(d, "SHIFT", "A")
-    key(d, "B")
-    t = field_text(d)
-    s = d.screen()
-    check(t == "Ab", f"框里「{t}」")
-    check(not fpre(s) and not fcands(s), f"像是又切回了拼音：小窗 `{fpre(s)}` {fcands(s)[:3]}")
-    return f"「{t}」，仍是英文"
-
-
-@case("HK-12", base="B0-实体", mutates="learn", needs=EMU)
-def hk12(d):
-    typ(d, "a")
-    key(d, "ESC")
-    combo(d, "CTRL", "SPACE", after=0)
-    f1 = flash(d, "En")
-    typ(d, "ok")
-    t1 = field_text(d)
-    esc_flash(d)
-    combo(d, "CTRL", "SPACE", after=0)
-    f2 = flash(d, "拼")
-    typ(d, "ni ")
-    t = field_text(d)
-    check(f1 == "En" and t1 == "ok", f"第一次 Ctrl+空格 后 {f1}，o k 后框里「{t1}」")
-    check(f2 == "拼" and t == "ok你", f"第二次后 {f2}，框里「{t}」")
-    return f"En「{t1}」；拼「{t}」"
+case("HK-12", needs="jvm:HardwareKeyUatTest.ctrlSpaceSwitchesAndTypesNoSpace")(lambda d: None)
 
 
 @case("HK-30", base="B0-实体", needs="manual:要分屏（上面测试页、下面设置）再点回上面的窗口；模拟器上 adb 摆不出分屏，手动做")
@@ -414,76 +290,16 @@ def hk30(d):
     pass
 
 
-def add_then_page(d, *names):
-    for n in names:
-        add_im(d, n)
-    d.open_page("text")
+case("HK-13", needs="jvm:HardwareKeyUatTest.shiftBackFromEnglishIsWubiNotPinyin")(lambda d: None)
 
 
-@case("HK-13", base="B0-实体", mutates=True, needs=EMU)
-def hk13(d):
-    add_then_page(d, "五笔")
-    d.switch_im("五笔")
-    typ(d, "w")
-    c0 = fcands(d.screen())
-    check(c0 and "人" in c0[:3], f"按 w 的候选不是五笔的：{c0[:5]}")
-    key(d, "BACKSPACE")
-    key(d, "SHIFT", after=0)
-    f1 = flash(d, "En")
-    esc_flash(d)
-    key(d, "SHIFT", after=0)
-    f2 = flash(d, "五")
-    typ(d, "q")
-    c = fcands(d.screen())
-    key(d, "ESC")
-    check(f1 == "En", f"第一次 Shift 后 {f1}")
-    check(f2 == "五", f"第二次 Shift 后 {f2}（不是五笔）")
-    check("我" in c, f"q 的候选 {c[:6]}")
-    return f"w {c0[:3]}；En；五；q {c[:3]}"
+case("HK-14", needs="jvm:HardwareKeyUatTest.ctrlShiftGoesRoundSkippingHandwritingAndNineKeys")(lambda d: None)
 
 
-@case("HK-14", base="B0-实体", mutates=True, needs=EMU)
-def hk14(d):
-    add_then_page(d, "五笔", "九键拼音", "手写")
-    typ(d, "a")
-    key(d, "ESC")
-    seen = []
-    for _ in range(4):
-        combo(d, "CTRL", "SHIFT", after=0)
-        time.sleep(0.4)
-        t = [n.text for n in floating(d.screen()) if n.text and not n.clickable]
-        seen.append(t[0] if t else "?")
-        esc_flash(d)
-    check(seen == ["En", "五", "拼", "En"], f"依次是 {seen}")
-    return " → ".join(seen)
+case("HK-15", needs="jvm:HardwareKeyUatTest.shiftThenCtrlToo")(lambda d: None)
 
 
-@case("HK-15", base="B0-实体", needs=EMU)
-def hk15(d):
-    typ(d, "a")
-    key(d, "ESC")
-    combo(d, "SHIFT", "CTRL", after=0)
-    f = flash(d, "En")
-    check(f == "En", f"Shift+Ctrl 后 {f}")
-    return "切到 En"
-
-
-@case("HK-16", base="B0-实体", mutates="learn", needs=EMU)
-def hk16(d):
-    typ(d, "nihao ")
-    if field_text(d) != "你好":
-        raise Blocked(f"打不出「你好」：「{field_text(d)}」")
-    combo(d, "CTRL", "A")
-    combo(d, "CTRL", "C")
-    key(d, "RIGHT")
-    combo(d, "CTRL", "V", after=0.8)
-    t = field_text(d)
-    check(t == "你好你好", f"框里「{t}」")
-    typ(d, "ni")
-    p = fpre(d.screen())
-    key(d, "ESC")
-    check(p == "ni", f"之后打 ni 小窗是「{p}」，输入法像是切了")
-    return f"「{t}」，仍是拼音"
+case("HK-16", needs="jvm:HardwareKeyUatTest.ctrlCAndCtrlVAreForTheApp")(lambda d: None)
 
 
 @case("HK-17", base="B0-实体", needs=EMU)
@@ -505,105 +321,22 @@ def hk17(d):
     return f"Meta+空格 后当前输入法 {cur.split('/')[0]}；幽默没报错"
 
 
-def hand_off(d, name, label):
-    add_then_page(d, name)
-    d.switch_im(label)
+case("HK-18", needs="jvm:HardwareKeyUatTest.handwritingTypedOnIsPinyin")(lambda d: None)
 
 
-@case("HK-18", base="B0-实体", mutates=True, needs=EMU)
-def hk18(d):
-    hand_off(d, "手写", "手写")
-    if not d.screen().find(desc="手写板", where="ime"):
-        raise Blocked("切到手写后没有书写板")
-    typ(d, "n")
-    s = d.screen()
-    p = fpre(s)
-    typ(d, "i ")
-    s = d.screen()
-    t = field_text(d)
-    check(not soft(s), "按实体键盘后屏幕键盘没收起")
-    check(p == "n", f"按 n 后小窗是「{p}」，不是拼音")
-    check(t == "你", f"框里「{t}」")
-    return f"按 n 小窗 `{p}`；「{t}」"
+case("HK-19", needs="jvm:HardwareKeyUatTest.theTouchKeyboardBackIsHandwriting")(lambda d: None)
 
 
-@case("HK-19", base="B0-实体", mutates=True, needs=EMU)
-def hk19(d):
-    hand_off(d, "手写", "手写")
-    typ(d, "ni ")
-    key(d, "ESC")
-    tap_button(d)
-    s = d.screen()
-    check(s.find(desc="手写板", where="ime"), f"回来的不是书写板：{d.im_label(s)}")
-    return "回来的是手写书写板"
+case("HK-20", needs="jvm:HardwareKeyUatTest.nineKeysTypedOnAndBack")(lambda d: None)
 
 
-@case("HK-20", base="B0-实体", mutates=True, needs=EMU)
-def hk20(d):
-    hand_off(d, "九键拼音", "九键")
-    typ(d, "2026hao ")
-    t = field_text(d)
-    key(d, "ESC")
-    tap_button(d)
-    s = d.screen()
-    lab = d.im_label(s)
-    check(t == "2026好", f"框里「{t}」")
-    check("九键" in lab, f"回来的是「{lab}」，不是九键")
-    return f"「{t}」；回来的是 {lab}"
+case("HK-21", needs="jvm:HardwareKeysUatTest.returnPutsTheWrittenInThenGoesToTheApp")(lambda d: None)
 
 
-@case("HK-21", base="B0-实体", page="chat", mutates=True, needs=EMU)
-def hk21(d):
-    hand_off(d, "手写", "手写")
-    d.open_page("chat")
-    d.switch_im("手写")
-    hw = script("09-handwriting")
-    hw.write(d, "人")
-    t0 = field_text(d)
-    key(d, "ENTER", after=0.8)
-    s = d.screen()
-    t1 = d.field_text(s) or ""
-    log1 = next((n.text for n in s.app() if n.rid == "log"), "") or ""
-    key(d, "ENTER", after=0.8)
-    s = d.screen()
-    t2 = d.field_text(s) or ""
-    logs = [n.text for n in s.app() if n.text and "人" in n.text and not n.cls.endswith("EditText")]
-    check(t0 == "人", f"写完「人」框里「{t0}」")
-    check(t1 == "人" and "人" not in log1, f"第一次回车后框里「{t1}」，已发「{log1}」")
-    check(t2 == "" and logs, f"第二次回车后框里「{t2}」，发出的 {logs}")
-    return f"写「{t0}」；回车「{t1}」未发；再回车发出 {logs[:1]}，框清空"
+case("HK-22", needs="jvm:HardwareKeyUatTest.aShortcutsChoiceIsKeptWhenTheTouchKeyboardIsBack")(lambda d: None)
 
 
-@case("HK-22", base="B0-实体", mutates=True, needs=EMU)
-def hk22(d):
-    hand_off(d, "手写", "手写")
-    typ(d, "ni ")
-    combo(d, "CTRL", "SHIFT", after=0)
-    time.sleep(0.4)
-    t = [n.text for n in floating(d.screen()) if n.text and not n.clickable]
-    key(d, "ESC")
-    tap_button(d)
-    lab = d.im_label()
-    check("手写" not in lab and not d.screen().find(desc="手写板", where="ime"), f"回来的是手写：{lab}")
-    return f"Ctrl+Shift 后 {t[:1]}；回来的是 {lab}"
-
-
-@case("HK-23", base="B0-实体", needs=EMU)
-def hk23(d):
-    typ(d, "a")
-    key(d, "ESC")
-    key(d, "SHIFT", after=0)
-    if flash(d, "En") != "En":
-        raise Blocked("Shift 没切到英文")
-    d.clear()
-    typ(d, "teh")
-    s = d.screen()
-    c = fcands(s)
-    typ(d, " ")
-    t = field_text(d)
-    check(t == "teh ", f"框里「{t}」")
-    check(not c, f"有候选窗 {c[:4]}")
-    return f"「{t}」，没有候选窗"
+case("HK-23", needs="jvm:HardwareKeysUatTest.englishTypesTheKeysAsPressed")(lambda d: None)
 
 
 @case("HK-24", base="B0-实体", page="password", needs=EMU)
@@ -616,134 +349,19 @@ def hk24(d):
     return f"框里 {len(t)} 个字符（「{t}」），没有候选窗"
 
 
-def hw_settings(d, title, option=None, on=None):
-    home(d, "实体键盘")
-    if option is not None:
-        choose(d, title, option)
-    else:
-        d.switch(title, on)
+case("HK-25", needs="jvm:HardwareKeyUatTest.noCandidatesWindowKeepsTheTouchKeyboard")(lambda d: None)
 
 
-@case("HK-25", base="B0-设置", mutates=True, needs=EMU)
-def hk25(d):
-    emu_only(d)
-    hw_settings(d, "显示候选窗口", "禁用")
-    d.kb("up")
-    time.sleep(1)
-    d.open_page("text")
-    typ(d, "ni")
-    s = d.screen()
-    k, c = soft(s), d.candidates(s)
-    typ(d, " ")
-    t = field_text(d)
-    check(k, "屏幕键盘收起了")
-    check("你" in c[:3], f"候选栏 {c[:5]}")
-    check(t == "你", f"框里「{t}」")
-    return f"屏幕键盘在，候选栏 {c[:3]}；「{t}」"
+case("HK-25a", needs="jvm:HardwareKeyUatTest.shortcutsOffSwitchNothing")(lambda d: None)
 
 
-@case("HK-25a", base="B0-设置", mutates=True, needs=EMU)
-def hk25a(d):
-    emu_only(d)
-    others = [x for x in d.sh("ime list -s").split() if x and PKG not in x]
-    hw_settings(d, "实体键盘快捷键", on=False)
-    d.kb("up")
-    time.sleep(1)
-    try:
-        for x in others:   # Ctrl+Space would go to the next system input method
-            d.sh(f"ime disable {x}")
-        d.open_page("text")
-        typ(d, "a")
-        key(d, "ESC")
-        names = []
-        for k in (("key", "SHIFT"), ("combo", "CTRL", "SHIFT"), ("combo", "CTRL", "SPACE")):
-            d.kb(*k)
-            time.sleep(0.4)
-            names += [n.text for n in floating(d.screen()) if n.text and not n.clickable]
-            esc_flash(d)
-        typ(d, "ni ")
-        t = field_text(d)
-        check(not names, f"开关关着，光标旁闪了 {names}")
-        check(t == "你", f"框里「{t}」")
-        add_im(d, "五笔")
-        d.open_page("text")
-        typ(d, "a")
-        key(d, "ESC")
-        combo(d, "CTRL", "SPACE")
-        combo(d, "CTRL", "SHIFT")
-        typ(d, "ni")
-        p = fpre(d.screen())
-        key(d, "ESC")
-        check(p == "ni", f"加了五笔后按 Ctrl+空格、Ctrl+Shift，再打 ni 小窗是「{p}」")
-        hw_settings(d, "实体键盘快捷键", on=True)
-        d.open_page("text")
-        typ(d, "a")
-        key(d, "ESC")
-        key(d, "SHIFT", after=0)
-        f = flash(d, "En")
-        check(f == "En", f"打开开关后 Shift 是 {f}")
-    finally:
-        for x in others:
-            d.sh(f"ime enable {x}")
-    return f"关着：不闪，「{t}」，五笔也不切；打开后 Shift 到 En"
+case("HK-26", needs="jvm:HardwareKeyUatTest.theCandidatesWindowStandsUp")(lambda d: None)
 
 
-@case("HK-26", base="B0-设置", mutates=True, needs=EMU)
-def hk26(d):
-    emu_only(d)
-    hw_settings(d, "候选词列表方向", "纵向")
-    d.kb("up")
-    time.sleep(1)
-    d.open_page("text")
-    typ(d, "shi")
-    ns = fcand_nodes(d.screen())
-    key(d, "ESC")
-    if len(ns) < 3:
-        raise Fail(f"候选窗里 {len(ns)} 个候选")
-    xs, ys = [n.b[0] for n in ns[:4]], [n.b[1] for n in ns[:4]]
-    check(max(xs) - min(xs) < 20 and ys == sorted(ys) and ys[1] > ys[0] + 20,
-          f"候选不是竖排：{[n.b for n in ns[:4]]}")
-    return f"竖排 {len(ns)} 个"
+case("HK-27", needs="jvm:HardwareKeyUatTest.unpluggedTheTouchKeyboardComesBack")(lambda d: None)
 
 
-@case("HK-27", base="B0-实体", mutates=True, needs=EMU)
-def hk27(d):
-    typ(d, "ni ")
-    key(d, "ESC")
-    if soft(d.screen()):
-        raise Blocked("按 n i 空格后屏幕键盘没收起")
-    d.kb("down")
-    ok = True
-    try:
-        back_on_screen(d, 6)
-    except Blocked:
-        ok = False
-    check(ok, "拔掉键盘后屏幕键盘没自己回来")
-    d.type("hao")
-    d.cands()
-    d.space()
-    t = field_text(d)
-    check(t == "你好", f"框里「{t}」")
-    return f"拔掉后屏幕键盘回来；「{t}」"
-
-
-@case("HK-28", base="B0-横屏", mutates=True, needs=EMU)
-def hk28(d):
-    emu_only(d)
-    d.kb("up")
-    time.sleep(1.5)
-    d.open_page("text")
-    typ(d, "ni")
-    s = d.screen()
-    k, c = soft(s), fcands(s)
-    typ(d, " ")
-    key(d, "ESC")
-    tap_button(d)
-    s = d.screen()
-    split = bool(s.find(desc="合并键盘", where="ime")) or len([n for n in s.ime() if n.text == "g" or n.text == "G"]) >= 2
-    check(not k and "你" in c[:3], f"打字时屏幕键盘{'没收起' if k else '收起'}，小窗 {c[:4]}")
-    check(split, "回来的不是分体键盘")
-    return f"收起，小窗 {c[:3]}；回来的是分体键盘"
+case("HK-28", needs="jvm:HardwareKeyUatTest.landscapeSplitBack")(lambda d: None)
 
 
 case("HK-33", base="B0-实体", needs="manual:要一个输入框在屏幕最顶上的应用（候选窗贴屏幕顶）；测试页的框不够高，手动跑")(lambda d: None)
@@ -753,181 +371,20 @@ case("HK-33", base="B0-实体", needs="manual:要一个输入框在屏幕最顶�
 
 # emu-keyboard.sh's key/combo release at once; holding a key down for a while (the system's key
 # repeat) or releasing in a given order needs the raw events, on the same device it registered
-RAW = {"SHIFT": 42, "DEL": 111}
+case("HK-31", needs="jvm:HardwareKeyUatTest.shiftDeleteForgetsTheHighlightedOnceHeld")(lambda d: None)
 
 
-def raw(d, *steps):
-    """("down"|"up", key) or a float to sleep, in one adb shell"""
-    emu_only(d)
-    dev = d.sh("dumpsys input | grep -A3 'Test USB Keyboard' | grep -o '/dev/input/event[0-9]*' | head -1").strip()
-    if not dev:
-        raise Blocked("没有实体键盘：先 emu-keyboard.sh up")
-    s = ""
-    for x in steps:
-        if isinstance(x, float):
-            s += f"sleep {x};"
-        else:
-            s += f"sendevent {dev} 1 {RAW[x[1]]} {1 if x[0] == 'down' else 0}; sendevent {dev} 0 0 0;"
-    d.sh(s)
-    d._keys = None
+case("HK-32", needs="jvm:HardwareKeyUatTest.aQuickShiftDeleteIsNoShiftTap")(lambda d: None)
 
 
-def fpick(d, want, pages=4):
-    """the floating window's candidate want, by its number key, paging down to it: a word not yet
-    learned (点了 for 他 dl) sits past the first page of the window's 7"""
-    c = fcands(d.screen())
-    for _ in range(pages):
-        if want in c[:9]:
-            break
-        key(d, "PAGEDOWN")
-        c = fcands(d.screen())
-    if want not in c[:9]:
-        raise Blocked(f"小窗里前 {pages + 1} 页没有「{want}」：{c[:9]}")
-    key(d, str(c.index(want) + 1))
+case("HK-34", needs="jvm:HardwareKeysUatTest.thePageSizeSetIsTheWindowsPage")(lambda d: None)
 
 
-def ta_dl(d):
-    """他, then dl; returns the window's candidates"""
-    typ(d, "ta")
-    fpick(d, "他")
-    typ(d, "dl")
-    return fcands(d.screen())
-
-
-def learn_dl(d):
-    """PY-54's steps on the hardware keyboard: after 他, 点了 picked twice for dl"""
-    typ(d, "a")   # the touch keyboard away first
-    key(d, "ESC")
-    # 点了 sits far down dl's list (PY-54 scrolls the touch keyboard's to it), many pages of the
-    # window's 7 in. It has to be picked from dl itself: picked from dianle it does not rise for dl
-    for _ in range(2):
-        ta_dl(d)
-        fpick(d, "点了", pages=60)
-    c = ta_dl(d)
-    if not c or c[0] != "点了":
-        raise Blocked(f"前提没到：「他」后 dl 选了两次「点了」仍是 {c[:4]}")
-
-
-def undo_chips(d, timeout=2.0):
-    """the undo hints said of 点了 seen over timeout, one per time it came up (from none to one: its
-    bounds may move as it slides in, and a second one in the same place is still a second), and one
-    more for a dump holding two: a second hint said while one is up crossfades in the same chip
-    (rule 5), which never goes away between them (F3547):
-    [(chip bounds as first seen, window top, window bottom)]"""
-    end, seen, up = time.time() + timeout, [], False
-    while time.time() < end:
-        s = d.screen()
-        chips = [n for n in s.nodes if "「点了」" in (n.text or "")]
-        chip = chips[0] if chips else None
-        ns = fcand_nodes(s)
-        shown = bool(chip and s.find(text="撤销", where="all"))
-        at = (chip.b, min(n.b[1] for n in ns) if ns else None, max(n.b[3] for n in ns) if ns else None) \
-            if chip else None
-        if shown and not up:
-            seen.append(at)
-        if shown and len(chips) > 1 and len(seen) < 2:
-            seen.append(at)
-        up = shown
-        time.sleep(0.2)
-    return seen
-
-
-def says_reset(d):
-    d.adb("logcat", "-c")
-
-
-def says(d):
-    """the notices put up in the chip since says_reset (BaseInputView.notice, one log line each), so a
-    second one crossfading in the same chip is counted too (F3547); a toast said with no keyboard
-    shown is not one"""
-    return sum(1 for l in d.adb("logcat", "-d", "-s", "*:I").splitlines() if l.rstrip().endswith(": say"))
-
-
-def chip_clear(seen):
-    """above the window, or below it when the window is at the screen's top: never over it"""
-    b, top, bottom = seen[0]
-    return top is None or b[3] <= top + 4 or b[1] >= bottom - 4
-
-
-@case("HK-31", base="B0-实体", mutates=True, needs=EMU)
-def hk31(d):
-    d.step("按住 Shift+Delete")
-    learn_dl(d)   # 他 dl is up, 点了 first and highlighted
-    says_reset(d)
-    raw(d, ("down", "SHIFT"), ("down", "DEL"), 1.5, ("up", "DEL"), ("up", "SHIFT"))
-    seen = undo_chips(d)
-    said = says(d)
-    key(d, "ESC")
-    c = ta_dl(d)
-    key(d, "ESC")
-    check(len(seen) == 1 and said == 1, f"撤销提示出现 {len(seen)} 次，说了 {said} 次")
-    check(seen and chip_clear(seen), f"提示 {seen[:1]} 盖着候选窗")
-    check(c and c[0] == "带来", f"忘掉后「他 dl」{c[:4]}")
-    d.step("按住 Delete 时再按一次 Shift")
-    learn_dl(d)
-    before = field_text(d)
-    says_reset(d)
-    # watched while Delete is still down: the last Shift up is a key, and a key typed puts the hint
-    # away (UndoChip.typed), so after both are up it is gone; once only is what says counts
-    raw(d, ("down", "SHIFT"), ("down", "DEL"), 0.6)
-    seen2 = undo_chips(d, timeout=1.0)
-    raw(d, ("up", "SHIFT"), 0.3, ("down", "SHIFT"), 0.3, ("up", "DEL"), ("up", "SHIFT"))
-    said2 = says(d)
-    after = field_text(d)
-    key(d, "ESC")
-    c2 = ta_dl(d)
-    key(d, "ESC")
-    typ(d, "ni")
-    n = fcands(d.screen())
-    key(d, "ESC")
-    check(after == before, f"框里「{before}」→「{after}」")
-    check(len(seen2) == 1 and said2 == 1, f"第二次撤销提示出现 {len(seen2)} 次，说了 {said2} 次")
-    check(c2 and c2[0] == "带来", f"第二次忘掉后「他 dl」{c2[:4]}")
-    check("你" in n[:3], f"之后 ni 的小窗 {n[:4]}（不是中文了？）")
-    return f"提示 1 次，不盖候选；忘掉后 {c[:2]}；再按 Shift 那次：字没删，忘 1 次，{c2[:2]}，ni {n[:2]}"
-
-
-@case("HK-32", base="B0-实体", mutates=True, needs=EMU)
-def hk32(d):
-    learn_dl(d)
-    # down to both released well under ¼ s: one adb shell, no sleeps between the events
-    says_reset(d)
-    raw(d, ("down", "SHIFT"), ("down", "DEL"), ("up", "DEL"), ("up", "SHIFT"))
-    seen = undo_chips(d)
-    said = says(d)
-    key(d, "ESC")
-    typ(d, "ni")
-    s = d.screen()
-    p, n = fpre(s), fcands(s)
-    key(d, "ESC")
-    check(len(seen) == 1 and said == 1, f"撤销提示出现 {len(seen)} 次，说了 {said} 次")
-    check(seen and chip_clear(seen), f"提示 {seen[:1]} 盖着候选窗")
-    check("你" in n[:3], f"之后 ni：小窗「{p}」{n[:4]}（切成英文了？）")
-    return f"提示 1 次；之后 ni {n[:3]}"
-
-
-@case("HK-34", base="B0-设置", mutates=True, needs=EMU)
-def hk34(d):
-    emu_only(d)
-    hw_settings(d, "每页候选数", "3")
-    d.kb("up")
-    time.sleep(1)
-    d.open_page("text")
-    typ(d, "shi")
-    p1 = fcands(d.screen())
-    key(d, "EQUAL")
-    p2 = fcands(d.screen())
-    key(d, "ESC")
-    check(len(p1) == 3, f"一页 {len(p1)} 个：{p1}")
-    check(len(p2) == 3 and p2 != p1, f"= 后 {p2}（第一页 {p1}）")
-    return f"第一页 {p1}，= 后 {p2}"
-
-
-def tip_seen(d, timeout=1.5):
-    """the engine's tip about full-width punctuation, waited for; its text, else None"""
+def tip_seen(d, timeout=1.5, text="全角标点"):
+    """the engine's tip (by default the one about full-width punctuation), waited for; its text, else None"""
     end = time.time() + timeout
     while time.time() < end:
-        n = d.screen().find(contains="全角标点", where="all")
+        n = d.screen().find(contains=text, where="all")
         if n:
             return n.text
         time.sleep(0.1)
@@ -964,3 +421,228 @@ def hk35(d):
     check(gone2, f"不打字约 2.6 秒后提示「{t2}」还在")
     check(t3 == t1, f"第三次 Ctrl+. 的提示「{t3}」，和第一次「{t1}」不同")
     return f"「{t1}」→「{t2}」→「{t3}」，打字那次 {late:.1f} 秒内看完"
+
+
+def hclear(d):
+    """the field emptied by this keyboard's Backspace: the touch keyboard, which d.clear() uses, is away"""
+    key(d, *["BACKSPACE"] * 6)
+
+
+def away(d):
+    """the touch keyboard put away by a key of this keyboard, nothing left typed"""
+    typ(d, "a")
+    key(d, "ESC")
+    hclear(d)
+
+
+@case("HK-36", base="B0-实体", needs=EMU)
+def hk36(d):
+    away(d)
+    combo(d, "CTRL", "SHIFT", "F", after=0)
+    t1 = tip_seen(d, text="繁")
+    typ(d, "guojia")
+    c1 = fcands(d.screen())
+    key(d, "SPACE")
+    f1 = field_text(d)
+    hclear(d)
+    combo(d, "CTRL", "SHIFT", "F", after=0)
+    t2 = tip_seen(d, text="简")
+    typ(d, "guojia ")
+    f2 = field_text(d)
+    check(t1, "第一次 Ctrl+Shift+F 光标旁没有繁體的提示")
+    check("國家" in c1[:3], f"繁體下 guojia 的候选 {c1[:5]}")
+    check(f1 == "國家", f"繁體下上屏「{f1}」")
+    check(t2, "第二次 Ctrl+Shift+F 没有切回简体的提示")
+    check(f2 == "国家", f"切回简体后上屏「{f2}」")
+    return f"「{t1}」→「{f1}」；「{t2}」→「{f2}」"
+
+
+# Android's window manager policy takes every key pressed with Meta held before an input method sees it
+# ("Dropped event because policy consumed it" for Meta and the key, down and up; hk37-debug.md): fcitx's
+# Super+` and Super+; triggers are kept, asserted on the JVM, and reached only where a system delivers them
+@case("HK-37", base="B0-实体", needs=EMU)
+def hk37(d):
+    away(d)
+    combo(d, "META", "GRAVE", after=0)
+    t = tip_seen(d, text="快速输入")
+    p = fpre(d.screen())
+    f0 = field_text(d)
+    typ(d, "ni ")
+    f = field_text(d)
+    check(not t, f"按 Super+` 光标旁出了「{t}」")
+    check(not p and f0 == "", f"Super+` 后小窗「{p}」框「{f0}」")
+    check(f == "你", f"之后 ni 空格 上屏「{f}」")
+    return f"Super+` 后没有快速输入，小窗「{p}」框「{f0}」；再打「{f}」"
+
+
+case("HK-38", needs="jvm:QuickPhraseTest.superGraveAndSuperSemicolonTriggerOnPressOnly")(lambda d: None)
+
+
+@case("HK-39", base="B0-实体", needs=EMU)
+def hk39(d):
+    away(d)
+    combo(d, "CTRL", "ALT", "SHIFT", "U", after=0)
+    t = tip_seen(d, text="Unicode")
+    typ(d, "degree")
+    s = d.screen()
+    c = tcands(s)
+    nodes = tcand_nodes(s)
+    labels = [n.text for n in nodes][:3]
+    combo(d, "ALT", "1")
+    f = field_text(d)
+    hclear(d)
+    typ(d, "shi")
+    py = fcand_nodes(d.screen())
+    hclear(d)
+    check(len(py) > 1 and py[0].b[1] == py[1].b[1] and py[0].b[0] < py[1].b[0],
+          f"之后拼音候选不是横排 {[n.b[:2] for n in py[:3]]}")
+    check(t, "按 Ctrl+Alt+Shift+U 光标旁没有「Unicode：」")
+    check(any("°" in x for x in c), f"degree 的候选 {c[:5]}")
+    check(labels and all(x.startswith("A-") for x in labels), f"标号不是 Alt 加数字 {labels}")
+    # 方向「自动」: the Unicode list asks for vertical, pinyin stays horizontal (F3975)
+    check(len(nodes) > 1 and all(a.b[1] < b.b[1] and abs(a.b[0] - b.b[0]) < 5 for a, b in zip(nodes, nodes[1:])),
+          f"Unicode 候选不是竖排 {[n.b[:2] for n in nodes[:3]]}")
+    check(f and c and f in c[0], f"Alt+1 上屏「{f}」，第一个候选 {c[:1]}")
+    return f"「{t}」{labels}，Alt+1 →「{f}」"
+
+
+@case("HK-40", base="B0-实体", needs=EMU)
+def hk40(d):
+    away(d)
+    combo(d, "CTRL", "SHIFT", "U")
+    typ(d, "4f60 ")
+    f = field_text(d)
+    hclear(d)
+    typ(d, "ni")
+    p = fpre(d.screen())
+    key(d, "ESC")
+    check(f == "你", f"4f60 空格 后框里「{f}」")
+    check(p == "ni", f"之后打 ni，小窗的拼音是「{p}」")
+    return f"「{f}」；之后拼音 `{p}`"
+
+
+@case("HK-41", base="B0-实体", needs=EMU)
+def hk41(d):
+    away(d)
+    im0 = d.sh("settings get secure default_input_method").strip()
+    shown = []
+    for k in (("CTRL", "SEMI"), ("META", "SPACE")):
+        combo(d, *k, after=0.8)
+        shown += [n.text or n.desc for n in floating(d.screen())]
+    im1 = d.sh("settings get secure default_input_method").strip()
+    d.sh(f"ime set {PKG}/org.fcitx.fcitx5.android.input.FcitxInputMethodService")
+    typ(d, "ni ")
+    f = field_text(d)
+    # the keyboard icon by the cursor may stay; a list or an input method's name may not
+    shown = [x for x in shown if x != BUTTON]
+    check(not shown, f"按下后光标旁出现 {shown[:5]}")
+    check(im1 == im0, f"输入法 {im0.split('/')[0]} → {im1.split('/')[0]}")
+    check(f == "你", f"之后 ni 空格 上屏「{f}」")
+    return f"两个快捷键后光标旁什么也没有，输入法没变；再打「{f}」"
+
+
+@case("HK-42", base="B0-实体", needs=EMU)
+def hk42(d):
+    away(d)
+    # the system takes it (as Super+`, HK-37): what is checked is that nothing reaches the pinyin
+    combo(d, "META", "J", after=0)
+    p = fpre(d.screen())
+    f0 = field_text(d)
+    typ(d, "ni ")
+    f = field_text(d)
+    check(not p, f"Super+J 后小窗的拼音是「{p}」")
+    check(f0 == "", f"Super+J 后框里「{f0}」")
+    check(f == "你", f"之后 ni 空格 上屏「{f}」")
+    return f"Super+J 后小窗「{p}」框「{f0}」；再打「{f}」"
+
+
+def show_touch(d, must=True):
+    """the toolbar's 显示屏幕键盘, as HK-43 to HK-45 bring the touch keyboard up under a hardware one;
+    not must: absent is fine (the touch keyboard already up)"""
+    s = d.screen()
+    b = s.find(desc=BUTTON, where="ime") or s.find(text=BUTTON, where="ime")
+    if b:
+        d.tap(b.c, 1.0)
+    elif must:
+        raise Blocked("工具栏上没有「显示屏幕键盘」")
+
+
+def to_14(d):
+    """拼音's 键盘 set to 14 键, back on the test page"""
+    emu_only(d)
+    d.hide_keyboard()
+    pinyin_keyboard(d, "14 键")
+    d.open_page("text")
+
+
+@case("HK-43", base="B0-实体", mutates=True, needs=EMU)
+def hk43(d):
+    to_14(d)
+    away(d)
+    typ(d, "nihao")
+    c = fcands(d.screen())
+    key(d, "SPACE")
+    f1 = field_text(d)
+    hclear(d)
+    typ(d, "nih")
+    show_touch(d)
+    grouped_keys(d, "as")
+    f2 = field_text(d)
+    check(c[:1] == ["你好"], f"实体键盘 nihao 的候选 {c[:4]}")
+    check(f1 == "你好", f"空格上屏「{f1}」")
+    check(f2 is not None and f2.startswith("nih") and not has_keyboard_code(f2), f"点屏幕上的 AS 后框里「{f2}」")
+    return f"「{f1}」；中途换屏幕键盘后「{f2}」"
+
+
+@case("HK-44", base="B0-实体", mutates=True, needs=EMU)
+def hk44(d):
+    # the Escape half is KeyboardPairTest's (.md): on the device a hardware key puts the touch keyboard
+    # away whoever gets the Escape (no 联想 left to see) and Esc leaves a web field's text alone, so
+    # the Escape here is a smoke and only the digit picking is checked
+    to_14(d)
+    show_touch(d, must=False)
+    # BN UI GH AS OP is 不好 as well as 你好: each tapped on its letter's half, as a finger means it
+    grouped_keys(d, "bn ui gh as op", at=[.75, .75, .75, .25, .25])
+    d.space()
+    f1 = field_text(d)
+    pred = d.candidates(d.screen())
+    key(d, "ESC")
+    typ(d, "ni")
+    c = fcands(d.screen())
+    key(d, "2")
+    f2 = field_text(d)
+    check(f1 == "你好", f"14 键上屏「{f1}」")
+    check(pred, f"14 键上屏后没有联想：{pred[:3]}")
+    check(len(c) > 1 and f2 == f1 + c[1], f"ni 按 2：候选 {c[:3]}，框里「{f2}」")
+    return f"「{f1}」；Esc（冒烟，规则在 KeyboardPairTest）；ni 2 →「{f2}」"
+
+
+@case("HK-45", base="B0-实体", mutates=True, needs=EMU)
+def hk45(d):
+    emu_only(d)
+    d.hide_keyboard()
+    add_im(d, "双拼")
+    gear(d, "双拼")
+    choose(d, "双拼方案", "微软")
+    shuangpin_keyboard(d, "18 键")
+    d.open_page("text")
+    d.switch_im("双拼")
+    # switching by the touch keyboard's globe leaves it up: the toolbar button only when it went away
+    show_touch(d, must=False)
+    grouped_keys(d, "bn io")
+    c = d.cands()
+    key(d, "2")
+    f1 = field_text(d)
+    hclear(d)
+    # the hardware key put the touch keyboard away: shown again from the toolbar
+    show_touch(d)
+    grouped_keys(d, "bn io")
+    typ(d, "d;")
+    f2 = field_text(d)
+    p = fpre(d.screen())
+    c2 = fcands(d.screen())
+    hclear(d)
+    check(len(c) > 1 and f1 == c[1], f"BN IO 按 2：候选 {c[:3]}，框里「{f1}」")
+    check(f2 and f2.isascii() and f2.isalpha() and not has_keyboard_code(f2), f"按 d 后框里「{f2}」")
+    check(c2 and ("定" in c2[:5] or "顶" in c2[:5]), f"d ; 的小窗「{p}」候选 {c2[:5]}")
+    return f"「{f1}」；「{f2}」+ d; {c2[:3]}"

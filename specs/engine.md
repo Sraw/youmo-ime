@@ -64,7 +64,8 @@ keeps its own, the model they follow.
    on, off by default, a key pressed again soon is its next letter and nothing else, `MultiTap`: the
    session puts it in as a letter typed as itself, upper case, in place of the digit, so `4 4` fast
    is `H`. The 2026-10-12 hybrid, read as keys too with a `Penalties.tapped`, went 2026-10-19: a
-   learned 广告 overrode the h the key's preview showed).
+   learned 广告 overrode the h the key's preview showed). The 14 keys (拼音 14 键) are the same
+   segmenter over a grouped layout: see [The 14 keys](#the-14-keys-grouped-keys) below.
 2. **Decode.** `PinyinDecoder` puts every dictionary word along every path into a lattice and beam
    searches it, scoring each step by `WordScorer` (the n-gram model, through `UserScorer` with the
    user's counts added; a word of the user's whose text the model has, added by hand or typed at a
@@ -78,7 +79,11 @@ keeps its own, the model they follow.
 3. **Rank.** At `ModelLevel.MEDIUM` and up, `Reranker` adds the 4M sentence model's score of the
    decoder's best whole-input readings (after the text before the cursor) to the decoder's score;
    at `HIGH`, while the user pauses, the 25M model refines the top readings in time slices
-   (`SentenceRefiner`, `Action.Refine`). Adding to, not replacing, the decoder's score was the
+   (`SentenceRefiner`, `Action.Refine`). The pause's weighing goes on from work slices between keys
+   already did (the scorer keeps it) and stops after `SLICES` slices, so tap pace can change a long
+   input's result: typed fast, nothing was done between keys and the cap gives up where slow typing
+   finishes (parity r2-7560, pinned by `TapPaceUatTest`). Kept by user decision (DECISIONS.md
+   2026-10-25) over a cost limit that would refine fewer long inputs. Adding to, not replacing, the decoder's score was the
    measured choice (replacing lost 2.2 points).
 4. **Present.** `PinyinSession` lists the readings of all the input, then words the start may be;
    picking a partial one keeps it and reads the rest after it. Committed text becomes the context
@@ -153,6 +158,26 @@ keeps its own, the model they follow.
   under 简拼 the first is the model's alone, what was typed in full never moves it (D32). The
   user's own words come next to it there by the ranking, not by the scores. Do not add per-case
   boosts or global penalties for "my word should win" (both were tried and lost on the sets).
+- **Across one keyboard's spellings** (U-20, D32 B; the user's rule in docs/pinyin.md 完整拼音和简拼).
+  Not in the scores but in the ranking (`HabitRanker.spellings`): `SpelledForm` tells a code's keys
+  as the full spelling, the 简拼 (a key a syllable) or a part of a word of two syllables or more, by
+  their count alone (fewer keys than syllables: none). A word used ≥2 times spelt in full on the same
+  keyboard (`Kinds.keyboard`: 连按 is the nine keys') and not under the code goes up to third under
+  its 简拼 or a part (fourth behind a pin, after any floored word; one already in the first three stays);
+  one corrected to under a 简拼 is no lower than second spelt in full or in part (right after a pin),
+  the floor before the lift. A word moved so, or held at its place so, shows `Tier.FLOORED` or `Tier.LIFTED` (为什么排在这, and `kept` holds it
+  in a sentence's first page). Counted from the STAT rows as they are: `LearnState` keeps them by word
+  and, for full and 简拼 codes, by keyboard and first key (`SpelledForm.filedUnder`: the nine keys by
+  the reading's first letter, so 连按's letters and digits meet), so nothing is rebuilt after a commit;
+  no record of its own, no format change. `HabitOrder` walks in such words the decoder lacks, where
+  `SpelledForm.spells` says the keys start each syllable in turn.
+  Measured (2026-10-24, this machine's JVM, `ime-eval learn-log-bench`, 200,000 commits over 365
+  days): a key typed with the record 0.81 ms before and after (v0.3.2: 0.81); the words of one first
+  key and their counts, as the first key after a commit finds them, 0.13 ms (an index rebuilt per
+  commit, as first written, was 2.2 ms). The two indexes hold only rows of words of two syllables or
+  more spelt in full or by 简拼: on the bench, where every row is one, about 1 MB of heap for 4,865
+  rows (state 10.7 MB with them, 9.7 MB without). `ime-eval learn` held-out was unchanged by the rule (90.3 / 91.1 / 90.7 before and after),
+  as it reads only the first, which this never moves; learn-ux `spelled.txt` passes 9 of 9.
 - **Layers.** The dictionary has layers (`WordLayers`: the base from libime, `new` from
   `lexicon/add.tsv` via the word pack, `latin`). Imported dictionaries are merged into the base only
   (`ImportedDictionaries.migrate` moves those an older build listed in `.new-words` there and
@@ -242,6 +267,117 @@ its own span, in the learning record; the custom phrases are untouched; not for 
 no undo), `NO_PREDICT` (不再联想, on a 联想), `WHY` (为什么排在这; not for English, nor a phrase alone). Each has conditions (`PinyinSession.forgettable/pinnable/blockable`), and none
 are offered where nothing is learned (a password field, `Session.learning` false).
 
+### The 14 keys (grouped keys)
+
+拼音's 键盘 setting picks the touch keyboard: the full one, or 14 keys of two letters each (iFlytek's
+拼音双键: `QW ER TY UI OP / AS DF GH JK L / ZX CV BN M`). The engine does not read the setting.
+
+- **Codes.** A grouped layout is a `NineKeyLetters` preset (`G14`), not made through `normalize`:
+  each key is one code character, U+F8DA + its first letter's place (BMP private use past the
+  syllables' and `G18`'s; R16 F4356, ⒜–⒵ before: text a user may type). The three grouped blocks are
+  `G18` U+F8C0–F8D9, `G14` U+F8DA–F8F3, `NINE_SP` U+F8F4–F8FB (`NineKeyLetters.CODES`), U+F8FC–F8FF free. The eight-key layouts (STANDARD and the user's 按键字母) keep the digits 2–9 and the
+  separator `'1'`, their `tag`, `serialize`, `parse` byte for byte (a contract test).
+  `NineKeyLetters.grouped(tag)` gives a grouped preset back from its tag; `parse` reads the eight
+  keys alone. What cannot be read is shown and committed by `asTyped`, each code as its key's
+  first letter (UI alone is `u`): no code reaches the user's text. `PopupOverrides` (按键字符) takes
+  none of them.
+- **Two sessions.** `Engines.PINYIN_KEYS` (`engine-pinyin#keys`, no fcitx input method; the name
+  under which a setting says "not for the 14 keys") is the grouped session: a `T9Segmenter` over
+  `G14`, no abbreviations, `spell = true`, wrapped in `ForgetsInTables` as the nine keys are, no
+  glide, no strokes. It is made at the first code. `KeyboardPair` stands for 拼音's keyboard: a
+  code or a syllable key goes to the grouped session, an ASCII letter (a hardware keyboard) to
+  full pinyin; while nothing is typed everything else goes to full pinyin (Esc to the app, digits
+  pick). Switching sessions mid-input ends the one typing with ENTER, committed as its composing row
+  shows it (unread keys by `asTyped`). Both
+  get `context`, `fieldFlags` and RESET. So a hardware keyboard always types full pinyin, whatever
+  the setting says.
+- **Accuracy** (top-1, default reading, both sentence models; full pinyin, the 14 keys (`g14` and
+  `g14-strict` alike), the nine keys (`t9-strict`), each on the same subset: the samples
+  `ime-eval t9 --keys 14 --same` keeps): pinyin-chat held out (983 samples) 73.4 / 61.3 / 53.6%;
+  pinyin.tsv (429 samples) 97.0 / 94.6 / 88.8%. The 14 keys sit between the nine keys and full pinyin.
+- **Tap position** (design `dev/design/k14-tap-position.md`). A tap on a key of two letters is one
+  character of `Keyboard.TAPS` (U+F0200 on, supplementary private use, after `AGAIN`):
+  `tapKey(code, at) = TAPS.first + (code − G14_BLOCK.first) × 17 + round(at × 16)`, `at` clamped to [0, 1] first
+  (just past 1 would round into the next code's places), NaN refused (the code itself is sent).
+  `Keyboard.char` decodes it whatever the session into `Action.Key(code, at = n / 16)`; the input
+  keeps the code, the place goes on `PressedKeys`' run (NaN for a syllable taken, a letter typed
+  as itself, a text of several), through every edit, and `taps(from, to)` gives one value a place.
+  Never learned, kept or backed up: `qk:` codes and every row are the same wherever a key was
+  tapped (`PinyinSessionTapsTest`, uatTest `Keys14UatTest`). `T9Segmenter.segment(input, taps)`
+  (grouped layouts only; `Segmenter`'s default ignores taps) gives each edge, per match,
+  `against = Σ max(0, ±2(at − 0.5))` over its keys of two letters, the sign by whether the
+  spelling typed for that syllable (a fuzzy partner's, üe's ue: a table beside the index, two bits
+  a key, ties none: `letterTies`) has the key's first or second letter. The decoder adds
+  `Penalties.tap × against` (−1, no dead zone) in `collect` and `collectStart`; at the centre, or
+  with no place, the graph and the scores are byte for byte as before (both sets: 0 won, 0 lost).
+  The bar (`NineKeys.offer`) puts after the rest a syllable one of whose keys was tapped at its
+  other letter's centre or further (against ≥ 0.5), a yes or no so a tap near the middle moves
+  nothing. Habits stay above it (user, 2026-10-25). Simulated hands (`ime-eval pinyin --taps
+  <hand>:<α>`; hands perfect, sigma0.2, sigma0.3, right0.15, left0.15, right0.1, middle, uniform),
+  `g14-strict`, both sentence models, the `--same` sets, held-out, top-1: chat (983) untapped 61.3,
+  perfect 69.0, σ0.2 67.3, σ0.3 65.9, right 0.15 67.3, left 0.15 66.1, right 0.1 67.3, near the
+  centre (unaware) 59.9, uniform 58.3; pinyin.tsv (203) 95.6, 96.6, 96.1, 95.6, 96.6, 95.1, 96.6,
+  95.1, 93.1. α was swept on held-out first and the tune-half rule written afterwards; it gives 1
+  too (see `Penalties.tap`). Simulated, for choosing α only.
+- **Learning.** The grouped session's codes are kind `qk:<tag>` (`Kinds.keys`), apart from `qp`
+  and `t9:*` as the nine keys are from full pinyin; the words and their counts are shared. The kind
+  and the codes are the record's format: never changed once in a release. 「已学条目」 names `qk:` as
+  「14 键」 and shows its keys as letters (`bn ui`, `NineKeyLetters.shown`).
+- **What does not apply**: typos and neighbouring keys, glide, 拆字, 中英混输 (the hardware keyboard
+  still has the last two), `rq`/`sj`/`xq` and custom phrases' keys (ASCII only). Fuzzy pinyin,
+  u↔v included, does.
+
+### 双拼 on 18 keys and on the nine keys
+
+双拼's 键盘 setting (`AppPrefs.keyboard.shuangpinKeyboard`: `Full`, `Keys18`, `NineKeys`, stored by
+name) picks its touch keyboard; every scheme is open to each. The engine does not read the
+setting either: it reads the codes.
+
+- **Codes.** `NineKeyLetters.G18` groups `q,we,rt,y,u,io,p,a,sd,fg,h,jk,l;,z,xc,v,bn,m`, each key
+  U+F8C0 + its first letter's place in the alphabet (BMP private use, freed by `Action.Syllable.IDS`
+  going from 100 to 99; not braille, which blind users type as text). `NINE_SP` groups
+  `abc,def,ghi,jkl;,mno,pqrs,tuv,wxyz`, codes U+F8F4 + (digit − 2), always the standard letters.
+  Neither is normalized and neither has a separator; `;` (微软's and 紫光's ing) is on L's key.
+  `NineKeyLetters.ofCode(c)` names the grouped keyboard a code is of (G14, G18, NINE_SP; null for
+  the nine keys' digits). `Engines.readsCode(im, c)`: pinyin reads G14's, 双拼 G18's and NINE_SP's;
+  `KeyRouter` swallows any other code an input method gets (the old keyboard still on screen just
+  after a switch), so a code is never read as another keyboard's group.
+- **Sessions.** `Engines.SHUANGPIN_KEYS18` and `Engines.SHUANGPIN_NINE` are the grouped sessions'
+  ids and the names under which a setting says it is no use there (「双拼 18 键」, 「九键双拼」).
+  `SHUANGPIN` is a `KeyboardPair` as pinyin is, a grouped session made at the first code of its
+  range; a hardware keyboard still types the full-keyboard scheme (it reads `;`). The segmenter
+  reads each syllable as the scheme's two keys turned into their groups' codes; the graph has one
+  path, the ambiguity in each edge's syllables.
+- **Segmenter.** `GroupedShuangpinSegmenter(scheme, letters, fuzzy, typos)`, built as
+  `ShuangpinSegmenter` is (pairs, a key alone as PARTIAL/INITIAL, a/e/o alone, fuzzy, ü typed v).
+  It and `T9Segmenter` are `KeyedSegmenter`s: `letters`, `isKey`, `asTyped`, `initialsOf` (the
+  bar's initials: the scheme's initials on the key's letters, 自然码's v zh) and `started` (a
+  syllable not whole yet shows as its initial in 双拼, as many letters on the nine keys).
+  `PinyinSession` and `NineKeys` use the interface, never `T9Segmenter`. An initial taken off the bar
+  binds the key after it as its final, read by group (owner's decision (b), 2026-10-26): XC IO with
+  c taken is ci, cuo …, and the bar offers those from the initial on.
+- **Routing.** A `KeyboardPair` may have several keyed sessions, picked by the code (`keyedOf`);
+  turning from one to another is as to full: what was typed committed as shown, both reset. A hardware
+  char that is no letter reaches 双拼 as `EngineEvent.HARD_CHAR` (KeyRouter, `!virtual`): full 双拼's
+  while a grouped session types where the scheme types it (微软's and 紫光's `;`), else the grouped
+  session's mark; the screen's `;` (L;'s long press, the symbol page) is always a mark after what is
+  typed (你；, never ni；).
+- **Collisions** (design §1.5, each scheme's taught spelling of 418 syllables): on 18 keys 244–272
+  codes, 253–301 syllables sharing their keys with another, 12.4–16.6% wrong for a syllable alone
+  with no context; on the nine keys every syllable shares, about 46% wrong alone. 九键双拼 ships
+  anyway (owner 2026-10-25), its summary saying so.
+- **Top-1** (E2, 2026-10-26; both sentence models, the samples `shuangpin <scheme> --keys 18 --same`
+  keeps, every keyboard on the same ones; 8 schemes' range): chat's held-out full / 18 keys / nine
+  keys 73.8 / 61.2–64.4 / 30.4–31.5%, pinyin.tsv 97.0 / 92.1–93.9 / 70.9–76.7%. For comparison 九键
+  拼音 53.6% on chat, the 14 keys 61.3%. Table per scheme: design §1.5.
+- **Learning.** Kind `spk:<scheme>:<tag>` (`Kinds.shuangpinKeys`, the scheme as
+  `EngineSettings.SCHEMES` names it, no colon in any), apart from `sp:<scheme>` and from each
+  scheme's: the same keys read other syllables under another. `Kinds.isShuangpin` is true for
+  both prefixes, `Kinds.keysTag` gives the tag, `Kinds.takeLayout` keeps a syllable taken from the
+  bar under `<scheme>:<tag>`. 「已学条目」 names an `spk:` pin 「双拼 18 键」 or 「九键双拼」 by its
+  tag, its scheme after, its keys as letters (`bn io`).
+- No tap position on G18 yet; `Keyboard.TAPS` leaves indices 26–51 for it (design k14-tap §1.4).
+
 ## Tables
 
 `TableSession` ranks entries whose code starts with the input as libime does (codes up to
@@ -263,9 +399,9 @@ the table's own. A full code the table has one entry for, which commits itself, 
 auto-commit on eval text from 22% to 9% before this).
 The dictionaries' words are coded in the background (`InBackground`, on `warmUps`) at the first key
 after a user model is made or reloaded; till then a table offers the rest.
-Options per table are in `androidengine.h` (`engineTable(...)`) and `TableOptions`; prediction and 性能档位
+Options per table are in the host's `EngineOptions` (`engineTable(...)`) and `TableOptions`; prediction and 性能档位
 are the shared settings on the 通用输入 page (`InputMethodSettings.SHARED`, `SharedInputFragment`), page size
-on the hardware keyboard page (`HARDWARE_KEYBOARD`); the addon's `EngineTablePage` config still carries them.
+on the hardware keyboard page (`HARDWARE_KEYBOARD`); each table's group in `androidengine.conf` still carries them.
 
 Every table's words follow one rule, set at build time (`table --words --pinyin`, decided on 五笔
 86 and kept for all, `lexicon/README.md` "Words in the code tables"): the table keeps every entry
@@ -353,14 +489,14 @@ on the keys it means. Words the user committed that the data lacks glide too: `E
 field's char before the cursor, as the host tells it (`Action.Context`), or what the session
 put in itself; what was written in a field now empty (`Action.Context.cleared`) is scored after
 but is not before the cursor: no space after it, and no Backspace takes any of it (`clearedAt`); a field not learned from tells nothing (user decision F2074: such a field's text is
-not read at all), nor does what the keyboard typed there (`androidengine` sends no `TYPED` from a
+not read at all), nor does what the keyboard typed there (`KeyRouter` sends no `TYPED` from a
 PasswordOrSensitive field: a password shown is Sensitive, not Password, and so looks like an
 incognito field), so there only the session's own glide counts; after typed text, a Backspace or
 an arrow nothing before the cursor is known, and a glide gets no space before it (part of the
 F2074 limit). A glided word always takes its in-sentence form (`inSentence`): the data's
 sentence-start "Hello" is "hello" anywhere, a word the data or the user has only capitalised (London,
 iPhone) keeps it; a capital comes only from Shift, as for a word tapped (`AutoCaps` turns Shift on
-where the field asks for sentence capitals), Caps Lock all capitals. Where English suggests nothing (`androidengine`'s
+where the field asks for sentence capitals), Caps Lock all capitals. Where English suggests nothing (`KeyRouter`'s
 `suggestsEnglish`: NoSpellCheck, an address, a password, suggestions off) the keys type themselves.
 
 On the nine keys English takes `Action.NineKey(digit, upper)` (the host `Keyboard`'s
@@ -496,17 +632,16 @@ has none till picked (its reading the dictionary lacks weighs -inf), and a word 
 everywhere, here, in handwriting's and pinyin's 联想 and in the tables (`Predictor.reading`), so it is not learned
 back at the reading forgotten. The first is not, however put in: the
 readings are often wrong, and a misread word not noticed, learned, would come back.
-The sentence is shown in the field and kept there as the keyboard goes (`composesText` in
-`androidengine.cpp`), as English's word is; pinyin's and a table's codes show above the candidates.
+The sentence is shown in the field and kept there as the keyboard goes (`KeyRouter.composesText`), as English's word is; pinyin's and a table's codes show above the candidates.
 The pad (`InkPad`, ime-core's
 `input/handwriting`) decides when to read (each stroke ended), when a piece is done (the pen up
 `InkPad.finishMillis`, the app's `handwritingPause` setting, `FINISH_MILLIS` its default: its ink
 wiped, its reading kept), and that backspace takes back a
-stroke. The session cannot be handed a reading through fcitx, which carries keys: the app offers it
+stroke. The session cannot be handed a reading through the host, which carries keys: the app offers it
 (`Engines.offerInk`) and sends `Keyboard.INK`, which the keyboard turns into `Action.Ink`.
 
 Pieces are numbered, later higher, and every reading carries its piece: what a reading does is
-decided in the session, on the fcitx thread, in order with the keys. A reading of a piece written
+decided in the session, on the host thread, in order with the keys. A reading of a piece written
 reads it again (none takes it out); a later piece's adds a character, unless read as nothing (a
 first dot); one of a piece already ended (committed, taken back, the cursor moved) or taken out
 comes too late. The session's `ended` goes back to the pad, which wipes the piece it is writing once it is
@@ -562,9 +697,9 @@ place. Rules that keep old files and old users working:
   not the backups' switch, told at every start, nor 清掉最近 10 分钟 or 1 小时, which reach the tail
   alone: those would convert on the typing thread). The merge reads whole records only, one being
   appended is the tail's.
-  A merge made stale by a fold is made again a few times, then on the fcitx thread; one that cannot
+  A merge made stale by a fold is made again a few times, then on the host thread; one that cannot
   be written is owed to the next start. The app's `additions()` and `legacy()` are read on the
-  fcitx thread and handed over as values. A clear while it is owed owes it no more (`remarkLegacy`),
+  host thread and handed over as values. A clear while it is owed owes it no more (`remarkLegacy`),
   the tables' logs alone too. A
   fault of the record's own turns learning off for the run (`LogHabits`, `CommitRecorder.safely`)
   and never loses the commit. The traditional text before the cursor is read simplified by
