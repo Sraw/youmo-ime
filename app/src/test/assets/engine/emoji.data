@@ -1,0 +1,13 @@
+# a few of each group, for the unit tests: the real file is built (compileEmojiData), not in the tests
+@smileys	😀 😃 😄 😁 😆 😅 🤣 😂
+@people	👋 🤚 🖐 ✋ 🖖 👌 👍
+@nature	🐵 🐒 🦍 🐶 🐕 🐱 🐈 🦁
+@food	🍇 🍈 🍉 🍊
+@travel	🌍 🌎 🌏
+@activities	🎃 🎄 🎆
+@objects	👓 🕶 🥽
+@symbols	🏧 🚮 🚰
+@flags	🏁 🚩 🎌
+猫	🐱 🐈	mao
+笑	😄 😆	xiao
+点赞	👍	dian zan

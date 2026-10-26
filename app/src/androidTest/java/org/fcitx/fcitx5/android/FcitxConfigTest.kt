@@ -5,7 +5,7 @@
 package org.fcitx.fcitx5.android
 
 import kotlinx.coroutines.runBlocking
-import org.fcitx.fcitx5.android.core.Fcitx
+import org.fcitx.fcitx5.android.core.FcitxInstance
 import org.fcitx.fcitx5.android.core.RawConfig
 import org.fcitx.fcitx5.android.engine.host.EngineSettings
 import org.fcitx.fcitx5.android.engine.host.Engines
@@ -30,7 +30,7 @@ class FcitxConfigTest {
     private companion object {
 
         val harness = TestFcitx()
-        val fcitx: Fcitx get() = harness.fcitx
+        val fcitx: FcitxInstance get() = harness.fcitx
 
         @BeforeClass
         @JvmStatic

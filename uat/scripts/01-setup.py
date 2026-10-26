@@ -1,7 +1,7 @@
 """uat/01-setup.md. The .md is the source of truth; each function follows its case's 前提/操作/预期."""
 import time
 
-from uat import IME, PKG, Blocked, add_im, case, check, home, in_picker, install
+from uat import IME, PKG, Blocked, add_im, case, check, in_picker, install
 
 
 def im_rows(d):
@@ -117,27 +117,10 @@ def set02(d):
     return "直接是设置首页"
 
 
-@case("SET-03", base="B0-设置")
-def set03(d):
-    home(d, "输入法")
-    r = im_rows(d)
-    check(r == ["拼音", "英文"], f"列表是 {r}")
-    return f"列表 {r}"
+case("SET-03", needs="jvm:SettingsPagesUatTest.theInputMethodsListed")(lambda d: None)
 
 
-@case("SET-04", base="B0-设置", mutates=True)
-def set04(d):
-    home(d, "输入法")
-    d.tap_text("添加", scroll=False, after=1.2)
-    s = d.screen()
-    want = ["九键拼音", "五笔", "二笔", "仓颉", "自然码", "双拼", "五笔拼音", "手写"]
-    got = [n.text for n in sorted(s.nodes, key=lambda n: n.b[1]) if n.text in want]
-    check(set(got) == set(want), f"可添加的是 {got}")
-    check(got[0] == "九键拼音", f"排在最前的是 {got[0]}")
-    d.tap_text("九键拼音", where="all", scroll=False, after=1.2)
-    r = im_rows(d)
-    check(r and r[-1] == "九键拼音", f"添加后列表 {r}")
-    return f"可添加 {got}；添加后 {r}"
+case("SET-04", needs="jvm:SettingsPagesUatTest.addingNineKeys")(lambda d: None)
 
 
 @case("SET-05", base="B0-设置", mutates=True)
@@ -192,14 +175,7 @@ def set06(d):
     return f"列表 {r}；地球键 {names}"
 
 
-@case("SET-08", base="B0")
-def set08(d):
-    a = globe_cycle(d, 1)[0]
-    n = len(d.keys(refresh=True))
-    b = globe_cycle(d, 1)[0]
-    check(a == "英文" and "q" in d.keys(refresh=True) and n > 26, f"第一次后「{a}」")
-    check(b == "拼音", f"第二次后「{b}」")
-    return f"{a} → {b}"
+case("SET-08", needs="jvm:ImeSwitchUatTest.theGlobeKeyGoesRoundAndTheSpaceSays")(lambda d: None)
 
 
 @case("SET-09", base="B0", mutates=True)
@@ -217,3 +193,6 @@ def set09(d):
     d.back(0.8)
     return f"系统选择输入法框：{items[:4]}"
 
+
+
+case("SET-11", needs="manual:要上游 Fcitx5 for Android 导出的备份")(lambda d: None)

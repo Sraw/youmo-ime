@@ -3,7 +3,7 @@
 区域代号 `WD`。要导入的文件先放到手机的"下载"目录：
 
 ```sh
-adb push uat/fixtures/userwords.txt uat/fixtures/dict-words.txt uat/fixtures/words.csv uat/fixtures/extra.dict uat/fixtures/extra.scel uat/fixtures/big-words.txt uat/fixtures/big-words.list uat/fixtures/old-export.txt uat/fixtures/rime-words.dict.yaml uat/fixtures/mixed-words.txt uat/fixtures/initials-words.txt uat/fixtures/gbk-words.txt uat/fixtures/log-words.txt uat/fixtures/binary-words.bin uat/fixtures/pinyin-first.txt uat/fixtures/rime-percent.dict.yaml uat/fixtures/trad-words.txt uat/fixtures/trad-big5.txt uat/fixtures/no-pinyin-some.txt uat/fixtures/no-pinyin-most.txt /sdcard/Download/
+adb push uat/fixtures/userwords.txt uat/fixtures/dict-words.txt uat/fixtures/words.csv uat/fixtures/extra.dict uat/fixtures/extra.scel uat/fixtures/big-words.txt uat/fixtures/rime-words.dict.yaml uat/fixtures/mixed-words.txt uat/fixtures/initials-words.txt uat/fixtures/gbk-words.txt uat/fixtures/log-words.txt uat/fixtures/binary-words.bin uat/fixtures/pinyin-first.txt uat/fixtures/rime-percent.dict.yaml uat/fixtures/trad-words.txt uat/fixtures/trad-big5.txt uat/fixtures/no-pinyin-some.txt uat/fixtures/no-pinyin-most.txt /sdcard/Download/
 ```
 
 ## 用户词库
@@ -12,53 +12,62 @@ adb push uat/fixtures/userwords.txt uat/fixtures/dict-words.txt uat/fixtures/wor
 - **前提**：B0-设置，打开 **用户词库** 的"手动添加的词"。
 - **操作**：点 **+**，词填「幽默」，拼音留空，保存。
 - **预期**：列表里「幽默」旁显示拼音 you mo。
+- **JVM**：`SettingsUatTest.aBlankPinyinIsFilledIn`（拼音留空 → 问引擎 → 填进框 → 保存 → 列表里 you mo）；引擎怎么读由 ime-core 的 `EnginesUserWordsTest` 测；设备上不跑。
 
 ### WD-03 [P0] 手动添加的词：立刻能打、整句照用、编辑、删除
 <!-- learning: U-65 U-08 -->
 - **前提**：B0-设置。
 - **操作**：**词库与短语 → 用户词库**，在"手动添加的词"里点 **+**，词填「澜境花园」，拼音填 `lan jing hua yuan`，保存；再点 **+** 加「鲸喵屿」，拼音 `jing miao yu`；回测试页打 l a n j i n g h u a y u a n；点 ⌫ 删光，打 j i n g m i a o y u；删光，打 w o z h u z a i j i n g m i a o y u。回去点「澜境花园」，选 **编辑**，改成「澜境公园」（拼音 lan jing gong yuan）保存；回测试页打 lanjinggongyuan；再回去点它选 **删除**，回测试页再打 lanjinggongyuan。
 - **预期**：加第一个词后列表里出现「澜境花园」，词数从 0 变 1；打字时「澜境花园」排第一（「蓝鲸花园」不是词库里的词，只是能按整句打出来，没有同拼音的词时加的词排第一）；jingmiaoyu 第一个是「鲸喵屿」，整句第一个是「我住在鲸喵屿」；编辑后列表显示「澜境公园」，打字时它排第一（没有同拼音的词库词）；删除后它不在列表里，也不在候选里（输入法自己的设置页里打的字不学，删掉就只是不再当词给出）。
+- **JVM**：`WordsUatTest.aWordAddedByHandTypedAtOnceInSentencesEditedDeleted`（:lib:ime-eval:uatTest，真数据）；设备上照跑：词库页的列表、词数和编辑对话框是界面，JVM 只断言打字和词库这一半。
 
 ### WD-06 [P1] 屏蔽词
 - **前提**：B0-设置。
 - **操作**：**用户词库 → 屏蔽的词**，加「时间」；回测试页打 s h i j i a n。
 - **预期**：候选里没有「时间」。
+- **JVM**：`LexiconUatTest.aWordBlockedInTheSettingsIsNoCandidate`（:lib:ime-eval:uatTest，真数据）（屏蔽「时间」后它在屏蔽列表里，shijian 没有它）；设备上不跑。
 
 ### WD-07 [P1] 恢复屏蔽的词
 <!-- learning: U-80 U-82 -->
 - **前提**：B0，在键盘上长按 `shijian` 的「时间」选 **屏蔽**，确认。
 - **操作**：打开 **用户词库** 的"屏蔽的词"，点「时间」恢复；回测试页打 s h i j i a n。
 - **预期**：「时间」在屏蔽列表里出现过，恢复后从列表消失；候选里又有「时间」。
+- **JVM**：`LexiconUatTest.aBlockedWordRestoredIsBack`（:lib:ime-eval:uatTest，真数据）（长按屏蔽后列在屏蔽的词，恢复后列表空、候选里又有）；设备上不跑。
 
 ### WD-08 [P1] 删掉你的词
 <!-- learning: U-82 U-84 -->
 - **前提**：B0，按 PY-34 让「汪小明」成为你的词。
 - **操作**：**用户词库 → 自动学到的词** 里点「汪小明」，选 **删除**；回测试页打 w a n g x i a o m i n g，再打 w x m。
 - **预期**：列表里没了；wangxiaoming 第一个是「王小明」，候选里没有「汪小明」（它不在词库里，删了就没了）；wxm 里也没有它。
+- **JVM**：`LexiconUatTest.aLearnedWordDeletedIsGone`（:lib:ime-eval:uatTest，真数据）（删掉学到的「汪小明」后 wangxiaoming 第一是「王小明」、没有它，wxm 也没有）；设备上不跑。
 
 ### WD-09 [P1] 导入到用户词库，成为导入的词
 <!-- learning: U-101 -->
 - **前提**：B0-设置，`userwords.txt` 已放到"下载"目录（内容：「幽默测试 you'mo'ce'shi」「蓝鲸花园」「!马上就好」）。
 - **操作**：**词库与短语 → 导入词库**，选 `userwords.txt`，**并入哪个词库？** 选"用户词库"。
 - **预期**：显示"导入完成：导入 2 个词，添加 0 个，屏蔽 1 个…"；「幽默测试」「蓝鲸花园」都是导入的词（「蓝鲸花园」不是词库里的词，只是能按整句打出来），**导入的词** 里有 `userwords.txt` 这一批；「马上就好」进了 **屏蔽的词**。
+- **JVM**：`LexiconUatTest.aWordListImportedIntoTheUserDictionary`（:lib:ime-eval:uatTest，真数据）（导入 2、添加 0、屏蔽 1，马上就好在屏蔽的词，导入的词有 userwords.txt 这一批（提示和页面的文字是界面））；设备上不跑。
 
 ### WD-09b [P1] 上千个词并入用户词库，直接导入
 <!-- learning: U-101 -->
 - **前提**：B0-设置，`big-words.txt`（1001 个带拼音的词，如「鲸喵屿 jing miao yu」，最后一行是屏蔽的「!马上就好」）已放到"下载"目录。
 - **操作**：**词库与短语 → 导入词库**，选 `big-words.txt`，并入"用户词库"，点 **导入词库**；关掉结果后点 **导入的词**。
 - **预期**：不再提示改放基础词库，直接显示"导入完成：导入 1001 个词…"（导入的词不进整句和语音，多了也不碍事）；词库页"基础词库"一节没有 `big-words`；**导入的词** 里有一行 `big-words.txt`，带导入的日子和"1001 个词还不是你的"。
+- **JVM**：`LexiconUatTest.aThousandWordsImportedIntoTheUserDictionary`（:lib:ime-eval:uatTest，真数据）（导入 1001 个，导入的词里 big-words.txt 这一批 1001 个还不是你的）；设备上不跑。
 
 ### WD-10 [P1] 导出后在别处导入，词、屏蔽、学到的都在
 <!-- learning: U-100 -->
 - **前提**：B0-设置，手动加了「蓝鲸花园」、屏蔽了「时间」，按 PY-34 让「汪小明」成为你的词。
 - **操作**：**用户词库** 里导出，存到"下载"；重置应用（README「重置」）；再 **词库与短语 → 导入词库** 选刚导出的文件。
 - **预期**：导出存成 `youmo-words-日期.fxlb`（用户词库页"文件"一节的 **导出**）；选了这个文件后不问并入哪个词库，出的是恢复备份的确认框（写着来源和日期），点 **确定** 按自己的备份合并；导入后「蓝鲸花园」在"手动添加的词"里、「汪小明」在"自动学到的词"里、「时间」在屏蔽的词里；不离开 **词库与短语** 页，用户词库那一行显示的个数已是恢复后的；回测试页点 w a n g x i a o m i n g，第一个是「汪小明」。
+- **JVM**：`LexiconUatTest.anExportImportedElsewhereHasTheAddedBlockedAndLearned`（:lib:ime-eval:uatTest，真数据）（导出的备份字节恢复到新装：头部可读（确认框）、添加的、屏蔽的、学到的各在原处，汪小明第一（文件名和保存界面是系统的））；设备上不跑。
 
 ### WD-10a [P1] 备份带着导入的词，恢复后仍是那次导入
 <!-- learning: U-101 U-106 -->
 - **前提**：B0-设置，`big-words.txt`（1001 个带拼音的词）已放到"下载"目录；**词库与短语 → 导入词库** 选它，并入"用户词库"（1001 个导入的词）。
 - **操作**：**用户词库 → 学习备份 → 另存一份到看得见的文件夹**，读提示，确定，存到"下载"；重置应用；**用户词库 → 学习备份 → 从备份恢复** 选刚存的文件，确定；再点 **词库与短语 → 导入的词**。
 - **预期**：另存前提示用这台手机的人都能拷走这份文件；"下载"里多了 `youmo-learning-<年月日>.fxlb`；恢复后 **导入的词** 里仍是 `big-words.txt` 那一批，1001 个词，能整批撤掉。（用户词库的 **导出** 也是这样的 `.fxlb`，同样带着这一批，见 WD-10。）
+- **JVM**：`LexiconUatTest.aBackupKeepsTheImportedBatch`（:lib:ime-eval:uatTest，真数据）（另存的备份恢复后仍是 big-words.txt 那一批 1001 个，能整批撤掉（另存前的提示是界面））；设备上不跑。
 
 ## 导入词库
 
@@ -66,17 +75,31 @@ adb push uat/fixtures/userwords.txt uat/fixtures/dict-words.txt uat/fixtures/wor
 - **前提**：B0-设置，`dict-words.txt` 已放到"下载"目录。
 - **操作**：**词库与短语 → 导入词库**，选 `dict-words.txt`，**并入哪个词库？** 选"基础词库（推荐）"；回测试页打 k e m i a o t a n g p u。
 - **预期**：词库页"基础词库"一节里（内置词库下面）列出这个导入的词库；候选里有「氪喵糖铺」。
+- **JVM**：`DictionaryUatTest.aTextDictionaryIntoTheBase`（一开始选基础词库；导入后列出 dict-words，合并文件里有氪喵糖铺）；设备上不跑。
 
 ### WD-13 [P1] 关闭、删除导入的词库
 - **前提**：B0-设置，`dict-words.txt` 已放到"下载"目录；**词库与短语 → 导入词库** 选它，并入"基础词库（推荐）"。
 - **操作**：看词库目录（`adb shell ls /sdcard/Android/data/<包名>/files/data/pinyin/dictionaries`）；在词库页点它，看菜单，选 **关闭**；回测试页打 kemiaotangpu；再看词库目录；再回词库页点它，选 **删除**；回测试页打 kemiaotangpu；再看词库目录。
 - **预期**：导入后目录里是 `dict-words.txt.gz`（压缩存放，没有 `dict-words.txt`），关闭后是 `dict-words.txt.gz.disable`，删除后两样都没有；菜单只有"关闭"和"删除"；关闭后候选第一页不再有「氪喵糖铺」；删除后词库页没有它，候选第一页也没有「氪喵糖铺」。
+- **JVM**：`DictionaryUatTest.turnedOffThenDeleted`（目录依次是 dict-words.txt.gz、.gz.disable、没有；关闭和删除后合并文件里没有氪喵糖铺（菜单是界面））；设备上不跑。
 
 ### WD-14b [P1] .dict 词库并入用户词库：排位、成你的词、撤掉这批、撤销
 <!-- learning: U-101 U-102 U-62 -->
 - **前提**：B0-设置，`extra.dict`（Fcitx 5 词库，两个词：「骁骎 xiao'qin」「琮璟 cong'jing」）已放到"下载"目录。
 - **操作**：**词库与短语 → 导入词库**，选 `extra.dict`，**并入哪个词库？** 选"用户词库"，导入；打开 **导入的词**；回测试页打 c o n g j i n g 看候选，点「琮璟」；再打 c o n g j i n g 看候选，点「琮璟」；再打一次 c o n g j i n g；打开 **用户词库 → 自动学到的词**。然后 **词库与短语 → 导入的词**，点 `extra.dict` 那一行，看提示，点 **撤掉这批**；回测试页打 x i a o q i n、c o n g j i n g。再把 `extra.dict` 导入用户词库一次，再撤掉这一批，这回在页底的提示条上点 **撤销**，看 **导入的词**，回测试页打 x i a o q i n。
 - **预期**：对话框一开始选的是"基础词库（推荐）"；导入完成提示导入 2 个词；**导入的词** 里有 `extra.dict` 这一批，2 个词还不是你的；第一次打时「琮璟」排在词库自带的同拼音词（如「从警」）后面；点过一次后它排第二；点过两次后它排第一，成了你的词：在"自动学到的词"里（没有"我的词"这一页）。撤掉时那一行写着"1 个词还不是你的"，确认框问"撤掉 extra.dict 里还不是你的 1 个词？"；撤掉后提示"撤掉了 1 个导入的词"，**导入的词** 里没有这一批，xiaoqin 里没有「骁骎」，congjing 里「琮璟」照旧（它已经是你的词）；再导入时提示导入 1 个词（撤掉的「骁骎」照样导得进来，「琮璟」已是你的词）；点撤销后这一批回到 **导入的词**，「骁骎」又打得出来。
+- **JVM**：`LexiconUatTest.aDictFileIntoTheUserDictionaryRanksBecomesYoursDroppedAndUndone`（:lib:ime-eval:uatTest，真数据）（extra.dict 经 LibimeFiles 读成两行导入；琮璟先在从警后、点一次第二、两次第一成学到的词；撤掉 1 个、xiaoqin 没有骁骎；再导入 1 个，撤销后回来（确认框文字是界面））；设备上不跑。
+
+### WD-14z [P1] 搜狗细胞词库（.scel）并入用户词库，成为导入的词
+<!-- learning: U-101 -->
+- **前提**：B0-设置，`extra.scel`（搜狗细胞词库格式，两个词：「骁骎 xiao'qin」「琮璟 cong'jing」，各带词频）已放到"下载"目录。
+- **操作**：**词库与短语 → 导入词库**，选 `extra.scel`，**并入哪个词库？** 选"用户词库"，导入；打开 **导入的词**；回测试页打 c o n g j i n g 看候选。
+- **预期**：导入完成提示导入 2 个词；**导入的词** 里有 `extra.scel` 这一批；「琮璟」在候选里，排在词库自带的同拼音词（如「从警」）后面。（这条走用户词库的读法；并入基础词库时 .scel 先转换成文本，那条路见 WD-14z2。）
+
+### WD-14z2 [P1] 搜狗细胞词库（.scel）并入基础词库
+- **前提**：B0-设置，`extra.scel`（同 WD-14z）已放到"下载"目录。
+- **操作**：**词库与短语 → 导入词库**，选 `extra.scel`，**并入哪个词库？** 选"基础词库"，导入；回测试页打 c o n g j i n g 看候选。
+- **预期**：词库页"基础词库"一节里列出 `extra` 这个导入的词库；「琮璟」在候选里。（并入基础词库时 .scel 先转换成文本词库再编译，转换坏了只有这条能在设备上看出来。）
 
 ### WD-14d [P0] 上百万词的大词库并入基础词库，键盘不崩
 - **前提**：B0-设置，雾凇拼音（rime-frost）发布的 `frost_dict_for_fcitx5.txt`（约 89 MB、191 万行，词、`'` 分开的拼音、概率三列；是哪一份、哈希多少见 [README](README.md) 的 fixtures 一行）已放到"下载"目录。
@@ -87,16 +110,19 @@ adb push uat/fixtures/userwords.txt uat/fixtures/dict-words.txt uat/fixtures/wor
 - **前提**：B0-设置，`rime-words.dict.yaml`（Rime 的表头，三个词，拼音用空格分开，带词频）已放到"下载"目录。
 - **操作**：**导入词库**，选 `rime-words.dict.yaml`，看标题和一开始选的；选"基础词库（推荐）"导入；回测试页打 k e m i a o x i n g g a n g。
 - **预期**：一开始选的是"基础词库（推荐）"；标题下面写着"Rime 词库 · 拼音用空格分开 · 第三列是词频 · 3 个词"；词库页列出 rime-words；候选里有「氪喵星港」。
+- **JVM**：`DictionaryUatTest.aRimeDictionaryKnownAndImported`（认出 Rime、空格分开、词频、3 个词（标题的各项）；列出 rime-words，有氪喵星港）；设备上不跑。
 
 ### WD-14f [P1] 格式拿不准的文件不导入，说明原因
 - **前提**：B0-设置，`mixed-words.txt`（一半行词在前、一半拼音在前）、`initials-words.txt`（拼音只写声母）、`gbk-words.txt`（GBK 编码的两个词）已放到"下载"目录。
 - **操作**：依次 **导入词库** 选 `mixed-words.txt`、`initials-words.txt`，各选"基础词库"点 **导入词库**；再导入 `gbk-words.txt`，看标题，取消。
 - **预期**：前两个照样弹出并入哪个词库的选择（标题下面没有认出的格式），选"基础词库"导入后分别提示"格式不支持：文件里混有不同格式的行"和"格式不支持：只有声母，无法确定读音"，词库页没有新增条目（选"用户词库"的话照旧逐行导入，读不懂的行跳过）；`gbk-words.txt` 的标题下面写着"GBK 编码"和"2 个词"。
+- **JVM**：`DictionaryUatTest.aFileNotSurelyReadIsRefusedWithWhy`（混有不同格式、只有声母各自的拒绝原因，词库没有新增；gbk 是 GBK 编码、2 个词）；设备上不跑。
 
 ### WD-14g [P1] 超过 10 万词的词库不能并入用户词库
 - **前提**：B0-设置，"下载"里有 `user-100k.txt`，100,001 个六字词带拼音，这样生成再推过去：`python3 -c "import itertools as i;c=list(zip('啊吧擦大饿发嘎哈鸡卡','a ba ca da e fa ga ha ji ka'.split()));open('user-100k.txt','w').write(''.join(''.join(x[0] for x in w)+' '+\"'\".join(x[1] for x in w)+'\\n' for w in i.islice(i.product(c,repeat=6),100001)))"`、`adb push user-100k.txt /sdcard/Download/`。
 - **操作**：**导入词库**，选 `user-100k.txt`，选"用户词库"，导入。
 - **预期**：提示"这个词库太大，请并入基础词库"；**导入的词** 里没有这一批，用户词库不变。
+- **JVM**：`DictionaryUatTest.pastAHundredThousandWordsIsNoImportForTheUser`（100,001 个词的文件算出 100,001 个，用户词库放不下，提示这个词库太大）；设备上不跑。
 
 ### WD-14h [P0] 从 0.3.1 升级：已导入的大词库在后台转换、合成，键盘不崩
 - **前提**：B0-设置，先回测试页弹出键盘、打几个字，按 [README](README.md#量-java-堆) 的做法量 Java 堆 5 次作对照；强行停止应用；把 `frost_dict_for_fcitx5.txt` 按 0.3.1 存词库的样子放进词库目录：`adb push frost_dict_for_fcitx5.txt /sdcard/Android/data/<包名>/files/data/pinyin/dictionaries/frost.txt`，删掉那里的 `merged.ymd`（如果有）；再放一个 0.3.1 停用的词库 `old.txt.disable`（一行「氪喵星港 ke'miao'xing'gang 0.0」）。
@@ -107,51 +133,61 @@ adb push uat/fixtures/userwords.txt uat/fixtures/dict-words.txt uat/fixtures/wor
 - **前提**：B0-设置，已按 WD-14e 把 `rime-words.dict.yaml` 并入基础词库；`frost_dict_for_fcitx5.txt` 放在下载目录。
 - **操作**：**词库与短语 → 导入词库** 选 frost，看读文件时的对话框；选「基础词库」点 **导入词库**，对话框显示「正在整理词条… N%」时点 **取消**；再导入一次，点 **导入词库** 后等「正在导入」对话框出现马上点它的 **取消**（还在保存词库时，记下这时对话框写的什么）；看词库页、词库目录和应用的缓存目录（`docker exec <容器> ls -a /data/data/<包名>/cache`，模拟器上先 `adb root` 再 `adb shell ls -a …`；列不出来就记为阻塞）；打 k e m i a o x i n g g a n g。
 - **预期**：读文件和导入时都有进度条和百分比（正在分析格式，再到正在整理词条），一路往前走；取消后对话框关掉，不报错；词库页和词库目录跟导入前一样（没有 frost，没有 `.tmp` 或 `.build` 文件），缓存目录里没有 `import*` 文件；候选里仍有「氪喵星港」。
+- **JVM**：`DictionaryUatTest.aCancelledImportChangesNothing`（导入时取消：目录、词库页、缓存都和之前一样，仍有氪喵星港。用 big-words.txt 代替 frost）；设备上不跑。
 
 ### WD-14j [P1] 停用、启用、删除词库：合好之前页面说正在更新
 - **前提**：B0-设置，已按 WD-14e 把 `rime-words.dict.yaml` 并入基础词库。
 - **操作**：在词库页点 rime-words → **关闭**，打 k e m i a o x i n g g a n g；再 **开启**，再打；再 **删除**，再打。每次操作后看词库目录。（换成 frost 这样的大词库更容易看到进度，见 WD-14j2。）
 - **预期**：每次操作后行的状态马上变，词库目录（`adb shell ls /sdcard/Android/data/<包名>/files/data/pinyin/dictionaries`）里依次是 `rime-words.txt.gz.disable`、`rime-words.txt.gz`，删除后都没有；合成时间长时（大词库）「基础词库」一节显示「正在更新词库」和「正在更新 N%，完成前打字仍用原来的词库」，合好以后词数更新（3 个词的小词库来不及看到）；关闭后没有「氪喵星港」，开启后又有，删除后行没了、也没有这个词。
+- **JVM**：`DictionaryUatTest.turnedOffOnAndDeleted`（关闭、开启、删除后目录依次是 .gz.disable、.gz、没有，氪喵星港随之没有、有、没有）；设备上不跑。
 
 ### WD-14j2 [P1] 大词库合成中关闭另一个词库
 - **前提**：B0-设置，已按 WD-14e 把 `rime-words.dict.yaml` 并入基础词库；frost（`UAT_FROST`，见 WD-14d）在手边，没有就记 Blocked。
 - **操作**：把 frost 也并入基础词库；在 frost 上点 **关闭**（剩下的小，马上合好），再点 **开启**；「基础词库」一节显示「正在更新 N%」时马上把 rime-words **关闭**。
 - **预期**：不弹"词库没能更新"；合好以后 frost「已开启 · 1914461 个词」，rime-words「已关闭 · 3 个词」。
+- **JVM**：`DictionaryUatTest.anotherTurnedOffWhileABigOneCompiles`（合成停在读词时关掉 rime-words：不报没能更新，big-words 开着 1001 个词、rime-words 关着。用 big-words 代替 frost，合成由钩子停住）；设备上不跑。
 
 ### WD-14k [P1] 第三列按认出的含义排先后
 - **前提**：B0-设置，`log-words.txt`（四个词，第三列是对数概率，三行负数、一行「量子喵星」是 `1`；「氪喵糖果」「氪喵堂果」拼音都是 ke'miao'tang'guo，文件里「氪喵糖果」在前、数小：-9.5 对 -3.2）已放到"下载"目录。
 - **操作**：**导入词库**，选 `log-words.txt`，看标题；选"基础词库（推荐）"导入；回测试页打 k e m i a o t a n g g u o。
 - **预期**：标题下面写着"第三列是对数概率"和"4 个词"；候选里「氪喵堂果」排在「氪喵糖果」前面（数大的在前，不按文件里的先后；一行 `1` 不让整个文件改按文件里的先后出词）。
+- **JVM**：`DictionaryUatTest.theThirdColumnRanksAsItIsRead`（认出对数概率、4 个词；合并文件里氪喵堂果的分数高于氪喵糖果）；设备上不跑。
 
 ### WD-14l [P1] 二进制文件直接拒绝；拼音在前、连写的词库认得出
 - **前提**：B0-设置，`binary-words.bin`（含 NUL 字节的二进制文件，代替搜狗 `.bin` 备份）、`pinyin-first.txt`（三行，拼音在前且连写，如 `kemiaoyu 氪喵屿`）已放到"下载"目录。
 - **操作**：**导入词库** 选 `binary-words.bin`；再 **导入词库** 选 `pinyin-first.txt`，看标题，选"基础词库（推荐）"导入；回测试页打 k e m i a o y u。
 - **预期**：`binary-words.bin` 读完不出并入哪个词库的选择，直接提示"格式不支持：这不是文本文件"，词库页没有新增；`pinyin-first.txt` 的标题下面写着"拼音在前"和"拼音连写"、"3 个词"，词库页列出 pinyin-first，候选里有「氪喵屿」。
+- **JVM**：`DictionaryUatTest.aBinaryFileRefusedPinyinFirstRunTogetherRead`（二进制文件拒绝（不是文本文件）；pinyin-first 认出拼音在前、连写、3 个词，有氪喵屿）；设备上不跑。
 
 ### WD-14m [P1] 同名的词库已在基础词库：先问要不要改并入用户词库
 - **前提**：B0-设置，按 WD-11 把 `dict-words.txt` 并入基础词库；然后用同名、五个新词的 `uat/fixtures/same-name/dict-words.txt` 换掉"下载"里那份：`adb push uat/fixtures/same-name/dict-words.txt /sdcard/Download/`（原来那五个词已在基础词库里，再导入一个也不会进用户词库）。用完把原来的推回去。
 - **操作**：再 **导入词库** 选 `dict-words.txt`，看出来的对话框；点 **并入用户词库**；打开 **导入的词**。
 - **预期**：选完文件马上（还没出"正在分析格式"的进度）弹出"基础词库里已有名为「dict-words」的词库。改为并入用户词库吗？"，不出并入哪个词库的选择；点 **并入用户词库** 后读文件、导入完成，提示导入 5 个词；**导入的词** 里有 `dict-words.txt` 这一批；基础词库一节仍只有一个 dict-words。
+- **JVM**：`DictionaryUatTest.aNameInTheBaseAlreadyAsksForTheUser`（同名已在基础词库（先问的条件），并入用户词库是 5 个词，不会再进基础词库（对话框是界面））；设备上不跑。
 
 ### WD-14n [P2] Rime 词库里写成百分数的权重照常导入
 - **前提**：B0-设置，`rime-percent.dict.yaml`（Rime 表头，三个词，两行第三列是 `5%`、`80%` 这样的百分数，一行没有）已放到"下载"目录。
 - **操作**：**导入词库** 选它，看标题；选"基础词库（推荐）"导入；回测试页打 k e m i a o d e n g g a n g。
 - **预期**：不提示格式不支持；标题下面写着"Rime 词库"和"3 个词"、没有"读不懂"；词库页列出 rime-percent；候选里有「氪喵灯港」。
+- **JVM**：`DictionaryUatTest.rimesPercentWeightsImported`（Rime、3 个词、没有读不懂；有氪喵灯港）；设备上不跑。
 
 ### WD-14o [P1] 用户词库 10 万词的上限按导入的词总数算
 - **前提**：B0-设置，"下载"里有 `big-words.txt` 和 `user-99k.txt`（99,500 个六字词带拼音，生成法同 WD-14g，把 `100001` 换成 `99500`、文件名换成 `user-99k.txt`）。
 - **操作**：**导入词库** 选 `big-words.txt`，选"用户词库"导入；再导入 `user-99k.txt`，选"用户词库"；打开 **导入的词**，把 `big-words.txt` 那一批撤掉；再把 `user-99k.txt` 导入用户词库。
 - **预期**：`big-words.txt` 导入 1001 个词；第一次导入 `user-99k.txt` 提示"用户词库里导入的词已近上限，放不下这些词；请并入基础词库，或先删掉以前导入的词"（单看它不到 10 万，加上已导入的 1001 个就超了），**导入的词** 里没有这一批；撤掉 `big-words.txt` 后再导入成功，提示导入 99500 个词。
+- **JVM**：`DictionaryUatTest.theUsersCapCountsWhatWasImportedBefore`（已导入 1001 个时 99,500 个放不下、提示已近上限；撤掉后放得下）；设备上不跑。
 
 ### WD-14p [P1] UTF-8 的繁体词库能并入基础词库；Big5 的不行
 - **前提**：B0-设置，`trad-words.txt`（UTF-8，12 个繁体词，如「氪喵燈塔」ke miao deng ta）和同样内容存成 Big5 的 `trad-big5.txt` 已放到"下载"目录。
 - **操作**：**导入词库** 选 `trad-words.txt`，选"基础词库（推荐）"导入；回测试页打 k e m i a o d e n g t a；再 **导入词库** 选 `trad-big5.txt`，选"基础词库"点 **导入词库**。
 - **预期**：`trad-words.txt` 照常导入（字和读音对不上只查按 GBK 读的文件），词库页列出 trad-words，候选里有「氪喵燈塔」；`trad-big5.txt` 提示"格式不支持：字和读音大多对不上…"，词库页没有 trad-big5。
+- **JVM**：`DictionaryUatTest.utf8TraditionalInBig5Not`（UTF-8 繁体照常并入、有氪喵燈塔；Big5 的拒绝为字和读音对不上（基础词库的读音用 UTF-8 那份的字代替））；设备上不跑。
 
 ### WD-14q [P1] 只写了词的行：确认框单列，太多就不并入基础词库
 - **前提**：B0-设置，`no-pinyin-some.txt`（60 行带拼音，1 行只有词「氪喵无音」）、`no-pinyin-most.txt`（3 行带拼音，7 行只有词）已放到"下载"目录。
 - **操作**：**导入词库** 选 `no-pinyin-some.txt`，看标题，取消；再 **导入词库** 选 `no-pinyin-most.txt`，选"基础词库"点 **导入词库**。
 - **预期**：`no-pinyin-some.txt` 的标题下面写着"60 个词"和"1 个词没有拼音（只能并入用户词库）"；`no-pinyin-most.txt` 提示"格式不支持：有些行没有拼音；没有拼音的词只能并入用户词库"，词库页没有新增。
+- **JVM**：`DictionaryUatTest.wordsWithoutPinyinApartTooManyNotForTheBase`（60 个词、1 个没有拼音；太多的拒绝为有些行没有拼音）；设备上不跑。
 
 ### WD-14r [P0] 从 0.3.2 升级：导入的大词库转换成压缩的，空间省下一大半
 - **前提**：装着 v0.3.2 正式版（不是要测的这一版），在它里面按 WD-14d 把雾凇拼音并入基础词库，等合好（候选里有「阿坝州」）；再导入 `dict-words.txt` 并入基础词库后把它 **关闭**；记下 **系统设置 → 应用 → 幽默输入法 → 存储** 的"用户数据"大小和词库目录（`adb shell ls -l /sdcard/Android/data/<包名>/files/data/pinyin/dictionaries`：`frost_dict_for_fcitx5.txt`、`dict-words.txt.disable`、`merged.ymd` 约 106 MB）。
@@ -162,21 +198,25 @@ adb push uat/fixtures/userwords.txt uat/fixtures/dict-words.txt uat/fixtures/wor
 - **前提**：B0-设置，按 WD-14h 的前提放好 0.3.1 样子的 `frost.txt`（不放 `old.txt.disable`）。
 - **操作**：回测试页点输入框弹出键盘；空闲栏出现「正在升级词库格式 N%」、N 还不到 30 时马上强行停止应用（`adb shell am force-stop <包名>`；前 30% 是转换，过了就已经转换完了）；看词库目录：没有 `frost.txt` 了就是停晚了，重新放好前提再来；再回测试页弹出键盘，等到提示「词库格式已升级」（最多三分钟）；看词库目录；打 a b a z h o u。
 - **预期**：强行停止后目录里有 `frost.txt`（可能还有一个 `.tmp` 文件或已经有 `frost.txt.gz`）；再打开后又显示「正在升级词库格式 N%」，合好以后目录里只有 `frost.txt.gz` 和 `merged.ymd`，没有 `frost.txt`、`.tmp` 文件；候选里有「阿坝州」；词库页里 frost 只有一行，约 191 万个词。
+- **JVM**：`DictionaryUatTest.anUpgradeKilledAsItConvertsIsFinishedAtTheNextStart`（强停留下的 frost.txt 和写了一半的转换文件，下次启动仍是升级，做完只剩 frost.txt.gz、有阿坝州、一行。frost 用小文本代替）；设备上不跑。
 
 ### WD-14s2 [P1] 升级转换完、合成没完时强行停止，再打开仍是升级
 - **前提**：B0-设置，按 WD-14h 的前提放好 0.3.1 样子的 `frost.txt`（不放 `old.txt.disable`）。
 - **操作**：回测试页点输入框弹出键盘；空闲栏的「正在升级词库格式 N%」出现后，看词库目录（`ls -a`）：一有 `frost.txt.gz`、没有 `frost.txt` 和 `merged.ymd`（转换已提交、正在合成；空闲栏到 30% 时 gzip 可能还没改名，别按它）就马上强行停止应用（`adb shell am force-stop <包名>`）；看词库目录（`ls -a`）：要有 `frost.txt.gz`、没有 `frost.txt` 和 `merged.ymd`，不是这样就重新放好前提再来；再回测试页弹出键盘，等 `merged.ymd` 出现（最多五分钟）；看词库目录；打 a b a z h o u。
 - **预期**：强行停止后目录里有 `.merged.upgrading`；再打开后空闲栏又写着「正在升级词库格式 N%」（不是「正在更新 N%」），合好以后提示「词库格式已升级」；目录里有 `frost.txt.gz` 和 `merged.ymd`，没有 `.merged.upgrading`；候选里有「阿坝州」。
+- **JVM**：`DictionaryUatTest.anUpgradeKilledAfterItsConversionIsStillAnUpgrade`（转换完、合成没完时停下：有 .merged.upgrading；再启动仍是升级，做完没有它、有阿坝州）；设备上不跑。
 
 ### WD-14t [P1] 升级转换中停用、删除词库
-- **前提**：B0-设置，按 WD-14h 的前提放好 0.3.1 样子的 `frost.txt`；再放一个 0.3.1 的词库 `small.txt`（一行「氪喵星港 ke'miao'xing'gang 0.0」）（正式版 89 MB 的 frost 一秒内就转换完，来不及操作：在 `frost.txt` 末尾接上几百 MB 以 `#` 开头的随机字母注释行，合成时跳过、不算词，转换要几十秒；脚本见 `slow_frost`）。
+- **前提**：B0-设置，按 WD-14h 的前提放好 0.3.1 样子的 `frost.txt`；再放一个 0.3.1 的词库 `small.txt`（一行「氪喵星港 ke'miao'xing'gang 0.0」）（正式版 89 MB 的 frost 一秒内就转换完，来不及操作：在 `frost.txt` 末尾接上几百 MB 以 `#` 开头的随机字母注释行，合成时跳过、不算词，转换要几十秒，例如 `head -c 300000000 /dev/urandom | base64 -w 100 | sed 's/^/#/' >> frost.txt`）。
 - **操作**：打开词库页（两个都列着）；回测试页点输入框弹出键盘，空闲栏出现「正在升级词库格式 N%」、N 还不到 30 时马上回词库页，看一眼词库目录（还有 `frost.txt` 才算；没有就是转换已经做完，重新放好前提再来），在 small 上点 **删除** 并确认，在 frost 上点 **关闭**；等「基础词库」一节不再显示「正在升级词库格式」「正在更新」，词库目录里也没有 `.txt`、`.txt.disable`、`.tmp` 文件（最多三分钟）；看词库目录；打 k e m i a o x i n g g a n g；回词库页在 frost 上点 **开启**，看「基础词库」一节和空闲栏，等它合好（最多三分钟）。
 - **预期**：两次操作都不报错，行的状态马上变；不弹"词库没能更新"；做完后词库页只有 frost，写着「已关闭」；词库目录里是 `frost.txt.gz.disable`，没有 `small` 开头的文件，也没有 `frost.txt`、`frost.txt.gz`；候选里没有「氪喵星港」；再开启 frost 时写着「正在更新 N%」，从头到尾不出现「正在升级词库格式」，也不提示「词库格式已升级」（转换后的 `.gz` 带着旧文本的时间，不能因此当成升级；「正在更新」消失后再看两秒，这个提示在合好时才出）。
+- **JVM**：`DictionaryUatTest.turnedOffAndDeletedAsTheyConvert`（转换中删 small、关 frost：只剩 frost.txt.gz.disable，没有氪喵星港；再开启只是更新、不说升级）；设备上不跑。
 
 ### WD-14t2 [P1] 升级时没删掉的旧文本：下一次合成只删掉它，关了再开也不重新转换、不提示升级
 - **前提**：B0-设置，按 WD-14h 的前提放好 0.3.1 样子的 `frost.txt`，回测试页弹出键盘，等它升级合好（目录里是 `frost.txt.gz` 和 `merged.ymd`，最多五分钟）。
 - **操作**：强行停止应用；在 `frost.txt.gz` 旁放一个文本 `frost.txt`（一行「氪喵星港 ke'miao'xing'gang 0.0」），时间改到整秒（`adb shell touch -d @<秒数> <目录>/frost.txt`），再写 `<目录>/.merged.left`，内容一行 `frost.txt<TAB><字节数><TAB><秒数>000`（像上次升级转换后删除被拒留下的记录）；回测试页弹出键盘，看空闲栏两秒，`ls -a` 目录（没改动的启动不合成，`.merged.left` 和 `frost.txt` 都还在）；打开词库页，等它的重试删掉 `.merged.left`（最多两分钟）；页面开着，用 adb 照上面再放一次 `frost.txt` 和 `.merged.left`；在 frost 上点 **关闭**，再点 **开启**（留下的文本旁边开关词库），等「正在更新」离开（整个 frost 重新合成，最多三分钟），再看两秒；看词库页和词库目录；打 a b a z h o u、k e m i a o x i n g g a n g。
 - **预期**：空闲栏和词库页都不出现「正在升级词库格式」，也不提示「词库格式已升级」；词库页 frost 已开启、写着词数；目录里没有 `frost.txt`、`.merged.left`，`frost.txt.gz` 还在；abazhou 的候选里有「阿坝州」，kemiaoxinggang 第一页没有「氪喵星港」（留下的文本没被当成新的再转换）。
+- **JVM**：`DictionaryUatTest.aTextLeftAfterAnUpgradeIsDeletedNotConvertedAgain`（留下的旧文本和 .merged.left：页面重试删掉它们；关了再开也不升级、不转换，有阿坝州、没有氪喵星港）；设备上不跑。
 
 升级时删不掉已转换文本的那一下（F3660：`.txt` 已转成 `.gz` 但删除被拒）没有用例：redroid 上 adb 改不了应用目录的权限让删除被拒而旁边的改名照常，用 root 去改又不像真手机，单元测试也造不出。它留下的状态（`.merged.left` 记着的文本）之后的合成怎么处理，由 WD-14t2 用 adb 直接造出来测。
 
@@ -189,26 +229,31 @@ adb push uat/fixtures/userwords.txt uat/fixtures/dict-words.txt uat/fixtures/wor
 - **前提**：B0-设置，按 WD-14h 的前提放好 0.3.1 样子的 `frost.txt`（不放 `old.txt.disable`）；`dict-words.txt` 已放到"下载"目录；`frost.txt` 照 WD-14t 接上注释行。
 - **操作**：回测试页点输入框弹出键盘；空闲栏出现「正在升级词库格式 N%」、N 还不到 30 时，回 **词库与短语 → 导入词库** 选 `dict-words.txt`，选"基础词库（推荐）"点 **导入词库**，点之前看一眼词库目录（还有 `frost.txt` 才算；没有就是转换已经做完，重新放好前提再来），看对话框里的进度，等它关上（最多五分钟）；对话框里没出现「正在转换」时，看点下去之后目录里还有没有 `frost.txt`：没有就是转换在点之前刚做完，重新放好前提再来；回测试页打 k e m i a o t a n g p u、a b a z h o u；打开词库页。
 - **预期**：对话框先写着「正在转换… N%」（等那边的转换），再往后是「正在整理词条」等，最后关上，提示导入成功；不挂住、不弹"词库没能更新"；kemiaotangpu 的候选里有「氪喵糖铺」，abazhou 的候选里有「阿坝州」；词库页"基础词库"一节 frost 和 dict-words 都已开启；词库目录里是 `frost.txt.gz`、`dict-words.txt.gz` 和 `merged.ymd`，没有 `.txt`、`.tmp` 文件。
+- **JVM**：`DictionaryUatTest.anImportWhileAnUpgradeConverts`（转换中导入 dict-words：等转换完再导入，两个都开着，目录只有两个 .gz，两边的词都有）；设备上不跑。
 
 ### WD-14x [P1] 基础词库的文件坏了：跳过它、行上写明，其余照常
 - **前提**：B0-设置，按 WD-11 把 `dict-words.txt` 并入基础词库，再把 `rime-words.dict.yaml` 也并入基础词库。
 - **操作**：强行停止应用；把词库目录里的 `dict-words.txt.gz` 截成只剩前 30 字节（`adb shell 'head -c 30 <目录>/dict-words.txt.gz > <目录>/x && mv <目录>/x <目录>/dict-words.txt.gz'`，像复制时被截断）；回测试页弹出键盘，等词库目录里出现 `.merged.unreadable`（`ls -a`，最多两分钟；「氪喵星港」在强行停止前的 merged.ymd 里就有，看到它不说明已经重新合过），再打 k e m i a o x i n g g a n g、k e m i a o t a n g p u；打开词库页；在 dict-words 上点 **删除** 并确认，按 WD-11 重新导入 `dict-words.txt`；打 k e m i a o t a n g p u；打开词库页。
 - **预期**：不弹"词库没能更新"；kemiaoxinggang 的候选里有「氪喵星港」（别的词库照常并入），kemiaotangpu 第一页没有「氪喵糖铺」；词库页 dict-words 的行上写着「读不了，没有并入：删掉后重新导入」，不是词数。重新导入后「氪喵糖铺」回来了，dict-words 只有一行、写着词数。
+- **JVM**：`DictionaryUatTest.aDamagedFileIsSkippedTheRestMerged`（截短的 dict-words 列为读不了、0 个词，其余照常；删掉重导后回来）；设备上不跑。
 
 ### WD-14x2 [P1] 基础词库的文件中间坏了：前面读到的词照常并入，行上写明可能不全
 - **前提**：B0-设置，`big-words.txt` 已放到"下载"目录；**导入词库** 选它并入"基础词库"。
 - **操作**：强行停止应用；把词库目录里的 `big-words.txt.gz` 截成原来的三分之二（`adb shell 'head -c <三分之二字节数> <目录>/big-words.txt.gz > <目录>/x && mv <目录>/x <目录>/big-words.txt.gz'`）；回测试页弹出键盘，等词库目录里出现 `.merged.unreadable`（`ls -a`，最多两分钟）；打 j i n g m i a o y u、j u x i n g y u；打开词库页。
 - **预期**：候选里有「鲸喵屿」（文件第一行，截断前的词照常并入），juxingyu 第一页没有「橘星屿」（文件最后一个词，在截断之后；还在就是没重新合）；词库页 big-words 的行上写着「文件损坏，并入了 N 个词，可能不全：删掉后重新导入」，N 大于 0、小于 1001，不是「读不了」。
+- **JVM**：`DictionaryUatTest.aFileDamagedHalfwayGivesWhatWasReadBefore`（截到三分之二：列为文件损坏、并入的词数在 1 到 1000 之间，有鲸喵屿、没有橘星屿）；设备上不跑。
 
 ### WD-14y [P1] 升级时词库没能转换（手机空间不够）：原文本留着、行上写明，腾出空间再开词库页就转换
 - **前提**：B0-设置；强行停止应用，在词库目录放一个 0.3.1 的词库 `small.txt`（一行「氪喵星港 ke'miao'xing'gang 0.0」）。redroid 上没法安全地把空间占满：在压缩文件要写的位置放一个非空目录顶替（`adb shell 'mkdir -p <目录>/small.txt.gz.convert.tmp/full && touch <目录>/small.txt.gz.convert.tmp/full/x'`），写入同样失败。真手机上可以改成真的占满空间（拷大文件把剩余空间占到几 MB 以内），腾出空间就是删掉这些大文件。
 - **操作**：回测试页弹出键盘，等词库目录里出现 `.merged.unwritten`（`ls -a`，最多两分钟）；打 k e m i a o x i n g g a n g；打开词库页（最多等一分钟，行上的字在这次打开的重试做完后更新）；看词库目录；删掉那个目录（`adb shell rm -r <目录>/small.txt.gz.convert.tmp`，即腾出空间）；离开词库页再打开，等目录里出现 `small.txt.gz`（最多两分钟）；看词库页；打 k e m i a o x i n g g a n g。
 - **预期**：腾出空间前：候选里没有「氪喵星港」，词库页 small 的行上写着「没转换成（手机空间不够？）：腾出空间后重新打开这一页」，不是「读不了」，目录里 `small.txt` 还在。腾出空间再开词库页后：目录里是 `small.txt.gz`，没有 `small.txt`；small 的行写着词数；候选里有「氪喵星港」。
+- **JVM**：`DictionaryUatTest.aTextNotConvertedForSpaceIsKeptTillThereIsRoom`（写不出时列为没转换成（不是读不了），small.txt 留着、没有氪喵星港；腾出后重开页面转换成 small.txt.gz、有氪喵星港）；设备上不跑。
 
 ### WD-14u [P1] 新装后恢复 0.3.2 的备份：不开词库页，导入的词也回来
 - **前提**：B0-设置，按 WD-11 把 `dict-words.txt` 并入基础词库；**备份与恢复 → 备份全部** 存到"下载"；把这份备份改成 0.3.2 的样子：里面的 `external/data/pinyin/dictionaries/dict-words.txt.gz` 换成解压后的 `dict-words.txt`（0.3.2 的备份就是这样），存成 `youmo_032.zip` 放回"下载"；重置应用（README「重置」）。
 - **操作**：**备份与恢复 → 从备份恢复** 选 `youmo_032.zip` 并确认；等应用重启；不打开设置里的词库页，直接回测试页弹出键盘，打 k e m i a o t a n g p u（没有就过几秒再打，最多一分钟）；然后看词库目录和词库页。
 - **预期**：一分钟内 kemiaotangpu 的候选里有「氪喵糖铺」；词库目录里是 `dict-words.txt.gz` 和 `merged.ymd`，没有 `dict-words.txt`；词库页"基础词库"一节列出 dict-words，已开启，写着词数。
+- **JVM**：`BackupUatTest.a032BackupOnAFreshInstallBringsItsDictionaryWithoutThePage`（0.3.2 样子的备份恢复到新装，不开词库页，启动后转换成 dict-words.txt.gz、有氪喵糖铺）；设备上不跑。
 
 ## 自定义短语
 
@@ -216,17 +261,20 @@ adb push uat/fixtures/userwords.txt uat/fixtures/dict-words.txt uat/fixtures/wor
 - **前提**：B0-设置，添加短语：输入码 `qm`，位置 1，短语两行「张三」「138 0000 0000」（数字和空格切到数字键盘 **123** 打）。
 - **操作**：回测试页点「句子」框，打 q m，点空格。
 - **预期**：框里是两行：「张三」换行「138 0000 0000」。
+- **JVM**：`LexiconUatTest.aPhraseOfTwoLines`（:lib:ime-eval:uatTest，真数据）（qm 空格上屏两行）；设备上不跑。
 
 ### WD-18 [P0] 自定义短语：添加、不被学习挪动、编辑、删除
 <!-- learning: U-66 -->
 - **前提**：B0-设置。
 - **操作**：**词库与短语 → 自定义短语**，点 **+**：输入码 `dz`，候选位置 1，短语「北京市海淀区」，保存；回测试页打 d z 看候选；选第二个候选 W，点 **。**；再点 d z 选 W，点 **。**；再点 d z。回去点这一行的文字（不是笔图标），在打开的编辑对话框里把短语改成「上海市」保存；回测试页打 dz 看候选；再回去点这一行，在对话框里点 **删除**；回测试页打 dz。
 - **预期**：加好后打 dz 候选第一个是「北京市海淀区」；选过两次 W 后第一个仍是「北京市海淀区」，W 排在它后面的第一个（学到的只在短语以外排）；改后候选第一个是「上海市」；删除后打 dz 没有这条短语。
+- **JVM**：`WordsUatTest.aCustomPhraseAddedNotMovedByLearningEditedDeleted`（:lib:ime-eval:uatTest，真数据）；设备上照跑：自定义短语页的添加、编辑对话框和删除是界面，JVM 只断言打字和词库这一半。
 
 ### WD-19 [P1] 九键里自定义短语不生效，双拼里按字母匹配
 - **前提**：B0-设置，在 **词库与短语 → 自定义短语** 里加输入码 `dz`、位置 1、短语「北京市海淀区」；添加九键拼音和双拼。
 - **操作**：回测试页切到九键，点 3 9；再切到双拼，点 d z。
 - **预期**：九键的候选里没有「北京市海淀区」（九键打的是数字）；双拼的候选里有「北京市海淀区」。
+- **JVM**：`LexiconUatTest.phrasesNotOnTheNineKeysButInShuangpin`（:lib:ime-eval:uatTest，真数据）（九键 39 没有短语，双拼 dz 有）；设备上不跑。
 
 ## 学到的东西：看、删、清
 
@@ -235,26 +283,31 @@ adb push uat/fixtures/userwords.txt uat/fixtures/dict-words.txt uat/fixtures/wor
 - **前提**：B0，按 PY-34 让「汪小明」成为你的词，点 s h i，长按第五个候选选 **固定首位**，按 PY-29 屏蔽「是」；然后照 PY-34 的做法，把「鲸喵屿」（j i n g m i a o y u，一个字一个字选）选两次，让它在「汪小明」之后成为你的词。
 - **操作**：打开 **词库与短语 → 用户词库**，看页顶和各页；在"自动学到的词"里点右上角菜单，勾 **最近学到的在前**。
 - **预期**：页顶有 **用我的输入习惯** 和 **自动备份** 两个开关；有手动添加的词、自动学到的词、屏蔽的词、不再联想的搭配、固定的词这几页（导入的词在 **词库与短语 → 导入的词**）；「汪小明」显示次数 2 和今天的日子（只到天，没有几点几分）；固定的字在"固定的词"里，「是」在"屏蔽的词"里；勾上 **最近学到的在前** 后，最近成为你的词的排在上面：「鲸喵屿」在最上，「汪小明」紧跟其下。
+- **JVM**：`SettingsPagesUatTest.theUsersWordsListsCountsAndDays`（页顶两个开关、各页入口；次数 2 和只到天的日子；最近学到的在前；屏蔽的词）；设备上不跑。
 
 ### WD-22 [P1] 固定的词一步取消
 <!-- learning: U-80 U-83 -->
 - **前提**：B0，点 s h i，长按第五个候选 C 选 **固定首位**。
 - **操作**：打开"固定的词"，点 C，在确认框里点 **取消固定**；回测试页点 s h i。
 - **预期**：C 不在列表里了；shi 的第一个是原来的第一个。
+- **JVM**：`LexiconUatTest.aPinUndoneInOneStep`（:lib:ime-eval:uatTest，真数据）（固定的词列出 C，取消后 shi 第一是原来的）；设备上不跑。
 
 ### WD-25 [P1] 清空学到的：不勾全部清空留下你的词，勾上回到刚装好
 <!-- learning: U-86 D17 F3108 -->
 - **前提**：B0，按 PY-54 在「他」后面连着选两次「点了」，按 PY-34 让「汪小明」成为你的词，点 s h i，长按第五个候选 C 选 **固定首位**，按 PY-29 屏蔽「是」；另外按 TBL-36 在五笔的 fghy 下屏蔽「寸」。
 - **操作**：打开 **用户词库**，点 **清空学到的**，读确认框，不勾 **全部清空**，确认；回测试页打「他」，点 d l；点 ⌫ 删掉，点 **。**，点 w x m；点 ⌫，点 s h i。再打开 **用户词库**，点 **清空学到的**，勾 **全部清空**，读确认框，确认；回测试页点 w a n g x i a o m i n g；点 ⌫，点 s h i；切到五笔，点 f g h y。
 - **预期**：不勾时确认框逐项写着清什么、留什么，写明自定义短语不在这里清、清空以后不能"退回恢复前"；清空后「他 dl」第一个是「带来」；wxm 里仍有「汪小明」（还是你的词，次数 0）；shi 的第一个仍是 C；候选里仍没有「是」。勾上后确认框写明"屏蔽的 2 个词会重新出现"（「是」和码表里的「寸」），并改为"回到刚装好，清掉：…"，固定、屏蔽、你的词都列在清掉里，"留下"只有自定义短语；清空后「王小明」第一、候选里没有「汪小明」；shi 里有「是」，C 不再固定；fghy 下「寸」又出现了。
+- **JVM**：`LexiconUatTest.clearingTheLearnedKeepsYourWordsUnlessAll`（:lib:ime-eval:uatTest，真数据）（不勾：他 dl 带来第一、wxm 有汪小明、shi 第一仍 C、没有是；勾上：王小明第一、没有汪小明、是回来、fghy 有寸（确认框文字是界面））；设备上不跑。
 
 ### WD-30 [P1] 搜索、多选删除、点"撤销"就回来
 <!-- learning: U-80 -->
 - **前提**：B0-设置，在用户词库里手动加「澜境花园」（lan jing hua yuan）和「幽默」（拼音留空）。
 - **操作**：打开 **用户词库 → 手动添加的词**，记下词数；搜 `lan`；再搜「幽」；清空搜索框，长按「澜境花园」再点「幽默」选中两个，点删除，读确认框，确认；马上点底部提示里的 **撤销**；回测试页点 l a n j i n g h u a y u a n。
 - **预期**：搜 lan 只剩「澜境花园」；搜「幽」只剩「幽默」；确认框写着要删 2 个；删后列表空了（词数 0），底部提示"已删掉 2 个 · 撤销"；撤销后两个词都回来，词数和删之前一样；lanjinghuayuan 第一个是「澜境花园」。
+- **JVM**：`SettingsPagesUatTest.searchDeleteSeveralAndTakeThemBack`（搜 lan、搜幽、长按多选、确认框写 2 个、删后列表空、提示带撤销、撤销后回来。lanjinghuayuan 打出它是引擎的事）；设备上不跑。
 
 ### WD-33 [P2] 前面的词组文字已在前面时，后面的词组位置不前移
 - **前提**：B0-设置，在 **自定义短语** 里加 `nihao` → 你好（位置 2）和 `nihao` → 您好呀（位置 3）。
 - **操作**：回测试页点 n i h a o。
 - **预期**：「你好」只出现一次；「您好呀」是第三个候选。
+- **JVM**：`LexiconUatTest.aPhraseAlreadyBeforeDoesNotMoveTheNextUp`（:lib:ime-eval:uatTest，真数据）（你好只出现一次，您好呀第三）；设备上不跑。

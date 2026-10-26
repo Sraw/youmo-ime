@@ -1,6 +1,5 @@
 """uat/08-english.md (B0-英文). The .md is the source of truth; each function follows its case's
 前提/操作/预期."""
-import time
 
 from uat import Blocked, case, check, gear, glide_on
 
@@ -14,13 +13,7 @@ def sym_comma(d):
     d.press(",")
 
 
-@case("EN-01", base="B0-英文")
-def en01(d):
-    d.type("hello")
-    c = d.cands()
-    check(c and c[0] == "hello", f"候选 {c[:4]}")
-    check(len(c) > 1, f"右边没有别的词：{c}")
-    return f"候选 {c[:4]}"
+case("EN-01", needs="jvm:OtherInputMethodsUatTest.englishTheWordTypedIsFirst")(lambda d: None)
 
 
 @case("EN-02", base="B0-英文", mutates="learn")
@@ -34,14 +27,7 @@ def en02(d):
     return f"候选 {c[:3]}，框里「{t}」"
 
 
-@case("EN-03", base="B0-英文", mutates="learn")
-def en03(d):
-    d.type("dont")
-    d.cands()
-    d.space()
-    t = d.field_text()
-    check(t == "don't ", f"框里「{t}」")
-    return f"「{t}」"
+case("EN-03", needs="jvm:EnglishUatTest.theApostropheAdded")(lambda d: None)
 
 
 @case("EN-04", base="B0-英文", mutates="learn", clean=True)
@@ -49,17 +35,16 @@ def en04(d):
     d.type("teh")
     d.cands()
     d.space()
-    t0 = d.field_text()
+    # read once the input method is idle, not the moment after the key: under load the field
+    # was still empty there
+    t0 = d.expect_field("the ", msg="第一次空格后「{got}」")
     d.bksp()
-    t1 = d.field_text()
+    t1 = d.expect_field("teh", msg="退格后「{got}」")
     d.space()
     d.type("teh")
     d.cands()
     d.space()
-    t2 = d.field_text()
-    check(t0 == "the ", f"第一次空格后「{t0}」")
-    check(t1 == "teh", f"退格后「{t1}」")
-    check(t2.endswith("teh "), f"最后框里「{t2}」")
+    t2 = d.expect_field(lambda t: t.endswith("teh "), msg="最后框里「{got}」")
     d.clear()
     d.step("英文词库里恢复自动改")
     en_settings(d)
@@ -79,61 +64,19 @@ def en04(d):
     return f"「{t0}」→退格「{t1}」→「{t2}」；恢复后「{t3}」"
 
 
-@case("EN-06", base="B0-英文", mutates="learn")
-def en06(d):
-    d.type("hi")
-    d.cands()
-    d.space()
-    d.press(".")
-    t = d.field_text()
-    check(t == "hi. ", f"框里「{t}」")
-    return f"「{t}」"
+case("EN-06", needs="jvm:EnglishUatTest.aMarkTakesTheSpaceAfterIt")(lambda d: None)
 
 
-@case("EN-07", base="B0-英文", mutates="learn")
-def en07(d):
-    d.type("ok")
-    d.cands()
-    sp = d.keys(refresh=True)["space"]
-    d.taps([sp, sp], gap=0.1, after=0.6)
-    t = d.field_text()
-    check(t == "ok. ", f"框里「{t}」")
-    return f"「{t}」"
+case("EN-07", needs="jvm:EnglishUatTest.twoSpacesAFullStop")(lambda d: None)
 
 
-@case("EN-08", base="B0-英文", mutates="learn")
-def en08(d):
-    d.type("thank")
-    d.cands()
-    d.space()
-    time.sleep(0.5)
-    c = d.candidates()
-    check(c and "you" in [x.lower() for x in c[:5]], f"联想 {c[:6]}")
-    return f"联想 {c[:4]}"
+case("EN-08", needs="jvm:EnglishUatTest.theNextWordPredicted")(lambda d: None)
 
 
-@case("EN-09", base="B0-英文", page="sentence", mutates="learn")
-def en09(d):
-    d.type("hi")
-    d.cands()
-    d.space()
-    d.press(".")
-    d.type("ok")
-    s = d.screen()
-    t, c = d.field_text(s), d.candidates(s)
-    ok = t == "Hi. Ok" or (t == "Hi. " and c and c[0] == "Ok")
-    check(ok, f"框里「{t}」，候选 {c[:3]}")
-    return f"「{t}」 {c[:2]}"
+case("EN-09", needs="jvm:EnglishCapsUatTest.aSentencesFirstLetterIsACapital")(lambda d: None)
 
 
-@case("EN-10", base="B0-英文", page="url")
-def en10(d):
-    d.type("abc")
-    time.sleep(0.4)
-    s = d.screen()
-    t = d.field_text(s)
-    check(t == "abc", f"框里「{t}」")
-    return f"「{t}」"
+case("EN-10", needs="jvm:EnglishCapsUatTest.anAddressFieldGetsNoCapitals")(lambda d: None)
 
 
 @case("EN-11", base="B0-英文", mutates="learn", clean=True)
@@ -164,78 +107,16 @@ def en11(d):
     return f"「{w}」一开始改成「{t0.strip()}」，两次后「{t}」"
 
 
-@case("EN-12", base="B0-设置", mutates=True)
-def en12(d):
-    en_settings(d)
-    d.tap_text("英文词库", after=1.2)
-    s = d.screen()
-    add = s.find(desc="添加") or next((n for n in s.app() if n.text == "+" or n.desc in ("新增", "添加词")), None)
-    if not add:
-        raise Blocked(f"英文词库页没有 +：{s.texts()[:8]} {[n.desc for n in s.app() if n.desc]}")
-    d.tap(add.c, 1.0)
-    s = d.screen()
-    e = next((n for n in s.nodes if n.cls == "EditText"), None)
-    if not e:
-        raise Blocked("添加没有输入框")
-    d.tap(e.c, 0.8)
-    d.switch_im("拼音")
-    d.type("qwzx")
-    d.enter()
-    d.hide_keyboard()
-    s = d.screen()
-    ok = next((n for n in s.nodes if n.text in ("确定", "保存", "添加")), None)
-    d.tap(ok.c, 1.0)
-    d.open_page("text")
-    d.switch_im("英文")
-    d.type("qwz")
-    c = d.cands()
-    d.type("x")
-    d.cands()
-    d.space()
-    t = d.field_text()
-    check(any(x == "qwzx" for x in c), f"qwz 的候选 {c[:5]}")
-    check(t == "qwzx ", f"框里「{t}」")
-    return f"qwz {c[:3]}；「{t}」"
+case("EN-12", needs="jvm:EnglishUatTest.aWordAddedIsNotCorrected")(lambda d: None)
 
 
-@case("EN-13", base="B0-英文", page="email")
-def en13(d):
-    d.type("teh")
-    time.sleep(0.4)
-    s = d.screen()
-    t, c = d.field_text(s), d.candidates(s)
-    check(t == "teh" and not c, f"框里「{t}」，候选 {c[:3]}")
-    return f"「{t}」，没有候选"
+case("EN-13", needs="jvm:EnglishUatTest.anEmailFieldNeitherSuggestsNorCorrects")(lambda d: None)
 
 
-@case("EN-14", base="B0-英文", page="nosuggest", mutates="learn")
-def en14(d):
-    d.type("teh")
-    c = d.candidates()
-    d.space()
-    t = d.field_text()
-    check(t == "teh " and not c, f"框里「{t}」，候选 {c[:3]}")
-    return f"「{t}」"
+case("EN-14", needs="jvm:EnglishUatTest.aFieldAskingNoSuggestionsGetsNone")(lambda d: None)
 
 
-@case("EN-15", base="B0-设置", mutates=True)
-def en15(d):
-    en_settings(d)
-    d.switch("单词提示", False)
-    d.open_page("text")
-    d.switch_im("英文")
-    d.type("teh")
-    time.sleep(0.4)
-    c = d.candidates()
-    d.space()
-    t = d.field_text()
-    check(not c, f"有候选 {c[:3]}")
-    check(t == "teh ", f"框里「{t}」")
-    return f"「{t}」，没有候选"
-
-
-def weird(t):
-    return any(ch in t for ch in "�?□") if t else True
+case("EN-15", needs="jvm:EnglishUatTest.suggestionsTurnedOff")(lambda d: None)
 
 
 @case("EN-19", base="B0-设置", mutates=True)

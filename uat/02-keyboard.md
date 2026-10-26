@@ -11,41 +11,49 @@
 - **前提**：B0，点地球键切到英文。
 - **操作**：点 o、k，再点空格。
 - **预期**：框里是「ok 」（单词后自动加了空格）。
+- **JVM**：`KeysUatTest.englishLettersTypeThemselvesASpaceAfter`（:lib:ime-eval:uatTest，真数据）（英文 ok 空格后框里「ok 」）；设备上不跑。
 
 ### KB-03 [P0] 向下滑字母键打出键角的数字
 - **前提**：B0。
 - **操作**：手指按在 w 键上向下滑再松开。
 - **预期**：框里是「2」，没有拼音候选。
+- **JVM**：`KeyboardUatTest.swipingALetterDownTypesItsCorner`（下划 w 只向引擎发一次角标 2）；设备上不跑。
 
 ### KB-04 [P1] 长按字母键后直接松手打出键角的字符
 - **前提**：B0。
 - **操作**：长按 e 键，弹出字符后不移动手指直接松开。
 - **预期**：框里是「3」。
+- **JVM**：`KeyboardUatTest.aLongPressLetGoTypesTheCorner`（长按 e 原地松开只发角标 3）；设备上不跑。
 
 ### KB-05 [P1] 长按弹出更多字符，滑到哪个打哪个
 - **前提**：B0。
 - **操作**：长按 q 键，弹出一排字符后手指滑到 `Q` 上再松开。
 - **预期**：弹出的字符里有 `1` 和 `Q`；框里是「Q」。
+- **JVM**：`KeyboardUatTest.aLongPressesChoicesTypeWhereTheFingerIs`（长按 q 弹出 1 和 Q，滑到 Q 松开只发 Q）；设备上不跑。
 
 ### KB-06 [P1] 打中文时键角显示中文标点
 - **前提**：B0。
 - **操作**：看 m 键和 v 键的键角。
 - **预期**：m 的键角是「、」，v 的键角是「？」（全角）。切到英文后再看，分别是 `\` 和 `?`。
+- **JVM**：`KeyboardUatTest.cornersShowChinesePunctuationWhileChinese`（标点开着时 m、v 角标是、和？，英文时是 \ 和 ?）；设备上不跑。
 
 ### KB-07 [P0] Shift 让下一个字母大写
 - **前提**：B0，点地球键切到英文。
 - **操作**：点 ⇧，点 h，点 i。
 - **预期**：候选栏最左边是「Hi」；点空格后框里是「Hi 」。
+- **JVM**：`KeysUatTest.shiftCapitalisesTheNextLetter`（:lib:ime-eval:uatTest，真数据）（Hi 第一、空格后「Hi 」（⇧ 送出大写由 KeyboardUatTest KB-08 看））；设备上不跑。
 
 ### KB-08 [P1] 双击 Shift 大写锁定
 - **前提**：B0，点地球键切到英文。
 - **操作**：快速点两下 ⇧，点 o、k；再点一下 ⇧，点 a。
 - **预期**：锁定后 ⇧ 键样子变了（表示锁定），o、k 都是大写，候选最左是「OK」；再点 ⇧ 解除锁定后打的 a 是小写。
+- **JVM**：`KeyboardUatTest.shiftTwiceLocksCaps`（双击 Shift 状态为大写锁定，O K 都是大写，再按一下回到小写）；设备上不跑。
 
 ### KB-09 [P0] 退格删除一个字
 - **前提**：B0，「普通文本」框里已有「你好」，光标在末尾。
 - **操作**：点 ⌫ 一次。
 - **预期**：框里是「你」。
+- **JVM**：`KeyboardUatTest.backspaceOnce`（点一下退格只发一次 BackSpace）；设备上不跑。
 
 ### KB-10 [P1] 退格把一个表情整个删掉
 - **前提**：B0，从表情面板打一个「👍🏽」（带肤色的），光标在它后面。
@@ -56,16 +64,19 @@
 - **前提**：B0，在「长文本」框里把光标放在末尾。
 - **操作**：按住 ⌫ 约 2 秒再松开；再按住 ⌫，按住时手指左右挪一点（不到半个键宽），约 2 秒后松开。
 - **预期**：按住期间一个接一个地删，越删越快；松开就停。手指挪一点也照样连续删（只有真正横滑才变成选择，见 KB-12）。
+- **JVM**：`KeyboardUatTest.holdingBackspaceRepeatsFasterTillLetGo`（按住退格连删且第二秒比第一秒多，松手即停；手指小幅移动照样连删）；设备上不跑。
 
 ### KB-12 [P1] 在退格键上向左滑选中并删除光标前的文字
 - **前提**：B0，「普通文本」框里已有「今天天气很好」，光标在末尾。
 - **操作**：手指按在 ⌫ 上向左慢慢滑一段，先不松手看一眼，再松手。
 - **预期**：滑动时光标前的文字随滑动距离被选中（高亮）；松手后选中的部分被删掉。
+- **JVM**：`KeyboardUatTest.swipingBackspaceLeftSelectsAndDeletes`（退格左滑选中光标前的字，松手删掉）；设备上不跑。
 
 ### KB-13 [P1] 打拼音时向左滑退格清空正在打的拼音
 - **前提**：B0。
 - **操作**：点 z h o n g g u o，然后在 ⌫ 上向左滑并松手。
 - **预期**：正在打的 `zhongguo` 整个消失，框里为空，候选栏回到工具栏。
+- **JVM**：`KeyboardUatTest.swipingBackspaceWhileTypingClearsThePinyin`（有拼音时退格左滑让引擎 reset 清掉拼音）；设备上不跑。
 
 ### KB-14 [P0] 打中文时逗号句号是中文标点
 - **前提**：B0。
@@ -81,46 +92,55 @@
 - **前提**：B0。
 - **操作**：长按底排的 **，**，看弹出；不挪松手；清空，再长按 **，** 往右挪约 25dp 松手；清空，再长按 **，** 往上挪约 25dp 松手；清空，长按 l 键往上挪很远（超过弹出框）再松手。
 - **预期**：弹出两排标点，依次是 . ? ! : ; " ' ( ) ~ 的中文形式，浮在键的上方；第一次是一开始选中的那个（「。」），往右挪一点是它右边那个，往上挪一点是它上面那个；挪过头停在最上一行，照样打出一个（不会什么都不打）。
+- **JVM**：`KeyboardUatTest.holdingTheCommaOffersTwoRows`（长按逗号弹出两行标点，原地松开打出第一个，往右、往上、上移很远松开都打出一个）；设备上不跑。
 
 ### KB-17 [P0] 在空格键上左右滑移动光标
 - **前提**：B0，点「长文本」框，光标在末尾。
 - **操作**：手指按住空格键向左滑一段再松开；再向右滑一点。
 - **预期**：向左滑时光标随手指往前移，滑得越远移得越多；向右滑往后移；不打出空格。
+- **JVM**：`KeyboardUatTest.spaceSlidesMoveTheCursor`（空格左滑发几次 Left，右滑短一点发更少的 Right）；设备上不跑。
 
 ### KB-18 [P0] 有候选时空格上屏第一个候选
 - **前提**：B0。
 - **操作**：点 s h i j i a n，点空格。
 - **预期**：框里是候选栏原来的第一个候选（例如「时间」），候选栏回到工具栏或显示联想。
+- **JVM**：`KeysUatTest.spaceCommitsTheFirstCandidate`（:lib:ime-eval:uatTest，真数据）（shijian 空格上屏第一候选、没有剩下的拼音）；设备上不跑。
 
 ### KB-19 [P0] 打拼音时回车把字母原样上屏
 - **前提**：B0。
 - **操作**：点 a b c，点回车键。
 - **预期**：框里是「abc」，没有换行。
+- **JVM**：`KeysUatTest.returnCommitsTheLettersAsTyped`（:lib:ime-eval:uatTest，真数据）（abc 回车上屏「abc」）；设备上不跑。
 
 ### KB-20 [P1] 搜索框的回车键是"搜索"
 - **前提**：B0，点「搜索」框。
 - **操作**：看回车键的图标；点 a，点回车键（打拼音时先把字母上屏），再点一次回车键。
 - **预期**：回车键是放大镜图标；第二次点回车后页面执行了搜索：「搜索」框下面出现"搜索：a"，框失去焦点，键盘收起；框里是「a」，没有换行。
+- **JVM**：`KeyboardUatTest.searchFieldsReturnSearches`（搜索框回车键是搜索，按下执行搜索不换行）；设备上不跑。
 
 ### KB-21 [P1] "下一项"框的回车跳到下一个输入框
 - **前提**：B0；打开一个回车是"下一项"（`IME_ACTION_NEXT`）、下面还有一个框的原生输入框，点它。redroid 上用调试包的测试宿主 `TypingHostActivity` 带 `--ez next true`（「第一项」「第二项」两个框，见 README"测试宿主"；测试页的 WebView 浏览器不理输入法的"下一项"）；真机上也可以在 Chrome 里点测试页的「下一项」框（下面是「不要提示」框）。
 - **操作**：点回车键。
 - **预期**：回车键图标是"下一项"箭头；点了以后焦点跳到下面的框（「第二项」，Chrome 里是「不要提示」）。
+- **JVM**：`KeyboardUatTest.nextFieldsReturnGoesOn`（下一项框回车键是下一项，按下执行 NEXT）；设备上不跑。
 
 ### KB-22 [P0] 网址框里逗号句号换成 / . .com
 - **前提**：B0，点「网址」框。
 - **操作**：看底排空格两边的键；点 **.com**。
 - **预期**：底排有 **/**、**.** 和 **.com**（没有中文逗号句号）；框里是「.com」。
+- **JVM**：`KeyboardUatTest.addressFieldHasSlashDotAndDotCom`；设备上不跑。
 
 ### KB-23 [P1] 长按 .com 有 .cn .net .org
 - **前提**：B0，点「网址」框。
 - **操作**：长按 **.com**，滑到 `.cn` 松手。
 - **预期**：弹出 `.cn`、`.net`、`.org`；框里是「.cn」。
+- **JVM**：`KeyboardUatTest.holdingDotComOffersMore`（长按 .com 弹出 .cn .net .org，选 .cn 上屏）；设备上不跑。
 
 ### KB-24 [P0] 邮箱框打拼音字母再按 @，字母原样上屏
 - **前提**：B0，点「邮箱」框。
 - **操作**：点 x i a o m i n g，再点 **@** 键，再点 q q，点 **.com**。
 - **预期**：框里是「xiaoming@qq.com」，没有出现汉字。
+- **JVM**：`KeysUatTest.anEmailFieldsLettersBeforeAtAreCommittedAsTyped`（:lib:ime-eval:uatTest，真数据）（邮箱框 @ 和 .com 按 PendingInputPolicy 先把字母原样上屏：「xiaoming@qq.com」）；设备上不跑。
 
 ### KB-25 [P1] 网址框里数字和符号原样打出
 - **前提**：B0，点「网址」框。
@@ -131,21 +151,25 @@
 - **前提**：B0。
 - **操作**：长按 k 键选 `(`（打中文时是「（」）。
 - **预期**：框里是「（）」，光标在两个括号中间。
+- **JVM**：`PairsUatTest.aBracketComesInPairsTheCursorBetween`（「（|）」（长按弹出的选择是 KeyboardUatTest KB-05 的））；设备上不跑。
 
 ### KB-27 [P1] 打右括号跳过已有的那个
 - **前提**：B0，按 KB-26 打出「（）」，光标在中间，再打 n i 空格出「你」。
 - **操作**：长按 l 键选右括号「）」。
 - **预期**：框里是「（你）」，只有一个右括号，光标在最后。
+- **JVM**：`PairsUatTest.theClosingBracketStepsOverTheOneThere`（「（你）|」）；设备上不跑。
 
 ### KB-28 [P1] 紧接着退格把一对一起删掉
 - **前提**：B0，按 KB-26 打出「（）」，光标在中间。
 - **操作**：点 ⌫。
 - **预期**：框里为空。
+- **JVM**：`PairsUatTest.backspaceRightAfterDeletesThePair`（退格后框里为空）；设备上不跑。
 
 ### KB-30 [P1] 按键时弹出放大的字符
 - **前提**：B0。
 - **操作**：按住 a 键不松手，看手指上方。
 - **预期**：手指上方弹出一个放大的"a"；松手后消失。
+- **JVM**：`KeyboardUatTest.aKeyHeldShowsItLarger`（按住 a 弹出放大的 a，松手收起）；设备上不跑。
 
 ### KB-31 [P1] 拼音那一行是键盘自己的，打字时不挡应用、键盘不变高
 - **前提**：B0，测试页地址改成 `fields.html#chat`（只显示「聊天」框，它和"发送"按钮贴在页面底部，像聊天应用的输入栏），点「聊天」框：键盘弹出后它紧贴键盘上沿。
@@ -160,6 +184,7 @@
 - **前提**：B0，点地球键切到英文。
 - **操作**：手指按在 h 上，不抬手依次划过 e、l、o，在 o 上抬起。
 - **预期**：没有画出手指走过的线，也没有上屏一个词；看设置 **通用输入**，**滑行输入** 是关着的。
+- **JVM**：`KeyboardUatTest.glideIsOffByDefault`（滑行默认关，从 h 滑到 o 不会滑行出词）；设备上不跑。
 
 ### KB-33 [P0] 英文划词：连同空格上屏，先上屏打着的词，换候选、退格整个删，后接标点
 - **前提**：B0-英文，**通用输入** 里打开 **滑行输入**。
@@ -170,6 +195,7 @@
 - **前提**：滑行开，切到英文。
 - **操作**：快速依次点 o、k；在 q 上往下短划；长按 e。
 - **预期**：框里先是「ok」（逐个字母，没有画线）；短划打出 q 的角标符号；长按 e 照常弹出更多字母。
+- **JVM**：`KeyboardUatTest.tapsShortSwipesAndHoldsAreNoGlide`（开了滑行，点按、角标下划、长按都照常，不当成滑行）；设备上不跑。
 
 ### KB-36 [P1] 密码、网址、邮箱框里不滑行
 - **前提**：滑行开，切到英文，点「密码」框。
@@ -180,14 +206,17 @@
 - **前提**：B0（文字版，空格长按默认"无"），切到英文，点「普通文本」框。
 - **操作**：点 a b；按住空格约 1 秒不动，再松开。
 - **预期**：框里是「ab 」；没有弹出任何东西（语音版在密码框里也是这样）。
+- **JVM**：`KeyboardUatTest.holdingTheSpaceSetToNothingIsOneSpace`（空格长按设为无时按住不弹东西，松手只打一个空格）；设备上不跑。
 
 ### KB-39 [P1] 键上的字母跟着 Shift 变大小写，三排都是
 - **前提**：B0（全拼；L 右边的 ; 键这时藏着，但一样会碰到这个问题）。
 - **操作**：看键盘上的字母；点一下 ⇧ 再看；再点一下 ⇧。
 - **预期**：没开 Shift 时三排字母都是小写（包括最下面一排 z x c v b n m），开了 Shift 三排都是大写，再点回到小写。
   （0.3.0 发版前发现：加了 ; 键以后最下面一排一直显示大写。）
+- **JVM**：`KeyboardUatTest.shiftChangesAllThreeRows`（三排字母关/开/关；图）；设备上不跑。
 
 ### KB-41 [P2] 等长按时已滑出键的下边，弹出后第一下往旁边挪不关掉
 - **前提**：B0。
 - **操作**：长按 q，等弹出时手指往下挪到键的下边外约 3dp；弹出后往右挪约 25dp（不往下）松手。
 - **预期**：框里打出弹出框里的一个字符（不是空）：弹出后第一次挪动没有把弹出框关掉。25dp 不到一个弹出键宽，焦点通常还在手指下那个字符上（如「1」）。
+- **JVM**：`KeyboardUatTest.aFirstMoveSidewaysAfterSlippingOffKeepsThePopup`（手指滑出 q 下沿后第一次横移，长按照样出结果）；设备上不跑。
