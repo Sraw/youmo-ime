@@ -5,7 +5,7 @@
 package org.fcitx.fcitx5.android.input.motion
 
 /**
- * The keyboard's one motion scale (dev/design/motion-notices-handle.md): every animation takes its
+ * The keyboard's one motion scale (specs/app.md, "Motion"): every animation takes its
  * length and curve from here, none writes its own. Nothing typed is animated, a key's preview, the
  * candidates as they change, a layout switched: each key would wait on it. At most 150 ms (user decision
  * 2026-10-23, F3460), the keyboard following the finger mattering more than how it looks.

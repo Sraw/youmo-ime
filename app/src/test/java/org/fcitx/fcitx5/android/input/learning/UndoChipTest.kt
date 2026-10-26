@@ -133,6 +133,19 @@ class UndoChipTest {
     }
 
     @Test
+    fun withAnimationsOffItIsInPlaceAndOpaqueAtOnce() {
+        // ST-26: 禁用动画 reaches the notice too; a screen recording cannot tell it on a device, the
+        // notice's first frame being most of the way in already
+        fun View.moved(): Boolean = alpha < 1f || translationX != 0f || translationY != 0f ||
+            (this is ViewGroup && (0 until childCount).any { getChildAt(it).moved() })
+        chip(off).show("已复制")
+        assertFalse("in place and opaque before a frame has run", windows().single().moved())
+        val animated = chip(Motion.Settings.DEFAULT)
+        animated.show("已复制")
+        assertTrue("on its way in, animated", windows().any { it.moved() })
+    }
+
+    @Test
     fun animatedItLeavesAfterItsExit() {
         val chip = chip(Motion.Settings.DEFAULT)
         chip.show("已复制")
@@ -246,6 +259,66 @@ class UndoChipTest {
         assertEquals("nor its act lapsed", emptyList<String>(), s.calls)
         idle(settled)
         assertEquals(listOf("二二二二二二", undoLabel), windows().single().texts())
+    }
+
+    // F4048: mid crossfade only the old 撤销's area is swallowed (its delegate rebuilt by the
+    // layout pass replace asks for); the new row's 撤销 takes back its own act
+    @Test
+    fun duringTheFadeTheOldUndosAreaIsSwallowedAndTheNewUndoTakesBack() {
+        val chip = chip(Motion.Settings.DEFAULT)
+        val r = Record()
+        chip.show("一", r.undo("一"))
+        idle(settled)
+        val old = shownRow("一")
+        val s = Record()
+        chip.show("二二二二二二", s.undo("二"))
+        // the layout pass replace's requestLayout asks for, run now: the delegate moves to nothing
+        old.measure(View.MeasureSpec.makeMeasureSpec(old.width, View.MeasureSpec.EXACTLY), View.MeasureSpec.makeMeasureSpec(old.height, View.MeasureSpec.EXACTLY))
+        old.layout(old.left, old.top, old.right, old.bottom)
+        // the old row's line beside its 撤销: in the delegate's area, outside 撤销 itself
+        val line = old.getChildAt(1)
+        tap(line, 0.5f, line.height / 2f)
+        assertEquals(listOf("lapsed 一"), r.calls)
+        assertTrue("swallowed: the new notice is not tapped away", chip.showing)
+        assertEquals(emptyList<String>(), s.calls)
+        val button = shownRow("二二二二二二").find(undoLabel)!!
+        tap(button, button.width / 2f, button.height / 2f)
+        assertEquals(listOf("undo 二"), s.calls)
+        assertFalse(chip.showing)
+    }
+
+    // F4048: the rest of the old row, under the new one, lets a tap by: it reaches the new notice
+    @Test
+    fun duringTheFadeATapOnTheOldWordsReachesTheNewNotice() {
+        val chip = chip(Motion.Settings.DEFAULT)
+        chip.show("一", Record().undo("一"))
+        idle(settled)
+        val words = windows().single().find("一")!!
+        val s = Record()
+        chip.show("二二二二二二", s.undo("二"))
+        tap(words, words.width / 2f, words.height / 2f)
+        assertEquals("the new notice tapped away, its act standing", listOf("lapsed 二"), s.calls)
+        assertFalse(chip.showing)
+    }
+
+    // F4143: a notice said before the keyboard's first layout wraps at the screen's width, not at
+    // nothing: as wide as the same notice once the keyboard is laid out
+    @Test
+    fun aNoticeBeforeTheFirstLayoutIsAsWideAsAfterIt() {
+        val message = "已复制到剪贴板，可以粘贴"
+        val unlaid = FrameLayout(PlaceholderStrings(activity))
+        activity.windowManager.addView(unlaid, WindowManager.LayoutParams(0, 0, WindowManager.LayoutParams.TYPE_APPLICATION, 0, 0))
+        idle()
+        assertEquals("the anchor's window has no width yet", 0, unlaid.rootView.width)
+        val early = UndoChip(unlaid, ThemePreset.PixelDark, { _, _, _ -> UndoChipPlacement.Place(0, 0, UndoChipPlacement.Slide.Up) }, { off })
+        assertTrue(early.show(message))
+        val before = shownRow(message).layoutParams.width
+        early.dismiss()
+        activity.windowManager.removeView(unlaid)
+        chip().show(message)
+        val after = shownRow(message).layoutParams.width
+        assertTrue("$before", before in 1..activity.resources.displayMetrics.widthPixels)
+        assertEquals(after, before)
     }
 
     @Test

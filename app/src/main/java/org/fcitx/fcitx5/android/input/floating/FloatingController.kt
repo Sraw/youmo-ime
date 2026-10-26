@@ -176,18 +176,18 @@ class FloatingController(
 
     // in place of the docked keyboard: its grip under the finger if grabbed, else at its spot, and
     // shrunk from the docked keyboard into its own size
-    private fun placeGrabbed(placer: FloatingPlacer, g: FloatingSwitch.Grab) {
-        val v = keyboard
+    private fun placeGrabbed(placer: FloatingPlacer, grab: FloatingSwitch.Grab) {
+        val board = keyboard
         val handle = handle ?: return
-        if (g.underFinger) placer.grabbed(g.x, g.y, handle.left + handle.width / 2f, handle.top + handle.height / 2f, keep = g.ended)
+        if (grab.underFinger) placer.grabbed(grab.x, grab.y, handle.left + handle.width / 2f, handle.top + handle.height / 2f, keep = grab.ended)
         else placer.place()
         val ms = Motion.Long.enter(motionSettings())
-        if (ms == 0L || v.width == 0 || v.height == 0) return
-        v.scaleX = FloatingKeyboard.startScale(g.from.width, v.width.toFloat())
-        v.scaleY = FloatingKeyboard.startScale(g.from.height, v.height.toFloat())
-        v.pivotX = FloatingKeyboard.pivot(g.from.left, g.from.width, v.left + v.translationX, v.width.toFloat())
-        v.pivotY = FloatingKeyboard.pivot(g.from.top, g.from.height, v.top + v.translationY, v.height.toFloat())
-        v.animate().scaleX(1f).scaleY(1f).setDuration(ms).setInterpolator(Motion.Curve.Move.interpolator).setListener(null).start()
+        if (ms == 0L || board.width == 0 || board.height == 0) return
+        board.scaleX = FloatingKeyboard.startScale(grab.from.width, board.width.toFloat())
+        board.scaleY = FloatingKeyboard.startScale(grab.from.height, board.height.toFloat())
+        board.pivotX = FloatingKeyboard.pivot(grab.from.left, grab.from.width, board.left + board.translationX, board.width.toFloat())
+        board.pivotY = FloatingKeyboard.pivot(grab.from.top, grab.from.height, board.top + board.translationY, board.height.toFloat())
+        board.animate().scaleX(1f).scaleY(1f).setDuration(ms).setInterpolator(Motion.Curve.Move.interpolator).setListener(null).start()
     }
 
     // floating to docked (放回底部, or let go in the zone): slid down to the bottom, centred, where the

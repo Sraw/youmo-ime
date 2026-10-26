@@ -26,7 +26,7 @@ class MotionTest {
     fun eitherTheSystemOrTheKeyboardTurningAnimationOffMakesEveryOneInstant() {
         for (off in listOf(Motion.Settings(systemScale = 0f, disabled = false), Motion.Settings(systemScale = 1f, disabled = true))) {
             assertEquals(false, off.animates)
-            assertEquals(listOf(0L, 0L, 0L), Motion.entries.map { it.enter(off) + it.exit(off) })
+            assertEquals(Motion.entries.map { 0L }, Motion.entries.map { it.enter(off) + it.exit(off) })
         }
     }
 }

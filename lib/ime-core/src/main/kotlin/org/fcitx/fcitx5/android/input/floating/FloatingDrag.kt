@@ -14,7 +14,8 @@ package org.fcitx.fcitx5.android.input.floating
  * Grabbed from the docked keyboard (始终显示悬浮条) the finger can start below its lowest place (the
  * docked grip is lower than the floating one goes): that [start]s as slack, taken up first as the
  * finger comes up, as a push is, so the grip comes under the finger and stays there; the slack is no
- * push into the zone, only a push on down past where the finger began is.
+ * push into the zone, only a push on down past the highest the finger came back up to within it
+ * (where it began, if it never came up) is.
  */
 class FloatingDrag(private val slop: Float) {
 

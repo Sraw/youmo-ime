@@ -8,7 +8,7 @@ import kotlin.math.abs
 
 /**
  * Where the keyboard's notice (the undo chip) goes, in the window's pixels, and which way it slides
- * out of the keyboard as it comes (dev/design/motion-notices-handle.md: always out of the keyboard,
+ * out of the keyboard as it comes (specs/app.md, "Notices": always out of the keyboard,
  * toward the screen's middle, where the eyes are).
  */
 object UndoChipPlacement {
@@ -26,7 +26,7 @@ object UndoChipPlacement {
     data class Place(val left: Int, val top: Int, val slide: Slide)
 
     /**
-     * Where the chip's top goes docked (user decision 2026-10-22, PY-80: over the bar it hid the
+     * Where the chip's top goes docked (user decision 2026-10-22, 原 PY-80: over the bar it hid the
      * second candidate). With no candidates shown it sits over the bar, near its top ([barTop] + [gap]).
      * With candidates it goes above the keyboard ([aboveTop] - [gap] - [chipHeight]): over the app,
      * under no key and no candidate the user is about to tap. Not the toolbar row: while composing

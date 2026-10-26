@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.input.floating
 
+import org.fcitx.fcitx5.android.assertRows
 import org.fcitx.fcitx5.android.input.floating.BoardMove.Kind
 import org.fcitx.fcitx5.android.input.keyboard.SplitKeyboard.Dock
 import org.junit.Assert.assertEquals
@@ -12,18 +13,30 @@ import org.junit.Test
 class BoardMoveTest {
 
     @Test
-    fun itsSettingSlidesItToASideOrAcrossAndWidensItBack() {
-        assertEquals(Kind.Slide, BoardMove.kind(bySetting = true, placed = true, was = null, now = Dock.RIGHT))
-        assertEquals(Kind.Slide, BoardMove.kind(bySetting = true, placed = true, was = Dock.RIGHT, now = Dock.LEFT))
-        assertEquals(Kind.Widen, BoardMove.kind(bySetting = true, placed = true, was = Dock.LEFT, now = null))
-    }
+    fun itsSettingSlidesItToASideOrAcrossAndWidensItBack() = assertRows(
+        "docked from full width: slides to the side" to {
+            assertEquals(Kind.Slide, BoardMove.kind(bySetting = true, placed = true, was = null, now = Dock.RIGHT))
+        },
+        "from one side to the other: slides across" to {
+            assertEquals(Kind.Slide, BoardMove.kind(bySetting = true, placed = true, was = Dock.RIGHT, now = Dock.LEFT))
+        },
+        "undocked: widens back to full width" to {
+            assertEquals(Kind.Widen, BoardMove.kind(bySetting = true, placed = true, was = Dock.LEFT, now = null))
+        },
+    )
 
     @Test
-    fun aWindowOrLayoutTheFirstPlaceOrNoChangeIsNotAnimated() {
-        assertEquals(Kind.None, BoardMove.kind(bySetting = false, placed = true, was = null, now = Dock.RIGHT))
-        assertEquals(Kind.None, BoardMove.kind(bySetting = true, placed = false, was = null, now = Dock.RIGHT))
-        assertEquals(Kind.None, BoardMove.kind(bySetting = true, placed = true, was = Dock.RIGHT, now = Dock.RIGHT))
-    }
+    fun aWindowOrLayoutTheFirstPlaceOrNoChangeIsNotAnimated() = assertRows(
+        "not the setting (a window or layout change): jumps" to {
+            assertEquals(Kind.None, BoardMove.kind(bySetting = false, placed = true, was = null, now = Dock.RIGHT))
+        },
+        "not placed yet: nothing to move from" to {
+            assertEquals(Kind.None, BoardMove.kind(bySetting = true, placed = false, was = null, now = Dock.RIGHT))
+        },
+        "the same side: nothing to move" to {
+            assertEquals(Kind.None, BoardMove.kind(bySetting = true, placed = true, was = Dock.RIGHT, now = Dock.RIGHT))
+        },
+    )
 
     @Test
     fun midWidenItIsMovedOnFromWhereItIsDrawn() {

@@ -44,7 +44,7 @@ import splitties.views.gravityCenterVertical
 import splitties.views.setPaddingDp
 
 /**
- * The keyboard's one notice (dev/design/motion-notices-handle.md §3): what was done, said for a
+ * The keyboard's one notice (specs/app.md, "Notices"): what was done, said for a
  * moment, with 撤销 when it can be taken back. A window of its own, not focusable, where [place]
  * says, so the editor keeps the focus and what is composing in it. It slides out of the keyboard
  * as it comes and back into it as it goes; a tap puts it away. One at a time: a new one takes the
@@ -79,10 +79,10 @@ class UndoChip(
     private var slide = Slide.Up
 
     // where the window is and how big, as last set
-    private var x = 0
-    private var y = 0
-    private var w = 0
-    private var h = 0
+    private var windowLeft = 0
+    private var windowTop = 0
+    private var windowWidth = 0
+    private var windowHeight = 0
 
     private var animator: ValueAnimator? = null
 
@@ -139,7 +139,7 @@ class UndoChip(
         state.dismiss()?.lapsed?.invoke()
         val shown = window ?: return
         val box = box ?: return gone()
-        val ms = if (animated && shown.isShowing) Motion.Short.exit(motion()) else 0L
+        val ms = if (animated && shown.isShowing) Motion.Medium.exit(motion()) else 0L
         val fromAlpha = box.alpha
         val fromX = box.translationX
         val fromY = box.translationY
@@ -174,15 +174,15 @@ class UndoChip(
         this.box = box
         this.row = row
         slide = to.slide
-        x = to.left
-        y = to.top
-        w = row.layoutParams.width
-        h = row.layoutParams.height
-        window = PopupWindow(box, w, h, false).apply {
+        windowLeft = to.left
+        windowTop = to.top
+        windowWidth = row.layoutParams.width
+        windowHeight = row.layoutParams.height
+        window = PopupWindow(box, windowWidth, windowHeight, false).apply {
             isTouchable = true
             // the window's own animation off: the box's below is the one
             animationStyle = 0
-            showAtLocation(anchor, Gravity.TOP or Gravity.LEFT, x, y)
+            showAtLocation(anchor, Gravity.TOP or Gravity.LEFT, windowLeft, windowTop)
         }
         // out of the keyboard: from the offset toward it, faded in. The window is the chip's size,
         // so what has not slid out yet is cut off at its edge, as if from behind it
@@ -200,12 +200,13 @@ class UndoChip(
         val box = box ?: return
         stop()
         val old = this.row
-        // what fades is said no more: its 撤销, lapsed already, takes nothing back (its handler sees
-        // the Undo is not pending) but still takes the tap, and the row takes any other: a finger
-        // reaching for the old 撤销 must not fall through to the box, which taps the new one away
-        old?.tag = null
-        (old as? ViewGroup)?.touchDelegate = null
-        old?.isClickable = true
+        // what fades is said no more, but its 撤销's area still takes the tap, now to nothing: a
+        // finger reaching for the old 撤销 must not fall through to the box, which taps the new one
+        // away. Only that area: the rest of the old row, under the new, lets the new one's taps by
+        if (old?.tag != null) {
+            old.tag = View(anchor.context).apply { isClickable = true }
+            old.requestLayout()
+        }
         // a third before the second was in: only the one most shown fades
         for (i in box.childCount - 1 downTo 0) {
             if (box.getChildAt(i) !== old) box.removeViewAt(i)
@@ -214,7 +215,7 @@ class UndoChip(
         box.addView(row)
         this.row = row
         slide = to.slide
-        val from = UndoChipPlacement.Box(x, y, x + w, y + h)
+        val from = UndoChipPlacement.Box(windowLeft, windowTop, windowLeft + windowWidth, windowTop + windowHeight)
         val target = UndoChipPlacement.Box(to.left, to.top, to.left + row.layoutParams.width, to.top + row.layoutParams.height)
         val oldAlpha = old?.alpha ?: 0f
         // a chip on its way out comes back
@@ -222,11 +223,11 @@ class UndoChip(
         val boxX = box.translationX
         val boxY = box.translationY
         animate(Motion.Short.enter(motion()), Motion.Curve.Move, end = { old?.let(box::removeView) }) { t ->
-            x = lerp(from.left, target.left, t)
-            y = lerp(from.top, target.top, t)
-            w = lerp(from.width, target.width, t)
-            h = lerp(from.height, target.height, t)
-            shown.update(x, y, w, h)
+            windowLeft = lerp(from.left, target.left, t)
+            windowTop = lerp(from.top, target.top, t)
+            windowWidth = lerp(from.width, target.width, t)
+            windowHeight = lerp(from.height, target.height, t)
+            shown.update(windowLeft, windowTop, windowWidth, windowHeight)
             old?.alpha = oldAlpha * (1 - t)
             row.alpha = t
             box.alpha = boxAlpha + (1 - boxAlpha) * t
@@ -294,7 +295,9 @@ class UndoChip(
             add(text, lParams(wrapContent, wrapContent))
         }
         // as wide as the screen less a margin each side: a long one wraps rather than going off it
-        var room = anchor.rootView.width - 2 * ctx.dp(MARGIN_DP)
+        // (the screen's own width before the keyboard's first layout: a notice said as it first shows)
+        val across = anchor.rootView.width.takeIf { it > 0 } ?: ctx.resources.displayMetrics.widthPixels
+        var room = across - 2 * ctx.dp(MARGIN_DP)
         if (undo != null) {
             val line = View(ctx).apply { setBackgroundColor(theme.dividerColor) }
             val button = undoButton(undo)

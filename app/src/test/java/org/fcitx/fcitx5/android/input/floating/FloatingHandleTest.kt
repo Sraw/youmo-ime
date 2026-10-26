@@ -12,6 +12,7 @@ import android.view.ViewGroup
 import org.fcitx.fcitx5.android.assertRows
 import org.fcitx.fcitx5.android.data.theme.ThemePreset
 import org.fcitx.fcitx5.android.ui.main.settings.PlaceholderStrings
+import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -19,6 +20,7 @@ import org.robolectric.Robolectric
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.Shadows.shadowOf
+import org.robolectric.android.controller.ActivityController
 import java.util.concurrent.TimeUnit
 
 @RunWith(RobolectricTestRunner::class)
@@ -26,6 +28,10 @@ class FloatingHandleTest {
 
     private val detached = ArrayList<Pair<Float, Float>>()
     private val touches = ArrayList<HandoffTouch?>()
+    private val activities = ArrayList<ActivityController<Activity>>()
+
+    @After
+    fun destroy() = activities.forEach { it.pause().stop().destroy() }
 
     // docked (始终显示悬浮条), attached: its long press is posted to the view
     private fun docked() = FloatingHandle(
@@ -35,7 +41,8 @@ class FloatingHandleTest {
             touches += touch
         },
     ).also {
-        Robolectric.buildActivity(Activity::class.java).setup().get().setContentView(it, ViewGroup.LayoutParams(1000, 24))
+        Robolectric.buildActivity(Activity::class.java).setup().also(activities::add).get()
+            .setContentView(it, ViewGroup.LayoutParams(1000, 24))
         it.layout(0, 0, 1000, 24)
     }
 
