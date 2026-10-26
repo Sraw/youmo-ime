@@ -70,7 +70,7 @@ jobs:
         uses: actions/setup-java@v5
         with:
           distribution: "temurin"
-          java-version: "17"
+          java-version: "21"
 
       - name: Setup Android environment
         if: steps.cache.outputs.cache-hit != 'true' || steps.handwriting.outputs.cache-hit != 'true'
