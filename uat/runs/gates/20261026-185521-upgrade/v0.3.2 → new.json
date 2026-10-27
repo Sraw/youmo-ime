@@ -1,0 +1,97 @@
+[
+ {
+  "item": "当前输入法 拼音",
+  "ok": true,
+  "got": "空格，拼音"
+ },
+ {
+  "item": "繁体: guojia 空格 → 國家",
+  "ok": true,
+  "got": {
+   "cands": [
+    "國家",
+    "郭嘉",
+    "郭家"
+   ],
+   "field": "國家"
+  }
+ },
+ {
+  "item": "自定义短语: dz 第一个是北京市海淀区",
+  "ok": true,
+  "got": [
+   "北京市海淀區",
+   "電子",
+   "導致"
+  ]
+ },
+ {
+  "item": "学到的词: jingmiaoyu 第一个是鲸喵屿",
+  "ok": true,
+  "got": [
+   "鯨喵嶼",
+   "精妙與",
+   "精妙於"
+  ]
+ },
+ {
+  "item": "中文标点: , → 、",
+  "ok": true,
+  "got": "、"
+ },
+ {
+  "item": "设置页: 性能档位 中档",
+  "ok": true,
+  "got": [
+   "中档：每次按键按整句通顺程度重排"
+  ]
+ },
+ {
+  "item": "括号成对 关 (prefs auto_pairs)",
+  "ok": true,
+  "got": "false"
+ },
+ {
+  "item": "键盘高度 高 (prefs keyboard_height_percent 34)",
+  "ok": true,
+  "got": "34"
+ },
+ {
+  "item": "性能档位 中档 (androidengine.conf)",
+  "ok": true,
+  "got": "Medium"
+ },
+ {
+  "item": "输入法 拼音、英文、双拼 (profile)",
+  "ok": true,
+  "got": [
+   "engine-pinyin",
+   "keyboard-us",
+   "engine-shuangpin"
+  ]
+ },
+ {
+  "item": "繁体 (chttrans.conf EnabledIM)",
+  "ok": true,
+  "got": {
+   "EnabledIM/0": "engine-pinyin"
+  }
+ },
+ {
+  "item": "中文标点 , → 、 (punc.mb.zh_CN)",
+  "ok": true,
+  "got": [
+   ", 、"
+  ]
+ },
+ {
+  "item": "自定义短语 dz (customphrase)",
+  "ok": true,
+  "got": "dz,1=北京市海淀区"
+ },
+ {
+  "item": "旧原生数据已删 (user_de descriptor.json, usr)",
+  "ok": null,
+  "got": "未检查：v0.3.2 无 de.tar"
+ }
+]
