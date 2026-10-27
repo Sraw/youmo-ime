@@ -38,6 +38,8 @@ Each release lists its **main changes** (new features, large improvements), its 
 - 候选之间的空隙跟着候选字号变，字小时一页放得下更多候选；单个字仍不窄于 32 dp，便于点。
 - 拼音 14 键、双拼 18 键和九键双拼上没有中/英键，空格更宽；到英文按 🌐。
 - 手工改配置文件才能改的几项不再生效：`config/config` 里的全局项（比如 `DefaultPageSize`），`chttrans.conf` 里的 `Engine=Native` 和自定的 OpenCC 配置（只有从上游 fcitx5-android 带来的配置才会有）。界面上能改的设置都不受影响。
+- Unicode 输入（长按 123）不带 `U+` 也能按编码找字，比如 `4e2d` 出「中」（14 键上打不出 `+`）。
+- **备份全部** 完成后提示「已备份到 <文件名>」。
 
 ### 修复
 
@@ -91,6 +93,8 @@ Each release lists its **main changes** (new features, large improvements), its 
 - Settings that only a hand-edited config file could change no longer apply: global items in `config/config` (such as `DefaultPageSize`), and
   `Engine=Native` or a custom OpenCC profile in `chttrans.conf` (found only in configs carried over from upstream fcitx5-android). Every setting
   the app shows is unaffected.
+- Unicode search (123 held) finds a code without `U+` too, `4e2d` giving 中 (the 14 keys have no `+`).
+- **备份全部** says which file it wrote once done.
 
 ### Fixes
 
