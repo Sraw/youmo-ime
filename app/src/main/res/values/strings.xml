@@ -187,6 +187,7 @@
     <string name="exception_user_data_metadata">Unable to find metadata of user data</string>
     <string name="exception_user_data_package_name_mismatch">User data does not match current application</string>
     <string name="user_data_imported">User data on %1$s has been imported, restarting…</string>
+    <string name="user_data_exported">Backed up to %1$s</string>
     <string name="confirm_import_user_data">Importing user data overrides the settings, custom phrases, punctuation and the clipboard, and merges the words and what was learned with this phone\'s; the app restarts for it to take effect. Proceed?</string>
     <string name="clear_clp_db_confirm">Clipboard database would be completely cleared, including pinned items. Proceed?</string>
     <string name="clear_clp_db_not_all">Some clipboard data could not be cleared. It may still be there or come back at the next start; clearing again, or after a restart, may help.</string>

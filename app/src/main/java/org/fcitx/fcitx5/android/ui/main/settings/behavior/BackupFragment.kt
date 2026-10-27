@@ -108,6 +108,9 @@ class BackupFragment : PaddingPreferenceFragment() {
                             val outputStream = ctx.contentResolver.openOutputStream(uri)!!
                             UserDataManager.export(outputStream, exportTimestamp, learning).getOrThrow()
                         }
+                        // said, as a restore is: the picker closes on its own and nothing else shows it worked
+                        val name = withContext(Dispatchers.IO) { ctx.contentResolver.queryFileName(uri) }
+                        ctx.toast(ctx.getString(R.string.user_data_exported, name ?: uri.lastPathSegment.orEmpty()))
                     } catch (@Suppress("TooGenericExceptionCaught") e: Exception) {
                         // whatever the provider threw: told, the page left as it was
                         Timber.w(e, "Failed to export the user's data")

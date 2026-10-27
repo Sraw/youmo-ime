@@ -187,6 +187,7 @@
     <string name="exception_user_data_metadata">找不到用户数据的元数据</string>
     <string name="exception_user_data_package_name_mismatch">用户数据与当前应用不匹配</string>
     <string name="user_data_imported">已导入来自 %1$s 的用户数据，正在重启…</string>
+    <string name="user_data_exported">已备份到 %1$s</string>
     <string name="confirm_import_user_data">导入用户数据会覆盖设置、自定义短语、标点和剪贴板，学到的和词库与手机上现有的合并；重启应用后生效。继续吗？</string>
     <string name="clear_clp_db_confirm">剪贴板数据库将会被完全清空，包括已置顶的条目。继续吗？</string>
     <string name="clear_clp_db_not_all">部分剪贴板数据未能清除，可能仍然存在，或在下次启动时重新出现；再次清空，或重启后再清空，或许有效。</string>

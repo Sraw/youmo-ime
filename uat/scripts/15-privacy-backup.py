@@ -99,8 +99,12 @@ def backup(d):
     s = d.screen()
     name = next((n.text for n in s.app() if n.cls == "EditText"), "")
     d.tap_text("保存", where="all", scroll=False, after=0.3)
-    # the toast is in no UI dump (03-t9's note): 备份成功 is read off the picture
-    d.shot("full", "备份后的提示（应为备份成功）")
+    # the toast is in no UI dump (03-t9's note): 备份成功 is read off the picture. Frames grabbed
+    # at once, not through shot()'s settle(): waiting for a still screen outlasted the 2 s toast
+    for i in range(3):
+        time.sleep(0.6)
+        d.shot("full", f"备份后的提示（应为备份成功）{i + 1}/3",
+               png=d.adb("exec-out", "screencap", "-p", binary=True))
     msgs = []
     for _ in range(10):
         msgs += [n.text for n in d.screen().nodes if n.text and ("备份" in n.text or "成功" in n.text)]
