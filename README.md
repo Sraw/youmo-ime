@@ -32,13 +32,15 @@
 
 ### 特色
 
-- **整句拼音**：全拼、8 种双拼、九键（按 `64426` 就是"你好"），拼音还有两个字母一个键的 14 键，双拼还有 18 键和九键；简拼、半截输入，按到相邻键会自动纠正。
+- **整句拼音**：全拼和双拼（小鹤、微软、自然码），键盘可选全键盘、18 键、两个字母一个键的 14 键或九键（按 `64426` 就是"你好"）；简拼、半截输入，按到相邻键会自动纠正。
+- **笔画筛选**：打了拼音后在键盘上画一笔（横、竖、撇、点、折），只留第一个字这样起笔的候选，再画就按笔顺接着筛，不用翻页找字（默认关，和滑行输入二选一）。
 - **自己训练的模型**：拼音和英文的 n-gram 模型从网页统计而来；两个小型句子模型参考前文，给整句重新排序。
 - **新词**：近几年的新词（显眼包、破防、红温……）逐个校对后收进词库，每次发版更新。
 - **手写**：一次写一个字，按整句理解，后写的字能改正前面认错的。
 - **码表**：五笔、仓颉、二笔、自然码、五笔拼音；重码按前文排，上屏后有联想。
 - **英文键盘**：自动纠错、补全、预测下一个词。
 - **滑行输入**：英文、拼音、九键、码表都能一笔划出一个词（默认关）。
+- **剪贴板、工具栏、输入框**：剪贴板条目能切成一块块，点选或横着滑选后拼起来上屏，历史可以不限条数；工具栏的按钮和顺序自己定；数字、电话框直接出数字键盘，网址、邮箱框给常用后缀和打过的邮箱。
 - **表情和小工具**：候选里给出对应的表情，表情面板按拼音搜索；u 开头按部件拆字，算式后打 = 出结果，rq/sj/xq 出日期时间。
 - **横屏分体、单手、悬浮键盘，实体键盘**：横屏时字母键分成左右两半；键盘可以缩到一边单手打，或变成能拖动的小窗；接实体键盘时候选显示在光标旁。
 - **边打边学**：记住你选的词和顺序，常用的排到前面；能导入搜狗等输入法的词库；长按候选可以删除、固定、屏蔽，做错了马上撤销；学到的东西自动备份，换手机能恢复。
@@ -48,7 +50,7 @@
 
 ### 效果
 
-拼音首选正确率（%），2026-10-26 测，开着相邻键纠错（App 默认如此）：
+拼音首选正确率（%），2026-11-01 测，开着相邻键纠错（App 默认如此）：
 
 | | 主集 | 近期网页 | 聊天 | 对话 | 新词 |
 |---|---|---|---|---|---|
@@ -57,7 +59,7 @@
 
 九键打主集 88.8%。英文每 25 个键按错一个时，73.8% 的错词能自动改对。
 
-新键盘在聊天集上（只算每个键序只有一种拼法的句子，所以和上表不能直接比）：14 键 61.3%，按左右半边点时 67.3%（点得偏一点）到 69.0%（点得准）；小鹤双拼 18 键 63.6%，九键双拼 30.9%；九键全拼 53.6%。各键盘留下的句子不完全相同。
+新键盘在聊天集上（只算每个键序只有一种拼法的句子，所以和上表不能直接比）：14 键 61.3%，按左右半边点时 67.3%（点得偏一点）到 69.0%（点得准）；小鹤双拼 18 键 63.6%、14 键 50.9%、九键 30.9%；九键全拼 53.6%。各键盘留下的句子不完全相同。
 
 ### 下载
 
@@ -97,13 +99,15 @@ English, and offline voice input in the voice build. It asks for no network perm
 
 ### Features
 
-- **Whole-sentence pinyin**: full pinyin, 8 shuangpin schemes, nine keys (`64426` is 你好), pinyin on 14 keys of two letters each, shuangpin on 18 keys or nine keys; abbreviations, half-typed syllables, slipped keys corrected.
+- **Whole-sentence pinyin**: full pinyin and shuangpin (小鹤, 微软, 自然码) on the full keyboard, 18 keys, 14 keys of two letters each or nine keys (`64426` is 你好); abbreviations, half-typed syllables, slipped keys corrected.
+- **Stroke filter**: after the pinyin, draw a stroke on the keyboard (horizontal, vertical, left-falling, dot, turning) to keep only the candidates whose first character starts with it; more strokes narrow it down further, so no paging for a character (off by default, exclusive with glide typing).
 - **Models of its own**: pinyin and English n-gram models counted from web pages; two small sentence models reorder sentences by the text before.
 - **New words**: the last few years' words, curated one by one, updated with every release.
 - **Handwriting**: one character at a time, read as a sentence, so a later character puts an earlier misread right.
 - **Code tables**: Wubi, Cangjie, Erbi, Ziranma, Wubi-Pinyin; candidates ordered by the text before, next-word suggestions.
 - **English keyboard**: autocorrection, completions, next-word predictions.
 - **Glide typing**: one stroke for a word in English, pinyin, nine keys and the code tables (off by default).
+- **Clipboard, toolbar, fields**: a clipboard entry cut into pieces, picked by taps or a sideways swipe and typed joined, with history of any length; the toolbar's buttons and their order your own; number and phone fields open a number pad, URL and email fields offer suffixes and the addresses you typed.
 - **Emoji and small tools**: emoji among the candidates, the emoji panel searched by pinyin; characters typed by their parts (u…), sums worked out after =, the date and time from rq/sj/xq.
 - **Split, one-handed and floating keyboards, physical keyboards**: in landscape the letters split in two halves; the keyboard shrinks to one side or floats as a small window you drag; with a physical keyboard, candidates show by the cursor.
 - **Offline voice** (voice build): hold the space bar to talk, Mandarin and English mixed, punctuation added; accented Mandarin understood too; letting go right after the last word keeps it, and quiet speech is heard. No dialects yet.
@@ -113,7 +117,7 @@ The [user's manual](docs/README.md) (in Chinese) covers every feature and settin
 
 ### Accuracy
 
-Pinyin top-1 (%), measured 2026-10-26 with neighbouring-key correction on (the app's default):
+Pinyin top-1 (%), measured 2026-11-01 with neighbouring-key correction on (the app's default):
 
 | | Main | Recent web | Chat | Dialog | New words |
 |---|---|---|---|---|---|
@@ -122,7 +126,7 @@ Pinyin top-1 (%), measured 2026-10-26 with neighbouring-key correction on (the a
 
 Nine keys, main set: 88.8%. English with one key in 25 slipping: 73.8% of slipped words corrected.
 
-The new keyboards on the chat set (only sentences whose keys spell one reading, so not comparable with the table): 14 keys 61.3%, and 67.3% (taps a little off) to 69.0% (taps on target) when the tapped half of a key counts; 小鹤 shuangpin on 18 keys 63.6%, on nine keys 30.9%; nine-key pinyin 53.6%. Each keyboard keeps a slightly different set of sentences.
+The new keyboards on the chat set (only sentences whose keys spell one reading, so not comparable with the table): 14 keys 61.3%, and 67.3% (taps a little off) to 69.0% (taps on target) when the tapped half of a key counts; 小鹤 shuangpin on 18 keys 63.6%, on 14 keys 50.9%, on nine keys 30.9%; nine-key pinyin 53.6%. Each keyboard keeps a slightly different set of sentences.
 
 ### Download
 

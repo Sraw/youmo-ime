@@ -37,7 +37,7 @@ class VersionsTest {
     // step of the youmo-release skill)
     @Test
     fun theBaseIsAboveTheLastPublishedRelease() {
-        assertTrue(Versions.baseVersionName, Versions.baseVersionCode > Versions.versionCodeOf("0.3.3"))
+        assertTrue(Versions.baseVersionName, Versions.baseVersionCode > Versions.versionCodeOf("0.4.0"))
     }
 
     @Test

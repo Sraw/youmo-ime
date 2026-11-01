@@ -8,6 +8,70 @@ Each release lists its **main changes** (new features, large improvements), its 
 
 ---
 
+## 0.5.0（2026-11-02）
+
+### 主要变化
+
+- **笔画筛选**（设置里的开关，和 **滑行输入** 二选一，开一个自动关另一个）：打了拼音后在键盘上画一笔（横、竖、撇、点、折），只留第一个字这样起笔的候选，再画就按这个字的笔顺往下筛。
+- **打字更快、占内存更少**：引擎少做重复的查找和计算，九键尤其明显；改了设置后头几个键不再变慢；学到的词多了以后每按一个键占的内存少了很多，不再越用越慢。
+- **拼音、双拼、英文各一个输入法，键盘自己选**：每个输入法的设置页有 **键盘** 一项（拼音：全键盘 / 18 键 / 14 键 / 九键；双拼：全键盘 / 18 键 / 14 键 / 九键；英文：全键盘 / 九键），打字时也能在 ⋯ → **键盘** 里切换，工具栏还可以放一个 **键盘** 按钮。
+  **九键拼音并入了拼音**：升级后原来用九键拼音的，拼音的键盘自动设成九键，键盘上提示一次「九键拼音已并入拼音，在 ⋯ → 键盘里切换」；两个都启用过的，按已启用列表里靠前的那个定键盘。九键的设置在拼音设置页里单独一栏「九键」。
+  **双拼也有 14 键了**（微软双拼除外）。**英文的九键也在英文的「键盘」里选**：九键拼音上不再有【中/英】键，去英文统一用地球键。
+- **双拼只留小鹤、微软、自然码**：紫光、智能ABC、中文之星、拼音加加、国标去掉了，用这些方案的升级后改成小鹤并提示一次；新装默认小鹤，升级时没选过方案的仍是自然码。学到的词原样保留。微软双拼照旧没有 14 键，选了 14 键时按 18 键显示。
+- **工具栏按钮可以自己定**（设置 → 按键 → **工具栏按钮**）：拖动排顺序、勾选要显示的，分成展开的工具栏里和一直在栏右边的两组；⋯ 和菜单键固定不能去掉，右边放不下的按钮挪进展开的工具栏。
+- **剪贴板切词**：长按一条选 **切词**，把它切成一块块（邮箱、网址、数字、英文单词、中文词），点一块选中，按点的先后编号，点 **上屏** 按这个顺序拼起来输入，**重选** 清空所选；从一块横着滑过去可以一次选中一串，像相册里选照片。返回键回到剪贴板列表。
+- **剪贴板历史可以不限条数**：条数上限里多了 **无上限**；把上限调低会删掉条目时先问一句。
+- **按输入框换键盘**：数字、电话、日期时间框直接打开数字键盘，旁边的键按框要的换掉；网址框、邮箱框的候选栏给出常用后缀和 **记住打过的邮箱地址**（设置 **网址和邮箱**，可以改后缀、关掉记忆、全部清空），记住的地址跟着学习备份走。
+- **码表的细节**：码表多了「拼」键，按下后用拼音查字，查到的字上屏、不学字母；仓颉的键上可以显示字根、五笔的键上显示字根或键名（在各自的设置页里选）；打字时回车键显示「确定」；分体键盘上码表多出的键也在 L 后面。
+
+### 小改动
+
+- **读音纠正**的提示在简拼、只打了一部分或混打时也出（`xxxuez`、`xinxinxuez` 都标出「莘莘学子」的正确读音）；只给已有的候选标注，不改排序；双拼不提示。
+- 九键打字时按 0，先上屏第一个候选再输入 0。
+- 拼音 18 键上显示 L，键上和长按都不再有 `;`。
+- 码表和英文里也能用自定义短语，最多排第二，空格照旧上屏编码或单词的第一个；内置的 rq/sj/xq（日期、时间、星期）在全拼的各种键盘上都有，双拼没有。
+- 改了要重建键盘的设置（主题、候选设置等）：没选的拼音清掉不上屏；英文打到一半的词、手写还没上屏的字照样上屏留下。
+- 不再转换 0.3.0 及更早版本学到的词：从这些版本升级，先升到 0.4.x，打几个字、停一下，再升到新版；直接升级的话以前学到的词不再读进来，只有码表（五笔等）保存的词照样保留，从 0.3.0 直接升级也一样。上游 Fcitx5 拼音（libime）学到的词也不再读进来。0.3.1 到 0.4.0 期间一次也没打开过的码表，以前保存的词仍在这个码表里，但不再同时加进拼音。
+- 在新版里恢复 0.3.0 及更早版本导出的备份 zip 会被拒绝，并提示先在 0.4.x 里恢复、打几个字、停一下、重新备份。
+
+### 修复
+
+- 自定义短语在 14 键、18 键、九键和双拼九键上不起作用（内置的 rq/sj/xq 也不出）：现在按设定的位置出。
+- 打到一半改键盘设置、换主题后，候选栏和拼音栏卡住或空着：现在改这类设置先清掉没选的拼音，重建的键盘接着显示引擎的候选。
+- 「通用输入」的设置（联想、档位、模糊音等）、已启用的输入法和标点，在清理软件清掉 `Android/data` 或启动时外部存储不在之后悄悄回到默认：现在存在应用自己的目录里，升级后第一次启动自动搬过去，读不出来会提示、不再用默认值覆盖。
+
+### Main changes
+
+- **Stroke filter** (笔画筛选, a switch exclusive with 滑行输入): after typing pinyin, draw one stroke on the keyboard to keep only candidates whose first character starts with it; further strokes follow its stroke order.
+- **Faster, lighter typing**: the engine repeats fewer lookups, the nine keys most of all; the first keys after a setting change no longer lag; with many learned words each key allocates far less, so typing no longer slows down as it learns.
+- **One pinyin, one shuangpin and one English input method, each with a keyboard to choose**: each input method's page has **键盘** (pinyin: full / 18 keys / 14 keys / nine keys; shuangpin: full / 18 / 14 / nine keys; English: full / nine keys), switchable while typing in ⋯ → **键盘**, and the toolbar can carry a **键盘** button.
+  **九键拼音 is merged into pinyin**: whoever used it gets pinyin on the nine keys and one notice on the keyboard; with both enabled, the one earlier in the enabled list decides. The nine keys' settings are a section 「九键」 on pinyin's page.
+  **Shuangpin gets the 14 keys** (not 微软). **English's nine keys are chosen in English's 键盘**: pinyin's nine keys lose the 中/英 key; English is reached by the globe key.
+- **Shuangpin keeps 小鹤, 微软 and 自然码**: 紫光, 智能ABC, 中文之星, 拼音加加 and 国标 are gone; their users are moved to 小鹤 with one notice. New installs start on 小鹤; an upgrade that never picked a scheme stays on 自然码. Learned words are kept. 微软 still has no 14 keys and shows the 18 keys when 14 is chosen.
+- **Toolbar buttons of your own** (Settings → 按键 → **工具栏按钮**): drag to order, tick to show, in the expanded toolbar or always on the bar's right. ⋯ and the menu key stay; buttons without room move into the expanded toolbar.
+- **Clipboard 切词**: long-press an entry, pick **切词** to split it into pieces (emails, URLs, numbers, words, Chinese words); tap pieces to pick them, numbered in tap order, **上屏** types them joined, **重选** clears; swipe sideways across pieces to pick a run at once, as in a photo grid. Back returns to the clipboard list.
+- **Unlimited clipboard history**: the limit has a **无上限** value; lowering it asks first when entries would be deleted.
+- **Keyboards by field type**: number, phone and date/time fields open a number pad with keys suited to the field; URL and email fields offer suffixes and **记住打过的邮箱地址** on the candidate bar (setting **网址和邮箱**: edit suffixes, turn memory off, clear all); remembered addresses travel in the learning backup.
+- **Table details**: a 拼 key looks up characters by pinyin (the pick goes in, no letters learned); 仓颉's keys can show roots and 五笔's roots or key names (chosen on their pages); enter shows 确定 while composing; a table's extra key sits after L on the split keyboard too.
+
+### Smaller changes
+
+- The **misreading hint** also shows on 简拼, half-typed and mixed input (`xxxuez`, `xinxinxuez` mark 莘莘学子's reading); it only labels candidates already shown and changes no order; not in shuangpin.
+- 0 on the nine keys while typing commits the first candidate, then 0.
+- Pinyin's 18 keys show L, with no `;` on the key or its long press.
+- Custom phrases in tables and English too, at most second, so space still commits the code's or word's first; the built-in rq/sj/xq on every full-pinyin keyboard, not in shuangpin.
+- A setting that rebuilds the keyboard drops unpicked pinyin; a half-typed English word or a handwritten character not yet committed is committed and kept.
+- What 0.3.0 and earlier learned is no longer converted: upgrade to 0.4.x, type a few characters and pause, then upgrade further; upgraded directly, the words learned before are not read, but for the phrases a table (Wubi and the like) saved, which are kept, straight from 0.3.0 too. What upstream Fcitx5's pinyin (libime) learned is not read either. A table never opened from 0.3.1 to 0.4.0 keeps the phrases it saved before, but no longer adds them to pinyin as well.
+- A backup zip exported by 0.3.0 or earlier is refused, with a note to restore it in 0.4.x, type a few characters and pause, and back up again first.
+
+### Fixes
+
+- Custom phrases did nothing on the 14, 18 and nine keys and 双拼九键 (nor the built-in rq/sj/xq): they now come at their set position.
+- The candidate and pinyin bars stuck or empty after changing a keyboard setting or theme mid-typing: such a change now drops unpicked pinyin, and the rebuilt keyboard shows the engine's candidates.
+- 通用输入's settings (联想, 档位, fuzzy pinyin…), the enabled input methods and punctuation quietly reset after a cleaner emptied `Android/data` or a start without external storage: they now live in the app's own storage, moved on the first start, and one that cannot be read is reported, never overwritten with defaults.
+
+---
+
 ## 0.4.0（2026-10-26）
 
 ### 主要变化
