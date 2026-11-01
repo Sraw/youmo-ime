@@ -71,6 +71,9 @@ class ClipboardSplitUatTest {
         list.scrollToPosition(list.adapter!!.itemCount - 1)
         h.waitFor("the note at the end") { cut in h.texts(h.inputView) }
         h.tap(h.described(s(R.string.back_to_clipboard)))
+        // the panel's list loaded before the next clip: one stored while its first page loads may
+        // miss the page's invalidation and never be listed (CI, once in two runs)
+        h.waitFor("the clipboard again") { startingWith("看看 abc") != null }
         // a password shown as dots: its pieces would show it
         ClipboardManager.lastClipTimestamp = -1L
         ClipboardManager.lastEntry = null

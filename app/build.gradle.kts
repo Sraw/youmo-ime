@@ -134,6 +134,14 @@ tasks.withType<Test>().matching { it.name.startsWith("testVoice") }.configureEac
     }
 }
 
+// TablesSettingsUatTest runs the real engine on build/generated's pinyin and table blobs. Nothing
+// else of a unit test run builds them, so a fresh checkout (CI) had none and the test's lookups
+// failed quietly; as inputs they are built first and key the test task's cache entry.
+tasks.withType<Test>().matching { it.name.endsWith("UnitTest") }.configureEach {
+    inputs.files(tasks.named("compileEngineData"), tasks.named("compileEngineTables"))
+        .withPathSensitivity(PathSensitivity.RELATIVE)
+}
+
 androidComponents {
     onVariants { variant ->
         // The build type's resValue entries (app_icon, app_icon_round, app_name) point at launcher
