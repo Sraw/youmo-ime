@@ -15,7 +15,7 @@ compiled is not done.
 | Python tools | `lexicon/tools`, `lib/ime-eval/tools` | `python3 -m unittest discover -s lexicon/tools` (and `-s lib/ime-eval/tools`) | the lexicon and evaluation scripts |
 | Static | all Kotlin modules | `./gradlew detekt` | syntax rules (type resolution does not work here); findings frozen in `config/detekt/baseline-*.xml` |
 | Native host tests | `lib/sherpa-onnx/host-test.sh` | the script | sherpa-onnx's C++ helpers, compiled for the host |
-| Instrumented | `app/src/androidTest` | CI (`emulator` label / weekly); locally `connectedTextDebugAndroidTest` | the real host, engine and keyboard (`KotlinFcitx`, `TestFcitx`): `FcitxTest`, `SoftKeyboardTest`, `TypingHostActivityTest`, `NativeMatrixKernelTest`, `FcitxConfigTest`, `FcitxEnglishTest`, `FcitxPreeditTest`, `SetupActivityDeviceTest`, `FileUtilTest`; `EngineEvalRunner` is the device runner behind `run-on-device.sh` |
+| Instrumented | `app/src/androidTest` | CI (`emulator` label / weekly); locally `connectedTextDebugAndroidTest` | the real host, engine and keyboard (`KotlinHost`, `TestHost`): `HostTest`, `SoftKeyboardTest`, `TypingHostActivityTest`, `NativeMatrixKernelTest`, `HostConfigTest`, `HostEnglishTest`, `HostPreeditTest`, `SetupActivityDeviceTest`, `FileUtilTest`; `EngineEvalRunner` is the device runner behind `run-on-device.sh` |
 | Evaluation | `lib/ime-eval` | see below | ranking: whether the first candidate is the sentence meant |
 | On a device | redroid or a phone | by hand / scripts | what a user sees: layout, gestures, rotation, upgrade |
 
@@ -27,8 +27,13 @@ the tool or build-logic tests if those changed. Unit tests need no NDK or CMake.
 - New logic gets a test in the same change, in ime-core where the logic is.
 - Prefer fakes over mockk. `FakeEditor` (ime-core `testFixtures`) stands in for an
   `InputConnection` and is held to the real `BaseInputConnection` by a contract test.
-  `FakeFcitxAPI` (app test sources) cannot be held to the real engine (JNI), so keep it dumb:
+  `FakeHostApi` (app test sources) cannot be held to the real engine (JNI), so keep it dumb:
   store config, record calls, simulate no input.
+- The engine's user files: `MemoryFiles` (ime-core testFixtures), a `UserFiles` in memory that
+  behaves as a disk does (a write needs its directory, a rename replaces, an appender on a file
+  renamed over writes no more). Use a `TemporaryFolder` with `JvmFiles` only where the bytes on the
+  disk, a symbolic link or a directory the disk refuses to write are what is tested: the record's
+  byte golden, the upgrade tests, `RecordStore`, `CodedIndex`, `DictionaryFile`.
 - `unitTests.isReturnDefaultValues = false` on purpose: a JVM test that reaches an android.jar stub
   fails loudly. Anything needing the framework runs under Robolectric.
 - A class reading `AppPrefs` in its initialiser needs `AppPrefs.init(sharedPreferences)` in the test
@@ -91,17 +96,18 @@ expectation PASS, FAIL or PENDING where the engine cannot do it yet; `--seed <n>
 samples first, `--gate` fails on a FAIL or when nothing was checked; a `space` with only 联想 shown stops the scenario), `ksc` (keystrokes), `t9` (a set turned into digits, then read with `pinyin --scheme
 t9-strict`, as the app types it; `--presses once`, 连按 off, the default, or `letters`, each letter
 spelt by 连按, a letter past its key's first as the letter typed as itself, as the session has it;
-`--keys nine|14`, the nine keys by default, `14` the 14 keys' codes read with `--scheme g14-strict`,
-which takes no `--presses letters`; the schemes `g14` and `g14-strict` are `T9Segmenter` over
-`NineKeyLetters.G14`; `release-report.sh` reports `g14-chat` and `g14-pinyin` at weight 0, as
-`t9-chat`, never in the weighted score; `shuangpin <scheme> … --keys 18|nine [--same <kept.tsv>]` types
+`--keys nine|14|18`, the nine keys by default, `14` the 14 keys' codes read with `--scheme g14-strict`,
+`18` pinyin's 18 keys' read with `--scheme g18-strict`, neither taking `--presses letters`; the schemes
+`g14`/`g14-strict` and `g18`/`g18-strict` are `T9Segmenter` over `NineKeyLetters.G14` and `G18`, only
+the `-strict` ones reading as the app does (its grouped sessions take no abbreviations); `release-report.sh` reports `g14-chat` and `g14-pinyin` at weight 0, as
+`t9-chat`, never in the weighted score; `shuangpin <scheme> … --keys 18|14|nine [--same <kept.tsv>]` types
 a set on 双拼's grouped keys, samples with a Latin letter left out, `--same` keeping the samples typed
-as they were for the full keyboard to be scored on, read with `--scheme <scheme>-18` or `<scheme>-nine`
-(`GroupedShuangpinSegmenter`); `sp18-chat` and `spnine-chat` (小鹤) are reported at weight 0 too; a `--keys` a command does not
+as they were for the full keyboard to be scored on, read with `--scheme <scheme>-18`, `<scheme>-14` or `<scheme>-nine`
+(`GroupedShuangpinSegmenter`; on the 14 keys a sample needing `;`, 微软's ing, is left out too); `sp18-chat` and `spnine-chat` (小鹤) are reported at weight 0 too; a `--keys` a command does not
 take is a usage error, exit 2), `english-glide` (glide
 typing on simulated paths, `--wobble` the key-width noise), `pinyin-glide` (the same per dictionary word
 of a pinyin set; `--shuangpin <scheme>`, `--keys nine`, `--table <table.data>`, `--word <pinyin>` one
-clean path's readings), `tune` (penalties), `score` (compare a result with a baseline), `handwriting` (handwriting's sentence reading), `table` (a table's codes, optionally with pinyin and the models), `sentences` (each sample's sentences written out), `predict-learn` (联想 after learning), `learn-log-bench` (a heavy year's learning record opened, folded and opened again; `--legacy <pinyin.data>`: a heavy user's old logs converted at the first open, and caught up after an older build wrote them; `--counts <pinyin.data>`: what the ranking's counts cost on that record, attached, made anew and per key typed; not together with `--legacy`, which reuses `<dir>/legacy`), `predict-set` (a 联想 set made from a set), `shuangpin` (a set turned into a 双拼 scheme's keys), `slips` (a set with slips put in), `chars` (the data's characters), `lm` (a sentence model's scores of texts), `libime` (reading libime's pinyin, history or table files);
+clean path's readings), `tune` (penalties), `score` (compare a result with a baseline), `handwriting` (handwriting's sentence reading), `table` (a table's codes, optionally with pinyin and the models), `sentences` (each sample's sentences written out), `predict-learn` (联想 after learning), `learn-log-bench` (a heavy year's learning record opened, folded and opened again; `--counts <pinyin.data>`: what the ranking's counts cost on that record, attached, made anew and per key typed), `predict-set` (a 联想 set made from a set), `shuangpin` (a set turned into a 双拼 scheme's keys), `slips` (a set with slips put in), `chars` (the data's characters), `lm` (a sentence model's scores of texts);
 run `ime-eval` with no arguments for the full usage.
 
 A change to `merged.ymd`'s layout or reader is gated per key: `ime-eval pinyin <pinyin.data> <set.tsv>
@@ -245,7 +251,10 @@ nothing here is in an APK.
   are logged masked. Keys are tapped where the Dumper reads them; hardware keys are `input keyevent`
   (no uinput on redroid). Each sequence starts from a root snapshot of the app's data
   (`prepare`), restored with `chown -R` to the current uid and `restorecon -R`; the builds are swapped
-  with `adb install -r -d`.
+  with `adb install -r -d`. The driver's input methods are those of the builds around `native-last`
+  (`ADDED`: 九键拼音 and 五笔, `engine-t9` in the profile): it compares those builds only. Since 0.5 the
+  nine keys are pinyin's keyboard, not an input method, and the device run is not ported to it; the
+  JVM replay below is what checks the host now.
 - **JVM**: `:lib:ime-eval:parityReplay` runs a file on `HostReplay` (about a second a sequence; `k/n`
   shards). What the service does around the host is modelled too: the host's texts in the devices'
   zh-CN, read from the app's `values-zh-rCN` (`ResourceHostStrings`); a tap on the bar picks the

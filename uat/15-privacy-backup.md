@@ -26,11 +26,13 @@
 - **前提**：B0，添加了五笔并切到五笔。
 - **操作**：点「密码」框；再点「普通文本」框，看空格键，点 q。
 - **预期**：在密码框里是英文；回到「普通文本」框后空格键上是"五笔"，q 出五笔候选（「我」）。
+- **JVM**：`HostCasesUatTest.leavingAPasswordFieldGoesBackToTheInputMethodBefore`（密码框英文，离开回五笔）；设备上不跑。
 
 ### PR-05 [P1] 密码框的工具栏是数字行
 - **前提**：B0。
 - **操作**：点「密码」框，看键盘上方；点那一排里的 1、2、3。
 - **预期**：键盘上方显示 1–0 一排数字键；框里多了 3 个圆点（内容是 123）。
+- **JVM**：`ToolbarUatTest.aPasswordsBarIsTheDigitsRow`（密码框切到英文后栏上是 1–0 一排、没有展开工具栏；点 1 2 3 发 1 2 3 的键）；设备上不跑。
 
 ### PR-07 [P1] 不要个性化学习的输入框里不学习
 <!-- learning: U-87 U-90 -->
@@ -44,6 +46,7 @@
 - **操作**：回测试页点「普通文本」框，看剪贴板提示；打开剪贴板面板。
 - **预期**：提示和面板里那一条都显示成圆点（•），哪里都没有明文「mima1234」。
 - **JVM**：`ImeSwitchUatTest.aSensitiveClipIsShownAsDots`（标为敏感的剪贴板内容在栏上和面板里都是圆点，没有明文；图）；设备上不跑。
+
 ## 备份与恢复
 
 ### PR-10 [P0] 备份全部，从备份恢复；恢复时设置、短语、标点和剪贴板照备份覆盖
@@ -51,11 +54,11 @@
 - **前提**：B0-设置，在 **词库与短语 → 自定义短语** 里加 `dz` → 北京市海淀区，手动加一个词「澜境花园」（拼音 lan jing hua yuan；没加时这个拼音第一个是整句拼出的「蓝鲸花园」），按 WD-11 把 `dict-words.txt` 并入基础词库。
 - **操作**：**备份与恢复 → 备份全部**，存到"下载"；重置应用（README「重置」）；**备份与恢复 → 从备份恢复**，选那个文件并确认；等应用重启；回测试页打 d z，再打 lanjinghuayuan，看词库页，打 k e m i a o t a n g p u。接着加一个短语 `yx` → test@example.com，把 **实体键盘 → 每页候选数** 改成 5，按 ST-28 把 `,` 的中文标点改成「、」，在「长文本」框里选中「公园」复制；从同一个备份再恢复一次；看 **实体键盘 → 每页候选数**；回测试页点底排的 **，**，打 y x，打开剪贴板面板。
 - **预期**：备份得到 `youmo_<时间>.zip`，提示备份成功；选文件前的确认框写着"导入用户数据会覆盖设置、自定义短语、标点和剪贴板，学到的和词库与手机上现有的合并；重启应用后生效。"；应用自动重启；`dz` 出「北京市海淀区」，「澜境花园」排第一；词库页"基础词库"一节列出 dict-words 和它的词数；合好以后（备份不带合成的 `merged.ymd`，恢复后重新合，小词库几秒）kemiaotangpu 候选里有「氪喵糖铺」；备份里的词库是 `external/data/pinyin/dictionaries/dict-words.txt.gz`，没有 `merged.ymd` 和 `.tmp` 文件（`unzip -l` 看）；第二次恢复后每页候选数回到 7（设置被备份覆盖），`yx` 那条短语没有了（自定义短语照备份覆盖），点 **，** 打出「，」（标点照备份），剪贴板面板里没有备份之后复制的「公园」（剪贴板照备份覆盖，不和手机上的合并）。
-- **JVM**：`BackupUatTest.aBackupRestoredReplacesSettingsPhrasesAndPunctuation`（备份里是 dict-words.txt.gz、没有 merged.ymd 和 .tmp；恢复后设置、短语、标点照备份覆盖，启动后有氪喵糖铺）；设备上留作冒烟：从选文件、确认、重启到打字看整条。
+- **JVM**：`BackupUatTest.aBackupRestoredReplacesSettingsPhrasesAndPunctuation`（备份里是 dict-words.txt.gz、没有 merged.ymd 和 .tmp；恢复后设置、短语、标点照备份覆盖，启动后有氪喵糖铺）；设备上留作冒烟（从选文件、确认、重启到打字看整条）。
 
 ### PR-10a [P1] 在已有导入词库的手机上恢复 0.3.2 的备份
 - **前提**：B0-设置，按 WD-11 把 `dict-words.txt` 并入基础词库；**备份与恢复 → 备份全部** 存到"下载"，按 WD-14u 的做法把它改成 0.3.2 的样子（`dict-words.txt.gz` 换成解压后的 `dict-words.txt`），存成 `youmo_032.zip` 放回"下载"；然后在词库页把 dict-words **关闭**。
-- **操作**：不重置，**备份与恢复 → 从备份恢复** 选 `youmo_032.zip` 并确认；等应用重启；回测试页打 k e m i a o t a n g p u（没有就过几秒再打，最多一分钟）；看词库页和词库目录（`adb shell ls /sdcard/Android/data/<包名>/files/data/pinyin/dictionaries`）。
+- **操作**：不重置，**备份与恢复 → 从备份恢复** 选 `youmo_032.zip` 并确认；等应用重启；回测试页打 k e m i a o t a n g p u（没有就过几秒再打，最多一分钟）；看词库页和词库目录（以 root 看 `/data/data/<包名>/files/host-data/pinyin/dictionaries`，redroid 用 `docker exec`）。
 - **预期**：一分钟内 kemiaotangpu 的候选里有「氪喵糖铺」（照备份是开着的）；词库页"基础词库"一节 dict-words 只有一行，已开启；词库目录里只有 `dict-words.txt.gz`（和 `merged.ymd`），没有 `dict-words.txt`、`dict-words.txt.gz.disable`。
 - **JVM**：`BackupUatTest.a032BackupOverAnImportOfTheNameOff`（手机上关着的同名词库被 0.3.2 的备份换成开着的一行，有氪喵糖铺）；设备上不跑。
 
@@ -83,15 +86,31 @@
 - **预期**：安装成功；「澜境花园」还在，排第一（同 WD-03）。
 
 ### PR-14 [P0] 从上一版升级后设置原样沿用
-- **前提**：两种前提各跑一次：（一）装着上一版正式版（现在是 v0.3.3，不是要测的这一版），在它的设置里添加 **双拼**、把它拖到英文前面，状态面板切到 **繁体**，**通用输入 → 中文标点** 把 `,` 改成「、」，加自定义短语 `dz` → 「北京市海淀区」，**实体键盘** 里每页候选数设成 5；（二）干净的设备装 `uat/fixtures/upgrade/v0.3.0`、`v0.3.1`、`v0.3.2` 之一对应的正式版，照那个目录的 README 把 `data.tar`、`external.tar` 以 root 解回去（三个各跑一次）。
+- **前提**：两种前提各跑一次：（一）装着上一版正式版（现在是 v0.4.0，不是要测的这一版；（二）的 v0.4.0 夹具和这里改的不全一样，照它的 README 核对），在它的设置里添加 **双拼**、把它拖到英文前面，状态面板切到 **繁体**，**通用输入 → 中文标点** 把 `,` 改成「、」，加自定义短语 `dz` → 「北京市海淀区」，**实体键盘** 里每页候选数设成 5，**外观 → 主题** 里建一个带背景图的自定义主题并用上；（二）干净的设备装 `uat/fixtures/upgrade/v0.3.0`、`v0.3.1`、`v0.3.2`、`v0.4.0` 之一对应的正式版，照那个目录的 README 把 `data.tar`、`external.tar`（有 `de.tar` 的也解）以 root 解回去（四个各跑一次）。
 - **操作**：不卸载，直接安装要测的这一版正式版（`adb install -r`）；打开设置看 **输入法**、**通用输入**、**实体键盘**、自定义短语；回测试页弹出键盘，看状态面板，打 g u o j i a、d z，长按 **符** 打 y a w n。
-- **预期**：输入法列表和顺序和升级前一样；繁体还开着，guojia 打出「國家」；`,` 是「、」；dz 第一候选是「北京市海淀区」；快速输入里 yawn 出颜文字；每页候选数是 5。fixture 那三次照各自 README 列的每一项核对（性能档位、括号成对、键盘高度、学到的词等都在）。这一条在发版时用正式版跑。
+- **预期**：输入法列表和顺序和升级前一样；繁体还开着，guojia 打出「國家」；`,` 是「、」；dz 第一候选是「北京市海淀区」；快速输入里 yawn 出颜文字；每页候选数是 5；（一）建的自定义主题还在主题列表里、仍在用，键盘上背景图照样显示。fixture 那四次照各自 README 列的每一项核对（性能档位、括号成对、键盘高度等都在）；学到的词 v0.3.1 及以后的都在，v0.3.0 的不在了（0.3.0 学到的不再转换，见 PR-30），它 README 列的其余各项照旧。这一条在发版时用正式版跑。
+
+### PR-41 [P1] 从 0.4.0 升级后设置已在应用自己的目录里，清掉 Android/data 也不丢
+- **前提**：PR-14（一）做完（从 v0.4.0 升到要测的这一版，打开过键盘）。
+- **操作**：以 root 看 `/sdcard/Android/data/<包名>/files/`；再删掉它（像清理软件清 `Android/data` 那样）；强停应用（`am force-stop`）；回测试页弹出键盘，打 g u o j i a、d z、`,`。
+- **预期**：删之前那里已经没有 `config`、`data`、`theme`（升级后第一次启动搬到应用自己的目录，核对好就删了旧的）；繁体还开着，guojia 打出「國家」；dz 第一候选是「北京市海淀区」；`,` 是「、」；没有"设置读不出来"之类的提示。这一条在发版时用正式版跑。
+
+### PR-42 [P1] 设置读不出或没搬好时提示，不覆盖、不备份
+- **前提**：B0-设置，已有自定义短语 `dz` →「北京市海淀区」（同 WD-18）；设置文件读不出来，或这次启动没能把设置、数据目录放到位（手工触发不了，只在 JVM 上做）。
+- **操作**：打开键盘打字；改一项输入设置；**通用输入 → 中文标点** 把 `,` 改成「、」，回键盘打 `,`；键盘上打 `dz`，长按「北京市海淀区」以外的一个候选选 **以自定义词组的方式置顶**、再长按「北京市海淀区」选 **从自定义词组中删除**，再打 `dz`；**外观 → 主题** 里建一个带背景图的自定义主题并保存；**备份与恢复** 里点 **备份全部**、**从备份恢复**。
+- **预期**：设置读不出来时提示"部分输入设置读取失败……"，读不出来的那份原样保留、不被默认值覆盖；设置没放到位时提示"输入设置暂时无法就位……"，这次打字可能用的是默认设置，改动在重启手机前不保存；数据没放到位时提示"你添加的内容和设置这次无法就位，暂时不能修改、备份或恢复……"，编辑器和备份、恢复都拒绝操作：中文标点页提示这句（标点表读不出来时提示"部分你添加的内容……读取失败或无法就位"），回键盘 `,` 仍是原来的，不是「、」；`dz` 的置顶、删除都不生效（再打 `dz` 候选和之前一样）；主题页保存时提示这句，主题列表里没有多出主题。
+- **JVM**：`KotlinHostTest.anUnreadableFileIsNeverWrittenOverAndTheUserIsTold`、`KotlinHostTest.filesNotSettledAreReadButNotWrittenAndTheUserIsTold`（提示和不写）、`UserDataManagerTest.aBackupAndARestoreAreRefusedWhileNotSettled`（备份、恢复被拒）、`PunctuationMapsTest.where the data is not settled nothing is saved`（标点表不保存）、`EngineBridgeTest.theKeyboardsPinIsRefusedWhereTheFileWouldBeLost`、`EngineBridgeTest.theKeyboardsPinIsRefusedWhereDataIsNotSettled`、`PhraseBookTest.aRefusedSaveTakesNoEffect`（键盘上置顶、删除不生效）、`ThemeFilesManagerTest.themesNotSettledAreNotWritten`（主题不写）；各页面上的提示文字不在内；设备上不跑。
+
+### PR-43 [P1] 从 0.4.0 升级：外部存储里的大词库整份搬进来，键盘不卡
+- **前提**：装着 v0.4.0 正式版（不是要测的这一版），在它里面按 WD-14d 把雾凇拼音并入基础词库，等合好（候选里有「阿坝州」）。
+- **操作**：以 root 记下合好的词库的修改时间（`ls -l --time-style=full-iso /data/media/0/Android/data/<包名>/files/data/pinyin/dictionaries/`，看 `merged.ymd` 那一行）；不卸载，直接安装要测的这一版正式版（`adb install -r`）；马上回测试页弹出键盘打几个字；打 a b a z h o u；以 root 看 `/sdcard/Android/data/<包名>/files/`，再对 `/data/data/<包名>/files/host-data/pinyin/dictionaries/` 同样 `ls -l --time-style=full-iso`；打开词库页。
+- **预期**：没有"应用无响应"，键盘弹出、照常打字（搬家在后台做）；候选里有「阿坝州」；外部的 `files/data` 已经没有了（搬进应用自己的目录，核对好就删了旧的）；词库页"基础词库"一节列出 frost_dict_for_fcitx5，约 191 万个词。升级后第一次打字就有，词库页没有出现「正在更新词库」（词库没有重新合并：`host-data/pinyin/dictionaries/merged.ymd` 的修改时间和升级前记下的一样）。这一条在发版时用正式版跑。
 
 ### PR-15 [P1] 本应用自己的输入框什么都不学
 - **前提**：B0-设置。
 - **操作**：点设置页顶上的搜索框；打 n i h a o，点第二个候选；打开符号面板点一个没用过的符号（例如 ※）；打 `1+1=`（数字键盘）；回测试页「普通文本」框打 n i h a o 看第一、二候选，打开符号面板看"最近使用"；打开 **词库与短语 → 用户词库**。
 - **预期**：搜索框里打 `1+1=` 时栏上没有"= 2"（不读本应用框里的字）；回测试页 nihao 的候选和平时一样（第二候选没被学到前面）；符号面板的"最近使用"里没有 ※；用户词库里没有新词（见 docs/keyboard.md「本应用的输入框」）。
-- **JVM**：`OwnFieldUatTest.thisAppsOwnFieldLearnsNothing`（本应用的框里，引擎被告知不学、不读框里的字（算式结果和符号最近使用在设备上看））；设备上留作冒烟：符号面板的最近使用和栏上的算式结果走界面。
+- **JVM**：`OwnFieldUatTest.thisAppsOwnFieldLearnsNothing`（引擎被告知不学、不读框里的字）、`OwnFieldUatTest.thisAppsOwnFieldKeepsNoRecentSymbolAndReadsNoSum`（本应用的框里 1+1= 栏上没有「= 2」、点过的符号不进最近使用；别的应用的框里有「= 2」作对照）；设备上不跑。
 
 ### PR-16 [P1] 本应用的输入框里退格删掉的字不再当前文
 - **前提**：B0-设置。
@@ -103,6 +122,7 @@
 - **前提**：B0-设置。**输入法 → 拼音** 的「键盘」改成「14 键」；添加「双拼」，它的「键盘」改成「18 键」。
 - **操作**：**备份全部** 存到"下载"；把两个「键盘」都改回「全键盘」；**从备份恢复** 选刚才的文件并确认；应用重启后看拼音页和双拼页的「键盘」，回测试页点「普通文本」框，再换到双拼。
 - **预期**：拼音的「键盘」是「14 键」、双拼的是「18 键」；框里拼音是 14 键，换到双拼是 18 键。
+- **JVM**：`BackupUatTest.aBackupBringsPinyinsAndShuangpinsKeyboards`（备份带着拼音 14 键、双拼 18 键，恢复后两项照备份）；这两项决定的键盘见 `PinyinKeyboardScreenshotTest`、`ShuangpinKeyboardScreenshotTest`；设备上不跑。
 
 ## 学习的开关和清除
 
@@ -111,7 +131,7 @@
 - **前提**：B0，按 PY-34 让「汪小明」成为你的词，打 s h i，长按第五个候选（记作 C）选 **固定首位**，按 PY-29 屏蔽「是」，在 **词库与短语 → 自定义短语** 里加 `dz` → 北京市海淀区，在表情面板里点过「😀」（它在"最近使用"里）。
 - **操作**：点工具栏 **⋯**，点 **不用我的输入习惯**；看弹出的提示，点 **返回键盘** 后看工具栏；点 w a n g x i a o m i n g；点 ⌫，点 s h i；点 ⌫，点 d z；打开表情面板；再点 **⋯** 看这一项；打开 **词库与短语 → 用户词库**，看页顶的 **用我的输入习惯**，打开它；回测试页看 **⋯** 里这一项，点 s h i，点 ⌫，点 d z，再打开表情面板。
 - **预期**：点的那一刻键盘上方提示 2 秒"已不用我的输入习惯，在 ⋯ 里恢复"（点它就消失，⋯ 面板不受影响），工具栏上不留标记；wangxiaoming 第一个是「王小明」，没有「汪小明」；shi 第一个是原来排在「是」后面的那个（「是」屏蔽了），不是 C，候选里仍没有「是」；dz 没有短语；表情面板里没有"最近使用"；**⋯** 里这一项变成 **恢复我的输入习惯**；用户词库页顶的开关是关着的（和 ⋯ 里的是同一个），打开后 **⋯** 里又是 **不用我的输入习惯**，shi 第一个又是 C、仍没有「是」，dz 第一个是「北京市海淀区」；"最近使用"回来，「😀」还在。
-- **JVM**：`WordsUatTest.notUsingMyHabitsAsFreshlyInstalledButForWhatIsBlocked`（:lib:ime-eval:uatTest，真数据）；设备上照跑：提示条、⋯ 里这一项的字、用户词库页顶的开关、表情面板的"最近使用"是界面，JVM 只断言打字和词库这一半。
+- **JVM**：`WordsUatTest.notUsingMyHabitsAsFreshlyInstalledButForWhatIsBlocked`（:lib:ime-eval:uatTest，真数据：打字和词库这一半）、`HabitsUatTest.offTheEntrySaysToRestoreAndTheRecentEmojiAreGoneTillOn`（⋯ 里关掉后这一项变成恢复、表情的最近使用空了，打开后 😀 回来）、`HabitsUatTest.theSwitchOnTopOfTheUserWordsIsTheSameAsInTheStatusArea`（用户词库页顶的开关是同一个）、`MotionNoticeUatTest.habitsOffAndOnEachSaidTheNewInTheOldsPlace`（提示条的字）；设备上不跑。
 
 ### PR-17a [P1] 不用我的输入习惯：并入基础词库的词照样打得出，拼音和码表都是
 <!-- learning: U-93 -->
@@ -150,11 +170,11 @@
 - **预期**：用户词库页顶 **自动备份** 开着；第一次上屏后马上就有一份今天的、"这次安装存的"自动备份（第 1 个打字日）；页里写着卸载会丢掉学到的东西和自动备份，除非另存过一份；确认框写着"删了不能找回"，点取消后这份还在列表里；确认删除后列表里显示"还没有备份"。（备份里只有学到的和词表，不带剪贴板：`BackupControl` 只写这两样。）
 - **JVM**：`PrivacyUatTest.anAutomaticBackupOnTheFirstTypingDayDeleted`（:lib:ime-eval:uatTest，真数据）（第一次上屏就有一份这次安装的自动备份，删除后没有备份（页面和确认框的文字是界面））；设备上不跑。
 
-### PR-30 [P1] 从 0.3.0 升级：词都在，置顶变成固定，顺序从头学
+### PR-30 [P1] 从 0.3.0 直接升级：设置和码表的词都在，学到的词不再读进来
 <!-- learning: §3 旧数据 -->
-- **前提**：装着 v0.3.0 正式版，在里面：全拼打 s h i 长按第五个字选"以自定义词组的方式置顶"；手动加词「澜境花园」；长按 `shijian` 的「时间」选"不再显示这个词"；一段段打出「汪小明」一次（旧版一次就学成词）。
-- **操作**：不卸载，安装要测的这一版（`adb install -r`）；打 s h i；打 l a n j i n g h u a y u a n；打 s h i j i a n；打开 **用户词库** 和 **自定义短语**。再回测试页随便上屏一个字，打开 **用户词库 → 学习备份**，把这次安装的那份自动备份 **另存一份到看得见的文件夹**（存到"下载"）；重置应用（README「重置」），**从备份恢复** 选它，再打开 **用户词库**。
-- **预期**：shi 第一个是置顶过的那个字，它在"固定的词"里，自定义短语里没有它；「澜境花园」在"手动添加的词"里；「时间」仍被屏蔽；「汪小明」在"自动学到的词"里（旧版学到的词都转成你的词）。升级后上屏一次，学习备份里就有这次安装的一份自动备份；从它恢复后「澜境花园」在"手动添加的词"、「汪小明」在"自动学到的词"、shi 置顶过的字在"固定的词"（第一份自动备份等旧版学习转完才存，带着旧的学习）。这一条在发版时用正式版跑。
+- **前提**：装着 v0.3.0 正式版，在里面：手动加词「澜境花园」；一段段打出「汪小明」一次（旧版一次就学成词）；添加五笔，一个字一个字打出码表里没有的两字词「好女」，等旧版自动造词把它存成词组（再打它的词组编码能出「好女」），记下这个编码。
+- **操作**：不卸载，安装要测的这一版（`adb install -r`）；打 l a n j i n g h u a y u a n；打 w a n g x i a o m i n g；打开 **用户词库**；切到五笔打记下的那个编码。
+- **预期**：安装成功，键盘照常出候选，没有报错；0.3.0 学到的词不再读进来（CHANGELOG 0.5「小改动」）：「澜境花园」「汪小明」不在 **用户词库** 里；码表保存的、表里没有的词组照样保留：打那个编码候选里有「好女」（表里本来就有的字词，0.3.0 的选词次数不再读进来，见 TBL-33）；设置照 PR-14（二）v0.3.0 那次的核对一样在。想留住 0.3.0 学到的，走两步：先升到 0.4.x，打几个字、停一下，再升到这一版（PR-14（一）的路）。这一条在发版时用正式版跑。
 
 ### PR-32 [P1] 恢复时屏蔽优先：备份里屏蔽的字，本机的固定让位
 <!-- learning: U-100 C9 -->
@@ -163,10 +183,10 @@
 - **预期**：「是」在"屏蔽的词"里，不在"固定的词"里；shi 的候选里没有「是」。
 - **JVM**：`PrivacyUatTest.aBlockInTheBackupWinsOverThePhonesPin`（:lib:ime-eval:uatTest，真数据）（恢复后「是」在屏蔽的词、不在固定的词，shi 没有它）；设备上不跑。
 
-### PR-35 [P1] 恢复 0.3.0 做的备份
+### PR-35 [P1] 0.3.0 做的备份被拒绝，什么都不变
 - **前提**：要测的这一版正式版，重置过（README「重置」）；`uat/fixtures/upgrade/v0.3.0/backup.zip` 放到"下载"。
-- **操作**：**备份与恢复 → 从备份恢复** 选它并确认；应用重启后照 `uat/fixtures/upgrade/v0.3.0/README.md` 列的每一项看设置，回测试页打出它列的字。发版时用 gate 3（`python3 uat/gates/gates.py backups <new.apk> --old <dir>`，uat/gates/README.md）跑：它恢复每个夹具的 `backup.zip` 后做同样的检查，过了就算这一条过，不用再手工做一遍。
-- **预期**：README 列的设置都和它说的一样（输入法和顺序、性能档位、括号成对、键盘高度、繁体、标点、自定义短语），它列的字打得出来；没有报错。这一条在发版时用正式版跑。
+- **操作**：**备份与恢复 → 从备份恢复** 选它并确认；读弹出的提示；回设置看 **输入法**、**通用输入**、自定义短语，回测试页打 d z。发版时用 gate 3（`python3 uat/gates/gates.py backups <new.apk> --old <dir>`，uat/gates/README.md）跑：它对 v0.3.0 的 `backup.zip` 期望被拒绝、设置不变，过了就算这一条过，不用再手工做一遍。
+- **预期**：恢复被拒绝，提示写着这个备份来自 0.3.0 或更早的版本，要先在 0.4.x 里恢复、打几个字、停一下、重新备份；应用不重启，设置和词都没变（输入法还是默认的，自定义短语里没有 dz，dz 打不出「北京市海淀区」）。这一条在发版时用正式版跑。
 
 ### PR-36 [P1] 恢复 0.3.1 做的备份
 - **前提**：同 PR-35，换成 `uat/fixtures/upgrade/v0.3.1/backup.zip`。
@@ -179,7 +199,7 @@
 - **预期**：双拼在列表里、顺序照旧；性能档位中档、括号成对关、键盘高度高；guojia 出「國家」；dz 第一候选是「北京市海淀区」；「鲸喵屿」排第一；`,` 是「、」。这一条在发版时用正式版跑。
 
 ### PR-38 [P1] 装回旧版本：本版的备份在 0.3.2 里恢复
-- **前提**：要测的这一版正式版，照 PR-14（一）的前提改好设置和自定义短语，以 root 在外部文件目录的 `data/data/quickphrase.d/` 里放一个 `mine.mb`（一行 `yx someone@example.com`），学一个词「鲸喵屿」（j i n g m i a o y u 选两次），在基础词库并入 `uat/fixtures/dict-words.txt`。
+- **前提**：要测的这一版正式版，照 PR-14（一）的前提改好设置和自定义短语，以 root 在 `/data/data/<包名>/files/host-data/data/quickphrase.d/` 里放一个 `mine.mb`（`chown` 成应用的用户）（一行 `yx someone@example.com`），学一个词「鲸喵屿」（j i n g m i a o y u 选两次），在基础词库并入 `uat/fixtures/dict-words.txt`。
 - **操作**：**备份全部**，把文件拷到电脑；卸载；装 v0.3.2 正式版，走完向导；把备份推回"下载"，**从备份恢复** 选它；看设置，回测试页打 g u o j i a、d z、j i n g m i a o y u，长按 **符** 打 y x；打开词库页。
 - **预期**：设置、输入法和顺序、繁体、标点、快速输入、自定义短语都回来（同 PR-14 的预期）；「鲸喵屿」排第一；词库页里看不到并入基础词库的 dict-words，它的词也打不出（docs/faq.md「想装回旧版本」）。这一条在发版时用正式版跑。
 
@@ -187,4 +207,29 @@
 - **前提**：设备上装了要测的版本。
 - **操作**：`adb shell dumpsys package <包名> | grep -i -A3 provider`；打开系统「文件」应用，看左侧的根目录列表。
 - **预期**：没有 `DocumentsProvider`（没有 `android.content.action.DOCUMENTS_PROVIDER` 的 provider）；文件应用的根目录里没有幽默输入法。
+- **JVM**：`BackupUatTest.noDocumentsProviderForTheFilesApp`（manifest 里的 provider 没有一个是 DocumentsProvider，也没有应答 `DOCUMENTS_PROVIDER` 的；没有它文件应用就列不出）；设备上不跑。
 - **备注**：脚本只查 `dumpsys`；文件应用的根目录手工看一眼。
+
+### PR-44 [P1] 备份带上网址和邮箱的列表和记下的内容
+- **前提**：B0-设置，在 **通用输入 → 网址和邮箱** 改过列表、关掉了「记住打过的邮箱地址」，并记住过地址。
+- **操作**：**用户数据 → 备份全部**；**清除数据** 后重新设置，**从备份恢复** 刚才的文件；回到 **网址和邮箱**。
+- **预期**：两个列表、开关、记住的地址都和备份前一样；后缀的排序（用过的次数）也恢复。
+- **JVM**：`BackupUatTest.aBackupBringsTheAddressListsAndWhatTheyLearned`（备份里的次数、地址、两个列表、开关原样恢复，读得回来）；设备上不跑。
+
+### PR-45 [P1] 学习备份带上后缀次数和记住的邮箱地址，恢复时合并
+- **前提**：B0，记住过 zhang@gmail.com，@gmail.com 用过几次。
+- **操作**：**用户数据 → 学习备份 → 复制备份**（或等自动备份）；然后在邮箱框打 li@qq.com 离开；**从这份备份恢复**；看 **通用输入 → 网址和邮箱**；再点「退回恢复前」再看。
+- **预期**：恢复后两个地址都在，li@qq.com 在前；@gmail.com 的次数取两边大的（不相加）。退回后只有 li@qq.com。用 0.4 做的学习备份恢复，不动这里的地址。
+- **JVM**：`BackupUatTest.aLearningBackupBringsWhatTheAddressBarLearned`（引擎做的备份带上地址，恢复时合并、取大次数、手机上的在前，退回恢复前回到原样）；设备上不跑。
+
+### PR-46 [P1] 从「备份全部」恢复时邮箱地址也是合并，退回恢复前是手机原来的
+- **前提**：B0，旧手机记住过 zhang@gmail.com（@gmail.com 用过 3 次），做了「备份全部」；这台手机记住过 li@qq.com。
+- **操作**：**用户数据 → 从备份恢复** 旧手机的文件；看 **通用输入 → 网址和邮箱**；再到 **学习备份** 点「退回恢复前」再看。
+- **预期**：恢复后两个地址都在，li@qq.com 在前，@gmail.com 是 3 次；退回后只有 li@qq.com。其余设置是文件里的。
+- **JVM**：`BackupUatTest.aSettingsBackupsAddressesMergeWithThePhones`（文件带着学习备份时设置里的地址留手机的，引擎启动时合并文件里的，退回恢复前回到手机的）；设备上不跑。
+
+### PR-47 [P1] 恢复 0.4 的备份：九键拼音也并入拼音
+- **前提**：要测的这一版，重置过；手机里有一个 0.4.x 导出的用户数据 `.zip`，导出前在 0.4 里加了九键拼音并拖到最上面（列表：九键拼音、拼音、英文）。
+- **操作**：**备份与恢复 → 从备份恢复**，选这个文件并确认；应用重启后看 **输入法** 列表和 **输入法 → 拼音 → 键盘**；回测试页点「普通文本」框。
+- **预期**：列表是拼音、英文，没有九键拼音；拼音的 **键盘** 是「九键」，弹出的键盘是九键。
+- **JVM**：`KotlinHostTest.aZeroFourBackupRestoredMergesItsNineKeysPinyinAgain`（恢复 0.4 的 profile 后重启，列表是拼音、英文，键盘是九键）；设备上不跑。

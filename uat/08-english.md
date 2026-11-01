@@ -25,7 +25,7 @@
 - **前提**：B0-英文。
 - **操作**：点 t e h，点空格（变成 the）；马上点 ⌫；再点空格；然后再打一次 t e h 空格。再打开 **输入法 → 英文 → 英文词库**，找「teh」，点它选 **恢复自动改**；回测试页清空，切到英文，打 t e h 点空格。
 - **预期**：退格后框里恢复成「teh」；最后一次打 teh 空格不再被改，框里末尾是「teh 」。英文词库的列表里有「teh」，标着不再自动改；恢复后 teh 空格又变成「the」。
-- **JVM**：`OtherInputMethodsUatTest.englishBackspaceRightAfterACorrectionUndoesItForGoodUntilRestored`（:lib:ime-eval:uatTest，真数据）；设备上照跑：英文词库页上 teh 那一行的标记和"恢复自动改"的按钮是界面，JVM 只断言打字和词库这一半。
+- **JVM**：`OtherInputMethodsUatTest.englishBackspaceRightAfterACorrectionUndoesItForGoodUntilRestored`（:lib:ime-eval:uatTest，真数据：打字和词库这一半）、`SettingsPagesUatTest.anEnglishWordNoLongerCorrectedIsMarkedAndCorrectedAgainOnATap`（英文词库里 teh 标着不再自动改，点它选恢复自动改，引擎被告知、标记没了）；设备上不跑。
 
 ### EN-06 [P1] 打标点时空格移到标点后面
 - **前提**：B0-英文。
@@ -62,6 +62,7 @@
 - **前提**：B0-英文。
 - **操作**：点 y o u m o，点空格（被改成别的词 X）；接着打 h i 空格；点回 X 这个词里，看候选，点原样的「youmo」；把光标移到末尾，再打 y o u m o 点空格。
 - **预期**：光标落进 X 时候选第一个是「youmo」；换回后框里是「youmo hi 」；最后一次空格上屏的是「youmo」，没有被改。
+- **JVM**：`EnglishUatTest.aCorrectionTappedBackIntoAndUndoneIsNotMadeAgain`（:lib:ime-eval:uatTest，真数据；youmo 被改后光标放到改出的词末尾、重新告诉引擎，候选第一个是 youmo，选回后再打不改）；设备上不跑。
 
 ### EN-12 [P1] 英文词库里加的词不会被改
 - **前提**：B0-设置，**输入法 → 英文** 的齿轮 → **英文词库**，添加 `qwzx`。
@@ -91,16 +92,18 @@
 - **前提**：B0-英文，打开 **滑行输入**，点「不要提示」框。
 - **操作**：划 h-e-l-l-o。再到英文设置里关掉 **单词提示**，回测试页在普通框里划 h-e-l-l-o。然后在这个框里清空，打 abc，再划 h-e-l-l-o，接着按一下退格；再划 h-e-l-l-o，接着打 `,`。
 - **预期**：前两次框里都是「hello 」，没有方块、问号之类的怪字符，也不会什么都没打上。打 abc 后划出的是「abc hello 」（有空格，不粘连）；按退格后整个「 hello 」删掉，剩「abc」；再划后打逗号，是「abc hello, 」（空格移到逗号后面），候选栏不出联想词。
+- **JVM**：`KeyboardFieldsUatTest.aNoSuggestionsFieldAndSuggestionsOffStillGlide`（两种情况都交出一次划词）、`EnglishUatTest.aGlideInANoSuggestionsFieldAndWithSuggestionsOffTypesTheWord`（:lib:ime-eval:uatTest，两次都是「hello 」；关掉单词提示后打 abc 再划是「abc hello 」，退格剩「abc」，再划打逗号是「abc hello, 」）；设备上照跑（候选栏不出联想词只在设备上看）。
 
 ### EN-21 [P1] 要求大写的框里划词：句首大写，专名和 I 保持大写；手动 ⇧ 也大写
 - **前提**：B0-英文，打开 **滑行输入**，点「句子」框（这个框要求句首大写），Shift 关着。
 - **操作**：清空，划 h-e-l-l-o，再划 l-o-n-d-o-n；打 `.` 和空格，划 i-m（i'm）。清空，打 `so ` 再划 i-m；到「不要提示」框（不自动大写）打 `ok ` 再划 i-m。在「不要提示」框清空，点一下 ⇧，划 h-e-l-l-o。
 - **预期**：框里是「Hello London. I'm 」：句首键盘自动打开 Shift，划出的第一个词大写；London 是词本身带的大写，句中照样保留；i'm 划出来是「I'm」，和点出来的一样。句中 Shift 关着时也一样：「So I'm 」（句首的 s 照常自动大写，I'm 在句中也大写）；不自动大写的框里是「ok I'm 」，不是「i'm」。点 ⇧ 后划的是「Hello 」（Shift 开着时首字母大写）。
+- **JVM**：`EnglishCapsUatTest.aGlideTakesShiftWhereTheFieldAsksACapitalOrItIsPressed`（键盘何时带 Shift）+ `EnglishUatTest.aGlideTakesShiftAWordsOwnCapitalAndI`（引擎的大写）；设备上不跑。
 
 ### EN-26 [P1] 在候选里点原样的词，算改回过一次
 <!-- learning: U-31 D11 -->
 - **前提**：B0-英文。
 - **操作**：打 t e h，点候选里原样的「teh」上屏；再打 t e h，点空格。
 - **预期**：最后一次 teh 空格不再被改，框里末尾是「teh 」（有改正时点原样的词，和上屏后退格改回一样，见 EN-04、docs/other-input-methods.md）；英文词库的"不再自动改的词"里有 teh。只是打过几次、没改回过的词照样会被改，这一条由单元测试 `EnglishUserTest.aWordTypedTwiceIsCorrectedStill` 管，设备上打不出"不经改正就上屏的 teh"。
-- **JVM**：`EnglishUatTest.theWordAsTypedPickedCountsAsACorrectionTakenBack`（:lib:ime-eval:uatTest，真数据）；设备上照跑：英文词库页上 teh 那一行的“不再自动改”是界面，JVM 只断言打字和词库这一半。
+- **JVM**：`EnglishUatTest.theWordAsTypedPickedCountsAsACorrectionTakenBack`（:lib:ime-eval:uatTest，真数据：打字和词库这一半）、`SettingsPagesUatTest.anEnglishWordNoLongerCorrectedIsMarkedAndCorrectedAgainOnATap`（英文词库里 teh 那一行写着不再自动改）；设备上不跑。
 

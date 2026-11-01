@@ -127,11 +127,11 @@ uat/tools/emu-keyboard.sh combo CTRL SPACE   # 按住前面的，按最后一个
 - **预期**：第一次 Shift 到英文；第二次回到五笔（不是拼音），q 的候选里有「我」。
 - **JVM**：`HardwareKeyUatTest.shiftBackFromEnglishIsWubiNotPinyin`（五笔 → 英文 → 五笔）；设备上不跑。
 
-### HK-14 [P1] Ctrl+Shift 轮流切换，跳过手写和九键
-- **前提**：B0-实体，在 **输入法** 里依次添加五笔、九键拼音、手写（列表：拼音、英文、五笔、九键拼音、手写）。
+### HK-14 [P1] Ctrl+Shift 轮流切换，跳过手写
+- **前提**：B0-实体，在 **输入法 → 拼音** 里把 **键盘** 选成「九键」，在 **输入法** 里依次添加五笔、手写（列表：拼音、英文、五笔、手写）。
 - **操作**：反复按 Ctrl+Shift，每次看光标旁闪出的名字。
-- **预期**：依次是 En → 五 → 拼 → En…，不出现九键和手写。
-- **JVM**：`HardwareKeyUatTest.ctrlShiftGoesRoundSkippingHandwritingAndNineKeys`（Ctrl+Shift 依次 En、五、拼、En，跳过九键和手写）；设备上不跑。
+- **预期**：依次是 En → 五 → 拼 → En…，不出现手写；拼音照常轮到（键盘选了九键，实体键盘上仍打全拼）。
+- **JVM**：`HardwareKeyUatTest.ctrlShiftGoesRoundSkippingHandwriting`（拼音在九键上，Ctrl+Shift 依次 En、五、拼、En，跳过手写）；设备上不跑。
 
 ### HK-15 [P1] Shift+Ctrl 顺序反过来也行
 - **前提**：B0-实体。
@@ -165,7 +165,7 @@ uat/tools/emu-keyboard.sh combo CTRL SPACE   # 按住前面的，按最后一个
 - **JVM**：`HardwareKeyUatTest.theTouchKeyboardBackIsHandwriting`（点小窗的键盘按钮，回来的是手写板）；设备上不跑。
 
 ### HK-20 [P1] 九键里按实体键盘打全拼
-- **前提**：B0-实体，添加了九键拼音；在屏幕键盘上切到九键。
+- **前提**：B0-实体，在 **输入法 → 拼音** 里把 **键盘** 选成「九键」。
 - **操作**：按 2 0 2 6 h a o 空格；点光标旁小窗上的键盘图标。
 - **预期**：框里是「2026好」；屏幕键盘回来，是九键。
 - **JVM**：`HardwareKeyUatTest.nineKeysTypedOnAndBack`（九键里按 2026hao 空格都发给引擎；回来是九键）；设备上不跑。

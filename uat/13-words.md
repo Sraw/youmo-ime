@@ -19,7 +19,7 @@ adb push uat/fixtures/userwords.txt uat/fixtures/dict-words.txt uat/fixtures/wor
 - **前提**：B0-设置。
 - **操作**：**词库与短语 → 用户词库**，在"手动添加的词"里点 **+**，词填「澜境花园」，拼音填 `lan jing hua yuan`，保存；再点 **+** 加「鲸喵屿」，拼音 `jing miao yu`；回测试页打 l a n j i n g h u a y u a n；点 ⌫ 删光，打 j i n g m i a o y u；删光，打 w o z h u z a i j i n g m i a o y u。回去点「澜境花园」，选 **编辑**，改成「澜境公园」（拼音 lan jing gong yuan）保存；回测试页打 lanjinggongyuan；再回去点它选 **删除**，回测试页再打 lanjinggongyuan。
 - **预期**：加第一个词后列表里出现「澜境花园」，词数从 0 变 1；打字时「澜境花园」排第一（「蓝鲸花园」不是词库里的词，只是能按整句打出来，没有同拼音的词时加的词排第一）；jingmiaoyu 第一个是「鲸喵屿」，整句第一个是「我住在鲸喵屿」；编辑后列表显示「澜境公园」，打字时它排第一（没有同拼音的词库词）；删除后它不在列表里，也不在候选里（输入法自己的设置页里打的字不学，删掉就只是不再当词给出）。
-- **JVM**：`WordsUatTest.aWordAddedByHandTypedAtOnceInSentencesEditedDeleted`（:lib:ime-eval:uatTest，真数据）；设备上照跑：词库页的列表、词数和编辑对话框是界面，JVM 只断言打字和词库这一半。
+- **JVM**：`WordsUatTest.aWordAddedByHandTypedAtOnceInSentencesEditedDeleted`（:lib:ime-eval:uatTest，真数据：打字和词库这一半）、`SettingsPagesUatTest.aWordAddedByHandListedCountedEditedDeleted`（列表里出现、词数 0→1、编辑框填着原词和拼音、改后和删除后的列表）；设备上留作冒烟（真设备上从词库页加词到键盘打出来的整条）。
 
 ### WD-06 [P1] 屏蔽词
 - **前提**：B0-设置。
@@ -79,7 +79,7 @@ adb push uat/fixtures/userwords.txt uat/fixtures/dict-words.txt uat/fixtures/wor
 
 ### WD-13 [P1] 关闭、删除导入的词库
 - **前提**：B0-设置，`dict-words.txt` 已放到"下载"目录；**词库与短语 → 导入词库** 选它，并入"基础词库（推荐）"。
-- **操作**：看词库目录（`adb shell ls /sdcard/Android/data/<包名>/files/data/pinyin/dictionaries`）；在词库页点它，看菜单，选 **关闭**；回测试页打 kemiaotangpu；再看词库目录；再回词库页点它，选 **删除**；回测试页打 kemiaotangpu；再看词库目录。
+- **操作**：看词库目录（以 root `ls /data/data/<包名>/files/host-data/pinyin/dictionaries`（redroid 上 `docker exec <容器> ls …`））；在词库页点它，看菜单，选 **关闭**；回测试页打 kemiaotangpu；再看词库目录；再回词库页点它，选 **删除**；回测试页打 kemiaotangpu；再看词库目录。
 - **预期**：导入后目录里是 `dict-words.txt.gz`（压缩存放，没有 `dict-words.txt`），关闭后是 `dict-words.txt.gz.disable`，删除后两样都没有；菜单只有"关闭"和"删除"；关闭后候选第一页不再有「氪喵糖铺」；删除后词库页没有它，候选第一页也没有「氪喵糖铺」。
 - **JVM**：`DictionaryUatTest.turnedOffThenDeleted`（目录依次是 dict-words.txt.gz、.gz.disable、没有；关闭和删除后合并文件里没有氪喵糖铺（菜单是界面））；设备上不跑。
 
@@ -95,16 +95,19 @@ adb push uat/fixtures/userwords.txt uat/fixtures/dict-words.txt uat/fixtures/wor
 - **前提**：B0-设置，`extra.scel`（搜狗细胞词库格式，两个词：「骁骎 xiao'qin」「琮璟 cong'jing」，各带词频）已放到"下载"目录。
 - **操作**：**词库与短语 → 导入词库**，选 `extra.scel`，**并入哪个词库？** 选"用户词库"，导入；打开 **导入的词**；回测试页打 c o n g j i n g 看候选。
 - **预期**：导入完成提示导入 2 个词；**导入的词** 里有 `extra.scel` 这一批；「琮璟」在候选里，排在词库自带的同拼音词（如「从警」）后面。（这条走用户词库的读法；并入基础词库时 .scel 先转换成文本，那条路见 WD-14z2。）
+- **JVM**：`LexiconUatTest.aScelFileIntoTheUserDictionaryIsImportedWords`（.scel 导入用户词库、批次、congjing 有琮璟）；设备上不跑。
 
 ### WD-14z2 [P1] 搜狗细胞词库（.scel）并入基础词库
 - **前提**：B0-设置，`extra.scel`（同 WD-14z）已放到"下载"目录。
 - **操作**：**词库与短语 → 导入词库**，选 `extra.scel`，**并入哪个词库？** 选"基础词库"，导入；回测试页打 c o n g j i n g 看候选。
 - **预期**：词库页"基础词库"一节里列出 `extra` 这个导入的词库；「琮璟」在候选里。（并入基础词库时 .scel 先转换成文本词库再编译，转换坏了只有这条能在设备上看出来。）
+- **JVM**：`BaseDictionaryUpgradeUatTest.aScelFileIntoTheBaseIsConvertedAndMerged`（.scel 转成文本词库并入基础词库、列出 extra、有琮璟）；设备上不跑。
 
 ### WD-14d [P0] 上百万词的大词库并入基础词库，键盘不崩
 - **前提**：B0-设置，雾凇拼音（rime-frost）发布的 `frost_dict_for_fcitx5.txt`（约 89 MB、191 万行，词、`'` 分开的拼音、概率三列；是哪一份、哈希多少见 [README](README.md) 的 fixtures 一行）已放到"下载"目录。
-- **操作**：**词库与短语 → 导入词库**，选它，看 **并入哪个词库？** 的标题；选"基础词库（推荐）"导入，等导入完；回测试页点输入框弹出键盘，按 [README](README.md#量-java-堆) 的做法量 Java 堆 5 次（导入前也这样弹出键盘、打几个字量 5 次作对照）；打 a b a z h o u（阿坝州）、g e n n i s h u o（跟你说）；看词库目录的文件大小（`adb shell ls -l /sdcard/Android/data/<包名>/files/data/pinyin/dictionaries`）。
+- **操作**：**词库与短语 → 导入词库**，选它，看 **并入哪个词库？** 的标题；选"基础词库（推荐）"导入，等导入完；回测试页点输入框弹出键盘，按 [README](README.md#量-java-堆) 的做法量 Java 堆 5 次（导入前也这样弹出键盘、打几个字量 5 次作对照）；打 a b a z h o u（阿坝州）、g e n n i s h u o（跟你说）；看词库目录的文件大小（以 root `ls -l /data/data/<包名>/files/host-data/pinyin/dictionaries`，redroid 用 `docker exec`）。
 - **预期**：读文件和导入时对话框有进度条和百分比（正在分析格式、正在整理词条……），一路往前走，各一分钟以内；标题下面写着"词库文本 · 拼音用 ' 分开 · 第三列是概率 · 1914461 个词 · 176 行读不懂"（词数只算带拼音的词，只写了词的行另写"N 个词没有拼音"）；导入完词库页"基础词库"一节列出 frost_dict_for_fcitx5，写着约 191 万个词；键盘照常弹出、打字不卡、不崩，Java 堆和导入前差不多（后 4 次读数的中位数比导入前多不到 64 MB；不该是上百 MB）；候选里有「阿坝州」，gennishuo 前三个候选里有「跟你说」；词库目录里是 `frost_dict_for_fcitx5.txt.gz`（约 24 MB）和 `merged.ymd`（约 50 MB），没有 `.txt`、`.tmp` 文件。
+- **注**：发版时用发布包在 redroid 上跑（`UAT_BUILD=release`，脚本照跑），平时不跑（用户 2026-10-30 定：要雾凇拼音，一条三四分钟）。
 
 ### WD-14e [P1] Rime 词库（.dict.yaml）认出格式，并入基础词库
 - **前提**：B0-设置，`rime-words.dict.yaml`（Rime 的表头，三个词，拼音用空格分开，带词频）已放到"下载"目录。
@@ -125,9 +128,11 @@ adb push uat/fixtures/userwords.txt uat/fixtures/dict-words.txt uat/fixtures/wor
 - **JVM**：`DictionaryUatTest.pastAHundredThousandWordsIsNoImportForTheUser`（100,001 个词的文件算出 100,001 个，用户词库放不下，提示这个词库太大）；设备上不跑。
 
 ### WD-14h [P0] 从 0.3.1 升级：已导入的大词库在后台转换、合成，键盘不崩
-- **前提**：B0-设置，先回测试页弹出键盘、打几个字，按 [README](README.md#量-java-堆) 的做法量 Java 堆 5 次作对照；强行停止应用；把 `frost_dict_for_fcitx5.txt` 按 0.3.1 存词库的样子放进词库目录：`adb push frost_dict_for_fcitx5.txt /sdcard/Android/data/<包名>/files/data/pinyin/dictionaries/frost.txt`，删掉那里的 `merged.ymd`（如果有）；再放一个 0.3.1 停用的词库 `old.txt.disable`（一行「氪喵星港 ke'miao'xing'gang 0.0」）。
+- **前提**：B0-设置，先回测试页弹出键盘、打几个字，按 [README](README.md#量-java-堆) 的做法量 Java 堆 5 次作对照；强行停止应用；把 `frost_dict_for_fcitx5.txt` 按 0.3.1 存词库的样子放进词库目录：先 `adb push frost_dict_for_fcitx5.txt /data/local/tmp/`，再以 root 拷成 `/data/data/<包名>/files/host-data/pinyin/dictionaries/frost.txt` 并 `chown` 成应用的用户（目录没有就建，同样 `chown`），删掉那里的 `merged.ymd`（如果有）；再放一个 0.3.1 停用的词库 `old.txt.disable`（一行「氪喵星港 ke'miao'xing'gang 0.0」）。
 - **操作**：回测试页点输入框弹出键盘，马上打几个字；等到词库目录里有了 `merged.ymd`、没有 `frost.txt`（最多五分钟），看词库目录；按 [README](README.md#量-java-堆) 的做法量 Java 堆 5 次；打 a b a z h o u。
 - **预期**：键盘马上弹出、照常打字，不崩、不卡（0.3.1 在这里每次弹键盘都内存不够、最后崩掉）；转换、合成时空闲栏写着「正在升级词库格式 N%」，下面一条细进度线往前走；合好后提示「词库格式已升级」；五分钟内词库目录里是 `frost.txt.gz`、`old.txt.gz.disable` 和 `merged.ymd`，`frost.txt`、`old.txt.disable` 没有了；Java 堆和对照差不多（后 4 次读数的中位数多不到 64 MB）；候选里有「阿坝州」，打 g e n n i s h u o 前三个候选里有「跟你说」；词库页列出 frost，写着约 191 万个词；old 列成「已关闭」，打 kemiaoxinggang 没有「氪喵星港」。合成快（正式版约半分钟）时空闲栏和提示可能来不及看到，以目录、合成日志和候选为准。
+- **JVM**：`BaseDictionaryUpgradeUatTest.v031sTextDictionariesAreUpgradedAtTheStart`（0.3.1 的目录：frost.txt、old.txt.disable 转成 .gz、合成 merged.ymd、开关照旧、阿坝州有、氪喵星港无）；设备上只看真升级不崩。
+- **注**：发版时用发布包在 redroid 上跑（`UAT_BUILD=release`，脚本照跑），平时不跑（用户 2026-10-30 定：要雾凇拼音，一条三四分钟）。
 
 ### WD-14i [P1] 导入大词库时取消：什么都不变
 - **前提**：B0-设置，已按 WD-14e 把 `rime-words.dict.yaml` 并入基础词库；`frost_dict_for_fcitx5.txt` 放在下载目录。
@@ -138,7 +143,7 @@ adb push uat/fixtures/userwords.txt uat/fixtures/dict-words.txt uat/fixtures/wor
 ### WD-14j [P1] 停用、启用、删除词库：合好之前页面说正在更新
 - **前提**：B0-设置，已按 WD-14e 把 `rime-words.dict.yaml` 并入基础词库。
 - **操作**：在词库页点 rime-words → **关闭**，打 k e m i a o x i n g g a n g；再 **开启**，再打；再 **删除**，再打。每次操作后看词库目录。（换成 frost 这样的大词库更容易看到进度，见 WD-14j2。）
-- **预期**：每次操作后行的状态马上变，词库目录（`adb shell ls /sdcard/Android/data/<包名>/files/data/pinyin/dictionaries`）里依次是 `rime-words.txt.gz.disable`、`rime-words.txt.gz`，删除后都没有；合成时间长时（大词库）「基础词库」一节显示「正在更新词库」和「正在更新 N%，完成前打字仍用原来的词库」，合好以后词数更新（3 个词的小词库来不及看到）；关闭后没有「氪喵星港」，开启后又有，删除后行没了、也没有这个词。
+- **预期**：每次操作后行的状态马上变，词库目录（以 root `ls /data/data/<包名>/files/host-data/pinyin/dictionaries`（redroid 上 `docker exec <容器> ls …`））里依次是 `rime-words.txt.gz.disable`、`rime-words.txt.gz`，删除后都没有；合成时间长时（大词库）「基础词库」一节显示「正在更新词库」和「正在更新 N%，完成前打字仍用原来的词库」，合好以后词数更新（3 个词的小词库来不及看到）；关闭后没有「氪喵星港」，开启后又有，删除后行没了、也没有这个词。
 - **JVM**：`DictionaryUatTest.turnedOffOnAndDeleted`（关闭、开启、删除后目录依次是 .gz.disable、.gz、没有，氪喵星港随之没有、有、没有）；设备上不跑。
 
 ### WD-14j2 [P1] 大词库合成中关闭另一个词库
@@ -192,7 +197,7 @@ adb push uat/fixtures/userwords.txt uat/fixtures/dict-words.txt uat/fixtures/wor
 ### WD-14r [P0] 从 0.3.2 升级：导入的大词库转换成压缩的，空间省下一大半
 - **前提**：装着 v0.3.2 正式版（不是要测的这一版），在它里面按 WD-14d 把雾凇拼音并入基础词库，等合好（候选里有「阿坝州」）；再导入 `dict-words.txt` 并入基础词库后把它 **关闭**；记下 **系统设置 → 应用 → 幽默输入法 → 存储** 的"用户数据"大小和词库目录（`adb shell ls -l /sdcard/Android/data/<包名>/files/data/pinyin/dictionaries`：`frost_dict_for_fcitx5.txt`、`dict-words.txt.disable`、`merged.ymd` 约 106 MB）。
 - **操作**：不卸载，直接安装要测的这一版正式版（`adb install -r`）；回测试页点输入框弹出键盘，马上打几个字；等到提示「词库格式已升级」（最多三分钟）；看词库目录和应用的存储；打 a b a z h o u、k e m i a o t a n g p u；打开词库页。
-- **预期**：键盘马上弹出、照常打字；空闲栏写着「正在升级词库格式 N%」，进度一路往前走，合好以后提示「词库格式已升级」；词库目录里是 `frost_dict_for_fcitx5.txt.gz`（约 24 MB）、`dict-words.txt.gz.disable` 和 `merged.ymd`（约 50 MB），没有 `.txt`、`.tmp` 文件；"用户数据"比升级前少约 120 MB；候选里有「阿坝州」，kemiaotangpu 第一页没有「氪喵糖铺」；词库页里 frost 已开启、约 191 万个词，dict-words 已关闭。这一条在发版时用正式版跑。
+- **预期**：键盘马上弹出、照常打字；空闲栏写着「正在升级词库格式 N%」，进度一路往前走，合好以后提示「词库格式已升级」；外部的 `files/data` 已经没有了（升级后搬进应用自己的目录，核对好就删了旧的，同 PR-41）；词库目录（以 root 看 `/data/data/<包名>/files/host-data/pinyin/dictionaries`，redroid 用 `docker exec`）里是 `frost_dict_for_fcitx5.txt.gz`（约 24 MB）、`dict-words.txt.gz.disable` 和 `merged.ymd`（约 50 MB），没有 `.txt`、`.tmp` 文件；"用户数据"比升级前少约 120 MB；候选里有「阿坝州」，kemiaotangpu 第一页没有「氪喵糖铺」；词库页里 frost 已开启、约 191 万个词，dict-words 已关闭。这一条在发版时用正式版跑。
 
 ### WD-14s [P1] 升级转换词库时强行停止，再打开接着做完
 - **前提**：B0-设置，按 WD-14h 的前提放好 0.3.1 样子的 `frost.txt`（不放 `old.txt.disable`）。
@@ -268,13 +273,25 @@ adb push uat/fixtures/userwords.txt uat/fixtures/dict-words.txt uat/fixtures/wor
 - **前提**：B0-设置。
 - **操作**：**词库与短语 → 自定义短语**，点 **+**：输入码 `dz`，候选位置 1，短语「北京市海淀区」，保存；回测试页打 d z 看候选；选第二个候选 W，点 **。**；再点 d z 选 W，点 **。**；再点 d z。回去点这一行的文字（不是笔图标），在打开的编辑对话框里把短语改成「上海市」保存；回测试页打 dz 看候选；再回去点这一行，在对话框里点 **删除**；回测试页打 dz。
 - **预期**：加好后打 dz 候选第一个是「北京市海淀区」；选过两次 W 后第一个仍是「北京市海淀区」，W 排在它后面的第一个（学到的只在短语以外排）；改后候选第一个是「上海市」；删除后打 dz 没有这条短语。
-- **JVM**：`WordsUatTest.aCustomPhraseAddedNotMovedByLearningEditedDeleted`（:lib:ime-eval:uatTest，真数据）；设备上照跑：自定义短语页的添加、编辑对话框和删除是界面，JVM 只断言打字和词库这一半。
+- **JVM**：`WordsUatTest.aCustomPhraseAddedNotMovedByLearningEditedDeleted`（:lib:ime-eval:uatTest，真数据：打字和词库这一半）、`SettingsPagesUatTest.aCustomPhraseAddedEditedOnItsRowAndDeleted`（自定义短语页 + 加 DZ（存成 dz）、点行文字打开填好的编辑框改成上海市、框里的删除；每次离开页面存进短语文件并让引擎重读）；设备上不跑。导入、导出见 WD-37。
 
-### WD-19 [P1] 九键里自定义短语不生效，双拼里按字母匹配
-- **前提**：B0-设置，在 **词库与短语 → 自定义短语** 里加输入码 `dz`、位置 1、短语「北京市海淀区」；添加九键拼音和双拼。
-- **操作**：回测试页切到九键，点 3 9；再切到双拼，点 d z。
-- **预期**：九键的候选里没有「北京市海淀区」（九键打的是数字）；双拼的候选里有「北京市海淀区」。
-- **JVM**：`LexiconUatTest.phrasesNotOnTheNineKeysButInShuangpin`（:lib:ime-eval:uatTest，真数据）（九键 39 没有短语，双拼 dz 有）；设备上不跑。
+### WD-19 [P1] 自定义短语在每种键盘上都能打
+- **前提**：B0-设置，在 **词库与短语 → 自定义短语** 里加输入码 `dz`、位置 1、短语「北京市海淀区」；拼音的键盘依次试九键、14 键、18 键，双拼（26 键、18 键、14 键、九键）、五笔和英文；英文的键盘也选成九键试一次。
+- **操作**：回测试页，每个键盘上按 d z 所在的键：九键点 3 9，14 键点 DF ZX，拼音 18 键点 SD XC，双拼 26 键点 d z，18 键、九键双拼点 d、z 所在的键，五笔、英文点 d z；最后选「北京市海淀区」。
+- **预期**：拼音的几种键盘上「北京市海淀区」都是第一个候选；五笔里它在 dz 自己的第一个字之后（第二个），英文里在打的 dz 之后（第二个），空格照旧上屏第一个；选它框里是「北京市海淀区」。关掉 dz 的短语后点地球键切到九键英文，点 3 9：候选栏只有 3 9 打得出的英文词（真词表里 3 9 开头的词很多，栏不会空），没有「北京市海淀区」，也不在词前多出一个单独的猜测词。
+- **JVM**：`LexiconUatTest.aPhraseOnEveryKeyboard`（:lib:ime-eval:uatTest，真数据）、`EnglishPhrasesTest.wherePhrasesGo`（:lib:ime-core:test，九键有词、短语关着时只出词，没有词时也不出猜测）；设备上不跑。
+
+### WD-35 [P1] 自定义短语的输入码存成小写，哪种键盘都打得出
+- **前提**：B0-设置。
+- **操作**：**词库与短语 → 自定义短语**，点 **+**：输入码打 `DZ`，候选位置 1，短语「北京市海淀区」，保存；离开再打开这一页看这一行；回测试页全键盘打 d z；再在 **输入法 → 拼音** 里把 **键盘** 选成「九键」，回测试页点 3 9。
+- **预期**：列表里输入码显示 `dz`，不是 `DZ`；全键盘和九键上「北京市海淀区」都是第一个候选（docs/words.md「大写会存成小写」）。
+- **JVM**：`SettingsPagesUatTest.aCustomPhraseAddedEditedOnItsRowAndDeleted`（键入 `DZ` 存成 `dz`，组字中键入的大写字母变成小写、输入法的组字区间保住；列表的显示和重新打开这一页不在内）、`LexiconUatTest.aPhraseOnEveryKeyboard`（同 WD-19，结果记在 WD-19 下；:lib:ime-eval:uatTest，dz 在每种键盘上第一）；设备上不跑。
+
+### WD-36 [P1] 码表里只有短语能打出的编码：点一下才上屏
+- **前提**：B0-设置，添加五笔，在 **词库与短语 → 自定义短语** 里加输入码 `abb`、位置 1、短语「张三」（`abb` 换成五笔里没有任何字词以它开头的编码也行：`qm` 这类两码下面都有更长的码，短语排不到第一）。
+- **操作**：回测试页切到五笔，打 a b b，点空格；再打 a b b，点 `,`；再打 a b b，点「张三」。
+- **预期**：打 abb 时「张三」是第一个（也是唯一的）候选；空格、`,` 都不上屏它，编码清掉；点它才上屏「张三」（docs/words.md「码表里只有短语能打出的编码」）。
+- **JVM**：`TablePhraseOnlyCodeTest.aKeyThatEndsTheCodeCommitsNoPhrase`、`TablePhraseOnlyCodeTest.aTapTakesThePhrase`（:lib:ime-core，只有 w、wq 的小码表：空格、选择键、`,` 清码不上屏，点击上屏）；设备上不跑。
 
 ## 学到的东西：看、删、清
 
@@ -311,3 +328,9 @@ adb push uat/fixtures/userwords.txt uat/fixtures/dict-words.txt uat/fixtures/wor
 - **操作**：回测试页点 n i h a o。
 - **预期**：「你好」只出现一次；「您好呀」是第三个候选。
 - **JVM**：`LexiconUatTest.aPhraseAlreadyBeforeDoesNotMoveTheNextUp`（:lib:ime-eval:uatTest，真数据）（你好只出现一次，您好呀第三）；设备上不跑。
+
+### WD-37 [P1] 自定义短语的导入和导出
+- **前提**：B0-设置；已有自定义短语 `dz` →「北京市海淀区」（同 WD-18）；把 `uat/fixtures/phrases.txt`（`dz,1=北京市海淀区`、`sh,1=上海`）推到 `/sdcard/Download/`。
+- **操作**：**词库与短语 → 自定义短语**，等 **+** 出现，右上角 ⋮ → **导入**，在下载里选 phrases.txt；返回，再进这一页看列表；回测试页打 s h；再回这一页 ⋮ → **导出**，在下载里保存；取回导出的文件看内容。
+- **预期**：导入后列表里「北京市海淀区」只有一条（已有的不重复加），多了 sh →「上海」，提示「导入了 1 条短语」（脚本截图留给人看）；离开再回来两条都在；sh 第一候选是「上海」；下载里多出一个导出的文件（同名的已有时存成「… (1).txt」），里面有 `dz,1=北京市海淀区` 和 `sh,1=上海` 两行。
+- **JVM**：`SettingsPagesUatTest.nothingIsAddedToTheCustomPhrasesBeforeTheirFileIsRead`（短语文件读完前没有 +、导入导出不可用；读完前送达的导入、导出等读完再做：导入不重复、离开页面时存下，导出不是空文件；这一状态手上看不到，只在 JVM 上断言）；设备上照跑：文件选择器、导入导出的真实文件只在设备上有。

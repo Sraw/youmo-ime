@@ -14,7 +14,7 @@ any change to behaviour or settings.
   Written so it is testable in milliseconds. Guarded by animal-sniffer (Android API 29 surface)
   and Kover floors (90% overall, 60% per package).
 - `app` — Android glue: Views, the `InputMethodService`, preferences, file-backed managers,
-  `core/` (`KotlinFcitx`, which runs ime-core's `host/` — the fcitx host ported to Kotlin — on one thread). Keep it thin: read prefs / Android state, pass *values* into ime-core
+  `core/` (`KotlinHost`, which runs ime-core's `host/` — the fcitx host ported to Kotlin — on one thread). Keep it thin: read prefs / Android state, pass *values* into ime-core
   classes, apply the returned decision.
 - `app/src/voice` / `app/src/text` — the `speech` flavor dimension: the two builds.
   Voice input (sherpa-onnx, X-ASR, silero VAD; `VoiceDataPlugin`) and `RECORD_AUDIO` exist
@@ -44,19 +44,19 @@ any change to behaviour or settings.
 | English glide typing measured on simulated paths: first, first three, time a word | `ime-eval english-glide <english.data> lib/ime-eval/data/english.txt [--wobble 0.3] [--misses <out.tsv>]` |
 | Pinyin glide typing measured the same way, a dictionary word at a time (`--word nihao`: one clean path's readings; 双拼, the nine keys, a table's codes instead) | `ime-eval pinyin-glide <pinyin.data> lib/ime-eval/data/pinyin-chat.tsv [--shuangpin Ziranma \| --keys nine \| --table <wbx.data>] [--misses <out.tsv>]` |
 
-Unit tests need no NDK or CMake (the repo has no submodules). Instrumented tests (`FcitxTest`, `SoftKeyboardTest`)
+Unit tests need no NDK or CMake (the repo has no submodules). Instrumented tests (`HostTest`, `SoftKeyboardTest`)
 need an APK build and an emulator; CI runs them weekly / on PRs labelled `emulator`.
 
 ## Conventions
 
 - New logic gets a unit test in the same change. Prefer fakes over mockk: `FakeEditor`
-  (ime-core testFixtures) and `FakeFcitxAPI` (app test sources). `FakeEditor` is held to the real
-  `BaseInputConnection` by a contract test; `FakeFcitxAPI` is not (the real `KotlinFcitx` needs the engine's data), so keep
+  (ime-core testFixtures) and `FakeHostApi` (app test sources). `FakeEditor` is held to the real
+  `BaseInputConnection` by a contract test; `FakeHostApi` is not (the real `KotlinHost` needs the engine's data), so keep
   it dumb: store config, record calls, simulate no input.
 - `unitTests.isReturnDefaultValues = false` on purpose: a JVM test that reaches an android.jar
   stub should fail loudly. Anything needing the framework runs under Robolectric.
-- `FcitxAPI.getImConfig`, `getAddonSubConfig` and friends are `suspend` and run on the fcitx thread.
-  Do not add `runBlocking` on the main thread; `FcitxConnection.runImmediately` is for cached
+- `HostApi` (its parts `TypingApi`, `EngineSettingsApi.imOptions`, `PunctuationApi.punctuationMap` and friends) is `suspend` and runs on the fcitx thread.
+  Do not add `runBlocking` on the main thread; `HostConnection.runImmediately` is for cached
   reads and `eventFlow` only.
 - detekt findings are frozen in `config/detekt/baseline-*.xml`. New code must not add to them;
   don't regenerate the baseline just to silence a new finding.

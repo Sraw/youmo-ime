@@ -152,7 +152,7 @@ handwriting is used) and `libyoumo-matrix` (`matrix-kernel.cpp`, the sentence mo
 The APK's `.so` files are those, onnxruntime's and `libc++_shared`. Host tests for native helpers:
 `lib/sherpa-onnx/host-test.sh` (CI runs it).
 
-When adding a method to `FcitxAPI`, read the Kotlin incremental compilation
+When adding a method to `HostApi`, read the Kotlin incremental compilation
 trap in [pitfalls.md](pitfalls.md#kotlin-ic-and-interface-delegation) before building an APK.
 
 ## Versions and releases
@@ -180,4 +180,4 @@ trap in [pitfalls.md](pitfalls.md#kotlin-ic-and-interface-delegation) before bui
 | `unit_test.yml` | push, PR | `:lib:ime-core:check`, dict-tool and eval tests, build-logic tests, `:app:testTextDebugUnitTest`, voice test compile, sherpa-onnx's host tests, Python tool tests (`lexicon/tools`, `lib/ime-eval/tools`), detekt, Kover reports, test failures annotated |
 | `pull_request.yml` | PR | `assembleTextRelease` and `assembleVoiceRelease` on Ubuntu (unsigned) |
 | `engine_downloads.yml` | push to main changing `EngineDataPlugin.kt`, `HandwritingDataPlugin.kt`, `lib/handwriting/build.gradle.kts` or the workflow; Mon/Thu 04:41; on demand | the engine data's download tasks alone (the handwriting models and onnxruntime too, a cache of their own), saving the `engine-downloads-*` cache a new pull request's build reads |
-| `emulator_test.yml` | weekly, and PRs labelled `emulator` | instrumented tests (`FcitxTest`, `SoftKeyboardTest` …) for Text and Voice on an API 35 emulator |
+| `emulator_test.yml` | weekly, and PRs labelled `emulator` | instrumented tests (`HostTest`, `SoftKeyboardTest` …) for Text and Voice on an API 35 emulator |

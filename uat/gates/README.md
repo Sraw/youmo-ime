@@ -7,7 +7,7 @@ Each brings up its own fresh redroid (`--container`, `--port`, `--cpus`; default
 
 | Gate | Command | What |
 |---|---|---|
-| 2 | `python3 uat/gates/gates.py upgrade <new.apk> [--old <dir>]` | each `uat/fixtures/upgrade/v0.3.x` upgraded to the new build, then 13 checks (14 with a `de.tar`) |
+| 2 | `python3 uat/gates/gates.py upgrade <new.apk> [--old <dir>]` | each `uat/fixtures/upgrade/v0.3.x` upgraded to the new build, then 14 checks (15 with a `de.tar`) |
 | 3 | `python3 uat/gates/gates.py backups <new.apk> --old <dir>` | the new build's 备份全部 restored into v0.3.0/0.3.1/0.3.2; each fixture's `backup.zip` restored into the new build |
 | 5 | `python3 uat/gates/gates.py perf <label>=<apk>…` | cold start (keyboard, host up, first candidate), per-key latency, PSS/Native/Java heap, side by side |
 
@@ -17,7 +17,10 @@ The checks (`phase.py check`), the same after every upgrade and restore: the fix
 (括号成对 关, 键盘高度 高, 性能档位 中档 in the file and on the settings page), the input method list
 and order, 繁体 on (`guojia` gives 國家), the punctuation map (`,` gives 、), the custom phrase
 (`dz`), the learned word (`jingmiaoyu` gives 鲸喵屿 first), each read from the files as fcitx reads
-them and typed on the test page. A fixture with a `de.tar` (device-protected storage, made by
+them and typed on the test page (from `host-config/` and `host-data/` in the app's own storage; for a
+v0.3.x build installed in gate 3, from `config/` and `data/` on the external storage, where it keeps
+them). Gate 2 also checks that the external storage's old `config/`, `data/` and `theme/` are deleted
+once the first start has moved them (in gate 3 the restore is what is under test). A fixture with a `de.tar` (device-protected storage, made by
 `make.py` since R15; the three v0.3.x fixtures predate it, so remake them to cover this) also has it
 restored, and the check adds that the old native host's synced data there (`descriptor.json`,
 `usr/`) is gone after the new build's first start (gate 2 only: in gate 3 an installed 0.3.x build keeps its own synced data there); without one, that migration is not exercised.

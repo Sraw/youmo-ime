@@ -6,10 +6,10 @@ Things that cost hours before. Each says how it shows and what to do.
 
 ### Kotlin IC and interface delegation
 
-After adding a method to `FcitxAPI` (or any interface implemented elsewhere with `by`), the
-incremental Kotlin build can leave a delegating class (`object : FcitxAPI by fcitx` in another
+After adding a method to `HostApi` (or any interface implemented elsewhere with `by`), the
+incremental Kotlin build can leave a delegating class (`object : HostApi by fcitx` in another
 file) without the new method. It compiles; the app crashes with `AbstractMethodError` the first
-time the method is called. Unit tests and Robolectric miss it (they use `FakeFcitxAPI`).
+time the method is called. Unit tests and Robolectric miss it (they use `FakeHostApi`).
 Before building an APK to test or ship after such a change, delete
 `app/build/intermediates/built_in_kotlinc/<variant>` (and `app/build/kotlin/compile<Variant>Kotlin`
 if present). Check with `javap`/`dexdump` that the delegate has the method.
@@ -46,7 +46,7 @@ library dropped from `lib/handwriting` or `lib/sherpa-onnx` later: exclude it th
 On the phone, 0.3.x's data sync left fcitx's files in device-protected storage (`usr/`, `learn/`,
 `README.md`, listed in `descriptor.json`; 7.4 MB from 0.3.2). `FcitxApplication.deleteNativeData` removes exactly
 the listed paths at the first start after the upgrade, the descriptor last (no descriptor: nothing
-to do). User data was never there: fcitx's config and data are in the external files dir.
+to do). User data was never there: fcitx's config and data were in the external files dir (now `files/host-config`, `files/host-data`, A4).
 
 ## Android behaviour
 
@@ -118,9 +118,6 @@ foreground app. What the keyboard says goes in its notice instead, `FcitxInputMe
 - A data format change without a version bump is read as garbage by an old reader, or crashes on a
   key press. Bump, and refuse what cannot be read.
 - User logs must stay readable by the next build and skippable by the previous one.
-- A downgrade to 0.3.0 while 0.3.1's first conversion is still owed (`learn.converting`) loses the
-  older build's counts: when 0.3.1 is installed again it finds a log that is not empty and has no
-  marker, takes only the words (`LegacyConversion.since`), and writes the marker. Rare, and accepted.
 - Never write a mapped file in place (`merged.ymd`, the tables' `.ymc`): the engine reads it while
   you write, and a page changed under a mapping is garbage to it, or a SIGBUS once the file is
   shorter. Write `<name>.tmp`, fsync, rename over it; the old mapping keeps the old inode.
@@ -133,8 +130,7 @@ foreground app. What the keyboard says goes in its notice instead, `FcitxInputMe
 - Never turn or delete a dictionary by the `File` a page listed: a conversion may have replaced
   `x.txt` by `x.txt.gz` since. Resolve the name under the lock.
 - After an upgrade from 0.3.1/0.3.2 imported words are missing until the conversion and compile end
-  (accepted). A 0.3.0 learning conversion still owed then (`UserLexicon.legacyModel` via
-  `dictionaryNow`) runs without merged words: rare, accepted.
+  (accepted).
 - A downgrade to 0.3.2 lists no `.txt.gz`: imported base dictionaries are hidden there (the files
   stay; 0.3.2 deletes `merged.ymd` v2 and the `.ymc`s) and come back on re-upgrade; a same-name
   import made in 0.3.2 wins then (its `.txt` is converted over the `.gz`).
@@ -146,7 +142,7 @@ foreground app. What the keyboard says goes in its notice instead, `FcitxInputMe
 - A class that reads `AppPrefs` in its initialiser fails in a JVM test until
   `AppPrefs.init(...)` is called; the message says so.
 - `isReturnDefaultValues = false`: reaching an android.jar stub throws. Use Robolectric for that test.
-- `FakeFcitxAPI` simulates no input; a test that needs the engine to type belongs in ime-core
+- `FakeHostApi` simulates no input; a test that needs the engine to type belongs in ime-core
   against `Engines` / a `Session`, or in the instrumented tests.
 
 ## Shell on the dev machine

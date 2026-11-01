@@ -13,7 +13,7 @@ user, and every setting, is in [`docs/`](../docs/README.md).
 | [data-and-build.md](data-and-build.md) | touching `build-logic`, a data release, `lexicon/`, native code, versions, CI |
 | [testing.md](testing.md) | finishing any change: which tests, the evaluation, trying it on a device |
 | [conventions.md](conventions.md) | writing code, comments, commits; adding a setting; product rules that are decided |
-| [host.md](host.md) | touching `lib/ime-core/.../host` or `KotlinFcitx`, the fcitx host in Kotlin: the key pipeline and its extension points, which input method a field is on |
+| [host.md](host.md) | touching `lib/ime-core/.../host` or `KotlinHost`, the fcitx host in Kotlin: the key pipeline and its extension points, which input method a field is on |
 | [pitfalls.md](pitfalls.md) | debugging something odd; before building an APK to ship or test |
 
 ## The project in five lines

@@ -12,11 +12,11 @@
 | 文件 | 范围 |
 |---|---|
 | [01-setup.md](01-setup.md) | 安装、向导、添加和排列输入法、切换输入法 |
-| [02-keyboard.md](02-keyboard.md) | 全键盘的每个键、长按、滑动、网址邮箱框、括号成对、滑行输入 |
-| [03-t9.md](03-t9.md) | 九键键盘和九键拼音 |
-| [04-panels.md](04-panels.md) | 数字键盘、符号面板、表情面板、表情拼音搜索 |
-| [05-toolbar.md](05-toolbar.md) | 工具栏、文本编辑、剪贴板、状态面板、单手模式、悬浮键盘、计算结果 |
-| [06-pinyin.md](06-pinyin.md) | 全拼：整句、简拼、纠错、模糊音、中英混输、笔画、联想、长按候选、学词、拆字、表情候选、自带日期时间、滑行；拼音 14 键 |
+| [02-keyboard.md](02-keyboard.md) | 全键盘的每个键、长按、滑动、网址邮箱框、网址和邮箱建议、括号成对、滑行输入、笔画筛选 |
+| [03-t9.md](03-t9.md) | 九键键盘（拼音的九键、九键英文） |
+| [04-panels.md](04-panels.md) | 数字键盘（含日期、时间、电话这些框自带的数字键盘）、符号面板、表情面板、表情拼音搜索 |
+| [05-toolbar.md](05-toolbar.md) | 工具栏（含自选的工具栏按钮）、文本编辑、剪贴板（含切词、历史上限）、状态面板（含 ⋯ 里的「键盘」）、单手模式、悬浮键盘、计算结果 |
+| [06-pinyin.md](06-pinyin.md) | 全拼：整句、简拼、纠错、模糊音、中英混输、笔画、联想、长按候选、学词、拆字、表情候选、自带日期时间、滑行、笔画筛选；拼音 18 键和 14 键 |
 | [07-shuangpin.md](07-shuangpin.md) | 双拼 |
 | [08-english.md](08-english.md) | 英文 |
 | [09-handwriting.md](09-handwriting.md) | 手写 |
@@ -32,7 +32,7 @@
 | [19-motion-notices.md](19-motion-notices.md) | 提示条（位置、替换、配色）、始终显示悬浮条、候选字号 |
 | [fixtures/](fixtures/) | 测试页 `fields.html` 和导入用的词表 |
 
-设备上跑的大词库用例（WD-14d、14h、TBL-12c；发版时手动跑的 WD-14r、14v、TBL-12d 也要；14i、14s 等搬到 JVM 的用 fixtures 里的 big-words.txt 或小词表，不要它）要雾凇拼音（[rime-frost](https://github.com/gaboolic/rime-frost/releases)）发布的
+大词库用例（WD-14d、14h、TBL-12c 发版时在 redroid 上用发布包跑，平时不跑；发版时手动跑的 WD-14r、14v、TBL-12d 也要；14i、14s 等搬到 JVM 的用 fixtures 里的 big-words.txt 或小词表，不要它）要雾凇拼音（[rime-frost](https://github.com/gaboolic/rime-frost/releases)）发布的
 `frost_dict_for_fcitx5.txt`，约 89 MB，不放进 fixtures：下载后用环境变量 `UAT_FROST=<路径>` 指给脚本。用例里的数
 （1914461 个词、176 行读不懂）出自 SHA-256 为 `86473190c505691c7f1ef7b87345a16b555c75fea30527f472a151b6eb1ad41f`
 的那一份（1914637 行），脚本先核对哈希，对不上记为 Blocked；换新版时连同用例里的数一起改。
@@ -78,7 +78,7 @@
 
 **B0-14键**：B0，然后在 **输入法 → 拼音** 里把 **键盘** 选成「14 键」，回测试页点「普通文本」框。
 
-**B0-18键**：B0，在 **输入法** 里添加"双拼"（方案是默认的自然码），然后在 **输入法 → 双拼** 里把 **键盘** 选成「18 键」，回测试页点「普通文本」框，换到双拼。
+**B0-18键**：B0，在 **输入法** 里添加"双拼"，然后在 **输入法 → 双拼** 里把 **方案** 选成"自然码"（新装默认是小鹤）、**键盘** 选成「18 键」，回测试页点「普通文本」框，换到双拼。
 
 **B0-九键双拼**：同 B0-18键，**键盘** 选成「九键」。
 
@@ -120,6 +120,7 @@ adb shell am start -a android.intent.action.VIEW -d http://127.0.0.1:8000/fields
 
 「聊天」框按回车或点"发送"后会把内容记进它的记录并清空，像聊天应用发出一条消息；`fields.html#chat` 时它和"发送"按钮贴在页面底部，键盘弹出后紧贴键盘上沿，像聊天应用的输入栏。
 「搜索」框按回车会执行搜索：搜的词写在框下面，框失去焦点，键盘收起。
+
 ### 测试宿主
 
 测试页是 WebView 里的网页框，有几样它给不了：回车是"下一项"并真的跳到下一个框（WebView 不理输入法的"下一项"）、
@@ -148,6 +149,31 @@ adb shell su 0 am start -n io.github.sraw.youmo.debug/org.fcitx.fcitx5.android.i
 
 redroid 里有浏览器"WebView Browser Tester"（`org.chromium.webview_shell`），测试页在它里面打开（`am start -a android.intent.action.VIEW -d <地址> -n org.chromium.webview_shell/.WebViewBrowserActivity`）。
 
+## 在哪跑
+
+每条用例按它检查的东西归一类，`needs=` 写它在哪跑（2026-10 F1 逐条分过，分类和理由见各条的 **JVM** 行）：
+
+| 类 | 在哪 | 写法 | 例子 |
+|---|---|---|---|
+| 引擎 | ime-core 单测（小数据、毫秒级）或 `:lib:ime-eval:uatTest`（真数据：EngineReplay 只有引擎，HostReplay 加 Kotlin 宿主的标点、简繁、快速输入、面板、虚拟时钟，ParityReplay 对设备录的序列） | `needs="jvm:<测试类>.<方法>"`，`.md` 加 **JVM** 行 | 整句、学习排序、标点、快速输入、九键连按 |
+| 界面 | `:app:testTextDebugUnitTest` 的 Robolectric + Roborazzi（`uat/*UatTest`、`KeyboardHarness`、`*KeyboardScreenshotTest`） | 同上 | 键盘样子、状态面板、设置页、词库页、横屏/分体 |
+| 只能在设备上 | redroid（模拟器：实体键盘、语音） | 不写 `needs=`（模拟器 `needs=EMU`） | 真窗口和 insets、系统界面（向导、输入法选择框、导航栏、TalkBack）、麦克风、真实体键盘、安装/升级/降级、杀进程、转屏和切应用、锁屏、内存和堆 |
+| 冒烟 | redroid，另有 JVM 断言 | 不写 `needs=`，`.md` 有 **JVM** 行并写"设备上留作冒烟" | 每区一条胶水最重的 |
+
+redroid 上只剩下面这些（33 条）：
+
+| 类 | 用例 |
+|---|---|
+| 只能在设备上（17） | KB-31、LC-01、LC-02、LC-03、LC-08、LC-10、LC-11、LC-13、PR-34、PY-96、SET-01、SET-09、ST-09、ST-26、ST-39、TB-22、TB-41 |
+| 冒烟（13） | KB-01、PY-01、T9-02、EN-02、HW-03、TBL-01、TB-08、PR-03、PR-10、LS-03、QU-01、WD-03、ST-29 |
+| JVM 断言了一部分、设备上照跑（3） | EN-19、TB-23、WD-37 |
+
+新用例先想能不能在 JVM 上断言；只有落在"只能在设备上"那几类的才写 redroid 脚本。一条既有引擎半又有界面半时两半各写一个测试，
+不因为"界面那半 JVM 没断言"把整条留在设备上。
+EN-19、TB-23、WD-37 三条 JVM 上有测试，剩下的那半还在设备上：EN-19 的打字结果（「hello 」「abc hello 」、退格、逗号）JVM 上断言，设备上只看候选栏不出联想词；TB-23 的 Robolectric 转屏不重排已显示的悬浮键盘，JVM 上是转屏后新起的键盘读回位置。WD-37 的读完前不能导入导出 JVM 上断言，设备上走系统的文件选择器、真的导入导出文件。原先还没搬的 EN-11、PY-87、T9-31 已于 2026-10-31 整条搬到 JVM。ST-26（动画）和 LC-10（引擎重启）要在 main 代码里加口子（IdleUi/InputWindowManager 的动画、HostDaemon 的引擎工厂）才能上 JVM，先算在"只能在设备上"。
+
+平时 redroid 跑这 33 条；发版时（`UAT_BUILD=release`）再加上面 `release,redroid:` 的三条大词库用例，`jvm` 的 run 文件也要绿。
+
 ## 自动跑（redroid）
 
 `uat/tools/uat.py` 在 redroid 上照用例操作、读回结果；用例脚本在 `uat/scripts/<文件名>.py`，一个 .md 一个，
@@ -162,13 +188,14 @@ redroid 里有浏览器"WebView Browser Tester"（`org.chromium.webview_shell`�
 |---|---|---|
 | `emu:…` | 模拟器（见下面"自动跑（模拟器）"） | 17 实体键盘的 HK 用例 |
 | `voice:…`（或 `emu,voice:…`） | 语音版 | 12 语音 |
-| `release:…` | 发版时手动（要上一版正式包或两个版本的包） | PR-13、PR-14、PR-30、PR-35、PR-36、PR-37、PR-38、TBL-12d、TBL-33、TBL-43、WD-14r、WD-14v |
+| `release:…` | 发版时手动（要上一版正式包或两个版本的包） | PR-13、PR-14、PR-30、PR-35、PR-36、PR-37、PR-38、PR-41、PR-43、TBL-12d、TBL-33、TBL-43、WD-14r、WD-14v |
+| `release,redroid:…` | 发版时在 redroid 上用发布包跑（`UAT_BUILD=release` 时脚本照跑，平时不跑；要雾凇拼音，一条三四分钟） | WD-14d、WD-14h、TBL-12c |
 | `manual:…` | 真机或手工 | HK-03a、HK-03b、HK-30、HK-33、MN-13、SET-11 |
 | `jvm:<测试>` | JVM 上的测试（`:app:testTextDebugUnitTest` 的 Robolectric，`:lib:ime-eval:uatTest` 的引擎回放，语音的 `:app:testVoiceDebugUnitTest`，`:lib:ime-core:test`），`uat.py jvm` 记录 | T9-01、PAN-09、ST-01、MN-20 |
 
 `skip:…`／`block:…` 只留给别的原因，记"跳过"／"阻塞"。
 
-现在共 532 条（P0 102、P1 414、P2 16）：redroid 上跑 145 条（其中 31 条在 JVM 上也断言，设备上留作冒烟或照跑），在别处跑 387 条（JVM 342、发版时手动 12、真机或手工 6、语音版 10、模拟器 17）。
+现在共 600 条（P0 114、P1 468、P2 18）：redroid 上跑 33 条（其中 19 条在 JVM 上也断言，设备上留作冒烟或照跑），在别处跑 567 条（JVM 517、发版时 17、真机或手工 6、语音版 10、模拟器 17）。
 
 横屏是把屏幕改成 2340×1080（851 dp，`Device.rotate`，等到界面按新尺寸排好），redroid 的显示不会真的转。手写用 `scripts/hw_strokes.py`
 里的笔画在书写板上画字。装包时比较设备上的 APK 和 `app/build/outputs` 里最新的那个（同一个版本号会重新构建），不同就重装。
@@ -208,7 +235,7 @@ debug 包（要先有 x86_64 debug 包），只当宿主应用、把它自己的
 ## 在 JVM 上断言的用例
 
 有些用例的 **预期** 在 JVM 上就能完整断言：`app/src/test` 里的 `KeyboardHarness` 在 Robolectric 里造出整个键盘
-（真的输入法服务和 `InputView`，引擎换成 `FakeFcitxAPI`，候选等用假事件推进来），设置页用 `MainActivity` 加同一个假引擎；
+（真的输入法服务和 `InputView`，引擎换成 `FakeHostApi`，候选等用假事件推进来），设置页用 `MainActivity` 加同一个假引擎；
 样子用 Roborazzi 截图，和 `app/src/test/screenshots/` 里提交的金图比。测试方法上标 `@Uat("<编号>")`，用例 .md 里多一行
 **JVM** 写测试名；整条搬走的，脚本里是 `needs="jvm:…"`，redroid 上不跑。还在设备上留一条冒烟的（看引擎和界面之间的胶水），
 .md 里写明。

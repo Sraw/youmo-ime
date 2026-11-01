@@ -19,7 +19,8 @@
 - **Licences.** Nothing research-only or non-commercial ships, and nothing that ships is trained on
   it (LCCC only measures, and helps choose parameters such as the model's mix weight). Check a
   dataset's README/data card as well as its LICENSE, and a model's training data.
-- **Privacy.** Nothing is read from or learned in sensitive fields (`FieldPolicy`); a backup is a
+- **Privacy.** Nothing is read from or learned in sensitive fields (`FieldPolicy`; the address bar
+  reads around the cursor to suggest and keeps nothing, app.md "Permissions and privacy"); a backup is a
   plain zip, so what an app marks sensitive stays out of it.
 
 ## Code

@@ -81,7 +81,7 @@ signKeyPwd=...
 |---|---|
 | `lib/ime-core` | 纯 JVM 模块，不依赖 Android：拼音与码表引擎、解码器、句子模型推理，以及各种决策逻辑 |
 | `lib/ime-core` 的 `host/` | 输入法框架：按 Fcitx5 的代码用 Kotlin 重写（输入上下文、按键管线、标点、全角、简繁、快速输入、Unicode） |
-| `app` | Android 部分：界面、`InputMethodService`、设置，以及在一个线程上运行框架的 `KotlinFcitx` |
+| `app` | Android 部分：界面、`InputMethodService`、设置，以及在一个线程上运行框架的 `KotlinHost` |
 | `app/src/voice`、`app/src/text` | 两个版本各自的代码：语音输入只在 `voice` 里 |
 | `lib/sherpa-onnx` | 语音识别运行库（sherpa-onnx 的源码，有本项目的改动） |
 | `lib/handwriting` | 手写识别的运行库（onnxruntime 和一个小 JNI）和句子模型的矩阵核心（`libyoumo-matrix`） |
@@ -178,7 +178,7 @@ A change to what users see or to a setting updates the [user's manual](docs/READ
 |---|---|
 | `lib/ime-core` | Plain JVM, no Android: the pinyin and table engines, the decoder, sentence-model inference, and the decision logic |
 | `lib/ime-core`'s `host/` | The input method framework, ported from Fcitx5's code to Kotlin (input contexts, key pipeline, punctuation, full width, simplified/traditional, quick input, Unicode) |
-| `app` | The Android part: views, the `InputMethodService`, preferences, and `KotlinFcitx`, which runs the framework on one thread |
+| `app` | The Android part: views, the `InputMethodService`, preferences, and `KotlinHost`, which runs the framework on one thread |
 | `app/src/voice`, `app/src/text` | Each build's own code: voice input is only in `voice` |
 | `lib/sherpa-onnx` | The speech recognition runtime (sherpa-onnx's source, with this project's changes) |
 | `lib/handwriting` | The handwriting recognizers' runtime (onnxruntime and a small JNI) and the sentence models' matrix kernel (`libyoumo-matrix`) |

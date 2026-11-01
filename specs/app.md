@@ -8,9 +8,9 @@ an ime-core class with a test.
 
 | Package | Holds |
 |---|---|
-| `core/` | The host's Android side: `KotlinFcitx` (the `FcitxAPI` over ime-core's `HostCore`, its lifecycle and config files, [host.md](host.md#the-apps-side-kotlinfcitx)), `HostDispatcher` (the host thread and clock), `HostResources` (`AppHostStrings`, the host's texts from app resources), `FcitxAPI` (suspend calls into the host), `FcitxEvent` (events out of it), `EngineBridge` (ime-core's `Engines` with their Android side: assets, user dir, saves; the host's `EngineHost`), `EngineMigration`, `SubtypeManager`, `InputMethodNames`, `NativeMatrixKernel`; the Android-free DTOs of the same package (`FcitxEvent`, `KeySym`, `KeyStates`, `CandidateWord`, `InputMethodEntry`, `Action`, `FormattedText`) are in ime-core, their `KeyEvent` conversions here (`KeySymEvents.kt`, `KeyStateEvents.kt`) |
-| `daemon/` | `FcitxDaemon`: the one fcitx instance, shared by connections (`FcitxConnection`) |
-| `input/` | The `InputMethodService` (`FcitxInputMethodService`), `InputView`, and what the keyboard shows: `bar/` (the candidate bar / toolbar, `KawaiiBarComponent`), `candidates/` (horizontal bar, expanded grid, floating window for physical keyboards), `keyboard/` (`TextKeyboard`, `T9Keyboard`, `NumberKeyboard`, `KeyDef`/`KeyDefPreset`, `KeyView`, `CommonKeyActionListener`), `picker/` (symbols, emoji), `popup/` (key previews, long-press keyboards), `clipboard/`, `editing/` (text editing panel, `InputConnectionEditor`), `status/` (the "more" panel), `preedit/`, `broadcast/`, `wm/` (`InputWindowManager`), `handwriting/`, `floating/` (the floating keyboard), `dialog/`, `editorinfo/` (the `EditorInfo` inspector), `learning/` (a candidate's long-press menu worded by the app from the engine's `LearningResult.Menu`, `CandidateLearningMenu`; the undo chip, `UndoChip`, the keyboard's one notice: see [Notices](#notices)) |
+| `core/` | The host's Android side: `KotlinHost` (the `HostApi` over ime-core's `HostCore`, its lifecycle and config files, [host.md](host.md#the-apps-side-kotlinhost)), `HostDispatcher` (the host thread and clock), `HostResources` (`AppHostStrings`, the host's texts from app resources), `HostApi` (suspend calls into the host; its `eventFlow`, the host's own `HostEvent`s out of it), `EngineBridge` (ime-core's `Engines` with their Android side: assets, user dir, saves; the host's `EngineHost`), `SubtypeManager`, `InputMethodNames`, `NativeMatrixKernel`; the Android-free DTOs of the same package (`KeySym`, `KeyStates`, `CandidateWord`, `InputMethodEntry`, `FormattedText`) are in ime-core, their `KeyEvent` conversions here (`KeySymEvents.kt`, `KeyStateEvents.kt`) |
+| `daemon/` | `HostDaemon`: the one fcitx instance, shared by connections (`HostConnection`) |
+| `input/` | The `InputMethodService` (`FcitxInputMethodService`), `InputView`, and what the keyboard shows: `bar/` (the candidate bar / toolbar, `KawaiiBarComponent`), `candidates/` (horizontal bar, expanded grid, floating window for physical keyboards), `keyboard/` (`TextKeyboard`, `T9Keyboard`, `NumberKeyboard`, `KeyDef`/`KeyDefPreset`, `KeyView`, `CommonKeyActionListener`), `picker/` (symbols, emoji), `popup/` (key previews, long-press keyboards), `clipboard/` (the history panel; 「切词」, `ClipboardChunksWindow`, shows ime-core's `ClipboardChunks` pieces, picked by tap or by a sideways sweep (ime-core's `SwipePick`), Chinese split by `HostApi.wordBoundaries`; the history at scale measured by `ClipboardScale`, JVM and device: on redroid at 10 000 entries opening ~30 ms, clearing ~0.2 s, a backup ~0.2 s; at 100 000 opening ~0.1 s, a page half way down ~0.35 s, clearing ~1.5 s, a backup ~2 s), `editing/` (text editing panel, `InputConnectionEditor`), `status/` (the "more" panel), `preedit/`, `broadcast/`, `wm/` (`InputWindowManager`), `handwriting/`, `floating/` (the floating keyboard), `dialog/`, `editorinfo/` (the `EditorInfo` inspector), `learning/` (a candidate's long-press menu worded by the app from the engine's `LearningResult.Menu`, `CandidateLearningMenu`; the undo chip, `UndoChip`, the keyboard's one notice: see [Notices](#notices)) |
 | `data/` | File-backed managers: `prefs/` (`AppPrefs`, the managed preference framework), `theme/`, `clipboard/` (Room), `pinyin/` (imported dictionaries, custom phrases; sources are `<name>.txt.gz[.disable]`, named through `SourceNames`; `MergedDictionary` compiles the dictionaries turned on into `merged.ymd` on one `dictionary-compile` thread, keyed by a stamp of the sources, the base data and a compiler revision; the engine maps the file, uses a stale one until the new one is made, and is reloaded through `made`. An older build's plain `.txt` is work by itself (`SourceNames.unconverted`: `current()`, `pending()`, `mergedWords` count it): the next compile gzips it first (`Step.CONVERT`, the progress's first share, 正在转换 on the 词库 page, the idle bar's 正在升级词库格式) through `<name>.txt.gz.convert.tmp`, and is an upgrade (UPGRADE) only by what it finds: a text converted or not, a v1 `merged.ymd` dropped, or `.merged.upgrading` (written before the first conversion or the drop, deleted when a non-import compile ends, so a kill in between is still an upgrade at the next start); never by files' times. A text that cannot be read, or a `.gz` that is not gzip or is cut short, is skipped and listed in `.merged.unreadable` (the page: 读不了 / 文件损坏，可能不全, delete and import again; a damaged `.gz` keeps what was read before the damage); a text whose gzip cannot be written (the disk full) stays as it is, listed in `.merged.unwritten` (the page: 没转换成, free space and reopen). A text converted whose delete is refused is listed in `.merged.left`: not converted again while its `.gz` of the same state is there (its words are in it); each compile tries its delete again (no reconversion, no UPGRADE) and drops the entry once it is gone, or once that `.gz` is (deleted outside the page, or a restore left only the other state), the text then converted like any other. The entry is the text's name on, length and mtime (`leftKey`), so a turn keeps it. Listed files are skipped at each start and reload till they change; only a `.merged.left` text leaves `pending()` false, an unreadable or unwritten one keeps it true (its words are owed). Opening the 词库 page (`retry`) clears `.merged.unwritten` and `.merged.unreadable` (but a damaged `.gz`'s entry), never `.merged.left`. Imported words are missing until it ends. `turn`/`delete` resolve a dictionary by name under the sources lock, never the `File` the page listed, and act on all its files together: `turn` renames a text and its `.gz` both (the text turned back if the `.gz`'s rename is refused), `delete` deletes the text first and keeps the `.gz` if that is refused, so the two never split), `punctuation/`, `UserDataManager` (backup/restore) |
 | `ui/` | Settings: `main/` (`MainActivity`, `MainFragment` = the home page, `settings/` pages and `SettingsRoute`, `settings/search/`), `setup/` (the first-run wizard), `common/` |
 | `utils/` | Small helpers (`AppUtil`, `Const`, extensions) |
@@ -26,11 +26,50 @@ in the keyboard area: `KeyboardWindow` (the layouts), `PickerWindow` (symbols / 
 The bar above is `KawaiiBarComponent`: idle (toolbar, number row, the result of a sum just written, clipboard suggestion, inline
 autofill, decided by `IdleUiPolicy`; the sum is read off the field when what the service commits
 ends with `=`, worked out by `Calculation` in ime-core, and dropped as the cursor leaves the `=`) or candidates (`KawaiiBarStateMachine`,
-`ExpandButtonStateMachine` in ime-core).
+`ExpandButtonStateMachine` in ime-core). Its buttons besides the menu key are the user's
+(`internal.toolbarButtons`, one string): `ToolbarConfig` in ime-core parses it (empty is the v0.4
+bar) and, given the situation (voice build and not a password, chttrans offered, one-handed
+offered, the input method with keyboards to pick from: `KeyboardPicker` through `PanelActions.chooseKeyboard`, the ⋯ panel's 键盘 too) and how many fit at the right, says which go on the opened toolbar (⋯ fixed at its end,
+the right's overflow before it) and which at the right; `IdleUi.arrange` places them, again as the
+bar's width changes. The ⋯ panel's own actions live in `PanelActions`, called by
+`StatusAreaWindow` and the bar's buttons alike. A new panel entry that should be a button too is a
+`ToolbarButton`, its `ToolbarButtonLooks`, its action in `PanelActions`, and an `on(…)` line in
+`KawaiiBarComponent`.
+Where `IdleUiPolicy` shows nothing (`IdleUi.emptyBar`), an email's or a
+URL's field gets its address suggestions (`input/address/AddressStrip`, the choice ime-core's `AddressSuggestions`:
+the field, the text around the cursor, the two lists, the counts in; the text to put in, what it replaces, the cursor out).
+A field left for another (`AddressLearning`, kept by the service: the keyboard hidden, the view rebuilt, the same field
+restarted do not leave it; the same field is the same `ContextMemory.field` name *and* the text last read, as a Compose
+screen's or a web page's fields share their view's name; the service destroyed learns the last one; a 「全部清空」 since
+the field started, `AddressStore.forgotten`, keeps what it held then from being learned again), `AddressBook.left` learns from the text it was left with, if it changed while the keyboard was up
+(the whole text as the field started, its selection too, is what a change is told by):
+the suffixes' counts and the whole email addresses (`keyboard.rememberAddresses`; off, none offered nor learned, those kept kept),
+never in a password's or an incognito field (`CapabilityFlag.PasswordOrSensitive`), before the first unlock, or with the habits off
+(`internal.useHabits`, which also hides what was learned). The book goes with the learning backups (`LearnBackup`
+`ADDRESS_COUNTS`, `ADDRESSES`, opaque to the engine: `Engines(addresses, putAddresses)` → `AddressStore`), merged in
+on a restore by `AddressBook.merged`, put back whole by 退回恢复前; a backup without them (v0.4.0's) leaves them as they are.
+A 「备份全部」 zip carrying a learning backup keeps the phone's two prefs over the zip's (`UserDataManager.keepAddressBook`):
+the zip's book comes in through the stash's merge, so 退回恢复前 holds the phone's.
 
 Work tied to the view runs in the view's scope (`dependency/Functions.kt`): a theme or layout
 change replaces the view and must cancel what touched the old one. Work that must survive it goes
 on the service's scope.
+
+A view made anew (A2) takes the engine's whole state as it starts handling events
+(`BaseInputView.onStartHandleFcitxEvent`, run once subscribed to `eventFlow` so no event between the
+read and the collector is lost): the input panel, input method and status area, and the last
+candidate list (`HostApi.candidatesCached`; `CandidatesView` the page, `pagedCached`), never only
+what later events bring. `KotlinHost.stop` empties the caches, so a view made after a restart shows
+no dead engine's state. Why it is made anew is `ViewRebuild` (ime-core): a setting
+(`recreateInputViewPrefs`, the candidates' prefs, any theme pref but floating) first ends what was
+typed as leaving the field does (`focusOutIn`: pinyin's code dropped, the field's composing text,
+English's word or handwriting's, committed; user, 2026-10-27 and 2026-10-31), so no code typed on the
+14 keys reaches the full keyboard's session and no code row is left over an empty bar; then it tells
+the engine its context again, as the field stays and no input restarts to. `onConfigurationChanged`
+ends it the same way, so of dark mode's two (it and the theme's rebuild, in either order) the last
+tell follows the last end. Floating and docked (`FLOATING`, told from a theme change by the
+`floatingKeyboard` value the views were made for), the system's `onCreateInputView` and a language
+picked anew keep it.
 
 ### Notices
 
@@ -81,7 +120,7 @@ slide from the top) and the whole keyboard moving.
 
 A layout is a list of rows of `KeyDef`s (`TextKeyboard.Layout`, `T9Keyboard`, `NumberKeyboard`, `HandwritingKeyboard`):
 an appearance (text, image, width, variant) and behaviours (`Press`, `LongPress`, `Repeat`,
-`Swipe`, `DoubleTap`), each a `KeyAction` (`FcitxKeyAction`, `SymAction`, `CommitAction`,
+`Swipe`, `DoubleTap`), each a `KeyAction` (`HostKeyAction`, `SymAction`, `CommitAction`,
 `LayoutSwitchAction`, `QuickPhraseAction`, `UnicodeAction`, `LangSwitchAction`,
 `SpaceLongPressAction` …). `CommonKeyActionListener` performs them. A key's long-press
 characters come from `PopupPreset` (built in) overridden by the user's `PopupOverrides`; the first
@@ -93,9 +132,19 @@ key (`PopupComponent.LONG_PRESS_KEY_*`; as wide as the key pressed, 九键's 7 f
 floating above it, the bubble gone; the finger picks by how far it moved since they opened, not
 where it is (`PopupFocus` in ime-core: 0.6 of a key a step, held past a row's ends, an empty slot's
 nearest key, a little hysteresis, only down off the key cancelling), each new key a buzz under 按键振动
-(`InputFeedbacks.hapticFeedback`). 微软 and 紫光 双拼 get a `;` key right of L (`semicolonKey(ime, scheme)` in ime-core's
-`input/keyboard/SemicolonKey.kt`, which `TextKeyboard.showSemicolonKey` asks); the split halves have none, the row's other keys widen to fill (`fitRow`/`showKey`),
-and `;` comes from l's long press. The keyboard area never passes 70% of the screen's height
+(`InputFeedbacks.hapticFeedback`). 微软 双拼 gets a `;` key right of L (`semicolonKey(ime, scheme)` in ime-core's
+`input/keyboard/SemicolonKey.kt`, which `TextKeyboard.showSemicolonKey` asks); the split halves have none for them, the row's other keys widen to fill (`fitRow`/`showKey`),
+and `;` comes from l's long press. A table's letters keyboard is told by the engine
+(`EngineState.tableKeyboard`, ime-core's `TableKeyboard`, set in `EngineBridge.followed` after each
+answer and context, not for an input method latched unloadable; its code keys once its session is made,
+the roots and 拼 key from the settings alone): a code key its face has nowhere else (`extraKey`: 二笔's `;` in that slot, 仓颉's `*` in the
+`*` one next to it while its corners show letters; split, the same slots after L in the right half, the
+gap between the halves filling what is left, so that half is six keys while one shows), its roots over the letters (`label`, the letter in
+the corner; 仓颉's by default, 五笔's 键名 or all its roots as its page says) and on a long press, in
+the key's bubble kept inside the keyboard (`rootsOf`), and its 拼 key (`LookUpKey`, two keys, the one
+shown dark while `lookingUp`) in Shift's place, sending `Keyboard.LOOKUP`. While a code is typed
+(`ReturnKeyAppearance.composing`) 确定 (`ConfirmKey`, Return's action) stands in Return's place.
+The keyboard area never passes 70% of the screen's height
 (`KeyboardHeightCap`), so 很高 in landscape leaves the field room.
 
 On a wide screen held sideways the letters split in two (`TextKeyboard.Split`, sized by
@@ -179,16 +228,30 @@ board and its bars (`floating/BoardMover`, `BoardMove` in ime-core); back to the
 widen from where they are drawn, about the same pivot; a window or layout putting the board at a
 side is never animated, nor a move while the keyboard is hidden.
 
-Glide typing (`keyboard/GlideInput`, held by `TextKeyboard` and `T9Keyboard`): it sees every touch
+Glide typing (`keyboard/GlideInput`, held by `TextKeyboard`, `T9Keyboard` and, for strokes alone, `GroupedKeyboard`): it sees every touch
 before the keys (`dispatch`), `GlideGesture` deciding when a finger glides; as a glide starts the keys
 are cancelled (their preview and swipe with them), other fingers are swallowed until all lift, and on
 the lift the path, in key widths over the letters, goes out as `KeyAction.GlideAction`, which
-`CommonKeyActionListener` hands to `FcitxAPI.offerGlide` (the engine's side: specs/engine.md).
+`CommonKeyActionListener` hands to `HostApi.offerGlide` (the engine's side: specs/engine.md).
 Glide is off in password, address (URL) and email fields (`BaseKeyboard.wordField`): a rule the
 owner set (2026-10-19), not a gap. A glide can only be read as a word of the lexicon and their text
 is no word (a domain, a user name, a password); a wrong guess in a password is not even seen, and a
 password is neither read nor learned; the space a glide puts before its word would break an address.
 Keys there are typed as they are, and a finger sliding across them never starts a glide.
+
+The same touch is a stroke (笔画筛选) where its switch is on (`AppPrefs.keyboard.strokeFilter`
+beside `glideTyping`, which keeps 0.4's `glide_typing` key, so a 0.4 user's glide carries over). The
+two are never both on: the shared page's `AppToggle.turnsOff` turns the other off as one is turned on,
+its switch flipped where it is seen, no dialog; so English glides none while strokes are on.
+`GlideInput` decides at the finger's down (`strokes`): the switch, a word field, pinyin typed (`BaseKeyboard.imTyping`, which
+`KeyboardWindow` sets from the preedit, not in a temporary mode: its panel alone has an aux line above) and a keyboard whose input method filters (`filters`:
+`InputMethodCatalog.filtersByStrokes` of the one shown, on `TextKeyboard`, `T9Keyboard` and
+`GroupedKeyboard`, the 14 and 18 keys, which have no glide). `GlideGesture` starts it far sooner than
+a glide (`STROKE`, 0.3 of a key any way, keys counted as wide and tall, before the long press): a
+竖 from the bottom row or a short 点 must be one before the key's swipe (36dp) is, so while pinyin
+is typed a key's swipe is a stroke; on the lift the path, in key widths both ways, is read by `StrokeShape` (ime-core) and
+sent as the engine's stroke key, `KeyAction.SymAction` of `Keyboard.strokeKey`; a shape it reads
+as none (up, up to the left) is dropped.
 
 ### Hardware keyboard
 
@@ -228,7 +291,7 @@ the keys then go to the host and the app as any other.
 The input method's name flashes by the cursor (fcitx's ShowInputMethodInformation).
 
 With the hardware keyboard, handwriting and the nine keys are skipped by Ctrl+Shift
-(`Engines.takesKeyboard`), and a character key pressed in one is typed by pinyin (全拼 or 双拼,
+(`InputMethodCatalog.takesKeyboard`), and a character key pressed in one is typed by pinyin (全拼 or 双拼,
 whichever is listed first), else the first enabled Chinese input method that takes a keyboard, else
 English (`InputMethodSwitch.forKeyboard`), as Sogou and Baidu type pinyin whatever their touch
 layout; the touch one comes back with the touch keyboard (`HardwareKeyboard.touchInputMethod`, the host thread's; the hand-off runs in the key's own host job).
@@ -239,16 +302,21 @@ is the host's too). The emulator's own `qwerty2` is an ALPHA keyboard (sticky Sh
 in the IME): register a USB keyboard with `/system/bin/uinput` (JSON `register`, vid/pid unknown so it
 reads `Generic.kl`/`Generic.kcm`) and `sendevent` to its `/dev/input/eventN` as root.
 
+A number's, a phone's or a date's field opens a number pad of its own (`NumberPad.of(EditorTraits.number)`:
+the keys beside the digits blank (`BlankKey`: no press, nothing for TalkBack) where the field takes none, a plain number
+field's the whole pad, a PIN's the digits alone; `FieldPad` in `KeyboardWindow` maps the 123 key and
+`Unchanged` to that pad within the field; a pad is never remembered, so the next text field gets its letters).
+
 Address fields swap the comma and the full stop for `/` or `@` and `.com` (`AddressKeys`); a key's
 digit or symbol goes in there as it is, what is typed committed as typed
 (`PendingInputPolicy.typesAsIs`, in `CommonKeyActionListener`), but for a key the input method
-types with (`Engines.readsAsKey`: the nine keys' digits, the `;` of every 双拼 scheme whose layout types it (微软, 紫光), the pinyins' `'` and a
+types with (`InputMethodCatalog.readsAsKey`: the nine keys' digits, the `;` of every 双拼 scheme whose layout types it (微软), the pinyins' `'` and a
 table's keys, 二笔's `;`, while something is typed, the table's from `Engines.tableKeys`); the nine
 keys' column, separator and multi-tap are in `T9Keyboard` with decisions in `MultiTap`, `NineKeys`.
 A nine key's long press shows one row, its letters in capitals, its digit, its letters (A B C 2 a
 b c, `Explicit.inRow` the digit's place: in that order, the digit under the finger, narrower keys
 when they don't fit; owner 2026-10-20), each committed as it is (`CommitAction`, after the first
-candidate), then in rows of their own above, no line between, its symbols (`NineKeySymbols` in ime-core, the pref `t9Symbols`, set on 九键拼音's page
+candidate), then in rows of their own above, no line between, its symbols (`NineKeySymbols` in ime-core, the pref `t9Symbols`, set in the 「九键」 section's
 按键长按, `NineKeySymbolsFragment`; separate from 按键字符, owner 2026-10-19): by default 2–9's are
 the full keyboard's corner characters of their letters (`PopupPresetTest` holds them to it), 1's
 the rest of 搜狗's column. `KeyDef.Popup.Keyboard.Explicit.symbolsFrom` sets 2–9's apart: shown
@@ -262,8 +330,30 @@ while typing, from the same `address` both boards take from `KeyboardWindow`; th
 always (keys of their own there left the space an eighth of the width, its label pushed off). (A probe with `adb shell input text` showed the nine
 keys committing the pinyin as typed before a mark: that is a hardware key's path, not the screen's.)
 
+Each of 拼音, 双拼 and English picks its touch keyboard (I1, 0.5; 0.4's separate 九键拼音 input method
+is gone). The choice logic is `ImKeyboards` (ime-core `input/keyboard/`): `ImKeyboard` (`FULL`,
+`KEYS18`, `KEYS14`, `NINE_KEYS`), `Chosen(pinyin, shuangpin, english)`, `choices(im, scheme)` (pinyin
+all four, 双拼 all four but 14 where `has14(scheme)` is false, i.e. 微软 whose `;` is a
+final, English full and nine), `effective` (a 14 chosen under such a scheme shows the 18 keys, the nearest), `fallback` (that
+keyboard where it differs from the chosen one: `EngineBridge.configure` stores it as the scheme
+changes, and `HostCore.configure` tells 双拼's keyboard anew with an `InputMethodChanged`, so the
+view in use changes at once), `layoutOf` → `Layout`, and `session(im, keyboard)`.
+The prefs are `AppPrefs.keyboard.pinyinKeyboard` (`PinyinKeyboard`: `Full`, `Keys18`, `Keys14`,
+`NineKeys`; `Full`/`Keys14` stored as in 0.4; pinyin's 18 keys show `L`, no `;`, which only
+微软 双拼 reads: `GroupedKeyboard(semicolon = false)`), `shuangpinKeyboard` (`ShuangpinKeyboard`, the same
+four) and `englishKeyboard` (`EnglishKeyboard`: `Full`, `NineKeys`, key `english_keyboard`, never
+following pinyin's); each is in `recreateInputViewPrefs`. The router's IM stays `engine-pinyin` on
+every pinyin keyboard. The ⋯ panel's 「键盘」 entry is `KeyboardPicker` (`show(anchor)`): the current
+input method's `choices`, the one in use ticked; a pick sets that input method's pref, so the view is
+rebuilt at once. No entry where there is no choice (the tables, handwriting). The settings pages
+show a section 「九键」 (`InputMethodSettings.NINE_KEYS`: 连按, 按键字母, 按键长按, one pref each, shared by
+pinyin's and English's nine keys; English's 九键英文打法 first in it; 双拼's holds 按键长按 alone, its
+letters the scheme's and no multi-tap) while 九键 is chosen, hidden and shown at once as 键盘 changes
+(`Section.shown`, re-run by the page's refreshers; owner 2026-11-01: no row to a page of their own, none
+on 按键). A hardware keyboard types full pinyin / the full layout whatever is chosen.
+
 The 14 keys (`GroupedKeyboard`, `GroupedKeyboard.Name14`) are 拼音's touch keyboard when
-`AppPrefs.keyboard.pinyinKeyboard` is `Keys14` (`PinyinKeyboard`, stored by name: `Full`, `Keys14`).
+`pinyinKeyboard` is `Keys14`.
 A tap sends its key's code (`SymAction`, as a syllable is), on a key of two letters with where the
 finger came down: `CustomGestureView.downAt` (x / width, the view's, its margins too) at ACTION_DOWN,
 made `clickAt` at ACTION_UP before `resetState` (NaN if the touch left the key or swiped past the
@@ -276,9 +366,10 @@ owner 2026-10-26): English is the language key's round or the space's long press
 keyboard (with the language key off and the long press at its default, none: not handled, owner
 2026-10-26); the bottom row's space takes what is left, ≥ 0.15 in every field. The syllables of the leftmost keys not yet taken are on the composing row's right
 (`SyllableStrip`, id `code_row_syllables`, at most 60% of the row; the preedit is `code_row_text`),
-from `EngineBridge.syllables` for the current input method; a tap takes one, backspace at the end
+from `EngineState.syllables` for the current input method; a tap takes one, backspace at the end
 gives the last back. The composing row is 32 dp only while the input method shown has the strip
-(pinyin on the 14 keys, 双拼 on the 18 or nine keys) and 18 dp in every other (`CodeRowHeight` in
+(`CodeRowHeight.showsStrip(layout)`: pinyin's and 双拼's 14 and 18 keys, 九键双拼; pinyin's nine keys
+show their syllables in the column) and 18 dp in every other (`CodeRowHeight` in
 ime-core, through `KawaiiBarComponent.preeditHeight(im)`); `InputView` sets it anew on each
 `IMChangeEvent` and recomputes the keys' cap (`KeyboardHeightCap`), so the keyboard changes by 14 dp
 between the two kinds (accepted, the user 2026-10-26) and never while typing in one; where the cap
@@ -286,47 +377,49 @@ binds (landscape, 很高) the area stays put and the keys give up the 14 dp inst
 preview draws the full keyboard, with the thin row. The prefs are in `recreateInputViewPrefs`. The
 bar's buttons keep their own 40 dp floor (`MIN_TOUCH_DP`), a different thing.
 
-双拼's 18 keys (`shuangpinKeyboard == Keys18`) are the same grouped keyboard over `G18`, with the same
-syllable strip, no 中/英 and 32 dp row while 双拼 is shown. 九键双拼 (`NineKeys`) is `T9Keyboard`
-built for 双拼: its digits send `NINE_SP`'s codes, its 1 key `'` while typing, no 中/英 (a wider
-space), no 连按 or custom letters; its syllables in its own left column, the strip off
+Pinyin's 18 keys (`Keys18`) are the grouped keyboard over `G18`, sending `Keyboard.pinyin18Key(code)`
+(L; is just L on pinyin); 双拼's 18 keys (`shuangpinKeyboard == Keys18`) the same keyboard with 双拼's
+codes, and 双拼's 14 keys (`Keys14`) the 14 keys' groups sending `Keyboard.shuangpin14Key(code)`; each
+with the syllable strip and the 32 dp row. 九键双拼 (`NineKeys`) is `T9Keyboard`
+built for 双拼: its digits send `NINE_SP`'s codes, its 1 key `'` while typing, a wider
+space, no 连按 or custom letters; its syllables in its own left column, the strip off
 (`ownsSyllables`; its 123 shows the strip), the row 32 dp as the 18 keys'.
 
+Pinyin's nine keys send their own codes, `Keyboard.pinyinNineKey(digit)` (plane 15, 0xF0400+), for
+2–9, and for every digit while typing: 1 the separator; 0 (and a key emptied of letters) ends the
+input as 0.4's 九键拼音 did, the first candidate then the digit, which `Keyboard.char` commits after
+it (the host swallows a code handed back; sent as a plain digit, the pair would read it as a
+hardware digit and pick the tenth candidate). With nothing typed 0 is a plain `0`. Because the keys are codes, not
+digits, a digit typed from elsewhere (the number row) in an address field goes in as it is even on
+the nine keys. No key of the nine keys switches language (0.4's 中/英, `NineKeyLanguageKey`,
+`englishOnNineKeys` and `EnglishLayoutPolicy` are deleted): 🌐 runs the enabled list
+(`enumerateIme`) as on every keyboard, the space shows 「拼音」.
+
 九键英文 (`T9Keyboard.EnglishName`, a second `T9Keyboard` built with `english = true`) is fcitx's
-English shown on the nine keys, reached only by 九键's 中/英 key (`NineKeyLanguageKey`, beside the
-space as 搜狗's; owner 2026-10-20, replacing a 「英文键盘」 setting and English following
-九键拼音 however switched to; its label `T9Keyboard.languageLabel`, the language in use full size, the other smaller and fainter, drawn because `AutoScaleTextView` lays a spanned text out with `StaticLayout`). `CommonKeyActionListener` sets `internal.englishOnNineKeys` and
-activates English, or 九键拼音 back (`EnglishLayoutPolicy.toggled`); `KeyboardWindow.onImeUpdate`
-shows the nine keys for English while the pref holds (`EnglishLayoutPolicy.nineKeys`), dropping it
-as anything but English shows, unless fcitx's cached IM is English again by then (`endsNineKeys`: an
-update queued behind 中/英 pressed again), and on the language key's round; a round that lands on English itself changes no IM, so
-`CommonKeyActionListener.englishShownAnew` (KeyboardWindow's from its first attach, kept when detached: the picker's space runs the round too) shows it anew. Not a
-listener on the pref: dropped before another IM comes, it would flash the full keyboard. So English come to any other way is the full keyboard and the input view
-made anew (a turn, a setting) shows it as it was. The language key's round (and the space's long press set to it) goes on
-from 九键拼音 when in 九键英文: straight to the one after it in the enabled list
-(`EnglishLayoutPolicy.nextFromNineKeys`), the pref dropped first, not through 九键拼音's keyboard.
-中/英 does nothing where the other is not enabled (`toggled(current, enabled)`: fcitx would switch to none, quietly). Its keys send `Keyboard.nineKey(digit, upper)` (predictive,
-the engine's `Action.NineKey`) where `EnglishLayoutPolicy.spellsWords` says English suggests
+English shown on the nine keys, whenever `englishKeyboard` is `NineKeys` and English is
+however reached; the 九键英文打法 row is on English's page, shown only then. Its keys send
+`Keyboard.nineKey(digit, upper)` (predictive, the engine's `Action.NineKey`) where
+`ImKeyboards.spellsWords` says English suggests
 (`t9EnglishTyping` Predictive, not a password, an address or NoSpellCheck, English's suggestions
-on, read from `EngineBridge.englishSuggests`), a long press's letter then pinned into the word
+on, read from `EngineState.englishSuggests`), a long press's letter then pinned into the word
 (`Keyboard.nineLetter`, owner 2026-10-20), else commit letters by `MultiTap` themselves
 (`CommitAction` replacing the last of a run), a long press's as it is. Whether a word is being spelled, for 1 (an
 apostrophe then, else `. , ? ! ' -` in turn) and the column, comes from
-`EngineBridge.englishTyping`. ⇧ stands where 重输 is, its state `NineKeyShift` (ime-core), lit by
+`EngineState.englishTyping`. ⇧ stands where 重输 is, its state `NineKeyShift` (ime-core), lit by
 auto-caps through `AutoCapsKeys`, which both boards implement. No glide on it.
 
-Handwriting's keyboard (`HandwritingKeyboard`, the letters layout of `Engines.HANDWRITING`) is a pad
+Handwriting's keyboard (`HandwritingKeyboard`, the letters layout of `InputMethodCatalog.HANDWRITING`) is a pad
 (`HandwritingPadView` over `InkPad`) and a column of backspace and marks. Each read goes to
 `HandwritingRecognition` (input/handwriting), its reading back to the engine through
-`EngineBridge.offerInk` and the key `Keyboard.INK`, with the piece it is of; the pad wipes the piece
-it writes once the engine has ended it (`EngineBridge.handwritingEnded`, the latest piece ended, so
+the key `Keyboard.INK` carrying it (`EngineBridge.ink`), with the piece it is of; the pad wipes the piece
+it writes once the engine has ended it (`EngineState.handwritingEnded`, the latest piece ended, so
 a value missed while detached is still seen), and ends it itself when detached and at each new
 input (`restart`, which also drops what was still being read). The
 recognizer skips a read only for a newer one of the same piece: a piece's last read is what it shows.
 How long the pen stays up before a piece is done (`InkPad.finishMillis`) is the app's setting
 `AppPrefs.keyboard.handwritingPause` (`HandwritingPause`, 0.3–1.5 s), on the handwriting page,
-read at each pen up. A piece so done is told to the engine (`EngineBridge.inkFinished` and an Ink
-key, after the piece's readings: `HandwritingRecognition.afterReads`), for the large sentence model
+read at each pen up. A piece so done is told to the engine (an Ink key carrying
+the piece and no reading, after the piece's readings: `HandwritingRecognition.afterReads`), for the large sentence model
 to weigh the finished character's sentence.
 
 ## Settings
@@ -346,11 +439,11 @@ Two stores, deliberately:
    `InputMethodConfigFragment` passes the `act` that runs it; the default `act = {}` of `create`/`addTo`
    ignores it, so an `Action` on another page does nothing), and `AppChoice`/`AppToggle` for the few app preferences that belong to one input method,
    such as 九键's multi-tap or English's auto-caps, or to all of them on the shared page, such as
-   glide typing, paired brackets and replacing a sum), over `FcitxAPI.getImConfig`/`setImConfig`.
+   glide typing, paired brackets and replacing a sum), over `HostApi.imOptions`/`setImOptions` (a page's options by path).
    The options every input method shares are one group in `EngineOptions`, so they are on one page,
    通用输入 (`InputMethodSettings.SHARED`, `SharedInputFragment`, saved through pinyin's config),
    each saying which input methods it is no use to (`notFor`); 每页候选数 is on 实体键盘
-   (`HARDWARE_KEYBOARD`). An option no use to pinyin on the 14 keys names `Engines.PINYIN_KEYS`
+   (`HARDWARE_KEYBOARD`). An option no use to pinyin on the 14 keys names `InputMethodCatalog.PINYIN_KEYS`
    in `notFor` (said 「拼音 14 键」, `InputMethodNames`), shown whichever keyboard is chosen, not
    hidden: the hardware keyboard types full pinyin still. 拼音's 键盘 (`AppChoice` over
    `pinyinKeyboard`) is the first row of 拼音's page, in no section. 双拼's 键盘 (`AppChoice` over `shuangpinKeyboard`) is in its 方案 section, nothing on the page hidden; glide says not for 「双拼 18 键」 and 「九键双拼」 (`SHUANGPIN_KEYS18`, `SHUANGPIN_NINE`: neither glides), fuzzy u↔v not for 「九键双拼」 (`SHUANGPIN_NINE`, u and v one key). A page saves only the paths it shows (`InputMethodSettings.only`), so one
@@ -385,7 +478,7 @@ Rules for settings, all decided:
 1. Decide the default first; the setting exists only if a user will want both values.
 2. App-side behaviour: add it to the right `AppPrefs` category (title and summary in strings);
    pass its value into the ime-core class that decides, never read `AppPrefs` from ime-core.
-3. Engine behaviour: add an option to `EngineOptions`, read it in `EngineSettings.parse`, show it
+3. Engine behaviour: add an option to `EngineOptions`, a field of `EngineSettings` it fills in `toSettings`, show it
    with an `Item` in `InputMethodSettings`; `nearest` maps old or odd stored values to a shown one.
 4. Strings: `values/strings.xml` (English) and `values-zh-rCN`, `values-zh-rTW` at least; the other
    locales fall back to English. Write the summary as what the user gets, not how it works.
@@ -395,7 +488,12 @@ Rules for settings, all decided:
 ## Persistence and backups
 
 `UserDataManager` exports one zip: `shared_prefs`, the clipboard database (less what an app marked
-sensitive), the external files dir (fcitx config, custom phrases, imported dictionaries as their `.txt.gz` sources; the compiled `merged.ymd`/`.ymc`, any `.txt.gz.tmp`/`.txt.gz.convert.tmp` and the markers `.merged.failed`, `.merged.unreadable`, `.merged.unwritten`, `.merged.left`, `.merged.upgrading` are left out (`MergedDictionary.isCompiled`) and made again after a restore, themes). A restore overlays the dictionaries directory: an older backup's `.txt` is converted again over a same-name `.gz`; both `.gz` states of one name keep the newer (equal mtimes: the one turned on)
+sensitive), the host's config, fcitx's data and the themes (`files/host-config`, `files/host-data`,
+`files/host-theme`, under `external/config`, `external/data`, `external/theme` in the zip where every
+backup had them, so older builds restore them and this one theirs; settled first by `HostConfigDir.inUse`,
+so an export takes, and a restore writes into, what is read: an older build's moved in before a restore
+can pass it over; an old copy not yet deleted (named by the home's `ConfigHome.MOVED`, deleted at a later start) is not taken), the rest of the external
+files dir; in the data, custom phrases and imported dictionaries as their `.txt.gz` sources (the compiled `merged.ymd`/`.ymc`, any `.txt.gz.tmp`/`.txt.gz.convert.tmp` and the markers `.merged.failed`, `.merged.unreadable`, `.merged.unwritten`, `.merged.left`, `.merged.upgrading` are left out (`MergedDictionary.isCompiled`) and made again after a restore). A restore overlays the dictionaries directory: an older backup's `.txt` is converted again over a same-name `.gz`; both `.gz` states of one name keep the newer (equal mtimes: the one turned on)
 and the engine's `files/engine/` (learned words, word lists).
 Restoring stops the host, closes the clipboard database, replaces the files, then restarts the
 process (`AppUtil.restart`); a failed restore reopens what it stopped (`restartAfterFailedImport`).
@@ -407,7 +505,13 @@ The learning is merged, not replaced (U-100, `UserDataManager.importEngine`): th
 learning (the zip's learning backup, or its record, or an older build's logs to convert, with its
 lists) is moved into a directory of its own under `RestoreStash.DIR`, and the engine merges it as it
 next starts (beside any stash not merged yet). A `learn.log.unreadable*` (a later build's log kept
-aside) stays.
+aside) stays. An export with the learning as a backup leaves out the files it is made of and the old
+logs (`*.user`, `*.user.told`) and `learn.table-logs-read`, the phone's own as the record is; with
+that mark (the old logs read into the record) an export without the learning leaves the old logs out
+too, and the mark goes with the record into the stash, whose logs are then not read again. A zip of this app from before 0.3.1 (its metadata's `versionCode`),
+or with old logs but neither the record nor a backup, is refused before anything is copied
+(`exception_user_data_too_old`); one from before the renaming is not, having none of the engine's
+learning.
 
 ## Permissions and privacy
 
@@ -422,7 +526,10 @@ learned from is *sensitive* (its text is never read for context, nothing is lear
 `ContextMemory`, voice never types into a password). A field of this app itself (its settings, the dictionary
 editors: `FieldPolicy.ownApp`, applied in `CapabilityFlags.forField`) is sensitive too, so what is
 typed there is never learned. Any new feature reading the editor or
-remembering text goes through it.
+remembering text goes through it. One exception: in an email's or a URL's field the address bar
+(`AddressStrip`) reads at most 256 units either side of the cursor of a sensitive field too, to offer
+an address's end there, and keeps nothing of it (not even to compare: `AddressLearning` holds no text
+of a field not learned from).
 
 ## The two flavors
 

@@ -1,7 +1,7 @@
 # The host: fcitx5 in Kotlin
 
 The app's input method framework is fcitx5's, ported to Kotlin (`dev/design/fcitx-replacement.md`, v3):
-`lib/ime-core/.../host` (package `org.fcitx.fcitx5.android.host`), run by the app's `KotlinFcitx`. It is
+`lib/ime-core/.../host` (package `org.fcitx.fcitx5.android.host`), run by the app's `KotlinHost`. It is
 the only host; the native fcitx5, libime and chinese-addons sources are gone. This page is the contract
 the pieces that plug into it follow: the engine host, the modules (punctuation, fullwidth, chttrans,
 status area), the temp modes (quick phrase, Unicode), the config files.
@@ -31,7 +31,7 @@ goes back to the application. The two flags are different things:
 | 1 | — | `KeyEvent` normalizes `origKey` into `key` (`Key.normalize`, `fcitx-utils/key.cpp:493-533`); handlers match on `key` | — |
 | 2 | ReservedFirst | e.g. hide the input method name overlay on a press | `PreKeyHook` list |
 | 3 | PreInputMethod | an active temp mode takes every key; the engine never sees it. A grouped keyboard's code (`NineKeyLetters.CODES`: 18 键's U+F8C0–F8D9, 14 键's U+F8DA–F8F3, 九键双拼's U+F8F4–F8FB) or a 14-key tap (`Keyboard.TAPS`) reaches the mode as its letter (`Keyboard.typedLetter`: the half tapped, the first at the centre), and the modes type no private use character | `TempMode` list in `TempModeManager` |
-| 4 | InputMethod | the engine's `keyEvent`; a grouped keyboard's code goes only to the input method that reads it (`Engines.readsCode`: pinyin G14's U+F8DA–F8F3, 双拼 G18's U+F8C0–F8D9 and NINE_SP's U+F8F4–F8FB; see engine.md *Codes*), and a tap (`Keyboard.TAPS`) is pinyin's alone; `KeyRouter` swallows them for any other input method | `KeyEngine` (`KeyRouter`) |
+| 4 | InputMethod | the engine's `keyEvent`; a grouped keyboard's code goes only to the input method that reads it (`InputMethodCatalog.readsCode`: pinyin G14's U+F8DA–F8F3, 双拼 G18's U+F8C0–F8D9 and NINE_SP's U+F8F4–F8FB; see engine.md *Codes*), and a tap (`Keyboard.TAPS`) is pinyin's alone; `KeyRouter` swallows them for any other input method | `KeyEngine` (`KeyRouter`) |
 | 5 | PostInputMethod | temp mode triggers first, then the hooks: fullwidth's conversion, Ctrl+. (punctuation), Ctrl+Shift+F (chttrans) | `PostKeyHook` list |
 | 6 | ReservedLast | the engine's `filterKey`, then `KeyResultListener`s (punctuation's last letter/digit) | `KeyResultListener` list |
 | 7 | — | not accepted: `HostOutput.handBack(origKey, release, timestamp)`, **press and release alike** | — |
@@ -68,7 +68,7 @@ each fcitx module does. Other entry points:
 |---|---|---|
 | `KeyEngine` | `KeyRouter` (`androidengine.cpp:550-687`) | filterAndAccept what it takes; `filterKey` at ReservedLast |
 | `EngineHost` | app `EngineBridge`; tests: `Engines` | `event` returns null for an engine that cannot load |
-| `HostOutput` | `HostCore` → `KotlinFcitx` events | commit/delete/handBack at once, panel coalesced |
+| `HostOutput` | `HostCore` → `KotlinHost` events | commit/delete/handBack at once, panel coalesced |
 | `TempMode` | `QuickPhrase`, `UnicodeInput` | `trigger` makes itself active; ignore releases there |
 | `PostKeyHook`, `CommitFilter` | `FullWidth` (both), punctuation and chttrans hotkeys | only on contexts whose status area has the module (a Chinese input method) |
 | `KeyResultListener`, `ForwardKeyListener`, `ContextListener` | `Punctuation` | per-context state in an `IcProperty` |
@@ -152,9 +152,9 @@ checkout needed) and also writes the golden files `KeySymsGoldenTest` checks; do
 points are the frontend's calls (`activate`, `focus`, `setCapabilities`, `sendKey`, `select`,
 `candidates`, `candidateActions`/`triggerCandidateAction`, `setCandidatePagingMode`,
 `offsetCandidatePage`, `moveCursor`, `reset`, `toggle`, `enumerate`, `setCurrentInputMethod`,
-`setInputMethods`); each is one event (`KeyPipeline.batch`). Output is `events` (`HostEvents`):
-a `MutableSharedFlow(extraBufferCapacity = Int.MAX_VALUE)` that never drops, its `handlers` run
-first as `fcitxEventHandlers` do. Commits, deletes and keys go out at once; the client preedit at
+`setInputMethods`); each is one event (`KeyPipeline.batch`). Output is `events`, a list of
+`HostEvents` listeners called in turn on the host thread, nothing buffered or dropped (the app's
+`KotlinHost` is the one listener, and wraps it as its flow). Commits, deletes and keys go out at once; the client preedit at
 once too (`updatePreedit`, only with the Preedit capability, two empty ones once); the panel and
 the candidates once at the end of the event, for the active context only.
 
@@ -181,8 +181,11 @@ Plug-ins: `HostModules` (made with the core's `HostServices`) carries the pipeli
 `candidates`/`get`/`push`). State that belongs in a file is told as it changes: `persist` gets
 `Persist.ProfileChanged` (input method list, default) and `Persist.ConfChanged(conf)` from a
 module's `HostServices.persistConf`, so the INI writer saves it without waiting for a settings page
-to stop. Texts gettext gave are `HostStrings` (the app's resources). `Engines(learnClock, uptimeMillis)`
-take the clocks learning and tables read, so nothing in a replay reads the system clock.
+to stop. Texts gettext gave are `HostStrings` (the app's resources). `Engines(clock)`
+takes the platform `Clock` (the wall time learning stamps and dates by, and the uptime tables read; `LearningFacade` and
+`SessionFactory` are handed it as their `learnClock`), and the date and time phrases (`rq`, `sj`, `xq`, those 日期 brings
+in a table) are filled in at `learnClock.calendar()`, so nothing in a replay reads the system clock
+(`HostCoreEnginesTest`); `Engines(background)` runs compactions and backups where a test can run them in place.
 
 ## Temp modes: quick input and Unicode
 
@@ -234,8 +237,10 @@ client preedit, aux and list, sent at the event's end; a tap is the mode's candi
 `triggerQuickPhrase` turns the preedit off first, as `native-lib.cpp:286-296`; the status area goes
 out as `HostEvent.StatusArea` once at the end of an event that changed it (`HostOutput.flushed`);
 `configure(EngineOptions)` sets the router's page size and English suggestions and the engines'
-flat settings. `FcitxEvents.of` turns each `HostEvent` into the app's `FcitxEvent` (a tip into
-none), with the input method entries androidengine lists (`FcitxEvents.entry`).
+settings (`EngineOptions.toSettings`). The app takes the `HostEvent`s as they are (a tip goes to
+`EngineNotices`, not the flow); an input method's entry is the one androidengine lists
+(`InputMethodEntries.of`), and the status area is its `StatusEntry`s, the native `Action`'s menu,
+separator and checked state never having been set.
 
 ## Config files
 
@@ -248,20 +253,57 @@ backup read as they are, and v0.3.x reads what the host writes.
   key `a `, which no option has), values unquoted/escaped as `stringutils.cpp:390-425`. Written without
   fcitx's description comments (translated text fcitx never reads). A node is implicit if it or a node
   above it is (`RawConfig::isImplicit`). `ConfigTree` is fcitx's `RawConfig`.
-- `engine.table.IniText` stays as the migrations' line editor (it keeps lines and comments as written);
-  it trims around `=`. Its readers — `LibimeMigration`, `AddonDefaults`, `EngineSettings.parse` (the
-  flat settings) — only ever see fcitx-written text, where both read alike (`IniSpacesTest`).
 - `EngineOptions` is `androidengine.h`'s option table with `Configuration`'s rules: a value that does
   not read falls back to its default, never clamped; a key it has no option for is dropped at the next
   save; a table group missing from the file is the table's defaults (`engineTable(hint)`: 仓颉 and 二笔
   without hints), a group there with an item missing gets a fresh group's (hints on), as fcitx does.
   `page(im)` is `getConfigForInputMethod` (a table's own keys at the top), `setPage` the partial save;
-  `flat()` is what the engine reads (`EngineSettings.parse`).
+  `toSettings()` is what the engine reads: every value, defaults too, each table's group among them,
+  as typed `EngineSettings` (no text between the two: the addon's `pushSettings` flattened and the
+  engine parsed again, a round trip with nothing to gain once both are Kotlin).
 - `ConfigWriter`: every change is written in the background, merged per file, atomically (`.new` →
   rename), without waiting for a settings page to close; `flush` at stop and before `save()` returns.
   The drain is `synchronized`, so a flush waits for a write the background thread already took
   instead of returning while that write is still in flight (`ConfigWriterTest`). Before the user unlocks
   nothing is written, stop included.
+  A file `hold` names is never written this run (what was pending for it dropped): one that did not
+  read.
+- **Where they are, and a read that fails (A4).** In the app's own files, `files/host-config`
+  (`ConfigHome.CONFIG`), not fcitx's `config/` on the external storage, which a phone cleaner empties and
+  which can be away at a start; fcitx's data and the themes the same way (`ConfigHome.DATA`,
+  `files/host-data`, from `data/`; `ConfigHome.THEME`, `files/host-theme`, from `theme/`), each settled
+  on its own, once a process (`ConfigHome.Settled`, held by `HostConfigDir`): whoever asks first decides,
+  a failed move too, and the engine, the editors and a backup then all use that one directory; the next
+  process tries again. A move in the middle of a process would leave an editor writing where the engine
+  no longer reads. `ConfigHome.settle` (ime-core, over `UserFiles`) moves an older build's in once: the
+  external one, else the `files/<old>` an older build fell back to, streamed to `<name>.new`, each file
+  read back and compared, then renamed in, and the old deleted (going back to 0.4 needs an
+  uninstall, which takes both). Only a home the move made deletes: `ConfigHome.MOVED`, written into
+  the copy before the rename, names the source, and goes once that is deleted; a delete that fails,
+  or a kill before it, is tried again at the next start, the external one only while the storage
+  lists. A home made empty never deletes an older build's directory that appears later; a backup
+  leaves the marker out. A directory that does not list (`UserFiles.listable`: FUSE's EIO/EACCES) fails the copy rather
+  than moving nothing, and an external storage not `MEDIA_MOUNTED` is away. A failed copy reads and
+  writes the old where it is and tries again next start; no external storage and nothing moved yet:
+  read what is there, write nothing (`EXTERNAL_AWAY`), unless certainly nothing is old (no
+  `files/engine` yet, the first run not done, no fallback: a new install), then its own directory is
+  made. Not writable, an editor's save (custom phrases, dictionaries, themes), a backup and a restore
+  refuse with `user_data_not_settled` (`HostConfigDir.inUse`), as what they wrote would be lost or
+  passed over at the next start; with none settled the editors read an empty stand-in under the
+  cache, never `files/<old>`, which a later start would take for an older build's fallback. A copy
+  lists each directory once (`UserFiles.listing`), a null listing failing it. The DATA home is settled
+  at the app's start on a background thread (`FcitxApplication`), only with the external storage
+  `MEDIA_MOUNTED`, so neither an editor on the main thread nor the host waits on its copy; this changes
+  when, never where. An absent file is the defaults, as INI says; a file that is there but does not read is **not**, and neither is one `exists()` calls absent where
+  a failed stat may hide it (`KotlinHost.statFailed`: its directory lists it, a directory on the way is
+  there but does not list, or the home itself is missing before the move): `KotlinHost.readConfig`
+  logs it, `hold`s it so the defaults typed with are never written over it, and tells the user once per
+  run (`config_unreadable`, on the keyboard through `EngineNotices.failedUntilSeen`, said again the next
+  time the keyboard shows if it was only a toast). A config not settled writable (`EXTERNAL_AWAY`, a
+  failed `mkdirs`) is told as `config_not_settled`; data not settled, a punctuation table, the custom
+  phrases, the quick phrases or a theme that does not read, as `user_data_unreadable`
+  (`EngineNotices.failedOnce`: once a process). An unreadable punctuation table gives the built-in one
+  and is never saved over (`PunctuationMaps.save` throws); unreadable custom phrases are not saved.
 - `PunctuationTable` / app `PunctuationMaps`: `punc.mb.<lang>` as `ca/punctuation/punctuation.cpp:75-173`
   reads and writes it; the user's file replaces the built-in table whole.
 
@@ -271,22 +313,33 @@ table (`lib/ime-core/tools/fcitx-ini/options.inc`, `androidengine.h`'s as of `na
 v0.3.0–0.3.2 devices' `androidengine.conf` from
 `uat/fixtures/upgrade`.
 
-## The app's side: `KotlinFcitx`
+## The app's side: `KotlinHost`
 
-`FcitxDaemon` starts `KotlinFcitx`, the only `FcitxInstance`. It implements the `FcitxAPI` and runs
+`HostDaemon` starts `KotlinHost`, the only `HostInstance`. It implements the `HostApi` and runs
 every call on `HostDispatcher`, the single "fcitx-main" thread ([architecture.md](architecture.md#processes-and-threads)).
-`startup` runs the engine's migrations and reload, reads the profile, `androidengine.conf`,
+`startup` settles the host's config and data directories (`ConfigHome.settle`), starts the engine, reads the profile, `androidengine.conf`,
 `punctuation.conf` and `chttrans.conf`, starts the quick phrase tables loading on a thread of their own,
 builds `ChineseModules` and `HostCore`, then posts Ready. Built-in data comes from the APK's `pkgdata/`
 assets (`BUILT_IN`), OpenCC's from `engine/opencc-s2tw.data`, mapped at the first traditional text;
 the gettext translations are gone, the host's own texts are app resources (`AppHostStrings`).
 
-- **The `EngineSide` seam.** `KotlinFcitx` takes an `EngineSide`: the engine host, `home()`, `start()`
-  and `close()`. The app passes `EngineSide.App`, which is `EngineBridge`. The JVM tests pass
-  `ScriptedEngine` (app test sources), so they need no JNI.
-- **Settings pages.** `getImConfig` returns `cfg` with an empty `desc`. `setImConfig` takes the `cfg`
-  node itself, as `FcitxPreferenceFragment.save` passes it. An addon sub-config (the punctuation map)
-  comes back with its entries under `cfg`, which is where `PunctuationManager.parseRawConfig` looks.
+- **The `HostApi`, by part.** `HostApi` is the host's cached state (`eventFlow`, the input method,
+  status area, preedit and panel as last told), `save` and `reloadConfig`, over one interface per
+  part: `TypingApi` (keys, candidates, the field, the status area, the engine's typing-time calls),
+  `InputMethodsApi`, `EngineSettingsApi`, `PunctuationApi`, `LexiconApi` (the user's words) and
+  `LearningApi`. Every call is `suspend` and runs on the host thread.
+- **The `EngineSide` seam.** `KotlinHost` owns its `EngineBridge` (`bridge`, made with it: one per
+  host) and takes an `EngineSide`: the engine host, `data()` (fcitx's data directory and whether it is written, `HostConfigDir.settle(DATA)`), `config()` (the config's
+  directory and whether it is written, `HostConfigDir.settle`), `start()` and `close()`. The app
+  passes none, and gets `EngineSide.App` over its bridge. The JVM tests pass `ScriptedEngine` (app
+  test sources), so they need no JNI. What the keyboards watch of the engine (the syllables
+  offered, English's word, the handwriting piece ended, the 双拼 scheme, refining) is
+  `EngineState`'s, one per process as the keyboards are.
+- **Settings pages.** `imOptions(im)` is the page's options by path (`Fuzzy/L_N`) to value, the
+  leaves of `EngineOptions.page`, null for an input method with no page. `setImOptions` takes those
+  a page shows (`InputMethodSettings.only`) into `EngineOptions.setPage`, a partial load that keeps
+  the rest. `punctuationMap(lang)`/`setPunctuationMap` are zh_CN's map as entries, another
+  language's empty.
 - **Reloading config.** `reloadConfig` reads the module files again. It calls
   `Chttrans.reload(enabled)` (chttrans.cpp:218), then sends the status area out again.
 - **Focus out.** Pinyin's typing is dropped when the field loses focus, as on the native host:

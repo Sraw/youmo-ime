@@ -14,11 +14,13 @@
 - **前提**：B0-手写。
 - **操作**：写「人」，停笔约 1 秒。
 - **预期**：写的过程中候选栏就出现候选；停笔后书写板清空；框里出现带下划线的「人」（还没上屏），候选栏里有「人」。
+- **JVM**：`HandwritingUatTest.whileWritingTheReadingIsOfferedAndThePauseWipesThePad`、`HostCasesUatTest.aCharacterWrittenIsComposingInTheFieldWithItsReadings`（写的过程中读出的墨迹就交给引擎（识别器模型换成固定读法），停笔后书写板清空；墨迹喂给引擎后框里组字「人」（未上屏），候选有「人」）；设备上不跑。
 
 ### HW-03 [P0] 空格上屏整句
 - **前提**：B0-手写。
 - **操作**：写「大」，停笔；写「人」，停笔；点空格。
 - **预期**：框里是「大人」，没有下划线。
+- **JVM**：`HandwritingEngineUatTest.spaceCommitsTheSentenceWritten`（写两字空格上屏）；设备上留作冒烟（书写板触摸到识别的胶水）。
 
 ### HW-04 [P1] 后面写的字改正前面认错的
 - **前提**：B0-手写。这个用例要一个识别拿不准的「谈」，手写不容易照着做出来：`uat/scripts` 里的手写脚本用固定笔画（hw_strokes.py）复现；人工测试时如果单写出来的不是「淡」，换个写法再试，三次都做不出来记为 **跳过**，不算失败。
@@ -54,6 +56,7 @@
 - **前提**：B0-手写。
 - **操作**：写「人」，停笔；点工具栏的 ⌄ 收起键盘（或点别的输入框）。
 - **预期**：「人」留在「普通文本」框里，没有下划线。
+- **JVM**：`HostCasesUatTest.aCharacterNotCommittedStaysInTheFieldWhenTheKeyboardGoes`（收起键盘后「人」留在框里、不再组字）；设备上不跑。
 
 ### HW-10 [P1] 上屏后联想下一个词
 - **前提**：B0-手写。
@@ -91,11 +94,13 @@
 - **前提**：B0-手写。
 - **操作**：写「人」，记下候选顺序，点候选里的「入」上屏；再写「人」，长按候选里的「入」，选 **屏蔽**、确认；不重写，马上点键盘上方提示里的 **撤销**；再长按「入」选 **忘掉学到的**；删光，再写「人」。
 - **预期**：菜单里有 **忘掉学到的**（学到过才有）和 **屏蔽**，没有 **固定首位**。屏蔽后候选里没有「入」，提示在键盘上方，不盖任何候选；点撤销后不用重写，候选里马上又有「入」；忘掉以后候选当场回到第一次写「人」时的顺序，再写「人」也一样。
+- **JVM**：`KeyboardHalvesUatTest.handwritingsMenuHasNoPinItsBlockUndoneAndForgettingReordersAtOnce`（uatTest，真数据：菜单有忘掉学到的和屏蔽、没有固定首位；屏蔽后没有「入」，撤销后不重写就回来；忘掉后当场回到第一次的顺序，重写也一样）、`HandwritingUatTest.handwritingsMenuHasNoPinAndItsNoticeIsOverTheCandidates`（菜单的字、提示条在候选栏上方、撤销送 Undo）；设备上不跑。
 
 ### HW-25 [P1] 在框里点一下没上屏的字：原样上屏
 - **前提**：B0-手写。
 - **操作**：写「人」，再写「大」（两个字都还带下划线，没上屏）；在输入框里「人」的前面点一下；再写「十」。
 - **预期**：「人大」原样上屏，没有下划线；候选栏和书写板清空；光标回到「人大」后面（上屏的字等于正在组的字时，光标放到它的末尾，0.3.x 也这样）；「十」从新的一句开始写，「人大」不变（框里是「人大十」，只有「十」带下划线）。上屏是 fcitx 点组字文字时的默认做法；光标放到末尾是本应用 `EditingSession.commitText` 的做法。
+- **JVM**：`HostCasesUatTest.aTapOnCharactersNotInPutsThemInAsTheyAre`（点在未上屏的字前：原样上屏、光标在后、再写另起）；设备上不跑。
 
 ### HW-26 [P1] 简繁切换时没上屏的手写字当场变繁体
 - **前提**：B0-手写，繁体关。
