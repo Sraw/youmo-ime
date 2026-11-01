@@ -18,7 +18,7 @@ import org.fcitx.fcitx5.android.engine.data.WordLayers
  * The values are fixed now: the session no longer learns them from picks (learning-ux
  * impl/design-1b.md §4), so nothing in the app calls [learn] or sets [journal]. They stay, with
  * [step] and ±[bound], for measuring a learned prior again; [restore] still takes back what an
- * older build kept by name (`pinyin.user`, UserLog), a name no build or pack uses any more just
+ * older build kept by name (`pinyin.user`'s log), a name no build or pack uses any more just
  * sitting in the log, a few bytes.
  */
 class LayerPrior(

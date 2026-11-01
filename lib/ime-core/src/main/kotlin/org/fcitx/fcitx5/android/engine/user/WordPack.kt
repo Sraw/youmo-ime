@@ -7,6 +7,7 @@ package org.fcitx.fcitx5.android.engine.user
 import org.fcitx.fcitx5.android.engine.data.SourceException
 import org.fcitx.fcitx5.android.engine.data.fields
 import org.fcitx.fcitx5.android.engine.user.UserModel.Entry
+import org.fcitx.fcitx5.android.engine.user.imports.WordText
 
 /**
  * A pack of words to type that the dictionary built in does not have yet, or has as unknown:
@@ -85,7 +86,7 @@ class WordPack(val layer: String, val words: List<Word>) {
             val f = line.fields()
             if (f.size != 3) return null
             val score = f[2].toFloatOrNull()?.takeIf { it.isFinite() && it <= 0f } ?: return null
-            val entry = LibimeImport.entry(f[0], f[1]) ?: return null
+            val entry = WordText.entry(f[0], f[1]) ?: return null
             return Word(entry, score)
         }
     }

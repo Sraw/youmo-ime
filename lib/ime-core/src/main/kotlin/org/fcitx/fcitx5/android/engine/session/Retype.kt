@@ -59,7 +59,7 @@ internal object Retype {
             val whole = k.rows.firstOrNull { it.whole }
             val n = whole?.let(matcherOf)?.consume(units, at)?.takeIf { it > 0 && at + it <= units.size } ?: break
             val text = units.texts.subList(at, at + n).joinToString("")
-            val reading = if (units.syllables.isEmpty()) "" else (at until at + n).joinToString(" ") { Syllables.spelling(units.syllables[it]) }
+            val reading = if (units.syllables.isEmpty()) "" else Syllables.spelled(units.syllables, at, at + n)
             val own = rows.any { it.code == whole.code && it.prev == whole.prev && it.words.text == text && it.words.reading == reading }
             if ((units.wordBefore[at] ?: last) == whole.prev && !own) out += row(whole, Words(listOf(Word(text, reading))), origin)
             last = text

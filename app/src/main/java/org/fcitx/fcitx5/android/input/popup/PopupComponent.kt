@@ -143,13 +143,14 @@ class PopupComponent :
      * Over the key [bounds], [width] wide, by default as wide as the key's face (the bounds across)
      * and its text, never narrower than [minPopupWidth]: a fixed width over a wider key
      * (九键's, `.com`, any in landscape) left the key's pressed colour showing at both sides.
-     * From [left], by default centred over the key.
+     * From [left], by default centred over the key, kept inside the keyboard: a table's roots
+     * (TextKeyboard) over A were wider than the half of it left of A.
      */
     private fun place(
         popup: PopupEntryUi,
         bounds: Rect,
         width: Int = entryWidth(popup, bounds),
-        left: Int = (bounds.left + bounds.right - width) / 2,
+        left: Int = ((bounds.left + bounds.right - width) / 2).let { if (root.width > width) it.coerceIn(0, root.width - width) else it },
     ) {
         popup.trigger.set(bounds)
         // align popup bottom with key border bottom [^1]

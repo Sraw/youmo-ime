@@ -5,8 +5,11 @@
 package org.fcitx.fcitx5.android.engine.learn.backup
 
 import org.fcitx.fcitx5.android.engine.learn.LearnClock
+import org.fcitx.fcitx5.android.engine.platform.LogFile
+import org.fcitx.fcitx5.android.engine.platform.UserFiles
+import org.fcitx.fcitx5.android.engine.platform.jvm.JvmClock
+import org.fcitx.fcitx5.android.engine.platform.write
 import org.fcitx.fcitx5.android.engine.store.replaceFile
-import java.io.File
 import java.io.IOException
 import java.security.SecureRandom
 import java.util.concurrent.ExecutionException
@@ -28,11 +31,13 @@ data class BackupInfo(val name: String, val head: BackupHead, val own: Boolean, 
  * no-backup directory), so a copy brought over is another's.
  */
 class Backups(
-    private val dir: File?,
+    private val dir: UserFiles?,
     val installId: Long,
     private val onError: (IOException) -> Unit = {},
     // writes a backup made due by a commit, so the key does not wait on the disk; null: here
     private val background: Executor? = null,
+    // the time of a backup whose record has none: the learning's clock, a replay's virtual one
+    private val clock: LearnClock = JvmClock,
 ) {
     /** Whether a backup is made every [EVERY] typing days (U-106's switch). */
     var auto = true
@@ -43,19 +48,20 @@ class Backups(
 
     /** The backups kept, newest first; the copy made before a restore apart ([beforeRestore]). */
     fun list(): List<BackupInfo> {
-        val files = dir?.listFiles { f -> f.isFile && f.name.endsWith(LearnBackup.EXTENSION) && f.name != BEFORE_RESTORE }.orEmpty()
+        val dir = dir ?: return emptyList()
+        val files = dir.files().filter { it.endsWith(LearnBackup.EXTENSION) && it != BEFORE_RESTORE }.map(dir::file)
         return files.mapNotNull(::info).sortedByDescending { it.head.time }
     }
 
-    private fun info(file: File): BackupInfo? = try {
-        LearnBackup.head(file.inputStream())?.let { BackupInfo(file.name, it, it.installId == installId, file.length()) }
+    private fun info(file: LogFile): BackupInfo? = try {
+        LearnBackup.head(file.input())?.let { BackupInfo(file.name, it, it.installId == installId, file.length()) }
     } catch (e: IOException) {
         onError(IOException("$file does not read as a backup", e))
         null
     }
 
     /** The bytes of the backup [name], as [list] names it; null if there is none. */
-    fun read(name: String): ByteArray? = file(name)?.takeIf { it.isFile }?.readBytes()
+    fun read(name: String): ByteArray? = file(name)?.takeIf { it.exists() }?.read()
 
     /** Deletes the backup [name]: whether there was one. */
     fun delete(name: String): Boolean {
@@ -65,7 +71,7 @@ class Backups(
     }
 
     // a name as listed, never a path out of the directory nor the copy [list] keeps apart
-    private fun file(name: String) = dir?.takeIf { '/' !in name && name != BEFORE_RESTORE && name.endsWith(LearnBackup.EXTENSION) }?.let { File(it, name) }
+    private fun file(name: String) = dir?.takeIf { '/' !in name && name != BEFORE_RESTORE && name.endsWith(LearnBackup.EXTENSION) }?.file(name)
 
     /** Whether an automatic backup is due on typing day [day]: on the first, then every [EVERY]; never for an install of no id. */
     fun due(day: Int): Boolean {
@@ -97,15 +103,15 @@ class Backups(
                     // nothing to back up yet (no log read): due again, not in seven typing days
                     lastAuto = null
                 } else {
-                    val time = LearnBackup.head(bytes.inputStream())?.time ?: System.currentTimeMillis()
+                    val time = LearnBackup.head(bytes.inputStream())?.time ?: clock.now()
                     val name = "$AUTO_PREFIX$time${LearnBackup.EXTENSION}"
-                    write(File(dir, name), bytes)
+                    write(dir.file(name), bytes)
                     // the one just written kept, it holds the learning now, and the newest of the others by
                     // typing day, as [due] reads them: neither a clock set back nor a log begun again behind
                     // the newest (due's day < last) may make it the one dropped (F3090)
                     list().filter { it.own && it.head.kind == BackupHead.AUTO && it.name != name }
                         .sortedWith(compareByDescending<BackupInfo> { it.head.day }.thenByDescending { it.head.time })
-                        .drop(KEEP - 1).forEach { File(dir, it.name).delete() }
+                        .drop(KEEP - 1).forEach { dir.file(it.name).delete() }
                 }
             } catch (e: IOException) {
                 notWritten(e)
@@ -127,20 +133,20 @@ class Backups(
     /** Keeps [bytes] as the copy made before a restore, in place of the last. */
     @Throws(IOException::class)
     fun saveBeforeRestore(bytes: ByteArray) {
-        write(File(dir ?: throw IOException("no directory for backups"), BEFORE_RESTORE), bytes)
+        write((dir ?: throw IOException("no directory for backups")).file(BEFORE_RESTORE), bytes)
     }
 
     /** The copy made before the last restore, if it is kept. */
-    fun beforeRestore(): ByteArray? = dir?.let { File(it, BEFORE_RESTORE) }?.takeIf { it.isFile }?.readBytes()
+    fun beforeRestore(): ByteArray? = dir?.file(BEFORE_RESTORE)?.takeIf { it.exists() }?.read()
 
     /** Whether the copy made before the last restore is kept, without reading it (it may be megabytes). */
-    fun hasBeforeRestore(): Boolean = dir?.let { File(it, BEFORE_RESTORE) }?.isFile == true
+    fun hasBeforeRestore(): Boolean = dir?.file(BEFORE_RESTORE)?.exists() == true
 
     /** When the copy made before the last restore was made (epoch milliseconds), if it is kept and reads. */
-    fun beforeRestoreTime(): Long? = dir?.let { File(it, BEFORE_RESTORE) }?.takeIf { it.isFile }?.let(::info)?.head?.time
+    fun beforeRestoreTime(): Long? = dir?.file(BEFORE_RESTORE)?.takeIf { it.exists() }?.let(::info)?.head?.time
 
     fun dropBeforeRestore() {
-        dir?.let { File(it, BEFORE_RESTORE).delete() }
+        dir?.file(BEFORE_RESTORE)?.delete()
     }
 
     /**
@@ -164,9 +170,9 @@ class Backups(
         lastAuto = null
     }
 
-    private fun write(file: File, bytes: ByteArray) {
-        file.parentFile?.mkdirs()
-        replaceFile(file, File(file.path + ".new")) { it.writeBytes(bytes) }
+    private fun write(file: LogFile, bytes: ByteArray) {
+        file.mkdirs()
+        replaceFile(file, file.beside(".new")) { it.write(bytes) }
     }
 
     companion object {
@@ -189,15 +195,15 @@ class Backups(
          * test's phone is another install each time. 0, told, if [file] can be neither read nor
          * written: never a new one each start, which would make this install's backups another's.
          */
-        fun installId(file: File?, onError: (IOException) -> Unit = {}): Long {
+        fun installId(file: LogFile?, onError: (IOException) -> Unit = {}): Long {
             if (file == null) return random()
             return try {
-                val kept = file.takeIf { it.isFile }?.readText()
+                val kept = file.takeIf { it.exists() }?.read()?.toString(Charsets.UTF_8)
                 kept?.trim()?.toLongOrNull() ?: random().also { id ->
                     // a garbled file: this install's backups become another's from here on, so say so
                     if (kept != null) onError(IOException("$file does not read as an install id: a new one made"))
-                    file.parentFile?.mkdirs()
-                    replaceFile(file, File(file.path + ".new")) { it.writeText(id.toString()) }
+                    file.mkdirs()
+                    replaceFile(file, file.beside(".new")) { it.write(id.toString().toByteArray()) }
                 }
             } catch (e: IOException) {
                 onError(IOException("no install id: backups not made", e))

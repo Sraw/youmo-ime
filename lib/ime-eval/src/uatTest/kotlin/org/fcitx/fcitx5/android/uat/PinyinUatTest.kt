@@ -5,8 +5,8 @@
 package org.fcitx.fcitx5.android.uat
 
 import org.fcitx.fcitx5.android.Uat
-import org.fcitx.fcitx5.android.engine.host.EngineSettings
-import org.fcitx.fcitx5.android.engine.host.ModelLevel
+import org.fcitx.fcitx5.android.engine.runtime.EngineSettings
+import org.fcitx.fcitx5.android.engine.runtime.ModelLevel
 import org.fcitx.fcitx5.android.engine.learn.HabitRanker
 import org.fcitx.fcitx5.android.engine.learn.control.LearningOp
 import org.fcitx.fcitx5.android.engine.learn.control.LearningResult
@@ -340,6 +340,11 @@ class PinyinUatTest {
         type("jiaose")
         expectAmong("角色")
         assertTrue("hint 「${hintOf("角色")}」", "jué sè" in hintOf("角色"))
+        backspace(6)
+        // 简拼 and a syllable half typed: the misreading is already plain
+        type("xxxuez")
+        expectAmong("莘莘学子")
+        assertTrue("hint 「${hintOf("莘莘学子")}」", "shēn shēn xué zǐ" in hintOf("莘莘学子"))
     }
 
     @Test
@@ -370,7 +375,7 @@ class PinyinUatTest {
     }
 
     @Test
-    @Uat("PY-20")
+    @Uat("PY-20", "ST-32")
     fun fuzzyZZh() = with(EngineReplay(settings(EngineSettings(fuzzy = setOf(Fuzzy.Z_ZH))))) {
         type("zongguo")
         expectOnFirstPage("中国")
@@ -609,11 +614,20 @@ class PinyinUatTest {
         expectFirst("点了")
     }
 
+    @Test
+    @Uat("QU-08")
+    fun quickInputOffersNoEnglishWords() = with(HostReplay(engines = UatEngines.fresh(), strings = checkNotNull(ResourceHostStrings.device()))) {
+        quick()
+        type("hell")
+        assertTrue("「$row」", row.startsWith("快速输入"))
+        // kaomoji, emoji or nothing: no word of English's
+        assertTrue("$page", page.none { w -> w.isNotEmpty() && w.all { it in 'a'..'z' || it in 'A'..'Z' } })
+    }
 }
 
 /**
  * A fresh install's engines with [s] set, as the settings pages set them. For pinyin's cases: [s]
- * replaces [UatEngines.NEW_INSTALL] whole, so a table gets EngineSettings' defaults, not a new
+ * replaces [UatEngines.BASELINE] whole, so a table gets EngineSettings' defaults, not a new
  * install's (a table's case sets its options as its page does, TablesUatTest.wubi).
  */
 internal fun settings(s: EngineSettings) = UatEngines.fresh().also { it.settings = s }

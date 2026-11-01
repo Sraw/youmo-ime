@@ -6,14 +6,15 @@ package org.fcitx.fcitx5.android.input.keyboard
 
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.runBlocking
-import org.fcitx.fcitx5.android.core.FakeFcitxAPI
-import org.fcitx.fcitx5.android.core.FcitxAPI
+import org.fcitx.fcitx5.android.core.FakeHostApi
+import org.fcitx.fcitx5.android.core.HostApi
 import org.fcitx.fcitx5.android.core.FcitxKeyMapping
 import org.fcitx.fcitx5.android.core.FormattedText
 import org.fcitx.fcitx5.android.core.InputMethodEntry
 import org.fcitx.fcitx5.android.core.UNICODE
-import org.fcitx.fcitx5.android.engine.host.Engines
-import org.fcitx.fcitx5.android.engine.host.Keyboard
+import org.fcitx.fcitx5.android.engine.InputMethodCatalog
+import org.fcitx.fcitx5.android.engine.assertRows
+import org.fcitx.fcitx5.android.engine.runtime.Keyboard
 import org.fcitx.fcitx5.android.engine.pinyin.ShuangpinScheme
 import org.fcitx.fcitx5.android.engine.pinyin.g14Code
 import org.junit.Assert.assertEquals
@@ -24,7 +25,8 @@ import org.junit.Test
 
 class CommonKeyActionListenerTest {
 
-    private val nineKeys = { Engines.T9 }
+    // the nine keys are a keyboard of pinyin's: their keys reach the listener as pinyin's
+    private val pinyin = { InputMethodCatalog.PINYIN }
     private val notAsked: () -> String = { error("the input method is not asked") }
 
     // xiaoming then the 123 page's 1 in an address field: the 1 goes in as it is, not picking 小明
@@ -38,19 +40,22 @@ class CommonKeyActionListenerTest {
         assertTrue(isKeypadSym(one))
         // a keypad's digit is no key of the nine keys': the input method is not even asked
         assertEquals("1", symTypedAsIs(one, address = true, im = notAsked, scheme = ShuangpinScheme.ZIRANMA))
-        assertEquals("1", symTypedAsIs(one, address = true, im = nineKeys, scheme = ShuangpinScheme.ZIRANMA))
-        assertNull(symTypedAsIs(one, address = false, im = nineKeys, scheme = ShuangpinScheme.ZIRANMA))
+        assertEquals("1", symTypedAsIs(one, address = true, im = pinyin, scheme = ShuangpinScheme.ZIRANMA))
+        assertNull(symTypedAsIs(one, address = false, im = pinyin, scheme = ShuangpinScheme.ZIRANMA))
     }
 
-    // the bar's digits are their own syms, which the nine keys read as keys as ever
+    // the bar's digits are their own syms: the nine keys' keys are their codes since I1, so a digit is
+    // no key of theirs, put in as it is in an address field
     @Test
     fun aCharactersOwnSymTypesIt() {
         assertEquals("1", symText('1'.code))
         assertEquals("@", symText('@'.code))
         assertFalse(isKeypadSym('1'.code))
-        assertNull(symTypedAsIs('1'.code, address = true, im = nineKeys, scheme = ShuangpinScheme.ZIRANMA))
-        assertEquals("1", symTypedAsIs('1'.code, address = true, im = { Engines.PINYIN }, scheme = ShuangpinScheme.ZIRANMA))
-        assertEquals("@", symTypedAsIs('@'.code, address = true, im = nineKeys, scheme = ShuangpinScheme.ZIRANMA))
+        assertEquals("1", symTypedAsIs('1'.code, address = true, im = pinyin, scheme = ShuangpinScheme.ZIRANMA))
+        // the nine keys' own codes type no character: to the engine, even in an address field
+        assertNull(symTypedAsIs(UNICODE + Keyboard.pinyinNineKey('2'), address = true, im = notAsked, scheme = ShuangpinScheme.ZIRANMA))
+        assertEquals("1", symTypedAsIs('1'.code, address = true, im = pinyin, scheme = ShuangpinScheme.ZIRANMA))
+        assertEquals("@", symTypedAsIs('@'.code, address = true, im = pinyin, scheme = ShuangpinScheme.ZIRANMA))
     }
 
     @Test
@@ -64,12 +69,15 @@ class CommonKeyActionListenerTest {
         assertNull(symTypedAsIs(FcitxKeyMapping.FcitxKey_BackSpace, address = true, im = notAsked, scheme = ShuangpinScheme.ZIRANMA))
     }
 
-    /** xiaoming2026@ came out 小明026@: an address field takes the digit, but on the nine keys, where it is a key. */
+    /** xiaoming2026@ came out 小明026@: an address field takes the digit, the nine keys' too, whose keys are their codes. */
     @Test
     fun aKeysCharacterGoesInAsItIsUnlessTheInputMethodTypesWithIt() {
-        assertEquals("2", typedAsIs("2", address = true, im = { Engines.PINYIN }, scheme = ShuangpinScheme.ZIRANMA))
-        assertEquals("_", typedAsIs("_", address = true, im = nineKeys, scheme = ShuangpinScheme.ZIRANMA))
-        assertNull(typedAsIs("2", address = true, im = nineKeys, scheme = ShuangpinScheme.ZIRANMA))
+        assertEquals("2", typedAsIs("2", address = true, im = pinyin, scheme = ShuangpinScheme.ZIRANMA))
+        assertEquals("_", typedAsIs("_", address = true, im = pinyin, scheme = ShuangpinScheme.ZIRANMA))
+        // with a syllable typed too: the digit, the nine keys' 0 and 1 among them, is the address's
+        assertRows(listOf("0", "1", "2"), { "$it, a syllable typed" }) { digit ->
+            assertEquals(digit, typedAsIs(digit, address = true, im = pinyin, scheme = ShuangpinScheme.ZIRANMA, composing = { true }))
+        }
         // anywhere else, and for a letter, the key goes to the engine, the input method not asked
         assertNull(typedAsIs("2", address = false, im = notAsked, scheme = ShuangpinScheme.ZIRANMA))
         assertNull(typedAsIs("a", address = true, im = notAsked, scheme = ShuangpinScheme.ZIRANMA))
@@ -78,7 +86,7 @@ class CommonKeyActionListenerTest {
     /** 微软双拼's ing is `;`: put in as it is, it cut the syllable typed in an address field. */
     @Test
     fun inShuangpinTheSchemesOwnKeysStayKeys() {
-        val shuangpin = { Engines.SHUANGPIN }
+        val shuangpin = { InputMethodCatalog.SHUANGPIN }
         assertNull(typedAsIs(";", address = true, im = shuangpin, scheme = ShuangpinScheme.MICROSOFT))
         assertNull(symTypedAsIs(';'.code, address = true, im = shuangpin, scheme = ShuangpinScheme.MICROSOFT))
         assertEquals(";", typedAsIs(";", address = true, im = shuangpin, scheme = ShuangpinScheme.ZIRANMA))
@@ -88,7 +96,6 @@ class CommonKeyActionListenerTest {
     /** Pinyin's `'` (Z's swipe) parts what is typed: in an address field it stayed a key only then. */
     @Test
     fun pinyinsSeparatorIsAKeyWhileSomethingIsTyped() {
-        val pinyin = { Engines.PINYIN }
         assertNull(typedAsIs("'", address = true, im = pinyin, scheme = ShuangpinScheme.ZIRANMA, composing = { true }))
         assertEquals("'", typedAsIs("'", address = true, im = pinyin, scheme = ShuangpinScheme.ZIRANMA, composing = { false }))
         // sent as its sym
@@ -111,22 +118,22 @@ class CommonKeyActionListenerTest {
      * of them, as commitOverEngine posts it: run, it puts its text in the field, `commit(text)` in [fcitx]'s calls
      * among the keys sent, in order; cancelled before its turn, it never runs.
      */
-    private class Queue(inputMethod: String = Engines.PINYIN) {
-        val fcitx = FakeFcitxAPI().apply { inputMethodEntryCached = InputMethodEntry("").copy(uniqueName = inputMethod) }
+    private class Queue(inputMethod: String = InputMethodCatalog.PINYIN) {
+        val fcitx = FakeHostApi().apply { inputMethodEntryCached = InputMethodEntry("").copy(uniqueName = inputMethod) }
 
         /** The texts commits were asked for, run or not. */
         val commits = mutableListOf<String>()
 
         /** The input methods whose table's keys a job asked of fcitx. */
         val tableKeysAsked = mutableListOf<String>()
-        private val jobs = mutableListOf<Pair<Job, suspend FcitxAPI.() -> Unit>>()
+        private val jobs = mutableListOf<Pair<Job, suspend HostApi.() -> Unit>>()
 
         // fcitx as the jobs see it, its table's keys' asks recorded
-        private val api = object : FcitxAPI by fcitx {
+        private val api = object : HostApi by fcitx {
             override suspend fun tableKeys(im: String): Set<Char> = fcitx.tableKeys(im).also { tableKeysAsked += im }
         }
 
-        fun post(job: suspend FcitxAPI.() -> Unit) {
+        fun post(job: suspend HostApi.() -> Unit) {
             enqueue(job)
         }
 
@@ -136,7 +143,7 @@ class CommonKeyActionListenerTest {
         }
 
         // as postFcitxJob's, LAZY: one cancelled before its turn never runs
-        private fun enqueue(block: suspend FcitxAPI.() -> Unit): Job = Job().also { jobs += it to block }
+        private fun enqueue(block: suspend HostApi.() -> Unit): Job = Job().also { jobs += it to block }
 
         fun runAll() = runBlocking { jobs.forEach { (job, block) -> if (!job.isCancelled) block(api) } }
 
@@ -211,7 +218,7 @@ class CommonKeyActionListenerTest {
     @Test
     fun aFourteenKeyTapIsNoTextAsItIs() {
         val sym = UNICODE + Keyboard.tapKey(g14Code('b'), 0.75f)
-        for (im in listOf(Engines.PINYIN, Engines.ENGLISH, "")) {
+        for (im in listOf(InputMethodCatalog.PINYIN, InputMethodCatalog.ENGLISH, "")) {
             assertNull(im, symAsIs(sym, address = true) { ShuangpinScheme.ZIRANMA }({ im }, { false }, { emptySet() }))
             assertEquals(im, "_", symAsIs('_'.code, address = true) { ShuangpinScheme.ZIRANMA }({ im }, { false }, { emptySet() }))
         }

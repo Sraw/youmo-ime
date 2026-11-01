@@ -9,14 +9,12 @@ import org.fcitx.fcitx5.android.engine.data.DataFile
 import org.fcitx.fcitx5.android.engine.data.DataFormatException
 import org.fcitx.fcitx5.android.engine.data.EliasFano
 import org.fcitx.fcitx5.android.engine.pinyin.Syllables
-import java.io.File
+import org.fcitx.fcitx5.android.engine.platform.LogFile
 import java.io.IOException
-import java.io.RandomAccessFile
 import java.nio.ByteBuffer
 import java.nio.CharBuffer
 import java.nio.FloatBuffer
 import java.nio.ShortBuffer
-import java.nio.channels.FileChannel
 
 /**
  * The dictionaries the user merged into the base one, compiled once ([DictionaryCompiler]) and
@@ -321,9 +319,7 @@ class DictionaryFile private constructor(buffer: ByteBuffer, verify: Boolean) {
          * the process.
          */
         @Throws(IOException::class)
-        fun open(file: File, verify: Boolean = true): DictionaryFile = RandomAccessFile(file, "r").use { f ->
-            DictionaryFile(f.channel.map(FileChannel.MapMode.READ_ONLY, 0, f.length()), verify)
-        }
+        fun open(file: LogFile, verify: Boolean = true): DictionaryFile = DictionaryFile(file.map(), verify)
 
         /** One already in memory: tests. */
         @Throws(IOException::class)
@@ -331,6 +327,6 @@ class DictionaryFile private constructor(buffer: ByteBuffer, verify: Boolean) {
 
         /** How many words [file] has, unchecked: for the settings' list. */
         @Throws(IOException::class)
-        fun wordCount(file: File): Int = open(file, verify = false).size
+        fun wordCount(file: LogFile): Int = open(file, verify = false).size
     }
 }

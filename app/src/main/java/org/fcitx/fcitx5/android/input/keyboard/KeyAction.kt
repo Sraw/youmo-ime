@@ -13,7 +13,7 @@ import org.fcitx.fcitx5.android.input.picker.PickerWindow
 
 sealed class KeyAction {
 
-    data class FcitxKeyAction(
+    data class HostKeyAction(
         val act: String,
         val code: Int = ScancodeMapping.charToScancode(act[0]),
         val states: KeyStates = KeyStates.Virtual
@@ -33,9 +33,6 @@ sealed class KeyAction {
     data object LangSwitchAction : KeyAction()
 
     data object ShowInputMethodPickerAction : KeyAction()
-
-    /** 九键's 中/英: 九键拼音 and English on the nine keys, one to the other (EnglishLayoutPolicy). */
-    data object NineKeyLanguageAction : KeyAction()
 
     data class LayoutSwitchAction(val act: String = "") : KeyAction()
 
@@ -60,6 +57,6 @@ sealed class KeyAction {
     /** The emoji panel's search by pinyin, begun ([on]) or left. */
     data class EmojiSearchAction(val on: Boolean) : KeyAction()
 
-    /** A glide across the letters, for the input method to read (GlideInput, Engines.glides). */
+    /** A glide across the letters, for the input method to read (GlideInput, InputMethodCatalog.glides). */
     class GlideAction(val glide: Glide) : KeyAction()
 }

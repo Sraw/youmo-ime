@@ -5,42 +5,38 @@
 package org.fcitx.fcitx5.android.core
 
 import android.text.TextPaint
-import android.util.Log
-import androidx.annotation.VisibleForTesting
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
+import org.fcitx.fcitx5.android.BuildConfig
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
-import org.fcitx.fcitx5.android.daemon.FcitxDaemon
 import org.fcitx.fcitx5.android.data.RecentlyUsed
 import org.fcitx.fcitx5.android.data.pinyin.CustomPhraseManager
 import org.fcitx.fcitx5.android.data.pinyin.ImportedDictionaries
 import org.fcitx.fcitx5.android.data.pinyin.MergedDictionary
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.restoreDirectory
+import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.engine.data.DataFormatException
 import org.fcitx.fcitx5.android.engine.glide.Glide
-import org.fcitx.fcitx5.android.engine.handwriting.HandwritingSession
-import org.fcitx.fcitx5.android.engine.handwriting.InkReading
-import org.fcitx.fcitx5.android.engine.host.ConversionNote
-import org.fcitx.fcitx5.android.engine.host.EngineEvent
-import org.fcitx.fcitx5.android.engine.host.EngineSettings
-import org.fcitx.fcitx5.android.engine.host.Engines
 import org.fcitx.fcitx5.android.engine.learn.Simplifier
 import org.fcitx.fcitx5.android.engine.learn.control.BackupOp
 import org.fcitx.fcitx5.android.engine.learn.control.LearningOp
 import org.fcitx.fcitx5.android.engine.learn.control.LearningResult
-import org.fcitx.fcitx5.android.engine.libime.LibimeFiles
 import org.fcitx.fcitx5.android.engine.phrase.CustomPhrases
 import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
-import org.fcitx.fcitx5.android.engine.pinyin.ShuangpinScheme
+import org.fcitx.fcitx5.android.engine.platform.jvm.JvmFile
+import org.fcitx.fcitx5.android.engine.platform.jvm.JvmFiles
+import org.fcitx.fcitx5.android.engine.runtime.EngineEvent
+import org.fcitx.fcitx5.android.engine.runtime.EngineSettings
+import org.fcitx.fcitx5.android.engine.runtime.Engines
+import org.fcitx.fcitx5.android.engine.runtime.FieldFlags
+import org.fcitx.fcitx5.android.engine.session.Action
 import org.fcitx.fcitx5.android.engine.session.Choice
 import org.fcitx.fcitx5.android.engine.session.Offer
 import org.fcitx.fcitx5.android.engine.session.Snapshot
-import org.fcitx.fcitx5.android.engine.user.DictionaryFile
-import org.fcitx.fcitx5.android.engine.user.LibimeImport
+import org.fcitx.fcitx5.android.host.ConfigHome
 import org.fcitx.fcitx5.android.host.EngineHost
+import org.fcitx.fcitx5.android.input.address.AddressStore
+import org.fcitx.fcitx5.android.input.keyboard.ImKeyboards
 import org.fcitx.fcitx5.android.input.popup.EmojiModifier
 import org.fcitx.fcitx5.android.utils.Const
 import org.fcitx.fcitx5.android.utils.appContext
@@ -52,85 +48,56 @@ import java.io.IOException
 import java.nio.ByteBuffer
 import java.nio.channels.FileChannel
 import java.util.concurrent.Executor
-import java.util.concurrent.Executors
-import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.LinkedBlockingQueue
+import java.util.concurrent.ThreadPoolExecutor
+import java.util.concurrent.TimeUnit
 
 /**
- * Where the Kotlin host ([host]) reaches ime-core's input methods. Called only on the host's
- * thread (`fcitx-main`): the sessions are that thread's alone, so nothing here locks. Only the
+ * Where the Kotlin host ([host]) reaches ime-core's input methods: one per host, its [KotlinHost]'s.
+ * Called only on the host's thread (`fcitx-main`): the sessions are that thread's alone, so nothing
+ * here locks. What the keyboards watch of it is [EngineState]'s. Only the
  * custom phrases the keyboard changes are saved on a thread of their own ([PhraseFile]), which
  * [additions] waits for before it reads them.
  */
-object EngineBridge {
+class EngineBridge {
 
     /**
-     * What the nine-key keyboard shows beside its keys: whether anything is typed, what its first
-     * digits not yet taken may be, and which list that is (see Snapshot.syllables, syllablesId).
+     * What the handwriting pad read, or a piece of it finished ([piece]), for the Ink key to carry,
+     * [send] sending it, then [Engines.inkSent] holds it if the key never reached the session; with
+     * handwriting not [current], the input method, no key, the piece only held. Whether the key was
+     * sent. On the fcitx thread.
      */
-    data class T9State(val composing: Boolean = false, val syllables: List<String> = emptyList(), val id: Int = 0)
+    fun sendInk(piece: Action.Ink, current: String, send: () -> Unit): Boolean {
+        if (current != InputMethodCatalog.HANDWRITING) {
+            handwriting(current) { engines.ink(piece, shown = false) }
+            return false
+        }
+        // only the session's making caught as handwriting's: a slip of the key sent after it is the key's,
+        // not a read untaken (else the pad would type it again as its character)
+        if (!handwriting(current) { engines.ink(piece, shown = true) }) return false
+        send()
+        engines.inkSent(piece)
+        return true
+    }
 
     /**
-     * The syllables offered, as the last event of input method [im] left them: whether anything is
-     * typed, what its first keys not yet taken may be, which list that is. Each reader takes its
-     * own input method's alone (the nine keys' column [Engines.T9]'s, the code row's pinyin's), so
-     * none shows another's: another's state means none offered, not no news (switching input
-     * methods writes the old one's and the new one's at once, and a reader may see the last alone).
-     * [im] is the router's active input method: the 14 keys answer as [Engines.PINYIN], never as
-     * [Engines.PINYIN_KEYS]. Set on the fcitx thread, read on the main one.
+     * A glide across the letters as [current], the input method, reads it, for the Glide key to
+     * carry and commit its word: Engines.glide. Null where no key is to be sent. On the fcitx thread.
      */
-    data class SyllableState(
-        val im: String = "",
-        val composing: Boolean = false,
-        val syllables: List<String> = emptyList(),
-        val id: Int = 0,
-    )
-
-    @VisibleForTesting
-    internal val syllablesState = MutableStateFlow(SyllableState())
-    val syllables: StateFlow<SyllableState> = syllablesState
-
-    private val englishTypingState = MutableStateFlow(false)
-
-    /**
-     * Whether English has a word typed (not a prediction offered), as its last event left it: on
-     * the nine keys, 1 is then an apostrophe in the word. Set on the fcitx thread, read on the main one.
-     */
-    val englishTyping: StateFlow<Boolean> = englishTypingState
-
-    /** Whether English suggests words, as the host's config last said ([EngineSettings.englishSuggest]). */
-    @Volatile
-    var englishSuggests = true
-        private set
-
-    private val inkEnded = MutableStateFlow(HandwritingSession.NO_PIECE)
-
-    /**
-     * The latest piece of handwriting the engine ended (Engines.inkEnded): the pad wipes the piece
-     * it is writing once it is among them. Set on the fcitx thread, read on the main one.
-     */
-    val handwritingEnded: StateFlow<Int> = inkEnded
-
-    /** What the handwriting pad read of its [piece], for the key sent next to show: Engines.offerInk. On the fcitx thread, [current] its input method. */
-    fun offerInk(reading: InkReading, piece: Int, current: String) = ink(current) { engines.offerInk(reading, piece) }
-
-    /** The handwriting pad's [piece] finished, for the key sent next to tell: Engines.inkFinished. On the fcitx thread, [current] its input method. */
-    fun inkFinished(piece: Int, current: String) = ink(current) { engines.inkFinished(piece) }
-
-    /** A glide across the letters, for the key sent next to commit its word: Engines.offerGlide. On the fcitx thread, [current] its input method. */
-    fun offerGlide(glide: Glide, current: String): Boolean {
-        if (current in unloadable) return false
+    fun glide(glide: Glide, current: String): Action.Glide? {
+        if (current in unloadable) return null
         return try {
-            unloadable.call(current) { engines.offerGlide(current, glide) }
+            unloadable.call(current) { engines.glide(current, glide) }
         } catch (e: IOException) {
             Timber.w(e, "glide in $current")
-            false
+            null
         } catch (e: DataFormatException) {
             Timber.w(e, "glide in $current")
-            false
+            null
         } catch (@Suppress("TooGenericExceptionCaught") e: RuntimeException) {
             // the decoders read any path drawn: a slip of theirs loses the glide, not the keyboard
             Timber.e(e, "glide in $current")
-            false
+            null
         }
     }
 
@@ -139,11 +106,11 @@ object EngineBridge {
     // Whether it was taken: not, no Ink key is sent, which unanswered would be typed as its character.
     // Handwriting's only: a piece finished as the pad leaves for English ([current]) is told the engine,
     // but is not a key typed into keyboard-us
-    internal fun ink(current: String, call: () -> Unit): Boolean {
-        if (Engines.HANDWRITING in unloadable) return false
+    internal fun handwriting(current: String, call: () -> Unit): Boolean {
+        if (InputMethodCatalog.HANDWRITING in unloadable) return false
         try {
-            unloadable.call(Engines.HANDWRITING, call)
-            return current == Engines.HANDWRITING
+            unloadable.call(InputMethodCatalog.HANDWRITING, call)
+            return current == InputMethodCatalog.HANDWRITING
         } catch (e: IOException) {
             Timber.w(e, "handwriting engine")
         } catch (e: DataFormatException) {
@@ -152,76 +119,41 @@ object EngineBridge {
         return false
     }
 
-    /** The 双拼 scheme the user set, for the keyboard to tell its keys from text (Engines.readsAsKey): set on the fcitx thread, read on the main one. */
-    @Volatile
-    var shuangpinScheme: ShuangpinScheme = ShuangpinScheme.ZIRANMA
-        // a JVM test sets the scheme the engine would have read (no engine there)
-        @VisibleForTesting internal set
-
     private var made: Engines? = null
 
-    // what the field's last context said learning leaves out, kept for engines made after it
-    private var fieldFlags = 0
+    // what the field's last context said learning leaves out, kept for engines made after it: the
+    // one copy, the engines' own (FieldFlags)
+    private val fieldFlags = FieldFlags()
 
     /** Made when first used, and again after [close]; on the fcitx thread only, as the host uses it there. */
     val engines: Engines
         get() = made ?: Engines(
-            load = ::asset,
-            userDir = userDir()?.let(::restored),
+            blobs = ::asset,
+            userDir = userDir()?.let(::restored)?.let(::JvmFiles),
             onError = { Timber.w(it, "engine user data") },
-            legacy = ::legacy,
-            additions = { additions(pinyinDir()) },
+            additions = { data().let { additions(pinyinDir(it), it.writable) } },
             kernel = NativeMatrixKernel.loaded,
             emojiShows = EmojiModifier.validator(),
             // a paint of its own: this is the fcitx thread's, not the main one's
             textShows = TextPaint().let { paint -> paint::hasGlyph },
             simplifier = ::simplifier,
             // where the app's files do not go with a phone moved: a copied backup is another install's
-            installFile = File(appContext.noBackupFilesDir, "learn.install"),
+            installFile = JvmFile(File(appContext.noBackupFilesDir, "learn.install")),
             appVersion = Const.versionName,
-            // libime's own, which [legacy] reads: gone with what the clears clear (review-E-engine S3)
-            legacyFiles = listOf(File(pinyinDir(), LIBIME_DICTIONARY), File(pinyinDir(), LIBIME_HISTORY)),
-            onConversion = ::conversion,
+            // libime's own, an older build's: gone with what the clears clear (review-E-engine S3)
+            legacyFiles = listOf(File(pinyinDir(), LIBIME_DICTIONARY), File(pinyinDir(), LIBIME_HISTORY)).map(::JvmFile),
+            // made anew in a field (after a close): its flags as the field's context told them (review-int N1)
+            fieldFlags = fieldFlags,
+            // what the address bar learned goes with the learning backups (LearnBackup.ADDRESSES)
+            addresses = AddressStore::data,
+            putAddresses = AddressStore::put,
+            // logged rather than thrown, as EditingSession's: a debug build is also someone's daily keyboard
+            offHostThread = if (BuildConfig.DEBUG) ({ Timber.e(IllegalStateException(it)) }) else null,
         ).also {
             it.useHabits = AppPrefs.getInstance().internal.useHabits.getValue()
-            // made anew in a field (after a close): its flags as the field's context told them (review-int N1)
-            it.fieldFlags = fieldFlags
             it.learning(null, BackupOp.SetAuto(AppPrefs.getInstance().internal.learningAutoBackup.getValue()))
             made = it
         }
-
-    /** See [Engines.paused]; nothing waits while the engine is not made. */
-    fun paused(idle: Boolean): Boolean = made?.paused(idle) == true
-
-    // the older builds' learning's conversion: logged, counts alone (a release's logcat reads it, the
-    // upgrade's device check); made, put in place once typing pauses a second (uat-0.3.1 recheck)
-    private fun conversion(note: ConversionNote) {
-        if (note != ConversionNote.Made) {
-            Log.i(LOG_TAG, note.toString())
-            return
-        }
-        // on the warm-up thread: the IME may disconnect after the connection was got, the
-        // conversion still made and put in place at the next start's pause
-        try {
-            FcitxDaemon.getFirstConnectionOrNull()?.runIfReady {
-                // a stale merge made again (up to three times) reports Made each time: one wait does for all
-                if (!puttingInPlace.compareAndSet(false, true)) return@runIfReady
-                do {
-                    try {
-                        do delay(Engines.IDLE_MILLIS) while (enginePaused(idle = true))
-                    } finally {
-                        puttingInPlace.set(false)
-                    }
-                    // a Made between the last pause and the flag's clearing found it set and left: asked
-                    // once more, and waited for again unless another Made took the wait (F3171)
-                } while (enginePaused(idle = true) && puttingInPlace.compareAndSet(false, true))
-            }
-        } catch (e: IllegalStateException) {
-            Timber.w(e, "learning converted: put in place once the engine pauses next")
-        }
-    }
-
-    private val puttingInPlace = AtomicBoolean(false)
 
     // OpenCC's character tables, as the app ships them: the app's traditional text read simplified by
     // learning. Read from the APK's assets, never from the data directory DataManager syncs: no
@@ -260,6 +192,8 @@ object EngineBridge {
         made?.close()
         made = null
         unloadable.clear()
+        // a view made before the next engine speaks (a restart) would show this one's syllables or word
+        EngineState.reset()
     }
 
     // what cannot load is not loaded again on every key: the keys go to the app, the user told once
@@ -311,36 +245,27 @@ object EngineBridge {
         }
     }
 
-    // fcitx's data home, as Fcitx starts it: where libime kept its files, and where the app's
-    // editors still keep what the user adds
-    internal fun fcitxHome(): File {
-        val context = FcitxApplication.getInstance().directBootAwareContext
-        return context.getExternalFilesDir(null) ?: context.filesDir
-    }
+    /**
+     * fcitx's data this run, where libime kept its files and the app's editors keep what the user
+     * adds: the app's own `files/host-data`, an older build's `data/` on the external storage moved
+     * in at the first start that can ([HostConfigDir.settle], A4).
+     */
+    internal fun data(): HostConfig = HostConfigDir.settle(ConfigHome.DATA)
 
-    private fun dataDir() = File(fcitxHome(), "data")
-
-    private fun pinyinDir() = File(dataDir(), "pinyin")
-
-    /** What libime's pinyin learned, where fcitx kept it (FCITX_DATA_HOME), as text. */
-    private fun legacy(): LibimeImport.Legacy? {
-        val dir = pinyinDir()
-        val dictionary = File(dir, LIBIME_DICTIONARY)
-        val history = File(dir, LIBIME_HISTORY)
-        if (!dictionary.exists() && !history.exists()) return null
-        return LibimeImport.Legacy(
-            libime(dictionary, LibimeFiles::pinyinDictionary),
-            libime(history, LibimeFiles::history),
-            { LibimeFiles.spell(it).orEmpty() },
-        ).also { Timber.i("libime's pinyin: %d words, %d sentences", it.dictionary.size, it.history.size) }
-    }
+    // with none settled (before the unlock; the external storage away, nothing moved yet): a directory
+    // with nothing in it, as fcitx's home was before the unlock, and nothing written
+    private fun pinyinDir(data: HostConfig = data()) = File(data.dir ?: HostConfigDir.unsettled(ConfigHome.DATA), "pinyin")
 
     /**
      * The custom phrases and the dictionaries turned on in [dir], fcitx's pinyin data directory, as
      * the editors keep them; the phrases not read are left out. The dictionaries are the file
      * compiled from them ([MergedDictionary]); libime's are turned into text first.
      */
-    internal fun additions(dir: File): Engines.Additions {
+    internal fun additions(
+        dir: File,
+        writable: Boolean = true,
+        unreadable: () -> Unit = { EngineNotices.failedOnce(R.string.user_data_unreadable) },
+    ): Engines.Additions {
         val phraseFile = File(dir, "customphrase")
         // what the keyboard changed just before is in the file as it is read again
         phraseSaves.submit(Runnable {}).get()
@@ -348,16 +273,24 @@ object EngineBridge {
         val phrases = try {
             phraseFile.takeIf { it.isFile }?.readText().orEmpty()
         } catch (e: IOException) {
-            Timber.w(e, "custom phrases")
+            Timber.e(e, "custom phrases: kept as they are, not written this run")
+            unreadable()
             read = false
             ""
         }
         val dictionaryDir = File(dir, "dictionaries")
-        ImportedDictionaries.migrate(dictionaryDir)
-        val save = PhraseFile(phraseFile, phrases, read, phraseSaves)::save
+        // where the data is not settled, nothing written: no libime file converted, no file compiled,
+        // what is there read as it is (where that is, the next start may not read)
+        if (writable) ImportedDictionaries.migrate(dictionaryDir)
+        val refused = when {
+            !read -> "custom phrases were not read"
+            !writable -> "where fcitx's data is, is not settled"
+            else -> null
+        }
+        val save = PhraseFile(phraseFile, phrases, refused == null, refused.orEmpty(), phraseSaves)::save
         // the compiled file, never the texts (0.3.1 read them whole here and ran the heap out at
         // every focus): one not made yet, or stale, is compiled off this thread, the engine reloaded then
-        val seen = MergedDictionary.current(dictionaryDir)
+        val seen = MergedDictionary.current(dictionaryDir, compiles = writable)
         val merged = seen.file
         Timber.d("merged dictionaries: %s", merged?.let { "${it.size} words" } ?: "none yet")
         return Engines.Additions(
@@ -365,37 +298,36 @@ object EngineBridge {
             dictionaries = seen.token,
             savePhrases = save,
             dictionary = { merged },
-            indexes = dictionaryDir,
-            // the file there, stale or not, for an older build's learning converted before the first is in (review S4)
-            dictionaryNow = { File(dictionaryDir, MergedDictionary.FILE).takeIf { it.isFile }?.let { DictionaryFile.open(it) } },
+            indexes = JvmFiles(dictionaryDir),
             dictionaryStale = seen.stale,
             dictionaryPending = { MergedDictionary.pending(dictionaryDir) },
         )
     }
 
-    /**
-     * Saves [phrases], the engine's, as what it changed since [base] (those it read or last saved)
-     * applied to [file] as it is now: the editor may have saved since, its reload of the engine
-     * not run, and what it saved is kept.
-     */
-    internal fun savePhrases(base: CustomPhrases, phrases: CustomPhrases, file: File) {
-        CustomPhraseManager.saveKeysOver(CustomPhraseManager.items(base), CustomPhraseManager.items(phrases), file)
-    }
-
-    // the engine's phrases saved off the fcitx thread, which takes the keys too; one at a time, in order
-    private val phraseSaves = Executors.newSingleThreadExecutor { Thread(it, "engine-phrases") }
+    // the engine's phrases saved off the fcitx thread, which takes the keys too; one at a time, in order.
+    // Its thread ends when idle, as the host's config thread does: a bridge is a host's, and a JVM
+    // test makes many, none closing it
+    private val phraseSaves = ThreadPoolExecutor(1, 1, IDLE_SECONDS, TimeUnit.SECONDS, LinkedBlockingQueue()) {
+        Thread(it, "engine-phrases")
+    }.apply { allowCoreThreadTimeOut(true) }
 
     /**
-     * The custom phrases the engine read from [file] as [text] ([read] false if it could not),
-     * saved there as the keyboard changes them ([savePhrases]), on [saves]: what the engine has
-     * as last saved, the base of the next, is that thread's.
+     * The custom phrases the engine read from [file] as [text], saved there as the keyboard changes
+     * them ([savePhrases]), on [saves], if [read] (false: it could not be, or the data is not settled,
+     * [refused] saying which): what the engine has as last saved, the base of the next, is that thread's.
      */
-    internal class PhraseFile(private val file: File, private val text: String, private val read: Boolean, private val saves: Executor) {
+    internal class PhraseFile(
+        private val file: File,
+        private val text: String,
+        private val read: Boolean,
+        private val refused: String = "custom phrases were not read",
+        private val saves: Executor,
+    ) {
         private var base: CustomPhrases? = null
 
         fun save(phrases: CustomPhrases) {
             // a file not read is not written: the phrases it has would be lost to the one pinned
-            if (!read) throw IOException("custom phrases were not read")
+            if (!read) throw IOException(refused)
             saves.execute {
                 try {
                     savePhrases(base ?: CustomPhrases.parse(text), phrases, file)
@@ -409,29 +341,11 @@ object EngineBridge {
         }
     }
 
-    /**
-     * One of libime's files, as [read] gives it back. One that cannot be read fails the whole
-     * import, which is tried again next time: a reader fixed in an update still gets what the
-     * user's pinyin learned.
-     */
-    private fun libime(file: File, read: (ByteArray) -> List<String>): List<String> =
-        if (file.exists()) read(file.readBytes()) else emptyList()
-
     // mapped where it lies in the APK (stored uncompressed): nothing copied, and pages the OS may
     // drop. Signed with the APK, so the checksums need not be read through.
     internal fun asset(path: String): ByteBuffer = appContext.assets.openFd(path).use { fd ->
         FileInputStream(fd.fileDescriptor).channel.use { it.map(FileChannel.MapMode.READ_ONLY, fd.startOffset, fd.length) }
     }
-
-    /**
-     * Whether the input method of the last [answer] has refining left, its snapshot's
-     * [refines][Snapshot.refines]: the host then sends it [EngineEvent.REFINE] while the user
-     * pauses. Written on the fcitx thread once an event is answered, and left as it was while one
-     * runs: read off that thread during a refining step (EngineEvalRunner), it is still true.
-     */
-    @Volatile
-    var refining = false
-        private set
 
     /**
      * The Kotlin host's port ([EngineHost]): [answer] of the engine's snapshot. What the engine
@@ -440,26 +354,26 @@ object EngineBridge {
      * there is kept.
      */
     val host: EngineHost = object : EngineHost {
-        override fun event(im: String, event: Int, arg: Int, learning: Boolean): Snapshot? =
-            answer(im, event) { engines.onEvent(im, event, arg, learning) }
+        override fun event(im: String, event: Int, arg: Int, learning: Boolean, payload: Action?): Snapshot? =
+            answer(im, event) { engines.onEvent(im, event, arg, learning, payload) }
 
         override fun candidates(im: String, from: Int, count: Int): List<Choice> = engines.candidates(im, from, count)
 
         override fun offers(im: String, index: Int): Set<Offer> = engines.offers(im, index)
 
-        override fun settings(flat: String) = configure(flat)
+        override fun settings(settings: EngineSettings) = configure(settings)
     }
 
     /**
      * [im]'s engine's answer to [event], [call], with its side effects (the syllables'
-     * and English's state, the unloadable latch, [refining]); null for an input method that cannot
+     * and English's state, the unloadable latch, [EngineState.refining]); null for an input method that cannot
      * load, whose key the host gives back.
      */
     internal fun answer(im: String, event: Int, call: () -> Snapshot): Snapshot? {
         if (im in unloadable) {
-            refining = false
+            EngineState.refining = false
             // nothing typed there now: syllables shown before it became unloadable go
-            syllablesState.value = SyllableState(im)
+            EngineState.syllablesState.value = EngineState.SyllableState(im)
             return null
         }
         val s = try {
@@ -468,7 +382,7 @@ object EngineBridge {
             failedEvent(im)
             throw e
         }
-        refining = s.refines
+        EngineState.refining = s.refines
         return s
     }
 
@@ -476,28 +390,36 @@ object EngineBridge {
     private fun follow(im: String, event: Int, s: Snapshot) {
         // every input method's answer, not only while keys are typed: the 14 keys handing back to
         // 全拼 answer with none, which clears what they offered (a gate on them would keep it shown)
-        if (event != EngineEvent.REFINE || s.handled) syllablesState.value = SyllableState(im, s.preedit.isNotEmpty(), s.syllables, s.syllablesId)
-        if (im == Engines.ENGLISH) englishTypingState.value = s.preedit.isNotEmpty() && !s.predicting
-        followed(im) { engines }
+        if (event != EngineEvent.REFINE || s.handled) EngineState.syllablesState.value = EngineState.SyllableState(im, s.preedit.isNotEmpty(), s.syllables, s.syllablesId)
+        if (im == InputMethodCatalog.ENGLISH) EngineState.englishTypingState.value = s.preedit.isNotEmpty() && !s.predicting
+        // the engines that answered: none made, nothing of theirs to tell (an answer not theirs is no reason to make them)
+        made?.let { e -> followed(im) { e } }
     }
 
     private fun failedEvent(im: String) {
         // the host refines no more after a failure (native-lib's engineFailed)
-        refining = false
+        EngineState.refining = false
         // nor is a word being spelled: 1 left an apostrophe with nothing typed
-        if (im == Engines.ENGLISH) englishTypingState.value = false
+        if (im == InputMethodCatalog.ENGLISH) EngineState.englishTypingState.value = false
         // nor any syllables to take: a tap would send an id the engine drops
-        syllablesState.value = SyllableState(im)
+        EngineState.syllablesState.value = EngineState.SyllableState(im)
     }
 
     /**
-     * The host's config, flattened as [EngineSettings.parse] reads it, with the nine keys' letters
-     * the keyboard draws (the app's preference, read again by [reload]); on the fcitx thread too.
+     * The host's config ([org.fcitx.fcitx5.android.host.EngineOptions.toSettings]), with the nine keys'
+     * letters the keyboard draws (the app's preference, read again by [reload]); on the fcitx thread too.
      */
-    fun configure(settings: String) {
-        engines.settings = EngineSettings.parse(settings).copy(nineKeys = nineKeys())
-        shuangpinScheme = engines.settings.scheme
-        englishSuggests = engines.settings.englishSuggest
+    fun configure(settings: EngineSettings) {
+        engines.settings = settings.copy(nineKeys = nineKeys())
+        EngineState.shuangpinScheme = engines.settings.scheme
+        EngineState.englishSuggests = engines.settings.englishSuggest
+        // 双拼's 14 keys under a scheme they cannot type (微软): stored as the 18 keys, which the
+        // input view is made anew for (a keyboard preference), the settings page and ⋯ showing it so
+        // Written here, on the fcitx thread: its listeners (the service's, which makes the input view anew) still run on
+        // the main thread, as SharedPreferences hands its change listeners there; a change told another way must post
+        val keyboards = AppPrefs.getInstance().keyboard
+        ImKeyboards.fallback(InputMethodCatalog.SHUANGPIN, keyboards.shuangpinKeyboard.getValue().keyboard, engines.settings.scheme)
+            ?.let { keyboards.setImKeyboard(InputMethodCatalog.SHUANGPIN, it) }
     }
 
     /**
@@ -534,9 +456,6 @@ object EngineBridge {
         BackupOp.Kept, is BackupOp.Delete, is BackupOp.Peek, BackupOp.Copy, is BackupOp.SetAuto -> false
     }
 
-    /** Whether [im] is one of the engine's input methods, whose long press the app words (U-82). */
-    fun isEngines(im: String) = im.startsWith(ENGINE) || im == Engines.ENGLISH
-
     private fun nineKeys() = NineKeyLetters.parse(AppPrefs.getInstance().keyboard.t9Letters.getValue())
 
     /**
@@ -561,8 +480,11 @@ object EngineBridge {
         selected: Boolean = false,
         said: Boolean = false,
     ): Boolean {
-        fieldFlags = learnFlags
-        val engines = made ?: return false
+        // the engines keep them as they hear the context; none made, kept here for those made next
+        val engines = made ?: run {
+            fieldFlags.value = learnFlags
+            return false
+        }
         val offers = engines.context(
             // named: eight flags in a row, two swapped would still compile (review R11 F3080)
             im, before, learning, cleared = cleared, learnFlags = learnFlags, started = started,
@@ -575,19 +497,36 @@ object EngineBridge {
     // what the app keeps of an input method's session, after any call of it: one place as input methods come.
     // [engines] asked only for one followed: a call answered elsewhere (a test's) makes none
     private inline fun followed(im: String, engines: () -> Engines) {
-        if (im == Engines.HANDWRITING) inkEnded.value = engines().inkEnded
+        if (im == InputMethodCatalog.HANDWRITING) EngineState.inkEnded.value = engines().inkEnded
+        // a table's keyboard: its 拼 key turned, its settings changed (a field's context comes as it
+        // shows); none of one that could not be read, whose keys say nothing
+        if (im in InputMethodCatalog.TABLES && im !in unloadable) EngineState.tableKeyboardState.value = engines().tableKeyboard(im)
     }
 
     /** See [Engines.tableKeys]; none while the engine is not made, no session yet, nor is it made to answer: the keyboard waits. */
     fun tableKeys(im: String): Set<Char> = made?.tableKeys(im).orEmpty()
 
-    // the host's input methods (the native androidengine's), but English, which is keyboard-us's
-    private const val ENGINE = "engine-"
-    private const val LOG_TAG = "youmo-learn"
-    private const val MS_PER_MINUTE = 60_000L
-    private const val LIBIME_DICTIONARY = "user.dict"
-    private const val LIBIME_HISTORY = "user.history"
-    // OpenCC 1.2.0's character tables, in the APK's assets: see simplifier()
-    private const val TRADITIONAL_TABLE = "learn/TSCharacters.txt"
-    private const val SIMPLIFIED_TABLE = "learn/STCharacters.txt"
+    companion object {
+        /**
+         * Saves [phrases], the engine's, as what it changed since [base] (those it read or last saved)
+         * applied to [file] as it is now: the editor may have saved since, its reload of the engine
+         * not run, and what it saved is kept.
+         */
+        internal fun savePhrases(base: CustomPhrases, phrases: CustomPhrases, file: File) {
+            CustomPhraseManager.saveKeysOver(CustomPhraseManager.items(base), CustomPhraseManager.items(phrases), file)
+        }
+
+        /** Whether [im] is one of the engine's input methods, whose long press the app words (U-82). */
+        fun isEngines(im: String) = im.startsWith(ENGINE) || im == InputMethodCatalog.ENGLISH
+
+        // the host's input methods (the native androidengine's), but English, which is keyboard-us's
+        private const val ENGINE = "engine-"
+        private const val MS_PER_MINUTE = 60_000L
+        private const val IDLE_SECONDS = 30L
+        private const val LIBIME_DICTIONARY = "user.dict"
+        private const val LIBIME_HISTORY = "user.history"
+        // OpenCC 1.2.0's character tables, in the APK's assets: see simplifier()
+        private const val TRADITIONAL_TABLE = "learn/TSCharacters.txt"
+        private const val SIMPLIFIED_TABLE = "learn/STCharacters.txt"
+    }
 }

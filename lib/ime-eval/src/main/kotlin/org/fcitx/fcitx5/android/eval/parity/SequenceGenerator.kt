@@ -4,18 +4,18 @@
  */
 package org.fcitx.fcitx5.android.eval.parity
 
-import org.fcitx.fcitx5.android.engine.host.Engines
+import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import java.util.Random
 
 /**
- * Random parity sequences from a seed (fcitx-replacement §7.2): typing in pinyin, the nine keys,
- * English and a table, marks, candidates picked, deletes, hardware keys, input method, field and app
- * switches. The same seed gives the same sequences on every machine ([java.util.Random] is specified).
+ * Random parity sequences from a seed (fcitx-replacement §7.2): typing in pinyin, English and a
+ * table, marks, candidates picked, deletes, hardware keys, input method, field and app switches. The
+ * same seed gives the same sequences on every machine ([java.util.Random] is specified). The nine keys
+ * are pinyin's keyboard since 0.5 (I1), no input method to switch to: none is typed on them here.
  *
  * Every step is one the device driver can do on any screen it leads to, so a sequence never stops
- * for want of a key: the nine keys type digits and only in a text field (a password, URL or email
- * field shows letters), marks only where the bottom row has `,` and `.` (not the nine keys, not a
- * URL or email field), no input method switch in a password field (it types English there).
+ * for want of a key: marks only where the bottom row has `,` and `.` (not a URL or email field), no
+ * input method switch in a password field (it types English there).
  */
 class SequenceGenerator(private val ims: List<String>, seed: Long) {
     private val random = Random(seed)
@@ -38,10 +38,9 @@ class SequenceGenerator(private val ims: List<String>, seed: Long) {
     }
 
     private fun next(at: At): Step {
-        val nine = at.im == T9 && at.field == "text"
-        val marks = !nine && at.field in MARK_FIELDS
+        val marks = at.field in MARK_FIELDS
         val choices = buildList {
-            add(Weighted(TYPE) { typing(at, nine).also { at.composing = true } })
+            add(Weighted(TYPE) { typing(at).also { at.composing = true } })
             if (marks) add(Weighted(MARK) { Step("type", if (random.nextBoolean()) "," else ".").also { at.composing = false } })
             add(Weighted(if (at.composing) PICK_COMPOSING else PICK_IDLE) { Step("pick", "${1 + random.nextInt(PICKS)}") })
             add(Weighted(SPACE) { Step("space").also { at.composing = false } })
@@ -71,8 +70,8 @@ class SequenceGenerator(private val ims: List<String>, seed: Long) {
         if (at.im in CHINESE && at.field == "text" && !at.composing) {
             add(Weighted(TOGGLE) { Step("toggle", Step.TOGGLES[random.nextInt(Step.TOGGLES.size)]) })
         }
-        // the 符 and 123 keys held: the full keyboard's, not the nine keys'
-        if (at.im != T9 && at.field == "text" && !at.composing) {
+        // the 符 and 123 keys held
+        if (at.field == "text" && !at.composing) {
             add(Weighted(TEMP) { Step(if (random.nextBoolean()) "quick" else "unicode").also { at.composing = true } })
         }
     }
@@ -80,8 +79,7 @@ class SequenceGenerator(private val ims: List<String>, seed: Long) {
     private class Weighted(val weight: Int, val make: () -> Step)
 
     private fun switchIm(at: At): Step {
-        // the nine keys only where they show: another input method's field kinds are kept for it
-        val to = ims.filter { it != at.im && (it != T9 || at.field == "text") }
+        val to = ims.filter { it != at.im }
         if (to.isEmpty()) return Step("pause")
         at.im = to[random.nextInt(to.size)]
         at.composing = false
@@ -89,16 +87,14 @@ class SequenceGenerator(private val ims: List<String>, seed: Long) {
     }
 
     private fun switchField(at: At): Step {
-        val kinds = if (at.im == T9) listOf("text") else Step.FIELDS
-        at.field = kinds[random.nextInt(kinds.size)]
+        at.field = Step.FIELDS[random.nextInt(Step.FIELDS.size)]
         at.composing = false
         return Step("field", at.field)
     }
 
-    private fun typing(at: At, nine: Boolean): Step {
+    private fun typing(at: At): Step {
         val keys = when {
             at.field != "text" || at.im == ENGLISH -> WORDS[random.nextInt(WORDS.size)]
-            nine -> syllables(1 + random.nextInt(MAX_SYLLABLES)).joinToString("") { NINE.getValue(it) }
             at.im in TABLES -> (1..1 + random.nextInt(MAX_CODE)).map { 'a' + random.nextInt(TABLE_LETTERS) }.joinToString("")
             else -> syllables(1 + random.nextInt(MAX_SYLLABLES)).joinToString("")
         }
@@ -108,17 +104,16 @@ class SequenceGenerator(private val ims: List<String>, seed: Long) {
     private fun syllables(n: Int) = (1..n).map { SYLLABLES[random.nextInt(SYLLABLES.size)] }
 
     companion object {
-        const val PINYIN = Engines.PINYIN
-        const val T9 = Engines.T9
-        const val WUBI = Engines.WUBI
-        const val ENGLISH = Engines.ENGLISH
+        const val PINYIN = InputMethodCatalog.PINYIN
+        const val WUBI = InputMethodCatalog.WUBI
+        const val ENGLISH = InputMethodCatalog.ENGLISH
 
-        /** The input methods a device's base state has, in its order: pinyin and English on a new install, the nine keys and 五笔 added. */
-        val DEFAULT_IMS = listOf(PINYIN, ENGLISH, T9, WUBI)
+        /** The input methods a device's base state has, in its order: pinyin and English on a new install, 五笔 added. */
+        val DEFAULT_IMS = listOf(PINYIN, ENGLISH, WUBI)
 
-        private val TABLES = Engines.TABLES.keys
+        private val TABLES = InputMethodCatalog.TABLES.keys
         private val MARK_FIELDS = setOf("text", "password")
-        private val CHINESE = setOf(PINYIN, T9, Engines.SHUANGPIN) + TABLES
+        private val CHINESE = setOf(PINYIN, InputMethodCatalog.SHUANGPIN) + TABLES
 
         // the weights of the steps
         private const val TYPE = 34
@@ -157,9 +152,5 @@ class SequenceGenerator(private val ims: List<String>, seed: Long) {
             "the", "hello", "world", "test", "input", "method", "phone", "keyboard", "good", "morning",
             "thanks", "today", "where", "what", "time", "home", "work", "please", "send", "message",
         )
-
-        private val NINE: Map<String, String> = SYLLABLES.associateWith { s ->
-            s.map { c -> "22233344455566677778889999"[c - 'a'] }.joinToString("")
-        }
     }
 }

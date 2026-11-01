@@ -5,8 +5,6 @@
 package org.fcitx.fcitx5.android.eval
 
 import org.fcitx.fcitx5.android.engine.data.PinyinData
-import org.fcitx.fcitx5.android.engine.english.EnglishUserStore
-import org.fcitx.fcitx5.android.engine.english.LegacyEnglishUser
 import org.fcitx.fcitx5.android.engine.learn.Code
 import org.fcitx.fcitx5.android.engine.learn.ImportedWords
 import org.fcitx.fcitx5.android.engine.learn.Kinds
@@ -15,20 +13,17 @@ import org.fcitx.fcitx5.android.engine.learn.LearnLog
 import org.fcitx.fcitx5.android.engine.learn.LearnState
 import org.fcitx.fcitx5.android.engine.learn.LearnTo
 import org.fcitx.fcitx5.android.engine.learn.LogHabits
-import org.fcitx.fcitx5.android.engine.learn.LegacyConversion
 import org.fcitx.fcitx5.android.engine.learn.Row
 import org.fcitx.fcitx5.android.engine.learn.SpelledForm
 import org.fcitx.fcitx5.android.engine.learn.Word
 import org.fcitx.fcitx5.android.engine.learn.Words
-import org.fcitx.fcitx5.android.engine.phrase.CustomPhrases
 import org.fcitx.fcitx5.android.engine.pinyin.PinyinSegmenter
 import org.fcitx.fcitx5.android.engine.pinyin.Syllables
+import org.fcitx.fcitx5.android.engine.platform.jvm.JvmFile
 import org.fcitx.fcitx5.android.engine.session.Action
 import org.fcitx.fcitx5.android.engine.session.PinyinSession
-import org.fcitx.fcitx5.android.engine.store.RecordFormat
 import org.fcitx.fcitx5.android.engine.user.HabitCounts
 import org.fcitx.fcitx5.android.engine.user.UserModel
-import java.io.ByteArrayOutputStream
 import java.io.File
 import kotlin.math.pow
 import kotlin.random.Random
@@ -75,11 +70,9 @@ internal class LearnLogBench(private val commits: Int, private val days: Int, pr
 
     /** The bench in [dir], which must have nothing in it: what it writes there it deletes first. */
     fun run(dir: File): Result {
-        // [legacy]'s directory is the bench's too
-        require(dir.listFiles().orEmpty().all { it.name.startsWith(LearnLog.FILE) || it.name.startsWith(LearnLog.MARKER) || it.name == LEGACY }) { "$dir: not empty" }
-        val file = File(dir, LearnLog.FILE)
+        require(dir.listFiles().orEmpty().all { it.name.startsWith(LearnLog.FILE) }) { "$dir: not empty" }
+        val file = JvmFile(File(dir, LearnLog.FILE))
         file.delete()
-        File(dir, LearnLog.MARKER).delete()
         val clock = Clock(START)
         val random = Random(seed)
         val vocabulary = Array(VOCABULARY) { word(it) }
@@ -115,8 +108,9 @@ internal class LearnLogBench(private val commits: Int, private val days: Int, pr
         val heap = usedHeap() - before
         val spelledRows = opened.state.stats.keys.count { SpelledForm.of(it.code.kind, it.code.keys, it.reading).let { f -> f == SpelledForm.FULL || f == SpelledForm.INITIALS } }
         val first = vocabulary[0].reading.first()
-        // anew each time: as the first key after a commit finds it
-        val spelled = bestNanos { LogHabits({ opened }).let { h -> h.spelledFrom(Kinds.FULL, first).forEach { h.spelled(Kinds.FULL, it) } } } / NANOS_PER_MS.toDouble()
+        // anew each time: as the first key after a commit finds it, each word's counts read once with
+        // its reading split (S15 B5.1), what HabitOrder's levels then read
+        val spelled = bestNanos { LogHabits({ opened }).spelledFrom(Kinds.FULL, first).size } / NANOS_PER_MS.toDouble()
         opened.close()
         return Result(unfolded, unfoldedOpen, fold, file.length(), foldedOpen, state.stats.size, state.mine.size, state.pairs.size, spelled, heap, spelledRows)
     }
@@ -146,7 +140,7 @@ internal class LearnLogBench(private val commits: Int, private val days: Int, pr
     fun counts(data: PinyinData, dir: File): Counts {
         run(dir)
         val clock = Clock(START + (days + 1) * LearnClock.DAY)
-        val log = LearnLog(File(dir, LearnLog.FILE), clock, foldDaily = false).also { it.open() }
+        val log = LearnLog(JvmFile(File(dir, LearnLog.FILE)), clock, foldDaily = false).also { it.open() }
         val state = log.state
         val model = UserModel(data.dictionary, data.vocabulary)
         val attach = best { HabitCounts(model).attach(state) }
@@ -193,84 +187,6 @@ internal class LearnLogBench(private val commits: Int, private val days: Int, pr
 
     private fun vocabulary(state: LearnState) = state.mine.entries.map { it.key to it.value.reading }
 
-    /** What the first open after the upgrade costs a heavy user of the older builds (review-1a-app S7). */
-    class Legacy(val convertMs: Long, val catchUpMs: Long, val logBytes: Long, val markerBytes: Long, val mine: Int, val pairs: Int, val tableRows: Int) {
-        fun lines() = listOf(
-            "conversion        %d ms (%,d words of the user's, %,d pairs, %,d table rows), log %,d bytes, marker %,d bytes"
-                .format(convertMs, mine, pairs, tableRows, logBytes, markerBytes),
-            "catch-up          %d ms (a table's log written by an older build since)".format(catchUpMs),
-        )
-    }
-
-    /**
-     * A heavy user's old files in [parent]'s `legacy` (made anew each time), converted as the first open after the upgrade
-     * converts them: [data]'s model with as many words of the user's and pairs as a year of
-     * [commits] makes, three tables, English. The user model is made before it is timed, as the
-     * app has it made already; what is timed is the conversion and the log written.
-     */
-    fun legacy(data: PinyinData, parent: File): Legacy {
-        val dir = File(parent, LEGACY)
-        // an earlier run's files (the old ones and what converting them wrote): no directory of anyone's in it
-        // only names the bench writes, as run() asks, before the directory is deleted whole
-        require(
-            dir.listFiles().orEmpty().all {
-                it.isFile && (it.name.endsWith(".user") || it.name.startsWith(LearnLog.FILE) || it.name.startsWith(LearnLog.MARKER))
-            },
-        ) { "$dir: not the bench's" }
-        dir.deleteRecursively()
-        dir.mkdirs()
-        val random = Random(seed)
-        val vocabulary = Array(VOCABULARY) { word(it) }
-        fun entry(w: Word) = UserModel.Entry(w.text, w.reading.split(' ').map(Syllables::id).toIntArray())
-        val model = UserModel(data.dictionary, data.vocabulary)
-        var prev: UserModel.Entry? = null
-        repeat(commits) {
-            val e = entry(vocabulary[zipf(random)])
-            model.learn(prev, listOf(e))
-            prev = e
-        }
-        var tableRows = 0
-        for (im in listOf("wbx", "cangjie", "zhengma")) {
-            val out = ByteArrayOutputStream()
-            out.write(TABLE_FORMAT.header())
-            repeat(commits / TABLE_SHARE) {
-                val w = vocabulary[zipf(random)]
-                out.write(TABLE_FORMAT.record(1) { writeUTF(w.reading.filter { it != ' ' }.take(4)); writeUTF(w.text); writeInt(1) })
-                tableRows++
-            }
-            File(dir, "$im.user").writeBytes(out.toByteArray())
-        }
-        val english = LegacyEnglishUser()
-        EnglishUserStore(File(dir, "english.user"), english).apply {
-            open()
-            var before: String? = null
-            repeat(commits / ENGLISH_SHARE) {
-                val word = "w" + zipf(random).toString(36)
-                english.learn(before, word)
-                before = word
-            }
-            close()
-        }
-        val phrases = CustomPhrases.parse((0 until PHRASES).joinToString("\n") { "p${it.toString(36)},1=短语$it" })
-        val conversion = LegacyConversion(dir, { model }, phrases)
-        val file = File(dir, LearnLog.FILE)
-        val clock = Clock(START)
-        var state = LearnLog(file, clock).also { it.open(conversion) }.also { it.close() }.state
-        val convert = best {
-            file.delete()
-            File(dir, LearnLog.MARKER).delete()
-            state = LearnLog(file, clock).also { it.open(conversion) }.also { it.close() }.state
-        }
-        val logBytes = file.length()
-        val markerBytes = File(dir, LearnLog.MARKER).length()
-        val wbx = File(dir, "wbx.user")
-        val catchUp = best {
-            wbx.appendBytes(TABLE_FORMAT.record(1) { writeUTF("aaaa"); writeUTF("工"); writeInt(1) })
-            LearnLog(file, clock).also { it.open(conversion) }.close()
-        }
-        return Legacy(convert, catchUp, logBytes, markerBytes, state.mine.size, state.pairs.size, tableRows)
-    }
-
     private inline fun bestNanos(run: () -> Unit): Long = (0 until WARM_RUNS).minOf {
         val start = System.nanoTime()
         run()
@@ -311,8 +227,6 @@ internal class LearnLogBench(private val commits: Int, private val days: Int, pr
     }
 
     private companion object {
-        const val LEGACY = "legacy"
-        val TABLE_FORMAT = RecordFormat("FXUT", 1)
         const val VOCABULARY = 40_000
         const val KEYS = "womenjintianqunali"
 
@@ -327,10 +241,6 @@ internal class LearnLogBench(private val commits: Int, private val days: Int, pr
 
         // the small times: the best of more runs, the JIT warmed as typing all day warms it
         const val WARM_RUNS = 30
-        // a table's picks, English's words: a share of the commits each
-        const val TABLE_SHARE = 10
-        const val ENGLISH_SHARE = 10
-        const val PHRASES = 300
         const val CORRECTED_ONE_IN = 8
         const val RUNS = 5
         const val NANOS_PER_MS = 1_000_000L

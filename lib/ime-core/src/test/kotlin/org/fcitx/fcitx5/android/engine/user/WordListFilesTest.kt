@@ -10,6 +10,7 @@ import org.fcitx.fcitx5.android.engine.user.WordListFiles.charset
 import org.fcitx.fcitx5.android.engine.user.WordListFiles.exportHead
 import org.fcitx.fcitx5.android.engine.user.WordListFiles.isOwnExport
 import org.fcitx.fcitx5.android.engine.user.WordListFiles.isUserExport
+import org.fcitx.fcitx5.android.engine.user.imports.WordText
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -39,7 +40,7 @@ class WordListFilesTest {
     fun aLineIsWrittenAsTheBaseReadsIt() {
         assertEquals("幽默 you'mo 0", baseLine("you mo 幽默 12"))
         assertEquals("幽默 you'mo 0", baseLine("'you'mo 幽默 1"))
-        // kept with no cost: ImportedDictionaries.write gives it one (LibimeImport.dictionaryText)
+        // kept with no cost: ImportedDictionaries.write gives it one (WordText.dictionaryText)
         assertEquals("幽默 you'mo", baseLine("\uFEFF幽默 you'mo"))
         // one in libime's format already keeps its cost
         assertEquals("搭子 da'zi -5.5", baseLine("搭子 da'zi -5.5"))

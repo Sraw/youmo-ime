@@ -6,6 +6,7 @@ package org.fcitx.fcitx5.android.engine.data
 
 import org.fcitx.fcitx5.android.engine.pinyin.Syllables
 import java.nio.ByteBuffer
+import java.util.concurrent.atomic.AtomicLongArray
 
 /**
  * The compiled pinyin data: one vocabulary shared by a syllable-keyed dictionary and an n-gram
@@ -372,15 +373,49 @@ class NgramModel internal constructor(file: DataFile, val vocabularySize: Int, p
         return if (bigram >= 0) biBackoffTable[biBackoff.get(bigram).toInt() and 0xff] else 0f
     }
 
+    // bigram's answers by (prev, word): the decoder asks the same pairs again on every path of every
+    // key, each a binary search over the mapped table (S15 N1: a fifth to a third of a key, 九键's
+    // most). Direct mapped, a slot a long: prev + 1, word, the bigram's index + 1 (0: none), so a
+    // reader on another thread (ime-eval's) sees a slot whole or not at all. Only the file's answer
+    // is kept, never a score: what bigram gives is the same either way, and the file never changes.
+    // None for a model too big to pack so.
+    private val bigrams: AtomicLongArray? =
+        if (vocabularySize < 1 shl KEY_BITS && biWord.size < (1 shl VALUE_BITS) - 1) AtomicLongArray(1 shl CACHE_BITS) else null
+
     /** @return the index of bigram (prev, word), or -1 */
     private fun bigram(prev: Int, word: Int): Int {
+        val cache = bigrams ?: return search(prev, word)
+        val key = ((prev + 1).toLong() shl (KEY_BITS + VALUE_BITS)) or (word.toLong() shl VALUE_BITS)
+        val slot = ((prev * HASH_A) xor word) * HASH_B ushr (Int.SIZE_BITS - CACHE_BITS)
+        val held = cache.get(slot)
+        if (held and KEY_MASK == key) return (held and VALUE_MASK).toInt() - 1
+        val at = search(prev, word)
+        cache.lazySet(slot, key or (at + 1).toLong())
+        return at
+    }
+
+    private fun search(prev: Int, word: Int): Int {
         val from = uniBigramStart[prev]
         val to = uniBigramStart[prev + 1]
         val at = biWord.lowerBound(from, to, word)
         return if (at < to && biWord[at] == word) at else -1
     }
 
+    /** How many of [bigram]'s slots hold an answer: for a test of the cache. */
+    internal fun bigramsHeld(): Int = bigrams?.let { c -> (0 until c.length()).count { c.get(it) != 0L } } ?: 0
+
     companion object {
         const val NO_WORD = -1
+
+        // a slot: prev + 1 and word KEY_BITS each, the bigram's index + 1 below them
+        private const val KEY_BITS = 20
+        private const val VALUE_BITS = 24
+        private const val VALUE_MASK = (1L shl VALUE_BITS) - 1
+        private const val KEY_MASK = VALUE_MASK.inv()
+
+        // 32768 slots, 256 KB: a key's pairs, and the next key's mostly the same
+        private const val CACHE_BITS = 15
+        private const val HASH_A = -0x61c88647 // 0x9e3779b9
+        private const val HASH_B = -0x7a143595 // 0x85ebca6b
     }
 }

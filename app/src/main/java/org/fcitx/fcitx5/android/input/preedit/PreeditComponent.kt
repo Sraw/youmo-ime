@@ -6,7 +6,7 @@ package org.fcitx.fcitx5.android.input.preedit
 
 import android.util.TypedValue
 import android.view.Gravity
-import org.fcitx.fcitx5.android.core.FcitxEvent
+import org.fcitx.fcitx5.android.host.HostEvent
 import org.fcitx.fcitx5.android.input.broadcast.InputBroadcastReceiver
 import org.fcitx.fcitx5.android.input.dependency.context
 import org.fcitx.fcitx5.android.input.dependency.inputMethodService
@@ -54,7 +54,7 @@ class PreeditComponent : UniqueComponent<PreeditComponent>(), Dependent, InputBr
     // the code on the row, as a tap on it found it
     private var shown = ""
 
-    override fun onInputPanelUpdate(data: FcitxEvent.InputPanelEvent.Data) {
+    override fun onInputPanelUpdate(data: HostEvent.InputPanel) {
         shown = data.preedit.toString()
         ui.update(data)
     }

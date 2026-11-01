@@ -5,8 +5,8 @@
 package org.fcitx.fcitx5.android.ui.main.settings
 
 import kotlinx.coroutines.test.runTest
-import org.fcitx.fcitx5.android.core.FakeFcitxAPI
-import org.fcitx.fcitx5.android.engine.host.Engines.UserWord
+import org.fcitx.fcitx5.android.core.FakeHostApi
+import org.fcitx.fcitx5.android.engine.runtime.UserWord
 import org.fcitx.fcitx5.android.engine.learn.control.LearningOp
 import org.fcitx.fcitx5.android.engine.learn.control.LearningResult
 import org.junit.Assert.assertEquals
@@ -19,7 +19,7 @@ class UserWordSourceTest {
     // U-80: the list page's delete is the learning's RemoveWords, its token the 撤销 offered
     @Test
     fun aPinyinListsDeleteIsTheLearningsAndGivesItsUndo() = runTest {
-        val fcitx = FakeFcitxAPI()
+        val fcitx = FakeHostApi()
         var asked: LearningOp? = null
         fcitx.learned = { asked = it; LearningResult.Done(undo = 7) }
         assertEquals(7L, PinyinWords(UserWord.Kind.ADDED).remove(fcitx, words))
@@ -29,7 +29,7 @@ class UserWordSourceTest {
     // not done (the record not open): nothing to take back, so no 撤销
     @Test
     fun noUndoWhenTheLearningDidNotDoIt() = runTest {
-        val fcitx = FakeFcitxAPI()
+        val fcitx = FakeHostApi()
         fcitx.learned = { LearningResult.Unavailable }
         assertEquals(LearningResult.NO_UNDO, PinyinWords(UserWord.Kind.ADDED).remove(fcitx, words))
     }
@@ -37,7 +37,7 @@ class UserWordSourceTest {
     // English's forget has no undo
     @Test
     fun englishOffersNoUndo() = runTest {
-        val fcitx = FakeFcitxAPI()
+        val fcitx = FakeHostApi()
         assertEquals(LearningResult.NO_UNDO, EnglishWords.remove(fcitx, words))
         assertEquals(listOf("forgetEnglishWords(你好)"), fcitx.calls)
     }

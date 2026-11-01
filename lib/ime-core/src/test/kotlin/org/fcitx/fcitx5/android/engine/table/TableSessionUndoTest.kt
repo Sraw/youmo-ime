@@ -248,8 +248,7 @@ class TableSessionUndoTest {
     fun aGlidedCodeIsTakenBack() {
         val table = session()
         val g = GlideSession(table, between = Action.Pick(0), heldBack = { r, _ -> table.heldBack(r.word) }) { _, _ -> listOf(GlideReading("kkkk", "人", 0f)) }
-        g.offer(Glide(FloatArray(0), GlideLayout(emptyMap())))
-        assertEquals("人", g.apply(Action.Glide).candidates.first())
+        assertEquals("人", g.apply(g.read(Glide(FloatArray(0), GlideLayout(emptyMap())))).candidates.first())
         assertEquals("人", g.apply(Select(0)).commit)
         g.delete(1)
         assertEquals(0, uses("kkkk", "人"))
@@ -263,8 +262,7 @@ class TableSessionUndoTest {
             listOf(GlideReading("kkkk", "人", 0f), GlideReading("xxxx", "话", -1f))
         }
         g.pick("kkkk", "天")
-        g.offer(Glide(FloatArray(0), GlideLayout(emptyMap())))
-        val shown = g.apply(Action.Glide).candidates
+        val shown = g.apply(g.read(Glide(FloatArray(0), GlideLayout(emptyMap())))).candidates
         assertTrue(shown.toString(), "话" in shown)
         assertEquals("话", g.apply(Select(shown.indexOf("话"))).commit)
         // 话 and 天 deleted: 话 had nothing to take back, and ends the run there; 天 is taken back as the field was known

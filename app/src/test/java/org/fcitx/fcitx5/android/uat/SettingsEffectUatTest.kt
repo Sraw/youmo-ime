@@ -7,11 +7,11 @@ package org.fcitx.fcitx5.android.uat
 import android.view.View
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.Uat
-import org.fcitx.fcitx5.android.core.FcitxEvent
 import org.fcitx.fcitx5.android.core.FcitxKeyMapping
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.data.theme.ThemePrefs
+import org.fcitx.fcitx5.android.host.HostEvent
 import org.fcitx.fcitx5.android.input.KeyboardHarness
 import org.fcitx.fcitx5.android.input.keyboard.AltTextKeyView
 import org.fcitx.fcitx5.android.input.keyboard.SpaceLongPressBehavior
@@ -205,7 +205,7 @@ class SettingsEffectUatTest {
             // sent to the engine: its commit back, as fcitx's punctuation gives it (the fake simulates no input),
             // is where the service pairs it or not
             assertEquals(h.api.calls.toString(), 1, sent().count())
-            h.emit(FcitxEvent.CommitStringEvent(FcitxEvent.CommitStringEvent.Data("(", -1)))
+            h.emit(HostEvent.Commit("(", -1))
         }
         assertEquals("(", h.field.text.toString())
     }

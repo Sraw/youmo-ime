@@ -5,7 +5,7 @@
 package org.fcitx.fcitx5.android.eval
 
 import org.fcitx.fcitx5.android.engine.data.PinyinData
-import org.fcitx.fcitx5.android.engine.host.EngineSettings
+import org.fcitx.fcitx5.android.engine.runtime.EngineSettings
 import org.fcitx.fcitx5.android.engine.lattice.Candidate
 import org.fcitx.fcitx5.android.engine.lattice.CoarseWords
 import org.fcitx.fcitx5.android.engine.lattice.Decoding

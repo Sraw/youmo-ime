@@ -14,6 +14,8 @@ import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
 import org.fcitx.fcitx5.android.engine.session.Action
 import org.fcitx.fcitx5.android.engine.session.Choice
 import org.fcitx.fcitx5.android.engine.session.Offer
+import org.fcitx.fcitx5.android.engine.session.OfferRules
+import org.fcitx.fcitx5.android.engine.session.Pager
 import org.fcitx.fcitx5.android.engine.session.Session
 import org.fcitx.fcitx5.android.engine.session.Snapshot
 import java.util.BitSet
@@ -54,10 +56,13 @@ import java.util.BitSet
  * A correction taken back makes the word typed never corrected (U-31): by backspace right after,
  * by picking the word typed over its correction, or later by a tap right after the correction
  * ([Corrections]), the word typed then offered in its place. A long press on a word counted forgets it.
+ *
+ * The user's custom phrases come among the candidates ([phrases], A1), never first; one picked goes
+ * in as it is, no space after it, never learned; a long press deletes it from the phrases.
  */
 class EnglishSession(
     private val data: EnglishData?,
-    private val pageSize: Int = DEFAULT_PAGE_SIZE,
+    pageSize: Int = DEFAULT_PAGE_SIZE,
     private val costs: TypingCosts = TypingCosts(),
     maxCorrection: Float = MAX_CORRECTION,
     user: EnglishUser? = null,
@@ -65,6 +70,7 @@ class EnglishSession(
     private val misspellings: Map<String, String> = Misspellings.MAP,
     // the nine keys' letters (the user's 按键字母): which a key typed for English is
     private val nineKeys: NineKeyLetters = NineKeyLetters.STANDARD,
+    private val phrases: EnglishPhrases = EnglishPhrases(),
 ) : Session {
 
     // what the user committed, kept by the host; else for this session alone
@@ -113,12 +119,12 @@ class EnglishSession(
     private fun nineKeyed(): Boolean = input.isNotEmpty() && (pinned || input.any { it in '2'..'9' })
 
     // the nine keys' first letters where no word fits ([typed]): a guess, not a word the user meant;
-    // letters all pinned are one
-    private fun guessed(): Boolean = candidates.isEmpty() && input.any { it in '2'..'9' }
+    // letters all pinned are one; so are phrases alone
+    private fun guessed(): Boolean = phrases.noWord(candidates) && input.any { it in '2'..'9' }
 
     override val picksByDigit: Boolean get() = nineKeyed()
     private var candidates: List<String> = emptyList()
-    private var page = 0
+    private val pager = Pager(pageSize)
 
     // what space commits in place of the word typed, if anything
     private var correction: String? = null
@@ -182,14 +188,7 @@ class EnglishSession(
     // word is taken back
     private class Glided(val committed: String, val words: List<String>, val lead: String = "", val edge: String = "", val seqs: List<Long> = emptyList())
 
-    // the keyboard's last glide, read at the Glide key sent after it
-    private var pendingGlide: Glide? = null
     private var glided: Glided? = null
-
-    /** The keyboard's [glide], for the [Action.Glide] sent after it to read. */
-    fun offerGlide(glide: Glide) {
-        pendingGlide = glide
-    }
 
     override fun apply(action: Action): Snapshot {
         val r = recalled
@@ -199,7 +198,7 @@ class EnglishSession(
         // it after the correction rather than in its place
         if (r != null) {
             candidates = emptyList()
-            page = 0
+            pager.reset()
         }
         val g = glided?.takeIf { input.isEmpty() && it.committed == last }
         // what goes on from the word glided: a pick, a backspace, a page; anything else leaves it
@@ -210,12 +209,12 @@ class EnglishSession(
             // Any space, a glided one too (glided is part of the action's equality)
             action is Action.Key && action.char == ' ' -> {
                 candidates = predictions()
-                page = 0
+                pager.reset()
                 snapshot()
             }
             action == Action.Backspace -> unglide(g, null)
             action is Action.Pick -> g.words.getOrNull(action.index)?.let { unglide(g, it) } ?: snapshot()
-            action is Action.Select && action.index in 0 until pageSize -> g.words.getOrNull(page * pageSize + action.index)?.let { unglide(g, it) } ?: snapshot()
+            action is Action.Select && pager.at(action.index) >= 0 -> g.words.getOrNull(pager.at(action.index))?.let { unglide(g, it) } ?: snapshot()
             else -> act(action)
         }
     }
@@ -227,12 +226,12 @@ class EnglishSession(
 
     private fun act(action: Action): Snapshot = when (action) {
         is Action.Key -> key(action.char)
-        Action.Glide -> glide()
+        is Action.Glide -> glide(action.glide)
         Action.Backspace -> backspace()
-        is Action.Select -> if (action.index in 0 until pageSize) pick(page * pageSize + action.index) else snapshot(handled = candidates.isNotEmpty())
+        is Action.Select -> select(action.index)
         is Action.Pick -> pick(action.index)
-        Action.NextPage -> turn(page + 1)
-        Action.PreviousPage -> turn(page - 1)
+        Action.NextPage -> turn(pager.page + 1)
+        Action.PreviousPage -> turn(pager.page - 1)
         // an arrow, a tab, enter: the word left as it is, maybe half typed, so not learned
         Action.CommitRaw -> if (input.isEmpty()) snapshot(handled = false) else commit(typed(), space = false, learned = false).copy(handled = false)
         is Action.NineKey -> nineKey(action.digit, action.upper)
@@ -251,8 +250,13 @@ class EnglishSession(
             snapshot()
         }
         is Action.Forget -> forget(action.index)
-        Action.Refine, Action.Ink, is Action.Pin, is Action.Unpin, is Action.Block, is Action.Syllable, is Action.Letter -> snapshot()
+        is Action.Unpin -> unpin(action.index)
+        // nothing here refines, inks, pins, blocks or picks a syllable or letter: what is shown stays
+        Action.Refine, is Action.Ink, is Action.Stroke, is Action.Pin, is Action.Block, is Action.Syllable, is Action.Letter, Action.LookUp -> snapshot()
     }
+
+    // 从自定义词组中删除 is an unpin (LearningMenu), on a phrase: nothing else is pinned here
+    private fun unpin(index: Int): Snapshot = also { if (phrases.delete(candidates, index)) read() }.snapshot()
 
     // what was learned read anew after an undo, the session and what is typed kept (review-int S1): the
     // word typed's candidates, or what may follow the word committed; a glide's words and a correction
@@ -260,7 +264,7 @@ class EnglishSession(
     override fun reread(): Snapshot? {
         if (glided != null || recalled != null) return null
         if (input.isEmpty() && last.isEmpty()) return null
-        if (input.isNotEmpty()) read() else candidates = predictions().also { page = 0 }
+        if (input.isNotEmpty()) read() else candidates = predictions().also { pager.reset() }
         return snapshot()
     }
 
@@ -273,18 +277,18 @@ class EnglishSession(
     override fun candidates(from: Int, count: Int): List<Choice> =
         candidates.subList(minOf(from, candidates.size), minOf(from + count, candidates.size)).map { Choice(it) }
 
-    override fun offers(index: Int): Set<Offer> =
-        if (candidates.getOrNull(index)?.let(::learnedAs) != null) setOf(Offer.FORGET) else emptySet()
+    // forgetting here records no word, it only takes counts away: offered in a password field too
+    override fun offers(index: Int): Set<Offer> = if (phrases.at(candidates, index) != null) OfferRules.offers(learning, forgets = { false }, phrase = true)
+        else OfferRules.offers(learning = true, forgets = { candidates.getOrNull(index)?.let(::learnedAs) != null })
 
     // the candidate [text] as the user committed it, if they did: as shown, or as at a sentence's start
     private fun learnedAs(text: String): String? =
         text.takeIf { user.count(it) > 0f } ?: text.replaceFirstChar(Char::lowercaseChar).takeIf { user.count(it) > 0f }
 
-    // the pending glide's word committed, a word typed before it ended as space ends it; a glide no
+    // the glide's word committed, a word typed before it ended as space ends it; a glide no
     // word fits leaves that word as it is, so it is decoded after the word as space would end it
-    private fun glide(): Snapshot {
-        val glide = pendingGlide ?: return snapshot()
-        pendingGlide = null
+    private fun glide(glide: Glide?): Snapshot {
+        glide ?: return snapshot()
         if (glider == null) return snapshot()
         // what key(' ') below commits: the two must stay in step. It is not called first, as a glide
         // no word fits leaves the word typed
@@ -308,7 +312,7 @@ class EnglishSession(
         wrote(made)
         glided = Glided(made, words, space, before, seqs)
         candidates = words
-        page = 0
+        pager.reset()
         return snapshot(commit = ended + space + made)
     }
 
@@ -401,7 +405,7 @@ class EnglishSession(
         last = made
         wrote(made)
         candidates = emptyList()
-        page = 0
+        pager.reset()
         return snapshot(commit = made, deleteBefore = found.length)
     }
 
@@ -518,7 +522,7 @@ class EnglishSession(
         last = made
         wrote(made)
         candidates = predictions()
-        page = 0
+        pager.reset()
         return snapshot(commit = made, deleteBefore = deleteBefore)
     }
 
@@ -565,7 +569,8 @@ class EnglishSession(
         corrected = null
         // the word typed picked over its correction: kept as typed, as by a correction taken back
         val kept = correction != null && text == typed()
-        return commit(text, space = true, typed = typed(), how = if (kept) EnCommit.REVERTED else EnCommit.PICKED)
+        // a phrase as it is: no word to learn, nor a space after it
+        return if (phrases.at(candidates, index) != null) commit(text, space = false, typed = typed(), learned = false) else commit(text, space = true, typed = typed(), how = if (kept) EnCommit.REVERTED else EnCommit.PICKED)
     }
 
     // [text] committed for [typed], how as [howOf] tells unless given; [learned] unless left as it is
@@ -588,8 +593,11 @@ class EnglishSession(
     // [word] typed as [typed] learned, how [howOf] tells
     private fun learnTyped(word: String, typed: String) = if (word == reverted) emptyList() else learn(word, typed, howOf(word, typed, keepTyped))
 
+    // nothing to pick past the page: the key (space, a digit) is the app's
+    private fun select(onPage: Int): Snapshot = pager.at(onPage).let { if (it >= 0) pick(it) else snapshot(handled = candidates.isNotEmpty()) }
+
     private fun turn(to: Int): Snapshot {
-        if (to >= 0 && to * pageSize < candidates.size) page = to
+        pager.turn(to, candidates.size)
         return snapshot()
     }
 
@@ -597,7 +605,7 @@ class EnglishSession(
         input.setLength(0)
         cursor = 0
         candidates = emptyList()
-        page = 0
+        pager.reset()
         correction = null
         keepTyped = false
         reverted = null
@@ -707,7 +715,6 @@ class EnglishSession(
     // perhaps, it is no word to score, only the edge. A Backspace is [erased]
     override fun typed(text: String) {
         glided = null
-        pendingGlide = null
         clear()
         last = ""
         corrected = null
@@ -732,14 +739,14 @@ class EnglishSession(
         if (endsInCluster(end) || endsInCluster(if (known) recent else edge)) forgetText()
     }
 
+    // what is typed read, the user's phrases under it put among its candidates (EnglishPhrases)
+    private fun read() = readWords().also { candidates = phrases.place(input, nineKeys.takeIf { nineKeyed() }, candidates, ::typed) }
+
     // the word typed, then what it may be, in its case; the correction first, if any
-    private fun read() {
-        page = 0
+    private fun readWords() {
+        pager.reset()
         correction = null
-        if (input.isEmpty()) {
-            candidates = emptyList()
-            return
-        }
+        if (input.isEmpty()) return run { candidates = emptyList() }
         if (nineKeyed()) return readNineKeys()
         val typed = typed()
         val keys = EnglishData.key(input.toString())
@@ -849,19 +856,18 @@ class EnglishSession(
     }
 
     private fun snapshot(commit: String = "", handled: Boolean = true, deleteBefore: Int = 0): Snapshot {
-        val from = page * pageSize
-        val shown = candidates.subList(minOf(from, candidates.size), minOf(from + pageSize, candidates.size))
+        val shown = pager.of(candidates)
         return Snapshot(
             commit = commit,
             preedit = if (nineKeyed()) typed() else input.toString(),
             candidates = shown,
-            page = page,
-            hasPreviousPage = page > 0,
-            hasNextPage = from + pageSize < candidates.size,
+            page = pager.page,
+            hasPreviousPage = pager.hasPrevious,
+            hasNextPage = pager.hasNext(candidates.size),
             handled = handled,
             predicting = input.isEmpty() && candidates.isNotEmpty(),
             total = candidates.size,
-            first = from,
+            first = pager.from,
             deleteBefore = deleteBefore,
             cursor = if (cursor == input.length || nineKeyed()) -1 else cursor,
         )

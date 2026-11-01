@@ -7,7 +7,7 @@ package org.fcitx.fcitx5.android.input.candidates
 import kotlinx.coroutines.runBlocking
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.core.CandidateWord
-import org.fcitx.fcitx5.android.core.FakeFcitxAPI
+import org.fcitx.fcitx5.android.core.FakeHostApi
 import org.fcitx.fcitx5.android.data.theme.ThemePreset
 import org.junit.Assert.assertEquals
 import org.junit.Test
@@ -31,7 +31,7 @@ class CandidateViewHolderTest {
         holder.update(1, CandidateWord("", "你", ""))
         val pick = holder.pick()
         holder.update(1, CandidateWord("", "拟", ""))
-        val fake = FakeFcitxAPI()
+        val fake = FakeHostApi()
         runBlocking { pick(this, fake) }
         assertEquals(listOf("select(1, 你)"), fake.calls)
     }

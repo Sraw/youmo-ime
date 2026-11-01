@@ -5,7 +5,7 @@
 package org.fcitx.fcitx5.android.input.dialog
 
 import android.content.Context
-import org.fcitx.fcitx5.android.core.FcitxAPI
+import org.fcitx.fcitx5.android.core.HostApi
 import org.fcitx.fcitx5.android.core.InputMethodNames
 import org.fcitx.fcitx5.android.utils.inputMethodManager
 
@@ -15,7 +15,7 @@ data class InputMethodData(
     val ime: Boolean
 ) {
     companion object {
-        suspend fun resolve(fcitx: FcitxAPI, context: Context): List<InputMethodData> {
+        suspend fun resolve(fcitx: HostApi, context: Context): List<InputMethodData> {
             val enabled = fcitx.enabledIme()
                 .map { InputMethodData(it.uniqueName, InputMethodNames.of(context, it), false) }
                 .toMutableList()

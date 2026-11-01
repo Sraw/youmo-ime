@@ -12,7 +12,7 @@ import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.fcitx.fcitx5.android.R
-import org.fcitx.fcitx5.android.daemon.FcitxConnection
+import org.fcitx.fcitx5.android.daemon.HostConnection
 import org.fcitx.fcitx5.android.engine.learn.backup.BackupHead
 import org.fcitx.fcitx5.android.engine.learn.backup.LearnBackup
 import org.fcitx.fcitx5.android.engine.learn.control.BackupOp
@@ -31,13 +31,13 @@ import timber.log.Timber
  */
 internal class LearningRestore(
     private val fragment: Fragment,
-    private val fcitx: () -> FcitxConnection,
+    private val fcitx: () -> HostConnection,
     private val ran: () -> Unit = {},
 ) {
     private val ctx get() = fragment.requireContext()
 
     /**
-     * The one call the engine takes (FcitxAPI.learning): a backup's op always answers a BackupResult,
+     * The one call the engine takes (HostApi.learning): a backup's op always answers a BackupResult,
      * null only when the record is not open (LearningResult.Unavailable: the phone not unlocked yet).
      */
     suspend fun backups(op: BackupOp): BackupResult? =

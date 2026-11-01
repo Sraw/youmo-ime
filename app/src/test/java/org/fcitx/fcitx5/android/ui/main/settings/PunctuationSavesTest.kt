@@ -12,9 +12,9 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.cancelChildren
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
-import org.fcitx.fcitx5.android.core.FakeFcitxConnection
-import org.fcitx.fcitx5.android.core.FcitxAPI
-import org.fcitx.fcitx5.android.daemon.FcitxConnection
+import org.fcitx.fcitx5.android.core.FakeHostConnection
+import org.fcitx.fcitx5.android.core.HostApi
+import org.fcitx.fcitx5.android.daemon.HostConnection
 import org.fcitx.fcitx5.android.data.punctuation.PunctuationManager
 import org.fcitx.fcitx5.android.data.punctuation.PunctuationMapEntry
 import org.junit.Assert.assertEquals
@@ -33,8 +33,8 @@ import kotlin.coroutines.suspendCoroutine
 class PunctuationSavesTest {
 
     /** Fcitx as the saves reach it: ready once [ready] completes, then failing with [failure] if set. */
-    private class Saver(scope: CoroutineScope, val fake: FakeFcitxConnection = FakeFcitxConnection(scope)) :
-        FcitxConnection by fake {
+    private class Saver(scope: CoroutineScope, val fake: FakeHostConnection = FakeHostConnection(scope)) :
+        HostConnection by fake {
 
         var ready = CompletableDeferred<Unit>()
         var failure: Throwable? = null
@@ -43,7 +43,7 @@ class PunctuationSavesTest {
         var hangs = false
         private val dropped = mutableListOf<Continuation<Unit>>()
 
-        override suspend fun <T> runOnReady(block: suspend FcitxAPI.() -> T): T {
+        override suspend fun <T> runOnReady(block: suspend HostApi.() -> T): T {
             ready.await()
             if (hangs) {
                 hangs = false
@@ -54,18 +54,16 @@ class PunctuationSavesTest {
         }
 
         val writes: Int
-            get() = fake.api.calls.count { it.startsWith("setAddonSubConfig(punctuation") }
+            get() = fake.api.calls.count { it.startsWith("setPunctuationMap(") }
 
-        suspend fun saved(lang: String) =
-            fake.api.getAddonSubConfig("punctuation", "punctuationmap/$lang")[PunctuationManager.ENTRIES]
-                .subItems!!.map { PunctuationMapEntry(it) }
+        suspend fun saved(lang: String) = fake.api.punctuationMap(lang)
     }
 
     /** [fcitx]: fcitx's own scope, whose coroutines its stop cancels. */
     private class Fixture(scope: CoroutineScope, fcitx: CoroutineScope = scope) {
         val saver = Saver(fcitx)
         // the page's own, ready at once
-        val page = FakeFcitxConnection(scope)
+        val page = FakeHostConnection(scope)
         var held = false
         val failures = mutableListOf<String?>()
         val saves = PunctuationSaves(scope, connect = { held = true; saver }, disconnect = { held = false }) {

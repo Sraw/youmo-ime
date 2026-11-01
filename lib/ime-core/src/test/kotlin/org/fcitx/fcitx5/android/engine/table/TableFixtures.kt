@@ -12,12 +12,18 @@ import org.fcitx.fcitx5.android.engine.lattice.TextWords
 import org.fcitx.fcitx5.android.engine.learn.Code
 import org.fcitx.fcitx5.android.engine.learn.Habits
 import org.fcitx.fcitx5.android.engine.learn.Kinds
+import org.fcitx.fcitx5.android.engine.learn.LearnLog
+import org.fcitx.fcitx5.android.engine.learn.LearnRecord
 import org.fcitx.fcitx5.android.engine.learn.Learner
 import org.fcitx.fcitx5.android.engine.pinyin.Syllables
+import org.fcitx.fcitx5.android.engine.platform.jvm.JvmFile
+import org.fcitx.fcitx5.android.engine.platform.jvm.JvmFiles
 import org.fcitx.fcitx5.android.engine.session.Action.Key
 import org.fcitx.fcitx5.android.engine.session.Session
 import org.fcitx.fcitx5.android.engine.session.Snapshot
+import org.fcitx.fcitx5.android.engine.user.DictionaryFile
 import org.fcitx.fcitx5.android.engine.user.UserScorer
+import java.io.File
 import java.nio.ByteBuffer
 
 /**
@@ -58,11 +64,22 @@ internal fun learning(
     )
 }
 
-/** What an older build saved in this table: [phrases] as code and text (自动造词 is gone, U-28 C46). */
-internal fun TableDictionary.savedBefore(vararg phrases: Pair<String, String>): TableUser = TableUser(this).also { user ->
-    val log = phrases.fold(TableUser.TableLog.FORMAT.header()) { bytes, (code, text) -> bytes + TableUser.TableLog.saved(code, text) }
-    TableUser.TableLog.FORMAT.read(log) { type, input -> TableUser.TableLog.replay(type, input, user) }
+/** A learning record holding what an older build saved in [im]: [phrases] as code and text (自动造词 is gone, U-28 C46). */
+internal fun savedLog(vararg phrases: Pair<String, String>, im: String = "engine-wubi") = LearnLog(null).apply {
+    absorb(phrases.mapIndexed { i, (code, text) -> LearnRecord.TableWordRow(im, code, text, i + 1) })
 }
+
+/** This table's saved phrases read from [log], a forget written back to it. */
+internal fun TableDictionary.savedIn(log: LearnLog, im: String = "engine-wubi") = SavedPhrases(this, im, { log.state }, log::dropTableWords)
+
+/** What an older build saved in this table: [phrases] as code and text. */
+internal fun TableDictionary.savedBefore(vararg phrases: Pair<String, String>, im: String = "engine-wubi") = savedIn(savedLog(*phrases, im = im), im)
+
+// the index on the disk: its file in a directory of the user's
+internal fun CodedIndex.Companion.build(table: TableDictionary, dictionary: DictionaryFile, dest: File, key: String, wanted: () -> Boolean = { true }) =
+    build(table, dictionary, JvmFiles(dest.parentFile), dest.name, key, wanted)
+
+internal fun CodedIndex.Companion.open(file: File, key: String) = open(JvmFile(file), key)
 
 /** Types [keys], returning every snapshot's commit joined and the last snapshot. */
 internal fun Session.type(keys: String): Pair<String, Snapshot> {

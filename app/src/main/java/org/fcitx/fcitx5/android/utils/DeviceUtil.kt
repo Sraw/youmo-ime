@@ -11,13 +11,6 @@ import timber.log.Timber
 object DeviceUtil {
 
     /**
-     * https://www.cnblogs.com/qixingchao/p/15899405.html
-     */
-    val isHMOS: Boolean by lazy {
-        getSystemProperty("hw_sc.build.platform.version").isNotEmpty()
-    }
-
-    /**
      * https://stackoverflow.com/questions/60122037/how-can-i-detect-samsung-one-ui
      */
     val isSamsungOneUI: Boolean by lazy {
@@ -35,10 +28,6 @@ object DeviceUtil {
 
     val isVivoOriginOS: Boolean by lazy {
         getSystemProperty("ro.vivo.os.version").isNotEmpty()
-    }
-
-    val isHonorMagicOS: Boolean by lazy {
-        getSystemProperty("ro.magic.systemversion").isNotEmpty()
     }
 
     val isFlyme: Boolean by lazy {

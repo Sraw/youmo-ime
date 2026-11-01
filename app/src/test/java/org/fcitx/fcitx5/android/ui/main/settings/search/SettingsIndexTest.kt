@@ -10,12 +10,13 @@ import androidx.preference.PreferenceGroup
 import androidx.preference.PreferenceManager
 import androidx.preference.PreferenceScreen
 import org.fcitx.fcitx5.android.FcitxApplication
-import org.fcitx.fcitx5.android.core.RawConfig
+import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
+import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.engine.assertRows
-import org.fcitx.fcitx5.android.engine.host.EngineSettings
-import org.fcitx.fcitx5.android.engine.host.Engines
+import org.fcitx.fcitx5.android.engine.runtime.EngineSettings
 import org.fcitx.fcitx5.android.ui.main.MainFragment
+import org.fcitx.fcitx5.android.ui.main.settings.AddressSettingsFragment
 import org.fcitx.fcitx5.android.ui.main.settings.PlaceholderStrings
 import org.fcitx.fcitx5.android.ui.main.settings.SettingsRoute
 import org.fcitx.fcitx5.android.ui.main.settings.behavior.KeysSettingsFragment
@@ -46,7 +47,7 @@ class SettingsIndexTest {
 
     /** [uniqueName]'s page, as InputMethodConfigFragment draws it. */
     private fun pageOf(ctx: Context, uniqueName: String): PreferenceScreen =
-        InputMethodSettings.create(PreferenceManager(ctx), InputMethodSettings.of(uniqueName)!!, RawConfig(), save = {}, open = {})
+        InputMethodSettings.create(PreferenceManager(ctx), InputMethodSettings.of(uniqueName)!!, mutableMapOf(), save = {}, open = {})
 
     /** The keys of the settings on [uniqueName]'s page. */
     private fun keysOn(ctx: Context, uniqueName: String): Set<String> {
@@ -77,7 +78,7 @@ class SettingsIndexTest {
     fun everySharedOptionFoundOpensTheSharedPageThatHasIt() {
         val ctx = context()
         val found = buildList<Entry<SettingsIndex.Target>> { SettingsIndex.sharedInput(ctx, this) }
-        val screen = InputMethodSettings.create(PreferenceManager(ctx), InputMethodSettings.SHARED, RawConfig(), save = {}, open = {})
+        val screen = InputMethodSettings.create(PreferenceManager(ctx), InputMethodSettings.SHARED, mutableMapOf(), save = {}, open = {})
         val options = found.filter { it.target.key != null }
         // each row of the shared page, sections aside, once
         assertEquals(InputMethodSettings.SHARED.flat().size, options.size)
@@ -101,6 +102,13 @@ class SettingsIndexTest {
         assertFalse(AppPrefs.getInstance().keyboard.soundOnKeyPress.key in on(SettingsRoute.Keys))
         assertTrue(AppPrefs.getInstance().keyboard.popupOnKeyPress.key in on(SettingsRoute.Keys))
         assertFalse(AppPrefs.AUTO_PAIRS in on(SettingsRoute.Keys))
+        // 网址和邮箱's rows, drawn by hand on their page
+        assertEquals(
+            setOf(AddressSettingsFragment.EMAIL_KEY, AddressSettingsFragment.URL_KEY, AddressSettingsFragment.REMEMBER_KEY, AddressSettingsFragment.REMEMBERED_KEY),
+            on(SettingsRoute.Addresses),
+        )
+        // the page itself found once: by 通用输入's row that opens it
+        assertEquals(1, all.count { it.title == context().getString(R.string.address_suggestions) })
     }
 
     // the app's own keyboard choices on fcitx's pages: found, and opening their input method's page
@@ -109,8 +117,8 @@ class SettingsIndexTest {
         val all = entries(context())
         assertRows(
             listOf(
-                Triple(AppPrefs.PINYIN_KEYBOARD, Engines.PINYIN, "全拼's keyboard, on pinyin's page"),
-                Triple(AppPrefs.SHUANGPIN_KEYBOARD, Engines.SHUANGPIN, "双拼's, under its scheme"),
+                Triple(AppPrefs.PINYIN_KEYBOARD, InputMethodCatalog.PINYIN, "全拼's keyboard, on pinyin's page"),
+                Triple(AppPrefs.SHUANGPIN_KEYBOARD, InputMethodCatalog.SHUANGPIN, "双拼's, under its scheme"),
             ),
             { it.third },
         ) { (key, im, _) ->
@@ -124,7 +132,7 @@ class SettingsIndexTest {
         val ctx = context()
         val all = entries(ctx)
         // the engine's own list: a table added there is held to this too
-        for (table in Engines.TABLES.keys) {
+        for (table in InputMethodCatalog.TABLES.keys) {
             val on = all.filter { (it.target.route as? SettingsRoute.InputMethodConfig)?.uniqueName == table }
             assertEquals(table, 1, on.count { it.target.key == null })
             assertEquals(table, keysOn(ctx, table) - InputMethodSettings.SHARED_LINK, on.mapNotNull { it.target.key }.toSet())
@@ -139,7 +147,8 @@ class SettingsIndexTest {
     @Test
     fun eachPageIsFoundOnceAndEachSettingOnItByAKeyOfItsOwn() {
         for ((route, on) in SettingsIndex.build(context()).groupBy { it.target.route }) {
-            assertEquals("$route", 1, on.count { it.target.key == null })
+            // 网址和邮箱 is found as 通用输入's row that opens it, not as a page of its own
+            assertEquals("$route", if (route == SettingsRoute.Addresses) 0 else 1, on.count { it.target.key == null })
             val keys = on.mapNotNull { it.target.key }
             assertEquals("$route: $keys", keys.size, keys.toSet().size)
         }
@@ -187,5 +196,20 @@ class SettingsIndexTest {
         val before = stores.map { it.all.toMap() }
         assertTrue(SettingsIndex.build(context()).isNotEmpty())
         assertEquals(before, stores.map { it.all.toMap() })
+    }
+
+    // the nine keys' settings are hidden unless the keyboard is the nine keys: each result also names the keyboard row, always on the page
+    @Test
+    fun aNineKeysSettingFoundAlsoNamesTheKeyboardRowThatShowsIt() {
+        val ctx = context()
+        val nine = entries(ctx).filter { it.target.key == AppPrefs.T9_MULTI_TAP }
+        assertTrue(nine.isNotEmpty())
+        for (entry in nine) {
+            val route = entry.target.route as SettingsRoute.InputMethodConfig
+            val via = entry.target.via
+            assertNotNull("$entry", via)
+            val row = pageOf(ctx, route.uniqueName).findPreference<Preference>(via!!)
+            assertTrue("$entry", row != null && generateSequence(row) { it.parent }.all { it.isVisible })
+        }
     }
 }

@@ -12,6 +12,7 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.content.SharedPreferences
 import android.content.res.Configuration
+import android.os.Environment
 import android.os.Process
 import androidx.core.content.ContextCompat
 import androidx.core.content.edit
@@ -23,11 +24,13 @@ import kotlinx.coroutines.plus
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
-import org.fcitx.fcitx5.android.daemon.FcitxDaemon
+import org.fcitx.fcitx5.android.core.HostConfigDir
+import org.fcitx.fcitx5.android.daemon.HostDaemon
 import org.fcitx.fcitx5.android.data.clipboard.ClipboardManager
 import org.fcitx.fcitx5.android.data.importedUserDataMarker
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
+import org.fcitx.fcitx5.android.host.ConfigHome
 import org.fcitx.fcitx5.android.ui.main.LogActivity
 import org.fcitx.fcitx5.android.utils.AppUtil
 import org.fcitx.fcitx5.android.utils.Locales
@@ -48,7 +51,7 @@ class FcitxApplication : Application() {
         override fun onReceive(context: Context, intent: Intent) {
             if (intent.action != Intent.ACTION_SHUTDOWN) return
             Timber.d("Device shutting down, trying to save fcitx state...")
-            val fcitx = FcitxDaemon.getFirstConnectionOrNull()
+            val fcitx = HostDaemon.getFirstConnectionOrNull()
                 ?: return Timber.d("No active fcitx connection, skipping")
             fcitx.runImmediately { save() }
         }
@@ -59,9 +62,9 @@ class FcitxApplication : Application() {
             if (intent.action != Intent.ACTION_USER_UNLOCKED) return
             if (!isDirectBootMode) return
             Timber.d("Device unlocked, app will exit now and restart to normal mode")
-            FcitxDaemon.getFirstConnectionOrNull()?.also {
+            HostDaemon.getFirstConnectionOrNull()?.also {
                 // try to shutdown fcitx gracefully
-                FcitxDaemon.stopFcitx()
+                HostDaemon.stopFcitx()
             }
             AppUtil.exit()
         }
@@ -70,9 +73,9 @@ class FcitxApplication : Application() {
     private val restartFcitxInstanceReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
             if (intent.action != ACTION_RESTART_FCITX_INSTANCE) return
-            if (FcitxDaemon.getFirstConnectionOrNull() != null) {
+            if (HostDaemon.getFirstConnectionOrNull() != null) {
                 Timber.i("Received broadcast '${intent.action}', try to restart fcitx instance ...")
-                FcitxDaemon.restartFcitx()
+                HostDaemon.restartFcitx()
             } else {
                 Timber.i("Received broadcast '${intent.action}', but there's no fcitx instance")
             }
@@ -138,6 +141,8 @@ class FcitxApplication : Application() {
 
         AppPrefs.init(sharedPrefs)
         resetHiddenSettings(AppPrefs.getInstance(), isDirectBootMode) { importedUserDataMarker(this) }
+        // what 0.4 kept and nothing reads now: a 0.4 backup restored brings it back, gone at the restart after
+        if (!isDirectBootMode) AppPrefs.getInstance().dropRetired()
         // record last pid for crash logs
         AppPrefs.getInstance().internal.pid.apply {
             val currentPid = Process.myPid()
@@ -157,6 +162,19 @@ class FcitxApplication : Application() {
         if (!isDirectBootMode) {
             AppPrefs.getInstance().syncToDeviceEncryptedStorage()
             ThemeManager.syncToDeviceEncryptedStorage()
+            // fcitx's data settled (an older build's moved in) off the main thread before an editor or the
+            // host asks: they would wait on its copy, an editor on the main thread. Whoever asks first moves
+            // it, the others wait (HostConfigDir), so this changes when, never where. Only with the external
+            // storage there: away, a settle copies nothing (it waits for it, or makes an empty home), so
+            // there is nothing to get ahead of; and a JVM test, whose storage reads as away till the test
+            // sets it up (phoneStorage), has no settle racing that
+            val external = getExternalFilesDir(null)
+            if (external != null && Environment.getExternalStorageState(external) == Environment.MEDIA_MOUNTED) {
+                thread(name = "user-data-settle") {
+                    // one that fails is asked again, and told, by whoever needs it next: no crash report from here
+                    runCatching { HostConfigDir.inUse(ConfigHome.DATA) }.onFailure { Timber.w(it, "user data not settled early") }
+                }
+            }
         }
         ContextCompat.registerReceiver(
             this,

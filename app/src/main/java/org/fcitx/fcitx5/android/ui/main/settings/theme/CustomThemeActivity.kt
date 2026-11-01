@@ -427,6 +427,12 @@ class CustomThemeActivity : AppCompatActivity() {
                     cancel()
                     return@withLoadingDialog
                 }
+                // the save would be refused (fcitx's themes no longer settled): the images, written first, would be left behind
+                if (!ThemeFilesManager.writable) {
+                    toast(R.string.user_data_not_settled)
+                    cancel()
+                    return@withLoadingDialog
+                }
                 withContext(Dispatchers.IO) {
                     croppedImageFile.delete()
                     croppedImageFile.outputStream().use {

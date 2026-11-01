@@ -4,6 +4,9 @@
  */
 package org.fcitx.fcitx5.android.host
 
+import org.fcitx.fcitx5.android.engine.InputMethodCatalog
+import org.fcitx.fcitx5.android.input.keyboard.ImKeyboard
+
 /**
  * fcitx's `config/profile`, the input method groups (`InputMethodConfig`,
  * `fcitx/inputmethodconfig_p.h`): each group's name, layout, default input method and items, and
@@ -34,6 +37,39 @@ class Profile private constructor(val groups: List<Group>, val order: List<Strin
         val layouts = old.items.associate { it.name to it.layout }
         val updated = Group(old.name, old.defaultLayout, group.defaultInputMethod, group.inputMethods.map { Item(it, layouts[it].orEmpty()) })
         return Profile(groups.map { if (it.name == old.name) updated else it }, order)
+    }
+
+    /** What [mergeNineKeys] made: the [profile], pinyin's keyboard, and whether anything [changed] or [both] were on (the user told). */
+    data class Merged(val profile: Profile, val pinyin: ImKeyboard, val changed: Boolean, val both: Boolean)
+
+    /**
+     * This with 0.4's 九键拼音 merged into pinyin in every group ([NineKeysMerge.group]), pinyin's
+     * keyboard [pinyin] as set: the current group's says which keyboard pinyin shows (one with
+     * neither, the first group with 九键拼音 and no pinyin), any group's with both on that the user is told. Read with
+     * [NineKeysMerge.OLD] among the input methods [load] keeps, or it is dropped before this.
+     */
+    fun mergeNineKeys(pinyin: ImKeyboard): Merged {
+        var keyboard: ImKeyboard? = null
+        // a group with 九键拼音 and no pinyin: says the keyboard where the current group has neither
+        var alone: ImKeyboard? = null
+        var both = false
+        var changed = false
+        val merged = groups.map { group ->
+            val out = NineKeysMerge.group(group.items.map(Item::name), group.defaultInputMethod, pinyin) ?: return@map group
+            changed = true
+            both = both || out.both
+            if (group.name == order.first()) keyboard = out.pinyin
+            if (alone == null && group.items.none { it.name == InputMethodCatalog.PINYIN }) alone = out.pinyin
+            val layouts = group.items.associate { it.name to it.layout }
+            // pinyin keeps its own layout, else 九键拼音's
+            val layoutOf = { name: String -> layouts[name] ?: layouts[NineKeysMerge.OLD].orEmpty() }
+            // the default by ImGroup's rule again: pinyin first now, it is the second
+            val default = ImGroup.of(group.name, out.items, out.defaultIm).defaultInputMethod
+            group.copy(defaultInputMethod = default, items = out.items.map { Item(it, layoutOf(it)) })
+        }
+        // the current group's pinyin (26 or 14 keys) as it was; with none, the one of a group that had only 九键拼音
+        val shown = keyboard ?: if (current.items.any { it.name == InputMethodCatalog.PINYIN }) pinyin else alone ?: pinyin
+        return Merged(Profile(merged, order), shown, changed, both)
     }
 
     /**

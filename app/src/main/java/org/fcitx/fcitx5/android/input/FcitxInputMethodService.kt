@@ -59,10 +59,9 @@ import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.core.CapabilityFlag
 import org.fcitx.fcitx5.android.core.CapabilityFlags
 import org.fcitx.fcitx5.android.core.EngineNotices
-import org.fcitx.fcitx5.android.core.FcitxAPI
-import org.fcitx.fcitx5.android.core.FcitxEvent
 import org.fcitx.fcitx5.android.core.FcitxKeyMapping
 import org.fcitx.fcitx5.android.core.FormattedText
+import org.fcitx.fcitx5.android.core.HostApi
 import org.fcitx.fcitx5.android.core.KeyStates
 import org.fcitx.fcitx5.android.core.KeySym
 import org.fcitx.fcitx5.android.core.ScancodeMapping
@@ -72,8 +71,8 @@ import org.fcitx.fcitx5.android.core.keyCode
 import org.fcitx.fcitx5.android.core.metaStateOf
 import org.fcitx.fcitx5.android.core.plus
 import org.fcitx.fcitx5.android.core.toSpannedString
-import org.fcitx.fcitx5.android.daemon.FcitxConnection
-import org.fcitx.fcitx5.android.daemon.FcitxDaemon
+import org.fcitx.fcitx5.android.daemon.HostConnection
+import org.fcitx.fcitx5.android.daemon.HostDaemon
 import org.fcitx.fcitx5.android.data.InputFeedbacks
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.prefs.ManagedPreference
@@ -81,7 +80,11 @@ import org.fcitx.fcitx5.android.data.prefs.ManagedPreferenceProvider
 import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.engine.session.Action
+import org.fcitx.fcitx5.android.host.HostEvent
 import org.fcitx.fcitx5.android.host.KeyCodes
+import org.fcitx.fcitx5.android.host.SwitchReason
+import org.fcitx.fcitx5.android.input.address.AddressLearning
+import org.fcitx.fcitx5.android.input.address.AddressStore
 import org.fcitx.fcitx5.android.input.bar.Calculation
 import org.fcitx.fcitx5.android.input.bar.CalculationOffer
 import org.fcitx.fcitx5.android.input.cursor.CursorRange
@@ -113,7 +116,7 @@ import timber.log.Timber
 
 class FcitxInputMethodService : LifecycleInputMethodService() {
 
-    private lateinit var fcitx: FcitxConnection
+    private lateinit var fcitx: HostConnection
 
     private var jobs = Channel<Job>(capacity = Channel.UNLIMITED)
 
@@ -192,21 +195,31 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
      * toast (long, steady), and nothing to take back: [undo] lapses.
      */
     fun say(message: String, undo: UndoChip.Undo? = null, steady: Boolean = false) {
+        sayOnKeyboard(message, undo, steady)
+    }
+
+    // [say]: whether it was said on the keyboard, else a toast if [toast] (EngineNotices' choose their own)
+    private fun sayOnKeyboard(message: String, undo: UndoChip.Undo?, steady: Boolean, toast: Boolean = true): Boolean {
         // the view shown, not the one the device mode picks: a key typed with ⋯ open flips that mode
         val view = inputView?.takeIf { it.isShown } ?: candidatesView?.takeIf { it.isShown }
         val length = if (steady) Toast.LENGTH_LONG else Toast.LENGTH_SHORT
-        when {
+        return when {
             view == null -> {
-                toast(message, length)
+                if (toast) toast(message, length)
                 undo?.lapsed?.invoke()
+                false
             }
             // shown, but its window not yet (or no longer) on the screen: the chip lapsed [undo] (F3530)
-            !view.say(message, undo, steady) -> toast(message, length)
+            !view.say(message, undo, steady) -> {
+                if (toast) toast(message, length)
+                false
+            }
+            else -> true
         }
     }
 
     // what the engine says, said here while this keyboard runs
-    private val engineSayer = EngineNotices.Sayer { message, steady -> say(message, steady = steady) }
+    private val engineSayer = EngineNotices.Sayer { message, steady -> sayOnKeyboard(message, null, steady, toast = false) }
 
     /** nothing said out loud goes into a password, its characters shown or not */
     val inPasswordField get() = fieldPolicy.password
@@ -272,9 +285,10 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         // drawn on 九键's keys, and in their long press
         prefs.keyboard.t9Letters,
         prefs.keyboard.t9Symbols,
-        // the 14 keys for pinyin, 双拼's 18 or nine keys, and the code row's height in those (KawaiiBarComponent.preeditHeight)
+        // each input method's keyboard (ImKeyboards), and the code row's height on it (KawaiiBarComponent.preeditHeight)
         prefs.keyboard.pinyinKeyboard,
         prefs.keyboard.shuangpinKeyboard,
+        prefs.keyboard.englishKeyboard,
         prefs.advanced.disableAnimation,
     )
 
@@ -309,18 +323,56 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         replaceCandidateView(theme)
     }
 
+    /**
+     * Before the views are made anew for [why]: what was typed ended where [ViewRebuild.endsComposition]
+     * ([endComposition]). The new views show the caches as they are, then the end's events empty
+     * their code row and bar.
+     */
+    private fun rebuilding(why: ViewRebuild) {
+        if (why.endsComposition) endComposition()
+    }
+
+    /**
+     * What was typed ended as leaving the field ends it: pinyin's code dropped, the field's composing
+     * text (English's word, handwriting's) committed where it is, the engine reset (focusOutIn). The
+     * field stays, so no input restarts to tell the engine its context, which the reset dropped:
+     * told here, after it in fcitx's queue. Of two in a row (dark mode: [onConfigurationChanged] and
+     * the theme's rebuild, in whichever order the system calls them) the last tell so comes after
+     * the last reset, and the next word keeps its 前文.
+     */
+    private fun endComposition() {
+        // no field: nothing typed, nothing to tell, and focusOutIn would focus a context in none
+        if (!currentInputStarted) {
+            postFcitxJob { reset() }
+            return
+        }
+        // the field's composing text kept there as text, as onFinishInputView does: with
+        // ClientUnfocusCommit fcitx drops its client preedit on focus out rather than commit it
+        finishComposing()
+        postFcitxJob { focusOutIn() }
+        if (currentInputEditorInfo?.isTypeNull() == false) tellContext()
+    }
+
+    // what the views were last made for, to tell the handle's move from a theme's change
+    private var floatingBuilt = ThemeManager.prefs.floatingKeyboard.getValue()
+
     @Keep
     private val recreateInputViewListener = ManagedPreference.OnChangeListener<Any> { _, _ ->
+        rebuilding(ViewRebuild.SETTING)
         replaceInputView(ThemeManager.activeTheme, start = true)
     }
 
     @Keep
     private val recreateCandidatesViewListener = ManagedPreferenceProvider.OnChangeListener {
+        rebuilding(ViewRebuild.SETTING)
         replaceCandidateView(ThemeManager.activeTheme)
     }
 
     @Keep
     private val onThemeChangeListener = ThemeManager.OnThemeChangeListener {
+        val floating = ThemeManager.prefs.floatingKeyboard.getValue()
+        rebuilding(if (floating != floatingBuilt) ViewRebuild.FLOATING else ViewRebuild.SETTING)
+        floatingBuilt = floating
         replaceInputViews(it, start = true)
     }
 
@@ -331,7 +383,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
      * subsequent operations can start if the prior operation is not finished (suspended),
      * [postFcitxJob] ensures that operations are executed sequentially.
      */
-    fun postFcitxJob(block: suspend FcitxAPI.() -> Unit): Job {
+    fun postFcitxJob(block: suspend HostApi.() -> Unit): Job {
         val job = fcitx.lifecycleScope.launch(start = CoroutineStart.LAZY) {
             fcitx.runOnReady(block)
         }
@@ -342,7 +394,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     override fun onCreate() {
         EngineNotices.sayer = engineSayer
         pickedLocalesChanged()
-        fcitx = FcitxDaemon.connect(javaClass.name)
+        fcitx = HostDaemon.connect(javaClass.name)
         lifecycleScope.launch {
             jobs.consumeEach { it.join() }
         }
@@ -371,15 +423,15 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         lastKnownConfig = Configuration(super.getResources().configuration)
     }
 
-    private fun handleFcitxEvent(event: FcitxEvent<*>) {
+    private fun handleFcitxEvent(event: HostEvent) {
         when (event) {
-            is FcitxEvent.CommitStringEvent -> {
-                commitTyped(event.data.text, event.data.cursor)
+            is HostEvent.Commit -> {
+                commitTyped(event.text, event.cursor)
             }
-            is FcitxEvent.KeyEvent -> event.data.let event@{
-                if (it.states.virtual) {
+            is HostEvent.Key -> event.let event@{
+                if (it.keyStates.virtual) {
                     // KeyEvent from virtual keyboard
-                    when (it.sym.sym) {
+                    when (it.sym) {
                         FcitxKeyMapping.FcitxKey_BackSpace -> handleBackspaceKey()
                         FcitxKeyMapping.FcitxKey_Return -> handleReturnKey()
                         FcitxKeyMapping.FcitxKey_Left -> handleArrowKey(EditorKeyPolicy.Direction.Left)
@@ -396,13 +448,13 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
                     // replay the original event if we still have it
                     if (keyEventRelay.replay(it.timestamp)) return@event
                     // no original event to replay: simulate one
-                    when (val action = ForwardedKeys.decide(it.sym.keyCode, it.up, it.unicode)) {
+                    when (val action = ForwardedKeys.decide(it.keySym.keyCode, it.up, it.unicode)) {
                         is ForwardedKeys.Action.SendKey -> {
                             val eventTime = SystemClock.uptimeMillis()
                             if (action.up) {
-                                sendUpKeyEvent(eventTime, action.keyCode, it.states.metaStateOf(action.keyCode, up = true))
+                                sendUpKeyEvent(eventTime, action.keyCode, it.keyStates.metaStateOf(action.keyCode, up = true))
                             } else {
-                                sendDownKeyEvent(eventTime, action.keyCode, it.states.metaStateOf(action.keyCode, up = false))
+                                sendDownKeyEvent(eventTime, action.keyCode, it.keyStates.metaStateOf(action.keyCode, up = false))
                             }
                         }
                         is ForwardedKeys.Action.CommitChar -> commitText(action.text)
@@ -411,15 +463,14 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
                     }
                 }
             }
-            is FcitxEvent.ClientPreeditEvent -> {
-                updateComposingText(event.data)
+            is HostEvent.ClientPreedit -> {
+                updateComposingText(event.text)
             }
-            is FcitxEvent.DeleteSurroundingEvent -> {
-                val (before, after) = event.data
-                handleDeleteSurrounding(before, after)
+            is HostEvent.DeleteSurrounding -> {
+                handleDeleteSurrounding(event.before, event.after)
             }
-            is FcitxEvent.IMChangeEvent -> {
-                val im = event.data.uniqueName
+            is HostEvent.InputMethodChanged -> {
+                val im = event.im
                 hardwareKeyboard.inputMethodChanged(im)
                 // the session switched to knows nothing of the field yet: told it, after fcitx's reset of it (FieldPolicy)
                 if (fieldPolicy.inputMethodChanged(im)) tellContext(started = true)
@@ -431,13 +482,13 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
                     if (subtype != null && subtypeEchoes.shouldTell(im, had)) tellSubtype(im, subtype)
                 }
                 if (inputDeviceMgr.evaluateOnInputMethodActivate()) {
-                    showStatusIcon(StatusIconMapping.fromEntry(event.data))
+                    showStatusIcon(StatusIconMapping.fromEntry(event.entry))
                 }
             }
-            is FcitxEvent.SwitchInputMethodEvent -> {
-                val (reason) = event.data
-                if (reason != FcitxEvent.SwitchInputMethodEvent.Reason.CapabilityChanged &&
-                    reason != FcitxEvent.SwitchInputMethodEvent.Reason.Other
+            is HostEvent.SwitchInputMethod -> {
+                val reason = event.reason
+                if (reason != SwitchReason.CapabilityChanged &&
+                    reason != SwitchReason.Other
                 ) {
                     if (inputDeviceMgr.evaluateOnInputMethodSwitch()) {
                         // show inputView for [CandidatesView] when input method switched by user
@@ -545,6 +596,21 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         }
     }
 
+    /** What the address fields left are learned from (AddressStrip): kept here, as the bar is made anew with the view. */
+    val addressLearning = AddressLearning()
+
+    /**
+     * An address suggestion tapped (AddressStrip): [before] and [after] units either side of the
+     * cursor replaced by [text], the cursor [cursor] units into it. Only with nothing composed, which
+     * the bar shows it alone with.
+     */
+    fun putAround(before: Int, after: Int, text: String, cursor: Int) {
+        if (editingSession.composing.isNotEmpty()) return
+        val at = if (cursor == text.length) -1 else cursor
+        editingSession.replaceAround(before, after, text, at)
+        contextMemory.committed(text, at, SystemClock.elapsedRealtime())
+    }
+
     fun commitText(text: String, cursor: Int = -1) {
         editingSession.commitText(text, cursor)
         contextMemory.committed(text, cursor, SystemClock.elapsedRealtime())
@@ -626,7 +692,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
      * fcitx reset. [address]: the field is one ([inAddressField]), as read when the key was pressed.
      */
     // there should be a new fcitx API for this
-    suspend fun FcitxAPI.commitAndReset(address: Boolean) {
+    suspend fun HostApi.commitAndReset(address: Boolean) {
         val resolution = PendingInputPolicy.resolve(
             inputMethodEntryCached.languageCode,
             hasPreedit = clientPreeditCached.isNotEmpty() || inputPanelCached.preedit.isNotEmpty(),
@@ -757,7 +823,9 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     }
 
     override fun onConfigurationChanged(newConfig: Configuration) {
-        postFcitxJob { reset() }
+        // as a setting's rebuild: the field's composing text committed, not wiped from it. The context
+        // told there is told again if super restarts the input below: one more round trip, the last kept
+        endComposition()
         /**
          * skip keyboard|keyboardHidden changes, because we have [inputDeviceMgr]
          * skip uiMode (system light/dark mode) changes, because we have [onThemeChangeListener]
@@ -778,9 +846,6 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
          */
         if (diff and f != diff) {
             super.onConfigurationChanged(newConfig)
-        } else if (currentInputStarted && currentInputEditorInfo?.isTypeNull() == false) {
-            // the reset above dropped the engine's context, and no input restarts to tell it anew
-            tellContext()
         }
         lastKnownConfig = newConfig
     }
@@ -790,9 +855,12 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         highlightColor =
             styledColorOrDefault(android.R.attr.colorAccent, DefaultHighlightColor).alpha(0.4f)
         InputFeedbacks.syncSystemPrefs()
+        // a failure said as the host started, before any keyboard showed (A4: the settings unreadable)
+        EngineNotices.keyboardShown()
     }
 
     override fun onCreateInputView(): View? {
+        rebuilding(ViewRebuild.SYSTEM)
         replaceInputViews(ThemeManager.activeTheme)
         // We will call `setInputView` by ourselves. This is fine.
         return null
@@ -1082,16 +1150,13 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         Timber.d("onStartInputView: restarting=$restarting")
         // the app's language picked anew in its settings: shown in it from now on
         if (pickedLocalesChanged()) {
+            rebuilding(ViewRebuild.LANGUAGE)
             replaceInputViews(ThemeManager.activeTheme)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
                 postFcitxJob { SubtypeManager.syncWith(enabledIme(), this@FcitxInputMethodService) }
             }
         }
-        postFcitxJob {
-            focus(true)
-            // the keyboard shown again in a field: typing paused, the older build's learning put in place if made (uat-0.3.1 recheck)
-            enginePaused()
-        }
+        postFcitxJob { focus(true) }
         // the touch keyboard coming up as this evaluates is started below, not in inputDeviceMgr's onChange
         inputViewStarted = false
         val virtual = inputDeviceMgr.evaluateOnStartInputView(info, this)
@@ -1371,10 +1436,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
             monitorCursorAnchor(false)
         }
         resetComposingState()
-        postFcitxJob {
-            focusOutIn()
-            enginePaused()
-        }
+        postFcitxJob { focusOutIn() }
         contextDropped = true
         hideStatusIcon()
         showingDialog?.dismiss()
@@ -1413,9 +1475,12 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         }
         prefs.candidates.unregisterOnChangeListener(recreateCandidatesViewListener)
         ThemeManager.removeOnChangedListener(onThemeChangeListener)
+        // the last field learned from as the service goes (another keyboard picked, the system stopping it): not at a hide or
+        // a bar made anew, the same field maybe to come back to. A process killed outright still loses it
+        addressLearning.end(AddressStore.forgotten)?.let(AddressStore::learn)
         super.onDestroy()
         // Fcitx might be used in super.onDestroy()
-        FcitxDaemon.disconnect(javaClass.name)
+        HostDaemon.disconnect(javaClass.name)
     }
 
     private var showingDialog: Dialog? = null
@@ -1451,7 +1516,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
 }
 
 // every flag of [c] passed on: each defaults to false at engineContext, so one left out is silently off (F3198)
-internal suspend fun FcitxAPI.tell(c: Action.Context, learning: Boolean) =
+internal suspend fun HostApi.tell(c: Action.Context, learning: Boolean) =
     engineContext(
         c.before, learning, cleared = c.cleared, learnFlags = c.learnFlags ?: 0, started = c.started,
         after = c.after, selected = c.selected, said = c.said,

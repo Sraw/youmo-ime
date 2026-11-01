@@ -70,9 +70,7 @@ class LearnState {
     var day = 0
     var localDay = Int.MIN_VALUE
     var nextSeq = 1L
-    var convertedDay = -1
     var restoredMinute = -1
-    var convertedTables = ""
 
     private val statMap = HashMap<StatKey, Stat>()
     // the same by code, for a code's used words (impl/design-1b.md S10): kept with statMap, as only this class changes it
@@ -104,7 +102,8 @@ class LearnState {
     val bars = HashMap<Take, Counted>()
     val enWords = HashMap<String, EnWord>()
     val enPairs = HashMap<Pair<String, String>, Counted>()
-    val tableWords = HashMap<Triple<String, String, String>, Int>()
+    // in the order they were saved, which a table offers them in under one code (SavedPhrases)
+    val tableWords = LinkedHashMap<Triple<String, String, String>, Int>()
     val noPredict = HashSet<Pair<String, String>>()
 
     /** The calendar day of each typing day in the window, as its first commit had it: a word's last use as a date (U-80). */
@@ -186,6 +185,10 @@ class LearnState {
     var tableBlocksVersion = 0L
         private set
 
+    /** Counted up as [tableWords] changes: what a table read of them is read again by (SavedPhrases). */
+    var tableWordsVersion = 0L
+        private set
+
     /** This state's own number, none other's: a cache keyed on which state it was made of holds no state (F3216). */
     val id = ids.incrementAndGet()
 
@@ -243,7 +246,10 @@ class LearnState {
             is BarRow -> bars[record.take] = Counted(record.count, record.lastDay)
             is EnWordRow -> enWords[record.word] = EnWord(record.flags, record.uses.copy())
             is EnPairRow -> enPairs[record.prev to record.word] = Counted(record.count, record.lastDay)
-            is TableWordRow -> tableWords[Triple(record.im, record.code, record.text)] = record.since
+            is TableWordRow -> {
+                tableWords[Triple(record.im, record.code, record.text)] = record.since
+                tableWordsVersion++
+            }
             is NoPredictRow -> noPredict += record.prev to record.text
             is TableBlockRow -> tableBlock(record, on = true)
             is WordUseRow -> wordUses.getOrPut(record.text) { HashMap(2) }[record.reading] = record.uses.copy()
@@ -260,9 +266,7 @@ class LearnState {
         day = h.day
         localDay = h.localDay
         nextSeq = h.nextSeq
-        convertedDay = h.convertedDay
         restoredMinute = h.restoredMinute
-        convertedTables = h.convertedTables
     }
 
     /** Takes the typing day on to [to], first sweeping what has not been used for [WINDOW] days by then. */
@@ -558,7 +562,7 @@ class LearnState {
         dropMine(text)
         pairs.keys.removeAll { it.prev == text || it.next == text }
         // the tables forget it too (Engines.forgottenEverywhere): their saved words as their logs have them
-        tableWords.keys.removeAll { it.third == text }
+        if (tableWords.keys.removeAll { it.third == text }) tableWordsVersion++
         // an imported word deleted is gone (U-82 删除)
         noteImports(imports.forget(text))
     }
@@ -567,7 +571,7 @@ class LearnState {
         changes.recount = true
         for (r in a.removed) when (r) {
             is MineRow -> forget(r.text)
-            is TableWordRow -> tableWords.remove(Triple(r.im, r.code, r.text))
+            is TableWordRow -> if (tableWords.remove(Triple(r.im, r.code, r.text)) != null) tableWordsVersion++
             is EnWordRow -> apply(EnForget(a.minute, r.word))
             else -> Unit
         }
@@ -580,7 +584,12 @@ class LearnState {
             }
             // an export's count, where the word has no uses of that reading
             is WordUseRow -> wordUses.getOrPut(r.text) { HashMap(2) }.let { if (r.reading !in it) it[r.reading] = r.uses.copy() }
-            is TableWordRow -> Triple(r.im, r.code, r.text).let { if (it !in tableWords) tableWords[it] = r.since }
+            is TableWordRow -> Triple(r.im, r.code, r.text).let {
+                if (it !in tableWords) {
+                    tableWords[it] = r.since
+                    tableWordsVersion++
+                }
+            }
             is EnWordRow -> enWords.getOrPut(r.word) { EnWord(0, DayCounts()) }.let { it.flags = it.flags or r.flags }
             else -> Unit
         }
@@ -630,9 +639,13 @@ class LearnState {
         if (w.flags == 0 && w.uses.isEmpty()) enWords.remove(word)
     }
 
-    /** The state as a snapshot's rows, [cut] its cut, each in a canonical order, then what is [kept], then [Cut]. */
+    /**
+     * The state as a snapshot's rows, [cut] its cut, each kind in a canonical order but the tables'
+     * saved phrases, kept in the order they were saved (the order a table offers them in), then what
+     * is [kept], then [Cut].
+     */
     fun snapshot(cut: Int): List<LearnRecord> = buildList {
-        add(Head(cut, lastMinute, day, localDay, nextSeq, convertedDay, restoredMinute, convertedTables))
+        add(Head(cut, lastMinute, day, localDay, nextSeq, restoredMinute = restoredMinute))
         for ((k, s) in stats.entries.sortedWith(compareBy({ it.key.code.kind }, { it.key.code.keys }, { it.key.text }, { it.key.reading }))) {
             add(StatRow(k.code, s.words, s.uses, s.corrections, s.older, s.firstSeq))
         }
@@ -646,9 +659,8 @@ class LearnState {
         for ((t, c) in bars.entries.sortedWith(compareBy({ it.key.layout }, { it.key.digits }, { it.key.syllable }))) add(BarRow(t, c.count, c.lastDay))
         for ((word, w) in enWords.entries.sortedBy { it.key }) add(EnWordRow(word, w.flags, w.uses))
         for ((k, c) in enPairs.entries.sortedWith(compareBy({ it.key.first }, { it.key.second }))) add(EnPairRow(k.first, k.second, c.count, c.lastDay))
-        for ((k, since) in tableWords.entries.sortedWith(compareBy({ it.key.first }, { it.key.second }, { it.key.third }))) {
-            add(TableWordRow(k.first, k.second, k.third, since))
-        }
+        // as saved, not sorted: the order is what a table offers them in
+        for ((k, since) in tableWords) add(TableWordRow(k.first, k.second, k.third, since))
         for ((prev, text) in noPredict.sortedWith(compareBy({ it.first }, { it.second }))) add(NoPredictRow(prev, text))
         for ((k, texts) in tableBlocks.entries.sortedWith(compareBy({ it.key.first }, { it.key.second }))) {
             for (text in texts.sorted()) add(TableBlockRow(k.first, k.second, text))
@@ -662,9 +674,12 @@ class LearnState {
         add(Cut)
     }
 
-    /** The state as text, in a canonical order, the cut left out: for tests to compare states built different ways. */
+    /**
+     * The state as text, in [snapshot]'s order, the cut left out: for tests to compare states built
+     * different ways (the tables' saved phrases in their saved order, which is part of the state).
+     */
     fun dump(): String = snapshot(0).drop(1).joinToString("\n", prefix = "day=$day localDay=$localDay lastMinute=$lastMinute next=$nextSeq " +
-        "converted=$convertedDay/$convertedTables restored=$restoredMinute\n") { r ->
+        "restored=$restoredMinute\n") { r ->
         when (r) {
             is StatRow -> "stat ${r.code} ${r.words.list} uses=${r.uses} corr=${r.corrections} older=${r.older} first=${r.firstSeq}"
             else -> r.toString()

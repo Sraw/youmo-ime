@@ -291,7 +291,7 @@ class PopupKeyboardUi(
         fun keyAction(key: String): KeyAction =
             // one character goes through fcitx like any key; anything longer (a user-entered word, or
             // text that happens to spell a key name such as "Tab") is not a key and is committed as text
-            if (key.codePointCount(0, key.length) == 1) KeyAction.FcitxKeyAction(key)
+            if (key.codePointCount(0, key.length) == 1) KeyAction.HostKeyAction(key)
             else KeyAction.CommitAction(key)
     }
 

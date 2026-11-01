@@ -5,8 +5,9 @@
 package org.fcitx.fcitx5.android.uat
 
 import org.fcitx.fcitx5.android.Uat
-import org.fcitx.fcitx5.android.engine.host.Engines
-import org.fcitx.fcitx5.android.engine.host.Engines.UserWord
+import org.fcitx.fcitx5.android.engine.InputMethodCatalog
+import org.fcitx.fcitx5.android.engine.platform.jvm.JvmFile
+import org.fcitx.fcitx5.android.engine.runtime.UserWord
 import org.fcitx.fcitx5.android.engine.learn.backup.BackupHead
 import org.fcitx.fcitx5.android.engine.learn.control.BackupOp
 import org.fcitx.fcitx5.android.engine.learn.control.BackupResult
@@ -23,7 +24,7 @@ import java.nio.file.Files
 /**
  * uat/15-privacy-backup.md, the engine's half: a field that asks not to learn, 不用我的输入习惯
  * with an imported base dictionary, 清掉最近, and the learning backups (restore merged, 退回恢复前,
- * this install's automatic ones, blocks first). The pages' buttons are FcitxAPI's `learning(op)`;
+ * this install's automatic ones, blocks first). The pages' buttons are HostApi's `learning(op)`;
  * here they are those ops.
  */
 class PrivacyUatTest {
@@ -48,7 +49,7 @@ class PrivacyUatTest {
             "${parts[0]} ${parts.drop(1).joinToString("'")} 0.0"
         }
         DictionaryCompiler.compile(listOf(lines.asSequence()), merged, names = listOf("dict-words"))
-        UatEngines.dictionary = { DictionaryFile.open(merged) }
+        UatEngines.dictionary = { DictionaryFile.open(JvmFile(merged)) }
         UatEngines.indexes = UatEngines.tempDir("uat-indexes")
         engines.reload()
         assertTrue(engines.addWord("鲸园", "jing yuan"))
@@ -56,7 +57,7 @@ class PrivacyUatTest {
         assertTrue("量子文化村" in typed("liangziwenhuacun"))
         assertFalse("鲸园" in typed("jingyuan"))
         focus("")
-        ime(Engines.WUBI)
+        ime(InputMethodCatalog.WUBI)
         UatEngines.settle()
         type("jbys")
         expectAmong("量子计算机", "量子文化村")

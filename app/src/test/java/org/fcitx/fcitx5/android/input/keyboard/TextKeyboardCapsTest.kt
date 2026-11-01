@@ -28,7 +28,7 @@ class TextKeyboardCapsTest {
     private val typed = ArrayList<String>()
 
     private val keyboard = TextKeyboard(PlaceholderStrings(RuntimeEnvironment.getApplication()), ThemePreset.PixelDark).apply {
-        keyActionListener = KeyActionListener { action, _ -> if (action is KeyAction.FcitxKeyAction) typed += action.act }
+        keyActionListener = KeyActionListener { action, _ -> if (action is KeyAction.HostKeyAction) typed += action.act }
     }
 
     private fun type(letter: String): String {

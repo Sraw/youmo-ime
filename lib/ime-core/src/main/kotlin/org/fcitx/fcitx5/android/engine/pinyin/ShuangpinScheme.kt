@@ -17,7 +17,8 @@ import org.fcitx.fcitx5.android.engine.pinyin.SyllableGraph.Companion.SEPARATOR
  * final (小鹤: `aa` a, `ah` ang). A two-letter one may also be typed as spelt (`ai`, `ou`):
  * always with `*`, otherwise wherever those two keys type no syllable exactly.
  *
- * The built-in schemes are the ones libime has, with its tables, so a user's choice carries over.
+ * The built-in schemes are three of libime's, with its tables, so a user's choice carries over: 0.5
+ * dropped the other five (the user's 2026-11-01), a config naming one read as 小鹤 (SchemeMigration).
  */
 class ShuangpinScheme(keys: String, val zero: String) {
 
@@ -79,7 +80,7 @@ class ShuangpinScheme(keys: String, val zero: String) {
     /** The initials [key] types, in [SpellingIndex.INITIALS]' order: 自然码's v zh, and v itself none. */
     internal fun initialsOn(key: Char): List<String> = SpellingIndex.INITIALS.filter { key in initialKeys(it) }
 
-    private fun initialKeys(init: String): String {
+    internal fun initialKeys(init: String): String {
         val mapped = initials[init].orEmpty()
         // libime reads a letter as its own initial even when it also types another one
         return if (init.length == 1 && init !in mapped) mapped + init else mapped
@@ -105,37 +106,11 @@ class ShuangpinScheme(keys: String, val zero: String) {
                 "iong=s iu=q ong=s ou=b ua=w uai=y uan=r uang=d ue=t ui=v un=p uo=o ve=v v=y",
             "o",
         )
-        val ZIGUANG = ShuangpinScheme(
-            "zh=u ch=a sh=i ai=p an=r ang=s ao=q ei=k en=w eng=t er=j ia=x ian=f iang=g iao=b ie=d in=y ing=; " +
-                "iong=h iu=j ong=h ou=z ua=x uai=y uan=l uang=g ue=n ui=n un=m uo=o ve=n v=v",
-            "o",
-        )
-        val ABC = ShuangpinScheme(
-            "zh=a ch=e sh=v ai=l an=j ang=h ao=k ei=q en=f eng=g er=r ia=d ian=w iang=t iao=z ie=x in=c ing=y " +
-                "iong=s iu=r ong=s ou=b ua=d uai=c uan=p uang=t ue=m ui=m un=n uo=o ve=m v=v",
-            "o",
-        )
 
-        /** libime gives 中文之星 the table of 拼音加加, without the leading vowel. */
-        val ZHONGWENZHIXING = ShuangpinScheme(
-            "zh=v ch=u sh=i ai=s an=f ang=g ao=d ei=w en=r eng=t er=q ia=b ian=j iang=h iao=k ie=m in=l ing=q " +
-                "iong=y iu=n ong=y ou=p ua=b uai=x uan=c uang=h ue=x ui=v un=z uo=o ve=x v=v",
-            "o",
-        )
-        val PINYINJIAJIA = ShuangpinScheme(
-            "zh=v ch=u sh=i ai=s an=f ang=g ao=d ei=w en=r eng=t er=q ia=b ian=j iang=h iao=k ie=m in=l ing=q " +
-                "iong=y iu=n ong=y ou=p ua=b uai=x uan=c uang=h ue=x ui=v un=z uo=o ve=x v=v",
-            "o*",
-        )
         val XIAOHE = ShuangpinScheme(
             "zh=v ch=i sh=u ai=d an=j ang=h ao=c ei=w en=f eng=g ia=x ian=m iang=l iao=n ie=p in=b ing=k " +
                 "iong=s iu=q ong=s ou=z ua=x uai=k uan=r uang=l ue=t ui=v un=y uo=o ve=t v=v",
             "*",
-        )
-        val GB = ShuangpinScheme(
-            "zh=v ch=i sh=u ai=k an=f ang=g ao=c ei=b en=r eng=h er=l ia=q ian=d iang=n iao=m ie=t in=l ing=j " +
-                "iong=s iu=y ong=s ou=p ua=q uai=y uan=w uang=n ue=x ui=v un=z uo=o ve=x v=v",
-            "a",
         )
     }
 }

@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.dicttool
 
+import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.engine.data.CodeTableReader
 import org.fcitx.fcitx5.android.engine.data.DataFile
 import org.fcitx.fcitx5.android.engine.data.DataFormatException
@@ -16,7 +17,7 @@ import org.fcitx.fcitx5.android.engine.data.WordLayers
 import org.fcitx.fcitx5.android.engine.data.forEachNumberedLine
 import org.fcitx.fcitx5.android.engine.english.EnglishDataBuilder
 import org.fcitx.fcitx5.android.engine.english.EnglishText
-import org.fcitx.fcitx5.android.engine.host.Engines
+import org.fcitx.fcitx5.android.engine.runtime.Engines
 import org.fcitx.fcitx5.android.engine.phrase.Chaizi
 import org.fcitx.fcitx5.android.engine.phrase.EmojiData
 import org.fcitx.fcitx5.android.engine.pinyin.Syllables
@@ -974,7 +975,7 @@ private fun emoji(options: Options, out: Appendable) {
 
 /** The engines of compiled pinyin [data] alone. */
 private fun pinyinEngines(data: String) =
-    Engines({ path -> if (path == Engines.PINYIN_DATA) map(data) else throw FileNotFoundException(path) }, null)
+    Engines({ path -> if (path == InputMethodCatalog.PINYIN_DATA) map(data) else throw FileNotFoundException(path) }, null)
 
 private val EMOJI_HEADER = """
     emoji.data, ime-dict-tool's emoji: the panel's groups (@), then the Chinese words emoji stand for

@@ -247,6 +247,27 @@ class PinyinDataTest {
         }
     }
 
+    // the bigrams' answers are kept by (prev, word) (S15 N1): asked again, in any order, more pairs
+    // than the cache has slots, each still the file's, a bigram seen or one backed off
+    @Test
+    fun bigramsAskedAgainScoreAsTheFileHasThem() {
+        val b = builder()
+        val words = (0 until 300).map { "w$it" }
+        words.forEach { b.unigram(it, -4f - (it.length % 3), -0.25f) }
+        fun prob(p: Int, w: Int) = -0.1f * (1 + (p + w) % 7)
+        val seen = words.indices.flatMap { p -> words.indices.filter { w -> (p * 31 + w) % 11 == 0 }.map { w -> p to w } }.toSet()
+        seen.forEach { (p, w) -> b.bigram(words[p], words[w], prob(p, w), 0f) }
+        val data = load(b)
+        val m = data.model
+        val ids = words.map { data.id(it) }
+        val all = words.indices.flatMap { p -> words.indices.map { w -> p to w } }
+        fun expected(p: Int, w: Int) = if ((p to w) in seen) prob(p, w) else m.backoff(ids[p]) + m.score(ids[w])
+        repeat(3) { round ->
+            for ((p, w) in all.shuffled(Random(round))) assertEquals("$p $w", expected(p, w), m.score(ids[p], ids[w]), 0f)
+        }
+        assertTrue(m.bigramsHeld() > 0)
+    }
+
     @Test
     fun ngramsAddedInAnyOrderAreFoundByTheirWords() {
         val b = builder()

@@ -1,7 +1,7 @@
 """uat/05-toolbar.md. The .md is the source of truth; each function follows its case's 前提/操作/预期."""
 import time
 
-from uat import BAR_BOTTOM, Blocked, case, check, home, open_url
+from uat import BAR_BOTTOM, Blocked, case, check, open_url
 
 LONG = "今天天气很好，我们一起去公园散步吧。"
 
@@ -74,12 +74,6 @@ def clip_item(d, text):
     return next((n for n in clip_items(d) if n.text.startswith(text)), None)
 
 
-def long_press(d, node):
-    """long-press an item: its popup menu opens"""
-    d.hold(node.c, 900)
-    time.sleep(0.6)
-
-
 case("TB-01", needs="jvm:BarUatTest.toolbarWhenIdleCandidatesWhileTyping")(lambda d: None)
 
 
@@ -89,16 +83,7 @@ case("TB-02", needs="jvm:ToolbarUatTest.expandingTheToolbar")(lambda d: None)
 case("TB-03", needs="jvm:ToolbarUatTest.undoAndRedo")(lambda d: None)
 
 
-@case("TB-04")
-def tb04(d):
-    ime(d, desc="隐藏键盘", after=1.0)
-    gone = not d.screen().find(rid="keyboard_view", where="ime")
-    f = next(n for n in d.screen().app() if n.cls == "EditText" and n.rid != "url_field")
-    d.tap(f.c, 1.2)
-    back = d.screen().find(rid="keyboard_view", where="ime")
-    check(gone, "点 ⌄ 后键盘没收起")
-    check(back, "再点框键盘没出来")
-    return "收起；再点框又出来"
+case("TB-04", needs="jvm:ToolbarUatTest.theHideButtonPutsTheKeyboardAway")(lambda d: None)
 
 
 case("TB-05", needs="jvm:BarUatTest.expandedCandidatesGridSelects")(lambda d: None)
@@ -129,6 +114,12 @@ case("TB-09", needs="jvm:ToolbarUatTest.justCopiedOnTheBar")(lambda d: None)
 
 
 case("TB-40", needs="jvm:ToolbarUatTest.justCopiedGoneAfterThirtySeconds")(lambda d: None)
+
+
+case("TB-42", needs="jvm:ToolbarUatTest.theToolbarButtonsPageSetsTheBar")(lambda d: None)
+
+
+case("TB-43", needs="jvm:ToolbarUatTest.thePanelsTogglesOnTheBar、KeyboardPickerUatTest.theKeyboardButtonOnTheBarIsThePanelsPicker")(lambda d: None)
 
 
 case("TB-10", needs="jvm:ToolbarUatTest.aPinnedEntryOutlivesTheLimit")(lambda d: None)
@@ -171,51 +162,19 @@ def status_toggle(d, frm):
     return now
 
 
-@case("TB-15", mutates=True)
-def tb15(d):
-    now = status_toggle(d, "简体")
-    d.type("guojia")
-    d.cands()
-    d.space()
-    t = d.field_text()
-    check(t == "國家", f"切到「{now}」后打 guojia：「{t}」")
-    return f"「{now}」：「{t}」"
+case("TB-15", needs="jvm:BarUatTest.theStatusPanelTurnsTraditionalOn")(lambda d: None)
 
 
-@case("TB-16", mutates=True)
-def tb16(d):
-    now = status_toggle(d, "中文标点")
-    d.press(",")
-    t = d.field_text()
-    check(t == ",", f"切到「{now}」后：「{t}」")
-    return f"「{now}」：「{t}」"
+case("TB-16", needs="jvm:BarUatTest.theStatusPanelTurnsEnglishPunctuationOn")(lambda d: None)
 
 
-@case("TB-17", mutates=True)
-def tb17(d):
-    from uat import flick
-    now = status_toggle(d, "半角")
-    flick(d, "q")
-    t = d.field_text()
-    d.switch_im("英文")
-    flick(d, "q")
-    t2 = d.field_text()
-    check(t == "１", f"切到「{now}」后：「{t}」")
-    check(t2 == "１1", f"英文再打 1：「{t2}」")
-    return f"「{t}」→「{t2}」"
+case("TB-17", needs="jvm:BarUatTest.theStatusPanelTurnsFullWidthOn")(lambda d: None)
 
 
 case("TB-18", needs="jvm:ToolbarUatTest.theStatusAreasWaysIntoTheSettings")(lambda d: None)
 
 
-@case("TB-19", base="B0-英文")
-def tb19(d):
-    status_panel(d)
-    s = d.screen()
-    texts = [n.text for n in s.ime() if n.text]
-    bad = [x for x in ("简体", "繁體", "繁体", "中文标点", "英文标点", "半角", "全角") if x in texts]
-    check(not bad, f"英文的状态面板里有 {bad}")
-    return f"状态面板 {texts}"
+case("TB-19", needs="jvm:BarUatTest.englishsStatusPanelHasNoChineseToggles")(lambda d: None)
 
 
 # ---------------------------------------------------------------- 单手、悬浮
@@ -350,83 +309,17 @@ case("TB-24", needs="jvm:FloatingUatTest.theDockButtonPutsItBack")(lambda d: Non
 
 # ---------------------------------------------------------------- 计算结果
 
-def numpad(d, keys):
-    d.press("123", after=0.8)
-    s = d.screen()
-    kb = s.find(rid="keyboard_view", where="ime")
-    lab = {}
-    for n in kb.walk():
-        if n.clickable:
-            t = [m.text for m in n.walk() if m.text]
-            if t:
-                lab[t[0]] = n.c
-    pts = []
-    for ch in keys:
-        if ch not in lab:
-            raise Blocked(f"数字键盘上没有「{ch}」")
-        pts.append(lab[ch])
-    d.taps(pts, gap=0.12, after=0.8)
-
-
-def result_on_bar(d):
-    s = d.screen()
-    return next((n for n in s.ime() if n.text.startswith("=") and n.c[1] < BAR_BOTTOM), None)
-
 
 case("TB-25", needs="jvm:ToolbarUatTest.aSumsResultOnTheBar")(lambda d: None)
 
 
-@case("TB-26", base="B0-设置", mutates=True)
-def tb26(d):
-    home(d, "通用输入")
-    d.switch("点算式结果时替换整个算式", True)
-    d.open_page("text")
-    d.switch_im("英文")
-    numpad(d, "1+2*2=")
-    r = result_on_bar(d)
-    check(r and r.text.replace(" ", "") == "=5", f"栏上 {r.text if r else None}")
-    d.tap(r.c, 0.8)
-    t = d.field_text()
-    check(t == "5", f"框里「{t}」")
-    return f"框里「{t}」"
+case("TB-26", needs="jvm:KeyboardFieldsUatTest.theResultReplacesTheWholeSum")(lambda d: None)
 
 
 case("TB-28", needs="jvm:ToolbarUatTest.copyingNothingLeavesTheCursor")(lambda d: None)
 
 
-@case("TB-29")
-def tb29(d):
-    d.type("ni", after=0.6)
-    s = d.screen()
-    b = s.find(desc="展开候选词列表", where="ime")
-    if not b:
-        raise Blocked("打 ni 后候选栏右边没有展开 ⌄")
-    d.hold(b.c, 900)
-    time.sleep(0.8)
-    s = d.screen()
-    check(not s.find(rid="expanded_candidate_view", where="ime"), "长按 ⌄ 展开了候选表格")
-    check(not s.find(rid="keyboard_view", where="ime"), "长按 ⌄ 后键盘还在")
-    # 联想 (the bar after a commit) has the same ⌄: a tap expands, a long press hides
-    d.open_page("text")
-    d.type("ni", after=0.6)
-    d.pick("你")
-    time.sleep(0.6)
-    b = d.screen().find(desc="展开候选词列表", where="ime")
-    if not b:
-        raise Blocked("选「你」后联想栏右边没有展开 ⌄")
-    d.tap(b.c, 0.8)
-    s = d.screen()
-    grid = s.find(rid="expanded_candidate_view", where="ime")
-    check(grid, "联想时点一下 ⌄ 没展开联想表格")
-    d.tap(b.c, 0.8)   # the same spot folds the table back
-    b = d.screen().find(desc="展开候选词列表", where="ime")
-    if not b:
-        raise Blocked("收起联想表格后没有 ⌄")
-    d.hold(b.c, 900)
-    time.sleep(0.8)
-    s = d.screen()
-    check(not s.find(rid="keyboard_view", where="ime"), "联想时长按 ⌄ 后键盘还在")
-    return "有候选、有联想时长按 ⌄ 都收起键盘；联想时点一下展开表格"
+case("TB-29", needs="jvm:ToolbarUatTest.holdingTheCandidatesExpandButtonHides")(lambda d: None)
 
 
 case("TB-30", needs="jvm:ToolbarUatTest.copyAndCutSaidNothingCopiedNotSaid")(lambda d: None)
@@ -451,3 +344,20 @@ def tb41(d):
     check(not stale, f"读到的还是上一个：{stale[:3]}（共 {len(stale)} 次）")
     return "20 次都读到新名字"
 
+
+case("TB-44", needs="jvm:ToolbarUatTest.aPieceOfAnEntryCommittedAlone")(lambda d: None)
+
+
+case("TB-45", needs="jvm:ClipboardLimitUatTest.unlimitedIsTheLimitsButtonAndLoweringAsksFirst")(lambda d: None)
+
+
+case("TB-46", needs="jvm:ToolbarUatTest.piecesPickedByTapsCommittedInTapOrder")(lambda d: None)
+
+
+case("TB-47", needs="jvm:KeyboardPickerUatTest.eachInputMethodsKeyboardsPickedFromTheStatusArea")(lambda d: None)
+
+
+case("TB-48", needs="jvm:ClipboardSplitUatTest.aLongEntrySplitsItsStartAndADottedOneNotAtAll")(lambda d: None)
+
+
+case("TB-49", needs="jvm:ClipboardSplitUatTest.piecesPickedBySweepingAcross")(lambda d: None)

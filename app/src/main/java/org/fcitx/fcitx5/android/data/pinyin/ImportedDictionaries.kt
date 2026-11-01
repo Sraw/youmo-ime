@@ -7,9 +7,9 @@ package org.fcitx.fcitx5.android.data.pinyin
 import org.fcitx.fcitx5.android.data.pinyin.dict.SourceNames
 import org.fcitx.fcitx5.android.data.pinyin.dict.TextDictionary
 import org.fcitx.fcitx5.android.engine.data.DataFormatException
-import org.fcitx.fcitx5.android.engine.libime.LibimeFiles
-import org.fcitx.fcitx5.android.engine.store.replaceFile
-import org.fcitx.fcitx5.android.engine.user.LibimeImport
+import org.fcitx.fcitx5.android.engine.platform.jvm.replaceFile
+import org.fcitx.fcitx5.android.engine.user.imports.LibimeFiles
+import org.fcitx.fcitx5.android.engine.user.imports.WordText
 import timber.log.Timber
 import java.io.File
 import java.io.IOException
@@ -42,7 +42,7 @@ object ImportedDictionaries {
         try {
             SourceNames.writeGzip(temp) { gz ->
                 val out = gz.bufferedWriter()
-                for (line in LibimeImport.dictionaryText(lines.withoutByteOrderMark())) {
+                for (line in WordText.dictionaryText(lines.withoutByteOrderMark())) {
                     out.write(line)
                     out.write('\n'.code)
                     words++
@@ -341,7 +341,7 @@ object ImportedDictionaries {
     // turn it; none if it can
     private fun whyUnread(file: File, read: (ByteArray) -> List<String>): Unread.Reason? = try {
         val lines = read(file.readBytes())
-        if (LibimeImport.dictionaryText(lines.asSequence()).none()) {
+        if (WordText.dictionaryText(lines.asSequence()).none()) {
             Unread.Reason.NO_WORDS
         } else {
             Timber.i("libime's dictionary %s: it reads, not noted", file.name)

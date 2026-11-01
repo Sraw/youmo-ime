@@ -4,8 +4,8 @@
  */
 package org.fcitx.fcitx5.android.host
 
-import org.fcitx.fcitx5.android.engine.host.Keyboard
 import org.fcitx.fcitx5.android.engine.pinyin.g14Code
+import org.fcitx.fcitx5.android.engine.runtime.Keyboard
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
@@ -38,7 +38,10 @@ class TempModeTapsTest {
         send(Keyboard.nineKey('2', upper = false))
         send(Keyboard.SYLLABLES.first.code)
         send(Keyboard.INK)
+        // a stroke drawn while quick input shows its code (笔画筛选): no mode's, swallowed
+        send(Keyboard.strokeKey('h'))
         assertEquals("a", rig.preedit)
+        assertEquals(emptyList<String>(), rig.commits())
     }
 
     @Test

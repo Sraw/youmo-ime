@@ -215,7 +215,7 @@ class UnicodeInput(
     }
 
     private fun list(words: List<TempCandidate>, labels: List<String>) =
-        TempCandidateList(words, TempKeys.PAGE_SIZE, labels, TempLayoutHint.Vertical).also {
+        TempCandidateList(words, TempKeys.PAGE_SIZE, labels, LayoutHint.Vertical).also {
             if (it.totalSize > 0) it.setGlobalCursorIndex(0)
         }
 

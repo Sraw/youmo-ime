@@ -28,6 +28,8 @@ class GroupedShuangpinSegmenter(
     typos: Boolean = true,
 ) : KeyedSegmenter {
 
+    override val spellsFullPinyin: Boolean get() = false
+
     private val pairs = HashMap<String, SyllableMatches>()
     private val leads = HashMap<Char, SyllableMatches>()
     private val vowels = HashMap<Char, SyllableMatches>()
@@ -98,6 +100,15 @@ class GroupedShuangpinSegmenter(
     override fun started(syllable: Int, keys: Int): String {
         val spelling = Syllables.spelling(syllable)
         return SpellingIndex.split(spelling)?.first?.ifEmpty { null } ?: spelling.take(1)
+    }
+
+    // as a phrase's key types it on the 26 keys: an initial its key, a syllable each way the scheme types it
+    override fun takenAs(spelling: String): List<String> {
+        if (spelling in byInitial) return scheme.initialKeys(spelling).map(Char::toString)
+        val id = Syllables.id(spelling)
+        if (id < 0) return emptyList()
+        val (init, fin) = SpellingIndex.split(spelling) ?: return emptyList()
+        return (scheme.codes(init, fin) + listOfNotNull(scheme.encode(id))).distinct()
     }
 
     override fun segment(input: String): SyllableGraph = GraphEdges.build(input) { at, edges ->

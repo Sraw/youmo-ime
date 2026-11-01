@@ -13,6 +13,7 @@ import java.io.DataInputStream
 import java.io.IOException
 import java.io.InputStream
 import java.io.OutputStream
+import java.io.UTFDataFormatException
 import java.nio.ByteBuffer
 import java.security.MessageDigest
 
@@ -47,9 +48,16 @@ data class ListedWord(val text: String, val code: String) {
 }
 
 /**
+ * What the app's address bar learned (input/address's AddressBook, its two strings as the app keeps
+ * them): carried by the backups as they are, the engine reading nothing of them.
+ */
+data class AddressData(val counts: String, val addresses: String)
+
+/**
  * A backup read: its [head] (null for a bare log), the learning [state], the words added and
  * blocked; [origin], the install its days are of (BackupMerge.ORIGIN): the head's, else one told
- * by the file's bytes ([LearnBackup.origin]), so two older builds' files are not one install's.
+ * by the file's bytes ([LearnBackup.origin]), so two older builds' files are not one install's;
+ * [addresses], null in one made before they went with it (v0.4.0's, a bare log).
  */
 class Backup(
     val head: BackupHead?,
@@ -57,6 +65,7 @@ class Backup(
     val added: List<ListedWord>,
     val blocked: List<ListedWord>,
     val origin: Long = head?.installId ?: 0L,
+    val addresses: AddressData? = null,
 )
 
 /**
@@ -64,7 +73,8 @@ class Backup(
  * header of their own ([FORMAT], `FXLB` 1), so a file the user picks is told apart from a log, a
  * zip or a word list. A [HEAD] record, then the learning as a snapshot ([LearnLog.writeSnapshot]:
  * 不再联想, pins and whatever rows a later build keeps included), then the words added by hand
- * ([ADDED]) and blocked ([BLOCKED]), which live in their own lists, not the log. Never the clipboard.
+ * ([ADDED]) and blocked ([BLOCKED]), which live in their own lists, not the log, and what the
+ * address bar learned ([ADDRESS_COUNTS], [ADDRESSES], since 0.5.0: v0.4.0 skips them). Never the clipboard.
  * Last, always and once, an [END] holding the file's length in bytes, itself included: a file cut
  * at a record's boundary, or one missing a record or given one more, does not read (原 WD-10d). A
  * file without it, a draft build's included, is refused.
@@ -80,6 +90,12 @@ object LearnBackup {
     const val ADDED: Byte = 71
     const val BLOCKED: Byte = 72
 
+    /** [AddressData.counts], one string. */
+    const val ADDRESS_COUNTS: Byte = 75
+
+    /** [AddressData.addresses], one string. */
+    const val ADDRESSES: Byte = 76
+
     /** The last record: the file's length in bytes (an Int), this record included. */
     const val END: Byte = 74
     // the END record's whole size, framed: internal for the tests that cut a file at it
@@ -88,8 +104,14 @@ object LearnBackup {
     /** The file name a backup is saved under, by the user or in the settings' zip. */
     const val EXTENSION = ".fxlb"
 
-    /** [state] and the lists as a backup's bytes, headed by [head]. */
-    fun bytes(head: BackupHead, state: LearnState, added: List<ListedWord>, blocked: List<ListedWord>): ByteArray {
+    /** [state], the lists and [addresses] (none: not written) as a backup's bytes, headed by [head]. */
+    fun bytes(
+        head: BackupHead,
+        state: LearnState,
+        added: List<ListedWord>,
+        blocked: List<ListedWord>,
+        addresses: AddressData? = null,
+    ): ByteArray {
         val out = ByteArrayOutputStream()
         out.write(FORMAT.header())
         out.write(
@@ -108,6 +130,18 @@ object LearnBackup {
         })
         for (w in added) out.write(word(ADDED, w))
         for (w in blocked) out.write(word(BLOCKED, w))
+        if (addresses != null) {
+            // the book's caps (AddressBook.MAX_ADDRESSES and its counts') keep them under writeUTF's 64 KB;
+            // past it they are left out, not every backup lost
+            try {
+                val counts = FORMAT.record(ADDRESS_COUNTS) { writeUTF(addresses.counts) }
+                val list = FORMAT.record(ADDRESSES) { writeUTF(addresses.addresses) }
+                out.write(counts)
+                out.write(list)
+            } catch (_: UTFDataFormatException) {
+                // too long for a record: the rest of the backup as it is
+            }
+        }
         out.write(FORMAT.record(END) { writeInt(out.size() + END_SIZE) })
         return out.toByteArray()
     }
@@ -135,6 +169,8 @@ object LearnBackup {
         var head: BackupHead? = null
         val added = ArrayList<ListedWord>()
         val blocked = ArrayList<ListedWord>()
+        var counts: String? = null
+        var addresses: String? = null
         val state = LearnState()
         val reader = LearnRecords.Reader()
         // a log stops at a record cut short (the app killed while writing), but a backup is written
@@ -147,6 +183,8 @@ object LearnBackup {
                 HEAD -> head = head(input)
                 ADDED -> added += ListedWord(input.readUTF(), input.readUTF())
                 BLOCKED -> blocked += ListedWord(input.readUTF(), input.readUTF())
+                ADDRESS_COUNTS -> counts = input.readUTF()
+                ADDRESSES -> addresses = input.readUTF()
                 END -> ended = input.readInt()
                 // this file's own range: a later build's type, not one of the log's; but ORIGIN, the log's
                 // own row of the range, kept as the log keeps a type it does not know (review-int-records M1)
@@ -158,7 +196,8 @@ object LearnBackup {
         if (whole != bytes.size || head == null || !ends) {
             throw IOException("a learning backup not whole: ${bytes.size} bytes, whole to $whole, end $ended, head ${head != null}")
         }
-        return Backup(head, state, added, blocked)
+        val book = if (counts == null && addresses == null) null else AddressData(counts.orEmpty(), addresses.orEmpty())
+        return Backup(head, state, added, blocked, addresses = book)
     }
 
     private fun head(input: DataInputStream) = BackupHead(input.readLong(), input.readInt(), input.readLong(), input.readUnsignedByte(), input.readUTF())

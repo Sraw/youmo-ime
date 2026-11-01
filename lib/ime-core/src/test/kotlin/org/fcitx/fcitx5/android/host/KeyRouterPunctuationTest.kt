@@ -4,7 +4,9 @@
  */
 package org.fcitx.fcitx5.android.host
 
-import org.fcitx.fcitx5.android.engine.host.Engines
+import org.fcitx.fcitx5.android.engine.InputMethodCatalog
+import org.fcitx.fcitx5.android.engine.runtime.EngineSettings
+import org.fcitx.fcitx5.android.engine.session.Action
 import org.fcitx.fcitx5.android.engine.session.Choice
 import org.fcitx.fcitx5.android.engine.session.Offer
 import org.fcitx.fcitx5.android.engine.session.Snapshot
@@ -17,11 +19,11 @@ import org.junit.Test
 class KeyRouterPunctuationTest {
 
     private val passOn = object : EngineHost {
-        override fun event(im: String, event: Int, arg: Int, learning: Boolean) =
+        override fun event(im: String, event: Int, arg: Int, learning: Boolean, payload: Action?) =
             Snapshot("", "", emptyList(), 0, false, false, handled = false, predicting = false)
         override fun candidates(im: String, from: Int, count: Int) = emptyList<Choice>()
         override fun offers(im: String, index: Int) = emptySet<Offer>()
-        override fun settings(flat: String) = Unit
+        override fun settings(settings: EngineSettings) = Unit
     }
 
     /** `,` one mark; `"` a pair typed a half at a time, with a second card; `.` two cards. */
@@ -46,9 +48,9 @@ class KeyRouterPunctuationTest {
     }
 
     private val punc = Punc()
-    private val core = HostCore(passOn, VirtualHostClock(), Profile.load(null, Engines.LISTED.map { it.name }.toSet(), "D"), firstRun = true,
+    private val core = HostCore(passOn, VirtualHostClock(), Profile.load(null, InputMethodCatalog.LISTED.map { it.name }.toSet(), "D"), firstRun = true,
         modules = { HostModules(punctuation = punc) })
-    private val log = mutableListOf<HostEvent>().also { l -> core.events.handlers += { l += it } }
+    private val log = mutableListOf<HostEvent>().also { l -> core.events += HostEvents { l += it } }
 
     init {
         core.activate(1)

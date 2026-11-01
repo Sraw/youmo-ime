@@ -2,6 +2,9 @@ package org.fcitx.fcitx5.android.data.theme
 
 import kotlinx.serialization.json.Json
 import org.fcitx.fcitx5.android.R
+import org.fcitx.fcitx5.android.core.EngineNotices
+import org.fcitx.fcitx5.android.core.HostConfigDir
+import org.fcitx.fcitx5.android.host.ConfigHome
 import org.fcitx.fcitx5.android.utils.appContext
 import org.fcitx.fcitx5.android.utils.errorRuntime
 import org.fcitx.fcitx5.android.utils.extract
@@ -20,7 +23,18 @@ import java.util.zip.ZipOutputStream
 
 object ThemeFilesManager {
 
-    private val dir = File(appContext.getExternalFilesDir(null), "theme").also { it.mkdirs() }
+    // the app's own files, an older build's themes on the external storage moved in first (A4): settled by
+    // the theme list at the app's start, on the main thread. That is the process's first ask for the themes
+    // (Application.onCreate), so it waits on no other thread's move; and the move is once an install, of a
+    // few json files and their images. Off the main thread the active theme would not be there to draw with.
+    // one directory a process (HostConfigDir), asked for each time as the engine's data is
+    private val themes get() = HostConfigDir.inUse(ConfigHome.THEME)
+    private val dir get() = themes.let { it.dir.also { dir -> if (it.writable) dir.mkdirs() } }
+
+    /** Whether a theme can be saved, deleted or imported: not while the themes are not settled (A4). */
+    val writable get() = themes.writable
+
+    private fun notSettled(): Nothing = throw IOException(appContext.getString(R.string.user_data_not_settled))
 
     private fun themeFile(theme: Theme.Custom) = File(dir, theme.name + ".json")
 
@@ -55,10 +69,12 @@ object ThemeFilesManager {
     } ?: this
 
     fun saveThemeFiles(theme: Theme.Custom) {
+        if (!writable) notSettled()
         themeFile(theme).writeText(Json.encodeToString(CustomThemeSerializer, theme.withImageNames()))
     }
 
     fun deleteThemeFiles(theme: Theme.Custom) {
+        if (!writable) notSettled()
         themeFile(theme).delete()
         theme.backgroundImage?.let {
             File(it.croppedFilePath).delete()
@@ -74,6 +90,8 @@ object ThemeFilesManager {
                 val (theme, migrated) = runCatching {
                     Json.decodeFromString(CustomThemeSerializer.WithMigrationStatus, it.readText())
                 }.getOrElse { e ->
+                    // one that did not read is left as it is (nothing writes a theme not listed); the user told
+                    if (e is IOException) EngineNotices.failedOnce(R.string.user_data_unreadable)
                     Timber.w("Failed to decode theme file ${it.absolutePath}: ${e.message}")
                     return@decode null
                 }
@@ -94,7 +112,7 @@ object ThemeFilesManager {
                     theme.copy(backgroundImage = here)
                 }
                 // Update the saved file if migration happens
-                if (migrated) {
+                if (migrated && writable) {
                     // listed by age: rewritten newest first, the newest would get the oldest new time
                     val modified = it.lastModified()
                     saveThemeFiles(found)
@@ -139,6 +157,7 @@ object ThemeFilesManager {
      */
     fun importTheme(src: InputStream): Result<Triple<Boolean, Theme.Custom, Boolean>> =
         runCatching {
+            if (!writable) notSettled()
             ZipInputStream(src).use { zipStream ->
                 withTempDir { tempDir ->
                     val extracted = zipStream.extract(tempDir)

@@ -44,6 +44,8 @@ proguard/
 
 # Log Files
 *.log
+# test fixtures hold learning records named *.log
+!**/src/*/resources/**/*.log
 
 # Android Studio Navigation editor temp files
 .navigation/

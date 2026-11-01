@@ -4,7 +4,7 @@
  */
 package org.fcitx.fcitx5.android.host
 
-import org.fcitx.fcitx5.android.engine.host.Engines
+import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 
 /**
  * What the modules start from: their files as the host read them, and where their data comes from.
@@ -58,7 +58,7 @@ class ChineseModules(private val inputs: ModuleInputs, private val strings: Host
         }
         fullWidth = FullWidth(statusArea) { ic, text -> services.commit(ic, text) }
         chttrans = Chttrans(
-            inputs.chttransEnabled, statusArea, services::inputMethod, { Engines.listed(it)?.language },
+            inputs.chttransEnabled, statusArea, services::inputMethod, { InputMethodCatalog.listed(it)?.language },
             inputs.converter, tip,
             // `updateUserInterface(InputPanel)` then `updatePreedit()` (`chttrans.cpp:214-215`)
             { ic ->

@@ -32,6 +32,9 @@ class GlideLayout(keys: List<Pair<Char, Pair<Float, Float>>>) {
     // each letter's keys as one id, letters on the same keys alike: the nine keys' a, b and c all on 2
     private val key = IntArray(LETTERS) { i -> (0..i).first { j -> x[j].contentEquals(x[i]) && y[j].contentEquals(y[i]) } }
 
+    /** Whether some letters share a key, as on the nine keys: pinyin hands such a glide to its nine keys' session (KeyboardPair). */
+    val sharesKeys: Boolean = (0 until LETTERS).any { i -> x[i].isNotEmpty() && key[i] != i }
+
     /** Whether [a] and [b] are on the same keys, as the nine keys' letters are: a glide goes from one to the other without moving. */
     fun sameKey(a: Char, b: Char): Boolean = a in this && b in this && key[index(a)] == key[index(b)]
 

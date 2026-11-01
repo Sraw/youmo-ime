@@ -9,8 +9,8 @@ import org.fcitx.fcitx5.android.engine.learn.LearnRecord.BatchRow
 import org.fcitx.fcitx5.android.engine.learn.LearnRecord.Commit
 import org.fcitx.fcitx5.android.engine.learn.LearnRecord.Cut
 import org.fcitx.fcitx5.android.engine.learn.LearnRecord.EnAdd
-import org.fcitx.fcitx5.android.engine.learn.LearnRecord.EnCorrect
 import org.fcitx.fcitx5.android.engine.learn.LearnRecord.EnCommit
+import org.fcitx.fcitx5.android.engine.learn.LearnRecord.EnCorrect
 import org.fcitx.fcitx5.android.engine.learn.LearnRecord.EnForget
 import org.fcitx.fcitx5.android.engine.learn.LearnRecord.EnPairRow
 import org.fcitx.fcitx5.android.engine.learn.LearnRecord.EnWordRow
@@ -30,9 +30,9 @@ import org.fcitx.fcitx5.android.engine.learn.LearnRecord.Pin
 import org.fcitx.fcitx5.android.engine.learn.LearnRecord.PinRow
 import org.fcitx.fcitx5.android.engine.learn.LearnRecord.Restored
 import org.fcitx.fcitx5.android.engine.learn.LearnRecord.StatRow
-import org.fcitx.fcitx5.android.engine.learn.LearnRecord.TableOrderReset
 import org.fcitx.fcitx5.android.engine.learn.LearnRecord.TableBlock
 import org.fcitx.fcitx5.android.engine.learn.LearnRecord.TableBlockRow
+import org.fcitx.fcitx5.android.engine.learn.LearnRecord.TableOrderReset
 import org.fcitx.fcitx5.android.engine.learn.LearnRecord.TableWordRow
 import org.fcitx.fcitx5.android.engine.learn.LearnRecord.Undo
 import org.fcitx.fcitx5.android.engine.learn.LearnRecord.Unknown

@@ -6,9 +6,9 @@ package org.fcitx.fcitx5.android.engine.learn.backup
 
 import org.fcitx.fcitx5.android.engine.learn.LearnLog
 import org.fcitx.fcitx5.android.engine.learn.LearnState
+import org.fcitx.fcitx5.android.engine.platform.UserFiles
 import org.fcitx.fcitx5.android.engine.user.UserModel.Entry
 import org.fcitx.fcitx5.android.engine.user.WordLists
-import java.io.File
 import java.io.IOException
 
 /**
@@ -17,9 +17,9 @@ import java.io.IOException
  * milliseconds ([pending], oldest first), to be merged as the engine next starts, not laid over
  * the phone's; each deleted only once merged, so a kill mid-merge has it merged again (which
  * changes nothing twice: BackupMerge), and one that does not read set aside as [UNREADABLE].
- * Each: the zip's [BACKUP]; or, a zip of an earlier build, its `learn.log`; or, older still,
- * its old logs (`pinyin.user`, the tables', English's), converted as the phone's were once; with
- * the lists of words it has (`words.added`, `words.blocked`).
+ * Each: the zip's [BACKUP]; or, a zip of an earlier build, its `learn.log`; with the lists of
+ * words it has (`words.added`, `words.blocked`). A zip older still (0.3.0's, its learning in the
+ * old logs alone) is refused as the app imports it; one left here all the same does not read.
  */
 object RestoreStash {
     const val DIR = "learn.restore"
@@ -31,31 +31,32 @@ object RestoreStash {
     const val BACKUP = "learning" + LearnBackup.EXTENSION
 
     /** The stashes in [root] ([DIR]), oldest first, with the epoch milliseconds each was left at. */
-    fun pending(root: File): List<Pair<File, Long>> =
-        root.listFiles { f -> f.isDirectory }.orEmpty().mapNotNull { f -> f.name.toLongOrNull()?.let { f to it } }.sortedBy { it.second }
+    fun pending(root: UserFiles): List<Pair<UserFiles, Long>> =
+        root.dirs().mapNotNull { name -> name.toLongOrNull()?.let { root.dir(name) to it } }.sortedBy { it.second }
 
-    /** [stash] moved to [UNREADABLE] beside [root], in place of one there before. */
-    fun setAside(root: File, stash: File) {
-        val aside = File(root.parentFile, UNREADABLE)
-        aside.deleteRecursively()
-        if (!stash.renameTo(aside)) stash.deleteRecursively()
+    /** [stash] moved to [UNREADABLE] in [userDir], beside [DIR], in place of one there before. */
+    fun setAside(userDir: UserFiles, stash: UserFiles) {
+        val aside = userDir.dir(UNREADABLE)
+        aside.deleteAll()
+        if (!stash.renameTo(aside)) stash.deleteAll()
     }
 
     /**
-     * What [dir] holds, as a backup; [convert] fills a state, empty, from the old logs in it (the
-     * learning record's conversion).
+     * What [dir] holds, as a backup.
      *
-     * @throws IOException if what it holds does not read
+     * @throws IOException if what it holds does not read, or is only an older build's logs
      */
-    fun read(dir: File, convert: (LearnState) -> Unit, onError: (IOException) -> Unit = {}): Backup {
-        File(dir, BACKUP).takeIf { it.isFile }?.let { return LearnBackup.read(it.readBytes()) }
-        val log = File(dir, LearnLog.FILE)
-        val state = if (log.isFile) LearnLog.replay(log.readBytes()) else LearnState().also(convert)
+    fun read(dir: UserFiles, onError: (IOException) -> Unit = {}): Backup {
+        dir.file(BACKUP).takeIf { it.exists() }?.let { return LearnBackup.read(it.read()) }
+        val log = dir.file(LearnLog.FILE)
+        val oldLogs = (dir.files() + dir.dirs()).any { it.endsWith(".user") }
+        if (!log.exists() && oldLogs) throw IOException("$dir: the learning of a build before 0.3.1, which this one no longer reads")
+        val state = if (log.exists()) LearnLog.replay(log.read()) else LearnState()
         val lists = WordLists(dir, onError)
-        val listed = { e: Entry -> ListedWord(e.text, WordLists.code(e.syllables)) }
+        val listed = { e: Entry -> ListedWord(e.text, e.apostrophed()) }
         // its days of an install its files tell: the same zip again (a retry, another import) the same one
-        val files = dir.listFiles { f -> f.isFile }.orEmpty().sortedBy { it.name }
-        val origin = LearnBackup.origin(*files.flatMap { listOf(it.name.toByteArray(), it.readBytes()) }.toTypedArray())
+        val files = dir.files().sorted()
+        val origin = LearnBackup.origin(*files.flatMap { listOf(it.toByteArray(), dir.file(it).read()) }.toTypedArray())
         return Backup(null, state, lists.addedWords.map(listed), lists.blockedWords.map(listed), origin)
     }
 }

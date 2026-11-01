@@ -6,15 +6,27 @@ package org.fcitx.fcitx5.android.uat
 
 import android.os.Looper
 import android.text.InputType
+import android.view.View
+import android.widget.TextView
 import org.fcitx.fcitx5.android.FcitxApplication
+import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.Uat
-import org.fcitx.fcitx5.android.core.FcitxEvent
+import org.fcitx.fcitx5.android.core.CandidateWord
 import org.fcitx.fcitx5.android.core.InputMethodEntry
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
-import org.fcitx.fcitx5.android.engine.host.Engines
+import org.fcitx.fcitx5.android.engine.InputMethodCatalog
+import org.fcitx.fcitx5.android.engine.handwriting.InkReading
+import org.fcitx.fcitx5.android.engine.learn.control.BlockScope
+import org.fcitx.fcitx5.android.engine.learn.control.LearningOp
+import org.fcitx.fcitx5.android.engine.learn.control.LearningResult
+import org.fcitx.fcitx5.android.engine.learn.control.MenuItem
+import org.fcitx.fcitx5.android.engine.learn.control.WordKind
+import org.fcitx.fcitx5.android.host.HostEvent
 import org.fcitx.fcitx5.android.input.KeyboardHarness
 import org.fcitx.fcitx5.android.input.handwriting.HandwritingPadView
 import org.fcitx.fcitx5.android.input.handwriting.HandwritingPause
+import org.fcitx.fcitx5.android.input.handwriting.HandwritingRecognition
+import org.fcitx.fcitx5.android.until as waitUntil
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -36,7 +48,7 @@ import org.robolectric.annotation.GraphicsMode
 @Config(application = FcitxApplication::class, qualifiers = "w393dp-h851dp-port-440dpi")
 class HandwritingUatTest {
 
-    private val handwriting = InputMethodEntry(Engines.HANDWRITING, "手写", "", "", "写", "zh_CN", "androidengine", false)
+    private val handwriting = InputMethodEntry(InputMethodCatalog.HANDWRITING, "手写", "", "", "写", "zh_CN", "androidengine", false)
 
     private val h = KeyboardHarness(im = handwriting).apply {
         api.availableIme = arrayOf(KeyboardHarness.PINYIN, KeyboardHarness.ENGLISH, handwriting)
@@ -60,14 +72,8 @@ class HandwritingUatTest {
     }
 
     // the pad's reading and finishing run on the recognizer's thread: waited for in real time
-    private fun until(what: String, ms: Long = 5_000, test: () -> Boolean) {
-        val deadline = System.currentTimeMillis() + ms
-        while (!test()) {
-            check(System.currentTimeMillis() < deadline) { "never: $what; ${h.api.calls}" }
-            Thread.sleep(10)
-            shadowOf(Looper.getMainLooper()).idle()
-        }
-    }
+    private fun until(what: String, ms: Long = 5_000, test: () -> Boolean) =
+        waitUntil(what, { h.api.calls }, ms, step = { shadowOf(Looper.getMainLooper()).idle() }, done = test)
 
     @Test
     @Uat("HW-01")
@@ -78,7 +84,7 @@ class HandwritingUatTest {
         // on the right ⌫, ，and 。; below 符 123 space globe enter
         assertTrue(keys.toString(), "，" in keys && "。" in keys)
         h.described("Backspace")
-        h.described(h.service.getString(org.fcitx.fcitx5.android.R.string.a11y_key_action_done))
+        h.described(h.service.getString(R.string.a11y_key_action_done))
         assertTrue(keys.toString(), keys.containsAll(listOf("符", "123")))
         h.capture("HandwritingUatTest/keyboard")
     }
@@ -97,6 +103,34 @@ class HandwritingUatTest {
     }
 
     private fun finishes() = h.api.calls.count { it.startsWith("inkFinished") }
+
+    // the keyboard's half, the recognizer's model (native, not on the JVM) swapped for a reader of
+    // fixed readings: read and offered while writing, the pad wiped at the pause; the composing 人
+    // and its candidates are the engine's (HostCasesUatTest)
+    @Test
+    @Uat("HW-02")
+    fun whileWritingTheReadingIsOfferedAndThePauseWipesThePad() {
+        val shared = HandwritingRecognition.shared
+        val was = shared.reader
+        shared.reader = object : HandwritingRecognition.Reader {
+            override val loadable = true
+            override fun load() = Unit
+            override fun read(strokes: List<FloatArray>) = InkReading(listOf("人", "入", "八"), doubleArrayOf(-1.0, -2.0, -3.0))
+        }
+        try {
+            h.start()
+            stroke(0.5f, 0.2f, 0.3f, 0.8f)
+            until("read while writing") { h.api.calls.any { it.startsWith("offerInk") } }
+            assertEquals("still writing", 1, pad.pad.strokes.size)
+            assertEquals(0, finishes())
+            stroke(0.5f, 0.4f, 0.7f, 0.8f)
+            h.advance(1500)
+            until("finished") { finishes() == 1 }
+            assertEquals("wiped", 0, pad.pad.strokes.size)
+        } finally {
+            shared.reader = was
+        }
+    }
 
     @Test
     @Uat("HW-12")
@@ -130,12 +164,49 @@ class HandwritingUatTest {
     fun aPasswordIsTheEnglishKeyboard() {
         h.start(InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD)
         // androidengine switches a password to English (PR-03)
-        h.emit(FcitxEvent.IMChangeEvent(KeyboardHarness.ENGLISH))
+        h.emit(HostEvent.InputMethodChanged(KeyboardHarness.ENGLISH))
         val keys = h.texts()
         assertTrue(keys.toString(), keys.take(10) == listOf("1", "2", "3", "4", "5", "6", "7", "8", "9", "0") && "q" in keys)
         assertTrue(KeyboardHarness.find<HandwritingPadView>(h.inputView)?.let { h.shown(it) } != true)
         h.start()
-        h.emit(FcitxEvent.IMChangeEvent(handwriting))
+        h.emit(HostEvent.InputMethodChanged(handwriting))
         assertTrue(h.shown(pad))
+    }
+
+    @Test
+    @Uat("HW-19")
+    fun handwritingsMenuHasNoPinAndItsNoticeIsOverTheCandidates() {
+        var undone = false
+        h.api.learned = { op ->
+            when ((op as? LearningOp.OnPage)?.op ?: op) {
+                is LearningOp.Menu -> LearningResult.Menu("入", WordKind.DICTIONARY, listOf(MenuItem.DELETE, MenuItem.BLOCK, MenuItem.WHY), null, BlockScope.EVERYWHERE)
+                is LearningOp.Undo -> LearningResult.Done().also { undone = true }
+                else -> LearningResult.Done(5L)
+            }
+        }
+        h.start()
+        h.api.candidates = arrayOf(CandidateWord("", "人", ""), CandidateWord("", "入", ""), CandidateWord("", "八", ""))
+        h.emit(HostEvent.Candidates(3, h.api.candidates.toList()))
+        val word = KeyboardHarness.all(h.inputView).filterIsInstance<TextView>().first { h.shown(it) && it.text.toString() == "入" }
+        generateSequence(word as View) { it.parent as? View }.first { it.isLongClickable }.performLongClick()
+        h.idle()
+        val menu = h.inputView.candidateActionMenu!!
+        fun lines() = (0 until menu.listView!!.adapter.count).map { menu.listView!!.adapter.getItem(it).toString() }
+        val s = h.service
+        // 忘掉学到的 (learned of it), 屏蔽; no 固定首位 in handwriting
+        assertTrue(lines().toString(), s.getString(R.string.learning_forget) in lines() && s.getString(R.string.learning_block) in lines())
+        assertFalse(lines().toString(), s.getString(R.string.learning_pin) in lines())
+        menu.performItemClick(lines().indexOf(s.getString(R.string.learning_block)))
+        h.idle()
+        menu.performItemClick(lines().indexOf(s.getString(R.string.learning_block_confirm)))
+        h.idle()
+        // the notice over the keyboard, clear of the candidates
+        val notice = h.noticeBox()
+        assertTrue("$notice over ${h.box(h.bar)}", notice.bottom <= h.box(h.bar).top + 2)
+        val undo = KeyboardHarness.all(h.notice()!!.contentView).filterIsInstance<TextView>()
+            .first { it.text.toString() == s.getString(R.string.learning_undo) && it.alpha > 0.5f }
+        assertTrue(undo.performClick())
+        h.idle()
+        assertTrue(h.api.calls.toString(), undone)
     }
 }

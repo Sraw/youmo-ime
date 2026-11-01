@@ -43,10 +43,10 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.fcitx.fcitx5.android.R
-import org.fcitx.fcitx5.android.core.FcitxAPI
+import org.fcitx.fcitx5.android.core.HostApi
 import org.fcitx.fcitx5.android.core.InputMethodNames
-import org.fcitx.fcitx5.android.engine.host.Engines
-import org.fcitx.fcitx5.android.engine.host.Engines.UserWord
+import org.fcitx.fcitx5.android.engine.InputMethodCatalog
+import org.fcitx.fcitx5.android.engine.runtime.UserWord
 import org.fcitx.fcitx5.android.engine.learn.control.LearningOp
 import org.fcitx.fcitx5.android.engine.learn.control.LearningResult
 import org.fcitx.fcitx5.android.engine.learn.control.LexiconView
@@ -274,7 +274,7 @@ class UserWordListFragment : Fragment() {
         if (args.english || args.kind == UserWord.Kind.BLOCKED.name) return
         val texts = all.map { it.text }
         val found = onFcitx("Reading the tables' codes failed") {
-            val tables = enabledIme().filter { Engines.hasTableKeys(it.uniqueName) }
+            val tables = enabledIme().filter { InputMethodCatalog.hasTableKeys(it.uniqueName) }
             tables to if (tables.isEmpty()) emptyMap() else sameCodes(texts, tables.map { it.uniqueName })
         }.getOrElse { return }
         val ctx = context ?: return
@@ -408,7 +408,7 @@ class UserWordListFragment : Fragment() {
      * [remove] shows it. A [Result], not null for a failure: what [block] gives may itself be null
      * (a word of no known pinyin).
      */
-    private suspend fun <T> onFcitx(failed: String, block: suspend FcitxAPI.() -> T): Result<T> {
+    private suspend fun <T> onFcitx(failed: String, block: suspend HostApi.() -> T): Result<T> {
         val ctx = requireContext()
         return try {
             Result.success(viewModel.fcitx.runOnReady(block))
@@ -487,7 +487,7 @@ class UserWordListFragment : Fragment() {
      * open, with an error under the pinyin, while they do not read together. Left blank, the
      * pinyin is filled in as the dictionary reads the word, for the user to check and save.
      */
-    private fun edit(title: Int, word: UserWord?, save: suspend FcitxAPI.(String, String) -> Boolean) {
+    private fun edit(title: Int, word: UserWord?, save: suspend HostApi.(String, String) -> Boolean) {
         val ctx = requireContext()
         val (textLayout, textField) = ctx.materialTextInput { hint = getString(R.string.word_text) }
         textField.apply {
@@ -618,10 +618,10 @@ internal sealed class WordSource(
     /** Whether its words have the day last used ([UserWord.lastUsed]): sorted and filtered by it. */
     val dated: Boolean = false,
 ) {
-    abstract suspend fun words(fcitx: FcitxAPI): List<UserWord>
+    abstract suspend fun words(fcitx: HostApi): List<UserWord>
 
     /** [words] taken off: the token that takes it back ([LearningOp.Undo]), [LearningResult.NO_UNDO] for none. */
-    abstract suspend fun remove(fcitx: FcitxAPI, words: List<UserWord>): Long
+    abstract suspend fun remove(fcitx: HostApi, words: List<UserWord>): Long
 
     abstract fun detail(res: Resources, word: UserWord): String
 }
@@ -648,13 +648,13 @@ internal class PinyinWords(private val kind: UserWord.Kind) : WordSource(
     editable = kind != UserWord.Kind.BLOCKED,
     dated = kind != UserWord.Kind.BLOCKED,
 ) {
-    override suspend fun words(fcitx: FcitxAPI) = fcitx.userWords(kind)
+    override suspend fun words(fcitx: HostApi) = fcitx.userWords(kind)
 
-    override suspend fun remove(fcitx: FcitxAPI, words: List<UserWord>): Long =
+    override suspend fun remove(fcitx: HostApi, words: List<UserWord>): Long =
         (fcitx.learning(LearningOp.RemoveWords(words)) as? LearningResult.Done)?.undo ?: LearningResult.NO_UNDO
 
     /** A word typed in, put on this list: added, or blocked. */
-    suspend fun add(fcitx: FcitxAPI, text: String, pinyin: String) =
+    suspend fun add(fcitx: HostApi, text: String, pinyin: String) =
         if (kind == UserWord.Kind.BLOCKED) fcitx.blockUserWord(text, pinyin) else fcitx.addUserWord(text, pinyin)
 
     override fun detail(res: Resources, word: UserWord): String {
@@ -679,9 +679,9 @@ internal object EnglishWords : WordSource(
     confirmRemove = R.plurals.confirm_forget_words,
     editable = false,
 ) {
-    override suspend fun words(fcitx: FcitxAPI) = fcitx.englishWords()
+    override suspend fun words(fcitx: HostApi) = fcitx.englishWords()
 
-    override suspend fun remove(fcitx: FcitxAPI, words: List<UserWord>): Long {
+    override suspend fun remove(fcitx: HostApi, words: List<UserWord>): Long {
         fcitx.forgetEnglishWords(words.map { it.text })
         return LearningResult.NO_UNDO
     }

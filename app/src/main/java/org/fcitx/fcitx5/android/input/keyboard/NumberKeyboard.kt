@@ -16,40 +16,44 @@ import org.fcitx.fcitx5.android.input.popup.PopupAction
 class NumberKeyboard(
     context: Context,
     theme: Theme,
-) : BaseKeyboard(context, theme, Layout) {
+    pad: NumberPad = NumberPad.FULL,
+) : BaseKeyboard(context, theme, layout(pad)) {
 
     companion object {
-        const val Name = "Number"
+        const val Name = NumberPad.FULL_LAYOUT
 
-        val Layout: List<List<KeyDef>> = listOf(
-            listOf(
-                NumPadKey("+", 0xffab, 23f, 0.15f, KeyDef.Appearance.Variant.Alternative),
-                NumPadKey("1", 0xffb1, 30f, 0f),
-                NumPadKey("2", 0xffb2, 30f, 0f),
-                NumPadKey("3", 0xffb3, 30f, 0f),
-                NumPadKey("/", 0xffaf, 23f, 0.15f, KeyDef.Appearance.Variant.Alternative),
-            ),
-            listOf(
-                NumPadKey("-", 0xffad, 23f, 0.15f, KeyDef.Appearance.Variant.Alternative),
-                NumPadKey("4", 0xffb4, 30f, 0f),
-                NumPadKey("5", 0xffb5, 30f, 0f),
-                NumPadKey("6", 0xffb6, 30f, 0f),
-                MiniSpaceKey()
-            ),
-            listOf(
-                NumPadKey("*", 0xffaa, 23f, 0.15f, KeyDef.Appearance.Variant.Alternative),
-                NumPadKey("7", 0xffb7, 30f, 0f),
-                NumPadKey("8", 0xffb8, 30f, 0f),
-                NumPadKey("9", 0xffb9, 30f, 0f),
-                BackspaceKey()
-            ),
+        // the keypad's own keys where it has them: no input method takes them for punctuation of its own (，for ,).
+        // Before Layout, which reads it as the companion is made
+        private val KEYPAD = mapOf("+" to 0xffab, "-" to 0xffad, "*" to 0xffaa, "/" to 0xffaf, "," to 0xffac, "=" to 0xffbd, "." to 0xffae)
+
+        val Layout: List<List<KeyDef>> = layout(NumberPad.FULL)
+
+        private fun digit(d: Int, percentWidth: Float = 0f) = NumPadKey("$d", 0xffb0 + d, 30f, percentWidth)
+
+        // a key beside the digits: blank where the pad has none there, the digits staying where they are on every pad
+        private fun side(label: String, percentWidth: Float, variant: KeyDef.Appearance.Variant = KeyDef.Appearance.Variant.Alternative): KeyDef {
+            if (label.isEmpty()) return BlankKey(percentWidth, variant)
+            return when (val sym = KEYPAD[label]) {
+                null -> KeyDef(
+                    KeyDef.Appearance.Text(label, 23f, percentWidth = percentWidth, variant = variant),
+                    setOf(KeyDef.Behavior.Press(KeyAction.CommitAction(label))),
+                )
+                else -> NumPadKey(label, sym, 23f, percentWidth, variant)
+            }
+        }
+
+        /** [pad]'s keys: the digits as a phone's, [NumberPad]'s beside them. */
+        fun layout(pad: NumberPad): List<List<KeyDef>> = listOf(
+            listOf(side(pad.left[0], 0.15f), digit(1), digit(2), digit(3), side(pad.corner, 0.15f)),
+            listOf(side(pad.left[1], 0.15f), digit(4), digit(5), digit(6), MiniSpaceKey()),
+            listOf(side(pad.left[2], 0.15f), digit(7), digit(8), digit(9), BackspaceKey()),
             listOf(
                 LayoutSwitchKey("ABC", TextKeyboard.Name),
-                NumPadKey(",", 0xffac, 23f, 0.1f, KeyDef.Appearance.Variant.Alternative),
+                side(pad.bottom[0], 0.1f),
                 LayoutSwitchKey("!?#", PickerWindow.Key.Symbol.name, 0.13333f, KeyDef.Appearance.Variant.AltForeground),
-                NumPadKey("0", 0xffb0, 30f, 0.23334f),
-                NumPadKey("=", 0xffbd, 23f, 0.13333f, KeyDef.Appearance.Variant.AltForeground),
-                NumPadKey(".", 0xffae, 23f, 0.1f, KeyDef.Appearance.Variant.Alternative),
+                digit(0, 0.23334f),
+                side(pad.bottom[1], 0.13333f, KeyDef.Appearance.Variant.AltForeground),
+                side(pad.bottom[2], 0.1f),
                 ReturnKey()
             )
         )

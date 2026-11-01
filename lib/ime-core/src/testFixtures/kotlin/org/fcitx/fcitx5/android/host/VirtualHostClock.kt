@@ -5,16 +5,19 @@
 package org.fcitx.fcitx5.android.host
 
 import org.fcitx.fcitx5.android.engine.learn.LearnClock
+import org.fcitx.fcitx5.android.engine.platform.Clock
 
 /**
- * A [HostClock] that moves only when told ([advance]), and the [LearnClock] learning reads, on the
- * same time (UTC, from [epochMillis]): a test or a replay runs the same keys to the same result.
+ * A [HostClock] that moves only when told ([advance]), and the engines' [Clock] (the [LearnClock]
+ * learning reads), on the same time (UTC, from [epochMillis]): a test or a replay runs the same keys to the same result.
  */
-class VirtualHostClock(private val epochMillis: Long = 0) : HostClock, LearnClock {
+class VirtualHostClock(private val epochMillis: Long = 0) : HostClock, Clock {
     private class Timer(val at: Long, val seq: Long, val task: () -> Unit) {
         var cancelled = false
     }
 
+    // read by the engines' background thread too (a backup's or compaction's stamp); moved by the test's own
+    @Volatile
     private var now = 0L
     private var seq = 0L
     private val timers = ArrayList<Timer>()

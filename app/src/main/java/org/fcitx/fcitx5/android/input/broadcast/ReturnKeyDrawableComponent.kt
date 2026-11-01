@@ -27,12 +27,17 @@ data class ReturnKeyAppearance(
     @StringRes val labelRes: Int,
     /** The editor's own name for its action (`EditorInfo.actionLabel`), when it gave one. */
     val customLabel: CharSequence? = null,
+    /** Something is typed: Return commits it (a table's keyboard says so, 确定). */
+    val composing: Boolean = false,
 ) {
     fun label(context: Context): CharSequence = customLabel ?: context.getString(labelRes)
 
     companion object {
         /** A plain Return: inserts a newline, or commits the composition while composing. */
         val Enter = ReturnKeyAppearance(R.drawable.ic_baseline_keyboard_return_24, R.string.a11y_key_enter)
+
+        /** Return while something is typed: [Enter], committing it. */
+        val Composing = Enter.copy(composing = true)
     }
 }
 
@@ -89,7 +94,7 @@ class ReturnKeyDrawableComponent :
 
     fun updateDrawableOnPreedit(preeditEmpty: Boolean) {
         // while composing, Return commits the composition whatever the editor's action is
-        val new = if (preeditEmpty) actionAppearance else ReturnKeyAppearance.Enter
+        val new = if (preeditEmpty) actionAppearance else ReturnKeyAppearance.Composing
         if (appearance == new) return
         appearance = new
         broadcaster.onReturnKeyDrawableUpdate(appearance)

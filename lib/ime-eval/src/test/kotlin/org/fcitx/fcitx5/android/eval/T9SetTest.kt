@@ -136,6 +136,9 @@ class T9SetTest {
         val out = StringBuilder()
         assertEquals(0, runCli(arrayOf("t9", set.path, converted.path, "--keys", "14"), out, StringBuilder()))
         assertEquals("1 of 1 samples typed on the 14 keys", out.trim())
+        val on18 = StringBuilder()
+        assertEquals(0, runCli(arrayOf("t9", set.path, tmp.newFile("g18.tsv").path, "--keys", "18"), on18, StringBuilder()))
+        assertEquals("1 of 1 samples typed on the 18 keys", on18.trim())
         assertEquals(g14("bn ui gh as op"), converted.useLines { EvalSet.parse(it) }.single().input)
         // the samples kept, as they were, for full pinyin on the same ones
         val two = tmp.newFile("two.tsv").apply { writeText("nihao\t你好\tdaily\nnh\t你好\tabbrev\n") }

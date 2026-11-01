@@ -19,8 +19,6 @@ import androidx.transition.Transition
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
-import org.fcitx.fcitx5.android.core.CandidateAction
-import org.fcitx.fcitx5.android.core.FcitxEvent
 import org.fcitx.fcitx5.android.daemon.launchOnReady
 import org.fcitx.fcitx5.android.input.bar.ExpandButtonStateMachine.BooleanKey.ExpandedCandidatesEmpty
 import org.fcitx.fcitx5.android.input.bar.ExpandButtonStateMachine.TransitionEvent.ExpandedCandidatesAttached
@@ -29,7 +27,6 @@ import org.fcitx.fcitx5.android.input.bar.KawaiiBarComponent
 import org.fcitx.fcitx5.android.input.broadcast.InputBroadcastReceiver
 import org.fcitx.fcitx5.android.input.broadcast.ReturnKeyDrawableComponent
 import org.fcitx.fcitx5.android.input.candidates.CandidateViewHolder
-import org.fcitx.fcitx5.android.input.candidates.expanded.CandidateTabActionsAdapter
 import org.fcitx.fcitx5.android.input.candidates.expanded.CandidatesPagingSource
 import org.fcitx.fcitx5.android.input.candidates.expanded.ExpandedCandidateLayout
 import org.fcitx.fcitx5.android.input.candidates.expanded.PagingCandidateViewAdapter
@@ -112,14 +109,6 @@ abstract class BaseExpandedCandidateWindow<T : BaseExpandedCandidateWindow<T>> :
                     }
                 })
             }
-            scrollableTabs.apply {
-                adapter = tabsAdapter
-                layoutManager = verticalLayoutManager()
-            }
-            pinnedTabs.apply {
-                adapter = pinnedTabsAdapter
-                layoutManager = verticalLayoutManager()
-            }
         }
         return candidateLayout
     }
@@ -137,34 +126,6 @@ abstract class BaseExpandedCandidateWindow<T : BaseExpandedCandidateWindow<T>> :
 
     abstract val adapter: PagingCandidateViewAdapter
     abstract val layoutManager: RecyclerView.LayoutManager
-
-    val tabsAdapter by lazy {
-        object : CandidateTabActionsAdapter(theme, false) {
-            override fun onTriggerTabAction(id: Int) {
-                fcitx.launchOnReady { it.triggerCandidateListTabAction(id) }
-            }
-        }
-    }
-
-    val pinnedTabsAdapter by lazy {
-        object : CandidateTabActionsAdapter(theme, true) {
-            override fun onTriggerTabAction(id: Int) {
-                fcitx.launchOnReady { it.triggerCandidateListTabAction(id) }
-            }
-        }
-    }
-
-    private fun updateTabs(newTabs: Array<CandidateAction>) {
-        val tabs = newTabs.takeWhile { !it.isSeparator }
-        val pinnedTabs = newTabs.drop(tabs.size + 1).filter { !it.isSeparator }
-        if (tabs.isEmpty() && pinnedTabs.isEmpty()) {
-            candidateLayout.tabsContainer.visibility = View.GONE
-        } else {
-            candidateLayout.tabsContainer.visibility = View.VISIBLE
-        }
-        tabsAdapter.updateTabs(tabs)
-        pinnedTabsAdapter.updateTabs(pinnedTabs)
-    }
 
     private var offsetJob: Job? = null
 
@@ -208,7 +169,6 @@ abstract class BaseExpandedCandidateWindow<T : BaseExpandedCandidateWindow<T>> :
             it.onReturnDrawableUpdate(returnKeyDrawable.appearance)
             it.keyActionListener = keyActionListener
         }
-        updateTabs(fcitx.runImmediately { inputPanelCached.tabs })
         offsetJob = imeScope.launch {
             horizontalCandidate.expandedCandidateOffset.collect {
                 if (it <= 0) {
@@ -255,10 +215,6 @@ abstract class BaseExpandedCandidateWindow<T : BaseExpandedCandidateWindow<T>> :
         if (empty) {
             windowManager.attachWindow(KeyboardWindow)
         }
-    }
-
-    override fun onInputPanelUpdate(data: FcitxEvent.InputPanelEvent.Data) {
-        updateTabs(data.tabs)
     }
 
 }

@@ -25,7 +25,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.asExecutor
 import kotlinx.coroutines.async
 import kotlinx.coroutines.withTimeoutOrNull
-import org.fcitx.fcitx5.android.daemon.FcitxConnection
+import org.fcitx.fcitx5.android.daemon.HostConnection
 import timber.log.Timber
 
 /**
@@ -148,7 +148,7 @@ object VoiceEngine {
      * the words the user added and made (VoiceHotwords.ofUser), read again for each listener; with
      * [habits] off (U-93's 用我的输入习惯) none of theirs, the blocked still blocked
      */
-    suspend fun userHotwords(fcitx: FcitxConnection, habits: Boolean = true): VoiceHotwords.Words {
+    suspend fun userHotwords(fcitx: HostConnection, habits: Boolean = true): VoiceHotwords.Words {
         // not cancelled with the wait: a read that comes late is still remembered for the next listener
         // one read at a time: a hold while one is still waiting on a busy engine waits on it too
         // read with habits on: shared and remembered, it serves later listeners whose switch may differ;
@@ -173,7 +173,7 @@ object VoiceEngine {
      * The pinyin engine's [VoiceChoice.Language], each answer in time or none: no boundaries
      * (VoiceBlocking takes a text as having the word), no scores (the recognizer's order).
      */
-    fun language(fcitx: FcitxConnection) = object : VoiceChoice.Language {
+    fun language(fcitx: HostConnection) = object : VoiceChoice.Language {
         override suspend fun boundaries(texts: List<String>) =
             withTimeoutOrNull(LANGUAGE_MS) { fcitx.runOnReady { wordBoundaries(texts) } }.orEmpty()
 

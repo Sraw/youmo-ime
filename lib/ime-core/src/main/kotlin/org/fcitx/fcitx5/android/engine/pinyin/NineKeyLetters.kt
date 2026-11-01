@@ -137,7 +137,7 @@ class NineKeyLetters private constructor(
         val G14 = grouped(FIRST_G14_CODE, "qw", "er", "ty", "ui", "op", "as", "df", "gh", "jk", "l", "zx", "cv", "bn", "m")
 
         /**
-         * 双拼's 18 keys: `Q WE RT Y U IO P / A SD FG H JK L; / Z XC V BN M`, ; (微软's and 紫光's
+         * 双拼's 18 keys: `Q WE RT Y U IO P / A SD FG H JK L; / Z XC V BN M`, ; (微软's
          * ing) on L as msime has it. Each key's code is a private use character, U+F8C0 plus its
          * first letter's place: codes of their own, so one code is one group whatever the input
          * method (a code shared with [G14] would be read as that keyboard's groups in the moment

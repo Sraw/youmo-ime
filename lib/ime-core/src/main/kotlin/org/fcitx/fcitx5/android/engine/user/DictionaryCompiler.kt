@@ -6,11 +6,12 @@ package org.fcitx.fcitx5.android.engine.user
 
 import org.fcitx.fcitx5.android.engine.data.BitPacked
 import org.fcitx.fcitx5.android.engine.data.DataFile
-import org.fcitx.fcitx5.android.engine.data.PinyinData
 import org.fcitx.fcitx5.android.engine.data.DataFormatException
 import org.fcitx.fcitx5.android.engine.data.EliasFano
+import org.fcitx.fcitx5.android.engine.data.PinyinData
 import org.fcitx.fcitx5.android.engine.data.splitValues
 import org.fcitx.fcitx5.android.engine.pinyin.Syllables
+import org.fcitx.fcitx5.android.engine.user.imports.WordText
 import java.io.BufferedInputStream
 import java.io.BufferedOutputStream
 import java.io.DataInputStream
@@ -108,7 +109,7 @@ object DictionaryCompiler {
 
     /**
      * The words of [sources] (each a dictionary, in libime's text format: `text pin'yin [weight]`,
-     * as [LibimeImport.dictionaryEntry] reads a line) into [dest], replaced whole or not at all.
+     * as [WordText.dictionaryEntry] reads a line) into [dest], replaced whole or not at all.
      * A source's weights are read as their kind, decided over the whole source: all in (0, 1]
      * probabilities (rime-frost), all > 1 counts (Sogou), all < 0 log10 probabilities; a 0 is
      * none, as 0.3.1 wrote one missing; signs mixed are none. Each source's best word scores 0,
@@ -276,7 +277,7 @@ object DictionaryCompiler {
         fun addLine(line: String, source: Int, kind: Kind): Boolean {
             val fields = splitValues(line)
             if (fields.size !in 2..3) return false
-            val entry = LibimeImport.entry(fields[0], fields[1]) ?: return false
+            val entry = WordText.entry(fields[0], fields[1]) ?: return false
             val weight = (if (fields.size == 3) fields[2].toFloatOrNull() else 0f)?.takeIf { it.isFinite() } ?: return false
             if (entry.syllables.size > MAX_SYLLABLES || entry.text.length > MAX_SYLLABLES * 2) return false
             if (++total > MAX_LINES) throw IOException("more than $MAX_LINES lines")

@@ -178,10 +178,10 @@ class BaseKeyboardTest {
 
     @Test
     fun aSwipeTypesTheKeysOwnTheLongPresssFirstOrNothing() {
-        val own = KeyAction.FcitxKeyAction("1")
+        val own = KeyAction.HostKeyAction("1")
         assertEquals(own to KeyActionListener.Source.Keyboard, SwipeChoice.of(null).typed(own))
         assertNull("its long press turned off", SwipeChoice.of("").typed(own))
-        assertEquals(KeyAction.FcitxKeyAction("é") to KeyActionListener.Source.Popup, SwipeChoice.of("é").typed(own))
+        assertEquals(KeyAction.HostKeyAction("é") to KeyActionListener.Source.Popup, SwipeChoice.of("é").typed(own))
         assertEquals(KeyAction.CommitAction("qu") to KeyActionListener.Source.Popup, SwipeChoice.of("qu").typed(own))
     }
 
@@ -293,7 +293,7 @@ class BaseKeyboardTest {
                     layout(0, 0, 1080, 800)
                 }
                 drag(letter(keyboard, "Q"), dy)
-                assertEquals(what, listOf("q"), actions.filterIsInstance<KeyAction.FcitxKeyAction>().map { it.act })
+                assertEquals(what, listOf("q"), actions.filterIsInstance<KeyAction.HostKeyAction>().map { it.act })
             }
         } finally {
             direction.setValue(was)
@@ -314,7 +314,7 @@ class BaseKeyboardTest {
                 layout(0, 0, 1080, 800)
             }
             drag(letter(keyboard, "Q"), -400f)
-            assertEquals(emptyList<String>(), actions.filterIsInstance<KeyAction.FcitxKeyAction>().map { it.act })
+            assertEquals(emptyList<String>(), actions.filterIsInstance<KeyAction.HostKeyAction>().map { it.act })
         } finally {
             direction.setValue(was)
         }

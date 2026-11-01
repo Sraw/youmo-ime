@@ -7,13 +7,21 @@ package org.fcitx.fcitx5.android.uat
 import android.view.View
 import android.view.ViewGroup
 import android.widget.TextView
+import kotlinx.coroutines.runBlocking
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.core.CandidateWord
-import org.fcitx.fcitx5.android.core.FcitxEvent
+import org.fcitx.fcitx5.android.core.KotlinHost
+import org.fcitx.fcitx5.android.core.ScriptedEngine
+import org.fcitx.fcitx5.android.core.keyboardOn
+import org.fcitx.fcitx5.android.core.startedHost
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
+import org.fcitx.fcitx5.android.engine.InputMethodCatalog
+import org.fcitx.fcitx5.android.host.HostEvent
 import org.fcitx.fcitx5.android.input.KeyboardHarness
+import org.fcitx.fcitx5.android.until as waitUntil
+import org.fcitx.fcitx5.android.utils.appContext
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -22,10 +30,14 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.RuntimeEnvironment
+import org.robolectric.Shadows
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 import org.robolectric.shadows.ShadowLooper
 import splitties.dimensions.dp
+import java.io.File
+import java.util.concurrent.TimeUnit
 
 /** UAT cases of the bar above the keys: toolbar, candidates, clipboard, notices (uat/05, 19). */
 @RunWith(RobolectricTestRunner::class)
@@ -37,14 +49,137 @@ class BarUatTest {
 
     private fun harness() = KeyboardHarness().also { harness = it }
 
+    // the Kotlin host on a scripted engine, for what its own events put on the bar (KotlinHostKeyboardTest's)
+    private var fcitx: KotlinHost? = null
+    private var home: File? = null
+
     @After
     fun close() {
         harness?.close()
+        fcitx?.stop()
+        home?.deleteRecursively()
+    }
+
+    // the host answers on its thread, the bar is drawn on the main one: both run till [done]
+    private fun KeyboardHarness.until(what: String, done: () -> Boolean) = waitUntil(
+        what,
+        { texts(inputView) },
+        step = {
+            idle()
+            relayout()
+        },
+        done = done,
+    )
+
+    private fun onTheHost(): KeyboardHarness {
+        val dir = File(appContext.filesDir, "kotlin-host").apply { deleteRecursively() }
+        home = dir
+        val host = startedHost(ScriptedEngine(dir)).also { fcitx = it }
+        return keyboardOn(host).also { harness = it }.start()
+    }
+
+    private fun KeyboardHarness.shownText(text: String) =
+        KeyboardHarness.all(inputView).any { shown(it) && it is TextView && it.text.toString() == text }
+
+    @Test
+    @Uat("KB-01")
+    fun lettersTypedPutTheCandidatesOnTheBar() {
+        val h = onTheHost()
+        assertTrue(h.has(R.string.expand_toolbar))
+        h.tap(h.key("n"))
+        h.tap(h.key("i"))
+        h.until("ni and its candidates") { h.shownText("ni") && h.shownText("你") }
+        // the bar's candidates in place of the toolbar, the pinyin above them, nothing in the field yet
+        assertFalse(h.has(R.string.expand_toolbar))
+        assertEquals("", h.field.text.toString())
+        val ni = KeyboardHarness.all(h.inputView).first { h.shown(it) && it is TextView && it.text.toString() == "ni" }
+        val first = KeyboardHarness.all(h.inputView).first { h.shown(it) && it is TextView && it.text.toString() == "你" }
+        assertTrue("ni above the candidates", h.box(ni).bottom <= h.box(first).top + 1)
+    }
+
+    @Test
+    @Uat("QU-01")
+    fun holdingTheSymbolsKeyOpensQuickInput() {
+        val h = onTheHost()
+        h.longPress(h.key("符"))
+        // the host's prompt on the bar, waiting for a keyword (in the device's language: HostReplayUatTest)
+        val prompt = h.service.getString(R.string.host_quick_phrase_aux)
+        h.until("the prompt $prompt") { h.texts(h.inputView).any { it.startsWith(prompt.trim()) } }
+        assertEquals("", h.field.text.toString())
+    }
+
+    // the status panel open, its entries' labels
+    private fun KeyboardHarness.statusPanel(): List<String> {
+        if (has(R.string.back_to_keyboard)) {
+            tap(described(service.getString(R.string.back_to_keyboard)))
+            after(1000)
+            relayout()
+        }
+        if (!has(R.string.hide_toolbar)) tap(described(service.getString(R.string.expand_toolbar)))
+        tap(described(service.getString(R.string.status_area)))
+        until("the panel") { has(R.string.open_input_method_settings) }
+        return texts(inputView)
+    }
+
+    private fun KeyboardHarness.statusTap(label: Int) {
+        val t = KeyboardHarness.all(inputView).first { shown(it) && it is TextView && it.text.toString() == service.getString(label) }
+        tap(generateSequence(t) { it.parent as? View }.first { it.hasOnClickListeners() })
+    }
+
+    // the host's toggle [name] on, as it now stands: its icon -active, but punctuation's is -active
+    // while Chinese punctuation is on, so its "on" (English punctuation) is the icon without it.
+    // Read on the test's thread, the host answering on its own (the cache is empty till its first event)
+    private fun on(name: String) =
+        fcitx!!.statusAreaCached.ifEmpty { runBlocking { fcitx!!.statusArea() } }
+            .first { it.name == name }.icon.endsWith("-active") != (name == "punctuation")
+
+    private fun KeyboardHarness.toggled(name: String, from: Int, to: Int) {
+        assertTrue(texts(inputView).toString(), service.getString(from) in statusPanel())
+        assertFalse(on(name))
+        statusTap(from)
+        // the host's toggle flipped, the panel shows it so
+        until("$name toggled") { on(name) }
+        until("${service.getString(to)} shown") { shownText(service.getString(to)) }
+        assertFalse(shownText(service.getString(from)))
+        // its effect on typing: StatusPanelHostUatTest, through the host with the app's data
+        tap(described(service.getString(R.string.back_to_keyboard)))
+    }
+
+    @Test
+    @Uat("TB-15")
+    fun theStatusPanelTurnsTraditionalOn() = onTheHost().toggled("chttrans", R.string.status_simplified, R.string.status_traditional)
+
+    @Test
+    @Uat("TB-16")
+    fun theStatusPanelTurnsEnglishPunctuationOn() =
+        onTheHost().toggled("punctuation", R.string.status_punctuation_chinese, R.string.status_punctuation_english)
+
+    @Test
+    @Uat("TB-17")
+    fun theStatusPanelTurnsFullWidthOn() = onTheHost().toggled("fullwidth", R.string.status_half_width, R.string.status_full_width)
+
+    @Test
+    @Uat("TB-19")
+    fun englishsStatusPanelHasNoChineseToggles() {
+        val h = onTheHost()
+        val chinese = listOf(R.string.status_simplified, R.string.status_punctuation_chinese, R.string.status_half_width).map(h.service::getString)
+        assertTrue(chinese.all { it in h.statusPanel() })
+        h.tap(h.described(h.service.getString(R.string.back_to_keyboard)))
+        h.service.postFcitxJob {
+            setEnabledIme(arrayOf(InputMethodCatalog.PINYIN, InputMethodCatalog.ENGLISH))
+            activateIme(InputMethodCatalog.ENGLISH)
+        }
+        h.until("English") { fcitx!!.inputMethodEntryCached.uniqueName == InputMethodCatalog.ENGLISH }
+        val panel = h.statusPanel()
+        val all = chinese + listOf(R.string.status_traditional, R.string.status_punctuation_english, R.string.status_full_width).map(h.service::getString)
+        assertTrue(panel.toString(), all.none { it in panel })
+        // the app's own entries still there
+        assertTrue(panel.toString(), h.service.getString(R.string.theme) in panel)
     }
 
     private fun KeyboardHarness.candidates(vararg words: String) {
         api.candidates = Array(words.size) { CandidateWord("", words[it], "") }
-        emit(FcitxEvent.CandidateListEvent(FcitxEvent.CandidateListEvent.Data(words.size, api.candidates)))
+        emit(HostEvent.Candidates(words.size, api.candidates.toList()))
     }
 
     private fun KeyboardHarness.has(description: Int) =
@@ -109,20 +244,20 @@ class BarUatTest {
         val h = harness().start()
         h.service.say(R.string.text_copied)
         h.idle()
-        val popup = org.robolectric.Shadows.shadowOf(org.robolectric.RuntimeEnvironment.getApplication()).latestPopupWindow
+        val popup = Shadows.shadowOf(RuntimeEnvironment.getApplication()).latestPopupWindow
         assertNotNull(popup)
         assertTrue(popup!!.isShowing)
         val said = KeyboardHarness.all(popup.contentView).filterIsInstance<TextView>().map { it.text.toString() }.toList()
         assertTrue(said.toString(), h.service.getString(R.string.text_copied) in said)
         popup.contentView.performClick()
-        ShadowLooper.idleMainLooper(1, java.util.concurrent.TimeUnit.SECONDS)
+        ShadowLooper.idleMainLooper(1, TimeUnit.SECONDS)
         assertFalse(popup.isShowing)
         // again, left alone: gone after its two seconds
         h.service.say(R.string.text_copied)
         h.idle()
-        val again = org.robolectric.Shadows.shadowOf(org.robolectric.RuntimeEnvironment.getApplication()).latestPopupWindow!!
+        val again = Shadows.shadowOf(RuntimeEnvironment.getApplication()).latestPopupWindow!!
         assertTrue(again.isShowing)
-        ShadowLooper.idleMainLooper(3, java.util.concurrent.TimeUnit.SECONDS)
+        ShadowLooper.idleMainLooper(3, TimeUnit.SECONDS)
         assertFalse(again.isShowing)
     }
 

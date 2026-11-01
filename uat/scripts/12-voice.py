@@ -421,7 +421,7 @@ case("VO-21", needs="jvm:VoiceUatTest.aWordDeletedOrBlockedIsNotListenedFor")(la
 case("VO-22", needs="jvm:VoiceUatTest.habitsOffListensForNoneOfTheirs")(lambda d: None)
 
 
-case("VO-27", needs="jvm:VoiceHoldUatTest.aSilentMicrophoneIsSaidAndListeningComesWithTheFirstSound")(lambda d: None)
+case("VO-27", needs="jvm:VoiceHoldUatTest.aSilentMicrophoneIsSaidAndListeningComesWithTheFirstSound、VoiceOnsetTest.twoSecondsOfZeroesIsASilentMicrophoneToldOnce、VoiceHoldUatTest.thePanelSaysASilentMicrophoneToo")(lambda d: None)
 
 
 def input_lag(d):

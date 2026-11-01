@@ -26,14 +26,23 @@ enum class SpelledForm {
         fun of(kind: String, keys: String, reading: String): SpelledForm? {
             if (Kinds.byText(kind) || reading.isEmpty()) return null
             val syllables = reading.split(' ')
-            if (syllables.size < 2) return null
-            val n = keys.count { it != '\'' }
+            return of(Kinds.isShuangpin(kind), keys.count { it != '\'' }, syllables.size, syllables.sumOf { it.length })
+        }
+
+        /**
+         * [of] by counts, under a kind of readings ([Kinds.byText] false): [n] keys (no separator)
+         * spelling a reading of [syllables] syllables, [letters] letters in all; [shuangpin], two
+         * keys a syllable. What a level asks of each word under its first key, no reading split
+         * there (S15 B5.1).
+         */
+        fun of(shuangpin: Boolean, n: Int, syllables: Int, letters: Int): SpelledForm? {
+            if (syllables < 2) return null
             // "f" never reads feng hua: no spelling, nor a reason to read the level (R14 F3741)
-            if (n < syllables.size) return null
-            val full = if (Kinds.isShuangpin(kind)) 2 * syllables.size else syllables.sumOf { it.length }
+            if (n < syllables) return null
+            val full = if (shuangpin) 2 * syllables else letters
             return when (n) {
                 full -> FULL
-                syllables.size -> INITIALS
+                syllables -> INITIALS
                 else -> PART
             }
         }
@@ -47,14 +56,22 @@ enum class SpelledForm {
         fun spells(keyboard: String, keys: String, reading: String): Boolean {
             if (Kinds.isShuangpin(keyboard)) return true
             val typed = keys.filter { it != '\'' }
-            val syllables = reading.split(' ')
-            fun same(key: Char, c: Char) = key == c || c in nineKeyLetters(keyboard, key)
+            return spells(typed, Array(typed.length) { nineKeyLetters(keyboard, typed[it]) }, reading.split(' '))
+        }
+
+        /**
+         * [spells] off 双拼, its parts worked out once for the many words under a key: [typed] the
+         * keys with no separator, [letters] each one's letters on the nine keys ([nineKeyLetters],
+         * empty off them), [syllables] the reading's.
+         */
+        fun spells(typed: String, letters: Array<String>, syllables: List<String>): Boolean {
+            fun same(i: Int, c: Char) = typed[i] == c || c in letters[i]
             // from key i on, syllable j on: each syllable at least its first letter
             fun from(i: Int, j: Int): Boolean {
                 if (j == syllables.size) return i == typed.length
                 val syl = syllables[j]
                 var k = 0
-                while (k < syl.length && i + k < typed.length && same(typed[i + k], syl[k])) {
+                while (k < syl.length && i + k < typed.length && same(i + k, syl[k])) {
                     k++
                     if (from(i + k, j + 1)) return true
                 }

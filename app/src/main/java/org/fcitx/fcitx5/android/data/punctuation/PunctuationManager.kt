@@ -4,10 +4,7 @@
  */
 package org.fcitx.fcitx5.android.data.punctuation
 
-import org.fcitx.fcitx5.android.core.FcitxAPI
-import org.fcitx.fcitx5.android.core.RawConfig
-import org.fcitx.fcitx5.android.core.getPunctuationConfig
-import org.fcitx.fcitx5.android.core.savePunctuationConfig
+import org.fcitx.fcitx5.android.core.HostApi
 
 object PunctuationManager {
 
@@ -17,28 +14,17 @@ object PunctuationManager {
     // moved by every save and forget: a read it overlapped may hold the old table, and is not kept
     private var changes = 0
 
-    fun parseRawConfig(raw: RawConfig): List<PunctuationMapEntry> {
-        val items = raw.findByName("cfg")?.findByName(ENTRIES)?.subItems ?: return emptyList()
-        return items.map { PunctuationMapEntry(it) }
-    }
-
-    suspend fun load(fcitx: FcitxAPI, lang: String): List<PunctuationMapEntry> {
+    suspend fun load(fcitx: HostApi, lang: String): List<PunctuationMapEntry> {
         val (known, seen) = synchronized(this) { kept[lang] to changes }
         if (known != null) return known
-        val raw = fcitx.getPunctuationConfig(lang)
-        val entries = parseRawConfig(raw)
+        val entries = fcitx.punctuationMap(lang)
         synchronized(this) { if (changes == seen) kept[lang] = entries }
         return entries
     }
 
-    suspend fun save(fcitx: FcitxAPI, lang: String, entries: List<PunctuationMapEntry>) {
-        val cfg = RawConfig(
-            arrayOf(
-                RawConfig(ENTRIES, entries.mapIndexed { i, it -> it.toRawConfig(i) }.toTypedArray())
-            )
-        )
+    suspend fun save(fcitx: HostApi, lang: String, entries: List<PunctuationMapEntry>) {
         try {
-            fcitx.savePunctuationConfig(lang, cfg)
+            fcitx.setPunctuationMap(lang, entries)
         } finally {
             // a save cancelled on its way back has reached fcitx all the same
             forget()
@@ -55,7 +41,7 @@ object PunctuationManager {
      * [fcitx] as the daemon hands it to its connections: any reload of its config reads the
      * tables again, so what [load] kept goes with it.
      */
-    fun forgettingOnReload(fcitx: FcitxAPI): FcitxAPI = object : FcitxAPI by fcitx {
+    fun forgettingOnReload(fcitx: HostApi): HostApi = object : HostApi by fcitx {
         override suspend fun reloadConfig() {
             fcitx.reloadConfig()
             forget()

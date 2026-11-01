@@ -26,6 +26,8 @@ import java.util.TreeMap
  */
 class ShuangpinSegmenter(private val scheme: ShuangpinScheme, fuzzy: Set<Fuzzy> = emptySet(), typos: Boolean = true) : Segmenter {
 
+    override val spellsFullPinyin: Boolean get() = false
+
     private val pairs = arrayOfNulls<SyllableMatches>(KEYS * KEYS)
     private val leads = arrayOfNulls<SyllableMatches>(KEYS)
     private val vowels = arrayOfNulls<SyllableMatches>(KEYS)
@@ -79,7 +81,7 @@ class ShuangpinSegmenter(private val scheme: ShuangpinScheme, fuzzy: Set<Fuzzy> 
 
     override fun reads(c: Char) = scheme.types(c)
 
-    // 微软 and 紫光 type ing on `;`: a final, so read only as a syllable's second key; at a
+    // 微软 types ing on `;`: a final, so read only as a syllable's second key; at a
     // syllable's start it is the punctuation key, as in Microsoft Pinyin (`ni;` is 你；)
     override fun readsAfter(before: String, c: Char): Boolean {
         if (!scheme.types(c) || c in 'a'..'z' || scheme.typesInitial(c)) return true

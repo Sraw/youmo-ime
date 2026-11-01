@@ -49,7 +49,12 @@ fun interface CommitFilter {
     fun filter(ic: InputContext, text: String): String
 }
 
-/** `Instance::OutputFilter`: rewrites preedit, aux, candidate and tip text, in registration order. */
+/**
+ * `Instance::OutputFilter`: rewrites preedit, aux, candidate and tip text, in registration order.
+ * Returns [FormattedText] itself for a text it leaves as it is, and an empty text as it is: a
+ * candidate's text and comment skip the filters when empty and are not joined back when none
+ * rewrote them ([HostCore.filterOutput], S15 A8.4).
+ */
 fun interface OutputFilter {
     fun filter(ic: InputContext, text: FormattedText): FormattedText
 }

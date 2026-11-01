@@ -4,15 +4,14 @@
  */
 package org.fcitx.fcitx5.android.engine.store
 
+import org.fcitx.fcitx5.android.engine.platform.LogFile
+import org.fcitx.fcitx5.android.engine.platform.write
 import java.io.BufferedOutputStream
 import java.io.ByteArrayOutputStream
 import java.io.Closeable
 import java.io.DataInputStream
-import java.io.File
-import java.io.FileOutputStream
 import java.io.IOException
 import java.io.OutputStream
-import java.io.RandomAccessFile
 import java.nio.ByteBuffer
 import java.util.concurrent.Callable
 import java.util.concurrent.ExecutionException
@@ -41,25 +40,25 @@ import java.util.concurrent.RejectedExecutionException
  * later appends do not land behind torn bytes; learning goes on in memory regardless.
  */
 class RecordStore internal constructor(
-    private val file: File,
+    private val file: LogFile,
     private val format: RecordFormat,
     private val compactAt: Long,
     private val onError: (IOException) -> Unit,
     // a seam for tests: a disk that fails part-way through a write
-    private val openAppend: (File) -> OutputStream,
+    private val openAppend: (LogFile) -> OutputStream,
     // writes a compaction an append made due; null: the thread that learns does
     private val background: Executor? = null,
     // compacts from the log's own bytes rather than the counts in memory: see [Fold]
     private val fold: Fold? = null,
 ) : Closeable {
     constructor(
-        file: File,
+        file: LogFile,
         format: RecordFormat,
         compactAt: Long = DEFAULT_COMPACT_AT,
         onError: (IOException) -> Unit = {},
         background: Executor? = null,
         fold: Fold? = null,
-    ) : this(file, format, compactAt, onError, { FileOutputStream(it, true) }, background, fold)
+    ) : this(file, format, compactAt, onError, LogFile::append, background, fold)
 
     /**
      * A log compacted from its own bytes: the file's first bytes as they were when the compaction
@@ -120,8 +119,8 @@ class RecordStore internal constructor(
     fun open(replay: (Byte, DataInputStream) -> Unit, counts: ((ByteArray) -> Unit) -> Unit, seed: (() -> Boolean)? = null) {
         check(out == null && !closed) { "opened already" }
         this.counts = counts
-        if (file.exists()) {
-            val bytes = file.readBytes()
+        if (file.taken()) {
+            val bytes = file.read()
             when {
                 format.hasHeader(bytes) -> {
                     var unread = 0
@@ -134,13 +133,13 @@ class RecordStore internal constructor(
                     if (end < bytes.size) cut(bytes, end)
                 }
                 // killed before the header was all written: nothing to keep
-                format.header().copyOf(bytes.size).contentEquals(bytes) -> file.writeBytes(format.header())
+                format.header().copyOf(bytes.size).contentEquals(bytes) -> file.write(format.header())
                 else -> moveAside()
             }
         }
-        val seeding = seed != null && (!file.exists() || file.length() <= RecordFormat.HEADER_SIZE) && seed()
+        val seeding = seed != null && (!file.taken() || file.length() <= RecordFormat.HEADER_SIZE) && seed()
         if (seeding) writeCounts(seeding = true)
-        if (!file.exists()) file.writeBytes(format.header())
+        if (!file.taken()) file.write(format.header())
         end = file.length()
         // a seed already written as counts: no call to write them again yet
         if (seeding) compacted = end
@@ -163,13 +162,8 @@ class RecordStore internal constructor(
             writeSynced(aside) { it.write(bytes) }
             onError(IOException("$file damaged at byte $end: kept whole as ${aside.name}"))
         }
-        RandomAccessFile(file, "rw").use {
-            it.setLength(end.toLong())
-            if (damaged && end <= RecordFormat.HEADER_SIZE) {
-                it.seek(end.toLong())
-                it.write(format.record(EMPTIED) {})
-            }
-        }
+        file.truncate(end.toLong())
+        if (damaged && end <= RecordFormat.HEADER_SIZE) file.append().use { it.write(format.record(EMPTIED) {}) }
     }
 
     /** Whether the records stop at [end] as a torn append leaves them: in a last record whose length, or the bytes it says, run past the end. */
@@ -188,27 +182,30 @@ class RecordStore internal constructor(
     }
 
     // never over an earlier file kept aside: that may be a newer version's log, still wanted
-    private fun aside(): File {
-        var aside = File(file.path + UNREADABLE)
+    private fun aside(): LogFile {
+        var aside = file.beside(UNREADABLE)
         var n = 1
-        while (aside.exists()) aside = File(file.path + UNREADABLE + "." + n++)
+        while (aside.taken()) aside = file.beside(UNREADABLE + "." + n++)
         return aside
     }
 
     private fun tooLong() = end > maxOf(compactAt, 2 * compacted)
 
-    /** Appends [record], unless not open, or longer than a reader would take for a record ([onError] hears of that). */
-    fun append(record: ByteArray) {
-        val stream = out ?: return
+    /**
+     * Appends [record], unless not open, or longer than a reader would take for a record ([onError]
+     * hears of that): whether it was written.
+     */
+    fun append(record: ByteArray): Boolean {
+        val stream = out ?: return false
         // the reader would take it for garbage and drop the rest of the log with it
-        if (!fits(record)) return
+        if (!fits(record)) return false
         try {
             stream.write(record)
             end += record.size
         } catch (e: IOException) {
             onError(e)
             recover()
-            return
+            return false
         }
         val compacting = pending
         if (compacting != null) {
@@ -217,6 +214,7 @@ class RecordStore internal constructor(
         } else if (tooLong()) {
             compactDue()
         }
+        return true
     }
 
     /**
@@ -281,7 +279,7 @@ class RecordStore internal constructor(
     private fun recover() {
         try {
             out?.close()
-            RandomAccessFile(file, "rw").use { it.setLength(end) }
+            file.truncate(end)
             out = openAppend(file)
         } catch (e: IOException) {
             onError(e)
@@ -326,14 +324,14 @@ class RecordStore internal constructor(
         pending?.let { finish(it) }
         if (out == null) return null
         val written = ByteArrayOutputStream()
-        if (!transform(file.readBytes(), written)) return null
+        if (!transform(file.read(), written)) return null
         // a header alone is a log a start seeds again (as a first one): never written for one emptied
         if (written.size() <= RecordFormat.HEADER_SIZE) {
             onError(IOException("a rewrite to a header alone declined"))
             return null
         }
         // a failure the caller's to tell (a clear that did not clear): the file as it was, still open
-        replaceFile(file, File(file.path + COMPACTING)) { it.writeBytes(written.toByteArray()) }
+        replaceFile(file, file.beside(COMPACTING)) { it.write(written.toByteArray()) }
         reopen(compactedTo = file.length())
         return written.toByteArray()
     }
@@ -341,11 +339,10 @@ class RecordStore internal constructor(
     /** Folds the log's first [end] bytes into the next file, written and synced: its length, or -1 for nothing to fold. */
     private fun foldTask(fold: Fold): FutureTask<Long> {
         val length = end
-        val next = File(file.path + COMPACTING)
+        val next = file.beside(COMPACTING)
         return FutureTask(
             Callable {
-                val log = ByteArray(length.toInt())
-                RandomAccessFile(file, "r").use { it.readFully(log) }
+                val log = file.read(length.toInt())
                 var folded = false
                 writeSynced(next) { folded = fold.fold(log, it) }
                 if (folded) {
@@ -368,7 +365,7 @@ class RecordStore internal constructor(
         } else {
             // as long as the log, which open read whole, so seldom grown; handed on as it is, not copied
             val bytes = ByteArrayOutputStream(end.coerceAtMost(Int.MAX_VALUE.toLong()).toInt()).also { countsTo(it, seeding = false) }
-            val next = File(file.path + COMPACTING)
+            val next = file.beside(COMPACTING)
             FutureTask(Callable { writeSynced(next) { bytes.writeTo(it) }.let { bytes.size().toLong() } })
         }
         val compacting = Pending(task)
@@ -384,7 +381,7 @@ class RecordStore internal constructor(
     /** Puts the counts [compacting] wrote in place of the log, with what was appended since behind them. */
     private fun finish(compacting: Pending) {
         pending = null
-        val next = File(file.path + COMPACTING)
+        val next = file.beside(COMPACTING)
         val size: Long
         try {
             size = written(compacting.task).getOrThrow()
@@ -406,13 +403,13 @@ class RecordStore internal constructor(
     }
 
     /** Appends to the [size] bytes of counts [compacting] wrote in [next] what was appended to the log since, and syncs it. */
-    private fun appendSince(next: File, size: Long, compacting: Pending) {
+    private fun appendSince(next: LogFile, size: Long, compacting: Pending) {
         // one gone would be made anew, of no header nor counts, and renamed over the log
         if (next.length() != size) throw IOException("$next is not the $size bytes of counts written")
         // synced before the rename: a power cut after it would otherwise lose what was appended meanwhile
-        FileOutputStream(next, true).use { stream ->
+        next.append().use { stream ->
             compacting.since.forEach { stream.write(it) }
-            stream.fd.sync()
+            stream.sync()
         }
     }
 
@@ -460,8 +457,8 @@ class RecordStore internal constructor(
 
     /** Writes the counts into a new file, renamed over [file] once it is all on disk. */
     private fun writeCounts(seeding: Boolean = false) {
-        replaceFile(file, File(file.path + COMPACTING)) { next ->
-            FileOutputStream(next).use { raw ->
+        replaceFile(file, file.beside(COMPACTING)) { next ->
+            next.create().use { raw ->
                 val stream = BufferedOutputStream(raw)
                 countsTo(stream, seeding)
                 stream.flush()
@@ -485,11 +482,11 @@ class RecordStore internal constructor(
     }
 
     /** Writes to [to] what [write] puts in its stream, and syncs it, or leaves no [to] at all. */
-    private fun writeSynced(to: File, write: (OutputStream) -> Unit) {
+    private fun writeSynced(to: LogFile, write: (OutputStream) -> Unit) {
         try {
-            FileOutputStream(to).use {
+            to.create().use {
                 write(it)
-                it.fd.sync()
+                it.sync()
             }
         } catch (e: IOException) {
             // a copy aside cut short (the disk full) is no copy, and each start would leave another

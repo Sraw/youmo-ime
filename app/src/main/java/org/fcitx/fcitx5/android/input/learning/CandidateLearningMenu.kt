@@ -9,7 +9,7 @@ import android.content.Context
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import org.fcitx.fcitx5.android.R
-import org.fcitx.fcitx5.android.daemon.FcitxConnection
+import org.fcitx.fcitx5.android.daemon.HostConnection
 import org.fcitx.fcitx5.android.engine.learn.control.BlockScope
 import org.fcitx.fcitx5.android.engine.learn.control.LearningMenu
 import org.fcitx.fcitx5.android.engine.learn.control.LearningMenu.Reason
@@ -28,7 +28,7 @@ import org.fcitx.fcitx5.android.utils.clipboardManager
  */
 class CandidateLearningMenu(
     private val context: Context,
-    private val fcitx: FcitxConnection,
+    private val fcitx: HostConnection,
     private val scope: CoroutineScope,
     private val done: (message: String, token: Long) -> Unit,
 ) {

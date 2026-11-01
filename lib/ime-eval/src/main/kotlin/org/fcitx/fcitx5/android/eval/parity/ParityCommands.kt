@@ -6,6 +6,7 @@ package org.fcitx.fcitx5.android.eval.parity
 
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.eval.Command
 import java.io.File
 
@@ -14,15 +15,21 @@ private fun repo(options: Map<String, String>) = File(options["repo"] ?: "../.."
 
 private fun ims(options: Map<String, String>) = options["ims"]?.split(',') ?: SequenceGenerator.DEFAULT_IMS
 
+// the input methods a user switches between: not 0.4's engine-t9 (now a keyboard of pinyin), which the
+// generator would type letters into
+private val SWITCHABLE = setOf(InputMethodCatalog.PINYIN, InputMethodCatalog.SHUANGPIN, InputMethodCatalog.ENGLISH) + InputMethodCatalog.TABLES.keys
+
 /** The parity commands (fcitx-replacement §7.2; the device side is uat/parity/parity.py). */
 internal val PARITY_COMMANDS = listOf(
-    Command("parity-generate", "<out.jsonl> --seed <n> --count <n> [--ims <im>,...] [--repo <checkout>]", 1..1, "seed", "count", "ims", "repo") { args, out, _ ->
+    Command("parity-generate", "<out.jsonl> --seed <n> --count <n> [--ims <im>,...] [--repo <checkout>]", 1..1, "seed", "count", "ims", "repo") { args, out, err ->
         val seed = args.options["seed"]?.toLongOrNull()
         val count = args.options["count"]?.toIntOrNull()?.takeIf { it > 0 }
-        if (seed == null || count == null) {
+        val ims = ims(args.options)
+        val unswitchable = ims - SWITCHABLE
+        if (unswitchable.isNotEmpty()) err.appendLine("parity-generate: no input method to switch to: ${unswitchable.joinToString(",")}")
+        if (seed == null || count == null || unswitchable.isNotEmpty()) {
             null
         } else {
-            val ims = ims(args.options)
             val header = Provenance.header(repo(args.options), "random", ims, seed)
             ParityFiles.writeSequences(File(args.operands[0]), header, SequenceGenerator(ims, seed).generate(count))
             out.appendLine("$count sequences, seed $seed: ${args.operands[0]}")

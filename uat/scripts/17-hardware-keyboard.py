@@ -114,7 +114,7 @@ def hk01(d):
     return f"屏幕键盘收起；小窗 `{p}` {c[:4]}，右端键盘图标"
 
 
-case("HK-02", needs="jvm:HardwareKeysUatTest.spaceCommitsTheFirstADigitPicksByNumber")(lambda d: None)
+case("HK-02", needs="jvm:HardwareKeysUatTest.spaceCommitsTheFirstADigitPicksByNumber、HardwareKeyUatTest.keysGoToTheEngineAndTheTouchKeyboardGoes")(lambda d: None)
 
 
 @case("HK-03", base="B0-实体", mutates="learn", needs=EMU)
@@ -293,7 +293,7 @@ def hk30(d):
 case("HK-13", needs="jvm:HardwareKeyUatTest.shiftBackFromEnglishIsWubiNotPinyin")(lambda d: None)
 
 
-case("HK-14", needs="jvm:HardwareKeyUatTest.ctrlShiftGoesRoundSkippingHandwritingAndNineKeys")(lambda d: None)
+case("HK-14", needs="jvm:HardwareKeyUatTest.ctrlShiftGoesRoundSkippingHandwriting")(lambda d: None)
 
 
 case("HK-15", needs="jvm:HardwareKeyUatTest.shiftThenCtrlToo")(lambda d: None)

@@ -97,7 +97,7 @@ class PopupKeyboardUiTest {
         keys.forEach { (label, cell) ->
             assertEquals(
                 "$count keys: the key drawn at $cell is the one typed there",
-                KeyAction.FcitxKeyAction(label),
+                KeyAction.HostKeyAction(label),
                 ui.select(cell.first, cell.second)
             )
         }
@@ -122,7 +122,7 @@ class PopupKeyboardUiTest {
         // the first symbol right above the digit, the key under the finger
         assertEquals(drawn["7"]!!.second, drawn["*"]!!.second)
         val rows = ui.root.childCount
-        drawn.forEach { (label, cell) -> assertEquals(KeyAction.FcitxKeyAction(label), ui.select(cell.first, cell.second)) }
+        drawn.forEach { (label, cell) -> assertEquals(KeyAction.HostKeyAction(label), ui.select(cell.first, cell.second)) }
         // no line between them
         assertTrue((0 until rows).all { ui.root.getChildAt(it).background == null })
     }
@@ -135,7 +135,7 @@ class PopupKeyboardUiTest {
         val ui = popup(keys, trigger, split = 7, inRow = 3)
         val drawn = drawn(ui)
         assertEquals((0 until 7).map { 0 to it }, keys.take(7).map { drawn[it] })
-        assertEquals(KeyAction.FcitxKeyAction("2"), ui.onTrigger())
+        assertEquals(KeyAction.HostKeyAction("2"), ui.onTrigger())
         assertEquals(drawn["2"]!!.second, drawn["@"]!!.second)
         assertTrue(keys.drop(7).all { drawn[it]!!.first == 1 })
         // the digit centred over the key, room enough either side
@@ -143,7 +143,7 @@ class PopupKeyboardUiTest {
         // too many to fit across at full width: narrower, all in the one row still
         val narrow = popup(keys, trigger, outerBounds = Rect(0, 0, 7 * keyWidth / 2, 2000), split = 7, inRow = 3)
         assertEquals(keyWidth / 2, narrow.keyWidth)
-        assertEquals(KeyAction.FcitxKeyAction("2"), narrow.onTrigger())
+        assertEquals(KeyAction.HostKeyAction("2"), narrow.onTrigger())
     }
 
     @Test
@@ -178,7 +178,7 @@ class PopupKeyboardUiTest {
     fun asIsEveryKeyIsCommittedAsItIs() {
         val ui = popup(arrayOf(".", "-"), Rect(480, 500, 520, 550), asIs = true)
         assertEquals(KeyAction.CommitAction("."), ui.onTrigger())
-        assertEquals(KeyAction.FcitxKeyAction("."), popup(arrayOf(".", "-"), Rect(480, 500, 520, 550)).onTrigger())
+        assertEquals(KeyAction.HostKeyAction("."), popup(arrayOf(".", "-"), Rect(480, 500, 520, 550)).onTrigger())
     }
 
     @Test
@@ -215,10 +215,10 @@ class PopupKeyboardUiTest {
     /** The long press and a letter's swipe (its first) type a pick the same way. */
     @Test
     fun oneCharacterIsAKeyAndAnythingLongerIsText() {
-        assertEquals(KeyAction.FcitxKeyAction("x"), PopupKeyboardUi.keyAction("x"))
-        assertEquals(KeyAction.FcitxKeyAction("é"), PopupKeyboardUi.keyAction("é"))
+        assertEquals(KeyAction.HostKeyAction("x"), PopupKeyboardUi.keyAction("x"))
+        assertEquals(KeyAction.HostKeyAction("é"), PopupKeyboardUi.keyAction("é"))
         // one code point, two chars
-        assertEquals(KeyAction.FcitxKeyAction("😀"), PopupKeyboardUi.keyAction("😀"))
+        assertEquals(KeyAction.HostKeyAction("😀"), PopupKeyboardUi.keyAction("😀"))
         assertEquals(KeyAction.CommitAction("Émile"), PopupKeyboardUi.keyAction("Émile"))
         // spells a key name, still text
         assertEquals(KeyAction.CommitAction("Tab"), PopupKeyboardUi.keyAction("Tab"))
@@ -278,7 +278,7 @@ class PopupKeyboardUiTest {
         // moved in by 10: the first key starts at the trigger's left, not 10 right of it, and is still under the finger
         assertEquals(0, ui.focusedKeyLeft)
         ui.changeFocus(nine.width() / 2f, nine.height() / 2f)
-        assertEquals(KeyAction.FcitxKeyAction("a"), ui.onTrigger())
+        assertEquals(KeyAction.HostKeyAction("a"), ui.onTrigger())
         // a long word over Q, the key at either edge
         for (q in listOf(Rect(0, 500, 40, 550), Rect(960, 500, 1000, 550))) {
             val (left, right) = popup(arrayOf("q", "hello"), q, minKeyWidth = 80).across(q, 2)
@@ -364,13 +364,13 @@ class PopupKeyboardUiTest {
         val ui = popup(keys, Rect(0, 500, 40, 550), outerBounds = Rect(0, 0, 7 * keyWidth / 2, 2000), split = 7, inRow = 3)
         val step = ui.keyWidth * PopupFocus.STEP
         assertFalse(ui.changeFocus(25f, 20f))
-        assertEquals(KeyAction.FcitxKeyAction("2"), ui.onTrigger())
+        assertEquals(KeyAction.HostKeyAction("2"), ui.onTrigger())
         ui.changeFocus(25f - step, 20f)
-        assertEquals(KeyAction.FcitxKeyAction("C"), ui.onTrigger())
+        assertEquals(KeyAction.HostKeyAction("C"), ui.onTrigger())
         ui.changeFocus(25f - 3 * step, 20f)
-        assertEquals(KeyAction.FcitxKeyAction("A"), ui.onTrigger())
+        assertEquals(KeyAction.HostKeyAction("A"), ui.onTrigger())
         ui.changeFocus(25f + 2 * step, 20f)
-        assertEquals(KeyAction.FcitxKeyAction("b"), ui.onTrigger())
+        assertEquals(KeyAction.HostKeyAction("b"), ui.onTrigger())
     }
 
     @Test
@@ -397,6 +397,6 @@ class PopupKeyboardUiTest {
         val drawn = drawn(ui)
         assertEquals(3, ui.root.childCount)
         assertEquals(0 to 0, drawn["1"])
-        assertEquals(KeyAction.FcitxKeyAction("1"), ui.onTrigger())
+        assertEquals(KeyAction.HostKeyAction("1"), ui.onTrigger())
     }
 }

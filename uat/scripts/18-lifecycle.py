@@ -2,7 +2,7 @@
 前提/操作/预期. A turn of the device is the display resized to landscape (Device.rotate)."""
 import time
 
-from uat import BROWSER, PKG, Blocked, case, check, has, home, open_url, script
+from uat import BROWSER, PKG, Blocked, case, check, home, open_url, script
 
 
 def fields(d, s=None):
@@ -108,21 +108,7 @@ def lc03(d):
     return f"没有残留；「{t}」"
 
 
-@case("LC-04")
-def lc04(d):
-    open_url(d, "")
-    d.type("ni")
-    d.cands()
-    tap_field(d, 1)
-    s = d.screen()
-    f = fields(d, s)
-    t0, t1, p = f[0].text, f[1].text, d.preedit(s)
-    d.type("ni")
-    c = d.cands()
-    check(not t0, f"普通文本框里「{t0}」")
-    check(not t1 and not p.replace("ni", ""), f"句子框里「{t1}」，拼音行 `{p}`")
-    check(has(c, "你"), f"再打 ni 候选 {c[:3]}")
-    return "两个框都没留下 ni；能正常打字"
+case("LC-04", needs="jvm:HostCasesUatTest.anotherFieldTappedWhilePinyinIsTypedLeavesNothing")(lambda d: None)
 
 
 case("LC-05", needs="jvm:LifecycleUatTest.aNumberFieldThenTextIsLettersAgain")(lambda d: None)
@@ -131,14 +117,7 @@ case("LC-05", needs="jvm:LifecycleUatTest.aNumberFieldThenTextIsLettersAgain")(l
 case("LC-06", needs="jvm:LifecycleUatTest.anotherFieldFromTheSymbolsIsLetters")(lambda d: None)
 
 
-@case("LC-07", base="B0-英文")
-def lc07(d):
-    d.hide_keyboard()
-    time.sleep(0.6)
-    tap_field(d)
-    lab = d.im_label()
-    check("英文" in lab, f"再弹出是「{lab}」")
-    return f"「{lab}」"
+case("LC-07", needs="jvm:LifecycleUatTest.hiddenAndShownAgainIsStillTheInputMethod")(lambda d: None)
 
 
 @case("LC-08", mutates="learn")
@@ -209,7 +188,6 @@ def lc11(d):
     return f"「{t}」"
 
 
-
 @case("LC-13", mutates=True)
 def lc13(d):
     tb = script("05-toolbar")
@@ -237,3 +215,22 @@ def lc13(d):
     check(tb.status_find(d, "英文标点"), "⋯ 里不是英文标点")
     tb.back_to_keys(d)
     return f"「{t}」"
+
+
+# A2: a setting or a theme changed with the keyboard up and pinyin half typed; the views made anew by the system
+case("LC-14", needs="jvm:StuckBarUatTest.aKeyboardSettingChangedMidPinyinDropsIt")(lambda d: None)
+
+
+case("LC-15", needs="jvm:StuckBarUatTest.aThemeChangedMidPinyinDropsIt")(lambda d: None)
+
+
+case("LC-16", needs="jvm:StuckBarUatTest.aViewMadeAnewMidPinyinShowsTheEnginesState")(lambda d: None)
+
+
+case("LC-17", needs="jvm:StuckBarUatTest.aThemeChangedMidEnglishWordCommitsIt")(lambda d: None)
+
+
+case("LC-18", needs="jvm:StuckBarUatTest.floatingAndDockedMidPinyinKeepIt")(lambda d: None)
+
+
+case("LC-19", needs="jvm:StuckBarUatTest.aThemeChangedMidHandwritingCommitsIt")(lambda d: None)

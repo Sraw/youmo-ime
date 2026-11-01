@@ -6,10 +6,9 @@ namespace fcitx {
 #undef FCITX_GETTEXT_DOMAIN
 #define FCITX_GETTEXT_DOMAIN "fcitx5-chinese-addons"
 
-enum class EngineShuangpinProfile { Ziranma, MS, Ziguang, ABC, Zhongwenzhixing, PinyinJiajia, Xiaohe, GB };
+enum class EngineShuangpinProfile { Ziranma, MS, Xiaohe };
 
-FCITX_CONFIG_ENUM_NAME_WITH_I18N(EngineShuangpinProfile, N_("Ziranma"), N_("MS"), N_("Ziguang"), N_("ABC"),
-                                 N_("Zhongwenzhixing"), N_("PinyinJiajia"), N_("Xiaohe"), N_("GB Standard"))
+FCITX_CONFIG_ENUM_NAME_WITH_I18N(EngineShuangpinProfile, N_("Ziranma"), N_("MS"), N_("Xiaohe"))
 
 FCITX_CONFIGURATION(
         EngineFuzzyConfig,
@@ -54,12 +53,33 @@ FCITX_CONFIGURATION(
         EngineTableConfig,
         ENGINE_TABLE_OPTIONS)
 
+// what the keys of a table with roots show (ime-core's KeyLabels): the letters, the roots' names, the roots
+enum class EngineKeyLabels { None, Names, Roots };
+
+FCITX_CONFIG_ENUM_NAME_WITH_I18N(EngineKeyLabels, N_("None"), N_("Names"), N_("Roots"))
+
+#define ENGINE_KEY_LABELS(labels) \
+        OptionWithAnnotation<EngineKeyLabels, EngineKeyLabelsI18NAnnotation> keyLabels{ \
+                this, "KeyLabels", D_("fcitx5-android", "Key labels"), EngineKeyLabels::labels};
+
+// the tables with roots (五笔's and 仓颉's), each with its own default; 自然码 and 二笔 have none
+FCITX_CONFIGURATION(
+        EngineLetterTableConfig,
+        ENGINE_TABLE_OPTIONS
+        ENGINE_KEY_LABELS(None))
+
+FCITX_CONFIGURATION(
+        EngineNamedTableConfig,
+        ENGINE_TABLE_OPTIONS
+        ENGINE_KEY_LABELS(Names))
+
 // each table's own defaults, those of ime-core's TableOptions presets (fcitx's .conf files) but
 // OrderPolicy (调频): off for every table on a new install (U-28 D7). Those who typed with a table
 // before keep it on: EngineMigration writes it into their config. A value read that is out of
 // range falls back to EngineTableConfig's, not to these
-inline EngineTableConfig engineTable(bool hint) {
-    EngineTableConfig config;
+template <typename T = EngineTableConfig>
+inline T engineTable(bool hint) {
+    T config;
     config.hint.setValue(hint);
     return config;
 }
@@ -68,7 +88,7 @@ inline EngineTableConfig engineTable(bool hint) {
 // engine's default and range, so a value the engine takes is not lost by saving the page
 #define ENGINE_SHUANGPIN_PROFILE \
     OptionWithAnnotation<EngineShuangpinProfile, EngineShuangpinProfileI18NAnnotation> shuangpinProfile{ \
-            this, "ShuangpinProfile", _("Shuangpin Profile"), EngineShuangpinProfile::Ziranma};
+            this, "ShuangpinProfile", _("Shuangpin Profile"), EngineShuangpinProfile::Xiaohe};
 #define ENGINE_PAGE_SIZE \
     Option<int, IntConstrain> pageSize{this, "PageSize", _("Candidates Per Page"), 7, IntConstrain(3, 10)};
 #define ENGINE_PREDICTION Option<bool> prediction{this, "Prediction", _("Enable Prediction"), true};
@@ -98,11 +118,11 @@ FCITX_CONFIGURATION(
         ENGINE_FUZZY
         ENGINE_ENGLISH_SUGGEST
         // named as the input methods are listed (androidengine.cpp)
-        Option<EngineTableConfig> wubi{this, "Wubi", "五笔", engineTable(true)};
-        Option<EngineTableConfig> cangjie{this, "Cangjie", "仓颉", engineTable(false)};
+        Option<EngineLetterTableConfig> wubi{this, "Wubi", "五笔", engineTable<EngineLetterTableConfig>(true)};
+        Option<EngineNamedTableConfig> cangjie{this, "Cangjie", "仓颉", engineTable<EngineNamedTableConfig>(false)};
         Option<EngineTableConfig> ziranma{this, "Ziranma", "自然码", engineTable(true)};
         Option<EngineTableConfig> erbi{this, "Erbi", "二笔", engineTable(false)};
-        Option<EngineTableConfig> wubiPinyin{this, "WubiPinyin", "五笔拼音", engineTable(true)};
+        Option<EngineLetterTableConfig> wubiPinyin{this, "WubiPinyin", "五笔拼音", engineTable<EngineLetterTableConfig>(true)};
         // opened by name in the app (ConfigDescriptor), the uri only says whose they are
         ExternalOption dictmanager{this, "DictManager", _("Manage Dictionaries"),
                                    "fcitx://config/addon/androidengine/dictmanager"};
@@ -145,11 +165,25 @@ FCITX_CONFIGURATION(
 
 // a table's page: its own options, under its group, and pinyin's page size, prediction, emoji and
 // performance level, the same options (every Chinese input method has them)
+#define ENGINE_TABLE_PAGE \
+        ENGINE_PAGE_SIZE \
+        ENGINE_PREDICTION \
+        ENGINE_EMOJI \
+        ENGINE_MODEL_LEVEL \
+        ENGINE_TABLE_OPTIONS
+
 FCITX_CONFIGURATION(
         EngineTablePage,
-        ENGINE_PAGE_SIZE
-        ENGINE_PREDICTION
-        ENGINE_EMOJI
-        ENGINE_MODEL_LEVEL
-        ENGINE_TABLE_OPTIONS)
+        ENGINE_TABLE_PAGE)
+
+// a table with roots: its key labels too, its own default
+FCITX_CONFIGURATION(
+        EngineLetterTablePage,
+        ENGINE_TABLE_PAGE
+        ENGINE_KEY_LABELS(None))
+
+FCITX_CONFIGURATION(
+        EngineNamedTablePage,
+        ENGINE_TABLE_PAGE
+        ENGINE_KEY_LABELS(Names))
 

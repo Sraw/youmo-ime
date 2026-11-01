@@ -17,13 +17,14 @@ import org.fcitx.fcitx5.android.core.KeySym
 import org.fcitx.fcitx5.android.core.UNICODE
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.theme.ThemePreset
+import org.fcitx.fcitx5.android.engine.assertRows
 import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
 import org.fcitx.fcitx5.android.engine.pinyin.g14Code
+import org.fcitx.fcitx5.android.engine.runtime.Keyboard
 import org.fcitx.fcitx5.android.input.popup.PopupAction
 import org.fcitx.fcitx5.android.input.popup.PopupActionListener
 import org.junit.After
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -76,7 +77,7 @@ class GroupedKeyboardTest {
         assertEquals(listOf(0.15f, 0.175f, 0.175f, 0.175f, 0.175f, 0.15f), widths[2])
         widths.forEach { assertEquals(1f, it.sum(), 1e-4f) }
         assertTrue(layout[2].last() is BackspaceKey)
-        assertEquals(KeyAction.FcitxKeyAction("'"), (layout[2][0].behaviors.single() as KeyDef.Behavior.Press).action)
+        assertEquals(KeyAction.HostKeyAction("'"), (layout[2][0].behaviors.single() as KeyDef.Behavior.Press).action)
     }
 
     @Test
@@ -101,8 +102,8 @@ class GroupedKeyboardTest {
         // a digit as a keypad's: typed, or picks that candidate while typing
         assertEquals(keypad(1), swipe("QW"))
         assertEquals(keypad(0), swipe("L"))
-        assertEquals(KeyAction.FcitxKeyAction("@"), swipe("BN"))
-        assertEquals(KeyAction.FcitxKeyAction("?"), swipe("M"))
+        assertEquals(KeyAction.HostKeyAction("@"), swipe("BN"))
+        assertEquals(KeyAction.HostKeyAction("?"), swipe("M"))
     }
 
     @Test
@@ -123,30 +124,35 @@ class GroupedKeyboardTest {
     @Test
     fun aLetterOrDigitOfTheLongPressIsCommittedAsItIs() {
         val popup = KeyActionListener.Source.Popup
-        assertEquals(KeyAction.CommitAction("q"), GroupedKeyboard.resolve(KeyAction.FcitxKeyAction("q"), popup))
-        assertEquals(KeyAction.CommitAction("W"), GroupedKeyboard.resolve(KeyAction.FcitxKeyAction("W"), popup))
-        assertEquals(KeyAction.CommitAction("1"), GroupedKeyboard.resolve(KeyAction.FcitxKeyAction("1"), popup))
+        assertEquals(KeyAction.CommitAction("q"), GroupedKeyboard.resolve(KeyAction.HostKeyAction("q"), popup))
+        assertEquals(KeyAction.CommitAction("W"), GroupedKeyboard.resolve(KeyAction.HostKeyAction("W"), popup))
+        assertEquals(KeyAction.CommitAction("1"), GroupedKeyboard.resolve(KeyAction.HostKeyAction("1"), popup))
         // a symbol goes through the engine, as the full keyboard's
-        assertEquals(KeyAction.FcitxKeyAction("%"), GroupedKeyboard.resolve(KeyAction.FcitxKeyAction("%"), popup))
+        assertEquals(KeyAction.HostKeyAction("%"), GroupedKeyboard.resolve(KeyAction.HostKeyAction("%"), popup))
         // the keys' own, as they are
         val keys = KeyActionListener.Source.Keyboard
-        assertEquals(KeyAction.FcitxKeyAction("'"), GroupedKeyboard.resolve(KeyAction.FcitxKeyAction("'"), keys))
+        assertEquals(KeyAction.HostKeyAction("'"), GroupedKeyboard.resolve(KeyAction.HostKeyAction("'"), keys))
         assertEquals(GroupedKeyboard.code(g14Code('b')), GroupedKeyboard.resolve(GroupedKeyboard.code(g14Code('b')), keys))
     }
 
+    // the fourteen keys (pinyin's) and the eighteen (shuangpin's) have the same bottom row
     @Test
-    @Uat("PY-91")
-    fun theBottomRowHasNoChineseEnglishKeyAndTheLanguageSwitchFollowsItsSetting() {
-        val keyboard = GroupedKeyboard(context, ThemePreset.PixelDark)
+    @Uat("PY-91", "SP-20")
+    fun theBottomRowHasNoChineseEnglishKeyAndTheLanguageSwitchFollowsItsSetting() = assertRows(
+        listOf("PY-91: fourteen keys" to NineKeyLetters.G14, "SP-20: eighteen keys" to NineKeyLetters.G18),
+        { it.first },
+    ) { (_, letters) ->
+        val showLang = AppPrefs.getInstance().keyboard.showLangSwitchKey
+        showLang.setValue(showLang.defaultValue)
+        val keyboard = GroupedKeyboard(context, ThemePreset.PixelDark, letters)
         // English is the language key's round, as on the full keyboard
-        assertNull(keyboard.findViewById<View>(R.id.button_nine_language))
         assertEquals(View.VISIBLE, keyboard.findViewById<View>(R.id.button_lang).visibility)
         listOf(R.id.button_space, R.id.button_return, R.id.button_comma, R.id.button_period, R.id.button_backspace).forEach {
             assertEquals(View.VISIBLE, keyboard.findViewById<View>(it).visibility)
         }
-        AppPrefs.getInstance().keyboard.showLangSwitchKey.setValue(false)
+        showLang.setValue(false)
         assertEquals(View.GONE, keyboard.findViewById<View>(R.id.button_lang).visibility)
-        assertEquals(View.GONE, GroupedKeyboard(context, ThemePreset.PixelDark).findViewById<View>(R.id.button_lang).visibility)
+        assertEquals(View.GONE, GroupedKeyboard(context, ThemePreset.PixelDark, letters).findViewById<View>(R.id.button_lang).visibility)
     }
 
     @Test
@@ -165,6 +171,7 @@ class GroupedKeyboardTest {
     }
 
     @Test
+    @Uat("PY-105")
     fun talkBackReadsAGroupLetterByLetterWithItsCorner() {
         val keyboard = GroupedKeyboard(context, ThemePreset.PixelDark)
         val views = keyboard.keyRows().flatMap { it.children.toList() }
@@ -175,6 +182,14 @@ class GroupedKeyboardTest {
         assertEquals(14, described.size)
         val separator = views.filterIsInstance<TextKeyView>().single { (it.def as? KeyDef.Appearance.Text)?.displayText == "分词" }
         assertEquals(context.getString(R.string.a11y_key_separator), separator.contentDescription)
+        // pinyin's 18 keys: the L key, shown without its `;`, is still a group key (its long press, corner, TalkBack
+        // and a stroke drawn from it go by the groups the views were matched to; once it was matched against "L;" and left out)
+        val g18 = GroupedKeyboard(context, ThemePreset.PixelDark, NineKeyLetters.G18, Keyboard::pinyin18Key, semicolon = false)
+        val keys18 = g18.keyRows().flatMap { it.children.toList() }.filterIsInstance<AltTextKeyView>()
+        val described18 = keys18.associate { (it.def as KeyDef.Appearance.AltText).displayText to it.contentDescription?.toString() }
+        val l = keys18.single { (it.def as KeyDef.Appearance.AltText).displayText == "L" }
+        assertEquals(context.getString(R.string.a11y_key_grouped, "L", (l.def as KeyDef.Appearance.AltText).altText), described18["L"])
+        assertEquals(18, described18.values.count { it != null })
     }
 
     @Test

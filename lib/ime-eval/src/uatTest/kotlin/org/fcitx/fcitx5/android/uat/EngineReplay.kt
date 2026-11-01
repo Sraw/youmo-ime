@@ -4,13 +4,15 @@
  */
 package org.fcitx.fcitx5.android.uat
 
-import org.fcitx.fcitx5.android.engine.glide.Glide
+import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.engine.glide.GlideLayout
-import org.fcitx.fcitx5.android.engine.host.EngineEvent
-import org.fcitx.fcitx5.android.engine.host.Engines
-import org.fcitx.fcitx5.android.engine.host.Keyboard
 import org.fcitx.fcitx5.android.engine.learn.control.LearningOp
 import org.fcitx.fcitx5.android.engine.learn.control.LearningResult
+import org.fcitx.fcitx5.android.engine.runtime.EngineEvent
+import org.fcitx.fcitx5.android.engine.runtime.EngineSettings
+import org.fcitx.fcitx5.android.engine.runtime.Engines
+import org.fcitx.fcitx5.android.engine.runtime.Keyboard
+import org.fcitx.fcitx5.android.engine.session.Action
 import org.fcitx.fcitx5.android.engine.session.Choice
 import org.fcitx.fcitx5.android.engine.session.Offer
 import org.fcitx.fcitx5.android.engine.session.Snapshot
@@ -18,13 +20,15 @@ import org.fcitx.fcitx5.android.host.Capability
 import org.fcitx.fcitx5.android.host.EngineHost
 import org.fcitx.fcitx5.android.host.HostCore
 import org.fcitx.fcitx5.android.host.HostEvent
+import org.fcitx.fcitx5.android.host.HostEvents
 import org.fcitx.fcitx5.android.host.Key
-import org.fcitx.fcitx5.android.host.KeySyms
 import org.fcitx.fcitx5.android.host.KeyStates as HostKeyStates
+import org.fcitx.fcitx5.android.host.KeySyms
 import org.fcitx.fcitx5.android.host.Profile
 import org.fcitx.fcitx5.android.host.VirtualHostClock
 import org.fcitx.fcitx5.android.input.FieldPolicy
 import org.fcitx.fcitx5.android.input.editing.ContextMemory
+import org.fcitx.fcitx5.android.input.keyboard.PendingInputPolicy
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 
@@ -43,7 +47,7 @@ import org.junit.Assert.assertTrue
  */
 class EngineReplay(
     engines: Engines = UatEngines.fresh(),
-    im: String = Engines.PINYIN,
+    im: String = InputMethodCatalog.PINYIN,
     field: Field = Field.TEXT,
 ) {
     /** The kind of field focused, as its EditorInfo makes fcitx's capability flags. */
@@ -93,8 +97,8 @@ class EngineReplay(
 
     // the sessions as the host reaches them: each snapshot the router shows is the panel
     private val port = object : EngineHost {
-        override fun event(im: String, event: Int, arg: Int, learning: Boolean): Snapshot = try {
-            this@EngineReplay.engines.onEvent(im, event, arg, learning)
+        override fun event(im: String, event: Int, arg: Int, learning: Boolean, payload: Action?): Snapshot = try {
+            this@EngineReplay.engines.onEvent(im, event, arg, learning, payload)
         } catch (@Suppress("TooGenericExceptionCaught") e: Throwable) {
             // the router catches it (KeyRouter.call) and goes on: a case expecting nothing would pass over
             // a crash, so it is thrown at the next flush
@@ -106,11 +110,11 @@ class EngineReplay(
             }
         override fun candidates(im: String, from: Int, count: Int): List<Choice> = this@EngineReplay.engines.candidates(im, from, count)
         override fun offers(im: String, index: Int): Set<Offer> = this@EngineReplay.engines.offers(im, index)
-        override fun settings(flat: String) = Unit
+        override fun settings(settings: EngineSettings) = Unit
     }
 
     private val core = HostCore(
-        port, clock, Profile.load(null, Engines.LISTED.map { it.name }.toSet(), "Default"),
+        port, clock, Profile.load(null, InputMethodCatalog.LISTED.map { it.name }.toSet(), "Default"),
         firstRun = true, showInputMethodInformation = false,
     )
 
@@ -121,8 +125,8 @@ class EngineReplay(
 
     init {
         requirePlain(field)
-        core.events.handlers += ::apply
-        core.setInputMethods(Engines.LISTED.map { it.name })
+        core.events += HostEvents(::apply)
+        core.setInputMethods(InputMethodCatalog.LISTED.map { it.name })
         core.activate(UID)
         core.setCapabilities(field.capabilities)
         core.focus(true)
@@ -215,7 +219,7 @@ class EngineReplay(
     private var memoryClock = 1L
 
     /**
-     * A long press's [op] on a candidate, as the menu does it (KotlinFcitx.learning): its event sent
+     * A long press's [op] on a candidate, as the menu does it (KotlinHost.learning): its event sent
      * only if the menu offers it on the candidate still shown (HostCore.triggerCandidateAction).
      */
     fun learn(op: LearningOp): LearningResult {
@@ -228,11 +232,15 @@ class EngineReplay(
         }.also { pause() }
     }
 
-    /** A glide across the centres of [keys] on [layout], as the keyboard hands it to the engine. */
-    fun glide(keys: String, layout: GlideLayout = GlideLayout.QWERTY) {
-        val path = Glide(keys.flatMap { layout.centre(it).toList() }.toFloatArray(), layout)
-        assertTrue("$im does not glide", engines.offerGlide(im, path))
-        key(symOf(Keyboard.GLIDE), virtual = true)
+    /** A glide across the centres of [keys] on [layout] ([shift] on or not), as the keyboard hands it to the engine (UatEngines.glide). */
+    fun glide(keys: String, layout: GlideLayout = GlideLayout.QWERTY, shift: Boolean = false) {
+        key(symOf(Keyboard.GLIDE), virtual = true, payload = UatEngines.glide(engines, im, keys, layout, shift))
+        pause()
+    }
+
+    /** [strokes] drawn on the keyboard one after another (笔画筛选), `h s p n z` for 横竖撇点折, as the keyboard sends each (Keyboard.strokeKey). */
+    fun stroke(strokes: String) {
+        for (c in strokes) key(symOf(Keyboard.strokeKey(c)), virtual = true)
         pause()
     }
 
@@ -282,12 +290,41 @@ class EngineReplay(
     }
 
     /**
+     * Text the keyboard puts in over the engine (a long press's letter, .com, @), as
+     * FcitxInputMethodService.commitOverEngine does: what is typed resolved as PendingInputPolicy
+     * says, fcitx's reset, then the text. The resolution taken, for a case to hold it. Unlike
+     * HostReplay.commitAndReset there is no client preedit or editor here: what is typed is the
+     * engine's preedit, and FinishComposing (the editor keeping its composing text) appends it.
+     */
+    fun commitOverEngine(text: String): PendingInputPolicy.Resolution {
+        val language = InputMethodCatalog.listed(im)?.language.orEmpty()
+        val address = field == Field.URL || field == Field.EMAIL
+        val resolution = PendingInputPolicy.resolve(language, hasPreedit = preedit.isNotEmpty(), address = address)
+        when (resolution) {
+            PendingInputPolicy.Resolution.SelectFirstCandidate -> core.select(0)
+            // the service's sendKey(FcitxKey_Return): no virtual state, a key of its own
+            PendingInputPolicy.Resolution.CommitAsTyped -> core.sendKey(Key(RETURN), virtual = false)
+            // the editor keeps what is composing: here the code as typed
+            PendingInputPolicy.Resolution.FinishComposing -> before.append(preedit)
+            PendingInputPolicy.Resolution.None -> {}
+        }
+        flush()
+        core.reset()
+        flush()
+        commit(text)
+        pause()
+        return resolution
+    }
+
+    /**
      * On the handwriting pad, a character written and the pen paused: the recognizer's [readings]
      * (best first, as it scores them) offered for the next piece, then the pad's Ink key.
      */
     fun write(vararg readings: String) {
-        lastPiece = UatEngines.offerInk(engines, readings.toList(), lastPiece)
-        key(symOf(Keyboard.INK), virtual = true)
+        val ink = UatEngines.ink(engines, readings.toList(), lastPiece)
+        lastPiece = ink.piece
+        key(symOf(Keyboard.INK), virtual = true, payload = ink)
+        engines.inkSent(ink)
         pause()
     }
 
@@ -311,11 +348,11 @@ class EngineReplay(
      * the screen's, not a hardware keyboard's. The router decides what the session gets; a key no
      * one took comes back and is the app's.
      */
-    fun key(sym: Int, virtual: Boolean = true) {
+    fun key(sym: Int, virtual: Boolean = true, payload: Action? = null) {
         // the router reads the option as the engine options set it (AndroidEngineConfig)
         core.router.options = core.router.options.copy(englishSuggest = engines.settings.englishSuggest)
-        // the screen's keys flagged as the service flags them (KotlinFcitx.sendVirtual)
-        core.sendKey(Key(sym, if (virtual) HostKeyStates.VIRTUAL else 0), virtual = virtual)
+        // the screen's keys flagged as the service flags them (KotlinHost.sendVirtual)
+        core.sendKey(Key(sym, if (virtual) HostKeyStates.VIRTUAL else 0), virtual = virtual, payload = payload)
         flush()
     }
 
@@ -334,6 +371,8 @@ class EngineReplay(
     /** The user pauses: the refine timer runs out, each slice shown that changed something. */
     fun pause() {
         clock.advance(PAUSE_MILLIS)
+        // the engines' uptime too, as HostReplay's waits move it (a table's space taken runs out)
+        UatEngines.Clock.away(PAUSE_MILLIS)
         flush()
     }
 
@@ -404,6 +443,13 @@ class EngineReplay(
         for (t in texts) assertTrue("「$t」 not on the first page $shown", t in shown)
     }
 
+    /** [texts] come in this order among the candidates, others between them or not. */
+    fun expectInOrder(vararg texts: String) {
+        val all = candidates
+        val at = texts.map { all.indexOf(it) }
+        assertTrue("${texts.toList()} at $at of ${all.take(SHOWN)}", at.all { it >= 0 } && at == at.sorted())
+    }
+
     fun expectAmong(vararg texts: String) {
         val all = candidates
         for (t in texts) assertTrue("「$t」 not among ${all.take(SHOWN)}", t in all)
@@ -449,6 +495,12 @@ class EngineReplay(
 
         /** The keysym the service sends for the character [c] (KeySyms.fromString of it): the host's own table, not a copy. */
         fun symOf(c: Int): Int = KeySyms.fromUnicode(c)
+
+        /** [digits] as pinyin's nine keys send them ([Keyboard.pinyinNineKey]), for [type]. */
+        fun nineKeys(digits: String): String = digits.map { String(Character.toChars(Keyboard.pinyinNineKey(it))) }.joinToString("")
+
+        /** Whether [s] has no private-use character: a key's code (the 14 keys', the 18 keys') never reaches the field or the row. */
+        fun noPrivateUse(s: String): Boolean = s.codePoints().noneMatch { Character.getType(it) == Character.PRIVATE_USE.toInt() }
 
         private const val UID = 1
         private const val PAUSE_MILLIS = 5_000L

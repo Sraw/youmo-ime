@@ -23,9 +23,15 @@ data class EditorTraits(
     val isEmail: Boolean = false,
     /** A number, phone or date field. */
     val isNumber: Boolean = false,
+    /** What kind of number a number, phone or date field says it takes; null for any other field. */
+    val number: NumberKind? = null,
     /** A search field: its action is the search key. */
     val isSearch: Boolean = false,
-    /** A password, or a field that asks not to be learned from: its text is not read, not even to step over an emoji. */
+    /**
+     * A password, or a field that asks not to be learned from: its text is not read, not even to
+     * step over an emoji; but by the address bar in an email's or a URL's field (incognito), which
+     * reads at most 256 units either side of the cursor to suggest and keeps nothing (AddressStrip).
+     */
     val isSensitive: Boolean = false,
     /**
      * The editor opted in, through `privateImeOptions`, to having Backspace done as an edit
@@ -41,6 +47,22 @@ data class EditorTraits(
     /** The action from `imeOptions`, or null when it is `UNSPECIFIED` or `NONE`. */
     val imeAction: Int? = null,
 )
+
+/** What a number, phone or date field declares it takes, out of its class, variation and flags. */
+enum class NumberKind {
+    /** Digits alone: neither signed nor decimal. */
+    INTEGER,
+    SIGNED,
+    DECIMAL,
+    SIGNED_DECIMAL,
+
+    /** A number password: a PIN. */
+    PIN,
+    PHONE,
+    DATE,
+    TIME,
+    DATETIME,
+}
 
 /** Decisions for keys whose meaning depends on the editor. */
 object EditorKeyPolicy {

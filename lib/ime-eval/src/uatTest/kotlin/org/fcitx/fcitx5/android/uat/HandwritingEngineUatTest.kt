@@ -5,7 +5,7 @@
 package org.fcitx.fcitx5.android.uat
 
 import org.fcitx.fcitx5.android.Uat
-import org.fcitx.fcitx5.android.engine.host.Engines
+import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.input.keyboard.PendingInputPolicy
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -22,13 +22,23 @@ class HandwritingEngineUatTest {
     private val ren = arrayOf("人", "入", "八")
     private val wo = arrayOf("我", "找", "伐")
 
-    private fun replay() = EngineReplay(im = Engines.HANDWRITING)
+    private fun replay() = EngineReplay(im = InputMethodCatalog.HANDWRITING)
+
+    @Test
+    @Uat("HW-03")
+    fun spaceCommitsTheSentenceWritten() = with(HostReplay(im = InputMethodCatalog.HANDWRITING)) {
+        write(*da)
+        write(*ren)
+        space()
+        expectText("大人")
+        assertEquals(-1 to -1, editor.composingStart to editor.composingEnd)
+    }
 
     // chttrans re-sends the composing text (chttrans.cpp:214-215): what is written and not yet in
-    // shows traditional at the toggle, with nothing more written; it goes in as shown (F4183)
+    // shows traditional at the toggle, with nothing more written; it goes in as shown
     @Test
     @Uat("HW-26")
-    fun aCharacterNotYetInIsShownTraditionalAtTheToggle() = with(HostReplay(im = Engines.HANDWRITING)) {
+    fun aCharacterNotYetInIsShownTraditionalAtTheToggle() = with(HostReplay(im = InputMethodCatalog.HANDWRITING)) {
         write("国", "图", "固")
         assertEquals("国", clientPreedit)
         toggle("chttrans")

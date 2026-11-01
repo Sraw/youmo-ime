@@ -27,4 +27,20 @@ class ClipboardManagerTest {
         assertEquals(900L, lastKept(0, 900L) { throw AssertionError("asked for entry $it") })
         assertEquals(900L, lastKept(-1, 900L) { throw AssertionError("asked for entry $it") })
     }
+
+    @Test
+    fun noneIsOutdatedWithNoLimit() = runTest {
+        // 「无上限」: nothing goes, the store not asked
+        assertNull(lastKept(CLIPBOARD_UNLIMITED, 900L) { throw AssertionError("asked for entry $it") })
+    }
+
+    @Test
+    fun idsGoInBatchesSQLiteOfAndroid10Takes() {
+        // more than SQLite's 999 variables before 3.32 (Android 10, 11)
+        val ids = IntArray(2000) { it * 3 }
+        val batches = idBatches(ids)
+        assertEquals(listOf(900, 900, 200), batches.map { it.size })
+        assertEquals(ids.toList(), batches.flatMap { it.toList() })
+        assertEquals(emptyList<IntArray>(), idBatches(IntArray(0)))
+    }
 }

@@ -106,14 +106,22 @@ android {
             // the resources reach Robolectric without the assets instead: unit-test-resources.
             isIncludeAndroidResources = false
             // Robolectric keeps what each test's keyboard left in the app's objects till the JVM
-            // ends; the UAT classes, a keyboard or more a test, ran out of Gradle's 512 MB default
-            all { it.maxHeapSize = "1g" }
+            // ends; the UAT classes, a keyboard or more a test, ran out of Gradle's 512 MB default,
+            // and of 1 GB once F1 moved the redroid UI cases here (about 1200 tests, four SDK sandboxes)
+            all {
+                it.maxHeapSize = "2g"
+                // fixtures found from any working directory (an IDE's run too): core/Fixtures.kt
+                it.systemProperty("uat.fixtures", rootProject.file("uat/fixtures").path)
+            }
         }
     }
     // fcitx's built-in data the Kotlin host reads (host-assets.md)
     sourceSets.getByName("main").assets.srcDir("src/main/host-assets")
     // the evaluation sets, for EngineEvalRunner (lib/ime-eval/run-on-device.sh)
     sourceSets.getByName("androidTest").assets.srcDir("../lib/ime-eval/data")
+    // what the JVM tests and the instrumented ones both run: ClipboardScale's benchmark, numbers on a device too
+    sourceSets.getByName("test").kotlin.srcDir("src/sharedTest/java")
+    sourceSets.getByName("androidTest").kotlin.srcDir("src/sharedTest/java")
 }
 
 // Screenshots are compared in the text flavor only: the voice build's bar has a microphone, so

@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.host
 
+import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.assertRows
 import org.fcitx.fcitx5.android.core.TextFormatFlag
 import org.junit.Assert.assertEquals
@@ -35,6 +36,7 @@ class QuickPhraseTest {
     private fun trigger() = rig.press(TempKeys.GRAVE, KeyStates.SUPER)
 
     @Test
+    @Uat("HK-38")
     fun superGraveAndSuperSemicolonTriggerOnPressOnly() {
         // :86-94, quickphrase.h:35-39
         assertFalse(rig.release(TempKeys.GRAVE, KeyStates.SUPER).filtered)
@@ -53,7 +55,7 @@ class QuickPhraseTest {
 
     @Test
     fun theTableIsAskedForAtTheFirstLookupNotBefore() {
-        // the app loads it on a thread of its own at start (KotlinFcitx.startup): nothing may wait on it sooner
+        // the app loads it on a thread of its own at start (KotlinHost.startup): nothing may wait on it sooner
         var asked = 0
         val rig = TempModeRig(QuickPhraseTable.EMPTY, { null }, tableSource = { asked++; table })
         rig.press(TempKeys.GRAVE, KeyStates.SUPER)

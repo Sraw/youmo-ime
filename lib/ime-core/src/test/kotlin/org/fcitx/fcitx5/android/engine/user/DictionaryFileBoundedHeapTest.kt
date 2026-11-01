@@ -5,6 +5,8 @@
 package org.fcitx.fcitx5.android.engine.user
 
 import org.fcitx.fcitx5.android.engine.pinyin.Syllables
+import org.fcitx.fcitx5.android.engine.platform.jvm.JvmFile
+import org.fcitx.fcitx5.android.engine.user.imports.WordText
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -39,12 +41,12 @@ class DictionaryFileBoundedHeapTest {
         val file = File(folder.root, "big.ymd")
         val result = DictionaryCompiler.compile(listOf(generateSequence { word(r) }.take(WORDS)), file)
         assertTrue(result.words > WORDS * 0.99)
-        val d = DictionaryFile.open(file)
+        val d = DictionaryFile.open(JvmFile(file))
         var found = 0
         val again = Random(7)
         repeat(1000) {
             val (text, code) = word(again).split(' ')
-            val entry = LibimeImport.entry(text, code)!!
+            val entry = WordText.entry(text, code)!!
             if (d.find(entry) >= 0) found++
         }
         assertEquals(1000, found)
@@ -62,7 +64,7 @@ class DictionaryFileBoundedHeapTest {
         val result = DictionaryCompiler.compile(listOf(words), file)
         assertEquals(DictionaryCompiler.MAX_PER_READING, result.words)
         assertEquals(WORDS - DictionaryCompiler.MAX_PER_READING, result.unread)
-        val d = DictionaryFile.open(file)
+        val d = DictionaryFile.open(JvmFile(file))
         var node = DictionaryFile.ROOT
         repeat(2) { node = d.child(node, Syllables.id("shi")) }
         assertEquals(DictionaryCompiler.MAX_PER_READING, d.wordCount(node))
@@ -78,7 +80,7 @@ class DictionaryFileBoundedHeapTest {
         val result = DictionaryCompiler.compile(listOf(generateSequence { "啊 a 0.5" }.take(copies)), file)
         assertEquals(1, result.words)
         assertEquals(0, result.unread)
-        assertEquals(1, DictionaryFile.open(file).size)
+        assertEquals(1, DictionaryFile.open(JvmFile(file)).size)
     }
 
     private companion object {

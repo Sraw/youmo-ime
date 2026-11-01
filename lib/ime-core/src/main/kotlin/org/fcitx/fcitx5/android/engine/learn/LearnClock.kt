@@ -4,11 +4,12 @@
  */
 package org.fcitx.fcitx5.android.engine.learn
 
-import java.util.TimeZone
+import java.util.Calendar
+import java.util.SimpleTimeZone
 
 /**
- * The time and the zone learning stamps its records with: the device's, or a test's. Read on the
- * thread that learns and on the one that folds the log.
+ * The time and the zone learning stamps its records with: the device's ([org.fcitx.fcitx5.android.engine.platform.Clock]
+ * of the platform), or a test's. Read on the thread that learns and on the one that folds the log.
  */
 interface LearnClock {
     /** Milliseconds since the epoch. */
@@ -17,9 +18,13 @@ interface LearnClock {
     /** The zone's offset from UTC at [at], in milliseconds. */
     fun offset(at: Long): Int
 
-    object System : LearnClock {
-        override fun now() = java.lang.System.currentTimeMillis()
-        override fun offset(at: Long) = TimeZone.getDefault().getOffset(at)
+    /**
+     * The calendar [now], in the zone [offset] has: what the date and time phrases are filled in with
+     * (CustomPhrases' `$year`, `rq`, `sj`, `xq`), so a replay's are its clock's, never the system's.
+     */
+    fun calendar(): Calendar {
+        val at = now()
+        return Calendar.getInstance(SimpleTimeZone(offset(at), "learn")).apply { timeInMillis = at }
     }
 
     /**

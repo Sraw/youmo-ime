@@ -9,7 +9,7 @@ import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.core.os.LocaleListCompat
 import org.fcitx.fcitx5.android.R
-import org.fcitx.fcitx5.android.daemon.FcitxDaemon
+import org.fcitx.fcitx5.android.daemon.HostDaemon
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.utils.Locales
 import org.fcitx.fcitx5.android.utils.appContext
@@ -84,6 +84,6 @@ object AppLanguage {
         // fcitx names its input methods and config pages in the language it starts in;
         // one not running starts in this one anyway
         Locales.onLocalesPicked(appContext)
-        if (FcitxDaemon.getFirstConnectionOrNull() != null) FcitxDaemon.restartFcitx()
+        if (HostDaemon.getFirstConnectionOrNull() != null) HostDaemon.restartFcitx()
     }
 }

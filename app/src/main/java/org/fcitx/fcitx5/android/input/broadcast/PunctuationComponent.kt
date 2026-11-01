@@ -6,8 +6,8 @@ package org.fcitx.fcitx5.android.input.broadcast
 
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
-import org.fcitx.fcitx5.android.core.Action
 import org.fcitx.fcitx5.android.data.punctuation.PunctuationManager
+import org.fcitx.fcitx5.android.host.StatusEntry
 import org.fcitx.fcitx5.android.input.dependency.fcitx
 import org.fcitx.fcitx5.android.input.dependency.imeScope
 import org.mechdancer.dependency.Dependent
@@ -33,8 +33,8 @@ class PunctuationComponent :
 
     fun transform(p: String) = mapping.getOrDefault(p, p)
 
-    fun updatePunctuationMapping(actions: Array<Action>) {
-        enabled = actions.any {
+    fun updatePunctuationMapping(entries: List<StatusEntry>) {
+        enabled = entries.any {
             // TODO: A better way to check if punctuation mapping is enabled
             it.name == "punctuation" && it.icon == "fcitx-punc-active"
         }

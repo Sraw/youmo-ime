@@ -8,15 +8,11 @@ package org.fcitx.fcitx5.android.ui.main.settings
 import android.net.Uri
 import android.os.Parcelable
 import androidx.navigation.NavController
-import androidx.navigation.NavType
 import androidx.navigation.createGraph
 import androidx.navigation.fragment.fragment
-import androidx.savedstate.SavedState
 import kotlinx.parcelize.Parcelize
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.Json
 import org.fcitx.fcitx5.android.R
-import org.fcitx.fcitx5.android.core.RawConfig
 import org.fcitx.fcitx5.android.ui.main.AboutFragment
 import org.fcitx.fcitx5.android.ui.main.DeveloperFragment
 import org.fcitx.fcitx5.android.ui.main.LicensesFragment
@@ -31,9 +27,6 @@ import org.fcitx.fcitx5.android.ui.main.settings.im.InputMethodListFragment
 import org.fcitx.fcitx5.android.ui.main.settings.im.SharedInputFragment
 import org.fcitx.fcitx5.android.ui.main.settings.search.SettingsSearchFragment
 import org.fcitx.fcitx5.android.ui.main.settings.theme.ThemeFragment
-import org.fcitx.fcitx5.android.utils.config.ConfigDescriptor
-import org.fcitx.fcitx5.android.utils.parcelable
-import kotlin.reflect.typeOf
 
 @Parcelize
 sealed class SettingsRoute : Parcelable {
@@ -91,43 +84,6 @@ sealed class SettingsRoute : Parcelable {
     /* ========== External ========== */
 
     @Serializable
-    data class ListConfig(val params: Params) : SettingsRoute() {
-        @Parcelize
-        @Serializable
-        data class Params(val cfg: RawConfig, val desc: ConfigDescriptor<*, *>) : Parcelable {
-            companion object {
-                // https://developer.android.com/guide/navigation/design/kotlin-dsl#custom-types
-                val NavType = object : NavType<Params>(isNullableAllowed = false) {
-                    override fun put(bundle: SavedState, key: String, value: Params) {
-                        bundle.putParcelable(key, value)
-                    }
-
-                    override fun get(bundle: SavedState, key: String): Params? {
-                        return bundle.parcelable<Params>(key)
-                    }
-
-                    override fun serializeAsValue(value: Params): String {
-                        // Serialized values must always be Uri encoded
-                        return Uri.encode(Json.encodeToString(value))
-                    }
-
-                    override fun parseValue(value: String): Params {
-                        // Navigation decodes the string before passing it to parseValue()
-                        return Json.decodeFromString(value)
-                    }
-                }
-            }
-        }
-
-        constructor(cfg: RawConfig, desc: ConfigDescriptor<*, *>) : this(Params(cfg, desc))
-
-        val desc: ConfigDescriptor<*, *>
-            get() = params.desc
-        val cfg: RawConfig
-            get() = params.cfg
-    }
-
-    @Serializable
     data class PinyinDict(val uri: String? = null) : SettingsRoute() {
         constructor(uri: Uri) : this(uri.toString())
     }
@@ -163,6 +119,16 @@ sealed class SettingsRoute : Parcelable {
     @Serializable
     data object T9Symbols : SettingsRoute()
 
+    /** 「通用输入 → 网址和邮箱」 (AddressSettingsFragment). */
+    @Serializable
+    data object Addresses : SettingsRoute()
+
+    /** One of its two lists, [kind] AddressSuffixesFragment's EMAIL or URL. */
+    @Serializable
+    data class AddressSuffixes(val kind: String) : SettingsRoute()
+
+    @Serializable
+    data object ToolbarButtons : SettingsRoute()
     @Serializable
     data object Search : SettingsRoute()
 
@@ -217,9 +183,6 @@ sealed class SettingsRoute : Parcelable {
 
             /* ========== External ========== */
 
-            fragment<ListFragment, ListConfig>(
-                typeMap = mapOf(typeOf<ListConfig.Params>() to ListConfig.Params.NavType)
-            )
             fragment<PinyinDictionaryFragment, PinyinDict> {
                 label = ctx.getString(R.string.word_packs)
             }
@@ -244,6 +207,13 @@ sealed class SettingsRoute : Parcelable {
             fragment<NineKeySymbolsFragment, T9Symbols> {
                 label = ctx.getString(R.string.t9_symbols)
             }
+            fragment<ToolbarButtonsFragment, ToolbarButtons> {
+                label = ctx.getString(R.string.toolbar_buttons)
+            }
+            fragment<AddressSettingsFragment, Addresses> {
+                label = ctx.getString(R.string.address_suggestions)
+            }
+            fragment<AddressSuffixesFragment, AddressSuffixes>()
             fragment<SettingsSearchFragment, Search> {
                 label = ctx.getString(R.string.search_settings)
             }

@@ -7,6 +7,7 @@ package org.fcitx.fcitx5.android.engine.user
 import org.fcitx.fcitx5.android.engine.data.escapeValue
 import org.fcitx.fcitx5.android.engine.data.splitValues
 import org.fcitx.fcitx5.android.engine.user.UserModel.Entry
+import org.fcitx.fcitx5.android.engine.user.imports.WordText
 import java.io.BufferedReader
 import java.io.FilterReader
 import java.io.IOException
@@ -158,7 +159,7 @@ object DictionaryFormat {
                         entry == null -> textOnly++
                         else -> {
                             words++
-                            write?.invoke("${escapeValue(entry.text)} ${WordLists.code(entry.syllables)} ${layout.weigh(read)}")
+                            write?.invoke("${escapeValue(entry.text)} ${entry.apostrophed()} ${layout.weigh(read)}")
                         }
                     }
                 }
@@ -373,7 +374,7 @@ object DictionaryFormat {
         val fields = splitValues(line)
         if (fields.size !in 2..3) return null
         val value = (if (fields.size == 3) fields[2].toDoubleOrNull() else 0.0) ?: return null
-        val entry = LibimeImport.entry(fields[0], fields[1]) ?: return null
+        val entry = WordText.entry(fields[0], fields[1]) ?: return null
         val reading = if (entry.syllables.size <= 1) LineReading.ANY else LineReading.APOSTROPHES
         return Read(Order.TEXT_FIRST, reading, weightOf(value), value, entry)
     }

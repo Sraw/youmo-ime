@@ -57,6 +57,14 @@ class ToolButton(context: Context) : CustomGestureView(context) {
         }
     }
 
+    /** The icon's colour: lit (a toggle on) or not */
+    @get:ColorInt
+    val iconTint: Int get() = image.imageTintList?.defaultColor ?: 0
+
+    fun setIconTint(@ColorInt color: Int) {
+        image.imageTintList = ColorStateList.valueOf(color)
+    }
+
     fun setIcon(@DrawableRes icon: Int) {
         image.imageResource = icon
     }

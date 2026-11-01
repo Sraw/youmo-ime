@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.engine.handwriting
 
+import org.fcitx.fcitx5.android.engine.handwriting.HandwritingSession.Companion.NO_PIECE
 import org.fcitx.fcitx5.android.engine.lattice.Predictor
 import org.fcitx.fcitx5.android.engine.lattice.TextWords
 import org.fcitx.fcitx5.android.engine.learn.Code
@@ -31,8 +32,8 @@ class HandwritingSessionUndoTest {
     private var pieces = 0
 
     private fun write(reading: InkReading): Snapshot {
-        session.offer(reading, pieces++)
-        return session.apply(Action.Ink)
+        session.hold(Action.Ink(pieces++, reading))
+        return session.apply(Action.Ink(NO_PIECE))
     }
 
     // [reading] written, [text] picked of what it shows: what goes in

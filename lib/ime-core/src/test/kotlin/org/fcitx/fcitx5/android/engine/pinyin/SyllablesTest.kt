@@ -46,6 +46,19 @@ class SyllablesTest {
         assertEquals(-1, Syllables.id("Ni"))
     }
 
+    @Test
+    fun aReadingIsSpelledWithSpacesOrApostrophes() {
+        val nihao = intArrayOf(Syllables.id("ni"), Syllables.id("hao"))
+        assertEquals("ni hao", Syllables.spelled(nihao))
+        assertEquals("hao", Syllables.spelled(nihao, 1, 2))
+        assertEquals("", Syllables.spelled(nihao, 1, 1))
+        assertEquals("ni hao", Syllables.spelled(2) { nihao[it] })
+        assertEquals("ni'hao", Syllables.apostrophed(nihao))
+        assertEquals("A'gu", Syllables.apostrophed(intArrayOf(Syllables.id("A"), Syllables.id("gu"))))
+        assertEquals("ni'hao", Syllables.apostrophed("ni hao"))
+        assertEquals("ni hao", Syllables.spaced("ni'hao"))
+    }
+
     private companion object {
         const val FROZEN_COUNT = 448
         const val FROZEN_CHECKSUM = 2064975150L

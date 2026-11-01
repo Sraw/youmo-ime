@@ -8,6 +8,7 @@ import android.content.res.Configuration
 import androidx.annotation.Keep
 import androidx.core.content.edit
 import androidx.preference.PreferenceManager
+import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.prefs.ManagedPreferenceProvider
 import org.fcitx.fcitx5.android.data.theme.ThemeManager.activeTheme
@@ -15,6 +16,7 @@ import org.fcitx.fcitx5.android.input.keyboard.OneHanded
 import org.fcitx.fcitx5.android.utils.WeakHashSet
 import org.fcitx.fcitx5.android.utils.appContext
 import org.fcitx.fcitx5.android.utils.isDarkMode
+import org.fcitx.fcitx5.android.utils.toast
 
 object ThemeManager {
 
@@ -83,7 +85,9 @@ object ThemeManager {
 
     val prefs = AppPrefs.getInstance().registerProvider(::ThemePrefs)
 
-    fun saveTheme(theme: Theme.Custom) {
+    /** Saves [theme]; whether it was, none while the themes are not settled (the user told). */
+    fun saveTheme(theme: Theme.Custom): Boolean {
+        if (refuseIfNotSettled()) return false
         ThemeFilesManager.saveThemeFiles(theme)
         customThemes.indexOfFirst { it.name == theme.name }.also {
             if (it >= 0) customThemes[it] = theme else customThemes.add(0, theme)
@@ -91,9 +95,12 @@ object ThemeManager {
         if (activeTheme.name == theme.name) {
             activeTheme = theme
         }
+        return true
     }
 
-    fun deleteTheme(name: String) {
+    /** Deletes the theme [name]; whether it was let, none while the themes are not settled (the user told). */
+    fun deleteTheme(name: String): Boolean {
+        if (refuseIfNotSettled()) return false
         customThemes.find { it.name == name }?.also {
             ThemeFilesManager.deleteThemeFiles(it)
             customThemes.remove(it)
@@ -101,6 +108,7 @@ object ThemeManager {
         if (activeTheme.name == name) {
             activeTheme = evaluateActiveTheme()
         }
+        return true
     }
 
     fun setNormalModeTheme(theme: Theme) {
@@ -132,6 +140,9 @@ object ThemeManager {
             else -> fireChange()
         }
     }
+
+    // the themes not settled (A4): nothing saved or deleted, as it would be lost at the next start; the user told
+    fun refuseIfNotSettled() = !ThemeFilesManager.writable.also { if (!it) appContext.toast(R.string.user_data_not_settled) }
 
     fun init(configuration: Configuration) {
         isDarkMode = configuration.isDarkMode()

@@ -20,7 +20,7 @@
 #
 # Full pinyin is read with neighbouring keys, as the app reads it by default (EngineSettings.typos);
 # the nine keys as the app types them (t9-strict), the set typed in digits by `t9` first; the 14
-# keys as their codes by `t9 --keys 14`, grouped 双拼 as its keys' codes by `shuangpin --keys`.
+# and 18 keys as their codes by `t9 --keys 14|18`, grouped 双拼 as its keys' codes by `shuangpin --keys`.
 #
 # Gate sets, by layer:
 #   base layer, must not get worse   web (recent pages, held out), chat (held-out half), dialog, pinyin
@@ -29,8 +29,8 @@
 #   user layer                       learn over chat: typed a third time, and what was not typed
 # Reported only: context, small (when given), slips (mixed-up and slipped syllables), mixed
 # (Chinese with an English word: not yet typed at all), and chat (held-out half) and pinyin on the
-# nine keys (t9-chat, t9-pinyin), the 14 keys (g14-chat, g14-pinyin), and chat in 小鹤双拼 on the
-# 18 keys and the nine keys (sp18-chat, spnine-chat).
+# nine keys (t9-chat, t9-pinyin), the 14 keys (g14-chat, g14-pinyin), pinyin's 18 keys (g18-chat),
+# and chat in 小鹤双拼 on the 18 keys, the 14 keys and the nine keys (sp18-chat, sp14-chat, spnine-chat).
 set -o pipefail
 OUT=${1:?usage: release-report.sh <out dir>}
 : "${EVAL:?EVAL: the ime-eval launcher}" "${DATA:?DATA: the pinyin data}" "${MODELS:?MODELS: the sentence models dir}"
@@ -39,8 +39,8 @@ mkdir -p "$OUT" || exit 1
 REPORT=$OUT/report.txt
 : > "$REPORT"
 
-# name:set:gate weight:half:scheme (a weight of 0 is reported only; a scheme is a nine-key, 14-key or grouped 双拼 one:
-# 小鹤 on the 18 keys and the nine keys, typed from the full-pinyin set as `t9` types the others).
+# name:set:gate weight:half:scheme (a weight of 0 is reported only; a scheme is a nine-key, 14-key, 18-key or grouped 双拼 one:
+# 小鹤 on the 18 keys, the 14 keys and the nine keys, typed from the full-pinyin set as `t9` types the others).
 # A keyed set keeps only the samples of one exact reading (no 简拼, no half syllables): its top-1 is not
 # comparable to the full-pinyin set's; `t9 --same` writes the samples kept, for full pinyin on the same ones.
 # The set - is SMALL, as given from where this was run: not in this list, as its path may hold a
@@ -50,7 +50,8 @@ new:pinyin-new.tsv:0.20:: collide:pinyin-collide.tsv:0.15:: pinyin:pinyin.tsv:0.
 context:pinyin-context.tsv:0:: slips:pinyin-slips.tsv:0:: mixed:pinyin-mixed.tsv:0::
 t9-chat:pinyin-chat.tsv:0:held-out:t9-strict t9-pinyin:pinyin.tsv:0::t9-strict
 g14-chat:pinyin-chat.tsv:0:held-out:g14-strict g14-pinyin:pinyin.tsv:0::g14-strict
-sp18-chat:pinyin-chat.tsv:0:held-out:xiaohe-18 spnine-chat:pinyin-chat.tsv:0:held-out:xiaohe-nine"
+g18-chat:pinyin-chat.tsv:0:held-out:g18-strict
+sp18-chat:pinyin-chat.tsv:0:held-out:xiaohe-18 sp14-chat:pinyin-chat.tsv:0:held-out:xiaohe-14 spnine-chat:pinyin-chat.tsv:0:held-out:xiaohe-nine"
 [ -n "$SMALL" ] && SPECS="$SPECS small:-:0::"
 
 failed=0
@@ -97,13 +98,13 @@ for spec in $SPECS; do
   if [ "$set" = - ]; then set=$SMALL; else set=$SETS/$set; fi
   : > "$OUT/$name.err"
   if [ -n "$scheme" ]; then
-    # a g14 scheme reads the 14 keys' codes, the others the nine keys' digits
-    # a grouped 双拼 scheme (<scheme>-18, <scheme>-nine) its scheme's keys as their groups' codes
-    if [[ $scheme == *-18 || $scheme == *-nine ]]; then
+    # a grouped 双拼 scheme (<scheme>-18, <scheme>-14, <scheme>-nine) reads its scheme's keys as their
+    # groups' codes; a g14 or g18 scheme the 14 or 18 keys' codes, the others the nine keys' digits
+    if [[ $scheme == *-18 || $scheme == *-14 || $scheme == *-nine ]]; then
       "$EVAL" shuangpin "${scheme%-*}" "$set" "$OUT/$name.set.tsv" --keys "${scheme##*-}" > /dev/null 2>> "$OUT/$name.err" ||
         fail "$name: the set could not be typed on the keys"
     else
-      keys=(); [[ $scheme == g14* ]] && keys=(--keys 14)
+      keys=(); [[ $scheme == g14* ]] && keys=(--keys 14); [[ $scheme == g18* ]] && keys=(--keys 18)
       "$EVAL" t9 "$set" "$OUT/$name.set.tsv" "${keys[@]}" > /dev/null 2>> "$OUT/$name.err" || fail "$name: the set could not be typed on the keys"
     fi
     set=$OUT/$name.set.tsv

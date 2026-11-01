@@ -7,7 +7,7 @@ package org.fcitx.fcitx5.android.input.status
 import android.content.Context
 import androidx.annotation.DrawableRes
 import org.fcitx.fcitx5.android.R
-import org.fcitx.fcitx5.android.core.Action
+import org.fcitx.fcitx5.android.host.StatusEntry
 
 sealed class StatusAreaEntry(
     val label: String,
@@ -28,11 +28,14 @@ sealed class StatusAreaEntry(
             HabitsToggle,
 
             /** U-88 「清掉最近」 */
-            ClearRecent
+            ClearRecent,
+
+            /** I1 「键盘」: the input method's keyboards (KeyboardPicker) */
+            KeyboardChoice
         }
     }
 
-    class Fcitx(val action: Action, label: String, icon: Int, active: Boolean) :
+    class Host(val action: StatusEntry, label: String, icon: Int, active: Boolean) :
         StatusAreaEntry(label, icon, active)
 
     companion object {
@@ -61,9 +64,9 @@ sealed class StatusAreaEntry(
             }
         }
 
-        fun fromAction(context: Context, it: Action): Fcitx {
-            val active = it.icon.endsWith("-active") || it.isChecked
-            return Fcitx(it, label(context, it.name, active) ?: it.shortText, drawableFromIconName(it.icon), active)
+        fun fromEntry(context: Context, it: StatusEntry): Host {
+            val active = it.icon.endsWith("-active")
+            return Host(it, label(context, it.name, active) ?: it.shortText, drawableFromIconName(it.icon), active)
         }
 
         // fcitx names its actions in its own language, not the app's (InputMethodNames)

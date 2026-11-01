@@ -22,7 +22,7 @@ import org.robolectric.RuntimeEnvironment
 class PopupMenuUiTest {
 
     private val items = Array(3) {
-        KeyDef.Popup.Menu.Item("$it", android.R.drawable.ic_menu_add, KeyAction.FcitxKeyAction("$it"))
+        KeyDef.Popup.Menu.Item("$it", android.R.drawable.ic_menu_add, KeyAction.HostKeyAction("$it"))
     }
     private val trigger = Rect(480, 500, 520, 550)
     private var moved = 0

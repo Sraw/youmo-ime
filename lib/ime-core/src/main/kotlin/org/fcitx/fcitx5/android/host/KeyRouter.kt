@@ -7,11 +7,12 @@ package org.fcitx.fcitx5.android.host
 import org.fcitx.fcitx5.android.core.CoreLog
 import org.fcitx.fcitx5.android.core.FormattedText
 import org.fcitx.fcitx5.android.core.TextFormatFlag
-import org.fcitx.fcitx5.android.engine.host.EngineEvent
-import org.fcitx.fcitx5.android.engine.host.Engines
-import org.fcitx.fcitx5.android.engine.host.Keyboard
-import org.fcitx.fcitx5.android.engine.host.KeyboardPair
-import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
+import org.fcitx.fcitx5.android.engine.InputMethodCatalog
+import org.fcitx.fcitx5.android.engine.runtime.EngineEvent
+import org.fcitx.fcitx5.android.engine.runtime.EngineSettings
+import org.fcitx.fcitx5.android.engine.runtime.Keyboard
+import org.fcitx.fcitx5.android.engine.runtime.KeyboardPair
+import org.fcitx.fcitx5.android.engine.session.Action
 import org.fcitx.fcitx5.android.engine.session.Offer
 import org.fcitx.fcitx5.android.engine.session.Snapshot
 
@@ -113,18 +114,19 @@ class KeyRouter(
         }
         endPunctuation(ic, take = true)
         val im = services.inputMethod(ic)
-        // a grouped keyboard's code (NineKeyLetters.ofCode, and the rest of their blocks), a tap's with its place
-        // (Keyboard.TAPS, the 14 keys' alone yet) too: never let through, the app would type it. The input method
-        // whose keyboard it is reads it; any other (a switch the keyboard shown has not caught up with) has it
-        // swallowed, never read as one of its own groups
+        // a grouped keyboard's code (NineKeyLetters.ofCode, and the rest of their blocks; those past the BMP,
+        // Keyboard.KEYED_CODES), a tap's with its place (Keyboard.TAPS, the 14 keys' alone yet) too: never let
+        // through, the app would type it. The input method whose keyboard it is reads it; any other (a switch the
+        // keyboard shown has not caught up with) has it swallowed, never read as one of its own groups
+        // A stroke drawn (笔画筛选, Keyboard.STROKES) the same: the input methods that filter by one read it
         val cp = KeySyms.toUnicode(key.sym)
-        val code = cp in NineKeyLetters.CODES || cp in Keyboard.TAPS
-        val reads = if (cp in Keyboard.TAPS) im == Engines.PINYIN else Engines.readsCode(im, cp)
+        val code = InputMethodCatalog.isCode(cp) || cp in Keyboard.STROKES
+        val reads = if (cp in Keyboard.STROKES) InputMethodCatalog.filtersByStrokes(im) else InputMethodCatalog.readsCode(im, cp)
         if (code && !reads) {
             e.filterAndAccept()
             return
         }
-        val chinese = Engines.listed(im)?.chinese == true
+        val chinese = InputMethodCatalog.listed(im)?.chinese == true
         if (!chinese && !suggestsEnglish(ic, e.virtual)) {
             asIs(ic, im, e)
             return
@@ -141,10 +143,10 @@ class KeyRouter(
         }
         val (what, arg) = eventOf(key)
         // 双拼's pair tells a hardware ; (微软's ing) from the screen's mark: KeyboardPair
-        val sent = if (what == EngineEvent.CHAR && !e.virtual && im == Engines.SHUANGPIN && !KeyboardPair.isLetter(arg)) EngineEvent.HARD_CHAR else what
+        val sent = if (what == EngineEvent.CHAR && !e.virtual && im == InputMethodCatalog.SHUANGPIN && !KeyboardPair.isLetter(arg)) EngineEvent.HARD_CHAR else what
         // English's punctuation is the key's own, not a Chinese mark
         // pinyin failing to take a code (its session not made): swallowed all the same
-        if (send(ic, im, sent, arg) || code || (what == EngineEvent.CHAR && chinese && pushPunctuation(ic, key))) {
+        if (send(ic, im, sent, arg, e.payload) || code || (what == EngineEvent.CHAR && chinese && pushPunctuation(ic, key))) {
             e.filterAndAccept()
         }
     }
@@ -181,7 +183,7 @@ class KeyRouter(
         // swallowed whatever it does, as let through the app would type its private-use character.
         // No Enter first: it would have the session forget the char before the cursor
         if (unicode == GLIDE_CHAR) {
-            glidedAsIs = send(ic, im, EngineEvent.CHAR, GLIDE_CHAR)
+            glidedAsIs = send(ic, im, EngineEvent.CHAR, GLIDE_CHAR, e.payload)
             e.filterAndAccept()
             return
         }
@@ -237,13 +239,13 @@ class KeyRouter(
         if (taken || !ic.has(Capability.PREEDIT)) e.filter()
     }
 
-    /** `AndroidEngine::send` (`:689-704`): [event] to [im]'s session and what comes back shown; whether it took it. */
-    fun send(ic: InputContext, im: String, event: Int, arg: Int = 0): Boolean {
+    /** `AndroidEngine::send` (`:689-704`): [event] to [im]'s session, [payload] its key's, and what comes back shown; whether it took it. */
+    fun send(ic: InputContext, im: String, event: Int, arg: Int = 0, payload: Action? = null): Boolean {
         refiner.cancel()
         // where what is typed shows is the input method's, whatever turned it since activate
         ic.preeditEnabled = composesText(im)
         val learning = !ic.has(Capability.PASSWORD_OR_SENSITIVE)
-        val s = call(im, event, arg, learning)
+        val s = call(im, event, arg, learning, payload)
         // a key may be on its way: the pause starts a little after it, the next slice at once
         if (s.refines) refineLater(ic, im, if (event == EngineEvent.REFINE) 0 else Refiner.PAUSE_MILLIS)
         // a slice of refining that changed nothing leaves the panel as it is, the list scrolled;
@@ -253,9 +255,9 @@ class KeyRouter(
     }
 
     @Suppress("TooGenericExceptionCaught")
-    private fun call(im: String, event: Int, arg: Int, learning: Boolean): Snapshot {
+    private fun call(im: String, event: Int, arg: Int, learning: Boolean, payload: Action?): Snapshot {
         val s = try {
-            host.event(im, event, arg, learning)
+            host.event(im, event, arg, learning, payload)
         } catch (e: Throwable) {
             failed("onEvent", im, event, e)
             // the panel is cleared for it (but for a slice of refining, not shown): so must the
@@ -263,7 +265,7 @@ class KeyRouter(
             // is not sent another till it answers
             if (event != EngineEvent.RESET && event != EngineEvent.REFINE && im in answered) {
                 try {
-                    host.event(im, EngineEvent.RESET, 0, learning)
+                    host.event(im, EngineEvent.RESET, 0, learning, payload = null)
                 } catch (again: Throwable) {
                     failed("onEvent", im, EngineEvent.RESET, again)
                     answered.remove(im)
@@ -291,10 +293,10 @@ class KeyRouter(
         emptySet()
     }
 
-    /** New engine options for the sessions, flattened (`AndroidEngine::pushSettings`, `:472-490`). */
+    /** New engine options for the sessions (`AndroidEngine::pushSettings`, `:472-490`). */
     @Suppress("TooGenericExceptionCaught")
-    fun settings(flat: String) = try {
-        host.settings(flat)
+    fun settings(settings: EngineSettings) = try {
+        host.settings(settings)
     } catch (e: Throwable) {
         failed("configure", "", -1, e)
     }
@@ -339,6 +341,8 @@ class KeyRouter(
         if (s.commit.isNotEmpty()) services.commit(ic, s.commit)
         panel.reset()
         if (s.preedit.isNotEmpty()) showPreedit(ic, s.preedit, s.cursor)
+        // a table's pinyin lookup, said before what is typed: no code of the table's
+        if (s.lookingUp) panel.auxUp = TempKeys.text(LOOKING_UP)
         if (s.candidates.isNotEmpty()) panel.candidateList = EngineCandidateList(ic, im, s)
         services.updatePreedit(ic)
         services.updatePanel(ic)
@@ -430,7 +434,7 @@ class KeyRouter(
         half: Boolean,
         // the key pushed again as it goes in, on the first entry of a pair typed a half at a time; else 0
         private val key: Int = 0,
-    ) : CandidateWord {
+    ) : PanelCandidate {
         override val text = mark + after
         override val comment = if (half) strings.half else ""
 
@@ -444,7 +448,7 @@ class KeyRouter(
 
     /** A session's candidate: picking it sends its index among all of them (`EngineCandidateWord`, `:39-56`). */
     internal inner class EngineWord(private val im: String, val index: Int, override val text: String, override val comment: String) :
-        CandidateWord {
+        PanelCandidate {
         override fun select(ic: InputContext) {
             send(ic, im, EngineEvent.PICK, index)
         }
@@ -481,7 +485,7 @@ class KeyRouter(
         private var asked: EngineWord? = null
 
         override fun label(index: Int) = labels.getOrElse(index) { "" }
-        override fun candidate(index: Int): CandidateWord? = if (index in 0 until size) words[index] else null
+        override fun candidate(index: Int): PanelCandidate? = if (index in 0 until size) words[index] else null
 
         // what space commits while composing: the first of the page
         override val cursorIndex get() = if (composing) 0 else -1
@@ -489,7 +493,7 @@ class KeyRouter(
         override val bulk get() = true
         override val totalSize get() = total
 
-        override fun candidateFromAll(index: Int): CandidateWord? {
+        override fun candidateFromAll(index: Int): PanelCandidate? {
             // a total of -1: the session has not counted them, so ask until it runs out
             if (index < 0 || (total >= 0 && index >= total)) return null
             if (index < offset) {
@@ -527,7 +531,7 @@ class KeyRouter(
             send(ic, im, EngineEvent.PAGE_DOWN)
         }
 
-        override fun actions(word: CandidateWord): List<CandidateAction> {
+        override fun actions(word: PanelCandidate): List<CandidateAction> {
             if (!actionable || word !is EngineWord) return emptyList()
             asked = word
             val offered = offers(im, word.index)
@@ -538,7 +542,7 @@ class KeyRouter(
         }
 
         @Suppress("ComplexCondition")
-        override fun triggerAction(word: CandidateWord, id: Int) {
+        override fun triggerAction(word: PanelCandidate, id: Int) {
             val offer = OFFER_ACTIONS.filter { it.second == id }.map { it.first }.toSet()
             // asked again: only what the session still offers for the candidate at that index, and
             // only on the one this list offered it for: a menu of a list since replaced names another
@@ -549,6 +553,9 @@ class KeyRouter(
     }
 
     companion object {
+        /** What is shown before a table's pinyin lookup ([Snapshot.lookingUp]): the 拼 key's own label. */
+        const val LOOKING_UP = "拼"
+
         /** `AndroidEngineConfig::pageSize`'s default (`androidengine.h:96-97`). */
         const val DEFAULT_PAGE_SIZE = 7
 
@@ -588,6 +595,6 @@ class KeyRouter(
         private val UNHANDLED = Snapshot("", "", emptyList(), 0, false, false, handled = false, predicting = false)
 
         /** `composesText` (`:375-383`): what [im] has typed is the text itself, shown in the app. */
-        fun composesText(im: String) = Engines.listed(im)?.composesText == true
+        fun composesText(im: String) = InputMethodCatalog.listed(im)?.composesText == true
     }
 }

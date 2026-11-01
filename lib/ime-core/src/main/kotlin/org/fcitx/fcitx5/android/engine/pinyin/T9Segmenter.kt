@@ -53,98 +53,115 @@ class T9Segmenter(
     override val letters: NineKeyLetters = NineKeyLetters.STANDARD,
 ) : KeyedSegmenter {
 
-    // digits typing a syllable whole, the start of one, and an initial
-    private val whole = HashMap<String, SyllableMatches>()
-    private val starts = HashMap<String, SyllableMatches>()
-    private val initials = HashMap<String, SyllableMatches>()
-
-    // a chosen letter, as an initial: its syllables
-    private val byInitial = HashMap<String, SyllableMatches>()
-
-    // digits typing a syllable of an initial and a final, or a final alone, of two letters or more:
-    // 啊, 呃, 哦, 呣, 嗯 and 儿 alone would keep 简拼 off every 2, 3, 6 and 7
-    private val regular = HashSet<String>()
-
-    // on a grouped keyboard, beside each of whole, starts and initials: which of its key's letters
-    // the spelling kept for each syllable has at each key, two bits a key, the first key lowest
-    private val wholeLetters = HashMap<String, IntArray>()
-    private val startLetters = HashMap<String, IntArray>()
-    private val initialLetters = HashMap<String, IntArray>()
+    // the tables below made once for the settings that shape them, shared by the sessions made anew
+    // after another setting changed (SettingsMemo, S15 N2)
+    private val tables = TABLES[fuzzy.toSet() to letters]
+    private val whole = tables.whole
+    private val starts = tables.starts
+    private val initials = tables.initials
+    private val byInitial = tables.byInitial
+    private val regular = tables.regular
+    private val wholeLetters = tables.wholeLetters
+    private val startLetters = tables.startLetters
+    private val initialLetters = tables.initialLetters
 
     /**
      * How many times two spellings of a syllable kept for the same keys and flags had different
      * letters: none, or which one [SyllableGraph.against] judges would depend on the order read.
      */
-    internal var letterTies = 0
-        private set
+    internal val letterTies: Int get() = tables.letterTies
 
-    init {
-        val wholeIds = HashMap<String, TreeMap<Int, Int>>()
-        val startIds = HashMap<String, TreeMap<Int, Int>>()
-        val initialIds = HashMap<String, TreeMap<Int, Int>>()
-        val letterIds = HashMap<String, TreeMap<Int, Int>>()
-        val grouped = letters.isGrouped
-        val wholeChoices = HashMap<String, TreeMap<Int, Int>>()
-        val startChoices = HashMap<String, TreeMap<Int, Int>>()
-        val initialChoices = HashMap<String, TreeMap<Int, Int>>()
-        // keepBest, and on a grouped keyboard the letters of the spelling it kept
-        fun keep(ids: HashMap<String, TreeMap<Int, Int>>, choices: HashMap<String, TreeMap<Int, Int>>, keys: String, id: Int, flags: Int, typed: String) {
-            val into = ids.getOrPut(keys) { TreeMap() }
-            val old = into[id]
-            keepBest(into, id, flags)
-            if (!grouped) return
-            val choice = choiceOf(keys, typed)
-            val kept = choices.getOrPut(keys) { TreeMap() }
-            if (old == null || flags < old) kept[id] = choice else if (flags == old && kept[id] != choice) letterTies++
-        }
-        val initialRules = fuzzy.filter { it.onInitial }
-        for (id in 0 until Syllables.count) {
-            val spelling = Syllables.spelling(id)
-            if (spelling[0].isUpperCase()) continue
-            val parts = SpellingIndex.split(spelling)
-            val spellings = if (parts == null) {
-                listOf(spelling to 0)
-            } else {
-                val (init, fin) = parts
-                val finalRules = fuzzy.filter { !it.onInitial && it.appliesAfter(init) }
-                if (init.isNotEmpty()) keepBest(letterIds.getOrPut(init) { TreeMap() }, id, SyllableMatches.COMPLETION)
-                SpellingIndex.variants(init, initialRules).flatMap { (i, iFlags) ->
-                    if (i.isNotEmpty()) {
-                        for (keys in letters.typings(i)) keep(initialIds, initialChoices, keys, id, iFlags or SyllableMatches.COMPLETION, i)
+    /** What a segmenter reads [letters] by under [fuzzy]: made at once, never changed after. */
+    private class Tables(fuzzy: Set<Fuzzy>, private val letters: NineKeyLetters) {
+        // digits typing a syllable whole, the start of one, and an initial
+        val whole = HashMap<String, SyllableMatches>()
+        val starts = HashMap<String, SyllableMatches>()
+        val initials = HashMap<String, SyllableMatches>()
+
+        // a chosen letter, as an initial: its syllables
+        val byInitial = HashMap<String, SyllableMatches>()
+
+        // digits typing a syllable of an initial and a final, or a final alone, of two letters or more:
+        // 啊, 呃, 哦, 呣, 嗯 and 儿 alone would keep 简拼 off every 2, 3, 6 and 7
+        val regular = HashSet<String>()
+
+        // on a grouped keyboard, beside each of whole, starts and initials: which of its key's letters
+        // the spelling kept for each syllable has at each key, two bits a key, the first key lowest
+        val wholeLetters = HashMap<String, IntArray>()
+        val startLetters = HashMap<String, IntArray>()
+        val initialLetters = HashMap<String, IntArray>()
+
+        var letterTies = 0
+            private set
+
+        init {
+            val wholeIds = HashMap<String, TreeMap<Int, Int>>()
+            val startIds = HashMap<String, TreeMap<Int, Int>>()
+            val initialIds = HashMap<String, TreeMap<Int, Int>>()
+            val letterIds = HashMap<String, TreeMap<Int, Int>>()
+            val grouped = letters.isGrouped
+            val wholeChoices = HashMap<String, TreeMap<Int, Int>>()
+            val startChoices = HashMap<String, TreeMap<Int, Int>>()
+            val initialChoices = HashMap<String, TreeMap<Int, Int>>()
+            // keepBest, and on a grouped keyboard the letters of the spelling it kept
+            fun keep(ids: HashMap<String, TreeMap<Int, Int>>, choices: HashMap<String, TreeMap<Int, Int>>, keys: String, id: Int, flags: Int, typed: String) {
+                val into = ids.getOrPut(keys) { TreeMap() }
+                val old = into[id]
+                keepBest(into, id, flags)
+                if (!grouped) return
+                val choice = choiceOf(keys, typed)
+                val kept = choices.getOrPut(keys) { TreeMap() }
+                if (old == null || flags < old) kept[id] = choice else if (flags == old && kept[id] != choice) letterTies++
+            }
+            val initialRules = fuzzy.filter { it.onInitial }
+            for (id in 0 until Syllables.count) {
+                val spelling = Syllables.spelling(id)
+                if (spelling[0].isUpperCase()) continue
+                val parts = SpellingIndex.split(spelling)
+                val spellings = if (parts == null) {
+                    listOf(spelling to 0)
+                } else {
+                    val (init, fin) = parts
+                    val finalRules = fuzzy.filter { !it.onInitial && it.appliesAfter(init) }
+                    if (init.isNotEmpty()) keepBest(letterIds.getOrPut(init) { TreeMap() }, id, SyllableMatches.COMPLETION)
+                    SpellingIndex.variants(init, initialRules).flatMap { (i, iFlags) ->
+                        if (i.isNotEmpty()) {
+                            for (keys in letters.typings(i)) keep(initialIds, initialChoices, keys, id, iFlags or SyllableMatches.COMPLETION, i)
+                        }
+                        // with no initial the final is the syllable: ou's partner u is none, as in 双拼
+                        SpellingIndex.finalsAfter(i, fin, finalRules).map { (f, fFlags) -> i + f to (iFlags or fFlags) }
                     }
-                    // with no initial the final is the syllable: ou's partner u is none, as in 双拼
-                    SpellingIndex.finalsAfter(i, fin, finalRules).map { (f, fFlags) -> i + f to (iFlags or fFlags) }
+                }
+                for ((s, flags) in spellings) {
+                    // üe is typed ue too (略 lue): on a phone u and v share 8, on the user's keys maybe not
+                    val typed = if ("ve" in s) listOf(s, s.replace("ve", "ue")) else listOf(s)
+                    val seen = HashSet<String>()
+                    for (t in typed) {
+                        for (keys in letters.typings(t)) {
+                            if (!seen.add(keys)) continue
+                            if (parts != null && s.length > 1) regular += keys
+                            keep(wholeIds, wholeChoices, keys, id, flags, t)
+                            for (n in 1 until keys.length) keep(startIds, startChoices, keys.substring(0, n), id, flags or SyllableMatches.COMPLETION, t)
+                        }
+                    }
                 }
             }
-            for ((s, flags) in spellings) {
-                // üe is typed ue too (略 lue): on a phone u and v share 8, on the user's keys maybe not
-                val typed = if ("ve" in s) listOf(s, s.replace("ve", "ue")) else listOf(s)
-                val seen = HashSet<String>()
-                for (t in typed) {
-                    for (keys in letters.typings(t)) {
-                        if (!seen.add(keys)) continue
-                        if (parts != null && s.length > 1) regular += keys
-                        keep(wholeIds, wholeChoices, keys, id, flags, t)
-                        for (n in 1 until keys.length) keep(startIds, startChoices, keys.substring(0, n), id, flags or SyllableMatches.COMPLETION, t)
-                    }
-                }
-            }
+            wholeIds.forEach { (k, m) -> whole[k] = toMatches(m) }
+            startIds.forEach { (k, m) -> starts[k] = toMatches(m) }
+            initialIds.forEach { (k, m) -> initials[k] = toMatches(m) }
+            letterIds.forEach { (k, m) -> byInitial[k] = toMatches(m) }
+            // in the matches' order: by syllable
+            wholeChoices.forEach { (k, m) -> wholeLetters[k] = m.values.toIntArray() }
+            startChoices.forEach { (k, m) -> startLetters[k] = m.values.toIntArray() }
+            initialChoices.forEach { (k, m) -> initialLetters[k] = m.values.toIntArray() }
         }
-        wholeIds.forEach { (k, m) -> whole[k] = toMatches(m) }
-        startIds.forEach { (k, m) -> starts[k] = toMatches(m) }
-        initialIds.forEach { (k, m) -> initials[k] = toMatches(m) }
-        letterIds.forEach { (k, m) -> byInitial[k] = toMatches(m) }
-        // in the matches' order: by syllable
-        wholeChoices.forEach { (k, m) -> wholeLetters[k] = m.values.toIntArray() }
-        startChoices.forEach { (k, m) -> startLetters[k] = m.values.toIntArray() }
-        initialChoices.forEach { (k, m) -> initialLetters[k] = m.values.toIntArray() }
-    }
 
-    // which of its key's letters each of [typed] is, [keys] the keys typing it: two bits a key
-    private fun choiceOf(keys: String, typed: String): Int {
-        var choice = 0
-        for (k in keys.indices) choice = choice or (letters.letters(keys[k]).indexOf(typed[k]).coerceIn(0, LETTER_MASK) shl (LETTER_BITS * k))
-        return choice
+        // which of its key's letters each of [typed] is, [keys] the keys typing it: two bits a key
+        private fun choiceOf(keys: String, typed: String): Int {
+            var choice = 0
+            for (k in keys.indices) choice = choice or (letters.letters(keys[k]).indexOf(typed[k]).coerceIn(0, LETTER_MASK) shl (LETTER_BITS * k))
+            return choice
+        }
     }
 
     // the letters of a syllable taken are the session's to put in, not typed
@@ -274,6 +291,11 @@ class T9Segmenter(
 
     companion object {
         private const val MAX_SYLLABLE = 6
+
+        private val TABLES = SettingsMemo<Pair<Set<Fuzzy>, NineKeyLetters>, Tables>(SpellingIndex.MEMO) { (fuzzy, letters) -> Tables(fuzzy, letters) }
+
+        /** How many tables are held: the settings' last few. */
+        internal val held: Int get() = TABLES.size
 
         /** The letters that are an initial alone. */
         private const val INITIAL_LETTERS = "bcdfghjklmnpqrstwxyz"

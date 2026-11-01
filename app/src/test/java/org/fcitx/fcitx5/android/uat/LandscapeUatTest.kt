@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.uat
 
+import android.content.Context
 import android.graphics.Rect
 import android.text.InputType
 import android.view.View
@@ -11,19 +12,27 @@ import android.widget.TextView
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.Uat
+import org.fcitx.fcitx5.android.assertRows
 import org.fcitx.fcitx5.android.core.CandidateWord
-import org.fcitx.fcitx5.android.core.EngineBridge
-import org.fcitx.fcitx5.android.core.FcitxEvent
+import org.fcitx.fcitx5.android.core.EngineState
+import org.fcitx.fcitx5.android.core.FormattedText
 import org.fcitx.fcitx5.android.core.InputMethodEntry
+import org.fcitx.fcitx5.android.data.RecentlyUsed
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
+import org.fcitx.fcitx5.android.data.prefs.PinyinKeyboard
+import org.fcitx.fcitx5.android.data.prefs.ShuangpinKeyboard
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
-import org.fcitx.fcitx5.android.engine.host.Engines
+import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.engine.pinyin.ShuangpinScheme
+import org.fcitx.fcitx5.android.host.HostEvent
 import org.fcitx.fcitx5.android.input.KeyboardHarness
 import org.fcitx.fcitx5.android.input.handwriting.HandwritingPadView
+import org.fcitx.fcitx5.android.input.keyboard.GroupedKeyboard
+import org.fcitx.fcitx5.android.input.keyboard.OneHanded
 import org.fcitx.fcitx5.android.input.keyboard.SplitDock
 import org.fcitx.fcitx5.android.input.keyboard.SplitKeyboardMode
 import org.fcitx.fcitx5.android.input.keyboard.TextKeyView
+import org.fcitx.fcitx5.android.input.keyboard.TextKeyboard
 import org.fcitx.fcitx5.android.ui.main.settings.SettingsRoute
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -36,6 +45,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
+import kotlin.math.abs
 
 /** UAT cases of the keyboard turned sideways (uat/16), at redroid's screen turned: 851 × 393 dp. */
 @RunWith(RobolectricTestRunner::class)
@@ -56,7 +66,7 @@ class LandscapeUatTest {
         harness?.close()
         settings?.close()
         FcitxApplication.getInstance().directBootAwareContext
-            .getSharedPreferences(org.fcitx.fcitx5.android.data.RecentlyUsed.PREFERENCE_NAME, android.content.Context.MODE_PRIVATE).edit().clear().commit()
+            .getSharedPreferences(RecentlyUsed.PREFERENCE_NAME, Context.MODE_PRIVATE).edit().clear().commit()
     }
 
     private fun x(v: View) = IntArray(2).also { v.getLocationInWindow(it) }[0]
@@ -188,7 +198,7 @@ class LandscapeUatTest {
         val b = board()
         assertTrue("$b of $width", onRight(b))
         val bar = bar()
-        assertTrue("bar $bar, board $b", kotlin.math.abs(bar.left - b.left) < 60 && bar.right >= width - 2)
+        assertTrue("bar $bar, board $b", abs(bar.left - b.left) < 60 && bar.right >= width - 2)
         val a = arrow()!!
         assertEquals(h.service.getString(R.string.split_dock_move_left), a.contentDescription)
         assertTrue(h.box(a).right <= b.left)
@@ -282,7 +292,7 @@ class LandscapeUatTest {
     @Test
     @Uat("LS-20")
     fun nineKeysAtTheSide() {
-        harness = KeyboardHarness(im = KeyboardHarness.T9)
+        harness = KeyboardHarness(im = KeyboardHarness.PINYIN, keyboards = KeyboardHarness.NINE_KEYS)
         h.start()
         val b = board()
         assertTrue("$b", onRight(b))
@@ -290,7 +300,7 @@ class LandscapeUatTest {
         assertEquals(sent().toString(), 5, sent().size)
         // the bar over it as narrow, as far right, with candidates too
         h.api.candidates = arrayOf(CandidateWord("", "你好", ""))
-        h.emit(FcitxEvent.CandidateListEvent(FcitxEvent.CandidateListEvent.Data(1, h.api.candidates)))
+        h.emit(HostEvent.Candidates(1, h.api.candidates.toList()))
         val word = KeyboardHarness.all(h.inputView).firstOrNull { h.shown(it) && it is TextView && it.text.toString() == "你好" }
             ?: error(h.texts(h.inputView).toString())
         assertTrue("${h.box(word)}", h.box(word).left >= b.left - 60)
@@ -300,7 +310,7 @@ class LandscapeUatTest {
     @Test
     @Uat("LS-21")
     fun handwritingAtTheSide() {
-        harness = KeyboardHarness(im = InputMethodEntry(Engines.HANDWRITING, "手写", "", "", "写", "zh_CN", "androidengine", false))
+        harness = KeyboardHarness(im = InputMethodEntry(InputMethodCatalog.HANDWRITING, "手写", "", "", "写", "zh_CN", "androidengine", false))
         h.start()
         val pad = KeyboardHarness.find<HandwritingPadView>(h.inputView)!!
         assertTrue(h.shown(pad))
@@ -364,7 +374,7 @@ class LandscapeUatTest {
         h.start(InputType.TYPE_CLASS_NUMBER)
         val b = board()
         assertTrue("$b", onRight(b))
-        assertTrue("${bar()} $b", kotlin.math.abs(bar().left - b.left) < 60)
+        assertTrue("${bar()} $b", abs(bar().left - b.left) < 60)
     }
 
     @Test
@@ -389,7 +399,7 @@ class LandscapeUatTest {
         h.api.candidates = Array(words.size) { CandidateWord("", words[it], "") }
         // more wait behind ⌄, as for a real nihao: only then do the shown words share the bar's width.
         // A list that fits whole stays packed at its natural width (the user's compact decision, 2026-10-25)
-        h.emit(FcitxEvent.CandidateListEvent(FcitxEvent.CandidateListEvent.Data(words.size + 50, h.api.candidates)))
+        h.emit(HostEvent.Candidates(words.size + 50, h.api.candidates.toList()))
         val shown = KeyboardHarness.all(h.inputView).filter { h.shown(it) && it is TextView && it.text.toString() in words }.toList()
         assertEquals("你好", (shown.minBy(::x) as TextView).text.toString())
         val across = union(shown.asSequence())!!
@@ -397,17 +407,138 @@ class LandscapeUatTest {
     }
 
     @Test
+    @Uat("LS-03")
+    fun bothHalvesType() {
+        harness = KeyboardHarness(im = KeyboardHarness.ENGLISH)
+        h.start()
+        val middle = width / 2
+        for (c in "women") {
+            val k = keys(c.toString()).single()
+            // w and e on the left half, o, m and n on the right
+            assertEquals("$c", c in "we", x(k) < middle)
+            h.tap(k)
+        }
+        h.tap(KeyboardHarness.all(h.inputView).first { it.id == R.id.button_space && h.shown(it) })
+        val typed = sent().map { Regex("key=([^,]*)").find(it)?.groupValues?.get(1) ?: it }
+        assertEquals(listOf("w", "o", "m", "e", "n"), typed.take(5))
+        assertEquals(typed.toString(), 6, typed.size)
+    }
+
+    private val shuangpin = InputMethodEntry(InputMethodCatalog.SHUANGPIN, "双拼", "", "", "双", "zh_CN", "androidengine", false)
+
+    private fun grouped(): Rect = h.box(KeyboardHarness.find<GroupedKeyboard>(h.inputView) ?: error("no grouped keyboard"))
+
+    // typing, as fcitx tells it: the code row's text and the strip's syllables
+    private fun typing(im: String) {
+        val typed = FormattedText(arrayOf("bn ui"), intArrayOf(0), 5)
+        h.api.inputPanelCached = HostEvent.InputPanel(typed, FormattedText.Empty, FormattedText.Empty)
+        h.emit(h.api.inputPanelCached)
+        EngineState.syllablesState.value = EngineState.SyllableState(im, composing = true, syllables = listOf("ni", "bu", "mi"), id = 1)
+        h.idle()
+        h.relayout()
+    }
+
+    private fun rowFollows(keys: Rect) {
+        val row = h.box(h.inputView.findViewById(R.id.code_row_text))
+        val strip = h.inputView.findViewById<View>(R.id.code_row_syllables)
+        assertTrue(h.shown(strip))
+        val s = h.box(strip)
+        assertTrue("row $row, strip $s over $keys", row.left >= keys.left - 5 && s.left >= keys.left - 5 && s.right <= keys.right + 5 && row.right <= keys.right + 5)
+        assertTrue("strip $s over $keys", s.bottom <= keys.top + 5)
+    }
+
+    @Test
+    @Uat("LS-30")
+    fun theFourteenKeysAtTheSideWithTheirCodeRow() {
+        prefs.set(AppPrefs.getInstance().keyboard.pinyinKeyboard, PinyinKeyboard.Keys14)
+        h.start()
+        val keys = grouped()
+        // a thumb's width at one side, as the nine keys
+        assertTrue("$keys of $width", keys.width() < width * 0.5 && (onRight(keys) || onLeft(keys)))
+        typing(InputMethodCatalog.PINYIN)
+        rowFollows(keys)
+        h.capture("LandscapeUatTest/keys14_side")
+        EngineState.syllablesState.value = EngineState.SyllableState()
+    }
+
+    @Test
+    @Uat("LS-30")
+    @Config(qualifiers = "w393dp-h851dp-port-440dpi")
+    fun theFourteenKeysOneHandedFloatingAndAsTheThemesPreviewHasThem() {
+        prefs.set(AppPrefs.getInstance().keyboard.pinyinKeyboard, PinyinKeyboard.Keys14)
+        h.start()
+        h.relayout()
+        val docked = grouped().height()
+        val dp = h.service.resources.displayMetrics.density
+        h.close()
+        harness = null
+        // each its own start, so one that fails does not hide the others
+        assertRows(
+            "one-handed: narrower than the screen, the code row over it" to {
+                prefs.set(ThemeManager.prefs.oneHanded, OneHanded.Right)
+                try {
+                    h.start()
+                    typing(InputMethodCatalog.PINYIN)
+                    assertTrue("${grouped()}", grouped().width() < h.service.resources.displayMetrics.widthPixels * 0.95)
+                    rowFollows(grouped())
+                } finally {
+                    harness?.close()
+                    harness = null
+                    prefs.set(ThemeManager.prefs.oneHanded, OneHanded.Off)
+                }
+            },
+            "floating: narrower than the screen, the code row over it" to {
+                prefs.set(ThemeManager.prefs.floatingKeyboard, true)
+                try {
+                    h.start()
+                    typing(InputMethodCatalog.PINYIN)
+                    assertTrue("${grouped()}", grouped().width() < h.service.resources.displayMetrics.widthPixels * 0.95)
+                    rowFollows(grouped())
+                } finally {
+                    harness?.close()
+                    harness = null
+                    EngineState.syllablesState.value = EngineState.SyllableState()
+                    ThemeManager.prefs.floatingKeyboard.setValue(false)
+                }
+            },
+            "the 外观 page's preview: the full keyboard, its keys as tall as the real ones at the 18 dp row" to {
+                val st = SettingsHarness().also { settings = it }
+                st.open(SettingsRoute.Theme)
+                val preview = KeyboardHarness.find<TextKeyboard>(st.activity.window.decorView) ?: error("no preview")
+                assertTrue("preview ${preview.height}, docked $docked", abs(preview.height - docked) <= 3 * dp)
+            },
+        )
+    }
+
+    @Test
+    @Uat("LS-31")
+    fun theEighteenKeysAtTheSideAsTheFourteen() {
+        prefs.set(AppPrefs.getInstance().keyboard.shuangpinKeyboard, ShuangpinKeyboard.Keys18)
+        harness = KeyboardHarness(im = shuangpin)
+        h.start()
+        val keys = grouped()
+        assertTrue("$keys of $width", keys.width() < width * 0.5 && (onRight(keys) || onLeft(keys)))
+        val labels = h.texts()
+        for (l in "Q WE RT Y U IO P A SD FG H JK L; Z XC V BN M".split(" ")) assertTrue("$l in $labels", l in labels)
+        typing(InputMethodCatalog.SHUANGPIN)
+        rowFollows(keys)
+        assertTrue(h.texts(h.inputView).toString(), "ni" in h.texts(h.inputView.findViewById(R.id.code_row_syllables)))
+        h.capture("LandscapeUatTest/keys18_side")
+        EngineState.syllablesState.value = EngineState.SyllableState()
+    }
+
+    @Test
     @Uat("LS-29")
     fun splitShuangpinHasNoSemicolonKey() {
-        val scheme = EngineBridge.shuangpinScheme
-        EngineBridge.shuangpinScheme = ShuangpinScheme.MICROSOFT
-        prefs.later { EngineBridge.shuangpinScheme = scheme }
-        harness = KeyboardHarness(im = InputMethodEntry(Engines.SHUANGPIN, "双拼", "", "", "双", "zh_CN", "androidengine", false))
+        val scheme = EngineState.shuangpinScheme
+        EngineState.shuangpinScheme = ShuangpinScheme.MICROSOFT
+        prefs.later { EngineState.shuangpinScheme = scheme }
+        harness = KeyboardHarness(im = InputMethodEntry(InputMethodCatalog.SHUANGPIN, "双拼", "", "", "双", "zh_CN", "androidengine", false))
         h.start()
         assertTrue(split())
         assertFalse(KeyboardHarness.all(h.inputView).any { it.id == R.id.button_semicolon && h.shown(it) })
         // L ends its row where the row above ends
-        assertTrue(kotlin.math.abs(h.box(h.key("l")).right - h.box(h.key("p")).right) <= 12)
+        assertTrue(abs(h.box(h.key("l")).right - h.box(h.key("p")).right) <= 12)
         val popup = h.longPress(h.key("l"), null)
         assertTrue(popup.toString(), ";" in popup || "；" in popup)
     }

@@ -8,8 +8,8 @@ import java.nio.ByteBuffer
 import org.fcitx.fcitx5.android.engine.assertRows
 import org.fcitx.fcitx5.android.engine.data.PinyinData
 import org.fcitx.fcitx5.android.engine.data.PinyinDataBuilder
-import org.fcitx.fcitx5.android.engine.host.EngineEvent
-import org.fcitx.fcitx5.android.engine.host.Keyboard
+import org.fcitx.fcitx5.android.engine.runtime.EngineEvent
+import org.fcitx.fcitx5.android.engine.runtime.Keyboard
 import org.fcitx.fcitx5.android.engine.learn.Kinds
 import org.fcitx.fcitx5.android.engine.learn.LearnTo
 import org.fcitx.fcitx5.android.engine.learn.Learner

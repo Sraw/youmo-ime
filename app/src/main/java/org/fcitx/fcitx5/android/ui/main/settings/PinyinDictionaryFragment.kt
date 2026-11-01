@@ -41,7 +41,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 import org.fcitx.fcitx5.android.R
-import org.fcitx.fcitx5.android.core.FcitxAPI
+import org.fcitx.fcitx5.android.core.HostApi
 import org.fcitx.fcitx5.android.data.pinyin.ImportedDictionaries
 import org.fcitx.fcitx5.android.data.pinyin.ImportedDictionaries.Unread
 import org.fcitx.fcitx5.android.data.pinyin.MergedDictionary
@@ -49,8 +49,8 @@ import org.fcitx.fcitx5.android.data.pinyin.PinyinDictManager
 import org.fcitx.fcitx5.android.data.pinyin.countWordLines
 import org.fcitx.fcitx5.android.data.pinyin.dict.PinyinDictionary
 import org.fcitx.fcitx5.android.data.pinyin.dict.TextDictionary
-import org.fcitx.fcitx5.android.engine.host.Engines
-import org.fcitx.fcitx5.android.engine.host.ImportLayer
+import org.fcitx.fcitx5.android.engine.runtime.Engines
+import org.fcitx.fcitx5.android.engine.runtime.ImportLayer
 import org.fcitx.fcitx5.android.engine.learn.backup.LearnBackup
 import org.fcitx.fcitx5.android.engine.user.DictionaryFormat
 import org.fcitx.fcitx5.android.engine.user.ImportFiles
@@ -143,7 +143,7 @@ class PinyinDictionaryFragment : PaddingPreferenceFragment() {
         if (savedInstanceState == null && !retried) {
             retried = true
             lifecycleScope.launch(Dispatchers.IO) {
-                MergedDictionary.retry(PinyinDictManager.pinyinDicDir)
+                PinyinDictManager.retryMerged()
                 PinyinDictManager.sweepCache()
             }
         }
@@ -918,11 +918,11 @@ internal class DictionaryChanges(
      * As the page is left: what reads the dictionaries again once the last change is made, if
      * one was made since the page was last left; null if none was.
      */
-    fun left(): (suspend FcitxAPI.() -> Unit)? {
+    fun left(): (suspend HostApi.() -> Unit)? {
         if (!changed) return null
         changed = false
         val made = last
-        val reload: suspend FcitxAPI.() -> Unit = {
+        val reload: suspend HostApi.() -> Unit = {
             made?.join()
             reloadEngine()
         }

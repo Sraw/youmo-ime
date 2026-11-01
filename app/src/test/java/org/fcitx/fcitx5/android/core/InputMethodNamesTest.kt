@@ -7,7 +7,7 @@ package org.fcitx.fcitx5.android.core
 import android.content.Context
 import io.mockk.every
 import io.mockk.mockk
-import org.fcitx.fcitx5.android.engine.host.Engines
+import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
@@ -21,9 +21,9 @@ class InputMethodNamesTest {
 
     @Test
     fun everyInputMethodOfTheAppHasANameOfItsOwn() {
-        val ids = listOf(Engines.PINYIN, Engines.SHUANGPIN, Engines.T9, Engines.ENGLISH) + Engines.TABLES.keys +
+        val ids = listOf(InputMethodCatalog.PINYIN, InputMethodCatalog.SHUANGPIN, InputMethodCatalog.T9, InputMethodCatalog.ENGLISH) + InputMethodCatalog.TABLES.keys +
             // a grouped keyboard's session, named where a setting is not for it
-            listOf(Engines.PINYIN_KEYS, Engines.SHUANGPIN_KEYS18, Engines.SHUANGPIN_NINE)
+            listOf(InputMethodCatalog.PINYIN_KEYS, InputMethodCatalog.SHUANGPIN_KEYS18, InputMethodCatalog.SHUANGPIN_NINE)
         assertEquals(emptyList<String>(), ids.filter { InputMethodNames.of(context, it, fallback = "") == "" })
     }
 

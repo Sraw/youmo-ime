@@ -11,8 +11,8 @@ import android.widget.ImageView
 import androidx.annotation.DrawableRes
 import androidx.annotation.StringRes
 import org.fcitx.fcitx5.android.R
-import org.fcitx.fcitx5.android.core.FcitxEvent
 import org.fcitx.fcitx5.android.data.theme.Theme
+import org.fcitx.fcitx5.android.host.HostEvent
 import org.fcitx.fcitx5.android.utils.styledFloat
 import splitties.dimensions.dp
 import splitties.resources.drawable
@@ -54,7 +54,7 @@ class PaginationUi(override val ctx: Context, val theme: Theme) : Ui {
         })
     }
 
-    fun update(data: FcitxEvent.PagedCandidateEvent.Data) {
+    fun update(data: HostEvent.Paged) {
         prevIcon.alpha = if (data.hasPrev) 1f else disabledAlpha
         nextIcon.alpha = if (data.hasNext) 1f else disabledAlpha
     }

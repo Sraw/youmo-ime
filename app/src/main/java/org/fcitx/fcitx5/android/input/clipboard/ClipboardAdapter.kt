@@ -109,6 +109,12 @@ abstract class ClipboardAdapter(
                         onPin(entry.id)
                     }
                 }
+                // not for a password shown as dots: its pieces would show it
+                if (!(entry.sensitive && maskSensitive)) {
+                    menu.item(R.string.clipboard_split, R.drawable.ic_baseline_content_cut_24, iconTint) {
+                        onSplit(entry)
+                    }
+                }
                 menu.item(R.string.edit, R.drawable.ic_baseline_edit_24, iconTint) {
                     onEdit(entry.id)
                 }
@@ -146,6 +152,8 @@ abstract class ClipboardAdapter(
     abstract fun onUnpin(id: Int)
 
     abstract fun onEdit(id: Int)
+
+    abstract fun onSplit(entry: ClipboardEntry)
 
     abstract fun onShare(entry: ClipboardEntry)
 

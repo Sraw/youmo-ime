@@ -20,14 +20,10 @@ import org.fcitx.fcitx5.android.input.keyboard.ImageLayoutSwitchKey
 import org.fcitx.fcitx5.android.input.keyboard.KeyDef
 import org.fcitx.fcitx5.android.input.keyboard.ReturnKey
 import org.fcitx.fcitx5.android.input.keyboard.showReturnAction
-import org.fcitx.fcitx5.android.utils.setVerticalScrollbarThumbColor
 import org.fcitx.fcitx5.android.utils.singleSideBorderDrawable
 import splitties.dimensions.dp
 import splitties.views.backgroundColor
-import splitties.views.dsl.constraintlayout.above
 import splitties.views.dsl.constraintlayout.bottomOfParent
-import splitties.views.dsl.constraintlayout.centerHorizontally
-import splitties.views.dsl.constraintlayout.constraintLayout
 import splitties.views.dsl.constraintlayout.lParams
 import splitties.views.dsl.constraintlayout.leftOfParent
 import splitties.views.dsl.constraintlayout.leftToRightOf
@@ -35,7 +31,6 @@ import splitties.views.dsl.constraintlayout.rightOfParent
 import splitties.views.dsl.constraintlayout.rightToLeftOf
 import splitties.views.dsl.constraintlayout.topOfParent
 import splitties.views.dsl.core.add
-import splitties.views.dsl.core.wrapContent
 import splitties.views.dsl.recyclerview.recyclerView
 
 @SuppressLint("ViewConstructor")
@@ -95,24 +90,6 @@ class ExpandedCandidateLayout(context: Context, theme: Theme) : ConstraintLayout
         isVerticalScrollBarEnabled = false
     }
 
-    val tabsContainer = constraintLayout()
-
-    val scrollableTabs = recyclerView {
-        itemAnimator = null
-        // always show scrollbar
-        isScrollbarFadingEnabled = false
-        scrollBarSize = dp(1)
-        setVerticalScrollbarThumbColor(theme.candidateTextColor)
-    }
-
-    val pinnedTabs = recyclerView {
-        itemAnimator = null
-        // prevent scrolling in pinned tabs at bottom
-        overScrollMode = OVER_SCROLL_NEVER
-        isNestedScrollingEnabled = false
-        isVerticalScrollBarEnabled = false
-    }
-
     var pageUpBtn: ImageKeyView
     var pageDnBtn: ImageKeyView
 
@@ -126,34 +103,15 @@ class ExpandedCandidateLayout(context: Context, theme: Theme) : ConstraintLayout
 
         val landscape = resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
         val inset = dp(if (landscape) keyVerticalMarginLandscape else keyVerticalMargin)
-        tabsContainer.background =
-            singleSideBorderDrawable(dp(1), theme.dividerColor, Gravity.RIGHT, inset)
         if (!keyBorder) {
             backgroundColor = theme.barColor
             embeddedKeyboard.background =
                 singleSideBorderDrawable(dp(1), theme.dividerColor, Gravity.LEFT, inset)
         }
 
-        add(tabsContainer, lParams {
-            matchConstraintPercentWidth = 0.15f
-            topOfParent()
-            leftOfParent()
-            bottomOfParent()
-        })
-        tabsContainer.apply {
-            add(scrollableTabs, lParams {
-                topOfParent()
-                centerHorizontally()
-                above(pinnedTabs)
-            })
-            add(pinnedTabs, lParams(height = wrapContent) {
-                bottomOfParent()
-                centerHorizontally()
-            })
-        }
         add(recyclerView, lParams {
             topOfParent()
-            leftToRightOf(tabsContainer)
+            leftOfParent()
             rightToLeftOf(embeddedKeyboard)
             bottomOfParent()
         })

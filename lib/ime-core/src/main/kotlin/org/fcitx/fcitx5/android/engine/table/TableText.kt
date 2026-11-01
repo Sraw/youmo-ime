@@ -47,7 +47,7 @@ object TableText {
      *   commits by itself;
      * - a word added goes if less than a tenth as common as the commonest of the code's others
      *   (characters and words not [fresh]) or never seen, unless not all Han, which no count is
-     *   of; one the user picked before stays theirs (TableUser). A [fresh] word (the new-word
+     *   of; one the user picked before stays theirs (SavedPhrases). A [fresh] word (the new-word
      *   pack's) never goes: new, it is more used than any count of the past says, taken as
      *   [FRESH_BOOST] more;
      * - codes shorter than the longest, the table's 简码, stay as they were.

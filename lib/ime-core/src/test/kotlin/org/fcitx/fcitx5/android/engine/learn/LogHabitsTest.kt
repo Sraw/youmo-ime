@@ -149,11 +149,16 @@ class LogHabitsTest {
         // 连按 is the nine keys' too
         habits.record(listOf(row("fenghua", "奉化", "feng hua", kind = Kinds.nineKeysMultiTap(NineKeyLetters.STANDARD.tag()))))
         assertEquals(Habits.Spelled(2, 0), habits.spelled(t9, fenghua))
-        assertEquals(listOf("点了"), habits.spelledFrom(Kinds.FULL, 'd').map { it.text })
-        assertEquals(listOf("奉化"), habits.spelledFrom(t9, '3').map { it.text })
+        assertEquals(listOf("点了"), habits.spelledFrom(Kinds.FULL, 'd').map { it.words.text })
+        assertEquals(listOf("奉化"), habits.spelledFrom(t9, '3').map { it.words.text })
         // used once spelt out, 发挥 moves nothing: not walked
         habits.record(listOf(row("fahui", "发挥", "fa hui")))
-        assertEquals(listOf("奉化"), habits.spelledFrom(Kinds.FULL, 'f').map { it.text })
+        assertEquals(listOf("奉化"), habits.spelledFrom(Kinds.FULL, 'f').map { it.words.text })
+        // the counts kept with each word are the record's as it is: another use spelt out counts at once (S15 B5.1)
+        habits.spelledFrom(Kinds.FULL, 'f').single().let { assertEquals(Habits.Spelled(2, 0), it.spelled); assertEquals(listOf("feng", "hua"), it.syllables) }
+        habits.record(listOf(row("fenghua", "奉化", "feng hua")))
+        assertEquals(Habits.Spelled(3, 0), habits.spelledFrom(Kinds.FULL, 'f').single().spelled)
+        assertEquals(Habits.Spelled(0, 1), habits.spelledFrom(Kinds.FULL, 'd').single().spelled)
         // only rows U-20 counts are kept by word: a syllable alone and a table's are not (R14 F3761, F3774)
         habits.record(listOf(row("de", "的", "de"), row("dehua", "的话", "de hua", kind = Kinds.table("wubi"))))
         assertTrue(log.state.statsOf("的", "de").isEmpty())
@@ -177,15 +182,15 @@ class LogHabitsTest {
         val habits = LogHabits({ log })
         val tag = NineKeyLetters.STANDARD.tag()
         repeat(2) { habits.record(listOf(row("fenghua", "奉化", "feng hua", kind = Kinds.nineKeysMultiTap(tag)))) }
-        assertEquals(listOf("奉化"), habits.spelledFrom(Kinds.nineKeys(tag), '3').map { it.text })
-        assertEquals(listOf("奉化"), habits.spelledFrom(Kinds.nineKeysMultiTap(tag), 'f').map { it.text })
+        assertEquals(listOf("奉化"), habits.spelledFrom(Kinds.nineKeys(tag), '3').map { it.words.text })
+        assertEquals(listOf("奉化"), habits.spelledFrom(Kinds.nineKeysMultiTap(tag), 'f').map { it.words.text })
         repeat(2) { habits.record(listOf(row("944326", "知道", "zhi dao", kind = Kinds.nineKeys(tag)))) }
-        assertEquals(listOf("知道"), habits.spelledFrom(Kinds.nineKeysMultiTap(tag), 'z').map { it.text })
-        assertEquals(listOf("知道"), habits.spelledFrom(Kinds.nineKeys(tag), '9').map { it.text })
+        assertEquals(listOf("知道"), habits.spelledFrom(Kinds.nineKeysMultiTap(tag), 'z').map { it.words.text })
+        assertEquals(listOf("知道"), habits.spelledFrom(Kinds.nineKeys(tag), '9').map { it.words.text })
         // a layout of the user's: f on 2, so 2 finds 奉化 and 3 does not (R14 F3768)
         val custom = NineKeyLetters.parse("abcf,de,ghi,jkl,mno,pqrs,tuv,wxyz").tag()
         repeat(2) { habits.record(listOf(row("2364482", "奉化", "feng hua", kind = Kinds.nineKeys(custom)))) }
-        assertEquals(listOf("奉化"), habits.spelledFrom(Kinds.nineKeys(custom), '2').map { it.text })
+        assertEquals(listOf("奉化"), habits.spelledFrom(Kinds.nineKeys(custom), '2').map { it.words.text })
         assertTrue(habits.spelledFrom(Kinds.nineKeys(custom), '3').isEmpty())
     }
 
@@ -199,7 +204,7 @@ class LogHabitsTest {
             // 自然码 feng hua: fg hw
             val fenghua = keys.typings("fghw").first()
             repeat(2) { habits.record(listOf(row(fenghua, "奉化", "feng hua", kind = kind))) }
-            assertEquals(listOf("奉化"), habits.spelledFrom(kind, fenghua.first()).map { it.text })
+            assertEquals(listOf("奉化"), habits.spelledFrom(kind, fenghua.first()).map { it.words.text })
         }
     }
 

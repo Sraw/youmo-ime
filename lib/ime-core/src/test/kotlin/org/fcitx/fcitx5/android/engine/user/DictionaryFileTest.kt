@@ -7,6 +7,8 @@ package org.fcitx.fcitx5.android.engine.user
 import org.fcitx.fcitx5.android.engine.assertRows
 import org.fcitx.fcitx5.android.engine.data.DataFile
 import org.fcitx.fcitx5.android.engine.pinyin.Syllables
+import org.fcitx.fcitx5.android.engine.platform.jvm.JvmFile
+import org.fcitx.fcitx5.android.engine.user.imports.WordText
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -33,7 +35,7 @@ class DictionaryFileTest {
     private fun compile(vararg lines: String, inBase: (String, IntArray) -> Boolean = { _, _ -> false }): Pair<DictionaryFile, DictionaryCompiler.Result> {
         val file = File(folder.root, "d.ymd")
         val result = DictionaryCompiler.compile(listOf(lines.asSequence()), file, stamp = "s1", base = "b1", inBase = inBase)
-        return DictionaryFile.open(file) to result
+        return DictionaryFile.open(JvmFile(file)) to result
     }
 
     // the words under a reading, walked down the trie as the decoder does
@@ -83,7 +85,7 @@ class DictionaryFileTest {
         assertEquals(-1, d.child(DictionaryFile.ROOT, Syllables.id("zhuang")))
         assertTrue(d.hasText("三个字"))
         assertFalse(d.hasText("三个"))
-        assertEquals(5, DictionaryFile.wordCount(File(folder.root, "d.ymd")))
+        assertEquals(5, DictionaryFile.wordCount(JvmFile(File(folder.root, "d.ymd"))))
     }
 
     @Test
@@ -131,7 +133,7 @@ class DictionaryFileTest {
         val file = File(folder.root, "two.ymd")
         // counts in one, probabilities in the other: each against its own best
         DictionaryCompiler.compile(listOf(sequenceOf("行 xing 10", "好 hao 1000", "乱"), sequenceOf("行 xing 1", "坏 huai 0.5")), file, names = listOf("a", "b"))
-        val two = DictionaryFile.open(file)
+        val two = DictionaryFile.open(JvmFile(file))
         // each source's words read, by name, for the settings' list
         assertEquals(mapOf("a" to 2, "b" to 2), DictionaryCompiler.sourceWords(file))
         assertEquals(emptyMap<String, Int>(), DictionaryCompiler.sourceWords(File(folder.root, "none.ymd")))
@@ -145,8 +147,8 @@ class DictionaryFileTest {
         val file = File(folder.root, "k.ymd")
         fun scores(vararg lines: String): List<Float> {
             DictionaryCompiler.compile(listOf(lines.asSequence()), file)
-            val d = DictionaryFile.open(file)
-            return lines.map { val (t, c) = it.split(' '); d.score(d.find(LibimeImport.entry(t, c)!!)) }
+            val d = DictionaryFile.open(JvmFile(file))
+            return lines.map { val (t, c) = it.split(' '); d.score(d.find(WordText.entry(t, c)!!)) }
         }
         // libime's log10, 0.3.1's own 0.0 for none, counts
         assertEquals(listOf(0f, -2f), scores("好 hao -3", "坏 huai -5"))
@@ -167,7 +169,7 @@ class DictionaryFileTest {
             listOf(sequenceOf("好 hao 0.5", "号 hao 0.005", "浩 hao 0.0"), sequenceOf("豪 hao 0", "毫 hao 0")),
             file,
         )
-        val d = DictionaryFile.open(file)
+        val d = DictionaryFile.open(JvmFile(file))
         val node = d.child(DictionaryFile.ROOT, Syllables.id("hao"))
         val order = (0 until d.wordCount(node)).map { d.word(node, it) }
         assertEquals(listOf("好", "号", "毫", "浩", "豪"), order.map(d::text))
@@ -188,12 +190,12 @@ class DictionaryFileTest {
         DictionaryCompiler.compile(listOf(sequenceOf("幽默 you'mo")), file)
         val bytes = file.readBytes()
         File(folder.root, "short").writeBytes(bytes.copyOf(bytes.size - 4))
-        assertThrows(IOException::class.java) { DictionaryFile.open(File(folder.root, "short")) }
+        assertThrows(IOException::class.java) { DictionaryFile.open(JvmFile(File(folder.root, "short"))) }
         File(folder.root, "bad").writeBytes(bytes.copyOf().also { it[it.size - 3] = (it[it.size - 3] + 1).toByte() })
-        assertThrows(IOException::class.java) { DictionaryFile.open(File(folder.root, "bad")) }
+        assertThrows(IOException::class.java) { DictionaryFile.open(JvmFile(File(folder.root, "bad"))) }
         File(folder.root, "text").writeText("幽默 you'mo\n".repeat(20))
-        assertThrows(IOException::class.java) { DictionaryFile.open(File(folder.root, "text")) }
-        assertThrows(IOException::class.java) { DictionaryFile.wordCount(File(folder.root, "text")) }
+        assertThrows(IOException::class.java) { DictionaryFile.open(JvmFile(File(folder.root, "text"))) }
+        assertThrows(IOException::class.java) { DictionaryFile.wordCount(JvmFile(File(folder.root, "text"))) }
     }
 
     @Test
@@ -203,7 +205,7 @@ class DictionaryFileTest {
         assertThrows(IllegalStateException::class.java) {
             DictionaryCompiler.compile(listOf(sequence { yield("优美 you'mei"); error("read failed") }), file)
         }
-        assertEquals(1, DictionaryFile.open(file).size)
+        assertEquals(1, DictionaryFile.open(JvmFile(file)).size)
         assertEquals(listOf("d.ymd"), folder.root.list()!!.toList())
     }
 
@@ -342,10 +344,10 @@ class DictionaryFileTest {
         val file = File(folder.root, "long.ymd")
         val result = DictionaryCompiler.compile(listOf((0 until n).asSequence().map(::line)), file)
         assertEquals(n, result.words)
-        val d = DictionaryFile.open(file)
+        val d = DictionaryFile.open(JvmFile(file))
         for (i in 0 until n) {
             val (text, code) = line(i).split(' ')
-            assertTrue(line(i), d.find(LibimeImport.entry(text, code)!!) >= 0)
+            assertTrue(line(i), d.find(WordText.entry(text, code)!!) >= 0)
         }
         var walked = 0
         fun walk(node: Int) {
@@ -365,7 +367,7 @@ class DictionaryFileTest {
         assertThrows(IOException::class.java) {
             DictionaryCompiler.compile(listOf(sequenceOf("优美 you'mei"), sequenceOf("中国 zhong'guo")), file, names = names)
         }
-        assertEquals(1, DictionaryFile.open(file).size)
+        assertEquals(1, DictionaryFile.open(JvmFile(file)).size)
     }
 
     // a random dictionary's words (surrogates, text longer in chars than its reading, some the
@@ -380,7 +382,7 @@ class DictionaryFileTest {
         while (words.size < 3000) {
             val reading = List(1 + r.nextInt(4)) { spellings[r.nextInt(spellings.size)] }
             // a character a syllable, some past the BMP: more chars than syllables. Never fewer: a
-            // source's line of fewer characters than syllables is refused (LibimeImport.entry), review F3631
+            // source's line of fewer characters than syllables is refused (WordText.entry), review F3631
             val text = buildString {
                 repeat(reading.size) { if (r.nextInt(6) == 0) appendCodePoint(0x20000 + r.nextInt(500)) else append((0x4E00 + r.nextInt(300)).toChar()) }
             }
@@ -439,7 +441,7 @@ class DictionaryFileTest {
         val file = File(folder.root, "v1.ymd")
         val meta = mapOf("words" to "0", "trieWords" to "0", "nodes" to "1", "hashSize" to "1")
         file.writeBytes(DataFile.Writer(DataFile.KIND_USER_DICTIONARY, DictionaryFile.VERSION - 1).addMeta(DictionaryFile.META, meta).toByteArray())
-        val e = assertThrows(IOException::class.java) { DictionaryFile.open(file) }
+        val e = assertThrows(IOException::class.java) { DictionaryFile.open(JvmFile(file)) }
         assertTrue(e.message, e.message!!.contains("version 1"))
     }
 }

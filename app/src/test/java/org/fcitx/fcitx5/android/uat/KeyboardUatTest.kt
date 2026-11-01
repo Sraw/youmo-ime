@@ -5,27 +5,28 @@
 package org.fcitx.fcitx5.android.uat
 
 import android.text.InputType
-import android.text.Spanned
-import android.text.style.RelativeSizeSpan
 import android.view.View
+import android.view.inputmethod.EditorInfo
+import android.widget.HorizontalScrollView
+import android.widget.TextView
 import androidx.core.view.ViewCompat
+import kotlinx.coroutines.runBlocking
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.Uat
-import org.fcitx.fcitx5.android.core.Action
 import org.fcitx.fcitx5.android.core.CapabilityFlag
-import org.fcitx.fcitx5.android.core.FcitxEvent
 import org.fcitx.fcitx5.android.core.FcitxKeyMapping
 import org.fcitx.fcitx5.android.core.FormattedText
+import org.fcitx.fcitx5.android.core.InputMethodEntry
 import org.fcitx.fcitx5.android.core.KeyStates
-import org.fcitx.fcitx5.android.core.KeySym
-import org.fcitx.fcitx5.android.core.RawConfig
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.punctuation.PunctuationManager
+import org.fcitx.fcitx5.android.data.punctuation.PunctuationMapEntry
+import org.fcitx.fcitx5.android.host.HostEvent
+import org.fcitx.fcitx5.android.host.StatusEntry
 import org.fcitx.fcitx5.android.input.KeyboardHarness
 import org.fcitx.fcitx5.android.input.keyboard.AltTextKeyView
 import org.fcitx.fcitx5.android.input.keyboard.SpaceLongPressBehavior
-import org.fcitx.fcitx5.android.input.keyboard.TextKeyView
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -44,48 +45,12 @@ class KeyboardUatTest {
 
     private var h: KeyboardHarness? = null
 
-    private fun harness(im: org.fcitx.fcitx5.android.core.InputMethodEntry = KeyboardHarness.PINYIN) =
+    private fun harness(im: InputMethodEntry = KeyboardHarness.PINYIN) =
         KeyboardHarness(im = im).also { h = it }
 
     @After
     fun close() {
         h?.close()
-    }
-
-    // the share of 中/英 shown large: the other's span is made smaller (T9Keyboard.languageLabel)
-    private fun large(key: TextKeyView): String {
-        val text = key.mainText.text as Spanned
-        val small = text.getSpans(0, text.length, RelativeSizeSpan::class.java).flatMap {
-            (text.getSpanStart(it) until text.getSpanEnd(it)).toList()
-        }.toSet()
-        return text.indices.filter { it !in small }.joinToString("") { text[it].toString() }
-    }
-
-    @Test
-    @Uat("T9-30")
-    fun nineKeysLanguageKeySwitchesToNineKeysEnglishAndBack() {
-        val h = harness(KeyboardHarness.T9).start()
-        h.api.enabledIme = arrayOf(KeyboardHarness.PINYIN, KeyboardHarness.T9, KeyboardHarness.ENGLISH)
-        h.api.availableIme = h.api.enabledIme
-        assertEquals("中", large(h.key("中/英")))
-        h.capture("KeyboardUatTest/t9_language_chinese")
-        h.tap(h.key("中/英"))
-        assertTrue(h.api.calls.toString(), "activateIme(${KeyboardHarness.ENGLISH.uniqueName})" in h.api.calls)
-        // the engine says so, as fcitx does after activateIme
-        h.emit(FcitxEvent.IMChangeEvent(KeyboardHarness.ENGLISH))
-        val english = h.texts()
-        assertEquals("英", large(h.key("中/英")))
-        // still the nine keys, small letters, ⇧ where 重输 was, the space saying English
-        assertTrue(english.toString(), "ghi" in english && "重输" !in english)
-        h.described("Shift")
-        assertTrue(english.toString(), "English" in english)
-        h.capture("KeyboardUatTest/t9_language_english")
-        h.api.calls.clear()
-        h.tap(h.key("中/英"))
-        assertTrue(h.api.calls.toString(), "activateIme(${KeyboardHarness.T9.uniqueName})" in h.api.calls)
-        h.emit(FcitxEvent.IMChangeEvent(KeyboardHarness.T9))
-        val back = h.texts()
-        assertTrue(back.toString(), "重输" in back && "Pinyin (9 keys)" in back)
     }
 
     @Test
@@ -143,7 +108,7 @@ class KeyboardUatTest {
         // the engine is told it is a password (CapabilityFlag.Password); it switches to English (androidengine)
         val flags = Regex("setCapFlags\\((\\d+)\\)").find(h.api.calls.joinToString())!!.groupValues[1].toULong()
         assertTrue("flags $flags", flags and CapabilityFlag.Password.flag != 0UL)
-        h.emit(FcitxEvent.IMChangeEvent(KeyboardHarness.ENGLISH))
+        h.emit(HostEvent.InputMethodChanged(KeyboardHarness.ENGLISH))
         val keys = h.texts()
         // the row above the keys is digits (PR-05), not candidates or the toolbar
         assertEquals(listOf("1", "2", "3", "4", "5", "6", "7", "8", "9", "0"), keys.take(10))
@@ -197,25 +162,20 @@ class KeyboardUatTest {
     fun cornersShowChinesePunctuationWhileChinese() {
         val h = harness().start()
         // fcitx's punctuation table, as its punctuation addon has it on
-        val entries = listOf("\\" to "、", "?" to "？").mapIndexed { i, (k, v) ->
-            org.fcitx.fcitx5.android.data.punctuation.PunctuationMapEntry(k, v, "").toRawConfig(i)
+        val entries = listOf("\\" to "、", "?" to "？").map { (k, v) ->
+            PunctuationMapEntry(k, v, "")
         }
-        kotlinx.coroutines.runBlocking {
-            h.api.setAddonSubConfig(
-                "punctuation", "punctuationmap/zh_CN",
-                RawConfig(arrayOf(RawConfig("cfg", arrayOf(RawConfig(PunctuationManager.ENTRIES, entries.toTypedArray()))))),
-            )
-        }
+        runBlocking { h.api.setPunctuationMap("zh_CN", entries) }
         PunctuationManager.forget()
-        val active = arrayOf(Action(1, false, false, false, "punctuation", "fcitx-punc-active", "", "", null))
-        h.api.statusAreaActionsCached = active
-        h.emit(FcitxEvent.StatusAreaEvent(FcitxEvent.StatusAreaEvent.Data(active, KeyboardHarness.PINYIN)))
+        val active = listOf(StatusEntry(1, "punctuation", "fcitx-punc-active", ""))
+        h.api.statusAreaCached = active
+        h.emit(HostEvent.StatusArea(active, KeyboardHarness.PINYIN))
         assertEquals("、", corner(h, "m"))
         assertEquals("？", corner(h, "v"))
         // English: the addon off for it
-        val inactive = arrayOf(Action(1, false, false, false, "punctuation", "fcitx-punc-inactive", "", "", null))
-        h.emit(FcitxEvent.IMChangeEvent(KeyboardHarness.ENGLISH))
-        h.emit(FcitxEvent.StatusAreaEvent(FcitxEvent.StatusAreaEvent.Data(inactive, KeyboardHarness.ENGLISH)))
+        val inactive = listOf(StatusEntry(1, "punctuation", "fcitx-punc-inactive", ""))
+        h.emit(HostEvent.InputMethodChanged(KeyboardHarness.ENGLISH))
+        h.emit(HostEvent.StatusArea(inactive, KeyboardHarness.ENGLISH))
         assertEquals("\\", corner(h, "m"))
         assertEquals("?", corner(h, "v"))
         PunctuationManager.forget()
@@ -240,6 +200,65 @@ class KeyboardUatTest {
     }
 
     private fun backspaces() = sent().count { "sym=${FcitxKeyMapping.FcitxKey_BackSpace}," in it }
+
+    // the keyboard's half: the space's slow drag sends ← to the engine (which moves the cursor,
+    // HostCasesUatTest), no long press, and the row follows the cursor the engine tells
+    @Test
+    @Uat("PY-41")
+    fun aSlowSpaceDragMovesThePinyinCursorAndTheRowFollowsIt() {
+        // set, not left at the default: the voice build's is voice input, whose hold takes the finger
+        // past the long press (spaceLongPressTakesTouch), so the drag would never reach the cursor
+        val behavior = AppPrefs.getInstance().keyboard.spaceKeyLongPressBehavior
+        val was = behavior.getValue()
+        behavior.setValue(SpaceLongPressBehavior.None)
+        try {
+            slowSpaceDrag()
+        } finally {
+            behavior.setValue(was)
+        }
+    }
+
+    private fun slowSpaceDrag() {
+        val h = harness().start()
+        val pinyin = "woxiangzhidaojintianwanshangwomenqunalichifan".repeat(2)
+        fun cursorAt(at: Int) {
+            h.api.inputPanelCached = HostEvent.InputPanel(FormattedText(arrayOf(pinyin), intArrayOf(0), at), FormattedText.Empty, FormattedText.Empty)
+            h.emit(h.api.inputPanelCached)
+            h.idle()
+            h.relayout()
+        }
+        cursorAt(pinyin.length)
+        val row = h.inputView.findViewById<HorizontalScrollView>(R.id.code_row_text)
+        val atEnd = row.scrollX
+        assertTrue("scrolled to the end: $atEnd", atEnd > 0)
+        h.api.calls.clear()
+        // held past the long press before it moves, then a third of the width in about 4 s
+        val key = space(h)
+        val finger = h.finger(key, h.at(key))
+        h.advance(AppPrefs.getInstance().keyboard.longPressDelay.getValue() + 100L)
+        val third = h.inputView.width / 3f / h.inputView.resources.displayMetrics.density
+        for (i in 1..20) {
+            h.advance(180)
+            finger.move(h.at(key, dx = -third * i / 20))
+        }
+        finger.up(h.at(key, dx = -third))
+        val lefts = sent().count { "sym=${FcitxKeyMapping.FcitxKey_Left}," in it }
+        assertTrue(h.api.calls.toString(), lefts >= 2)
+        assertTrue(h.api.calls.toString(), h.api.calls.none { "enumerate" in it.lowercase() || "toggleIme" in it })
+        assertTrue(h.popupKeys().toString(), h.popupKeys().isEmpty())
+        assertEquals("", h.field.text.toString())
+        assertEquals(0, h.field.selectionStart)
+        // the engine's cursor gone past the row's left edge: scrolled back to it
+        cursorAt(pinyin.length / 3)
+        val shown = row.scrollX
+        assertTrue("$shown of $atEnd", shown < atEnd)
+        val x = (row.getChildAt(0) as TextView).let { it.totalPaddingLeft + it.layout.getPrimaryHorizontal(pinyin.length / 3) }
+        assertTrue("$x in $shown..${shown + row.width}", x >= shown && x <= shown + row.width)
+        // a finger on the row scrolls it too
+        val box = h.box(row)
+        h.drag(row, box.right - 10f, box.exactCenterY())
+        assertTrue("${row.scrollX} after $shown", row.scrollX != shown)
+    }
 
     @Test
     @Uat("KB-09")
@@ -290,8 +309,8 @@ class KeyboardUatTest {
     @Uat("KB-13")
     fun swipingBackspaceWhileTypingClearsThePinyin() {
         val h = harness().start()
-        h.api.inputPanelCached = FcitxEvent.InputPanelEvent.Data(FormattedText(arrayOf("zhong guo"), intArrayOf(0), 9), FormattedText.Empty, FormattedText.Empty, emptyArray())
-        h.emit(FcitxEvent.InputPanelEvent(h.api.inputPanelCached))
+        h.api.inputPanelCached = HostEvent.InputPanel(FormattedText(arrayOf("zhong guo"), intArrayOf(0), 9), FormattedText.Empty, FormattedText.Empty)
+        h.emit(h.api.inputPanelCached)
         val key = h.described("Backspace")
         val b = h.box(key)
         h.drag(key, b.exactCenterX() - h.service.resources.displayMetrics.widthPixels * 0.4f, b.exactCenterY(), steps = 16)
@@ -349,31 +368,31 @@ class KeyboardUatTest {
      */
     private fun returnLetThrough(h: KeyboardHarness) {
         assertTrue(h.api.calls.toString(), sent().any { "sym=${FcitxKeyMapping.FcitxKey_Return}," in it })
-        h.emit(FcitxEvent.KeyEvent(FcitxEvent.KeyEvent.Data(KeySym(FcitxKeyMapping.FcitxKey_Return), KeyStates.Virtual, 0, false, 0)))
+        h.emit(HostEvent.Key(FcitxKeyMapping.FcitxKey_Return, KeyStates.Virtual.states.toInt(), 0, false, 0))
     }
 
     @Test
     @Uat("KB-20")
     fun searchFieldsReturnSearches() {
-        val h = harness().start(android.text.InputType.TYPE_CLASS_TEXT, android.view.inputmethod.EditorInfo.IME_ACTION_SEARCH)
+        val h = harness().start(InputType.TYPE_CLASS_TEXT, EditorInfo.IME_ACTION_SEARCH)
         val ret = h.described(s(R.string.a11y_key_action_search))
         val done = actions(h)
         h.tap(ret)
         // nothing typed, the engine lets the key through: the app's own action
         returnLetThrough(h)
-        assertEquals(listOf(android.view.inputmethod.EditorInfo.IME_ACTION_SEARCH), done)
+        assertEquals(listOf(EditorInfo.IME_ACTION_SEARCH), done)
         assertFalse(h.field.text.contains("\n"))
     }
 
     @Test
     @Uat("KB-21")
     fun nextFieldsReturnGoesOn() {
-        val h = harness().start(android.text.InputType.TYPE_CLASS_TEXT, android.view.inputmethod.EditorInfo.IME_ACTION_NEXT)
+        val h = harness().start(InputType.TYPE_CLASS_TEXT, EditorInfo.IME_ACTION_NEXT)
         val ret = h.described(s(R.string.a11y_key_action_next))
         val done = actions(h)
         h.tap(ret)
         returnLetThrough(h)
-        assertEquals(listOf(android.view.inputmethod.EditorInfo.IME_ACTION_NEXT), done)
+        assertEquals(listOf(EditorInfo.IME_ACTION_NEXT), done)
     }
 
     @Test
@@ -399,7 +418,9 @@ class KeyboardUatTest {
     @Test
     @Uat("KB-32")
     fun glideIsOffByDefault() {
+        // both of the finger's switches off: no glide, no stroke
         assertFalse(AppPrefs.getInstance().keyboard.glideTyping.getValue())
+        assertFalse(AppPrefs.getInstance().keyboard.strokeFilter.getValue())
         val h = harness(KeyboardHarness.ENGLISH).start()
         // h across to o: a finger's path over e and l
         val o = h.box(h.key("o"))
@@ -432,6 +453,7 @@ class KeyboardUatTest {
     fun holdingTheSpaceSetToNothingIsOneSpace() {
         // set, not left at the default: the voice build's default is voice input
         val behavior = AppPrefs.getInstance().keyboard.spaceKeyLongPressBehavior
+        val was = behavior.getValue()
         behavior.setValue(SpaceLongPressBehavior.None)
         try {
             val h = harness(KeyboardHarness.ENGLISH).start()
@@ -441,7 +463,7 @@ class KeyboardUatTest {
             h.release()
             assertEquals(sent().toString(), 1, sent().count { "sym=${FcitxKeyMapping.FcitxKey_space}," in it })
         } finally {
-            behavior.setValue(behavior.defaultValue)
+            behavior.setValue(was)
         }
     }
 

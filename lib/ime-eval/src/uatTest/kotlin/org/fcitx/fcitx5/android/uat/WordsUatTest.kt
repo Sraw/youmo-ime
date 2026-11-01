@@ -5,7 +5,11 @@
 package org.fcitx.fcitx5.android.uat
 
 import org.fcitx.fcitx5.android.Uat
-import org.fcitx.fcitx5.android.engine.host.Engines.UserWord
+import org.fcitx.fcitx5.android.engine.InputMethodCatalog
+import org.fcitx.fcitx5.android.engine.learn.Code
+import org.fcitx.fcitx5.android.engine.learn.Kinds
+import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
+import org.fcitx.fcitx5.android.engine.runtime.UserWord
 import org.fcitx.fcitx5.android.engine.learn.control.LearningOp
 import org.fcitx.fcitx5.android.engine.learn.control.LearningResult
 import org.junit.Assert.assertEquals
@@ -16,7 +20,7 @@ import org.junit.Test
 
 /**
  * uat/13-words.md and 15-privacy-backup.md: what the user's words, phrases and habits do to typing.
- * The settings pages are where the user does it; here it is done as the pages do it (FcitxAPI's
+ * The settings pages are where the user does it; here it is done as the pages do it (HostApi's
  * calls, the custom phrases file) and the page's list is what the engine lists.
  */
 class WordsUatTest {
@@ -89,7 +93,7 @@ class WordsUatTest {
         focus("")
         type("shi")
         val before = candidates
-        // 固定首位 on the fifth (C), then 是 blocked, as their long presses' menus do (FcitxAPI.learning)
+        // 固定首位 on the fifth (C), then 是 blocked, as their long presses' menus do (HostApi.learning)
         val c = before[4]
         // with habits off the first is the first of before that is not 是, wherever 是 was; 是 being C would make it unmeetable
         assertTrue("是 is the fifth of shi $before: the case blocks it and pins another", before.indexOf("是") != 4)
@@ -132,5 +136,37 @@ class WordsUatTest {
         focus("")
         type("dz")
         expectFirst("北京市海淀区")
+    }
+
+    // the fifth candidate pinned first, as its long press's 固定首位 does; the pins as the lexicon page lists them
+    private fun EngineReplay.pinnedFifth(): Code {
+        val c = candidates[4]
+        engines.learning(im, LearningOp.Pin(4, c))
+        val pins = engines.learning(null, LearningOp.ListItems(LearningOp.Listed.PINS)) as LearningResult.Listed
+        return pins.items.single { it.text == c }.code!!
+    }
+
+    @Test
+    @Uat("PY-94")
+    fun aPinOnTheFourteenKeysIsListedUnderItsKeys() = with(EngineReplay()) {
+        // AS GH UI: the page shows these as their letters (SettingsPagesUatTest.aPinOnTheFourteenKeysSaysSoAndShowsItsLetters)
+        val keys = NineKeyLetters.G14.typings("shi").single()
+        type(keys)
+        val code = pinnedFifth()
+        assertEquals(Kinds.keys(NineKeyLetters.G14.tag()), code.kind)
+        assertEquals("as gh ui", NineKeyLetters.G14.shown(code.keys))
+    }
+
+    @Test
+    @Uat("SP-19")
+    fun pinsOnTheEighteenKeysAndTheFullListedUnderTheirKinds() = with(EngineReplay(im = InputMethodCatalog.SHUANGPIN)) {
+        // 自然码's U IO on the 18 keys, then u i on the full keyboard (SettingsPagesUatTest.aPinOnTheEighteenKeysSaysSoWithItsSchemeAndLetters)
+        type("${NineKeyLetters.G18.key('u')}${NineKeyLetters.G18.key('i')}")
+        val keys18 = pinnedFifth()
+        assertEquals(Kinds.shuangpinKeys("Ziranma", NineKeyLetters.G18.tag()), keys18.kind)
+        assertEquals("u io", NineKeyLetters.G18.shown(keys18.keys))
+        focus("")
+        type("ui")
+        assertEquals(Code(Kinds.shuangpin("Ziranma"), "ui"), pinnedFifth())
     }
 }

@@ -87,7 +87,7 @@ class ImportedWords {
     fun syllable(place: Int, i: Int) = syllables[syllablesAt[place] + i].toInt()
 
     /** The reading of the word at [place], syllables apart by spaces. */
-    fun reading(place: Int) = (0 until length(place)).joinToString(" ") { Syllables.spelling(syllable(place, it)) }
+    fun reading(place: Int) = Syllables.spelled(length(place)) { syllable(place, it) }
 
     /** The batch the word at [place] came in. */
     fun batch(place: Int) = batchOf[place]

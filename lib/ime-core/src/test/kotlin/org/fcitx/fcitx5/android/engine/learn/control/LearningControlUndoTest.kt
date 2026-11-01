@@ -12,32 +12,29 @@ import org.fcitx.fcitx5.android.engine.learn.LearnRecord
 import org.fcitx.fcitx5.android.engine.learn.LearnState
 import org.fcitx.fcitx5.android.engine.learn.Row
 import org.fcitx.fcitx5.android.engine.learn.corrected
+import org.fcitx.fcitx5.android.engine.platform.MemoryFiles
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
-import org.junit.Rule
 import org.junit.Test
-import org.junit.rules.TemporaryFolder
 import java.io.ByteArrayOutputStream
-import java.io.File
 import java.io.IOException
 
 /** [LearningControl.undoable] and [LearningControl.undo]: the chip's 撤销, an act taken back as though never done. */
 class LearningControlUndoTest {
-    @get:Rule
-    val dir = TemporaryFolder()
+    private val dir = MemoryFiles()
 
     private val clock = FakeClock()
     private val errors = ArrayList<IOException>()
 
-    private fun file() = File(dir.root, LearnLog.FILE)
+    private fun file() = dir.file(LearnLog.FILE)
 
     private fun open(): LearnLog = LearnLog(file(), clock, errors::add, compactAt = 1L shl 30).also { it.open() }
 
     private fun control(log: LearnLog) = LearningControl({ log }, clock, onError = errors::add).also { it.attach(log) }
 
-    private fun replayed() = LearnLog.replay(file().readBytes())
+    private fun replayed() = LearnLog.replay(file().read())
 
     private fun LearnLog.commit(vararg rows: Row): LearnRecord.Commit = checkNotNull(record(rows.toList()))
 
@@ -136,8 +133,8 @@ class LearningControlUndoTest {
         log.forget("你")
         log.guide()
         val out = ByteArrayOutputStream()
-        assertFalse(LogRewrites.dropLast(file().readBytes(), listOf(LearnRecord.Forget(0, 0, "你")), out))
-        assertFalse(LogRewrites.dropLast(file().readBytes(), emptyList(), out))
+        assertFalse(LogRewrites.dropLast(file().read(), listOf(LearnRecord.Forget(0, 0, "你")), out))
+        assertFalse(LogRewrites.dropLast(file().read(), emptyList(), out))
         assertEquals(0, out.size())
     }
 

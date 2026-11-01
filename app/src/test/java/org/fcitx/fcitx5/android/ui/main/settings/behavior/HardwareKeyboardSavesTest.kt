@@ -6,10 +6,9 @@ package org.fcitx.fcitx5.android.ui.main.settings.behavior
 
 import kotlinx.coroutines.runBlocking
 import org.fcitx.fcitx5.android.FcitxApplication
-import org.fcitx.fcitx5.android.core.FakeFcitxAPI
-import org.fcitx.fcitx5.android.core.RawConfig
-import org.fcitx.fcitx5.android.engine.host.EngineSettings
-import org.fcitx.fcitx5.android.engine.host.Engines
+import org.fcitx.fcitx5.android.core.FakeHostApi
+import org.fcitx.fcitx5.android.engine.InputMethodCatalog
+import org.fcitx.fcitx5.android.engine.runtime.EngineSettings
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
@@ -27,16 +26,16 @@ class HardwareKeyboardSavesTest {
 
     @Test
     fun theHardwareKeyboardPageSavesThePageSizeAlone(): Unit = runBlocking {
-        val fcitx = FakeFcitxAPI()
-        val cfg = RawConfig().apply {
-            getOrCreate(EngineSettings.PAGE_SIZE).value = "7"
-            getOrCreate(EngineSettings.EMOJI).value = "False"
-            getOrCreate(EngineSettings.CHAIZI).value = "True"
+        val fcitx = FakeHostApi()
+        val cfg = mutableMapOf<String, String>().apply {
+            this[EngineSettings.PAGE_SIZE] = "7"
+            this[EngineSettings.EMOJI] = "False"
+            this[EngineSettings.CHAIZI] = "True"
         }
         HardwareKeyboardFragment.save(fcitx, cfg)
-        val saved = fcitx.getImConfig(Engines.PINYIN)
-        assertEquals("7", saved.findByName(EngineSettings.PAGE_SIZE)?.value)
-        assertNull(saved.findByName(EngineSettings.EMOJI))
-        assertNull(saved.findByName(EngineSettings.CHAIZI))
+        val saved = fcitx.imOptions(InputMethodCatalog.PINYIN)!!
+        assertEquals("7", saved[EngineSettings.PAGE_SIZE])
+        assertNull(saved[EngineSettings.EMOJI])
+        assertNull(saved[EngineSettings.CHAIZI])
     }
 }

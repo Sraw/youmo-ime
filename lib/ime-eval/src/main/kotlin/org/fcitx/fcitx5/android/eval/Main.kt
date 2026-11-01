@@ -5,7 +5,6 @@
 package org.fcitx.fcitx5.android.eval
 
 import org.fcitx.fcitx5.android.engine.data.CodeTable
-import org.fcitx.fcitx5.android.engine.data.DataFormatException
 import org.fcitx.fcitx5.android.engine.data.PinyinData
 import org.fcitx.fcitx5.android.engine.english.EnglishData
 import org.fcitx.fcitx5.android.engine.english.EnglishSession
@@ -14,12 +13,12 @@ import org.fcitx.fcitx5.android.engine.glide.GlidePath
 import org.fcitx.fcitx5.android.engine.glide.PinyinGlide
 import org.fcitx.fcitx5.android.engine.glide.TableGlide
 import org.fcitx.fcitx5.android.engine.handwriting.HandwritingDecoder
-import org.fcitx.fcitx5.android.engine.host.EngineSettings
+import org.fcitx.fcitx5.android.engine.platform.jvm.JvmFile
+import org.fcitx.fcitx5.android.engine.runtime.EngineSettings
 import org.fcitx.fcitx5.android.engine.lattice.Penalties
 import org.fcitx.fcitx5.android.engine.lattice.PinyinDecoder
 import org.fcitx.fcitx5.android.engine.lattice.Predictor
 import org.fcitx.fcitx5.android.engine.lattice.TextWords
-import org.fcitx.fcitx5.android.engine.libime.LibimeFiles
 import org.fcitx.fcitx5.android.engine.pinyin.Fuzzy
 import org.fcitx.fcitx5.android.engine.pinyin.GroupedShuangpinSegmenter
 import org.fcitx.fcitx5.android.engine.pinyin.LatinWords
@@ -27,6 +26,7 @@ import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
 import org.fcitx.fcitx5.android.engine.pinyin.PinyinSegmenter
 import org.fcitx.fcitx5.android.engine.pinyin.Segmenter
 import org.fcitx.fcitx5.android.engine.pinyin.ShuangpinSegmenter
+import org.fcitx.fcitx5.android.engine.pinyin.Syllables
 import org.fcitx.fcitx5.android.engine.pinyin.T9Segmenter
 import org.fcitx.fcitx5.android.engine.rerank.Reranker
 import org.fcitx.fcitx5.android.engine.rerank.SentenceModel
@@ -34,6 +34,8 @@ import org.fcitx.fcitx5.android.engine.rerank.SentencePicker
 import org.fcitx.fcitx5.android.engine.rerank.SentenceRefiner
 import org.fcitx.fcitx5.android.engine.session.Action
 import org.fcitx.fcitx5.android.engine.session.PinyinSession
+import org.fcitx.fcitx5.android.engine.stroke.StrokeFilter
+import org.fcitx.fcitx5.android.engine.stroke.Strokes
 import org.fcitx.fcitx5.android.engine.table.TableDictionary
 import org.fcitx.fcitx5.android.engine.table.TableLanguage
 import org.fcitx.fcitx5.android.engine.user.DictionaryCompiler
@@ -41,8 +43,8 @@ import org.fcitx.fcitx5.android.engine.user.DictionaryFile
 import org.fcitx.fcitx5.android.engine.user.LearningUse
 import org.fcitx.fcitx5.android.engine.user.WordPack
 import org.fcitx.fcitx5.android.eval.parity.PARITY_COMMANDS
+import org.fcitx.fcitx5.android.input.keyboard.ImKeyboards
 import java.io.File
-import java.io.IOException
 import java.io.RandomAccessFile
 import java.nio.channels.FileChannel
 import java.nio.file.Files
@@ -166,12 +168,10 @@ internal val COMMANDS = listOf(
         rows.forEach { (label, score) -> out.appendLine("%-28s %s".format(label, score)) }
         0
     },
-    Command("learn-log-bench", "<dir> [--commits <n>] [--days <n>] [--legacy <pinyin.data>] [--counts <pinyin.data>]", 1..1, "commits", "days", "legacy", "counts") { args, out, _ ->
-        require("legacy" !in args.options || "counts" !in args.options) { "--legacy or --counts, not both" }
+    Command("learn-log-bench", "<dir> [--commits <n>] [--days <n>] [--counts <pinyin.data>]", 1..1, "commits", "days", "counts") { args, out, _ ->
         val dir = File(args.operands[0]).apply { mkdirs() }
         val bench = LearnLogBench(args.options["commits"]?.toInt() ?: LEARN_LOG_COMMITS, args.options["days"]?.toInt() ?: LEARN_LOG_DAYS)
-        val lines = args.options["legacy"]?.let { bench.legacy(loadData(it), dir).lines() }
-            ?: args.options["counts"]?.let { bench.counts(loadData(it), dir).lines() } ?: bench.run(dir).lines()
+        val lines = args.options["counts"]?.let { bench.counts(loadData(it), dir).lines() } ?: bench.run(dir).lines()
         lines.forEach(out::appendLine)
         0
     },
@@ -194,18 +194,23 @@ internal val COMMANDS = listOf(
         val (modelPath, context) = args.operands
         lm(modelPath, context, args.operands.drop(2), out)
     },
-    Command("shuangpin", "<scheme> <set.tsv> <shuangpin-set.tsv> [--keys 18|nine] [--same <set-kept.tsv>]", 3..3, "keys", "same") { args, out, _ ->
+    Command("shuangpin", "<scheme> <set.tsv> <shuangpin-set.tsv> [--keys 18|14|nine] [--same <set-kept.tsv>]", 3..3, "keys", "same") { args, out, err ->
         val (scheme, setPath, outPath) = args.operands
         val keys = args.options["keys"]?.let { ShuangpinSet.KEYS[it] ?: return@Command null }
+        // no 14 keys under a scheme that types ; (微软), as the app offers none
+        if (keys == NineKeyLetters.G14 && ShuangpinSet.SCHEMES[scheme]?.let(ImKeyboards::has14) == false) {
+            err.appendLine("shuangpin: $scheme types ; and has no 14 keys, as the app offers none")
+            return@Command null
+        }
         if (scheme in ShuangpinSet.SCHEMES) writeShuangpinSet(scheme, setPath, outPath, out, keys, args.options["same"]) else null
     },
-    Command("t9", "<set.tsv> <t9-set.tsv> [--presses once|letters] [--keys nine|14] [--same <set-kept.tsv>]", 2..2, "presses", "keys", "same") { args, out, err ->
+    Command("t9", "<set.tsv> <t9-set.tsv> [--presses once|letters] [--keys nine|14|18] [--same <set-kept.tsv>]", 2..2, "presses", "keys", "same") { args, out, err ->
         val (setPath, outPath) = args.operands
         val presses = T9Set.Presses.of(args.options["presses"] ?: "once")!!
         val keys = T9Set.KEYS[args.options["keys"] ?: "nine"] ?: return@Command null
-        // the 14 keys have no 连按
+        // the grouped keys have no 连按
         if (presses != T9Set.Presses.ONCE && keys != NineKeyLetters.STANDARD) {
-            err.appendLine("t9: --presses ${presses.option} is the nine keys' alone, not --keys 14")
+            err.appendLine("t9: --presses ${presses.option} is the nine keys' alone, not --keys ${args.options["keys"]}")
             null
         } else writeT9Set(setPath, outPath, presses, keys, out, args.options["same"])
     },
@@ -241,6 +246,14 @@ internal val COMMANDS = listOf(
         val (dataPath, scriptPath) = args.operands
         learnUx(dataPath, File(scriptPath), args.options, out)
     },
+    Command(
+        "strokes", "<pinyin.data> <stroke.data> <set.tsv> [--scheme <scheme>] [--look-ahead <n>] [--first-char] [--rerank <model.safetensors>] [--refine <model.safetensors>]",
+        3..3, "scheme", "look-ahead", "first-char", "rerank", "refine",
+    ) { args, out, _ ->
+        val (dataPath, strokePath, setPath) = args.operands
+        val lookAhead = args.options["look-ahead"]?.let { it.toIntOrNull()?.takeIf { n -> n > 0 } ?: return@Command null } ?: StrokeFilter.LOOK_AHEAD
+        strokes(dataPath, strokePath, setPath, lookAhead, args.options, out)
+    },
     Command("chars", "<pinyin.data>", 1..1) { args, out, _ ->
         CharRanks.report(CharRanks(loadData(args.operands[0])).measure(), out)
         0
@@ -274,10 +287,6 @@ internal val COMMANDS = listOf(
             0
         }
     },
-    Command("libime", "pinyin|history|table <file>", 2..2) { args, out, err ->
-        val (kind, path) = args.operands
-        if (kind in LIBIME_KINDS) libime(kind, path, out, err) else null
-    },
 ) + PARITY_COMMANDS
 
 val USAGE = "usage: " + COMMANDS.joinToString("\n       ") { "${it.name} ${it.usage}" } + """
@@ -305,8 +314,8 @@ internal class Command(
     val options = options.toSet()
 }
 
-/** Options that take no value: `--gate`, `--stale`, `--jvm`. */
-private val FLAGS = setOf("gate", "stale", "jvm")
+/** Options that take no value: `--gate`, `--stale`, `--jvm`, `--first-char`. */
+private val FLAGS = setOf("gate", "stale", "jvm", "first-char")
 
 /** Arguments split into the positional ones and `--name value` options, a [FLAGS] one with an empty value. */
 internal class Arguments(args: Array<String>) {
@@ -380,8 +389,8 @@ private fun optionsValid(options: Map<String, String>): Boolean {
         valid("user-weight") { weight(it) != null },
         valid("max-correction") { weight(it) != null },
         valid("noise") { n -> n.toDoubleOrNull()?.let { it in 0.0..1.0 } == true },
-        // the union; each command checks its own: english and pinyin-glide nine only, t9 nine or 14,
-        // shuangpin 18 or nine
+        // the union; each command checks its own: english and pinyin-glide nine only, t9 nine, 14 or 18,
+        // shuangpin 18, 14 or nine
         valid("keys") { it in T9Set.KEYS || it in ShuangpinSet.KEYS },
         valid("user-counts") { it in setOf("full", "none", "multi") },
         valid("short-guard") { it in ON_OFF },
@@ -540,7 +549,7 @@ private fun runPinyin(dataPath: String, setPath: String, resultPath: String, opt
                 data, options.segmenter(data), penalties = Penalties(tap = options.taps?.let { -it.alpha } ?: Penalties().tap),
                 beam = options.beam, sentenceCount = options.sentences, layers = options.layers, pack = pack,
                 reranker = models.reranker, refiner = models.refiner,
-                merged = merged?.let { DictionaryFile.open(it, verify = false) }, mergedStale = options.stale,
+                merged = merged?.let { DictionaryFile.open(JvmFile(it), verify = false) }, mergedStale = options.stale,
             )
         }) { hand -> run(hand) }
         File(resultPath).printWriter().use { out -> results.forEach { out.println(RunResultFormat.format(it)) } }
@@ -562,7 +571,7 @@ private fun compileMerged(source: String, data: PinyinData, dest: File): File {
             "${dest.length()} bytes, compiled in ${(System.nanoTime() - started) / NANOS_PER_MILLI} ms",
     )
     // checked once here; each thread opens it unchecked
-    DictionaryFile.open(dest)
+    DictionaryFile.open(JvmFile(dest))
     return dest
 }
 
@@ -604,16 +613,52 @@ private fun writeSet(outPath: String, header: String, samples: List<Sample>) {
     }
 }
 
+// the grouped keyboard [keys] by its name in what `t9` and `shuangpin` say
+private fun keysName(keys: NineKeyLetters): String = when (keys) {
+    NineKeyLetters.G18 -> "18 keys"
+    NineKeyLetters.G14 -> "14 keys"
+    else -> "nine keys"
+}
+
 // [same]: the samples kept, as they were, for full pinyin to be scored on the same ones (only a sample of one
 // exact reading is typed: 简拼 and half syllables are left out, so the whole set is no like for like)
 private fun writeT9Set(setPath: String, outPath: String, presses: T9Set.Presses, keys: NineKeyLetters, out: Appendable, same: String? = null): Int {
     val samples = readSet(setPath)
     val converted = T9Set.convert(samples, presses, keys)
     same?.let { path -> writeSet(path, "$setPath: the samples `t9` typed, as they were", samples.filter { T9Set.convert(listOf(it), presses, keys).isNotEmpty() }) }
-    val on = if (keys == NineKeyLetters.STANDARD) "the nine keys" else "the 14 keys"
+    val on = "the ${keysName(keys)}"
     writeSet(outPath, "$setPath typed on $on by `t9`, keys pressed ${presses.option}; samples without one exact reading left out", converted)
     out.appendLine("${converted.size} of ${samples.size} samples typed on $on")
     return 0
+}
+
+private fun strokes(dataPath: String, strokePath: String, setPath: String, lookAhead: Int, o: Map<String, String>, out: Appendable): Int {
+    val data = loadData(dataPath)
+    val strokes = Strokes(CodeTable.load(mapFile(strokePath))) { c -> data.wordIndex.find(c).let { if (it < 0) Float.NEGATIVE_INFINITY else data.model.score(it) } }
+    // the sentence models as the app's 档位 has them: without, a refine has nothing to weigh again
+    val models = Models(o)
+    val session = PinyinSession(data, RunOptions(o).segmenter(data), prediction = false, reranker = models.reranker?.invoke(), refiner = models.refiner?.invoke())
+    val set = readSet(setPath)
+    val samples = if ("first-char" in o) firstChars(set, o["scheme"]) else set
+    StrokeRun(session, strokes, lookAhead).run(samples).rows().forEach(out::appendLine)
+    return 0
+}
+
+/**
+ * `strokes --first-char`: each sample's first character alone (a syllable's many homophones), typed as
+ * its sample reads it (the [ExactReading]'s first syllable: 说 shuo, not the first of its readings,
+ * shui), in [scheme]'s keys. A sample with no exact reading, or whose syllable the keys cannot type, is left out.
+ */
+internal fun firstChars(set: List<Sample>, scheme: String?): List<Sample> = set.mapNotNull { s ->
+    val syllable = ExactReading.of(s)?.firstOrNull()?.syllable ?: return@mapNotNull null
+    // a code point: a character past the BMP is two chars
+    val one = Sample(Syllables.spelling(syllable), String(Character.toChars(s.expected.codePointAt(0))), s.tag)
+    when (scheme) {
+        null, NO_LATIN -> one
+        in T9Set.SCHEMES -> T9Set.convert(listOf(one), keys = T9Set.lettersOf(scheme)).firstOrNull()
+        in ShuangpinSet.GROUPED -> ShuangpinSet.GROUPED.getValue(scheme).let { (sp, keys) -> ShuangpinSet.convert(listOf(one), sp, keys) }.firstOrNull()
+        else -> ShuangpinSet.convert(listOf(one), ShuangpinSet.SCHEMES.getValue(scheme)).firstOrNull()
+    }
 }
 
 // [same]: the samples kept, as they were, for the full keyboard and full pinyin to be scored on the same ones
@@ -622,11 +667,7 @@ private fun writeShuangpinSet(scheme: String, setPath: String, outPath: String, 
     val s = ShuangpinSet.SCHEMES.getValue(scheme)
     val converted = ShuangpinSet.convert(samples, s, keys)
     same?.let { path -> writeSet(path, "$setPath: the samples `shuangpin` typed, as they were", samples.filter { ShuangpinSet.convert(listOf(it), s, keys).isNotEmpty() }) }
-    val on = when (keys) {
-        null -> ""
-        NineKeyLetters.G18 -> " on the 18 keys"
-        else -> " on the nine keys"
-    }
+    val on = keys?.let { " on the ${keysName(it)}" }.orEmpty()
     writeSet(outPath, "$setPath typed in $scheme 双拼$on by `shuangpin`; samples without one exact reading left out", converted)
     out.appendLine("${converted.size} of ${samples.size} samples typed in $scheme$on")
     return 0
@@ -849,29 +890,6 @@ private fun tableHomographs(dataPath: String, setPath: String, preset: String, p
     out.appendLine("重码 words: $n")
     languages.forEachIndexed { i, (label, _) -> out.appendLine(String.format(Locale.ROOT, "  %-24s first %.1f%%", label, 100.0 * first[i] / maxOf(n, 1))) }
 }
-
-/** A libime file as the text libime's own tools write of it, to check the readers against them. */
-private fun libime(kind: String, path: String, out: Appendable, err: Appendable): Int {
-    val data = try {
-        File(path).readBytes()
-    } catch (e: IOException) {
-        err.appendLine("$path: ${e.message}")
-        return 1
-    }
-    try {
-        when (kind) {
-            "pinyin" -> LibimeFiles.pinyinDictionary(data).forEach { out.appendLine(it) }
-            "history" -> LibimeFiles.history(data).forEach { out.appendLine(it) }
-            else -> out.append(LibimeFiles.table(data))
-        }
-    } catch (e: DataFormatException) {
-        err.appendLine("$path: ${e.message}")
-        return 1
-    }
-    return 0
-}
-
-private val LIBIME_KINDS = setOf("pinyin", "history", "table")
 
 private val ON_OFF = setOf("on", "off")
 

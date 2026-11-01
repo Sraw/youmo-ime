@@ -27,10 +27,8 @@ import org.fcitx.fcitx5.android.engine.pinyin.Syllables
  * A word is its text and the syllables it was read as, so it means the same after the
  * dictionary is rebuilt with other ids: that is what [Entry] is and what the record keeps.
  *
- * [learn], [forget] and [addCount] are an older build's: its log (`pinyin.user`, UserLog), or
- * libime's history (LibimeImport), is replayed through them into a model of its own, to be
- * converted (LegacyConversion). The model typing goes on with never learns through them: its
- * words come from [own] and its counts from [setCount] ([HabitCounts]).
+ * The model counts nothing itself: its words come from [own], its counts from [setCount] and
+ * [setPair] ([HabitCounts]). Tests build theirs over the internal steps below.
  *
  * [index], the model's words by text, gives each of the user's words the model's word of its text
  * if it has one ([modelWord]): a word of the dictionary's typed, or added by hand ([listByHand]), at a
@@ -56,7 +54,13 @@ class UserModel(
 
         override fun equals(other: Any?) = other is Entry && text == other.text && syllables.contentEquals(other.syllables)
         override fun hashCode() = text.hashCode() * 31 + syllables.contentHashCode()
-        override fun toString() = text + syllables.joinToString(" ", "(", ")") { Syllables.spelling(it) }
+        override fun toString() = "$text(${spelled()})"
+
+        /** How it reads, a space between its syllables, as the learning record files it ([Syllables.spelled]). */
+        fun spelled(): String = Syllables.spelled(syllables)
+
+        /** How it reads, `'` between its syllables, as the lists show it ([Syllables.apostrophed]). */
+        fun apostrophed(): String = Syllables.apostrophed(syllables)
     }
 
     // words the dictionary lacks, by id from vocabulary.size up
@@ -67,7 +71,7 @@ class UserModel(
     private var sameText = IntArray(INITIAL_WORDS)
     private val ids = HashMap<Entry, Int>()
     // the entry each word was learned as, to write it out again: one of the dictionary's as last typed
-    private val entries = HashMap<Int, Entry>()
+    internal val entries = HashMap<Int, Entry>()
     // those of them from the user's dictionaries: see list
     private val listed = HashSet<Int>()
 
@@ -127,7 +131,7 @@ class UserModel(
     // the words the user blocked (see block): as they read, so a word made later is blocked as
     // it is made; and as the decoder asks, the dictionary's by node and id, the user's by id, with
     // how many readings of each are blocked
-    private val blockedEntries = HashSet<Entry>()
+    internal val blockedEntries = HashSet<Entry>()
     private val blockedReadings = HashSet<Long>()
     private val blockedIds = Counts()
 
@@ -136,12 +140,21 @@ class UserModel(
         private set
 
     /**
+     * Goes up as a count, a pair or [total] the decoders score with may change: a word or pair
+     * counted, the counts made again or some forgotten (not what 联想 predicts, [setPredicted]). What
+     * the decoders worked out of them is as it would be worked out now while this stays (their
+     * look-ahead kept across a setting).
+     */
+    var countsVersion = 0
+        private set
+
+    /**
      * Goes up as [ownTexts] may change, or the counts: a word made, owned or disowned, typed a
      * first time, forgotten, blocked or offered again, the counts made again. For another input
      * method to know its copy of them is stale.
      */
     var changes = 0
-        private set
+        internal set
 
     /** Goes up as [listedTexts] change: a word of the user's dictionaries listed. */
     var listings = 0
@@ -170,7 +183,7 @@ class UserModel(
     }
 
     // an imported word's id found by its text ([idsOfText]) once it has an entry: given one, its text changed
-    private fun entered(id: Int, entry: Entry) {
+    internal fun entered(id: Int, entry: Entry) {
         if ((isImport(id) || isMerged(id)) && id !in entries) wordChanged(entry.text)
         entries[id] = entry
     }
@@ -182,27 +195,6 @@ class UserModel(
     }
 
     /**
-     * Counts [sentence], each word and each pair, the first after [prev] if given (the word
-     * committed before it) and still known: one forgotten since is not made a word again. Words
-     * of the sentence the dictionary lacks become the user's made words ([madeWords]). An older
-     * build's log replayed, or libime's history, to be converted: see the class.
-     *
-     * @return the words' ids
-     */
-    fun learn(prev: Entry?, sentence: List<Entry>): IntArray {
-        require(sentence.isNotEmpty()) { "nothing to learn" }
-        val words = IntArray(sentence.size) { idAsTyped(sentence[it]) }
-        // a word before whose reading is not kept yet takes this one: its pair is written out with it
-        var before = if (prev != null && knows(prev)) id(prev).also { if (it !in entries) entered(it, prev) } else NO_WORD
-        for (w in words) {
-            add(NO_WORD, w, 1f)
-            if (before != NO_WORD) add(before, w, 1f)
-            before = w
-        }
-        return words
-    }
-
-    /**
      * [entry] as the user's own word (impl/design-1b.md §3): in the trie if the dictionary lacks
      * it, its reading and score theirs ([chosen]), for good: no count takes it away, only [disown].
      */
@@ -210,7 +202,7 @@ class UserModel(
         val id = idAsTyped(entry)
         if (owned.add(id)) {
             changes++
-            mergedChoice(id)
+            ownedChanged(id)
         }
         if (isImport(id)) settle(id)
         return id
@@ -223,7 +215,7 @@ class UserModel(
     fun disown(entry: Entry) {
         val id = ids[entry] ?: return
         if (!owned.remove(id)) return
-        mergedChoice(id)
+        ownedChanged(id)
         changes++
         if (isImport(id)) settle(id) else if (id >= vocabulary.size && !isListed(id)) dropOwn(entry, id)
     }
@@ -325,6 +317,16 @@ class UserModel(
     // how many merged words have a count of their own
     private var mergedCounted = 0
 
+    // [owned]'s dictionary words as bits too: [owns] is asked of every arc from the start a key,
+    // and a set's lookup boxes each id (S15 A8.3)
+    private val ownedBase = java.util.BitSet()
+
+    // [ownedBase] and [mergedChosen] kept in step with [owned], for [id] just owned or disowned
+    private fun ownedChanged(id: Int) {
+        if (id in 0 until vocabulary.size) ownedBase[id] = id in owned
+        mergedChoice(id)
+    }
+
     // [mergedChosen] kept in step with [owned] and [mergedByHand], for [id] one of them just changed
     private fun mergedChoice(id: Int) {
         if (isMerged(id)) mergedChosen[id - mergedBase] = id in owned || id in mergedByHand
@@ -347,7 +349,7 @@ class UserModel(
     private fun importId(entry: Entry): Int? = imports?.find(entry.text, entry.syllables)?.takeIf { it >= 0 }?.let { importBase + it }
 
     // the id entry has, made, merged or imported, without making one: id()'s order (review S3)
-    private fun idOf(entry: Entry): Int? = ids[entry] ?: mergedId(entry).takeIf { it != NO_WORD } ?: importId(entry)
+    internal fun idOf(entry: Entry): Int? = ids[entry] ?: mergedId(entry).takeIf { it != NO_WORD } ?: importId(entry)
 
     // an imported word in the trie while it is a whole word (the user's own, listed, added by hand), else offered from the start alone
     private fun settle(id: Int) {
@@ -364,7 +366,7 @@ class UserModel(
     }
 
     /** Whether [word] is one of the user's own words: see [own]. */
-    fun owns(word: Int): Boolean = word in owned
+    fun owns(word: Int): Boolean = if (word in 0 until vocabulary.size) ownedBase[word] else word in owned
 
     /** The counts made anew: none till [setCount] and [setPair] give them ([HabitCounts]). */
     internal fun clearCounts() {
@@ -376,6 +378,7 @@ class UserModel(
         total = 0f
         mergedCounted = 0
         changes++
+        countsVersion++
     }
 
     /** [word]'s count as [count]; [entry], its reading, kept for [forEachCount] if it has none yet (never a chosen word's own). */
@@ -384,6 +387,7 @@ class UserModel(
         val key = key(NO_WORD, word)
         val was = counts[key]
         if (was == count) return
+        countsVersion++
         counts[key] = count
         counted(word, was, count)
         total += count - was
@@ -395,6 +399,7 @@ class UserModel(
 
     /** The count of [next] after [prev] as [count]; [byText], [next] was put in by its text alone, for 联想 only. */
     internal fun setPair(prev: Int, next: Int, count: Float, byText: Boolean = false) {
+        countsVersion++
         if (byText) textPairs[key(prev, next)] = count else counts[key(prev, next)] = count
         if (count > 0f) followers.getOrPut(prev) { HashSet() } += next
     }
@@ -412,22 +417,6 @@ class UserModel(
     private fun text(word: Int, entry: Entry?) = entry?.text ?: if (word < vocabulary.size) vocabulary.word(word) else text(word)
 
     /**
-     * Forgets [words], a candidate the user asked to: their counts and every pair they are in.
-     * One of the user's own words, forgotten alone, is gone from the trie too, as libime drops
-     * it from its user dictionary. One [list]ed stays typeable, its counts gone; so does one in a
-     * longer candidate, till the next start.
-     */
-    fun forget(words: List<Entry>) {
-        val forgotten = words.mapNotNull(::idOf).toSet()
-        if (forgotten.isEmpty()) return
-        forgetCounts(forgotten)
-        val word = words.singleOrNull()
-        val id = word?.let(::idOf) ?: NO_WORD
-        if (word != null && isMade(id)) dropOwn(word, id)
-        changes++
-    }
-
-    /**
      * Whether anything is learned of [words]: a count, a pair one of them is in, or, alone, a word
      * the user owns ([owns]) or made. A word of the dictionary's never typed has none, so a long
      * press on it offers no forgetting.
@@ -441,7 +430,8 @@ class UserModel(
             textPairs.any { key -> first(key) in known || second(key) in known }
     }
 
-    private fun forgetCounts(forgotten: Set<Int>) {
+    internal fun forgetCounts(forgotten: Set<Int>) {
+        countsVersion++
         counts.removeIf { first(it) in forgotten || second(it) in forgotten }
         predicted.keys.removeAll(forgotten)
         predicted.values.forEach { it.keys.removeAll(forgotten) }
@@ -462,20 +452,14 @@ class UserModel(
         }
     }
 
-    private fun dropOwn(word: Entry, id: Int) {
+    internal fun dropOwn(word: Entry, id: Int) {
         wordChanged(word.text)
-        if (owned.remove(id)) mergedChoice(id)
+        if (owned.remove(id)) ownedChanged(id)
         trie.remove(word.syllables, id)
         // learned again, it is a new word, put back in the trie
         ids.remove(word)
         entries.remove(id)
     }
-
-    /** Adds [count] to [entry] as a word; for counts kept, as compaction writes them. */
-    fun addCount(entry: Entry, count: Float) = add(NO_WORD, idAsTyped(entry), count)
-
-    /** Adds [count] to [second] after [first]. */
-    fun addCount(first: Entry, second: Entry, count: Float) = add(idAsTyped(first), idAsTyped(second), count)
 
     /** Calls [word] with every word counted, its count above 0. */
     fun forEachWordCount(word: (Entry, Float) -> Unit) = forEachCount(word) { _, _, _ -> }
@@ -562,7 +546,7 @@ class UserModel(
     }
 
     // the id of entry as typed: a word of the dictionary's is then read so, not as it was listed or blocked
-    private fun idAsTyped(entry: Entry): Int = id(entry).also { entered(it, entry) }
+    internal fun idAsTyped(entry: Entry): Int = id(entry).also { entered(it, entry) }
 
     /**
      * [id] of a word from the user's dictionaries: one they did not make, so forgetting it drops
@@ -699,8 +683,8 @@ class UserModel(
         }
     }
 
-    // a word the user made, typing it (learn), not the dictionary's nor one of their dictionaries', nor imported
-    private fun isMade(id: Int) = id >= vocabulary.size && !isListed(id) && !isImport(id)
+    // a word the user made (owned at a reading the dictionary lacks), not the dictionary's nor one of their dictionaries', nor imported
+    internal fun isMade(id: Int) = id >= vocabulary.size && !isListed(id) && !isImport(id)
 
     /** The id of [entry] if it has one, the dictionary's, imported or the user's, without making it the user's word; else [NO_WORD]. */
     fun known(entry: Entry): Int = if (knows(entry)) id(entry) else NO_WORD
@@ -789,14 +773,6 @@ class UserModel(
 
     /** The words the user owns ([own]), not blocked, with how often each was typed lately. */
     fun ownWords(): List<Pair<Entry, Float>> = owned.mapNotNull { id -> entries[id]?.takeIf { it !in blockedEntries }?.let { it to counts[key(NO_WORD, id)] } }
-
-    /**
-     * The words the user made in an older build, by putting a reading together from pieces, with
-     * how often each was typed: not those of their dictionaries or packs, nor those forgotten. What
-     * converting that build's log makes the user's own (LegacyConversion).
-     */
-    fun madeWords(): List<Pair<Entry, Float>> = entries.filter { (id, entry) -> isMade(id) && entry !in blockedEntries }
-        .map { (id, entry) -> entry to counts[key(NO_WORD, id)] }
 
     /**
      * The texts of the words of the user's dictionaries and packs, and those they added, for
@@ -894,9 +870,10 @@ class UserModel(
         null
     }
 
-    private fun add(first: Int, second: Int, count: Float) {
+    internal fun add(first: Int, second: Int, count: Float) {
         val was = counts[key(first, second)]
         if (first == NO_WORD && was == 0f) changes++
+        countsVersion++
         counts.add(key(first, second), count)
         if (first == NO_WORD) counted(second, was, counts[key(first, second)])
         if (first == NO_WORD) total += count else followers.getOrPut(first) { HashSet() } += second

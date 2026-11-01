@@ -126,10 +126,11 @@ class CustomPhrasesTest {
     fun theSettingsListEveryPhraseAndSaveThemAsFcitxDoes() {
         val phrases = CustomPhrases.parse("zz,2=乙\nab,-1=off\nzz,1=甲\nsig,1=\nline one\nline two\nq,1=\"\"\nD,1=大")
         val all = phrases.all
-        assertEquals(listOf("D", "ab", "q", "sig", "zz", "zz"), all.map { it.key })
-        assertEquals(listOf(1, -1, 1, 1, 1, 2), all.map { it.order })
+        // a key in capitals kept in lower case, as it is matched (A1)
+        assertEquals(listOf("ab", "d", "q", "sig", "zz", "zz"), all.map { it.key })
+        assertEquals(listOf(-1, 1, 1, 1, 1, 2), all.map { it.order })
         val text = CustomPhrases.format(all)
-        assertEquals("D,1=大\nab,-1=off\nq,1=\"\"\nsig,1=\"line one\\nline two\"\nzz,1=甲\nzz,2=乙\n", text)
+        assertEquals("ab,-1=off\nd,1=大\nq,1=\"\"\nsig,1=\"line one\\nline two\"\nzz,1=甲\nzz,2=乙\n", text)
         // what is saved reads back the same
         assertEquals(text, CustomPhrases.format(CustomPhrases.parse(text).all))
         assertEquals(listOf(0 to "line one\nline two"), CustomPhrases.parse(text).lookup("sig", now))

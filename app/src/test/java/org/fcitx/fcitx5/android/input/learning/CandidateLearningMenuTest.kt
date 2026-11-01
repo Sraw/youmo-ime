@@ -6,7 +6,7 @@ package org.fcitx.fcitx5.android.input.learning
 
 import kotlinx.coroutines.test.runTest
 import org.fcitx.fcitx5.android.R
-import org.fcitx.fcitx5.android.core.FakeFcitxConnection
+import org.fcitx.fcitx5.android.core.FakeHostConnection
 import org.fcitx.fcitx5.android.engine.learn.HabitRanker
 import org.fcitx.fcitx5.android.engine.learn.control.BlockScope
 import org.fcitx.fcitx5.android.engine.learn.control.LearningOp
@@ -37,7 +37,7 @@ class CandidateLearningMenuTest {
 
     @Test
     fun theEnginesMenuIsWordedHere() = runTest {
-        val connection = FakeFcitxConnection(this)
+        val connection = FakeHostConnection(this)
         // the ops themselves, not their text: a field renamed is not a behaviour changed
         val ops = mutableListOf<LearningOp>()
         connection.api.learned = { ops += it; if (it is LearningOp.Menu) menu(WordKind.DICTIONARY) else LearningResult.Done(1) }
@@ -66,7 +66,7 @@ class CandidateLearningMenuTest {
 
     @Test
     fun theUsersOwnWordIsDeleted() = runTest {
-        val connection = FakeFcitxConnection(this)
+        val connection = FakeHostConnection(this)
         connection.api.learned = { menu(WordKind.MINE) }
         val lines = CandidateLearningMenu(context, connection, this) { _, _ -> error("not shown") }.lines(0, "指导", paged = true)!!
         assertEquals(placeholder(R.string.learning_delete), lines.first().label)
@@ -75,7 +75,7 @@ class CandidateLearningMenuTest {
 
     @Test
     fun noMenuWhereTheEngineHasNone() = runTest {
-        val connection = FakeFcitxConnection(this)
+        val connection = FakeHostConnection(this)
         connection.api.learned = { LearningResult.Unavailable }
         val menu = CandidateLearningMenu(context, connection, this) { _, _ -> error("not shown") }
         assertNull(menu.lines(0, "a", paged = false))
@@ -86,7 +86,7 @@ class CandidateLearningMenuTest {
 
     @Test
     fun anActIsSaidWithTheTokenThatTakesItBack() = runTest {
-        val connection = FakeFcitxConnection(this)
+        val connection = FakeHostConnection(this)
         connection.api.learned = { if (it is LearningOp.Menu) menu(WordKind.DICTIONARY) else LearningResult.Done(7) }
         val said = mutableListOf<Pair<String, Long>>()
         val lines = CandidateLearningMenu(context, connection, this) { message, token -> said += message to token }.lines(2, "指导", paged = false)!!
@@ -98,7 +98,7 @@ class CandidateLearningMenuTest {
 
     @Test
     fun nothingDoneIsSaidWithNothingToUndo() = runTest {
-        val connection = FakeFcitxConnection(this)
+        val connection = FakeHostConnection(this)
         connection.api.learned = { if (it is LearningOp.Menu) menu(WordKind.DICTIONARY) else LearningResult.Unavailable }
         val said = mutableListOf<Pair<String, Long>>()
         val menu = CandidateLearningMenu(context, connection, this) { m, t -> said += m to t }
@@ -110,7 +110,7 @@ class CandidateLearningMenuTest {
 
     @Test
     fun shiftDeleteForgetsAsTheLongPressWould() = runTest {
-        val connection = FakeFcitxConnection(this)
+        val connection = FakeHostConnection(this)
         connection.api.learned = { if ((it as LearningOp.OnPage).op is LearningOp.Menu) menu(WordKind.MINE) else LearningResult.Done(LearningResult.NO_UNDO) }
         val said = mutableListOf<Long>()
         val menu = CandidateLearningMenu(context, connection, this) { _, token -> said += token }

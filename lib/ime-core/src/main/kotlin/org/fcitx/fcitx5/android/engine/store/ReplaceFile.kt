@@ -4,8 +4,7 @@
  */
 package org.fcitx.fcitx5.android.engine.store
 
-import java.io.File
-import java.io.FileOutputStream
+import org.fcitx.fcitx5.android.engine.platform.LogFile
 import java.io.IOException
 
 /**
@@ -14,13 +13,13 @@ import java.io.IOException
  *
  * @throws IOException if [dest] could not be replaced
  */
-inline fun replaceFile(dest: File, temp: File, write: (File) -> Unit) {
+inline fun replaceFile(dest: LogFile, temp: LogFile, write: (LogFile) -> Unit) {
     try {
         write(temp)
         // the sync below would make a missing one, empty, and rename it over dest
-        if (!temp.isFile) throw IOException("cannot replace ${dest.name}: nothing written")
+        if (!temp.exists()) throw IOException("cannot replace ${dest.name}: nothing written")
         // on disk before the rename: else a power cut may leave the new name on an empty file
-        FileOutputStream(temp, true).use { it.fd.sync() }
+        temp.append().use { it.sync() }
         if (!temp.renameTo(dest)) throw IOException("cannot replace ${dest.name}")
     } finally {
         temp.delete()

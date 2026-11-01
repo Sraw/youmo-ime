@@ -9,9 +9,9 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
-import org.fcitx.fcitx5.android.core.FakeFcitxConnection
-import org.fcitx.fcitx5.android.core.FcitxAPI
-import org.fcitx.fcitx5.android.daemon.FcitxConnection
+import org.fcitx.fcitx5.android.core.FakeHostConnection
+import org.fcitx.fcitx5.android.core.HostApi
+import org.fcitx.fcitx5.android.daemon.HostConnection
 import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
 import org.junit.Assert.assertEquals
 import org.junit.Test
@@ -21,17 +21,17 @@ import kotlin.coroutines.EmptyCoroutineContext
 class NineKeyLettersFragmentTest {
 
     /** Fcitx starting till [ready] completes: until then [runIfReady] drops its block, as the real one does. */
-    private class Starting(scope: CoroutineScope, val fake: FakeFcitxConnection = FakeFcitxConnection(scope)) :
-        FcitxConnection by fake {
+    private class Starting(scope: CoroutineScope, val fake: FakeHostConnection = FakeHostConnection(scope)) :
+        HostConnection by fake {
 
         val ready = CompletableDeferred<Unit>()
 
-        override suspend fun <T> runOnReady(block: suspend FcitxAPI.() -> T): T {
+        override suspend fun <T> runOnReady(block: suspend HostApi.() -> T): T {
             ready.await()
             return fake.runOnReady(block)
         }
 
-        override fun runIfReady(block: suspend FcitxAPI.() -> Unit) {
+        override fun runIfReady(block: suspend HostApi.() -> Unit) {
             if (ready.isCompleted) fake.runIfReady(block)
         }
     }

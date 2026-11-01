@@ -1,8 +1,8 @@
 name: Emulator Tests
 
-# Instrumented tests on an emulator: FcitxTest (the engine through JNI) and SoftKeyboardTest
+# Instrumented tests on an emulator: HostTest (the Kotlin host and engine on the device) and SoftKeyboardTest
 # (typing on the real keyboard into a real EditText), in both builds, and in the voice one
-# VoiceEngineTest (the packaged models on a recording). They need the native build, so they take
+# VoiceEngineTest (the packaged models on a recording). They need an APK and a device, so they take
 # far longer than the JVM unit tests and do not gate every push: they run weekly, on demand,
 # and on pull requests labelled `emulator`.
 

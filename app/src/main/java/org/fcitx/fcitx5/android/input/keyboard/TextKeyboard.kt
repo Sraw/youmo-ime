@@ -7,13 +7,21 @@ package org.fcitx.fcitx5.android.input.keyboard
 import android.annotation.SuppressLint
 import android.content.Context
 import android.content.res.Configuration
+import android.text.SpannableString
+import android.util.TypedValue
 import android.view.View
 import androidx.annotation.Keep
+import androidx.constraintlayout.widget.ConstraintLayout
 import androidx.core.view.ViewCompat
 import androidx.core.view.allViews
 import androidx.core.view.isVisible
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
 import org.fcitx.fcitx5.android.R
-import org.fcitx.fcitx5.android.core.EngineBridge
+import org.fcitx.fcitx5.android.core.EngineState
 import org.fcitx.fcitx5.android.core.InputMethodEntry
 import org.fcitx.fcitx5.android.core.KeyState
 import org.fcitx.fcitx5.android.core.KeyStates
@@ -21,8 +29,10 @@ import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.prefs.ManagedPreference
 import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
+import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.engine.glide.Glide
-import org.fcitx.fcitx5.android.engine.host.Engines
+import org.fcitx.fcitx5.android.engine.table.TableKeyboard
+import org.fcitx.fcitx5.android.input.AutoScaleTextView
 import org.fcitx.fcitx5.android.input.broadcast.ReturnKeyAppearance
 import org.fcitx.fcitx5.android.input.floating.FloatingKeyboard
 import org.fcitx.fcitx5.android.input.picker.PickerWindow
@@ -38,6 +48,9 @@ class TextKeyboard private constructor(
     theme: Theme,
     split: Split?,
 ) : BaseKeyboard(context, theme, split?.keys ?: Layout, split?.widths), AutoCapsKeys {
+
+    // the halves: 双拼's ing is L's long press there (LS-29), a table's code key has a key of its own
+    private val isSplit = split != null
 
     constructor(context: Context, theme: Theme) : this(context, theme, Split.of(context))
 
@@ -87,11 +100,16 @@ class TextKeyboard private constructor(
                 AlphabetKey("J", "#"),
                 AlphabetKey("K", "("),
                 AlphabetKey("L", ")"),
-                // where a physical keyboard has it: 微软 and 紫光 双拼 type ing on it, hidden else (semicolonKey)
-                SymbolKey(";", 0.1f, viewId = R.id.button_semicolon)
+                // where a physical keyboard has it: 微软 双拼 types ing on it, hidden else (semicolonKey);
+                // a table's code key the face has nowhere else, as the engine says (TableKeyboard.extraKey)
+                SymbolKey(";", 0.1f, viewId = R.id.button_semicolon),
+                SymbolKey("*", 0.1f, viewId = R.id.button_star),
             ),
             listOf(
+                // a table's 拼 key in Shift's place, one of the two shown as its lookup is (showLookUpKey)
                 CapsKey(),
+                LookUpKey(on = false),
+                LookUpKey(on = true),
                 AlphabetKey("Z", "'"),
                 AlphabetKey("X", ":"),
                 AlphabetKey("C", "\""),
@@ -117,9 +135,21 @@ class TextKeyboard private constructor(
                 AddressKey(".", R.id.button_dot),
                 AddressKey(AddressKeys.DOMAINS.first(), R.id.button_domain, 0.14f, AddressKeys.DOMAINS),
                 LanguageKey(),
-                ReturnKey()
+                ReturnKey(),
+                // a table's while a code is typed, in Return's place (showConfirmKey)
+                ConfirmKey(),
             )
         )
+
+        // the keys either side of Shift's place in [Layout]'s third row that stand in for it
+        private const val LOOK_UP_KEYS = 2
+
+        // what a table's code key may have of its own beside the letters, the first wanted first
+        private val EXTRA_SLOTS = listOf(';', '*')
+
+        // a table's roots in two lines on a key, of a letter's size
+        private const val ROOTS_TEXT_SCALE = 0.55f
+        private const val ROOTS_INSET_DP = 6
     }
 
     /**
@@ -135,10 +165,21 @@ class TextKeyboard private constructor(
         init {
             val rows = listOf(
                 sizes.row(Layout[0].take(SplitKeyboard.HALF_KEYS), Layout[0].takeLast(SplitKeyboard.HALF_KEYS), GapKey),
-                // without the 双拼 `;`: each half is five keys
-                Layout[1].dropLast(1).let { sizes.row(it.take(SplitKeyboard.HALF_KEYS), it.takeLast(SplitKeyboard.HALF_KEYS), GapKey) },
-                // Shift Z X C V, V B N M backspace
-                sizes.row(Layout[2].take(SplitKeyboard.HALF_KEYS), Layout[2].takeLast(SplitKeyboard.HALF_KEYS), GapKey),
+                // a table's extra key after L, as unsplit (not the 双拼 `;`, showSemicolonKey): the right
+                // half six keys while one shows, the room between the halves giving way (it fills what is left)
+                Layout[1].let { row ->
+                    val letters = row.dropLast(EXTRA_SLOTS.size)
+                    val halves = sizes.row(letters.take(SplitKeyboard.HALF_KEYS), letters.takeLast(SplitKeyboard.HALF_KEYS), GapKey)
+                    halves.map { (key, width) -> key to if (key === GapKey) 0f else width } +
+                        row.takeLast(EXTRA_SLOTS.size).map { it to sizes.width(it.appearance.percentWidth) }
+                },
+                // Shift Z X C V, V B N M backspace; a table's 拼 keys as wide as Shift, one of them shown in its place
+                Layout[2].let { row ->
+                    val shift = row.take(1)
+                    val lookUp = row.subList(1, 1 + LOOK_UP_KEYS)
+                    val halves = sizes.row(shift + row.subList(1 + LOOK_UP_KEYS, LOOK_UP_KEYS + SplitKeyboard.HALF_KEYS), row.takeLast(SplitKeyboard.HALF_KEYS), GapKey)
+                    halves.take(1) + lookUp.map { it to halves[0].second } + halves.drop(1)
+                },
                 Layout[3].map { it to sizes.width(it.appearance.percentWidth) },
             )
             keys = rows.map { row -> row.map { it.first } }
@@ -162,6 +203,7 @@ class TextKeyboard private constructor(
     val lang: ImageKeyView by lazy { findViewById(R.id.button_lang) }
     val space: TextKeyView by lazy { findViewById(R.id.button_space) }
     val `return`: ImageKeyView by lazy { findViewById(R.id.button_return) }
+    private val confirm: TextKeyView by lazy { findViewById(R.id.button_confirm) }
 
     /** What the bottom row has either side of the space, as the field is: see [AddressKeys]. */
     override var address: AddressKeys = AddressKeys.NONE
@@ -194,10 +236,24 @@ class TextKeyboard private constructor(
     @Keep
     private val popupOverridesListener = ManagedPreference.OnChangeListener<String> { _, _ ->
         updatePunctuationKeys()
+        // a swipe changed may type a table's code key no more, or now
+        showSemicolonKey()
     }
 
     // the input method last reported, for the `;` key again when the 双拼 scheme changed meanwhile
     private var imeName = ""
+
+    // what the engine last said of a table input method's keyboard (EngineState.tableKeyboard), null
+    // for another, or none said yet of the one shown: its letters' roots, its 拼 key, its code keys
+    private var table: TableKeyboard? = null
+
+    // Return as it was last shown: while something is typed, a table shows 确定 in its place
+    private var returnAppearance = ReturnKeyAppearance.Enter
+
+    // the letter key whose long press shows its roots (TableKeyboard.rootsOf) in its bubble
+    private var rootsShownOn = View.NO_ID
+
+    private var scope: CoroutineScope? = null
 
     init {
         // hidden until an input method says it types on it: shown, every one's A row had an 11th key
@@ -207,6 +263,54 @@ class TextKeyboard private constructor(
         updateLangSwitchKey(showLangSwitchKey.getValue())
         showLangSwitchKey.registerOnChangeListener(showLangSwitchKeyListener)
         popupOverridesPref.registerOnChangeListener(popupOverridesListener)
+        confirm.mainText.text = context.getString(R.string.key_confirm)
+        showLookUpKey()
+        showConfirmKey()
+    }
+
+    override fun onAttachedToWindow() {
+        super.onAttachedToWindow()
+        scope = CoroutineScope(Dispatchers.Main.immediate + Job()).also { s ->
+            s.launch { EngineState.tableKeyboard.collect(::showTable) }
+        }
+    }
+
+    override fun onDetachedFromWindow() {
+        scope?.cancel()
+        scope = null
+        super.onDetachedFromWindow()
+    }
+
+    // [state] of the table shown, or of another input method's (none of this one's then)
+    private fun showTable(state: TableKeyboard?) {
+        val shown = state?.takeIf { it.im == imeName }
+        if (shown == table) return
+        // another table's roots as well: 五笔's 键名 to 仓颉's, both NAMES, told before the switch shows
+        val relabels = shown?.labels != table?.labels || shown?.roots !== table?.roots
+        table = shown
+        showLookUpKey()
+        if (relabels) {
+            keysLaidOut = false
+            updateAlphabetKeys()
+            updatePunctuationKeys()
+        }
+        showSemicolonKey()
+    }
+
+    // a table's 拼 key, dark while it looks up, in Shift's place; Shift elsewhere
+    private fun showLookUpKey() {
+        val isTable = imeName in InputMethodCatalog.TABLES
+        val on = table?.lookingUp == true
+        showKey(caps, !isTable)
+        findViewById<View>(R.id.button_lookup)?.let { showKey(it, isTable && !on) }
+        findViewById<View>(R.id.button_lookup_on)?.let { showKey(it, isTable && on) }
+    }
+
+    // 确定 in Return's place while a table has a code typed: what Return does then, said
+    private fun showConfirmKey() {
+        val confirms = returnAppearance.composing && imeName in InputMethodCatalog.TABLES
+        showKey(`return`, !confirms)
+        showKey(confirm, confirms)
     }
 
     private val textKeys: List<TextKeyView> by lazy {
@@ -215,12 +319,19 @@ class TextKeyboard private constructor(
 
     private var capsState: CapsState = CapsState.None
 
-    // the input method reads a glide (Engines.glides)
+    // the input method reads a glide (InputMethodCatalog.glides)
     private var glides = false
 
     private fun showSemicolonKey() {
-        // split, the halves have no room for it: absent there
-        findViewById<View>(R.id.button_semicolon)?.let { showKey(it, semicolonKey(imeName, EngineBridge.shuangpinScheme)) }
+        // the table's code key the face has nowhere else: not on a corner its swipe types, unless the corners show roots
+        val extra = table?.extraKey(EXTRA_SLOTS, BOTTOM_ROW_KEYS + if (table?.labelled == true) emptySet() else cornerKeys())
+        findViewById<View>(R.id.button_semicolon)?.let { showKey(it, (!isSplit && semicolonKey(imeName, EngineState.shuangpinScheme)) || extra == ';') }
+        findViewById<View>(R.id.button_star)?.let { showKey(it, extra == '*') }
+    }
+
+    // what the letters' swipes type, drawn in their corners
+    private fun cornerKeys(): Set<Char> = textKeys.mapNotNullTo(HashSet()) { v ->
+        (v.def as? KeyDef.Appearance.AltText)?.let { (swipeOverride(it) ?: it.altText).singleOrNull() }
     }
 
     private val letterKeys: List<Pair<Char, TextKeyView>> by lazy {
@@ -229,8 +340,8 @@ class TextKeyboard private constructor(
         }
     }
 
-    // glide typing (滑行输入) where the input method reads one
-    override val glide = glideInput(letters = { letterKeys }, enabled = { glides }) { path, layout ->
+    // glide typing (滑行输入) where the input method reads one; a stroke (笔画筛选) in pinyin's and 双拼's
+    override val glide = glideInput(letters = { letterKeys }, enabled = { glides }, filters = { InputMethodCatalog.filtersByStrokes(imeName) }) { path, layout ->
         onAction(KeyAction.GlideAction(Glide(path, layout, shift = capsState == CapsState.Once, capsLock = capsState == CapsState.Lock)))
         // as a letter typed: Shift-once used up in any input method, as a tap uses it up (only English reads it)
         if (capsState == CapsState.Once) switchCapsState()
@@ -271,7 +382,7 @@ class TextKeyboard private constructor(
     override fun onAction(action: KeyAction, source: KeyActionListener.Source) {
         var transformed = action
         when (action) {
-            is KeyAction.FcitxKeyAction -> when (source) {
+            is KeyAction.HostKeyAction -> when (source) {
                 KeyActionListener.Source.Keyboard -> {
                     when (capsState) {
                         CapsState.None -> {
@@ -318,6 +429,8 @@ class TextKeyboard private constructor(
 
     override fun onReturnDrawableUpdate(appearance: ReturnKeyAppearance) {
         `return`.showReturnAction(appearance)
+        returnAppearance = appearance
+        showConfirmKey()
     }
 
     override fun onPunctuationUpdate(mapping: Map<String, String>) {
@@ -328,8 +441,12 @@ class TextKeyboard private constructor(
     override fun onInputMethodUpdate(ime: InputMethodEntry) {
         showInputMethodName(space, ime)
         imeName = ime.uniqueName
+        // what the engine said last, if of this one: a table's state comes with its first answer
+        showTable(EngineState.tableKeyboard.value)
+        showLookUpKey()
+        showConfirmKey()
         showSemicolonKey()
-        glides = Engines.glides(ime.uniqueName)
+        glides = InputMethodCatalog.glides(ime.uniqueName)
         if (capsState != CapsState.None) {
             switchCapsState()
         }
@@ -340,8 +457,23 @@ class TextKeyboard private constructor(
     override fun onPopupAction(action: PopupAction) {
         val newAction = when (action) {
             is PopupAction.PreviewAction -> action.copy(content = transformPopupPreview(action.viewId, action.content))
-            is PopupAction.PreviewUpdateAction -> action.copy(content = transformPopupPreview(action.viewId, action.content))
+            // the roots stay shown till the key is let go
+            is PopupAction.PreviewUpdateAction -> if (action.viewId == rootsShownOn) return else action.copy(content = transformPopupPreview(action.viewId, action.content))
+            is PopupAction.DismissAction -> action.also { if (it.viewId == rootsShownOn) rootsShownOn = View.NO_ID }
+            // let go: the bubble goes whether or not a press shows one (no long press's keys to take it down)
+            is PopupAction.TriggerAction -> if (action.viewId == rootsShownOn) {
+                rootsShownOn = View.NO_ID
+                action.outConsumed = true
+                super.onPopupAction(PopupAction.DismissAction(action.viewId))
+                return
+            } else action
             is PopupAction.ShowKeyboardAction -> {
+                // a table's roots, large, in the key's bubble while the keys show them; nothing to pick
+                rootsOf(action.keyboard)?.let { roots ->
+                    rootsShownOn = action.viewId
+                    super.onPopupAction(PopupAction.PreviewAction(action.viewId, roots, action.bounds))
+                    return
+                }
                 when (action.keyboard) {
                     is KeyDef.Popup.Keyboard.Preset -> {
                         val label = action.keyboard.label
@@ -404,28 +536,63 @@ class TextKeyboard private constructor(
         lang.visibility = if (visible) View.VISIBLE else View.GONE
     }
 
+    // the letters' sizes and places set for the table shown: a Shift changes their text alone, and
+    // setting them again lays out every key
+    private var keysLaidOut = false
+
     private fun updateAlphabetKeys() {
+        val layOut = !keysLaidOut
+        keysLaidOut = true
         textKeys.forEach {
             // on to the next key, not out: the 双拼 `;` after L is no letter, and Z to M come after it
             if (it.def !is KeyDef.Appearance.AltText) return@forEach
             it.mainText.text = it.def.displayText.let { str ->
                 if (str.length != 1 || !str[0].isLetter()) return@forEach
-                if (keepLettersUppercase) str.uppercase() else transformAlphabet(str)
+                // a table's roots over the letter, which its corner shows (updatePunctuationKeys); in
+                // lines, shrunk to fit the key (AutoScaleTextView lays out a styled text's lines)
+                val label = table?.label(str[0].lowercaseChar())
+                val lines = label != null && '\n' in label
+                val roots = label != null && label.length > 1
+                if (layOut) {
+                    it.mainText.scaleMode = if (roots) AutoScaleTextView.Mode.Proportional else AutoScaleTextView.Mode.None
+                    // held to the key, so they shrink to it: wrapped, it was as wide as they are, over the next keys
+                    (it.mainText.layoutParams as? ConstraintLayout.LayoutParams)?.let { lp ->
+                        lp.constrainedWidth = roots
+                        lp.constrainedHeight = roots
+                        it.mainText.layoutParams = lp
+                    }
+                    // the key's face is narrower than its place by its margins
+                    val inset = if (roots) (ROOTS_INSET_DP * resources.displayMetrics.density).toInt() else 0
+                    it.mainText.setPadding(inset, 0, inset, 0)
+                    // two lines in the height of one
+                    it.mainText.setTextSize(TypedValue.COMPLEX_UNIT_DIP, it.def.textSize * keyTextScale(context) * if (lines) ROOTS_TEXT_SCALE else 1f)
+                }
+                if (lines) SpannableString(label) else label ?: if (keepLettersUppercase) str.uppercase() else transformAlphabet(str)
             }
         }
+    }
+
+    // [keyboard]'s, a letter's long press, as a table's roots in a line, while the keys show them
+    private fun rootsOf(keyboard: KeyDef.Popup.Keyboard): String? {
+        val letter = (keyboard as? KeyDef.Popup.Keyboard.Preset)?.label?.singleOrNull()?.lowercaseChar() ?: return null
+        return table?.rootsOf(letter)?.joinToString(" ")
     }
 
     private fun updatePunctuationKeys() {
         textKeys.forEach {
             if (it is AltTextKeyView) {
                 it.def as KeyDef.Appearance.AltText
-                it.altText.text = transformPunctuation(swipeOverride(it.def) ?: it.def.altText)
+                val letter = it.def.displayText.singleOrNull()?.takeIf { c -> c.isLetter() }
+                // a table's roots over the letter: the letter in the corner, its swipe as it was
+                it.altText.text = if (letter != null && table?.labelled == true) letter.lowercase()
+                else transformPunctuation(swipeOverride(it.def) ?: it.def.altText)
             } else {
                 it.def as KeyDef.Appearance.Text
                 // an address's keys commit as they are, and say so: . not 。
                 if (it.id in ADDRESS_KEYS) return@forEach
                 it.mainText.text = it.def.displayText.let { str ->
-                    if (str[0].run { isLetter() || isWhitespace() }) return@forEach
+                    // 确定's text is the keyboard's own (ConfirmKey)
+                    if (str.isEmpty() || str[0].run { isLetter() || isWhitespace() }) return@forEach
                     transformPunctuation(str)
                 }
             }
@@ -452,7 +619,10 @@ internal fun PopupOverrides.longPressOf(label: String): Array<String>? = resolve
 
 // here, not in the companion: previewOf's JVM test would otherwise load TextKeyboard, a View;
 // the 双拼 `;` is a key of the scheme, shown as it is too (; not ；)
-private val ADDRESS_KEYS = setOf(R.id.button_slash, R.id.button_at, R.id.button_dot, R.id.button_domain, R.id.button_semicolon)
+private val ADDRESS_KEYS = setOf(R.id.button_slash, R.id.button_at, R.id.button_dot, R.id.button_domain, R.id.button_semicolon, R.id.button_star)
+
+// the bottom row's own keys a table's code may have: the comma and the full stop
+private val BOTTOM_ROW_KEYS = setOf(',', '.')
 
 
 /**

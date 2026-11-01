@@ -7,8 +7,10 @@ package org.fcitx.fcitx5.android.uat
 import android.content.res.Configuration
 import android.text.InputType
 import org.fcitx.fcitx5.android.FcitxApplication
+import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
+import org.fcitx.fcitx5.android.host.HostEvent
 import org.fcitx.fcitx5.android.input.KeyboardHarness
 import org.fcitx.fcitx5.android.input.keyboard.KeyView
 import org.fcitx.fcitx5.android.input.keyboard.TextKeyView
@@ -24,7 +26,7 @@ import org.robolectric.annotation.GraphicsMode
 /** UAT cases of the keyboard across fields and system changes (uat/18). */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
-@Config(application = FcitxApplication::class, qualifiers = "w393dp-h851dp-port-440dpi")
+@Config(application = FcitxApplication::class, qualifiers = "w393dp-h851dp-port-440dpi", shadows = [HideRecordingShadow::class])
 class LifecycleUatTest {
 
     private val h = KeyboardHarness()
@@ -51,6 +53,27 @@ class LifecycleUatTest {
         assertTrue("the symbols shown", !letters())
         h.start(InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_AUTO_CORRECT)
         assertTrue(letters())
+    }
+
+    @Test
+    @Uat("LC-07")
+    fun hiddenAndShownAgainIsStillTheInputMethod() {
+        h.api.availableIme = arrayOf(KeyboardHarness.PINYIN, KeyboardHarness.ENGLISH)
+        h.api.enabledIme = h.api.availableIme
+        h.start()
+        h.tap(h.described(h.service.getString(R.string.a11y_key_switch_language)))
+        h.emit(HostEvent.InputMethodChanged(h.api.inputMethodEntryCached))
+        assertTrue(h.texts().toString(), "English" in h.texts())
+        h.api.calls.clear()
+        // ⌄, the system hiding the window, the field tapped again
+        h.tap(h.described(h.service.getString(R.string.hide_keyboard)))
+        h.service.hideWindow()
+        h.idle()
+        h.start()
+        // no switch asked on the way: English still, its keyboard shown
+        assertEquals(h.api.calls.toString(), emptyList<String>(), h.api.calls.filter { "Ime(" in it || it == "toggleIme()" })
+        assertEquals(KeyboardHarness.ENGLISH.uniqueName, h.api.inputMethodEntryCached.uniqueName)
+        assertTrue(h.texts().toString(), "English" in h.texts() && letters())
     }
 
     private fun system(night: Boolean) {

@@ -7,6 +7,7 @@ package org.fcitx.fcitx5.android.data.prefs
 import android.content.Context
 import androidx.core.content.edit
 import org.fcitx.fcitx5.android.FcitxApplication
+import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.data.theme.ThemePrefs
 import org.fcitx.fcitx5.android.engine.assertRows
@@ -100,6 +101,22 @@ class AppPrefsTest {
         assertTrue(later.registerProvider(::ThemePrefs).keyRippleEffect.getValue())
     }
 
+    // 0.4's glide typing switch (glide_typing) is this version's 滑行输入 switch, under the same key:
+    // a 0.4 user's, or a 0.4 backup's, carries over as it is; 笔画筛选 off
+    @Test
+    @Uat("ST-43")
+    fun glideTypingCarriesOverAsItIs() {
+        class Row(val why: String, val stored: Boolean?)
+        assertRows(listOf(Row("0.4 on", true), Row("0.4 off", false), Row("never stored", null)), { it.why }) { row ->
+            sp.edit {
+                clear()
+                if (row.stored != null) putBoolean(AppPrefs.GLIDE_TYPING, row.stored)
+            }
+            assertEquals(row.stored == true, AppPrefs(sp).keyboard.glideTyping.getValue())
+            assertFalse(AppPrefs(sp).keyboard.strokeFilter.getValue())
+        }
+    }
+
     // contract: the keyboard choices are stored by the constant's name under keys that never change:
     // one renamed would put every user's back to the full keyboard; a value this version does not know
     // (a later keyboard's) reads as the default
@@ -119,15 +136,21 @@ class AppPrefsTest {
         )
         assertRows(
             listOf(
+                // 0.4's Full and Keys14 as they were; Keys18 and NineKeys since I1
                 Row(
-                    "全拼's keyboard", listOf("Full", "Keys14"), PinyinKeyboard.entries, "pinyin_keyboard", AppPrefs.PINYIN_KEYBOARD,
-                    { it.keyboard.pinyinKeyboard.setValue(PinyinKeyboard.Keys14) }, "Keys14", "Keys18",
+                    "全拼's keyboard", listOf("Full", "Keys18", "Keys14", "NineKeys"), PinyinKeyboard.entries, "pinyin_keyboard", AppPrefs.PINYIN_KEYBOARD,
+                    { it.keyboard.pinyinKeyboard.setValue(PinyinKeyboard.Keys14) }, "Keys14", "Keys16",
                     { it.keyboard.pinyinKeyboard.getValue() }, PinyinKeyboard.Full,
                 ),
                 Row(
-                    "双拼's keyboard", listOf("Full", "Keys18", "NineKeys"), ShuangpinKeyboard.entries, "shuangpin_keyboard", AppPrefs.SHUANGPIN_KEYBOARD,
-                    { it.keyboard.shuangpinKeyboard.setValue(ShuangpinKeyboard.NineKeys) }, "NineKeys", "Keys14",
+                    "双拼's keyboard", listOf("Full", "Keys18", "Keys14", "NineKeys"), ShuangpinKeyboard.entries, "shuangpin_keyboard", AppPrefs.SHUANGPIN_KEYBOARD,
+                    { it.keyboard.shuangpinKeyboard.setValue(ShuangpinKeyboard.NineKeys) }, "NineKeys", "Keys16",
                     { it.keyboard.shuangpinKeyboard.getValue() }, ShuangpinKeyboard.Full,
+                ),
+                Row(
+                    "English's keyboard", listOf("Full", "NineKeys"), EnglishKeyboard.entries, "english_keyboard", AppPrefs.ENGLISH_KEYBOARD,
+                    { it.keyboard.englishKeyboard.setValue(EnglishKeyboard.NineKeys) }, "NineKeys", "Keys14",
+                    { it.keyboard.englishKeyboard.getValue() }, EnglishKeyboard.Full,
                 ),
             ),
             { it.why },

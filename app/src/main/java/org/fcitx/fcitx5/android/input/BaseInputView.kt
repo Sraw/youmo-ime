@@ -25,17 +25,18 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.doOnPreDraw
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.onSubscription
 import kotlinx.coroutines.launch
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.core.EngineBridge
-import org.fcitx.fcitx5.android.core.FcitxEvent
-import org.fcitx.fcitx5.android.daemon.FcitxConnection
+import org.fcitx.fcitx5.android.daemon.HostConnection
 import org.fcitx.fcitx5.android.data.InputFeedbacks
 import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.data.theme.ThemePrefs
 import org.fcitx.fcitx5.android.engine.learn.control.LearningOp
 import org.fcitx.fcitx5.android.engine.learn.control.LearningResult
+import org.fcitx.fcitx5.android.host.HostEvent
 import org.fcitx.fcitx5.android.input.learning.CandidateLearningMenu
 import org.fcitx.fcitx5.android.input.learning.UndoChip
 import org.fcitx.fcitx5.android.utils.navbarFrameHeight
@@ -49,25 +50,27 @@ import kotlin.math.min
 
 abstract class BaseInputView(
     val service: FcitxInputMethodService,
-    val fcitx: FcitxConnection,
+    val fcitx: HostConnection,
     val theme: Theme
 ) : ConstraintLayout(service) {
 
     /**
-     * Update UI (from cached events in FcitxAPI) to match fcitx's state, before ready to receive real events
+     * Update UI (from cached events in HostApi) to match fcitx's state, before ready to receive real events
      */
     protected abstract fun onStartHandleFcitxEvent()
 
-    protected abstract fun handleFcitxEvent(it: FcitxEvent<*>)
+    protected abstract fun handleFcitxEvent(it: HostEvent)
 
     private var eventHandlerJob: Job? = null
 
     private fun setupFcitxEventHandler() {
         eventHandlerJob = service.lifecycleScope.launch {
-            fcitx.runImmediately { eventFlow }.collect {
+            // the caches read once subscribed: an event in between (a rebuild's reset) comes after
+            // them, not lost before the collector was there (the flow keeps none for late comers)
+            fcitx.runImmediately { eventFlow }.onSubscription { onStartHandleFcitxEvent() }.collect {
                 // the menu holds an index: in a list since changed it names another candidate,
                 // and "Forget word" would forget that one
-                if (it is FcitxEvent.CandidateListEvent || it is FcitxEvent.PagedCandidateEvent) {
+                if (it is HostEvent.Candidates || it is HostEvent.Paged) {
                     candidateActionMenu?.dismiss()
                 }
                 typed(it)
@@ -80,10 +83,7 @@ abstract class BaseInputView(
         set(value) {
             field = value
             if (field) {
-                onStartHandleFcitxEvent()
-                if (eventHandlerJob == null) {
-                    setupFcitxEventHandler()
-                }
+                if (eventHandlerJob == null) setupFcitxEventHandler() else onStartHandleFcitxEvent()
             } else {
                 eventHandlerJob?.cancel()
                 eventHandlerJob = null
@@ -202,13 +202,13 @@ abstract class BaseInputView(
 
     private val chipTyping = ChipTyping()
 
-    private fun typed(event: FcitxEvent<*>) {
+    private fun typed(event: HostEvent) {
         val goes = when (event) {
-            is FcitxEvent.ClientPreeditEvent -> chipTyping.editorPreedit(event.data.toString())
-            is FcitxEvent.InputPanelEvent -> chipTyping.barPreedit(event.data.preedit.toString())
+            is HostEvent.ClientPreedit -> chipTyping.editorPreedit(event.text.toString())
+            is HostEvent.InputPanel -> chipTyping.barPreedit(event.preedit.toString())
             // a key the engine let through, or a word put in: typing too
-            is FcitxEvent.KeyEvent -> chipTyping.key(event.data.up)
-            is FcitxEvent.CommitStringEvent -> chipTyping.typed()
+            is HostEvent.Key -> chipTyping.key(event.up)
+            is HostEvent.Commit -> chipTyping.typed()
             else -> false
         }
         // typing on: put away as a tap would, the act standing

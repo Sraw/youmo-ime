@@ -542,30 +542,29 @@ class PinyinSessionTest {
 
     @Test
     fun 双拼SemicolonIsAFinalAfterAnInitialAndPunctuationElsewhere() {
-        for (scheme in listOf(ShuangpinScheme.MICROSOFT, ShuangpinScheme.ZIGUANG)) {
-            val session = PinyinSession(data, ShuangpinSegmenter(scheme), spell = true)
-            // nothing typed: the app's punctuation key
-            val empty = session.apply(Key(';'))
-            assertFalse(empty.handled)
-            assertEquals("", empty.preedit)
-            // after a whole syllable: the first candidate, then the app's ；
-            val ni = session.type("ni")
-            val after = session.apply(Key(';'))
-            assertFalse(after.handled)
-            assertEquals(ni.candidates.first(), after.commit)
-            assertEquals("", after.preedit)
-            // after an initial: ing, read into the input (no 星 in the data: shown as typed)
-            val xing = session.type("x;")
-            assertTrue(xing.handled)
-            assertEquals("x;", xing.preedit)
-            val segmenter = ShuangpinSegmenter(scheme)
-            assertTrue(segmenter.readsAfter("x", ';'))
-            assertTrue(segmenter.readsAfter("nix", ';'))
-            assertFalse(segmenter.readsAfter("", ';'))
-            assertFalse(segmenter.readsAfter("ni", ';'))
-            assertFalse(segmenter.readsAfter("x;", ';'))
-            session.apply(Reset)
-        }
+        // 微软 alone of the schemes gives ; a final
+        val scheme = ShuangpinScheme.MICROSOFT
+        val session = PinyinSession(data, ShuangpinSegmenter(scheme), spell = true)
+        // nothing typed: the app's punctuation key
+        val empty = session.apply(Key(';'))
+        assertFalse(empty.handled)
+        assertEquals("", empty.preedit)
+        // after a whole syllable: the first candidate, then the app's ；
+        val ni = session.type("ni")
+        val after = session.apply(Key(';'))
+        assertFalse(after.handled)
+        assertEquals(ni.candidates.first(), after.commit)
+        assertEquals("", after.preedit)
+        // after an initial: ing, read into the input (no 星 in the data: shown as typed)
+        val xing = session.type("x;")
+        assertTrue(xing.handled)
+        assertEquals("x;", xing.preedit)
+        val segmenter = ShuangpinSegmenter(scheme)
+        assertTrue(segmenter.readsAfter("x", ';'))
+        assertTrue(segmenter.readsAfter("nix", ';'))
+        assertFalse(segmenter.readsAfter("", ';'))
+        assertFalse(segmenter.readsAfter("ni", ';'))
+        assertFalse(segmenter.readsAfter("x;", ';'))
     }
 
     @Test

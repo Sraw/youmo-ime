@@ -10,7 +10,7 @@ import android.view.ViewGroup
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.launch
 import org.fcitx.fcitx5.android.R
-import org.fcitx.fcitx5.android.core.FcitxAPI
+import org.fcitx.fcitx5.android.core.HostApi
 import org.fcitx.fcitx5.android.input.FcitxInputMethodService
 import org.fcitx.fcitx5.android.utils.AppUtil
 import splitties.dimensions.dp
@@ -23,7 +23,7 @@ import splitties.views.topPadding
 
 object InputMethodPickerDialog {
     suspend fun build(
-        fcitx: FcitxAPI,
+        fcitx: HostApi,
         service: FcitxInputMethodService,
         context: Context
     ): AlertDialog {

@@ -142,6 +142,16 @@ internal class SpellingIndex(fuzzy: Set<Fuzzy>, typos: Boolean, neighbours: Bool
     }
 
     companion object {
+        // a few: the settings of the moment and those just left, a test's or an evaluation's several
+        private val made = SettingsMemo<Triple<Set<Fuzzy>, Boolean, Boolean>, SpellingIndex>(MEMO) { (f, t, n) -> SpellingIndex(f, t, n) }
+
+        /** The index of these settings, made once while they are among the last few asked for ([SettingsMemo]). */
+        fun of(fuzzy: Set<Fuzzy>, typos: Boolean, neighbours: Boolean = false): SpellingIndex = made[Triple(fuzzy.toSet(), typos, neighbours)]
+
+        internal val held: Int get() = made.size
+
+        const val MEMO = 4
+
         /** Each standard spelling with one letter slipped, as [add] is to keep it, unless [spelt] already. */
         fun addSlips(spelt: Set<String>, add: (String, Int) -> Unit) {
             for (id in 0 until Syllables.count) {

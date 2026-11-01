@@ -13,16 +13,15 @@ import android.widget.TextView
 import androidx.core.view.isVisible
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
-import org.fcitx.fcitx5.android.core.EngineBridge
+import org.fcitx.fcitx5.android.core.EngineState
 import org.fcitx.fcitx5.android.core.KeyStates
 import org.fcitx.fcitx5.android.core.KeySym
 import org.fcitx.fcitx5.android.core.UNICODE
 import org.fcitx.fcitx5.android.data.theme.ThemePreset
-import org.fcitx.fcitx5.android.engine.host.Engines
+import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
 import org.fcitx.fcitx5.android.engine.pinyin.nineSpCode
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNull
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.Robolectric
@@ -55,33 +54,32 @@ class T9ShuangpinKeyboardTest {
     fun aDigitKeySendsItsGroupsCodeEveryPressItsOwn() {
         val tap = MultiTap(400)
         for (d in '2'..'9') {
-            assertEquals(code(NineKeyLetters.NINE_SP.codes[d - '2']), T9Keyboard.resolveShuangpin(KeyAction.FcitxKeyAction("$d"), keys, tap, 0L, composing = false))
+            assertEquals(code(NineKeyLetters.NINE_SP.codes[d - '2']), T9Keyboard.resolveShuangpin(KeyAction.HostKeyAction("$d"), keys, tap, 0L, composing = false))
         }
         // pressed again soon: no 连按, the same code again
-        assertEquals(code(nineSpCode('2')), T9Keyboard.resolveShuangpin(KeyAction.FcitxKeyAction("2"), keys, tap, 10L, composing = true))
-        assertEquals(code(nineSpCode('2')), T9Keyboard.resolveShuangpin(KeyAction.FcitxKeyAction("2"), keys, tap, 20L, composing = true))
+        assertEquals(code(nineSpCode('2')), T9Keyboard.resolveShuangpin(KeyAction.HostKeyAction("2"), keys, tap, 10L, composing = true))
+        assertEquals(code(nineSpCode('2')), T9Keyboard.resolveShuangpin(KeyAction.HostKeyAction("2"), keys, tap, 20L, composing = true))
     }
 
     @Test
     fun oneIsTheSeparatorWhileTypingElsePunctuation() {
         val tap = MultiTap(0)
-        assertEquals(KeyAction.FcitxKeyAction("'"), T9Keyboard.resolveShuangpin(KeyAction.FcitxKeyAction("1"), keys, tap, 0L, composing = true))
-        assertEquals(KeyAction.CommitAction("，"), T9Keyboard.resolveShuangpin(KeyAction.FcitxKeyAction("1"), keys, tap, 0L, composing = false))
+        assertEquals(KeyAction.HostKeyAction("'"), T9Keyboard.resolveShuangpin(KeyAction.HostKeyAction("1"), keys, tap, 0L, composing = true))
+        assertEquals(KeyAction.CommitAction("，"), T9Keyboard.resolveShuangpin(KeyAction.HostKeyAction("1"), keys, tap, 0L, composing = false))
     }
 
     @Test
     fun theLongPressAndOtherKeysAreAsNineKeysHasThem() {
         val tap = MultiTap(0)
         val popup = KeyActionListener.Source.Popup
-        assertEquals(KeyAction.CommitAction("j"), T9Keyboard.resolveShuangpin(KeyAction.FcitxKeyAction("j"), popup, tap, 0L, composing = true))
-        assertEquals(KeyAction.CommitAction("5"), T9Keyboard.resolveShuangpin(KeyAction.FcitxKeyAction("5"), popup, tap, 0L, composing = true))
-        assertEquals(KeyAction.FcitxKeyAction("0"), T9Keyboard.resolveShuangpin(KeyAction.FcitxKeyAction("0"), keys, tap, 0L, composing = true))
+        assertEquals(KeyAction.CommitAction("j"), T9Keyboard.resolveShuangpin(KeyAction.HostKeyAction("j"), popup, tap, 0L, composing = true))
+        assertEquals(KeyAction.CommitAction("5"), T9Keyboard.resolveShuangpin(KeyAction.HostKeyAction("5"), popup, tap, 0L, composing = true))
+        assertEquals(KeyAction.HostKeyAction("0"), T9Keyboard.resolveShuangpin(KeyAction.HostKeyAction("0"), keys, tap, 0L, composing = true))
     }
 
     @Test
     fun noLanguageKeyAndTheColumnOffersShuangpinsSyllablesNotNineKeys() {
         val keyboard = T9Keyboard(context, ThemePreset.PixelDark, shuangpin = true)
-        assertNull(keyboard.findViewById<View>(R.id.button_nine_language))
         assertEquals(View.VISIBLE, keyboard.findViewById<View>(R.id.button_space).visibility)
         assertEquals(true, keyboard.ownsSyllables)
         val items = (0 until keyboard.childCount).map { keyboard.getChildAt(it) }.filterIsInstance<ScrollView>().single().getChildAt(0) as ViewGroup
@@ -91,15 +89,15 @@ class T9ShuangpinKeyboardTest {
         val looper = shadowOf(Looper.getMainLooper())
         try {
             // the column: 双拼's syllables while typing, as 九键's
-            EngineBridge.syllablesState.value = EngineBridge.SyllableState(Engines.SHUANGPIN, composing = true, syllables = listOf("ni", "mi"), id = 1)
+            EngineState.syllablesState.value = EngineState.SyllableState(InputMethodCatalog.SHUANGPIN, composing = true, syllables = listOf("ni", "mi"), id = 1)
             looper.idle()
             assertEquals(listOf("ni", "mi"), column())
-            // 九键's answer is another input method's here: not taken
-            EngineBridge.syllablesState.value = EngineBridge.SyllableState(Engines.T9, composing = true, syllables = listOf("bu", "nu"), id = 2)
+            // pinyin's answer is another input method's here: not taken
+            EngineState.syllablesState.value = EngineState.SyllableState(InputMethodCatalog.PINYIN, composing = true, syllables = listOf("bu", "nu"), id = 2)
             looper.idle()
-            assertEquals(T9Keyboard.labels(EngineBridge.T9State()), column())
+            assertEquals(T9Keyboard.labels(EngineState.T9State()), column())
         } finally {
-            EngineBridge.syllablesState.value = EngineBridge.SyllableState()
+            EngineState.syllablesState.value = EngineState.SyllableState()
         }
     }
 }

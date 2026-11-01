@@ -14,8 +14,8 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.selects.select
-import org.fcitx.fcitx5.android.core.FcitxAPI
-import org.fcitx.fcitx5.android.daemon.FcitxConnection
+import org.fcitx.fcitx5.android.core.HostApi
+import org.fcitx.fcitx5.android.daemon.HostConnection
 import org.fcitx.fcitx5.android.data.punctuation.PunctuationManager
 import org.fcitx.fcitx5.android.data.punctuation.PunctuationMapEntry
 import org.fcitx.fcitx5.android.utils.LatestWriter
@@ -31,7 +31,7 @@ import org.fcitx.fcitx5.android.utils.LatestWriter
  */
 internal class PunctuationSaves(
     private val scope: CoroutineScope,
-    private val connect: () -> FcitxConnection,
+    private val connect: () -> HostConnection,
     private val disconnect: () -> Unit,
     private val onFailure: (Throwable) -> Unit
 ) {
@@ -41,7 +41,7 @@ internal class PunctuationSaves(
     // the newest table saved of each language, until it has landed
     private val unsaved = MutableStateFlow(emptyMap<String, List<PunctuationMapEntry>>())
 
-    suspend fun load(fcitx: FcitxConnection, lang: String): List<PunctuationMapEntry> {
+    suspend fun load(fcitx: HostConnection, lang: String): List<PunctuationMapEntry> {
         unsaved.first { lang !in it }
         return fcitx.runOnReady { PunctuationManager.load(this, lang) }
     }
@@ -70,7 +70,7 @@ internal class PunctuationSaves(
  * hold up every save of the language after it, and every load of the page. So it is not waited
  * for; it is cancelled, and left where it hangs.
  */
-private suspend fun FcitxConnection.landing(write: suspend FcitxAPI.() -> Unit): Boolean {
+private suspend fun HostConnection.landing(write: suspend HostApi.() -> Unit): Boolean {
     // fcitx's scope, whose coroutines its stop cancels
     val stopped = lifecycleScope.launch { awaitCancellation() }
     // not a child of the save's, which would wait for it

@@ -34,19 +34,21 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import org.fcitx.fcitx5.android.R
-import org.fcitx.fcitx5.android.core.FakeFcitxAPI
-import org.fcitx.fcitx5.android.core.FakeFcitxConnection
-import org.fcitx.fcitx5.android.core.FcitxAPI
-import org.fcitx.fcitx5.android.core.FcitxEvent
+import org.fcitx.fcitx5.android.core.FakeHostApi
+import org.fcitx.fcitx5.android.core.FakeHostConnection
+import org.fcitx.fcitx5.android.core.HostApi
 import org.fcitx.fcitx5.android.core.InputMethodEntry
-import org.fcitx.fcitx5.android.daemon.FcitxConnection
-import org.fcitx.fcitx5.android.daemon.FcitxDaemon
+import org.fcitx.fcitx5.android.daemon.HostConnection
+import org.fcitx.fcitx5.android.daemon.HostDaemon
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.data.theme.ThemePreset
-import org.fcitx.fcitx5.android.engine.host.Engines
+import org.fcitx.fcitx5.android.engine.InputMethodCatalog
+import org.fcitx.fcitx5.android.host.HostEvent
 import org.fcitx.fcitx5.android.input.keyboard.AltTextKeyView
+import org.fcitx.fcitx5.android.input.keyboard.ImKeyboard
+import org.fcitx.fcitx5.android.input.keyboard.ImKeyboards
 import org.fcitx.fcitx5.android.input.keyboard.KeyView
 import org.fcitx.fcitx5.android.input.keyboard.TextKeyView
 import org.robolectric.Robolectric
@@ -57,8 +59,8 @@ import org.robolectric.shadows.ShadowPopupMenu
 
 /**
  * The whole keyboard on the JVM: the real [FcitxInputMethodService] built by Robolectric, its
- * [InputView] made as on a device, on a [FakeFcitxAPI] instead of the Kotlin host (the seam
- * [FcitxDaemon.testConnection]). Engine output comes from events pushed with [emit]; what the
+ * [InputView] made as on a device, on a [FakeHostApi] instead of the Kotlin host (the seam
+ * [HostDaemon.testConnection]). Engine output comes from events pushed with [emit]; what the
  * keys asked of the engine is in [api]`.calls`.
  *
  * [theme] is made the active one first; null keeps what is active.
@@ -68,18 +70,23 @@ import org.robolectric.shadows.ShadowPopupMenu
 class KeyboardHarness(
     theme: Theme? = ThemePreset.PixelLight,
     im: InputMethodEntry = PINYIN,
-    /** A real host to type through (a [KotlinFcitx] on a scripted engine) in place of [api]: its own events, its own answers. */
-    host: FcitxAPI? = null,
+    /** A real host to type through (a [KotlinHost] on a scripted engine) in place of [api]: its own events, its own answers. */
+    host: HostApi? = null,
+    /** Each input method's keyboard (I1), [NINE_KEYS] pinyin's nine keys: set before the keyboard is made, put back at [close]; null leaves the preferences as they are. */
+    keyboards: ImKeyboards.Chosen? = null,
 ) : AutoCloseable {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
-    val api = FakeFcitxAPI().apply { inputMethodEntryCached = im }
+    val api = FakeHostApi().apply { inputMethodEntryCached = im }
     private val controller: ServiceController<FcitxInputMethodService>
     val service: FcitxInputMethodService
 
+    private val keyboardsWere = keyboards?.let { AppPrefs.getInstance().keyboard.imKeyboards() }
+
     init {
-        val connection = host?.let { HostConnection(scope, it) } ?: FakeFcitxConnection(scope, api)
-        FcitxDaemon.testConnection = { connection }
+        keyboards?.let(::setKeyboards)
+        val connection = host?.let { HarnessConnection(scope, it) } ?: FakeHostConnection(scope, api)
+        HostDaemon.testConnection = { connection }
         // the seam is global: a harness that fails to build leaves it to no later test (no close() to call)
         try {
             theme?.let(ThemeManager::setNormalModeTheme)
@@ -97,7 +104,8 @@ class KeyboardHarness(
             }
             idle()
         } catch (e: Throwable) {
-            FcitxDaemon.testConnection = null
+            keyboardsWere?.let(::setKeyboards)
+            HostDaemon.testConnection = null
             scope.cancel()
             throw e
         }
@@ -120,18 +128,38 @@ class KeyboardHarness(
     lateinit var field: EditText
         private set
 
-    /** Focus a field of this [inputType], as the app's field gaining focus would; [packageName] the app's. */
-    fun start(inputType: Int = InputType.TYPE_CLASS_TEXT, imeOptions: Int = 0, packageName: String = "org.example.app"): KeyboardHarness {
+    /** The field's [EditorInfo], as [start] or [restart] gave it to the service. */
+    lateinit var info: EditorInfo
+        private set
+
+    private lateinit var connection: InputConnection
+
+    /**
+     * Focus a field of this [inputType], as the app's field gaining focus would; [packageName] the
+     * app's, [fieldId] its view's (one field told from another by them, as ContextMemory.field does),
+     * [prefill] what the app put in it before it was focused.
+     */
+    fun start(
+        inputType: Int = InputType.TYPE_CLASS_TEXT,
+        imeOptions: Int = 0,
+        packageName: String = "org.example.app",
+        fieldId: Int = 0,
+        prefill: (EditText) -> Unit = {},
+    ): KeyboardHarness {
         val activity = Robolectric.buildActivity(Activity::class.java).setup().get()
         field = EditText(activity).also {
             it.inputType = inputType
             it.imeOptions = imeOptions
+            prefill(it)
             activity.setContentView(it)
             // keys the keyboard sends (←, Home, Ctrl+Z) go to the focused view, as on a device
             it.requestFocus()
         }
         delivered = intArrayOf(field.selectionStart, field.selectionEnd, -1, -1)
-        val info = EditorInfo().also { it.packageName = packageName }
+        val info = EditorInfo().also {
+            it.packageName = packageName
+            it.fieldId = fieldId
+        }
         val target = field
         // a key the keyboard sends (←, Home, Ctrl+Z) the system hands to the focused view: Robolectric's does not
         val ic = object : android.view.inputmethod.InputConnectionWrapper(field.onCreateInputConnection(info), true) {
@@ -140,11 +168,9 @@ class KeyboardHarness(
                 (event.isCtrlPressed && event.action == KeyEvent.ACTION_DOWN && target.onKeyShortcut(event.keyCode, event)) ||
                     target.dispatchKeyEvent(event)
         }
-        // InputMethodService's own entry (hidden): sets the connection the service commits through, then onStartInput
-        InputMethodService::class.java
-            .getDeclaredMethod("doStartInput", InputConnection::class.java, EditorInfo::class.java, Boolean::class.javaPrimitiveType)
-            .apply { isAccessible = true }
-            .invoke(service, ic, info, false)
+        this.info = info
+        connection = ic
+        doStartInput(ic, info, restarting = false)
         service.onStartInputView(info, false)
         // the window put on the screen: views attached (what a chip, a popup checks), the input area shown
         runCatching { service.showWindow(true) }.onFailure { System.err.println("showWindow: $it") }
@@ -153,8 +179,31 @@ class KeyboardHarness(
         return this
     }
 
+    /** The app restarting input in the same field, now of [inputType] (a WebView's field told anew). */
+    fun restart(inputType: Int = field.inputType) {
+        field.inputType = inputType
+        val info = EditorInfo().also {
+            it.packageName = this.info.packageName
+            it.fieldId = this.info.fieldId
+        }
+        field.onCreateInputConnection(info)
+        this.info = info
+        doStartInput(connection, info, restarting = true)
+        service.onStartInputView(info, true)
+        idle()
+        relayout()
+    }
+
+    // InputMethodService's own entry (hidden): sets the connection the service commits through, then onStartInput
+    private fun doStartInput(ic: InputConnection, info: EditorInfo, restarting: Boolean) {
+        InputMethodService::class.java
+            .getDeclaredMethod("doStartInput", InputConnection::class.java, EditorInfo::class.java, Boolean::class.javaPrimitiveType)
+            .apply { isAccessible = true }
+            .invoke(service, ic, info, restarting)
+    }
+
     /** An engine event, as fcitx would send it, then everything it set off. */
-    fun emit(event: FcitxEvent<*>) {
+    fun emit(event: HostEvent) {
         check(api.events.tryEmit(event)) { "event buffer full" }
         idle()
         relayout()
@@ -548,6 +597,14 @@ class KeyboardHarness(
     }
 
     private var closed = false
+    private var destroyed = false
+
+    /** The service destroyed, as another keyboard picked: [close] after it all the same. */
+    fun destroy() {
+        if (destroyed) return
+        destroyed = true
+        controller.destroy()
+    }
 
     override fun close() {
         if (closed) return
@@ -557,24 +614,41 @@ class KeyboardHarness(
             val cm = org.fcitx.fcitx5.android.data.clipboard.ClipboardManager
             cm.purgeMarked(*cm.deleteAll(skipPinned = false))
         }
-        controller.destroy()
-        FcitxDaemon.testConnection = null
+        // destroyed first: it learns the last field's address
+        destroy()
+        // what the address bar learned in a test's email field: not the next test's (PrefsRule restores only what a test set)
+        AppPrefs.getInstance().internal.run {
+            addressCounts.setValue("")
+            rememberedAddresses.setValue("")
+        }
+        keyboardsWere?.let(::setKeyboards)
+        HostDaemon.testConnection = null
         scope.cancel()
     }
 
     // the daemon's connection to a real host, which answers on its own thread
-    private class HostConnection(override val lifecycleScope: CoroutineScope, val host: FcitxAPI) : FcitxConnection {
-        override fun <T> runImmediately(block: suspend FcitxAPI.() -> T): T = runBlocking { block(host) }
-        override suspend fun <T> runOnReady(block: suspend FcitxAPI.() -> T): T = block(host)
-        override fun runIfReady(block: suspend FcitxAPI.() -> Unit) {
+    private class HarnessConnection(override val lifecycleScope: CoroutineScope, val host: HostApi) : HostConnection {
+        override fun <T> runImmediately(block: suspend HostApi.() -> T): T = runBlocking { block(host) }
+        override suspend fun <T> runOnReady(block: suspend HostApi.() -> T): T = block(host)
+        override fun runIfReady(block: suspend HostApi.() -> Unit) {
             if (host.isReady) lifecycleScope.launch { block(host) }
         }
     }
 
     companion object {
-        val PINYIN = InputMethodEntry(Engines.PINYIN, "拼音", "", "", "拼", "zh_CN", "androidengine", false)
-        val ENGLISH = InputMethodEntry(Engines.ENGLISH, "English", "", "", "En", "en", "androidengine", false)
-        val T9 = InputMethodEntry(Engines.T9, "九键", "", "", "九", "zh_CN", "androidengine", false)
+        val PINYIN = InputMethodEntry(InputMethodCatalog.PINYIN, "拼音", "", "", "拼", "zh_CN", "androidengine", false)
+        val ENGLISH = InputMethodEntry(InputMethodCatalog.ENGLISH, "English", "", "", "En", "en", "androidengine", false)
+
+        /** Pinyin on the nine keys (0.4's 九键拼音): [PINYIN] with these [keyboards]. */
+        val NINE_KEYS = ImKeyboards.Chosen(pinyin = ImKeyboard.NINE_KEYS)
+
+        /** [keyboards] chosen as the user would: each a preference, the keyboard made anew on a change. */
+        fun setKeyboards(keyboards: ImKeyboards.Chosen) {
+            val prefs = AppPrefs.getInstance().keyboard
+            listOf(InputMethodCatalog.PINYIN, InputMethodCatalog.SHUANGPIN, InputMethodCatalog.ENGLISH).forEach {
+                if (prefs.imKeyboards().of(it) != keyboards.of(it)) prefs.setImKeyboard(it, keyboards.of(it))
+            }
+        }
 
         inline fun <reified T : View> find(v: View): T? = all(v).firstNotNullOfOrNull { it as? T }
 

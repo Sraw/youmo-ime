@@ -6,31 +6,27 @@ package org.fcitx.fcitx5.android.engine.learn
 
 import org.fcitx.fcitx5.android.engine.learn.LearnRecord.Commit
 import org.fcitx.fcitx5.android.engine.learn.LearnRecord.Unknown
+import org.fcitx.fcitx5.android.engine.platform.MemoryFiles
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
-import org.junit.Rule
 import org.junit.Test
-import org.junit.rules.TemporaryFolder
 import java.io.ByteArrayOutputStream
-import java.io.File
 import java.io.IOException
-import java.io.RandomAccessFile
 
 /**
  * [LearnLog] and [LearnState]: what is learned live is what a start replays, and what a fold at
  * any cut leaves; expiry by typing day; what an undo puts back.
  */
 class LearnLogTest {
-    @get:Rule
-    val dir = TemporaryFolder()
+    private val dir = MemoryFiles()
 
     private val clock = FakeClock()
     private val errors = ArrayList<IOException>()
 
-    private fun file() = File(dir.root, LearnLog.FILE)
+    private fun file() = dir.file(LearnLog.FILE)
 
     private fun open(compactAt: Long = 1L shl 30) = LearnLog(file(), clock, errors::add, compactAt = compactAt).also { it.open() }
 
@@ -72,7 +68,7 @@ class LearnLogTest {
         return seqs
     }
 
-    private fun replayed() = LearnLog.replay(file().readBytes()).dump()
+    private fun replayed() = LearnLog.replay(file().read()).dump()
 
     @Test
     fun aStartReadsWhatWasLearnedLive() {
@@ -114,7 +110,7 @@ class LearnLogTest {
         script(log, skewed)
         val live = log.state.dump()
         log.close()
-        val bytes = file().readBytes()
+        val bytes = file().read()
         val minutes = LearnLog.replay(bytes).let { (it.lastMinute - 4 * LearnClock.DAY_MINUTES)..(it.lastMinute + 1) }
         var folded = 0
         for (cut in minutes step 97) {
@@ -146,13 +142,13 @@ class LearnLogTest {
             writeBoolean(true)
             writeUTF("a later build's")
         }
-        file().appendBytes(later)
+        file().append().use { it.write(later) }
         val live = open().also { it.close() }.state.dump()
         // a later build's, not this one's failing
         assertTrue(errors.isEmpty())
-        assertTrue(contains(file().readBytes(), later))
+        assertTrue(contains(file().read(), later))
         val out = ByteArrayOutputStream()
-        assertTrue(LearnLog.fold(file().readBytes(), Int.MAX_VALUE, out))
+        assertTrue(LearnLog.fold(file().read(), Int.MAX_VALUE, out))
         assertTrue(contains(out.toByteArray(), later))
         assertEquals(live, LearnLog.replay(out.toByteArray()).dump())
     }
@@ -185,7 +181,7 @@ class LearnLogTest {
         val log = open()
         script(log)
         log.close()
-        assertFalse(LearnLog.fold(file().readBytes(), Int.MIN_VALUE, ByteArrayOutputStream()))
+        assertFalse(LearnLog.fold(file().read(), Int.MIN_VALUE, ByteArrayOutputStream()))
     }
 
     @Test
@@ -206,7 +202,7 @@ class LearnLogTest {
         assertEquals(live, replayed())
         // folded, not one record a commit
         val records = ArrayList<Byte>()
-        LearnRecords.FORMAT.read(file().readBytes()) { type, _ -> records += type }
+        LearnRecords.FORMAT.read(file().read()) { type, _ -> records += type }
         assertTrue(LearnRecords.HEAD in records)
         assertTrue(errors.isEmpty())
     }
@@ -220,7 +216,7 @@ class LearnLogTest {
         val live = log.state.dump()
         log.close()
         val records = ArrayList<Byte>()
-        LearnRecords.FORMAT.read(file().readBytes()) { type, _ -> records += type }
+        LearnRecords.FORMAT.read(file().read()) { type, _ -> records += type }
         assertEquals(LearnRecords.HEAD, records.first())
         assertNotEquals(before, file().length())
         assertEquals(live, replayed())
@@ -234,7 +230,7 @@ class LearnLogTest {
         val last = log.record(listOf(row("zhong", "中", "zhong")))!!
         log.close()
         val length = file().length()
-        RandomAccessFile(file(), "rw").use { it.setLength(length - 3) }
+        file().truncate(length - 3)
         val reopened = open()
         assertEquals(beforeLast, reopened.state.dump())
         assertNull(reopened.state.stats.keys.find { it.text == "中" })
@@ -470,13 +466,13 @@ class LearnLogTest {
         log.record(listOf(row("ni", "你", "ni")))
         log.close()
         val later = LearnRecords.FORMAT.record(99) { writeUTF("later") }
-        file().appendBytes(later)
+        file().append().use { it.write(later) }
         clock.days(1)
         val reopened = open()
         reopened.record(listOf(row("ni", "你", "ni")))
         reopened.fold()
         reopened.close()
-        val kept = LearnLog.replay(file().readBytes()).kept
+        val kept = LearnLog.replay(file().read()).kept
         assertEquals(listOf<LearnRecord>(Unknown(99, later.copyOfRange(5, later.size - 4))), kept)
     }
 
@@ -540,42 +536,6 @@ class LearnLogTest {
         assertTrue(log.state.englishVersion > at)
     }
 
-    // F2989, F3113: a deferred open of a log whose tail is older than the cut folds it in the
-    // background; the conversion merged before the fold landed is merged again, nothing lost
-    @Test
-    fun aDeferredOpenFoldsAnOldTailAndTheConversionIsMergedAgain() {
-        val file = File(dir.root, LearnLog.FILE)
-        LearnLog(file, clock).apply { open() }.apply { record(listOf(row("ni", "你", "ni"))) }.close()
-        File(dir.root, LearnLog.MARKER).delete()
-        // a conversion owed from an earlier start: it may wait days
-        File(dir.root, LearnLog.CONVERTING).createNewFile()
-        clock.days(3)
-        val legacy = object : LearnLog.Legacy {
-            override fun into(state: LearnState, clock: LearnClock) {
-                state.apply(LearnRecord.WordUseRow("老词", "lao ci", DayCounts.of(1 to 1)))
-            }
-
-            override fun marker(state: LearnState) = ConvertedMarker(emptyMap(), emptySet())
-
-            override fun since(was: ConvertedMarker?, state: LearnState, stamp: LearnClock.Stamp): Pair<List<LearnRecord>, ConvertedMarker>? = null
-
-            override val heavy get() = true
-        }
-        val held = ArrayList<Runnable>()
-        val log = LearnLog(file, clock, background = { held += it }).also { it.open(legacy, deferred = true) }
-        assertTrue(log.conversionPending)
-        val merged = checkNotNull(log.mergeConversion(checkNotNull(log.conversion())()))
-        assertTrue(held.isNotEmpty())
-        while (held.isNotEmpty()) held.removeAt(0).run()
-        // the fold put in place under the merge (at the take's rewrite): only it makes the merge stale
-        assertEquals(LearnLog.Taken.STALE, log.takeConversion(merged))
-        assertEquals(LearnLog.Taken.DONE, log.takeConversion(checkNotNull(log.mergeConversion(merged.converted))))
-        val live = log.state.dump()
-        log.close()
-        assertTrue(live.contains("你") && live.contains("老词"))
-        assertEquals(live, LearnLog.replay(file.readBytes()).dump())
-    }
-
     // F3137: a table's per-code block changes the version a cache of them keys on
     @Test
     fun aTableBlockChangesItsVersion() {
@@ -620,7 +580,7 @@ class LearnLogTest {
         log.record(listOf(row("ni", "你", "ni")))
         val today = LearnClock.localDay(clock, LearnClock.floorDiv(clock.now(), LearnClock.MINUTE).toInt())
         assertEquals(mapOf(1 to today - 2, 2 to today), log.state.dates)
-        assertEquals(log.state.dates, LearnLog.replay(file().readBytes()).dates)
+        assertEquals(log.state.dates, LearnLog.replay(file().read()).dates)
         // a month of typing days on, the first is gone with what was used then
         repeat(30) {
             clock.days(1)

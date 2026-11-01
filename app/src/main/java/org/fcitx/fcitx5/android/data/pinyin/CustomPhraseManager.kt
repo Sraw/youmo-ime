@@ -4,9 +4,13 @@
  */
 package org.fcitx.fcitx5.android.data.pinyin
 
+import org.fcitx.fcitx5.android.R
+import org.fcitx.fcitx5.android.core.HostConfigDir
+import org.fcitx.fcitx5.android.core.InUse
 import org.fcitx.fcitx5.android.data.pinyin.customphrase.PinyinCustomPhrase
 import org.fcitx.fcitx5.android.engine.phrase.CustomPhrases
-import org.fcitx.fcitx5.android.engine.store.replaceFile
+import org.fcitx.fcitx5.android.engine.platform.jvm.replaceFile
+import org.fcitx.fcitx5.android.host.ConfigHome
 import org.fcitx.fcitx5.android.utils.appContext
 import java.io.File
 import java.io.IOException
@@ -14,13 +18,24 @@ import java.io.IOException
 /** The pinyin custom phrases, where fcitx5-chinese-addons kept them and the engine reads them. */
 object CustomPhraseManager {
 
-    private val file by lazy { File(appContext.getExternalFilesDir(null)!!, "data/pinyin/customphrase") }
+    // in fcitx's data, the app's own files once an older build's is moved in (A4): where the engine reads it
+    private fun file() = file(HostConfigDir.inUse(ConfigHome.DATA))
+
+    private fun file(home: InUse) = File(home.dir, "pinyin/customphrase")
+
+    // the file to save to, a save without one given asking at its start: none while fcitx's data is not
+    // settled, what was saved then being lost at the next start
+    private fun fileToSave(): File {
+        val home = HostConfigDir.inUse(ConfigHome.DATA)
+        if (!home.writable) throw IOException(appContext.getString(R.string.user_data_not_settled))
+        return file(home)
+    }
 
     /**
      * Every phrase, turned off too, as [CustomPhrases.all] lists them; none if there is no file.
      * @throws IOException if there is one that cannot be read
      */
-    fun load(from: File = file): List<PinyinCustomPhrase> {
+    fun load(from: File = file()): List<PinyinCustomPhrase> {
         if (!from.isFile) return emptyList()
         return items(CustomPhrases.parse(from.readText()))
     }
@@ -29,8 +44,10 @@ object CustomPhraseManager {
     fun items(phrases: CustomPhrases) = phrases.all.map { PinyinCustomPhrase(it.key, it.order, it.value) }
 
     /** Saves [items] in their order, whole or not at all. */
-    fun save(items: List<PinyinCustomPhrase>, to: File = file) =
-        write(items.map { CustomPhrases.Phrase(it.key, it.order, it.value) }, to)
+    fun save(items: List<PinyinCustomPhrase>, to: File? = null) {
+        val target = to ?: fileToSave()
+        write(items.map { CustomPhrases.Phrase(it.key, it.order, it.value) }, target)
+    }
 
     /**
      * Saves [mine], the editor's list, loaded as [base] by [load] or returned by the last call.
@@ -40,10 +57,11 @@ object CustomPhraseManager {
      * @throws IOException if the file cannot be read or written
      */
     @Synchronized
-    fun saveOver(base: List<PinyinCustomPhrase>, mine: List<PinyinCustomPhrase>, to: File = file): List<PinyinCustomPhrase> {
-        val theirs = load(to)
+    fun saveOver(base: List<PinyinCustomPhrase>, mine: List<PinyinCustomPhrase>, to: File? = null): List<PinyinCustomPhrase> {
+        val target = to ?: fileToSave()
+        val theirs = load(target)
         if (theirs == base) {
-            save(mine, to)
+            save(mine, target)
         } else {
             val removed = base.toSet() - mine.toSet()
             val added = (mine.toSet() - base.toSet() - theirs.toSet()).toMutableList()
@@ -52,9 +70,9 @@ object CustomPhraseManager {
                 if (phrase !in removed) phrase
                 else added.firstOrNull { it.key == phrase.key }?.also { added.remove(it) }
             }
-            save(kept + added, to)
+            save(kept + added, target)
         }
-        return load(to)
+        return load(target)
     }
 
     /**
@@ -64,9 +82,10 @@ object CustomPhraseManager {
      * @throws IOException if the file cannot be read or written
      */
     @Synchronized
-    fun saveKeysOver(base: List<PinyinCustomPhrase>, mine: List<PinyinCustomPhrase>, to: File = file) {
-        val theirs = load(to)
-        if (theirs == base) return save(mine, to)
+    fun saveKeysOver(base: List<PinyinCustomPhrase>, mine: List<PinyinCustomPhrase>, to: File? = null) {
+        val target = to ?: fileToSave()
+        val theirs = load(target)
+        if (theirs == base) return save(mine, target)
         val before = base.groupBy { it.key }
         val now = theirs.groupBy { it.key }
         val wanted = mine.groupBy { it.key }
@@ -75,7 +94,7 @@ object CustomPhraseManager {
             val t = now[key].orEmpty()
             val m = wanted[key].orEmpty()
             if (m == b) t else m.filter { it !in b || it in t } + t.filter { it !in b && it !in m }
-        }, to)
+        }, target)
     }
 
     /**
@@ -83,9 +102,10 @@ object CustomPhraseManager {
      * One writer at a time, the editor's and the engine's sharing the file next to it.
      */
     @Synchronized
-    fun write(phrases: List<CustomPhrases.Phrase>, to: File = file) {
-        to.parentFile?.mkdirs()
-        replaceFile(to, File(to.path + ".new")) {
+    fun write(phrases: List<CustomPhrases.Phrase>, to: File? = null) {
+        val target = to ?: fileToSave()
+        target.parentFile?.mkdirs()
+        replaceFile(target, File(target.path + ".new")) {
             it.writeText(CustomPhrases.format(phrases))
         }
     }

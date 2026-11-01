@@ -5,12 +5,11 @@
 package org.fcitx.fcitx5.android.input.broadcast
 
 import android.view.inputmethod.EditorInfo
-import org.fcitx.fcitx5.android.core.Action
 import org.fcitx.fcitx5.android.core.CapabilityFlags
-import org.fcitx.fcitx5.android.core.FcitxEvent.CandidateListEvent
-import org.fcitx.fcitx5.android.core.FcitxEvent.InputPanelEvent
 import org.fcitx.fcitx5.android.core.FormattedText
 import org.fcitx.fcitx5.android.core.InputMethodEntry
+import org.fcitx.fcitx5.android.host.HostEvent
+import org.fcitx.fcitx5.android.host.StatusEntry
 import org.fcitx.fcitx5.android.input.wm.InputWindow
 import org.mechdancer.dependency.Dependent
 import org.mechdancer.dependency.DynamicScope
@@ -42,7 +41,7 @@ class InputBroadcaster : UniqueComponent<InputBroadcaster>(), Dependent, InputBr
         receivers.forEach { it.onClientPreeditUpdate(data) }
     }
 
-    override fun onInputPanelUpdate(data: InputPanelEvent.Data) {
+    override fun onInputPanelUpdate(data: HostEvent.InputPanel) {
         receivers.forEach { it.onInputPanelUpdate(data) }
     }
 
@@ -58,12 +57,12 @@ class InputBroadcaster : UniqueComponent<InputBroadcaster>(), Dependent, InputBr
         receivers.forEach { it.onImeUpdate(ime) }
     }
 
-    override fun onCandidateUpdate(data: CandidateListEvent.Data) {
+    override fun onCandidateUpdate(data: HostEvent.Candidates) {
         receivers.forEach { it.onCandidateUpdate(data) }
     }
 
-    override fun onStatusAreaUpdate(actions: Array<Action>) {
-        receivers.forEach { it.onStatusAreaUpdate(actions) }
+    override fun onStatusAreaUpdate(entries: List<StatusEntry>) {
+        receivers.forEach { it.onStatusAreaUpdate(entries) }
     }
 
     override fun onSelectionUpdate(start: Int, end: Int) {

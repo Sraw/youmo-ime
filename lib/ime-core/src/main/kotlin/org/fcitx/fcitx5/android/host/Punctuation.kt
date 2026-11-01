@@ -10,7 +10,8 @@ package org.fcitx.fcitx5.android.host
  */
 data class PunctuationConfig(
     val enabled: Boolean = true,
-    val halfWidthAfterLatinOrNumber: Boolean = true,
+    // off by default, as the app always set it (AddonDefaults till 0.4): a Chinese comma after 3 stays one
+    val halfWidthAfterLatinOrNumber: Boolean = false,
     val typePairedTogether: Boolean = false,
 )
 

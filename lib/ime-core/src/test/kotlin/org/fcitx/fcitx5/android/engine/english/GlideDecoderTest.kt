@@ -70,8 +70,7 @@ class GlideDecoderTest {
         fun glide(keys: String, shift: Boolean = false) = Glide(path(keys), GlideLayout.QWERTY, shift)
 
         fun EnglishSession.glided(keys: String, shift: Boolean = false) = run {
-            offerGlide(glide(keys, shift))
-            apply(Action.Glide)
+            apply(Action.Glide(glide(keys, shift)))
         }
     }
 }

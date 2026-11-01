@@ -68,6 +68,22 @@ class StrokesTest {
     }
 
     @Test
+    fun aCharacterIsWrittenInAnyOfItsOrders() {
+        val s = strokes(dict + "\n王\thhsz\n")
+        assertEquals(listOf("hhsh", "hhsz"), s.ordersOf('王').sorted())
+        assertTrue(s.startsWith('王', "hhs"))
+        assertTrue(s.startsWith('王', "hhsz"))
+        assertTrue(s.startsWith('王', "hhsh"))
+        assertFalse(s.startsWith('王', "hs"))
+        // no longer than its order, nothing drawn, a character the table has not
+        assertFalse(s.startsWith('一', "hh"))
+        assertFalse(s.startsWith('一', ""))
+        assertFalse(s.startsWith('人', "p"))
+        assertEquals(emptyList<String>(), s.ordersOf('人'))
+        assertEquals(listOf("hsh"), s.ordersOf('土'))
+    }
+
+    @Test
     fun onlyTheCharactersOfTheBmpAreKept() {
         val read = Strokes.read("...\n㐄\thzs\n𠀀\thzs\n".reader().buffered(), "stroke")
         assertEquals(listOf("hzs" to "㐄"), read.entryList)
@@ -86,8 +102,11 @@ class StrokesTest {
         val actions = ArrayList<Action>()
         val typed = StringBuilder()
         var cursor = 0
+        // keys it reads but not where it stands (双拼's ; where no syllable starts)
+        var refuses = emptySet<Char>()
         override var learning = true
         override fun reads(c: Char) = c in 'a'..'z'
+        override fun endsInput(c: Char) = !reads(c) || c in refuses
         override fun apply(action: Action): Snapshot {
             actions += action
             when (action) {
@@ -110,6 +129,19 @@ class StrokesTest {
 
     private fun lookup(pinyin: Pinyin = Pinyin(), strokes: Strokes? = strokes()) =
         StrokeLookup(pinyin, { strokes }, reading = { if (it == "王") "wang" else "" }, pageSize = 3)
+
+    // the stroke filter asks the lookup whether a key ends the input: pinyin's own answer passes
+    // through, so a key pinyin reads but refuses where it stands still ends it; u while idle starts a
+    // lookup whatever pinyin says of it
+    @Test
+    fun whetherAKeyEndsTheInputIsPinyinsSaveUWhileIdle() {
+        val l = lookup(Pinyin().apply { refuses = setOf('a', 'u') })
+        assertTrue(l.reads('a'))
+        assertTrue(l.endsInput('a'))
+        assertFalse(l.endsInput('b'))
+        assertTrue(l.endsInput(','))
+        assertFalse(l.endsInput('u'))
+    }
 
     @Test
     fun uStartsALookupWhoseStrokesShowAsStrokes() {

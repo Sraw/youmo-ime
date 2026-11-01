@@ -9,6 +9,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import org.fcitx.fcitx5.android.data.pinyin.dict.SourceNames
 import org.fcitx.fcitx5.android.engine.assertRows
+import org.fcitx.fcitx5.android.engine.platform.jvm.JvmFile
 import org.fcitx.fcitx5.android.engine.user.DictionaryFile
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -328,7 +329,7 @@ class MergedDictionaryTest {
         // the check, then the compile it queued, are done before this one
         MergedDictionary.refreshNow(dictionaries)
         assertTrue(made > 0)
-        assertNotNull(DictionaryFile.open(dest))
+        assertNotNull(DictionaryFile.open(JvmFile(dest)))
         assertEquals(2, MergedDictionary.current(dictionaries).file!!.size)
     }
 

@@ -24,10 +24,14 @@ import androidx.recyclerview.widget.RecyclerView
  */
 object SearchHighlight {
 
-    /** Has [entry], the page a search result has just opened, point at its preference [key], if any. */
-    fun point(entry: NavBackStackEntry, key: String?) {
+    /**
+     * Has [entry], the page a search result has just opened, point at its preference [key], if any;
+     * at [via] instead while that one is hidden (a section only a keyboard choice shows).
+     */
+    fun point(entry: NavBackStackEntry, key: String?, via: String? = null) {
         if (key == null) return
         entry.savedStateHandle[KEY] = key
+        entry.savedStateHandle[VIA] = via
         entry.savedStateHandle[AT] = SystemClock.uptimeMillis()
     }
 
@@ -39,6 +43,10 @@ object SearchHighlight {
         val state = entry.savedStateHandle
         return state.contains(KEY) && isFresh(state)
     }
+
+    /** The setting [entry]'s page is to point at and the one it goes through, as [point] left them. */
+    internal fun pointedAt(entry: NavBackStackEntry): Pair<String?, String?> =
+        entry.savedStateHandle.get<String>(KEY) to entry.savedStateHandle.get<String>(VIA)
 
     /** Points [fragment] at the setting its page is to point at, if it has it. */
     fun showIn(fragment: PreferenceFragmentCompat) {
@@ -55,7 +63,10 @@ object SearchHighlight {
             return
         }
         val screen = fragment.preferenceScreen ?: return
-        val pref = screen.findPreference<Preference>(key) ?: return
+        val wanted = screen.findPreference<Preference>(key) ?: return
+        // hidden, it or a group it is in: nowhere to scroll to, the page left at its top
+        val shown = generateSequence(wanted) { it.parent }.all { it.isVisible }
+        val pref = if (shown) wanted else state.get<String>(VIA)?.let { screen.findPreference<Preference>(it) } ?: wanted
         forget(state)
         val list = fragment.listView
         whenListed(list) {
@@ -92,11 +103,13 @@ object SearchHighlight {
 
     private fun forget(state: SavedStateHandle) {
         state.remove<String>(KEY)
+        state.remove<String>(VIA)
         state.remove<Long>(AT)
     }
 
     // beside the route's own arguments in the entry's saved state: names no route has
     private const val KEY = "search_highlight_key"
+    private const val VIA = "search_highlight_via"
     private const val AT = "search_highlight_at"
 
     private const val WAIT = 5000L

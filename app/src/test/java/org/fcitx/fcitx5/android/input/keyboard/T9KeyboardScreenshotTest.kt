@@ -34,14 +34,15 @@ class T9KeyboardScreenshotTest {
     @Uat("T9-01")
     fun theNineKeysDark() = check(ThemePreset.PixelDark, "t9_dark")
 
-    private fun check(theme: Theme, name: String) = KeyboardHarness(theme, KeyboardHarness.T9).use { h ->
+    private fun check(theme: Theme, name: String) = KeyboardHarness(theme, KeyboardHarness.PINYIN, keyboards = KeyboardHarness.NINE_KEYS).use { h ->
         h.start()
         val labels = h.texts()
         // left column's punctuation is the column; the keys: 1 to 9 with their letters, 重输, 0, 符, 123
         for (d in '1'..'9') assertTrue("$d in $labels", d.toString() in labels)
         for (l in listOf("ABC", "DEF", "WXYZ", "重输", "0", "符", "123")) assertTrue("$l in $labels", l in labels)
-        assertTrue("space names the input method: $labels", "Pinyin (9 keys)" in labels)
-        assertTrue("中/英" in labels)
+        // pinyin's own keyboard: its name on the space, no 中/英 (I1)
+        assertTrue("space names the input method: $labels", "Pinyin" in labels)
+        assertTrue("中/英" !in labels)
         h.capture("T9KeyboardScreenshotTest/$name")
     }
 }

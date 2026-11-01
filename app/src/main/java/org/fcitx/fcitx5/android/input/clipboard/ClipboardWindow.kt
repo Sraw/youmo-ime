@@ -99,6 +99,10 @@ class ClipboardWindow : InputWindow.ExtendedInputWindow<ClipboardWindow>() {
                 AppUtil.launchClipboardEdit(context, id)
             }
 
+            override fun onSplit(entry: ClipboardEntry) {
+                windowManager.attachWindow(ClipboardChunksWindow(entry.text))
+            }
+
             override fun onShare(entry: ClipboardEntry) {
                 val target = Intent(Intent.ACTION_SEND).apply {
                     type = "text/plain"

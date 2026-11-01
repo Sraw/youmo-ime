@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.engine.store
 
+import org.fcitx.fcitx5.android.engine.platform.jvm.JvmFile
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -61,7 +62,7 @@ class RecordStoreTest {
         background: Executor? = null,
         openAppend: (File) -> OutputStream = { FileOutputStream(it, true) },
         fold: RecordStore.Fold? = null,
-    ) = RecordStore(file, format, compactAt, { errors += it }, openAppend, background, fold).apply {
+    ) = RecordStore(JvmFile(file), format, compactAt, { errors += it }, { openAppend((it as JvmFile).file) }, background, fold).apply {
         open(replay = { type, input -> replay(type, input, kept) }, counts = { write -> kept.forEach { (word, n) -> write(count(word, n)) } })
     }
 
@@ -243,11 +244,11 @@ class RecordStoreTest {
         val kept = LinkedHashMap<String, Int>()
         val counts: ((ByteArray) -> Unit) -> Unit = { write -> kept.forEach { (word, n) -> write(count(word, n)) } }
         var seeds = 0
-        RecordStore(file, format, RecordStore.DEFAULT_COMPACT_AT, {}).use {
+        RecordStore(JvmFile(file), format, RecordStore.DEFAULT_COMPACT_AT, {}).use {
             it.open(replay = { type, input -> replay(type, input, kept) }, counts = counts, seed = { seeds++; false })
         }
         assertArrayEquals(format.header(), file.readBytes())
-        RecordStore(file, format, RecordStore.DEFAULT_COMPACT_AT, {}).use {
+        RecordStore(JvmFile(file), format, RecordStore.DEFAULT_COMPACT_AT, {}).use {
             it.open(replay = { type, input -> replay(type, input, kept) }, counts = counts, seed = { seeds++; kept["a"] = 3; true })
         }
         assertEquals(2, seeds)

@@ -7,6 +7,7 @@ package org.fcitx.fcitx5.android.engine.phrase
 import org.fcitx.fcitx5.android.engine.data.escapeValue
 import org.fcitx.fcitx5.android.engine.data.unescapeValue
 import java.util.Calendar
+import java.util.TreeSet
 
 /**
  * Text the user put under a key of letters, offered when the input read is that key: libime's
@@ -45,14 +46,34 @@ class CustomPhrases private constructor(private val phrases: Map<String, List<Ph
     class Offered(val index: Int, val text: String, val phrase: Phrase)
 
     /** The phrases turned on under [key], each text once, as offered at [now], in order. */
-    fun offered(key: String, now: Calendar): List<Offered> {
-        val found = phrases[key] ?: return emptyList()
+    fun offered(key: String, now: Calendar): List<Offered> = offered(listOf(key), now)
+
+    /**
+     * The phrases turned on under [keys] together, each text once, as offered at [now]: in order,
+     * those of one order as [keys] has their keys, then in the file's order (A1: the keys one input
+     * typed on keys of letter groups reads as, [keysRead]).
+     */
+    fun offered(keys: List<String>, now: Calendar): List<Offered> {
+        val found = keys.flatMap { phrases[it].orEmpty() }.filter { it.enabled }
+        // stable: one key's are in order already, so one key alone stays as it was
+        val ordered = if (keys.size > 1) found.sortedBy { it.order } else found
         val seen = HashSet<String>()
-        return found.filter { it.enabled }.mapNotNull { p ->
+        return ordered.mapNotNull { p ->
             val text = if (p.dynamic) evaluate(p.value.substring(1), now) else p.value
             if (text.isEmpty() || !seen.add(text)) null else Offered(p.order - 1, text, p)
         }
     }
+
+    /** The keys of these phrases, turned on or off, that [typed] reads as ([PhraseKeys]), sorted. */
+    fun keysRead(typed: PhraseKeys): List<String> =
+        typed.lengths.flatMap { keysByLength[it].orEmpty() }.filter(typed::reads).let { if (typed.lengths.first == typed.lengths.last) it else it.sorted() }
+
+    /** Whether a key of a phrase turned on starts with [prefix] (a table's code leading somewhere). */
+    fun leadsTo(prefix: String): Boolean = keysOn.ceiling(prefix)?.startsWith(prefix) == true
+
+    // asked at every key typed on keys of letter groups and on a table's: indexed once, not each phrase looked at
+    private val keysByLength by lazy { phrases.keys.groupBy { it.length }.mapValues { (_, keys) -> keys.sorted() } }
+    private val keysOn by lazy { phrases.filterValues { list -> list.any { it.enabled } }.keys.toCollection(TreeSet()) }
 
     /**
      * The phrases turned on under [key], each once, as offered at [now]: its text and where it
@@ -111,16 +132,30 @@ class CustomPhrases private constructor(private val phrases: Map<String, List<Ph
         text: (T) -> String,
         all: (T) -> Boolean,
         make: (String) -> T,
+    ): List<T> = place(listOf(key), now, candidates, text, all, make = make)
+
+    /**
+     * [place] with the phrases under [keys] together, as [offered] has them, none before the
+     * [from]th candidate (English: the word space commits stays first).
+     */
+    fun <T> place(
+        keys: List<String>,
+        now: () -> Calendar,
+        candidates: List<T>,
+        text: (T) -> String,
+        all: (T) -> Boolean,
+        from: Int = 0,
+        make: (String) -> T,
     ): List<T> {
-        if (key !in phrases) return candidates
-        val found = lookup(key, now())
+        if (keys.none { it in phrases }) return candidates
+        val found = offered(keys, now()).map { it.index to it.text }
         if (found.isEmpty()) return candidates
         val texts = found.mapTo(HashSet()) { it.second }
         val out = candidates.filterTo(ArrayList()) { text(it) !in texts || all(it) }
         var last = -1
         for ((order, phrase) in found) {
             // found is in order: one of the same order goes after the one before it
-            val at = minOf(maxOf(order, last + 1), out.size)
+            val at = minOf(maxOf(order, last + 1, from), out.size)
             // the same text before it stands for it, there; nothing is added, so no phrase after it
             // moves up a place as when the copy was added and de-duplicated away later (F3000)
             if ((0 until at).any { text(out[it]) == phrase }) {
@@ -210,7 +245,8 @@ class CustomPhrases private constructor(private val phrases: Map<String, List<Ph
             var i = 0
             while (i < line.length && line[i].isAsciiLetter()) i++
             if (i == 0 || i >= line.length || line[i] != ',') return null
-            val key = line.substring(0, i)
+            // matched by letters typed in either case (English) or by keys (the nine keys'): one case kept
+            val key = line.substring(0, i).lowercase()
             i++
             val negative = i < line.length && line[i] == '-'
             if (negative) i++

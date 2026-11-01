@@ -86,9 +86,7 @@ object BackupMerge {
                 day = today,
                 localDay = phone.localDay,
                 nextSeq = maxOf(phone.nextSeq, backup.nextSeq),
-                convertedDay = phone.convertedDay,
                 restoredMinute = minute,
-                convertedTables = phone.convertedTables,
             ),
         )
         for (row in rows(ours, theirs)) {

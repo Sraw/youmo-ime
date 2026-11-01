@@ -5,7 +5,7 @@
 package org.fcitx.fcitx5.android.uat
 
 import org.fcitx.fcitx5.android.Uat
-import org.fcitx.fcitx5.android.engine.host.Engines
+import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.input.keyboard.PendingInputPolicy
 import org.junit.Assert.assertEquals
 import org.junit.Test
@@ -18,7 +18,7 @@ class KeysUatTest {
 
     @Test
     @Uat("KB-02")
-    fun englishLettersTypeThemselvesASpaceAfter() = with(EngineReplay(im = Engines.ENGLISH)) {
+    fun englishLettersTypeThemselvesASpaceAfter() = with(EngineReplay(im = InputMethodCatalog.ENGLISH)) {
         type("ok")
         space()
         expectText("ok ")
@@ -26,7 +26,7 @@ class KeysUatTest {
 
     @Test
     @Uat("KB-07")
-    fun shiftCapitalisesTheNextLetter() = with(EngineReplay(im = Engines.ENGLISH)) {
+    fun shiftCapitalisesTheNextLetter() = with(EngineReplay(im = InputMethodCatalog.ENGLISH)) {
         // ⇧ then h: the keyboard sends the capital (KB-08's test checks the key sent)
         type("Hi")
         expectFirst("Hi")

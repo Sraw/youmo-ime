@@ -13,7 +13,7 @@ import tarfile
 
 # the app's input methods and what the driver calls their page (androidengine.cpp:347-357)
 PAGES = {
-    "engine-pinyin": ("-", "pinyin"), "engine-t9": ("-", "pinyin"), "engine-shuangpin": ("-", "shuangpin"),
+    "engine-pinyin": ("-", "pinyin"), "engine-shuangpin": ("-", "shuangpin"),
     "keyboard-us": ("-", "english"), "engine-handwriting": ("-", "handwriting"),
     "engine-wubi": ("Wubi", "Wubi"), "engine-cangjie": ("Cangjie", "Cangjie"), "engine-ziranma": ("Ziranma", "Ziranma"),
     "engine-erbi": ("Erbi", "Erbi"), "engine-wubipinyin": ("WubiPinyin", "WubiPinyin"),
@@ -22,9 +22,9 @@ PAGES = {
 # name: (file as found, [(input method, what its page saves)])
 CASES = {
     "new-install": ("", []),
-    "defaults-written": ("ShuangpinProfile=Ziranma\nPageSize=7\nPrediction=True\n\n[Fuzzy]\nNG_GN=True\nL_N=False\n\n"
+    "defaults-written": ("ShuangpinProfile=Xiaohe\nPageSize=7\nPrediction=True\n\n[Fuzzy]\nNG_GN=True\nL_N=False\n\n"
                          "[Cangjie]\nAutoSelect=True\nHint=False\nOrderPolicy=No\n", []),
-    "user-changed": ("ShuangpinProfile=\"GB Standard\"\nPageSize=5\nEmoji=False\nModelLevel=Medium\nEnglishSuggest=False\n"
+    "user-changed": ("ShuangpinProfile=MS\nPageSize=5\nEmoji=False\nModelLevel=Medium\nEnglishSuggest=False\n"
                      "[Fuzzy]\nNG_GN=False\nL_N=True\nZ_ZH=True\n", []),
     "tables": ("[Wubi]\nHint=False\nOrderPolicy=Freq\n[Cangjie]\nAutoSelect=False\n[Ziranma]\n[Erbi]\nOrderPolicy=Fast\n"
                "[WubiPinyin]\nHint=True\n", []),
@@ -35,13 +35,13 @@ CASES = {
     "number-plus": ("PageSize=+5\n", []),
     "number-negative": ("PageSize=-3\n", []),
     "spaces": ("PageSize = 5\nEmoji= False\n  Chaizi=False  \n[ Fuzzy ]\nL_N=True\n[Fuzzy]\nV_U =True\nC_CH= True\n\tF_H=True\t\n", []),
-    "quotes": ("ShuangpinProfile=\"GB Standard\" \nPrediction=\"False\"\nModelLevel=\"Low\"x\"\nLatinWords=\"False\n"
+    "quotes": ("ShuangpinProfile=\"MS\" \nPrediction=\"False\"\nModelLevel=\"Low\"x\"\nLatinWords=\"False\n"
                "Chaizi=\"\\\"False\\\"\"\n", []),
     "unknown-keys": ("Unknown=1\nPageSize=6\n[Wubi]\nAutoPhraseLength=4\nSaveAutoPhraseAfter=-1\nHint=False\n[Other]\nA=1\n"
                      "[Fuzzy/X]\nY=1\n", []),
     "libime-migrated": ("ShuangpinProfile=MS\nPageSize=7\nPrediction=False\n\n[Fuzzy]\nV_U=True\nNG_GN=True\n\n"
                         "[Wubi]\nAutoSelect=True\nHint=True\nOrderPolicy=Fast\n", []),
-    "order-kept": ("# ShuangpinProfile=Ziranma\n\n# [Wubi]\n# AutoSelect=True\n# Hint=True\n# OrderPolicy=No\n\n"
+    "order-kept": ("# ShuangpinProfile=Xiaohe\n\n# [Wubi]\n# AutoSelect=True\n# Hint=True\n# OrderPolicy=No\n\n"
                    "[Wubi]\nOrderPolicy=Freq\n", []),
     "group-path-in-key": ("Cangjie/AutoSelect=False\nFuzzy/L_N=True\n", []),
     "crlf": ("PageSize=4\r\n[Fuzzy]\r\nL_N=True\r\n", []),
@@ -50,12 +50,12 @@ CASES = {
         ("engine-pinyin", "PageSize=5\nPrediction=False\n[Fuzzy]\nL_N=True\n"),
         ("engine-wubi", "Hint=False\nPageSize=4\nOrderPolicy=Freq\n"),
         ("keyboard-us", "EnglishSuggest=False\n"),
-        ("engine-shuangpin", "ShuangpinProfile=Xiaohe\n"),
+        ("engine-shuangpin", "ShuangpinProfile=MS\n"),
         ("engine-cangjie", "AutoSelect=False\n"),
         ("engine-cangjie", "Hint=bad\n"),
         ("engine-pinyin", "Prediction=nope\n"),
         ("engine-handwriting", "ModelLevel=Low\n"),
-        ("engine-t9", "[Fuzzy]\nZ_ZH=True\n"),
+        ("engine-pinyin", "[Fuzzy]\nZ_ZH=True\n"),
         ("engine-erbi", "Chaizi=False\nWubi/AutoSelect=False\n"),
         ("not-an-im", "PageSize=9\n"),
     ]),

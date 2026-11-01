@@ -4,7 +4,6 @@
  */
 package org.fcitx.fcitx5.android.engine.learn.control
 
-import org.fcitx.fcitx5.android.engine.host.Engines.UserWord
 import org.fcitx.fcitx5.android.engine.learn.FakeClock
 import org.fcitx.fcitx5.android.engine.learn.LearnClock
 import org.fcitx.fcitx5.android.engine.learn.LearnLog
@@ -13,17 +12,15 @@ import org.fcitx.fcitx5.android.engine.learn.LearnState
 import org.fcitx.fcitx5.android.engine.learn.Mine
 import org.fcitx.fcitx5.android.engine.learn.Row
 import org.fcitx.fcitx5.android.engine.learn.row
+import org.fcitx.fcitx5.android.engine.platform.MemoryFiles
+import org.fcitx.fcitx5.android.engine.runtime.UserWord
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
-import org.junit.Rule
 import org.junit.Test
-import org.junit.rules.TemporaryFolder
-import java.io.File
 
 class LexiconViewTest {
-    @get:Rule
-    val dir = TemporaryFolder()
+    private val dir = MemoryFiles()
 
     private val clock = FakeClock()
 
@@ -58,7 +55,7 @@ class LexiconViewTest {
     // verify-E F3: when a word was last used, as the lexicon page lists it: idle in typing days, never a day not known
     @Test
     fun aWordsLastUseIsCountedInTypingDays() {
-        val log = LearnLog(File(dir.root, LearnLog.FILE), clock).also { it.open() }
+        val log = LearnLog(dir.file(LearnLog.FILE), clock).also { it.open() }
         log.commit(row("zd", "指导", "zhi dao"))
         repeat(3) {
             clock.days(5)

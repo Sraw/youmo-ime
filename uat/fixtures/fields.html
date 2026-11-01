@@ -55,6 +55,25 @@
 <label for="tel">电话（tel）</label>
 <input id="tel" type="tel">
 
+<label for="decimal">小数（inputmode=decimal）</label>
+<input id="decimal" type="text" inputmode="decimal">
+
+<label for="numeric">整数（inputmode=numeric）</label>
+<input id="numeric" type="text" inputmode="numeric">
+
+<label for="telmode">电话（inputmode=tel）</label>
+<input id="telmode" type="text" inputmode="tel">
+
+<label for="pin">数字密码（password，inputmode=numeric）</label>
+<input id="pin" type="password" inputmode="numeric">
+
+<!-- Chrome opens its own picker for these, no keyboard: an app's EditText with TYPE_CLASS_DATETIME gets the pad -->
+<label for="date">日期（date，Chrome 弹自己的日期选择器）</label>
+<input id="date" type="date">
+
+<label for="time">时间（time，Chrome 弹自己的时间选择器）</label>
+<input id="time" type="time">
+
 <label for="search">搜索（search，回车键显示“搜索”，回车后执行搜索）</label>
 <form id="searchform" role="search">
 <input id="search" type="search" enterkeyhint="search">
@@ -73,6 +92,9 @@
 <label for="link">链接（url，预先填好带跟踪参数的网址）</label>
 <input id="link" type="url" value="https://example.com/a?id=1&amp;utm_source=x">
 
+<label for="orglink">.org 的链接（url，预先填好，主机不是 .com）</label>
+<input id="orglink" type="url" value="https://www.python.org/doc?a=1">
+
 <!-- fields.html#clips shows the five together: short words to copy one by one -->
 <div id="clips">
 <label for="clip1">短词1–5（预先填好的短框）</label>
@@ -83,10 +105,28 @@
 <input id="clip5" type="text" value="一起">
 </div>
 
+<label for="filled">预填的邮箱（email，聚焦时全选，像应用自动填好的）</label>
+<input id="filled" type="email" value="me@qq.com">
+
+<label for="switching">邮箱，聚焦两秒后变成电话框（email→tel，框重新开始）</label>
+<input id="switching" type="email">
+
 <label for="long">长文本（用来测光标移动、选择，预先填好）</label>
 <textarea id="long">今天天气很好，我们一起去公园散步吧。The quick brown fox jumps over the lazy dog.</textarea>
 
+<label for="huge">很长的文本（6000 字，用来测剪贴板切词，打开页面时填好）</label>
+<textarea id="huge"></textarea>
+
 <script>
+  // KB-53: what an app filled in, selected as a login form's may be
+  // TB-48: past the 5000 characters the clipboard splits
+  document.getElementById('huge').value = '今天天气很好，我们一起去公园散步吧。'.repeat(353).slice(0, 6000);
+  document.getElementById('filled').addEventListener('focus', e => e.target.select());
+  // KB-51: the field told anew as another type while focused, as a WebView restarts its input
+  document.getElementById('switching').addEventListener('focus', e => {
+    e.target.type = 'email';
+    setTimeout(() => { e.target.type = 'tel'; }, 2000);
+  });
   // fields.html#<id>: that field alone, at the top (the chat's send button and log, the search's
   // result with it), the chat at the bottom; again as the #<id> changes in a tab showing the page
   function filter() {
@@ -118,7 +158,8 @@
       if (primed || el.value) return;
       primed = true;
       el.value = '\u200b';
-      el.setSelectionRange(0, 0);
+      // an email's, a number's field has no selection to set: it throws, and the character would stay
+      try { el.setSelectionRange(0, 0); } catch (e) {}
       setTimeout(() => { if (el.value === '\u200b') el.value = ''; }, 400);
     });
   }

@@ -4,10 +4,17 @@
  */
 package org.fcitx.fcitx5.android.uat
 
+import android.widget.TextView
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.Uat
+import org.fcitx.fcitx5.android.data.RecentlyUsed
+import org.fcitx.fcitx5.android.host.HostEvent
 import org.fcitx.fcitx5.android.input.KeyboardHarness
+import org.fcitx.fcitx5.android.input.keyboard.TextKeyView
+import org.fcitx.fcitx5.android.input.picker.PickerGridView
+import org.fcitx.fcitx5.android.input.picker.PickerSideUi
 import org.junit.After
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -54,5 +61,53 @@ class OwnFieldUatTest {
     fun thisAppsOwnFieldLearnsNothing() {
         val told = contextsAfterTyping(h.service.packageName)
         assertTrue(told.toString(), told.isNotEmpty() && told.all { it.startsWith("engineContext(, false") })
+    }
+
+    private fun shown(text: String) = KeyboardHarness.all(h.inputView).filterIsInstance<TextView>().firstOrNull { h.shown(it) && it.text.toString() == text }
+
+    private fun categories() = KeyboardHarness.all(KeyboardHarness.find<PickerSideUi>(h.inputView)!!)
+        .filterIsInstance<TextView>().filter { h.shown(it) }.map { it.text.toString() }.toList()
+
+    // the grid binds only the rows on screen: scrolled down a row at a time till the key is among them
+    private fun scrolledTo(label: String): TextKeyView {
+        val grid = KeyboardHarness.find<PickerGridView>(h.inputView)!!
+        repeat(30) {
+            KeyboardHarness.all(grid).filterIsInstance<TextKeyView>().firstOrNull { it.mainText.text.toString() == label }?.let { return it }
+            grid.scrollBy(0, grid.height / 3)
+            h.relayout()
+        }
+        error("no $label in the grid")
+    }
+
+    // a sum and its = in the field, as the engine commits the = typed
+    private fun sum() {
+        h.field.setText("1+1")
+        h.field.setSelection(3)
+        h.idle()
+        h.emit(HostEvent.Commit("=", -1))
+        h.idle()
+    }
+
+    @Test
+    @Uat("PR-15")
+    fun thisAppsOwnFieldKeepsNoRecentSymbolAndReadsNoSum() {
+        try {
+            h.start(packageName = h.service.packageName)
+            sum()
+            assertEquals(null, shown("= 2"))
+            h.start(packageName = h.service.packageName)
+            h.tap(h.key("符"))
+            h.tap(shown("Shapes")!!)
+            h.tap(scrolledTo("★"))
+            h.tap(h.key("符"))
+            assertTrue(categories().toString(), "Recent" !in categories())
+            // another app's field, alike: its sum read
+            h.start()
+            sum()
+            assertTrue(h.texts(h.inputView).toString(), shown("= 2") != null)
+        } finally {
+            FcitxApplication.getInstance().directBootAwareContext
+                .getSharedPreferences(RecentlyUsed.PREFERENCE_NAME, android.content.Context.MODE_PRIVATE).edit().clear().commit()
+        }
     }
 }

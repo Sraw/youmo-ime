@@ -5,12 +5,11 @@
 package org.fcitx.fcitx5.android.input.broadcast
 
 import android.view.inputmethod.EditorInfo
-import org.fcitx.fcitx5.android.core.Action
 import org.fcitx.fcitx5.android.core.CapabilityFlags
-import org.fcitx.fcitx5.android.core.FcitxEvent.CandidateListEvent
-import org.fcitx.fcitx5.android.core.FcitxEvent.InputPanelEvent
 import org.fcitx.fcitx5.android.core.FormattedText
 import org.fcitx.fcitx5.android.core.InputMethodEntry
+import org.fcitx.fcitx5.android.host.HostEvent
+import org.fcitx.fcitx5.android.host.StatusEntry
 import org.fcitx.fcitx5.android.input.wm.InputWindow
 import org.mechdancer.dependency.DynamicScope
 
@@ -25,13 +24,13 @@ interface InputBroadcastReceiver {
 
     fun onClientPreeditUpdate(data: FormattedText) {}
 
-    fun onInputPanelUpdate(data: InputPanelEvent.Data) {}
+    fun onInputPanelUpdate(data: HostEvent.InputPanel) {}
 
     fun onImeUpdate(ime: InputMethodEntry) {}
 
-    fun onCandidateUpdate(data: CandidateListEvent.Data) {}
+    fun onCandidateUpdate(data: HostEvent.Candidates) {}
 
-    fun onStatusAreaUpdate(actions: Array<Action>) {}
+    fun onStatusAreaUpdate(entries: List<StatusEntry>) {}
 
     fun onSelectionUpdate(start: Int, end: Int) {}
 

@@ -5,9 +5,9 @@
 package org.fcitx.fcitx5.android.ui.main.settings.im
 
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
-import org.fcitx.fcitx5.android.engine.host.EngineSettings
-import org.fcitx.fcitx5.android.engine.host.Engines
-import org.fcitx.fcitx5.android.engine.host.TableSettings
+import org.fcitx.fcitx5.android.engine.InputMethodCatalog
+import org.fcitx.fcitx5.android.engine.runtime.EngineSettings
+import org.fcitx.fcitx5.android.engine.runtime.TableSettings
 import org.fcitx.fcitx5.android.engine.pinyin.Fuzzy
 import org.fcitx.fcitx5.android.ui.main.settings.SettingsRoute
 import org.fcitx.fcitx5.android.ui.main.settings.im.InputMethodSettings.Choice
@@ -19,6 +19,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -48,14 +49,17 @@ class InputMethodSettingsTest {
     fun everyInputMethodOfTheAppHasAPageAndOthersNone() {
         appInputMethods.forEach { assertNotNull(it, InputMethodSettings.of(it)) }
         assertNull(InputMethodSettings.of("keyboard-de"))
+        // a route 0.4 saved to its 九键拼音 opens pinyin's page, not the tables' it would fall to by its engine- name
+        assertSame(InputMethodSettings.of(InputMethodCatalog.PINYIN), InputMethodSettings.of(InputMethodCatalog.T9))
     }
 
     // appInputMethods is BUILT_IN itself: held here to the names androidengine.cpp registers (and
-    // English), by hand, so that one BUILT_IN leaves out is not skipped by every check above
+    // English), by hand, so that one BUILT_IN leaves out is not skipped by every check above; the
+    // nine keys' engine-t9 is pinyin's keyboard since I1, a session with no page of its own
     @Test
     fun builtInIsEveryInputMethodTheEngineRegisters() {
         val registered = setOf(
-            "engine-pinyin", "engine-shuangpin", "engine-t9", "engine-wubi", "engine-cangjie",
+            "engine-pinyin", "engine-shuangpin", "engine-wubi", "engine-cangjie",
             "engine-ziranma", "engine-erbi", "engine-wubipinyin", "engine-handwriting", "keyboard-us"
         )
         assertEquals(registered, InputMethodSettings.BUILT_IN.toSet())
@@ -90,7 +94,7 @@ class InputMethodSettingsTest {
     @Test
     fun aTableHasNoAutoPhraseSettings() {
         // 自动造词 is gone (U-28 C46): an older config's two keys are left, read by nothing
-        for (im in Engines.TABLES.keys) {
+        for (im in InputMethodCatalog.TABLES.keys) {
             assertEquals(im, emptyList<String>(), keys(im).filter { it == "AutoPhraseLength" || it == "SaveAutoPhraseAfter" })
         }
     }
@@ -109,7 +113,7 @@ class InputMethodSettingsTest {
     @Test
     fun theSharedOptionsAreOnTheSharedPageAlone() {
         val shared = listOf(
-            AppPrefs.GLIDE_TYPING, AppPrefs.AUTO_PAIRS, AppPrefs.CALCULATION_REPLACES_SUM,
+            AppPrefs.GLIDE_TYPING, AppPrefs.STROKE_FILTER, AppPrefs.AUTO_PAIRS, AppPrefs.CALCULATION_REPLACES_SUM, InputMethodSettings.ADDRESSES,
             EngineSettings.PREDICTION, EngineSettings.EMOJI, EngineSettings.BUILT_IN_PHRASES, EngineSettings.MODEL_LEVEL, InputMethodSettings.PUNCTUATION,
             "${EngineSettings.FUZZY}/${EngineSettings.TYPOS}", EngineSettings.FUZZY,
         )
@@ -122,16 +126,24 @@ class InputMethodSettingsTest {
         assertEquals(listOf(EngineSettings.PAGE_SIZE), InputMethodSettings.HARDWARE_KEYBOARD.flat().map { (it as Choice).key })
     }
 
+    // the nine keys' own (a section 九键 on the page of each keyboard they are, 11-01): one pref each
+    private val nineKeys = listOf(AppPrefs.T9_MULTI_TAP, InputMethodSettings.T9_LETTERS, InputMethodSettings.T9_SYMBOLS)
+
     // each page's own, and first a way to the shared page
     @Test
     fun eachPageHasItsOwnOptionsAfterTheWayToTheSharedOnes() {
         val own = mapOf(
-            Engines.PINYIN to listOf(EngineSettings.CHAIZI, EngineSettings.LATIN_WORDS, AppPrefs.PINYIN_KEYBOARD),
-            Engines.SHUANGPIN to listOf(EngineSettings.SHUANGPIN_PROFILE, AppPrefs.SHUANGPIN_KEYBOARD),
-            Engines.T9 to listOf(AppPrefs.T9_MULTI_TAP, AppPrefs.T9_ENGLISH_TYPING, InputMethodSettings.T9_LETTERS, InputMethodSettings.T9_SYMBOLS),
-            Engines.HANDWRITING to listOf(AppPrefs.HANDWRITING_PAUSE),
-            Engines.ENGLISH to listOf(EngineSettings.ENGLISH_SUGGEST, AppPrefs.ENGLISH_AUTO_CAPS, InputMethodSettings.ENGLISH_WORDS),
-        ) + Engines.TABLES.keys.associateWith { TableSettings.KEYS.toList() + InputMethodSettings.RESET_TABLE_ORDER }
+            InputMethodCatalog.PINYIN to listOf(EngineSettings.CHAIZI, EngineSettings.LATIN_WORDS, AppPrefs.PINYIN_KEYBOARD) + nineKeys,
+            InputMethodCatalog.SHUANGPIN to listOf(EngineSettings.SHUANGPIN_PROFILE, AppPrefs.SHUANGPIN_KEYBOARD, InputMethodSettings.T9_SYMBOLS),
+            InputMethodCatalog.HANDWRITING to listOf(AppPrefs.HANDWRITING_PAUSE),
+            InputMethodCatalog.ENGLISH to listOf(
+                AppPrefs.ENGLISH_KEYBOARD, AppPrefs.T9_ENGLISH_TYPING, *nineKeys.toTypedArray(),
+                EngineSettings.ENGLISH_SUGGEST, AppPrefs.ENGLISH_AUTO_CAPS, InputMethodSettings.ENGLISH_WORDS,
+            ),
+        ) + InputMethodCatalog.TABLES.mapValues { (_, method) ->
+            // what the keys show, where a table has roots on them (仓颉, 五笔)
+            TableSettings.KEYS.toList() + InputMethodSettings.RESET_TABLE_ORDER + listOfNotNull(TableSettings.KEY_LABELS.takeIf { method.options.roots != null })
+        }
         assertEquals(appInputMethods.toSet(), own.keys)
         appInputMethods.forEach { page ->
             val keys = keys(page)
@@ -151,22 +163,25 @@ class InputMethodSettingsTest {
             is InputMethodSettings.Titled -> row.notFor
             else -> error("$row")
         }
-        // the keyboard's glide: every input method's that reads one; the 14 keys and 双拼's 18 and nine keys have none
-        assertEquals(appInputMethods.filterNot { Engines.glides(it) } + Engines.PINYIN_KEYS + Engines.SHUANGPIN_KEYS18 + Engines.SHUANGPIN_NINE, notFor(AppPrefs.GLIDE_TYPING))
+        // a finger drawn on the keyboard: a glide, every input method's that glides; a stroke, those that filter by one
+        assertEquals(appInputMethods.filterNot(InputMethodCatalog::glides), notFor(AppPrefs.GLIDE_TYPING))
+        assertEquals(listOf(InputMethodCatalog.HANDWRITING), notFor(AppPrefs.GLIDE_TYPING))
+        assertEquals(appInputMethods.filterNot(InputMethodCatalog::filtersByStrokes), notFor(AppPrefs.STROKE_FILTER))
         assertEquals(emptyList<String>(), notFor(AppPrefs.AUTO_PAIRS))
         assertEquals(emptyList<String>(), notFor(AppPrefs.CALCULATION_REPLACES_SUM))
         // the Chinese input methods' section says English for all of it: under a row, only an exception within it
         assertEquals(emptyList<String>(), notFor(EngineSettings.PREDICTION))
-        assertEquals(listOf(Engines.HANDWRITING), notFor(EngineSettings.EMOJI))
-        assertEquals(listOf(Engines.HANDWRITING), notFor(EngineSettings.BUILT_IN_PHRASES))
+        assertEquals(listOf(InputMethodCatalog.HANDWRITING), notFor(EngineSettings.EMOJI))
+        assertEquals(listOf(InputMethodCatalog.HANDWRITING), notFor(EngineSettings.BUILT_IN_PHRASES))
         assertEquals(emptyList<String>(), notFor(EngineSettings.MODEL_LEVEL))
         assertEquals(emptyList<String>(), notFor(InputMethodSettings.PUNCTUATION))
-        assertEquals(listOf(Engines.T9, Engines.PINYIN_KEYS, Engines.SHUANGPIN_NINE), notFor("${EngineSettings.FUZZY}/${EngineSettings.TYPOS}"))
+        assertEquals(listOf(InputMethodCatalog.T9, InputMethodCatalog.PINYIN_KEYS18, InputMethodCatalog.PINYIN_KEYS, InputMethodCatalog.SHUANGPIN_NINE), notFor("${EngineSettings.FUZZY}/${EngineSettings.TYPOS}"))
         // u and v are both on 8 (9 keys' 双拼 too): the pair alone is said to be no use to the nine keys, the others are
         val fuzzy = rows.filterIsInstance<Flags>().single()
-        assertEquals(mapOf(Fuzzy.V_U.name to listOf(Engines.T9, Engines.SHUANGPIN_NINE)), fuzzy.notFor)
+        assertEquals(mapOf(Fuzzy.V_U.name to listOf(InputMethodCatalog.T9, InputMethodCatalog.SHUANGPIN_NINE)), fuzzy.notFor)
         // each a name the app has: one it does not know would be said by its id
-        val named = appInputMethods.toSet() + Engines.PINYIN_KEYS + Engines.SHUANGPIN_KEYS18 + Engines.SHUANGPIN_NINE
+        val named = appInputMethods.toSet() + InputMethodCatalog.T9 + InputMethodCatalog.PINYIN_KEYS18 + InputMethodCatalog.PINYIN_KEYS +
+            InputMethodCatalog.SHUANGPIN_KEYS18 + InputMethodCatalog.SHUANGPIN_KEYS14 + InputMethodCatalog.SHUANGPIN_NINE
         rows.forEach { row ->
             val all = when (row) {
                 is Toggle -> row.notFor
@@ -184,20 +199,21 @@ class InputMethodSettingsTest {
         val fuzzy = InputMethodSettings.SHARED.flat().filterIsInstance<Flags>().single()
         assertEquals(EngineSettings.FUZZY, fuzzy.path)
         assertEquals(Fuzzy.entries.map { it.name }.sorted(), fuzzy.flags.map { it.first }.sorted())
-        assertEquals(TableSettings.KEYS.sorted(), keys("engine-wubi").filter { it != InputMethodSettings.SHARED_LINK && it != InputMethodSettings.RESET_TABLE_ORDER }.sorted())
+        assertEquals((TableSettings.KEYS + TableSettings.KEY_LABELS).sorted(), keys("engine-wubi").filter { it != InputMethodSettings.SHARED_LINK && it != InputMethodSettings.RESET_TABLE_ORDER }.sorted())
     }
 
     // the page's main choice, right under the way to the shared page
     @Test
     fun pinyinsKeyboardIsItsFirstOwnRow() {
-        assertEquals(AppPrefs.PINYIN_KEYBOARD, keys(Engines.PINYIN)[1])
+        assertEquals(AppPrefs.PINYIN_KEYBOARD, keys(InputMethodCatalog.PINYIN)[1])
     }
 
-    // the hardware keyboard still types full pinyin and reads both: said not for the 14 keys, not hidden
+    // the hardware keyboard still types full pinyin and reads both: said not for the nine, 18 and 14 keys, not hidden
     @Test
     fun pinyinsOwnOptionsSayTheyAreNoUseToThe14Keys() {
-        val rows = InputMethodSettings.of(Engines.PINYIN)!!.flat().filterIsInstance<Toggle>().associateBy { it.key }
-        assertEquals(listOf(Engines.PINYIN_KEYS), rows.getValue(EngineSettings.CHAIZI).notFor)
-        assertEquals(listOf(Engines.PINYIN_KEYS), rows.getValue(EngineSettings.LATIN_WORDS).notFor)
+        val rows = InputMethodSettings.of(InputMethodCatalog.PINYIN)!!.flat().filterIsInstance<Toggle>().associateBy { it.key }
+        val keys = listOf(InputMethodCatalog.T9, InputMethodCatalog.PINYIN_KEYS18, InputMethodCatalog.PINYIN_KEYS)
+        assertEquals(keys, rows.getValue(EngineSettings.CHAIZI).notFor)
+        assertEquals(keys, rows.getValue(EngineSettings.LATIN_WORDS).notFor)
     }
 }

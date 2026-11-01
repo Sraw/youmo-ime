@@ -13,5 +13,8 @@
     <item name="button_dot" type="id"/>
     <item name="button_domain" type="id"/>
     <item name="button_semicolon" type="id"/>
-    <item name="button_nine_language" type="id"/>
+    <item name="button_star" type="id"/>
+    <item name="button_lookup" type="id"/>
+    <item name="button_lookup_on" type="id"/>
+    <item name="button_confirm" type="id"/>
 </resources>

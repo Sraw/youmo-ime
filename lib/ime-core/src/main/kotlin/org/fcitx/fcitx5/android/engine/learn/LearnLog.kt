@@ -17,6 +17,8 @@ import org.fcitx.fcitx5.android.engine.learn.LearnRecord.NoPredict
 import org.fcitx.fcitx5.android.engine.learn.LearnRecord.Pin
 import org.fcitx.fcitx5.android.engine.learn.LearnRecord.Undo
 import org.fcitx.fcitx5.android.engine.learn.backup.BackupMerge
+import org.fcitx.fcitx5.android.engine.platform.LogFile
+import org.fcitx.fcitx5.android.engine.platform.jvm.JvmClock
 import org.fcitx.fcitx5.android.engine.store.RecordFormat
 import org.fcitx.fcitx5.android.engine.store.RecordStore
 import java.io.BufferedOutputStream
@@ -24,7 +26,6 @@ import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import java.io.Closeable
 import java.io.DataInputStream
-import java.io.File
 import java.io.IOException
 import java.io.OutputStream
 import java.util.concurrent.Executor
@@ -36,16 +37,10 @@ import java.util.concurrent.atomic.AtomicLong
  * applied as written. Folded in the [background] from the file's own bytes: what is older than
  * the cut ([LearnClock.cut]) becomes a snapshot, what is newer stays as it was written, for U-88
  * to take back. Without a [file] (no user directory, a test) it learns in memory alone.
- *
- * What the user learned in older builds is converted once, when the log is first opened and
- * empty, unless the [MARKER] beside it says that was done: a log moved aside unreadable, or
- * cleared, does not bring the old learning back. What an older build did in its files since
- * (run again after a downgrade, or its backup restored) is taken in at the next open
- * ([ConvertedMarker], [Legacy.since]): its new words and the forgets its logs record, not its counts.
  */
 class LearnLog(
-    private val file: File?,
-    private val clock: LearnClock = LearnClock.System,
+    private val file: LogFile?,
+    private val clock: LearnClock = JvmClock,
     private val onError: (IOException) -> Unit = {},
     private val background: Executor? = null,
     private val compactAt: Long = RecordStore.DEFAULT_COMPACT_AT,
@@ -70,13 +65,6 @@ class LearnLog(
     internal var store: RecordStore? = null
         private set
 
-    // the older builds' files, for a clear to say them as it leaves them: see remarkLegacy
-    private var legacy: Legacy? = null
-
-    /** Whether the last [open] wrote the marker: a clear's files set aside are deleted only then (verify-E F1). */
-    var markedAtOpen = false
-        private set
-
     /** A commit the user may still take back (U-03, written from step 1c): it and what it changed, as it was. */
     private class Undoable(val commit: LearnRecord, val befores: List<Before>)
 
@@ -98,119 +86,17 @@ class LearnLog(
         rewrites = GENERATIONS.incrementAndGet()
     }
 
-    /** The older builds' files, as [open] converts them. */
-    interface Legacy {
-        /** Fills [state], empty, from the files, as of now by [clock]. */
-        @Throws(IOException::class)
-        fun into(state: LearnState, clock: LearnClock)
-
-        /** The marker of the files as they are, [state] just filled from them. */
-        @Throws(IOException::class)
-        fun marker(state: LearnState): ConvertedMarker
-
-        /**
-         * What an older build did in the files since [was] (null: no marker that reads), as
-         * records for [state] stamped [stamp], and the marker after them; null if nothing changed.
-         */
-        @Throws(IOException::class)
-        fun since(was: ConvertedMarker?, state: LearnState, stamp: LearnClock.Stamp): Pair<List<LearnRecord>, ConvertedMarker>?
-
-        /** Whether there are logs to convert, worth [open]'s deferring: with none, converting is quick. */
-        val heavy: Boolean get() = false
-    }
-
-    /**
-     * Replays the log, and appends from now on; once only. [legacy] fills an empty log from an
-     * older build's files, where that was never done: one that fails (an IOException or any
-     * RuntimeException, told) leaves the log empty and unmarked, learning on disk at once, the
-     * conversion owed to the next open ([CONVERTING] beside it where [deferred]; not deferred, as
-     * LearnLogBench opens it, the next open finds the log written and does not seed it). Where it was
-     * done and the files changed since, what changed is taken in; with [remark], not: a clear
-     * deleted them, killed before it said so in the marker, and the marker now says them as they are.
-     *
-     * [deferred]: a conversion is not done here but left [pending], the log opened as it is (fresh
-     * for a first one) and learning at once, for [takeConversion] to merge in once made off this
-     * thread: a heavy user's first open after the upgrade waited on it (uat-0.3.1: 19.5 s). Till it
-     * is merged and the marker written, [CONVERTING] beside the log says it is owed, so a kill
-     * before leaves it owed to the next open, not marked as done with nothing taken in.
-     */
-    fun open(legacy: Legacy? = null, remark: Boolean = false, deferred: Boolean = false) {
-        markedAtOpen = false
+    /** Replays the log, and appends from now on; once only. One that does not open learns in memory this time. */
+    fun open() {
         val file = file ?: return
-        val marker = File(file.parentFile, MARKER)
-        // a clear's remark converts nothing: not deferred
-        val deferring = deferred && !remark
-        if (deferring && legacy != null && defers(file, marker, legacy)) {
-            val oldestTail = openStore(file, null) ?: return
-            this.legacy = legacy
-            pending = legacy
-            // an old tail folded as below: owed across starts, the conversion may wait days (a fold makes it STALE, merged again)
-            if (foldDaily && oldestTail < LearnClock.cut(clock)) store?.compactSoon()
-            state.takeChanges()
-            return
-        }
-        val seed = legacy?.takeIf { !marker.exists() }
-        // null: no seed asked for; false: one that failed, owed to the next start
-        var seeded: Boolean? = null
-        val opened = openStore(file, seed?.let { c -> { seedFrom(c, file, deferred).also { seeded = it } } }) ?: return
-        val oldestTail = opened
-        this.legacy = legacy
-        if (seeded != false) try {
-            // a clear killed before its marker was written (LearningControl): the files said as they are, nothing taken in
-            if (remark && legacy != null && seeded != true) remark(legacy, marker) else mark(marker, legacy, seeded == true)
-            markedAtOpen = true
-        } catch (e: IOException) {
-            onError(e)
-        } catch (@Suppress("TooGenericExceptionCaught") e: RuntimeException) {
-            // old files a catch-up trips on: the log is fine, and learns to disk (review-1a-r2 S2)
-            onError(IOException("the older builds' files not taken in", e))
-        }
+        val oldestTail = openStore(file) ?: return
         if (foldDaily && oldestTail < LearnClock.cut(clock)) store?.compactSoon()
         state.takeChanges()
     }
 
-    // [legacy] converted into the empty state, whether it was: an older build's files that do not
-    // convert leave the store opening unseeded and with no marker, what was half done dropped, and
-    // the conversion owed (the mark [defers] reads), so the next start tries it again though this
-    // one learns to disk (review R11 F2725)
-    private fun seedFrom(legacy: Legacy, file: File, deferred: Boolean): Boolean {
-        val failure = try {
-            legacy.into(state, clock)
-            return true
-        } catch (e: IOException) {
-            e
-        } catch (@Suppress("TooGenericExceptionCaught") e: RuntimeException) {
-            IOException("the older builds' files not taken in", e)
-        }
-        onError(failure)
-        state = LearnState()
-        if (deferred) runCatching { File(file.parentFile, CONVERTING).createNewFile() }
-        return false
-    }
-
-    // whether [open] leaves [legacy]'s conversion owed, the mark beside [file] saying so: logs to
-    // convert, none converted yet into an empty log, or one begun and not finished (learned since)
-    private fun defers(file: File, marker: File, legacy: Legacy): Boolean {
-        val converting = File(file.parentFile, CONVERTING)
-        if (marker.exists()) {
-            converting.delete()
-            return false
-        }
-        // a seed that failed (see [open]) owes it, logs or none
-        if (!legacy.heavy && !converting.exists()) return false
-        val owed = converting.exists() || !file.exists() || file.length() <= RecordFormat.HEADER_SIZE
-        return owed && try {
-            converting.exists() || converting.createNewFile()
-        } catch (e: IOException) {
-            // no mark to say it is owed: converted here, as before (review-uat-fixes S4)
-            onError(e)
-            false
-        }
-    }
-
-    // the store opened on [file], [seed] filling it if empty: the oldest minute of its tail, or null
-    // if it did not open (learning in memory this time)
-    private fun openStore(file: File, seed: (() -> Boolean)?): Int? {
+    // the store opened on [file]: the oldest minute of its tail, or null if it did not open
+    // (learning in memory this time)
+    private fun openStore(file: LogFile): Int? {
         val reader = LearnRecords.Reader()
         var inTail = true
         var oldestTail = Int.MAX_VALUE
@@ -227,149 +113,15 @@ class LearnLog(
                     }
                 },
                 counts = { write -> writeSnapshot(state, LearnClock.cut(clock), write, reader.kinds) },
-                seed = seed,
             )
         } catch (e: IOException) {
             onError(e)
-            // learned in memory this time; what a conversion half did is not kept
+            // learned in memory this time
             state = LearnState()
             return null
         }
         this.store = store
         return oldestTail
-    }
-
-    // the older builds' files whose conversion [open] left owed: see [conversion]
-    private var pending: Legacy? = null
-
-    /** Whether a conversion [open] deferred is still owed: [conversion] makes it, [takeConversion] merges it in. */
-    val conversionPending: Boolean get() = pending != null
-
-    /**
-     * The conversion [open] deferred, as work for another thread: it reads the older builds' files
-     * (by [using], the same files read with nothing of this thread's) and nothing of this log, and
-     * gives the state they make. Null if none is owed.
-     */
-    fun conversion(using: Legacy? = pending): (() -> LearnState)? {
-        if (pending == null || using == null) return null
-        return { LearnState().also { using.into(it, clock) } }
-    }
-
-    /**
-     * The log as it is now with [converted], what [conversion] made, merged into its snapshot and
-     * its tail kept as written (review-uat-fixes S1): each count of the snapshot the larger, day by
-     * day, as a backup restored, so merging it twice changes nothing and a kill between the merge and
-     * the marker costs nothing at the next open; what was typed since the open, in the tail, counts
-     * on top of the older build's and stays 清掉最近's to take out. [legacy]'s marker made here too,
-     * as it reads every older log. Run off this thread, as [conversion] is: the log read as it is on
-     * disk, for [takeConversion] to put in place if it is still that, records appended or not. Null
-     * without a log on disk.
-     */
-    fun mergeConversion(converted: LearnState, legacy: Legacy? = pending): Merged? {
-        val file = file ?: return null
-        val read = try {
-            file.readBytes()
-        } catch (e: IOException) {
-            onError(e)
-            return null
-        }
-        if (!LearnRecords.FORMAT.hasHeader(read)) return null
-        // the whole records alone: one read half written (appended meanwhile) is the tail's, after
-        // the merge, not cut in two (verify-uat-fixes V1)
-        val base = read.copyOf(LearnRecords.FORMAT.spans(read) { _, _ -> })
-        return Merged(base, merged(base, converted), converted, legacy?.marker(converted))
-    }
-
-    /** The log [base] was, and [bytes] it is with [converted] merged in, the older logs then as [marker] says: see [mergeConversion]. */
-    class Merged(val base: ByteArray, val bytes: ByteArray, val converted: LearnState, val marker: ConvertedMarker?)
-
-    private fun merged(log: ByteArray, converted: LearnState): ByteArray {
-        val walk = Walk(log)
-        val snapshot = walk.state(walk.tail)
-        val merged = BackupMerge.merge(snapshot, converted, 0L, sameInstall = true, minute = snapshot.cut, lastBatch = snapshot.imports.lastId)
-        // the log's own head but for what the conversion says: its cut (U-88 reaches the tail), no restore
-        merged.cut = snapshot.cut
-        merged.restoredMinute = snapshot.restoredMinute
-        merged.lastMinute = maxOf(snapshot.lastMinute, converted.lastMinute)
-        merged.localDay = maxOf(snapshot.localDay, converted.localDay)
-        merged.convertedDay = converted.convertedDay
-        merged.convertedTables = converted.convertedTables
-        val out = ByteArrayOutputStream()
-        out.write(LearnRecords.FORMAT.header())
-        writeSnapshot(merged, merged.cut, out::write, walk.reader.kinds)
-        walk.writeFrom(walk.tail, out)
-        return out.toByteArray()
-    }
-
-    /** What [takeConversion] did. */
-    enum class Taken {
-        /** Merged in and marked. */
-        DONE,
-
-        /** Not: the log was rewritten since the merge was made (a fold), to be made again on it. */
-        STALE,
-
-        /** Not: the log could not be rewritten, the conversion owed to the next open. */
-        FAILED,
-
-        /** None owed (a clear came first). */
-        NONE,
-    }
-
-    /**
-     * [merged] put in place of the log, if the log is still what it was made from, records
-     * appended to it or not (typing went on: those kept after it); then the marker written and
-     * nothing owed. See [Taken].
-     */
-    fun takeConversion(merged: Merged): Taken {
-        val legacy = pending ?: return Taken.NONE
-        val file = file ?: return Taken.FAILED
-        var stale = false
-        val done = try {
-            rewrite(endUndo = false) { log, out ->
-                val appended = log.size >= merged.base.size && log.copyOf(merged.base.size).contentEquals(merged.base)
-                stale = !appended
-                if (appended) {
-                    out.write(merged.bytes)
-                    out.write(log, merged.base.size, log.size - merged.base.size)
-                }
-                appended
-            }
-        } catch (e: IOException) {
-            onError(e)
-            false
-        }
-        if (stale) return Taken.STALE
-        if (!done) return Taken.FAILED
-        pending = null
-        try {
-            ConvertedMarker.write(File(file.parentFile, MARKER), merged.marker ?: legacy.marker(merged.converted))
-            File(file.parentFile, CONVERTING).delete()
-        } catch (e: IOException) {
-            // owed still: the next open merges it again, which changes nothing
-            onError(e)
-        }
-        return Taken.DONE
-    }
-
-    /**
-     * The conversion owed merged in now, on this thread (review-uat-fixes S3: before what reads or
-     * rewrites the whole record): [made] if it was made already and is not stale, else converted
-     * (or [made]'s conversion merged again) here.
-     */
-    fun finishConversion(made: Merged? = null): Taken {
-        if (pending == null) return Taken.NONE
-        made?.let { m -> takeConversion(m).let { if (it != Taken.STALE) return it } }
-        val merged = try {
-            mergeConversion(made?.converted ?: conversion()?.invoke() ?: return Taken.NONE)
-        } catch (e: IOException) {
-            onError(e)
-            null
-        } catch (@Suppress("TooGenericExceptionCaught") e: RuntimeException) {
-            onError(IOException("the older builds' files not taken in", e))
-            null
-        }
-        return merged?.let(::takeConversion) ?: Taken.FAILED
     }
 
     /**
@@ -449,25 +201,30 @@ class LearnLog(
     /**
      * Takes in [rows] (of [LearnRecord.MineRow], [LearnRecord.WordUseRow], [LearnRecord.TableWordRow], [LearnRecord.EnWordRow]) where the log has none of them,
      * stamped now: an export's words, a table's saved phrases, as [Absorbed] takes an older build's.
+     * Whether all of them reached the disk.
      */
-    fun absorb(rows: List<LearnRecord>) {
-        if (rows.isEmpty()) return
+    fun absorb(rows: List<LearnRecord>): Boolean {
+        if (rows.isEmpty()) return true
         val stamp = LearnClock.stamp(clock, state, commit = false)
-        rows.chunked(LearnRecords.ABSORBED_ROWS).forEach { absorbed(stamp.minute, it) }
+        return rows.chunked(LearnRecords.ABSORBED_ROWS).map { absorbed(stamp.minute, it) }.all { it }
     }
 
     // long rows (an export's long phrases and readings) make so many pass a record's 64 KB: halved
     // till they fit, not dropped whole (R11 F2688)
-    private fun absorbed(minute: Int, rows: List<LearnRecord>) {
+    private fun absorbed(minute: Int, rows: List<LearnRecord>): Boolean {
         val record = Absorbed(minute, rows, emptyList())
         // [encoded] tells nothing, so a row too long for any record is told once, by the write of it alone (F3145)
-        if (rows.size == 1 || encoded(record) != null) {
-            write(record)
-            return
-        }
+        if (rows.size == 1 || encoded(record) != null) return put(record) == Put.ON_DISK
         val half = rows.size / 2
-        absorbed(minute, rows.subList(0, half))
-        absorbed(minute, rows.subList(half, rows.size))
+        val first = absorbed(minute, rows.subList(0, half))
+        return absorbed(minute, rows.subList(half, rows.size)) && first
+    }
+
+    /** Takes [rows], phrases a table saved, out of the record, stamped now: forgotten in a table, or everywhere (U-84). */
+    fun dropTableWords(rows: List<LearnRecord.TableWordRow>) {
+        if (rows.isEmpty()) return
+        val stamp = LearnClock.stamp(clock, state, commit = false)
+        rows.chunked(LearnRecords.ABSORBED_ROWS).forEach { write(Absorbed(stamp.minute, emptyList(), it)) }
     }
 
     /** Turns [text] off as a prediction after [prev] (U-72 不再联想), or on again. */
@@ -549,17 +306,22 @@ class LearnLog(
         return write(make(stamp.minute, stamp.day))
     }
 
-    private fun write(record: LearnRecord): Boolean {
+    private fun write(record: LearnRecord): Boolean = put(record) != Put.TOO_LONG
+
+    private enum class Put { TOO_LONG, IN_MEMORY, ON_DISK }
+
+    // [record] applied, unless too long to keep; on disk, or in the state alone
+    private fun put(record: LearnRecord): Put {
         val bytes = encoded(record)
         if (bytes == null) {
             onError(IOException("a record too long to keep: $record"))
-            return false
+            return Put.TOO_LONG
         }
-        store?.append(bytes)
+        val kept = store?.append(bytes) == true
         state.apply(record)
         appended?.invoke(record)
         changed()
-        return true
+        return if (kept) Put.ON_DISK else Put.IN_MEMORY
     }
 
     /**
@@ -604,33 +366,6 @@ class LearnLog(
         return if (transform(log.toByteArray(), written)) written.toByteArray() else null
     }
 
-    /**
-     * The older builds' files changed under the marker (the user cleared what was learned, and
-     * they went with it): the marker made to say them as they are now, nothing taken in, so the
-     * next open takes in nothing the clear took away (a table's saved words read again). Whether the files may go: not when
-     * the marker could not be written, so the next open remarks them (verify-E F1); with no marker
-     * to keep (none read, or a log in memory), they may.
-     */
-    fun remarkLegacy(): Boolean {
-        val legacy = legacy ?: return true
-        val file = file ?: return true
-        return try {
-            remark(legacy, File(file.parentFile, MARKER))
-            // a conversion owed is owed no more: what it would bring back was cleared
-            pending = null
-            File(file.parentFile, CONVERTING).delete()
-            true
-        } catch (e: IOException) {
-            onError(e)
-            false
-        }
-    }
-
-    private fun remark(legacy: Legacy, marker: File) {
-        val now = LearnState().also { legacy.into(it, clock) }
-        ConvertedMarker.write(marker, legacy.marker(now))
-    }
-
     private fun changed() {
         val changes = state.takeChanges()
         if (!changes.isEmpty()) listener?.invoke(changes)
@@ -644,30 +379,10 @@ class LearnLog(
         null
     }
 
-    // the marker written, or what an older build did since it was, taken in
-    private fun mark(marker: File, legacy: Legacy?, seeded: Boolean) {
-        when {
-            // what was converted is the state; with nothing to convert (a test, the eval), nothing
-            seeded -> ConvertedMarker.write(marker, checkNotNull(legacy).marker(state))
-            legacy == null -> if (!marker.exists()) ConvertedMarker.write(marker, ConvertedMarker.NONE)
-            // the log not empty but no marker (restored without one), or one that does not read:
-            // what the files have is taken in where the log lacks it, nothing forgotten by it
-            else -> {
-                val was = if (marker.exists()) ConvertedMarker.read(marker) else null
-                val (records, now) = legacy.since(was, state, LearnClock.stamp(clock, state, commit = false)) ?: return
-                records.forEach(::write)
-                ConvertedMarker.write(marker, now)
-            }
-        }
-    }
-
     /** Folds the log now, as the background would: for tests. */
     internal fun fold() = store?.compact()
 
-    /**
-     * Closes the log. The marker is not written: a process killed is not closed, and the next open
-     * must read the old files the same either way (review-1a-r2 M1).
-     */
+    /** Closes the log. */
     override fun close() {
         store?.close()
         store = null
@@ -676,12 +391,6 @@ class LearnLog(
     companion object {
         /** The log, in the engine's user directory. */
         const val FILE = "learn.log"
-
-        /** Beside the log: the older builds' learning was converted (impl/design-1a.md §5). */
-        const val MARKER = "learn.converted"
-
-        /** Beside the log: a conversion begun ([open]'s deferred) and not yet merged and marked. */
-        const val CONVERTING = "learn.converting"
 
         private const val MAX_TAKES = 255
 

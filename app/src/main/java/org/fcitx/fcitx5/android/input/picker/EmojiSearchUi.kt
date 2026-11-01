@@ -39,7 +39,7 @@ class EmojiSearchUi(context: Context, private val theme: Theme) : LinearLayout(c
 
     private class LetterKey(letter: String) : KeyDef(
         Appearance.Text(displayText = letter, textSize = 23f),
-        setOf(Behavior.Press(KeyAction.FcitxKeyAction(letter))),
+        setOf(Behavior.Press(KeyAction.HostKeyAction(letter))),
         arrayOf(Popup.Preview(letter))
     )
 

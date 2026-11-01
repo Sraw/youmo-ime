@@ -4,8 +4,8 @@
  */
 package org.fcitx.fcitx5.android.engine.table
 
-import org.fcitx.fcitx5.android.engine.host.EngineEvent
-import org.fcitx.fcitx5.android.engine.host.Keyboard
+import org.fcitx.fcitx5.android.engine.runtime.EngineEvent
+import org.fcitx.fcitx5.android.engine.runtime.Keyboard
 import org.fcitx.fcitx5.android.engine.session.Action.Backspace
 import org.fcitx.fcitx5.android.engine.session.Action.Key
 import org.fcitx.fcitx5.android.engine.session.Action.Select

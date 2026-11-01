@@ -21,6 +21,7 @@ import androidx.navigation.NavHostController
 import androidx.navigation.Navigation
 import androidx.navigation.Navigator
 import androidx.preference.Preference
+import androidx.preference.PreferenceCategory
 import androidx.preference.PreferenceFragmentCompat
 import androidx.preference.PreferenceManager
 import androidx.preference.PreferenceScreen
@@ -205,5 +206,25 @@ class SearchHighlightTest {
         // one with no list yet goes at once (scrollToPreference waits for the list itself)
         SearchHighlight.whenListed(null) { scrolled++ }
         assertEquals(2, scrolled)
+    }
+
+    // a setting in a hidden section (a keyboard not chosen): the row that shows it is pointed at, not the page's top
+    @Test
+    fun aHiddenSettingPointsAtTheRowThatShowsIt() {
+        val result = open(RESULT)
+        SearchHighlight.point(result, "wanted", "keyboard")
+        val page = Page(screen("keyboard", "wanted").apply { findPreference<Preference>("wanted")!!.isVisible = false })
+        SearchHighlight.showIn(page, result)
+        assertEquals("keyboard", page.scrolledTo?.key)
+        // as the pages hide one: the section's group hidden, the setting in it still visible itself
+        SearchHighlight.point(result, "wanted", "keyboard")
+        val grouped = Page(screen("keyboard").apply {
+            val section = PreferenceCategory(ctx).apply { key = "section"; isPersistent = false }
+            addPreference(section)
+            section.addPreference(Preference(ctx).apply { isPersistent = false; key = "wanted"; title = "Title" })
+            section.isVisible = false
+        })
+        SearchHighlight.showIn(grouped, result)
+        assertEquals("keyboard", grouped.scrolledTo?.key)
     }
 }

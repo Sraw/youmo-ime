@@ -278,18 +278,32 @@ object ClipboardManager : ClipboardManager.OnPrimaryClipChangedListener,
         } else {
             clbDao.findAllIds()
         }
-        clbDao.markAsDeleted(*ids)
+        inBatches(ids) { clbDao.markAsDeleted(*it) }
         updateItemCount()
         ids
     }
 
     suspend fun undoDelete(vararg ids: Int) = orNeutral(Unit) {
-        clbDao.undoDelete(*ids)
+        inBatches(ids) { clbDao.undoDelete(*it) }
         updateItemCount()
     }
 
     suspend fun purgeMarked(vararg ids: Int) = orNeutral(Unit) {
-        clbDao.purgeMarked(*ids)
+        inBatches(ids) { clbDao.purgeMarked(*it) }
+    }
+
+    // an IN (:ids) of at most ID_BATCH, in one transaction: Android 10 and 11's SQLite takes 999 variables
+    // at most, and 「无上限」 makes a clearing of thousands
+    private suspend fun inBatches(ids: IntArray, statement: suspend (IntArray) -> Unit) {
+        val batches = idBatches(ids)
+        if (batches.size <= 1) return statement(ids)
+        clbDb.withTransaction { for (batch in batches) statement(batch) }
+    }
+
+    /** How many unpinned entries a history limit of [limit] would delete now: what to confirm before it is set. */
+    suspend fun outdatedBy(limit: Int): Int = orNeutral(0) {
+        val last = lastKept(limit, System.currentTimeMillis()) { clbDao.unpinnedTimestampAt(it) } ?: return@orNeutral 0
+        clbDao.countUnpinnedEarlierThan(last)
     }
 
     /**
@@ -427,12 +441,15 @@ internal suspend fun clearedTables(
 
 /**
  * When the last unpinned entry kept for [limit] was copied, those copied before it outdated: the
- * [limit]th newest time ([unpinnedAt] gives the newest from 0), null with fewer than [limit],
- * [now] with no room for one.
+ * [limit]th newest time ([unpinnedAt] gives the newest from 0), null with fewer than [limit] or
+ * [CLIPBOARD_UNLIMITED] (not asked: OFFSET 2147483646 would sort the whole table), [now] with no room for one.
  */
-internal suspend fun lastKept(limit: Int, now: Long, unpinnedAt: suspend (Int) -> Long?): Long? =
+internal suspend fun lastKept(limit: Int, now: Long, unpinnedAt: suspend (Int) -> Long?): Long? = when {
+    limit == CLIPBOARD_UNLIMITED -> null
     // not OFFSET -1, which SQLite takes as 0, keeping the newest
-    if (limit > 0) unpinnedAt(limit - 1) else now
+    limit > 0 -> unpinnedAt(limit - 1)
+    else -> now
+}
 
 /**
  * Opens the clipboard's database at [path] with [open], or puts another in its place, so that no start crashes on
@@ -516,6 +533,16 @@ private fun withJournals(path: File) = listOf("", "-journal", "-wal", "-shm").ma
 
 // the clipboard's database, by the name UserDataManager's export and import know it by too
 internal const val CLIPBOARD_DATABASE = "clbdb"
+
+// below SQLite's 999 variables of an older build (SQLITE_MAX_VARIABLE_NUMBER before 3.32)
+internal const val ID_BATCH = 900
+
+/** [ids] in order, in batches of [ID_BATCH] at most. */
+internal fun idBatches(ids: IntArray): List<IntArray> =
+    (ids.indices step ID_BATCH).map { ids.copyOfRange(it, minOf(ids.size, it + ID_BATCH)) }
+
+/** The history limit that is none, 「无上限」: no entry outdated. */
+const val CLIPBOARD_UNLIMITED = Int.MAX_VALUE
 
 /**
  * Left in [databases], beside the clipboard's database, by an import once the backup's is in, for the next open to take

@@ -256,7 +256,7 @@ class TableLanguageTest {
 
     @Test
     fun `a phrase an older build saved comes after the table's own of its code, which the word model places`() {
-        val s = TableSession(table, TableOptions.WUBI, user = table.savedBefore("abcd" to "人山"), language = language())
+        val s = TableSession(table, TableOptions.WUBI, saved = table.savedBefore("abcd" to "人山"), language = language())
         val shown = s.type("abcd").second.candidates
         assertEquals("人山", shown.last())
         assertEquals(setOf("人", "山"), shown.dropLast(1).toSet())
@@ -268,7 +268,7 @@ class TableLanguageTest {
         val model = modelLearner.model
         // the word model lacks it: the user's own, read ren shan
         model.own(Entry("人山", intArrayOf(Syllables.id("ren"), Syllables.id("shan"))))
-        val s = TableSession(table, TableOptions.WUBI, user = table.savedBefore("abcd" to "人山"), language = language(model, habits = modelLearner.habits))
+        val s = TableSession(table, TableOptions.WUBI, saved = table.savedBefore("abcd" to "人山"), language = language(model, habits = modelLearner.habits))
         assertEquals("人山", s.apply(Action.Select(s.type("abcd").second.candidates.indexOf("人山"))).commit)
         assertEquals("高", s.type("g").first)
         assertTrue("人山 高" in modelLearner.used())

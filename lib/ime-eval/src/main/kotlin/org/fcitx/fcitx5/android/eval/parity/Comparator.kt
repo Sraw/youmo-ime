@@ -5,7 +5,7 @@
 package org.fcitx.fcitx5.android.eval.parity
 
 import kotlinx.serialization.json.JsonArray
-import org.fcitx.fcitx5.android.engine.host.Engines
+import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import kotlin.math.abs
 
 /**
@@ -165,7 +165,7 @@ class Comparator(
 
     companion object {
         // what the overlay shows: each listed input method's label
-        private val OVERLAYS: Set<String> = Engines.LISTED.map { it.label }.toSet()
+        private val OVERLAYS: Set<String> = InputMethodCatalog.LISTED.map { it.label }.toSet()
 
         fun report(r: Result, out: Appendable) {
             out.appendLine("same ${r.same}, different ${r.differences.size}, swaps allowed ${r.swapped.size}, timing ${r.timing.size}, stopped ${r.errors.size}, missing ${r.missing.size}")

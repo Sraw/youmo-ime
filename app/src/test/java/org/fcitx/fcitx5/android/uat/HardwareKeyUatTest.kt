@@ -14,21 +14,22 @@ import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.core.CandidateWord
-import org.fcitx.fcitx5.android.core.FcitxEvent
 import org.fcitx.fcitx5.android.core.FcitxKeyMapping
 import org.fcitx.fcitx5.android.core.InputMethodEntry
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
-import org.fcitx.fcitx5.android.engine.host.Engines
+import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.engine.learn.control.BlockScope
 import org.fcitx.fcitx5.android.engine.learn.control.LearningOp
 import org.fcitx.fcitx5.android.engine.learn.control.LearningResult
 import org.fcitx.fcitx5.android.engine.learn.control.MenuItem
 import org.fcitx.fcitx5.android.engine.learn.control.WordKind
+import org.fcitx.fcitx5.android.host.HostEvent
 import org.fcitx.fcitx5.android.input.CandidatesView
 import org.fcitx.fcitx5.android.input.KeyboardHarness
 import org.fcitx.fcitx5.android.input.candidates.floating.FloatingCandidatesMode
 import org.fcitx.fcitx5.android.input.candidates.floating.FloatingCandidatesOrientation
 import org.fcitx.fcitx5.android.input.keyboard.HandwritingKeyboard
+import org.fcitx.fcitx5.android.input.keyboard.ImKeyboards
 import org.fcitx.fcitx5.android.input.keyboard.T9Keyboard
 import org.fcitx.fcitx5.android.input.keyboard.TextKeyboard
 import org.junit.After
@@ -56,13 +57,17 @@ class HardwareKeyUatTest {
     private var h: KeyboardHarness? = null
 
     private fun entry(name: String, label: String = name) = InputMethodEntry(name, name, "", "", label, "zh_CN", "androidengine", false)
-    private val wubi = entry(Engines.WUBI, "五")
-    private val handwriting = entry(Engines.HANDWRITING, "写")
+    private val wubi = entry(InputMethodCatalog.WUBI, "五")
+    private val handwriting = entry(InputMethodCatalog.HANDWRITING, "写")
 
-    private fun harness(vararg enabled: InputMethodEntry = arrayOf(KeyboardHarness.PINYIN, KeyboardHarness.ENGLISH), im: InputMethodEntry = enabled.first()) =
-        KeyboardHarness(im = im).also {
+    private fun harness(
+        vararg enabled: InputMethodEntry = arrayOf(KeyboardHarness.PINYIN, KeyboardHarness.ENGLISH),
+        im: InputMethodEntry = enabled.first(),
+        keyboards: ImKeyboards.Chosen? = null,
+    ) =
+        KeyboardHarness(im = im, keyboards = keyboards).also {
             h = it
-            it.api.availableIme = arrayOf(KeyboardHarness.PINYIN, KeyboardHarness.ENGLISH, wubi, KeyboardHarness.T9, handwriting)
+            it.api.availableIme = arrayOf(KeyboardHarness.PINYIN, KeyboardHarness.ENGLISH, wubi, handwriting)
             it.api.enabledIme = arrayOf(*enabled)
         }
 
@@ -86,7 +91,7 @@ class HardwareKeyUatTest {
     private fun KeyboardHarness.up(code: Int, meta: Int = 0): Boolean =
         service.onKeyUp(code, event(KeyEvent.ACTION_UP, code, meta)).also { advance(20) }
 
-    /** A key typed: down and up, then what fcitx says of the input method (an [FcitxEvent.IMChangeEvent] when it changed). */
+    /** A key typed: down and up, then what fcitx says of the input method (an [HostEvent.InputMethodChanged] when it changed). */
     private fun KeyboardHarness.press(vararg codes: Int) = codes.forEach {
         down(it)
         up(it)
@@ -102,7 +107,7 @@ class HardwareKeyUatTest {
         val now = api.inputMethodEntryCached
         if (now.uniqueName != told) {
             told = now.uniqueName
-            emit(FcitxEvent.IMChangeEvent(now))
+            emit(HostEvent.InputMethodChanged(now))
         }
     }
 
@@ -192,10 +197,10 @@ class HardwareKeyUatTest {
     fun aShiftTapSwitchesChineseAndEnglish() {
         val h = harness().start()
         h.shiftTap()
-        assertEquals(Engines.ENGLISH, h.current)
+        assertEquals(InputMethodCatalog.ENGLISH, h.current)
         h.type("hi ")
         h.shiftTap()
-        assertEquals(Engines.PINYIN, h.current)
+        assertEquals(InputMethodCatalog.PINYIN, h.current)
         h.type("ni ")
         assertEquals("hi ni ".map { it.toString() }, h.sent())
     }
@@ -207,7 +212,7 @@ class HardwareKeyUatTest {
         h.type("ni")
         h.shiftTap()
         // the engine puts what was typed in as it is when it is switched away (fcitx's own)
-        assertEquals(Engines.ENGLISH, h.current)
+        assertEquals(InputMethodCatalog.ENGLISH, h.current)
     }
 
     @Test
@@ -221,7 +226,7 @@ class HardwareKeyUatTest {
         h.up(KeyEvent.KEYCODE_A, KeyEvent.META_SHIFT_ON)
         h.up(KeyEvent.KEYCODE_SHIFT_LEFT)
         h.press(KeyEvent.KEYCODE_B)
-        assertEquals(Engines.ENGLISH, h.current)
+        assertEquals(InputMethodCatalog.ENGLISH, h.current)
         assertFalse(h.api.calls.toString(), h.api.calls.any { it.startsWith("activateIme") })
         assertTrue(h.sent().toString(), h.sent().containsAll(listOf("A", "b")))
     }
@@ -231,10 +236,10 @@ class HardwareKeyUatTest {
     fun ctrlSpaceSwitchesAndTypesNoSpace() {
         val h = harness().start()
         h.ctrlSpace()
-        assertEquals(Engines.ENGLISH, h.current)
+        assertEquals(InputMethodCatalog.ENGLISH, h.current)
         h.type("ok")
         h.ctrlSpace()
-        assertEquals(Engines.PINYIN, h.current)
+        assertEquals(InputMethodCatalog.PINYIN, h.current)
         h.type("ni ")
         // no space went in for either Ctrl+Space
         assertEquals("okni ".map { it.toString() }, h.sent())
@@ -246,19 +251,20 @@ class HardwareKeyUatTest {
         val h = harness(KeyboardHarness.PINYIN, KeyboardHarness.ENGLISH, wubi, im = wubi).start()
         h.synced()
         h.shiftTap()
-        assertEquals(Engines.ENGLISH, h.current)
+        assertEquals(InputMethodCatalog.ENGLISH, h.current)
         h.shiftTap()
-        assertEquals(Engines.WUBI, h.current)
+        assertEquals(InputMethodCatalog.WUBI, h.current)
     }
 
     @Test
     @Uat("HK-14")
-    fun ctrlShiftGoesRoundSkippingHandwritingAndNineKeys() {
-        val h = harness(KeyboardHarness.PINYIN, KeyboardHarness.ENGLISH, wubi, KeyboardHarness.T9, handwriting).start()
-        // typed on first: the hardware keyboard's turn, where the nine keys and handwriting take no keys
+    fun ctrlShiftGoesRoundSkippingHandwriting() {
+        // pinyin on the nine keys: a hardware keyboard types full pinyin in it whatever its keyboard
+        val h = harness(KeyboardHarness.PINYIN, KeyboardHarness.ENGLISH, wubi, handwriting, keyboards = KeyboardHarness.NINE_KEYS).start()
+        // typed on first: the hardware keyboard's turn, where handwriting takes no keys
         h.type("a")
         val seen = (1..4).map { h.ctrlShift(); h.current }
-        assertEquals(listOf(Engines.ENGLISH, Engines.WUBI, Engines.PINYIN, Engines.ENGLISH), seen)
+        assertEquals(listOf(InputMethodCatalog.ENGLISH, InputMethodCatalog.WUBI, InputMethodCatalog.PINYIN, InputMethodCatalog.ENGLISH), seen)
     }
 
     @Test
@@ -270,7 +276,7 @@ class HardwareKeyUatTest {
         h.up(KeyEvent.KEYCODE_CTRL_LEFT, KeyEvent.META_SHIFT_ON)
         h.up(KeyEvent.KEYCODE_SHIFT_LEFT)
         h.synced()
-        assertEquals(Engines.ENGLISH, h.current)
+        assertEquals(InputMethodCatalog.ENGLISH, h.current)
     }
 
     @Test
@@ -285,7 +291,7 @@ class HardwareKeyUatTest {
             h.up(KeyEvent.KEYCODE_CTRL_LEFT)
         }
         // no switch; fcitx passes what it does not take on to the app (forwarded keys)
-        assertEquals(Engines.PINYIN, h.current)
+        assertEquals(InputMethodCatalog.PINYIN, h.current)
         assertFalse(h.api.calls.toString(), h.api.calls.any { it.startsWith("activateIme") || it.startsWith("enumerateIme") })
     }
 
@@ -296,7 +302,7 @@ class HardwareKeyUatTest {
         h.synced()
         assertTrue(h.showing<HandwritingKeyboard>())
         h.type("ni ")
-        assertEquals(Engines.PINYIN, h.current)
+        assertEquals(InputMethodCatalog.PINYIN, h.current)
         assertFalse(h.touchKeyboardUp)
         assertEquals("ni ".map { it.toString() }, h.sent())
     }
@@ -310,14 +316,14 @@ class HardwareKeyUatTest {
         h.touchKeyboardButton()
         h.synced()
         assertTrue(h.touchKeyboardUp)
-        assertEquals(Engines.HANDWRITING, h.current)
+        assertEquals(InputMethodCatalog.HANDWRITING, h.current)
         assertTrue(h.showing<HandwritingKeyboard>())
     }
 
     @Test
     @Uat("HK-20")
     fun nineKeysTypedOnAndBack() {
-        val h = harness(KeyboardHarness.PINYIN, KeyboardHarness.ENGLISH, KeyboardHarness.T9, im = KeyboardHarness.T9).start()
+        val h = harness(KeyboardHarness.PINYIN, KeyboardHarness.ENGLISH, keyboards = KeyboardHarness.NINE_KEYS).start()
         h.synced()
         h.type("2026hao ")
         assertEquals("2026hao ".map { it.toString() }, h.sent())
@@ -367,13 +373,13 @@ class HardwareKeyUatTest {
             h.shiftTap()
             h.ctrlShift()
             h.ctrlSpace()
-            assertEquals(Engines.PINYIN, h.current)
+            assertEquals(InputMethodCatalog.PINYIN, h.current)
             h.type("ni ")
             // the shortcuts off switched nothing: what is typed after reaches the engine as typed
             assertEquals("ni ".map { it.toString() }, h.sent().takeLast(3))
             on.setValue(true)
             h.shiftTap()
-            assertEquals(Engines.ENGLISH, h.current)
+            assertEquals(InputMethodCatalog.ENGLISH, h.current)
         } finally {
             on.setValue(on.defaultValue)
         }
@@ -388,7 +394,7 @@ class HardwareKeyUatTest {
             val h = harness().start()
             h.type("shi")
             val words = arrayOf("是", "时", "事").map { CandidateWord("", it, "") }.toTypedArray()
-            h.emit(FcitxEvent.PagedCandidateEvent(FcitxEvent.PagedCandidateEvent.Data(words, 0, FcitxEvent.PagedCandidateEvent.LayoutHint.NotSet, false, true)))
+            h.emit(HostEvent.Paged(words.toList(), 0, false, true))
             val cells = KeyboardHarness.all(h.candidatesView).filterIsInstance<TextView>()
                 .filter { it.text.toString() in listOf("是", "时", "事") }.toList()
             assertEquals(cells.toString(), 3, cells.size)
@@ -460,7 +466,7 @@ class HardwareKeyUatTest {
         h.api.learned = ::learned
         h.type("dl")
         val words = arrayOf("带来", "点了").map { CandidateWord("", it, "") }.toTypedArray()
-        h.emit(FcitxEvent.PagedCandidateEvent(FcitxEvent.PagedCandidateEvent.Data(words, 1, FcitxEvent.PagedCandidateEvent.LayoutHint.NotSet, false, false)))
+        h.emit(HostEvent.Paged(words.toList(), 1, false, false))
         h.api.calls.clear()
         h.down(KeyEvent.KEYCODE_SHIFT_LEFT, KeyEvent.META_SHIFT_ON)
         // held: the key repeats
@@ -473,7 +479,7 @@ class HardwareKeyUatTest {
         assertTrue(forgets.single(), "点了" in forgets.single())
         // no Delete to the engine, no switch
         assertFalse(h.api.calls.toString(), h.api.calls.any { it.startsWith("sendKey(sym=${FcitxKeyMapping.FcitxKey_Delete}") })
-        assertEquals(Engines.PINYIN, h.current)
+        assertEquals(InputMethodCatalog.PINYIN, h.current)
     }
 
     @Test
@@ -483,7 +489,7 @@ class HardwareKeyUatTest {
         h.api.learned = ::learned
         h.type("dl")
         val words = arrayOf("带来", "点了").map { CandidateWord("", it, "") }.toTypedArray()
-        h.emit(FcitxEvent.PagedCandidateEvent(FcitxEvent.PagedCandidateEvent.Data(words, 1, FcitxEvent.PagedCandidateEvent.LayoutHint.NotSet, false, false)))
+        h.emit(HostEvent.Paged(words.toList(), 1, false, false))
         h.api.calls.clear()
         h.service.onKeyDown(KeyEvent.KEYCODE_SHIFT_LEFT, event(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_SHIFT_LEFT, KeyEvent.META_SHIFT_ON))
         h.service.onKeyDown(KeyEvent.KEYCODE_FORWARD_DEL, event(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_FORWARD_DEL, KeyEvent.META_SHIFT_ON))
@@ -492,6 +498,6 @@ class HardwareKeyUatTest {
         h.idle()
         h.synced()
         assertEquals(h.api.calls.toString(), 1, h.forgets().size)
-        assertEquals(Engines.PINYIN, h.current)
+        assertEquals(InputMethodCatalog.PINYIN, h.current)
     }
 }

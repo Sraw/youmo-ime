@@ -5,6 +5,7 @@
 package org.fcitx.fcitx5.android.engine.table
 
 import org.fcitx.fcitx5.android.engine.data.DataFormatException
+import org.fcitx.fcitx5.android.engine.learn.LearnRecord.TableWordRow
 import org.fcitx.fcitx5.android.engine.session.Action
 import org.fcitx.fcitx5.android.engine.session.Action.Backspace
 import org.fcitx.fcitx5.android.engine.session.Action.Block
@@ -13,8 +14,8 @@ import org.fcitx.fcitx5.android.engine.session.Action.Context
 import org.fcitx.fcitx5.android.engine.session.Action.Forget
 import org.fcitx.fcitx5.android.engine.session.Action.Key
 import org.fcitx.fcitx5.android.engine.session.Action.NextPage
-import org.fcitx.fcitx5.android.engine.session.Action.Pin
 import org.fcitx.fcitx5.android.engine.session.Action.Pick
+import org.fcitx.fcitx5.android.engine.session.Action.Pin
 import org.fcitx.fcitx5.android.engine.session.Action.PreviousPage
 import org.fcitx.fcitx5.android.engine.session.Action.Reset
 import org.fcitx.fcitx5.android.engine.session.Action.Select
@@ -144,9 +145,10 @@ class TableSessionTest {
         val t = session(TableOptions.CANGJIE)
         val (commit, s) = t.type("wx")
         assertEquals("", commit)
-        assertEquals("wx", s.preedit)
+        // shown in its roots (TableRoots.CANGJIE)
+        assertEquals("田難", s.preedit)
         // full, then the next key drops the code that has no candidate
-        assertEquals("a", t.type("xxa").second.preedit)
+        assertEquals("日", t.type("xxa").second.preedit)
     }
 
     @Test
@@ -162,7 +164,7 @@ class TableSessionTest {
     @Test
     fun spaceOnACodeWithNoCandidateDropsIt() {
         val t = session(TableOptions.CANGJIE)
-        assertEquals("wx", t.type("wx").second.preedit)
+        assertEquals("田難", t.type("wx").second.preedit)
         val s = t.apply(Select(0))
         assertTrue(s.handled)
         assertEquals("", s.commit)
@@ -234,21 +236,21 @@ class TableSessionTest {
     @Test
     fun charactersTypedOneByOneMakeNoPhrase() {
         // 自动造词 is gone (U-28 C46): 你 then 们, again and again, make no 你们 under wqwu
-        val user = TableUser(wubi)
-        val t = TableSession(wubi, TableOptions.WUBI, user = user)
+        val log = savedLog()
+        val t = TableSession(wubi, TableOptions.WUBI, saved = wubi.savedIn(log))
         repeat(3) {
             t.type("wqiy")
             t.type("wun")
             t.apply(Select(0))
         }
         assertFalse("你们" in t.type("wqwu").second.candidates)
-        assertTrue(user.savedTexts().isEmpty())
+        assertTrue(log.state.tableWords.isEmpty())
     }
 
     @Test
     fun aPhraseSavedBeforeIsForgottenAndTheTablesOwnHaveNothingToForget() {
-        val user = wubi.savedBefore("wqwu" to "你们")
-        val t = TableSession(wubi, TableOptions.WUBI, user = user)
+        val saved = wubi.savedBefore("wqwu" to "你们")
+        val t = TableSession(wubi, TableOptions.WUBI, saved = saved)
         val shown = t.type("aaaa").second
         assertEquals(listOf("工", "恭恭敬敬"), shown.candidates)
         // nothing learned of the table's own here (PY-33, as pinyin); nothing to pin or block to without a learning record
@@ -259,7 +261,7 @@ class TableSessionTest {
         assertEquals(listOf("你们"), t.type("wqw").second.candidates)
         assertEquals(setOf(Offer.FORGET), t.offers(0))
         assertTrue(t.apply(Forget(0)).candidates.isEmpty())
-        assertTrue(user.savedTexts().isEmpty())
+        assertTrue(saved.saved("").isEmpty())
         // nothing to forget: nothing typed
         t.apply(Reset)
         assertFalse(t.apply(Forget(0)).handled)
@@ -267,8 +269,9 @@ class TableSessionTest {
 
     @Test
     fun whileLearningIsOffNothingIsForgottenOrBlocked() {
-        val user = TableUser(wubi)
-        val records = ArrayList<ByteArray>()
+        val records = ArrayList<List<TableWordRow>>()
+        // what a forget would take out of the learning record
+        val saved = SavedPhrases(wubi, "engine-wubi", { null }, { records += it })
         val forgotten = ArrayList<String>()
         // 你们, wqwu by the rules: a word of the other input methods
         val shared = object : SharedWords {
@@ -282,9 +285,8 @@ class TableSessionTest {
             }
             override fun learned(text: String) = true
         }
-        val t = TableSession(wubi, TableOptions.WUBI, user = user, shared = shared)
+        val t = TableSession(wubi, TableOptions.WUBI, saved = saved, shared = shared)
         t.learning = false
-        user.journal = { records += it }
         assertEquals(listOf("你们"), t.type("wqw").second.candidates)
         assertEquals(emptySet<Offer>(), t.offers(0))
         assertEquals(listOf("你们"), t.apply(Forget(0)).candidates)
@@ -516,16 +518,15 @@ class TableSessionTest {
 
     @Test
     fun whatPinyinFoundIsNotLearned() {
-        val user = TableUser(wubiPinyin)
-        val t = TableSession(wubiPinyin, TableOptions.WUBI_PINYIN, user = user)
+        val log = savedLog()
+        val t = TableSession(wubiPinyin, TableOptions.WUBI_PINYIN, saved = wubiPinyin.savedIn(log))
         t.type("ai")
         assertEquals("哀", t.apply(Pick(2)).commit)
         t.type("gong")
         assertEquals("工", t.apply(Pick(1)).commit)
-        var records = 0
-        user.forEachRecord { records++ }
-        assertEquals(0, records)
+        // the order as it was: nothing learned of it, nor saved under a code of the table's
         assertEquals(listOf("蛙", "爱", "哀"), t.type("ai").second.candidates)
+        assertTrue(log.state.tableWords.isEmpty())
     }
 
     @Test

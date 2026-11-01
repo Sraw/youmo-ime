@@ -14,11 +14,11 @@ import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import org.fcitx.fcitx5.android.R
-import org.fcitx.fcitx5.android.core.FcitxEvent
 import org.fcitx.fcitx5.android.core.InputMethodEntry
 import org.fcitx.fcitx5.android.core.InputMethodNames
 import org.fcitx.fcitx5.android.daemon.launchOnReady
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
+import org.fcitx.fcitx5.android.host.HostEvent
 import org.fcitx.fcitx5.android.input.bar.ExpandButtonStateMachine.BooleanKey.ExpandedCandidatesEmpty
 import org.fcitx.fcitx5.android.input.bar.ExpandButtonStateMachine.TransitionEvent.ExpandedCandidatesUpdated
 import org.fcitx.fcitx5.android.input.bar.CandidateSpacing
@@ -158,7 +158,7 @@ class HorizontalCandidateComponent :
         }
     }
 
-    override fun onCandidateUpdate(data: FcitxEvent.CandidateListEvent.Data) {
+    override fun onCandidateUpdate(data: HostEvent.Candidates) {
         val candidates = data.candidates
         val total = data.total
         if (english) {

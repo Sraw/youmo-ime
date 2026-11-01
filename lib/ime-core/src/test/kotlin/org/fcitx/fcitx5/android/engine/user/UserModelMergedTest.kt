@@ -5,10 +5,11 @@
 package org.fcitx.fcitx5.android.engine.user
 
 import org.fcitx.fcitx5.android.engine.data.NgramModel.Companion.NO_WORD
-import org.fcitx.fcitx5.android.engine.learn.ImportedWords
-import org.fcitx.fcitx5.android.engine.learn.import
-import org.fcitx.fcitx5.android.engine.learn.Row
 import org.fcitx.fcitx5.android.engine.lattice.StartWords
+import org.fcitx.fcitx5.android.engine.learn.ImportedWords
+import org.fcitx.fcitx5.android.engine.learn.Row
+import org.fcitx.fcitx5.android.engine.learn.import
+import org.fcitx.fcitx5.android.engine.platform.jvm.JvmFile
 import org.fcitx.fcitx5.android.engine.user.UserFixtures.data
 import org.fcitx.fcitx5.android.engine.user.UserFixtures.entry
 import org.fcitx.fcitx5.android.engine.user.UserFixtures.inTrie
@@ -37,7 +38,7 @@ class UserModelMergedTest {
     private fun merged(vararg lines: String): DictionaryFile {
         val file = File(folder.root, "merged.ymd")
         DictionaryCompiler.compile(listOf(lines.asSequence()), file, inBase = DictionaryCompiler.inBase(data))
-        return DictionaryFile.open(file)
+        return DictionaryFile.open(JvmFile(file))
     }
 
     private fun model(file: DictionaryFile) = UserModel(data.dictionary, data.vocabulary, data.wordIndex, file)
@@ -132,7 +133,7 @@ class UserModelMergedTest {
 
     @Test
     fun aMergedWordAnOldLogReplaysIsTheDictionarysNotMade() {
-        // legacyModel's order: the log replayed into a model that has the file from the first
+        // the order an older build's log was replayed in: into a model that has the file from the first
         val m = model(merged("妮好 ni'hao 0.01"))
         m.learn(null, listOf(niHao))
         assertTrue(m.isMerged(m.known(niHao)))
@@ -214,12 +215,12 @@ class UserModelMergedTest {
         val file = File(folder.root, "stale.ymd")
         // compiled as if the base lacked 你
         DictionaryCompiler.compile(listOf(sequenceOf("你 ni 0.5", "妮 ni 0.1")), file)
-        val m = UserModel(data.dictionary, data.vocabulary, data.wordIndex, DictionaryFile.open(file), mergedStale = true)
+        val m = UserModel(data.dictionary, data.vocabulary, data.wordIndex, DictionaryFile.open(JvmFile(file)), mergedStale = true)
         val copy = m.mergedWords!!.at("ni").single { m.text(it) == "你" }
         assertTrue(m.blockedAnyhow(copy))
         assertFalse(m.blockedAnyhow(m.mergedWords!!.at("ni").single { m.text(it) == "妮" }))
         // fresh, the same file's copy is offered (never so: the compile left the base's out)
-        val fresh = UserModel(data.dictionary, data.vocabulary, data.wordIndex, DictionaryFile.open(file))
+        val fresh = UserModel(data.dictionary, data.vocabulary, data.wordIndex, DictionaryFile.open(JvmFile(file)))
         assertFalse(fresh.blockedAnyhow(copy))
     }
 }

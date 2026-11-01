@@ -4,8 +4,10 @@
  */
 package org.fcitx.fcitx5.android.engine.phrase
 
+import org.fcitx.fcitx5.android.Uat
 import org.junit.Assert.assertEquals
 import org.junit.Test
+import java.io.IOException
 import java.util.Calendar
 import java.util.GregorianCalendar
 
@@ -120,5 +122,16 @@ class PhraseBookTest {
         assertEquals(listOf("星期六"), book.builtInsOf("星期") { now })
         // the user's own under the key are no built-in ones
         assertEquals(emptyList<String>(), PhraseBook(CustomPhrases.parse("rq,1=日前")).builtInsOf("日期") { now })
+    }
+
+    // a save refused (the file not read, the data not settled): the change takes no effect, as a refused punctuation save
+    @Test
+    @Uat("PR-42")
+    fun aRefusedSaveTakesNoEffect() {
+        val book = PhraseBook(CustomPhrases.parse("yx,1=邮箱")) { throw IOException("not settled") }
+        book.pin("yx", "游戏")
+        assertEquals(listOf("邮箱"), book.phrases.lookup("yx", GregorianCalendar()).map { it.second })
+        book.remove("yx", "邮箱")
+        assertEquals(listOf("邮箱"), book.phrases.lookup("yx", GregorianCalendar()).map { it.second })
     }
 }

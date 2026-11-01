@@ -12,10 +12,12 @@ import org.fcitx.fcitx5.android.engine.learn.ImportedWords
 import org.fcitx.fcitx5.android.engine.learn.import
 import org.fcitx.fcitx5.android.engine.pinyin.ShuangpinScheme
 import org.fcitx.fcitx5.android.engine.pinyin.Syllables
+import org.fcitx.fcitx5.android.engine.platform.jvm.JvmFile
 import org.fcitx.fcitx5.android.engine.user.DictionaryCompiler
 import org.fcitx.fcitx5.android.engine.user.DictionaryFile
 import org.fcitx.fcitx5.android.engine.user.UserModel
 import org.fcitx.fcitx5.android.engine.user.UserScorer
+import org.fcitx.fcitx5.android.engine.user.addCount
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -198,7 +200,7 @@ class PinyinGlideTest {
     fun aMergedDictionarysWordsGlideBestFirstTheBlockedSkipped() {
         val file = java.io.File.createTempFile("merged", ".ymd").apply { deleteOnExit() }
         DictionaryCompiler.compile(listOf(sequenceOf("我爱 wo'ai 0.5", "卧碍 wo'ai 0.01")), file, inBase = DictionaryCompiler.inBase(data))
-        val model = UserModel(data.dictionary, data.vocabulary, data.wordIndex, DictionaryFile.open(file))
+        val model = UserModel(data.dictionary, data.vocabulary, data.wordIndex, DictionaryFile.open(JvmFile(file)))
         var version = 0
         // scored as Engines scores a glide: the user's scorer, a merged word by its file's rank till chosen
         val scorer = UserScorer(data.model, model)
@@ -224,7 +226,7 @@ class PinyinGlideTest {
     fun anImportedAndAMergedWordOnOnePathAreOneReading() {
         val file = java.io.File.createTempFile("merged", ".ymd").apply { deleteOnExit() }
         DictionaryCompiler.compile(listOf(sequenceOf("卧碍 wo'ai 0.5")), file, inBase = DictionaryCompiler.inBase(data))
-        val model = UserModel(data.dictionary, data.vocabulary, data.wordIndex, DictionaryFile.open(file))
+        val model = UserModel(data.dictionary, data.vocabulary, data.wordIndex, DictionaryFile.open(JvmFile(file)))
         model.attachImports(ImportedWords().import("我爱" to "wo ai"))
         var version = 0
         val scorer = UserScorer(data.model, model)

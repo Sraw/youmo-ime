@@ -8,6 +8,7 @@ import org.fcitx.fcitx5.android.engine.learn.control.Why
 import org.fcitx.fcitx5.android.engine.session.Action
 import org.fcitx.fcitx5.android.engine.session.Choice
 import org.fcitx.fcitx5.android.engine.session.Offer
+import org.fcitx.fcitx5.android.engine.session.Pager
 import org.fcitx.fcitx5.android.engine.session.Session
 import org.fcitx.fcitx5.android.engine.session.Snapshot
 
@@ -34,7 +35,7 @@ class StrokeLookup(
     private val pinyin: Session,
     private val strokes: () -> Strokes?,
     private val reading: (String) -> String = { "" },
-    private val pageSize: Int = DEFAULT_PAGE_SIZE,
+    pageSize: Int = DEFAULT_PAGE_SIZE,
     private val blocked: (String) -> Boolean = { false },
     private val follow: (String) -> Snapshot = { pinyin.apply(Action.Context(it)) },
     private val retype: (String) -> Snapshot = { keys ->
@@ -47,7 +48,7 @@ class StrokeLookup(
     private val input = StringBuilder()
     private var cursor = 0 // where in the strokes the next goes
     private var found = Found.none()
-    private var page = 0
+    private val pager = Pager(pageSize)
 
     // whether pinyin shows nothing typed: only then does the key start a lookup
     private var idle = true
@@ -59,6 +60,9 @@ class StrokeLookup(
         }
 
     override fun reads(c: Char): Boolean = if (looking) c in 'a'..'z' else (c == KEY && idle) || pinyin.reads(c)
+
+    // pinyin's own answer while it has the keys: one it reads only where it stands (双拼's ;) is its to say
+    override fun endsInput(c: Char): Boolean = if (looking) !reads(c) else !(c == KEY && idle) && pinyin.endsInput(c)
 
     override fun apply(action: Action): Snapshot {
         if (!looking) {
@@ -81,10 +85,10 @@ class StrokeLookup(
                 cursor == 0 -> snapshot()
                 else -> lookUp { input.deleteCharAt(--cursor) }
             }
-            is Action.Select -> if (action.index in 0 until pageSize) pick(page * pageSize + action.index) else snapshot()
+            is Action.Select -> pager.at(action.index).let { if (it >= 0) pick(it) else snapshot() }
             is Action.Pick -> pick(action.index)
-            Action.NextPage -> turn(page + 1)
-            Action.PreviousPage -> turn(page - 1)
+            Action.NextPage -> turn(pager.page + 1)
+            Action.PreviousPage -> turn(pager.page - 1)
             Action.CommitRaw -> leave("$KEY$input")
             Action.Reset, is Action.Context -> {
                 end()
@@ -132,7 +136,7 @@ class StrokeLookup(
     private inline fun lookUp(change: () -> Unit = {}): Snapshot {
         change()
         found = Found(strokes()?.find(input.toString()).orEmpty().filterNot(blocked).iterator())
-        page = 0
+        pager.reset()
         return snapshot()
     }
 
@@ -160,7 +164,7 @@ class StrokeLookup(
     }
 
     private fun turn(to: Int): Snapshot {
-        if (to >= 0 && found[to * pageSize] != null) page = to
+        pager.turn(to) { found[it] != null }
         return snapshot()
     }
 
@@ -169,26 +173,25 @@ class StrokeLookup(
         input.setLength(0)
         cursor = 0
         found = Found.none()
-        page = 0
+        pager.reset()
         return Snapshot(commit, "", emptyList(), 0, hasPreviousPage = false, hasNextPage = false, handled = handled, predicting = false)
     }
 
     private fun snapshot(): Snapshot {
-        val from = page * pageSize
-        val shown = found.page(from, pageSize)
+        val shown = found.page(pager.from, pager.size)
         return Snapshot(
             commit = "",
             preedit = "$KEY" + Strokes.shown(input),
             cursor = if (cursor < input.length) cursor + 1 else -1,
             candidates = shown,
-            page = page,
-            hasPreviousPage = page > 0,
-            hasNextPage = found[from + pageSize] != null,
+            page = pager.page,
+            hasPreviousPage = pager.hasPrevious,
+            hasNextPage = found[pager.from + pager.size] != null,
             handled = true,
             predicting = false,
             hints = shown.map(reading),
             total = found.size,
-            first = from,
+            first = pager.from,
         )
     }
 

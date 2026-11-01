@@ -48,7 +48,8 @@ class PinyinSegmenter(
     private val userLatin: UserLatinWords? = null,
 ) : Segmenter {
 
-    private val index = SpellingIndex(fuzzy, typos, neighbours)
+    // the settings' own, shared by the sessions made with them (SettingsMemo)
+    private val index = SpellingIndex.of(fuzzy, typos, neighbours)
 
     override fun segment(input: String): SyllableGraph {
         // read as slips, 简拼 turns into anything: 我喜欢你 into 网讯

@@ -5,8 +5,8 @@
 package org.fcitx.fcitx5.android.engine.learn
 
 import org.fcitx.fcitx5.android.engine.assertRows
-import org.fcitx.fcitx5.android.engine.host.EngineSettings
 import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
+import org.fcitx.fcitx5.android.engine.runtime.EngineSettings
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals

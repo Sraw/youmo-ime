@@ -15,8 +15,8 @@ import android.widget.TextView
 import androidx.core.text.buildSpannedString
 import androidx.core.view.doOnPreDraw
 import org.fcitx.fcitx5.android.R
-import org.fcitx.fcitx5.android.core.FcitxEvent
 import org.fcitx.fcitx5.android.data.theme.Theme
+import org.fcitx.fcitx5.android.host.HostEvent
 import splitties.dimensions.dp
 import splitties.views.dsl.core.add
 import splitties.views.dsl.core.lParams
@@ -32,7 +32,7 @@ import splitties.views.dsl.core.wrapContent
 class CodeRowUi(ctx: Context, theme: Theme, setupTextView: TextView.() -> Unit) :
     PreeditUi(ctx, theme, setupTextView) {
 
-    /** Where in the preedit a tap on the row puts the cursor, in code points (FcitxAPI.moveCursor). */
+    /** Where in the preedit a tap on the row puts the cursor, in code points (HostApi.moveCursor). */
     var onTap: ((Int) -> Unit)? = null
 
     private val row = HorizontalScrollView(ctx).apply {
@@ -77,7 +77,7 @@ class CodeRowUi(ctx: Context, theme: Theme, setupTextView: TextView.() -> Unit) 
         return line to ""
     }
 
-    override fun update(inputPanel: FcitxEvent.InputPanelEvent.Data) {
+    override fun update(inputPanel: HostEvent.InputPanel) {
         super.update(inputPanel)
         auxShown = inputPanel.auxUp.length
         preeditShown = inputPanel.preedit.toString()

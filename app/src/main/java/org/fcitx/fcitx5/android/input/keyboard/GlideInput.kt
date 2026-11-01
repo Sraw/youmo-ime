@@ -18,6 +18,9 @@ import splitties.dimensions.dp
  * Glide typing on [keyboard]'s letters ([GlideGesture]): the finger's path drawn as it goes, and
  * once it lifts, in key widths over where the [letters] are, given to [glided]. While it glides
  * the keys have none of the touch: they are cancelled as it starts, their preview and swipe with them.
+ *
+ * Where [strokes] says so as the finger goes down, the same touch is a stroke (笔画筛选) instead,
+ * started far sooner ([GlideGesture.STROKE]): its path, in key widths both ways, given to [stroked]. The setting has one or the other, never both.
  */
 class GlideInput(
     private val keyboard: ViewGroup,
@@ -29,12 +32,18 @@ class GlideInput(
     private val longPressMillis: () -> Long,
     // how far up or down a glide starts, in key heights (GlideGesture)
     down: Float = GlideGesture.DOWN,
+    // whether a touch now is a stroke drawn rather than a glide (StrokeShape reads it)
+    private val strokes: () -> Boolean = { false },
+    private val stroked: (path: FloatArray) -> Unit = {},
     private val glided: (path: FloatArray, layout: GlideLayout) -> Unit,
 ) {
     // which finger may glide, which events are the keys', the path in the decoder's units
     private val touch = GlideTouch(down)
     private val trail = Path()
     private val rect = Rect()
+
+    // the touch, as it went down, a stroke's
+    private var stroking = false
 
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.STROKE
@@ -75,7 +84,8 @@ class GlideInput(
     }
 
     private fun down(event: MotionEvent): GlideTouch.Route {
-        val keys = if (enabled()) letters() else emptyList()
+        stroking = strokes()
+        val keys = if (stroking || enabled()) letters() else emptyList()
         val x = event.x.toInt()
         val y = event.y.toInt()
         val onLetter = keys.any { (_, v) -> bounds(v).contains(x, y) }
@@ -83,7 +93,7 @@ class GlideInput(
         if (onLetter) bounds(keys.first().second)
         touch.down(
             event.getPointerId(0), event.x, event.y, event.eventTime, onLetter,
-            rect.width().toFloat(), rect.height().toFloat(), longPressMillis(),
+            rect.width().toFloat(), rect.height().toFloat(), longPressMillis(), stroke = stroking,
         )
         return GlideTouch.Route.KEYS
     }
@@ -102,6 +112,8 @@ class GlideInput(
         val unitX = rect.width().toFloat()
         val unitY = GlideTouch.unitY(rect.height().toFloat())
         if (unitX <= 0f || unitY <= 0f) return
+        // a stroke's shape is read as drawn: down in key widths too
+        if (stroking) return stroked(FloatArray(path.size) { if (it % 2 == 0) path[it] else path[it] * unitY / unitX })
         // every key a letter has: the split keyboard's G and V are on both halves
         val centres = keys.map { (c, v) -> bounds(v).let { b -> c to (b.exactCenterX() / unitX to b.exactCenterY() / unitY) } }
         glided(path, GlideLayout(centres))

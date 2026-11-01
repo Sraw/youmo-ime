@@ -27,7 +27,7 @@ import com.google.android.material.snackbar.Snackbar
 import com.google.android.material.R as MaterialR
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
-import org.fcitx.fcitx5.android.daemon.FcitxDaemon
+import org.fcitx.fcitx5.android.daemon.HostDaemon
 import org.fcitx.fcitx5.android.data.punctuation.PunctuationMapEntry
 import org.fcitx.fcitx5.android.ui.main.MainViewModel.ButtonMode
 import org.fcitx.fcitx5.android.utils.appContext
@@ -321,8 +321,8 @@ class PunctuationEditorFragment : ProgressFragment() {
             val name = PunctuationSaves::class.java.name
             PunctuationSaves(
                 FcitxApplication.getInstance().coroutineScope,
-                connect = { FcitxDaemon.connect(name) },
-                disconnect = { FcitxDaemon.disconnect(name) }
+                connect = { HostDaemon.connect(name) },
+                disconnect = { HostDaemon.disconnect(name) }
             ) {
                 Timber.w(it, "punctuation")
                 // the fragment may be gone by now

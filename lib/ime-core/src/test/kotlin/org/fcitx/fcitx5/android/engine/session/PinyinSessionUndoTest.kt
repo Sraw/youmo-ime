@@ -6,25 +6,26 @@ package org.fcitx.fcitx5.android.engine.session
 
 import org.fcitx.fcitx5.android.engine.data.PinyinData
 import org.fcitx.fcitx5.android.engine.data.PinyinDataBuilder
+import org.fcitx.fcitx5.android.engine.learn.Code
+import org.fcitx.fcitx5.android.engine.learn.Kinds
+import org.fcitx.fcitx5.android.engine.learn.LearnLog
+import org.fcitx.fcitx5.android.engine.learn.LearnState
+import org.fcitx.fcitx5.android.engine.learn.LearnTo
+import org.fcitx.fcitx5.android.engine.learn.Learner
+import org.fcitx.fcitx5.android.engine.learn.Words
 import org.fcitx.fcitx5.android.engine.learn.backup.BackupControl
 import org.fcitx.fcitx5.android.engine.learn.backup.BackupHead
 import org.fcitx.fcitx5.android.engine.learn.backup.Backups
 import org.fcitx.fcitx5.android.engine.learn.backup.LearnBackup
 import org.fcitx.fcitx5.android.engine.learn.backup.ListedWord
-import org.fcitx.fcitx5.android.engine.learn.Code
 import org.fcitx.fcitx5.android.engine.learn.control.LearningControl
 import org.fcitx.fcitx5.android.engine.learn.control.LearningOp
-import org.fcitx.fcitx5.android.engine.learn.Kinds
-import org.fcitx.fcitx5.android.engine.learn.Learner
-import org.fcitx.fcitx5.android.engine.learn.LearnLog
-import org.fcitx.fcitx5.android.engine.learn.LearnState
-import org.fcitx.fcitx5.android.engine.learn.LearnTo
 import org.fcitx.fcitx5.android.engine.learn.row
-import org.fcitx.fcitx5.android.engine.learn.Words
 import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
 import org.fcitx.fcitx5.android.engine.pinyin.PinyinSegmenter
 import org.fcitx.fcitx5.android.engine.pinyin.Syllables
 import org.fcitx.fcitx5.android.engine.pinyin.T9Segmenter
+import org.fcitx.fcitx5.android.engine.platform.MemoryFiles
 import org.fcitx.fcitx5.android.engine.session.Action.Backspace
 import org.fcitx.fcitx5.android.engine.session.Action.Context
 import org.fcitx.fcitx5.android.engine.session.Action.Key
@@ -33,10 +34,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
-import org.junit.Rule
-import org.junit.rules.TemporaryFolder
 import org.junit.Test
-import java.io.File
 import java.nio.ByteBuffer
 
 /**
@@ -44,9 +42,6 @@ import java.nio.ByteBuffer
  * there (U-03, impl/design-1c.md §2): learn-ux's undo.txt, and what keeps a deletion from counting.
  */
 class PinyinSessionUndoTest {
-
-    @get:Rule
-    val folder = TemporaryFolder()
 
     // dl reads 带来 first; 打了 and 点了 are picked over it
     private val data = dataOf(
@@ -253,12 +248,12 @@ class PinyinSessionUndoTest {
             Rewrite("revert", { b -> b.restore(other) }) { _, b -> assertTrue(b.revert()) },
         )
         for (rewrite in rewrites) {
-            val dir = folder.newFolder()
-            val learner = Learner(data, file = File(dir, LearnLog.FILE))
+            val dir = MemoryFiles()
+            val learner = Learner(data, file = dir.file(LearnLog.FILE))
             val log = learner.log
             try {
                 val backups = BackupControl(
-                    Backups(File(dir, Backups.DIR), 1L), learner.clock, "test", state = { log.state }, lists = { emptyList<ListedWord>() to emptyList() },
+                    Backups(dir.dir(Backups.DIR), 1L), learner.clock, "test", state = { log.state }, lists = { emptyList<ListedWord>() to emptyList() },
                     rewrite = { t -> log.rewrite(t) }, addLists = { _, _ -> }, removeLists = { _, _ -> }, importLines = {},
                 )
                 rewrite.before(backups)

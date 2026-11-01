@@ -99,6 +99,12 @@ val uatTest = tasks.register<Test>("uatTest") {
     testClassesDirs = uatTestSources.output.classesDirs
     classpath = uatTestSources.runtimeClasspath
     appData()
+    // as :lib:ime-core's tests: an engines' call off the thread that made it fails the case
+    systemProperty("youmo.engines.hostThreadStrict", "true")
+}
+
+tasks.test {
+    systemProperty("youmo.engines.hostThreadStrict", "true")
 }
 
 // a parity sequence file (fcitx-replacement §7.2, uat/parity) on the Kotlin host with the app's data:

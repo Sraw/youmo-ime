@@ -18,6 +18,10 @@ class EditTextIntPreference(context: Context) : EditTextPreference(context) {
     var max: Int = Int.MAX_VALUE
     var unit: String = ""
 
+    /** A value shown as [specialLabel], set by the dialog's own button: ManagedPreferenceUi.EditTextInt.Special. */
+    var specialValue: Int? = null
+    var specialLabel: String = ""
+
     private var default: Int = 0
 
     override fun persistInt(value: Int): Boolean {
@@ -48,7 +52,8 @@ class EditTextIntPreference(context: Context) : EditTextPreference(context) {
 
     init {
         setOnBindEditTextListener {
-            it.setText(textForValue())
+            // the special value's number means nothing to the user: an empty box
+            it.setText(if (specialValue != null && getPersistedInt(value) == specialValue) "" else textForValue())
             it.inputType = InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_FLAG_DECIMAL
             it.keyListener = DigitsKeyListener.getInstance(Locale.ROOT, min < 0, false)
         }
@@ -70,7 +75,9 @@ class EditTextIntPreference(context: Context) : EditTextPreference(context) {
 
     object SimpleSummaryProvider : SummaryProvider<EditTextIntPreference> {
         override fun provideSummary(preference: EditTextIntPreference): CharSequence {
-            return preference.run { "${textForValue()} $unit" }
+            return preference.run {
+                if (specialValue != null && getPersistedInt(value) == specialValue) specialLabel else "${textForValue()} $unit"
+            }
         }
     }
 }

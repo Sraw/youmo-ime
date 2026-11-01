@@ -5,6 +5,7 @@
 package org.fcitx.fcitx5.android.input.keyboard
 
 import kotlin.math.abs
+import kotlin.math.hypot
 
 /**
  * When a finger on the letters glides (滑行输入) rather than taps, swipes or holds a key: it went
@@ -13,12 +14,18 @@ import kotlin.math.abs
  * A letter's swipe is up or down and shorter (the keys' swipe threshold); its long press, once up,
  * is the popup's, the finger choosing in it. [keyWidth] and [keyHeight] in the units of the places
  * given, [longPressMillis] the keys'.
+ *
+ * A [stroke] drawn (笔画筛选) starts much sooner: once the finger is [STROKE] of a key from where it
+ * went down, any way, keys counted as they are wide across and tall down. A 竖 from the bottom row
+ * has a key's height at most to go, a short 点 less still, and both must be strokes before the key's
+ * swipe (its 角标, 36dp) or long press are.
  */
 class GlideGesture(
     private val keyWidth: Float,
     private val keyHeight: Float,
     private val longPressMillis: Long,
     private val downKeys: Float = DOWN,
+    private val stroke: Boolean = false,
 ) {
 
     private var x0 = 0f
@@ -51,7 +58,11 @@ class GlideGesture(
             possible = false
             return false
         }
-        gliding = abs(x - x0) >= ACROSS * keyWidth || abs(y - y0) >= downKeys * keyHeight
+        gliding = if (stroke) {
+            hypot((x - x0) / keyWidth, (y - y0) / keyHeight) >= STROKE
+        } else {
+            abs(x - x0) >= ACROSS * keyWidth || abs(y - y0) >= downKeys * keyHeight
+        }
         return gliding
     }
 
@@ -67,5 +78,8 @@ class GlideGesture(
 
         /** The nine keys' up or down: their keys as tall as the next row is far, a digit key's swipe shorter still. */
         const val NINE_KEYS_DOWN = 0.8f
+
+        /** How far a stroke goes before it is one, in keys (a key's width across, its height down): on a phone's keys about 15dp down, well short of their swipe's 36dp, past a tap's wobble. */
+        const val STROKE = 0.3f
     }
 }

@@ -24,14 +24,14 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import org.fcitx.fcitx5.android.R
-import org.fcitx.fcitx5.android.core.EngineBridge
+import org.fcitx.fcitx5.android.core.EngineState
 import org.fcitx.fcitx5.android.core.KeyStates
 import org.fcitx.fcitx5.android.core.KeySym
 import org.fcitx.fcitx5.android.core.UNICODE
 import org.fcitx.fcitx5.android.data.InputFeedbacks
 import org.fcitx.fcitx5.android.data.theme.Theme
-import org.fcitx.fcitx5.android.engine.host.Engines
-import org.fcitx.fcitx5.android.engine.host.Keyboard
+import org.fcitx.fcitx5.android.engine.InputMethodCatalog
+import org.fcitx.fcitx5.android.engine.runtime.Keyboard
 import org.fcitx.fcitx5.android.input.bar.KawaiiBarComponent
 import org.fcitx.fcitx5.android.input.keyboard.KeyAction
 import org.fcitx.fcitx5.android.utils.pressHighlightDrawable
@@ -39,7 +39,7 @@ import splitties.dimensions.dp
 
 /**
  * The code row's syllables (拼音选择栏) for the 14 keys and 双拼's 18: what the leftmost keys not yet taken may
- * be, as 九键's column offers them ([EngineBridge.syllables]), in a row at the code row's right end,
+ * be, as 九键's column offers them ([EngineState.syllables]), in a row at the code row's right end,
  * never over [MAX_SHARE] of its width. A tap takes one ([Keyboard.syllableKey], with the list's id:
  * shown before a key typed since replaced it, the engine drops it). Gone while nothing is typed or
  * nothing is left to take, for any input method but pinyin and 双拼, and where the keyboard shown
@@ -60,7 +60,7 @@ class SyllableStrip(context: Context, private val theme: Theme) : HorizontalScro
     private val items = LinearLayout(context).apply { orientation = LinearLayout.HORIZONTAL }
 
     /** What the row shows, read by its items when tapped. */
-    private var state = EngineBridge.SyllableState()
+    private var state = EngineState.SyllableState()
 
     /** Whether the keyboard shown offers the syllables itself (BaseKeyboard.ownsSyllables), as KeyboardWindow tells. */
     var owned: Boolean = false
@@ -91,7 +91,7 @@ class SyllableStrip(context: Context, private val theme: Theme) : HorizontalScro
     override fun onAttachedToWindow() {
         super.onAttachedToWindow()
         scope = CoroutineScope(Dispatchers.Main.immediate + Job()).also { s ->
-            s.launch { EngineBridge.syllables.collectLatest(::show) }
+            s.launch { EngineState.syllables.collectLatest(::show) }
         }
     }
 
@@ -102,9 +102,9 @@ class SyllableStrip(context: Context, private val theme: Theme) : HorizontalScro
     }
 
     /** The row for [state]: its syllables while pinyin or 双拼 types with some to take, else gone; its items kept. */
-    internal fun show(state: EngineBridge.SyllableState) {
+    internal fun show(state: EngineState.SyllableState) {
         // the grouped session answers as its input method (the router's), the full keyboard's never has syllables
-        val grouped = state.im == Engines.PINYIN || state.im == Engines.SHUANGPIN
+        val grouped = state.im == InputMethodCatalog.PINYIN || state.im == InputMethodCatalog.SHUANGPIN
         val labels = if (grouped && state.composing && !owned) state.syllables else emptyList()
         this.state = state
         // every input method's state comes here: hidden and staying so, nothing to cancel or redraw
@@ -159,7 +159,7 @@ class SyllableStrip(context: Context, private val theme: Theme) : HorizontalScro
         const val MAX_SHARE = 0.6f
 
         /** What taking syllable [i] of [state] sends: its key, with the list's id. */
-        internal fun pick(state: EngineBridge.SyllableState, i: Int): KeyAction =
+        internal fun pick(state: EngineState.SyllableState, i: Int): KeyAction =
             KeyAction.SymAction(KeySym(UNICODE + Keyboard.syllableKey(i, state.id).code), KeyStates.Virtual)
     }
 }

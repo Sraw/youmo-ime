@@ -4,13 +4,13 @@
  */
 package org.fcitx.fcitx5.android.engine.learn.control
 
-import org.fcitx.fcitx5.android.engine.host.Engines.UserWord
+import org.fcitx.fcitx5.android.engine.runtime.UserWord
 import org.fcitx.fcitx5.android.engine.learn.Code
 import org.fcitx.fcitx5.android.engine.learn.HabitRanker
 
 /**
  * What the user asks of what was learned (PLAN §2.8, impl/streams/E-design.md): one call for them
- * all, `FcitxAPI.learning`, so the API and its fakes stay small. Answered by a [LearningResult].
+ * all, `HostApi.learning`, so the API and its fakes stay small. Answered by a [LearningResult].
  */
 sealed class LearningOp {
     /**
@@ -101,7 +101,7 @@ sealed class LearningOp {
      */
     data class RemoveWords(val words: List<UserWord>) : LearningOp()
 
-    /** The English words [texts] corrected again (U-31 恢复), their uses kept: [org.fcitx.fcitx5.android.engine.host.Engines.restoreEnglishCorrection]. */
+    /** The English words [texts] corrected again (U-31 恢复), their uses kept: [org.fcitx.fcitx5.android.engine.runtime.Engines.restoreEnglishCorrection]. */
     data class RestoreCorrection(val texts: List<String>) : LearningOp()
 
     /** [items] of a [ListItems] taken off it: unpinned, predicted again, shown again under their code. */

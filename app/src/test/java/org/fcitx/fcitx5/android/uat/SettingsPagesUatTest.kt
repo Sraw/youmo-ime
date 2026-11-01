@@ -4,31 +4,55 @@
  */
 package org.fcitx.fcitx5.android.uat
 
+import android.net.Uri
 import android.os.Looper
+import android.text.SpannableString
 import android.view.View
+import android.view.inputmethod.BaseInputConnection
 import android.widget.EditText
 import android.widget.TextView
 import androidx.appcompat.app.AlertDialog
+import androidx.appcompat.widget.Toolbar
 import androidx.fragment.app.Fragment
 import androidx.preference.Preference
 import androidx.preference.PreferenceFragmentCompat
 import androidx.preference.PreferenceGroup
 import androidx.preference.TwoStatePreference
+import com.google.android.material.floatingactionbutton.FloatingActionButton
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.Uat
-import org.fcitx.fcitx5.android.core.FakeFcitxAPI
+import org.fcitx.fcitx5.android.core.FakeHostApi
 import org.fcitx.fcitx5.android.core.InputMethodEntry
+import org.fcitx.fcitx5.android.core.ShuangpinNames
+import org.fcitx.fcitx5.android.core.phoneStorage
+import org.fcitx.fcitx5.android.data.pinyin.CustomPhraseManager
+import org.fcitx.fcitx5.android.data.pinyin.customphrase.PinyinCustomPhrase
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
-import org.fcitx.fcitx5.android.engine.host.Engines
-import org.fcitx.fcitx5.android.engine.host.Engines.UserWord
+import org.fcitx.fcitx5.android.data.theme.ThemeManager
+import org.fcitx.fcitx5.android.engine.InputMethodCatalog
+import org.fcitx.fcitx5.android.engine.learn.Code
+import org.fcitx.fcitx5.android.engine.learn.Kinds
 import org.fcitx.fcitx5.android.engine.learn.control.LearningOp
 import org.fcitx.fcitx5.android.engine.learn.control.LearningResult
+import org.fcitx.fcitx5.android.engine.learn.control.ListedItem
+import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
+import org.fcitx.fcitx5.android.engine.runtime.UserWord
+import org.fcitx.fcitx5.android.host.HostEvent
 import org.fcitx.fcitx5.android.input.KeyboardHarness
+import org.fcitx.fcitx5.android.input.keyboard.ImKeyboard
+import org.fcitx.fcitx5.android.input.keyboard.ImKeyboards
+import org.fcitx.fcitx5.android.input.keyboard.TextKeyboard
+import org.fcitx.fcitx5.android.input.voice.VoiceFeature
+import org.fcitx.fcitx5.android.ui.main.settings.PinyinCustomPhraseFragment
 import org.fcitx.fcitx5.android.ui.main.settings.SettingsRoute
+import org.fcitx.fcitx5.android.ui.main.settings.UserWordsFragment
+import org.fcitx.fcitx5.android.until as waitUntil
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
+import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -36,6 +60,11 @@ import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 import org.robolectric.shadows.ShadowDialog
+import org.robolectric.shadows.ShadowToast
+import java.io.ByteArrayInputStream
+import java.io.ByteArrayOutputStream
+import java.time.Duration
+import java.util.concurrent.CountDownLatch
 
 /**
  * UAT cases of the settings app's pages over a fake engine (uat/01, 03, 13): the input methods,
@@ -47,7 +76,10 @@ import org.robolectric.shadows.ShadowDialog
 @Config(application = FcitxApplication::class, qualifiers = "w393dp-h851dp-port-440dpi")
 class SettingsPagesUatTest {
 
-    private val api = FakeFcitxAPI()
+    @Before
+    fun phone() = phoneStorage()
+
+    private val api = FakeHostApi()
     private val st = SettingsHarness(api)
     private val activity get() = st.activity
 
@@ -57,14 +89,8 @@ class SettingsPagesUatTest {
     private fun idle() = st.idle()
 
     // a page's work done off the main thread (a search, a list read): waited for, as a user would
-    private fun until(what: String, test: () -> Boolean) {
-        val deadline = System.currentTimeMillis() + 10_000
-        while (!test()) {
-            check(System.currentTimeMillis() < deadline) { "never: $what; shown ${shown()}" }
-            Thread.sleep(20)
-            shadowOf(Looper.getMainLooper()).idleFor(java.time.Duration.ofMillis(100))
-        }
-    }
+    private fun until(what: String, test: () -> Boolean) =
+        waitUntil(what, { "; shown ${shown()}" }, step = { shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(100)) }, done = test)
 
     private fun open(route: SettingsRoute) = st.open(route)
 
@@ -86,42 +112,46 @@ class SettingsPagesUatTest {
 
     private fun clickable(v: View): View = generateSequence(v) { it.parent as? View }.first { it.hasOnClickListeners() || it.isLongClickable }
 
-    private fun dialog() = ShadowDialog.getLatestDialog() as AlertDialog
+    // a dialog opened by a tap may show a looper turn later under load: wait for it rather than read null
+    private fun dialog(): AlertDialog {
+        until("a dialog showing") { ShadowDialog.getLatestDialog()?.isShowing == true }
+        return ShadowDialog.getLatestDialog() as AlertDialog
+    }
 
     private fun entry(name: String) = InputMethodEntry(name, name, "", "", name, "zh_CN", "androidengine", false)
 
     @Test
     @Uat("SET-03")
     fun theInputMethodsListed() {
-        api.availableIme = arrayOf(entry(Engines.PINYIN), entry(Engines.ENGLISH), entry(Engines.T9))
-        api.enabledIme = arrayOf(entry(Engines.PINYIN), entry(Engines.ENGLISH))
+        api.availableIme = arrayOf(entry(InputMethodCatalog.PINYIN), entry(InputMethodCatalog.ENGLISH), entry(InputMethodCatalog.WUBI))
+        api.enabledIme = arrayOf(entry(InputMethodCatalog.PINYIN), entry(InputMethodCatalog.ENGLISH))
         open(SettingsRoute.InputMethodList)
         until("listed") { "Pinyin" in shown() }
-        val rows = shown().filter { it in listOf("Pinyin", "English", "Pinyin (9 keys)") }
+        val rows = shown().filter { it in listOf("Pinyin", "English", "Wubi") }
         assertEquals(listOf("Pinyin", "English"), rows)
     }
 
+    // 0.4's 九键拼音 is pinyin's keyboard now (I1): none to add, 五笔 first
     @Test
-    @Uat("SET-04")
-    fun addingNineKeys() {
-        val all = listOf(Engines.PINYIN, Engines.ENGLISH, Engines.WUBI, "engine-erbi", "engine-cangjie", "engine-ziranma", Engines.SHUANGPIN, "engine-wubipinyin", Engines.HANDWRITING, Engines.T9)
+    @Uat("SET-12")
+    fun addingAnInputMethodOffersNoNineKeysAndWubiFirst() {
+        val all = listOf(InputMethodCatalog.PINYIN, InputMethodCatalog.ENGLISH, "engine-erbi", "engine-cangjie", InputMethodCatalog.WUBI, "engine-ziranma", InputMethodCatalog.SHUANGPIN, "engine-wubipinyin", InputMethodCatalog.HANDWRITING)
         api.availableIme = all.map(::entry).toTypedArray()
-        api.enabledIme = arrayOf(entry(Engines.PINYIN), entry(Engines.ENGLISH))
+        api.enabledIme = arrayOf(entry(InputMethodCatalog.PINYIN), entry(InputMethodCatalog.ENGLISH))
         open(SettingsRoute.InputMethodList)
         until("listed") { "Pinyin" in shown() }
-        KeyboardHarness.all(activity.window.decorView).filterIsInstance<com.google.android.material.floatingactionbutton.FloatingActionButton>().single().performClick()
+        KeyboardHarness.all(activity.window.decorView).filterIsInstance<FloatingActionButton>().single().performClick()
         idle()
         val list = dialog().listView
         val items = (0 until list.adapter.count).map { list.adapter.getItem(it).toString() }
-        // the eight not added, nine keys first
-        assertEquals(8, items.size)
-        assertEquals("Pinyin (9 keys)", items.first())
+        assertEquals(7, items.size)
+        assertEquals("Wubi", items.first())
+        assertTrue(items.toString(), items.none { "9" in it })
         list.performItemClick(list.getChildAt(0), 0, 0)
         idle()
-        until("added") { "Pinyin (9 keys)" in shown() }
-        assertEquals("Pinyin (9 keys)", shown().filter { it in listOf("Pinyin", "English", "Pinyin (9 keys)") }.last())
+        until("added") { "Wubi" in shown() }
         until("saved") { api.calls.any { it.startsWith("setEnabledIme") } }
-        assertTrue(api.calls.toString(), api.calls.last { it.startsWith("setEnabledIme") }.endsWith("${Engines.T9})"))
+        assertTrue(api.calls.toString(), api.calls.last { it.startsWith("setEnabledIme") }.endsWith("${InputMethodCatalog.WUBI})"))
     }
 
     // a key of the nine keys' page: its card, read out as its letters and digit
@@ -146,8 +176,8 @@ class SettingsPagesUatTest {
             editKey('7', "prs")
             editKey('3', "")
             // the keyboard made after: 7's long press without q, 3's symbols a row of up to five
-            KeyboardHarness(im = KeyboardHarness.T9).use { h ->
-                h.api.availableIme = arrayOf(KeyboardHarness.PINYIN, KeyboardHarness.T9, KeyboardHarness.ENGLISH)
+            KeyboardHarness(im = KeyboardHarness.PINYIN, keyboards = KeyboardHarness.NINE_KEYS).use { h ->
+                h.api.availableIme = arrayOf(KeyboardHarness.PINYIN, KeyboardHarness.ENGLISH)
                 h.api.enabledIme = h.api.availableIme
                 h.start()
                 val seven = h.longPressed('7')
@@ -183,8 +213,9 @@ class SettingsPagesUatTest {
             editKey('1', "a")
             assertEquals(before, symbols.getValue())
             editKey('1', "， 。")
-            KeyboardHarness(im = KeyboardHarness.T9).use { h ->
-                h.api.availableIme = arrayOf(KeyboardHarness.PINYIN, KeyboardHarness.T9, KeyboardHarness.ENGLISH)
+            val nine = ImKeyboards.Chosen(pinyin = ImKeyboard.NINE_KEYS, english = ImKeyboard.NINE_KEYS)
+            KeyboardHarness(im = KeyboardHarness.PINYIN, keyboards = nine).use { h ->
+                h.api.availableIme = arrayOf(KeyboardHarness.PINYIN, KeyboardHarness.ENGLISH)
                 h.api.enabledIme = h.api.availableIme
                 h.start()
                 val five = h.longPressed('5')
@@ -192,8 +223,7 @@ class SettingsPagesUatTest {
                 val one = h.longPressed('1')
                 assertTrue(one.toString(), "，" in one && "。" in one && "…" !in one)
                 // nine keys English's 1: its own marks, half width, not the pinyin's
-                h.tap(h.key("中/英"))
-                h.emit(org.fcitx.fcitx5.android.core.FcitxEvent.IMChangeEvent(KeyboardHarness.ENGLISH))
+                h.emit(HostEvent.InputMethodChanged(KeyboardHarness.ENGLISH))
                 val english = h.longPressed('1')
                 assertTrue(english.toString(), english.containsAll(listOf(":", ";", "(", ")", "@")) && "，" !in english && "：" !in english)
             }
@@ -284,7 +314,7 @@ class SettingsPagesUatTest {
         )
         val titles = prefs.map { it.title.toString() }
         for (kind in UserWord.Kind.entries) {
-            assertTrue("${kind.name} in $titles", s(org.fcitx.fcitx5.android.ui.main.settings.UserWordsFragment.title(kind)) in titles)
+            assertTrue("${kind.name} in $titles", s(UserWordsFragment.title(kind)) in titles)
         }
         open(SettingsRoute.UserWordList(UserWord.Kind.LEARNED.name))
         until("listed") { "汪小明" in shown() }
@@ -307,11 +337,289 @@ class SettingsPagesUatTest {
         val prefs = preferences((page as PreferenceFragmentCompat).preferenceScreen)
         val libri = prefs.firstOrNull { it.title == "LibriSpeech" }
         // the voice build credits it; the text build has no voice model, nor the entry
-        assertEquals(org.fcitx.fcitx5.android.input.voice.VoiceFeature.AVAILABLE, libri != null)
+        assertEquals(VoiceFeature.AVAILABLE, libri != null)
         if (libri == null) return
         assertEquals("CC-BY-4.0", libri.summary.toString())
         libri.performClick()
         idle()
         assertEquals("https://www.openslr.org/12/", shadowOf(activity).nextStartedActivity.dataString)
+    }
+
+    private fun listedPage(what: LearningOp.Listed, items: List<ListedItem>) {
+        api.learned = { op -> if (op is LearningOp.ListItems && op.what == what) LearningResult.Listed(items) else LearningResult.Done() }
+        open(SettingsRoute.LearnedItems(what.name))
+        until("listed") { st.titles().containsAll(items.map { it.text }) }
+    }
+
+    private fun said(text: String) = st.pref(text).summary.toString()
+
+    @Test
+    @Uat("PY-94")
+    fun aPinOnTheFourteenKeysSaysSoAndShowsItsLetters() {
+        // as the engine lists a pin made on AS GH UI (WordsUatTest.aPinOnTheFourteenKeysIsListedUnderItsKeys)
+        val keys = NineKeyLetters.G14.typings("shi").single()
+        listedPage(LearningOp.Listed.PINS, listOf(ListedItem(Code(Kinds.keys(NineKeyLetters.G14.tag()), keys), "", "时")))
+        assertEquals(s(R.string.learning_pinned_detail, "as gh ui", s(R.string.learning_kind_keys14)), said("时"))
+    }
+
+    @Test
+    @Uat("SP-19")
+    fun aPinOnTheEighteenKeysSaysSoWithItsSchemeAndLetters() {
+        // as the engine lists them (WordsUatTest.pinsOnTheEighteenKeysAndTheFullListedUnderTheirKinds)
+        val keys18 = "${NineKeyLetters.G18.key('u')}${NineKeyLetters.G18.key('i')}"
+        listedPage(
+            LearningOp.Listed.PINS,
+            listOf(
+                ListedItem(Code(Kinds.shuangpinKeys("Ziranma", NineKeyLetters.G18.tag()), keys18), "", "时"),
+                ListedItem(Code(Kinds.shuangpin("Ziranma"), "ui"), "", "使"),
+            ),
+        )
+        val ziranma = ShuangpinNames.of(activity, "Ziranma")!!
+        val keyboard18 = s(R.string.learning_kind_with_scheme, s(R.string.learning_kind_shuangpin_keys18), ziranma)
+        assertEquals(s(R.string.learning_pinned_detail, "u io", keyboard18), said("时"))
+        val full = s(R.string.learning_kind_with_scheme, s(R.string.learning_kind_shuangpin), ziranma)
+        assertEquals(s(R.string.learning_pinned_detail, "ui", full), said("使"))
+    }
+
+    @Test
+    @Uat("PY-72")
+    fun aPredictionTurnedOffListedUnderBlockedAndTakenBack() {
+        var listed = listOf(ListedItem(null, "你好", "啊"))
+        api.learned = { op ->
+            when (op) {
+                LearningOp.Overview -> LearningResult.Overview(0, 0, 0, 0, listed.size, true)
+                is LearningOp.ListItems -> LearningResult.Listed(if (op.what == LearningOp.Listed.NO_PREDICT) listed else emptyList())
+                is LearningOp.RemoveItems -> {
+                    listed = listed - op.items.toSet()
+                    LearningResult.Done()
+                }
+                else -> LearningResult.Done()
+            }
+        }
+        // in the lexicon page, right under the blocked words
+        open(SettingsRoute.UserWords)
+        val titles = st.titles()
+        val blocked = titles.indexOf(s(UserWordsFragment.title(UserWord.Kind.BLOCKED)))
+        assertEquals(titles.toString(), blocked + 1, titles.indexOf(s(R.string.my_words_no_predict)))
+        open(SettingsRoute.UserWordList(UserWord.Kind.BLOCKED.name))
+        val row = s(R.string.learning_no_predict_entry, 1)
+        until("the row on top") { row in shown() }
+        view(row).performClick()
+        until("listed") { "啊" in st.titles() }
+        assertEquals(s(R.string.learning_no_predict_detail, "你好"), said("啊"))
+        st.pref("啊").performClick()
+        idle()
+        val again = dialog().getButton(AlertDialog.BUTTON_POSITIVE)
+        assertEquals(s(R.string.learning_suggest_again), again.text.toString())
+        again.performClick()
+        until("taken back") { "啊" !in st.titles() }
+        assertTrue(api.calls.toString(), api.calls.any { it.startsWith("learning(RemoveItems") && "你好" in it })
+    }
+
+    @Test
+    @Uat("EN-04", "EN-26")
+    fun anEnglishWordNoLongerCorrectedIsMarkedAndCorrectedAgainOnATap() {
+        api.englishWords += UserWord("teh", "", UserWord.Kind.LEARNED, count = 1f, neverCorrected = true)
+        api.learned = { op ->
+            if (op is LearningOp.RestoreCorrection) {
+                api.englishWords.replaceAll { if (it.text in op.texts) it.copy(neverCorrected = false) else it }
+            }
+            LearningResult.Done()
+        }
+        open(SettingsRoute.UserWordList(UserWord.Kind.LEARNED.name, english = true))
+        until("listed") { "teh" in shown() }
+        assertEquals(s(R.string.english_word_learned), shown()[shown().indexOf("teh") + 1])
+        act("teh", R.string.english_restore_correction)
+        until("corrected again") { shown().getOrNull(shown().indexOf("teh") + 1).let { it != null && it != s(R.string.english_word_learned) } }
+        assertTrue(api.calls.toString(), "learning(RestoreCorrection(texts=[teh]))" in api.calls)
+    }
+
+    private fun wordDialog(text: String, pinyin: String) {
+        val d = dialog()
+        val (t, p) = KeyboardHarness.all(d.window!!.decorView).filterIsInstance<EditText>().toList()
+        t.setText(text)
+        p.setText(pinyin)
+        d.getButton(AlertDialog.BUTTON_POSITIVE).performClick()
+        idle()
+    }
+
+    // a row tapped, one of what its dialog offers picked
+    private fun act(word: String, action: Int) {
+        clickable(view(word)).performClick()
+        idle()
+        val l = dialog().listView
+        val items = (0 until l.adapter.count).map { l.adapter.getItem(it).toString() }
+        val at = items.indexOf(s(action))
+        assertTrue(items.toString(), at >= 0)
+        l.performItemClick(null, at, at.toLong())
+        idle()
+    }
+
+    private fun addedCount(): String {
+        open(SettingsRoute.UserWords)
+        val title = UserWordsFragment.title(UserWord.Kind.ADDED)
+        until("counted") { !st.pref(title).summary.isNullOrEmpty() }
+        return st.pref(title).summary.toString()
+    }
+
+    @Test
+    @Uat("WD-03")
+    fun aWordAddedByHandListedCountedEditedDeleted() {
+        api.learned = { op ->
+            if (op is LearningOp.RemoveWords) api.userWords.removeAll(op.words.toSet())
+            LearningResult.Done()
+        }
+        assertEquals(activity.resources.getQuantityString(R.plurals.word_count, 0, 0), addedCount())
+        open(SettingsRoute.UserWordList(UserWord.Kind.ADDED.name))
+        KeyboardHarness.all(activity.window.decorView).filterIsInstance<FloatingActionButton>().single().performClick()
+        idle()
+        wordDialog("澜境花园", "lan jing hua yuan")
+        until("listed") { "澜境花园" in shown() }
+        assertTrue(api.calls.toString(), "addUserWord(澜境花园, lan jing hua yuan)" in api.calls)
+        assertEquals(activity.resources.getQuantityString(R.plurals.word_count, 1, 1), addedCount())
+        open(SettingsRoute.UserWordList(UserWord.Kind.ADDED.name))
+        until("listed") { "澜境花园" in shown() }
+        act("澜境花园", R.string.edit)
+        // filled in with the word's own
+        val fields = KeyboardHarness.all(dialog().window!!.decorView).filterIsInstance<EditText>().map { it.text.toString() }.toList()
+        assertEquals(listOf("澜境花园", "lan jing hua yuan"), fields)
+        wordDialog("澜境公园", "lan jing gong yuan")
+        until("edited") { "澜境公园" in shown() && "澜境花园" !in shown() }
+        assertTrue(api.calls.toString(), "addUserWord(澜境公园, lan jing gong yuan)" in api.calls)
+        act("澜境公园", R.string.delete)
+        until("deleted") { "澜境公园" !in shown() }
+        assertTrue(api.userWords.toString(), api.userWords.isEmpty())
+    }
+
+    private fun phraseDialog(key: String?, order: String?, phrase: String?, button: Int = AlertDialog.BUTTON_POSITIVE) {
+        val d = dialog()
+        val fields = KeyboardHarness.all(d.window!!.decorView).filterIsInstance<EditText>().toList()
+        listOf(key, order, phrase).zip(fields).forEach { (v, f) -> if (v != null) f.setText(v) }
+        d.getButton(button).performClick()
+        idle()
+    }
+
+    // the page left, as going back to type: it saves then, and the engine reads it again
+    private fun phrasesSaved(): List<String> {
+        open(SettingsRoute.About)
+        until("saved") { "reloadEngine()" in api.calls }
+        api.calls.clear()
+        return CustomPhraseManager.load().map { "${it.key},${it.order}=${it.value}" }
+    }
+
+    // a tap on the row's text, not its pen
+    private fun tapPhrase(text: String) {
+        open(SettingsRoute.PinyinCustomPhrase)
+        until("listed") { shown().any { text in it } }
+        clickable(KeyboardHarness.all(activity.window.decorView).first { it.isShown && it is TextView && text in it.text }).performClick()
+        idle()
+    }
+
+    @Test
+    @Uat("WD-18", "WD-35")
+    fun aCustomPhraseAddedEditedOnItsRowAndDeleted() {
+        CustomPhraseManager.save(emptyList())
+        try {
+            open(SettingsRoute.PinyinCustomPhrase)
+            KeyboardHarness.all(activity.window.decorView).filterIsInstance<FloatingActionButton>().single().performClick()
+            idle()
+            // the key field's filter makes capitals lowercase as they are typed, so every keyboard reaches
+            // it; a capital being composed keeps its input method's composing span on the letter made
+            // lowercase, else one that composes and then appends would type the letters twice (F4955; F4973:
+            // the capital, not a letter already lowercase, is what reaches that branch)
+            val key = KeyboardHarness.all(dialog().window!!.decorView).filterIsInstance<EditText>().first()
+            key.setText("DZ")
+            val typed = SpannableString("Xx").also { BaseInputConnection.setComposingSpans(it) }
+            key.text.replace(2, 2, typed, 0, 1)
+            assertEquals("dzx", key.text.toString())
+            assertEquals(2 to 3, BaseInputConnection.getComposingSpanStart(key.text) to BaseInputConnection.getComposingSpanEnd(key.text))
+            key.text.delete(2, 3)
+            phraseDialog(null, "1", "北京市海淀区")
+            assertEquals(listOf("dz,1=北京市海淀区"), phrasesSaved())
+            tapPhrase("北京市海淀区")
+            val filled = KeyboardHarness.all(dialog().window!!.decorView).filterIsInstance<EditText>().map { it.text.toString() }.toList()
+            assertEquals(listOf("dz", "1", "北京市海淀区"), filled)
+            phraseDialog(null, null, "上海市")
+            assertEquals(listOf("dz,1=上海市"), phrasesSaved())
+            tapPhrase("上海市")
+            assertEquals(s(R.string.delete), dialog().getButton(AlertDialog.BUTTON_NEUTRAL).text.toString())
+            phraseDialog(null, null, null, AlertDialog.BUTTON_NEUTRAL)
+            assertEquals(emptyList<String>(), phrasesSaved())
+        } finally {
+            CustomPhraseManager.save(emptyList())
+        }
+    }
+
+    // F4974: the page could be edited while its file was still being read, and what was added then was
+    // taken for the file's and never saved; F5001: import and export, off till the read ends; F5003: an
+    // import delivered before the read (the activity made anew under the picker) waits for it; F5008: so
+    // does an export, which wrote an empty file
+    @Test
+    @Uat("WD-37")
+    fun nothingIsAddedToTheCustomPhrasesBeforeTheirFileIsRead() {
+        CustomPhraseManager.save(listOf(PinyinCustomPhrase("bj", 1, "北京")))
+        val read = CountDownLatch(1)
+        val load = PinyinCustomPhraseFragment.load
+        PinyinCustomPhraseFragment.load = { read.await(); load() }
+        try {
+            open(SettingsRoute.PinyinCustomPhrase)
+            idle()
+            val fab = KeyboardHarness.all(activity.window.decorView).filterIsInstance<FloatingActionButton>().single()
+            assertNotEquals(View.VISIBLE, fab.visibility)
+            val menu = KeyboardHarness.all(activity.window.decorView).filterIsInstance<Toolbar>().first().menu
+            fun usable() = listOf(R.string.import_file, R.string.export_file).map { id ->
+                (0 until menu.size()).map(menu::getItem).single { it.title.toString() == s(id) }.isEnabled
+            }
+            assertEquals(listOf(false, false), usable())
+            // the file's phrase again, which is not added twice, and a new one
+            val file = Uri.parse("content://phrases.test/import.txt")
+            shadowOf(activity.contentResolver).registerInputStream(file, ByteArrayInputStream("bj,1=北京\nsh,1=上海\n".toByteArray()))
+            (page as PinyinCustomPhraseFragment).importPhrases(file)
+            // an export delivered before the read too (F5008): the file's phrase, not an empty file
+            val exportTo = Uri.parse("content://phrases.test/export.txt")
+            val exported = ByteArrayOutputStream()
+            shadowOf(activity.contentResolver).registerOutputStream(exportTo, exported)
+            (page as PinyinCustomPhraseFragment).exportPhrases(exportTo)
+            idle()
+            read.countDown()
+            until("listed") { shown().any { "上海" in it } }
+            until("addable") { fab.visibility == View.VISIBLE }
+            until("importable") { usable() == listOf(true, true) }
+            until("exported") { "bj,1=北京" in exported.toString(Charsets.UTF_8) }
+            // the file's phrase not counted again
+            assertEquals(s(R.string.import_phrases_done, 1), ShadowToast.getTextOfLatestToast())
+            assertEquals(listOf("bj,1=北京", "sh,1=上海"), phrasesSaved())
+        } finally {
+            read.countDown()
+            PinyinCustomPhraseFragment.load = load
+            CustomPhraseManager.save(emptyList())
+        }
+    }
+
+    @Test
+    @Uat("MN-22")
+    fun thePreviewsBarFollowsTheCandidateSizeOnThePage() {
+        val size = ThemeManager.prefs.candidateTextSize
+        try {
+            st.activity
+            st.open(SettingsRoute.Theme)
+            st.tab(1)
+            // the preview's keys: where they start under the bar, and how tall they are
+            fun keys(): Pair<Int, Int> {
+                st.tab(1)
+                val k = KeyboardHarness.find<TextKeyboard>(st.activity.window.decorView)!!
+                val at = IntArray(2).also { k.getLocationInWindow(it) }
+                return at[1] to k.height
+            }
+            val (top, height) = keys()
+            size.setValue(28)
+            val (bigTop, bigHeight) = keys()
+            size.setValue(14)
+            val (smallTop, smallHeight) = keys()
+            assertTrue("$smallTop < $top < $bigTop", smallTop < top && top < bigTop)
+            assertEquals(listOf(height, height), listOf(bigHeight, smallHeight))
+        } finally {
+            size.setValue(size.defaultValue)
+        }
     }
 }

@@ -15,9 +15,9 @@ import android.view.View
 import android.widget.TextView
 import androidx.annotation.ColorInt
 import androidx.core.text.buildSpannedString
-import org.fcitx.fcitx5.android.core.FcitxEvent
 import org.fcitx.fcitx5.android.core.toSpannedString
 import org.fcitx.fcitx5.android.data.theme.Theme
+import org.fcitx.fcitx5.android.host.HostEvent
 import splitties.dimensions.dp
 import splitties.views.dsl.core.Ui
 import splitties.views.dsl.core.add
@@ -78,7 +78,7 @@ open class PreeditUi(
         view.visibility = if (visible) View.VISIBLE else View.GONE
     }
 
-    open fun update(inputPanel: FcitxEvent.InputPanelEvent.Data) {
+    open fun update(inputPanel: HostEvent.InputPanel) {
         val activeBkg = theme.genericActiveBackgroundColor
         val upString: SpannedString
         val upCursor: Int

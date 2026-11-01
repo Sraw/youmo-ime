@@ -13,10 +13,13 @@ import org.fcitx.fcitx5.android.engine.pinyin.Fuzzy
 import org.fcitx.fcitx5.android.engine.pinyin.PinyinSegmenter
 import org.fcitx.fcitx5.android.engine.pinyin.Syllables
 import org.fcitx.fcitx5.android.engine.pinyin.T9Segmenter
+import org.fcitx.fcitx5.android.engine.platform.jvm.JvmFile
 import org.fcitx.fcitx5.android.engine.user.DictionaryCompiler
 import org.fcitx.fcitx5.android.engine.user.DictionaryFile
 import org.fcitx.fcitx5.android.engine.user.UserModel
 import org.fcitx.fcitx5.android.engine.user.UserScorer
+import org.fcitx.fcitx5.android.engine.user.addCount
+import org.fcitx.fcitx5.android.engine.user.learn
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
@@ -590,7 +593,7 @@ class PinyinDecoderTest {
             file,
             inBase = DictionaryCompiler.inBase(data),
         )
-        return UserModel(data.dictionary, data.vocabulary, data.wordIndex, DictionaryFile.open(file))
+        return UserModel(data.dictionary, data.vocabulary, data.wordIndex, DictionaryFile.open(JvmFile(file)))
     }
 
     // review MUST-2/S6: a merged file's words come in its order, one without a weight after all weighted

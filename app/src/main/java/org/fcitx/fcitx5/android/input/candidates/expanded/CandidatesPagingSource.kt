@@ -7,10 +7,10 @@ package org.fcitx.fcitx5.android.input.candidates.expanded
 import androidx.paging.PagingSource
 import androidx.paging.PagingState
 import org.fcitx.fcitx5.android.core.CandidateWord
-import org.fcitx.fcitx5.android.daemon.FcitxConnection
+import org.fcitx.fcitx5.android.daemon.HostConnection
 import timber.log.Timber
 
-class CandidatesPagingSource(val fcitx: FcitxConnection, val total: Int, val offset: Int) :
+class CandidatesPagingSource(val fcitx: HostConnection, val total: Int, val offset: Int) :
     PagingSource<Int, CandidateWord>() {
 
     override suspend fun load(params: LoadParams<Int>): LoadResult<Int, CandidateWord> {

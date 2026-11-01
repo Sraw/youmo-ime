@@ -10,32 +10,35 @@ import org.fcitx.fcitx5.android.engine.learn.ImportedWords
 import org.fcitx.fcitx5.android.engine.learn.ImportedWords.Incoming
 import org.fcitx.fcitx5.android.engine.learn.Kinds
 import org.fcitx.fcitx5.android.engine.learn.LearnClock
-import org.fcitx.fcitx5.android.engine.learn.LearnRecord
 import org.fcitx.fcitx5.android.engine.learn.LearnLog
+import org.fcitx.fcitx5.android.engine.learn.LearnRecord
 import org.fcitx.fcitx5.android.engine.learn.LearnState
 import org.fcitx.fcitx5.android.engine.learn.control.BackupOp
 import org.fcitx.fcitx5.android.engine.learn.control.LearningResult
 import org.fcitx.fcitx5.android.engine.learn.corrected
+import org.fcitx.fcitx5.android.engine.platform.MemoryFiles
+import org.fcitx.fcitx5.android.engine.platform.write
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
-import org.junit.Rule
 import org.junit.Test
-import org.junit.rules.TemporaryFolder
-import java.io.File
 import java.io.IOException
 
 class BackupControlTest {
-    @get:Rule
-    val folder = TemporaryFolder()
+
+    private val root = MemoryFiles()
 
     private val clock = FakeClock()
-    private val log by lazy { LearnLog(File(folder.root, LearnLog.FILE), clock).apply { open() } }
+    private val log by lazy { LearnLog(root.file(LearnLog.FILE), clock).apply { open() } }
     private val added = LinkedHashSet<ListedWord>()
     private val blocked = LinkedHashSet<ListedWord>()
     private val imported = ArrayList<String>()
+
+    // the app's address book, as AddressStore keeps it: a merge noted, the merge itself AddressBook's
+    private var book = AddressData("", "")
+    private val puts = ArrayList<Pair<AddressData, Boolean>>()
 
     @After
     fun close() = log.close()
@@ -44,9 +47,8 @@ class BackupControlTest {
     private var importFails = false
     private var importFailsAfterAdding = false
     private var importFailsAfterLearning = false
-    private var converting = false
 
-    private fun control(backups: Backups = Backups(File(folder.root, Backups.DIR), 1L), logBytes: (() -> ByteArray?)? = null) = BackupControl(
+    private fun control(backups: Backups = Backups(root.dir(Backups.DIR), 1L), logBytes: (() -> ByteArray?)? = null) = BackupControl(
         backups, clock, "test",
         state = { log.state },
         lists = { added.toList() to blocked.toList() },
@@ -66,7 +68,7 @@ class BackupControlTest {
                 imported += line
                 line.split(' ').takeIf { it.size == 2 && !line.startsWith("#") }?.let { (text, code) -> added += ListedWord(text, code) }
             }
-            // as UserLexicon.importWords' second write, its blocks, failing after the first
+            // as WordImport.importWords' second write, its blocks, failing after the first
             if (importFailsAfterAdding) throw IOException("the blocks were not written")
             // as its learning lines, part written: the log changed, the lists not
             if (importFailsAfterLearning) {
@@ -75,13 +77,20 @@ class BackupControlTest {
             }
         },
         logBytes = logBytes,
-        conversionPending = { converting },
+        addresses = { book },
+        putAddresses = { d, merge ->
+            puts += d to merge
+            book = if (merge) AddressData(lines(book.counts, d.counts), lines(book.addresses, d.addresses)) else d
+        },
     )
+
+    // a book's lines joined as a book: not a merge's counts, which BackupMerge's tests have
+    private fun lines(a: String, b: String) = listOf(a, b).filter { it.isNotEmpty() }.joinToString("\n")
 
     private fun learn(text: String) = log.record(listOf(corrected("ni", text, "ni")))
 
     // what a restart would read: the log on disk replayed
-    private fun onDisk() = LearnLog.replay(File(folder.root, LearnLog.FILE).readBytes()).dump().substringAfter('\n')
+    private fun onDisk() = LearnLog.replay(root.file(LearnLog.FILE).read()).dump().substringAfter('\n')
 
     private fun now() = log.state.dump().substringAfter('\n')
 
@@ -160,7 +169,7 @@ class BackupControlTest {
         assertTrue(control.run(BackupOp.Restore(backupOf(3L, "泥"))).ok)
         assertTrue(control.run(BackupOp.Revert).ok)
         assertEquals(stored, BackupMerge.origins(log.state))
-        assertEquals(stored, BackupMerge.origins(LearnLog.replay(File(folder.root, LearnLog.FILE).readBytes())))
+        assertEquals(stored, BackupMerge.origins(LearnLog.replay(root.file(LearnLog.FILE).read())))
     }
 
     // review-int-records S3: a backup's batch is numbered past one the phone undid (F2811: whose 撤销 the restore ends)
@@ -194,7 +203,7 @@ class BackupControlTest {
             clock.days(1)
             learn("拟")
         }
-        val phone = control(Backups(File(folder.root, "carried"), 6L))
+        val phone = control(Backups(root.dir("carried"), 6L))
         phone.claim(log)
         val stats = statLines()
         assertTrue(phone.run(BackupOp.Restore(backup)).ok)
@@ -374,13 +383,14 @@ class BackupControlTest {
     // 退回恢复前's copy cut at its end: the revert fails, nothing half put back
     @Test
     fun aCopyBeforeCutAtItsEndDoesNotRevert() {
-        val backups = Backups(File(folder.root, Backups.DIR), 1L)
+        val backups = Backups(root.dir(Backups.DIR), 1L)
         val control = control(backups)
         learn("你")
         assertTrue(control.run(BackupOp.Restore(backupOf(2L, "拟"))).ok)
         val copy = checkNotNull(backups.beforeRestore())
-        val file = File(folder.root, Backups.DIR).walk().single { it.isFile && it.readBytes().contentEquals(copy) }
-        file.writeBytes(copy.copyOf(copy.size - LearnBackup.END_SIZE))
+        val dir = root.dir(Backups.DIR)
+        val file = dir.files().map(dir::file).single { it.read().contentEquals(copy) }
+        file.write(copy.copyOf(copy.size - LearnBackup.END_SIZE))
         val after = now()
         assertFalse(control.run(BackupOp.Revert).ok)
         assertEquals(after, now())
@@ -399,8 +409,8 @@ class BackupControlTest {
         added += ListedWord("幽默", "you'mo")
         val copy = checkNotNull(control().run(BackupOp.Copy).bytes)
         check(copy)
-        for (logBytes in listOf(null, { File(folder.root, LearnLog.FILE).readBytes() })) {
-            val dir = File(folder.root, "auto-${logBytes != null}")
+        for (logBytes in listOf(null, { root.file(LearnLog.FILE).read() })) {
+            val dir = root.dir("auto-${logBytes != null}")
             val control = control(Backups(dir, 1L), logBytes)
             control.afterCommit()
             check(checkNotNull(control.backups.read(control.backups.list().single().name)))
@@ -409,8 +419,8 @@ class BackupControlTest {
         assertTrue(control.run(BackupOp.Restore(backupOf(2L, "拟"))).ok)
         check(checkNotNull(control.backups.beforeRestore()))
         // the settings' zip carries Copy's bytes as they are
-        val stash = folder.newFolder("stash")
-        File(stash, RestoreStash.BACKUP).writeBytes(copy)
+        val stash = MemoryFiles()
+        stash.file(RestoreStash.BACKUP).write(copy)
         assertEquals(listOf(ListedWord("幽默", "you'mo")), RestoreStash.read(stash, {}).added)
     }
 
@@ -434,20 +444,6 @@ class BackupControlTest {
         assertTrue(control.backups.list().isEmpty())
     }
 
-    // F3024, F3077: none made while an older build's learning is still to be converted in, due still; one once it is
-    @Test
-    fun noAutomaticBackupWhileAConversionIsOwed() {
-        val control = control()
-        learn("拟")
-        converting = true
-        control.afterCommit()
-        assertTrue(control.backups.list().isEmpty())
-        assertTrue(control.backups.due(log.state.day))
-        converting = false
-        control.afterCommit()
-        assertEquals(1, control.backups.list().size)
-    }
-
     // F2991, F3091: a clock set back after a commit times the backup no earlier than that commit's minute, so a clear from it drops it
     @Test
     fun aBackupAfterTheClockSetBackIsTimedAtItsLastCommit() {
@@ -466,7 +462,7 @@ class BackupControlTest {
     // DE-S2: made of the log as on disk, off the keyboard's thread
     @Test
     fun anAutomaticBackupIsMadeOfTheLogOnDisk() {
-        val control = control(logBytes = { File(folder.root, LearnLog.FILE).readBytes() })
+        val control = control(logBytes = { root.file(LearnLog.FILE).read() })
         learn("拟")
         control.afterCommit()
         val kept = control.backups.list().single()
@@ -477,11 +473,43 @@ class BackupControlTest {
     // an install of no id (its file unwritable) makes none, and takes no backup for its own
     @Test
     fun anInstallOfNoIdMakesNone() {
-        val control = control(Backups(File(folder.root, Backups.DIR), 0L))
+        val control = control(Backups(root.dir(Backups.DIR), 0L))
         learn("拟")
         control.afterCommit()
         control.saveIfOn()
         assertTrue(control.backups.list().isEmpty())
         assertFalse(control.run(BackupOp.Peek(backupOf(0L))).own)
+    }
+
+    @Test
+    fun theAddressBarsBookGoesWithEachBackupAndComesBackMerged() {
+        val control = control()
+        book = AddressData("1\t@qq.com", "1\ta@qq.com")
+        learn("拟")
+        control.afterCommit()
+        val auto = control.backups.list().single()
+        assertEquals(book, LearnBackup.read(control.backups.read(auto.name)!!).addresses)
+        assertEquals(book, LearnBackup.read(control.bytes(BackupHead.SAVED)).addresses)
+        // another's restored: merged in; 退回恢复前: the phone's as it was, whole
+        val other = LearnBackup.bytes(BackupHead(0, 0, 2L, BackupHead.SAVED), LearnState(), emptyList(), emptyList(), AddressData("2\t@163.com", "1\tb@163.com"))
+        control.run(BackupOp.Restore(other))
+        assertEquals(listOf(AddressData("2\t@163.com", "1\tb@163.com") to true), puts)
+        assertTrue(control.run(BackupOp.Revert).ok)
+        assertEquals(AddressData("1\t@qq.com", "1\ta@qq.com") to false, puts.last())
+        assertEquals(AddressData("1\t@qq.com", "1\ta@qq.com"), book)
+    }
+
+    @Test
+    fun aBackupMadeBeforeAddressesWentWithItLeavesThemAsTheyAre() {
+        val control = control()
+        book = AddressData("1\t@qq.com", "1\ta@qq.com")
+        // v0.4.0's: none in it
+        control.run(BackupOp.Restore(backupOf(2L, "你")))
+        assertEquals(emptyList<Pair<AddressData, Boolean>>(), puts)
+        // a copy before made by v0.4.0, taken back: as they are
+        control.backups.saveBeforeRestore(backupOf(1L, "拟"))
+        assertTrue(control.run(BackupOp.Revert).ok)
+        assertEquals(emptyList<Pair<AddressData, Boolean>>(), puts)
+        assertEquals(AddressData("1\t@qq.com", "1\ta@qq.com"), book)
     }
 }

@@ -38,6 +38,9 @@ from uat import PKG, Device, Blocked, ensure_ime, home, ime_ready, script  # noq
 FIXTURES = os.path.join(UAT_DIR, "fixtures", "upgrade")
 EXTERNAL = f"/data/media/0/Android/data/{PKG}/files"
 DATA = f"/data/data/{PKG}"
+# where this build keeps fcitx's config/ and data/: moved in from EXTERNAL at the first start (ConfigHome)
+HOST_CONFIG = f"{DATA}/files/host-config"
+HOST_DATA = f"{DATA}/files/host-data"
 DE = f"/data/user_de/0/{PKG}"   # device-protected: the old builds' synced native data and direct-boot prefs
 PREFS = f"{DATA}/shared_prefs/{PKG}_preferences.xml"
 
@@ -45,6 +48,8 @@ PREFS = f"{DATA}/shared_prefs/{PKG}_preferences.xml"
 # simplified or, 繁体 being on, traditional
 PHRASE = ("北京市海淀区", "北京市海淀區")   # OpenCC s2tw keeps the place name 海淀
 LEARNED = ("鲸喵屿", "鯨喵嶼")
+# fixtures whose learning this build no longer reads, nor restores their backups (exception_user_data_too_old)
+UNREAD_LEARNING = ("v0.3.0",)
 
 
 def device(port):
@@ -129,10 +134,12 @@ def ini_values(text):
     return out
 
 
-def file_checks(d, version=None):
+def file_checks(d, version=None, old=False):
     """version: gate 2's fixture, restored before the new build's first start; None for gate 3's
-    restores, where user_de is whatever the installed build left (a 0.3.x one syncs its data there)"""
+    restores, where user_de is whatever the installed build left (a 0.3.x one syncs its data there).
+    old: a v0.3.x build is installed (gate 3's new → v0.3.x), which keeps config/ and data/ on EXTERNAL"""
     res = []
+    config, data = (f"{EXTERNAL}/config", f"{EXTERNAL}/data") if old else (HOST_CONFIG, HOST_DATA)
 
     def item(name, ok, got):
         res.append({"item": name, "ok": bool(ok), "got": got})
@@ -142,18 +149,22 @@ def file_checks(d, version=None):
     item("括号成对 关 (prefs auto_pairs)", m and m.group(1) == "false", m and m.group(1))
     m = re.search(r'name="keyboard_height_percent" value="(\d+)"', prefs)
     item("键盘高度 高 (prefs keyboard_height_percent 34)", m and m.group(1) == "34", m and m.group(1))
-    engine = ini_values(cat(d, f"{EXTERNAL}/config/conf/androidengine.conf"))
+    engine = ini_values(cat(d, f"{config}/conf/androidengine.conf"))
     item("性能档位 中档 (androidengine.conf)", engine.get("ModelLevel") == "Medium", engine.get("ModelLevel"))
-    profile = ini_values(cat(d, f"{EXTERNAL}/config/profile"))
+    profile = ini_values(cat(d, f"{config}/profile"))
     ims = [profile[k] for k in sorted(profile) if re.fullmatch(r"Groups/0/Items/\d+/Name", k)]
     item("输入法 拼音、英文、双拼 (profile)", ims == ["engine-pinyin", "keyboard-us", "engine-shuangpin"], ims)
-    trad = ini_values(cat(d, f"{EXTERNAL}/config/conf/chttrans.conf"))
+    trad = ini_values(cat(d, f"{config}/conf/chttrans.conf"))
     item("繁体 (chttrans.conf EnabledIM)", "engine-pinyin" in [v for k, v in trad.items() if k.startswith("EnabledIM/")],
          trad)
-    punc = cat(d, f"{EXTERNAL}/data/punctuation/punc.mb.zh_CN")
+    punc = cat(d, f"{data}/punctuation/punc.mb.zh_CN")
     item("中文标点 , → 、 (punc.mb.zh_CN)", ", 、" in punc.splitlines(), [l for l in punc.splitlines() if l.startswith(",")])
-    phrase = cat(d, f"{EXTERNAL}/data/pinyin/customphrase")
+    phrase = cat(d, f"{data}/pinyin/customphrase")
     item("自定义短语 dz (customphrase)", "dz,1=北京市海淀区" in phrase.splitlines(), phrase.strip())
+    if version:
+        # the old copies deleted once the move is read back: one left there is a cleaner's or another app's to read
+        left = d.root(f"ls -d {EXTERNAL}/config {EXTERNAL}/data {EXTERNAL}/theme 2>/dev/null").split()
+        item("外部存储的旧副本已删 (Android/data config、data、theme)", not left, left)
     if version and "de" in names(version):
         # only a fixture with a de.tar put the old data there: else the item would pass unexercised;
         # the old native host's synced data (FcitxApplication.deleteNativeData) gone after the first start
@@ -165,7 +176,8 @@ def file_checks(d, version=None):
     return res
 
 
-def typed_checks(d):
+def typed_checks(d, version=None):
+    """version: gate 2's fixture; v0.3.0's learning is not read by this build (only 0.4.x converts it)"""
     res = []
 
     def item(name, ok, got):
@@ -187,7 +199,11 @@ def typed_checks(d):
     d.open_page("text")
     d.type("jingmiaoyu")
     c = d.cands()
-    item("学到的词: jingmiaoyu 第一个是鲸喵屿", c[:1] and c[0] in LEARNED, c[:3])
+    if version in UNREAD_LEARNING:
+        # candidates at all: typing broken by the upgrade must not pass as "not learned"
+        item(f"学到的词: {version} 的不再读，jingmiaoyu 有候选、第一个不是鲸喵屿", c[:1] and c[0] not in LEARNED, c[:3])
+    else:
+        item("学到的词: jingmiaoyu 第一个是鲸喵屿", c[:1] and c[0] in LEARNED, c[:3])
     d.open_page("text")
     d.type(",")
     time.sleep(0.8)
@@ -223,14 +239,14 @@ def first_start(d):
     d.open_settings()
 
 
-def check(d, out, version=None):
+def check(d, out, version=None, old=False):
     def run():
         first_start(d)
-        typed = typed_checks(d)
+        typed = typed_checks(d, version)
         # the settings page closed before the files are read (the host writes each change at once)
         d.sh("input keyevent KEYCODE_HOME")
         time.sleep(2)
-        return typed + file_checks(d, version)
+        return typed + file_checks(d, version, old)
     res = with_page(d, run)
     with open(out, "w") as f:
         json.dump(res, f, ensure_ascii=False, indent=1)
@@ -279,18 +295,39 @@ def backup(d, out):
     return new[0]
 
 
-def import_(d, zip_path):
+def pushed(d, zip_path):
+    """zip_path in Download, the media store told of it; its name there"""
     s15 = script("15-privacy-backup")
     name = f"gate-{int(time.time())}.zip"
     d.adb("push", zip_path, f"{s15.DOWNLOAD}/{name}", check=True)
     # the media store learns of a pushed file only when scanned: else the picker does not list it
     d.sh(f"am broadcast -a android.intent.action.MEDIA_SCANNER_SCAN_FILE -d file://{s15.DOWNLOAD}/{name}")
+    return name
+
+
+def import_(d, zip_path):
+    s15 = script("15-privacy-backup")
+    name = pushed(d, zip_path)
     first_start(d)
     warn, restarted = s15.restore(d, name)
     # restore() only reports a missing restart; a gate that restored without one must fail (F4089)
     # uat.check, not check: this file's own check (the gate step) shadows the import (F4160)
     uat.check(restarted, "恢复后应用没有重启")
     return f"restored {name}, restarted {restarted}"
+
+
+def import_refused(d, zip_path):
+    """a backup this build refuses (0.3.0's: exception_user_data_too_old): its error shown, no restart,
+    nothing of it restored"""
+    s15 = script("15-privacy-backup")
+    name = pushed(d, zip_path)
+    first_start(d)
+    # the error dialog naming 0.3.0 (exception_user_data_too_old, any locale), our process unchanged
+    s15.restore(d, name, refused="0.3.0")
+    # the fixture's 括号成对 关: a clean install's prefs never say so
+    m = re.search(r'name="auto_pairs" value="(\w+)"', cat(d, PREFS))
+    uat.check(not (m and m.group(1) == "false"), "被拒绝的备份仍改了设置（括号成对 关）")
+    return f"refused {name}"
 
 
 # --- gate 5
@@ -354,7 +391,7 @@ def perf(d, out, runs=5):
                     break
             run_ = {k: round(v * 1000) if v else None for k, v in
                     (("keyboard", t_kb), ("ready", t_ready), ("candidate", t_cand))}
-            m = re.search(r"Kotlin host ready in (\d+) ms", d.sh("logcat -d"))   # KotlinFcitx.startup's own
+            m = re.search(r"Kotlin host ready in (\d+) ms", d.sh("logcat -d"))   # KotlinHost.startup's own
             run_["host_log"] = int(m.group(1)) if m else None
             cold.append(run_)
             d.bksp(3)
@@ -399,9 +436,10 @@ def main():
         return
     d = device(port)
     try:
-        r = {"restore-files": lambda: restore_files(d, args[0]), "check": lambda: check(d, *args[:2]),
+        r = {"restore-files": lambda: restore_files(d, args[0]), "check": lambda: check(d, args[0], next((a for a in args[1:] if a != "--old"), None),
+                                                                      "--old" in args),
              "rewrite": lambda: rewrite(d), "backup": lambda: backup(d, args[0]),
-             "import": lambda: import_(d, args[0]),
+             "import": lambda: import_(d, args[0]), "import-refused": lambda: import_refused(d, args[0]),
              "perf": lambda: perf(d, args[0], int(args[1]) if len(args) > 1 else 5)}[step]()
         print(f"{step}: {r}")
     finally:

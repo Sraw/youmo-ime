@@ -11,8 +11,8 @@ import android.view.View
 import android.view.ViewGroup
 import androidx.recyclerview.widget.RecyclerView
 import org.fcitx.fcitx5.android.core.CandidateWord
-import org.fcitx.fcitx5.android.core.FcitxEvent.PagedCandidateEvent
 import org.fcitx.fcitx5.android.data.theme.ThemePreset
+import org.fcitx.fcitx5.android.host.HostEvent
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -46,8 +46,8 @@ class PagedCandidatesUiTest {
             onCandidateClick = { _, _ -> }, onCandidateAction = { _, _, _ -> }, onPrevPage = {}, onNextPage = {}
         )
         // no page before or after: the list is the candidate alone
-        val data = PagedCandidateEvent.Data(
-            arrayOf(CandidateWord("1", "你", "")), 0, PagedCandidateEvent.LayoutHint.NotSet, false, false
+        val data = HostEvent.Paged(
+            listOf(CandidateWord("1", "你", "")), 0, hasPrev = false, hasNext = false
         )
         ui.update(data, FloatingCandidatesOrientation.Horizontal)
         @Suppress("UNCHECKED_CAST")

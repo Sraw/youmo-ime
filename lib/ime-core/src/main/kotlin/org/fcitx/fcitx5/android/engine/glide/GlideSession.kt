@@ -40,8 +40,6 @@ class GlideSession(
     private val read: (Glide, limit: Int) -> List<GlideReading>,
 ) : Session by session {
 
-    private var offered: List<GlideReading> = emptyList()
-
     // the other readings' words, shown after the first candidate while the input is what the glide typed
     private var others: List<GlideReading> = emptyList()
 
@@ -56,14 +54,16 @@ class GlideSession(
 
     private val composing get() = last?.let(::typing) == true
 
-    /** The glide that the next [Action.Glide] types: [Glide.path] read now, on the thread the session is used on. */
-    fun offer(g: Glide) {
-        offered = read(g, readings)
-    }
+    /**
+     * [g] as the [Action.Glide] sent with it types it: [Glide.path] read now, on the thread the
+     * session is used on, before the key is sent, so that a path the decoders slip on loses the
+     * glide alone, not the key.
+     */
+    fun read(g: Glide): Action.Glide = Action.Glide(g, read(g, readings))
 
     override fun apply(action: Action): Snapshot {
         val s = when (action) {
-            Action.Glide -> glided()
+            is Action.Glide -> glided(action)
             is Action.Pick -> picked(action.index) { action.copy(index = it) }
             // of the page shown: the others are on the first
             is Action.Select -> if (last?.first != 0) session.apply(action) else picked(action.index) { action.copy(index = it) }
@@ -102,11 +102,10 @@ class GlideSession(
         return s
     }
 
-    private fun glided(): Snapshot {
-        val readings = offered
-        offered = emptyList()
+    private fun glided(action: Action.Glide): Snapshot {
+        val readings = action.readings ?: action.glide?.let { read(it, this.readings) }.orEmpty()
         others = emptyList()
-        val best = readings.firstOrNull() ?: return session.apply(Action.Glide)
+        val best = readings.firstOrNull() ?: return session.apply(action)
         var commit = ""
         // after what is typed, a boundary; that may end it (笔画查字 leaves, its character committed).
         // What shows no candidates is taken back: a table's 空码 would run on into the glide's code, a
@@ -119,7 +118,7 @@ class GlideSession(
         val fresh = before == null || before.preedit.isEmpty() || before.predicting
         var s = before
         for (c in best.keys) s = session.apply(typed(c)).also { commit += it.commit }
-        val shown = (s ?: return session.apply(Action.Glide)).copy(commit = commit, handled = true)
+        val shown = (s ?: return session.apply(action)).copy(commit = commit, handled = true)
         if (fresh) {
             glided = shown.preedit
             others = readings.drop(1).filter { !blocked(it.word) }.distinctBy { it.word }

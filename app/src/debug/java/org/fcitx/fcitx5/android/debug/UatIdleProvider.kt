@@ -10,9 +10,9 @@ import android.database.Cursor
 import android.database.MatrixCursor
 import android.net.Uri
 import android.os.Looper
-import org.fcitx.fcitx5.android.core.EngineBridge
+import org.fcitx.fcitx5.android.core.EngineState
 import org.fcitx.fcitx5.android.core.HostDispatcher
-import org.fcitx.fcitx5.android.engine.host.BackgroundWork
+import org.fcitx.fcitx5.android.engine.runtime.BackgroundWork
 
 /**
  * Whether the input method is idle, for the device UAT (uat.py's Device.idle, through `content
@@ -28,7 +28,7 @@ class UatIdleProvider : ContentProvider() {
 
     override fun query(uri: Uri, projection: Array<out String>?, selection: String?, selectionArgs: Array<out String>?, sortOrder: String?): Cursor {
         val fcitx = HostDispatcher.pendingJobs
-        val refine = EngineBridge.refining
+        val refine = EngineState.refining
         val background = BackgroundWork.busy
         val main = Looper.getMainLooper().queue.isIdle
         val idle = fcitx == 0 && !refine && background == 0 && main

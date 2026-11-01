@@ -4,15 +4,22 @@
  */
 package org.fcitx.fcitx5.android.uat
 
+import org.fcitx.fcitx5.android.engine.glide.Glide
+import org.fcitx.fcitx5.android.engine.glide.GlideLayout
 import org.fcitx.fcitx5.android.engine.handwriting.InkReading
-import org.fcitx.fcitx5.android.engine.host.BackgroundWork
-import org.fcitx.fcitx5.android.engine.host.EngineSettings
-import org.fcitx.fcitx5.android.engine.host.Engines
-import org.fcitx.fcitx5.android.engine.host.TableSettings
 import org.fcitx.fcitx5.android.engine.learn.LearnClock
 import org.fcitx.fcitx5.android.engine.learn.LearnLog
 import org.fcitx.fcitx5.android.engine.phrase.CustomPhrases
+import org.fcitx.fcitx5.android.engine.platform.Clock as EngineClock
+import org.fcitx.fcitx5.android.engine.platform.jvm.JvmClock
+import org.fcitx.fcitx5.android.engine.platform.jvm.JvmFile
+import org.fcitx.fcitx5.android.engine.platform.jvm.JvmFiles
+import org.fcitx.fcitx5.android.engine.runtime.BackgroundWork
+import org.fcitx.fcitx5.android.engine.runtime.EngineSettings
+import org.fcitx.fcitx5.android.engine.runtime.Engines
+import org.fcitx.fcitx5.android.engine.session.Action
 import org.fcitx.fcitx5.android.engine.user.DictionaryFile
+import org.fcitx.fcitx5.android.host.EngineOptions
 import java.io.File
 import java.io.FileNotFoundException
 import java.io.IOException
@@ -29,11 +36,21 @@ import java.util.concurrent.Executor
  */
 object UatEngines {
     /** Learning's clock: the system's, moved on by [days] (a case's typing days, U-42's expiry); back to now on [fresh]. */
-    object Clock : LearnClock {
+    object Clock : EngineClock {
         @Volatile private var shift = 0L
 
         override fun now() = System.currentTimeMillis() + shift
-        override fun offset(at: Long) = LearnClock.System.offset(at)
+        override fun offset(at: Long) = JvmClock.offset(at)
+
+        // the system's, as the engines' own would be, moved on by a replay's user away ([away]): the
+        // engines' timing (a table's space taken after a commit) sees the time pass as the host does
+        @Volatile private var ahead = 0L
+
+        override fun uptimeMillis() = JvmClock.uptimeMillis() + ahead
+
+        fun away(millis: Long) {
+            ahead += millis
+        }
 
         fun days(n: Int) {
             shift += n * LearnClock.DAY
@@ -41,6 +58,7 @@ object UatEngines {
 
         fun reset() {
             shift = 0L
+            ahead = 0L
         }
     }
 
@@ -91,9 +109,9 @@ object UatEngines {
     }
 
     private fun make() = Engines(
-        load = ::mappedOnce,
-        userDir = userDir,
-        installFile = installFile,
+        blobs = ::mappedOnce,
+        userDir = JvmFiles(userDir),
+        installFile = JvmFile(installFile),
         onError = { synchronized(errors) { errors += it } },
         additions = {
             Engines.Additions(
@@ -101,16 +119,16 @@ object UatEngines {
                 dictionaries = "",
                 savePhrases = { phrases = CustomPhrases.format(it.all) },
                 dictionary = { dictionary() },
-                indexes = indexes,
+                indexes = indexes?.let(::JvmFiles),
             )
         },
         // on the caller's thread: what a case sees does not depend on a warm-up's timing
         warmUps = Executor(Runnable::run),
-        learnClock = Clock,
+        clock = Clock,
     )
 
     /** The engines of the case running: [fresh]'s. */
-    var engines: Engines = make().also { it.settings = NEW_INSTALL }
+    var engines: Engines = make().also { it.settings = BASELINE }
         private set
 
     /**
@@ -132,18 +150,20 @@ object UatEngines {
         indexes = null
         val left = synchronized(errors) { errors.toList().also { errors.clear() } }
         check(left.isEmpty()) { "user files: ${left.joinToString { it.toString() }}" }
-        engines = make().also { it.settings = NEW_INSTALL }
+        engines = make().also { it.settings = BASELINE }
         return engines
     }
 
     /**
-     * What the addon pushes on a new install: its config's defaults, which for the tables are not
-     * the presets' (TableOptions): 调频 off for every table (U-28 D7; androidengine.h's
-     * EngineTableConfig), 自动上屏 on.
+     * The baselines' settings, B0's: what the app pushes on a new install, its host's fresh options (KotlinHost's EngineOptions, as
+     * EngineSettings), read from them so the replays' defaults cannot drift from the device's (for
+     * the tables 调频 off, 自动上屏 on, 编码提示 the preset's, not TableOptions' presets). That the app
+     * pushes these and adds nothing at their default is EngineBridgeTest's. 双拼's scheme as the
+     * baselines that add 双拼 set it (B0-双拼 chooses 自然码, the cases written for its keys), not a new
+     * install's 小鹤 (SchemeMigration; KotlinHostSchemeTest.aNewInstallsShuangpinIsXiaohe).
      */
-    val NEW_INSTALL: EngineSettings get() = EngineSettings(
-        tables = Engines.TABLES.values.associate { it.group to TableSettings(autoSelect = true, orderByUse = false) },
-    )
+    val BASELINE: EngineSettings
+        get() = EngineOptions().toSettings().copy(shuangpin = EngineSettings.ZIRANMA)
 
     /** The app started again (a force stop): the engines read the user's files afresh, nothing wiped. */
     fun restart(): Engines {
@@ -156,14 +176,21 @@ object UatEngines {
     }
 
     /**
-     * The recognizer's [readings] (best first, scored as it ranks them) offered to [engines] for a new ink
-     * piece, after [last] (the replay's last offered) and after what the pad ended: the piece's number.
+     * A glide across the centres of [keys] on [layout] ([shift]: Shift on, as TextKeyboard hands one
+     * over where it is on), as the engine read it: what the GLIDE key carries. EngineReplay's and
+     * HostReplay's one rule, as [ink] is.
+     */
+    fun glide(engines: Engines, im: String, keys: String, layout: GlideLayout, shift: Boolean = false) =
+        checkNotNull(engines.glide(im, Glide(keys.flatMap { layout.centre(it).toList() }.toFloatArray(), layout, shift = shift))) { "$im does not glide" }
+
+    /**
+     * The recognizer's [readings] (best first, scored as it ranks them) for a new ink piece, after
+     * [last] (the replay's last written) and after what the pad ended: what the Ink key carries.
      * EngineReplay's and HostReplay's one rule, so their handwriting cannot drift apart (F4299).
      */
-    fun offerInk(engines: Engines, readings: List<String>, last: Int): Int {
+    fun ink(engines: Engines, readings: List<String>, last: Int): Action.Ink {
         val piece = maxOf(last + 1, engines.inkEnded + 1)
-        engines.offerInk(InkReading(readings, DoubleArray(readings.size) { -it.toDouble() }), piece)
-        return piece
+        return Action.Ink(piece, InkReading(readings, DoubleArray(readings.size) { -it.toDouble() })).also { engines.ink(it, shown = true) }
     }
 
     /** The learning record as the engines wrote it ([LearnLog.FILE]), its background work done first; empty for none yet. */

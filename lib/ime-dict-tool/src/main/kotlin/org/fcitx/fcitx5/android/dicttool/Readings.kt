@@ -98,7 +98,7 @@ internal class Readings(private val data: PinyinData) {
             syllables.addAll(0, best.getValue(text.substring(from[end], end)).syllables.asList())
             end = from[end]
         }
-        return syllables.joinToString("'") { Syllables.spelling(it) }
+        return Syllables.apostrophed(syllables.toIntArray())
     }
 
     private companion object {

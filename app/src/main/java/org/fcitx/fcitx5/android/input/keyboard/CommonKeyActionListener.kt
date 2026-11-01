@@ -10,11 +10,11 @@ import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
-import org.fcitx.fcitx5.android.core.EngineBridge
-import org.fcitx.fcitx5.android.core.FcitxAPI
+import org.fcitx.fcitx5.android.core.EngineState
+import org.fcitx.fcitx5.android.core.HostApi
 import org.fcitx.fcitx5.android.daemon.launchOnReady
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
-import org.fcitx.fcitx5.android.engine.host.Engines
+import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.engine.pinyin.ShuangpinScheme
 import org.fcitx.fcitx5.android.input.broadcast.PreeditEmptyStateComponent
 import org.fcitx.fcitx5.android.input.dependency.context
@@ -27,11 +27,10 @@ import org.fcitx.fcitx5.android.input.dialog.InputMethodPickerDialog
 import org.fcitx.fcitx5.android.input.keyboard.KeyAction.BeginSelectionSwipeAction
 import org.fcitx.fcitx5.android.input.keyboard.KeyAction.CommitAction
 import org.fcitx.fcitx5.android.input.keyboard.KeyAction.DeleteSelectionAction
-import org.fcitx.fcitx5.android.input.keyboard.KeyAction.FcitxKeyAction
+import org.fcitx.fcitx5.android.input.keyboard.KeyAction.HostKeyAction
 import org.fcitx.fcitx5.android.input.keyboard.KeyAction.GlideAction
 import org.fcitx.fcitx5.android.input.keyboard.KeyAction.LangSwitchAction
 import org.fcitx.fcitx5.android.input.keyboard.KeyAction.MoveSelectionAction
-import org.fcitx.fcitx5.android.input.keyboard.KeyAction.NineKeyLanguageAction
 import org.fcitx.fcitx5.android.input.keyboard.KeyAction.PickerSwitchAction
 import org.fcitx.fcitx5.android.input.keyboard.KeyAction.QuickPhraseAction
 import org.fcitx.fcitx5.android.input.keyboard.KeyAction.ShowInputMethodPickerAction
@@ -68,39 +67,14 @@ class CommonKeyActionListener :
 
     private val backspaceSwipe = BackspaceSwipeBehavior()
 
-    // English on the nine keys, brought by 中/英 (EnglishLayoutPolicy)
-    private val englishOnNineKeys = AppPrefs.getInstance().internal.englishOnNineKeys
-
-    // the next input method, from 九键英文 the one after 九键拼音: the two are one to the user
-    private suspend fun FcitxAPI.nextInputMethod() {
-        val current = currentIme().uniqueName
-        val next = if (EnglishLayoutPolicy.nineKeys(current, englishOnNineKeys.getValue())) {
-            EnglishLayoutPolicy.nextFromNineKeys(enabledIme().map { it.uniqueName })
-        } else {
-            null
-        }
-        // dropped first: English next is its own input method, the full keyboard
-        englishOnNineKeys.setValue(false)
-        when (next) {
-            null -> enumerateIme()
-            // the input method shown stays (English, after 九键拼音 in the list): fcitx tells of no
-            // change, so the keyboard is told
-            current -> service.lifecycleScope.launch { englishShownAnew?.invoke() }
-            else -> activateIme(next)
-        }
-    }
-
-    /**
-     * KeyboardWindow's, from its first attach: English's letters shown anew, as the flag now has them, where
-     * the language key's round from 九键英文 lands on English itself.
-     */
-    var englishShownAnew: (() -> Unit)? = null
+    // the next input method: each on its own keyboard, the nine keys' English one of English's (I1)
+    private suspend fun HostApi.nextInputMethod() = enumerateIme()
 
     /**
      * What is typed put in first ([FcitxInputMethodService.commitAndReset]), then [then]: whether
      * the field is an address's read now, as the key is pressed, not on fcitx's thread.
      */
-    private fun afterPendingInput(then: suspend FcitxAPI.() -> Unit) {
+    private fun afterPendingInput(then: suspend HostApi.() -> Unit) {
         val address = service.inAddressField
         service.postFcitxJob {
             with(service) { commitAndReset(address) }
@@ -109,7 +83,7 @@ class CommonKeyActionListener :
     }
 
     // [asIs] is asked on fcitx's side too: whether the field is an address's is read before, as the key is pressed
-    private fun typeOrSend(asIs: (im: () -> String, composing: () -> Boolean, tableKeys: () -> Set<Char>) -> String?, sent: suspend FcitxAPI.() -> Unit) =
+    private fun typeOrSend(asIs: (im: () -> String, composing: () -> Boolean, tableKeys: () -> Set<Char>) -> String?, sent: suspend HostApi.() -> Unit) =
         typeAsIsOrSend(asIs, { service.postFcitxJob(it) }, { service.commitOverEngine(it) }, sent)
 
     private fun showInputMethodPicker() {
@@ -124,21 +98,21 @@ class CommonKeyActionListener :
         KeyActionListener { action, _ ->
             when (action) {
                 // as the address keys are: through the engine a digit would pick a candidate, _ be ——
-                is FcitxKeyAction -> {
+                is HostKeyAction -> {
                     val address = service.inAddressField
-                    typeOrSend(keyAsIs(action.act, address, EngineBridge::shuangpinScheme)) {
+                    typeOrSend(keyAsIs(action.act, address, EngineState::shuangpinScheme)) {
                         sendKey(action.act, action.states.states, action.code)
                     }
                 }
                 // a keypad's too: through the engine KP_1 is 1, which picks a candidate
                 is SymAction -> {
                     val address = service.inAddressField
-                    typeOrSend(symAsIs(action.sym.sym, address, EngineBridge::shuangpinScheme)) {
+                    typeOrSend(symAsIs(action.sym.sym, address, EngineState::shuangpinScheme)) {
                         sendKey(action.sym, action.states)
                     }
                 }
                 is CommitAction -> service.commitOverEngine(action.text, action.replacing)
-                // the engine sends the key that commits its word itself (Fcitx.offerGlide)
+                // the engine sends the key that commits its word, carrying the glide, itself (HostApi.offerGlide)
                 is GlideAction -> service.postFcitxJob { offerGlide(action.glide) }
                 is QuickPhraseAction -> afterPendingInput { triggerQuickPhrase() }
                 is UnicodeAction -> afterPendingInput { triggerUnicode() }
@@ -166,13 +140,6 @@ class CommonKeyActionListener :
                     }
                 }
                 is ShowInputMethodPickerAction -> showInputMethodPicker()
-                // what is typed kept as a switch of input method keeps it (androidengine's deactivate)
-                is NineKeyLanguageAction -> service.postFcitxJob {
-                    val to = EnglishLayoutPolicy.toggled(currentIme().uniqueName, enabledIme().map { it.uniqueName })
-                        ?: return@postFcitxJob
-                    englishOnNineKeys.setValue(to == Engines.ENGLISH)
-                    activateIme(to)
-                }
                 is BeginSelectionSwipeAction -> backspaceSwipe.onTouchDown()
                 is MoveSelectionAction -> {
                     // something typed: candidates with nothing typed are the words that may come
@@ -255,14 +222,14 @@ internal fun symText(sym: Int): String? = when (sym) {
 /**
  * [key], the character a key types, if an [address] field takes it as it is (PendingInputPolicy.typesAsIs),
  * committed over the engine; null for a key sent to it. A key the input method [im] types with
- * (Engines.readsAsKey: the nine keys' digits, [scheme]'s ;, pinyin's ' and a table's keys while something is
+ * (InputMethodCatalog.readsAsKey: the grouped keyboards' codes, [scheme]'s ;, pinyin's ' and a table's keys while something is
  * typed, [composing], [tableKeys]) is still a key there. [im] and [composing] are asked only for a character
- * that may be such a key, [tableKeys] (FcitxAPI.tableKeys, read on fcitx's thread) only while something is typed
+ * that may be such a key, [tableKeys] (HostApi.tableKeys, read on fcitx's thread) only while something is typed
  * (and, in [typeAsIsOrSend], only for a table input method).
  */
 @Suppress("LongParameterList")
 internal fun typedAsIs(key: String, address: Boolean, im: () -> String, scheme: ShuangpinScheme, composing: () -> Boolean = { false }, tableKeys: () -> Set<Char> = { emptySet() }): String? =
-    takenAsIs(key, address) { c -> Engines.readsAsKey(im(), scheme, c, composing(), tableKeys) }
+    takenAsIs(key, address) { c -> InputMethodCatalog.readsAsKey(im(), scheme, c, composing(), tableKeys) }
 
 /**
  * The character [sym] types ([symText]) if an [address] field takes it as it is ([typedAsIs]); null for a key sent to the engine.
@@ -283,7 +250,7 @@ internal fun keyAsIs(key: String, address: Boolean, scheme: () -> ShuangpinSchem
 internal fun symAsIs(sym: Int, address: Boolean, scheme: () -> ShuangpinScheme): (im: () -> String, composing: () -> Boolean, tableKeys: () -> Set<Char>) -> String? =
     { im, composing, tableKeys -> symTypedAsIs(sym, address, im, scheme(), composing, tableKeys) }
 
-// no input method: Engines.readsAsKey has it read no character as a key
+// no input method: InputMethodCatalog.readsAsKey has it read no character as a key
 private const val NO_INPUT_METHOD = ""
 
 /**
@@ -291,15 +258,15 @@ private const val NO_INPUT_METHOD = ""
  * [typedAsIs]) has an address field take it as it is, [commit]ted over the engine, else [sent] to it, in a job
  * [post]ed to fcitx. [asIs] is told in that job, every key before it handled: told as the key was pressed, a `'`
  * swiped while a space's commit was still queued went to the engine with nothing typed, and was ‘ in a URL. The
- * table's keys are the engine's, asked of fcitx there ([FcitxAPI.tableKeys]) for a table input method only
- * ([Engines.hasTableKeys]): the job itself runs off fcitx's thread, and the engine's sessions are that thread's
+ * table's keys are the engine's, asked of fcitx there ([HostApi.tableKeys]) for a table input method only
+ * ([InputMethodCatalog.hasTableKeys]): the job itself runs off fcitx's thread, and the engine's sessions are that thread's
  * alone. A character read as a key there is sent, and its commit, posted after the job, cancelled before it starts.
  */
 internal fun typeAsIsOrSend(
     asIs: (im: () -> String, composing: () -> Boolean, tableKeys: () -> Set<Char>) -> String?,
-    post: (suspend FcitxAPI.() -> Unit) -> Unit,
+    post: (suspend HostApi.() -> Unit) -> Unit,
     commit: (String) -> Job,
-    sent: suspend FcitxAPI.() -> Unit,
+    sent: suspend HostApi.() -> Unit,
 ) {
     // as no input method would read it with nothing typed: null is a key whatever fcitx has
     val text = asIs({ NO_INPUT_METHOD }, { false }, { emptySet() })
@@ -313,7 +280,7 @@ internal fun typeAsIsOrSend(
         // as commitAndReset reads it
         val composing = clientPreeditCached.isNotEmpty() || inputPanelCached.preedit.isNotEmpty()
         // only a table's, while something is typed, as readsAsKey asks for them: another input method has none, not asked across threads
-        val keys = if (composing && Engines.hasTableKeys(im)) tableKeys(im) else emptySet<Char>()
+        val keys = if (composing && InputMethodCatalog.hasTableKeys(im)) tableKeys(im) else emptySet<Char>()
         if (asIs({ im }, { composing }, { keys }) == null) {
             committing.await().cancel()
             sent()

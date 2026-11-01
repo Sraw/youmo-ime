@@ -11,14 +11,19 @@ import androidx.core.content.edit
 import androidx.preference.PreferenceManager
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.data.InputFeedbacks.InputFeedbackMode
+import org.fcitx.fcitx5.android.data.clipboard.CLIPBOARD_UNLIMITED
 import org.fcitx.fcitx5.android.data.prefs.ManagedPreferenceUi.Levels.Level
+import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
+import org.fcitx.fcitx5.android.input.address.AddressLists
 import org.fcitx.fcitx5.android.input.candidates.expanded.ExpandedCandidateStyle
 import org.fcitx.fcitx5.android.input.candidates.floating.FloatingCandidatesMode
 import org.fcitx.fcitx5.android.input.candidates.floating.FloatingCandidatesOrientation
 import org.fcitx.fcitx5.android.input.candidates.horizontal.HorizontalCandidateMode
 import org.fcitx.fcitx5.android.input.floating.FloatingKeyboard
 import org.fcitx.fcitx5.android.input.handwriting.HandwritingPause
+import org.fcitx.fcitx5.android.input.keyboard.ImKeyboard
+import org.fcitx.fcitx5.android.input.keyboard.ImKeyboards
 import org.fcitx.fcitx5.android.input.keyboard.KeyboardHeightPercentBase
 import org.fcitx.fcitx5.android.input.keyboard.LangSwitchBehavior
 import org.fcitx.fcitx5.android.input.keyboard.NineKeySymbols
@@ -42,9 +47,6 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
         val lastPickerType = string("last_picker_type", PickerWindow.Key.Emoji.name)
         val symbolPanelLocked = bool("symbol_panel_locked", false)
 
-        /** Whether English is on the nine keys, 九键's 中/英 having brought it (EnglishLayoutPolicy): kept for the input view made anew. */
-        val englishOnNineKeys = bool("english_on_nine_keys", false)
-
         /**
          * U-93 「用我的输入习惯」, from the ⋯ menu or the lexicon page: off, the engine as installed but
          * for the blocks (Engines.useHabits), nothing learned, nothing shown of what was.
@@ -63,8 +65,42 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
          */
         val popupOverrides = string("popup_overrides", "")
 
+        /**
+         * The bar's buttons, their order and which show (ToolbarConfig.serialize; empty, as
+         * never set, is the bar as it always was): set on its own page from the 按键 page.
+         */
+        val toolbarButtons = string("toolbar_buttons", "")
+
         /** Whether [resetHiddenSettings] ran: on the first start of a version with it, and so once. */
         val hiddenSettingsReset = bool("hidden_settings_reset", false)
+
+        /**
+         * Whether 0.4's 九键拼音 was merged into pinyin (KotlinHost.mergeNineKeys): pinyin's keyboard set
+         * once, though the profile could not be written back without the old name. Not a 0.4 backup's,
+         * so one restored is merged again.
+         */
+        val nineKeysMerged = bool("nine_keys_merged", false)
+
+        /**
+         * Whether the merge's notice ([nineKeysMerged], both pinyins were on) is still to be seen: kept till
+         * it is said on the keyboard, so a process ended before any keyboard showed says it at the next start.
+         */
+        val nineKeysUnseen = bool("nine_keys_merged_unseen", false)
+
+        /**
+         * Whether the user saw that the 双拼 scheme they had is one 0.5 dropped, now 小鹤 (KotlinHost):
+         * once, though the config could not be written back. Not a 0.4 backup's, so one restored is told again.
+         */
+        val schemeRetiredTold = bool("scheme_retired_told", false)
+
+        /** The dropped scheme ([schemeRetiredTold]) still to be told, by its config name, till it is seen; empty, none. */
+        val schemeRetiredUnseen = string("scheme_retired_unseen", "")
+
+        /**
+         * Whether 双拼's scheme was settled for 0.5 on this install (KotlinHost): a new install's at its
+         * first start, an upgrade's once 自然码 is pinned. Not a 0.4 backup's, so one restored is pinned too.
+         */
+        val schemeSettled = bool("shuangpin_scheme_settled", false)
 
         /**
          * Where the lone floating keyboard button was dragged in an editor that tells no cursor, as
@@ -78,6 +114,14 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
 
         /** U-106's switch, at the lexicon page's top beside 用我的输入习惯 (UserWordsFragment): a backup of the learning every few typing days. */
         val learningAutoBackup = bool("learning.auto_backup", true)
+
+        /**
+         * What the address suggestions learned ([org.fcitx.fcitx5.android.input.address.AddressBook]'s two
+         * strings): how often each suffix ended an address, and the email addresses remembered. In the
+         * backup with the rest of this file; never in the device-protected copy (AddressStrip learns nothing before the first unlock).
+         */
+        val addressCounts = string("address.counts", "")
+        val rememberedAddresses = string("address.remembered", "")
     }
 
     inner class Advanced : ManagedPreferenceCategory(R.string.advanced, sharedPreferences) {
@@ -159,35 +203,59 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
         private fun <T : Any> stringLike(key: String, codec: ManagedPreference.StringLikeCodec<T>, defaultValue: T) =
             ManagedPreference.PStringLike(sharedPreferences, key, defaultValue, codec).apply { register() }
 
-        /** Shown on the 九键 page (InputMethodSettings), not here: one input method's alone. */
+        /** Shown in the 九键 section of pinyin's and English's pages (InputMethodSettings), while the nine keys are their keyboard. */
         val t9MultiTap = stringLike(T9_MULTI_TAP, object : ManagedPreference.StringLikeCodec<T9MultiTap> {
             override fun decode(raw: String) = T9MultiTap.entries.firstOrNull { it.name == raw }
         }, T9MultiTap.Off)
 
-        /** Shown on the 九键 page: how the nine keys type English. */
+        /** Shown in the 九键 section of English's page: how the nine keys type English. */
         val t9EnglishTyping = stringLike(T9_ENGLISH_TYPING, object : ManagedPreference.StringLikeCodec<T9EnglishTyping> {
             override fun decode(raw: String) = T9EnglishTyping.entries.firstOrNull { it.name == raw }
         }, T9EnglishTyping.Predictive)
 
         /**
          * What each of 九键's digit keys types ([NineKeyLetters.serialize], empty as on a phone):
-         * set on its own page from the 九键 page, read by the keyboard and the engine alike.
+         * set on its own page from the 九键 section of an input method's page, read by the keyboard and the engine alike.
          */
         val t9Letters = string("t9_letters", "")
 
-        /** Shown on the pinyin page: the on-screen keyboard pinyin is typed on. A hardware keyboard types 全拼 still. */
+        /**
+         * Shown on the pinyin page and in ⋯'s 键盘: the on-screen keyboard pinyin is typed on, the
+         * nine keys 0.4's 九键拼音 (NineKeysMerge). A hardware keyboard types 全拼 still.
+         */
         val pinyinKeyboard = stringLike(PINYIN_KEYBOARD, object : ManagedPreference.StringLikeCodec<PinyinKeyboard> {
             override fun decode(raw: String) = PinyinKeyboard.entries.firstOrNull { it.name == raw }
         }, PinyinKeyboard.Full)
 
-        /** Shown on the 双拼 page: the on-screen keyboard 双拼 is typed on, any scheme on any. A hardware keyboard types the full one still. */
+        /**
+         * Shown on the 双拼 page and in ⋯'s 键盘: the on-screen keyboard 双拼 is typed on; the 14 keys
+         * not under 微软 (ImKeyboards.choices): chosen before 微软 is, they give way to the 18 keys,
+         * which are then stored (EngineBridge.configure). A hardware keyboard types the full one still.
+         */
         val shuangpinKeyboard = stringLike(SHUANGPIN_KEYBOARD, object : ManagedPreference.StringLikeCodec<ShuangpinKeyboard> {
             override fun decode(raw: String) = ShuangpinKeyboard.entries.firstOrNull { it.name == raw }
         }, ShuangpinKeyboard.Full)
 
+        /** Shown on the English page and in ⋯'s 键盘: the 26 keys for everyone, upgrades too (I1 Q3), or the nine keys. */
+        val englishKeyboard = stringLike(ENGLISH_KEYBOARD, object : ManagedPreference.StringLikeCodec<EnglishKeyboard> {
+            override fun decode(raw: String) = EnglishKeyboard.entries.firstOrNull { it.name == raw }
+        }, EnglishKeyboard.Full)
+
+        /** Each input method's keyboard as set, for ImKeyboards to decide the layout from. */
+        fun imKeyboards() = ImKeyboards.Chosen(pinyinKeyboard.getValue().keyboard, shuangpinKeyboard.getValue().keyboard, englishKeyboard.getValue().keyboard)
+
+        /** [im]'s keyboard set to [keyboard], one it offers (ImKeyboards.choices). */
+        fun setImKeyboard(im: String, keyboard: ImKeyboard) {
+            when (im) {
+                InputMethodCatalog.PINYIN -> pinyinKeyboard.setValue(PinyinKeyboard.of(keyboard))
+                InputMethodCatalog.SHUANGPIN -> shuangpinKeyboard.setValue(ShuangpinKeyboard.of(keyboard))
+                InputMethodCatalog.ENGLISH -> englishKeyboard.setValue(EnglishKeyboard.of(keyboard))
+            }
+        }
+
         /**
          * What each of 九键's keys 1 to 9 offers on a long press besides its digit and letters
-         * ([NineKeySymbols.serialize], empty as by default): set on its own page from the 九键 page.
+         * ([NineKeySymbols.serialize], empty as by default): set on its own page from the 九键 section of an input method's page.
          */
         val t9Symbols = string("t9_symbols", "")
 
@@ -195,17 +263,29 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
         val englishAutoCaps = bool(ENGLISH_AUTO_CAPS, true)
 
         /**
-         * Shown on the page of what every input method shares (InputMethodSettings.SHARED), one
-         * setting for all that glide (Engines.glides): a word by gliding across its keys
-         * (GlideInput). Off till turned on: a fast tap may glide.
+         * Shown on the page of what every input method shares (InputMethodSettings.SHARED), two
+         * switches for what a finger drawn across the keys does (GlideInput), one or the other, never
+         * both (the page turns the other off): a word glided across its keys in every input method
+         * that glides (InputMethodCatalog.glides), or a stroke drawn while pinyin is typed that
+         * filters its candidates (笔画筛选, InputMethodCatalog.filtersByStrokes). Both off till
+         * chosen: a fast tap may glide. The glide's key is 0.4's, so its switch carries over as it is.
          */
         val glideTyping = bool(GLIDE_TYPING, false)
+        val strokeFilter = bool(STROKE_FILTER, false)
 
         /** Shown on the shared page too: every input method types a bracket or a quote. */
         val autoPairs = bool(AUTO_PAIRS, true)
 
         /** Shown on the shared page too: a sum is typed in any input method. */
         val calculationReplacesSum = bool(CALCULATION_REPLACES_SUM, false)
+
+        /**
+         * 「通用输入 → 网址和邮箱」's (AddressSettingsFragment): the bar's suggestions' two lists, one entry a
+         * line ([AddressLists.serialize]), and whether the email addresses typed are remembered.
+         */
+        val emailSuffixes = string("address_email_suffixes", AddressLists.serialize(AddressLists.DEFAULT_EMAIL))
+        val urlSuffixes = string("address_url_suffixes", AddressLists.serialize(AddressLists.DEFAULT_URL))
+        val rememberAddresses = bool("address_remember", true)
 
         /** Shown on the handwriting page (InputMethodSettings): how long the pen stays up before a character is done. */
         val handwritingPause = stringLike(HANDWRITING_PAUSE, object : ManagedPreference.StringLikeCodec<HandwritingPause> {
@@ -523,10 +603,14 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
 
     inner class Clipboard : ManagedPreferenceCategory(R.string.clipboard, sharedPreferences) {
         val clipboardListening = switch(R.string.clipboard_listening, "clipboard_enable", true)
+        /** [CLIPBOARD_UNLIMITED] for 「无上限」, 0 keeping none. */
         val clipboardHistoryLimit = int(
             R.string.clipboard_limit,
             "clipboard_limit",
             10,
+            special = ManagedPreferenceUi.EditTextInt.Special(
+                CLIPBOARD_UNLIMITED, R.string.clipboard_unlimited, R.string.clipboard_unlimited_summary
+            ),
         ) { clipboardListening.getValue() }
         val clipboardSuggestion = switch(
             R.string.clipboard_suggestion, "clipboard_suggestion", true
@@ -616,6 +700,8 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
                 internal.editorInfoInspector,
                 // the long-press and swipe characters: a password may be typed with them before the first unlock
                 internal.popupOverrides,
+                // the bar is there before the first unlock too
+                internal.toolbarButtons,
                 advanced.ignoreSystemCursor,
                 advanced.disableAnimation,
                 advanced.vivoKeypressWorkaround
@@ -632,6 +718,15 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
                 }
             }
         }
+    }
+
+    /**
+     * The settings no version reads any more removed, as a 0.4 install or a backup of one has them:
+     * at every start, a backup restored being read at the next.
+     */
+    fun dropRetired() {
+        if (!sharedPreferences.contains(ENGLISH_ON_NINE_KEYS)) return
+        sharedPreferences.edit { remove(ENGLISH_ON_NINE_KEYS) }
     }
 
     /**
@@ -660,9 +755,15 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
         const val PINYIN_KEYBOARD = "pinyin_keyboard"
 
         const val SHUANGPIN_KEYBOARD = "shuangpin_keyboard"
+        const val ENGLISH_KEYBOARD = "english_keyboard"
+
+        // 0.4's: English on the nine keys while 九键's 中/英 had brought it there, gone with the key (I1)
+        private const val ENGLISH_ON_NINE_KEYS = "english_on_nine_keys"
 
         const val ENGLISH_AUTO_CAPS = "english_auto_caps"
         const val GLIDE_TYPING = "glide_typing"
+        const val STROKE_FILTER = "stroke_filter"
+
         const val AUTO_PAIRS = "auto_pairs"
         const val CALCULATION_REPLACES_SUM = "calculation_replaces_sum"
         const val HANDWRITING_PAUSE = "handwriting_pause"
@@ -692,15 +793,36 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
     }
 }
 
-/** Pinyin's on-screen keyboard: the full one, or the 14 keys of two letters each (拼音双键). Kept by name: never rename one. */
-enum class PinyinKeyboard(override val stringRes: Int) : ManagedPreferenceEnum {
-    Full(R.string.pinyin_keyboard_full),
-    Keys14(R.string.pinyin_keyboard_14)
+/** Pinyin's on-screen keyboard ([ImKeyboard]): the full one, the 18 keys, the 14 keys (拼音双键), the nine keys. Kept by name: never rename one. */
+enum class PinyinKeyboard(override val stringRes: Int, val keyboard: ImKeyboard) : ManagedPreferenceEnum {
+    Full(R.string.pinyin_keyboard_full, ImKeyboard.FULL),
+    Keys18(R.string.keyboard_18, ImKeyboard.KEYS18),
+    Keys14(R.string.pinyin_keyboard_14, ImKeyboard.KEYS14),
+    NineKeys(R.string.keyboard_nine, ImKeyboard.NINE_KEYS);
+
+    companion object {
+        fun of(keyboard: ImKeyboard) = entries.first { it.keyboard == keyboard }
+    }
 }
 
-/** 双拼's on-screen keyboard: the full one, the 18 keys, or the nine keys (many more alike). Kept by name: never rename one. */
-enum class ShuangpinKeyboard(override val stringRes: Int) : ManagedPreferenceEnum {
-    Full(R.string.pinyin_keyboard_full),
-    Keys18(R.string.shuangpin_keyboard_18),
-    NineKeys(R.string.shuangpin_keyboard_nine)
+/** 双拼's on-screen keyboard ([ImKeyboard]): the full one, the 18 keys, the 14 keys, or the nine keys (many more alike). Kept by name: never rename one. */
+enum class ShuangpinKeyboard(override val stringRes: Int, val keyboard: ImKeyboard) : ManagedPreferenceEnum {
+    Full(R.string.pinyin_keyboard_full, ImKeyboard.FULL),
+    Keys18(R.string.keyboard_18, ImKeyboard.KEYS18),
+    Keys14(R.string.pinyin_keyboard_14, ImKeyboard.KEYS14),
+    NineKeys(R.string.keyboard_nine, ImKeyboard.NINE_KEYS);
+
+    companion object {
+        fun of(keyboard: ImKeyboard) = entries.first { it.keyboard == keyboard }
+    }
+}
+
+/** English's on-screen keyboard ([ImKeyboard]): the 26 keys or the nine keys. Kept by name: never rename one. */
+enum class EnglishKeyboard(override val stringRes: Int, val keyboard: ImKeyboard) : ManagedPreferenceEnum {
+    Full(R.string.pinyin_keyboard_full, ImKeyboard.FULL),
+    NineKeys(R.string.keyboard_nine, ImKeyboard.NINE_KEYS);
+
+    companion object {
+        fun of(keyboard: ImKeyboard) = entries.first { it.keyboard == keyboard }
+    }
 }

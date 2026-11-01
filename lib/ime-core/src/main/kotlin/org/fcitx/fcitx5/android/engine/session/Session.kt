@@ -4,7 +4,10 @@
  */
 package org.fcitx.fcitx5.android.engine.session
 
-import org.fcitx.fcitx5.android.engine.host.Keyboard
+import org.fcitx.fcitx5.android.engine.glide.Glide as GlidePath
+import org.fcitx.fcitx5.android.engine.glide.GlideReading
+import org.fcitx.fcitx5.android.engine.handwriting.InkReading
+import org.fcitx.fcitx5.android.engine.runtime.Keyboard
 import org.fcitx.fcitx5.android.engine.learn.Kinds
 import org.fcitx.fcitx5.android.engine.learn.LearnRecord.Commit
 import org.fcitx.fcitx5.android.engine.learn.control.Why
@@ -22,6 +25,12 @@ interface Session {
      * pick; the rest are sent as [Action.Key] all the same, to end the input, then typed.
      */
     fun reads(c: Char): Boolean
+
+    /**
+     * Whether [c], sent as [Action.Key] now, ends what is typed instead of going into it: not [read][reads],
+     * or not where it stands (a 双拼 scheme's `;` read only where its syllable may start).
+     */
+    fun endsInput(c: Char): Boolean = !reads(c)
 
     /**
      * Whether it takes every character itself, as English does: space ends a word and digits are
@@ -85,6 +94,23 @@ interface Session {
      */
     fun typed(text: String) {}
 
+    /**
+     * Ends what is typed, nothing learned of what was not picked: the words picked from its start
+     * put in as their pick puts them in, the keys after them handed back as typed, not read (a
+     * table's 拼 key turned off mid-lookup). Here, where nothing is picked in pieces, all of it is
+     * keys, put in with learning off.
+     */
+    fun handBack(): HandedBack {
+        val was = learning
+        learning = false
+        val keys = try {
+            apply(Action.CommitRaw).commit
+        } finally {
+            learning = was
+        }
+        return HandedBack("", null, keys)
+    }
+
     companion object {
         /**
          * What the app [typed] for a Backspace it did itself: what the editor's Backspace takes
@@ -98,6 +124,9 @@ interface Session {
         const val ERASED = "\b"
     }
 }
+
+/** What [Session.handBack] ends with: [picked] put in, [record] its learning record's commit, and the [keys] after it, as typed. */
+data class HandedBack(val picked: String, val record: Commit?, val keys: String)
 
 /**
  * What a long press on a candidate may offer, each done by the [Action] of its name; [bit] is its
@@ -121,7 +150,7 @@ sealed class Action {
      * [handled][Snapshot.handled]): what comes after it does not run on from what came before.
      * [glided]: typed by a glide, no key pressed (learning files it by its pinyin). [at]: where
      * across its key a grouped keyboard's code was tapped, 0 the left edge and 1 the right
-     * ([Keyboard.tapKey][org.fcitx.fcitx5.android.engine.host.Keyboard.tapKey]); NaN for none.
+     * ([Keyboard.tapKey][org.fcitx.fcitx5.android.engine.runtime.Keyboard.tapKey]); NaN for none.
      */
     data class Key(val char: Char, val glided: Boolean = false, val at: Float = Float.NaN) : Action()
 
@@ -192,17 +221,28 @@ sealed class Action {
     object CommitRaw : Action()
 
     /**
-     * Handwriting: shows what the pad last read (HandwritingSession.offer). Sent as a key, so that
-     * it comes in order with the keys and taps around it; nothing to any other session.
-     */
-    object Ink : Action()
-
-    /**
-     * Glide typing: the keyboard's last glide read, as offered to the session (EnglishSession.offerGlide
-     * commits its word, GlideSession, a pinyin's or a table's, types its reading). Sent as a key, as [Ink]; nothing to any
+     * Handwriting: what the pad read of its [piece], [reading], or, none, that [piece] finished;
+     * shown with those held before it (HandwritingSession.hold). Sent with the key that carries it
+     * ([Keyboard.INK]), so that it comes in order with the keys and taps around it; nothing to any
      * other session.
      */
-    object Glide : Action()
+    data class Ink(val piece: Int, val reading: InkReading? = null) : Action()
+
+    /**
+     * Glide typing: the keyboard's [glide] (EnglishSession commits its word), or its [readings] as
+     * read when it was sent (GlideSession.read: a pinyin's or a table's types the first). Sent with
+     * the key that carries it ([Keyboard.GLIDE]), as [Ink]; nothing to any other session.
+     */
+    data class Glide(val glide: GlidePath?, val readings: List<GlideReading>? = null) : Action()
+
+    /**
+     * 笔画筛选: a stroke drawn on the keyboard while something is typed, one of
+     * [Strokes.KEYS][org.fcitx.fcitx5.android.engine.stroke.Strokes.KEYS]: the candidates whose
+     * first character is written so are kept, the next stroke its next
+     * ([StrokeFilter][org.fcitx.fcitx5.android.engine.stroke.StrokeFilter]). Sent as its
+     * [Keyboard.strokeKey]; nothing to any other session.
+     */
+    data class Stroke(val stroke: Char) : Action()
 
     /**
      * Puts the cursor [at] that character of the preedit (a tap in the composed text, where the
@@ -232,6 +272,13 @@ sealed class Action {
      * snapshot [refines][Snapshot.refines]. Any other action drops what is left of it.
      */
     object Refine : Action()
+
+    /**
+     * The table's 拼 key: its pinyin lookup turned on or off, kept so till pressed again, every
+     * letter then looked up as [TableOptions.pinyinKey][org.fcitx.fcitx5.android.engine.table.TableOptions.pinyinKey]
+     * typed first would. Nothing to the other sessions.
+     */
+    object LookUp : Action()
 
     /** Drops everything: the input, and what was committed as context (the cursor moved away). */
     object Reset : Action()
@@ -301,6 +348,7 @@ sealed class Action {
  * @property cursor where in [preedit] the cursor is, in characters; -1 at its end
  * @property deleteBefore how many code points before the cursor go first (the app deletes in code points), before [commit]: English
  *   puts a space it added after a word behind the punctuation typed next (`word .` as `word. `)
+ * @property lookingUp [preedit] is a table's pinyin lookup, not its code: the host marks it (拼)
  */
 data class Snapshot(
     val commit: String,
@@ -321,4 +369,5 @@ data class Snapshot(
     val syllablesId: Int = 0,
     val deleteBefore: Int = 0,
     val cursor: Int = -1,
+    val lookingUp: Boolean = false,
 )

@@ -7,7 +7,11 @@ package org.fcitx.fcitx5.android.uat
 import android.text.InputType
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.Uat
-import org.fcitx.fcitx5.android.core.FcitxEvent
+import org.fcitx.fcitx5.android.core.FakeHostApi
+import org.fcitx.fcitx5.android.core.HostApi
+import org.fcitx.fcitx5.android.data.prefs.AppPrefs
+import org.fcitx.fcitx5.android.engine.glide.Glide
+import org.fcitx.fcitx5.android.host.HostEvent
 import org.fcitx.fcitx5.android.input.KeyboardHarness
 import org.fcitx.fcitx5.android.input.keyboard.TextKeyView
 import org.junit.After
@@ -28,15 +32,16 @@ import org.robolectric.annotation.GraphicsMode
 @Config(application = FcitxApplication::class, qualifiers = "w393dp-h851dp-port-440dpi")
 class EnglishCapsUatTest {
 
-    private var h: KeyboardHarness? = null
+    // the harness open, closed after each test (the tests name theirs h)
+    private var open: KeyboardHarness? = null
 
     @After
     fun close() {
-        h?.close()
+        open?.close()
     }
 
-    private fun english(inputType: Int) = KeyboardHarness(im = KeyboardHarness.ENGLISH).also { h = it }.start(inputType).also {
-        it.emit(FcitxEvent.IMChangeEvent(KeyboardHarness.ENGLISH))
+    private fun english(inputType: Int) = KeyboardHarness(im = KeyboardHarness.ENGLISH).also { open = it }.start(inputType).also {
+        it.emit(HostEvent.InputMethodChanged(KeyboardHarness.ENGLISH))
     }
 
     // the letter key [c] whichever case it shows
@@ -64,6 +69,65 @@ class EnglishCapsUatTest {
         h.tap(h.letter('o'))
         h.tap(h.letter('k'))
         assertEquals("HiOk", h.typed())
+    }
+
+    // a fake engine that keeps the glides offered: whether each came with Shift on
+    private val fake = FakeHostApi().apply { inputMethodEntryCached = KeyboardHarness.ENGLISH }
+    private val glides = ArrayList<Glide>()
+    private val keepingGlides = object : HostApi by fake {
+        override suspend fun offerGlide(glide: Glide): Boolean {
+            glides += glide
+            return true
+        }
+    }
+
+    private fun KeyboardHarness.glide(from: Char, to: Char) {
+        val end = box(letter(to))
+        drag(letter(from), end.exactCenterX(), end.exactCenterY(), steps = 12)
+    }
+
+    // the field's text as the engine's commits leave it (EnglishUatTest EN-21), the cursor at its end
+    private fun KeyboardHarness.typedIn(text: String) {
+        field.setText(text)
+        field.setSelection(text.length)
+        idle()
+    }
+
+    @Test
+    @Uat("EN-21")
+    fun aGlideTakesShiftWhereTheFieldAsksACapitalOrItIsPressed() {
+        AppPrefs.getInstance().keyboard.glideTyping.setValue(true)
+        try {
+            val h = KeyboardHarness(im = KeyboardHarness.ENGLISH, host = keepingGlides).also { open = it }
+                .start(InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_CAP_SENTENCES)
+            check(fake.events.tryEmit(HostEvent.InputMethodChanged(KeyboardHarness.ENGLISH)))
+            h.idle()
+            // a sentence's start: Shift on by itself
+            h.glide('h', 'o')
+            h.typedIn("Hello ")
+            // mid-sentence: off
+            h.glide('l', 'n')
+            h.typedIn("Hello London. ")
+            h.glide('i', 'm')
+            h.typedIn("So ")
+            h.glide('i', 'm')
+            assertEquals(listOf(true, false, true, false), glides.map { it.shift })
+            h.close()
+            glides.clear()
+            // nothing capitalised where the field asks none; Shift tapped, the glide takes it
+            val q = KeyboardHarness(im = KeyboardHarness.ENGLISH, host = keepingGlides).also { open = it }
+                .start(InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS)
+            check(fake.events.tryEmit(HostEvent.InputMethodChanged(KeyboardHarness.ENGLISH)))
+            q.idle()
+            q.typedIn("ok ")
+            q.glide('i', 'm')
+            q.typedIn("")
+            q.tap(q.described("Shift"))
+            q.glide('h', 'o')
+            assertEquals(listOf(false, true), glides.map { it.shift })
+        } finally {
+            AppPrefs.getInstance().keyboard.glideTyping.setValue(false)
+        }
     }
 
     @Test

@@ -27,7 +27,7 @@ class UserModelTest {
     private fun word(text: String) = (0 until data.vocabulary.size).first { data.vocabulary.word(it) == text }
 
     // [text] forgotten at each reading, as an older build's log forgot a candidate: for the replay
-    // (LegacyConversion); what this build forgets by text, the learning record forgets (HabitCountsTest)
+    // (0.4's conversion); what this build forgets by text, the learning record forgets (HabitCountsTest)
     private fun forgetText(m: UserModel, text: String) = m.entriesOf(text).forEach { m.forget(listOf(it)) }
 
     // review R11 F2932: the texts whose ids changed, the last ones; past what is kept, none to go by
@@ -357,9 +357,16 @@ class UserModelTest {
         val m = UserModel(polyphones.dictionary, polyphones.vocabulary)
         val hang = entry("行", "hang")
         val id = m.own(hang)
+        // a dictionary word's ownership is asked of bits kept beside the set: in step both ways
+        assertTrue(id < polyphones.vocabulary.size && m.owns(id))
         // no longer theirs, the dictionary's word keeps the entry it was owned as, but not as a reading
         m.disown(hang)
+        assertFalse(m.owns(id))
         assertEquals(null, m.reading(id))
+        assertTrue(m.owns(m.own(hang)))
+        m.disown(hang)
+        assertFalse(m.owns(id))
+        assertFalse(m.owns(NO_WORD))
         // one of their dictionaries', never typed, is not theirs yet (its reading may be wrong); one
         // added by hand is, and one imported once theirs
         val listed = m.list(entry("行行", "hang", "hang"))

@@ -4,7 +4,7 @@
  */
 package org.fcitx.fcitx5.android.ui.main.settings
 
-import org.fcitx.fcitx5.android.engine.host.Engines.UserWord
+import org.fcitx.fcitx5.android.engine.runtime.UserWord
 import org.junit.Assert.assertEquals
 import org.junit.Test
 

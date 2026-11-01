@@ -45,9 +45,9 @@ class PopupPresetTest {
 
     @Test
     fun lOffersTheSemicolonThatTwoShuangpinSchemesTypeAsAKey() {
-        // 微软 and 紫光 read ';' as ing; one character picked goes through fcitx as a key
+        // 微软 reads ';' as ing; one character picked goes through fcitx as a key
         assertTrue(";" in PopupPreset["l"]!!)
-        assertTrue(PopupKeyboardUi.keyAction(";") is KeyAction.FcitxKeyAction)
+        assertTrue(PopupKeyboardUi.keyAction(";") is KeyAction.HostKeyAction)
     }
 
     // 九键's long press offers by default the full keyboard's corner characters of each key's letters

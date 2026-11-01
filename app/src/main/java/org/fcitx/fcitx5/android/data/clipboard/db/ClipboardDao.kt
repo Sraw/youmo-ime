@@ -61,6 +61,9 @@ interface ClipboardDao {
     @Query("DELETE FROM ${ClipboardEntry.TABLE_NAME} WHERE timestamp<:timestamp AND pinned=0 AND deleted=0")
     suspend fun deleteUnpinnedEarlierThan(timestamp: Long)
 
+    @Query("SELECT COUNT(*) FROM ${ClipboardEntry.TABLE_NAME} WHERE timestamp<:timestamp AND pinned=0 AND deleted=0")
+    suspend fun countUnpinnedEarlierThan(timestamp: Long): Int
+
     @Query("UPDATE ${ClipboardEntry.TABLE_NAME} SET deleted=0 WHERE id in (:ids) AND deleted=1")
     suspend fun undoDelete(vararg ids: Int)
 

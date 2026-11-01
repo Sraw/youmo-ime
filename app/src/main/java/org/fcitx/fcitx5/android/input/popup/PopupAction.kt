@@ -48,6 +48,8 @@ sealed class PopupAction {
 
     data class TriggerAction(
         override val viewId: Int,
-        var outAction: KeyAction? = null
+        var outAction: KeyAction? = null,
+        /** Let go over a popup with nothing to pick (a table's roots, TextKeyboard): no key typed either. */
+        var outConsumed: Boolean = false,
     ) : PopupAction()
 }

@@ -4,8 +4,8 @@
  */
 package org.fcitx.fcitx5.android.host
 
-import org.fcitx.fcitx5.android.engine.host.Keyboard
 import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
+import org.fcitx.fcitx5.android.engine.runtime.Keyboard
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -17,7 +17,8 @@ class KeyCodesTest {
     fun everyKeyboardCodeIsInternal() {
         val codes = listOf(
             KeyCodes.GROUPED, KeyCodes.G18, KeyCodes.NINE_SHUANGPIN, Keyboard.TAPS, Keyboard.LETTERS,
-            Keyboard.NINE_DIGITS, Keyboard.NINE_LETTERS, Keyboard.INK..Keyboard.AGAIN,
+            Keyboard.NINE_DIGITS, Keyboard.NINE_LETTERS, Keyboard.INK..Keyboard.LOOKUP, Keyboard.STROKES,
+            Keyboard.KEYED_CODES,
             Keyboard.SYLLABLES.first.code..Keyboard.SYLLABLES.last.code,
         )
         for (range in codes) for (c in range) assertTrue("U+%X".format(c), KeyCodes.isInternal(c))

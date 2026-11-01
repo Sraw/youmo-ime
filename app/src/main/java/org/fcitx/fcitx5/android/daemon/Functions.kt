@@ -6,9 +6,9 @@ package org.fcitx.fcitx5.android.daemon
 
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
-import org.fcitx.fcitx5.android.core.FcitxAPI
+import org.fcitx.fcitx5.android.core.HostApi
 
-fun FcitxConnection.launchOnReady(block: suspend CoroutineScope.(FcitxAPI) -> Unit) {
+fun HostConnection.launchOnReady(block: suspend CoroutineScope.(HostApi) -> Unit) {
     lifecycleScope.launch {
         runOnReady { block(this) }
     }

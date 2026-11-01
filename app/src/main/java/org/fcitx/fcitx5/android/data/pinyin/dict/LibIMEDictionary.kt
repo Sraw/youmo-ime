@@ -5,7 +5,7 @@
 package org.fcitx.fcitx5.android.data.pinyin.dict
 
 import org.fcitx.fcitx5.android.R
-import org.fcitx.fcitx5.android.engine.libime.LibimeFiles
+import org.fcitx.fcitx5.android.engine.user.imports.LibimeFiles
 import org.fcitx.fcitx5.android.utils.errorArg
 import java.io.File
 

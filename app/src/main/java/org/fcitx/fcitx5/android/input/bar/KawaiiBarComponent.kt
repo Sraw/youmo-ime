@@ -17,7 +17,6 @@ import android.widget.ViewAnimator
 import android.widget.inline.InlineContentView
 import androidx.annotation.Keep
 import androidx.annotation.RequiresApi
-import androidx.core.view.isVisible
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -27,15 +26,19 @@ import kotlinx.coroutines.suspendCancellableCoroutine
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.core.CapabilityFlag
 import org.fcitx.fcitx5.android.core.CapabilityFlags
-import org.fcitx.fcitx5.android.core.FcitxEvent.CandidateListEvent
+import org.fcitx.fcitx5.android.core.EngineState
+import org.fcitx.fcitx5.android.core.InputMethodEntry
+import org.fcitx.fcitx5.android.daemon.HostConnection
 import org.fcitx.fcitx5.android.data.clipboard.ClipboardManager
 import org.fcitx.fcitx5.android.data.clipboard.db.ClipboardEntry
 import org.fcitx.fcitx5.android.data.pinyin.MergedDictionary
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.prefs.ManagedPreference
-import org.fcitx.fcitx5.android.data.prefs.PinyinKeyboard
-import org.fcitx.fcitx5.android.data.prefs.ShuangpinKeyboard
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
+import org.fcitx.fcitx5.android.engine.pinyin.ShuangpinScheme
+import org.fcitx.fcitx5.android.host.HostEvent
+import org.fcitx.fcitx5.android.host.StatusEntry
+import org.fcitx.fcitx5.android.input.address.AddressStrip
 import org.fcitx.fcitx5.android.input.bar.ExpandButtonStateMachine.State.ClickToAttachWindow
 import org.fcitx.fcitx5.android.input.bar.ExpandButtonStateMachine.State.ClickToDetachWindow
 import org.fcitx.fcitx5.android.input.bar.ExpandButtonStateMachine.State.Hidden
@@ -57,6 +60,7 @@ import org.fcitx.fcitx5.android.input.candidates.horizontal.HorizontalCandidateC
 import org.fcitx.fcitx5.android.input.clipboard.ClipboardWindow
 import org.fcitx.fcitx5.android.input.dependency.UniqueViewComponent
 import org.fcitx.fcitx5.android.input.dependency.context
+import org.fcitx.fcitx5.android.input.dependency.fcitx
 import org.fcitx.fcitx5.android.input.dependency.imeScope
 import org.fcitx.fcitx5.android.input.dependency.inputMethodService
 import org.fcitx.fcitx5.android.input.dependency.theme
@@ -64,9 +68,11 @@ import org.fcitx.fcitx5.android.input.editing.TextEditingWindow
 import org.fcitx.fcitx5.android.input.keyboard.CodeRowHeight
 import org.fcitx.fcitx5.android.input.keyboard.CommonKeyActionListener
 import org.fcitx.fcitx5.android.input.keyboard.CustomGestureView
+import org.fcitx.fcitx5.android.input.keyboard.ImKeyboards
 import org.fcitx.fcitx5.android.input.keyboard.KeyboardWindow
 import org.fcitx.fcitx5.android.input.popup.PopupComponent
 import org.fcitx.fcitx5.android.input.preedit.PreeditComponent
+import org.fcitx.fcitx5.android.input.status.PanelActions
 import org.fcitx.fcitx5.android.input.status.StatusAreaWindow
 import org.fcitx.fcitx5.android.input.voice.VoiceFeature
 import org.fcitx.fcitx5.android.input.wm.InputWindow
@@ -98,7 +104,23 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
     private val commonKeyActionListener: CommonKeyActionListener by manager.must()
     private val popup: PopupComponent by manager.must()
 
+    private val fcitx: HostConnection by manager.fcitx()
+
     private val prefs = AppPrefs.getInstance()
+
+    private val toolbarButtons = prefs.internal.toolbarButtons
+
+    private val panelActions by lazy { PanelActions(context, service, fcitx, imeScope, windowManager) }
+
+    // what fcitx last offered for the ⋯ panel: 简繁 is one of them, where the input method has it
+    private var statusEntries: List<StatusEntry> = emptyList()
+
+    @Keep
+    private val onToolbarButtonsUpdateListener = ManagedPreference.OnChangeListener<String> { _, _ -> arrangeButtons() }
+
+    // set elsewhere too (the ⋯ panel, the one-handed keyboard's full-width button): the buttons lit as it is
+    @Keep
+    private val onToggleUpdateListener = ManagedPreference.OnChangeListener<Any> { _, _ -> showToggles() }
 
     private val clipboardSuggestion = prefs.clipboard.clipboardSuggestion
     private val clipboardItemTimeout = prefs.clipboard.clipboardItemTimeout
@@ -215,6 +237,8 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
         )
         if (newState == idleUi.currentState) return
         idleUi.updateState(newState, fromUser)
+        // the toolbar out for any reason (the clipboard's suggestion timed out): its microphone too
+        prepareVoice()
     }
 
     private val hideKeyboardCallback = View.OnClickListener {
@@ -279,9 +303,15 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
         } else false
     }
 
+    // in an email's or a URL's field, the bar's suggestions where it is empty else
+    private val addressStrip by lazy { AddressStrip(context, theme, service) }
+
     private val idleUi: IdleUi by lazy {
         IdleUi(context, theme, popup, commonKeyActionListener).apply {
+            emptyBar.addView(addressStrip.view, FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT))
             menuButton.setOnClickListener {
+                // 清掉最近's spans, anchored to a button going away
+                panelActions.dismiss()
                 when (idleUi.currentState) {
                     IdleUiPolicy.Display.Empty -> {
                         isToolbarManuallyToggled = !expandToolbarByDefault
@@ -300,9 +330,7 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
                 if (clipboardTimeoutJob != null) {
                     launchClipboardTimeoutJob()
                 }
-            }
-            voiceButton.setOnClickListener {
-                VoiceFeature.window()?.let { windowManager.attachWindow(it) }
+                prepareVoice()
             }
             hideKeyboardButton.apply {
                 setOnClickListener(hideKeyboardCallback)
@@ -311,22 +339,29 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
                 swipeThresholdX = swipeThresholdY
                 onGestureListener = swipeHideKeyboardCallback
             }
-            buttonsUi.apply {
-                undoButton.setOnClickListener {
-                    service.sendCombinationKeyEvents(KeyEvent.KEYCODE_Z, ctrl = true)
+            // every button's tap, the `when` exhaustive so that a new button cannot go without one
+            ToolbarButton.entries.forEach { button ->
+                val action: ((View) -> Unit)? = when (button) {
+                    // set where they are made: the emoji's in IdleUi, the hide's above with its swipe
+                    ToolbarButton.Emoji, ToolbarButton.Hide -> null
+                    ToolbarButton.Voice -> { _ -> VoiceFeature.window()?.let { windowManager.attachWindow(it) } }
+                    ToolbarButton.Undo -> { _ -> service.sendCombinationKeyEvents(KeyEvent.KEYCODE_Z, ctrl = true) }
+                    ToolbarButton.Redo -> { _ -> service.sendCombinationKeyEvents(KeyEvent.KEYCODE_Z, ctrl = true, shift = true) }
+                    ToolbarButton.CursorMove -> { _ -> windowManager.attachWindow(TextEditingWindow()) }
+                    ToolbarButton.Clipboard -> { _ -> windowManager.attachWindow(ClipboardWindow()) }
+                    ToolbarButton.More -> { _ -> windowManager.attachWindow(StatusAreaWindow()) }
+                    // the ⋯ panel's, as there (PanelActions)
+                    ToolbarButton.TradSimp -> { _ -> tradSimpEntry()?.let(panelActions::activate) }
+                    ToolbarButton.Floating -> { _ -> panelActions.toggleFloating() }
+                    // the keyboard resized where it is (InputView), not taken back to its letters
+                    ToolbarButton.OneHanded -> { _ -> panelActions.toggleOneHanded(reattach = false) }
+                    ToolbarButton.Habits -> { _ -> panelActions.toggleHabits() }
+                    ToolbarButton.ClearRecent -> { v -> panelActions.clearRecent(v) }
+                    ToolbarButton.Theme -> { _ -> panelActions.themes() }
+                    ToolbarButton.InputMethodSettings -> { _ -> panelActions.inputMethodSettings() }
+                    ToolbarButton.Keyboard -> { v -> panelActions.chooseKeyboard(v) }
                 }
-                redoButton.setOnClickListener {
-                    service.sendCombinationKeyEvents(KeyEvent.KEYCODE_Z, ctrl = true, shift = true)
-                }
-                cursorMoveButton.setOnClickListener {
-                    windowManager.attachWindow(TextEditingWindow())
-                }
-                clipboardButton.setOnClickListener {
-                    windowManager.attachWindow(ClipboardWindow())
-                }
-                moreButton.setOnClickListener {
-                    windowManager.attachWindow(StatusAreaWindow())
-                }
+                action?.let { buttons.getValue(button).setOnClickListener(it) }
             }
             clipboardUi.suggestionView.apply {
                 setOnClickListener {
@@ -450,6 +485,11 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
             add(idleUi.root, lParams(matchParent, matchParent))
             add(candidateUi.root, lParams(matchParent, matchParent))
             add(titleUi.root, lParams(matchParent, matchParent))
+            // the input view replaced (a theme, a layout setting): 清掉最近's spans go with it
+            addOnAttachStateChangeListener(object : View.OnAttachStateChangeListener {
+                override fun onViewAttachedToWindow(v: View) = Unit
+                override fun onViewDetachedFromWindow(v: View) = panelActions.dismiss()
+            })
         }
     }
 
@@ -466,9 +506,15 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
         ClipboardManager.addOnUpdateListener(onClipboardUpdateListener)
         clipboardSuggestion.registerOnChangeListener(onClipboardSuggestionUpdateListener)
         clipboardItemTimeout.registerOnChangeListener(onClipboardTimeoutUpdateListener)
+        toolbarButtons.registerOnChangeListener(onToolbarButtonsUpdateListener)
+        ThemeManager.prefs.oneHanded.registerOnChangeListener(onToggleUpdateListener)
+        prefs.internal.useHabits.registerOnChangeListener(onToggleUpdateListener)
+        statusEntries = fcitx.runImmediately { statusAreaCached }
+        arrangeButtons()
     }
 
     override fun onStartInput(info: EditorInfo, capFlags: CapabilityFlags) {
+        panelActions.dismiss()
         isCapabilityFlagsPassword = toolbarNumRowOnPassword && capFlags.has(CapabilityFlag.Password)
         isInlineSuggestionPresent = false
         calculation = null
@@ -477,11 +523,66 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
             inlineSuggestionsJob?.cancel()
             idleUi.inlineSuggestionsBar.clear()
         }
-        // nothing said out loud goes into a password
-        idleUi.voiceButton.isVisible = VoiceFeature.AVAILABLE && !service.inPasswordField
-        // the first hold of a process finds its VAD made (the start's latency)
-        if (idleUi.voiceButton.isVisible) VoiceFeature.shown(context)
+        arrangeButtons()
+        addressStrip.start(info, capFlags)
         evalIdleUiState()
+        prepareVoice()
+    }
+
+    // the first hold of a process finds its VAD made (the start's latency); only with the microphone in sight,
+    // not folded away on a toolbar that is not out
+    private fun prepareVoice() {
+        if (idleUi.onScreen(ToolbarButton.Voice)) VoiceFeature.shown(context)
+    }
+
+    override fun onFinishInput() = addressStrip.finish()
+
+    private fun tradSimpEntry() = statusEntries.firstOrNull { it.name == PanelActions.TRAD_SIMP }
+
+    // the preference as last parsed, with what it read: arranged on every start and input method
+    private var parsed: Pair<String, ToolbarConfig>? = null
+
+    /**
+     * The buttons the user chose ([ToolbarConfig]), of those of use here. Not again as the 双拼 scheme
+     * changes: that changes which keyboards are offered, never whether any are ([ImKeyboards.choices]).
+     */
+    private fun arrangeButtons() {
+        val situation = ToolbarConfig.Situation(
+            // nothing said out loud goes into a password
+            voice = VoiceFeature.AVAILABLE && !service.inPasswordField,
+            tradSimp = tradSimpEntry() != null,
+            oneHanded = panelActions.oneHandedOffered,
+            keyboards = panelActions.keyboardsOffered,
+        )
+        val stored = toolbarButtons.getValue()
+        val config = parsed?.takeIf { it.first == stored }?.second
+            ?: ToolbarConfig.parse(stored).also { parsed = stored to it }
+        idleUi.arrange { config.layout(situation, it) }
+        showToggles()
+    }
+
+    // lit while on, as in the ⋯ panel
+    private fun showToggles() {
+        idleUi.setActive(ToolbarButton.OneHanded, panelActions.oneHanded)
+        idleUi.setActive(ToolbarButton.Floating, panelActions.floating)
+        idleUi.setActive(ToolbarButton.Habits, !panelActions.habitsOn)
+        // named for what a tap does, as the panel's entry
+        idleUi.buttons.getValue(ToolbarButton.Habits).contentDescription =
+            context.getString(if (panelActions.habitsOn) R.string.learning_habits_off else R.string.learning_habits_on)
+        val traditional = tradSimpEntry()?.icon?.endsWith("-active") == true
+        idleUi.setActive(ToolbarButton.TradSimp, traditional)
+        idleUi.buttons.getValue(ToolbarButton.TradSimp).apply {
+            setIcon(if (traditional) R.drawable.ic_fcitx_status_chttrans_trad else R.drawable.ic_fcitx_status_chttrans_simp)
+            contentDescription = context.getString(if (traditional) R.string.status_traditional else R.string.status_simplified)
+        }
+    }
+
+    // 键盘 is there for an input method with keyboards to choose from
+    override fun onImeUpdate(ime: InputMethodEntry) = arrangeButtons()
+
+    override fun onStatusAreaUpdate(entries: List<StatusEntry>) {
+        statusEntries = entries
+        arrangeButtons()
     }
 
     /** [worked]'s result offered till the cursor leaves [at], the end of the sum's `=`. */
@@ -499,23 +600,27 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
 
     override fun onSelectionUpdate(start: Int, end: Int) {
         if (calculation?.keeps(start, end) == false) dropCalculation()
+        addressStrip.refresh(start, end)
     }
 
     override fun onPreeditEmptyStateUpdate(empty: Boolean) {
         barStateMachine.push(PreeditUpdated, PreeditEmpty to empty)
     }
 
-    override fun onCandidateUpdate(data: CandidateListEvent.Data) {
+    override fun onCandidateUpdate(data: HostEvent.Candidates) {
         barStateMachine.push(CandidatesUpdated, CandidateEmpty to data.candidates.isEmpty())
     }
 
     override fun onWindowAttached(window: InputWindow) {
+        panelActions.dismiss()
         when (window) {
             is InputWindow.ExtendedInputWindow<*> -> {
                 titleUi.setTitle(window.title)
                 window.onCreateBarExtension()?.let { titleUi.addExtension(it, window.showTitle) }
+                titleUi.setReturnButtonDescription(context.getString(window.returnLabel))
                 titleUi.setReturnButtonOnClickListener {
-                    windowManager.attachWindow(KeyboardWindow)
+                    val back = window.returnTo
+                    if (back != null) windowManager.attachWindow(back()) else windowManager.attachWindow(KeyboardWindow)
                 }
                 barStateMachine.push(ExtendedWindowAttached)
             }
@@ -608,13 +713,12 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
          * tap where [im] shows the syllable strip, thin elsewhere ([CodeRowHeight]); the input view
          * sets it anew as the input method changes, and is made anew when either keyboard setting does.
          */
-        fun preeditHeight(im: String?): Int = AppPrefs.getInstance().keyboard.let {
-            preeditHeight(im, it.pinyinKeyboard.getValue(), it.shuangpinKeyboard.getValue())
-        }
+        fun preeditHeight(im: String?): Int =
+            preeditHeight(im, AppPrefs.getInstance().keyboard.imKeyboards(), EngineState.shuangpinScheme)
 
-        /** [preeditHeight] for [im] with pinyin's keyboard [pinyin] and 双拼's [shuangpin]. */
-        fun preeditHeight(im: String?, pinyin: PinyinKeyboard, shuangpin: ShuangpinKeyboard): Int =
-            CodeRowHeight.dp(im, pinyin == PinyinKeyboard.Keys14, shuangpin != ShuangpinKeyboard.Full)
+        /** [preeditHeight] for [im] with each input method's keyboard as [chosen] has it, 双拼's under [scheme]. */
+        fun preeditHeight(im: String?, chosen: ImKeyboards.Chosen, scheme: ShuangpinScheme): Int =
+            CodeRowHeight.dp(ImKeyboards.layoutOf(im.orEmpty(), chosen, scheme))
 
         /** The bar's buttons are never narrower than this, in dp, however short 候选字号 makes the bar. */
         const val MIN_TOUCH_DP = 40

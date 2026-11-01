@@ -5,7 +5,6 @@
 package org.fcitx.fcitx5.android.eval.parity
 
 import org.fcitx.fcitx5.android.eval.parity.SequenceGenerator.Companion.DEFAULT_IMS
-import org.fcitx.fcitx5.android.eval.parity.SequenceGenerator.Companion.T9
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
@@ -46,22 +45,16 @@ class SequenceGeneratorTest {
                 when (step.op) {
                     "type" -> {
                         val keys = step.arg!!
-                        val nine = im == T9 && field == "text"
                         when {
-                            keys == "," || keys == "." -> assertTrue("$s: a mark on ${if (nine) "the nine keys" else field}", !nine && field in setOf("text", "password"))
-                            nine -> assertTrue("$s: $keys", keys.all { it in '2'..'9' })
+                            keys == "," || keys == "." -> assertTrue("$s: a mark in $field", field in setOf("text", "password"))
                             else -> assertTrue("$s: $keys", keys.all { it in 'a'..'z' })
                         }
                     }
                     "ime" -> {
                         assertNotEquals("$s: switch in a password field", "password", field)
-                        assertTrue(step.arg != T9 || field == "text")
                         im = step.arg!!
                     }
-                    "field" -> {
-                        assertTrue("$s: the nine keys in a $field field", im != T9 || step.arg == "text")
-                        field = step.arg!!
-                    }
+                    "field" -> field = step.arg!!
                     "app" -> field = "text"
                     else -> checkToolStep(s, step, im, field)
                 }
@@ -74,7 +67,7 @@ class SequenceGeneratorTest {
             "pick", "bksp" -> assertTrue(step.arg!!.toInt() in 1..3)
             "hw" -> assertTrue(step.arg in Step.HW_KEYS)
             "toggle" -> assertTrue("$s: a toggle in $im $field", im != SequenceGenerator.ENGLISH && field == "text" && step.arg in Step.TOGGLES)
-            "quick", "unicode" -> assertTrue("$s: ${step.op} in $im $field", im != T9 && field == "text")
+            "quick", "unicode" -> assertTrue("$s: ${step.op} in $im $field", field == "text")
         }
     }
 

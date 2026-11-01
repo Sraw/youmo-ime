@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.uat
 
+import android.content.Intent
 import android.os.Looper
 import android.view.View
 import android.widget.TextView
@@ -13,6 +14,7 @@ import androidx.navigation.fragment.NavHostFragment
 import androidx.preference.Preference
 import androidx.preference.PreferenceFragmentCompat
 import androidx.preference.PreferenceGroup
+import androidx.viewpager2.widget.ViewPager2
 import com.github.takahirom.roborazzi.RoborazziOptions
 import com.github.takahirom.roborazzi.captureRoboImage
 import kotlinx.coroutines.CoroutineScope
@@ -20,9 +22,10 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import org.fcitx.fcitx5.android.R
-import org.fcitx.fcitx5.android.core.FakeFcitxAPI
-import org.fcitx.fcitx5.android.core.FakeFcitxConnection
-import org.fcitx.fcitx5.android.daemon.FcitxDaemon
+import org.fcitx.fcitx5.android.core.FakeHostApi
+import org.fcitx.fcitx5.android.core.FakeHostConnection
+import org.fcitx.fcitx5.android.core.HostApi
+import org.fcitx.fcitx5.android.daemon.HostDaemon
 import org.fcitx.fcitx5.android.input.KeyboardHarness
 import org.fcitx.fcitx5.android.ui.main.MainActivity
 import org.fcitx.fcitx5.android.ui.main.settings.SettingsRoute
@@ -30,19 +33,24 @@ import org.robolectric.Robolectric
 import org.robolectric.Shadows.shadowOf
 
 /**
- * The settings app on a [FakeFcitxAPI], as [SettingsUatTest] has it: pages opened by their route,
+ * The settings app on a [FakeHostApi], as [SettingsUatTest] has it: pages opened by their route,
  * read through their preferences. Engine config a page builds from is put in [api] first
- * (`setImConfig`, `setGlobalConfig`, `setAddonSubConfig`); [intent], what it is opened with. [close] at the end: the daemon seam is global.
+ * (`setImOptions`, `setPunctuationMap`); [intent], what it is opened with. [close] at the end: the daemon seam is global.
  */
-class SettingsHarness(val api: FakeFcitxAPI = FakeFcitxAPI(), private val intent: android.content.Intent? = null) : AutoCloseable {
+class SettingsHarness(
+    val api: FakeHostApi = FakeHostApi(),
+    private val intent: Intent? = null,
+    // the pages' engine: [api], or a real one over it (EngineBackedHostApi)
+    private val host: HostApi = api,
+) : AutoCloseable {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
 
     // put back at close: a keyboard harness still open beside this one keeps its own (TB-18)
-    private val before = FcitxDaemon.testConnection
+    private val before = HostDaemon.testConnection
 
     val activity: MainActivity by lazy {
-        FcitxDaemon.testConnection = { FakeFcitxConnection(scope, api) }
+        HostDaemon.testConnection = { FakeHostConnection(scope, api, host) }
         Robolectric.buildActivity(MainActivity::class.java, intent).setup().get().also { idle() }
     }
 
@@ -59,7 +67,7 @@ class SettingsHarness(val api: FakeFcitxAPI = FakeFcitxAPI(), private val intent
 
     /** The page's tab [at] (外观's 主题 / 大小与样式), its pages made as a swipe to it would. */
     fun tab(at: Int) {
-        KeyboardHarness.all(activity.window.decorView).filterIsInstance<androidx.viewpager2.widget.ViewPager2>().first().setCurrentItem(at, false)
+        KeyboardHarness.all(activity.window.decorView).filterIsInstance<ViewPager2>().first().setCurrentItem(at, false)
         idle()
         activity.window.decorView.let {
             it.measure(View.MeasureSpec.makeMeasureSpec(it.width, View.MeasureSpec.EXACTLY), View.MeasureSpec.makeMeasureSpec(it.height, View.MeasureSpec.EXACTLY))
@@ -77,11 +85,11 @@ class SettingsHarness(val api: FakeFcitxAPI = FakeFcitxAPI(), private val intent
         .filterIsInstance<PreferenceFragmentCompat>()
         .flatMap { f -> f.preferenceScreen?.let(::preferences).orEmpty() }
 
+    // a group hidden hides what is in it, as the screen does
     private fun preferences(group: PreferenceGroup): List<Preference> =
-        (0 until group.preferenceCount).flatMap { i ->
-            val p = group.getPreference(i)
+        (0 until group.preferenceCount).map(group::getPreference).filter { it.isVisible }.flatMap { p ->
             listOf(p) + ((p as? PreferenceGroup)?.let(::preferences) ?: emptyList())
-        }.filter { it.isVisible }
+        }
 
     fun titles() = preferences().map { it.title.toString() }
 
@@ -104,7 +112,7 @@ class SettingsHarness(val api: FakeFcitxAPI = FakeFcitxAPI(), private val intent
     }
 
     override fun close() {
-        FcitxDaemon.testConnection = before
+        HostDaemon.testConnection = before
         scope.cancel()
     }
 }

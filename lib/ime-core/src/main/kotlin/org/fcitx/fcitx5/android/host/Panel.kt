@@ -4,11 +4,13 @@
  */
 package org.fcitx.fcitx5.android.host
 
-import org.fcitx.fcitx5.android.core.FcitxEvent
 import org.fcitx.fcitx5.android.core.FormattedText
 
-/** A candidate on a [CandidateList], fcitx's `CandidateWord`: its [text], the [comment] beside it, what picking it does. */
-interface CandidateWord {
+/**
+ * A candidate on a [CandidateList], fcitx's `CandidateWord`: its [text], the [comment] beside it, what
+ * picking it does. Named apart from the app's `core.CandidateWord`, the [CandidateEntry] the host sends.
+ */
+interface PanelCandidate {
     val text: String
     val comment: String get() = ""
 
@@ -34,7 +36,7 @@ interface CandidateList {
     fun label(index: Int): String
 
     /** The [index]th of the page shown. */
-    fun candidate(index: Int): CandidateWord?
+    fun candidate(index: Int): PanelCandidate?
 
     /** The highlighted one of the page, what space would pick; -1 none. */
     val cursorIndex: Int
@@ -45,12 +47,12 @@ interface CandidateList {
     val totalSize: Int get() = size
 
     /** The [index]th of all ([bulk] lists); else the page's. */
-    fun candidateFromAll(index: Int): CandidateWord? = candidate(index)
+    fun candidateFromAll(index: Int): PanelCandidate? = candidate(index)
 
     val pageable: Boolean get() = false
 
     /** `CandidateList::layoutHint`, what the paged window's orientation follows when automatic (Unicode's: vertical). */
-    val layoutHint: FcitxEvent.PagedCandidateEvent.LayoutHint get() = FcitxEvent.PagedCandidateEvent.LayoutHint.NotSet
+    val layoutHint: LayoutHint get() = LayoutHint.NotSet
 
     val hasPrev: Boolean get() = false
     val hasNext: Boolean get() = false
@@ -58,9 +60,9 @@ interface CandidateList {
     fun next() {}
 
     /** The long-press menu of [word], one of this list's. */
-    fun actions(word: CandidateWord): List<CandidateAction> = emptyList()
+    fun actions(word: PanelCandidate): List<CandidateAction> = emptyList()
 
-    fun triggerAction(word: CandidateWord, id: Int) {}
+    fun triggerAction(word: PanelCandidate, id: Int) {}
 }
 
 /**
@@ -69,7 +71,7 @@ interface CandidateList {
  * What punctuation's marks are offered in (`androidengine.cpp:534-541`); quick phrase and Unicode
  * may use it too.
  */
-open class CommonCandidateList(words: List<CandidateWord> = emptyList()) : CandidateList {
+open class CommonCandidateList(words: List<PanelCandidate> = emptyList()) : CandidateList {
     private val words = words.toMutableList()
     private var labels: List<String> = emptyList()
     private var page = 0
@@ -88,7 +90,7 @@ open class CommonCandidateList(words: List<CandidateWord> = emptyList()) : Candi
             field = if (value < 0) -1 else value
         }
 
-    fun append(word: CandidateWord) {
+    fun append(word: PanelCandidate) {
         words += word
     }
 
@@ -100,14 +102,14 @@ open class CommonCandidateList(words: List<CandidateWord> = emptyList()) : Candi
 
     override fun label(index: Int): String = if (index in 0 until size) labels.getOrElse(index) { "" } else ""
 
-    override fun candidate(index: Int): CandidateWord? = if (index in 0 until size) words[page * pageSize + index] else null
+    override fun candidate(index: Int): PanelCandidate? = if (index in 0 until size) words[page * pageSize + index] else null
 
     override val cursorIndex: Int
         get() = if (globalCursorIndex >= 0 && globalCursorIndex / pageSize == page) globalCursorIndex % pageSize else -1
 
     override val bulk get() = true
     override val totalSize get() = words.size
-    override fun candidateFromAll(index: Int): CandidateWord? = words.getOrNull(index)
+    override fun candidateFromAll(index: Int): PanelCandidate? = words.getOrNull(index)
 
     override val pageable get() = true
     override val hasPrev get() = page > 0

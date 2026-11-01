@@ -18,7 +18,6 @@ import org.fcitx.fcitx5.android.engine.learn.Word
 import org.fcitx.fcitx5.android.engine.learn.Words
 import org.fcitx.fcitx5.android.engine.learn.rankView
 import org.fcitx.fcitx5.android.engine.learn.control.Why
-import org.fcitx.fcitx5.android.engine.pinyin.Syllables
 import org.fcitx.fcitx5.android.engine.rerank.SentencePicker
 import org.fcitx.fcitx5.android.engine.rerank.SentenceRefiner
 import org.fcitx.fcitx5.android.engine.session.Action
@@ -26,6 +25,8 @@ import org.fcitx.fcitx5.android.engine.session.Choice
 import org.fcitx.fcitx5.android.engine.session.CommitJournal
 import org.fcitx.fcitx5.android.engine.session.FieldJournal
 import org.fcitx.fcitx5.android.engine.session.Offer
+import org.fcitx.fcitx5.android.engine.session.OfferRules
+import org.fcitx.fcitx5.android.engine.session.Pager
 import org.fcitx.fcitx5.android.engine.session.Predictions
 import org.fcitx.fcitx5.android.engine.session.RefineSlices
 import org.fcitx.fcitx5.android.engine.session.Retype
@@ -91,7 +92,7 @@ import org.fcitx.fcitx5.android.engine.user.UserModel.Entry
 class HandwritingSession(
     private val decoder: HandwritingDecoder?,
     private val words: TextWords?,
-    private val pageSize: Int = DEFAULT_PAGE_SIZE,
+    pageSize: Int = DEFAULT_PAGE_SIZE,
     private val user: UserModel? = null,
     private val predictor: Predictor? = null,
     private val reranker: SentencePicker? = null,
@@ -134,7 +135,7 @@ class HandwritingSession(
     private var decoding: HandwritingDecoder.Decoding? = null
     private val unrefined = RefineSlices<HandwritingDecoder.Decoding>(refiner)
 
-    private var page = 0
+    private val pager = Pager(pageSize)
 
     // the field as this session wrote it (U-03); what each sentence of it was written as, a set of
     // what the ink of each character read as, by its record (seqs are given again after an undo)
@@ -164,15 +165,19 @@ class HandwritingSession(
 
     override var learning = true
 
-    /** What the pad read of its [piece], to be shown at the next [Action.Ink]: those offered by then, in turn. */
-    fun offer(reading: InkReading, piece: Int) {
-        offered.addLast(Offered(reading, piece))
+    /**
+     * What the pad read, or a piece of it finished ([ink]), held for the next [Action.Ink] to show
+     * in turn with its own: told while handwriting is not the input method, no key typed into another.
+     */
+    fun hold(ink: Action.Ink) {
+        offered.addLast(Offered(ink.reading, ink.piece))
     }
 
-    /** The pad's [piece] finished, after its readings: told at the next [Action.Ink], in turn with them. */
-    fun finished(piece: Int) {
-        offered.addLast(Offered(null, piece))
-    }
+    // the last Ink this showed: one whose key it never had (see took) is held instead
+    private var lastInk: Action.Ink? = null
+
+    /** Whether [ink]'s key reached this, the last shown: not one a temp mode had, nor one sent to a field gone. */
+    fun took(ink: Action.Ink): Boolean = ink === lastInk
 
     override fun reads(c: Char): Boolean = false
 
@@ -189,18 +194,18 @@ class HandwritingSession(
     // handwriting keeps none of, a prediction forgotten or blocked (a candidate's reads anew, see
     // pressed), what no handwriting does
     private fun keepsOrder(action: Action) = when (action) {
-        Action.Refine, Action.Ink, Action.Glide, is Action.Cursor, is Action.Step, is Action.Forget, is Action.Block, is Action.Pin, is Action.Unpin, is Action.Syllable, is Action.Letter, is Action.NineKey -> true
+        Action.Refine, is Action.Ink, is Action.Glide, is Action.Stroke, is Action.Cursor, is Action.Step, is Action.Forget, is Action.Block, is Action.Pin, is Action.Unpin, is Action.Syllable, is Action.Letter, is Action.NineKey -> true
         else -> false
     }
 
     private fun act(action: Action): Snapshot = when (action) {
-        Action.Ink -> show()
+        is Action.Ink -> show(action)
         // with nothing written the app's: an offer goes away
         Action.Backspace -> if (written.isEmpty()) deleted() else takeBack()
-        is Action.Select -> if (action.index in 0 until pageSize) pick(page * pageSize + action.index) else snapshot(handled = written.isNotEmpty())
+        is Action.Select -> pager.at(action.index).let { if (it >= 0) pick(it) else snapshot(handled = written.isNotEmpty()) }
         is Action.Pick -> pick(action.index)
-        Action.NextPage -> turn(page + 1)
-        Action.PreviousPage -> turn(page - 1)
+        Action.NextPage -> turn(pager.page + 1)
+        Action.PreviousPage -> turn(pager.page - 1)
         // as pinyin's enter: put in, nothing offered after it
         Action.CommitRaw -> if (written.isEmpty()) unoffer(handled = false) else pick(0, offer = false)
         is Action.Key -> key(action.char)
@@ -218,7 +223,7 @@ class HandwritingSession(
         Action.Refine -> refine()
         is Action.Forget -> pressed(action.index, Offer.FORGET)
         is Action.Block -> pressed(action.index, Offer.BLOCK)
-        Action.Glide, is Action.Pin, is Action.Unpin, is Action.Syllable, is Action.Letter, is Action.NineKey -> snapshot()
+        is Action.Glide, is Action.Stroke, is Action.Pin, is Action.Unpin, is Action.Syllable, is Action.Letter, is Action.NineKey, Action.LookUp -> snapshot()
     }
 
     override fun candidates(from: Int, count: Int): List<Choice> {
@@ -251,11 +256,8 @@ class HandwritingSession(
     // a candidate's, as the class says: forgotten where something is learned of it
     private fun writtenOffers(index: Int): Set<Offer> {
         val text = sentences.getOrNull(index)?.let { lastCharacter(it.text) }
-        if (text == null || !learning) return emptySet()
-        return buildSet {
-            if (habits.knows(text)) add(Offer.FORGET)
-            if (block != null && decoder?.alone(text) != null) add(Offer.BLOCK)
-        }
+        if (text == null) return emptySet()
+        return OfferRules.offers(learning, forgets = { habits.knows(text) }, blocks = { block != null && decoder?.alone(text) != null })
     }
 
     override fun passedOn() {
@@ -263,7 +265,9 @@ class HandwritingSession(
         predictions.forgetBefore()
     }
 
-    private fun show(): Snapshot {
+    private fun show(ink: Action.Ink): Snapshot {
+        lastInk = ink
+        hold(ink)
         var changed = false
         var finished = false
         while (offered.isNotEmpty()) {
@@ -287,7 +291,7 @@ class HandwritingSession(
 
     private fun unoffer(handled: Boolean = true): Snapshot {
         predictions.unoffer()
-        page = 0
+        pager.reset()
         return snapshot(handled = handled)
     }
 
@@ -310,7 +314,7 @@ class HandwritingSession(
 
     // what may follow the text before, as far as it is words
     private fun predict() {
-        page = 0
+        pager.reset()
         predictions.predict()
     }
 
@@ -332,7 +336,7 @@ class HandwritingSession(
     }
 
     private fun decode() {
-        page = 0
+        pager.reset()
         predictions.unoffer()
         // read anew: what the refiner was to weigh is not what shows
         unrefined.drop()
@@ -404,7 +408,7 @@ class HandwritingSession(
         sentences = emptyList()
         decoding = null
         unrefined.drop()
-        if (offer) predict() else page = 0
+        if (offer) predict() else pager.reset()
         return snapshot(commit = sentence.text)
     }
 
@@ -426,7 +430,7 @@ class HandwritingSession(
         // as 添加词 fills one in): a sentence that is no word, put in twice, is the user's word typed
         // so (U-06, 原 UAT HW-20). Counted by their text alone, never for pinyin's order (D28, LearnState.heard)
         val read = sentence.words
-        val whole = read?.map { Word(it.text, it.syllables.joinToString(" ") { s -> Syllables.spelling(s) }) } ?: listOf(Word(sentence.text, ""))
+        val whole = read?.map { Word(it.text, it.spelled()) } ?: listOf(Word(sentence.text, ""))
         val origin = read?.let { origin(sentence.text, it) } ?: Row.DICTIONARY
         val rows = KeyedRows.of(Kinds.HANDWRITING, picks, whole, predictions.wordBefore(), origin)
         // sentences deleted whole just before, written again by this one, a character for each written (U-03)
@@ -470,7 +474,7 @@ class HandwritingSession(
         val text = predictions.pick(index) ?: return snapshot(handled = predictions.offered.isNotEmpty())
         // deleted whole at once, the pick is taken back (U-03); it types nothing deleted again
         journal.committed(text, predictions.picked, learning)
-        page = 0
+        pager.reset()
         return snapshot(commit = text)
     }
 
@@ -478,7 +482,7 @@ class HandwritingSession(
     // offered again; or the candidate's character, what is written read again without it
     private fun pressed(index: Int, offer: Offer): Snapshot {
         if (written.isEmpty()) {
-            if (predictions.press(index, offer)) page = 0
+            if (predictions.press(index, offer)) pager.reset()
             return snapshot()
         }
         if (offer !in writtenOffers(index)) return snapshot()
@@ -510,33 +514,31 @@ class HandwritingSession(
         decoding = null
         unrefined.drop()
         predictions.unoffer()
-        page = 0
+        pager.reset()
         return snapshot()
     }
 
     private fun turn(to: Int): Snapshot {
-        if (to < 0 || to * pageSize >= shown().size) return snapshot()
-        page = to
+        pager.turn(to, shown().size)
         return snapshot()
     }
 
     private fun snapshot(commit: String = "", handled: Boolean = true): Snapshot {
         val all = shown()
-        val from = page * pageSize
         val predicting = written.isEmpty() && predictions.offered.isNotEmpty()
         return Snapshot(
             commit = commit,
             preedit = if (written.isEmpty()) "" else sentences.firstOrNull()?.text.orEmpty(),
-            candidates = all.subList(minOf(from, all.size), minOf(from + pageSize, all.size)),
-            page = page,
-            hasPreviousPage = page > 0,
-            hasNextPage = from + pageSize < all.size,
+            candidates = pager.of(all),
+            page = pager.page,
+            hasPreviousPage = pager.hasPrevious,
+            hasNextPage = pager.hasNext(all.size),
             handled = handled,
             predicting = predicting,
             actionable = predicting || written.isNotEmpty(),
             refines = unrefined.refines,
             total = all.size,
-            first = from,
+            first = pager.from,
         )
     }
 

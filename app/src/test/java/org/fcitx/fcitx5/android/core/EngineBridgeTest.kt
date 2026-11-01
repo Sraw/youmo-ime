@@ -5,22 +5,28 @@
 package org.fcitx.fcitx5.android.core
 
 import org.fcitx.fcitx5.android.FcitxApplication
+import org.fcitx.fcitx5.android.Uat
+import org.fcitx.fcitx5.android.assertRows
 import org.fcitx.fcitx5.android.data.pinyin.CustomPhraseManager
 import org.fcitx.fcitx5.android.data.pinyin.ImportedDictionaries
 import org.fcitx.fcitx5.android.data.pinyin.MergedDictionary
 import org.fcitx.fcitx5.android.data.pinyin.customphrase.PinyinCustomPhrase
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.replaceDirectory
+import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.engine.data.DataFormatException
-import org.fcitx.fcitx5.android.engine.host.EngineEvent
-import org.fcitx.fcitx5.android.engine.host.Engines
+import org.fcitx.fcitx5.android.engine.handwriting.HandwritingSession
 import org.fcitx.fcitx5.android.engine.learn.control.BackupOp
 import org.fcitx.fcitx5.android.engine.learn.control.LearningOp
 import org.fcitx.fcitx5.android.engine.learn.control.LearningResult
 import org.fcitx.fcitx5.android.engine.phrase.CustomPhrases
 import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
 import org.fcitx.fcitx5.android.engine.pinyin.ShuangpinScheme
+import org.fcitx.fcitx5.android.engine.runtime.EngineEvent
+import org.fcitx.fcitx5.android.engine.runtime.EngineSettings
+import org.fcitx.fcitx5.android.engine.runtime.Engines
 import org.fcitx.fcitx5.android.engine.session.Snapshot
+import org.fcitx.fcitx5.android.host.EngineOptions
 import org.fcitx.fcitx5.android.utils.appContext
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -30,7 +36,6 @@ import org.junit.Assert.assertNotSame
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
-import org.junit.Assume.assumeFalse
 import org.junit.Assume.assumeTrue
 import org.junit.Rule
 import org.junit.Test
@@ -54,6 +59,8 @@ import java.nio.file.Files
  * and the 双拼 scheme configured, which the keyboard reads.
  */
 class EngineBridgeTest {
+
+    private val bridge = EngineBridge()
 
     @get:Rule
     val folder = TemporaryFolder()
@@ -122,7 +129,7 @@ class EngineBridgeTest {
     fun anInputMethodThatCannotLoadIsNotCalledAgainTillReloaded() {
         val latched = ArrayList<String>()
         val unloadable = EngineBridge.Unloadable { im, _ -> latched += im }
-        val broken = { throw FileNotFoundException(Engines.PINYIN_DATA) }
+        val broken = { throw FileNotFoundException(InputMethodCatalog.PINYIN_DATA) }
         assertThrows(FileNotFoundException::class.java) { unloadable.call("engine-pinyin", broken) }
         assertTrue("engine-pinyin" in unloadable)
         assertThrows(FileNotFoundException::class.java) { unloadable.call("engine-pinyin", broken) }
@@ -146,14 +153,14 @@ class EngineBridgeTest {
     fun aBugOrMemoryRunOutBeforeTheFirstAnswerIsThatEventsAlone() {
         val latched = ArrayList<String>()
         val unloadable = EngineBridge.Unloadable { im, _ -> latched += im }
-        assertThrows(IllegalStateException::class.java) { unloadable.callThrowing(Engines.PINYIN, IllegalStateException("a bug")) }
-        assertThrows(IllegalArgumentException::class.java) { unloadable.callThrowing(Engines.PINYIN, IllegalArgumentException("a bug")) }
-        assertThrows(OutOfMemoryError::class.java) { unloadable.callThrowing(Engines.PINYIN, OutOfMemoryError()) }
+        assertThrows(IllegalStateException::class.java) { unloadable.callThrowing(InputMethodCatalog.PINYIN, IllegalStateException("a bug")) }
+        assertThrows(IllegalArgumentException::class.java) { unloadable.callThrowing(InputMethodCatalog.PINYIN, IllegalArgumentException("a bug")) }
+        assertThrows(OutOfMemoryError::class.java) { unloadable.callThrowing(InputMethodCatalog.PINYIN, OutOfMemoryError()) }
         // the data mapped with no memory left to map it in
-        assertThrows(IOException::class.java) { unloadable.callThrowing(Engines.PINYIN, IOException("Map failed", OutOfMemoryError())) }
-        assertFalse(Engines.PINYIN in unloadable)
+        assertThrows(IOException::class.java) { unloadable.callThrowing(InputMethodCatalog.PINYIN, IOException("Map failed", OutOfMemoryError())) }
+        assertFalse(InputMethodCatalog.PINYIN in unloadable)
         assertEquals(emptyList<String>(), latched)
-        assertEquals(1, unloadable.call(Engines.PINYIN) { 1 })
+        assertEquals(1, unloadable.call(InputMethodCatalog.PINYIN) { 1 })
     }
 
     // a walk that does not end would hang the test, not fail it
@@ -163,8 +170,8 @@ class EngineBridgeTest {
         val unloadable = EngineBridge.Unloadable { im, _ -> latched += im }
         val first = IOException("cannot read")
         first.initCause(IOException("cannot read", first))
-        assertThrows(IOException::class.java) { unloadable.callThrowing(Engines.PINYIN, first) }
-        assertEquals(listOf(Engines.PINYIN), latched)
+        assertThrows(IOException::class.java) { unloadable.callThrowing(InputMethodCatalog.PINYIN, first) }
+        assertEquals(listOf(InputMethodCatalog.PINYIN), latched)
     }
 
     @Test
@@ -175,13 +182,13 @@ class EngineBridgeTest {
         fun Engines.reset(im: String) = unloadable.call(im) { onEvent(im, EngineEvent.RESET, 0) }
         // no data in the app
         Engines({ throw FileNotFoundException(it) }, null).use { engines ->
-            assertThrows(FileNotFoundException::class.java) { engines.reset(Engines.PINYIN) }
+            assertThrows(FileNotFoundException::class.java) { engines.reset(InputMethodCatalog.PINYIN) }
         }
         // data that is not the engine's
         Engines({ ByteBuffer.allocate(0) }, null).use { engines ->
-            assertThrows(DataFormatException::class.java) { engines.reset(Engines.T9) }
+            assertThrows(DataFormatException::class.java) { engines.reset(InputMethodCatalog.SHUANGPIN) }
         }
-        assertEquals(listOf(Engines.PINYIN, Engines.T9), latched)
+        assertEquals(listOf(InputMethodCatalog.PINYIN, InputMethodCatalog.SHUANGPIN), latched)
     }
 
     @Test
@@ -189,7 +196,7 @@ class EngineBridgeTest {
         val dir = File(folder.root, "engine")
         val aside = File(dir.path + ".old")
         File(aside.apply { mkdirs() }, "log").writeText("learned")
-        assertEquals(dir, EngineBridge.restored(dir))
+        assertEquals(dir, bridge.restored(dir))
         assertEquals("learned", File(dir, "log").readText())
         assertFalse(aside.exists())
     }
@@ -201,22 +208,64 @@ class EngineBridgeTest {
         File(aside.apply { mkdirs() }, "log").writeText("learned")
         // a directory is not renamed over a file: here a link to nothing, so engine/ is not there
         assumeTrue(runCatching { Files.createSymbolicLink(dir.toPath(), File(folder.root, "none").toPath()) }.isSuccess)
-        assertNull(EngineBridge.restored(dir))
+        assertNull(bridge.restored(dir))
         assertThrows(IOException::class.java) { replaceDirectory(dir, File(dir.path + ".import")) {} }
         assertEquals("learned", File(aside, "log").readText())
     }
 
+    // a phrase file not read: the keyboard's pin is refused, with why, and the file left as it was
+    // (its phrases would be lost to the pin)
     @Test
-    fun customPhrasesThatCannotBeReadAreNotSavedOver() {
+    @Uat("PR-42")
+    fun theKeyboardsPinIsRefusedWhereTheFileWouldBeLost() {
+        // as root, every file reads: checked once, a skip (F4987), not a test that passes having checked nothing
+        val probe = File(folder.root, "probe").apply { writeText("") }
+        assumeTrue("an unreadable file (not as root)", probe.setReadable(false) && !probe.canRead())
+        probe.delete()
         val file = phraseFile()
         file.setReadable(false)
-        // as root, every file reads
-        assumeFalse(file.canRead())
-        val added = EngineBridge.additions(folder.root)
+        var told = 0
+        val added = bridge.additions(folder.root, unreadable = { told++ })
         file.setReadable(true)
+        assertEquals(1, told)
         assertEquals("", added.phrases)
-        assertThrows(IOException::class.java) { added.savePhrases(CustomPhrases.parse("").pinned("yx", "信箱")) }
+        val refused = assertThrows(IOException::class.java) { added.savePhrases(CustomPhrases.parse("").pinned("yx", "信箱")) }
+        assertEquals("custom phrases were not read", refused.message)
         assertEquals(listOf(phone, email), CustomPhraseManager.load(file))
+    }
+
+    // data not settled (external storage away on an upgraded phone): the pin is refused and nothing is
+    // written that the next settle would not look for, the dictionaries neither converted nor compiled.
+    // Changes no permission bits: runs as root too (F5004)
+    @Test
+    @Uat("PR-42")
+    fun theKeyboardsPinIsRefusedWhereDataIsNotSettled() {
+        val file = phraseFile()
+        val before = file.readText()
+        val dictionaries = File(folder.root, "dictionaries").apply { mkdirs() }
+        File(dictionaries, "mine.txt").writeText("你好 ni'hao 0.0\n")
+        val list = File(dictionaries, ImportedDictionaries.INTO_NEW).apply { writeText("mine\n") }
+        MergedDictionary.reset()
+        var made = 0
+        MergedDictionary.made = { made++ }
+        MergedDictionary.base = { null }
+        try {
+            val added = bridge.additions(folder.root, writable = false)
+            assertEquals(before, added.phrases)
+            val refused = assertThrows(IOException::class.java) { added.savePhrases(CustomPhrases.parse(added.phrases).pinned("yx", "信箱")) }
+            assertEquals("where fcitx's data is, is not settled", refused.message)
+            assertEquals(before, file.readText())
+            // 0.3.1's text and the older build's list as they were, nothing compiled (the text still
+            // owes its words, so it stays pending for the start that settles the data)
+            assertTrue(list.exists())
+            assertTrue(File(dictionaries, "mine.txt").exists())
+            assertFalse(File(dictionaries, "mine.txt.gz").exists())
+            assertFalse(File(dictionaries, MergedDictionary.FILE).exists())
+            assertEquals(0, made)
+        } finally {
+            MergedDictionary.reset()
+            MergedDictionary.made = {}
+        }
     }
 
     // one an older build merged into the new words is merged into the base, its list gone; and 0.3.1's
@@ -233,7 +282,7 @@ class EngineBridgeTest {
         MergedDictionary.made = { made++ }
         MergedDictionary.base = { null }
         try {
-            val added = EngineBridge.additions(folder.root)
+            val added = bridge.additions(folder.root)
             assertFalse(list.exists())
             assertNull(added.dictionary())
             MergedDictionary.refreshNow(dictionaries)
@@ -243,7 +292,7 @@ class EngineBridgeTest {
             assertTrue(made > 0)
             assertEquals(mapOf("mine" to 1, "theirs" to 1), MergedDictionary.sourceWords(dictionaries))
             // the engine is told of another file, as it reads them again for it
-            assertNotEquals(added.dictionaries, EngineBridge.additions(folder.root).dictionaries)
+            assertNotEquals(added.dictionaries, bridge.additions(folder.root).dictionaries)
             // kept gzip'd, the texts gone
             assertEquals(listOf("mine.txt.gz", "theirs.txt.gz"), dictionaries.list()!!.filter { it.endsWith(".gz") }.sorted())
             assertFalse(File(dictionaries, "mine.txt").exists())
@@ -272,23 +321,23 @@ class EngineBridgeTest {
         )
         val during = ArrayList<Boolean>()
         // a key, then the slices the host sends for it, the last with nothing left to refine
-        EngineBridge.answer(Engines.PINYIN, EngineEvent.CHAR) { refines(true) }
-        assertTrue(EngineBridge.refining)
-        EngineBridge.answer(Engines.PINYIN, EngineEvent.REFINE) { during += EngineBridge.refining; refines(true) }
-        EngineBridge.answer(Engines.PINYIN, EngineEvent.REFINE) { during += EngineBridge.refining; refines(false) }
+        bridge.answer(InputMethodCatalog.PINYIN, EngineEvent.CHAR) { refines(true) }
+        assertTrue(EngineState.refining)
+        bridge.answer(InputMethodCatalog.PINYIN, EngineEvent.REFINE) { during += EngineState.refining; refines(true) }
+        bridge.answer(InputMethodCatalog.PINYIN, EngineEvent.REFINE) { during += EngineState.refining; refines(false) }
         // as EngineEvalRunner reads it off the host thread while a slice runs
         assertEquals(listOf(true, true), during)
-        assertFalse(EngineBridge.refining)
+        assertFalse(EngineState.refining)
         // the host sends no refine after a failure, and the failure is thrown on for its router
-        EngineBridge.answer(Engines.PINYIN, EngineEvent.CHAR) { refines(true) }
-        EngineBridge.syllablesState.value = EngineBridge.SyllableState(Engines.PINYIN, true, listOf("ni"), 1)
+        bridge.answer(InputMethodCatalog.PINYIN, EngineEvent.CHAR) { refines(true) }
+        EngineState.syllablesState.value = EngineState.SyllableState(InputMethodCatalog.PINYIN, true, listOf("ni"), 1)
         assertThrows(IllegalStateException::class.java) {
-            EngineBridge.answer(Engines.PINYIN, EngineEvent.REFINE) { error("a bug") }
+            bridge.answer(InputMethodCatalog.PINYIN, EngineEvent.REFINE) { error("a bug") }
         }
-        assertFalse(EngineBridge.refining)
+        assertFalse(EngineState.refining)
         // nor syllables to take after it: a tap would send an id the engine drops
-        assertEquals(EngineBridge.SyllableState(Engines.PINYIN), EngineBridge.syllables.value)
-        EngineBridge.syllablesState.value = EngineBridge.SyllableState()
+        assertEquals(EngineState.SyllableState(InputMethodCatalog.PINYIN), EngineState.syllables.value)
+        EngineState.syllablesState.value = EngineState.SyllableState()
     }
 
     // written on each answer, and a hand-back writes the empty state once
@@ -299,26 +348,26 @@ class EngineBridgeTest {
             hasNextPage = false, handled = handled, predicting = false, syllables = syllables, syllablesId = id,
         )
         try {
-            // 九键 as before
-            EngineBridge.answer(Engines.T9, EngineEvent.CHAR) { typed("64", listOf("ni", "mi"), 1) }
-            assertEquals(EngineBridge.SyllableState(Engines.T9, true, listOf("ni", "mi"), 1), EngineBridge.syllables.value)
-            // the 14 keys, which are pinyin's: no gate on which keys typed
-            EngineBridge.answer(Engines.PINYIN, EngineEvent.CHAR) { typed("bn", listOf("bu", "nu"), 2) }
-            assertEquals(EngineBridge.SyllableState(Engines.PINYIN, true, listOf("bu", "nu"), 2), EngineBridge.syllables.value)
+            // 双拼's
+            bridge.answer(InputMethodCatalog.SHUANGPIN, EngineEvent.CHAR) { typed("ni", listOf("ni", "mi"), 1) }
+            assertEquals(EngineState.SyllableState(InputMethodCatalog.SHUANGPIN, true, listOf("ni", "mi"), 1), EngineState.syllables.value)
+            // the 14 or nine keys, which are pinyin's: no gate on which keys typed
+            bridge.answer(InputMethodCatalog.PINYIN, EngineEvent.CHAR) { typed("bn", listOf("bu", "nu"), 2) }
+            assertEquals(EngineState.SyllableState(InputMethodCatalog.PINYIN, true, listOf("bu", "nu"), 2), EngineState.syllables.value)
             // a refine that changed nothing keeps them
-            EngineBridge.answer(Engines.PINYIN, EngineEvent.REFINE) { typed("", emptyList(), handled = false) }
-            assertEquals(listOf("bu", "nu"), EngineBridge.syllables.value.syllables)
+            bridge.answer(InputMethodCatalog.PINYIN, EngineEvent.REFINE) { typed("", emptyList(), handled = false) }
+            assertEquals(listOf("bu", "nu"), EngineState.syllables.value.syllables)
             // one that did, tells
-            EngineBridge.answer(Engines.PINYIN, EngineEvent.REFINE) { typed("bn", listOf("nu"), 3) }
-            assertEquals(EngineBridge.SyllableState(Engines.PINYIN, true, listOf("nu"), 3), EngineBridge.syllables.value)
+            bridge.answer(InputMethodCatalog.PINYIN, EngineEvent.REFINE) { typed("bn", listOf("nu"), 3) }
+            assertEquals(EngineState.SyllableState(InputMethodCatalog.PINYIN, true, listOf("nu"), 3), EngineState.syllables.value)
             // handed back to 全拼, which offers none: cleared
-            EngineBridge.answer(Engines.PINYIN, EngineEvent.CHAR) { typed("n", emptyList()) }
-            assertEquals(EngineBridge.SyllableState(Engines.PINYIN, true), EngineBridge.syllables.value)
+            bridge.answer(InputMethodCatalog.PINYIN, EngineEvent.CHAR) { typed("n", emptyList()) }
+            assertEquals(EngineState.SyllableState(InputMethodCatalog.PINYIN, true), EngineState.syllables.value)
             // another input method after: its own, empty
-            EngineBridge.answer(Engines.WUBI, EngineEvent.RESET) { typed("", emptyList()) }
-            assertEquals(EngineBridge.SyllableState(Engines.WUBI), EngineBridge.syllables.value)
+            bridge.answer(InputMethodCatalog.WUBI, EngineEvent.RESET) { typed("", emptyList()) }
+            assertEquals(EngineState.SyllableState(InputMethodCatalog.WUBI), EngineState.syllables.value)
         } finally {
-            EngineBridge.syllablesState.value = EngineBridge.SyllableState()
+            EngineState.syllablesState.value = EngineState.SyllableState()
         }
     }
 
@@ -326,98 +375,138 @@ class EngineBridgeTest {
     @RunWith(RobolectricTestRunner::class)
     @Config(application = FcitxApplication::class)
     class Made {
+
+        private val bridge = EngineBridge()
         /** Taken, it says so: an Ink key goes out for what is shown. */
         @Test
         fun handwritingThatLoadsTakesTheInk() {
-            EngineBridge.unloadable.clear()
+            bridge.unloadable.clear()
             var calls = 0
             try {
-                assertTrue(EngineBridge.ink(Engines.HANDWRITING) { calls++ })
+                assertTrue(bridge.handwriting(InputMethodCatalog.HANDWRITING) { calls++ })
                 assertEquals(1, calls)
-                assertFalse(Engines.HANDWRITING in EngineBridge.unloadable)
+                assertFalse(InputMethodCatalog.HANDWRITING in bridge.unloadable)
             } finally {
-                EngineBridge.unloadable.clear()
+                bridge.unloadable.clear()
             }
         }
 
         /** A piece finished as the pad leaves for English: the engine is told, but no Ink key goes into keyboard-us. */
         @Test
         fun inkUnderAnotherInputMethodReachesTheEngineButIsNotTaken() {
-            EngineBridge.unloadable.clear()
+            bridge.unloadable.clear()
             var calls = 0
             try {
-                assertFalse(EngineBridge.ink(Engines.ENGLISH) { calls++ })
+                assertFalse(bridge.handwriting(InputMethodCatalog.ENGLISH) { calls++ })
                 assertEquals(1, calls)
-                assertFalse(Engines.HANDWRITING in EngineBridge.unloadable)
+                assertFalse(InputMethodCatalog.HANDWRITING in bridge.unloadable)
             } finally {
-                EngineBridge.unloadable.clear()
+                bridge.unloadable.clear()
             }
         }
 
         // Robolectric: a latch is said on the keyboard (EngineNotices)
         @Test
         fun anInputMethodThatCannotLoadAnswersNothingAndItsSyllablesGo() {
-            EngineBridge.unloadable.clear()
+            bridge.unloadable.clear()
             try {
-                assertThrows(FileNotFoundException::class.java) { EngineBridge.unloadable.call("mine") { throw FileNotFoundException("mine") } }
-                EngineBridge.syllablesState.value = EngineBridge.SyllableState("mine", true, listOf("ni", "mi"), 4)
-                assertEquals(null, EngineBridge.answer("mine", EngineEvent.CHAR) { error("not called") })
-                assertEquals(EngineBridge.SyllableState("mine"), EngineBridge.syllables.value)
+                assertThrows(FileNotFoundException::class.java) { bridge.unloadable.call("mine") { throw FileNotFoundException("mine") } }
+                EngineState.syllablesState.value = EngineState.SyllableState("mine", true, listOf("ni", "mi"), 4)
+                assertEquals(null, bridge.answer("mine", EngineEvent.CHAR) { error("not called") })
+                assertEquals(EngineState.SyllableState("mine"), EngineState.syllables.value)
             } finally {
-                EngineBridge.unloadable.clear()
-                EngineBridge.syllablesState.value = EngineBridge.SyllableState()
+                bridge.unloadable.clear()
+                EngineState.syllablesState.value = EngineState.SyllableState()
             }
         }
 
         @Test
         fun handwritingWhosePinyinDataCannotLoadIsTriedOnceThenSkippedThrowingNothing() {
-            EngineBridge.unloadable.clear()
+            bridge.unloadable.clear()
             var calls = 0
             try {
                 // each a character written: offerInk, inkFinished; none taken, so no Ink key is sent for it
                 repeat(3) {
                     assertFalse(
-                        EngineBridge.ink(Engines.HANDWRITING) {
+                        bridge.handwriting(InputMethodCatalog.HANDWRITING) {
                             calls++
                             throw FileNotFoundException("pinyin")
                         }
                     )
                 }
                 assertEquals(1, calls)
-                assertTrue(Engines.HANDWRITING in EngineBridge.unloadable)
+                assertTrue(InputMethodCatalog.HANDWRITING in bridge.unloadable)
             } finally {
-                EngineBridge.unloadable.clear()
+                bridge.unloadable.clear()
             }
         }
 
         @Test
         fun whatAnImportKilledBetweenItsRenamesLeftAsideIsPutBackBeforeTheEngineOpensIt() {
-            // made here, whichever test of this sandbox made it before
-            EngineBridge.close()
             val dir = File(appContext.filesDir, "engine")
             val aside = File(dir.path + ".old")
             File(aside.apply { mkdirs() }, "log").writeText("learned")
-            assertNotNull(EngineBridge.engines)
+            assertNotNull(bridge.engines)
             assertEquals("learned", File(dir, "log").readText())
             assertFalse(aside.exists())
-            EngineBridge.close()
+            bridge.close()
+        }
+
+        // a view made before the next engine speaks would show this one's syllables or word; the
+        // config's (the scheme, suggesting) stays, read again at the next start (F4908: close dropped them too)
+        @Test
+        fun closeLeavesNoSessionStateButKeepsTheConfigs() {
+            val scheme = EngineState.shuangpinScheme
+            val suggests = EngineState.englishSuggests
+            try {
+                EngineState.refining = true
+                EngineState.syllablesState.value = EngineState.SyllableState(im = "pinyin", composing = true, syllables = listOf("ni"), id = 3)
+                EngineState.englishTypingState.value = true
+                EngineState.inkEnded.value = 7
+                EngineState.shuangpinScheme = if (scheme === ShuangpinScheme.XIAOHE) ShuangpinScheme.ZIRANMA else ShuangpinScheme.XIAOHE
+                EngineState.englishSuggests = !suggests
+                bridge.close()
+                assertFalse(EngineState.refining)
+                assertEquals(EngineState.SyllableState(), EngineState.syllables.value)
+                assertFalse(EngineState.englishTyping.value)
+                assertEquals(HandwritingSession.NO_PIECE, EngineState.handwritingEnded.value)
+                assertNotEquals(scheme, EngineState.shuangpinScheme)
+                assertEquals(!suggests, EngineState.englishSuggests)
+            } finally {
+                EngineState.shuangpinScheme = scheme
+                EngineState.englishSuggests = suggests
+            }
         }
 
         @Test
         fun aClosedEngineIsMadeAnewAtItsNextUse() {
-            val closed = EngineBridge.engines
-            EngineBridge.close()
-            assertNotSame(closed, EngineBridge.engines)
-            EngineBridge.close()
+            val closed = bridge.engines
+            bridge.close()
+            assertNotSame(closed, bridge.engines)
+            bridge.close()
         }
 
         @Test
         fun anInputMethodThatCouldNotLoadIsTriedAgainOnTheEngineMadeAnew() {
             val broken = { throw FileNotFoundException("mine") }
-            assertThrows(FileNotFoundException::class.java) { EngineBridge.unloadable.call("mine", broken) }
-            assertTrue("mine" in EngineBridge.unloadable)
-            EngineBridge.close()
-            assertFalse("mine" in EngineBridge.unloadable)
+            assertThrows(FileNotFoundException::class.java) { bridge.unloadable.call("mine", broken) }
+            assertTrue("mine" in bridge.unloadable)
+            bridge.close()
+            assertFalse("mine" in bridge.unloadable)
+        }
+
+        // UAT decision 6 (dev/design/f1-uat-classification.md): KotlinHostTest holds a first run's host to
+        // pushing EngineOptions().toSettings(); this is the bridge's half: those settings, with the AppPrefs
+        // the engine also reads (the nine keys' letters) left at their defaults, reach the engine unchanged
+        @Test
+        fun aNewInstallsEngineSettingsAreTheHostOptionsDefaults() {
+            val defaults = EngineOptions().toSettings()
+            try {
+                bridge.configure(defaults)
+                assertEquals(defaults, bridge.engines.settings)
+            } finally {
+                bridge.close()
+            }
         }
 
         // the keyboard draws the user's letters: the engine must read the keys by them
@@ -428,15 +517,15 @@ class EngineBridgeTest {
             val again = NineKeyLetters.of(listOf("abc", "def", "gi", "jkl", "mnoh", "pqrs", "tuv", "wxyz"))
             try {
                 pref.setValue(moved.serialize())
-                EngineBridge.configure("")
-                assertEquals(moved, EngineBridge.engines.settings.nineKeys)
+                bridge.configure(EngineSettings())
+                assertEquals(moved, bridge.engines.settings.nineKeys)
                 // changed on the settings page, then fcitx reloads the engine, its config as it was
                 pref.setValue(again.serialize())
-                EngineBridge.reload()
-                assertEquals(again, EngineBridge.engines.settings.nineKeys)
+                bridge.reload()
+                assertEquals(again, bridge.engines.settings.nineKeys)
             } finally {
                 pref.setValue("")
-                EngineBridge.close()
+                bridge.close()
             }
         }
 
@@ -444,31 +533,31 @@ class EngineBridgeTest {
         @Test
         fun theShuangpinSchemeIsTheOneConfigured() {
             try {
-                EngineBridge.configure("ShuangpinProfile=MS")
-                assertEquals(ShuangpinScheme.MICROSOFT, EngineBridge.shuangpinScheme)
+                bridge.configure(EngineSettings(shuangpin = "MS"))
+                assertEquals(ShuangpinScheme.MICROSOFT, EngineState.shuangpinScheme)
                 // the default again once the config no longer names one, not the last set
-                EngineBridge.configure("")
-                assertEquals(ShuangpinScheme.ZIRANMA, EngineBridge.shuangpinScheme)
+                bridge.configure(EngineSettings())
+                assertEquals(ShuangpinScheme.ZIRANMA, EngineState.shuangpinScheme)
             } finally {
-                EngineBridge.close()
+                bridge.close()
             }
         }
 
         // the keyboard waits on it (CommonKeyActionListener.typeAsIsOrSend): no table has a session yet, nor is the engine made to answer
         @Test
         fun noTableHasKeysWhileTheEngineIsNotMade() {
-            EngineBridge.close()
+            bridge.close()
             val dir = File(appContext.filesDir, "engine").apply { deleteRecursively() }
             val aside = File(dir.path + ".old")
             File(aside.apply { mkdirs() }, "log").writeText("learned")
             try {
-                assertEquals(emptySet<Char>(), EngineBridge.tableKeys("engine-erbi"))
+                assertEquals(emptySet<Char>(), bridge.tableKeys("engine-erbi"))
                 // made, it would have put engine.old back
                 assertTrue(aside.exists())
                 assertFalse(dir.exists())
             } finally {
                 // made after all, it is not left to the tests after
-                EngineBridge.close()
+                bridge.close()
                 dir.deleteRecursively()
                 aside.deleteRecursively()
             }
@@ -484,22 +573,22 @@ class EngineBridgeTest {
             LearningOp.NoPredict(0, "你"), LearningOp.OnPage(LearningOp.NoPredict(0, "你")), LearningOp.RemoveWords(emptyList()),
             // a restore or 退回恢复前 changes what was learned (F2962)
             BackupOp.Restore(ByteArray(0)), BackupOp.RestoreKept("a"), BackupOp.Revert)) {
-            assertTrue(op.toString(), EngineBridge.shownAnew(op, pinyin, done))
+            assertTrue(op.toString(), bridge.shownAnew(op, pinyin, done))
         }
         // what only reads, or the addon shows itself
         for (op in listOf(LearningOp.Overview, LearningOp.Menu(0, "你"), LearningOp.Delete(0, "你"), LearningOp.ResetTableOrder("wbx"),
             BackupOp.Kept, BackupOp.Copy, BackupOp.Peek(ByteArray(0)), BackupOp.Delete("a"), BackupOp.SetAuto(true))) {
-            assertFalse(op.toString(), EngineBridge.shownAnew(op, pinyin, done))
+            assertFalse(op.toString(), bridge.shownAnew(op, pinyin, done))
         }
         // nothing done, or an input method not the engine's: nothing shown anew
-        assertFalse(EngineBridge.shownAnew(LearningOp.Undo(1), pinyin, LearningResult.Unavailable))
-        assertFalse(EngineBridge.shownAnew(LearningOp.Undo(1), "rime", done))
-        assertTrue(EngineBridge.shownAnew(LearningOp.Undo(1), Engines.ENGLISH, done))
+        assertFalse(bridge.shownAnew(LearningOp.Undo(1), pinyin, LearningResult.Unavailable))
+        assertFalse(bridge.shownAnew(LearningOp.Undo(1), "rime", done))
+        assertTrue(bridge.shownAnew(LearningOp.Undo(1), InputMethodCatalog.ENGLISH, done))
     }
 
     @Test
     fun recentsAreClearedFromTheMinuteLearningWas() {
-        assertEquals(0L, EngineBridge.recentsSince(LearningResult.ALL))
-        assertEquals(30_000_000L * 60_000L, EngineBridge.recentsSince(30_000_000))
+        assertEquals(0L, bridge.recentsSince(LearningResult.ALL))
+        assertEquals(30_000_000L * 60_000L, bridge.recentsSince(30_000_000))
     }
 }

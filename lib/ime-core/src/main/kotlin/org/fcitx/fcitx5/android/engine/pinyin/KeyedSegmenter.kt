@@ -29,4 +29,10 @@ interface KeyedSegmenter : Segmenter {
 
     /** How [syllable] shows read off [keys] keys that do not type it whole yet: as many letters on the nine keys, its initial in 双拼. */
     fun started(syllable: Int, keys: Int): String
+
+    /**
+     * A syllable or initial taken off the bar, [spelling] in the input, as a custom phrase's key has
+     * it (PhraseKeys): each way it is typed in letters. Its own letters on full pinyin's keyboards.
+     */
+    fun takenAs(spelling: String): List<String> = listOf(spelling)
 }

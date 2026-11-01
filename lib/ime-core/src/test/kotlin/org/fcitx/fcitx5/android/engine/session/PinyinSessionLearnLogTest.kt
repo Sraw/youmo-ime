@@ -143,6 +143,26 @@ class PinyinSessionLearnLogTest {
         assertEquals(listOf("qp:nihao||nihao|F|3"), rows())
     }
 
+    // a table's 拼 key turned off mid-lookup: the letters handed back, nothing learned of them
+    @Test
+    fun keysHandedBackAreNotLearned() {
+        val s = session()
+        s.type("nihao")
+        assertEquals(HandedBack("", null, "nihao"), s.handBack())
+        assertEquals(emptyList<List<Row>>(), habits.commits)
+    }
+
+    // a piece picked first is put in and learned as a pick, the letters after it not
+    @Test
+    fun aPieceHandedBackIsLearnedAsAPick() {
+        val s = session()
+        s.type("nihao")
+        s.pick("你")
+        val back = s.handBack()
+        assertEquals("你" to "hao", back.picked to back.keys)
+        assertEquals(listOf("qp:ni||你(ni)|C|7"), rows())
+    }
+
     @Test
     fun shuangpinIsFiledUnderItsScheme() {
         val s = session(ShuangpinSegmenter(ShuangpinScheme.ZIRANMA), spell = true, kind = Kinds.shuangpin("Ziranma"))
@@ -230,8 +250,7 @@ class PinyinSessionLearnLogTest {
         val pinyin = session()
         val readings = listOf(GlideReading("nihao", "你好", 0f, "ni hao"), GlideReading("xian", "鲜", -1f, "xian"))
         val glide = GlideSession(pinyin, Key(SyllableGraph.SEPARATOR), heldBack = { r, first -> pinyin.heldBack(r.word, r.pinyin, first) }) { _, _ -> readings }
-        glide.offer(Glide(floatArrayOf(0f, 0f), GlideLayout.QWERTY))
-        val shown = glide.apply(Action.Glide)
+        val shown = glide.apply(glide.read(Glide(floatArrayOf(0f, 0f), GlideLayout.QWERTY)))
         assertEquals("鲜", shown.candidates[1])
         assertEquals("鲜", glide.apply(Select(1)).commit)
         assertEquals(listOf("qp:xian||鲜(xian)|B*|3"), rows())

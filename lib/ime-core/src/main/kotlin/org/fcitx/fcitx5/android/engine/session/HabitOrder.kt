@@ -55,7 +55,8 @@ internal class HabitOrder(
     // press goes at once, the sessions kept (review-1b S2)
     private var addedAt = -1
     private var addedOrder = emptyMap<String, Int>()
-    private var addedIds = emptySet<Int>()
+    // sorted, asked by a search: asked of every arc from the start a key, a set would box each id (S15 A8.3)
+    private var addedIds = IntArray(0)
 
     private fun addedNow() {
         val at = user?.listings ?: 0
@@ -64,8 +65,10 @@ internal class HabitOrder(
         val texts = added()
         addedOrder = texts.withIndex().associate { it.value to it.index }
         // the dictionary's words added by hand; a word of the user's own trie is [UserModel.chosen]
-        addedIds = texts.mapNotNullTo(HashSet()) { text -> data.wordIndex.find(text).takeIf { it >= 0 } }
+        addedIds = texts.mapNotNull { text -> data.wordIndex.find(text).takeIf { it >= 0 } }.toIntArray().apply { sort() }
     }
+
+    private fun isAddedId(id: Int) = addedIds.isNotEmpty() && addedIds.binarySearch(id) >= 0
 
     /** Whether [text] is a word added by hand. */
     fun isAdded(text: String): Boolean {
@@ -138,7 +141,7 @@ internal class HabitOrder(
         if (user != null && !habitsOnly) {
             // (a name added by hand, of the user's own trie, is [UserModel.chosen]; review-1b M1). One
             // pass over the start's arcs for both, each key (review-int-runtime N4)
-            val own = { id: Int -> user.chosen(id) || id in addedIds }
+            fun own(id: Int) = user.chosen(id) || isAddedId(id)
             val starts = decoder.startWords(graph, end) { own(it) || user.startOnly(it) }
             starts.forEach { if (own(it.words[0])) add(it) }
             // a page of them by their order (D24), not each of the hundreds a short code reads (review-G S9): the rest as the decoder has them.
@@ -150,14 +153,25 @@ internal class HabitOrder(
     }
 
     // those of the code's keyboard and first key whose counts across its spellings move them under it
+    // (each word's reading split and its counts read once a record as it is, the code's keys once a
+    // level: a heavy user has hundreds under a key, every level of every key, S15 B5.1)
     private fun spelledHere(code: Code): List<Words> {
         val first = code.keys.firstOrNull { it != '\'' } ?: return emptyList()
-        return habits.spelledFrom(code.kind, first).filter { w ->
-            val form = SpelledForm.of(code.kind, code.keys, w.reading) ?: return@filter false
-            if (!SpelledForm.spells(Kinds.keyboard(code.kind), code.keys, w.reading)) return@filter false
-            val s = habits.spelled(code.kind, w)
-            (form != SpelledForm.INITIALS && s.initialsCorrections > 0) || (form != SpelledForm.FULL && s.fullUses >= HabitRanker.FULL_USES)
+        val words = habits.spelledFrom(code.kind, first)
+        if (words.isEmpty() || Kinds.byText(code.kind)) return emptyList()
+        val shuangpin = Kinds.isShuangpin(code.kind)
+        val keyboard = Kinds.keyboard(code.kind)
+        val typed = code.keys.filter { it != '\'' }
+        // 双拼's keys are no nine keys' letters: none made for it
+        val letters = if (shuangpin) null else Array(typed.length) { SpelledForm.nineKeyLetters(keyboard, typed[it]) }
+        val here = ArrayList<Words>()
+        for (w in words) {
+            val form = SpelledForm.of(shuangpin, typed.length, w.syllables.size, w.letters) ?: continue
+            val s = w.spelled
+            val moves = (form != SpelledForm.INITIALS && s.initialsCorrections > 0) || (form != SpelledForm.FULL && s.fullUses >= HabitRanker.FULL_USES)
+            if (moves && (letters == null || SpelledForm.spells(typed, letters, w.syllables))) here += w.words
         }
+        return here
     }
 
     /**
@@ -315,7 +329,7 @@ internal class HabitOrder(
         for (a in bounds) for (b in bounds.tailSet(a + 1)) {
             // keys glided are no keys of a word (1b N8)
             val arcs = if (recorder.pressed.glided(from + a, from + b)) emptyList() else decoder.arcsBetween(graph, a, b)
-            val only = arcs.singleOrNull()?.takeIf { user.addedByHand(it.words[0]) || it.words[0] in addedIds } ?: continue
+            val only = arcs.singleOrNull()?.takeIf { user.addedByHand(it.words[0]) || isAddedId(it.words[0]) } ?: continue
             items += Enforced.Item(a, b, only.words, only.ends, only.text, null, Enforced.Kind.ADDED)
         }
         return items
@@ -393,7 +407,7 @@ internal class HabitOrder(
             if (word == NO_WORD) return null
             val own = user?.takeIf { word >= data.vocabulary.size }
             val r = reading(graph, from, c.ends[i], word, data.dictionary, own) { _, s -> Syllables.spelling(s) } ?: return null
-            out += Word(if (own != null) own.text(word) else data.vocabulary.word(word), r.syllables.joinToString(" ") { Syllables.spelling(it) })
+            out += Word(if (own != null) own.text(word) else data.vocabulary.word(word), Syllables.spelled(r.syllables))
             from = c.ends[i]
         }
         return Words(out)

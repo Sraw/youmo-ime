@@ -4,7 +4,7 @@
  */
 package org.fcitx.fcitx5.android.input.voice
 
-import org.fcitx.fcitx5.android.engine.host.Engines
+import org.fcitx.fcitx5.android.engine.runtime.UserWord
 
 /**
  * Words the recognizer is told to listen for (sherpa-onnx's hotwords, a bonus on each of their
@@ -111,25 +111,26 @@ object VoiceHotwords {
 
     /**
      * The user's words for one stream: as hotwords, those they added first, then those they made
-     * as they typed, most used first ([Engines.userWords]' order): 我的词 alone (U-30, D29), no
+     * as they typed, most used first
+     * ([org.fcitx.fcitx5.android.engine.runtime.Engines.userWords]' order): 我的词 alone (U-30, D29), no
      * word of another kind, nor one the user only typed once; blocked, those they blocked. With
      * [habits] off (U-93's 「用我的输入习惯」) no hotword of theirs, the blocked still blocked.
      */
-    fun ofUser(words: List<Engines.UserWord>, habits: Boolean = true): Words {
-        fun spell(kinds: (Engines.UserWord.Kind) -> Boolean) = words.asSequence()
+    fun ofUser(words: List<UserWord>, habits: Boolean = true): Words {
+        fun spell(kinds: (UserWord.Kind) -> Boolean) = words.asSequence()
             .filter { kinds(it.kind) }
             .mapNotNull { word -> spelled(word.text)?.let { it to word.kind } }
             // added and learned both: added, which comes first
             .distinctBy { it.first }
             .take(MAX_USER)
             // sherpa-onnx's own bonus for one hotword, after its tokens; learned ones get [SCORE]
-            .joinToString("/") { (spelling, kind) -> if (kind == Engines.UserWord.Kind.ADDED) "$spelling :$ADDED_SCORE" else spelling }
+            .joinToString("/") { (spelling, kind) -> if (kind == UserWord.Kind.ADDED) "$spelling :$ADDED_SCORE" else spelling }
         return Words(
             hotwords = if (habits) spell { it in MINE } else "",
-            blocked = spell { it == Engines.UserWord.Kind.BLOCKED },
+            blocked = spell { it == UserWord.Kind.BLOCKED },
         )
     }
 
-    // the kinds of [Engines.UserWord] that are the user's own words (稿子 §1 我的词)
-    private val MINE = setOf(Engines.UserWord.Kind.ADDED, Engines.UserWord.Kind.LEARNED)
+    // the kinds of [UserWord] that are the user's own words (稿子 §1 我的词)
+    private val MINE = setOf(UserWord.Kind.ADDED, UserWord.Kind.LEARNED)
 }

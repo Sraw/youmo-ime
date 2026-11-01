@@ -130,7 +130,13 @@ class Elsewhere(Exception):
 
 # needs kinds that name where a case runs instead, in place()'s order (voice beats emu: a voice case
 # is only on the voice build, which runs on the emulator); unmet, tally and counts_line read it too
-ELSEWHERE = {"jvm": "JVM", "release": "发版时手动", "manual": "真机或手工", "voice": "语音版", "emu": "模拟器"}
+ELSEWHERE = {"jvm": "JVM", "release": "发版时", "manual": "真机或手工", "voice": "语音版", "emu": "模拟器"}
+# when a case of an ELSEWHERE kind runs on this device and build after all (a kind not here never does).
+# release,redroid: scripted but too long for every run (a big lexicon), so only in a release's own run
+# (UAT_BUILD=release), and on redroid: on the 2 GB emulator each takes minutes
+RUNS_HERE = {"emu": lambda d, kinds: d.emu,
+             "voice": lambda d, kinds: d.flavor == "voice",
+             "release": lambda d, kinds: "redroid" in kinds and BUILD == "release" and not d.emu}
 # what a case in the .md with no script is registered as: tally reports each
 NO_SCRIPT = "block:没有脚本"
 
@@ -159,12 +165,27 @@ class Case:
         if "block" in kinds:
             return Blocked, why
         for k in ELSEWHERE:
-            if k not in kinds or k == "emu" and d.emu or k == "voice" and d.flavor == "voice":
+            if k not in kinds or RUNS_HERE.get(k, lambda d, kinds: False)(d, kinds):
                 continue
             if k == "voice":
                 return Elsewhere, f"{ELSEWHERE[k]}：文字版没有语音输入（--flavor voice 装语音版再跑）"
+            if k == "release":
+                where = "发版时在 redroid 上（UAT_BUILD=release）" if "redroid" in kinds else "发版时手动"
+                return Elsewhere, f"{where}：{why}"
             return Elsewhere, f"{ELSEWHERE[k]}：{why}"
         return None
+
+    def heavy_here(self, ports):
+        """whether this run on [ports] may run the case at all, before a device is picked: a heavy case
+        that runs elsewhere goes with its group instead of waiting for every device to go idle only to be
+        listed as 在别处跑. The release,redroid ones as RUNS_HERE has them: BUILD=release and a device that
+        is not the emulator; any other ELSEWHERE kind counts as elsewhere (it would then run with its
+        group, not alone)"""
+        where = place(self.needs)
+        if where == "release":
+            return ("redroid" in self.needs.split(":", 1)[0].split(",") and BUILD == "release"
+                    and any(p != EMU_PORT for p in ports))
+        return where == "redroid"
 
     @property
     def group(self):
@@ -186,8 +207,8 @@ def case(id, base="B0", page=None, mutates=False, clean=False, visual=False, nee
     visual: part of the 预期 is only seen on a screenshot -> 待看图 unless a machine check failed.
     needs: "skip:<why>" / "block:<why>" when redroid cannot run it at all; "emu:<why>" for the emulator
     only, "voice:<why>" for the voice build only, "emu,voice:<why>" both; "release:<why>" run by hand
-    at a release, "manual:<why>" on a real phone, "jvm:<test>" asserted by a JVM test (`uat.py jvm`
-    records it): those five are 在别处跑 where unmet, no reset. heavy: the case loads the host (a big
+    at a release ("release,redroid:<why>": scripted, run on redroid only when UAT_BUILD=release), "manual:<why>" on a real phone, "jvm:<tests>" asserted by JVM tests carrying its @Uat (`uat.py jvm`
+    records it from those; the Class.method names, separated by 、, must each carry it too): those five are 在别处跑 where unmet, no reset. heavy: the case loads the host (a big
     lexicon compiled, an upgrade, the heap measured): run last, alone, with the other devices idle,
     so its load does not break the timing (long presses, quick taps) of a case beside it."""
     if page is None:
@@ -804,7 +825,7 @@ class Device:
         kb = self.need_keyboard()
         names = {"button_space": "space", "button_backspace": "bksp", "button_caps": "shift",
                  "button_return": "enter", "button_lang": "globe", "button_comma": ",",
-                 "button_period": "."}
+                 "button_period": ".", "button_confirm": "enter"}
         k = {}
         for n in kb.walk():
             if not n.clickable:
@@ -819,8 +840,8 @@ class Device:
             t = [m.text for m in n.walk() if m.text]
             if t and t[0] not in k:
                 k[t[0].lower()] = n.c
-            for x in t[1:]:   # the nine keys: "ABC" over "2"
-                if len(x) == 1 and x.isdigit():
+            for x in t[1:]:   # the nine keys: "ABC" over "2"; a table's roots over their letter (日 over a)
+                if len(x) == 1 and (x.isdigit() or "a" <= x <= "z"):
                     k.setdefault(x, n.c)
         self._keys = k
         return k
@@ -1184,8 +1205,8 @@ class Device:
     def switch_im(self, label):
         """the globe key until the space key names this input method"""
         for _ in range(8):
-            # the name after 「空格，」 whole: 拼音 is in 九键拼音 too (and 五笔 in 五笔拼音); 九键 is short for it
-            if {"九键": "九键拼音"}.get(label, label) == self.im_label().split("，", 1)[-1]:
+            # the name after 「空格，」 whole: 拼音 is in 五笔拼音 too
+            if label == self.im_label().split("，", 1)[-1]:
                 self._keys = None
                 return
             s = self.screen()
@@ -1457,13 +1478,16 @@ def ensure_ime(d):
 
 # baselines "B0-<x>": B0, then this input method added in settings and switched to with the globe key
 # (the space key's description names it); B0-英文 is B0 and the globe key once. The third: 双拼's 键盘
-# set to this before the page is opened again (B0-14键 is 拼音's, its own branch in reset)
-IM_BASES = {"B0-九键": ("九键拼音", "九键", None), "B0-五笔": ("五笔", "五笔", None),
+# set to this before the page is opened again (B0-14键 and B0-九键 are 拼音's keyboards, their own branch in reset)
+IM_BASES = {"B0-五笔": ("五笔", "五笔", None),
             "B0-二笔": ("二笔", "二笔", None), "B0-仓颉": ("仓颉", "仓颉", None),
             "B0-双拼": ("双拼", "双拼", None), "B0-手写": ("手写", "手写", None),
             "B0-自然码": ("自然码", "自然码", None), "B0-五笔拼音": ("五笔拼音", "五笔拼音", None),
             "B0-英文": (None, "英文", None),
             "B0-18键": ("双拼", "双拼", "18 键"), "B0-九键双拼": ("双拼", "双拼", "九键")}
+# baselines that are B0 with 拼音's 键盘 set to this (0.5: 九键 is pinyin's keyboard, no 九键拼音 to add);
+# the space key still names 拼音
+PINYIN_KEYBOARDS = {"B0-14键": "14 键", "B0-九键": "九键"}
 
 
 def add_im(d, name):
@@ -1503,12 +1527,12 @@ def reset(d, base, page):
         name, label, keyboard = IM_BASES[base]
         if name:
             add_im(d, name)
-            if keyboard:
-                shuangpin_keyboard(d, keyboard)
+            if name == "双拼":
+                shuangpin_scheme(d, keyboard)
             d.open_page(page)
         d.switch_im(label)
-    elif base == "B0-14键":
-        pinyin_keyboard(d, "14 键")
+    elif base in PINYIN_KEYBOARDS:
+        pinyin_keyboard(d, PINYIN_KEYBOARDS[base])
         d.open_page(page)
     elif base == "B0-横屏":
         d.rotate(1)
@@ -1558,17 +1582,11 @@ def soft_reset(d, base, page):
 
 # ---------------------------------------------------------------- helpers for the case scripts
 
-# Where the tree tells too little (the emoji tabs are icons with no text; a panel's rows have no ids),
+# Where the tree tells too little (a panel's rows have no ids),
 # a few scripts go by place: the portrait layout of 1080x2340 at 440 dpi, the default keyboard height
 # (redroid and the emulator alike). Named once here; a new device size or keyboard height changes them.
 BAR_BOTTOM = 1560                     # the toolbar / candidate bar's lower edge: the keys or a panel below
 PANEL_TOP, PANEL_BOTTOM = 1550, 2090  # a panel's content (symbols, emoji, clipboard rows)
-GRID_TOP, GRID_BOTTOM = 1600, 2040    # the emoji grid, without its tabs and bottom row
-
-
-def emoji_tab_xy(i):
-    """the emoji panel's i-th category tab (0-based): icons only"""
-    return 54 + 108 * i, 1491
 
 
 def check(ok, msg):
@@ -1631,14 +1649,6 @@ def path_steps(pts, per_hop=6):
     return steps
 
 
-def glide_shot(d, pts, note):
-    """glide over pts, a screenshot of the keyboard before lifting (the trace), then lift"""
-    d.touch(*path_steps(pts))
-    d.shot("kb", note)
-    d.touch(("up", *pts[-1]))
-    time.sleep(0.8)
-
-
 def sym_char(d, ch):
     """a character from the 符 panel's 英文/常用/数学 categories"""
     d.press("符", after=1.0)
@@ -1655,16 +1665,6 @@ def sym_char(d, ch):
                 return
             d.swipe((640, 2000), (640, 1700), 400)
     raise Blocked(f"符号面板里找不到「{ch}」")
-
-
-def menu_tap(d, text):
-    """an item of the popup menu showing (the app's first, then any window's)"""
-    s = d.screen()
-    n = next((n for n in s.nodes if n.text == text and n.pkg == PKG), None) or \
-        next((n for n in s.nodes if n.text == text), None)
-    if not n:
-        raise Blocked(f"菜单里没有「{text}」：{s.texts(where='all')[:12]}")
-    d.tap(n.c, 0.8)
 
 
 def glide_on(d, im=None, page="text", add=None):
@@ -1690,42 +1690,30 @@ def gear(d, im_name):
 
 
 def pinyin_keyboard(d, option):
-    """输入法 → 拼音's 键盘 set to option (全键盘 or 14 键); stays on the page"""
+    """输入法 → 拼音's 键盘 set to option (全键盘, 18 键, 14 键 or 九键); stays on the page"""
     gear(d, "拼音")
     choose(d, "键盘", option)
 
 
 def shuangpin_keyboard(d, option):
-    """输入法 → 双拼's 键盘 set to option (全键盘, 18 键 or 九键); stays on the page"""
+    """输入法 → 双拼's 键盘 set to option (全键盘, 18 键, 14 键 or 九键); stays on the page"""
     gear(d, "双拼")
     choose(d, "键盘", option)
 
 
-def pinyin_keyboard_value(d):
-    """what 输入法 → 拼音's 键盘 shows as chosen (the summary's first line), from its page"""
-    gear(d, "拼音")
-    d.scroll_top()
-    v = d.summary("键盘")
-    if v is None:
-        raise Blocked("拼音页没有「键盘」")
-    return v.split("\n")[0]
+def shuangpin_scheme(d, keyboard=None):
+    """输入法 → 双拼's 方案 set to 自然码, as the 双拼 baselines have it (a new install's is 小鹤), and its
+    键盘 to keyboard if given; stays on the page"""
+    gear(d, "双拼")
+    choose(d, "双拼方案", "自然码")
+    if keyboard:
+        choose(d, "键盘", keyboard)
 
 
 # the grouped keyboards' codes (14 keys, 18 keys, 九键双拼) and a tap's place are all private use:
 # none of them may reach a field
 def has_keyboard_code(t):
     return any(unicodedata.category(c) == "Co" for c in t or "")
-
-
-def space_share(d):
-    """the space key's width over the keyboard's (not the screen's: side margins, one-handed and
-    floating make it narrower), in the field shown"""
-    s = d.screen()
-    kb = s.find(rid="keyboard_view", where="ime")
-    sp = s.find(rid="button_space", where="ime")
-    if not kb or not sp:
-        raise Blocked("没有键盘或空格键")
-    return (sp.b[2] - sp.b[0]) / (kb.b[2] - kb.b[0])
 
 
 def grouped_keys(d, groups, *, after=0.6, at=None, drift=None):
@@ -1767,95 +1755,6 @@ def grouped_keys(d, groups, *, after=0.6, at=None, drift=None):
         d.taps(pts[drift + 1:], gap=0.3, after=after)
     else:
         time.sleep(after)
-
-
-def key_texts(d, label, s=None):
-    n = d.key_node(label, s)
-    return [m.text for m in n.walk() if m.text] if n else []
-
-
-def popup(d, key, left=False):
-    """long-press a key and keep the finger down: (the popup's texts above the key, the key's centre).
-    Finish with popup_slide (a pick) or popup_away (none): a lift in place types the key in focus"""
-    k = d.key_node(key)
-    if not k:
-        raise Blocked(f"键盘上没有 {key} 键")
-    x, y = k.c
-    if left:   # near the key's left edge: room to slide right on a key at the screen's edge
-        x = k.b[0] + 8
-    d.touch(("down", x, y), ("sleep", 0.9))
-    s = d.screen()
-
-    def on_key(n):   # a key's own label (its clickable key node is a parent)
-        a = n.parent
-        for _ in range(2):
-            if a is None:
-                return False
-            if a.clickable:
-                return True
-            a = a.parent
-        return False
-    top = max(150, k.b[1] - 700)   # not the status bar; landscape's keyboard starts higher up
-    items = [n for n in s.ime() if n.text and n.b[3] <= k.b[1] + 10 and n.b[1] > top and not on_key(n)]
-    d._popup = (items, key, x)
-    return items, (x, y)
-
-
-# a long press's keys pick by how far the finger moves, this much of a key a step (PopupKeyboardUi.STEP)
-POPUP_STEP = 0.6
-
-
-def popup_focus(items, key, x):
-    """the key in focus as a popup opens: a nine key's digit, else the bottom row's nearest the finger"""
-    if not items:
-        return None
-    bottom = max(n.b[3] for n in items)
-    row = [n for n in items if abs(n.b[3] - bottom) < 10]
-    return next((n for n in row if n.text == key), None) or min(row, key=lambda n: abs(n.c[0] - x))
-
-
-def popup_slide(d, xy, tgt, items=None, key=None):
-    """move from the key in focus to tgt as the popup reads it: so many keys across and up, each
-    POPUP_STEP of a key; the first move is where the finger starts. The popup's items and key are
-    popup()'s, or given for a long press made without it (an emoji's): used once, then dropped, so a
-    later case never reads another's popup"""
-    x, y = xy
-    if items is None:
-        items, key, _ = d.__dict__.pop("_popup", ([], None, x))
-    else:
-        d.__dict__.pop("_popup", None)
-    focus = popup_focus(items, key, x) or tgt
-    tx = x + round((tgt.c[0] - focus.c[0]) * POPUP_STEP)
-    ty = y + round((tgt.c[1] - focus.c[1]) * POPUP_STEP)
-    d.touch(("move", x + 1, y), ("sleep", 0.05), ("move", (x + tx) // 2, (y + ty) // 2), ("sleep", 0.05),
-            ("move", tx, ty), ("sleep", 0.15), ("up", tx, ty))
-    time.sleep(0.5)
-
-
-def popup_away(d, xy):
-    """let a long press's popup go with nothing picked: a lift with no move types the key in focus,
-    a move down off the key first closes it"""
-    x, y = xy
-    # the first move is where the finger starts: then down off the key
-    d.touch(("move", x + 1, y), ("sleep", 0.05), ("move", x, y + 400), ("sleep", 0.1), ("up", x, y + 400))
-
-
-def popup_pick(d, key, char):
-    """long-press a key, slide to char in its popup, let go; returns the popup's texts"""
-    items, xy = popup(d, key)
-    tgt = next((n for n in items if n.text == char), None)
-    if not tgt:
-        popup_away(d, xy)
-        raise Blocked(f"长按 {key} 的弹出里没有「{char}」：{[n.text for n in items]}")
-    popup_slide(d, xy, tgt)
-    return [n.text for n in items]
-
-
-def flick(d, key, dy=130, ms=200):
-    """a short swipe on a key (dy > 0 down). Not quicker: `input swipe` sends a move every frame or
-    so, and one of 120 ms read as a tap about once in six on redroid (the key saw too few moves)"""
-    x, y = d.keys(refresh=True)[key]
-    d.swipe((x, y), (x, y + dy), ms)
 
 
 HOST_PKG = "io.github.sraw.youmo.debug"
@@ -1904,36 +1803,6 @@ def in_picker(d, timeout=8):
         d.wait(shown, timeout, step=0.2, what="the file picker")
     except Blocked:
         pass
-
-
-def new_files(d, folder, before, timeout=10):
-    """the files new in folder since before (a set of names), polled until there is one or timeout:
-    the app writes what the picker named after the picker closed"""
-    end = time.time() + timeout
-    while True:
-        new = sorted(set(d.sh(f"ls -1 {folder}").splitlines()) - before)
-        if new or time.time() >= end:
-            break
-        time.sleep(0.3)
-    # named is not written: the picker makes the file empty and the app fills it after. Done once
-    # each file's size is not 0 and the same at two reads 0.5 s apart
-    sizes = None
-    while new:
-        now = [d.sh(f"stat -c %s '{folder}/{f}'").strip() for f in new]
-        # a size, not a stat that failed (gone, renamed): "" would read as stable and not 0
-        if now == sizes and all(x.isdigit() and x != "0" for x in now) or time.time() >= end + 5:
-            break
-        sizes = now
-        time.sleep(0.5)
-    # and the app done with it: the save runs under a loading dialog (toast after), and a case
-    # may reset (pm clear) next
-    while new and time.time() < end + 10:
-        s = d.screen()
-        if s.app() and not any(n.cls == "ProgressBar" for n in s.app()):
-            break
-        time.sleep(0.3)
-    time.sleep(0.5)
-    return new
 
 
 def unhost(d):
@@ -2084,13 +1953,13 @@ class Scheduler:
     def __init__(self, cases, run, ports, flavor="text"):
         groups = {}
         for c in cases:
-            if not c.heavy:
+            if not c.heavy or not c.heavy_here(ports):
                 groups.setdefault(c.group, []).append(c)
         for g in groups.values():
             g.sort(key=lambda c: (c.order(), c.id))
         # biggest groups first, so the stealing at the end has small pieces
         self.pending = sorted(groups.values(), key=lambda g: -sum(3 if c.mutates else 1 for c in g))
-        self.heavy = [[c] for c in sorted((c for c in cases if c.heavy), key=lambda c: c.id)]
+        self.heavy = [[c] for c in sorted((c for c in cases if c.heavy and c.heavy_here(ports)), key=lambda c: c.id)]
         self.active = []
         self.busy = set()   # the ports running a group now
         self.lock = threading.Condition()
@@ -2665,6 +2534,23 @@ def cmd_run(a):
 UAT_RE = re.compile(r'@Uat\(([^)]*)\)\s*(?:@\w+(?:\([^)]*\))?\s*)*fun\s+`?([\w ]+?)`?\s*\(')
 
 
+CLASS_RE = re.compile(r"^([ \t]*)(?:(?:internal|private|open|abstract|data|inner)\s+)*class\s+(\w+)", re.M)
+
+
+def enclosing_class(classes, pos, indent):
+    """JUnit's name of the class a method at [pos] indented [indent] is in, from [classes] [(pos, indent,
+    name)] in order: a nested class is Outer$Inner, as the XML names it (formatted code: a class's members
+    sit deeper than it, and a class ends where one at its depth or shallower begins)"""
+    stack = []
+    for at, ind, name in classes:
+        if at > pos:
+            break
+        while stack and stack[-1][0] >= ind:
+            stack.pop()
+        stack.append((ind, name))
+    return "$".join(name for ind, name in stack if ind < indent)
+
+
 def uat_tests(roots):
     """{case id: [(test class, method)]} from @Uat("…") on test methods under [roots]"""
     found = {}
@@ -2675,21 +2561,47 @@ def uat_tests(roots):
                     continue
                 text = open(os.path.join(dirpath, name), encoding="utf-8").read()
                 pkg = re.search(r"^package\s+([\w.]+)", text, re.M)
-                cls = re.search(r"^(?:internal\s+)?class\s+(\w+)", text, re.M)
-                if not cls:
+                classes = [(m.start(), len(m.group(1).expandtabs()), m.group(2)) for m in CLASS_RE.finditer(text)]
+                if not classes:
                     continue
-                fqcn = (pkg.group(1) + "." if pkg else "") + cls.group(1)
-                # either regex falling short drops a case without a word: a method name UAT_RE cannot
-                # read, or the ids under another top-level class than the first
+                # UAT_RE falling short drops a case without a word: a method name it cannot read
                 matched = len(UAT_RE.findall(text))
                 if matched != text.count("@Uat("):
                     print(f"warning: {name}: {text.count('@Uat(')} @Uat, {matched} read", file=sys.stderr)
-                if len(re.findall(r"^(?:internal\s+)?class\s+\w+", text, re.M)) > 1 and matched:
-                    print(f"warning: {name}: @Uat ids all taken as {cls.group(1)}'s, the first class", file=sys.stderr)
                 for m in UAT_RE.finditer(text):
+                    line = text.rfind("\n", 0, m.start()) + 1
+                    indent = len(text[line:m.start()].expandtabs())
+                    cls = enclosing_class(classes, m.start(), indent)
+                    if not cls:
+                        continue
+                    fqcn = (pkg.group(1) + "." if pkg else "") + cls
                     for cid in re.findall(r'"([^"]+)"', m.group(1)):
                         found.setdefault(cid, []).append((fqcn, m.group(2)))
     return found
+
+
+def named_tests(needs):
+    """the "Class.method" names a needs=jvm text lists ("Class" alone names no method), separated by 、"""
+    return [n.strip() for n in needs.split(":", 1)[1].split("、") if "." in n]
+
+
+def needs_problems(cases, found):
+    """for each needs=jvm case in [cases] {id: needs}: the tests its needs= names that do not carry its
+    @Uat in [found] (uat_tests'), so their results would never reach the case"""
+    have = {}
+    for cid, tests in found.items():
+        for cls, method in tests:
+            have.setdefault(f"{cls.rsplit('.', 1)[-1]}.{method}", set()).add(cid)
+    out = []
+    for cid, needs in sorted(cases.items()):
+        if place(needs) != "jvm":
+            continue
+        for n in named_tests(needs):
+            if n not in have:
+                out.append(f"{cid}: needs= names {n}, which has no @Uat")
+            elif cid not in have[n]:
+                out.append(f"{cid}: needs= names {n}, whose @Uat is {'、'.join(sorted(have[n]))}'s")
+    return out
 
 
 def junit_results(dirs):
@@ -2719,9 +2631,11 @@ def junit_results(dirs):
 WORSE = ("失败", "阻塞", "跳过", "通过")
 
 
-def jvm_record(found, results):
-    """{case id: (state, seen)}: each case's tests' results; a case with a test that did not run is 阻塞"""
-    rec = {}
+def jvm_record(found, results, expected=()):
+    """{case id: (state, seen)}: each case's tests' results; a case with a test that did not run is 阻塞,
+    and so is each of [expected] (the scripts' needs=jvm cases) with no @Uat test at all: a test renamed
+    or overwritten must not drop its case from the record without a word"""
+    rec = {cid: ("阻塞", "没有 @Uat 测试") for cid in expected if cid not in found}
     for cid, tests in sorted(found.items()):
         states, seen = [], []
         for cls, method in tests:
@@ -2735,7 +2649,7 @@ def jvm_record(found, results):
                 seen.append(f"{short} {r[1]:.1f} s" + (f"：{r[2]}" if r[2] else ""))
         state = next((s for s in WORSE if s in states), "通过")
         rec[cid] = (state, "；".join(seen))
-    return rec
+    return dict(sorted(rec.items()))
 
 
 def cmd_jvm(a):
@@ -2743,7 +2657,13 @@ def cmd_jvm(a):
     roots = [os.path.join(REPO, p) for p in ("app/src/test", "app/src/testText", "app/src/testVoice", "lib/ime-core/src/test",
                                                 "lib/ime-eval/src/uatTest")]
     dirs = [os.path.join(REPO, p) for p in a.results.split(",")]
-    rec = jvm_record(uat_tests(roots), junit_results(dirs))
+    load_scripts()
+    expected = [c.id for c in CASES.values() if place(c.needs) == "jvm"]
+    found = uat_tests(roots)
+    rec = jvm_record(found, junit_results(dirs), expected)
+    problems = needs_problems({c.id: c.needs for c in CASES.values()}, found)
+    for p in problems:
+        print("problem:", p)
     ver = subprocess.run(["git", "-C", REPO, "describe", "--tags"], capture_output=True, text=True).stdout.strip() or "unknown"
     name = f"{datetime.date.today().isoformat()}-jvm-{ver}"
     counts = {}
@@ -2756,7 +2676,7 @@ def cmd_jvm(a):
     path = os.path.join(REPO, "uat", "runs", name + ".md")
     write_atomic(path, "\n".join(lines) + "\n")
     print(f"{len(rec)} cases: " + ", ".join(f"{v} {k}" for k, v in counts.items()) + f"; {os.path.relpath(path, REPO)}")
-    return 0 if all(st == "通过" for st, _ in rec.values()) else 1
+    return 0 if all(st == "通过" for st, _ in rec.values()) and not problems else 1
 
 
 def place(needs):

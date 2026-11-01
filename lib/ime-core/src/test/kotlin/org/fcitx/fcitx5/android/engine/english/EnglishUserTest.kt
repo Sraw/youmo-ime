@@ -9,6 +9,7 @@ import org.fcitx.fcitx5.android.engine.learn.LearnLog
 import org.fcitx.fcitx5.android.engine.learn.LearnRecord.Commit
 import org.fcitx.fcitx5.android.engine.learn.LearnRecord.EnCommit
 import org.fcitx.fcitx5.android.engine.learn.LearnRecords
+import org.fcitx.fcitx5.android.engine.platform.MemoryFiles
 import org.fcitx.fcitx5.android.engine.session.Action
 import org.fcitx.fcitx5.android.engine.session.Offer
 import org.fcitx.fcitx5.android.engine.session.Snapshot
@@ -17,20 +18,16 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
-import org.junit.Rule
 import org.junit.Test
-import org.junit.rules.TemporaryFolder
-import java.io.File
 
 class EnglishUserTest {
 
-    @get:Rule
-    val dir = TemporaryFolder()
+    private val dir = MemoryFiles()
 
     private val data = EnglishDecoderTest.data()
 
     private val clock = FakeClock()
-    private val file by lazy { File(dir.root, LearnLog.FILE) }
+    private val file by lazy { dir.file(LearnLog.FILE) }
     private val log by lazy { LearnLog(file, clock, foldDaily = false).apply { open() } }
     private val user by lazy { EnglishUser({ log }) }
 
@@ -49,7 +46,7 @@ class EnglishUserTest {
         get() {
             val reader = LearnRecords.Reader()
             val out = ArrayList<EnCommit>()
-            LearnRecords.FORMAT.read(file.readBytes()) { type, input -> if (type != 0.toByte()) (reader.decode(type, input) as? EnCommit)?.let(out::add) }
+            LearnRecords.FORMAT.read(file.read()) { type, input -> if (type != 0.toByte()) (reader.decode(type, input) as? EnCommit)?.let(out::add) }
             return out
         }
 

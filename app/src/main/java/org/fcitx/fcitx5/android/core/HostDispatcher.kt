@@ -19,7 +19,7 @@ import kotlin.coroutines.CoroutineContext
 /**
  * The Kotlin host's one thread (fcitx-replacement §4), in place of fcitx's libuv loop: a
  * single-thread scheduled executor still named `fcitx-main`, the coroutine dispatcher every
- * [FcitxAPI] call runs on, and the [HostClock] whose timers (the refine pause, the name overlay)
+ * [HostApi] call runs on, and the [HostClock] whose timers (the refine pause, the name overlay)
  * run on the same thread, strictly ordered with the calls around them. Made anew at each [start].
  * [stopWaitSeconds]: how long [stop] waits for a call still running; a test's own.
  */

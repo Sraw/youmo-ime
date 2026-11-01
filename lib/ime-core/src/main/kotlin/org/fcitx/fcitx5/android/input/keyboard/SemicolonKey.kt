@@ -4,8 +4,8 @@
  */
 package org.fcitx.fcitx5.android.input.keyboard
 
-import org.fcitx.fcitx5.android.engine.host.Engines
+import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.engine.pinyin.ShuangpinScheme
 
-/** Whether the letters show a `;` key: in 双拼 whose [scheme] types a final on it (微软, 紫光). */
-fun semicolonKey(ime: String, scheme: ShuangpinScheme): Boolean = ime == Engines.SHUANGPIN && scheme.types(';')
+/** Whether the letters show a `;` key: in 双拼 whose [scheme] types a final on it (微软). */
+fun semicolonKey(ime: String, scheme: ShuangpinScheme): Boolean = ime == InputMethodCatalog.SHUANGPIN && scheme.types(';')

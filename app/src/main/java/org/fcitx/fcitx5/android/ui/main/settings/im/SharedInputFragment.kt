@@ -6,11 +6,10 @@ package org.fcitx.fcitx5.android.ui.main.settings.im
 
 import androidx.preference.PreferenceScreen
 import org.fcitx.fcitx5.android.R
-import org.fcitx.fcitx5.android.core.FcitxAPI
-import org.fcitx.fcitx5.android.core.RawConfig
+import org.fcitx.fcitx5.android.core.HostApi
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
-import org.fcitx.fcitx5.android.engine.host.Engines
-import org.fcitx.fcitx5.android.ui.main.settings.FcitxPreferenceFragment
+import org.fcitx.fcitx5.android.engine.InputMethodCatalog
+import org.fcitx.fcitx5.android.ui.main.settings.HostPreferenceFragment
 import org.fcitx.fcitx5.android.utils.navigateWithAnim
 
 /**
@@ -18,18 +17,18 @@ import org.fcitx.fcitx5.android.utils.navigateWithAnim
  * keeps one value of each, which pinyin's page reads and writes as any other's would, and pinyin's
  * has them all; pinyin need not be among the input methods turned on.
  */
-class SharedInputFragment : FcitxPreferenceFragment() {
+class SharedInputFragment : HostPreferenceFragment() {
 
     override fun getPageTitle(): String = getString(R.string.shared_input)
 
-    override fun createScreen(raw: RawConfig, save: () -> Unit): PreferenceScreen =
-        InputMethodSettings.create(preferenceManager, InputMethodSettings.SHARED, raw["cfg"], save) { route -> navigateWithAnim(route) }
+    override fun createScreen(options: MutableMap<String, String>, save: () -> Unit): PreferenceScreen =
+        InputMethodSettings.create(preferenceManager, InputMethodSettings.SHARED, options, save) { route -> navigateWithAnim(route) }
 
-    override suspend fun obtainConfig(fcitx: FcitxAPI): RawConfig = fcitx.getImConfig(Engines.PINYIN)
+    override suspend fun obtainConfig(fcitx: HostApi) = fcitx.imOptions(InputMethodCatalog.PINYIN)
 
-    override suspend fun saveConfig(fcitx: FcitxAPI, newConfig: RawConfig) {
+    override suspend fun saveConfig(fcitx: HostApi, newConfig: Map<String, String>) {
         // the shared options alone: pinyin's own on its page, which may be open behind this one
-        fcitx.setImConfig(Engines.PINYIN, InputMethodSettings.only(InputMethodSettings.SHARED, newConfig))
+        fcitx.setImOptions(InputMethodCatalog.PINYIN, InputMethodSettings.only(InputMethodSettings.SHARED, newConfig))
     }
 
     override fun onStop() {

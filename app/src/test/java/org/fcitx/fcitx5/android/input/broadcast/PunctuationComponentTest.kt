@@ -11,13 +11,13 @@ import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
-import org.fcitx.fcitx5.android.core.Action
-import org.fcitx.fcitx5.android.core.FakeFcitxConnection
-import org.fcitx.fcitx5.android.core.FcitxAPI
+import org.fcitx.fcitx5.android.core.FakeHostConnection
+import org.fcitx.fcitx5.android.core.HostApi
 import org.fcitx.fcitx5.android.core.InputMethodEntry
-import org.fcitx.fcitx5.android.core.RawConfig
-import org.fcitx.fcitx5.android.daemon.FcitxConnection
+import org.fcitx.fcitx5.android.daemon.HostConnection
 import org.fcitx.fcitx5.android.data.punctuation.PunctuationManager
+import org.fcitx.fcitx5.android.data.punctuation.PunctuationMapEntry
+import org.fcitx.fcitx5.android.host.StatusEntry
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -30,7 +30,7 @@ import org.mechdancer.dependency.plusAssign
 
 /**
  * The first test of an input-layer component built the way InputView builds it: a
- * [DynamicScope] holding a [FakeFcitxConnection] and a coroutine scope, no Android.
+ * [DynamicScope] holding a [FakeHostConnection] and a coroutine scope, no Android.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class PunctuationComponentTest {
@@ -43,7 +43,7 @@ class PunctuationComponentTest {
     }
 
     /** [runOnReady] waits, while [hold] is on, till [release], as the real one waits for fcitx. */
-    private class HeldConnection(private val fake: FakeFcitxConnection) : FcitxConnection by fake {
+    private class HeldConnection(private val fake: FakeHostConnection) : HostConnection by fake {
         var hold = false
         private val waiting = mutableListOf<CompletableDeferred<Unit>>()
 
@@ -52,21 +52,21 @@ class PunctuationComponentTest {
             waiting.clear()
         }
 
-        override suspend fun <T> runOnReady(block: suspend FcitxAPI.() -> T): T {
+        override suspend fun <T> runOnReady(block: suspend HostApi.() -> T): T {
             if (hold) CompletableDeferred<Unit>().also { waiting += it }.await()
             return fake.runOnReady(block)
         }
     }
 
     private class Fixture(testScope: TestScope) {
-        val fcitx = FakeFcitxConnection(testScope)
+        val fcitx = FakeHostConnection(testScope)
         val held = HeldConnection(fcitx)
         val recorder = Recorder()
         val punctuation = PunctuationComponent()
 
         init {
             val scope = DynamicScope()
-            val connection: FcitxConnection = held
+            val connection: HostConnection = held
             val coroutines: CoroutineScope = testScope
             scope += connection.wrapToUniqueComponent()
             scope += coroutines.wrapToUniqueComponent()
@@ -76,27 +76,15 @@ class PunctuationComponentTest {
         }
     }
 
-    private fun punctuationAction(active: Boolean) = Action(
-        id = 1, isSeparator = false, isCheckable = true, isChecked = active,
-        name = "punctuation", icon = if (active) "fcitx-punc-active" else "fcitx-punc-inactive",
-        shortText = "", longText = "", menu = null
+    private fun punctuationAction(active: Boolean) = StatusEntry(
+        id = 1, name = "punctuation", icon = if (active) "fcitx-punc-active" else "fcitx-punc-inactive", shortText = ""
     )
 
-    private fun entry(idx: Int, key: String, mapping: String) = RawConfig(
-        idx.toString(),
-        arrayOf(
-            RawConfig(PunctuationManager.KEY, key),
-            RawConfig(PunctuationManager.MAPPING, mapping),
-            RawConfig(PunctuationManager.ALT_MAPPING, "")
-        )
-    )
+    private fun entry(key: String, mapping: String) = PunctuationMapEntry(key, mapping, "")
 
-    private suspend fun Fixture.configure(lang: String, vararg entries: RawConfig) {
+    private suspend fun Fixture.configure(lang: String, vararg entries: PunctuationMapEntry) {
         fcitx.api.inputMethodEntryCached = InputMethodEntry("pinyin").copy(languageCode = lang)
-        fcitx.api.setAddonSubConfig(
-            "punctuation", "punctuationmap/$lang",
-            RawConfig(arrayOf(RawConfig("cfg", arrayOf(RawConfig(PunctuationManager.ENTRIES, arrayOf(*entries))))))
-        )
+        fcitx.api.setPunctuationMap(lang, entries.toList())
     }
 
     // PunctuationManager keeps the tables it read for the whole process: each test's fake has its own
@@ -108,9 +96,9 @@ class PunctuationComponentTest {
     @Test
     fun anActivePunctuationActionLoadsTheLanguagesMappingAndBroadcastsIt() = runTest(StandardTestDispatcher()) {
         val f = Fixture(this)
-        f.configure("zh_CN", entry(0, ",", "，"), entry(1, ".", "。"))
+        f.configure("zh_CN", entry(",", "，"), entry(".", "。"))
 
-        f.punctuation.updatePunctuationMapping(arrayOf(punctuationAction(active = true)))
+        f.punctuation.updatePunctuationMapping(listOf(punctuationAction(active = true)))
         advanceUntilIdle()
 
         assertTrue(f.punctuation.enabled)
@@ -123,9 +111,9 @@ class PunctuationComponentTest {
     @Test
     fun aDuplicateKeyKeepsTheFirstMapping() = runTest(StandardTestDispatcher()) {
         val f = Fixture(this)
-        f.configure("zh_CN", entry(0, "'", "‘"), entry(1, "'", "’"))
+        f.configure("zh_CN", entry("'", "‘"), entry("'", "’"))
 
-        f.punctuation.updatePunctuationMapping(arrayOf(punctuationAction(active = true)))
+        f.punctuation.updatePunctuationMapping(listOf(punctuationAction(active = true)))
         advanceUntilIdle()
 
         assertEquals("‘", f.punctuation.transform("'"))
@@ -134,9 +122,9 @@ class PunctuationComponentTest {
     @Test
     fun anInactivePunctuationActionBroadcastsAnEmptyMapping() = runTest(StandardTestDispatcher()) {
         val f = Fixture(this)
-        f.configure("zh_CN", entry(0, ",", "，"))
+        f.configure("zh_CN", entry(",", "，"))
 
-        f.punctuation.updatePunctuationMapping(arrayOf(punctuationAction(active = false)))
+        f.punctuation.updatePunctuationMapping(listOf(punctuationAction(active = false)))
         advanceUntilIdle()
 
         assertFalse(f.punctuation.enabled)
@@ -147,12 +135,12 @@ class PunctuationComponentTest {
     @Test
     fun anOlderUpdateStillLoadingDoesNotOverwriteANewerOne() = runTest(StandardTestDispatcher()) {
         val f = Fixture(this)
-        f.configure("zh_CN", entry(0, ",", "，"))
+        f.configure("zh_CN", entry(",", "，"))
         f.held.hold = true
 
-        f.punctuation.updatePunctuationMapping(arrayOf(punctuationAction(active = true)))
+        f.punctuation.updatePunctuationMapping(listOf(punctuationAction(active = true)))
         advanceUntilIdle()
-        f.punctuation.updatePunctuationMapping(arrayOf(punctuationAction(active = false)))
+        f.punctuation.updatePunctuationMapping(listOf(punctuationAction(active = false)))
         advanceUntilIdle()
         // the on update's load finishes last
         f.held.release()

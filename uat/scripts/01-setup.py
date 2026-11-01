@@ -1,24 +1,7 @@
 """uat/01-setup.md. The .md is the source of truth; each function follows its case's 前提/操作/预期."""
 import time
 
-from uat import IME, PKG, Blocked, add_im, case, check, in_picker, install
-
-
-def im_rows(d):
-    """settings 输入法: the input methods' names, top to bottom"""
-    s = d.screen()
-    return [n.text for n in sorted(s.app(), key=lambda n: n.b[1])
-            if n.cls == "TextView" and n.clickable and n.parent and n.parent.cls == "ViewGroup"
-            and n.b[1] > 200 and n.b[3] < 2200 and n.text]
-
-
-def globe_cycle(d, n):
-    names = []
-    for _ in range(n):
-        d.press("globe", after=0.8)
-        d._keys = None
-        names.append(d.im_label().replace("空格，", ""))
-    return names
+from uat import IME, PKG, Blocked, case, check, in_picker, install
 
 
 @case("SET-01", base="B0", mutates=True)
@@ -106,73 +89,16 @@ def set01(d):
     return "向导两步，完成后是设置首页；弹出的是幽默输入法（拼音）"
 
 
-@case("SET-02", base="B0-设置")
-def set02(d):
-    d.sh("input keyevent KEYCODE_HOME")
-    time.sleep(1.0)
-    d.sh(f"am start -W -n {PKG}/org.fcitx.fcitx5.android.ui.main.MainActivity")
-    time.sleep(1.0)
-    s = d.screen()
-    check(d.at_home(s), f"再次打开是 {s.texts()[:8]}")
-    return "直接是设置首页"
+case("SET-02", needs="jvm:SettingsMenuUatTest.enabledAndSelectedTheAppOpensOnItsHomePage")(lambda d: None)
 
 
 case("SET-03", needs="jvm:SettingsPagesUatTest.theInputMethodsListed")(lambda d: None)
 
 
-case("SET-04", needs="jvm:SettingsPagesUatTest.addingNineKeys")(lambda d: None)
+case("SET-05", needs="jvm:ImeSwitchUatTest.draggedFirstTheGlobeKeyGoesInTheNewOrder")(lambda d: None)
 
 
-@case("SET-05", base="B0-设置", mutates=True)
-def set05(d):
-    add_im(d, "五笔")
-    s = d.screen()
-    n = s.find(text="五笔")
-    top = s.find(text="拼音")
-    if not n or not top:
-        raise Blocked(f"输入法页 {s.texts()[:6]}")
-    hx = 85
-    y0, y1 = n.c[1], top.b[1] + 10
-    steps = [("down", hx, y0), ("sleep", 0.6)] + \
-        [("move", hx, y0 - (y0 - y1) * i // 12) for i in range(1, 13)] + [("sleep", 0.3), ("up", hx, y1)]
-    d.touch(*steps)
-    time.sleep(1.0)
-    r = im_rows(d)
-    check(r == ["五笔", "拼音", "英文"], f"拖动后列表 {r}")
-    d.open_page("text")
-    time.sleep(1.0)
-    start = d.im_label().replace("空格，", "")
-    names = globe_cycle(d, 3)
-    order = ["五笔", "拼音", "英文"]
-    i = order.index(start) if start in order else -1
-    expect = [order[(i + k) % 3] for k in (1, 2, 3)]
-    check(i >= 0 and names == expect, f"开始「{start}」，地球键依次 {names}（应为 {expect}）")
-    return f"列表 {r}；开始 {start}，地球键 {names}"
-
-
-@case("SET-06", base="B0-设置", mutates=True)
-def set06(d):
-    add_im(d, "双拼")
-    d.tap_text("编辑", scroll=False, after=1.0)
-    s = d.screen()
-    n = s.find(text="双拼")
-    box = next((k for k in n.parent.kids if k.cls == "CheckBox"), None) if n and n.parent else None
-    if not box:
-        raise Blocked("编辑时双拼一行没有勾选框")
-    d.tap(box.c, 0.8)
-    d.tap_text("删除", scroll=False, after=1.2)
-    s = d.screen()
-    ok = next((k for k in s.nodes if k.text in ("确定", "删除") and k.cls == "Button"), None)
-    if ok:
-        d.tap(ok.c, 1.0)
-    if d.screen().find(text="编辑") is None:
-        d.back(1.0)
-    r = im_rows(d)
-    check("双拼" not in r, f"删除后列表 {r}")
-    d.open_page("text")
-    names = globe_cycle(d, 3)
-    check(set(names) == {"拼音", "英文"}, f"地球键依次 {names}")
-    return f"列表 {r}；地球键 {names}"
+case("SET-06", needs="jvm:ImeSwitchUatTest.aDeletedInputMethodIsNoLongerGoneRoundTo")(lambda d: None)
 
 
 case("SET-08", needs="jvm:ImeSwitchUatTest.theGlobeKeyGoesRoundAndTheSpaceSays")(lambda d: None)
@@ -194,5 +120,16 @@ def set09(d):
     return f"系统选择输入法框：{items[:4]}"
 
 
-
 case("SET-11", needs="manual:要上游 Fcitx5 for Android 导出的备份")(lambda d: None)
+
+
+case("SET-12", needs="jvm:SettingsPagesUatTest.addingAnInputMethodOffersNoNineKeysAndWubiFirst")(lambda d: None)
+
+
+case("SET-13", needs="jvm:KotlinHostTest.zeroFoursNineKeysPinyinBecomesPinyinsKeyboardAndTheUserIsToldOnce")(lambda d: None)
+
+
+case("SET-14", needs="jvm:KotlinHostSchemeTest.anUpgradeKeepsItsScheme")(lambda d: None)
+
+
+case("SET-15", needs="jvm:KotlinHostSchemeTest.aDroppedSchemeIsXiaoheAndTheUserIsToldOnce")(lambda d: None)

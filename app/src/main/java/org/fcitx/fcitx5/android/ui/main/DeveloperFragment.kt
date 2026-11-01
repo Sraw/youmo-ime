@@ -17,7 +17,7 @@ import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.fcitx.fcitx5.android.R
-import org.fcitx.fcitx5.android.daemon.FcitxDaemon
+import org.fcitx.fcitx5.android.daemon.HostDaemon
 import org.fcitx.fcitx5.android.data.clipboard.ClipboardManager
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.ui.common.PaddingPreferenceFragment
@@ -106,7 +106,7 @@ class DeveloperFragment : PaddingPreferenceFragment() {
                     .setNegativeButton(android.R.string.cancel, null)
                     .setPositiveButton(android.R.string.ok) { _, _ ->
                         lifecycleScope.launch {
-                            FcitxDaemon.restartFcitx()
+                            HostDaemon.restartFcitx()
                             context.toast(R.string.done)
                         }
                     }

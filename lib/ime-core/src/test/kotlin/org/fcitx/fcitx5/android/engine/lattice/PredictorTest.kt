@@ -12,6 +12,7 @@ import org.fcitx.fcitx5.android.engine.learn.import
 import org.fcitx.fcitx5.android.engine.pinyin.Syllables
 import org.fcitx.fcitx5.android.engine.user.UserModel
 import org.fcitx.fcitx5.android.engine.user.UserModel.Entry
+import org.fcitx.fcitx5.android.engine.user.learn
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test

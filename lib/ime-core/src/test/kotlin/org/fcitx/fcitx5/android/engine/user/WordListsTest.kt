@@ -5,6 +5,9 @@
 package org.fcitx.fcitx5.android.engine.user
 
 import org.fcitx.fcitx5.android.engine.pinyin.Syllables
+import org.fcitx.fcitx5.android.engine.platform.MemoryFiles
+import org.fcitx.fcitx5.android.engine.platform.UserFiles
+import org.fcitx.fcitx5.android.engine.platform.jvm.JvmFiles
 import org.fcitx.fcitx5.android.engine.user.UserFixtures.entry
 import org.fcitx.fcitx5.android.engine.user.UserFixtures.inTrie
 import org.fcitx.fcitx5.android.engine.user.UserFixtures.model
@@ -52,7 +55,7 @@ class WordListsTest {
     // review R11 F2933: a delete taken back puts each word where it was, in order, past the end at the end
     @Test
     fun wordsPutBackGoWhereTheyWereAndAreKept() {
-        val dir = folder.newFolder()
+        val dir = MemoryFiles()
         val lists = WordLists(dir)
         val a = entry("你", "ni")
         val b = entry("好", "hao")
@@ -70,24 +73,24 @@ class WordListsTest {
 
     @Test
     fun theListsAreKeptInTheirFiles() {
-        val dir = folder.newFolder()
+        val dir = MemoryFiles()
         val lists = WordLists(dir)
         assertTrue(lists.add(entry("你好", "ni", "hao")))
         assertFalse(lists.add(entry("你好", "ni", "hao")))
         assertTrue(lists.block(entry("拟", "ni")))
-        assertEquals("你好 ni'hao\n", File(dir, WordLists.ADDED).readText())
+        assertEquals("你好 ni'hao\n", dir.file(WordLists.ADDED).read().decodeToString())
         val again = WordLists(dir)
         assertEquals(listOf(entry("你好", "ni", "hao")), again.addedWords)
         assertEquals(listOf(entry("拟", "ni")), again.blockedWords)
         assertTrue(again.unblock(entry("拟", "ni")))
         assertTrue(again.remove(entry("你好", "ni", "hao")))
-        assertEquals("", File(dir, WordLists.BLOCKED).readText())
+        assertEquals("", dir.file(WordLists.BLOCKED).read().decodeToString())
         assertEquals(emptyList<UserModel.Entry>(), WordLists(dir).addedWords)
     }
 
     @Test
     fun theListsReadBackAreAppliedToAModel() {
-        val dir = folder.newFolder()
+        val dir = MemoryFiles()
         WordLists(dir).apply {
             add(entry("拟好", "ni", "hao"))
             block(entry("你好", "ni", "hao"))
@@ -105,7 +108,8 @@ class WordListsTest {
     fun aListThatCannotBeWrittenIsKeptInMemory() {
         val errors = ArrayList<IOException>()
         // a file where the directory should be
-        val lists = WordLists(folder.newFile(), errors::add)
+        val root = MemoryFiles().apply { file("lists").createNew() }
+        val lists = WordLists(root.dir("lists"), errors::add)
         assertTrue(lists.add(entry("你好", "ni", "hao")))
         assertEquals(listOf(entry("你好", "ni", "hao")), lists.addedWords)
         assertEquals(1, errors.size)
@@ -113,8 +117,10 @@ class WordListsTest {
 
     @Test
     fun aListThatDidNotReadIsNotWrittenOver() {
-        val dir = folder.newFolder()
-        val link = File(dir, WordLists.ADDED)
+        // a symbolic link: on the disk
+        val disk = folder.newFolder()
+        val dir = JvmFiles(disk)
+        val link = File(disk, WordLists.ADDED)
         // a list there that cannot be read as one, yet could be renamed over
         assumeTrue(runCatching { Files.createSymbolicLink(link.toPath(), folder.newFolder().toPath()) }.isSuccess)
         val errors = ArrayList<IOException>()
@@ -124,23 +130,27 @@ class WordListsTest {
         assertEquals(listOf(entry("你好", "ni", "hao")), lists.addedWords)
         assertEquals(2, errors.size)
         assertTrue(Files.isSymbolicLink(link.toPath()))
-        assertFalse(File(dir, "${WordLists.ADDED}.new").exists())
+        assertFalse(dir.file("${WordLists.ADDED}.new").exists())
         // the other list is written as ever
         assertTrue(lists.block(entry("拟", "ni")))
-        assertEquals("拟 ni\n", File(dir, WordLists.BLOCKED).readText())
+        assertEquals("拟 ni\n", dir.file(WordLists.BLOCKED).read().decodeToString())
         assertEquals(2, errors.size)
     }
 
     @Test
-    fun aListThatCannotBeRenamedInLeavesNoTempFile() {
-        val dir = folder.newFolder()
+    fun aListThatCannotBeRenamedInLeavesNoTempFile() = listThatCannotBeRenamedIn(MemoryFiles())
+
+    @Test
+    fun aListThatCannotBeRenamedInLeavesNoTempFileOnDisk() = listThatCannotBeRenamedIn(JvmFiles(folder.newFolder()))
+
+    private fun listThatCannotBeRenamedIn(dir: UserFiles) {
         val errors = ArrayList<IOException>()
         val lists = WordLists(dir, errors::add)
         // where the list goes, a directory
-        File(dir, WordLists.ADDED).mkdir()
+        dir.dir(WordLists.ADDED).mkdirs()
         assertTrue(lists.add(entry("你好", "ni", "hao")))
         assertEquals(1, errors.size)
-        assertFalse(File(dir, "${WordLists.ADDED}.new").exists())
+        assertFalse(dir.file("${WordLists.ADDED}.new").exists())
     }
 
     @Test
@@ -180,7 +190,7 @@ class WordListsTest {
     @Test
     fun aLetterIsASyllableAsSpelledAndReadsBackSo() {
         val stock = WordLists.entry("A股", "A'gu")!!
-        assertEquals("A股 A'gu", "${stock.text} ${WordLists.code(stock.syllables)}")
+        assertEquals("A股 A'gu", "${stock.text} ${stock.apostrophed()}")
         assertEquals(stock, WordLists.entry("A股", "A gu"))
         // typed in capitals, a word of pinyin still reads
         assertEquals(entry("你好", "ni", "hao"), WordLists.entry("你好", "Ni Hao"))

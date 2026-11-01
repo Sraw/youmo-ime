@@ -17,7 +17,6 @@ import org.fcitx.fcitx5.android.core.UNICODE
 import org.fcitx.fcitx5.android.data.theme.ThemePreset
 import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -60,7 +59,7 @@ class GroupedKeyboard18Test {
         assertEquals(listOf(0.15f, 0.14f, 0.14f, 0.14f, 0.14f, 0.14f, 0.15f), widths[2])
         widths.forEach { assertEquals(1f, it.sum(), 1e-4f) }
         assertTrue(layout[2].last() is BackspaceKey)
-        assertEquals(KeyAction.FcitxKeyAction("'"), (layout[2][0].behaviors.single() as KeyDef.Behavior.Press).action)
+        assertEquals(KeyAction.HostKeyAction("'"), (layout[2][0].behaviors.single() as KeyDef.Behavior.Press).action)
     }
 
     @Test
@@ -78,10 +77,10 @@ class GroupedKeyboard18Test {
         NineKeyLetters.G18.codes.toList().zip(layout.take(3).flatten().filter { it.appearance is KeyDef.Appearance.AltText }).forEach { (code, def) ->
             assertEquals(GroupedKeyboard.code(code), def.behaviors.filterIsInstance<KeyDef.Behavior.Press>().single().action)
         }
-        // L; is 微软's and 紫光's ing too: one code for both
+        // L; is 微软's ing too: one code for both
         assertEquals(GroupedKeyboard.code(NineKeyLetters.G18.key(';')), press("L;"))
         assertEquals(KeyAction.SymAction(KeySym(FcitxKeyMapping.FcitxKey_KP_0 + 8), KeyStates.Virtual), swipe("A"))
-        assertEquals(KeyAction.FcitxKeyAction(":"), swipe("M"))
+        assertEquals(KeyAction.HostKeyAction(":"), swipe("M"))
     }
 
     @Test
@@ -99,6 +98,24 @@ class GroupedKeyboard18Test {
         assertEquals(2, l.inRow)
     }
 
+    // pinyin's 18 keys have no ;: L alone on the key, its long press L 0 l and the symbols, no ; or :
+    @Test
+    fun pinyinsEighteenKeysShowLWithoutTheSemicolon() {
+        val pinyin = GroupedKeyboard.layout(NineKeyLetters.G18, semicolon = false) { letter ->
+            when (letter) {
+                "l" -> listOf(")", "L")
+                ";" -> listOf(":")
+                else -> emptyList()
+            }
+        }
+        val faces = pinyin.take(3).flatten().mapNotNull { (it.appearance as? KeyDef.Appearance.AltText)?.displayText }
+        assertEquals(listOf("A", "SD", "FG", "H", "JK", "L"), faces.subList(7, 13))
+        val l = pinyin.flatten().single { (it.appearance as? KeyDef.Appearance.AltText)?.displayText == "L" }
+        assertEquals(listOf("L", "-", "l", ")"), l.popup!!.filterIsInstance<KeyDef.Popup.Keyboard.Explicit>().single().items.toList())
+        // the code is the group's all the same, as the session reads it
+        assertEquals(key("L;").behaviors.filterIsInstance<KeyDef.Behavior.Press>().single().action, l.behaviors.filterIsInstance<KeyDef.Behavior.Press>().single().action)
+    }
+
     @Test
     @Uat("SP-21")
     fun theSpaceIsAtLeast15PercentOfTheRowInEveryField() {
@@ -111,8 +128,6 @@ class GroupedKeyboard18Test {
         listOf(R.id.button_lang, R.id.button_space, R.id.button_return, R.id.button_comma, R.id.button_backspace).forEach {
             assertEquals(View.VISIBLE, keyboard.findViewById<View>(it).visibility)
         }
-        // no 中/英: English is the language key's round
-        assertNull(keyboard.findViewById<View>(R.id.button_nine_language))
         val described = (0 until keyboard.childCount).map { keyboard.getChildAt(it) }.filterIsInstance<ViewGroup>()
             .flatMap { it.children.toList() }.filterIsInstance<AltTextKeyView>()
             .associate { (it.def as KeyDef.Appearance.AltText).displayText to it.contentDescription.toString() }

@@ -6,7 +6,7 @@ package org.fcitx.fcitx5.android.input.voice
 
 import androidx.test.platform.app.InstrumentationRegistry
 import kotlinx.coroutines.runBlocking
-import org.fcitx.fcitx5.android.engine.host.Engines
+import org.fcitx.fcitx5.android.engine.runtime.UserWord
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -43,7 +43,7 @@ class VoiceEngineTest {
         // a beam of 16 the search keeps 开放 heard, rightly. Not 开放 either: the pack has 开放时间,
         // and a hotword ending where a longer one goes on takes the search back to the start of
         // the graph, the longer one's bonus lost.)
-        val word = Engines.UserWord("早上", "zao shang", Engines.UserWord.Kind.ADDED)
+        val word = UserWord("早上", "zao shang", UserWord.Kind.ADDED)
         val with = topScore(VoiceHotwords.ofUser(listOf(word)))
         val without = topScore(VoiceHotwords.Words.NONE)
         assertTrue("$with with, $without without", with > without)
@@ -53,8 +53,8 @@ class VoiceEngineTest {
     fun theLastWordsGraphIsTakenAgainForTheSameWordsOnly() {
         // the recognizer keeps the graph of the words last asked for: the same words take it again,
         // others (苹果, not said) get their own, without the bonus on 早上, and 早上 its graph back
-        val said = VoiceHotwords.ofUser(listOf(Engines.UserWord("早上", "zao shang", Engines.UserWord.Kind.ADDED)))
-        val unsaid = VoiceHotwords.ofUser(listOf(Engines.UserWord("苹果", "ping guo", Engines.UserWord.Kind.ADDED)))
+        val said = VoiceHotwords.ofUser(listOf(UserWord("早上", "zao shang", UserWord.Kind.ADDED)))
+        val unsaid = VoiceHotwords.ofUser(listOf(UserWord("苹果", "ping guo", UserWord.Kind.ADDED)))
         val first = topScore(said)
         assertEquals(first, topScore(said), SAME_SCORE)
         val other = topScore(unsaid)

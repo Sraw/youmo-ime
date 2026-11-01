@@ -20,7 +20,7 @@ import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
-import org.fcitx.fcitx5.android.daemon.FcitxDaemon
+import org.fcitx.fcitx5.android.daemon.HostDaemon
 import org.fcitx.fcitx5.android.data.UserDataManager
 import org.fcitx.fcitx5.android.data.clipboard.ClipboardManager
 import org.fcitx.fcitx5.android.engine.learn.control.BackupOp
@@ -69,7 +69,7 @@ class BackupFragment : PaddingPreferenceFragment() {
                     val failed = FcitxApplication.getInstance().coroutineScope.async(Dispatchers.Main.immediate) {
                         try {
                             // stop fcitx before overwriting files
-                            FcitxDaemon.stopFcitx()
+                            HostDaemon.stopFcitx()
                             val metadata = withContext(Dispatchers.IO) {
                                 ClipboardManager.closeDatabase()
                                 val inputStream = cr.openInputStream(uri)!!
@@ -83,7 +83,7 @@ class BackupFragment : PaddingPreferenceFragment() {
                             null
                         } catch (@Suppress("TooGenericExceptionCaught") e: Exception) {
                             // whatever the provider or the zip threw: shown, after the clipboard is reopened and fcitx restarted
-                            restartAfterFailedImport({ ClipboardManager.reopenDatabase() }) { FcitxDaemon.startFcitx() }
+                            restartAfterFailedImport({ ClipboardManager.reopenDatabase() }) { HostDaemon.startFcitx() }
                             e
                         }
                     }

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Release gates 2, 3 and 5 of dev/design/fcitx-replacement.md §8 on a redroid of their own.
 
-  gates.py upgrade <new.apk> [--old DIR]        gate 2: v0.3.0/0.3.1/0.3.2 upgraded in place
+  gates.py upgrade <new.apk> [--old DIR]        gate 2: v0.3.0/0.3.1/0.3.2/0.4.0 upgraded in place
   gates.py backups <new.apk> --old DIR          gate 3: new backup → each old build; old backups → new
   gates.py perf <label>=<apk> [<label>=<apk>…]   gate 5: start, key latency, memory, side by side
 
@@ -34,7 +34,9 @@ sys.path.insert(0, os.path.join(UAT_DIR, "tools"))
 import uat  # noqa: E402
 
 RELEASED = "io.github.sraw.youmo"
-VERSIONS = ("v0.3.0", "v0.3.1", "v0.3.2")
+VERSIONS = ("v0.3.0", "v0.3.1", "v0.3.2", "v0.4.0")
+# old builds whose backups this build refuses (exception_user_data_too_old: 0.3.0's learning is not read)
+REFUSED = ("v0.3.0",)
 FIXTURES = os.path.join(UAT_DIR, "fixtures", "upgrade")
 
 
@@ -121,10 +123,11 @@ class Gate:
                 f.write(f"--- {pkg} {args}\n" + "\n".join(out[-40:]) + "\n")
         return r.returncode == 0, last
 
-    def checked(self, scenario, pkg, version=None):
-        """version: gate 2's fixture, whose user_de (if it has a de.tar) the check also reads"""
+    def checked(self, scenario, pkg, version=None, old=False):
+        """version: gate 2's fixture, whose user_de (if it has a de.tar) the check also reads;
+        old: a released v0.3.x build is installed, its files still on the external storage"""
         out = os.path.join(self.dir, f"{scenario}.json")
-        ok, last = self.phase(pkg, "check", out, *([version] if version else []))
+        ok, last = self.phase(pkg, "check", out, *([version] if version else []), *(["--old"] if old else []))
         items = json.load(open(out)) if os.path.exists(out) else []
         self.rows.append((scenario, ok and items and all(i["ok"] is not False for i in items), last, items))
 
@@ -237,7 +240,7 @@ def cmd_backups(a):
             if ok:
                 ok, last = g.phase(RELEASED, "import", z)
             if ok:
-                g.checked(f"new → {v}", RELEASED)
+                g.checked(f"new → {v}", RELEASED, old=True)
             else:
                 g.blocked(f"new → {v}", last)
         g.uninstall(RELEASED)
@@ -247,6 +250,10 @@ def cmd_backups(a):
             g.uninstall(g.new_pkg)
             z = retarget(os.path.join(FIXTURES, v, "backup.zip"), os.path.join(g.dir, f"{v}-for-new.zip"), g.new_pkg)
             ok, last = g.phase(g.new_pkg, "install", g.new)
+            if ok and v in REFUSED:
+                ok, last = g.phase(g.new_pkg, "import-refused", z)
+                g.rows.append((f"{v} backup → new (refused)", ok, last, []))
+                continue
             if ok:
                 ok, last = g.phase(g.new_pkg, "import", z)
             if ok:
@@ -259,7 +266,7 @@ def cmd_backups(a):
                     "New → old: the new build upgraded from the v0.3.2 fixture, 繁体 and 性能档位 changed and "
                     "changed back from its keyboard and settings (so it wrote those files), 备份全部; that zip "
                     "restored into each released build on a clean install. Old → new: each fixture's backup.zip "
-                    "restored into a clean new build." + ("" if g.new_pkg == RELEASED else
+                    "restored into a clean new build; v0.3.0's refused (its learning no longer read), nothing of it restored." + ("" if g.new_pkg == RELEASED else
                                                           " Debug build: zips retargeted between the two ids."))
 
 

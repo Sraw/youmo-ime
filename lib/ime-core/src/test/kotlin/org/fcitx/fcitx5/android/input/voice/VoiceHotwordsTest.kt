@@ -4,8 +4,8 @@
  */
 package org.fcitx.fcitx5.android.input.voice
 
-import org.fcitx.fcitx5.android.engine.host.Engines.UserWord
-import org.fcitx.fcitx5.android.engine.host.Engines.UserWord.Kind
+import org.fcitx.fcitx5.android.engine.runtime.UserWord
+import org.fcitx.fcitx5.android.engine.runtime.UserWord.Kind
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test

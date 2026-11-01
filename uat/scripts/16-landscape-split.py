@@ -1,7 +1,7 @@
 """uat/16-landscape-split.md (B0-横屏). The .md is the source of truth; each function follows its
 case's 前提/操作/预期. redroid's display does not turn: landscape is the display resized to
 2340x1080 (851 dp wide, Device.rotate), which the app sees as a landscape screen."""
-from uat import Blocked, add_im, case, check, grouped_keys, home, pinyin_keyboard, script, shuangpin_keyboard
+from uat import Blocked, case, check
 
 
 def kb_keys(d, s=None):
@@ -112,99 +112,12 @@ case("LS-28", needs="jvm:LandscapeUatTest.candidatesAcrossTheWidth")(lambda d: N
 case("LS-29", needs="jvm:LandscapeUatTest.splitShuangpinHasNoSemicolonKey")(lambda d: None)
 
 
-def kb_and_row(d):
-    s = d.screen()
-    kb = s.find(rid="keyboard_view", where="ime")
-    row, strip = d.code_row(s), s.find(rid="code_row_syllables", where="ime")
-    if not kb or not row:
-        raise Blocked("键盘或编码行没出来")
-    return kb.b, row.b, strip.b if strip else None
-
-
 def size(box):
     """(width, height) of 14-settings' keys_box / preview_box"""
     return box[2] - box[0], box[3] - box[1]
 
 
-def tap_ime(d, text=None, desc=None):
-    s = d.screen()
-    n = (s.find(text=text, where="ime") if text else None) or (s.find(desc=desc or text, where="ime"))
-    if not n:
-        raise Blocked(f"键盘上没有「{text or desc}」")
-    d.tap(n.c, 1.0)
+case("LS-30", needs="jvm:LandscapeUatTest.theFourteenKeysAtTheSideWithTheirCodeRow、LandscapeUatTest.theFourteenKeysOneHandedFloatingAndAsTheThemesPreviewHasThem")(lambda d: None)
 
 
-def toggle_mode(d, name):
-    """the toolbar's 状态区域 → name (单手模式, 悬浮键盘): on if off, off if on"""
-    d.expand_toolbar()
-    tap_ime(d, desc="状态区域")
-    tap_ime(d, text=name)
-
-
-@case("LS-30", base="B0-横屏", mutates=True, visual=True)
-def ls30(d):
-    d.hide_keyboard()
-    pinyin_keyboard(d, "14 键")
-    d.open_page("text")
-    d.step("横屏分体")
-    grouped_keys(d, "bn ui")
-    d.cands()
-    kb, row, strip = kb_and_row(d)
-    check(kb[2] - kb[0] < 0.6 * 2340, f"横屏分体时 14 键 {kb} 没靠一边")
-    check(strip and kb[0] - 5 <= strip[0] and strip[2] <= kb[2] + 5, f"音节条 {strip} 不在键盘 {kb} 上方")
-    d.shot("kb", "横屏分体：14 键靠一边，编码行和音节条跟着")
-    d.clear()
-    d.rotate(0)
-    d.open_page("text")
-    settings = script("14-settings")
-    real_w, real = size(settings.keys_box(d))   # the docked full-width board, for the preview's height below
-    d.step("单手")
-    toggle_mode(d, "单手模式")
-    grouped_keys(d, "bn ui")
-    d.cands()
-    kb1, row1, strip1 = kb_and_row(d)
-    check(strip1 and kb1[0] - 5 <= strip1[0] and strip1[2] <= kb1[2] + 5, f"单手：音节条 {strip1}，键盘 {kb1}")
-    d.shot("kb", "单手：编码行和音节条随键盘")
-    d.clear()
-    toggle_mode(d, "单手模式")
-    d.step("悬浮")
-    toggle_mode(d, "悬浮键盘")
-    grouped_keys(d, "bn ui")
-    d.cands()
-    kb2, row2, strip2 = kb_and_row(d)
-    check(strip2 and kb2[0] - 5 <= strip2[0] and strip2[2] <= kb2[2] + 5, f"悬浮：音节条 {strip2}，键盘 {kb2}")
-    d.shot("kb", "悬浮：编码行和音节条随键盘")
-    d.clear()
-    d.step("主题页的预览")
-    d.hide_keyboard()
-    home(d, "外观")
-    # the page shows the preview scaled down to fit (half the width on a phone): its height is
-    # compared at the real board's width, the keys' union across in both
-    # the preview takes the code row's height off its keys as the real keyboard does (KeyboardHeightCap)
-    pw, ph = size(settings.preview_box(d))
-    pv = round(ph * real_w / pw) if pw else 0
-    d.shot("full", "外观页的键盘预览：和真键盘一样高（键区）")
-    check(abs(real - pv) / d.dpx() <= 3, f"预览的键高 {pv}px，真键盘 {real}px")
-    return f"分体 {kb}；单手 {kb1}；悬浮 {kb2}；预览 {pv}px / 真键盘 {real}px"
-
-
-@case("LS-31", base="B0-横屏", mutates=True, visual=True)
-def ls31(d):
-    d.hide_keyboard()
-    add_im(d, "双拼")
-    shuangpin_keyboard(d, "18 键")
-    d.open_page("text")
-    d.switch_im("双拼")
-    k = d.keys(refresh=True)
-    miss = [g for g in "q we rt y u io p a sd fg h jk z xc v bn m".split() if g not in k]
-    check(not miss, f"横屏 18 键上没有 {miss}")
-    grouped_keys(d, "bn io")
-    d.cands()
-    kb, row, strip = kb_and_row(d)
-    sy = d.syllables()
-    check(kb[2] - kb[0] < 0.6 * 2340, f"横屏分体时 18 键 {kb} 没靠一边")
-    check(strip and kb[0] - 5 <= strip[0] and strip[2] <= kb[2] + 5, f"音节条 {strip} 不在键盘 {kb} 上方")
-    check("ni" in sy, f"音节条 {sy}")
-    d.shot("kb", "横屏分体：18 键靠一边，编码行和音节条跟着")
-    d.clear()
-    return f"18 键 {kb}；音节条 {sy[:4]}"
+case("LS-31", needs="jvm:LandscapeUatTest.theEighteenKeysAtTheSideAsTheFourteen")(lambda d: None)

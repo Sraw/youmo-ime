@@ -11,6 +11,7 @@ import androidx.annotation.Keep
 import androidx.core.view.children
 import androidx.core.view.isVisible
 import org.fcitx.fcitx5.android.R
+import org.fcitx.fcitx5.android.core.EngineState
 import org.fcitx.fcitx5.android.core.FcitxKeyMapping
 import org.fcitx.fcitx5.android.core.InputMethodEntry
 import org.fcitx.fcitx5.android.core.KeyStates
@@ -19,7 +20,8 @@ import org.fcitx.fcitx5.android.core.UNICODE
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.prefs.ManagedPreference
 import org.fcitx.fcitx5.android.data.theme.Theme
-import org.fcitx.fcitx5.android.engine.host.Keyboard
+import org.fcitx.fcitx5.android.engine.InputMethodCatalog
+import org.fcitx.fcitx5.android.engine.runtime.Keyboard
 import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
 import org.fcitx.fcitx5.android.input.broadcast.ReturnKeyAppearance
 import org.fcitx.fcitx5.android.input.picker.PickerWindow
@@ -36,29 +38,43 @@ import splitties.views.existingOrNewId
  * group's letters, as 九键's digits; on a key of two letters with where across it the finger came
  * down ([Keyboard.tapKey], [pressed]), so the letter on that side weighs more (讯飞's 你好 for
  * nihao); its candidates and the syllables on the code row come back
- * through the engine ([org.fcitx.fcitx5.android.core.EngineBridge.syllables]). A swipe types its
+ * through the engine ([EngineState.syllables]). A swipe types its
  * corner, iFlytek's: 1 to 0 on the top two rows (a keypad's digit, which picks that candidate while
  * typing), `~ ! @ ?` on the third. Its long press offers a row of its letters in capitals, the
  * corner and its letters (Q W 1 q w), the one chosen committed as it is after what is typed, and
  * above them what the full keyboard's long press of its letters offers besides. No glide, no Shift:
- * capitals are English's.
+ * capitals are English's; but a stroke drawn over them while pinyin is typed (笔画筛选) filters
+ * the candidates as on the full keyboard.
  *
  * [NineKeyLetters.G18]: 双拼's 18 keys, Q WE RT Y U IO P, A SD FG H JK L;, Z XC V BN M, laid out
  * and typed the same way, its corners 1 to 0 then marks (iFlytek has no 18 keys to follow). Their
  * taps send the code alone: where across the key it fell is the 14 keys' only so far.
+ *
+ * [wire]: what a group's code goes out as. Pinyin's 14 keys and 双拼's 18 send the group's code itself;
+ * pinyin's 18 keys ([NamePinyin18]) and 双拼's 14 ([NameShuangpin14]) send codes of their own
+ * ([Keyboard.pinyin18Key], [Keyboard.shuangpin14Key]), each read by its input method's own session
+ * of that keyboard (I1), no tap places. [semicolon]: whether a group shows its `;` (双拼's, ing to 微软); pinyin's 18 keys have none, their L key L alone, its long press no `;` or `:`.
  */
 @SuppressLint("ViewConstructor")
 class GroupedKeyboard(
     context: Context,
     theme: Theme,
     private val letters: NineKeyLetters = NineKeyLetters.G14,
-) : BaseKeyboard(context, theme, layout(letters, ::symbolsOf)) {
+    private val wire: (Char) -> Int = Char::code,
+    private val semicolon: Boolean = true,
+) : BaseKeyboard(context, theme, layout(letters, wire, semicolon, ::symbolsOf)) {
 
     companion object {
         const val Name14 = "Grouped14"
 
         /** 双拼's 18 keys ([NineKeyLetters.G18]). */
         const val Name18 = "Grouped18"
+
+        /** Pinyin's 18 keys: [NineKeyLetters.G18]'s groups, sent as [Keyboard.pinyin18Key]. */
+        const val NamePinyin18 = "GroupedPinyin18"
+
+        /** 双拼's 14 keys: [NineKeyLetters.G14]'s groups, sent as [Keyboard.shuangpin14Key]. */
+        const val NameShuangpin14 = "GroupedShuangpin14"
 
         // iFlytek's corners, a group each in order
         internal val CORNERS = listOf("1", "2", "3", "4", "5", "6", "7", "8", "9", "0", "~", "!", "@", "?")
@@ -83,7 +99,7 @@ class GroupedKeyboard(
         private const val SEPARATOR = "分词"
 
         /** A group's code as the engine reads it: a Unicode character, as 九键's syllables are sent. */
-        internal fun code(c: Char) = KeyAction.SymAction(KeySym(UNICODE + c.code), KeyStates.Virtual)
+        internal fun code(c: Char, wire: (Char) -> Int = Char::code) = KeyAction.SymAction(KeySym(UNICODE + wire(c)), KeyStates.Virtual)
 
         /** [action], a group's [code], as tapped at [at] across its key ([Keyboard.tapKey]) where it has two letters and a place. */
         internal fun tapped(action: KeyAction, at: Float, letters: NineKeyLetters): KeyAction {
@@ -100,7 +116,7 @@ class GroupedKeyboard(
             if (c in '0'..'9') {
                 KeyAction.SymAction(KeySym(FcitxKeyMapping.FcitxKey_KP_0 + (c - '0')), KeyStates.Virtual)
             } else {
-                KeyAction.FcitxKeyAction(text)
+                KeyAction.HostKeyAction(text)
             }
         }
 
@@ -129,11 +145,11 @@ class GroupedKeyboard(
             )
         }
 
-        private fun groupKey(group: String, code: Char, corner: String, width: Float, symbolsOf: (String) -> List<String>): KeyDef {
+        private fun groupKey(group: String, code: Char, corner: String, width: Float, symbolsOf: (String) -> List<String>, wire: (Char) -> Int): KeyDef {
             return KeyDef(
                 KeyDef.Appearance.AltText(displayText = group.uppercase(), altText = corner, textSize = 20f, percentWidth = width),
                 setOf(
-                    KeyDef.Behavior.Press(code(code)),
+                    KeyDef.Behavior.Press(code(code, wire)),
                     KeyDef.Behavior.Swipe(corner(corner)),
                 ),
                 arrayOf(
@@ -143,13 +159,20 @@ class GroupedKeyboard(
             )
         }
 
-        /** The keys: [letters]' groups in their rows, each with its corner and long press ([symbolsOf] a letter's symbols). */
-        internal fun layout(letters: NineKeyLetters, symbolsOf: (String) -> List<String>): List<List<KeyDef>> {
-            val groups = letters.tag().split(',')
+        /** [letters]' groups as their keys show them: without `;` unless [semicolon]. */
+        private fun groupsOf(letters: NineKeyLetters, semicolon: Boolean) =
+            letters.tag().split(',').map { if (semicolon) it else it.replace(";", "") }
+
+        /**
+         * The keys: [letters]' groups in their rows, each with its corner and long press ([symbolsOf] a
+         * letter's symbols), sent as [wire] has them; a group's `;` left off but with [semicolon].
+         */
+        internal fun layout(letters: NineKeyLetters, wire: (Char) -> Int = Char::code, semicolon: Boolean = true, symbolsOf: (String) -> List<String>): List<List<KeyDef>> {
+            val groups = groupsOf(letters, semicolon)
             val shape = shapeOf(letters)
             val first = shape.rows.runningFold(0, Int::plus)
             fun row(r: Int) = (first[r] until first[r + 1]).map {
-                groupKey(groups[it], letters.codes[it], shape.corners[it], shape.widths[r], symbolsOf)
+                groupKey(groups[it], letters.codes[it], shape.corners[it], shape.widths[r], symbolsOf, wire)
             }
             return listOf(
                 row(0),
@@ -162,7 +185,7 @@ class GroupedKeyboard(
                             contentDescription = R.string.a11y_key_separator,
                         ),
                         // while typing the separator; else the full keyboard's ', typed by the app
-                        setOf(KeyDef.Behavior.Press(KeyAction.FcitxKeyAction("'"))),
+                        setOf(KeyDef.Behavior.Press(KeyAction.HostKeyAction("'"))),
                     ),
                 ) + row(2) + BackspaceKey(SIDE),
                 listOf(
@@ -189,7 +212,7 @@ class GroupedKeyboard(
          */
         internal fun resolve(action: KeyAction, source: KeyActionListener.Source): KeyAction {
             if (source != KeyActionListener.Source.Popup) return action
-            val c = (action as? KeyAction.FcitxKeyAction)?.act?.singleOrNull() ?: return action
+            val c = (action as? KeyAction.HostKeyAction)?.act?.singleOrNull() ?: return action
             return if (c in '0'..'9' || c in 'a'..'z' || c in 'A'..'Z') KeyAction.CommitAction(c.toString()) else action
         }
     }
@@ -238,13 +261,16 @@ class GroupedKeyboard(
 
     private val AltTextKeyView.corner get() = (def as KeyDef.Appearance.AltText).altText
 
-    // the group keys with their letters
+    // the group keys with their letters, as [layout] made them (pinyin's 18 keys: L without its `;`)
     private val groupViews: List<Pair<AltTextKeyView, String>> by lazy {
-        val groups = letters.tag().split(',')
+        val groups = groupsOf(letters, semicolon)
         keyRows.flatMap { it.children.toList() }.filterIsInstance<AltTextKeyView>().mapNotNull { view ->
             groups.firstOrNull { it.uppercase() == (view.def as KeyDef.Appearance.AltText).displayText }?.let { view to it }
         }
     }
+
+    // no glide: a stroke drawn alone (笔画筛选), over the group keys, each its first letter's
+    override val glide = glideInput(letters = { groupViews.map { (v, g) -> g[0] to v } }, enabled = { false }, filters = { InputMethodCatalog.filtersByStrokes(imeName) }) { _, _ -> }
 
     // a key's popup names it by its view's id
     private val groupOf: Map<Int, Pair<String, String>> by lazy {
@@ -291,7 +317,11 @@ class GroupedKeyboard(
         `return`.showReturnAction(appearance)
     }
 
+    // the input method shown, for whether a stroke is drawn (笔画筛选)
+    private var imeName = ""
+
     override fun onInputMethodUpdate(ime: InputMethodEntry) {
+        imeName = ime.uniqueName
         showInputMethodName(space, ime)
     }
 

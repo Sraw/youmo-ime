@@ -11,12 +11,12 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.fcitx.fcitx5.android.R
-import org.fcitx.fcitx5.android.core.FakeFcitxAPI
+import org.fcitx.fcitx5.android.core.FakeHostApi
 import org.fcitx.fcitx5.android.data.pinyin.ImportedDictionaries.Unread
 import org.fcitx.fcitx5.android.data.pinyin.dict.TextDictionary
 import org.fcitx.fcitx5.android.engine.assertRows
-import org.fcitx.fcitx5.android.engine.host.Engines
-import org.fcitx.fcitx5.android.engine.host.ImportLayer
+import org.fcitx.fcitx5.android.engine.runtime.Engines
+import org.fcitx.fcitx5.android.engine.runtime.ImportLayer
 import org.fcitx.fcitx5.android.engine.learn.LearnState
 import org.fcitx.fcitx5.android.engine.learn.backup.BackupHead
 import org.fcitx.fcitx5.android.engine.learn.backup.LearnBackup
@@ -265,7 +265,7 @@ class PinyinDictionaryFragmentTest {
         c.change("last", after = last)
         val reload = c.changes.left()!!
         assertNull("once for the changes made before", c.changes.left())
-        val fcitx = FakeFcitxAPI()
+        val fcitx = FakeHostApi()
         backgroundScope.launch { fcitx.reload() }
         runCurrent()
         assertEquals(emptyList<String>(), fcitx.calls)

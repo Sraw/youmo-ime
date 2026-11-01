@@ -14,6 +14,7 @@ import androidx.preference.PreferenceManager
 import androidx.preference.PreferenceScreen
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.core.InputMethodNames
+import org.fcitx.fcitx5.android.ui.main.settings.AddressSettingsFragment
 import org.fcitx.fcitx5.android.ui.main.settings.SettingsRoute
 import org.fcitx.fcitx5.android.ui.main.settings.behavior.BackupFragment
 import org.fcitx.fcitx5.android.ui.main.settings.behavior.ClipboardSettingsFragment
@@ -31,8 +32,11 @@ import org.fcitx.fcitx5.android.ui.search.SettingsSearch.Entry
  */
 object SettingsIndex {
 
-    /** The page to open, and the setting on it to point at (its preference's key), if not the page itself. */
-    data class Target(val route: SettingsRoute, val key: String?)
+    /**
+     * The page to open, and the setting on it to point at (its preference's key), if not the page
+     * itself; [via], the row to point at instead while that setting is hidden (InputMethodSettings.Section.via).
+     */
+    data class Target(val route: SettingsRoute, val key: String?, val via: String? = null)
 
     fun build(context: Context): List<Entry<Target>> = buildList {
         fun page(@StringRes title: Int, route: SettingsRoute, vararg under: Int) =
@@ -49,14 +53,25 @@ object SettingsIndex {
         managed(context, R.string.virtual_keyboard, SettingsRoute.Keys, { KeysSettingsFragment.build(it) }, this)
         add(Entry(context.getString(R.string.long_press_characters), context.getString(R.string.long_press_characters_summary),
             listOf(context.getString(R.string.virtual_keyboard)), Target(SettingsRoute.PopupOverrides, null)))
+        add(Entry(context.getString(R.string.toolbar_buttons), context.getString(R.string.toolbar_buttons_summary),
+            listOf(context.getString(R.string.virtual_keyboard)), Target(SettingsRoute.ToolbarButtons, null)))
         managed(context, R.string.section_sound_and_vibration, SettingsRoute.SoundAndVibration, { SoundSettingsFragment.build(it) }, this)
         managed(context, R.string.clipboard_and_emoji, SettingsRoute.Clipboard, { ClipboardSettingsFragment.build(it) }, this)
         managed(context, R.string.hardware_keyboard, SettingsRoute.HardwareKeyboard, { HardwareKeyboardFragment.build(it) }, this)
         // added to that page once fcitx answers
         val hardware = listOf(context.getString(R.string.hardware_keyboard))
-        items(context, InputMethodSettings.HARDWARE_KEYBOARD, hardware) { title, summary, key, path ->
-            add(Entry(title, summary, path, Target(SettingsRoute.HardwareKeyboard, key)))
+        items(context, InputMethodSettings.HARDWARE_KEYBOARD, hardware) { title, summary, key, via, path ->
+            add(Entry(title, summary, path, Target(SettingsRoute.HardwareKeyboard, key, via)))
         }
+        // 通用输入 → 网址和邮箱, drawn by hand: its rows by keys of its own (the page itself is 通用输入's row)
+        val addresses = listOf(context.getString(R.string.shared_input), context.getString(R.string.address_suggestions))
+        for ((title, key, summary) in listOf(
+            Triple(R.string.email_suffixes, AddressSettingsFragment.EMAIL_KEY, 0),
+            Triple(R.string.url_suffixes, AddressSettingsFragment.URL_KEY, 0),
+            Triple(R.string.remember_addresses, AddressSettingsFragment.REMEMBER_KEY, R.string.remember_addresses_summary),
+            // 全部清空's row is in it only while an address is remembered: found by the group's result
+            Triple(R.string.remembered_addresses, AddressSettingsFragment.REMEMBERED_KEY, R.string.forget_all_addresses),
+        )) add(Entry(context.getString(title), if (summary == 0) "" else context.getString(summary), addresses, Target(SettingsRoute.Addresses, key)))
         // drawn by hand on that page: its own ids, so a title changed there is still the one pointed at
         page(R.string.user_data, SettingsRoute.Backup)
         val backup = listOf(context.getString(R.string.user_data))
@@ -107,8 +122,8 @@ object SettingsIndex {
     internal fun sharedInput(context: Context, into: MutableList<Entry<Target>>) {
         val page = context.getString(R.string.shared_input)
         into += Entry(page, "", emptyList(), Target(SettingsRoute.SharedInput, null))
-        items(context, InputMethodSettings.SHARED, listOf(page)) { title, summary, key, path ->
-            into += Entry(title, summary, path, Target(SettingsRoute.SharedInput, key))
+        items(context, InputMethodSettings.SHARED, listOf(page)) { title, summary, key, via, path ->
+            into += Entry(title, summary, path, Target(SettingsRoute.SharedInput, key, via))
         }
     }
 
@@ -121,23 +136,24 @@ object SettingsIndex {
             into += Entry(page, "", listOf(top), Target(route, null))
             // not the row that opens the shared page, on every one: sharedInput has that page
             val own = items.filterNot { it is InputMethodSettings.Page && it.key == InputMethodSettings.SHARED_LINK }
-            items(context, own, listOf(top, page)) { title, summary, key, path ->
-                into += Entry(title, summary, path, Target(route, key))
+            items(context, own, listOf(top, page)) { title, summary, key, via, path ->
+                into += Entry(title, summary, path, Target(route, key, via))
             }
         }
     }
 
-    // each with the key InputMethodSettings.create gives its preference
+    // each with the key InputMethodSettings.create gives its preference, and in a section a keyboard
+    // choice shows, that choice's row ([InputMethodSettings.Section.via]): the setting may be hidden
     private fun items(
-        context: Context, items: List<InputMethodSettings.Item>, path: List<String>,
-        visit: (String, String, String, List<String>) -> Unit,
+        context: Context, items: List<InputMethodSettings.Item>, path: List<String>, via: String? = null,
+        visit: (String, String, String, String?, List<String>) -> Unit,
     ) {
         fun text(@StringRes id: Int) = if (id == 0) "" else context.getString(id)
         for (item in items) when (item) {
-            is InputMethodSettings.Toggle -> visit(item.title(context), text(item.summary), item.key, path)
-            is InputMethodSettings.Flags -> visit(text(item.title), item.flags.joinToString(" ") { it.second }, item.path, path)
-            is InputMethodSettings.Titled -> visit(text(item.title), text(item.summary), item.key, path)
-            is InputMethodSettings.Section -> items(context, item.items, path + text(item.title), visit)
+            is InputMethodSettings.Toggle -> visit(item.title(context), text(item.summary), item.key, via, path)
+            is InputMethodSettings.Flags -> visit(text(item.title), item.flags.joinToString(" ") { it.second }, item.path, via, path)
+            is InputMethodSettings.Titled -> visit(text(item.title), text(item.summary), item.key, via, path)
+            is InputMethodSettings.Section -> items(context, item.items, path + text(item.title), item.via ?: via, visit)
         }
     }
 }

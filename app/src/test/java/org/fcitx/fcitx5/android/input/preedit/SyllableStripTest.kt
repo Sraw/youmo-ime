@@ -15,15 +15,15 @@ import android.widget.FrameLayout
 import android.widget.TextView
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
-import org.fcitx.fcitx5.android.core.EngineBridge
-import org.fcitx.fcitx5.android.core.FcitxEvent
+import org.fcitx.fcitx5.android.core.EngineState
 import org.fcitx.fcitx5.android.core.FormattedText
 import org.fcitx.fcitx5.android.core.KeyStates
 import org.fcitx.fcitx5.android.core.KeySym
 import org.fcitx.fcitx5.android.core.UNICODE
 import org.fcitx.fcitx5.android.data.theme.ThemePreset
-import org.fcitx.fcitx5.android.engine.host.Engines
-import org.fcitx.fcitx5.android.engine.host.Keyboard
+import org.fcitx.fcitx5.android.engine.InputMethodCatalog
+import org.fcitx.fcitx5.android.engine.runtime.Keyboard
+import org.fcitx.fcitx5.android.host.HostEvent
 import org.fcitx.fcitx5.android.input.keyboard.KeyAction
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -47,8 +47,8 @@ class SyllableStripTest {
 
     private val context = RuntimeEnvironment.getApplication()
 
-    private fun typing(vararg syllables: String, id: Int = 1, im: String = Engines.PINYIN) =
-        EngineBridge.SyllableState(im, composing = true, syllables = syllables.toList(), id = id)
+    private fun typing(vararg syllables: String, id: Int = 1, im: String = InputMethodCatalog.PINYIN) =
+        EngineState.SyllableState(im, composing = true, syllables = syllables.toList(), id = id)
 
     private fun SyllableStrip.item(i: Int) = (getChildAt(0) as ViewGroup).getChildAt(i) as TextView
 
@@ -78,13 +78,13 @@ class SyllableStripTest {
         strip.show(typing("ni", "mi"))
         assertEquals(View.VISIBLE, strip.visibility)
         assertEquals("ni", strip.item(0).text.toString())
-        strip.show(EngineBridge.SyllableState(Engines.PINYIN))
+        strip.show(EngineState.SyllableState(InputMethodCatalog.PINYIN))
         assertEquals(View.GONE, strip.visibility)
         // typing, all keys taken
         strip.show(typing())
         assertEquals(View.GONE, strip.visibility)
-        // 九键's are its column's
-        strip.show(typing("ni", im = Engines.T9))
+        // another input method's
+        strip.show(typing("ni", im = InputMethodCatalog.ENGLISH))
         assertEquals(View.GONE, strip.visibility)
     }
 
@@ -97,7 +97,7 @@ class SyllableStripTest {
         assertEquals((width * SyllableStrip.MAX_SHARE).toInt(), row.syllables.measuredWidth)
         assertEquals(width - row.syllables.measuredWidth, row.root.findViewById<View>(R.id.code_row_text).measuredWidth)
         // none: the code takes the whole row
-        row.syllables.show(EngineBridge.SyllableState())
+        row.syllables.show(EngineState.SyllableState())
         row.root.measure(View.MeasureSpec.makeMeasureSpec(width, View.MeasureSpec.EXACTLY), View.MeasureSpec.makeMeasureSpec(100, View.MeasureSpec.EXACTLY))
         assertEquals(width, row.root.findViewById<View>(R.id.code_row_text).measuredWidth)
     }
@@ -184,7 +184,7 @@ class SyllableStripTest {
         Robolectric.buildActivity(Activity::class.java).setup().get()
             .setContentView(FrameLayout(context).apply { addView(row.root, FrameLayout.LayoutParams(1000, 100)) })
         val looper = shadowOf(Looper.getMainLooper())
-        row.update(FcitxEvent.InputPanelEvent.Data(FormattedText(arrayOf("ni hao"), intArrayOf(0), 6), FormattedText.Empty, FormattedText.Empty, emptyArray()))
+        row.update(HostEvent.InputPanel(FormattedText(arrayOf("ni hao"), intArrayOf(0), 6), FormattedText.Empty, FormattedText.Empty))
         row.syllables.show(typing("ni", "mi"))
         looper.idleFor(1, TimeUnit.SECONDS)
         assertEquals(View.VISIBLE, row.syllables.visibility)
@@ -208,18 +208,18 @@ class SyllableStripTest {
     fun shuangpinsSyllablesShowUnlessTheKeyboardOffersThemItself() {
         val strip = SyllableStrip(context, ThemePreset.PixelDark)
         // the 18 keys: 双拼's grouped session answers as 双拼
-        strip.show(typing("ni", "mi", im = Engines.SHUANGPIN))
+        strip.show(typing("ni", "mi", im = InputMethodCatalog.SHUANGPIN))
         assertEquals(View.VISIBLE, strip.visibility)
         assertEquals("mi", strip.item(1).text.toString())
         // 九键双拼's column has them: shown again as the keyboard changes
         strip.owned = true
         assertEquals(View.GONE, strip.visibility)
-        strip.show(typing("ni", im = Engines.SHUANGPIN))
+        strip.show(typing("ni", im = InputMethodCatalog.SHUANGPIN))
         assertEquals(View.GONE, strip.visibility)
         strip.owned = false
         assertEquals(View.VISIBLE, strip.visibility)
         // other input methods still none
-        strip.show(typing("ni", im = Engines.WUBI))
+        strip.show(typing("ni", im = InputMethodCatalog.WUBI))
         assertEquals(View.GONE, strip.visibility)
     }
 }

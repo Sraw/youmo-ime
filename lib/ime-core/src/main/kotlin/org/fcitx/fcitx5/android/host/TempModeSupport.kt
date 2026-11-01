@@ -4,7 +4,6 @@
  */
 package org.fcitx.fcitx5.android.host
 
-import org.fcitx.fcitx5.android.core.FcitxEvent
 import org.fcitx.fcitx5.android.core.FormattedText
 
 /**
@@ -44,11 +43,8 @@ class TempPanel(
     }
 }
 
-/** fcitx's `CandidateLayoutHint`: the app's own enum, as the paged event carries it. */
-typealias TempLayoutHint = FcitxEvent.PagedCandidateEvent.LayoutHint
-
 /**
- * A candidate: [select] is what `CandidateWord::select` does, null for a display-only one; [comment]
+ * A candidate: [select] is what `PanelCandidate::select` does, null for a display-only one; [comment]
  * worked out the first time it is read (Unicode's names, for the page sent only).
  */
 class TempCandidate(val text: String, comment: () -> String, internal val select: ((InputContext) -> Unit)?) {
@@ -69,7 +65,7 @@ class TempCandidateList(
     val pageSize: Int,
     /** The selection keys' labels (`keyToLabel`, `candidatelist.cpp:479-516`), padded to 10 with "". */
     labels: List<String>,
-    val layoutHint: TempLayoutHint = TempLayoutHint.NotSet,
+    val layoutHint: LayoutHint = LayoutHint.NotSet,
     private val resetCursorAfterPaging: Boolean = false,
 ) {
     private val labels = labels + List(maxOf(0, REGULAR_LABEL_SIZE - labels.size)) { "" }

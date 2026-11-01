@@ -146,4 +146,22 @@ class EditorInfoTraitsTest {
             info { actionLabel = "Post"; actionId = EditorInfo.IME_ACTION_UNSPECIFIED }.customActionId,
         )
     }
+
+    @Test
+    fun aNumbersPhonesOrDatesFieldSaysWhichNumbers() {
+        val n = InputType.TYPE_CLASS_NUMBER
+        val d = InputType.TYPE_CLASS_DATETIME
+        fun kind(type: Int) = info { inputType = type }.number
+        assertEquals(NumberKind.INTEGER, kind(n))
+        assertEquals(NumberKind.SIGNED, kind(n or InputType.TYPE_NUMBER_FLAG_SIGNED))
+        assertEquals(NumberKind.DECIMAL, kind(n or InputType.TYPE_NUMBER_FLAG_DECIMAL))
+        assertEquals(NumberKind.SIGNED_DECIMAL, kind(n or InputType.TYPE_NUMBER_FLAG_SIGNED or InputType.TYPE_NUMBER_FLAG_DECIMAL))
+        // a PIN's digits whatever its flags
+        assertEquals(NumberKind.PIN, kind(n or InputType.TYPE_NUMBER_VARIATION_PASSWORD or InputType.TYPE_NUMBER_FLAG_DECIMAL))
+        assertEquals(NumberKind.PHONE, kind(InputType.TYPE_CLASS_PHONE))
+        assertEquals(NumberKind.DATE, kind(d or InputType.TYPE_DATETIME_VARIATION_DATE))
+        assertEquals(NumberKind.TIME, kind(d or InputType.TYPE_DATETIME_VARIATION_TIME))
+        assertEquals(NumberKind.DATETIME, kind(d))
+        assertNull(kind(InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD))
+    }
 }

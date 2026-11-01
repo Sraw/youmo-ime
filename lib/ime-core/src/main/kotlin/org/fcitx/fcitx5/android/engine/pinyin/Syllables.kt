@@ -62,6 +62,32 @@ object Syllables {
     fun id(spelling: String): Int = ids[spelling] ?: -1
 
     /**
+     * [syllables] [from] to [to] spelt, a space between them: a reading as the learning record, the
+     * word lists and the settings keep it (`ni hao`). One copy, as `pin yin` and `pin'yin` were each
+     * written out in a dozen places ([apostrophed] the other way).
+     */
+    fun spelled(syllables: IntArray, from: Int = 0, to: Int = syllables.size): String = spelled(to - from) { syllables[from + it] }
+
+    /** [count] syllables [spelled], the [i]th of them [syllable]: for syllables kept otherwise than in an array. */
+    fun spelled(count: Int, syllable: (i: Int) -> Int): String = joined(count, ' ', syllable)
+
+    /** [syllables] spelt, `'` between them: a reading as libime's text dictionaries and the lists shown in the settings have it (`ni'hao`). */
+    fun apostrophed(syllables: IntArray): String = joined(syllables.size, '\'') { syllables[it] }
+
+    /** A reading [spelled] (`ni hao`) as [apostrophed] has it (`ni'hao`). */
+    fun apostrophed(reading: String): String = reading.replace(' ', '\'')
+
+    /** A reading [apostrophed] (`ni'hao`) as [spelled] has it (`ni hao`). */
+    fun spaced(reading: String): String = reading.replace('\'', ' ')
+
+    private fun joined(count: Int, separator: Char, syllable: (Int) -> Int): String = buildString {
+        for (i in 0 until count) {
+            if (i > 0) append(separator)
+            append(spellings[syllable(i)])
+        }
+    }
+
+    /**
      * The initial and final of [spelling], the initial empty for a, ai, er ...; null for a
      * syllable that is no initial plus a final (m, ng, the Latin letters).
      */

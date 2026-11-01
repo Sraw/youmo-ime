@@ -87,7 +87,7 @@ class HandwritingKeyboardTest {
         keyboard.mark("。").performClick()
         assertEquals(emptyList<KeyAction>(), sent)
         runAll()
-        assertEquals(listOf<KeyAction>(KeyAction.FcitxKeyAction(".")), sent)
+        assertEquals(listOf<KeyAction>(KeyAction.HostKeyAction(".")), sent)
     }
 
     @Test
@@ -127,7 +127,7 @@ class HandwritingKeyboardTest {
         runAll()
         // 。 committed the piece: the backspace deletes in the field, it takes no stroke of that piece back
         assertEquals(
-            listOf(KeyAction.FcitxKeyAction("."), KeyAction.SymAction(KeySym(FcitxKeyMapping.FcitxKey_BackSpace))),
+            listOf(KeyAction.HostKeyAction("."), KeyAction.SymAction(KeySym(FcitxKeyMapping.FcitxKey_BackSpace))),
             sent,
         )
         assertEquals(0, pad.pad.strokes.size)

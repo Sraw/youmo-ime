@@ -52,7 +52,7 @@ class PickerLayout(context: Context, private val theme: Theme, switchKey: KeyDef
                 variant = Appearance.Variant.Alternative
             ),
             setOf(
-                Behavior.Press(KeyAction.FcitxKeyAction(symbol))
+                Behavior.Press(KeyAction.HostKeyAction(symbol))
             )
         )
 

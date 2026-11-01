@@ -37,14 +37,14 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.core.CapabilityFlags
-import org.fcitx.fcitx5.android.core.FcitxEvent
-import org.fcitx.fcitx5.android.daemon.FcitxConnection
+import org.fcitx.fcitx5.android.daemon.HostConnection
 import org.fcitx.fcitx5.android.daemon.launchOnReady
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.prefs.ManagedPreference
 import org.fcitx.fcitx5.android.data.prefs.ManagedPreferenceProvider
 import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
+import org.fcitx.fcitx5.android.host.HostEvent
 import org.fcitx.fcitx5.android.input.bar.Calculation
 import org.fcitx.fcitx5.android.input.bar.KawaiiBarComponent
 import org.fcitx.fcitx5.android.input.bar.KawaiiBarStateMachine
@@ -117,7 +117,7 @@ private const val SIDE_BUTTON_DP = SplitKeyboard.ONE_HANDED_MIN_FREE_DP
 @SuppressLint("ViewConstructor")
 class InputView(
     service: FcitxInputMethodService,
-    fcitx: FcitxConnection,
+    fcitx: HostConnection,
     theme: Theme
 ) : BaseInputView(service, fcitx, theme) {
 
@@ -366,7 +366,7 @@ class InputView(
 
         // restore punctuation mapping in case of InputView recreation
         fcitx.launchOnReady {
-            punctuation.updatePunctuationMapping(it.statusAreaActionsCached)
+            punctuation.updatePunctuationMapping(it.statusAreaCached)
         }
 
         // make sure KeyboardWindow's view has been created before it receives any broadcast
@@ -620,39 +620,41 @@ class InputView(
         broadcaster.onFinishInput()
     }
 
+    // the engine's whole state, the candidates too: a view made anew while a code is typed showed
+    // the code row over an empty bar till the next key (A2)
     override fun onStartHandleFcitxEvent() {
-        val inputPanelData = fcitx.runImmediately { inputPanelCached }
-        val inputMethodEntry = fcitx.runImmediately { inputMethodEntryCached }
-        val statusAreaActions = fcitx.runImmediately { statusAreaActionsCached }
-        arrayOf(
-            FcitxEvent.InputPanelEvent(inputPanelData),
-            FcitxEvent.IMChangeEvent(inputMethodEntry),
-            FcitxEvent.StatusAreaEvent(
-                FcitxEvent.StatusAreaEvent.Data(statusAreaActions, inputMethodEntry)
+        // read together, in one hop: one the host changes meanwhile has its event come after, to the collector
+        fcitx.runImmediately {
+            val entry = inputMethodEntryCached
+            listOf(
+                inputPanelCached,
+                HostEvent.InputMethodChanged(entry),
+                HostEvent.StatusArea(statusAreaCached, entry),
+                candidatesCached,
             )
-        ).forEach { handleFcitxEvent(it) }
+        }.forEach { handleFcitxEvent(it) }
     }
 
-    override fun handleFcitxEvent(it: FcitxEvent<*>) {
+    override fun handleFcitxEvent(it: HostEvent) {
         when (it) {
-            is FcitxEvent.CandidateListEvent -> {
-                broadcaster.onCandidateUpdate(it.data)
+            is HostEvent.Candidates -> {
+                broadcaster.onCandidateUpdate(it)
             }
-            is FcitxEvent.ClientPreeditEvent -> {
-                preeditEmptyState.updatePreeditEmptyState(clientPreedit = it.data)
-                broadcaster.onClientPreeditUpdate(it.data)
+            is HostEvent.ClientPreedit -> {
+                preeditEmptyState.updatePreeditEmptyState(clientPreedit = it.text)
+                broadcaster.onClientPreeditUpdate(it.text)
             }
-            is FcitxEvent.InputPanelEvent -> {
-                preeditEmptyState.updatePreeditEmptyState(preedit = it.data.preedit)
-                broadcaster.onInputPanelUpdate(it.data)
+            is HostEvent.InputPanel -> {
+                preeditEmptyState.updatePreeditEmptyState(preedit = it.preedit)
+                broadcaster.onInputPanelUpdate(it)
             }
-            is FcitxEvent.IMChangeEvent -> {
-                updateCodeRow(it.data.uniqueName)
-                broadcaster.onImeUpdate(it.data)
+            is HostEvent.InputMethodChanged -> {
+                updateCodeRow(it.im)
+                broadcaster.onImeUpdate(it.entry)
             }
-            is FcitxEvent.StatusAreaEvent -> {
-                punctuation.updatePunctuationMapping(it.data.actions)
-                broadcaster.onStatusAreaUpdate(it.data.actions)
+            is HostEvent.StatusArea -> {
+                punctuation.updatePunctuationMapping(it.entries)
+                broadcaster.onStatusAreaUpdate(it.entries)
             }
             else -> {}
         }

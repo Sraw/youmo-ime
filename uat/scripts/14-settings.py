@@ -6,10 +6,7 @@ import subprocess
 import tempfile
 import time
 
-from uat import (PKG, Blocked, add_im, case, check, choose, gear, has, home, grouped_keys, pinyin_keyboard, pinyin_keyboard_value,
-                 script, shuangpin_keyboard)
-
-SWITCHES = ("Switch", "SwitchCompat", "SwitchMaterial", "CheckBox")
+from uat import (PKG, Blocked, case, check, choose, home, script)
 
 
 def kb_box(d, s=None):
@@ -48,12 +45,6 @@ def appearance_tab(d, tab):
 
 # ---------------------------------------------------------------- 首页
 
-HOME = ["输入法", "通用输入", "词库与短语", "外观", "按键", "声音与振动", "剪贴板与表情", "实体键盘",
-        "备份与恢复", "界面语言"]
-# ST-33's tour: every input method with a settings page of its own, added once
-IMS = ["九键拼音", "手写", "双拼"]
-TABLES = ["五笔", "二笔", "仓颉", "自然码", "五笔拼音"]
-
 
 case("ST-01", needs="jvm:SettingsUatTest.theHomePage")(lambda d: None)
 
@@ -66,174 +57,11 @@ case("ST-03", needs="jvm:SettingsMenuUatTest.helpOpensTheManual")(lambda d: None
 
 # ---------------------------------------------------------------- 通用输入
 
-@case("ST-32", base="B0-设置", mutates=True)
-def st32(d):
-    home(d, "通用输入")
-    d.tap_text("模糊音", after=1.0)
-    d.tap_text("z ↔ zh", scroll=False)
-    d.tap_text("确定", scroll=False, after=1.0)
-    choose(d, "性能档位", "低档")
-    gear(d, "拼音")
-    d.switch("中英混输", False)
-    home(d, "实体键盘")
-    choose(d, "每页候选数", "5")
-    home(d, "通用输入")
-    # read off the whole page: a longer summary above (滑行输入) can push it below the fold
-    perf = next((sm for t, sm, _ in d.pref_rows() if t == "性能档位"), None) or ""
-    d.tap_text("模糊音", after=1.0)
-    s = d.screen()
-    z = next((n for n in s.app() if n.text.startswith("z ↔ zh")), None)
-    zon = bool(z and z.checked)
-    d.tap_text("取消", scroll=False)
-    check(zon, "z↔zh 没勾着")
-    check(perf.startswith("低档"), f"性能档位是「{perf}」")
-    d.open_page("text")
-    d.type("zongguo")
-    c = d.cands()
-    check(has(c, "中国"), f"zongguo 候选 {c}")
-    return f"z↔zh 勾着，档位「{perf.splitlines()[0]}」，zongguo {c[:3]}"
+
+case("ST-32", needs="jvm:SettingsUatTest.anInputMethodsPageAndTheHardwareKeyboardsSavedLeaveTheSharedOptions、PinyinUatTest.fuzzyZZh")(lambda d: None)
 
 
-@case("ST-33", base="B0-设置", mutates=True)
-def st33(d):
-    d.step("加输入法")
-    for im in IMS + TABLES:
-        add_im(d, im)
-
-    d.step("词库与短语")
-    home(d, "词库与短语")
-    t = d.all_texts()
-    lead = next((x for x in t if x.startswith("用户词库的词排得靠前")), None)
-    order = [x for x in t if x in ("用户词库", "基础词库", "导入", "短语", "新词")]
-    check(lead and "还没选过的，可能排在很常用的同音词后面" in lead, f"最上面 {t[1:2]}")
-    check([x for i, x in enumerate(order) if i == 0 or x != order[i - 1]] == ["用户词库", "基础词库", "导入", "短语"],
-          f"分组 {order}")
-    check("新词" not in t, "有新词分组")
-    for x in ("内置词库", "常用词和近几年的新词，随应用更新 · 只读", "导入词库", "自定义短语"):
-        check(x in t, f"没有「{x}」")
-
-    d.step("用户词库")
-    home(d, "词库与短语", "用户词库")
-    on = {x: switch_state(d, x) for x in ("用我的输入习惯", "自动备份")}
-    texts = d.all_texts()
-    check(on == {"用我的输入习惯": True, "自动备份": True}, f"页顶开关 {on}")
-    miss = [x for x in ("清空学到的", "学习备份", "英文词库", "导出") if x not in texts]
-    check(not miss, f"用户词库页缺 {miss}：{texts[:20]}")
-    d.tap_text("学习备份", after=1.2)
-    bk = d.all_texts()
-    miss = [x for x in ("从备份恢复", "另存一份到看得见的文件夹", "退回恢复前") if x not in bk]
-    check(not miss, f"学习备份里缺 {miss}：{bk[:8]}")
-    d.back()
-    d.tap_text("英文词库", after=1.2)
-    here = d.screen().texts()
-    script("08-english").en_settings(d)
-    d.tap_text("英文词库", after=1.2)
-    there = d.screen().texts()
-    check(here == there, f"两处英文词库不是同一页：{here[:5]} / {there[:5]}")
-
-    d.step("通用输入")
-    home(d, "通用输入")
-    rows = d.pref_rows()
-    cats = [r[0] for r in rows if r[2]]
-    check(cats == ["所有输入法", "中文输入法", "拼音（全拼、双拼、九键）"], f"分组 {cats}")
-    summ = {r[0]: r[1] for r in rows}
-    for x, last in (("滑行输入", "不适用：手写、拼音 14 键、双拼 18 键、九键双拼。"), ("表情候选", "不适用：手写。"),
-                    ("纠正错拼和按偏的键", "不适用：九键拼音、拼音 14 键、九键双拼。")):
-        check(summ.get(x, "").splitlines()[-1:] == [last], f"{x} 的说明最后一句：{summ.get(x)!r}")
-    sec, inside = [], False
-    for r in rows:
-        if r[2]:
-            inside = r[0] == "中文输入法"
-        elif inside:
-            sec.append(r)
-    bad = [r[0] for r in sec if "不适用：英文" in r[1]]
-    dt = next((r for r in sec if r[0] == "自带的日期时间"), None)
-    check(dt and dt[1].splitlines()[-1:] == ["不适用：手写。"], f"中文输入法一节里的自带的日期时间：{dt}")
-    check(not bad, f"中文输入法一节里有不适用：英文：{bad}")
-    d.scroll_top()
-    d.tap_text("模糊音", after=1.0)
-    s = d.screen()
-    texts = s.texts(where="all")
-    uv = next((i for i, x in enumerate(texts) if "u ↔ v" in x or "u↔v" in x), None)
-    check(uv is not None and any(x.strip().rstrip("。") == "不适用：九键拼音、九键双拼" or [y.rstrip("。") for y in x.splitlines()[-1:]] == ["不适用：九键拼音、九键双拼"] for x in texts[uv:uv + 3]), f"模糊音 {texts[:20]}")
-    check([n for n in s.nodes if n.cls in ("CheckBox", "CheckedTextView") and n.enabled], "模糊音里的勾选框不能勾")
-    d.tap_text("取消", scroll=False)
-
-    d.step("拼音")
-    gear(d, "拼音")
-    t = d.all_texts()
-    check(t and "通用输入设置" in t[:4], f"最上面是 {t[:4]}")
-    check("中英混输" in t, f"没有中英混输：{t[:20]}")
-    bad = [x for x in ("每页候选数", "联想下一个词", "性能档位", "纠正错拼和按偏的键", "模糊音") if x in t]
-    check(not bad, f"拼音页里有 {bad}")
-    d.scroll_top()
-    d.tap_text("通用输入设置", after=1.2)
-    check(d.screen().find(text="通用输入"), f"点通用输入设置后是 {d.screen().texts()[:4]}")
-
-    d.step("九键拼音")
-    gear(d, "九键拼音")
-    t = d.all_texts()
-    want = ["通用输入设置", "连按选字母", "九键英文打法", "按键字母", "按键长按"]
-    check([x for x in t if x in want] == want, f"九键页 {t[:14]}")
-    check(any("只有这一种读法" in x for x in t), f"连按选字母的说明 {t[:14]}")
-    check(any(x.rstrip("。").endswith("总是连按") for x in t), f"九键英文打法的说明 {t[:14]}")
-    # a password field switches to English on the full keyboard: never 九键英文's 连按
-    check(not any("连按" in x and "密码" in x for x in t), f"九键英文打法的说明还写密码 {t[:14]}")
-
-    d.step("手写")
-    gear(d, "手写")
-    t = d.all_texts()
-    check(t and "通用输入设置" in t[:4], f"最上面 {t[:4]}")
-    check("停笔多久算写完一个字" in t, f"没有停笔：{t[:12]}")
-    bad = [x for x in ("每页候选数", "联想下一个词", "性能档位") if x in t]
-    check(not bad, f"手写页里有 {bad}")
-
-    d.step("双拼")
-    gear(d, "双拼")
-    t = d.all_texts()
-    check("方案" in t and "中英混输" not in t, f"双拼设置 {t[:12]}")
-
-    sw = {}
-    for im in TABLES:
-        d.step(im)
-        gear(d, im)
-        t = d.all_texts()
-        d.scroll_top()
-        sw[im] = {x: switch_state(d, x) if x in t else None
-                  for x in ("只有一个候选时直接上屏", "显示编码提示", "调频")}
-        if any(v is None and x in t for x, v in sw[im].items()):
-            d.scroll()   # a switch below the fold
-            sw[im].update({x: switch_state(d, x) for x, v in sw[im].items() if v is None and x in t})
-        check("恢复码表顺序" in t, f"{im} 没有恢复码表顺序：{t[:12]}")
-        check(sw[im]["调频"] is False, f"{im} 的调频 {sw[im]['调频']}")
-        # 自动造词's two are gone (U-28 C46)
-        gone = [x for x in ("最长造多少字的词", "造出的词何时记住") if x in t]
-        check(not gone, f"{im} 还有 {gone}")
-        if im == "五笔":
-            check(t and "通用输入设置" in t[:4], f"五笔页最上面 {t[:4]}")
-            check(sw[im]["只有一个候选时直接上屏"] and sw[im]["显示编码提示"], f"五笔 {sw[im]}")
-    check(sw["仓颉"]["显示编码提示"] is False, f"仓颉 {sw['仓颉']}")
-
-    d.step("实体键盘")
-    home(d, "实体键盘")
-    rows = d.pref_rows()
-    want = [("显示候选窗口", "根据输入设备而定"), ("实体键盘快捷键", None), ("候选词列表方向", "自动"),
-            ("浮动候选窗字号", "20 sp"), ("每页候选数", "7")]
-    got = {r[0]: r[1] for r in rows if not r[2]}
-    titles = [r[0] for r in rows if not r[2]]
-    for x, v in want:
-        check(x in got, f"没有「{x}」：{titles}")
-        if v:
-            check(got[x].splitlines()[0] == v, f"「{x}」是「{got[x]}」")
-    check(titles[-1] == "每页候选数", f"最后一项是 {titles[-1]}")
-    check("所有输入法都用" in got["每页候选数"], f"每页候选数说明「{got['每页候选数']}」")
-    check(switch_state(d, "实体键盘快捷键"), "实体键盘快捷键不是开的")
-
-    d.step("首页")
-    d.open_settings()
-    titles = [r[0] for r in d.pref_rows()]
-    check(titles == HOME, f"首页入口 {titles}")
-    return f"词库与短语、用户词库、通用输入、{len(IMS) + 1 + len(TABLES)} 个输入法页、实体键盘都对；首页 {len(titles)} 项"
+case("ST-33", needs="jvm:SettingsUatTest.pagesFromTopToBottom、SettingsUatTest.everyInputMethodsPageAndTheSharedOnes、SettingsUatTest.theHomePage")(lambda d: None)
 
 
 case("ST-34", needs="jvm:TablesUatTest.predictionOffHoldsForTablesToo")(lambda d: None)
@@ -243,9 +71,6 @@ case("ST-34", needs="jvm:TablesUatTest.predictionOffHoldsForTablesToo")(lambda d
 
 
 case("ST-05", needs="jvm:SettingsUatTest.aDarkThemeTurnsPreviewAndKeyboardDark")(lambda d: None)
-
-
-IMG = None
 
 
 def push_picture(d):
@@ -475,48 +300,12 @@ case("ST-20", needs="jvm:SettingsEffectUatTest.noLanguageKeyAWiderSpace")(lambda
 case("ST-21", needs="jvm:SettingsEffectUatTest.aCharacterMadeFirstIsTheCornerAndTheSwipe")(lambda d: None)
 
 
-case("ST-22", needs="jvm:SettingsEffectUatTest.charactersAddedThenTheDefaultBack, KotlinHostKeyboardTest.aCircledLetterLongPressedOnTheFourteenKeysIsTypedAsText, KotlinHostKeyboardTest.aParenthesisedDigitLongPressedOnShuangpinsNineKeysIsTypedAsText, PopupOverridesFragmentTest$Dialog.aKeyCodeAloneIsRefusedAndTheDialogStays")(lambda d: None)
+case("ST-22", needs="jvm:SettingsEffectUatTest.charactersAddedThenTheDefaultBack、KotlinHostKeyboardTest.aCircledLetterLongPressedOnTheFourteenKeysIsTypedAsText、KotlinHostKeyboardTest.aParenthesisedDigitLongPressedOnShuangpinsNineKeysIsTypedAsText、PopupOverridesFragmentTest$Dialog.aKeyCodeAloneIsRefusedAndTheDialogStays")(lambda d: None)
 
 
 # ---------------------------------------------------------------- 其他
 
-# also on the JVM (SettingsMenuUatTest.theLanguagesOfferedAreFour), which checks the choice and the
-# locale; this one, that the keyboard's own text (EngineNotices and all) follows it and typing still works
-@case("ST-25", base="B0-设置", mutates=True)
-def st25(d):
-    home(d, "界面语言")
-    d.tap_text("English", scroll=False, after=2.5)
-    d.open_settings()
-    s = d.screen()
-    titles = [n.text for n in s.app() if n.rid == "title"]
-    cjk = [t for t in titles if any("一" <= ch <= "鿿" for ch in t)]
-    check(titles and not cjk, f"设置页 {titles[:6]}")
-    d.open_page("text")
-    s = d.screen()
-    sp = s.find(rid="button_space", where="ime")
-    if not sp:
-        raise Blocked("键盘上没有空格键（button_space）")
-    descs = [n.desc for n in s.ime() if n.desc]
-    cjk_kb = [x for x in descs + [sp.desc] if any("一" <= ch <= "鿿" for ch in x)]
-    check(not cjk_kb, f"键盘上还有中文：{cjk_kb}")
-    d.type("nihao")
-    d.cands()
-    d.space()
-    t = d.field_text()
-    check(t == "你好", f"打出「{t}」")
-    d.hide_keyboard()
-    # back by its English title (the row may be below the fold: goto scrolls); language_follow_system
-    home(d, "App language")
-    # the page is rebuilt for the new locale: its choices can come a few seconds after the title
-    end, n = time.time() + 6, None
-    while not n and time.time() < end:
-        n = d.screen().find(text="Same as the phone")
-        if not n:
-            time.sleep(0.5)
-    if not n:
-        raise Blocked("界面语言里没有「Same as the phone」，没能改回跟随系统")
-    d.tap(n.c, 2.0)
-    return f"设置 {titles[:3]}；空格「{sp.desc}」；打出「{t}」"
+case("ST-25", needs="jvm:SettingsMenuUatTest.theLanguagesOfferedAreFour、AppLanguageUatTest.englishPickedTheKeyboardsOwnWordsAreEnglish")(lambda d: None)
 
 
 def record_change(d, y0, y1, act):
@@ -649,14 +438,7 @@ def set_comma(d, mark):
     d.tap_text("确定", scroll=False, after=1.0)
 
 
-@case("ST-28", base="B0-设置", mutates=True)
-def st28(d):
-    set_comma(d, "、")
-    d.open_page("text")
-    d.press(",")
-    t = d.field_text()
-    check(t == "、", f"点底排的，打出「{t}」")
-    return f"打出「{t}」"
+case("ST-28", needs="jvm:PunctuationMapUatTest.theCommaMappedToAnotherMarkTypesIt")(lambda d: None)
 
 
 @case("ST-29", base="B0-设置", mutates=True)
@@ -694,153 +476,26 @@ def st29(d):
 case("ST-31", needs="jvm:SettingsMenuUatTest.aboutListsVersionsSourceAndLicenses")(lambda d: None)
 
 
-def switch_state(d, title):
-    r = d.row(title)
-    w = [n for n in r.walk() if n.cls in SWITCHES] if r else []
-    return w[0].checked if w else None
-
-
 # ---------------------------------------------------------------- 拼音的键盘
 
-NOT_14 = "拼音 14 键"
+
+case("ST-40", needs="jvm:SettingsUatTest.pinyinsKeyboardOnItsPageAndTheSharedOptionsSayingFourteenKeys、KeyboardChoiceUatTest.theFourteenKeysChosenAreThereAtTheNextFocus")(lambda d: None)
 
 
-@case("ST-40", base="B0-设置", mutates=True)
-def st40(d):
-    v = pinyin_keyboard_value(d)
-    t = d.all_texts()
-    ok = [x for x in t if NOT_14 in x]
-    check(v == "全键盘", f"「键盘」默认是「{v}」")
-    check(any("实体键盘仍按全拼打" in x for x in t), f"「键盘」的说明 {t[:16]}")
-    check("拆字" in t and "中英混输" in t and len(ok) >= 2, f"拼音页的不适用 {ok}")
-    home(d, "通用输入")
-    t2 = d.all_texts()
-    ok2 = [x for x in t2 if NOT_14 in x]
-    check("纠正错拼和按偏的键" in t2 and "滑行输入" in t2 and len(ok2) >= 2, f"通用输入的不适用 {ok2}")
-    pinyin_keyboard(d, "14 键")
-    d.open_page("text")
-    k = d.keys(refresh=True)
-    check("qw" in k and "bn" in k, f"回到框里不是 14 键：{sorted(k)[:12]}")
-    return f"默认「{v}」；不适用 {len(ok)}+{len(ok2)} 行；马上是 14 键"
+case("ST-41", needs="jvm:GroupedKeyboardUatTest.theCodeRowIsTallOnlyInPinyinOnTheFourteenKeys")(lambda d: None)
 
 
-def code_row_dp(d):
-    s = d.screen()
-    row = d.code_row(s)
-    if not row:
-        raise Blocked("没有编码行")
-    return round((row.b[3] - row.b[1]) / d.dpx())
+case("ST-42", needs="jvm:SettingsUatTest.shuangpinsKeyboardUnderItsScheme、KeyboardChoiceUatTest.shuangpinsEighteenThenNineKeysChosenAreThereAtTheNextFocus")(lambda d: None)
 
 
-def kb_h(d):
-    """the whole input view's height above the keys' bottom: from the composing row's top (its row is
-    there, 18 or 32 dp, typing or not: the height must not jump while typing) to the keyboard's bottom. Not the
-    IME window's top: that window spans the screen, so its top is the same whatever the board"""
-    b = kb_box(d)
-    row = d.code_row()
-    if not row:
-        raise Blocked("没有编码行（没打字时这一行也该在）")
-    return b[3] - row.b[1]
+case("ST-43", needs="jvm:AppPrefsTest.glideTypingCarriesOverAsItIs")(lambda d: None)
 
 
-@case("ST-41", base="B0-设置", mutates=True, visual=True)
-def st41(d):
-    add_im(d, "五笔")
-    add_im(d, "九键拼音")
-    add_im(d, "双拼")
-    d.open_page("text")
-    d.switch_im("拼音")   # the last added is the one on
-    d.type("ni")
-    d.cands()
-    full = code_row_dp(d)
-    d.clear()
-    h_full = kb_h(d)
-    d.hide_keyboard()
-    pinyin_keyboard(d, "14 键")
-    d.open_page("text")
-    grouped_keys(d, "bn ui")
-    d.cands()
-    k14 = code_row_dp(d)
-    d.clear()
-    h = {"拼音": kb_h(d)}
-    rows = {"拼音": code_row_dp(d)}
-    for im in ("英文", "五笔", "九键"):
-        d.switch_im(im)
-        h[im] = kb_h(d)
-        rows[im] = code_row_dp(d)
-    d.shot("kb", "14 键时换到九键：编码行变回 18dp，键盘总高和全键盘一样")
-    d.switch_im("拼音")
-    h["拼音回来"] = kb_h(d)
-    d.hide_keyboard()
-    pinyin_keyboard(d, "全键盘")
-    d.open_page("text")
-    d.type("ni")
-    d.cands()
-    back = code_row_dp(d)
-    d.clear()
-    # 双拼's 18 keys: 32 dp there, 18 on English and 五笔 after them
-    d.hide_keyboard()
-    shuangpin_keyboard(d, "18 键")
-    d.open_page("text")
-    d.switch_im("双拼")
-    grouped_keys(d, "bn io")
-    d.cands()
-    d.clear()
-    rows18 = {"双拼": code_row_dp(d)}
-    for im in ("英文", "五笔"):
-        d.switch_im(im)
-        rows18[im] = code_row_dp(d)
-    d.hide_keyboard()
-    shuangpin_keyboard(d, "全键盘")
-    check(full == 18, f"全键盘时编码行 {full}dp")
-    check(k14 == 32, f"14 键时编码行 {k14}dp")
-    check(rows == {"拼音": 32, "英文": 18, "五笔": 18, "九键": 18}, f"14 键时各输入法的编码行 {rows}")
-    # the keys keep their height: the 14 keys' board is the code row's 14 dp taller, the others as 全键盘's
-    grew = (h["拼音"] - h_full) / d.dpx()
-    check(abs(grew - 14) <= 2, f"14 键比全键盘高 {grew:.0f}dp（应为 14）")
-    others = [h[im] for im in ("英文", "五笔", "九键")]
-    check(max(abs(x - h_full) for x in others) <= 3, f"其他输入法的键盘总高 {h}，全键盘 {h_full}")
-    check(abs(h["拼音回来"] - h["拼音"]) <= 3, f"换回拼音的总高 {h}")
-    check(back == 18, f"改回全键盘后编码行 {back}dp")
-    check(rows18 == {"双拼": 32, "英文": 18, "五笔": 18}, f"双拼 18 键时各输入法的编码行 {rows18}")
-    return f"{full} → {k14} → {back} dp；编码行 {rows}；总高 {h}（全键盘 {h_full}）；18 键 {rows18}"
+case("ST-44", needs="jvm:AddressSettingsUatTest.theAddressPageItsListsAndRememberedAddresses")(lambda d: None)
 
 
-@case("ST-42", base="B0-设置", mutates=True)
-def st42(d):
-    add_im(d, "双拼")
-    gear(d, "双拼")
-    d.scroll_top()
-    v = d.summary("键盘")
-    if v is None:
-        raise Blocked("双拼页没有「键盘」")
-    t = d.all_texts()
-    check(v.split("\n")[0] == "全键盘", f"「键盘」默认是「{v}」")
-    check(any("重码" in x and "实体键盘" in x for x in t), f"「键盘」的说明 {t[:16]}")
-    shuangpin_keyboard(d, "18 键")
-    d.open_page("text")
-    d.switch_im("双拼")
-    k = d.keys(refresh=True)
-    check("we" in k and "io" in k, f"回到框里不是 18 键：{sorted(k)[:16]}")
-    grouped_keys(d, "bn io")
-    d.cands()
-    k18, sy = code_row_dp(d), d.syllables()
-    d.clear()
-    d.hide_keyboard()
-    shuangpin_keyboard(d, "九键")
-    d.open_page("text")
-    d.switch_im("双拼")
-    k = d.keys(refresh=True)
-    check(all(c in k for c in "23456789"), f"回到框里不是九键：{sorted(k)[:16]}")
-    d.taps([k["6"], k["4"]], gap=0.35, after=0.6)
-    d.cands()
-    k9, sy9 = code_row_dp(d), d.syllables()
-    d.clear()
-    d.hide_keyboard()
-    shuangpin_keyboard(d, "全键盘")
-    home(d, "通用输入")
-    glide = d.summary("滑行输入") or ""
-    check(k18 == 32 and sy, f"18 键时编码行 {k18}dp，音节条 {sy}")
-    check(k9 == 32 and not sy9, f"九键时编码行 {k9}dp，音节条 {sy9}")
-    check("双拼 18 键" in glide and "九键双拼" in glide, f"滑行输入的说明「{glide}」")
-    return f"默认「{v.split(chr(10))[0]}」；18 键 {k18}dp {sy[:3]}；九键 {k9}dp"
+case("ST-45", needs="jvm:SettingsUatTest.theNineKeysSettingsAreASectionOfEachKeyboardsPage")(lambda d: None)
+
+case("ST-46", needs="jvm:SettingsUatTest.glideTypingAndStrokeFilterTurnEachOtherOff")(lambda d: None)
+
+case("ST-47", needs="jvm:SettingsMenuUatTest.searchingFindsTheNineKeysAndTheAddressRows")(lambda d: None)

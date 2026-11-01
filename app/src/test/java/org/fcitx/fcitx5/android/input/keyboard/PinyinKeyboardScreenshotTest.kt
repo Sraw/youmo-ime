@@ -6,12 +6,12 @@ package org.fcitx.fcitx5.android.input.keyboard
 
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
-import org.fcitx.fcitx5.android.core.FcitxEvent
 import org.fcitx.fcitx5.android.core.InputMethodEntry
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.prefs.PinyinKeyboard
 import org.fcitx.fcitx5.android.data.theme.ThemePreset
-import org.fcitx.fcitx5.android.engine.host.Engines
+import org.fcitx.fcitx5.android.engine.InputMethodCatalog
+import org.fcitx.fcitx5.android.host.HostEvent
 import org.fcitx.fcitx5.android.input.KeyboardHarness
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -61,13 +61,13 @@ class PinyinKeyboardScreenshotTest {
             fun row() = h.box(h.inputView.findViewById(R.id.code_row_text)).height().toFloat()
             val keys = h.box(h.board).height()
             assertEquals(density * CodeRowHeight.STRIP_DP, row(), 1f)
-            val english = InputMethodEntry(Engines.ENGLISH, "English", "", "", "En", "en", "keyboard", false)
+            val english = InputMethodEntry(InputMethodCatalog.ENGLISH, "English", "", "", "En", "en", "keyboard", false)
             h.api.inputMethodEntryCached = english
-            h.emit(FcitxEvent.IMChangeEvent(english))
+            h.emit(HostEvent.InputMethodChanged(english))
             assertEquals(density * CodeRowHeight.THIN_DP, row(), 1f)
             assertEquals(keys, h.box(h.board).height())
             h.api.inputMethodEntryCached = KeyboardHarness.PINYIN
-            h.emit(FcitxEvent.IMChangeEvent(KeyboardHarness.PINYIN))
+            h.emit(HostEvent.InputMethodChanged(KeyboardHarness.PINYIN))
             assertEquals(density * CodeRowHeight.STRIP_DP, row(), 1f)
             assertEquals(keys, h.box(h.board).height())
         }
@@ -91,13 +91,13 @@ class PinyinKeyboardScreenshotTest {
                 fun area() = h.box(h.board).bottom - h.box(h.inputView.findViewById(R.id.code_row_text)).top
                 val tall = keys()
                 assertTrue("area ${area()} of $screenH", area() <= 0.70 * screenH + 2)
-                val english = InputMethodEntry(Engines.ENGLISH, "English", "", "", "En", "en", "keyboard", false)
+                val english = InputMethodEntry(InputMethodCatalog.ENGLISH, "English", "", "", "En", "en", "keyboard", false)
                 h.api.inputMethodEntryCached = english
-                h.emit(FcitxEvent.IMChangeEvent(english))
+                h.emit(HostEvent.InputMethodChanged(english))
                 assertEquals(density * (CodeRowHeight.STRIP_DP - CodeRowHeight.THIN_DP), (keys() - tall).toFloat(), 2f)
                 assertTrue("area ${area()} of $screenH", area() <= 0.70 * screenH + 2)
                 h.api.inputMethodEntryCached = KeyboardHarness.PINYIN
-                h.emit(FcitxEvent.IMChangeEvent(KeyboardHarness.PINYIN))
+                h.emit(HostEvent.InputMethodChanged(KeyboardHarness.PINYIN))
                 assertEquals(tall, keys())
             }
         } finally {

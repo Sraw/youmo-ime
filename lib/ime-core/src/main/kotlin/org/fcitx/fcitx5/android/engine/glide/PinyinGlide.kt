@@ -350,7 +350,7 @@ class PinyinGlide(
             found.syllables.joinToString(if (spelling.separated) SEPARATOR.toString() else "") { spelling.of(it).orEmpty() },
             text(found.word),
             found.score,
-            found.syllables.joinToString(" ") { Syllables.spelling(it) },
+            Syllables.spelled(found.syllables),
         )
     }
 

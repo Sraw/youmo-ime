@@ -17,7 +17,7 @@ import org.fcitx.fcitx5.android.input.AutoScaleTextView
 import org.fcitx.fcitx5.android.input.keyboard.CustomGestureView
 import org.fcitx.fcitx5.android.input.keyboard.CustomGestureView.OnGestureListener
 import org.fcitx.fcitx5.android.input.keyboard.KeyAction.CommitAction
-import org.fcitx.fcitx5.android.input.keyboard.KeyAction.FcitxKeyAction
+import org.fcitx.fcitx5.android.input.keyboard.KeyAction.HostKeyAction
 import org.fcitx.fcitx5.android.input.keyboard.KeyActionListener
 import org.fcitx.fcitx5.android.input.keyboard.KeyActionListener.Source
 import org.fcitx.fcitx5.android.input.keyboard.KeyDef
@@ -220,7 +220,7 @@ class PickerGridAdapter(
         popupActionListener.onPopupAction(action)
         // a candidate longer than one character (user-entered) arrives as a CommitAction
         val text = when (val picked = action.outAction) {
-            is FcitxKeyAction -> picked.act
+            is HostKeyAction -> picked.act
             is CommitAction -> picked.text
             else -> return false
         }

@@ -30,4 +30,10 @@ fun interface Segmenter {
      * input is digits, the syllables shown spelt and taken one by one ([T9Segmenter]).
      */
     val typesLetters: Boolean get() = true
+
+    /**
+     * Whether the keys spell full pinyin, so the built-in phrases' keys (`rq`, `sj`, `xq`) are no
+     * syllable's: false in 双拼, where `sj` and `xq` spell syllables (san, xiu in 自然码) whose words they would push down.
+     */
+    val spellsFullPinyin: Boolean get() = true
 }

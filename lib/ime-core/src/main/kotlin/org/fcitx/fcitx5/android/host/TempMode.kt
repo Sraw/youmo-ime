@@ -4,7 +4,7 @@
  */
 package org.fcitx.fcitx5.android.host
 
-import org.fcitx.fcitx5.android.engine.host.Keyboard
+import org.fcitx.fcitx5.android.engine.runtime.Keyboard
 
 /**
  * A temporary input mode (quick phrase, Unicode), fcitx's `TempMode` (`fcitx/tempmode.h`). While
@@ -45,9 +45,14 @@ class TempModeManager(private val modes: List<TempMode>) {
     fun keyEvent(ic: InputContext, e: KeyEvent) {
         val mode = modes.firstOrNull { it.isActive(ic) } ?: return
         e.filter()
+        // a stroke drawn (笔画筛选) filters no mode's: swallowed, the app would type its private-use character
+        if (KeySyms.toUnicode(e.key.sym) in Keyboard.STROKES) {
+            e.accept()
+            return
+        }
         val letter = Keyboard.typedLetter(KeySyms.toUnicode(e.key.sym))
         // KeyEvent is immutable: the mode gets a letter's, its use the one's that came
-        val seen = if (letter == null) e else KeyEvent(Key(KeySyms.fromUnicode(letter.code), e.origKey.states), e.release, e.virtual, e.timestamp)
+        val seen = if (letter == null) e else KeyEvent(Key(KeySyms.fromUnicode(letter.code), e.origKey.states), e.release, e.virtual, e.timestamp, e.payload)
         if (mode.keyEvent(ic, seen)) e.accept()
     }
 

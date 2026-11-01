@@ -6,10 +6,10 @@ package org.fcitx.fcitx5.android.input
 
 import android.view.KeyEvent
 import kotlinx.coroutines.runBlocking
-import org.fcitx.fcitx5.android.core.FakeFcitxAPI
-import org.fcitx.fcitx5.android.core.FcitxAPI
+import org.fcitx.fcitx5.android.core.FakeHostApi
+import org.fcitx.fcitx5.android.core.HostApi
 import org.fcitx.fcitx5.android.core.InputMethodEntry
-import org.fcitx.fcitx5.android.engine.host.Engines
+import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -22,12 +22,12 @@ import org.junit.Test
  */
 class HardwareKeyboardTest {
 
-    private val api = FakeFcitxAPI().apply {
-        availableIme = arrayOf(entry(Engines.PINYIN), entry(Engines.HANDWRITING), entry(Engines.ENGLISH))
+    private val api = FakeHostApi().apply {
+        availableIme = arrayOf(entry(InputMethodCatalog.PINYIN), entry(InputMethodCatalog.HANDWRITING), entry(InputMethodCatalog.ENGLISH))
         enabledIme = availableIme
-        inputMethodEntryCached = entry(Engines.PINYIN)
+        inputMethodEntryCached = entry(InputMethodCatalog.PINYIN)
     }
-    private val posted = mutableListOf<suspend FcitxAPI.() -> Unit>()
+    private val posted = mutableListOf<suspend HostApi.() -> Unit>()
     private var onTouch = false
     private var textField = true
     private var shortcutsOn = true
@@ -60,15 +60,15 @@ class HardwareKeyboardTest {
 
     @Test
     fun aShiftTapOrCtrlSpaceSwitchesChineseAndEnglishInATextField() {
-        keyboard.inputMethodChanged(Engines.PINYIN)
+        keyboard.inputMethodChanged(InputMethodCatalog.PINYIN)
         assertFalse("the Shift goes on", shiftTap(0))
         runPosted()
-        assertEquals(Engines.ENGLISH, current)
+        assertEquals(InputMethodCatalog.ENGLISH, current)
 
         assertTrue(ctrlSpaceDown(1000))
         assertTrue("its release too", keyboard.up(KeyEvent.KEYCODE_SPACE, 1050))
         runPosted()
-        assertEquals(Engines.PINYIN, current)
+        assertEquals(InputMethodCatalog.PINYIN, current)
     }
 
     @Test
@@ -77,7 +77,7 @@ class HardwareKeyboardTest {
         assertFalse(ctrlSpaceDown(0))
         assertFalse(keyboard.up(KeyEvent.KEYCODE_SPACE, 50))
         assertFalse(shiftTap(1000))
-        api.inputMethodEntryCached = entry(Engines.HANDWRITING)
+        api.inputMethodEntryCached = entry(InputMethodCatalog.HANDWRITING)
         assertFalse("handwriting stays", keyboard.mayHandOff('n'.code, modified = false))
         assertTrue(posted.isEmpty())
     }
@@ -89,13 +89,13 @@ class HardwareKeyboardTest {
         assertFalse(keyboard.up(KeyEvent.KEYCODE_SPACE, 50))
         assertFalse(shiftTap(1000))
         assertTrue(posted.isEmpty())
-        assertEquals(Engines.PINYIN, current)
+        assertEquals(InputMethodCatalog.PINYIN, current)
     }
 
     /** Pinyin alone enabled: Ctrl+Space is no shortcut, and goes on to the app (an editor's completion). */
     @Test
     fun ctrlSpaceWithNowhereToGoGoesOn() {
-        api.enabledIme = arrayOf(entry(Engines.PINYIN))
+        api.enabledIme = arrayOf(entry(InputMethodCatalog.PINYIN))
         keyboard.fieldStarted()
         runPosted()
         assertFalse(ctrlSpaceDown(0))
@@ -134,32 +134,32 @@ class HardwareKeyboardTest {
     fun aSwitchSeesTheEnabledListAgain() {
         keyboard.fieldStarted()
         runPosted()
-        api.enabledIme = arrayOf(entry(Engines.PINYIN))
+        api.enabledIme = arrayOf(entry(InputMethodCatalog.PINYIN))
         assertTrue(ctrlSpaceDown(0))
         keyboard.up(KeyEvent.KEYCODE_SPACE, 50)
         runPosted()
-        assertEquals(Engines.PINYIN, current)
+        assertEquals(InputMethodCatalog.PINYIN, current)
         assertFalse(ctrlSpaceDown(1000))
     }
 
     /** English enabled with the field kept: the change fcitx tells is seen, so Ctrl+Space is no longer the app's. */
     @Test
     fun aListSetAnewIsSeenByTheNextCtrlSpace() {
-        api.enabledIme = arrayOf(entry(Engines.PINYIN))
+        api.enabledIme = arrayOf(entry(InputMethodCatalog.PINYIN))
         keyboard.fieldStarted()
         runPosted()
         api.enabledIme = api.availableIme
-        keyboard.inputMethodChanged(Engines.PINYIN)
+        keyboard.inputMethodChanged(InputMethodCatalog.PINYIN)
         runPosted()
         assertTrue(ctrlSpaceDown(30))
         keyboard.up(KeyEvent.KEYCODE_SPACE, 80)
         runPosted()
-        assertEquals(Engines.ENGLISH, current)
+        assertEquals(InputMethodCatalog.ENGLISH, current)
 
         // and English disabled again: Ctrl+Space goes on to the app
-        api.enabledIme = arrayOf(entry(Engines.PINYIN))
-        api.inputMethodEntryCached = entry(Engines.PINYIN)
-        keyboard.inputMethodChanged(Engines.PINYIN)
+        api.enabledIme = arrayOf(entry(InputMethodCatalog.PINYIN))
+        api.inputMethodEntryCached = entry(InputMethodCatalog.PINYIN)
+        keyboard.inputMethodChanged(InputMethodCatalog.PINYIN)
         runPosted()
         assertFalse(ctrlSpaceDown(1030))
     }
@@ -168,41 +168,41 @@ class HardwareKeyboardTest {
     fun ctrlShiftOnTheHardwareKeyboardSkipsWhatItCannotTypeIn() {
         assertFalse(ctrlShift(0))
         runPosted()
-        assertEquals("handwriting skipped", Engines.ENGLISH, current)
+        assertEquals("handwriting skipped", InputMethodCatalog.ENGLISH, current)
 
-        api.inputMethodEntryCached = entry(Engines.PINYIN)
+        api.inputMethodEntryCached = entry(InputMethodCatalog.PINYIN)
         onTouch = true
         ctrlShift(1000)
         runPosted()
-        assertEquals("the touch keyboard up", Engines.HANDWRITING, current)
+        assertEquals("the touch keyboard up", InputMethodCatalog.HANDWRITING, current)
     }
 
     @Test
     fun aShortcutAfterAHandOffKeepsWhatItChose() {
-        api.inputMethodEntryCached = entry(Engines.HANDWRITING)
+        api.inputMethodEntryCached = entry(InputMethodCatalog.HANDWRITING)
         runBlocking { keyboard.handOff(api) }
-        assertEquals(Engines.PINYIN, current)
+        assertEquals(InputMethodCatalog.PINYIN, current)
         shiftTap(0)
         runPosted()
-        assertEquals(Engines.ENGLISH, current)
+        assertEquals(InputMethodCatalog.ENGLISH, current)
 
         keyboard.touchKeyboardBack()
         runPosted()
-        assertEquals("not handwriting again", Engines.ENGLISH, current)
+        assertEquals("not handwriting again", InputMethodCatalog.ENGLISH, current)
     }
 
     @Test
     fun aKeyTypedInHandwritingIsTypedByPinyinUntilTheTouchKeyboardIsBack() {
-        api.inputMethodEntryCached = entry(Engines.HANDWRITING)
+        api.inputMethodEntryCached = entry(InputMethodCatalog.HANDWRITING)
         assertTrue(keyboard.mayHandOff('n'.code, modified = false))
         runBlocking { keyboard.handOff(api) }
-        assertEquals(Engines.PINYIN, current)
+        assertEquals(InputMethodCatalog.PINYIN, current)
         // in the key's own job: none of its own
         assertTrue(posted.isEmpty())
 
         keyboard.touchKeyboardBack()
         runPosted()
-        assertEquals(Engines.HANDWRITING, current)
+        assertEquals(InputMethodCatalog.HANDWRITING, current)
     }
 
     @Test
@@ -210,7 +210,7 @@ class HardwareKeyboardTest {
         api.calls.clear()
         runBlocking { keyboard.handOff(api) }
         assertEquals(emptyList<String>(), api.calls)
-        assertEquals(Engines.PINYIN, current)
+        assertEquals(InputMethodCatalog.PINYIN, current)
     }
 
     @Test

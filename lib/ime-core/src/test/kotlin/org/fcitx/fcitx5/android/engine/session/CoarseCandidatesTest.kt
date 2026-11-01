@@ -16,6 +16,7 @@ import org.fcitx.fcitx5.android.engine.learn.row
 import org.fcitx.fcitx5.android.engine.pinyin.PinyinSegmenter
 import org.fcitx.fcitx5.android.engine.session.Action.Key
 import org.fcitx.fcitx5.android.engine.user.UserModel
+import org.fcitx.fcitx5.android.engine.user.learn
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test

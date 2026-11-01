@@ -143,6 +143,22 @@ class HeavyTest(unittest.TestCase):
         self.assertFalse(t.is_alive(), "b still waiting after a stopped")
         self.assertEqual([c.id for c in got[0]], ["H-2"])
 
+    def test_a_heavy_case_out_of_this_run_waits_for_no_one(self):
+        # a release-only heavy case in an everyday run: with its group, not in the queue that waits for every device
+        r = case("R-1", "release,redroid:x", heavy=True)
+        def queued(sch):
+            return [[c.id for c in g] for g in sch.heavy], sorted(c.id for g in sch.pending for c in g)
+        sch = uat.Scheduler([self.case("A-1"), r, self.case("H-1", True)], None, ["a"])
+        self.assertEqual(([["H-1"]], ["A-1", "R-1"]), queued(sch))
+        was = uat.BUILD
+        try:
+            uat.BUILD = "release"
+            self.assertEqual(([["R-1"]], ["A-1"]), queued(uat.Scheduler([self.case("A-1"), r], None, ["a"])))
+            # the emulator alone never runs a release,redroid case (RUNS_HERE): with its group again
+            self.assertEqual(([], ["A-1", "R-1"]), queued(uat.Scheduler([self.case("A-1"), r], None, [uat.EMU_PORT])))
+        finally:
+            uat.BUILD = was
+
 
 class JvmTest(unittest.TestCase):
     """uat.py jvm: the @Uat ids in the test sources, and their JUnit results"""
@@ -167,6 +183,24 @@ class JvmTest(unittest.TestCase):
         self.assertEqual({"KB-22": [("org.x.KeysTest", "address")], "TB-01": [("org.x.KeysTest", "bar")],
                           "KB-01": [("org.x.KeysTest", "bar")]}, found)
 
+    def test_a_nested_class_is_outer_dollar_inner_and_the_outer_resumes_after_it(self):
+        self.write("src/b/PopupTest.kt", 'package org.x\n\nclass PopupTest {\n'
+                   '    @Uat("ST-01")\n    fun before() {}\n\n'
+                   '    class Dialog {\n        @Uat("ST-22")\n        fun inner() {}\n    }\n\n'
+                   '    @Uat("ST-02")\n    fun after() {}\n}\n\n'
+                   'class SecondTest {\n    @Uat("ST-03")\n    fun other() {}\n}\n')
+        found = uat.uat_tests([os.path.join(self.tmp.name, "src")])
+        self.assertEqual({"ST-01": [("org.x.PopupTest", "before")], "ST-22": [("org.x.PopupTest$Dialog", "inner")],
+                          "ST-02": [("org.x.PopupTest", "after")], "ST-03": [("org.x.SecondTest", "other")]}, found)
+
+    def test_needs_names_each_test_by_its_own_uat(self):
+        found = {"WD-19": [("org.x.LexiconUatTest", "aPhrase")], "WD-35": [("org.x.LexiconUatTest", "clear")]}
+        cases = {"WD-35": "jvm:LexiconUatTest.clear、LexiconUatTest.aPhrase、LexiconUatTest.gone、LexiconUatTest",
+                 "WD-36": "redroid:LexiconUatTest.gone"}   # not jvm: not checked
+        self.assertEqual(["WD-35: needs= names LexiconUatTest.aPhrase, whose @Uat is WD-19's",
+                          "WD-35: needs= names LexiconUatTest.gone, which has no @Uat"],
+                         uat.needs_problems(cases, found))
+
     def test_a_case_fails_with_any_of_its_tests_and_is_blocked_without_a_result(self):
         self.write("r/TEST-org.x.KeysTest.xml", '<testsuite name="org.x.KeysTest">'
                    '<testcase name="address" classname="org.x.KeysTest" time="0.5"/>'
@@ -178,6 +212,11 @@ class JvmTest(unittest.TestCase):
         self.assertEqual("通过", rec["KB-22"][0])
         self.assertEqual(("失败", "KeysTest.bar 1.0 s：no .com"), rec["TB-01"])
         self.assertEqual("阻塞", rec["PY-01"][0])
+
+    def test_a_jvm_case_without_an_uat_test_is_blocked_not_dropped(self):
+        rec = uat.jvm_record({"KB-22": [("org.x.KeysTest", "address")]}, {}, expected=["KB-22", "HW-09"])
+        self.assertEqual(("阻塞", "没有 @Uat 测试"), rec["HW-09"])
+        self.assertEqual(["HW-09", "KB-22"], list(rec))
 
     def test_a_test_failing_in_one_flavor_fails_whichever_is_read_last(self):
         # the failing flavor read first, then last: the worse result counts either way
@@ -226,6 +265,24 @@ class JvmTest(unittest.TestCase):
         state, why = c.unmet(SimpleNamespace(emu=False, flavor="text"))
         self.assertIs(uat.Elsewhere, state)
         self.assertTrue(why.startswith("JVM"))
+
+    def test_a_scripted_release_case_runs_only_in_a_release_run(self):
+        # the big-lexicon cases (WD-14d, 14h, TBL-12c; user 2026-10-30): out of the everyday run, in the release's
+        c = case("WD-14d", "release,redroid:x")
+        device = SimpleNamespace(emu=False, flavor="text")
+        self.assertEqual("release", uat.place(c.needs))
+        self.assertIs(uat.Elsewhere, c.unmet(device)[0])
+        was = uat.BUILD
+        try:
+            uat.BUILD = "release"
+            self.assertIsNone(c.unmet(device))
+            # one run by hand stays by hand
+            self.assertIs(uat.Elsewhere, case("WD-14r", "release:x").unmet(device)[0])
+            # the emulator stays out of it (a 2 GB AVD takes minutes each), and the reasons say which is by hand
+            self.assertIs(uat.Elsewhere, c.unmet(SimpleNamespace(emu=True, flavor="text"))[0])
+            self.assertTrue(case("WD-14r", "release:x").unmet(device)[1].startswith("发版时手动"))
+        finally:
+            uat.BUILD = was
 
     def test_a_voice_case_on_the_emulator_is_reported_as_voice_where_place_puts_it(self):
         # emu,voice on redroid's text build: the voice reason, as place() files it under voice (F4263)

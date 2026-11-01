@@ -20,6 +20,20 @@ class GlideTouchTest {
     }
 
     @Test
+    fun aStrokeCancelsTheKeysSoonerAndTheNextTouchGlidesAsBefore() {
+        val t = GlideTouch()
+        t.down(0, 50f, 70f, 0, onLetter = true, keyWidth = 100f, keyHeight = 140f, longPressMillis = 300, stroke = true)
+        assertEquals(Route.KEYS, t.move(50f, 100f, 20))
+        assertEquals(Route.CANCEL_KEYS, t.move(50f, 120f, 40))
+        assertEquals(Route.GLIDE, t.up(50f, 140f, cancelled = false))
+        // down, two moves, the lift: four places
+        assertEquals(8, t.takeGlided()?.size)
+        // the same keys, no stroke: as far down is the keys'
+        t.down(0, 50f, 70f, 0, onLetter = true, keyWidth = 100f, keyHeight = 140f, longPressMillis = 300)
+        assertEquals(Route.KEYS, t.move(50f, 120f, 40))
+    }
+
+    @Test
     fun aGlideCancelsTheKeysOnceThenIsItsOwn() {
         val t = touch()
         assertEquals(Route.KEYS, t.move(60f, 70f, 20))

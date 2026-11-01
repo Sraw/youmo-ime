@@ -74,7 +74,7 @@ class MotionNoticeUatTest {
     private fun grip(): View? = KeyboardHarness.find<FloatingHandle>(h.inputView)?.takeIf { h.shown(it) }
 
     @Test
-    @Uat("MN-02")
+    @Uat("MN-02", "PR-17")
     fun habitsOffAndOnEachSaidTheNewInTheOldsPlace() {
         prefs.set(AppPrefs.getInstance().internal.useHabits, true)
         h.start()

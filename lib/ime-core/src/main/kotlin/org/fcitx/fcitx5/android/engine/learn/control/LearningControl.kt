@@ -8,7 +8,9 @@ import org.fcitx.fcitx5.android.engine.learn.LearnClock
 import org.fcitx.fcitx5.android.engine.learn.LearnLog
 import org.fcitx.fcitx5.android.engine.learn.LearnRecord
 import org.fcitx.fcitx5.android.engine.learn.LearnRecords
-import java.io.File
+import org.fcitx.fcitx5.android.engine.platform.LogFile
+import org.fcitx.fcitx5.android.engine.platform.UserFiles
+import org.fcitx.fcitx5.android.engine.platform.jvm.JvmClock
 import java.io.IOException
 import java.io.OutputStream
 
@@ -20,13 +22,13 @@ import java.io.OutputStream
  *
  * [log] is the engine's, opened again where it was closed (review-E-engine S6). One not on disk
  * (direct boot) has what was typed in its state alone, no time on it: [clearRecent] does nothing
- * there. [legacy] are the older builds' learning files no build writes any more, deleted with what
- * was cleared (PLAN §2.8: 「装回旧版也看不到了」).
+ * there. [legacy] are the older builds' learning files no build writes any more (for a clear of
+ * everything, or not), deleted with what was cleared (PLAN §2.8: 「装回旧版也看不到了」).
  */
 class LearningControl(
     private val log: () -> LearnLog,
-    private val clock: LearnClock = LearnClock.System,
-    private val legacy: () -> List<File> = { emptyList() },
+    private val clock: LearnClock = JvmClock,
+    private val legacy: (all: Boolean) -> List<LogFile> = { emptyList() },
     internal val onError: (IOException) -> Unit = {},
 ) {
     /** An act that may still be taken back: the records it wrote, the log's [LearnLog.rewrites] then, and how to undo what it did outside the log. */
@@ -124,7 +126,7 @@ class LearningControl(
         invalidate(cut)
         // nothing to take out (false) is cleared all the same: what a session keeps of the span too (review-1c S4)
         if (!log.rewrite { bytes, out -> LogRewrites.clearSince(bytes, cut, out) }) log.rewritten()
-        if (span == LearningOp.Span.TODAY) dropLegacy(log)
+        if (span == LearningOp.Span.TODAY) dropLegacy(all = false)
         return cut
     }
 
@@ -149,52 +151,59 @@ class LearningControl(
             rows.forEach(writer::write)
             true
         }
-        if (written) dropLegacy(log)
+        if (written) dropLegacy(all)
         return written
     }
 
     /**
-     * The older builds' files gone, and the marker made to say so, lest the next start read them
-     * gone as words forgotten. Crash-safe (review-E-engine M3): each renamed aside first, the marker
-     * written without them, then deleted; a kill between leaves the renamed ones for [resumeDrop].
+     * The older builds' files gone, so a build before 0.4 put back shows none of what was cleared:
+     * each renamed aside first, then deleted; a kill between leaves the renamed ones for [resumeDrop].
+     * A whole clear sets aside first what only it takes: killed after pinyin.user alone, [resumeDrop]
+     * would finish it as a partial clear and the table logs left would come back into the record.
      */
-    private fun dropLegacy(log: LearnLog) {
-        val files = legacy().filter { it.exists() }
-        if (files.isEmpty()) {
-            // a conversion still owed (the tables' logs alone: none of them retired) owed no more, nor
-            // merged in after the clear to bring back what it cleared (review-uat-fixes S2)
-            if (log.conversionPending) log.remarkLegacy()
-            return
-        }
-        val aside = files.mapNotNull { f ->
+    private fun dropLegacy(all: Boolean) {
+        val partialNames = if (all) legacy(false).mapTo(HashSet()) { it.name } else emptySet()
+        val aside = legacy(all).sortedBy { it.name in partialNames }.filter { it.taken() }.mapNotNull { f ->
             aside(f).takeIf { f.renameTo(it) }.also { if (it == null) onError(IOException("cannot set $f aside")) }
         }
-        // the marker not written, the files stay aside: the next open remarks them and deletes them then
-        if (log.remarkLegacy()) deleteAside(aside)
+        deleteAside(aside)
     }
 
     /**
-     * Whether a clear was killed between setting the older builds' files aside and saying so in
-     * the marker: the rest of them set aside too, for the log to open remarking them
-     * ([LearnLog.open]'s remark), then [finishDrop].
+     * Whether a clear was killed between setting the older builds' files aside and deleting them:
+     * the rest of them set aside too, for [finishDrop] to delete as the log opens.
      */
     fun resumeDrop(): Boolean {
-        val files = legacy()
-        if (files.none { aside(it).exists() }) return false
-        for (f in files) if (f.exists() && !f.renameTo(aside(f))) onError(IOException("cannot set $f aside"))
+        // which clear it was: a whole one where a file only a whole clear takes was set aside; else the
+        // partial one's alone, or a table log not yet read into the record would go with it
+        val whole = legacy(true)
+        if (whole.none { aside(it).taken() }) return false
+        val partial = legacy(false)
+        val partialNames = partial.mapTo(HashSet()) { it.name }
+        val files = if (whole.any { it.name !in partialNames && aside(it).taken() }) whole else partial
+        for (f in files) if (f.taken() && !f.renameTo(aside(f))) onError(IOException("cannot set $f aside"))
         return true
     }
 
-    /** What [resumeDrop] left, deleted once the marker says them gone. */
-    fun finishDrop() = deleteAside(legacy().map(::aside).filter { it.exists() })
+    /** What [resumeDrop] left, deleted. */
+    fun finishDrop() = deleteAside(legacy(true).map(::aside).filter { it.taken() })
 
-    private fun deleteAside(files: List<File>) {
+    private fun deleteAside(files: List<LogFile>) {
         for (f in files) if (!f.delete()) onError(IOException("cannot delete $f"))
     }
 
-    private fun aside(f: File) = File(f.path + CLEARED)
+    private fun aside(f: LogFile) = f.beside(CLEARED)
 
-    private companion object {
-        const val CLEARED = ".cleared"
+    companion object {
+        private const val CLEARED = ".cleared"
+
+        /**
+         * The older builds' learning files in [dir] no build writes any more (pinyin's, English's, the
+         * tables' [tableLogs] and 0.4's mark beside each): a clear deletes them with what it cleared
+         * (U-86, U-88 today; review E-S4), or a 0.4 put back would offer a phrase cleared. By name,
+         * not by what [dir] lists: one set aside is found again by its name ([resumeDrop]).
+         */
+        fun retired(dir: UserFiles, tableLogs: List<LogFile> = emptyList()): List<LogFile> =
+            listOf("pinyin.user", "english.user").map { dir.file(it) } + tableLogs.flatMap { listOf(it, it.beside(".told")) }
     }
 }

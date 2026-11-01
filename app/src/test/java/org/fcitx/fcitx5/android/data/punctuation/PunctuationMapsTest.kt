@@ -4,11 +4,14 @@
  */
 package org.fcitx.fcitx5.android.data.punctuation
 
+import org.fcitx.fcitx5.android.R
+import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.engine.assertRows
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertThrows
 import org.junit.Assume.assumeFalse
+import org.junit.Assume.assumeTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
@@ -30,6 +33,37 @@ class PunctuationMapsTest {
             maps().load("zh_CN"),
         )
         assertEquals(emptyList<PunctuationMapEntry>(), maps().load("zh_TW"))
+    }
+
+    // A4: a table the user edited that does not read is the built-in one on the keyboard, the user told,
+    // and never saved over with what the editor showed of it
+    @Test
+    fun `a user file that cannot be read is told and not saved over`() {
+        val file = File(tmp.root, "punctuation/punc.mb.zh_CN")
+        file.parentFile!!.mkdirs()
+        file.writeText(", 、\n")
+        assumeTrue("running as root: a file cannot be made unreadable", file.setReadable(false) && !file.canRead())
+        val told = mutableListOf<String>()
+        val maps = PunctuationMaps(tmp.root, onUnreadable = { told += it }) { lang -> if (lang == "zh_CN") builtIn.byteInputStream() else null }
+        assertEquals(3, maps.load("zh_CN").size)
+        assertEquals(listOf("zh_CN"), told)
+        // the user is told the table was not read (not that the data is not settled)
+        assertEquals(R.string.user_data_unreadable, assertThrows(PunctuationMaps.Refused::class.java) { maps.save("zh_CN", listOf(PunctuationMapEntry(",", "。", ""))) }.reason)
+        file.setReadable(true)
+        assertEquals(", 、\n", file.readText())
+    }
+
+    @Test
+    @Uat("PR-42")
+    fun `where the data is not settled nothing is saved`() {
+        val maps = PunctuationMaps(tmp.root, writable = false) { builtIn.byteInputStream() }
+        assertEquals(R.string.user_data_not_settled, assertThrows(PunctuationMaps.Refused::class.java) { maps.save("zh_CN", listOf(PunctuationMapEntry(",", "。", ""))) }.reason)
+        assertFalse(File(tmp.root, "punctuation").exists())
+    }
+
+    @Test
+    fun `with no data directory the built-in table`() {
+        assertEquals(3, PunctuationMaps(null) { builtIn.byteInputStream() }.load("zh_CN").size)
     }
 
     @Test

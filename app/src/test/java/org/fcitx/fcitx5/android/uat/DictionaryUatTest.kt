@@ -10,12 +10,15 @@ import kotlinx.coroutines.launch
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.Uat
+import org.fcitx.fcitx5.android.core.fixture
+import org.fcitx.fcitx5.android.core.phoneStorage
 import org.fcitx.fcitx5.android.data.pinyin.ImportedDictionaries
 import org.fcitx.fcitx5.android.data.pinyin.LegacyTextConversion
 import org.fcitx.fcitx5.android.data.pinyin.MergedDictionary
 import org.fcitx.fcitx5.android.data.pinyin.PinyinDictManager
 import org.fcitx.fcitx5.android.data.pinyin.dict.SourceNames
 import org.fcitx.fcitx5.android.engine.pinyin.Syllables
+import org.fcitx.fcitx5.android.engine.platform.jvm.JvmFile
 import org.fcitx.fcitx5.android.engine.user.DictionaryFile
 import org.fcitx.fcitx5.android.engine.user.DictionaryFormat
 import org.fcitx.fcitx5.android.ui.main.settings.Incoming
@@ -57,12 +60,11 @@ class DictionaryUatTest {
 
     private val dir get() = PinyinDictManager.pinyinDicDir
 
-    private fun fixture(name: String) = File("../uat/fixtures", name).also { check(it.isFile) { "no fixture $it" } }
 
     // the files of the directory but the merged file and its dot files
     private fun files() = dir.list()!!.filter { !it.startsWith(".") && !MergedDictionary.isCompiled(File(dir, it)) }.sorted()
 
-    private fun merged(): DictionaryFile? = File(dir, MergedDictionary.FILE).takeIf { it.isFile }?.let { DictionaryFile.open(it) }
+    private fun merged(): DictionaryFile? = File(dir, MergedDictionary.FILE).takeIf { it.isFile }?.let { DictionaryFile.open(JvmFile(it)) }
 
     private fun typed(text: String) = merged()?.hasText(text) == true
 
@@ -82,6 +84,7 @@ class DictionaryUatTest {
 
     @Before
     fun empty() {
+        phoneStorage()
         MergedDictionary.reset()
         MergedDictionary.made = {}
         MergedDictionary.base = { null }

@@ -24,6 +24,7 @@ class GlideTouch(private val downKeys: Float = GlideGesture.DOWN) {
     private var longPressMillis = 0L
     private var keyWidth = 0f
     private var keyHeight = 0f
+    private var stroke = false
     private var swallowing = false
     private var glided: FloatArray? = null
 
@@ -52,19 +53,24 @@ class GlideTouch(private val downKeys: Float = GlideGesture.DOWN) {
 
     /**
      * The first finger down, [pointerId] at [x], [y] at [time]: it may glide if [onLetter] (a glide
-     * taken now, and on a letter), keys [keyWidth] by [keyHeight].
+     * taken now, and on a letter), keys [keyWidth] by [keyHeight]; a [stroke] drawn if so (GlideGesture's).
      */
-    fun down(pointerId: Int, x: Float, y: Float, time: Long, onLetter: Boolean, keyWidth: Float, keyHeight: Float, longPressMillis: Long) {
+    fun down(
+        pointerId: Int, x: Float, y: Float, time: Long, onLetter: Boolean, keyWidth: Float, keyHeight: Float, longPressMillis: Long,
+        stroke: Boolean = false,
+    ) {
         reset()
         glided = null
         if (!onLetter || keyWidth <= 0f || keyHeight <= 0f) return
-        val same = made != null && keyWidth == this.keyWidth && keyHeight == this.keyHeight && longPressMillis == this.longPressMillis
-        if (!same) made = GlideGesture(keyWidth, keyHeight, longPressMillis, downKeys)
+        val same = made != null && keyWidth == this.keyWidth && keyHeight == this.keyHeight && longPressMillis == this.longPressMillis &&
+            stroke == this.stroke
+        if (!same) made = GlideGesture(keyWidth, keyHeight, longPressMillis, downKeys, stroke)
         pointer = pointerId
         t0 = time
         this.keyWidth = keyWidth
         this.keyHeight = keyHeight
         this.longPressMillis = longPressMillis
+        this.stroke = stroke
         gesture = made?.apply { down(x, y, time, onLetter = true) }
         add(x, y)
     }

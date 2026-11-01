@@ -82,7 +82,7 @@ class GlideSessionTest {
 
     private fun path(keys: String) = keys.flatMap { GlideLayout.QWERTY.centre(it).toList() }.toFloatArray()
 
-    private fun glide(keys: String) = session.offer(Glide(path(keys), GlideLayout.QWERTY)).let { session.apply(Action.Glide) }
+    private fun glide(keys: String) = session.apply(session.read(Glide(path(keys), GlideLayout.QWERTY)))
 
     @Test
     fun theLikeliestTypedTheOthersWordsAfterItsFirst() {
@@ -183,8 +183,7 @@ class GlideSessionTest {
 
     @Test
     fun noReadingIsTheSessionsGlide() {
-        session.offer(Glide(floatArrayOf(0f, 0f), GlideLayout.QWERTY))
-        assertEquals("", session.apply(Action.Glide).preedit)
+        assertEquals("", session.apply(session.read(Glide(floatArrayOf(0f, 0f), GlideLayout.QWERTY))).preedit)
     }
 
     // a table's: hints and selection labels, a 空码, a word it has not, an offer past the others
@@ -201,8 +200,7 @@ class GlideSessionTest {
     private fun tableGlided(vararg readings: GlideReading): Snapshot {
         tableReadings = readings.toList()
         session = tableGlide
-        session.offer(Glide(floatArrayOf(0f, 0f), GlideLayout.QWERTY))
-        return session.apply(Action.Glide)
+        return session.apply(session.read(Glide(floatArrayOf(0f, 0f), GlideLayout.QWERTY)))
     }
 
     @Test
@@ -250,15 +248,13 @@ class GlideSessionTest {
         }
         tableReadings = listOf(GlideReading("wqiy", "你", 0f), GlideReading("vbg", "𠀾𠀾", -1f))
         session = GlideSession(inner, Action.Pick(0)) { _, _ -> tableReadings }
-        session.offer(Glide(floatArrayOf(0f, 0f), GlideLayout.QWERTY))
-        session.apply(Action.Glide)
+        session.apply(session.read(Glide(floatArrayOf(0f, 0f), GlideLayout.QWERTY)))
         assertEquals("𠀾𠀾", session.apply(Action.Pick(1)).commit)
         swap = true
         session.apply(Action.Refine)
         swap = false
         tableReadings = listOf(GlideReading("wqiy", "你", 0f), GlideReading("vbg", "奻", -1f))
-        session.offer(Glide(floatArrayOf(0f, 0f), GlideLayout.QWERTY))
-        session.apply(Action.Glide)
+        session.apply(session.read(Glide(floatArrayOf(0f, 0f), GlideLayout.QWERTY)))
         session.apply(Action.Pick(1))
         // what follows is after the emoji, none of the word left
         assertEquals("📢奻", followed)
@@ -269,8 +265,7 @@ class GlideSessionTest {
         session = GlideSession(tableSession, Action.Pick(0)) { _, _ -> listOf(GlideReading("vbg", "好", 0f)) }
         session.apply(Action.Key('v'))
         assertTrue(session.apply(Action.Key('x')).candidates.isEmpty())
-        session.offer(Glide(floatArrayOf(0f, 0f), GlideLayout.QWERTY))
-        val s = session.apply(Action.Glide)
+        val s = session.apply(session.read(Glide(floatArrayOf(0f, 0f), GlideLayout.QWERTY)))
         assertEquals("", s.commit)
         assertEquals("vbg", s.preedit)
         assertEquals("好", s.candidates.first())
@@ -299,8 +294,7 @@ class GlideSessionTest {
         }
         tableReadings = listOf(GlideReading("vbg", "好", 0f), GlideReading("wqiy", "你", -1f))
         session = GlideSession(inner, Action.Pick(0)) { _, _ -> tableReadings }
-        session.offer(Glide(floatArrayOf(0f, 0f), GlideLayout.QWERTY))
-        val s = session.apply(Action.Glide)
+        val s = session.apply(session.read(Glide(floatArrayOf(0f, 0f), GlideLayout.QWERTY)))
         assertEquals(listOf("好", "你", "妤", "姓"), s.candidates)
         assertEquals(listOf(0, null, 1, 2), s.candidates.indices.map { session.why(it)?.uses })
         assertEquals(s.candidates, session.reread()!!.candidates)

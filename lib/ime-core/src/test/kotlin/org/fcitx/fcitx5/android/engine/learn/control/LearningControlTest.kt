@@ -5,7 +5,6 @@
 package org.fcitx.fcitx5.android.engine.learn.control
 
 import org.fcitx.fcitx5.android.engine.learn.Code
-import org.fcitx.fcitx5.android.engine.learn.ConvertedMarker
 import org.fcitx.fcitx5.android.engine.learn.FakeClock
 import org.fcitx.fcitx5.android.engine.learn.Kinds
 import org.fcitx.fcitx5.android.engine.learn.LearnClock
@@ -14,20 +13,23 @@ import org.fcitx.fcitx5.android.engine.learn.LearnRecord
 import org.fcitx.fcitx5.android.engine.learn.LearnRecord.Commit
 import org.fcitx.fcitx5.android.engine.learn.LearnRecords
 import org.fcitx.fcitx5.android.engine.learn.LearnState
-import org.fcitx.fcitx5.android.engine.learn.Mine
 import org.fcitx.fcitx5.android.engine.learn.Row
 import org.fcitx.fcitx5.android.engine.learn.corrected
 import org.fcitx.fcitx5.android.engine.learn.row
+import org.fcitx.fcitx5.android.engine.platform.LogFile
+import org.fcitx.fcitx5.android.engine.platform.MemoryFiles
+import org.fcitx.fcitx5.android.engine.platform.UserFiles
+import org.fcitx.fcitx5.android.engine.platform.jvm.JvmFiles
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Assume.assumeFalse
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
-import java.io.File
 import java.io.IOException
 
 /**
@@ -37,18 +39,21 @@ import java.io.IOException
  */
 class LearningControlTest {
     @get:Rule
-    val dir = TemporaryFolder()
+    val folder = TemporaryFolder()
+
+    // in memory, but where a test needs a disk that refuses: that test passes its own
+    private val dir: UserFiles = MemoryFiles()
 
     private val clock = FakeClock()
     private val errors = ArrayList<IOException>()
 
-    private fun file() = File(dir.root, LearnLog.FILE)
+    private fun file(dir: UserFiles = this.dir) = dir.file(LearnLog.FILE)
 
-    private fun open(): LearnLog = LearnLog(file(), clock, errors::add, compactAt = 1L shl 30).also { it.open() }
+    private fun open(dir: UserFiles = this.dir): LearnLog = LearnLog(file(dir), clock, errors::add, compactAt = 1L shl 30).also { it.open() }
 
-    private fun control(log: LearnLog, legacy: List<File> = emptyList()) = LearningControl({ log }, clock, legacy = { legacy }, onError = errors::add).also { it.attach(log) }
+    private fun control(log: LearnLog, legacy: List<LogFile> = emptyList()) = LearningControl({ log }, clock, legacy = { legacy }, onError = errors::add).also { it.attach(log) }
 
-    private fun replayed() = LearnLog.replay(file().readBytes())
+    private fun replayed(dir: UserFiles = this.dir) = LearnLog.replay(file(dir).read())
 
     private fun LearnLog.commit(vararg rows: Row): Commit = checkNotNull(record(rows.toList()))
 
@@ -65,7 +70,7 @@ class LearningControlTest {
         repeat(5) { log.guide() }
         clock.days(3)
         // as a start three days later reads it, before the hour typed
-        val asBefore = LearnLog.replay(file().readBytes()).dump()
+        val asBefore = LearnLog.replay(file().read()).dump()
         clock.minutes(10)
         log.guide()
         log.commit(corrected("dl", "点了", "dian le", prev = "我", origin = Row.NONE, shown = "带来"))
@@ -110,7 +115,7 @@ class LearningControlTest {
         control(log).clearRecent(LearningOp.Span.HOUR)
         val records = ArrayList<LearnRecord>()
         val reader = LearnRecords.Reader()
-        LearnRecords.FORMAT.read(file().readBytes()) { type, input -> reader.decode(type, input)?.let(records::add) }
+        LearnRecords.FORMAT.read(file().read()) { type, input -> reader.decode(type, input)?.let(records::add) }
         assertEquals(listOf(first.seq), records.filterIsInstance<Commit>().map { it.seq })
         // the undo of the first stays: it was typed before the hour, and taken back
         assertEquals(listOf(first.seq), records.filterIsInstance<LearnRecord.Undo>().map { it.undoneSeq })
@@ -125,67 +130,69 @@ class LearningControlTest {
         clock.minutes(14 * 60 + 5)
         log.guide()
         log.guide()
-        val old = dir.newFile("pinyin.user")
+        val old = dir.file("pinyin.user").apply { createNew() }
         control(log, listOf(old)).clearRecent(LearningOp.Span.TODAY)
         assertEquals(1, log.state.uses("指导"))
         assertFalse(old.exists())
         assertEquals(1, replayed().uses("指导"))
     }
 
-    // an older build's log, as the learning record converts it: one changed since its marker reads
-    // the words it lacks now as forgotten, as a log saying so past what was seen would
-    private class Old(var fingerprint: String, var words: List<String>) : LearnLog.Legacy {
-        override fun into(state: LearnState, clock: LearnClock) {
-            for (w in words) state.apply(LearnRecord.MineRow(w, Mine("zhi dao", Mine.CONVERTED, 1, 0, 1, 0, 0)))
-        }
-
-        override fun marker(state: LearnState) = ConvertedMarker(mapOf(fingerprint to ConvertedMarker.Seen(0, 0, 0)), words.toSet())
-
-        override fun since(was: ConvertedMarker?, state: LearnState, stamp: LearnClock.Stamp): Pair<List<LearnRecord>, ConvertedMarker>? {
-            val now = marker(state)
-            if (was != null && was.seen == now.seen) return null
-            return was?.mine.orEmpty().filter { it !in words }.map { LearnRecord.Forget(stamp.minute, stamp.day, it) } to now
-        }
-    }
-
-    // review-E-engine M3: the old files set aside, the marker not yet written, killed; the next open
-    // says them gone without reading them as words forgotten
+    // review-E-engine M3: a clear killed with the old files set aside: the next open deletes them,
+    // losing none of the user's words
     @Test
-    fun aClearKilledBeforeItsMarkerLosesNoneOfTheUsersWords() {
-        val old = Old("pinyin.user:3", listOf("指导"))
-        LearnLog(file(), clock, errors::add).also { it.open(old) }.close()
-        val files = listOf(dir.newFile("pinyin.user"), dir.newFile("user.dict"))
-        assertTrue(files[0].renameTo(File(files[0].path + ".cleared")))
-        old.fingerprint = ""
-        old.words = emptyList()
+    fun aClearKilledWithTheOldFilesAsideDeletesThemAtTheNextOpen() {
+        open().apply { guide() }.close()
+        val files = listOf(dir.file("pinyin.user").apply { createNew() }, dir.file("user.dict").apply { createNew() })
+        assertTrue(files[0].renameTo(files[0].beside(".cleared")))
         val log = LearnLog(file(), clock, errors::add)
         val control = LearningControl({ log }, clock, legacy = { files }, onError = errors::add)
+        // the next open as LearningFacade.learnLog makes it: what was set aside dropped, then the log opened
         assertTrue(control.resumeDrop())
-        log.open(old, remark = true)
         control.finishDrop()
-        assertTrue("指导" in log.state.mine)
-        assertTrue(files.none { it.exists() || File(it.path + ".cleared").exists() })
+        log.open()
+        assertEquals(1, log.state.uses("指导"))
+        assertTrue(files.none { it.exists() || it.beside(".cleared").exists() })
         assertFalse(control.resumeDrop())
         log.close()
-        assertTrue("指导" in LearnLog(file(), clock, errors::add).also { it.open(old) }.state.mine)
+        assertTrue(errors.isEmpty())
+    }
+
+    // killed as a whole clear sets pinyin.user aside: the table's log is aside by then, so the resume
+    // finishes the whole clear, not a partial one that would leave the log to come back into the record
+    @Test
+    fun aWholeClearKilledMidwaySetsTheTableLogsAsideFirst() {
+        val wubi = dir.file("wubi.user").apply { createNew() }
+        val pinyin = dir.file("pinyin.user").apply { createNew() }
+        val killing = object : LogFile by pinyin {
+            override fun renameTo(dest: LogFile): Boolean = throw IllegalStateException("killed")
+        }
+        val log = open()
+        val clearing = LearningControl({ log }, clock, legacy = { all -> if (all) listOf(killing, wubi) else listOf(killing) }, onError = errors::add)
+        assertThrows(IllegalStateException::class.java) { clearing.clearLearned(all = true) }
+        assertTrue(wubi.beside(".cleared").exists())
+        val control = LearningControl({ log }, clock, legacy = { all -> if (all) listOf(pinyin, wubi) else listOf(pinyin) }, onError = errors::add)
+        assertTrue(control.resumeDrop())
+        control.finishDrop()
+        assertTrue(listOf(pinyin, wubi).none { it.exists() || it.beside(".cleared").exists() })
         assertTrue(errors.isEmpty())
     }
 
     // review-E-engine S1: a clear the disk refuses is no clear, and says so
     @Test
     fun aClearTheDiskRefusesClearsNothing() {
-        val log = open()
+        val disk = JvmFiles(folder.root)
+        val log = open(disk)
         log.guide()
-        assertTrue(dir.root.setWritable(false))
+        assertTrue(folder.root.setWritable(false))
         try {
             // root writes all the same: nothing to test there
-            assumeFalse(dir.root.canWrite())
+            assumeFalse(folder.root.canWrite())
             assertTrue(runCatching { control(log).clearLearned(all = false) }.exceptionOrNull() is IOException)
         } finally {
-            dir.root.setWritable(true)
+            folder.root.setWritable(true)
         }
         assertEquals(1, log.state.uses("指导"))
-        assertEquals(1, replayed().uses("指导"))
+        assertEquals(1, replayed(disk).uses("指导"))
     }
 
     // review-E-engine S7: U-88 takes the typing, not an English correction the user took back
@@ -208,7 +215,7 @@ class LearningControlTest {
         log.close()
         // a restore (stream D's record) at half an hour on, ten minutes before the clear: the hour's cut is no earlier
         val minute = LearnClock.floorDiv(clock.now(), LearnClock.MINUTE).toInt()
-        file().appendBytes(LearnRecords.encode(LearnRecord.Restored(minute + 30)))
+        file().append().use { it.write(LearnRecords.encode(LearnRecord.Restored(minute + 30))) }
         clock.minutes(40)
         val again = open()
         again.guide()
@@ -289,7 +296,7 @@ class LearningControlTest {
         log.guide()
         log.pin(Code(Kinds.FULL, "dz"), "地址", "di zhi", on = true)
         log.commit(row("wqiy", "你好", kind = Kinds.table("engine-wbx")))
-        val old = dir.newFile("pinyin.user")
+        val old = dir.file("pinyin.user").apply { createNew() }
         val day = log.state.day
         assertTrue(control(log, listOf(old)).clearLearned(all = true))
         assertTrue(log.state.isEmpty())
@@ -366,30 +373,26 @@ class LearningControlTest {
         assertTrue(errors.isEmpty())
     }
 
-    // verify-E F1: the marker not written, the files set aside stay, for the next open to remark them and delete them then
+    // a partial clear (today's) killed with pinyin.user aside: the next open finishes it, a table's
+    // log it never took (not read into the record yet) kept; one a whole clear set aside goes as a whole clear's
     @Test
-    fun aMarkerTheDiskRefusesKeepsTheFilesForTheNextOpen() {
-        val old = Old("pinyin.user:3", listOf("指导"))
-        val log = LearnLog(file(), clock, errors::add).also { it.open(old) }
-        val files = listOf(dir.newFile("pinyin.user"), dir.newFile("user.dict"))
-        old.fingerprint = ""
-        old.words = emptyList()
-        // where the marker is written first: a folder with something in it, which no file replaces
-        val blocker = File(dir.root, LearnLog.MARKER + ".new").apply { mkdir() }
-        File(blocker, "x").createNewFile()
-        assertTrue(control(log, files).clearLearned(all = false))
-        assertTrue(files.all { !it.exists() && File(it.path + ".cleared").exists() })
-        // killed here, never closed
-        blocker.deleteRecursively()
-        val again = LearnLog(file(), clock, errors::add)
-        val control = LearningControl({ again }, clock, legacy = { files }, onError = errors::add)
+    fun aKilledClearIsFinishedAsTheClearItWas() {
+        val pinyin = dir.file("pinyin.user").apply { createNew() }
+        val wubi = dir.file("wubi.user").apply { createNew() }
+        val legacy = { all: Boolean -> if (all) listOf(pinyin, wubi) else listOf(pinyin) }
+        assertTrue(pinyin.renameTo(pinyin.beside(".cleared")))
+        val log = LearnLog(file(), clock, errors::add)
+        val control = LearningControl({ log }, clock, legacy = legacy, onError = errors::add)
         assertTrue(control.resumeDrop())
-        again.open(old, remark = true)
-        assertTrue(again.markedAtOpen)
         control.finishDrop()
-        assertTrue("指导" in again.state.mine)
-        assertTrue(files.none { it.exists() || File(it.path + ".cleared").exists() })
-        again.close()
+        assertFalse(pinyin.exists() || pinyin.beside(".cleared").exists())
+        assertTrue(wubi.exists())
+        // the table's log aside: the whole clear's, pinyin.user with it
+        pinyin.createNew()
+        assertTrue(wubi.renameTo(wubi.beside(".cleared")))
+        assertTrue(control.resumeDrop())
+        control.finishDrop()
+        assertTrue(listOf(pinyin, wubi).none { it.exists() || it.beside(".cleared").exists() })
+        assertTrue(errors.isEmpty())
     }
-
 }

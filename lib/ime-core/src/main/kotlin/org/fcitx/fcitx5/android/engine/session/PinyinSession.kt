@@ -8,9 +8,7 @@ import org.fcitx.fcitx5.android.engine.data.NgramModel.Companion.NO_WORD
 import org.fcitx.fcitx5.android.engine.data.Misreadings
 import org.fcitx.fcitx5.android.engine.data.PinyinData
 import org.fcitx.fcitx5.android.engine.lattice.Candidate
-import org.fcitx.fcitx5.android.engine.learn.Code
 import org.fcitx.fcitx5.android.engine.learn.CommitRows
-import org.fcitx.fcitx5.android.engine.learn.Kinds
 import org.fcitx.fcitx5.android.engine.learn.control.Why
 import org.fcitx.fcitx5.android.engine.learn.HabitRanker
 import org.fcitx.fcitx5.android.engine.learn.HabitRanker.Tier
@@ -34,6 +32,7 @@ import org.fcitx.fcitx5.android.engine.pinyin.Segmenter
 import org.fcitx.fcitx5.android.engine.pinyin.SyllableGraph
 import org.fcitx.fcitx5.android.engine.pinyin.SyllableGraph.Kind
 import org.fcitx.fcitx5.android.engine.pinyin.Syllables
+import org.fcitx.fcitx5.android.engine.platform.jvm.JvmClock
 import org.fcitx.fcitx5.android.engine.rerank.Reranker
 import org.fcitx.fcitx5.android.engine.rerank.SentencePicker
 import org.fcitx.fcitx5.android.engine.rerank.SentenceRefiner
@@ -98,7 +97,10 @@ class PinyinSession(
     prior: LayerPrior? = null,
     /** Offered where their order says when what is left of the input is their key, a place down where a pin leads. */
     private val phraseBook: PhraseBook = PhraseBook(),
-    /** Whether [phraseBook]'s built-in phrases (the date, the time, the weekday) are offered, the setting; never where [spell]. */
+    /**
+     * Whether [phraseBook]'s built-in phrases (the date, the time, the weekday) are offered, the setting:
+     * under their keys where the [segmenter] [spells full pinyin][Segmenter.spellsFullPinyin], their words' (日期) everywhere.
+     */
     private val builtInPhrases: Boolean = true,
     /** The emoji a word stands for ([EmojiCandidates]); none, the setting off. */
     private val emoji: (String) -> List<String> = { emptyList() },
@@ -108,7 +110,7 @@ class PinyinSession(
      */
     private val chaizi: (String) -> List<Pair<String, String>> = { emptyList() },
     /** The time a dynamic phrase is filled in with. */
-    private val now: () -> Calendar = { Calendar.getInstance() },
+    private val now: () -> Calendar = JvmClock::calendar,
     private val refiner: SentenceRefiner? = null,
     /** Keeps a word the user blocked ([Action.Block]), blocked in [user] too; none offered without. */
     private val block: ((Entry) -> Unit)? = null,
@@ -127,6 +129,8 @@ class PinyinSession(
      * again as the user's lists change ([UserModel.listings]); the coarse ones as the session is made.
      */
     private val addedWords: () -> Set<String> = { emptySet() },
+    // the coarse words but [addedWords], a few hundred lookups as the session is made, unless given (Engines' sessions share one: SessionFactory)
+    private val coarse: CoarseWords = CoarseWords.of({ data.wordIndex.find(it) }, CoarseWords.LIST - addedWords()),
     /** How what is learned reaches the scores: [LearningUse.DEFAULT] but to measure the channels' worth (ime-eval). */
     use: LearningUse = LearningUse.DEFAULT,
     /** The learning record a commit is written to (impl/design-1a.md), and how; the candidates are ranked by it. */
@@ -134,10 +138,6 @@ class PinyinSession(
     // last, so a test's picker can follow as a lambda
     private val reranker: SentencePicker? = null,
 ) : Session {
-    init {
-        require(pageSize >= 1) { "page size $pageSize" }
-    }
-
     /** Picked text, its words, where it ends in the input, how its words read (null if some is no word), and as the learning record takes it. */
     private class Piece(val text: String, val words: IntArray, val end: Int, val entries: List<Entry>?, val learned: CommitRows.Pick?)
 
@@ -177,8 +177,6 @@ class PinyinSession(
         val moreWords get() = decoded?.more == true
     }
 
-    // a few hundred lookups: made with each session, as the data's index is
-    private val coarse = CoarseWords.of({ data.wordIndex.find(it) }, CoarseWords.LIST - addedWords())
     private val coarseCandidates = CoarseCandidates(coarse, data, user)
 
     private val decoder = PinyinDecoder(
@@ -187,9 +185,7 @@ class PinyinSession(
         whole = use.whole(data.model, user, prior), uncounted = use.uncounted(data.model, user, prior),
     )
     private val predictor = Predictor(data.model, data.vocabulary, data.dictionary, user, coarse = coarse, charReadings = charReadings)
-    private val predictionOrder = PredictionOrder(predictor) { text -> user?.idsOfText(text)?.firstOrNull() ?: data.wordIndex.find(text) }
-    private var predictedAfter = "" // the word the predictions offered follow: their code
-    private val textWords by lazy { TextWords(data.model, data.wordIndex) }
+    private val textWords = TextWords(data.model, data.wordIndex)
 
     private val input = StringBuilder()
     private var cursor = 0 // where in the input the next key goes
@@ -216,7 +212,9 @@ class PinyinSession(
         NineKeys(data, k.letters, recorder.pressed, k::isKey, k::initialsOf) { digits -> if (learning && recorder.learns) recorder.habits.bar(recorder.takeLayout, digits) else emptyMap() }
     }
     private val habitOrder: HabitOrder = HabitOrder(data, user, recorder, decoder, addedWords)
-    private var page = 0
+    // 联想: what may follow the words committed here ([predict]); its forgetting and blocking are this session's
+    private val predictions = Predictions(predictor, textWords, user, habits = recorder.habits, learning = { learning })
+    private val pager = Pager(pageSize)
     private var predicting = false
 
     override var learning = true
@@ -238,17 +236,16 @@ class PinyinSession(
 
     private fun act(action: Action): Snapshot = when (action) {
         Action.Refine -> refine()
-        Action.Ink, Action.Glide, is Action.NineKey -> snapshot()
+        is Action.Ink, is Action.Glide, is Action.Stroke, is Action.NineKey, Action.LookUp -> snapshot()
         is Action.Key -> type(action.char, action.glided, action.at)
         is Action.Letter -> letter(action.letter, action.again, glided = action.glided)
         Action.Backspace -> backspace()
-        // nothing to pick past the page: the key (space, a digit) is the app's
-        is Action.Select -> if (action.index in 0 until pageSize) pick(page * pageSize + action.index) else snapshot(handled = candidates.isNotEmpty())
+        is Action.Select -> select(action.index)
         is Action.Pick -> pick(action.index)
         is Action.Syllable -> takeSyllable(action.index, action.of)
         is Action.Forget, is Action.Pin, is Action.Unpin, is Action.Block -> pressed(action)
-        Action.NextPage -> turn(page + 1)
-        Action.PreviousPage -> turn(page - 1)
+        Action.NextPage -> turn(pager.page + 1)
+        Action.PreviousPage -> turn(pager.page - 1)
         Action.CommitRaw -> commitRaw()
         Action.Reset -> {
             // the input method left, the field went, a panel or another input method writes: what is
@@ -328,7 +325,7 @@ class PinyinSession(
     }
 
     private fun type(c: Char, glided: Boolean = false, at: Float = Float.NaN): Snapshot {
-        if (!reads(c) || !segmenter.readsAfter(input.substring(readFrom(), cursor), c)) return leave()
+        if (endsInput(c)) return leave()
         // on the nine keys 1 is 分词
         insert((if (c == NINE_KEYS_SEPARATOR && nineKeys?.oneSeparates == true) SyllableGraph.SEPARATOR else c).toString(), glided, at)
         read()
@@ -396,6 +393,8 @@ class PinyinSession(
         return snapshot()
     }
 
+    override fun endsInput(c: Char): Boolean = !reads(c) || !segmenter.readsAfter(input.substring(readFrom(), cursor), c)
+
     override fun reads(c: Char): Boolean =
         segmenter.reads(c) || (c == SyllableGraph.SEPARATOR || c == NINE_KEYS_SEPARATOR && nineKeys?.oneSeparates == true) && input.isNotEmpty()
 
@@ -422,8 +421,10 @@ class PinyinSession(
 
     /**
      * A word often read wrongly ([PinyinData.misreadings]) typed by a misreading: the reading,
-     * with its tones (般若 typed banruo: bō rě). Not for 简拼 or a syllable half typed, which
-     * are no misreading; nor for 双拼, whose keys are no reading to compare.
+     * with its tones (般若 typed banruo: bō rě). Each syllable may be typed by its start, the last
+     * ones not at all (xxxuez, xinxinxue: 莘莘学子 shēn shēn xué zǐ), but the typed letters must not
+     * fit the reading too: shu claims no misreading for 说服. Only labels what is offered: it ranks
+     * nothing. 双拼's keys are no reading to compare.
      */
     private fun hint(c: Candidate): String {
         if (spell || predicting) return ""
@@ -464,7 +465,7 @@ class PinyinSession(
     override fun why(index: Int): Why? {
         val c = candidates.getOrNull(index) ?: return null
         val r = lastRead.ranks[c]
-        if (predicting) return Why(r?.tier, r?.uses ?: 0, Code(Kinds.PREDICTION, predictedAfter))
+        if (predicting) return predictions.why(index)
         r ?: return null
         return Why(r.tier, r.uses, lastRead.decoded?.levels?.firstOrNull { it.end == c.end }?.code)
     }
@@ -486,14 +487,16 @@ class PinyinSession(
         val c = candidates.getOrNull(index) ?: return emptySet()
         if (predicting) return predictionOffers(c)
         val phrase = lastRead.placed[c.text]?.takeIf { NO_WORD in c.words }
-        return buildSet {
-            if (forgettable(c)) add(Offer.FORGET)
-            // a word pinned is unpinned, any other word may be (U-83); a phrase is the settings' (custom phrases)
-            if (pinnable(c)) add(if (pinnedHere(c) != null) Offer.UNPIN else Offer.PIN)
-            // but deleted from them here, as v0.3.0 did (从自定义词组中删除, docs/words.md; UAT PY-49)
-            if (phrase != null) add(Offer.DELETE_PHRASE)
-            if (phrase == null && blockable(c)) add(Offer.BLOCK)
-        }
+        // a word pinned is unpinned, any other word may be (U-83); a phrase is the settings' (custom
+        // phrases), but deleted from them here, as v0.3.0 did (从自定义词组中删除, docs/words.md; UAT PY-49)
+        return OfferRules.offers(
+            learning,
+            forgets = { forgettable(c) },
+            pins = { pinnable(c) },
+            pinned = { pinnedHere(c) != null },
+            blocks = { blockable(c) },
+            phrase = phrase != null,
+        )
     }
 
     // phrases hold nothing to forget, nor a text nothing was learned of (PY-33); text kept as typed
@@ -508,10 +511,7 @@ class PinyinSession(
         val word = c.words.singleOrNull()
         if (!learning) return emptySet()
         if (user == null || word == null || entries(c) == null) return emptySet()
-        return buildSet {
-            if (recorder.habits.knows(c.text)) add(Offer.FORGET)
-            if (block != null) add(Offer.BLOCK)
-        }
+        return OfferRules.offers(learning, forgets = { recorder.habits.knows(c.text) }, blocks = { block != null })
     }
 
     /**
@@ -577,14 +577,14 @@ class PinyinSession(
         if (predicting) {
             lastRead = predict()
             predicting = candidates.isNotEmpty()
-            page = 0
+            pager.reset()
             return snapshot()
         }
-        val shown = page
+        val shown = pager.page
         read()
         // a page past the words read at first: read on to it, as turning to it did
         readUntil((shown + 1) * pageSize + 1)
-        if (shown * pageSize < candidates.size) page = shown
+        pager.keep(shown, candidates.size)
         return snapshot()
     }
 
@@ -607,7 +607,7 @@ class PinyinSession(
      * A prediction read no input: its likeliest reading.
      */
     private fun entries(c: Candidate): List<Entry>? {
-        if (predicting) return c.words.singleOrNull()?.let { w -> predictor.reading(w)?.let { listOf(Entry(c.text, it)) } }
+        if (predicting) return predictions.entryOf(c)?.let(::listOf)
         val graph = lastRead.decoded?.graph ?: return null
         var from = graph.start
         return c.words.indices.map { i ->
@@ -631,7 +631,7 @@ class PinyinSession(
     /** Learns [c], a prediction picked, after the word it follows: how it reads (what follows it is offered after its end), or null. */
     private fun learnPrediction(c: Candidate): Entry? {
         if (!learning) return null
-        recorder.prediction(c.text, predictedAfter, candidates.firstOrNull()?.text.orEmpty())
+        recorder.prediction(c.text, predictions.after, candidates.firstOrNull()?.text.orEmpty())
         return if (user == null) null else entries(c)?.singleOrNull()
     }
 
@@ -672,11 +672,12 @@ class PinyinSession(
      */
     fun heldBack(word: String, reading: String, first: () -> String) = if (learning && recorder.learns && reading.isNotEmpty()) recorder.heldBack(Word(word, reading), first()) else Unit
 
+    // nothing to pick past the page: the key (space, a digit) is the app's
+    private fun select(onPage: Int): Snapshot = pager.at(onPage).let { if (it >= 0) pick(it) else snapshot(handled = candidates.isNotEmpty()) }
+
     private fun turn(to: Int): Snapshot {
         readUntil((to + 1) * pageSize + 1)
-        if (to < 0 || to * pageSize >= candidates.size) return snapshot(handled = candidates.isNotEmpty())
-        page = to
-        return snapshot()
+        return if (pager.turn(to, candidates.size)) snapshot() else snapshot(handled = candidates.isNotEmpty())
     }
 
     /**
@@ -695,7 +696,8 @@ class PinyinSession(
         return snapshot(commit = picked + rest, handled = false)
     }
 
-    private fun commitRaw(): Snapshot {
+    // a table's lookup turned off ([keysBack], Session.handBack): the pieces alone put in, learned as their pick, the rest handed back
+    private fun commitRaw(keysBack: Boolean = false): Snapshot {
         if (input.isEmpty()) {
             clear()
             return snapshot(handled = false)
@@ -705,14 +707,22 @@ class PinyinSession(
         val shown = lastRead.restShown.filter { it != ' ' && it != SyllableGraph.SEPARATOR }
         // a letter typed as itself (九键) is upper case in the input; no other input has one
         val rest = if (nineKeys == null || shown.isEmpty()) asTyped(input.substring(readFrom())) else shown
-        val text = pieces.joinToString("") { it.text } + rest
-        record(CommitRows.Pick(readFrom(), listOf(Word(rest, "")), intArrayOf(input.length), 'F', "", null))
+        val text = pieces.joinToString("") { it.text } + if (keysBack) "" else rest
+        record(CommitRows.Pick(readFrom(), listOf(Word(rest, "")), intArrayOf(input.length), 'F', "", null).takeUnless { keysBack })
         // text as typed is no words: nothing to go on from
         dropContext()
         // but for the word before what is learned: letters as typed (U-52), which end with the text's
         recorder.committed(text, learning)
         clear()
         return snapshot(commit = text)
+    }
+
+    // nothing picked, nothing put in: the text before is as it was
+    override fun handBack(): HandedBack {
+        val keys = asTyped(input.substring(readFrom()))
+        if (pieces.isNotEmpty()) return HandedBack(commitRaw(keysBack = true).commit, lastCommit, keys)
+        clear()
+        return HandedBack("", null, keys)
     }
 
     private fun commit(text: String, words: IntArray): Snapshot {
@@ -740,7 +750,7 @@ class PinyinSession(
      */
     private fun predict(): Read {
         // a search field: no 联想 (U-91)
-        if (recorder.learnFlags and Commit.NO_PREDICT != 0) return Read()
+        if (recorder.learnFlags and Commit.NO_PREDICT != 0) return Read().also { predictions.unoffer() }
         val (prev2, prev) = TextWords.previous(context)
         val last = lastEntry
         val tail = { last?.let { predictor.tail(it.text, it.syllables) } ?: NO_WORD }
@@ -748,16 +758,15 @@ class PinyinSession(
         // a word of the model's the decoder read in pieces (好的 as 好 的): the tail finds it, as it ends with it
         val own = if (prev == NO_WORD || data.wordIndex.find(learned) != NO_WORD) NO_WORD else ownWord(user, text(prev), learned)
         // after the user's own word, what follows the decoder's word it ends with
-        val offer = if (own == NO_WORD) {
+        if (own == NO_WORD) {
             // what was put in after it is counted after that word, as the record has its text (原 UAT PY-71)
             val decoded = if (prev == NO_WORD) "" else text(prev)
             val whole = if (decoded.isEmpty() || learned.length <= decoded.length || !learned.endsWith(decoded)) NO_WORD else data.wordIndex.find(learned)
-            predictionOrder.offer(recorder.habits, prev2, prev, if (whole == NO_WORD) prev else whole, tail)
+            predictions.offer(prev2, prev, if (whole == NO_WORD) prev else whole, tail)
         } else {
-            predictionOrder.offer(recorder.habits, NO_WORD, own, tail = { if (prev < data.vocabulary.size) prev else tail() })
+            predictions.offer(NO_WORD, own, tail = { if (prev < data.vocabulary.size) prev else tail() })
         }
-        predictedAfter = offer.after
-        return Read(candidates = offer.candidates, ranks = offer.ranks)
+        return Read(candidates = predictions.offered)
     }
 
     // a key the app took (an arrow, Enter, Escape) moved the cursor or changed the text before it,
@@ -787,7 +796,7 @@ class PinyinSession(
         nineKeys?.clear()
         recorder.clear()
         pieces.clear()
-        page = 0
+        pager.reset()
         predicting = false
     }
 
@@ -796,7 +805,7 @@ class PinyinSession(
     /** Reads the input after the pieces picked. */
     private fun read() {
         predicting = false
-        page = 0
+        pager.reset()
         cursor = cursor.coerceIn(readFrom(), input.length)
         if (input.isEmpty()) {
             lastRead = Read()
@@ -836,11 +845,11 @@ class PinyinSession(
     private fun place(decoded: Decoded, time: Calendar? = null) {
         val rest = input.length - readFrom()
         val key = input.substring(readFrom())
-        // the built-in ones for full pinyin only: 双拼's sj, xq spell syllables
-        val phrases = phraseBook.offered(builtIns = !spell && builtInPhrases)
+        // the built-in ones under their keys on full pinyin's keyboards only: 双拼's sj, xq spell syllables
+        val (phrases, keys) = phraseBook.typed(key, builtIns = segmenter.spellsFullPinyin && builtInPhrases, keyed?.letters) { keyed?.takenAs(it).orEmpty() }
         // the time asked once, for what is shown and what is kept of it to agree
-        val time = time ?: if (key in phrases) now() else null
-        val placed: Map<String, Phrase> = if (time == null) emptyMap() else phrases.offered(key, time).associate { it.text to it.phrase }
+        val time = time ?: if (keys.isNotEmpty()) now() else null
+        val placed: Map<String, Phrase> = if (time == null) emptyMap() else phrases.offered(keys, time).associate { it.text to it.phrase }
         // a phrase is text, no word: nothing to learn, and what follows it reads after nothing; so are
         // the emoji and the characters by their parts, placed before the phrases so each is where its order says
         val asText = { text: String -> Candidate(text, rest, 0f, intArrayOf(NO_WORD), intArrayOf(rest)) }
@@ -850,7 +859,7 @@ class PinyinSession(
         val withPhrases = { list: List<Candidate> ->
             val pin = ordered.pinned?.takeIf { list.firstOrNull() === it }
             val unpinned = if (pin == null) list else list.drop(1)
-            val placed = phrases.place(key, { checkNotNull(time) }, unpinned, text = { it.text }, all = { it.end == rest }) { asText(it) }
+            val placed = phrases.place(keys, { checkNotNull(time) }, unpinned, text = { it.text }, all = { it.end == rest }) { asText(it) }
             // a phrase of the pin's text is the pin, shown once (an older build's, both kept: review-1b M2)
             listOfNotNull(pin) + if (pin == null) placed else placed.filter { it.text != pin.text }
         }
@@ -914,21 +923,20 @@ class PinyinSession(
     }
 
     private fun snapshot(commit: String = "", handled: Boolean = true): Snapshot {
-        val from = page * pageSize
-        val shown = candidates.subList(minOf(from, candidates.size), minOf(from + pageSize, candidates.size))
+        val shown = pager.of(candidates)
         return Snapshot(
             commit = commit,
             preedit = lastRead.preedit,
             candidates = shown.map { it.text },
-            page = page,
-            hasPreviousPage = page > 0,
-            hasNextPage = from + pageSize < candidates.size || lastRead.moreWords,
+            page = pager.page,
+            hasPreviousPage = pager.hasPrevious,
+            hasNextPage = pager.hasNext(candidates.size) || lastRead.moreWords,
             handled = handled,
             predicting = predicting,
             hints = shown.map(::hint).takeIf { h -> h.any { it.isNotEmpty() } }.orEmpty(),
             // not counted while the decoder has words not yet read
             total = if (lastRead.moreWords) -1 else candidates.size,
-            first = from,
+            first = pager.from,
             // a prediction too: what was learned of it may be forgotten (see predictionOffers)
             actionable = candidates.isNotEmpty(),
             refines = unrefined != null,
@@ -1008,11 +1016,12 @@ class PinyinSession(
          * the large model, a few milliseconds on a phone. A key pressed meanwhile waits for it.
          */
         const val REFINE_BUDGET = 1
-        // as much of the host's text as makes it the end of what was committed, not a word that
-        // happens to be: as long as the text the context is read from
-        private const val OVERLAP = 24
     }
 }
+
+// as much of the host's text as makes it the end of what was committed, not a word that
+// happens to be: as long as the text the context is read from
+private const val OVERLAP = 24
 
 // the text committed that the reranker reads before the input: well over what it has room
 // for (39 tokens), so a commit drops only text it no longer reads, and it goes on from what
@@ -1039,10 +1048,34 @@ fun endsOnSyllable(graph: SyllableGraph): Boolean {
 }
 
 // [c] read on to [end] as typed: a word of the start of the input, shown for all of it
-// [text]'s reading, if [typed] is one of its misreadings ([PinyinData.misreadings]); else ""
+// [text]'s reading, if [typed] fits one of its misreadings ([PinyinData.misreadings]) and not the
+// reading itself; else ""
 private fun misreading(data: PinyinData, text: String, typed: String): String {
     val word = data.misreadings[text] ?: return ""
-    return if (word.misread.any { it.replace("'", "") == typed }) word.reading else ""
+    if (typed.isEmpty() || fits(word.typed, typed)) return ""
+    return if (word.misread.any { fits(it, typed) }) word.reading else ""
+}
+
+// Whether [typed] is [spelling]'s syllables (split on ') in order, each by a non-empty start of it,
+// covering all of [typed]; the syllables after may be untyped: x'x'xue'z fits xin'xin'xue'zi.
+private fun fits(spelling: String, typed: String): Boolean {
+    val syllables = spelling.split('\'')
+    // reached[i]: typed's first i letters are the syllables so far
+    var reached = BooleanArray(typed.length + 1).also { it[0] = true }
+    for (syllable in syllables) {
+        if (reached[typed.length]) return true
+        val next = BooleanArray(typed.length + 1)
+        for (i in typed.indices) {
+            if (!reached[i]) continue
+            var n = 0
+            while (n < syllable.length && i + n < typed.length && typed[i + n] == syllable[n]) {
+                n++
+                next[i + n] = true
+            }
+        }
+        reached = next
+    }
+    return reached[typed.length]
 }
 
 private fun throughEnd(c: Candidate, end: Int) = if (c.end >= end) c else Candidate(c.text, end, c.score, c.words + NO_WORD, c.ends + end)

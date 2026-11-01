@@ -28,14 +28,15 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import org.fcitx.fcitx5.android.R
-import org.fcitx.fcitx5.android.core.FcitxAPI
-import org.fcitx.fcitx5.android.core.FcitxEvent
+import org.fcitx.fcitx5.android.core.HostApi
 import org.fcitx.fcitx5.android.core.InputMethodEntry
 import org.fcitx.fcitx5.android.core.InputMethodNames
 import org.fcitx.fcitx5.android.core.SubtypeManager
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
-import org.fcitx.fcitx5.android.daemon.FcitxDaemon
-import org.fcitx.fcitx5.android.engine.host.Engines
+import org.fcitx.fcitx5.android.data.prefs.PinyinKeyboard
+import org.fcitx.fcitx5.android.daemon.HostDaemon
+import org.fcitx.fcitx5.android.engine.InputMethodCatalog
+import org.fcitx.fcitx5.android.host.HostEvent
 import org.fcitx.fcitx5.android.input.keyboard.T9MultiTap
 import org.fcitx.fcitx5.android.utils.inputMethodManager
 import org.junit.After
@@ -65,10 +66,19 @@ class SoftKeyboardTest {
 
     private lateinit var scenario: ActivityScenario<TypingHostActivity>
 
+    // pinyin's keyboard before a nine keys' case chose the nine keys (launch)
+    private var pinyinKeyboardWas: PinyinKeyboard? = null
+
     /** Descriptions come from the app's strings, so the tests run in any device language. */
     private fun string(id: Int, vararg args: Any): String = context.getString(id, *args)
 
-    private fun launch(action: Int? = null, inputMethod: String) {
+    private fun launch(action: Int? = null, inputMethod: String, nineKeys: Boolean = false) {
+        // pinyin's nine keys are its keyboard (I1), chosen before the keyboard is made; put back in tearDown
+        if (nineKeys) {
+            val keyboard = AppPrefs.getInstance().keyboard.pinyinKeyboard
+            if (pinyinKeyboardWas == null) pinyinKeyboardWas = keyboard.getValue()
+            keyboard.setValue(PinyinKeyboard.NineKeys)
+        }
         // lives in the debug app (see app/src/debug), next to the input method
         val intent = Intent(context, TypingHostActivity::class.java)
         action?.let { intent.putExtra(TypingHostActivity.EXTRA_ACTION, it) }
@@ -108,6 +118,7 @@ class SoftKeyboardTest {
     @After
     fun close() {
         if (::scenario.isInitialized) scenario.close()
+        pinyinKeyboardWas?.let { AppPrefs.getInstance().keyboard.pinyinKeyboard.setValue(it) }
     }
 
     private fun key(selector: BySelector): UiObject2 =
@@ -169,7 +180,7 @@ class SoftKeyboardTest {
         val before = multiTap.getValue()
         multiTap.setValue(T9MultiTap.Medium)
         try {
-            launch(inputMethod = Engines.T9)
+            launch(inputMethod = InputMethodCatalog.PINYIN, nineKeys = true)
             pressOneTwiceSoon()
             assertFieldBecomes("。")
             key(onKeyboard().text("ABC")).click()
@@ -189,7 +200,7 @@ class SoftKeyboardTest {
         // at its slowest, 0.9 s: the most room for the editor's report of ， before the second press
         multiTap.setValue(T9MultiTap.Slow)
         try {
-            launch(action = EditorInfo.IME_ACTION_DONE or EditorInfo.IME_FLAG_NO_PERSONALIZED_LEARNING, inputMethod = Engines.T9)
+            launch(action = EditorInfo.IME_ACTION_DONE or EditorInfo.IME_FLAG_NO_PERSONALIZED_LEARNING, inputMethod = InputMethodCatalog.PINYIN, nineKeys = true)
             val one = oneKey()
             val first = press(one)
             // again once the editor's report of ， is handled, as at a person's pace (before it, ，。 goes in:
@@ -313,14 +324,14 @@ class SoftKeyboardTest {
         val deadline = SystemClock.uptimeMillis() + 5_000
         while (systemIme() != ENGLISH && SystemClock.uptimeMillis() < deadline) SystemClock.sleep(50)
         assertEquals("the system's subtype after the launch", ENGLISH, systemIme())
-        // back to back from one block (each activateIme its own hop to fcitx): all three IMChangeEvents
+        // back to back from one block (each activateIme its own hop to fcitx): all three HostEvent.InputMethodChanged events
         // most likely reach the service before the first's echo is back, as on the emulator
         val changes = withFcitx {
             val seen = CopyOnWriteArrayList<String>()
             coroutineScope {
                 // in the emitting thread: eventFlow drops its oldest event past 15 buffered
                 val collecting = launch(Dispatchers.Unconfined, CoroutineStart.UNDISPATCHED) {
-                    eventFlow.filterIsInstance<FcitxEvent.IMChangeEvent>().collect { seen += it.data.uniqueName }
+                    eventFlow.filterIsInstance<HostEvent.InputMethodChanged>().collect { seen += it.im }
                 }
                 activateIme(PINYIN)
                 activateIme(ENGLISH)
@@ -335,7 +346,7 @@ class SoftKeyboardTest {
             seen.toList()
         }
         // a single slot holds the last switch (Shuangpin), so the earlier switches' echoes read as the user's picks and switch fcitx back
-        // from the third switch on only its sub-modes' changes, which repeat the input method (Fcitx.handleFcitxEvent)
+        // from the third switch on only its sub-modes' changes, which repeat the input method (KotlinHost.emit)
         assertEquals("input methods from the third switch on, of $changes", listOf(SHUANGPIN), changes.dropWhile { it != SHUANGPIN }.distinct())
         assertEquals("the input method switched to last", SHUANGPIN, withFcitx { currentIme().uniqueName })
         assertEquals("the system's subtype", SHUANGPIN, systemIme())
@@ -506,8 +517,8 @@ class SoftKeyboardTest {
     }
 
     private companion object {
-        const val PINYIN = Engines.PINYIN
-        const val SHUANGPIN = Engines.SHUANGPIN
+        const val PINYIN = InputMethodCatalog.PINYIN
+        const val SHUANGPIN = InputMethodCatalog.SHUANGPIN
         const val ENGLISH = "keyboard-us"
 
         // allowed for an injected press's way to the keyboard, which counts 连按 from when it gets there
@@ -529,10 +540,10 @@ class SoftKeyboardTest {
 
         fun shell(command: String): String = device.executeShellCommand(command).trim()
 
-        fun <T> withFcitx(block: suspend FcitxAPI.() -> T): T = try {
-            runBlocking { withTimeout(30_000) { FcitxDaemon.connect(SoftKeyboardTest::class.java.name).runOnReady(block) } }
+        fun <T> withFcitx(block: suspend HostApi.() -> T): T = try {
+            runBlocking { withTimeout(30_000) { HostDaemon.connect(SoftKeyboardTest::class.java.name).runOnReady(block) } }
         } finally {
-            FcitxDaemon.disconnect(SoftKeyboardTest::class.java.name)
+            HostDaemon.disconnect(SoftKeyboardTest::class.java.name)
         }
 
         @BeforeClass
@@ -553,10 +564,10 @@ class SoftKeyboardTest {
         /**
          * Leaves the device as it was: a developer's own keyboard back, and this input method
          * no longer bound in this process, where it would share the native engine with the next
-         * test class (FcitxTest starts one of its own).
+         * test class (HostTest starts one of its own).
          *
          * On a device whose keyboard is this app already, it is left selected -- and bound here,
-         * where FcitxTest then refuses to start an engine of its own (checkThisInputMethodIsNotBound).
+         * where HostTest then refuses to start an engine of its own (checkThisInputMethodIsNotBound).
          */
         @AfterClass
         @JvmStatic
@@ -583,7 +594,7 @@ class SoftKeyboardTest {
                 }
                 if (!wasEnabled) shell("ime disable $imeId")
                 // The system unbinds the service asynchronously; its onDestroy stops the engine
-                // (FcitxDaemon.disconnect -> Fcitx.stop, which blocks until stopped).
+                // (HostDaemon.disconnect -> KotlinHost.stop, which blocks until stopped).
                 val deadline = SystemClock.uptimeMillis() + 10_000
                 while (FcitxInputMethodService::class.java.name in shell("dumpsys activity services $imePkg") &&
                     SystemClock.uptimeMillis() < deadline

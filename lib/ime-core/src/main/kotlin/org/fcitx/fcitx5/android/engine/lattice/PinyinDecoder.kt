@@ -14,6 +14,7 @@ import org.fcitx.fcitx5.android.engine.pinyin.SyllableGraph
 import org.fcitx.fcitx5.android.engine.pinyin.SyllableGraph.Kind
 import org.fcitx.fcitx5.android.engine.pinyin.SyllableMatches
 import org.fcitx.fcitx5.android.engine.pinyin.Syllables
+import java.util.function.IntPredicate
 
 /**
  * Reads a [SyllableGraph] as Chinese. Every dictionary word along every path of the graph
@@ -87,6 +88,9 @@ class PinyinDecoder(
     // what the beams hold now came from these, or from nothing if lastEnd is -1
     private var lastArcs = Lattice()
     private var lastEnd = -1
+
+    // the words a pass over the arcs has taken, each once ([startWords], [arcsBetween], [rankedWords])
+    private val seen = SeenWords()
     private var lastStart = 0
     private var lastPrev2 = NO_WORD
     private var lastPrev = NO_WORD
@@ -294,14 +298,14 @@ class PinyinDecoder(
      * once, as candidates scored by their arcs' costs alone: those a list may lack that the user
      * has (impl/design-1b.md §1, injection). Every word from the start is an arc, with no limit.
      */
-    fun startWords(graph: SyllableGraph, to: Int, take: (Int) -> Boolean): List<Candidate> {
+    fun startWords(graph: SyllableGraph, to: Int, take: IntPredicate): List<Candidate> {
         if (lastEnd != graph.end || lastStart != graph.start) return emptyList()
         val out = ArrayList<Candidate>()
-        val seen = HashSet<Int>()
+        seen.clear()
         for (a in arcs.start[graph.start] until arcs.start[graph.start + 1]) {
             val word = arcs.word[a]
             if (arcs.to[a] != to || word == NO_WORD) continue
-            if (take(word) && seen.add(word)) out += Candidate(text(word), to, arcs.cost[a], intArrayOf(word), intArrayOf(to))
+            if (take.test(word) && seen.add(word)) out += Candidate(text(word), to, arcs.cost[a], intArrayOf(word), intArrayOf(to))
         }
         return out
     }
@@ -322,7 +326,7 @@ class PinyinDecoder(
     fun arcsBetween(graph: SyllableGraph, from: Int, to: Int): List<Candidate> {
         if (from !in graph.start until graph.end || lastEnd != graph.end || lastStart != graph.start) return emptyList()
         val out = ArrayList<Candidate>()
-        val seen = HashSet<Int>()
+        seen.clear()
         for (a in arcs.start[from] until arcs.start[from + 1]) {
             val word = arcs.word[a]
             if (arcs.to[a] == to && word != NO_WORD && seen.add(word)) out += Candidate(text(word), to - from, arcs.cost[a], intArrayOf(word), intArrayOf(to))
@@ -602,7 +606,7 @@ class PinyinDecoder(
         val from = arcs.start[graph.start]
         var next = 0
         val out = ArrayList<Candidate>()
-        val seen = HashSet<Int>()
+        seen.clear()
         while (out.size < limit && next < firstRanked.size) {
             val a = firstRanked[next++].toInt()
             val word = arcs.word[a]

@@ -5,7 +5,7 @@
 package org.fcitx.fcitx5.android.uat
 
 import org.fcitx.fcitx5.android.Uat
-import org.fcitx.fcitx5.android.engine.host.Engines
+import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -18,8 +18,8 @@ class OtherInputMethodsUatTest {
 
     @Test
     @Uat("T9-02")
-    fun nineKeysDigitsGiveASentence() = with(EngineReplay(im = Engines.T9)) {
-        type("64426")
+    fun nineKeysDigitsGiveASentence() = with(EngineReplay(im = InputMethodCatalog.PINYIN)) {
+        type(EngineReplay.nineKeys("64426"))
         expectFirst("你好")
         space()
         expectText("你好")
@@ -27,8 +27,8 @@ class OtherInputMethodsUatTest {
 
     @Test
     @Uat("T9-03")
-    fun nineKeysTheSyllableColumnSettlesASyllable() = with(EngineReplay(im = Engines.T9)) {
-        type("64")
+    fun nineKeysTheSyllableColumnSettlesASyllable() = with(EngineReplay(im = InputMethodCatalog.PINYIN)) {
+        type(EngineReplay.nineKeys("64"))
         val column = panel.syllables
         assertTrue("column $column", listOf("ni", "mi", "o").all { it in column })
         syllable("mi")
@@ -39,7 +39,7 @@ class OtherInputMethodsUatTest {
 
     @Test
     @Uat("SP-01")
-    fun shuangpinZiranmaByDefault() = with(EngineReplay(im = Engines.SHUANGPIN)) {
+    fun shuangpinZiranma() = with(EngineReplay(im = InputMethodCatalog.SHUANGPIN)) {
         type("nihk")
         space()
         expectText("你好")
@@ -47,7 +47,7 @@ class OtherInputMethodsUatTest {
 
     @Test
     @Uat("EN-01")
-    fun englishTheWordTypedIsFirst() = with(EngineReplay(im = Engines.ENGLISH)) {
+    fun englishTheWordTypedIsFirst() = with(EngineReplay(im = InputMethodCatalog.ENGLISH)) {
         type("hello")
         expectFirst("hello")
         assertTrue("nothing beside hello: $candidates", candidates.size > 1)
@@ -55,7 +55,7 @@ class OtherInputMethodsUatTest {
 
     @Test
     @Uat("EN-02")
-    fun englishSpaceCorrectsAMisspellingASpaceAfterIt() = with(EngineReplay(im = Engines.ENGLISH)) {
+    fun englishSpaceCorrectsAMisspellingASpaceAfterIt() = with(EngineReplay(im = InputMethodCatalog.ENGLISH)) {
         type("teh")
         expectStart("the", "teh")
         space()
@@ -64,7 +64,7 @@ class OtherInputMethodsUatTest {
 
     @Test
     @Uat("EN-04")
-    fun englishBackspaceRightAfterACorrectionUndoesItForGoodUntilRestored() = with(EngineReplay(im = Engines.ENGLISH)) {
+    fun englishBackspaceRightAfterACorrectionUndoesItForGoodUntilRestored() = with(EngineReplay(im = InputMethodCatalog.ENGLISH)) {
         type("teh")
         space()
         expectText("the ")
@@ -87,7 +87,7 @@ class OtherInputMethodsUatTest {
 
     @Test
     @Uat("TBL-01")
-    fun wubiFirstLevelShortCodes() = with(EngineReplay(im = Engines.WUBI)) {
+    fun wubiFirstLevelShortCodes() = with(EngineReplay(im = InputMethodCatalog.WUBI)) {
         type("q")
         space()
         type("w")
@@ -97,7 +97,7 @@ class OtherInputMethodsUatTest {
 
     @Test
     @Uat("TBL-02")
-    fun wubiFourCodesWithOneCharacterCommitIt() = with(EngineReplay(im = Engines.WUBI)) {
+    fun wubiFourCodesWithOneCharacterCommitIt() = with(EngineReplay(im = InputMethodCatalog.WUBI)) {
         type("ftjb")
         expectText("都")
         expectPreedit("")
@@ -105,7 +105,7 @@ class OtherInputMethodsUatTest {
 
     @Test
     @Uat("TBL-10")
-    fun wubiAWord() = with(EngineReplay(im = Engines.WUBI)) {
+    fun wubiAWord() = with(EngineReplay(im = InputMethodCatalog.WUBI)) {
         type("khlg")
         // a word's four codes are not committed at the fourth (other words share them): first, the code shown
         expectText("")

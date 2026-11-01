@@ -5,27 +5,24 @@
 package org.fcitx.fcitx5.android.engine.learn
 
 import org.fcitx.fcitx5.android.engine.learn.ImportedWords.Incoming
-import org.fcitx.fcitx5.android.engine.learn.backup.LearnBackup
 import org.fcitx.fcitx5.android.engine.learn.LearnRecord.ImportBatch
 import org.fcitx.fcitx5.android.engine.learn.LearnRecord.ImportUndo
 import org.fcitx.fcitx5.android.engine.learn.LearnRecord.Imported
+import org.fcitx.fcitx5.android.engine.learn.backup.LearnBackup
+import org.fcitx.fcitx5.android.engine.platform.MemoryFiles
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
-import org.junit.Rule
 import org.junit.Test
-import org.junit.rules.TemporaryFolder
 import java.io.ByteArrayOutputStream
-import java.io.File
 
 /** The imported words in the learning record (U-101, U-102): batches written, replayed, folded, undone. */
 class ImportedWordsTest {
-    @get:Rule
-    val dir = TemporaryFolder()
+    private val dir = MemoryFiles()
 
     private val clock = FakeClock()
 
-    private fun file() = File(dir.root, LearnLog.FILE)
+    private fun file() = dir.file(LearnLog.FILE)
 
     private fun open() = LearnLog(file(), clock, compactAt = 1L shl 30, foldDaily = false).also { it.open() }
 
@@ -67,7 +64,7 @@ class ImportedWordsTest {
         log.record(listOf(row("ni", "你", "ni")))
         val live = log.state.dump()
         log.close()
-        val bytes = file().readBytes()
+        val bytes = file().read()
         assertEquals(live, LearnLog.replay(bytes).dump())
         val out = ByteArrayOutputStream()
         assertTrue(LearnLog.fold(bytes, LearnClock.cut(clock) + LearnClock.DAY_MINUTES, out))
@@ -163,7 +160,7 @@ class ImportedWordsTest {
         later.forEach { it.run() }
         val live = log.state.dump()
         log.close()
-        assertEquals(live, LearnLog.replay(file().readBytes()).dump())
+        assertEquals(live, LearnLog.replay(file().read()).dump())
         assertTrue(live.contains("text=鲸喵") && live.contains("text=汪小明"))
     }
 
@@ -175,7 +172,7 @@ class ImportedWordsTest {
         val live = log.state.dump()
         log.close()
         val out = ByteArrayOutputStream()
-        assertTrue(LearnLog.fold(file().readBytes(), LearnClock.cut(clock), out))
+        assertTrue(LearnLog.fold(file().read(), LearnClock.cut(clock), out))
         assertEquals(live, LearnLog.replay(out.toByteArray()).dump())
         assertTrue(live.contains("ImportedRow(batch=1, order=0, text=鲸园, reading=jing yuan)"))
     }
@@ -229,6 +226,6 @@ class ImportedWordsTest {
         check(firstLive = true)
         val live = log.state.dump()
         log.close()
-        assertEquals(live, LearnLog.replay(file().readBytes()).dump())
+        assertEquals(live, LearnLog.replay(file().read()).dump())
     }
 }

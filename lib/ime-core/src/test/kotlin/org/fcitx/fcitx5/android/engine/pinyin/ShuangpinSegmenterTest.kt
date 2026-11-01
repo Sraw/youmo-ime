@@ -4,13 +4,8 @@
  */
 package org.fcitx.fcitx5.android.engine.pinyin
 
-import org.fcitx.fcitx5.android.engine.pinyin.ShuangpinScheme.Companion.ABC
-import org.fcitx.fcitx5.android.engine.pinyin.ShuangpinScheme.Companion.GB
 import org.fcitx.fcitx5.android.engine.pinyin.ShuangpinScheme.Companion.MICROSOFT
-import org.fcitx.fcitx5.android.engine.pinyin.ShuangpinScheme.Companion.PINYINJIAJIA
 import org.fcitx.fcitx5.android.engine.pinyin.ShuangpinScheme.Companion.XIAOHE
-import org.fcitx.fcitx5.android.engine.pinyin.ShuangpinScheme.Companion.ZHONGWENZHIXING
-import org.fcitx.fcitx5.android.engine.pinyin.ShuangpinScheme.Companion.ZIGUANG
 import org.fcitx.fcitx5.android.engine.pinyin.ShuangpinScheme.Companion.ZIRANMA
 import org.fcitx.fcitx5.android.engine.pinyin.SyllableGraph.Kind
 import org.fcitx.fcitx5.android.engine.pinyin.SyllableMatches.Companion.COMPLETION
@@ -57,7 +52,7 @@ class ShuangpinSegmenterTest {
 
     @Test
     fun everySyllableTypedInEverySchemeReadsBack() {
-        val schemes = listOf(ZIRANMA, MICROSOFT, ZIGUANG, ABC, ZHONGWENZHIXING, PINYINJIAJIA, XIAOHE, GB)
+        val schemes = listOf(ZIRANMA, MICROSOFT, XIAOHE, ZIGUANG, ABC, GB)
         for (scheme in schemes) {
             val segmenter = ShuangpinSegmenter(scheme)
             var typed = 0
@@ -213,5 +208,25 @@ class ShuangpinSegmenterTest {
             assertThrows(keys, IllegalArgumentException::class.java) { ShuangpinScheme(keys, "o") }
         }
         assertThrows(IllegalArgumentException::class.java) { ShuangpinScheme("", "O") }
+    }
+
+    private companion object {
+        // three of the schemes 0.5 dropped (SchemeMigration), libime's tables kept here: a no-initial
+        // key that types an initial too (紫光's and 智能ABC's a), and 国标's zero key a
+        val ZIGUANG = ShuangpinScheme(
+            "zh=u ch=a sh=i ai=p an=r ang=s ao=q ei=k en=w eng=t er=j ia=x ian=f iang=g iao=b ie=d in=y ing=; " +
+                "iong=h iu=j ong=h ou=z ua=x uai=y uan=l uang=g ue=n ui=n un=m uo=o ve=n v=v",
+            "o",
+        )
+        val ABC = ShuangpinScheme(
+            "zh=a ch=e sh=v ai=l an=j ang=h ao=k ei=q en=f eng=g er=r ia=d ian=w iang=t iao=z ie=x in=c ing=y " +
+                "iong=s iu=r ong=s ou=b ua=d uai=c uan=p uang=t ue=m ui=m un=n uo=o ve=m v=v",
+            "o",
+        )
+        val GB = ShuangpinScheme(
+            "zh=v ch=i sh=u ai=k an=f ang=g ao=c ei=b en=r eng=h er=l ia=q ian=d iang=n iao=m ie=t in=l ing=j " +
+                "iong=s iu=y ong=s ou=p ua=q uai=y uan=w uang=n ue=x ui=v un=z uo=o ve=x v=v",
+            "a",
+        )
     }
 }

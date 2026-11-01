@@ -5,7 +5,7 @@
 package org.fcitx.fcitx5.android.eval
 
 import org.fcitx.fcitx5.android.engine.data.PinyinData
-import org.fcitx.fcitx5.android.engine.host.EngineSettings
+import org.fcitx.fcitx5.android.engine.runtime.EngineSettings
 import org.fcitx.fcitx5.android.engine.learn.ImportedWords
 import org.fcitx.fcitx5.android.engine.learn.Kinds
 import org.fcitx.fcitx5.android.engine.learn.LearnLog
@@ -13,6 +13,7 @@ import org.fcitx.fcitx5.android.engine.pinyin.LatinWords
 import org.fcitx.fcitx5.android.engine.pinyin.PinyinSegmenter
 import org.fcitx.fcitx5.android.engine.pinyin.Segmenter
 import org.fcitx.fcitx5.android.engine.pinyin.ShuangpinSegmenter
+import org.fcitx.fcitx5.android.engine.pinyin.Syllables
 import org.fcitx.fcitx5.android.engine.pinyin.T9Segmenter
 import org.fcitx.fcitx5.android.engine.rerank.SentencePicker
 import org.fcitx.fcitx5.android.engine.rerank.SentenceRefiner
@@ -518,7 +519,7 @@ object LearnUxScript {
         private fun import(n: Int, rest: String, bad: (String) -> Nothing): Step {
             val parts = rest.split(Regex("\\s+"))
             if (parts.size != 2 || parts[1].any { it !in 'a'..'z' && it != '\'' }) bad("import <text> <pin'yin>")
-            return Step.Import(n, parts[0], parts[1].replace('\'', ' '))
+            return Step.Import(n, parts[0], Syllables.spaced(parts[1]))
         }
 
         private fun expect(n: Int, line: String, rest: String, bad: (String) -> Nothing): Step {

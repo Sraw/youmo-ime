@@ -10,7 +10,7 @@ import org.fcitx.fcitx5.android.core.InputMethodEntry
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.prefs.ShuangpinKeyboard
 import org.fcitx.fcitx5.android.data.theme.ThemePreset
-import org.fcitx.fcitx5.android.engine.host.Engines
+import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.input.KeyboardHarness
 import org.fcitx.fcitx5.android.input.preedit.SyllableStrip
 import org.junit.After
@@ -33,7 +33,7 @@ import org.robolectric.annotation.GraphicsMode
 @Config(application = FcitxApplication::class, qualifiers = "w393dp-h851dp-port-440dpi")
 class ShuangpinKeyboardScreenshotTest {
 
-    private val shuangpin = InputMethodEntry(Engines.SHUANGPIN, "双拼", "", "", "双", "zh_CN", "androidengine", false)
+    private val shuangpin = InputMethodEntry(InputMethodCatalog.SHUANGPIN, "双拼", "", "", "双", "zh_CN", "androidengine", false)
     private val setting = AppPrefs.getInstance().keyboard.shuangpinKeyboard
 
     @After

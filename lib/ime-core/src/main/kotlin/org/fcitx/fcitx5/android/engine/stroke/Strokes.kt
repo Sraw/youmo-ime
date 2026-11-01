@@ -32,6 +32,51 @@ class Strokes(private val table: CodeTable, private val score: (String) -> Float
         IntArray(keys.size) { (keys[it] and INDEX_MASK).toInt() }
     }
 
+    // every entry by its character, then the table's order: what a character is written as, for
+    // 笔画筛选 (StrokeFilter); made at its first stroke, ~170 000 entries' indexes, ~680 KB. The
+    // characters are read off the table, not made strings of: the first stroke waits for this
+    private val byChar: IntArray by lazy(LazyThreadSafetyMode.NONE) {
+        // the character above the index's bits: one sort of plain numbers, as for [order]
+        val keys = LongArray(table.size) { (table.textChar(it, 0).code.toLong() shl INDEX_BITS) or it.toLong() }
+        keys.sort()
+        IntArray(keys.size) { (keys[it] and INDEX_MASK).toInt() }
+    }
+
+    private fun charAt(i: Int) = table.textChar(byChar[i], 0)
+
+    // where [c]'s entries start in [byChar], or where they would
+    private fun firstOf(c: Char): Int {
+        var lo = 0
+        var hi = byChar.size
+        while (lo < hi) {
+            val mid = (lo + hi) ushr 1
+            if (charAt(mid) < c) lo = mid + 1 else hi = mid
+        }
+        return lo
+    }
+
+    /**
+     * Whether [c] is written in an order that starts with [strokes] (a character of more than one
+     * order, 望's two, in either): false for one the table has not, or nothing drawn.
+     */
+    fun startsWith(c: Char, strokes: CharSequence): Boolean {
+        if (strokes.isEmpty()) return false
+        var i = firstOf(c)
+        while (i < byChar.size && charAt(i) == c) {
+            val entry = byChar[i++]
+            if (table.codeLength(entry) >= strokes.length && strokes.indices.all { table.codeKey(entry, it) == strokes[it] }) return true
+        }
+        return false
+    }
+
+    /** The orders [c] is written in, as the table has them: none for a character it has not. */
+    fun ordersOf(c: Char): List<String> {
+        val orders = ArrayList<String>()
+        var i = firstOf(c)
+        while (i < byChar.size && charAt(i) == c) orders += table.code(byChar[i++])
+        return orders
+    }
+
     /**
      * The characters whose strokes start with [strokes], the likeliest first, each once; none for
      * nothing typed. Made as they are gone through: the first stroke has thousands, a page shows a few.

@@ -12,7 +12,7 @@ object CodeRow {
 
     /**
      * Where a tap at [offset] into the line shown puts the cursor in [preedit], in code points
-     * (FcitxAPI.moveCursor): the preedit after [aux] characters of aux, the cursor drawn at [cursor]
+     * (HostApi.moveCursor): the preedit after [aux] characters of aux, the cursor drawn at [cursor]
      * of the line (-1 for none), which is no character of the preedit. A tap on the aux before it is
      * the preedit's start; on the aux after it, or past the end, its end.
      */

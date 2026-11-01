@@ -7,7 +7,7 @@ package org.fcitx.fcitx5.android.uat
 import kotlinx.serialization.json.add
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.putJsonArray
-import org.fcitx.fcitx5.android.engine.host.Engines
+import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.host.KeySyms
 import org.fcitx.fcitx5.android.host.Refiner
 import org.fcitx.fcitx5.android.eval.parity.Header
@@ -53,7 +53,7 @@ class HostReplayUatTest {
 
     @Test
     fun aMarkAfterADigitIsChineseAsInTheApp() = with(HostReplay()) {
-        // the app turns HalfWidthPuncAfterLetterOrNumber off (AddonDefaults): the device types 3。
+        // HalfWidthPuncAfterLetterOrNumber off, the default: the device types 3。
         type("3.")
         expectText("3。")
     }
@@ -61,16 +61,16 @@ class HostReplayUatTest {
     @Test
     fun englishLeftOnRanksTheFirstFieldsWordAsASentenceStart() {
         // as a field focused anew: English's session told the field's start, not made by a switch after it
-        val first = HostReplay(engines = UatEngines.fresh(), im = Engines.ENGLISH)
+        val first = HostReplay(engines = UatEngines.fresh(), im = InputMethodCatalog.ENGLISH)
         first.type("work")
-        val again = HostReplay(engines = UatEngines.fresh(), im = Engines.ENGLISH)
+        val again = HostReplay(engines = UatEngines.fresh(), im = InputMethodCatalog.ENGLISH)
         again.focus("")
         again.type("work")
         assertEquals(again.shown.take(4), first.shown.take(4))
     }
 
     @Test
-    fun aKeyEventTheEditorTookTellsTheFieldAgainUnlessItsReportWasPredicted() = with(HostReplay(engines = UatEngines.fresh(), im = Engines.ENGLISH)) {
+    fun aKeyEventTheEditorTookTellsTheFieldAgainUnlessItsReportWasPredicted() = with(HostReplay(engines = UatEngines.fresh(), im = InputMethodCatalog.ENGLISH)) {
         type("what")
         space()
         enter()
@@ -86,7 +86,7 @@ class HostReplayUatTest {
     }
 
     @Test
-    fun backspacingEnglishsLastLetterTakesItOut() = with(HostReplay(engines = UatEngines.fresh(), im = Engines.ENGLISH)) {
+    fun backspacingEnglishsLastLetterTakesItOut() = with(HostReplay(engines = UatEngines.fresh(), im = InputMethodCatalog.ENGLISH)) {
         space()
         type("wo")
         backspace(2)
@@ -127,7 +127,7 @@ class HostReplayUatTest {
     }
 
     @Test
-    fun leavingTheFieldKeepsEnglishsComposingWord() = with(HostReplay(im = Engines.ENGLISH)) {
+    fun leavingTheFieldKeepsEnglishsComposingWord() = with(HostReplay(im = InputMethodCatalog.ENGLISH)) {
         type("hel")
         val shown = clientPreedit
         assertTrue("English composes in the field (androidengine.cpp:380-383): [$shown] [$preedit] [$text]", shown.isNotEmpty())
@@ -164,7 +164,7 @@ class HostReplayUatTest {
     }
 
     @Test
-    fun englishTypesTheWord() = with(HostReplay(im = Engines.ENGLISH)) {
+    fun englishTypesTheWord() = with(HostReplay(im = InputMethodCatalog.ENGLISH)) {
         type("hello")
         space()
         assertEquals("hello ", text)
@@ -189,7 +189,7 @@ class HostReplayUatTest {
     // the learning design's U-31 (a word corrected, offered again on a tap); no uat/ case of its own
     // (EN-11 taps into the corrected word, which this does not), so no @Uat
     @Test
-    fun aTapAfterACorrectionOffersTheWordTypedThroughTheRecallKey() = with(HostReplay(im = Engines.ENGLISH)) {
+    fun aTapAfterACorrectionOffersTheWordTypedThroughTheRecallKey() = with(HostReplay(im = InputMethodCatalog.ENGLISH)) {
         type("fed teh ")
         expectText("fed the ")
         tapField()
@@ -225,6 +225,7 @@ class HostReplayUatTest {
     // a cursor report it did not expect, not after its own commits, so 「点了吗。」 typed before is not
     // a context the engine is told; a replay that told it after every commit ranked 的脸 first
     @Test
+    @Uat("PY-64")
     fun aSentenceTypedBeforeIsNotToldAfterTheAppsOwnCommits() = with(HostReplay()) {
         type("ta"); pick("他"); type("dl"); pick("带领"); type("ma"); space()
         expectText("他带领吗")
@@ -236,7 +237,7 @@ class HostReplayUatTest {
         type("ta"); pick("他"); type("dl")
         val second = candidates.take(SHOWN)
         assertEquals("first of $first", "带来", first.first())
-        assertTrue("点了 before 带领 in $first", first.indexOf("点了") < first.indexOf("带领"))
+        assertTrue("点了 before 带领 in $first", "点了" in first && "带领" in first && first.indexOf("点了") < first.indexOf("带领"))
         assertEquals("first of $second", "点了", second.first())
     }
 
@@ -277,18 +278,18 @@ class HostReplayUatTest {
         space()
         assertEquals("", contextTold)
         // FcitxInputMethodService's IMChangeEvent: the session switched to told the field (FieldPolicy)
-        ime(Engines.ENGLISH)
+        ime(InputMethodCatalog.ENGLISH)
         assertEquals(text, contextTold)
     }
 
     @Test
     fun anotherAppsBarIsCoveredOnASwitchOrAHardwareReturn() {
-        val header = Header(buildJsonObject { putJsonArray("ims") { add(Engines.PINYIN); add(Engines.ENGLISH) } })
-        fun last(vararg steps: Step) = ParityReplay.run(header, Sequence("s", Engines.PINYIN, "text", steps.toList())).states.last()
+        val header = Header(buildJsonObject { putJsonArray("ims") { add(InputMethodCatalog.PINYIN); add(InputMethodCatalog.ENGLISH) } })
+        fun last(vararg steps: Step) = ParityReplay.run(header, Sequence("s", InputMethodCatalog.PINYIN, "text", steps.toList())).states.last()
         val typed = Step("type", "nihao")
         // what the other app showed, until the host updates it
         assertEquals("ni hao", last(typed, Step("app")).preedit)
-        assertEquals("", last(typed, Step("app"), Step("ime", Engines.ENGLISH)).preedit)
+        assertEquals("", last(typed, Step("app"), Step("ime", InputMethodCatalog.ENGLISH)).preedit)
         assertEquals("", last(typed, Step("app"), Step("hw", "Return")).preedit)
         assertEquals("ni hao", last(typed, Step("app"), Step("hw", "BackSpace")).preedit)
         // the floating window a hardware Return brought up gone as the screen's keyboard is used: the bar as it was
@@ -302,7 +303,7 @@ class HostReplayUatTest {
     }
 
     @Test
-    fun anotherAppsEmptyFieldIsToldNothingOfTheFirst() = with(HostReplay(engines = UatEngines.fresh(), im = Engines.ENGLISH)) {
+    fun anotherAppsEmptyFieldIsToldNothingOfTheFirst() = with(HostReplay(engines = UatEngines.fresh(), im = InputMethodCatalog.ENGLISH)) {
         // English left on: the first field focused twice, both times the same field
         type("keyboard")
         space()
@@ -313,9 +314,9 @@ class HostReplayUatTest {
 
     @Test
     fun aMalformedStepStopsOnlyItsSequence() {
-        val header = Header(buildJsonObject { putJsonArray("ims") { add(Engines.PINYIN) } })
+        val header = Header(buildJsonObject { putJsonArray("ims") { add(InputMethodCatalog.PINYIN) } })
         // a hardware key the replay has no name for: F4127's catch, not the shard's run
-        val out = ParityReplay.run(header, Sequence("s", Engines.PINYIN, "text", listOf(Step("type", "nihao"), Step("hw", "NoSuchKey"))))
+        val out = ParityReplay.run(header, Sequence("s", InputMethodCatalog.PINYIN, "text", listOf(Step("type", "nihao"), Step("hw", "NoSuchKey"))))
         assertTrue("not stopped", out.error != null)
         // the steps before it kept
         assertEquals(listOf("ni hao"), out.states.map { it.preedit })
@@ -323,8 +324,8 @@ class HostReplayUatTest {
 
     @Test
     fun aToggleUnderSuggestionsGoesByTheKeyboardPutAway() {
-        val header = Header(buildJsonObject { putJsonArray("ims") { add(Engines.PINYIN) } })
-        val states = ParityReplay.run(header, Sequence("s", Engines.PINYIN, "text", listOf(Step("type", "zaiwen"), Step("space"), Step("toggle", "fullwidth")))).states
+        val header = Header(buildJsonObject { putJsonArray("ims") { add(InputMethodCatalog.PINYIN) } })
+        val states = ParityReplay.run(header, Sequence("s", InputMethodCatalog.PINYIN, "text", listOf(Step("type", "zaiwen"), Step("space"), Step("toggle", "fullwidth")))).states
         assertTrue("suggestions after the commit", states[1].cands.isNotEmpty())
         // uat.py's expand_toolbar: Back and a tap on the field, which the suggestions do not outlast
         assertEquals(emptyList<String>(), states[2].cands)
@@ -332,9 +333,9 @@ class HostReplayUatTest {
 
     @Test
     fun aSingleLineFieldsEnterPutsTheKeyboardAwayAndATapBringsItBackAtTheEnd() {
-        val header = Header(buildJsonObject { putJsonArray("ims") { add(Engines.PINYIN); add(Engines.ENGLISH) } })
+        val header = Header(buildJsonObject { putJsonArray("ims") { add(InputMethodCatalog.PINYIN); add(InputMethodCatalog.ENGLISH) } })
         val steps = listOf(Step("type", "test"), Step("enter"), Step("hw", "Left"), Step("type", "x"))
-        val states = ParityReplay.run(header, Sequence("s", Engines.ENGLISH, "url", steps)).states
+        val states = ParityReplay.run(header, Sequence("s", InputMethodCatalog.ENGLISH, "url", steps)).states
         // the arrow moves the cursor in the field with no keyboard; the letter's tap on the field puts it at the end first
         assertEquals(3 to 3, states[2].sel)
         assertEquals("testx", states[3].text)
@@ -342,9 +343,9 @@ class HostReplayUatTest {
 
     @Test
     fun theKeyboardBackFromUnderTheFloatingWindowIsTappedForAtTheFieldsEnd() {
-        val header = Header(buildJsonObject { putJsonArray("ims") { add(Engines.PINYIN); add(Engines.ENGLISH) } })
+        val header = Header(buildJsonObject { putJsonArray("ims") { add(InputMethodCatalog.PINYIN); add(InputMethodCatalog.ENGLISH) } })
         val steps = listOf(Step("type", "test"), Step("space"), Step("hw", "Left"), Step("hw", "Return"), Step("type", "x"))
-        val states = ParityReplay.run(header, Sequence("s", Engines.ENGLISH, "text", steps)).states
+        val states = ParityReplay.run(header, Sequence("s", InputMethodCatalog.ENGLISH, "text", steps)).states
         // the Return typed where the arrow left the cursor, before the space
         assertEquals("test\n ", states[3].text)
         // the letter after the field's end, where the tap put the cursor
@@ -352,9 +353,9 @@ class HostReplayUatTest {
     }
 
     @Test
-    fun keysTypedTogetherAreTappedApartAsTheDevicesDriverTapsThem() = with(HostReplay(engines = UatEngines.fresh(), im = Engines.T9)) {
+    fun keysTypedTogetherAreTappedApartAsTheDevicesDriverTapsThem() = with(HostReplay(engines = UatEngines.fresh(), im = InputMethodCatalog.PINYIN)) {
         val start = clock.uptimeMillis()
-        type("94")
+        pinyinNine("94")
         // 200 ms between the two taps, as an `input tap` each takes: the refine's pause runs out between
         // them; then the user's pause
         assertTrue(200L > Refiner.PAUSE_MILLIS)
@@ -372,11 +373,11 @@ class HostReplayUatTest {
 
     @Test
     fun unicodeResetsEnglishsKnowledgeOfTheField() {
-        val opened = HostReplay(engines = UatEngines.fresh(), im = Engines.ENGLISH)
+        val opened = HostReplay(engines = UatEngines.fresh(), im = InputMethodCatalog.ENGLISH)
         opened.unicode()
         opened.backspace(3)
         opened.type("work")
-        val reset = HostReplay(engines = UatEngines.fresh(), im = Engines.ENGLISH)
+        val reset = HostReplay(engines = UatEngines.fresh(), im = InputMethodCatalog.ENGLISH)
         reset.core.reset()
         reset.type("work")
         // the reset before the mode (commitAndReset): English ranks as where nothing is known

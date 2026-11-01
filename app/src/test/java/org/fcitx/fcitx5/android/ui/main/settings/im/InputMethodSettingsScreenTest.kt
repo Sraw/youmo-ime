@@ -14,16 +14,20 @@ import androidx.preference.SwitchPreferenceCompat
 import kotlinx.coroutines.runBlocking
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
-import org.fcitx.fcitx5.android.core.FakeFcitxAPI
+import org.fcitx.fcitx5.android.Uat
+import org.fcitx.fcitx5.android.core.FakeHostApi
 import org.fcitx.fcitx5.android.core.InputMethodNames
-import org.fcitx.fcitx5.android.core.RawConfig
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
-import org.fcitx.fcitx5.android.engine.host.EngineSettings
-import org.fcitx.fcitx5.android.engine.host.Engines
-import org.fcitx.fcitx5.android.engine.host.ModelLevel
-import org.fcitx.fcitx5.android.engine.host.TableSettings
+import org.fcitx.fcitx5.android.data.prefs.PinyinKeyboard
+import org.fcitx.fcitx5.android.data.prefs.ShuangpinKeyboard
+import org.fcitx.fcitx5.android.engine.InputMethodCatalog
+import org.fcitx.fcitx5.android.engine.runtime.EngineSettings
+import org.fcitx.fcitx5.android.engine.runtime.ModelLevel
+import org.fcitx.fcitx5.android.engine.runtime.TableSettings
 import org.fcitx.fcitx5.android.engine.learn.control.LearningResult
 import org.fcitx.fcitx5.android.engine.pinyin.Fuzzy
+import org.fcitx.fcitx5.android.host.ConfigTree
+import org.fcitx.fcitx5.android.host.EngineOptions
 import org.fcitx.fcitx5.android.input.handwriting.HandwritingPause
 import org.fcitx.fcitx5.android.input.keyboard.T9EnglishTyping
 import org.fcitx.fcitx5.android.input.keyboard.T9MultiTap
@@ -66,12 +70,12 @@ class InputMethodSettingsScreenTest {
     }
 
 
-    private fun create(items: List<Item>, cfg: RawConfig = RawConfig(), save: () -> Unit = {}): PreferenceScreen {
+    private fun create(items: List<Item>, cfg: MutableMap<String, String> = mutableMapOf(), save: () -> Unit = {}): PreferenceScreen {
         val ctx = PlaceholderStrings(RuntimeEnvironment.getApplication())
         return InputMethodSettings.create(PreferenceManager(ctx), items, cfg, save, open = {})
     }
 
-    private fun screen(page: String, cfg: RawConfig = RawConfig(), save: () -> Unit = {}) =
+    private fun screen(page: String, cfg: MutableMap<String, String> = mutableMapOf(), save: () -> Unit = {}) =
         create(InputMethodSettings.of(page)!!, cfg, save)
 
     private fun PreferenceGroup.all(): List<Preference> = (0 until preferenceCount).flatMap {
@@ -83,18 +87,23 @@ class InputMethodSettingsScreenTest {
 
     private fun PreferenceGroup.titled(@StringRes title: Int) = all().single { it.title == placeholder(title) }
 
-    // as the addon flattens its config for the engine (EngineSettings.parse): a group's keys after its name and a slash;
-    // that it keeps these keys, the options androidengine.h declares, is AndroidEngineHeaderTest's to hold
-    private fun RawConfig.flattened(prefix: String = ""): String = subItems.orEmpty().joinToString("") {
-        if (it.subItems.isNullOrEmpty()) "$prefix${it.name}=${it.value}\n" else it.flattened("$prefix${it.name}/")
+    // a page's keys, a group's after its name and a slash, to see what a save holds
+    private fun Map<String, String>.flattened(): String = entries.joinToString("") {
+        "${it.key}=${it.value}\n"
     }
+
+    // what the engine reads once [im]'s page saves [cfg]: the host's partial save, then its settings
+    // (that the host keeps these keys, the options androidengine.h declares, is AndroidEngineHeaderTest's to hold)
+    private fun engineReads(im: String, cfg: Map<String, String>) = EngineOptions().apply { setPage(im, ConfigTree.of(cfg)) }.toSettings()
+
+    private val defaults = EngineOptions().toSettings()
 
     // the English page's word list, opened as the app's settings open a page
     @Test
     fun theEnglishPageOpensItsWordList() {
         val opened = ArrayList<SettingsRoute>()
         val ctx = PlaceholderStrings(RuntimeEnvironment.getApplication())
-        val screen = InputMethodSettings.create(PreferenceManager(ctx), InputMethodSettings.of(InputMethodNames.KEYBOARD)!!, RawConfig(), {}) { opened += it }
+        val screen = InputMethodSettings.create(PreferenceManager(ctx), InputMethodSettings.of(InputMethodNames.KEYBOARD)!!, mutableMapOf(), {}) { opened += it }
         val words = screen.titled(R.string.english_words)
         assertSame(words, screen.findPreference<Preference>(InputMethodSettings.ENGLISH_WORDS))
         words.performClick()
@@ -114,12 +123,12 @@ class InputMethodSettingsScreenTest {
         val wubi = "engine-wubi"
         val ctx = PlaceholderStrings(RuntimeEnvironment.getApplication())
         val screen = InputMethodSettings.create(
-            PreferenceManager(ctx), InputMethodSettings.of(wubi)!!, RawConfig(), {}, act = { item, done -> acted += item; told += done }, confirm = confirm,
+            PreferenceManager(ctx), InputMethodSettings.of(wubi)!!, mutableMapOf(), {}, act = { item, done -> acted += item; told += done }, confirm = confirm,
         ) {}
         screen.findPreference<Preference>(InputMethodSettings.RESET_TABLE_ORDER)!!.performClick()
         assertTrue(acted.isEmpty())
         asked.single()()
-        val fcitx = FakeFcitxAPI()
+        val fcitx = FakeHostApi()
         assertTrue(runBlocking { acted.single().run(fcitx, wubi) })
         assertEquals(listOf("learning(ResetTableOrder(im=$wubi))"), fcitx.calls)
         // F2673: the engine not there, not done; what is shown says which
@@ -145,27 +154,31 @@ class InputMethodSettingsScreenTest {
         }
     }
 
-    // the keyboard's own: in the app's preferences, nothing of it in fcitx's config
+    // the keyboard's own, in the 九键 section of pinyin's and English's pages (11-01): in the app's preferences,
+    // nothing of it in fcitx's config
     @Test
     fun multiTapOnTheNineKeysPageIsTheAppsPreference() {
         val pref = AppPrefs.getInstance().keyboard.t9MultiTap
         pref.setValue(T9MultiTap.Medium)
-        val cfg = RawConfig()
+        val cfg = mutableMapOf<String, String>()
         var saved = 0
-        val list = screen(Engines.T9, cfg) { saved++ }.findPreference<ListPreference>(AppPrefs.T9_MULTI_TAP)!!
+        val list = create(InputMethodSettings.NINE_KEYS, cfg) { saved++ }.findPreference<ListPreference>(AppPrefs.T9_MULTI_TAP)!!
         assertEquals(T9MultiTap.Medium.name, list.value)
         assertTrue(list.callChangeListener(T9MultiTap.Off.name))
         assertEquals(T9MultiTap.Off, pref.getValue())
         assertEquals(0, saved)
         assertTrue(AppPrefs.T9_MULTI_TAP !in cfg.flattened())
-        assertNull(screen(Engines.PINYIN).findPreference<ListPreference>(AppPrefs.T9_MULTI_TAP))
+        // on pinyin's page, its section hidden while the keyboard is the 26 keys
+        AppPrefs.getInstance().keyboard.pinyinKeyboard.setValue(PinyinKeyboard.Full)
+        val row = screen(InputMethodCatalog.PINYIN).findPreference<ListPreference>(AppPrefs.T9_MULTI_TAP)!!
+        assertFalse(row.parent!!.isVisible)
     }
 
-    // how 九键英文 types: the app's preference, as multi-tap
+    // how 九键英文 types: the app's preference, as multi-tap, on English's page
     @Test
     fun nineKeyEnglishTypingIsTheAppsPreference() {
         val keyboard = AppPrefs.getInstance().keyboard
-        val typing = screen(Engines.T9, RawConfig()).findPreference<ListPreference>(AppPrefs.T9_ENGLISH_TYPING)!!
+        val typing = screen(InputMethodCatalog.ENGLISH, mutableMapOf()).findPreference<ListPreference>(AppPrefs.T9_ENGLISH_TYPING)!!
         assertEquals(T9EnglishTyping.Predictive.name, typing.value)
         assertTrue(typing.callChangeListener(T9EnglishTyping.MultiTap.name))
         assertEquals(T9EnglishTyping.MultiTap, keyboard.t9EnglishTyping.getValue())
@@ -177,15 +190,15 @@ class InputMethodSettingsScreenTest {
     fun thePauseOnTheHandwritingPageIsTheAppsPreference() {
         val pref = AppPrefs.getInstance().keyboard.handwritingPause
         pref.setValue(HandwritingPause.Medium)
-        val cfg = RawConfig()
+        val cfg = mutableMapOf<String, String>()
         var saved = 0
-        val list = screen(Engines.HANDWRITING, cfg) { saved++ }.findPreference<ListPreference>(AppPrefs.HANDWRITING_PAUSE)!!
+        val list = screen(InputMethodCatalog.HANDWRITING, cfg) { saved++ }.findPreference<ListPreference>(AppPrefs.HANDWRITING_PAUSE)!!
         assertEquals(HandwritingPause.Medium.name, list.value)
         assertTrue(list.callChangeListener(HandwritingPause.Slow.name))
         assertEquals(HandwritingPause.Slow, pref.getValue())
         assertEquals(0, saved)
         assertTrue(AppPrefs.HANDWRITING_PAUSE !in cfg.flattened())
-        assertNull(screen(Engines.PINYIN).findPreference<ListPreference>(AppPrefs.HANDWRITING_PAUSE))
+        assertNull(screen(InputMethodCatalog.PINYIN).findPreference<ListPreference>(AppPrefs.HANDWRITING_PAUSE))
     }
 
     // as multi-tap: the keyboard's own, nothing of it in fcitx's config
@@ -193,7 +206,7 @@ class InputMethodSettingsScreenTest {
     fun autoCapsOnTheEnglishPageIsTheAppsPreference() {
         val pref = AppPrefs.getInstance().keyboard.englishAutoCaps
         pref.setValue(true)
-        val cfg = RawConfig()
+        val cfg = mutableMapOf<String, String>()
         var saved = 0
         val toggle = screen(InputMethodNames.KEYBOARD, cfg) { saved++ }.findPreference<SwitchPreferenceCompat>(AppPrefs.ENGLISH_AUTO_CAPS)!!
         assertTrue(toggle.isChecked)
@@ -201,6 +214,38 @@ class InputMethodSettingsScreenTest {
         assertFalse(pref.getValue())
         assertEquals(0, saved)
         assertTrue(AppPrefs.ENGLISH_AUTO_CAPS !in cfg.flattened())
+    }
+
+    // 滑行输入 and 笔画筛选, never both on: the one turned on turns the other off, its switch shown off too;
+    // one turned off leaves the other as it is
+    @Test
+    fun glideTypingAndStrokeFilterTurnEachOtherOff() {
+        val keyboard = AppPrefs.getInstance().keyboard
+        try {
+            keyboard.glideTyping.setValue(true)
+            keyboard.strokeFilter.setValue(false)
+            val shared = create(InputMethodSettings.SHARED)
+            val glide = shared.findPreference<SwitchPreferenceCompat>(AppPrefs.GLIDE_TYPING)!!
+            val strokes = shared.findPreference<SwitchPreferenceCompat>(AppPrefs.STROKE_FILTER)!!
+            assertTrue(glide.isChecked)
+            assertFalse(strokes.isChecked)
+            assertTrue(strokes.callChangeListener(true))
+            strokes.isChecked = true
+            assertTrue(keyboard.strokeFilter.getValue())
+            assertFalse(keyboard.glideTyping.getValue())
+            assertFalse(glide.isChecked)
+            assertTrue(glide.callChangeListener(true))
+            glide.isChecked = true
+            assertTrue(keyboard.glideTyping.getValue())
+            assertFalse(keyboard.strokeFilter.getValue())
+            assertFalse(strokes.isChecked)
+            assertTrue(glide.callChangeListener(false))
+            glide.isChecked = false
+            assertFalse(keyboard.glideTyping.getValue() || keyboard.strokeFilter.getValue() || strokes.isChecked)
+        } finally {
+            keyboard.glideTyping.setValue(false)
+            keyboard.strokeFilter.setValue(false)
+        }
     }
 
     // a dialog message would leave the list's dialog with no choices in it
@@ -234,7 +279,7 @@ class InputMethodSettingsScreenTest {
     // session (EngineSettings, one for all: pinyin's, a table's, handwriting's)
     @Test
     fun aChangeIsSavedWhereTheEngineReadsIt() {
-        val cfg = RawConfig()
+        val cfg = mutableMapOf<String, String>()
         var saves = 0
         val page = create(InputMethodSettings.SHARED, cfg) { saves++ }
         page.titled(R.string.im_prediction).callChangeListener(false)
@@ -242,26 +287,26 @@ class InputMethodSettingsScreenTest {
         page.findPreference<ListPreference>(EngineSettings.MODEL_LEVEL)!!.callChangeListener("Low")
         create(InputMethodSettings.HARDWARE_KEYBOARD, cfg) { saves++ }.findPreference<ListPreference>(EngineSettings.PAGE_SIZE)!!.callChangeListener("5")
         assertEquals(4, saves)
-        assertEquals("False", cfg[EngineSettings.FUZZY][EngineSettings.TYPOS].value)
-        assertEquals(EngineSettings(prediction = false, typos = false, pageSize = 5, modelLevel = ModelLevel.LOW), EngineSettings.parse(cfg.flattened()))
+        assertEquals("False", cfg["${EngineSettings.FUZZY}/${EngineSettings.TYPOS}"])
+        assertEquals(defaults.copy(prediction = false, typos = false, pageSize = 5, modelLevel = ModelLevel.LOW), engineReads(InputMethodCatalog.PINYIN, cfg))
     }
 
     // a page saves what it shows alone: the addon keeps the rest (a partial load), so a table's page
     // opened before the shared one does not write back the prediction it read then
     @Test
     fun aPageSavesOnlyWhatItShows() {
-        val cfg = RawConfig().apply {
-            getOrCreate(EngineSettings.PREDICTION).value = "True"
-            getOrCreate(TableSettings.HINT).value = "True"
+        val cfg = mutableMapOf<String, String>().apply {
+            this[EngineSettings.PREDICTION] = "True"
+            this[TableSettings.HINT] = "True"
         }
         screen("engine-wubi", cfg).titled(R.string.im_hint).callChangeListener(false)
         val saved = InputMethodSettings.only(InputMethodSettings.of("engine-wubi")!!, cfg).flattened()
         assertTrue(saved, "${TableSettings.HINT}=False\n" in saved)
         assertFalse(saved, EngineSettings.PREDICTION in saved)
-        val shared = RawConfig().apply {
-            getOrCreate(EngineSettings.CHAIZI).value = "False"
-            getOrCreate(EngineSettings.FUZZY).getOrCreate(Fuzzy.L_N.name).value = "True"
-            getOrCreate(EngineSettings.EMOJI).value = "False"
+        val shared = mutableMapOf<String, String>().apply {
+            this[EngineSettings.CHAIZI] = "False"
+            this["${EngineSettings.FUZZY}/${Fuzzy.L_N.name}"] = "True"
+            this[EngineSettings.EMOJI] = "False"
         }
         // pinyin's own (拆字) stays on its page; a pair of the fuzzy ones, not the group's name alone
         assertEquals("${EngineSettings.EMOJI}=False\n${EngineSettings.FUZZY}/${Fuzzy.L_N.name}=True\n", InputMethodSettings.only(InputMethodSettings.SHARED, shared).flattened())
@@ -275,11 +320,12 @@ class InputMethodSettingsScreenTest {
         assertEquals(placeholder(R.string.im_prediction_summary), shared.titled(R.string.im_prediction).summary?.toString())
         assertEquals("${placeholder(R.string.im_emoji_summary)}\n${placeholder(R.string.im_not_for)}", shared.titled(R.string.im_emoji).summary?.toString())
         assertNull(shared.titled(R.string.auto_pairs).summary)
-        assertEquals("${placeholder(R.string.im_glide_summary)}\n${placeholder(R.string.im_not_for)}", shared.titled(R.string.im_glide).summary?.toString())
+        assertEquals("${placeholder(R.string.glide_typing_summary)}\n${placeholder(R.string.im_not_for)}", shared.titled(R.string.glide_typing).summary?.toString())
+        assertEquals("${placeholder(R.string.stroke_filter_summary)}\n${placeholder(R.string.im_not_for)}", shared.titled(R.string.stroke_filter).summary?.toString())
         val level = shared.findPreference<ListPreference>(EngineSettings.MODEL_LEVEL)!!
         assertEquals("${level.entry}\n${placeholder(R.string.im_model_level_summary)}", level.summary?.toString())
         // pinyin's own: not for the 14 keys (the hardware keyboard still types full pinyin)
-        assertEquals("${placeholder(R.string.im_chaizi_summary)}\n${placeholder(R.string.im_not_for)}", screen(Engines.PINYIN).titled(R.string.im_chaizi).summary?.toString())
+        assertEquals("${placeholder(R.string.im_chaizi_summary)}\n${placeholder(R.string.im_not_for)}", screen(InputMethodCatalog.PINYIN).titled(R.string.im_chaizi).summary?.toString())
     }
 
     // every input method's page opens the shared one from its first row
@@ -288,7 +334,7 @@ class InputMethodSettingsScreenTest {
         val ctx = PlaceholderStrings(RuntimeEnvironment.getApplication())
         appInputMethods.forEach { page ->
             val opened = ArrayList<SettingsRoute>()
-            val screen = InputMethodSettings.create(PreferenceManager(ctx), InputMethodSettings.of(page)!!, RawConfig(), {}) { opened += it }
+            val screen = InputMethodSettings.create(PreferenceManager(ctx), InputMethodSettings.of(page)!!, mutableMapOf(), {}) { opened += it }
             val link = screen.getPreference(0)
             assertEquals(page, InputMethodSettings.SHARED_LINK, link.key)
             link.performClick()
@@ -298,24 +344,24 @@ class InputMethodSettingsScreenTest {
 
     @Test
     fun aSchemeAndATablesOptionsAreSavedWhereTheEngineReadsThem() {
-        val shuangpin = RawConfig()
-        screen(Engines.SHUANGPIN, shuangpin).findPreference<ListPreference>(EngineSettings.SHUANGPIN_PROFILE)!!.callChangeListener("Xiaohe")
-        assertEquals("Xiaohe", EngineSettings.parse(shuangpin.flattened()).shuangpin)
-        val wubi = RawConfig()
+        val shuangpin = mutableMapOf<String, String>()
+        screen(InputMethodCatalog.SHUANGPIN, shuangpin).findPreference<ListPreference>(EngineSettings.SHUANGPIN_PROFILE)!!.callChangeListener("Xiaohe")
+        assertEquals("Xiaohe", engineReads(InputMethodCatalog.SHUANGPIN, shuangpin).shuangpin)
+        val wubi = mutableMapOf<String, String>()
         val page = screen("engine-wubi", wubi)
         page.titled(R.string.im_auto_select).callChangeListener(false)
         page.titled(R.string.im_order_by_use).callChangeListener(false)
         // a table's page is its group of the addon's config
-        val group = Engines.TABLES.getValue("engine-wubi").group
+        val group = InputMethodCatalog.TABLES.getValue("engine-wubi").group
         assertEquals(
-            TableSettings(autoSelect = false, orderByUse = false),
-            EngineSettings.parse(wubi.flattened("$group/")).tables[group],
+            defaults.tables.getValue(group).copy(autoSelect = false, orderByUse = false),
+            engineReads("engine-wubi", wubi).tables[group],
         )
     }
 
     @Test
     fun theFuzzyPairsStoredShowOnTheirRow() {
-        val cfg = RawConfig().apply { getOrCreate(EngineSettings.FUZZY).getOrCreate(Fuzzy.L_N.name).value = "True" }
+        val cfg = mutableMapOf<String, String>().apply { this["${EngineSettings.FUZZY}/${Fuzzy.L_N.name}"] = "True" }
         assertEquals("l ↔ n", create(InputMethodSettings.SHARED, cfg).titled(R.string.im_fuzzy).summary?.toString())
     }
 
@@ -326,5 +372,20 @@ class InputMethodSettingsScreenTest {
         assertEquals(1, screen.preferenceCount)
         val outer = screen.getPreference(0) as PreferenceGroup
         assertEquals(placeholder(R.string.im_section_words), outer.getPreference(0).title?.toString())
+    }
+
+    // 双拼's 14 keys, then 微软 chosen on the page: the keyboard row says the 18 keys, the ones typed on and stored
+    @Test
+    @Uat("SP-26")
+    fun theFourteenKeysUnderMicrosoftShowAsTheEighteen() {
+        val keyboard = AppPrefs.getInstance().keyboard
+        keyboard.shuangpinKeyboard.setValue(ShuangpinKeyboard.Keys14)
+        try {
+            val page = screen(InputMethodCatalog.SHUANGPIN, mutableMapOf())
+            assertTrue(page.findPreference<ListPreference>(EngineSettings.SHUANGPIN_PROFILE)!!.callChangeListener(EngineSettings.MS))
+            assertEquals(ShuangpinKeyboard.Keys18.name, page.findPreference<ListPreference>(AppPrefs.SHUANGPIN_KEYBOARD)!!.value)
+        } finally {
+            keyboard.shuangpinKeyboard.setValue(ShuangpinKeyboard.Full)
+        }
     }
 }

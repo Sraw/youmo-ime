@@ -4,7 +4,7 @@
  */
 package org.fcitx.fcitx5.android.eval
 
-import org.fcitx.fcitx5.android.engine.host.Keyboard
+import org.fcitx.fcitx5.android.engine.runtime.Keyboard
 import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
 import org.fcitx.fcitx5.android.engine.pinyin.Syllables
 import java.util.Random

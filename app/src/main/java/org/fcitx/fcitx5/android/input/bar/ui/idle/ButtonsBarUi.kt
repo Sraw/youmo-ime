@@ -6,11 +6,9 @@ package org.fcitx.fcitx5.android.input.bar.ui.idle
 
 import android.content.Context
 import android.widget.HorizontalScrollView
-import androidx.annotation.DrawableRes
 import com.google.android.flexbox.AlignItems
 import com.google.android.flexbox.FlexboxLayout
 import com.google.android.flexbox.JustifyContent
-import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.input.bar.KawaiiBarComponent
 import org.fcitx.fcitx5.android.input.bar.ui.ToolButton
@@ -39,33 +37,14 @@ class ButtonsBarUi(override val ctx: Context, private val theme: Theme) : Ui {
 
     // as tall as the bar (候选字号) and as wide as the other bar buttons; narrower where the bar is
     // (the floating keyboard's), down to MIN_SIZE, then scrolled; the icon its size all the same
-    private fun toolButton(@DrawableRes icon: Int) = ToolButton(ctx, icon, theme).also {
+    /** [toolButtons] in this order, none of them in another parent. */
+    fun show(toolButtons: List<ToolButton>) {
+        buttons.removeAllViews()
         val width = ctx.dp(KawaiiBarComponent.buttonWidthDp())
-        it.fixIconSize(ctx.dp(KawaiiBarComponent.ICON_DP))
-        buttons.addView(
-            it,
-            FlexboxLayout.LayoutParams(width, ctx.dp(KawaiiBarComponent.heightDp())).apply { minWidth = ctx.dp(MIN_SIZE) }
-        )
-    }
-
-    val undoButton = toolButton(R.drawable.ic_baseline_undo_24).apply {
-        contentDescription = ctx.getString(R.string.undo)
-    }
-
-    val redoButton = toolButton(R.drawable.ic_baseline_redo_24).apply {
-        contentDescription = ctx.getString(R.string.redo)
-    }
-
-    val cursorMoveButton = toolButton(R.drawable.ic_cursor_move).apply {
-        contentDescription = ctx.getString(R.string.text_editing)
-    }
-
-    val clipboardButton = toolButton(R.drawable.ic_clipboard).apply {
-        contentDescription = ctx.getString(R.string.clipboard)
-    }
-
-    val moreButton = toolButton(R.drawable.ic_baseline_more_horiz_24).apply {
-        contentDescription = ctx.getString(R.string.status_area)
+        val height = ctx.dp(KawaiiBarComponent.heightDp())
+        toolButtons.forEach {
+            buttons.addView(it, FlexboxLayout.LayoutParams(width, height).apply { minWidth = ctx.dp(MIN_SIZE) })
+        }
     }
 
     private companion object {

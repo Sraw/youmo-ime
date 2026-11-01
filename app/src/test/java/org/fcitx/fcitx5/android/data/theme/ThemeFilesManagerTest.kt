@@ -4,14 +4,22 @@
  */
 package org.fcitx.fcitx5.android.data.theme
 
+import android.os.Environment
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonObject
 import org.fcitx.fcitx5.android.FcitxApplication
+import org.fcitx.fcitx5.android.R
+import org.fcitx.fcitx5.android.Uat
+import org.fcitx.fcitx5.android.core.HostConfigDir
+import org.fcitx.fcitx5.android.core.phoneStorage
+import org.fcitx.fcitx5.android.host.ConfigHome
+import org.fcitx.fcitx5.android.utils.appContext
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -19,8 +27,10 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
+import org.robolectric.shadows.ShadowEnvironment
 import java.io.ByteArrayOutputStream
 import java.io.File
+import java.io.IOException
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
 
@@ -34,11 +44,12 @@ import java.util.zip.ZipOutputStream
 @Config(application = FcitxApplication::class)
 class ThemeFilesManagerTest {
 
-    // the manager's own, made once for the class: each test's application has another external dir
-    private val dir = ThemeFilesManager.newCustomBackgroundImages().second.parentFile!!
+    // the manager's own: each test's application has another
+    private val dir get() = ThemeFilesManager.newCustomBackgroundImages().second.parentFile!!
 
     @Before
     fun empty() {
+        phoneStorage()
         dir.deleteRecursively()
         dir.mkdirs()
     }
@@ -172,6 +183,38 @@ class ThemeFilesManagerTest {
             val crafted = zip("t.json" to theme("t", cropped, "t-src"), "t-src" to "s")
             assertTrue(cropped, ThemeFilesManager.importTheme(crafted).isFailure)
             assertEquals(cropped, emptyList<String>(), dir.list()!!.toList())
+        }
+    }
+
+    // A4: an upgraded install started without its external storage, the themes not moved yet: nothing
+    // saved, deleted or imported, and a theme an older version wrote is listed but not saved again
+    @Test
+    @Uat("PR-42")
+    fun themesNotSettledAreNotWritten() {
+        val external = appContext.getExternalFilesDir(null)!!
+        dir.deleteRecursively()
+        File(appContext.filesDir, "engine").mkdirs()
+        ShadowEnvironment.setExternalStorageState(external, Environment.MEDIA_REMOVED)
+        HostConfigDir.forget()
+        try {
+            assertFalse(ThemeFilesManager.writable)
+            val theme = ThemePreset.TransparentDark.deriveCustomNoBackground("n")
+            val notSettled = appContext.getString(R.string.user_data_not_settled)
+            assertEquals(notSettled, assertThrows(IOException::class.java) { ThemeFilesManager.saveThemeFiles(theme) }.message)
+            assertEquals(notSettled, assertThrows(IOException::class.java) { ThemeFilesManager.deleteThemeFiles(theme) }.message)
+            // the list page lists, replaces or removes a theme by these: refused, no ghost theme, list unchanged
+            val before = ThemeManager.getAllThemes().map { it.name }
+            assertFalse(ThemeManager.saveTheme(theme))
+            assertFalse(ThemeManager.deleteTheme(theme.name))
+            assertEquals(before, ThemeManager.getAllThemes().map { it.name })
+            assertTrue(ThemeFilesManager.importTheme(zip("t.json" to Json.encodeToString(CustomThemeSerializer, theme))).isFailure)
+            val json = older(Json.encodeToString(CustomThemeSerializer, ThemePreset.TransparentDark.deriveCustomNoBackground("o")))
+            val file = File(HostConfigDir.inUse(ConfigHome.THEME).dir.apply { mkdirs() }, "o.json").apply { writeText(json) }
+            assertEquals(listOf("o"), ThemeFilesManager.listThemes().map { it.name })
+            assertEquals(json, file.readText())
+        } finally {
+            File(appContext.filesDir, "engine").deleteRecursively()
+            phoneStorage()
         }
     }
 }

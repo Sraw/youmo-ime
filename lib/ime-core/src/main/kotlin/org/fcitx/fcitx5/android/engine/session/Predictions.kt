@@ -21,10 +21,11 @@ import org.fcitx.fcitx5.android.engine.user.UserModel
 import org.fcitx.fcitx5.android.engine.user.UserModel.Entry
 
 /**
- * What may follow the text put in (联想), for the input methods other than pinyin (handwriting, the
- * tables), and the text before the cursor it goes on from: one copy, as each kept its own and they
- * drifted apart. [offered] after [predict], from [before] as far as it is words, in the user's order
- * ([PredictionOrder]); none without a [predictor] or [words], nor while nothing is [learning]. A
+ * What may follow the text put in (联想), and the text before the cursor it goes on from: one copy,
+ * as each input method kept its own and they drifted apart. [offered] after [predict], from [before]
+ * as far as it is words, in the user's order ([PredictionOrder]); none without a [predictor] or
+ * [words], nor while nothing is [learning]. Pinyin, which knows the words it committed by their ids
+ * and says itself when to offer, has them [offer]ed after those; the rest of this is the others'. A
  * prediction picked is learned into [habits] after the word it follows, as pinyin learns one, by its
  * text alone: it comes up after that word again, and moves nothing of pinyin's. So is what the session
  * commits ([record]), after [lastEntry]. A long press on one
@@ -59,8 +60,9 @@ class Predictions(
 
     private val order = predictor?.let { p -> PredictionOrder(p) { text -> user?.idsOfText(text)?.firstOrNull() ?: words?.id(text) ?: NO_WORD } }
 
-    // the word [offered] follow: their code
-    private var after = ""
+    /** The word [offered] follow: their code. */
+    internal var after = ""
+        private set
 
     // how the habits ranked [offered]: what 为什么排在这 says (U-81)
     private var ranks: Map<Candidate, HabitRanker.Ranked<Candidate>> = emptyMap()
@@ -149,7 +151,18 @@ class Predictions(
         val w = words
         // nothing where nothing is learned (a password), nor in a search field (U-91)
         val shows = learning() && learnFlags and Commit.NO_PREDICT == 0
-        val offer = if (o == null || w == null || !shows) PredictionOrder.Offer.NONE else TextWords.previous(w.lastTwo(simplify(before))).let { (prev2, prev) -> o.offer(habits, prev2, prev) }
+        show(if (o == null || w == null || !shows) PredictionOrder.Offer.NONE else TextWords.previous(w.lastTwo(simplify(before))).let { (prev2, prev) -> o.offer(habits, prev2, prev) })
+    }
+
+    /**
+     * What may follow [prev] after [prev2], words the session knows by their ids (pinyin's committed
+     * ones), offered: as [PredictionOrder.offer] has it, learned after [learnedAfter], [tail] the
+     * model's word a word it lacks ends with. Whether to offer any is the session's to say.
+     */
+    internal fun offer(prev2: Int, prev: Int, learnedAfter: Int = prev, tail: () -> Int = { NO_WORD }) =
+        show(order?.offer(habits, prev2, prev, learnedAfter, tail) ?: PredictionOrder.Offer.NONE)
+
+    private fun show(offer: PredictionOrder.Offer) {
         offered = offer.candidates
         ranks = offer.ranks
         after = offer.after
@@ -164,10 +177,10 @@ class Predictions(
     }
 
     /** The prediction at [index] as the user model has it, read as it likeliest is; null for none. */
-    fun entry(index: Int): Entry? {
-        val c = offered.getOrNull(index) ?: return null
-        return c.words.singleOrNull()?.let { w -> predictor?.reading(w)?.let { Entry(c.text, it) } }
-    }
+    fun entry(index: Int): Entry? = offered.getOrNull(index)?.let(::entryOf)
+
+    /** [c], one of [offered], as the user model has it, read as it likeliest is; null for none. */
+    internal fun entryOf(c: Candidate): Entry? = c.words.singleOrNull()?.let { w -> predictor?.reading(w)?.let { Entry(c.text, it) } }
 
     /** The record of the last prediction [pick]ed, null for none: what the session's journal takes back if it is deleted (U-03). */
     var picked: Commit? = null
@@ -189,11 +202,12 @@ class Predictions(
         val u = user
         if (!learning() || u == null) return emptySet()
         val c = offered.getOrNull(index)?.takeIf { it.words.size == 1 } ?: return emptySet()
-        return buildSet {
+        return OfferRules.offers(
+            learning = true,
             // picked here, it is counted by its text (see the class), in the record alone
-            if (u.probability(NO_WORD, c.words[0]) > 0f || habits.knows(c.text)) add(Offer.FORGET)
-            if (block != null && blockable(c.text) && entry(index) != null) add(Offer.BLOCK)
-        }
+            forgets = { u.probability(NO_WORD, c.words[0]) > 0f || habits.knows(c.text) },
+            blocks = { block != null && blockable(c.text) && entry(index) != null },
+        )
     }
 
     /** The prediction at [index] forgotten or blocked, as [offers] has it, and what may follow offered again: whether it was. */
@@ -221,14 +235,11 @@ class Predictions(
         Why(r?.tier, r?.uses ?: 0, Code(Kinds.PREDICTION, after))
     }
 
-    /** What may follow offered anew (a prediction turned off, an undo): the page [shown] of [pageSize] if it still has one, else the first. */
-    fun reread(shown: Int, pageSize: Int): Int {
+    /** What may follow offered anew (a prediction turned off, an undo): on the [pager]'s page if it still has some, else the first. */
+    internal fun reread(pager: Pager) {
         predict()
-        return if (hasPage(shown, pageSize)) shown else 0
+        pager.keep(pager.page, offered.size)
     }
-
-    /** Whether page [to] of [pageSize] has predictions on it. */
-    fun hasPage(to: Int, pageSize: Int) = to >= 0 && to * pageSize < offered.size
 
     // as much as a sentence model reads (not from the middle of a pair), only the last words where nothing is learned
     private fun kept(text: String) = if (learning()) recentTail(text) else text.takeLast(WORDS_KEPT).let {

@@ -4,6 +4,8 @@
  */
 package org.fcitx.fcitx5.android.input.keyboard
 
+import org.fcitx.fcitx5.android.engine.InputMethodCatalog
+
 /**
  * What happens to half-typed input when a key does something other than typing -- commits a
  * symbol, starts quick phrase or unicode input. fcitx is reset afterwards either way; this
@@ -48,7 +50,7 @@ object PendingInputPolicy {
      * as the address keys' are, what is typed before it committed as typed ([resolve]): through the
      * engine a digit picks a candidate and `_` is ——, and xiaoming2026@ came out 小明026@. A letter
      * is typed as ever, a space too, and so is a character the input method [reads] as a key of its
-     * own (`Engines.readsAsKey`: the nine keys' digits, 微软双拼's `;`, the pinyins' `'` and a table's
+     * own (`InputMethodCatalog.readsAsKey`: the nine keys' digits, 微软双拼's `;`, the pinyins' `'` and a table's
      * keys, 二笔's `;`, while something is typed), and those the nine keys send for a syllable or a
      * letter.
      */

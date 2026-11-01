@@ -4,10 +4,12 @@
  */
 package org.fcitx.fcitx5.android.engine.lattice
 
+import org.fcitx.fcitx5.android.engine.platform.jvm.JvmFile
 import org.fcitx.fcitx5.android.engine.user.DictionaryCompiler
 import org.fcitx.fcitx5.android.engine.user.DictionaryFile
 import org.fcitx.fcitx5.android.engine.user.UserFixtures
 import org.fcitx.fcitx5.android.engine.user.UserModel
+import org.fcitx.fcitx5.android.engine.user.learn
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -94,7 +96,7 @@ class CoarseWordsTest {
         DictionaryCompiler.compile(listOf(sequenceOf("妮好 ni'hao 0.5", "拟浩 ni'hao 0.1")), file)
         val user = UserModel(
             data.dictionary, data.vocabulary, data.wordIndex,
-            DictionaryFile.open(file),
+            DictionaryFile.open(JvmFile(file)),
         )
         val coarse = CoarseWords.of({ -1 }, listOf("拟浩"))
         val entry = { t: String -> UserModel.Entry(t, UserFixtures.syl("ni", "hao")) }

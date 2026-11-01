@@ -4,8 +4,8 @@
  */
 package org.fcitx.fcitx5.android.engine.pinyin
 
-import org.fcitx.fcitx5.android.engine.host.Keyboard
 import org.fcitx.fcitx5.android.engine.learn.Kinds
+import org.fcitx.fcitx5.android.engine.runtime.Keyboard
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
@@ -181,7 +181,7 @@ class NineKeyLettersTest {
 
     @Test
     fun semicolonIsTypedOnTheKeysHoldingIt() {
-        // 微软's and 紫光's ing, on L: never normalized away
+        // 微软's ing, on L: never normalized away
         assertEquals('\uF8CB', NineKeyLetters.G18.key(';'))
         assertEquals(nineSpCode('5'), NineKeyLetters.NINE_SP.key(';'))
         assertEquals("l;", NineKeyLetters.G18.letters('\uF8CB'))

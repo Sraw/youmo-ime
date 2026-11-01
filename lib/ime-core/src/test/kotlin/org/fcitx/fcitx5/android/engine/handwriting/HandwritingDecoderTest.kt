@@ -14,10 +14,13 @@ import org.fcitx.fcitx5.android.engine.lattice.WordScorer
 import org.fcitx.fcitx5.android.engine.learn.ImportedWords
 import org.fcitx.fcitx5.android.engine.learn.import
 import org.fcitx.fcitx5.android.engine.pinyin.Syllables
+import org.fcitx.fcitx5.android.engine.platform.jvm.JvmFile
 import org.fcitx.fcitx5.android.engine.user.DictionaryCompiler
 import org.fcitx.fcitx5.android.engine.user.DictionaryFile
 import org.fcitx.fcitx5.android.engine.user.UserModel
 import org.fcitx.fcitx5.android.engine.user.UserScorer
+import org.fcitx.fcitx5.android.engine.user.addCount
+import org.fcitx.fcitx5.android.engine.user.learn
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertThrows
@@ -366,7 +369,7 @@ class HandwritingDecoderTest {
         val d = walkers()
         val file = java.io.File.createTempFile("merged", ".ymd").apply { deleteOnExit() }
         DictionaryCompiler.compile(listOf(sequenceOf("行人 hang'ren 0.5")), file, inBase = DictionaryCompiler.inBase(d))
-        val user = UserModel(d.dictionary, d.vocabulary, d.wordIndex, DictionaryFile.open(file))
+        val user = UserModel(d.dictionary, d.vocabulary, d.wordIndex, DictionaryFile.open(JvmFile(file)))
         fun endings() = walkersDecoder(d, user).decode(listOf(read("行"), read("人"))).endings.map { it.words.toString() }
         // unpicked it is the unknown word, below 行 + 人; learned, the file's word is read as one, from its trie
         assertEquals(listOf("[行(hang), 人(ren)]"), endings())

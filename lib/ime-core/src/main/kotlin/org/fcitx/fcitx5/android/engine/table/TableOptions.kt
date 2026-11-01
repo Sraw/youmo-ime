@@ -29,6 +29,8 @@ package org.fcitx.fcitx5.android.engine.table
  * @property selectionKeys keys that pick a candidate while something is typed, the first key the
  *   first on the page: for a table whose codes are digits (a `.conf`'s Selection, letters such
  *   as `qwertyuiop`)
+ * @property roots the table's roots on its letter keys (仓颉, 五笔 86), none for the others
+ * @property keyLabels what of [roots] the keys show; any but none, [TableRoots.inPreedit]'s code is shown as roots too
  */
 data class TableOptions(
     val autoSelect: Boolean = true,
@@ -43,22 +45,28 @@ data class TableOptions(
     val pageSize: Int = 5,
     val endKeys: String = "",
     val selectionKeys: String = "",
+    val roots: TableRoots? = null,
+    val keyLabels: KeyLabels = KeyLabels.NONE,
 ) {
     init {
         require(pageSize >= 1) { "page size $pageSize" }
     }
+
+    /** [code] as the preedit shows it: in roots where the keys show them ([TableRoots.spell]). */
+    fun shown(code: String): String = if (keyLabels == KeyLabels.NONE) code else roots?.spell(code) ?: code
 
     companion object {
         /** fcitx's wbx.conf: 五笔 86 */
         val WUBI = TableOptions(
             noSortInputLength = 2,
             // orderByUse as fcitx's .conf has it, in each preset: what an older build ordered by,
-            // which LibimeMigration.keepOrderByUse keeps on for those who typed with it. A new
+            // which 0.4 kept on for those who typed with it. A new
             // install's 调频 is off (U-28 D7): the addon's setting, pushed to EngineSettings, says so
             // over this; where its flattened config has no OrderPolicy, TableSettings.applyTo keeps this true
             orderByUse = true,
             matchingKey = 'z',
             pinyinKey = 'z',
+            roots = TableRoots.WUBI86,
         )
 
         /**
@@ -67,11 +75,13 @@ data class TableOptions(
          */
         val WUBI_PINYIN = WUBI.copy(pinyinKey = null)
 
-        /** fcitx's cangjie.conf. */
+        /** fcitx's cangjie.conf; its roots on the keys and in the preedit (日月, not ab), as a new install has them. */
         val CANGJIE = TableOptions(
             noMatchAutoSelectLength = 0,
             matchingKey = '*',
             hint = false,
+            roots = TableRoots.CANGJIE,
+            keyLabels = KeyLabels.NAMES,
         )
 
         /** fcitx's zrm.conf: OrderPolicy=Fast, which orders by use as Freq does. */

@@ -6,9 +6,11 @@ package org.fcitx.fcitx5.android.engine.user
 
 import org.fcitx.fcitx5.android.engine.data.escapeValue
 import org.fcitx.fcitx5.android.engine.pinyin.Syllables
+import org.fcitx.fcitx5.android.engine.platform.UserFiles
+import org.fcitx.fcitx5.android.engine.platform.write
 import org.fcitx.fcitx5.android.engine.store.replaceFile
 import org.fcitx.fcitx5.android.engine.user.UserModel.Entry
-import java.io.File
+import org.fcitx.fcitx5.android.engine.user.imports.WordText
 import java.io.IOException
 import java.nio.ByteBuffer
 import java.nio.charset.CharacterCodingException
@@ -22,7 +24,7 @@ import java.nio.charset.CodingErrorAction
  * dictionaries have it (`你好 ni'hao`), written whole on each change: they are lists a user keeps
  * by hand, short, and unlike the learning record not counts. With no [dir], kept in memory.
  */
-class WordLists(private val dir: File?, private val onError: (IOException) -> Unit = {}) {
+class WordLists(private val dir: UserFiles?, private val onError: (IOException) -> Unit = {}) {
     // the lists whose file did not read: what is in memory is not all of them, so not written over them
     private val unread = HashSet<String>()
     private val added = read(ADDED)
@@ -73,10 +75,10 @@ class WordLists(private val dir: File?, private val onError: (IOException) -> Un
     }
 
     private fun read(name: String): LinkedHashSet<Entry> {
-        val file = dir?.let { File(it, name) } ?: return LinkedHashSet()
+        val file = dir?.file(name) ?: return LinkedHashSet()
         return try {
-            if (!file.exists()) LinkedHashSet() else file.useLines { lines ->
-                lines.mapNotNull { LibimeImport.dictionaryEntry(it) }.toCollection(LinkedHashSet())
+            if (!file.taken()) LinkedHashSet() else file.input().bufferedReader().useLines { lines ->
+                lines.mapNotNull { WordText.dictionaryEntry(it) }.toCollection(LinkedHashSet())
             }
         } catch (e: IOException) {
             onError(e)
@@ -87,7 +89,7 @@ class WordLists(private val dir: File?, private val onError: (IOException) -> Un
 
     private fun write(name: String, entries: Collection<Entry>) {
         val dir = dir ?: return
-        val file = File(dir, name)
+        val file = dir.file(name)
         if (name in unread) {
             onError(IOException("$file did not read: not written over"))
             return
@@ -95,8 +97,8 @@ class WordLists(private val dir: File?, private val onError: (IOException) -> Un
         try {
             dir.mkdirs()
             // a whole list or the one before it, never half of one, nor an empty one after a power cut
-            replaceFile(file, File(dir, "$name.new")) { temp ->
-                temp.writeBytes(entries.joinToString("") { "${escapeValue(it.text)} ${code(it.syllables)}\n" }.toByteArray())
+            replaceFile(file, dir.file("$name.new")) { temp ->
+                temp.write(entries.joinToString("") { "${escapeValue(it.text)} ${it.apostrophed()}\n" }.toByteArray())
             }
         } catch (e: IOException) {
             // kept in memory: what the user sees stays as they asked, till the next start
@@ -108,7 +110,7 @@ class WordLists(private val dir: File?, private val onError: (IOException) -> Un
      * A line of a word list the user imports, as other input methods export them too: a word
      * and its pinyin either way round (`幽默 you'mo`, `you mo 幽默`), a count after them left
      * out; a word alone, its [pinyin] null, for the dictionary to read. `!` before the word
-     * blocks it, as [Engines][org.fcitx.fcitx5.android.engine.host.Engines] exports the blocked.
+     * blocks it, as [Engines][org.fcitx.fcitx5.android.engine.runtime.Engines] exports the blocked.
      */
     data class Line(val text: String, val pinyin: String?, val blocked: Boolean) {
         companion object {
@@ -179,9 +181,6 @@ class WordLists(private val dir: File?, private val onError: (IOException) -> Un
             return Line(text, pinyin.joinToString(" ").ifEmpty { null }, blocked)
         }
 
-        /** [syllables] as libime's text dictionaries spell them: `ni'hao`. */
-        fun code(syllables: IntArray) = syllables.joinToString("'") { Syllables.spelling(it) }
-
         /**
          * [text] read as [pinyin], as a user types it in: syllables apart by spaces or `'`, or run
          * together (`nihao`) where they split one way into a syllable a character; ü as v or ü.
@@ -196,11 +195,11 @@ class WordLists(private val dir: File?, private val onError: (IOException) -> Un
             val letters = given.size == chars && word.isNotEmpty() && given.withIndex().all { (i, part) ->
                 part.none { it.isUpperCase() } || part == String(Character.toChars(word.codePointAt(word.offsetByCodePoints(0, i))))
             }
-            if (letters) LibimeImport.entry(word, given.joinToString("'"))?.let { return it }
+            if (letters) WordText.entry(word, given.joinToString("'"))?.let { return it }
             val parts = pieces(pinyin.lowercase())
             if (word.isEmpty() || parts.isEmpty()) return null
             val syllables = if (parts.size == chars) parts else split(parts.joinToString(""), chars) ?: return null
-            return LibimeImport.entry(word, syllables.joinToString("'"))
+            return WordText.entry(word, syllables.joinToString("'"))
         }
 
         // [pinyin]'s syllables, or runs of them, ü as v
@@ -216,7 +215,7 @@ class WordLists(private val dir: File?, private val onError: (IOException) -> Un
             val next = Array(n + 1) { IntArray(count + 1) { -1 } }
             ways[n][0] = 1
             for (i in n - 1 downTo 0) for (k in 1..count) for (j in i + 1..minOf(n, i + MAX_SPELLING)) {
-                if (ways[j][k - 1] == 0 || Syllables.id(LibimeImport.spelling(spelling.substring(i, j))) < 0) continue
+                if (ways[j][k - 1] == 0 || Syllables.id(WordText.spelling(spelling.substring(i, j))) < 0) continue
                 ways[i][k] = minOf(2, ways[i][k] + ways[j][k - 1])
                 next[i][k] = j
             }

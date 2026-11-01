@@ -9,6 +9,7 @@ import org.junit.Assert.assertThrows
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
+import org.fcitx.fcitx5.android.engine.platform.jvm.replaceFile
 import java.io.File
 import java.io.IOException
 

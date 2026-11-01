@@ -22,11 +22,11 @@ import android.widget.ImageView
 import android.widget.TextView
 import androidx.annotation.Size
 import org.fcitx.fcitx5.android.R
-import org.fcitx.fcitx5.android.core.FcitxEvent
-import org.fcitx.fcitx5.android.daemon.FcitxConnection
+import org.fcitx.fcitx5.android.daemon.HostConnection
 import org.fcitx.fcitx5.android.daemon.launchOnReady
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.theme.Theme
+import org.fcitx.fcitx5.android.host.HostEvent
 import org.fcitx.fcitx5.android.input.candidates.floating.PagedCandidatesUi
 import org.fcitx.fcitx5.android.input.floating.FloatingButtonPlacement
 import org.fcitx.fcitx5.android.input.floating.FloatingButtonPlacement.Area
@@ -53,7 +53,7 @@ import kotlin.math.roundToInt
 @SuppressLint("ViewConstructor")
 class CandidatesView(
     service: FcitxInputMethodService,
-    fcitx: FcitxConnection,
+    fcitx: HostConnection,
     theme: Theme
 ) : BaseInputView(service, fcitx, theme) {
 
@@ -68,8 +68,8 @@ class CandidatesView(
     private val itemPaddingVertical by candidatesPrefs.itemPaddingVertical
     private val itemPaddingHorizontal by candidatesPrefs.itemPaddingHorizontal
 
-    private var inputPanel = FcitxEvent.InputPanelEvent.Data()
-    private var paged = FcitxEvent.PagedCandidateEvent.Data.Empty
+    private var inputPanel = HostEvent.InputPanel.EMPTY
+    private var paged = HostEvent.Paged.EMPTY
 
     override val pagedCandidates = true
 
@@ -162,18 +162,20 @@ class CandidatesView(
     }
 
     override fun onStartHandleFcitxEvent() {
-        val inputPanelData = fcitx.runImmediately { inputPanelCached }
-        handleFcitxEvent(FcitxEvent.InputPanelEvent(inputPanelData))
+        // read together; one the host changes meanwhile has its event come after, to the collector
+        val (panel, page) = fcitx.runImmediately { inputPanelCached to pagedCached }
+        handleFcitxEvent(panel)
+        handleFcitxEvent(page)
     }
 
-    override fun handleFcitxEvent(it: FcitxEvent<*>) {
+    override fun handleFcitxEvent(it: HostEvent) {
         when (it) {
-            is FcitxEvent.InputPanelEvent -> {
-                inputPanel = it.data
+            is HostEvent.InputPanel -> {
+                inputPanel = it
                 updateUi()
             }
-            is FcitxEvent.PagedCandidateEvent -> {
-                paged = it.data
+            is HostEvent.Paged -> {
+                paged = it
                 updateUi()
             }
             else -> {}

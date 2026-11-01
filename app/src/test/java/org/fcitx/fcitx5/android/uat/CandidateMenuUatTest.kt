@@ -12,13 +12,13 @@ import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.core.CandidateWord
-import org.fcitx.fcitx5.android.core.FcitxEvent
 import org.fcitx.fcitx5.android.engine.learn.control.BlockScope
 import org.fcitx.fcitx5.android.engine.learn.control.LearningOp
 import org.fcitx.fcitx5.android.engine.learn.control.LearningResult
 import org.fcitx.fcitx5.android.engine.learn.control.MenuItem
 import org.fcitx.fcitx5.android.engine.learn.control.Why
 import org.fcitx.fcitx5.android.engine.learn.control.WordKind
+import org.fcitx.fcitx5.android.host.HostEvent
 import org.fcitx.fcitx5.android.input.KeyboardHarness
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -65,7 +65,7 @@ class CandidateMenuUatTest {
 
     private fun candidates(vararg words: String) {
         h.api.candidates = Array(words.size) { CandidateWord("", words[it], "") }
-        h.emit(FcitxEvent.CandidateListEvent(FcitxEvent.CandidateListEvent.Data(words.size, h.api.candidates)))
+        h.emit(HostEvent.Candidates(words.size, h.api.candidates.toList()))
     }
 
     private fun s(id: Int, vararg args: Any) = h.service.getString(id, *args)
@@ -122,6 +122,23 @@ class CandidateMenuUatTest {
         assertTrue(ops.toString(), ops.any { "Block(index=0, text=是)" in it.toString() })
     }
 
+    // the rows the engine gives, worded: a word never picked has no 忘掉学到的, 删除 or 取消固定 (KeyboardHalvesUatTest's)
+    @Test
+    @Uat("PY-33")
+    fun theMenuShowsTheRowsTheEngineGivesAndForgetOnceLearned() {
+        engine(dictionary.copy(text = "试"))
+        h.start()
+        candidates("是", "时", "事", "试")
+        longPress("试")
+        assertEquals(listOf("试", s(R.string.learning_block), s(R.string.learning_pin), s(R.string.learning_why)), lines())
+        for (absent in listOf(R.string.learning_forget, R.string.learning_delete, R.string.learning_unpin)) assertFalse(s(absent) in lines())
+        menu!!.dismiss()
+        h.idle()
+        engine(LearningResult.Menu("试", WordKind.DICTIONARY, listOf(MenuItem.DELETE, MenuItem.BLOCK, MenuItem.PIN, MenuItem.WHY), null, BlockScope.EVERYWHERE))
+        longPress("试")
+        assertEquals(listOf("试", s(R.string.learning_forget), s(R.string.learning_block), s(R.string.learning_pin), s(R.string.learning_why)), lines())
+    }
+
     @Test
     @Uat("PY-68")
     fun aBlockIsTakenBackOnTheSpot() {
@@ -150,7 +167,7 @@ class CandidateMenuUatTest {
         // the engine tells of the a it was sent: typing
         val typed = org.fcitx.fcitx5.android.core.FormattedText(arrayOf("a"), intArrayOf(0), 1)
         val empty = org.fcitx.fcitx5.android.core.FormattedText.Empty
-        h.emit(FcitxEvent.InputPanelEvent(FcitxEvent.InputPanelEvent.Data(typed, empty, empty, emptyArray())))
+        h.emit(HostEvent.InputPanel(typed, empty, empty))
         h.advance(500)
         assertFalse(w.isShowing)
     }

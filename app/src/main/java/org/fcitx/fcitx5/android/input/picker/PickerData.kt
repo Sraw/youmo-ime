@@ -6,7 +6,7 @@ package org.fcitx.fcitx5.android.input.picker
 
 import androidx.annotation.StringRes
 import org.fcitx.fcitx5.android.R
-import org.fcitx.fcitx5.android.engine.host.Engines
+import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.engine.phrase.EmojiData
 import org.fcitx.fcitx5.android.utils.appContext
 import timber.log.Timber
@@ -148,7 +148,7 @@ object PickerData {
     /** That data, its words too: what the panel's search finds emoji by. */
     val EmojiWords: EmojiData by lazy {
         try {
-            appContext.assets.open(Engines.EMOJI_DATA).use { EmojiData.read(it.reader().readText()) }
+            appContext.assets.open(InputMethodCatalog.EMOJI_DATA).use { EmojiData.read(it.reader().readText()) }
         } catch (e: IOException) {
             Timber.w(e, "no emoji panel")
             EmojiData.EMPTY

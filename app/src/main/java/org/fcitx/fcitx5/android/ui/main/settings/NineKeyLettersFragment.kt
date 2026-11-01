@@ -16,8 +16,8 @@ import com.google.android.material.button.MaterialButton
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import org.fcitx.fcitx5.android.R
-import org.fcitx.fcitx5.android.daemon.FcitxConnection
-import org.fcitx.fcitx5.android.daemon.FcitxDaemon
+import org.fcitx.fcitx5.android.daemon.HostConnection
+import org.fcitx.fcitx5.android.daemon.HostDaemon
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
 import org.fcitx.fcitx5.android.input.keyboard.T9Keyboard
@@ -43,7 +43,7 @@ class NineKeyLettersFragment : KeyCapsPageFragment() {
 
     /** Keeps [value] for the keyboard and has the engine read it. */
     private fun save(value: NineKeyLetters) =
-        saveLetters(value, letters, { pref.setValue(it.serialize()) }, FcitxDaemon.getFirstConnectionOrNull())
+        saveLetters(value, letters, { pref.setValue(it.serialize()) }, HostDaemon.getFirstConnectionOrNull())
 
     override fun rebuild() {
         val ctx = requireContext()
@@ -168,7 +168,7 @@ internal fun saveLetters(
     value: NineKeyLetters,
     kept: NineKeyLetters,
     keep: (NineKeyLetters) -> Unit,
-    fcitx: FcitxConnection?,
+    fcitx: HostConnection?,
     context: CoroutineContext = Dispatchers.Main.immediate,
 ) {
     // as they were: the engine's reload, which reads the user's words again too, is for nothing

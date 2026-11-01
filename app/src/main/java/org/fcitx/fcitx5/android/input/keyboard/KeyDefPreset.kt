@@ -12,7 +12,10 @@ import org.fcitx.fcitx5.android.core.FcitxKeyMapping
 import org.fcitx.fcitx5.android.core.KeyState
 import org.fcitx.fcitx5.android.core.KeyStates
 import org.fcitx.fcitx5.android.core.KeySym
+import org.fcitx.fcitx5.android.core.UNICODE
 import org.fcitx.fcitx5.android.data.InputFeedbacks
+import org.fcitx.fcitx5.android.engine.runtime.Keyboard
+import org.fcitx.fcitx5.android.host.KeyRouter
 import org.fcitx.fcitx5.android.input.keyboard.KeyDef.Appearance.Border
 import org.fcitx.fcitx5.android.input.keyboard.KeyDef.Appearance.Variant
 import org.fcitx.fcitx5.android.input.picker.PickerWindow
@@ -34,12 +37,18 @@ class SymbolKey(
         viewId = viewId,
     ),
     setOf(
-        Behavior.Press(KeyAction.FcitxKeyAction(symbol))
+        Behavior.Press(KeyAction.HostKeyAction(symbol))
     ),
     popup ?: arrayOf(
         Popup.Preview(symbol),
         Popup.Keyboard.Preset(symbol)
     )
+)
+
+/** A key left blank ([NumberPad]'s), so the keys around it stay where they are: no press, nothing for TalkBack. */
+class BlankKey(percentWidth: Float, variant: Variant = Variant.Alternative) : KeyDef(
+    Appearance.Text("", 23f, percentWidth = percentWidth, variant = variant),
+    emptySet(),
 )
 
 /**
@@ -74,8 +83,8 @@ class AlphabetKey(
         variant = variant
     ),
     setOf(
-        Behavior.Press(KeyAction.FcitxKeyAction(character)),
-        Behavior.Swipe(KeyAction.FcitxKeyAction(punctuation))
+        Behavior.Press(KeyAction.HostKeyAction(character)),
+        Behavior.Swipe(KeyAction.HostKeyAction(punctuation))
     ),
     popup ?: arrayOf(
         Popup.AltPreview(character, punctuation),
@@ -97,6 +106,24 @@ class CapsKey(percentWidth: Float = 0.15f) : KeyDef(
         Behavior.LongPress(KeyAction.CapsAction(true)),
         Behavior.DoubleTap(KeyAction.CapsAction(true))
     )
+)
+
+/**
+ * A table's 拼 key, in Shift's place (TextKeyboard): its pinyin lookup turned on or off
+ * ([Keyboard.LOOKUP]). Two, one shown: [on] is dark, as the lookup is then.
+ */
+class LookUpKey(on: Boolean, percentWidth: Float = 0.15f) : KeyDef(
+    Appearance.Text(
+        displayText = KeyRouter.LOOKING_UP,
+        textSize = 18f,
+        textStyle = Typeface.BOLD,
+        percentWidth = percentWidth,
+        variant = if (on) Variant.Accent else Variant.Alternative,
+        // drawn whatever the theme's borders: dark is its point
+        border = if (on) Border.On else Border.Default,
+        viewId = if (on) R.id.button_lookup_on else R.id.button_lookup,
+    ),
+    setOf(Behavior.Press(KeyAction.SymAction(KeySym(UNICODE + Keyboard.LOOKUP), KeyStates.Virtual))),
 )
 
 class LayoutSwitchKey(
@@ -150,19 +177,6 @@ class LanguageKey : KeyDef(
     )
 )
 
-/** 九键's 中/英, beside the space as 搜狗's: [KeyAction.NineKeyLanguageAction]; its label T9Keyboard.languageLabel. */
-class NineKeyLanguageKey(percentWidth: Float) : KeyDef(
-    Appearance.Text(
-        displayText = "中/英",
-        textSize = 16f,
-        percentWidth = percentWidth,
-        variant = Variant.Alternative,
-        viewId = R.id.button_nine_language,
-        contentDescription = R.string.a11y_key_nine_language,
-    ),
-    setOf(Behavior.Press(KeyAction.NineKeyLanguageAction)),
-)
-
 class SpaceKey : KeyDef(
     Appearance.Text(
         displayText = " ",
@@ -192,6 +206,35 @@ class ReturnKey(percentWidth: Float = 0.15f) : KeyDef(
         viewId = R.id.button_return,
         soundEffect = InputFeedbacks.SoundEffect.Return,
         contentDescription = R.string.a11y_key_enter
+    ),
+    setOf(
+        Behavior.Press(KeyAction.SymAction(KeySym(FcitxKeyMapping.FcitxKey_Return)))
+    ),
+    arrayOf(
+        Popup.Menu(
+            arrayOf(
+                Popup.Menu.Item(
+                    "Emoji", R.drawable.ic_baseline_tag_faces_24, KeyAction.PickerSwitchAction()
+                )
+            )
+        )
+    ),
+)
+
+/**
+ * Return as a table shows it while a code is typed: 确定 (its text the keyboard's to set, a
+ * string's), what it does the same ([ReturnKey]'s); shown in its place (TextKeyboard).
+ */
+class ConfirmKey(percentWidth: Float = 0.15f) : KeyDef(
+    Appearance.Text(
+        displayText = "",
+        textSize = 16f,
+        textStyle = Typeface.BOLD,
+        percentWidth = percentWidth,
+        variant = Variant.Accent,
+        border = Border.On,
+        viewId = R.id.button_confirm,
+        soundEffect = InputFeedbacks.SoundEffect.Return,
     ),
     setOf(
         Behavior.Press(KeyAction.SymAction(KeySym(FcitxKeyMapping.FcitxKey_Return)))

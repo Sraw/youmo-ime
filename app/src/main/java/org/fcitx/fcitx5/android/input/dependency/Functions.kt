@@ -6,8 +6,8 @@ package org.fcitx.fcitx5.android.input.dependency
 
 import android.view.ContextThemeWrapper
 import kotlinx.coroutines.CoroutineScope
-import org.fcitx.fcitx5.android.daemon.FcitxConnection
-import org.fcitx.fcitx5.android.daemon.FcitxDaemon
+import org.fcitx.fcitx5.android.daemon.HostConnection
+import org.fcitx.fcitx5.android.daemon.HostDaemon
 import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.input.FcitxInputMethodService
 import org.fcitx.fcitx5.android.input.InputView
@@ -17,7 +17,7 @@ import org.mechdancer.dependency.manager.mustWrapped
 
 
 fun DependencyManager.fcitx() =
-    mustWrapped<UniqueComponentWrapper<FcitxConnection>, FcitxConnection>()
+    mustWrapped<UniqueComponentWrapper<HostConnection>, HostConnection>()
 
 fun DependencyManager.context() =
     mustWrapped<UniqueComponentWrapper<ContextThemeWrapper>, ContextThemeWrapper>()

@@ -11,16 +11,21 @@ import android.transition.TransitionManager
 import android.transition.TransitionSet
 import android.view.Gravity
 import android.view.View
+import android.view.ViewGroup
 import android.view.animation.AlphaAnimation
 import android.view.animation.AnimationSet
 import android.view.animation.TranslateAnimation
+import android.widget.LinearLayout
+import android.widget.FrameLayout
 import android.widget.ProgressBar
-import android.widget.Space
 import android.widget.ViewAnimator
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.input.bar.IdleUiPolicy.Display
 import org.fcitx.fcitx5.android.input.bar.KawaiiBarComponent
+import org.fcitx.fcitx5.android.input.bar.ToolbarButton
+import org.fcitx.fcitx5.android.input.bar.ToolbarButtonLooks
+import org.fcitx.fcitx5.android.input.bar.ToolbarConfig
 import org.fcitx.fcitx5.android.input.bar.ui.idle.ButtonsBarUi
 import org.fcitx.fcitx5.android.input.bar.ui.idle.CalculationUi
 import org.fcitx.fcitx5.android.input.bar.ui.idle.ClipboardSuggestionUi
@@ -45,9 +50,11 @@ import splitties.views.dsl.constraintlayout.startOfParent
 import splitties.views.dsl.core.Ui
 import splitties.views.dsl.core.add
 import splitties.views.dsl.core.frameLayout
+import splitties.views.dsl.core.horizontalLayout
 import splitties.views.dsl.core.lParams
 import splitties.views.dsl.core.matchParent
 import splitties.views.dsl.core.textView
+import splitties.views.dsl.core.wrapContent
 import splitties.views.imageResource
 import timber.log.Timber
 
@@ -82,31 +89,74 @@ class IdleUi(
         updateMenuButtonContentDescription()
     }
 
-    val hideKeyboardButton = ToolButton(ctx, R.drawable.ic_baseline_arrow_drop_down_24, theme).apply {
-        contentDescription = ctx.getString(R.string.hide_keyboard)
-        fixIconSize(ctx.dp(KawaiiBarComponent.ICON_DP))
+    /** Every button the user may put on the bar ([ToolbarConfig]), placed by [arrange]. */
+    val buttons: Map<ToolbarButton, ToolButton> = ToolbarButton.entries.associateWith { button ->
+        val looks = ToolbarButtonLooks.of(button)
+        ToolButton(ctx, looks.icon, theme).apply {
+            contentDescription = ctx.getString(looks.label)
+            fixIconSize(ctx.dp(KawaiiBarComponent.ICON_DP))
+        }
     }
 
+    val hideKeyboardButton = buttons.getValue(ToolbarButton.Hide)
+
     /**
-     * The emoji, on the bar whenever it is idle, as Sogou's 表情: a long press on the comma was
-     * all there was, and nobody finds that. Opens the emoji or kaomoji, whichever was last.
+     * The emoji, as Sogou's 表情: a long press on the comma was all there was, and nobody finds
+     * that. Opens the emoji or kaomoji, whichever was last.
      */
-    val emojiButton = ToolButton(ctx, R.drawable.ic_baseline_tag_faces_24, theme).apply {
-        contentDescription = ctx.getString(R.string.a11y_key_emoji)
-        fixIconSize(ctx.dp(KawaiiBarComponent.ICON_DP))
+    val emojiButton = buttons.getValue(ToolbarButton.Emoji).apply {
         setOnClickListener {
             commonKeyActionListener.listener.onKeyAction(KeyAction.PickerSwitchAction(), KeyActionListener.Source.Keyboard)
         }
     }
 
-    /** Voice input, in a voice build only (VoiceFeature): beside the emoji, as on Sogou's bar */
-    val voiceButton = ToolButton(ctx, R.drawable.ic_baseline_keyboard_voice_24, theme).apply {
-        contentDescription = ctx.getString(R.string.voice_input)
-        fixIconSize(ctx.dp(KawaiiBarComponent.ICON_DP))
-        visibility = View.GONE
+    /** Voice input, in a voice build only (VoiceFeature): by default beside the emoji, as on Sogou's bar */
+    val voiceButton = buttons.getValue(ToolbarButton.Voice)
+
+    /** Whether [button] is where the user sees it: pinned at the right, or on the toolbar while it is out. */
+    fun onScreen(button: ToolbarButton): Boolean = buttons.getValue(button).parent.let {
+        it === pinnedBar || (it != null && currentState == Display.Toolbar)
     }
 
-    val emptyBar = Space(ctx)
+    /** A toggle's button drawn lit while on, as its entry in the ⋯ panel is. */
+    fun setActive(button: ToolbarButton, active: Boolean) =
+        buttons.getValue(button).setIconTint(if (active) theme.accentKeyBackgroundColor else theme.altKeyTextColor)
+
+    // the bar's right, after the toolbar: there whenever the bar is idle
+    private val pinnedBar = horizontalLayout()
+
+    private var arranged: ToolbarConfig.Layout? = null
+
+    private var layoutFor: ((Int) -> ToolbarConfig.Layout)? = null
+
+    /**
+     * How many buttons fit at the right beside the menu key, the middle (a clipboard suggestion,
+     * a sum, the password's digits) kept [MIDDLE_BUTTONS] buttons wide: the rest go onto the toolbar.
+     */
+    private fun roomForPinned(width: Int): Int {
+        if (width <= 0) return Int.MAX_VALUE
+        val button = ctx.dp(KawaiiBarComponent.buttonWidthDp())
+        return (width - button * (1 + MIDDLE_BUTTONS)) / button
+    }
+
+    /** The buttons [layout] places given the room at the right, the others nowhere; again as the bar's width changes. */
+    fun arrange(layout: (maxPinned: Int) -> ToolbarConfig.Layout) {
+        layoutFor = layout
+        place(layout(roomForPinned(root.width)))
+    }
+
+    private fun place(layout: ToolbarConfig.Layout) {
+        if (layout == arranged) return
+        arranged = layout
+        buttons.values.forEach { (it.parent as? ViewGroup)?.removeView(it) }
+        buttonsUi.show(layout.toolbar.map(buttons::getValue))
+        val size = ctx.dp(KawaiiBarComponent.heightDp())
+        val buttonWidth = ctx.dp(KawaiiBarComponent.buttonWidthDp())
+        layout.pinned.forEach { pinnedBar.addView(buttons.getValue(it), LinearLayout.LayoutParams(buttonWidth, size)) }
+    }
+
+    // what the bar shows with nothing else to: the address suggestions (AddressStrip), when there are
+    val emptyBar = FrameLayout(ctx)
 
     val buttonsUi = ButtonsBarUi(ctx, theme)
 
@@ -196,26 +246,22 @@ class IdleUi(
             startOfParent()
             centerVertically()
         })
-        add(hideKeyboardButton, lParams(buttonWidth, size) {
+        // never over the menu key, however many there are
+        add(pinnedBar, lParams(wrapContent, size) {
+            after(menuButton)
             endOfParent()
-            centerVertically()
-        })
-        add(voiceButton, lParams(buttonWidth, size) {
-            before(hideKeyboardButton)
-            centerVertically()
-        })
-        add(emojiButton, lParams(buttonWidth, size) {
-            before(voiceButton)
+            horizontalBias = 1f
+            constrainedWidth = true
             centerVertically()
         })
         add(animator, lParams(matchConstraints, matchParent) {
             after(menuButton)
-            before(emojiButton)
+            before(pinnedBar)
             centerVertically()
         })
         add(workUi, lParams(matchConstraints, matchParent) {
             after(menuButton)
-            before(emojiButton)
+            before(pinnedBar)
             centerVertically()
         })
     }
@@ -223,6 +269,9 @@ class IdleUi(
     override val root = frameLayout {
         add(idleBody, lParams(matchParent, matchParent))
         add(numberRow, lParams(matchParent, matchParent))
+        addOnLayoutChangeListener { _, left, _, right, _, oldLeft, _, oldRight, _ ->
+            if (right - left != oldRight - oldLeft) layoutFor?.let { f -> post { place(f(roomForPinned(width))) } }
+        }
     }
 
     private fun updateMenuButtonContentDescription() {
@@ -322,5 +371,7 @@ class IdleUi(
 
     companion object {
         private const val WORK_BAR_DP = 2
+
+        private const val MIDDLE_BUTTONS = 2
     }
 }

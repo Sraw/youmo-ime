@@ -4,12 +4,12 @@
  */
 package org.fcitx.fcitx5.android.input.hardware
 
-import org.fcitx.fcitx5.android.engine.host.Engines
+import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 
 /**
  * Which input method a hardware keyboard's shortcut, or key, goes to, of the user's [enabled] ones
  * in their order. [english] is English's; [usable] says whether one may be gone to: while the
- * hardware keyboard is typed on, only those it can type (Engines.takesKeyboard).
+ * hardware keyboard is typed on, only those it can type (InputMethodCatalog.takesKeyboard).
  */
 object InputMethodSwitch {
 
@@ -55,5 +55,5 @@ object InputMethodSwitch {
                 ?: english.takeIf { it in enabled }
         }
 
-    private val PINYINS = setOf(Engines.PINYIN, Engines.SHUANGPIN)
+    private val PINYINS = setOf(InputMethodCatalog.PINYIN, InputMethodCatalog.SHUANGPIN)
 }

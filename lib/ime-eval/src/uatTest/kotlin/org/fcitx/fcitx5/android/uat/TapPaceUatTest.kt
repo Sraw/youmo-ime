@@ -17,7 +17,7 @@ class TapPaceUatTest {
     private fun typed(gapMillis: Long): List<String> {
         val r = HostReplay(
             engines = UatEngines.fresh(), im = "engine-wubi", field = EngineReplay.Field.TEXT,
-            inputMethods = listOf("engine-pinyin", "keyboard-us", "engine-t9", "engine-wubi"),
+            inputMethods = listOf("engine-pinyin", "keyboard-us", "engine-wubi"),
         )
         // a slice and a key as a phone takes them, about: so many slices fit between keys
         r.refineMillis = 1

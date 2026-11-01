@@ -20,8 +20,6 @@ import org.junit.Assume.assumeTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
-import java.io.ByteArrayOutputStream
-import java.io.DataOutputStream
 import java.io.File
 import java.nio.ByteBuffer
 import java.util.concurrent.TimeUnit
@@ -181,8 +179,6 @@ class MainTest {
             arrayOf("handwriting", "d", "r", "--model-weights", "1"),
             // the models read the sentences at one ink weight
             arrayOf("handwriting", "d", "r", "--rerank", "m", "--weights", "1,2"),
-            arrayOf("libime", "user", "f"),
-            arrayOf("libime", "table", "f", "--preset", "plain"),
             arrayOf(),
         )
         for (args in usageErrors) assertEquals(args.joinToString(" "), 2, exit(*args))
@@ -278,6 +274,10 @@ class MainTest {
         // the 14 keys' sets typed as codes by `t9 --keys 14`, not as digits
         assertTrue(made.joinToString("\n"), made.any { it.startsWith("t9 ") && it.endsWith("/g14-chat.set.tsv --keys 14") })
         assertTrue(made.joinToString("\n"), made.any { it.startsWith("pinyin ") && "/g14-chat.set.tsv " in it && "--scheme g14-strict" in it })
+        // pinyin's 18 keys as their codes too, not the nine keys' digits; 双拼's 14 keys by `shuangpin`, not `t9`
+        assertTrue(made.joinToString("\n"), made.any { it.startsWith("t9 ") && it.endsWith("/g18-chat.set.tsv --keys 18") })
+        assertTrue(made.joinToString("\n"), made.any { it.startsWith("shuangpin xiaohe ") && it.endsWith("/sp14-chat.set.tsv --keys 14") })
+        assertTrue(made.joinToString("\n"), made.any { it.startsWith("pinyin ") && "/sp14-chat.set.tsv " in it && "--scheme xiaohe-14" in it })
 
         // that run's dir as BASE, as the script wrote it: each set's results, and the options it read them with
         val base = written
@@ -406,31 +406,6 @@ class MainTest {
         assertEquals(text, setOf("0", "1"), sizes.toSet())
     }
 
-    @Test
-    fun libimesHistoryAsText() {
-        // libime's HistoryBigram, version 1: two pools, a sentence of a word in the first
-        val bytes = ByteArrayOutputStream()
-        DataOutputStream(bytes).apply {
-            writeInt(0x000fc315)
-            writeInt(1)
-            writeInt(1)
-            writeInt(1)
-            val word = "你好".toByteArray()
-            writeInt(word.size)
-            write(word)
-            writeInt(0)
-        }
-        val file = tmp.newFile("user.history").apply { writeBytes(bytes.toByteArray()) }
-        val out = StringBuilder()
-        assertEquals(0, runCli(arrayOf("libime", "history", file.path), out, StringBuilder()))
-        assertEquals("你好\n", out.toString())
-        // not libime's, or not there: said, not thrown
-        val err = StringBuilder()
-        assertEquals(1, runCli(arrayOf("libime", "pinyin", file.path), StringBuilder(), err))
-        assertEquals(1, runCli(arrayOf("libime", "table", file.path + ".gone"), StringBuilder(), err))
-        assertEquals(2, err.lines().count { it.startsWith(file.path) })
-    }
-
     // its three modes' lines, not their times; a directory with another's files in it refused, its own reused
     @Test
     fun learnLogBenchRunsItsModes() {
@@ -443,11 +418,7 @@ class MainTest {
         }
         assertEquals(listOf("unfolded log", "fold at start", "folded log", "state", "spellings"), bench().map { it.substringBefore("  ").trim() })
         assertTrue(bench("--counts", data.path).first().startsWith("counts "))
-        assertTrue(bench("--legacy", data.path).first().startsWith("conversion "))
-        // again over what the last left
-        assertTrue(bench("--legacy", data.path)[1].startsWith("catch-up "))
         assertEquals(5, bench().size)
-        assertThrows(IllegalArgumentException::class.java) { bench("--legacy", data.path, "--counts", data.path) }
         File(dir, "notes.txt").writeText("mine")
         assertThrows(IllegalArgumentException::class.java) { bench() }
         // F2907: one commit forms no word, its cost NaN rather than a crash

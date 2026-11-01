@@ -5,14 +5,18 @@
 package org.fcitx.fcitx5.android.uat
 
 import org.fcitx.fcitx5.android.Uat
-import org.fcitx.fcitx5.android.engine.host.Engines
-import org.fcitx.fcitx5.android.engine.host.Engines.UserWord
+import org.fcitx.fcitx5.android.engine.InputMethodCatalog
+import org.fcitx.fcitx5.android.engine.assertRows
+import org.fcitx.fcitx5.android.engine.runtime.Engines
+import org.fcitx.fcitx5.android.engine.runtime.UserWord
 import org.fcitx.fcitx5.android.engine.learn.control.BackupOp
 import org.fcitx.fcitx5.android.engine.learn.control.BackupResult
 import org.fcitx.fcitx5.android.engine.learn.control.LearningOp
 import org.fcitx.fcitx5.android.engine.learn.control.LearningResult
-import org.fcitx.fcitx5.android.engine.libime.LibimeFiles
+import org.fcitx.fcitx5.android.engine.user.ImportFiles
+import org.fcitx.fcitx5.android.engine.user.imports.LibimeFiles
 import org.fcitx.fcitx5.android.engine.phrase.CustomPhrases
+import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
@@ -22,7 +26,7 @@ import org.junit.Test
 /**
  * uat/13-words.md, the user lexicon's half: blocked, learned and imported words, export and
  * learning backups, custom phrases, clearing what was learned. The pages do these through
- * FcitxAPI's calls (the words, the imports, `learning(op)`); here they are those calls, and a
+ * HostApi's calls (the words, the imports, `learning(op)`); here they are those calls, and a
  * page's list is what the engine lists. An import's file is read as the page reads it: a word
  * list's lines as they are, libime's `.dict` through LibimeFiles.
  */
@@ -159,6 +163,22 @@ class LexiconUatTest {
         assertTrue("骁骎" in typed("xiaoqin"))
     }
 
+    // into the user dictionary a .scel is read straight to word-list lines, as the page reads it
+    // (ImportFiles.Scel, PinyinDictionaryFragment's scelLines); into the base it is converted to a
+    // text dictionary first (WD-14z2, ScelDictionaryUatTest)
+    @Test
+    @Uat("WD-14z")
+    fun aScelFileIntoTheUserDictionaryIsImportedWords() = with(EngineReplay()) {
+        val lines = ArrayList<String>()
+        ImportFiles.Scel.read(UatEngines.fixture("extra.scel").readBytes()) { lines += it.line() }
+        assertEquals(2, engines.importWords(lines.asSequence(), "extra.scel").imported)
+        val batch = engines.importBatches().single()
+        assertEquals("extra.scel", batch.file)
+        assertEquals(setOf("骁骎", "琮璟"), engines.importedWords(batch.id).map { it.text }.toSet())
+        val c = typed("congjing")
+        assertTrue("congjing $c", "从警" in c && c.indexOf("琮璟") > c.indexOf("从警"))
+    }
+
     @Test
     @Uat("WD-16")
     fun aPhraseOfTwoLines() = with(EngineReplay()) {
@@ -169,17 +189,35 @@ class LexiconUatTest {
         expectText("张三\n138 0000 0000")
     }
 
+    // a WD-19 row: the input method, dz as its keyboard types it, where the phrase at 1 is among the candidates
+    private data class PhraseCase(val im: String, val keys: String, val expectedIndex: Int)
+
+    private fun dz(letters: NineKeyLetters) = "dz".map(letters::key).joinToString("")
+
     @Test
     @Uat("WD-19")
-    fun phrasesNotOnTheNineKeysButInShuangpin() = with(EngineReplay(im = Engines.T9)) {
-        UatEngines.phrases = "dz,1=北京市海淀区\n"
-        engines.reload()
-        type("39")
-        expectNotAmong("北京市海淀区")
-        focus("")
-        ime(Engines.SHUANGPIN)
-        type("dz")
-        expectAmong("北京市海淀区")
+    fun aPhraseOnEveryKeyboard() = assertRows(
+        listOf(
+            PhraseCase(InputMethodCatalog.PINYIN, EngineReplay.nineKeys("39"), 0) to "pinyin's nine keys: first, as on the 26 keys",
+            PhraseCase(InputMethodCatalog.PINYIN, dz(NineKeyLetters.G14), 0) to "the 14 keys: their codes reach the same phrase",
+            PhraseCase(InputMethodCatalog.SHUANGPIN, "dz", 0) to "双拼 on the full keyboard: first",
+            PhraseCase(InputMethodCatalog.SHUANGPIN, dz(NineKeyLetters.G18), 0) to "双拼's 18 keys: their codes reach it",
+            PhraseCase(InputMethodCatalog.SHUANGPIN, dz(NineKeyLetters.NINE_SP), 0) to "九键双拼: its codes reach it",
+            PhraseCase(InputMethodCatalog.WUBI, "dz", 1) to "a table: after the code's own first, never first",
+            PhraseCase(InputMethodCatalog.ENGLISH, "dz", 1) to "English: after the word typed, which space still commits",
+        ),
+        { it.second },
+    ) { (case, _) ->
+        // each row its own replay: one row's switch and commit are not the next one's state
+        with(EngineReplay(im = case.im)) {
+            UatEngines.phrases = "dz,1=北京市海淀区\n"
+            engines.reload()
+            focus("")
+            type(case.keys)
+            assertEquals("${case.im}: ${candidates.take(4)}", case.expectedIndex, candidates.indexOf("北京市海淀区"))
+            pick("北京市海淀区")
+            expectText("北京市海淀区")
+        }
     }
 
     @Test
@@ -211,11 +249,11 @@ class LexiconUatTest {
         type("shi")
         engines.learning(im, LearningOp.Block(candidates.indexOf("是"), "是"))
         focus("")
-        ime(Engines.WUBI)
+        ime(InputMethodCatalog.WUBI)
         type("fghy")
         engines.learning(im, LearningOp.Block(candidates.indexOf("寸"), "寸"))
         focus("")
-        ime(Engines.PINYIN)
+        ime(InputMethodCatalog.PINYIN)
 
         assertTrue(engines.learning(null, LearningOp.ClearLearned(all = false)) is LearningResult.Cleared)
         assertEquals("带来", taDl(null).first())
@@ -236,7 +274,7 @@ class LexiconUatTest {
         assertTrue("是 not back: shi $shi2", "是" in shi2)
         assertTrue("$c still pinned: shi $shi2", c == "是" || shi2.first() != c)
         focus("")
-        ime(Engines.WUBI)
+        ime(InputMethodCatalog.WUBI)
         type("fghy")
         expectAmong("寸")
     }

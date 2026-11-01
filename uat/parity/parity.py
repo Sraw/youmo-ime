@@ -59,7 +59,9 @@ OVERLAYS = {"拼", "双", "九", "五", "倉", "自", "二", "手", "En"}
 TOGGLE_LABELS = {"chttrans": ("简体", "繁體", "繁体"), "punctuation": ("中文标点", "英文标点"), "fullwidth": ("半角", "全角")}
 HW = {"Left": "KEYCODE_DPAD_LEFT", "Right": "KEYCODE_DPAD_RIGHT", "BackSpace": "KEYCODE_DEL",
       "Return": "KEYCODE_ENTER"}
-# the input methods prepare adds, after pinyin and English (a new install's): the header's ims order
+# the input methods prepare adds, after pinyin and English (a new install's): the header's ims order.
+# 九键拼音 as an input method is the builds' around native-last, the ones the device run compares:
+# from 0.5 on the nine keys are pinyin's keyboard and prepare stops at the add (specs/testing.md)
 ADDED = ("九键拼音", "五笔")
 
 

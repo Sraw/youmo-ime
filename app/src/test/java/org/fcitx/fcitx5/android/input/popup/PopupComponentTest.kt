@@ -153,7 +153,7 @@ class PopupComponentTest {
             return PopupAction.TriggerAction(id).also { send(it) }.outAction to rows
         }
         assertEquals(KeyAction.CommitAction(".") to 1, shown(KeyDef.Popup.Keyboard.Explicit(arrayOf(".", "-"), asIs = true)))
-        assertEquals(KeyAction.FcitxKeyAction(".") to 1, shown(KeyDef.Popup.Keyboard.Explicit(arrayOf(".", "-"))))
+        assertEquals(KeyAction.HostKeyAction(".") to 1, shown(KeyDef.Popup.Keyboard.Explicit(arrayOf(".", "-"))))
         assertEquals(2, shown(KeyDef.Popup.Keyboard.Explicit(arrayOf("2", "a", "!"), symbolsFrom = 2)).second)
         // committed as they are, none can be set apart to be mapped
         assertThrows(IllegalArgumentException::class.java) {

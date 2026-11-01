@@ -62,7 +62,7 @@ class UnicodeInputTest {
         val list = rig.panel.candidates!!
         assertEquals("U+0061 LATIN SMALL LETTER A", list.candidate(0).comment)
         assertEquals("U+4E2D CJK UNIFIED IDEOGRAPH-4E2D", list.candidate(1).comment)
-        assertEquals(TempLayoutHint.Vertical, list.layoutHint)
+        assertEquals(LayoutHint.Vertical, list.layoutHint)
         assertEquals("", list.label(0))
         // display only: Return and Alt+1 do nothing (DisplayOnlyCandidateWord)
         rig.press(KeySyms.RETURN)

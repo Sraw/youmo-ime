@@ -11,8 +11,8 @@ import android.view.ViewGroup
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.fragment.app.Fragment
-import org.fcitx.fcitx5.android.daemon.FcitxConnection
-import org.fcitx.fcitx5.android.daemon.FcitxDaemon
+import org.fcitx.fcitx5.android.daemon.HostConnection
+import org.fcitx.fcitx5.android.daemon.HostDaemon
 import org.fcitx.fcitx5.android.databinding.FragmentSetupBinding
 import org.fcitx.fcitx5.android.ui.main.settings.LearningRestore
 import org.fcitx.fcitx5.android.utils.serializable
@@ -25,8 +25,8 @@ class SetupFragment : Fragment() {
 
     // 以前用过？从备份恢复 (U-106): the file picked and restored here, the settings not reached
     // before the setup is done (review-E-ui M1); fcitx run for it alone, until the page goes
-    private var fcitx: FcitxConnection? = null
-    private val restore = LearningRestore(this, { fcitx ?: FcitxDaemon.connect(javaClass.name).also { fcitx = it } })
+    private var fcitx: HostConnection? = null
+    private val restore = LearningRestore(this, { fcitx ?: HostDaemon.connect(javaClass.name).also { fcitx = it } })
     private lateinit var pickBackup: ActivityResultLauncher<Array<String>>
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -35,7 +35,7 @@ class SetupFragment : Fragment() {
     }
 
     override fun onDestroy() {
-        if (fcitx != null) FcitxDaemon.disconnect(javaClass.name)
+        if (fcitx != null) HostDaemon.disconnect(javaClass.name)
         fcitx = null
         super.onDestroy()
     }

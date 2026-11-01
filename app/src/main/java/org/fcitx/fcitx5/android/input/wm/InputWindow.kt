@@ -6,9 +6,11 @@ package org.fcitx.fcitx5.android.input.wm
 
 import android.view.Gravity
 import android.view.View
+import androidx.annotation.StringRes
 import androidx.transition.Fade
 import androidx.transition.Slide
 import androidx.transition.Transition
+import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.input.dependency.context
 import org.mechdancer.dependency.Dependent
 import org.mechdancer.dependency.IUniqueComponent
@@ -73,6 +75,13 @@ sealed class InputWindow : Dependent {
         open fun onCreateBarExtension(): View? {
             return null
         }
+
+        /** Where the title's ← goes: the keyboard when null; a panel opened from another, back to that one. */
+        open val returnTo: (() -> InputWindow)? = null
+
+        /** What ← is said to do, for [returnTo]. */
+        @get:StringRes
+        open val returnLabel: Int = R.string.back_to_keyboard
 
         override val type: KClass<out IUniqueComponent<*>> by lazy { defaultType() }
 

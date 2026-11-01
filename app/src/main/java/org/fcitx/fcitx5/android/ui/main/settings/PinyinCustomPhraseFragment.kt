@@ -8,6 +8,9 @@ import android.net.Uri
 import android.os.Bundle
 import android.text.InputFilter
 import android.text.InputType
+import android.text.SpannableString
+import android.text.Spanned
+import android.text.TextUtils
 import android.view.LayoutInflater
 import android.view.Menu
 import android.view.MenuInflater
@@ -17,6 +20,7 @@ import android.view.ViewGroup
 import android.view.inputmethod.EditorInfo
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.annotation.VisibleForTesting
 import androidx.appcompat.app.AlertDialog
 import androidx.core.view.MenuProvider
 import androidx.fragment.app.Fragment
@@ -25,6 +29,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.navigation.fragment.findNavController
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -64,8 +69,14 @@ class PinyinCustomPhraseFragment : Fragment(), OnItemChangedListener<PinyinCusto
 
     private val dustman = NaiveDustman<PinyinCustomPhrase>()
 
-    // false when the file could not be read: the fragment leaves, and saves nothing over it
-    private var readable = true
+    // false till the file is read (on IO: the first read may wait on the move of fcitx's data), and when it
+    // could not be: nothing is saved over it, and a failed read leaves the page
+    private var readable = false
+
+    // the read of the view's list: an import or export delivered before it ends (the activity made anew
+    // under the file picker) waits on it, else it is added to a list the read then takes for the file's,
+    // or writes an empty one
+    private var read: Job? = null
 
     // the file as last loaded or saved here: what the keyboard changed since is kept on save
     private var loaded = emptyList<PinyinCustomPhrase>()
@@ -91,18 +102,12 @@ class PinyinCustomPhraseFragment : Fragment(), OnItemChangedListener<PinyinCusto
         container: ViewGroup?,
         savedInstanceState: Bundle?
     ): View {
-        val initialItems = try {
-            CustomPhraseManager.load().also { loaded = it }
-        } catch (e: IOException) {
-            Timber.w(e, "custom phrases")
-            requireContext().toast(e)
-            readable = false
-            emptyList()
-        }
+        // a view made anew reads the file anew
+        readable = false
         ui = object : BaseDynamicListUi<PinyinCustomPhrase>(
             requireContext(),
             Mode.FreeAdd("", converter = { PinyinCustomPhrase("", 1, "") }),
-            initialItems,
+            emptyList(),
             enableOrder = true,
             initCheckBox = { entry ->
                 isChecked = entry.enabled
@@ -111,6 +116,12 @@ class PinyinCustomPhraseFragment : Fragment(), OnItemChangedListener<PinyinCusto
                 }
             }
         ) {
+            // nothing added before the file is read: the read's list would take it for the file's, and
+            // a page left before the read ends saves nothing
+            override fun updateFAB() {
+                if (readable) super.updateFAB() else fab.hide()
+            }
+
             override fun showEntry(x: PinyinCustomPhrase): String {
                 val s = x.serialize()
                 val firstLF = s.indexOf('\n')
@@ -137,11 +148,7 @@ class PinyinCustomPhraseFragment : Fragment(), OnItemChangedListener<PinyinCusto
                 }
                 keyField.apply {
                     isSingleLine = true
-                    filters = arrayOf(
-                        InputFilter { source, _, _, _, _, _ ->
-                            source.filter { it.code in 'A'.code..'Z'.code || it.code in 'a'.code..'z'.code }
-                        }
-                    )
+                    filters = arrayOf(InputFilter { source, start, end, _, _, _ -> keyTyped(source, start, end) })
                     imeOptions = EditorInfo.IME_ACTION_NEXT
                     inputType =
                         InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_NORMAL or InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS
@@ -217,14 +224,42 @@ class PinyinCustomPhraseFragment : Fragment(), OnItemChangedListener<PinyinCusto
         return ui.root
     }
 
+    // kept lower case, as the engine matches them (CustomPhrases.parse); null when nothing changes, so
+    // an input method's composing span is kept
+    private fun keyTyped(source: CharSequence, start: Int, end: Int): CharSequence? {
+        val typed = source.subSequence(start, end)
+        val kept = typed.filter { it.code in 'A'.code..'Z'.code || it.code in 'a'.code..'z'.code }.toString().lowercase()
+        return when {
+            kept == typed.toString() -> null
+            // the input method's composing span kept on what is left: without it, one that composes and
+            // then appends would type the letters twice
+            source is Spanned -> SpannableString(kept).also { TextUtils.copySpansFrom(source, start, start + kept.length, null, it, 0) }
+            else -> kept
+        }
+    }
+
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
-        if (!readable) {
-            findNavController().popBackStack()
-            return
+        read = viewLifecycleOwner.lifecycleScope.launch {
+            val items = try {
+                withContext(Dispatchers.IO) { load() }
+            } catch (e: IOException) {
+                Timber.w(e, "custom phrases")
+                requireContext().toast(e)
+                findNavController().popBackStack()
+                return@launch
+            }
+            loaded = items
+            ui.addItems(items)
+            // what was read is not a change to save
+            dustman.reset(items.associateBy { it.serialize() })
+            readable = true
+            ui.updateFAB()
+            // import and export too: one before the read would export nothing, or be lost as the add is
+            requireActivity().invalidateMenu()
+            viewModel.toolbarButton.value = if (ui.entries.isNotEmpty()) ButtonMode.EDIT else ButtonMode.NONE
         }
-        viewModel.toolbarButton.value =
-            if (ui.entries.isNotEmpty()) ButtonMode.EDIT else ButtonMode.NONE
+        viewModel.toolbarButton.value = ButtonMode.NONE
         requireActivity().addMenuProvider(
             EditDeleteMenuProvider(
                 buttonMode = viewModel.toolbarButton,
@@ -239,11 +274,11 @@ class PinyinCustomPhraseFragment : Fragment(), OnItemChangedListener<PinyinCusto
         // in the overflow: a file of phrases, as fcitx writes them, in and out
         requireActivity().addMenuProvider(object : MenuProvider {
             override fun onCreateMenu(menu: Menu, menuInflater: MenuInflater) {
-                menu.add(R.string.import_file).setOnMenuItemClickListener {
+                menu.add(R.string.import_file).setEnabled(readable).setOnMenuItemClickListener {
                     importLauncher.launch("text/*")
                     true
                 }
-                menu.add(R.string.export_file).setOnMenuItemClickListener {
+                menu.add(R.string.export_file).setEnabled(readable).setOnMenuItemClickListener {
                     exportLauncher.launch("youmo-phrases.txt")
                     true
                 }
@@ -254,9 +289,13 @@ class PinyinCustomPhraseFragment : Fragment(), OnItemChangedListener<PinyinCusto
     }
 
     /** Adds the phrases of a file the user picks, those the list has not already; saved as the page is left. */
-    private fun importPhrases(uri: Uri) {
+    @VisibleForTesting
+    internal fun importPhrases(uri: Uri) {
         val ctx = requireContext()
         lifecycleScope.launch {
+            read?.join()
+            // the read failed and the page is left, or its view went with the read
+            if (!readable) return@launch
             ctx.showingFileErrors("custom phrases import") {
                 val bytes = withContext(Dispatchers.IO) {
                     ctx.contentResolver.openInputStreamOrThrow(uri).use { it.readImported() }
@@ -272,11 +311,16 @@ class PinyinCustomPhraseFragment : Fragment(), OnItemChangedListener<PinyinCusto
         }
     }
 
-    private fun exportPhrases(uri: Uri) {
+    /** Writes the list to a file the user picks, once the file is read. */
+    @VisibleForTesting
+    internal fun exportPhrases(uri: Uri) {
         val ctx = requireContext()
-        // a copy: written on another thread while the list may change
-        val items = ui.entries.toList()
         lifecycleScope.launch {
+            // as an import: one delivered before the read ends would write an empty file
+            read?.join()
+            if (!readable) return@launch
+            // a copy: written on another thread while the list may change
+            val items = ui.entries.toList()
             ctx.showingFileErrors("custom phrases export") {
                 withContext(Dispatchers.IO) {
                     val temp = File(ctx.cacheDir, "customphrase.export")
@@ -348,6 +392,12 @@ class PinyinCustomPhraseFragment : Fragment(), OnItemChangedListener<PinyinCusto
     override fun onDestroy() {
         ui.removeItemChangedListener()
         super.onDestroy()
+    }
+
+    companion object {
+        // the file's read; a test holds it to see the page while it waits
+        @VisibleForTesting
+        internal var load: () -> List<PinyinCustomPhrase> = { CustomPhraseManager.load() }
     }
 
 }

@@ -240,6 +240,20 @@ class EditingSession(
     }
 
     /**
+     * [before] and [after] UTF-16 units either side of the cursor replaced by [text], the cursor
+     * [cursor] into it as [commitText] has it: one change, the editor sees no half of it (the
+     * address bar's suggestion, a half-typed suffix finished).
+     */
+    fun replaceAround(before: Int, after: Int, text: String, cursor: Int = -1) {
+        checkThread()
+        if (!editor.isAvailable) return
+        editor.batchEdit {
+            if (before > 0 || after > 0) deleteSurrounding(before, after, inCodePoints = false)
+            commitText(text, cursor)
+        }
+    }
+
+    /**
      * Commits [text], replacing the composing region if there is one, the selection if there
      * is one, or simply inserting before the cursor.
      *

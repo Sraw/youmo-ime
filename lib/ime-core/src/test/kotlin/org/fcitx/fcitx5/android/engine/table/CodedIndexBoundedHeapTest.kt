@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.engine.table
 
+import org.fcitx.fcitx5.android.engine.platform.jvm.JvmFile
 import org.fcitx.fcitx5.android.engine.session.Action
 import org.fcitx.fcitx5.android.engine.user.DictionaryCompiler
 import org.fcitx.fcitx5.android.engine.user.DictionaryFile
@@ -32,7 +33,7 @@ class CodedIndexBoundedHeapTest {
         val (table, lines) = manyWords(chars = CHARS)
         val merged = File(folder.root, "merged.ymd")
         DictionaryCompiler.compile(listOf(lines), merged)
-        val d = DictionaryFile.open(merged)
+        val d = DictionaryFile.open(JvmFile(merged))
         assertTrue(d.size >= 2_000_000)
         val dest = File(folder.root, "wubi.ymc")
         CodedIndex.build(table, d, dest, "k")

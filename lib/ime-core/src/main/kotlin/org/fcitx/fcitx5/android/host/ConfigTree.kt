@@ -8,8 +8,7 @@ package org.fcitx.fcitx5.android.host
  * fcitx's `RawConfig` (`fcitx-config/rawconfig.cpp`): a named node with a value and children in
  * the order they were made, reached by a path of names joined by `/`. [implicit] is what
  * `Configuration::save` sets for an option at its default (`configuration.cpp:126-139`): written as
- * a comment, so a file says nothing of it. The app's `RawConfig` is converted to and from this at
- * the host's edge.
+ * a comment, so a file says nothing of it. The app's pages read and write its [leaves] ([of]).
  */
 class ConfigTree(val name: String = "", var value: String = "") {
     var implicit: Boolean = false
@@ -41,5 +40,12 @@ class ConfigTree(val name: String = "", var value: String = "") {
             }
         }
         walk(this, "")
+    }
+
+    companion object {
+        /** The tree whose [leaves] are [leaves]: each made at its path, in order. */
+        fun of(leaves: Map<String, String>): ConfigTree = ConfigTree().also { tree ->
+            leaves.forEach { (path, value) -> tree[path].value = value }
+        }
     }
 }

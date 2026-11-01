@@ -5,7 +5,7 @@
 package org.fcitx.fcitx5.android.uat
 
 import org.fcitx.fcitx5.android.Uat
-import org.fcitx.fcitx5.android.engine.host.Engines
+import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
@@ -85,7 +85,7 @@ class HardwareKeysUatTest {
 
     @Test
     @Uat("HK-21")
-    fun returnPutsTheWrittenInThenGoesToTheApp() = with(EngineReplay(im = Engines.HANDWRITING)) {
+    fun returnPutsTheWrittenInThenGoesToTheApp() = with(EngineReplay(im = InputMethodCatalog.HANDWRITING)) {
         write("人", "入", "八")
         expectPreedit("人")
         pressKey(EngineReplay.RETURN)
@@ -99,7 +99,7 @@ class HardwareKeysUatTest {
 
     @Test
     @Uat("HK-23")
-    fun englishTypesTheKeysAsPressed() = with(EngineReplay(im = Engines.ENGLISH)) {
+    fun englishTypesTheKeysAsPressed() = with(EngineReplay(im = InputMethodCatalog.ENGLISH)) {
         press("teh ")
         expectText("teh ")
         assertTrue(page.toString(), page.isEmpty())

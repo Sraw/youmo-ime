@@ -4,7 +4,7 @@
  */
 package org.fcitx.fcitx5.android.engine.learn.control
 
-import org.fcitx.fcitx5.android.engine.host.Engines.UserWord
+import org.fcitx.fcitx5.android.engine.runtime.UserWord
 import org.fcitx.fcitx5.android.engine.learn.LearnState
 import org.fcitx.fcitx5.android.engine.learn.Mine
 

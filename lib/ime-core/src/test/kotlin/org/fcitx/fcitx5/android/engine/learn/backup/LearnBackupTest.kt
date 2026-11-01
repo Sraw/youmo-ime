@@ -13,23 +13,21 @@ import org.fcitx.fcitx5.android.engine.learn.LearnRecords
 import org.fcitx.fcitx5.android.engine.learn.LearnState
 import org.fcitx.fcitx5.android.engine.learn.corrected
 import org.fcitx.fcitx5.android.engine.learn.row
+import org.fcitx.fcitx5.android.engine.platform.MemoryFiles
 import org.fcitx.fcitx5.android.engine.store.RecordFormat
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
-import org.junit.Rule
 import org.junit.Test
-import org.junit.rules.TemporaryFolder
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
-import java.io.File
 import java.io.IOException
 
 class LearnBackupTest {
-    @get:Rule
-    val folder = TemporaryFolder()
+
+    private val root = MemoryFiles()
 
     private val head = BackupHead(1_792_461_600_000L, 3, 42L, BackupHead.SAVED, "0.3.1")
 
@@ -54,6 +52,22 @@ class LearnBackupTest {
         assertEquals(blocked, read.blocked)
         // 不再联想 rides in the snapshot
         assertTrue(("你" to "好") in read.state.noPredict)
+    }
+
+    @Test
+    fun theAddressBarsBookReadsBackAndAnOlderBackupHasNone() {
+        val book = AddressData("3\t@qq.com\n1\t.org", "2\tzhang@qq.com")
+        assertEquals(book, LearnBackup.read(LearnBackup.bytes(head, learned(), emptyList(), emptyList(), book)).addresses)
+        // empty, still told from none
+        assertEquals(AddressData("", ""), LearnBackup.read(LearnBackup.bytes(head, learned(), emptyList(), emptyList(), AddressData("", ""))).addresses)
+        // v0.4.0's, a bare log: none
+        assertNull(LearnBackup.read(LearnBackup.bytes(head, learned(), emptyList(), emptyList())).addresses)
+        assertNull(LearnBackup.read(logBytes(learned())).addresses)
+        // contract: of this file's range, which v0.4.0 skips as a later build's (ORIGIN aside), so a
+        // 0.5 backup restores on 0.4.0; mutation cannot see it
+        for (type in listOf(LearnBackup.ADDRESS_COUNTS, LearnBackup.ADDRESSES)) {
+            assertTrue(type in 70..79 && type != BackupMerge.ORIGIN && type != LearnBackup.END)
+        }
     }
 
     @Test
@@ -191,9 +205,9 @@ class LearnBackupTest {
     @Test
     fun aLogWrittenOpensAsTheState() {
         val state = learned()
-        val file = File(folder.root, LearnLog.FILE)
-        file.outputStream().use { LearnBackup.writeLog(it, state) }
-        assertEquals(state.dump(), LearnBackup.replay(file.readBytes()).first.dump())
+        val file = root.file(LearnLog.FILE)
+        file.create().use { LearnBackup.writeLog(it, state) }
+        assertEquals(state.dump(), LearnBackup.replay(file.read()).first.dump())
         val log = LearnLog(file, FakeClock()).apply { open() }
         assertEquals(state.dump(), log.state.dump())
         log.close()
@@ -204,5 +218,13 @@ class LearnBackupTest {
         out.write(LearnRecords.FORMAT.header())
         LearnLog.writeSnapshot(state, state.cut, out::write)
         return out.toByteArray()
+    }
+
+    @Test
+    fun addressesPastWriteUtfsLimitAreLeftOutNotTheBackup() {
+        val long = AddressData("1\t" + "a".repeat(70_000), "1\ta@qq.com")
+        val read = LearnBackup.read(LearnBackup.bytes(head, learned(), listOf(ListedWord("幽默", "you'mo")), emptyList(), long))
+        assertNull(read.addresses)
+        assertEquals(listOf(ListedWord("幽默", "you'mo")), read.added)
     }
 }

@@ -48,7 +48,7 @@ class SharedWordsTest {
     fun sharedWordsComeAfterTheTablesOwnAndBlockedOnesUnderTheCodeBlockedThere() {
         val shared = Fake(wubi, listOf("你门", "你们"))
         // nothing commits itself: wqwu's one entry would, and no word from outside the table takes its place (D8)
-        val session = TableSession(wubi, TableOptions.WUBI.copy(autoSelect = false), user = TableUser(wubi), shared = shared, language = learning())
+        val session = TableSession(wubi, TableOptions.WUBI.copy(autoSelect = false), shared = shared, language = learning())
         // 你门 is wqwu as 你们 is: the table's first
         assertEquals(listOf("你们", "你门"), session.type("wqwu").second.candidates)
         assertEquals(setOf(Offer.FORGET, Offer.PIN, Offer.BLOCK), session.offers(1))
@@ -65,7 +65,7 @@ class SharedWordsTest {
     @Test
     fun forgottenAWordIsForgottenByAllTheTablesOwnOnceLearned() {
         val shared = Fake(wubi, listOf("你门"))
-        val session = TableSession(wubi, TableOptions.WUBI.copy(autoSelect = false), user = TableUser(wubi), shared = shared, language = learning())
+        val session = TableSession(wubi, TableOptions.WUBI.copy(autoSelect = false), shared = shared, language = learning())
         session.type("wqwu")
         // the table's own, nothing learned of it: nothing to forget (U-28)
         assertFalse(Offer.FORGET in session.offers(0))

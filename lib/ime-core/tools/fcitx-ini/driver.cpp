@@ -13,9 +13,14 @@
 using namespace fcitx;
 
 static void clear(RawConfig &c) { c.setComment(""); for (auto &n : c.subItems()) clear(*c.get(n)); }
-static Option<EngineTableConfig> *table(AndroidEngineConfig &c, const std::string &g) {
-    if (g == "Wubi") return &c.wubi; if (g == "Cangjie") return &c.cangjie; if (g == "Ziranma") return &c.ziranma;
-    if (g == "Erbi") return &c.erbi; if (g == "WubiPinyin") return &c.wubiPinyin; return nullptr;
+// [f] over table group [g]'s option and the page type that shows it; false for no table
+template <typename F> static bool table(AndroidEngineConfig &c, const std::string &g, F f) {
+    if (g == "Wubi") return f(c.wubi, EngineLetterTablePage{}), true;
+    if (g == "Cangjie") return f(c.cangjie, EngineNamedTablePage{}), true;
+    if (g == "Ziranma") return f(c.ziranma, EngineTablePage{}), true;
+    if (g == "Erbi") return f(c.erbi, EngineTablePage{}), true;
+    if (g == "WubiPinyin") return f(c.wubiPinyin, EngineLetterTablePage{}), true;
+    return false;
 }
 // stdin: an INI file, read as the addon reads it at start (readAsIni: a full load).
 // then each "page <group> <ini>": a page's partial save (setConfigForInputMethod); <group> a table's or "-".
@@ -32,7 +37,7 @@ int main(int argc, char **argv) {
         if (a == "page") {
             std::string group = argv[++i]; std::stringstream p(argv[++i]);
             RawConfig page; readFromIni(page, p);
-            if (auto *t = table(config, group)) { EngineTableConfig v = t->value(); v.load(page, true); t->setValue(v); }
+            table(config, group, [&](auto &t, auto) { auto v = t.value(); v.load(page, true); t.setValue(v); });
             config.load(page, true);
             continue;
         }
@@ -44,7 +49,7 @@ int main(int argc, char **argv) {
             else if (k == "shuangpin") { EngineShuangpinPage p; p.load(all, true); p.save(out); }
             else if (k == "english") { EngineEnglishPage p; p.load(all, true); p.save(out); }
             else if (k == "handwriting") { EngineHandwritingPage p; p.load(all, true); p.save(out); }
-            else { EngineTablePage p; p.load(all, true); RawConfig own; table(config, k)->value().save(own); p.load(own, true); p.save(out); }
+            else table(config, k, [&](auto &t, auto p) { p.load(all, true); RawConfig own; t.value().save(own); p.load(own, true); p.save(out); });
         }
         if (nodesc) clear(out);
         writeAsIni(out, std::cout);

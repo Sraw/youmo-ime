@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.uat
 
+import android.graphics.Outline
 import android.graphics.drawable.GradientDrawable
 import android.view.View
 import android.widget.TextView
@@ -27,6 +28,7 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 import kotlin.math.abs
@@ -78,11 +80,45 @@ class FloatingUatTest {
         assertFalse("${keys()}", floatingNow())
     }
 
+    // Robolectric does not lay the shown keyboard out again on a rotation (onConfigurationChanged
+    // leaves its window as it was): the service made anew in the turned screen, its place read
+    // from where it was left, as a rotation's new input view reads it
+    @Test
+    @Uat("TB-23")
+    fun leftInACornerItIsThereNextTimeAndAfterARotation() {
+        prefs.set(floating, true)
+        h.start()
+        h.drag(grip(), 0f, 0f)
+        h.after(1000)
+        val at = keys()
+        fun KeyboardHarness.inTheCorner(what: String) {
+            after(1000)
+            relayout()
+            val w = service.resources.displayMetrics.widthPixels
+            val ht = service.resources.displayMetrics.heightPixels
+            val now = box(board)
+            assertTrue("$what floating: $now in $w", now.width() < w * 0.9)
+            assertTrue("$what: $now in $w x $ht, left at $at", now.left < w * 0.1 && now.top < ht * 0.2)
+        }
+        h.inTheCorner("left")
+        h.start()
+        h.inTheCorner("shown again")
+        assertTrue("same place: ${keys()} $at", abs(keys().left - at.left) <= 2 && abs(keys().top - at.top) <= 2)
+        h.close()
+        for (q in listOf("+land", "+port")) {
+            RuntimeEnvironment.setQualifiers(q)
+            KeyboardHarness().use { k ->
+                k.start()
+                k.inTheCorner(q)
+            }
+        }
+    }
+
     // the floating keyboard is cut to its outline as the device draws it (a software draw does not
     // clip, so the outline is read rather than a pixel)
     private fun cornerRadius(k: KeyboardHarness): Float {
         val card = KeyboardHarness.all(k.inputView.rootView).first { it.outlineProvider?.javaClass?.name?.contains("FloatingCorners") == true }
-        return android.graphics.Outline().also { card.outlineProvider.getOutline(card, it) }.radius
+        return Outline().also { card.outlineProvider.getOutline(card, it) }.radius
     }
 
     @Test

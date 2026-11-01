@@ -11,12 +11,13 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
-import org.fcitx.fcitx5.android.daemon.FcitxDaemon
+import org.fcitx.fcitx5.android.daemon.HostDaemon
 import org.fcitx.fcitx5.android.data.pinyin.dict.SourceNames
+import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.engine.data.DataFile
 import org.fcitx.fcitx5.android.engine.data.PinyinData
-import org.fcitx.fcitx5.android.engine.host.BackgroundWork
-import org.fcitx.fcitx5.android.engine.host.Engines
+import org.fcitx.fcitx5.android.engine.platform.jvm.JvmFile
+import org.fcitx.fcitx5.android.engine.runtime.BackgroundWork
 import org.fcitx.fcitx5.android.engine.user.DictionaryCompiler
 import org.fcitx.fcitx5.android.engine.user.DictionaryFile
 import org.fcitx.fcitx5.android.utils.appContext
@@ -182,7 +183,7 @@ object MergedDictionary {
 
     private val assetBase by lazy { assetBase() }
 
-    private fun mapped(): ByteBuffer = appContext.assets.openFd(Engines.PINYIN_DATA).use { fd ->
+    private fun mapped(): ByteBuffer = appContext.assets.openFd(InputMethodCatalog.PINYIN_DATA).use { fd ->
         FileInputStream(fd.fileDescriptor).channel.use { it.map(FileChannel.MapMode.READ_ONLY, fd.startOffset, fd.length) }
     }
 
@@ -193,7 +194,7 @@ object MergedDictionary {
         val crc = CRC32()
         crc.update(data.duplicate().apply { limit(minOf(FINGERPRINT_BYTES, capacity())) })
         crc.update(data.duplicate().apply { position(maxOf(0, capacity() - FINGERPRINT_BYTES)) })
-        Base("${Engines.PINYIN_DATA} ${data.capacity()} ${crc.value}") { DictionaryCompiler.inBase(PinyinData.load(mapped(), verify = false)) }
+        Base("${InputMethodCatalog.PINYIN_DATA} ${data.capacity()} ${crc.value}") { DictionaryCompiler.inBase(PinyinData.load(mapped(), verify = false)) }
     } catch (e: IOException) {
         Timber.w(e, "pinyin data: merged words not split off the base")
         null
@@ -203,7 +204,7 @@ object MergedDictionary {
 
     /** Told once the engine has a file it did not: the engine read again. */
     @Volatile
-    var made: () -> Unit = { FcitxDaemon.getFirstConnectionOrNull()?.runIfReady { reloadEngine() } }
+    var made: () -> Unit = { HostDaemon.getFirstConnectionOrNull()?.runIfReady { reloadEngine() } }
 
     // a reload not run (fcitx disconnected meanwhile) is no failure of the compile: the next additions pick the file up
     private fun tellMade() {
@@ -231,9 +232,10 @@ object MergedDictionary {
      * leave the engine told of a file it does not have): never compiled nor read through here, on
      * the fcitx thread. The file on disk of the sources as they are is mapped at once at a fresh
      * start, checked through after, off the thread. One of other sources than [dir]'s now (or none
-     * yet) has a compile queued, and is used until it is done.
+     * yet) has a compile queued, and is used until it is done. Not [compiles] (fcitx's data not
+     * settled, nothing to be written there): nothing queued, what is there used as it is.
      */
-    fun current(dir: File): Seen {
+    fun current(dir: File, compiles: Boolean = true): Seen {
         val sources = sources(dir)
         val unconverted = LegacyTextConversion.toConvert(dir)
         if (unconverted.isNotEmpty()) {
@@ -241,19 +243,19 @@ object MergedDictionary {
             // converted and compiled, without the 词库 page opened; the file in use meanwhile, or the one
             // there (a backup's texts restored beside it) as it is, mapped before the compile is queued (F3604)
             val now = opened.get() ?: mapUnchecked(File(dir, FILE), null)
-            refresh(dir)
+            if (compiles) refresh(dir)
             return Seen(now?.file, now?.let { "$FILE ${it.stamp}" } ?: (sources + unconverted).joinToString(" ") { it.name }, staleOf(now, base()))
         }
         if (sources.isEmpty()) {
             // a file left by a kill after the last was deleted: deleted then
-            if (opened.get() != null || File(dir, FILE).exists()) refresh(dir)
+            if (compiles && (opened.get() != null || File(dir, FILE).exists())) refresh(dir)
             val now = opened.get()
             return Seen(now?.file, now?.let { "$FILE ${it.stamp}" }.orEmpty())
         }
         val base = base()
         val stamp = stamp(sources, base)
         val now = opened.get() ?: mapUnchecked(File(dir, FILE), stamp)
-        if (now?.stamp != stamp) refresh(dir)
+        if (compiles && now?.stamp != stamp) refresh(dir)
         return Seen(now?.file, now?.let { "$FILE ${it.stamp}" } ?: sources.joinToString(" ") { it.name }, staleOf(now, base))
     }
 
@@ -265,7 +267,7 @@ object MergedDictionary {
     private fun mapUnchecked(dest: File, stamp: String?): Opened? {
         if (!dest.isFile) return null
         val file = try {
-            DictionaryFile.open(dest, verify = false)
+            DictionaryFile.open(JvmFile(dest), verify = false)
         } catch (e: IOException) {
             Timber.w(e, "%s: not mapped", FILE)
             return null
@@ -276,7 +278,7 @@ object MergedDictionary {
         if (!opened.compareAndSet(null, mapped)) return opened.get()
         compiles.submit {
             try {
-                DictionaryFile.open(dest)
+                DictionaryFile.open(JvmFile(dest))
             } catch (e: IOException) {
                 Timber.w(e, "%s: damaged, made again", FILE)
                 opened.compareAndSet(mapped, null)
@@ -491,7 +493,7 @@ object MergedDictionary {
                 names = sources.map { SourceNames.nameOf(it.name) },
             )
             Timber.i("merged dictionaries: %d words of %d files, %d of the base, %d lines unread", result.words, sources.size, result.inBase, result.unread)
-            opened.set(Opened(stamp, DictionaryFile.open(dest)))
+            opened.set(Opened(stamp, DictionaryFile.open(JvmFile(dest))))
             unreadNotes.note(dest.parentFile!!, damaged)
             ok = true
             tellMade()
@@ -569,7 +571,7 @@ object MergedDictionary {
     private fun openOrDelete(dest: File): DictionaryFile? {
         if (!dest.exists()) return null
         return try {
-            DictionaryFile.open(dest)
+            DictionaryFile.open(JvmFile(dest))
         } catch (e: IOException) {
             Timber.w(e, "%s: compiled again", FILE)
             dest.delete()

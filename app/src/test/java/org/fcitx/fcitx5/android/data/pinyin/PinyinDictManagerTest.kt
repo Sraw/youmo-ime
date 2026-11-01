@@ -4,12 +4,16 @@
  */
 package org.fcitx.fcitx5.android.data.pinyin
 
+import android.os.Environment
 import kotlinx.coroutines.runBlocking
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
+import org.fcitx.fcitx5.android.core.HostConfigDir
+import org.fcitx.fcitx5.android.core.phoneStorage
 import org.fcitx.fcitx5.android.data.pinyin.dict.TextDictionary
 import org.fcitx.fcitx5.android.engine.assertRows
 import org.fcitx.fcitx5.android.engine.user.DictionaryFormat
+import org.fcitx.fcitx5.android.utils.appContext
 import org.fcitx.fcitx5.android.utils.errorArg
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -21,14 +25,15 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
+import org.robolectric.shadows.ShadowEnvironment
 import java.io.File
 import java.io.IOException
 import java.io.InputStream
 import java.util.concurrent.CancellationException
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicReference
-import kotlin.concurrent.thread
 import java.util.zip.GZIPInputStream
+import kotlin.concurrent.thread
 
 // the real application: the manager and its error messages go through appContext
 @RunWith(RobolectricTestRunner::class)
@@ -43,6 +48,7 @@ class PinyinDictManagerTest {
 
     @Before
     fun empty() {
+        phoneStorage()
         MergedDictionary.reset()
         MergedDictionary.made = {}
         MergedDictionary.base = { null }
@@ -352,6 +358,35 @@ class PinyinDictManagerTest {
 
         override fun close() {
             closed = true
+        }
+    }
+
+    // A4: an upgraded install started without its external storage, fcitx's data not moved yet: a
+    // dictionary is neither turned, deleted nor imported, the page told why
+    @Test
+    fun dictionariesNotSettledAreNotWritten() {
+        val external = appContext.getExternalFilesDir(null)!!
+        // the data's home, which the settle would take as moved in
+        dir.parentFile!!.parentFile!!.deleteRecursively()
+        File(appContext.filesDir, "engine").mkdirs()
+        ShadowEnvironment.setExternalStorageState(external, Environment.MEDIA_REMOVED)
+        HostConfigDir.forget()
+        try {
+            // the list as the page holds it: its home not settled is no directory to hold one, so one elsewhere
+            val mine = TextDictionary(File(appContext.cacheDir, "mine.txt").apply { writeText("搭子 da'zi 0\n") })
+            val notSettled = appContext.getString(R.string.user_data_not_settled)
+            assertEquals(notSettled, assertThrows(IllegalArgumentException::class.java) { PinyinDictManager.turn(mine, false) }.message)
+            assertEquals(notSettled, assertThrows(IllegalArgumentException::class.java) { PinyinDictManager.delete(mine) }.message)
+            assertTrue(PinyinDictManager.importFromInputStream("搭子 da'zi 0\n".byteInputStream(), "mine.txt").isFailure)
+            // the page's retry of a failed compile: nothing compiled where the data is not settled
+            PinyinDictManager.retryMerged()
+            assertFalse(File(dir, "merged.ymd").exists())
+            assertFalse(File(dir, "mine.txt").exists())
+            assertTrue(mine.file.exists())
+        } finally {
+            File(appContext.cacheDir, "mine.txt").delete()
+            File(appContext.filesDir, "engine").deleteRecursively()
+            phoneStorage()
         }
     }
 

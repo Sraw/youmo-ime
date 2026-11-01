@@ -18,9 +18,9 @@ import com.google.android.flexbox.AlignItems
 import com.google.android.flexbox.FlexDirection
 import com.google.android.flexbox.FlexWrap
 import com.google.android.flexbox.FlexboxLayoutManager
-import org.fcitx.fcitx5.android.core.FcitxEvent
-import org.fcitx.fcitx5.android.core.FcitxEvent.PagedCandidateEvent.LayoutHint
 import org.fcitx.fcitx5.android.data.theme.Theme
+import org.fcitx.fcitx5.android.host.HostEvent
+import org.fcitx.fcitx5.android.host.LayoutHint
 import splitties.views.dsl.core.Ui
 import splitties.views.dsl.recyclerview.recyclerView
 
@@ -34,7 +34,7 @@ class PagedCandidatesUi(
     private val onNextPage: () -> Unit
 ) : Ui {
 
-    private var data = FcitxEvent.PagedCandidateEvent.Data.Empty
+    private var data = HostEvent.Paged.EMPTY
 
     private var isVertical = false
 
@@ -123,7 +123,7 @@ class PagedCandidatesUi(
 
     @SuppressLint("NotifyDataSetChanged")
     fun update(
-        data: FcitxEvent.PagedCandidateEvent.Data,
+        data: HostEvent.Paged,
         orientation: FloatingCandidatesOrientation
     ) {
         this.data = data

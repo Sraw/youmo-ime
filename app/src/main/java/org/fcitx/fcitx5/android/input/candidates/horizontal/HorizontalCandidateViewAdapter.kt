@@ -28,14 +28,14 @@ open class HorizontalCandidateViewAdapter(val theme: Theme) :
         setHasStableIds(true)
     }
 
-    var candidates: Array<CandidateWord> = arrayOf()
+    var candidates: List<CandidateWord> = emptyList()
         private set
 
     var total = -1
         private set
 
     @SuppressLint("NotifyDataSetChanged")
-    fun updateCandidates(data: Array<CandidateWord>, total: Int) {
+    fun updateCandidates(data: List<CandidateWord>, total: Int) {
         this.candidates = data
         this.total = total
         notifyDataSetChanged()

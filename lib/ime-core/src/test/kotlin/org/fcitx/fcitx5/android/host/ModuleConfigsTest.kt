@@ -26,7 +26,7 @@ class ModuleConfigsTest {
         val old = "HalfWidthPuncAfterLetterOrNumber=False\n\n[Hotkey]\n0=Control+period\n"
         val text = ModuleConfigs.punctuationText(old, PunctuationConfig(enabled = false, halfWidthAfterLatinOrNumber = false))
         assertEquals(
-            "HalfWidthPuncAfterLetterOrNumber=False\nEnabled=False\n# TypePairedPunctuationsTogether=False\n\n[Hotkey]\n0=Control+period\n\n",
+            "# HalfWidthPuncAfterLetterOrNumber=False\nEnabled=False\n# TypePairedPunctuationsTogether=False\n\n[Hotkey]\n0=Control+period\n\n",
             text,
         )
         assertEquals(PunctuationConfig(enabled = false, halfWidthAfterLatinOrNumber = false), ModuleConfigs.punctuation(text))

@@ -8,17 +8,20 @@ import androidx.room.Room
 import kotlinx.coroutines.test.runTest
 import org.fcitx.fcitx5.android.BuildConfig
 import org.fcitx.fcitx5.android.FcitxApplication
+import org.fcitx.fcitx5.android.R
+import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.assertRows
-import org.fcitx.fcitx5.android.core.EngineMigration
+import org.fcitx.fcitx5.android.core.dirsUnder
+import org.fcitx.fcitx5.android.core.phoneStorage
 import org.fcitx.fcitx5.android.data.clipboard.db.ClipboardDatabase
 import org.fcitx.fcitx5.android.data.clipboard.db.ClipboardEntry
 import org.fcitx.fcitx5.android.data.clipboard.importedClipboardMarker
-import org.fcitx.fcitx5.android.engine.host.Engines
-import org.fcitx.fcitx5.android.engine.host.TableSettings
 import org.fcitx.fcitx5.android.engine.learn.LearnLog
 import org.fcitx.fcitx5.android.engine.learn.backup.Backups
 import org.fcitx.fcitx5.android.engine.learn.backup.RestoreStash
+import org.fcitx.fcitx5.android.engine.runtime.Engines
 import org.fcitx.fcitx5.android.engine.user.WordLists
+import org.fcitx.fcitx5.android.host.ConfigHome
 import org.fcitx.fcitx5.android.utils.appContext
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -32,6 +35,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import java.io.ByteArrayOutputStream
 import java.io.File
+import java.io.InputStream
 import java.util.zip.ZipEntry
 import java.util.zip.ZipInputStream
 import java.util.zip.ZipOutputStream
@@ -51,25 +55,23 @@ class UserDataManagerTest {
     val folder = TemporaryFolder()
 
     // an install's directories, made as they are needed: not the app's, which it writes as the test runs
-    private fun install(name: String) = File(folder.root, name).let {
-        UserDataManager.Dirs(
-            File(it, "shared_prefs"), File(it, "databases"), File(it, "external"), File(it, "recently_used"), File(it, "engine")
-        )
-    }
+    private fun install(name: String) = dirsUnder(File(folder.root, name))
 
-    private fun metadata(packageName: String) =
-        """{"packageName":"$packageName","versionCode":1,"versionName":"1","exportTime":0}""".encodeToByteArray()
+    // as this build would write it, or as the release [versionCode] did (Versions.calculateVersionCode)
+    private fun metadata(packageName: String, versionCode: Long = BuildConfig.VERSION_CODE.toLong()) =
+        """{"packageName":"$packageName","versionCode":$versionCode,"versionName":"1","exportTime":0}""".encodeToByteArray()
 
-    private fun zip(packageName: String, vararg entries: Pair<String, String>) = ByteArrayOutputStream().also { bytes ->
-        ZipOutputStream(bytes).use { zip ->
-            zip.putNextEntry(ZipEntry("metadata.json"))
-            zip.write(metadata(packageName))
-            for ((name, text) in entries) {
-                zip.putNextEntry(ZipEntry(name))
-                zip.write(text.encodeToByteArray())
+    private fun zip(packageName: String, vararg entries: Pair<String, String>, versionCode: Long = BuildConfig.VERSION_CODE.toLong()) =
+        ByteArrayOutputStream().also { bytes ->
+            ZipOutputStream(bytes).use { zip ->
+                zip.putNextEntry(ZipEntry("metadata.json"))
+                zip.write(metadata(packageName, versionCode))
+                for ((name, text) in entries) {
+                    zip.putNextEntry(ZipEntry(name))
+                    zip.write(text.encodeToByteArray())
+                }
             }
-        }
-    }.toByteArray().inputStream()
+        }.toByteArray().inputStream()
 
     // named as the app's: the package Robolectric runs it as need not be the one the import checks for
     private fun exported(dirs: UserDataManager.Dirs) = ByteArrayOutputStream().also { bytes ->
@@ -91,6 +93,7 @@ class UserDataManagerTest {
 
     @Test
     fun anImportLeavesTheNextStartToResetTheSettingsWithoutAUi() {
+        phoneStorage()
         val marker = importedUserDataMarker(appContext)
         marker.delete()
         UserDataManager.import(zip(BuildConfig.APPLICATION_ID)).getOrThrow()
@@ -240,10 +243,12 @@ class UserDataManagerTest {
         assertFalse(importedClipboardMarker(phone.dataBases).exists())
     }
 
+    // of a version before 0.3.1 (upstream's code): not refused for it, having none of the engine's learning (F2 review 8)
     @Test
     fun aBackupFromBeforeTheRenamingBringsItsSettingsUnderTheNewName() {
         val fresh = install("fresh")
-        UserDataManager.import(zip(legacy, "shared_prefs/${UserDataOrigin.preferencesFile(legacy)}" to "<map />"), fresh)
+        val backup = zip(legacy, "shared_prefs/${UserDataOrigin.preferencesFile(legacy)}" to "<map />", versionCode = UPSTREAM)
+        UserDataManager.import(backup, fresh)
             .getOrThrow()
         assertEquals(listOf(prefs), fresh.sharedPrefs.list()!!.toList())
         assertEquals("<map />", File(fresh.sharedPrefs, prefs).readText())
@@ -287,20 +292,20 @@ class UserDataManagerTest {
         val phone = install("phone")
         File(phone.engine, Backups.DIR).mkdirs()
         File(phone.engine, LearnLog.FILE).writeText("the phone's")
-        File(phone.engine, LearnLog.MARKER).writeText("the phone's")
+        File(phone.engine, OLD_MARKER).writeText("the phone's")
         File(phone.engine, WordLists.ADDED).writeText("the phone's")
         File(phone.engine, "${Backups.DIR}/auto-1.fxlb").writeText("the phone's")
         File(phone.engine, "wubi.user").writeText("the phone's")
         val backup = zip(
             BuildConfig.APPLICATION_ID,
             RestoreStash.BACKUP to "the backup's learning",
-            "engine/${LearnLog.MARKER}" to "the backup's",
+            "engine/${OLD_MARKER}" to "the backup's",
             "engine/${WordLists.ADDED}" to "the backup's",
             "engine/wubi.user" to "the backup's table",
         )
         UserDataManager.import(backup, phone).getOrThrow()
         // review-DE-design D-M3: every old log the phone's, a changed one reading to the record as words removed
-        for (name in listOf(LearnLog.FILE, LearnLog.MARKER, WordLists.ADDED, "${Backups.DIR}/auto-1.fxlb", "wubi.user")) {
+        for (name in listOf(LearnLog.FILE, OLD_MARKER, WordLists.ADDED, "${Backups.DIR}/auto-1.fxlb", "wubi.user")) {
             assertEquals(name, "the phone's", File(phone.engine, name).readText())
         }
         val stash = stashes(phone).single()
@@ -315,27 +320,11 @@ class UserDataManagerTest {
         assertEquals("the second's", File(both[1], RestoreStash.BACKUP).readText())
     }
 
-    // R11 F2745: a zip from before tables.order-kept keeps 调频 on for its tables typed with, as
-    // such a build's first start would; the phone's marker would otherwise skip it
-    @Test
-    fun aBackupFromBeforeTheOrderMarkerKeepsItsTypedTablesOrderingByUse() {
-        val im = Engines.TABLES.entries.first { it.value.options.orderByUse }.key
-        val phone = install("phone")
-        UserDataManager.import(zip(BuildConfig.APPLICATION_ID, "engine/${Engines.userTable(im)}" to "a log"), phone).getOrThrow()
-        val conf = File(phone.external, "config/conf/androidengine.conf").readText()
-        assertTrue(conf, "${TableSettings.ORDER_POLICY}=${TableSettings.ORDER_BY_USE}" in conf)
-        // a newer backup, with the marker: its settings as they are
-        val other = install("other")
-        val newer = zip(BuildConfig.APPLICATION_ID, "engine/${Engines.userTable(im)}" to "a log", "engine/${EngineMigration.ORDER_KEPT}" to "")
-        UserDataManager.import(newer, other).getOrThrow()
-        assertFalse(File(other.external, "config/conf/androidengine.conf").exists())
-    }
-
     // PR-10: a setting changed after the backup was made goes back with it, though its default is not in the backup
     @Test
     fun aBackupsSettingsReplaceThePhonesThoseAtTheirDefaultsIncluded() {
         val phone = install("phone")
-        val config = File(phone.external, "config").apply { File(this, "conf").mkdirs() }
+        val config = phone.config.apply { File(this, "conf").mkdirs() }
         File(config, "conf/androidengine.conf").writeText("PageSize=5\n")
         File(config, "conf/punctuation.conf").writeText("phone's")
         File(phone.external, "data/pinyin/dictionaries").mkdirs()
@@ -353,39 +342,88 @@ class UserDataManagerTest {
         assertEquals("the phone's dictionary", File(phone.external, "data/pinyin/dictionaries/mine.txt").readText())
     }
 
-    // R11 F3123: a backup without the addon's settings over a phone whose fcitx wrote them in full,
-    // 调频 off as its default: the backup's typed table orders by use again, one it did not type stays off
+    private fun entries(zip: InputStream) = ZipInputStream(zip).use { from ->
+        generateSequence { from.nextEntry }.filterNot { it.isDirectory }.associate { it.name to from.readBytes().decodeToString() }
+    }
+
+    // an install whose config, data and themes are in the app's own files, as on a phone once moved in (A4)
+    private fun moved(name: String) = File(folder.root, name).let {
+        dirsUnder(it, data = File(it, "files/host-data"), theme = File(it, "files/host-theme"))
+    }
+
+    private fun File.put(path: String, text: String) = File(this, path).apply { parentFile!!.mkdirs() }.writeText(text)
+
+    // A4: the config, data and themes in the app's own files go where every backup has had them
+    // (external/config, external/data, external/theme: so older builds restore them and this one theirs), and
+    // come back into their own directories; the older build's copies left on the external storage are not
+    // backed up, nor what is compiled of the dictionaries
     @Test
-    fun aBackupWithoutTheAddonsSettingsTurnsItsTypedTablesOrderingOnOverThePhones() {
-        val ordered = Engines.TABLES.entries.filter { it.value.options.orderByUse }
-        val (im, typed) = ordered[0]
-        val untyped = ordered.first { it.value.group != typed.group }.value
-        fun restored(name: String, vararg entries: Pair<String, String>): String {
-            val phone = install(name)
-            val settings = File(phone.external, "config/conf/androidengine.conf").apply { parentFile!!.mkdirs() }
-            settings.writeText("[${typed.group}]\n${TableSettings.ORDER_POLICY}=No\n\n[${untyped.group}]\n${TableSettings.ORDER_POLICY}=No\n")
-            val log = "engine/${Engines.userTable(im)}" to "a log"
-            UserDataManager.import(zip(BuildConfig.APPLICATION_ID, log, *entries), phone).getOrThrow()
-            return settings.readText()
-        }
-        val on = "${TableSettings.ORDER_POLICY}=${TableSettings.ORDER_BY_USE}"
-        assertRows(
-            // F3724: a real backup's shape: the phone's settings pruned, then the typed table's set
-            "with external/config" to {
-                val conf = restored("full", "external/config/config" to "backup's")
-                assertTrue(conf, "[${typed.group}]\n$on" in conf)
-                assertFalse(conf, "[${untyped.group}]\n$on" in conf)
-            },
-            "a zip without external/config keeps the phone's settings" to {
-                val conf = restored("bare")
-                assertTrue(conf, "[${typed.group}]\n$on" in conf)
-                assertTrue(conf, "[${untyped.group}]\n${TableSettings.ORDER_POLICY}=No" in conf)
-            },
+    fun theConfigDataAndThemesAreBackedUpWhereBackupsHaveThemAndRestoredIntoTheirOwnDirectories() {
+        val phone = moved("phone")
+        phone.config.put("conf/androidengine.conf", "PageSize=9\n")
+        phone.data.put("pinyin/customphrase", "dz,1=北京\n")
+        phone.data.put("pinyin/dictionaries/mine.txt.gz", "gz")
+        phone.data.put("pinyin/dictionaries/merged.ymd", "compiled")
+        phone.data.put("punctuation/punc.mb.zh_CN", ", 、\n")
+        phone.theme.put("mine.json", "{}")
+        // the move's marker is not backed up: restored, it would have the next start delete an old copy it never moved
+        phone.data.put(ConfigHome.MOVED, "moved")
+        for (old in listOf("config/profile", "data/pinyin/customphrase", "theme/old.json")) phone.external.put(old, "moved from")
+        val zip = exported(phone).readBytes()
+        assertEquals(
+            mapOf(
+                "external/config/conf/androidengine.conf" to "PageSize=9\n",
+                "external/data/pinyin/customphrase" to "dz,1=北京\n",
+                "external/data/pinyin/dictionaries/mine.txt.gz" to "gz",
+                "external/data/punctuation/punc.mb.zh_CN" to ", 、\n",
+                "external/theme/mine.json" to "{}",
+            ),
+            entries(zip.inputStream()).filterKeys { it.startsWith("external/") },
         )
+        val fresh = moved("fresh")
+        fresh.data.put("pinyin/dictionaries/theirs.txt.gz", "phone's")
+        fresh.theme.put("theirs.json", "phone's")
+        fresh.data.put("data/quickphrase.d/gone.mb", "not in the backup")
+        UserDataManager.import(zip.inputStream(), fresh).getOrThrow()
+        assertEquals("PageSize=9\n", File(fresh.config, "conf/androidengine.conf").readText())
+        assertEquals("dz,1=北京\n", File(fresh.data, "pinyin/customphrase").readText())
+        assertEquals(", 、\n", File(fresh.data, "punctuation/punc.mb.zh_CN").readText())
+        // dictionaries and themes merged with the phone's; the text files the user edits follow the backup
+        assertEquals("phone's", File(fresh.data, "pinyin/dictionaries/theirs.txt.gz").readText())
+        assertEquals("gz", File(fresh.data, "pinyin/dictionaries/mine.txt.gz").readText())
+        assertEquals(setOf("mine.json", "theirs.json"), fresh.theme.list()!!.toSet())
+        assertFalse(File(fresh.data, "data/quickphrase.d/gone.mb").exists())
+        assertFalse(File(fresh.external, "config").exists())
+        assertFalse(File(fresh.external, "data").exists())
+        assertFalse(File(fresh.external, "theme").exists())
+    }
+
+    // A4: with the config, data or themes not settled, an export would take a stand-in and a restore write
+    // where the next start does not read: both refuse, the user told why, nothing written
+    @Test
+    @Uat("PR-42")
+    fun aBackupAndARestoreAreRefusedWhileNotSettled() {
+        val phone = moved("phone")
+        phone.data.put("pinyin/customphrase", "dz,1=北京\n")
+        val zip = exported(phone).readBytes()
+        val away = File(folder.root, "away").let {
+            dirsUnder(it, data = File(it, "cache/host-data.unsettled"), theme = File(it, "files/host-theme"), settled = false)
+        }
+        val notSettled = appContext.getString(R.string.user_data_not_settled)
+        assertEquals(notSettled, UserDataManager.export(ByteArrayOutputStream(), 0L, away).exceptionOrNull()?.message)
+        assertEquals(notSettled, UserDataManager.import(zip.inputStream(), away).exceptionOrNull()?.message)
+        assertFalse(File(folder.root, "away").exists())
+    }
+
+    // where an install keeps [path] as a backup's external/ names it: the config in its own directory
+    private fun UserDataManager.Dirs.at(path: String) = when {
+        path.startsWith("config/") -> File(config, path.removePrefix("config/"))
+        path.startsWith("data/") -> File(data, path.removePrefix("data/"))
+        else -> File(external, path)
     }
 
     // F3717/F3719: the text files the user edits follow the backup as the settings do; the collections,
-    // the dot-entries (EngineMigration's .libime copies) and, from a zip without external/config, all are kept
+    // the dot-entries (the .libime copies an older build kept) and, from a zip without external/config, all are kept
     @Test
     fun theUsersTextFilesFollowTheBackupItsCollectionsAndDotEntriesStay() {
         val phoneOwn = listOf(
@@ -394,7 +432,7 @@ class UserDataManagerTest {
         )
         fun phone(name: String) = install(name).also { dirs ->
             (phoneOwn + listOf("config/.libime/conf/pinyin.conf", "data/punctuation/.libime/x", "data/pinyin/dictionaries/mine.txt"))
-                .forEach { File(dirs.external, it).apply { parentFile!!.mkdirs() }.writeText("phone's") }
+                .forEach { dirs.at(it).apply { parentFile!!.mkdirs() }.writeText("phone's") }
         }
         // each row its own phone and import: a failing import shows in its row, not in every row that reads it
         fun full(name: String) = phone(name).also {
@@ -412,12 +450,12 @@ class UserDataManagerTest {
         assertRows(
             "a backup without them leaves no phone-added phrases, quick phrases, punctuation or settings" to {
                 val dirs = full("full")
-                phoneOwn.forEach { assertFalse(it, File(dirs.external, it).exists()) }
+                phoneOwn.forEach { assertFalse(it, dirs.at(it).exists()) }
             },
             "dot-entries are left alone" to {
                 val dirs = full("dots")
-                assertTrue(File(dirs.external, "config/.libime/conf/pinyin.conf").exists())
-                assertTrue(File(dirs.external, "data/punctuation/.libime/x").exists())
+                assertTrue(dirs.at("config/.libime/conf/pinyin.conf").exists())
+                assertTrue(dirs.at("data/punctuation/.libime/x").exists())
             },
             "the backup's own replaces the phone's" to {
                 assertEquals("backup's", File(own().external, "data/pinyin/customphrase").readText())
@@ -425,7 +463,7 @@ class UserDataManagerTest {
             "dictionaries are merged" to { assertTrue(File(full("dicts").external, "data/pinyin/dictionaries/mine.txt").exists()) },
             "a zip without external/config keeps them all" to {
                 val dirs = bare()
-                phoneOwn.forEach { assertTrue(it, File(dirs.external, it).exists()) }
+                phoneOwn.forEach { assertTrue(it, dirs.at(it).exists()) }
             },
         )
     }
@@ -433,22 +471,68 @@ class UserDataManagerTest {
     private fun stashes(phone: UserDataManager.Dirs) =
         File(phone.engine, RestoreStash.DIR).listFiles().orEmpty().sortedBy { it.name.toLong() }
 
-    // a zip of an earlier build: its learning record; older still, its pinyin log, to convert
+    // a zip of an earlier build: its learning record, and an old pinyin log beside it, left as the phone's
     @Test
     fun anOlderBackupsLearningFilesAreLeftToMerge() {
         val phone = install("phone")
         phone.engine.mkdirs()
-        File(phone.engine, Engines.USER_PINYIN).writeText("the phone's")
-        UserDataManager.import(zip(BuildConfig.APPLICATION_ID, "engine/${LearnLog.FILE}" to "a record", "engine/${Engines.USER_PINYIN}" to "a log"), phone).getOrThrow()
+        File(phone.engine, OLD_PINYIN).writeText("the phone's")
+        UserDataManager.import(zip(BuildConfig.APPLICATION_ID, "engine/${LearnLog.FILE}" to "a record", "engine/${OLD_PINYIN}" to "a log"), phone).getOrThrow()
         val stash = stashes(phone).single()
         assertEquals("a record", File(stash, LearnLog.FILE).readText())
-        assertEquals("a log", File(stash, Engines.USER_PINYIN).readText())
-        assertEquals("the phone's", File(phone.engine, Engines.USER_PINYIN).readText())
+        assertEquals("a log", File(stash, OLD_PINYIN).readText())
+        assertEquals("the phone's", File(phone.engine, OLD_PINYIN).readText())
         assertFalse(File(phone.engine, LearnLog.FILE).exists())
         // a backup of no learning leaves nothing to merge
         File(phone.engine, RestoreStash.DIR).deleteRecursively()
         UserDataManager.import(zip(BuildConfig.APPLICATION_ID, "engine/notes" to "notes"), phone).getOrThrow()
         assertFalse(File(phone.engine, RestoreStash.DIR).exists())
+    }
+
+    // a zip of 0.3.0 or before, its learning in the old logs alone: refused before anything is copied, by the
+    // version that made it, with old logs or none (F2 review 8)
+    @Test
+    fun aBackupOf030OrBeforeIsRefusedLeavingThePhoneAsItWas() {
+        val phone = install("phone")
+        phone.config.mkdirs()
+        File(phone.config, "config").writeText("the phone's")
+        val logs = zip(BuildConfig.APPLICATION_ID, "external/config/config" to "the backup's", "engine/$OLD_PINYIN" to "a log", "engine/wubi.user" to "a log", versionCode = V030)
+        val none = zip(BuildConfig.APPLICATION_ID, "external/config/config" to "the backup's", versionCode = V030)
+        for (old in listOf(logs, none)) assertTrue(UserDataManager.import(old, phone).isFailure)
+        assertEquals("the phone's", File(phone.config, "config").readText())
+        assertFalse(File(phone.engine, RestoreStash.DIR).exists())
+        // 0.3.1 on: a backup of the learning beside them, which is read
+        val v031 = zip(BuildConfig.APPLICATION_ID, RestoreStash.BACKUP to "a backup", "engine/$OLD_PINYIN" to "a log", versionCode = V031)
+        assertTrue(UserDataManager.import(v031, phone).isSuccess)
+    }
+
+    // which zips are too old: this app's by the version that made it (0.3.1's lowest code the first
+    // taken), one from before the renaming by its files (old logs with neither a backup nor a record)
+    @Test
+    fun aBackupIsTooOldByItsVersionOrBeforeTheRenamingByItsFiles() {
+        val prefs = "shared_prefs/${UserDataOrigin.preferencesFile(legacy)}" to "<map />"
+        assertRows(
+            "this app's of the code before 0.3.1's lowest is refused" to {
+                assertTrue(UserDataManager.import(zip(BuildConfig.APPLICATION_ID, "engine/$OLD_PINYIN" to "a log", versionCode = FIRST_WITH_THE_RECORD - 1), install("2129")).isFailure)
+            },
+            "this app's of 0.3.1's lowest code is taken" to {
+                assertTrue(UserDataManager.import(zip(BuildConfig.APPLICATION_ID, "engine/$OLD_PINYIN" to "a log", versionCode = FIRST_WITH_THE_RECORD), install("2130")).isSuccess)
+            },
+            "this app's of now with old logs alone is taken (its learning not copied), not judged by its files" to {
+                assertTrue(UserDataManager.import(zip(BuildConfig.APPLICATION_ID, "engine/$OLD_PINYIN" to "a log"), install("now")).isSuccess)
+            },
+            "one from before the renaming, old logs alone, is refused" to {
+                assertTrue(UserDataManager.import(zip(legacy, prefs, "engine/$OLD_PINYIN" to "a log", versionCode = UPSTREAM), install("legacy-logs")).isFailure)
+            },
+            "one from before the renaming with a backup of the learning beside its old logs is taken" to {
+                val zip = zip(legacy, prefs, RestoreStash.BACKUP to "a backup", "engine/$OLD_PINYIN" to "a log", versionCode = UPSTREAM)
+                assertTrue(UserDataManager.import(zip, install("legacy-backup")).isSuccess)
+            },
+            "one from before the renaming with a learning record beside its old logs is taken" to {
+                val zip = zip(legacy, prefs, "engine/${LearnLog.FILE}" to "record", "engine/$OLD_PINYIN" to "a log", versionCode = UPSTREAM)
+                assertTrue(UserDataManager.import(zip, install("legacy-record")).isSuccess)
+            },
+        )
     }
 
     // the learning goes as a backup of it, not as the files it is made of, nor the phone's own backups
@@ -457,7 +541,11 @@ class UserDataManagerTest {
         val phone = install("phone")
         File(phone.engine, Backups.DIR).mkdirs()
         File(phone.engine, LearnLog.FILE).writeText("record")
-        File(phone.engine, Engines.USER_PINYIN).writeText("old log")
+        File(phone.engine, OLD_PINYIN).writeText("old log")
+        // a table's 0.4 log and its mark: the learning too (F2 review 1)
+        File(phone.engine, OLD_TABLE).writeText("old log")
+        File(phone.engine, "$OLD_TABLE.told").writeText("")
+        File(phone.engine, Engines.TABLE_LOGS_READ).writeText("")
         File(phone.engine, WordLists.ADDED).writeText("words")
         File(phone.engine, "${Backups.DIR}/auto-1.fxlb").writeText("backup")
         val names = ByteArrayOutputStream().also { UserDataManager.export(it, 0L, phone, "learning".toByteArray()).getOrThrow() }.let { bytes ->
@@ -465,6 +553,50 @@ class UserDataManagerTest {
         }
         assertTrue(RestoreStash.BACKUP in names)
         assertTrue("engine/${WordLists.ADDED}" in names)
-        for (gone in listOf("engine/${LearnLog.FILE}", "engine/${Engines.USER_PINYIN}", "engine/${Backups.DIR}/auto-1.fxlb")) assertFalse(gone, gone in names)
+        val gone = listOf(LearnLog.FILE, OLD_PINYIN, OLD_TABLE, "$OLD_TABLE.told", Engines.TABLE_LOGS_READ, "${Backups.DIR}/auto-1.fxlb").map { "engine/$it" }
+        for (name in gone) assertFalse(name, name in names)
+    }
+
+    // F2 review B1: the tables' old logs read into the record, an export with no learning given (the record bare) leaves
+    // them out too, and its mark goes with the record into the stash: a restore reads none of them again
+    @Test
+    fun theOldLogsReadAreLeftOutOfABareExportAndItsMarkGoesToTheStash() {
+        val phone = install("phone")
+        phone.engine.mkdirs()
+        File(phone.engine, LearnLog.FILE).writeText("record")
+        File(phone.engine, OLD_TABLE).writeText("old log")
+        File(phone.engine, "$OLD_TABLE.told").writeText("")
+        val unread = ByteArrayOutputStream().also { UserDataManager.export(it, 0L, phone).getOrThrow() }.names()
+        assertTrue("engine/$OLD_TABLE" in unread)
+        File(phone.engine, Engines.TABLE_LOGS_READ).writeText("")
+        val bytes = exported(phone)
+        val read = ByteArrayOutputStream().also { UserDataManager.export(it, 0L, phone).getOrThrow() }.names()
+        for (name in listOf(OLD_TABLE, "$OLD_TABLE.told")) assertFalse(name, "engine/$name" in read)
+        assertTrue("engine/${LearnLog.FILE}" in read && "engine/${Engines.TABLE_LOGS_READ}" in read)
+        val fresh = install("fresh")
+        UserDataManager.import(bytes, fresh).getOrThrow()
+        val stash = stashes(fresh).single()
+        assertEquals("record", File(stash, LearnLog.FILE).readText())
+        assertTrue(File(stash, Engines.TABLE_LOGS_READ).exists())
+        // the phone's own mark: none, as this phone has read no log
+        assertFalse(File(fresh.engine, Engines.TABLE_LOGS_READ).exists())
+    }
+
+    private fun ByteArrayOutputStream.names() =
+        ZipInputStream(toByteArray().inputStream()).use { zip -> generateSequence { zip.nextEntry }.map { it.name }.toList() }
+
+    private companion object {
+        // 0.4's names of files beside the record: still a phone's
+        const val OLD_MARKER = "learn.converted"
+        const val OLD_PINYIN = "pinyin.user"
+        const val OLD_TABLE = "wubi.user"
+
+        // 0.3.0's and 0.3.1's version codes, of arm64-v8a (Versions.calculateVersionCode)
+        const val V030 = 2122L
+        const val V031 = 2132L
+        // UserDataManager's FIRST_WITH_THE_RECORD: 0.3.1's lowest ABI's code
+        const val FIRST_WITH_THE_RECORD = 2130L
+        // upstream's, which the builds before the renaming carried
+        const val UPSTREAM = 114L
     }
 }

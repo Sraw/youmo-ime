@@ -5,6 +5,7 @@
 package org.fcitx.fcitx5.android.engine.user
 
 import org.fcitx.fcitx5.android.engine.data.escapeValue
+import org.fcitx.fcitx5.android.engine.user.imports.WordText
 import java.io.InputStream
 import java.io.InputStreamReader
 import java.nio.charset.CharacterCodingException
@@ -71,11 +72,11 @@ object WordListFiles {
         val learned = bare.trimStart().startsWith(LEARNED_MARK)
         if (learned && !export) return null
         val plain = if (learned) bare.trimStart().removePrefix(LEARNED_MARK) else bare
-        if (!learned && LibimeImport.dictionaryEntry(plain) != null) return plain
+        if (!learned && WordText.dictionaryEntry(plain) != null) return plain
         val read = WordLists.line(plain) ?: return null
         if (read.blocked) return null
         val entry = WordLists.entry(read.text, read.pinyin ?: return null) ?: return null
-        return "${escapeValue(entry.text)} ${WordLists.code(entry.syllables)} 0"
+        return "${escapeValue(entry.text)} ${entry.apostrophed()} 0"
     }
 
     /** [lines], a text file, as [baseLine] reads them: an export ([EXPORT_MARK] its first line not blank) with its learned words. */

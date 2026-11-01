@@ -10,6 +10,7 @@ import org.fcitx.fcitx5.android.engine.pinyin.ShuangpinScheme
 import org.fcitx.fcitx5.android.engine.pinyin.Syllables
 import org.fcitx.fcitx5.android.engine.pinyin.nineSp
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertThrows
 import org.junit.Rule
 import org.junit.Test
@@ -65,9 +66,24 @@ class ShuangpinSetTest {
         assertEquals(0, runCli(arrayOf("shuangpin", "xiaohe", set.path, converted.path, "--keys", "nine", "--same", same.path), out, StringBuilder()))
         assertEquals("1 of 2 samples typed in xiaohe on the nine keys", out.trim())
         assertEquals(listOf("nihao"), same.useLines { EvalSet.parse(it) }.map { it.input })
-        assertEquals(2, runCli(arrayOf("shuangpin", "xiaohe", set.path, converted.path, "--keys", "14"), StringBuilder(), StringBuilder()))
-        assertEquals((ShuangpinSet.SCHEMES.size * 2), ShuangpinSet.GROUPED.size)
+        val on14 = StringBuilder()
+        assertEquals(0, runCli(arrayOf("shuangpin", "xiaohe", set.path, converted.path, "--keys", "14"), on14, StringBuilder()))
+        assertEquals("1 of 2 samples typed in xiaohe on the 14 keys", on14.trim())
+        assertEquals(2, runCli(arrayOf("shuangpin", "xiaohe", set.path, converted.path, "--keys", "16"), StringBuilder(), StringBuilder()))
+        // 微软 types ing as ;: no 14 keys there, as the app offers none
+        assertEquals(ShuangpinSet.SCHEMES.size * ShuangpinSet.KEYS.size - 1, ShuangpinSet.GROUPED.size)
+        assertNull(ShuangpinSet.GROUPED["ms-14"])
+        assertEquals(2, runCli(arrayOf("shuangpin", "ms", set.path, converted.path, "--keys", "14"), StringBuilder(), StringBuilder()))
+        assertEquals(ShuangpinScheme.XIAOHE to NineKeyLetters.G14, ShuangpinSet.GROUPED["xiaohe-14"])
         assertEquals(ShuangpinScheme.XIAOHE to g18, ShuangpinSet.GROUPED["xiaohe-18"])
+    }
+
+    // a key the keyboard has not is no sample of it: 微软's ; (ing) on the 14 keys, which the 18 keys have
+    @Test
+    fun aSampleTypingAKeyTheKeyboardHasNotIsLeftOut() {
+        val xing = listOf(Sample("xing", "星", "daily"))
+        assertEquals(emptyList<Sample>(), ShuangpinSet.convert(xing, ShuangpinScheme.MICROSOFT, NineKeyLetters.G14))
+        assertEquals(listOf("x;".map(NineKeyLetters.G18::key).joinToString("")), ShuangpinSet.convert(xing, ShuangpinScheme.MICROSOFT, NineKeyLetters.G18).map { it.input })
     }
 
     @Test

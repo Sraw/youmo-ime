@@ -12,10 +12,10 @@ import android.widget.FrameLayout
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.core.InputMethodEntry
-import org.fcitx.fcitx5.android.data.prefs.ShuangpinKeyboard
 import org.fcitx.fcitx5.android.data.theme.ThemePreset
-import org.fcitx.fcitx5.android.engine.host.Engines
+import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
+import org.fcitx.fcitx5.android.engine.pinyin.ShuangpinScheme
 import org.fcitx.fcitx5.android.ui.main.settings.PlaceholderStrings
 import org.fcitx.fcitx5.android.ui.main.settings.placeholder
 import org.junit.Assert.assertEquals
@@ -69,47 +69,49 @@ class KeyboardWindowTest {
     @Test
     fun goingBackToALayoutAnnouncesOnlyTheInputMethodGoneTo() {
         val letters = TextKeyboard(context, ThemePreset.PixelDark)
-        show(letters, Engines.PINYIN)
+        show(letters, InputMethodCatalog.PINYIN)
         assertEquals("the window appearing, which TalkBack says itself", emptyList<String>(), frame.announced)
-        show(T9Keyboard(context, ThemePreset.PixelDark), Engines.T9)
-        show(letters, Engines.PINYIN)
-        assertEquals(listOf(placeholder(R.string.im_t9), placeholder(R.string.im_pinyin)), frame.announced)
+        show(T9Keyboard(context, ThemePreset.PixelDark, shuangpin = true), InputMethodCatalog.SHUANGPIN)
+        show(letters, InputMethodCatalog.PINYIN)
+        assertEquals(listOf(placeholder(R.string.im_shuangpin), placeholder(R.string.im_pinyin)), frame.announced)
     }
 
     @Test
     fun aChangeUnderTheNumbersIsAnnouncedOnTheLetters() {
         val letters = TextKeyboard(context, ThemePreset.PixelDark)
         val numbers = NumberKeyboard(context, ThemePreset.PixelDark)
-        show(letters, Engines.PINYIN)
-        show(numbers, Engines.PINYIN)
-        spaceKeys.current = InputMethodEntry(Engines.SHUANGPIN, Engines.SHUANGPIN, "", "", "", "zh", "", false)
+        show(letters, InputMethodCatalog.PINYIN)
+        show(numbers, InputMethodCatalog.PINYIN)
+        spaceKeys.current = InputMethodEntry(InputMethodCatalog.SHUANGPIN, InputMethodCatalog.SHUANGPIN, "", "", "", "zh", "", false)
         spaceKeys.show(numbers)
-        show(letters, Engines.SHUANGPIN)
+        show(letters, InputMethodCatalog.SHUANGPIN)
         assertEquals(listOf(placeholder(R.string.im_shuangpin)), frame.announced)
     }
 
+    // each input method's keyboard its own choice (I1): pinyin's, 双拼's and English's apart
     @Test
-    fun pinyinShowsTheFourteenKeysAsItsSettingHasThemAndEnglishTheFullKeyboard() {
-        assertEquals(GroupedKeyboard.Name14, lettersOf(Engines.PINYIN, nine = false, keys14 = true))
-        assertEquals(TextKeyboard.Name, lettersOf(Engines.PINYIN, nine = false, keys14 = false))
-        // English with the 14 keys chosen: the full keyboard
-        assertEquals(TextKeyboard.Name, lettersOf(Engines.ENGLISH, nine = false, keys14 = true))
-        // the others as they were
-        assertEquals(T9Keyboard.EnglishName, lettersOf(Engines.ENGLISH, nine = true, keys14 = true))
-        assertEquals(T9Keyboard.Name, lettersOf(Engines.T9, nine = false, keys14 = true))
-        assertEquals(TextKeyboard.Name, lettersOf(Engines.SHUANGPIN, nine = false, keys14 = true))
-        assertEquals(HandwritingKeyboard.Name, lettersOf(Engines.HANDWRITING, nine = false, keys14 = true))
-    }
-
-    @Test
-    fun shuangpinShowsTheKeyboardItsSettingHas() {
-        assertEquals(TextKeyboard.Name, lettersOf(Engines.SHUANGPIN, nine = false, keys14 = false, ShuangpinKeyboard.Full))
-        assertEquals(GroupedKeyboard.Name18, lettersOf(Engines.SHUANGPIN, nine = false, keys14 = false, ShuangpinKeyboard.Keys18))
-        assertEquals(T9Keyboard.ShuangpinName, lettersOf(Engines.SHUANGPIN, nine = false, keys14 = true, ShuangpinKeyboard.NineKeys))
-        // pinyin's own and English's full keyboard whatever 双拼's is
-        assertEquals(TextKeyboard.Name, lettersOf(Engines.PINYIN, nine = false, keys14 = false, ShuangpinKeyboard.Keys18))
-        assertEquals(TextKeyboard.Name, lettersOf(Engines.ENGLISH, nine = false, keys14 = false, ShuangpinKeyboard.Keys18))
-        assertEquals(T9Keyboard.Name, lettersOf(Engines.T9, nine = false, keys14 = false, ShuangpinKeyboard.NineKeys))
+    fun eachInputMethodShowsTheKeyboardChosenForIt() {
+        val sp = ShuangpinScheme.ZIRANMA
+        fun py(k: ImKeyboard) = lettersOf(InputMethodCatalog.PINYIN, ImKeyboards.Chosen(pinyin = k), sp)
+        fun shp(k: ImKeyboard, scheme: ShuangpinScheme = sp) = lettersOf(InputMethodCatalog.SHUANGPIN, ImKeyboards.Chosen(shuangpin = k), scheme)
+        fun en(k: ImKeyboard) = lettersOf(InputMethodCatalog.ENGLISH, ImKeyboards.Chosen(english = k), sp)
+        assertEquals(TextKeyboard.Name, py(ImKeyboard.FULL))
+        assertEquals(GroupedKeyboard.NamePinyin18, py(ImKeyboard.KEYS18))
+        assertEquals(GroupedKeyboard.Name14, py(ImKeyboard.KEYS14))
+        assertEquals(T9Keyboard.Name, py(ImKeyboard.NINE_KEYS))
+        assertEquals(TextKeyboard.Name, shp(ImKeyboard.FULL))
+        assertEquals(GroupedKeyboard.Name18, shp(ImKeyboard.KEYS18))
+        assertEquals(GroupedKeyboard.NameShuangpin14, shp(ImKeyboard.KEYS14))
+        assertEquals(T9Keyboard.ShuangpinName, shp(ImKeyboard.NINE_KEYS))
+        // 微软 has no 14 keys (`;` is ing): the 18 keys, the nearest
+        assertEquals(GroupedKeyboard.Name18, shp(ImKeyboard.KEYS14, ShuangpinScheme.MICROSOFT))
+        assertEquals(TextKeyboard.Name, en(ImKeyboard.FULL))
+        assertEquals(T9Keyboard.EnglishName, en(ImKeyboard.NINE_KEYS))
+        // one input method's choice moves no other's
+        val all = ImKeyboards.Chosen(ImKeyboard.NINE_KEYS, ImKeyboard.KEYS18, ImKeyboard.NINE_KEYS)
+        assertEquals(TextKeyboard.Name, lettersOf(InputMethodCatalog.WUBI, all, sp))
+        assertEquals(HandwritingKeyboard.Name, lettersOf(InputMethodCatalog.HANDWRITING, all, sp))
+        assertEquals(TextKeyboard.Name, lettersOf(InputMethodCatalog.ENGLISH, ImKeyboards.Chosen(pinyin = ImKeyboard.NINE_KEYS), sp))
     }
 
     @Test
@@ -134,15 +136,9 @@ class KeyboardWindowTest {
     // the tall row goes with the letters that put syllables on it: kept in step with lettersOf
     @Test
     fun theTallCodeRowGoesWithTheGroupedLetters() {
-        val grouped = setOf(GroupedKeyboard.Name14, GroupedKeyboard.Name18, T9Keyboard.ShuangpinName)
-        for (im in listOf(Engines.PINYIN, Engines.SHUANGPIN, Engines.T9, Engines.ENGLISH, Engines.HANDWRITING, "wbx")) {
-            for (keys14 in listOf(false, true)) for (sp in ShuangpinKeyboard.entries) {
-                assertEquals(
-                    "$im 14=$keys14 $sp",
-                    lettersOf(im, false, keys14, sp) in grouped,
-                    CodeRowHeight.showsStrip(im, keys14, sp != ShuangpinKeyboard.Full),
-                )
-            }
+        val grouped = setOf(GroupedKeyboard.Name14, GroupedKeyboard.NamePinyin18, GroupedKeyboard.Name18, GroupedKeyboard.NameShuangpin14, T9Keyboard.ShuangpinName)
+        for (layout in ImKeyboards.Layout.entries) {
+            assertEquals("$layout", nameOf(layout) in grouped, CodeRowHeight.showsStrip(layout))
         }
     }
 }

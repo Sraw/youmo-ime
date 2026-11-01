@@ -12,6 +12,7 @@ import org.fcitx.fcitx5.android.engine.user.DictionaryFormat.Reason
 import org.fcitx.fcitx5.android.engine.user.DictionaryFormat.Refused
 import org.fcitx.fcitx5.android.engine.user.DictionaryFormat.Source
 import org.fcitx.fcitx5.android.engine.user.DictionaryFormat.Weight
+import org.fcitx.fcitx5.android.engine.user.imports.WordText
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -129,7 +130,7 @@ class DictionaryFormatTest {
     private fun knowing(pairs: List<Pair<String, String>>): (String, IntArray) -> Boolean {
         val known = HashSet<Pair<String, Int>>()
         for ((t, p) in pairs) {
-            val entry = LibimeImport.entry(t, p.replace(' ', '\'')) ?: error("no entry $t")
+            val entry = WordText.entry(t, p.replace(' ', '\'')) ?: error("no entry $t")
             t.forEachIndexed { i, c -> known += c.toString() to entry.syllables[i] }
         }
         return { text, syllables -> (text to syllables.single()) in known }

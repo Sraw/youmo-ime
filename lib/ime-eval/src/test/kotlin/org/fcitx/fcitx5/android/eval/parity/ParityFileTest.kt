@@ -110,6 +110,20 @@ class ParityFileTest {
     }
 
     @Test
+    fun parityGenerateRefusesAnInputMethodNoUserSwitchesTo() {
+        val root = checkout()
+        val seqs = File(tmp.root, "s.jsonl")
+        fun generate(ims: String, err: StringBuilder = StringBuilder()) =
+            runCli(arrayOf("parity-generate", seqs.path, "--seed", "3", "--count", "5", "--ims", ims, "--repo", root.path), StringBuilder(), err)
+        // 0.4's engine-t9, a keyboard of pinyin now, is no input method to switch to: refused, and said why
+        val err = StringBuilder()
+        assertEquals(2, generate("engine-pinyin,engine-t9", err))
+        assertTrue(err.toString(), "engine-t9" in err)
+        // one a user does switch to is still taken
+        assertEquals(0, generate("engine-pinyin,engine-shuangpin"))
+    }
+
+    @Test
     fun aRecordingOfAnotherEngineIsComparedAndLabelled() {
         val root = checkout()
         val seqs = File(tmp.root, "s.jsonl")

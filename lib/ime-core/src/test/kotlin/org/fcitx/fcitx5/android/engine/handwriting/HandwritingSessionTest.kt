@@ -4,8 +4,7 @@
  */
 package org.fcitx.fcitx5.android.engine.handwriting
 
-import org.fcitx.fcitx5.android.engine.host.EngineEvent
-import org.fcitx.fcitx5.android.engine.host.Keyboard
+import org.fcitx.fcitx5.android.engine.handwriting.HandwritingSession.Companion.NO_PIECE
 import org.fcitx.fcitx5.android.engine.lattice.Predictor
 import org.fcitx.fcitx5.android.engine.lattice.TextWords
 import org.fcitx.fcitx5.android.engine.learn.Code
@@ -15,6 +14,8 @@ import org.fcitx.fcitx5.android.engine.learn.Kinds
 import org.fcitx.fcitx5.android.engine.learn.Learner
 import org.fcitx.fcitx5.android.engine.rerank.SentencePicker
 import org.fcitx.fcitx5.android.engine.rerank.SentenceRefiner
+import org.fcitx.fcitx5.android.engine.runtime.EngineEvent
+import org.fcitx.fcitx5.android.engine.runtime.Keyboard
 import org.fcitx.fcitx5.android.engine.session.Action
 import org.fcitx.fcitx5.android.engine.session.Choice
 import org.fcitx.fcitx5.android.engine.session.Offer
@@ -33,8 +34,8 @@ class HandwritingSessionTest {
     private var pieces = 0
 
     private fun HandwritingSession.show(reading: InkReading, piece: Int = pieces++) = run {
-        offer(reading, piece)
-        apply(Action.Ink)
+        hold(Action.Ink(piece, reading))
+        apply(Action.Ink(NO_PIECE))
     }
 
     @Test
@@ -48,7 +49,7 @@ class HandwritingSessionTest {
         assertEquals("", shown.commit)
         assertEquals(listOf(Choice("山")), s.candidates(2, 5))
         // an Ink with nothing offered since changes nothing
-        assertEquals(shown, s.apply(Action.Ink))
+        assertEquals(shown, s.apply(Action.Ink(NO_PIECE)))
         // the same piece read again, with more strokes: its reading replaces what was shown
         assertEquals("人", s.show(read("人"), piece = 0).preedit)
     }
@@ -69,10 +70,10 @@ class HandwritingSessionTest {
     @Test
     fun `the readings offered before an Ink are shown in turn`() {
         val s = session()
-        s.offer(read("淡", "谈", step = 0.3), 0)
-        s.offer(read("天"), 1)
-        s.offer(read("话"), 1)
-        assertEquals("谈话", s.apply(Action.Ink).preedit)
+        s.hold(Action.Ink(0, read("淡", "谈", step = 0.3)))
+        s.hold(Action.Ink(1, read("天")))
+        s.hold(Action.Ink(1, read("话")))
+        assertEquals("谈话", s.apply(Action.Ink(NO_PIECE)).preedit)
     }
 
     @Test
@@ -114,11 +115,11 @@ class HandwritingSessionTest {
     fun `the cursor moved ends every piece read so far, those waiting too`() {
         val s = session()
         s.show(read("天"), piece = 2)
-        s.offer(read("人"), 3)
+        s.hold(Action.Ink(3, read("人")))
         val reset = s.apply(Action.Reset)
         assertEquals("", reset.preedit)
         assertEquals(3, s.ended)
-        assertEquals("", s.apply(Action.Ink).preedit)
+        assertEquals("", s.apply(Action.Ink(NO_PIECE)).preedit)
         s.show(read("人"), piece = 4)
         s.apply(Action.Context("高"))
         assertEquals(4, s.ended)
@@ -244,7 +245,7 @@ class HandwritingSessionTest {
         val medium = HandwritingSession(handwritingDecoder(), words, reranker = picker)
         medium.apply(Action.Context("我说"))
         written.forEach { medium.show(it) }
-        val shown = medium.apply(Action.Ink)
+        val shown = medium.apply(Action.Ink(NO_PIECE))
         assertEquals("淡话", shown.preedit)
         assertEquals("我说", seen.last())
         assertFalse(shown.refines)
@@ -254,14 +255,14 @@ class HandwritingSessionTest {
         val high = HandwritingSession(handwritingDecoder(), words, refiner = refiner)
         written.forEach { high.show(it) }
         // a character still being written is not weighed
-        val before = high.apply(Action.Ink)
+        val before = high.apply(Action.Ink(NO_PIECE))
         assertEquals("谈话", before.preedit)
         assertFalse(before.refines)
         // nor one finished that is not the last
-        high.finished(pieces - 2)
-        assertFalse(high.apply(Action.Ink).refines)
-        high.finished(pieces - 1)
-        assertTrue(high.apply(Action.Ink).refines)
+        high.hold(Action.Ink(pieces - 2))
+        assertFalse(high.apply(Action.Ink(NO_PIECE)).refines)
+        high.hold(Action.Ink(pieces - 1))
+        assertTrue(high.apply(Action.Ink(NO_PIECE)).refines)
         val after = high.apply(Action.Refine)
         assertEquals("淡话", after.preedit)
         assertFalse(after.refines)
@@ -272,8 +273,8 @@ class HandwritingSessionTest {
         // a page turned while it weighs: the order shown stays, the weighing dropped
         val paged = HandwritingSession(handwritingDecoder(), words, pageSize = 1, refiner = refiner)
         written.forEach { paged.show(it) }
-        paged.finished(pieces - 1)
-        assertTrue(paged.apply(Action.Ink).refines)
+        paged.hold(Action.Ink(pieces - 1))
+        assertTrue(paged.apply(Action.Ink(NO_PIECE)).refines)
         val turned = paged.apply(Action.NextPage)
         assertFalse(turned.refines)
         assertEquals(turned, paged.apply(Action.Refine))
@@ -335,11 +336,11 @@ class HandwritingSessionTest {
     fun `the keyboard sends the pad's key as an Ink, and the rest as any session's`() {
         val s = session()
         val keyboard = Keyboard(s, nineKeys = false)
-        s.offer(read("天", "人"), 0)
+        s.hold(Action.Ink(0, read("天", "人")))
         assertEquals("天", keyboard.onEvent(EngineEvent.CHAR, Keyboard.INK).preedit)
         // space picks the first, as in pinyin
         assertEquals("天", keyboard.onEvent(EngineEvent.CHAR, ' '.code).commit)
-        s.offer(read("天", "人"), 1)
+        s.hold(Action.Ink(1, read("天", "人")))
         keyboard.onEvent(EngineEvent.CHAR, Keyboard.INK)
         // a digit picks the one it numbers
         assertEquals("人", keyboard.onEvent(EngineEvent.CHAR, '2'.code).commit)
@@ -404,7 +405,7 @@ class HandwritingSessionTest {
         s.show(read("天"), piece = 0)
         s.apply(Action.Pick(0))
         s.show(read("人"), piece = 1)
-        s.offer(read("山"), 2)
+        s.hold(Action.Ink(2, read("山")))
         assertEquals(2, s.latestPiece)
         val next = HandwritingSession(handwritingDecoder(), TextWords(handwritingData.model, handwritingData.wordIndex), ended = s.latestPiece)
         assertEquals(2, next.ended)
@@ -426,8 +427,8 @@ class HandwritingSessionTest {
         val s = refining()
         s.show(read("淡", "谈", step = 0.3), piece = 0)
         s.show(read("话"), piece = 1)
-        s.finished(1)
-        assertTrue(s.apply(Action.Ink).refines)
+        s.hold(Action.Ink(1))
+        assertTrue(s.apply(Action.Ink(NO_PIECE)).refines)
         // the cursor, which handwriting keeps none of; an Ink that reads nothing new, the next one's first dot
         assertTrue(s.apply(Action.Cursor(0)).refines)
         assertTrue(s.apply(Action.Step(1)).refines)
@@ -446,19 +447,19 @@ class HandwritingSessionTest {
         s.show(read("淡", "谈", step = 0.3), piece = 0)
         s.show(read("天"), piece = 1)
         // its last stroke read and the pen up long enough, told at one Ink
-        s.offer(read("话"), 1)
-        s.finished(1)
-        val shown = s.apply(Action.Ink)
+        s.hold(Action.Ink(1, read("话")))
+        s.hold(Action.Ink(1))
+        val shown = s.apply(Action.Ink(NO_PIECE))
         assertEquals("谈话", shown.preedit)
         assertTrue(shown.refines)
         assertEquals("淡话", s.apply(Action.Refine).preedit)
         // finished, then the next character begun, at one Ink: the last is not finished
         val other = refining()
         other.show(read("淡", "谈", step = 0.3), piece = 0)
-        other.offer(read("话"), 1)
-        other.finished(1)
-        other.offer(read("天"), 2)
-        assertFalse(other.apply(Action.Ink).refines)
+        other.hold(Action.Ink(1, read("话")))
+        other.hold(Action.Ink(1))
+        other.hold(Action.Ink(2, read("天")))
+        assertFalse(other.apply(Action.Ink(NO_PIECE)).refines)
     }
 
     @Test

@@ -27,11 +27,13 @@ import org.fcitx.fcitx5.android.core.InputMethodNames
 import org.fcitx.fcitx5.android.core.InputMethodSubMode
 import org.fcitx.fcitx5.android.core.KeyStates
 import org.fcitx.fcitx5.android.core.KeySym
+import org.fcitx.fcitx5.android.core.UNICODE
 import org.fcitx.fcitx5.android.data.InputFeedbacks
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.prefs.ManagedPreference
 import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.engine.glide.GlideLayout
+import org.fcitx.fcitx5.android.engine.runtime.Keyboard
 import org.fcitx.fcitx5.android.input.broadcast.ReturnKeyAppearance
 import org.fcitx.fcitx5.android.input.keyboard.CustomGestureView.GestureType
 import org.fcitx.fcitx5.android.input.keyboard.CustomGestureView.OnGestureListener
@@ -98,22 +100,36 @@ abstract class BaseKeyboard(
     open var address: AddressKeys = AddressKeys.NONE
 
     private val glideTyping = prefs.keyboard.glideTyping
+    private val strokeFilter = prefs.keyboard.strokeFilter
+
+    /**
+     * Set as the input method has something typed or not, a temporary mode's (快速输入) not counted
+     * ([KeyboardWindow]): a stroke drawn then filters its candidates (笔画筛选).
+     */
+    var imTyping = false
     private val longPressDelay by prefs.keyboard.longPressDelay
 
-    /** The layout's glide typing (滑行输入), if it has one: see [glideInput]. */
+    /**
+     * What a finger drawn over the layout's letters reads, if it has any ([glideInput]): glide typing
+     * (滑行输入), a stroke for 笔画筛选, or both; a layout with no glide (the grouped keys) has it for the strokes alone.
+     */
     protected open val glide: GlideInput? = null
 
     /** Whether the layout shows the syllables to take itself (九键's column): the code row's then show none. */
     open val ownsSyllables: Boolean get() = false
 
     /**
-     * Glide typing over [letters], taken where [enabled] says and the setting is on, in a field
-     * where words are typed: not a password's or an address's.
+     * Glide typing over [letters], taken where [enabled] says and 滑行输入 is on, in a field where
+     * words are typed: not a password's or an address's. Where 笔画筛选 is on instead (the settings
+     * page keeps the two from being on together), a stroke drawn over them while pinyin is typed in an input method [filters] says reads
+     * one: sent as the engine's stroke key (Keyboard.strokeKey), the shape StrokeShape's; one it
+     * reads as none is dropped.
      */
     protected fun glideInput(
         letters: () -> List<Pair<Char, TextKeyView>>,
         down: Float = GlideGesture.DOWN,
         enabled: () -> Boolean = { true },
+        filters: () -> Boolean = { false },
         glided: (path: FloatArray, layout: GlideLayout) -> Unit,
     ) = GlideInput(
         this, theme,
@@ -121,6 +137,8 @@ abstract class BaseKeyboard(
         letters = letters,
         longPressMillis = { longPressDelay.toLong() },
         down = down,
+        strokes = { strokeFilter.getValue() && wordField() && imTyping && filters() },
+        stroked = { path -> StrokeShape.classify(path)?.let { onAction(KeyAction.SymAction(KeySym(UNICODE + Keyboard.strokeKey(it)), KeyStates.Virtual)) } },
         glided = glided,
     )
 
@@ -305,6 +323,10 @@ abstract class BaseKeyboard(
                 is BackspaceKey -> InputFeedbacks.SoundEffect.Delete
                 is ReturnKey -> InputFeedbacks.SoundEffect.Return
                 else -> InputFeedbacks.SoundEffect.Standard
+            }
+            if (def is BlankKey) {
+                isEnabled = false
+                importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
             }
             // the number pad's space moves the cursor too (UAT PAN-14): it had the press only
             if (def is SpaceKey || def is MiniSpaceKey) {
@@ -657,7 +679,7 @@ abstract class BaseKeyboard(
         val triggerAction = PopupAction.TriggerAction(viewId)
         // ask popup keyboard whether there's a pending KeyAction
         onPopupAction(triggerAction)
-        val action = triggerAction.outAction ?: return false
+        val action = triggerAction.outAction ?: return triggerAction.outConsumed
         onAction(action, KeyActionListener.Source.Popup)
         onPopupAction(PopupAction.DismissAction(viewId))
         return true

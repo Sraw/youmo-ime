@@ -33,6 +33,9 @@ class CodeTable private constructor(file: DataFile) {
     fun code(index: Int): String = codes[index]
     fun text(index: Int): String = texts[index]
 
+    /** [index]'s text's UTF-16 unit [at], without making a string of it. */
+    fun textChar(index: Int, at: Int): Char = texts.char(index, at)
+
     /** The length of [index]'s code, and its key [at]: without making a string of it. */
     fun codeLength(index: Int): Int = codes.length(index)
 

@@ -81,6 +81,19 @@ class EditingSessionTest {
     }
 
     @Test
+    fun aReplacementAroundTheCursorIsOneChange() {
+        val (s, e) = session("to a@q", cursor = 6)
+        s.replaceAround(3, 0, "a@qq.com")
+        assertEquals("to a@qq.com", e.text)
+        assertEquals(11, e.selectionStart)
+        assertEquals("the deletion and the commit seen as one", 1, e.maxBatchDepth)
+        val (s2, e2) = session("ab|cd".replace("|", ""), cursor = 2)
+        s2.replaceAround(1, 1, "xyz", cursor = 1)
+        assertEquals("axyzd", e2.text)
+        assertEquals(2, e2.selectionStart)
+    }
+
+    @Test
     fun anExplicitCursorIsAppliedInOneBatch() {
         val (s, e) = session()
         s.commitText("()", cursor = 1)
@@ -694,6 +707,7 @@ class EditingSessionTest {
             put("applySelectionOffset") { applySelectionOffset(0) }
             put("cancelSelection") { cancelSelection() }
             put("deleteSurrounding") { deleteSurrounding(1, 0, inCodePoints = false) }
+            put("replaceAround") { replaceAround(1, 0, "x") }
             put("backspace") { backspace(EditorTraits()) }
             put("onCursorUpdate") { onCursorUpdate(3, 3, -1, -1, ignoreSystemCursor = false) }
             put("updateComposingText") { updateComposingText(formatted("ni")) }

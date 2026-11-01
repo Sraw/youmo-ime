@@ -4,12 +4,14 @@
  */
 package org.fcitx.fcitx5.android.host
 
-import org.fcitx.fcitx5.android.engine.host.EngineEvent
-import org.fcitx.fcitx5.android.engine.host.Engines
-import org.fcitx.fcitx5.android.engine.host.Keyboard
+import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
 import org.fcitx.fcitx5.android.engine.pinyin.g14Code
 import org.fcitx.fcitx5.android.engine.pinyin.nineSpCode
+import org.fcitx.fcitx5.android.engine.runtime.EngineEvent
+import org.fcitx.fcitx5.android.engine.runtime.EngineSettings
+import org.fcitx.fcitx5.android.engine.runtime.Keyboard
+import org.fcitx.fcitx5.android.engine.session.Action
 import org.fcitx.fcitx5.android.engine.session.Choice
 import org.fcitx.fcitx5.android.engine.session.Offer
 import org.fcitx.fcitx5.android.engine.session.Snapshot
@@ -23,7 +25,7 @@ class KeyRouterCodesTest {
     private class Host(val fails: Boolean) : EngineHost {
         val events = mutableListOf<Pair<String, Int>>()
         val kinds = mutableListOf<Int>()
-        override fun event(im: String, event: Int, arg: Int, learning: Boolean): Snapshot {
+        override fun event(im: String, event: Int, arg: Int, learning: Boolean, payload: Action?): Snapshot {
             events += im to arg
             kinds += event
             if (fails) error("the 14 keys' session not made")
@@ -31,16 +33,16 @@ class KeyRouterCodesTest {
         }
         override fun candidates(im: String, from: Int, count: Int) = emptyList<Choice>()
         override fun offers(im: String, index: Int) = emptySet<Offer>()
-        override fun settings(flat: String) = Unit
+        override fun settings(settings: EngineSettings) = Unit
     }
 
-    private fun core(host: Host) = HostCore(host, VirtualHostClock(), Profile.load(null, Engines.LISTED.map { it.name }.toSet(), "D"), firstRun = true).also {
+    private fun core(host: Host) = HostCore(host, VirtualHostClock(), Profile.load(null, InputMethodCatalog.LISTED.map { it.name }.toSet(), "D"), firstRun = true).also {
         it.activate(1)
         it.setCapabilities(Capability.PREEDIT or Capability.COMMIT_STRING_WITH_CURSOR)
         it.focus(true)
     }
 
-    private fun HostCore.log() = mutableListOf<HostEvent>().also { l -> events.handlers += { l += it } }
+    private fun HostCore.log() = mutableListOf<HostEvent>().also { l -> events += HostEvents { l += it } }
 
     // a tap with its place (Keyboard.TAPS) is a code too
     private val codes = listOf(g14Code('a'), g14Code('b'), g14Code('z'), '\uF8C0', '\uF8D9', nineSpCode('2'), nineSpCode('9')).map { Key(KeySyms.fromUnicode(it.code)) } +
@@ -58,10 +60,10 @@ class KeyRouterCodesTest {
     // (b) another input method active, the 14 keys still shown: swallowed, its session never told
     @Test
     fun aCodeInAnotherInputMethodIsSwallowed() {
-        for (im in listOf(Engines.ENGLISH, Engines.WUBI)) {
+        for (im in listOf(InputMethodCatalog.ENGLISH, InputMethodCatalog.WUBI)) {
             val host = Host(fails = false)
             val core = core(host)
-            core.setInputMethods(listOf(Engines.PINYIN, im))
+            core.setInputMethods(listOf(InputMethodCatalog.PINYIN, im))
             core.setCurrentInputMethod(im)
             val log = core.log()
             host.events.clear()
@@ -80,10 +82,10 @@ class KeyRouterCodesTest {
     @Test
     fun aCodeOfAnotherInputMethodsKeyboardIsSwallowed() {
         val tap = Keyboard.tapKey(g14Code('b'), 0.75f)
-        for ((im, read) in listOf(Engines.PINYIN to listOf(g14Code('b').code, tap), Engines.SHUANGPIN to listOf(0xF8C1, nineSpCode('6').code))) {
+        for ((im, read) in listOf(InputMethodCatalog.PINYIN to listOf(g14Code('b').code, tap), InputMethodCatalog.SHUANGPIN to listOf(0xF8C1, nineSpCode('6').code))) {
             val host = Host(fails = false)
             val core = core(host)
-            core.setInputMethods(listOf(Engines.PINYIN, Engines.SHUANGPIN))
+            core.setInputMethods(listOf(InputMethodCatalog.PINYIN, InputMethodCatalog.SHUANGPIN))
             core.setCurrentInputMethod(im)
             val log = core.log()
             host.events.clear()
@@ -101,7 +103,26 @@ class KeyRouterCodesTest {
         val core = core(host)
         val tap = Keyboard.tapKey(g14Code('b'), 0.75f)
         core.sendKey(Key(KeySyms.fromUnicode(tap)), virtual = true)
-        assertEquals(listOf(Engines.PINYIN to tap), host.events.filter { it.second == tap })
+        assertEquals(listOf(InputMethodCatalog.PINYIN to tap), host.events.filter { it.second == tap })
+    }
+
+    // 笔画筛选: a stroke drawn reaches the input methods that filter by one, never the app; any other has it swallowed
+    @Test
+    fun aStrokeIsReadByThePinyinsAloneAndNeverTyped() {
+        val stroke = Keyboard.strokeKey('n')
+        for ((im, told) in listOf(InputMethodCatalog.PINYIN to true, InputMethodCatalog.SHUANGPIN to true, InputMethodCatalog.WUBI to false, InputMethodCatalog.ENGLISH to false)) {
+            for (fails in listOf(false, true)) {
+                val host = Host(fails)
+                val core = core(host)
+                core.setInputMethods(listOf(InputMethodCatalog.PINYIN, im))
+                core.setCurrentInputMethod(im)
+                val log = core.log()
+                host.events.clear()
+                assertTrue(core.sendKey(Key(KeySyms.fromUnicode(stroke)), virtual = true))
+                assertTrue(log.toString(), log.none { it is HostEvent.Commit || it is HostEvent.Key })
+                assertEquals(im, if (told) listOf(im to stroke) else emptyList(), host.events.filter { it.second == stroke })
+            }
+        }
     }
 
     // review S1: 双拼 is told a hardware ; from the screen's, the screen's a mark after what is typed
@@ -109,8 +130,8 @@ class KeyRouterCodesTest {
     fun aHardwareMarkReachesShuangpinAsAHardwareChar() {
         val host = Host(fails = false)
         val core = core(host)
-        core.setInputMethods(listOf(Engines.PINYIN, Engines.SHUANGPIN))
-        core.setCurrentInputMethod(Engines.SHUANGPIN)
+        core.setInputMethods(listOf(InputMethodCatalog.PINYIN, InputMethodCatalog.SHUANGPIN))
+        core.setCurrentInputMethod(InputMethodCatalog.SHUANGPIN)
         host.kinds.clear()
         core.sendKey(Key(KeySyms.fromUnicode(';'.code)), virtual = false)
         core.sendKey(Key(KeySyms.fromUnicode(';'.code)), virtual = true)

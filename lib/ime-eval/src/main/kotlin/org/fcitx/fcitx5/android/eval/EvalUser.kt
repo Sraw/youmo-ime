@@ -14,6 +14,7 @@ import org.fcitx.fcitx5.android.engine.learn.LearnTo
 import org.fcitx.fcitx5.android.engine.learn.LogHabits
 import org.fcitx.fcitx5.android.engine.learn.Row
 import org.fcitx.fcitx5.android.engine.pinyin.Syllables
+import org.fcitx.fcitx5.android.engine.platform.jvm.JvmFile
 import org.fcitx.fcitx5.android.engine.user.HabitCounts
 import org.fcitx.fcitx5.android.engine.user.UserModel
 import java.io.File
@@ -27,7 +28,7 @@ import java.io.File
 class EvalUser(data: PinyinData, file: File? = null) {
     val clock = StepClock()
     val model = UserModel(data.dictionary, data.vocabulary, index = data.wordIndex)
-    val log = LearnLog(file, clock, foldDaily = false).apply { open() }
+    val log = LearnLog(file?.let(::JvmFile), clock, foldDaily = false).apply { open() }
     val habits = LogHabits({ log })
     private val counts = HabitCounts(model).also { it.attach(log.state) }
 

@@ -104,8 +104,7 @@ class EnglishGlideTest {
         val t = EnglishSession(EnglishDecoderTest.data())
         t.apply(Action.Context("say"))
         // a path no word fits: nothing, not a lone space
-        t.offerGlide(Glide(floatArrayOf(0.5f, 0.7f, 0.6f, 0.7f, 0.5f, 3.5f), GlideDecoderTest.glide("the").layout))
-        assertEquals("", t.apply(Action.Glide).commit)
+        assertEquals("", t.apply(Action.Glide(Glide(floatArrayOf(0.5f, 0.7f, 0.6f, 0.7f, 0.5f, 3.5f), GlideDecoderTest.glide("the").layout))).commit)
     }
 
     @Test
@@ -146,8 +145,7 @@ class EnglishGlideTest {
         val s = session()
         s.apply(Action.Key('h'))
         s.apply(Action.Key('e'))
-        s.offerGlide(Glide(floatArrayOf(0.5f, 0.7f, 0.6f, 0.7f, 0.5f, 3.5f), GlideDecoderTest.glide("the").layout))
-        val shown = s.apply(Action.Glide)
+        val shown = s.apply(Action.Glide(Glide(floatArrayOf(0.5f, 0.7f, 0.6f, 0.7f, 0.5f, 3.5f), GlideDecoderTest.glide("the").layout)))
         assertEquals("", shown.commit)
         assertEquals("he", shown.preedit)
     }
@@ -216,13 +214,12 @@ class EnglishGlideTest {
     @Test
     fun capsLockGlidesInCapitals() {
         val s = session()
-        s.offerGlide(Glide(GlideDecoderTest.path("helo"), GlideLayout.QWERTY, capsLock = true))
-        assertEquals("HELLO ", s.apply(Action.Glide).commit)
+        assertEquals("HELLO ", s.apply(Action.Glide(Glide(GlideDecoderTest.path("helo"), GlideLayout.QWERTY, capsLock = true))).commit)
     }
 
     @Test
     fun noGlideOfferedNothingCommitted() {
-        assertEquals("", session().apply(Action.Glide).commit)
+        assertEquals("", session().apply(Action.Glide(null)).commit)
         assertEquals("", EnglishSession(null).glided("the").commit)
     }
 

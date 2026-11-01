@@ -6,11 +6,13 @@ package org.fcitx.fcitx5.android.ui.main.settings.im
 
 import kotlinx.coroutines.runBlocking
 import org.fcitx.fcitx5.android.FcitxApplication
-import org.fcitx.fcitx5.android.core.FakeFcitxAPI
-import org.fcitx.fcitx5.android.core.RawConfig
-import org.fcitx.fcitx5.android.engine.host.EngineSettings
-import org.fcitx.fcitx5.android.engine.host.Engines
+import org.fcitx.fcitx5.android.core.FakeHostApi
+import org.fcitx.fcitx5.android.engine.InputMethodCatalog
+import org.fcitx.fcitx5.android.engine.runtime.EngineSettings
+import org.fcitx.fcitx5.android.host.ConfigTree
+import org.fcitx.fcitx5.android.host.EngineOptions
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -27,14 +29,30 @@ class SharedInputSavesTest {
 
     @Test
     fun theSharedPageSavesTheSharedOptionsAlone(): Unit = runBlocking {
-        val fcitx = FakeFcitxAPI()
-        val cfg = RawConfig().apply {
-            getOrCreate(EngineSettings.EMOJI).value = "False"
-            getOrCreate(EngineSettings.CHAIZI).value = "True"
+        val fcitx = FakeHostApi()
+        val cfg = mutableMapOf<String, String>().apply {
+            this[EngineSettings.EMOJI] = "False"
+            this[EngineSettings.CHAIZI] = "True"
         }
         SharedInputFragment().saveConfig(fcitx, cfg)
-        val saved = fcitx.getImConfig(Engines.PINYIN)
-        assertEquals("False", saved.findByName(EngineSettings.EMOJI)?.value)
-        assertNull(saved.findByName(EngineSettings.CHAIZI))
+        val saved = fcitx.imOptions(InputMethodCatalog.PINYIN)!!
+        assertEquals("False", saved[EngineSettings.EMOJI])
+        assertNull(saved[EngineSettings.CHAIZI])
+    }
+
+    // pinyin's page open behind the shared one read the shared options before they changed there:
+    // its save, of what it shows alone, leaves them as the shared page set them (the host's partial load)
+    @Test
+    fun aPageOpenBehindTheSharedOneDoesNotWriteBackWhatItRead() {
+        val options = EngineOptions()
+        val behind = options.page(InputMethodCatalog.PINYIN)!!.leaves().toMutableMap()
+        val shared = options.page(InputMethodCatalog.PINYIN)!!.leaves().toMutableMap()
+        shared[EngineSettings.EMOJI] = "False"
+        options.setPage(InputMethodCatalog.PINYIN, ConfigTree.of(InputMethodSettings.only(InputMethodSettings.SHARED, shared)))
+        behind[EngineSettings.CHAIZI] = "False"
+        options.setPage(InputMethodCatalog.PINYIN, ConfigTree.of(InputMethodSettings.only(InputMethodSettings.of(InputMethodCatalog.PINYIN)!!, behind)))
+        val read = options.toSettings()
+        assertFalse(read.emoji)
+        assertFalse(read.chaizi)
     }
 }

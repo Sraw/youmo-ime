@@ -4,17 +4,20 @@
  */
 package org.fcitx.fcitx5.android.host
 
-import org.fcitx.fcitx5.android.engine.host.EngineSettings
-import org.fcitx.fcitx5.android.engine.host.Engines
-import org.fcitx.fcitx5.android.engine.host.ModelLevel
-import org.fcitx.fcitx5.android.engine.host.TableSettings
+import org.fcitx.fcitx5.android.engine.InputMethodCatalog
+import org.fcitx.fcitx5.android.engine.runtime.EngineSettings
+import org.fcitx.fcitx5.android.engine.runtime.ModelLevel
+import org.fcitx.fcitx5.android.engine.runtime.SchemeMigration
+import org.fcitx.fcitx5.android.engine.runtime.TableSettings
+import org.fcitx.fcitx5.android.engine.table.KeyLabels
+import org.fcitx.fcitx5.android.engine.pinyin.Fuzzy
 
 /**
  * The androidengine addon's config, `conf/androidengine.conf`: the option table of
  * `androidengine.h:27-198` (`AndroidEngineConfig` and the pages over it) with fcitx's
  * `Configuration` semantics (`fcitx-config/configuration.cpp:109-139`, `option.h:434-443`). Reading
- * and saving the file, each input method's page, the page's partial save and the flat settings the
- * engine reads ([EngineSettings.parse]) are all here; the host only moves text and trees.
+ * and saving the file, each input method's page, the page's partial save and the settings the
+ * engine reads ([toSettings]) are all here; the host only moves text and trees.
  *
  * A value that does not read (a bad boolean, a number out of range or not one, a name not known)
  * falls back to its default, not to the nearest value. A key the table does not have is dropped at
@@ -60,7 +63,7 @@ class EngineOptions {
     }
 
     // androidengine.h's options, each written once and shared by the pages, as there
-    private val shuangpin = Option(EngineSettings.SHUANGPIN_PROFILE, Names(EngineSettings.SCHEMES.keys.toList()), EngineSettings.ZIRANMA)
+    private val shuangpin = Option(EngineSettings.SHUANGPIN_PROFILE, Names(EngineSettings.SCHEMES.keys.toList()), EngineSettings.XIAOHE)
     private val pageSize = Option(EngineSettings.PAGE_SIZE, Number(EngineSettings.PAGE_SIZES), EngineSettings.DEFAULT_PAGE_SIZE.toString())
     private val prediction = Option(EngineSettings.PREDICTION, Flag, TRUE)
     private val emoji = Option(EngineSettings.EMOJI, Flag, TRUE)
@@ -75,15 +78,20 @@ class EngineOptions {
     )
 
     // ENGINE_TABLE_OPTIONS: libime table's keys; the engine orders by use alike for Freq and Fast
-    private val tableOptions = listOf(
-        Option(TableSettings.AUTO_SELECT, Flag, TRUE),
-        Option(TableSettings.HINT, Flag, TRUE),
-        Option(TableSettings.ORDER_POLICY, Names(listOf("No", "Freq", "Fast")), "No"),
-    )
+    private val autoSelect = Option(TableSettings.AUTO_SELECT, Flag, TRUE)
+    private val hint = Option(TableSettings.HINT, Flag, TRUE)
+    private val orderPolicy = Option(TableSettings.ORDER_POLICY, Names(listOf(NO_ORDER, "Freq", "Fast")), NO_ORDER)
+    private val tableOptions = listOf(autoSelect, hint, orderPolicy)
+
+    // the app's own, where a table has roots (仓颉, 五笔): what its keys show of them. Its preset's
+    // by default in a fresh group too: a group an older config has (anything of the table changed)
+    // then shows 仓颉's roots as a new install does
+    private fun keyLabels(default: KeyLabels) = Option(TableSettings.KEY_LABELS, Names(KeyLabels.entries.map { it.key }), default.key)
 
     // each table's group, named as androidengine.cpp lists them; engineTable(hint) of the preset
-    private val tables: Map<String, Group> = Engines.TABLES.mapValues { (_, method) ->
-        Group(method.group, tableOptions, mapOf(TableSettings.HINT to flag(method.options.hint)))
+    private val tables: Map<String, Group> = InputMethodCatalog.TABLES.mapValues { (_, method) ->
+        val options = if (method.options.roots != null) tableOptions + keyLabels(method.options.keyLabels) else tableOptions
+        Group(method.group, options, mapOf(TableSettings.HINT to flag(method.options.hint)))
     }
 
     /** `AndroidEngineConfig`'s options in order (its two `ExternalOption`s are never saved, `option.cpp:73`). */
@@ -117,12 +125,23 @@ class EngineOptions {
     val suggestsEnglish: Boolean get() = values.getValue(englishSuggest.key) == TRUE
 
     /**
-     * Reads [text], the file, as the addon does at start (`readAsIni` → `Configuration::load(raw)`,
-     * not partial): what it does not say is the default.
+     * What the last [load] changed of 双拼's scheme as stored ([SchemeMigration]): null, nothing; else
+     * the config is to be written, and a dropped scheme told.
      */
-    fun load(text: String) {
+    var schemeMigrated: SchemeMigration.Outcome? = null
+        private set
+
+    /**
+     * Reads [text], the file, as the addon does at start (`readAsIni` → `Configuration::load(raw)`,
+     * not partial): what it does not say is the default. 双拼's scheme then as 0.5 has them
+     * ([SchemeMigration]), [upgrade] whether the install is one from before 0.5 not yet settled.
+     */
+    fun load(text: String, upgrade: Boolean = false) {
         reset()
-        load(IniFile.read(text), partial = false)
+        val tree = IniFile.read(text)
+        load(tree, partial = false)
+        schemeMigrated = SchemeMigration.settle(tree.find(shuangpin.key)?.value, upgrade)
+        schemeMigrated?.let { values[shuangpin.key] = it.name }
     }
 
     // Configuration::load (configuration.cpp:109-124) over entries
@@ -179,10 +198,33 @@ class EngineOptions {
 
     /**
      * The settings as the addon pushes them to the engine (`androidengine.cpp:473-491`): every
-     * value, defaults too, `key=value` a line, a group's under `group/` — [EngineSettings.parse]'s input.
+     * value, defaults too, each table's group among them. The nine keys' letters are not the
+     * addon's (the app merges its own preference in).
      */
-    fun flat(): String = buildString {
-        for ((path, value) in save().leaves()) append(path).append('=').append(value).append('\n')
+    fun toSettings(): EngineSettings {
+        fun flag(path: String) = values.getValue(path) == TRUE
+        return EngineSettings(
+            shuangpin = values.getValue(shuangpin.key),
+            fuzzy = Fuzzy.entries.filterTo(HashSet()) { values["${fuzzy.key}/${it.name}"] == TRUE },
+            typos = flag("${fuzzy.key}/${EngineSettings.TYPOS}"),
+            prediction = flag(prediction.key),
+            emoji = flag(emoji.key),
+            chaizi = flag(chaizi.key),
+            builtInPhrases = flag(builtInPhrases.key),
+            pageSize = pageSizeValue,
+            modelLevel = ModelLevel.entries.first { it.key == values.getValue(modelLevel.key) },
+            latinWords = flag(latinWords.key),
+            tables = tables.values.associate { group ->
+                group.key to TableSettings(
+                    autoSelect = flag(path(group, autoSelect)),
+                    hint = flag(path(group, hint)),
+                    // Freq and Fast alike
+                    orderByUse = values.getValue(path(group, orderPolicy)) != NO_ORDER,
+                    keyLabels = values["${group.key}/${TableSettings.KEY_LABELS}"]?.let(KeyLabels::of),
+                )
+            },
+            englishSuggest = suggestsEnglish,
+        )
     }
 
     /**
@@ -237,10 +279,10 @@ class EngineOptions {
 
     // the entries of androidengine.h's page for [im]: EnginePinyinPage and the others
     private fun pageOf(im: String): List<Any>? = when (im) {
-        Engines.PINYIN, Engines.T9 -> listOf(pageSize, prediction, emoji, chaizi, builtInPhrases, modelLevel, latinWords, fuzzy)
-        Engines.SHUANGPIN -> listOf(shuangpin, pageSize, prediction, emoji, modelLevel, fuzzy)
-        Engines.ENGLISH -> listOf(englishSuggest)
-        Engines.HANDWRITING -> listOf(pageSize, prediction, modelLevel)
+        InputMethodCatalog.PINYIN -> listOf(pageSize, prediction, emoji, chaizi, builtInPhrases, modelLevel, latinWords, fuzzy)
+        InputMethodCatalog.SHUANGPIN -> listOf(shuangpin, pageSize, prediction, emoji, modelLevel, fuzzy)
+        InputMethodCatalog.ENGLISH -> listOf(englishSuggest)
+        InputMethodCatalog.HANDWRITING -> listOf(pageSize, prediction, modelLevel)
         in tables -> listOf(pageSize, prediction, emoji, modelLevel)
         else -> null
     }
@@ -251,6 +293,7 @@ class EngineOptions {
         const val PATH = "conf/androidengine.conf"
         private const val TRUE = "True"
         private const val FALSE = "False"
+        private const val NO_ORDER = "No"
 
         // EngineFuzzyConfig's order after NG_GN (androidengine.h:36-51)
         private val FUZZY_KEYS = listOf(

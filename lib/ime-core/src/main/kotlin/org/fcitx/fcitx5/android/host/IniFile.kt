@@ -8,7 +8,7 @@ import org.fcitx.fcitx5.android.core.FcitxUtils
 
 /**
  * fcitx's INI as `fcitx-config/iniparser.cpp` reads and writes it, so a file either side wrote reads
- * the same on the other. Unlike `engine.table.IniText` (which trims around `=`), a key and its value
+ * the same on the other. Nothing is trimmed around `=`: a key and its value
  * are taken as written between the trimmed line's ends.
  */
 object IniFile {

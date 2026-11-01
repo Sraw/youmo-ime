@@ -4,13 +4,13 @@
  */
 package org.fcitx.fcitx5.android.engine.pinyin
 
-import org.fcitx.fcitx5.android.engine.host.EngineSettings
 import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters.Companion.G18
 import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters.Companion.NINE_SP
 import org.fcitx.fcitx5.android.engine.pinyin.ShuangpinScheme.Companion.MICROSOFT
 import org.fcitx.fcitx5.android.engine.pinyin.ShuangpinScheme.Companion.XIAOHE
 import org.fcitx.fcitx5.android.engine.pinyin.ShuangpinScheme.Companion.ZIRANMA
 import org.fcitx.fcitx5.android.engine.pinyin.SyllableGraph.Kind
+import org.fcitx.fcitx5.android.engine.runtime.EngineSettings
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue

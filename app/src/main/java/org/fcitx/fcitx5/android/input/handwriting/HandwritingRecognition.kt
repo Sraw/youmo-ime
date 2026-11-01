@@ -6,9 +6,10 @@ package org.fcitx.fcitx5.android.input.handwriting
 
 import android.os.Handler
 import android.os.Looper
+import androidx.annotation.VisibleForTesting
 import org.fcitx.fcitx5.android.R
-import org.fcitx.fcitx5.android.core.EngineBridge
 import org.fcitx.fcitx5.android.core.EngineNotices
+import org.fcitx.fcitx5.android.core.EngineState
 import org.fcitx.fcitx5.android.engine.handwriting.InkNet
 import org.fcitx.fcitx5.android.engine.handwriting.InkReading
 import org.fcitx.fcitx5.android.engine.handwriting.InkRecognizer
@@ -33,7 +34,8 @@ class HandwritingRecognition internal constructor(
     private val worker: Executor,
     private val main: Executor,
     private val ended: () -> Int,
-    private val reader: Reader,
+    // a JVM test's reader of fixed readings in place of the native model
+    @VisibleForTesting internal var reader: Reader,
 ) {
 
     /** What reads the strokes, on the worker. */
@@ -114,7 +116,7 @@ class HandwritingRecognition internal constructor(
             HandwritingRecognition(
                 Executors.newSingleThreadExecutor { Thread(it, "handwriting").apply { isDaemon = true } },
                 Executor { main.post(it) },
-                { EngineBridge.handwritingEnded.value },
+                { EngineState.handwritingEnded.value },
                 LoadingReader(AssetRecognizer::open, AssetRecognizer::told),
             )
         }

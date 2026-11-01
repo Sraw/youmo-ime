@@ -5,14 +5,16 @@
 package org.fcitx.fcitx5.android.host
 
 import org.fcitx.fcitx5.android.assertRows
-import org.fcitx.fcitx5.android.core.FcitxEvent
-import org.fcitx.fcitx5.android.engine.host.EngineEvent
-import org.fcitx.fcitx5.android.engine.host.Engines
+import org.fcitx.fcitx5.android.engine.InputMethodCatalog
+import org.fcitx.fcitx5.android.engine.runtime.EngineEvent
+import org.fcitx.fcitx5.android.engine.runtime.EngineSettings
+import org.fcitx.fcitx5.android.engine.session.Action
 import org.fcitx.fcitx5.android.engine.session.Choice
 import org.fcitx.fcitx5.android.engine.session.Offer
 import org.fcitx.fcitx5.android.engine.session.Snapshot
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -33,7 +35,7 @@ class HostCoreContractTest {
         var offered: Set<Offer> = emptySet()
         val fetches = mutableListOf<Pair<Int, Int>>()
 
-        override fun event(im: String, event: Int, arg: Int, learning: Boolean): Snapshot? {
+        override fun event(im: String, event: Int, arg: Int, learning: Boolean, payload: Action?): Snapshot? {
             calls += "$im $event $arg${if (learning) "" else " nolearn"}"
             if (throwOn(event)) throw throwable()
             return answer(im, event, arg)
@@ -45,7 +47,7 @@ class HostCoreContractTest {
         }
 
         override fun offers(im: String, index: Int) = offered
-        override fun settings(flat: String) {
+        override fun settings(settings: EngineSettings) {
             calls += "settings"
         }
     }
@@ -69,12 +71,12 @@ class HostCoreContractTest {
     private val persisted = mutableListOf<Persist>()
 
     private fun core(
-        profile: Profile = Profile.load(null, Engines.LISTED.map { it.name }.toSet(), "Default"),
+        profile: Profile = Profile.load(null, InputMethodCatalog.LISTED.map { it.name }.toSet(), "Default"),
         firstRun: Boolean = true,
         modules: (HostServices) -> HostModules = { HostModules() },
     ) = HostCore(fake, clock, profile, firstRun = firstRun, persist = { persisted += it }, modules = modules)
 
-    private fun HostCore.log(): MutableList<HostEvent> = mutableListOf<HostEvent>().also { l -> events.handlers += { l += it } }
+    private fun HostCore.log(): MutableList<HostEvent> = mutableListOf<HostEvent>().also { l -> events += HostEvents { l += it } }
 
     private fun HostCore.open(uid: Int = 1, caps: Long = Capability.PREEDIT or Capability.CLIENT_UNFOCUS_COMMIT or Capability.COMMIT_STRING_WITH_CURSOR) {
         activate(uid)
@@ -91,7 +93,7 @@ class HostCoreContractTest {
     @Test
     fun `first run is the Default group, pinyin first, keyboard-us default, and saved`() {
         // fcitx/inputmethodmanager.cpp:147-162 + native-last:app/src/main/java/org/fcitx/fcitx5/android/core/Fcitx.kt:437-447
-        val listed = Engines.LISTED.map { it.name }.toSet()
+        val listed = InputMethodCatalog.LISTED.map { it.name }.toSet()
         fun firstRun(available: Set<String>, expected: List<String>) {
             fake = FakeHost()
             clock = VirtualHostClock()
@@ -101,18 +103,18 @@ class HostCoreContractTest {
             assertEquals(ImGroup.KEYBOARD_US, core.contexts.group.defaultInputMethod)
             // saved when it changed the default profile (the keyboard alone is that profile)
             val saved = persisted.filterIsInstance<Persist.ProfileChanged>().lastOrNull()?.profile?.currentGroup()?.inputMethods
-            assertEquals(expected.takeIf { Engines.PINYIN in it }, saved)
+            assertEquals(expected.takeIf { InputMethodCatalog.PINYIN in it }, saved)
         }
         assertRows(
-            "the engines list pinyin" to { firstRun(listed, listOf(Engines.PINYIN, ImGroup.KEYBOARD_US)) },
+            "the engines list pinyin" to { firstRun(listed, listOf(InputMethodCatalog.PINYIN, ImGroup.KEYBOARD_US)) },
             // F4199: HostCore's init puts pinyin first only when the engines list it
-            "no pinyin listed keeps the keyboard alone (F4199)" to { firstRun(listed - Engines.PINYIN, listOf(ImGroup.KEYBOARD_US)) },
+            "no pinyin listed keeps the keyboard alone (F4199)" to { firstRun(listed - InputMethodCatalog.PINYIN, listOf(ImGroup.KEYBOARD_US)) },
         )
     }
 
     @Test
     fun `a later run keeps the profile as it is`() {
-        val profile = Profile.load(Profile.default("Default").text(), setOf(ImGroup.KEYBOARD_US, Engines.PINYIN), "Default")
+        val profile = Profile.load(Profile.default("Default").text(), setOf(ImGroup.KEYBOARD_US, InputMethodCatalog.PINYIN), "Default")
         val core = core(profile, firstRun = false)
         assertEquals(listOf(ImGroup.KEYBOARD_US), core.contexts.group.inputMethods)
         assertTrue(persisted.isEmpty())
@@ -127,7 +129,7 @@ class HostCoreContractTest {
         val log = core.log()
         core.open()
         assertEquals("engine-pinyin ${EngineEvent.RESET} 0", fake.calls.last())
-        assertEquals(HostEvent.InputMethodChanged(Engines.PINYIN), log.first())
+        assertEquals(HostEvent.InputMethodChanged(InputMethodCatalog.PINYIN), log.first())
     }
 
     @Test
@@ -375,6 +377,31 @@ class HostCoreContractTest {
     }
 
     @Test
+    fun `a candidate's text no filter rewrote is the text itself, an empty one never filtered`() {
+        val asked = ArrayList<String>()
+        val core = core(
+            modules = {
+                HostModules(
+                    outputFilters = listOf(
+                        OutputFilter { _, t -> t.also { asked += it.toString() } },
+                        OutputFilter { _, t -> if (t.toString() == "门") t.copy(strings = arrayOf("門")) else t },
+                    ),
+                )
+            },
+        )
+        core.open()
+        val ic = checkNotNull(core.contexts.active)
+        asked.clear()
+        // a fresh instance, not the literal: assertSame then holds only if a text no filter changes
+        // comes back as given, not rebuilt (a string a candidate a key on the typing path)
+        val text = String(charArrayOf('们'))
+        assertSame(text, core.filterOutput(ic, text))
+        assertEquals("門", core.filterOutput(ic, "门"))
+        assertEquals("", core.filterOutput(ic, ""))
+        assertEquals(listOf("们", "门"), asked)
+    }
+
+    @Test
     fun `the paged window shows the page, labels by number, and turns while composing`() {
         // af:125-148,270-289; ae:94-121,156-172
         val core = core()
@@ -383,7 +410,7 @@ class HostCoreContractTest {
         val log = core.log()
         core.typed((1..10).map { "c$it" })
         val paged = log.filterIsInstance<HostEvent.Paged>().last()
-        assertEquals(FcitxEvent.PagedCandidateEvent.LayoutHint.NotSet, paged.layoutHint)
+        assertEquals(LayoutHint.NotSet, paged.layoutHint)
         assertEquals(listOf("1", "2", "3", "4", "5"), paged.candidates.map { it.label })
         assertEquals(0, paged.cursorIndex)
         assertTrue(paged.hasNext)
@@ -475,7 +502,7 @@ class HostCoreContractTest {
         core.toggle()
         val calls = fake.calls.takeLast(3)
         assertEquals(listOf("engine-pinyin ${EngineEvent.ENTER} 0", "engine-pinyin ${EngineEvent.RESET} 0", "keyboard-us ${EngineEvent.RESET} 0"), calls)
-        assertTrue(HostEvent.SwitchInputMethod(SwitchReason.Trigger, Engines.PINYIN) in log)
+        assertTrue(HostEvent.SwitchInputMethod(SwitchReason.Trigger, InputMethodCatalog.PINYIN) in log)
         assertEquals("En", log.filterIsInstance<HostEvent.InputPanel>().last().auxUp.toString())
         clock.advance(HostCore.INFO_MILLIS)
         assertEquals("", log.filterIsInstance<HostEvent.InputPanel>().last().auxUp.toString())
@@ -500,14 +527,14 @@ class HostCoreContractTest {
         // fcitx/inputmethodengine.cpp:46-54 (defaultInvokeActionBehavior), F3788
         val core = core()
         core.open()
-        core.setInputMethods(listOf(Engines.PINYIN, Engines.HANDWRITING, ImGroup.KEYBOARD_US))
-        core.setCurrentInputMethod(Engines.HANDWRITING)
+        core.setInputMethods(listOf(InputMethodCatalog.PINYIN, InputMethodCatalog.HANDWRITING, ImGroup.KEYBOARD_US))
+        core.setCurrentInputMethod(InputMethodCatalog.HANDWRITING)
         fake.answer = { _, e, _ -> if (e == EngineEvent.CHAR) snap(preedit = "你") else snap(handled = false) }
         core.press('a')
         val log = core.log()
         core.moveCursor(0)
         assertTrue("$log ${fake.calls}", HostEvent.Commit("你", -1) in log)
-        assertTrue(fake.calls.toString(), fake.calls.last().startsWith("${Engines.HANDWRITING} ${EngineEvent.RESET} 0"))
+        assertTrue(fake.calls.toString(), fake.calls.last().startsWith("${InputMethodCatalog.HANDWRITING} ${EngineEvent.RESET} 0"))
     }
 
     @Test
@@ -530,16 +557,16 @@ class HostCoreContractTest {
             // the plain field's text learns, not "nolearn" under the password's flags
             "into a password field" to {
                 val c = calls(0, Capability.PASSWORD)
-                assertEquals(c.toString(), listOf("${Engines.PINYIN} ${EngineEvent.ENTER} 0"), c.filter { it.split(' ')[1] == "${EngineEvent.ENTER}" })
-                assertTrue(c.toString(), of(c, Engines.PINYIN).none { it.endsWith(" nolearn") })
+                assertEquals(c.toString(), listOf("${InputMethodCatalog.PINYIN} ${EngineEvent.ENTER} 0"), c.filter { it.split(' ')[1] == "${EngineEvent.ENTER}" })
+                assertTrue(c.toString(), of(c, InputMethodCatalog.PINYIN).none { it.endsWith(" nolearn") })
             },
             // the privacy half: what was typed in the password field is never learnt; pinyin comes
             // back learning, its activation not under the password's flags
             "out of a password field" to {
                 val c = calls(Capability.PASSWORD, 0)
                 assertTrue(c.toString(), of(c, ImGroup.KEYBOARD_US).all { it.endsWith(" nolearn") })
-                val pinyin = of(c, Engines.PINYIN)
-                assertTrue(c.toString(), "${Engines.PINYIN} ${EngineEvent.RESET} 0" in pinyin && pinyin.none { it.endsWith(" nolearn") })
+                val pinyin = of(c, InputMethodCatalog.PINYIN)
+                assertTrue(c.toString(), "${InputMethodCatalog.PINYIN} ${EngineEvent.RESET} 0" in pinyin && pinyin.none { it.endsWith(" nolearn") })
             },
         )
     }
@@ -564,18 +591,18 @@ class HostCoreContractTest {
         core.open()
         val log = core.log()
         persisted.clear()
-        core.setInputMethods(listOf(Engines.WUBI, Engines.PINYIN, ImGroup.KEYBOARD_US))
+        core.setInputMethods(listOf(InputMethodCatalog.WUBI, InputMethodCatalog.PINYIN, ImGroup.KEYBOARD_US))
         assertTrue(log.none { it is HostEvent.SwitchInputMethod })
         assertEquals("engine-wubi ${EngineEvent.RESET} 0", fake.calls.last())
         clock.advance(HostCore.GROUP_INFO_DELAY)
         assertEquals("五", log.filterIsInstance<HostEvent.InputPanel>().last().auxUp.toString())
-        assertEquals(listOf(Engines.WUBI, Engines.PINYIN, ImGroup.KEYBOARD_US), (persisted.single() as Persist.ProfileChanged).profile.currentGroup().inputMethods)
+        assertEquals(listOf(InputMethodCatalog.WUBI, InputMethodCatalog.PINYIN, ImGroup.KEYBOARD_US), (persisted.single() as Persist.ProfileChanged).profile.currentGroup().inputMethods)
     }
 
     @Test
     fun `the name overlay can be turned off`() {
-        // TestFcitx.kt:120's ShowInputMethodInformation, now a constructor switch
-        val core = HostCore(fake, clock, Profile.load(null, Engines.LISTED.map { it.name }.toSet(), "Default"), firstRun = true, showInputMethodInformation = false)
+        // the instrumented TestHost sets KotlinHost.showInputMethodInformation = false; here a constructor switch
+        val core = HostCore(fake, clock, Profile.load(null, InputMethodCatalog.LISTED.map { it.name }.toSet(), "Default"), firstRun = true, showInputMethodInformation = false)
         core.open()
         core.toggle()
         assertTrue(core.isEmpty())

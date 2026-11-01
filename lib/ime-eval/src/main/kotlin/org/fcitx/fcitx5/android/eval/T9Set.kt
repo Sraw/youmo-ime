@@ -21,9 +21,13 @@ object T9Set {
     /** The 14 keys' (NineKeyLetters.G14) that reads 简拼 as [ABBREVIATING] does. */
     const val G14_ABBREVIATING = "g14"
 
+    /** The 18 keys' (NineKeyLetters.G18) that reads 简拼 as [ABBREVIATING] does. */
+    const val G18_ABBREVIATING = "g18"
+
     /**
      * The segmenters measured: `t9` reads 简拼 where no longer syllable starts, `t9-strict` only where
-     * nothing else is read; `g14` and `g14-strict` the same on the 14 keys, a set typed `--keys 14`.
+     * nothing else is read; `g14` and `g14-strict` the same on the 14 keys, a set typed `--keys 14`,
+     * `g18` and `g18-strict` on pinyin's 18 keys (G18, the 双拼 18 keys' grouping), one typed `--keys 18`.
      */
     val SCHEMES: Set<String> get() = LETTERS.keys
 
@@ -33,16 +37,18 @@ object T9Set {
         "t9-strict" to NineKeyLetters.STANDARD,
         G14_ABBREVIATING to NineKeyLetters.G14,
         "g14-strict" to NineKeyLetters.G14,
+        G18_ABBREVIATING to NineKeyLetters.G18,
+        "g18-strict" to NineKeyLetters.G18,
     )
 
-    /** The keys a scheme of [SCHEMES] reads: the 14 keys' for `g14…`, else the nine keys'. Another name fails. */
+    /** The keys a scheme of [SCHEMES] reads: the 14 keys' for `g14…`, the 18 keys' for `g18…`, else the nine keys'. Another name fails. */
     fun lettersOf(scheme: String): NineKeyLetters = LETTERS[scheme] ?: throw IllegalArgumentException("no nine-key scheme $scheme")
 
-    /** Whether [scheme] of [SCHEMES] reads 简拼 where no longer syllable starts. */
-    fun abbreviates(scheme: String): Boolean = scheme == ABBREVIATING || scheme == G14_ABBREVIATING
+    /** Whether [scheme] of [SCHEMES] reads 简拼 where no longer syllable starts: all but the `-strict` ones. */
+    fun abbreviates(scheme: String): Boolean = !scheme.endsWith("-strict")
 
-    /** The keyboards a set is typed on, `t9 --keys`: the nine keys' (the default) or the 14 keys'. */
-    val KEYS = mapOf("nine" to NineKeyLetters.STANDARD, "14" to NineKeyLetters.G14)
+    /** The keyboards a set is typed on, `t9 --keys`: the nine keys' (the default), the 14 keys' or the 18 keys'. */
+    val KEYS = mapOf("nine" to NineKeyLetters.STANDARD, "14" to NineKeyLetters.G14, "18" to NineKeyLetters.G18)
 
     /** How each letter's key is pressed, `t9 --presses`. */
     enum class Presses(val option: String) {

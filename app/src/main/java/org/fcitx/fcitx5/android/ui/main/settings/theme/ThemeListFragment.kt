@@ -58,21 +58,20 @@ class ThemeListFragment : Fragment() {
             when (result) {
                 is CustomThemeActivity.BackgroundResult.Created -> {
                     val theme = result.theme
+                    // listed and put in use only once saved: a theme not saved would be gone at the next start
+                    if (!ThemeManager.saveTheme(theme)) return@registerForActivityResult
                     themeListAdapter.prependTheme(theme)
-                    ThemeManager.saveTheme(theme)
                     if (!followSystemDayNightTheme) {
                         ThemeManager.setNormalModeTheme(theme)
                     }
                 }
                 is CustomThemeActivity.BackgroundResult.Deleted -> {
                     val name = result.name
-                    themeListAdapter.removeTheme(name)
-                    ThemeManager.deleteTheme(name)
+                    if (ThemeManager.deleteTheme(name)) themeListAdapter.removeTheme(name)
                 }
                 is CustomThemeActivity.BackgroundResult.Updated -> {
                     val theme = result.theme
-                    themeListAdapter.replaceTheme(theme)
-                    ThemeManager.saveTheme(theme)
+                    if (ThemeManager.saveTheme(theme)) themeListAdapter.replaceTheme(theme)
                 }
             }
         }
@@ -159,6 +158,8 @@ class ThemeListFragment : Fragment() {
     }
 
     private fun addTheme() {
+        // the themes not settled: the editor's images would go nowhere the next start reads, so none is begun
+        if (ThemeManager.refuseIfNotSettled()) return
         val ctx = requireContext()
         val actions = arrayOf(
             getString(R.string.choose_image),
@@ -187,8 +188,7 @@ class ThemeListFragment : Fragment() {
                             override fun onClick(theme: Theme.Builtin) {
                                 val newTheme =
                                     theme.deriveCustomNoBackground(UUID.randomUUID().toString())
-                                themeListAdapter.prependTheme(newTheme)
-                                ThemeManager.saveTheme(newTheme)
+                                if (ThemeManager.saveTheme(newTheme)) themeListAdapter.prependTheme(newTheme)
                                 dialog.dismiss()
                             }
                         }
@@ -221,6 +221,7 @@ class ThemeListFragment : Fragment() {
     }
 
     private fun editTheme(theme: Theme.Custom) {
+        if (ThemeManager.refuseIfNotSettled()) return
         imageLauncher.launch(theme)
     }
 

@@ -5,6 +5,7 @@
 package org.fcitx.fcitx5.android.engine.table
 
 import org.fcitx.fcitx5.android.engine.data.CodeTable
+import org.fcitx.fcitx5.android.engine.platform.jvm.JvmFile
 import org.fcitx.fcitx5.android.engine.session.Action
 import org.fcitx.fcitx5.android.engine.user.DictionaryCompiler
 import org.fcitx.fcitx5.android.engine.user.DictionaryFile
@@ -27,7 +28,7 @@ class CodedIndexTest {
     private val wubi = dictionary("wqiy 你", "vbg 好", "wqvb 你好", "trnt 我", "wu 们", "wuyy 门", "wqwu 你们")
 
     private fun file(vararg lines: String): DictionaryFile =
-        File(folder.root, "merged.ymd").also { DictionaryCompiler.compile(listOf(lines.asSequence()), it) }.let(DictionaryFile::open)
+        File(folder.root, "merged.ymd").also { DictionaryCompiler.compile(listOf(lines.asSequence()), it) }.let { DictionaryFile.open(JvmFile(it)) }
 
     @Test
     fun theFilesWordsAreCodedAsCodedWordsCodesThem() {
@@ -69,7 +70,7 @@ class CodedIndexTest {
         // a newer file's build started while the older still runs (each on its own warm-up thread):
         // they shared the work dir and temporary, the newer deleting the older's runs (review F3271)
         val older = file("我们 wo'men 0.4")
-        val newer = File(folder.root, "newer.ymd").also { DictionaryCompiler.compile(listOf(sequenceOf("好你 hao'ni 0.2")), it) }.let(DictionaryFile::open)
+        val newer = File(folder.root, "newer.ymd").also { DictionaryCompiler.compile(listOf(sequenceOf("好你 hao'ni 0.2")), it) }.let { DictionaryFile.open(JvmFile(it)) }
         val dest = File(folder.root, "wubi.ymc")
         var second: CodedIndex? = null
         val other = Thread { second = CodedIndex.build(wubi, newer, dest, "new") }

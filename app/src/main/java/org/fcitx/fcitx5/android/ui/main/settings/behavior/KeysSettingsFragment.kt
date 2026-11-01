@@ -29,6 +29,16 @@ class KeysSettingsFragment : ManagedPreferenceFragment(AppPrefs.getInstance().ke
                 true
             }
         })
+        screen.addPreference(Preference(requireContext()).apply {
+            isIconSpaceReserved = false
+            isSingleLineTitle = false
+            setTitle(R.string.toolbar_buttons)
+            setSummary(R.string.toolbar_buttons_summary)
+            setOnPreferenceClickListener {
+                navigateWithAnim(SettingsRoute.ToolbarButtons)
+                true
+            }
+        })
     }
 
     companion object {

@@ -9,9 +9,8 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.async
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
-import org.fcitx.fcitx5.android.core.FakeFcitxAPI
-import org.fcitx.fcitx5.android.core.FcitxAPI
-import org.fcitx.fcitx5.android.core.RawConfig
+import org.fcitx.fcitx5.android.core.FakeHostApi
+import org.fcitx.fcitx5.android.core.HostApi
 import org.junit.Assert.assertEquals
 import org.junit.Before
 import org.junit.Test
@@ -23,22 +22,19 @@ import org.junit.Test
 @OptIn(ExperimentalCoroutinesApi::class)
 class PunctuationManagerTest {
 
-    /** Fcitx as it hands a table back, under `cfg`, which [FakeFcitxAPI] does not add. */
-    private class Tables(private val fake: FakeFcitxAPI = FakeFcitxAPI()) : FcitxAPI by fake {
+    /** Fcitx as it hands a table back, a read held till [held] is completed. */
+    private class Tables(private val fake: FakeHostApi = FakeHostApi()) : HostApi by fake {
         /** Set, a read waits for it with the table it has read. */
         var held: CompletableDeferred<Unit>? = null
 
-        override suspend fun getAddonSubConfig(addon: String, path: String): RawConfig {
-            val raw = RawConfig(arrayOf(RawConfig("cfg", fake.getAddonSubConfig(addon, path).subItems ?: emptyArray())))
+        override suspend fun punctuationMap(lang: String): List<PunctuationMapEntry> {
+            val entries = fake.punctuationMap(lang)
             held?.await()
-            return raw
+            return entries
         }
 
         /** [lang]'s table changed in fcitx, not through [PunctuationManager]: an edited file read again. */
-        suspend fun change(lang: String, entries: List<PunctuationMapEntry>) = fake.setAddonSubConfig(
-            "punctuation", "punctuationmap/$lang",
-            RawConfig(arrayOf(RawConfig(PunctuationManager.ENTRIES, entries.mapIndexed { i, it -> it.toRawConfig(i) }.toTypedArray())))
-        )
+        suspend fun change(lang: String, entries: List<PunctuationMapEntry>) = fake.setPunctuationMap(lang, entries)
     }
 
     private val comma = listOf(PunctuationMapEntry(",", "，", ""))

@@ -62,6 +62,11 @@ class TitleUi(override val ctx: Context, theme: Theme) : Ui {
         })
     }
 
+    /** What ← says it goes back to: the keyboard, or the panel the window came from. */
+    fun setReturnButtonDescription(description: String) {
+        backButton.contentDescription = description
+    }
+
     fun setReturnButtonOnClickListener(block: () -> Unit) {
         backButton.setOnClickListener {
             block()

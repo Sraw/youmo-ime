@@ -4,20 +4,18 @@
  */
 package org.fcitx.fcitx5.android.engine.table
 
+import org.fcitx.fcitx5.android.engine.platform.LogFile
+import org.fcitx.fcitx5.android.engine.platform.UserFiles
 import org.fcitx.fcitx5.android.engine.user.DictionaryFile
 import java.io.BufferedInputStream
 import java.io.BufferedOutputStream
 import java.io.DataInputStream
 import java.io.DataOutputStream
 import java.io.EOFException
-import java.io.File
-import java.io.FileInputStream
-import java.io.FileOutputStream
 import java.io.IOException
-import java.io.RandomAccessFile
+import java.io.InputStream
 import java.nio.Buffer
 import java.nio.ByteBuffer
-import java.nio.channels.FileChannel
 import java.util.PriorityQueue
 import java.util.concurrent.ConcurrentHashMap
 import java.util.zip.CRC32
@@ -141,22 +139,36 @@ class CodedIndex private constructor(private val records: ByteBuffer, private va
          * is of another key, or is damaged (built again then). Read through once for its CRC:
          * off the input thread.
          */
-        fun open(file: File, key: String): CodedIndex? = try {
-            RandomAccessFile(file, "r").use { f ->
-                val header = DataInputStream(BufferedInputStream(FileInputStream(f.fd), BUFFER))
-                if (header.readInt() != MAGIC || header.readInt() != VERSION || header.readUTF() != key) return null
-                val width = header.readInt()
-                val size = header.readInt()
-                val start = headerSize(key)
-                val bytes = size.toLong() * (width * 2 + 4)
-                if (width < 1 || size < 0 || f.length() != start + bytes + 8) return null
-                val records = f.channel.map(FileChannel.MapMode.READ_ONLY, start.toLong(), bytes)
-                val crc = crc32(records.duplicate())
-                val stored = f.channel.map(FileChannel.MapMode.READ_ONLY, start + bytes, 8).getLong()
-                if (crc != stored) null else CodedIndex(records, width, size)
-            }
+        fun open(file: LogFile, key: String): CodedIndex? = try {
+            // mapped once: the header, the records and their CRC of the one file, not of another put in its place meanwhile
+            val all = file.map()
+            val header = DataInputStream(Bytes(all.duplicate()))
+            if (header.readInt() != MAGIC || header.readInt() != VERSION || header.readUTF() != key) return null
+            val width = header.readInt()
+            val size = header.readInt()
+            val start = headerSize(key)
+            val bytes = size.toLong() * (width * 2 + 4)
+            if (width < 1 || size < 0 || all.capacity().toLong() != start + bytes + 8) return null
+            val records = slice(all, start, bytes.toInt())
+            val crc = crc32(records.duplicate())
+            val stored = all.getLong(start + bytes.toInt())
+            if (crc != stored) null else CodedIndex(records, width, size)
         } catch (_: IOException) {
             null
+        }
+
+        // [buffer]'s bytes from its position, as a stream: open reads the header so (EOFException past its end)
+        private class Bytes(private val buffer: ByteBuffer) : InputStream() {
+            override fun read(): Int = if (buffer.hasRemaining()) buffer.get().toInt() and 0xff else -1
+        }
+
+        // [length] bytes of [all] from [start], as a buffer of their own: what open maps of the file
+        private fun slice(all: ByteBuffer, start: Int, length: Int): ByteBuffer {
+            val part = all.duplicate()
+            // through Buffer: ByteBuffer's own position(int) and limit(int) are past Android's API floor
+            (part as Buffer).position(start)
+            (part as Buffer).limit(start + length)
+            return part.slice()
         }
 
         /**
@@ -166,16 +178,17 @@ class CodedIndex private constructor(private val records: ByteBuffer, private va
          * ASCII (a stamp), as the header's size counts it: another is refused at the write.
          */
         @Throws(IOException::class)
-        fun build(table: TableDictionary, dictionary: DictionaryFile, dest: File, key: String, wanted: () -> Boolean = { true }): CodedIndex? =
-            // one build of [dest] at a time: a newer file's, started while an older one still writes
+        fun build(table: TableDictionary, dictionary: DictionaryFile, dir: UserFiles, name: String, key: String, wanted: () -> Boolean = { true }): CodedIndex? =
+            // one build of [name] at a time: a newer file's, started while an older one still writes
             // (each on its own warm-up thread), shared the work dir and temporary, and each deleted the other's
-            synchronized(building.computeIfAbsent(dest.absolutePath) { Any() }) { buildAlone(table, dictionary, dest, key, wanted) }
+            synchronized(building.computeIfAbsent(dir.file(name).toString()) { Any() }) { buildAlone(table, dictionary, dir, name, key, wanted) }
 
         private val building = ConcurrentHashMap<String, Any>()
 
-        private fun buildAlone(table: TableDictionary, dictionary: DictionaryFile, dest: File, key: String, wanted: () -> Boolean): CodedIndex? {
-            val work = emptyDir(File(dest.absoluteFile.parentFile, ".${dest.name}.build"))
-            val temp = File(dest.path + ".tmp")
+        private fun buildAlone(table: TableDictionary, dictionary: DictionaryFile, dir: UserFiles, name: String, key: String, wanted: () -> Boolean): CodedIndex? {
+            val dest = dir.file(name)
+            val work = emptyDir(dir.dir(".$name.build"))
+            val temp = dest.beside(".tmp")
             try {
                 val runs = Runs(work)
                 if (!table.rules.isEmpty && !code(table, dictionary, runs, wanted)) return null
@@ -187,14 +200,13 @@ class CodedIndex private constructor(private val records: ByteBuffer, private va
                 return open(dest, key) ?: throw IOException("$dest did not read back")
             } finally {
                 temp.delete()
-                work.deleteRecursively()
+                work.deleteAll()
             }
         }
 
         // [dir] made anew, empty: a killed build's runs left there are not read into this one
-        private fun emptyDir(dir: File): File {
-            dir.deleteRecursively()
-            if (!dir.mkdirs()) throw IOException("could not make $dir")
+        private fun emptyDir(dir: UserFiles): UserFiles {
+            if (!dir.deleteAll() || !dir.mkdirs()) throw IOException("could not make $dir")
             return dir
         }
 
@@ -210,13 +222,13 @@ class CodedIndex private constructor(private val records: ByteBuffer, private va
             return true
         }
 
-        private fun write(temp: File, key: String, runs: Runs) {
+        private fun write(temp: LogFile, key: String, runs: Runs) {
             // writeUTF's modified UTF-8 is UTF-8 only for ASCII without NUL, as open reads its length (review NIT 13)
             require(key.all { it.code in 1..0x7f }) { "key $key" }
             temp.delete()
             val width = maxOf(runs.width, 1)
-            RandomAccessFile(temp, "rw").use { f ->
-                val out = DataOutputStream(BufferedOutputStream(FileOutputStream(f.fd), BUFFER))
+            temp.create().use { f ->
+                val out = DataOutputStream(BufferedOutputStream(f, BUFFER))
                 out.writeInt(MAGIC)
                 out.writeInt(VERSION)
                 out.writeUTF(key)
@@ -234,7 +246,7 @@ class CodedIndex private constructor(private val records: ByteBuffer, private va
                 }
                 out.writeLong(crc.value)
                 out.flush()
-                f.fd.sync()
+                f.sync()
             }
         }
 
@@ -253,8 +265,8 @@ class CodedIndex private constructor(private val records: ByteBuffer, private va
     }
 
     // (code, place) records sorted on disk a run at a time, then merged
-    private class Runs(private val dir: File) {
-        private val files = ArrayList<File>()
+    private class Runs(private val dir: UserFiles) {
+        private val files = ArrayList<LogFile>()
         private val codes = arrayOfNulls<String>(RUN)
         private val places = IntArray(RUN)
         private var n = 0
@@ -272,8 +284,8 @@ class CodedIndex private constructor(private val records: ByteBuffer, private va
         private fun spill() {
             if (n == 0) return
             val order = (0 until n).sortedWith { a, b -> compareValuesBy(a, b, { codes[it]!!.length }, { codes[it] }, { places[it] }) }
-            val file = File(dir, "run${files.size}")
-            DataOutputStream(BufferedOutputStream(FileOutputStream(file), BUFFER)).use { out ->
+            val file = dir.file("run${files.size}")
+            DataOutputStream(BufferedOutputStream(file.create(), BUFFER)).use { out ->
                 for (i in order) {
                     out.writeUTF(codes[i]!!)
                     out.writeInt(places[i])
@@ -302,8 +314,8 @@ class CodedIndex private constructor(private val records: ByteBuffer, private va
         }
     }
 
-    private class Reader(file: File) {
-        private val input = DataInputStream(BufferedInputStream(FileInputStream(file), BUFFER))
+    private class Reader(file: LogFile) {
+        private val input = DataInputStream(BufferedInputStream(file.input(), BUFFER))
         var code = ""
         var place = 0
 

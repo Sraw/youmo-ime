@@ -18,18 +18,25 @@ import androidx.recyclerview.widget.RecyclerView
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.Uat
+import org.fcitx.fcitx5.android.core.phoneStorage
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.data.theme.ThemePreset
 import org.fcitx.fcitx5.android.input.KeyboardHarness
 import org.fcitx.fcitx5.android.ui.main.settings.SettingsRoute
+import org.fcitx.fcitx5.android.ui.main.settings.AddressSettingsFragment
+import org.fcitx.fcitx5.android.ui.main.settings.search.SearchHighlight
 import org.fcitx.fcitx5.android.ui.main.settings.theme.ThemeListAdapter
+import org.fcitx.fcitx5.android.ui.main.MainFragment
+import org.fcitx.fcitx5.android.ui.setup.SetupActivity
 import org.fcitx.fcitx5.android.utils.Const
+import org.fcitx.fcitx5.android.utils.InputMethodUtil
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
+import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -44,6 +51,9 @@ import org.robolectric.shadows.ShadowDialog
 @Config(application = FcitxApplication::class, qualifiers = "zh-rCN-w393dp-h851dp-port-440dpi")
 class SettingsMenuUatTest {
 
+    @Before
+    fun phone() = phoneStorage()
+
     private val st = SettingsHarness()
 
     @After
@@ -52,8 +62,10 @@ class SettingsMenuUatTest {
     private fun texts() = KeyboardHarness.all(st.activity.window.decorView).filterIsInstance<TextView>()
         .filter { it.isShown }.map { it.text.toString() }.toList()
 
-    private val route get() = (st.activity.supportFragmentManager.findFragmentById(R.id.nav_host_fragment) as NavHostFragment)
-        .navController.currentDestination?.route.orEmpty()
+    private val navController get() = (st.activity.supportFragmentManager.findFragmentById(R.id.nav_host_fragment) as NavHostFragment)
+        .navController
+
+    private val route get() = navController.currentDestination?.route.orEmpty()
 
     private fun dialog() = ShadowDialog.getLatestDialog() as AlertDialog
 
@@ -75,6 +87,46 @@ class SettingsMenuUatTest {
         row.performClick()
         st.idle()
         assertTrue(route, "SharedInput" in route)
+    }
+
+    @Test
+    @Uat("ST-47")
+    fun searchingFindsTheNineKeysAndTheAddressRows() {
+        // a 九键 setting while pinyin is on the full keyboard: its page, pointed at the 键盘 row that shows it
+        val (key, via) = searchAndOpen(st.s(R.string.t9_multi_tap)) { st.s(R.string.im_pinyin) in it }
+        assertTrue(route, "InputMethodConfig" in route)
+        assertEquals(AppPrefs.T9_MULTI_TAP, key)
+        assertEquals(AppPrefs.PINYIN_KEYBOARD, via)
+        st.activity.onBackPressedDispatcher.onBackPressed()
+        st.idle()
+        // a row of 网址和邮箱: that page, pointed at the row itself
+        assertEquals(AddressSettingsFragment.EMAIL_KEY to null, searchAndOpen(st.s(R.string.email_suffixes)) { true })
+        assertTrue(route, "Addresses" in route)
+    }
+
+    /**
+     * Searches [query] and opens the result titled so whose path [under] takes; the setting the
+     * opened page is to point at and the row to point at while it is hidden. Read from the result's
+     * entry as SearchHighlight keeps them: the flash itself waits for an input method page's
+     * options, which come from the engine, not here.
+     */
+    private fun searchAndOpen(query: String, under: (String) -> Boolean): Pair<String?, String?> {
+        if ("Search" !in route) st.open(SettingsRoute.Search)
+        val field = KeyboardHarness.all(st.activity.window.decorView).filterIsInstance<EditText>().first()
+        field.setText(query)
+        st.idle()
+        val list = KeyboardHarness.all(st.activity.window.decorView).filterIsInstance<RecyclerView>().first()
+        list.measure(0, 0)
+        list.layout(0, 0, 1080, 2000)
+        st.idle()
+        val row = (0 until list.childCount).map(list::getChildAt).first { r ->
+            val shown = KeyboardHarness.all(r).filterIsInstance<TextView>().map { it.text.toString() }.toList()
+            query in shown && shown.any { it != query && under(it) }
+        }
+        row.performClick()
+        val pointed = SearchHighlight.pointedAt(navController.currentBackStackEntry!!)
+        st.idle()
+        return pointed
     }
 
     @Test
@@ -204,6 +256,30 @@ class SettingsMenuUatTest {
             ThemeManager.setNormalModeTheme(ThemePreset.PixelLight)
             ThemeManager.getAllThemes().filterIsInstance<Theme.Custom>().filter { it.name !in had }.forEach { ThemeManager.deleteTheme(it.name) }
             follow.setValue(follow.defaultValue)
+        }
+    }
+
+    // SDK 33: the keyboard selected is read from Settings.Secure there, which Robolectric keeps; from 34
+    // it is InputMethodManager.getCurrentInputMethodInfo, which it has no shadow for
+    @Test
+    @Uat("SET-02")
+    @Config(sdk = [33])
+    fun enabledAndSelectedTheAppOpensOnItsHomePage() {
+        val context = androidx.test.core.app.ApplicationProvider.getApplicationContext<android.content.Context>()
+        val ours = android.view.inputmethod.InputMethodInfo(context.packageName, InputMethodUtil.serviceName, "幽默输入法", null)
+        val imm = context.getSystemService(android.view.inputmethod.InputMethodManager::class.java)
+        shadowOf(imm).setEnabledInputMethodInfoList(listOf(ours))
+        android.provider.Settings.Secure.putString(context.contentResolver, android.provider.Settings.Secure.DEFAULT_INPUT_METHOD, InputMethodUtil.componentName)
+        SetupActivity.skipped = false
+        try {
+            st.activity
+            // no wizard over it: the home page's ten rows
+            val next = shadowOf(st.activity).nextStartedActivity
+            assertTrue("started ${next?.component}", next?.component?.className != SetupActivity::class.java.name)
+            assertEquals(MainFragment.HOME.map { st.s(it.title) } + st.s(R.string.app_language), st.titles())
+        } finally {
+            shadowOf(imm).setEnabledInputMethodInfoList(emptyList())
+            android.provider.Settings.Secure.putString(context.contentResolver, android.provider.Settings.Secure.DEFAULT_INPUT_METHOD, null)
         }
     }
 }

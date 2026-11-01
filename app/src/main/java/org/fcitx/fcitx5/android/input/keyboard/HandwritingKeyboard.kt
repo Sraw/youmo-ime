@@ -17,7 +17,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import org.fcitx.fcitx5.android.R
-import org.fcitx.fcitx5.android.core.EngineBridge
+import org.fcitx.fcitx5.android.core.EngineState
 import org.fcitx.fcitx5.android.core.FcitxKeyMapping
 import org.fcitx.fcitx5.android.core.InputMethodEntry
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
@@ -41,7 +41,7 @@ import splitties.views.existingOrNewId
  * the pad's last stroke back while it has one), ，(its long press more marks) and 。 on the right;
  * symbols, numbers, space, the language switch and return below. What the pad reads is handed to
  * [deliver] with the piece it is of; the engine shows it as candidates. The pad wipes the piece it
- * is writing once the engine ends it (EngineBridge.handwritingEnded), and ends it itself when
+ * is writing once the engine ends it (EngineState.handwritingEnded), and ends it itself when
  * hidden.
  */
 @SuppressLint("ViewConstructor")
@@ -70,7 +70,7 @@ class HandwritingKeyboard(
 
         private fun mark(label: String, key: String, more: Array<String>? = null) = KeyDef(
             KeyDef.Appearance.Text(label, 20f, percentWidth = SIDE, variant = KeyDef.Appearance.Variant.Alternative),
-            setOf(KeyDef.Behavior.Press(KeyAction.FcitxKeyAction(key))),
+            setOf(KeyDef.Behavior.Press(KeyAction.HostKeyAction(key))),
             more?.let { arrayOf(KeyDef.Popup.Keyboard.Explicit(it)) },
         )
 
@@ -136,7 +136,7 @@ class HandwritingKeyboard(
     override fun onAttachedToWindow() {
         super.onAttachedToWindow()
         scope = CoroutineScope(Dispatchers.Main.immediate + Job()).also { s ->
-            s.launch { EngineBridge.handwritingEnded.collect(padView::ended) }
+            s.launch { EngineState.handwritingEnded.collect(padView::ended) }
         }
         recognition.warmUp()
     }
@@ -198,7 +198,7 @@ class HandwritingKeyboard(
         if (action is KeyAction.SymAction && action.sym.sym == FcitxKeyMapping.FcitxKey_BackSpace && padView.undo()) return
         // a key for the engine commits the piece: its strokes wiped now, not once the engine's end of it
         // comes back, else a backspace right behind (held with it) takes back a stroke of what is committed
-        if ((action is KeyAction.SymAction || action is KeyAction.FcitxKeyAction) && padView.pad.finished.isNotEmpty()) padView.next()
+        if ((action is KeyAction.SymAction || action is KeyAction.HostKeyAction) && padView.pad.finished.isNotEmpty()) padView.next()
         super.onAction(action, source)
     }
 

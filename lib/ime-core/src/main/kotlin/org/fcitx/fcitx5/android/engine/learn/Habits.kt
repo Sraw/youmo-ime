@@ -63,13 +63,23 @@ interface Habits {
     fun spelled(kind: String, words: Words): Spelled = Spelled.NONE
 
     /** The words of [kind] with a count of [spelled], typed under codes whose first key is [first]: to put in where the decoder lacks them. */
-    fun spelledFrom(kind: String, first: Char): List<Words> = emptyList()
+    fun spelledFrom(kind: String, first: Char): List<SpelledWord> = emptyList()
 
     /** What [spelled] tells: uses spelt in full, corrections under 简拼. */
     data class Spelled(val fullUses: Int, val initialsCorrections: Int) {
         companion object {
             val NONE = Spelled(0, 0)
         }
+    }
+
+    /**
+     * A word of [spelledFrom] with its [spelled] and its reading's syllables, worked out once a
+     * record as it is: each level of each key asks of every word under its first key, and a heavy
+     * user's split them all again there (S15 B5.1).
+     */
+    class SpelledWord(val words: Words, val spelled: Spelled) {
+        val syllables: List<String> = words.reading.split(' ')
+        val letters: Int = syllables.sumOf { it.length }
     }
 
     /** How often each syllable was taken for [digits] on the nine keys of [layout]. */
@@ -258,9 +268,9 @@ class LogHabits(private val log: () -> LearnLog, private val onError: (IOExcepti
     private var fromOf: LearnState? = null
     private var fromAt = -1L
     private var fromDay = 0
-    private val fromCache = HashMap<Pair<String, Char>, List<Words>>()
+    private val fromCache = HashMap<Pair<String, Char>, List<Habits.SpelledWord>>()
 
-    override fun spelledFrom(kind: String, first: Char): List<Words> {
+    override fun spelledFrom(kind: String, first: Char): List<Habits.SpelledWord> {
         val s = state
         // advance() moves the day with no version of its own
         if (s !== fromOf || s.version != fromAt || s.day != fromDay) {
@@ -273,13 +283,16 @@ class LogHabits(private val log: () -> LearnLog, private val onError: (IOExcepti
         return fromCache.getOrPut(keyboard to first) { spelledFrom(s, kind, keyboard, first) }
     }
 
-    private fun spelledFrom(s: LearnState, kind: String, keyboard: String, first: Char): List<Words> {
+    private fun spelledFrom(s: LearnState, kind: String, keyboard: String, first: Char): List<Habits.SpelledWord> {
         // a digit on the nine keys: the words of each letter on its key
         val firsts = SpelledForm.nineKeyLetters(keyboard, first).ifEmpty { first.toString() }
         val words = LinkedHashSet<Words>()
         for (c in firsts) for (stat in s.spelledFrom(keyboard, c).values) words += stat.words
-        // only those that move a word: walked each key, so none that would not
-        return words.filter { w -> spelled(kind, w).let { it.fullUses >= HabitRanker.FULL_USES || it.initialsCorrections > 0 } }
+        // only those that move a word: walked each key, so none that would not. Their counts kept,
+        // as the keyboard has them (kind's own: the same keyboard's)
+        return words.mapNotNull { w ->
+            spelled(kind, w).takeIf { it.fullUses >= HabitRanker.FULL_USES || it.initialsCorrections > 0 }?.let { Habits.SpelledWord(w, it) }
+        }
     }
 
     override fun importOrder(text: String) = state.imports.order(text)

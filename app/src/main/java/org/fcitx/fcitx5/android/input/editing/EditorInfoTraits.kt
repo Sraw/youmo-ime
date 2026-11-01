@@ -19,6 +19,28 @@ const val DeleteSurroundingFlag = "org.fcitx.fcitx5.android.DELETE_SURROUNDING"
 
 private val EMAIL_VARIATIONS = setOf(InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS, InputType.TYPE_TEXT_VARIATION_WEB_EMAIL_ADDRESS)
 
+// what a number, phone or date field says it takes: its variation and flags mean this only in their class
+private fun numberKind(type: Int, variation: Int, flags: Int): NumberKind? = when (type) {
+    InputType.TYPE_CLASS_NUMBER -> {
+        val signed = flags and InputType.TYPE_NUMBER_FLAG_SIGNED != 0
+        val decimal = flags and InputType.TYPE_NUMBER_FLAG_DECIMAL != 0
+        when {
+            variation == InputType.TYPE_NUMBER_VARIATION_PASSWORD -> NumberKind.PIN
+            signed && decimal -> NumberKind.SIGNED_DECIMAL
+            signed -> NumberKind.SIGNED
+            decimal -> NumberKind.DECIMAL
+            else -> NumberKind.INTEGER
+        }
+    }
+    InputType.TYPE_CLASS_PHONE -> NumberKind.PHONE
+    InputType.TYPE_CLASS_DATETIME -> when (variation) {
+        InputType.TYPE_DATETIME_VARIATION_DATE -> NumberKind.DATE
+        InputType.TYPE_DATETIME_VARIATION_TIME -> NumberKind.TIME
+        else -> NumberKind.DATETIME
+    }
+    else -> null
+}
+
 /**
  * Decodes the bits of [EditorInfo] that [EditorKeyPolicy] and [EditingSession] act on. [ownPackage]
  * given, a field of this app is sensitive as the service tells fcitx ([CapabilityFlags.forField]).
@@ -32,6 +54,7 @@ fun EditorInfo.toEditorTraits(ownPackage: String? = null): EditorTraits {
         isUri = type == InputType.TYPE_CLASS_TEXT && variation == InputType.TYPE_TEXT_VARIATION_URI,
         isEmail = type == InputType.TYPE_CLASS_TEXT && variation in EMAIL_VARIATIONS,
         isNumber = type == InputType.TYPE_CLASS_NUMBER || type == InputType.TYPE_CLASS_PHONE || type == InputType.TYPE_CLASS_DATETIME,
+        number = numberKind(type, variation, inputType and InputType.TYPE_MASK_FLAGS),
         isSearch = action == EditorInfo.IME_ACTION_SEARCH,
         isSensitive = (if (ownPackage != null) CapabilityFlags.forField(this, ownPackage) else CapabilityFlags.fromEditorInfo(this))
             .hasAny(CapabilityFlag.PasswordOrSensitive),

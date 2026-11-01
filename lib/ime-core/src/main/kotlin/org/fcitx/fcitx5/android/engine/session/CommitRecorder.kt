@@ -259,7 +259,7 @@ internal class CommitRecorder(
         fun firstShown(candidates: List<Candidate>, end: Int, aside: (Candidate) -> Boolean) = candidates.firstOrNull { it.end == end && !aside(it) }
 
         /** [entries] as learning has words: their syllables spelt, apart by spaces. */
-        fun words(entries: List<Entry>) = entries.map { e -> Word(e.text, e.syllables.joinToString(" ") { Syllables.spelling(it) }) }
+        fun words(entries: List<Entry>) = entries.map { e -> Word(e.text, e.spelled()) }
     }
 }
 

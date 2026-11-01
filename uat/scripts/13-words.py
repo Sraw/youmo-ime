@@ -8,11 +8,23 @@ import statistics
 import tempfile
 import time
 
-from uat import Blocked, Fail, PKG, case, check, first, home, script, sym_char, in_picker
+from uat import Blocked, PKG, case, check, first, home, sym_char, in_picker
 
 FIXTURES = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "fixtures")
 DOWNLOAD = "/sdcard/Download"
-DICTS = f"/sdcard/Android/data/{PKG}/files/data/pinyin/dictionaries"
+# fcitx's data is in the app's own files (moved in from the external storage at the first start): root reads it
+DICTS = f"/data/data/{PKG}/files/host-data/pinyin/dictionaries"
+
+
+def put_dict(d, src, name, timeout=60):
+    """[src] into DICTS as [name], the app's own: pushed to /data/local/tmp, copied in by root"""
+    tmp = f"/data/local/tmp/{name}"
+    d.adb("push", src, tmp, timeout=timeout, check=True)
+    # a failed copy surfaces here, not as the merged.ymd wait timing out minutes later
+    out = d.root(f"cp {tmp} {DICTS}/{name} && chown $(stat -c %u:%g /data/data/{PKG}) {DICTS}/{name} && "
+                 f"restorecon {DICTS}/{name} && echo copied; rm -f {tmp}")
+    if "copied" not in out:
+        raise Blocked(f"{name} 没有复制进 {DICTS}：{out.strip()[:200]}")
 
 # how to type each word with pinyin: one piece per composition
 PIECES = {"蓝鲸花园": [("lanjinghuayuan", "蓝鲸花园")], "幽默": [("youmo", "幽默")],
@@ -189,16 +201,8 @@ def show_hidden(d):
         d.back()
 
 
-def import_file(d, name, target=None):
-    """词库与短语 → 导入词库 → name; returns the dialog's choice before any change, then picks
-    target (a prefix of the option) and 导入词库. The toast/dialog after it is returned too.
-    A dialog with no choice (a backup's restore, a file refused before the choice, 已有名为…)
-    returns (None, its Screen) whatever target is: messages(s) has its text."""
-    dict_page(d)
-    d.tap_text("导入词库", after=0.3)
-    in_picker(d)
-    if "documentsui" not in d.top_activity():
-        raise Blocked(f"没出文件选择：{d.top_activity()}")
+def pick_in_download(d, name):
+    """the file picker, open: name in 下载 tapped"""
     # a package the picker has not served yet opens in 最近 (the release build after the debug one
     # had used it): go to 下载 through the roots drawer
     if d.screen().find(text="近期的文件"):
@@ -215,6 +219,19 @@ def import_file(d, name, target=None):
     else:
         raise Blocked(f"下载里没有 {name}")
     d.tap(n.c, 1.0)
+
+
+def import_file(d, name, target=None):
+    """词库与短语 → 导入词库 → name; returns the dialog's choice before any change, then picks
+    target (a prefix of the option) and 导入词库. The toast/dialog after it is returned too.
+    A dialog with no choice (a backup's restore, a file refused before the choice, 已有名为…)
+    returns (None, its Screen) whatever target is: messages(s) has its text."""
+    dict_page(d)
+    d.tap_text("导入词库", after=0.3)
+    in_picker(d)
+    if "documentsui" not in d.top_activity():
+        raise Blocked(f"没出文件选择：{d.top_activity()}")
+    pick_in_download(d, name)
     # the whole file is read before the dialog (D6): a large one takes seconds; one refused shows
     # 格式不支持 instead, its message returned with no choice
     s = d.wait(lambda x: progress_seen(d, x) or (x if any(m.cls == "CheckedTextView" or m.rid == "message" for m in x.nodes) else None),
@@ -260,13 +277,6 @@ def dictionaries(d):
 
 # ---------------------------------------------------------------- user lexicon
 
-
-def learn_name(d):
-    """PY-34's steps (06-pinyin's, the one copy): 汪小明 picked piece by piece twice, so it becomes your word"""
-    try:
-        script("06-pinyin").learn_sentence(d)
-    except Fail as e:
-        raise Blocked(f"前提（PY-34 的步骤）没到：{e}")
 
 case("WD-02", needs="jvm:SettingsUatTest.aBlankPinyinIsFilledIn")(lambda d: None)
 
@@ -368,42 +378,10 @@ case("WD-13", needs="jvm:DictionaryUatTest.turnedOffThenDeleted")(lambda d: None
 case("WD-14b", needs="jvm:LexiconUatTest.aDictFileIntoTheUserDictionaryRanksBecomesYoursDroppedAndUndone")(lambda d: None)
 
 
-@case("WD-14z", base="B0-设置", mutates=True)
-def wd14z(d):
-    # into the user dictionary the .scel is read straight into lines (ImportFiles.Scel.read); the
-    # conversion to a text dictionary is the base path's, WD-14z2
-    push(d, "extra.scel")
-    _, msgs = import_file(d, "extra.scel", "用户词库")
-    d.back()
-    home(d, "词库与短语", "导入的词")
-    batches = d.screen().texts()
-    d.back()
-    d.open_page("text")
-    d.switch_im("拼音")
-    d.type("congjing")
-    c = words(d.all_cands())
-    d.clear()
-    check(any(re.search(r"导入\s*2\s*个词", m or "") for m in msgs), f"提示 {msgs[:3]}")
-    check(any("extra.scel" in t for t in batches), f"导入的词 {batches[:5]}")
-    check("琮璟" in c and c.index("琮璟") > 0, f"congjing 的候选 {c[:6]}")
-    return f"提示 {msgs[:1]}；congjing {c[:4]}"
+case("WD-14z", needs="jvm:LexiconUatTest.aScelFileIntoTheUserDictionaryIsImportedWords")(lambda d: None)
 
 
-@case("WD-14z2", base="B0-设置", mutates=True)
-def wd14z2(d):
-    # into the base the .scel is converted to a text dictionary first (Scel.writeTextDictionary,
-    # streamed, dest deleted on failure: F3793/F4217), then compiled like WD-11's
-    push(d, "extra.scel")
-    import_file(d, "extra.scel", "基础词库")
-    rows = dictionaries(d)
-    d.open_page("text")
-    d.switch_im("拼音")
-    d.type("congjing")
-    c = words(d.all_cands())
-    d.clear()
-    check(any("extra" in r for r in rows), f"基础词库一节 {rows}")
-    check("琮璟" in c, f"congjing 的候选 {c[:6]}")
-    return f"基础词库 {rows}；congjing {c[:4]}"
+case("WD-14z2", needs="jvm:BaseDictionaryUpgradeUatTest.aScelFileIntoTheBaseIsConvertedAndMerged")(lambda d: None)
 
 
 def title_of(s):
@@ -459,7 +437,7 @@ _frost_ok = {}
 def file_sizes(d):
     """the dictionaries directory's names and sizes in bytes"""
     out = {}
-    for ln in d.sh(f"ls -l {DICTS}").splitlines():
+    for ln in d.root(f"ls -l {DICTS}").splitlines():
         f = ln.split()
         if len(f) >= 8 and f[4].isdigit():
             out[f[-1]] = int(f[4])
@@ -489,7 +467,8 @@ def abazhou(d):
     return c
 
 
-@case("WD-14d", base="B0-设置", mutates=True, heavy=True)
+@case("WD-14d", base="B0-设置", mutates=True, heavy=True,
+      needs="release,redroid:发版时在 redroid 上用发布包跑（UAT_BUILD=release），平时不跑：要雾凇拼音，一条三四分钟（用户 2026-10-30 定）")
 def wd14d(d):
     src = frost(d)
     d.open_page("text")
@@ -534,7 +513,8 @@ case("WD-14f", needs="jvm:DictionaryUatTest.aFileNotSurelyReadIsRefusedWithWhy")
 case("WD-14g", needs="jvm:DictionaryUatTest.pastAHundredThousandWordsIsNoImportForTheUser")(lambda d: None)
 
 
-@case("WD-14h", base="B0-设置", mutates=True, heavy=True)
+@case("WD-14h", base="B0-设置", mutates=True, heavy=True,
+      needs="release,redroid:发版时在 redroid 上用发布包跑（UAT_BUILD=release），平时不跑：要雾凇拼音，一条三四分钟（用户 2026-10-30 定）")
 def wd14h(d):
     src = frost(d)
     dicts = DICTS
@@ -544,16 +524,18 @@ def wd14h(d):
     d.sh(f"am force-stop {PKG}")
     # the compile's log line counted from here only
     d.sh("logcat -c")
-    d.sh(f"mkdir -p {dicts}; rm -f {dicts}/merged.ymd")
+    host_data = f"/data/data/{PKG}/files/host-data"
+    d.root(f"mkdir -p {dicts} && chown -R $(stat -c %u:%g /data/data/{PKG}) {host_data} && restorecon -R {host_data}; "
+           f"rm -f {dicts}/merged.ymd")
     # no touch to an old mtime any more: a .txt an older version left is converted, an upgrade by
     # itself (SourceNames.unconverted)
-    d.adb("push", src, f"{dicts}/frost.txt", timeout=300)
+    put_dict(d, src, "frost.txt", timeout=300)
     # one 0.3.1 kept turned off: listed off, not compiled
     with tempfile.TemporaryDirectory() as tmp:
         off = os.path.join(tmp, "old.txt.disable")
         with open(off, "w") as f:
             f.write("氪喵星港 ke'miao'xing'gang 0.0\n")
-        d.adb("push", off, f"{dicts}/old.txt.disable")
+        put_dict(d, off, "old.txt.disable")
     d.open_page("text")
     d.switch_im("拼音")
     early = page_cands(d, "nihao")
@@ -568,7 +550,7 @@ def wd14h(d):
         for t in x.texts(where="all"):
             if ("正在升级词库格式" in t or t == "词库格式已升级") and t not in caught:
                 caught.append(t)
-        names = d.sh(f"ls {dicts}").split()
+        names = d.root(f"ls {dicts}").split()
         return ("merged.ymd" in names and "frost.txt" not in names) or None
 
     # its own name, not merged.ymd.tmp being written, after the conversion; then the notice's 2 s
@@ -580,7 +562,7 @@ def wd14h(d):
     compiled = re.search(r"merged dictionaries: (\d+) words of 1 files", log)
     bar = next((t for t in caught if "正在升级" in t), None)
     said = "词库格式已升级" in caught or None
-    files = d.sh(f"ls {dicts}").split()
+    files = d.root(f"ls {dicts}").split()
     time.sleep(3)
     heap = heaps(d)
     rise = heap_rise(base, heap)
@@ -613,6 +595,8 @@ case("WD-14j2", needs="jvm:DictionaryUatTest.anotherTurnedOffWhileABigOneCompile
 
 
 case("WD-14r", needs="release:v0.3.2 正式版里并入雾凇拼音，再覆盖安装这一版正式版，签名要一致")(lambda d: None)
+
+
 case("WD-14v", needs="release:WD-14r 之后装回 v0.3.2 正式版（adb install -r -d），再装回这一版正式版")(lambda d: None)
 
 
@@ -704,76 +688,13 @@ def dz(d):
 case("WD-16", needs="jvm:LexiconUatTest.aPhraseOfTwoLines")(lambda d: None)
 
 
-@case("WD-18", base="B0-设置", mutates=True)
-def wd18(d):
-    d.step("加 dz")
-    dz(d)
-    c0 = words(page_cands(d, "dz"))
-    check(c0[:1] == ["北京市海淀区"], f"候选 {c0[:3]}")
-    if len(c0) < 2:
-        raise Blocked(f"dz 只有 {c0}")
-    d.step("选两次第二个")
-    w = c0[1]
-    d.pick(w)
-    d.press(".")
-    d.type("dz")
-    d.cands()
-    d.pick(w)
-    d.press(".")
-    d.type("dz")
-    c = words(d.cands())
-    d.clear()
-    check(c[:2] == ["北京市海淀区", w], f"W=「{w}」，两次后 dz {c[:4]}")
-
-    def open_row(text):
-        s = d.screen()
-        n = next((n for n in s.app() if text in n.text), None)
-        if not n:
-            raise Blocked(f"短语列表里没有「{text}」：{s.texts()[:6]}")
-        d.tap(n.c, 1.2)   # the row itself (docs/words.md: 点一条可以编辑或删除)
-        e = edits(d)
-        if len(e) < 3:
-            raise Fail(f"点「{text}」那一行没出编辑框：{[x.text for x in d.screen().nodes if x.text][:8]}")
-        return e
-    d.step("编辑")
-    d.hide_keyboard()
-    home(d, "词库与短语", "自定义短语")
-    e = open_row("北京市海淀区")
-    focus(d, e[2])
-    clear_field(d, 2)
-    type_cn(d, "上海市")
-    d.hide_keyboard()
-    ok(d)
-    c1 = page_cands(d, "dz")
-    check(first(c1) == "上海市", f"改后 {c1[:3]}")
-    d.step("删除")
-    d.hide_keyboard()
-    home(d, "词库与短语", "自定义短语")
-    open_row("上海市")
-    d.hide_keyboard()
-    s = d.screen()
-    dl = next((n for n in s.nodes if n.text == "删除" and n.pkg == PKG), None)
-    if not dl:
-        raise Fail(f"编辑框里没有删除：{[x.text for x in s.nodes if x.text and x.pkg == PKG][:8]}")
-    d.tap(dl.c, 1.0)
-    conf = next((n for n in d.screen().nodes if n.rid == "button1"), None)
-    if conf:
-        d.tap(conf.c, 1.0)
-    time.sleep(3.0)
-    c2 = words(page_cands(d, "dz"))
-    check("上海市" not in c2 and "北京市海淀区" not in c2, f"删除后 {c2[:4]}")
-    return f"dz {c0[:2]}；W=「{w}」两次后 {c[:2]}；改后 {c1[:2]}；删除后 {c2[:3]}"
+case("WD-18", needs="jvm:WordsUatTest.aCustomPhraseAddedNotMovedByLearningEditedDeleted、SettingsPagesUatTest.aCustomPhraseAddedEditedOnItsRowAndDeleted")(lambda d: None)
 
 
-case("WD-19", needs="jvm:LexiconUatTest.phrasesNotOnTheNineKeysButInShuangpin")(lambda d: None)
+case("WD-19", needs="jvm:LexiconUatTest.aPhraseOnEveryKeyboard、EnglishPhrasesTest.wherePhrasesGo")(lambda d: None)
 
 
 # ---------------------------------------------------------------- the user lexicon's pages
-
-def switch_on(d, title):
-    r = d.row(title)
-    w = [n for n in r.walk() if n.cls in ("Switch", "SwitchCompat", "SwitchMaterial", "CheckBox")] if r else []
-    return w[0].checked if w else None
 
 
 case("WD-21", needs="jvm:SettingsPagesUatTest.theUsersWordsListsCountsAndDays")(lambda d: None)
@@ -785,10 +706,80 @@ case("WD-22", needs="jvm:LexiconUatTest.aPinUndoneInOneStep")(lambda d: None)
 case("WD-33", needs="jvm:LexiconUatTest.aPhraseAlreadyBeforeDoesNotMoveTheNextUp")(lambda d: None)
 
 
+case("WD-35", needs="jvm:SettingsPagesUatTest.aCustomPhraseAddedEditedOnItsRowAndDeleted")(lambda d: None)
+
+
+case("WD-36", needs="jvm:TablePhraseOnlyCodeTest.aKeyThatEndsTheCodeCommitsNoPhrase、TablePhraseOnlyCodeTest.aTapTakesThePhrase")(lambda d: None)
+
+
+def phrase_menu(d, item):
+    """自定义短语 → ⋮ → item (导入 or 导出): the file picker, once the page has read its file"""
+    d.hide_keyboard()
+    home(d, "词库与短语", "自定义短语")
+    # 导入/导出 stay off till the file is read: + shows with them
+    d.wait(lambda s: any(n.cls.endswith("ActionButton") for n in s.app()) or None, timeout=15, step=0.3, what="自定义短语页读完（+）")
+    more = d.screen().find(desc="更多选项", where="all")
+    if not more:
+        raise Blocked("自定义短语页没有 ⋮")
+    d.tap(more.c, 0.8)
+    d.tap_text(item, where="all", scroll=False, after=0.3)
+    in_picker(d)
+    if "documentsui" not in d.top_activity():
+        raise Blocked(f"没出文件选择：{d.top_activity()}")
+
+
+@case("WD-37", base="B0-设置", mutates=True)
+def wd37(d):
+    d.step("前提")
+    dz(d)
+    push(d, "phrases.txt")
+    d.step("导入")
+    phrase_menu(d, "导入")
+    pick_in_download(d, "phrases.txt")
+    # a toast's window is not in uiautomator's dump: 导入了 1 条短语 is read off the pictures (its count
+    # asserted on the JVM)
+    for i in range(3):
+        time.sleep(0.6)
+        d.shot("full", f"导入后的提示（应为导入了 1 条短语）{i + 1}/3",
+               png=d.adb("exec-out", "screencap", "-p", binary=True))
+    shown = d.all_texts()
+    check(sum("北京市海淀区" in t for t in shown) == 1, f"导入后 dz 只有一条：{shown}")
+    check(any("上海" in t for t in shown), f"导入后有 sh →「上海」：{shown}")
+    d.step("离开再回来")
+    d.back()
+    home(d, "词库与短语", "自定义短语")
+    shown = d.all_texts()
+    check(any("上海" in t for t in shown) and sum("北京市海淀区" in t for t in shown) == 1, f"回来后列表 {shown}")
+    c = page_cands(d, "sh")
+    d.clear()
+    check(first(c) == "上海", f"sh {c[:3]}")
+    d.step("导出")
+    # the file this export makes, not one an earlier run left: a name taken saves as "… (1).txt"
+    before = set(d.sh(f"ls -1 {DOWNLOAD}").splitlines())
+    phrase_menu(d, "导出")
+    if not any(n.cls == "EditText" for n in d.screen().app()):
+        raise Blocked("保存界面里没有文件名")
+    d.tap_text("保存", where="all", scroll=False, after=0.5)
+    # the picker makes the file at once, the app writes it after: wait for its bytes, not a fixed pause
+    def written(_):
+        names = sorted(set(d.sh(f"ls -1 {DOWNLOAD}").splitlines()) - before)
+        return names if len(names) == 1 and d.sh(f"stat -c %s '{DOWNLOAD}/{names[0]}'").strip() not in ("", "0") else None
+    try:
+        new = d.wait(written, timeout=15, step=0.5, what="导出的文件写好")
+    except Blocked:
+        new = sorted(set(d.sh(f"ls -1 {DOWNLOAD}").splitlines()) - before)
+    check(len(new) == 1, f"下载里新文件 {new}")
+    if len(new) == 1:
+        with tempfile.TemporaryDirectory() as tmp:
+            local = os.path.join(tmp, "out.txt")
+            d.adb("pull", f"{DOWNLOAD}/{new[0]}", local)
+            text = open(local, encoding="utf-8").read()
+        check("dz,1=北京市海淀区" in text and "sh,1=上海" in text, f"导出的 {new[0]}：{text[:120]!r}")
+
+
 # ---------------------------------------------------------------- R11: 清空学到的 / 全部清空
 
 case("WD-25", needs="jvm:LexiconUatTest.clearingTheLearnedKeepsYourWordsUnlessAll")(lambda d: None)
 
 
 case("WD-30", needs="jvm:SettingsPagesUatTest.searchDeleteSeveralAndTakeThemBack")(lambda d: None)
-

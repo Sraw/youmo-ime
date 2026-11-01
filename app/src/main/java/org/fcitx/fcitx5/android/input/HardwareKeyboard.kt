@@ -5,8 +5,8 @@
 package org.fcitx.fcitx5.android.input
 
 import android.view.KeyEvent
-import org.fcitx.fcitx5.android.core.FcitxAPI
-import org.fcitx.fcitx5.android.engine.host.Engines
+import org.fcitx.fcitx5.android.core.HostApi
+import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.input.hardware.HardwareShortcuts
 import org.fcitx.fcitx5.android.input.hardware.InputMethodSwitch
 import timber.log.Timber
@@ -21,7 +21,7 @@ import timber.log.Timber
  * view's), where every key is the app's, Ctrl+Space too. [shortcutsOn]: the user's setting.
  */
 class HardwareKeyboard(
-    private val post: (suspend FcitxAPI.() -> Unit) -> Unit,
+    private val post: (suspend HostApi.() -> Unit) -> Unit,
     private val typingOnTouch: () -> Boolean,
     private val inTextField: () -> Boolean,
     private val shortcutsOn: () -> Boolean,
@@ -63,13 +63,13 @@ class HardwareKeyboard(
     // native-lib clears), to the app (an editor's completion)
     private fun hasToggle(): Boolean {
         val (current, enabled) = seen ?: return true
-        return InputMethodSwitch.canToggle(current, enabled, Engines.ENGLISH, usable())
+        return InputMethodSwitch.canToggle(current, enabled, InputMethodCatalog.ENGLISH, usable())
     }
 
     // while the hardware keyboard is typed on, only what it can type is gone to
-    private fun usable(): (String) -> Boolean = if (typingOnTouch()) { _ -> true } else Engines::takesKeyboard
+    private fun usable(): (String) -> Boolean = if (typingOnTouch()) { _ -> true } else InputMethodCatalog::takesKeyboard
 
-    private suspend fun FcitxAPI.see() {
+    private suspend fun HostApi.see() {
         seen = inputMethodEntryCached.uniqueName to enabledIme().map { it.uniqueName }
     }
 
@@ -88,7 +88,7 @@ class HardwareKeyboard(
         val usable = usable()
         when (decision.action) {
             HardwareShortcuts.Action.TOGGLE -> switchInputMethod(HardwareShortcuts.Action.TOGGLE) { current, enabled ->
-                InputMethodSwitch.toggle(current, enabled, leftForEnglish, Engines.ENGLISH, usable)
+                InputMethodSwitch.toggle(current, enabled, leftForEnglish, InputMethodCatalog.ENGLISH, usable)
             }
             HardwareShortcuts.Action.NEXT -> switchInputMethod(HardwareShortcuts.Action.NEXT) { current, enabled ->
                 InputMethodSwitch.next(current, enabled, usable)
@@ -132,11 +132,11 @@ class HardwareKeyboard(
      * keyboard is, by one that takes a keyboard, until the touch keyboard is back. Run in the key's
      * own job, before the key: no job of its own for each key typed in pinyin or English.
      */
-    suspend fun handOff(fcitx: FcitxAPI) {
+    suspend fun handOff(fcitx: HostApi) {
         val current = fcitx.inputMethodEntryCached.uniqueName
-        if (Engines.takesKeyboard(current)) return
+        if (InputMethodCatalog.takesKeyboard(current)) return
         val to = InputMethodSwitch.forKeyboard(
-            current, fcitx.enabledIme().map { it.uniqueName }, Engines.ENGLISH, Engines::takesKeyboard
+            current, fcitx.enabledIme().map { it.uniqueName }, InputMethodCatalog.ENGLISH, InputMethodCatalog::takesKeyboard
         ) ?: return
         touchInputMethod = current
         Timber.d("hardware keyboard key typed: $current -> $to")
@@ -157,7 +157,7 @@ class HardwareKeyboard(
      * that as a change too): a Chinese one is what Shift comes back to from English, and the list is read again.
      */
     fun inputMethodChanged(im: String) = post {
-        if (im != Engines.ENGLISH) leftForEnglish = im
+        if (im != InputMethodCatalog.ENGLISH) leftForEnglish = im
         see()
     }
 }

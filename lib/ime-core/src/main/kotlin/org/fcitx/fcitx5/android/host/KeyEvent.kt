@@ -4,6 +4,8 @@
  */
 package org.fcitx.fcitx5.android.host
 
+import org.fcitx.fcitx5.android.engine.session.Action
+
 /**
  * One key through the pipeline, fcitx's `KeyEvent` (`fcitx/event.h:360-386`).
  *
@@ -24,6 +26,11 @@ class KeyEvent(
     val virtual: Boolean = false,
     /** The physical key's event time, to replay it; -1 when there is none. */
     val timestamp: Int = -1,
+    /**
+     * What the engine reads at the key, sent with it: the handwriting pad's reading at its Ink key,
+     * a glide at its Glide key (Keyboard.INK, Keyboard.GLIDE). In the key, it cannot come apart from it.
+     */
+    val payload: Action? = null,
 ) {
     val key: Key = origKey.normalize()
 

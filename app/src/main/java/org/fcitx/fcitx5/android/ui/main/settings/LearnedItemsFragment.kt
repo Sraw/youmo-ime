@@ -13,6 +13,7 @@ import androidx.preference.Preference
 import kotlinx.coroutines.launch
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.core.InputMethodNames
+import org.fcitx.fcitx5.android.core.ShuangpinNames
 import org.fcitx.fcitx5.android.engine.learn.Code
 import org.fcitx.fcitx5.android.engine.learn.Kinds
 import org.fcitx.fcitx5.android.engine.learn.control.LearningOp
@@ -21,7 +22,6 @@ import org.fcitx.fcitx5.android.engine.learn.control.ListedItem
 import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
 import org.fcitx.fcitx5.android.ui.common.PaddingPreferenceFragment
 import org.fcitx.fcitx5.android.ui.main.MainViewModel
-import org.fcitx.fcitx5.android.ui.main.settings.im.InputMethodSettings
 import org.fcitx.fcitx5.android.utils.lazyRoute
 
 /**
@@ -129,7 +129,7 @@ class LearnedItemsFragment : PaddingPreferenceFragment() {
          */
         fun label(context: Context, code: Code): String {
             val kind = context.getString(kind(code))
-            val scheme = Kinds.shuangpinScheme(code.kind)?.let { InputMethodSettings.schemeName(context, it) }
+            val scheme = Kinds.shuangpinScheme(code.kind)?.let { ShuangpinNames.of(context, it) }
             return if (scheme == null) kind else context.getString(R.string.learning_kind_with_scheme, kind, scheme)
         }
 
@@ -139,11 +139,15 @@ class LearnedItemsFragment : PaddingPreferenceFragment() {
             code.kind == Kinds.HANDWRITING -> R.string.learning_kind_handwriting
             code.kind.startsWith(Kinds.shuangpin("")) -> R.string.learning_kind_shuangpin
             // the keyboard from the kind's tag; its scheme said by [label]
-            Kinds.isShuangpin(code.kind) ->
-                if (Kinds.keysTag(code.kind) == NineKeyLetters.NINE_SP.tag()) R.string.learning_kind_shuangpin_nine
-                else R.string.learning_kind_shuangpin_keys18
+            Kinds.isShuangpin(code.kind) -> when (Kinds.keysTag(code.kind)) {
+                NineKeyLetters.NINE_SP.tag() -> R.string.learning_kind_shuangpin_nine
+                NineKeyLetters.G14.tag() -> R.string.learning_kind_shuangpin_keys14
+                else -> R.string.learning_kind_shuangpin_keys18
+            }
             code.kind.startsWith(Kinds.nineKeys("")) || code.kind.startsWith(Kinds.nineKeysMultiTap("")) -> R.string.learning_kind_nine_keys
-            code.kind.startsWith(KEYS) -> R.string.learning_kind_keys14
+            // pinyin's 18 keys and 14 keys, by the kind's tag (I1)
+            code.kind.startsWith(KEYS) ->
+                if (Kinds.keysTag(code.kind) == NineKeyLetters.G18.tag()) R.string.learning_kind_keys18 else R.string.learning_kind_keys14
             else -> R.string.learning_kind_table
         }
     }

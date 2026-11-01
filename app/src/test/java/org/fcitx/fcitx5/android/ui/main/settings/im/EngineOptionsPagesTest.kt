@@ -13,7 +13,7 @@ import org.junit.Test
 
 /**
  * The Kotlin host's pages ([EngineOptions.page]) have every option the app's pages read, at the
- * RawConfig path they read it: the pages stay as they are when the host changes.
+ * path they read it: the pages stay as they are when the host changes.
  * contract: pages generated from fcitx's option table, which mutation cannot see.
  */
 class EngineOptionsPagesTest {

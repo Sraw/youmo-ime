@@ -7,6 +7,7 @@ package org.fcitx.fcitx5.android.data.pinyin
 import androidx.annotation.StringRes
 import androidx.annotation.VisibleForTesting
 import org.fcitx.fcitx5.android.R
+import org.fcitx.fcitx5.android.core.HostConfigDir
 import org.fcitx.fcitx5.android.data.pinyin.dict.PinyinDictionary
 import org.fcitx.fcitx5.android.data.pinyin.dict.SourceNames
 import org.fcitx.fcitx5.android.data.pinyin.dict.TextDictionary
@@ -14,6 +15,7 @@ import org.fcitx.fcitx5.android.engine.user.DictionaryCompiler
 import org.fcitx.fcitx5.android.engine.user.DictionaryFormat
 import org.fcitx.fcitx5.android.engine.user.ImportFiles
 import org.fcitx.fcitx5.android.engine.user.WordListFiles
+import org.fcitx.fcitx5.android.host.ConfigHome
 import org.fcitx.fcitx5.android.ui.main.settings.readAtMost
 import org.fcitx.fcitx5.android.utils.appContext
 import org.fcitx.fcitx5.android.utils.errorArg
@@ -30,13 +32,18 @@ import java.util.concurrent.atomic.AtomicBoolean
 
 object PinyinDictManager {
 
-    internal val pinyinDicDir = File(
-        appContext.getExternalFilesDir(null)!!, "data/pinyin/dictionaries"
-    ).also { it.mkdirs() }
+    // under fcitx's data, the app's own files once an older build's is moved in (A4): where the engine reads
+    // them, one directory a process (HostConfigDir); nothing written while it is not settled, what would be
+    // lost at the next start
+    private val data get() = HostConfigDir.inUse(ConfigHome.DATA)
+    internal val pinyinDicDir: File
+        get() = data.let { File(it.dir, "pinyin/dictionaries").also { dir -> if (it.writable) dir.mkdirs() } }
+
+    private fun notSettled(): Nothing = errorArg(R.string.user_data_not_settled)
 
     /** The dictionaries the user imported, on or off, by name. */
     fun listDictionaries(): List<TextDictionary> {
-        ImportedDictionaries.migrate(pinyinDicDir)
+        if (data.writable) ImportedDictionaries.migrate(pinyinDicDir)
         // each made under the sources lock: a conversion's commit deletes a text listed, which TextDictionary refuses (F3602)
         return synchronized(ImportedDictionaries) { ImportedDictionaries.list(pinyinDicDir).map(::TextDictionary) }
     }
@@ -45,14 +52,20 @@ object PinyinDictManager {
     fun unread() = ImportedDictionaries.unread(pinyinDicDir)
 
     /** Forgets [told], the dictionaries put aside unread the user was told of. */
-    fun forgetUnread(told: List<ImportedDictionaries.Unread>) = runCatching { ImportedDictionaries.forgetUnread(pinyinDicDir, told) }
+    fun forgetUnread(told: List<ImportedDictionaries.Unread>) = runCatching {
+        if (!data.writable) notSettled()
+        ImportedDictionaries.forgetUnread(pinyinDicDir, told)
+    }
 
     /**
      * Deletes [dictionary], by its name: whichever of its files is there now (the page may have
      * listed a text since converted); whether it went. The merged file is made again without it.
      */
-    fun delete(dictionary: TextDictionary): Boolean =
-        ImportedDictionaries.delete(pinyinDicDir, dictionary.name).also { if (it) MergedDictionary.refresh(pinyinDicDir) }
+    fun delete(dictionary: TextDictionary): Boolean {
+        // refused as turn is, so the page says why rather than "cannot delete"
+        if (!data.writable) notSettled()
+        return ImportedDictionaries.delete(pinyinDicDir, dictionary.name).also { if (it) MergedDictionary.refresh(pinyinDicDir) }
+    }
 
     /**
      * Turns [dictionary] on or off; whether it is so now. The merged file is made again for it.
@@ -61,6 +74,7 @@ object PinyinDictManager {
      * is the compiler's, a test's smaller.
      */
     fun turn(dictionary: TextDictionary, on: Boolean, max: Int = DictionaryCompiler.MAX_WORDS): Boolean {
+        if (!data.writable) notSettled()
         // counted by its name, as it is turned: the file the page listed may be a text converted since (F3591)
         if (on && mergedWords() + wordCount(dictionary) > max) {
             refuse(DictionaryFormat.Reason.TOO_MANY)
@@ -152,6 +166,12 @@ object PinyinDictManager {
         }
     }
 
+    /** Compiles again what failed to compile in this process; nothing where fcitx's data is not settled: it would be written there. */
+    fun retryMerged() {
+        val data = data
+        if (data.writable) MergedDictionary.retry(File(data.dir, "pinyin/dictionaries"))
+    }
+
     /**
      * Deletes what an import left in the cache when its page was killed (the copy and its lines,
      * about twice the file): those older than an hour, never one an import under way still uses.
@@ -195,6 +215,7 @@ object PinyinDictManager {
         cancel: AtomicBoolean = AtomicBoolean(),
         progress: (Float) -> Unit = {},
     ): Result<TextDictionary> = runCatching {
+        if (!data.writable) notSettled()
         val dest = File(pinyinDicDir, TextDictionary.fileName(name, true))
         // one of that name, on or off, is the user's: the list may not have shown it yet
         if (ImportedDictionaries.hasDictionary(pinyinDicDir, name)) errorArg(R.string.dict_already_exists)

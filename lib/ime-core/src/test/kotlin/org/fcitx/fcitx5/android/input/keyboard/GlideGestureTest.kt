@@ -56,4 +56,45 @@ class GlideGestureTest {
         two.otherDown()
         assertFalse(two.move(400f, 75f, 50))
     }
+
+    // keys 100 by 150: a stroke starts 0.3 of a key off, either way
+    private fun stroke() = GlideGesture(keyWidth = 100f, keyHeight = 150f, longPressMillis = 300, stroke = true)
+
+    @Test
+    fun aStrokeStartsFarSoonerThanAGlide() {
+        // a 竖 from the bottom row: a third of a key's height down, where a glide needs 1.6
+        val down = stroke()
+        down.down(50f, 75f, 0, onLetter = true)
+        assertFalse(down.move(50f, 110f, 40))
+        assertTrue(down.move(50f, 125f, 60))
+        // a short 点, a quarter of a key each way
+        val dot = stroke()
+        dot.down(50f, 75f, 0, onLetter = true)
+        assertTrue(dot.move(75f, 112f, 50))
+        // a 横 a third of a key's width across, under half a glide's
+        val across = stroke()
+        across.down(50f, 75f, 0, onLetter = true)
+        assertFalse(across.move(75f, 75f, 40))
+        assertTrue(across.move(83f, 75f, 50))
+        // a tap's wobble (a tenth of a key) is no stroke: the tap is the key's
+        val tap = stroke()
+        tap.down(50f, 75f, 0, onLetter = true)
+        assertFalse(tap.move(58f, 82f, 30))
+        assertFalse(tap.move(60f, 87f, 60))
+    }
+
+    @Test
+    fun aSlowStrokeIsOneOnceStartedBeforeTheLongPress() {
+        val slow = stroke()
+        slow.down(50f, 75f, 0, onLetter = true)
+        assertFalse(slow.move(55f, 100f, 150))
+        assertTrue(slow.move(55f, 125f, 290))
+        // drawn on well past the long press: still the stroke's
+        assertTrue(slow.move(55f, 300f, 1200))
+        // not started by then: the popup's
+        val held = stroke()
+        held.down(50f, 75f, 0, onLetter = true)
+        assertFalse(held.move(52f, 80f, 310))
+        assertFalse(held.move(50f, 300f, 400))
+    }
 }

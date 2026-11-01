@@ -57,7 +57,7 @@ class AutoScaleTextView @JvmOverloads constructor(
     private var textScaleX = 1.0f
     private var textScaleY = 1.0f
 
-    // a text with spans (one part smaller or fainter: 九键's 中/英) laid out by the platform, which
+    // a text with spans (one part smaller or fainter than the rest) laid out by the platform, which
     // draws them; drawn as a plain string they were lost
     private var styled: Layout? = null
 
@@ -80,7 +80,7 @@ class AutoScaleTextView @JvmOverloads constructor(
         val heightMode = MeasureSpec.getMode(heightMeasureSpec)
         val heightSize = MeasureSpec.getSize(heightMeasureSpec)
         val width = measureTextBounds().width() + paddingLeft + paddingRight
-        val height = ceil(fontMetrics.bottom - fontMetrics.top + paddingTop + paddingBottom).toInt()
+        val height = ceil(textHeight() + paddingTop + paddingBottom).toInt()
         val maxHeight = if (maxHeight >= 0) maxHeight else Int.MAX_VALUE
         val maxWidth = if (maxWidth >= 0) maxWidth else Int.MAX_VALUE
         setMeasuredDimension(
@@ -104,7 +104,8 @@ class AutoScaleTextView @JvmOverloads constructor(
             styled = null
             if (spanned != null) {
                 val width = ceil(Layout.getDesiredWidth(spanned, paint)).toInt()
-                styled = StaticLayout.Builder.obtain(spanned, 0, spanned.length, paint, max(width, 1)).setIncludePad(false).build()
+                styled = StaticLayout.Builder.obtain(spanned, 0, spanned.length, paint, max(width, 1))
+                    .setIncludePad(false).setAlignment(Layout.Alignment.ALIGN_CENTER).build()
                 textBounds.set(0, floor(fontMetrics.top).toInt(), width, ceil(fontMetrics.bottom).toInt())
             } else if (codePointCount == 1) {
                 // use actual text bounds when there is only one "character",
@@ -136,9 +137,11 @@ class AutoScaleTextView @JvmOverloads constructor(
         measureTextBounds()
         val textLeft: Float = textBounds.left.toFloat()
         val textWidth: Float = textBounds.width().toFloat()
-        val textTop: Float = fontMetrics.top
-        val textHeight: Float = fontMetrics.bottom - fontMetrics.top
-        if (textWidth > contentWidth) {
+        // lines drawn from their top, the first's baseline nowhere in particular
+        val textTop: Float = if (lines() != null) 0.0f else fontMetrics.top
+        val textHeight: Float = textHeight()
+        val taller = lines() != null && textHeight > contentHeight
+        if (textWidth > contentWidth || taller) {
             when (scaleMode) {
                 Mode.None -> {
                     textScaleX = 1.0f
@@ -149,7 +152,7 @@ class AutoScaleTextView @JvmOverloads constructor(
                     textScaleY = 1.0f
                 }
                 Mode.Proportional -> {
-                    val scale = contentWidth / textWidth
+                    val scale = if (taller) min(contentWidth / textWidth, contentHeight / textHeight) else contentWidth / textWidth
                     textScaleX = scale
                     textScaleY = scale
                 }
@@ -212,13 +215,21 @@ class AutoScaleTextView @JvmOverloads constructor(
             scale(textScaleX, textScaleY)
             val layout = styled
             if (layout != null) {
-                // its first line's baseline where the plain text's is
-                translate(0.0f, -layout.getLineBaseline(0).toFloat())
+                // its first line's baseline where the plain text's is; lines from their top
+                if (layout.lineCount == 1) translate(0.0f, -layout.getLineBaseline(0).toFloat())
                 layout.draw(this)
             } else {
                 drawText(text.toString(), 0.0f, 0.0f, paint)
             }
         }
+    }
+
+    // a styled text of more than one line (a table's roots on a key, TextKeyboard): sized and centred whole
+    private fun lines(): Layout? = styled?.takeIf { it.lineCount > 1 }
+
+    private fun textHeight(): Float {
+        measureTextBounds()
+        return lines()?.height?.toFloat() ?: (fontMetrics.bottom - fontMetrics.top)
     }
 
     override fun getBaseline(): Int {

@@ -5,7 +5,7 @@
 package org.fcitx.fcitx5.android.input.popup
 
 import org.fcitx.fcitx5.android.assertRows
-import org.fcitx.fcitx5.android.engine.host.Keyboard
+import org.fcitx.fcitx5.android.engine.runtime.Keyboard
 import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
 import org.fcitx.fcitx5.android.engine.pinyin.g14
 import org.fcitx.fcitx5.android.engine.pinyin.nineSp

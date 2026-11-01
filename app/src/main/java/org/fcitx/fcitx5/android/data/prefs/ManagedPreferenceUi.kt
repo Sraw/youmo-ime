@@ -157,8 +157,12 @@ abstract class ManagedPreferenceUi<T : Preference>(
         val min: Int,
         val max: Int,
         val unit: String = "",
+        val special: Special? = null,
         enableUiOn: (() -> Boolean)? = null
     ) : ManagedPreferenceUi<EditTextPreference>(key, enableUiOn) {
+        /** A value with a name of its own (「无上限」): a button in the dialog in place of the default's, [message] above the box. */
+        data class Special(val value: Int, @StringRes val label: Int, @StringRes val message: Int)
+
         override fun createUi(context: Context) = EditTextIntPreference(context).apply {
             key = this@EditTextInt.key
             isIconSpaceReserved = false
@@ -170,6 +174,11 @@ abstract class ManagedPreferenceUi<T : Preference>(
             min = this@EditTextInt.min
             max = this@EditTextInt.max
             unit = this@EditTextInt.unit
+            this@EditTextInt.special?.let {
+                specialValue = it.value
+                specialLabel = context.getString(it.label)
+                dialogMessage = context.getString(it.message)
+            }
         }
     }
 

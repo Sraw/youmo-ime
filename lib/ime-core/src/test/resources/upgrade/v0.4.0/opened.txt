@@ -1,0 +1,32 @@
+dz: [北京市海淀区, dz]
+ni: 你
+ADDED: []
+LEARNED: [(鲸喵屿, jing miao yu)]
+BLOCKED: []
+english: []
+files: [backups/auto-1793335172220.fxlb, learn.converted, learn.log, learn.pins-moved, tables.order-kept]
+errors: []
+state: day=1 localDay=20756 lastMinute=29888929 next=5 restored=-1
+stat qp:guojia [Word(text=国家, reading=guo jia)] uses=[1:1] corr=[] older=0 first=3
+stat qp:jing [Word(text=鲸, reading=jing)] uses=[1:2] corr=[1:2] older=0 first=1
+stat qp:jingmiaoyu [Word(text=鲸, reading=jing), Word(text=喵, reading=miao), Word(text=屿, reading=yu)] uses=[1:2] corr=[1:2] older=0 first=1
+stat qp:miao [Word(text=喵, reading=miao)] uses=[1:2] corr=[1:2] older=0 first=1
+stat qp:ni [Word(text=你, reading=ni)] uses=[1:1] corr=[] older=0 first=4
+stat qp:yu [Word(text=屿, reading=yu)] uses=[1:2] corr=[1:2] older=0 first=1
+FirstRow(code=qp:jing, prev=, value=First(first=null, set=[鲸(jing)], lastDay=1, lastBy=1))
+FirstRow(code=qp:jing, prev=屿, value=First(first=null, set=[鲸(jing)], lastDay=1, lastBy=2))
+FirstRow(code=qp:jingmiaoyu, prev=, value=First(first=null, set=[鲸喵屿(jing miao yu)], lastDay=1, lastBy=1))
+FirstRow(code=qp:jingmiaoyu, prev=屿, value=First(first=null, set=[鲸喵屿(jing miao yu)], lastDay=1, lastBy=2))
+FirstRow(code=qp:miao, prev=鲸, value=First(first=喵(miao), set=[], lastDay=1, lastBy=2))
+FirstRow(code=qp:yu, prev=喵, value=First(first=屿(yu), set=[], lastDay=1, lastBy=2))
+PendingRow(text=鲸喵屿, value=Pending(reading=jing miao yu, firstDay=1, lastBy=1))
+MineRow(text=鲸喵屿, value=Mine(reading=jing miao yu, how=0, since=1, sinceSeq=2, lastUsedDay=1, lastUsedLocalDay=20756, lastBy=2))
+PairRow(prev=喵, next=屿, nextReading=yu, count=2, lastDay=1)
+PairRow(prev=屿, next=鲸, nextReading=jing, count=1, lastDay=1)
+PairRow(prev=鲸, next=喵, nextReading=miao, count=2, lastDay=1)
+WordUseRow(你, ni, [1:1])
+WordUseRow(国家, guo jia, [1:1])
+WordUseRow(鲸喵屿, jing miao yu, [1:2])
+DateRow(day=1, localDay=20756)
+Unknown(73, 12 bytes)
+Cut

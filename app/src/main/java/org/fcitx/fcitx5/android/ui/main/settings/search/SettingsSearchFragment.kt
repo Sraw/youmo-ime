@@ -145,6 +145,6 @@ class SettingsSearchFragment : Fragment() {
         view?.let { requireContext().getSystemService<InputMethodManager>()?.hideSoftInputFromWindow(it.windowToken, 0) }
         navigateWithAnim(target.route)
         // the result's entry, on the back stack before its fragment is made: its page reads the key there
-        findNavController().currentBackStackEntry?.let { SearchHighlight.point(it, target.key) }
+        findNavController().currentBackStackEntry?.let { SearchHighlight.point(it, target.key, target.via) }
     }
 }

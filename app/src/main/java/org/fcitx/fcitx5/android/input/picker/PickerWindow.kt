@@ -106,7 +106,7 @@ class PickerWindow(
                 }
             }
 
-            is KeyAction.FcitxKeyAction -> {
+            is KeyAction.HostKeyAction -> {
                 // we want the behavior of CommitAction (commit the character as-is),
                 // but don't want to include it in recently used list
                 commonKeyActionListener.listener.onKeyAction(KeyAction.CommitAction(it.act), source)
@@ -139,7 +139,7 @@ class PickerWindow(
     // where the search's keys go: EmojiSearchQuery
     private val searchKeyActionListener = KeyActionListener { it, source ->
         val outcome = when {
-            it is KeyAction.FcitxKeyAction -> query.type(it.act)
+            it is KeyAction.HostKeyAction -> query.type(it.act)
             it is KeyAction.SymAction && it.sym == EmojiSearchUi.BACKSPACE -> query.backspace(it.states.has(KeyState.Repeat))
             else -> EmojiSearchQuery.Outcome.PASSED
         }

@@ -4,8 +4,11 @@
  */
 package org.fcitx.fcitx5.android.host
 
+import java.util.concurrent.CopyOnWriteArrayList
 import org.fcitx.fcitx5.android.core.FormattedText
-import org.fcitx.fcitx5.android.engine.host.Engines
+import org.fcitx.fcitx5.android.engine.InputMethodCatalog
+import org.fcitx.fcitx5.android.engine.pinyin.ShuangpinScheme
+import org.fcitx.fcitx5.android.engine.session.Action
 
 /**
  * The modules plugged into the host, each list in fcitx's registration order (`specs/host.md`):
@@ -61,17 +64,24 @@ class HostCore(
     private val clock: HostClock,
     profile: Profile,
     /** What the engines list (`InputMethodManager::entries_`). */
-    private val available: Set<String> = Engines.LISTED.map { it.name }.toSet(),
+    private val available: Set<String> = InputMethodCatalog.LISTED.map { it.name }.toSet(),
     private val strings: HostStrings = HostStrings.ENGLISH,
     /** The app's first run (`Fcitx.onFirstRun`, `native-last:app/src/main/java/org/fcitx/fcitx5/android/core/Fcitx.kt:437-447`): pinyin goes first in the group. */
     firstRun: Boolean = false,
-    /** `ShowInputMethodInformation`, a constructor switch here (the instrumented tests turn it off through `KotlinFcitx.showInputMethodInformation`). */
+    /** `ShowInputMethodInformation`, a constructor switch here (the instrumented tests turn it off through `KotlinHost.showInputMethodInformation`). */
     private val showInputMethodInformation: Boolean = true,
     private val persist: (Persist) -> Unit = {},
     modules: (HostServices) -> HostModules = { HostModules() },
 ) : HostServices {
 
-    val events = HostEvents()
+    /**
+     * Who hears the host's events ([HostEvents]), in turn, on the host thread: the app's host, a test's
+     * log. Copied on write, so a listener added or removed while an event is told (or from another
+     * thread) is heard from the next event on, never a ConcurrentModificationException mid-emit.
+     */
+    val events = CopyOnWriteArrayList<HostEvents>()
+
+    private fun emit(event: HostEvent) = events.forEach { it.onEvent(event) }
 
     var profile: Profile = profile
         private set
@@ -112,9 +122,9 @@ class HostCore(
 
     init {
         router.punctuation = this.modules.punctuation
-        if (firstRun && Engines.PINYIN in available) {
+        if (firstRun && InputMethodCatalog.PINYIN in available) {
             val ims = contexts.group.inputMethods
-            setInputMethods(listOf(Engines.PINYIN) + ims.filter { it != Engines.PINYIN })
+            setInputMethods(listOf(InputMethodCatalog.PINYIN) + ims.filter { it != InputMethodCatalog.PINYIN })
         }
     }
 
@@ -170,10 +180,10 @@ class HostCore(
         contexts.active?.let { contexts.setCapabilities(it, flags) }
     }
 
-    /** A key from the app; whether the host took it (else it went back as a [HostEvent.Key]). */
-    fun sendKey(key: Key, release: Boolean = false, virtual: Boolean = false, timestamp: Int = -1): Boolean {
+    /** A key from the app, [payload] with it ([KeyEvent.payload]); whether the host took it (else it went back as a [HostEvent.Key]). */
+    fun sendKey(key: Key, release: Boolean = false, virtual: Boolean = false, timestamp: Int = -1, payload: Action? = null): Boolean {
         val ic = contexts.active ?: return false
-        val e = KeyEvent(key, release, virtual, timestamp)
+        val e = KeyEvent(key, release, virtual, timestamp, payload)
         // `RETURN_IF_HAS_NO_FOCUS` (`inputcontext.cpp:333-335`): unfocused, nobody sees it, it goes back
         if (!ic.hasFocus) {
             handBack(key, release, timestamp)
@@ -224,12 +234,24 @@ class HostCore(
     /**
      * The engine options read or changed (`AndroidEngine::reloadConfig`/`setConfigForInputMethod`,
      * `androidengine.cpp:405-490`): the router's page size and English suggestions, and the engines'
-     * settings, flattened.
+     * settings ([EngineOptions.toSettings]).
      */
     fun configure(options: EngineOptions) {
         router.options = KeyRouter.Options(options.pageSizeValue, options.suggestsEnglish)
-        router.settings(options.flat())
+        val settings = options.toSettings()
+        val schemeChanged = scheme != null && scheme != settings.scheme
+        scheme = settings.scheme
+        router.settings(settings)
+        // 双拼's keyboard is the scheme's too (ImKeyboards: no 14 keys under 微软): the keyboard on show
+        // told anew, as for a switch, with the engine's settings in place
+        val active = contexts.active
+        if (schemeChanged && active != null && contexts.inputMethod(active) == InputMethodCatalog.SHUANGPIN) {
+            emit(HostEvent.InputMethodChanged(InputMethodCatalog.SHUANGPIN))
+        }
     }
+
+    // the 双拼 scheme [configure] last gave the engine, null before the first
+    private var scheme: ShuangpinScheme? = null
 
     /** `isInputPanelEmpty`. */
     fun isEmpty() = contexts.active?.panel?.empty ?: true
@@ -329,7 +351,7 @@ class HostCore(
         // `InputMethodGroupChanged` (`instance.cpp:711`): the frontend tells an unfocused active
         // context's change (`androidfrontend.cpp:341-348`); fcitx shows the name on the focused
         // ones 30 ms after (`instance.cpp:1213-1229`)
-        contexts.active?.takeIf { !it.hasFocus }?.let { events.emit(HostEvent.InputMethodChanged(contexts.inputMethod(it))) }
+        contexts.active?.takeIf { !it.hasFocus }?.let { emit(HostEvent.InputMethodChanged(contexts.inputMethod(it))) }
         groupInfoTimer?.cancel()
         groupInfoTimer = clock.schedule(GROUP_INFO_DELAY) {
             pipeline.batch { contexts.focused?.let(::showInputMethodInformation) }
@@ -364,7 +386,7 @@ class HostCore(
         if (reason == SwitchReason.CapabilityChanged || reason == SwitchReason.GroupChange) return
         // Default: temp modes leave (`tempmodemanager.cpp:47-49`), the frontend told (`androidfrontend.cpp:349-359`)
         pipeline.switchedInputMethod(ic)
-        if (ic === contexts.active) events.emit(HostEvent.SwitchInputMethod(reason, old))
+        if (ic === contexts.active) emit(HostEvent.SwitchInputMethod(reason, old))
         // ReservedLast: the name, for every reason fcitx lists (`instance.cpp:1203-1211`)
         showInputMethodInformation(ic)
     }
@@ -372,10 +394,10 @@ class HostCore(
     /** `Instance::activateInputMethod` (`instance.cpp:2454-2494`, `androidengine.cpp:492-513`). */
     private fun activateInputMethod(ic: InputContext) {
         val im = contexts.inputMethod(ic)
-        val chinese = Engines.listed(im)?.chinese == true
+        val chinese = InputMethodCatalog.listed(im)?.chinese == true
         activationListeners.forEach { it.onActivated(ic, im, chinese) }
         router.activate(ic, im)
-        if (ic === contexts.active) events.emit(HostEvent.InputMethodChanged(im))
+        if (ic === contexts.active) emit(HostEvent.InputMethodChanged(im))
     }
 
     /**
@@ -385,7 +407,7 @@ class HostCore(
     private fun showInputMethodInformation(ic: InputContext) {
         if (!showInputMethodInformation) return
         val im = contexts.inputMethod(ic)
-        val listed = Engines.listed(im)
+        val listed = InputMethodCatalog.listed(im)
         val display = listed?.label?.takeIf { it.isNotEmpty() } ?: listed?.text ?: im
         val state = ic.propertyFor(overlay)
         ic.panel.overlayMessage = display
@@ -420,14 +442,14 @@ class HostCore(
         val empty = ic.panel.clientPreedit.isEmpty()
         if (empty && ic.lastPreeditUpdateIsEmpty) return
         ic.lastPreeditUpdateIsEmpty = empty
-        events.emit(HostEvent.ClientPreedit(pipeline.filterOutput(ic, ic.panel.clientPreedit)))
+        emit(HostEvent.ClientPreedit(pipeline.filterOutput(ic, ic.panel.clientPreedit)))
     }
 
     override fun updatePanel(ic: InputContext) = pipeline.updatePanel(ic)
 
     override fun inputMethod(ic: InputContext) = contexts.inputMethod(ic)
 
-    override fun tip(text: String) = events.emit(HostEvent.Tip(text))
+    override fun tip(text: String) = emit(HostEvent.Tip(text))
 
     override fun showPanel(ic: InputContext, panel: TempPanel) {
         // a temp mode's panel replaces the context's whole panel (`inputPanel().reset()` first, as
@@ -450,16 +472,22 @@ class HostCore(
         pipeline.batch {}
     }
 
-    override fun filterOutput(ic: InputContext, text: String) =
-        pipeline.filterOutput(ic, FormattedText(arrayOf(text), intArrayOf(0), -1)).toString()
+    // three a candidate a key, most of them an empty comment or a text no filter changes: neither
+    // wrapped for nothing nor joined back into a string it already is (S15 A8.4)
+    override fun filterOutput(ic: InputContext, text: String): String {
+        if (text.isEmpty()) return text
+        val given = FormattedText(arrayOf(text), intArrayOf(0), -1)
+        val out = pipeline.filterOutput(ic, given)
+        return if (out === given) text else out.toString()
+    }
 
     // ---- HostOutput: what the pipeline sends, as the frontend's callbacks
 
     private inner class Output : HostOutput {
-        override fun commit(ic: InputContext, text: String, cursor: Int) = events.emit(HostEvent.Commit(text, cursor))
+        override fun commit(ic: InputContext, text: String, cursor: Int) = emit(HostEvent.Commit(text, cursor))
 
         override fun deleteSurrounding(ic: InputContext, before: Int, after: Int) =
-            events.emit(HostEvent.DeleteSurrounding(before, after))
+            emit(HostEvent.DeleteSurrounding(before, after))
 
         override fun handBack(ic: InputContext, key: Key, release: Boolean, timestamp: Int) = this@HostCore.handBack(key, release, timestamp)
 
@@ -467,7 +495,7 @@ class HostCore(
             if (!statusDirty) return
             statusDirty = false
             val ic = contexts.active ?: return
-            events.emit(HostEvent.StatusArea(modules.statusArea?.entries(ic).orEmpty(), contexts.inputMethod(ic)))
+            emit(HostEvent.StatusArea(modules.statusArea?.entries(ic).orEmpty(), contexts.inputMethod(ic)))
         }
 
         /** `InputContextFlushUI` (`androidfrontend.cpp:360-382`): the active context's panel and candidates. */
@@ -475,34 +503,34 @@ class HostCore(
             if (ic !== contexts.active) return
             val p = ic.panel
             if (p.empty) {
-                events.emit(HostEvent.InputPanel(FormattedText.Empty, text(p.overlayMessage), FormattedText.Empty))
+                emit(HostEvent.InputPanel(FormattedText.Empty, text(p.overlayMessage), FormattedText.Empty))
             } else {
-                events.emit(HostEvent.InputPanel(pipeline.filterOutput(ic, p.preedit), pipeline.filterOutput(ic, p.auxUp), pipeline.filterOutput(ic, p.auxDown)))
+                emit(HostEvent.InputPanel(pipeline.filterOutput(ic, p.preedit), pipeline.filterOutput(ic, p.auxUp), pipeline.filterOutput(ic, p.auxDown)))
             }
             sendCandidates(ic)
         }
     }
 
     private fun handBack(key: Key, release: Boolean, timestamp: Int) =
-        events.emit(HostEvent.Key(key.sym, key.states, KeySyms.toUnicode(key.sym), release, timestamp))
+        emit(HostEvent.Key(key.sym, key.states, KeySyms.toUnicode(key.sym), release, timestamp))
 
     private fun sendCandidates(ic: InputContext) {
         val list = ic.panel.candidateList
         if (pagingMode != 0) {
             if (list == null) {
-                events.emit(HostEvent.Paged.EMPTY)
+                emit(HostEvent.Paged.EMPTY)
                 return
             }
             val page = (0 until list.size).mapNotNull { i -> list.candidate(i)?.let { entry(ic, list.label(i), it) } }
-            events.emit(HostEvent.Paged(page, list.cursorIndex, list.pageable && list.hasPrev, list.pageable && list.hasNext, list.layoutHint))
+            emit(HostEvent.Paged(page, list.cursorIndex, list.pageable && list.hasPrev, list.pageable && list.hasNext, list.layoutHint))
             return
         }
         if (list == null) {
-            events.emit(HostEvent.Candidates(0, emptyList()))
+            emit(HostEvent.Candidates(0, emptyList()))
             return
         }
         if (!list.bulk) {
-            events.emit(HostEvent.Candidates(list.size, (0 until list.size).mapNotNull { i -> list.candidate(i)?.let { entry(ic, "", it) } }))
+            emit(HostEvent.Candidates(list.size, (0 until list.size).mapNotNull { i -> list.candidate(i)?.let { entry(ic, "", it) } }))
             return
         }
         var total = list.totalSize
@@ -517,22 +545,22 @@ class HostCore(
             }
             out += entry(ic, "", word)
         }
-        events.emit(HostEvent.Candidates(total, out))
+        emit(HostEvent.Candidates(total, out))
     }
 
-    private fun entry(ic: InputContext, label: String, word: CandidateWord) =
+    private fun entry(ic: InputContext, label: String, word: PanelCandidate) =
         CandidateEntry(if (label.isEmpty()) "" else filterOutput(ic, label), filterOutput(ic, word.text), filterOutput(ic, word.comment))
 
     // `shows` (`androidfrontend.cpp:303-307`): the word the user tapped, by the text sent for it,
     // filtered (traditional, say); an empty text (a key's pick) is not checked
-    private fun shows(ic: InputContext, word: CandidateWord, text: String) = text.isEmpty() || filterOutput(ic, word.text) == text
+    private fun shows(ic: InputContext, word: PanelCandidate, text: String) = text.isEmpty() || filterOutput(ic, word.text) == text
 
     /**
      * A temp mode's [TempCandidateList] as the panel's list (fcitx's `CommonCandidateList`: bulk,
      * pageable, labelled): a pick is the mode's candidate's own select.
      */
     private class TempModeCandidates(private val list: TempCandidateList) : CandidateList {
-        private inner class Word(val candidate: TempCandidate) : CandidateWord {
+        private inner class Word(val candidate: TempCandidate) : PanelCandidate {
             override val text get() = candidate.text
             override val comment get() = candidate.comment
             override fun select(ic: InputContext) {
@@ -542,11 +570,11 @@ class HostCore(
 
         override val size get() = list.size
         override fun label(index: Int) = if (index in 0 until list.size) list.label(index) else ""
-        override fun candidate(index: Int): CandidateWord? = if (index in 0 until list.size) Word(list.candidate(index)) else null
+        override fun candidate(index: Int): PanelCandidate? = if (index in 0 until list.size) Word(list.candidate(index)) else null
         override val cursorIndex get() = list.cursorIndex
         override val bulk get() = true
         override val totalSize get() = list.totalSize
-        override fun candidateFromAll(index: Int): CandidateWord? = list.candidates.getOrNull(index)?.let(::Word)
+        override fun candidateFromAll(index: Int): PanelCandidate? = list.candidates.getOrNull(index)?.let(::Word)
         override val pageable get() = true
         override val hasPrev get() = list.hasPrev
         override val hasNext get() = list.hasNext

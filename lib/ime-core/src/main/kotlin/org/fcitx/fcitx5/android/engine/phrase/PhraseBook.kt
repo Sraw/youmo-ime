@@ -4,16 +4,18 @@
  */
 package org.fcitx.fcitx5.android.engine.phrase
 
+import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
+import java.io.IOException
 import java.util.Calendar
 
 /**
- * The custom phrases the pinyin sessions share, and the user's changes to them from the keyboard
+ * The custom phrases the pinyin sessions, the tables and English share, and the user's changes to them from the keyboard
  * (a candidate pinned, a phrase deleted), each handed to [save] as the whole list, as the file
- * keeps them. [builtIn] phrases ([CustomPhrases.BUILT_IN]: the date under `rq`) are offered under
+ * keeps them; one [save] refuses (an [IOException]) takes no effect. [builtIn] phrases ([CustomPhrases.BUILT_IN]: the date under `rq`) are offered under
  * a key the user has none of; a change under such a key makes them the user's first, so pinning
  * a word there keeps the date, and deleting the date turns it off rather than letting it come back,
  * while deleting the user's own word gives the key back to the built-in ones not deleted.
- * The built-in ones are for full pinyin only ([offered] without them elsewhere): in 双拼 `sj` and
+ * The built-in ones are for full pinyin's keyboards only ([offered] without them elsewhere): in 双拼 `sj` and
  * `xq` spell syllables (san, xiu in 自然码), whose words they would push down; so there the user's
  * lines reading as a built-in one are left out too, as a change in either made them the user's.
  */
@@ -34,6 +36,26 @@ class PhraseBook(
 
     /** What is offered where [builtIns] are: [phrases]; elsewhere the user's alone. */
     fun offered(builtIns: Boolean): CustomPhrases = if (builtIns) phrases else own
+
+    /**
+     * What is offered (as [offered]) and the keys of it [typed] is (A1): itself where the keys type
+     * letters, [letters] null; on keys of letter groups each key any of its letters ([PhraseKeys]),
+     * [taken] spelling a syllable taken off the bar, so one input may be several keys.
+     */
+    fun typed(
+        typed: CharSequence,
+        builtIns: Boolean,
+        letters: NineKeyLetters?,
+        taken: (String) -> List<String> = { listOf(it) },
+    ): Pair<CustomPhrases, List<String>> {
+        val offered = offered(builtIns)
+        val keys = when {
+            offered.isEmpty -> emptyList()
+            letters == null -> listOf(typed.toString()).filter { it in offered }
+            else -> PhraseKeys.of(typed, letters, taken)?.let(offered::keysRead).orEmpty()
+        }
+        return offered to keys
+    }
 
     /** [value] made the first phrase under [key], the built-in ones there kept for where they are offered. */
     fun pin(key: String, value: String) = change(user.adopting(key, builtIn).pinned(key, value))
@@ -62,10 +84,16 @@ class PhraseBook(
         builtIn.all.fold(phrases) { p, b -> p.without(b.key, b.value) }
 
     private fun change(to: CustomPhrases) {
+        // a save refused (it throws: the file not read, the data not settled) takes no effect, the
+        // phrases as they were, rather than kept this run and gone at the next start
+        try {
+            save(to)
+        } catch (_: IOException) {
+            return
+        }
         user = to
         phrases = to.over(builtIn)
         own = withoutBuiltIns(to)
-        save(to)
     }
 
     companion object {
