@@ -84,7 +84,8 @@ class ExportTest(unittest.TestCase):
                 parity.uat_export(path)
             seqs = [json.loads(x) for x in open(path, encoding="utf-8")]
         ids = {s["id"] for s in seqs}
-        self.assertTrue({"PY-01", "PY-64", "KB-14", "TBL-01"} <= ids, ids)
+        # cases still scripted on the device (most moved to the JVM, needs=jvm, and give none)
+        self.assertTrue({"PY-01", "EN-02", "TBL-01"} <= ids, ids)
         ops = {"type", "space", "enter", "bksp", "pick", "pickText", "hw", "ime", "field", "app", "pause", "toggle", "quick", "unicode"}
         for s in seqs:
             self.assertIn(s["im"], parity.IM_LABELS)

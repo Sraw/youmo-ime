@@ -73,7 +73,8 @@ class TablesSettingsUatTest {
         st.activity
         st.open(SettingsRoute.UserWordList(UserWord.Kind.ADDED.name))
         val row = st.s(R.string.same_code_as, InputMethodNames.of(st.activity, wubi), "昏天黑地")
-        until("「$row」", { "in ${shown()}" }, step = { shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(100)) }) {
+        // the row waits for 五笔's table to load: tens of seconds on a slow runner
+        until("「$row」", { "in ${shown()}" }, timeoutMs = 60_000, step = { shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(100)) }) {
             shown().any { row in it }
         }
         assertTrue(shown().any { it == "鲸园" })

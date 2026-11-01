@@ -240,8 +240,9 @@ class KotlinHostSchemeTest {
                 val quoted = if (' ' in name) "\"$name\"" else name
                 assertEquals(Read(EngineSettings.XIAOHE, listOf(Told(dropped(name), steady = false))), schemeRead("ShuangpinProfile=$quoted\n", firstRun = false))
                 assertTrue(told.getValue())
-                // written back as the default, which is left out: the dropped name gone
-                assertFalse(conf()!!.contains(name))
+                // written back as the default, which is left out: the dropped name gone (written on the
+                // writer's thread, so waited for: a slow runner reads it before the write lands)
+                until("「$name」 written away", { conf() }) { conf()?.contains(name) == false }
                 EngineNotices.sayer = EngineNotices.Sayer { message, _ -> said += message; true }
                 said.clear()
                 restart()
