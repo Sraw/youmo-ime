@@ -227,7 +227,7 @@ adb push uat/fixtures/userwords.txt uat/fixtures/dict-words.txt uat/fixtures/wor
 
 ### WD-14v [P1] 装回 0.3.2 再升级：导入的基础词库藏起来，回来时又有了
 - **前提**：WD-14r 做完的手机（这一版正式版，frost 已开启、dict-words 已关闭，目录里是 `frost_dict_for_fcitx5.txt.gz`、`dict-words.txt.gz.disable`）。
-- **操作**：装回 v0.3.2 正式版（`adb install -r -d`；手机不让降级就记"阻塞"）；回测试页打 a b a z h o u；打开词库页；看词库目录。再在 0.3.2 里按 WD-11 把 `dict-words.txt` 并入基础词库；然后装回这一版正式版（`adb install -r`）；回测试页弹出键盘，等到提示「词库格式已升级」（最多三分钟）；打 a b a z h o u、k e m i a o t a n g p u；打开词库页；看词库目录。
+- **操作**：照用户装回旧版的路（docs/faq.md「想装回旧版本」；正式版不能 `install -r -d` 留着数据降级，手机上只能卸载）：**备份全部**，把文件拷到电脑；卸载；装 v0.3.2 正式版，走完向导，把备份推回"下载"，**从备份恢复** 选它；回测试页打 a b a z h o u；打开词库页；看词库目录。再在 0.3.2 里按 WD-11 把 `dict-words.txt` 并入基础词库；然后装回这一版正式版（`adb install -r`）；回测试页弹出键盘，等到提示「词库格式已升级」（最多三分钟）；打 a b a z h o u、k e m i a o t a n g p u；打开词库页；看词库目录。
 - **预期**：0.3.2 里键盘照常打字，不崩；abazhou 的候选里没有「阿坝州」，词库页"基础词库"一节没有 frost；词库目录里 `frost_dict_for_fcitx5.txt.gz`、`dict-words.txt.gz.disable` 还在。装回这一版后空闲栏写着「正在升级词库格式 N%」，合好以后：「阿坝州」回来了，kemiaotangpu 第一页有「氪喵糖铺」；词库页 frost 已开启、约 191 万个词，dict-words 只有一行、已开启（0.3.2 里新导入的那份胜出）；词库目录里 dict-words 只剩 `dict-words.txt.gz`，没有 `.txt`、`.txt.gz.disable`、`.tmp` 文件。这一条在发版时用正式版跑。
 
 ### WD-14w [P1] 升级转换词库时导入新词库

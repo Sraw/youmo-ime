@@ -31,7 +31,7 @@ Each release lists its **main changes** (new features, large improvements), its 
 - 拼音 18 键上显示 L，键上和长按都不再有 `;`。
 - 码表和英文里也能用自定义短语，最多排第二，空格照旧上屏编码或单词的第一个；内置的 rq/sj/xq（日期、时间、星期）在全拼的各种键盘上都有，双拼没有。
 - 改了要重建键盘的设置（主题、候选设置等）：没选的拼音清掉不上屏；英文打到一半的词、手写还没上屏的字照样上屏留下。
-- 不再转换 0.3.0 及更早版本学到的词：从这些版本升级，先升到 0.4.x，打几个字、停一下，再升到新版；直接升级的话以前学到的词不再读进来，只有码表（五笔等）保存的词照样保留，从 0.3.0 直接升级也一样。上游 Fcitx5 拼音（libime）学到的词也不再读进来。0.3.1 到 0.4.0 期间一次也没打开过的码表，以前保存的词仍在这个码表里，但不再同时加进拼音。
+- 不再转换 0.3.0 及更早版本学到的词：从这些版本升级，先升到 0.4.x，打几个字、停一下，再升到新版；直接升级的话以前学到的词不再读进来，手动添加的词、屏蔽的词和码表（五笔等）保存的词照样保留，码表的「调频」回到默认（关，到码表设置里打开），从 0.3.0 直接升级也一样。上游 Fcitx5 拼音（libime）学到的词也不再读进来。0.3.1 到 0.4.0 期间一次也没打开过的码表，以前保存的词仍在这个码表里，但不再同时加进拼音。
 - 在新版里恢复 0.3.0 及更早版本导出的备份 zip 会被拒绝，并提示先在 0.4.x 里恢复、打几个字、停一下、重新备份。
 
 ### 修复
@@ -61,7 +61,7 @@ Each release lists its **main changes** (new features, large improvements), its 
 - Pinyin's 18 keys show L, with no `;` on the key or its long press.
 - Custom phrases in tables and English too, at most second, so space still commits the code's or word's first; the built-in rq/sj/xq on every full-pinyin keyboard, not in shuangpin.
 - A setting that rebuilds the keyboard drops unpicked pinyin; a half-typed English word or a handwritten character not yet committed is committed and kept.
-- What 0.3.0 and earlier learned is no longer converted: upgrade to 0.4.x, type a few characters and pause, then upgrade further; upgraded directly, the words learned before are not read, but for the phrases a table (Wubi and the like) saved, which are kept, straight from 0.3.0 too. What upstream Fcitx5's pinyin (libime) learned is not read either. A table never opened from 0.3.1 to 0.4.0 keeps the phrases it saved before, but no longer adds them to pinyin as well.
+- What 0.3.0 and earlier learned is no longer converted: upgrade to 0.4.x, type a few characters and pause, then upgrade further; upgraded directly, the words learned before are not read; words added by hand, blocked words and the phrases a table (Wubi and the like) saved are kept, and a table's 调频 (order by use) goes back to its default, off (turn it on in the table's settings), straight from 0.3.0 too. What upstream Fcitx5's pinyin (libime) learned is not read either. A table never opened from 0.3.1 to 0.4.0 keeps the phrases it saved before, but no longer adds them to pinyin as well.
 - A backup zip exported by 0.3.0 or earlier is refused, with a note to restore it in 0.4.x, type a few characters and pause, and back up again first.
 
 ### Fixes
