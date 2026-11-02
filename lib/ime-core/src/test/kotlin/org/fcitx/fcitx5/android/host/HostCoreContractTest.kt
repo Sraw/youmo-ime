@@ -631,6 +631,56 @@ class HostCoreContractTest {
     }
 
     @Test
+    fun `an app unbound clears the panel its focus out dropped, before no context is active`() {
+        // a switch from recents unbinds the app before its field finishes: deactivate, not a focus out, ends its input
+        val core = core()
+        core.open()
+        fake.answer = { _, e, _ -> if (e == EngineEvent.CHAR) snap(preedit = "ni", candidates = listOf("你")) else snap() }
+        core.press('n')
+        // a reset with nothing on show answers unhandled: the new field's empty panel is not sent again
+        fake.answer = { _, _, _ -> snap(handled = false) }
+        val log = core.log()
+        core.deactivate(1)
+        core.activate(2)
+        core.focus(false)
+        core.focus(true)
+        assertEquals("", log.filterIsInstance<HostEvent.InputPanel>().last().preedit.toString())
+        assertEquals(0, log.filterIsInstance<HostEvent.Candidates>().last().total)
+    }
+
+    @Test
+    fun `another app bound before the focused one unbound gets an empty panel, once`() {
+        // InputContexts.deactivate: an unbind may come after the next bind
+        val core = core()
+        core.open()
+        fake.answer = { _, e, _ -> if (e == EngineEvent.CHAR) snap(preedit = "ni", candidates = listOf("你")) else snap() }
+        core.press('n')
+        fake.answer = { _, _, _ -> snap(handled = false) }
+        val log = core.log()
+        core.activate(2)
+        core.focus(true)
+        core.deactivate(1)
+        val panels = log.filterIsInstance<HostEvent.InputPanel>()
+        assertEquals(1, panels.size)
+        assertEquals("", panels.single().preedit.toString())
+        assertEquals(0, log.filterIsInstance<HostEvent.Candidates>().last().total)
+    }
+
+    @Test
+    fun `an unbind arriving after the next app's bind leaves that app focused, its keys typed`() {
+        val core = core()
+        core.open()
+        core.activate(2)
+        core.focus(true)
+        core.deactivate(1)
+        fake.answer = { _, e, _ -> if (e == EngineEvent.CHAR) snap(preedit = "n", candidates = listOf("你")) else snap() }
+        val log = core.log()
+        assertTrue(core.press('n'))
+        assertTrue(log.none { it is HostEvent.Key })
+        assertEquals("n", log.filterIsInstance<HostEvent.InputPanel>().last().preedit.toString())
+    }
+
+    @Test
     fun `without ClientUnfocusCommit the client preedit is committed on focus out`() {
         // fcitx/instance.cpp:1131-1139
         val core = core()

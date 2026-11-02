@@ -135,10 +135,12 @@ class HostCore(
         contexts.activate(uid)
     }
 
-    /** `deactivateInputContext` (`:485-490`): for a known [uid], the focused context loses focus, none is active. */
-    fun deactivate(uid: Int) = pipeline.batch {
-        if (uid !in contexts) return@batch
-        contexts.focused?.let(::focusOut)
+    /** `deactivateInputContext` (`:485-490`): [uid]'s context loses focus and is no longer active (only its: [InputContexts.deactivate]). */
+    fun deactivate(uid: Int) {
+        if (uid !in contexts) return
+        // its own batch: the cleared panel flushes while the context is still the active one; flushed
+        // after, no context is active, nothing goes out, and the keyboard keeps showing the dropped code
+        pipeline.batch { contexts.focused?.takeIf { it.uid == uid }?.let(::focusOut) }
         contexts.deactivate(uid)
     }
 
@@ -147,11 +149,14 @@ class HostCore(
         val ic = contexts.active ?: return@batch
         if (focus) {
             if (ic.hasFocus) return@batch
-            contexts.focused?.let(::focusOut)
+            // another app bound before the focused one unbound: that one's cleared panel is not the
+            // active context's and goes nowhere, so this one's panel is sent instead (once: a set)
+            val replaced = contexts.focused?.also(::focusOut)
             contexts.focus(ic, true)
             // `FocusIn`, ReservedFirst: the input method activated (`instance.cpp:1069-1091`)
             activateInputMethod(ic)
             pipeline.focusIn(ic)
+            if (replaced != null) pipeline.updatePanel(ic)
         } else if (ic.hasFocus) {
             focusOut(ic)
         }

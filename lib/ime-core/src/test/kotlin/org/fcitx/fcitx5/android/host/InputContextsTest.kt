@@ -181,7 +181,7 @@ class InputContextsTest {
     }
 
     @Test
-    fun `deactivate of an unknown uid changes nothing, a known one clears active whichever it is`() {
+    fun `deactivate of an unknown uid changes nothing, a known one clears only its own`() {
         // native-last:app/src/main/cpp/androidfrontend/androidfrontend.cpp:485-490 (F3811)
         val ics = InputContexts(ImGroup.of("Default", listOf("pinyin", us)), { _, _, _, _ -> })
         ics.activate(1)
@@ -190,6 +190,8 @@ class InputContextsTest {
         assertTrue(ics.active === second)
         // an unbind of 1 arriving after the bind of 2
         ics.deactivate(1)
+        assertTrue(ics.active === second)
+        ics.deactivate(2)
         assertEquals(null, ics.active)
     }
 
