@@ -135,12 +135,12 @@ class HostCore(
         contexts.activate(uid)
     }
 
-    /** `deactivateInputContext` (`:485-490`): for a known [uid], the focused context loses focus, none is active. */
+    /** `deactivateInputContext` (`:485-490`): [uid]'s context loses focus and is no longer active (only its: [InputContexts.deactivate]). */
     fun deactivate(uid: Int) {
         if (uid !in contexts) return
         // its own batch: the cleared panel flushes while the context is still the active one; flushed
         // after, no context is active, nothing goes out, and the keyboard keeps showing the dropped code
-        pipeline.batch { contexts.focused?.let(::focusOut) }
+        pipeline.batch { contexts.focused?.takeIf { it.uid == uid }?.let(::focusOut) }
         contexts.deactivate(uid)
     }
 

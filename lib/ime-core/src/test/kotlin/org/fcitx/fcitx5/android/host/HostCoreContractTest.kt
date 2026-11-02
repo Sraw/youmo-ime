@@ -667,6 +667,20 @@ class HostCoreContractTest {
     }
 
     @Test
+    fun `an unbind arriving after the next app's bind leaves that app focused, its keys typed`() {
+        val core = core()
+        core.open()
+        core.activate(2)
+        core.focus(true)
+        core.deactivate(1)
+        fake.answer = { _, e, _ -> if (e == EngineEvent.CHAR) snap(preedit = "n", candidates = listOf("你")) else snap() }
+        val log = core.log()
+        assertTrue(core.press('n'))
+        assertTrue(log.none { it is HostEvent.Key })
+        assertEquals("n", log.filterIsInstance<HostEvent.InputPanel>().last().preedit.toString())
+    }
+
+    @Test
     fun `without ClientUnfocusCommit the client preedit is committed on focus out`() {
         // fcitx/instance.cpp:1131-1139
         val core = core()

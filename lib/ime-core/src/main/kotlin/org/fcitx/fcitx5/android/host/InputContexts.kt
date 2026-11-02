@@ -100,14 +100,14 @@ class InputContexts(
     operator fun contains(uid: Int) = contexts.containsKey(uid)
 
     /**
-     * `AndroidFrontend::deactivateInputContext` (`androidfrontend.cpp:485-490`): an unknown [uid]
-     * changes nothing; a known one leaves nothing focused and none active, whichever context that
-     * was (an unbind arriving after the next bind).
+     * `AndroidFrontend::deactivateInputContext` (`androidfrontend.cpp:485-490`): [uid]'s context
+     * loses focus and is no longer active. Unlike fcitx, only [uid]'s: an unbind arriving after the
+     * next bind left that app's context unfocused, its keys handed back to it untyped.
      */
     fun deactivate(uid: Int) {
-        if (uid !in this) return
-        focused?.hasFocus = false
-        active = null
+        val ic = contexts[uid] ?: return
+        ic.hasFocus = false
+        if (active === ic) active = null
     }
 
     /** Focus in or out; one focus group, so focusing one context unfocuses the rest. */
