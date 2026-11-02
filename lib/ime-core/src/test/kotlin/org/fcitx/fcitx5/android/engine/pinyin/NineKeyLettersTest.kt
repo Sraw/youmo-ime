@@ -168,8 +168,9 @@ class NineKeyLettersTest {
     @Test
     fun theGroupedCodesAreThreeBlocksOfThePrivateUseAreaPastTheSyllables() {
         val blocks = listOf(NineKeyLetters.G18_BLOCK, NineKeyLetters.G14_BLOCK, NineKeyLetters.NINE_SP_BLOCK)
-        // one after the other, none overlapping, from past the syllables' to no further than the BMP's area
-        assertEquals(Keyboard.SYLLABLES.last.code + 1, blocks.first().first)
+        // one after the other, none overlapping, from past the syllables' and zhuyin's to no further than the BMP's area
+        assertEquals(Keyboard.SYLLABLES.last.code + 1, ZhuyinKeys.BLOCK.first.code)
+        assertTrue(ZhuyinKeys.BLOCK.last.code < blocks.first().first)
         blocks.zipWithNext { a, b -> assertEquals(a.last + 1, b.first) }
         assertTrue(blocks.last().last <= 0xF8FF)
         assertEquals(blocks.first().first..blocks.last().last, NineKeyLetters.CODES)

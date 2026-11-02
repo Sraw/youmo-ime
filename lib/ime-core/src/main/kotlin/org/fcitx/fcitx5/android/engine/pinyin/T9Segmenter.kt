@@ -46,16 +46,22 @@ import java.util.TreeMap
  * reads its keys as go against those places ([SyllableGraph.against]). The letters are those of
  * the spelling actually typed for it (a fuzzy partner's, üe's ue), kept beside the index as the
  * group's first or second letter of each key.
+ *
+ * The keys may spell syllables in zhuyin's symbols instead ([KeySpelling], 注音九键 and 大千 of
+ * [ZhuyinKeys]): every syllable indexed by its symbols' keys, a symbol typed as itself its code, a
+ * tone after a syllable a separator (the decoder weighs it: [SyllableGraph.tone]).
  */
 class T9Segmenter(
     fuzzy: Set<Fuzzy> = emptySet(),
     private val abbreviations: Boolean = true,
     override val letters: NineKeyLetters = NineKeyLetters.STANDARD,
+    override val toneAllows: ((codePoint: Int, syllable: Int, tone: Int) -> Boolean)? = null,
 ) : KeyedSegmenter {
 
     // the tables below made once for the settings that shape them, shared by the sessions made anew
     // after another setting changed (SettingsMemo, S15 N2)
     private val tables = TABLES[fuzzy.toSet() to letters]
+    private val spelling = KeySpelling.of(letters)
     private val whole = tables.whole
     private val starts = tables.starts
     private val initials = tables.initials
@@ -73,6 +79,8 @@ class T9Segmenter(
 
     /** What a segmenter reads [letters] by under [fuzzy]: made at once, never changed after. */
     private class Tables(fuzzy: Set<Fuzzy>, private val letters: NineKeyLetters) {
+        private val keySpelling = KeySpelling.of(letters)
+
         // digits typing a syllable whole, the start of one, and an initial
         val whole = HashMap<String, SyllableMatches>()
         val starts = HashMap<String, SyllableMatches>()
@@ -126,7 +134,8 @@ class T9Segmenter(
                     if (init.isNotEmpty()) keepBest(letterIds.getOrPut(init) { TreeMap() }, id, SyllableMatches.COMPLETION)
                     SpellingIndex.variants(init, initialRules).flatMap { (i, iFlags) ->
                         if (i.isNotEmpty()) {
-                            for (keys in letters.typings(i)) keep(initialIds, initialChoices, keys, id, iFlags or SyllableMatches.COMPLETION, i)
+                            val spelt = keySpelling.initial(i)
+                            if (spelt != null) for (keys in letters.typings(spelt)) keep(initialIds, initialChoices, keys, id, iFlags or SyllableMatches.COMPLETION, spelt)
                         }
                         // with no initial the final is the syllable: ou's partner u is none, as in 双拼
                         SpellingIndex.finalsAfter(i, fin, finalRules).map { (f, fFlags) -> i + f to (iFlags or fFlags) }
@@ -134,12 +143,12 @@ class T9Segmenter(
                 }
                 for ((s, flags) in spellings) {
                     // üe is typed ue too (略 lue): on a phone u and v share 8, on the user's keys maybe not
-                    val typed = if ("ve" in s) listOf(s, s.replace("ve", "ue")) else listOf(s)
+                    val typed = if (keySpelling != KeySpelling.Pinyin) listOfNotNull(keySpelling.of(s)) else if ("ve" in s) listOf(s, s.replace("ve", "ue")) else listOf(s)
                     val seen = HashSet<String>()
                     for (t in typed) {
                         for (keys in letters.typings(t)) {
                             if (!seen.add(keys)) continue
-                            if (parts != null && s.length > 1) regular += keys
+                            if (parts != null && t.length > 1) regular += keys
                             keep(wholeIds, wholeChoices, keys, id, flags, t)
                             for (n in 1 until keys.length) keep(startIds, startChoices, keys.substring(0, n), id, flags or SyllableMatches.COMPLETION, t)
                         }
@@ -165,7 +174,9 @@ class T9Segmenter(
     }
 
     // the letters of a syllable taken are the session's to put in, not typed
-    override fun reads(c: Char) = letters.isCode(c) && letters.letters(c).isNotEmpty()
+    // zhuyin's symbols typed as themselves and tones are keys sent as codes ([ZhuyinKeys]), read as the groups are
+    override fun reads(c: Char) = letters.isCode(c) && letters.letters(c).isNotEmpty() ||
+        spelling == KeySpelling.Bopomofo && (spelling.isFixed(c) || spelling.separates(c) && c != SEPARATOR)
 
     override fun segment(input: String): SyllableGraph = segment(input, null)
 
@@ -247,14 +258,16 @@ class T9Segmenter(
     }
 
     // a letter typed as itself as any key typing it: every way to type a syllable is indexed
-    private fun keysOf(typed: String) = buildString(typed.length) { typed.forEach { append(if (letters.isCode(it)) it else letters.key(it.lowercaseChar())) } }
+    private fun keysOf(typed: String) = buildString(typed.length) {
+        typed.forEach { append(if (letters.isCode(it)) it else spelling.letterOf(it).let { c -> letters.keysOf(c).firstOrNull() ?: c }) }
+    }
 
     // [spelling] has [c] at [k]; üe is spelt lve here and typed lue as well (略, 虐)
     private fun spells(spelling: String, k: Int, c: Char) =
         spelling.getOrNull(k) == c || c == 'u' && spelling.getOrNull(k) == 'v' && spelling.getOrNull(k + 1) == 'e'
 
-    // the end of the input, or of a syllable the user separated
-    private fun endsAt(input: String, at: Int) = at == input.length || input[at] == SEPARATOR
+    // the end of the input, or of a syllable the user separated (or gave a tone)
+    private fun endsAt(input: String, at: Int) = at == input.length || spelling.separates(input[at])
 
     // a regular syllable read for [keys] as [full], what a letter typed as itself left of them
     private fun isRegular(keys: String, full: SyllableMatches?): Boolean = when {
@@ -266,10 +279,10 @@ class T9Segmenter(
 
     /** Those of [matches] spelt with each letter typed as itself in [typed] where it is; null if none. */
     private fun fitting(matches: SyllableMatches, typed: String): SyllableMatches? {
-        if (typed.none { it in FIXED }) return matches
+        if (typed.none { spelling.isFixed(it) }) return matches
         val kept = (0 until matches.size).filter { i ->
-            val spelling = Syllables.spelling(matches.syllable(i))
-            typed.indices.all { k -> typed[k] !in FIXED || spells(spelling, k, typed[k].lowercaseChar()) }
+            val spelt = spelling.of(matches.syllable(i))
+            typed.indices.all { k -> !spelling.isFixed(typed[k]) || spells(spelt, k, spelling.letterOf(typed[k])) }
         }
         if (kept.isEmpty()) return null
         return SyllableMatches(IntArray(kept.size) { matches.syllable(kept[it]) }, IntArray(kept.size) { matches.flags(kept[it]) })
@@ -279,15 +292,32 @@ class T9Segmenter(
      * [text], of the input, as it is shown or committed: a letter typed as itself lower case, a
      * grouped key's code its first letter ([NineKeyLetters.asTyped]).
      */
-    override fun asTyped(text: CharSequence): String = letters.asTyped(text.toString())
+    override fun asTyped(text: CharSequence): String =
+        if (spelling == KeySpelling.Pinyin) letters.asTyped(text.toString()) else text.map { spelling.shown(it) ?: letters.asTyped(it.toString()) }.joinToString("")
 
     /** Whether [c] is a key typed: one of the keys' codes (the nine keys' digits) or a letter typed as itself. */
-    override fun isKey(c: Char): Boolean = letters.isCode(c) || c in FIXED
+    override fun isKey(c: Char): Boolean = letters.isCode(c) || spelling.isFixed(c)
 
-    override fun initialsOf(code: Char): List<String> = initialsOf(letters, code)
+    override fun initialsOf(code: Char): List<String> = when (spelling) {
+        KeySpelling.Pinyin -> initialsOf(letters, code)
+        // the key's initial symbols as pinyin's initials, what the bar puts in
+        KeySpelling.Bopomofo -> (ZhuyinKeys.symbolOf(code)?.toString() ?: letters.letters(code)).mapNotNull { KeySpelling.Bopomofo.initialOf[it] }
+    }
 
     // digits say nothing: of a syllable still being typed as many letters as were typed
-    override fun started(syllable: Int, keys: Int): String = Syllables.spelling(syllable).take(keys)
+    override fun started(syllable: Int, keys: Int): String = spelling.of(syllable).take(keys)
+
+    override fun spelt(syllable: Int): String = spelling.of(syllable)
+
+    override fun separates(c: Char): Boolean = spelling.separates(c)
+
+    override fun phraseWays(c: Char): List<String>? = when {
+        spelling != KeySpelling.Bopomofo -> null
+        ZhuyinKeys.toneOf(c) > 0 -> emptyList()
+        else -> (ZhuyinKeys.symbolOf(c)?.toString() ?: letters.letters(c).takeIf { letters.isCode(c) })?.flatMap { ZhuyinKeys.PINYIN_WAYS.getValue(it) }?.distinct()
+    }
+
+    override val spaceTone: Char? = if (letters == ZhuyinKeys.DACHEN) ZhuyinKeys.toneCode(1) else null
 
     companion object {
         private const val MAX_SYLLABLE = 6

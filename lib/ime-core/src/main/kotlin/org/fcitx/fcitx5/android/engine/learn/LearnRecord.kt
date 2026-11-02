@@ -44,6 +44,13 @@ object Kinds {
     private const val KEYS = "qk:"
     private const val SHUANGPIN_KEYS = "spk:"
 
+    /** Pinyin typed in zhuyin, 注音九键's and 大千's: their keys' codes ([org.fcitx.fcitx5.android.engine.pinyin.ZhuyinKeys]) under a kind each. */
+    const val ZHUYIN_NINE = "zy:nine"
+    const val ZHUYIN_DACHEN = "zy:dachen"
+
+    /** Whether [kind] is a zhuyin keyboard's ([ZHUYIN_NINE], [ZHUYIN_DACHEN]): keys of symbols, filed by the code itself as 双拼's are. */
+    fun isZhuyin(kind: String) = kind.startsWith("zy:")
+
     fun shuangpin(scheme: String) = "$SHUANGPIN$scheme"
     fun nineKeys(layout: String) = "t9:$layout"
     fun nineKeysMultiTap(layout: String) = "t9m:$layout"

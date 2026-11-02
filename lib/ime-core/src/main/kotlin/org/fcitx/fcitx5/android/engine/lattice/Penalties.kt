@@ -74,4 +74,9 @@ data class Penalties(
      * α only.
      */
     val tap: Float = -1f,
+    /**
+     * A word with a character whose reading has not the tone typed after it on the zhuyin keyboards:
+     * after those that have it, kept (the readings' data is wrong now and then; design 051 Q4 A).
+     */
+    val tone: Float = -4f,
 )

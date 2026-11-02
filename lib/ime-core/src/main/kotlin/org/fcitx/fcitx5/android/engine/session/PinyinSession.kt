@@ -32,6 +32,7 @@ import org.fcitx.fcitx5.android.engine.pinyin.Segmenter
 import org.fcitx.fcitx5.android.engine.pinyin.SyllableGraph
 import org.fcitx.fcitx5.android.engine.pinyin.SyllableGraph.Kind
 import org.fcitx.fcitx5.android.engine.pinyin.Syllables
+import org.fcitx.fcitx5.android.engine.pinyin.ZhuyinKeys
 import org.fcitx.fcitx5.android.engine.platform.jvm.JvmClock
 import org.fcitx.fcitx5.android.engine.rerank.Reranker
 import org.fcitx.fcitx5.android.engine.rerank.SentencePicker
@@ -182,7 +183,7 @@ class PinyinSession(
     private val decoder = PinyinDecoder(
         data.dictionary, data.vocabulary, use.scorer(data.model, user, prior), penalties,
         user = user, extensions = extensions, wholeFirst = segmenter.typesLetters, coarse = coarse, asTyped = ::asTyped,
-        whole = use.whole(data.model, user, prior), uncounted = use.uncounted(data.model, user, prior),
+        whole = use.whole(data.model, user, prior), uncounted = use.uncounted(data.model, user, prior), toneAllows = (segmenter as? KeyedSegmenter)?.toneAllows,
     )
     private val predictor = Predictor(data.model, data.vocabulary, data.dictionary, user, coarse = coarse, charReadings = charReadings)
     private val textWords = TextWords(data.model, data.wordIndex)
@@ -326,8 +327,8 @@ class PinyinSession(
 
     private fun type(c: Char, glided: Boolean = false, at: Float = Float.NaN): Snapshot {
         if (endsInput(c)) return leave()
-        // on the nine keys 1 is 分词
-        insert((if (c == NINE_KEYS_SEPARATOR && nineKeys?.oneSeparates == true) SyllableGraph.SEPARATOR else c).toString(), glided, at)
+        // on the nine keys 1 is 分词; on 大千 a space after a syllable with no tone its first tone
+        insert((if (c == NINE_KEYS_SEPARATOR && nineKeys?.oneSeparates == true) SyllableGraph.SEPARATOR else if (c == ' ') keyed?.spaceTone ?: c else c).toString(), glided, at)
         read()
         return snapshot()
     }
@@ -396,7 +397,7 @@ class PinyinSession(
     override fun endsInput(c: Char): Boolean = !reads(c) || !segmenter.readsAfter(input.substring(readFrom(), cursor), c)
 
     override fun reads(c: Char): Boolean =
-        segmenter.reads(c) || (c == SyllableGraph.SEPARATOR || c == NINE_KEYS_SEPARATOR && nineKeys?.oneSeparates == true) && input.isNotEmpty()
+        segmenter.reads(c) || (c == SyllableGraph.SEPARATOR || c == NINE_KEYS_SEPARATOR && nineKeys?.oneSeparates == true) && input.isNotEmpty() || c == ' ' && keyed?.tonesBySpace(input.substring(readFrom(), cursor)) == true
 
     override fun candidates(from: Int, count: Int): List<Choice> {
         readUntil(from + count)
@@ -846,7 +847,7 @@ class PinyinSession(
         val rest = input.length - readFrom()
         val key = input.substring(readFrom())
         // the built-in ones under their keys on full pinyin's keyboards only: 双拼's sj, xq spell syllables
-        val (phrases, keys) = phraseBook.typed(key, builtIns = segmenter.spellsFullPinyin && builtInPhrases, keyed?.letters) { keyed?.takenAs(it).orEmpty() }
+        val (phrases, keys) = phraseBook.typed(key, builtIns = segmenter.spellsFullPinyin && builtInPhrases, keyed?.letters, { keyed?.phraseWays(it) }) { keyed?.takenAs(it).orEmpty() }
         // the time asked once, for what is shown and what is kept of it to agree
         val time = time ?: if (keys.isNotEmpty()) now() else null
         val placed: Map<String, Phrase> = if (time == null) emptyMap() else phrases.offered(keys, time).associate { it.text to it.phrase }
@@ -995,7 +996,7 @@ class PinyinSession(
         private fun shown(graph: SyllableGraph, edge: Int, syllable: Int): String = when {
             // digits say nothing: the syllable read, a fuzzy one too (9664 as zhong with z for zh), and
             // of one still being typed as many letters as were typed
-            keyed != null -> if (graph.kind(edge) == Kind.SYLLABLE) Syllables.spelling(syllable) else keyed.started(syllable, graph.text(edge).length)
+            keyed != null -> if (graph.kind(edge) == Kind.SYLLABLE) keyed.spelt(syllable) else keyed.started(syllable, graph.text(edge).length)
             spell && graph.kind(edge) == Kind.SYLLABLE -> Syllables.spelling(syllable)
             else -> graph.text(edge)
         }
@@ -1094,9 +1095,11 @@ private fun joined(graph: SyllableGraph, parts: List<String>, ends: List<Int>, b
         } else if (k > 0) {
             out.add(" ", base + start, base + start)
         }
-        // a separator ending the part shows as the next joiner, or, last, not at all
-        val end = if (graph.input[ends[k] - 1] == SyllableGraph.SEPARATOR) ends[k] - 1 else ends[k]
-        out.add(parts[k], base + start, base + end)
+        // a separator ending the part shows as the next joiner, or, last, not at all; a zhuyin tone as its mark after it
+        val last = graph.input[ends[k] - 1]
+        val end = if (last == SyllableGraph.SEPARATOR) ends[k] - 1 else ends[k]
+        val tone = ZhuyinKeys.toneOf(last)
+        out.add(if (tone > 0) parts[k] + ZhuyinKeys.MARKS[tone - 1] else parts[k], base + start, base + end)
     }
     return out
 }
