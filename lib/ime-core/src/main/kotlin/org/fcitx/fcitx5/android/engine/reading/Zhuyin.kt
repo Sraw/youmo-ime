@@ -75,5 +75,5 @@ object Zhuyin {
     fun syllable(zhuyin: String): Int = byZhuyin[zhuyin] ?: -1
 
     /** Every zhuyin symbol a syllable may use, initials first: what a zhuyin keyboard needs keys for. */
-    val symbols: String = "ㄅㄆㄇㄈㄉㄊㄋㄌㄍㄎㄏㄐㄑㄒㄓㄔㄕㄖㄗㄘㄙㄧㄨㄩㄚㄛㄜㄝㄞㄟㄠㄡㄢㄣㄤㄥㄦ"
+    const val symbols: String = "ㄅㄆㄇㄈㄉㄊㄋㄌㄍㄎㄏㄐㄑㄒㄓㄔㄕㄖㄗㄘㄙㄧㄨㄩㄚㄛㄜㄝㄞㄟㄠㄡㄢㄣㄤㄥㄦ"
 }

@@ -32,6 +32,9 @@ class LicensesFragment : PaddingPreferenceFragment() {
             VoiceFeature.Credit(getString(R.string.engine_data_stroke), "LGPL-3.0-only", "https://github.com/rime/rime-stroke"),
             VoiceFeature.Credit(getString(R.string.engine_data_emoji), "Unicode-3.0", "https://www.unicode.org/license.txt"),
             VoiceFeature.Credit(getString(R.string.engine_data_chaizi), "CC-BY-3.0", "https://github.com/kfcd/chaizi"),
+            VoiceFeature.Credit(getString(R.string.engine_data_unihan), "Unicode-3.0", "https://www.unicode.org/license.txt"),
+            VoiceFeature.Credit(getString(R.string.engine_data_pinyin_data), "MIT", "https://github.com/mozillazg/pinyin-data"),
+            VoiceFeature.Credit(getString(R.string.engine_data_phrase_pinyin), "MIT", "https://github.com/mozillazg/phrase-pinyin-data"),
             // what runs the handwriting recognizers (lib/handwriting), and in a voice build the speech one
             VoiceFeature.Credit("onnxruntime:$ort", "MIT", "https://github.com/microsoft/onnxruntime/blob/main/LICENSE"),
             // others' code built into libonnxruntime.so: the notices of the release it is built from
