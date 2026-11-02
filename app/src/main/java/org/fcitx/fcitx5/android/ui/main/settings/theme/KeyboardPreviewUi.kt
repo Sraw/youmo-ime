@@ -92,7 +92,8 @@ class KeyboardPreviewUi(override val ctx: Context, val theme: Theme) : Ui {
     // the bar and the row above it for the code being typed, thin as over the full keyboard drawn here
     // (where the cap binds, a 14 键 user's real keys are the tall row's 14 dp shorter); read each time,
     // as 候选字号 can change on this page
-    private val barHeight get() = ctx.dp(KawaiiBarComponent.heightDp() + CodeRowHeight.THIN_DP)
+    // the keyboard with nothing typed: floating over the app (编码行), the code row is no part of it
+    private val barHeight get() = ctx.dp(KawaiiBarComponent.heightDp() + if (KawaiiBarComponent.codeRowFloats()) 0 else CodeRowHeight.THIN_DP)
     private val fakeKawaiiBar = view(::View)
 
     private var keyboardWidth = -1
@@ -121,6 +122,7 @@ class KeyboardPreviewUi(override val ctx: Context, val theme: Theme) : Ui {
             keyboardBottomFlush.registerOnChangeListener(sizeChangeListener)
             // the docked handle is counted in the height cap (keyboardWindowAspectRatio)
             ThemeManager.prefs.alwaysShowHandle.registerOnChangeListener(sizeChangeListener)
+            ThemeManager.prefs.codeRow.registerOnChangeListener(sizeChangeListener)
             // the bar's height follows the candidate text size (KawaiiBarComponent.heightDp)
             ThemeManager.prefs.candidateTextSize.registerOnChangeListener(sizeChangeListener)
         }
@@ -135,6 +137,7 @@ class KeyboardPreviewUi(override val ctx: Context, val theme: Theme) : Ui {
             navbarBackground.unregisterOnChangeListener(sizeChangeListener)
             keyboardBottomFlush.unregisterOnChangeListener(sizeChangeListener)
             ThemeManager.prefs.alwaysShowHandle.unregisterOnChangeListener(sizeChangeListener)
+            ThemeManager.prefs.codeRow.unregisterOnChangeListener(sizeChangeListener)
             ThemeManager.prefs.candidateTextSize.unregisterOnChangeListener(sizeChangeListener)
             super.onDetachedFromWindow()
         }

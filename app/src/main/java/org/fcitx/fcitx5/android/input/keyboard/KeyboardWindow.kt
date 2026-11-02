@@ -196,9 +196,9 @@ class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), Essentia
     // whether the keyboard shown offers the syllables itself (九键's column), as it attached
     private var stripOwned = false
 
-    // the code row's strip hidden: 九键's column offers the syllables, or the input method's code row
-    // is the thin one, too low for a strip to be tapped; on each attach and input method change
-    private fun stripHidden() = syllablesOwned(stripOwned, KawaiiBarComponent.preeditHeight(spaceKeys.current?.uniqueName))
+    // the code row's strip hidden: 九键's column offers the syllables, or the input method's keyboard
+    // shows none (its code row thin); on each attach and input method change
+    private fun stripHidden() = syllablesOwned(stripOwned, KawaiiBarComponent.showsStrip(spaceKeys.current?.uniqueName))
 
     /** Whether the letters are the layout shown, which take the whole width, split. */
     val lettersShown get() = currentKeyboardName == TextKeyboard.Name
@@ -336,10 +336,10 @@ class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), Essentia
 
 /**
  * Whether the code row's syllables are hidden: the keyboard offers them itself ([owns], 九键's
- * column), or the code row is [preeditHeight] dp, the thin one ([CodeRowHeight]), too low to tap.
+ * column), or its layout [showsStrip] none ([CodeRowHeight.showsStrip]): asked of the layout, not the
+ * row's height, which floating is none in the keyboard.
  */
-internal fun syllablesOwned(owns: Boolean, preeditHeight: Int): Boolean =
-    owns || preeditHeight < CodeRowHeight.STRIP_DP
+internal fun syllablesOwned(owns: Boolean, showsStrip: Boolean): Boolean = owns || !showsStrip
 
 /**
  * The letters' layout of input method [ime]: its keyboard as [chosen] has it ([ImKeyboards.layoutOf]),

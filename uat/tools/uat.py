@@ -447,6 +447,16 @@ class Device:
         """Pixels per dp, from the device's density."""
         return int(self.sh("wm density").split()[-1]) / 160
 
+    def ime_touchable_region(self):
+        """The input method window's touchable region from dumpsys input, as (left, top, right, bottom)
+        rectangles: where a touch goes to the keyboard rather than the app under it"""
+        for line in self.sh("dumpsys input").splitlines():
+            if "InputMethod" in line and "touchableRegion=" in line and "InputMethodManager" not in line:
+                part = line.split("touchableRegion=", 1)[1]
+                # "[0,1370][100,1436]|[0,1436][1080,2340], ownerPid=…": rectangles as [l,t][r,b], joined by |
+                return [tuple(map(int, m)) for m in re.findall(r"\[(-?\d+),(-?\d+)\]\[(-?\d+),(-?\d+)\]", part.split(" ", 1)[0])]
+        return []
+
     def screen_h(self):
         """The screen's height in pixels in its natural (portrait) orientation, from wm size (an override wins); not the rotated height."""
         return int(self.sh("wm size").strip().splitlines()[-1].split()[-1].split("x")[1])

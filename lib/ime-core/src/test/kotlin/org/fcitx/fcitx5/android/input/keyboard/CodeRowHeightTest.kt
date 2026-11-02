@@ -35,4 +35,14 @@ class CodeRowHeightTest {
             assertEquals(dp == tall, CodeRowHeight.showsStrip(layout))
         }
     }
+
+    // floating over the app the keyboard keeps no room for it; the strip is 24 dp, 32 with the syllables
+    @Test
+    fun floatingTheKeyboardHasNoRowAndTheStripItsOwnHeight() = assertRows(Layout.entries, { "$it" }) { layout ->
+        assertEquals(0, CodeRowHeight.keyboardDp(layout, floats = true))
+        assertEquals(CodeRowHeight.dp(layout), CodeRowHeight.keyboardDp(layout, floats = false))
+        val strip = if (CodeRowHeight.showsStrip(layout)) CodeRowHeight.STRIP_DP else CodeRowHeight.FLOAT_DP
+        assertEquals(strip, CodeRowHeight.stripDp(layout))
+        assertEquals(24, CodeRowHeight.FLOAT_DP)
+    }
 }

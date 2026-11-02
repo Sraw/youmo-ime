@@ -29,6 +29,7 @@ import org.fcitx.fcitx5.android.data.prefs.EnglishKeyboard
 import org.fcitx.fcitx5.android.data.prefs.PinyinKeyboard
 import org.fcitx.fcitx5.android.data.prefs.ShuangpinKeyboard
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
+import org.fcitx.fcitx5.android.input.preedit.CodeRowStyle
 import org.fcitx.fcitx5.android.data.theme.ThemePreset
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.engine.runtime.EngineSettings
@@ -153,6 +154,8 @@ class SettingsUatTest {
     fun aDarkThemeTurnsPreviewAndKeyboardDark() {
         ThemeManager.prefs.followSystemDayNightTheme.setValue(false)
         ThemeManager.setNormalModeTheme(ThemePreset.PixelLight)
+        // the preview as shipped, the tests' baseline embedded (OneDefaultPreferencesShadow)
+        ThemeManager.prefs.codeRow.setValue(CodeRowStyle.Floating)
         try {
             activity
             open(SettingsRoute.Theme)
@@ -177,6 +180,7 @@ class SettingsUatTest {
         } finally {
             ThemeManager.setNormalModeTheme(ThemePreset.PixelLight)
             ThemeManager.prefs.followSystemDayNightTheme.setValue(ThemeManager.prefs.followSystemDayNightTheme.defaultValue)
+            ThemeManager.prefs.codeRow.setValue(CodeRowStyle.Embedded)
         }
     }
 

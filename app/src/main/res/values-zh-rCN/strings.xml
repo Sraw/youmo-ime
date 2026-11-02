@@ -794,6 +794,9 @@
     <string name="one_handed_exit">恢复全宽</string>
     <string name="floating_keyboard">悬浮键盘</string>
     <string name="floating_keyboard_dock">键盘放回底部</string>
+    <string name="code_row_style">编码行</string>
+    <string name="code_row_floating">浮在键盘上方</string>
+    <string name="code_row_embedded">嵌在键盘里</string>
     <string name="floating_handle">悬浮键盘拖动条</string>
     <string name="floating_handle_bottom">下面</string>
     <string name="floating_handle_top">上面</string>

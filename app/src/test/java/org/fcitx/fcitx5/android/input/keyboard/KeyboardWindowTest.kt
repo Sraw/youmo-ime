@@ -128,13 +128,15 @@ class KeyboardWindowTest {
     }
 
     @Test
-    fun theCodeRowsSyllablesHideWhereTheKeyboardOffersThemOrTheRowIsTooLowToTap() {
-        // the keyboard's own column (九键) owns them, whatever the row
-        assertTrue(syllablesOwned(true, CodeRowHeight.STRIP_DP))
-        // a thin code row (an input method without the strip) is under a touch target
-        assertTrue(syllablesOwned(false, CodeRowHeight.THIN_DP))
-        // the 14 keys, 双拼's 18 and nine keys (its 123): the row is tall, the strip can be tapped
-        assertFalse(syllablesOwned(false, CodeRowHeight.STRIP_DP))
+    fun theCodeRowsSyllablesHideWhereTheKeyboardOffersThemOrItsLayoutShowsNone() {
+        // the keyboard's own column (九键) owns them, whatever the layout
+        assertTrue(syllablesOwned(true, CodeRowHeight.showsStrip(ImKeyboards.Layout.PINYIN_NINE)))
+        // a layout without the strip (the full keys) hides them, floating or embedded alike
+        assertTrue(syllablesOwned(false, CodeRowHeight.showsStrip(ImKeyboards.Layout.TEXT)))
+        // the 14 and 18 keys, 双拼's nine keys (its 123 too): the strip shows
+        for (layout in listOf(ImKeyboards.Layout.PINYIN14, ImKeyboards.Layout.PINYIN18, ImKeyboards.Layout.SHUANGPIN_NINE)) {
+            assertFalse("$layout", syllablesOwned(false, CodeRowHeight.showsStrip(layout)))
+        }
     }
 
     // the tall row goes with the letters that put syllables on it: kept in step with lettersOf

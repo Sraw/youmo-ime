@@ -78,6 +78,9 @@ class UndoChip(
 
     private var slide = Slide.Up
 
+    // where the one shown was asked to go, for [reposition]
+    private var aboveKeys = false
+
     // where the window is and how big, as last set
     private var windowLeft = 0
     private var windowTop = 0
@@ -109,6 +112,7 @@ class UndoChip(
             gone()
             return false
         }
+        this.aboveKeys = aboveKeys
         val row = row(message, undo)
         val to = place(row.layoutParams.width, row.layoutParams.height, aboveKeys)
         val shown = window
@@ -126,6 +130,23 @@ class UndoChip(
         } ?: shownMs
         anchor.postDelayed(timeout, shownFor)
         return true
+    }
+
+    /**
+     * Placed again where it shown now would go, at once: a steady one stays as keys are typed, and
+     * the floating code strip coming, going or growing under it would leave it over the code.
+     */
+    fun reposition() {
+        val shown = window?.takeIf { it.isShowing } ?: return
+        val row = row ?: return
+        // sliding in or to a new notice: placed again as that ends; going: let go
+        if (animator?.isRunning == true) return
+        val to = place(row.layoutParams.width, row.layoutParams.height, aboveKeys)
+        if (to.left == windowLeft && to.top == windowTop) return
+        slide = to.slide
+        windowLeft = to.left
+        windowTop = to.top
+        shown.update(windowLeft, windowTop, windowWidth, windowHeight)
     }
 
     /** A key typed, a word put in: put away as a tap would, unless [show] said steady or it is going already. */
@@ -188,7 +209,7 @@ class UndoChip(
         // so what has not slid out yet is cut off at its edge, as if from behind it
         val (fromX, fromY) = offset()
         box.alpha = 0f
-        animate(Motion.Medium.enter(motion()), Motion.Curve.Enter) { t ->
+        animate(Motion.Medium.enter(motion()), Motion.Curve.Enter, end = ::reposition) { t ->
             box.alpha = t
             box.translationX = fromX * (1 - t)
             box.translationY = fromY * (1 - t)
@@ -222,7 +243,7 @@ class UndoChip(
         val boxAlpha = box.alpha
         val boxX = box.translationX
         val boxY = box.translationY
-        animate(Motion.Short.enter(motion()), Motion.Curve.Move, end = { old?.let(box::removeView) }) { t ->
+        animate(Motion.Short.enter(motion()), Motion.Curve.Move, end = { old?.let(box::removeView); reposition() }) { t ->
             windowLeft = lerp(from.left, target.left, t)
             windowTop = lerp(from.top, target.top, t)
             windowWidth = lerp(from.width, target.width, t)

@@ -41,6 +41,7 @@ import org.fcitx.fcitx5.android.core.InputMethodEntry
 import org.fcitx.fcitx5.android.daemon.HostConnection
 import org.fcitx.fcitx5.android.daemon.HostDaemon
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
+import org.fcitx.fcitx5.android.input.preedit.CodeRowStyle
 import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.data.theme.ThemePreset
@@ -74,6 +75,12 @@ class KeyboardHarness(
     host: HostApi? = null,
     /** Each input method's keyboard (I1), [NINE_KEYS] pinyin's nine keys: set before the keyboard is made, put back at [close]; null leaves the preferences as they are. */
     keyboards: ImKeyboards.Chosen? = null,
+    /**
+     * 编码行: embedded, every test's baseline (OneDefaultPreferencesShadow), unless a test asks for the
+     * strip floating (the default since 0.5.1): set before the keyboard is made, put back at [close].
+     * Only a change is made: each one rebuilds the input view of every keyboard alive.
+     */
+    codeRow: CodeRowStyle = CodeRowStyle.Embedded,
 ) : AutoCloseable {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
@@ -83,8 +90,11 @@ class KeyboardHarness(
 
     private val keyboardsWere = keyboards?.let { AppPrefs.getInstance().keyboard.imKeyboards() }
 
+    private val codeRowWas = ThemeManager.prefs.codeRow.getValue().takeIf { it != codeRow }
+
     init {
         keyboards?.let(::setKeyboards)
+        codeRowWas?.let { ThemeManager.prefs.codeRow.setValue(codeRow) }
         val connection = host?.let { HarnessConnection(scope, it) } ?: FakeHostConnection(scope, api)
         HostDaemon.testConnection = { connection }
         // the seam is global: a harness that fails to build leaves it to no later test (no close() to call)
@@ -105,6 +115,7 @@ class KeyboardHarness(
             idle()
         } catch (e: Throwable) {
             keyboardsWere?.let(::setKeyboards)
+            codeRowWas?.let(ThemeManager.prefs.codeRow::setValue)
             HostDaemon.testConnection = null
             scope.cancel()
             throw e
@@ -622,6 +633,7 @@ class KeyboardHarness(
             rememberedAddresses.setValue("")
         }
         keyboardsWere?.let(::setKeyboards)
+        codeRowWas?.let(ThemeManager.prefs.codeRow::setValue)
         HostDaemon.testConnection = null
         scope.cancel()
     }

@@ -54,7 +54,8 @@ object UndoChipPlacement {
 
     /**
      * Docked: [top]'s place, across the middle of a window [windowWidth] wide. Up out of the
-     * keyboard, or down when it went below it.
+     * keyboard, or down when it went below it. [stripTop]: the floating code strip's top while it
+     * shows over the keyboard, which the chip goes above too.
      */
     fun docked(
         windowWidth: Int,
@@ -66,8 +67,10 @@ object UndoChipPlacement {
         gap: Int,
         belowBottom: Int? = null,
         bottomLimit: Int = Int.MAX_VALUE,
+        stripTop: Int? = null,
     ): Place {
-        val top = top(candidates, barTop, aboveTop, chipHeight, gap, belowBottom, bottomLimit)
+        val above = if (stripTop == null) aboveTop else minOf(aboveTop, stripTop)
+        val top = top(candidates, barTop, above, chipHeight, gap, belowBottom, bottomLimit)
         val below = candidates && belowBottom != null && top == belowBottom + gap
         return Place((windowWidth - chipWidth) / 2, top, if (below) Slide.Down else Slide.Up)
     }
@@ -78,9 +81,14 @@ object UndoChipPlacement {
      * the part of half the screen it is off by; the one off more wins, up and down on a tie, as
      * docked: a keyboard pinned to the top has it below, pinned left to its right, pinned right to
      * its left, low on the screen above. Where the chip does not fit (the screen's edge), the
-     * opposite side, then the other axis's; with no room anywhere, over the keyboard's top.
+     * opposite side, then the other axis's; with no room anywhere, over the keyboard's top. The
+     * floating code strip ([strip], while it shows) counts as part of the keyboard: never under the chip.
      */
-    fun floating(screen: Box, keyboard: Box, chipWidth: Int, chipHeight: Int, gap: Int): Place {
+    fun floating(screen: Box, board: Box, chipWidth: Int, chipHeight: Int, gap: Int, strip: Box? = null): Place {
+        val keyboard = if (strip == null) board else Box(
+            minOf(board.left, strip.left), minOf(board.top, strip.top),
+            maxOf(board.right, strip.right), maxOf(board.bottom, strip.bottom),
+        )
         val dx = off(keyboard.left + keyboard.right, screen.left + screen.right, screen.width)
         val dy = off(keyboard.top + keyboard.bottom, screen.top + screen.bottom, screen.height)
         val vertical = if (dy >= 0f) listOf(Slide.Up, Slide.Down) else listOf(Slide.Down, Slide.Up)

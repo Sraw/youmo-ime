@@ -22,6 +22,7 @@ import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.prefs.PinyinKeyboard
 import org.fcitx.fcitx5.android.data.prefs.ShuangpinKeyboard
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
+import org.fcitx.fcitx5.android.input.preedit.CodeRowStyle
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.engine.pinyin.ShuangpinScheme
 import org.fcitx.fcitx5.android.host.HostEvent
@@ -167,6 +168,8 @@ class LandscapeUatTest {
     @Test
     @Uat("LS-10")
     fun thePreviewSplitsToo() {
+        // the preview as shipped, the tests' baseline embedded (OneDefaultPreferencesShadow)
+        prefs.set(ThemeManager.prefs.codeRow, CodeRowStyle.Floating)
         val st = SettingsHarness().also { settings = it }
         st.open(SettingsRoute.Theme)
         fun gs() = KeyboardHarness.all(st.activity.window.decorView).filterIsInstance<TextKeyView>()
