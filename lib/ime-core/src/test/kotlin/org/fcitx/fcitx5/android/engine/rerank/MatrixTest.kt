@@ -53,6 +53,23 @@ class MatrixTest {
     }
 
     @Test
+    fun floatsGiveRowMajorDotsToTheBit() {
+        // a large table and small ones, columns short of a multiple of the eight sums
+        for ((rows, columns) in listOf(3 to 12, 1100 to 17, 600 to 192)) {
+            val f = FloatArray(rows * columns) { random.nextGaussian().toFloat() }
+            val x = FloatArray(columns) { random.nextGaussian().toFloat() }
+            val m = Matrix.of(rows, columns, f)
+            val y = FloatArray(rows)
+            m.times(x, y)
+            for (r in 0 until rows) {
+                val expected = dotF(f, columns, x, r)
+                assertEquals("$rows × $columns, row $r", expected.toRawBits(), y[r].toRawBits())
+                assertEquals("$rows × $columns, row $r", expected.toRawBits(), m.dot(x, r).toRawBits())
+            }
+        }
+    }
+
+    @Test
     fun int8IsMultipliedByItsKernelAndFloatsAreAlreadyUnpacked() {
         val w = weights(2, 5)
         val asked = ArrayList<Pair<Int, Int>>()
