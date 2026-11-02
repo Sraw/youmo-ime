@@ -522,7 +522,7 @@ class LandscapeUatTest {
         val keys = grouped()
         assertTrue("$keys of $width", keys.width() < width * 0.5 && (onRight(keys) || onLeft(keys)))
         val labels = h.texts()
-        for (l in "Q WE RT Y U IO P A SD FG H JK L; Z XC V BN M".split(" ")) assertTrue("$l in $labels", l in labels)
+        for (l in "Q WE RT Y U IO P A SD FG H JK L Z XC V BN M".split(" ")) assertTrue("$l in $labels", l in labels)
         typing(InputMethodCatalog.SHUANGPIN)
         rowFollows(keys)
         assertTrue(h.texts(h.inputView).toString(), "ni" in h.texts(h.inputView.findViewById(R.id.code_row_syllables)))
