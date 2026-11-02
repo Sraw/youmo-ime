@@ -573,7 +573,7 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
     private fun showNotLearned() {
         val (info, flags) = field ?: return
         val reasons = NotLearned.of(
-            password = flags.has(CapabilityFlag.Password),
+            password = CapabilityFlags.isPassword(info),
             sensitive = flags.hasAny(CapabilityFlag.PasswordOrSensitive),
             ownApp = FieldPolicy.ownApp(info.packageName, context.packageName),
             learnFlags = FieldPolicy.learnFlags(info.toEditorTraits()),

@@ -7,6 +7,7 @@ package org.fcitx.fcitx5.android.input
 import android.view.View
 import android.widget.TextView
 import org.fcitx.fcitx5.android.FcitxApplication
+import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.core.KotlinHost
 import org.fcitx.fcitx5.android.core.ScriptedEngine
@@ -58,8 +59,12 @@ class KotlinHostKeyboardTest {
             activateIme(im)
         }
         until("$im active") { fcitx.inputMethodEntryCached.uniqueName == im }
-        h.idle()
-        h.relayout()
+        // the keyboard follows on the main thread once the host has told it: on a loaded runner the
+        // one made before (no input method yet, its space "(Not Available)") was still up (ST-22's QW not found)
+        until("$im's keyboard", { "${h.texts()}" }) {
+            h.relayout()
+            h.service.getString(R.string._not_available_) !in h.texts()
+        }
     }
 
     @After

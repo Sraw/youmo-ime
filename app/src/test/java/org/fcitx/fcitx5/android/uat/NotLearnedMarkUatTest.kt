@@ -145,6 +145,13 @@ class NotLearnedMarkUatTest {
         val h = keyboard()
         h.start(InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_URI)
         assertEquals(h.s(R.string.not_learned_no_pairs), h.held())
+        h.start(InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS)
+        assertEquals(h.s(R.string.not_learned_no_pairs), h.held())
+        // its characters shown, still a password: only Sensitive among the flags, the password told by the field
+        h.start(InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD)
+        assertEquals(h.s(R.string.not_learned_password), h.held())
+        h.start(imeOptions = EditorInfo.IME_FLAG_NO_PERSONALIZED_LEARNING)
+        assertEquals(h.s(R.string.not_learned_app_asks), h.held())
         h.start(InputType.TYPE_CLASS_NUMBER)
         assertEquals(h.s(R.string.not_learned_no_pairs), h.held())
         h.start(packageName = h.service.packageName)
