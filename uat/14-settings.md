@@ -244,3 +244,22 @@
 - **操作**：点 🔍，输入「连按选字母」，点 **输入法 → 拼音** 下的那条结果；返回，搜「邮箱后缀」，点结果。
 - **预期**：第一条打开拼音页，闪一下 **键盘** 那一行（选成九键才有这一项）。第二条打开 **通用输入 → 网址和邮箱**，闪一下 **邮箱后缀**。
 - **JVM**：`SettingsIndexTest.aNineKeysSettingFoundAlsoNamesTheKeyboardRowThatShowsIt`（搜到的九键设置带着显示它的「键盘」一行）、`SearchHighlightTest.aHiddenSettingPointsAtTheRowThatShowsIt`（藏着的设置闪的是显示它的那一行）、`SettingsMenuUatTest.searchingFindsTheNineKeysAndTheAddressRows`（两次搜索点结果后打开的页和闪的行）；设备上不跑。
+
+### ST-48 [P0] 编码行浮在键盘上方：打字时出现，点得到，浮条外点到应用
+- **前提**：B0-设置（新装，**外观 → 大小与样式 → 编码行** 是默认的「浮在键盘上方」）。
+- **操作**：回测试页点「普通文本」框，没打字时看键盘顶；点 n i h a o，看拼音显示在哪；点浮条上 ni 和 hao 之间；点浮条正上方 20dp、浮条右边 20dp 的网页空白处；按空格上屏后再点原来浮条的位置。亮色、暗色主题各看一次全拼、14 键、九键、双拼 18 键。
+- **预期**：没打字时键盘顶就是工具栏顶，没有空着的编码行。打字时拼音在一小条里，贴在候选栏左上角外面，盖在网页上，宽度跟着字，上边两个角圆，底色和候选栏一样、略透明；网页本身没有跳动。点浮条中间光标移到那里。浮条外面（上方、右边）点到的是网页。上屏后浮条消失，原来的位置点到网页。
+- **JVM**：`FloatingCodeStripUatTest.theStripComesWithTheFirstKeyAndGoesWithTheCode`（出现、位置、24dp、消失）、`aTapOnTheStripPutsTheCursorInTheCode`（点浮条移光标）、`dockedTheStripTakesTouchesAndTheAppTheRest`（应用排到键盘顶为止；触摸区是键盘加浮条，浮条上方、右边不在里面；浮条消失后回到整块）、`theStripOnEachKeyboardLightAndDark`（截图）。
+- **设备**：浮条的点按真的到了输入法窗口、浮条外的点按到了应用（触摸区，`dumpsys input` 里输入法窗口的 touchableRegion）。
+
+### ST-49 [P1] 浮条里有音节条；换键盘时键盘高度不变
+- **前提**：B0-14键。
+- **操作**：点 BN UI，看浮条；点浮条右边的 ni；换到拼音全键盘、九键，各打几个键，量键盘总高；**编码行** 改成「嵌在键盘里」再量。
+- **预期**：浮条 32dp 高，拼音在左、音节在右，点音节定下它。全键盘、14 键键盘总高一样（工具栏顶到键盘底），比嵌在键盘里时矮 18dp（14 键矮 32dp），按键本身不变高。九键的浮条只有拼音（24dp），音节在左边那一列。
+- **JVM**：`FloatingCodeStripUatTest.theSyllablesAreInTheStripBesideTheCode`、`theKeyboardIsAsHighOnEveryKeyboardAndLowerThanEmbedded`；嵌在键盘里的高度见 ST-41。
+
+### ST-50 [P1] 浮条跟着单手、悬浮的键盘
+- **前提**：B0-设置。
+- **操作**：开 **单手模式**（靠右），点 n i；关掉单手，开 **悬浮键盘**，点 n i；把悬浮键盘拖到屏幕最上面，再点 n i。
+- **预期**：单手时浮条左边对齐键盘左边（不是屏幕左边）。悬浮时浮条贴在悬浮键盘左上角外面，点得到；拖到最上面时浮条在键盘下边外面，下边两个角圆。拖动中浮条先藏起来，停下后出现。
+- **JVM**：`FloatingCodeStripUatTest.oneHandedTheStripIsAtTheBoardsLeft`、`floatingTheStripIsOutsideTheKeyboardAndUnderItAtTheTop`（位置、触摸区、截图）；设备上不跑。

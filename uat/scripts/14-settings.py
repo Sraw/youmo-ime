@@ -499,3 +499,36 @@ case("ST-45", needs="jvm:SettingsUatTest.theNineKeysSettingsAreASectionOfEachKey
 case("ST-46", needs="jvm:SettingsUatTest.glideTypingAndStrokeFilterTurnEachOtherOff")(lambda d: None)
 
 case("ST-47", needs="jvm:SettingsMenuUatTest.searchingFindsTheNineKeysAndTheAddressRows")(lambda d: None)
+
+
+@case("ST-48")
+def st48(d):
+    # the strip's touches: the IME window's touchable region holds it, and not the app's room above
+    # or beside it; the rest of the case (where it is, a tap moving the cursor) is the JVM's
+    d.type("nihao")
+    s = d.screen()
+    row = d.code_row(s)
+    check(row is not None, "打字时没有编码行")
+    x0, y0, x1, y1 = row.b
+    kb = s.find(rid="keyboard_view", where="ime")
+    check(kb is None or y1 <= kb.b[1] + 2, f"浮条 {row.b} 不在键盘 {kb.b if kb else None} 上面")
+    region = d.ime_touchable_region()
+    gap = int(20 * d.dpx())
+    inside = region_has(region, (x0 + x1) // 2, (y0 + y1) // 2)
+    above = region_has(region, (x0 + x1) // 2, y0 - gap)
+    beside = region_has(region, x1 + gap, (y0 + y1) // 2)
+    d.clear()
+    after = region_has(d.ime_touchable_region(), (x0 + x1) // 2, (y0 + y1) // 2)
+    check(inside and not above and not beside and not after,
+          f"浮条上 {inside}，上方 {above}，右边 {beside}，消失后 {after}")
+    return f"浮条 {row.b}，触摸区只在浮条和键盘"
+
+
+def region_has(rects, x, y):
+    return any(a <= x < c and b <= y < e for a, b, c, e in rects)
+
+
+case("ST-49", needs="jvm:FloatingCodeStripUatTest.theSyllablesAreInTheStripBesideTheCode、FloatingCodeStripUatTest.theKeyboardIsAsHighOnEveryKeyboardAndLowerThanEmbedded")(lambda d: None)
+
+
+case("ST-50", needs="jvm:FloatingCodeStripUatTest.oneHandedTheStripIsAtTheBoardsLeft、FloatingCodeStripUatTest.floatingTheStripIsOutsideTheKeyboardAndUnderItAtTheTop")(lambda d: None)
