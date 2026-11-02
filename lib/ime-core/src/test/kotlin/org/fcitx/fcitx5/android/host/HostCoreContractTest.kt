@@ -631,6 +631,24 @@ class HostCoreContractTest {
     }
 
     @Test
+    fun `an app unbound clears the panel its focus out dropped, before no context is active`() {
+        // a switch from recents unbinds the app before its field finishes: deactivate, not a focus out, ends its input
+        val core = core()
+        core.open()
+        fake.answer = { _, e, _ -> if (e == EngineEvent.CHAR) snap(preedit = "ni", candidates = listOf("你")) else snap() }
+        core.press('n')
+        // a reset with nothing on show answers unhandled: the new field's empty panel is not sent again
+        fake.answer = { _, _, _ -> snap(handled = false) }
+        val log = core.log()
+        core.deactivate(1)
+        core.activate(2)
+        core.focus(false)
+        core.focus(true)
+        assertEquals("", log.filterIsInstance<HostEvent.InputPanel>().last().preedit.toString())
+        assertEquals(0, log.filterIsInstance<HostEvent.Candidates>().last().total)
+    }
+
+    @Test
     fun `without ClientUnfocusCommit the client preedit is committed on focus out`() {
         // fcitx/instance.cpp:1131-1139
         val core = core()
