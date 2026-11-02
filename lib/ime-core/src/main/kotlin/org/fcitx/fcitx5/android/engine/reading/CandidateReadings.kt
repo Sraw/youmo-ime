@@ -32,7 +32,13 @@ class WordReading(val text: String, val word: Int, val syllables: IntArray)
  * model first, each read the likeliest way the dictionary has it, a character left over alone. Asked
  * for only while [style] is not [ReadingStyle.OFF].
  */
-class CandidateReadings(private val data: PinyinData, private val table: ReadingTable, charReadings: () -> Map<Int, IntArray>) {
+class CandidateReadings(
+    private val data: PinyinData,
+    private val table: ReadingTable,
+    // traditional text (仓颉's, handwriting's) to simplified, a character at a time: the dictionary's (說 as 说)
+    private val simplify: (String) -> String = { it },
+    charReadings: () -> Map<Int, IntArray>,
+) {
 
     private val predictor = Predictor(data.model, data.vocabulary, data.dictionary, charReadings = charReadings)
     private val charReadings by lazy(LazyThreadSafetyMode.NONE, charReadings)
@@ -40,7 +46,7 @@ class CandidateReadings(private val data: PinyinData, private val table: Reading
     /** [text] written out as [style] has it, [words] how its session read it if it knows; empty if nothing of it is shown. */
     fun of(text: String, style: ReadingStyle, words: List<WordReading>? = null): List<String> {
         if (style == ReadingStyle.OFF || text.none { Character.isIdeographic(it.code) || it.isSurrogate() }) return emptyList()
-        val read = words?.takeIf { w -> w.joinToString("") { it.text } == text } ?: byText(text)
+        val read = words?.takeIf { w -> w.joinToString("") { it.text } == text } ?: byText(simplify(text).takeIf { it.length == text.length } ?: text)
         val out = ArrayList<String>(text.length)
         for (w in read) {
             val tones = table.tones(w.text, w.syllables, w.word)
@@ -53,9 +59,40 @@ class CandidateReadings(private val data: PinyinData, private val table: Reading
                 at += Character.charCount(cp)
                 i++
             }
+            if (erhua(w)) out[out.size - 1] = if (style == ReadingStyle.ZHUYIN) ERHUA_ZHUYIN else ERHUA_PINYIN
         }
         return if (out.all { it.isEmpty() }) emptyList() else out
     }
+
+    /**
+     * A pinyin hint of [text] (a misreading's true "jué sè", a part's or a stroke lookup's "hao") as one reading
+     * a character, written as [style] has it (pinyin while 候选词注音 is off): the hint's own tones where it has
+     * them, else its syllables with the tones they have in [text], toneless where none is known; empty if [text]
+     * is not all Han or [hint] is no syllable a character (an emoji's name stays a hint).
+     */
+    fun ofHint(text: String, hint: String, style: ReadingStyle = ReadingStyle.PINYIN): List<String> {
+        if (hint.isBlank() || !text.codePoints().allMatch(Character::isIdeographic)) return emptyList()
+        val parts = hint.trim().split(' ')
+        if (parts.size != text.codePointCount(0, text.length) || parts.any { p -> p.isEmpty() || !p.all(Char::isLetter) }) return emptyList()
+        val toned = parts.any { p -> p.any { it.code > ASCII } }
+        val ids = IntArray(parts.size) { Syllables.id(if (toned) ToneMark.parse(parts[it])?.first.orEmpty() else parts[it]) }
+        if (style == ReadingStyle.PINYIN || ids.any { it < 0 }) return if (toned || ids.any { it < 0 }) parts else ofSyllables(text, parts, ids)
+        // zhuyin: each syllable's symbols, in the hint's tone or the character's
+        val known = if (toned) null else table.tones(text, ids)
+        val tones = IntArray(ids.size) { if (toned) ToneMark.parse(parts[it])?.second ?: ToneMark.NONE else known?.get(it)?.toInt() ?: ToneMark.NONE }
+        return ids.mapIndexed { i, id -> Zhuyin.of(id)?.let { ToneMark.zhuyin(it, tones[i]) }.orEmpty() }
+    }
+
+    // [parts], toneless syllables of [text], with the tones they have in it where known
+    private fun ofSyllables(text: String, parts: List<String>, ids: IntArray): List<String> {
+        val read = of(text, ReadingStyle.PINYIN, listOf(WordReading(text, -1, ids)))
+        return parts.mapIndexed { i, p -> read.getOrNull(i)?.ifEmpty { null } ?: p }
+    }
+
+    // a word's last 儿 read er, 儿化 (哪儿 nǎr, written nǎ r; ㄦ with no ˙, as Taiwan's textbooks): not a word
+    // whose 儿 is a child (女儿 nǚ ér)
+    private fun erhua(w: WordReading): Boolean =
+        w.text.length > 1 && w.text.last() == '儿' && w.syllables.last().let { it == ER || it == R } && w.text !in CHILD
 
     private fun written(syllable: Int, tone: Int, style: ReadingStyle): String = when (style) {
         ReadingStyle.ZHUYIN -> Zhuyin.of(syllable)?.let { ToneMark.zhuyin(it, tone) }.orEmpty()
@@ -94,6 +131,17 @@ class CandidateReadings(private val data: PinyinData, private val table: Reading
     companion object {
         // the longest word looked for in a candidate's text, in chars
         private const val MAX_WORD = 8
+        private const val ASCII = 0x7f
+        private val ER = Syllables.id("er")
+        private val R = Syllables.id("r")
+        private const val ERHUA_PINYIN = "r"
+        private const val ERHUA_ZHUYIN = "ㄦ"
+
+        // words ending in 儿 that is a child or a son, read ér
+        private val CHILD = setOf(
+            "女儿", "婴儿", "幼儿", "孤儿", "男儿", "胎儿", "宠儿", "患儿", "健儿", "少儿", "弃儿", "育儿",
+            "新生儿", "早产儿", "混血儿", "低能儿", "娇儿", "妻儿", "生儿",
+        )
 
         // a syllable no character has a tone for: the Latin letter A, which no Han character reads as
         private val UNREAD = Syllables.id("A")

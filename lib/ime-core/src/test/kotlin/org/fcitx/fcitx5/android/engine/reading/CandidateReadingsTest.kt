@@ -84,4 +84,35 @@ class CandidateReadingsTest {
         assertEquals(ReadingStyle.OFF, ReadingStyle.of(null))
         assertEquals(ReadingStyle.OFF, ReadingStyle.of("x"))
     }
+
+    @Test
+    fun aHintIsOneReadingACharacterWithItsTones() {
+        // a misreading's, toned already
+        assertEquals(listOf("jué", "sè"), readings.ofHint("角色", "jué sè"))
+        // a stroke lookup's or a part's: the syllable as hinted, with its tone in the character
+        assertEquals(listOf("háng"), readings.ofHint("行", "hang"))
+        assertEquals(listOf("xíng"), readings.ofHint("行", "xing"))
+        // no tone known, or no syllable: as hinted
+        assertEquals(listOf("he"), readings.ofHint("𠀀", "he"))
+        assertEquals(listOf("hm"), readings.ofHint("你", "hm"))
+        // in zhuyin: the hint's tones, or the character's
+        assertEquals(listOf("ㄅㄛ", "ㄖㄜˇ"), readings.ofHint("般若", "bō rě", ReadingStyle.ZHUYIN))
+        assertEquals(listOf("ㄒㄧㄥˊ"), readings.ofHint("行", "xing", ReadingStyle.ZHUYIN))
+        assertEquals(listOf("ㄏㄜ"), readings.ofHint("𠀀", "he", ReadingStyle.ZHUYIN))
+    }
+
+    @Test
+    fun whatIsNoReadingOfEachCharacterStaysAHint() {
+        assertEquals(emptyList<String>(), readings.ofHint("你", ""))
+        assertEquals(emptyList<String>(), readings.ofHint("😀", "smile"))
+        assertEquals(emptyList<String>(), readings.ofHint("你A", "ni a"))
+        assertEquals(emptyList<String>(), readings.ofHint("银行", "yinhang"))
+        assertEquals(emptyList<String>(), readings.ofHint("你", "~ni"))
+    }
+
+    @Test
+    fun traditionalTextIsReadAsItsSimplified() {
+        val r = CandidateReadings(data, data.tones, { it.replace('銀', '银') }) { Predictor.charReadingsOf(data.dictionary, data.vocabulary) }
+        assertEquals(listOf("yín", "háng"), r.of("銀行", ReadingStyle.PINYIN))
+    }
 }

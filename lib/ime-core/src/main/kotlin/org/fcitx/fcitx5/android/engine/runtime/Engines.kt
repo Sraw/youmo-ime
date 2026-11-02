@@ -365,7 +365,10 @@ class Engines(
     }
 
     // 候选词注音 of the reading for each candidate shown; made at the first asked for
-    private val candidateReadings by lazy(LazyThreadSafetyMode.NONE) { CandidateReadings(assets.pinyinData, assets.pinyinData.tones) { assets.charSyllables } }
+    private val candidateReadings by lazy(LazyThreadSafetyMode.NONE) {
+        val simplified by lazy(LazyThreadSafetyMode.NONE, simplifier)
+        CandidateReadings(assets.pinyinData, assets.pinyinData.tones, { simplified.simplify(it) }) { assets.charSyllables }
+    }
 
     // the session [im]'s candidates are of, if they are any 候选词注音 reads: not English's
     private fun annotatedSession(im: String): Session? =
@@ -377,12 +380,29 @@ class Engines(
      * a table's (what is left of its code) stay.
      */
     private fun annotated(im: String, s: Snapshot): Snapshot {
+        if (settings.candidateReading == ReadingStyle.OFF) return hintsAbove(im, s)
         val session = annotatedSession(im) ?: return s
         if (s.candidates.isEmpty()) return s
         val style = settings.candidateReading
-        val readings = s.candidates.mapIndexed { i, text -> candidateReadings.of(text, style, session.readingOf(s.first + i)) }
+        val readings = s.candidates.mapIndexed { i, text ->
+            // a hint is the true reading (角色 typed jiaose: jué sè, not as typed)
+            hintAbove(text, if (im in pairs) s.hints.getOrElse(i) { "" } else "", style).ifEmpty { candidateReadings.of(text, style, session.readingOf(s.first + i)) }
+        }
         return s.copy(readings = readings, hints = if (im in pairs) emptyList() else s.hints)
     }
+
+    /**
+     * [s] with pinyin's and 双拼's hints, readings, as readings while 候选词注音 is off: drawn above the
+     * candidate as the setting's pinyin is, in the bar's height (the user, 2026-11-02); others' stay hints.
+     */
+    private fun hintsAbove(im: String, s: Snapshot): Snapshot {
+        if (im !in pairs || s.hints.none { it.isNotEmpty() }) return s
+        val readings = s.candidates.mapIndexed { i, text -> hintAbove(text, s.hints.getOrElse(i) { "" }) }
+        return s.copy(readings = readings, hints = s.hints.mapIndexed { i, h -> if (readings.getOrNull(i).isNullOrEmpty()) h else "" })
+    }
+
+    private fun hintAbove(text: String, hint: String, style: ReadingStyle = ReadingStyle.PINYIN): List<String> =
+        if (hint.isEmpty()) emptyList() else candidateReadings.ofHint(text, hint, style)
 
     private fun keyboard(im: String): Keyboard = keyboards[im] ?: Keyboard(session(im), nineKeys = im in KeyboardPair.KEYED).also {
         keyboards[im] = it
@@ -509,10 +529,14 @@ class Engines(
     /** Candidates of [im]'s input, from the [from]th, at most [count]; none if it has no session yet. */
     fun candidates(im: String, from: Int, count: Int): List<Choice> = checked {
         val choices = sessions[pairs.shownSession(im)]?.candidates(from, count).orEmpty()
+        if (settings.candidateReading == ReadingStyle.OFF && im in pairs) {
+            return@checked choices.map { c -> hintAbove(c.text, c.hint).let { r -> if (r.isEmpty()) c else Choice(c.text, "", r) } }
+        }
         val session = annotatedSession(im) ?: return@checked choices
         val style = settings.candidateReading
         choices.mapIndexed { i, c ->
-            Choice(c.text, if (im in pairs) "" else c.hint, candidateReadings.of(c.text, style, session.readingOf(from + i)))
+            val hint = if (im in pairs) c.hint else ""
+            Choice(c.text, c.hint.takeIf { im !in pairs }.orEmpty(), hintAbove(c.text, hint, style).ifEmpty { candidateReadings.of(c.text, style, session.readingOf(from + i)) })
         }
     }
 

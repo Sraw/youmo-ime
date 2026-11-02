@@ -474,7 +474,8 @@ class EnginesTest : EnginesFixture() {
         val s = engines.type(InputMethodCatalog.PINYIN, "uz")
         assertEquals("u乛", s.preedit)
         assertEquals(listOf("好"), s.candidates)
-        assertEquals("hao", engines.candidates(InputMethodCatalog.PINYIN, 0, 1).single().hint)
+        // its pinyin above it, with its tone (候选词注音 off: a hint's reading, EnginesReadingsTest)
+        assertEquals(listOf("hǎo"), engines.candidates(InputMethodCatalog.PINYIN, 0, 1).single().readings)
         assertEquals("好", engines.onEvent(InputMethodCatalog.PINYIN, EngineEvent.CHAR, ' '.code).commit)
         // an app without the data: u is pinyin's, and that is reported
         strokes = null

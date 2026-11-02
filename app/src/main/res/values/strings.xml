@@ -618,7 +618,7 @@
     <string name="t9_symbols_reset_all_message">Put every key back to its default symbols?</string>
     <string name="t9_symbols_none_kept">None of those can be a symbol (a digit or a letter alone): the key is left as it was.</string>
     <string name="im_candidate_reading">Candidate readings</string>
-    <string name="im_candidate_reading_summary">Each character\'s reading on the candidates, with its tone</string>
+    <string name="im_candidate_reading_summary">Each character\'s reading on the candidates, with its tone; the bar gets taller and the candidates wider</string>
     <string name="im_candidate_reading_off">Off</string>
     <string name="im_candidate_reading_pinyin">Pinyin</string>
     <string name="im_candidate_reading_zhuyin">Zhuyin</string>

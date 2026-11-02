@@ -17,6 +17,7 @@ import org.fcitx.fcitx5.android.engine.phrase.Chaizi
 import org.fcitx.fcitx5.android.engine.phrase.EmojiData
 import org.fcitx.fcitx5.android.engine.pinyin.Syllables
 import org.fcitx.fcitx5.android.engine.platform.UserFiles
+import org.fcitx.fcitx5.android.engine.data.Misreadings
 import org.fcitx.fcitx5.android.engine.rerank.TinyModel
 import org.fcitx.fcitx5.android.engine.stroke.Strokes
 import org.junit.Assert.assertEquals
@@ -41,7 +42,16 @@ open class EnginesFixture {
         .charTone('拟'.code, Syllables.id("ni"), 3)
         .charTone('好'.code, Syllables.id("hao"), 3)
         .charTone('好'.code, Syllables.id("hao"), 4)
-        .build()
+        // a word often misread (Misreadings): under its true reading and, weighed down, its misreading
+        .unigram("角色", -3f, 0f)
+        .entry("角色", syl("jue", "se"))
+        .entry("角色", syl("jiao", "se"), Misreadings.WEIGHT)
+        .unigram("角", -4f, 0f).entry("角", syl("jiao")).entry("角", syl("jue"))
+        .unigram("色", -4f, 0f).entry("色", syl("se"))
+        .charTone('角'.code, Syllables.id("jue"), 2)
+        .charTone('角'.code, Syllables.id("jiao"), 3)
+        .charTone('色'.code, Syllables.id("se"), 4)
+        .build(mapOf(Misreadings.META_PREFIX + "角色" to Misreadings.meta(Misreadings("角色", "jué sè", listOf("jiao'se")))))
         .toByteArray()
 
     private val wubi = CodeTable.Builder()

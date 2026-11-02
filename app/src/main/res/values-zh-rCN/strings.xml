@@ -601,7 +601,7 @@
     <string name="t9_symbols_reset_all_message">把所有键的长按符号恢复成默认？</string>
     <string name="t9_symbols_none_kept">填的都是单个的数字或字母，不能做符号，这个键没有改。</string>
     <string name="im_candidate_reading">候选词注音</string>
-    <string name="im_candidate_reading_summary">在候选词的每个字上标出读音和声调</string>
+    <string name="im_candidate_reading_summary">在候选词的每个字上标出读音和声调；候选栏会变高、候选词变宽</string>
     <string name="im_candidate_reading_off">关闭</string>
     <string name="im_candidate_reading_pinyin">拼音</string>
     <string name="im_candidate_reading_zhuyin">注音符号</string>

@@ -9,6 +9,7 @@ import org.fcitx.fcitx5.android.engine.InputMethodCatalog.PINYIN
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog.WUBI
 import org.fcitx.fcitx5.android.engine.phrase.Chaizi
 import org.fcitx.fcitx5.android.engine.reading.ReadingStyle
+import org.fcitx.fcitx5.android.engine.session.Choice
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -24,13 +25,41 @@ class EnginesReadingsTest : EnginesFixture() {
         Engines(::load, null, warmUps = inPlace).apply { this.settings = settings.copy(candidateReading = style) }
 
     @Test
-    fun offShowsNoneAndKeepsTheHints() {
+    fun offShowsNoneButTheHintsAboveTheCandidates() {
         val e = engines(ReadingStyle.OFF)
         assertEquals(emptyList<List<String>>(), e.type(PINYIN, "ni").readings)
         assertTrue(e.candidates(PINYIN, 0, 2).all { it.readings.isEmpty() })
-        // the stroke lookup shows each character's reading as its hint
+        // the stroke lookup's hint of each character's reading: a reading above it, no hint beside
         val strokes = engines(ReadingStyle.OFF).type(PINYIN, "upsnp")
-        assertTrue(strokes.toString(), strokes.hints.any { it.isNotEmpty() })
+        val at = strokes.candidates.indexOf("你")
+        assertEquals(strokes.toString(), listOf("nǐ"), strokes.readings[at])
+        assertEquals("", strokes.hints[at])
+        val listed = engines(ReadingStyle.OFF).run { type(PINYIN, "upsnp"); candidates(PINYIN, 0, 10) }.single { it.text == "你" }
+        assertEquals(Choice("你", "", listOf("nǐ")), listed)
+        // a part's
+        val parts = engines(ReadingStyle.OFF).type(PINYIN, "unvzi")
+        assertEquals(parts.toString(), listOf("hǎo"), parts.readings[parts.candidates.indexOf("好")])
+    }
+
+    @Test
+    fun aWordTypedByItsMisreadingIsAnnotatedWithItsTrueReading() {
+        for ((style, want) in listOf(ReadingStyle.OFF to listOf("jué", "sè"), ReadingStyle.PINYIN to listOf("jué", "sè"), ReadingStyle.ZHUYIN to listOf("ㄐㄩㄝˊ", "ㄙㄜˋ"))) {
+            val e = engines(style)
+            val s = e.type(PINYIN, "jiaose")
+            val at = s.candidates.indexOf("角色")
+            assertEquals("$style $s", want, s.readings[at])
+            assertEquals("", s.hints.getOrElse(at) { "" })
+            assertEquals(want, e.candidates(PINYIN, 0, 10).single { it.text == "角色" }.readings)
+        }
+        // typed by its true reading: as typed, no hint
+        assertEquals(listOf("jué", "sè"), engines(ReadingStyle.PINYIN).type(PINYIN, "juese").let { it.readings[it.candidates.indexOf("角色")] })
+        assertTrue(engines(ReadingStyle.OFF).type(PINYIN, "juese").readings.all { it.isEmpty() })
+    }
+
+    @Test
+    fun offATablesHintsStay() {
+        val off = engines(ReadingStyle.OFF, wubiShown).type(WUBI, "vbg")
+        assertTrue(off.readings.all { it.isEmpty() })
     }
 
     @Test

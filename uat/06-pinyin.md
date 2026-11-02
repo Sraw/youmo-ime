@@ -109,10 +109,10 @@
 - **预期**：zhagn 的候选第一页有「张」「章」；zhon 的有「中」；jv 的有「句」；nihso 的有「你好」。
 - **JVM**：`PinyinUatTest.pinyinTypedWrongStillGivesTheWord`（:lib:ime-eval:uatTest，真数据）；设备上不跑。
 
-### PY-18 [P1] 常读错的词按错的读音打，候选旁标出正确读音
+### PY-18 [P1] 常读错的词按错的读音打，候选上方标出正确读音
 - **前提**：B0。
 - **操作**：点 j i a o s e；清空，点 x x x u e z（简拼加半个字）。
-- **预期**：候选里有「角色」，旁边标着 jué sè；第二次候选里有「莘莘学子」的话，旁边标着 shēn shēn xué zǐ。
+- **预期**：候选里有「角色」，字的上方一字一音标着 jué sè；第二次候选里有「莘莘学子」的话，上方标着 shēn shēn xué zǐ。
 - **JVM**：`PinyinUatTest.aWordOftenMisreadShowsItsReading`（:lib:ime-eval:uatTest，真数据）；设备上不跑。
 
 ### PY-19 [P1] 开关关掉生效：纠错、中英混输、联想、表情候选、拆字
@@ -149,7 +149,7 @@
 ### PY-24 [P1] u 开头按笔画查字
 - **前提**：B0。
 - **操作**：点 u h s p。
-- **预期**：候选里有「才」「本」「村」等，候选旁显示读音。
+- **预期**：候选里有「才」「本」「村」等，字的上方标着带声调的读音。
 - **JVM**：`PinyinUatTest.uThenStrokes`（:lib:ime-eval:uatTest，真数据）；设备上不跑。
 
 ## 联想
@@ -248,7 +248,7 @@
 ### PY-44 [P1] 拆字：u 后打各部分的拼音
 - **前提**：B0。
 - **操作**：点 u n i u n i u n i u；看候选；点 ⌫ 删光，点 u j i n j i n j i n。
-- **预期**：第一串的候选最前面是「犇」，旁边显示读音；第二串最前面是「鑫」。
+- **预期**：第一串的候选最前面是「犇」，上方标着读音；第二串最前面是「鑫」。
 - **JVM**：`PinyinUatTest.chaiziByTheParts`（:lib:ime-eval:uatTest，真数据）；设备上不跑。
 
 ### PY-45 [P1] 拆字开着时，不是部件的照常当拼音
@@ -485,3 +485,9 @@
 - **操作**：看键盘；点 N（BN 键）I（IO 键）H（H 键）A（A 键）O（IO 键），看编码行和候选；点「你好」。
 - **预期**：三行键：`Q WE RT Y U IO P` / `A SD FG H JK L;` / `分词 Z XC V BN M ⌫`（和双拼 18 键同一套分组，拼音的 L 键只写 L，长按也没有 `;` `:`；角标和别的键一样，打中文时显示中文标点，读屏读出 L 和角标；从 L 起笔滑行照样算在键上），键面大写；编码行 32dp，右边有音节条；候选第一页有「你好」，点了框里是「你好」，没有私用区字符。双拼的键盘不受影响，仍是自己选的那个。
 - **JVM**：`ImKeyboardsUatTest.pinyinsEighteenKeysShowTheGroupsAndSendTheirOwnCodes`（键面是 G18 的分组，BN 发拼音 18 键自己的码不是双拼的，编码行 32dp，双拼仍是全键盘；图）、`GroupedKeyboardTest.talkBackReadsAGroupLetterByLetterWithItsCorner`（L 键也是分组键：角标、读屏、起笔）、`EnginesImKeyboardsTest`（ime-core：拼音 18 键的码进拼音、打出你好）；准确率见 dev/m2/i1-report.md（ime-eval `t9 --keys 18`）；设备上不跑。
+
+### PY-106 [P1] 读音提示标在字上方，候选栏不变高
+- **前提**：B0，**候选词注音** 是「关闭」。
+- **操作**：点 j i a o s e，看候选栏；清空，点 u n v z i；清空，把 **候选字号** 依次调成最小、最大，各打一次 j i a o s e；横屏再打一次；打开悬浮候选窗再打一次。
+- **预期**：「角色」字的上方标着 jué sè，字体、颜色、居中和拼音注音一样，只是字小一些；它和旁边没有提示的候选字在同一条水平线上；候选栏的高度和不打字时一样，提示出现、消失时栏不跳。拆字出的「好」上方标 hǎo。字号最小时提示不小于 7sp，可能略碰到字顶。悬浮窗里每个候选一样高。码表的编码提示仍在候选右边。
+- **JVM**：`CandidateHintsUatTest`（栏高、和旁边候选的基线一样、悬浮窗候选同高；浅色深色、竖屏横屏、14/20/28sp 的图）、`EnginesReadingsTest.offShowsNoneButTheHintsAboveTheCandidates`（ime-core：笔画、拆字的提示变成读音）、`CandidateReadingsTest.aHintIsOneReadingACharacterWithItsTones`、`CandidateBarHeightTest.aHintsReadingFillsTheRoomBetweenItsBounds`；设备上不跑。

@@ -22,13 +22,23 @@ import kotlin.math.min
  * centred above it, the character widened where the pinyin is wider; zhuyin upright to its right, the
  * symbols shrunk to fit the character's height, ˊˇˋ beside the last and ˙ over the first, as
  * Taiwan's textbooks print it.
+ *
+ * A hint's reading (候选词注音 off: a misreading's, a part's, a stroke lookup's; [hintSize] above 0) is
+ * pinyin too, but in the line's height: [hintSize] its text size ([CandidateBarHeight.hintSize]), [hintRoom]
+ * what the view has above the baseline, so the candidate stays where its neighbours are.
  */
-class ReadingSpan(private val reading: String, private val color: Int) : ReplacementSpan() {
+class ReadingSpan(
+    private val reading: String,
+    private val color: Int,
+    private val hintSize: Float = 0f,
+    private val hintRoom: Float = 0f
+) : ReplacementSpan() {
 
-    private val zhuyin = isZhuyin(reading)
+    private val hint = hintSize > 0f
+    private val zhuyin = !hint && isZhuyin(reading)
     private val small = TextPaint(Paint.ANTI_ALIAS_FLAG)
 
-    private fun small(paint: Paint, size: Float = paint.textSize * CandidateBarHeight.READING_SCALE): TextPaint = small.apply {
+    private fun small(paint: Paint, size: Float = if (hint) hintSize else paint.textSize * CandidateBarHeight.READING_SCALE): TextPaint = small.apply {
         set(paint)
         textSize = size
         color = this@ReadingSpan.color
@@ -36,9 +46,11 @@ class ReadingSpan(private val reading: String, private val color: Int) : Replace
 
     override fun getSize(paint: Paint, text: CharSequence, start: Int, end: Int, fm: Paint.FontMetricsInt?): Int {
         if (fm != null) {
-            paint.getFontMetricsInt(fm)
+            // the text's own fonts (a Han character's fallback is taller than the paint's): a line of it plain
+            // and one of it read are then the same height
+            paint.getFontMetricsInt(text, start, end - start, start, end - start, false, fm)
             // room above for the pinyin where the view lays out by lines (the floating window's)
-            if (!zhuyin) {
+            if (!zhuyin && !hint) {
                 val line = ceil(paint.textSize * CandidateBarHeight.READING_LINE).toInt()
                 fm.ascent -= line
                 fm.top -= line
@@ -60,7 +72,9 @@ class ReadingSpan(private val reading: String, private val color: Int) : Replace
             val size = width(paint, text, start, end)
             canvas.drawText(text, start, end, x + (size - w) / 2, y.toFloat(), paint)
             val p = small(paint)
-            canvas.drawText(reading, x + (size - p.measureText(reading)) / 2, y + paint.ascent() - p.descent(), p)
+            // a hint's: on the characters' tops, or lower where the view's top is nearer
+            val baseline = if (hint) max(y - paint.textSize * CandidateBarHeight.HAN_TOP - p.descent(), y - hintRoom - p.ascent()) else y + paint.ascent() - p.descent()
+            canvas.drawText(reading, x + (size - p.measureText(reading)) / 2, baseline, p)
             return
         }
         canvas.drawText(text, start, end, x, y.toFloat(), paint)
@@ -100,8 +114,11 @@ class ReadingSpan(private val reading: String, private val color: Int) : Replace
 
         fun isZhuyin(reading: String): Boolean = reading.any { it in 'ㄅ'..'ㄯ' }
 
-        /** [text] with a [ReadingSpan] on each code point [readings] has one for (one per code point; empty for none). */
-        fun annotate(builder: SpannableStringBuilder, text: String, readings: List<String>, color: Int) {
+        /**
+         * [text] with a [ReadingSpan] on each code point [readings] has one for (one per code point; empty for none);
+         * hints' readings with [hintSize] above 0, [hintRoom] as the span has them.
+         */
+        fun annotate(builder: SpannableStringBuilder, text: String, readings: List<String>, color: Int, hintSize: Float = 0f, hintRoom: Float = 0f) {
             val start = builder.length
             builder.append(text)
             if (readings.isEmpty()) return
@@ -110,11 +127,18 @@ class ReadingSpan(private val reading: String, private val color: Int) : Replace
             while (at < text.length) {
                 val n = Character.charCount(text.codePointAt(at))
                 readings.getOrNull(i)?.takeIf { it.isNotEmpty() }?.let {
-                    builder.setSpan(ReadingSpan(it, color), start + at, start + at + n, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+                    builder.setSpan(ReadingSpan(it, color, hintSize, hintRoom), start + at, start + at + n, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
                 }
                 at += n
                 i++
             }
+        }
+
+        /** A hint's reading size ([CandidateBarHeight.hintSize]) for text in [paint], [baseline] below the view's top. */
+        fun hintSize(paint: Paint, baseline: Float, floor: Float): Float {
+            val fm = paint.fontMetrics
+            val room = baseline - paint.textSize * CandidateBarHeight.HAN_TOP
+            return CandidateBarHeight.hintSize(paint.textSize, room, (fm.descent - fm.ascent) / paint.textSize, floor)
         }
 
         /** Whether [readings] are pinyin above the characters, which the candidate's view makes room for. */

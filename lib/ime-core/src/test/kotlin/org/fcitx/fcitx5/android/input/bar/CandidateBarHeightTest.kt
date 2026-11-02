@@ -29,4 +29,14 @@ class CandidateBarHeightTest {
         )
         for ((sp, style, dp) in table) assertEquals("$sp $style", dp, CandidateBarHeight.dp(sp, style))
     }
+
+    @Test
+    fun aHintsReadingFillsTheRoomBetweenItsBounds() {
+        // text 40 px, a line 1.2 of its size: 12 px of room fits 10 px, 30 px no more than half the text, 2 px the floor
+        assertEquals(10f, CandidateBarHeight.hintSize(40f, 12f, 1.2f, 7f), 1e-4f)
+        assertEquals(20f, CandidateBarHeight.hintSize(40f, 30f, 1.2f, 7f), 1e-4f)
+        assertEquals(7f, CandidateBarHeight.hintSize(40f, 2f, 1.2f, 7f), 1e-4f)
+        // a floor above half the text gives way to it
+        assertEquals(5f, CandidateBarHeight.hintSize(10f, 1f, 1.2f, 7f), 1e-4f)
+    }
 }
