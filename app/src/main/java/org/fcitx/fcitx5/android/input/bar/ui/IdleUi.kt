@@ -142,7 +142,7 @@ class IdleUi(
     /** The buttons [layout] places given the room at the right, the others nowhere; again as the bar's width changes. */
     fun arrange(layout: (maxPinned: Int) -> ToolbarConfig.Layout) {
         layoutFor = layout
-        place(layout(roomForPinned(root.width)))
+        place(layout(roomForPinned(body.width)))
     }
 
     private fun place(layout: ToolbarConfig.Layout) {
@@ -266,12 +266,21 @@ class IdleUi(
         })
     }
 
-    override val root = frameLayout {
+    /** 「不学」 (D5), leftmost: before the menu key, or before the password's digits, which give it room. */
+    val notLearnedMark = NotLearnedMark(ctx, theme)
+
+    // the bar beside the mark
+    private val body = frameLayout {
         add(idleBody, lParams(matchParent, matchParent))
         add(numberRow, lParams(matchParent, matchParent))
         addOnLayoutChangeListener { _, left, _, right, _, oldLeft, _, oldRight, _ ->
             if (right - left != oldRight - oldLeft) layoutFor?.let { f -> post { place(f(roomForPinned(width))) } }
         }
+    }
+
+    override val root = horizontalLayout {
+        add(notLearnedMark, LinearLayout.LayoutParams(dp(NotLearnedMark.WIDTH_DP), matchParent))
+        add(body, LinearLayout.LayoutParams(0, matchParent, 1f))
     }
 
     private fun updateMenuButtonContentDescription() {
@@ -321,7 +330,7 @@ class IdleUi(
             addTransition(slideIn)
             addTransition(slideOut)
         }
-        TransitionManager.beginDelayedTransition(root, set)
+        TransitionManager.beginDelayedTransition(body, set)
     }
 
     private fun skipsAnimation(state: Display, fromUser: Boolean, motion: Motion.Settings) =

@@ -531,6 +531,11 @@ remembering text goes through it. One exception: in an email's or a URL's field 
 an address's end there, and keeps nothing of it (not even to compare: `AddressLearning` holds no text
 of a field not learned from).
 
+Where a field learns nothing or less than others, the bar says so: `NotLearned.of` (ime-core) turns
+the field's traits (password, sensitive, own app, `FieldPolicy.learnFlags`) and 「不用我的输入习惯」
+into reasons, and `KawaiiBarComponent` shows them on `NotLearnedMark`, leftmost on `IdleUi` (before
+the password's number row, which narrows for it) and on `CandidateUi`; held, a bubble says why.
+
 ## The two flavors
 
 `speech` dimension: `text` and `voice`. Main code reaches voice only through `VoiceFeature`

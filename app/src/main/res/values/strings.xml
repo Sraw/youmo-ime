@@ -338,6 +338,14 @@
     <string name="learning_done_delete_phrase">Deleted “%1$s” from custom phrases</string>
     <string name="learning_done_no_predict">“%1$s” no longer suggested here</string>
     <string name="learning_undo_gone">Too late to undo</string>
+    <string name="not_learned_glyph">学</string>
+    <string name="not_learned_mark">Not learning here</string>
+    <string name="not_learned_password">A password field: nothing typed here is learned</string>
+    <string name="not_learned_app_asks">The app asks for nothing to be kept here (incognito, say): nothing is learned</string>
+    <string name="not_learned_own_app">A field of this keyboard\'s own: nothing is learned</string>
+    <string name="not_learned_habits_off">“Don\'t use my habits” is on: nothing is learned; restore it in ⋯</string>
+    <string name="not_learned_no_pairs">An address, email or number field: words are learned, not which follow which</string>
+    <string name="not_learned_no_predict">A search field: no suggestions after a word, none learned</string>
     <string name="learning_habits_off">Don\'t use my habits</string>
     <string name="learning_habits_on">Use my habits again</string>
     <string name="learning_clear_recent">Clear recent</string>

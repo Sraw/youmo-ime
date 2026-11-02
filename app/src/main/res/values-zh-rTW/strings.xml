@@ -334,6 +334,14 @@
     <string name="learning_done_delete_phrase">已從自訂詞組中刪除「%1$s」</string>
     <string name="learning_done_no_predict">不再聯想「%1$s」</string>
     <string name="learning_undo_gone">已經復原不了了</string>
+    <string name="not_learned_glyph">學</string>
+    <string name="not_learned_mark">這裡不學</string>
+    <string name="not_learned_password">密碼框：這裡打的什麼都不學</string>
+    <string name="not_learned_app_asks">應用程式要求不記錄（例如無痕模式）：什麼都不學</string>
+    <string name="not_learned_own_app">本輸入法自己的輸入框：什麼都不學</string>
+    <string name="not_learned_habits_off">開著「不用我的輸入習慣」：什麼都不學，在 ⋯ 裡恢復</string>
+    <string name="not_learned_no_pairs">網址、郵箱、數字框：只學詞，不學詞和詞的前後搭配</string>
+    <string name="not_learned_no_predict">搜尋框：不出聯想，也不學聯想</string>
     <string name="learning_habits_off">不用我的輸入習慣</string>
     <string name="learning_habits_on">恢復我的輸入習慣</string>
     <string name="learning_clear_recent">清掉最近</string>
