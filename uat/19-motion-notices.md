@@ -49,7 +49,7 @@
 - **JVM**：`MotionNoticeUatTest.oneHandedTheHandleAsWideAsTheKeyboard`（单手时悬浮条和键盘一样宽）；设备上不跑。
 
 ### MN-13 [P2] 读屏时用把手分离的悬浮键盘，转屏、换主题后还在原处
-- **前提**：同 MN-10；能开 TalkBack 的真机或模拟器（redroid 没有 TalkBack），打开 TalkBack。
+- **前提**：同 MN-10；能开 TalkBack 的真机或模拟器（AVD youmo 的 google_apis 镜像带 TalkBack），打开 TalkBack。
 - **操作**：在「普通文本」框里让键盘出来；用 TalkBack 选中悬浮条的把手，双击并按住（读屏把它当一次长按，没有手指可拖，键盘在原处脱离成悬浮的）；记下悬浮键盘的位置；转屏再转回来；再换一个主题（或切夜间模式）回来看。
 - **预期**：双击按住后键盘变成悬浮键盘，停在脱离的地方；转屏和换主题后悬浮键盘仍在原处，没有跳回底部或别的位置。
 

@@ -12,7 +12,7 @@ uat/tools/emu-keyboard.sh key SHIFT          # 依次按下松开
 uat/tools/emu-keyboard.sh combo CTRL SPACE   # 按住前面的，按最后一个
 ```
 
-不要用模拟器自带的键盘（qwerty2，它的 Shift 是粘滞的，也不给输入法字符），也不要在 redroid 里造键盘（见脚本开头）。
+不要用模拟器自带的键盘（qwerty2，它的 Shift 是粘滞的，也不给输入法字符），也不要在 redroid 这类和宿主机共用内核的容器里造键盘（见脚本开头）。
 
 前提里的 **B0-实体**：B0，再接上实体键盘（系统设置里"显示屏幕键盘"保持关闭，这是默认），点「普通文本」框，屏幕键盘弹出来。
 "按 X"指按实体键盘上的键。

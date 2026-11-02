@@ -79,7 +79,7 @@ adb push uat/fixtures/userwords.txt uat/fixtures/dict-words.txt uat/fixtures/wor
 
 ### WD-13 [P1] 关闭、删除导入的词库
 - **前提**：B0-设置，`dict-words.txt` 已放到"下载"目录；**词库与短语 → 导入词库** 选它，并入"基础词库（推荐）"。
-- **操作**：看词库目录（以 root `ls /data/data/<包名>/files/host-data/pinyin/dictionaries`（redroid 上 `docker exec <容器> ls …`））；在词库页点它，看菜单，选 **关闭**；回测试页打 kemiaotangpu；再看词库目录；再回词库页点它，选 **删除**；回测试页打 kemiaotangpu；再看词库目录。
+- **操作**：看词库目录（以 root `ls /data/data/<包名>/files/host-data/pinyin/dictionaries`（模拟器上 `adb root` 后直接 `adb shell ls …`））；在词库页点它，看菜单，选 **关闭**；回测试页打 kemiaotangpu；再看词库目录；再回词库页点它，选 **删除**；回测试页打 kemiaotangpu；再看词库目录。
 - **预期**：导入后目录里是 `dict-words.txt.gz`（压缩存放，没有 `dict-words.txt`），关闭后是 `dict-words.txt.gz.disable`，删除后两样都没有；菜单只有"关闭"和"删除"；关闭后候选第一页不再有「氪喵糖铺」；删除后词库页没有它，候选第一页也没有「氪喵糖铺」。
 - **JVM**：`DictionaryUatTest.turnedOffThenDeleted`（目录依次是 dict-words.txt.gz、.gz.disable、没有；关闭和删除后合并文件里没有氪喵糖铺（菜单是界面））；设备上不跑。
 
@@ -105,9 +105,9 @@ adb push uat/fixtures/userwords.txt uat/fixtures/dict-words.txt uat/fixtures/wor
 
 ### WD-14d [P0] 上百万词的大词库并入基础词库，键盘不崩
 - **前提**：B0-设置，雾凇拼音（rime-frost）发布的 `frost_dict_for_fcitx5.txt`（约 89 MB、191 万行，词、`'` 分开的拼音、概率三列；是哪一份、哈希多少见 [README](README.md) 的 fixtures 一行）已放到"下载"目录。
-- **操作**：**词库与短语 → 导入词库**，选它，看 **并入哪个词库？** 的标题；选"基础词库（推荐）"导入，等导入完；回测试页点输入框弹出键盘，按 [README](README.md#量-java-堆) 的做法量 Java 堆 5 次（导入前也这样弹出键盘、打几个字量 5 次作对照）；打 a b a z h o u（阿坝州）、g e n n i s h u o（跟你说）；看词库目录的文件大小（以 root `ls -l /data/data/<包名>/files/host-data/pinyin/dictionaries`，redroid 用 `docker exec`）。
+- **操作**：**词库与短语 → 导入词库**，选它，看 **并入哪个词库？** 的标题；选"基础词库（推荐）"导入，等导入完；回测试页点输入框弹出键盘，按 [README](README.md#量-java-堆) 的做法量 Java 堆 5 次（导入前也这样弹出键盘、打几个字量 5 次作对照）；打 a b a z h o u（阿坝州）、g e n n i s h u o（跟你说）；看词库目录的文件大小（以 root `ls -l /data/data/<包名>/files/host-data/pinyin/dictionaries`，模拟器上 `adb root` 后直接 `adb shell`）。
 - **预期**：读文件和导入时对话框有进度条和百分比（正在分析格式、正在整理词条……），一路往前走，各一分钟以内；标题下面写着"词库文本 · 拼音用 ' 分开 · 第三列是概率 · 1914461 个词 · 176 行读不懂"（词数只算带拼音的词，只写了词的行另写"N 个词没有拼音"）；导入完词库页"基础词库"一节列出 frost_dict_for_fcitx5，写着约 191 万个词；键盘照常弹出、打字不卡、不崩，Java 堆和导入前差不多（后 4 次读数的中位数比导入前多不到 64 MB；不该是上百 MB）；候选里有「阿坝州」，gennishuo 前三个候选里有「跟你说」；词库目录里是 `frost_dict_for_fcitx5.txt.gz`（约 24 MB）和 `merged.ymd`（约 50 MB），没有 `.txt`、`.tmp` 文件。
-- **注**：发版时用发布包在 redroid 上跑（`UAT_BUILD=release`，脚本照跑），平时不跑（用户 2026-10-30 定：要雾凇拼音，一条三四分钟）。
+- **注**：发版时用发布包脚本跑（`UAT_BUILD=release`），平时不跑（用户 2026-10-30 定：要雾凇拼音，一条三四分钟）。
 
 ### WD-14e [P1] Rime 词库（.dict.yaml）认出格式，并入基础词库
 - **前提**：B0-设置，`rime-words.dict.yaml`（Rime 的表头，三个词，拼音用空格分开，带词频）已放到"下载"目录。
@@ -132,7 +132,7 @@ adb push uat/fixtures/userwords.txt uat/fixtures/dict-words.txt uat/fixtures/wor
 - **操作**：回测试页点输入框弹出键盘，马上打几个字；等到词库目录里有了 `merged.ymd`、没有 `frost.txt`（最多五分钟），看词库目录；按 [README](README.md#量-java-堆) 的做法量 Java 堆 5 次；打 a b a z h o u。
 - **预期**：键盘马上弹出、照常打字，不崩、不卡（0.3.1 在这里每次弹键盘都内存不够、最后崩掉）；转换、合成时空闲栏写着「正在升级词库格式 N%」，下面一条细进度线往前走；合好后提示「词库格式已升级」；五分钟内词库目录里是 `frost.txt.gz`、`old.txt.gz.disable` 和 `merged.ymd`，`frost.txt`、`old.txt.disable` 没有了；Java 堆和对照差不多（后 4 次读数的中位数多不到 64 MB）；候选里有「阿坝州」，打 g e n n i s h u o 前三个候选里有「跟你说」；词库页列出 frost，写着约 191 万个词；old 列成「已关闭」，打 kemiaoxinggang 没有「氪喵星港」。合成快（正式版约半分钟）时空闲栏和提示可能来不及看到，以目录、合成日志和候选为准。
 - **JVM**：`BaseDictionaryUpgradeUatTest.v031sTextDictionariesAreUpgradedAtTheStart`（0.3.1 的目录：frost.txt、old.txt.disable 转成 .gz、合成 merged.ymd、开关照旧、阿坝州有、氪喵星港无）；设备上只看真升级不崩。
-- **注**：发版时用发布包在 redroid 上跑（`UAT_BUILD=release`，脚本照跑），平时不跑（用户 2026-10-30 定：要雾凇拼音，一条三四分钟）。
+- **注**：发版时用发布包脚本跑（`UAT_BUILD=release`），平时不跑（用户 2026-10-30 定：要雾凇拼音，一条三四分钟）。
 
 ### WD-14i [P1] 导入大词库时取消：什么都不变
 - **前提**：B0-设置，已按 WD-14e 把 `rime-words.dict.yaml` 并入基础词库；`frost_dict_for_fcitx5.txt` 放在下载目录。
@@ -143,7 +143,7 @@ adb push uat/fixtures/userwords.txt uat/fixtures/dict-words.txt uat/fixtures/wor
 ### WD-14j [P1] 停用、启用、删除词库：合好之前页面说正在更新
 - **前提**：B0-设置，已按 WD-14e 把 `rime-words.dict.yaml` 并入基础词库。
 - **操作**：在词库页点 rime-words → **关闭**，打 k e m i a o x i n g g a n g；再 **开启**，再打；再 **删除**，再打。每次操作后看词库目录。（换成 frost 这样的大词库更容易看到进度，见 WD-14j2。）
-- **预期**：每次操作后行的状态马上变，词库目录（以 root `ls /data/data/<包名>/files/host-data/pinyin/dictionaries`（redroid 上 `docker exec <容器> ls …`））里依次是 `rime-words.txt.gz.disable`、`rime-words.txt.gz`，删除后都没有；合成时间长时（大词库）「基础词库」一节显示「正在更新词库」和「正在更新 N%，完成前打字仍用原来的词库」，合好以后词数更新（3 个词的小词库来不及看到）；关闭后没有「氪喵星港」，开启后又有，删除后行没了、也没有这个词。
+- **预期**：每次操作后行的状态马上变，词库目录（以 root `ls /data/data/<包名>/files/host-data/pinyin/dictionaries`（模拟器上 `adb root` 后直接 `adb shell ls …`））里依次是 `rime-words.txt.gz.disable`、`rime-words.txt.gz`，删除后都没有；合成时间长时（大词库）「基础词库」一节显示「正在更新词库」和「正在更新 N%，完成前打字仍用原来的词库」，合好以后词数更新（3 个词的小词库来不及看到）；关闭后没有「氪喵星港」，开启后又有，删除后行没了、也没有这个词。
 - **JVM**：`DictionaryUatTest.turnedOffOnAndDeleted`（关闭、开启、删除后目录依次是 .gz.disable、.gz、没有，氪喵星港随之没有、有、没有）；设备上不跑。
 
 ### WD-14j2 [P1] 大词库合成中关闭另一个词库
@@ -197,7 +197,7 @@ adb push uat/fixtures/userwords.txt uat/fixtures/dict-words.txt uat/fixtures/wor
 ### WD-14r [P0] 从 0.3.2 升级：导入的大词库转换成压缩的，空间省下一大半
 - **前提**：装着 v0.3.2 正式版（不是要测的这一版），在它里面按 WD-14d 把雾凇拼音并入基础词库，等合好（候选里有「阿坝州」）；再导入 `dict-words.txt` 并入基础词库后把它 **关闭**；记下 **系统设置 → 应用 → 幽默输入法 → 存储** 的"用户数据"大小和词库目录（`adb shell ls -l /sdcard/Android/data/<包名>/files/data/pinyin/dictionaries`：`frost_dict_for_fcitx5.txt`、`dict-words.txt.disable`、`merged.ymd` 约 106 MB）。
 - **操作**：不卸载，直接安装要测的这一版正式版（`adb install -r`）；回测试页点输入框弹出键盘，马上打几个字；等到提示「词库格式已升级」（最多三分钟）；看词库目录和应用的存储；打 a b a z h o u、k e m i a o t a n g p u；打开词库页。
-- **预期**：键盘马上弹出、照常打字；空闲栏写着「正在升级词库格式 N%」，进度一路往前走，合好以后提示「词库格式已升级」；外部的 `files/data` 已经没有了（升级后搬进应用自己的目录，核对好就删了旧的，同 PR-41）；词库目录（以 root 看 `/data/data/<包名>/files/host-data/pinyin/dictionaries`，redroid 用 `docker exec`）里是 `frost_dict_for_fcitx5.txt.gz`（约 24 MB）、`dict-words.txt.gz.disable` 和 `merged.ymd`（约 50 MB），没有 `.txt`、`.tmp` 文件；"用户数据"比升级前少约 120 MB；候选里有「阿坝州」，kemiaotangpu 第一页没有「氪喵糖铺」；词库页里 frost 已开启、约 191 万个词，dict-words 已关闭。这一条在发版时用正式版跑。
+- **预期**：键盘马上弹出、照常打字；空闲栏写着「正在升级词库格式 N%」，进度一路往前走，合好以后提示「词库格式已升级」；外部的 `files/data` 已经没有了（升级后搬进应用自己的目录，核对好就删了旧的，同 PR-41）；词库目录（以 root 看 `/data/data/<包名>/files/host-data/pinyin/dictionaries`，模拟器上 `adb root` 后直接 `adb shell`）里是 `frost_dict_for_fcitx5.txt.gz`（约 24 MB）、`dict-words.txt.gz.disable` 和 `merged.ymd`（约 50 MB），没有 `.txt`、`.tmp` 文件；"用户数据"比升级前少约 120 MB；候选里有「阿坝州」，kemiaotangpu 第一页没有「氪喵糖铺」；词库页里 frost 已开启、约 191 万个词，dict-words 已关闭。这一条在发版时用正式版跑。
 
 ### WD-14s [P1] 升级转换词库时强行停止，再打开接着做完
 - **前提**：B0-设置，按 WD-14h 的前提放好 0.3.1 样子的 `frost.txt`（不放 `old.txt.disable`）。

@@ -25,7 +25,7 @@ cd youmo-ime
 
 版本有两个：`text`（纯文字，默认）和 `voice`（离线语音输入，多一个录音权限和约 180 MB 的语音模型），都不申请网络权限。
 `./gradlew :app:assembleRelease` 两个都打。默认四种 ABI 都编，只编一种快得多：手机加 `-PbuildABI=arm64-v8a`（发布的安装包就是这样打的），
-x86_64 的模拟器或 redroid 加 `-PbuildABI=x86_64`。
+Apple 芯片上的 arm64 模拟器同样用 arm64-v8a；x86_64 的模拟器或 redroid 加 `-PbuildABI=x86_64`。
 
 从 0.3.x 的检出更新时（原生 fcitx5 和 chinese-addons 已删掉，fcitx5 子模块也去掉了），pull/merge 前先执行一次，否则子模块留下的文件会挡住 git：
 
@@ -120,7 +120,7 @@ cd youmo-ime
 
 There are two builds, neither with a network permission: `text`, the default, and `voice`, offline voice input, with the microphone
 permission and a ~180 MB speech model. `./gradlew :app:assembleRelease` makes both. All four ABIs are built by default; one is much faster:
-`-PbuildABI=arm64-v8a` for phones (as the released APKs are built), `-PbuildABI=x86_64` for an x86_64 emulator or redroid.
+`-PbuildABI=arm64-v8a` for phones (as the released APKs are built) and an arm64 emulator (Apple silicon), `-PbuildABI=x86_64` for an x86_64 emulator or redroid.
 
 Updating a checkout of 0.3.x (native fcitx5 and chinese-addons are deleted, and with them the fcitx5 submodule): run this once
 before pulling or merging, or the files the submodule left behind get in git's way:
