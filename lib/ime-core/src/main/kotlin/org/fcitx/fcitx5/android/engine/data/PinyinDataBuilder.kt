@@ -55,8 +55,9 @@ class PinyinDataBuilder {
     // code point × KEY_SPAN + syllable to its usual tone and the tones it may have, as ToneTable reads them
     private val charTones = HashMap<Int, Int>()
 
-    // word to its readings' tones, a reading as its syllables
+    // word to its readings' tones, a reading as its syllables; those a curated source gave, which no rule changes
     private val wordTones = HashMap<String, HashMap<List<Int>, ByteArray>>()
+    private val curated = HashSet<Pair<String, List<Int>>>()
 
     /**
      * [codePoint] read as [syllable] may have [tone] (1–4, [ToneMark.NEUTRAL]). Called in order of
@@ -75,13 +76,15 @@ class PinyinDataBuilder {
      * [word] read as [syllables] has [tones], one a code point; a later call for the same reading
      * replaces it, so the sources go in from the least trusted. 一 and 不 keep their own tones (yī,
      * bù), whatever the source writes: the dictionaries' way, and a rule simpler than the sandhi.
+     * A [curated] reading (`lexicon/tones.tsv`, a misreading's) is taken as it is; others go through [ToneRules].
      */
-    fun wordTones(word: String, syllables: IntArray, tones: ByteArray) = apply {
+    fun wordTones(word: String, syllables: IntArray, tones: ByteArray, curated: Boolean = false) = apply {
         val cps = word.codePoints().toArray()
         require(cps.size == syllables.size && tones.size == syllables.size) { "\"$word\": ${syllables.size} syllables, ${tones.size} tones" }
         require(tones.all { it in 1..ToneMark.NEUTRAL }) { "\"$word\": tones ${tones.joinToString()}" }
         val own = ByteArray(tones.size) { i -> OWN_TONES[cps[i] to syllables[i]]?.toByte() ?: tones[i] }
         wordTones.getOrPut(word) { HashMap() }[syllables.toList()] = own
+        if (curated) this.curated += word to syllables.toList() else this.curated -= word to syllables.toList()
     }
 
     private var built = false
@@ -137,6 +140,7 @@ class PinyinDataBuilder {
      */
     private fun writeTones(out: DataFile.Writer) {
         val chars = HashMap(charTones)
+        val neutral = { cp: Int, syllable: Int -> (chars[cp * ToneTable.KEY_SPAN + syllable] ?: 0) and (1 shl (ToneMark.NEUTRAL - 1 + ToneTable.MASK_SHIFT)) != 0 }
         for ((word, readings) in wordTones.entries.sortedWith(compareBy({ it.key.codePointCount(0, it.key.length) > 1 }, { it.key }))) {
             val cps = word.codePoints().toArray()
             for ((reading, tones) in readings) cps.indices.forEach { i ->
@@ -153,9 +157,13 @@ class PinyinDataBuilder {
         val exceptions = sortedMapOf<Int, MutableList<Pair<List<Int>, ByteArray>>>()
         entries.distinctBy { it.word to it.syllables.toList() }.forEach { e ->
             val reading = e.syllables.toList()
-            val tones = wordTones[e.word]?.get(reading) ?: return@forEach
+            val own = wordTones[e.word]?.get(reading)
             val cps = e.word.codePoints().toArray()
+            // a Latin word's letters (iPhone) are no syllable each
+            if (cps.size != reading.size) return@forEach
             val usual = ByteArray(cps.size) { i -> ((chars[cps[i] * ToneTable.KEY_SPAN + reading[i]] ?: 0) and ToneTable.USUAL_MASK).toByte() }
+            if (own == null && usual.any { it.toInt() == 0 }) return@forEach
+            val tones = if (own != null && (e.word to reading) in curated) own else ToneRules.tones(e.word, cps, reading, own, usual, neutral) { w, r -> wordTones[w]?.get(r) }
             if (!usual.contentEquals(tones)) exceptions.getOrPut(model.id(e.word)) { ArrayList() } += reading to tones
         }
         val runs = exceptions.flatMap { (id, list) -> list.map { id to it } }

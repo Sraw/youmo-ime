@@ -27,6 +27,7 @@ class ReadingsRunTest {
                 .charTone('行'.code, Syllables.id("hang"), 2)
                 .charTone('东'.code, Syllables.id("dong"), 1)
                 .charTone('西'.code, Syllables.id("xi"), 1)
+                .unigram("行", -3f, 0f).charTone('行'.code, Syllables.id("xing"), 2)
                 .wordTones("东西", syl("dong", "xi"), byteArrayOf(1, 5))
                 .build().toByteArray(),
         ),
@@ -45,5 +46,12 @@ class ReadingsRunTest {
     @Test
     fun aLineWithNoReadingIsRefused() {
         assertThrows(IllegalArgumentException::class.java) { ReadingsRun.parse(sequenceOf("银行")) }
+    }
+
+    @Test
+    fun typedTheWordIsReadByTheSyllablesItWasTypedWith() {
+        // 行 alone is likelier xíng; typed as a word of 银行 its syllable is hang either way
+        val set = ReadingsRun.parse(sequenceOf("行\txíng", "银行\tyín háng"))
+        assertEquals(2, ReadingsRun(data, typed = true).measure(set).right)
     }
 }

@@ -3,42 +3,16 @@
 # give wrongly, its reading with tones (a space between syllables, no tone mark for the neutral tone).
 # Compiled after the sources, so a line here wins; misreadings.tsv's readings win over it. Readings as
 # 《现代汉语词典》 (7th ed.) has them; 一 and 不 always in their own tones (yī, bù).
-喜欢	xǐ huan	2026-11-01	neutral tone
-时候	shí hou	2026-11-01	neutral tone
 小时候	xiǎo shí hou	2026-11-01	neutral tone
-什么时候	shén me shí hou	2026-11-01	neutral tone
-回来	huí lai	2026-11-01	neutral tone
-回去	huí qu	2026-11-01	neutral tone
-起来	qǐ lai	2026-11-01	neutral tone
 下来	xià lai	2026-11-01	neutral tone
-谢谢	xiè xie	2026-11-01	neutral tone
-朋友	péng you	2026-11-01	neutral tone
-男朋友	nán péng you	2026-11-01	neutral tone
-女朋友	nǚ péng you	2026-11-01	neutral tone
-真是	zhēn shi	2026-11-01	neutral tone
-姐姐	jiě jie	2026-11-01	neutral tone
-妈妈	mā ma	2026-11-01	neutral tone
 爸爸	bà ba	2026-11-01	neutral tone
-哥哥	gē ge	2026-11-01	neutral tone
 妹妹	mèi mei	2026-11-01	neutral tone
 奶奶	nǎi nai	2026-11-01	neutral tone
 叔叔	shū shu	2026-11-01	neutral tone
-宝宝	bǎo bao	2026-11-01	neutral tone
 星星	xīng xing	2026-11-01	neutral tone
-告诉	gào su	2026-11-01	neutral tone
-厉害	lì hai	2026-11-01	neutral tone
-得很	de hěn	2026-11-01	neutral tone
-长得	zhǎng de	2026-11-01	neutral tone
 变得	biàn de	2026-11-01	neutral tone
 说得	shuō de	2026-11-01	neutral tone
 看得	kàn de	2026-11-01	neutral tone
-过得	guò de	2026-11-01	neutral tone
-衣服	yī fu	2026-11-01	neutral tone
-味道	wèi dao	2026-11-01	neutral tone
-麻将	má jiàng	2026-11-01	tone
-打麻将	dǎ má jiàng	2026-11-01	tone
-多少	duō shao	2026-11-01	neutral tone
-样子	yàng zi	2026-11-01	neutral tone
 老样子	lǎo yàng zi	2026-11-01	neutral tone
 名字	míng zi	2026-11-01	neutral tone
 妹子	mèi zi	2026-11-01	neutral tone
@@ -46,38 +20,13 @@
 机子	jī zi	2026-11-01	neutral tone
 一下子	yī xià zi	2026-11-01	neutral tone
 一辈子	yī bèi zi	2026-11-01	neutral tone
-打算	dǎ suan	2026-11-01	neutral tone
-东西	dōng xi	2026-11-01	neutral tone
-运气	yùn qi	2026-11-01	neutral tone
 力气	lì qi	2026-11-01	neutral tone
-客气	kè qi	2026-11-01	neutral tone
 不客气	bù kè qi	2026-11-01	neutral tone
 不用客气	bù yòng kè qi	2026-11-01	neutral tone
-事情	shì qing	2026-11-01	neutral tone
-休息	xiū xi	2026-11-01	neutral tone
-消息	xiāo xi	2026-11-01	neutral tone
-眼睛	yǎn jing	2026-11-01	neutral tone
-照片	zhào piàn	2026-11-01	tone
-头发	tóu fa	2026-11-01	neutral tone
-踏实	tā shi	2026-11-01	neutral tone
 老实	lǎo shi	2026-11-01	neutral tone
-凉快	liáng kuai	2026-11-01	neutral tone
-姑娘	gū niang	2026-11-01	neutral tone
-早晨	zǎo chen	2026-11-01	neutral tone
-宝贝儿	bǎo bèi er	2026-11-01	neutral tone
 事儿	shì er	2026-11-01	neutral tone
-石榴	shí liu	2026-11-01	neutral tone
-这里	zhè li	2026-11-01	neutral tone
-那里	nà li	2026-11-01	neutral tone
-哪里	nǎ li	2026-11-01	neutral tone
-嘴里	zuǐ li	2026-11-01	neutral tone
 心里	xīn li	2026-11-01	neutral tone
 夜里	yè li	2026-11-01	neutral tone
-人家	rén jia	2026-11-01	neutral tone
-地方	dì fang	2026-11-01	neutral tone
-晚上	wǎn shang	2026-11-01	neutral tone
-漂亮	piào liang	2026-11-01	neutral tone
-认识	rèn shi	2026-11-01	neutral tone
 学生	xué sheng	2026-11-01	neutral tone
 先生	xiān sheng	2026-11-01	neutral tone
 明白	míng bai	2026-11-01	neutral tone
@@ -103,3 +52,255 @@
 何为	hé wéi	2026-11-01	tone
 接发	jiē fà	2026-11-01	tone
 谁	shéi	2026-11-01	common reading
+得	de	2026-11-02	usual tone: the particle (跑得快), far commoner than dé alone
+啊	a	2026-11-02	usual tone: the particle, as said
+师傅	shī fu	2026-11-02	neutral tone
+媳妇	xí fu	2026-11-02	neutral tone
+早上	zǎo shang	2026-11-02	neutral tone
+打发	dǎ fa	2026-11-02	neutral tone
+生意	shēng yi	2026-11-02	neutral tone (business)
+道理	dào li	2026-11-02	neutral tone
+脑袋	nǎo dai	2026-11-02	neutral tone
+棉花	mián hua	2026-11-02	neutral tone
+暖和	nuǎn huo	2026-11-02	neutral tone
+大方	dà fang	2026-11-02	neutral tone (generous, as in chat)
+在乎	zài hu	2026-11-02	neutral tone
+老爷	lǎo ye	2026-11-02	neutral tone
+舍不得	shě bù de	2026-11-02	neutral tone
+拜拜	bái bái	2026-11-02	common reading
+麻麻	mā ma	2026-11-02	妈妈 as typed in chat
+狗狗	gǒu gou	2026-11-02	neutral tone
+兜兜	dōu dou	2026-11-02	neutral tone
+更博	gēng bó	2026-11-02	更新博客
+爱人	ài ren	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+巴掌	bā zhang	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+白净	bái jing	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+帮手	bāng shou	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+包袱	bāo fu	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+包涵	bāo han	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+本事	běn shi	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+比方	bǐ fang	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+扁担	biǎn dan	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+别扭	biè niu	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+补丁	bǔ ding	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+裁缝	cái feng	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+财主	cái zhu	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+苍蝇	cāng ying	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+差事	chāi shi	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+柴火	chái huo	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+称呼	chēng hu	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+刺猬	cì wei	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+凑合	còu he	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+耷拉	dā la	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+答应	dā ying	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+打扮	dǎ ban	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+打点	dǎ dian	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+打量	dǎ liang	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+打算	dǎ suan	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+打听	dǎ ting	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+大爷	dà ye	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+大夫	dài fu	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+耽搁	dān ge	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+耽误	dān wu	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+道士	dào shi	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+灯笼	dēng long	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+地道	dì dao	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+地方	dì fang	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+弟兄	dì xiong	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+点心	diǎn xin	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+东家	dōng jia	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+东西	dōng xi	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+动静	dòng jing	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+动弹	dòng tan	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+豆腐	dòu fu	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+嘟囔	dū nang	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+队伍	duì wu	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+对付	duì fu	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+对头	duì tou	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+耳朵	ěr duo	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+风筝	fēng zheng	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+福气	fú qi	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+甘蔗	gān zhe	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+干事	gàn shi	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+高粱	gāo liang	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+膏药	gāo yao	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+告诉	gào su	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+胳膊	gē bo	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+公公	gōng gong	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+姑娘	gū niang	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+故事	gù shi	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+寡妇	guǎ fu	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+怪物	guài wu	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+关系	guān xi	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+官司	guān si	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+规矩	guī ju	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+闺女	guī nü	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+含糊	hán hu	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+合同	hé tong	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+和尚	hé shang	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+核桃	hé tao	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+红火	hóng huo	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+厚道	hòu dao	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+狐狸	hú li	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+胡琴	hú qin	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+糊涂	hú tu	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+皇上	huáng shang	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+活泼	huó po	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+火候	huǒ hou	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+伙计	huǒ ji	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+护士	hù shi	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+机灵	jī ling	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+脊梁	jǐ liang	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+记号	jì hao	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+架势	jià shi	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+嫁妆	jià zhuang	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+见识	jiàn shi	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+将就	jiāng jiu	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+交情	jiāo qing	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+叫唤	jiào huan	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+结实	jiē shi	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+街坊	jiē fang	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+姐夫	jiě fu	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+戒指	jiè zhi	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+咳嗽	ké sou	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+客气	kè qi	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+口袋	kǒu dai	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+窟窿	kū long	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+快活	kuài huo	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+阔气	kuò qi	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+老婆	lǎo po	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+老太太	lǎo tài tai	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+累赘	léi zhui	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+篱笆	lí ba	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+厉害	lì hai	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+利落	lì luo	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+利索	lì suo	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+痢疾	lì ji	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+连累	lián lei	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+凉快	liáng kuai	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+粮食	liáng shi	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+溜达	liū da	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+骆驼	luò tuo	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+麻利	má li	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+马虎	mǎ hu	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+码头	mǎ tou	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+买卖	mǎi mai	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+忙活	máng huo	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+冒失	mào shi	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+眉毛	méi mao	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+媒人	méi ren	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+门道	mén dao	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+眯缝	mī feng	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+迷糊	mí hu	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+苗条	miáo tiao	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+名堂	míng tang	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+蘑菇	mó gu	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+模糊	mó hu	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+木匠	mù jiang	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+难为	nán wei	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+能耐	néng nai	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+念叨	niàn dao	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+娘家	niáng jia	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+奴才	nú cai	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+女婿	nǚ xu	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+牌楼	pái lou	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+盘算	pán suan	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+朋友	péng you	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+脾气	pí qi	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+漂亮	piào liang	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+婆家	pó jia	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+铺盖	pū gai	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+亲戚	qīn qi	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+勤快	qín kuai	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+热闹	rè nao	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+人家	rén jia	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+认识	rèn shi	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+扫帚	sào zhou	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+商量	shāng liang	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+上司	shàng si	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+少爷	shào ye	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+牲口	shēng kou	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+师父	shī fu	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+石匠	shí jiang	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+石榴	shí liu	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+时候	shí hou	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+拾掇	shí duo	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+使唤	shǐ huan	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+世故	shì gu	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+事情	shì qing	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+收成	shōu cheng	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+收拾	shōu shi	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+首饰	shǒu shi	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+舒服	shū fu	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+舒坦	shū tan	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+疏忽	shū hu	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+爽快	shuǎng kuai	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+思量	sī liang	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+算计	suàn ji	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+岁数	suì shu	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+太太	tài tai	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+特务	tè wu	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+挑剔	tiāo ti	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+跳蚤	tiào zao	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+铁匠	tiě jiang	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+头发	tóu fa	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+妥当	tuǒ dang	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+唾沫	tuò mo	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+挖苦	wā ku	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+娃娃	wá wa	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+晚上	wǎn shang	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+委屈	wěi qu	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+稳当	wěn dang	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+稀罕	xī han	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+喜欢	xǐ huan	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+吓唬	xià hu	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+乡下	xiāng xia	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+相声	xiàng sheng	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+消息	xiāo xi	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+小气	xiǎo qi	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+笑话	xiào hua	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+谢谢	xiè xie	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+心思	xīn si	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+猩猩	xīng xing	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+行李	xíng li	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+兄弟	xiōng di	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+休息	xiū xi	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+秀才	xiù cai	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+秀气	xiù qi	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+学问	xué wen	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+衙门	yá men	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+胭脂	yān zhi	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+烟筒	yān tong	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+眼睛	yǎn jing	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+秧歌	yāng ge	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+养活	yǎng huo	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+吆喝	yāo he	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+妖精	yāo jing	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+衣服	yī fu	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+应酬	yìng chou	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+冤枉	yuān wang	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+月饼	yuè bing	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+月亮	yuè liang	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+云彩	yún cai	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+运气	yùn qi	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+扎实	zhā shi	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+眨巴	zhǎ ba	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+栅栏	zhà lan	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+张罗	zhāng luo	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+丈夫	zhàng fu	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+帐篷	zhàng peng	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+丈人	zhàng ren	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+招呼	zhāo hu	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+招牌	zhāo pai	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+芝麻	zhī ma	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+知识	zhī shi	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+指甲	zhǐ jia	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+转悠	zhuàn you	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+庄稼	zhuāng jia	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+壮实	zhuàng shi	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+状元	zhuàng yuan	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+字号	zì hao	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+自在	zì zai	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+祖宗	zǔ zong	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+嘴巴	zuǐ ba	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)
+琢磨	zuó mo	2026-11-02	neutral tone (普通话水平测试 必读轻声词语)

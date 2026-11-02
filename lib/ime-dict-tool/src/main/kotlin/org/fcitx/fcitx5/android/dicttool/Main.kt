@@ -908,8 +908,9 @@ private fun pinyin(options: Options, out: Appendable) {
     // from the least trusted: a later source's reading of a word replaces an earlier one's
     options.charTones?.split(',')?.forEach { path -> File(path).useLines { ToneSources.chars(it, path, builder::charTone) } }
     options.phraseTones?.let { path -> File(path).useLines { ToneSources.phrases(it, path, builder::wordTones) } }
-    options.tones?.let { path -> File(path).useLines { ToneSources.curated(it, path, builder::wordTones) } }
-    misread.forEach { ToneSources.word(it.word, it.reading, builder::wordTones) }
+    val curated = { w: String, s: IntArray, t: ByteArray -> builder.wordTones(w, s, t, curated = true); Unit }
+    options.tones?.let { path -> File(path).useLines { ToneSources.curated(it, path, curated) } }
+    misread.forEach { ToneSources.word(it.word, it.reading, curated) }
     val meta = mapOf("source" to (listOf(lm) + dicts).joinToString(",") { File(it).name }) +
         misread.associate { Misreadings.META_PREFIX + it.word to Misreadings.meta(it) }
     write(output, builder.build(meta), out)

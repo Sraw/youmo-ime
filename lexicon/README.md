@@ -14,7 +14,7 @@ put before a curator again.
 | `remove.tsv` | `word  kind  date  note`: a word of libime's dictionary (the base layer) that should not be there; left out when pinyin.data is compiled |
 | `readings.tsv` | `word  reading  date  note`: a word of libime's dictionary it reads wrongly; compiled under the readings listed here (a line each) instead |
 | `misreadings.tsv` | `word  reading  misreadings`: a word often read wrongly (般若, bō rě, read ban'ruo), its reading with tones (a space between syllables) and its misreadings as typed (`,` between them); compiled under both, a tenth as likely under a misreading, so either types it, and typed by a misreading its candidate shows the reading, tones and all |
-| `tones.tsv` | `word  reading  date  note`: a word whose tones the downloaded lists give wrongly (轻声 left out, the wrong one of a polyphone's tones), its reading with tones as in `misreadings.tsv`; compiled into pinyin.data's tones after those lists, before `misreadings.tsv`'s readings |
+| `tones.tsv` | `word  reading  date  note`: a word whose tones the downloaded lists give wrongly (轻声 left out, the wrong one of a polyphone's tones), its reading with tones as in `misreadings.tsv`; compiled into pinyin.data's tones after those lists, before `misreadings.tsv`'s readings; never taken from `lib/ime-eval/data/readings/chat.tsv` (the test set) |
 | `latin.words` | a word pack (`word  R'E'A'D'I'N'G  log10P`, layer `latin`): the Latin words typed inside Chinese, made by `tools/latin.py` from `tools/latin_counts.py`'s counts of FineWeb-2 (ODC-By 1.0) — not by hand; its junk goes in `reject.tsv` |
 
 Tab-separated, `#` starts a comment. A reading is `pin'yin`, a syllable a character, `v` for ü.
