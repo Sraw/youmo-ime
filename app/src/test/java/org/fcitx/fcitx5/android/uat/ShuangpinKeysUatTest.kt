@@ -17,6 +17,7 @@ import org.fcitx.fcitx5.android.core.InputMethodEntry
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.prefs.ShuangpinKeyboard
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog
+import org.fcitx.fcitx5.android.engine.pinyin.ShuangpinScheme
 import org.fcitx.fcitx5.android.host.HostEvent
 import org.fcitx.fcitx5.android.input.KeyboardHarness
 import org.fcitx.fcitx5.android.input.preedit.SyllableStrip
@@ -52,6 +53,7 @@ class ShuangpinKeysUatTest {
     fun close() {
         h?.close()
         setting.setValue(setting.defaultValue)
+        EngineState.shuangpinScheme = ShuangpinScheme.XIAOHE
         EngineState.syllablesState.value = EngineState.SyllableState()
     }
 
@@ -69,7 +71,7 @@ class ShuangpinKeysUatTest {
     fun theEighteenKeysAreThreeRowsOfCapitalsAndTheCodeRowOffersTheSyllables() {
         val h = harness(ShuangpinKeyboard.Keys18)
         val labels = h.texts()
-        for (l in listOf("Q", "WE", "RT", "Y", "U", "IO", "P", "A", "SD", "FG", "H", "JK", "L;", "Z", "XC", "V", "BN", "M")) {
+        for (l in listOf("Q", "WE", "RT", "Y", "U", "IO", "P", "A", "SD", "FG", "H", "JK", "L", "Z", "XC", "V", "BN", "M")) {
             assertTrue("$l in $labels", l in labels)
         }
         assertFalse("no 中/英: $labels", "中/英" in labels)
@@ -86,7 +88,7 @@ class ShuangpinKeysUatTest {
     fun theNineKeysHaveThePhonesLettersAndTheColumnOffersTheSyllables() {
         val h = harness(ShuangpinKeyboard.NineKeys)
         val labels = h.texts()
-        for (l in listOf("ABC", "DEF", "GHI", "JKL;", "MNO", "PQRS", "TUV", "WXYZ")) assertTrue("$l in $labels", l in labels)
+        for (l in listOf("ABC", "DEF", "GHI", "JKL", "MNO", "PQRS", "TUV", "WXYZ")) assertTrue("$l in $labels", l in labels)
         assertFalse("no 中/英: $labels", "中/英" in labels)
         h.typedWo()
         // the column has them, the code row none
@@ -100,10 +102,30 @@ class ShuangpinKeysUatTest {
     @Test
     @Uat("SP-16")
     fun theEighteenKeysHaveLAndSemicolonOnOneKeyAndNoSemicolonKey() {
+        EngineState.shuangpinScheme = ShuangpinScheme.MICROSOFT
         val h = harness(ShuangpinKeyboard.Keys18)
         val faces = h.texts()
         assertTrue(faces.toString(), "L;" in faces)
         assertFalse(faces.toString(), ";" in faces || "；" in faces)
+    }
+
+    // 小鹤 (and 自然码) type no `;`: the key is L alone, as pinyin's 18 keys have it
+    @Test
+    @Uat("SP-28")
+    fun theEighteenKeysUnderASchemeWithoutTheSemicolonShowLAlone() {
+        val h = harness(ShuangpinKeyboard.Keys18)
+        val faces = h.texts()
+        assertTrue(faces.toString(), "L" in faces)
+        assertFalse(faces.toString(), "L;" in faces || ";" in faces || "；" in faces)
+    }
+
+    @Test
+    @Uat("SP-28")
+    fun theNineKeysUnderASchemeWithoutTheSemicolonShowJklAlone() {
+        val h = harness(ShuangpinKeyboard.NineKeys)
+        assertTrue(h.texts().toString(), "JKL" in h.texts() && "JKL;" !in h.texts())
+        val five = h.longPress(h.nineKey("5"))
+        assertFalse("$five", five.any { it == ";" || it == "；" || it == ":" || it == "：" })
     }
 
     @Test

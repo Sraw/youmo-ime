@@ -100,7 +100,9 @@ class T9Keyboard(
     symbols: NineKeySymbols = NineKeySymbols.STANDARD,
     private val english: Boolean = false,
     private val shuangpin: Boolean = false,
-) : BaseKeyboard(context, theme, layout(letters, symbols, english, shuangpin)), AutoCapsKeys {
+    /** 九键双拼's 5 shows `;` (JKL;): only under a scheme that types it (微软's ing). */
+    semicolon: Boolean = true,
+) : BaseKeyboard(context, theme, layout(letters, symbols, english, shuangpin, semicolon)), AutoCapsKeys {
 
     companion object {
         const val Name = "T9"
@@ -110,6 +112,9 @@ class T9Keyboard(
 
         /** 九键双拼: a layout of its own, as [EnglishName]. */
         const val ShuangpinName = "T9Shuangpin"
+
+        /** 九键双拼 under a scheme that types no `;`: 5 is JKL alone, its long press no `;` or `:` of it. */
+        const val ShuangpinPlainName = "T9ShuangpinPlain"
 
         // the column's share of the width, and of the right one
         private const val SIDE = 0.16f
@@ -369,16 +374,17 @@ class T9Keyboard(
 
         /**
          * The keys, each digit key with [letters]' letters on it; [english]'s in lower case, Shift for
-         * 重输; [shuangpin]'s [NineKeyLetters.NINE_SP]'s, and no 中/英.
+         * 重输; [shuangpin]'s [NineKeyLetters.NINE_SP]'s (5's `;` left off but with [semicolon]), and no 中/英.
          */
         internal fun layout(
             letters: NineKeyLetters,
             symbols: NineKeySymbols = NineKeySymbols.STANDARD,
             english: Boolean = false,
             shuangpin: Boolean = false,
+            semicolon: Boolean = true,
         ): List<List<KeyDef>> {
             fun on(d: Char) = when {
-                shuangpin -> NineKeyLetters.NINE_SP.letters(NineKeyLetters.NINE_SP.codes[d - '2']).uppercase()
+                shuangpin -> NineKeyLetters.NINE_SP.letters(NineKeyLetters.NINE_SP.codes[d - '2']).uppercase().let { if (semicolon) it else it.replace(";", "") }
                 english -> letters.letters(d).lowercase()
                 else -> letters.letters(d).uppercase()
             }

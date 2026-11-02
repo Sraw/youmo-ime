@@ -80,10 +80,12 @@ class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), Essentia
         T9Keyboard.EnglishName to { nineKeys(english = true) },
         GroupedKeyboard.Name14 to { GroupedKeyboard(context, theme) },
         GroupedKeyboard.Name18 to { GroupedKeyboard(context, theme, NineKeyLetters.G18) },
+        GroupedKeyboard.Name18Plain to { GroupedKeyboard(context, theme, NineKeyLetters.G18, semicolon = false) },
         GroupedKeyboard.NamePinyin18 to { GroupedKeyboard(context, theme, NineKeyLetters.G18, Keyboard::pinyin18Key, semicolon = false) },
         GroupedKeyboard.NameShuangpin14 to { GroupedKeyboard(context, theme, NineKeyLetters.G14, Keyboard::shuangpin14Key) },
         // the user's 按键字符 (its symbols) as 九键拼音 has them; its letters are 全拼's alone
         T9Keyboard.ShuangpinName to { T9Keyboard(context, theme, symbols = NineKeySymbols.parse(AppPrefs.getInstance().keyboard.t9Symbols.getValue()), shuangpin = true) },
+        T9Keyboard.ShuangpinPlainName to { T9Keyboard(context, theme, symbols = NineKeySymbols.parse(AppPrefs.getInstance().keyboard.t9Symbols.getValue()), shuangpin = true, semicolon = false) },
         NumberKeyboard.Name to { NumberKeyboard(context, theme) },
         // a number's, phone's or date's field's own (FieldPad)
         *NumberPad.entries.filter { it != NumberPad.FULL }.map { pad -> pad.layout to { NumberKeyboard(context, theme, pad) } }.toTypedArray(),
@@ -348,17 +350,17 @@ internal fun lettersOf(
     chosen: ImKeyboards.Chosen = ImKeyboards.Chosen(),
     scheme: ShuangpinScheme = ShuangpinScheme.XIAOHE,
     password: Boolean = false,
-): String = nameOf(ImKeyboards.layoutOf(ime, chosen, scheme, password))
+): String = nameOf(ImKeyboards.layoutOf(ime, chosen, scheme, password), scheme)
 
-/** The keyboard [layout] is shown on, by its name. */
-internal fun nameOf(layout: ImKeyboards.Layout): String = when (layout) {
+/** The keyboard [layout] is shown on, by its name; 双拼's 18 and nine keys show `;` only where [scheme] types it. */
+internal fun nameOf(layout: ImKeyboards.Layout, scheme: ShuangpinScheme = ShuangpinScheme.XIAOHE): String = when (layout) {
     ImKeyboards.Layout.TEXT -> TextKeyboard.Name
     ImKeyboards.Layout.PINYIN14 -> GroupedKeyboard.Name14
     ImKeyboards.Layout.PINYIN18 -> GroupedKeyboard.NamePinyin18
     ImKeyboards.Layout.PINYIN_NINE -> T9Keyboard.Name
-    ImKeyboards.Layout.SHUANGPIN18 -> GroupedKeyboard.Name18
+    ImKeyboards.Layout.SHUANGPIN18 -> if (scheme.types(';')) GroupedKeyboard.Name18 else GroupedKeyboard.Name18Plain
     ImKeyboards.Layout.SHUANGPIN14 -> GroupedKeyboard.NameShuangpin14
-    ImKeyboards.Layout.SHUANGPIN_NINE -> T9Keyboard.ShuangpinName
+    ImKeyboards.Layout.SHUANGPIN_NINE -> if (scheme.types(';')) T9Keyboard.ShuangpinName else T9Keyboard.ShuangpinPlainName
     ImKeyboards.Layout.ENGLISH_NINE -> T9Keyboard.EnglishName
     ImKeyboards.Layout.HANDWRITING -> HandwritingKeyboard.Name
 }

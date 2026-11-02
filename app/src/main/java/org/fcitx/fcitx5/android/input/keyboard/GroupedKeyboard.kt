@@ -67,8 +67,11 @@ class GroupedKeyboard(
     companion object {
         const val Name14 = "Grouped14"
 
-        /** 双拼's 18 keys ([NineKeyLetters.G18]). */
+        /** 双拼's 18 keys ([NineKeyLetters.G18]) under a scheme that types `;` (微软's ing): L; shows it. */
         const val Name18 = "Grouped18"
+
+        /** 双拼's 18 keys under any other scheme: L alone, as pinyin's, its code the same. */
+        const val Name18Plain = "Grouped18Plain"
 
         /** Pinyin's 18 keys: [NineKeyLetters.G18]'s groups, sent as [Keyboard.pinyin18Key]. */
         const val NamePinyin18 = "GroupedPinyin18"

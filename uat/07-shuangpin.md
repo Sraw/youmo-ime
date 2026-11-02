@@ -64,7 +64,7 @@
 
 ## 18 键和九键双拼
 
-前提 **B0-18键** / **B0-九键双拼**：B0，在 **输入法** 里添加"双拼"，在 **输入法 → 双拼** 里把 **键盘** 选成「18 键」/「九键」，回测试页点「普通文本」框，换到双拼（README「基线状态」）。下面「点 WE」指点键面是 WE 的那个键；18 键是 `Q WE RT Y U IO P` / `A SD FG H JK L;` / `Z XC V BN M`。
+前提 **B0-18键** / **B0-九键双拼**：B0，在 **输入法** 里添加"双拼"，在 **输入法 → 双拼** 里把 **键盘** 选成「18 键」/「九键」，回测试页点「普通文本」框，换到双拼（README「基线状态」）。下面「点 WE」指点键面是 WE 的那个键；18 键是 `Q WE RT Y U IO P` / `A SD FG H JK L` / `Z XC V BN M`（微软是 L;）。
 
 ### SP-14 [P0] 18 键用小鹤打整句，音节条
 - **前提**：B0-18键，**方案** 改成"小鹤"。
@@ -75,8 +75,8 @@
 ### SP-15 [P0] 九键双拼用自然码打整句，左列
 - **前提**：B0-九键双拼（自然码）。
 - **操作**：先看键盘；点 9 6（wo），看左边那一列；接着点 6 3 5 6 8 6 7 8 4 4 3 5（自然码：wo mf jn tm qu ii fj），看候选，选「我们今天去吃饭」。
-- **预期**：九宫格，2 键到 9 键是 ABC…WXYZ，5 键写着 JKL（`;` 也在上面），没有中/英键，编码行上没有音节条。点 9 6 后左边那一列列出音节，其中有 wo。第一页有「我们今天去吃饭」，选了框里就是它，没有私用区字符（键盘内部的码）。
-- **JVM**：`ShuangpinUatTest.theNineKeysInZiranmaTypeASentenceAndOfferTheSyllables`（音节有 wo，整句在第一页、上屏无私用区字符）、`ShuangpinKeysUatTest.theNineKeysHaveThePhonesLettersAndTheColumnOffersTheSyllables`（ABC…WXYZ、JKL;，无中/英，左列列出 wo、编码行无音节条，金图）；设备上不跑。
+- **预期**：九宫格，2 键到 9 键是 ABC…WXYZ，5 键写着 JKL（自然码用不到 `;`，所以没有；微软是 JKL;，见 SP-24），没有中/英键，编码行上没有音节条。点 9 6 后左边那一列列出音节，其中有 wo。第一页有「我们今天去吃饭」，选了框里就是它，没有私用区字符（键盘内部的码）。
+- **JVM**：`ShuangpinUatTest.theNineKeysInZiranmaTypeASentenceAndOfferTheSyllables`（音节有 wo，整句在第一页、上屏无私用区字符）、`ShuangpinKeysUatTest.theNineKeysHaveThePhonesLettersAndTheColumnOffersTheSyllables`（ABC…WXYZ、JKL，无中/英，左列列出 wo、编码行无音节条，金图）；设备上不跑。
 
 ### SP-16 [P1] 微软 18 键的 L; 键
 - **前提**：B0-18键，**方案** 改成"微软"。
@@ -150,3 +150,10 @@
 - **操作**：打开 **输入法 → 双拼**，看 **方案** 和它的选项；回测试页点「普通文本」框，换到双拼，点 n i h c（小鹤：hao = h c），点空格；重启手机后再看 **方案**。
 - **预期**：**方案** 是"小鹤"，选项只有自然码、微软、小鹤三个（没有紫光、智能ABC、中文之星、拼音加加、国标）；框里是「你好」；键盘上方没有提示；重启后仍是小鹤。
 - **JVM**：`KotlinHostSchemeTest.aNewInstallsShuangpinIsXiaohe`（新装第一次启动是小鹤，即选项的默认值，不写配置、不提示，重启后仍是小鹤）、`SchemeMigrationTest`（ime-core：默认值是小鹤、升级、三个方案各自怎么读）、`SettingsUatTest.theShuangpinSchemesAreTheThreeKept`（方案的选项只有三个）；设备上不跑。
+
+### SP-28 [P1] 小鹤、自然码的 18 键和九键没有分号
+- **前提**：B0-18键，**方案** 是"小鹤"（再试一次"自然码"）；然后 **键盘** 改成「九键」再看一次。
+- **操作**：看 L 那个键（九键看 5 键），长按它。
+- **预期**：18 键的键面只写 L，九键的 5 键只写 JKL，都不写 `;`；长按一行里没有 `;` 和 `:`（九键 2–9 键自己设的符号照旧）。把方案改成"微软"，不收起键盘，马上变成 L; 和 JKL;。
+- **JVM**：`ShuangpinKeysUatTest.theEighteenKeysUnderASchemeWithoutTheSemicolonShowLAlone`（小鹤键面是 L，没有 `;`）、`ShuangpinKeysUatTest.theNineKeysUnderASchemeWithoutTheSemicolonShowJklAlone`（5 键是 JKL，长按没有 `;` `:`）、`KeyboardWindowTest`（小鹤、自然码的 18 键和九键是没有分号的那个，微软是带分号的）、`GroupedKeyboard18Test.pinyinsEighteenKeysShowLWithoutTheSemicolon`（不带分号时长按没有 `;` `:`，码不变）；设备上不跑。
+

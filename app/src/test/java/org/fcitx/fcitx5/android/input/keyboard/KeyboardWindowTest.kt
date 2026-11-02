@@ -100,9 +100,13 @@ class KeyboardWindowTest {
         assertEquals(GroupedKeyboard.Name14, py(ImKeyboard.KEYS14))
         assertEquals(T9Keyboard.Name, py(ImKeyboard.NINE_KEYS))
         assertEquals(TextKeyboard.Name, shp(ImKeyboard.FULL))
-        assertEquals(GroupedKeyboard.Name18, shp(ImKeyboard.KEYS18))
+        // 自然码 types no `;`: L alone; 微软's ing is L;
+        assertEquals(GroupedKeyboard.Name18Plain, shp(ImKeyboard.KEYS18))
+        assertEquals(GroupedKeyboard.Name18Plain, shp(ImKeyboard.KEYS18, ShuangpinScheme.XIAOHE))
+        assertEquals(GroupedKeyboard.Name18, shp(ImKeyboard.KEYS18, ShuangpinScheme.MICROSOFT))
         assertEquals(GroupedKeyboard.NameShuangpin14, shp(ImKeyboard.KEYS14))
-        assertEquals(T9Keyboard.ShuangpinName, shp(ImKeyboard.NINE_KEYS))
+        assertEquals(T9Keyboard.ShuangpinPlainName, shp(ImKeyboard.NINE_KEYS))
+        assertEquals(T9Keyboard.ShuangpinName, shp(ImKeyboard.NINE_KEYS, ShuangpinScheme.MICROSOFT))
         // 微软 has no 14 keys (`;` is ing): the 18 keys, the nearest
         assertEquals(GroupedKeyboard.Name18, shp(ImKeyboard.KEYS14, ShuangpinScheme.MICROSOFT))
         assertEquals(TextKeyboard.Name, en(ImKeyboard.FULL))
@@ -136,7 +140,7 @@ class KeyboardWindowTest {
     // the tall row goes with the letters that put syllables on it: kept in step with lettersOf
     @Test
     fun theTallCodeRowGoesWithTheGroupedLetters() {
-        val grouped = setOf(GroupedKeyboard.Name14, GroupedKeyboard.NamePinyin18, GroupedKeyboard.Name18, GroupedKeyboard.NameShuangpin14, T9Keyboard.ShuangpinName)
+        val grouped = setOf(GroupedKeyboard.Name14, GroupedKeyboard.NamePinyin18, GroupedKeyboard.Name18, GroupedKeyboard.Name18Plain, GroupedKeyboard.NameShuangpin14, T9Keyboard.ShuangpinName, T9Keyboard.ShuangpinPlainName)
         for (layout in ImKeyboards.Layout.entries) {
             assertEquals("$layout", nameOf(layout) in grouped, CodeRowHeight.showsStrip(layout))
         }
