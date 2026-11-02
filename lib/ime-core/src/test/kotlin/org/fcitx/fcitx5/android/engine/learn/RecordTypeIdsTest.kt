@@ -53,7 +53,7 @@ class RecordTypeIdsTest {
             "HEAD" to 32, "KIND" to 33, "STAT_ROW" to 34, "FIRST_OF" to 35, "PENDING_ROW" to 36, "MINE_ROW" to 37,
             "PAIR_ROW" to 38, "PIN_ROW" to 39, "BAR_ROW" to 40, "EN_WORD_ROW" to 41, "EN_PAIR_ROW" to 42,
             "TABLE_WORD_ROW" to 43, "NO_PREDICT_ROW" to 44, "CUT" to 45, "BATCH_ROW" to 46, "IMPORTED_ROW" to 47,
-            "WORD_USE_ROW" to 48, "TABLE_BLOCK_ROW" to 65, "DATE_ROW" to 80,
+            "WORD_USE_ROW" to 48, "PHRASE_ROW" to 49, "TABLE_BLOCK_ROW" to 65, "DATE_ROW" to 80,
             // a backup's own (70–79, never a log's but ORIGIN)
             "backup.HEAD" to 70, "backup.ADDED" to 71, "backup.BLOCKED" to 72, "backup.ORIGIN" to 73,
             // LAST: not a type, the bound of a backup's range, kept as fixed as one

@@ -107,7 +107,7 @@ internal object LogRewrites {
      * table's settings; its uses and firsts both), imports, an English word's flags (never
      * corrected, added) without its uses; HEAD as it is, so typing days and seqs go on (review
      * E-M1). The rest goes, what this build does not know too: the uses and corrections under each
-     * code, the firsts, the texts typed once, the pairs, the nine keys' bar, English's uses and
+     * code, the firsts, the texts typed once, the pairs, the whole phrases (U-73), the nine keys' bar, English's uses and
      * pairs; but a restore's offsets ([BackupMerge.ORIGIN]) stay till 全部清空, as the rows they moved do. [all] 「全部清空」: everything, as installed; the counters of HEAD go on, so what is
      * written after is newer than what was.
      */
@@ -116,7 +116,7 @@ internal object LogRewrites {
             is Head, is Cut -> r
             is StatRow -> r.takeIf { !all && isTable(r.code.kind) }
             is FirstRow -> r.takeIf { !all && isTable(r.code.kind) }
-            is PendingRow, is PairRow, is BarRow, is EnPairRow, is WordUseRow, is DateRow -> null
+            is PendingRow, is PairRow, is BarRow, is EnPairRow, is WordUseRow, is DateRow, is LearnRecord.PhraseRow -> null
             is EnWordRow -> if (all || r.flags == 0) null else EnWordRow(r.word, r.flags, DayCounts())
             // the offsets a restore moved another install's days by: the rows they moved may stay
             // (a table's order), and the same backup restored again must land on the same days (D-M1)

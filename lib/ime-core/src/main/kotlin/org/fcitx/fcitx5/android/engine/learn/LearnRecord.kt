@@ -194,6 +194,8 @@ sealed class LearnRecord {
         val flags: Int,
         val rows: List<Row>,
         val takes: List<Take> = emptyList(),
+        /** A 联想 picked that went on with a whole phrase learned (U-73): that phrase, used whole once more; "" for none. */
+        val continued: String = "",
     ) : LearnRecord() {
         companion object {
             /** A field of URLs, e-mail, numbers, phone numbers or dates: no pairs learned (U-91). */
@@ -300,7 +302,11 @@ sealed class LearnRecord {
     }
     data class EnPairRow(val prev: String, val word: String, val count: Int, val lastDay: Int) : LearnRecord()
     data class TableWordRow(val im: String, val code: String, val text: String, val since: Int) : LearnRecord()
+    /** [prev] "" for a whole phrase (U-73) turned off everywhere: a word's 联想 always follows one. */
     data class NoPredictRow(val prev: String, val text: String) : LearnRecord()
+
+    /** A whole commit's text of 3 to [Phrases.MAX] letters (U-73), committed whole [count] times, last on typing day [lastDay]. Type 49. */
+    data class PhraseRow(val text: String, val count: Int, val lastDay: Int) : LearnRecord()
 
     /** [text] not offered under the table [im]'s [code] alone (U-28 屏蔽): pinyin's blocks never hide a table's own entries (C12). */
     data class TableBlockRow(val im: String, val code: String, val text: String) : LearnRecord()

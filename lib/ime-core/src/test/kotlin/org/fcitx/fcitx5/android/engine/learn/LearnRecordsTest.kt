@@ -104,6 +104,7 @@ class LearnRecordsTest {
         ImportedRow(1, 0, "鲸园", "jing yuan"),
         LearnRecord.WordUseRow("鲸园", "jing yuan", DayCounts.of(2 to 1, 3 to 2)),
         LearnRecord.DateRow(3, 20_746),
+        LearnRecord.PhraseRow("你好呀亲爱的", 3, 3),
         Cut,
     )
 
@@ -177,5 +178,18 @@ class LearnRecordsTest {
         val read = LearnRecords.decode(pin)
         assertTrue(read is Unknown)
         assertEquals(pin.toList(), LearnRecords.encode(read!!).toList())
+    }
+
+    // U-73: the phrase a 联想 went on with, appended to a commit only where there is one: an older reader stops before it
+    @Test
+    fun aCommitsPhraseIsAppendedAndReadBack() {
+        val plain = commit.copy(takes = emptyList())
+        val continued = plain.copy(continued = "你好呀亲爱的")
+        assertEquals(continued, LearnRecords.decode(LearnRecords.encode(continued)))
+        assertEquals(plain, LearnRecords.decode(LearnRecords.encode(plain)))
+        val before = LearnRecords.encode(plain)
+        val after = LearnRecords.encode(continued)
+        // the same fields, then the phrase: length (4) and type (1) ahead, CRC (4) after
+        assertEquals(before.copyOfRange(5, before.size - 4).toList(), after.copyOfRange(5, before.size - 4).toList())
     }
 }

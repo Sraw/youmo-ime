@@ -20,6 +20,7 @@ import org.fcitx.fcitx5.android.engine.learn.LearnRecord.MineRow
 import org.fcitx.fcitx5.android.engine.learn.LearnRecord.NoPredictRow
 import org.fcitx.fcitx5.android.engine.learn.LearnRecord.PairRow
 import org.fcitx.fcitx5.android.engine.learn.LearnRecord.PendingRow
+import org.fcitx.fcitx5.android.engine.learn.LearnRecord.PhraseRow
 import org.fcitx.fcitx5.android.engine.learn.LearnRecord.PinRow
 import org.fcitx.fcitx5.android.engine.learn.LearnRecord.StatRow
 import org.fcitx.fcitx5.android.engine.learn.LearnRecord.TableBlockRow
@@ -185,6 +186,7 @@ object BackupMerge {
         is PendingRow -> "pending" to r.text
         is MineRow -> "mine" to r.text
         is PairRow -> listOf("pair", r.prev, r.next, r.nextReading)
+        is PhraseRow -> "phrase" to r.text
         is BarRow -> "bar" to r.take
         is EnWordRow -> "en" to r.word
         is EnPairRow -> "enPair" to (r.prev to r.word)
@@ -219,6 +221,7 @@ object BackupMerge {
             }
         }
         is PairRow -> (theirs as PairRow).let { PairRow(ours.prev, ours.next, ours.nextReading, maxOf(ours.count, it.count), maxOf(ours.lastDay, it.lastDay)) }
+        is PhraseRow -> (theirs as PhraseRow).let { PhraseRow(ours.text, maxOf(ours.count, it.count), maxOf(ours.lastDay, it.lastDay)) }
         is BarRow -> (theirs as BarRow).let { BarRow(ours.take, maxOf(ours.count, it.count), maxOf(ours.lastDay, it.lastDay)) }
         is EnWordRow -> (theirs as EnWordRow).let { EnWordRow(ours.word, ours.flags or it.flags, max(ours.uses, it.uses)) }
         is EnPairRow -> (theirs as EnPairRow).let { EnPairRow(ours.prev, ours.word, maxOf(ours.count, it.count), maxOf(ours.lastDay, it.lastDay)) }
@@ -250,6 +253,7 @@ object BackupMerge {
         is MineRow -> MineRow(r.text, r.value.copy(since = r.value.since + by, lastUsedDay = r.value.lastUsedDay + by))
         is PairRow -> PairRow(r.prev, r.next, r.nextReading, r.count, r.lastDay + by)
         is BarRow -> BarRow(r.take, r.count, r.lastDay + by)
+        is PhraseRow -> PhraseRow(r.text, r.count, r.lastDay + by)
         is EnWordRow -> EnWordRow(r.word, r.flags, r.uses.shifted(by))
         is EnPairRow -> EnPairRow(r.prev, r.word, r.count, r.lastDay + by)
         is TableWordRow -> TableWordRow(r.im, r.code, r.text, r.since + by)

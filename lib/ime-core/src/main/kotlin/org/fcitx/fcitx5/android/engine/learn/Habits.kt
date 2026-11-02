@@ -21,6 +21,9 @@ interface Habits {
     val today: Int
 
     fun record(rows: List<Row>, takes: List<Take> = emptyList(), flags: Int = 0): Commit?
+
+    /** A 联想 picked ([rows]) that went on with the whole phrase [continued] (U-73): a use of it whole. */
+    fun recordContinued(rows: List<Row>, flags: Int, continued: String): Commit? = record(rows, flags = flags)
     fun pin(code: Code, text: String, reading: String, on: Boolean)
     fun forget(text: String)
 
@@ -165,6 +168,7 @@ class LogHabits(private val log: () -> LearnLog, private val onError: (IOExcepti
     override val rewrites get() = guarded(0L) { log().rewrites }
 
     override fun record(rows: List<Row>, takes: List<Take>, flags: Int) = guarded(null) { log().record(rows, takes, flags) }
+    override fun recordContinued(rows: List<Row>, flags: Int, continued: String) = guarded(null) { log().record(rows, flags = flags, continued = continued) }
     override fun pin(code: Code, text: String, reading: String, on: Boolean) = guarded(Unit) { log().pin(code, text, reading, on) }
     override fun forget(text: String) = guarded(Unit) { log().forget(text) }
 

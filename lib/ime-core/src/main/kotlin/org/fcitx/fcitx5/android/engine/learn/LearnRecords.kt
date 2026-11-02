@@ -28,6 +28,7 @@ import org.fcitx.fcitx5.android.engine.learn.LearnRecord.NoPredict
 import org.fcitx.fcitx5.android.engine.learn.LearnRecord.NoPredictRow
 import org.fcitx.fcitx5.android.engine.learn.LearnRecord.PairRow
 import org.fcitx.fcitx5.android.engine.learn.LearnRecord.PendingRow
+import org.fcitx.fcitx5.android.engine.learn.LearnRecord.PhraseRow
 import org.fcitx.fcitx5.android.engine.learn.LearnRecord.Pin
 import org.fcitx.fcitx5.android.engine.learn.LearnRecord.PinRow
 import org.fcitx.fcitx5.android.engine.learn.LearnRecord.Restored
@@ -53,9 +54,9 @@ import java.io.DataOutputStream
  * type's end, read only while some are left ([intOr], [utfOr]): an older reader stops before
  * them, as [RecordFormat.read] does not ask that a record be read to its end. Types are never
  * reused. Allocated: events 1–15 and 28 ([EN_CORRECT]); events 16–27, 29–31 free (31 the
- * last event type); rows 32–48, 65 ([TABLE_BLOCK_ROW]) and 80 ([DATE_ROW]); 70–79 the backup
+ * last event type); rows 32–49 (49 [PHRASE_ROW]), 65 ([TABLE_BLOCK_ROW]) and 80 ([DATE_ROW]); 70–79 the backup
  * file's ([backup.LearnBackup]; 73 [backup.BackupMerge.ORIGIN] the one a log may also hold, 74 its
- * END, 75–79 kept for the file), never a log's. Free rows: 49–64, 66–69, 81 on. Only snapshot
+ * END, 75–79 kept for the file), never a log's. Free rows: 50–64, 66–69, 81 on. Only snapshot
  * rows name a kind by its id ([KIND], scoped to the snapshot); events, and the rows an [Undo] puts
  * back, name it in full. A fold keeps the ids the snapshot it read had ([SnapshotWriter]), so a row
  * of a later build's that names a kind by id still names the same one.
@@ -110,6 +111,8 @@ object LearnRecords {
     const val IMPORTED_ROW: Byte = 47
     const val WORD_USE_ROW: Byte = 48
     const val DATE_ROW: Byte = 80
+    /** A whole phrase's count (U-73, [PhraseRow]). */
+    const val PHRASE_ROW: Byte = 49
     /** Step 2's (tables): a table word the user blocked, put in and taken out by TableBlock (15) as they block it and let it show again, and kept by a snapshot. */
     const val TABLE_BLOCK_ROW: Byte = 65
 
@@ -165,6 +168,7 @@ object LearnRecords {
     private fun laterRowType(record: LearnRecord): Byte = when (record) {
         is DateRow -> DATE_ROW
         is TableBlockRow -> TABLE_BLOCK_ROW
+        is PhraseRow -> PHRASE_ROW
         is Unknown -> record.type
         else -> error("not a row: $record")
     }
@@ -178,6 +182,8 @@ object LearnRecords {
                 r.rows.forEach { row(it) }
                 writeByte(r.takes.size)
                 r.takes.forEach { take(it) }
+                // appended (U-73), only where there is one: an older reader stops before it
+                if (r.continued.isNotEmpty()) writeUTF(r.continued)
             }
             is Undo -> {
                 stamp(r.undoneSeq, r.minute, r.day, r.localDay)
@@ -345,6 +351,11 @@ object LearnRecords {
                 writeInt(r.localDay)
             }
             is TableBlockRow -> listOf(r.im, r.code, r.text).forEach(::writeUTF)
+            is PhraseRow -> {
+                writeUTF(r.text)
+                writeInt(r.count)
+                writeInt(r.lastDay)
+            }
             is Unknown -> write(r.fields)
             else -> error("not a row: $r")
         }
@@ -500,6 +511,7 @@ object LearnRecords {
                     readLong(), readInt(), readInt(), readInt(), readUnsignedByte(),
                     List(readUnsignedShort()) { row() },
                     List(readUnsignedByte()) { take() },
+                    utfOr(""),
                 )
                 UNDO -> {
                     val seq = readLong()
@@ -572,6 +584,7 @@ object LearnRecords {
                 WORD_USE_ROW -> WordUseRow(readUTF(), readUTF(), days())
                 DATE_ROW -> DateRow(readInt(), readInt())
                 TABLE_BLOCK_ROW -> TableBlockRow(readUTF(), readUTF(), readUTF())
+                PHRASE_ROW -> PhraseRow(readUTF(), readInt(), readInt())
                 else -> Unknown(type, ByteArray(available()).also { readFully(it) })
             }
         }

@@ -129,11 +129,11 @@ class LearnLog(
      * a commit too long for a record losing its level-3 rows first, then itself. Null if nothing
      * was kept.
      */
-    fun record(rows: List<Row>, takes: List<Take> = emptyList(), flags: Int = 0): Commit? {
+    fun record(rows: List<Row>, takes: List<Take> = emptyList(), flags: Int = 0, continued: String = ""): Commit? {
         if (rows.isEmpty()) return null
         val stamp = LearnClock.stamp(clock, state, commit = true)
         // a count of takes is a byte: more in one commit than anyone takes, the first so many
-        var commit = Commit(state.nextSeq, stamp.minute, stamp.day, stamp.localDay, flags, rows, takes.take(MAX_TAKES))
+        var commit = Commit(state.nextSeq, stamp.minute, stamp.day, stamp.localDay, flags, rows, takes.take(MAX_TAKES), continued)
         var bytes = encoded(commit)
         if (bytes == null) {
             commit = commit.copy(rows = rows.filter { it.flags and (Row.PICK or Row.WHOLE) != 0 })

@@ -61,6 +61,8 @@ class LearningMenuTest {
             assertEquals(if (tier in afterWord) reasons.getValue(tier) else Reason.PREDICTION, LearningMenu.reason(Why(tier, 3, predicted)))
         }
         assertEquals(Reason.PREDICTION, LearningMenu.reason(Why(null, 0, predicted)))
+        // the rest of a whole phrase (U-73): that it was put in whole, whatever its tier
+        assertEquals(Reason.PHRASE, LearningMenu.reason(Why(Tier.USED, 3, predicted, "你好呀亲爱的")))
         // a 联想's, as the session gives it: EnginesLearningTest.aPredictionsWhyIsThatItFollowsTheWordBefore
         assertEquals(Reason.UNKNOWN, LearningMenu.reason(Why(null)))
         assertEquals(Reason.UNKNOWN, LearningMenu.reason(null))

@@ -28,6 +28,7 @@ import org.fcitx.fcitx5.android.engine.learn.LearnRecord.NoPredict
 import org.fcitx.fcitx5.android.engine.learn.LearnRecord.NoPredictRow
 import org.fcitx.fcitx5.android.engine.learn.LearnRecord.PairRow
 import org.fcitx.fcitx5.android.engine.learn.LearnRecord.PendingRow
+import org.fcitx.fcitx5.android.engine.learn.LearnRecord.PhraseRow
 import org.fcitx.fcitx5.android.engine.learn.LearnRecord.Pin
 import org.fcitx.fcitx5.android.engine.learn.LearnRecord.PinRow
 import org.fcitx.fcitx5.android.engine.learn.LearnRecord.Restored
@@ -98,6 +99,8 @@ class LearnState {
     val pending = HashMap<String, Pending>()
     val mine = HashMap<String, Mine>()
     val pairs = HashMap<PairKey, Counted>()
+    /** The whole commits of [Phrases] by their text, and the 联想 that went on with one (U-73). */
+    val phrases = HashMap<String, Counted>()
     val pins = HashMap<Code, Words>()
     val bars = HashMap<Take, Counted>()
     val enWords = HashMap<String, EnWord>()
@@ -159,7 +162,7 @@ class LearnState {
     fun takeChanges(): Changes = changes.also { changes = Changes() }
 
     /** Whether nothing is learned: a log of a snapshot of nothing, as a first start leaves it, is none. */
-    fun isEmpty() = stats.isEmpty() && wordUses.isEmpty() && firsts.isEmpty() && pending.isEmpty() && mine.isEmpty() && pairs.isEmpty() && pins.isEmpty() &&
+    fun isEmpty() = stats.isEmpty() && wordUses.isEmpty() && firsts.isEmpty() && pending.isEmpty() && mine.isEmpty() && pairs.isEmpty() && phrases.isEmpty() && pins.isEmpty() &&
         bars.isEmpty() && enWords.isEmpty() && enPairs.isEmpty() && tableWords.isEmpty() && noPredict.isEmpty() && tableBlocks.isEmpty() &&
         imports.isEmpty() && kept.isEmpty()
 
@@ -244,6 +247,7 @@ class LearnState {
             is PairRow -> pairs[PairKey(record.prev, record.next, record.nextReading)] = Counted(record.count, record.lastDay)
             is PinRow -> pins[record.code] = Words.of(record.text, record.reading)
             is BarRow -> bars[record.take] = Counted(record.count, record.lastDay)
+            is PhraseRow -> phrases[record.text] = Counted(record.count, record.lastDay)
             is EnWordRow -> enWords[record.word] = EnWord(record.flags, record.uses.copy())
             is EnPairRow -> enPairs[record.prev to record.word] = Counted(record.count, record.lastDay)
             is TableWordRow -> {
@@ -306,6 +310,7 @@ class LearnState {
         dates.keys.removeAll { it < from }
         pending.values.removeAll { old(it.firstDay, today) }
         pairs.values.removeAll { old(it.lastDay, today) }
+        phrases.values.removeAll { old(it.lastDay, today) }
         bars.values.removeAll { old(it.lastDay, today) }
         enPairs.values.removeAll { old(it.lastDay, today) }
         val en = enWords.values.iterator()
@@ -342,6 +347,7 @@ class LearnState {
             wordsOf(row, c) { w -> wordUses.getOrPut(w.text) { HashMap(2) }.getOrPut(w.reading) { DayCounts() }.add(c.day, 1) }
             if (c.flags and Commit.UNPAIRED == 0) pairsOf(row) { key -> pairs.getOrPut(key) { Counted(0, c.day) }.let { it.count++; it.lastDay = c.day } }
         }
+        phrasesOf(c) { text -> phrases.getOrPut(text) { Counted(0, c.day) }.let { it.count++; it.lastDay = c.day } }
         for (take in c.takes) bars.getOrPut(take) { Counted(0, c.day) }.let { it.count++; it.lastDay = c.day }
         return befores.values.toList()
     }
@@ -475,6 +481,20 @@ class LearnState {
         }
     }
 
+    /**
+     * The whole phrases [c] used (U-73): its whole rows' texts, and the phrase a 联想 picked went
+     * on with; none where it learns no pairs (U-91). A 联想's own text is not one: what was typed
+     * whole is, as the user typed it.
+     */
+    private inline fun phrasesOf(c: Commit, each: (String) -> Unit) {
+        if (c.flags and Commit.UNPAIRED != 0) return
+        for (row in c.rows) {
+            if (!row.whole || row.flags and Row.RETYPED != 0 || row.code.kind == Kinds.PREDICTION) continue
+            if (Phrases.learnable(row.words.text)) each(row.words.text)
+        }
+        if (Phrases.learnable(c.continued)) each(c.continued)
+    }
+
     private fun undo(u: Undo) {
         changes.recount = true
         when (val c = u.undone) {
@@ -520,6 +540,7 @@ class LearnState {
             wordsOf(row, c) { unuse(it, c.day) }
             if (c.flags and Commit.UNPAIRED == 0) pairsOf(row) { key -> pairs[key]?.let { if (--it.count <= 0) pairs.remove(key) } }
         }
+        phrasesOf(c) { text -> phrases[text]?.let { if (--it.count <= 0) phrases.remove(text) } }
         for (take in c.takes) bars[take]?.let { if (--it.count <= 0) bars.remove(take) }
     }
 
@@ -561,6 +582,8 @@ class LearnState {
         pending.remove(text)
         dropMine(text)
         pairs.keys.removeAll { it.prev == text || it.next == text }
+        // a whole phrase deleted from its long press (U-73): only by its own text, as a word's forget leaves those it is in (C52)
+        phrases.remove(text)
         // the tables forget it too (Engines.forgottenEverywhere): their saved words as their logs have them
         if (tableWords.keys.removeAll { it.third == text }) tableWordsVersion++
         // an imported word deleted is gone (U-82 删除)
@@ -655,6 +678,7 @@ class LearnState {
         for ((k, c) in pairs.entries.sortedWith(compareBy({ it.key.prev }, { it.key.next }, { it.key.nextReading }))) {
             add(PairRow(k.prev, k.next, k.nextReading, c.count, c.lastDay))
         }
+        for ((t, c) in phrases.entries.sortedBy { it.key }) add(PhraseRow(t, c.count, c.lastDay))
         for ((code, w) in pins.entries.sortedWith(compareBy({ it.key.kind }, { it.key.keys }))) add(PinRow(code, w.text, w.reading))
         for ((t, c) in bars.entries.sortedWith(compareBy({ it.key.layout }, { it.key.digits }, { it.key.syllable }))) add(BarRow(t, c.count, c.lastDay))
         for ((word, w) in enWords.entries.sortedBy { it.key }) add(EnWordRow(word, w.flags, w.uses))
