@@ -139,6 +139,11 @@ abstract class BaseInputView(
     /** The floating code strip's rectangle in window pixels into [out] while it shows, for the chip to keep off; false else. */
     protected open fun undoStrip(out: Rect): Boolean = false
 
+    /** The floating code strip came, went, moved or grew: the chip shown keeps off it. */
+    protected fun undoStripMoved() {
+        undoChip?.reposition()
+    }
+
     private val undoKeyboard = Rect()
     private val undoScreen = Rect()
     private val undoStripAt = Rect()

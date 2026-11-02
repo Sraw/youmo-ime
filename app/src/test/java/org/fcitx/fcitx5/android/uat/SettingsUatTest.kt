@@ -154,7 +154,7 @@ class SettingsUatTest {
     fun aDarkThemeTurnsPreviewAndKeyboardDark() {
         ThemeManager.prefs.followSystemDayNightTheme.setValue(false)
         ThemeManager.setNormalModeTheme(ThemePreset.PixelLight)
-        // the preview as shipped (a harness before may have left the code row embedded)
+        // the preview as shipped, the tests' baseline embedded (OneDefaultPreferencesShadow)
         ThemeManager.prefs.codeRow.setValue(CodeRowStyle.Floating)
         try {
             activity
@@ -180,6 +180,7 @@ class SettingsUatTest {
         } finally {
             ThemeManager.setNormalModeTheme(ThemePreset.PixelLight)
             ThemeManager.prefs.followSystemDayNightTheme.setValue(ThemeManager.prefs.followSystemDayNightTheme.defaultValue)
+            ThemeManager.prefs.codeRow.setValue(CodeRowStyle.Embedded)
         }
     }
 

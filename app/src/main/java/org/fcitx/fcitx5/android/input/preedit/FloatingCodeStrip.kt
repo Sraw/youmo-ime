@@ -41,10 +41,12 @@ class FloatingCodeStrip(ctx: Context, theme: Theme, keyBorder: Boolean, content:
     private val radius = dp(CORNER_DP).toFloat()
 
     // the colour the bar looks: the keyboard's under bordered keys, the bar's own else; a theme's
-    // picture is not carried out to the strip
+    // picture is not carried out to the strip. A see-through bar (the Transparent themes, 15% black)
+    // is the keyboard's colour seen through it: made 90% opaque as it is, black text sat on black
     private val shape = GradientDrawable().apply {
         val picture = theme is Theme.Custom && theme.backgroundImage != null
-        setColor(ColorUtils.setAlphaComponent(if (keyBorder || picture) theme.backgroundColor else theme.barColor, ALPHA))
+        val looks = if (keyBorder || picture) theme.backgroundColor else ColorUtils.compositeColors(theme.barColor, theme.backgroundColor)
+        setColor(ColorUtils.setAlphaComponent(looks, ALPHA))
     }
 
     init {

@@ -39,8 +39,8 @@ class CodeStripPlacementTest {
             "left of the room: kept in at the left" to {
                 assertEquals(Place(0, 1134, false), CodeStripPlacement.place(Box(-50, 1200, 850, 1900), portrait, 300, 66))
             },
-            "no room above or below: above, over the status bar" to {
-                assertEquals(Place(0, 40, false), CodeStripPlacement.place(Box(0, 106, 1080, 2340), portrait, 300, 66))
+            "no room above or below: over the board's top, under the status bar" to {
+                assertEquals(Place(0, 80, false), CodeStripPlacement.place(Box(0, 106, 1080, 2340), portrait, 300, 66))
             },
         ),
         { it.first },

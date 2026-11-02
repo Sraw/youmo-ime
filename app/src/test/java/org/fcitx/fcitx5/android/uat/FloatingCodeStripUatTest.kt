@@ -4,10 +4,13 @@
  */
 package org.fcitx.fcitx5.android.uat
 
+import android.graphics.Color
 import android.graphics.Rect
+import android.graphics.drawable.GradientDrawable
 import android.inputmethodservice.InputMethodService
 import android.view.View
 import android.view.ViewGroup
+import android.widget.HorizontalScrollView
 import android.widget.TextView
 import androidx.core.view.children
 import androidx.core.view.isVisible
@@ -16,11 +19,11 @@ import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.core.EngineState
 import org.fcitx.fcitx5.android.core.FormattedText
-import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.core.InputMethodEntry
 import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.data.theme.ThemePreset
+import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.host.HostEvent
 import org.fcitx.fcitx5.android.input.KeyboardHarness
 import org.fcitx.fcitx5.android.input.floating.FloatingHandle
@@ -34,6 +37,7 @@ import org.fcitx.fcitx5.android.input.preedit.SyllableStrip
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -72,6 +76,9 @@ class FloatingCodeStripUatTest {
         style: CodeRowStyle = CodeRowStyle.Floating,
     ): KeyboardHarness {
         harness?.close()
+        // set here, put back once at the test's end: a harness's own would flip it back and forth at
+        // each open, every flip rebuilding every keyboard alive (the JVM ran out of memory)
+        if (ThemeManager.prefs.codeRow.getValue() != style) prefs.set(ThemeManager.prefs.codeRow, style)
         return KeyboardHarness(theme, im, keyboards = keyboards, codeRow = style).also {
             harness = it
             it.start()
@@ -279,5 +286,82 @@ class FloatingCodeStripUatTest {
             typing("ni hk", InputMethodCatalog.SHUANGPIN, "ni", "nu")
             h.capture("FloatingCodeStripUatTest/shuangpin18_$name", h.inputView)
         }
+    }
+    // the Transparent themes' bar is 15% / 30% black over the keyboard: the strip the colour that looks
+    @Test
+    @Uat("ST-48")
+    fun onTheTransparentThemesTheStripIsTheBarAsItLooks() {
+        for ((theme, name) in listOf(ThemePreset.TransparentLight to "light", ThemePreset.TransparentDark to "dark")) {
+            open(theme = theme)
+            typing("jin tian qing")
+            val colour = (strip().background as GradientDrawable).color!!.defaultColor
+            assertEquals(FloatingCodeStrip.ALPHA, Color.alpha(colour))
+            val text = h.inputView.findViewById<HorizontalScrollView>(R.id.code_row_text)
+            val ink = KeyboardHarness.all(text).filterIsInstance<TextView>().first().currentTextColor
+            // the code readable on it: far apart in lightness
+            val gap = kotlin.math.abs(Color.luminance(colour or 0xff000000.toInt()) - Color.luminance(ink))
+            assertTrue("$name: strip ${Integer.toHexString(colour)} text ${Integer.toHexString(ink)}", gap > 0.4f)
+            h.capture("FloatingCodeStripUatTest/transparent_$name", h.inputView)
+        }
+    }
+
+    @Test
+    @Uat("ST-48")
+    fun aLongCodeScrollsInTheStripToTheCursor() {
+        open()
+        typing("zhuang bu hao kuo ni hao a ni hao a ni hao a ni hao a ni hao a ni hao")
+        val box = h.box(strip())
+        assertEquals("as wide as the keyboard at most", h.box(h.keyboard).width(), box.width())
+        val codeRow = h.inputView.findViewById<HorizontalScrollView>(R.id.code_row_text)
+        val content = codeRow.getChildAt(0)
+        assertTrue("${content.width} in ${codeRow.width}", content.width > codeRow.width)
+        assertTrue("scrolled ${codeRow.scrollX}", codeRow.scrollX + codeRow.width >= content.width - 32 * dp)
+    }
+
+    @Test
+    @Uat("ST-48")
+    fun theSwitchFlippedWithTheKeyboardUp() {
+        open()
+        typing("ni")
+        assertTrue(shownStrip())
+        prefs.set(ThemeManager.prefs.codeRow, CodeRowStyle.Embedded)
+        h.idle()
+        h.relayout()
+        assertNull("no strip embedded", KeyboardHarness.find<FloatingCodeStrip>(h.inputView))
+        assertTrue("the row in the keyboard", inKeyboard(h.inputView.findViewById(R.id.code_row_text)))
+        ThemeManager.prefs.codeRow.setValue(CodeRowStyle.Floating)
+        h.idle()
+        typing("ni")
+        assertTrue(shownStrip())
+        assertFalse(inKeyboard(h.inputView.findViewById(R.id.code_row_text)))
+    }
+
+    // a notice kept as keys are typed (what the engine says as a key fails): off the strip that comes under it
+    @Test
+    @Uat("ST-48")
+    fun aSteadyNoticeMakesWayForTheStrip() {
+        open()
+        drawn()
+        h.service.say("词库没装上", steady = true)
+        h.advance(1000)
+        val before = h.noticeBox()
+        typing("zhuang bu hao kuo ni hao a ni hao a ni hao")
+        h.advance(1000)
+        val strip = region()!!
+        val chip = h.noticeBox()
+        assertTrue("$chip off $strip (was $before)", !Rect.intersects(chip, strip))
+        assertTrue("above it: $chip", chip.bottom <= strip.top)
+    }
+
+    @Test
+    @Uat("ST-50")
+    @Config(qualifiers = "w851dp-h393dp-land-440dpi")
+    fun inLandscapeTheStripIsOverTheKeyboard() {
+        open()
+        typing("jin tian qing")
+        val keyboard = h.box(h.keyboard)
+        assertEquals(keyboard.top, h.box(strip()).bottom)
+        assertEquals(keyboard.left, h.box(strip()).left)
+        h.capture("FloatingCodeStripUatTest/landscape", h.inputView)
     }
 }

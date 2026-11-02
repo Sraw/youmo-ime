@@ -32,7 +32,13 @@ class OneDefaultPreferencesShadow : ShadowContextImpl() {
         if (name == null || !name.endsWith("_preferences")) return super.getSharedPreferences(name, mode)
         // not by the file: each test's data dir is a temporary one of its own
         val key = "$name ${context.isDeviceProtectedStorage}"
-        return synchronized(shared) { shared.getOrPut(key) { super.getSharedPreferences(name, mode) } }
+        return synchronized(shared) {
+            shared.getOrPut(key) {
+                // 编码行 embedded for every test (0.5.0's keyboard, its goldens and geometry), as a device
+                // that chose it: a test of the floating strip (shipped by default) asks for it, and puts it back
+                super.getSharedPreferences(name, mode).also { it.edit().putString("code_row_style", "Embedded").commit() }
+            }
+        }
     }
 
     companion object {

@@ -76,10 +76,9 @@ class KeyboardHarness(
     /** Each input method's keyboard (I1), [NINE_KEYS] pinyin's nine keys: set before the keyboard is made, put back at [close]; null leaves the preferences as they are. */
     keyboards: ImKeyboards.Chosen? = null,
     /**
-     * 编码行: embedded unless a test asks for the strip floating (the default since 0.5.1), so the
-     * keyboard's goldens and geometry stay 0.5.0's; set before the keyboard is made and left so. Not
-     * put back: each change rebuilds the input view of every service a test left alive, and two a
-     * test ran the JVM out of memory; a test reading it without a harness sets it itself.
+     * 编码行: embedded, every test's baseline (OneDefaultPreferencesShadow), unless a test asks for the
+     * strip floating (the default since 0.5.1): set before the keyboard is made, put back at [close].
+     * Only a change is made: each one rebuilds the input view of every keyboard alive.
      */
     codeRow: CodeRowStyle = CodeRowStyle.Embedded,
 ) : AutoCloseable {
@@ -91,9 +90,11 @@ class KeyboardHarness(
 
     private val keyboardsWere = keyboards?.let { AppPrefs.getInstance().keyboard.imKeyboards() }
 
+    private val codeRowWas = ThemeManager.prefs.codeRow.getValue().takeIf { it != codeRow }
+
     init {
         keyboards?.let(::setKeyboards)
-        if (ThemeManager.prefs.codeRow.getValue() != codeRow) ThemeManager.prefs.codeRow.setValue(codeRow)
+        codeRowWas?.let { ThemeManager.prefs.codeRow.setValue(codeRow) }
         val connection = host?.let { HarnessConnection(scope, it) } ?: FakeHostConnection(scope, api)
         HostDaemon.testConnection = { connection }
         // the seam is global: a harness that fails to build leaves it to no later test (no close() to call)
@@ -114,6 +115,7 @@ class KeyboardHarness(
             idle()
         } catch (e: Throwable) {
             keyboardsWere?.let(::setKeyboards)
+            codeRowWas?.let(ThemeManager.prefs.codeRow::setValue)
             HostDaemon.testConnection = null
             scope.cancel()
             throw e
@@ -631,6 +633,7 @@ class KeyboardHarness(
             rememberedAddresses.setValue("")
         }
         keyboardsWere?.let(::setKeyboards)
+        codeRowWas?.let(ThemeManager.prefs.codeRow::setValue)
         HostDaemon.testConnection = null
         scope.cancel()
     }

@@ -751,7 +751,7 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
         private fun codeLayout(im: String?) =
             ImKeyboards.layoutOf(im.orEmpty(), AppPrefs.getInstance().keyboard.imKeyboards(), EngineState.shuangpinScheme)
 
-        /** [preeditHeight] for [im] with each input method's keyboard as [chosen] has it, 双拼's under [scheme]. */
+        /** The embedded row's height for [im] with each input method's keyboard as [chosen] has it, 双拼's under [scheme]; floating or not. */
         fun preeditHeight(im: String?, chosen: ImKeyboards.Chosen, scheme: ShuangpinScheme): Int =
             CodeRowHeight.dp(ImKeyboards.layoutOf(im.orEmpty(), chosen, scheme))
 

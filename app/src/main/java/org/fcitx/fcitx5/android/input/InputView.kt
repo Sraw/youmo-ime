@@ -682,6 +682,8 @@ class InputView(
             // the touchable region is worked out again on the next traversal (onComputeInsets)
             strip.requestLayout()
         }
+        // a notice shown keeps off it as it grows and goes with the board (nothing done if none, or in place)
+        undoStripMoved()
     }
 
     /**
@@ -731,7 +733,14 @@ class InputView(
                 preeditEmptyState.updatePreeditEmptyState(preedit = it.preedit)
                 broadcaster.onInputPanelUpdate(it)
                 // floating, there only while there is a code: from the first key till it goes up or is cleared
-                codeStrip?.let { strip -> if (preedit.ui.visible != (strip.visibility != GONE)) strip.isVisible = preedit.ui.visible }
+                codeStrip?.let { strip ->
+                    if (preedit.ui.visible != (strip.visibility != GONE)) {
+                        strip.isVisible = preedit.ui.visible
+                        // at once, not on the next frame: the touchable region of this one is worked out first
+                        placeCodeStrip()
+                        if (!strip.isVisible) undoStripMoved()
+                    }
+                }
             }
             is HostEvent.InputMethodChanged -> {
                 updateCodeRow(it.im)

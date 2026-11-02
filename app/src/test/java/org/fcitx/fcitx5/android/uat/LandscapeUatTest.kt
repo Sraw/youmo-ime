@@ -168,7 +168,7 @@ class LandscapeUatTest {
     @Test
     @Uat("LS-10")
     fun thePreviewSplitsToo() {
-        // the preview as shipped (a harness before may have left the code row embedded)
+        // the preview as shipped, the tests' baseline embedded (OneDefaultPreferencesShadow)
         prefs.set(ThemeManager.prefs.codeRow, CodeRowStyle.Floating)
         val st = SettingsHarness().also { settings = it }
         st.open(SettingsRoute.Theme)
