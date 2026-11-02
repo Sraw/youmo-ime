@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.data.clipboard.db
 
+import androidx.paging.PagingSource
 import androidx.room.Room
 import kotlinx.coroutines.test.runTest
 import org.junit.After
@@ -89,5 +90,26 @@ class ClipboardDaoTest {
         assertNotNull(dao.get(awaitingUndo))
         assertNotNull(dao.get(pinned))
         assertNotNull(dao.get(recent))
+    }
+
+    private suspend fun order(): List<String> {
+        val page = dao.allEntries().load(PagingSource.LoadParams.Refresh(null, 50, false))
+        return (page as PagingSource.LoadResult.Page).data.map { it.text }
+    }
+
+    @Test
+    fun anUnpinnedEntryUsedComesFirstOfTheUnpinnedAPinnedOneStays() = runTest {
+        add("p1", 500L, pinned = true)
+        val p2 = add("p2", 400L, pinned = true)
+        add("a", 3000L)
+        val b = add("b", 2000L)
+        add("c", 1000L)
+        dao.updateTimeIfUnpinned(b, 5000L)
+        assertEquals(listOf("p1", "p2", "b", "a", "c"), order())
+        dao.updateTimeIfUnpinned(p2, 6000L)
+        assertEquals(listOf("p1", "p2", "b", "a", "c"), order())
+        // the limit drops the least recently used: c, not b
+        dao.deleteUnpinnedEarlierThan(2000L)
+        assertEquals(listOf("p1", "p2", "b", "a"), order())
     }
 }

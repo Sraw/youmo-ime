@@ -27,6 +27,7 @@ import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.prefs.ManagedPreference
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.input.FcitxInputMethodService
+import org.fcitx.fcitx5.android.input.broadcast.InputBroadcastReceiver
 import org.fcitx.fcitx5.android.input.clipboard.ClipboardStateMachine.BooleanKey.ClipboardDbEmpty
 import org.fcitx.fcitx5.android.input.clipboard.ClipboardStateMachine.BooleanKey.ClipboardListeningEnabled
 import org.fcitx.fcitx5.android.input.clipboard.ClipboardStateMachine.State.AddMore
@@ -47,7 +48,7 @@ import org.fcitx.fcitx5.android.utils.styledColorOrDefault
 import org.mechdancer.dependency.manager.must
 import splitties.dimensions.dp
 
-class ClipboardWindow : InputWindow.ExtendedInputWindow<ClipboardWindow>() {
+class ClipboardWindow : InputWindow.ExtendedInputWindow<ClipboardWindow>(), InputBroadcastReceiver {
 
     private val service: FcitxInputMethodService by manager.inputMethodService()
     private val windowManager: InputWindowManager by manager.must()
@@ -123,6 +124,8 @@ class ClipboardWindow : InputWindow.ExtendedInputWindow<ClipboardWindow>() {
 
             override fun onPaste(entry: ClipboardEntry) {
                 service.commitOverEngine(entry.text)
+                // moved first when the panel closes: moved now, another entry would be under the finger
+                pasted += entry.id
                 if (clipboardReturnAfterPaste) windowManager.attachWindow(KeyboardWindow)
             }
         }
@@ -234,7 +237,20 @@ class ClipboardWindow : InputWindow.ExtendedInputWindow<ClipboardWindow>() {
         clipboardEnabledPref.registerOnChangeListener(clipboardEnabledListener)
     }
 
+    private val pasted = mutableListOf<Int>()
+
+    private fun movePasted() {
+        if (pasted.isEmpty()) return
+        val ids = pasted.toList()
+        pasted.clear()
+        service.lifecycleScope.launch { ClipboardManager.used(ids) }
+    }
+
+    // the input view replaced (a rotation, a theme) never detaches its windows, but finishes their input
+    override fun onFinishInput() = movePasted()
+
     override fun onDetached() {
+        movePasted()
         clipboardEnabledPref.unregisterOnChangeListener(clipboardEnabledListener)
         adapter.onDetached()
         adapter.removeLoadStateListener(loadStateListener)
