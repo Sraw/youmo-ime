@@ -49,6 +49,7 @@ object SettingsIndex {
         page(R.string.word_packs, SettingsRoute.PinyinDict(""))
         page(R.string.my_words, SettingsRoute.UserWords, R.string.word_packs)
         page(R.string.custom_phrases, SettingsRoute.PinyinCustomPhrase, R.string.word_packs)
+        page(R.string.quick_phrases, SettingsRoute.QuickPhrase(), R.string.word_packs)
         managed(context, R.string.theme_and_size, SettingsRoute.Theme, { ThemeSettingsFragment.build(it) }, this)
         managed(context, R.string.virtual_keyboard, SettingsRoute.Keys, { KeysSettingsFragment.build(it) }, this)
         add(Entry(context.getString(R.string.long_press_characters), context.getString(R.string.long_press_characters_summary),

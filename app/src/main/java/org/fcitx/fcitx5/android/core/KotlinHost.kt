@@ -51,7 +51,13 @@ import org.fcitx.fcitx5.android.host.Punctuation
 import org.fcitx.fcitx5.android.host.PunctuationConfig
 import org.fcitx.fcitx5.android.host.PunctuationEntry
 import org.fcitx.fcitx5.android.host.PunctuationProfile
-import org.fcitx.fcitx5.android.host.QuickPhraseTable
+import org.fcitx.fcitx5.android.host.QuickPhraseBook
+import androidx.core.content.ContextCompat
+import org.fcitx.fcitx5.android.data.quickphrase.QuickPhraseManager
+import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
+import org.fcitx.fcitx5.android.utils.AppUtil
+import org.fcitx.fcitx5.android.host.QuickPhraseEntry
+import org.fcitx.fcitx5.android.host.QuickPhraseHooks
 import org.fcitx.fcitx5.android.host.StatusEntry
 import timber.log.Timber
 import java.io.File
@@ -346,6 +352,7 @@ class KotlinHost(
     // ---- quick input, focus, status area, candidates
 
     override suspend fun triggerQuickPhrase() = onHost { triggerQuickPhrase(); Unit }
+    override suspend fun quickPhraseAt(index: Int) = onHost { quickPhraseAt(index) }
     override suspend fun triggerUnicode() = onHost { triggerUnicode(); Unit }
     override suspend fun focus(focus: Boolean) = onHost { focus(focus) }
     override suspend fun focusOutIn() = onHost { focusOutIn() }
@@ -492,6 +499,7 @@ class KotlinHost(
                 chttransEnabled = ModuleConfigs.chttrans(confTexts[ModuleConfigs.CHTTRANS]),
                 converter = ::converter,
                 quickPhrases = quickPhraseTable,
+                quickPhraseHooks = quickPhraseHooks,
                 charSelectData = ::charSelectData,
                 clipboard = { clipboardText },
             ),
@@ -595,20 +603,20 @@ class KotlinHost(
     // fcitx loads them as the addon loads, in C++ at no cost; here 0.4 s on a debug build, so on a
     // thread of their own, at the start in parallel with the engine and at a reload with the keys
     // typed meanwhile; a lookup before they are read waits for them
-    private fun quickPhrasesLater(): () -> QuickPhraseTable {
+    private fun quickPhrasesLater(): () -> QuickPhraseBook {
         val table = FutureTask { quickPhrases() }
         Thread(table, "host-quickphrase").start()
         return table::get
     }
 
-    // the user's (fcitx's data, which backups keep) before the built-in ones; the user's not read: the
-    // built-in ones still, the user told (nothing writes the user's, so nothing is written over them)
-    private fun quickPhrases(): QuickPhraseTable {
+    // the user's own (fcitx's data, which backups keep) and the built-in ones; the user's not read: the
+    // built-in ones still, the user told (the settings page reads them anew before it writes)
+    private fun quickPhrases(): QuickPhraseBook {
         val builtIn = AssetPkgDataDir(context.assets, BUILT_IN)
         val user = dataHome?.let(::FilePkgDataDir)
         if (user != null) {
             try {
-                return QuickPhraseTable.load(listOf(user, builtIn))
+                return QuickPhraseBook.load(user, builtIn)
             } catch (@Suppress("TooGenericExceptionCaught") e: Exception) {
                 // any slip reading the user's (not only IOException): the built-in ones, never a key's
                 // lookup failing in the FutureTask
@@ -617,10 +625,33 @@ class KotlinHost(
             }
         }
         return try {
-            QuickPhraseTable.load(listOf(builtIn))
+            QuickPhraseBook.load(null, builtIn)
         } catch (@Suppress("TooGenericExceptionCaught") e: Exception) {
             Timber.w(e, "quick phrases")
-            QuickPhraseTable.EMPTY
+            QuickPhraseBook.EMPTY
+        }
+    }
+
+    // quick input's ties to the app: the nine keys' letters, the habits (借手机), the use kept, ＋添加
+    private val quickPhraseHooks = object : QuickPhraseHooks {
+        override val nineKeys: NineKeyLetters
+            get() = NineKeyLetters.parse(AppPrefs.getInstance().keyboard.t9Letters.getValue())
+
+        override val withMine: Boolean get() = AppPrefs.getInstance().internal.useHabits.getValue()
+
+        override fun used(entry: QuickPhraseEntry, at: Long) {
+            // on the writer's thread, never the host's: a key is not held on a file
+            configThread.execute {
+                try {
+                    QuickPhraseManager.markUsed(entry, at)
+                } catch (e: IOException) {
+                    Timber.w(e, "quick phrase use")
+                }
+            }
+        }
+
+        override fun add() {
+            ContextCompat.getMainExecutor(context).execute { AppUtil.launchQuickPhraseEditor(context) }
         }
     }
 

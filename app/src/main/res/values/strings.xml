@@ -352,7 +352,7 @@
     <string name="learning_span_ten_minutes">The last 10 minutes</string>
     <string name="learning_span_hour">The last hour</string>
     <string name="learning_span_today">Today</string>
-    <string name="learning_clear_recent_message">Everything learned in this time is forgotten, as if you had not typed then. What you did yourself stays: pins, blocks, suggestions turned off, deletes, imports, words added, English words no longer corrected; files you exported are not touched. Auto backups saved in this time are dropped and a new one saved; you can no longer go back to before a restore.</string>
+    <string name="learning_clear_recent_message">Everything learned in this time is forgotten, as if you had not typed then. What you did yourself stays: quick input, pins, blocks, suggestions turned off, deletes, imports, words added, English words no longer corrected; files you exported are not touched. Auto backups saved in this time are dropped and a new one saved; you can no longer go back to before a restore.</string>
     <string name="learning_clear">Clear</string>
     <string name="learning_cleared">Cleared</string>
     <string name="learning_not_done">The candidates changed: nothing done</string>
@@ -382,9 +382,9 @@
     <string name="learning_kind_handwriting">Handwriting</string>
     <string name="learning_clear_learned">Clear what was learned</string>
     <string name="learning_clear_learned_summary">The orders and counts learned as you typed; your words, pins and blocks stay</string>
-    <string name="learning_clear_learned_message">Cleared:\n· the orders, corrections and counts learned everywhere, and what was typed once\n· the pairs and the suggestions learned\n· English\'s counts and order\n· the emoji and symbol panels\' recent\n\nKept:\n· words you added, pins, blocks, suggestions turned off, English words never corrected\n· your words (their counts back to 0)\n· imported words (as if never used here)\n· the order a table learned (reset it in the table\'s settings)\n\nCustom phrases are not cleared here. This install\'s auto backups are deleted too, and you can no longer go back to before a restore; backups of other installs or copied in are kept, and restoring them brings back what was cleared.</string>
+    <string name="learning_clear_learned_message">Cleared:\n· the orders, corrections and counts learned everywhere, and what was typed once\n· the pairs and the suggestions learned\n· English\'s counts and order\n· the emoji and symbol panels\' recent\n\nKept:\n· words you added, pins, blocks, suggestions turned off, English words never corrected\n· your words (their counts back to 0)\n· imported words (as if never used here)\n· the order a table learned (reset it in the table\'s settings)\n\nCustom phrases and quick input are not cleared here. This install\'s auto backups are deleted too, and you can no longer go back to before a restore; backups of other installs or copied in are kept, and restoring them brings back what was cleared.</string>
     <string name="learning_clear_all">Clear everything, as just installed</string>
-    <string name="learning_clear_all_message">Back to a fresh install. Cleared:\n· the orders, corrections and counts learned everywhere, the pairs and the suggestions learned\n· English\'s counts and order, the emoji and symbol panels\' recent\n· your words, words you added, imported words\n· pins, blocks, suggestions turned off, English words never corrected\n· the order a table learned\n\nKept:\n· custom phrases (delete them under Custom phrases)\n\nThis install\'s auto backups are deleted too, and you can no longer go back to before a restore; backups of other installs or copied in are kept, and restoring them brings back what was cleared.</string>
+    <string name="learning_clear_all_message">Back to a fresh install. Cleared:\n· the orders, corrections and counts learned everywhere, the pairs and the suggestions learned\n· English\'s counts and order, the emoji and symbol panels\' recent\n· your words, words you added, imported words\n· pins, blocks, suggestions turned off, English words never corrected\n· the order a table learned\n\nKept:\n· custom phrases (delete them under Custom phrases)\n· quick input, its entries and their order (delete them under Quick input)\n\nThis install\'s auto backups are deleted too, and you can no longer go back to before a restore; backups of other installs or copied in are kept, and restoring them brings back what was cleared.</string>
     <string name="learning_clear_do">Clear</string>
     <string name="learning_sort_recent">Recently learned first</string>
     <string name="learning_filter_unused">Only those not used for long</string>
@@ -838,7 +838,7 @@
     <string name="section_key_style">Key style</string>
     <string name="section_phrases">Phrases</string>
     <string name="punctuation_map_summary">What each punctuation key types in Chinese, such as ， for ,</string>
-    <string name="custom_phrases_summary">A short code for a longer text, such as dz for your address</string>
+    <string name="custom_phrases_summary">A short code for a longer text as you type pinyin, such as dz for your address; long, many-line or now-and-then text goes in Quick input</string>
     <string name="im_page_size_summary">Only in the physical keyboard\'s candidate window; every input method\'s, English too</string>
     <string name="home_input_methods_summary">Add and order them, and each one\'s own options</string>
     <string name="home_shared_input_summary">Shared by every input method: prediction, emoji, glide typing, fuzzy pinyin, punctuation</string>
@@ -915,4 +915,27 @@
     <string name="clipboard_split_commit">Insert</string>
     <string name="clipboard_split_reset">Clear</string>
     <string name="clipboard_split_cut">Only the first %d characters are split</string>
+    <string name="quick_phrases">Quick input</string>
+    <string name="quick_phrases_summary">Long press 符, type the start of a key and pick saved text; with nothing typed, all of it</string>
+    <string name="quick_phrases_page_hint">Long press 符 to come here: type the start of a key to pick saved text, or nothing to list it all, like a notebook. For a short code that comes up as you type pinyin, use Custom phrases.</string>
+    <string name="host_quick_phrase_add">+ Add</string>
+    <string name="host_quick_phrase_hint">type a key, or tap + Add for your own</string>
+    <string name="quick_phrase_key">Key</string>
+    <string name="quick_phrase_content">Content</string>
+    <string name="quick_phrase_key_invalid">A key has no spaces and at most 30 characters</string>
+    <string name="quick_phrase_content_too_long">At most 5000 characters</string>
+    <string name="quick_phrase_duplicate">The same key and content are there already</string>
+    <string name="quick_phrase_search">Search keys or content</string>
+    <string name="quick_phrase_built_in">Built in</string>
+    <string name="quick_phrase_built_in_emoji">Kaomoji (words such as yawn, happy)</string>
+    <string name="quick_phrase_built_in_emoji_eac">Emoji codes (such as :smile:)</string>
+    <string name="quick_phrase_built_in_latex">LaTeX symbols (such as \\alpha)</string>
+    <string name="quick_phrase_import_done">%1$d imported, %2$d duplicates skipped</string>
+    <string name="quick_phrase_deleted">Deleted</string>
+    <string name="quick_phrase_new">New quick input</string>
+    <string name="quick_phrase_change">Edit quick input</string>
+    <string name="quick_phrase_commit">Type it</string>
+    <string name="quick_phrase_copy">Copy</string>
+    <string name="quick_phrase_lines">(%1$d lines)</string>
+    <string name="clipboard_save_quick_phrase">Save as quick input</string>
 </resources>

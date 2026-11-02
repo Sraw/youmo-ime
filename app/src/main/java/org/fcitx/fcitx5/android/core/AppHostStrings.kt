@@ -22,6 +22,8 @@ class AppHostStrings(context: Context) : HostStrings {
     override val defaultGroup: String = res.getString(R.string.host_default_group)
     override val half: String = res.getString(R.string.host_half)
     override val quickPhrase: String = res.getString(R.string.host_quick_phrase_aux)
+    override val quickPhraseAdd: String = res.getString(R.string.host_quick_phrase_add)
+    override val quickPhraseHint: String = res.getString(R.string.host_quick_phrase_hint)
     override val unicode = UnicodeStrings(
         aux = res.getString(R.string.host_unicode_aux),
         hint = res.getString(R.string.host_unicode_hint),

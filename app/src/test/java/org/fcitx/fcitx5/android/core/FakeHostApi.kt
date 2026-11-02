@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.core
 
+import org.fcitx.fcitx5.android.host.QuickPhraseBook
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -276,6 +277,11 @@ class FakeHostApi : HostApi {
     override suspend fun triggerQuickPhrase() {
         calls += "triggerQuickPhrase()"
     }
+
+    /** What [quickPhraseAt] gives, by the candidate's index. */
+    val quickPhrases = mutableMapOf<Int, QuickPhraseBook.Found>()
+
+    override suspend fun quickPhraseAt(index: Int): QuickPhraseBook.Found? = quickPhrases[index]
 
     override suspend fun triggerUnicode() {
         calls += "triggerUnicode()"

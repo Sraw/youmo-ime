@@ -4,6 +4,8 @@
  */
 package org.fcitx.fcitx5.android.data
 
+import org.fcitx.fcitx5.android.data.quickphrase.QuickPhraseManager
+import org.fcitx.fcitx5.android.host.QuickPhraseEntry
 import androidx.room.Room
 import kotlinx.coroutines.test.runTest
 import org.fcitx.fcitx5.android.BuildConfig
@@ -352,6 +354,30 @@ class UserDataManagerTest {
     }
 
     private fun File.put(path: String, text: String) = File(this, path).apply { parentFile!!.mkdirs() }.writeText(text)
+
+    // 051 quick input: the user's entries, their order of use and the built-in tables turned off go
+    // with a backup and come back as it has them, what the phone has and the backup not deleted
+    @Test
+    @Uat("QU-16")
+    fun quickInputsEntriesOrderAndSwitchesRoundTripThroughABackup() {
+        val phone = moved("phone")
+        val mine = "gh https://github.com\naddr \"北京\\n3 号楼\"\n"
+        // a backup with settings: one without keeps all of the phone's
+        phone.config.put("conf/androidengine.conf", "PageSize=9\n")
+        phone.data.put("data/quickphrase.d/mine.mb", mine)
+        phone.data.put("data/quickphrase.d/mine.used", "5\tgh\t\"https://github.com\"\n")
+        phone.data.put("data/quickphrase.d/latex.mb.disable", "")
+        val zip = exported(phone).readBytes()
+        assertEquals(mine, entries(zip.inputStream())["external/data/data/quickphrase.d/mine.mb"])
+        val fresh = moved("fresh")
+        fresh.data.put("data/quickphrase.d/emoji.mb.disable", "the phone's, not the backup's")
+        UserDataManager.import(zip.inputStream(), fresh).getOrThrow()
+        val dir = File(fresh.data, "data/quickphrase.d")
+        assertEquals(mine, File(dir, "mine.mb").readText())
+        assertEquals(listOf(QuickPhraseEntry("gh", "https://github.com"), QuickPhraseEntry("addr", "北京\n3 号楼")), QuickPhraseManager.load(dir))
+        assertTrue(File(dir, "latex.mb.disable").exists())
+        assertFalse(File(dir, "emoji.mb.disable").exists())
+    }
 
     // A4: the config, data and themes in the app's own files go where every backup has had them
     // (external/config, external/data, external/theme: so older builds restore them and this one theirs), and
