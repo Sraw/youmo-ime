@@ -41,6 +41,7 @@ import org.fcitx.fcitx5.android.core.InputMethodEntry
 import org.fcitx.fcitx5.android.daemon.HostConnection
 import org.fcitx.fcitx5.android.daemon.HostDaemon
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
+import org.fcitx.fcitx5.android.input.preedit.CodeRowStyle
 import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.data.theme.ThemePreset
@@ -74,6 +75,13 @@ class KeyboardHarness(
     host: HostApi? = null,
     /** Each input method's keyboard (I1), [NINE_KEYS] pinyin's nine keys: set before the keyboard is made, put back at [close]; null leaves the preferences as they are. */
     keyboards: ImKeyboards.Chosen? = null,
+    /**
+     * 编码行: embedded unless a test asks for the strip floating (the default since 0.5.1), so the
+     * keyboard's goldens and geometry stay 0.5.0's; set before the keyboard is made and left so. Not
+     * put back: each change rebuilds the input view of every service a test left alive, and two a
+     * test ran the JVM out of memory; a test reading it without a harness sets it itself.
+     */
+    codeRow: CodeRowStyle = CodeRowStyle.Embedded,
 ) : AutoCloseable {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
@@ -85,6 +93,7 @@ class KeyboardHarness(
 
     init {
         keyboards?.let(::setKeyboards)
+        if (ThemeManager.prefs.codeRow.getValue() != codeRow) ThemeManager.prefs.codeRow.setValue(codeRow)
         val connection = host?.let { HarnessConnection(scope, it) } ?: FakeHostConnection(scope, api)
         HostDaemon.testConnection = { connection }
         // the seam is global: a harness that fails to build leaves it to no later test (no close() to call)

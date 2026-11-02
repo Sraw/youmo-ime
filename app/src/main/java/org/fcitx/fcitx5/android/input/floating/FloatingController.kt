@@ -140,6 +140,10 @@ class FloatingController(
     /** Hidden, or its field left. */
     fun inputEnded() = switch.inputEnded()
 
+    /** Floating, while it is dragged, scaled from or into the docked keyboard, or slid down to dock. */
+    val moving: Boolean
+        get() = placer?.dragging == true || switch.docking || (floating && (keyboard.scaleX != 1f || keyboard.scaleY != 1f))
+
     private fun drag(dx: Float, dy: Float) {
         if (switch.drag(dx, dy)) placer?.drag(dx, dy)
     }

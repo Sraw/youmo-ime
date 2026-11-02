@@ -891,6 +891,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     private var inputViewLocation = intArrayOf(0, 0)
 
     private val floatingRegion = Rect()
+    private val codeStripRegion = Rect()
 
     override fun onComputeInsets(outInsets: Insets) {
         if (inputDeviceMgr.isVirtualKeyboard && inputView?.floatingRegion(floatingRegion) == true) {
@@ -901,13 +902,24 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
                 visibleTopInsets = h
                 touchableInsets = Insets.TOUCHABLE_INSETS_REGION
                 touchableRegion.set(floatingRegion)
+                // the code strip floating over the app outside it (编码行) takes touches too
+                if (inputView?.codeStripRegion(codeStripRegion) == true) touchableRegion.union(codeStripRegion)
             }
         } else if (inputDeviceMgr.isVirtualKeyboard) {
-            inputView?.keyboardView?.getLocationInWindow(inputViewLocation)
+            val keyboard = inputView?.keyboardView
+            keyboard?.getLocationInWindow(inputViewLocation)
             outInsets.apply {
+                // the app laid out down to the keyboard's top, never moved as the strip comes and goes
                 contentTopInsets = inputViewLocation[1]
                 visibleTopInsets = inputViewLocation[1]
-                touchableInsets = Insets.TOUCHABLE_INSETS_VISIBLE
+                if (keyboard != null && inputView?.codeStripRegion(codeStripRegion) == true) {
+                    // above that top, touches reach the app but on the strip
+                    touchableInsets = Insets.TOUCHABLE_INSETS_REGION
+                    touchableRegion.set(0, inputViewLocation[1], decorView.width, decorView.height)
+                    touchableRegion.union(codeStripRegion)
+                } else {
+                    touchableInsets = Insets.TOUCHABLE_INSETS_VISIBLE
+                }
             }
         } else {
             val n = decorView.findViewById<View>(android.R.id.navigationBarBackground)?.height ?: 0

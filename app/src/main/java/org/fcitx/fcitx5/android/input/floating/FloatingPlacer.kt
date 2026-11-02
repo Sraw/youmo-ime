@@ -38,6 +38,9 @@ class FloatingPlacer(private val parent: View, private val view: View) {
 
     private var moved = false
 
+    /** While a drag moves it, till it is let go. */
+    val dragging get() = moved
+
     private val dock = FloatingDrag(view.context.dp(DOCK_SLOP_DP).toFloat())
 
     // the strip above the bottom the keyboard never goes into: the docking zone's mark shows there

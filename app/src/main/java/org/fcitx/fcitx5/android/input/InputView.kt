@@ -16,6 +16,7 @@ import android.os.Build
 import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
+import android.view.ViewTreeObserver
 import android.view.WindowInsets
 import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InlineSuggestionsResponse
@@ -79,6 +80,8 @@ import org.fcitx.fcitx5.android.input.picker.emojiPicker
 import org.fcitx.fcitx5.android.input.picker.emoticonPicker
 import org.fcitx.fcitx5.android.input.picker.symbolPicker
 import org.fcitx.fcitx5.android.input.popup.PopupComponent
+import org.fcitx.fcitx5.android.input.preedit.CodeStripPlacement
+import org.fcitx.fcitx5.android.input.preedit.FloatingCodeStrip
 import org.fcitx.fcitx5.android.input.preedit.PreeditComponent
 import org.fcitx.fcitx5.android.input.wm.InputWindow
 import org.fcitx.fcitx5.android.input.wm.InputWindowManager
@@ -122,6 +125,9 @@ class InputView(
 ) : BaseInputView(service, fcitx, theme) {
 
     private val keyBorder by ThemeManager.prefs.keyBorder
+
+    // the code row floating over the app (编码行), read once: the view is made anew as it changes
+    private val codeFloats = KawaiiBarComponent.codeRowFloats()
 
     private val customBackground = imageView {
         scaleType = ImageView.ScaleType.CENTER_CROP
@@ -187,7 +193,7 @@ class InputView(
     private val punctuation = PunctuationComponent()
     private val returnKeyDrawable = ReturnKeyDrawableComponent()
     private val preeditEmptyState = PreeditEmptyStateComponent()
-    private val preedit = PreeditComponent()
+    private val preedit = PreeditComponent(codeFloats)
 
     // the code row's height in dp, for the input method shown (KawaiiBarComponent.preeditHeight):
     // set anew on its change, never while typing in one
@@ -202,6 +208,9 @@ class InputView(
 
     // with candidates on the bar, above the whole keyboard (preedit row included): over the app, not a key
     override val undoAbove: View get() = keyboardView
+
+    // and above the floating code strip, never over it
+    override fun undoStrip(out: Rect): Boolean = codeStripRegion(out)
     override val undoAnchorShowsCandidates: Boolean
         get() = kawaiiBar.view.displayedChild == KawaiiBarStateMachine.State.Candidate.ordinal
 
@@ -357,7 +366,16 @@ class InputView(
     private val handleAtBottom = floatingController.handleAtBottom
 
     // the bars over the board and the docked handle go with it, moved across by their setting too
-    private val boardFollowers by lazy { listOfNotNull(barBackground, preedit.ui.root, kawaiiBar.view, floatingHandle?.takeIf { !floating }) }
+    private val boardFollowers by lazy {
+        listOfNotNull(barBackground, preedit.ui.root.takeIf { !codeFloats }, kawaiiBar.view, floatingHandle?.takeIf { !floating })
+    }
+
+    /**
+     * Floating over the app (编码行), the code row's strip: in this view, not in [keyboardView],
+     * which floating clips to its outline; placed outside the board's top-left as drawn, each frame
+     * ([placeCodeStrip]). Null embedded.
+     */
+    private val codeStrip: FloatingCodeStrip?
     private val boardMover by lazy { BoardMover(keyboardView, listOf(windowManager.view) + boardFollowers) }
 
     init {
@@ -407,12 +425,19 @@ class InputView(
                     rightToRight = LayoutParams.PARENT_ID
                 })
             }
-            add(preedit.ui.root, lParams(0, dp(codeRowDp)) {
-                if (floatingHandle != null && !handleAtBottom) below(floatingHandle) else topOfParent()
-                // start and end set in updateKeyboardSize, as the bar's
-            })
+            // the row at the top of the keyboard embedded; floating, the bar is, under a handle at the top
+            val top = if (codeFloats) null else preedit.ui.root.also {
+                add(it, lParams(0, dp(codeRowDp)) {
+                    if (floatingHandle != null && !handleAtBottom) below(floatingHandle) else topOfParent()
+                    // start and end set in updateKeyboardSize, as the bar's
+                })
+            }
             add(kawaiiBar.view, lParams(0, dp(KawaiiBarComponent.heightDp())) {
-                below(preedit.ui.root)
+                when {
+                    top != null -> below(top)
+                    floatingHandle != null && !handleAtBottom -> below(floatingHandle)
+                    else -> topOfParent()
+                }
                 // start and end set in updateKeyboardSize
             })
             // left and right, not start and end: a board docked right is on the right in any locale.
@@ -452,6 +477,13 @@ class InputView(
             bottomOfParent()
         })
         floatingController.setUp(keyboardView)
+        codeStrip = if (!codeFloats) null else FloatingCodeStrip(context, theme, keyBorder, preedit.ui.root).also {
+            // under the key previews, as the embedded row is
+            add(it, lParams(wrapContent, dp(KawaiiBarComponent.stripHeight(fcitx.runImmediately { inputMethodEntryCached }.uniqueName))) {
+                topOfParent()
+                leftToLeft = LayoutParams.PARENT_ID
+            })
+        }
         add(popup.root, lParams(matchParent, matchParent) {
             centerVertically()
             centerHorizontally()
@@ -602,6 +634,57 @@ class InputView(
     fun floatingRegion(out: Rect): Boolean = floatingController.region(out)
 
     /**
+     * Where the floating code strip is in the window while it shows, set into [out]: it takes
+     * touches over the app (the service adds it to the keyboard's region); false while it does not.
+     */
+    fun codeStripRegion(out: Rect): Boolean {
+        val strip = codeStrip ?: return false
+        if (strip.visibility != VISIBLE || !strip.isLaidOut) return false
+        strip.getLocationInWindow(stripAt)
+        out.set(stripAt[0], stripAt[1], stripAt[0] + strip.width, stripAt[1] + strip.height)
+        return true
+    }
+
+    private val stripAt = IntArray(2)
+    private val boardAt = IntArray(2)
+    private val viewAt = IntArray(2)
+
+    // each frame, the strip outside the board's top-left as it is drawn now: docked, at a side
+    // (one-handed, sliding across), floating and dragged; hidden while a floating keyboard is
+    // dragged or scaled (docking, undocking), where following it would shake
+    private val codeStripPlacer = ViewTreeObserver.OnPreDrawListener {
+        placeCodeStrip()
+        true
+    }
+
+    private fun placeCodeStrip() {
+        val strip = codeStrip ?: return
+        if (strip.visibility == GONE) return
+        val moving = floatingController.moving
+        strip.visibility = if (moving) INVISIBLE else VISIBLE
+        if (moving) return
+        val bar = kawaiiBar.view
+        bar.getLocationInWindow(boardAt)
+        val left = boardAt[0] + bar.paddingLeft
+        val right = boardAt[0] + bar.width - bar.paddingRight
+        keyboardView.getLocationInWindow(boardAt)
+        getLocationInWindow(viewAt)
+        val board = UndoChipPlacement.Box(left, boardAt[1], right, boardAt[1] + keyboardView.height)
+        val room = UndoChipPlacement.Box(viewAt[0], viewAt[1] + (floatingPlacer?.topInset ?: 0), viewAt[0] + width, viewAt[1] + height)
+        strip.maxWidth = right - left
+        val place = CodeStripPlacement.place(board, room, strip.width, strip.height)
+        strip.below = place.below
+        val x = (place.x - viewAt[0]).toFloat()
+        val y = (place.y - viewAt[1]).toFloat()
+        if (strip.translationX != x || strip.translationY != y) {
+            strip.translationX = x
+            strip.translationY = y
+            // the touchable region is worked out again on the next traversal (onComputeInsets)
+            strip.requestLayout()
+        }
+    }
+
+    /**
      * called when [InputView] is about to show, or restart
      */
     fun startInput(info: EditorInfo, capFlags: CapabilityFlags, restarting: Boolean = false) {
@@ -647,6 +730,8 @@ class InputView(
             is HostEvent.InputPanel -> {
                 preeditEmptyState.updatePreeditEmptyState(preedit = it.preedit)
                 broadcaster.onInputPanelUpdate(it)
+                // floating, there only while there is a code: from the first key till it goes up or is cleared
+                codeStrip?.let { strip -> if (preedit.ui.visible != (strip.visibility != GONE)) strip.isVisible = preedit.ui.visible }
             }
             is HostEvent.InputMethodChanged -> {
                 updateCodeRow(it.im)
@@ -662,6 +747,10 @@ class InputView(
 
     // the code row tall or thin for input method [im]; the keys keep their height (the cap aside)
     private fun updateCodeRow(im: String) {
+        codeStrip?.let { strip ->
+            val h = dp(KawaiiBarComponent.stripHeight(im))
+            if (strip.layoutParams.height != h) strip.updateLayoutParams { height = h }
+        }
         val rowDp = KawaiiBarComponent.preeditHeight(im)
         if (rowDp == codeRowDp) return
         codeRowDp = rowDp
@@ -692,11 +781,14 @@ class InputView(
     override fun onAttachedToWindow() {
         super.onAttachedToWindow()
         floatingController.attached()
+        if (codeStrip != null) viewTreeObserver.addOnPreDrawListener(codeStripPlacer)
         // the scopes are torn down on detach; a re-attached view would silently do nothing
         if (!viewScope.isActive) Timber.e(IllegalStateException("InputView re-attached after detach"))
     }
 
     override fun onDetachedFromWindow() {
+        // the window's tree outlives this view, made anew in the same window
+        viewTreeObserver.removeOnPreDrawListener(codeStripPlacer)
         floatingController.detached()
         advancedPrefs.unregisterOnChangeListener(onKeyboardSizeChangeListener)
         keyboardPrefs.unregisterOnChangeListener(onKeyboardSizeChangeListener)

@@ -27,9 +27,10 @@ import splitties.views.dsl.core.wrapContent
  * The row above the candidates for the code being typed ([PreeditComponent]): [PreeditUi]'s line
  * below put after the one above, for a row of one line's height ([CodeRow]); scrolled to keep the
  * cursor in sight, and a tap on it is [onTap]'s. The 14 or 18 keys' syllables ([syllables]) share the row
- * at its right end, in a part of their own: a tap on either is never the other's.
+ * at its right end, in a part of their own: a tap on either is never the other's. [wrap]: as wide
+ * as its text, for the floating strip ([FloatingCodeStrip]), which caps it; else across the whole row.
  */
-class CodeRowUi(ctx: Context, theme: Theme, setupTextView: TextView.() -> Unit) :
+class CodeRowUi(ctx: Context, theme: Theme, wrap: Boolean = false, setupTextView: TextView.() -> Unit) :
     PreeditUi(ctx, theme, setupTextView) {
 
     /** Where in the preedit a tap on the row puts the cursor, in code points (HostApi.moveCursor). */
@@ -49,7 +50,8 @@ class CodeRowUi(ctx: Context, theme: Theme, setupTextView: TextView.() -> Unit) 
 
     override val root: View = LinearLayout(ctx).apply {
         orientation = LinearLayout.HORIZONTAL
-        add(row, LinearLayout.LayoutParams(0, matchParent, 1f))
+        // wrapped, the code shrinks, not the syllables, where both are more than the strip's cap
+        add(row, LinearLayout.LayoutParams(if (wrap) wrapContent else 0, matchParent, 1f))
         add(syllables, LinearLayout.LayoutParams(wrapContent, matchParent))
     }
 

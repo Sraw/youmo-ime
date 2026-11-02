@@ -136,13 +136,18 @@ abstract class BaseInputView(
      */
     protected open fun undoFloating(keyboard: Rect, screen: Rect): Boolean = false
 
+    /** The floating code strip's rectangle in window pixels into [out] while it shows, for the chip to keep off; false else. */
+    protected open fun undoStrip(out: Rect): Boolean = false
+
     private val undoKeyboard = Rect()
     private val undoScreen = Rect()
+    private val undoStripAt = Rect()
 
     private fun undoPlace(width: Int, height: Int, aboveKeys: Boolean): UndoChipPlacement.Place {
         val gap = dp(4)
+        val strip = if (undoStrip(undoStripAt)) undoStripAt else null
         if (undoFloating(undoKeyboard, undoScreen)) {
-            return UndoChipPlacement.floating(undoScreen.box(), undoKeyboard.box(), width, height, gap)
+            return UndoChipPlacement.floating(undoScreen.box(), undoKeyboard.box(), width, height, gap, strip?.box())
         }
         val bar = IntArray(2).also { undoAnchor.getLocationInWindow(it) }
         val over = undoAbove
@@ -158,6 +163,7 @@ abstract class BaseInputView(
             belowBottom = if (undoBelowOk) aboveAt[1] + over.height else null,
             // off the bottom PopupWindow would clip it back over the keys
             bottomLimit = undoBottomLimit,
+            stripTop = strip?.top,
         )
     }
 

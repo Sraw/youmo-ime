@@ -377,6 +377,21 @@ binds (landscape, 很高) the area stays put and the keys give up the 14 dp inst
 preview draws the full keyboard, with the thin row. The prefs are in `recreateInputViewPrefs`. The
 bar's buttons keep their own 40 dp floor (`MIN_TOUCH_DP`), a different thing.
 
+That is the embedded row (`ThemePrefs.codeRow` = `CodeRowStyle.Embedded`, 0.5.0's). The default,
+`Floating`, puts the same `CodeRowUi` (wrapped: as wide as its text) in a `FloatingCodeStrip` over
+the app, while there is a code: `InputView` adds it to itself, not to `keyboardView`, which floating
+clips to its outline (`FloatingCorners`), and places it each frame from a pre-draw listener
+(`CodeStripPlacement` in ime-core: outside the board's top-left as drawn, the bar's left less its
+padding, so one-handed and floating it follows; under the board where there is no room above; at
+most the board's width), hidden while a floating keyboard is dragged or scaled
+(`FloatingController.moving`). The keyboard keeps no row for it (`CodeRowHeight.keyboardDp` 0, the
+cap counting the bar alone); the strip is 24 dp, 32 with the syllables (`stripDp`). Whether the
+syllables show is asked of the layout (`syllablesOwned(owns, showsStrip)`), no longer of the row's
+height. Docked the service's touchable insets become a region, the keyboard's band ∪ the strip
+(`InputView.codeStripRegion`), the content insets still the keyboard's top so the app never moves;
+floating, the strip is added to the keyboard's region. The undo chip keeps off it
+(`UndoChipPlacement` `stripTop` / `strip`). The physical keyboard's `CandidatesView` is unaffected.
+
 Pinyin's 18 keys (`Keys18`) are the grouped keyboard over `G18`, sending `Keyboard.pinyin18Key(code)`
 (L; is just L on pinyin); 双拼's 18 keys (`shuangpinKeyboard == Keys18`) the same keyboard with 双拼's
 codes, and 双拼's 14 keys (`Keys14`) the 14 keys' groups sending `Keyboard.shuangpin14Key(code)`; each

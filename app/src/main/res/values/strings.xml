@@ -813,6 +813,9 @@
     <string name="one_handed_exit">Full width</string>
     <string name="floating_keyboard">Floating keyboard</string>
     <string name="floating_keyboard_dock">Dock the keyboard</string>
+    <string name="code_row_style">Code row</string>
+    <string name="code_row_floating">Over the keyboard</string>
+    <string name="code_row_embedded">In the keyboard</string>
     <string name="floating_handle">Floating keyboard handle</string>
     <string name="floating_handle_bottom">Bottom</string>
     <string name="floating_handle_top">Top</string>

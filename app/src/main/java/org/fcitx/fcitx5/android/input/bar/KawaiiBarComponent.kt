@@ -72,6 +72,7 @@ import org.fcitx.fcitx5.android.input.keyboard.CodeRowHeight
 import org.fcitx.fcitx5.android.input.keyboard.CommonKeyActionListener
 import org.fcitx.fcitx5.android.input.keyboard.CustomGestureView
 import org.fcitx.fcitx5.android.input.keyboard.ImKeyboards
+import org.fcitx.fcitx5.android.input.preedit.CodeRowStyle
 import org.fcitx.fcitx5.android.input.keyboard.KeyboardWindow
 import org.fcitx.fcitx5.android.input.popup.PopupComponent
 import org.fcitx.fcitx5.android.input.preedit.PreeditComponent
@@ -734,9 +735,21 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
          * whether or not one is typed, so the keyboard keeps its height while typing. Tall enough to
          * tap where [im] shows the syllable strip, thin elsewhere ([CodeRowHeight]); the input view
          * sets it anew as the input method changes, and is made anew when either keyboard setting does.
+         * None floating over the app (编码行 浮在键盘上方, [codeRowFloats]): the strip is outside the keyboard.
          */
-        fun preeditHeight(im: String?): Int =
-            preeditHeight(im, AppPrefs.getInstance().keyboard.imKeyboards(), EngineState.shuangpinScheme)
+        fun preeditHeight(im: String?): Int = CodeRowHeight.keyboardDp(codeLayout(im), codeRowFloats())
+
+        /** The floating code strip's height in dp on [im]'s keyboard ([CodeRowHeight.stripDp]). */
+        fun stripHeight(im: String?): Int = CodeRowHeight.stripDp(codeLayout(im))
+
+        /** Whether [im]'s keyboard shows the code row's syllables ([CodeRowHeight.showsStrip]). */
+        fun showsStrip(im: String?): Boolean = CodeRowHeight.showsStrip(codeLayout(im))
+
+        /** Whether the code row floats over the app (编码行), a preference read: the input view is made anew as it changes. */
+        fun codeRowFloats(): Boolean = ThemeManager.prefs.codeRow.getValue() == CodeRowStyle.Floating
+
+        private fun codeLayout(im: String?) =
+            ImKeyboards.layoutOf(im.orEmpty(), AppPrefs.getInstance().keyboard.imKeyboards(), EngineState.shuangpinScheme)
 
         /** [preeditHeight] for [im] with each input method's keyboard as [chosen] has it, 双拼's under [scheme]. */
         fun preeditHeight(im: String?, chosen: ImKeyboards.Chosen, scheme: ShuangpinScheme): Int =

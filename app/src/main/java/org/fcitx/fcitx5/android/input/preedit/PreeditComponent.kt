@@ -21,7 +21,8 @@ import org.mechdancer.dependency.manager.must
 import splitties.dimensions.dp
 import splitties.views.horizontalPadding
 
-class PreeditComponent : UniqueComponent<PreeditComponent>(), Dependent, InputBroadcastReceiver,
+/** The code row; [floats]: in the strip over the app ([FloatingCodeStrip]), not embedded in the keyboard. */
+class PreeditComponent(private val floats: Boolean = false) : UniqueComponent<PreeditComponent>(), Dependent, InputBroadcastReceiver,
     ManagedHandler by managedHandler() {
 
     private val context by manager.context()
@@ -30,15 +31,16 @@ class PreeditComponent : UniqueComponent<PreeditComponent>(), Dependent, InputBr
     private val commonKeyActionListener: CommonKeyActionListener by manager.must()
 
     val ui by lazy {
-        CodeRowUi(context, theme, setupTextView = {
-            // in dp: the row's height is fixed, and a large font scale would cut it off
-            setTextSize(TypedValue.COMPLEX_UNIT_DIP, 14f)
+        CodeRowUi(context, theme, wrap = floats, setupTextView = {
+            // in dp: the row's height is fixed, and a large font scale would cut it off. A little
+            // larger floating, where the strip is taller (CodeRowHeight.FLOAT_DP)
+            setTextSize(TypedValue.COMPLEX_UNIT_DIP, if (floats) 15f else 14f)
             horizontalPadding = dp(8)
             isSingleLine = true
             includeFontPadding = false
             gravity = Gravity.CENTER_VERTICAL
         }).apply {
-            // on InputView's barBackground, with the bar: one taller bar. A tap puts the cursor in
+            // on InputView's barBackground, with the bar: one taller bar (or on the strip's own). A tap puts the cursor in
             // the code, for a key missed in the middle of it to be typed or deleted there; queued
             // after the keys typed before it, which go in where the cursor was. The place is one in
             // the code tapped on: a key still queued that changed the code leaves it nowhere meant
