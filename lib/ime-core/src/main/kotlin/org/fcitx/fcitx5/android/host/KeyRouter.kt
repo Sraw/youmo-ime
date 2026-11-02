@@ -52,6 +52,10 @@ class KeyRouter(
     // input methods whose session has answered: one that never did has nothing to drop (`native-lib.cpp:728`)
     private val answered = HashSet<String>()
 
+    // what was typed since nothing was, to type it again when 清除 is taken back; null once a part of it
+    // was committed (a candidate chosen), what is left no longer what those keys type
+    private var typed: MutableList<Typed>? = ArrayList()
+
     // failures by call, input method, event and class, their trace at the first, a count at the 2nd, 4th, 8th…
     private val failures = HashMap<String, Long>()
 
@@ -246,6 +250,7 @@ class KeyRouter(
         ic.preeditEnabled = composesText(im)
         val learning = !ic.has(Capability.PASSWORD_OR_SENSITIVE)
         val s = call(im, event, arg, learning, payload)
+        if (event != EngineEvent.REFINE) keep(Typed(event, arg, payload), s)
         // a key may be on its way: the pause starts a little after it, the next slice at once
         if (s.refines) refineLater(ic, im, if (event == EngineEvent.REFINE) 0 else Refiner.PAUSE_MILLIS)
         // a slice of refining that changed nothing leaves the panel as it is, the list scrolled;
@@ -253,6 +258,35 @@ class KeyRouter(
         if ((event != EngineEvent.REFINE && event != EngineEvent.CURSOR) || s.handled) show(ic, im, s)
         return s.handled
     }
+
+    private fun keep(key: Typed, s: Snapshot) {
+        val log = typed
+        typed = when {
+            s.preedit.isEmpty() -> ArrayList()
+            s.commit.isNotEmpty() -> null
+            log == null -> null
+            else -> log.apply { if (s.handled) add(key) }
+        }
+    }
+
+    /**
+     * What is typed dropped, nothing committed (清除): the keys that typed it, to [retype] it, or null
+     * when they no longer would (a part of it was chosen) or in a password.
+     */
+    fun clearTyped(ic: InputContext, im: String): List<Typed>? {
+        val keys = typed?.toList()?.takeIf { it.isNotEmpty() && !ic.has(Capability.PASSWORD_OR_SENSITIVE) }
+        reset(ic, im)
+        return keys
+    }
+
+    /** [keys] from [clearTyped] typed again, from nothing typed. */
+    fun retype(ic: InputContext, im: String, keys: List<Typed>) {
+        reset(ic, im)
+        keys.forEach { send(ic, im, it.event, it.arg, it.payload) }
+    }
+
+    /** A key as the session took it: [send]'s arguments. */
+    data class Typed(val event: Int, val arg: Int, val payload: Action?)
 
     @Suppress("TooGenericExceptionCaught")
     private fun call(im: String, event: Int, arg: Int, learning: Boolean, payload: Action?): Snapshot {

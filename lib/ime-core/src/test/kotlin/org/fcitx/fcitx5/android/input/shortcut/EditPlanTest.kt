@@ -7,6 +7,7 @@ package org.fcitx.fcitx5.android.input.shortcut
 import org.fcitx.fcitx5.android.input.editing.FakeEditor
 import org.fcitx.fcitx5.android.input.shortcut.EditPlan.Menu
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -68,62 +69,117 @@ class EditPlanTest {
         assertEquals("hello ", selected.text)
     }
 
+    private fun FakeEditor.field(limit: Int = 1000) = read(limit).let { (b, s, a) -> EditPlan.Field(b.toString(), s, a.toString()) }
+
+    private fun FakeEditor.clear(kept: ClearedText, limit: Int = 1000, password: Boolean = false): EditPlan.Clearing {
+        val clearing = EditPlan.clear(field(limit), minOf(selectionStart, selectionEnd), limit, password)
+        run(clearing.steps)
+        if (clearing.steps.isNotEmpty()) kept.remember("f", clearing.cleared)
+        return clearing
+    }
+
+    private fun FakeEditor.restore(kept: ClearedText): Boolean =
+        kept.take("f", field())?.also { run(it.restore) } != null
+
     @Test
-    fun aClearPutBackHasTheTextAndCursorAsTheyWere() {
-        val editor = FakeEditor("hello world")
-        editor.setSelection(2, 4)
-        val (before, selected, after) = editor.read()
-        val clearing = EditPlan.clear(before, selected, after, limit = 1000, password = false)
-        editor.run(clearing.steps)
+    fun aClearTakesTheSelectionThenWhatIsBeforeTheCursorThenWhatIsAfter() {
+        val kept = ClearedText()
+        val editor = FakeEditor("one two three", cursor = 8)
+        editor.setSelection(4, 8)
+        editor.clear(kept)
+        assertEquals("one three", editor.text)
+        editor.clear(kept)
+        assertEquals("three", editor.text)
+        assertEquals(0, editor.selectionStart)
+        editor.clear(kept)
         assertEquals("", editor.text)
-        editor.run(EditPlan.restore(clearing.cleared!!))
-        assertEquals("hello world", editor.text)
-        assertEquals(2, editor.selectionStart)
-        assertEquals(4, editor.selectionEnd)
+        assertTrue("nothing left", editor.clear(kept).steps.isEmpty())
+        // put back last first, each in its place, the selection as it was
+        assertTrue(editor.restore(kept))
+        assertEquals("three", editor.text)
+        assertEquals(0, editor.selectionStart)
+        assertTrue(editor.restore(kept))
+        assertEquals("one three", editor.text)
+        assertEquals(4, editor.selectionStart)
+        assertTrue(editor.restore(kept))
+        assertEquals("one two three", editor.text)
+        assertEquals(4, editor.selectionStart)
+        assertEquals(8, editor.selectionEnd)
+        assertFalse("all put back", editor.restore(kept))
     }
 
     @Test
-    fun aFieldTooLongToReadIsClearedWithNothingToPutBack() {
-        val editor = FakeEditor("x".repeat(50), cursor = 20)
-        val (before, selected, after) = editor.read(limit = 10)
-        val clearing = EditPlan.clear(before, selected, after, limit = 10, password = false)
-        assertNull(clearing.cleared)
-        editor.run(clearing.steps)
+    fun nothingIsPutBackOnceTheFieldChanged() {
+        val kept = ClearedText()
+        val editor = FakeEditor("ab cd", cursor = 2)
+        editor.clear(kept)
+        editor.commitText("x", 1)
+        assertFalse(editor.restore(kept))
+        editor.setSelection(0, 1)
+        editor.commitText("", 1)
+        assertEquals(" cd", editor.text)
+        assertFalse("forgotten, not just passed over", editor.restore(kept))
+        val moved = FakeEditor("ab cd", cursor = 5)
+        moved.clear(kept)
+        assertEquals("", moved.text)
+        assertTrue(moved.restore(kept))
+        assertEquals(5, moved.selectionStart)
+        assertNull("another field", kept.take("g", EditPlan.Field("", "", "")))
+    }
+
+    @Test
+    fun theCursorAtTheStartClearsWhatIsAfterIt() {
+        val kept = ClearedText()
+        val editor = FakeEditor("hello", cursor = 0)
+        editor.clear(kept)
         assertEquals("", editor.text)
-        editor.revealLimit = null
-        assertNull("unread", EditPlan.clear(editor.textBeforeCursor(10), "", editor.textAfterCursor(10), 10, password = false).cleared)
+        assertTrue(editor.restore(kept))
+        assertEquals("hello", editor.text)
+        assertEquals(0, editor.selectionStart)
+    }
+
+    @Test
+    fun aSideTooLongToReadIsClearedWithNothingToPutBack() {
+        val kept = ClearedText()
+        val editor = FakeEditor("x".repeat(50) + "yz", cursor = 50)
+        val clearing = editor.clear(kept, limit = 10)
+        assertNull(clearing.cleared)
+        assertEquals("yz", editor.text)
+        val after = FakeEditor("x".repeat(50), cursor = 0)
+        assertNull(after.clear(kept, limit = 10).cleared)
+        assertEquals("", after.text)
+        assertFalse(after.restore(kept))
     }
 
     @Test
     fun aPasswordIsClearedButNotKept() {
-        val clearing = EditPlan.clear("secret", "", "", limit = 1000, password = true)
-        assertNull(clearing.cleared)
-        val editor = FakeEditor("secret")
-        editor.run(clearing.steps)
+        val kept = ClearedText()
+        val editor = FakeEditor("secret", cursor = 6)
+        assertNull(editor.clear(kept, password = true).cleared)
         assertEquals("", editor.text)
+        assertFalse(editor.restore(kept))
     }
 
     @Test
     fun anEmptyFieldNeedsNothing() {
-        val clearing = EditPlan.clear("", "", "", limit = 1000, password = false)
+        val editor = FakeEditor("")
+        val clearing = editor.clear(ClearedText())
         assertTrue(clearing.steps.isEmpty())
         assertNull(clearing.cleared)
-        val editor = FakeEditor("")
-        editor.run(clearing.steps)
-        assertTrue(editor.calls.isEmpty())
+        assertEquals("", editor.text)
     }
 
     @Test
-    fun whatWasClearedIsPutBackInItsFieldWhileStillEmptyOnce() {
+    fun whatWasTypedIsKeptLikeAnyClear() {
         val kept = ClearedText()
-        val cleared = EditPlan.Cleared("hi", 2, 2)
-        kept.remember("a", cleared)
-        assertNull("typed in since", kept.take("a", empty = false))
-        assertNull("another field", kept.take("b", empty = true))
-        assertEquals(cleared, kept.take("a", empty = true))
-        assertNull("taken", kept.take("a", empty = true))
-        kept.remember("a", null)
-        assertNull(kept.take("a", empty = true))
+        val field = EditPlan.Field("ab", "", "")
+        kept.remember("f", EditPlan.Cleared(field, emptyList(), typed = "nihao"))
+        assertNull("typed into since", kept.take("f", EditPlan.Field("abc", "", "")))
+        kept.remember("f", EditPlan.Cleared(field, emptyList(), typed = "nihao"))
+        assertEquals("nihao", kept.take("f", field)?.typed)
+        kept.remember("f", EditPlan.Cleared(field, emptyList()))
+        kept.remember("f", null)
+        assertNull("a clear not kept", kept.take("f", field))
     }
 
     @Test

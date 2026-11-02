@@ -7,9 +7,9 @@ package org.fcitx.fcitx5.android.input.shortcut
 import org.fcitx.fcitx5.android.input.editing.InputEditor
 
 /**
- * What 复制, 剪切, 清空 and 恢复 do to the field, as steps the app carries out: with something selected,
- * on it; with nothing, on the whole field, the cursor left where it was. Each goes through the
- * editor as an edit of its own, so the app's own undo (撤销, Ctrl+Z) takes it back.
+ * What 复制, 剪切, 清除 and 恢复 do to the field, as steps the app carries out: 复制 and 剪切 on the
+ * selection, or with none the whole field; 清除 as [clear] says. Each goes through the editor as an
+ * edit of its own, so the app's own undo (撤销, Ctrl+Z) takes it back too.
  */
 object EditPlan {
 
@@ -24,8 +24,14 @@ object EditPlan {
         data class Replace(val text: String) : Step
     }
 
-    /** What a field held as it was cleared, and its selection: put back by [restore]. */
-    data class Cleared(val text: String, val start: Int, val end: Int)
+    /** The field as read around its selection, each side at most a limit's characters. */
+    data class Field(val before: String, val selected: String, val after: String)
+
+    /**
+     * A clear to put back: [restore] carried out on the field as the clear [left] it. [typed], when it
+     * was what is typed that went (the app types it again), the app's token for it; [restore] then empty.
+     */
+    data class Cleared(val left: Field, val restore: List<Step>, val typed: Any? = null)
 
     /** What a clear does ([steps]) and what it took, to put back ([cleared]); null when not kept. */
     data class Clearing(val steps: List<Step>, val cleared: Cleared?)
@@ -47,27 +53,28 @@ object EditPlan {
     }
 
     /**
-     * A clear of the whole field, read as [before] the selection, [selected] and [after] it (null where
-     * the editor gave nothing), each asked for at most [limit] characters. Kept to put back only when
-     * read whole (one as long as [limit] may have been cut short) and not a [password]'s: else the
-     * field is cleared all the same, with nothing to put back.
+     * 清除 with nothing typed, the field read as [field] with its selection from [start] (the editor's,
+     * so a side cut short at [limit] is cleared all the same): the selection; else all before the
+     * cursor; else all after it. Kept to put back when what went was read whole and is no [password].
      */
-    @Suppress("LongParameterList")
-    fun clear(before: CharSequence?, selected: CharSequence?, after: CharSequence?, limit: Int, password: Boolean): Clearing {
-        val parts = listOfNotNull(before, selected, after)
-        if (password || parts.size < 3 || parts.any { it.length >= limit }) {
-            return Clearing(listOf(Step.ContextMenu(Menu.SelectAll), Step.Replace("")), null)
-        }
-        val text = parts.joinToString("")
-        if (text.isEmpty()) return Clearing(emptyList(), null)
-        val (start, length) = parts[0].length to parts[1].length
-        val cleared = Cleared(text, start, start + length)
-        return Clearing(listOf(Step.Select(0, text.length), Step.Replace("")), cleared)
+    fun clear(field: Field, start: Int, limit: Int, password: Boolean): Clearing {
+        val (before, selected, after) = field
+        return when {
+            selected.isNotEmpty() -> Clearing(
+                listOf(Step.Replace("")),
+                Cleared(Field(before, "", after), listOf(Step.Select(start, start), Step.Replace(selected), Step.Select(start, start + selected.length))),
+            )
+            before.isNotEmpty() -> Clearing(
+                listOf(Step.Select(0, start), Step.Replace("")),
+                Cleared(Field("", "", after), listOf(Step.Select(0, 0), Step.Replace(before))).takeIf { before.length < limit },
+            )
+            after.isNotEmpty() -> Clearing(
+                listOf(Step.ContextMenu(Menu.SelectAll), Step.Replace("")),
+                Cleared(Field("", "", ""), listOf(Step.Replace(after), Step.Select(0, 0))).takeIf { after.length < limit },
+            )
+            else -> Clearing(emptyList(), null)
+        }.let { if (password) it.copy(cleared = null) else it }
     }
-
-    /** [cleared] put back in its now empty field, its selection as it was. */
-    fun restore(cleared: Cleared): List<Step> =
-        listOf(Step.Replace(cleared.text), Step.Select(cleared.start, cleared.end))
 
     /** [steps] carried out on [editor], the context menu's through [menu] (the editor has no such call). */
     fun apply(steps: List<Step>, editor: InputEditor, menu: (Menu) -> Unit) {
@@ -85,24 +92,30 @@ object EditPlan {
 }
 
 /**
- * The field last cleared and what it held, in memory only (a password's never): put back
- * ([take]) in that field while it is still empty. Once text is typed there, 撤销 is what takes the
- * clear back; another field's text is never put in this one.
+ * The clears of the field in it, in memory only (a password's never), put back last first ([take])
+ * while the field is as the clear left it: once anything else changed it, nothing is put back.
+ * Another field's clears are forgotten as one is cleared there.
  */
 class ClearedText {
 
     private var field: String? = null
-    private var cleared: EditPlan.Cleared? = null
+    private val clears = ArrayDeque<EditPlan.Cleared>()
 
-    /** [field] (the app's name for it) cleared of [cleared]; null forgets what was kept, a clear not kept. */
+    /** [field] (the app's name for it) cleared: [cleared] kept, or null when that clear could not be. */
     fun remember(field: String, cleared: EditPlan.Cleared?) {
+        if (field != this.field) clears.clear()
         this.field = field
-        this.cleared = cleared
+        // one not kept breaks the chain: those before it were left by a field since changed
+        if (cleared == null) clears.clear() else clears.addLast(cleared)
     }
 
-    /** What to put back in [field], [empty] now or not: taken, so a second 恢复 puts nothing in. */
-    fun take(field: String, empty: Boolean): EditPlan.Cleared? {
-        if (field != this.field || !empty) return null
-        return cleared.also { cleared = null }
+    /** The last clear to put back in [field], read as [now]; null, all forgotten, when it changed since. */
+    fun take(field: String, now: EditPlan.Field): EditPlan.Cleared? {
+        val last = clears.lastOrNull()?.takeIf { field == this.field } ?: return null
+        if (last.left != now) {
+            clears.clear()
+            return null
+        }
+        return clears.removeLast()
     }
 }
