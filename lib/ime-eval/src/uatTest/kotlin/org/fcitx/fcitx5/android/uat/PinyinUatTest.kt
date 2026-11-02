@@ -339,12 +339,12 @@ class PinyinUatTest {
     fun aWordOftenMisreadShowsItsReading() = with(EngineReplay()) {
         type("jiaose")
         expectAmong("角色")
-        assertTrue("hint 「${hintOf("角色")}」", "jué sè" in hintOf("角色"))
+        assertEquals("jué sè", readingOf("角色"))
         backspace(6)
         // 简拼 and a syllable half typed: the misreading is already plain
         type("xxxuez")
         expectAmong("莘莘学子")
-        assertTrue("hint 「${hintOf("莘莘学子")}」", "shēn shēn xué zǐ" in hintOf("莘莘学子"))
+        assertEquals("shēn shēn xué zǐ", readingOf("莘莘学子"))
     }
 
     @Test
@@ -393,7 +393,7 @@ class PinyinUatTest {
     fun uThenStrokes() = with(EngineReplay()) {
         type("uhsp")
         expectAmong("才", "本", "村")
-        for (c in listOf("才", "本", "村")) assertTrue("no reading beside $c", hintOf(c).isNotBlank())
+        for (c in listOf("才", "本", "村")) assertTrue("no reading above $c", readingOf(c).isNotBlank())
     }
 
     @Test
@@ -476,7 +476,7 @@ class PinyinUatTest {
     fun chaiziByTheParts() = with(EngineReplay()) {
         type("uniuniuniu")
         expectFirst("犇")
-        assertTrue("no reading beside 犇", hintOf("犇").isNotBlank())
+        assertTrue("no reading above 犇", readingOf("犇").isNotBlank())
         while (preedit.isNotEmpty()) backspace()
         type("ujinjinjin")
         expectFirst("鑫")
