@@ -115,7 +115,8 @@ def set09(d):
     # Android 14's picker lists each enabled input method's subtypes: ours as 拼音, 英文
     i = next(i for i, x in enumerate(t) if "选择输入法" in x)
     items = t[i + 1:i + 6]
-    check("拼音" in items and any("Android" in x or "键盘" in x for x in items), f"选择框里 {items}")
+    # the other: AOSP's keyboard on redroid, Gboard on the emulator's google_apis image
+    check("拼音" in items and any("Android" in x or "键盘" in x or "Gboard" in x for x in items), f"选择框里 {items}")
     d.back(0.8)
     return f"系统选择输入法框：{items[:4]}"
 

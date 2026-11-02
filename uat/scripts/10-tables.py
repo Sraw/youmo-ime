@@ -96,7 +96,7 @@ case("TBL-12b", needs="jvm:TablesUatTest.importedWordsAfterTheTablesOwnNotOnItsO
 
 
 @case("TBL-12c", base="B0-设置", mutates=True, heavy=True,
-      needs="release,redroid:发版时在 redroid 上用发布包跑（UAT_BUILD=release），平时不跑：要雾凇拼音，一条三四分钟（用户 2026-10-30 定）")
+      needs="release,scripted:发版时用发布包跑（UAT_BUILD=release），平时不跑：要雾凇拼音，一条三四分钟（用户 2026-10-30 定）")
 def tbl12c(d):
     """frost in the base dictionary, coded for 五笔 through the merged file: typing stays, the heap too"""
     words13 = script("13-words")

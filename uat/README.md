@@ -1,7 +1,7 @@
 # 用户验收测试（UAT）
 
 这里的每一条测试都站在用户的角度：**在给定的情况下，用户做给定的操作，应该看到给定的结果**。
-它们在 Android 设备上跑（真机、redroid 或模拟器）；预期能在 JVM 上完整断言的，搬到 Robolectric 上的
+它们在 Android 设备上跑（真机或模拟器）；预期能在 JVM 上完整断言的，搬到 Robolectric 上的
 整个键盘里跑（见"在 JVM 上断言的用例"），设备上只留看胶水的冒烟。单元测试证明逻辑对，这里证明用户用起来对。
 
 每条测试都是独立的：前提里写清从哪个状态开始、自己要先做什么准备，不依赖别的测试先跑过，
@@ -32,15 +32,15 @@
 | [19-motion-notices.md](19-motion-notices.md) | 提示条（位置、替换、配色）、始终显示悬浮条、候选字号 |
 | [fixtures/](fixtures/) | 测试页 `fields.html` 和导入用的词表 |
 
-大词库用例（WD-14d、14h、TBL-12c 发版时在 redroid 上用发布包跑，平时不跑；发版时手动跑的 WD-14r、14v、TBL-12d 也要；14i、14s 等搬到 JVM 的用 fixtures 里的 big-words.txt 或小词表，不要它）要雾凇拼音（[rime-frost](https://github.com/gaboolic/rime-frost/releases)）发布的
+大词库用例（WD-14d、14h、TBL-12c 发版时用发布包脚本跑，平时不跑；发版时手动跑的 WD-14r、14v、TBL-12d 也要；14i、14s 等搬到 JVM 的用 fixtures 里的 big-words.txt 或小词表，不要它）要雾凇拼音（[rime-frost](https://github.com/gaboolic/rime-frost/releases)）发布的
 `frost_dict_for_fcitx5.txt`，约 89 MB，不放进 fixtures：下载后用环境变量 `UAT_FROST=<路径>` 指给脚本。用例里的数
 （1914461 个词、176 行读不懂）出自 SHA-256 为 `86473190c505691c7f1ef7b87345a16b555c75fea30527f472a151b6eb1ad41f`
 的那一份（1914637 行），脚本先核对哈希，对不上记为 Blocked；换新版时连同用例里的数一起改。
 
 ### 量 Java 堆
 
-每次读数前先让应用做一次垃圾回收：以 root 给它发 SIGUSR1（redroid 上 `docker exec <容器> sh -c 'kill -10 $(pidof <包名>)'`，
-模拟器上 adbd 是 root，直接 `adb shell 'kill -10 $(pidof <包名>)'`），等 1 秒，再看 `adb shell dumpsys meminfo <包名>` 里 App Summary 的 Java Heap。
+每次读数前先让应用做一次垃圾回收：以 root 给它发 SIGUSR1（模拟器上 adbd 是 root，
+直接 `adb shell 'kill -10 $(pidof <包名>)'`），等 1 秒，再看 `adb shell dumpsys meminfo <包名>` 里 App Summary 的 Java Heap。
 不先回收会读到后台工作留下的、还没回收的垃圾（实测 130 MB，一秒后 60 MB）。第一次读数常偏高，不算；比的是后 4 次的中位数。
 
 用户文档（[`docs/`](../docs/README.md)）说应用该怎样，这里的预期就照它写；两者不一致时，先弄清哪边错了，
@@ -134,7 +134,7 @@ adb shell su 0 am start -n io.github.sraw.youmo.debug/org.fcitx.fcitx5.android.i
 #   --es sensitiveClip mima1234：打开时把这段文字标成敏感放上剪贴板
 ```
 
-（redroid 上 root 是 `docker exec <容器> am start …`；脚本里是 `open_host(d, next=True)` 这样。）真机上也可以照用例里写的，
+（模拟器上 `adb root` 之后直接 `adb shell am start …`；脚本里是 `open_host(d, next=True)` 这样。）真机上也可以照用例里写的，
 用 Chrome 的无痕标签页、真的密码管理器。KB-21、PR-07、PR-08、PR-12 原来用它，现在都在 JVM 上断言（`needs="jvm:…"`），
 没有脚本再调 `open_host`；宿主留给手工在设备上看这几种框。
 
@@ -142,12 +142,12 @@ adb shell su 0 am start -n io.github.sraw.youmo.debug/org.fcitx.fcitx5.android.i
 
 | 测试 | 设备 |
 |---|---|
-| 大部分 | 真机（arm64）或 Android 模拟器（x86_64 包）。发版前至少在一台真机上跑一遍 P0 |
-| 实体键盘（17） | 真机接蓝牙或 USB 键盘；或者 Android 模拟器加一个 uinput 键盘（见 [17-hardware-keyboard.md](17-hardware-keyboard.md) 开头）。**不要在 redroid 里造虚拟键盘**：redroid 和宿主机共用内核，造出来的键盘宿主机也会收到 |
+| 大部分 | 真机或 Android 模拟器（arm64-v8a 镜像，装的就是发布用的 arm64 包；Apple 芯片上原生跑）。发版前至少在一台真机上跑一遍 P0 |
+| 实体键盘（17） | 真机接蓝牙或 USB 键盘；或者模拟器加一个 uinput 键盘（见 [17-hardware-keyboard.md](17-hardware-keyboard.md) 开头）。模拟器有自己的内核，和别的用例同一台设备上跑；**只在模拟器里造虚拟键盘**（容器类设备如 redroid 和宿主机共用内核，造出来的键盘宿主机也会收到） |
 | 横屏与分体（16） | 屏幕横过来宽度不少于 600 dp 的手机或平板，模拟器也行 |
-| 语音（12） | 真机，有麦克风，装语音版 |
+| 语音（12） | 真机，有麦克风，装语音版；arm64 语音版也能装在模拟器上跑，但 macOS 上还没有把语音片段放进模拟器麦克风的办法 |
 
-redroid 里有浏览器"WebView Browser Tester"（`org.chromium.webview_shell`），测试页在它里面打开（`am start -a android.intent.action.VIEW -d <地址> -n org.chromium.webview_shell/.WebViewBrowserActivity`）。
+模拟器快照里装了浏览器"WebView Browser Tester"（`org.chromium.webview_shell`），测试页在它里面打开（`am start -a android.intent.action.VIEW -d <地址> -n org.chromium.webview_shell/.WebViewBrowserActivity`）。
 
 ## 在哪跑
 
@@ -157,47 +157,49 @@ redroid 里有浏览器"WebView Browser Tester"（`org.chromium.webview_shell`�
 |---|---|---|---|
 | 引擎 | ime-core 单测（小数据、毫秒级）或 `:lib:ime-eval:uatTest`（真数据：EngineReplay 只有引擎，HostReplay 加 Kotlin 宿主的标点、简繁、快速输入、面板、虚拟时钟，ParityReplay 对设备录的序列） | `needs="jvm:<测试类>.<方法>"`，`.md` 加 **JVM** 行 | 整句、学习排序、标点、快速输入、九键连按 |
 | 界面 | `:app:testTextDebugUnitTest` 的 Robolectric + Roborazzi（`uat/*UatTest`、`KeyboardHarness`、`*KeyboardScreenshotTest`） | 同上 | 键盘样子、状态面板、设置页、词库页、横屏/分体 |
-| 只能在设备上 | redroid（模拟器：实体键盘、语音） | 不写 `needs=`（模拟器 `needs=EMU`） | 真窗口和 insets、系统界面（向导、输入法选择框、导航栏、TalkBack）、麦克风、真实体键盘、安装/升级/降级、杀进程、转屏和切应用、锁屏、内存和堆 |
-| 冒烟 | redroid，另有 JVM 断言 | 不写 `needs=`，`.md` 有 **JVM** 行并写"设备上留作冒烟" | 每区一条胶水最重的 |
+| 只能在设备上 | 模拟器 | 不写 `needs=` | 真窗口和 insets、系统界面（向导、输入法选择框、导航栏、TalkBack）、麦克风、真实体键盘、安装/升级/降级、杀进程、转屏和切应用、锁屏、内存和堆 |
+| 冒烟 | 模拟器，另有 JVM 断言 | 不写 `needs=`，`.md` 有 **JVM** 行并写"设备上留作冒烟" | 每区一条胶水最重的 |
 
-redroid 上只剩下面这些（33 条）：
+设备上跑的是下面这些（2026-11 搬到模拟器前 redroid 上的 33 条，加上原来单独在模拟器上跑的实体键盘 17 条）：
 
 | 类 | 用例 |
 |---|---|
 | 只能在设备上（17） | KB-31、LC-01、LC-02、LC-03、LC-08、LC-10、LC-11、LC-13、PR-34、PY-96、SET-01、SET-09、ST-09、ST-26、ST-39、TB-22、TB-41 |
 | 冒烟（13） | KB-01、PY-01、T9-02、EN-02、HW-03、TBL-01、TB-08、PR-03、PR-10、LS-03、QU-01、WD-03、ST-29 |
 | JVM 断言了一部分、设备上照跑（3） | EN-19、TB-23、WD-37 |
+| 实体键盘（17） | HK-01、HK-03、HK-03c、HK-03d、HK-17、HK-24、HK-29、HK-35、HK-36、HK-37、HK-39、HK-40、HK-41、HK-42、HK-43、HK-44、HK-45 |
 
-新用例先想能不能在 JVM 上断言；只有落在"只能在设备上"那几类的才写 redroid 脚本。一条既有引擎半又有界面半时两半各写一个测试，
+新用例先想能不能在 JVM 上断言；只有落在"只能在设备上"那几类的才写设备脚本。一条既有引擎半又有界面半时两半各写一个测试，
 不因为"界面那半 JVM 没断言"把整条留在设备上。
 EN-19、TB-23、WD-37 三条 JVM 上有测试，剩下的那半还在设备上：EN-19 的打字结果（「hello 」「abc hello 」、退格、逗号）JVM 上断言，设备上只看候选栏不出联想词；TB-23 的 Robolectric 转屏不重排已显示的悬浮键盘，JVM 上是转屏后新起的键盘读回位置。WD-37 的读完前不能导入导出 JVM 上断言，设备上走系统的文件选择器、真的导入导出文件。原先还没搬的 EN-11、PY-87、T9-31 已于 2026-10-31 整条搬到 JVM。ST-26（动画）和 LC-10（引擎重启）要在 main 代码里加口子（IdleUi/InputWindowManager 的动画、HostDaemon 的引擎工厂）才能上 JVM，先算在"只能在设备上"。
 
-平时 redroid 跑这 33 条；发版时（`UAT_BUILD=release`）再加上面 `release,redroid:` 的三条大词库用例，`jvm` 的 run 文件也要绿。
+平时模拟器跑这些；发版时（`UAT_BUILD=release`）再加上面 `release,scripted:` 的三条大词库用例，`jvm` 的 run 文件也要绿。
 
-## 自动跑（redroid）
+## 自动跑（模拟器）
 
-`uat/tools/uat.py` 在 redroid 上照用例操作、读回结果；用例脚本在 `uat/scripts/<文件名>.py`，一个 .md 一个，
+`uat/tools/uat.py` 在 Android 模拟器上照用例操作、读回结果；用例脚本在 `uat/scripts/<文件名>.py`，一个 .md 一个，
 **.md 仍是准绳**：脚本照前提/操作/预期做，做不到就记"阻塞"并写原因，不放宽预期。每条用例都要有脚本：.md 里有、
 脚本里没有的编号，跑的时候记 **阻塞「没有脚本」**，不会从结果里消失。合并过的长用例在每一段前用 `d.step("…")` 起名，
 失败或阻塞时结果写"「那一段」这一步：……"。
 
-有些用例有自己的地方跑，用 `needs=` 标出来；在 redroid 上它们不跑、不先重置，结果里不算"跳过"，单列在
+有些用例有自己的地方跑，用 `needs=` 标出来；在模拟器上它们不跑、不先重置，结果里不算"跳过"，单列在
 **「在别处跑」**一节（汇总写"另有在别处跑 N 条，不计入"）：
 
 | `needs=` | 在哪跑 | 例子 |
 |---|---|---|
-| `emu:…` | 模拟器（见下面"自动跑（模拟器）"） | 17 实体键盘的 HK 用例 |
-| `voice:…`（或 `emu,voice:…`） | 语音版 | 12 语音 |
+| `voice:…` | 语音版（`--flavor voice`） | 12 语音 |
 | `release:…` | 发版时手动（要上一版正式包或两个版本的包） | PR-13、PR-14、PR-30、PR-35、PR-36、PR-37、PR-38、PR-41、PR-43、TBL-12d、TBL-33、TBL-43、WD-14r、WD-14v |
-| `release,redroid:…` | 发版时在 redroid 上用发布包跑（`UAT_BUILD=release` 时脚本照跑，平时不跑；要雾凇拼音，一条三四分钟） | WD-14d、WD-14h、TBL-12c |
+| `release,scripted:…` | 发版时用发布包脚本跑（`UAT_BUILD=release` 时脚本照跑，平时不跑；要雾凇拼音，一条三四分钟） | WD-14d、WD-14h、TBL-12c |
 | `manual:…` | 真机或手工 | HK-03a、HK-03b、HK-30、HK-33、MN-13、SET-11 |
 | `jvm:<测试>` | JVM 上的测试（`:app:testTextDebugUnitTest` 的 Robolectric，`:lib:ime-eval:uatTest` 的引擎回放，语音的 `:app:testVoiceDebugUnitTest`，`:lib:ime-core:test`），`uat.py jvm` 记录 | T9-01、PAN-09、ST-01、MN-20 |
 
 `skip:…`／`block:…` 只留给别的原因，记"跳过"／"阻塞"。
 
-现在共 600 条（P0 114、P1 468、P2 18）：redroid 上跑 33 条（其中 19 条在 JVM 上也断言，设备上留作冒烟或照跑），在别处跑 567 条（JVM 517、发版时 17、真机或手工 6、语音版 10、模拟器 17）。
+现在共 607 条（P0 115、P1 474、P2 18）：模拟器上跑 55 条（其中 26 条在 JVM 上也断言，设备上留作冒烟或照跑），在别处跑 552 条（JVM 519、发版时 17、真机或手工 6、语音版 10）。
 
-横屏是把屏幕改成 2340×1080（851 dp，`Device.rotate`，等到界面按新尺寸排好），redroid 的显示不会真的转。手写用 `scripts/hw_strokes.py`
+（2026-11 从 redroid 搬到模拟器时 `needs=` 改了两处：原来的 `emu:` 去掉，实体键盘用例不再单独跑；`release,redroid:` 改名 `release,scripted:`，意思不变：发版时脚本跑。）
+
+横屏是把屏幕改成 2340×1080（851 dp，`Device.rotate`，等到界面按新尺寸排好）；这是 redroid 时期的做法（它的显示不会真的转），模拟器上照旧，坐标不用重量。手写用 `scripts/hw_strokes.py`
 里的笔画在书写板上画字。装包时比较设备上的 APK 和 `app/build/outputs` 里最新的那个（同一个版本号会重新构建），不同就重装。
 
 每次点、划之后只停很短（`PAUSE`：点 0.15 s、打字 0.25 s……），原来停顿（`OLD`）剩下的部分记在账上，
@@ -209,27 +211,31 @@ EN-19、TB-23、WD-37 三条 JVM 上有测试，剩下的那半还在设备上�
 还等不到就报阻塞，并写明当前输入法、进程在不在、前台是哪个界面。
 怀疑失败是时机问题时，加 `UAT_SLOW=1` 用原来的长停顿再跑一次对比。
 要在这份用例下跑另一个检出构建的包（红色基线，如 VO-23 在 R15 上先红），加 `UAT_APK_REPO=<那个检出的路径>`：装包时取它的 `app/build/outputs` 里最新的 APK，用例和脚本仍用这一份。
-测试页的本地网页服务按第一台设备取端口（5556 → 8765，5557 → 8766，模拟器 8763）；端口被占时运行器直接退出，
+测试页的本地网页服务按第一台设备取端口（5554 → 8765，5556 → 8766）；端口被占时运行器直接退出，
 停掉占用的服务或用 `UAT_HTTP_PORT=<端口>` 换一个。
 
 ```sh
-BUILD_ABI=x86_64 ./gradlew :app:assembleTextDebug   # 没有 debug 包时（运行器只要 x86_64）
-uat/tools/uat.py up                         # 第二台 youmo-redroid2（127.0.0.1:5557）；第一台是 youmo-redroid（5556）
-uat/tools/uat.py run [--areas 14,06] [--ids PY-01,ST-02] [--devices 5556,5557]
+BUILD_ABI=arm64-v8a ./gradlew :app:assembleTextDebug   # 没有 debug 包时（运行器只要 arm64-v8a）
+uat/tools/uat.py up --port 5554             # 第一台 emulator-5554；不带 --port 是第二台 5556
+uat/tools/uat.py up
+uat/tools/uat.py run [--areas 14,06] [--ids PY-01,ST-02] [--devices 5554,5556]
 uat/tools/uat.py mark <run> <编号> 通过|失败 [看到了什么]     # 看过拼图后
-uat/tools/uat.py down                       # 用完关掉第二台
+uat/tools/uat.py down; uat/tools/uat.py down --port 5554   # 用完关掉
 ```
 
-两台 redroid 一起跑时，`run` 先用 `docker update --cpuset-cpus` 把宿主机的核按 `--devices` 的顺序平分给它们
-（12 核：0-5、6-11），这样一台上的重用例不会拖慢另一台上掐时间的用例（2026-10-23 实测：易抖的几区从 30/45 通过
-升到 39/45，只等界面空闲几乎没用）。标了 `heavy=True` 的用例照旧排在最后、一次只跑一条，别的设备都闲着。
-要自己分就写 `UAT_CPUSET=0-3/4-11`（每台一段，用 `/` 隔开），不想限就写 `UAT_CPUSET=off`；`up` 新建容器时
-`UAT_CPUSET=0-5` 只给这一台定核。只在一台上跑时，`run` 把所有核还给它（`UAT_CPUSET=off` 则不动核）。
+设备是 AVD `youmo`（android-36 google_apis arm64-v8a，1080×2340，440 dpi，三键导航，简体中文，3 GB 内存）
+的模拟器，`dev/emu/avd.sh` 建它并存一个快照 `clean`。`up` 从这个快照只读启动（`-read-only -no-snapshot-save`，
+约 5 秒），所以每次 `up` 都是干净设备，同一个 AVD 能同时开两台；`adb root` 后 adbd 是 root。
+无界面（`-no-window`），GPU 用宿主（`-gpu host`；`EMU_GPU=swiftshader_indirect` 换软件渲染，但快照是 host 存的，
+换了要冷启动）。两台一起跑时不分核（macOS 上没法给进程定核）；标了 `heavy=True` 的用例照旧排在最后、
+一次只跑一条，别的设备都闲着。别的工作区要自己的设备就开在别的偶数端口（`up --port 5558`，到 5584），
+`run --devices 5558`。adb 37 的 mDNS 在这台机器的局域网上会让 adb 服务几秒就崩（`ADB_MDNS=0` 关掉；运行器和
+`dev/emu/up.sh` 自己设，别的地方先起的 adb 服务要带上它）。
 
-测发布包（正式版发版前）：先 `BUILD_ABI=x86_64 ./gradlew :app:assembleTextRelease`（要签名密钥，没有就只出
+测发布包（正式版发版前）：先 `BUILD_ABI=arm64-v8a ./gradlew :app:assembleTextRelease`（要签名密钥，没有就只出
 `-unsigned.apk`，装不上），再在命令前加 `UAT_BUILD=release`：装 `io.github.sraw.youmo`，设备上的 debug 包先卸掉
 （两个都在时系统的输入法列表有两个幽默输入法）。脚本若调 `open_host`（现在没有用例这样做），它在那一条里临时装上
-debug 包（要先有 x86_64 debug 包），只当宿主应用、把它自己的输入法停用，这条结束就卸掉，所以别的用例（SET-01 的向导）
+debug 包（要先有 arm64-v8a debug 包），只当宿主应用、把它自己的输入法停用，这条结束就卸掉，所以别的用例（SET-01 的向导）
 仍只看到一个幽默输入法。正式包里不认 debug 包的测试标记，宿主框对它就是别的应用的框。
 
 ## 在 JVM 上断言的用例
@@ -237,7 +243,7 @@ debug 包（要先有 x86_64 debug 包），只当宿主应用、把它自己的
 有些用例的 **预期** 在 JVM 上就能完整断言：`app/src/test` 里的 `KeyboardHarness` 在 Robolectric 里造出整个键盘
 （真的输入法服务和 `InputView`，引擎换成 `FakeHostApi`，候选等用假事件推进来），设置页用 `MainActivity` 加同一个假引擎；
 样子用 Roborazzi 截图，和 `app/src/test/screenshots/` 里提交的金图比。测试方法上标 `@Uat("<编号>")`，用例 .md 里多一行
-**JVM** 写测试名；整条搬走的，脚本里是 `needs="jvm:…"`，redroid 上不跑。还在设备上留一条冒烟的（看引擎和界面之间的胶水），
+**JVM** 写测试名；整条搬走的，脚本里是 `needs="jvm:…"`，设备上不跑。还在设备上留一条冒烟的（看引擎和界面之间的胶水），
 .md 里写明。
 
 ```sh
@@ -252,18 +258,16 @@ uat/tools/uat.py jvm                             # 读 JUnit 结果，按编号�
 
 发版的"全部 P0 + 改过的功能区"照旧逐条对号：设备的 run 文件和 `jvm` 的 run 文件两份都要绿。
 
-## 自动跑（模拟器）
+## 实体键盘和语音
 
-实体键盘（17）和语音（12）在模拟器上跑：`uat.py emu-up` 起无界面模拟器（端口 5554，Xvfb；语音要宿主机
-PulseAudio 的虚拟音源，语音片段先用 `uat/tools/voice-clips.py` 合成），跑完 `uat.py emu-down`。模拟器单独跑，
-不和 redroid 同一次（`run` 会拒绝）。`--flavor` 要和装的包一致：运行器把它传给用例，文字版上语音用例单列为"在别处跑"。
+实体键盘（17）的用例和别的用例一起跑：基线 `B0-实体` 用 `uat/tools/emu-keyboard.sh` 插上一个 uinput USB 键盘，
+别的基线拔掉。语音（12）要语音版：`--flavor` 要和装的包一致，运行器把它传给用例，文字版上语音用例单列为"在别处跑"。
+在 Linux 上语音片段（`uat/tools/voice-clips.py` 合成）经宿主 PulseAudio 的虚拟音源放进模拟器麦克风；macOS 上还没有
+接上（要一个虚拟声卡，或模拟器的 gRPC 音频注入），语音用例记"阻塞"。`emu-up`/`emu-down` 还在，等于 `up/down --port 5554`。
 
 ```sh
-BUILD_ABI=x86_64 ./gradlew :app:assembleVoiceDebug   # 语音版
-uat/tools/uat.py emu-up
-uat/tools/uat.py run --devices 5554 --areas 17                  # 实体键盘，文字版
-uat/tools/uat.py run --devices 5554 --flavor voice --areas 12   # 语音
-uat/tools/uat.py emu-down
+BUILD_ABI=arm64-v8a ./gradlew :app:assembleVoiceDebug   # 语音版
+uat/tools/uat.py run --devices 5554 --flavor voice --areas 12
 ```
 
 - **分组**：同一基线（和同一页面）的用例是一组，基线只到一次。组里先跑不改状态的，再跑只因上屏而学词的，
@@ -276,8 +280,8 @@ uat/tools/uat.py emu-down
 - **拼图**：只有预期要靠眼睛看的用例（`visual=True`）截图，裁到相关区域、缩小，每组拼成一张
   `dev/uat-out/<run>/sheet-<组>.png`，每格写编号和预期原文。这些用例记为"待看图"，看过后用 `mark` 改。
 - **两台并行**：两台设备各取一组；没组可取的设备把别组末尾要重置的用例分走一半。结果自动写进
-  `uat/runs/<日期>-redroid-<版本>.md`。
-- 设备上只用 `adb shell input`、uiautomator 接口、am/pm/ime/settings；**不造 uinput 设备**。
+  `uat/runs/<日期>-emulator-<版本>.md`。
+- 设备上只用 `adb shell input`、uiautomator 接口、am/pm/ime/settings；uinput 设备只有实体键盘那一个（脚本只认模拟器）。
 
 ### 用代理看拼图
 

@@ -468,7 +468,7 @@ def abazhou(d):
 
 
 @case("WD-14d", base="B0-设置", mutates=True, heavy=True,
-      needs="release,redroid:发版时在 redroid 上用发布包跑（UAT_BUILD=release），平时不跑：要雾凇拼音，一条三四分钟（用户 2026-10-30 定）")
+      needs="release,scripted:发版时用发布包跑（UAT_BUILD=release），平时不跑：要雾凇拼音，一条三四分钟（用户 2026-10-30 定）")
 def wd14d(d):
     src = frost(d)
     d.open_page("text")
@@ -514,7 +514,7 @@ case("WD-14g", needs="jvm:DictionaryUatTest.pastAHundredThousandWordsIsNoImportF
 
 
 @case("WD-14h", base="B0-设置", mutates=True, heavy=True,
-      needs="release,redroid:发版时在 redroid 上用发布包跑（UAT_BUILD=release），平时不跑：要雾凇拼音，一条三四分钟（用户 2026-10-30 定）")
+      needs="release,scripted:发版时用发布包跑（UAT_BUILD=release），平时不跑：要雾凇拼音，一条三四分钟（用户 2026-10-30 定）")
 def wd14h(d):
     src = frost(d)
     dicts = DICTS
