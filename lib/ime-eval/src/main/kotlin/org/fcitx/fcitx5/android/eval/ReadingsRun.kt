@@ -18,6 +18,8 @@ import org.fcitx.fcitx5.android.engine.reading.WordReading
  * words the candidates would show read right, every character's syllable and tone, each read by its
  * text as a table's or a prediction's candidate is (the likeliest reading the dictionary has); [typed], as
  * pinyin's candidate is when the word was typed by the list's syllables (their tones still the data's).
+ * A syllable the list reads neutral is right in any tone ([agrees]): the readings shown keep each
+ * character's own tone (the user, 2026-11-02), and which tone that is the data says, not the list.
  */
 internal class ReadingsRun(private val data: PinyinData, private val typed: Boolean = false) {
 
@@ -31,7 +33,7 @@ internal class ReadingsRun(private val data: PinyinData, private val typed: Bool
         val misses = ArrayList<String>()
         for ((word, expected) in set) {
             val got = readings.of(word, ReadingStyle.PINYIN, if (typed) typedAs(word, expected) else null).joinToString(" ")
-            if (got != expected) misses += "$word\t$expected\t$got"
+            if (!agrees(expected, got)) misses += "$word\t$expected\t$got"
         }
         return Result(set.size, set.size - misses.size, misses)
     }
@@ -43,6 +45,16 @@ internal class ReadingsRun(private val data: PinyinData, private val typed: Bool
     }
 
     companion object {
+        /** [got] reads as [expected] does, a syllable [expected] reads neutral in any tone of it. */
+        fun agrees(expected: String, got: String): Boolean {
+            if (expected == got) return true
+            val e = expected.split(' ')
+            val g = got.split(' ')
+            return e.size == g.size && e.indices.all { i ->
+                e[i] == g[i] || ToneMark.parse(e[i]).let { it != null && it.second == ToneMark.NEUTRAL && it.first == ToneMark.parse(g[i])?.first }
+            }
+        }
+
         /** A share of the words read right a release must reach (design 051-zhuyin §4). */
         const val GATE = 98.0
 

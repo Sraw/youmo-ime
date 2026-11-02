@@ -33,7 +33,8 @@ class CandidateReadingsTest {
                 .charTone('说'.code, Syllables.id("shuo"), 1)
                 .charTone('话'.code, Syllables.id("hua"), 4)
                 .charTone('我'.code, Syllables.id("wo"), 3)
-                .charTone('们'.code, Syllables.id("men"), 2)
+                // 们 as Unihan has it: no tone but the neutral one, kept in 我们
+                .charTone('们'.code, Syllables.id("men"), ToneMark.NEUTRAL)
                 .wordTones("我们", syl("wo", "men"), byteArrayOf(3, 5))
                 .charTone('银'.code, Syllables.id("yin"), 2)
                 .charTone('行'.code, Syllables.id("xing"), 2)

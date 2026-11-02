@@ -8,7 +8,9 @@ import org.fcitx.fcitx5.android.engine.data.PinyinData
 import org.fcitx.fcitx5.android.engine.data.PinyinDataBuilder
 import org.fcitx.fcitx5.android.engine.pinyin.Syllables
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertThrows
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.nio.ByteBuffer
 
@@ -35,12 +37,23 @@ class ReadingsRunTest {
 
     @Test
     fun countsTheWordsReadRightAndListsTheRest() {
-        val set = ReadingsRun.parse(sequenceOf("# comment", "银行\tyín háng", "东西\tdōng xī", ""))
+        // 东西's xi, neutral as listed, read in 西's own tone
+        val set = ReadingsRun.parse(sequenceOf("# comment", "银行\tyín hàng", "东西\tdōng xī", ""))
         val r = ReadingsRun(data).measure(set)
         assertEquals(2, r.words)
         assertEquals(1, r.right)
         assertEquals(50.0, r.accuracy, 0.0)
-        assertEquals(listOf("东西\tdōng xī\tdōng xi"), r.misses)
+        assertEquals(listOf("银行\tyín hàng\tyín háng"), r.misses)
+    }
+
+    @Test
+    fun aNeutralToneInTheListIsRightInAnyToneOfItsSyllable() {
+        assertTrue(ReadingsRun.agrees("dōng xi", "dōng xī"))
+        assertTrue(ReadingsRun.agrees("dōng xi", "dōng xi"))
+        assertFalse(ReadingsRun.agrees("dōng xi", "dōng xīn"))
+        // a toned syllable is still read as listed
+        assertFalse(ReadingsRun.agrees("dōng xī", "dōng xi"))
+        assertFalse(ReadingsRun.agrees("dōng xi", "dōng"))
     }
 
     @Test

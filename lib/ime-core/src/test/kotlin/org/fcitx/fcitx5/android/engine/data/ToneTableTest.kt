@@ -32,6 +32,8 @@ class ToneTableTest {
         U+4E0D: bù,fǒu  # 不
         U+5B50: zǐ  # 子
         U+684C: zhuō  # 桌
+        U+6211: wǒ  # 我
+        U+4EEC: men  # 们
         U+3400: ê̄  # 㐀
         U+20000: hē  # 𠀀
     """.trimIndent()
@@ -43,6 +45,7 @@ class ToneTableTest {
         好人: hǎo rén
         一个: yí gè
         桌子: zhuō zi
+        我们: wǒ men
         不好: bú hǎo
         长长长: cháng
     """.trimIndent()
@@ -50,7 +53,7 @@ class ToneTableTest {
     private fun data(curated: String = ""): PinyinData {
         val b = PinyinDataBuilder().unigram(PinyinDataBuilder.UNKNOWN, -7f, 0f)
         listOf("爱好" to "ai hao", "东西" to "dong xi", "银行" to "yin hang", "行走" to "xing zou", "好人" to "hao ren",
-            "一个" to "yi ge", "桌子" to "zhuo zi", "不好" to "bu hao", "好" to "hao", "𠀀" to "he")
+            "一个" to "yi ge", "桌子" to "zhuo zi", "我们" to "wo men", "不好" to "bu hao", "好" to "hao", "𠀀" to "he")
             .forEach { (w, r) -> b.entry(w, ids(r)) }
         ToneSources.chars(unihan.lineSequence(), "unihan", b::charTone)
         ToneSources.phrases(phrases.lineSequence(), "phrases", b::wordTones)
@@ -81,12 +84,17 @@ class ToneTableTest {
     }
 
     @Test
-    fun neutralTonesComeFromWords() {
+    fun aWordsNeutralToneIsItsCharactersOwn() {
         val d = data()
-        assertEquals(t(1, ToneMark.NEUTRAL), d.tonesOf("东西", "dong xi"))
-        assertTrue(d.tones.allows('子'.code, Syllables.id("zi"), ToneMark.NEUTRAL))
+        // listed dōng xi and zhuō zi: read in 西's and 子's own tones (the user, 2026-11-02)
+        assertEquals(t(1, 1), d.tonesOf("东西", "dong xi"))
+        assertEquals(t(1, 3), d.tonesOf("桌子", "zhuo zi"))
+        assertFalse(d.tones.allows('子'.code, Syllables.id("zi"), ToneMark.NEUTRAL))
         assertTrue(d.tones.allows('子'.code, Syllables.id("zi"), 3))
-        assertFalse(d.tones.allows('子'.code, Syllables.id("zi"), 1))
+        // 们 has no tone but the neutral one: kept
+        assertEquals(t(3, ToneMark.NEUTRAL), d.tonesOf("我们", "wo men"))
+        // a curated one is no different
+        assertEquals(t(1, 1), data("东西\tdōng xi\t2026-11-02\ttest\n").tonesOf("东西", "dong xi"))
     }
 
     @Test
@@ -98,8 +106,8 @@ class ToneTableTest {
 
     @Test
     fun onlyWordsTheirCharactersWouldGetWrongAreStored() {
-        // 爱好 东西 桌子; not 好人 银行 不好 一个, whose characters' usual tones are theirs
-        assertEquals(3, data().tones.exceptions)
+        // 爱好; not 好人 银行 不好 一个, whose characters' usual tones are theirs, nor 东西 桌子 我们, read so too
+        assertEquals(1, data().tones.exceptions)
     }
 
     @Test

@@ -39,9 +39,10 @@ class CandidateReadingsUatTest {
         ThemeManager.prefs.candidateTextSize.let { it.setValue(it.defaultValue) }
     }
 
+    // 东西 in 西's own tone (no 轻声, the user 2026-11-02); 呢 has no other, so its ˙ is still drawn
     private val words = listOf("你好", "东西", "你", "呢", "泥", "银行")
-    private val pinyin = listOf(listOf("nǐ", "hǎo"), listOf("dōng", "xi"), listOf("nǐ"), listOf("ne"), listOf("ní"), listOf("yín", "háng"))
-    private val zhuyin = listOf(listOf("ㄋㄧˇ", "ㄏㄠˇ"), listOf("ㄉㄨㄥ", "˙ㄒㄧ"), listOf("ㄋㄧˇ"), listOf("˙ㄋㄜ"), listOf("ㄋㄧˊ"), listOf("ㄧㄣˊ", "ㄏㄤˊ"))
+    private val pinyin = listOf(listOf("nǐ", "hǎo"), listOf("dōng", "xī"), listOf("nǐ"), listOf("ne"), listOf("ní"), listOf("yín", "háng"))
+    private val zhuyin = listOf(listOf("ㄋㄧˇ", "ㄏㄠˇ"), listOf("ㄉㄨㄥ", "ㄒㄧ"), listOf("ㄋㄧˇ"), listOf("˙ㄋㄜ"), listOf("ㄋㄧˊ"), listOf("ㄧㄣˊ", "ㄏㄤˊ"))
 
     private fun shown(style: ReadingStyle, sp: Int, name: String) {
         ThemeManager.prefs.candidateTextSize.setValue(sp)

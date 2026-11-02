@@ -133,21 +133,25 @@ class PinyinDataBuilder {
     }
 
     /**
-     * The characters' tones, those the words' readings use among them (a neutral tone only a word
-     * has, 子 in 桌子), and the words whose tones are not their characters' usual ones. Words of one
-     * character are read first: the usual tone they set is what the longer words are compared with;
-     * the rest in order of their text, so the same sources compile to the same file.
+     * The characters' tones, those the words' readings use among them, and the words whose tones are
+     * not their characters' usual ones. Words of one character are read first: the usual tone they set
+     * is what the longer words are compared with, and what a longer word's neutral tone becomes
+     * ([ToneRules.full]); the rest in order of their text, so the same sources compile to the same file.
      */
     private fun writeTones(out: DataFile.Writer) {
         val chars = HashMap(charTones)
-        val neutral = { cp: Int, syllable: Int -> (chars[cp * ToneTable.KEY_SPAN + syllable] ?: 0) and (1 shl (ToneMark.NEUTRAL - 1 + ToneTable.MASK_SHIFT)) != 0 }
+        fun usual(cps: IntArray, reading: List<Int>) =
+            ByteArray(cps.size) { i -> ((chars[cps[i] * ToneTable.KEY_SPAN + reading[i]] ?: 0) and ToneTable.USUAL_MASK).toByte() }
         for ((word, readings) in wordTones.entries.sortedWith(compareBy({ it.key.codePointCount(0, it.key.length) > 1 }, { it.key }))) {
             val cps = word.codePoints().toArray()
-            for ((reading, tones) in readings) cps.indices.forEach { i ->
-                val key = cps[i] * ToneTable.KEY_SPAN + reading[i]
-                // a character listed alone (谁 shéi) is its usual tone, whatever Unihan listed first
-                val usual = if (cps.size == 1) tones[i].toInt() else (chars[key] ?: tones[i].toInt()) and ToneTable.USUAL_MASK
-                chars[key] = ((chars[key] ?: 0) and ToneTable.USUAL_MASK.inv()) or usual or (1 shl (tones[i] - 1 + ToneTable.MASK_SHIFT))
+            for ((reading, listed) in readings) {
+                val tones = if (cps.size == 1) listed else ToneRules.full(listed, usual(cps, reading))
+                cps.indices.forEach { i ->
+                    val key = cps[i] * ToneTable.KEY_SPAN + reading[i]
+                    // a character listed alone (谁 shéi) is its usual tone, whatever Unihan listed first
+                    val usual = if (cps.size == 1) tones[i].toInt() else (chars[key] ?: tones[i].toInt()) and ToneTable.USUAL_MASK
+                    chars[key] = ((chars[key] ?: 0) and ToneTable.USUAL_MASK.inv()) or usual or (1 shl (tones[i] - 1 + ToneTable.MASK_SHIFT))
+                }
             }
         }
         val keys = chars.keys.sorted()
@@ -161,9 +165,10 @@ class PinyinDataBuilder {
             val cps = e.word.codePoints().toArray()
             // a Latin word's letters (iPhone) are no syllable each
             if (cps.size != reading.size) return@forEach
-            val usual = ByteArray(cps.size) { i -> ((chars[cps[i] * ToneTable.KEY_SPAN + reading[i]] ?: 0) and ToneTable.USUAL_MASK).toByte() }
+            val usual = usual(cps, reading)
             if (own == null && usual.any { it.toInt() == 0 }) return@forEach
-            val tones = if (own != null && (e.word to reading) in curated) own else ToneRules.tones(e.word, cps, reading, own, usual, neutral) { w, r -> wordTones[w]?.get(r) }
+            val ruled = if (own != null && (e.word to reading) in curated) own else ToneRules.tones(e.word, cps, reading, own, usual) { w, r -> wordTones[w]?.get(r) }
+            val tones = ToneRules.full(ruled, usual)
             if (!usual.contentEquals(tones)) exceptions.getOrPut(model.id(e.word)) { ArrayList() } += reading to tones
         }
         val runs = exceptions.flatMap { (id, list) -> list.map { id to it } }
