@@ -10,6 +10,7 @@ import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.input.bar.KawaiiBarComponent
 import splitties.dimensions.dp
+import splitties.views.dsl.constraintlayout.after
 import splitties.views.dsl.constraintlayout.before
 import splitties.views.dsl.constraintlayout.centerVertically
 import splitties.views.dsl.constraintlayout.constraintLayout
@@ -18,8 +19,12 @@ import splitties.views.dsl.constraintlayout.lParams
 import splitties.views.dsl.constraintlayout.startOfParent
 import splitties.views.dsl.core.Ui
 import splitties.views.dsl.core.add
+import splitties.views.dsl.core.matchParent
 
 class CandidateUi(override val ctx: Context, theme: Theme, private val horizontalView: View) : Ui {
+
+    /** 「不学」 (D5), before the candidates as on the idle bar */
+    val notLearnedMark = NotLearnedMark(ctx, theme)
 
     val expandButton = ToolButton(ctx, R.drawable.ic_baseline_expand_more_24, theme).apply {
         id = R.id.expand_candidate_btn
@@ -33,9 +38,13 @@ class CandidateUi(override val ctx: Context, theme: Theme, private val horizonta
             centerVertically()
             endOfParent()
         })
-        add(horizontalView, lParams {
+        add(notLearnedMark, lParams(dp(NotLearnedMark.WIDTH_DP), matchParent) {
             centerVertically()
             startOfParent()
+        })
+        add(horizontalView, lParams {
+            centerVertically()
+            after(notLearnedMark)
             before(expandButton)
         })
     }

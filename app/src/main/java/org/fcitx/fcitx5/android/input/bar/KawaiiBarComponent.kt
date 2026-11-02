@@ -38,6 +38,8 @@ import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.engine.pinyin.ShuangpinScheme
 import org.fcitx.fcitx5.android.host.HostEvent
 import org.fcitx.fcitx5.android.host.StatusEntry
+import org.fcitx.fcitx5.android.input.FieldPolicy
+import org.fcitx.fcitx5.android.input.NotLearned
 import org.fcitx.fcitx5.android.input.address.AddressStrip
 import org.fcitx.fcitx5.android.input.bar.ExpandButtonStateMachine.State.ClickToAttachWindow
 import org.fcitx.fcitx5.android.input.bar.ExpandButtonStateMachine.State.ClickToDetachWindow
@@ -65,6 +67,7 @@ import org.fcitx.fcitx5.android.input.dependency.imeScope
 import org.fcitx.fcitx5.android.input.dependency.inputMethodService
 import org.fcitx.fcitx5.android.input.dependency.theme
 import org.fcitx.fcitx5.android.input.editing.TextEditingWindow
+import org.fcitx.fcitx5.android.input.editing.toEditorTraits
 import org.fcitx.fcitx5.android.input.keyboard.CodeRowHeight
 import org.fcitx.fcitx5.android.input.keyboard.CommonKeyActionListener
 import org.fcitx.fcitx5.android.input.keyboard.CustomGestureView
@@ -524,6 +527,8 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
             idleUi.inlineSuggestionsBar.clear()
         }
         arrangeButtons()
+        field = info to capFlags
+        showNotLearned()
         addressStrip.start(info, capFlags)
         evalIdleUiState()
         prepareVoice()
@@ -562,7 +567,24 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
     }
 
     // lit while on, as in the ⋯ panel
+    // the field focused last, for its 「不学」 reasons again as 「不用我的输入习惯」 changes
+    private var field: Pair<EditorInfo, CapabilityFlags>? = null
+
+    private fun showNotLearned() {
+        val (info, flags) = field ?: return
+        val reasons = NotLearned.of(
+            password = flags.has(CapabilityFlag.Password),
+            sensitive = flags.hasAny(CapabilityFlag.PasswordOrSensitive),
+            ownApp = FieldPolicy.ownApp(info.packageName, context.packageName),
+            learnFlags = FieldPolicy.learnFlags(info.toEditorTraits()),
+            habitsOn = panelActions.habitsOn,
+        )
+        idleUi.notLearnedMark.reasons = reasons
+        candidateUi.notLearnedMark.reasons = reasons
+    }
+
     private fun showToggles() {
+        showNotLearned()
         idleUi.setActive(ToolbarButton.OneHanded, panelActions.oneHanded)
         idleUi.setActive(ToolbarButton.Floating, panelActions.floating)
         idleUi.setActive(ToolbarButton.Habits, !panelActions.habitsOn)

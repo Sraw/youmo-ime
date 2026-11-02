@@ -130,8 +130,8 @@
 <!-- learning: U-93 D21 -->
 - **前提**：B0，按 PY-34 让「汪小明」成为你的词，打 s h i，长按第五个候选（记作 C）选 **固定首位**，按 PY-29 屏蔽「是」，在 **词库与短语 → 自定义短语** 里加 `dz` → 北京市海淀区，在表情面板里点过「😀」（它在"最近使用"里）。
 - **操作**：点工具栏 **⋯**，点 **不用我的输入习惯**；看弹出的提示，点 **返回键盘** 后看工具栏；点 w a n g x i a o m i n g；点 ⌫，点 s h i；点 ⌫，点 d z；打开表情面板；再点 **⋯** 看这一项；打开 **词库与短语 → 用户词库**，看页顶的 **用我的输入习惯**，打开它；回测试页看 **⋯** 里这一项，点 s h i，点 ⌫，点 d z，再打开表情面板。
-- **预期**：点的那一刻键盘上方提示 2 秒"已不用我的输入习惯，在 ⋯ 里恢复"（点它就消失，⋯ 面板不受影响），工具栏上不留标记；wangxiaoming 第一个是「王小明」，没有「汪小明」；shi 第一个是原来排在「是」后面的那个（「是」屏蔽了），不是 C，候选里仍没有「是」；dz 没有短语；表情面板里没有"最近使用"；**⋯** 里这一项变成 **恢复我的输入习惯**；用户词库页顶的开关是关着的（和 ⋯ 里的是同一个），打开后 **⋯** 里又是 **不用我的输入习惯**，shi 第一个又是 C、仍没有「是」，dz 第一个是「北京市海淀区」；"最近使用"回来，「😀」还在。
-- **JVM**：`WordsUatTest.notUsingMyHabitsAsFreshlyInstalledButForWhatIsBlocked`（:lib:ime-eval:uatTest，真数据：打字和词库这一半）、`HabitsUatTest.offTheEntrySaysToRestoreAndTheRecentEmojiAreGoneTillOn`（⋯ 里关掉后这一项变成恢复、表情的最近使用空了，打开后 😀 回来）、`HabitsUatTest.theSwitchOnTopOfTheUserWordsIsTheSameAsInTheStatusArea`（用户词库页顶的开关是同一个）、`MotionNoticeUatTest.habitsOffAndOnEachSaidTheNewInTheOldsPlace`（提示条的字）；设备上不跑。
+- **预期**：点的那一刻键盘上方提示 2 秒"已不用我的输入习惯，在 ⋯ 里恢复"（点它就消失，⋯ 面板不受影响），之后工具栏最左边有「不学」标记（PR-48）；wangxiaoming 第一个是「王小明」，没有「汪小明」；shi 第一个是原来排在「是」后面的那个（「是」屏蔽了），不是 C，候选里仍没有「是」；dz 没有短语；表情面板里没有"最近使用"；**⋯** 里这一项变成 **恢复我的输入习惯**；用户词库页顶的开关是关着的（和 ⋯ 里的是同一个），打开后 **⋯** 里又是 **不用我的输入习惯**，shi 第一个又是 C、仍没有「是」，dz 第一个是「北京市海淀区」；"最近使用"回来，「😀」还在。
+- **JVM**：`WordsUatTest.notUsingMyHabitsAsFreshlyInstalledButForWhatIsBlocked`（:lib:ime-eval:uatTest，真数据：打字和词库这一半）、`HabitsUatTest.offTheEntrySaysToRestoreAndTheRecentEmojiAreGoneTillOn`（⋯ 里关掉后这一项变成恢复、表情的最近使用空了，打开后 😀 回来）、`HabitsUatTest.theSwitchOnTopOfTheUserWordsIsTheSameAsInTheStatusArea`（用户词库页顶的开关是同一个）、`MotionNoticeUatTest.habitsOffAndOnEachSaidTheNewInTheOldsPlace`（提示条的字）、`NotLearnedMarkUatTest.habitsOffMarksEveryFieldTillOn`（关着时有标记、原因是它，打开后没有）；设备上不跑。
 
 ### PR-17a [P1] 不用我的输入习惯：并入基础词库的词照样打得出，拼音和码表都是
 <!-- learning: U-93 -->
@@ -146,6 +146,12 @@
 - **操作**：点 **⋯ → 清掉最近**，选 **最近 1 小时**，读确认框，确认；回到框里，接着打「他」，点 d l；点 ⌫，点 s h i；打开表情面板。
 - **预期**：确认框写明清掉以后不能"退回恢复前"；确认后键盘上方提示「已清掉」；「他 dl」第一个是「带来」，「点了」也不在第二（这段时间的选择都忘了）；shi 第一个仍是 C（主动做的固定不撤）；表情面板的"最近使用"里没有「😀」。
 - **JVM**：`PrivacyUatTest.clearingTheLastHourForgetsItsPicksNotThePins`（:lib:ime-eval:uatTest，真数据）（清掉最近 1 小时后他 dl 第一是带来、点了不在第二，shi 第一仍 C。表情最近使用的清除由 RecentlyUsedTest，确认框文字是界面）；设备上不跑。
+
+### PR-48 [P1] 不学的输入框里候选栏有「不学」标记，长按说原因
+- **前提**：B0；测试页有「普通文本」「密码」「网址」「搜索」框（没有就用浏览器地址栏当网址框、任意 App 的搜索框）。
+- **操作**：依次点「普通文本」「搜索」「网址」「密码」框，看候选栏（工具栏）最左边；在搜索框里打 n i h a o 看候选栏最左边；在每个有标记的框里长按标记；点设置页顶上的搜索框，长按标记；点 **⋯ → 不用我的输入习惯**，回「普通文本」框长按标记，再 **恢复我的输入习惯**。
+- **预期**：「普通文本」框没有标记；其他框最左边有「学」字加斜杠的小标记，打字出候选时它在第一个候选前；密码框上方是数字行时标记在 1 前面，0 仍在屏幕内。长按弹出小气泡：搜索框「搜索框：不出联想，也不学联想」，网址框「网址、邮箱、数字框：只学词，不学词和词的前后搭配」，密码框「密码框：这里打的什么都不学」，设置页搜索框「本输入法自己的输入框：什么都不学」，关掉习惯后「开着「不用我的输入习惯」：什么都不学，在 ⋯ 里恢复」；恢复后普通文本框标记消失。浅色、深色主题都看得清（见 docs/words.md「这里不学」）。
+- **JVM**：`NotLearnedMarkUatTest`（普通框没有标记；空闲栏、候选栏、密码数字行三处的位置和浅色/深色图；每种原因的文字；习惯关掉时有、打开后没有）；原因的规则见 ime-core `NotLearnedTest`；设备上留作冒烟（redroid 截图）。
 
 ## 备份与恢复（学到的）
 
