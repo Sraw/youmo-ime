@@ -12,6 +12,7 @@ import androidx.core.text.buildSpannedString
 import androidx.core.text.color
 import org.fcitx.fcitx5.android.core.CandidateWord
 import org.fcitx.fcitx5.android.data.theme.Theme
+import org.fcitx.fcitx5.android.input.candidates.ReadingSpan
 import splitties.views.backgroundColor
 import splitties.views.dsl.core.Ui
 import splitties.views.dsl.core.textView
@@ -35,7 +36,7 @@ class LabeledCandidateItemUi(
                 append(candidate.label)
             }
             color(fg) {
-                append(candidate.text)
+                ReadingSpan.annotate(this, candidate.text, candidate.readings, altFg)
             }
             if (candidate.comment.isNotBlank()) {
                 if (candidate.spaceBetweenComment) {

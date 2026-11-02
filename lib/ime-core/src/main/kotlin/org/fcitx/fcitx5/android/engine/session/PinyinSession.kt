@@ -33,6 +33,7 @@ import org.fcitx.fcitx5.android.engine.pinyin.SyllableGraph
 import org.fcitx.fcitx5.android.engine.pinyin.SyllableGraph.Kind
 import org.fcitx.fcitx5.android.engine.pinyin.Syllables
 import org.fcitx.fcitx5.android.engine.platform.jvm.JvmClock
+import org.fcitx.fcitx5.android.engine.reading.WordReading
 import org.fcitx.fcitx5.android.engine.rerank.Reranker
 import org.fcitx.fcitx5.android.engine.rerank.SentencePicker
 import org.fcitx.fcitx5.android.engine.rerank.SentenceRefiner
@@ -347,8 +348,7 @@ class PinyinSession(
     }
 
     /** See [Action.Letter]: on the nine keys alone, the others type letters as they are; a press again goes on no run before [runFrom]. */
-    private fun letter(c: Char, again: Boolean, runFrom: Int = readFrom(), glided: Boolean = false): Snapshot =
-        cursorAfter(nineKeys?.letter(input, c, again, runFrom, cursor, glided) ?: -1)
+    private fun letter(c: Char, again: Boolean, runFrom: Int = readFrom(), glided: Boolean = false) = cursorAfter(nineKeys?.letter(input, c, again, runFrom, cursor, glided) ?: -1)
 
     private fun backspace(): Snapshot {
         if (input.isEmpty()) {
@@ -432,6 +432,8 @@ class PinyinSession(
         val from = readFrom()
         return misreading(data, c.text, input.substring(from, minOf(input.length, from + c.end)).filter { it != SyllableGraph.SEPARATOR })
     }
+
+    override fun readingOf(index: Int) = candidates.getOrNull(index)?.let { c -> entries(c)?.mapIndexed { i, e -> WordReading(e.text, c.words[i].takeIf { it < data.vocabulary.size } ?: -1, e.syllables) } }
 
     private fun pick(index: Int): Snapshot {
         val c = candidates.getOrNull(index) ?: return snapshot(handled = candidates.isNotEmpty())

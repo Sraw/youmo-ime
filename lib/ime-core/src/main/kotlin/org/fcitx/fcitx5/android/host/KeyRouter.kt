@@ -447,7 +447,13 @@ class KeyRouter(
     }
 
     /** A session's candidate: picking it sends its index among all of them (`EngineCandidateWord`, `:39-56`). */
-    internal inner class EngineWord(private val im: String, val index: Int, override val text: String, override val comment: String) :
+    internal inner class EngineWord(
+        private val im: String,
+        val index: Int,
+        override val text: String,
+        override val comment: String,
+        override val readings: List<String> = emptyList(),
+    ) :
         PanelCandidate {
         override fun select(ic: InputContext) {
             send(ic, im, EngineEvent.PICK, index)
@@ -474,7 +480,7 @@ class KeyRouter(
 
         // the index among all of words[0], the page's first
         private val offset = maxOf(s.first, 0)
-        private val words = s.candidates.mapIndexedTo(ArrayList()) { i, text -> EngineWord(im, offset + i, text, s.hints.getOrElse(i) { "" }) }
+        private val words = s.candidates.mapIndexedTo(ArrayList()) { i, text -> EngineWord(im, offset + i, text, s.hints.getOrElse(i) { "" }, s.readings.getOrElse(i) { emptyList() }) }
         override val size = words.size
 
         // as the keys that pick them: 1 to 9, then 0
@@ -498,7 +504,7 @@ class KeyRouter(
             if (index < 0 || (total >= 0 && index >= total)) return null
             if (index < offset) {
                 // asked once, whatever came back: a fetch that failed is not made again for each index
-                val earlier = before ?: fetch(im, 0, offset).mapIndexed { i, c -> EngineWord(im, i, c.text, c.hint) }.also { before = it }
+                val earlier = before ?: fetch(im, 0, offset).mapIndexed { i, c -> EngineWord(im, i, c.text, c.hint, c.readings) }.also { before = it }
                 return earlier.getOrNull(index)
             }
             while (offset + words.size <= index) {
@@ -506,7 +512,7 @@ class KeyRouter(
                 val count = maxOf(CHUNK, index + 1 - from)
                 val more = fetch(im, from, count)
                 if (more.size < count) total = from + more.size
-                more.forEach { words += EngineWord(im, offset + words.size, it.text, it.hint) }
+                more.forEach { words += EngineWord(im, offset + words.size, it.text, it.hint, it.readings) }
                 // a short chunk was the last: none past it to ask for
                 if (total >= 0 && index >= total) return null
             }

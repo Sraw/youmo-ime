@@ -31,6 +31,7 @@ import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.engine.learn.control.LearningOp
 import org.fcitx.fcitx5.android.engine.learn.control.LearningResult
 import org.fcitx.fcitx5.android.engine.pinyin.Fuzzy
+import org.fcitx.fcitx5.android.engine.reading.ReadingStyle
 import org.fcitx.fcitx5.android.engine.runtime.EngineSettings
 import org.fcitx.fcitx5.android.engine.runtime.UserWord
 import org.fcitx.fcitx5.android.engine.runtime.ModelLevel
@@ -183,6 +184,12 @@ object InputMethodSettings {
 
     private val PAGE_SIZES = EngineSettings.PAGE_SIZES.map { it.toString() }
 
+    private val READING_STYLES = mapOf(
+        ReadingStyle.OFF to R.string.im_candidate_reading_off,
+        ReadingStyle.PINYIN to R.string.im_candidate_reading_pinyin,
+        ReadingStyle.ZHUYIN to R.string.im_candidate_reading_zhuyin,
+    )
+
     private val MODEL_LEVELS = mapOf(
         ModelLevel.LOW to R.string.im_model_level_low,
         ModelLevel.MEDIUM to R.string.im_model_level_medium,
@@ -240,6 +247,12 @@ object InputMethodSettings {
                     label = { ctx, v -> ctx.getString(MODEL_LEVELS.getValue(ModelLevel.entries.first { it.key == v })) },
                     // what the engine reads as the default (EngineOptions.toSettings)
                     nearest = { v -> ModelLevel.entries.firstOrNull { it.key == v }?.key ?: ModelLevel.HIGH.key },
+                ),
+                // 候选词注音: pinyin above each character or zhuyin beside it, on every Chinese input method's candidates
+                Choice(
+                    EngineSettings.CANDIDATE_READING, R.string.im_candidate_reading, ReadingStyle.entries.map { it.key }, R.string.im_candidate_reading_summary,
+                    label = { ctx, v -> ctx.getString(READING_STYLES.getValue(ReadingStyle.of(v))) },
+                    nearest = { v -> ReadingStyle.of(v).key },
                 ),
                 // the punctuation addon's own page went with the list of addons
                 Page(PUNCTUATION, R.string.punctuation_map, R.string.punctuation_map_summary, SettingsRoute.Punctuation()),

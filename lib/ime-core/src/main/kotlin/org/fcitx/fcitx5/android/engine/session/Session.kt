@@ -11,6 +11,7 @@ import org.fcitx.fcitx5.android.engine.runtime.Keyboard
 import org.fcitx.fcitx5.android.engine.learn.Kinds
 import org.fcitx.fcitx5.android.engine.learn.LearnRecord.Commit
 import org.fcitx.fcitx5.android.engine.learn.control.Why
+import org.fcitx.fcitx5.android.engine.reading.WordReading
 
 /**
  * An input method engine as its host sees it: actions in, what to show and commit out. The host
@@ -65,6 +66,12 @@ interface Session {
      * session does not say.
      */
     fun why(index: Int): Why? = null
+
+    /**
+     * How the words of the candidate at [index] of all were read from what was typed, for 候选词注音
+     * (CandidateReadings); null where the session does not know, the candidate then read by its text.
+     */
+    fun readingOf(index: Int): List<WordReading>? = null
 
     /**
      * What was learned changed under the input (a long press taken back, a clear): the candidates
@@ -139,8 +146,8 @@ enum class Offer(val bit: Int) {
     DELETE_PHRASE(1 shl 4),
 }
 
-/** A candidate as a host lists it, with its [hint] (see [Snapshot.hints]). */
-data class Choice(val text: String, val hint: String = "")
+/** A candidate as a host lists it, with its [hint] (see [Snapshot.hints]) and [readings] (see [Snapshot.readings]). */
+data class Choice(val text: String, val hint: String = "", val readings: List<String> = emptyList())
 
 /** What a user does. */
 sealed class Action {
@@ -349,6 +356,8 @@ sealed class Action {
  * @property deleteBefore how many code points before the cursor go first (the app deletes in code points), before [commit]: English
  *   puts a space it added after a word behind the punctuation typed next (`word .` as `word. `)
  * @property lookingUp [preedit] is a table's pinyin lookup, not its code: the host marks it (拼)
+ * @property readings 候选词注音: empty, or one per candidate, each one string per code point of it
+ *   (CandidateReadings), empty for one shown none
  */
 data class Snapshot(
     val commit: String,
@@ -370,4 +379,5 @@ data class Snapshot(
     val deleteBefore: Int = 0,
     val cursor: Int = -1,
     val lookingUp: Boolean = false,
+    val readings: List<List<String>> = emptyList(),
 )

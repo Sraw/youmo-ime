@@ -14,6 +14,9 @@ interface PanelCandidate {
     val text: String
     val comment: String get() = ""
 
+    /** 候选词注音's, one per code point of [text] ([org.fcitx.fcitx5.android.engine.session.Snapshot.readings]); empty for none. */
+    val readings: List<String> get() = emptyList()
+
     /** Picked (a tap, a key): the list it is on may be replaced by what this does. */
     fun select(ic: InputContext)
 }

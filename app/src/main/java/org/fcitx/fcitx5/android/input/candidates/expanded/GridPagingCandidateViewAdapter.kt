@@ -7,13 +7,18 @@ package org.fcitx.fcitx5.android.input.candidates.expanded
 
 import android.graphics.Paint
 import android.graphics.Rect
+import android.text.Layout
+import android.text.SpannableStringBuilder
+import android.text.TextPaint
 import android.util.LruCache
 import android.view.ViewGroup
 import androidx.recyclerview.widget.GridLayoutManager
+import org.fcitx.fcitx5.android.core.EngineState
 import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.input.bar.CandidateBarHeight
 import org.fcitx.fcitx5.android.input.candidates.CandidateViewHolder
+import org.fcitx.fcitx5.android.input.candidates.ReadingSpan
 import splitties.dimensions.dp
 import splitties.views.dsl.core.matchParent
 
@@ -42,13 +47,19 @@ abstract class GridPagingCandidateViewAdapter(theme: Theme) : PagingCandidateVie
     fun measureWidth(position: Int): Float {
         // the span lookup reads ahead of what is shown: getItem would have Paging load for it
         val candidate = peek(position) ?: return 0f
-        return measuredWidths[candidate.textWithComment()] * textScale
+        if (candidate.readings.isEmpty()) return measuredWidths[candidate.textWithComment()] * textScale
+        // 候选词注音 widens the characters: measured as drawn (ReadingSpan), the comment after them
+        val annotated = SpannableStringBuilder().also { ReadingSpan.annotate(it, candidate.text, candidate.readings, 0) }
+        if (candidate.comment.isNotBlank()) annotated.append(if (candidate.spaceBetweenComment) " " else "").append(candidate.comment)
+        return Layout.getDesiredWidth(annotated, readingPaint) / TEXT_SIZE * textScale
     }
+
+    private val readingPaint = TextPaint().apply { textSize = TEXT_SIZE }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): CandidateViewHolder {
         return super.onCreateViewHolder(parent, viewType).apply {
             itemView.apply {
-                layoutParams = GridLayoutManager.LayoutParams(matchParent, dp(CandidateBarHeight.dp(textSp)))
+                layoutParams = GridLayoutManager.LayoutParams(matchParent, dp(CandidateBarHeight.dp(textSp, EngineState.candidateReading.value)))
             }
         }
     }

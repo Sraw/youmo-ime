@@ -9,6 +9,7 @@ import org.fcitx.fcitx5.android.engine.data.PinyinDataBuilder
 import org.fcitx.fcitx5.android.engine.lattice.Predictor
 import org.fcitx.fcitx5.android.engine.pinyin.Syllables
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Test
 import java.nio.ByteBuffer
 
@@ -37,8 +38,18 @@ class CandidateReadingsTest {
     private val readings = CandidateReadings(data, data.tones) { Predictor.charReadingsOf(data.dictionary, data.vocabulary) }
 
     @Test
-    fun offShowsNothing() {
-        assertEquals(emptyList<String>(), readings.of("银行", ReadingStyle.OFF))
+    fun offShowsNothingAndReadsNoTable() {
+        var asked = 0
+        val counting = object : ReadingTable by data.tones {
+            override fun tones(text: String, syllables: IntArray, word: Int): ByteArray? = data.tones.tones(text, syllables, word).also { asked++ }
+        }
+        var charsRead = false
+        val r = CandidateReadings(data, counting) { charsRead = true; Predictor.charReadingsOf(data.dictionary, data.vocabulary) }
+        assertEquals(emptyList<String>(), r.of("银行", ReadingStyle.OFF))
+        assertEquals(0, asked)
+        assertFalse(charsRead)
+        r.of("银行", ReadingStyle.PINYIN)
+        assertEquals(1, asked)
     }
 
     @Test

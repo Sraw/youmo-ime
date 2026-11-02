@@ -7,6 +7,7 @@ package org.fcitx.fcitx5.android.engine.runtime
 import org.fcitx.fcitx5.android.engine.pinyin.Fuzzy
 import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
 import org.fcitx.fcitx5.android.engine.pinyin.ShuangpinScheme
+import org.fcitx.fcitx5.android.engine.reading.ReadingStyle
 import org.fcitx.fcitx5.android.engine.table.KeyLabels
 import org.fcitx.fcitx5.android.engine.table.TableOptions
 
@@ -39,6 +40,8 @@ data class EngineSettings(
     val nineKeys: NineKeyLetters = NineKeyLetters.STANDARD,
     /** Whether English suggests words ([ENGLISH_SUGGEST]): the keyboard's to know, the engine's is the addon's. */
     val englishSuggest: Boolean = true,
+    /** 候选词注音: what is shown above or beside each character of a Chinese candidate. */
+    val candidateReading: ReadingStyle = ReadingStyle.OFF,
 ) {
     val scheme: ShuangpinScheme get() = SCHEMES[shuangpin] ?: ShuangpinScheme.ZIRANMA
 
@@ -52,6 +55,7 @@ data class EngineSettings(
         const val FUZZY = "Fuzzy"
         const val MODEL_LEVEL = "ModelLevel"
         const val LATIN_WORDS = "LatinWords"
+        const val CANDIDATE_READING = "CandidateReading"
         /**
          * Read by the addon itself: off, English hands the session no key, and they type themselves.
          * The nine keys read it too: there they type English a letter at a time (连按).

@@ -30,6 +30,8 @@ import org.fcitx.fcitx5.android.engine.platform.LogFile
 import org.fcitx.fcitx5.android.engine.platform.UserFiles
 import org.fcitx.fcitx5.android.engine.platform.jvm.JvmClock
 import org.fcitx.fcitx5.android.engine.platform.jvm.JvmThreads
+import org.fcitx.fcitx5.android.engine.reading.CandidateReadings
+import org.fcitx.fcitx5.android.engine.reading.ReadingStyle
 import org.fcitx.fcitx5.android.engine.rerank.MatrixKernel
 import org.fcitx.fcitx5.android.engine.session.Action
 import org.fcitx.fcitx5.android.engine.session.Choice
@@ -357,8 +359,29 @@ class Engines(
     fun onEvent(im: String, event: Int, arg: Int, learning: Boolean = true, payload: Action? = null): Snapshot {
         hostThread.check()
         if (im == PINYIN) syncLatin()
-        return pairs[im]?.onEvent(event, arg, learning, payload)
+        val s = pairs[im]?.onEvent(event, arg, learning, payload)
             ?: keyboard(im).onEvent(if (event == EngineEvent.HARD_CHAR) EngineEvent.CHAR else event, arg, learning, payload)
+        return annotated(im, s)
+    }
+
+    // 候选词注音 of the reading for each candidate shown; made at the first asked for
+    private val candidateReadings by lazy(LazyThreadSafetyMode.NONE) { CandidateReadings(assets.pinyinData, assets.pinyinData.tones) { assets.charSyllables } }
+
+    // the session [im]'s candidates are of, if they are any 候选词注音 reads: not English's
+    private fun annotatedSession(im: String): Session? =
+        if (settings.candidateReading == ReadingStyle.OFF) null else sessions[pairs.shownSession(im)]?.takeIf { it !is EnglishSession }
+
+    /**
+     * [s] with 候选词注音's readings, while it is on. Pinyin's and 双拼's hints then go: each a reading
+     * (a misreading's, a character by its parts', a stroke lookup's), which the readings show now;
+     * a table's (what is left of its code) stay.
+     */
+    private fun annotated(im: String, s: Snapshot): Snapshot {
+        val session = annotatedSession(im) ?: return s
+        if (s.candidates.isEmpty()) return s
+        val style = settings.candidateReading
+        val readings = s.candidates.mapIndexed { i, text -> candidateReadings.of(text, style, session.readingOf(s.first + i)) }
+        return s.copy(readings = readings, hints = if (im in pairs) emptyList() else s.hints)
     }
 
     private fun keyboard(im: String): Keyboard = keyboards[im] ?: Keyboard(session(im), nineKeys = im in KeyboardPair.KEYED).also {
@@ -484,7 +507,14 @@ class Engines(
     val inkEnded: Int get() = checked { (sessions[HANDWRITING] as? HandwritingSession)?.ended ?: inkEndedBefore }
 
     /** Candidates of [im]'s input, from the [from]th, at most [count]; none if it has no session yet. */
-    fun candidates(im: String, from: Int, count: Int): List<Choice> = checked { sessions[pairs.shownSession(im)]?.candidates(from, count).orEmpty() }
+    fun candidates(im: String, from: Int, count: Int): List<Choice> = checked {
+        val choices = sessions[pairs.shownSession(im)]?.candidates(from, count).orEmpty()
+        val session = annotatedSession(im) ?: return@checked choices
+        val style = settings.candidateReading
+        choices.mapIndexed { i, c ->
+            Choice(c.text, if (im in pairs) "" else c.hint, candidateReadings.of(c.text, style, session.readingOf(from + i)))
+        }
+    }
 
     /** What a long press on the [index]th of [im]'s candidates offers; nothing if it has no session yet. */
     fun offers(im: String, index: Int): Set<Offer> = checked { sessions[pairs.shownSession(im)]?.offers(index).orEmpty() }

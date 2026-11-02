@@ -264,6 +264,11 @@ they share the large model's slices at a pause (`session/RefineSlices`) too.
   now, `mainland`), `Zhuyin` the syllables in zhuyin, `ToneMark` the written forms (hǎo, ㄏㄠˇ, ˙ㄗ).
   `ime-eval readings` measures it on `lib/ime-eval/data/readings/chat.tsv` (500 hand-checked words; a
   release needs 98%).
+  候选词注音 (`EngineSettings.candidateReading`, off by default) puts `readings` on each `Snapshot` and
+  `Choice`: one string a code point, by `CandidateReadings`, from `Session.readingOf` (pinyin's words as
+  typed) or else the text. Engines adds them for every input method but English; pinyin's and 双拼's
+  hints (all readings) go while it is on. The host keeps them only while the shown text (traditional)
+  has a code point for each; the bar is taller for pinyin (`CandidateBarHeight.dp(textSp, style)`).
 - **Strokes.** `u` with nothing typed starts `StrokeLookup` (`h s p n z` = 横竖撇捺折); any other
   letter turns it back into pinyin (`usb`, or `uan` as a slip for `yan`), typed at the strokes'
   cursor, which they keep as pinyin keeps its own.

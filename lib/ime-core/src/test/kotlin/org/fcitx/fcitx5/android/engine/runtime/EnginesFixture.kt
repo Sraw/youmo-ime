@@ -37,6 +37,10 @@ open class EnginesFixture {
         .entry("你", syl("ni"))
         .entry("拟", syl("ni"))
         .entry("好", syl("hao"))
+        .charTone('你'.code, Syllables.id("ni"), 3)
+        .charTone('拟'.code, Syllables.id("ni"), 3)
+        .charTone('好'.code, Syllables.id("hao"), 3)
+        .charTone('好'.code, Syllables.id("hao"), 4)
         .build()
         .toByteArray()
 

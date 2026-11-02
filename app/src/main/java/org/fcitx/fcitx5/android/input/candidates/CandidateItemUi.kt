@@ -12,6 +12,7 @@ import org.fcitx.fcitx5.android.core.CandidateWord
 import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.input.AutoScaleTextView
+import org.fcitx.fcitx5.android.input.bar.CandidateBarHeight
 import org.fcitx.fcitx5.android.input.keyboard.CustomGestureView
 import org.fcitx.fcitx5.android.utils.pressHighlightDrawable
 import splitties.views.dsl.core.Ui
@@ -21,6 +22,7 @@ import splitties.views.dsl.core.matchParent
 import splitties.views.dsl.core.view
 import splitties.views.dsl.core.wrapContent
 import splitties.views.gravityCenter
+import kotlin.math.roundToInt
 
 class CandidateItemUi(override val ctx: Context, val theme: Theme) : Ui {
 
@@ -49,9 +51,12 @@ class CandidateItemUi(override val ctx: Context, val theme: Theme) : Ui {
     fun updateCandidate(candidate: CandidateWord) {
         val fg = theme.candidateTextColor
         val altFg = theme.candidateCommentColor
+        // pinyin above the words: the text centred below it, in the bar made taller for it (CandidateBarHeight)
+        val above = ReadingSpan.above(candidate.readings)
+        text.setPadding(0, if (above) (text.textSize * CandidateBarHeight.READING_LINE).roundToInt() else 0, 0, 0)
         text.text = buildSpannedString {
             color(fg) {
-                append(candidate.text)
+                ReadingSpan.annotate(this, candidate.text, candidate.readings, altFg)
             }
             if (candidate.comment.isNotBlank()) {
                 if (candidate.spaceBetweenComment) {
