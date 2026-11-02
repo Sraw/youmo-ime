@@ -510,8 +510,6 @@ def st48(d):
     row = d.code_row(s)
     check(row is not None, "打字时没有编码行")
     x0, y0, x1, y1 = row.b
-    kb = s.find(rid="keyboard_view", where="ime")
-    check(kb is None or y1 <= kb.b[1] + 2, f"浮条 {row.b} 不在键盘 {kb.b if kb else None} 上面")
     region = d.ime_touchable_region()
     gap = int(20 * d.dpx())
     inside = region_has(region, (x0 + x1) // 2, (y0 + y1) // 2)
@@ -519,6 +517,9 @@ def st48(d):
     beside = region_has(region, x1 + gap, (y0 + y1) // 2)
     d.clear()
     after = region_has(d.ime_touchable_region(), (x0 + x1) // 2, (y0 + y1) // 2)
+    # outside the keyboard: the band the keyboard takes, its full width, starts at the strip's bottom
+    band = [r for r in region if r[0] <= 0 and r[2] >= x1 + gap]
+    check(band and abs(min(r[1] for r in band) - y1) <= 2, f"浮条 {row.b} 不在键盘 {band} 上面")
     check(inside and not above and not beside and not after,
           f"浮条上 {inside}，上方 {above}，右边 {beside}，消失后 {after}")
     return f"浮条 {row.b}，触摸区只在浮条和键盘"
