@@ -73,7 +73,7 @@ class ReadingSpan(
             canvas.drawText(text, start, end, x + (size - w) / 2, y.toFloat(), paint)
             val p = small(paint)
             // a hint's: on the characters' tops, or lower where the view's top is nearer
-            val baseline = if (hint) max(y - paint.textSize * CandidateBarHeight.HAN_TOP - p.descent(), y - hintRoom - p.ascent()) else y + paint.ascent() - p.descent()
+            val baseline = if (hint) max(y - paint.textSize * CandidateBarHeight.HAN_TOP - p.descent() - HINT_GAP, y - hintRoom - p.ascent()) else y + paint.ascent() - p.descent()
             canvas.drawText(reading, x + (size - p.measureText(reading)) / 2, baseline, p)
             return
         }
@@ -134,10 +134,13 @@ class ReadingSpan(
             }
         }
 
+        // a pixel between a hint and its characters, out of the hint's size, so the bar keeps its height
+        private const val HINT_GAP = 1f
+
         /** A hint's reading size ([CandidateBarHeight.hintSize]) for text in [paint], [baseline] below the view's top. */
         fun hintSize(paint: Paint, baseline: Float, floor: Float): Float {
             val fm = paint.fontMetrics
-            val room = baseline - paint.textSize * CandidateBarHeight.HAN_TOP
+            val room = baseline - paint.textSize * CandidateBarHeight.HAN_TOP - HINT_GAP
             return CandidateBarHeight.hintSize(paint.textSize, room, (fm.descent - fm.ascent) / paint.textSize, floor)
         }
 

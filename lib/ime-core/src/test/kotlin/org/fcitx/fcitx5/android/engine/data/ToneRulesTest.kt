@@ -59,6 +59,9 @@ class ToneRulesTest {
         assertEquals("44", tones("过去", "guo qu", "44", own = "44"))
         assertEquals("35", tones("里边", "li bian", "31", own = "31"))
         assertEquals("45", tones("外面", "wai mian", "44"))
+        // 一起 then 来: no direction
+        assertEquals("134", tones("一起来", "yi qi lai", "134"))
+        assertEquals("435", tones("看起来", "kan qi lai", "434"))
         // only a word of the two
         assertEquals("244", tones("从下面", "cong xia mian", "244"))
     }

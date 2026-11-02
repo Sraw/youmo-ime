@@ -7,6 +7,7 @@ package org.fcitx.fcitx5.android.engine.reading
 import org.fcitx.fcitx5.android.engine.data.PinyinData
 import org.fcitx.fcitx5.android.engine.data.PinyinDataBuilder
 import org.fcitx.fcitx5.android.engine.lattice.Predictor
+import org.fcitx.fcitx5.android.engine.learn.Simplifier
 import org.fcitx.fcitx5.android.engine.pinyin.Syllables
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -26,6 +27,14 @@ class CandidateReadingsTest {
                 .unigram("银", -3f, 0f).entry("银", syl("yin"))
                 .unigram("你", -2f, 0f).entry("你", syl("ni"))
                 .entry("𠀀", syl("he"))
+                .unigram("说话", -2f, 0f).entry("说话", syl("shuo", "hua"))
+                .unigram("我们", -2f, 0f).entry("我们", syl("wo", "men"))
+                .entry("说", syl("shuo")).entry("话", syl("hua")).entry("我", syl("wo")).entry("们", syl("men"))
+                .charTone('说'.code, Syllables.id("shuo"), 1)
+                .charTone('话'.code, Syllables.id("hua"), 4)
+                .charTone('我'.code, Syllables.id("wo"), 3)
+                .charTone('们'.code, Syllables.id("men"), 2)
+                .wordTones("我们", syl("wo", "men"), byteArrayOf(3, 5))
                 .charTone('银'.code, Syllables.id("yin"), 2)
                 .charTone('行'.code, Syllables.id("xing"), 2)
                 .charTone('行'.code, Syllables.id("hang"), 2)
@@ -114,5 +123,13 @@ class CandidateReadingsTest {
     fun traditionalTextIsReadAsItsSimplified() {
         val r = CandidateReadings(data, data.tones, { it.replace('銀', '银') }) { Predictor.charReadingsOf(data.dictionary, data.vocabulary) }
         assertEquals(listOf("yín", "háng"), r.of("銀行", ReadingStyle.PINYIN))
+    }
+
+    @Test
+    fun traditionalTextGoesThroughOpenCCsSimplifier() {
+        val simplifier = Simplifier.read("說\t说\n話\t话\n們\t们\n".toByteArray(), "说\t說\n".toByteArray())
+        val r = CandidateReadings(data, data.tones, simplifier::simplify) { Predictor.charReadingsOf(data.dictionary, data.vocabulary) }
+        assertEquals(listOf("shuō", "huà"), r.of("說話", ReadingStyle.PINYIN))
+        assertEquals(listOf("wǒ", "men"), r.of("我們", ReadingStyle.PINYIN))
     }
 }
