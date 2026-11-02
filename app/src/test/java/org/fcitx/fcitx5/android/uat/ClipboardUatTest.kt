@@ -5,6 +5,7 @@
 package org.fcitx.fcitx5.android.uat
 
 import android.content.ClipData
+import androidx.paging.PagingSource
 import kotlinx.coroutines.job
 import kotlinx.coroutines.runBlocking
 import org.fcitx.fcitx5.android.FcitxApplication
@@ -20,6 +21,8 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import org.robolectric.shadows.ShadowSystemClock
+import java.time.Duration
 
 /**
  * uat/05-toolbar.md's clipboard: what the history keeps of a copy, as the listener the app's start
@@ -64,5 +67,25 @@ class ClipboardUatTest {
         } finally {
             listening.setValue(was)
         }
+    }
+
+    private fun panel() = runBlocking {
+        ClipboardManager.coroutineContext.job.children.forEach { it.join() }
+        val page = ClipboardManager.allEntries().load(PagingSource.LoadParams.Refresh(null, 50, false))
+        (page as PagingSource.LoadResult.Page).data
+    }
+
+    @Test
+    @Uat("TB-50")
+    fun anEntryPastedFromThePanelMovesFirstOfTheUnpinned() = runBlocking {
+        // a clip a moment after the last: the same time is taken for the same clip again
+        for (text in listOf("甲", "乙", "丙")) {
+            ShadowSystemClock.advanceBy(Duration.ofSeconds(1))
+            copy(text)
+        }
+        val entries = panel()
+        assertEquals("丙", entries.first().text)
+        ClipboardManager.used(entries.first { it.text == "乙" }.id, now = entries.maxOf { it.timestamp } + 1)
+        assertEquals("乙", panel().first { !it.pinned }.text)
     }
 }

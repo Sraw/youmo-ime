@@ -259,6 +259,9 @@ object ClipboardManager : ClipboardManager.OnPrimaryClipChangedListener,
 
     suspend fun unpin(id: Int) = orNeutral(Unit) { clbDao.updatePinStatus(id, false) }
 
+    /** [id] pasted from the panel: used now, first of the unpinned and the last the limit drops, as a copy would be. */
+    suspend fun used(id: Int, now: Long = System.currentTimeMillis()) = orNeutral(Unit) { clbDao.updateTimeIfUnpinned(id, now) }
+
     suspend fun updateText(id: Int, text: String) {
         lastEntry?.let {
             if (id == it.id) updateLastEntry(it.copy(text = text))

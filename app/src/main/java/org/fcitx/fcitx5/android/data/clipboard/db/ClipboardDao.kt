@@ -23,6 +23,10 @@ interface ClipboardDao {
     @Query("UPDATE ${ClipboardEntry.TABLE_NAME} SET timestamp=:timestamp WHERE id=:id")
     suspend fun updateTime(id: Int, timestamp: Long)
 
+    // a pinned entry keeps its place among the pinned
+    @Query("UPDATE ${ClipboardEntry.TABLE_NAME} SET timestamp=:timestamp WHERE id=:id AND pinned=0")
+    suspend fun updateTimeIfUnpinned(id: Int, timestamp: Long)
+
     @Query("SELECT COUNT(*) FROM ${ClipboardEntry.TABLE_NAME} WHERE deleted=0")
     suspend fun itemCount(): Int
 
