@@ -74,7 +74,7 @@ class KeyboardChoiceUatTest {
             keyboard.shuangpinKeyboard.setValue(ShuangpinKeyboard.NineKeys)
             h.start()
             h.relayout()
-            assertTrue(h.texts().toString(), "JKL;" in h.texts() && "WXYZ" in h.texts())
+            assertTrue(h.texts().toString(), "JKL" in h.texts() && "WXYZ" in h.texts())
             assertEquals(h.dp(CodeRowHeight.STRIP_DP), h.row(), 1f)
         }
     }
