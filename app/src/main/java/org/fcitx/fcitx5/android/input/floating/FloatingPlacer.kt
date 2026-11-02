@@ -107,6 +107,8 @@ class FloatingPlacer(private val parent: View, private val view: View) {
             prefs.floatingKeyboardY.setValue(spot.y)
         }
         moved = false
+        // a frame drawn: the floating code strip, hidden while dragged, shows again on one (InputView)
+        view.invalidate()
         return docks
     }
 
