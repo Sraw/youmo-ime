@@ -84,6 +84,13 @@ class SentenceModel private constructor(
 
     val window: Int get() = config.window
 
+    /**
+     * `<bos>` run, with its denominator: where every [Scorer] starts, the same node for each. One
+     * per model, not per scorer, as a scorer is made per input in ime-eval; done whole before it is
+     * shared, as its lazily kept parts would otherwise be written by whichever thread got there.
+     */
+    private val bos: Node by lazy { next(null, BOS).also { logSum(it) } }
+
     /** Token ids of [text]'s characters; unknown ones (and any beyond the BMP) as `<unk>`. */
     fun encode(text: String): IntArray {
         val out = IntArray(text.length)
@@ -217,7 +224,7 @@ class SentenceModel private constructor(
         private val scratch = Scratch(config)
         private val allLogits = FloatArray(config.vocab)
 
-        private val bos by lazy(LazyThreadSafetyMode.NONE) { next(null, BOS, scratch) }
+        private val bos get() = this@SentenceModel.bos
 
         private var context: String? = null
 
