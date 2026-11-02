@@ -191,7 +191,8 @@ Details in `uat/README.md`.
 Release gates 2, 3 and 5 of the host replacement (0.4.0) (in-place upgrade from the `uat/fixtures/upgrade`
 releases, backups both ways with them, start/latency/memory side by side) are one command each,
 `uat/gates/gates.py upgrade|backups|perf`, on a redroid of their own (not ported to the emulator yet:
-they and `uat/parity`, `uat/fixtures/upgrade/make.py` exit saying so); results in `uat/runs/`
+they, `uat/parity/parity.py prepare|run`, `uat/parity/record.sh` and `uat/fixtures/upgrade/make.py` exit
+saying so; parity.py's other commands need no device); results in `uat/runs/`
 (`uat/gates/README.md`). A `.debug` build is upgraded by putting the fixture's files into its own
 directories and gets backups retargeted to its id; the release APK is upgraded with `install -r`.
 

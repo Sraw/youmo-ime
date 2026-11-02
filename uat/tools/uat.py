@@ -69,12 +69,32 @@ def emu_port(port):
     return str(int(port))
 
 
+AVD_NAME_TIMEOUT = 20   # s: the console answers at once, booting or not
+
+
+def avd_name(d):
+    """the AVD emulator-<port> runs: its name, "" when no emulator answers on the port, None when adb
+    hangs (an emulator there that does not answer its console)"""
+    try:
+        out = d.adb("emu", "avd", "name", timeout=AVD_NAME_TIMEOUT)
+    except subprocess.TimeoutExpired:
+        return None
+    lines = out.strip().splitlines()
+    return lines[0].strip() if lines else ""
+
+
+def not_ours(d, name):
+    what = (f"not answering (adb emu avd name hung {AVD_NAME_TIMEOUT} s)" if name is None
+            else "not up" if not name else f"AVD {name}")
+    sys.exit(f"{d.serial} is {what}: not this runner's ({AVD}), left as it is")
+
+
 def ours(d):
     """exit unless emulator-<port> runs this AVD: another project's emulator on the port is never
     installed on, cleared or killed (redroid's runner refused other containers the same way)"""
-    name = d.adb("emu", "avd", "name").strip().splitlines()[:1]
-    if name != [AVD]:
-        sys.exit(f"{d.serial} is {'not up' if not name else 'AVD ' + name[0]}: not this runner's ({AVD}), left as it is")
+    name = avd_name(d)
+    if name != AVD:
+        not_ours(d, name)
 
 
 def version_key(name):
@@ -2261,25 +2281,33 @@ def emulator_bin():
 def up(port="5556"):
     """emulator-<port> of the AVD from its snapshot, read-only (-read-only: two of one AVD at once,
     nothing saved back), so a device this starts is clean; one already up is left as it is"""
-    d = Device(emu_port(port))
+    port = emu_port(port)
+    d = Device(port)
     if d.sh("getprop sys.boot_completed").strip() == "1":
         ours(d)
         print(f"{d.serial} already up")
     else:
-        os.makedirs(os.path.join(OUT, "emu"), exist_ok=True)
-        log = open(os.path.join(OUT, "emu", f"emulator-{port}.log"), "w")
-        # -gpu host: the Mac's GPU (its OpenGL; EMU_GPU=swiftshader_indirect for software, which the
-        # snapshot was not saved with: a cold boot). -no-audio: no microphone yet (Device.say)
-        subprocess.Popen([emulator_bin(), "-avd", AVD, "-port", port, "-snapshot", SNAPSHOT,
-                          "-no-snapshot-save", "-read-only", "-no-window", "-no-audio", "-no-boot-anim",
-                          "-gpu", os.environ.get("EMU_GPU", "host")],
-                         stdout=log, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL, start_new_session=True)
+        # one still booting is waited for if it is this AVD; another project's, or one not answering,
+        # is left: starting ours on its port would fail and the wait below would take that one
+        name = avd_name(d)
+        if name not in ("", AVD):
+            not_ours(d, name)
+        if not name:
+            os.makedirs(os.path.join(OUT, "emu"), exist_ok=True)
+            log = open(os.path.join(OUT, "emu", f"emulator-{port}.log"), "w")
+            # -gpu host: the Mac's GPU (its OpenGL; EMU_GPU=swiftshader_indirect for software, which the
+            # snapshot was not saved with: a cold boot). -no-audio: no microphone yet (Device.say)
+            subprocess.Popen([emulator_bin(), "-avd", AVD, "-port", port, "-snapshot", SNAPSHOT,
+                              "-no-snapshot-save", "-read-only", "-no-window", "-no-audio", "-no-boot-anim",
+                              "-gpu", os.environ.get("EMU_GPU", "host")],
+                             stdout=log, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL, start_new_session=True)
         for _ in range(180):
             time.sleep(1)
             if d.sh("getprop sys.boot_completed").strip() == "1":
                 break
         else:
             sys.exit(f"{d.serial} did not boot in 3 min (dev/uat-out/emu/emulator-{port}.log)")
+        ours(d)   # the port taken by another emulator between the look and the start: that one booted
     subprocess.run(["adb", "-s", d.serial, "root"], capture_output=True)
     subprocess.run(["adb", "-s", d.serial, "wait-for-device"], capture_output=True)
     for _ in range(30):

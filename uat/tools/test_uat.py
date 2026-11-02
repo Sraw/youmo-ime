@@ -8,6 +8,7 @@ import threading
 import time
 import unittest
 from types import SimpleNamespace
+from unittest import mock
 
 import uat
 
@@ -306,6 +307,94 @@ class JvmTest(unittest.TestCase):
             time.sleep = real
         self.assertEqual([uat.PAUSE["tap_text"]], slept)
         self.assertGreaterEqual(d._quiet_at, t0 + uat.OLD["tap_text"] - uat.PAUSE["tap_text"])
+
+
+# adb for UpTest: answers emu avd name from $FAKE_DIR/avd (an error when empty, a hang with
+# $FAKE_DIR/hang), sys.boot_completed 1 after $FAKE_DIR/boot_after asks, nothing to the rest; logs each call
+FAKE_ADB = r"""#!/bin/sh
+D=$FAKE_DIR
+[ "$1" = -s ] && shift 2
+echo "$*" >> "$D/log"
+case "$*" in
+  "emu avd name")
+    [ -f "$D/hang" ] && exec sleep 30
+    A=$(cat "$D/avd" 2>/dev/null)
+    if [ -n "$A" ]; then printf '%s\r\nOK\r\n' "$A"; else echo "error: no emulator detected" >&2; exit 1; fi ;;
+  "shell getprop sys.boot_completed")
+    n=$(($(cat "$D/boots" 2>/dev/null || echo 0) + 1)); echo $n > "$D/boots"
+    if [ $n -gt "$(cat "$D/boot_after" 2>/dev/null || echo 0)" ]; then echo 1; else echo; fi ;;
+esac
+"""
+
+
+class UpTest(unittest.TestCase):
+    """up() on a port another project's emulator holds: it exits before touching the device"""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.dir = self.tmp.name
+        adb = os.path.join(self.dir, "adb")
+        with open(adb, "w") as f:
+            f.write(FAKE_ADB)
+        os.chmod(adb, 0o755)
+        self.popen = mock.MagicMock()   # the emulator's start; adb's (subprocess.run's) go through
+        real = uat.subprocess.Popen
+        popen = lambda args, *a, **k: self.popen(args, *a, **k) if args[0] == "EMULATOR" else real(args, *a, **k)  # noqa: E731
+        for p in (mock.patch.dict(os.environ, {"PATH": self.dir + os.pathsep + os.environ["PATH"],
+                                               "FAKE_DIR": self.dir}),
+                  mock.patch.object(uat, "OUT", self.dir), mock.patch.object(uat, "AVD_NAME_TIMEOUT", 1),
+                  mock.patch.object(uat.time, "sleep", lambda s: None),
+                  mock.patch.object(uat, "emulator_bin", lambda: "EMULATOR"),
+                  mock.patch.object(uat.subprocess, "Popen", popen)):
+            p.start()
+            self.addCleanup(p.stop)
+        self.addCleanup(self.tmp.cleanup)
+
+    def put(self, name, text=""):
+        with open(os.path.join(self.dir, name), "w") as f:
+            f.write(text)
+
+    def calls(self):
+        with open(os.path.join(self.dir, "log")) as f:
+            return f.read().splitlines()
+
+    def up(self, port="5556"):
+        with self.assertRaises(SystemExit) as e, contextlib.redirect_stdout(io.StringIO()):
+            uat.up(port)
+        return str(e.exception.code)
+
+    def test_another_avd_still_booting_is_not_started_over_nor_waited_for(self):
+        self.put("avd", "dsapp")
+        self.put("boot_after", "1000")
+        self.assertIn("AVD dsapp", self.up())
+        self.popen.assert_not_called()
+        self.assertEqual(["shell getprop sys.boot_completed", "emu avd name"], self.calls())
+
+    def test_an_emulator_that_does_not_answer_its_console_is_left(self):
+        self.put("hang")
+        self.put("boot_after", "1000")
+        self.assertIn("not answering", self.up())
+        self.popen.assert_not_called()
+        self.assertEqual(["shell getprop sys.boot_completed", "emu avd name"], self.calls())
+        with self.assertRaises(SystemExit):   # ours alone: an exit, not TimeoutExpired
+            uat.ours(uat.Device("5556"))
+
+    def test_another_avd_that_took_the_port_after_the_look_is_refused_before_root(self):
+        self.put("boot_after", "2")
+        self.popen.side_effect = lambda *a, **k: self.put("avd", "dsapp")
+        self.assertIn("AVD dsapp", self.up("05556"))
+        args = self.popen.call_args[0][0]
+        self.assertEqual("5556", args[args.index("-port") + 1])   # the normalised port, in the log name too
+        self.assertTrue(os.path.exists(os.path.join(self.dir, "emu", "emulator-5556.log")))
+        self.assertEqual("emu avd name", self.calls()[-1])
+        self.assertFalse([c for c in self.calls() if c == "root" or "setprop" in c], self.calls())
+
+    def test_this_avd_still_booting_is_waited_for_not_started_again(self):
+        self.put("avd", "youmo")
+        self.put("boot_after", "3")
+        self.assertIn("webview_shell", self.up())   # the fake has no packages: past the checks
+        self.popen.assert_not_called()
+        self.assertIn("root", self.calls())
 
 
 if __name__ == "__main__":
