@@ -43,8 +43,8 @@ internal class ReadingsRun(private val data: PinyinData, private val typed: Bool
     }
 
     companion object {
-        /** A share of the words read right a release must reach (design 051-zhuyin §4 said 98: 96 until the neutral tones are better). */
-        const val GATE = 96.0
+        /** A share of the words read right a release must reach (design 051-zhuyin §4). */
+        const val GATE = 98.0
 
         fun parse(lines: Sequence<String>): List<Pair<String, String>> = lines
             .filter { it.isNotBlank() && !it.startsWith('#') }

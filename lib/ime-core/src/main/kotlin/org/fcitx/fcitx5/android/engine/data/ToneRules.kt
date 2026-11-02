@@ -80,7 +80,8 @@ object ToneRules {
         val pair = String(cps, n - 2, 2)
         val kin = n == 2 && cps[0] == cps[1] && cps[0].toChar() in KIN
         // 一起来 is 一起 then 来, no direction of a verb
-        val direction = pair[0] in MOVED && pair[1] in DIRECTION && pair != "过去" && String(cps) !in NOT_DIRECTION
+        val direction = pair[0] in MOVED && pair[1] in DIRECTION && pair != "过去" &&
+            String(cps, 0, n) !in NOT_DIRECTION
         return kin || direction || n == 2 && pair[0] in PLACE && pair[1] in SIDE
     }
 

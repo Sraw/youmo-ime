@@ -267,9 +267,9 @@ they share the large model's slices at a pause (`session/RefineSlices`) too.
   `tones.tsv` is curated and taken as written. 一 and 不 are always yī and bù (no sandhi). `ReadingTable` is the interface (one table
   now, `mainland`), `Zhuyin` the syllables in zhuyin, `ToneMark` the written forms (hǎo, ㄏㄠˇ, ˙ㄗ).
   `ime-eval readings` measures it on `lib/ime-eval/data/readings/chat.tsv` (500 hand-checked words; a
-  release needs 96% for now; 98% once the neutral tones are better), read by text or, `--typed`, by
-  the syllables the list gives. That set is the test set: nothing in `tones.tsv` is taken from it. The
-  sets are simplified text, so the measure reads them without the app's traditional-to-simplified step.
+  release needs 98%), read by text or, `--typed`, by the syllables the list gives. That set is the test
+  set: nothing in `tones.tsv` is taken from it. The sets are simplified text, so the measure reads them
+  without the app's traditional-to-simplified step.
   候选词注音 (`EngineSettings.candidateReading`, off by default) puts `readings` on each `Snapshot` and
   `Choice`: one string a code point, by `CandidateReadings`, from `Session.readingOf` (pinyin's words as
   typed) or else the text. Engines adds them for every input method but English; pinyin's and 双拼's
