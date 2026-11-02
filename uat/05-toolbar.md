@@ -283,8 +283,8 @@
 - **预期**：点「li」照常选中（1）；上下拖什么都不选；从已选的「li」滑过「@」，「li」取消、「@」不选；从「x.com」往左滑到「li」，三块一起选中，序号按原文顺序 1、2、3（li、@、x.com），往回退时退出范围的块恢复原样；上屏的是 `li@x.com`，回到键盘。沿最上一行横滑不滚动，只选中滑过的块；拖到下边缘按住，面板一直往下滚，选区跟着手指下面的块变长；拖出面板外按住，面板照样往下滚，选区接着变长。
 - **JVM**：`ClipboardSplitUatTest.piecesPickedBySweepingAcross`（点仍是选中、竖拖不选、从已选的块滑开取消、往左滑按原文顺序选中并上屏）；范围、往回退恢复、已选块的位置、何时贴边滚动见 `SwipePickTest`；`ClipboardSwipeTest`（拖到下边缘或拖出面板外按住一直滚、选区跟着变长，第二根手指按下就结束，沿最上一行横滑不滚，滑到一半换了切分就结束，从「只切了前 5000 字」起滑什么都不选）；设备上不跑。
 
-### TB-50 [P1] 剪贴板里点了的条目移到最前，置顶的不动
-- **前提**：B0，依次复制「甲」「乙」「丙」，再复制「钉」并长按置顶。
-- **操作**：打开剪贴板面板，点「乙」；再打开面板，点「钉」；再打开面板。
-- **预期**：点「乙」上屏乙，再打开时顺序是 钉、乙、丙、甲；点「钉」上屏钉，顺序不变。
-- **JVM**：`ClipboardUatTest.anEntryPastedFromThePanelMovesFirstOfTheUnpinned`；`ClipboardDaoTest.anUnpinnedEntryUsedComesFirstOfTheUnpinnedAPinnedOneStays`（置顶的不动，上限按最久没用过的清）；设备上不跑。
+### TB-50 [P1] 剪贴板里点了的条目在面板关掉后移到最前，置顶的不动
+- **前提**：B0，关掉「粘贴后回到键盘」；依次复制「钉」「甲」「乙」「丙」，把「钉」置顶。
+- **操作**：打开剪贴板面板，依次点「甲」「乙」「钉」；看面板；回到键盘，再打开面板。
+- **预期**：上屏 甲乙钉；面板开着时顺序不变（钉、丙、乙、甲）；再打开时是 钉、乙、甲、丙。
+- **JVM**：`ToolbarUatTest.entriesPastedFromThePanelMoveFirstWhenItCloses`；`ClipboardDaoTest.anUnpinnedEntryUsedComesFirstOfTheUnpinnedAPinnedOneStays`（置顶的不动，上限按最久没用过的清）；设备上不跑。

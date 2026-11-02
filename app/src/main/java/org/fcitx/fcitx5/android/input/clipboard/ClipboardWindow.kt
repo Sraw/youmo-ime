@@ -123,7 +123,8 @@ class ClipboardWindow : InputWindow.ExtendedInputWindow<ClipboardWindow>() {
 
             override fun onPaste(entry: ClipboardEntry) {
                 service.commitOverEngine(entry.text)
-                service.lifecycleScope.launch { ClipboardManager.used(entry.id) }
+                // moved first when the panel closes: moved now, another entry would be under the finger
+                pasted += entry.id
                 if (clipboardReturnAfterPaste) windowManager.attachWindow(KeyboardWindow)
             }
         }
@@ -235,7 +236,14 @@ class ClipboardWindow : InputWindow.ExtendedInputWindow<ClipboardWindow>() {
         clipboardEnabledPref.registerOnChangeListener(clipboardEnabledListener)
     }
 
+    private val pasted = mutableListOf<Int>()
+
     override fun onDetached() {
+        if (pasted.isNotEmpty()) {
+            val ids = pasted.toList()
+            pasted.clear()
+            service.lifecycleScope.launch { ClipboardManager.used(ids) }
+        }
         clipboardEnabledPref.unregisterOnChangeListener(clipboardEnabledListener)
         adapter.onDetached()
         adapter.removeLoadStateListener(loadStateListener)
