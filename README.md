@@ -10,7 +10,8 @@
 <a href="https://github.com/Sraw/youmo-ime/actions/workflows/unit_test.yml"><img src="https://github.com/Sraw/youmo-ime/actions/workflows/unit_test.yml/badge.svg?branch=main" alt="Unit Tests"></a>
 <a href="LICENSE"><img src="https://img.shields.io/badge/license-LGPL--2.1--or--later-blue" alt="LGPL-2.1-or-later"></a>
 <img src="https://img.shields.io/badge/Android-10%2B%20arm64-3DDC84?logo=android&logoColor=white" alt="Android 10+ arm64">
-<a href="https://t.me/+smgndImIg7EzNjYx"><img src="https://img.shields.io/badge/Telegram-%E4%BA%A4%E6%B5%81%E7%BE%A4-26A5E4?logo=telegram&logoColor=white" alt="Telegram 交流群"></a></p>
+<a href="https://t.me/+smgndImIg7EzNjYx"><img src="https://img.shields.io/badge/Telegram-%E4%BA%A4%E6%B5%81%E7%BE%A4-26A5E4?logo=telegram&logoColor=white" alt="Telegram 交流群"></a>
+<img src="https://img.shields.io/badge/QQ%E4%BA%A4%E6%B5%81%E7%BE%A4-1072603549-12B7F5?logo=qq&logoColor=white" alt="QQ 交流群 1072603549"></p>
 
 <p align="center">
 <img src="docs/images/screenshot-pinyin.png" width="19%" alt="整句拼音 / pinyin sentences">
