@@ -118,6 +118,12 @@ abstract class ClipboardAdapter(
                 menu.item(R.string.edit, R.drawable.ic_baseline_edit_24, iconTint) {
                     onEdit(entry.id)
                 }
+                // nor a password kept as quick input, where every keyboard would offer it
+                if (!entry.sensitive) {
+                    menu.item(R.string.clipboard_save_quick_phrase, R.drawable.ic_quick_phrase, iconTint) {
+                        onSaveQuickPhrase(entry)
+                    }
+                }
                 menu.item(R.string.share, R.drawable.ic_baseline_share_24, iconTint) {
                     onShare(entry)
                 }
@@ -156,6 +162,8 @@ abstract class ClipboardAdapter(
     abstract fun onSplit(entry: ClipboardEntry)
 
     abstract fun onShare(entry: ClipboardEntry)
+
+    abstract fun onSaveQuickPhrase(entry: ClipboardEntry)
 
     abstract fun onDelete(id: Int)
 

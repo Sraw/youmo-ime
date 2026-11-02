@@ -79,7 +79,7 @@ class HandwritingKeyboard(
             listOf(spacer(), mark("，", ",", MORE)),
             listOf(spacer(), mark("。", ".")),
             listOf(
-                LayoutSwitchKey("符", PickerWindow.Key.Symbol.name, SIDE),
+                LayoutSwitchKey("符", PickerWindow.Key.Symbol.name, SIDE, longPress = KeyAction.QuickPhraseAction),
                 LayoutSwitchKey("123", NumberKeyboard.Name, 0.14f),
                 SpaceKey(),
                 LanguageKey(),

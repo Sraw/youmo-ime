@@ -136,9 +136,20 @@ class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), Essentia
         keyboards[currentKeyboardName]?.imTyping = composing && !tempMode
     }
 
+    // quick input's keys are typed, which the handwriting pad has none of: the full keyboard while it
+    // lasts, the pad back after
+    private var padDuringQuickPhrase = false
+
     override fun onInputPanelUpdate(data: HostEvent.InputPanel) {
         tempMode = data.auxUp.isNotEmpty()
         keyboards[currentKeyboardName]?.imTyping = composing && !tempMode
+        if (data.quickPhrase && currentKeyboardName == HandwritingKeyboard.Name) {
+            padDuringQuickPhrase = true
+            showLayout(TextKeyboard.Name)
+        } else if (!data.quickPhrase && padDuringQuickPhrase) {
+            padDuringQuickPhrase = false
+            if (currentKeyboardName == TextKeyboard.Name) showLayout(HandwritingKeyboard.Name)
+        }
     }
 
     private val currentKeyboard: BaseKeyboard?
@@ -246,6 +257,7 @@ class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), Essentia
     private var noSuggestions = false
 
     override fun onStartInput(info: EditorInfo, capFlags: CapabilityFlags) {
+        padDuringQuickPhrase = false
         (keyboards[HandwritingKeyboard.Name] as? HandwritingKeyboard)?.restart()
         noSuggestions = capFlags.has(CapabilityFlag.NoSpellCheck)
         (keyboards[T9Keyboard.EnglishName] as? T9Keyboard)?.noSuggestions = noSuggestions

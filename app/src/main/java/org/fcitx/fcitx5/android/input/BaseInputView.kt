@@ -5,6 +5,15 @@
 
 package org.fcitx.fcitx5.android.input
 
+import android.content.ClipData
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import org.fcitx.fcitx5.android.data.quickphrase.QuickPhraseManager
+import org.fcitx.fcitx5.android.host.QuickPhraseBook
+import org.fcitx.fcitx5.android.utils.AppUtil
+import org.fcitx.fcitx5.android.utils.clipboardManager
+import org.fcitx.fcitx5.android.utils.toast
+import java.io.IOException
 import android.graphics.Rect
 import android.os.SystemClock
 import android.util.SparseArray
@@ -239,7 +248,9 @@ abstract class BaseInputView(
             // what the addon offers, as it words it: not the addon's words where the engine's list
             // changed under the press (review-E-ui N8)
             val im = fcitx.runImmediately { inputMethodEntryCached }.uniqueName
-            val lines = learningMenu.lines(idx, text, pagedCandidates) ?: if (EngineBridge.isEngines(im)) return@launch else {
+            // quick input's, not the engine's: its entries numbered over the whole list, not a page's
+            val phrase = if (pagedCandidates) null else fcitx.runOnReady { quickPhraseAt(idx) }
+            val lines = phrase?.let { quickPhraseLines(idx, text, it) } ?: learningMenu.lines(idx, text, pagedCandidates) ?: if (EngineBridge.isEngines(im)) return@launch else {
                 fcitx.runOnReady { getCandidateActions(idx) }.map { action ->
                     CandidateLearningMenu.Line(action.text) {
                         triggerCandidateAction(idx, action.id, text)
@@ -301,6 +312,49 @@ abstract class BaseInputView(
                 show()
                 listView?.rootView?.let { decor -> decor.doOnPreDraw { growFrom(decor, view) } }
             }
+        }
+    }
+
+    // 上屏 and 复制 for any; 编辑 and 删除 for the user's own, a deletion undone from the same menu
+    private fun quickPhraseLines(idx: Int, text: String, found: QuickPhraseBook.Found): List<CandidateLearningMenu.Line> {
+        val entry = found.entry
+        val commit = CandidateLearningMenu.Line(context.getString(R.string.quick_phrase_commit)) {
+            service.postFcitxJob { select(idx, text) }
+            null
+        }
+        val copy = CandidateLearningMenu.Line(context.getString(R.string.quick_phrase_copy)) {
+            context.clipboardManager.setPrimaryClip(ClipData.newPlainText(null, found.content))
+            null
+        }
+        if (!found.mine) return listOf(commit, copy)
+        val edit = CandidateLearningMenu.Line(context.getString(R.string.edit)) {
+            AppUtil.launchQuickPhraseEditor(context, entry)
+            null
+        }
+        val delete = CandidateLearningMenu.Line(context.getString(R.string.delete)) {
+            quickPhraseChange { QuickPhraseManager.remove(entry) }
+            listOf(
+                CandidateLearningMenu.Line(context.getString(R.string.quick_phrase_deleted), enabled = false),
+                CandidateLearningMenu.Line(context.getString(R.string.undo)) {
+                    quickPhraseChange { QuickPhraseManager.put(null, entry, now = 0L) }
+                    null
+                },
+            )
+        }
+        return listOf(commit, copy, edit, delete)
+    }
+
+    // saved off the main thread, then quick input reads its files again
+    private fun quickPhraseChange(op: () -> Unit) {
+        service.lifecycleScope.launch {
+            try {
+                withContext(Dispatchers.IO) { op() }
+            } catch (e: IOException) {
+                Timber.w(e, "quick phrase")
+                context.toast(e)
+                return@launch
+            }
+            fcitx.runIfReady { reloadConfig() }
         }
     }
 
