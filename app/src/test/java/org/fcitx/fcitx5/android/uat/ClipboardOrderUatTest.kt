@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.uat
 
+import android.content.res.Configuration
 import androidx.paging.PagingSource
 import kotlinx.coroutines.job
 import kotlinx.coroutines.runBlocking
@@ -19,6 +20,7 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
@@ -68,5 +70,30 @@ class ClipboardOrderUatTest {
         h.tap(h.described(s(R.string.back_to_keyboard)))
         // the last pasted first of the unpinned, the pinned in its place
         h.waitFor("moved") { order() == listOf("钉", "乙", "甲", "丙") }
+    }
+
+    @Test
+    @Uat("TB-50")
+    fun entriesPastedBeforeTheScreenTurnsMoveFirstToo() {
+        prefs.set(AppPrefs.getInstance().clipboard.clipboardReturnAfterPaste, false)
+        h.start()
+        for (w in listOf("甲", "乙", "丙")) {
+            h.copied(w)
+            h.after(1000)
+        }
+        h.clipboard("丙")
+        h.tap(h.entry("甲")!!)
+        assertEquals(listOf("丙", "乙", "甲"), order())
+        // the input view made anew: its windows never detached
+        try {
+            RuntimeEnvironment.setQualifiers("+land")
+            h.service.onConfigurationChanged(Configuration(h.service.resources.configuration))
+            h.idle()
+            h.waitFor("moved") { order() == listOf("甲", "丙", "乙") }
+        } finally {
+            RuntimeEnvironment.setQualifiers("+port")
+            h.service.onConfigurationChanged(Configuration(h.service.resources.configuration))
+            h.idle()
+        }
     }
 }

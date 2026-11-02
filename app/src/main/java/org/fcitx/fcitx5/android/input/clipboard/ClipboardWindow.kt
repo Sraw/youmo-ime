@@ -27,6 +27,7 @@ import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.prefs.ManagedPreference
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.input.FcitxInputMethodService
+import org.fcitx.fcitx5.android.input.broadcast.InputBroadcastReceiver
 import org.fcitx.fcitx5.android.input.clipboard.ClipboardStateMachine.BooleanKey.ClipboardDbEmpty
 import org.fcitx.fcitx5.android.input.clipboard.ClipboardStateMachine.BooleanKey.ClipboardListeningEnabled
 import org.fcitx.fcitx5.android.input.clipboard.ClipboardStateMachine.State.AddMore
@@ -47,7 +48,7 @@ import org.fcitx.fcitx5.android.utils.styledColorOrDefault
 import org.mechdancer.dependency.manager.must
 import splitties.dimensions.dp
 
-class ClipboardWindow : InputWindow.ExtendedInputWindow<ClipboardWindow>() {
+class ClipboardWindow : InputWindow.ExtendedInputWindow<ClipboardWindow>(), InputBroadcastReceiver {
 
     private val service: FcitxInputMethodService by manager.inputMethodService()
     private val windowManager: InputWindowManager by manager.must()
@@ -238,12 +239,18 @@ class ClipboardWindow : InputWindow.ExtendedInputWindow<ClipboardWindow>() {
 
     private val pasted = mutableListOf<Int>()
 
+    private fun movePasted() {
+        if (pasted.isEmpty()) return
+        val ids = pasted.toList()
+        pasted.clear()
+        service.lifecycleScope.launch { ClipboardManager.used(ids) }
+    }
+
+    // the input view replaced (a rotation, a theme) never detaches its windows, but finishes their input
+    override fun onFinishInput() = movePasted()
+
     override fun onDetached() {
-        if (pasted.isNotEmpty()) {
-            val ids = pasted.toList()
-            pasted.clear()
-            service.lifecycleScope.launch { ClipboardManager.used(ids) }
-        }
+        movePasted()
         clipboardEnabledPref.unregisterOnChangeListener(clipboardEnabledListener)
         adapter.onDetached()
         adapter.removeLoadStateListener(loadStateListener)
