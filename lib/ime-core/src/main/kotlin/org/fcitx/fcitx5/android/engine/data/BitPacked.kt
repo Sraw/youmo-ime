@@ -48,11 +48,22 @@ class BitPacked(buffer: ByteBuffer) {
 
     /** Index of the first value in [from, to) that is >= [key], for a range sorted ascending. */
     fun lowerBound(from: Int, to: Int, key: Int): Int {
+        if (from < 0 || to > size) throw IndexOutOfBoundsException("[$from, $to) of $size")
         var lo = from
         var hi = to
+        // get's reads without its check, the range checked once: the language model's lookups
+        // are a fifth to a third of a key, nearly all of it this loop
+        val b = buffer
+        val width = width
+        val mask = mask
         while (lo < hi) {
             val mid = (lo + hi) ushr 1
-            if (get(mid) < key) lo = mid + 1 else hi = mid
+            val bit = mid.toLong() * width
+            val word = HEADER_BYTES + (bit ushr 6).toInt() * 8
+            val shift = (bit and 63).toInt()
+            var value = b.getLong(word) ushr shift
+            if (shift + width > 64) value = value or (b.getLong(word + 8) shl (64 - shift))
+            if ((value and mask).toInt() < key) lo = mid + 1 else hi = mid
         }
         return lo
     }

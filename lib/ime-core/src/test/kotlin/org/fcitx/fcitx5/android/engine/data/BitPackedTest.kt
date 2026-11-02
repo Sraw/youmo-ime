@@ -64,6 +64,25 @@ class BitPackedTest {
         assertEquals(3, packed.lowerBound(3, 3, 1))
     }
 
+    @Test
+    fun lowerBoundAgreesWithAScanAtEveryWidthAndFailsOutsideTheValues() {
+        val random = Random(5)
+        // widths whose values straddle two words, and one that never does
+        for (width in listOf(7, 16, 19, 23, 31)) {
+            val values = IntArray(300) { random.nextInt(1 shl (width - 1)) }.sortedArray()
+            val packed = read(BitPacked.encode(values))
+            repeat(200) {
+                val from = random.nextInt(values.size)
+                val to = from + random.nextInt(values.size - from + 1)
+                val key = random.nextInt(1 shl (width - 1)) + random.nextInt(2)
+                val scan = (from until to).firstOrNull { values[it] >= key } ?: to
+                assertEquals("width $width [$from, $to) $key", scan, packed.lowerBound(from, to, key))
+            }
+            assertThrows(IndexOutOfBoundsException::class.java) { packed.lowerBound(0, values.size + 1, 0) }
+            assertThrows(IndexOutOfBoundsException::class.java) { packed.lowerBound(-1, 2, 0) }
+        }
+    }
+
     @Test(expected = IndexOutOfBoundsException::class)
     fun readingPastTheEndFails() {
         read(BitPacked.encode(intArrayOf(1, 2)))[2]
