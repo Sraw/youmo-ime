@@ -649,6 +649,24 @@ class HostCoreContractTest {
     }
 
     @Test
+    fun `another app bound before the focused one unbound gets an empty panel, once`() {
+        // InputContexts.deactivate: an unbind may come after the next bind
+        val core = core()
+        core.open()
+        fake.answer = { _, e, _ -> if (e == EngineEvent.CHAR) snap(preedit = "ni", candidates = listOf("你")) else snap() }
+        core.press('n')
+        fake.answer = { _, _, _ -> snap(handled = false) }
+        val log = core.log()
+        core.activate(2)
+        core.focus(true)
+        core.deactivate(1)
+        val panels = log.filterIsInstance<HostEvent.InputPanel>()
+        assertEquals(1, panels.size)
+        assertEquals("", panels.single().preedit.toString())
+        assertEquals(0, log.filterIsInstance<HostEvent.Candidates>().last().total)
+    }
+
+    @Test
     fun `without ClientUnfocusCommit the client preedit is committed on focus out`() {
         // fcitx/instance.cpp:1131-1139
         val core = core()

@@ -149,11 +149,14 @@ class HostCore(
         val ic = contexts.active ?: return@batch
         if (focus) {
             if (ic.hasFocus) return@batch
-            contexts.focused?.let(::focusOut)
+            // another app bound before the focused one unbound: that one's cleared panel is not the
+            // active context's and goes nowhere, so this one's panel is sent instead (once: a set)
+            val replaced = contexts.focused?.also(::focusOut)
             contexts.focus(ic, true)
             // `FocusIn`, ReservedFirst: the input method activated (`instance.cpp:1069-1091`)
             activateInputMethod(ic)
             pipeline.focusIn(ic)
+            if (replaced != null) pipeline.updatePanel(ic)
         } else if (ic.hasFocus) {
             focusOut(ic)
         }
