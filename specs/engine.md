@@ -117,7 +117,12 @@ they share the large model's slices at a pause (`session/RefineSlices`) too.
    `Commit.continued`, appended); used whole 3 times, the rest of it (2 characters or more) is offered first
    after the text before ends its start from a word's start, covering the last word put in
    (`user/Continuations`, kept in `UserModel.continuations` by `HabitCounts`; U-73): at most 2, in front of
-   the words but a word the user put first there. Turned off everywhere as `NoPredict("", phrase)`, deleted
+   the words but a word the user put first there. Only the start is looked at, not what is before it (C51):
+   a sentence never typed that starts with the same word gets the phrase first, in place of the word it
+   wanted. Measured by `predict-learn --continuations on|off` (top1/top5 on held-out sentences after the tune
+   half is typed three times): pinyin-chat 12.9/28.5% → 6.1/25.3%, pinyin 20.4/40.9% → 14.0/37.1%; the
+   sentences typed, 36.4/62.0% → 55.8/74.8% and 58.9/83.8% → 73.6/90.2%. The user kept it first (D-C3,
+   2026-11-02) at that cost. Turned off everywhere as `NoPredict("", phrase)`, deleted
    as a `Forget` of the phrase. Where nothing is learned (`Session.learning` false) the habits still rank, after no
    word, and nothing is recorded. A pinned sentence the model has not as one word is put in as
    the fewest of its words. `Session.why` (为什么排在这, U-81) says a candidate's tier and uses
