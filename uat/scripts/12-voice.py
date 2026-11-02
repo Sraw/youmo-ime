@@ -1,6 +1,6 @@
 """uat/12-voice.md (语音输入, the voice build): `uat.py run --flavor voice`. What is "said" is a clip of
-uat/tools/voice-clips.py played into the emulator's microphone (Device.say: the host's PulseAudio
-source on Linux; on macOS not yet, the cases blocked there). The .md is the source of truth."""
+uat/tools/voice-clips.py played into the emulator's microphone (Device.say: not wired up yet, so the
+cases that speak are blocked). The .md is the source of truth."""
 import json
 import os
 import re

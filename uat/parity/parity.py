@@ -737,6 +737,7 @@ def cmd_dry_run(a):
 
 
 def main():
+    sys.exit("parity.py: still made for redroid (Docker on Linux); not ported to the emulator yet (uat/README.md)")
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = p.add_subparsers(dest="cmd", required=True)
     sub.add_parser("build-editor")

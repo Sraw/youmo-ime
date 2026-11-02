@@ -148,8 +148,9 @@ a settings page, rotation, a field type, an upgrade) is tried on a device before
   `ime enable` / `ime set` the service, drive it with `adb shell input tap/swipe` at measured key
   coordinates, read the field back, screenshot the bar. Scripted, that is `uat/tools/uat.py`
   (below); `dev/emu/` is only an uncommitted workbench (it makes the AVD). Root via `adb root`.
-  Voice (UAT 12) needs the microphone fed: on Linux from a host PulseAudio virtual source playing
-  clips made by `uat/tools/voice-clips.py`; on macOS not wired up yet.
+  Voice (UAT 12) needs the microphone fed with clips made by `uat/tools/voice-clips.py`: not wired
+  up yet (the emulators start `-no-audio`; on Linux it was a host PulseAudio virtual source), so the
+  cases that speak are blocked.
 - A real phone (arm64) for performance, voice latency and a real microphone.
 
 Worth checking by hand for keyboard changes: portrait and landscape; a password field (nothing
@@ -189,7 +190,8 @@ Details in `uat/README.md`.
 
 Release gates 2, 3 and 5 of the host replacement (0.4.0) (in-place upgrade from the `uat/fixtures/upgrade`
 releases, backups both ways with them, start/latency/memory side by side) are one command each,
-`uat/gates/gates.py upgrade|backups|perf`, on a redroid of their own (not ported to the emulator yet); results in `uat/runs/`
+`uat/gates/gates.py upgrade|backups|perf`, on a redroid of their own (not ported to the emulator yet:
+they and `uat/parity`, `uat/fixtures/upgrade/make.py` exit saying so); results in `uat/runs/`
 (`uat/gates/README.md`). A `.debug` build is upgraded by putting the fixture's files into its own
 directories and gets backups retargeted to its id; the release APK is upgraded with `install -r`.
 

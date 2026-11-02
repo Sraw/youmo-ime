@@ -14,8 +14,8 @@ Python 3 stdlib + PIL. `adb shell input tap/swipe/motionevent/keyevent/text`, ui
 am/pm/ime/settings drive the device. The devices are emulators (AVD youmo, android-36 google_apis
 arm64-v8a: the release ABI, native on Apple silicon; dev/emu/avd.sh makes it), VMs with their own
 kernel: root over `adb root`, and 17 实体键盘's USB keyboard a uinput one (uat/tools/emu-keyboard.sh),
-which is never made anywhere else. The voice cases' microphone (`Device.say`) is the host's PulseAudio
-source uat-mic.monitor on Linux; on macOS nothing feeds it yet, so they are blocked there.
+which is never made anywhere else. Nothing feeds the voice cases' microphone yet (`Device.say`: the
+emulators start -no-audio), so those cases are blocked.
 Output is kept short on purpose (counts and paths): an agent reading it re-reads its context.
 """
 import argparse
@@ -62,9 +62,17 @@ PORTS = ("5554", "5556")
 
 def emu_port(port):
     """port as the emulator's console port, or exit: even, 5554-5584 (adb's emulator range)"""
-    if not (port.isdigit() and 5554 <= int(port) <= 5584 and int(port) % 2 == 0):
+    if not (port.isascii() and port.isdigit() and 5554 <= int(port) <= 5584 and int(port) % 2 == 0):
         sys.exit(f"device {port}: an emulator console port, even, 5554-5584")
-    return port
+    return str(int(port))
+
+
+def ours(d):
+    """exit unless emulator-<port> runs this AVD: another project's emulator on the port is never
+    installed on, cleared or killed (redroid's runner refused other containers the same way)"""
+    name = d.adb("emu", "avd", "name").strip().splitlines()[:1]
+    if name != [AVD]:
+        sys.exit(f"{d.serial} is {'not up' if not name else 'AVD ' + name[0]}: not this runner's ({AVD}), left as it is")
 
 
 def version_key(name):
@@ -80,7 +88,6 @@ def http_port(port):
     """host side of `adb reverse tcp:8000` for the first device on this serial port: one per port,
     so runs and gates on different devices never share a server (5554 → 8765, 5556 → 8766)"""
     return 8765 + (int(port) - 5554) // 2
-MIC = "uat-mic"   # a PulseAudio (PipeWire) null sink on Linux; the emulator recorded its monitor
 CLIPS = os.path.join(OUT, "voice-clips")
 # host side of `adb reverse tcp:8000`: one per first device, so two runs at once (on 5554 and on 5556,
 # from two checkouts) each serve their own fixtures rather than the other's
@@ -468,17 +475,10 @@ class Device:
         return "Test USB Keyboard" in self.sh("dumpsys input | grep -m1 'Test USB Keyboard'")
 
     def say(self, clip, wait=True):
-        """play dev/uat-out/voice-clips/<clip>.wav into the emulator's microphone; wait=False: in
-        the background (returns the player)"""
-        if sys.platform == "darwin":
-            raise Blocked("macOS 上还没有把语音放进模拟器麦克风的办法（uat/README.md「语音」）")
-        f = os.path.join(CLIPS, f"{clip}.wav")
-        if not os.path.exists(f):
-            raise Blocked(f"没有 {f}：先跑 uat/tools/voice-clips.py")
-        p = subprocess.Popen(["pw-play", "--target", MIC, f], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        if wait:
-            p.wait(30)
-        return p
+        """play dev/uat-out/voice-clips/<clip>.wav into the emulator's microphone: not wired up yet
+        (up() starts the emulators -no-audio; the redroid-era runner played clips into a PulseAudio
+        source the emulator recorded, Linux only)"""
+        raise Blocked("模拟器的麦克风还没接上语音片段（uat/README.md「实体键盘和语音」）")
 
     # --- reading the screen
     # the dump server (Dumper.java): one UiAutomation connection kept open, ~0.1 s a dump
@@ -2261,6 +2261,7 @@ def up(port="5556"):
     nothing saved back), so a device this starts is clean; one already up is left as it is"""
     d = Device(emu_port(port))
     if d.sh("getprop sys.boot_completed").strip() == "1":
+        ours(d)
         print(f"{d.serial} already up")
     else:
         os.makedirs(os.path.join(OUT, "emu"), exist_ok=True)
@@ -2334,9 +2335,7 @@ def install(d, flavor="text"):
 def down(port="5556"):
     """emulator-<port> killed, if it is this AVD's (another project's emulator on the port is left)"""
     d = Device(emu_port(port))
-    name = d.adb("emu", "avd", "name").strip().splitlines()[:1]
-    if name != [AVD]:
-        sys.exit(f"{d.serial} is {'not up' if not name else 'AVD ' + name[0]}: left as it is")
+    ours(d)
     subprocess.run([os.path.join(UAT, "tools", "emu-keyboard.sh"), "down"], capture_output=True,
                    env={**os.environ, "ANDROID_SERIAL": d.serial})
     d.adb("emu", "kill")
@@ -2382,9 +2381,14 @@ def cmd_run(a):
         d = Device(p)
         if d.sh("getprop sys.boot_completed").strip() != "1":
             sys.exit(f"{d.serial} is not up (uat.py up --port {p})")
+        ours(d)
         if d.sh("whoami").strip() != "root":   # started by hand: open_host and the keyboard need root
             subprocess.run(["adb", "-s", d.serial, "root"], capture_output=True)
             subprocess.run(["adb", "-s", d.serial, "wait-for-device"], capture_output=True)
+            for _ in range(30):   # adbd restarted: the package manager answers again before installing
+                if "package:" in d.sh("pm path android"):
+                    break
+                time.sleep(1)
         install(d, a.flavor)
         d.adb("reverse", "tcp:8000", f"tcp:{HTTP_PORT}", check=True)
     ver = version(Device(ports[0]))

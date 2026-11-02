@@ -2,7 +2,7 @@
 
 区域代号 `VO`。本文件的测试都用**语音版**，在有麦克风的真机上跑，周围安静。前提里的 **B0-语音**：B0（装的是语音版），并且已经给过麦克风权限（没给过的见 VO-01）。
 
-自动跑（`uat/tools/uat.py emu-up`，再 `uat.py run --devices 5554 --flavor voice --areas 12`）：在模拟器上，它的麦克风是宿主机 PulseAudio 的一个虚拟音源，"说"的话是 `uat/tools/voice-clips.py` 离线合成的语音片段（Kokoro），每段先用同一个 X-ASR 模型确认听得出。合成的声音干净、没有口音，真机上用真人说话再跑一遍。模拟器的麦克风在宿主机忙时会丢帧（系统日志 `late delivering frames, inserting … silence`），一句没听全时脚本重说，最多三次，结果里写第几次。
+自动跑（`uat/tools/uat.py run --devices 5554 --flavor voice --areas 12`）：**现在没接上**，要说话的用例记阻塞（2026-11 搬到 Mac 后，模拟器以 `-no-audio` 启动，还没有把语音片段放进它麦克风的办法，要一个虚拟声卡或模拟器的 gRPC 音频注入）。搬家前在 Linux 上是这样跑的：模拟器的麦克风是宿主机 PulseAudio 的一个虚拟音源，"说"的话是 `uat/tools/voice-clips.py` 离线合成的语音片段（Kokoro），每段先用同一个 X-ASR 模型确认听得出。合成的声音干净、没有口音，真机上用真人说话再跑一遍。模拟器的麦克风在宿主机忙时会丢帧（系统日志 `late delivering frames, inserting … silence`），一句没听全时脚本重说，最多三次，结果里写第几次。
 
 ### VO-01 [P0] 第一次用时请求麦克风权限
 - **前提**：B0，语音版刚重置，没给过麦克风权限。

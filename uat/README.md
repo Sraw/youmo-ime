@@ -145,7 +145,7 @@ adb shell su 0 am start -n io.github.sraw.youmo.debug/org.fcitx.fcitx5.android.i
 | 大部分 | 真机或 Android 模拟器（arm64-v8a 镜像，装的就是发布用的 arm64 包；Apple 芯片上原生跑）。发版前至少在一台真机上跑一遍 P0 |
 | 实体键盘（17） | 真机接蓝牙或 USB 键盘；或者模拟器加一个 uinput 键盘（见 [17-hardware-keyboard.md](17-hardware-keyboard.md) 开头）。模拟器有自己的内核，和别的用例同一台设备上跑；**只在模拟器里造虚拟键盘**（容器类设备如 redroid 和宿主机共用内核，造出来的键盘宿主机也会收到） |
 | 横屏与分体（16） | 屏幕横过来宽度不少于 600 dp 的手机或平板，模拟器也行 |
-| 语音（12） | 真机，有麦克风，装语音版；arm64 语音版也能装在模拟器上跑，但 macOS 上还没有把语音片段放进模拟器麦克风的办法 |
+| 语音（12） | 真机，有麦克风，装语音版；arm64 语音版也能装在模拟器上跑，但还没有把语音片段放进模拟器麦克风的办法 |
 
 模拟器快照里装了浏览器"WebView Browser Tester"（`org.chromium.webview_shell`），测试页在它里面打开（`am start -a android.intent.action.VIEW -d <地址> -n org.chromium.webview_shell/.WebViewBrowserActivity`）。
 
@@ -262,8 +262,8 @@ uat/tools/uat.py jvm                             # 读 JUnit 结果，按编号�
 
 实体键盘（17）的用例和别的用例一起跑：基线 `B0-实体` 用 `uat/tools/emu-keyboard.sh` 插上一个 uinput USB 键盘，
 别的基线拔掉。语音（12）要语音版：`--flavor` 要和装的包一致，运行器把它传给用例，文字版上语音用例单列为"在别处跑"。
-在 Linux 上语音片段（`uat/tools/voice-clips.py` 合成）经宿主 PulseAudio 的虚拟音源放进模拟器麦克风；macOS 上还没有
-接上（要一个虚拟声卡，或模拟器的 gRPC 音频注入），语音用例记"阻塞"。`emu-up`/`emu-down` 还在，等于 `up/down --port 5554`。
+语音片段（`uat/tools/voice-clips.py` 合成）现在没有放进模拟器麦克风的办法（模拟器以 `-no-audio` 启动；要一个虚拟声卡，
+或模拟器的 gRPC 音频注入），要说话的语音用例记"阻塞"。搬到 Mac 前是经 Linux 宿主的 PulseAudio 虚拟音源放进去的。`emu-up`/`emu-down` 还在，等于 `up/down --port 5554`。
 
 ```sh
 BUILD_ABI=arm64-v8a ./gradlew :app:assembleVoiceDebug   # 语音版

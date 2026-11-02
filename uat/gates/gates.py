@@ -342,6 +342,7 @@ def median_of(rows, key, scale=None):
 
 
 def main():
+    sys.exit("gates.py: still made for redroid (Docker on Linux); not ported to the emulator yet (uat/README.md)")
     p = argparse.ArgumentParser()
     p.add_argument("--port", default="5566")
     p.add_argument("--container", default="youmo-gates")

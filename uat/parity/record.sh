@@ -20,6 +20,7 @@
 # A sequence file of another engine (parity-check, Provenance) is still run and compared, the JVM
 # comparison labelled "engine changed since this recording: differences may be intended".
 set -euo pipefail
+echo "record.sh: still made for redroid (Docker on Linux); not ported to the emulator yet (uat/README.md)" >&2; exit 1
 here=$(cd "$(dirname "$0")" && pwd)
 repo=$(cd "$here/../.." && pwd)
 seqs=$(realpath "$1"); out=$(realpath -m "$2"); shift 2

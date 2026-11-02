@@ -14,6 +14,12 @@
 #   uat/tools/emu-keyboard.sh key SHIFT     # press and release keys in turn
 #   uat/tools/emu-keyboard.sh combo CTRL SPACE   # hold the first ones, press the last
 #   uat/tools/emu-keyboard.sh down          # unplug it
+# declare -A and ${x^^} need bash 4: macOS's /bin/bash is 3.2, and a non-login shell (ssh, launchd)
+# may not have Homebrew's first in PATH
+if [ "${BASH_VERSINFO[0]}" -lt 4 ]; then
+  for b in /opt/homebrew/bin/bash /usr/local/bin/bash; do [ -x "$b" ] && exec "$b" "$0" "$@"; done
+  echo "emu-keyboard.sh: needs bash 4 or newer (brew install bash)" >&2; exit 1
+fi
 set -euo pipefail
 
 declare -A C=(
