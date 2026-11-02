@@ -614,6 +614,9 @@
     <string name="engine_data_handwriting">手写识别模型：本项目用 Make Me a Hanzi 的笔画（来自文鼎字体）和开源手写字体训练</string>
     <string name="engine_data_stroke">笔画表：rime-stroke</string>
     <string name="engine_data_emoji">表情列表和关键词：Unicode 的 emoji-test.txt 和 CLDR</string>
+    <string name="engine_data_unihan">字的声调：Unicode 的 Unihan 字库（kMandarin、kHanyuPinlu、kXHC1983、kTGHZ2013、kHanyuPinyin）</string>
+    <string name="engine_data_pinyin_data">Unihan 读音的整理：mozillazg/pinyin-data</string>
+    <string name="engine_data_phrase_pinyin">词的声调：mozillazg/phrase-pinyin-data，本项目校订</string>
     <string name="engine_data_chaizi">拆字数据：开放词典《汉语拆字字典》kfcd/chaizi，本项目给部件注音</string>
     <string name="im_auto_select">只有一个候选时直接上屏</string>
     <string name="im_auto_select_summary">编码打满时也直接上屏第一个</string>

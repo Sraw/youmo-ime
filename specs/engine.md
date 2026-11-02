@@ -255,6 +255,15 @@ they share the large model's slices at a pause (`session/RefineSlices`) too.
   a misreading and not the reading, syllable by syllable, each by a start of it, the last ones
   maybe untyped (`xxxuez` → 莘莘学子 shēn shēn xué zǐ; `shu` for 说服 none). A label only, in
   `hint()`: it ranks nothing; the misread entry itself is what offers the word.
+- **Tones** (`engine/reading/`, the tones sections of `pinyin.data`, `ToneTable`): each character
+  read as a syllable has a usual tone and the tones it may have (Unihan's, the likeliest list first;
+  a character alone in `lexicon/tones.tsv` sets its usual one, 谁 shéi); a word whose tones are not
+  its characters' usual ones (爱好 ài hào, 东西 dōng xi, 3,568 of them) has its own, kept by word id
+  and reading. Later sources win: phrase-pinyin-data, then `tones.tsv`, then `misreadings.tsv`'s
+  readings. 一 and 不 are always yī and bù (no sandhi). `ReadingTable` is the interface (one table
+  now, `mainland`), `Zhuyin` the syllables in zhuyin, `ToneMark` the written forms (hǎo, ㄏㄠˇ, ˙ㄗ).
+  `ime-eval readings` measures it on `lib/ime-eval/data/readings/chat.tsv` (500 hand-checked words; a
+  release needs 98%).
 - **Strokes.** `u` with nothing typed starts `StrokeLookup` (`h s p n z` = 横竖撇捺折); any other
   letter turns it back into pinyin (`usb`, or `uan` as a slip for `yan`), typed at the strokes'
   cursor, which they keep as pinyin keeps its own.

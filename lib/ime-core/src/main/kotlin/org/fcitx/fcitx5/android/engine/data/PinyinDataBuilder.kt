@@ -6,6 +6,7 @@ package org.fcitx.fcitx5.android.engine.data
 
 import org.fcitx.fcitx5.android.engine.data.PinyinData.Section
 import org.fcitx.fcitx5.android.engine.pinyin.Syllables
+import org.fcitx.fcitx5.android.engine.reading.ToneMark
 
 /**
  * Compiles a dictionary and an ARPA-style backoff model into the layout [PinyinData] reads.
@@ -51,6 +52,38 @@ class PinyinDataBuilder {
         entries += Entry(syllables, word, weight, layer)
     }
 
+    // code point × KEY_SPAN + syllable to its usual tone and the tones it may have, as ToneTable reads them
+    private val charTones = HashMap<Int, Int>()
+
+    // word to its readings' tones, a reading as its syllables
+    private val wordTones = HashMap<String, HashMap<List<Int>, ByteArray>>()
+
+    /**
+     * [codePoint] read as [syllable] may have [tone] (1–4, [ToneMark.NEUTRAL]). Called in order of
+     * likelihood: the first tone given for a character and syllable is its usual one.
+     */
+    fun charTone(codePoint: Int, syllable: Int, tone: Int) = apply {
+        require(codePoint in 0 until ToneTable.MAX_CODE_POINT && syllable in 0 until Syllables.count && tone in 1..ToneMark.NEUTRAL) {
+            "tone $tone of U+${codePoint.toString(16)} as syllable $syllable"
+        }
+        val key = codePoint * ToneTable.KEY_SPAN + syllable
+        val old = charTones[key] ?: tone
+        charTones[key] = old or (1 shl (tone - 1 + ToneTable.MASK_SHIFT))
+    }
+
+    /**
+     * [word] read as [syllables] has [tones], one a code point; a later call for the same reading
+     * replaces it, so the sources go in from the least trusted. 一 and 不 keep their own tones (yī,
+     * bù), whatever the source writes: the dictionaries' way, and a rule simpler than the sandhi.
+     */
+    fun wordTones(word: String, syllables: IntArray, tones: ByteArray) = apply {
+        val cps = word.codePoints().toArray()
+        require(cps.size == syllables.size && tones.size == syllables.size) { "\"$word\": ${syllables.size} syllables, ${tones.size} tones" }
+        require(tones.all { it in 1..ToneMark.NEUTRAL }) { "\"$word\": tones ${tones.joinToString()}" }
+        val own = ByteArray(tones.size) { i -> OWN_TONES[cps[i] to syllables[i]]?.toByte() ?: tones[i] }
+        wordTones.getOrPut(word) { HashMap() }[syllables.toList()] = own
+    }
+
     private var built = false
 
     /** Once only: building appends the dictionary's own words to the vocabulary. */
@@ -75,6 +108,7 @@ class PinyinDataBuilder {
         writeVocabulary(out)
         writeDictionary(out) { id -> model.tables.unigramProb(if (id < lmSize) id else unknown) }
         writeLayers(out)
+        writeTones(out)
         model.tables.write(out, lmSize)
         return out
     }
@@ -93,6 +127,44 @@ class PinyinDataBuilder {
             layer[id] = if (layer[id] < 0) e.layer else minOf(layer[id], e.layer)
         }
         out.add(Section.WORD_LAYER, BitPacked.encode(size) { maxOf(layer[it], 0) })
+    }
+
+    /**
+     * The characters' tones, those the words' readings use among them (a neutral tone only a word
+     * has, 子 in 桌子), and the words whose tones are not their characters' usual ones. Words of one
+     * character are read first: the usual tone they set is what the longer words are compared with;
+     * the rest in order of their text, so the same sources compile to the same file.
+     */
+    private fun writeTones(out: DataFile.Writer) {
+        val chars = HashMap(charTones)
+        for ((word, readings) in wordTones.entries.sortedWith(compareBy({ it.key.codePointCount(0, it.key.length) > 1 }, { it.key }))) {
+            val cps = word.codePoints().toArray()
+            for ((reading, tones) in readings) cps.indices.forEach { i ->
+                val key = cps[i] * ToneTable.KEY_SPAN + reading[i]
+                // a character listed alone (谁 shéi) is its usual tone, whatever Unihan listed first
+                val usual = if (cps.size == 1) tones[i].toInt() else (chars[key] ?: tones[i].toInt()) and ToneTable.USUAL_MASK
+                chars[key] = ((chars[key] ?: 0) and ToneTable.USUAL_MASK.inv()) or usual or (1 shl (tones[i] - 1 + ToneTable.MASK_SHIFT))
+            }
+        }
+        val keys = chars.keys.sorted()
+        out.add(Section.TONE_CHAR_KEYS, BitPacked.encode(keys.size) { keys[it] })
+        out.add(Section.TONE_CHAR, ByteArray(keys.size) { chars.getValue(keys[it]).toByte() })
+        // only a reading in the dictionary, whose tones its characters' usual ones would not give
+        val exceptions = sortedMapOf<Int, MutableList<Pair<List<Int>, ByteArray>>>()
+        entries.distinctBy { it.word to it.syllables.toList() }.forEach { e ->
+            val reading = e.syllables.toList()
+            val tones = wordTones[e.word]?.get(reading) ?: return@forEach
+            val cps = e.word.codePoints().toArray()
+            val usual = ByteArray(cps.size) { i -> ((chars[cps[i] * ToneTable.KEY_SPAN + reading[i]] ?: 0) and ToneTable.USUAL_MASK).toByte() }
+            if (!usual.contentEquals(tones)) exceptions.getOrPut(model.id(e.word)) { ArrayList() } += reading to tones
+        }
+        val runs = exceptions.flatMap { (id, list) -> list.map { id to it } }
+        val starts = IntArray(runs.size + 1).also { s -> runs.forEachIndexed { i, r -> s[i + 1] = s[i] + r.second.first.size } }
+        val syllables = runs.flatMap { it.second.first }
+        out.add(Section.TONE_WORDS, BitPacked.encode(runs.size) { runs[it].first })
+        out.add(Section.TONE_WORD_START, BitPacked.encode(starts))
+        out.add(Section.TONE_SYLLABLES, BitPacked.encode(syllables.size) { syllables[it] })
+        out.add(Section.TONE_TONES, runs.flatMap { it.second.second.toList() }.toByteArray())
     }
 
     private class Node(val syllable: Int) {
@@ -139,6 +211,12 @@ class PinyinDataBuilder {
 
     companion object {
         const val UNKNOWN = "<unk>"
+
+        // 一 and 不 as the dictionaries list them, not as said before another syllable (yí bù)
+        private val OWN_TONES = mapOf(
+            '一'.code to Syllables.id("yi") to 1,
+            '不'.code to Syllables.id("bu") to 4,
+        )
     }
 }
 

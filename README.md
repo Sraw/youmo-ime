@@ -75,6 +75,7 @@
 
 - 代码：LGPL-2.1-or-later。构建方法见 [BUILDING.md](BUILDING.md)；[隐私政策](PRIVACY.md)。
 - 词典、码表和拼音模型的基础来自 [libime](https://github.com/fcitx/libime)（LGPL-2.1-or-later），笔画表来自 [rime-stroke](https://github.com/rime/rime-stroke)（LGPL-3.0-only）。
+- 候选词注音的声调：字来自 Unicode 的 [Unihan](https://www.unicode.org/charts/unihan.html)（Unicode-3.0），经 [mozillazg/pinyin-data](https://github.com/mozillazg/pinyin-data)（MIT）整理；词来自 [mozillazg/phrase-pinyin-data](https://github.com/mozillazg/phrase-pinyin-data)（MIT），本项目校订（`lexicon/tones.tsv`）。
 - 表情列表来自 Unicode 的 [emoji-test.txt](https://www.unicode.org/Public/17.0.0/emoji/emoji-test.txt)，表情的中文关键词来自 [CLDR](https://github.com/unicode-org/cldr)（均为 Unicode-3.0）。
 - 繁简转换的数据来自 [OpenCC](https://github.com/BYVoid/OpenCC)（Apache-2.0，1.2.0 版，未改动）：`STPhrases`、`STCharacters`、`TWVariants` 用于把输出转成繁体（与 OpenCC 的 s2tw 结果相同），`TSCharacters.txt`、`STCharacters.txt` 供学习把输入框里的繁体文字按简体读。
 - 标点表、快速输入的表情和 LaTeX 表、Unicode 字符名数据来自 [Fcitx5](https://github.com/fcitx/fcitx5) 和 [fcitx5-chinese-addons](https://github.com/fcitx/fcitx5-chinese-addons)（LGPL-2.1-or-later，未改动）；输入法框架、标点、全角、简繁、快速输入、Unicode 输入和搜狗词库转换按它们的代码用 Kotlin 重写。
@@ -142,6 +143,7 @@ Needs an arm64 phone on Android 10 or later. The models and dictionary are insid
 
 - Code: LGPL-2.1-or-later. Building: [BUILDING.md](BUILDING.md); [privacy policy](PRIVACY.md).
 - Dictionary, code tables and the base of the pinyin model: [libime](https://github.com/fcitx/libime) (LGPL-2.1-or-later); stroke table: [rime-stroke](https://github.com/rime/rime-stroke) (LGPL-3.0-only).
+- Tones shown on the candidates: characters' from Unicode's [Unihan](https://www.unicode.org/charts/unihan.html) (Unicode-3.0) as [mozillazg/pinyin-data](https://github.com/mozillazg/pinyin-data) (MIT) lists them; words' from [mozillazg/phrase-pinyin-data](https://github.com/mozillazg/phrase-pinyin-data) (MIT), put right by this project (`lexicon/tones.tsv`).
 - Emoji list: Unicode's [emoji-test.txt](https://www.unicode.org/Public/17.0.0/emoji/emoji-test.txt); their Chinese keywords: [CLDR](https://github.com/unicode-org/cldr) (both Unicode-3.0).
 - Simplified/traditional conversion data: [OpenCC](https://github.com/BYVoid/OpenCC) (Apache-2.0, 1.2.0, unchanged): `STPhrases`, `STCharacters` and `TWVariants` to write traditional output (the same as OpenCC's s2tw), `TSCharacters.txt` and `STCharacters.txt` for learning to read traditional text in the field as simplified.
 - Punctuation table, quick input's emoji and LaTeX tables, Unicode character names: [Fcitx5](https://github.com/fcitx/fcitx5) and [fcitx5-chinese-addons](https://github.com/fcitx/fcitx5-chinese-addons) (LGPL-2.1-or-later, unchanged); the input method framework, punctuation, full width, simplified/traditional, quick input, Unicode input and the Sogou dictionary converter are ported from their code to Kotlin.
