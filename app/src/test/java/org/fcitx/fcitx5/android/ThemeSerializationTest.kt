@@ -11,6 +11,7 @@ import kotlinx.serialization.json.jsonObject
 import org.fcitx.fcitx5.android.data.theme.CustomThemeSerializer
 import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.data.theme.ThemePreset
+import org.fcitx.fcitx5.android.input.theme.LookDefaults
 import org.junit.Assert
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -207,10 +208,21 @@ class ThemeSerializationTest {
 
     @Test
     fun version21() {
-        // the current schema: decoding must not report a migration
+        // the last before the look: migrated, its colours and picture kept, the default keys
         val (decoded, migrated) = Fixtures.v21.toCustomTheme()
-        Assert.assertEquals("Migration shouldn't happen", false, migrated)
+        Assert.assertEquals("Migration should happen", true, migrated)
+        Assert.assertEquals(-10577930, decoded.genericActiveBackgroundColor)
+        Assert.assertEquals(LookDefaults.KEYS, decoded.look.keys)
         Assert.assertEquals("Round trip", decoded, decoded.toJson().toCustomTheme().first)
+    }
+
+    @Test
+    fun version3() {
+        // the current schema: decoding must not report a migration
+        val theme = Fixtures.v21.toCustomTheme().first
+        val (decoded, migrated) = theme.toJson().toCustomTheme()
+        Assert.assertEquals("Migration shouldn't happen", false, migrated)
+        Assert.assertEquals(theme, decoded)
     }
 
     @Test
@@ -239,7 +251,7 @@ class ThemeSerializationTest {
     @Test
     fun serializingStampsCurrentVersion() {
         val theme = Fixtures.v21.toCustomTheme().first
-        Assert.assertTrue("Serialized form carries a version", theme.toJson().contains("\"version\":\"2.1\""))
+        Assert.assertTrue("Serialized form carries a version", theme.toJson().startsWith("{\"version\":\"3.0\""))
     }
 
     /**

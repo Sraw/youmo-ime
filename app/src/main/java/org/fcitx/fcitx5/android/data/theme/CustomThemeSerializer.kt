@@ -5,17 +5,24 @@
 package org.fcitx.fcitx5.android.data.theme
 
 import arrow.core.compose
+import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.JsonTransformingSerializer
 import kotlinx.serialization.json.boolean
+import kotlinx.serialization.json.int
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import org.fcitx.fcitx5.android.input.theme.Box
+import org.fcitx.fcitx5.android.input.theme.Crop
+import org.fcitx.fcitx5.android.input.theme.LookDefaults
+import org.fcitx.fcitx5.android.input.theme.Palette
+import org.fcitx.fcitx5.android.input.theme.Picture
 import org.fcitx.fcitx5.android.utils.NostalgicSerializer
 
-object CustomThemeSerializer : JsonTransformingSerializer<Theme.Custom>(Theme.Custom.serializer()) {
+object CustomThemeSerializer : JsonTransformingSerializer<Theme.Custom>(ThemeFileSerializer) {
 
     val WithMigrationStatus = NostalgicSerializer(this) {
         it.jsonObject[VERSION]?.jsonPrimitive?.content != CURRENT_VERSION
@@ -34,8 +41,9 @@ object CustomThemeSerializer : JsonTransformingSerializer<Theme.Custom>(Theme.Cu
         return applyStrategy(version, element.jsonObject).removeVersion()
     }
 
+    // first, as the theme maker writes it: a reader sees the version before what it governs
     private fun JsonObject.addVersion() =
-        JsonObject(this + (VERSION to JsonPrimitive(CURRENT_VERSION)))
+        JsonObject(mapOf(VERSION to JsonPrimitive(CURRENT_VERSION)) + this)
 
     private fun JsonObject.removeVersion() =
         JsonObject(this - VERSION)
@@ -56,6 +64,9 @@ object CustomThemeSerializer : JsonTransformingSerializer<Theme.Custom>(Theme.Cu
     private val strategies: List<MigrationStrategy> =
         // Add migrations here
         listOf(
+            // the 21 colours into the palette, the background image the picture's portrait cut, the
+            // rest the defaults: drawn as 2.1 was with the default key style settings
+            MigrationStrategy("3.0") { from21(it) },
             MigrationStrategy("2.1") {
                 JsonObject(it.toMutableMap().apply {
                     put("candidateTextColor", getValue("keyTextColor"))
@@ -89,9 +100,45 @@ object CustomThemeSerializer : JsonTransformingSerializer<Theme.Custom>(Theme.Cu
 
     private const val VERSION = "version"
 
-    private const val CURRENT_VERSION = "2.1"
+    private const val CURRENT_VERSION = "3.0"
     private const val FALLBACK_VERSION = "1.0"
 
     private val knownVersions = strategies.map { it.version }
+
+    private fun from21(obj: JsonObject): JsonObject {
+        fun color(key: String) = obj.getValue(key).jsonPrimitive.int
+        val palette = Palette(
+            color("backgroundColor"), color("barColor"), color("keyboardColor"), color("keyBackgroundColor"),
+            color("keyTextColor"), color("candidateTextColor"), color("candidateLabelColor"),
+            color("candidateCommentColor"), color("altKeyBackgroundColor"), color("altKeyTextColor"),
+            color("accentKeyBackgroundColor"), color("accentKeyTextColor"), color("keyPressHighlightColor"),
+            color("keyShadowColor"), color("popupBackgroundColor"), color("popupTextColor"),
+            color("spaceBarColor"), color("dividerColor"), color("clipboardEntryColor"),
+            color("genericActiveBackgroundColor"), color("genericActiveForegroundColor"),
+        )
+        val picture = (obj["backgroundImage"] as? JsonObject)?.let { image ->
+            val rect = (image["cropRect"] as? JsonObject)?.let { r ->
+                // an edge left out was -1 (the old Rect reader's), not a refused theme
+                fun side(key: String) = r[key]?.jsonPrimitive?.int ?: -1
+                Box(side("left"), side("top"), side("right"), side("bottom"))
+            }
+            Picture(
+                src = image.getValue("srcFilePath").jsonPrimitive.content,
+                portrait = Crop(
+                    image.getValue("croppedFilePath").jsonPrimitive.content, rect,
+                    image["cropRotation"]?.jsonPrimitive?.int ?: 0
+                ),
+                landscape = null,
+                brightness = image["brightness"]?.jsonPrimitive?.int ?: 70,
+                blurDp = 0,
+            )
+        }
+        val theme = Theme.Custom(
+            obj.getValue("name").jsonPrimitive.content,
+            obj.getValue("isDark").jsonPrimitive.boolean,
+            LookDefaults.look(palette, picture),
+        )
+        return Json.encodeToJsonElement(ThemeFileSerializer, theme).jsonObject
+    }
 
 }

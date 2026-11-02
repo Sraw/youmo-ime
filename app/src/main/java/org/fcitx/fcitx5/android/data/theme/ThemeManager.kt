@@ -40,7 +40,10 @@ object ThemeManager {
 
     private var monetThemes = listOf(ThemeMonet.getLight(), ThemeMonet.getDark())
 
-    private val customThemes: MutableList<Theme.Custom> = ThemeFilesManager.listThemes()
+    val prefs = AppPrefs.getInstance().registerProvider(::ThemePrefs)
+
+    // before the themes, which an older format's are read with (the key style settings before 3.0)
+    private val customThemes: MutableList<Theme.Custom> = ThemeFilesManager.listThemes(prefs.legacyLook())
 
     fun getTheme(name: String) =
         customThemes.find { it.name == name } ?: BuiltinThemes.find { it.name == name }
@@ -49,7 +52,7 @@ object ThemeManager {
 
     fun refreshThemes() {
         customThemes.clear()
-        customThemes.addAll(ThemeFilesManager.listThemes())
+        customThemes.addAll(ThemeFilesManager.listThemes(prefs.legacyLook()))
         activeTheme = evaluateActiveTheme()
     }
 
@@ -82,8 +85,6 @@ object ThemeManager {
     private fun fireChange() {
         onChangeListeners.forEach { it.onThemeChange(_activeTheme) }
     }
-
-    val prefs = AppPrefs.getInstance().registerProvider(::ThemePrefs)
 
     /** Saves [theme]; whether it was, none while the themes are not settled (the user told). */
     fun saveTheme(theme: Theme.Custom): Boolean {

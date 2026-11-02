@@ -7,6 +7,7 @@ package org.fcitx.fcitx5.android.utils
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertThrows
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
@@ -84,5 +85,23 @@ class ZipStreamTest {
         val top = zip("./" to null, "a" to "x").use { it.extract(dest) }
         assertEquals(listOf("a"), top.map { it.name })
         assertEquals("x", File(dest, "a").readText())
+    }
+
+    @Test
+    fun theCheckSeesEachEntrysCountItsSizeAndTheTotalBefore() {
+        val seen = mutableListOf<Triple<Int, Long, Long>>()
+        zip("a" to "12345", "d/" to null, "b" to "").use { it.extract(dest) { c, s, t -> seen += Triple(c, s, t) } }
+        // before each entry (size 0) and after each chunk; a directory is no entry of the count
+        assertEquals(listOf(Triple(1, 0L, 0L), Triple(1, 5L, 0L), Triple(2, 0L, 5L)), seen)
+    }
+
+    @Test
+    fun aCheckThatThrowsStopsBeforeTheChunkPastTheLimitIsWritten() {
+        val big = "x".repeat(3 * DEFAULT_BUFFER_SIZE)
+        assertThrows(IllegalStateException::class.java) {
+            zip("big" to big).use { z -> z.extract(dest) { _, size, _ -> check(size <= DEFAULT_BUFFER_SIZE) } }
+        }
+        // the zip's reader hands out chunks of up to a buffer: none past the limit reaches the disk
+        assertTrue(File(dest, "big").length() <= DEFAULT_BUFFER_SIZE)
     }
 }

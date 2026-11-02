@@ -249,14 +249,10 @@ class CustomThemeActivity : AppCompatActivity() {
         darkKeys: Boolean
     ) {
         val template = if (darkKeys) ThemePreset.TransparentLight else ThemePreset.TransparentDark
-        theme = template.deriveCustomBackground(
-            theme.name,
-            background.croppedFilePath,
-            background.srcFilePath,
-            brightnessSeekBar.progress,
-            background.cropRect,
-            background.cropRotation
-        )
+        // the template's colours alone: the rest of the look (the keys, a landscape cut) stays the theme's
+        val colours = template.deriveCustomNoBackground(theme.name)
+        theme = theme.copy(isDark = colours.isDark, look = theme.look.copy(palette = colours.look.palette))
+            .withBackground(background.copy(brightness = brightnessSeekBar.progress))
         previewUi.setTheme(theme, filteredDrawable)
     }
 
@@ -441,8 +437,8 @@ class CustomThemeActivity : AppCompatActivity() {
                     if (newCreated) {
                         if (srcImageExtension != null) {
                             srcImageFile = File("${srcImageFile.absolutePath}.$srcImageExtension")
-                            theme = theme.copy(
-                                backgroundImage = it.copy(
+                            theme = theme.withBackground(
+                                it.copy(
                                     srcFilePath = srcImageFile.absolutePath
                                 )
                             )
@@ -456,8 +452,8 @@ class CustomThemeActivity : AppCompatActivity() {
                 Intent().apply {
                     var newTheme = theme
                     whenHasBackground {
-                        newTheme = theme.copy(
-                            backgroundImage = it.copy(
+                        newTheme = theme.withBackground(
+                            it.copy(
                                 brightness = brightnessSeekBar.progress,
                                 cropRect = cropRect,
                                 cropRotation = cropRotation

@@ -1,10 +1,18 @@
 package org.fcitx.fcitx5.android.data.theme
 
+import android.graphics.BitmapFactory
+import android.graphics.fonts.Font
+import androidx.annotation.VisibleForTesting
 import kotlinx.serialization.json.Json
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.core.EngineNotices
 import org.fcitx.fcitx5.android.core.HostConfigDir
 import org.fcitx.fcitx5.android.host.ConfigHome
+import org.fcitx.fcitx5.android.input.theme.KeyFill
+import org.fcitx.fcitx5.android.input.theme.KeyPressed
+import org.fcitx.fcitx5.android.input.theme.LegacyLook
+import org.fcitx.fcitx5.android.input.theme.ThemeAssetLimits
+import org.fcitx.fcitx5.android.input.theme.ThemeLook
 import org.fcitx.fcitx5.android.utils.appContext
 import org.fcitx.fcitx5.android.utils.errorRuntime
 import org.fcitx.fcitx5.android.utils.extract
@@ -38,18 +46,44 @@ object ThemeFilesManager {
 
     private fun themeFile(theme: Theme.Custom) = File(dir, theme.name + ".json")
 
-    // the image paths in an imported json are untrusted: only their file name is kept, as in listThemes,
+    // the file names in an imported json are untrusted: only their file name is kept, as in listThemes,
     // and never a json's, which listThemes would load as one more theme
-    private fun importedImageFile(path: String) =
+    private fun importedFile(path: String) =
         File(path).name.takeIf { isPlainFileName(it) && !it.endsWith(".json", ignoreCase = true) }
             ?.let { File(dir, it) }
 
     // a planted json (a crafted import, another app on shared storage) would aim delete and export at any file
-    private fun File.isThemeImage() = exists() && try {
+    private fun File.isThemeAsset() = exists() && try {
         canonicalFile.parentFile == dir.canonicalFile
     } catch (_: IOException) {
         false
     }
+
+    /** What an import reads of an image or a font before it takes it: Android's, a fake's in a JVM test. */
+    internal interface AssetProbe {
+        /** Its width and height, read from its header; null if it is no image. */
+        fun imageSize(file: File): Pair<Int, Int>?
+
+        fun fontReads(file: File): Boolean
+    }
+
+    private object AndroidAssetProbe : AssetProbe {
+        override fun imageSize(file: File): Pair<Int, Int>? {
+            val options = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+            BitmapFactory.decodeFile(file.path, options)
+            return if (options.outWidth > 0 && options.outHeight > 0) options.outWidth to options.outHeight else null
+        }
+
+        override fun fontReads(file: File) = try {
+            Font.Builder(file).build()
+            true
+        } catch (_: Exception) {
+            false
+        }
+    }
+
+    @VisibleForTesting
+    internal var probe: AssetProbe = AndroidAssetProbe
 
     fun newCustomBackgroundImages(): Triple<String, File, File> {
         val themeName = UUID.randomUUID().toString()
@@ -58,31 +92,26 @@ object ThemeFilesManager {
         return Triple(themeName, croppedImageFile, srcImageFile)
     }
 
-    // the images by name only, as exported: an absolute path breaks once the files dir moves
-    private fun Theme.Custom.withImageNames() = backgroundImage?.let {
-        copy(
-            backgroundImage = it.copy(
-                croppedFilePath = File(it.croppedFilePath).name,
-                srcFilePath = File(it.srcFilePath).name
-            )
-        )
-    } ?: this
+    // the files by name only, as exported: an absolute path breaks once the files dir moves
+    private fun Theme.Custom.withFileNames() = copy(look = look.mapFiles { File(it).name })
 
     fun saveThemeFiles(theme: Theme.Custom) {
         if (!writable) notSettled()
-        themeFile(theme).writeText(Json.encodeToString(CustomThemeSerializer, theme.withImageNames()))
+        themeFile(theme).writeText(Json.encodeToString(CustomThemeSerializer, theme.withFileNames()))
     }
 
     fun deleteThemeFiles(theme: Theme.Custom) {
         if (!writable) notSettled()
         themeFile(theme).delete()
-        theme.backgroundImage?.let {
-            File(it.croppedFilePath).delete()
-            File(it.srcFilePath).delete()
-        }
+        theme.look.files().map(::File).filter { it.isThemeAsset() }.forEach { it.delete() }
     }
 
-    fun listThemes(): MutableList<Theme.Custom> {
+    /**
+     * The themes in the directory, newest first; one of an older format saved again as 3.0, with
+     * [legacy] (the key style settings before 3.0, while they are there) as its keys: drawn as it was.
+     * A theme of 3.0 already is never changed by them, so an old backup restored leaves the new ones be.
+     */
+    fun listThemes(legacy: LegacyLook? = null): MutableList<Theme.Custom> {
         val files = dir.listFiles(FileFilter { it.extension == "json" }) ?: return mutableListOf()
         return files
             .sortedByDescending { it.lastModified() } // newest first
@@ -100,16 +129,14 @@ object ThemeFilesManager {
                     Timber.w("Theme file ${it.absolutePath} has a name that is a path: ${theme.name}")
                     return@decode null
                 }
-                val image = theme.backgroundImage
-                val found = if (image == null) {
-                    theme
+                val here = theme.foundIn(dir) { f -> f.isThemeAsset() } ?: run {
+                    Timber.w("Cannot find a file of theme ${theme.name}")
+                    return@decode null
+                }
+                val found = if (migrated && legacy != null && !legacy.isDefault) {
+                    here.copy(look = legacy.applyTo(here.look))
                 } else {
-                    val here = image.foundIn(dir) { it.isThemeImage() }
-                    if (here == null) {
-                        Timber.w("Cannot find background image file for theme ${theme.name}")
-                        return@decode null
-                    }
-                    theme.copy(backgroundImage = here)
+                    here
                 }
                 // Update the saved file if migration happens
                 if (migrated && writable) {
@@ -128,20 +155,12 @@ object ThemeFilesManager {
     fun exportTheme(theme: Theme.Custom, dest: OutputStream) =
         runCatching {
             ZipOutputStream(dest.buffered()).use { zipStream ->
-                // we don't export the internal path of images
-                val tweakedTheme = theme.withImageNames()
-                if (tweakedTheme.backgroundImage != null) {
-                    requireNotNull(theme.backgroundImage)
-                    // write cropped image
-                    zipStream.putNextEntry(ZipEntry(tweakedTheme.backgroundImage.croppedFilePath))
-                    File(theme.backgroundImage.croppedFilePath).inputStream()
-                        .use { it.copyTo(zipStream) }
-                    // write src image
-                    zipStream.putNextEntry(ZipEntry(tweakedTheme.backgroundImage.srcFilePath))
-                    File(theme.backgroundImage.srcFilePath).inputStream()
-                        .use { it.copyTo(zipStream) }
+                // the files it names, by name: we don't export their internal paths
+                theme.look.files().forEach { path ->
+                    zipStream.putNextEntry(ZipEntry(File(path).name))
+                    File(path).inputStream().use { it.copyTo(zipStream) }
                 }
-                // write json
+                val tweakedTheme = theme.withFileNames()
                 zipStream.putNextEntry(ZipEntry("${tweakedTheme.name}.json"))
                 zipStream.write(
                     Json.encodeToString(CustomThemeSerializer, tweakedTheme)
@@ -160,64 +179,83 @@ object ThemeFilesManager {
             if (!writable) notSettled()
             ZipInputStream(src).use { zipStream ->
                 withTempDir { tempDir ->
-                    val extracted = zipStream.extract(tempDir)
+                    // counted as it is unpacked: refused at the first entry past a limit, a zip bomb too
+                    val extracted = zipStream.extract(tempDir) { count, size, total ->
+                        ThemeAssetLimits.entry(count, size, total)?.let(::refused)
+                    }
                     val jsonFile = extracted.find { it.extension == "json" }
                         ?: errorRuntime(R.string.exception_theme_json)
                     val (decoded, migrated) = Json.decodeFromString(
                         CustomThemeSerializer.WithMigrationStatus,
                         jsonFile.readText()
                     )
+                    ThemeAssetLimits.look(decoded.look)?.let(::refused)
                     // the name becomes a file name in dir, so a crafted one must not be a path out of it
                     if (!isPlainFileName(decoded.name)) errorRuntime(R.string.invalid_value)
                     if (ThemeManager.BuiltinThemes.find { it.name == decoded.name } != null)
                         errorRuntime(R.string.exception_theme_name_clash)
                     val oldTheme = ThemeManager.getTheme(decoded.name) as? Theme.Custom
                     val newCreated = oldTheme == null
-                    val newTheme = if (decoded.backgroundImage != null) {
-                        val srcFile = importedImageFile(decoded.backgroundImage.srcFilePath)
-                            ?: errorRuntime(R.string.exception_theme_src_image)
-                        val croppedFile = importedImageFile(decoded.backgroundImage.croppedFilePath)
-                            ?: errorRuntime(R.string.exception_theme_cropped_image)
-                        // both found before either is copied: one refused would leave the other in dir
-                        val extractedSrcFile = extracted.find { it.name == srcFile.name }
-                            ?: errorRuntime(R.string.exception_theme_src_image)
-                        val extractedCroppedFile = extracted.find { it.name == croppedFile.name }
-                            ?: errorRuntime(R.string.exception_theme_cropped_image)
-                        val oldSrcFile = oldTheme?.backgroundImage?.srcFilePath?.let { File(it) }
-                        val srcFileNameMatches = oldSrcFile?.name == srcFile.name
-                        // allow overwriting background image files when theme and file names all are same
-                        extractedSrcFile.copyTo(srcFile, overwrite = srcFileNameMatches)
-                        val oldCroppedFile =
-                            oldTheme?.backgroundImage?.croppedFilePath?.let { File(it) }
-                        val croppedFileNameMatches = oldCroppedFile?.name == croppedFile.name
-                        extractedCroppedFile.copyTo(croppedFile, overwrite = croppedFileNameMatches)
-                        if (!srcFileNameMatches) {
-                            oldSrcFile?.delete()
-                        }
-                        if (!croppedFileNameMatches) {
-                            oldCroppedFile?.delete()
-                        }
-                        decoded.copy(
-                            backgroundImage = decoded.backgroundImage.copy(
-                                croppedFilePath = croppedFile.path,
-                                srcFilePath = srcFile.path
-                            )
-                        )
-                    } else {
-                        decoded
+                    // every file found and checked before any is copied: one refused would leave the others in dir
+                    val files = decoded.look.files().associate { name ->
+                        val target = importedFile(name) ?: errorRuntime(R.string.exception_theme_file, name)
+                        target.name to (extracted.find { it.name == target.name } ?: errorRuntime(R.string.exception_theme_file, name))
                     }
+                    check(decoded.look, files)
+                    // a file may be written over when the theme of that name had it already
+                    val oldFiles = oldTheme?.look?.files().orEmpty().map { File(it).name }.toSet()
+                    files.keys.firstOrNull { it !in oldFiles && File(dir, it).exists() }?.let {
+                        throw FileAlreadyExistsException(File(dir, it))
+                    }
+                    files.forEach { (name, from) -> from.copyTo(File(dir, name), overwrite = true) }
+                    (oldFiles - files.keys).forEach { File(dir, it).delete() }
+                    val newTheme = decoded.copy(look = decoded.look.mapFiles { File(dir, File(it).name).path })
                     saveThemeFiles(newTheme)
                     Triple(newCreated, newTheme, migrated)
                 }
             }
         }
 
+    // the pictures' cuts, key images and fonts: read before taken, each as what it is named for
+    private fun check(look: ThemeLook, files: Map<String, File>) {
+        fun of(name: String) = files.getValue(File(name).name)
+        fun size(name: String) = probe.imageSize(of(name)) ?: errorRuntime(R.string.exception_theme_image, File(name).name)
+        look.picture?.let { p ->
+            listOfNotNull(p.portrait.file, p.landscape?.file).forEach { name ->
+                val (w, h) = size(name)
+                ThemeAssetLimits.picture(w, h)?.let(::refused)
+            }
+        }
+        val slices = look.keys.kinds().flatMap { listOf(it.fill, it.pressed) } +
+            look.keys.overrides.values.flatMap { listOfNotNull(it.fill, it.pressed) }
+        slices.mapNotNull { (it as? KeyFill.Image)?.slice ?: (it as? KeyPressed.Image)?.slice }
+            .map { it.file }.distinct().forEach { name ->
+                val (w, h) = size(name)
+                ThemeAssetLimits.keyImage(w, h, of(name).length())?.let(::refused)
+            }
+        listOfNotNull(look.text.keyFont, look.text.candidateFont).distinct().forEach { name ->
+            ThemeAssetLimits.font(of(name).length())?.let(::refused)
+            if (!probe.fontReads(of(name))) errorRuntime(R.string.exception_theme_font, File(name).name)
+        }
+    }
+
+    private fun refused(breach: ThemeAssetLimits.Breach): Nothing = errorRuntime(
+        when (breach) {
+            ThemeAssetLimits.Breach.Entries -> R.string.exception_theme_entries
+            ThemeAssetLimits.Breach.FileSize -> R.string.exception_theme_file_size
+            ThemeAssetLimits.Breach.TotalSize -> R.string.exception_theme_total_size
+            ThemeAssetLimits.Breach.PictureSide -> R.string.exception_theme_picture_side
+            ThemeAssetLimits.Breach.KeyImageSide -> R.string.exception_theme_key_image_side
+            ThemeAssetLimits.Breach.KeyImageSize -> R.string.exception_theme_key_image_size
+            ThemeAssetLimits.Breach.FontSize -> R.string.exception_theme_file_size
+            ThemeAssetLimits.Breach.Overrides -> R.string.exception_theme_overrides
+        }
+    )
+
 }
 
-// a json names its images by file name; an older one by absolute path, of the old package id's dir in a backup
-// from before the renaming to 幽默输入法, while the images came along into this one; null if either is missing
-internal fun Theme.Custom.CustomBackground.foundIn(dir: File, isThemeImage: (File) -> Boolean) =
-    copy(
-        croppedFilePath = File(dir, File(croppedFilePath).name).path,
-        srcFilePath = File(dir, File(srcFilePath).name).path
-    ).takeIf { isThemeImage(File(it.croppedFilePath)) && isThemeImage(File(it.srcFilePath)) }
+// a json names its files by file name; an older one by absolute path, of the old package id's dir in a backup
+// from before the renaming to 幽默输入法, while the files came along into this one; null if one is missing
+internal fun Theme.Custom.foundIn(dir: File, isThemeAsset: (File) -> Boolean) =
+    copy(look = look.mapFiles { File(dir, File(it).name).path })
+        .takeIf { it.look.files().all { f -> isThemeAsset(File(f)) } }

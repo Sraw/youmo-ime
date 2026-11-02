@@ -485,6 +485,44 @@ Rules for settings, all decided:
 5. Test the decision in ime-core; if the page is hand-drawn, the search index too.
 6. Describe it in `docs/settings.md`.
 
+## Theme files (`data/theme/`)
+
+A custom theme is `files/host-theme/<name>.json` and the files it names beside it, by file name
+(a picture's source and its portrait and landscape cuts, key images, fonts). The json is format
+**3.0**: `version` first, then `name`, `isDark`, `palette` (24 colours: the 21 of 2.1 and
+`keyBorderColor`, `keyHintColor`, `toolbarIconColor`), `picture` (or null), `base`, `bar`, `keys`,
+`text`. It is ime-core's `ThemeLook` (`input/theme/`) one to one, through `ThemeLookJson.kt` (the
+only place the two meet): no field has a default, a field missing or not known is an error, and a
+value out of range is refused as the `ThemeLook` is made. `keys.overrides` maps a key's name
+(`KeyNames`: `<board>/<key>`, `*/<role>` for a function key on every board) to its own fill,
+pressed face and label; a name no board here has (a later build's board) is read, kept and drawn
+by none. A key's style is its board's own name, then `*/` (roles only), then its kind's; each field
+falls through by itself (`KeyStyleResolver`). Every key a theme can reach has `KeyDef.name`, its
+keyboard the board (`BaseKeyboard.themeBoard`, `KeyView.themeKey`); `ThemeKeyNamesTest` holds the
+two to `KeyNames`.
+
+Reading an older json (`CustomThemeSerializer`, newest first: 3.0 ← 2.1 ← 2.0 ← 1.0): 2.1 → 3.0
+keeps the colours and the picture (one portrait cut, its rect and turn, brightness; no blur), and
+gives the default keys, text and a transparent bar (`LookDefaults.look`). The key style settings
+before 3.0 were global (`ThemePrefs`' border, stroke, ripple, radius, gaps); `ThemeLookMigration`
+moves them into the themes by one rule: **a theme read in an older format gets the settings as its
+keys** (`LegacyLook.applyTo`, while they are in the prefs and not the defaults), saved again as 3.0 with
+its mtime kept. A 3.0 theme is never changed by them, so a backup from before restored (the
+settings come back with it) leaves the themes made since as they were. `ThemeLookMigration.settle`
+(copy a built-in or Monet theme in use with them, put the copy in its place, remove the settings,
+tell once) runs once the keys are drawn from the themes, not before: until then the settings still
+draw the keys.
+
+Import (`ThemeFilesManager.importTheme`) takes the json and every file it names, by file name only
+(never a path, never a `.json`); it checks all before copying any, so a refusal leaves nothing.
+Limits (`ThemeAssetLimits`), counted as the zip is unpacked (a zip bomb stops at the first entry
+past one): 300 entries, 32 MB a file, 64 MB in all; a picture's cuts 4096 px a side (the source
+photo is not limited); a key image 1024 px a side and 2 MB; a font 32 MB and it must load; 400
+overrides. Over an existing theme of the same name, the files it had and the new one does not name
+are deleted; one of another theme's is a clash. Export writes each named file once, then the json;
+delete removes the json and every named file that is in the theme dir. Listing skips a theme with a
+file missing.
+
 ## Persistence and backups
 
 `UserDataManager` exports one zip: `shared_prefs`, the clipboard database (less what an app marked
