@@ -57,6 +57,8 @@ os.environ.setdefault("ADB_MDNS", "0")
 # are the two of a run; a worktree may start its own on another even port up to 5584 (uat.py up --port)
 AVD = os.environ.get("UAT_AVD", "youmo")
 SNAPSHOT = "clean"   # the AVD's state after dev/emu/avd.sh: zh-CN, three-button nav, the WebView shell
+# two by design: on the 32 GB Mac one emulator is 3-4.5 GB resident beside two heavy Gradle jobs
+# (~7 GB each); a third wants the builds serialized (YOUMO_HEAVY_SLOTS=1, dev/README.md)
 PORTS = ("5554", "5556")
 
 
