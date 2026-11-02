@@ -62,6 +62,8 @@ abstract class BaseKeyboard(
     private val keyLayout: List<List<KeyDef>>,
     /** Each key's width in place of its own ([KeyDef.Appearance.percentWidth]): a split layout's. */
     private val keyWidths: List<List<Float>>? = null,
+    /** Its keys' board in a theme ([KeyNames]: `qwerty`, `nine`…), each key named by [KeyDef.name]; null, styled by kind alone. */
+    val themeBoard: String? = null,
 ) : ConstraintLayout(context) {
 
     var keyActionListener: KeyActionListener? = null
@@ -317,6 +319,7 @@ abstract class BaseKeyboard(
             is KeyDef.Appearance.Text -> TextKeyView(context, theme, def.appearance)
             is KeyDef.Appearance.Image -> ImageKeyView(context, theme, def.appearance)
         }.apply {
+            themeKey = def.name
             soundEffect = when (def) {
                 is SpaceKey -> InputFeedbacks.SoundEffect.SpaceBar
                 is MiniSpaceKey -> InputFeedbacks.SoundEffect.SpaceBar

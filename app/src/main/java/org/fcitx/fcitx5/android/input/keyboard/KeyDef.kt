@@ -12,7 +12,12 @@ import org.fcitx.fcitx5.android.data.InputFeedbacks
 open class KeyDef(
     val appearance: Appearance,
     val behaviors: Set<Behavior>,
-    val popup: Array<Popup>? = null
+    val popup: Array<Popup>? = null,
+    /**
+     * The key's name in a theme, its board's prefix left off ([KeyNames][org.fcitx.fcitx5.android.input.theme.KeyNames]):
+     * its place (`q`, `2`, `r1c3`) or its role (`backspace`); null for a key a theme does not style by itself.
+     */
+    val name: String? = null,
 ) {
     sealed class Appearance(
         val percentWidth: Float,

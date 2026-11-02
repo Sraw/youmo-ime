@@ -37,7 +37,7 @@ class PickerWindow(
     // asked for when the view is made, as the picker first opens: the emoji are read from their data
     private val data: () -> List<Pair<PickerData.Category, Array<String>>>,
     private val density: PickerGridView.Density,
-    private val switchKey: KeyDef,
+    internal val switchKey: KeyDef,
     private val popupPreview: Boolean = true,
     private val followKeyBorder: Boolean = true,
     private val policy: PickerPolicy = DefaultPickerPolicy(),
@@ -294,13 +294,14 @@ class PickerWindow(
         /** The category a picker of [count] opens on: no emoji (the app without their data), the recently used, the only one there is. */
         internal fun firstShown(count: Int) = minOf(FirstCategory, count - 1)
 
-        private val SearchKey = KeyDef(
+        internal val SearchKey = KeyDef(
             KeyDef.Appearance.Image(
                 src = R.drawable.ic_baseline_search_24,
                 variant = KeyDef.Appearance.Variant.Alternative,
                 contentDescription = R.string.emoji_search
             ),
-            setOf(KeyDef.Behavior.Press(KeyAction.EmojiSearchAction(true)))
+            setOf(KeyDef.Behavior.Press(KeyAction.EmojiSearchAction(true))),
+            name = "search",
         )
     }
 }

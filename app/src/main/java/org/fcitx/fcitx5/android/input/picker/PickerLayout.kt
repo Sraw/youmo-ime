@@ -21,6 +21,7 @@ import org.fcitx.fcitx5.android.input.keyboard.ReturnKey
 import org.fcitx.fcitx5.android.input.keyboard.SpaceKey
 import org.fcitx.fcitx5.android.input.keyboard.TextKeyboard
 import org.fcitx.fcitx5.android.input.keyboard.showReturnAction
+import org.fcitx.fcitx5.android.input.theme.KeyNames
 import splitties.views.dsl.constraintlayout.above
 import splitties.views.dsl.constraintlayout.after
 import splitties.views.dsl.constraintlayout.below
@@ -42,7 +43,8 @@ import splitties.views.dsl.core.add
 class PickerLayout(context: Context, private val theme: Theme, switchKey: KeyDef, density: PickerGridView.Density, panel: Boolean, searchKey: KeyDef? = null) :
     ConstraintLayout(context) {
 
-    class Keyboard(context: Context, theme: Theme, keys: List<KeyDef>) : BaseKeyboard(context, theme, listOf(keys)) {
+    class Keyboard(context: Context, theme: Theme, keys: List<KeyDef>, board: String? = null) :
+        BaseKeyboard(context, theme, listOf(keys), themeBoard = board) {
 
         class PunctuationKey(val symbol: String) : KeyDef(
             Appearance.Text(
@@ -53,7 +55,8 @@ class PickerLayout(context: Context, private val theme: Theme, switchKey: KeyDef
             ),
             setOf(
                 Behavior.Press(KeyAction.HostKeyAction(symbol))
-            )
+            ),
+            name = if (symbol == ",") "comma" else "period",
         )
 
         val `return`: ImageKeyView by lazy { findViewById(R.id.button_return) }
@@ -74,7 +77,11 @@ class PickerLayout(context: Context, private val theme: Theme, switchKey: KeyDef
         }
     }
 
-    val embeddedKeyboard = Keyboard(context, theme, if (panel) panelKeys(context, switchKey) else listKeys(switchKey, searchKey))
+    // the symbols' board, or the emoji's (the emoticons' too)
+    val embeddedKeyboard = Keyboard(
+        context, theme, if (panel) panelKeys(context, switchKey) else listKeys(switchKey, searchKey),
+        if (panel) KeyNames.SYMBOLS else KeyNames.EMOJI,
+    )
 
     val grid = PickerGridView(context, theme, density)
 
@@ -130,7 +137,7 @@ class PickerLayout(context: Context, private val theme: Theme, switchKey: KeyDef
         private const val SIDE_WIDTH = 0.18f
 
         // the emoji's search in place of the comma, which the letters have a step away
-        private fun listKeys(switchKey: KeyDef, searchKey: KeyDef?) = listOf(
+        internal fun listKeys(switchKey: KeyDef, searchKey: KeyDef?) = listOf(
             LayoutSwitchKey("ABC", TextKeyboard.Name),
             searchKey ?: Keyboard.PunctuationKey(","),
             switchKey,
@@ -142,7 +149,7 @@ class PickerLayout(context: Context, private val theme: Theme, switchKey: KeyDef
         )
 
         /** Sogou's: 返回 where ABC was, the lock beside it; the punctuation is in the panel */
-        private fun panelKeys(context: Context, switchKey: KeyDef) = listOf(
+        internal fun panelKeys(context: Context, switchKey: KeyDef) = listOf(
             KeyDef(
                 KeyDef.Appearance.Text(
                     displayText = context.getString(R.string.picker_back),
@@ -151,7 +158,8 @@ class PickerLayout(context: Context, private val theme: Theme, switchKey: KeyDef
                     percentWidth = 0.15f,
                     variant = KeyDef.Appearance.Variant.Alternative
                 ),
-                setOf(KeyDef.Behavior.Press(KeyAction.PanelBackAction))
+                setOf(KeyDef.Behavior.Press(KeyAction.PanelBackAction)),
+                name = "back",
             ),
             KeyDef(
                 KeyDef.Appearance.Image(
@@ -161,7 +169,8 @@ class PickerLayout(context: Context, private val theme: Theme, switchKey: KeyDef
                     viewId = R.id.button_panel_lock,
                     contentDescription = R.string.picker_lock
                 ),
-                setOf(KeyDef.Behavior.Press(KeyAction.PanelLockAction))
+                setOf(KeyDef.Behavior.Press(KeyAction.PanelLockAction)),
+                name = "lock",
             ),
             switchKey,
             SpaceKey(),

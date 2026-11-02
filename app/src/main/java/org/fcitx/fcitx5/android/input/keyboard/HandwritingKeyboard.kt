@@ -30,6 +30,7 @@ import org.fcitx.fcitx5.android.input.handwriting.HandwritingPadView
 import org.fcitx.fcitx5.android.input.handwriting.HandwritingRecognition
 import org.fcitx.fcitx5.android.input.handwriting.InkPad
 import org.fcitx.fcitx5.android.input.picker.PickerWindow
+import org.fcitx.fcitx5.android.input.theme.KeyNames
 import splitties.dimensions.dp
 import splitties.views.dsl.constraintlayout.lParams
 import splitties.views.dsl.constraintlayout.leftOfParent
@@ -52,7 +53,7 @@ class HandwritingKeyboard(
     /** The pad's piece finished (the pen up long enough), told after its readings are delivered. */
     private val finished: (piece: Int) -> Unit = {},
     private val recognition: HandwritingRecognition = HandwritingRecognition.shared,
-) : BaseKeyboard(context, theme, Layout) {
+) : BaseKeyboard(context, theme, Layout, themeBoard = KeyNames.HANDWRITING) {
 
     companion object {
         const val Name = "Handwriting"
@@ -72,6 +73,7 @@ class HandwritingKeyboard(
             KeyDef.Appearance.Text(label, 20f, percentWidth = SIDE, variant = KeyDef.Appearance.Variant.Alternative),
             setOf(KeyDef.Behavior.Press(KeyAction.HostKeyAction(key))),
             more?.let { arrayOf(KeyDef.Popup.Keyboard.Explicit(it)) },
+            name = if (key == ",") "comma" else "period",
         )
 
         val Layout: List<List<KeyDef>> = listOf(
