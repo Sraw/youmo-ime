@@ -10,6 +10,7 @@ import kotlin.math.min
 data class Area(val left: Float, val top: Float, val right: Float, val bottom: Float) {
     val width get() = right - left
     val height get() = bottom - top
+    val hasSize get() = width > 0 && height > 0
 }
 
 /**
@@ -80,7 +81,7 @@ object NineSliceLayout {
 
     fun of(srcWidth: Int, srcHeight: Int, slice: NineSlice, target: Area, density: Float): List<Piece> {
         val i = slice.insets
-        if (i.left == 0 && i.top == 0 && i.right == 0 && i.bottom == 0) {
+        if (i.isZero) {
             return listOf(Piece(Area(0f, 0f, srcWidth.toFloat(), srcHeight.toFloat()), target))
         }
         val scale = density / slice.pxPerDp
@@ -94,7 +95,7 @@ object NineSliceLayout {
         for (r in 0..2) for (c in 0..2) {
             val src = Area(sx[c], sy[r], sx[c + 1], sy[r + 1])
             val dst = Area(dx[c], dy[r], dx[c + 1], dy[r + 1])
-            if (src.width > 0 && src.height > 0 && dst.width > 0 && dst.height > 0) out += Piece(src, dst)
+            if (src.hasSize && dst.hasSize) out += Piece(src, dst)
         }
         return out
     }

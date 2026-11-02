@@ -178,6 +178,9 @@ data class Insets(val left: Int, val top: Int, val right: Int, val bottom: Int) 
     init {
         require(left >= 0 && top >= 0 && right >= 0 && bottom >= 0) { "negative insets" }
     }
+
+    /** No corners: the image stretched whole. */
+    val isZero get() = left == 0 && top == 0 && right == 0 && bottom == 0
 }
 
 /** A key's face: its kind's colour from the palette, an image, or the picture's part where the key is. */
