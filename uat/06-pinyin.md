@@ -14,7 +14,7 @@
 - **前提**：B0。
 - **操作**：点 w o m e n y i q i q u g o n g y u a n，点空格。
 - **预期**：框里是「我们一起去公园」。
-- **JVM**：`PinyinUatTest.aWholeSentence`（整句上屏，真数据）；设备上不跑。
+- **JVM**：`PhraseUatTest.aWholeSentence`（整句上屏，真数据）；设备上不跑。
 
 ### PY-03 [P0] 只选前半句，剩下的接着给候选
 - **前提**：B0。
@@ -485,3 +485,24 @@
 - **操作**：看键盘；点 N（BN 键）I（IO 键）H（H 键）A（A 键）O（IO 键），看编码行和候选；点「你好」。
 - **预期**：三行键：`Q WE RT Y U IO P` / `A SD FG H JK L;` / `分词 Z XC V BN M ⌫`（和双拼 18 键同一套分组，拼音的 L 键只写 L，长按也没有 `;` `:`；角标和别的键一样，打中文时显示中文标点，读屏读出 L 和角标；从 L 起笔滑行照样算在键上），键面大写；编码行 32dp，右边有音节条；候选第一页有「你好」，点了框里是「你好」，没有私用区字符。双拼的键盘不受影响，仍是自己选的那个。
 - **JVM**：`ImKeyboardsUatTest.pinyinsEighteenKeysShowTheGroupsAndSendTheirOwnCodes`（键面是 G18 的分组，BN 发拼音 18 键自己的码不是双拼的，编码行 32dp，双拼仍是全键盘；图）、`GroupedKeyboardTest.talkBackReadsAGroupLetterByLetterWithItsCorner`（L 键也是分组键：角标、读屏、起笔）、`EnginesImKeyboardsTest`（ime-core：拼音 18 键的码进拼音、打出你好）；准确率见 dev/m2/i1-report.md（ime-eval `t9 --keys 18`）；设备上不跑。
+
+### PY-106 [P1] 完整打过 3 次的一段话，打出开头就接着联想剩下的
+<!-- learning: U-73 -->
+- **前提**：B0。
+- **操作**：在空框里打 n i h a o y a q i n a i d e 空格上屏「你好呀亲爱的」，清空框，重复共 3 次；每次之后打 n i 选「你」看联想。再打 n i h a o 选「你好」看联想，点第一个。长按「好呀亲爱的」选 **不再联想**，点提示上的 **撤销**；再选一次 **不再联想**，看"不再联想的搭配"，点它恢复；最后长按它选 **删除**，再整段上屏 3 次。
+- **预期**：前两次之后「你」的联想里没有「好呀亲爱的」，第三次之后它排第一；「你好」后面第一个是「呀亲爱的」，点了框里是「你好呀亲爱的」，联想换成它后面的词。不再联想后不出，撤销后回来；列表里写着"整段：哪里都不再联想"，恢复后回来；删除后不出，再整段上屏 3 次又回来。
+- **JVM**：`PhraseUatTest.aWholeSentenceTypedThreeTimesGoesOnAfterItsStart`、`PhraseUatTest.aPhraseTurnedOffOrDeletedIsNoLongerOffered`（:lib:ime-eval:uatTest，真数据）；设备上不跑。
+
+### PY-107 [P1] 分几次上屏的不算一段
+<!-- learning: U-73 -->
+- **前提**：B0。
+- **操作**：在空框里分别选「你」「好呀」「亲爱的」上屏，清空框，共 3 次；再打 n i 选「你」。
+- **预期**：联想第一个是「好呀」（一个词一个词联想，和以前一样），没有「好呀亲爱的」这样的整段。
+- **JVM**：`PhraseUatTest.piecesCommittedApartAreNoPhrase`；设备上不跑。
+
+### PY-108 [P1] 不学的框不学整段，码表里也接着联想
+<!-- learning: U-73, U-87 -->
+- **前提**：B0。
+- **操作**：在无痕标签页（不学习的框）里整段上屏「你好呀亲爱的」3 次；回普通框整段上屏 1 次，打 n i 选「你」；再整段上屏 2 次；切到五笔，打 w q i y 选「你」。
+- **预期**：普通框只打过 1 次时「你」后面没有「好呀亲爱的」（无痕框里的不算）；五笔里「你」后面第一个是「好呀亲爱的」。网址、邮箱、数字框和搜索框的不学由单元测试 `PhrasesTest` 管（这几个框的标记是外层给的）。
+- **JVM**：`PhraseUatTest.noPhraseWhereNothingIsLearnedAndOneInATable`；设备上不跑。

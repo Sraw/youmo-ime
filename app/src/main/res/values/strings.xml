@@ -372,6 +372,7 @@
     <string name="my_words_no_predict">Suggestions turned off</string>
     <string name="learning_pinned_detail">first under %1$s · %2$s</string>
     <string name="learning_no_predict_detail">not suggested after “%1$s”</string>
+    <string name="learning_no_predict_phrase_detail">Whole phrase: not suggested anywhere</string>
     <string name="learning_suggest_again">Suggest again</string>
     <string name="learning_kind_full">Full pinyin</string>
     <string name="learning_kind_shuangpin">Shuangpin</string>
@@ -398,6 +399,10 @@
     <plurals name="learning_why_used">
         <item quantity="one">Used once under these keys lately</item>
         <item quantity="other">Used %d times under these keys lately</item>
+    </plurals>
+    <plurals name="learning_why_phrase">
+        <item quantity="one">You typed this whole phrase once</item>
+        <item quantity="other">You typed this whole phrase %d times</item>
     </plurals>
     <plurals name="learning_clear_all_blocked">
         <item quantity="one">The %d blocked word will show again</item>

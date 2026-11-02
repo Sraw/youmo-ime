@@ -165,6 +165,9 @@ internal class CommitRecorder(
     /** The word before what is committed now. */
     fun prev() = if (cleared) "" else lastWord.of(text)
 
+    /** The text before what is committed now, as the record has its text (simplified): what a whole phrase goes on from (U-73). */
+    fun textBefore() = if (cleared) "" else simplify(text)
+
     /** A commit of [picks], with the syllables taken of [nineKeys]. */
     fun commit(picks: List<CommitRows.Pick>, nineKeys: NineKeys?) = safely {
         val takes = if (layout == null) emptyList() else nineKeys?.takes(takeLayout).orEmpty()
@@ -191,12 +194,13 @@ internal class CommitRecorder(
         habits.pin(code, text, Words(entries?.let(::words).orEmpty()).reading, on)
     }
 
-    /** A prediction (联想) of [text] picked [after] the word it follows, [first] the one shown first: see [PredictionOrder]. */
-    fun prediction(text: String, after: String, first: String) = safely {
+    /** A prediction (联想) of [text] picked [after] the word it follows, [first] the one shown first, the rest of [continued] if a whole phrase's: see [PredictionOrder]. */
+    fun prediction(text: String, after: String, first: String, continued: String = "") = safely {
         if (after.isEmpty()) return@safely
         val row = PredictionOrder.row(text, after, first)
-        // in the journal as a commit is: deleted whole at once, the pick is taken back (U-03)
-        recorded = habits.record(listOf(row), flags = learnFlags)
+        // in the journal as a commit is: deleted whole at once, the pick is taken back (U-03); the rest
+        // of a whole phrase, a use of it whole (U-73)
+        recorded = if (continued.isEmpty()) habits.record(listOf(row), flags = learnFlags) else habits.recordContinued(listOf(row), learnFlags, continued)
     }
 
     /** A word of a glide's other readings committed though the session held it back: as a pick of it from [first]. */

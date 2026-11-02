@@ -112,7 +112,13 @@ they share the large model's slices at a pause (`session/RefineSlices`) too.
    by their text alone, so they move neither pinyin's order nor the decoder's counts; a word put in
    right after another 3 times (`Predictor.PAIRS`), any way, is offered after it (`UserModel.forEachPredicted`,
    counted apart from the decoder's pairs, which leave out words of no reading), one turned off
-   there (不再联想) never. Where nothing is learned (`Session.learning` false) the habits still rank, after no
+   there (不再联想) never. A whole commit of 3 to 12 letters (`learn/Phrases`) is counted as a phrase
+   (`LearnState.phrases`, snapshot row `PhraseRow`, type 49; a 联想 that went on with one counts it through
+   `Commit.continued`, appended); used whole 3 times, the rest of it (2 characters or more) is offered first
+   after the text before ends its start from a word's start, covering the last word put in
+   (`user/Continuations`, kept in `UserModel.continuations` by `HabitCounts`; U-73): at most 2, in front of
+   the words but a word the user put first there. Turned off everywhere as `NoPredict("", phrase)`, deleted
+   as a `Forget` of the phrase. Where nothing is learned (`Session.learning` false) the habits still rank, after no
    word, and nothing is recorded. A pinned sentence the model has not as one word is put in as
    the fewest of its words. `Session.why` (为什么排在这, U-81) says a candidate's tier and uses
    under the code of the level that ranked it, a prediction's under its `pred:` code; a candidate

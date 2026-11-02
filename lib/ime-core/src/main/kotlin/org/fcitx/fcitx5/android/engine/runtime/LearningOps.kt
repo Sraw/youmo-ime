@@ -185,7 +185,9 @@ internal class LearningOps(
             }
             is LearningOp.NoPredict -> {
                 val prev = prediction(s, op.index) ?: return LearningResult.Unavailable
-                LearningResult.Done(control.undoable { log().noPredict(prev, op.text, on = true) })
+                // a whole phrase off everywhere, filed after no word (U-73)
+                val whole = s.why(op.index)?.whole.orEmpty()
+                LearningResult.Done(control.undoable { if (whole.isEmpty()) log().noPredict(prev, op.text, on = true) else log().noPredict("", whole, on = true) })
             }
             is LearningOp.Report -> LearningResult.Text(report(im, s))
         }

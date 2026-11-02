@@ -9,8 +9,12 @@ import org.fcitx.fcitx5.android.engine.handwriting.handwritingData
 import org.fcitx.fcitx5.android.engine.handwriting.learned
 import org.fcitx.fcitx5.android.engine.lattice.Predictor
 import org.fcitx.fcitx5.android.engine.lattice.TextWords
+import org.fcitx.fcitx5.android.engine.learn.Code
+import org.fcitx.fcitx5.android.engine.learn.Kinds
 import org.fcitx.fcitx5.android.engine.learn.LearnRecord.Commit
 import org.fcitx.fcitx5.android.engine.learn.Learner
+import org.fcitx.fcitx5.android.engine.learn.Row
+import org.fcitx.fcitx5.android.engine.learn.Words
 import org.fcitx.fcitx5.android.engine.user.UserModel
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -211,5 +215,41 @@ class PredictionsTest {
         assertEquals(emptySet<Offer>(), q.offers(0))
         assertFalse(q.press(0, Offer.BLOCK))
         assertTrue(blocked.isEmpty())
+    }
+
+    // U-73: a whole phrase put in three times, by its text (handwriting's), goes on after its start;
+    // picked, it is used whole once more, and why says so
+    @Test
+    fun aWholePhraseGoesOnAfterItsStart() {
+        fun whole() = learner.habits.record(listOf(Row(Row.PICK or Row.WHOLE, Code(Kinds.HANDWRITING, ""), "", Words.of("高山人天"), 'A', Row.DICTIONARY, "")))
+        repeat(Predictor.PAIRS - 1) { whole() }
+        p.wrote("高", null)
+        p.predict()
+        assertTrue(p.offered.none { it.text == "山人天" })
+        whole()
+        p.predict()
+        assertEquals("山人天", p.offered.first().text)
+        val why = checkNotNull(p.why(0))
+        assertEquals("高山人天" to Predictor.PAIRS, why.whole to why.uses)
+        assertEquals(setOf(Offer.FORGET), p.offers(0))
+        assertEquals("山人天", p.pick(0))
+        assertEquals(Predictor.PAIRS + 1, learner.log.state.phrases.getValue("高山人天").count)
+        assertEquals("高山人天", p.before)
+    }
+
+    // U-73: nothing where nothing is learned, nor in a search field
+    @Test
+    fun noPhraseWhereNothingIsLearnedOrPredicted() {
+        repeat(Predictor.PAIRS) {
+            learner.habits.record(listOf(Row(Row.PICK or Row.WHOLE, Code(Kinds.HANDWRITING, ""), "", Words.of("高山人天"), 'A', Row.DICTIONARY, "")))
+        }
+        p.wrote("高", null)
+        p.learnFrom(Action.Context("高", learnFlags = Commit.NO_PREDICT))
+        assertEquals(emptyList<Any>(), p.continued("高", "高"))
+        p.learnFrom(Action.Context("高", learnFlags = 0))
+        assertEquals(listOf("山人天"), p.continued("高", "高").map { it.rest })
+        assertEquals(emptyList<Any>(), p.continued("高", ""))
+        learning = false
+        assertEquals(emptyList<Any>(), p.continued("高", "高"))
     }
 }

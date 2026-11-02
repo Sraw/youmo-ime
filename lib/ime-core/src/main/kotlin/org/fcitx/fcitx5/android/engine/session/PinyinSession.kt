@@ -437,7 +437,8 @@ class PinyinSession(
         val c = candidates.getOrNull(index) ?: return snapshot(handled = candidates.isNotEmpty())
         if (predicting) {
             lastEntry = learnPrediction(c)
-            return commit(c.text, c.words)
+            // the rest of a whole phrase (U-73) is no word: what follows goes on from its last words
+            return commit(c.text, predictions.phraseOf(c)?.let { textWords.lastTwo(it.whole) } ?: c.words)
         }
         pieces += Piece(c.text, c.words, readFrom() + c.end, if (user == null) null else entries(c), toLearn(c))
         if (pieces.last().end < input.length) {
@@ -504,12 +505,13 @@ class PinyinSession(
     // nothing is to be kept (a password): forgetting records the word. A word added by hand is the
     // user's to delete here too (U-82)
     private fun forgettable(c: Candidate) =
-        learning && !shownAside(c) && (recorder.habits.knows(c.text) || habitOrder.isAdded(c.text))
+        learning && !shownAside(c) && (recorder.habits.knows(c.text) || habitOrder.isAdded(c.text) || predictions.phraseOf(c) != null)
 
     // a prediction the user taught is forgotten, as are the words learned; any may be blocked
     private fun predictionOffers(c: Candidate): Set<Offer> {
         val word = c.words.singleOrNull()
-        if (!learning) return emptySet()
+        // a whole phrase (U-73) is deleted, nothing more: no word to block
+        if (!learning || predictions.phraseOf(c) != null) return if (learning) setOf(Offer.FORGET) else emptySet()
         if (user == null || word == null || entries(c) == null) return emptySet()
         return OfferRules.offers(learning, forgets = { recorder.habits.knows(c.text) }, blocks = { block != null })
     }
@@ -564,7 +566,8 @@ class PinyinSession(
         // as offered: nothing recorded where nothing is to be kept
         val c = candidates.getOrNull(index)
         if (!learning || c == null || !forgettable(c)) return snapshot()
-        recorder.forget(c.text)
+        // a whole phrase by its text (U-73); it has no words
+        recorder.forget(predictions.phraseOf(c)?.whole ?: c.text)
         // or the next pick learns it again, as the word before it
         val words = entries(c)
         if (words != null && before() in words) dropContext()
@@ -631,7 +634,7 @@ class PinyinSession(
     /** Learns [c], a prediction picked, after the word it follows: how it reads (what follows it is offered after its end), or null. */
     private fun learnPrediction(c: Candidate): Entry? {
         if (!learning) return null
-        recorder.prediction(c.text, predictions.after, candidates.firstOrNull()?.text.orEmpty())
+        recorder.prediction(c.text, predictions.after, candidates.firstOrNull()?.text.orEmpty(), predictions.phraseOf(c)?.whole.orEmpty())
         return if (user == null) null else entries(c)?.singleOrNull()
     }
 
@@ -762,9 +765,9 @@ class PinyinSession(
             // what was put in after it is counted after that word, as the record has its text (原 UAT PY-71)
             val decoded = if (prev == NO_WORD) "" else text(prev)
             val whole = if (decoded.isEmpty() || learned.length <= decoded.length || !learned.endsWith(decoded)) NO_WORD else data.wordIndex.find(learned)
-            predictions.offer(prev2, prev, if (whole == NO_WORD) prev else whole, tail)
+            predictions.offer(prev2, prev, if (whole == NO_WORD) prev else whole, tail, predictions.continued(recorder.textBefore(), learned))
         } else {
-            predictions.offer(NO_WORD, own, tail = { if (prev < data.vocabulary.size) prev else tail() })
+            predictions.offer(NO_WORD, own, tail = { if (prev < data.vocabulary.size) prev else tail() }, continued = predictions.continued(recorder.textBefore(), learned))
         }
         return Read(candidates = predictions.offered)
     }
