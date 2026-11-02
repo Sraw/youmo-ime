@@ -23,6 +23,9 @@ class CodeRowHeightTest {
             Layout.SHUANGPIN18 to tall,
             Layout.SHUANGPIN14 to tall,
             Layout.SHUANGPIN_NINE to tall,
+            // 注音九键 has no column; 大千 a symbol a key, as the full keyboard
+            Layout.ZHUYIN_NINE to tall,
+            Layout.ZHUYIN_FULL to thin,
             // pinyin's nine keys have their column
             Layout.PINYIN_NINE to thin,
             Layout.ENGLISH_NINE to thin,

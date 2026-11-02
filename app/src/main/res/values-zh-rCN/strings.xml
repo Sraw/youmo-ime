@@ -558,6 +558,11 @@
     <string name="shuangpin_keyboard">键盘</string>
     <string name="shuangpin_keyboard_summary">屏幕上打双拼用的键盘。微软没有 14 键。九键上重码很多，要多选几次。实体键盘仍按全键盘打。</string>
     <string name="keyboard_18">18 键</string>
+    <string name="keyboard_zhuyin_nine">注音九键</string>
+    <string name="keyboard_zhuyin_full">注音全键盘</string>
+    <string name="im_zhuyin_nine">拼音 · 注音九键</string>
+    <string name="im_zhuyin">拼音 · 注音全键盘</string>
+    <string name="zhuyin_traditional_hint">注音一般配繁体字：要繁体，在 ⋯ 里点简繁。</string>
     <string name="keyboard_nine">九键</string>
     <string name="im_pinyin_keys18">拼音 · 18 键</string>
     <string name="im_shuangpin_keys14">双拼 · 14 键</string>

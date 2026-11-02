@@ -27,6 +27,7 @@ object CodeRowHeight {
 
     private val STRIP = setOf(
         ImKeyboards.Layout.PINYIN14,
+        ImKeyboards.Layout.ZHUYIN_NINE,
         ImKeyboards.Layout.PINYIN18,
         ImKeyboards.Layout.SHUANGPIN18,
         ImKeyboards.Layout.SHUANGPIN14,

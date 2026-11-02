@@ -558,6 +558,11 @@
     <string name="shuangpin_keyboard">鍵盤</string>
     <string name="shuangpin_keyboard_summary">螢幕上打雙拼用的鍵盤。微軟沒有 14 鍵。九鍵上重碼很多，要多選幾次。實體鍵盤仍按全鍵盤打。</string>
     <string name="keyboard_18">18 鍵</string>
+    <string name="keyboard_zhuyin_nine">注音九鍵</string>
+    <string name="keyboard_zhuyin_full">注音全鍵盤</string>
+    <string name="im_zhuyin_nine">拼音 · 注音九鍵</string>
+    <string name="im_zhuyin">拼音 · 注音全鍵盤</string>
+    <string name="zhuyin_traditional_hint">注音一般配繁體字：要繁體，在 ⋯ 裡點簡繁。</string>
     <string name="keyboard_nine">九鍵</string>
     <string name="im_pinyin_keys18">拼音 · 18 鍵</string>
     <string name="im_shuangpin_keys14">雙拼 · 14 鍵</string>

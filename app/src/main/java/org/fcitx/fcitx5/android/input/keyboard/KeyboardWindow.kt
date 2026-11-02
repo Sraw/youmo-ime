@@ -84,6 +84,8 @@ class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), Essentia
         GroupedKeyboard.NameShuangpin14 to { GroupedKeyboard(context, theme, NineKeyLetters.G14, Keyboard::shuangpin14Key) },
         // the user's 按键字符 (its symbols) as 九键拼音 has them; its letters are 全拼's alone
         T9Keyboard.ShuangpinName to { T9Keyboard(context, theme, symbols = NineKeySymbols.parse(AppPrefs.getInstance().keyboard.t9Symbols.getValue()), shuangpin = true) },
+        ZhuyinKeyboard.NameNine to { ZhuyinKeyboard(context, theme, nine = true) },
+        ZhuyinKeyboard.NameFull to { ZhuyinKeyboard(context, theme, nine = false) },
         NumberKeyboard.Name to { NumberKeyboard(context, theme) },
         // a number's, phone's or date's field's own (FieldPad)
         *NumberPad.entries.filter { it != NumberPad.FULL }.map { pad -> pad.layout to { NumberKeyboard(context, theme, pad) } }.toTypedArray(),
@@ -204,10 +206,21 @@ class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), Essentia
     /** Told each layout shown: InputView, which puts the others at a side while the letters split. */
     var onLayoutShown: (() -> Unit)? = null
 
+    // a zhuyin keyboard first shown: Taiwan's users write 繁体, 简繁 is in ⋯ (design 051 Q11 A), said once
+    private fun tellZhuyinOnce(target: String) {
+        if (target != ZhuyinKeyboard.NameNine && target != ZhuyinKeyboard.NameFull) return
+        val told = AppPrefs.getInstance().internal.zhuyinTraditionalTold
+        if (told.getValue()) return
+        told.setValue(true)
+        // posted: picked from ⋯, the panel closing as the layout shows would take a notice said now with it
+        keyboardView.post { service.say(R.string.zhuyin_traditional_hint) }
+    }
+
     private fun showLayout(target: String) {
         detachCurrentLayout()
         attachLayout(target)
         onLayoutShown?.invoke()
+        tellZhuyinOnce(target)
         // the letters back from the symbols, Shift off as they attach: at a sentence start, on again
         updateAutoCaps()
         if (windowManager.isAttached(this)) {
@@ -359,6 +372,8 @@ internal fun nameOf(layout: ImKeyboards.Layout): String = when (layout) {
     ImKeyboards.Layout.SHUANGPIN18 -> GroupedKeyboard.Name18
     ImKeyboards.Layout.SHUANGPIN14 -> GroupedKeyboard.NameShuangpin14
     ImKeyboards.Layout.SHUANGPIN_NINE -> T9Keyboard.ShuangpinName
+    ImKeyboards.Layout.ZHUYIN_NINE -> ZhuyinKeyboard.NameNine
+    ImKeyboards.Layout.ZHUYIN_FULL -> ZhuyinKeyboard.NameFull
     ImKeyboards.Layout.ENGLISH_NINE -> T9Keyboard.EnglishName
     ImKeyboards.Layout.HANDWRITING -> HandwritingKeyboard.Name
 }

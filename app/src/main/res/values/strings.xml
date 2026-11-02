@@ -575,6 +575,11 @@
     <string name="shuangpin_keyboard">Keyboard</string>
     <string name="shuangpin_keyboard_summary">The on-screen keyboard Shuangpin is typed on. Microsoft has no 14 keys. On the 9 keys many syllables share keys, so expect to pick more often. A hardware keyboard still types on the full layout.</string>
     <string name="keyboard_18">18 keys</string>
+    <string name="keyboard_zhuyin_nine">Zhuyin 9 keys</string>
+    <string name="keyboard_zhuyin_full">Zhuyin (Dachen)</string>
+    <string name="im_zhuyin_nine">Pinyin (Zhuyin 9 keys)</string>
+    <string name="im_zhuyin">Pinyin (Zhuyin Dachen)</string>
+    <string name="zhuyin_traditional_hint">Zhuyin is usually written in Traditional Chinese: tap 简繁 in ⋯ for it.</string>
     <string name="keyboard_nine">9 keys</string>
     <string name="im_pinyin_keys18">Pinyin (18 keys)</string>
     <string name="im_shuangpin_keys14">Shuangpin (14 keys)</string>

@@ -6,6 +6,7 @@ package org.fcitx.fcitx5.android.uat
 
 import android.view.View
 import android.widget.TextView
+import org.robolectric.shadows.ShadowToast
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.Uat
@@ -111,19 +112,30 @@ class KeyboardPickerUatTest {
         prefs.set(keyboard.shuangpinKeyboard, ShuangpinKeyboard.Full)
         prefs.set(keyboard.englishKeyboard, EnglishKeyboard.Full)
         start()
-        // pinyin: the four, 全键盘 ticked; the nine keys picked, the keyboard is them
-        val four = listOf(R.string.pinyin_keyboard_full, R.string.keyboard_18, R.string.pinyin_keyboard_14, R.string.keyboard_nine).map(::s)
+        // pinyin: the six (two of them zhuyin's), 全键盘 ticked; the nine keys picked, the keyboard is them
+        val four = listOf(R.string.pinyin_keyboard_full, R.string.keyboard_18, R.string.pinyin_keyboard_14, R.string.keyboard_nine, R.string.keyboard_zhuyin_nine, R.string.keyboard_zhuyin_full).map(::s)
         assertEquals(four to s(R.string.pinyin_keyboard_full), picked(R.string.keyboard_nine))
         assertEquals(PinyinKeyboard.NineKeys, keyboard.pinyinKeyboard.getValue())
         assertTrue(h.texts().toString(), "重输" in h.texts())
         assertEquals(four to s(R.string.keyboard_nine), picked())
+        h.start()
+        // 大千 picked: said once that 繁体 is in ⋯
+        assertEquals(four to s(R.string.keyboard_nine), picked(R.string.keyboard_zhuyin_full))
+        assertEquals(PinyinKeyboard.ZhuyinFull, keyboard.pinyinKeyboard.getValue())
+        assertTrue(AppPrefs.getInstance().internal.zhuyinTraditionalTold.getValue())
+        assertTrue(h.texts().toString(), "ㄅ" in h.texts())
+        // on the keyboard, or a toast while ⋯ still covered it
+        h.idle()
+        val notice = h.notice()?.let { n -> KeyboardHarness.all(n.contentView).filterIsInstance<TextView>().map { it.text.toString() }.toList() }.orEmpty() +
+            listOfNotNull(ShadowToast.getTextOfLatestToast())
+        assertTrue("$notice", s(R.string.zhuyin_traditional_hint) in notice)
         h.start()
         // English: its own two, the nine keys picked moves no other's
         switchTo(KeyboardHarness.ENGLISH)
         val two = listOf(R.string.pinyin_keyboard_full, R.string.keyboard_nine).map(::s)
         assertEquals(two to s(R.string.pinyin_keyboard_full), picked(R.string.keyboard_nine))
         assertEquals(EnglishKeyboard.NineKeys, keyboard.englishKeyboard.getValue())
-        assertEquals(PinyinKeyboard.NineKeys, keyboard.pinyinKeyboard.getValue())
+        assertEquals(PinyinKeyboard.ZhuyinFull, keyboard.pinyinKeyboard.getValue())
         h.start()
         // 双拼 under 微软: no 14 keys (its ; is ing)
         EngineState.shuangpinScheme = ShuangpinScheme.MICROSOFT
@@ -149,7 +161,7 @@ class KeyboardPickerUatTest {
         h.tap(h.described(s(R.string.status_keyboard)))
         val menu = ShadowPopupMenu.getLatestPopupMenu().menu
         val items = (0 until menu.size()).map { menu.getItem(it) }
-        val four = listOf(R.string.pinyin_keyboard_full, R.string.keyboard_18, R.string.pinyin_keyboard_14, R.string.keyboard_nine).map(::s)
+        val four = listOf(R.string.pinyin_keyboard_full, R.string.keyboard_18, R.string.pinyin_keyboard_14, R.string.keyboard_nine, R.string.keyboard_zhuyin_nine, R.string.keyboard_zhuyin_full).map(::s)
         assertEquals(four, items.map { it.title.toString() })
         assertEquals(s(R.string.pinyin_keyboard_full), items.single { it.isChecked }.title.toString())
         shadowOf(ShadowPopupMenu.getLatestPopupMenu()).onMenuItemClickListener.onMenuItemClick(items.first { it.title.toString() == s(R.string.keyboard_nine) })
