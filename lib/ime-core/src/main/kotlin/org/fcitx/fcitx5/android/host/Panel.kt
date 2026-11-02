@@ -142,6 +142,9 @@ class Panel {
     var candidateList: CandidateList? = null
     var overlayMessage: String = ""
 
+    /** A quick input's panel ([TempPanel.quickPhrase]). */
+    var quickPhrase: Boolean = false
+
     /** `InputPanel::reset` (`inputpanel.cpp:121-132`): everything, the overlay too. */
     fun reset() {
         preedit = FormattedText.Empty
@@ -150,6 +153,7 @@ class Panel {
         auxDown = FormattedText.Empty
         candidateList = null
         overlayMessage = ""
+        quickPhrase = false
     }
 
     /**

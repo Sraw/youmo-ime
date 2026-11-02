@@ -47,6 +47,9 @@ class FilePkgDataDir(private val root: File) : PkgDataDir {
  */
 class QuickPhraseTable private constructor(private val map: TreeMap<String, MutableList<String>>) {
 
+    /** Every (key, value), in table order: what [populate] gives for the empty input. */
+    fun entries(): Sequence<Pair<String, String>> = map.asSequence().flatMap { (key, values) -> values.asSequence().map { key to it } }
+
     /** `populate`: (key, value) of every entry whose key starts with [input], in table order. */
     fun populate(input: String): List<Pair<String, String>> {
         val out = ArrayList<Pair<String, String>>()
@@ -101,6 +104,13 @@ class QuickPhraseTable private constructor(private val map: TreeMap<String, Muta
             return QuickPhraseTable(map)
         }
 
+        /** The (key, value) of each line of a `.mb` file's [bytes] as [load] reads it, in order; lines it skips left out. */
+        fun parse(bytes: ByteArray): List<Pair<String, String>> {
+            val out = ArrayList<Pair<String, String>>()
+            eachLine(bytes) { out += it }
+            return out
+        }
+
         /** `std::filesystem::path::extension`: from the last dot, unless the name starts with it. */
         private fun extension(name: String): String {
             val dot = name.lastIndexOf('.')
@@ -110,7 +120,10 @@ class QuickPhraseTable private constructor(private val map: TreeMap<String, Muta
         private fun isWhitespace(b: Byte) = b == ' '.code.toByte() || b in 0x09..0x0d
 
         /** `load` (`quickphraseprovider.cpp:72-104`), line by line on `\n`. */
-        private fun loadInto(map: TreeMap<String, MutableList<String>>, bytes: ByteArray) {
+        private fun loadInto(map: TreeMap<String, MutableList<String>>, bytes: ByteArray) =
+            eachLine(bytes) { (key, value) -> map.getOrPut(key) { ArrayList(1) }.add(value) }
+
+        private inline fun eachLine(bytes: ByteArray, each: (Pair<String, String>) -> Unit) {
             // one decoder for the file: made per line, it was most of a cold start's 0.4 s on a debug build
             val decoder = Charsets.UTF_8.newDecoder()
                 .onMalformedInput(CodingErrorAction.REPORT)
@@ -119,7 +132,7 @@ class QuickPhraseTable private constructor(private val map: TreeMap<String, Muta
             while (start < bytes.size) {
                 var end = start
                 while (end < bytes.size && bytes[end] != '\n'.code.toByte()) end++
-                parseLine(decoder, bytes, start, end)?.let { (key, value) -> map.getOrPut(key) { ArrayList(1) }.add(value) }
+                parseLine(decoder, bytes, start, end)?.let(each)
                 start = end + 1
             }
         }

@@ -40,7 +40,8 @@ class TempModeTapsTest {
         send(Keyboard.INK)
         // a stroke drawn while quick input shows its code (笔画筛选): no mode's, swallowed
         send(Keyboard.strokeKey('h'))
-        assertEquals("a", rig.preedit)
+        // a letter typed as itself and the nine keys' digit are keys' (QuickPhraseKeys): typed as they read
+        assertEquals("ab2", rig.preedit)
         assertEquals(emptyList<String>(), rig.commits())
     }
 
@@ -48,7 +49,7 @@ class TempModeTapsTest {
     fun aRejectedCodeLeavesQuickInputUntouched() {
         // code review N5: a 九键 digit typed nothing, yet Return no longer committed alt
         rig.quickPhrase.trigger(rig.ic, str = "S", alt = "ALT", key = Key('k'.code))
-        send(Keyboard.nineKey('2', upper = false))
+        send(Keyboard.SYLLABLES.first.code)
         rig.press(KeySyms.RETURN)
         assertEquals(listOf("ALT"), rig.commits())
     }

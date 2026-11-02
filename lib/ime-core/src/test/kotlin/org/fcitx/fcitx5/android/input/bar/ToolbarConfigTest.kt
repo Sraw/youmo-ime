@@ -30,7 +30,7 @@ class ToolbarConfigTest {
     fun neverSetTheBarIsZeroFoursBar() {
         assertEquals(ToolbarConfig.DEFAULT, ToolbarConfig.parse(""))
         assertEquals(
-            Layout(listOf(Undo, Redo, CursorMove, Clipboard, More), listOf(Emoji, Voice, Hide)),
+            Layout(listOf(Undo, Redo, CursorMove, Clipboard, ToolbarButton.QuickPhrase, More), listOf(Emoji, Voice, Hide)),
             ToolbarConfig.DEFAULT.layout(everything)
         )
     }
@@ -96,6 +96,15 @@ class ToolbarConfigTest {
         val config = ToolbarConfig.parse("keyboard,undo,|,hide")
         assertEquals(Layout(listOf(Keyboard, Undo, More), listOf(Hide)), config.layout(everything))
         assertEquals(Layout(listOf(Undo, More), listOf(Hide)), config.layout(everything.copy(keyboards = false)))
+    }
+
+    @Test
+    fun quickInputComesInHiddenOnAnUpgradeShownOnANewInstall() {
+        // design 051-quickphrase 6 A: a bar stored before 0.5.1 keeps its look
+        val old = ToolbarConfig.parse("undo,redo,cursor_move,clipboard,|,emoji,voice,hide")
+        assertEquals(Item.Button(ToolbarButton.QuickPhrase, false), old.items.single { it is Item.Button && it.button == ToolbarButton.QuickPhrase })
+        assertEquals(true, ToolbarConfig.DEFAULT.items.contains(Item.Button(ToolbarButton.QuickPhrase, true)))
+        assertEquals(ToolbarButton.QuickPhrase, ToolbarButton.ofKey("quick_phrase"))
     }
 
     @Test

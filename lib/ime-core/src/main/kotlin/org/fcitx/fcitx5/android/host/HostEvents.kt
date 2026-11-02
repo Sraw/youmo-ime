@@ -24,7 +24,13 @@ enum class LayoutHint { NotSet, Vertical, Horizontal }
 sealed class HostEvent {
     data class Commit(val text: String, val cursor: Int) : HostEvent()
     data class ClientPreedit(val text: FormattedText) : HostEvent()
-    data class InputPanel(val preedit: FormattedText, val auxUp: FormattedText, val auxDown: FormattedText) : HostEvent() {
+    data class InputPanel(
+        val preedit: FormattedText,
+        val auxUp: FormattedText,
+        val auxDown: FormattedText,
+        /** Quick input's panel ([TempPanel.quickPhrase]). */
+        val quickPhrase: Boolean = false,
+    ) : HostEvent() {
         companion object {
             val EMPTY = InputPanel(FormattedText.Empty, FormattedText.Empty, FormattedText.Empty)
         }

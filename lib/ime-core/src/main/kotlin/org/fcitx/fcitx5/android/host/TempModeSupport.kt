@@ -14,6 +14,9 @@ import org.fcitx.fcitx5.android.core.FormattedText
 interface TempModeHost {
     fun commit(ic: InputContext, text: String)
 
+    /** [text] as it is, through no commit filter (traditional, full width): the user's own quick phrase. */
+    fun commitAsIs(ic: InputContext, text: String) = commit(ic, text)
+
     /**
      * The mode's whole panel ([TempPanel.EMPTY] when it leaves: fcitx resets the input panel then,
      * `quickphrasetempmode.cpp:67-83`, `unicodetempmode.cpp:92-100`, and the engine's panel comes back
@@ -37,6 +40,8 @@ class TempPanel(
     val clientPreedit: FormattedText = FormattedText.Empty,
     val auxUp: FormattedText = FormattedText.Empty,
     val candidates: TempCandidateList? = null,
+    /** Quick input's, not Unicode's: the app lists its candidates a row each and opens one long pressed. */
+    val quickPhrase: Boolean = false,
 ) {
     companion object {
         val EMPTY = TempPanel()

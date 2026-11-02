@@ -218,6 +218,12 @@ class HostCore(
         mode.trigger(ic)
     }
 
+    /** What quick input's candidate [index] is, for the card a long press opens: null for ＋添加, or none shown. */
+    fun quickPhraseAt(index: Int): QuickPhraseBook.Found? {
+        val ic = contexts.active ?: return null
+        return modules.quickPhrase?.entryAt(ic, index)
+    }
+
     /** `triggerUnicode` (`native-lib.cpp:298-303`): Unicode search on the active context. */
     fun triggerUnicode() = pipeline.batch {
         val ic = contexts.active ?: return@batch
@@ -438,6 +444,8 @@ class HostCore(
 
     override fun commit(ic: InputContext, text: String, cursor: Int) = pipeline.commit(ic, text, cursor)
 
+    override fun commitAsIs(ic: InputContext, text: String) = pipeline.commitAsIs(ic, text)
+
     override fun deleteSurrounding(ic: InputContext, before: Int, after: Int) = pipeline.deleteSurrounding(ic, before, after)
 
     override fun forwardKey(ic: InputContext, key: Key, release: Boolean) = pipeline.forwardKey(ic, key, release)
@@ -465,6 +473,7 @@ class HostCore(
         p.clientPreedit = panel.clientPreedit
         p.auxUp = panel.auxUp
         p.candidateList = panel.candidates?.let(::TempModeCandidates)
+        p.quickPhrase = panel.quickPhrase
         updatePreedit(ic)
         updatePanel(ic)
     }
@@ -510,7 +519,7 @@ class HostCore(
             if (p.empty) {
                 emit(HostEvent.InputPanel(FormattedText.Empty, text(p.overlayMessage), FormattedText.Empty))
             } else {
-                emit(HostEvent.InputPanel(pipeline.filterOutput(ic, p.preedit), pipeline.filterOutput(ic, p.auxUp), pipeline.filterOutput(ic, p.auxDown)))
+                emit(HostEvent.InputPanel(pipeline.filterOutput(ic, p.preedit), pipeline.filterOutput(ic, p.auxUp), pipeline.filterOutput(ic, p.auxDown), p.quickPhrase))
             }
             sendCandidates(ic)
         }

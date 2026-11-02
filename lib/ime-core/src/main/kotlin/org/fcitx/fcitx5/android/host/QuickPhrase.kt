@@ -6,6 +6,28 @@ package org.fcitx.fcitx5.android.host
 
 import org.fcitx.fcitx5.android.core.FormattedText
 import org.fcitx.fcitx5.android.core.TextFormatFlag
+import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
+
+/** What quick input asks the app and tells it, for the user's own entries ([QuickPhraseBook.mine]). */
+interface QuickPhraseHooks {
+    /** The user's nine keys' letters, what the nine keys' digits are in a key ([QuickPhraseKeys]). */
+    val nineKeys: NineKeyLetters get() = NineKeyLetters.STANDARD
+
+    /** Whether the user's entries are offered: not with the habits off (借手机), a notebook being private. */
+    val withMine: Boolean get() = true
+
+    /** [entry] committed at [at] (never in a password field): kept in `mine.used`. */
+    fun used(entry: QuickPhraseEntry, at: Long) {}
+
+    /** ＋添加 tapped: the settings page's new entry. */
+    fun add() {}
+
+    fun now(): Long = System.currentTimeMillis()
+
+    companion object {
+        val NONE = object : QuickPhraseHooks {}
+    }
+}
 
 /**
  * Quick input, fcitx's quick phrase temp mode (`modules/quickphrase/quickphrasetempmode.cpp`, the
@@ -25,41 +47,67 @@ import org.fcitx.fcitx5.android.core.TextFormatFlag
  *   `processComposeString` is always the empty string (`fcitx/instance.cpp:1925-1929`) and a key
  *   types its own character.
  *
- * [table] is read once by the caller ([QuickPhraseTable.load]) and replaced with [reload]; it is
+ * This app's own besides (design 051-quickphrase): the user's entries ([QuickPhraseBook.mine]) listed
+ * with nothing typed, the last used first, then ＋添加; a key of several letters (the nine keys', the
+ * 14 and 18 keys') any of them ([QuickPhraseKeys]); an entry shown as its first line's start
+ * ([QuickPhraseExcerpt]) with its key as the comment, committed whole and as it is (no traditional,
+ * no full width: [TempModeHost.commitAsIs]); its use kept, but not in a password field.
+ *
+ * [book] is read once by the caller ([QuickPhraseBook.load]) and replaced with [reload]; it is
  * asked for at the first lookup, not before, so the caller can load it off the host thread meanwhile.
  */
+@Suppress("LongParameterList")
 class QuickPhrase(
     private val host: TempModeHost,
-    @Volatile private var table: () -> QuickPhraseTable,
+    @Volatile private var book: () -> QuickPhraseBook,
     /** `_("Quick Phrase: ")`, translated by the app. */
     private val auxLabel: String = "Quick Phrase: ",
+    private val hooks: QuickPhraseHooks = QuickPhraseHooks.NONE,
+    /** The last candidate with nothing typed, the way to a new entry. */
+    private val addLabel: String = "+ Add",
+    /** After [auxLabel] with nothing typed and none of the user's entries. */
+    private val emptyHint: String = "type a key, or tap + Add for your own",
 ) : PanelTempMode {
 
     constructor(host: TempModeHost, table: QuickPhraseTable, auxLabel: String = "Quick Phrase: ") :
-        this(host, { table }, auxLabel)
+        this(host, fixed(QuickPhraseBook(table)), auxLabel)
+
+    /** A key typed reads its code ([QuickPhraseKeys]), not the letter [TempModeManager] would make it. */
+    override val readsCodes: Boolean get() = true
 
     private class State {
         var active = false
         var typed = false
         var text = ""
+        var hint = ""
         var prefix = ""
         var str = ""
         var alt = ""
         var key = Key(TempKeys.NONE)
         val buffer = TempInputBuffer(MAX_SIZE)
+
+        // what each character of buffer may be in a key, in step with it
+        val keys = ArrayList<Set<Int>>()
         var list: TempCandidateList? = null
+
+        // what list shows, the user's or built-in, one for each candidate; null for ＋添加
+        var found: List<QuickPhraseBook.Found?> = emptyList()
     }
 
     private val state = IcProperty { State() }
 
-    fun reload(table: QuickPhraseTable) {
-        this.table = { table }
+    fun reload(book: QuickPhraseBook) {
+        this.book = { book }
     }
 
-    /** As [reload], with a table read off the host thread: a lookup before it is read waits for it. */
-    fun reload(table: () -> QuickPhraseTable) {
-        this.table = table
+    /** As [reload], with a book read off the host thread: a lookup before it is read waits for it. */
+    fun reload(book: () -> QuickPhraseBook) {
+        this.book = book
     }
+
+    /** What the candidate at [globalIndex] of the list shown is: null for ＋添加, or none. */
+    fun entryAt(ic: InputContext, globalIndex: Int): QuickPhraseBook.Found? =
+        ic.propertyFor(state).takeIf { it.active }?.found?.getOrNull(globalIndex)
 
     override fun isActive(ic: InputContext) = ic.propertyFor(state).active
 
@@ -92,6 +140,7 @@ class QuickPhrase(
         s.alt = alt
         s.key = key
         s.buffer.clear()
+        s.keys.clear()
         updateUI(ic)
     }
 
@@ -101,8 +150,15 @@ class QuickPhrase(
         if (e.release) return false
         val s = ic.propertyFor(state)
         val key = e.key
+        // nothing typed, nothing is lit: Space leaves and types itself, never a whole entry by mistake
+        if (key.sym == KeySyms.SPACE && key.states == 0 && s.buffer.isEmpty()) {
+            reset(ic)
+            host.commit(ic, " ")
+            return true
+        }
         s.list?.let { list ->
-            val idx = TempKeys.digitSelection(key, 0)
+            // nothing typed, a digit is a key's: the list is the user's whole notebook, not a page to pick from
+            val idx = if (s.buffer.isEmpty()) -1 else TempKeys.digitSelection(key, 0)
             if (idx >= 0 && idx < list.size) {
                 list.candidate(idx).select?.invoke(ic)
                 return true
@@ -158,6 +214,7 @@ class QuickPhrase(
                 if (s.buffer.isEmpty()) {
                     reset(ic)
                 } else if (s.buffer.backspace()) {
+                    s.keys.removeAt(s.buffer.cursor)
                     if (s.buffer.isEmpty()) reset(ic) else updateUI(ic)
                 }
                 return true
@@ -166,6 +223,7 @@ class QuickPhrase(
                 if (s.buffer.isEmpty()) {
                     reset(ic)
                 } else if (s.buffer.del()) {
+                    s.keys.removeAt(s.buffer.cursor)
                     if (s.buffer.isEmpty()) reset(ic) else updateUI(ic)
                 }
                 return true
@@ -192,9 +250,13 @@ class QuickPhrase(
             return true
         }
         val chr = KeySyms.toUnicode(key.sym)
-        // a keyboard's own code types nothing and leaves the mode untouched (Enter still commits s.alt)
-        if (KeySyms.isPrivateUse(chr)) return true
-        s.buffer.type(if (chr == 0) "" else String(Character.toChars(chr)))
+        if (chr == 0) {
+            s.buffer.type("")
+        } else {
+            // a keyboard's own code that is no key's types nothing and leaves the mode untouched (Enter still commits s.alt)
+            val typed = QuickPhraseKeys.of(chr, hooks.nineKeys) ?: return true
+            if (s.buffer.type(String(Character.toChars(typed.shown)))) s.keys.add(s.buffer.cursor - 1, typed.can)
+        }
         s.typed = true
         updateUI(ic)
         return true
@@ -225,6 +287,8 @@ class QuickPhrase(
         s.typed = false
         s.text = ""
         s.buffer.clear()
+        s.keys.clear()
+        s.found = emptyList()
         s.prefix = ""
         s.str = ""
         s.alt = ""
@@ -243,20 +307,52 @@ class QuickPhrase(
     /** `updateUI` (`:345-428`). */
     private fun updateUI(ic: InputContext) {
         val s = ic.propertyFor(state)
-        s.list = if (s.buffer.isEmpty()) {
+        val book = book()
+        val withMine = hooks.withMine
+        val empty = s.buffer.isEmpty()
+        val found: List<QuickPhraseBook.Found?> = if (empty) {
+            // the whole notebook, then the way to add to it: the built-in tables are thousands, not listed
+            if (withMine) book.mine.map { QuickPhraseBook.Found(it.key, it.content, true) } + null else emptyList()
+        } else {
+            book.find(s.keys, withMine)
+        }
+        s.found = found
+        s.list = if (found.isEmpty()) {
             null
         } else {
-            val words = table().populate(s.buffer.userInput).map { (key, value) ->
-                TempCandidate(value, key) { c ->
-                    host.commit(c, value)
-                    reset(c)
-                }
-            }
+            val words = found.map { f -> if (f == null) addCandidate() else candidate(f) }
             TempCandidateList(words, TempKeys.PAGE_SIZE, SELECTION_LABELS, resetCursorAfterPaging = true).also {
-                if (it.totalSize > 0) it.setGlobalCursorIndex(0)
+                if (it.totalSize > 0 && !empty) it.setGlobalCursorIndex(0)
             }
         }
+        // a trigger's own text (none of the app's) has the line to itself
+        val noneYet = withMine && book.mine.isEmpty()
+        s.hint = if (empty && noneYet && s.text.isEmpty()) emptyHint else ""
         show(ic)
+    }
+
+    private fun candidate(f: QuickPhraseBook.Found): TempCandidate {
+        if (!f.mine) {
+            return TempCandidate(f.content, f.key) { c ->
+                host.commit(c, f.content)
+                reset(c)
+            }
+        }
+        return TempCandidate(QuickPhraseExcerpt.of(f.content), f.key) { c ->
+            host.commitAsIs(c, f.content)
+            // a password field's use is not kept: nothing typed in one leaves a trace
+            if (!c.has(Capability.PASSWORD_OR_SENSITIVE)) {
+                val at = hooks.now()
+                book().use(f.entry, at)
+                hooks.used(f.entry, at)
+            }
+            reset(c)
+        }
+    }
+
+    private fun addCandidate() = TempCandidate(addLabel, "") { c ->
+        reset(c)
+        hooks.add()
     }
 
     private fun show(ic: InputContext) {
@@ -270,19 +366,21 @@ class QuickPhrase(
             IntArray(segments.size) { format },
             s.prefix.length + s.buffer.cursorInString,
         )
-        val aux = TempKeys.text(if (s.typed) auxLabel else auxLabel + s.text)
+        val aux = TempKeys.text(if (s.typed) auxLabel else auxLabel + s.text + s.hint)
         host.showPanel(
             ic,
             if (client) {
-                TempPanel(clientPreedit = preedit, auxUp = aux, candidates = s.list)
+                TempPanel(clientPreedit = preedit, auxUp = aux, candidates = s.list, quickPhrase = true)
             } else {
-                TempPanel(preedit = preedit, auxUp = aux, candidates = s.list)
+                TempPanel(preedit = preedit, auxUp = aux, candidates = s.list, quickPhrase = true)
             },
         )
     }
 
     companion object {
         private const val MAX_SIZE = 30
+
+        private fun fixed(book: QuickPhraseBook): () -> QuickPhraseBook = { book }
 
         /** `TriggerKey` default (`quickphrase.h:35-39`). */
         val TRIGGER_KEYS = listOf(
