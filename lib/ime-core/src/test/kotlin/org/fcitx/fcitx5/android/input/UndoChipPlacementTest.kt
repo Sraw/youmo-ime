@@ -105,4 +105,30 @@ class UndoChipPlacementTest {
             assertEquals(Place(390, 110, Slide.Down), floating(portrait, Box(0, 100, 1080, 2300)))
         },
     )
+
+    // the floating code strip over the keyboard is never under the chip: docked above it, floating beside both
+    @Test
+    fun theChipKeepsOffTheFloatingCodeStrip() = assertRows(
+        "docked, above the strip" to {
+            val place = UndoChipPlacement.docked(
+                windowWidth = 1080, chipWidth = 200, candidates = true, barTop = 1300, aboveTop = 1200,
+                chipHeight = 110, gap = 10, stripTop = 1140,
+            )
+            assertEquals(Place(440, 1020, Slide.Up), place)
+        },
+        "docked, a strip lower than the top changes nothing" to {
+            val place = UndoChipPlacement.docked(
+                windowWidth = 1080, chipWidth = 200, candidates = true, barTop = 1300, aboveTop = 1200,
+                chipHeight = 110, gap = 10, stripTop = 1250,
+            )
+            assertEquals(Place(440, 1080, Slide.Up), place)
+        },
+        "floating, above the strip on the keyboard" to {
+            val place = UndoChipPlacement.floating(
+                Box(0, 0, 1080, 2300), Box(90, 1400, 990, 2200), chipWidth = 300, chipHeight = 100, gap = 10,
+                strip = Box(90, 1330, 400, 1400),
+            )
+            assertEquals(Place(390, 1220, Slide.Up), place)
+        },
+    )
 }
