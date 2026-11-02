@@ -254,6 +254,13 @@ internal val COMMANDS = listOf(
         val lookAhead = args.options["look-ahead"]?.let { it.toIntOrNull()?.takeIf { n -> n > 0 } ?: return@Command null } ?: StrokeFilter.LOOK_AHEAD
         strokes(dataPath, strokePath, setPath, lookAhead, args.options, out)
     },
+    Command("readings", "<pinyin.data> <readings.tsv> [--misses <out.tsv>] [--gate]", 2..2, "misses", "gate") { args, out, _ ->
+        val (dataPath, setPath) = args.operands
+        val r = ReadingsRun(loadData(dataPath)).measure(File(setPath).useLines { ReadingsRun.parse(it) })
+        out.appendLine("words: ${r.words}, read right: ${r.right} (${"%.2f".format(r.accuracy)}%), gate ${ReadingsRun.GATE}%")
+        args.options["misses"]?.let { path -> File(path).printWriter().use { w -> r.misses.forEach(w::println) } }
+        if ("gate" in args.options && r.accuracy < ReadingsRun.GATE) 1 else 0
+    },
     Command("chars", "<pinyin.data>", 1..1) { args, out, _ ->
         CharRanks.report(CharRanks(loadData(args.operands[0])).measure(), out)
         0
