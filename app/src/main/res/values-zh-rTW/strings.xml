@@ -997,7 +997,7 @@
     <string name="quick_phrase_built_in">內建的</string>
     <string name="quick_phrase_built_in_emoji">顏文字（yawn、happy 這些詞）</string>
     <string name="quick_phrase_built_in_emoji_eac">表情代碼（:smile: 這樣）</string>
-    <string name="quick_phrase_built_in_latex">LaTeX 符号（\\alpha 这样）</string>
+    <string name="quick_phrase_built_in_latex">LaTeX 符號（\\alpha 這樣）</string>
     <string name="quick_phrase_import_done">匯入 %1$d 條，略過 %2$d 條重複</string>
     <string name="quick_phrase_deleted">已刪除</string>
     <string name="quick_phrase_new">新增快速輸入</string>
