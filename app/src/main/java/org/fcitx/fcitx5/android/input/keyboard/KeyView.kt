@@ -29,9 +29,9 @@ import androidx.annotation.FloatRange
 import androidx.constraintlayout.widget.ConstraintLayout
 import androidx.core.view.updateLayoutParams
 import org.fcitx.fcitx5.android.R
+import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
-import org.fcitx.fcitx5.android.data.theme.ThemePrefs.PunctuationPosition
 import org.fcitx.fcitx5.android.input.AutoScaleTextView
 import org.fcitx.fcitx5.android.input.floating.FloatingKeyboard
 import org.fcitx.fcitx5.android.input.keyboard.KeyDef.Appearance.Border
@@ -54,6 +54,7 @@ import splitties.views.dsl.core.wrapContent
 import splitties.views.existingOrNewId
 import splitties.views.imageResource
 import splitties.views.padding
+import kotlin.math.abs
 import kotlin.math.min
 import kotlin.math.roundToInt
 
@@ -124,21 +125,23 @@ abstract class KeyView(ctx: Context, val theme: Theme, val def: KeyDef.Appearanc
         data class Text(val text: String) : Mark
     }
 
-    // the shortcut marks drawn, top left and bottom left; made the first time one is drawn
-    private val markViews = arrayOfNulls<View>(2)
+    // the shortcut marks drawn, by slot, an up shortcut's before a function key's down one; made as drawn
+    private val markViews = linkedMapOf<KeyMarks.Slot, View>()
 
-    /** The shortcut's mark drawn in the top left corner, if one is. */
-    internal val topLeftMark: View? get() = markViews[0]
+    /** The shortcut's mark drawn in [slot], if one is. */
+    internal fun markAt(slot: KeyMarks.Slot): View? = markViews[slot]
 
-    /** A function key's down shortcut's mark, in the bottom left corner, if one is. */
-    internal val bottomLeftMark: View? get() = markViews[1]
+    /** The shortcut marks drawn, by slot. */
+    internal val shortcutMarks: Map<KeyMarks.Slot, View> get() = markViews
 
     /**
-     * Draws [placed]'s shortcuts in their left corners; its [Mark.Symbol], the key's own corner
-     * symbol, which only [AltTextKeyView] has, is placed by its override.
+     * Draws [placed]'s shortcuts in their slots; its [Mark.Symbol], the key's own corner symbol, which
+     * only [AltTextKeyView] has, is placed by its override.
      */
     open fun showMarks(placed: KeyMarks.Placed<Mark>) {
-        listOf(placed.topLeft, placed.bottomLeft).forEachIndexed { i, mark -> showMark(i, mark?.takeIf { it != Mark.Symbol }) }
+        markViews.values.forEach { appearanceView.removeView(it) }
+        markViews.clear()
+        placed.at.forEach { (slot, mark) -> if (mark != Mark.Symbol) showMark(slot, mark) }
     }
 
     /** The face's sides, its key's margins in. */
@@ -146,15 +149,100 @@ abstract class KeyView(ctx: Context, val theme: Theme, val def: KeyDef.Appearanc
         hMargin.toFloat(), vMargin.toFloat(), (appearanceView.width - hMargin).toFloat(), (appearanceView.height - vMargin).toFloat(),
     )
 
+    /** Where its glyph and marks may move: the face, clear of its rounded corners. */
+    protected fun room() = face().let { KeyMarkYield.Ink(it.left + dp(2), it.top + dp(1), it.right - dp(2), it.bottom - dp(1)) }
+
     // [r], in [v]'s coordinates, in the face's
     protected fun ink(v: View, r: RectF) = KeyMarkYield.Ink(v.left + r.left, v.top + r.top, v.left + r.right, v.top + r.bottom)
 
-    private fun showMark(corner: Int, mark: Mark?) {
-        markViews[corner]?.let { appearanceView.removeView(it) }
-        markViews[corner] = null
-        if (mark == null) return
+    private val inkRect = RectF()
+
+    /** [v]'s ink in the face's coordinates as laid out: a text's glyphs, another's box; null if not shown or not measured. */
+    protected fun inkOf(v: View?): KeyMarkYield.Ink? {
+        if (v == null || v.visibility != View.VISIBLE) return null
+        if (v is AutoScaleTextView) {
+            if (!v.inkBounds(inkRect)) return null
+        } else {
+            inkRect.set(0f, 0f, v.width.toFloat(), v.height.toFloat())
+        }
+        return ink(v, inkRect)
+    }
+
+    /** What its marks keep clear of: its label or icon; null for none. */
+    protected open val glyph: View? get() = null
+
+    /** Its own symbol and the slot it is in, which only [AltTextKeyView] has. */
+    protected open val symbol: Pair<View, KeyMarks.Slot>? get() = null
+
+    /** Its glyph and marks back as laid out: each one moved, smaller or left out last time put back. */
+    protected fun unsettle() {
+        for (v in listOfNotNull(glyph, symbol?.first) + markViews.values) {
+            v.translationX = 0f
+            v.translationY = 0f
+            v.scaleX = 1f
+            v.scaleY = 1f
+        }
+        symbol?.first?.alpha = 1f
+        markViews.values.forEach { it.alpha = 1f }
+    }
+
+    /** Its symbol and shortcut marks drawn, as [KeyMarkYield] takes them: the symbol left out last, a down shortcut first. */
+    protected fun yieldMarks(): List<Pair<View, KeyMarkYield.Mark>> {
+        val density = resources.displayMetrics.density
+        // a text no smaller than a symbol's least, an icon than an icon's
+        fun minScale(v: View) = if (v is AutoScaleTextView) {
+            KeyMarkYield.minScale(KeyMarkYield.MIN_SYMBOL_DP, v.textSize / density)
+        } else {
+            KeyMarkYield.minScale(KeyMarkYield.MIN_ICON_DP, v.height / density)
+        }
+        val out = mutableListOf<Pair<View, KeyMarkYield.Mark>>()
+        symbol?.let { (v, slot) -> inkOf(v)?.let { out += v to KeyMarkYield.Mark(it, slot, minScale(v), KeyMarkYield.DROP_SYMBOL) } }
+        markViews.entries.forEachIndexed { i, (slot, v) ->
+            inkOf(v)?.let { out += v to KeyMarkYield.Mark(it, slot, minScale(v), KeyMarkYield.DROP_SHORTCUT + i) }
+        }
+        return out
+    }
+
+    /** This view, whose ink is [from], drawn as [to] (as wide to tall, from its own top left), or not at all (null). */
+    protected fun View.settle(from: KeyMarkYield.Ink, to: KeyMarkYield.Ink?) {
+        if (to == null) {
+            alpha = 0f
+            return
+        }
+        val s = if (from.width > 0f && abs(to.width - from.width) > SAME) to.width / from.width else 1f
+        pivotX = 0f
+        pivotY = 0f
+        scaleX = s
+        scaleY = s
+        translationX = (to.left - left - (from.left - left) * s).takeIf { abs(it) > SAME } ?: 0f
+        translationY = (to.top - top - (from.top - top) * s).takeIf { abs(it) > SAME } ?: 0f
+    }
+
+    // its glyph and marks clear of each other where their ink meets (KeyMarkYield.key): 大千's symbols
+    // on its narrow keys (ㄌ under the scissors), handwriting's and 紧凑's low backspace (the bin on its
+    // tip). After the face's own layout: the key's onLayout saw the marks before they were placed
+    protected open fun settleMarks() {
+        unsettle()
+        val g = glyph ?: return
+        val marks = yieldMarks()
+        if (marks.isEmpty()) return
+        val ink = inkOf(g) ?: return
+        val s = KeyMarkYield.key(ink, marks.map { it.second }, room(), gap = dp(1).toFloat())
+        g.settle(ink, s.glyph)
+        marks.forEachIndexed { i, (v, m) -> v.settle(m.ink, s.marks[i]) }
+    }
+
+    private fun showMark(slot: KeyMarks.Slot, mark: Mark) {
+        val v = markView(slot, mark) ?: return
+        v.isClickable = false
+        v.isFocusable = false
+        appearanceView.add(v, markParams(slot, mark is Mark.Text))
+        markViews[slot] = v
+    }
+
+    private fun markView(slot: KeyMarks.Slot, mark: Mark): View? {
         val color = theme.altKeyTextColor
-        val v: View = when (mark) {
+        return when (mark) {
             is Mark.Icon -> ImageView(context).apply {
                 imageTintList = ColorStateList.valueOf(color)
                 imageResource = mark.res
@@ -165,29 +253,42 @@ abstract class KeyView(ctx: Context, val theme: Theme, val def: KeyDef.Appearanc
                 setTextColor(color)
                 scaleMode = AutoScaleTextView.Mode.Horizontal
                 // from the corner in, however short
-                gravity = Gravity.START or Gravity.TOP
+                gravity = (if (slot.left) Gravity.START else if (slot.right) Gravity.END else Gravity.CENTER_HORIZONTAL) or
+                    (if (slot.bottom) Gravity.BOTTOM else Gravity.TOP)
                 setSingleLine()
                 text = mark.text
             }
-            Mark.Symbol -> return
+            Mark.Symbol -> null
         }
-        v.isClickable = false
-        v.isFocusable = false
-        // 紧凑: smaller and into the corner, or on 大千's narrow low keys the icon sat on the symbol
+    }
+
+    // [slot]'s place on the face; 紧凑: smaller and into the corner, or on 大千's narrow low keys the
+    // icon sat on the symbol
+    private fun markParams(slot: KeyMarks.Slot, text: Boolean): ConstraintLayout.LayoutParams {
         val compact = keyboardCompact()
         val size = dp(if (compact) MARK_ICON_COMPACT_DP else MARK_ICON_DP)
         val inset = dp(if (compact) 1 else 2)
         val insetSide = dp(if (compact) 2 else 3)
-        appearanceView.add(v, ConstraintLayout.LayoutParams(if (mark is Mark.Text) 0 else size, if (mark is Mark.Text) wrapContent else size).apply {
-            if (mark is Mark.Text) matchConstraintPercentWidth = MARK_TEXT_WIDTH
-            leftToLeft = parentId; leftMargin = hMargin + insetSide
-            if (corner == 0) {
-                topToTop = parentId; topMargin = vMargin + inset
-            } else {
-                bottomToBottom = parentId; bottomMargin = vMargin + inset
+        return ConstraintLayout.LayoutParams(if (text) 0 else size, if (text) wrapContent else size).apply {
+            if (text) matchConstraintPercentWidth = MARK_TEXT_WIDTH
+            if (!slot.right) {
+                leftToLeft = parentId
+                if (slot.left) leftMargin = hMargin + insetSide
             }
-        })
-        markViews[corner] = v
+            if (!slot.left) {
+                rightToRight = parentId
+                if (slot.right) rightMargin = hMargin + insetSide
+            }
+            if (slot.bottom) {
+                bottomToBottom = parentId; bottomMargin = vMargin + inset
+            } else {
+                topToTop = parentId; topMargin = vMargin + inset
+            }
+        }
+    }
+
+    init {
+        appearanceView.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ -> settleMarks() }
     }
 
     init {
@@ -393,64 +494,7 @@ open class TextKeyView(ctx: Context, theme: Theme, def: KeyDef.Appearance.Text) 
         }
     }
 
-    /** Its corner symbol, wherever it is: [AltTextKeyView]'s. */
-    protected open val cornerSymbol: View? get() = null
-
-    protected val labelInk = RectF()
-    protected val markInk = RectF()
-    protected val shortcutInk = RectF()
-
-    /** Its label and marks as they are laid out: each one moved or shrunk last time put back (a corner's maybe another now). */
-    protected fun unsettle() {
-        for (v in listOfNotNull(mainText, topLeftMark, cornerSymbol)) {
-            v.translationX = 0f
-            v.translationY = 0f
-            v.scaleX = 1f
-            v.scaleY = 1f
-        }
-    }
-
-    /** [mark] if it is shown and its ink measured, into [ink]: a text's glyphs, an icon's box. */
-    protected fun measured(mark: View?, ink: RectF): View? {
-        if (mark == null || mark.visibility != View.VISIBLE) return null
-        if (mark is AutoScaleTextView) {
-            if (!mark.inkBounds(ink)) return null
-        } else {
-            ink.set(0f, 0f, mark.width.toFloat(), mark.height.toFloat())
-        }
-        return mark
-    }
-
-    // the label out of the way of its shortcut's mark, top left, where their ink meets (KeyMarkYield):
-    // 大千's symbols on its narrow keys (ㄌ under the scissors). After the face's own layout: the
-    // key's onLayout saw the mark before it was placed
-    protected open fun yieldToMark() {
-        unsettle()
-        val mark = measured(topLeftMark, shortcutInk) ?: return
-        if (!mainText.inkBounds(labelInk)) return
-        val y = KeyMarkYield.ofTopLeft(
-            ink(mainText, labelInk), ink(mark, shortcutInk), face(),
-            gap = dp(1).toFloat(), markShrinks = mark is AutoScaleTextView,
-        )
-        mainText.translationX = y.dx
-        mainText.translationY = y.dy
-        if (y.labelScale < 1f) {
-            mainText.pivotX = labelInk.right
-            mainText.pivotY = labelInk.bottom
-            mainText.scaleX = y.labelScale
-            mainText.scaleY = y.labelScale
-        }
-        if (y.markScale < 1f) {
-            mark.pivotX = shortcutInk.left
-            mark.pivotY = shortcutInk.top
-            mark.scaleX = y.markScale
-            mark.scaleY = y.markScale
-        }
-    }
-
-    init {
-        appearanceView.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ -> yieldToMark() }
-    }
+    override val glyph: View? get() = mainText
 
     private var badge: ImageView? = null
 
@@ -495,14 +539,6 @@ open class TextKeyView(ctx: Context, theme: Theme, def: KeyDef.Appearance.Text) 
 class AltTextKeyView(ctx: Context, theme: Theme, def: KeyDef.Appearance.AltText) :
     TextKeyView(ctx, theme, def) {
 
-    override val cornerSymbol: View? get() = altText
-
-    // its symbol, while that is in the top right corner
-    private val topRightSymbol: View?
-        get() = altText.takeIf {
-            (it.layoutParams as ConstraintLayout.LayoutParams).run { topToTop == parentId && rightToRight == parentId }
-        }
-
     val altText = view(::AutoScaleTextView) {
         isClickable = false
         isFocusable = false
@@ -519,6 +555,14 @@ class AltTextKeyView(ctx: Context, theme: Theme, def: KeyDef.Appearance.AltText)
         )
     }
 
+    // the slot its symbol is laid out in; null for not drawn
+    private var symbolLaidOut: KeyMarks.Slot? = null
+
+    override val symbol: Pair<View, KeyMarks.Slot>? get() = symbolLaidOut?.let { altText to it }
+
+    /** The slot its symbol is drawn in; null for none. */
+    internal val symbolSlot: KeyMarks.Slot? get() = symbolLaidOut
+
     init {
         appearanceView.apply {
             add(altText, lParams(wrapContent, wrapContent))
@@ -527,58 +571,30 @@ class AltTextKeyView(ctx: Context, theme: Theme, def: KeyDef.Appearance.AltText)
     }
 
     // the letter stays where it is, as its row's do: the keyboard settles them all at once (letters)
-    override fun yieldToMark() = Unit
+    override fun settleMarks() = Unit
 
-    // its top right symbol and top left shortcut as measured for letters
-    private var corner: View? = null
-    private var leftCorner: View? = null
+    // its letter's ink and marks as measured for letters
+    private var letterInk: KeyMarkYield.Ink? = null
+    private var settling: List<Pair<View, KeyMarkYield.Mark>> = emptyList()
 
     /**
-     * Its letter and corners as [KeyMarkYield.letters] takes them, after [BaseKeyboard]'s layout;
+     * Its letter and marks as [KeyMarkYield.letters] takes them, after [BaseKeyboard]'s layout;
      * null for a letter not measured.
      */
     internal fun letterKey(): KeyMarkYield.LetterKey? {
         unsettle()
-        corner = measured(topRightSymbol, markInk)
-        leftCorner = measured(topLeftMark, shortcutInk)
-        if (!mainText.inkBounds(labelInk)) return null
-        val face = face()
-        val density = resources.displayMetrics.density
-        fun dpOf(v: View?) = ((v as? AutoScaleTextView)?.textSize ?: v?.height?.toFloat() ?: 0f) / density
-        return KeyMarkYield.LetterKey(
-            ink(mainText, labelInk),
-            baseline = (mainText.top + mainText.baseline).toFloat(),
-            symbol = corner?.let { ink(it, markInk) },
-            // clear of the face's rounded corners
-            room = KeyMarkYield.Ink(face.left + dp(2), face.top + dp(1), face.right - dp(2), face.bottom),
-            symbolDp = dpOf(corner),
-            shortcut = leftCorner?.let { ink(it, shortcutInk) },
-            shortcutDp = dpOf(leftCorner),
-            shortcutIcon = leftCorner !is AutoScaleTextView,
-        )
+        letterInk = null
+        settling = emptyList()
+        val letter = inkOf(mainText) ?: return null
+        letterInk = letter
+        settling = yieldMarks()
+        return KeyMarkYield.LetterKey(letter, baseline = (mainText.top + mainText.baseline).toFloat(), settling.map { it.second }, room())
     }
 
-    /** Its letter scaled by [scale] about its middle on its baseline, its corners as [c] and [left] say. */
-    internal fun settle(scale: Float, c: KeyMarkYield.Corner, left: KeyMarkYield.Corner) {
-        if (scale < 1f) {
-            mainText.pivotX = labelInk.centerX()
-            mainText.pivotY = mainText.baseline.toFloat()
-            mainText.scaleX = scale
-            mainText.scaleY = scale
-        }
-        corner?.settle(c, markInk.right, markInk.top)
-        leftCorner?.settle(left, shortcutInk.left, shortcutInk.top)
-    }
-
-    private fun View.settle(c: KeyMarkYield.Corner, x: Float, y: Float) {
-        translationX = c.dx
-        translationY = c.dy
-        if (c.scale < 1f) {
-            pivotX = x
-            pivotY = y
-            scaleX = c.scale
-            scaleY = c.scale
-        }
+    /** Its letter and marks where [settled] puts them. */
+    internal fun settle(settled: KeyMarkYield.Settled) {
+        letterInk?.let { mainText.settle(it, settled.glyph) }
+        settling.forEachIndexed { i, (v, m) -> v.settle(m.ink, settled.marks.getOrNull(i)) }
     }
 
     private fun applyTopRightAltTextPosition() {
@@ -598,6 +614,14 @@ class AltTextKeyView(ctx: Context, theme: Theme, def: KeyDef.Appearance.AltText)
             topToTop = parentId; topMargin = vMargin
             leftToLeft = unset
             rightToRight = parentId; rightMargin = hMargin + dp(4)
+        }
+    }
+
+    private fun applyBottomRightAltTextPosition() {
+        applyTopRightAltTextPosition()
+        altText.updateLayoutParams<ConstraintLayout.LayoutParams> {
+            topToTop = unset; topMargin = 0
+            bottomToBottom = parentId; bottomMargin = vMargin
         }
     }
 
@@ -633,49 +657,41 @@ class AltTextKeyView(ctx: Context, theme: Theme, def: KeyDef.Appearance.AltText)
         altText.visibility = View.GONE
     }
 
-    // where the symbol is drawn as the swipes' marks are placed ([showMarks]); null, as 标点位置 says
-    private var symbolAt: Int? = null
+    // where the symbol is drawn as the swipes' marks are placed ([showMarks]); null, as 标点位置 and 滑动 say
+    private var marked = false
+    private var markedSymbol: KeyMarks.Slot? = null
 
     override fun showMarks(placed: KeyMarks.Placed<Mark>) {
         super.showMarks(placed)
-        symbolAt = when (Mark.Symbol) {
-            placed.topRight -> SYMBOL_TOP_RIGHT
-            placed.below -> SYMBOL_BELOW
-            else -> SYMBOL_NONE
-        }
+        marked = true
+        markedSymbol = placed.slotOf(Mark.Symbol)
         applyLayout(resources.configuration.orientation)
     }
 
     private fun applyLayout(orientation: Int) {
-        when (symbolAt) {
-            SYMBOL_TOP_RIGHT -> return applyTopRightAltTextPosition()
-            SYMBOL_BELOW -> return applyBottomAltTextPosition()
-            SYMBOL_NONE -> return applyNoAltTextPosition()
+        // a key no swipe marks: its symbol alone, where 标点位置 and the way 滑动 swipes to it put it
+        val slot = if (marked) {
+            markedSymbol
+        } else {
+            KeyMarks.symbolSlot(
+                AppPrefs.getInstance().keyboard.swipeLayers.getValue().layers.wayOf(SwipeLayers.Layer.Symbol), markPosition(),
+                landscape = orientation == Configuration.ORIENTATION_LANDSCAPE, compact = keyboardCompact(),
+            )
         }
-        // a key no swipe marks: its symbol alone, where 标点位置 puts it
-        val placed = KeyMarks.place(
-            Unit, null, false, markPosition(),
-            landscape = orientation == Configuration.ORIENTATION_LANDSCAPE, compact = keyboardCompact(),
-        )
-        when {
-            placed.topRight != null -> applyTopRightAltTextPosition()
-            placed.below != null -> applyBottomAltTextPosition()
-            else -> applyNoAltTextPosition()
+        symbolLaidOut = slot
+        when (slot) {
+            KeyMarks.Slot.TopRight -> applyTopRightAltTextPosition()
+            KeyMarks.Slot.BottomRight -> applyBottomRightAltTextPosition()
+            KeyMarks.Slot.Below -> applyBottomAltTextPosition()
+            else -> {
+                symbolLaidOut = null
+                applyNoAltTextPosition()
+            }
         }
     }
 
     override fun onConfigurationChanged(newConfig: Configuration) {
-        // top right either way round: nothing to move
-        if (symbolAt == null && (ThemeManager.prefs.punctuationPosition.getValue() == PunctuationPosition.TopRight || keyboardCompact())) {
-            return
-        }
         applyLayout(newConfig.orientation)
-    }
-
-    private companion object {
-        const val SYMBOL_TOP_RIGHT = 0
-        const val SYMBOL_BELOW = 1
-        const val SYMBOL_NONE = 2
     }
 }
 
@@ -689,35 +705,11 @@ class ImageKeyView(ctx: Context, theme: Theme, def: KeyDef.Appearance.Image) :
             add(img, lParams(wrapContent, wrapContent) {
                 centerInParent()
             })
-            addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ -> yieldToMarks() }
         }
     }
 
-    private val box = RectF()
-
-    // the icon right of its shortcuts' marks where they meet (KeyMarkYield.ofIcon): handwriting's and
-    // 紧凑's low backspace had the bin on its tip. Boxes, not ink: an icon's is its drawable's
-    private fun yieldToMarks() {
-        img.translationX = 0f
-        img.scaleX = 1f
-        img.scaleY = 1f
-        fun boxOf(v: View?) = v?.takeIf { it.visibility == View.VISIBLE }?.let {
-            box.set(0f, 0f, it.width.toFloat(), it.height.toFloat())
-            ink(it, box)
-        }
-        val top = boxOf(topLeftMark)
-        val bottom = boxOf(bottomLeftMark)
-        if (top == null && bottom == null) return
-        val icon = boxOf(img) ?: return
-        val y = KeyMarkYield.ofIcon(icon, top, bottom, face(), gap = dp(1).toFloat())
-        img.translationX = y.dx
-        if (y.labelScale < 1f) {
-            img.pivotX = img.width.toFloat()
-            img.pivotY = img.height / 2f
-            img.scaleX = y.labelScale
-            img.scaleY = y.labelScale
-        }
-    }
+    // its icon's box, not ink: an icon's is its drawable's
+    override val glyph: View? get() = img
 }
 
 private fun ImageView.configure(theme: Theme, @DrawableRes src: Int, variant: Variant) = apply {
@@ -788,3 +780,6 @@ private const val MARK_ICON_DP = 11
 private const val MARK_ICON_COMPACT_DP = 8
 private const val MARK_TEXT_DP = 9f
 private const val MARK_TEXT_WIDTH = 0.45f
+
+// a move or scale below this many pixels, a hundredth of one, no move: a float's rounding
+private const val SAME = 0.01f

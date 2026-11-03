@@ -17,6 +17,7 @@ import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.data.theme.ThemePrefs.PunctuationPosition
 import org.fcitx.fcitx5.android.input.KeyboardHarness
+import org.fcitx.fcitx5.android.input.keyboard.ShortcutMarkPosition
 import org.fcitx.fcitx5.android.input.popup.PopupOverrides
 import org.fcitx.fcitx5.android.input.shortcut.KeyCommand
 import org.fcitx.fcitx5.android.input.shortcut.KeyShortcut
@@ -90,7 +91,7 @@ class KeyShortcutsPageScreenshotTest {
     @Test
     fun everyTabsKeysWithTheirMarks() {
         open()
-        // a's select all top right and its @ bottom right, as on the keyboard; s's * alone top right
+        // a's select all top left and its @ bottom right (滑动 swipes down to it), as on the keyboard; s's * alone bottom right
         assertEquals(1, icons(key("a")))
         assertEquals(0, icons(key("s")))
         capture("full")
@@ -131,6 +132,20 @@ class KeyShortcutsPageScreenshotTest {
         capture("full_landscape")
         tab(R.string.shortcut_page_function)
         capture("function_landscape")
+    }
+
+    // 快捷键标记位置 as the keyboard has it: each position's full and function keys, the symbols out of
+    // the shortcut's corner (uat/02 KB-64)
+    @Test
+    fun theMarksWhereTheShortcutPositionSays() {
+        for (at in ShortcutMarkPosition.entries.filter { it != ShortcutMarkPosition.TopLeft }) {
+            prefs.set(AppPrefs.getInstance().keyboard.shortcutMarkPosition, at)
+            open()
+            assertEquals(1, icons(key("a")))
+            capture("full_${at.name}")
+            tab(R.string.shortcut_page_function)
+            capture("function_${at.name}")
+        }
     }
 
     // 标点位置 无: no marks on the page, as on the keyboard

@@ -14,6 +14,7 @@ import org.fcitx.fcitx5.android.data.theme.ThemePrefs.PunctuationPosition
 import org.fcitx.fcitx5.android.input.KeyboardHarness
 import org.fcitx.fcitx5.android.input.keyboard.AltTextKeyView
 import org.fcitx.fcitx5.android.input.keyboard.KeyView
+import org.fcitx.fcitx5.android.input.keyboard.ShortcutMarkPosition
 import org.fcitx.fcitx5.android.input.keyboard.SwipeLayersChoice
 import org.fcitx.fcitx5.android.input.keyboard.TextKeyView
 import org.fcitx.fcitx5.android.input.shortcut.KeyShortcut
@@ -28,10 +29,11 @@ import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
 /**
- * Where the keys draw their marks (uat/02 KB-64): a shortcut's in the top left corner, the symbol
- * where 标点位置 puts it, the same the first time the keyboard opens as after any setting changes.
- * 0.5.1's testers saw the symbols pushed to the bottom right by the shortcuts at first, then the
- * shortcuts bottom right after a setting changed: they followed the way 滑动 swiped to them.
+ * Where the keys draw their marks (uat/02 KB-64): every shortcut's where 快捷键标记位置 says, the
+ * symbol on the right by the way that swipes to it (the other right corner where the shortcut is),
+ * the same the first time the keyboard opens as after any setting changes. 0.5.1's testers saw the
+ * symbols pushed to the bottom right by the shortcuts at first, then the shortcuts bottom right after
+ * a setting changed: they followed the way 滑动 swiped to them.
  */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -54,32 +56,66 @@ class KeyMarksUatTest {
         made?.close()
     }
 
-    // [v]'s corner of [key]: T(op) or B(ottom), L(eft) or R(ight); - for none drawn
+    // [v]'s place on [key]: T(op), M(iddle) or B(ottom); L(eft), C(entre) or R(ight); - for none drawn
     private fun corner(key: View, v: View?): String {
-        if (v == null || !h.shown(v)) return "-"
+        if (v == null || !h.shown(v) || v.alpha == 0f) return "-"
         val k = h.box(key)
         val b = h.box(v)
-        return (if (b.centerY() < k.centerY()) "T" else "B") + (if (b.centerX() < k.centerX()) "L" else "R")
+        val x = when {
+            kotlin.math.abs(b.centerX() - k.centerX()) <= 1 -> "C"
+            b.centerX() < k.centerX() -> "L"
+            else -> "R"
+        }
+        return (if (b.centerY() < k.centerY()) "T" else "B") + x
     }
 
-    // every key's marks: its top left and bottom left shortcut's corners, its symbol's
+    // every key's marks: its shortcuts' places, its symbol's
     private fun marks(): List<String> = KeyboardHarness.all(h.keyboard).filterIsInstance<KeyView>().filter { h.shown(it) }.map { k ->
         val name = (k as? TextKeyView)?.mainText?.text ?: k.contentDescription
         val symbol = (k as? AltTextKeyView)?.altText
-        "$name ${corner(k, k.topLeftMark)} ${corner(k, k.bottomLeftMark)} ${corner(k, symbol)}"
+        "$name ${k.shortcutMarks.values.joinToString(",") { corner(k, it) }.ifEmpty { "-" }} ${corner(k, symbol)}"
     }.toList()
 
     private fun marksOf(name: String) = marks().first { it.startsWith("$name ") }
 
+    private fun backspace() = KeyboardHarness.all(h.keyboard).filterIsInstance<KeyView>().first { it.def.viewId == R.id.button_backspace }
+
+    private fun backspaceMarks() = backspace().let { b -> b.shortcutMarks.values.joinToString(",") { corner(b, it) } }
+
+    private fun at(position: ShortcutMarkPosition) {
+        prefs.set(AppPrefs.getInstance().keyboard.shortcutMarkPosition, position)
+        h.idle()
+    }
+
     @Test
     @Uat("KB-64")
-    fun theShortcutsTopLeftTheSymbolsTopRight() {
+    fun theShortcutsWhereChosenTheSymbolsByTheirWay() {
         h.start()
-        assertEquals("a TL - TR", marksOf("a"))
-        assertEquals("y TL - TR", marksOf("y"))
-        assertEquals("s - - TR", marksOf("s"))
-        val backspace = KeyboardHarness.all(h.keyboard).filterIsInstance<KeyView>().first { it.def.viewId == R.id.button_backspace }
-        assertEquals("清除 up, 恢复 down", "TL BL", "${corner(backspace, backspace.topLeftMark)} ${corner(backspace, backspace.bottomLeftMark)}")
+        // the default: 左上; 滑动 上滑快捷键，下滑符号, so the symbols bottom right
+        assertEquals("a TL BR", marksOf("a"))
+        assertEquals("z TL BR", marksOf("z"))
+        assertEquals("s - BR", marksOf("s"))
+        assertEquals("清除 up, 恢复 down", "TL,BL", backspaceMarks())
+        at(ShortcutMarkPosition.BottomLeft)
+        assertEquals("a BL BR", marksOf("a"))
+        assertEquals("BL,TL", backspaceMarks())
+        // z's 「，」 swiped down, bottom right: the shortcut chosen there, it goes up
+        at(ShortcutMarkPosition.BottomRight)
+        assertEquals("z BR TR", marksOf("z"))
+        assertEquals("s - BR", marksOf("s"))
+        assertEquals("BR,TR", backspaceMarks())
+        at(ShortcutMarkPosition.TopRight)
+        assertEquals("z TR BR", marksOf("z"))
+        at(ShortcutMarkPosition.Bottom)
+        assertEquals("z BC BR", marksOf("z"))
+        assertEquals("BC,TC", backspaceMarks())
+        // the symbols swiped up: top right, out of a top right shortcut's way
+        prefs.set(AppPrefs.getInstance().keyboard.swipeLayers, SwipeLayersChoice.SymbolUpShortcutDown)
+        h.idle()
+        assertEquals("z BC TR", marksOf("z"))
+        at(ShortcutMarkPosition.TopRight)
+        assertEquals("z TR BR", marksOf("z"))
+        assertEquals("s - TR", marksOf("s"))
     }
 
     @Test
@@ -87,17 +123,29 @@ class KeyMarksUatTest {
     fun theFirstOpenIsAsAfterAnySettingChanges() {
         h.start()
         val first = marks()
-        // the testers' second keyboard: swipes the other way, the marks where they were
+        // each position chosen with the keyboard up, and the keyboard opened anew with it: the same
+        for (position in ShortcutMarkPosition.entries) {
+            at(position)
+            val changed = marks()
+            fresh().start()
+            assertEquals(position.name, changed, marks())
+        }
+        at(ShortcutMarkPosition.TopLeft)
+        assertEquals(first, marks())
+        // the testers' second keyboard: swiped the other way and back
         for (choice in listOf(SwipeLayersChoice.SymbolUpShortcutDown, SwipeLayersChoice.ShortcutUpSymbolDown)) {
             prefs.set(AppPrefs.getInstance().keyboard.swipeLayers, choice)
             h.idle()
-            assertEquals(choice.name, first, marks())
+            val changed = marks()
+            fresh().start()
+            assertEquals(choice.name, changed, marks())
         }
+        assertEquals(first, marks())
         // a shortcut changed and back, 标点位置 changed and back
         val shortcuts = AppPrefs.getInstance().internal.keyShortcuts
         prefs.set(shortcuts, KeyShortcuts.Empty.with("full/s", KeyShortcut.Text("你好")).serialize())
         h.idle()
-        assertEquals("s TL - TR", marksOf("s"))
+        assertEquals("s TL BR", marksOf("s"))
         prefs.set(shortcuts, "")
         h.idle()
         assertEquals(first, marks())
@@ -106,7 +154,6 @@ class KeyMarksUatTest {
         prefs.set(ThemeManager.prefs.punctuationPosition, PunctuationPosition.TopRight)
         h.idle()
         assertEquals(first, marks())
-        // the keyboard made anew, as the next time it opens
         fresh().start()
         assertEquals(first, marks())
     }

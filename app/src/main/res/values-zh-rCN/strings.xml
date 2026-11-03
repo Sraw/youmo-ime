@@ -970,6 +970,12 @@
     <string name="swipe_shortcut_up_only">只上滑用快捷键</string>
     <string name="swipe_shortcut_down_only">只下滑用快捷键</string>
     <string name="swipe_off">关</string>
+    <string name="shortcut_mark_position">快捷键标记位置</string>
+    <string name="shortcut_mark_top_left">左上</string>
+    <string name="shortcut_mark_bottom_left">左下</string>
+    <string name="shortcut_mark_top_right">右上</string>
+    <string name="shortcut_mark_bottom_right">右下</string>
+    <string name="shortcut_mark_bottom">底部</string>
     <string name="shortcut_select_all">全选</string>
     <string name="shortcut_copy">复制</string>
     <string name="shortcut_cut">剪切</string>

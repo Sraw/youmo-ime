@@ -15,6 +15,7 @@ import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.data.theme.ThemePrefs.PunctuationPosition
+import org.fcitx.fcitx5.android.input.keyboard.SwipeLayersChoice
 import org.fcitx.fcitx5.android.uat.PrefsRule
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -25,7 +26,10 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
 
-/** The settings' keys put a key's symbol where the keyboard does: 底部 under the letter, but top right at 紧凑. */
+/**
+ * The settings' keys put a key's symbol where the keyboard does: 底部 under the letter, but in its
+ * way's corner at 紧凑 (滑动's default swipes down to it: bottom right; up: top right).
+ */
 @RunWith(RobolectricTestRunner::class)
 @Config(application = FcitxApplication::class, qualifiers = "w393dp-h851dp-port-440dpi")
 class KeyCapsTest {
@@ -40,21 +44,22 @@ class KeyCapsTest {
     // the symbol's own TextView: in a column under the letter, or in the frame's top right
     private fun under(key: FrameLayout) = key.getChildAt(0) is LinearLayout
 
-    private fun topRight(key: FrameLayout): Boolean =
+    private fun corner(key: FrameLayout, gravity: Int): Boolean =
         (0 until key.childCount).map { key.getChildAt(it) }.any {
-            it is TextView && it.text == "2" && (it.layoutParams as FrameLayout.LayoutParams).gravity == (Gravity.TOP or Gravity.END)
+            it is TextView && it.text == "2" && (it.layoutParams as FrameLayout.LayoutParams).gravity == gravity
         }
 
     @Test
     @Uat("ST-51")
-    fun atBottomTheSymbolIsUnderTheLetterButTopRightWhenCompact() {
+    fun atBottomTheSymbolIsUnderTheLetterButInItsCornerWhenCompact() {
         prefs.set(ThemeManager.prefs.punctuationPosition, PunctuationPosition.Bottom)
         val standard = key()
         assertTrue(under(standard))
         prefs.set(AppPrefs.getInstance().keyboard.keyboardHeightPercent, 20)
         prefs.set(AppPrefs.getInstance().keyboard.keyboardHeightPercentLandscape, 34)
-        val compact = key()
-        assertTrue(topRight(compact))
+        assertTrue(corner(key(), Gravity.BOTTOM or Gravity.END))
+        prefs.set(AppPrefs.getInstance().keyboard.swipeLayers, SwipeLayersChoice.SymbolUpShortcutDown)
+        assertTrue(corner(key(), Gravity.TOP or Gravity.END))
         // 无 is none whatever the height
         prefs.set(ThemeManager.prefs.punctuationPosition, PunctuationPosition.None)
         assertEquals(1, key().childCount)

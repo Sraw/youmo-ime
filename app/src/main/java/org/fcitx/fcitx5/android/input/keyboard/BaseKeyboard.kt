@@ -244,7 +244,7 @@ abstract class BaseKeyboard(
         val keys = rowKeys.flatMap { it.keys }.filterIsInstance<AltTextKeyView>().filter { it.isVisible }
             .mapNotNull { k -> k.letterKey()?.let { k to it } }
         val letters = KeyMarkYield.letters(keys.map { it.second }, gap = dp(1).toFloat())
-        keys.forEachIndexed { i, (k, _) -> k.settle(letters.scale, letters.corners[i], letters.leftCorners[i]) }
+        keys.forEachIndexed { i, (k, _) -> k.settle(letters.keys[i]) }
     }
 
     init {

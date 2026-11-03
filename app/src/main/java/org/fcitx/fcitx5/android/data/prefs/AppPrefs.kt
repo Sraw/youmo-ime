@@ -28,6 +28,7 @@ import org.fcitx.fcitx5.android.input.keyboard.KeyboardHeightPercentBase
 import org.fcitx.fcitx5.android.input.keyboard.LangSwitchBehavior
 import org.fcitx.fcitx5.android.input.keyboard.NineKeySymbols
 import org.fcitx.fcitx5.android.input.keyboard.SpaceLongPressBehavior
+import org.fcitx.fcitx5.android.input.keyboard.ShortcutMarkPosition
 import org.fcitx.fcitx5.android.input.keyboard.SwipeLayers
 import org.fcitx.fcitx5.android.input.keyboard.SwipeLayersChoice
 import org.fcitx.fcitx5.android.input.keyboard.T9EnglishTyping
@@ -175,6 +176,12 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
             R.string.swipe_layers,
             SWIPE_LAYERS,
             SwipeLayersChoice.ShortcutUpSymbolDown
+        )
+        /** Where every key draws its shortcut's mark ([ShortcutMarkPosition]), whichever way swipes to it. */
+        val shortcutMarkPosition = enumList(
+            R.string.shortcut_mark_position,
+            "shortcut_mark_position",
+            ShortcutMarkPosition.TopLeft
         )
         val longPressDelay = hidden(setByLevels = true) {
             int(

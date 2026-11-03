@@ -56,11 +56,14 @@ internal class KeySwipes(
     private val swipeLayersListener = ManagedPreference.OnChangeListener<SwipeLayersChoice> { _, _ -> showMarks() }
     @Keep
     private val keyShortcutsListener = ManagedPreference.OnChangeListener<String> { _, _ -> showMarks() }
+    @Keep
+    private val markPositionListener = ManagedPreference.OnChangeListener<ShortcutMarkPosition> { _, _ -> showMarks() }
 
     init {
         if (shortcuts) {
             prefs.keyboard.swipeLayers.registerOnChangeListener(swipeLayersListener)
             prefs.internal.keyShortcuts.registerOnChangeListener(keyShortcutsListener)
+            prefs.keyboard.shortcutMarkPosition.registerOnChangeListener(markPositionListener)
         }
     }
 
@@ -143,6 +146,7 @@ internal class KeySwipes(
     fun showMarks() {
         val layers = swipeLayers
         val position = markPosition()
+        val at = prefs.keyboard.shortcutMarkPosition.getValue().at
         val compact = keyboardCompact()
         val landscape = board.resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
         val charShortcuts = keyboard.charShortcutMarks
@@ -150,10 +154,13 @@ internal class KeySwipes(
             val placed = when (val key = swipeKey(view, def)) {
                 is KeySwipe.Key.Char -> {
                     val symbol = KeyView.Mark.Symbol.takeIf { (view as? AltTextKeyView)?.altText?.text?.isNotEmpty() == true }
-                    KeyMarks.place(symbol, markOf(key.shortcut).takeIf { charShortcuts }, layers.wayOf(SwipeLayers.Layer.Shortcut) != null, position, landscape, compact)
+                    KeyMarks.place(
+                        symbol, layers.wayOf(SwipeLayers.Layer.Symbol), markOf(key.shortcut).takeIf { charShortcuts },
+                        layers.wayOf(SwipeLayers.Layer.Shortcut), at, position, landscape, compact,
+                    )
                 }
                 is KeySwipe.Key.Function -> KeyMarks.placeFunction(
-                    markOf(key.up), markOf(key.down), layers.up != SwipeLayers.Layer.Off, layers.down != SwipeLayers.Layer.Off, position,
+                    markOf(key.up), markOf(key.down), layers.up != SwipeLayers.Layer.Off, layers.down != SwipeLayers.Layer.Off, at, position,
                 )
             }
             view.showMarks(placed)

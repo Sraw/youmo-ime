@@ -994,6 +994,12 @@
     <string name="swipe_shortcut_up_only">Up for shortcuts only</string>
     <string name="swipe_shortcut_down_only">Down for shortcuts only</string>
     <string name="swipe_off">Off</string>
+    <string name="shortcut_mark_position">Shortcut marks</string>
+    <string name="shortcut_mark_top_left">Top left</string>
+    <string name="shortcut_mark_bottom_left">Bottom left</string>
+    <string name="shortcut_mark_top_right">Top right</string>
+    <string name="shortcut_mark_bottom_right">Bottom right</string>
+    <string name="shortcut_mark_bottom">Bottom middle</string>
     <string name="shortcut_select_all">Select all</string>
     <string name="shortcut_copy">Copy</string>
     <string name="shortcut_cut">Cut</string>
