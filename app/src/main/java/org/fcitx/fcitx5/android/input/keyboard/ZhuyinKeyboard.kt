@@ -55,7 +55,7 @@ class ZhuyinKeyboard(
     theme,
     if (nine) nineLayout() else fullLayout(keyboardCompact()),
     // 注音九键's keys are not named yet: the format's grid for it is not the keyboard's (tones on the left)
-    themeBoard = if (nine) null else KeyNames.ZHUYIN,
+    themeBoard = if (nine) KeyNames.ZHUYIN_NINE else KeyNames.ZHUYIN,
     shortcuts = true,
 ) {
 
@@ -122,6 +122,7 @@ class ZhuyinKeyboard(
             if (typing) sym(Keyboard.zhuyinNineTone(0)) else KeyAction.SymAction(KeySym(','.code), KeyStates.Virtual)
 
         // ˉ ˊ ˇ ˋ: a tap each, as 元書's zhuyin nine keys; ˙ on ˉ's long press and swipe
+        // its theme name (KeyNames.ZHUYIN_NINE): r1c1 … r4c1
         private fun toneKey(tone: Int): KeyDef {
             val mark = ZhuyinKeys.MARKS[tone - 1].toString()
             val neutral = ZhuyinKeys.MARKS[4].toString()
@@ -133,6 +134,7 @@ class ZhuyinKeyboard(
                     setOf(KeyDef.Behavior.Press(sym(Keyboard.zhuyinNineTone(tone))))
                 },
                 if (tone == 1) arrayOf(KeyDef.Popup.Preview(mark), KeyDef.Popup.Keyboard.Explicit(arrayOf(neutral))) else arrayOf(KeyDef.Popup.Preview(mark)),
+                name = "r${tone}c1",
             )
         }
 
@@ -144,15 +146,17 @@ class ZhuyinKeyboard(
                     symbols, 18f, GROUP, sym(Keyboard.zhuyinNineKey(g)),
                     arrayOf(KeyDef.Popup.AltPreview(symbols, symbols), KeyDef.Popup.Keyboard.Explicit(symbols.map { it.toString() }.toTypedArray())),
                     ZhuyinShortcutHook.nineKey("${g + 1}"),
+                    name = "r${g / 3 + 1}c${g % 3 + 2}",
                 )
             }
             val slot = KeyDef(
                 KeyDef.Appearance.Text(PUNCTUATION, 18f, percentWidth = GROUP),
                 setOf(KeyDef.Behavior.Press(slotAction(typing = false))),
                 arrayOf(KeyDef.Popup.Keyboard.Explicit(PUNCTUATION_MORE, asIs = true)),
+                name = "r${SLOT_ROW + 1}c${SLOT_COLUMN + 1}",
             )
             val keys = groups + slot
-            val side = listOf(BackspaceKey(SIDE)) + listOf("?", "!", "~").map { SymbolKey(it, SIDE, KeyDef.Appearance.Variant.Alternative) }
+            val side = listOf(BackspaceKey(SIDE)) + listOf("?", "!", "~").mapIndexed { i, c -> SymbolKey(c, SIDE, KeyDef.Appearance.Variant.Alternative, name = "r${i + 2}c5") }
             val rows = (0 until 4).map { r -> listOf(toneKey(r + 1)) + keys.subList(3 * r, 3 * r + 3) + side[r] }
             check(rows[SLOT_ROW][SLOT_COLUMN] === slot)
             return rows + listOf(GroupedKeyboard.bottomRow())
