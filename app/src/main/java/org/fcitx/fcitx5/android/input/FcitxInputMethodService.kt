@@ -405,10 +405,11 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
                 handleFcitxEvent(it)
             }
         }
-        // 候选词注音 is the host's config, set on the fcitx thread: the bar's height goes by it (KawaiiBarComponent.heightDp)
+        // 候选词注音 is the host's config, set on the fcitx thread: the bar's height goes by it (KawaiiBarComponent.heightDp).
+        // What is typed stays (the handwriting pad's 注 sets it mid-sentence): the engine shows it annotated anew
         lifecycleScope.launch {
             EngineState.candidateReading.drop(1).collect {
-                rebuilding(ViewRebuild.SETTING)
+                rebuilding(ViewRebuild.READING)
                 replaceInputView(ThemeManager.activeTheme, start = true)
             }
         }

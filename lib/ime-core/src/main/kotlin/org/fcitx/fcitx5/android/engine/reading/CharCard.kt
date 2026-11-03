@@ -37,10 +37,18 @@ data class CharCard(
         parts?.let { p -> add(words.parts + p.joinToString(" ") { it.text }) }
     }.joinToString(words.comma)
 
+    /** The parts with their readings after them, as the card writes them: 彳 亍（chì chù）, — for a part of none; null for none. */
+    fun partsShown(): String? = parts?.let { p ->
+        val read = p.map { it.pinyin ?: UNKNOWN }
+        p.joinToString(" ") { it.text } + if (read.all { it == UNKNOWN }) "" else read.joinToString(" ", "（", "）")
+    }
+
     /** The labels [spoken] reads, in the app's language. */
     class Words(val readings: String, val radical: String, val parts: String, val between: String, val comma: String, val strokes: (Int) -> String)
 
     companion object {
+        private const val UNKNOWN = "—"
+
         /**
          * The card of [text], one Han character, [before] the text written before it (its readings'
          * order: [CandidateReadings.ordered]); null for anything else.

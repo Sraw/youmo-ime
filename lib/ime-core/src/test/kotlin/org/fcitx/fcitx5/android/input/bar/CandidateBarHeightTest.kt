@@ -39,4 +39,15 @@ class CandidateBarHeightTest {
         // a floor above half the text gives way to it
         assertEquals(5f, CandidateBarHeight.hintSize(10f, 1f, 1.2f, 7f), 1e-4f)
     }
+
+    // xíng/háng… over 行: smaller till it fits, not below the floor, then the candidate widens
+    @Test
+    fun readingsShrinkToTheFloorBeforeTheCandidateWidens() {
+        assertEquals(10f, CandidateBarHeight.readingsSize(20f, 20f, 15f, 7f), 0f)
+        assertEquals(8f, CandidateBarHeight.readingsSize(20f, 20f, 25f, 7f), 1e-4f)
+        assertEquals(7f, CandidateBarHeight.readingsSize(20f, 20f, 60f, 7f), 0f)
+        assertEquals(10f, CandidateBarHeight.readingsSize(20f, 20f, 60f, 0f), 0f)
+        // a floor above half the text: half the text
+        assertEquals(5f, CandidateBarHeight.readingsSize(10f, 10f, 60f, 7f), 0f)
+    }
 }

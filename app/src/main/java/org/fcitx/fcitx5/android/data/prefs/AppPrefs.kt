@@ -47,6 +47,9 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
         val lastPickerType = string("last_picker_type", PickerWindow.Key.Emoji.name)
         val symbolPanelLocked = bool("symbol_panel_locked", false)
 
+        /** The 候选词注音 style last used but off (ReadingStyle's key; empty, none yet): what the handwriting pad's 注 turns on. */
+        val lastCandidateReading = string("last_candidate_reading", "")
+
         /**
          * U-93 「用我的输入习惯」, from the ⋯ menu or the lexicon page: off, the engine as installed but
          * for the blocks (Engines.useHabits), nothing learned, nothing shown of what was.

@@ -9,6 +9,7 @@ import org.fcitx.fcitx5.android.data.punctuation.PunctuationMapEntry
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.engine.glide.Glide
 import org.fcitx.fcitx5.android.engine.handwriting.InkReading
+import org.fcitx.fcitx5.android.engine.reading.CharCard
 import org.fcitx.fcitx5.android.engine.runtime.Engines
 import org.fcitx.fcitx5.android.engine.runtime.ImportLayer
 import org.fcitx.fcitx5.android.engine.runtime.UserWord
@@ -207,6 +208,12 @@ interface LexiconApi {
 
     /** How the dictionary reads [text], for the user to check: see [Engines.pinyinOf]. */
     suspend fun pinyinOf(text: String): String?
+
+    /**
+     * The card of candidate [index] of the input method shown, if it still shows [text]: a handwritten
+     * character's or one looked up (see [Engines.charCard]); null for any other.
+     */
+    suspend fun charCard(index: Int, text: String): CharCard?
 
     /** Adds [text] read as [pinyin]; false if it does not read so. */
     suspend fun addUserWord(text: String, pinyin: String): Boolean

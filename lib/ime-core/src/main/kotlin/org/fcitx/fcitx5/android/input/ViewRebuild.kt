@@ -31,6 +31,13 @@ enum class ViewRebuild(
     FLOATING(endsComposition = false),
 
     /**
+     * 候选词注音 changed (the handwriting pad's 注, or its row in the settings): the bar's height alone, the
+     * same keyboard. What is typed stays, the engine annotates it the new way (HostCore.configure's
+     * recall), and the new views show it.
+     */
+    READING(endsComposition = false),
+
+    /**
      * The system asked for them (onCreateInputView, the window's views made again) with nothing
      * changed by the user: what is typed stays, and the new views show it.
      */

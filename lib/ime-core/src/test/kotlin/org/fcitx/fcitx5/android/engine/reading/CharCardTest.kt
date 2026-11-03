@@ -77,6 +77,15 @@ class CharCardTest {
     }
 
     @Test
+    fun thePartsWithTheirReadings() {
+        assertEquals("彳 亍（chì chù）", card("行")!!.partsShown())
+        assertNull(card("乾")!!.partsShown())
+        val some = CharCard("x", emptyList(), null, null, listOf(CharCard.Part("丅", null), CharCard.Part("口", "kǒu")), null)
+        assertEquals("丅 口（— kǒu）", some.partsShown())
+        assertEquals("丅", some.copy(parts = listOf(CharCard.Part("丅", null))).partsShown())
+    }
+
+    @Test
     fun spokenAsOneSentence() {
         val words = CharCard.Words("读音 ", "部首 ", "拆字 ", "、", "，") { "$it 画" }
         assertEquals("行，读音 xíng、háng、héng、hàng，部首 行，6 画，拆字 彳 亍", card("行")!!.spoken(words))

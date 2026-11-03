@@ -4,16 +4,24 @@
  */
 package org.fcitx.fcitx5.android.uat
 
+import android.content.ClipboardManager
 import android.os.Looper
 import android.text.InputType
 import android.view.View
+import android.view.inputmethod.BaseInputConnection
+import android.widget.LinearLayout
+import android.widget.ListPopupWindow
 import android.widget.TextView
+import kotlinx.coroutines.runBlocking
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.core.CandidateWord
+import org.fcitx.fcitx5.android.core.EngineState
+import org.fcitx.fcitx5.android.core.FormattedText
 import org.fcitx.fcitx5.android.core.InputMethodEntry
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
+import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.engine.handwriting.InkReading
 import org.fcitx.fcitx5.android.engine.learn.control.BlockScope
@@ -21,8 +29,13 @@ import org.fcitx.fcitx5.android.engine.learn.control.LearningOp
 import org.fcitx.fcitx5.android.engine.learn.control.LearningResult
 import org.fcitx.fcitx5.android.engine.learn.control.MenuItem
 import org.fcitx.fcitx5.android.engine.learn.control.WordKind
+import org.fcitx.fcitx5.android.engine.reading.CharCard
+import org.fcitx.fcitx5.android.engine.reading.ReadingStyle
+import org.fcitx.fcitx5.android.engine.runtime.EngineSettings
 import org.fcitx.fcitx5.android.host.HostEvent
 import org.fcitx.fcitx5.android.input.KeyboardHarness
+import org.fcitx.fcitx5.android.input.bar.CandidateBarHeight
+import org.fcitx.fcitx5.android.input.candidates.CharCardView
 import org.fcitx.fcitx5.android.input.handwriting.HandwritingPadView
 import org.fcitx.fcitx5.android.input.handwriting.HandwritingPause
 import org.fcitx.fcitx5.android.input.handwriting.HandwritingRecognition
@@ -37,6 +50,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
+import splitties.dimensions.dp
 
 /**
  * UAT cases of handwriting (uat/09) on the whole keyboard over a fake engine: the pad, its strokes
@@ -56,7 +70,11 @@ class HandwritingUatTest {
     }
 
     @After
-    fun close() = h.close()
+    fun close() {
+        h.close()
+        EngineState.candidateReadingState.value = ReadingStyle.OFF
+        AppPrefs.getInstance().internal.lastCandidateReading.setValue("")
+    }
 
     private val pad: HandwritingPadView get() = KeyboardHarness.find(h.inputView) ?: error("no pad")
 
@@ -208,5 +226,165 @@ class HandwritingUatTest {
         assertTrue(undo.performClick())
         h.idle()
         assertTrue(h.api.calls.toString(), undone)
+    }
+
+    // 银行 written, not yet in: in the field as composing text, as the engine sends it
+    private fun written(text: String) {
+        h.emit(HostEvent.ClientPreedit(FormattedText(arrayOf(text), intArrayOf(0), text.length)))
+        h.api.candidates = arrayOf(CandidateWord("", "行", "", readings = listOf("háng/xíng…")), CandidateWord("", "衍", "", readings = listOf("yǎn")))
+        h.emit(HostEvent.Candidates(2, h.api.candidates.toList()))
+    }
+
+    private fun composing() = h.field.text.toString().let { t ->
+        val start = BaseInputConnection.getComposingSpanStart(h.field.text)
+        if (start < 0) "" else t.substring(start, BaseInputConnection.getComposingSpanEnd(h.field.text))
+    }
+
+    // in Chinese, as the user reviews the image
+    @Config(qualifiers = "zh-rCN-w393dp-h851dp-port-440dpi")
+    @Test
+    @Uat("HW-28")
+    fun theReadingKeyTurnsTheReadingsOnAndWhatIsWrittenStays() {
+        h.start()
+        written("银行")
+        assertEquals("银行", composing())
+        val key = h.inputView.findViewById<View>(R.id.button_reading)
+        val name = h.service.getString(R.string.im_candidate_reading)
+        assertEquals(h.service.getString(R.string.hw_reading_key_off, name), key.contentDescription)
+        val low = h.bar.height
+        val padHeight = pad.height
+        h.api.calls.clear()
+        h.tap(key)
+        until("set") { h.api.calls.any { it.startsWith("setImOptions") } }
+        assertEquals(mapOf(EngineSettings.CANDIDATE_READING to ReadingStyle.PINYIN.key), runBlocking { h.api.imOptions(InputMethodCatalog.PINYIN) })
+        // the host's config then says so (KotlinHost.setImOptions): the views made anew, the bar taller, nothing committed
+        EngineState.candidateReadingState.value = ReadingStyle.PINYIN
+        h.idle()
+        h.relayout()
+        assertEquals("银行", composing())
+        assertFalse(h.api.calls.toString(), h.api.calls.any { it == "focusOutIn()" || it.startsWith("select") })
+        val taller = h.bar
+        assertEquals(h.service.dp(CandidateBarHeight.dp(ThemeManager.prefs.candidateTextSize.getValue(), ReadingStyle.PINYIN)), taller.height)
+        assertTrue("$low < ${taller.height}", low < taller.height)
+        assertEquals(padHeight, pad.height)
+        val on = h.inputView.findViewById<View>(R.id.button_reading)
+        assertEquals(h.service.getString(R.string.hw_reading_key_on, name), on.contentDescription)
+        written("银行")
+        h.capture("HandwritingUatTest/reading_key_on")
+    }
+
+    private val hang = CharCard(
+        "行",
+        listOf(
+            CharCard.Row("háng", "ㄏㄤˊ", listOf("银行", "行业")),
+            CharCard.Row("xíng", "ㄒㄧㄥˊ", listOf("进行", "行为")),
+            CharCard.Row("héng", "ㄏㄥˊ", listOf("道行")),
+            CharCard.Row("hàng", "ㄏㄤˋ", emptyList()),
+        ),
+        "行", 6, listOf(CharCard.Part("彳", "chì"), CharCard.Part("亍", "chù")), "丿丿丨一一丨",
+    )
+
+    private fun held(text: String): ListPopupWindow {
+        h.api.learned = { LearningResult.Menu(text, WordKind.DICTIONARY, listOf(MenuItem.DELETE, MenuItem.BLOCK), null, BlockScope.EVERYWHERE) }
+        val word = KeyboardHarness.all(h.inputView).filterIsInstance<TextView>().first { h.shown(it) && it.text.toString() == text }
+        generateSequence(word as View) { it.parent as? View }.first { it.isLongClickable }.performLongClick()
+        h.idle()
+        return h.inputView.candidateActionMenu!!
+    }
+
+    private fun ListPopupWindow.row(i: Int): View = listView!!.adapter.getView(i, null, listView!!)
+
+    // in Chinese, as the user reviews the image
+    @Config(qualifiers = "zh-rCN-w393dp-h851dp-port-440dpi")
+    @Test
+    @Uat("HW-29")
+    fun aHeldCharactersCardThenItsButtonsAndTheMenu() {
+        h.api.charCards["行"] = hang
+        h.start()
+        written("银行")
+        val menu = held("行")
+        val card = menu.row(0) as CharCardView
+        assertEquals(hang, card.card)
+        val texts = KeyboardHarness.all(card).filterIsInstance<TextView>().map { it.text.toString() }.toList()
+        val s = h.service
+        val radical = s.getString(R.string.char_card_radical)
+        val parts = s.getString(R.string.char_card_parts)
+        val lines = listOf("$radical 行　" + s.getString(R.string.char_card_strokes, 6), "$parts 彳 亍（chì chù）", s.getString(R.string.char_card_order) + " 丿丿丨一一丨")
+        assertTrue(texts.toString(), texts.containsAll(listOf("行", "háng", "ㄏㄤˊ", "银行 行业") + lines))
+        assertEquals(
+            "行，${s.getString(R.string.char_card_readings)} háng、xíng、héng、hàng，$radical 行，${s.getString(R.string.char_card_strokes, 6)}，$parts 彳 亍",
+            card.contentDescription,
+        )
+        val buttons = KeyboardHarness.all(menu.row(1)).filterIsInstance<TextView>().map { it.text.toString() }.toList()
+        assertEquals(listOf(s.getString(R.string.clipboard_split_commit), s.getString(R.string.a11y_copy)), buttons)
+        // the learning menu's lines after them, the card and buttons no lines to pick
+        val menuLines = (2 until menu.listView!!.adapter.count).map { menu.listView!!.adapter.getItem(it).toString() }
+        assertTrue(menuLines.toString(), h.service.getString(R.string.learning_block) in menuLines)
+        assertFalse(menu.listView!!.adapter.isEnabled(0) || menu.listView!!.adapter.isEnabled(1))
+        h.relayout()
+        h.capture("HandwritingUatTest/char_card_port", menu.listView!!.rootView)
+        // a candidate with no card: the title as before
+        h.api.charCards.clear()
+        menu.dismiss()
+        val plain = held("衍")
+        assertEquals("衍", plain.listView!!.adapter.getItem(0).toString())
+        assertFalse(plain.row(0) is CharCardView)
+    }
+
+    @Test
+    @Uat("HW-30")
+    fun copyPutsTheCharacterAloneOnTheClipboardAndCommitIsATap() {
+        h.api.charCards["行"] = hang
+        h.start()
+        written("银行")
+        var menu = held("行")
+        h.api.calls.clear()
+        val copy = KeyboardHarness.all(menu.row(1)).filterIsInstance<TextView>().single { it.text == h.service.getString(R.string.a11y_copy) }
+        assertTrue(copy.performClick())
+        h.idle()
+        val clip = h.service.getSystemService(ClipboardManager::class.java).primaryClip!!
+        assertEquals("行", clip.getItemAt(0).text.toString())
+        assertEquals("银行", composing())
+        assertFalse(h.api.calls.toString(), h.api.calls.any { it.startsWith("select") || it.startsWith("sendKey") })
+        assertEquals(null, h.inputView.candidateActionMenu)
+        // 上屏: as the candidate tapped
+        menu = held("行")
+        KeyboardHarness.all(menu.row(1)).filterIsInstance<TextView>().single { it.text == h.service.getString(R.string.clipboard_split_commit) }.performClick()
+        h.idle()
+        assertTrue(h.api.calls.toString(), "select(0, 行)" in h.api.calls)
+        assertEquals(null, h.inputView.candidateActionMenu)
+    }
+
+    @Test
+    @Config(qualifiers = "zh-rCN-w851dp-h393dp-land-440dpi")
+    fun theCardInLandscapeIsTwoColumns() {
+        h.api.charCards["行"] = hang
+        h.start()
+        written("银行")
+        val card = held("行").row(0) as CharCardView
+        card.measure(View.MeasureSpec.makeMeasureSpec(h.service.dp(567), View.MeasureSpec.EXACTLY), View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED))
+        assertEquals(LinearLayout.HORIZONTAL, card.orientation)
+        // three readings, then scrolled
+        assertTrue("${card.readingsScroll.measuredHeight}", card.readingsScroll.measuredHeight < card.readingsScroll.getChildAt(0).measuredHeight)
+        h.relayout()
+        h.capture("HandwritingUatTest/char_card_land", h.inputView.candidateActionMenu!!.listView!!.rootView)
+    }
+
+    // floating in landscape: one column, as upright
+    @Test
+    @Config(qualifiers = "zh-rCN-w851dp-h393dp-land-440dpi")
+    fun theCardOnTheFloatingKeyboardIsOneColumn() {
+        ThemeManager.prefs.floatingKeyboard.setValue(true)
+        try {
+            h.api.charCards["行"] = hang
+            h.start()
+            written("银行")
+            val menu = held("行")
+            assertEquals(LinearLayout.VERTICAL, (menu.row(0) as CharCardView).orientation)
+            h.relayout()
+            h.capture("HandwritingUatTest/char_card_floating", menu.listView!!.rootView)
+        } finally {
+            ThemeManager.prefs.floatingKeyboard.setValue(false)
+        }
     }
 }

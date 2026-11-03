@@ -9,6 +9,7 @@ import org.fcitx.fcitx5.android.core.KeyStates
 import org.fcitx.fcitx5.android.core.KeySym
 import org.fcitx.fcitx5.android.core.ScancodeMapping
 import org.fcitx.fcitx5.android.engine.glide.Glide
+import org.fcitx.fcitx5.android.engine.reading.ReadingStyle
 import org.fcitx.fcitx5.android.input.picker.PickerWindow
 
 sealed class KeyAction {
@@ -59,4 +60,7 @@ sealed class KeyAction {
 
     /** A glide across the letters, for the input method to read (GlideInput, InputMethodCatalog.glides). */
     class GlideAction(val glide: Glide) : KeyAction()
+
+    /** The handwriting pad's 注: 候选词注音 set to [style], or, null, turned off or on as a tap does (ReadingToggle). */
+    data class ReadingAction(val style: ReadingStyle? = null) : KeyAction()
 }

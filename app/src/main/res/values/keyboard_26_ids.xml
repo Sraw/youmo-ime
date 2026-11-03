@@ -17,4 +17,5 @@
     <item name="button_lookup" type="id"/>
     <item name="button_lookup_on" type="id"/>
     <item name="button_confirm" type="id"/>
+    <item name="button_reading" type="id"/>
 </resources>

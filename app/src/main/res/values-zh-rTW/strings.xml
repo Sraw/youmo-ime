@@ -605,6 +605,13 @@
     <string name="im_candidate_reading_off">關閉</string>
     <string name="im_candidate_reading_pinyin">拼音</string>
     <string name="im_candidate_reading_zhuyin">注音符號</string>
+    <string name="hw_reading_key_on">%1$s，已開</string>
+    <string name="hw_reading_key_off">%1$s，已關</string>
+    <string name="char_card_readings">讀音</string>
+    <string name="char_card_radical">部首</string>
+    <string name="char_card_strokes">%1$d 畫</string>
+    <string name="char_card_parts">拆字</string>
+    <string name="char_card_order">筆順</string>
     <string name="im_model_level">效能檔位</string>
     <string name="im_model_level_summary">檔位越高越準，也越耗電</string>
     <string name="im_model_level_low">低檔：只按詞頻和搭配，最省電</string>

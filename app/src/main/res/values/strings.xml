@@ -622,6 +622,13 @@
     <string name="im_candidate_reading_off">Off</string>
     <string name="im_candidate_reading_pinyin">Pinyin</string>
     <string name="im_candidate_reading_zhuyin">Zhuyin</string>
+    <string name="hw_reading_key_on">%1$s, on</string>
+    <string name="hw_reading_key_off">%1$s, off</string>
+    <string name="char_card_readings">Readings</string>
+    <string name="char_card_radical">Radical</string>
+    <string name="char_card_strokes">%1$d strokes</string>
+    <string name="char_card_parts">Parts</string>
+    <string name="char_card_order">Stroke order</string>
     <string name="im_model_level">Performance level</string>
     <string name="im_model_level_summary">Higher picks better and uses more battery</string>
     <string name="im_model_level_low">Low: by how common words and pairs are, least battery</string>
