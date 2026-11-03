@@ -163,6 +163,7 @@ class QuickPhraseMineTest {
     }
 
     @Test
+    @Uat("QU-11")
     fun the14KeysFindByTheWholeKeyAndBackspaceKeepsStep() {
         open()
         send(Keyboard.tapKey(g14Code('g'), 0.9f))

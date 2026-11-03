@@ -9,6 +9,7 @@ import android.view.ViewGroup
 import android.widget.TextView
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
+import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.core.CandidateWord
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.data.theme.ThemePreset
@@ -70,6 +71,7 @@ class CandidateHintsUatTest {
     }
 
     @Test
+    @Uat("PY-111")
     fun portrait() {
         for (dark in listOf(false, true)) shown(20, dark, "hint_20sp_port_" + if (dark) "dark" else "light")
         shown(28, false, "hint_28sp_port_light")
@@ -78,12 +80,14 @@ class CandidateHintsUatTest {
     }
 
     @Test
+    @Uat("PY-111")
     @Config(qualifiers = "w851dp-h393dp-land-440dpi")
     fun landscape() {
         for (dark in listOf(false, true)) shown(20, dark, "hint_20sp_land_" + if (dark) "dark" else "light")
     }
 
     @Test
+    @Uat("PY-111")
     fun theFloatingWindowsCandidatesAreOneHeightHintedOrNot() {
         val ctx = RuntimeEnvironment.getApplication()
         val theme = ThemePreset.PixelLight

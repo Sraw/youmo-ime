@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.engine.data
 
+import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.engine.pinyin.Syllables
 import org.fcitx.fcitx5.android.engine.reading.ToneMark
 import org.junit.Assert.assertEquals
@@ -84,6 +85,7 @@ class ToneTableTest {
     }
 
     @Test
+    @Uat("PY-110")
     fun aWordsNeutralToneIsItsCharactersOwn() {
         val d = data()
         // listed dōng xi and zhuō zi: read in 西's and 子's own tones (the user, 2026-11-02)

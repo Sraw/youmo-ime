@@ -288,4 +288,4 @@
 - **前提**：B0，关掉「粘贴后回到键盘」；依次复制「钉」「甲」「乙」「丙」，把「钉」置顶。
 - **操作**：打开剪贴板面板，依次点「甲」「乙」「钉」；看面板；回到键盘，再打开面板。
 - **预期**：上屏 甲乙钉；面板开着时顺序不变（钉、丙、乙、甲）；再打开时是 钉、乙、甲、丙。
-- **JVM**：`ToolbarUatTest.entriesPastedFromThePanelMoveFirstWhenItCloses`；`ClipboardDaoTest.anUnpinnedEntryUsedComesFirstOfTheUnpinnedAPinnedOneStays`（置顶的不动，上限按最久没用过的清）；设备上不跑。
+- **JVM**：`ClipboardOrderUatTest.entriesPastedFromThePanelMoveFirstWhenItCloses`；`ClipboardDaoTest.anUnpinnedEntryUsedComesFirstOfTheUnpinnedAPinnedOneStays`（置顶的不动，上限按最久没用过的清）；设备上不跑。

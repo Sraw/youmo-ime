@@ -16,6 +16,7 @@ import androidx.lifecycle.setViewTreeLifecycleOwner
 import java.util.concurrent.TimeUnit
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
+import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.core.InputMethodSubMode
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.theme.ThemePreset
@@ -274,6 +275,7 @@ class BaseKeyboardTest {
 
     // 滑动 at its default (shortcuts up, symbols down): a's select all up, its symbol down, s with nothing up a tap
     @Test
+    @Uat("KB-61")
     @Config(application = FcitxApplication::class)
     fun aLettersSwipeUpIsItsShortcutAndDownItsSymbol() {
         val actions = mutableListOf<KeyAction>()
@@ -297,6 +299,7 @@ class BaseKeyboardTest {
 
     // the space swiped up opens the edit menu over it; the backspace swiped up clears, down restores
     @Test
+    @Uat("KB-62")
     @Config(application = FcitxApplication::class)
     fun theSpaceUpIsTheEditMenuAndTheBackspaceUpAndDownClearAndRestore() {
         val actions = mutableListOf<KeyAction>()
@@ -321,6 +324,7 @@ class BaseKeyboardTest {
 
     // a text shortcut set for a key is committed as its shortcut; the swipe off takes it all the same
     @Test
+    @Uat("KB-63")
     @Config(application = FcitxApplication::class)
     fun aKeysOwnTextShortcutIsWhatItsSwipeRuns() {
         val stored = AppPrefs.getInstance().internal.keyShortcuts

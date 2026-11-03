@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.input.shortcut
 
+import org.fcitx.fcitx5.android.Uat
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -32,6 +33,7 @@ class KeyShortcutPagesTest {
     }
 
     @Test
+    @Uat("T9-61")
     fun zhuyinNinesGroupsAreNamedByTheirPlaceThreeARow() {
         val page = KeyShortcutPages.ZhuyinNine
         assertEquals(listOf(3, 3, 3, 2), page.rows.map { it.size })

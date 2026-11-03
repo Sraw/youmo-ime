@@ -507,11 +507,11 @@
 - **预期**：普通框只打过 1 次时「你」后面没有「好呀亲爱的」（无痕框里的不算）；五笔里「你」后面第一个是「好呀亲爱的」。网址、邮箱、数字框和搜索框的不学由单元测试 `PhrasesTest` 管（这几个框的标记是外层给的）。
 - **JVM**：`PhraseUatTest.noPhraseWhereNothingIsLearnedAndOneInATable`；设备上不跑。
 
-### PY-106 [P1] 读音提示标在字上方，候选栏不变高
-- **前提**：B0，**候选词注音** 是「关闭」。
-- **操作**：点 j i a o s e，看候选栏；清空，点 u n v z i；清空，把 **候选字号** 依次调成最小、最大，各打一次 j i a o s e；横屏再打一次；打开悬浮候选窗再打一次。
-- **预期**：「角色」字的上方标着 jué sè，字体、颜色、居中和拼音注音一样，只是字小一些；它和旁边没有提示的候选字在同一条水平线上；候选栏的高度和不打字时一样，提示出现、消失时栏不跳。拆字出的「好」上方标 hǎo。字号最小时提示不小于 7sp，可能略碰到字顶。悬浮窗里每个候选一样高。码表的编码提示仍在候选右边。
-- **JVM**：`CandidateHintsUatTest`（栏高、和旁边候选的基线一样、悬浮窗候选同高；浅色深色、竖屏横屏、14/20/28sp 的图）、`EnginesReadingsTest.offShowsNoneButTheHintsAboveTheCandidates`（ime-core：笔画、拆字的提示变成读音）、`CandidateReadingsTest.aHintIsOneReadingACharacterWithItsTones`、`CandidateBarHeightTest.aHintsReadingFillsTheRoomBetweenItsBounds`；设备上不跑。
+### PY-109 [P1] 注音全键盘（大千）：打声调，空格当一声，回车上屏注音
+- **前提**：B0-注音全键盘。
+- **操作**：看键盘；点 ㄋ ㄧ ˇ ㄏ ㄠ ˇ，看码行和候选，点「你好」；点 ㄇ ㄚ，按空格，看码行和候选，再按空格；点 ㄉ ㄜ ˙，看候选，按空格；点 ㄅ ˇ，按回车。
+- **预期**：大千排列，第一行是 ㄅ ㄉ ˇ ˋ ㄓ ˊ ˙ ㄚ ㄞ ㄢ ㄦ；码行 `ㄋㄧˇ ㄏㄠˇ`，首选「你好」；ㄇㄚ 后按空格码行是 `ㄇㄚˉ`、首选「妈」，再按空格上屏「妈」；ㄉㄜ˙ 首选「的」；回车上屏 `ㄅˇ`。框里最后是「你好妈的ㄅˇ」。
+- **JVM**：`ZhuyinKeyboardTest.dachenHasEachSymbolAndToneWhereTaiwanPrintsIt`、`PinyinSessionZhuyinTest`（`dachenTypesAWordByItsSymbolsShownInZhuyin`、`dachensSpaceIsTheFirstToneThenThePick`、`enterCommitsTheZhuyinShown`）、`PinyinUatTest.aNeutralToneTypedOrNotPutsTheWordFirst`（真数据：ㄓㄨㄛㄗ、ㄉㄨㄥㄒㄧ 打 ˙、打本调、不打声调，「桌子」「东西」都排第一，大千和注音九键都是）；设备上照跑。
 
 ### PY-110 [P1] 候选词注音一律标本调，不标轻声
 - **前提**：B0，**候选词注音** 选「拼音」。
@@ -519,13 +519,13 @@
 - **预期**：拼音是 zhuō zǐ、dōng xī、wǒ men；注音是 ㄓㄨㄛ ㄗˇ、ㄉㄨㄥ ㄒㄧ、ㄨㄛˇ ˙ㄇㄣ。轻声的字按它的本调标（子 zǐ、西 xī），只有本身只读轻声的字（的 了 吗 呢 们 么）标轻声（用户 2026-11-02 定）。注音键盘上照台湾习惯打 ˙（ㄗ˙、ㄒㄧ˙）不算错，「桌子」「东西」照样排第一，见注音键盘那条线的 PY-109。
 - **JVM**：`PinyinUatTest.aReadingIsInItsCharactersOwnTones`（真数据，拼音和注音两种）、`ToneTableTest.aWordsNeutralToneIsItsCharactersOwn`（ime-core：读音本调，输入时 ˙ 和本调都不罚分）；设备上不跑。
 
-### PY-109 [P1] 注音全键盘（大千）：打声调，空格当一声，回车上屏注音
-- **前提**：B0-注音全键盘。
-- **操作**：看键盘；点 ㄋ ㄧ ˇ ㄏ ㄠ ˇ，看码行和候选，点「你好」；点 ㄇ ㄚ，按空格，看码行和候选，再按空格；点 ㄉ ㄜ ˙，看候选，按空格；点 ㄅ ˇ，按回车。
-- **预期**：大千排列，第一行是 ㄅ ㄉ ˇ ˋ ㄓ ˊ ˙ ㄚ ㄞ ㄢ ㄦ；码行 `ㄋㄧˇ ㄏㄠˇ`，首选「你好」；ㄇㄚ 后按空格码行是 `ㄇㄚˉ`、首选「妈」，再按空格上屏「妈」；ㄉㄜ˙ 首选「的」；回车上屏 `ㄅˇ`。框里最后是「你好妈的ㄅˇ」。
-- **JVM**：`ZhuyinKeyboardTest.dachenHasEachSymbolAndToneWhereTaiwanPrintsIt`、`PinyinSessionZhuyinTest`（`dachenTypesAWordByItsSymbolsShownInZhuyin`、`dachensSpaceIsTheFirstToneThenThePick`、`enterCommitsTheZhuyinShown`）、`PinyinUatTest.aNeutralToneTypedOrNotPutsTheWordFirst`（真数据：ㄓㄨㄛㄗ、ㄉㄨㄥㄒㄧ 打 ˙、打本调、不打声调，「桌子」「东西」都排第一，大千和注音九键都是）；设备上照跑。
+### PY-111 [P1] 读音提示标在字上方，候选栏不变高
+- **前提**：B0，**候选词注音** 是「关闭」。
+- **操作**：点 j i a o s e，看候选栏；清空，点 u n v z i；清空，把 **候选字号** 依次调成最小、最大，各打一次 j i a o s e；横屏再打一次；打开悬浮候选窗再打一次。
+- **预期**：「角色」字的上方标着 jué sè，字体、颜色、居中和拼音注音一样，只是字小一些；它和旁边没有提示的候选字在同一条水平线上；候选栏的高度和不打字时一样，提示出现、消失时栏不跳。拆字出的「好」上方标 hǎo。字号最小时提示不小于 7sp，可能略碰到字顶。悬浮窗里每个候选一样高。码表的编码提示仍在候选右边。
+- **JVM**：`CandidateHintsUatTest`（栏高、和旁边候选的基线一样、悬浮窗候选同高；浅色深色、竖屏横屏、14/20/28sp 的图）、`EnginesReadingsTest.offShowsNoneButTheHintsAboveTheCandidates`（ime-core：笔画、拆字的提示变成读音）、`CandidateReadingsTest.aHintIsOneReadingACharacterWithItsTones`、`CandidateBarHeightTest.aHintsReadingFillsTheRoomBetweenItsBounds`；设备上不跑。
 
-### PY-107 [P1] 注音全键盘的快捷键：按键位套用全键盘的
+### PY-112 [P1] 注音全键盘的快捷键：按键位套用全键盘的
 - **前提**：B0-注音全键盘，滑动是默认（上滑快捷键），测试页输入框里有字。
 - **操作**：看键角；ㄇ 上滑；ㄋ 上滑。
 - **预期**：ㄇ（a 的位置）、ㄏ（c）、ㄌ（x）、ㄒ（v）、ㄈ（z）、ㄗ（y）的右上角画着全选、复制、剪切、粘贴、撤销、重做的图标，别的键没有；ㄇ 上滑全选；ㄋ 没有快捷键，上滑打出 ㄋ。**按键 → 按键字符和快捷键** 的「注音全键盘」页能改。

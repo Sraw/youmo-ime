@@ -174,3 +174,6 @@ case("TBL-49", needs="jvm:TablesKeysUatTest.wubiKeysShowNamesOrAllRoots")(lambda
 
 
 case("TBL-50", needs="jvm:TablesKeysUatTest.erbisSemicolonHasAKey")(lambda d: None)
+
+
+case("TBL-51", needs="jvm:TablesKeysUatTest.wubisAllRootsAreItsNamesAtCompact、TableRootsTest.atCompactAllTheRootsAreShownAsTheirNames")(lambda d: None)

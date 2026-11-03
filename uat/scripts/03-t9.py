@@ -200,3 +200,6 @@ def t960(d):
     check(code3 == "ㄓㄨㄥ" and first(c3) == "中", f"点 ㄓ 再打 ㄨㄥ：码行「{code3}」，候选 {c3[:4]}")
     d.bksp(4)
     return f"码行 {code}，音节条 {strip[:4]}，点 ㄇㄧ 后 {taken}；不打声调 {code2}，框里「{got}」；ㄓ 条 {zh[:6]}，{code3}"
+
+
+case("T9-61", needs="jvm:ZhuyinShortcutsUatTest.zhuyinNinesGroupsHaveNoneUntilOneIsSet、ZhuyinShortcutsUatTest.thePageHasZhuyinNinesTabBeforeDachens、ZhuyinKeyboardTest.theSymbolKeysAreNamedForTheirShortcuts、KeyShortcutPagesTest.zhuyinNinesGroupsAreNamedByTheirPlaceThreeARow")(lambda d: None)

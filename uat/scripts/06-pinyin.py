@@ -283,8 +283,15 @@ case("PY-104", needs="jvm:StrokeFilterUatTest.haoThenADotThenBackspace")(lambda 
 case("PY-105", needs="jvm:ImKeyboardsUatTest.pinyinsEighteenKeysShowTheGroupsAndSendTheirOwnCodes、GroupedKeyboardTest.talkBackReadsAGroupLetterByLetterWithItsCorner")(lambda d: None)
 
 
-case("PY-106", needs="jvm:CandidateHintsUatTest、EnginesReadingsTest.offShowsNoneButTheHintsAboveTheCandidates、CandidateReadingsTest.aHintIsOneReadingACharacterWithItsTones、CandidateBarHeightTest.aHintsReadingFillsTheRoomBetweenItsBounds")(lambda d: None)
-case("PY-110", needs="jvm:PinyinUatTest.aReadingIsInItsCharactersOwnTones、ToneTableTest.aWordsNeutralToneIsItsCharactersOwn")(lambda d: None)
+case("PY-106", needs="jvm:PhraseUatTest.aWholeSentenceTypedThreeTimesGoesOnAfterItsStart、PhraseUatTest.aPhraseTurnedOffOrDeletedIsNoLongerOffered")(lambda d: None)
+
+
+case("PY-107", needs="jvm:PhraseUatTest.piecesCommittedApartAreNoPhrase")(lambda d: None)
+
+
+case("PY-108", needs="jvm:PhraseUatTest.noPhraseWhereNothingIsLearnedAndOneInATable")(lambda d: None)
+
+
 @case("PY-109", base="B0-注音全键盘", mutates="learn")
 def py109(d):
     k = d.keys(refresh=True)
@@ -311,3 +318,12 @@ def py109(d):
     d.enter()
     got = d.expect_field("你好妈的ㄅˇ")
     return f"码行 {code}、{toned}，框里「{got}」"
+
+
+case("PY-110", needs="jvm:PinyinUatTest.aReadingIsInItsCharactersOwnTones、ToneTableTest.aWordsNeutralToneIsItsCharactersOwn")(lambda d: None)
+
+
+case("PY-111", needs="jvm:CandidateHintsUatTest、EnginesReadingsTest.offShowsNoneButTheHintsAboveTheCandidates、CandidateReadingsTest.aHintIsOneReadingACharacterWithItsTones、CandidateBarHeightTest.aHintsReadingFillsTheRoomBetweenItsBounds")(lambda d: None)
+
+
+case("PY-112", needs="jvm:ZhuyinShortcutsUatTest.dachensKeysTakeTheFullKeyboardsShortcutsByPlace、ZhuyinKeyboardTest.theSymbolKeysAreNamedForTheirShortcuts")(lambda d: None)

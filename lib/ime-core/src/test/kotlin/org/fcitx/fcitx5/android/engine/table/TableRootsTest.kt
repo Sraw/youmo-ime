@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.engine.table
 
+import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.engine.runtime.TableSettings
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -57,6 +58,7 @@ class TableRootsTest {
     }
 
     @Test
+    @Uat("TBL-51")
     fun atCompactAllTheRootsAreShownAsTheirNames() {
         fun keyboard(labels: KeyLabels) = TableKeyboard("engine-wubi", setOf(';'), true, labels, TableRoots.WUBI86)
         val compact = keyboard(KeyLabels.ROOTS).atHeight(compact = true)

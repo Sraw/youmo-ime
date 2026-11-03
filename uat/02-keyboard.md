@@ -346,7 +346,7 @@
 - **前提**：两个应用都开过、各有一个输入框（例如联系人的新建和搜索）。
 - **操作**：在 A 的框里打 `nih`，看到候选；按最近任务键，点 B 的卡片，键盘在 B 的框里弹出。
 - **预期**：拼音栏和候选栏都是空的，没有 nih；接着打 a 只出 a 的候选。
-- **JVM**：`HostCoreContractTest.an app unbound clears the panel its focus out dropped, before no context is active`（ime-core：应用先解绑再换框时，清空的面板在还有活动上下文时发出）；redroid 上手动跑过一次（2026-11-02）。
+- **JVM**：`HostCoreContractTest.an app unbound clears the panel its focus out dropped before no context is active`（ime-core：应用先解绑再换框时，清空的面板在还有活动上下文时发出）；redroid 上手动跑过一次（2026-11-02）。
 
 ### KB-61 [P1] 字母上滑是快捷键，下滑是符号
 - **前提**：B0，滑动是默认（上滑快捷键，下滑符号），测试页输入框里有字。

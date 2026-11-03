@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.host
 
+import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.assertRows
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.engine.runtime.EngineEvent
@@ -631,7 +632,8 @@ class HostCoreContractTest {
     }
 
     @Test
-    fun `an app unbound clears the panel its focus out dropped, before no context is active`() {
+    @Uat("KB-60")
+    fun `an app unbound clears the panel its focus out dropped before no context is active`() {
         // a switch from recents unbinds the app before its field finishes: deactivate, not a focus out, ends its input
         val core = core()
         core.open()

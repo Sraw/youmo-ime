@@ -198,3 +198,15 @@ case("KB-58", needs="jvm:AddressUatTest.onlyTheAddressAddedToWhatTheFieldStarted
 
 
 case("KB-59", needs="jvm:AddressUatTest.aUrlFieldsStartingHostIsNotCountedAddedOnesAre")(lambda d: None)
+
+
+case("KB-60", needs="jvm:HostCoreContractTest.an app unbound clears the panel its focus out dropped before no context is active")(lambda d: None)
+
+
+case("KB-61", needs="jvm:BaseKeyboardTest.aLettersSwipeUpIsItsShortcutAndDownItsSymbol")(lambda d: None)
+
+
+case("KB-62", needs="jvm:BaseKeyboardTest.theSpaceUpIsTheEditMenuAndTheBackspaceUpAndDownClearAndRestore、EditPlanTest、HostCoreEnginesTest.what is typed is cleared without a commit and typed again")(lambda d: None)
+
+
+case("KB-63", needs="jvm:BaseKeyboardTest.aKeysOwnTextShortcutIsWhatItsSwipeRuns")(lambda d: None)

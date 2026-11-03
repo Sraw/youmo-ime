@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.host
 
+import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.engine.handwriting.InkReading
 import org.fcitx.fcitx5.android.engine.runtime.EngineEvent
@@ -48,6 +49,7 @@ class HostCoreEnginesTest : EnginesFixture() {
 
     // 清除 while typing: what is typed goes, nothing committed; 恢复 types it again, the same keys
     @Test
+    @Uat("KB-62")
     fun `what is typed is cleared without a commit and typed again`() {
         val core = core(engines())
         val log = mutableListOf<HostEvent>()

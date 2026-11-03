@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.data.quickphrase
 
+import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.host.QuickPhraseEntry
 import org.fcitx.fcitx5.android.host.QuickPhraseFiles
 import org.junit.Assert.assertEquals
@@ -25,6 +26,7 @@ class QuickPhraseManagerTest {
     private val addr = QuickPhraseEntry("addr", "北京\n3 号楼 \"502\"")
 
     @Test
+    @Uat("QU-15")
     fun putChangeAndRemoveRoundTripThroughTheFiles() {
         assertEquals(QuickPhraseManager.Put.Saved, QuickPhraseManager.put(null, gh, now = 1, dir = dir))
         QuickPhraseManager.put(null, addr, now = 2, dir = dir)
@@ -41,6 +43,7 @@ class QuickPhraseManagerTest {
     }
 
     @Test
+    @Uat("QU-15")
     fun usedFromTheKeyboardReordersButAnEntryDeletedMeanwhileStaysGone() {
         QuickPhraseManager.put(null, gh, now = 1, dir = dir)
         QuickPhraseManager.put(null, addr, now = 2, dir = dir)
@@ -56,6 +59,7 @@ class QuickPhraseManagerTest {
     }
 
     @Test
+    @Uat("QU-15")
     fun importAddsNewOnesAndCountsTheSkipped() {
         QuickPhraseManager.put(null, gh, now = 1, dir = dir)
         val file = QuickPhraseFiles.formatMine(listOf(gh, addr)) + "bad\n"
@@ -65,6 +69,7 @@ class QuickPhraseManagerTest {
     }
 
     @Test
+    @Uat("QU-15")
     fun builtInTablesTurnOffAndOn() {
         assertTrue(QuickPhraseManager.builtInOn("latex.mb", dir))
         QuickPhraseManager.setBuiltIn("latex.mb", false, dir)

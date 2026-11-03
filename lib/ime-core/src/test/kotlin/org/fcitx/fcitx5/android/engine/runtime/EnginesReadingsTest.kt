@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.engine.runtime
 
+import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog.ENGLISH
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog.PINYIN
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog.WUBI
@@ -25,6 +26,7 @@ class EnginesReadingsTest : EnginesFixture() {
         Engines(::load, null, warmUps = inPlace).apply { this.settings = settings.copy(candidateReading = style) }
 
     @Test
+    @Uat("PY-111")
     fun offShowsNoneButTheHintsAboveTheCandidates() {
         val e = engines(ReadingStyle.OFF)
         assertEquals(emptyList<List<String>>(), e.type(PINYIN, "ni").readings)

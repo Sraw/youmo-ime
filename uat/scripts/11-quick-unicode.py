@@ -46,3 +46,24 @@ case("QU-08", needs="jvm:PinyinUatTest.quickInputOffersNoEnglishWords")(lambda d
 
 
 case("QU-09", needs="jvm:Keys14UatTest.unicodeOnTheFourteenKeysTakesTheCodeFromCornersAndHalves")(lambda d: None)
+
+
+case("QU-10", needs="jvm:QuickPhraseMineTest.nothingTypedListsMineThenAddWithNothingLit、QuickPhraseBookTest.mineInOrderOfUseThenFileOrder")(lambda d: None)
+
+
+case("QU-11", needs="jvm:QuickPhraseMineTest.theNineKeysFindAKeyByItsLettersShowingDigits、QuickPhraseMineTest.the14KeysFindByTheWholeKeyAndBackspaceKeepsStep")(lambda d: None)
+
+
+case("QU-12", needs="jvm:LayoutSwitchKeyTest.theNineKeysAndHandwritingsSymbolsKeyHoldsQuickInputTheirNumbersKeyOnlyTaps")(lambda d: None)
+
+
+case("QU-13", needs="jvm:QuickPhraseMineTest.inAPasswordFieldMineCommitsButItsUseIsNotKept")(lambda d: None)
+
+
+case("QU-14", needs="jvm:QuickPhraseMineTest.habitsOffShowNoneOfMine")(lambda d: None)
+
+
+case("QU-15", needs="jvm:QuickPhraseManagerTest")(lambda d: None)
+
+
+case("QU-16", needs="jvm:UserDataManagerTest.quickInputsEntriesOrderAndSwitchesRoundTripThroughABackup")(lambda d: None)

@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.input.bar
 
+import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.engine.reading.ReadingStyle
 import org.junit.Assert.assertEquals
 import org.junit.Test
@@ -31,6 +32,7 @@ class CandidateBarHeightTest {
     }
 
     @Test
+    @Uat("PY-111")
     fun aHintsReadingFillsTheRoomBetweenItsBounds() {
         // text 40 px, a line 1.2 of its size: 12 px of room fits 10 px, 30 px no more than half the text, 2 px the floor
         assertEquals(10f, CandidateBarHeight.hintSize(40f, 12f, 1.2f, 7f), 1e-4f)

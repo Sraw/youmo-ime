@@ -361,3 +361,6 @@ case("TB-48", needs="jvm:ClipboardSplitUatTest.aLongEntrySplitsItsStartAndADotte
 
 
 case("TB-49", needs="jvm:ClipboardSplitUatTest.piecesPickedBySweepingAcross")(lambda d: None)
+
+
+case("TB-50", needs="jvm:ClipboardOrderUatTest.entriesPastedFromThePanelMoveFirstWhenItCloses、ClipboardDaoTest.anUnpinnedEntryUsedComesFirstOfTheUnpinnedAPinnedOneStays")(lambda d: None)

@@ -100,6 +100,7 @@ class GroupedKeyboard18Test {
 
     // pinyin's 18 keys have no ;: L alone on the key, its long press L 0 l and the symbols, no ; or :
     @Test
+    @Uat("SP-28")
     fun pinyinsEighteenKeysShowLWithoutTheSemicolon() {
         val pinyin = GroupedKeyboard.layout(NineKeyLetters.G18, semicolon = false) { letter ->
             when (letter) {

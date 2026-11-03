@@ -7,6 +7,7 @@ package org.fcitx.fcitx5.android.input.keyboard
 import android.view.View
 import android.view.ViewGroup
 import org.fcitx.fcitx5.android.FcitxApplication
+import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.core.EngineState
 import org.fcitx.fcitx5.android.core.KeyStates
 import org.fcitx.fcitx5.android.core.KeySym
@@ -81,6 +82,7 @@ class ZhuyinKeyboardTest {
 
     // their swipes' shortcuts: 大千's by QWERTY place, the groups' by theirs; no tone, no slot
     @Test
+    @Uat("PY-112", "T9-61")
     fun theSymbolKeysAreNamedForTheirShortcuts() {
         val full = ZhuyinKeyboard.fullLayout().dropLast(1).map { row -> row.filter { it.appearance is KeyDef.Appearance.Text }.map { it.shortcut } }
         assertEquals(listOf("zyfull/1", "zyfull/q", "zyfull/a", "zyfull/z"), full.map { it.first() })

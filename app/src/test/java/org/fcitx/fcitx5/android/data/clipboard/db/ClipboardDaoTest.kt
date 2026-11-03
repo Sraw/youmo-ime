@@ -7,6 +7,7 @@ package org.fcitx.fcitx5.android.data.clipboard.db
 import androidx.paging.PagingSource
 import androidx.room.Room
 import kotlinx.coroutines.test.runTest
+import org.fcitx.fcitx5.android.Uat
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
@@ -98,6 +99,7 @@ class ClipboardDaoTest {
     }
 
     @Test
+    @Uat("TB-50")
     fun anUnpinnedEntryUsedComesFirstOfTheUnpinnedAPinnedOneStays() = runTest {
         add("p1", 500L, pinned = true)
         val p2 = add("p2", 400L, pinned = true)

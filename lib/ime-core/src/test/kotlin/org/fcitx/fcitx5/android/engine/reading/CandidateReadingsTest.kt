@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.engine.reading
 
+import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.engine.data.PinyinData
 import org.fcitx.fcitx5.android.engine.data.PinyinDataBuilder
 import org.fcitx.fcitx5.android.engine.lattice.Predictor
@@ -96,6 +97,7 @@ class CandidateReadingsTest {
     }
 
     @Test
+    @Uat("PY-111")
     fun aHintIsOneReadingACharacterWithItsTones() {
         // a misreading's, toned already
         assertEquals(listOf("jué", "sè"), readings.ofHint("角色", "jué sè"))

@@ -70,7 +70,7 @@ class ZhuyinShortcutsUatTest {
     }
 
     @Test
-    @Uat("PY-107")
+    @Uat("PY-112")
     fun dachensKeysTakeTheFullKeyboardsShortcutsByPlace() {
         val h = harness(ImKeyboard.ZHUYIN_FULL)
         h.field.setText("one two")
