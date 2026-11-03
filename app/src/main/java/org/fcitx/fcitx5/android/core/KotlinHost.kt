@@ -356,7 +356,7 @@ class KotlinHost(
     override suspend fun activateAction(id: Int) = onHost { activateAction(id); Unit }
 
     override suspend fun getCandidates(offset: Int, limit: Int): Array<CandidateWord> =
-        onHost { candidates(offset, limit).map { CandidateWord(it.label, it.text, it.comment) }.toTypedArray() }
+        onHost { candidates(offset, limit).map { CandidateWord(it.label, it.text, it.comment, readings = it.readings) }.toTypedArray() }
 
     override suspend fun getCandidateActions(idx: Int): Array<CandidateAction> =
         onHost { candidateActions(idx).map { CandidateAction(it.id, it.text, isSeparator = false, icon = "", isCheckable = false, isChecked = false) }.toTypedArray() }

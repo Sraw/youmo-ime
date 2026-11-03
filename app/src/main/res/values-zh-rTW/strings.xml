@@ -617,6 +617,11 @@
     <string name="t9_symbols_editor_hint">用空格分開，最多 %1$d 個。單個的數字和字母不能填：長按選它們是當按鍵用的（選候選、打拼音），打不出它們本身。清空就是這個鍵不加符號。</string>
     <string name="t9_symbols_reset_all_message">把所有鍵的長按符號恢復成預設？</string>
     <string name="t9_symbols_none_kept">填的都是單個的數字或字母，不能做符號，這個鍵沒有改。</string>
+    <string name="im_candidate_reading">候選詞注音</string>
+    <string name="im_candidate_reading_summary">在候選詞的每個字上標出讀音和聲調；候選欄會變高、候選詞變寬</string>
+    <string name="im_candidate_reading_off">關閉</string>
+    <string name="im_candidate_reading_pinyin">拼音</string>
+    <string name="im_candidate_reading_zhuyin">注音符號</string>
     <string name="im_model_level">效能檔位</string>
     <string name="im_model_level_summary">檔位越高越準，也越耗電</string>
     <string name="im_model_level_low">低檔：只按詞頻和搭配，最省電</string>
@@ -631,6 +636,9 @@
     <string name="engine_data_handwriting">手寫辨識模型：本專案用 Make Me a Hanzi 的筆畫（來自文鼎字型）和開源手寫字型訓練</string>
     <string name="engine_data_stroke">筆畫表：rime-stroke</string>
     <string name="engine_data_emoji">表情列表和關鍵詞：Unicode 的 emoji-test.txt 和 CLDR</string>
+    <string name="engine_data_unihan">字的聲調：Unicode 的 Unihan 字庫（kMandarin、kHanyuPinlu、kXHC1983、kTGHZ2013、kHanyuPinyin）</string>
+    <string name="engine_data_pinyin_data">Unihan 讀音的整理：mozillazg/pinyin-data</string>
+    <string name="engine_data_phrase_pinyin">詞的聲調：mozillazg/phrase-pinyin-data，本專案校訂</string>
     <string name="engine_data_chaizi">拆字資料：開放詞典 kfcd/chaizi，部件讀音由本專案標注</string>
     <string name="im_auto_select">只有一個候選時直接上屏</string>
     <string name="im_auto_select_summary">編碼打滿時也直接上屏第一個</string>

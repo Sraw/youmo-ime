@@ -109,10 +109,10 @@
 - **预期**：zhagn 的候选第一页有「张」「章」；zhon 的有「中」；jv 的有「句」；nihso 的有「你好」。
 - **JVM**：`PinyinUatTest.pinyinTypedWrongStillGivesTheWord`（:lib:ime-eval:uatTest，真数据）；设备上不跑。
 
-### PY-18 [P1] 常读错的词按错的读音打，候选旁标出正确读音
+### PY-18 [P1] 常读错的词按错的读音打，候选上方标出正确读音
 - **前提**：B0。
 - **操作**：点 j i a o s e；清空，点 x x x u e z（简拼加半个字）。
-- **预期**：候选里有「角色」，旁边标着 jué sè；第二次候选里有「莘莘学子」的话，旁边标着 shēn shēn xué zǐ。
+- **预期**：候选里有「角色」，字的上方一字一音标着 jué sè；第二次候选里有「莘莘学子」的话，上方标着 shēn shēn xué zǐ。
 - **JVM**：`PinyinUatTest.aWordOftenMisreadShowsItsReading`（:lib:ime-eval:uatTest，真数据）；设备上不跑。
 
 ### PY-19 [P1] 开关关掉生效：纠错、中英混输、联想、表情候选、拆字
@@ -149,7 +149,7 @@
 ### PY-24 [P1] u 开头按笔画查字
 - **前提**：B0。
 - **操作**：点 u h s p。
-- **预期**：候选里有「才」「本」「村」等，候选旁显示读音。
+- **预期**：候选里有「才」「本」「村」等，字的上方标着带声调的读音。
 - **JVM**：`PinyinUatTest.uThenStrokes`（:lib:ime-eval:uatTest，真数据）；设备上不跑。
 
 ## 联想
@@ -248,7 +248,7 @@
 ### PY-44 [P1] 拆字：u 后打各部分的拼音
 - **前提**：B0。
 - **操作**：点 u n i u n i u n i u；看候选；点 ⌫ 删光，点 u j i n j i n j i n。
-- **预期**：第一串的候选最前面是「犇」，旁边显示读音；第二串最前面是「鑫」。
+- **预期**：第一串的候选最前面是「犇」，上方标着读音；第二串最前面是「鑫」。
 - **JVM**：`PinyinUatTest.chaiziByTheParts`（:lib:ime-eval:uatTest，真数据）；设备上不跑。
 
 ### PY-45 [P1] 拆字开着时，不是部件的照常当拼音
@@ -506,3 +506,15 @@
 - **操作**：在无痕标签页（不学习的框）里整段上屏「你好呀亲爱的」3 次；回普通框整段上屏 1 次，打 n i 选「你」；再整段上屏 2 次；切到五笔，打 w q i y 选「你」。
 - **预期**：普通框只打过 1 次时「你」后面没有「好呀亲爱的」（无痕框里的不算）；五笔里「你」后面第一个是「好呀亲爱的」。网址、邮箱、数字框和搜索框的不学由单元测试 `PhrasesTest` 管（这几个框的标记是外层给的）。
 - **JVM**：`PhraseUatTest.noPhraseWhereNothingIsLearnedAndOneInATable`；设备上不跑。
+
+### PY-106 [P1] 读音提示标在字上方，候选栏不变高
+- **前提**：B0，**候选词注音** 是「关闭」。
+- **操作**：点 j i a o s e，看候选栏；清空，点 u n v z i；清空，把 **候选字号** 依次调成最小、最大，各打一次 j i a o s e；横屏再打一次；打开悬浮候选窗再打一次。
+- **预期**：「角色」字的上方标着 jué sè，字体、颜色、居中和拼音注音一样，只是字小一些；它和旁边没有提示的候选字在同一条水平线上；候选栏的高度和不打字时一样，提示出现、消失时栏不跳。拆字出的「好」上方标 hǎo。字号最小时提示不小于 7sp，可能略碰到字顶。悬浮窗里每个候选一样高。码表的编码提示仍在候选右边。
+- **JVM**：`CandidateHintsUatTest`（栏高、和旁边候选的基线一样、悬浮窗候选同高；浅色深色、竖屏横屏、14/20/28sp 的图）、`EnginesReadingsTest.offShowsNoneButTheHintsAboveTheCandidates`（ime-core：笔画、拆字的提示变成读音）、`CandidateReadingsTest.aHintIsOneReadingACharacterWithItsTones`、`CandidateBarHeightTest.aHintsReadingFillsTheRoomBetweenItsBounds`；设备上不跑。
+
+### PY-110 [P1] 候选词注音一律标本调，不标轻声
+- **前提**：B0，**候选词注音** 选「拼音」。
+- **操作**：打 zhuozi，看「桌子」上方；清空，打 dongxi，看「东西」上方；清空，打 women，看「我们」上方。把 **候选词注音** 换成「注音」，再打一遍。
+- **预期**：拼音是 zhuō zǐ、dōng xī、wǒ men；注音是 ㄓㄨㄛ ㄗˇ、ㄉㄨㄥ ㄒㄧ、ㄨㄛˇ ˙ㄇㄣ。轻声的字按它的本调标（子 zǐ、西 xī），只有本身只读轻声的字（的 了 吗 呢 们 么）标轻声（用户 2026-11-02 定）。注音键盘上照台湾习惯打 ˙（ㄗ˙、ㄒㄧ˙）不算错，「桌子」「东西」照样排第一，见注音键盘那条线的 PY-109。
+- **JVM**：`PinyinUatTest.aReadingIsInItsCharactersOwnTones`（真数据，拼音和注音两种）、`ToneTableTest.aWordsNeutralToneIsItsCharactersOwn`（ime-core：读音本调，输入时 ˙ 和本调都不罚分）；设备上不跑。

@@ -721,7 +721,7 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
          * The bar's height in dp, from 候选字号 (a preference read, so read once a view); the input
          * view is made anew when that changes.
          */
-        fun heightDp(): Int = CandidateBarHeight.dp(ThemeManager.prefs.candidateTextSize.getValue())
+        fun heightDp(): Int = CandidateBarHeight.dp(ThemeManager.prefs.candidateTextSize.getValue(), EngineState.candidateReading.value)
 
         /** A candidate's side padding in dp, from 候选字号 ([CandidateSpacing]). */
         fun candidatePaddingDp(): Int = CandidateSpacing.paddingDp(ThemeManager.prefs.candidateTextSize.getValue())

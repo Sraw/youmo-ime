@@ -1,7 +1,8 @@
 # word	reading	misreadings
 # Words often read wrongly. Each is compiled under its reading and, at a lower weight, under the
 # misreadings (`,` between them), so either types it; typed by a misreading, the candidate shows the
-# reading, with its tones (lexicon/README.md). Readings as 《现代汉语词典》 (7th ed.) has them.
+# reading, with its tones (lexicon/README.md). Readings as 《现代汉语词典》 (7th ed.) has them, but no
+# 轻声: a syllable it reads neutral is in its character's own tone (刽子手 guì zǐ shǒu; the user, 2026-11-02).
 般若	bō rě	ban'ruo
 莘莘学子	shēn shēn xué zǐ	xin'xin'xue'zi
 龟裂	jūn liè	gui'lie
@@ -55,7 +56,7 @@
 心广体胖	xīn guǎng tǐ pán	xin'guang'ti'pang
 否极泰来	pǐ jí tài lái	fou'ji'tai'lai
 未雨绸缪	wèi yǔ chóu móu	wei'yu'chou'miu
-刽子手	guì zi shǒu	kuai'zi'shou
+刽子手	guì zǐ shǒu	kuai'zi'shou
 联袂	lián mèi	lian'jue
 惬意	qiè yì	xia'yi
 鞭挞	biān tà	bian'da
@@ -68,7 +69,7 @@
 星宿	xīng xiù	xing'su
 肄业	yì yè	si'ye
 粗糙	cū cāo	cu'zao
-道行	dào heng	dao'xing
+道行	dào héng	dao'xing
 荨麻疹	xún má zhěn	qian'ma'zhen
 熨帖	yù tiē	yun'tie
 拓片	tà piàn	tuo'pian
@@ -85,7 +86,7 @@
 草菅人命	cǎo jiān rén mìng	cao'guan'ren'ming
 包扎	bāo zā	bao'zha
 擎天柱	qíng tiān zhù	jing'tian'zhu
-寒碜	hán chen	han'can
+寒碜	hán chěn	han'can
 拮据	jié jū	ji'ju
 蹒跚	pán shān	man'shan
 媲美	pì měi	bi'mei
@@ -122,7 +123,7 @@
 掮客	qián kè	jian'ke
 驰骋	chí chěng	chi'pin
 塑料	sù liào	suo'liao
-亲家	qìng jia	qin'jia
+亲家	qìng jiā	qin'jia
 便秘	biàn mì	bian'bi
 秘鲁	bì lǔ	mi'lu
 混沌	hùn dùn	hun'tun
@@ -130,7 +131,7 @@
 造诣	zào yì	zao'zhi
 浑身解数	hún shēn xiè shù	hun'shen'jie'shu
 良莠不齐	liáng yǒu bù qí	liang'xiu'bu'qi
-提防	dī fang	ti'fang
+提防	dī fáng	ti'fang
 纰漏	pī lòu	bi'lou
 负隅顽抗	fù yú wán kàng	fu'ou'wan'kang
 穷兵黩武	qióng bīng dú wǔ	qiong'bing'mai'wu

@@ -553,8 +553,13 @@ class HostCore(
         emit(HostEvent.Candidates(total, out))
     }
 
-    private fun entry(ic: InputContext, label: String, word: PanelCandidate) =
-        CandidateEntry(if (label.isEmpty()) "" else filterOutput(ic, label), filterOutput(ic, word.text), filterOutput(ic, word.comment))
+    // 候选词注音's readings go with the text as shown, kept while it has a code point for each (traditional
+    // output converts character for character; a phrase it rewrites otherwise is shown none)
+    private fun entry(ic: InputContext, label: String, word: PanelCandidate): CandidateEntry {
+        val text = filterOutput(ic, word.text)
+        val readings = word.readings.takeIf { it.size == text.codePointCount(0, text.length) }.orEmpty()
+        return CandidateEntry(if (label.isEmpty()) "" else filterOutput(ic, label), text, filterOutput(ic, word.comment), readings = readings)
+    }
 
     // `shows` (`androidfrontend.cpp:303-307`): the word the user tapped, by the text sent for it,
     // filtered (traditional, say); an empty text (a key's pick) is not checked

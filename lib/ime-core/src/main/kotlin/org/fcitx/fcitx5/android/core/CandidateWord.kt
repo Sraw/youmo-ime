@@ -9,7 +9,9 @@ data class CandidateWord @JvmOverloads constructor(
     val label: String,
     val text: String,
     val comment: String,
-    val spaceBetweenComment: Boolean = true
+    val spaceBetweenComment: Boolean = true,
+    /** 候选词注音: one string per code point of [text], empty for one shown none; empty for none at all. */
+    val readings: List<String> = emptyList(),
 ) {
     fun textWithComment(): String {
         return buildString {

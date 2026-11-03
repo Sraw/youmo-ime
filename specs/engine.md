@@ -282,6 +282,33 @@ they share the large model's slices at a pause (`session/RefineSlices`) too.
   a misreading and not the reading, syllable by syllable, each by a start of it, the last ones
   maybe untyped (`xxxuez` → 莘莘学子 shēn shēn xué zǐ; `shu` for 说服 none). A label only, in
   `hint()`: it ranks nothing; the misread entry itself is what offers the word.
+- **Tones** (`engine/reading/`, the tones sections of `pinyin.data`, `ToneTable`): each character
+  read as a syllable has a usual tone and the tones it may have (Unihan's, the likeliest list first;
+  a character alone in `lexicon/tones.tsv` sets its usual one, 谁 shéi); a word whose tones are not
+  its characters' usual ones (爱好 ài hào, ~4,800 of them) has its own, kept by word id and reading.
+  Later sources win: phrase-pinyin-data, then `tones.tsv`, then `misreadings.tsv`'s readings. Words of
+  the dictionary and phrase-pinyin-data go through `ToneRules`: a word no source lists takes the tones of
+  the longest listed word it ends with; a final 为 is wéi (but 因为). `tones.tsv` is curated and taken as
+  written. Then no word keeps a 轻声 (the user, 2026-11-02: every reading in its characters' own tones):
+  a syllable any source reads neutral takes its character's usual tone (东西 dōng xī, 桌子 zhuō zǐ,
+  记得 jì dé), unless that is the neutral one too (的, 吗, 们: no other to take). 一 and 不 are always yī
+  and bù (no sandhi). `ReadingTable` is the interface (one table
+  now, `mainland`), `Zhuyin` the syllables in zhuyin, `ToneMark` the written forms (hǎo, ㄏㄠˇ, ˙ㄗ).
+  `ime-eval readings` measures it on `lib/ime-eval/data/readings/chat.tsv` (500 hand-checked words; a
+  release needs 98%), read by text or, `--typed`, by the syllables the list gives. That set is the test
+  set: nothing in `tones.tsv` is taken from it. The sets are simplified text, so the measure reads them
+  without the app's traditional-to-simplified step. A syllable the list reads neutral is right in any
+  tone of it: which tone is the character's own is the data's to say.
+  候选词注音 (`EngineSettings.candidateReading`, off by default) puts `readings` on each `Snapshot` and
+  `Choice`: one string a code point, by `CandidateReadings`, from `Session.readingOf` (pinyin's words as
+  typed) or else the text. Engines adds them for every input method but English; pinyin's and 双拼's
+  hints (all readings) go while it is on. The host keeps them only while the shown text (traditional)
+  has a code point for each; the bar is taller for pinyin (`CandidateBarHeight.dp(textSp, style)`).
+  While it is off, those hints become `readings` instead (`CandidateReadings.ofHint`: a misreading's
+  toned syllables as they are, a part's or stroke lookup's toneless one toned by the character's table),
+  their hint emptied; the views draw them as pinyin above in the bar's own height (`ReadingSpan`'s hint
+  mode, sized by `CandidateBarHeight.hintSize`, floor `HINT_FLOOR_SP`), the baseline unmoved. An emoji's
+  or a table's hint, no syllable a Han character, stays a hint.
 - **Strokes.** `u` with nothing typed starts `StrokeLookup` (`h s p n z` = 横竖撇捺折); any other
   letter turns it back into pinyin (`usb`, or `uan` as a slip for `yan`), typed at the strokes'
   cursor, which they keep as pinyin keeps its own.

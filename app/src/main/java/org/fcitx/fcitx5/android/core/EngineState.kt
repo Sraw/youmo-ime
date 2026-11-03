@@ -10,6 +10,7 @@ import kotlinx.coroutines.flow.StateFlow
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.engine.handwriting.HandwritingSession
 import org.fcitx.fcitx5.android.engine.pinyin.ShuangpinScheme
+import org.fcitx.fcitx5.android.engine.reading.ReadingStyle
 import org.fcitx.fcitx5.android.engine.table.TableKeyboard
 
 /**
@@ -58,6 +59,14 @@ object EngineState {
     @Volatile
     var englishSuggests = true
         internal set
+
+    internal val candidateReadingState = MutableStateFlow(ReadingStyle.OFF)
+
+    /**
+     * 候选词注音, as the host's config last said ([EngineSettings.candidateReading][org.fcitx.fcitx5.android.engine.runtime.EngineSettings.candidateReading]):
+     * the bar's height goes by it, so the service makes the input view anew when it changes.
+     */
+    val candidateReading: StateFlow<ReadingStyle> = candidateReadingState
 
     internal val inkEnded = MutableStateFlow(HandwritingSession.NO_PIECE)
 

@@ -7,6 +7,7 @@ package org.fcitx.fcitx5.android.host
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.engine.pinyin.Fuzzy
 import org.fcitx.fcitx5.android.engine.pinyin.ShuangpinScheme
+import org.fcitx.fcitx5.android.engine.reading.ReadingStyle
 import org.fcitx.fcitx5.android.engine.runtime.EngineSettings
 import org.fcitx.fcitx5.android.engine.runtime.ModelLevel
 import org.fcitx.fcitx5.android.engine.runtime.TableSettings
@@ -121,4 +122,12 @@ class EngineOptionsTest {
         assertFalse("Unknown" in text)
         assertFalse("AutoPhraseLength" in text)
     }
+
+    @Test
+    fun candidateReadingIsOffTillSetAndAnUnknownStyleIsOff() {
+        assertEquals(ReadingStyle.OFF, EngineOptions().toSettings().candidateReading)
+        assertEquals(ReadingStyle.ZHUYIN, EngineOptions().apply { load("CandidateReading=Zhuyin\n") }.toSettings().candidateReading)
+        assertEquals("Off", EngineOptions().apply { load("CandidateReading=Ruby\n") }["CandidateReading"])
+    }
+
 }

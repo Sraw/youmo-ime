@@ -413,6 +413,7 @@ class EngineBridge {
         engines.settings = settings.copy(nineKeys = nineKeys())
         EngineState.shuangpinScheme = engines.settings.scheme
         EngineState.englishSuggests = engines.settings.englishSuggest
+        EngineState.candidateReadingState.value = engines.settings.candidateReading
         // 双拼's 14 keys under a scheme they cannot type (微软): stored as the 18 keys, which the
         // input view is made anew for (a keyboard preference), the settings page and ⋯ showing it so
         // Written here, on the fcitx thread: its listeners (the service's, which makes the input view anew) still run on

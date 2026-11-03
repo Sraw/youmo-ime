@@ -81,6 +81,8 @@ class EvalSetTest {
         val predictSets = File("data/predict").listFiles { file -> file.name.endsWith(".tsv") }!!
         assertTrue(predictSets.any { it.name == "chat.tsv" })
         for (set in predictSets) assertTrue(set.name, set.useLines { PredictRun.parse(it) }.isNotEmpty())
+        // 候选词注音's are word<TAB>reading
+        assertEquals(500, File("data/readings/chat.tsv").useLines { ReadingsRun.parse(it) }.size)
     }
 
     /** The derived sets are made by commands from data/pinyin.tsv; a change to it must remake them. */

@@ -33,6 +33,7 @@ import org.fcitx.fcitx5.android.engine.pinyin.SyllableGraph
 import org.fcitx.fcitx5.android.engine.pinyin.SyllableGraph.Kind
 import org.fcitx.fcitx5.android.engine.pinyin.Syllables
 import org.fcitx.fcitx5.android.engine.platform.jvm.JvmClock
+import org.fcitx.fcitx5.android.engine.reading.WordReading
 import org.fcitx.fcitx5.android.engine.rerank.Reranker
 import org.fcitx.fcitx5.android.engine.rerank.SentencePicker
 import org.fcitx.fcitx5.android.engine.rerank.SentenceRefiner
@@ -419,19 +420,15 @@ class PinyinSession(
         }
     }
 
-    /**
-     * A word often read wrongly ([PinyinData.misreadings]) typed by a misreading: the reading,
-     * with its tones (般若 typed banruo: bō rě). Each syllable may be typed by its start, the last
-     * ones not at all (xxxuez, xinxinxue: 莘莘学子 shēn shēn xué zǐ), but the typed letters must not
-     * fit the reading too: shu claims no misreading for 说服. Only labels what is offered: it ranks
-     * nothing. 双拼's keys are no reading to compare.
-     */
+    // a part's or an emoji's ([lastRead]'s aside), else a misreading's ([misreading]); 双拼's keys are no reading to compare
     private fun hint(c: Candidate): String {
         if (spell || predicting) return ""
         lastRead.aside[c.text]?.let { return it }
         val from = readFrom()
         return misreading(data, c.text, input.substring(from, minOf(input.length, from + c.end)).filter { it != SyllableGraph.SEPARATOR })
     }
+
+    override fun readingOf(index: Int) = candidates.getOrNull(index)?.let { c -> entries(c)?.mapIndexed { i, e -> WordReading(e.text, c.words[i].takeIf { it < data.vocabulary.size } ?: -1, e.syllables) } }
 
     private fun pick(index: Int): Snapshot {
         val c = candidates.getOrNull(index) ?: return snapshot(handled = candidates.isNotEmpty())
@@ -1051,8 +1048,13 @@ fun endsOnSyllable(graph: SyllableGraph): Boolean {
 }
 
 // [c] read on to [end] as typed: a word of the start of the input, shown for all of it
-// [text]'s reading, if [typed] fits one of its misreadings ([PinyinData.misreadings]) and not the
-// reading itself; else ""
+/**
+ * A word often read wrongly ([PinyinData.misreadings]) typed by a misreading: the reading,
+ * with its tones (般若 typed banruo: bō rě); else "". Each syllable may be typed by its start, the last
+ * ones not at all (xxxuez, xinxinxue: 莘莘学子 shēn shēn xué zǐ), but the typed letters must not
+ * fit the reading too: shu claims no misreading for 说服. Only labels what is offered: it ranks
+ * nothing. The hint is the true reading 候选词注音 shows (Engines).
+ */
 private fun misreading(data: PinyinData, text: String, typed: String): String {
     val word = data.misreadings[text] ?: return ""
     if (typed.isEmpty() || fits(word.typed, typed)) return ""

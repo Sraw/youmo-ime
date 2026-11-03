@@ -11,6 +11,7 @@ import org.fcitx.fcitx5.android.engine.data.DataFormatException
 import org.fcitx.fcitx5.android.engine.data.Misreadings
 import org.fcitx.fcitx5.android.engine.data.PinyinData
 import org.fcitx.fcitx5.android.engine.data.PinyinDataBuilder
+import org.fcitx.fcitx5.android.engine.data.ToneSources
 import org.fcitx.fcitx5.android.engine.data.SourceException
 import org.fcitx.fcitx5.android.engine.data.WordIndex
 import org.fcitx.fcitx5.android.engine.data.WordLayers
@@ -56,12 +57,14 @@ private class Command(val synopsis: String, about: String, val inputs: IntRange 
 
 private val COMMANDS = listOf(
     Command(
-        "pinyin -o <out> --lm <lm.arpa> [--remove <remove.tsv>] [--readings <readings.tsv>] [--misreadings <misreadings.tsv>] <dict>...",
+        "pinyin -o <out> --lm <lm.arpa> [--remove <remove.tsv>] [--readings <readings.tsv>] [--misreadings <misreadings.tsv>] [--char-tones <kX.txt,...>] [--phrase-tones <pinyin.txt>] [--tones <tones.tsv>] <dict>...",
         """
             compile a pinyin dictionary and model, from
             libime's text and word packs (.words), each
             pack a layer of its own; the text's words
-            corrected by lexicon/'s lists
+            corrected by lexicon/'s lists; the tones of
+            Unihan's readings (likeliest list first), of
+            phrase-pinyin-data's words and tones.tsv's
         """,
         action = ::pinyin,
     ),
@@ -282,6 +285,10 @@ private class Options(
     val readings: String?,
     /** `pinyin`: lexicon/misreadings.tsv, words often read wrongly, typed either way. */
     val misreadings: String?,
+    /** `pinyin`: Unihan's readings as mozillazg/pinyin-data lists them, `,` between the files; its phrase list; lexicon/tones.tsv. */
+    val charTones: String?,
+    val phraseTones: String?,
+    val tones: String?,
     /** `table`: a word pack whose words go in, coded by the table's rules. */
     val words: String?,
     /** `table`: compiled pinyin data whose words go in too; `emoji`: that reads the words. */
@@ -401,6 +408,9 @@ private class Options(
                 remove = values["--remove"],
                 readings = values["--readings"],
                 misreadings = values["--misreadings"],
+                charTones = values["--char-tones"],
+                phraseTones = values["--phrase-tones"],
+                tones = values["--tones"],
                 words = values["--words"],
                 pinyin = values["--pinyin"],
                 test = values["--test"],
@@ -895,12 +905,19 @@ private fun pinyin(options: Options, out: Appendable) {
             reader.unknownSyllables.entries.joinToString(" ") { "${it.key}×${it.value}" })
     }
     if (misread.isNotEmpty()) out.appendLine("misread: ${misread.size} words, typed by their misreadings too")
+    // from the least trusted: a later source's reading of a word replaces an earlier one's
+    options.charTones?.split(',')?.forEach { path -> File(path).useLines { ToneSources.chars(it, path, builder::charTone) } }
+    options.phraseTones?.let { path -> File(path).useLines { ToneSources.phrases(it, path, builder::wordTones) } }
+    val curated = { w: String, s: IntArray, t: ByteArray -> builder.wordTones(w, s, t, curated = true); Unit }
+    options.tones?.let { path -> File(path).useLines { ToneSources.curated(it, path, curated) } }
+    misread.forEach { ToneSources.word(it.word, it.reading, curated) }
     val meta = mapOf("source" to (listOf(lm) + dicts).joinToString(",") { File(it).name }) +
         misread.associate { Misreadings.META_PREFIX + it.word to Misreadings.meta(it) }
     write(output, builder.build(meta), out)
     val data = PinyinData.load(map(output))
     out.appendLine("vocabulary: ${data.vocabulary.size} words, ${data.model.vocabularySize} of them in the model")
     out.appendLine("trie: ${data.dictionary.nodeCount} nodes")
+    out.appendLine("tones: ${data.tones.characters} characters' readings, ${data.tones.exceptions} words' own")
 }
 
 private fun table(output: String, input: String, words: String?, pinyin: String?, out: Appendable) {

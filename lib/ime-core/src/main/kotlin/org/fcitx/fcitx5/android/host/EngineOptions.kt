@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.host
 
+import org.fcitx.fcitx5.android.engine.reading.ReadingStyle
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.engine.runtime.EngineSettings
 import org.fcitx.fcitx5.android.engine.runtime.ModelLevel
@@ -72,6 +73,7 @@ class EngineOptions {
     private val modelLevel = Option(EngineSettings.MODEL_LEVEL, Names(ModelLevel.entries.map { it.key }), ModelLevel.HIGH.key)
     private val latinWords = Option(EngineSettings.LATIN_WORDS, Flag, TRUE)
     private val englishSuggest = Option(EngineSettings.ENGLISH_SUGGEST, Flag, TRUE)
+    private val candidateReading = Option(EngineSettings.CANDIDATE_READING, Names(ReadingStyle.entries.map { it.key }), ReadingStyle.OFF.key)
     private val fuzzy = Group(
         EngineSettings.FUZZY,
         listOf(Option(EngineSettings.TYPOS, Flag, TRUE)) + FUZZY_KEYS.map { Option(it, Flag, FALSE) },
@@ -96,7 +98,7 @@ class EngineOptions {
 
     /** `AndroidEngineConfig`'s options in order (its two `ExternalOption`s are never saved, `option.cpp:73`). */
     private val entries: List<Any> = listOf(
-        shuangpin, pageSize, prediction, emoji, chaizi, builtInPhrases, modelLevel, latinWords, fuzzy, englishSuggest,
+        shuangpin, pageSize, prediction, emoji, chaizi, builtInPhrases, modelLevel, latinWords, fuzzy, englishSuggest, candidateReading,
     ) + tables.values
 
     private val values = HashMap<String, String>()
@@ -224,6 +226,7 @@ class EngineOptions {
                 )
             },
             englishSuggest = suggestsEnglish,
+            candidateReading = ReadingStyle.of(values.getValue(candidateReading.key)),
         )
     }
 
@@ -279,7 +282,7 @@ class EngineOptions {
 
     // the entries of androidengine.h's page for [im]: EnginePinyinPage and the others
     private fun pageOf(im: String): List<Any>? = when (im) {
-        InputMethodCatalog.PINYIN -> listOf(pageSize, prediction, emoji, chaizi, builtInPhrases, modelLevel, latinWords, fuzzy)
+        InputMethodCatalog.PINYIN -> listOf(pageSize, prediction, emoji, chaizi, builtInPhrases, modelLevel, latinWords, candidateReading, fuzzy)
         InputMethodCatalog.SHUANGPIN -> listOf(shuangpin, pageSize, prediction, emoji, modelLevel, fuzzy)
         InputMethodCatalog.ENGLISH -> listOf(englishSuggest)
         InputMethodCatalog.HANDWRITING -> listOf(pageSize, prediction, modelLevel)

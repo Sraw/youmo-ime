@@ -4,6 +4,8 @@
  */
 package org.fcitx.fcitx5.android.uat
 
+import org.fcitx.fcitx5.android.engine.InputMethodCatalog
+import org.fcitx.fcitx5.android.engine.data.PinyinData
 import org.fcitx.fcitx5.android.engine.glide.Glide
 import org.fcitx.fcitx5.android.engine.glide.GlideLayout
 import org.fcitx.fcitx5.android.engine.handwriting.InkReading
@@ -73,6 +75,9 @@ object UatEngines {
         val file = roots.map { File(it, path) }.firstOrNull { it.isFile } ?: throw FileNotFoundException(path)
         return RandomAccessFile(file, "r").use { it.channel.map(FileChannel.MapMode.READ_ONLY, 0, it.length()) }
     }
+
+    /** The app's pinyin data, as the engines map it: what a case reads off it directly (a character's tones). */
+    val pinyinData: PinyinData by lazy { PinyinData.load(load(InputMethodCatalog.PINYIN_DATA)) }
 
     /** A file of uat/fixtures, as a device's case pushes it. */
     fun fixture(name: String): File =

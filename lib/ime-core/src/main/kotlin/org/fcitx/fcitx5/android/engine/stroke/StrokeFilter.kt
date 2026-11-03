@@ -5,6 +5,7 @@
 package org.fcitx.fcitx5.android.engine.stroke
 
 import org.fcitx.fcitx5.android.engine.learn.control.Why
+import org.fcitx.fcitx5.android.engine.reading.WordReading
 import org.fcitx.fcitx5.android.engine.session.Action
 import org.fcitx.fcitx5.android.engine.session.Choice
 import org.fcitx.fcitx5.android.engine.session.Offer
@@ -84,6 +85,8 @@ class StrokeFilter(
 
     override fun offers(index: Int): Set<Offer> =
         if (!filtering) session.offers(index) else keptAt(index)?.let { session.offers(it.index) }.orEmpty()
+
+    override fun readingOf(index: Int): List<WordReading>? = if (!filtering) session.readingOf(index) else keptAt(index)?.let { session.readingOf(it.index) }
 
     override fun why(index: Int): Why? = if (!filtering) session.why(index) else keptAt(index)?.let { session.why(it.index) }
 

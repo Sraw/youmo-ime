@@ -26,8 +26,7 @@ import org.junit.Test
  */
 class TablesUatTest {
 
-    // the hint the bar shows beside [text] on the page, null when it is not there (named apart from
-    // EngineReplay.hintOf, the engine's list's, which as a member would win over an extension)
+    // the hint the bar shows beside [text] on the page, null when it is not there
     private fun EngineReplay.barHintOf(text: String): String? {
         val i = page.indexOf(text)
         return if (i >= 0) panel.hints.getOrNull(i) else null

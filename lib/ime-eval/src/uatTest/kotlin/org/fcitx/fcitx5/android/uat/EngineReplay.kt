@@ -244,9 +244,13 @@ class EngineReplay(
         pause()
     }
 
-    /** The hint shown beside the candidate [text] (a reading, a 拆字's pinyin), "" for none. */
-    fun hintOf(text: String): String =
-        engines.candidates(im, 0, if (panel.total >= 0) panel.total else ALL).first { it.text == text }.hint
+    /**
+     * The reading shown above the candidate [text], its syllables space-separated, "" for none: with
+     * 候选词注音 off, a misreading's, a 拆字's or a stroke lookup's, once hints beside (CandidateReadings.ofHint).
+     */
+    fun readingOf(text: String): String = choice(text).readings.joinToString(" ")
+
+    private fun choice(text: String) = engines.candidates(im, 0, if (panel.total >= 0) panel.total else ALL).first { it.text == text }
 
     /** Another input method, as the globe key or the language key switches: what was typed committed as typed (deactivate's Enter). */
     fun ime(name: String) {

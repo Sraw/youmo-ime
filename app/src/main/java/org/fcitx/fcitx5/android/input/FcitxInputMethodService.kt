@@ -52,6 +52,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.consumeEach
+import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.fcitx.fcitx5.android.BuildConfig
@@ -59,6 +60,7 @@ import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.core.CapabilityFlag
 import org.fcitx.fcitx5.android.core.CapabilityFlags
 import org.fcitx.fcitx5.android.core.EngineNotices
+import org.fcitx.fcitx5.android.core.EngineState
 import org.fcitx.fcitx5.android.core.FcitxKeyMapping
 import org.fcitx.fcitx5.android.core.FormattedText
 import org.fcitx.fcitx5.android.core.HostApi
@@ -401,6 +403,13 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         lifecycleScope.launch {
             fcitx.runImmediately { eventFlow }.collect {
                 handleFcitxEvent(it)
+            }
+        }
+        // 候选词注音 is the host's config, set on the fcitx thread: the bar's height goes by it (KawaiiBarComponent.heightDp)
+        lifecycleScope.launch {
+            EngineState.candidateReading.drop(1).collect {
+                rebuilding(ViewRebuild.SETTING)
+                replaceInputView(ThemeManager.activeTheme, start = true)
             }
         }
         pkgNameCache = PackageNameCache(this)

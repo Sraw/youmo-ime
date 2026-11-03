@@ -635,6 +635,11 @@
     <string name="t9_symbols_editor_hint">Apart by spaces, up to %1$d. A digit or a letter alone is not kept: a long press types those as keys, not as themselves. Emptied, the key offers none.</string>
     <string name="t9_symbols_reset_all_message">Put every key back to its default symbols?</string>
     <string name="t9_symbols_none_kept">None of those can be a symbol (a digit or a letter alone): the key is left as it was.</string>
+    <string name="im_candidate_reading">Candidate readings</string>
+    <string name="im_candidate_reading_summary">Each character\'s reading on the candidates, with its tone; the bar gets taller and the candidates wider</string>
+    <string name="im_candidate_reading_off">Off</string>
+    <string name="im_candidate_reading_pinyin">Pinyin</string>
+    <string name="im_candidate_reading_zhuyin">Zhuyin</string>
     <string name="im_model_level">Performance level</string>
     <string name="im_model_level_summary">Higher picks better and uses more battery</string>
     <string name="im_model_level_low">Low: by how common words and pairs are, least battery</string>
@@ -649,6 +654,9 @@
     <string name="engine_data_handwriting">Handwriting recognizers: trained by this project on Make Me a Hanzi\'s strokes (from Arphic\'s fonts) and open handwriting fonts</string>
     <string name="engine_data_stroke">Stroke table: rime-stroke</string>
     <string name="engine_data_emoji">Emoji list and keywords: Unicode\'s emoji-test.txt and CLDR</string>
+    <string name="engine_data_unihan">Tones of characters: Unicode\'s Unihan database (kMandarin, kHanyuPinlu, kXHC1983, kTGHZ2013, kHanyuPinyin)</string>
+    <string name="engine_data_pinyin_data">Unihan\'s readings as mozillazg/pinyin-data lists them</string>
+    <string name="engine_data_phrase_pinyin">Tones of words: mozillazg/phrase-pinyin-data, put right by this project</string>
     <string name="engine_data_chaizi">Character decompositions: the open dictionary kfcd/chaizi, its components given readings by this project</string>
     <string name="im_auto_select">Commit a lone candidate at once</string>
     <string name="im_auto_select_summary">And the first one once the code is full</string>

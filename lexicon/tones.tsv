@@ -1,0 +1,15 @@
+# word	reading	date	note
+# Tones put right: a word whose tones the sources (Unihan by character, phrase-pinyin-data by word)
+# give wrongly, its reading with tones (a space between syllables, no tone mark for the neutral tone).
+# Compiled after the sources, so a line here wins; misreadings.tsv's readings win over it. Readings as
+# 《现代汉语词典》 (7th ed.) has them; 一 and 不 always in their own tones (yī, bù). No 轻声: every
+# reading is in its characters' own tones (the user, 2026-11-02), and a word's neutral tone written here is
+# compiled as its character's usual one anyway, so a line only for a 轻声 has no use.
+舍友	shè yǒu	2026-11-01	tone
+身处	shēn chǔ	2026-11-01	tone
+何为	hé wéi	2026-11-01	tone
+接发	jiē fà	2026-11-01	tone
+谁	shéi	2026-11-01	common reading
+拜拜	bái bái	2026-11-02	common reading
+麻麻	mā mā	2026-11-02	妈妈 as typed in chat, both syllables in mā
+更博	gēng bó	2026-11-02	更新博客
