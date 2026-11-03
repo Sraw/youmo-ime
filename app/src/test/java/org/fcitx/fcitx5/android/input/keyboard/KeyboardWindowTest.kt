@@ -147,4 +147,16 @@ class KeyboardWindowTest {
             assertEquals("$layout", nameOf(layout) in grouped, CodeRowHeight.showsStrip(layout))
         }
     }
+
+    // quick input is typed in letters: the pad and the zhuyin keyboards, which send none, give way to
+    // the full keyboard while it lasts; the keyboards with letters of their own stay
+    @Test
+    fun quickInputShowsTheFullKeyboardInPlaceOfOnesWithoutLetters() {
+        for (k in listOf(HandwritingKeyboard.Name, ZhuyinKeyboard.NameNine, ZhuyinKeyboard.NameFull)) {
+            assertEquals(k, TextKeyboard.Name, KeyboardWindow.quickInputStandIn(k))
+        }
+        for (k in listOf(TextKeyboard.Name, T9Keyboard.Name, GroupedKeyboard.Name14, GroupedKeyboard.Name18, NumberKeyboard.Name)) {
+            assertEquals(k, null, KeyboardWindow.quickInputStandIn(k))
+        }
+    }
 }

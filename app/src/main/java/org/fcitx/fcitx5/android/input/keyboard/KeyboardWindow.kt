@@ -54,7 +54,17 @@ class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), Essentia
     private val returnKeyDrawable: ReturnKeyDrawableComponent by manager.must()
     private val preedit: PreeditComponent by manager.must()
 
-    companion object : EssentialWindow.Key
+    companion object : EssentialWindow.Key {
+        /**
+         * The keyboard shown in place of [keyboard] while quick input lasts: its keys are typed letters,
+         * which the handwriting pad has none of and the zhuyin keyboards send none of (a symbol's own
+         * code, which quick input takes as no key); null where [keyboard] types them itself.
+         */
+        fun quickInputStandIn(keyboard: String): String? = when (keyboard) {
+            HandwritingKeyboard.Name, ZhuyinKeyboard.NameNine, ZhuyinKeyboard.NameFull -> TextKeyboard.Name
+            else -> null
+        }
+    }
 
     override val key: EssentialWindow.Key
         get() = KeyboardWindow
@@ -139,19 +149,20 @@ class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), Essentia
         keyboards[currentKeyboardName]?.imTyping = composing && !tempMode
     }
 
-    // quick input's keys are typed, which the handwriting pad has none of: the full keyboard while it
-    // lasts, the pad back after
-    private var padDuringQuickPhrase = false
+    // the keyboard the full one stands in for while quick input lasts ([quickInputStandIn]), shown again after
+    private var standingInFor: String? = null
 
     override fun onInputPanelUpdate(data: HostEvent.InputPanel) {
         tempMode = data.auxUp.isNotEmpty()
         keyboards[currentKeyboardName]?.imTyping = composing && !tempMode
-        if (data.quickPhrase && currentKeyboardName == HandwritingKeyboard.Name) {
-            padDuringQuickPhrase = true
-            showLayout(TextKeyboard.Name)
-        } else if (!data.quickPhrase && padDuringQuickPhrase) {
-            padDuringQuickPhrase = false
-            if (currentKeyboardName == TextKeyboard.Name) showLayout(HandwritingKeyboard.Name)
+        val standIn = quickInputStandIn(currentKeyboardName)
+        if (data.quickPhrase && standIn != null) {
+            standingInFor = currentKeyboardName
+            showLayout(standIn)
+        } else if (!data.quickPhrase) {
+            val back = standingInFor ?: return
+            standingInFor = null
+            if (currentKeyboardName == TextKeyboard.Name) showLayout(back)
         }
     }
 
@@ -275,7 +286,7 @@ class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), Essentia
     private var noSuggestions = false
 
     override fun onStartInput(info: EditorInfo, capFlags: CapabilityFlags) {
-        padDuringQuickPhrase = false
+        standingInFor = null
         (keyboards[HandwritingKeyboard.Name] as? HandwritingKeyboard)?.restart()
         noSuggestions = capFlags.has(CapabilityFlag.NoSpellCheck)
         (keyboards[T9Keyboard.EnglishName] as? T9Keyboard)?.noSuggestions = noSuggestions
