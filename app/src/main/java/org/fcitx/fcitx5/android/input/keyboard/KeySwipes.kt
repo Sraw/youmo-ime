@@ -157,7 +157,8 @@ internal class KeySwipes(
                     KeyMarks.place(symbol, shortcut, spots.symbol, spots.shortcut, landscape, compact)
                 }
                 is KeySwipe.Key.Function -> KeyMarks.placeFunction(
-                    markOf(key.up), markOf(key.down), layers.up != SwipeLayers.Layer.Off, layers.down != SwipeLayers.Layer.Off, spots.shortcut,
+                    markOf(key.up), markOf(key.down), layers.up != SwipeLayers.Layer.Off, layers.down != SwipeLayers.Layer.Off,
+                    spots.symbol, spots.shortcut, landscape, compact,
                 )
             }
             view.showMarks(placed)

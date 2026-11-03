@@ -65,9 +65,12 @@ class KeyMarksScreenshotTest {
     @Test
     @Uat("KB-66")
     fun everyPlaceCompact() {
+        // 紧凑 is both heights at its level (KeyboardHeightLevels.isCompact): the portrait one alone is
+        // just a low keyboard, its keys made as standard ones
         prefs.set(AppPrefs.getInstance().keyboard.keyboardHeightPercent, 20)
-        // 底部 has no room there: top right, bottom right where the shortcuts are
-        for ((symbolAt, shortcutAt) in (pairs + (KeyMarkPosition.Bottom to KeyMarkPosition.TopRight)).distinct()) {
+        prefs.set(AppPrefs.getInstance().keyboard.keyboardHeightPercentLandscape, 34)
+        // 底部 has no room there: the first corner the other does not take
+        for ((symbolAt, shortcutAt) in (pairs + (KeyMarkPosition.Bottom to KeyMarkPosition.TopRight) + (KeyMarkPosition.TopLeft to KeyMarkPosition.Bottom)).distinct()) {
             shoot("full_compact", symbolAt, shortcutAt, boards[0].second)
         }
     }

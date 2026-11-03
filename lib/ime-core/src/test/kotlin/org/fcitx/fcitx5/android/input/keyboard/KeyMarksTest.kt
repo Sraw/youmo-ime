@@ -37,16 +37,23 @@ class KeyMarksTest {
     }
 
     @Test
-    fun bottomWithNoRoomUnderTheLetterIsTopRightOrBottomRight() {
+    fun onLowKeysBottomIsTheFirstCornerTheOtherDoesNotTake() {
         for (squeezed in listOf(true to false, false to true)) {
             val (landscape, compact) = squeezed
+            // the symbol's: top left, the shortcuts' corner skipped
             assertEquals(Placed.of(Slot.TopLeft to "全选", Slot.TopRight to "，"), place(At.Bottom, At.TopLeft, landscape, compact))
-            // the shortcuts top right: bottom right
-            assertEquals(Placed.of(Slot.TopRight to "全选", Slot.BottomRight to "，"), place(At.Bottom, At.TopRight, landscape, compact))
-            assertEquals(Slot.BottomRight, KeyMarks.symbolSlot(At.Bottom, At.TopRight, landscape, compact))
+            assertEquals(Placed.of(Slot.TopRight to "全选", Slot.TopLeft to "，"), place(At.Bottom, At.TopRight, landscape, compact))
+            assertEquals(Placed.of(Slot.BottomLeft to "全选", Slot.TopLeft to "，"), place(At.Bottom, At.BottomLeft, landscape, compact))
+            assertEquals(Placed.of(Slot.TopLeft to "，"), place(At.Bottom, At.None, landscape, compact))
+            // the shortcut's alike
+            assertEquals(Placed.of(Slot.TopLeft to "全选", Slot.TopRight to "，"), place(At.TopRight, At.Bottom, landscape, compact))
+            assertEquals(Placed.of(Slot.TopRight to "全选", Slot.TopLeft to "，"), place(At.TopLeft, At.Bottom, landscape, compact))
+            assertEquals(Placed.of(Slot.TopLeft to "全选"), place(At.None, At.Bottom, landscape, compact))
+            assertEquals(Spots(At.TopRight, At.TopLeft), KeyMarks.onKeys(At.Bottom, At.Bottom, landscape, compact))
         }
         // the other places as in portrait
         assertEquals(Placed.of(Slot.TopRight to "全选", Slot.BottomLeft to "，"), place(At.BottomLeft, At.TopRight, compact = true))
+        assertEquals(Spots(At.Bottom, At.TopLeft), KeyMarks.onKeys(At.Bottom, At.TopLeft, false, false))
     }
 
     @Test
@@ -81,7 +88,10 @@ class KeyMarksTest {
 
     private fun check(c: Case) {
         val placed = KeyMarks.place(c.symbol, c.shortcut, c.symbolAt, c.shortcutAt, c.landscape, c.compact)
-        val shortcutSlot = KeyMarks.shortcutSlot(c.shortcutAt)
+        val low = c.landscape || c.compact
+        val shortcutSlot = KeyMarks.shortcutSlot(KeyMarks.onKeys(c.symbolAt, c.shortcutAt, c.landscape, c.compact).shortcut)
+        if (!low) assertEquals("$c", KeyMarks.shortcutSlot(c.shortcutAt), shortcutSlot)
+        assertTrue("$c: no bottom edge on low keys", !low || shortcutSlot != Slot.Bottom)
         assertEquals("$c", if (c.shortcut != null) shortcutSlot else null, placed.slotOf("全选"))
         val s = placed.slotOf("，")
         val alone = KeyMarks.symbolSlot(c.symbolAt, c.shortcutAt, c.landscape, c.compact)
@@ -89,7 +99,7 @@ class KeyMarksTest {
         if (alone == null) return assertTrue("$c", c.symbolAt == At.None)
         assertNotEquals("$c", shortcutSlot, alone)
         assertTrue("$c", !(alone == Slot.Below && shortcutSlot == Slot.Bottom))
-        assertTrue("$c: under the letter only with room", alone != Slot.Below || (!c.landscape && !c.compact))
+        assertTrue("$c: under the letter only with room", alone != Slot.Below || !low)
         // the legal ones (apart) where chosen
         if (c.symbolAt != c.shortcutAt && c.symbolAt != At.Bottom) assertEquals("$c", c.symbolAt.corner, alone)
     }
@@ -103,15 +113,21 @@ class KeyMarksTest {
             At.BottomRight to (Slot.BottomRight to Slot.TopRight),
             At.Bottom to (Slot.Bottom to Slot.Top),
         )
+        fun f(up: String?, down: String?, upOn: Boolean, downOn: Boolean, at: At, symbolAt: At = At.TopRight, low: Boolean = false) =
+            KeyMarks.placeFunction(up, down, upOn, downOn, symbolAt, at, low, false)
         for ((at, slots) in expected) {
             val (up, down) = slots
-            assertEquals(Placed.of(up to "清除", down to "恢复"), KeyMarks.placeFunction("清除", "恢复", true, true, at))
-            assertEquals("the down one alone where chosen", Placed.of(up to "恢复"), KeyMarks.placeFunction("清除", "恢复", false, true, at))
-            assertEquals(Placed.of(up to "清除"), KeyMarks.placeFunction("清除", "恢复", true, false, at))
-            assertEquals(Placed.of(up to "清除"), KeyMarks.placeFunction("清除", null, true, true, at))
-            assertEquals(Placed<String>(), KeyMarks.placeFunction<String>(null, null, true, true, at))
+            assertEquals(Placed.of(up to "清除", down to "恢复"), f("清除", "恢复", true, true, at, At.None))
+            assertEquals("the down one alone where chosen", Placed.of(up to "恢复"), f("清除", "恢复", false, true, at, At.None))
+            assertEquals(Placed.of(up to "清除"), f("清除", "恢复", true, false, at, At.None))
+            assertEquals(Placed.of(up to "清除"), f("清除", null, true, true, at, At.None))
+            assertEquals(Placed<String>(), f(null, null, true, true, at, At.None))
         }
-        assertEquals(Placed<String>(), KeyMarks.placeFunction("清除", "恢复", true, true, At.None))
+        assertEquals(Placed<String>(), f("清除", "恢复", true, true, At.None))
+        // 底部 on low keys: the first corner the symbols do not take, the down one under it
+        assertEquals(Placed.of(Slot.TopLeft to "清除", Slot.BottomLeft to "恢复"), f("清除", "恢复", true, true, At.Bottom, low = true))
+        assertEquals(Placed.of(Slot.TopRight to "清除", Slot.BottomRight to "恢复"), f("清除", "恢复", true, true, At.Bottom, At.TopLeft, low = true))
+        assertEquals(Placed.of(Slot.TopLeft to "清除", Slot.BottomLeft to "恢复"), KeyMarks.placeFunction("清除", "恢复", true, true, At.TopRight, At.Bottom, false, true))
     }
 
     @Test

@@ -114,6 +114,25 @@ class CompactKeyboardUatTest {
         assertTrue(h.api.calls.toString(), h.api.calls.any { it.startsWith("sendKey") && "key=2," in it })
     }
 
+    // too low for the bottom edge's middle: the first corner of top left, top right, … the symbols do
+    // not take, drawn, none left out (KeyMarks.onKeys)
+    @Test
+    @Uat("ST-51")
+    fun aBottomShortcutInTheFirstCornerFree() {
+        prefs.set(AppPrefs.getInstance().keyboard.shortcutMarkPosition, KeyMarkPosition.Bottom)
+        compact()
+        h.start()
+        for (k in listOf("a", "z", "x", "c", "v")) {
+            val marks = h.key(k).shortcutMarks
+            assertEquals(k, setOf(KeyMarks.Slot.TopLeft), marks.keys)
+            assertTrue(k, marks.values.all { it.alpha != 0f })
+        }
+        fresh()
+        prefs.set(AppPrefs.getInstance().keyboard.punctuationPosition, KeyMarkPosition.TopLeft)
+        h.start()
+        assertEquals(setOf(KeyMarks.Slot.TopRight), h.key("a").shortcutMarks.keys)
+    }
+
     @Test
     @Uat("ST-51")
     fun theShortcutIsDrawnTopLeftBesideTheSymbol() {

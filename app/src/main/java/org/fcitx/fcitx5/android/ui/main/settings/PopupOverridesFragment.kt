@@ -190,7 +190,10 @@ class PopupOverridesFragment : KeyCapsPageFragment() {
     private fun functionMarks(names: List<String>): KeyMarks.Placed<KeyCaps.Mark> {
         val (up, down) = names.map(::markOf)
         val l = layers.layers
-        return KeyMarks.placeFunction(up, down, l.up != SwipeLayers.Layer.Off, l.down != SwipeLayers.Layer.Off, markSpots().shortcut)
+        val spots = markSpots()
+        return KeyMarks.placeFunction(
+            up, down, l.up != SwipeLayers.Layer.Off, l.down != SwipeLayers.Layer.Off, spots.symbol, spots.shortcut, landscape, keyboardCompact(),
+        )
     }
 
     /** [names]' shortcuts (one, or a function key's up and down) edited, under [label]. */
