@@ -333,10 +333,13 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     /**
      * Before the views are made anew for [why]: what was typed ended where [ViewRebuild.endsComposition]
      * ([endComposition]). The new views show the caches as they are, then the end's events empty
-     * their code row and bar.
+     * their code row and bar. A clear of what was typed goes with it: the keyboard may be another
+     * ([ClearedText.forgetTyped]).
      */
     private fun rebuilding(why: ViewRebuild) {
-        if (why.endsComposition) endComposition()
+        if (!why.endsComposition) return
+        endComposition()
+        clearedText.forgetTyped()
     }
 
     /**

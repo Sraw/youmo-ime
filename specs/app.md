@@ -138,7 +138,8 @@ typed is in, the field's edits as `EditPlan` steps. 清除 (`EditPlan.clear`: wh
 selection, else all before the cursor, else all after) is kept in memory (`ClearedText`, under the EditorInfo input started with, by identity, forgotten as
 input starts in another field or finishes; at most 16), 恢复 putting clears back last first while the
 field reads as each left it and nothing is typed (pinyin never reaching the field, a clear of what is
-typed drops those before it); what was typed is dropped and typed
+typed drops those before it, and is forgotten as the views are made anew for a setting, `ClearedText.forgetTyped`:
+its keys are the keyboard's that typed them); what was typed is dropped and typed
 again by `HostCore.clearTyped`/`retype` (the router's log of the keys since nothing was typed: plain
 keys alone, a pick or a candidate's action ending it, as sent again by its index it could land on
 another word). The

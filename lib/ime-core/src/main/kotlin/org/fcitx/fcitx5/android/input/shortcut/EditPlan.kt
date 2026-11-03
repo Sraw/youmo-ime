@@ -122,6 +122,16 @@ class ClearedText {
     }
 
     /**
+     * What was typed ended where it was (the views made anew for a setting: ViewRebuild.endsComposition),
+     * the keyboard maybe another: a clear of what was typed forgotten, as the end dropped what is typed.
+     * Its keys are the keyboard's that typed them, which another reads otherwise or, a code of no session
+     * its keys turn to, commits as letters at its next key. The field's clears stay, the field as it was.
+     */
+    fun forgetTyped() {
+        clears.removeAll { it.typed != null }
+    }
+
+    /**
      * [field] (the app's token for the input it started, told from another by identity alone)
      * cleared: [cleared] kept, or null when that clear could not be.
      */

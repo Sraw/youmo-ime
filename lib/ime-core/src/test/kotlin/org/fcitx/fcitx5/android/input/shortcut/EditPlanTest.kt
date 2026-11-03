@@ -208,6 +208,19 @@ class EditPlanTest {
         assertEquals("", text.text)
     }
 
+    // the keyboard changed: what was typed is the keys of the one before; the text cleared since stays
+    @Test
+    fun aKeyboardMadeAnewForgetsWhatWasTypedButNotTheText() {
+        val kept = ClearedText()
+        val editor = FakeEditor("hello", cursor = 5)
+        kept.remember(f, EditPlan.Cleared(editor.field(), emptyList(), typed = "ni"))
+        editor.clear(kept)
+        kept.forgetTyped()
+        assertTrue(editor.restore(kept))
+        assertEquals("hello", editor.text)
+        assertNull("ni forgotten", kept.take(f, editor.field(), typing = false))
+    }
+
     // review M1: another field that reads the same (another chat's empty box, the same view) is
     // another input started: nothing put back there; input started anew or finished forgets all
     @Test

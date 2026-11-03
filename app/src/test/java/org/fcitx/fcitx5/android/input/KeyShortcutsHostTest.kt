@@ -13,6 +13,8 @@ import org.fcitx.fcitx5.android.core.KotlinHost
 import org.fcitx.fcitx5.android.core.ScriptedEngine
 import org.fcitx.fcitx5.android.core.keyboardOn
 import org.fcitx.fcitx5.android.core.startedHost
+import org.fcitx.fcitx5.android.data.prefs.AppPrefs
+import org.fcitx.fcitx5.android.data.prefs.PinyinKeyboard
 import org.fcitx.fcitx5.android.until as waitUntil
 import org.fcitx.fcitx5.android.utils.appContext
 import org.junit.After
@@ -47,6 +49,7 @@ class KeyShortcutsHostTest {
 
     @After
     fun tearDown() {
+        AppPrefs.getInstance().keyboard.pinyinKeyboard.let { it.setValue(it.defaultValue) }
         if (::h.isInitialized) h.close()
         if (::fcitx.isInitialized) fcitx.stop()
         if (::home.isInitialized) home.deleteRecursively()
@@ -58,6 +61,14 @@ class KeyShortcutsHostTest {
         step = { h.idle() },
         done = done,
     )
+
+    // what the main thread posted to the host done, and what it told back shown
+    private fun synced() {
+        var done = false
+        h.service.postFcitxJob { done = true }
+        until("the host's queue done") { done }
+        h.idle()
+    }
 
     private val backspace: View get() = h.inputView.findViewById(R.id.button_backspace)
 
@@ -120,6 +131,27 @@ class KeyShortcutsHostTest {
         swipe(backspace, up = false)
         h.idle()
         assertEquals("haoa", preedit)
+    }
+
+    // the keyboard changed since (the full keys for the 14): what the one before typed is no code
+    // of this one's, and would reach the field as letters with this one's next key. Its clear is
+    // dropped, as the change itself drops what is typed; a text clear stays
+    @Test
+    fun pinyinClearedIsNotTypedAgainOnAnotherKeyboard() {
+        start("你好")
+        type("ni")
+        swipe(backspace, up = true)
+        until("ni cleared") { preedit.isEmpty() }
+        swipe(backspace, up = true)
+        until("text cleared") { h.field.text.isEmpty() }
+        AppPrefs.getInstance().keyboard.pinyinKeyboard.setValue(PinyinKeyboard.Keys14)
+        h.idle()
+        swipe(backspace, up = false)
+        until("the text put back") { h.field.text.toString() == "你好" }
+        swipe(backspace, up = false)
+        synced()
+        assertEquals("", preedit)
+        assertEquals("你好", h.field.text.toString())
     }
 
     // review M1: another field, as empty as the clear left the first, gets nothing of it
