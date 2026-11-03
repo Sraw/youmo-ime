@@ -4,6 +4,10 @@ import android.graphics.BitmapFactory
 import android.graphics.fonts.Font
 import androidx.annotation.VisibleForTesting
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.core.EngineNotices
 import org.fcitx.fcitx5.android.core.HostConfigDir
@@ -22,6 +26,8 @@ import timber.log.Timber
 import java.io.File
 import java.io.FileFilter
 import java.io.FileOutputStream
+import java.nio.channels.FileChannel
+import java.nio.file.StandardOpenOption
 import java.io.IOException
 import java.io.InputStream
 import java.io.OutputStream
@@ -83,12 +89,32 @@ object ThemeFilesManager {
         }
     }
 
+    // [theme]'s json staged: [modified] set before the rename, which keeps it
+    private fun stageJson(theme: Theme.Custom, modified: Long? = null) =
+        stage { it.write(Json.encodeToString(CustomThemeSerializer, theme.withFileNames()).encodeToByteArray()) }
+            .also { temp -> modified?.let(temp::setLastModified) }
+
     // a json whole or not at all: writeText cut short (a full disk, a power cut) left an empty or half
-    // file, which no start reads again, the theme lost. [modified] set before the rename, which keeps it
+    // file, which no start reads again, the theme lost
     private fun writeWhole(theme: Theme.Custom, modified: Long? = null) {
-        val temp = stage { it.write(Json.encodeToString(CustomThemeSerializer, theme.withFileNames()).encodeToByteArray()) }
-        modified?.let(temp::setLastModified)
-        temp.renameOver(themeFile(theme))
+        stageJson(theme, modified).renameOver(themeFile(theme))
+        syncDir()
+    }
+
+    // the renames on disk too, not only the files' bytes (a power cut right after one could undo it).
+    // Linux (Android) syncs a directory opened for reading; another system may refuse: nothing lost but this
+    private fun syncDir() {
+        try {
+            FileChannel.open(dir.toPath(), StandardOpenOption.READ).use { it.force(true) }
+        } catch (e: IOException) {
+            Timber.d(e, "Theme dir not synced")
+        }
+    }
+
+    /** For a test: the next listing clears SAVING again, as a process's first does. */
+    @VisibleForTesting
+    internal fun forgetSwept() {
+        swept = false
     }
 
     // a planted json (a crafted import, another app on shared storage) would aim delete and export at any file
@@ -154,7 +180,9 @@ object ThemeFilesManager {
     fun listThemes(legacy: LegacyLook? = null): MutableList<Theme.Custom> {
         if (writable && !swept) {
             swept = true
-            File(dir, SAVING).listFiles()?.forEach { it.delete() }
+            val saving = File(dir, SAVING)
+            // a plain file there would refuse every save till it went
+            if (saving.isDirectory) saving.listFiles()?.forEach { it.delete() } else saving.delete()
         }
         val files = dir.listFiles(FileFilter { it.extension == "json" }) ?: return mutableListOf()
         return files
@@ -237,7 +265,8 @@ object ThemeFilesManager {
                     val extracted = zipStream.extract(tempDir, flat = true) { count, size, total ->
                         ThemeAssetLimits.entry(count, size, total)?.let(::refused)
                     }
-                    val jsonFile = extracted.find { it.isFile && it.extension == "json" }
+                    // not a Mac's "._<name>" beside it (its attributes, some zippers put at the top)
+                    val jsonFile = extracted.find { it.isFile && it.extension == "json" && !it.name.startsWith("._") }
                         ?: errorRuntime(R.string.exception_theme_json)
                     val (decoded, migrated) = Json.decodeFromString(
                         CustomThemeSerializer.WithMigrationStatus,
@@ -250,20 +279,27 @@ object ThemeFilesManager {
                         errorRuntime(R.string.exception_theme_name_clash)
                     val oldTheme = ThemeManager.getTheme(decoded.name) as? Theme.Custom
                     val newCreated = oldTheme == null
+                    // a json of that name not listed: a later build's is kept (this one cannot read it, nor
+                    // know its files); one that reads (a file of it missing) is replaced, its files with it; a
+                    // broken one is replaced
+                    val unlisted = if (oldTheme == null) themeFile(decoded).takeIf { it.isFile }?.let { file ->
+                        runCatching { Json.decodeFromString(CustomThemeSerializer, file.readText()) }.onFailure {
+                            if (it is CustomThemeSerializer.UnknownVersion) errorRuntime(R.string.exception_theme_newer_kept)
+                        }.getOrNull()
+                    } else null
                     // every file found and checked before any is copied: one refused would leave the others in dir
                     val files = decoded.look.files().associate { name ->
                         val target = importedFile(name) ?: errorRuntime(R.string.exception_theme_file, name)
                         target.name to (extracted.find { it.isFile && it.name == target.name } ?: errorRuntime(R.string.exception_theme_file, name))
                     }
                     check(decoded.look, files)
-                    // another listed theme's file is a clash; one no theme names (left by a backup from before
-                    // 3.0 put back over a 3.0 theme's json, say) is taken over, else its name could never be imported
-                    val others = ThemeManager.getAllThemes().filterIsInstance<Theme.Custom>()
-                        .filter { it.name != decoded.name }.flatMap { it.look.files() }.map { File(it).name }.toSet()
+                    // another theme's file is a clash; one no theme names (left by a backup from before 3.0 put
+                    // back over a 3.0 theme's json, say) is taken over, else its name could never be imported
+                    val others = othersFiles(decoded.name)
                     files.keys.firstOrNull { it in others }?.let { errorRuntime(R.string.exception_theme_file_clash, it) }
-                    val oldFiles = oldTheme?.look?.files().orEmpty().map { File(it).name }.toSet()
+                    val oldFiles = (oldTheme ?: unlisted)?.look?.files().orEmpty().map { File(it).name }.toSet()
                     val newTheme = decoded.copy(look = decoded.look.mapFiles { File(dir, File(it).name).path })
-                    place(files, oldFiles) { writeWhole(newTheme) }
+                    place(files, oldFiles, newTheme)
                     // only once the json names the new files: one not written leaves the theme it replaces whole
                     (oldFiles - files.keys).forEach { File(dir, it).delete() }
                     Triple(newCreated, newTheme, migrated)
@@ -272,26 +308,52 @@ object ThemeFilesManager {
         }
 
     /**
-     * [files] (by name in dir) copied whole beside the themes, then each renamed into place, then [json]:
-     * if any of it fails, none of what was not in dir as [oldFiles] is left (a copy cut short would be
-     * an orphan whose name no later import could take). One of [oldFiles] already renamed over keeps the
-     * new bytes: the theme it was of is drawn with them, its json intact.
+     * The files of every theme but [name], by name: the listed ones', and of each json not listed (a later
+     * build's, a broken one) every string that is the name of a file here, read loosely: its files are
+     * not known, and taken over they would be lost to it when it is read again.
      */
-    private fun place(files: Map<String, File>, oldFiles: Set<String>, json: () -> Unit) {
+    private fun othersFiles(name: String): Set<String> {
+        val listed = ThemeManager.getAllThemes().filterIsInstance<Theme.Custom>()
+        val here = dir.list()?.toSet().orEmpty()
+        val unlisted = dir.listFiles(FileFilter { it.extension == "json" }).orEmpty()
+            .filter { f -> f.nameWithoutExtension != name && listed.none { f.nameWithoutExtension == it.name } }
+            .flatMap { f -> runCatching { strings(Json.parseToJsonElement(f.readText())) }.getOrDefault(emptyList()) }
+            .map { File(it).name }.filter { it in here }
+        return listed.filter { it.name != name }.flatMap { it.look.files() }.map { File(it).name }.toSet() + unlisted
+    }
+
+    private fun strings(e: JsonElement): List<String> = when (e) {
+        is JsonObject -> e.values.flatMap(::strings)
+        is JsonArray -> e.flatMap(::strings)
+        is JsonPrimitive -> if (e.isString) listOf(e.content) else emptyList()
+    }
+
+    /**
+     * [files] (by name in dir) and [theme]'s json copied whole beside the themes, then the files renamed
+     * into place, the json last: if any of it fails, none of what was not in dir as [oldFiles] is left (a
+     * copy cut short would be an orphan whose name no later import could take). All written before any is
+     * renamed, only a rename in one directory can fail between the files and the json; one of [oldFiles]
+     * renamed over by then keeps the new bytes, drawn with them by the theme it was of, its json intact.
+     */
+    private fun place(files: Map<String, File>, oldFiles: Set<String>, theme: Theme.Custom) {
         val staged = mutableMapOf<String, File>()
         val placed = mutableListOf<File>()
+        var json: File? = null
         var done = false
         try {
             files.forEach { (name, from) -> staged[name] = stage { out -> from.inputStream().use { it.copyTo(out) } } }
+            json = stageJson(theme)
             staged.forEach { (name, temp) -> File(dir, name).also { temp.renameOver(it); placed += it } }
-            json()
+            json.renameOver(themeFile(theme))
             done = true
         } finally {
             if (!done) {
                 staged.values.forEach { it.delete() }
+                json?.delete()
                 placed.filter { it.name !in oldFiles }.forEach { it.delete() }
             }
         }
+        syncDir()
     }
 
     // the pictures' cuts, key images and fonts: read before taken, each as what it is named for

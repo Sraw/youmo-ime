@@ -520,19 +520,24 @@ is counted and its bytes metered, never written. Limits (`ThemeAssetLimits`, the
 read from it), counted as the zip is unpacked (a zip bomb stops at the first entry past one; a directory
 is an entry): 300 entries, 32 MB a file, 64 MB in all; a picture's cuts 4096 px a side (the source photo
 is not limited); a key image 1024 px a side and 2 MB; a font a file's 32 MB and it must load; 400
-overrides. A file another listed theme names is a clash (`exception_theme_file_clash`); one no listed
-theme names (an orphan: an older backup's json put back over a 3.0 theme's) is taken over. A later
-build's format is refused in the user's words (`CustomThemeSerializer.UnknownVersion`).
+overrides. The json is the zip's top `.json` that is not a Mac's `._` attributes file. A file another
+theme names is a clash (`exception_theme_file_clash`): a listed theme's files, and of a json not listed
+(a later build's, one that does not decode) every string in it that is the name of a file in the dir,
+read loosely; one no json names (an orphan: an older backup's json put back over a 3.0 theme's) is taken
+over. A json of the theme's name that is not listed is replaced, its files with it if it decodes (a file
+of it missing), except a later build's: kept, the import refused (`exception_theme_newer_kept`). A
+later build's format imported is refused in the user's words (`CustomThemeSerializer.UnknownVersion`).
 
 Every write is whole or not at all: a theme's json and an import's files are written in `.saving/` in
 the theme dir (a directory: no import's file can be one there, no listing reads one), synced, then
-renamed into place (a migration's json given its old time first); what a kill left there is cleared at
-the process's first listing.
-An import puts its files in place, then its json, and only then deletes the files the theme it
-replaces had and it does not name; if any step fails, the files it added are deleted (one of the old
-theme's it renamed over keeps the new bytes). A migration saved again while listing that fails (a
-full disk) is logged and drawn migrated all the same, saved at the next start; `ThemeManager.saveTheme`
-tells the user and returns false. Export writes each named file once (only files of the theme dir:
+renamed into place (a migration's json given its old time first), the dir synced after (where the
+system lets a directory be: Linux does); what a kill left there, or a plain file of that name, is
+cleared at the process's first listing. An import writes its files and its json there, then renames
+the files into place and the json last, and only then deletes the files the theme it replaces had and
+it does not name; if any step fails, the files it added are deleted (one of the old theme's renamed
+over by then keeps the new bytes: only a rename in one directory can fail there). A migration saved
+again while listing that fails (a full disk) is logged and drawn migrated all the same, saved at the
+next start; `ThemeManager.saveTheme` tells the user (`theme_not_saved`, no path) and returns false. Export writes each named file once (only files of the theme dir:
 a planted json's other paths are refused before anything is written), then the json; delete removes
 the json and every named file that is in the theme dir. Listing skips a theme with a file missing, and
 one that does not read (told once, `user_data_unreadable`), leaving its file as it is.

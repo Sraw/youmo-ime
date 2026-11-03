@@ -5,6 +5,7 @@
 package org.fcitx.fcitx5.android.data.theme
 
 import android.content.res.Configuration
+import android.widget.Toast
 import androidx.annotation.Keep
 import androidx.core.content.edit
 import androidx.preference.PreferenceManager
@@ -94,9 +95,10 @@ object ThemeManager {
         try {
             ThemeFilesManager.saveThemeFiles(theme)
         } catch (e: IOException) {
-            // a full disk, say: its file as it was, the list too
+            // a full disk, say: its file as it was, the list too. Told in the user's words: the exception's
+            // message is a path of the app's files
             Timber.w(e, "Theme ${theme.name} not saved")
-            appContext.toast(e)
+            appContext.toast(R.string.theme_not_saved, Toast.LENGTH_LONG)
             return false
         }
         customThemes.indexOfFirst { it.name == theme.name }.also {

@@ -131,6 +131,8 @@
     <string name="exception_theme_overrides">The theme styles more than %1$s single keys</string>
     <string name="exception_theme_file_clash">The theme\'s file %1$s has the name of another theme\'s file</string>
     <string name="exception_theme_version">This theme was made by a newer version of this keyboard (theme format %1$s): update it to use the theme</string>
+    <string name="exception_theme_newer_kept">A theme of this name made by a newer version of this keyboard is here: this version cannot read it, so it is not replaced</string>
+    <string name="theme_not_saved">The theme could not be saved: the phone\'s storage may be full</string>
     <string name="exception_theme_src_image">Unable to save source image of theme background</string>
     <string name="follow_system_day_night_theme">Follow system day/night theme</string>
     <string name="follow_system_day_night_theme_summary">Override manual theme selection</string>

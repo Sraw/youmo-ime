@@ -38,6 +38,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
 import org.robolectric.shadows.ShadowEnvironment
+import org.robolectric.shadows.ShadowToast
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.IOException
@@ -65,6 +66,9 @@ class ThemeFilesManagerTest {
         dir.mkdirs()
         ThemeFilesManager.probe = FakeProbe
         FakeProbe.asked.clear()
+        FakeProbe.beside.clear()
+        // the process's first listing (the app's start) done: a test's own .saving is not cleared under it
+        ThemeFilesManager.listThemes()
     }
 
     @After
@@ -77,10 +81,14 @@ class ThemeFilesManagerTest {
     private object FakeProbe : ThemeFilesManager.AssetProbe {
         val asked = mutableListOf<String>()
 
+        // what was beside each image as it was read: the import's unpacked zip
+        val beside = mutableSetOf<String>()
+
         private val png = byteArrayOf(0x89.toByte(), 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a)
 
         override fun imageSize(file: File): Pair<Int, Int>? {
             asked += file.name
+            beside += file.parentFile!!.list()!!
             val bytes = file.readBytes()
             if (bytes.size >= 24 && bytes.copyOf(8).contentEquals(png)) {
                 return ByteBuffer.wrap(bytes).let { it.getInt(16) to it.getInt(20) }
@@ -408,8 +416,9 @@ class ThemeFilesManagerTest {
         val changed = theme.copy(isDark = !theme.isDark)
         assertThrows(IOException::class.java) { ThemeFilesManager.saveThemeFiles(changed) }
         assertEquals(before, File(dir, "w.json").readText())
-        // the list page's save: refused and told, not a crash
+        // the list page's save: refused and told in the user's words (no path of the app's), not a crash
         assertFalse(ThemeManager.saveTheme(changed))
+        assertEquals(appContext.getString(R.string.theme_not_saved), ShadowToast.getTextOfLatestToast())
         assertEquals(before, File(dir, "w.json").readText())
         File(dir, ".saving").delete()
         ThemeFilesManager.saveThemeFiles(changed)
@@ -527,6 +536,9 @@ class ThemeFilesManagerTest {
         val withAttributes = zip("f.json" to json(full("f")), *files("f"), "__MACOSX/" to "", "__MACOSX/._f-q.png" to "attr")
         ThemeFilesManager.importTheme(withAttributes).getOrThrow()
         assertEquals(setOf("f.json") + files("f").map { it.first }, names().toSet())
+        // not even unpacked beside the theme's files
+        assertTrue(FakeProbe.beside.isNotEmpty())
+        assertFalse(FakeProbe.beside.toString(), "__MACOSX" in FakeProbe.beside)
         dir.listFiles()!!.forEach { it.delete() }
         // the theme's own files in a folder: not found
         val inAFolder = zip("t/f.json" to json(full("f")), *files("f").map { "t/${it.first}" to it.second }.toTypedArray())
@@ -563,6 +575,87 @@ class ThemeFilesManagerTest {
         val e = ThemeFilesManager.exportTheme(planted, out).exceptionOrNull()!!
         assertEquals(appContext.getString(R.string.exception_theme_file, "pinyin.user"), e.message)
         assertEquals(0, out.size())
+    }
+
+    @Test
+    fun aMacsAttributesFileAtTheTopIsNotTakenForTheJson() {
+        val zip = zip("._f.json" to "\u0000\u0005\u0016\u0007 attributes", "f.json" to json(full("f")), *files("f"))
+        ThemeFilesManager.importTheme(zip).getOrThrow()
+        assertEquals(setOf("f.json") + files("f").map { it.first }, names().toSet())
+    }
+
+    // a later build's theme, listed by none here: its json and the key image it names
+    private fun laterTheme(): String {
+        files("l").forEach { (name, text) -> File(dir, name).writeText(text) }
+        return json(full("l")).replace("\"version\":\"3.0\"", "\"version\":\"3.1\"").also { File(dir, "l.json").writeText(it) }
+    }
+
+    @Test
+    fun aFileALaterBuildsThemeNamesIsAClashThoughNotListed() {
+        val later = laterTheme()
+        ThemeManager.refreshThemes()
+        try {
+            val before = snapshot()
+            val b = full("b").let { t -> t.copy(look = t.look.mapFiles { if (it == "b-q.png") "l-q.png" else it }) }
+            val bFiles = files("b").map { if (it.first == "b-q.png") "l-q.png" to "16x16" else it }.toTypedArray()
+            val e = ThemeFilesManager.importTheme(zip("b.json" to json(b), *bFiles)).exceptionOrNull()!!
+            assertEquals(appContext.getString(R.string.exception_theme_file_clash, "l-q.png"), e.message)
+            assertEquals(before, snapshot())
+            assertEquals(later, File(dir, "l.json").readText())
+            // a broken json protects nothing it might have named: what cannot be read names no file
+            File(dir, "x.json").writeText("{\"name\":\"x\",\"keyFont\":\"c-q.png\"")
+            File(dir, "c-q.png").writeText("orphan")
+            ThemeFilesManager.importTheme(zip("c.json" to json(full("c")), *files("c"))).getOrThrow()
+            assertEquals("64x64", File(dir, "c-q.png").readText())
+        } finally {
+            dir.listFiles()!!.forEach { it.deleteRecursively() }
+            ThemeManager.refreshThemes()
+        }
+    }
+
+    @Test
+    fun aThemeOfTheSameNameNotListedIsReplacedUnlessALaterBuildMadeIt() {
+        val later = laterTheme()
+        ThemeManager.refreshThemes()
+        try {
+            val plain = ThemePreset.TransparentDark.deriveCustomNoBackground("l")
+            val e = ThemeFilesManager.importTheme(zip("l.json" to json(plain))).exceptionOrNull()!!
+            assertEquals(appContext.getString(R.string.exception_theme_newer_kept), e.message)
+            assertEquals(later, File(dir, "l.json").readText())
+            // a broken one is replaced
+            File(dir, "l.json").writeText("{\"version\":")
+            assertTrue(ThemeFilesManager.importTheme(zip("l.json" to json(plain))).getOrThrow().first)
+            assertEquals(plain, ThemeFilesManager.listThemes().single { it.name == "l" })
+            // one that reads, not listed for a file it lost: replaced, the files it had and the new one does not name gone
+            ThemeFilesManager.importTheme(zip("u.json" to json(full("u")), *files("u"))).getOrThrow()
+            File(dir, "u-fn.png").delete()
+            ThemeManager.refreshThemes()
+            ThemeFilesManager.importTheme(zip("u.json" to json(ThemePreset.TransparentDark.deriveCustomNoBackground("u")))).getOrThrow()
+            assertEquals(emptyList<String>(), names().filter { it.startsWith("u") && it != "u.json" })
+        } finally {
+            dir.listFiles()!!.forEach { it.deleteRecursively() }
+            ThemeManager.refreshThemes()
+        }
+    }
+
+    @Test
+    fun whatAKillLeftWhereFilesAreWrittenIsClearedAtTheFirstListing() {
+        File(dir, ".saving").mkdirs()
+        val left = File(dir, ".saving/0c1d").apply { writeText("half a json") }
+        ThemeFilesManager.forgetSwept()
+        ThemeFilesManager.listThemes()
+        assertFalse(left.exists())
+        // later listings leave it be: a save may be writing there
+        File(dir, ".saving/0c1e").writeText("being written")
+        ThemeFilesManager.listThemes()
+        assertTrue(File(dir, ".saving/0c1e").exists())
+        // a plain file in its place would refuse every save: gone too
+        File(dir, ".saving").deleteRecursively()
+        blockWrites()
+        ThemeFilesManager.forgetSwept()
+        ThemeFilesManager.listThemes()
+        ThemeFilesManager.saveThemeFiles(ThemePreset.TransparentDark.deriveCustomNoBackground("s"))
+        assertTrue(File(dir, "s.json").exists())
     }
 
     companion object {
