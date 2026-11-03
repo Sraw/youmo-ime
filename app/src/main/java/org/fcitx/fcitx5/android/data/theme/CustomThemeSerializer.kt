@@ -15,12 +15,14 @@ import kotlinx.serialization.json.boolean
 import kotlinx.serialization.json.int
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.input.theme.Box
 import org.fcitx.fcitx5.android.input.theme.Crop
 import org.fcitx.fcitx5.android.input.theme.LookDefaults
 import org.fcitx.fcitx5.android.input.theme.Palette
 import org.fcitx.fcitx5.android.input.theme.Picture
 import org.fcitx.fcitx5.android.utils.NostalgicSerializer
+import org.fcitx.fcitx5.android.utils.appContext
 
 object CustomThemeSerializer : JsonTransformingSerializer<Theme.Custom>(ThemeFileSerializer) {
 
@@ -34,8 +36,7 @@ object CustomThemeSerializer : JsonTransformingSerializer<Theme.Custom>(ThemeFil
     override fun transformDeserialize(element: JsonElement): JsonElement {
         val version = element.jsonObject[VERSION]?.let {
             val version = it.jsonPrimitive.content
-            if (version !in knownVersions)
-                error("$version is not in known versions: $knownVersions")
+            if (version !in knownVersions) throw UnknownVersion(version, knownVersions)
             version
         } ?: FALLBACK_VERSION
         return applyStrategy(version, element.jsonObject).removeVersion()
@@ -97,6 +98,16 @@ object CustomThemeSerializer : JsonTransformingSerializer<Theme.Custom>(ThemeFil
             },
             MigrationStrategy("1.0", EmptyTransform)
         )
+
+    /**
+     * A theme of a format this build does not know, a later build's most likely: [message] the log's;
+     * the user's ([getLocalizedMessage], what an import's dialog shows) read only then, so a JVM test needs no app.
+     */
+    class UnknownVersion(val version: String, known: List<String>) :
+        IllegalStateException("$version is not in known versions: $known") {
+        override fun getLocalizedMessage(): String =
+            runCatching { appContext.getString(R.string.exception_theme_version, version) }.getOrDefault(message.orEmpty())
+    }
 
     private const val VERSION = "version"
 

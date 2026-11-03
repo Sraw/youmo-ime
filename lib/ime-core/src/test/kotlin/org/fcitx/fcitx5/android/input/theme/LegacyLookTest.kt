@@ -66,8 +66,6 @@ class LegacyLookTest {
         assertNull(l.keyImage(1024, 1024, l.MAX_KEY_IMAGE_BYTES))
         assertEquals(ThemeAssetLimits.Breach.KeyImageSide, l.keyImage(10, 1025, 1))
         assertEquals(ThemeAssetLimits.Breach.KeyImageSize, l.keyImage(10, 10, l.MAX_KEY_IMAGE_BYTES + 1))
-        assertNull(l.font(l.MAX_FONT_BYTES))
-        assertEquals(ThemeAssetLimits.Breach.FontSize, l.font(l.MAX_FONT_BYTES + 1))
         val look = LookDefaults.look(PALETTE)
         assertNull(l.look(look))
         val many = (1..401).associate { "qwerty/k$it" to KeyOverride(null, null, KeyLabel.Show) }

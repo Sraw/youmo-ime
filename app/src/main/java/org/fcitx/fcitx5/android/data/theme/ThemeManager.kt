@@ -17,6 +17,8 @@ import org.fcitx.fcitx5.android.utils.WeakHashSet
 import org.fcitx.fcitx5.android.utils.appContext
 import org.fcitx.fcitx5.android.utils.isDarkMode
 import org.fcitx.fcitx5.android.utils.toast
+import timber.log.Timber
+import java.io.IOException
 
 object ThemeManager {
 
@@ -86,10 +88,17 @@ object ThemeManager {
         onChangeListeners.forEach { it.onThemeChange(_activeTheme) }
     }
 
-    /** Saves [theme]; whether it was, none while the themes are not settled (the user told). */
+    /** Saves [theme]; whether it was, none while the themes are not settled or it could not be written (the user told). */
     fun saveTheme(theme: Theme.Custom): Boolean {
         if (refuseIfNotSettled()) return false
-        ThemeFilesManager.saveThemeFiles(theme)
+        try {
+            ThemeFilesManager.saveThemeFiles(theme)
+        } catch (e: IOException) {
+            // a full disk, say: its file as it was, the list too
+            Timber.w(e, "Theme ${theme.name} not saved")
+            appContext.toast(e)
+            return false
+        }
         customThemes.indexOfFirst { it.name == theme.name }.also {
             if (it >= 0) customThemes[it] = theme else customThemes.add(0, theme)
         }

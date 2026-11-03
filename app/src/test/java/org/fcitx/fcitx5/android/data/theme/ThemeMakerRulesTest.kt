@@ -14,6 +14,8 @@ import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.encodeToJsonElement
 import kotlinx.serialization.json.put
+import org.fcitx.fcitx5.android.FcitxApplication
+import org.fcitx.fcitx5.android.core.phoneStorage
 import org.fcitx.fcitx5.android.input.theme.Area
 import org.fcitx.fcitx5.android.input.theme.Box
 import org.fcitx.fcitx5.android.input.theme.BoxBlur
@@ -43,7 +45,9 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
 import java.io.ByteArrayOutputStream
+import java.io.File
 import java.time.LocalDateTime
 import java.util.zip.CRC32
 import java.util.zip.Deflater
@@ -58,6 +62,8 @@ import java.util.zip.ZipOutputStream
  * what this app and one before 3.0 export). Changed here, the page's test fails till it follows.
  */
 @RunWith(RobolectricTestRunner::class)
+// the real application: the export goes through appContext (where the themes are)
+@Config(application = FcitxApplication::class)
 class ThemeMakerRulesTest {
 
     private val json = Json { prettyPrint = true }
@@ -333,7 +339,7 @@ class ThemeMakerRulesTest {
     }.toByteArray()
 
     private fun entries(zip: ByteArray) = ZipInputStream(zip.inputStream()).use { z ->
-        generateSequence { z.nextEntry?.let { it.name to z.readBytes().decodeToString() } }.toList()
+        generateSequence { z.nextEntry?.let { it.name to z.readBytes() } }.toList()
     }
 
     @Test
@@ -343,7 +349,14 @@ class ThemeMakerRulesTest {
             t.copy(look = t.look.mapFiles { it.replace("full-", "from-app-") })
         }
         val files = theme.look.files().map { it to png(if ("landscape" in it) 24 else 16, if ("landscape" in it) 12 else 24, 0x80336699.toInt()) }
-        val exported = zip(files + ("from-app.json" to Json.encodeToString(CustomThemeSerializer, theme).encodeToByteArray()))
+        // in the theme dir, as the app keeps them (it exports no other file), and out through its own export
+        phoneStorage()
+        val dir = ThemeFilesManager.newCustomBackgroundImages().second.parentFile!!.apply { mkdirs() }
+        files.forEach { (name, bytes) -> File(dir, name).writeBytes(bytes) }
+        val out = ByteArrayOutputStream()
+        ThemeFilesManager.exportTheme(theme.copy(look = theme.look.mapFiles { File(dir, it).path }), out).getOrThrow()
+        // its entries as it wrote them, in its order; only their times fixed (it stamps the time of the export)
+        val exported = zip(entries(out.toByteArray()))
         assertEquals(theme.look.files() + "from-app.json", entries(exported).map { it.first })
         ThemeMakerTestdata.check("from-app.zip", exported)
         // one before 3.0: its two images and its 2.1 json

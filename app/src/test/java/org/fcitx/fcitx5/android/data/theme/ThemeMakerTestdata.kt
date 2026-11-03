@@ -30,4 +30,7 @@ object ThemeMakerTestdata {
     }
 
     fun check(name: String, text: String) = check(name, text.encodeToByteArray())
+
+    /** The file [name] as it is in the repo: for the app's own tests to read what the page reads. */
+    fun file(name: String) = File(dir, name)
 }

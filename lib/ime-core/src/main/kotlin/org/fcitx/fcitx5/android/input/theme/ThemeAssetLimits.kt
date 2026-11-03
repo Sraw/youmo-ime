@@ -7,7 +7,8 @@ package org.fcitx.fcitx5.android.input.theme
 /**
  * How big a theme may be as it is imported: a zip is counted as it is unpacked and refused at the
  * first entry past a limit (a zip bomb with it), an image by its size read before it is decoded.
- * Enough for every key's image, pressed and not, on every board.
+ * Enough for every key's image, pressed and not, on every board. A font has no limit of its own: a
+ * CJK one is often 10–30 MB, so it is held to a file's (design §3.6), checked as the zip is unpacked.
  */
 object ThemeAssetLimits {
 
@@ -17,11 +18,10 @@ object ThemeAssetLimits {
     const val MAX_PICTURE_SIDE = 4096
     const val MAX_KEY_IMAGE_SIDE = 1024
     const val MAX_KEY_IMAGE_BYTES = 2L * 1024 * 1024
-    const val MAX_FONT_BYTES = MAX_FILE_BYTES
     const val MAX_OVERRIDES = 400
 
     /** A limit passed, and by what. */
-    enum class Breach { Entries, FileSize, TotalSize, PictureSide, KeyImageSide, KeyImageSize, FontSize, Overrides }
+    enum class Breach { Entries, FileSize, TotalSize, PictureSide, KeyImageSide, KeyImageSize, Overrides }
 
     /** The [count]th entry, [size] bytes, after [total] bytes before it. */
     fun entry(count: Int, size: Long, total: Long): Breach? = when {
@@ -39,8 +39,6 @@ object ThemeAssetLimits {
         bytes > MAX_KEY_IMAGE_BYTES -> Breach.KeyImageSize
         else -> null
     }
-
-    fun font(bytes: Long): Breach? = if (bytes > MAX_FONT_BYTES) Breach.FontSize else null
 
     fun look(look: ThemeLook): Breach? = if (look.keys.overrides.size > MAX_OVERRIDES) Breach.Overrides else null
 }
