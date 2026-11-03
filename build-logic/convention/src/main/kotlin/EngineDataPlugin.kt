@@ -587,7 +587,8 @@ class EngineDataPlugin : Plugin<Project> {
      * `engine/charinfo.data`: ime-dict-tool's `charinfo`, each character's radical, strokes, parts and
      * stroke order; the build fails if a character handwriting knows has no reading, radical or strokes,
      * or under 97% of them are taken apart, or under 94% have the mainland's stroke order; or when one of
-     * lexicon/stroke-order.tsv's orders is unlike Unihan's count or rime-stroke's with no note why.
+     * lexicon/stroke-order.tsv's orders is unlike Unihan's count or rime-stroke's with no note why, or has a note
+     * with nothing to excuse.
      */
     @CacheableTask
     abstract class CompileCharInfo : ToolDataTask() {

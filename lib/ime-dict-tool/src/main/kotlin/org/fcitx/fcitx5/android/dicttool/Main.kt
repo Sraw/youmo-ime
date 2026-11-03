@@ -128,7 +128,8 @@ private val COMMANDS = listOf(
             rime-stroke's orders where Unihan counts none,
             the mainland's orders (lexicon/stroke-order.tsv;
             one unlike Unihan's count or rime-stroke's
-            orders, with no note why, fails);
+            orders with no note why, or noted with
+            nothing to excuse, fails);
             how many of the characters handwriting knows
             (--cover) have each, and readings, checked
         """,

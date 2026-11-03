@@ -167,6 +167,8 @@ class CharInfoTest {
         }
         assertEquals(2, stale.line)
         assertTrue(stale.message, "江 a note, but its order is as Unihan counts and rime-stroke writes" in stale.message!!)
+        val unknown = assertThrows(SourceException::class.java) { CharInfoBuilder().orders(sequenceOf("江\t441121\tsome note"), "o.tsv").build() }
+        assertTrue(unknown.message, "江 a note, but neither Unihan nor rime-stroke has the character to differ from" in unknown.message!!)
         // a line ended \r\n, a blank one between
         val crlf = CharInfoBuilder().unihan(UNIHAN.lineSequence(), "u.txt").radicals(RADICALS.lineSequence(), "r.txt")
             .orders(sequenceOf("江\t441121\r", "", "行\t332112\r"), "o.tsv")

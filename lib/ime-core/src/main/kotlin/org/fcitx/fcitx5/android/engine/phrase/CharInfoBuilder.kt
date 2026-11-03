@@ -168,6 +168,8 @@ class CharInfoBuilder {
                 else -> null
             }
             when {
+                cp in explained && why == null && count == null && rimeOrders[cp] == null ->
+                    cp to "$c a note, but neither Unihan nor rime-stroke has the character to differ from"
                 cp in explained && why == null -> cp to "$c a note, but its order is as Unihan counts and rime-stroke writes"
                 cp !in explained && why != null -> cp to "$why, with no note why"
                 else -> null
@@ -176,7 +178,7 @@ class CharInfoBuilder {
         if (odd.isNotEmpty()) {
             throw SourceException(
                 ordersSource, orderLines.getValue(odd[0].first),
-                "${odd.size} stroke orders unlike Unihan's count or rime-stroke's: " + odd.joinToString("; ") { it.second },
+                "${odd.size} stroke orders unlike Unihan's count or rime-stroke's with no note why, or noted with nothing to excuse: " + odd.joinToString("; ") { it.second },
             )
         }
         val chars = radicalOf.keys.sorted().mapNotNull { cp -> entry(cp)?.let { cp to it } }
