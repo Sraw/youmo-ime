@@ -237,6 +237,15 @@ preview reads (format 1: views of items, every key name one `KeyNames` knows, ev
 field, every icon there). The test task takes `web/theme-maker` as an
 input, so a change to the page reruns it. Nothing in those blocks is edited by hand.
 
+Changing the page: edit `web/theme-maker/src/` (`page.html` with slots for the rest, `style.css`,
+`lib.js`: everything the tests hold to the app's rules, `ui.js`: the page), then
+`node web/theme-maker/tools/assemble.mjs`, which writes `index.html`: the sources put in, the
+generated blocks kept from the `index.html` there is, and the Content-Security-Policy's
+`script-src` set to the two scripts' SHA-256 (nothing else runs; an edit to `index.html` by hand
+breaks them). The page's test fails when `index.html` is not what assemble makes of `src/`, and
+when the CSP's hashes are not its scripts'. Commit `src/` and `index.html` together. The site is
+`index.html` alone: the Pages workflow leaves `src/`, `tools/` and `test/` out.
+
 ## Golden files from upstream fcitx
 
 The host is fcitx ported to Kotlin, and the native sources are not in the tree. What fcitx does is kept

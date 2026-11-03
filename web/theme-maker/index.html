@@ -4,8 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <!-- nothing leaves the browser: no request of any kind, so the line on the page is true; a link someone adds later is refused too.
-     Only the page's own two scripts run (by their hashes, assemble.py writes them; the page's test checks them) -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src blob: data:; font-src blob: data:; style-src 'unsafe-inline'; script-src 'sha256-4kiI+xAqv58BKDl5Ijwm7eUgnyRjv/pW6LbNyc5bYXs=' 'sha256-rBzUu73S23RAYxs9UlEJkQt27DWKY7jopOCEa+wqXkc='; connect-src blob: data:; base-uri 'none'; form-action 'none'">
+     Only the page's own two scripts run (by their hashes: tools/assemble.mjs writes them, the page's test checks them) -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src blob: data:; font-src blob: data:; style-src 'unsafe-inline'; script-src 'sha256-VoupqmVclkGQ1p1uqcKElcq6XVSg0hvjaJ2RkcFcGNw=' 'sha256-+FrGa+BgcT7GQHrTOdlf9nYw7f+kl84R725ngNETBYo='; connect-src blob: data:; base-uri 'none'; form-action 'none'">
 <meta name="color-scheme" content="light dark">
 <title>幽默输入法 · 主题制作</title>
 <style>
@@ -1888,6 +1888,33 @@ dialog::backdrop { background: #0008; }
     return { letter: 'keyBackgroundColor', function: 'altKeyBackgroundColor', enter: 'accentKeyBackgroundColor' }[kind];
   }
 
+  // A source picture may be a phone's photo (the app keeps it as it is); one past these is not decoded
+  const SOURCE_SIDE = 12000;
+  const SOURCE_PIXELS = 108e6;
+
+  /**
+   * How big an image the page decodes, by what it is in the theme ([role]: 'source', 'key' or a cut of
+   * the picture): {side, pixels} it must be within (past them the header said enough: a few bytes can
+   * say 30000 × 30000, gigabytes once decoded), and {keep}: its bitmap's longer side at most.
+   */
+  function decodeCaps(format, role) {
+    const L = format.limits;
+    if (role === 'source') return { side: SOURCE_SIDE, pixels: SOURCE_PIXELS, keep: L.pictureSide };
+    const side = role === 'key' ? L.keyImageSide : L.pictureSide;
+    return { side, pixels: side * side, keep: side };
+  }
+
+  /** What [theme] has the file [name] as: its picture's source, a key image, or else (a cut). */
+  function fileRole(theme, name) {
+    if (theme.picture && theme.picture.src === name) return 'source';
+    return keyImageFiles(theme).includes(name) ? 'key' : 'picture';
+  }
+
+  /** Whether an image of [size] (its header's; null: unread) is decoded under [caps]. */
+  function decodable(size, caps) {
+    return !!size && Math.max(size[0], size[1]) <= caps.side && size[0] * size[1] <= caps.pixels;
+  }
+
   /** The alpha (30 %) a key's colour is turned down to when its face shows the picture: the app lays the colour over it. */
   const SEE_THROUGH_ALPHA = 0x4d;
 
@@ -1957,7 +1984,7 @@ dialog::backdrop { background: #0008; }
 
   root.YoumoLib = {
     ThemeError, crc32, writeZip, readZip, readTheme, writeTheme, openZip, exportZip, lookFiles, keyImageFiles,
-    limitBreaches, entryBreach, imageSize, mapFiles, isThemeFileName, isPlainFileName, baseName, entryPath, fitKeyImage, from21, defaultLook, parseKeyName, isKnownKeyName, checkRanges, ordered, PALETTE_21,
+    limitBreaches, entryBreach, imageSize, decodeCaps, fileRole, decodable, mapFiles, isThemeFileName, isPlainFileName, baseName, entryPath, fitKeyImage, from21, defaultLook, parseKeyName, isKnownKeyName, checkRanges, ordered, PALETTE_21,
     keyFace, nineSlice, centerCrop, pictureUnder, blurShrink, blur, resolveStyle, imagesOn, budgetBytes, budgetSample,
     argb, channels, toHex, fromHex, css, withAlpha, contrast, over, luminance, deriveSimple, simpleOf, isDarkColor,
     invertLightness, cropToSource, cropFromSource, resizeInside, darkenAlpha, boardField, barField, panelField, faceField, SEE_THROUGH_ALPHA, seeThroughFields, seeThrough, imageType, fontType, contentId,
@@ -2144,30 +2171,30 @@ dialog::backdrop { background: #0008; }
     return L.imageType(bytes) || L.fontType(bytes) || 'bin';
   }
   /** A file the page adds: named by the theme, its role and its content, so new content is a new name and the same is kept once. */
-  async function addFile(role, bytes, maxSide, keepSide) {
+  async function addFile(role, bytes, caps) {
     const tail = '-' + role + '-' + L.contentId(bytes) + '.' + extOf(bytes);
     // a file name is at most 255 bytes: a long theme name (an imported one's) is cut, never a character in half
     let head = S.theme.name;
     while (new TextEncoder().encode(head + tail).length > 255) head = [...head].slice(0, -1).join('');
     const name = head + tail;
-    await putFile(name, bytes, maxSide, keepSide);
+    await putFile(name, bytes, caps);
     return name;
   }
   /**
-   * A file kept by name. An image's size is read from its header first, and one past [maxSide] (a
-   * key image's, a picture's, the source's) is not decoded: a small file can say 30000 × 30000 and take
-   * gigabytes. [keepSide]: the bitmap made no bigger than that (the source: kept whole only as bytes).
+   * A file kept by name. An image's size is read from its header first, and one past [caps]
+   * (L.decodeCaps: a cut's by default) is not decoded; its bitmap is no bigger than caps.keep (the
+   * source: kept whole only as bytes).
    */
-  async function putFile(name, bytes, maxSide, keepSide) {
+  async function putFile(name, bytes, caps = L.decodeCaps(FORMAT, 'picture')) {
     if (Object.hasOwn(S.files, name)) return;
     S.files[name] = bytes;
     S.urls[name] = URL.createObjectURL(new Blob([bytes]));
     if (L.imageType(bytes)) {
       const size = L.imageSize(bytes);
       if (size) S.sizes[name] = size;
-      if (!size || Math.max(size[0], size[1]) > (maxSide || LIM.pictureSide)) return; // not drawn here; export refuses it
+      if (!L.decodable(size, caps)) return; // not drawn here (a cut or key image past its side: export refuses it)
       try {
-        const bm = await decodeShrunk(new Blob([bytes]), size, keepSide || maxSide || LIM.pictureSide);
+        const bm = await decodeShrunk(new Blob([bytes]), size, caps.keep);
         S.bitmaps[name] = bm;
         if (!S.sizes[name]) S.sizes[name] = [bm.width, bm.height];
       } catch (e) { /* not drawable here: the size stays the header's */ }
@@ -2322,18 +2349,9 @@ dialog::backdrop { background: #0008; }
     const sim = L.deriveSimple(L.simpleOf(theme.palette), theme.isDark);
     S.manual = Object.keys(theme.palette).filter((k) => theme.palette[k] !== sim[k]);
     S.see = seenNow();
-    return Promise.all(Object.entries(files || {}).map(([n, b]) => putFile(n, b, ...capsOf(theme, n)))).then(() => {
+    return Promise.all(Object.entries(files || {}).map(([n, b]) => putFile(n, b, L.decodeCaps(FORMAT, L.fileRole(theme, n))))).then(() => {
       for (const c of pictureCuts()) if (S.bitmaps[c]) S.avg[c] = averageOf(S.bitmaps[c]);
     });
-  }
-  // the source picture: decoded up to this side (a phone's photo), kept as a bitmap no bigger than a cut may be
-  const SRC_SIDE = 12000;
-  const SRC_PIXELS = 108e6;
-  /** [maxSide, keepSide] of [theme]'s file [n] for putFile: by what it is in the theme. */
-  function capsOf(theme, n) {
-    if (theme.picture && theme.picture.src === n) return [SRC_SIDE, LIM.pictureSide];
-    if (L.keyImageFiles(theme).includes(n)) return [LIM.keyImageSide];
-    return [LIM.pictureSide];
   }
   /** The source picture's own size (its bitmap may be smaller). */
   const srcSize = (src) => S.sizes[src] || [S.bitmaps[src].width, S.bitmaps[src].height];
@@ -2896,11 +2914,12 @@ dialog::backdrop { background: #0008; }
     if (file.size > LIM.fileBytes) return toast('图片太大（超过 32 MB）', true);
     const bytes = await readBytes(file);
     const size = L.imageSize(bytes);
-    if (size && (Math.max(size[0], size[1]) > SRC_SIDE || size[0] * size[1] > SRC_PIXELS)) return toast(`图片太大（${size[0]} × ${size[1]}）：先缩小一点`, true);
+    const caps = L.decodeCaps(FORMAT, 'source');
+    if (size && !L.decodable(size, caps)) return toast(`图片太大（${size[0]} × ${size[1]}）：先缩小一点`, true);
     let bm;
     try {
       // as small as a cut may be: a 48 MP photo kept whole would take 200 MB
-      bm = await decodeShrunk(new Blob([bytes]), size, LIM.pictureSide);
+      bm = await decodeShrunk(new Blob([bytes]), size, caps.keep);
     } catch (e) {
       return toast('浏览器打不开这张图' + (/heic|heif/i.test(file.name) ? '：这个格式浏览器打不开，先转成 jpg' : ''), true);
     }
@@ -2908,7 +2927,7 @@ dialog::backdrop { background: #0008; }
     let src;
     try {
       // one the app may not read (HEIC, AVIF) as a PNG of the bitmap: no bigger than a canvas draws
-      src = await addFile('src', L.imageType(bytes) ? bytes : await pngOf(drawn(bm)), SRC_SIDE, LIM.pictureSide);
+      src = await addFile('src', L.imageType(bytes) ? bytes : await pngOf(drawn(bm)), caps);
     } catch (e) {
       bm.close();
       return toast('这张图存不下来：' + e.message, true);
@@ -3216,7 +3235,8 @@ dialog::backdrop { background: #0008; }
     if (file.size > LIM.fileBytes) { toast('图片太大（超过 32 MB）', true); return null; }
     let bytes = await readBytes(file);
     const size = L.imageSize(bytes);
-    if (size && size[0] * size[1] > SRC_PIXELS) { toast(`图片太大（${size[0]} × ${size[1]}）`, true); return null; }
+    // bigger than a key image may be is made smaller; bigger than a source picture may be, refused
+    if (size && !L.decodable(size, L.decodeCaps(FORMAT, 'source'))) { toast(`图片太大（${size[0]} × ${size[1]}）`, true); return null; }
     let bm;
     // decoded no bigger than a key image may be: then made again from that, if it was bigger
     try { bm = await decodeShrunk(new Blob([bytes]), size, LIM.keyImageSide); } catch (e) { toast('浏览器打不开这张图', true); return null; }
@@ -3240,7 +3260,7 @@ dialog::backdrop { background: #0008; }
       bm.close();
     }
     if (shrunk) toast('图片超过 App 的上限（边长 1024、2 MB），已缩小');
-    const name = await addFile('key', bytes, LIM.keyImageSide);
+    const name = await addFile('key', bytes, L.decodeCaps(FORMAT, 'key'));
     const [w, hh] = S.sizes[name] || drawnSize;
     return { type: 'image', file: name, insets: [0, 0, 0, 0], pxPerDp: Math.min(LIM.pxPerDp, Math.max(1, Math.round(Math.max(w, hh) / 48))) };
   }
@@ -3555,7 +3575,7 @@ dialog::backdrop { background: #0008; }
       const g = c.getContext('2d');
       g.imageSmoothingQuality = 'high';
       g.drawImage(bm, 0, 0, c.width, c.height);
-      const file = await addFile('key', await pngOf(c), LIM.keyImageSide);
+      const file = await addFile('key', await pngOf(c), L.decodeCaps(FORMAT, 'key'));
       return { type: img.type, file, insets: fit.insets, pxPerDp: fit.pxPerDp };
     };
     const replace = async (want) => {

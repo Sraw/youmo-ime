@@ -39,13 +39,15 @@ jobs:
       - name: Run theme maker tests
         run: node --test web/theme-maker/test/format.test.mjs
 
-      # the site: web/ as it is, its tests and their files left out
+      # the site: web/ as it is, the page's tests, sources and tools left out (index.html is all it needs)
       - name: Pack the site
         run: |
           mkdir _site
-          tar -C web --exclude='./*/test' -cf - . | tar -C _site -xf -
+          tar -C web --exclude='./*/test' --exclude='./*/src' --exclude='./*/tools' -cf - . | tar -C _site -xf -
           test -f _site/theme-maker/index.html
           test ! -e _site/theme-maker/test
+          test ! -e _site/theme-maker/src
+          test ! -e _site/theme-maker/tools
 
       - name: Upload the site
         uses: actions/upload-pages-artifact@v4

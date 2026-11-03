@@ -1,7 +1,8 @@
 // The theme maker's own code against what the app makes (testdata/, written by the app's tests):
 // the drawing rules case by case (rules.json), the theme file both ways (theme.json, the zips), and
 // the page's export byte for byte (from-web.zip, which the app's ThemeMakerFormatTest imports).
-// Run: node --test web/theme-maker/test/   (UPDATE=1 writes from-web.zip again)
+// Run: node --test web/theme-maker/test/format.test.mjs   (a file: Node 24 takes no folder here; UPDATE=1
+// writes from-web.zip again). The page is made of src/ by tools/assemble.mjs; index.html must be what it makes.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, writeFileSync } from 'node:fs';
@@ -10,6 +11,7 @@ import { dirname, join } from 'node:path';
 import vm from 'node:vm';
 import { createHash } from 'node:crypto';
 import { deflateRawSync } from 'node:zlib';
+import { assemble } from '../tools/assemble.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const data = join(here, 'testdata');
@@ -597,6 +599,36 @@ test('contrast is Contrast.ratio, a colour reads dark as the page guesses, a cut
   assert.deepEqual(L.resizeInside(3000, 4000, 1440, 800), [600, 800]);
   assert.deepEqual(L.resizeInside(3000, 1000, 1440, 800), [1440, 480]);
   assert.deepEqual(L.resizeInside(10000, 1, 100, 100), [100, 1]);
+});
+
+test('index.html is what tools/assemble.mjs makes of src/ (src/ changed, the page not made again: fails)', () => {
+  assert.ok(assemble() === html, 'index.html is not src/ assembled: node web/theme-maker/tools/assemble.mjs');
+});
+
+test('an image is decoded only within what it may be: the source a photo, a cut 4096, a key image 1024', async () => {
+  const lim = format.limits;
+  const source = L.decodeCaps(format, 'source');
+  assert.ok(L.decodable([12000, 9000], source));
+  assert.ok(!L.decodable([12000, 9001], source), 'past the source\'s pixels');
+  assert.ok(!L.decodable([12001, 10], source), 'past the source\'s side');
+  assert.ok(!L.decodable([11000, 11000], source), 'within the side, past the pixels');
+  assert.equal(source.keep, lim.pictureSide);
+  const cut = L.decodeCaps(format, 'picture');
+  assert.ok(L.decodable([lim.pictureSide, lim.pictureSide], cut));
+  assert.ok(!L.decodable([lim.pictureSide, lim.pictureSide + 1], cut));
+  const key = L.decodeCaps(format, 'key');
+  assert.ok(L.decodable([lim.keyImageSide, lim.keyImageSide], key));
+  assert.ok(!L.decodable([lim.keyImageSide + 1, 1], key));
+  assert.ok(!L.decodable(null, cut), 'an unread header is not decoded');
+  // each file of a zip by what it is in its theme: a source as big as the app keeps is not decoded
+  const { theme } = await L.openZip(format, bytes('from-app.zip'));
+  assert.equal(L.fileRole(theme, theme.picture.src), 'source');
+  assert.equal(L.fileRole(theme, theme.picture.portrait.file), 'picture');
+  assert.equal(L.fileRole(theme, 'from-app-space.png'), 'key');
+  const good = await appEntries();
+  const huge = await L.openZip(format, zipOf(good.map((e) => (e.name === theme.picture.src ? { name: e.name, data: png(30000, 30000) } : e))));
+  assert.deepEqual(L.imageSize(huge.files[theme.picture.src]), [30000, 30000]);
+  assert.ok(!L.decodable(L.imageSize(huge.files[theme.picture.src]), L.decodeCaps(format, L.fileRole(huge.theme, huge.theme.picture.src))));
 });
 
 test('the page runs only its own two scripts, by their hashes', () => {
