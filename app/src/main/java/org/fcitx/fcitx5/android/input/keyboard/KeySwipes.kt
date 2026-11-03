@@ -87,7 +87,7 @@ internal class KeySwipes(
     /** What the preview shows of [shortcut]: a command's name, a text as it is. */
     private fun shortcutLabel(shortcut: KeyShortcut): String = when (shortcut) {
         is KeyShortcut.Command -> board.context.getString(KeyShortcutLooks.of(shortcut.command).label)
-        is KeyShortcut.Text -> shortcut.text.take(PREVIEW_TEXT)
+        is KeyShortcut.Text -> KeyShortcut.clip(shortcut.text, PREVIEW_TEXT)
         KeyShortcut.None -> ""
     }
 
