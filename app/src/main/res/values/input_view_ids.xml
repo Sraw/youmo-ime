@@ -10,4 +10,6 @@
     <item name="code_row_syllables" type="id" />
     <!-- the theme picture a view lies over (PictureHost) -->
     <item name="theme_picture_host" type="id" />
+    <!-- the theme a list thumbnail was last bound to (ThemeThumbnailUi): a decoded picture shown only on its own -->
+    <item name="theme_thumbnail_look" type="id" />
 </resources>

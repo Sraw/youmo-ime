@@ -69,9 +69,9 @@ class ThemeListFragment : Fragment() {
                             val inputStream = cr.openInputStream(uri)!!
                             ThemeFilesManager.importTheme(inputStream).getOrThrow()
                         }
-                        // one imported again under its name: its files new under the old names
-                        ThemeManager.filesChanged()
-                        ThemeManager.refreshThemes()
+                        // one imported again under its name: its files new under the old names, the
+                        // keyboard drawn anew if it is the one in use
+                        ThemeManager.filesChanged(theme.name) { ThemeManager.refreshThemes() }
                         if (newCreated) {
                             themeListAdapter.prependTheme(theme)
                         } else {

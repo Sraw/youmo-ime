@@ -32,8 +32,12 @@ import org.fcitx.fcitx5.android.utils.DarkenColorFilter
  */
 class PictureHost(private val look: ThemeLook, val base: View, private val landscape: Boolean) {
 
-    // a blur's picture as laid over the base at its size: asked of ThemeAssets once, not each key a frame
-    private class Placed(val bitmap: Bitmap?, val w: Int, val h: Int, val scale: Float, val dx: Float, val dy: Float)
+    // a blur's picture as laid over the base at its size: asked of ThemeAssets once, not each key a frame;
+    // asked again once the files were let go as changed (a theme imported again under its name, its
+    // picture another: the theme itself equal, nothing made anew for it)
+    private class Placed(
+        val bitmap: Bitmap?, val w: Int, val h: Int, val scale: Float, val dx: Float, val dy: Float, val generation: Int,
+    )
 
     private val placed = SparseArray<Placed>(2)
     private val baseAt = IntArray(2)
@@ -43,13 +47,15 @@ class PictureHost(private val look: ThemeLook, val base: View, private val lands
     /**
      * [into]'s paint set to the picture blurred [blurDp] at [brightness] percent lying where [view] is
      * over the base, for drawing in [view]'s coordinates less ([left], [top]) (a drawable's bounds'
-     * corner, the canvas moved there); null with no picture or none that reads.
+     * corner, the canvas moved there); null with no picture or none that reads, or while it is decoded
+     * on another thread ([view] drawn again once it is in: not a frame waited for it).
      */
     fun paint(view: View, blurDp: Int, brightness: Int, into: PicturePaint, left: Int = 0, top: Int = 0): Paint? {
         val w = base.width
         val h = base.height
         if (w == 0 || h == 0) return null
-        val at = placed[blurDp]?.takeIf { it.w == w && it.h == h } ?: place(blurDp, w, h)
+        val at = placed[blurDp]?.takeIf { it.w == w && it.h == h && it.generation == ThemeAssets.generation }
+            ?: place(view, blurDp, w, h) ?: return null
         val bitmap = at.bitmap ?: return null
         matrix.setScale(at.scale, at.scale)
         if (!offsetOf(view)) {
@@ -62,10 +68,16 @@ class PictureHost(private val look: ThemeLook, val base: View, private val lands
         return into.of(bitmap, matrix, brightness)
     }
 
-    private fun place(blurDp: Int, w: Int, h: Int): Placed {
-        val bitmap = ThemeAssets.picture(look, landscape, blurDp, w, base.resources.displayMetrics.density)
+    // null while it is decoded on another thread
+    private fun place(view: View, blurDp: Int, w: Int, h: Int): Placed? {
+        // before it is asked for: let go while asked, it is asked again
+        val generation = ThemeAssets.generation
+        val got = ThemeAssets.pictureOrLater(look, landscape, blurDp, w, base.resources.displayMetrics.density) {
+            view.invalidate()
+        } ?: return null
+        val bitmap = got.bitmap
         val p = bitmap?.let { PictureWindow.centerCrop(it.width, it.height, w.toFloat(), h.toFloat()) }
-        return Placed(bitmap, w, h, p?.scale ?: 1f, p?.dx ?: 0f, p?.dy ?: 0f).also { placed.put(blurDp, it) }
+        return Placed(bitmap, w, h, p?.scale ?: 1f, p?.dx ?: 0f, p?.dy ?: 0f, generation).also { placed.put(blurDp, it) }
     }
 
     private val offset = FloatArray(2)

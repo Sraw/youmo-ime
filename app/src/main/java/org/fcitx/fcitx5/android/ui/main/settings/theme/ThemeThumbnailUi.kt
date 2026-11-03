@@ -84,13 +84,13 @@ class ThemeThumbnailUi(override val ctx: Context) : Ui {
         // the picture under the keyboard if it is there (decoded small off the main thread, blurred as on
         // the keyboard: ThemeAssets.thumbnail), its colour else; the bar's colour if it has one
         bkg.imageDrawable = null
-        bkg.tag = look
+        bkg.setTag(R.id.theme_thumbnail_look, look)
         if (look.base == BoardBase.Picture) {
             val p = look.picture!!
             val dm = ctx.resources.displayMetrics
             ThemeAssets.thumbnail(look, ctx.dp(PICTURE_DP), dm.widthPixels, dm.density) { b ->
                 // bound to another theme since
-                if (b == null || bkg.tag !== look) return@thumbnail
+                if (b == null || bkg.getTag(R.id.theme_thumbnail_look) !== look) return@thumbnail
                 bkg.setImageBitmap(b)
                 bkg.colorFilter = if (p.brightness < 100) DarkenColorFilter(100 - p.brightness) else null
             }

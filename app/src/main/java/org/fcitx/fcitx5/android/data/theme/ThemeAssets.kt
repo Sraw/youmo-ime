@@ -18,6 +18,8 @@ import timber.log.Timber
 import java.io.File
 import java.util.concurrent.Executor
 import java.util.concurrent.Executors
+import java.util.concurrent.locks.ReentrantLock
+import kotlin.math.ln
 import kotlin.math.roundToInt
 
 /**
@@ -27,7 +29,8 @@ import kotlin.math.roundToInt
  * drop them all, a theme of none too ([retain]): a picture let go when a plain theme is picked.
  *
  * The picture is decoded ahead at every blur the theme shows it at ([prefetch], when it is picked);
- * one asked for before that is decoded on the asking thread (as slow as before, but once). Decoding
+ * one asked for before that is decoded on the asking thread (as slow as before, but once); a view
+ * finding it decoded on another thread draws without it till it is in ([pictureOrLater]). Decoding
  * and blurring are done outside the lock, so a view asking for a font or a keyboard's images waits on
  * no picture; two threads asking for the same picture decode it once. The key images are a
  * keyboard's at a time, on a thread of their own; the keys are drawn as their kinds' colours till
@@ -93,17 +96,37 @@ object ThemeAssets {
     private var look: ThemeLook? = null
     private var files: List<String>? = null
 
-    private data class PictureKey(val landscape: Boolean, val blurDp: Int)
+    // a blur's picture is made for the width it is drawn at (its radius in the picture's pixels: a
+    // floating keyboard's, narrower, blurred as much as the screen wide one); widths within a tenth or
+    // so of each other share it. The sharp one is decoded once for all widths: width 0
+    private data class PictureKey(val landscape: Boolean, val blurDp: Int, val width: Int)
 
-    // a picture asked for: decoded by the first to take its own lock, outside the cache's
+    // a picture asked for: decoded by the first to take its own lock, outside the cache's; [waiting]
+    // (under the cache's lock) the views that found it being decoded, told when it is in
     private class PictureSlot {
+        val decoding = ReentrantLock()
+
+        @Volatile
         var done = false
         var bitmap: Bitmap? = null
+        val waiting = ArrayList<() -> Unit>()
     }
+
+    /** A picture as [pictureOrLater] gives it: [bitmap] null for none. */
+    class Got internal constructor(val bitmap: Bitmap?)
 
     private val pictures = HashMap<PictureKey, PictureSlot>()
     private val boards = LinkedHashMap<String, BoardImages>(8, 0.75f, true)
     private val fonts = HashMap<Pair<String?, Int>, Typeface?>()
+
+    /**
+     * Counts the times the files decoded were let go as changed ([clear]: a theme saved, imported,
+     * deleted): a bitmap a view holds of a generation before is of files maybe written anew since, and
+     * is asked for again. Another theme drawn ([retain]) does not count: what a view holds is still its files'.
+     */
+    @Volatile
+    var generation = 0
+        private set
 
     // under the lock: the caches of another theme's files are of no use
     private fun use(look: ThemeLook) {
@@ -125,6 +148,7 @@ object ThemeAssets {
 
     /** Drops everything: the theme's files changed, or a test starts afresh. */
     fun clear() = synchronized(lock) {
+        generation++
         look = null
         files = null
         pictures.clear()
@@ -133,29 +157,72 @@ object ThemeAssets {
         thumbnails.clear()
     }
 
+    // under the lock: [look] is the theme drawn now, or one of its files
+    private fun current(look: ThemeLook) = this.look === look || files != null && look.files() == files
+
     /**
      * [look]'s picture for [landscape] (its own cut, else the portrait one), blurred [blurDp] dp as
      * drawn [widthPx] wide at [density]; null for none or a file that does not read. Decoded no wider
-     * than it is drawn, nearly, and no bigger than [MAX_PIXELS]: a cut of 4096 is 64 MB whole.
+     * than it is drawn, nearly, and no bigger than [MAX_PIXELS]: a cut of 4096 is 64 MB whole. Waits
+     * for another thread decoding it.
      */
     fun picture(look: ThemeLook, landscape: Boolean, blurDp: Int, widthPx: Int, density: Float): Bitmap? {
+        synchronized(lock) { use(look) }
+        return pictureOf(look, landscape, blurDp, widthPx, density, null)?.bitmap
+    }
+
+    /**
+     * [picture] for a view drawing now: null while another thread decodes it (ahead, [prefetch]), [then]
+     * told on the main thread when it is in; a view does not wait a frame on a picture of 4096.
+     */
+    fun pictureOrLater(look: ThemeLook, landscape: Boolean, blurDp: Int, widthPx: Int, density: Float, then: () -> Unit): Got? {
+        synchronized(lock) { use(look) }
+        return pictureOf(look, landscape, blurDp, widthPx, density, then)
+    }
+
+    /**
+     * [look]'s picture if it is the theme drawn now, without making it so: a prefetch run late, a theme
+     * picked since, keeps no slot and decodes nothing (it would let the theme now drawn's go). Null when
+     * [then] is given and another thread decodes it (or the sharp one the blur is made from), [then]
+     * told when it is in; else waits for it.
+     */
+    private fun pictureOf(look: ThemeLook, landscape: Boolean, blurDp: Int, widthPx: Int, density: Float, then: (() -> Unit)?): Got? {
+        if (blurDp > 0 && then != null) {
+            // the sharp one first, without waiting: the blur's maker would wait on it
+            pictureOf(look, landscape, 0, widthPx, density, then) ?: return null
+        }
         val slot = synchronized(lock) {
-            use(look)
-            if (look.picture == null) return null
-            val key = PictureKey(landscape, blurDp)
+            if (look.picture == null || !current(look)) return Got(null)
+            val key = PictureKey(landscape, blurDp, if (blurDp == 0) 0 else widthBucket(widthPx))
             pictures[key] ?: PictureSlot().also {
                 // turned, the other orientation's are let go
                 pictures.keys.removeAll { k -> k.landscape != landscape }
                 pictures[key] = it
             }
         }
-        synchronized(slot) {
-            if (!slot.done) {
-                slot.bitmap = decodeSafely("picture") { decodePicture(look, landscape, blurDp, widthPx, density) }
-                slot.done = true
+        if (slot.done) return Got(slot.bitmap)
+        if (then == null) {
+            slot.decoding.lock()
+        } else if (!slot.decoding.tryLock()) {
+            synchronized(lock) {
+                if (slot.done) return Got(slot.bitmap)
+                slot.waiting += then
             }
-            return slot.bitmap
+            return null
         }
+        val told = try {
+            if (slot.done) return Got(slot.bitmap)
+            val b = decodeSafely("picture") { decodePicture(look, landscape, blurDp, widthPx, density) }
+            synchronized(lock) {
+                slot.bitmap = b
+                slot.done = true
+                slot.waiting.toList().also { slot.waiting.clear() }
+            }
+        } finally {
+            slot.decoding.unlock()
+        }
+        if (told.isNotEmpty()) poster(Runnable { told.forEach { it() } })
+        return Got(slot.bitmap)
     }
 
     private fun decodePicture(look: ThemeLook, landscape: Boolean, blurDp: Int, widthPx: Int, density: Float): Bitmap? {
@@ -163,9 +230,12 @@ object ThemeAssets {
         return if (blurDp == 0) {
             decodePicture(if (landscape) p.landscape?.file ?: p.portrait.file else p.portrait.file, widthPx)
         } else {
-            picture(look, landscape, 0, widthPx, density)?.let { blurred(it, blurDp, widthPx, density) }
+            pictureOf(look, landscape, 0, widthPx, density, null)?.bitmap?.let { blurred(it, blurDp, widthPx, density) }
         }
     }
+
+    // the width a blur is made for, a step of about a tenth: log base 1.1
+    private fun widthBucket(widthPx: Int) = if (widthPx > 0) (ln(widthPx.toDouble()) / ln(WIDTH_STEP)).roundToInt() else 0
 
     private fun decodePicture(path: String, widthPx: Int): Bitmap? {
         val size = decoder.size(path) ?: return null.also { Timber.w("Theme picture $path does not read") }
@@ -209,10 +279,19 @@ object ThemeAssets {
         val small = BoxBlur.shrink(pixels, w, h, BLUR_SHRINK)
         val sw = maxOf(1, w / BLUR_SHRINK)
         val sh = maxOf(1, h / BLUR_SHRINK)
-        val pxPerBitmapPx = if (widthPx > 0) widthPx.toFloat() / w else 1f
-        val radius = maxOf(1, (blurDp * density / pxPerBitmapPx / BLUR_SHRINK).roundToInt())
-        val out = BoxBlur.blur(small, sw, sh, radius)
+        val out = BoxBlur.blur(small, sw, sh, blurRadius(blurDp, widthPx, w, density))
         return Bitmap.createBitmap(out, sw, sh, Bitmap.Config.ARGB_8888)
+    }
+
+    /**
+     * The radius a blur of [blurDp] is made with, in pixels of the picture shrunk a quarter a side, the
+     * picture [bitmapWidth] wide drawn [widthPx] wide at [density]: the narrower it is drawn, the more of
+     * its pixels a dp is.
+     */
+    @VisibleForTesting
+    fun blurRadius(blurDp: Int, widthPx: Int, bitmapWidth: Int, density: Float): Int {
+        val pxPerBitmapPx = if (widthPx > 0) widthPx.toFloat() / bitmapWidth else 1f
+        return maxOf(1, (blurDp * density / pxPerBitmapPx / BLUR_SHRINK).roundToInt())
     }
 
     /** What the picture slots hold decoded now: a test's. */
@@ -296,8 +375,9 @@ object ThemeAssets {
         retain(look)
         val blurs = look.pictureBlurs()
         if (blurs.isEmpty()) return
-        // the sharp one first: the blurs are made from it
-        runner { (listOf(0) + blurs).distinct().forEach { picture(look, landscape, it, widthPx, density) } }
+        // the sharp one first: the blurs are made from it. Each only while [look] is still the theme
+        // drawn (pictureOf asks, a blur at a time): one picked since is not let go for it
+        runner { (listOf(0) + blurs).distinct().forEach { pictureOf(look, landscape, it, widthPx, density, null) } }
     }
 
     private class Thumbnail {
@@ -334,6 +414,8 @@ object ThemeAssets {
                 val told = synchronized(lock) {
                     made.bitmap = b
                     made.done = true
+                    // none (a file that does not read, out of memory) is not kept: asked again, tried again
+                    if (b == null && thumbnails[key] === made) thumbnails.remove(key)
                     trimThumbnails(keep = made)
                     made.waiting.toList().also { made.waiting.clear() }
                 }
@@ -372,6 +454,7 @@ object ThemeAssets {
     fun thumbnailBytes(): Long = synchronized(lock) { thumbnails.values.sumOf { it.bytes } }
 
     private const val BLUR_SHRINK = 4
+    private const val WIDTH_STEP = 1.1
     private const val NORMAL_WEIGHT = 400
 
     /** The most pixels a picture is decoded to: 2048² (16 MB). */

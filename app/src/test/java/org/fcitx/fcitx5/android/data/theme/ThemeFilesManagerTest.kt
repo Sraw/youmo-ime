@@ -409,6 +409,26 @@ class ThemeFilesManagerTest {
     private fun blockWrites() = File(dir, ".saving").apply { deleteRecursively(); writeText("") }
 
     @Test
+    fun theThemeInUseWrittenAnewIsToldThoughItReadsTheSame() {
+        val told = mutableListOf<Theme>()
+        val listener = ThemeManager.OnThemeChangeListener { told += it }
+        ThemeManager.addOnChangedListener(listener)
+        try {
+            val inUse = ThemeManager.activeTheme
+            val g = ThemeAssets.generation
+            // another theme's files: what was decoded let go, the keyboard not made anew
+            ThemeManager.filesChanged("not in use")
+            assertEquals(emptyList<Theme>(), told)
+            // the one in use imported again (another picture, the same name and settings): made anew once
+            ThemeManager.filesChanged(inUse.name) { ThemeManager.refreshThemes() }
+            assertEquals(listOf(inUse), told)
+            assertEquals(g + 2, ThemeAssets.generation)
+        } finally {
+            ThemeManager.removeOnChangedListener(listener)
+        }
+    }
+
+    @Test
     fun aThemeNotWrittenLeavesItsFileAsItWas() {
         val theme = ThemePreset.TransparentDark.deriveCustomNoBackground("w")
         ThemeFilesManager.saveThemeFiles(theme)

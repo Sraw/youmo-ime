@@ -613,19 +613,25 @@ font (`ThemeAssets.typeface`, the weight asked); hints, marks and the bar's icon
 `ThemeAssets` (`data/theme/`) decodes off the main thread and caches for one theme's files at a time:
 the picture once an orientation at the width it is drawn (halved while wider, and till it is at most
 2048² pixels and 4096 high, so a 4096 cut is not held whole), its blurs from that (`BoxBlur`), each
-once, decoded ahead when the theme is picked at every blur it shows (`prefetch`, `ThemeLook.pictureBlurs`;
-decoding and blurring outside the cache's lock, one decode a picture however many ask); a board's key
+once a width it is drawn at within a tenth (a floating keyboard's blurred as much as the docked one),
+decoded ahead when the theme is picked and when the screen turns at every blur it shows (`prefetch`,
+`ThemeLook.pictureBlurs`; decoding and blurring outside the cache's lock, one decode a picture however
+many ask; a prefetch run after another theme was picked decodes nothing and keeps nothing). A view
+drawing does not wait for a picture another thread decodes (`pictureOrLater`): it draws the colour and
+is drawn again once it is in; a board's key
 images when the board is made (`boardImages`, the names it can reach: `KeyStyleResolver.imagesOn`; a
 keyboard of no board name, the number row or a search's keys, its kinds' and roles'), at the sample
 `KeyImageBudget` gives, the boards least recently made dropped past 24 MB; fonts once. A file that
 does not decode, or runs out of memory, is none (its colour drawn). A theme of other files (another
 picture, a crop, a key image) drops it all, a theme of none too (a plain theme picked lets a picture
 go); a colour, brightness or blur changed keeps what was decoded. A save, a delete and an import clear
-it (`ThemeManager.filesChanged`: a file of the same name may have new bytes). `PictureHost` asks it once
-a blur and base size, then lays the picture by the views' places added up from their parents (the
+it (`ThemeManager.filesChanged`: a file of the same name may have new bytes) and count a `generation`;
+the theme in use written anew is told as changed even if it reads the same (imported again with another
+picture), so the keyboard and the settings' preview are made anew with the new files. `PictureHost`
+asks it once a blur, base size and generation, then lays the picture by the views' places added up from their parents (the
 window asked only under a scaled view); `KeyFaceDrawable` lays a key image's nine pieces once a size.
 The theme list's thumbnails (`ThemeAssets.thumbnail`) are its portrait cut decoded 160 dp wide on the
-same thread, blurred as on the keyboard, 12 MB of them kept.
+same thread, blurred as on the keyboard, 12 MB of them kept; one that does not read is not kept.
 
 The app does not edit themes (user, 2026-11-03): they are made on the web page
 (`Const.themeMakerUrl`, 新增主题 → 在网页上制作…) and imported (导入文件…). The theme list

@@ -6,6 +6,9 @@ package org.fcitx.fcitx5.android.data.theme
 
 import android.graphics.Bitmap
 import android.graphics.Typeface
+import android.view.View
+import org.fcitx.fcitx5.android.input.PictureHost
+import org.fcitx.fcitx5.android.input.PicturePaint
 import org.fcitx.fcitx5.android.input.theme.BarBase
 import org.fcitx.fcitx5.android.input.theme.BoardBase
 import org.fcitx.fcitx5.android.input.theme.Crop
@@ -24,9 +27,14 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Before
+import org.junit.BeforeClass
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.RuntimeEnvironment
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicInteger
 
 @RunWith(RobolectricTestRunner::class)
 class ThemeAssetsTest {
@@ -59,9 +67,20 @@ class ThemeAssetsTest {
         ThemeAssets.decoder = decoder
     }
 
-    private val realDecoder = ThemeAssets.decoder
-    private val realRunner = ThemeAssets.runner
-    private val realPoster = ThemeAssets.poster
+    companion object {
+        // the real ones, taken once before any test sets its own
+        private lateinit var realDecoder: ThemeAssets.Decoder
+        private lateinit var realRunner: (Runnable) -> Unit
+        private lateinit var realPoster: (Runnable) -> Unit
+
+        @BeforeClass
+        @JvmStatic
+        fun keepTheReal() {
+            realDecoder = ThemeAssets.decoder
+            realRunner = ThemeAssets.runner
+            realPoster = ThemeAssets.poster
+        }
+    }
 
     @Before
     fun setUp() {
@@ -280,5 +299,154 @@ class ThemeAssetsTest {
         assertNotNull(ThemeAssets.typeface(look, "f.ttf", 400))
         ThemeAssets.typeface(look, "f.ttf", 400)
         assertEquals(1, decoder.fonts)
+    }
+
+    // [decoder]'s decodes held at the gate till it opens; [entered] when the first is held
+    private class Gate(val decoder: ThemeAssets.Decoder) : ThemeAssets.Decoder by decoder {
+        val entered = CountDownLatch(1)
+        val open = CountDownLatch(1)
+        val decodes = AtomicInteger()
+
+        override fun decode(path: String, sample: Int): Bitmap? {
+            decodes.incrementAndGet()
+            entered.countDown()
+            check(open.await(10, TimeUnit.SECONDS))
+            return decoder.decode(path, sample)
+        }
+    }
+
+    // [f] on a thread of its own, its result in [out]
+    private fun thread(out: Array<Bitmap?>, f: () -> Bitmap?) = Thread { out[0] = f() }.apply { start() }
+
+    // till [t] waits on a lock (another thread decoding what it asked for)
+    private fun waitsOnALock(t: Thread) {
+        val until = System.nanoTime() + TimeUnit.SECONDS.toNanos(10)
+        while (t.state != Thread.State.WAITING && t.state != Thread.State.BLOCKED) {
+            check(System.nanoTime() < until) { "never waited: ${t.state}" }
+            Thread.yield()
+        }
+    }
+
+    @Test
+    fun aPrefetchRunLateLetsTheThemePickedSinceKeepItsOwn() {
+        use("p.png" to intArrayOf(1000, 800), "q.png" to intArrayOf(1000, 800), "a.png" to intArrayOf(30, 30))
+        val a = pictured(blur = 8).copy(base = BoardBase.Picture)
+        val b = a.copy(picture = a.picture!!.copy(portrait = Crop("q.png", null, 0)))
+        // A picked, its prefetch queued behind; B picked and drawn before it runs
+        ThemeAssets.prefetch(a, false, 1000, 2f)
+        ThemeAssets.retain(b)
+        assertNotNull(ThemeAssets.picture(b, false, 0, 1000, 2f))
+        val images = ThemeAssets.boardImages(b, "qwerty", listOf(slice("a.png")))
+        runQueued()
+        // A's run: nothing of A decoded, nothing of B's let go
+        assertFalse(decoder.decoded.any { it.first == "p.png" })
+        assertEquals(1, ThemeAssets.pictureCount())
+        assertTrue(images.ready)
+        assertSame(images, ThemeAssets.boardImages(b, "qwerty", listOf(slice("a.png"))))
+        assertTrue(ThemeAssets.boardBytes() > 0)
+        assertEquals(listOf("q.png" to 1, "a.png" to 1), decoder.decoded)
+    }
+
+    @Test
+    fun twoAskingForAPictureLetGoAsTheyWaitDecodeItOnceAndKeepItNot() {
+        use("p.png" to intArrayOf(1000, 800))
+        val gate = Gate(decoder)
+        ThemeAssets.decoder = gate
+        val l = pictured()
+        val first = arrayOfNulls<Bitmap>(1)
+        val second = arrayOfNulls<Bitmap>(1)
+        val t1 = thread(first) { ThemeAssets.picture(l, false, 0, 1000, 2f) }
+        check(gate.entered.await(10, TimeUnit.SECONDS))
+        val t2 = thread(second) { ThemeAssets.picture(l, false, 0, 1000, 2f) }
+        waitsOnALock(t2)
+        // the files written anew as they wait
+        ThemeAssets.clear()
+        gate.open.countDown()
+        t1.join(10_000)
+        t2.join(10_000)
+        assertNotNull(first[0])
+        assertSame(first[0], second[0])
+        assertEquals(1, gate.decodes.get())
+        assertEquals("not put back after the clear", 0, ThemeAssets.pictureCount())
+        // asked again: decoded anew
+        assertNotNull(ThemeAssets.picture(l, false, 0, 1000, 2f))
+        assertEquals(2, gate.decodes.get())
+    }
+
+    @Test
+    fun aViewDrawingWaitsNotForAPictureDecodedOnAnotherThreadAndIsToldWhenItIsIn() {
+        use("p.png" to intArrayOf(1000, 800))
+        val gate = Gate(decoder)
+        ThemeAssets.decoder = gate
+        val l = pictured()
+        val ahead = arrayOfNulls<Bitmap>(1)
+        val t = thread(ahead) { ThemeAssets.picture(l, false, 0, 1000, 2f) }
+        check(gate.entered.await(10, TimeUnit.SECONDS))
+        var told = 0
+        // the sharp one, and a blur made from it: neither waited for
+        assertNull(ThemeAssets.pictureOrLater(l, false, 0, 1000, 2f) { told++ })
+        assertNull(ThemeAssets.pictureOrLater(l, false, 8, 1000, 2f) { told++ })
+        gate.open.countDown()
+        t.join(10_000)
+        assertEquals("each told once it is in", 2, told)
+        assertSame(ahead[0], ThemeAssets.pictureOrLater(l, false, 0, 1000, 2f) { told++ }!!.bitmap)
+        assertNotNull(ThemeAssets.pictureOrLater(l, false, 8, 1000, 2f) { told++ }!!.bitmap)
+        assertEquals(1, gate.decodes.get())
+        assertEquals(2, told)
+    }
+
+    @Test
+    fun aBlurIsMadeForTheWidthItIsDrawnAt() {
+        use("p.png" to intArrayOf(1000, 800))
+        val l = pictured()
+        val wide = ThemeAssets.picture(l, false, 8, 1000, 2f)!!
+        // a floating keyboard's, half as wide: its own, blurred twice the picture's pixels
+        val narrow = ThemeAssets.picture(l, false, 8, 500, 2f)!!
+        assertTrue(wide !== narrow)
+        assertEquals(2 * ThemeAssets.blurRadius(8, 1000, 1000, 2f), ThemeAssets.blurRadius(8, 500, 1000, 2f))
+        // nearly as wide: the same
+        assertSame(wide, ThemeAssets.picture(l, false, 8, 980, 2f))
+        // both from the one sharp picture
+        assertEquals(listOf("p.png" to 1), decoder.decoded)
+    }
+
+    @Test
+    fun filesLetGoAsChangedAreANewGenerationAnotherThemeDrawnIsNot() {
+        use("p.png" to intArrayOf(1000, 800), "q.png" to intArrayOf(1000, 800))
+        val g = ThemeAssets.generation
+        ThemeAssets.picture(pictured(), false, 0, 1000, 2f)
+        ThemeAssets.retain(pictured().let { it.copy(picture = it.picture!!.copy(portrait = Crop("q.png", null, 0))) })
+        assertEquals(g, ThemeAssets.generation)
+        ThemeAssets.clear()
+        assertEquals(g + 1, ThemeAssets.generation)
+    }
+
+    @Test
+    fun aPicturePlacedIsAskedForAgainOnceTheFilesChanged() {
+        use("p.png" to intArrayOf(1000, 800))
+        val base = View(RuntimeEnvironment.getApplication()).apply { layout(0, 0, 1000, 800) }
+        val host = PictureHost(pictured(), base, false)
+        val paint = PicturePaint()
+        assertNotNull(host.paint(base, 0, 100, paint))
+        host.paint(base, 0, 100, paint)
+        assertEquals("placed once", 1, decoder.decoded.size)
+        // imported again under its name, the theme itself the same: its new file decoded
+        ThemeAssets.clear()
+        assertNotNull(host.paint(base, 0, 100, paint))
+        assertEquals(2, decoder.decoded.size)
+    }
+
+    @Test
+    fun aThumbnailThatDoesNotReadIsTriedAgain() {
+        use()
+        val got = mutableListOf<Bitmap?>()
+        ThemeAssets.thumbnail(pictured(), 300, 1000, 2f) { got += it }
+        runQueued()
+        assertEquals(listOf<Bitmap?>(null), got)
+        // its file there now (written as it was asked, say): not none kept
+        use("p.png" to intArrayOf(600, 600))
+        ThemeAssets.thumbnail(pictured(), 300, 1000, 2f) { got += it }
+        runQueued()
+        assertEquals(300, got[1]!!.width)
     }
 }

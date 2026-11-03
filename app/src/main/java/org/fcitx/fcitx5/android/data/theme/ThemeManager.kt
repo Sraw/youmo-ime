@@ -116,9 +116,10 @@ object ThemeManager {
             if (it >= 0) customThemes[it] = theme else customThemes.add(0, theme)
         }
         // its files may be new under the same names (a picture cut again)
-        filesChanged()
-        if (activeTheme.name == theme.name) {
-            activeTheme = theme
+        filesChanged(theme.name) {
+            if (activeTheme.name == theme.name) {
+                activeTheme = theme
+            }
         }
         return true
     }
@@ -131,20 +132,30 @@ object ThemeManager {
             customThemes.remove(it)
         }
         // its picture and thumbnail let go; one imported again under its name is decoded anew
-        filesChanged()
-        if (activeTheme.name == name) {
-            activeTheme = evaluateActiveTheme()
+        filesChanged(name) {
+            if (activeTheme.name == name) {
+                activeTheme = evaluateActiveTheme()
+            }
         }
         return true
     }
 
     /**
-     * The themes' files written or removed (a save, a delete, an import): what was decoded of them let go
-     * ([ThemeAssets.clear]: a file may be new under its old name), the theme in use decoded ahead again.
+     * The theme [name]'s files written or removed (a save, a delete, an import): what was decoded of them
+     * let go ([ThemeAssets.clear]: a file may be new under its old name), then [update] (the themes
+     * read again, say). The theme in use, if it is [name] and reads as it did (imported again with
+     * another picture), is told as changed all the same: the keyboard drawn anew with its new files,
+     * not the ones decoded before; else decoded ahead again (told already if [update] changed it).
      */
-    fun filesChanged() {
+    fun filesChanged(name: String, update: () -> Unit = {}) {
         ThemeAssets.clear()
-        prefetch()
+        val before = _activeTheme
+        update()
+        when {
+            _activeTheme !== before -> Unit
+            before.name == name -> fireChange()
+            else -> prefetch()
+        }
     }
 
     fun setNormalModeTheme(theme: Theme) {
@@ -208,7 +219,11 @@ object ThemeManager {
         monetThemes = listOf(ThemeMonet.getLight(), ThemeMonet.getDark())
         // `ManagedThemePreference` finds a theme with same name in `getAllThemes()`
         // thus `evaluateActiveTheme()` should be called after updating `monetThemes`
+        val before = _activeTheme
         activeTheme = evaluateActiveTheme()
+        // turned (or another change of the configuration): the picture's cut for it decoded ahead, as
+        // the theme picked is; a theme changed did that already
+        if (_activeTheme === before) prefetch()
     }
 
     fun syncToDeviceEncryptedStorage() {
